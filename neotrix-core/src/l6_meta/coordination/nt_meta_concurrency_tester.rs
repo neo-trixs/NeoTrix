@@ -176,7 +176,7 @@ impl ConcurrencyIsolationTester {
     }
 
     /// 获取干净基线
-    pub fn get_clean_baseline(&self) -> HashMap<String, String> {
+    pub(crate) fn _get_clean_baseline(&self) -> HashMap<String, String> {
         let mut baseline = HashMap::new();
         baseline.insert("command".into(), "CARGO_TARGET_DIR=/tmp/nt-target-clean cargo test -p neotrix --lib".into());
         baseline.insert("expected".into(), "8123 passed, 0 failed".into());

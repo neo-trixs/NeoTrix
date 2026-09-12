@@ -28,7 +28,7 @@ impl BackgroundLoop {
         self
     }
 
-    pub fn with_exploration_evolver(mut self, work_dir: std::path::PathBuf) -> Self {
+    pub(crate) fn _with_exploration_evolver(mut self, work_dir: std::path::PathBuf) -> Self {
         let brain = ReasoningBrain::new();
         let bank = ReasoningBank::new(100);
         self.self_evolver = Some(SelfEvolver::new(brain, bank, work_dir));
@@ -40,29 +40,29 @@ impl BackgroundLoop {
         self
     }
 
-    pub fn with_curiosity_drive(mut self, drive: CuriosityDrive) -> Self {
+    pub(crate) fn _with_curiosity_drive(mut self, drive: CuriosityDrive) -> Self {
         self.curiosity_drive = drive;
         self
     }
 
-    pub fn with_knowledge_aging(mut self, aging: KnowledgeAging) -> Self {
+    pub(crate) fn _with_knowledge_aging(mut self, aging: KnowledgeAging) -> Self {
         self.knowledge_aging = aging;
         self
     }
 
-    pub fn with_auto_crystallizer(mut self, crystallizer: AutoCrystallizer) -> Self {
+    pub(crate) fn _with_auto_crystallizer(mut self, crystallizer: AutoCrystallizer) -> Self {
         self.auto_crystallizer = crystallizer;
         self
     }
 
     #[cfg(feature = "stealth-net")]
-    pub fn with_tor_crawler(mut self, tor_crawler: std::sync::Arc<crate::neotrix::nt_shield_stealth_net::tor_crawler::TorCrawler>) -> Self {
+    pub(crate) fn _with_tor_crawler(mut self, tor_crawler: std::sync::Arc<crate::neotrix::nt_shield_stealth_net::tor_crawler::TorCrawler>) -> Self {
         self.tor_crawler = Some(tor_crawler);
         self
     }
 
     #[cfg(feature = "stealth-net")]
-    pub fn with_proxy_heartbeat(mut self, interval_secs: u64) -> Self {
+    pub(crate) fn _with_proxy_heartbeat(mut self, interval_secs: u64) -> Self {
         use crate::neotrix::nt_shield_stealth_net::{ProxyHeartbeatEngine, FingerprintManager};
         use crate::neotrix::nt_shield_stealth_net::proxy_pool::global_pool;
 
@@ -73,7 +73,7 @@ impl BackgroundLoop {
     }
 
     /// Register built-in plugins.
-    pub fn with_builtin_plugins(self) -> Self {
+    pub(crate) fn _with_builtin_plugins(self) -> Self {
         let reg = self.plugin_registry.clone();
         let rt = tokio::runtime::Handle::current();
         rt.block_on(async {
@@ -89,7 +89,7 @@ impl BackgroundLoop {
     /// Spawn a HotReloadWatcher for config/rules/subscriptions hot-reload.
     /// Spawns the watcher and stores the join handle in `self.handles`.
     #[cfg(feature = "stealth-net")]
-    pub fn with_hot_reload(mut self, neotrix_dir: std::path::PathBuf) -> Self {
+    pub(crate) fn _with_hot_reload(mut self, neotrix_dir: std::path::PathBuf) -> Self {
         match crate::neotrix::nt_io_hotreload::default_watcher(neotrix_dir, None, None) {
             Ok(mut watcher) => match watcher.spawn() {
                 Ok(handle) => self.handles.push(handle),
@@ -114,7 +114,7 @@ impl BackgroundLoop {
     }
 
     #[cfg(feature = "stealth-net")]
-    pub fn with_proxy_client(mut self) -> Self {
+    pub(crate) fn _with_proxy_client(mut self) -> Self {
         self.proxy_client = Some(crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient::new());
         self
     }
@@ -131,7 +131,7 @@ impl BackgroundLoop {
         self
     }
 
-    pub fn with_awareness(mut self, monitor: ConsciousnessMonitor) -> Self {
+    pub(crate) fn _with_awareness(mut self, monitor: ConsciousnessMonitor) -> Self {
         self.awareness = Some(monitor);
         self
     }

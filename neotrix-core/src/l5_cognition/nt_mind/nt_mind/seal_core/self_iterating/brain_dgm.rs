@@ -31,7 +31,7 @@ impl Default for EditCritic {
 
 impl EditCritic {
     /// Score a list of MicroEdits from 0.0 (bad) to 1.0 (perfect).
-    pub fn score_edits(&self, edits: &[MicroEdit], _task: &str) -> f64 {
+    pub(crate) fn _score_edits(&self, edits: &[MicroEdit], _task: &str) -> f64 {
         if edits.is_empty() {
             return 0.0;
         }
@@ -98,7 +98,7 @@ impl DgmSelfEditStrategy {
     }
 
     /// Generate a self-edit via the full diffusion process.
-    pub fn generate_via_diffusion(&self, context: &EditContext) -> Vec<MicroEdit> {
+    pub(crate) fn _generate_via_diffusion(&self, context: &EditContext) -> Vec<MicroEdit> {
         let task = context.task;
         if task.is_empty() {
             return Vec::new();
@@ -113,7 +113,7 @@ impl DgmSelfEditStrategy {
         let noise_0 = self.noise_schedule.first().copied().unwrap_or(0.3);
         let mut current = self.add_noise(&initial_edits, noise_0);
         let mut best_edits = current.clone();
-        let mut best_score = self.critic.score_edits(&best_edits, task);
+        let mut best_score = self.critic._score_edits(&best_edits, task);
 
         for step in 0..self.num_diffusion_steps {
             let noise_level = self
@@ -127,10 +127,10 @@ impl DgmSelfEditStrategy {
                 brain: context.brain,
                 noise_level,
             };
-            let refined = self.denoise_step(&current, step, &ctx);
+            let refined = self._denoise_step(&current, step, &ctx);
 
             if !refined.is_empty() {
-                let score = self.critic.score_edits(&refined, task);
+                let score = self.critic._score_edits(&refined, task);
                 if score > best_score {
                     best_edits = refined.clone();
                     best_score = score;
@@ -143,7 +143,7 @@ impl DgmSelfEditStrategy {
     }
 
     /// Single refinement step: apply denoising + critic-guided adjustment.
-    pub fn denoise_step(
+    pub(crate) fn _denoise_step(
         &self,
         edits: &[MicroEdit],
         _step: usize,
@@ -185,7 +185,7 @@ impl DgmSelfEditStrategy {
     }
 
     /// Convert a SelfEdit to MicroEdits (bridge if needed).
-    pub fn edit_to_micro(
+    pub(crate) fn _edit_to_micro(
         &self,
         target_dims: &[String],
         magnitude: f64,
@@ -216,7 +216,7 @@ impl DgmEditOrchestrator {
     }
 
     /// Generate the single best edit across multiple parallel diffusion runs.
-    pub fn generate_best_edit(&self, brain: &ReasoningBrain, task: &str) -> Vec<MicroEdit> {
+    pub(crate) fn _generate_best_edit(&self, brain: &ReasoningBrain, task: &str) -> Vec<MicroEdit> {
         if task.is_empty() {
             return Vec::new();
         }
@@ -230,7 +230,7 @@ impl DgmEditOrchestrator {
             let noise_0 = self.dgm.noise_schedule.first().copied().unwrap_or(0.3);
             let mut current = self.dgm.add_noise(&initial_edits, noise_0);
             let mut local_best = current.clone();
-            let mut local_best_score = self.dgm.critic.score_edits(&local_best, task);
+            let mut local_best_score = self.dgm.critic._score_edits(&local_best, task);
 
             for step in 0..self.dgm.num_diffusion_steps {
                 let noise_level = self
@@ -245,10 +245,10 @@ impl DgmEditOrchestrator {
                     brain,
                     noise_level,
                 };
-                let refined = self.dgm.denoise_step(&current, step, &ctx);
+                let refined = self.dgm._denoise_step(&current, step, &ctx);
 
                 if !refined.is_empty() {
-                    let score = self.dgm.critic.score_edits(&refined, task);
+                    let score = self.dgm.critic._score_edits(&refined, task);
                     if score > local_best_score {
                         local_best = refined.clone();
                         local_best_score = score;
@@ -267,7 +267,7 @@ impl DgmEditOrchestrator {
     }
 
     /// Return all candidate diffusion trajectories (for analysis).
-    pub fn orchestrate_diffusion(
+    pub(crate) fn _orchestrate_diffusion(
         &self,
         brain: &ReasoningBrain,
         task: &str,
@@ -296,7 +296,7 @@ impl DgmEditOrchestrator {
                     brain,
                     noise_level,
                 };
-                let refined = self.dgm.denoise_step(&current, step, &ctx);
+                let refined = self.dgm._denoise_step(&current, step, &ctx);
                 if !refined.is_empty() {
                     if step == self.dgm.num_diffusion_steps - 1 {
                         trajectories.push(refined.clone());
@@ -324,7 +324,7 @@ mod tests {
             brain: &brain,
             noise_level: 0.0,
         };
-        let result = dgm.generate_via_diffusion(&ctx);
+        let result = dgm._generate_via_diffusion(&ctx);
         let direct = brain.generate_self_edit("design a UI");
         assert_eq!(result.len(), direct.len());
         for (r, d) in result.iter().zip(direct.iter()) {
@@ -347,7 +347,7 @@ mod tests {
             brain: &brain,
             noise_level: 0.0,
         };
-        let result = dgm.generate_via_diffusion(&ctx);
+        let result = dgm._generate_via_diffusion(&ctx);
         assert!(!result.is_empty());
         assert!(dgm.critic.is_valid(&result));
     }
@@ -361,7 +361,7 @@ mod tests {
             brain: &brain,
             noise_level: 0.0,
         };
-        let result = dgm.generate_via_diffusion(&ctx);
+        let result = dgm._generate_via_diffusion(&ctx);
         assert!(result.is_empty());
     }
 
@@ -374,7 +374,7 @@ mod tests {
             brain: &brain,
             noise_level: 0.0,
         };
-        let result = dgm.generate_via_diffusion(&ctx);
+        let result = dgm._generate_via_diffusion(&ctx);
         assert!(!result.is_empty());
         assert!(dgm.critic.is_valid(&result));
         assert!(result.iter().any(|e| matches!(e, MicroEdit::NormalizeVector)));
@@ -389,7 +389,7 @@ mod tests {
             MicroEdit::NormalizeVector,
         ];
         let critic = EditCritic::default();
-        let score = critic.score_edits(&edits, "design");
+        let score = critic._score_edits(&edits, "design");
         assert!(score > 0.0);
         assert!(score <= 1.0);
         assert!(critic.is_valid(&edits));
@@ -398,7 +398,7 @@ mod tests {
     #[test]
     fn test_critic_scores_empty_as_zero() {
         let critic = EditCritic::default();
-        let score = critic.score_edits(&[], "");
+        let score = critic._score_edits(&[], "");
         assert!((score - 0.0).abs() < 1e-10);
     }
 
@@ -407,7 +407,7 @@ mod tests {
         let brain = ReasoningBrain::new();
         let dgm = DgmSelfEditStrategy::new(2);
         let orch = DgmEditOrchestrator::new(3, dgm);
-        let result = orch.generate_best_edit(&brain, "build a React dashboard");
+        let result = orch._generate_best_edit(&brain, "build a React dashboard");
         assert!(!result.is_empty());
     }
 
@@ -416,7 +416,7 @@ mod tests {
         let brain = ReasoningBrain::new();
         let dgm = DgmSelfEditStrategy::new(2);
         let orch = DgmEditOrchestrator::new(3, dgm);
-        let result = orch.generate_best_edit(&brain, "");
+        let result = orch._generate_best_edit(&brain, "");
         assert!(result.is_empty());
     }
 
@@ -425,7 +425,7 @@ mod tests {
         let brain = ReasoningBrain::new();
         let dgm = DgmSelfEditStrategy::new(2);
         let orch = DgmEditOrchestrator::new(2, dgm);
-        let trajectories = orch.orchestrate_diffusion(&brain, "optimize SQL queries");
+        let trajectories = orch._orchestrate_diffusion(&brain, "optimize SQL queries");
         assert_eq!(trajectories.len(), 2);
         for t in &trajectories {
             assert!(!t.is_empty());
@@ -436,7 +436,7 @@ mod tests {
     fn test_edit_to_micro() {
         let dgm = DgmSelfEditStrategy::new(3);
         let dims = vec!["analysis".to_string(), "synthesis".to_string()];
-        let edits = dgm.edit_to_micro(&dims, 0.1, 0.05);
+        let edits = dgm._edit_to_micro(&dims, 0.1, 0.05);
         assert_eq!(edits.len(), 4);
         assert!(edits.iter().any(|e| matches!(e, MicroEdit::NormalizeVector)));
         assert!(edits.iter().any(|e| matches!(e, MicroEdit::UpdateLearningRate(0.05))));
@@ -451,7 +451,7 @@ mod tests {
             brain: &ReasoningBrain::new(),
             noise_level: 0.3,
         };
-        let result = dgm.denoise_step(&edits, 0, &ctx);
+        let result = dgm._denoise_step(&edits, 0, &ctx);
         if let MicroEdit::AdjustDimension(_, val) = &result[0] {
             assert!(*val < 0.9);
         }

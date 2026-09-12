@@ -1,6 +1,6 @@
 //! Harness 优化器 — 基于 NVlabs/SoL-Pi 模式
 //!
-//! Action Fusion + ObservationPack + Online Context Compact + Evidence-Preserving Reducer。
+//! Action Fusion + _ObservationPack + Online Context Compact + Evidence-Preserving Reducer。
 //! 实现 45-64% token 节省，保持 94% 质量。
 
 /// 工具调用
@@ -16,7 +16,7 @@ pub struct ToolCall {
 /// 融合后的动作
 
 #[derive(Clone, Debug)]
-pub struct FusedAction {
+pub(crate) struct _FusedAction {
     pub tools: Vec<String>,
     pub fused_input: String,
     pub fused_output: String,
@@ -28,7 +28,7 @@ pub struct FusedAction {
 /// 观测包（压缩后的观测）
 
 #[derive(Clone, Debug)]
-pub struct ObservationPack {
+pub(crate) struct _ObservationPack {
     pub tool_name: String,
     pub compressed_output: String,
     pub key_evidence: Vec<String>,
@@ -56,13 +56,13 @@ pub struct HarnessOptimizer {
     /// 压缩率目标
     _compression_target: f64,
     /// 优化历史
-    history: Vec<OptimizationRecord>,
+    history: Vec<_OptimizationRecord>,
 }
 
 /// 优化记录
 
 #[derive(Clone, Debug)]
-pub struct OptimizationRecord {
+pub(crate) struct _OptimizationRecord {
     pub timestamp: i64,
     pub action_count: usize,
     pub fused_count: usize,
@@ -82,7 +82,7 @@ impl HarnessOptimizer {
     }
 
     /// Action Fusion — 合并连续相同工具调用
-    pub fn fuse_actions(&self, calls: &[ToolCall]) -> Vec<FusedAction> {
+    pub(crate) fn _fuse_actions(&self, calls: &[ToolCall]) -> Vec<_FusedAction> {
         let mut fused = Vec::new();
         let mut i = 0;
 
@@ -117,7 +117,7 @@ impl HarnessOptimizer {
                     0.0
                 };
 
-                fused.push(FusedAction {
+                fused.push(_FusedAction {
                     tools: group.iter().map(|c| c.tool_name.clone()).collect(),
                     fused_input,
                     fused_output,
@@ -128,7 +128,7 @@ impl HarnessOptimizer {
             } else {
                 // 不融合，保持原样
                 for call in &group {
-                    fused.push(FusedAction {
+                    fused.push(_FusedAction {
                         tools: vec![call.tool_name.clone()],
                         fused_input: call.input.clone(),
                         fused_output: call.output.clone(),
@@ -145,8 +145,8 @@ impl HarnessOptimizer {
         fused
     }
 
-    /// ObservationPack — 压缩工具观测
-    pub fn pack_observation(&self, call: &ToolCall) -> ObservationPack {
+    /// _ObservationPack — 压缩工具观测
+    pub(crate) fn _pack_observation(&self, call: &ToolCall) -> _ObservationPack {
         let output = &call.output;
 
         // 提取关键证据（简化：取前 200 字符 + 错误信息）
@@ -163,7 +163,7 @@ impl HarnessOptimizer {
             1.0
         };
 
-        ObservationPack {
+        _ObservationPack {
             tool_name: call.tool_name.clone(),
             compressed_output: compressed,
             key_evidence,
@@ -174,7 +174,7 @@ impl HarnessOptimizer {
     }
 
     /// Online Context Compact — 动态压缩上下文
-    pub fn compact_context(&self, tokens_used: usize, max_tokens: usize) -> CompactionResult {
+    pub(crate) fn _compact_context(&self, tokens_used: usize, max_tokens: usize) -> CompactionResult {
         let savings_needed = if tokens_used > max_tokens {
             (tokens_used - max_tokens) as f64 / tokens_used as f64
         } else {
@@ -228,7 +228,7 @@ impl HarnessOptimizer {
     }
 
     /// 记录优化
-    pub fn record_optimization(&mut self, record: OptimizationRecord) {
+    pub(crate) fn _record_optimization(&mut self, record: _OptimizationRecord) {
         self.history.push(record);
     }
 

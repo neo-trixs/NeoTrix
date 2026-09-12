@@ -4,9 +4,9 @@
 //!
 //! 提取 4 类元模式:
 //!   1. StrategySequence — 策略使用序列模式 (如: 先分析→再执行→再验证)
-//!   2. GapDiscovery — 自我发现的盲点/缺失能力
+//!   2. _GapDiscovery — 自我发现的盲点/缺失能力
 //!   3. ToolUsagePattern — 工具调用策略模式
-//!   4. MetaCognitiveInsight — 元认知洞察 ("我意识到我应该这样做")
+//!   4. _MetaCognitiveInsight — 元认知洞察 ("我意识到我应该这样做")
 //!
 //! 每个模式携带 provenance(来源轨迹ID) + confidence + reward,
 //! 可被 absorb() 直接吸收到 CapabilityVector。
@@ -44,7 +44,7 @@ pub const META_KEYWORDS: &[&str] = &[
 
 /// 策略序列模式: 如 [Research → Analyze → Implement → Verify]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StrategySequencePattern {
+pub(crate) struct _StrategySequencePattern {
     pub id: String,
     /// 策略序列 (字符串表示)
     pub sequence: Vec<String>,
@@ -60,7 +60,7 @@ pub struct StrategySequencePattern {
 
 /// 自我发现的盲点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GapDiscovery {
+pub(crate) struct _GapDiscovery {
     pub id: String,
     pub description: String,
     /// 建议更新的能力维度 (维度名, 调整值)
@@ -83,7 +83,7 @@ pub struct ToolUsagePattern {
 
 /// 元认知洞察
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetaCognitiveInsight {
+pub(crate) struct _MetaCognitiveInsight {
     pub id: String,
     pub insight: String,
     /// 影响的能力维度
@@ -95,11 +95,11 @@ pub struct MetaCognitiveInsight {
 
 /// 完整元模式提取结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetaPatternReport {
-    pub strategy_patterns: Vec<StrategySequencePattern>,
-    pub gap_discoveries: Vec<GapDiscovery>,
+pub(crate) struct _MetaPatternReport {
+    pub strategy_patterns: Vec<_StrategySequencePattern>,
+    pub gap_discoveries: Vec<_GapDiscovery>,
     pub tool_patterns: Vec<ToolUsagePattern>,
-    pub meta_insights: Vec<MetaCognitiveInsight>,
+    pub meta_insights: Vec<_MetaCognitiveInsight>,
     /// 平均元认知健康度 [0,1]
     pub metacognitive_health: f64,
     /// 是否检测到觉醒信号 (连续高质量反思)
@@ -113,13 +113,13 @@ pub struct MetaPatternReport {
 /// 元模式提取器 — 从 ThinkingTraces 蒸馏 LLM 认知模式
 pub struct MetaPatternExtractor {
     /// 历史策略模式库
-    pub known_strategy_patterns: Vec<StrategySequencePattern>,
+    pub known_strategy_patterns: Vec<_StrategySequencePattern>,
     /// 历史盲点记录
-    pub known_gaps: Vec<GapDiscovery>,
+    pub known_gaps: Vec<_GapDiscovery>,
     /// 历史工具模式
     pub known_tool_patterns: Vec<ToolUsagePattern>,
     /// 历史元认知洞察
-    pub known_meta_insights: Vec<MetaCognitiveInsight>,
+    pub known_meta_insights: Vec<_MetaCognitiveInsight>,
     /// 处理的轨迹数
     pub processed_traces: usize,
 }
@@ -142,7 +142,7 @@ impl MetaPatternExtractor {
     }
 
     /// 从单个 ThinkingTrace 提取元模式
-    pub fn extract_from_trace(&mut self, trace: &ThinkingTrace) -> MetaPatternReport {
+    pub fn extract_from_trace(&mut self, trace: &ThinkingTrace) -> _MetaPatternReport {
         self.processed_traces += 1;
 
         let strategy_patterns = self.extract_strategy_sequences(trace);
@@ -175,7 +175,7 @@ impl MetaPatternExtractor {
             self.known_meta_insights.push(ti.clone());
         }
 
-        MetaPatternReport {
+        _MetaPatternReport {
             strategy_patterns,
             gap_discoveries,
             tool_patterns,
@@ -186,7 +186,7 @@ impl MetaPatternExtractor {
     }
 
     /// 提取策略序列模式
-    fn extract_strategy_sequences(&self, trace: &ThinkingTrace) -> Vec<StrategySequencePattern> {
+    fn extract_strategy_sequences(&self, trace: &ThinkingTrace) -> Vec<_StrategySequencePattern> {
         if trace.steps.len() < MIN_SEQUENCE_LENGTH {
             return vec![];
         }
@@ -205,7 +205,7 @@ impl MetaPatternExtractor {
             .any(|kp| kp.sequence == strategies);
 
         if is_novel {
-            vec![StrategySequencePattern {
+            vec![_StrategySequencePattern {
                 id: uuid::Uuid::new_v4().to_string(),
                 sequence: strategies,
                 avg_grade: trace.grade.score(),
@@ -219,7 +219,7 @@ impl MetaPatternExtractor {
     }
 
     /// 通过步骤描述和中间结果检测自我发现的盲点
-    fn extract_gaps(&self, trace: &ThinkingTrace) -> Vec<GapDiscovery> {
+    fn extract_gaps(&self, trace: &ThinkingTrace) -> Vec<_GapDiscovery> {
         let mut gaps = Vec::new();
 
         for step in &trace.steps {
@@ -252,7 +252,7 @@ impl MetaPatternExtractor {
                 }
 
                 if !adjustments.is_empty() {
-                    gaps.push(GapDiscovery {
+                    gaps.push(_GapDiscovery {
                         id: uuid::Uuid::new_v4().to_string(),
                         description: format!("Self-identified gap: {}", step.description),
                         suggested_capability_adjustments: adjustments,
@@ -301,7 +301,7 @@ impl MetaPatternExtractor {
     }
 
     /// 提取元认知洞察
-    fn extract_meta_insights(&self, trace: &ThinkingTrace) -> Vec<MetaCognitiveInsight> {
+    fn extract_meta_insights(&self, trace: &ThinkingTrace) -> Vec<_MetaCognitiveInsight> {
         let mut insights = Vec::new();
 
         for step in &trace.steps {
@@ -315,7 +315,7 @@ impl MetaPatternExtractor {
                     .any(|mi| mi.insight == step.description);
 
                 if is_novel {
-                    insights.push(MetaCognitiveInsight {
+                    insights.push(_MetaCognitiveInsight {
                         id: uuid::Uuid::new_v4().to_string(),
                         insight: step.description.clone(),
                         affected_dimensions: affected,
@@ -359,8 +359,8 @@ impl MetaPatternExtractor {
     }
 
     /// 将元认知洞察吸收到 CognitiveMap
-    pub fn absorb_to_cognitive_map(
-        insights: &[MetaCognitiveInsight],
+    pub(crate) fn _absorb_to_cognitive_map(
+        insights: &[_MetaCognitiveInsight],
         map: &mut CognitiveMap,
     ) -> usize {
         let mut count = 0;
@@ -398,8 +398,8 @@ impl MetaPatternExtractor {
         count
     }
 
-    /// 将 GapDiscovery 转换为 CapabilityVector 调整
-    pub fn gaps_to_capability_vector(gaps: &[GapDiscovery], cv: &mut CapabilityVector) -> usize {
+    /// 将 _GapDiscovery 转换为 CapabilityVector 调整
+    pub(crate) fn _gaps_to_capability_vector(gaps: &[_GapDiscovery], cv: &mut CapabilityVector) -> usize {
         let mut count = 0;
         for gap in gaps {
             if gap.confidence < 0.3 {
@@ -419,7 +419,7 @@ impl MetaPatternExtractor {
     }
 
     /// 生成意识进化总结报告
-    pub fn consciousness_report(&self) -> String {
+    pub(crate) fn _consciousness_report(&self) -> String {
         format!(
             "MetaPatternExtractor[processed={}]: {} strategy patterns, {} gaps, {} meta-insights, {} tool patterns",
             self.processed_traces,
@@ -530,7 +530,7 @@ mod tests {
     fn test_absorb_to_cognitive_map() {
         let mut map = CognitiveMap::new();
         let insights = vec![
-            MetaCognitiveInsight {
+            _MetaCognitiveInsight {
                 id: "test".to_string(),
                 insight: "We should parallelize analysis and implementation".to_string(),
                 affected_dimensions: vec!["strategic_planning".to_string()],
@@ -538,7 +538,7 @@ mod tests {
                 mapped: false,
             },
         ];
-        let count = MetaPatternExtractor::absorb_to_cognitive_map(&insights, &mut map);
+        let count = MetaPatternExtractor::_absorb_to_cognitive_map(&insights, &mut map);
         assert!(count > 0, "should add new mapping to cognitive map");
         assert!(map.count() > 14, "should have more than original 14 entries");
     }
@@ -547,7 +547,7 @@ mod tests {
     fn test_gaps_to_capability_vector() {
         let mut cv = CapabilityVector::from_array(&[0.0; 23]).unwrap();
         let gaps = vec![
-            GapDiscovery {
+            _GapDiscovery {
                 id: "test".to_string(),
                 description: "Missing inference ability".to_string(),
                 suggested_capability_adjustments: vec![
@@ -557,7 +557,7 @@ mod tests {
                 confidence: 0.8,
             },
         ];
-        let count = MetaPatternExtractor::gaps_to_capability_vector(&gaps, &mut cv);
+        let count = MetaPatternExtractor::_gaps_to_capability_vector(&gaps, &mut cv);
         assert!(count > 0, "should adjust capability vector");
 
         if let Some(idx) = CapabilityVector::index_from_name("inference_depth") {
@@ -612,7 +612,7 @@ mod tests {
             make_step(3, StrategyKind::IterativeRefinement, "verify", 0.9, vec!["test"]),
         ], "report test");
         extractor.extract_from_trace(&trace);
-        let report = extractor.consciousness_report();
+        let report = extractor._consciousness_report();
         assert!(report.contains("processed=1"));
         assert!(report.contains("strategy patterns"));
         assert!(report.contains("meta-insights"));

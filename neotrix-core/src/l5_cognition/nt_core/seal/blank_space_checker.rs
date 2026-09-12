@@ -12,7 +12,7 @@ use crate::l5_cognition::nt_core::seal::rhythm_recalculator::{SegmentData, Segme
 
 /// 留白检查配置
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BlankSpaceConfig {
+pub(crate) struct _BlankSpaceConfig {
     /// 爽点后最小留白时长 (秒)
     pub min_blank_after_climax: f32,
     /// 爽点后最大留白时长 (秒)
@@ -23,7 +23,7 @@ pub struct BlankSpaceConfig {
     pub emotion_beat_interval: f32,
 }
 
-impl Default for BlankSpaceConfig {
+impl Default for _BlankSpaceConfig {
     fn default() -> Self {
         Self {
             min_blank_after_climax: 3.0,
@@ -40,11 +40,11 @@ impl Default for BlankSpaceConfig {
 
 /// 留白检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlankSpaceCheckResult {
+pub(crate) struct _BlankSpaceCheckResult {
     /// 是否通过检查
     pub passed: bool,
     /// 检查详情
-    pub details: Vec<BlankSpaceDetail>,
+    pub details: Vec<_BlankSpaceDetail>,
     /// 建议
     pub suggestions: Vec<String>,
     /// 评分 (0-100)
@@ -53,7 +53,7 @@ pub struct BlankSpaceCheckResult {
 
 /// 留白检查详情
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlankSpaceDetail {
+pub(crate) struct _BlankSpaceDetail {
     /// 检查项
     pub check_item: String,
     /// 是否通过
@@ -73,22 +73,22 @@ pub struct BlankSpaceDetail {
 
 /// 留白量化检查器
 pub struct BlankSpaceChecker {
-    config: BlankSpaceConfig,
+    config: _BlankSpaceConfig,
 }
 
 impl BlankSpaceChecker {
     /// 创建检查器
-    pub fn new(config: BlankSpaceConfig) -> Self {
+    pub fn new(config: _BlankSpaceConfig) -> Self {
         Self { config }
     }
     
     /// 使用默认配置创建检查器
     pub fn default_checker() -> Self {
-        Self::new(BlankSpaceConfig::default())
+        Self::new(_BlankSpaceConfig::default())
     }
     
     /// 检查留白
-    pub fn check(&self, segments: &[SegmentData], total_duration: f32) -> BlankSpaceCheckResult {
+    pub fn check(&self, segments: &[SegmentData], total_duration: f32) -> _BlankSpaceCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;
@@ -120,7 +120,7 @@ impl BlankSpaceChecker {
         // 计算评分
         let score = self.calculate_score(&details);
         
-        BlankSpaceCheckResult {
+        _BlankSpaceCheckResult {
             passed,
             details,
             suggestions,
@@ -129,7 +129,7 @@ impl BlankSpaceChecker {
     }
     
     /// 检查爽点后留白
-    fn check_blank_after_climax(&self, segments: &[SegmentData]) -> BlankSpaceCheckResult {
+    fn check_blank_after_climax(&self, segments: &[SegmentData]) -> _BlankSpaceCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;
@@ -145,7 +145,7 @@ impl BlankSpaceChecker {
                 
                 if blank_duration < self.config.min_blank_after_climax {
                     passed = false;
-                    details.push(BlankSpaceDetail {
+                    details.push(_BlankSpaceDetail {
                         check_item: "爽点后留白".to_string(),
                         passed: false,
                         detail: format!(
@@ -160,7 +160,7 @@ impl BlankSpaceChecker {
                         self.config.max_blank_after_climax
                     ));
                 } else if blank_duration > self.config.max_blank_after_climax {
-                    details.push(BlankSpaceDetail {
+                    details.push(_BlankSpaceDetail {
                         check_item: "爽点后留白".to_string(),
                         passed: true,
                         detail: format!(
@@ -171,7 +171,7 @@ impl BlankSpaceChecker {
                     });
                     suggestions.push("爽点后留白略长，考虑缩短以保持节奏".to_string());
                 } else {
-                    details.push(BlankSpaceDetail {
+                    details.push(_BlankSpaceDetail {
                         check_item: "爽点后留白".to_string(),
                         passed: true,
                         detail: format!("爽点后留白 {:.1}秒，符合要求", blank_duration),
@@ -180,7 +180,7 @@ impl BlankSpaceChecker {
                 }
             } else {
                 // 爽点是最后一段
-                details.push(BlankSpaceDetail {
+                details.push(_BlankSpaceDetail {
                     check_item: "爽点后留白".to_string(),
                     passed: true,
                     detail: "爽点在最后，无需留白".to_string(),
@@ -189,11 +189,11 @@ impl BlankSpaceChecker {
             }
         }
         
-        BlankSpaceCheckResult { passed, details, suggestions, score: if passed { 100 } else { 0 } }
+        _BlankSpaceCheckResult { passed, details, suggestions, score: if passed { 100 } else { 0 } }
     }
     
     /// 检查无爽点最大平淡期
-    fn check_max_blank_period(&self, segments: &[SegmentData], _total_duration: f32) -> BlankSpaceCheckResult {
+    fn check_max_blank_period(&self, segments: &[SegmentData], _total_duration: f32) -> _BlankSpaceCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;
@@ -213,7 +213,7 @@ impl BlankSpaceChecker {
         
         if max_blank > self.config.max_blank_period {
             passed = false;
-            details.push(BlankSpaceDetail {
+            details.push(_BlankSpaceDetail {
                 check_item: "无爽点最大平淡期".to_string(),
                 passed: false,
                 detail: format!(
@@ -227,7 +227,7 @@ impl BlankSpaceChecker {
                 self.config.max_blank_period
             ));
         } else {
-            details.push(BlankSpaceDetail {
+            details.push(_BlankSpaceDetail {
                 check_item: "无爽点最大平淡期".to_string(),
                 passed: true,
                 detail: format!("连续无爽点段 {:.1}秒，在允许范围内", max_blank),
@@ -235,11 +235,11 @@ impl BlankSpaceChecker {
             });
         }
         
-        BlankSpaceCheckResult { passed, details, suggestions, score: if passed { 100 } else { 0 } }
+        _BlankSpaceCheckResult { passed, details, suggestions, score: if passed { 100 } else { 0 } }
     }
     
     /// 检查情绪波动频率
-    fn check_emotion_beat_frequency(&self, segments: &[SegmentData], total_duration: f32) -> BlankSpaceCheckResult {
+    fn check_emotion_beat_frequency(&self, segments: &[SegmentData], total_duration: f32) -> _BlankSpaceCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;
@@ -257,7 +257,7 @@ impl BlankSpaceChecker {
         
         if actual_beats < expected_beats {
             passed = false;
-            details.push(BlankSpaceDetail {
+            details.push(_BlankSpaceDetail {
                 check_item: "情绪波动频率".to_string(),
                 passed: false,
                 detail: format!(
@@ -271,7 +271,7 @@ impl BlankSpaceChecker {
                 self.config.emotion_beat_interval
             ));
         } else {
-            details.push(BlankSpaceDetail {
+            details.push(_BlankSpaceDetail {
                 check_item: "情绪波动频率".to_string(),
                 passed: true,
                 detail: format!("情绪节拍 {} 个，满足要求", actual_beats),
@@ -279,11 +279,11 @@ impl BlankSpaceChecker {
             });
         }
         
-        BlankSpaceCheckResult { passed, details, suggestions, score: if passed { 100 } else { 0 } }
+        _BlankSpaceCheckResult { passed, details, suggestions, score: if passed { 100 } else { 0 } }
     }
     
     /// 计算评分
-    fn calculate_score(&self, details: &[BlankSpaceDetail]) -> u32 {
+    fn calculate_score(&self, details: &[_BlankSpaceDetail]) -> u32 {
         if details.is_empty() {
             return 100;
         }

@@ -10,9 +10,9 @@ pub struct CausalEngine {
     /// 因果图
     pub causal_graph: CausalGraph,
     /// 因果发现器
-    pub discoverers: Vec<Box<dyn CausalDiscoverer>>,
+    pub discoverers: Vec<Box<dyn _CausalDiscoverer>>,
     /// 因果历史
-    pub history: Vec<CausalRecord>,
+    pub history: Vec<_CausalRecord>,
 }
 
 /// 因果图
@@ -62,14 +62,14 @@ pub enum EdgeType {
 }
 
 /// 因果发现器 trait
-pub trait CausalDiscoverer: Send + Sync {
+pub(crate) trait _CausalDiscoverer: Send + Sync {
     fn discover_causes(&self, effect: &str, context: &str) -> Vec<String>;
     fn name(&self) -> &str;
 }
 
 /// 因果记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CausalRecord {
+pub(crate) struct _CausalRecord {
     pub id: String,
     pub cycle: u32,
     pub cause: String,
@@ -98,7 +98,7 @@ impl CausalEngine {
         
         // 记录
         for cause in &causes {
-            let record = CausalRecord {
+            let record = _CausalRecord {
                 id: format!("causal_{}", uuid::Uuid::new_v4()),
                 cycle,
                 cause: cause.clone(),
@@ -113,7 +113,7 @@ impl CausalEngine {
     }
 
     /// 推断效果
-    pub fn infer_effect(&self, cause: &str) -> Vec<String> {
+    pub(crate) fn _infer_effect(&self, cause: &str) -> Vec<String> {
         self.causal_graph.edges.iter()
             .filter(|e| e.source == cause)
             .map(|e| self.causal_graph.nodes[&e.target].name.clone())
@@ -121,8 +121,8 @@ impl CausalEngine {
     }
 
     /// 获取统计
-    pub fn stats(&self) -> CausalStats {
-        CausalStats {
+    pub fn stats(&self) -> _CausalStats {
+        _CausalStats {
             total_nodes: self.causal_graph.nodes.len(),
             total_edges: self.causal_graph.edges.len(),
             total_discoveries: self.history.len(),
@@ -131,13 +131,13 @@ impl CausalEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CausalStats {
+pub(crate) struct _CausalStats {
     pub total_nodes: usize,
     pub total_edges: usize,
     pub total_discoveries: usize,
 }
 
-impl std::fmt::Display for CausalStats {
+impl std::fmt::Display for _CausalStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "CausalEngine: {} nodes, {} edges, {} discoveries",
             self.total_nodes, self.total_edges, self.total_discoveries)

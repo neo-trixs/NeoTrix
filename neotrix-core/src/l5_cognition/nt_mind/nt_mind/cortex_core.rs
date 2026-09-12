@@ -86,7 +86,7 @@ impl PredictiveCortex {
         let mut forecasts: Vec<HorizonForecast> = Vec::with_capacity(candidate_actions.len());
 
         for (idx, action) in candidate_actions.iter().enumerate() {
-            let perturbed = self.apply_action(current_latent, action);
+            let perturbed = self._apply_action(current_latent, action);
             let forecast = self.predict_horizon(&perturbed, horizon);
             rankings.push((idx, forecast.cumulative_fe));
             forecasts.push(forecast);
@@ -132,7 +132,7 @@ impl PredictiveCortex {
         action: &[f64],
         horizon: usize,
     ) -> HorizonForecast {
-        let perturbed = self.apply_action(current_latent, action);
+        let perturbed = self._apply_action(current_latent, action);
         self.predict_horizon(&perturbed, horizon)
     }
 
@@ -147,7 +147,7 @@ impl PredictiveCortex {
         actions
     }
 
-    pub fn apply_action(&self, latent: &[f64], action: &[f64]) -> Vec<f64> {
+    pub(crate) fn _apply_action(&self, latent: &[f64], action: &[f64]) -> Vec<f64> {
         let dim = latent.len().min(action.len());
         let mut perturbed = latent.to_vec();
         for i in 0..dim {

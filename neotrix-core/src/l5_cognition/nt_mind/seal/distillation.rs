@@ -4,13 +4,13 @@ use std::collections::HashMap;
 
 /// 执行轨迹摘要（蒸馏输入）
 #[derive(Debug, Clone)]
-pub struct TraceSummary {
+pub(crate) struct _TraceSummary {
     /// 轨迹唯一标识
     pub trace_id: String,
     /// 任务描述
     pub task_description: String,
     /// 执行步骤摘要
-    pub steps: Vec<StepSummary>,
+    pub steps: Vec<_StepSummary>,
     /// 轨迹是否成功
     pub success: bool,
     /// 总 token 消耗
@@ -19,7 +19,7 @@ pub struct TraceSummary {
 
 /// 单步执行摘要
 #[derive(Debug, Clone)]
-pub struct StepSummary {
+pub(crate) struct _StepSummary {
     /// 使用的技能名称
     pub skill_name: String,
     /// 输入模式摘要
@@ -57,7 +57,7 @@ pub struct SkillTemplate {
 
 /// 失败反模式（避免重复犯错）
 #[derive(Debug, Clone)]
-pub struct FailureAntiPattern {
+pub(crate) struct _FailureAntiPattern {
     /// 失败模式描述
     pub pattern: String,
     /// 错误签名（用于快速匹配）
@@ -103,9 +103,9 @@ pub struct DistillationEngine {
     /// 已生成的技能模板
     templates: Vec<SkillTemplate>,
     /// 已提取的失败反模式
-    anti_patterns: Vec<FailureAntiPattern>,
+    anti_patterns: Vec<_FailureAntiPattern>,
     /// 待处理的轨迹摘要
-    trace_summaries: Vec<TraceSummary>,
+    trace_summaries: Vec<_TraceSummary>,
     /// 下一个模板 ID 计数器
     next_template_id: u32,
 }
@@ -122,7 +122,7 @@ impl DistillationEngine {
     }
 
     /// 添加执行轨迹摘要到待处理队列
-    pub fn add_trace(&mut self, summary: TraceSummary) {
+    pub(crate) fn _add_trace(&mut self, summary: _TraceSummary) {
         self.trace_summaries.push(summary);
     }
 
@@ -130,11 +130,11 @@ impl DistillationEngine {
     ///
     /// 流程：分离成功/失败轨迹 → 对比模式差异 → 生成模板 + 反模式
     pub fn distill(&mut self) -> DistillationResult {
-        let traces: Vec<TraceSummary> = self.trace_summaries.drain(..).collect();
+        let traces: Vec<_TraceSummary> = self.trace_summaries.drain(..).collect();
         let traces_analyzed = traces.len();
 
-        let success_traces: Vec<&TraceSummary> = traces.iter().filter(|t| t.success).collect();
-        let failure_traces: Vec<&TraceSummary> = traces.iter().filter(|t| !t.success).collect();
+        let success_traces: Vec<&_TraceSummary> = traces.iter().filter(|t| t.success).collect();
+        let failure_traces: Vec<&_TraceSummary> = traces.iter().filter(|t| !t.success).collect();
 
         let diffs = self.compare_traces_owned(&success_traces, &failure_traces);
 
@@ -146,7 +146,7 @@ impl DistillationEngine {
 
         let new_templates = self.generate_templates(&diffs);
 
-        let failure_refs: Vec<&TraceSummary> = failure_traces;
+        let failure_refs: Vec<&_TraceSummary> = failure_traces;
         let new_anti_patterns = self.extract_anti_patterns(&failure_refs);
 
         DistillationResult {
@@ -160,10 +160,10 @@ impl DistillationEngine {
     /// 比较成功与失败轨迹，找出差异模式
     fn compare_traces_owned(
         &self,
-        success: &[&TraceSummary],
-        failure: &[&TraceSummary],
+        success: &[&_TraceSummary],
+        failure: &[&_TraceSummary],
     ) -> Vec<PatternDiff> {
-        let mut success_skill_map: HashMap<String, Vec<&StepSummary>> = HashMap::new();
+        let mut success_skill_map: HashMap<String, Vec<&_StepSummary>> = HashMap::new();
         for trace in success {
             for step in &trace.steps {
                 success_skill_map
@@ -173,7 +173,7 @@ impl DistillationEngine {
             }
         }
 
-        let mut failure_skill_map: HashMap<String, Vec<&StepSummary>> = HashMap::new();
+        let mut failure_skill_map: HashMap<String, Vec<&_StepSummary>> = HashMap::new();
         for trace in failure {
             for step in &trace.steps {
                 failure_skill_map
@@ -247,7 +247,7 @@ impl DistillationEngine {
     }
 
     /// 从失败轨迹提取反模式
-    fn extract_anti_patterns(&mut self, failure: &[&TraceSummary]) -> usize {
+    fn extract_anti_patterns(&mut self, failure: &[&_TraceSummary]) -> usize {
         let mut error_groups: HashMap<String, Vec<&str>> = HashMap::new();
 
         for trace in failure {
@@ -273,7 +273,7 @@ impl DistillationEngine {
             let occurrences = skills.len() as u32;
             let skills_involved: Vec<String> = skills.iter().map(|s| s.to_string()).collect();
 
-            let anti_pattern = FailureAntiPattern {
+            let anti_pattern = _FailureAntiPattern {
                 pattern: format!("技能 {:?} 执行时出现错误: {}", skills_involved, error_sig),
                 error_signature: error_sig.clone(),
                 occurrences,
@@ -296,12 +296,12 @@ impl DistillationEngine {
     }
 
     /// 获取所有反模式
-    pub fn anti_patterns(&self) -> &[FailureAntiPattern] {
+    pub fn anti_patterns(&self) -> &[_FailureAntiPattern] {
         &self.anti_patterns
     }
 
     /// 清理旧轨迹，仅保留最近 N 条
-    pub fn prune_traces(&mut self, keep_recent: usize) {
+    pub(crate) fn _prune_traces(&mut self, keep_recent: usize) {
         let len = self.trace_summaries.len();
         if len > keep_recent {
             let drain_start = len - keep_recent;
@@ -330,7 +330,7 @@ fn compute_pattern_divergence(success: &[&str], failure: &[&str]) -> f64 {
 }
 
 /// 提取步骤列表中出现频率最高的 output_pattern 作为代表
-fn average_output_pattern(steps: &[&StepSummary]) -> String {
+fn average_output_pattern(steps: &[&_StepSummary]) -> String {
     if steps.is_empty() {
         return String::new();
     }
@@ -370,7 +370,7 @@ mod tests {
     fn test_add_and_prune_traces() {
         let mut engine = DistillationEngine::new();
         for i in 0..10 {
-            engine.add_trace(TraceSummary {
+            engine._add_trace(_TraceSummary {
                 trace_id: format!("t{}", i),
                 task_description: "task".into(),
                 steps: vec![],
@@ -380,7 +380,7 @@ mod tests {
         }
         assert_eq!(engine.trace_summaries.len(), 10);
 
-        engine.prune_traces(3);
+        engine._prune_traces(3);
         assert_eq!(engine.trace_summaries.len(), 3);
         assert_eq!(engine.trace_summaries[0].trace_id, "t7");
     }
@@ -389,10 +389,10 @@ mod tests {
     fn test_distill_with_traces() {
         let mut engine = DistillationEngine::new();
 
-        let success_trace = TraceSummary {
+        let success_trace = _TraceSummary {
             trace_id: "s1".into(),
             task_description: "测试成功".into(),
-            steps: vec![StepSummary {
+            steps: vec![_StepSummary {
                 skill_name: "code_gen".into(),
                 input_pattern: "函数定义".into(),
                 output_pattern: "完整实现".into(),
@@ -403,10 +403,10 @@ mod tests {
             total_tokens: 200,
         };
 
-        let failure_trace = TraceSummary {
+        let failure_trace = _TraceSummary {
             trace_id: "f1".into(),
             task_description: "测试失败".into(),
-            steps: vec![StepSummary {
+            steps: vec![_StepSummary {
                 skill_name: "code_gen".into(),
                 input_pattern: "类型注解".into(),
                 output_pattern: "编译错误".into(),
@@ -417,8 +417,8 @@ mod tests {
             total_tokens: 150,
         };
 
-        engine.add_trace(success_trace);
-        engine.add_trace(failure_trace);
+        engine._add_trace(success_trace);
+        engine._add_trace(failure_trace);
 
         let result = engine.distill();
         assert_eq!(result.traces_analyzed, 2);

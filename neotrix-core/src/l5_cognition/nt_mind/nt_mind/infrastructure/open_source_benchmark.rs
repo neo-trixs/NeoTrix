@@ -82,7 +82,7 @@ impl OpenSourceBenchmarker {
         }
     }
 
-    pub fn benchmark_top3(&self, task: &str, task_type: TaskType,
+    pub(crate) fn _benchmark_top3(&self, task: &str, task_type: TaskType,
         current_capability: &CapabilityVector) -> Vec<BenchmarkReport> {
         let mut matched = match_keyword(task, &task_type);
         matched.sort_by_key(|b| std::cmp::Reverse(b.1));
@@ -97,7 +97,7 @@ impl OpenSourceBenchmarker {
         result.into_iter().map(|p| self.report_for(p, current_capability)).collect()
     }
 
-    pub fn find_url(&self, task: &str, task_type: &TaskType) -> Option<&'static str> {
+    pub(crate) fn _find_url(&self, task: &str, task_type: &TaskType) -> Option<&'static str> {
         match_keyword(task, task_type).first().map(|(p, _)| p.url)
     }
 
@@ -141,7 +141,7 @@ impl OpenSourceBenchmarker {
         }.to_string()
     }
 
-    pub fn generate_edits_from_reports(reports: &[BenchmarkReport]) -> Vec<MicroEdit> {
+    pub(crate) fn _generate_edits_from_reports(reports: &[BenchmarkReport]) -> Vec<MicroEdit> {
         let mut edits = Vec::new();
         let mut applied = std::collections::HashSet::new();
         for report in reports {
@@ -180,14 +180,14 @@ mod tests {
     fn test_benchmarker_top3() {
         let b = OpenSourceBenchmarker::new();
         let cap = CapabilityVector::default();
-        let reports = b.benchmark_top3("stealth proxy with memory", TaskType::CodeAnalysis, &cap);
+        let reports = b._benchmark_top3("stealth proxy with memory", TaskType::CodeAnalysis, &cap);
         assert!(!reports.is_empty());
     }
 
     #[test]
     fn test_find_url() {
         let b = OpenSourceBenchmarker::new();
-        let url = b.find_url("tor", &TaskType::Security);
+        let url = b._find_url("tor", &TaskType::Security);
         assert!(url.is_some());
     }
 }

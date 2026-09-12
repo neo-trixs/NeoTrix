@@ -146,7 +146,7 @@ impl ReasoningBrain {
         true
     }
 
-    pub fn sia_should_switch_to_weight(&self, recent_rewards: &[f64]) -> bool {
+    pub(crate) fn _sia_should_switch_to_weight(&self, recent_rewards: &[f64]) -> bool {
         if recent_rewards.len() < 3 {
             return false;
         }
@@ -157,7 +157,7 @@ impl ReasoningBrain {
         avg_improvement.abs() < 0.01
     }
 
-    pub fn replenish_budget(&mut self, amount: f64) {
+    pub(crate) fn _replenish_budget(&mut self, amount: f64) {
         self.learning_rate_budget = (self.learning_rate_budget + amount).min(self.max_budget);
     }
 
@@ -165,7 +165,7 @@ impl ReasoningBrain {
         self.learning_rate_budget
     }
 
-    pub fn list_sources(&self) -> Vec<String> {
+    pub(crate) fn _list_sources(&self) -> Vec<String> {
         let mut sources: Vec<String> = vec![
             KnowledgeSource::HeroUI.name().to_string(),
             KnowledgeSource::BaseUI.name().to_string(),

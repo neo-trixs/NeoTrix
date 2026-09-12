@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Audience {
+pub(crate) enum _Audience {
     Executive,
     Board,
     Team,
 }
 
 #[derive(Debug, Clone)]
-pub struct StakeholderReport {
-    pub audience: Audience,
+pub(crate) struct _StakeholderReport {
+    pub audience: _Audience,
     pub title: String,
     pub summary: String,
     pub key_metrics: Vec<(String, f64)>,
@@ -18,12 +18,12 @@ pub struct StakeholderReport {
     pub next_steps: Vec<String>,
 }
 
-impl StakeholderReport {
+impl _StakeholderReport {
     pub fn to_markdown(&self) -> String {
         let audience_label = match self.audience {
-            Audience::Executive => "Executive Summary",
-            Audience::Board => "Board Update",
-            Audience::Team => "Team Report",
+            _Audience::Executive => "Executive Summary",
+            _Audience::Board => "Board Update",
+            _Audience::Team => "Team Report",
         };
         let mut md = format!("# {}\n\n", audience_label);
         md.push_str(&format!("**{}**\n\n", self.title));
@@ -66,30 +66,30 @@ impl StakeholderReport {
     }
 }
 
-pub struct StakeholderCommunicator {
-    pub tone_adjustments: HashMap<Audience, f64>,
+pub(crate) struct _StakeholderCommunicator {
+    pub tone_adjustments: HashMap<_Audience, f64>,
 }
 
-impl Default for StakeholderCommunicator {
+impl Default for _StakeholderCommunicator {
     fn default() -> Self {
         let mut tone_adjustments = HashMap::new();
-        tone_adjustments.insert(Audience::Executive, 0.9);
-        tone_adjustments.insert(Audience::Board, 0.7);
-        tone_adjustments.insert(Audience::Team, 0.5);
+        tone_adjustments.insert(_Audience::Executive, 0.9);
+        tone_adjustments.insert(_Audience::Board, 0.7);
+        tone_adjustments.insert(_Audience::Team, 0.5);
         Self { tone_adjustments }
     }
 }
 
-impl StakeholderCommunicator {
+impl _StakeholderCommunicator {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn executive_report(&self, title: &str, metrics: Vec<(String, f64)>, recommendations: Vec<String>) -> StakeholderReport {
-        StakeholderReport {
-            audience: Audience::Executive,
+    pub(crate) fn _executive_report(&self, title: &str, metrics: Vec<(String, f64)>, recommendations: Vec<String>) -> _StakeholderReport {
+        _StakeholderReport {
+            audience: _Audience::Executive,
             title: title.to_string(),
-            summary: format!("Executive-level overview focusing on strategic impact and ROI. Technical detail level: {:.0}%.", self.tone_adjustments[&Audience::Executive] * 100.0),
+            summary: format!("Executive-level overview focusing on strategic impact and ROI. Technical detail level: {:.0}%.", self.tone_adjustments[&_Audience::Executive] * 100.0),
             key_metrics: metrics,
             recommendations,
             risks: vec![],
@@ -97,9 +97,9 @@ impl StakeholderCommunicator {
         }
     }
 
-    pub fn board_report(&self, title: &str, summary: &str, metrics: Vec<(String, f64)>, risks: Vec<String>, next_steps: Vec<String>) -> StakeholderReport {
-        StakeholderReport {
-            audience: Audience::Board,
+    pub(crate) fn _board_report(&self, title: &str, summary: &str, metrics: Vec<(String, f64)>, risks: Vec<String>, next_steps: Vec<String>) -> _StakeholderReport {
+        _StakeholderReport {
+            audience: _Audience::Board,
             title: title.to_string(),
             summary: summary.to_string(),
             key_metrics: metrics,
@@ -109,9 +109,9 @@ impl StakeholderCommunicator {
         }
     }
 
-    pub fn team_report(&self, title: &str, summary: &str, technical_items: Vec<String>) -> StakeholderReport {
-        StakeholderReport {
-            audience: Audience::Team,
+    pub(crate) fn _team_report(&self, title: &str, summary: &str, technical_items: Vec<String>) -> _StakeholderReport {
+        _StakeholderReport {
+            audience: _Audience::Team,
             title: title.to_string(),
             summary: summary.to_string(),
             key_metrics: vec![],
@@ -121,14 +121,14 @@ impl StakeholderCommunicator {
         }
     }
 
-    pub fn from_metrics(&self, audience: Audience, title: &str, metrics: HashMap<String, f64>) -> StakeholderReport {
+    pub(crate) fn _from_metrics(&self, audience: _Audience, title: &str, metrics: HashMap<String, f64>) -> _StakeholderReport {
         let metric_vec: Vec<(String, f64)> = metrics.into_iter().collect();
         let summary = match audience {
-            Audience::Executive => "Performance summary with strategic recommendations.".to_string(),
-            Audience::Board => "Board-level update on project status and risk profile.".to_string(),
-            Audience::Team => "Detailed technical report for team execution.".to_string(),
+            _Audience::Executive => "Performance summary with strategic recommendations.".to_string(),
+            _Audience::Board => "Board-level update on project status and risk profile.".to_string(),
+            _Audience::Team => "Detailed technical report for team execution.".to_string(),
         };
-        StakeholderReport {
+        _StakeholderReport {
             audience,
             title: title.to_string(),
             summary,
@@ -146,54 +146,54 @@ mod tests {
 
     #[test]
     fn test_executive_report() {
-        let comm = StakeholderCommunicator::new();
-        let report = comm.executive_report(
+        let comm = _StakeholderCommunicator::new();
+        let report = comm._executive_report(
             "Q3 Performance",
             vec![("Revenue".to_string(), 1.2e6), ("Growth".to_string(), 0.15)],
             vec!["Invest in AI pipeline".to_string()],
         );
-        assert_eq!(report.audience, Audience::Executive);
+        assert_eq!(report.audience, _Audience::Executive);
         assert_eq!(report.key_metrics.len(), 2);
     }
 
     #[test]
     fn test_board_report() {
-        let comm = StakeholderCommunicator::new();
-        let report = comm.board_report(
+        let comm = _StakeholderCommunicator::new();
+        let report = comm._board_report(
             "Board Update",
             "All milestones on track",
             vec![("Velocity".to_string(), 0.85)],
             vec!["Staffing gap".to_string()],
             vec!["Hire Q4".to_string()],
         );
-        assert_eq!(report.audience, Audience::Board);
+        assert_eq!(report.audience, _Audience::Board);
         assert!(!report.risks.is_empty());
     }
 
     #[test]
     fn test_team_report() {
-        let comm = StakeholderCommunicator::new();
-        let report = comm.team_report(
+        let comm = _StakeholderCommunicator::new();
+        let report = comm._team_report(
             "Sprint Review",
             "Completed 8/10 stories",
             vec!["Refactor auth module".to_string()],
         );
-        assert_eq!(report.audience, Audience::Team);
+        assert_eq!(report.audience, _Audience::Team);
     }
 
     #[test]
     fn test_from_metrics() {
-        let comm = StakeholderCommunicator::new();
+        let comm = _StakeholderCommunicator::new();
         let mut metrics = HashMap::new();
         metrics.insert("Accuracy".to_string(), 0.95);
-        let report = comm.from_metrics(Audience::Executive, "Model Report", metrics);
+        let report = comm._from_metrics(_Audience::Executive, "Model Report", metrics);
         assert_eq!(report.key_metrics.len(), 1);
     }
 
     #[test]
     fn test_markdown_executive() {
-        let comm = StakeholderCommunicator::new();
-        let report = comm.executive_report(
+        let comm = _StakeholderCommunicator::new();
+        let report = comm._executive_report(
             "Test",
             vec![("Score".to_string(), 0.99)],
             vec!["Ship it".to_string()],
@@ -205,8 +205,8 @@ mod tests {
 
     #[test]
     fn test_markdown_board() {
-        let comm = StakeholderCommunicator::new();
-        let report = comm.board_report(
+        let comm = _StakeholderCommunicator::new();
+        let report = comm._board_report(
             "Board Update",
             "Status green",
             vec![],
@@ -221,8 +221,8 @@ mod tests {
 
     #[test]
     fn test_markdown_team() {
-        let comm = StakeholderCommunicator::new();
-        let report = comm.team_report("Sprint", "Done", vec!["Fix bug".to_string()]);
+        let comm = _StakeholderCommunicator::new();
+        let report = comm._team_report("Sprint", "Done", vec!["Fix bug".to_string()]);
         let md = report.to_markdown();
         assert!(md.contains("Team Report"));
         assert!(md.contains("Fix bug"));
@@ -230,8 +230,8 @@ mod tests {
 
     #[test]
     fn test_default_tone() {
-        let comm = StakeholderCommunicator::new();
-        assert_eq!(comm.tone_adjustments[&Audience::Executive], 0.9);
-        assert_eq!(comm.tone_adjustments[&Audience::Team], 0.5);
+        let comm = _StakeholderCommunicator::new();
+        assert_eq!(comm.tone_adjustments[&_Audience::Executive], 0.9);
+        assert_eq!(comm.tone_adjustments[&_Audience::Team], 0.5);
     }
 }

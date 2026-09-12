@@ -1,7 +1,7 @@
 type StudySectionTuple<'a> = (&'a str, &'a str, Vec<(String, f64)>);
 
 #[derive(Debug, Clone)]
-pub struct CaseStudySection {
+pub(crate) struct _CaseStudySection {
     pub title: String,
     pub content: String,
     pub metrics: Vec<(String, f64)>,
@@ -11,9 +11,9 @@ pub struct CaseStudySection {
 pub struct CaseStudy {
     pub title: String,
     pub tagline: String,
-    pub problem: CaseStudySection,
-    pub process: Vec<CaseStudySection>,
-    pub results: Vec<CaseStudySection>,
+    pub problem: _CaseStudySection,
+    pub process: Vec<_CaseStudySection>,
+    pub results: Vec<_CaseStudySection>,
     pub key_takeaways: Vec<String>,
 }
 
@@ -65,15 +65,15 @@ impl CaseStudy {
     }
 }
 
-pub struct CaseStudyWriter;
+pub(crate) struct _CaseStudyWriter;
 
-impl Default for CaseStudyWriter {
+impl Default for _CaseStudyWriter {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CaseStudyWriter {
+impl _CaseStudyWriter {
     pub fn new() -> Self {
         Self
     }
@@ -89,18 +89,18 @@ impl CaseStudyWriter {
         result_sections: Vec<StudySectionTuple<'a>>,
         takeaways: Vec<String>,
     ) -> CaseStudy {
-        let process: Vec<CaseStudySection> = process_steps
+        let process: Vec<_CaseStudySection> = process_steps
             .into_iter()
-            .map(|(title, content, metrics)| CaseStudySection {
+            .map(|(title, content, metrics)| _CaseStudySection {
                 title: title.to_string(),
                 content: content.to_string(),
                 metrics,
             })
             .collect();
 
-        let results: Vec<CaseStudySection> = result_sections
+        let results: Vec<_CaseStudySection> = result_sections
             .into_iter()
-            .map(|(title, content, metrics)| CaseStudySection {
+            .map(|(title, content, metrics)| _CaseStudySection {
                 title: title.to_string(),
                 content: content.to_string(),
                 metrics,
@@ -110,7 +110,7 @@ impl CaseStudyWriter {
         CaseStudy {
             title: title.to_string(),
             tagline: tagline.to_string(),
-            problem: CaseStudySection {
+            problem: _CaseStudySection {
                 title: "Problem".to_string(),
                 content: problem_desc.to_string(),
                 metrics: problem_metrics,
@@ -125,17 +125,17 @@ impl CaseStudyWriter {
         CaseStudy {
             title: title.to_string(),
             tagline: format!("{} → {} → {}", problem, solution, outcome),
-            problem: CaseStudySection {
+            problem: _CaseStudySection {
                 title: "Problem".to_string(),
                 content: problem.to_string(),
                 metrics: vec![],
             },
-            process: vec![CaseStudySection {
+            process: vec![_CaseStudySection {
                 title: "Solution".to_string(),
                 content: solution.to_string(),
                 metrics: vec![],
             }],
-            results: vec![CaseStudySection {
+            results: vec![_CaseStudySection {
                 title: "Outcome".to_string(),
                 content: outcome.to_string(),
                 metrics: vec![],
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_simple_case_study() {
-        let writer = CaseStudyWriter::new();
+        let writer = _CaseStudyWriter::new();
         let cs = writer.simple("Migration", "Legacy system slow", "Moved to cloud", "40% faster");
         assert_eq!(cs.title, "Migration");
         assert_eq!(cs.process.len(), 1);
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_full_case_study() {
-        let writer = CaseStudyWriter::new();
+        let writer = _CaseStudyWriter::new();
         let cs = writer.write(
             "AI Pipeline Optimization",
             "Reducing inference latency by 60%",
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn test_markdown_output() {
-        let writer = CaseStudyWriter::new();
+        let writer = _CaseStudyWriter::new();
         let cs = writer.simple("Test", "Problem X", "Solution Y", "Outcome Z");
         let md = cs.to_markdown();
         assert!(md.contains("# Test"));
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_full_markdown() {
-        let writer = CaseStudyWriter::new();
+        let writer = _CaseStudyWriter::new();
         let cs = writer.write(
             "Full Study",
             "Tagline here",
@@ -216,14 +216,14 @@ mod tests {
 
     #[test]
     fn test_writer_new() {
-        let writer = CaseStudyWriter::new();
+        let writer = _CaseStudyWriter::new();
         let cs = writer.simple("A", "B", "C", "D");
         assert_eq!(cs.problem.content, "B");
     }
 
     #[test]
     fn test_takeaways_in_markdown() {
-        let writer = CaseStudyWriter::new();
+        let writer = _CaseStudyWriter::new();
         let cs = writer.simple("X", "P", "S", "O");
         let md = cs.to_markdown();
         assert!(md.contains("Documented for future reference."));

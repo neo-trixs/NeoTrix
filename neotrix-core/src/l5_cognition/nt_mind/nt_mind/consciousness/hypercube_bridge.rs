@@ -22,7 +22,7 @@ impl HyperCubeBridge {
         }
     }
 
-    pub fn dimension_tag_to_axis(tag: &DimensionTag) -> Vec<DimensionAxis> {
+    pub(crate) fn _dimension_tag_to_axis(tag: &DimensionTag) -> Vec<DimensionAxis> {
         use DimensionTag::*;
         match tag {
             General => DimensionAxis::all().to_vec(),
@@ -48,7 +48,7 @@ impl HyperCubeBridge {
         // analyze_gaps 恒判全域稀疏，好奇心持续误触发"探索一切"。
         let mut coord = HyperCoord::new();
         for tag in tags {
-            for axis in Self::dimension_tag_to_axis(tag) {
+            for axis in Self::_dimension_tag_to_axis(tag) {
                 let cur = coord.get(&axis);
                 // 聚合：均值折中多标签，避免相消为 0
                 let v = match axis {
@@ -128,7 +128,7 @@ impl HyperCubeBridge {
         reports
     }
 
-    pub fn sparse_domains(&self, gap_reports: &[GapReport]) -> Vec<ExploreDomain> {
+    pub(crate) fn _sparse_domains(&self, gap_reports: &[GapReport]) -> Vec<ExploreDomain> {
         let high_gap = gap_reports.iter().any(|r| r.gap > 0.3);
         let high_sparsity = gap_reports.iter().any(|r| r.sparsity_score > 0.5);
         let empty_count = gap_reports.iter().filter(|r| !r.empty_regions.is_empty()).count();
@@ -187,22 +187,22 @@ mod tests {
 
     #[test]
     fn test_dimension_tag_mapping() {
-        let result = HyperCubeBridge::dimension_tag_to_axis(&DimensionTag::TimelineGeology);
+        let result = HyperCubeBridge::_dimension_tag_to_axis(&DimensionTag::TimelineGeology);
         assert_eq!(result, vec![DimensionAxis::Time]);
 
-        let result = HyperCubeBridge::dimension_tag_to_axis(&DimensionTag::TechAI);
+        let result = HyperCubeBridge::_dimension_tag_to_axis(&DimensionTag::TechAI);
         assert_eq!(result, vec![DimensionAxis::Domain]);
 
-        let result = HyperCubeBridge::dimension_tag_to_axis(&DimensionTag::KnowledgeScience);
+        let result = HyperCubeBridge::_dimension_tag_to_axis(&DimensionTag::KnowledgeScience);
         assert_eq!(result, vec![DimensionAxis::Abstraction]);
 
-        let result = HyperCubeBridge::dimension_tag_to_axis(&DimensionTag::KnowledgeCulture);
+        let result = HyperCubeBridge::_dimension_tag_to_axis(&DimensionTag::KnowledgeCulture);
         assert_eq!(result, vec![DimensionAxis::Culture]);
 
-        let result = HyperCubeBridge::dimension_tag_to_axis(&DimensionTag::CosmoSpacetime);
+        let result = HyperCubeBridge::_dimension_tag_to_axis(&DimensionTag::CosmoSpacetime);
         assert_eq!(result, vec![DimensionAxis::Scale]);
 
-        let result = HyperCubeBridge::dimension_tag_to_axis(&DimensionTag::General);
+        let result = HyperCubeBridge::_dimension_tag_to_axis(&DimensionTag::General);
         assert_eq!(result.len(), DimensionAxis::count());
     }
 

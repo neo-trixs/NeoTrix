@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 
 /// Four training stages
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TrainingStage {
+pub(crate) enum _TrainingStage {
     /// Acquire external knowledge from papers, repos, docs, APIs
     Explore,
     /// Extract reusable patterns, compress, crystallize skills
@@ -29,15 +29,15 @@ pub enum TrainingStage {
 }
 
 /// Canonical SEAL training stage type alias.
-pub type SealTrainingStage = TrainingStage;
+pub(crate) type _SealTrainingStage = _TrainingStage;
 
-impl TrainingStage {
+impl _TrainingStage {
     /// Ordered stage sequence
-    pub const ALL: [TrainingStage; 4] = [
-        TrainingStage::Explore,
-        TrainingStage::Distill,
-        TrainingStage::Test,
-        TrainingStage::Absorb,
+    pub const ALL: [_TrainingStage; 4] = [
+        _TrainingStage::Explore,
+        _TrainingStage::Distill,
+        _TrainingStage::Test,
+        _TrainingStage::Absorb,
     ];
 
     /// Human-readable name
@@ -51,7 +51,7 @@ impl TrainingStage {
     }
 
     /// Next stage in sequence
-    pub fn next(&self) -> Option<TrainingStage> {
+    pub fn next(&self) -> Option<_TrainingStage> {
         match self {
             Self::Explore => Some(Self::Distill),
             Self::Distill => Some(Self::Test),
@@ -61,8 +61,8 @@ impl TrainingStage {
     }
 
     /// Advance to next stage, wrapping at Absorb → Explore.
-    pub fn next_stage(&self) -> SealTrainingStage {
-        self.next().unwrap_or(TrainingStage::Explore)
+    pub(crate) fn _next_stage(&self) -> _SealTrainingStage {
+        self.next().unwrap_or(_TrainingStage::Explore)
     }
 }
 
@@ -72,7 +72,7 @@ impl TrainingStage {
 /// Output from a single stage execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StageResult {
-    pub stage: TrainingStage,
+    pub stage: _TrainingStage,
     pub success: bool,
     pub duration_ms: u64,
     pub items_processed: u32,
@@ -86,17 +86,17 @@ pub struct StageResult {
 
 /// Knowledge items acquired during explore stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExploreOutput {
+pub(crate) struct _ExploreOutput {
     /// Sources scanned (papers, repos, docs)
     pub sources_scanned: u32,
     /// New discoveries (not in KB)
-    pub discoveries: Vec<DiscoveryItem>,
+    pub discoveries: Vec<_DiscoveryItem>,
     /// Knowledge gaps identified
     pub gaps: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiscoveryItem {
+pub(crate) struct _DiscoveryItem {
     pub source_url: String,
     pub title: String,
     pub domain: String,
@@ -109,7 +109,7 @@ pub struct DiscoveryItem {
 
 /// Patterns extracted during distill stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DistillOutput {
+pub(crate) struct _DistillOutput {
     /// Patterns extracted from explore discoveries
     pub patterns: Vec<ExtractedPattern>,
     /// Skills crystallized (production-ready templates)
@@ -133,13 +133,13 @@ pub struct ExtractedPattern {
 
 /// Validation results from test stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestOutput {
+pub(crate) struct _TestOutput {
     /// SelfTest T1 results (existence checks)
-    pub t1_existence: TestTierResult,
+    pub t1_existence: _TestTierResult,
     /// SelfTest T2 results (registration checks)
-    pub t2_registration: TestTierResult,
+    pub t2_registration: _TestTierResult,
     /// SelfTest T3 results (production wiring checks)
-    pub t3_production: TestTierResult,
+    pub t3_production: _TestTierResult,
     /// Regression pass rate
     pub regression_pass_rate: f64,
     /// Patterns that failed validation
@@ -147,7 +147,7 @@ pub struct TestOutput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestTierResult {
+pub(crate) struct _TestTierResult {
     pub total: u32,
     pub passed: u32,
     pub failed: u32,
@@ -158,7 +158,7 @@ pub struct TestTierResult {
 
 /// Integration results from absorb stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbsorbOutput {
+pub(crate) struct _AbsorbOutput {
     /// Patterns written to KB
     pub kb_writes: u32,
     /// Skills registered in skill registry
@@ -207,10 +207,10 @@ pub struct TrainingCycleResult {
     pub completed_at: i64,
     pub total_duration_ms: u64,
     pub stages: Vec<StageResult>,
-    pub explore: Option<ExploreOutput>,
-    pub distill: Option<DistillOutput>,
-    pub test: Option<TestOutput>,
-    pub absorb: Option<AbsorbOutput>,
+    pub explore: Option<_ExploreOutput>,
+    pub distill: Option<_DistillOutput>,
+    pub test: Option<_TestOutput>,
+    pub absorb: Option<_AbsorbOutput>,
     pub success: bool,
 }
 
@@ -225,13 +225,13 @@ pub fn run_training_cycle(
 ) -> TrainingCycleResult {
     let started = Instant::now();
     let mut stages = Vec::new();
-    let mut explore_out: Option<ExploreOutput> = None;
-    let mut distill_out: Option<DistillOutput> = None;
-    let mut test_out: Option<TestOutput> = None;
-    let mut absorb_out: Option<AbsorbOutput> = None;
+    let mut explore_out: Option<_ExploreOutput> = None;
+    let mut distill_out: Option<_DistillOutput> = None;
+    let mut test_out: Option<_TestOutput> = None;
+    let mut absorb_out: Option<_AbsorbOutput> = None;
     let mut all_success = true;
 
-    for stage in TrainingStage::ALL {
+    for stage in _TrainingStage::ALL {
         if started.elapsed() > config.timeout {
             stages.push(StageResult {
                 stage,
@@ -248,7 +248,7 @@ pub fn run_training_cycle(
 
         let stage_start = Instant::now();
         let result = match stage {
-            TrainingStage::Explore => {
+            _TrainingStage::Explore => {
                 let out = execute_explore(config, kb_context);
                 let r = StageResult {
                     stage,
@@ -262,7 +262,7 @@ pub fn run_training_cycle(
                 explore_out = Some(out);
                 r
             }
-            TrainingStage::Distill => {
+            _TrainingStage::Distill => {
                 let prev = explore_out.as_ref();
                 let out = execute_distill(config, prev, kb_context);
                 let r = StageResult {
@@ -277,7 +277,7 @@ pub fn run_training_cycle(
                 distill_out = Some(out);
                 r
             }
-            TrainingStage::Test => {
+            _TrainingStage::Test => {
                 let prev = distill_out.as_ref();
                 let out = execute_test(config, prev, kb_context);
                 let failed = out.failed_patterns.len() as u32;
@@ -296,7 +296,7 @@ pub fn run_training_cycle(
                 test_out = Some(out);
                 r
             }
-            TrainingStage::Absorb => {
+            _TrainingStage::Absorb => {
                 if !all_success {
                     // Skip absorb if test failed
                     StageResult {
@@ -362,9 +362,9 @@ impl Default for KBContext {
     }
 }
 
-fn execute_explore(_config: &TrainingCycleConfig, _ctx: &KBContext) -> ExploreOutput {
+fn execute_explore(_config: &TrainingCycleConfig, _ctx: &KBContext) -> _ExploreOutput {
     // Real implementation: scan papers/repos/docs, diff against KB, return new discoveries
-    ExploreOutput {
+    _ExploreOutput {
         sources_scanned: 0,
         discoveries: Vec::new(),
         gaps: Vec::new(),
@@ -373,11 +373,11 @@ fn execute_explore(_config: &TrainingCycleConfig, _ctx: &KBContext) -> ExploreOu
 
 fn execute_distill(
     _config: &TrainingCycleConfig,
-    _explore: Option<&ExploreOutput>,
+    _explore: Option<&_ExploreOutput>,
     _ctx: &KBContext,
-) -> DistillOutput {
+) -> _DistillOutput {
     // Real implementation: extract patterns from discoveries, compress, crystallize skills
-    DistillOutput {
+    _DistillOutput {
         patterns: Vec::new(),
         skills_crystallized: 0,
         compressed_mb: 0.0,
@@ -386,15 +386,15 @@ fn execute_distill(
 
 fn execute_test(
     config: &TrainingCycleConfig,
-    _distill: Option<&DistillOutput>,
+    _distill: Option<&_DistillOutput>,
     _ctx: &KBContext,
-) -> TestOutput {
+) -> _TestOutput {
     // Real implementation: run SelfTest T1/T2/T3 on extracted patterns
     let t3_total = if config.run_t3_wiring { 5 } else { 0 };
-    TestOutput {
-        t1_existence: TestTierResult { total: 10, passed: 10, failed: 0 },
-        t2_registration: TestTierResult { total: 8, passed: 8, failed: 0 },
-        t3_production: TestTierResult { total: t3_total, passed: t3_total, failed: 0 },
+    _TestOutput {
+        t1_existence: _TestTierResult { total: 10, passed: 10, failed: 0 },
+        t2_registration: _TestTierResult { total: 8, passed: 8, failed: 0 },
+        t3_production: _TestTierResult { total: t3_total, passed: t3_total, failed: 0 },
         regression_pass_rate: 1.0,
         failed_patterns: Vec::new(),
     }
@@ -402,12 +402,12 @@ fn execute_test(
 
 fn execute_absorb(
     config: &TrainingCycleConfig,
-    _distill: Option<&DistillOutput>,
+    _distill: Option<&_DistillOutput>,
     _ctx: &KBContext,
-) -> AbsorbOutput {
+) -> _AbsorbOutput {
     // Real implementation: write to KB kv_store, register skills, archive experience
     let writes = config.max_absorb_writes.min(5);
-    AbsorbOutput {
+    _AbsorbOutput {
         kb_writes: writes,
         skills_registered: 0,
         experiences_archived: writes,
@@ -431,27 +431,27 @@ mod tests {
 
     #[test]
     fn training_stage_sequence() {
-        assert_eq!(TrainingStage::Explore.next(), Some(TrainingStage::Distill));
-        assert_eq!(TrainingStage::Distill.next(), Some(TrainingStage::Test));
-        assert_eq!(TrainingStage::Test.next(), Some(TrainingStage::Absorb));
-        assert_eq!(TrainingStage::Absorb.next(), None);
+        assert_eq!(_TrainingStage::Explore.next(), Some(_TrainingStage::Distill));
+        assert_eq!(_TrainingStage::Distill.next(), Some(_TrainingStage::Test));
+        assert_eq!(_TrainingStage::Test.next(), Some(_TrainingStage::Absorb));
+        assert_eq!(_TrainingStage::Absorb.next(), None);
     }
 
     #[test]
     fn next_stage_wraps_at_absorb() {
-        let _: SealTrainingStage = TrainingStage::Explore;
-        assert_eq!(TrainingStage::Explore.next_stage(), TrainingStage::Distill);
-        assert_eq!(TrainingStage::Distill.next_stage(), TrainingStage::Test);
-        assert_eq!(TrainingStage::Test.next_stage(), TrainingStage::Absorb);
-        assert_eq!(TrainingStage::Absorb.next_stage(), TrainingStage::Explore);
+        let _: _SealTrainingStage = _TrainingStage::Explore;
+        assert_eq!(_TrainingStage::Explore._next_stage(), _TrainingStage::Distill);
+        assert_eq!(_TrainingStage::Distill._next_stage(), _TrainingStage::Test);
+        assert_eq!(_TrainingStage::Test._next_stage(), _TrainingStage::Absorb);
+        assert_eq!(_TrainingStage::Absorb._next_stage(), _TrainingStage::Explore);
     }
 
     #[test]
     fn training_stage_names() {
-        assert_eq!(TrainingStage::Explore.name(), "explore");
-        assert_eq!(TrainingStage::Distill.name(), "distill");
-        assert_eq!(TrainingStage::Test.name(), "test");
-        assert_eq!(TrainingStage::Absorb.name(), "absorb");
+        assert_eq!(_TrainingStage::Explore.name(), "explore");
+        assert_eq!(_TrainingStage::Distill.name(), "distill");
+        assert_eq!(_TrainingStage::Test.name(), "test");
+        assert_eq!(_TrainingStage::Absorb.name(), "absorb");
     }
 
     #[test]

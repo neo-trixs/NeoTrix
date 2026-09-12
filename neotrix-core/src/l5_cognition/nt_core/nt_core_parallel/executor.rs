@@ -106,7 +106,7 @@ impl OptimalTaskAllocator {
         Self { strategy, capability_weight: 0.5, load_balance_weight: 0.3, throughput_weight: 0.2 }
     }
 
-    pub fn with_weights(mut self, cap: f64, load: f64, throughput: f64) -> Self {
+    pub(crate) fn _with_weights(mut self, cap: f64, load: f64, throughput: f64) -> Self {
         self.capability_weight = cap; self.load_balance_weight = load; self.throughput_weight = throughput; self
     }
 

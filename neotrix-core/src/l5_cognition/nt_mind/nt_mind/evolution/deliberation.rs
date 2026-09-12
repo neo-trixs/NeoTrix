@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, HashMap};
 #[allow(unused_imports)]
 use std::sync::{Arc, RwLock};
 
-/// DeliberationEngine namespace。
+/// _DeliberationEngine namespace。
 pub const NS_DELIBERATION: &str = "deliberation";
 
 /// 辩论角色。
@@ -36,7 +36,7 @@ pub enum DeliberationRole {
 
 /// 论证节点。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArgumentNode {
+pub(crate) struct _ArgumentNode {
     pub id: String,
     pub author: DeliberationRole,
     pub claim: String,           // 主张
@@ -53,7 +53,7 @@ pub struct ArgumentNode {
 
 /// 辩论轮次。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeliberationRound {
+pub(crate) struct _DeliberationRound {
     pub round_num: usize,
     pub phase: DeliberationPhase,
     pub arguments: Vec<String>, // 节点 ID 列表
@@ -74,8 +74,8 @@ pub enum DeliberationPhase {
 
 /// 辩论图 — 论证的有向图。
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct ArgumentGraph {
-    pub nodes: HashMap<String, ArgumentNode>,
+pub(crate) struct _ArgumentGraph {
+    pub nodes: HashMap<String, _ArgumentNode>,
     pub edges: HashMap<String, Vec<GraphEdge>>, // from -> edges
 }
 
@@ -102,8 +102,8 @@ pub struct DeliberationSession {
     pub scenario: String,
     pub context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
     pub participants: Vec<DeliberationRole>,
-    pub rounds: Vec<DeliberationRound>,
-    pub graph: ArgumentGraph,
+    pub rounds: Vec<_DeliberationRound>,
+    pub graph: _ArgumentGraph,
     pub final_verdict: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict>,
     pub consensus_score: f64,
     pub started_at: i64,
@@ -120,9 +120,9 @@ pub enum SessionStatus {
     Terminated,
 }
 
-/// DeliberationEngine 配置。
+/// _DeliberationEngine 配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeliberationConfig {
+pub(crate) struct _DeliberationConfig {
     pub max_rounds: usize,
     pub max_args_per_round: usize,
     pub min_participants: usize,
@@ -133,7 +133,7 @@ pub struct DeliberationConfig {
     pub auto_assign_devil_advocate: bool,
 }
 
-impl Default for DeliberationConfig {
+impl Default for _DeliberationConfig {
     fn default() -> Self {
         Self {
             max_rounds: 5,
@@ -148,15 +148,15 @@ impl Default for DeliberationConfig {
     }
 }
 
-/// DeliberationEngine 核心。
-pub struct DeliberationEngine {
-    config: DeliberationConfig,
+/// _DeliberationEngine 核心。
+pub(crate) struct _DeliberationEngine {
+    config: _DeliberationConfig,
     active_sessions: Arc<RwLock<HashMap<String, DeliberationSession>>>,
     completed_sessions: Arc<RwLock<BTreeMap<String, DeliberationSession>>>,
 }
 
-impl DeliberationEngine {
-    pub fn new(config: DeliberationConfig) -> Self {
+impl _DeliberationEngine {
+    pub fn new(config: _DeliberationConfig) -> Self {
         Self {
             config,
             active_sessions: Arc::new(RwLock::new(HashMap::new())),
@@ -165,7 +165,7 @@ impl DeliberationEngine {
     }
 
     /// 启动新的辩论会话。
-    pub fn start_deliberation(
+    pub fn _start_deliberation(
         &self,
         scenario: String,
         context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
@@ -193,14 +193,14 @@ impl DeliberationEngine {
             scenario,
             context,
             participants,
-            rounds: vec![DeliberationRound {
+            rounds: vec![_DeliberationRound {
                 round_num: 0,
                 phase: DeliberationPhase::Opening,
                 arguments: vec![],
                 start_time: now(),
                 end_time: None,
             }],
-            graph: ArgumentGraph::default(),
+            graph: _ArgumentGraph::default(),
             final_verdict: None,
             consensus_score: 0.0,
             started_at: now(),
@@ -215,7 +215,7 @@ impl DeliberationEngine {
     }
 
     /// 提交论证。
-    pub fn submit_argument(
+    pub(crate) fn _submit_argument(
         &self,
         session_id: &str,
         author: DeliberationRole,
@@ -245,7 +245,7 @@ impl DeliberationEngine {
         let rebut_edges: Vec<String> = rebuts.clone();
         let support_edges: Vec<String> = supports.clone();
         let claim_full = format!("{:?}: {}", author, claim);
-        let node = ArgumentNode {
+        let node = _ArgumentNode {
             id: arg_id.clone(),
             author,
             claim: claim_full,
@@ -306,7 +306,7 @@ impl DeliberationEngine {
             if session.rounds.len() >= self.config.max_rounds {
                 // 强制进入评议
             } else {
-                session.rounds.push(DeliberationRound {
+                session.rounds.push(_DeliberationRound {
                     round_num: session.rounds.len(),
                     phase: next_phase.clone(),
                     arguments: vec![],
@@ -315,7 +315,7 @@ impl DeliberationEngine {
                 });
             }
         } else {
-            session.rounds.push(DeliberationRound {
+            session.rounds.push(_DeliberationRound {
                 round_num: session.rounds.len(),
                 phase: next_phase.clone(),
                 arguments: vec![],
@@ -355,7 +355,7 @@ impl DeliberationEngine {
     }
 
     /// 计算共识度。
-    fn compute_consensus(&self, graph: &ArgumentGraph) -> f64 {
+    fn compute_consensus(&self, graph: &_ArgumentGraph) -> f64 {
         if graph.nodes.is_empty() { return 0.0; }
         
         let mut support = 0.0;
@@ -377,7 +377,7 @@ impl DeliberationEngine {
     }
 
     /// 基于图结构推导裁决。
-    fn derive_verdict(&self, graph: &ArgumentGraph, context: &crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext) -> crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict {
+    fn derive_verdict(&self, graph: &_ArgumentGraph, context: &crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext) -> crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict {
         // 简化：统计支持/反对的角色权重
         let mut pro_weight = 0.0;
         let mut con_weight = 0.0;
@@ -458,21 +458,21 @@ impl DeliberationEngine {
 
 /// 运行时包装。
 #[derive(Clone)]
-pub struct DeliberationEngineRuntime {
-    inner: Arc<DeliberationEngine>,
+pub(crate) struct _DeliberationEngineRuntime {
+    inner: Arc<_DeliberationEngine>,
 }
 
-impl DeliberationEngineRuntime {
-    pub fn new(config: DeliberationConfig) -> Self {
-        Self { inner: Arc::new(DeliberationEngine::new(config)) }
+impl _DeliberationEngineRuntime {
+    pub fn new(config: _DeliberationConfig) -> Self {
+        Self { inner: Arc::new(_DeliberationEngine::new(config)) }
     }
 
     pub fn start(&self, scenario: String, context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext, initial: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment>) -> Result<String, String> {
-        self.inner.start_deliberation(scenario, context, initial)
+        self.inner._start_deliberation(scenario, context, initial)
     }
 
     pub fn submit(&self, session_id: &str, author: DeliberationRole, claim: String, premises: Vec<String>, reasoning: String, evidence: Vec<String>, targets: Vec<String>, rebuts: Vec<String>, supports: Vec<String>) -> Result<String, String> {
-        self.inner.submit_argument(session_id, author, claim, premises, reasoning, evidence, targets, rebuts, supports)
+        self.inner._submit_argument(session_id, author, claim, premises, reasoning, evidence, targets, rebuts, supports)
     }
 
     pub fn advance(&self, session_id: &str) -> Result<DeliberationPhase, String> {
@@ -489,12 +489,12 @@ impl DeliberationEngineRuntime {
 }
 
 /// 便捷函数：创建引擎并启动辩论。
-pub fn start_deliberation(
+pub(crate) fn _start_deliberation(
     scenario: String,
     context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
     initial: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment>,
 ) -> Result<String, String> {
-    let engine = DeliberationEngineRuntime::new(DeliberationConfig::default());
+    let engine = _DeliberationEngineRuntime::new(_DeliberationConfig::default());
     engine.start(scenario, context, initial)
 }
 
@@ -520,7 +520,7 @@ mod tests {
 
     #[test]
     fn test_deliberation_flow() {
-        let engine = DeliberationEngineRuntime::new(DeliberationConfig::default());
+        let engine = _DeliberationEngineRuntime::new(_DeliberationConfig::default());
 
         let session_id = engine.start(
             "医生是否应在未经同意的情况下使用患者数据训练AI？".into(),

@@ -1,4 +1,4 @@
-use super::GameDefinition;
+use super::{EngineConfig, GameDefinition};
 
 pub struct CodeGenerator {
     game_def: GameDefinition,

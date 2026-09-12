@@ -49,7 +49,7 @@ impl ConsciousnessBridge {
     }
 
     /// Extract task context from brain, register as a GWT specialist module
-    pub fn from_seal(brain: &SelfIteratingBrain, gwt: &mut GlobalWorkspace) {
+    pub(crate) fn _from_seal(brain: &SelfIteratingBrain, gwt: &mut GlobalWorkspace) {
         let task_type = brain._current_task_type();
         let task_name = format!("seal_task_{:?}", task_type);
 
@@ -73,7 +73,7 @@ impl ConsciousnessBridge {
     }
 
     /// Apply GWT broadcast result back to brain (adjust capability vector)
-    pub fn to_seal(gwt: &GlobalWorkspace, brain: &mut SelfIteratingBrain) {
+    pub(crate) fn _to_seal(gwt: &GlobalWorkspace, brain: &mut SelfIteratingBrain) {
         let active = gwt.active_specialists();
         if active.is_empty() {
             return;
@@ -180,7 +180,7 @@ impl ConsciousnessBridge {
                     .sum::<f64>().max(0.0);
             let details = format!("GWT broadcast: {}, specialists: {:?} (phi={:.3}, coherence={:.3})",
                 content, specialists, phi, coherence);
-            let _ = kb.record_consciousness_snapshot(phi, coherence, active_count > 0, "bridge_cycle", &details);
+            let _ = kb.record_consciousness_snapshot(phi, coherence, active_count > 0, "_bridge_cycle", &details);
         }
     }
 
@@ -188,8 +188,8 @@ impl ConsciousnessBridge {
     pub fn maybe_poll(&mut self, brain: &mut SelfIteratingBrain, gwt: &mut GlobalWorkspace) {
         self.iterations_since_last_poll += 1;
         if self.iterations_since_last_poll >= self.poll_interval {
-            Self::from_seal(brain, gwt);
-            Self::to_seal(gwt, brain);
+            Self::_from_seal(brain, gwt);
+            Self::_to_seal(gwt, brain);
             self.last_broadcast = gwt.active_content.clone();
             self.inject_kb_knowledge(gwt);
             self.log_consciousness_snapshot(gwt);
@@ -199,9 +199,9 @@ impl ConsciousnessBridge {
     }
 
     /// Run a full bridge cycle: brain → GWT → brain → KB
-    pub fn bridge_cycle(&self, brain: &mut SelfIteratingBrain, gwt: &mut GlobalWorkspace) {
-        Self::from_seal(brain, gwt);
-        Self::to_seal(gwt, brain);
+    pub(crate) fn _bridge_cycle(&self, brain: &mut SelfIteratingBrain, gwt: &mut GlobalWorkspace) {
+        Self::_from_seal(brain, gwt);
+        Self::_to_seal(gwt, brain);
         let msg = format!(
             "consciousness bridge: task={:?}, active_specialists={}",
             brain._current_task_type(),
@@ -261,7 +261,7 @@ mod tests {
     fn test_from_seal_registers_module() {
         let brain = SelfIteratingBrain::new();
         let mut gwt = GlobalWorkspace::new(0.4);
-        ConsciousnessBridge::from_seal(&brain, &mut gwt);
+        ConsciousnessBridge::_from_seal(&brain, &mut gwt);
         assert_eq!(gwt.active_specialists().len(), 1);
     }
 
@@ -269,7 +269,7 @@ mod tests {
     fn test_to_seal_does_not_panic_on_empty_gwt() {
         let gwt = GlobalWorkspace::new(0.4);
         let mut brain = SelfIteratingBrain::new();
-        ConsciousnessBridge::to_seal(&gwt, &mut brain);
+        ConsciousnessBridge::_to_seal(&gwt, &mut brain);
         let cap = brain.brain.capability.clone();
         assert!(cap.arr().iter().any(|&v| v >= 0.0));
     }
@@ -295,7 +295,7 @@ mod tests {
         let mut gwt = GlobalWorkspace::new(0.4);
         let cb = ConsciousnessBridge::new();
         let history_before = gwt.broadcast_history.len();
-        cb.bridge_cycle(&mut brain, &mut gwt);
+        cb._bridge_cycle(&mut brain, &mut gwt);
         assert!(gwt.broadcast_history.len() > history_before);
     }
 }

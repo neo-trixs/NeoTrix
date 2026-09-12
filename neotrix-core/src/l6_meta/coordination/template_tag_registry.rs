@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 模板标签
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemplateTag {
+pub(crate) struct _TemplateTag {
     /// 标签ID
     pub id: String,
     /// 标签名称
@@ -20,7 +20,7 @@ pub struct TemplateTag {
     /// 标签描述
     pub description: String,
     /// 标签分类
-    pub category: TagCategory,
+    pub category: _TagCategory,
     /// 关联的动态等级
     pub dynamic_level: Option<String>,
     /// 关联的分段模式
@@ -37,7 +37,7 @@ pub struct TemplateTag {
 
 /// 标签分类
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum TagCategory {
+pub(crate) enum _TagCategory {
     /// 动态等级
     DynamicLevel,
     /// 节奏模式
@@ -93,9 +93,9 @@ pub struct SkillTemplate {
 
 /// 模板复用标签系统
 /// 管理模板标签、模板、复用关系
-pub struct TemplateTagRegistry {
+pub(crate) struct _TemplateTagRegistry {
     /// 所有标签
-    tags: HashMap<String, TemplateTag>,
+    tags: HashMap<String, _TemplateTag>,
     /// 所有模板
     templates: HashMap<String, SkillTemplate>,
     /// 标签复用关系 (标签ID -> 复用的标签ID列表)
@@ -104,7 +104,7 @@ pub struct TemplateTagRegistry {
     template_reuse: HashMap<String, Vec<String>>,
 }
 
-impl TemplateTagRegistry {
+impl _TemplateTagRegistry {
     /// 创建空注册中心
     pub fn new() -> Self {
         Self {
@@ -116,17 +116,17 @@ impl TemplateTagRegistry {
     }
     
     /// 添加标签
-    pub fn add_tag(&mut self, tag: TemplateTag) {
+    pub(crate) fn _add_tag(&mut self, tag: _TemplateTag) {
         self.tags.insert(tag.id.clone(), tag);
     }
     
     /// 添加模板
-    pub fn add_template(&mut self, template: SkillTemplate) {
+    pub(crate) fn _add_template(&mut self, template: SkillTemplate) {
         self.templates.insert(template.id.clone(), template);
     }
     
     /// 添加标签复用关系
-    pub fn add_tag_reuse(&mut self, source_tag_id: &str, target_tag_id: &str) {
+    pub(crate) fn _add_tag_reuse(&mut self, source_tag_id: &str, target_tag_id: &str) {
         if self.tags.contains_key(source_tag_id) && self.tags.contains_key(target_tag_id) {
             self.tag_reuse
                 .entry(source_tag_id.to_string())
@@ -136,7 +136,7 @@ impl TemplateTagRegistry {
     }
     
     /// 添加模板复用关系
-    pub fn add_template_reuse(&mut self, source_template_id: &str, target_template_id: &str) {
+    pub(crate) fn _add_template_reuse(&mut self, source_template_id: &str, target_template_id: &str) {
         if self.templates.contains_key(source_template_id) && self.templates.contains_key(target_template_id) {
             self.template_reuse
                 .entry(source_template_id.to_string())
@@ -146,35 +146,35 @@ impl TemplateTagRegistry {
     }
     
     /// 根据标签查找模板
-    pub fn find_templates_by_tag(&self, tag_id: &str) -> Vec<&SkillTemplate> {
+    pub(crate) fn _find_templates_by_tag(&self, tag_id: &str) -> Vec<&SkillTemplate> {
         self.templates.values()
             .filter(|t| t.tags.contains(&tag_id.to_string()))
             .collect()
     }
     
     /// 根据分类查找标签
-    pub fn find_tags_by_category(&self, category: TagCategory) -> Vec<&TemplateTag> {
+    pub(crate) fn _find_tags_by_category(&self, category: _TagCategory) -> Vec<&_TemplateTag> {
         self.tags.values()
             .filter(|t| t.category == category)
             .collect()
     }
     
     /// 查找最常用的模板
-    pub fn find_most_used_templates(&self, limit: usize) -> Vec<&SkillTemplate> {
+    pub(crate) fn _find_most_used_templates(&self, limit: usize) -> Vec<&SkillTemplate> {
         let mut templates: Vec<&SkillTemplate> = self.templates.values().collect();
         templates.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
         templates.into_iter().take(limit).collect()
     }
     
     /// 查找评分最高的模板
-    pub fn find_highest_rated_templates(&self, limit: usize) -> Vec<&SkillTemplate> {
+    pub(crate) fn _find_highest_rated_templates(&self, limit: usize) -> Vec<&SkillTemplate> {
         let mut templates: Vec<&SkillTemplate> = self.templates.values().collect();
         templates.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal));
         templates.into_iter().take(limit).collect()
     }
     
     /// 获取标签的复用链
-    pub fn get_tag_reuse_chain(&self, tag_id: &str, depth: usize) -> Vec<String> {
+    pub(crate) fn _get_tag_reuse_chain(&self, tag_id: &str, depth: usize) -> Vec<String> {
         let mut chain = Vec::new();
         let mut visited = std::collections::HashSet::new();
         
@@ -198,7 +198,7 @@ impl TemplateTagRegistry {
     }
     
     /// 获取模板的复用链
-    pub fn get_template_reuse_chain(&self, template_id: &str, depth: usize) -> Vec<String> {
+    pub(crate) fn _get_template_reuse_chain(&self, template_id: &str, depth: usize) -> Vec<String> {
         let mut chain = Vec::new();
         let mut visited = std::collections::HashSet::new();
         
@@ -222,14 +222,14 @@ impl TemplateTagRegistry {
     }
     
     /// 统计信息
-    pub fn statistics(&self) -> RegistryStatistics {
+    pub fn statistics(&self) -> _RegistryStatistics {
         let mut category_counts: HashMap<String, usize> = HashMap::new();
         for tag in self.tags.values() {
             let category_name = format!("{:?}", tag.category);
             *category_counts.entry(category_name).or_insert(0) += 1;
         }
         
-        RegistryStatistics {
+        _RegistryStatistics {
             tag_count: self.tags.len(),
             template_count: self.templates.len(),
             tag_reuse_count: self.tag_reuse.len(),
@@ -240,7 +240,7 @@ impl TemplateTagRegistry {
     }
     
     fn find_most_used_tags(&self, limit: usize) -> Vec<(String, u32)> {
-        let mut tags: Vec<&TemplateTag> = self.tags.values().collect();
+        let mut tags: Vec<&_TemplateTag> = self.tags.values().collect();
         tags.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
         tags.into_iter()
             .take(limit)
@@ -251,7 +251,7 @@ impl TemplateTagRegistry {
 
 /// 注册中心统计信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegistryStatistics {
+pub(crate) struct _RegistryStatistics {
     /// 标签数量
     pub tag_count: usize,
     /// 模板数量
@@ -276,14 +276,14 @@ mod tests {
     
     #[test]
     fn test_template_tag_registry() {
-        let mut registry = TemplateTagRegistry::new();
+        let mut registry = _TemplateTagRegistry::new();
         
         // 添加标签
-        let tag1 = TemplateTag {
+        let tag1 = _TemplateTag {
             id: "dynamic_micro".to_string(),
             name: "微动态".to_string(),
             description: "头发轻飘/眼皮颤动/手指微动".to_string(),
-            category: TagCategory::DynamicLevel,
+            category: _TagCategory::DynamicLevel,
             dynamic_level: Some("Micro".to_string()),
             segment_pattern: vec![],
             emotion_curve: None,
@@ -292,11 +292,11 @@ mod tests {
             usage_count: 10,
         };
         
-        let tag2 = TemplateTag {
+        let tag2 = _TemplateTag {
             id: "rhythm_slow".to_string(),
             name: "慢节奏".to_string(),
             description: "铺垫/抒情".to_string(),
-            category: TagCategory::RhythmPattern,
+            category: _TagCategory::RhythmPattern,
             dynamic_level: None,
             segment_pattern: vec!["Setup".to_string()],
             emotion_curve: None,
@@ -305,8 +305,8 @@ mod tests {
             usage_count: 5,
         };
         
-        registry.add_tag(tag1);
-        registry.add_tag(tag2);
+        registry._add_tag(tag1);
+        registry._add_tag(tag2);
         
         // 添加模板
         let template = SkillTemplate {
@@ -324,7 +324,7 @@ mod tests {
             source: "builtin".to_string(),
         };
         
-        registry.add_template(template);
+        registry._add_template(template);
         
         // 验证
         let stats = registry.statistics();
@@ -334,13 +334,13 @@ mod tests {
     
     #[test]
     fn test_find_templates_by_tag() {
-        let mut registry = TemplateTagRegistry::new();
+        let mut registry = _TemplateTagRegistry::new();
         
-        let tag = TemplateTag {
+        let tag = _TemplateTag {
             id: "test_tag".to_string(),
             name: "测试标签".to_string(),
             description: "测试".to_string(),
-            category: TagCategory::ContentType,
+            category: _TagCategory::ContentType,
             dynamic_level: None,
             segment_pattern: vec![],
             emotion_curve: None,
@@ -349,7 +349,7 @@ mod tests {
             usage_count: 0,
         };
         
-        registry.add_tag(tag);
+        registry._add_tag(tag);
         
         let template = SkillTemplate {
             id: "test_template".to_string(),
@@ -366,9 +366,9 @@ mod tests {
             source: "builtin".to_string(),
         };
         
-        registry.add_template(template);
+        registry._add_template(template);
         
-        let found = registry.find_templates_by_tag("test_tag");
+        let found = registry._find_templates_by_tag("test_tag");
         assert_eq!(found.len(), 1);
     }
 }

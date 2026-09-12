@@ -10,7 +10,7 @@ pub struct AbstractEngine {
     /// 概念库
     pub concepts: HashMap<String, Concept>,
     /// 抽象历史
-    pub history: Vec<AbstractRecord>,
+    pub history: Vec<_AbstractRecord>,
 }
 
 /// 概念
@@ -18,15 +18,15 @@ pub struct AbstractEngine {
 pub struct Concept {
     pub id: String,
     pub name: String,
-    pub abstraction_level: AbstractionLevel,
+    pub abstraction_level: _AbstractionLevel,
     pub features: Vec<String>,
     pub examples: Vec<String>,
-    pub relations: Vec<ConceptRelation>,
+    pub relations: Vec<_ConceptRelation>,
 }
 
 /// 抽象层次
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AbstractionLevel {
+pub(crate) enum _AbstractionLevel {
     Concrete,
     SubCategory,
     Category,
@@ -36,7 +36,7 @@ pub enum AbstractionLevel {
 
 /// 概念关系
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConceptRelation {
+pub(crate) struct _ConceptRelation {
     pub relation_type: String,
     pub target_concept: String,
     pub strength: f64,
@@ -44,12 +44,12 @@ pub struct ConceptRelation {
 
 /// 抽象记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbstractRecord {
+pub(crate) struct _AbstractRecord {
     pub id: String,
     pub cycle: u32,
     pub input: String,
     pub abstracted: String,
-    pub level: AbstractionLevel,
+    pub level: _AbstractionLevel,
     pub timestamp: String,
 }
 
@@ -62,15 +62,15 @@ impl AbstractEngine {
     }
 
     /// 抽象概念
-    pub fn abstract_concept(&mut self, cycle: u32, input: &str) -> String {
+    pub(crate) fn _abstract_concept(&mut self, cycle: u32, input: &str) -> String {
         let abstracted = format!("Abstract({})", input);
         
-        let record = AbstractRecord {
+        let record = _AbstractRecord {
             id: format!("abs_{}", uuid::Uuid::new_v4()),
             cycle,
             input: input.to_string(),
             abstracted: abstracted.clone(),
-            level: AbstractionLevel::Category,
+            level: _AbstractionLevel::Category,
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
         
@@ -105,8 +105,8 @@ impl AbstractEngine {
     }
 
     /// 获取统计
-    pub fn stats(&self) -> AbstractStats {
-        AbstractStats {
+    pub fn stats(&self) -> _AbstractStats {
+        _AbstractStats {
             total_concepts: self.concepts.len(),
             total_abstractions: self.history.len(),
         }
@@ -114,12 +114,12 @@ impl AbstractEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbstractStats {
+pub(crate) struct _AbstractStats {
     pub total_concepts: usize,
     pub total_abstractions: usize,
 }
 
-impl std::fmt::Display for AbstractStats {
+impl std::fmt::Display for _AbstractStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "AbstractEngine: {} concepts, {} abstractions",
             self.total_concepts, self.total_abstractions)

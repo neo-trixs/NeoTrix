@@ -22,7 +22,7 @@ pub fn register_ecc_dimensions(cv: &mut CapabilityVector) {
 }
 
 /// 读取某 ECC 维度当前值（扩展维度，不参与 base `index_from_name`）。
-pub fn ecc_dimension_value(cv: &CapabilityVector, name: &str) -> Option<f64> {
+pub(crate) fn _ecc_dimension_value(cv: &CapabilityVector, name: &str) -> Option<f64> {
     let names = cv.extension_names();
     let values = cv.extension_values();
     for (n, v) in names.iter().zip(values.iter()) {
@@ -35,7 +35,7 @@ pub fn ecc_dimension_value(cv: &CapabilityVector, name: &str) -> Option<f64> {
 
 /// 演化某 ECC 维度（SEAL 自进化调用点，避免依赖 base `index_from_name`）。
 pub fn evolve_ecc_dimension(cv: &mut CapabilityVector, name: &str, delta: f64) {
-    let cur = ecc_dimension_value(cv, name).unwrap_or(0.5);
+    let cur = _ecc_dimension_value(cv, name).unwrap_or(0.5);
     let next = (cur + delta).clamp(0.0, 1.0);
     cv.add_extension_dim(name, next);
 }
@@ -53,9 +53,9 @@ pub fn select_ecc_dimensions(task_type: &TaskType) -> Vec<String> {
     }
 }
 
-pub struct SealEccSelfTest;
+pub(crate) struct _SealEccSelfTest;
 
-impl SelfTest for SealEccSelfTest {
+impl SelfTest for _SealEccSelfTest {
     fn name(&self) -> &str {
         "seal_ecc_dimensions"
     }
@@ -67,7 +67,7 @@ impl SelfTest for SealEccSelfTest {
             return Err(vec![format!("total_dim mismatch: {}", cv.total_dim())]);
         }
         for d in SEAL_ECC_DIMENSIONS {
-            if ecc_dimension_value(&cv, d).is_none() {
+            if _ecc_dimension_value(&cv, d).is_none() {
                 return Err(vec![format!("missing ecc dim {d}")]);
             }
         }
@@ -76,7 +76,7 @@ impl SelfTest for SealEccSelfTest {
             return Err(vec!["select_ecc_dimensions returned empty".into()]);
         }
         evolve_ecc_dimension(&mut cv, "security", 0.2);
-        let after = ecc_dimension_value(&cv, "security")
+        let after = _ecc_dimension_value(&cv, "security")
             .ok_or_else(|| vec!["security lost after evolve".to_string()])?;
         if (after - 0.7).abs() > 1e-9 {
             return Err(vec![format!("evolve wrong: {after}")]);
@@ -87,7 +87,7 @@ impl SelfTest for SealEccSelfTest {
 
 /// 注册 SEAL ECC 维度 SelfTest 到全局注册表 (T2)。
 pub fn register_seal_ecc_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(SealEccSelfTest));
+    registry.register(Box::new(_SealEccSelfTest));
 }
 
 #[cfg(test)]
@@ -97,9 +97,9 @@ mod tests {
     #[test]
     fn test_seal_ecc_self_test_passes() {
         assert!(
-            SealEccSelfTest.self_test().is_ok(),
+            _SealEccSelfTest.self_test().is_ok(),
             "seal ecc self_test failed: {:?}",
-            SealEccSelfTest.self_test().err()
+            _SealEccSelfTest.self_test().err()
         );
     }
 }

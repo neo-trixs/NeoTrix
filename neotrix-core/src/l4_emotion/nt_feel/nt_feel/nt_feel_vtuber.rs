@@ -293,7 +293,7 @@ impl VTuberEmotionEngine {
     }
 
     /// 获取情绪历史
-    pub fn get_emotion_history(&self) -> &[EmotionReading] {
+    pub(crate) fn _get_emotion_history(&self) -> &[EmotionReading] {
         &self.emotion_history
     }
 

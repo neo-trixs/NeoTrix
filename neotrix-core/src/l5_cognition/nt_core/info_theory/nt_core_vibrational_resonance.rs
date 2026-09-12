@@ -10,17 +10,17 @@
 use serde::{Deserialize, Serialize};
 
 /// 振动共振整合框架
-pub struct VibrationalResonanceFramework {
-    processing_streams: Vec<ProcessingStream>,
-    resonance_mechanisms: Vec<ResonanceMechanism>,
-    sync_states: Vec<SyncState>,
-    config: VibrationalConfig,
-    stats: VibrationalStats,
+pub(crate) struct _VibrationalResonanceFramework {
+    _processing_streams: Vec<_ProcessingStream>,
+    _resonance_mechanisms: Vec<_ResonanceMechanism>,
+    _sync_states: Vec<_SyncState>,
+    config: _VibrationalConfig,
+    stats: _VibrationalStats,
 }
 
 /// 振动配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VibrationalConfig {
+pub(crate) struct _VibrationalConfig {
     pub gamma_range: (f64, f64),
     pub certs_frequency: f64,
     pub microtubule_frequency: f64,
@@ -28,7 +28,7 @@ pub struct VibrationalConfig {
     pub enable_hierarchical_sync: bool,
 }
 
-impl Default for VibrationalConfig {
+impl Default for _VibrationalConfig {
     fn default() -> Self {
         Self {
             gamma_range: (40.0, 100.0),
@@ -42,9 +42,9 @@ impl Default for VibrationalConfig {
 
 /// 处理流
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessingStream {
+pub(crate) struct _ProcessingStream {
     pub stream_id: String,
-    pub stream_type: StreamType,
+    pub stream_type: _StreamType,
     pub frequency_hz: f64,
     pub amplitude: f64,
     pub phase: f64,
@@ -54,7 +54,7 @@ pub struct ProcessingStream {
 /// 流类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum StreamType {
+pub(crate) enum _StreamType {
     Sensory,
     Cognitive,
     Emotional,
@@ -65,9 +65,9 @@ pub enum StreamType {
 
 /// 共振机制
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResonanceMechanism {
+pub(crate) struct _ResonanceMechanism {
     pub mechanism_id: String,
-    pub mechanism_type: ResonanceType,
+    pub mechanism_type: _ResonanceType,
     pub frequency_alignment: f64,
     pub amplitude_matching: f64,
     pub temporal_sync: f64,
@@ -77,7 +77,7 @@ pub struct ResonanceMechanism {
 /// 共振类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ResonanceType {
+pub(crate) enum _ResonanceType {
     FrequencyTuning,     // 频率调谐
     AmplitudeMatching,   // 振幅匹配
     TemporalSynchronization, // 时间同步
@@ -86,7 +86,7 @@ pub enum ResonanceType {
 
 /// 同步状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncState {
+pub(crate) struct _SyncState {
     pub state_id: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub gamma_synchrony: f64,
@@ -97,7 +97,7 @@ pub struct SyncState {
 
 /// 振动统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VibrationalStats {
+pub(crate) struct _VibrationalStats {
     pub total_streams: u64,
     pub active_streams: u64,
     pub total_mechanisms: u64,
@@ -108,7 +108,7 @@ pub struct VibrationalStats {
 
 /// 意识整合结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsciousnessIntegrationResult {
+pub(crate) struct _ConsciousnessIntegrationResult {
     pub integrated: bool,
     pub integration_level: f64,
     pub gamma_sync: f64,
@@ -116,15 +116,15 @@ pub struct ConsciousnessIntegrationResult {
     pub consciousness_emergent: bool,
 }
 
-impl VibrationalResonanceFramework {
+impl _VibrationalResonanceFramework {
     /// 创建新的振动共振整合框架
     pub fn new() -> Self {
         Self {
-            processing_streams: Vec::new(),
-            resonance_mechanisms: Vec::new(),
-            sync_states: Vec::new(),
-            config: VibrationalConfig::default(),
-            stats: VibrationalStats {
+            _processing_streams: Vec::new(),
+            _resonance_mechanisms: Vec::new(),
+            _sync_states: Vec::new(),
+            config: _VibrationalConfig::default(),
+            stats: _VibrationalStats {
                 total_streams: 0,
                 active_streams: 0,
                 total_mechanisms: 0,
@@ -136,20 +136,20 @@ impl VibrationalResonanceFramework {
     }
 
     /// 添加处理流
-    pub fn add_processing_stream(&mut self, stream: ProcessingStream) {
-        self.processing_streams.push(stream);
+    pub(crate) fn _add_processing_stream(&mut self, stream: _ProcessingStream) {
+        self._processing_streams.push(stream);
         self.stats.total_streams += 1;
     }
 
     /// 添加共振机制
-    pub fn add_resonance_mechanism(&mut self, mechanism: ResonanceMechanism) {
-        self.resonance_mechanisms.push(mechanism);
+    pub(crate) fn _add_resonance_mechanism(&mut self, mechanism: _ResonanceMechanism) {
+        self._resonance_mechanisms.push(mechanism);
         self.stats.total_mechanisms += 1;
     }
 
     /// 评估 Gamma 同步
-    pub fn evaluate_gamma_sync(&self) -> f64 {
-        let gamma_streams: Vec<&ProcessingStream> = self.processing_streams.iter()
+    pub(crate) fn _evaluate_gamma_sync(&self) -> f64 {
+        let gamma_streams: Vec<&_ProcessingStream> = self._processing_streams.iter()
             .filter(|s| s.active && s.frequency_hz >= self.config.gamma_range.0 && s.frequency_hz <= self.config.gamma_range.1)
             .collect();
 
@@ -167,7 +167,7 @@ impl VibrationalResonanceFramework {
     }
 
     /// 计算相位相干性
-    fn calculate_phase_coherence(&self, streams: &[&ProcessingStream]) -> f64 {
+    fn calculate_phase_coherence(&self, streams: &[&_ProcessingStream]) -> f64 {
         if streams.len() < 2 {
             return 1.0;
         }
@@ -183,8 +183,8 @@ impl VibrationalResonanceFramework {
     }
 
     /// 评估跨流相干性
-    pub fn evaluate_cross_stream_coherence(&self) -> f64 {
-        let active_streams: Vec<&ProcessingStream> = self.processing_streams.iter()
+    pub(crate) fn _evaluate_cross_stream_coherence(&self) -> f64 {
+        let active_streams: Vec<&_ProcessingStream> = self._processing_streams.iter()
             .filter(|s| s.active)
             .collect();
 
@@ -212,14 +212,14 @@ impl VibrationalResonanceFramework {
     }
 
     /// 执行意识整合
-    pub fn integrate_consciousness(&mut self) -> ConsciousnessIntegrationResult {
-        let gamma_sync = self.evaluate_gamma_sync();
-        let cross_stream_coherence = self.evaluate_cross_stream_coherence();
+    pub(crate) fn _integrate_consciousness(&mut self) -> _ConsciousnessIntegrationResult {
+        let gamma_sync = self._evaluate_gamma_sync();
+        let cross_stream_coherence = self._evaluate_cross_stream_coherence();
 
-        let resonance_mechanism_score = if !self.resonance_mechanisms.is_empty() {
-            self.resonance_mechanisms.iter()
+        let resonance_mechanism_score = if !self._resonance_mechanisms.is_empty() {
+            self._resonance_mechanisms.iter()
                 .map(|m| (m.frequency_alignment + m.amplitude_matching + m.temporal_sync + m.structural_resonance) / 4.0)
-                .sum::<f64>() / self.resonance_mechanisms.len() as f64
+                .sum::<f64>() / self._resonance_mechanisms.len() as f64
         } else {
             0.0
         };
@@ -230,7 +230,7 @@ impl VibrationalResonanceFramework {
                                     cross_stream_coherence > 0.6 &&
                                     integration_level > 0.65;
 
-        let sync_state = SyncState {
+        let sync_state = _SyncState {
             state_id: uuid::Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now(),
             gamma_synchrony: gamma_sync,
@@ -243,11 +243,11 @@ impl VibrationalResonanceFramework {
             },
         };
 
-        self.sync_states.push(sync_state);
+        self._sync_states.push(sync_state);
         self.stats.avg_sync_level = integration_level;
         self.stats.gamma_dominance = gamma_sync;
 
-        ConsciousnessIntegrationResult {
+        _ConsciousnessIntegrationResult {
             integrated: integration_level > self.config.min_sync_threshold,
             integration_level,
             gamma_sync,
@@ -257,22 +257,22 @@ impl VibrationalResonanceFramework {
     }
 
     /// 获取所有处理流
-    pub fn processing_streams(&self) -> &[ProcessingStream] {
-        &self.processing_streams
+    pub(crate) fn _processing_streams(&self) -> &[_ProcessingStream] {
+        &self._processing_streams
     }
 
     /// 获取所有共振机制
-    pub fn resonance_mechanisms(&self) -> &[ResonanceMechanism] {
-        &self.resonance_mechanisms
+    pub(crate) fn _resonance_mechanisms(&self) -> &[_ResonanceMechanism] {
+        &self._resonance_mechanisms
     }
 
     /// 获取所有同步状态
-    pub fn sync_states(&self) -> &[SyncState] {
-        &self.sync_states
+    pub(crate) fn _sync_states(&self) -> &[_SyncState] {
+        &self._sync_states
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &VibrationalStats {
+    pub fn stats(&self) -> &_VibrationalStats {
         &self.stats
     }
 }

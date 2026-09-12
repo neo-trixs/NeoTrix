@@ -1,6 +1,6 @@
 //! 推理引擎类型定义（从 reasoning_engine.rs 拆分）
 //!
-//! 包含: CascadeConfig, CascadeResult, ReasoningType, ReasoningMethod,
+//! 包含: _CascadeConfig, _CascadeResult, ReasoningType, ReasoningMethod,
 //!       PerspectiveLens, ReasoningTrace, ReasoningStats
 
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use super::model_router::ModelTier;
 /// Cascade 推理配置（来自 Wildfire SMoL 的多级联推理模式）
 /// 类比：450M 模型做 fast classify，置信度低才升级到 full reason
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CascadeConfig {
+pub(crate) struct _CascadeConfig {
     pub enabled: bool,
     pub fast_max_tokens: u32,
     pub fast_context_size: u32,
@@ -17,7 +17,7 @@ pub struct CascadeConfig {
     pub deep_context_size: u32,
 }
 
-impl Default for CascadeConfig {
+impl Default for _CascadeConfig {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -31,7 +31,7 @@ impl Default for CascadeConfig {
 
 /// Cascade 推理结果
 #[derive(Debug, Clone)]
-pub struct CascadeResult {
+pub(crate) struct _CascadeResult {
     pub fast_response: String,
     pub escalated: bool,
     pub deep_response: Option<String>,
@@ -158,7 +158,7 @@ impl ContextTier {
         }
     }
 
-    pub fn from_window(window_tokens: usize) -> Self {
+    pub(crate) fn _from_window(window_tokens: usize) -> Self {
         match window_tokens {
             0..=50_000 => Self::Small,
             50_001..=150_000 => Self::Medium,
@@ -176,7 +176,7 @@ impl ContextTier {
         }
     }
 
-    pub fn max_search_results(&self) -> usize {
+    pub(crate) fn _max_search_results(&self) -> usize {
         match self {
             Self::Small => 10,
             Self::Medium => 25,
@@ -192,22 +192,22 @@ impl ContextTier {
 
 /// Context-aware execution limits
 #[derive(Debug, Clone)]
-pub struct ContextAwareLimits {
+pub(crate) struct _ContextAwareLimits {
     pub tier: ContextTier,
     pub context_window: usize,
     pub max_tool_calls: usize,
-    pub max_search_results: usize,
+    pub _max_search_results: usize,
     pub safe_output_tokens: usize,
 }
 
-impl ContextAwareLimits {
+impl _ContextAwareLimits {
     pub fn new(context_window: usize) -> Self {
-        let tier = ContextTier::from_window(context_window);
+        let tier = ContextTier::_from_window(context_window);
         Self {
             tier,
             context_window,
             max_tool_calls: tier.max_tool_calls(),
-            max_search_results: tier.max_search_results(),
+            _max_search_results: tier._max_search_results(),
             safe_output_tokens: (context_window as f64 * 0.85) as usize,
         }
     }

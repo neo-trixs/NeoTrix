@@ -11,18 +11,18 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 规划引擎
-pub struct PlanningEngine {
+pub(crate) struct _PlanningEngine {
     plans: HashMap<String, Plan>,
-    task_graph: TaskGraph,
-    resource_manager: ResourceManager,
+    task_graph: _TaskGraph,
+    resource_manager: _ResourceManager,
     #[allow(dead_code)]
-    config: PlanningConfig,
-    stats: PlanningStats,
+    config: _PlanningConfig,
+    stats: _PlanningStats,
 }
 
 /// 规划配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlanningConfig {
+pub(crate) struct _PlanningConfig {
     pub max_depth: u32,
     pub max_tasks: usize,
     pub enable_dynamic_planning: bool,
@@ -30,7 +30,7 @@ pub struct PlanningConfig {
     pub planning_horizon: u32,
 }
 
-impl Default for PlanningConfig {
+impl Default for _PlanningConfig {
     fn default() -> Self {
         Self {
             max_depth: 5,
@@ -49,7 +49,7 @@ pub struct Plan {
     pub name: String,
     pub goal: String,
     pub sub_plans: Vec<Plan>,
-    pub tasks: Vec<PlannedTask>,
+    pub tasks: Vec<_PlannedTask>,
     pub dependencies: Vec<Dependency>,
     pub estimated_duration: u64,
     pub priority: u32,
@@ -69,7 +69,7 @@ pub enum PlanStatus {
 
 /// 规划任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlannedTask {
+pub(crate) struct _PlannedTask {
     pub id: String,
     pub name: String,
     pub task_type: String,
@@ -100,16 +100,16 @@ pub struct Dependency {
 }
 
 /// 任务图
-pub struct TaskGraph {
-    nodes: HashMap<String, TaskNode>,
+pub(crate) struct _TaskGraph {
+    nodes: HashMap<String, _TaskNode>,
     edges: Vec<TaskEdge>,
 }
 
 /// 任务节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskNode {
+pub(crate) struct _TaskNode {
     pub id: String,
-    pub task: PlannedTask,
+    pub task: _PlannedTask,
     pub in_degree: u32,
     pub out_degree: u32,
 }
@@ -123,9 +123,9 @@ pub struct TaskEdge {
 }
 
 /// 资源管理器
-pub struct ResourceManager {
+pub(crate) struct _ResourceManager {
     resources: HashMap<String, Resource>,
-    allocations: Vec<ResourceAllocation>,
+    allocations: Vec<_ResourceAllocation>,
 }
 
 /// 资源
@@ -141,7 +141,7 @@ pub struct Resource {
 
 /// 资源分配
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceAllocation {
+pub(crate) struct _ResourceAllocation {
     pub resource_id: String,
     pub task_id: String,
     pub amount: f64,
@@ -150,7 +150,7 @@ pub struct ResourceAllocation {
 
 /// 规划统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlanningStats {
+pub(crate) struct _PlanningStats {
     pub plans_created: u64,
     pub tasks_planned: u64,
     pub tasks_completed: u64,
@@ -160,7 +160,7 @@ pub struct PlanningStats {
 
 /// 执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionResult {
+pub(crate) struct _ExecutionResult {
     pub plan_id: String,
     pub status: PlanStatus,
     pub completed_tasks: u32,
@@ -169,21 +169,21 @@ pub struct ExecutionResult {
     pub resource_usage: HashMap<String, f64>,
 }
 
-impl PlanningEngine {
+impl _PlanningEngine {
     /// 创建新的规划引擎
-    pub fn new(config: PlanningConfig) -> Self {
+    pub fn new(config: _PlanningConfig) -> Self {
         Self {
             plans: HashMap::new(),
-            task_graph: TaskGraph {
+            task_graph: _TaskGraph {
                 nodes: HashMap::new(),
                 edges: Vec::new(),
             },
-            resource_manager: ResourceManager {
+            resource_manager: _ResourceManager {
                 resources: HashMap::new(),
                 allocations: Vec::new(),
             },
             config,
-            stats: PlanningStats {
+            stats: _PlanningStats {
                 plans_created: 0,
                 tasks_planned: 0,
                 tasks_completed: 0,
@@ -213,14 +213,14 @@ impl PlanningEngine {
     }
 
     /// 添加任务到计划
-    pub fn add_task_to_plan(&mut self, plan_id: &str, task: PlannedTask) -> Result<(), String> {
+    pub(crate) fn _add_task_to_plan(&mut self, plan_id: &str, task: _PlannedTask) -> Result<(), String> {
         if let Some(plan) = self.plans.get_mut(plan_id) {
             plan.tasks.push(task.clone());
             plan.estimated_duration += task.estimated_time;
             self.stats.tasks_planned += 1;
 
             // 添加到任务图
-            let node = TaskNode {
+            let node = _TaskNode {
                 id: task.id.clone(),
                 task,
                 in_degree: 0,
@@ -300,12 +300,12 @@ impl PlanningEngine {
     }
 
     /// 分配资源
-    pub fn allocate_resource(&mut self, resource_id: &str, task_id: &str, amount: f64, duration: u64) -> Result<(), String> {
+    pub(crate) fn _allocate_resource(&mut self, resource_id: &str, task_id: &str, amount: f64, duration: u64) -> Result<(), String> {
         if let Some(resource) = self.resource_manager.resources.get_mut(resource_id) {
             if resource.available >= amount {
                 resource.available -= amount;
 
-                self.resource_manager.allocations.push(ResourceAllocation {
+                self.resource_manager.allocations.push(_ResourceAllocation {
                     resource_id: resource_id.to_string(),
                     task_id: task_id.to_string(),
                     amount,
@@ -322,7 +322,7 @@ impl PlanningEngine {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &PlanningStats {
+    pub fn stats(&self) -> &_PlanningStats {
         &self.stats
     }
 }

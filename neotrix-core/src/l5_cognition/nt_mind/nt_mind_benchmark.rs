@@ -91,9 +91,9 @@ impl BenchmarkSuite {
     pub fn run_all_extended(cap: &CapabilityVector, bank: &mut ReasoningBank) -> BenchmarkReport {
         let mut base = Self::run_all(cap);
 
-        let knowledge = Self::run_knowledge_benchmarks(cap);
-        let memory = Self::run_memory_benchmarks(bank);
-        let convergence = Self::run_convergence_benchmarks(cap);
+        let knowledge = Self::_run_knowledge_benchmarks(cap);
+        let memory = Self::_run_memory_benchmarks(bank);
+        let convergence = Self::_run_convergence_benchmarks(cap);
 
         base.results.extend(knowledge);
         base.results.extend(memory);
@@ -104,7 +104,7 @@ impl BenchmarkSuite {
         base
     }
 
-    pub fn run_knowledge_benchmarks(cap: &CapabilityVector) -> Vec<BenchmarkResult> {
+    pub(crate) fn _run_knowledge_benchmarks(cap: &CapabilityVector) -> Vec<BenchmarkResult> {
         use KnowledgeSource::*;
         let sources = vec![
             HeroUI, BaseUI, ArcUI, CortexUI, AgenticDS, DesignPhilosophy,
@@ -168,7 +168,7 @@ impl BenchmarkSuite {
         ]
     }
 
-    pub fn run_memory_benchmarks(bank: &mut ReasoningBank) -> Vec<BenchmarkResult> {
+    pub(crate) fn _run_memory_benchmarks(bank: &mut ReasoningBank) -> Vec<BenchmarkResult> {
         let mut results = Vec::new();
 
         let memory_retention_result = {
@@ -274,7 +274,7 @@ impl BenchmarkSuite {
         results
     }
 
-    pub fn run_convergence_benchmarks(cap: &CapabilityVector) -> Vec<BenchmarkResult> {
+    pub(crate) fn _run_convergence_benchmarks(cap: &CapabilityVector) -> Vec<BenchmarkResult> {
         let mut results = Vec::new();
 
         let vector_stability_result = {
@@ -374,9 +374,9 @@ impl BenchmarkSuite {
 // 按 rubric 打分答案 → 输出 per-model 分数表 → 选出最优模型。
 //
 // 设计 (R-P42 强化既有 BenchmarkSuite 节点):
-// - `OriEvalModel` trait: 让测试注入 test-double; 生产走 `Arc<dyn LlmProvider>`
+// - `_OriEvalModel` trait: 让测试注入 test-double; 生产走 `Arc<dyn LlmProvider>`
 //   (GatewayV2 实现该 trait, 因此可复用真实网关请求)。
-// - 评分纯函数化: `grade_case` / `tool_call_legitimacy` 可单测。
+// - 评分纯函数化: `_grade_case` / `tool_call_legitimacy` 可单测。
 // ═══════════════════════════════════════════════════════════════════
 
 /// 一个 Ori-Eval 用例 — 我们自己的 agent 提示词 + 期望行为
@@ -412,7 +412,7 @@ impl OriEvalCase {
 
 /// Ori-Eval 模型执行接口 — 让测试注入 test-double, 生产用真实 provider
 #[async_trait::async_trait]
-pub trait OriEvalModel: Send + Sync {
+pub(crate) trait _OriEvalModel: Send + Sync {
     /// 以指定模型名运行一次完整 prompt, 返回 (内容, tool 调用名列表)
     async fn run(&self, model: &str, prompt: &str) -> Result<(String, Vec<String>), LlmError>;
 }
@@ -492,19 +492,19 @@ impl OriEvalSuite {
         Ok(Self::finalize_report(scores))
     }
 
-    /// 用 test-double (OriEvalModel trait) 跑一批模型 — 单测/离线路径
+    /// 用 test-double (_OriEvalModel trait) 跑一批模型 — 单测/离线路径
     pub async fn run_with_model(
         &self,
-        models: &[(&str, &dyn OriEvalModel)],
+        models: &[(&str, &dyn _OriEvalModel)],
     ) -> Result<OriEvalReport, LlmError> {
         let mut scores = Vec::new();
         for (name, model) in models {
             let mut case_scores = Vec::new();
             for case in &self.cases {
                 let (content, calls) = model.run(name, &case.prompt).await?;
-                case_scores.push(Self::grade_case(case, &content, &calls));
+                case_scores.push(Self::_grade_case(case, &content, &calls));
             }
-            scores.push(Self::aggregate_model(name.to_string(), case_scores));
+            scores.push(Self::_aggregate_model(name.to_string(), case_scores));
         }
         Ok(Self::finalize_report(scores))
     }
@@ -537,13 +537,13 @@ impl OriEvalSuite {
                 .iter()
                 .map(|tc| tc.function.name.clone())
                 .collect();
-            case_scores.push(Self::grade_case(case, &response.content, &calls));
+            case_scores.push(Self::_grade_case(case, &response.content, &calls));
         }
-        Ok(Self::aggregate_model(model_name.to_string(), case_scores))
+        Ok(Self::_aggregate_model(model_name.to_string(), case_scores))
     }
 
     /// 纯函数评分 — 单个用例: rubric 关键词 + tool 合法性/必要性
-    pub fn grade_case(case: &OriEvalCase, content: &str, tool_calls: &[String]) -> OriCaseScore {
+    pub(crate) fn _grade_case(case: &OriEvalCase, content: &str, tool_calls: &[String]) -> OriCaseScore {
         let lower = content.to_lowercase();
         let answer_grade = if case.rubric_keywords.is_empty() {
             if content.trim().is_empty() { 0.0 } else { 1.0 }
@@ -577,7 +577,7 @@ impl OriEvalSuite {
     }
 
     /// 聚合一个模型的全部用例分数
-    pub fn aggregate_model(model: String, case_scores: Vec<OriCaseScore>) -> OriModelScore {
+    pub(crate) fn _aggregate_model(model: String, case_scores: Vec<OriCaseScore>) -> OriModelScore {
         let n = case_scores.len().max(1) as f64;
         let avg_answer_grade = case_scores.iter().map(|s| s.answer_grade).sum::<f64>() / n;
         let tool_call_accuracy =
@@ -640,7 +640,7 @@ mod tests {
     #[test]
     fn test_knowledge_benchmarks() {
         let cap = make_test_cap();
-        let results = BenchmarkSuite::run_knowledge_benchmarks(&cap);
+        let results = BenchmarkSuite::_run_knowledge_benchmarks(&cap);
         assert_eq!(results.len(), 3);
         for r in &results {
             assert_eq!(r.category, "knowledge");
@@ -656,7 +656,7 @@ mod tests {
     #[test]
     fn test_memory_retention() {
         let mut bank = ReasoningBank::new(100);
-        let results = BenchmarkSuite::run_memory_benchmarks(&mut bank);
+        let results = BenchmarkSuite::_run_memory_benchmarks(&mut bank);
         let retention = results.iter().find(|r| r.name == "memory_retention").expect("memory_retention result should be present");
         assert_eq!(retention.category, "memory");
         assert!(retention.score >= 0.0 && retention.score <= 1.0);
@@ -665,7 +665,7 @@ mod tests {
     #[test]
     fn test_memory_capacity() {
         let mut bank = ReasoningBank::new(100);
-        let results = BenchmarkSuite::run_memory_benchmarks(&mut bank);
+        let results = BenchmarkSuite::_run_memory_benchmarks(&mut bank);
         let capacity = results.iter().find(|r| r.name == "memory_capacity").expect("memory_capacity result should be present");
         assert_eq!(capacity.max_score, 1.0);
         let meta = capacity.metadata.as_ref().expect("memory_capacity should have metadata");
@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn test_vector_stability() {
         let cap = make_test_cap();
-        let results = BenchmarkSuite::run_convergence_benchmarks(&cap);
+        let results = BenchmarkSuite::_run_convergence_benchmarks(&cap);
         let stability = results.iter().find(|r| r.name == "vector_stability").expect("vector_stability result should be present");
         assert_eq!(stability.category, "convergence");
         assert!(stability.score > 0.0 && stability.score <= 1.0);
@@ -712,11 +712,11 @@ mod tests {
     #[test]
     fn test_ori_grade_rubric_keyword_hit() {
         let case = OriEvalCase::new("q1", "write a rust fn", None, &["fn", "rust"], false);
-        let score = OriEvalSuite::grade_case(&case, "fn add(a: u32) -> u32 { a } in rust", &[]);
+        let score = OriEvalSuite::_grade_case(&case, "fn add(a: u32) -> u32 { a } in rust", &[]);
         assert!((score.answer_grade - 1.0).abs() < 1e-9, "两个关键词都命中: {}", score.answer_grade);
-        let partial = OriEvalSuite::grade_case(&case, "just rust", &[]);
+        let partial = OriEvalSuite::_grade_case(&case, "just rust", &[]);
         assert!((partial.answer_grade - 0.5).abs() < 1e-9);
-        let none = OriEvalSuite::grade_case(&case, "nothing here", &[]);
+        let none = OriEvalSuite::_grade_case(&case, "nothing here", &[]);
         assert_eq!(none.answer_grade, 0.0);
     }
 
@@ -724,14 +724,14 @@ mod tests {
     fn test_ori_tool_call_legitimacy() {
         let case = OriEvalCase::new("q1", "search the web", Some("web_search"), &["result"], true);
         // 命中期望工具 → 合法
-        let ok = OriEvalSuite::grade_case(&case, "found result", &["web_search".to_string()]);
+        let ok = OriEvalSuite::_grade_case(&case, "found result", &["web_search".to_string()]);
         assert!(ok.tool_call_legit);
         assert!(ok.tool_call_necessary);
         // 调用非期望工具 → 不合法
-        let bad = OriEvalSuite::grade_case(&case, "result", &["execute_command".to_string()]);
+        let bad = OriEvalSuite::_grade_case(&case, "result", &["execute_command".to_string()]);
         assert!(!bad.tool_call_legit);
         // requires_tool=true 但未调用 → 不必要
-        let no_call = OriEvalSuite::grade_case(&case, "result", &[]);
+        let no_call = OriEvalSuite::_grade_case(&case, "result", &[]);
         assert!(!no_call.tool_call_necessary);
     }
 
@@ -739,11 +739,11 @@ mod tests {
     fn test_ori_tool_necessity_when_not_required() {
         let case = OriEvalCase::new("q1", "just answer", None, &["answer"], false);
         // 不需要工具时未调用 → 必要
-        let no_call = OriEvalSuite::grade_case(&case, "the answer is 42", &[]);
+        let no_call = OriEvalSuite::_grade_case(&case, "the answer is 42", &[]);
         assert!(no_call.tool_call_necessary);
         assert!(no_call.tool_call_legit);
         // 不需要工具时却调用 → 不必要
-        let over = OriEvalSuite::grade_case(&case, "answer", &["web_search".to_string()]);
+        let over = OriEvalSuite::_grade_case(&case, "answer", &["web_search".to_string()]);
         assert!(!over.tool_call_necessary);
         assert!(!over.tool_call_legit);
     }
@@ -751,9 +751,9 @@ mod tests {
     #[test]
     fn test_ori_case_composite_factor() {
         let case = OriEvalCase::new("q1", "search", Some("web_search"), &["hit"], true);
-        let perfect = OriEvalSuite::grade_case(&case, "hit", &["web_search".to_string()]);
+        let perfect = OriEvalSuite::_grade_case(&case, "hit", &["web_search".to_string()]);
         assert!((perfect.composite() - 1.0).abs() < 1e-9);
-        let tool_bad = OriEvalSuite::grade_case(&case, "hit", &[]);
+        let tool_bad = OriEvalSuite::_grade_case(&case, "hit", &[]);
         assert!(tool_bad.composite() < perfect.composite());
     }
 
@@ -763,7 +763,7 @@ mod tests {
             good: bool,
         }
         #[async_trait::async_trait]
-        impl OriEvalModel for Double {
+        impl _OriEvalModel for Double {
             async fn run(&self, _model: &str, prompt: &str) -> Result<(String, Vec<String>), LlmError> {
                 if self.good {
                     Ok(("answer with correct result".into(), vec!["web_search".into()]))
@@ -796,9 +796,9 @@ mod tests {
     #[test]
     fn test_ori_aggregate_model_and_tool_accuracy() {
         let case = OriEvalCase::new("q", "search", Some("web_search"), &["result"], true);
-        let good = OriEvalSuite::grade_case(&case, "result", &["web_search".into()]);
-        let bad = OriEvalSuite::grade_case(&case, "result", &[]);
-        let score = OriEvalSuite::aggregate_model("m1".into(), vec![good, bad]);
+        let good = OriEvalSuite::_grade_case(&case, "result", &["web_search".into()]);
+        let bad = OriEvalSuite::_grade_case(&case, "result", &[]);
+        let score = OriEvalSuite::_aggregate_model("m1".into(), vec![good, bad]);
         assert_eq!(score.case_scores.len(), 2);
         assert!((score.tool_call_accuracy - 0.5).abs() < 1e-9);
         assert!((score.tool_necessity - 0.5).abs() < 1e-9);
@@ -809,9 +809,9 @@ mod tests {
     #[test]
     fn test_ori_empty_rubric_grades_nonempty_content() {
         let case = OriEvalCase::new("q", "hi", None, &[], false);
-        let score = OriEvalSuite::grade_case(&case, "hello world", &[]);
+        let score = OriEvalSuite::_grade_case(&case, "hello world", &[]);
         assert_eq!(score.answer_grade, 1.0);
-        let empty = OriEvalSuite::grade_case(&case, "", &[]);
+        let empty = OriEvalSuite::_grade_case(&case, "", &[]);
         assert_eq!(empty.answer_grade, 0.0);
     }
 }

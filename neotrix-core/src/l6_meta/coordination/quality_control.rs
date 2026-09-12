@@ -38,13 +38,13 @@ pub enum ReviewStatus {
 
 /// 质量检查项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualityCheckItem {
+pub(crate) struct _QualityCheckItem {
     /// 检查项ID
     pub id: String,
     /// 检查项名称
     pub name: String,
     /// 检查类型
-    pub check_type: QualityCheckType,
+    pub check_type: _QualityCheckType,
     /// 权重
     pub weight: f32,
     /// 是否启用
@@ -53,7 +53,7 @@ pub struct QualityCheckItem {
 
 /// 质量检查类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum QualityCheckType {
+pub(crate) enum _QualityCheckType {
     /// 技术质量
     Technical,
     /// 内容合规
@@ -97,7 +97,7 @@ pub struct ReviewResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QualityIssue {
     /// 问题类型
-    pub check_type: QualityCheckType,
+    pub check_type: _QualityCheckType,
     /// 严重程度
     pub severity: IssueSeverity,
     /// 问题描述
@@ -123,9 +123,9 @@ pub enum IssueSeverity {
 
 /// 质量控制配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualityControlConfig {
+pub(crate) struct _QualityControlConfig {
     /// 检查项列表
-    pub check_items: Vec<QualityCheckItem>,
+    pub check_items: Vec<_QualityCheckItem>,
     /// 通过阈值 (0.0-1.0)
     pub pass_threshold: f32,
     /// 警告阈值 (0.0-1.0)
@@ -139,44 +139,44 @@ pub struct QualityControlConfig {
 }
 
 /// 质量控制流水线
-pub struct QualityControlPipeline {
+pub(crate) struct _QualityControlPipeline {
     /// 配置
-    config: QualityControlConfig,
+    config: _QualityControlConfig,
     /// 审核历史
     history: Vec<ReviewResult>,
 }
 
-impl QualityControlPipeline {
+impl _QualityControlPipeline {
     /// 创建流水线
     pub fn new() -> Self {
         Self {
-            config: QualityControlConfig {
+            config: _QualityControlConfig {
                 check_items: vec![
-                    QualityCheckItem {
+                    _QualityCheckItem {
                         id: "tech_quality".to_string(),
                         name: "技术质量".to_string(),
-                        check_type: QualityCheckType::Technical,
+                        check_type: _QualityCheckType::Technical,
                         weight: 0.3,
                         enabled: true,
                     },
-                    QualityCheckItem {
+                    _QualityCheckItem {
                         id: "compliance".to_string(),
                         name: "内容合规".to_string(),
-                        check_type: QualityCheckType::Compliance,
+                        check_type: _QualityCheckType::Compliance,
                         weight: 0.2,
                         enabled: true,
                     },
-                    QualityCheckItem {
+                    _QualityCheckItem {
                         id: "visual".to_string(),
                         name: "视觉一致性".to_string(),
-                        check_type: QualityCheckType::VisualConsistency,
+                        check_type: _QualityCheckType::VisualConsistency,
                         weight: 0.25,
                         enabled: true,
                     },
-                    QualityCheckItem {
+                    _QualityCheckItem {
                         id: "narrative".to_string(),
                         name: "叙事连贯性".to_string(),
-                        check_type: QualityCheckType::NarrativeCoherence,
+                        check_type: _QualityCheckType::NarrativeCoherence,
                         weight: 0.25,
                         enabled: true,
                     },
@@ -192,7 +192,7 @@ impl QualityControlPipeline {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: QualityControlConfig) -> Self {
+    pub fn with_config(config: _QualityControlConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -200,7 +200,7 @@ impl QualityControlPipeline {
     }
     
     /// 执行 AI 自动审核
-    pub fn review_by_ai(&self, content_id: &str) -> ReviewResult {
+    pub(crate) fn _review_by_ai(&self, content_id: &str) -> ReviewResult {
         let mut check_scores = HashMap::new();
         let mut total_score = 0.0;
         let mut total_weight = 0.0;
@@ -243,25 +243,25 @@ impl QualityControlPipeline {
     }
     
     /// 评估检查项
-    fn evaluate_check_item(&self, check_type: &QualityCheckType) -> f32 {
+    fn evaluate_check_item(&self, check_type: &_QualityCheckType) -> f32 {
         // TODO: 实际调用评估逻辑
         match check_type {
-            QualityCheckType::Technical => 0.92,
-            QualityCheckType::Compliance => 0.95,
-            QualityCheckType::VisualConsistency => 0.88,
-            QualityCheckType::NarrativeCoherence => 0.90,
-            QualityCheckType::AudioVisualSync => 0.85,
-            QualityCheckType::Performance => 0.87,
+            _QualityCheckType::Technical => 0.92,
+            _QualityCheckType::Compliance => 0.95,
+            _QualityCheckType::VisualConsistency => 0.88,
+            _QualityCheckType::NarrativeCoherence => 0.90,
+            _QualityCheckType::AudioVisualSync => 0.85,
+            _QualityCheckType::Performance => 0.87,
         }
     }
     
     /// 执行完整审核流程
-    pub fn execute_review_flow(&mut self, content_id: &str) -> Vec<ReviewResult> {
+    pub(crate) fn _execute_review_flow(&mut self, content_id: &str) -> Vec<ReviewResult> {
         let mut results = vec![];
         
         for level in &self.config.review_flow {
             let result = match level {
-                ReviewLevel::AI => self.review_by_ai(content_id),
+                ReviewLevel::AI => self._review_by_ai(content_id),
                 ReviewLevel::Human => {
                     // TODO: 实际调用人工审核接口
                     ReviewResult {
@@ -307,7 +307,7 @@ impl QualityControlPipeline {
     }
     
     /// 获取统计信息
-    pub fn statistics(&self) -> QualityStats {
+    pub fn statistics(&self) -> _QualityStats {
         let total_reviews = self.history.len();
         let approved = self.history.iter().filter(|r| r.status == ReviewStatus::Approved).count();
         let rejected = self.history.iter().filter(|r| r.status == ReviewStatus::Rejected).count();
@@ -317,7 +317,7 @@ impl QualityControlPipeline {
             0.0
         };
         
-        QualityStats {
+        _QualityStats {
             total_reviews,
             approved,
             rejected,
@@ -333,7 +333,7 @@ impl QualityControlPipeline {
 
 /// 质量统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualityStats {
+pub(crate) struct _QualityStats {
     /// 总审核数
     pub total_reviews: usize,
     /// 通过数
@@ -351,7 +351,7 @@ pub struct QualityStats {
 // ============================================================================
 
 /// 质量门禁 (向后兼容别名)
-pub type QualityGate = QualityControlPipeline;
+pub type QualityGate = _QualityControlPipeline;
 
 // ============================================================================
 // 测试模块
@@ -363,9 +363,9 @@ mod tests {
     
     #[test]
     fn test_quality_pipeline() {
-        let mut pipeline = QualityControlPipeline::new();
+        let mut pipeline = _QualityControlPipeline::new();
         
-        let results = pipeline.execute_review_flow("content_001");
+        let results = pipeline._execute_review_flow("content_001");
         assert!(!results.is_empty());
         
         let stats = pipeline.statistics();
@@ -375,9 +375,9 @@ mod tests {
     
     #[test]
     fn test_ai_review() {
-        let pipeline = QualityControlPipeline::new();
+        let pipeline = _QualityControlPipeline::new();
         
-        let result = pipeline.review_by_ai("content_001");
+        let result = pipeline._review_by_ai("content_001");
         assert!(result.total_score > 0.8);
         assert_eq!(result.status, ReviewStatus::Approved);
     }

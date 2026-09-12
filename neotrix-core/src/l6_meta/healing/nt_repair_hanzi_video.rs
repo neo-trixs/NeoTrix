@@ -20,7 +20,7 @@
 //! |------|-----------|------|
 //! | C0 身份映射 | `HanziChar` / `HanziComponent` 建模 | 编译 |
 //! | C1 拆字 | `HanziChaiziEngine::decompose` | 单测 |
-//! | C2 组件序列 | `HanziChaiziEngine::component_sequence` | 单测 |
+//! | C2 组件序列 | `HanziChaiziEngine::_component_sequence` | 单测 |
 //! | C3 视频计划 | `VideoClipPlanner::plan` | 单测 |
 //! | C4 契约输出 | `RepairHarness::repair` 聚合 | 集成 (SelfTest) |
 //! | C5 跨面复用 | 修复注册 | 生产接线 (T3) |
@@ -166,7 +166,7 @@ impl HanziChaiziEngine {
     }
 
     /// 组件序列 (只取字形), 叶子优先。
-    pub fn component_sequence(&self, glyph: &str) -> Vec<String> {
+    pub(crate) fn _component_sequence(&self, glyph: &str) -> Vec<String> {
         self.decompose(glyph)
             .components
             .iter()
@@ -350,7 +350,7 @@ impl SelfTest for HanziVideoSelfTest {
         }
 
         // C2: 组件序列 — 叶子优先, 末为根
-        let seq = engine.component_sequence("李");
+        let seq = engine._component_sequence("李");
         if seq.first().map(|s| s.as_str()) != Some("木") {
             failures.push(format!("expected 木 first, got {:?}", seq.first()));
         }
@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn test_component_sequence_order() {
         let engine = HanziChaiziEngine::default();
-        let seq = engine.component_sequence("明");
+        let seq = engine._component_sequence("明");
         assert_eq!(seq, vec!["日", "月", "明"]);
     }
 

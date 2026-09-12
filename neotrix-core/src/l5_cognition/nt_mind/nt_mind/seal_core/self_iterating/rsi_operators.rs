@@ -71,7 +71,7 @@ impl RsiOperator {
     ///
     /// 每个变换生成一个增强副本, 所有副本组成增强数据集。
     /// 用于 SEAL Phase-0 数据合成阶段。
-    pub fn execute_data_rsi(&self, data: &[String]) -> Vec<String> {
+    pub(crate) fn _execute_data_rsi(&self, data: &[String]) -> Vec<String> {
         match self {
             RsiOperator::DataRsi { transformations } => {
                 if transformations.is_empty() || data.is_empty() {
@@ -93,7 +93,7 @@ impl RsiOperator {
     ///
     /// 新指标初始化为 0.0, 由后续评估循环逐步填充真实值。
     /// 用于 SEAL Phase-1 评估框架改进。
-    pub fn execute_harness_rsi(&self, metrics: &HashMap<String, f64>) -> HashMap<String, f64> {
+    pub(crate) fn _execute_harness_rsi(&self, metrics: &HashMap<String, f64>) -> HashMap<String, f64> {
         match self {
             RsiOperator::HarnessRsi {
                 metrics: new_metrics,
@@ -112,7 +112,7 @@ impl RsiOperator {
     ///
     /// 将架构变更描述标记为已修改, 触发后续能力向量重评估。
     /// 用于 SEAL Phase-2 模型架构演化。
-    pub fn execute_model_rsi(&self, config: &mut HashMap<String, String>) {
+    pub(crate) fn _execute_model_rsi(&self, config: &mut HashMap<String, String>) {
         if let RsiOperator::ModelRsi {
             architecture_changes,
         } = self
@@ -128,7 +128,7 @@ impl RsiOperator {
     /// Data-RSI: 与变换数量成正比 (数据多样性增益)
     /// Harness-RSI: 与指标数量成正比 (评估覆盖增益)
     /// Model-RSI: 与变更数量成正比 (架构探索增益)
-    pub fn expected_gain(&self) -> f64 {
+    pub(crate) fn _expected_gain(&self) -> f64 {
         match self {
             RsiOperator::DataRsi { transformations } => {
                 (transformations.len() as f64 * 0.05).min(0.3)
@@ -210,7 +210,7 @@ impl RsiOperatorChain {
     }
 
     /// 执行所有算子, 返回总预期收益
-    pub fn execute_all(
+    pub(crate) fn _execute_all(
         &self,
         data: &mut Vec<String>,
         metrics: &mut HashMap<String, f64>,
@@ -218,18 +218,18 @@ impl RsiOperatorChain {
     ) -> f64 {
         let mut total_gain = 0.0;
         for op in &self.operators {
-            total_gain += op.expected_gain();
+            total_gain += op._expected_gain();
             match op {
                 RsiOperator::DataRsi { .. } => {
-                    let augmented = op.execute_data_rsi(data);
+                    let augmented = op._execute_data_rsi(data);
                     data.extend(augmented);
                 }
                 RsiOperator::HarnessRsi { .. } => {
-                    let updated = op.execute_harness_rsi(metrics);
+                    let updated = op._execute_harness_rsi(metrics);
                     *metrics = updated;
                 }
                 RsiOperator::ModelRsi { .. } => {
-                    op.execute_model_rsi(config);
+                    op._execute_model_rsi(config);
                 }
             }
         }
@@ -287,7 +287,7 @@ impl BrainStage for MetaRsiStage {
         );
         let mut config: HashMap<String, String> = HashMap::new();
 
-        let total_gain = chain.execute_all(&mut data, &mut metrics, &mut config);
+        let total_gain = chain._execute_all(&mut data, &mut metrics, &mut config);
 
         // 将增强后的 harness_history 写回 brain
         brain.brain.harness_history = data;
@@ -336,7 +336,7 @@ mod tests {
             transformations: vec!["backtranslation".into(), "paraphrase".into()],
         };
         let data = vec!["hello".into(), "world".into()];
-        let result = op.execute_data_rsi(&data);
+        let result = op._execute_data_rsi(&data);
         assert_eq!(result.len(), 4); // 2 items × 2 transforms
         assert!(result[0].contains("backtranslation"));
         assert!(result[1].contains("paraphrase"));
@@ -349,7 +349,7 @@ mod tests {
             transformations: vec![],
         };
         let data = vec!["hello".into()];
-        let result = op.execute_data_rsi(&data);
+        let result = op._execute_data_rsi(&data);
         assert_eq!(result, vec!["hello".into()]);
     }
 
@@ -360,7 +360,7 @@ mod tests {
         };
         let mut existing = HashMap::new();
         existing.insert("reward".into(), 0.5);
-        let result = op.execute_harness_rsi(&existing);
+        let result = op._execute_harness_rsi(&existing);
         assert_eq!(result.len(), 3);
         assert_eq!(result["reward"], 0.5);
         assert_eq!(result["diversity"], 0.0);
@@ -373,7 +373,7 @@ mod tests {
         };
         let mut existing = HashMap::new();
         existing.insert("reward".into(), 0.75);
-        let result = op.execute_harness_rsi(&existing);
+        let result = op._execute_harness_rsi(&existing);
         assert_eq!(result["reward"], 0.75); // preserved, not reset to 0.0
     }
 
@@ -383,7 +383,7 @@ mod tests {
             architecture_changes: vec!["add_head".into()],
         };
         let mut config = HashMap::new();
-        op.execute_model_rsi(&mut config);
+        op._execute_model_rsi(&mut config);
         assert_eq!(config["add_head"], "modified");
     }
 
@@ -392,17 +392,17 @@ mod tests {
         let data_op = RsiOperator::DataRsi {
             transformations: vec!["a".into(), "b".into()],
         };
-        assert!((data_op.expected_gain() - 0.1).abs() < 1e-6);
+        assert!((data_op._expected_gain() - 0.1).abs() < 1e-6);
 
         let harness_op = RsiOperator::HarnessRsi {
             metrics: vec!["a".into(), "b".into(), "c".into()],
         };
-        assert!((harness_op.expected_gain() - 0.24).abs() < 1e-6);
+        assert!((harness_op._expected_gain() - 0.24).abs() < 1e-6);
 
         let model_op = RsiOperator::ModelRsi {
             architecture_changes: vec!["a".into()],
         };
-        assert!((model_op.expected_gain() - 0.06).abs() < 1e-6);
+        assert!((model_op._expected_gain() - 0.06).abs() < 1e-6);
     }
 
     #[test]

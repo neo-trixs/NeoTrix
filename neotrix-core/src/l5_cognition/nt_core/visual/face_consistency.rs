@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 面部修复策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FaceFixStrategy {
+pub(crate) enum _FaceFixStrategy {
     /// ADetailer 自动补脸 (SD WebUI)
     ADetailer,
     /// FaceDetailer 自动补脸 (ComfyUI Impact Pack)
@@ -25,9 +25,9 @@ pub enum FaceFixStrategy {
 
 /// 面部修复配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FaceFixConfig {
+pub(crate) struct _FaceFixConfig {
     /// 修复策略
-    pub strategy: FaceFixStrategy,
+    pub strategy: _FaceFixStrategy,
     /// 检测阈值 (0.0-1.0)
     pub detection_threshold: f32,
     /// 修复强度 (0.0-1.0)
@@ -44,7 +44,7 @@ pub struct FaceFixConfig {
 
 /// 面部修复结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FaceFixResult {
+pub(crate) struct _FaceFixResult {
     /// 是否成功
     pub success: bool,
     /// 修复后的图片路径
@@ -84,7 +84,7 @@ pub struct RegionConfig {
 
 /// 多角色分区配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegionalPromptingConfig {
+pub(crate) struct _RegionalPromptingConfig {
     /// 是否启用
     pub enabled: bool,
     /// 分区模式
@@ -120,21 +120,21 @@ pub enum RegionalMode {
 pub struct FaceConsistencyManager {
     /// 面部修复配置
     #[allow(dead_code)]
-    face_fix_config: FaceFixConfig,
+    face_fix_config: _FaceFixConfig,
     /// 区域提示词配置
-    regional_config: RegionalPromptingConfig,
+    regional_config: _RegionalPromptingConfig,
     /// 角色参考图缓存
     reference_cache: HashMap<String, String>,
     /// 修复历史
-    fix_history: Vec<FaceFixResult>,
+    fix_history: Vec<_FaceFixResult>,
 }
 
 impl FaceConsistencyManager {
     /// 创建增强器
     pub fn new() -> Self {
         Self {
-            face_fix_config: FaceFixConfig {
-                strategy: FaceFixStrategy::FaceDetailer,
+            face_fix_config: _FaceFixConfig {
+                strategy: _FaceFixStrategy::FaceDetailer,
                 detection_threshold: 0.5,
                 fix_strength: 0.8,
                 max_retries: 2,
@@ -142,7 +142,7 @@ impl FaceConsistencyManager {
                 lora_name: None,
                 lora_weight: 0.7,
             },
-            regional_config: RegionalPromptingConfig {
+            regional_config: _RegionalPromptingConfig {
                 enabled: false,
                 mode: RegionalMode::Horizontal,
                 regions: vec![],
@@ -165,13 +165,13 @@ impl FaceConsistencyManager {
     }
     
     /// 执行面部修复
-    pub fn fix_faces(
+    pub(crate) fn _fix_faces(
         &mut self,
         image_path: &str,
         _character_id: Option<&str>,
-    ) -> FaceFixResult {
+    ) -> _FaceFixResult {
         // TODO: 实际调用面部修复逻辑
-        let result = FaceFixResult {
+        let result = _FaceFixResult {
             success: true,
             fixed_image_path: Some(format!("{}_fixed.png", image_path)),
             detected_faces: 1,
@@ -186,13 +186,13 @@ impl FaceConsistencyManager {
     }
     
     /// 批量修复面部
-    pub fn batch_fix_faces(
+    pub(crate) fn _batch_fix_faces(
         &mut self,
         image_paths: &[String],
         character_id: Option<&str>,
-    ) -> Vec<FaceFixResult> {
+    ) -> Vec<_FaceFixResult> {
         image_paths.iter()
-            .map(|path| self.fix_faces(path, character_id))
+            .map(|path| self._fix_faces(path, character_id))
             .collect()
     }
     
@@ -215,7 +215,7 @@ impl FaceConsistencyManager {
     }
     
     /// 设置区域配置
-    pub fn set_regional_config(&mut self, config: RegionalPromptingConfig) {
+    pub fn set_regional_config(&mut self, config: _RegionalPromptingConfig) {
         self.regional_config = config;
     }
     
@@ -271,7 +271,7 @@ mod tests {
         assert!(manager.get_reference("char_001").is_some());
         
         // 执行修复
-        let result = manager.fix_faces("/input/test.png", Some("char_001"));
+        let result = manager._fix_faces("/input/test.png", Some("char_001"));
         assert!(result.success);
         assert!(result.consistency_score > 0.9);
         
@@ -285,7 +285,7 @@ mod tests {
     fn test_regional_prompting() {
         let mut manager = FaceConsistencyManager::new();
         
-        let config = RegionalPromptingConfig {
+        let config = _RegionalPromptingConfig {
             enabled: true,
             mode: RegionalMode::Horizontal,
             regions: vec![

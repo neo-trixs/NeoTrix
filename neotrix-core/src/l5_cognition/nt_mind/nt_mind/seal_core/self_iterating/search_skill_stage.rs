@@ -83,16 +83,16 @@ pub struct Evidence {
 
 /// 搜索技能缓冲
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchSkillBuffer {
+pub(crate) struct _SearchSkillBuffer {
     pub exercises: VecDeque<SearchExercise>,
     pub max_size: usize,
 }
 
-impl Default for SearchSkillBuffer {
+impl Default for _SearchSkillBuffer {
     fn default() -> Self { Self::new() }
 }
 
-impl SearchSkillBuffer {
+impl _SearchSkillBuffer {
     pub fn new() -> Self {
         Self { exercises: VecDeque::with_capacity(SEARCH_SKILL_BUFFER_SIZE), max_size: SEARCH_SKILL_BUFFER_SIZE }
     }
@@ -110,7 +110,7 @@ impl SearchSkillBuffer {
 
 /// 搜索技能阶段报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchSkillReport {
+pub(crate) struct _SearchSkillReport {
     pub total_updates: u64,
     pub buffer_size: usize,
     pub avg_grounding: f64,
@@ -126,7 +126,7 @@ pub struct SearchSkillReport {
 /// 累积到 CapabilityVector.extension (nt_cap:search_*)。
 #[derive(Debug, Clone)]
 pub struct SearchSkillStage {
-    pub buffer: SearchSkillBuffer,
+    pub buffer: _SearchSkillBuffer,
     pub learning_rate: f64,
     pub total_updates: u64,
     /// 搜索子技能维度 (EMA 累积)
@@ -145,7 +145,7 @@ impl Default for SearchSkillStage {
 impl SearchSkillStage {
     pub fn new() -> Self {
         Self {
-            buffer: SearchSkillBuffer::new(),
+            buffer: _SearchSkillBuffer::new(),
             learning_rate: SEARCH_SKILL_LEARNING_RATE,
             total_updates: 0,
             query_generation: 0.0,
@@ -157,14 +157,14 @@ impl SearchSkillStage {
     }
 
     /// 绑定 PSV 合成管线 (用于生成搜索训练数据)
-    pub fn with_synthesis_pipeline(mut self, pipeline: super::data_synthesis::AsymmetricSynthesisPipeline) -> Self {
+    pub(crate) fn _with_synthesis_pipeline(mut self, pipeline: super::data_synthesis::AsymmetricSynthesisPipeline) -> Self {
         self.synthesis_pipeline = Some(pipeline);
         self
     }
 
     /// 从 nt_world_crawl 执行一次搜索演练 (需外部提供 crawler 实例)
     /// 返回 SearchExercise，由外部调用者负责执行实际搜索
-    pub fn create_exercise_from_crawl(
+    pub(crate) fn _create_exercise_from_crawl(
         &self,
         task_type: SearchTaskType,
         query: String,
@@ -214,7 +214,7 @@ impl SearchSkillStage {
 
     /// 从 PSV 管线生成搜索训练数据 (Proposer→Solver→Verifier)
     /// Solver 闭包中调用实际搜索工具
-    pub fn generate_training_data<F>(
+    pub(crate) fn _generate_training_data<F>(
         &mut self,
         gaps: Vec<super::data_synthesis::KnowledgeGap>,
         solver: F,
@@ -355,7 +355,7 @@ impl SearchSkillStage {
         stage
     }
 
-    pub fn report(&self) -> SearchSkillReport {
+    pub fn report(&self) -> _SearchSkillReport {
         use std::collections::HashMap;
         let mut type_dist = HashMap::new();
         let mut sum_g = 0.0; let mut sum_r = 0.0; let mut sum_s = 0.0;
@@ -366,7 +366,7 @@ impl SearchSkillStage {
             sum_s += ex.synthesis_quality;
         }
         let n = self.buffer.len().max(1) as f64;
-        SearchSkillReport {
+        _SearchSkillReport {
             total_updates: self.total_updates,
             buffer_size: self.buffer.len(),
             avg_grounding: sum_g / n,
@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn test_buffer_push_and_by_type() {
-        let mut buf = SearchSkillBuffer::new();
+        let mut buf = _SearchSkillBuffer::new();
         buf.push(make_exercise(SearchTaskType::FactLookup, 0.9, 0.8, 0.85));
         buf.push(make_exercise(SearchTaskType::CodeExample, 0.7, 0.6, 0.65));
         assert_eq!(buf.len(), 2);

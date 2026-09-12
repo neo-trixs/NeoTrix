@@ -10,12 +10,12 @@ pub struct Generator {
     /// 生成历史
     pub history: Vec<GenerationRecord>,
     /// 创意库
-    pub creativity_pool: Vec<CreativeElement>,
+    pub creativity_pool: Vec<_CreativeElement>,
 }
 
 /// 创意元素
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreativeElement {
+pub(crate) struct _CreativeElement {
     pub id: String,
     pub element_type: ElementType,
     pub content: String,
@@ -38,7 +38,7 @@ pub enum ElementType {
 pub struct GenerationRecord {
     pub id: String,
     pub cycle: u32,
-    pub generation_type: GenerationType,
+    pub generation_type: _GenerationType,
     pub input: String,
     pub output: String,
     pub creativity_score: f64,
@@ -47,7 +47,7 @@ pub struct GenerationRecord {
 
 /// 生成类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum GenerationType {
+pub(crate) enum _GenerationType {
     Content,
     Solution,
     Innovation,
@@ -63,13 +63,13 @@ impl Generator {
     }
 
     /// 生成内容
-    pub fn generate_content(&mut self, cycle: u32, prompt: &str, context: &str) -> String {
+    pub(crate) fn _generate_content(&mut self, cycle: u32, prompt: &str, context: &str) -> String {
         let output = format!("Generated content for: {} (context: {})", prompt, context);
         
         let record = GenerationRecord {
             id: format!("gen_{}", uuid::Uuid::new_v4()),
             cycle,
-            generation_type: GenerationType::Content,
+            generation_type: _GenerationType::Content,
             input: prompt.to_string(),
             output: output.clone(),
             creativity_score: 0.7,
@@ -81,13 +81,13 @@ impl Generator {
     }
 
     /// 生成方案
-    pub fn generate_solution(&mut self, cycle: u32, problem: &str) -> String {
+    pub(crate) fn _generate_solution(&mut self, cycle: u32, problem: &str) -> String {
         let solution = format!("Solution for: {}", problem);
         
         let record = GenerationRecord {
             id: format!("gen_{}", uuid::Uuid::new_v4()),
             cycle,
-            generation_type: GenerationType::Solution,
+            generation_type: _GenerationType::Solution,
             input: problem.to_string(),
             output: solution.clone(),
             creativity_score: 0.8,
@@ -99,8 +99,8 @@ impl Generator {
     }
 
     /// 获取统计
-    pub fn stats(&self) -> GeneratorStats {
-        GeneratorStats {
+    pub fn stats(&self) -> _GeneratorStats {
+        _GeneratorStats {
             total_generations: self.history.len(),
             avg_creativity: if self.history.is_empty() {
                 0.0
@@ -112,12 +112,12 @@ impl Generator {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GeneratorStats {
+pub(crate) struct _GeneratorStats {
     pub total_generations: usize,
     pub avg_creativity: f64,
 }
 
-impl std::fmt::Display for GeneratorStats {
+impl std::fmt::Display for _GeneratorStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Generator: {} generations, avg creativity {:.4}",
             self.total_generations, self.avg_creativity)
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn test_generator() {
         let mut gen = Generator::new();
-        let output = gen.generate_content(0, "test", "context");
+        let output = gen._generate_content(0, "test", "context");
         assert!(!output.is_empty());
     }
 }

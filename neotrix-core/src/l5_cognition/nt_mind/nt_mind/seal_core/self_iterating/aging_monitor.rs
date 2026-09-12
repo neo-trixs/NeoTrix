@@ -49,7 +49,7 @@ impl AgingMonitor {
     }
 
     /// Detect compression aging: variance loss in compressed representations.
-    pub fn detect_compression(&self) -> f64 {
+    pub(crate) fn _detect_compression(&self) -> f64 {
         let n = self.capability_history.len();
         if n < 3 {
             return 0.0;
@@ -75,7 +75,7 @@ impl AgingMonitor {
     }
 
     /// Detect interference aging: retrieval cross-talk in growing memory.
-    pub fn detect_interference(&self, brain: &SelfIteratingBrain) -> f64 {
+    pub(crate) fn _detect_interference(&self, brain: &SelfIteratingBrain) -> f64 {
         let memories = brain.reasoning_bank.memories();
         let memory_count = memories.len() as f64;
         if memory_count < 5.0 {
@@ -91,7 +91,7 @@ impl AgingMonitor {
     }
 
     /// Detect revision aging: inconsistency from sequential fact updates.
-    pub fn detect_revision(&self) -> f64 {
+    pub(crate) fn _detect_revision(&self) -> f64 {
         let n = self.capability_history.len();
         if n < 5 {
             return 0.0;
@@ -111,7 +111,7 @@ impl AgingMonitor {
     }
 
     /// Detect maintenance aging: drift after consolidation cycles.
-    pub fn detect_maintenance(&self, brain: &SelfIteratingBrain) -> f64 {
+    pub(crate) fn _detect_maintenance(&self, brain: &SelfIteratingBrain) -> f64 {
         let total_absorbs = brain.brain.total_absorb_count;
         if total_absorbs < 5 {
             return 0.0;
@@ -132,17 +132,17 @@ impl AgingMonitor {
     }
 
     pub fn update_all(&mut self, brain: &SelfIteratingBrain) {
-        self.compression_score = self.detect_compression();
-        self.interference_score = self.detect_interference(brain);
-        self.revision_score = self.detect_revision();
-        self.maintenance_score = self.detect_maintenance(brain);
+        self.compression_score = self._detect_compression();
+        self.interference_score = self._detect_interference(brain);
+        self.revision_score = self._detect_revision();
+        self.maintenance_score = self._detect_maintenance(brain);
     }
 
     pub fn overall_aging(&self) -> f64 {
         (self.compression_score + self.interference_score + self.revision_score + self.maintenance_score) / 4.0
     }
 
-    pub fn has_alert(&self) -> Option<&'static str> {
+    pub(crate) fn _has_alert(&self) -> Option<&'static str> {
         if self.compression_score > self.alert_threshold {
             return Some("compression aging exceeds threshold");
         }
@@ -158,7 +158,7 @@ impl AgingMonitor {
         None
     }
 
-    pub fn diagnostic_report(&self) -> String {
+    pub(crate) fn _diagnostic_report(&self) -> String {
         format!(
             "AgingDiagnostic {{ compression: {:.3}, interference: {:.3}, revision: {:.3}, maintenance: {:.3}, overall: {:.3} }}",
             self.compression_score,
@@ -201,12 +201,12 @@ impl BrainStage for AgingDiagnosisStage {
         {
             let monitor = &mut brain._aging_monitor;
             monitor.record_snapshot(iteration, &capability);
-            monitor.compression_score = monitor.detect_compression();
+            monitor.compression_score = monitor._detect_compression();
             monitor.interference_score = if memory_count >= 5 && !memory_pairs.is_empty() {
                 let similarity_sum: f64 = memory_pairs.iter().map(|(a, b)| (a - b).abs()).sum();
                 (1.0 - similarity_sum / memory_count as f64 * 2.0).max(0.0).min(1.0)
             } else { 0.0 };
-            monitor.revision_score = monitor.detect_revision();
+            monitor.revision_score = monitor._detect_revision();
             monitor.maintenance_score = if total_absorbs >= 5 {
                 let n = monitor.capability_history.len();
                 if n >= 3 {
@@ -223,10 +223,10 @@ impl BrainStage for AgingDiagnosisStage {
             } else { 0.0 };
         }
 
-        let report = brain._aging_monitor.diagnostic_report();
+        let report = brain._aging_monitor._diagnostic_report();
         log::info!("[aging] {}", report);
 
-        if let Some(alert) = brain._aging_monitor.has_alert() {
+        if let Some(alert) = brain._aging_monitor._has_alert() {
             log::warn!("[aging] ALERT: {}", alert);
             let existing = brain._open_source_insights.clone().unwrap_or_default();
             let combined = if existing.is_empty() {

@@ -60,7 +60,7 @@ impl ReasoningBrain {
     /// VideoLingo 原文: "Translate → Reflect → Adaptation" 三步循环,
     /// 反思结果驱动适应, 而非一次性单向吸收。
     /// 返回 (是否触发适应, 位移量)。
-    pub fn absorb_with_reflection(&mut self, source: KnowledgeSource) -> (bool, f64) {
+    pub(crate) fn _absorb_with_reflection(&mut self, source: KnowledgeSource) -> (bool, f64) {
         let before = self.capability.arr().to_vec();
         self.absorb(source);
         let after = self.capability.arr().to_vec();
@@ -217,7 +217,7 @@ impl ReasoningBrain {
         applied_indices
     }
 
-    pub fn apply_self_edit(&mut self, edit: &SelfEdit, reward: Option<f64>) -> bool {
+    pub(crate) fn _apply_self_edit(&mut self, edit: &SelfEdit, reward: Option<f64>) -> bool {
         let snapshot = self.capability.clone();
         let snapshot_lr = self.learning_rate;
 
@@ -276,7 +276,7 @@ impl ReasoningBrain {
         score
     }
 
-    pub fn update_task_affinity(&mut self, task_type: TaskType, performance: f64) {
+    pub(crate) fn _update_task_affinity(&mut self, task_type: TaskType, performance: f64) {
         let entry = self.task_affinity.entry(task_type).or_insert(0.5);
         *entry = *entry * 0.7 + performance * 0.3;
     }
@@ -307,7 +307,7 @@ mod tests {
         let cap_before = brain.capability.arr().to_vec();
 
         // 极端源: 高维强向量 → 位移必然超阈值 → 触发适应
-        let (adapted, displacement) = brain.absorb_with_reflection(KnowledgeSource::ResearchFindings);
+        let (adapted, displacement) = brain._absorb_with_reflection(KnowledgeSource::ResearchFindings);
 
         assert!(adapted, "extreme source should trigger adaptation");
         assert!(displacement > 0.10, "displacement should exceed threshold, got {}", displacement);
@@ -330,7 +330,7 @@ mod tests {
         let mut brain = ReasoningBrain::new();
         let lr_before = brain.learning_rate;
         // AdamsLaw: 基础维度多为 0, 位移 ≈ 0.05 (阈值内) → 不触发适应
-        let (adapted, _) = brain.absorb_with_reflection(KnowledgeSource::AdamsLaw);
+        let (adapted, _) = brain._absorb_with_reflection(KnowledgeSource::AdamsLaw);
         assert!(!adapted, "gentle source should not trigger adaptation");
         assert_eq!(brain.learning_rate, lr_before, "learning rate unchanged");
     }

@@ -28,7 +28,7 @@ use std::collections::HashMap;
 pub struct EvolutionHarness {
     loop_: TranscendentLoop,
     /// 已落盘的建议计数 (累计, 供观测)
-    persisted_total: usize,
+    _persisted_total: usize,
     /// 预留: harness 运行元数据, 待观测通道接入后填充
     _metadata: HashMap<String, serde_json::Value>,
 }
@@ -37,7 +37,7 @@ impl EvolutionHarness {
     pub fn new(config: LoopConfig) -> Self {
         Self {
             loop_: TranscendentLoop::new(config),
-            persisted_total: 0,
+            _persisted_total: 0,
             _metadata: HashMap::new(),
         }
     }
@@ -47,7 +47,7 @@ impl EvolutionHarness {
     /// 输入格式与 `.neotrix/capability_registry.json` (RegistryExport) 对齐:
     /// `{ "nodes": [{ "id", "domain", "layer", "constellation", ... }] }`。
     /// 返回 (Vec<CapabilityNodeInfo>, 解析失败原因)。
-    pub fn infos_from_registry_export(json: &str) -> (Vec<CapabilityNodeInfo>, Vec<String>) {
+    pub(crate) fn _infos_from_registry_export(json: &str) -> (Vec<CapabilityNodeInfo>, Vec<String>) {
         let mut infos = Vec::new();
         let mut problems = Vec::new();
 
@@ -138,7 +138,7 @@ impl EvolutionHarness {
         .to_string();
         match kb.kv_set("transcendent", "suggestions", &json) {
             Ok(()) => {
-                self.persisted_total += report.suggestions.len();
+                self._persisted_total += report.suggestions.len();
                 report.suggestions.len()
             }
             Err(e) => {
@@ -149,8 +149,8 @@ impl EvolutionHarness {
     }
 
     /// 累计落盘建议数 (观测用)
-    pub fn persisted_total(&self) -> usize {
-        self.persisted_total
+    pub(crate) fn _persisted_total(&self) -> usize {
+        self._persisted_total
     }
     pub fn inner(&self) -> &TranscendentLoop {
         &self.loop_
@@ -158,7 +158,7 @@ impl EvolutionHarness {
 
     /// 提取应推入 goal_loop 的高价值建议 (strengthen 且共振度达标)。
     /// threshold 建议 0.7 — 过滤低信号噪声。
-    pub fn actionable_suggestions(report: &LoopReport, threshold: f64) -> Vec<EvolutionSuggestion> {
+    pub(crate) fn _actionable_suggestions(report: &LoopReport, threshold: f64) -> Vec<EvolutionSuggestion> {
         report
             .suggestions
             .iter()
@@ -203,7 +203,7 @@ impl crate::l5_cognition::traits::EvolutionHarnessApi for EvolutionHarness {
     }
 
     fn harness_infos_from_registry_export(json: &str) -> (Vec<crate::l5_cognition::traits::RegistryNodeInfo>, Vec<String>) {
-        let (l6_infos, problems) = EvolutionHarness::infos_from_registry_export(json);
+        let (l6_infos, problems) = EvolutionHarness::_infos_from_registry_export(json);
         let infos = l6_infos.into_iter().map(|i| crate::l5_cognition::traits::RegistryNodeInfo {
             node_id: i.node_id,
             domain: i.domain,
@@ -255,7 +255,7 @@ impl crate::l5_cognition::traits::EvolutionHarnessApi for EvolutionHarness {
             Ok(r) => r,
             Err(_) => return Vec::new(),
         };
-        EvolutionHarness::actionable_suggestions(&l6_report, threshold)
+        EvolutionHarness::_actionable_suggestions(&l6_report, threshold)
             .into_iter()
             .map(|s| crate::l5_cognition::traits::RegistrySuggestion {
                 node_id: s.node_id,
@@ -273,7 +273,7 @@ impl crate::core::nt_core_self_test::SelfTest for EvolutionHarness {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut harness = EvolutionHarness::new(LoopConfig::default());
         let snapshot = crate::core::nt_core_consciousness_core::CoreSnapshot::default();
-        let infos = EvolutionHarness::infos_from_registry_export(
+        let infos = EvolutionHarness::_infos_from_registry_export(
             r#"{"nodes":[{"id":"nt-core::gwt","domain":"NT-CORE","layer":"L4","constellation":"C0","metadata":{"strength":0.3}}]}"#,
         );
         assert!(
@@ -295,19 +295,19 @@ mod tests {
     fn test_harness_self_test() {
         let h = EvolutionHarness::new(LoopConfig::default());
         assert!(h.self_test().is_ok());
-        assert_eq!(h.persisted_total(), 0);
+        assert_eq!(h._persisted_total(), 0);
     }
 
     #[test]
     fn test_parse_registry_export_minimal() {
-        let (infos, problems) = EvolutionHarness::infos_from_registry_export(r#"{"nodes":[]}"#);
+        let (infos, problems) = EvolutionHarness::_infos_from_registry_export(r#"{"nodes":[]}"#);
         assert!(infos.is_empty());
         assert!(!problems.is_empty(), "空 nodes 应报告问题");
     }
 
     #[test]
     fn test_parse_registry_export_with_strength() {
-        let (infos, problems) = EvolutionHarness::infos_from_registry_export(
+        let (infos, problems) = EvolutionHarness::_infos_from_registry_export(
             r#"{"nodes":[{"id":"a","domain":"NT-MEMORY","layer":"L4","constellation":"C3","metadata":{"strength":0.8}}]}"#,
         );
         assert!(problems.is_empty());
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_parse_maturity_falls_back_to_constellation() {
-        let (infos, _) = EvolutionHarness::infos_from_registry_export(
+        let (infos, _) = EvolutionHarness::_infos_from_registry_export(
             r#"{"nodes":[{"id":"a","domain":"NT-CORE","layer":"L1","constellation":"C4"}]}"#,
         );
         assert_eq!(infos.len(), 1);
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn test_malformed_json_reports_problem() {
-        let (infos, problems) = EvolutionHarness::infos_from_registry_export("not-json");
+        let (infos, problems) = EvolutionHarness::_infos_from_registry_export("not-json");
         assert!(infos.is_empty());
         assert!(!problems.is_empty());
     }
@@ -341,7 +341,7 @@ mod tests {
             ..Default::default()
         };
         let mut harness = EvolutionHarness::new(LoopConfig::default());
-        let infos = EvolutionHarness::infos_from_registry_export(
+        let infos = EvolutionHarness::_infos_from_registry_export(
             r#"{"nodes":[
                 {"id":"strong","domain":"NT-CORE","layer":"L4","constellation":"C5","metadata":{"strength":0.95}},
                 {"id":"weak","domain":"NT-MIND","layer":"L3","constellation":"C0","metadata":{"strength":0.1}}

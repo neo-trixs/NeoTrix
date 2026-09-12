@@ -42,7 +42,7 @@ pub enum SkillType {
 /// 执行依赖边
 
 #[derive(Debug, Clone)]
-pub struct ExecutionEdge {
+pub(crate) struct _ExecutionEdge {
     /// 源技能 ID
     pub from: String,
     /// 目标技能 ID
@@ -100,13 +100,13 @@ pub struct TraceStep {
 /// 图拓扑编辑操作
 
 #[derive(Debug, Clone)]
-pub enum GraphEdit {
+pub(crate) enum _GraphEdit {
     /// 添加节点
     AddNode(SkillNode),
     /// 删除节点
     RemoveNode(String),
     /// 添加边
-    AddEdge(ExecutionEdge),
+    AddEdge(_ExecutionEdge),
     /// 删除边（from, to）
     RemoveEdge(String, String),
     /// 重连边（from, old_to, new_to）
@@ -118,7 +118,7 @@ pub enum GraphEdit {
 #[derive(Debug, Clone)]
 pub struct RejectedEdit {
     /// 被拒绝的编辑
-    pub edit: GraphEdit,
+    pub edit: _GraphEdit,
     /// 拒绝原因
     pub reason: String,
     /// 累计被拒绝次数
@@ -128,7 +128,7 @@ pub struct RejectedEdit {
 /// 图统计信息
 
 #[derive(Debug, Clone)]
-pub struct GraphStats {
+pub(crate) struct _GraphStats {
     /// 节点数
     pub node_count: usize,
     /// 边数
@@ -152,8 +152,8 @@ pub struct GraphStats {
 /// 1. **构建图** — `add_node` + `add_edge` 建立技能拓扑
 /// 2. **执行排序** — `topological_sort` 返回合法执行顺序
 /// 3. **记录轨迹** — `record_trace` 记录每次执行的详细步骤
-/// 4. **提议编辑** — `propose_edit` 让 LLM refiner 提议拓扑变更
-/// 5. **审核决策** — `approve_edit` / `reject_edit` 控制进化方向
+/// 4. **提议编辑** — `_propose_edit` 让 LLM refiner 提议拓扑变更
+/// 5. **审核决策** — `_approve_edit` / `_reject_edit` 控制进化方向
 /// 6. **反模式** — 被拒绝的编辑自动积累为反模式知识
 
 #[derive(Debug, Clone)]
@@ -161,7 +161,7 @@ pub struct ProceduralGraph {
     /// 技能节点（ID → 节点）
     nodes: HashMap<String, SkillNode>,
     /// 执行依赖边列表
-    edges: Vec<ExecutionEdge>,
+    edges: Vec<_ExecutionEdge>,
     /// 执行轨迹历史
     traces: Vec<ExecutionTrace>,
     /// 被拒绝的编辑（反模式）
@@ -227,7 +227,7 @@ impl ProceduralGraph {
             return Err(format!("边已存在: {} → {}", from, to));
         }
 
-        let edge = ExecutionEdge {
+        let edge = _ExecutionEdge {
             from: from.to_string(),
             to: to.to_string(),
             edge_type,
@@ -335,19 +335,19 @@ impl ProceduralGraph {
 
     /// 提议拓扑编辑（由 LLM refiner 调用）
     ///
-    /// 编辑会被暂存，需要通过 `approve_edit` 或 `reject_edit` 最终决策。
+    /// 编辑会被暂存，需要通过 `_approve_edit` 或 `_reject_edit` 最终决策。
     /// 基本合法性检查（节点存在性、循环检测）在此阶段执行。
-    pub fn propose_edit(&mut self, edit: GraphEdit) -> Result<(), RejectedEdit> {
+    pub(crate) fn _propose_edit(&mut self, edit: _GraphEdit) -> Result<(), RejectedEdit> {
         // 先提取验证信息，再用 owned edit 构造错误
         let validation = match &edit {
-            GraphEdit::AddNode(node) => {
+            _GraphEdit::AddNode(node) => {
                 if self.nodes.contains_key(&node.id) {
                     Err(format!("节点 {} 已存在", node.id))
                 } else {
                     Ok(())
                 }
             }
-            GraphEdit::RemoveNode(node_id) => {
+            _GraphEdit::RemoveNode(node_id) => {
                 if !self.nodes.contains_key(node_id) {
                     Err(format!("节点 {} 不存在", node_id))
                 } else {
@@ -362,7 +362,7 @@ impl ProceduralGraph {
                     }
                 }
             }
-            GraphEdit::AddEdge(edge) => {
+            _GraphEdit::AddEdge(edge) => {
                 if !self.nodes.contains_key(&edge.from) {
                     Err(format!("源节点 {} 不存在", edge.from))
                 } else if !self.nodes.contains_key(&edge.to) {
@@ -371,7 +371,7 @@ impl ProceduralGraph {
                     Err("不允许自环".to_string())
                 } else {
                     // 临时添加边检查循环
-                    let test_edge = ExecutionEdge {
+                    let test_edge = _ExecutionEdge {
                         from: edge.from.clone(),
                         to: edge.to.clone(),
                         edge_type: edge.edge_type.clone(),
@@ -389,7 +389,7 @@ impl ProceduralGraph {
                     }
                 }
             }
-            GraphEdit::RemoveEdge(from, to) => {
+            _GraphEdit::RemoveEdge(from, to) => {
                 let exists = self.edges.iter().any(|e| &e.from == from && &e.to == to);
                 if !exists {
                     Err(format!("边 {} → {} 不存在", from, to))
@@ -397,7 +397,7 @@ impl ProceduralGraph {
                     Ok(())
                 }
             }
-            GraphEdit::RewireEdge(from, old_to, new_to) => {
+            _GraphEdit::RewireEdge(from, old_to, new_to) => {
                 let exists = self
                     .edges
                     .iter()
@@ -439,22 +439,22 @@ impl ProceduralGraph {
     }
 
     /// 批准编辑，将变更应用到图拓扑
-    pub fn approve_edit(&mut self, edit: GraphEdit) {
+    pub(crate) fn _approve_edit(&mut self, edit: _GraphEdit) {
         match edit {
-            GraphEdit::AddNode(node) => {
+            _GraphEdit::AddNode(node) => {
                 self.nodes.insert(node.id.clone(), node);
             }
-            GraphEdit::RemoveNode(node_id) => {
+            _GraphEdit::RemoveNode(node_id) => {
                 self.nodes.remove(&node_id);
                 self.edges.retain(|e| e.from != node_id && e.to != node_id);
             }
-            GraphEdit::AddEdge(edge) => {
+            _GraphEdit::AddEdge(edge) => {
                 self.edges.push(edge);
             }
-            GraphEdit::RemoveEdge(from, to) => {
+            _GraphEdit::RemoveEdge(from, to) => {
                 self.edges.retain(|e| !(e.from == from && e.to == to));
             }
-            GraphEdit::RewireEdge(from, old_to, new_to) => {
+            _GraphEdit::RewireEdge(from, old_to, new_to) => {
                 if let Some(edge) = self
                     .edges
                     .iter_mut()
@@ -467,7 +467,7 @@ impl ProceduralGraph {
     }
 
     /// 拒绝编辑，记录为反模式
-    pub fn reject_edit(&mut self, edit: GraphEdit, reason: &str) {
+    pub(crate) fn _reject_edit(&mut self, edit: _GraphEdit, reason: &str) {
         // 查找是否已有相同的反模式
         let existing = self.rejected_edits.iter_mut().find(|re| {
             std::mem::discriminant(&re.edit) == std::mem::discriminant(&edit) && re.reason == reason
@@ -501,7 +501,7 @@ impl ProceduralGraph {
 
         fn has_cycle_dfs<'a>(
             node: &'a str,
-            edges: &'a [ExecutionEdge],
+            edges: &'a [_ExecutionEdge],
             color: &mut HashMap<&'a str, Color>,
         ) -> bool {
             color.insert(node, Color::Gray);
@@ -539,7 +539,7 @@ impl ProceduralGraph {
     }
 
     /// 获取图统计信息
-    pub fn stats(&self) -> GraphStats {
+    pub fn stats(&self) -> _GraphStats {
         let total_success: u32 = self.nodes.values().map(|n| n.success_count).sum();
         let total_exec: u32 = self
             .nodes
@@ -553,7 +553,7 @@ impl ProceduralGraph {
             total_success as f64 / total_exec as f64
         };
 
-        GraphStats {
+        _GraphStats {
             node_count: self.nodes.len(),
             edge_count: self.edges.len(),
             trace_count: self.traces.len(),
@@ -568,7 +568,7 @@ impl ProceduralGraph {
     }
 
     /// 获取所有边的引用
-    pub fn edges(&self) -> &[ExecutionEdge] {
+    pub fn edges(&self) -> &[_ExecutionEdge] {
         &self.edges
     }
 
@@ -588,7 +588,7 @@ impl ProceduralGraph {
     }
 
     /// 查找所有入度为 0 的根节点（无前置依赖）
-    pub fn root_nodes(&self) -> Vec<&SkillNode> {
+    pub(crate) fn _root_nodes(&self) -> Vec<&SkillNode> {
         let has_incoming: std::collections::HashSet<&str> =
             self.edges.iter().map(|e| e.to.as_str()).collect();
         self.nodes
@@ -598,7 +598,7 @@ impl ProceduralGraph {
     }
 
     /// 查找所有出度为 0 的叶节点（无后续依赖）
-    pub fn leaf_nodes(&self) -> Vec<&SkillNode> {
+    pub(crate) fn _leaf_nodes(&self) -> Vec<&SkillNode> {
         let has_outgoing: std::collections::HashSet<&str> =
             self.edges.iter().map(|e| e.from.as_str()).collect();
         self.nodes
@@ -608,7 +608,7 @@ impl ProceduralGraph {
     }
 
     /// 查找指定节点的所有直接后继
-    pub fn successors(&self, node_id: &str) -> Vec<&SkillNode> {
+    pub(crate) fn _successors(&self, node_id: &str) -> Vec<&SkillNode> {
         self.edges
             .iter()
             .filter(|e| e.from == node_id)
@@ -635,7 +635,7 @@ impl ProceduralGraph {
     }
 
     /// 按成功率排序的节点列表（降序）
-    pub fn nodes_by_success_rate(&self) -> Vec<(&SkillNode, f64)> {
+    pub(crate) fn _nodes_by_success_rate(&self) -> Vec<(&SkillNode, f64)> {
         let mut pairs: Vec<(&SkillNode, f64)> = self
             .nodes
             .values()
@@ -779,15 +779,15 @@ mod tests {
     #[test]
     fn test_reject_edit_creates_anti_pattern() {
         let mut g = make_graph();
-        let edit = GraphEdit::RemoveNode("skill_1".to_string());
+        let edit = _GraphEdit::RemoveNode("skill_1".to_string());
         let reason = "核心节点不可删除";
 
-        g.reject_edit(edit.clone(), reason);
+        g._reject_edit(edit.clone(), reason);
         assert_eq!(g.anti_patterns().len(), 1);
         assert_eq!(g.anti_patterns()[0].rejection_count, 1);
 
         // 重复拒绝同一编辑应递增计数
-        g.reject_edit(edit, reason);
+        g._reject_edit(edit, reason);
         assert_eq!(g.anti_patterns().len(), 1);
         assert_eq!(g.anti_patterns()[0].rejection_count, 2);
     }
@@ -806,20 +806,20 @@ mod tests {
             success_count: 0,
             failure_count: 0,
         };
-        let result = g.propose_edit(GraphEdit::AddNode(dup_node));
+        let result = g._propose_edit(_GraphEdit::AddNode(dup_node));
         assert!(result.is_err());
 
         // 删除不存在的节点
-        let result = g.propose_edit(GraphEdit::RemoveNode("nonexistent".to_string()));
+        let result = g._propose_edit(_GraphEdit::RemoveNode("nonexistent".to_string()));
         assert!(result.is_err());
 
         // 添加到不存在的节点的边
-        let edge = ExecutionEdge {
+        let edge = _ExecutionEdge {
             from: "skill_1".to_string(),
             to: "nonexistent".to_string(),
             edge_type: EdgeType::Prerequisite,
         };
-        let result = g.propose_edit(GraphEdit::AddEdge(edge));
+        let result = g._propose_edit(_GraphEdit::AddEdge(edge));
         assert!(result.is_err());
     }
 
@@ -835,7 +835,7 @@ mod tests {
             success_count: 0,
             failure_count: 0,
         };
-        g.approve_edit(GraphEdit::AddNode(new_node));
+        g._approve_edit(_GraphEdit::AddNode(new_node));
         assert_eq!(g.node_count(), 4);
         assert!(g.get_node("skill_new").is_some());
     }
@@ -844,7 +844,7 @@ mod tests {
     fn test_approve_edit_remove_node() {
         let mut g = make_graph();
         // skill_3 是叶节点，无依赖，可以安全删除
-        g.approve_edit(GraphEdit::RemoveNode("skill_3".to_string()));
+        g._approve_edit(_GraphEdit::RemoveNode("skill_3".to_string()));
         assert_eq!(g.node_count(), 2);
         assert!(g.get_node("skill_3").is_none());
     }
@@ -852,8 +852,8 @@ mod tests {
     #[test]
     fn test_root_and_leaf_nodes() {
         let g = make_graph();
-        let roots = g.root_nodes();
-        let leaves = g.leaf_nodes();
+        let roots = g._root_nodes();
+        let leaves = g._leaf_nodes();
         assert_eq!(roots.len(), 1);
         assert_eq!(roots[0].name, "fetch");
         assert_eq!(leaves.len(), 1);
@@ -960,7 +960,7 @@ mod tests {
             total_latency_ms: 0,
         });
 
-        let ranked = g.nodes_by_success_rate();
+        let ranked = g._nodes_by_success_rate();
         assert_eq!(ranked[0].0.name, "high");
         assert_eq!(ranked[1].0.name, "low");
     }
@@ -971,7 +971,7 @@ mod tests {
 
         // skill_1 → skill_2 → skill_3
         // 将 skill_2 → skill_3 重连为 skill_2 → skill_1 (会形成循环)
-        let result = g.propose_edit(GraphEdit::RewireEdge(
+        let result = g._propose_edit(_GraphEdit::RewireEdge(
             "skill_2".to_string(),
             "skill_3".to_string(),
             "skill_1".to_string(),

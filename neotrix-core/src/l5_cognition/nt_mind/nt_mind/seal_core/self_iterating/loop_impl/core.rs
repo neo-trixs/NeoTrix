@@ -309,17 +309,17 @@ impl SelfIteratingBrain {
     }
 
     // ========== CryptoAgent integration (shared Arc<Mutex<>>) ==========
-    pub fn with_nt_act_crypto(mut self, crypto: Arc<Mutex<CryptoAgent>>) -> Self {
+    pub(crate) fn _with_nt_act_crypto(mut self, crypto: Arc<Mutex<CryptoAgent>>) -> Self {
         self.nt_act_crypto = Some(crypto);
         self
     }
 
-    pub fn with_nt_world_jepa(mut self, jepa: JepaWorldModel) -> Self {
+    pub(crate) fn _with_nt_world_jepa(mut self, jepa: JepaWorldModel) -> Self {
         self.nt_world_jepa = Some(jepa);
         self
     }
 
-    pub fn nt_act_crypto_arc(&self) -> Option<Arc<Mutex<CryptoAgent>>> {
+    pub(crate) fn _nt_act_crypto_arc(&self) -> Option<Arc<Mutex<CryptoAgent>>> {
         self.nt_act_crypto.clone()
     }
 
@@ -366,14 +366,14 @@ impl SelfIteratingBrain {
             .collect()
     }
 
-    pub fn init_nt_act_crypto(&mut self) -> Arc<Mutex<CryptoAgent>> {
+    pub(crate) fn _init_nt_act_crypto(&mut self) -> Arc<Mutex<CryptoAgent>> {
         self.nt_act_crypto
             .get_or_insert_with(|| Arc::new(Mutex::new(CryptoAgent::new())))
             .clone()
     }
 
-    pub fn run_crypto_iteration(&mut self) -> Option<f64> {
-        let crypto_lock = self.init_nt_act_crypto();
+    pub(crate) fn _run_crypto_iteration(&mut self) -> Option<f64> {
+        let crypto_lock = self._init_nt_act_crypto();
         let mut crypto = crypto_lock.lock().unwrap_or_else(|e| e.into_inner());
         crypto.run_iteration();
         let opps = crypto.scan_opportunities();
@@ -461,7 +461,7 @@ impl SelfIteratingBrain {
     }
 
     /// 预览 MicroEdit 序列的效果
-    pub fn preview_edit(&self, _edits: &[MicroEdit]) -> (CapabilityVector, f64) {
+    pub(crate) fn _preview_edit(&self, _edits: &[MicroEdit]) -> (CapabilityVector, f64) {
         let mut simulated = self.brain.capability.clone();
         let dummy_source = KnowledgeSource::DesignPhilosophy;
         simulated.update_from_other(&dummy_source.capability_vector(), self.brain.learning_rate);
@@ -633,17 +633,17 @@ impl SelfIteratingBrain {
     }
 
     /// Enable DGM diffusion strategy with the given number of steps.
-    pub fn use_dgm_strategy(&mut self, num_steps: usize) {
+    pub(crate) fn _use_dgm_strategy(&mut self, num_steps: usize) {
         self.dgm_strategy = Some(super::super::brain_dgm::DgmSelfEditStrategy::new(num_steps));
     }
 
     /// Enable DGM with custom noise schedule.
-    pub fn use_dgm_strategy_with_schedule(&mut self, num_steps: usize, schedule: Vec<f64>) {
+    pub(crate) fn _use_dgm_strategy_with_schedule(&mut self, num_steps: usize, schedule: Vec<f64>) {
         self.dgm_strategy = Some(super::super::brain_dgm::DgmSelfEditStrategy::with_schedule(num_steps, schedule));
     }
 
     /// Disable DGM and revert to default `generate_self_edit()`.
-    pub fn disable_dgm_strategy(&mut self) {
+    pub(crate) fn _disable_dgm_strategy(&mut self) {
         self.dgm_strategy = None;
     }
 }
@@ -654,15 +654,15 @@ impl SelfIteratingBrain {
 pub struct EvoStats {
     pub growth_slope: f64,
     pub recent_improvement_avg: f64,
-    pub transfer_efficiency: f64,
-    pub error_avoidance_rate: f64,
+    pub _transfer_efficiency: f64,
+    pub _error_avoidance_rate: f64,
     pub tool_success_rate: f64,
     pub cms_promotion_rate: f64,
     pub health_score: f64,
 }
 
 impl SelfIteratingBrain {
-    pub fn growth_curve_slope(&self) -> f64 {
+    pub(crate) fn _growth_curve_slope(&self) -> f64 {
         let n = self.evaluation_history.len();
         if n < 3 {
             return 0.0;
@@ -678,7 +678,7 @@ impl SelfIteratingBrain {
         if den.abs() < 1e-12 { 0.0 } else { num / den }
     }
 
-    pub fn transfer_efficiency(&self) -> f64 {
+    pub(crate) fn _transfer_efficiency(&self) -> f64 {
         if self.evaluation_history.len() < 2 {
             return 0.0;
         }
@@ -698,7 +698,7 @@ impl SelfIteratingBrain {
         if cross_sims.is_empty() { 0.0 } else { cross_sims.iter().sum::<f64>() / cross_sims.len() as f64 }
     }
 
-    pub fn error_avoidance_rate(&self) -> f64 {
+    pub(crate) fn _error_avoidance_rate(&self) -> f64 {
         let total = self.archive.len();
         if total < 2 {
             return 1.0;
@@ -709,9 +709,9 @@ impl SelfIteratingBrain {
     }
 
     pub fn evo_stats(&self) -> EvoStats {
-        let growth = self.growth_curve_slope();
-        let transfer = self.transfer_efficiency();
-        let error_avoid = self.error_avoidance_rate();
+        let growth = self._growth_curve_slope();
+        let transfer = self._transfer_efficiency();
+        let error_avoid = self._error_avoidance_rate();
         let recent_imp: f64 = self.evaluation_history.iter().rev().take(5)
             .map(|r| if r.improved { 1.0 } else { 0.0 })
             .sum::<f64>() / 5.0_f64.max(1.0);
@@ -732,7 +732,7 @@ impl SelfIteratingBrain {
             .clamp(0.0, 1.0);
         EvoStats {
             growth_slope: growth, recent_improvement_avg: recent_imp,
-            transfer_efficiency: transfer, error_avoidance_rate: error_avoid,
+            _transfer_efficiency: transfer, _error_avoidance_rate: error_avoid,
             tool_success_rate: tool_success, cms_promotion_rate: cms_rate,
             health_score: health,
         }

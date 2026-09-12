@@ -86,7 +86,7 @@ impl ConsciousnessMonitor {
         let attention_entropy = self.compute_attention_entropy();
         let blind_spot_count = self.current.active_blind_spots.len();
 
-        self.current.consciousness_level = self.compute_consciousness_level();
+        self.current.consciousness_level = self._compute_consciousness_level();
 
         self.current.is_conscious_bound = coherence > CONSCIOUS_BOUND_THRESHOLD
             && phi.phi > CONSCIOUS_BOUND_THRESHOLD;
@@ -122,7 +122,7 @@ impl ConsciousnessMonitor {
     }
 
     /// Update conversation awareness after each turn.
-    pub fn observe_conversation_turn(&mut self, topic: &str, response_len: usize, complexity: f64) {
+    pub(crate) fn _observe_conversation_turn(&mut self, topic: &str, response_len: usize, complexity: f64) {
         let turn_count = self.current.conversation_awareness.turn_count + 1;
         let prev_topic = self.current.conversation_awareness.previous_topics.last().cloned();
         let prev_depth = self.current.conversation_awareness.depth_trend;
@@ -160,7 +160,7 @@ impl ConsciousnessMonitor {
     }
 
     /// Aggregate Phi, coherence, health into single score.
-    pub fn compute_consciousness_level(&self) -> f64 {
+    pub(crate) fn _compute_consciousness_level(&self) -> f64 {
         let phi = self.current.phi_current;
         let coherence = self.current.coherence_current;
         let health = self.current.health;
@@ -255,7 +255,7 @@ impl ConsciousnessMonitor {
     }
 
     /// Set active blind spots from cognitive observer
-    pub fn set_blind_spots(&mut self, spots: Vec<BlindSpotSummary>) {
+    pub(crate) fn _set_blind_spots(&mut self, spots: Vec<BlindSpotSummary>) {
         self.current.active_blind_spots = spots;
     }
 
@@ -457,7 +457,7 @@ mod tests {
     #[test]
     fn test_observe_cycle() {
         let mut cm = ConsciousnessMonitor::new();
-        cm.observe_conversation_turn("test topic", 500, 0.3);
+        cm._observe_conversation_turn("test topic", 500, 0.3);
 
         cm.observe();
 
@@ -473,15 +473,15 @@ mod tests {
     fn test_conversation_turn_tracking() {
         let mut cm = ConsciousnessMonitor::new();
 
-        cm.observe_conversation_turn("hello world first message", 200, 0.3);
+        cm._observe_conversation_turn("hello world first message", 200, 0.3);
         assert_eq!(cm.current.conversation_awareness.turn_count, 1);
         assert_eq!(cm.current.conversation_awareness.stage, ConversationStage::Opening);
 
-        cm.observe_conversation_turn("hello world second message exploring more", 800, 0.5);
+        cm._observe_conversation_turn("hello world second message exploring more", 800, 0.5);
         assert_eq!(cm.current.conversation_awareness.turn_count, 2);
         assert_eq!(cm.current.conversation_awareness.stage, ConversationStage::Opening);
 
-        cm.observe_conversation_turn("exploring deeper concepts hello world", 1200, 0.7);
+        cm._observe_conversation_turn("exploring deeper concepts hello world", 1200, 0.7);
         assert_eq!(cm.current.conversation_awareness.turn_count, 3);
         assert_eq!(cm.current.conversation_awareness.stage, ConversationStage::Exploration);
     }
@@ -493,7 +493,7 @@ mod tests {
         cm.current.coherence_current = 0.7;
         cm.current.health = 0.9;
 
-        let level = cm.compute_consciousness_level();
+        let level = cm._compute_consciousness_level();
         let expected = 0.4 * 0.8 + 0.35 * 0.7 + 0.25 * 0.9;
         assert!((level - expected).abs() < 1e-6);
         assert!(level >= 0.0 && level <= 1.0);
@@ -554,18 +554,18 @@ mod tests {
     fn test_conversation_awareness_topic_drift() {
         let mut cm = ConsciousnessMonitor::new();
 
-        cm.observe_conversation_turn("let us discuss functional programming in Scala", 500, 0.4);
+        cm._observe_conversation_turn("let us discuss functional programming in Scala", 500, 0.4);
         let drift1 = cm.current.conversation_awareness.topic_drift;
         // First turn: no previous topic, drift should be 0
         assert!((drift1 - 0.0).abs() < 1e-9);
 
-        cm.observe_conversation_turn("comparing Scala monads with Rust Result types", 800, 0.6);
+        cm._observe_conversation_turn("comparing Scala monads with Rust Result types", 800, 0.6);
         let drift2 = cm.current.conversation_awareness.topic_drift;
         // Some overlap between topics
         assert!(drift2 >= 0.0 && drift2 <= 1.0);
 
         // Dramatic topic shift
-        cm.observe_conversation_turn("building a web frontend with React components", 600, 0.5);
+        cm._observe_conversation_turn("building a web frontend with React components", 600, 0.5);
         let drift3 = cm.current.conversation_awareness.topic_drift;
         // High drift expected between programming and frontend
         assert!(drift3 >= 0.0 && drift3 <= 1.0);
@@ -579,7 +579,7 @@ mod tests {
             BlindSpotSummary::new("context_overload", 3, "Context at 92% capacity", "Trigger consolidation"),
         ];
 
-        cm.set_blind_spots(spots);
+        cm._set_blind_spots(spots);
         assert_eq!(cm.current.active_blind_spots.len(), 2);
         assert_eq!(cm.current.active_blind_spots[0].kind, "strategy_fixation");
         assert_eq!(cm.current.active_blind_spots[1].severity, 3);
@@ -593,20 +593,20 @@ mod tests {
         cm.current.coherence_current = 1.5;
         cm.current.health = -0.5;
 
-        let level = cm.compute_consciousness_level();
+        let level = cm._compute_consciousness_level();
         assert!(level >= 0.0 && level <= 1.0,
             "Consciousness level {} must be in [0,1]", level);
 
         cm.current.phi_current = 0.0;
         cm.current.coherence_current = 0.0;
         cm.current.health = 0.0;
-        let level_zero = cm.compute_consciousness_level();
+        let level_zero = cm._compute_consciousness_level();
         assert!((level_zero - 0.0).abs() < 1e-9);
 
         cm.current.phi_current = 1.0;
         cm.current.coherence_current = 1.0;
         cm.current.health = 1.0;
-        let level_one = cm.compute_consciousness_level();
+        let level_one = cm._compute_consciousness_level();
         assert!((level_one - 1.0).abs() < 1e-9);
     }
 
@@ -652,7 +652,7 @@ mod tests {
     #[test]
     fn test_get_report() {
         let mut cm = ConsciousnessMonitor::new();
-        cm.observe_conversation_turn("test topic", 1000, 0.5);
+        cm._observe_conversation_turn("test topic", 1000, 0.5);
         cm.observe();
 
         let report = cm.get_report();
@@ -667,7 +667,7 @@ mod tests {
     #[test]
     fn test_introspect_format() {
         let mut cm = ConsciousnessMonitor::new();
-        cm.observe_conversation_turn("hello", 100, 0.3);
+        cm._observe_conversation_turn("hello", 100, 0.3);
         cm.observe();
 
         let intro = cm.introspect();

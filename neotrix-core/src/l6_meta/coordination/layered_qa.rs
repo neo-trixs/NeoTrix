@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 检查阶段
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum QAStage {
+pub(crate) enum _QAStage {
     /// 结构验证 (规格级别)
     Structural,
     /// 确定性检查 (输出级别)
@@ -25,7 +25,7 @@ pub enum QAStage {
 
 /// 检查项类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum CheckType {
+pub(crate) enum _CheckType {
     /// 必需字段存在
     RequiredField,
     /// 时长匹配
@@ -50,15 +50,15 @@ pub enum CheckType {
 
 /// 检查项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QACheckItem {
+pub(crate) struct _QACheckItem {
     /// 检查项ID
     pub id: String,
     /// 检查项名称
     pub name: String,
     /// 检查类型
-    pub check_type: CheckType,
+    pub check_type: _CheckType,
     /// 所属阶段
-    pub stage: QAStage,
+    pub stage: _QAStage,
     /// 权重
     pub weight: f32,
     /// 是否启用
@@ -82,7 +82,7 @@ pub enum IssueSeverity {
 
 /// 检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QACheckResult {
+pub(crate) struct _QACheckResult {
     /// 检查项ID
     pub check_item_id: String,
     /// 是否通过
@@ -97,13 +97,13 @@ pub struct QACheckResult {
 
 /// 阶段结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QAStageResult {
+pub(crate) struct _QAStageResult {
     /// 阶段
-    pub stage: QAStage,
+    pub stage: _QAStage,
     /// 是否通过
     pub passed: bool,
     /// 检查结果列表
-    pub check_results: Vec<QACheckResult>,
+    pub check_results: Vec<_QACheckResult>,
     /// 通过率
     pub pass_rate: f32,
     /// 阶段耗时 (毫秒)
@@ -112,13 +112,13 @@ pub struct QAStageResult {
 
 /// 完整 QA 结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayeredQAResult {
+pub(crate) struct _LayeredQAResult {
     /// 是否通过
     pub passed: bool,
     /// 总体分数 (0.0-1.0)
     pub total_score: f32,
     /// 各阶段结果
-    pub stage_results: Vec<QAStageResult>,
+    pub stage_results: Vec<_QAStageResult>,
     /// 总耗时 (毫秒)
     pub total_time_ms: u64,
     /// 是否需要修订
@@ -127,11 +127,11 @@ pub struct LayeredQAResult {
 
 /// QA 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayeredQAConfig {
+pub(crate) struct _LayeredQAConfig {
     /// 检查项列表
-    pub check_items: Vec<QACheckItem>,
+    pub check_items: Vec<_QACheckItem>,
     /// 各阶段是否必须通过
-    pub stage_must_pass: HashMap<QAStage, bool>,
+    pub stage_must_pass: HashMap<_QAStage, bool>,
     /// 总体通过阈值 (0.0-1.0)
     pub overall_pass_threshold: f32,
     /// 是否启用快速失败
@@ -140,7 +140,7 @@ pub struct LayeredQAConfig {
 
 /// 发布决策
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PublishDecision {
+pub(crate) struct _PublishDecision {
     /// 是否发布
     pub publish: bool,
     /// 决策原因
@@ -159,57 +159,57 @@ pub struct PublishDecision {
 
 /// 分层质量检查器
 /// 实现结构化检查 → 确定性检查 → 语义检查 → 发布门禁
-pub struct LayeredQA {
+pub(crate) struct _LayeredQA {
     /// 配置
-    config: LayeredQAConfig,
+    config: _LayeredQAConfig,
     /// 检查历史
-    history: Vec<LayeredQAResult>,
+    history: Vec<_LayeredQAResult>,
 }
 
-impl LayeredQA {
+impl _LayeredQA {
     /// 创建检查器
     pub fn new() -> Self {
         let mut stage_must_pass = HashMap::new();
-        stage_must_pass.insert(QAStage::Structural, true);
-        stage_must_pass.insert(QAStage::Deterministic, true);
-        stage_must_pass.insert(QAStage::Semantic, false);
-        stage_must_pass.insert(QAStage::PublishGate, true);
+        stage_must_pass.insert(_QAStage::Structural, true);
+        stage_must_pass.insert(_QAStage::Deterministic, true);
+        stage_must_pass.insert(_QAStage::Semantic, false);
+        stage_must_pass.insert(_QAStage::PublishGate, true);
         
         Self {
-            config: LayeredQAConfig {
+            config: _LayeredQAConfig {
                 check_items: vec![
-                    QACheckItem {
+                    _QACheckItem {
                         id: "struct_001".to_string(),
                         name: "必需字段存在".to_string(),
-                        check_type: CheckType::RequiredField,
-                        stage: QAStage::Structural,
+                        check_type: _CheckType::RequiredField,
+                        stage: _QAStage::Structural,
                         weight: 0.3,
                         enabled: true,
                         severity_threshold: IssueSeverity::Blocking,
                     },
-                    QACheckItem {
+                    _QACheckItem {
                         id: "struct_002".to_string(),
                         name: "时长匹配".to_string(),
-                        check_type: CheckType::DurationMatch,
-                        stage: QAStage::Structural,
+                        check_type: _CheckType::DurationMatch,
+                        stage: _QAStage::Structural,
                         weight: 0.2,
                         enabled: true,
                         severity_threshold: IssueSeverity::Error,
                     },
-                    QACheckItem {
+                    _QACheckItem {
                         id: "det_001".to_string(),
                         name: "输出维度匹配".to_string(),
-                        check_type: CheckType::OutputDimensionMatch,
-                        stage: QAStage::Deterministic,
+                        check_type: _CheckType::OutputDimensionMatch,
+                        stage: _QAStage::Deterministic,
                         weight: 0.25,
                         enabled: true,
                         severity_threshold: IssueSeverity::Error,
                     },
-                    QACheckItem {
+                    _QACheckItem {
                         id: "sem_001".to_string(),
                         name: "实体一致性".to_string(),
-                        check_type: CheckType::EntityConsistency,
-                        stage: QAStage::Semantic,
+                        check_type: _CheckType::EntityConsistency,
+                        stage: _QAStage::Semantic,
                         weight: 0.25,
                         enabled: true,
                         severity_threshold: IssueSeverity::Warning,
@@ -224,7 +224,7 @@ impl LayeredQA {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: LayeredQAConfig) -> Self {
+    pub fn with_config(config: _LayeredQAConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -232,13 +232,13 @@ impl LayeredQA {
     }
     
     /// 执行完整 QA 流程
-    pub fn execute(&mut self, spec: &serde_json::Value, output: &serde_json::Value) -> LayeredQAResult {
+    pub fn execute(&mut self, spec: &serde_json::Value, output: &serde_json::Value) -> _LayeredQAResult {
         let start = std::time::Instant::now();
         let mut stage_results = vec![];
         let mut all_passed = true;
         
         // 按阶段执行检查
-        for stage in [QAStage::Structural, QAStage::Deterministic, QAStage::Semantic, QAStage::PublishGate] {
+        for stage in [_QAStage::Structural, _QAStage::Deterministic, _QAStage::Semantic, _QAStage::PublishGate] {
             let stage_result = self.execute_stage(stage, spec, output);
             
             if !stage_result.passed && self.config.stage_must_pass.get(&stage) == Some(&true) {
@@ -256,7 +256,7 @@ impl LayeredQA {
         let passed = all_passed && total_score >= self.config.overall_pass_threshold;
         let needs_revision = !passed;
         
-        let result = LayeredQAResult {
+        let result = _LayeredQAResult {
             passed,
             total_score,
             stage_results,
@@ -269,7 +269,7 @@ impl LayeredQA {
     }
     
     /// 执行单阶段检查
-    fn execute_stage(&self, stage: QAStage, spec: &serde_json::Value, output: &serde_json::Value) -> QAStageResult {
+    fn execute_stage(&self, stage: _QAStage, spec: &serde_json::Value, output: &serde_json::Value) -> _QAStageResult {
         let start = std::time::Instant::now();
         let mut check_results = vec![];
         
@@ -287,7 +287,7 @@ impl LayeredQA {
             check_results.iter().filter(|r| r.passed).count() as f32 / check_results.len() as f32
         };
         
-        QAStageResult {
+        _QAStageResult {
             stage,
             passed,
             check_results,
@@ -297,9 +297,9 @@ impl LayeredQA {
     }
     
     /// 执行单个检查
-    fn execute_check(&self, item: &QACheckItem, _spec: &serde_json::Value, _output: &serde_json::Value) -> QACheckResult {
+    fn execute_check(&self, item: &_QACheckItem, _spec: &serde_json::Value, _output: &serde_json::Value) -> _QACheckResult {
         // TODO: 实际执行检查逻辑
-        QACheckResult {
+        _QACheckResult {
             check_item_id: item.id.clone(),
             passed: true,
             severity: IssueSeverity::Info,
@@ -309,7 +309,7 @@ impl LayeredQA {
     }
     
     /// 计算总分
-    fn calculate_total_score(&self, stage_results: &[QAStageResult]) -> f32 {
+    fn calculate_total_score(&self, stage_results: &[_QAStageResult]) -> f32 {
         if stage_results.is_empty() {
             return 0.0;
         }
@@ -319,9 +319,9 @@ impl LayeredQA {
     }
     
     /// 生成发布决策
-    pub fn generate_publish_decision(&self, qa_result: &LayeredQAResult) -> PublishDecision {
+    pub(crate) fn _generate_publish_decision(&self, qa_result: &_LayeredQAResult) -> _PublishDecision {
         if qa_result.passed {
-            PublishDecision {
+            _PublishDecision {
                 publish: true,
                 reason: "所有质量检查通过".to_string(),
                 suggested_action: "发布".to_string(),
@@ -329,7 +329,7 @@ impl LayeredQA {
                 decision_time: 0,
             }
         } else {
-            PublishDecision {
+            _PublishDecision {
                 publish: false,
                 reason: format!("质量检查未通过，总分: {:.2}", qa_result.total_score),
                 suggested_action: "修订后重新提交".to_string(),
@@ -340,7 +340,7 @@ impl LayeredQA {
     }
     
     /// 获取检查统计
-    pub fn statistics(&self) -> QAStats {
+    pub fn statistics(&self) -> _QAStats {
         let total_runs = self.history.len();
         let passed = self.history.iter().filter(|r| r.passed).count();
         let avg_score = if total_runs > 0 {
@@ -349,7 +349,7 @@ impl LayeredQA {
             0.0
         };
         
-        QAStats {
+        _QAStats {
             total_runs,
             passed,
             failed: total_runs - passed,
@@ -360,7 +360,7 @@ impl LayeredQA {
 
 /// QA 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QAStats {
+pub(crate) struct _QAStats {
     /// 总运行次数
     pub total_runs: usize,
     /// 通过次数
@@ -381,7 +381,7 @@ mod tests {
     
     #[test]
     fn test_layered_qa() {
-        let mut qa = LayeredQA::new();
+        let mut qa = _LayeredQA::new();
         
         let spec = serde_json::json!({
             "scenes": [{"id": "scene_001", "duration_secs": 5.0}],
@@ -397,7 +397,7 @@ mod tests {
         let result = qa.execute(&spec, &output);
         assert!(result.passed);
         
-        let decision = qa.generate_publish_decision(&result);
+        let decision = qa._generate_publish_decision(&result);
         assert!(decision.publish);
     }
 }

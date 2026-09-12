@@ -40,7 +40,7 @@ impl MemoryElement {
         self.bank.store(memory);
     }
 
-    pub fn recall_count(&self) -> usize {
+    pub(crate) fn _recall_count(&self) -> usize {
         self.bank.stats().total_memories.max(self.projected_count)
     }
 
@@ -106,7 +106,7 @@ mod tests {
     fn test_new_memory_element() {
         let el = MemoryElement::new(100);
         assert_eq!(el.id(), "element.memory");
-        assert_eq!(el.recall_count(), 0);
+        assert_eq!(el._recall_count(), 0);
     }
 
     #[test]
@@ -121,7 +121,7 @@ mod tests {
     fn test_store_memory() {
         let mut el = MemoryElement::new(100);
         el.store("test memory", 0.9);
-        assert_eq!(el.recall_count(), 1);
+        assert_eq!(el._recall_count(), 1);
     }
 
     #[test]

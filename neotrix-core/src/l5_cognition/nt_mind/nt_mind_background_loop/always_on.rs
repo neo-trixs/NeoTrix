@@ -6,7 +6,7 @@ use chrono::Datelike;
 
 /// Always-on task state
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum AlwaysOnState {
+pub(crate) enum _AlwaysOnState {
     Idle,
     Scanning,
     Working,
@@ -14,7 +14,7 @@ pub enum AlwaysOnState {
     Sleeping,
 }
 
-impl std::fmt::Display for AlwaysOnState {
+impl std::fmt::Display for _AlwaysOnState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Idle => write!(f, "idle"),
@@ -28,14 +28,14 @@ impl std::fmt::Display for AlwaysOnState {
 
 /// Cron-like schedule expression: "every <N> <unit>" or "daily at <HH:MM>" or "hourly"
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ScheduleExpr {
+pub(crate) enum _ScheduleExpr {
     Every { interval_secs: u64 },
     Daily { hour: u8, minute: u8 },
     Hourly,
     Weekly { weekday: u8, hour: u8, minute: u8 },
 }
 
-impl ScheduleExpr {
+impl _ScheduleExpr {
     pub fn parse(expr: &str) -> Result<Self, String> {
         let expr = expr.trim();
         if expr == "hourly" {
@@ -156,7 +156,7 @@ impl ScheduleExpr {
 
 /// A persistent always-on task
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AlwaysOnTask {
+pub(crate) struct _AlwaysOnTask {
     pub id: String,
     pub description: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -164,12 +164,12 @@ pub struct AlwaysOnTask {
     pub interval_secs: u64,
     pub max_runs: u64,
     pub run_count: u64,
-    pub state: AlwaysOnState,
+    pub state: _AlwaysOnState,
     pub output_files: Vec<String>,
     pub last_output: Option<String>,
     pub tags: Vec<String>,
     #[serde(default)]
-    pub schedule: Option<ScheduleExpr>,
+    pub schedule: Option<_ScheduleExpr>,
     #[serde(default)]
     pub cron_description: Option<String>,
     #[serde(default)]
@@ -177,14 +177,14 @@ pub struct AlwaysOnTask {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScannedTask {
+pub(crate) struct _ScannedTask {
     pub description: String,
     pub priority: u8,
     pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkReport {
+pub(crate) struct _WorkReport {
     pub task_id: String,
     pub description: String,
     pub success: bool,
@@ -194,16 +194,16 @@ pub struct WorkReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CycleReport {
+pub(crate) struct _CycleReport {
     pub scan_count: usize,
     pub tasks_executed: usize,
     pub tasks_completed: usize,
     pub duration_ms: u64,
-    pub reports: Vec<WorkReport>,
+    pub reports: Vec<_WorkReport>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EngineStatus {
+pub(crate) struct _EngineStatus {
     pub enabled: bool,
     pub state: String,
     pub total_tasks: usize,
@@ -216,8 +216,8 @@ pub struct EngineStatus {
 /// Always-on engine for persistent background task execution
 pub struct AlwaysOnEngine {
     pub enabled: bool,
-    pub state: AlwaysOnState,
-    pub tasks: Vec<AlwaysOnTask>,
+    pub state: _AlwaysOnState,
+    pub tasks: Vec<_AlwaysOnTask>,
     pub scan_interval_secs: u64,
     pub idle_cooldown_secs: u64,
     pub max_concurrent: u32,
@@ -237,7 +237,7 @@ impl AlwaysOnEngine {
     pub fn new() -> Self {
         Self {
             enabled: false,
-            state: AlwaysOnState::Idle,
+            state: _AlwaysOnState::Idle,
             tasks: Vec::new(),
             scan_interval_secs: 60,
             idle_cooldown_secs: 300,
@@ -254,7 +254,7 @@ impl AlwaysOnEngine {
             return Err("Already running".into());
         }
         self.enabled = true;
-        self.state = AlwaysOnState::Idle;
+        self.state = _AlwaysOnState::Idle;
         self.started_at = Some(Instant::now());
         Ok(())
     }
@@ -264,12 +264,12 @@ impl AlwaysOnEngine {
             return Err("Not running".into());
         }
         self.enabled = false;
-        self.state = AlwaysOnState::Idle;
+        self.state = _AlwaysOnState::Idle;
         Ok(())
     }
 
-    pub fn scan_cycle(&mut self) -> Vec<ScannedTask> {
-        self.state = AlwaysOnState::Scanning;
+    pub(crate) fn _scan_cycle(&mut self) -> Vec<_ScannedTask> {
+        self.state = _AlwaysOnState::Scanning;
         let mut discovered = Vec::new();
 
         // Auto-discover tasks from critical directories
@@ -284,13 +284,13 @@ impl AlwaysOnEngine {
                     let line = line.trim();
                     if !line.is_empty() && !line.starts_with('#') {
                         if let Some(desc) = line.strip_prefix("monitor:") {
-                            discovered.push(ScannedTask {
+                            discovered.push(_ScannedTask {
                                 description: desc.trim().to_string(),
                                 priority: 3,
                                 source: "monitor_file".into(),
                             });
                         } else if let Some(desc) = line.strip_prefix("recurring:") {
-                            discovered.push(ScannedTask {
+                            discovered.push(_ScannedTask {
                                 description: desc.trim().to_string(),
                                 priority: 2,
                                 source: "recurring_file".into(),
@@ -309,7 +309,7 @@ impl AlwaysOnEngine {
                         let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("");
                         if status == "pending" || status == "in_progress" {
                             if let Some(desc) = item.get("description").and_then(|v| v.as_str()) {
-                                discovered.push(ScannedTask {
+                                discovered.push(_ScannedTask {
                                     description: desc.to_string(),
                                     priority: 1,
                                     source: "goal_queue".into(),
@@ -321,13 +321,13 @@ impl AlwaysOnEngine {
             }
         }
 
-        self.state = AlwaysOnState::Idle;
+        self.state = _AlwaysOnState::Idle;
         discovered
     }
 
-    pub fn add_recurring(&mut self, description: &str, interval_secs: u64) -> String {
+    pub(crate) fn _add_recurring(&mut self, description: &str, interval_secs: u64) -> String {
         let id = format!("ao_{}", self.tasks.len() + 1);
-        let task = AlwaysOnTask {
+        let task = _AlwaysOnTask {
             id: id.clone(),
             description: description.to_string(),
             created_at: chrono::Utc::now(),
@@ -335,7 +335,7 @@ impl AlwaysOnEngine {
             interval_secs,
             max_runs: 1000,
             run_count: 0,
-            state: AlwaysOnState::Idle,
+            state: _AlwaysOnState::Idle,
             output_files: Vec::new(),
             last_output: None,
             tags: vec!["recurring".into()],
@@ -350,7 +350,7 @@ impl AlwaysOnEngine {
 
     pub fn add_oneshot(&mut self, description: &str) -> String {
         let id = format!("ao_{}", self.tasks.len() + 1);
-        let task = AlwaysOnTask {
+        let task = _AlwaysOnTask {
             id: id.clone(),
             description: description.to_string(),
             created_at: chrono::Utc::now(),
@@ -358,7 +358,7 @@ impl AlwaysOnEngine {
             interval_secs: 0,
             max_runs: 1,
             run_count: 0,
-            state: AlwaysOnState::Idle,
+            state: _AlwaysOnState::Idle,
             output_files: Vec::new(),
             last_output: None,
             tags: vec!["oneshot".into()],
@@ -371,28 +371,28 @@ impl AlwaysOnEngine {
         id
     }
 
-    pub fn add_scheduled(&mut self, description: &str, schedule: ScheduleExpr) -> String {
+    pub(crate) fn _add_scheduled(&mut self, description: &str, schedule: _ScheduleExpr) -> String {
         let cron_desc = match &schedule {
-            ScheduleExpr::Every { interval_secs } => format!("every {interval_secs}s"),
-            ScheduleExpr::Daily { hour, minute } => format!("daily at {hour:02}:{minute:02}"),
-            ScheduleExpr::Hourly => "hourly".into(),
-            ScheduleExpr::Weekly { weekday, hour, minute } => {
+            _ScheduleExpr::Every { interval_secs } => format!("every {interval_secs}s"),
+            _ScheduleExpr::Daily { hour, minute } => format!("daily at {hour:02}:{minute:02}"),
+            _ScheduleExpr::Hourly => "hourly".into(),
+            _ScheduleExpr::Weekly { weekday, hour, minute } => {
                 format!("weekly on {weekday} at {hour:02}:{minute:02}")
             }
         };
         let id = format!("sched_{}", self.tasks.len() + 1);
-        let task = AlwaysOnTask {
+        let task = _AlwaysOnTask {
             id: id.clone(),
             description: description.to_string(),
             created_at: chrono::Utc::now(),
             last_run: None,
             interval_secs: match &schedule {
-                ScheduleExpr::Every { interval_secs } => *interval_secs,
+                _ScheduleExpr::Every { interval_secs } => *interval_secs,
                 _ => 0,
             },
             max_runs: u64::MAX,
             run_count: 0,
-            state: AlwaysOnState::Idle,
+            state: _AlwaysOnState::Idle,
             output_files: Vec::new(),
             last_output: None,
             tags: vec!["scheduled".into()],
@@ -405,11 +405,11 @@ impl AlwaysOnEngine {
         id
     }
 
-    pub fn list_scheduled(&self) -> Vec<&AlwaysOnTask> {
+    pub(crate) fn _list_scheduled(&self) -> Vec<&_AlwaysOnTask> {
         self.tasks.iter().filter(|t| t.schedule.is_some()).collect()
     }
 
-    pub fn pause_scheduled(&mut self, id: &str) -> Result<(), String> {
+    pub(crate) fn _pause_scheduled(&mut self, id: &str) -> Result<(), String> {
         let task = self
             .tasks
             .iter_mut()
@@ -422,7 +422,7 @@ impl AlwaysOnEngine {
         Ok(())
     }
 
-    pub fn resume_scheduled(&mut self, id: &str) -> Result<(), String> {
+    pub(crate) fn _resume_scheduled(&mut self, id: &str) -> Result<(), String> {
         let task = self
             .tasks
             .iter_mut()
@@ -435,7 +435,7 @@ impl AlwaysOnEngine {
         Ok(())
     }
 
-    pub fn list_tasks(&self, filter: Option<&str>) -> Vec<&AlwaysOnTask> {
+    pub fn list_tasks(&self, filter: Option<&str>) -> Vec<&_AlwaysOnTask> {
         match filter {
             Some("recurring") => self.tasks.iter().filter(|t| t.tags.contains(&"recurring".into())).collect(),
             Some("oneshot") => self.tasks.iter().filter(|t| t.tags.contains(&"oneshot".into())).collect(),
@@ -468,8 +468,8 @@ impl AlwaysOnEngine {
         }
     }
 
-    pub fn status(&self) -> EngineStatus {
-        EngineStatus {
+    pub fn status(&self) -> _EngineStatus {
+        _EngineStatus {
             enabled: self.enabled,
             state: self.state.to_string(),
             total_tasks: self.tasks.len(),
@@ -480,12 +480,12 @@ impl AlwaysOnEngine {
         }
     }
 
-    pub fn full_cycle(&mut self) -> Result<CycleReport, String> {
+    pub fn full_cycle(&mut self) -> Result<_CycleReport, String> {
         let start = Instant::now();
-        self.state = AlwaysOnState::Scanning;
+        self.state = _AlwaysOnState::Scanning;
 
         // 1. Discover candidate tasks
-        let discovered = self.scan_cycle();
+        let discovered = self._scan_cycle();
         let scan_count = discovered.len();
 
         // Auto-add discovered tasks
@@ -498,7 +498,7 @@ impl AlwaysOnEngine {
         }
 
         // 2. Execute pending tasks
-        self.state = AlwaysOnState::Working;
+        self.state = _AlwaysOnState::Working;
         let mut reports = Vec::new();
         let mut executed = 0;
 
@@ -528,7 +528,7 @@ impl AlwaysOnEngine {
 
         for &idx in &pending {
             let task = &mut self.tasks[idx];
-            task.state = AlwaysOnState::Working;
+            task.state = _AlwaysOnState::Working;
             let desc = task.description.clone();
             let task_id = task.id.clone();
 
@@ -539,9 +539,9 @@ impl AlwaysOnEngine {
             info!("{}", output);
 
             task.last_output = Some(output.clone());
-            task.state = AlwaysOnState::Idle;
+            task.state = _AlwaysOnState::Idle;
 
-            let report = WorkReport {
+            let report = _WorkReport {
                 task_id,
                 description: desc,
                 success: true,
@@ -564,16 +564,16 @@ impl AlwaysOnEngine {
         }
 
         // 3. Report
-        self.state = AlwaysOnState::Reporting;
+        self.state = _AlwaysOnState::Reporting;
         let duration = start.elapsed();
         self.last_cycle = Some(chrono::Utc::now());
 
-        self.state = AlwaysOnState::Sleeping;
+        self.state = _AlwaysOnState::Sleeping;
         if executed == 0 {
-            self.state = AlwaysOnState::Idle;
+            self.state = _AlwaysOnState::Idle;
         }
 
-        Ok(CycleReport {
+        Ok(_CycleReport {
             scan_count,
             tasks_executed: executed,
             tasks_completed: reports.iter().filter(|r| r.success).count(),
@@ -603,15 +603,15 @@ impl AlwaysOnEngine {
             let enabled = data.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
             let state_str = data.get("state").and_then(|v| v.as_str()).unwrap_or("idle");
             let state = match state_str {
-                "scanning" => AlwaysOnState::Scanning,
-                "working" => AlwaysOnState::Working,
-                "reporting" => AlwaysOnState::Reporting,
-                "sleeping" => AlwaysOnState::Sleeping,
-                _ => AlwaysOnState::Idle,
+                "scanning" => _AlwaysOnState::Scanning,
+                "working" => _AlwaysOnState::Working,
+                "reporting" => _AlwaysOnState::Reporting,
+                "sleeping" => _AlwaysOnState::Sleeping,
+                _ => _AlwaysOnState::Idle,
             };
             let scan_interval = data.get("scan_interval_secs").and_then(|v| v.as_u64()).unwrap_or(60);
             let idle_cooldown = data.get("idle_cooldown_secs").and_then(|v| v.as_u64()).unwrap_or(300);
-            let tasks: Vec<AlwaysOnTask> = data.get("tasks")
+            let tasks: Vec<_AlwaysOnTask> = data.get("tasks")
                 .and_then(|v| serde_json::from_value(v.clone()).ok())
                 .unwrap_or_default();
             let completed: Vec<String> = data.get("completed_task_ids")
@@ -649,7 +649,7 @@ mod tests {
     fn test_always_on_engine_new() {
         let engine = AlwaysOnEngine::new();
         assert!(!engine.enabled);
-        assert_eq!(engine.state, AlwaysOnState::Idle);
+        assert_eq!(engine.state, _AlwaysOnState::Idle);
         assert!(engine.tasks.is_empty());
     }
 
@@ -667,7 +667,7 @@ mod tests {
     #[test]
     fn test_always_on_add_recurring() {
         let mut engine = AlwaysOnEngine::new();
-        let id = engine.add_recurring("check system health", 300);
+        let id = engine._add_recurring("check system health", 300);
         assert!(id.starts_with("ao_"));
         assert_eq!(engine.tasks.len(), 1);
         assert_eq!(engine.tasks[0].description, "check system health");
@@ -687,7 +687,7 @@ mod tests {
     #[test]
     fn test_always_on_list_tasks() {
         let mut engine = AlwaysOnEngine::new();
-        engine.add_recurring("health", 300);
+        engine._add_recurring("health", 300);
         engine.add_oneshot("cleanup");
         assert_eq!(engine.list_tasks(None).len(), 2);
         assert_eq!(engine.list_tasks(Some("recurring")).len(), 1);
@@ -737,7 +737,7 @@ mod tests {
     #[test]
     fn test_always_on_save_load_roundtrip() {
         let mut engine = AlwaysOnEngine::new();
-        engine.add_recurring("health check", 600);
+        engine._add_recurring("health check", 600);
         engine.add_oneshot("cleanup");
         assert!(engine.save().is_ok());
         let loaded = AlwaysOnEngine::load();
@@ -748,37 +748,37 @@ mod tests {
 
     #[test]
     fn test_schedule_expr_parse_every() {
-        let s = ScheduleExpr::parse("every 300").unwrap();
-        assert!(matches!(s, ScheduleExpr::Every { interval_secs: 300 }));
+        let s = _ScheduleExpr::parse("every 300").unwrap();
+        assert!(matches!(s, _ScheduleExpr::Every { interval_secs: 300 }));
     }
 
     #[test]
     fn test_schedule_expr_parse_daily() {
-        let s = ScheduleExpr::parse("daily at 09:30").unwrap();
-        assert!(matches!(s, ScheduleExpr::Daily { hour: 9, minute: 30 }));
+        let s = _ScheduleExpr::parse("daily at 09:30").unwrap();
+        assert!(matches!(s, _ScheduleExpr::Daily { hour: 9, minute: 30 }));
     }
 
     #[test]
     fn test_schedule_expr_parse_hourly() {
-        let s = ScheduleExpr::parse("hourly").unwrap();
-        assert!(matches!(s, ScheduleExpr::Hourly));
+        let s = _ScheduleExpr::parse("hourly").unwrap();
+        assert!(matches!(s, _ScheduleExpr::Hourly));
     }
 
     #[test]
     fn test_schedule_expr_parse_weekly() {
-        let s = ScheduleExpr::parse("weekly on 1 at 14:00").unwrap();
-        assert!(matches!(s, ScheduleExpr::Weekly { weekday: 1, hour: 14, minute: 0 }));
+        let s = _ScheduleExpr::parse("weekly on 1 at 14:00").unwrap();
+        assert!(matches!(s, _ScheduleExpr::Weekly { weekday: 1, hour: 14, minute: 0 }));
     }
 
     #[test]
     fn test_schedule_expr_parse_invalid() {
-        assert!(ScheduleExpr::parse("invalid").is_err());
-        assert!(ScheduleExpr::parse("every").is_err());
+        assert!(_ScheduleExpr::parse("invalid").is_err());
+        assert!(_ScheduleExpr::parse("every").is_err());
     }
 
     #[test]
     fn test_schedule_expr_next_run_every() {
-        let s = ScheduleExpr::Every { interval_secs: 60 };
+        let s = _ScheduleExpr::Every { interval_secs: 60 };
         let now = chrono::Utc::now();
         let next = s.next_run(now);
         let diff = (next - now).num_seconds();
@@ -787,7 +787,7 @@ mod tests {
 
     #[test]
     fn test_schedule_expr_next_run_daily_tomorrow() {
-        let s = ScheduleExpr::Daily { hour: 23, minute: 0 };
+        let s = _ScheduleExpr::Daily { hour: 23, minute: 0 };
         let today_noon = chrono::Utc::now()
             .with_hour(12).unwrap()
             .with_minute(0).unwrap()
@@ -800,7 +800,7 @@ mod tests {
     #[test]
     fn test_always_on_add_scheduled() {
         let mut engine = AlwaysOnEngine::new();
-        let id = engine.add_scheduled("daily health", ScheduleExpr::Daily { hour: 6, minute: 0 });
+        let id = engine._add_scheduled("daily health", _ScheduleExpr::Daily { hour: 6, minute: 0 });
         assert!(id.starts_with("sched_"));
         assert_eq!(engine.tasks.len(), 1);
         assert!(engine.tasks[0].schedule.is_some());
@@ -812,29 +812,29 @@ mod tests {
     #[test]
     fn test_always_on_list_scheduled() {
         let mut engine = AlwaysOnEngine::new();
-        engine.add_recurring("normal", 300);
-        engine.add_scheduled("sched1", ScheduleExpr::Hourly);
-        engine.add_scheduled("sched2", ScheduleExpr::Daily { hour: 9, minute: 0 });
-        let scheduled = engine.list_scheduled();
+        engine._add_recurring("normal", 300);
+        engine._add_scheduled("sched1", _ScheduleExpr::Hourly);
+        engine._add_scheduled("sched2", _ScheduleExpr::Daily { hour: 9, minute: 0 });
+        let scheduled = engine._list_scheduled();
         assert_eq!(scheduled.len(), 2);
     }
 
     #[test]
     fn test_always_on_pause_resume_scheduled() {
         let mut engine = AlwaysOnEngine::new();
-        let id = engine.add_scheduled("test", ScheduleExpr::Hourly);
+        let id = engine._add_scheduled("test", _ScheduleExpr::Hourly);
         assert!(!engine.tasks[0].paused);
-        assert!(engine.pause_scheduled(&id).is_ok());
+        assert!(engine._pause_scheduled(&id).is_ok());
         assert!(engine.tasks[0].paused);
-        assert!(engine.resume_scheduled(&id).is_ok());
+        assert!(engine._resume_scheduled(&id).is_ok());
         assert!(!engine.tasks[0].paused);
-        assert!(engine.pause_scheduled("nonexistent").is_err());
+        assert!(engine._pause_scheduled("nonexistent").is_err());
     }
 
     #[test]
     fn test_always_on_pause_non_scheduled() {
         let mut engine = AlwaysOnEngine::new();
         let id = engine.add_oneshot("test");
-        assert!(engine.pause_scheduled(&id).is_err());
+        assert!(engine._pause_scheduled(&id).is_err());
     }
 }

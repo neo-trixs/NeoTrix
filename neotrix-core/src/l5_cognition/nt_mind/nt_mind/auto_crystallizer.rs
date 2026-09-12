@@ -22,12 +22,12 @@ pub struct AutoCrystallizer {
     /// 被门禁拒绝的结晶进幻觉桶 — 可审计、可追溯、可复查,
     /// 而非仅计数丢弃。bullyingllms 原文: "findings go into a
     /// hallucination bin before passing the gate"。
-    pub hallucination_bin: Vec<HallucinationEntry>,
+    pub hallucination_bin: Vec<_HallucinationEntry>,
 }
 
 /// 幻觉桶条目 — 记录被反幻觉门拒绝的结晶候选及其拒绝原因。
 #[derive(Debug, Clone)]
-pub struct HallucinationEntry {
+pub(crate) struct _HallucinationEntry {
     pub source_name: String,
     pub domain: String,
     pub reward: f64,
@@ -67,12 +67,12 @@ impl AutoCrystallizer {
 
     /// P0-4 幻觉桶入桶 (bullyingllms 模式): 无验证契约的结晶候选
     /// 记录到 hallucination_bin, 供审计/复查 — 拒绝可追溯而非静默丢弃。
-    pub fn bin_hallucination(&mut self, source_name: &str, domain: &str, reward: f64, reason: &str) {
+    pub(crate) fn _bin_hallucination(&mut self, source_name: &str, domain: &str, reward: f64, reason: &str) {
         if !self.anti_hallucination_gate {
             return;
         }
         let now = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_diversity::now_unix_secs() as u64;
-        self.hallucination_bin.push(HallucinationEntry {
+        self.hallucination_bin.push(_HallucinationEntry {
             source_name: source_name.to_string(),
             domain: domain.to_string(),
             reward,
@@ -82,11 +82,11 @@ impl AutoCrystallizer {
     }
 
     /// 幻觉桶审计: 返回当前桶内条目数 (供监控/复盘)。
-    pub fn hallucination_bin_len(&self) -> usize {
+    pub(crate) fn _hallucination_bin_len(&self) -> usize {
         self.hallucination_bin.len()
     }
 
-    pub fn crystallize_from_absorption(
+    pub(crate) fn _crystallize_from_absorption(
         &mut self,
         _brain: &mut ReasoningBrain,
         bank: &mut ReasoningBank,
@@ -104,7 +104,7 @@ impl AutoCrystallizer {
         let verification = self.apply_verification_gate(verification);
         // P0-4: 无验证契约 → 入幻觉桶 (可审计), 同时仍结晶但标记 Unverified。
         if verification.is_none() {
-            self.bin_hallucination(
+            self._bin_hallucination(
                 source_name,
                 domain,
                 reward,
@@ -145,7 +145,7 @@ impl AutoCrystallizer {
         Some(crystal)
     }
 
-    pub fn crystallize_from_trace(
+    pub(crate) fn _crystallize_from_trace(
         &mut self,
         bank: &mut ReasoningBank,
         description: &str,
@@ -208,41 +208,41 @@ impl AutoCrystallizer {
 
 /// 蒸馏章节
 #[derive(Debug, Clone)]
-pub struct DistilledChapter {
+pub(crate) struct _DistilledChapter {
     pub title: String,
     pub body: String,
 }
 
 /// 术语表条目
 #[derive(Debug, Clone)]
-pub struct GlossaryTerm {
+pub(crate) struct _GlossaryTerm {
     pub term: String,
     pub definition: String,
 }
 
 /// 模式条目
 #[derive(Debug, Clone)]
-pub struct PatternEntry {
+pub(crate) struct _PatternEntry {
     pub name: String,
     pub description: String,
 }
 
 /// book-to-skill 蒸馏五件套
 #[derive(Debug, Clone)]
-pub struct DistillationSuite {
+pub(crate) struct _DistillationSuite {
     /// SKILL.md 主文件 — 技能入口 (标题 + 摘要 + 章节索引)
     pub skill_md: String,
     /// 章节 — 按 markdown 标题切分
-    pub chapters: Vec<DistilledChapter>,
+    pub chapters: Vec<_DistilledChapter>,
     /// glossary — 术语表 (**term**: definition 或 - term: definition)
-    pub glossary: Vec<GlossaryTerm>,
+    pub glossary: Vec<_GlossaryTerm>,
     /// patterns — 模式库 (Pattern:/模式: 前缀行)
-    pub patterns: Vec<PatternEntry>,
+    pub patterns: Vec<_PatternEntry>,
     /// cheatsheet — 速查条目 (列表项/代码块)
     pub cheatsheet: Vec<String>,
 }
 
-impl DistillationSuite {
+impl _DistillationSuite {
     /// 从原始 markdown 知识源蒸馏五件套。
     /// 解析规则:
     ///   - `#`/`##` 标题 → 章节
@@ -259,11 +259,11 @@ impl DistillationSuite {
         let mut cur_body = String::new();
         let mut in_code = false;
 
-        let flush = |cur_title: &mut String, cur_body: &mut String, chapters: &mut Vec<DistilledChapter>| {
+        let flush = |cur_title: &mut String, cur_body: &mut String, chapters: &mut Vec<_DistilledChapter>| {
             // 章节只要有标题就入册 — 正文可能仅含术语/模式/速查行
             // (这些行被 continue 掉, 不累积进 body), body 空不等于章节不存在。
             if !cur_title.is_empty() {
-                chapters.push(DistilledChapter {
+                chapters.push(_DistilledChapter {
                     title: std::mem::take(cur_title),
                     body: std::mem::take(cur_body),
                 });
@@ -307,7 +307,7 @@ impl DistillationSuite {
                     let term = rest[..eq].trim().to_string();
                     let definition = rest[eq + 3..].trim().to_string();
                     if !term.is_empty() && !definition.is_empty() {
-                        glossary.push(GlossaryTerm { term, definition });
+                        glossary.push(_GlossaryTerm { term, definition });
                         continue;
                     }
                 }
@@ -319,21 +319,21 @@ impl DistillationSuite {
                     let definition = rest[eq + 1..].trim().to_string();
                     if !term.is_empty() && !definition.is_empty()
                         && !term.starts_with("Pattern") && !term.starts_with("模式") {
-                        glossary.push(GlossaryTerm { term, definition });
+                        glossary.push(_GlossaryTerm { term, definition });
                         continue;
                     }
                 }
             }
             // patterns: Pattern: / 模式: 前缀
             if let Some(rest) = trimmed.strip_prefix("Pattern:") {
-                patterns.push(PatternEntry {
+                patterns.push(_PatternEntry {
                     name: rest.trim().to_string(),
                     description: String::new(),
                 });
                 continue;
             }
             if let Some(rest) = trimmed.strip_prefix("模式:") {
-                patterns.push(PatternEntry {
+                patterns.push(_PatternEntry {
                     name: rest.trim().to_string(),
                     description: String::new(),
                 });
@@ -372,7 +372,7 @@ impl DistillationSuite {
     }
 
     /// 五件套完整性检查 — 空套件不可用 (Dark Forest: 无产出即删除)
-    pub fn is_usable(&self) -> bool {
+    pub(crate) fn _is_usable(&self) -> bool {
         !self.chapters.is_empty() || !self.glossary.is_empty()
             || !self.patterns.is_empty() || !self.cheatsheet.is_empty()
     }
@@ -399,7 +399,7 @@ mod tests {
         let mut c = AutoCrystallizer::new();
         let mut brain = ReasoningBrain::new();
         let mut bank = ReasoningBank::new(100);
-        let result = c.crystallize_from_absorption(
+        let result = c._crystallize_from_absorption(
             &mut brain, &mut bank,
             "https://example.com", "test", "general",
             &[], 0.1, None,
@@ -417,7 +417,7 @@ mod tests {
             MicroEdit::AdjustDimension("compound_composition".to_string(), 0.1),
             MicroEdit::NormalizeVector,
         ];
-        let result = c.crystallize_from_absorption(
+        let result = c._crystallize_from_absorption(
             &mut brain, &mut bank,
             "https://example.com", "test", "general",
             &edits, 0.8, None,
@@ -433,7 +433,7 @@ mod tests {
         let mut c = AutoCrystallizer::new();
         let mut bank = ReasoningBank::new(100);
         let insights = vec!["pattern: use agent isolation".to_string(), "pattern: module boundaries".to_string()];
-        let result = c.crystallize_from_trace(&mut bank, "agent design", &insights, 0.7, None);
+        let result = c._crystallize_from_trace(&mut bank, "agent design", &insights, 0.7, None);
         assert!(result.is_some());
         assert_eq!(c.total_crystallized, 1);
     }
@@ -442,7 +442,7 @@ mod tests {
     fn test_crystallize_from_trace_low_confidence() {
         let mut c = AutoCrystallizer::new();
         let mut bank = ReasoningBank::new(100);
-        let result = c.crystallize_from_trace(&mut bank, "test", &[], 0.1, None);
+        let result = c._crystallize_from_trace(&mut bank, "test", &[], 0.1, None);
         assert!(result.is_none());
     }
 
@@ -452,7 +452,7 @@ mod tests {
         c.auto_crystallize = false;
         let mut brain = ReasoningBrain::new();
         let mut bank = ReasoningBank::new(100);
-        let result = c.crystallize_from_absorption(
+        let result = c._crystallize_from_absorption(
             &mut brain, &mut bank,
             "url", "name", "domain", &[], 0.9, None,
         );
@@ -465,7 +465,7 @@ mod tests {
     fn test_anti_hallucination_gate_marks_unverified() {
         let mut c = AutoCrystallizer::new();
         let mut bank = ReasoningBank::new(100);
-        let result = c.crystallize_from_trace(&mut bank, "no verification", &["insight".to_string()], 0.9, None);
+        let result = c._crystallize_from_trace(&mut bank, "no verification", &["insight".to_string()], 0.9, None);
         assert!(result.is_some());
         let crystal = result.unwrap();
         // 无验证契约 → 反幻觉门标记 Unverified 并计数
@@ -483,7 +483,7 @@ mod tests {
             method: "replay trace and check behavior change".to_string(),
             status: VerificationStatus::Pending,
         };
-        let result = c.crystallize_from_trace(
+        let result = c._crystallize_from_trace(
             &mut bank, "verified insight", &["insight".to_string()], 0.9, Some(contract),
         );
         assert!(result.is_some());
@@ -499,7 +499,7 @@ mod tests {
         let mut c = AutoCrystallizer::new();
         c.anti_hallucination_gate = false;
         let mut bank = ReasoningBank::new(100);
-        let result = c.crystallize_from_trace(&mut bank, "gate off", &["insight".to_string()], 0.9, None);
+        let result = c._crystallize_from_trace(&mut bank, "gate off", &["insight".to_string()], 0.9, None);
         assert!(result.is_some());
         assert_eq!(c.unverified_crystallized, 0);
     }
@@ -522,8 +522,8 @@ mod tests {
     #[test]
     fn test_distill_extracts_all_five_parts() {
         let raw = "# Agent Design\n\n## Isolation\n\n**Agent**: 独立执行单元\n**Reward**: 反馈信号\n\nPattern: isolate agents per task\n\n- use sandbox per agent\n- cap retries at 3\n\n## Memory\n\n**KB**: 知识库\n\n模式: snapshot before mutation\n";
-        let suite = DistillationSuite::distill("Agent Design", raw);
-        assert!(suite.is_usable());
+        let suite = _DistillationSuite::distill("Agent Design", raw);
+        assert!(suite._is_usable());
         assert_eq!(suite.chapters.len(), 2, "两个章节: {:?}", suite.chapters.iter().map(|c| &c.title).collect::<Vec<_>>());
         assert_eq!(suite.glossary.len(), 3, "三个术语: {:?}", suite.glossary);
         assert_eq!(suite.patterns.len(), 2, "两个模式");
@@ -535,15 +535,15 @@ mod tests {
 
     #[test]
     fn test_distill_empty_source_not_usable() {
-        let suite = DistillationSuite::distill("Empty", "");
-        assert!(!suite.is_usable(), "空源不可用 (Dark Forest)");
+        let suite = _DistillationSuite::distill("Empty", "");
+        assert!(!suite._is_usable(), "空源不可用 (Dark Forest)");
         assert!(suite.chapters.is_empty());
     }
 
     #[test]
     fn test_distill_code_block_goes_to_cheatsheet() {
         let raw = "# Tool\n\n## Usage\n\n```rust\nlet x = 1;\n```\n";
-        let suite = DistillationSuite::distill("Tool", raw);
+        let suite = _DistillationSuite::distill("Tool", raw);
         assert!(suite.cheatsheet.iter().any(|c| c.contains("let x = 1")),
             "代码块应入 cheatsheet: {:?}", suite.cheatsheet);
     }

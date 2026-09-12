@@ -14,7 +14,7 @@ use md5::Digest;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryKernel {
     /// 成功记录
-    pub successes: Vec<SuccessRecord>,
+    pub successes: Vec<_SuccessRecord>,
     /// 模式库
     pub patterns: HashMap<String, u32>,
     /// 技术库
@@ -27,7 +27,7 @@ pub struct MemoryKernel {
 
 /// 成功记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SuccessRecord {
+pub(crate) struct _SuccessRecord {
     /// 类别
     pub category: String,
     /// 输入
@@ -64,7 +64,7 @@ impl MemoryKernel {
     }
 
     /// 学习成功经验
-    pub fn learn_success(
+    pub(crate) fn _learn_success(
         &mut self,
         category: &str,
         input: &str,
@@ -72,7 +72,7 @@ impl MemoryKernel {
         technique: Option<&str>,
     ) {
         // 创建成功记录
-        let record = SuccessRecord {
+        let record = _SuccessRecord {
             category: category.to_string(),
             input: input.to_string(),
             output: output.to_string(),
@@ -103,17 +103,17 @@ impl MemoryKernel {
     }
 
     /// 查询模式
-    pub fn query_pattern(&self, pattern: &str) -> u32 {
+    pub(crate) fn _query_pattern(&self, pattern: &str) -> u32 {
         self.patterns.get(pattern).copied().unwrap_or(0)
     }
 
     /// 查询技术
-    pub fn query_technique(&self, technique: &str) -> u32 {
+    pub(crate) fn _query_technique(&self, technique: &str) -> u32 {
         self.techniques.get(technique).copied().unwrap_or(0)
     }
 
     /// 获取最近的成功记录
-    pub fn recent_successes(&self, n: usize) -> Vec<&SuccessRecord> {
+    pub(crate) fn _recent_successes(&self, n: usize) -> Vec<&_SuccessRecord> {
         self.successes.iter().rev().take(n).collect()
     }
 
@@ -195,10 +195,10 @@ mod tests {
     #[test]
     fn test_memory_kernel() {
         let mut kernel = MemoryKernel::new();
-        kernel.learn_success("reasoning", "test input", "test output", Some("deduction"));
+        kernel._learn_success("reasoning", "test input", "test output", Some("deduction"));
         
         assert_eq!(kernel.stats.total, 1);
-        assert_eq!(kernel.query_pattern("test"), 1);
-        assert_eq!(kernel.query_technique("deduction"), 1);
+        assert_eq!(kernel._query_pattern("test"), 1);
+        assert_eq!(kernel._query_technique("deduction"), 1);
     }
 }

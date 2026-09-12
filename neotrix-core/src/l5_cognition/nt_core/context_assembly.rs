@@ -327,7 +327,7 @@ impl ContextAssembler {
     }
 
     /// 获取预算使用率
-    pub fn budget_utilization(&self) -> f64 {
+    pub(crate) fn _budget_utilization(&self) -> f64 {
         if self.budget == 0 {
             return 0.0;
         }

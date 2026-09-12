@@ -9,7 +9,7 @@ pub struct PerformanceEvaluator;
 // CUDA Agent 吸收接线 (cycle 1188): 外部执行反馈奖励信号。
 // 对标 CUDA Agent 的 skill-augmented env + 自动验证/profiling 提供可靠奖励信号:
 // 静态能力评估 (evaluate) 无经验反馈, RL 需要「执行后验证」信号。
-// combine_reward: 外部执行反馈 (verification/profiling, RewardSource::External)
+// _combine_reward: 外部执行反馈 (verification/profiling, RewardSource::External)
 // 与内部能力自评 (RewardSource::Internal) 加权融合 — external_weight 越高,
 // 奖励越接地于真实执行结果 (CUDA Agent 核心主张: 自动验证 → 稳定 RL 训练)。
 #[derive(Debug, Clone, Copy)]
@@ -63,7 +63,7 @@ impl PerformanceEvaluator {
         raw_score.clamp(0.0, 1.0)
     }
 
-    pub fn has_meaningful_change(before: f64, after: f64, threshold: f64) -> bool {
+    pub(crate) fn _has_meaningful_change(before: f64, after: f64, threshold: f64) -> bool {
         (after - before).abs() > threshold
     }
 
@@ -76,7 +76,7 @@ impl PerformanceEvaluator {
     /// - `threshold`: 加权支持率门限, ≥ 则采纳 (决定输出, 非概率)。
     ///
     /// 返回 (采纳, 支持率, 反对率): 决定性 bool + 可解释的边际。
-    pub fn deterministic_pick(
+    pub(crate) fn _deterministic_pick(
         commits: &[bool],
         weights: &[f64],
         threshold: f64,
@@ -105,7 +105,7 @@ impl PerformanceEvaluator {
     ///   为 0 → 纯内部自评 (无验证工具时的退化); 为 1 → 纯外部执行信号。
     /// - 外部信号: 验证通过 + 延迟比 + 质量分 合成的可执行奖励。
     /// - 内部信号: capability 静态评估 (evaluate)。
-    pub fn combine_reward(
+    pub(crate) fn _combine_reward(
         capability_score: f64,
         feedback: ExecutionFeedback,
         external_weight: f64,
@@ -124,9 +124,9 @@ impl PerformanceEvaluator {
         combined.clamp(0.0, 1.0)
     }
 
-    /// combine_reward 的情感扩展 (Q2, 设计: docs/1-DESIGN/affective-reward-context.md):
+    /// _combine_reward 的情感扩展 (Q2, 设计: docs/1-DESIGN/affective-reward-context.md):
     /// external 通道内部再细分 — 执行验证信号 (verified/latency/quality) 与
-    /// 情感引导信号 (AffectiveFeedback)。`affective == None` 时退化为 combine_reward。
+    /// 情感引导信号 (AffectiveFeedback)。`affective == None` 时退化为 _combine_reward。
     ///
     /// 合成 (确定性, 防 LLM 打分 flat-band):
     /// - `affective_guide = valence * trust_k * engagement_k`
@@ -284,27 +284,27 @@ mod tests {
 
     #[test]
     fn test_has_meaningful_change_above_threshold() {
-        assert!(PerformanceEvaluator::has_meaningful_change(0.3, 0.8, 0.1));
+        assert!(PerformanceEvaluator::_has_meaningful_change(0.3, 0.8, 0.1));
     }
 
     #[test]
     fn test_has_meaningful_change_below_threshold() {
-        assert!(!PerformanceEvaluator::has_meaningful_change(0.45, 0.5, 0.1));
+        assert!(!PerformanceEvaluator::_has_meaningful_change(0.45, 0.5, 0.1));
     }
 
     #[test]
     fn test_has_meaningful_change_equal_value() {
-        assert!(!PerformanceEvaluator::has_meaningful_change(0.5, 0.5, 0.01));
+        assert!(!PerformanceEvaluator::_has_meaningful_change(0.5, 0.5, 0.01));
     }
 
     #[test]
     fn test_has_meaningful_change_negative_threshold() {
-        assert!(PerformanceEvaluator::has_meaningful_change(0.3, 0.8, -0.1));
+        assert!(PerformanceEvaluator::_has_meaningful_change(0.3, 0.8, -0.1));
     }
 
     #[test]
     fn test_has_meaningful_change_exact_threshold() {
-        assert!(!PerformanceEvaluator::has_meaningful_change(0.5, 0.6, 0.1));
+        assert!(!PerformanceEvaluator::_has_meaningful_change(0.5, 0.6, 0.1));
     }
 
     // ========== CUDA Agent 接线测试 (cycle 1188: 外部执行反馈奖励) ==========
@@ -313,8 +313,8 @@ mod tests {
     fn test_combine_reward_verified_high_quality() {
         // 验证通过 + 高质量 → 外部权重越高奖励越高
         let feedback = ExecutionFeedback::new(true, 1.0, 0.9);
-        let pure_internal = PerformanceEvaluator::combine_reward(0.5, feedback, 0.0);
-        let grounded = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
+        let pure_internal = PerformanceEvaluator::_combine_reward(0.5, feedback, 0.0);
+        let grounded = PerformanceEvaluator::_combine_reward(0.5, feedback, 1.0);
         assert!(grounded > pure_internal, "验证通过的高质量产物应获更高奖励");
         assert!((pure_internal - 0.5).abs() < 1e-9, "external_weight=0 应退化为内部自评");
     }
@@ -323,7 +323,7 @@ mod tests {
     fn test_combine_reward_unverified_penalized() {
         // 未验证通过 → 外部奖励被惩罚 (cap 0.3), 不应超过内部自评
         let feedback = ExecutionFeedback::new(false, 1.0, 0.9);
-        let grounded = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
+        let grounded = PerformanceEvaluator::_combine_reward(0.5, feedback, 1.0);
         assert!(grounded < 0.5, "未验证产物应受惩罚: {}", grounded);
         assert!(grounded <= 0.3, "未验证奖励 cap 0.3: {}", grounded);
     }
@@ -333,15 +333,15 @@ mod tests {
         // 快 2x (latency_ratio=0.5) 应比持平 (1.0) 奖励高
         let fast = ExecutionFeedback::new(true, 0.5, 0.8);
         let equal = ExecutionFeedback::new(true, 1.0, 0.8);
-        let fast_r = PerformanceEvaluator::combine_reward(0.5, fast, 1.0);
-        let equal_r = PerformanceEvaluator::combine_reward(0.5, equal, 1.0);
+        let fast_r = PerformanceEvaluator::_combine_reward(0.5, fast, 1.0);
+        let equal_r = PerformanceEvaluator::_combine_reward(0.5, equal, 1.0);
         assert!(fast_r > equal_r, "更快应获更高奖励: fast={} equal={}", fast_r, equal_r);
     }
 
     #[test]
     fn test_combine_reward_clamped() {
         let feedback = ExecutionFeedback::new(true, 0.05, 1.0); // latency_bonus 封顶 2.0
-        let r = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
+        let r = PerformanceEvaluator::_combine_reward(0.5, feedback, 1.0);
         assert!(r <= 1.0);
         assert!(r >= 0.0);
     }
@@ -350,9 +350,9 @@ mod tests {
     fn test_combine_reward_external_weight_blend() {
         // 外部权重 0.5 → 结果落在内部与外部之间
         let feedback = ExecutionFeedback::new(true, 1.0, 0.6);
-        let internal_only = PerformanceEvaluator::combine_reward(0.5, feedback, 0.0);
-        let external_only = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
-        let blended = PerformanceEvaluator::combine_reward(0.5, feedback, 0.5);
+        let internal_only = PerformanceEvaluator::_combine_reward(0.5, feedback, 0.0);
+        let external_only = PerformanceEvaluator::_combine_reward(0.5, feedback, 1.0);
+        let blended = PerformanceEvaluator::_combine_reward(0.5, feedback, 0.5);
         assert!((blended - (internal_only + external_only) / 2.0).abs() < 1e-9);
     }
 
@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn test_deterministic_pick_adopts_above_threshold() {
         // 2/3 分类承诺 → 支持率 0.667 ≥ 0.6 → 采纳
-        let (adopt, support, oppose) = PerformanceEvaluator::deterministic_pick(
+        let (adopt, support, oppose) = PerformanceEvaluator::_deterministic_pick(
             &[true, true, false],
             &[1.0, 1.0, 1.0],
             0.6,
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_deterministic_pick_rejects_below_threshold() {
-        let (adopt, support, _) = PerformanceEvaluator::deterministic_pick(
+        let (adopt, support, _) = PerformanceEvaluator::_deterministic_pick(
             &[true, false, false],
             &[1.0, 1.0, 1.0],
             0.6,
@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn test_deterministic_pick_weighted_commit() {
         // 强票权 (3x) 的单票否决 2 票弱票: 3/(3+1+1)=0.6 ≥ 0.6 → 采纳
-        let (adopt, support, _) = PerformanceEvaluator::deterministic_pick(
+        let (adopt, support, _) = PerformanceEvaluator::_deterministic_pick(
             &[true, false, false],
             &[3.0, 1.0, 1.0],
             0.6,
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_deterministic_pick_empty_is_reject() {
-        let (adopt, support, oppose) = PerformanceEvaluator::deterministic_pick(&[], &[], 0.5);
+        let (adopt, support, oppose) = PerformanceEvaluator::_deterministic_pick(&[], &[], 0.5);
         assert!(!adopt);
         assert_eq!(support, 0.0);
         assert_eq!(oppose, 0.0);
@@ -404,7 +404,7 @@ mod tests {
 
     #[test]
     fn test_deterministic_pick_zero_weight_is_reject() {
-        let (adopt, _, _) = PerformanceEvaluator::deterministic_pick(
+        let (adopt, _, _) = PerformanceEvaluator::_deterministic_pick(
             &[true, true],
             &[0.0, 0.0],
             0.0,
@@ -415,7 +415,7 @@ mod tests {
     #[test]
     fn test_deterministic_pick_negative_weights_ignored() {
         // 负票权被忽略 (不拉低支持率), 符合 max(0) 语义
-        let (adopt, support, _) = PerformanceEvaluator::deterministic_pick(
+        let (adopt, support, _) = PerformanceEvaluator::_deterministic_pick(
             &[true, false],
             &[1.0, -5.0],
             0.5,
@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn test_deterministic_pick_threshold_boundary() {
         // 支持率恰等于阈值 → 采纳 (≥ 语义)
-        let (adopt, _, _) = PerformanceEvaluator::deterministic_pick(
+        let (adopt, _, _) = PerformanceEvaluator::_deterministic_pick(
             &[true, false],
             &[1.0, 1.0],
             0.5,
@@ -452,7 +452,7 @@ mod tests {
     #[test]
     fn test_combine_reward_with_affective_boost() {
         // 高 valence + Bond(stage=4) + interactions≥3 → 情感引导抬高外部通道奖励
-        let base = PerformanceEvaluator::combine_reward(0.5, fb(true, 0.7), 1.0);
+        let base = PerformanceEvaluator::_combine_reward(0.5, fb(true, 0.7), 1.0);
         let boosted = PerformanceEvaluator::combine_reward_with_affective(
             0.5, fb(true, 0.7), Some(aff(0.9, 4, 10)), 1.0,
         );
@@ -501,8 +501,8 @@ mod tests {
 
     #[test]
     fn test_combine_reward_with_affective_none_regression() {
-        // None 时与 combine_reward 逐位一致 (回归)
-        let plain = PerformanceEvaluator::combine_reward(0.5, fb(true, 0.7), 0.5);
+        // None 时与 _combine_reward 逐位一致 (回归)
+        let plain = PerformanceEvaluator::_combine_reward(0.5, fb(true, 0.7), 0.5);
         let with_none = PerformanceEvaluator::combine_reward_with_affective(
             0.5, fb(true, 0.7), None, 0.5,
         );

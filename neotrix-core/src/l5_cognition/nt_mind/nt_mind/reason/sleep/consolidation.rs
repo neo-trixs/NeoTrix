@@ -44,7 +44,7 @@ impl MemoryConsolidation {
         Self { config }
     }
 
-    pub fn select_memories_for_sleep(&self, bank: &ReasoningBank) -> Vec<ReasoningMemory> {
+    pub(crate) fn _select_memories_for_sleep(&self, bank: &ReasoningBank) -> Vec<ReasoningMemory> {
         let all_mems = bank.memories();
         let mut scored: Vec<(f64, &ReasoningMemory)> = all_mems.iter()
             .filter(|m| m.reward >= self.config.min_reward)
@@ -73,7 +73,7 @@ impl MemoryConsolidation {
 //         operator: &SelectableOperator,
         updater: &HebbianUpdater,
     ) -> ConsolidationResult {
-        let memories = self.select_memories_for_sleep(bank);
+        let memories = self._select_memories_for_sleep(bank);
         let count = memories.len();
         if count == 0 {
             return ConsolidationResult {
@@ -102,7 +102,7 @@ impl MemoryConsolidation {
         }
     }
 
-    pub fn scoring_breakdown(&self, memory: &ReasoningMemory) -> (f64, f64, f64, f64) {
+    pub(crate) fn _scoring_breakdown(&self, memory: &ReasoningMemory) -> (f64, f64, f64, f64) {
         let recency = 1.0 / (1.0 + memory.lifecycle.last_accessed as f64).sqrt();
         let value = memory.reward;
         let diversity = 1.0 - (memory.lifecycle.access_count as f64).tanh();
@@ -161,7 +161,7 @@ mod tests {
         ];
         let bank = build_test_bank(mems);
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
-        let selected = mc.select_memories_for_sleep(&bank);
+        let selected = mc._select_memories_for_sleep(&bank);
         assert!(selected.iter().any(|m| m.id == "high"), "high-reward memory should be selected");
     }
 
@@ -169,7 +169,7 @@ mod tests {
     fn test_select_memories_empty_bank() {
         let bank = ReasoningBank::new(10);
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
-        let selected = mc.select_memories_for_sleep(&bank);
+        let selected = mc._select_memories_for_sleep(&bank);
         assert!(selected.is_empty(), "empty bank should return empty selection");
     }
 
@@ -180,7 +180,7 @@ mod tests {
         }).collect();
         let bank = build_test_bank(mems);
         let mc = MemoryConsolidation::new(ConsolidationConfig { max_memories_per_pass: 5, ..Default::default() });
-        let selected = mc.select_memories_for_sleep(&bank);
+        let selected = mc._select_memories_for_sleep(&bank);
         assert!(selected.len() <= 5, "should limit to max_memories_per_pass");
     }
 
@@ -193,7 +193,7 @@ mod tests {
         ];
         let bank = build_test_bank(mems);
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
-        let selected = mc.select_memories_for_sleep(&bank);
+        let selected = mc._select_memories_for_sleep(&bank);
         let recent = selected.iter().position(|m| m.id == "recent");
         let old = selected.iter().position(|m| m.id == "old");
         assert!(recent < Some(old.unwrap_or(usize::MAX)), "recent memory should rank higher");
@@ -214,7 +214,7 @@ mod tests {
     fn test_scoring_breakdown_returns_valid() {
         let mem = make_memory(0.8, true, "score_test", 100);
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
-        let (recency, value, diversity, score) = mc.scoring_breakdown(&mem);
+        let (recency, value, diversity, score) = mc._scoring_breakdown(&mem);
         assert!(recency > 0.0, "recency should be positive");
         assert!(value == 0.8, "value should match reward");
         assert!(diversity > 0.0, "diversity should be positive");

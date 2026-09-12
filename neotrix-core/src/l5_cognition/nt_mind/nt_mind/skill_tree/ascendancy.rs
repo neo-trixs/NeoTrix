@@ -28,7 +28,7 @@ impl WeaponSetKind {
 pub struct SwitchRecord {
     pub from_set: WeaponSetKind,
     pub to_set: WeaponSetKind,
-    pub switch_count: u32,
+    pub _switch_count: u32,
 }
 
 /// Ascendancy 双专精路由 — AttentionManager 按任务类型路由
@@ -37,9 +37,9 @@ pub struct AscendancyRouter {
     /// 当前激活的 Weapon Set
     current_set: WeaponSetKind,
     /// 切换记录
-    switch_history: Vec<SwitchRecord>,
+    _switch_history: Vec<SwitchRecord>,
     /// 切换次数
-    switch_count: u32,
+    _switch_count: u32,
     /// 每个域的激活强度 (用于路由决策)
     domain_scores: HashMap<AttentionDomain, f64>,
     /// AttentionManager 引用
@@ -51,8 +51,8 @@ impl AscendancyRouter {
         let mgr = AttentionManager::new(0.5);
         Self {
             current_set: WeaponSetKind::Acquisition,
-            switch_history: Vec::new(),
-            switch_count: 0,
+            _switch_history: Vec::new(),
+            _switch_count: 0,
             domain_scores: HashMap::new(),
             attention_mgr: mgr,
         }
@@ -64,12 +64,12 @@ impl AscendancyRouter {
     }
 
     /// 获取切换次数
-    pub fn switch_count(&self) -> u32 {
-        self.switch_count
+    pub(crate) fn _switch_count(&self) -> u32 {
+        self._switch_count
     }
 
     /// 切换到指定专精
-    pub fn switch_to(&mut self, set: WeaponSetKind) {
+    pub(crate) fn _switch_to(&mut self, set: WeaponSetKind) {
         let from = self.current_set;
         if from == set {
             return;
@@ -81,13 +81,13 @@ impl AscendancyRouter {
             },
             0.6,
         );
-        self.switch_history.push(SwitchRecord {
+        self._switch_history.push(SwitchRecord {
             from_set: from,
             to_set: set,
-            switch_count: self.switch_count,
+            _switch_count: self._switch_count,
         });
         self.current_set = set;
-        self.switch_count += 1;
+        self._switch_count += 1;
     }
 
     /// 根据任务类型自动路由到正确的专精
@@ -97,7 +97,7 @@ impl AscendancyRouter {
             WeaponSet::Acquisition => WeaponSetKind::Acquisition,
             WeaponSet::Evolution => WeaponSetKind::Evolution,
         };
-        self.switch_to(target);
+        self._switch_to(target);
     }
 
     /// 获取当前专精的优先级域
@@ -161,7 +161,7 @@ impl AscendancyRouter {
     }
 
     /// 更新域的激活强度
-    pub fn update_domain_score(&mut self, domain: AttentionDomain, score: f64) {
+    pub(crate) fn _update_domain_score(&mut self, domain: AttentionDomain, score: f64) {
         self.domain_scores.insert(domain, score.clamp(0.0, 1.0));
     }
 
@@ -170,21 +170,21 @@ impl AscendancyRouter {
         &self.attention_mgr
     }
 
-    pub fn attention_manager_mut(&mut self) -> &mut AttentionManager {
+    pub(crate) fn _attention_manager_mut(&mut self) -> &mut AttentionManager {
         &mut self.attention_mgr
     }
 
     /// 获取切换历史
-    pub fn switch_history(&self) -> &[SwitchRecord] {
-        &self.switch_history
+    pub(crate) fn _switch_history(&self) -> &[SwitchRecord] {
+        &self._switch_history
     }
 
     /// 获取当前会话的两个专精状态摘要
     pub fn ascendancy_summary(&self) -> String {
         format!(
-            "Ascendancy: current={}, switch_count={}, priority_domains={:?}",
+            "Ascendancy: current={}, _switch_count={}, priority_domains={:?}",
             self.current_set.label(),
-            self.switch_count,
+            self._switch_count,
             self.active_priority_domains()
                 .iter()
                 .map(|d| d.label())
@@ -201,7 +201,7 @@ impl Default for AscendancyRouter {
 
 /// 将 WeaponSetKind 转换为 AttentionDomain (用于域匹配)
 impl WeaponSetKind {
-    pub fn to_attention_domain(&self) -> AttentionDomain {
+    pub(crate) fn _to_attention_domain(&self) -> AttentionDomain {
         match self {
             Self::Acquisition => AttentionDomain::Code,
             Self::Evolution => AttentionDomain::SelfReflection,
@@ -218,22 +218,22 @@ mod tests {
     fn test_ascendancy_router_new() {
         let router = AscendancyRouter::new();
         assert_eq!(router.current_set(), WeaponSetKind::Acquisition);
-        assert_eq!(router.switch_count(), 0);
+        assert_eq!(router._switch_count(), 0);
     }
 
     #[test]
     fn test_switch_to_evolution() {
         let mut router = AscendancyRouter::new();
-        router.switch_to(WeaponSetKind::Evolution);
+        router._switch_to(WeaponSetKind::Evolution);
         assert_eq!(router.current_set(), WeaponSetKind::Evolution);
-        assert_eq!(router.switch_count(), 1);
+        assert_eq!(router._switch_count(), 1);
     }
 
     #[test]
     fn test_switch_same_set_no_op() {
         let mut router = AscendancyRouter::new();
-        router.switch_to(WeaponSetKind::Acquisition);
-        assert_eq!(router.switch_count(), 0);
+        router._switch_to(WeaponSetKind::Acquisition);
+        assert_eq!(router._switch_count(), 0);
     }
 
     #[test]
@@ -257,7 +257,7 @@ mod tests {
     #[test]
     fn test_active_priority_domains_evolution() {
         let mut router = AscendancyRouter::new();
-        router.switch_to(WeaponSetKind::Evolution);
+        router._switch_to(WeaponSetKind::Evolution);
         let domains = router.active_priority_domains();
         assert!(domains.contains(&AttentionDomain::SelfReflection));
         assert!(domains.contains(&AttentionDomain::Creativity));
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn test_match_score_evolution() {
         let mut router = AscendancyRouter::new();
-        router.switch_to(WeaponSetKind::Evolution);
+        router._switch_to(WeaponSetKind::Evolution);
         let score = router.match_score("reflect on the design");
         assert!(score > 0.0);
     }
@@ -282,22 +282,22 @@ mod tests {
     #[test]
     fn test_update_domain_score() {
         let mut router = AscendancyRouter::new();
-        router.update_domain_score(AttentionDomain::Code, 0.8);
-        router.update_domain_score(AttentionDomain::Creativity, 0.6);
+        router._update_domain_score(AttentionDomain::Code, 0.8);
+        router._update_domain_score(AttentionDomain::Creativity, 0.6);
         assert_eq!(router.domain_scores[&AttentionDomain::Code], 0.8);
     }
 
     #[test]
     fn test_switch_history() {
         let mut router = AscendancyRouter::new();
-        router.switch_to(WeaponSetKind::Evolution);
-        router.switch_to(WeaponSetKind::Acquisition);
-        assert_eq!(router.switch_count(), 2);
-        assert_eq!(router.switch_history().len(), 2);
-        assert_eq!(router.switch_history()[0].from_set, WeaponSetKind::Acquisition);
-        assert_eq!(router.switch_history()[0].to_set, WeaponSetKind::Evolution);
-        assert_eq!(router.switch_history()[1].from_set, WeaponSetKind::Evolution);
-        assert_eq!(router.switch_history()[1].to_set, WeaponSetKind::Acquisition);
+        router._switch_to(WeaponSetKind::Evolution);
+        router._switch_to(WeaponSetKind::Acquisition);
+        assert_eq!(router._switch_count(), 2);
+        assert_eq!(router._switch_history().len(), 2);
+        assert_eq!(router._switch_history()[0].from_set, WeaponSetKind::Acquisition);
+        assert_eq!(router._switch_history()[0].to_set, WeaponSetKind::Evolution);
+        assert_eq!(router._switch_history()[1].from_set, WeaponSetKind::Evolution);
+        assert_eq!(router._switch_history()[1].to_set, WeaponSetKind::Acquisition);
     }
 
     #[test]
@@ -311,18 +311,18 @@ mod tests {
     fn test_attention_manager_access() {
         let mut router = AscendancyRouter::new();
         assert_eq!(router.current_set(), WeaponSetKind::Acquisition);
-        router.switch_to(WeaponSetKind::Evolution);
+        router._switch_to(WeaponSetKind::Evolution);
         assert_eq!(router.current_set(), WeaponSetKind::Evolution);
     }
 
     #[test]
     fn test_weapon_set_kind_to_attention_domain() {
         assert_eq!(
-            WeaponSetKind::Acquisition.to_attention_domain(),
+            WeaponSetKind::Acquisition._to_attention_domain(),
             AttentionDomain::Code
         );
         assert_eq!(
-            WeaponSetKind::Evolution.to_attention_domain(),
+            WeaponSetKind::Evolution._to_attention_domain(),
             AttentionDomain::SelfReflection
         );
     }

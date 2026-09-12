@@ -46,7 +46,7 @@ pub struct RouterStats {
 }
 
 impl RouterStats {
-    pub fn from_cost_log(cost_log: &[super::reasoning_engine::CostRecord]) -> Self {
+    pub(crate) fn _from_cost_log(cost_log: &[super::reasoning_engine::CostRecord]) -> Self {
         let total = cost_log.len() as u64;
         let mut tier_counts: HashMap<String, u64> = HashMap::new();
         let mut tier_costs: HashMap<String, f64> = HashMap::new();

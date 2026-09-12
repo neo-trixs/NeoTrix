@@ -28,7 +28,7 @@ pub struct OracleRequest {
 ///
 /// This trait abstracts the L1 `OracleGate` that L5 needs.
 /// The actual implementation lives in L1 and is injected via DI.
-pub trait OracleGateContract: Send + Sync {
+pub(crate) trait _OracleGateContract: Send + Sync {
     /// Evaluate failure and decide if oracle intervention is needed.
     fn evaluate_failure(&mut self, attempt_count: u32, dimension: &str) -> OracleDecision;
     
@@ -39,7 +39,7 @@ pub trait OracleGateContract: Send + Sync {
 /// SemanticEntropyGate trait — L5 contract for semantic entropy operations.
 ///
 /// This trait abstracts the L1 `SemanticEntropyGate` that L5 needs.
-pub trait SemanticEntropyGateContract: Send + Sync {
+pub(crate) trait _SemanticEntropyGateContract: Send + Sync {
     /// Compute entropy for a prompt.
     fn compute_entropy(prompt: &str, context: &[String]) -> f64 where Self: Sized;
     
@@ -50,7 +50,7 @@ pub trait SemanticEntropyGateContract: Send + Sync {
     fn record(&mut self, entropy: f64);
     
     /// Get entropy trend.
-    fn entropy_trend(&self) -> EntropyTrend;
+    fn entropy_trend(&self) -> _EntropyTrend;
     
     /// Create a new instance.
     fn new_gate() -> Self where Self: Sized;
@@ -58,7 +58,7 @@ pub trait SemanticEntropyGateContract: Send + Sync {
 
 /// Entropy trend direction (L5层定义)
 #[derive(Debug, Clone, PartialEq)]
-pub enum EntropyTrend {
+pub(crate) enum _EntropyTrend {
     Increasing,
     Decreasing,
     Stable,
@@ -75,7 +75,7 @@ pub enum SandboxVerdict {
 /// ActionSandbox trait — L5 contract for action sandbox operations.
 ///
 /// This trait abstracts the L1 `ActionSandbox` that L5 needs.
-pub trait ActionSandboxContract: Send + Sync {
+pub(crate) trait _ActionSandboxContract: Send + Sync {
     /// Evaluate an action against sandbox rules.
     fn evaluate(&mut self, action: &str) -> SandboxVerdict;
     
@@ -92,7 +92,7 @@ pub trait ActionSandboxContract: Send + Sync {
     fn new_sandbox() -> Self where Self: Sized;
 }
 
-/// L1 implementation of OracleGateContract
+/// L1 implementation of _OracleGateContract
 pub struct L1OracleGate {
     inner: crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate,
 }
@@ -105,7 +105,7 @@ impl L1OracleGate {
     }
 }
 
-impl OracleGateContract for L1OracleGate {
+impl _OracleGateContract for L1OracleGate {
     fn evaluate_failure(&mut self, attempt_count: u32, dimension: &str) -> OracleDecision {
         let decision = self.inner.evaluate_failure(attempt_count, dimension);
         OracleDecision {
@@ -140,7 +140,7 @@ impl crate::core::nt_core_self_test::SelfTest for L1OracleGate {
     }
 }
 
-/// L1 implementation of SemanticEntropyGateContract
+/// L1 implementation of _SemanticEntropyGateContract
 pub struct L1SemanticEntropyGate {
     inner: crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate,
 }
@@ -153,7 +153,7 @@ impl L1SemanticEntropyGate {
     }
 }
 
-impl SemanticEntropyGateContract for L1SemanticEntropyGate {
+impl _SemanticEntropyGateContract for L1SemanticEntropyGate {
     fn compute_entropy(prompt: &str, context: &[String]) -> f64 {
         crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate::compute_entropy(prompt, context)
     }
@@ -166,11 +166,11 @@ impl SemanticEntropyGateContract for L1SemanticEntropyGate {
         self.inner.record(entropy);
     }
     
-    fn entropy_trend(&self) -> EntropyTrend {
+    fn entropy_trend(&self) -> _EntropyTrend {
         match self.inner.entropy_trend() {
-            crate::l1_action::nt_act::nt_act_code::semantic_entropy::TrendDirection::Increasing => EntropyTrend::Increasing,
-            crate::l1_action::nt_act::nt_act_code::semantic_entropy::TrendDirection::Decreasing => EntropyTrend::Decreasing,
-            crate::l1_action::nt_act::nt_act_code::semantic_entropy::TrendDirection::Stable => EntropyTrend::Stable,
+            crate::l1_action::nt_act::nt_act_code::semantic_entropy::TrendDirection::Increasing => _EntropyTrend::Increasing,
+            crate::l1_action::nt_act::nt_act_code::semantic_entropy::TrendDirection::Decreasing => _EntropyTrend::Decreasing,
+            crate::l1_action::nt_act::nt_act_code::semantic_entropy::TrendDirection::Stable => _EntropyTrend::Stable,
         }
     }
     
@@ -192,7 +192,7 @@ impl crate::core::nt_core_self_test::SelfTest for L1SemanticEntropyGate {
     }
 }
 
-/// L1 implementation of ActionSandboxContract
+/// L1 implementation of _ActionSandboxContract
 pub struct L1ActionSandbox {
     inner: crate::l1_action::nt_act::actions::sandbox::ActionSandbox,
 }
@@ -205,7 +205,7 @@ impl L1ActionSandbox {
     }
 }
 
-impl ActionSandboxContract for L1ActionSandbox {
+impl _ActionSandboxContract for L1ActionSandbox {
     fn evaluate(&mut self, action: &str) -> SandboxVerdict {
         match self.inner.evaluate(action) {
             crate::l1_action::nt_act::actions::sandbox::SandboxVerdict::Approved => SandboxVerdict::Approved,

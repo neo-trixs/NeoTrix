@@ -11,15 +11,15 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 提示模板管理器
-pub struct PromptTemplateManager {
-    templates: HashMap<String, PromptTemplate>,
+pub(crate) struct _PromptTemplateManager {
+    templates: HashMap<String, _PromptTemplate>,
     variables: HashMap<String, serde_json::Value>,
-    stats: TemplateStats,
+    stats: _TemplateStats,
 }
 
 /// 提示模板
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PromptTemplate {
+pub(crate) struct _PromptTemplate {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -27,14 +27,14 @@ pub struct PromptTemplate {
     pub variables: Vec<TemplateVariable>,
     pub version: u32,
     pub tags: Vec<String>,
-    pub metadata: TemplateMetadata,
+    pub metadata: _TemplateMetadata,
 }
 
 /// 模板变量
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateVariable {
     pub name: String,
-    pub var_type: VariableType,
+    pub var_type: _VariableType,
     pub default: Option<serde_json::Value>,
     pub required: bool,
     pub description: Option<String>,
@@ -43,7 +43,7 @@ pub struct TemplateVariable {
 /// 变量类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum VariableType {
+pub(crate) enum _VariableType {
     String,
     Number,
     Boolean,
@@ -53,7 +53,7 @@ pub enum VariableType {
 
 /// 模板元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemplateMetadata {
+pub(crate) struct _TemplateMetadata {
     pub author: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -63,7 +63,7 @@ pub struct TemplateMetadata {
 
 /// 渲染结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RenderedPrompt {
+pub(crate) struct _RenderedPrompt {
     pub template_id: String,
     pub rendered: String,
     pub variables_used: HashMap<String, serde_json::Value>,
@@ -72,7 +72,7 @@ pub struct RenderedPrompt {
 
 /// 模板统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemplateStats {
+pub(crate) struct _TemplateStats {
     pub total_templates: u64,
     pub total_renders: u64,
     pub avg_render_time_ms: f64,
@@ -81,19 +81,19 @@ pub struct TemplateStats {
 
 /// 条件表达式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConditionalExpression {
+pub(crate) struct _ConditionalExpression {
     pub condition: String,
     pub then_branch: String,
     pub else_branch: Option<String>,
 }
 
-impl PromptTemplateManager {
+impl _PromptTemplateManager {
     /// 创建新的模板管理器
     pub fn new() -> Self {
         Self {
             templates: HashMap::new(),
             variables: HashMap::new(),
-            stats: TemplateStats {
+            stats: _TemplateStats {
                 total_templates: 0,
                 total_renders: 0,
                 avg_render_time_ms: 0.0,
@@ -103,18 +103,18 @@ impl PromptTemplateManager {
     }
 
     /// 注册模板
-    pub fn register_template(&mut self, template: PromptTemplate) {
+    pub fn register_template(&mut self, template: _PromptTemplate) {
         self.templates.insert(template.id.clone(), template);
         self.stats.total_templates += 1;
     }
 
     /// 设置全局变量
-    pub fn set_variable(&mut self, name: &str, value: serde_json::Value) {
+    pub(crate) fn _set_variable(&mut self, name: &str, value: serde_json::Value) {
         self.variables.insert(name.to_string(), value);
     }
 
     /// 渲染模板
-    pub fn render(&mut self, template_id: &str, variables: &HashMap<String, serde_json::Value>) -> Result<RenderedPrompt, String> {
+    pub fn render(&mut self, template_id: &str, variables: &HashMap<String, serde_json::Value>) -> Result<_RenderedPrompt, String> {
         let template = self.templates.get(template_id)
             .ok_or_else(|| format!("Template {} not found", template_id))?;
 
@@ -139,7 +139,7 @@ impl PromptTemplateManager {
 
         self.stats.total_renders += 1;
 
-        Ok(RenderedPrompt {
+        Ok(_RenderedPrompt {
             template_id: template_id.to_string(),
             rendered,
             variables_used: all_variables,
@@ -255,7 +255,7 @@ impl PromptTemplateManager {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &TemplateStats {
+    pub fn stats(&self) -> &_TemplateStats {
         &self.stats
     }
 }

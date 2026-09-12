@@ -26,7 +26,7 @@ pub struct TraceStep {
 /// Digest 输出（压缩轨迹）
 
 #[derive(Clone, Debug)]
-pub struct TraceDigest {
+pub(crate) struct _TraceDigest {
     pub trace_id: String,
     pub task_summary: String,
     pub success_patterns: Vec<String>,
@@ -38,8 +38,8 @@ pub struct TraceDigest {
 /// 适应景观（Planner 输出）
 
 #[derive(Clone, Debug)]
-pub struct AdaptationLandscape {
-    pub dimensions: Vec<AdaptationDimension>,
+pub(crate) struct _AdaptationLandscape {
+    pub dimensions: Vec<_AdaptationDimension>,
     pub current_position: Vec<f64>,
     pub target_position: Vec<f64>,
     pub potential_improvements: Vec<String>,
@@ -47,7 +47,7 @@ pub struct AdaptationLandscape {
 
 
 #[derive(Clone, Debug)]
-pub struct AdaptationDimension {
+pub(crate) struct _AdaptationDimension {
     pub name: String,
     pub current_value: f64,
     pub optimal_value: f64,
@@ -57,7 +57,7 @@ pub struct AdaptationDimension {
 /// 类型化编辑（Evolver 输出）
 
 #[derive(Clone, Debug)]
-pub struct TypedEdit {
+pub(crate) struct _TypedEdit {
     pub edit_id: String,
     pub edit_type: EditType,
     pub target: String,
@@ -79,7 +79,7 @@ pub enum EditType {
 /// Critic 评估
 
 #[derive(Clone, Debug)]
-pub struct CriticAssessment {
+pub(crate) struct _CriticAssessment {
     pub edit_id: String,
     pub supported: bool,
     pub evidence: String,
@@ -92,12 +92,12 @@ pub struct CriticAssessment {
 #[derive(Debug)]
 pub struct AegisEngine {
     traces: Vec<ExecutionTrace>,
-    digests: Vec<TraceDigest>,
-    landscape: Option<AdaptationLandscape>,
-    edits: Vec<TypedEdit>,
-    assessments: Vec<CriticAssessment>,
-    adopted_edits: Vec<TypedEdit>,
-    rejected_edits: Vec<(TypedEdit, String)>,
+    digests: Vec<_TraceDigest>,
+    landscape: Option<_AdaptationLandscape>,
+    edits: Vec<_TypedEdit>,
+    assessments: Vec<_CriticAssessment>,
+    adopted_edits: Vec<_TypedEdit>,
+    rejected_edits: Vec<(_TypedEdit, String)>,
 }
 
 
@@ -115,7 +115,7 @@ impl AegisEngine {
     }
 
     /// Stage 1: Digester — 压缩轨迹
-    pub fn digest(&mut self, trace: ExecutionTrace) -> TraceDigest {
+    pub fn digest(&mut self, trace: ExecutionTrace) -> _TraceDigest {
         let success_patterns: Vec<String> = trace
             .steps
             .iter()
@@ -136,7 +136,7 @@ impl AegisEngine {
             .map(|s| format!("{} → {}", s.action, if s.success { "OK" } else { "FAIL" }))
             .collect();
 
-        let digest = TraceDigest {
+        let digest = _TraceDigest {
             trace_id: trace.trace_id.clone(),
             task_summary: trace.task.clone(),
             success_patterns,
@@ -151,27 +151,27 @@ impl AegisEngine {
     }
 
     /// Stage 2: Planner — 分析适应景观
-    pub fn plan(&mut self) -> AdaptationLandscape {
+    pub fn plan(&mut self) -> _AdaptationLandscape {
         let dimensions = vec![
-            AdaptationDimension {
+            _AdaptationDimension {
                 name: "prompt_quality".to_string(),
                 current_value: 0.7,
                 optimal_value: 0.9,
                 weight: 0.3,
             },
-            AdaptationDimension {
+            _AdaptationDimension {
                 name: "tool_selection".to_string(),
                 current_value: 0.6,
                 optimal_value: 0.85,
                 weight: 0.25,
             },
-            AdaptationDimension {
+            _AdaptationDimension {
                 name: "context_efficiency".to_string(),
                 current_value: 0.5,
                 optimal_value: 0.8,
                 weight: 0.25,
             },
-            AdaptationDimension {
+            _AdaptationDimension {
                 name: "routing_accuracy".to_string(),
                 current_value: 0.65,
                 optimal_value: 0.9,
@@ -193,7 +193,7 @@ impl AegisEngine {
             })
             .collect();
 
-        let landscape = AdaptationLandscape {
+        let landscape = _AdaptationLandscape {
             dimensions,
             current_position,
             target_position,
@@ -205,13 +205,13 @@ impl AegisEngine {
     }
 
     /// Stage 3: Evolver — 生成类型化编辑
-    pub fn evolve(&mut self) -> Vec<TypedEdit> {
+    pub fn evolve(&mut self) -> Vec<_TypedEdit> {
         let mut edits = Vec::new();
 
         if let Some(landscape) = &self.landscape {
             for dim in &landscape.dimensions {
                 if dim.optimal_value - dim.current_value > 0.1 {
-                    let edit = TypedEdit {
+                    let edit = _TypedEdit {
                         edit_id: format!("edit_{}", edits.len()),
                         edit_type: match dim.name.as_str() {
                             "prompt_quality" => EditType::PromptModification,
@@ -234,8 +234,8 @@ impl AegisEngine {
     }
 
     /// Stage 4: Critic — 确定性门控评估
-    pub fn critique(&mut self) -> Vec<CriticAssessment> {
-        let assessments: Vec<CriticAssessment> = self
+    pub fn critique(&mut self) -> Vec<_CriticAssessment> {
+        let assessments: Vec<_CriticAssessment> = self
             .edits
             .iter()
             .map(|edit| {
@@ -243,7 +243,7 @@ impl AegisEngine {
                 let risk_score = if supported { 0.2 } else { 0.8 };
                 let improvement_estimate = edit.confidence * 0.3;
 
-                CriticAssessment {
+                _CriticAssessment {
                     edit_id: edit.edit_id.clone(),
                     supported,
                     evidence: if supported {
@@ -262,7 +262,7 @@ impl AegisEngine {
     }
 
     /// 确定性门控：只有通过 Critic 的编辑才能被采纳
-    pub fn gate(&mut self) -> Vec<TypedEdit> {
+    pub fn gate(&mut self) -> Vec<_TypedEdit> {
         let mut adopted = Vec::new();
 
         for edit in &self.edits {
@@ -281,8 +281,8 @@ impl AegisEngine {
     }
 
     /// 获取统计
-    pub fn stats(&self) -> AegisStats {
-        AegisStats {
+    pub fn stats(&self) -> _AegisStats {
+        _AegisStats {
             traces: self.traces.len(),
             digests: self.digests.len(),
             edits: self.edits.len(),
@@ -294,7 +294,7 @@ impl AegisEngine {
 
 
 #[derive(Clone, Debug)]
-pub struct AegisStats {
+pub(crate) struct _AegisStats {
     pub traces: usize,
     pub digests: usize,
     pub edits: usize,

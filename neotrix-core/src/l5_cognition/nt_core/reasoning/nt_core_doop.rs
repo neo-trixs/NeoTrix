@@ -1,7 +1,7 @@
 //! NT-CORE — doop 吸收 (github.com/kgoedecke/doop).
 //!
 //! doop: 声明式指针/静态分析 (declarative pointer/static analysis) — 以声明式
-//! 规则表达对程序指针流与数据依赖的查询。本模块实现 `PointerAnalysis` trait
+//! 规则表达对程序指针流与数据依赖的查询。本模块实现 `_PointerAnalysis` trait
 //! (C1: trait 存在 + 基础逻辑 + SelfTest T1 + 3 测试), 建模声明式分析点的
 //! 指针集 (points-to set) 推导与查询。
 
@@ -10,13 +10,13 @@ use std::collections::HashMap;
 
 /// 声明式分析点: 变量名 → 其指向的目标集 (points-to set)。
 #[derive(Debug, Clone, PartialEq)]
-pub struct AnalysisPoint {
+pub(crate) struct _AnalysisPoint {
     pub var: String,
     pub points_to: Vec<String>,
 }
 
 /// 声明式指针/静态分析 trait。
-pub trait PointerAnalysis {
+pub(crate) trait _PointerAnalysis {
     /// 声明一个分析点并登记其初始指针集。
     fn declare(&mut self, var: &str, points_to: &[&str]);
     /// 查询某变量的声明式 points-to set, 无登记则空。
@@ -31,11 +31,11 @@ pub trait PointerAnalysis {
 }
 
 /// doop 声明式指针分析实现。
-pub struct DoopPointerAnalysis {
+pub(crate) struct _DoopPointerAnalysis {
     points: HashMap<String, Vec<String>>,
 }
 
-impl DoopPointerAnalysis {
+impl _DoopPointerAnalysis {
     pub fn new() -> Self {
         Self {
             points: HashMap::new(),
@@ -43,13 +43,13 @@ impl DoopPointerAnalysis {
     }
 }
 
-impl Default for DoopPointerAnalysis {
+impl Default for _DoopPointerAnalysis {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl PointerAnalysis for DoopPointerAnalysis {
+impl _PointerAnalysis for _DoopPointerAnalysis {
     fn declare(&mut self, var: &str, points_to: &[&str]) {
         let entry = self
             .points
@@ -83,9 +83,9 @@ impl PointerAnalysis for DoopPointerAnalysis {
     }
 }
 
-impl SelfTest for DoopPointerAnalysis {
+impl SelfTest for _DoopPointerAnalysis {
     fn name(&self) -> &'static str {
-        "DoopPointerAnalysis"
+        "_DoopPointerAnalysis"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_declare_registers_points_to_set() {
-        let mut a = DoopPointerAnalysis::new();
+        let mut a = _DoopPointerAnalysis::new();
         a.declare("p", &["obj_x"]);
         assert_eq!(a.query_points_to("p"), vec!["obj_x".to_string()]);
         assert_eq!(a.len(), 1);
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_merge_alias_propagates_and_counts() {
-        let mut a = DoopPointerAnalysis::new();
+        let mut a = _DoopPointerAnalysis::new();
         a.declare("p", &["obj_x"]);
         a.declare("q", &["obj_y"]);
         let added = a.merge_alias("p", "q");
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_self_test_rejects_self_alias() {
-        let mut a = DoopPointerAnalysis::new();
+        let mut a = _DoopPointerAnalysis::new();
         a.declare("p", &["p"]);
         assert!(a.self_test().is_err());
     }

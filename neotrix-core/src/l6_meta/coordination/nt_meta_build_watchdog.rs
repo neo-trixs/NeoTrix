@@ -25,7 +25,7 @@ pub struct BuildWatchdog {
 pub struct WatchdogConfig {
     pub check_interval: u64,
     pub alert_threshold: f64,
-    pub auto_fix: bool,
+    pub _auto_fix: bool,
     pub max_history: usize,
     pub enable_cache_monitoring: bool,
 }
@@ -35,7 +35,7 @@ impl Default for WatchdogConfig {
         Self {
             check_interval: 60,
             alert_threshold: 0.8,
-            auto_fix: true,
+            _auto_fix: true,
             max_history: 100,
             enable_cache_monitoring: true,
         }
@@ -305,10 +305,10 @@ impl BuildWatchdog {
     }
 
     /// 自动修复
-    pub fn auto_fix(&mut self) -> Vec<FixAction> {
+    pub(crate) fn _auto_fix(&mut self) -> Vec<FixAction> {
         let mut fixes = Vec::new();
 
-        if self.config.auto_fix {
+        if self.config._auto_fix {
             // 检查缓存状态
             if let Some(last_status) = self.history.last() {
                 if !last_status.cache_status.valid {

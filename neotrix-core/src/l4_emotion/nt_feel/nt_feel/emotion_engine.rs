@@ -205,7 +205,7 @@ impl FeelEngine {
         self.social.increment_interaction();
         let resonance = self.compute_resonance();
         self.social.update_empathy(resonance);
-        self.current_label()
+        self._current_label()
     }
 
     // -- Regulation -----------------------------------------------------------
@@ -238,7 +238,7 @@ impl FeelEngine {
 
     // -- Current state --------------------------------------------------------
 
-    pub fn current_label(&self) -> EmotionLabel {
+    pub(crate) fn _current_label(&self) -> EmotionLabel {
         self.core.report().emotion_label
     }
 
@@ -278,7 +278,7 @@ impl FeelEngine {
     }
 
     /// Return the last `n` snapshots (most recent first).
-    pub fn recent_snapshots(&self, n: usize) -> Vec<&EmotionSnapshot> {
+    pub(crate) fn _recent_snapshots(&self, n: usize) -> Vec<&EmotionSnapshot> {
         self.snapshots.iter().rev().take(n).collect()
     }
 
@@ -302,7 +302,7 @@ impl FeelEngine {
     /// Produce an attention signal that the ConsciousnessTree consumes to
     /// modulate attention allocation. High arousal + high social trust =
     /// higher salience.
-    pub fn attention_signal(&self) -> AttentionSignal {
+    pub(crate) fn _attention_signal(&self) -> AttentionSignal {
         let report = self.core.report();
         let arousal = report.arousal;
         let social_mod = self.config.social_trust_weight * self.social.trust
@@ -340,7 +340,7 @@ mod tests {
     #[test]
     fn test_feel_engine_default_config() {
         let engine = FeelEngine::default();
-        assert_eq!(engine.current_label(), EmotionLabel::Neutral);
+        assert_eq!(engine._current_label(), EmotionLabel::Neutral);
         assert_eq!(engine.social_state().trust, 0.5);
         assert_eq!(engine.social_state().empathy, 0.0);
     }
@@ -446,7 +446,7 @@ mod tests {
         let mut engine = FeelEngine::default();
         engine.observe(EmotionDimension::Curiosity, 0.7, "curious");
         let snap = engine.snapshot();
-        assert_eq!(snap.label, engine.current_label());
+        assert_eq!(snap.label, engine._current_label());
         assert_eq!(engine.snapshot_count(), 1);
     }
 
@@ -457,7 +457,7 @@ mod tests {
         let _ = engine.snapshot();
         engine.observe(EmotionDimension::Frustration, 0.6, "second");
         let _ = engine.snapshot();
-        let recent = engine.recent_snapshots(10);
+        let recent = engine._recent_snapshots(10);
         assert_eq!(recent.len(), 2);
         assert_eq!(recent[0].report.observation_count, 2);
     }
@@ -481,7 +481,7 @@ mod tests {
         let mut engine = FeelEngine::default();
         engine.observe(EmotionDimension::Frustration, 0.9, "frustrated");
         engine.observe(EmotionDimension::Urgency, 0.8, "urgent");
-        let signal = engine.attention_signal();
+        let signal = engine._attention_signal();
         assert!(
             signal.arousal > 0.5,
             "high frustration+urgency should produce high arousal"
@@ -495,7 +495,7 @@ mod tests {
         // Build trust
         engine.detect_from_text("thank you very much");
         engine.detect_from_text("太开心了");
-        let signal = engine.attention_signal();
+        let signal = engine._attention_signal();
         assert!(
             signal.social_trust > 0.5,
             "trust should modulate salience"
@@ -555,7 +555,7 @@ mod tests {
         engine.detect_from_text("开心");
         let json = engine.to_json().unwrap();
         let restored = FeelEngine::from_json(&json).unwrap();
-        assert_eq!(restored.current_label(), engine.current_label());
+        assert_eq!(restored._current_label(), engine._current_label());
         assert_eq!(
             restored.social_state().interaction_count,
             engine.social_state().interaction_count
@@ -575,7 +575,7 @@ mod tests {
         engine.observe(EmotionDimension::Urgency, 1.0, "max");
         engine.social.trust = 1.0;
         engine.social.empathy = 1.0;
-        let signal = engine.attention_signal();
+        let signal = engine._attention_signal();
         assert!(
             signal.salience <= 2.0,
             "salience should be capped at 2.0, got {}",

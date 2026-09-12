@@ -15,18 +15,18 @@ use super::self_observer::{Observation, Reflection, Insight};
 /// 自我进化器
 pub struct SelfEvolver {
     /// 能力评估
-    pub capability_assessment: CapabilityAssessment,
+    pub capability_assessment: _CapabilityAssessment,
     /// 进化历史
     pub evolution_history: Vec<EvolutionRecord>,
     /// 进化策略
-    pub strategies: Vec<EvolutionStrategy>,
+    pub strategies: Vec<_EvolutionStrategy>,
     /// 进化配置
-    pub config: EvolverConfig,
+    pub config: _EvolverConfig,
 }
 
 /// 进化配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvolverConfig {
+pub(crate) struct _EvolverConfig {
     /// 最大进化历史
     pub max_history: usize,
     /// 最小差距阈值
@@ -35,7 +35,7 @@ pub struct EvolverConfig {
     pub max_parallel_evolutions: usize,
 }
 
-impl Default for EvolverConfig {
+impl Default for _EvolverConfig {
     fn default() -> Self {
         Self {
             max_history: 500,
@@ -47,7 +47,7 @@ impl Default for EvolverConfig {
 
 /// 能力评估
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct CapabilityAssessment {
+pub(crate) struct _CapabilityAssessment {
     /// 能力维度评分
     pub dimension_scores: HashMap<String, f64>,
     /// 总体能力分数
@@ -72,14 +72,14 @@ pub struct CapabilityGap {
     /// 差距大小
     pub gap_size: f64,
     /// 优先级
-    pub priority: GapPriority,
+    pub priority: _GapPriority,
     /// 建议的进化策略
     pub suggested_strategy: String,
 }
 
 /// 差距优先级
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum GapPriority {
+pub(crate) enum _GapPriority {
     Low,
     Medium,
     High,
@@ -88,7 +88,7 @@ pub enum GapPriority {
 
 /// 进化策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvolutionStrategy {
+pub(crate) struct _EvolutionStrategy {
     /// 策略ID
     pub id: String,
     /// 策略名称
@@ -104,7 +104,7 @@ pub struct EvolutionStrategy {
     /// 实际效果
     pub actual_improvement: Option<f64>,
     /// 状态
-    pub status: StrategyStatus,
+    pub status: _StrategyStatus,
 }
 
 /// 进化步骤
@@ -149,7 +149,7 @@ pub enum StepStatus {
 
 /// 策略状态
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum StrategyStatus {
+pub(crate) enum _StrategyStatus {
     Planned,
     InProgress,
     Completed,
@@ -165,7 +165,7 @@ pub struct EvolutionRecord {
     /// 周期
     pub cycle: u32,
     /// 进化类型
-    pub evolution_type: EvolutionType,
+    pub evolution_type: _EvolutionType,
     /// 目标
     pub target: String,
     /// 执行的动作
@@ -178,7 +178,7 @@ pub struct EvolutionRecord {
 
 /// 进化类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EvolutionType {
+pub(crate) enum _EvolutionType {
     /// 能力增强
     CapabilityEnhancement,
     /// 知识获取
@@ -208,9 +208,9 @@ pub struct EvolutionResult {
 
 impl SelfEvolver {
     /// 创建新的自我进化器
-    pub fn new(config: EvolverConfig) -> Self {
+    pub fn new(config: _EvolverConfig) -> Self {
         Self {
-            capability_assessment: CapabilityAssessment::default(),
+            capability_assessment: _CapabilityAssessment::default(),
             evolution_history: Vec::new(),
             strategies: Vec::new(),
             config,
@@ -218,7 +218,7 @@ impl SelfEvolver {
     }
 
     /// 评估能力
-    pub fn assess_capabilities(&mut self, observations: &[Observation], reflections: &[Reflection]) {
+    pub(crate) fn _assess_capabilities(&mut self, observations: &[Observation], reflections: &[Reflection]) {
         let mut dimension_scores = HashMap::new();
 
         // 从观测中提取能力维度
@@ -243,7 +243,7 @@ impl SelfEvolver {
         // 识别差距
         let gaps = self.identify_gaps(&dimension_scores);
 
-        self.capability_assessment = CapabilityAssessment {
+        self.capability_assessment = _CapabilityAssessment {
             dimension_scores,
             overall_score,
             gaps,
@@ -262,10 +262,10 @@ impl SelfEvolver {
             
             if gap_size > self.config.min_gap_threshold {
                 let priority = match gap_size {
-                    s if s > 0.5 => GapPriority::Critical,
-                    s if s > 0.3 => GapPriority::High,
-                    s if s > 0.2 => GapPriority::Medium,
-                    _ => GapPriority::Low,
+                    s if s > 0.5 => _GapPriority::Critical,
+                    s if s > 0.3 => _GapPriority::High,
+                    s if s > 0.2 => _GapPriority::Medium,
+                    _ => _GapPriority::Low,
                 };
 
                 gaps.push(CapabilityGap {
@@ -287,11 +287,11 @@ impl SelfEvolver {
     }
 
     /// 制定进化策略
-    pub fn formulate_strategies(&mut self) {
+    pub(crate) fn _formulate_strategies(&mut self) {
         self.strategies.clear();
 
         for gap in &self.capability_assessment.gaps {
-            let strategy = EvolutionStrategy {
+            let strategy = _EvolutionStrategy {
                 id: format!("strat_{}", uuid::Uuid::new_v4()),
                 name: format!("进化策略: {}", gap.dimension),
                 description: gap.suggested_strategy.clone(),
@@ -299,7 +299,7 @@ impl SelfEvolver {
                 steps: self.create_evolution_steps(gap),
                 expected_improvement: gap.gap_size * 0.8,
                 actual_improvement: None,
-                status: StrategyStatus::Planned,
+                status: _StrategyStatus::Planned,
             };
 
             self.strategies.push(strategy);
@@ -348,10 +348,10 @@ impl SelfEvolver {
     }
 
     /// 执行进化
-    pub fn execute_evolution(&mut self, cycle: u32, strategy_id: &str) -> Option<EvolutionRecord> {
+    pub(crate) fn _execute_evolution(&mut self, cycle: u32, strategy_id: &str) -> Option<EvolutionRecord> {
         let strategy = self.strategies.iter_mut().find(|s| s.id == strategy_id)?;
         
-        strategy.status = StrategyStatus::InProgress;
+        strategy.status = _StrategyStatus::InProgress;
 
         // 模拟执行
         let success = strategy.expected_improvement > 0.1;
@@ -363,15 +363,15 @@ impl SelfEvolver {
 
         strategy.actual_improvement = Some(improvement);
         strategy.status = if success {
-            StrategyStatus::Completed
+            _StrategyStatus::Completed
         } else {
-            StrategyStatus::Failed
+            _StrategyStatus::Failed
         };
 
         let record = EvolutionRecord {
             id: format!("evo_{}", uuid::Uuid::new_v4()),
             cycle,
-            evolution_type: EvolutionType::CapabilityEnhancement,
+            evolution_type: _EvolutionType::CapabilityEnhancement,
             target: strategy.target_gap.clone(),
             actions: strategy.steps.iter().map(|s| s.description.clone()).collect(),
             result: EvolutionResult {
@@ -400,7 +400,7 @@ impl SelfEvolver {
     }
 
     /// 获取进化统计
-    pub fn stats(&self) -> EvolverStats {
+    pub fn stats(&self) -> _EvolverStats {
         let total_evolutions = self.evolution_history.len();
         let successful_evolutions = self.evolution_history.iter()
             .filter(|r| r.result.success)
@@ -410,7 +410,7 @@ impl SelfEvolver {
             .map(|r| r.result.improvement)
             .sum();
 
-        EvolverStats {
+        _EvolverStats {
             total_evolutions,
             successful_evolutions,
             success_rate: if total_evolutions > 0 {
@@ -426,7 +426,7 @@ impl SelfEvolver {
             },
             identified_gaps: self.capability_assessment.gaps.len(),
             active_strategies: self.strategies.iter()
-                .filter(|s| s.status == StrategyStatus::InProgress)
+                .filter(|s| s.status == _StrategyStatus::InProgress)
                 .count(),
         }
     }
@@ -434,7 +434,7 @@ impl SelfEvolver {
 
 /// 进化统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvolverStats {
+pub(crate) struct _EvolverStats {
     pub total_evolutions: usize,
     pub successful_evolutions: usize,
     pub success_rate: f64,
@@ -444,7 +444,7 @@ pub struct EvolverStats {
     pub active_strategies: usize,
 }
 
-impl std::fmt::Display for EvolverStats {
+impl std::fmt::Display for _EvolverStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "═══════════════════════════════════════════════")?;
         writeln!(f, "        SelfEvolver 统计")?;
@@ -467,18 +467,18 @@ mod tests {
 
     #[test]
     fn test_self_evolver_creation() {
-        let evolver = SelfEvolver::new(EvolverConfig::default());
+        let evolver = SelfEvolver::new(_EvolverConfig::default());
         assert_eq!(evolver.evolution_history.len(), 0);
         assert_eq!(evolver.strategies.len(), 0);
     }
 
     #[test]
     fn test_assess_capabilities() {
-        let mut evolver = SelfEvolver::new(EvolverConfig::default());
+        let mut evolver = SelfEvolver::new(_EvolverConfig::default());
         let observations = vec![];
         let reflections = vec![];
         
-        evolver.assess_capabilities(&observations, &reflections);
+        evolver._assess_capabilities(&observations, &reflections);
         assert_eq!(evolver.capability_assessment.gaps.len(), 0);
     }
 }

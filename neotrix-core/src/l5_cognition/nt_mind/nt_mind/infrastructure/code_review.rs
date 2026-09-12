@@ -4,7 +4,7 @@
 //! 审查结果可作为 RL 奖励信号输入 SEAL 循环
 //!
 //! v2.0 新增:
-//!   - CodeReviewLoop: 审查→评估→修复→再审查 迭代循环
+//!   - _CodeReviewLoop: 审查→评估→修复→再审查 迭代循环
 //!   - SEAL 奖励信号集成 (review_reward → SelfIteratingBrain)
 //!   - 对标开源项目 (nitpicker/DiffScope/Octorus/roborev/Coacker/Grippy)
 //!   - OWASP Top 10:2025 安全检查
@@ -17,9 +17,9 @@ use crate::l5_cognition::nt_mind::nt_mind::self_edit::MicroEdit;
 use crate::neotrix::nt_shield_audit::AuditMode;
 
 #[derive(Debug, Clone)]
-pub struct ReviewIssue {
+pub(crate) struct _ReviewIssue {
     pub severity: IssueSeverity,
-    pub category: IssueCategory,
+    pub category: _IssueCategory,
     pub message: String,
     pub line: Option<u32>,
     pub suggestion: Option<String>,
@@ -29,37 +29,37 @@ pub struct ReviewIssue {
 pub enum IssueSeverity { Critical, High, Medium, Low, Info }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum IssueCategory {
+pub(crate) enum _IssueCategory {
     Security, Performance, Architecture, Style, ErrorHandling, UnsafeCode, Testing
 }
 
 #[derive(Debug, Clone)]
-pub struct ReviewReport {
+pub(crate) struct _ReviewReport {
     pub file: String,
-    pub issues: Vec<ReviewIssue>,
+    pub issues: Vec<_ReviewIssue>,
     pub score: f64,
 }
 
-impl ReviewReport {
+impl _ReviewReport {
     pub fn total(&self) -> usize { self.issues.len() }
-    pub fn by_severity(&self, sev: IssueSeverity) -> Vec<&ReviewIssue> {
+    pub fn by_severity(&self, sev: IssueSeverity) -> Vec<&_ReviewIssue> {
         self.issues.iter().filter(|i| i.severity == sev).collect()
     }
 }
 
 /// Audit report for L7-level code review
 #[derive(Debug, Clone)]
-pub struct CodeAuditReport {
+pub(crate) struct _CodeAuditReport {
     pub name: String,
     pub path: String,
     pub file_count: usize,
     pub total_lines: usize,
-    pub issues: Vec<AuditIssue>,
+    pub issues: Vec<_AuditIssue>,
     pub score: f64,
 }
 
 #[derive(Debug, Clone)]
-pub struct AuditIssue {
+pub(crate) struct _AuditIssue {
     pub dimension: String,
     pub file: String,
     pub line: u32,
@@ -85,13 +85,13 @@ impl CodeReviewEngine {
     }
 
     /// Enable linter integration
-    pub fn with_linters(mut self) -> Self {
+    pub(crate) fn _with_linters(mut self) -> Self {
         self.linters_enabled = true;
         self
     }
 
     /// Load source files from a directory path
-    pub fn load_sources(&self, path: &Path) -> Vec<String> {
+    pub(crate) fn _load_sources(&self, path: &Path) -> Vec<String> {
         let mut sources = Vec::new();
         if let Ok(entries) = std::fs::read_dir(path) {
             for entry in entries.flatten() {
@@ -102,7 +102,7 @@ impl CodeReviewEngine {
                     }
                 }
                 if p.is_dir() && !p.ends_with("target") && !p.ends_with("node_modules") {
-                    sources.extend(self.load_sources(&p));
+                    sources.extend(self._load_sources(&p));
                 }
             }
         }
@@ -110,7 +110,7 @@ impl CodeReviewEngine {
     }
 
     /// Run a full audit on the project
-    pub fn audit(&self, name: &str, path: &str, sources: &[String]) -> CodeAuditReport {
+    pub fn audit(&self, name: &str, path: &str, sources: &[String]) -> _CodeAuditReport {
         let mut issues = Vec::new();
         let mut total_lines = 0;
         for src in sources {
@@ -121,7 +121,7 @@ impl CodeReviewEngine {
                     // Basic audit checks
                     if self.linters_enabled {
                         if line.contains(".unwrap()") {
-                            issues.push(AuditIssue {
+                            issues.push(_AuditIssue {
                                 dimension: "security".into(),
                                 file: src.clone(),
                                 line: (i + 1) as u32,
@@ -130,7 +130,7 @@ impl CodeReviewEngine {
                             });
                         }
                         if line.contains("api_key") || line.contains("password") {
-                            issues.push(AuditIssue {
+                            issues.push(_AuditIssue {
                                 dimension: "security".into(),
                                 file: src.clone(),
                                 line: (i + 1) as u32,
@@ -143,7 +143,7 @@ impl CodeReviewEngine {
             }
         }
         let score = if issues.is_empty() { 1.0 } else { (1.0 - (issues.len() as f64 * 0.05).min(0.8)).max(0.0) };
-        CodeAuditReport {
+        _CodeAuditReport {
             name: name.to_string(),
             path: path.to_string(),
             file_count: sources.len(),
@@ -154,7 +154,7 @@ impl CodeReviewEngine {
     }
 
     /// Generate a markdown report string
-    pub fn generate_markdown_report(&self, report: &CodeAuditReport) -> String {
+    pub(crate) fn _generate_markdown_report(&self, report: &_CodeAuditReport) -> String {
         let mut md = format!(
             "# Code Audit Report: {}\n\n**Path:** {}\n**Files:** {}\n**Lines:** {}\n**Score:** {:.1}/100\n\n",
             report.name, report.path, report.file_count, report.total_lines, report.score * 100.0
@@ -174,18 +174,18 @@ impl CodeReviewEngine {
     }
 
     /// 审查代码片段，返回审查报告
-    pub fn review(&self, file: &str, code: &str) -> ReviewReport {
+    pub fn review(&self, file: &str, code: &str) -> _ReviewReport {
         let mut issues = Vec::new();
 
         let arr = &self.capability.arr;
         if arr[super::core::IDX_ANALYSIS] > 0.3 {
-            Self::check_unwrap(code, &mut issues);
-            Self::check_panic(code, &mut issues);
-            Self::check_unsafe(code, &mut issues);
+            Self::_check_unwrap(code, &mut issues);
+            Self::_check_panic(code, &mut issues);
+            Self::_check_unsafe(code, &mut issues);
             Self::check_hardcoded_paths(code, &mut issues);
         }
         if arr[super::core::IDX_QUALITY_GATES] > 0.3 {
-            Self::check_missing_tests(code, &mut issues);
+            Self::_check_missing_tests(code, &mut issues);
             Self::check_command_injection(code, &mut issues);
         }
         if arr[super::core::IDX_VERIFICATION] > 0.3 {
@@ -201,15 +201,15 @@ impl CodeReviewEngine {
         }).sum::<f64>();
         let score = (base - penalty).clamp(0.0, 1.0);
 
-        ReviewReport { file: file.to_string(), issues, score }
+        _ReviewReport { file: file.to_string(), issues, score }
     }
 
-    pub fn check_unwrap(code: &str, issues: &mut Vec<ReviewIssue>) {
+    pub(crate) fn _check_unwrap(code: &str, issues: &mut Vec<_ReviewIssue>) {
         for (i, line) in code.lines().enumerate() {
             if line.contains(".unwrap()") && !line.trim().starts_with("//") && !line.trim().starts_with("#[") {
-                issues.push(ReviewIssue {
+                issues.push(_ReviewIssue {
                     severity: IssueSeverity::Medium,
-                    category: IssueCategory::ErrorHandling,
+                    category: _IssueCategory::ErrorHandling,
                     message: "[OWASP A08:2025] 使用 .unwrap() 可能导致 panic（异常未处理）".to_string(),
                     line: Some((i + 1) as u32),
                     suggestion: Some("替换为 .expect(\"msg\") 或 ? 操作符 + 统一 NeoTrixError".to_string()),
@@ -218,12 +218,12 @@ impl CodeReviewEngine {
         }
     }
 
-    pub fn check_panic(code: &str, issues: &mut Vec<ReviewIssue>) {
+    pub(crate) fn _check_panic(code: &str, issues: &mut Vec<_ReviewIssue>) {
         for (i, line) in code.lines().enumerate() {
             if line.contains("panic!(") && !line.trim().starts_with("//") {
-                issues.push(ReviewIssue {
+                issues.push(_ReviewIssue {
                     severity: IssueSeverity::High,
-                    category: IssueCategory::ErrorHandling,
+                    category: _IssueCategory::ErrorHandling,
                     message: "使用 panic!() 导致不可恢复崩溃".to_string(),
                     line: Some((i + 1) as u32),
                     suggestion: Some("替换为返回 Result 类型".to_string()),
@@ -232,12 +232,12 @@ impl CodeReviewEngine {
         }
     }
 
-    pub fn check_unsafe(code: &str, issues: &mut Vec<ReviewIssue>) {
+    pub(crate) fn _check_unsafe(code: &str, issues: &mut Vec<_ReviewIssue>) {
         for (i, line) in code.lines().enumerate() {
             if line.contains("unsafe {") && !line.trim().starts_with("//") {
-                issues.push(ReviewIssue {
+                issues.push(_ReviewIssue {
                     severity: IssueSeverity::High,
-                    category: IssueCategory::UnsafeCode,
+                    category: _IssueCategory::UnsafeCode,
                     message: "[OWASP X02:2025] unsafe 块需要安全注释说明".to_string(),
                     line: Some((i + 1) as u32),
                     suggestion: Some("添加 Safety: 注释说明为什么 unsafe 是安全的; 考虑使用安全抽象替代".to_string()),
@@ -246,14 +246,14 @@ impl CodeReviewEngine {
         }
     }
 
-    fn check_hardcoded_paths(code: &str, issues: &mut Vec<ReviewIssue>) {
+    fn check_hardcoded_paths(code: &str, issues: &mut Vec<_ReviewIssue>) {
         for (i, line) in code.lines().enumerate() {
             let trimmed = line.trim();
             if trimmed.starts_with("//") { continue; }
             if trimmed.contains("\"/tmp/") || trimmed.contains("\"/Users/") || trimmed.contains("\"/etc/") {
-                issues.push(ReviewIssue {
+                issues.push(_ReviewIssue {
                     severity: IssueSeverity::Medium,
-                    category: IssueCategory::Architecture,
+                    category: _IssueCategory::Architecture,
                     message: "硬编码路径降低可移植性; 可能违反安全原则".to_string(),
                     line: Some((i + 1) as u32),
                     suggestion: Some("使用 std::env::temp_dir() 或可配置项替代; 环境变量: $HOME, $TMPDIR".to_string()),
@@ -262,13 +262,13 @@ impl CodeReviewEngine {
         }
     }
 
-    fn check_command_injection(code: &str, issues: &mut Vec<ReviewIssue>) {
+    fn check_command_injection(code: &str, issues: &mut Vec<_ReviewIssue>) {
         for (i, line) in code.lines().enumerate() {
             let trimmed = line.trim();
             if trimmed.contains("sh") && trimmed.contains("-c") && trimmed.contains("Command::new") {
-                issues.push(ReviewIssue {
+                issues.push(_ReviewIssue {
                     severity: IssueSeverity::Critical,
-                    category: IssueCategory::Security,
+                    category: _IssueCategory::Security,
                     message: "[OWASP A05:2025] 检测到 shell 注入风险 (sh -c)".to_string(),
                     line: Some((i + 1) as u32),
                     suggestion: Some("使用 Command::arg() 直接传参代替 shell 字符串".to_string()),
@@ -278,7 +278,7 @@ impl CodeReviewEngine {
     }
 
     /// 检测代码中的硬编码 secrets (OWASP A04:2025)
-    fn check_secrets_in_code(code: &str, issues: &mut Vec<ReviewIssue>) {
+    fn check_secrets_in_code(code: &str, issues: &mut Vec<_ReviewIssue>) {
         let secret_patterns = [
             ("api_key", "API 密钥"),
             ("apiKey", "API 密钥"),
@@ -296,9 +296,9 @@ impl CodeReviewEngine {
 
             for (pattern, label) in &secret_patterns {
                 if trimmed.contains(pattern) && (trimmed.contains('=') || trimmed.contains(": \"")) {
-                    issues.push(ReviewIssue {
+                    issues.push(_ReviewIssue {
                         severity: IssueSeverity::High,
-                        category: IssueCategory::Security,
+                        category: _IssueCategory::Security,
                         message: format!("[OWASP A04:2025] 检测到可能硬编码的 {} (line {})", label, i + 1),
                         line: Some((i + 1) as u32),
                         suggestion: Some("使用环境变量或加密 vault 替代硬编码; 审核 git history 是否已泄露".to_string()),
@@ -309,22 +309,22 @@ impl CodeReviewEngine {
         }
     }
 
-    pub fn check_missing_tests(code: &str, issues: &mut Vec<ReviewIssue>) {
+    pub(crate) fn _check_missing_tests(code: &str, issues: &mut Vec<_ReviewIssue>) {
         let has_test_module = code.contains("#[cfg(test)]");
         let has_tests = code.contains("#[test]");
         let has_pub_fns = code.contains("pub fn") || code.contains("pub async fn");
         if has_pub_fns && !has_test_module {
-            issues.push(ReviewIssue {
+            issues.push(_ReviewIssue {
                 severity: IssueSeverity::Low,
-                category: IssueCategory::Testing,
+                category: _IssueCategory::Testing,
                 message: "公开函数缺少测试模块".to_string(),
                 line: None,
                 suggestion: Some("添加 #[cfg(test)] mod tests { ... }".to_string()),
             });
         } else if has_pub_fns && !has_tests {
-            issues.push(ReviewIssue {
+            issues.push(_ReviewIssue {
                 severity: IssueSeverity::Info,
-                category: IssueCategory::Testing,
+                category: _IssueCategory::Testing,
                 message: "测试模块存在但没有测试用例".to_string(),
                 line: None,
                 suggestion: Some("添加 #[test] 函数".to_string()),
@@ -333,7 +333,7 @@ impl CodeReviewEngine {
     }
 
     /// 审查结果生成 MicroEdit 序列（供 SEAL 循环使用）
-    pub fn issues_to_micro_edits(&self, report: &ReviewReport) -> Vec<MicroEdit> {
+    pub fn issues_to_micro_edits(&self, report: &_ReviewReport) -> Vec<MicroEdit> {
         let mut edits = Vec::new();
         let critical_count = report.by_severity(IssueSeverity::Critical).len() as f64;
         let high_count = report.by_severity(IssueSeverity::High).len() as f64;
@@ -350,18 +350,18 @@ impl CodeReviewEngine {
     }
 }
 
-/// CodeReviewLoop — 审查→修复→再审查 迭代循环
+/// _CodeReviewLoop — 审查→修复→再审查 迭代循环
 ///
 /// 对标 Octorus AI Rally: 双AI agent review-fix cycle
 /// 对标 roborev: continuous background review + auto-fix
-pub struct CodeReviewLoop {
+pub(crate) struct _CodeReviewLoop {
     pub iteration: u64,
     pub max_iterations: usize,
     pub quality_target: f64,
-    pub history: Vec<ReviewReport>,
+    pub history: Vec<_ReviewReport>,
 }
 
-impl CodeReviewLoop {
+impl _CodeReviewLoop {
     pub fn new(max_iterations: usize, quality_target: f64) -> Self {
         Self {
             iteration: 0,
@@ -391,7 +391,7 @@ impl CodeReviewLoop {
 
     /// 计算奖励信号 (供 SEAL 循环使用)
     /// 正奖励 = 评分提升; 负奖励 = 发现新问题
-    pub fn compute_seal_reward(&self) -> f64 {
+    pub(crate) fn _compute_seal_reward(&self) -> f64 {
         if self.history.len() < 2 {
             return 0.0;
         }
@@ -403,7 +403,7 @@ impl CodeReviewLoop {
     }
 
     /// 获取增量改进
-    pub fn delta_improvement(&self) -> f64 {
+    pub(crate) fn _delta_improvement(&self) -> f64 {
         if self.history.len() < 2 {
             return 0.0;
         }
@@ -415,7 +415,7 @@ impl CodeReviewLoop {
         if self.history.len() < 3 {
             return false;
         }
-        let recent: Vec<&ReviewReport> = self.history.iter().rev().take(3).collect();
+        let recent: Vec<&_ReviewReport> = self.history.iter().rev().take(3).collect();
         let scores: Vec<f64> = recent.iter().map(|r| r.score).collect();
         // 连续3轮评分变化 < 0.02 视为收敛
         scores.windows(2).all(|w| (w[1] - w[0]).abs() < 0.02)
@@ -453,7 +453,7 @@ mod tests {
         let engine = CodeReviewEngine::new(cv);
         let code = "fn main() { unsafe { *p = 1; } }";
         let report = engine.review("test.rs", code);
-        assert!(report.issues.iter().any(|i| i.category == IssueCategory::UnsafeCode));
+        assert!(report.issues.iter().any(|i| i.category == _IssueCategory::UnsafeCode));
     }
 
     #[test]
@@ -482,13 +482,13 @@ mod tests {
         cv.arr[crate::l5_cognition::nt_mind::nt_mind::core::IDX_QUALITY_GATES] = 0.8;
         let engine = CodeReviewEngine::new(cv);
 
-        let mut loop_ = CodeReviewLoop::new(5, 0.9);
+        let mut loop_ = _CodeReviewLoop::new(5, 0.9);
         let code = "fn main() { let x = foo.unwrap(); panic!(\"err\"); }";
 
         let (converged, score, _iters) = loop_.iterate(&engine, "test.rs", code);
         assert!(!converged || score > 0.5);
 
-        let reward = loop_.compute_seal_reward();
+        let reward = loop_._compute_seal_reward();
         assert!(reward >= -1.0 && reward <= 1.0);
     }
 
@@ -509,6 +509,6 @@ mod tests {
         let engine = CodeReviewEngine::new(cv);
         let code = "let password = \"hunter2\";";
         let report = engine.review("test.rs", code);
-        assert!(report.issues.iter().any(|i| i.category == IssueCategory::Security));
+        assert!(report.issues.iter().any(|i| i.category == _IssueCategory::Security));
     }
 }

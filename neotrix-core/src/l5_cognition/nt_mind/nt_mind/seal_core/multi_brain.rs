@@ -16,10 +16,10 @@ use super::self_edit::MicroEdit;
 /// 借鉴 MemOS：管理多个记忆体（这里对应多个 ReasoningBrain）
 pub struct MultiBrainManager {
     /// 活跃的 Brain 实例
-    brains: Vec<ReasoningBrain>,
+    _brains: Vec<ReasoningBrain>,
     
     /// 共享的 ReasoningBank（所有 brain 共享知识库）
-    shared_bank: ReasoningBank,
+    _shared_bank: ReasoningBank,
     
     /// Brain 到任务类型的映射
     brain_task_map: Vec<(usize, String)>, // (brain_index, task_type)
@@ -29,33 +29,33 @@ impl MultiBrainManager {
     /// 创建新的多 Brain 管理器
     pub fn new(bank_capacity: usize) -> Self {
         Self {
-            brains: Vec::new(),
-            shared_bank: ReasoningBank::new(bank_capacity),
+            _brains: Vec::new(),
+            _shared_bank: ReasoningBank::new(bank_capacity),
             brain_task_map: Vec::new(),
         }
     }
     
     /// 添加一个新的 ReasoningBrain
     /// 借鉴 MemOS：为每个记忆体分配领域
-    pub fn add_brain(&mut self, brain: ReasoningBrain, task_type: &str) {
-        let index = self.brains.len();
-        self.brains.push(brain);
+    pub(crate) fn _add_brain(&mut self, brain: ReasoningBrain, task_type: &str) {
+        let index = self._brains.len();
+        self._brains.push(brain);
         self.brain_task_map.push((index, task_type.to_string()));
     }
     
     /// 根据任务类型选择合适的 Brain
     /// 借鉴 dbskill：多维度检索，选择最匹配的 brain
-    pub fn select_brain(&self, task_type: &str) -> Option<&ReasoningBrain> {
+    pub(crate) fn _select_brain(&self, task_type: &str) -> Option<&ReasoningBrain> {
         self.brain_task_map
             .iter()
             .find(|(_, t)| t == task_type)
-            .map(|(idx, _)| &self.brains[*idx])
+            .map(|(idx, _)| &self._brains[*idx])
     }
     
     /// 选择最匹配的 Brain（基于能力向量相似度）
     /// 借鉴 dbskill：多维度检索，使用 cosine similarity
-    pub fn select_brain_by_capability(&self, target: &ReasoningBrain) -> Option<(usize, f64)> {
-        self.brains.iter()
+    pub(crate) fn _select_brain_by_capability(&self, target: &ReasoningBrain) -> Option<(usize, f64)> {
+        self._brains.iter()
             .enumerate()
             .map(|(i, brain)| {
                 let sim = brain.capability.similarity(&target.capability);
@@ -67,13 +67,13 @@ impl MultiBrainManager {
     
     /// 协同更新：将一个 brain 的知识迁移到另一个
     /// 借鉴 MemOS 记忆迁移：提取 source brain 的 KnowledgeSource 并应用到 target brain
-    pub fn migrate_knowledge(&mut self, from_index: usize, to_index: usize) {
-        if from_index >= self.brains.len() || to_index >= self.brains.len() {
+    pub(crate) fn _migrate_knowledge(&mut self, from_index: usize, to_index: usize) {
+        if from_index >= self._brains.len() || to_index >= self._brains.len() {
             return;
         }
         
         // 从 source brain 提取知识来源
-        let sources: Vec<KnowledgeSource> = self.brains[from_index].absorption_history
+        let sources: Vec<KnowledgeSource> = self._brains[from_index].absorption_history
             .iter()
             .map(|r| r.source)
             .collect();
@@ -83,13 +83,13 @@ impl MultiBrainManager {
         }
         
         // 应用到 target brain
-        self.brains[to_index].absorb_batch(&sources);
+        self._brains[to_index].absorb_batch(&sources);
     }
     
     /// 合并所有 brain 的知识到共享 ReasoningBank
     /// 每个 brain 的 CapabilityVector 转化为 ReasoningMemory 存储
-    pub fn consolidate_knowledge(&mut self) {
-        for (i, brain) in self.brains.iter().enumerate() {
+    pub(crate) fn _consolidate_knowledge(&mut self) {
+        for (i, brain) in self._brains.iter().enumerate() {
             // 将 CapabilityVector 转化为 MicroEdit 序列
             let mut micro_edits = Vec::new();
             let task_type_name = self.brain_task_map.get(i)
@@ -122,58 +122,58 @@ impl MultiBrainManager {
                 brain.capability.arr().iter().sum::<f64>() / 23.0,
             );
             
-            self.shared_bank.store(memory);
+            self._shared_bank.store(memory);
         }
     }
     
     /// 获取共享 ReasoningBank 的引用
-    pub fn shared_bank(&self) -> &ReasoningBank {
-        &self.shared_bank
+    pub(crate) fn _shared_bank(&self) -> &ReasoningBank {
+        &self._shared_bank
     }
     
     /// 获取共享 ReasoningBank 的可变引用
-    pub fn shared_bank_mut(&mut self) -> &mut ReasoningBank {
-        &mut self.shared_bank
+    pub(crate) fn _shared_bank_mut(&mut self) -> &mut ReasoningBank {
+        &mut self._shared_bank
     }
     
     /// 获取所有 brain 的引用
-    pub fn brains(&self) -> &Vec<ReasoningBrain> {
-        &self.brains
+    pub(crate) fn _brains(&self) -> &Vec<ReasoningBrain> {
+        &self._brains
     }
     
     /// 获取 brain 数量
-    pub fn brain_count(&self) -> usize {
-        self.brains.len()
+    pub(crate) fn _brain_count(&self) -> usize {
+        self._brains.len()
     }
     
     /// 获取某个 brain 的可变引用
-    pub fn brain_mut(&mut self, index: usize) -> Option<&mut ReasoningBrain> {
-        self.brains.get_mut(index)
+    pub(crate) fn _brain_mut(&mut self, index: usize) -> Option<&mut ReasoningBrain> {
+        self._brains.get_mut(index)
     }
 
     /// GEA 风格群体进化：找出最优 brain，将其知识广播到其他 brain
     /// 最优 = total_absorb_count 最高的 brain
     /// 这是群体级知识共享的简化实现
     pub fn evolve_group(&mut self) {
-        if self.brains.len() < 2 { return; }
+        if self._brains.len() < 2 { return; }
 
         // 选择最优 brain
-        let best_idx = self.brains.iter()
+        let best_idx = self._brains.iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_absorb_count.cmp(&b.total_absorb_count))
             .map(|(i, _)| i);
 
         if let Some(idx) = best_idx {
-            let best_absorbed = self.brains[idx].total_absorb_count;
-            for i in 0..self.brains.len() {
-                if i != idx && self.brains[i].total_absorb_count < best_absorbed {
-                    self.migrate_knowledge(idx, i);
+            let best_absorbed = self._brains[idx].total_absorb_count;
+            for i in 0..self._brains.len() {
+                if i != idx && self._brains[i].total_absorb_count < best_absorbed {
+                    self._migrate_knowledge(idx, i);
                 }
             }
         }
 
         // 合并所有 brain 知识到共享 bank
-        self.consolidate_knowledge();
+        self._consolidate_knowledge();
     }
 }
 
@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn test_multi_brain_creation() {
         let manager = MultiBrainManager::new(100);
-        assert_eq!(manager.brain_count(), 0);
+        assert_eq!(manager._brain_count(), 0);
     }
     
     #[test]
@@ -193,15 +193,15 @@ mod tests {
         let brain1 = ReasoningBrain::new();
         let brain2 = ReasoningBrain::new();
         
-        manager.add_brain(brain1, "UIDesign");
-        manager.add_brain(brain2, "CodeAnalysis");
+        manager._add_brain(brain1, "UIDesign");
+        manager._add_brain(brain2, "CodeAnalysis");
         
-        assert_eq!(manager.brain_count(), 2);
+        assert_eq!(manager._brain_count(), 2);
         
-        let selected = manager.select_brain("UIDesign");
+        let selected = manager._select_brain("UIDesign");
         assert!(selected.is_some());
         
-        let not_found = manager.select_brain("NonExistent");
+        let not_found = manager._select_brain("NonExistent");
         assert!(not_found.is_none());
     }
     
@@ -215,13 +215,13 @@ mod tests {
         brain1.absorb(KnowledgeSource::HeroUI);
         brain1.absorb(KnowledgeSource::BaseUI);
         
-        manager.add_brain(brain1, "UIDesign");
-        manager.add_brain(brain2, "CodeAnalysis");
+        manager._add_brain(brain1, "UIDesign");
+        manager._add_brain(brain2, "CodeAnalysis");
         
         // 迁移知识从 brain 0 到 brain 1
-        manager.migrate_knowledge(0, 1);
+        manager._migrate_knowledge(0, 1);
         
-        let target_brain = manager.brain_mut(1).expect("value should be ok in test");
+        let target_brain = manager._brain_mut(1).expect("value should be ok in test");
         assert!(target_brain.total_absorb_count >= 2);
     }
     
@@ -234,16 +234,16 @@ mod tests {
         brain1.absorb(KnowledgeSource::HeroUI);
         brain2.absorb(KnowledgeSource::BaseUI);
         
-        manager.add_brain(brain1, "UIDesign");
-        manager.add_brain(brain2, "Accessibility");
+        manager._add_brain(brain1, "UIDesign");
+        manager._add_brain(brain2, "Accessibility");
         
         // 初始共享 bank 为空
-        assert_eq!(manager.shared_bank().stats().total_memories, 0);
+        assert_eq!(manager._shared_bank().stats().total_memories, 0);
         
         // 合并知识
-        manager.consolidate_knowledge();
+        manager._consolidate_knowledge();
         
         // 应该有 2 个记忆（每个 brain 一个）
-        assert_eq!(manager.shared_bank().stats().total_memories, 2);
+        assert_eq!(manager._shared_bank().stats().total_memories, 2);
     }
 }

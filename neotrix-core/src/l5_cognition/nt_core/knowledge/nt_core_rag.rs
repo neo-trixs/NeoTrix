@@ -11,17 +11,17 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// RAG 管线
-pub struct RAGPipeline {
-    chunker: DocumentChunker,
-    retriever: VectorRetriever,
+pub(crate) struct _RAGPipeline {
+    chunker: _DocumentChunker,
+    retriever: _VectorRetriever,
     reranker: Reranker,
     compressor: ContextCompressor,
-    config: RAGConfig,
+    config: _RAGConfig,
 }
 
 /// RAG 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RAGConfig {
+pub(crate) struct _RAGConfig {
     pub chunk_size: usize,
     pub chunk_overlap: usize,
     pub top_k: usize,
@@ -31,7 +31,7 @@ pub struct RAGConfig {
     pub enable_compression: bool,
 }
 
-impl Default for RAGConfig {
+impl Default for _RAGConfig {
     fn default() -> Self {
         Self {
             chunk_size: 512,
@@ -46,24 +46,24 @@ impl Default for RAGConfig {
 }
 
 /// 文档分块器
-pub struct DocumentChunker {
+pub(crate) struct _DocumentChunker {
     chunk_size: usize,
     overlap: usize,
 }
 
 /// 文档块
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentChunk {
+pub(crate) struct _DocumentChunk {
     pub id: String,
     pub document_id: String,
     pub content: String,
-    pub metadata: ChunkMetadata,
+    pub metadata: _ChunkMetadata,
     pub embedding: Option<Vec<f32>>,
 }
 
 /// 块元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChunkMetadata {
+pub(crate) struct _ChunkMetadata {
     pub start_pos: usize,
     pub end_pos: usize,
     pub chunk_index: usize,
@@ -73,9 +73,9 @@ pub struct ChunkMetadata {
 }
 
 /// 向量检索器
-pub struct VectorRetriever {
+pub(crate) struct _VectorRetriever {
     index: HashMap<String, Vec<f32>>,
-    chunks: HashMap<String, DocumentChunk>,
+    chunks: HashMap<String, _DocumentChunk>,
 }
 
 /// 重排序器
@@ -90,9 +90,9 @@ pub struct ContextCompressor {
 
 /// RAG 查询结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RAGResult {
+pub(crate) struct _RAGResult {
     pub query: String,
-    pub chunks: Vec<DocumentChunk>,
+    pub chunks: Vec<_DocumentChunk>,
     pub context: String,
     pub citations: Vec<Citation>,
     pub relevance_score: f64,
@@ -111,18 +111,18 @@ pub struct Citation {
 /// 检索结果
 #[derive(Debug, Clone)]
 pub struct RetrievalResult {
-    pub chunk: DocumentChunk,
+    pub chunk: _DocumentChunk,
     pub score: f64,
 }
 
-impl DocumentChunker {
+impl _DocumentChunker {
     /// 创建新的分块器
     pub fn new(chunk_size: usize, overlap: usize) -> Self {
         Self { chunk_size, overlap }
     }
 
     /// 分块文档
-    pub fn chunk_document(&self, document_id: &str, content: &str, source: Option<String>) -> Vec<DocumentChunk> {
+    pub(crate) fn _chunk_document(&self, document_id: &str, content: &str, source: Option<String>) -> Vec<_DocumentChunk> {
         let mut chunks = Vec::new();
         let chars: Vec<char> = content.chars().collect();
         let total_chars = chars.len();
@@ -133,11 +133,11 @@ impl DocumentChunker {
             let end = (start + self.chunk_size).min(total_chars);
             let chunk_content: String = chars[start..end].iter().collect();
 
-            chunks.push(DocumentChunk {
+            chunks.push(_DocumentChunk {
                 id: format!("{}:{}", document_id, chunk_index),
                 document_id: document_id.to_string(),
                 content: chunk_content,
-                metadata: ChunkMetadata {
+                metadata: _ChunkMetadata {
                     start_pos: start,
                     end_pos: end,
                     chunk_index,
@@ -162,17 +162,17 @@ impl DocumentChunker {
     }
 
     /// 按段落分块
-    pub fn chunk_by_paragraph(&self, document_id: &str, content: &str, source: Option<String>) -> Vec<DocumentChunk> {
+    pub(crate) fn _chunk_by_paragraph(&self, document_id: &str, content: &str, source: Option<String>) -> Vec<_DocumentChunk> {
         let paragraphs: Vec<&str> = content.split("\n\n").collect();
         let mut chunks = Vec::new();
 
         for (i, paragraph) in paragraphs.iter().enumerate() {
             if !paragraph.trim().is_empty() {
-                chunks.push(DocumentChunk {
+                chunks.push(_DocumentChunk {
                     id: format!("{}:para:{}", document_id, i),
                     document_id: document_id.to_string(),
                     content: paragraph.to_string(),
-                    metadata: ChunkMetadata {
+                    metadata: _ChunkMetadata {
                         start_pos: 0,
                         end_pos: paragraph.len(),
                         chunk_index: i,
@@ -189,7 +189,7 @@ impl DocumentChunker {
     }
 }
 
-impl VectorRetriever {
+impl _VectorRetriever {
     /// 创建新的检索器
     pub fn new() -> Self {
         Self {
@@ -199,7 +199,7 @@ impl VectorRetriever {
     }
 
     /// 索引文档块
-    pub fn index_chunks(&mut self, chunks: Vec<DocumentChunk>) {
+    pub(crate) fn _index_chunks(&mut self, chunks: Vec<_DocumentChunk>) {
         for chunk in chunks {
             if let Some(embedding) = &chunk.embedding {
                 self.index.insert(chunk.id.clone(), embedding.clone());
@@ -261,7 +261,7 @@ impl ContextCompressor {
     }
 
     /// 压缩上下文
-    pub fn compress(&self, chunks: Vec<DocumentChunk>) -> (String, Vec<Citation>) {
+    pub fn compress(&self, chunks: Vec<_DocumentChunk>) -> (String, Vec<Citation>) {
         let mut context = String::new();
         let mut citations = Vec::new();
         let mut current_tokens = 0;
@@ -292,12 +292,12 @@ impl ContextCompressor {
     }
 }
 
-impl RAGPipeline {
+impl _RAGPipeline {
     /// 创建新的 RAG 管线
-    pub fn new(config: RAGConfig) -> Self {
+    pub fn new(config: _RAGConfig) -> Self {
         Self {
-            chunker: DocumentChunker::new(config.chunk_size, config.chunk_overlap),
-            retriever: VectorRetriever::new(),
+            chunker: _DocumentChunker::new(config.chunk_size, config.chunk_overlap),
+            retriever: _VectorRetriever::new(),
             reranker: Reranker::new("default"),
             compressor: ContextCompressor::new(config.max_context_tokens),
             config,
@@ -305,13 +305,13 @@ impl RAGPipeline {
     }
 
     /// 索引文档
-    pub fn index_document(&mut self, document_id: &str, content: &str, source: Option<String>) {
-        let chunks = self.chunker.chunk_document(document_id, content, source);
-        self.retriever.index_chunks(chunks);
+    pub(crate) fn _index_document(&mut self, document_id: &str, content: &str, source: Option<String>) {
+        let chunks = self.chunker._chunk_document(document_id, content, source);
+        self.retriever._index_chunks(chunks);
     }
 
     /// 查询
-    pub fn query(&self, query: &str, query_embedding: &[f32]) -> RAGResult {
+    pub fn query(&self, query: &str, query_embedding: &[f32]) -> _RAGResult {
         // 检索
         let mut results = self.retriever.search(query_embedding, self.config.top_k);
 
@@ -325,7 +325,7 @@ impl RAGPipeline {
             .filter(|r| r.score >= self.config.similarity_threshold)
             .collect();
 
-        let chunks: Vec<DocumentChunk> = filtered_results.iter().map(|r| r.chunk.clone()).collect();
+        let chunks: Vec<_DocumentChunk> = filtered_results.iter().map(|r| r.chunk.clone()).collect();
         let len = chunks.len();
 
         // 压缩上下文
@@ -349,7 +349,7 @@ impl RAGPipeline {
             0.0
         };
 
-        RAGResult {
+        _RAGResult {
             query: query.to_string(),
             chunks,
             context,

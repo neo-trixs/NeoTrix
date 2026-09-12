@@ -1,7 +1,7 @@
 //! NT-MIND — Recuris 吸收 (arXiv:2608.24876).
 //!
 //! Recuris: 递归经验工作记忆 (recurrent experiential working memory) — 为长程
-//! agent 提供可递归重访的经验缓存。本模块实现 `RecurisWorkingMemory` 经验缓存
+//! agent 提供可递归重访的经验缓存。本模块实现 `_RecurisWorkingMemory` 经验缓存
 //! trait (C1: trait 存在 + 基础逻辑 + SelfTest T1 + 3 测试)。
 
 use crate::core::nt_core_self_test::SelfTest;
@@ -16,7 +16,7 @@ pub struct Experience {
 }
 
 /// 递归经验工作记忆 trait。
-pub trait WorkingMemory {
+pub(crate) trait _WorkingMemory {
     /// 写入一条经验, 返回其递归深度 (当前缓存长度)。
     fn remember(&mut self, input: &str, output: &str) -> usize;
     /// 按递归深度重访最近经验 (0 = 最新), 无则 None。
@@ -29,12 +29,12 @@ pub trait WorkingMemory {
 }
 
 /// Recuris 递归经验工作记忆实现。
-pub struct RecurisWorkingMemory {
+pub(crate) struct _RecurisWorkingMemory {
     buffer: VecDeque<Experience>,
     capacity: usize,
 }
 
-impl RecurisWorkingMemory {
+impl _RecurisWorkingMemory {
     pub fn new(capacity: usize) -> Self {
         Self {
             buffer: VecDeque::with_capacity(capacity),
@@ -47,7 +47,7 @@ impl RecurisWorkingMemory {
     }
 }
 
-impl WorkingMemory for RecurisWorkingMemory {
+impl _WorkingMemory for _RecurisWorkingMemory {
     fn remember(&mut self, input: &str, output: &str) -> usize {
         let depth = self.buffer.len();
         self.buffer.push_back(Experience {
@@ -71,9 +71,9 @@ impl WorkingMemory for RecurisWorkingMemory {
     }
 }
 
-impl SelfTest for RecurisWorkingMemory {
+impl SelfTest for _RecurisWorkingMemory {
     fn name(&self) -> &'static str {
-        "RecurisWorkingMemory"
+        "_RecurisWorkingMemory"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_remember_assigns_recursive_depth() {
-        let mut m = RecurisWorkingMemory::new(4);
+        let mut m = _RecurisWorkingMemory::new(4);
         let d0 = m.remember("a", "x");
         let d1 = m.remember("b", "y");
         assert_eq!(d0, 0);
@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_recall_by_recursive_depth() {
-        let mut m = RecurisWorkingMemory::new(4);
+        let mut m = _RecurisWorkingMemory::new(4);
         m.remember("a", "x");
         m.remember("b", "y");
         assert_eq!(m.recall(0).unwrap().input, "b");
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_capacity_eviction() {
-        let mut m = RecurisWorkingMemory::new(2);
+        let mut m = _RecurisWorkingMemory::new(2);
         m.remember("a", "x");
         m.remember("b", "y");
         m.remember("c", "z");

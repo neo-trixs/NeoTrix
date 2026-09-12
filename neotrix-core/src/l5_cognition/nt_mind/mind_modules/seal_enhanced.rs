@@ -9,18 +9,18 @@
 use serde::{Deserialize, Serialize};
 
 /// SEAL 管线增强版
-pub struct SEALPipelineEnhanced {
-    stages: Vec<SEALStage>,
-    failure_library: FailureLibrary,
+pub(crate) struct _SEALPipelineEnhanced {
+    stages: Vec<_SEALStage>,
+    failure_library: _FailureLibrary,
     #[allow(dead_code)]
-    feedback_loop: FeedbackLoop,
-    config: SEALConfig,
-    stats: SEALStats,
+    feedback_loop: _FeedbackLoop,
+    config: _SEALConfig,
+    stats: _SEALStats,
 }
 
 /// SEAL 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SEALConfig {
+pub(crate) struct _SEALConfig {
     pub exploration_budget: usize,
     pub distillation_threshold: f64,
     pub self_test_required: bool,
@@ -28,7 +28,7 @@ pub struct SEALConfig {
     pub adaptive_learning_rate: bool,
 }
 
-impl Default for SEALConfig {
+impl Default for _SEALConfig {
     fn default() -> Self {
         Self {
             exploration_budget: 100,
@@ -42,9 +42,9 @@ impl Default for SEALConfig {
 
 /// SEAL 阶段
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SEALStage {
+pub(crate) struct _SEALStage {
     pub name: String,
-    pub stage_type: StageType,
+    pub stage_type: _StageType,
     pub inputs: Vec<String>,
     pub outputs: Vec<String>,
     pub validator: Option<String>,
@@ -53,7 +53,7 @@ pub struct SEALStage {
 /// 阶段类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum StageType {
+pub(crate) enum _StageType {
     Exploration,
     Distillation,
     SelfTest,
@@ -63,9 +63,9 @@ pub enum StageType {
 
 /// 失败模式库
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FailureLibrary {
+pub(crate) struct _FailureLibrary {
     pub patterns: Vec<FailurePattern>,
-    pub statistics: FailureStats,
+    pub statistics: _FailureStats,
 }
 
 /// 失败模式
@@ -82,7 +82,7 @@ pub struct FailurePattern {
 
 /// 失败统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FailureStats {
+pub(crate) struct _FailureStats {
     pub total_failures: u64,
     pub resolved_failures: u64,
     pub recurring_patterns: Vec<String>,
@@ -91,9 +91,9 @@ pub struct FailureStats {
 
 /// 反馈回路
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FeedbackLoop {
+pub(crate) struct _FeedbackLoop {
     pub signals: Vec<FeedbackSignal>,
-    pub adjustments: Vec<LearningAdjustment>,
+    pub adjustments: Vec<_LearningAdjustment>,
     pub effectiveness: f64,
 }
 
@@ -108,7 +108,7 @@ pub struct FeedbackSignal {
 
 /// 学习调整
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LearningAdjustment {
+pub(crate) struct _LearningAdjustment {
     pub parameter: String,
     pub old_value: f64,
     pub new_value: f64,
@@ -118,7 +118,7 @@ pub struct LearningAdjustment {
 
 /// SEAL 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SEALStats {
+pub(crate) struct _SEALStats {
     pub total_cycles: u64,
     pub successful_absorptions: u64,
     pub failed_absorptions: u64,
@@ -128,18 +128,18 @@ pub struct SEALStats {
 
 /// SEAL 执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SEALResult {
+pub(crate) struct _SEALResult {
     pub cycle_id: String,
     pub stages_completed: Vec<String>,
-    pub extracted_knowledge: Vec<ExtractedKnowledge>,
+    pub extracted_knowledge: Vec<_ExtractedKnowledge>,
     pub failures: Vec<FailurePattern>,
-    pub adjustments: Vec<LearningAdjustment>,
+    pub adjustments: Vec<_LearningAdjustment>,
     pub success: bool,
 }
 
 /// 提取的知识
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtractedKnowledge {
+pub(crate) struct _ExtractedKnowledge {
     pub id: String,
     pub knowledge_type: String,
     pub content: serde_json::Value,
@@ -148,56 +148,56 @@ pub struct ExtractedKnowledge {
     pub verified: bool,
 }
 
-impl SEALPipelineEnhanced {
+impl _SEALPipelineEnhanced {
     /// 创建增强版 SEAL 管线
-    pub fn new(config: SEALConfig) -> Self {
+    pub fn new(config: _SEALConfig) -> Self {
         Self {
             stages: vec![
-                SEALStage {
+                _SEALStage {
                     name: "exploration".into(),
-                    stage_type: StageType::Exploration,
+                    stage_type: _StageType::Exploration,
                     inputs: vec!["task".into(), "context".into()],
                     outputs: vec!["candidates".into()],
                     validator: None,
                 },
-                SEALStage {
+                _SEALStage {
                     name: "distillation".into(),
-                    stage_type: StageType::Distillation,
+                    stage_type: _StageType::Distillation,
                     inputs: vec!["candidates".into()],
                     outputs: vec!["knowledge".into()],
                     validator: Some("quality_check".into()),
                 },
-                SEALStage {
+                _SEALStage {
                     name: "self_test".into(),
-                    stage_type: StageType::SelfTest,
+                    stage_type: _StageType::SelfTest,
                     inputs: vec!["knowledge".into()],
                     outputs: vec!["verified_knowledge".into()],
                     validator: Some("test_suite".into()),
                 },
-                SEALStage {
+                _SEALStage {
                     name: "absorption".into(),
-                    stage_type: StageType::Absorption,
+                    stage_type: _StageType::Absorption,
                     inputs: vec!["verified_knowledge".into()],
                     outputs: vec!["absorbed_knowledge".into()],
                     validator: None,
                 },
             ],
-            failure_library: FailureLibrary {
+            failure_library: _FailureLibrary {
                 patterns: Vec::new(),
-                statistics: FailureStats {
+                statistics: _FailureStats {
                     total_failures: 0,
                     resolved_failures: 0,
                     recurring_patterns: Vec::new(),
                     mttr: 0.0,
                 },
             },
-            feedback_loop: FeedbackLoop {
+            feedback_loop: _FeedbackLoop {
                 signals: Vec::new(),
                 adjustments: Vec::new(),
                 effectiveness: 0.0,
             },
             config,
-            stats: SEALStats {
+            stats: _SEALStats {
                 total_cycles: 0,
                 successful_absorptions: 0,
                 failed_absorptions: 0,
@@ -208,7 +208,7 @@ impl SEALPipelineEnhanced {
     }
 
     /// 执行 SEAL 周期
-    pub fn execute_cycle(&mut self, task: &str, context: &serde_json::Value) -> SEALResult {
+    pub(crate) fn _execute_cycle(&mut self, task: &str, context: &serde_json::Value) -> _SEALResult {
         let cycle_id = uuid::Uuid::new_v4().to_string();
         let mut stages_completed = Vec::new();
         let mut extracted_knowledge = Vec::new();
@@ -218,18 +218,18 @@ impl SEALPipelineEnhanced {
         // 模拟执行各阶段
         for stage in &self.stages {
             match stage.stage_type {
-                StageType::Exploration => {
+                _StageType::Exploration => {
                     // 探索阶段
                     let _candidates = self.explore(task, context);
                     stages_completed.push("exploration".into());
                 }
-                StageType::Distillation => {
+                _StageType::Distillation => {
                     // 蒸馏阶段
                     let knowledge = self.distill(task);
                     extracted_knowledge.extend(knowledge);
                     stages_completed.push("distillation".into());
                 }
-                StageType::SelfTest => {
+                _StageType::SelfTest => {
                     // 自测阶段
                     match self.self_test(&extracted_knowledge) {
                         Ok(_) => stages_completed.push("self_test".into()),
@@ -246,7 +246,7 @@ impl SEALPipelineEnhanced {
                         }
                     }
                 }
-                StageType::Absorption => {
+                _StageType::Absorption => {
                     // 吸收阶段
                     if self.absorb(&extracted_knowledge) {
                         stages_completed.push("absorption".into());
@@ -271,7 +271,7 @@ impl SEALPipelineEnhanced {
         self.failure_library.patterns.extend(failures.clone());
 
         let success = failures.is_empty();
-        SEALResult {
+        _SEALResult {
             cycle_id,
             stages_completed,
             extracted_knowledge,
@@ -294,9 +294,9 @@ impl SEALPipelineEnhanced {
     }
 
     /// 蒸馏阶段
-    fn distill(&self, task: &str) -> Vec<ExtractedKnowledge> {
+    fn distill(&self, task: &str) -> Vec<_ExtractedKnowledge> {
         vec![
-            ExtractedKnowledge {
+            _ExtractedKnowledge {
                 id: uuid::Uuid::new_v4().to_string(),
                 knowledge_type: "pattern".into(),
                 content: serde_json::json!({
@@ -311,7 +311,7 @@ impl SEALPipelineEnhanced {
     }
 
     /// 自测阶段
-    fn self_test(&self, knowledge: &[ExtractedKnowledge]) -> Result<(), String> {
+    fn self_test(&self, knowledge: &[_ExtractedKnowledge]) -> Result<(), String> {
         // 检查置信度阈值
         let avg_confidence: f64 = knowledge.iter().map(|k| k.confidence).sum::<f64>() / knowledge.len() as f64;
 
@@ -323,13 +323,13 @@ impl SEALPipelineEnhanced {
     }
 
     /// 吸收阶段
-    fn absorb(&self, _knowledge: &[ExtractedKnowledge]) -> bool {
+    fn absorb(&self, _knowledge: &[_ExtractedKnowledge]) -> bool {
         // 简化版: 总是成功
         true
     }
 
     /// 自适应学习率调整
-    fn adapt_learning_rate(&mut self) -> Vec<LearningAdjustment> {
+    fn adapt_learning_rate(&mut self) -> Vec<_LearningAdjustment> {
         let mut adjustments = Vec::new();
 
         // 基于成功率调整
@@ -340,7 +340,7 @@ impl SEALPipelineEnhanced {
         };
 
         if success_rate < 0.5 {
-            adjustments.push(LearningAdjustment {
+            adjustments.push(_LearningAdjustment {
                 parameter: "exploration_budget".into(),
                 old_value: self.config.exploration_budget as f64,
                 new_value: (self.config.exploration_budget as f64 * 1.2) as f64,
@@ -353,7 +353,7 @@ impl SEALPipelineEnhanced {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &SEALStats {
+    pub fn stats(&self) -> &_SEALStats {
         &self.stats
     }
 }

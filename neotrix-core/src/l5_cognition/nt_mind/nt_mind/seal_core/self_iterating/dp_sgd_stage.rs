@@ -10,7 +10,7 @@ const DELTA: f64 = 1e-5;
 const MAX_EPSILON: f64 = 10.0;
 
 #[derive(Debug, Clone)]
-pub struct DpSgdState {
+pub(crate) struct _DpSgdState {
     pub epsilon_spent: f64,
     pub delta: f64,
     pub total_steps: u64,
@@ -18,7 +18,7 @@ pub struct DpSgdState {
     pub noise_scale: f64,
 }
 
-impl Default for DpSgdState {
+impl Default for _DpSgdState {
     fn default() -> Self {
         Self {
             epsilon_spent: 0.0,
@@ -30,12 +30,12 @@ impl Default for DpSgdState {
     }
 }
 
-impl DpSgdState {
-    pub fn privacy_budget_exhausted(&self) -> bool {
+impl _DpSgdState {
+    pub(crate) fn _privacy_budget_exhausted(&self) -> bool {
         self.epsilon_spent >= MAX_EPSILON
     }
 
-    pub fn remaining_epsilon(&self) -> f64 {
+    pub(crate) fn _remaining_epsilon(&self) -> f64 {
         (MAX_EPSILON - self.epsilon_spent).max(0.0)
     }
 
@@ -46,7 +46,7 @@ impl DpSgdState {
 }
 
 pub struct DpSgdStage {
-    state: Mutex<DpSgdState>,
+    state: Mutex<_DpSgdState>,
     /// Whether the policy learner has been notified that DP-SGD budget is exhausted.
     /// Prevents repeated notifications on every Skip.
     notified_policy: Mutex<bool>,
@@ -57,7 +57,7 @@ pub struct DpSgdStage {
 impl Default for DpSgdStage {
     fn default() -> Self {
         Self {
-            state: Mutex::new(DpSgdState::default()),
+            state: Mutex::new(_DpSgdState::default()),
             notified_policy: Mutex::new(false),
             total_steps_completed: Mutex::new(0),
         }
@@ -71,17 +71,17 @@ impl DpSgdStage {
 
     pub fn reset(&self) {
         if let Ok(mut state) = self.state.lock() {
-            *state = DpSgdState::default();
+            *state = _DpSgdState::default();
         }
     }
 
-    pub fn set_noise_multiplier(&self, sigma: f64) {
+    pub(crate) fn _set_noise_multiplier(&self, sigma: f64) {
         if let Ok(mut state) = self.state.lock() {
             state.noise_scale = compute_noise_scale(sigma, NOISE_MULTIPLIER, L2_CLIP_NORM);
         }
     }
 
-    pub fn state_snapshot(&self) -> DpSgdState {
+    pub fn state_snapshot(&self) -> _DpSgdState {
         self.state.lock().map(|s| s.clone()).unwrap_or_default()
     }
 }
@@ -100,7 +100,7 @@ impl BrainStage for DpSgdStage {
             crate::neotrix::nt_core_error::NeoTrixError::Io(format!("dp_sgd state lock: {e}"))
         })?;
 
-        if state.privacy_budget_exhausted() {
+        if state._privacy_budget_exhausted() {
             let mut notified = self.notified_policy.lock().map_err(|e| {
                 crate::neotrix::nt_core_error::NeoTrixError::Io(format!("dp_sgd notified lock: {e}"))
             })?;
@@ -174,33 +174,33 @@ mod tests {
 
     #[test]
     fn test_dp_sgd_state_default() {
-        let state = DpSgdState::default();
+        let state = _DpSgdState::default();
         assert_eq!(state.epsilon_spent, 0.0);
         assert_eq!(state.delta, 1e-5);
-        assert!(!state.privacy_budget_exhausted());
+        assert!(!state._privacy_budget_exhausted());
     }
 
     #[test]
     fn test_privacy_budget_exhausted() {
-        let mut state = DpSgdState::default();
-        assert!(!state.privacy_budget_exhausted());
+        let mut state = _DpSgdState::default();
+        assert!(!state._privacy_budget_exhausted());
         state.epsilon_spent = MAX_EPSILON + 0.1;
-        assert!(state.privacy_budget_exhausted());
+        assert!(state._privacy_budget_exhausted());
     }
 
     #[test]
     fn test_remaining_epsilon() {
-        let mut state = DpSgdState::default();
-        assert!((state.remaining_epsilon() - MAX_EPSILON).abs() < 1e-10);
+        let mut state = _DpSgdState::default();
+        assert!((state._remaining_epsilon() - MAX_EPSILON).abs() < 1e-10);
         state.epsilon_spent = 3.0;
-        assert!((state.remaining_epsilon() - (MAX_EPSILON - 3.0)).abs() < 1e-10);
+        assert!((state._remaining_epsilon() - (MAX_EPSILON - 3.0)).abs() < 1e-10);
         state.epsilon_spent = 20.0;
-        assert_eq!(state.remaining_epsilon(), 0.0);
+        assert_eq!(state._remaining_epsilon(), 0.0);
     }
 
     #[test]
     fn test_account_step() {
-        let mut state = DpSgdState::default();
+        let mut state = _DpSgdState::default();
         state.account_step(0.1);
         assert!((state.epsilon_spent - 0.1).abs() < 1e-10);
         assert_eq!(state.total_steps, 1);
@@ -215,13 +215,13 @@ mod tests {
         assert_eq!(stage.name(), "dp_sgd");
         assert_eq!(stage.frequency(), 1);
         let state = stage.state_snapshot();
-        assert!(!state.privacy_budget_exhausted());
+        assert!(!state._privacy_budget_exhausted());
     }
 
     #[test]
     fn test_set_noise_multiplier() {
         let stage = DpSgdStage::default();
-        stage.set_noise_multiplier(2.0);
+        stage._set_noise_multiplier(2.0);
         let state = stage.state_snapshot();
         assert!((state.noise_scale - 2.0).abs() < 1e-10);
     }

@@ -58,16 +58,16 @@ pub struct ProcessExample {
 
 /// 过程缓冲
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessBuffer {
+pub(crate) struct _ProcessBuffer {
     pub traces: VecDeque<ReasoningTrace>,
     pub max_size: usize,
 }
 
-impl Default for ProcessBuffer {
+impl Default for _ProcessBuffer {
     fn default() -> Self { Self::new() }
 }
 
-impl ProcessBuffer {
+impl _ProcessBuffer {
     pub fn new() -> Self {
         Self { traces: VecDeque::with_capacity(PROCESS_BUFFER_SIZE), max_size: PROCESS_BUFFER_SIZE }
     }
@@ -82,7 +82,7 @@ impl ProcessBuffer {
 
 /// 过程阶段统计报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessReport {
+pub(crate) struct _ProcessReport {
     pub total_updates: u64,
     pub buffer_size: usize,
     pub avg_trace_length: f64,
@@ -97,7 +97,7 @@ pub struct ProcessReport {
 /// 过程知识习得：从高质量推理轨迹学习"如何推理"，扩展 CapabilityVector 过程维度。
 #[derive(Debug, Clone)]
 pub struct ProcessStage {
-    pub buffer: ProcessBuffer,
+    pub buffer: _ProcessBuffer,
     pub learning_rate: f64,
     pub total_updates: u64,
     /// 过程能力扩展维度 (动态累积到 CapabilityVector.extension)
@@ -115,7 +115,7 @@ impl Default for ProcessStage {
 impl ProcessStage {
     pub fn new() -> Self {
         Self {
-            buffer: ProcessBuffer::new(),
+            buffer: _ProcessBuffer::new(),
             learning_rate: PROCESS_LEARNING_RATE,
             total_updates: 0,
             reasoning_depth: 0.0,
@@ -161,7 +161,7 @@ impl ProcessStage {
     }
 
     /// 从 KB Experience GoldTrajectory 提取推理轨迹
-    pub fn extract_from_kb_experience(
+    pub(crate) fn _extract_from_kb_experience(
         trajectories: &[crate::core::nt_core_prm::AgentTrajectory],
     ) -> Vec<ReasoningTrace> {
         trajectories.iter().enumerate().map(|(i, traj)| {
@@ -279,7 +279,7 @@ impl ProcessStage {
         stage
     }
 
-    pub fn report(&self) -> ProcessReport {
+    pub fn report(&self) -> _ProcessReport {
         use std::collections::HashMap;
         let mut specialist_dist = HashMap::new();
         let mut action_dist = HashMap::new();
@@ -294,7 +294,7 @@ impl ProcessStage {
             }
         }
         let n = self.buffer.len().max(1) as f64;
-        ProcessReport {
+        _ProcessReport {
             total_updates: self.total_updates,
             buffer_size: self.buffer.len(),
             avg_trace_length: total_len / n,
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_buffer_push_and_len() {
-        let mut buf = ProcessBuffer::new();
+        let mut buf = _ProcessBuffer::new();
         buf.push(make_trace(3, 0.9, vec!["think", "search", "verify"]));
         assert_eq!(buf.len(), 1);
     }

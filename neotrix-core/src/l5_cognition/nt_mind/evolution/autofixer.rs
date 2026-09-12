@@ -6,12 +6,12 @@ use crate::core::nt_core_context::revertible::{ClosureEffect, RevertibleContext}
 use crate::core::nt_core_error_parse::{self, CompilerDiagnostic, DiagnosticSeverity};
 
 /// 自愈快照 — 修复前记录文件原内容作为 ∂Γ inverse (写回原状)。
-pub struct HealSnapshot {
+pub(crate) struct _HealSnapshot {
     pub path: PathBuf,
     pub original: Vec<u8>,
 }
 
-impl HealSnapshot {
+impl _HealSnapshot {
     pub fn capture(path: &Path) -> Result<Self, String> {
         let original = std::fs::read(path)
             .map_err(|e| format!("快照读取失败 {}: {}", path.display(), e))?;
@@ -24,12 +24,12 @@ impl HealSnapshot {
 
 /// ∂Γ 事务性自愈批次 — heal 前快照, 批内任一步失败 recover 回滚全部已写文件。
 /// 语义: all-or-nothing (与 PluginRegistry::load_batch 同一回滚原语)。
-pub struct RepairBatch {
+pub(crate) struct _RepairBatch {
     ctx: RevertibleContext<'static, ()>,
-    snapshots: Vec<HealSnapshot>,
+    snapshots: Vec<_HealSnapshot>,
 }
 
-impl RepairBatch {
+impl _RepairBatch {
     pub fn begin() -> Self {
         Self {
             ctx: RevertibleContext::new(()),
@@ -40,7 +40,7 @@ impl RepairBatch {
     /// 快照并登记回滚效果 (inverse = 写回原内容 / 原文件不存在则移除)。
     /// 返回原内容字节, 供调用方读取。
     pub fn snapshot(&mut self, path: &Path) -> Result<Vec<u8>, String> {
-        let snap = HealSnapshot::capture(path)?;
+        let snap = _HealSnapshot::capture(path)?;
         let path2 = snap.path.clone();
         let original = snap.original.clone();
         let original_for_inverse = original.clone();
@@ -118,7 +118,7 @@ impl AutoFixer {
     }
 
     /// 启用一个被 #[ignore] 的测试
-    pub fn enable_ignored_test(file_path: &str, line: usize) -> Result<String, String> {
+    pub(crate) fn _enable_ignored_test(file_path: &str, line: usize) -> Result<String, String> {
         let content = std::fs::read_to_string(file_path)
             .map_err(|e| format!("读取失败: {}", e))?;
         let mut lines: Vec<&str> = content.lines().collect();
@@ -153,7 +153,7 @@ impl AutoFixer {
     }
 
     /// 移除未使用导入 (通过 cargo fix)
-    pub fn remove_unused_imports() -> Result<String, String> {
+    pub(crate) fn _remove_unused_imports() -> Result<String, String> {
         let output = std::process::Command::new("cargo")
             .args(["fix", "--lib", "--allow-dirty", "--edition-idioms"])
             .output()
@@ -166,7 +166,7 @@ impl AutoFixer {
     }
 
     /// 删除文件中特定行的 TODO 注释
-    pub fn remove_todo_line(file_path: &str, line: usize) -> Result<String, String> {
+    pub(crate) fn _remove_todo_line(file_path: &str, line: usize) -> Result<String, String> {
         let content = std::fs::read_to_string(file_path)
             .map_err(|e| format!("读取失败: {}", e))?;
         let mut lines: Vec<&str> = content.lines().collect();
@@ -253,7 +253,7 @@ impl AutoFixer {
     }
 
     /// 扫描并清理文件中的 TODO 注释
-    pub fn cleanup_todos(file_path: &str) -> Result<usize, String> {
+    pub(crate) fn _cleanup_todos(file_path: &str) -> Result<usize, String> {
         let content = std::fs::read_to_string(file_path)
             .map_err(|e| format!("读取失败: {}", e))?;
         let mut removed = 0usize;
@@ -278,11 +278,11 @@ impl AutoFixer {
     }
 
     /// 事务性 TODO 清理 (∂Γ 自愈回滚): 写入前快照原内容, 写失败 recover 回滚。
-    /// 生产路径 (EvolutionDaemon) 应调用此版本而非裸 cleanup_todos。
+    /// 生产路径 (EvolutionDaemon) 应调用此版本而非裸 _cleanup_todos。
     pub fn cleanup_todos_tx(file_path: &str) -> Result<usize, String> {
-        let mut batch = RepairBatch::begin();
+        let mut batch = _RepairBatch::begin();
         let _original = batch.snapshot(Path::new(file_path))?;
-        match Self::cleanup_todos(file_path) {
+        match Self::_cleanup_todos(file_path) {
             Ok(n) => {
                 batch.commit();
                 Ok(n)
@@ -305,7 +305,7 @@ impl AutoFixer {
     ///
     /// 把 `nt_core_error_parse` 的解析 + `suggest_fix` 映射暴露给生产修复路径,
     /// 使编译错误从"仅检测"升级为"可执行修复指引" (T3 生产接线)。
-    pub fn suggest_fixes_from_output(output: &str) -> Vec<(String, String, String)> {
+    pub(crate) fn _suggest_fixes_from_output(output: &str) -> Vec<(String, String, String)> {
         let diags = nt_core_error_parse::parse_compiler_output(output);
         diags
             .iter()
@@ -318,7 +318,7 @@ impl AutoFixer {
     }
 
     /// 便捷: 从单个错误码直接查修复建议 (供诊断器/守护进程直接调用)。
-    pub fn suggest_fix_for_code(code: &str) -> Option<(String, String)> {
+    pub(crate) fn _suggest_fix_for_code(code: &str) -> Option<(String, String)> {
         let d = CompilerDiagnostic {
             file: String::new(),
             line: 0,
@@ -339,7 +339,7 @@ impl AutoFixer {
 
 /// GAUNTLET 门控阶段。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GauntletStage {
+pub(crate) enum _GauntletStage {
     /// SPEC: 变更前必须有明确规格 (spec-before 门禁)。
     Spec,
     /// RED: 先写失败测试。
@@ -352,41 +352,41 @@ pub enum GauntletStage {
     Evidence,
 }
 
-impl GauntletStage {
+impl _GauntletStage {
     /// 五阶段顺序。
-    pub const ORDER: [GauntletStage; 5] = [
-        GauntletStage::Spec,
-        GauntletStage::Red,
-        GauntletStage::Green,
-        GauntletStage::Gauntlet,
-        GauntletStage::Evidence,
+    pub const ORDER: [_GauntletStage; 5] = [
+        _GauntletStage::Spec,
+        _GauntletStage::Red,
+        _GauntletStage::Green,
+        _GauntletStage::Gauntlet,
+        _GauntletStage::Evidence,
     ];
 
     pub fn label(self) -> &'static str {
         match self {
-            GauntletStage::Spec => "SPEC",
-            GauntletStage::Red => "RED",
-            GauntletStage::Green => "GREEN",
-            GauntletStage::Gauntlet => "GAUNTLET",
-            GauntletStage::Evidence => "EVIDENCE",
+            _GauntletStage::Spec => "SPEC",
+            _GauntletStage::Red => "RED",
+            _GauntletStage::Green => "GREEN",
+            _GauntletStage::Gauntlet => "GAUNTLET",
+            _GauntletStage::Evidence => "EVIDENCE",
         }
     }
 
-    pub fn next(self) -> Option<GauntletStage> {
+    pub fn next(self) -> Option<_GauntletStage> {
         match self {
-            GauntletStage::Spec => Some(GauntletStage::Red),
-            GauntletStage::Red => Some(GauntletStage::Green),
-            GauntletStage::Green => Some(GauntletStage::Gauntlet),
-            GauntletStage::Gauntlet => Some(GauntletStage::Evidence),
-            GauntletStage::Evidence => None,
+            _GauntletStage::Spec => Some(_GauntletStage::Red),
+            _GauntletStage::Red => Some(_GauntletStage::Green),
+            _GauntletStage::Green => Some(_GauntletStage::Gauntlet),
+            _GauntletStage::Gauntlet => Some(_GauntletStage::Evidence),
+            _GauntletStage::Evidence => None,
         }
     }
 }
 
 /// GAUNTLET 门禁判定结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GauntletVerdict {
-    pub stage: GauntletStage,
+pub(crate) struct _GauntletVerdict {
+    pub stage: _GauntletStage,
     /// 是否通过该阶段门禁。
     pub pass: bool,
     /// 未通过时的原因 (pass=true 时空)。
@@ -396,15 +396,15 @@ pub struct GauntletVerdict {
     pub diagnosis: String,
 }
 
-impl GauntletVerdict {
+impl _GauntletVerdict {
     /// 携带诊断的重试条款 — 返回诊断, 空则调用方不得重试。
     /// J-Space: "Retrying; I think the failure was <diagnosis>."
     pub fn diagnosis(&self) -> &str {
         &self.diagnosis
     }
 
-    fn pass(stage: GauntletStage) -> GauntletVerdict {
-        GauntletVerdict {
+    fn pass(stage: _GauntletStage) -> _GauntletVerdict {
+        _GauntletVerdict {
             stage,
             pass: true,
             reason: String::new(),
@@ -412,8 +412,8 @@ impl GauntletVerdict {
         }
     }
 
-    fn fail(stage: GauntletStage, reason: &str, diagnosis: &str) -> GauntletVerdict {
-        GauntletVerdict {
+    fn fail(stage: _GauntletStage, reason: &str, diagnosis: &str) -> _GauntletVerdict {
+        _GauntletVerdict {
             stage,
             pass: false,
             reason: reason.to_string(),
@@ -432,9 +432,9 @@ impl GauntletVerdict {
 /// - EVIDENCE: 交付必须携带真实证据包 (非空, 且与实现匹配)。
 #[derive(Debug, Clone, Default)]
 pub struct GauntletMachine {
-    pub current: Option<GauntletStage>,
-    pub passed: Vec<GauntletStage>,
-    pub failures: Vec<GauntletVerdict>,
+    pub current: Option<_GauntletStage>,
+    pub passed: Vec<_GauntletStage>,
+    pub failures: Vec<_GauntletVerdict>,
 }
 
 impl GauntletMachine {
@@ -444,11 +444,11 @@ impl GauntletMachine {
 
     /// 启动: 从 SPEC 开始。
     pub fn start(&mut self) {
-        self.current = Some(GauntletStage::Spec);
+        self.current = Some(_GauntletStage::Spec);
     }
 
     /// 当前阶段。
-    pub fn current(&self) -> Option<GauntletStage> {
+    pub fn current(&self) -> Option<_GauntletStage> {
         self.current
     }
 
@@ -458,18 +458,18 @@ impl GauntletMachine {
     }
 
     /// 评估并推进到下一阶段 (若通过)。返回本次判定。
-    pub fn advance(&mut self, spec: &str, failed_tests: usize, tests_pass: bool, lint_ok: bool, todos: usize, unwraps: usize, evidence: &[String]) -> GauntletVerdict {
+    pub fn advance(&mut self, spec: &str, failed_tests: usize, tests_pass: bool, lint_ok: bool, todos: usize, unwraps: usize, evidence: &[String]) -> _GauntletVerdict {
         let stage = match self.current {
             Some(s) => s,
             None => {
-                return GauntletVerdict::fail(
-                    GauntletStage::Spec,
+                return _GauntletVerdict::fail(
+                    _GauntletStage::Spec,
                     "machine not started",
                     "gauntlet: call start() before advancing",
                 );
             }
         };
-        let verdict = Self::evaluate_stage(stage, spec, failed_tests, tests_pass, lint_ok, todos, unwraps, evidence);
+        let verdict = Self::_evaluate_stage(stage, spec, failed_tests, tests_pass, lint_ok, todos, unwraps, evidence);
         if verdict.pass {
             self.passed.push(stage);
             self.current = stage.next();
@@ -480,30 +480,30 @@ impl GauntletMachine {
     }
 
     /// 单阶段门禁评估 (纯函数, 便于测试)。
-    pub fn evaluate_stage(stage: GauntletStage, spec: &str, failed_tests: usize, tests_pass: bool, lint_ok: bool, todos: usize, unwraps: usize, evidence: &[String]) -> GauntletVerdict {
+    pub(crate) fn _evaluate_stage(stage: _GauntletStage, spec: &str, failed_tests: usize, tests_pass: bool, lint_ok: bool, todos: usize, unwraps: usize, evidence: &[String]) -> _GauntletVerdict {
         match stage {
-            GauntletStage::Spec => {
+            _GauntletStage::Spec => {
                 if spec.trim().is_empty() {
-                    GauntletVerdict::fail(stage, "spec-before: no spec provided", "spec: provide a non-empty spec first")
+                    _GauntletVerdict::fail(stage, "spec-before: no spec provided", "spec: provide a non-empty spec first")
                 } else {
-                    GauntletVerdict::pass(stage)
+                    _GauntletVerdict::pass(stage)
                 }
             }
-            GauntletStage::Red => {
+            _GauntletStage::Red => {
                 if failed_tests == 0 {
-                    GauntletVerdict::fail(stage, "RED: need at least 1 failing test first", "red: write a failing test before implementing")
+                    _GauntletVerdict::fail(stage, "RED: need at least 1 failing test first", "red: write a failing test before implementing")
                 } else {
-                    GauntletVerdict::pass(stage)
+                    _GauntletVerdict::pass(stage)
                 }
             }
-            GauntletStage::Green => {
+            _GauntletStage::Green => {
                 if !tests_pass {
-                    GauntletVerdict::fail(stage, "GREEN: tests must pass", "green: fix implementation until tests pass")
+                    _GauntletVerdict::fail(stage, "GREEN: tests must pass", "green: fix implementation until tests pass")
                 } else {
-                    GauntletVerdict::pass(stage)
+                    _GauntletVerdict::pass(stage)
                 }
             }
-            GauntletStage::Gauntlet => {
+            _GauntletStage::Gauntlet => {
                 let mut problems = Vec::new();
                 if !lint_ok {
                     problems.push("lint failing".to_string());
@@ -515,34 +515,34 @@ impl GauntletMachine {
                     problems.push(format!("{unwraps} unwrap abuses"));
                 }
                 if problems.is_empty() {
-                    GauntletVerdict::pass(stage)
+                    _GauntletVerdict::pass(stage)
                 } else {
-                    GauntletVerdict::fail(
+                    _GauntletVerdict::fail(
                         stage,
                         &format!("GAUNTLET blocked: {}", problems.join(", ")),
                         &format!("gauntlet: resolve {}", problems.join(", ")),
                     )
                 }
             }
-            GauntletStage::Evidence => {
+            _GauntletStage::Evidence => {
                 if evidence.is_empty() {
-                    GauntletVerdict::fail(stage, "evidence-after: no evidence attached", "evidence: attach a real evidence pack before delivery")
+                    _GauntletVerdict::fail(stage, "evidence-after: no evidence attached", "evidence: attach a real evidence pack before delivery")
                 } else {
-                    GauntletVerdict::pass(stage)
+                    _GauntletVerdict::pass(stage)
                 }
             }
         }
     }
 
     /// 是否被某阶段阻挡 (供调用方区分"卡住" vs "完成")。
-    pub fn blocked(&self) -> Option<&GauntletVerdict> {
+    pub fn blocked(&self) -> Option<&_GauntletVerdict> {
         self.failures.last()
     }
 
     /// J-Space 监控→控制绑定: 取出最近失败诊断供重试携带。
     /// 返回 None 表示无失败/未开始, 此时调用方不得空白重试 (self-monitoring.md
     /// "A retry that does not carry the diagnosis is the same attempt again")。
-    pub fn retry_diagnosis(&self) -> Option<String> {
+    pub(crate) fn _retry_diagnosis(&self) -> Option<String> {
         self.failures
             .last()
             .filter(|v| !v.pass)
@@ -555,7 +555,7 @@ impl GauntletMachine {
         if diagnosis.trim().is_empty() {
             return false;
         }
-        if self.retry_diagnosis().is_none_or(|d| d != diagnosis) {
+        if self._retry_diagnosis().is_none_or(|d| d != diagnosis) {
             return false;
         }
         true
@@ -566,7 +566,7 @@ impl GauntletMachine {
 /// 失败后必须三选一, 禁止空白重试 ("a retry that does not carry the diagnosis
 /// is the same attempt again")。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResolveExit {
+pub(crate) enum _ResolveExit {
     /// 接受失败为已知事实, 不再重试 (范围重新界定)。
     Trust,
     /// 携带失败诊断重试 — 这是默认出口, 空白诊断被拒绝。
@@ -575,19 +575,19 @@ pub enum ResolveExit {
     Reconcile,
 }
 
-impl ResolveExit {
+impl _ResolveExit {
     /// T17: 监控闭环的强制出口列表 — 卡住时不存在第 4 个选择。
-    pub const ALL: [ResolveExit; 3] = [
-        ResolveExit::Trust,
-        ResolveExit::RetryWithDiagnosis,
-        ResolveExit::Reconcile,
+    pub const ALL: [_ResolveExit; 3] = [
+        _ResolveExit::Trust,
+        _ResolveExit::RetryWithDiagnosis,
+        _ResolveExit::Reconcile,
     ];
 
     pub fn label(self) -> &'static str {
         match self {
-            ResolveExit::Trust => "trust",
-            ResolveExit::RetryWithDiagnosis => "retry-with-diagnosis",
-            ResolveExit::Reconcile => "reconcile",
+            _ResolveExit::Trust => "trust",
+            _ResolveExit::RetryWithDiagnosis => "retry-with-diagnosis",
+            _ResolveExit::Reconcile => "reconcile",
         }
     }
 }
@@ -599,7 +599,7 @@ impl ResolveExit {
 
 /// 单个 healer 巡检产出的修复建议。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HealSuggestion {
+pub(crate) struct _HealSuggestion {
     /// 健康维度 (如 "compile" / "todo" / "unused_import" / "unwraps")。
     pub dimension: String,
     /// 目标文件 (可空 = 全局维度)。
@@ -615,11 +615,11 @@ pub struct HealSuggestion {
 #[derive(Debug, Default, Clone)]
 pub struct HealerRegistry {
     /// 各维度最近一次扫描结果 (dimension → 建议列表)。
-    pub last_report: Vec<HealSuggestion>,
+    pub last_report: Vec<_HealSuggestion>,
     /// 已执行自动修复数 (遥测)。
     pub auto_fixes_applied: u32,
     /// 最近一轮成功落地的修复明细 (供上层写入经验分支, 单一事实源闭环)。
-    pub last_landed: Vec<HealSuggestion>,
+    pub last_landed: Vec<_HealSuggestion>,
 }
 
 impl HealerRegistry {
@@ -631,7 +631,7 @@ impl HealerRegistry {
     /// 扫描给定目录下的 .rs 文件, 统计未加 #[ignore] 的 TODO/FIXME 注释行。
     /// 纯占位 TODO 行 (// TODO / // FIXME 无正文) 标记 auto_fixable — 由
     /// apply_auto_fixable 经 cleanup_todos_tx 事务落地 (GAP-3 修复, R-P79)。
-    pub fn scan_todos(&mut self, dir: &Path) -> Vec<HealSuggestion> {
+    pub(crate) fn _scan_todos(&mut self, dir: &Path) -> Vec<_HealSuggestion> {
         let mut out = Vec::new();
         for path in Self::collect_rs_files(dir) {
             let Ok(content) = std::fs::read_to_string(&path) else { continue };
@@ -649,7 +649,7 @@ impl HealerRegistry {
                     t == "// TODO" || t == "//TODO" || t == "// FIXME" || t == "//FIXME"
                 });
             if count > 0 {
-                out.push(HealSuggestion {
+                out.push(_HealSuggestion {
                     dimension: "todo".into(),
                     file: Some(path.to_string_lossy().to_string()),
                     action: format!("{} TODO/FIXME comments pending", count),
@@ -663,14 +663,14 @@ impl HealerRegistry {
 
     /// 巡检 unwrap 滥用 (未处理 Result/Option) — 维度 "unwraps"。
     /// 统计 `.unwrap()` 调用 (不含测试模块)。
-    pub fn scan_unwraps(&mut self, dir: &Path) -> Vec<HealSuggestion> {
+    pub(crate) fn _scan_unwraps(&mut self, dir: &Path) -> Vec<_HealSuggestion> {
         let mut out = Vec::new();
         for path in Self::collect_rs_files(dir) {
             let Ok(content) = std::fs::read_to_string(&path) else { continue };
             let in_tests = content.contains("#[cfg(test)]");
             let count = content.matches(".unwrap()").count();
             if count > 0 && !in_tests {
-                out.push(HealSuggestion {
+                out.push(_HealSuggestion {
                     dimension: "unwraps".into(),
                     file: Some(path.to_string_lossy().to_string()),
                     action: format!("{} unwrap() calls in production path", count),
@@ -682,10 +682,10 @@ impl HealerRegistry {
     }
 
     /// 汇总巡检: 扫描全部维度, 更新 last_report, 返回建议列表。
-    pub fn run_full_scan(&mut self, dir: &Path) -> Vec<HealSuggestion> {
+    pub fn run_full_scan(&mut self, dir: &Path) -> Vec<_HealSuggestion> {
         let mut report = Vec::new();
-        report.extend(self.scan_todos(dir));
-        report.extend(self.scan_unwraps(dir));
+        report.extend(self._scan_todos(dir));
+        report.extend(self._scan_unwraps(dir));
         self.last_report = report.clone();
         report
     }
@@ -763,7 +763,7 @@ mod tests {
     #[test]
     fn test_suggest_fixes_from_output_wires_parser() {
         let output = "error[E0433]: failed to resolve: use of undeclared type `Foo`\n  --> src/b.rs:2:3\nerror[E0308]: mismatched types\n  --> src/lib.rs:5:1\n";
-        let fixes = AutoFixer::suggest_fixes_from_output(output);
+        let fixes = AutoFixer::_suggest_fixes_from_output(output);
         assert_eq!(fixes.len(), 2);
         assert_eq!(fixes[0].0, "E0433");
         assert_eq!(fixes[0].1, "add");
@@ -773,10 +773,10 @@ mod tests {
 
     #[test]
     fn test_suggest_fix_for_code_direct() {
-        let fix = AutoFixer::suggest_fix_for_code("E0382").expect("E0382 should map");
+        let fix = AutoFixer::_suggest_fix_for_code("E0382").expect("E0382 should map");
         assert_eq!(fix.0, "clone");
         assert!(fix.1.contains("clone"));
-        assert!(AutoFixer::suggest_fix_for_code("E9999").is_none());
+        assert!(AutoFixer::_suggest_fix_for_code("E9999").is_none());
     }
 
     #[test]
@@ -785,7 +785,7 @@ mod tests {
         let _ = std::fs::create_dir_all(&dir);
         let f = dir.join("a.rs");
         std::fs::write(&f, "// TODO\nfn a() {}\n").unwrap();
-        let mut batch = RepairBatch::begin();
+        let mut batch = _RepairBatch::begin();
         let _orig = batch.snapshot(&f).unwrap();
         // 模拟修复写入
         std::fs::write(&f, "fn a() {}\n").unwrap();
@@ -801,7 +801,7 @@ mod tests {
         let f = dir.join("b.rs");
         let original = "fn original() {}\n";
         std::fs::write(&f, original).unwrap();
-        let mut batch = RepairBatch::begin();
+        let mut batch = _RepairBatch::begin();
         let _orig = batch.snapshot(&f).unwrap();
         // 修复写入后某步失败 → rollback 写回原内容
         std::fs::write(&f, "fn corrupted() {}\n").unwrap();
@@ -826,41 +826,41 @@ mod tests {
     #[test]
     fn gauntlet_stage_order() {
         assert_eq!(
-            GauntletStage::ORDER.to_vec(),
+            _GauntletStage::ORDER.to_vec(),
             vec![
-                GauntletStage::Spec,
-                GauntletStage::Red,
-                GauntletStage::Green,
-                GauntletStage::Gauntlet,
-                GauntletStage::Evidence,
+                _GauntletStage::Spec,
+                _GauntletStage::Red,
+                _GauntletStage::Green,
+                _GauntletStage::Gauntlet,
+                _GauntletStage::Evidence,
             ]
         );
-        assert_eq!(GauntletStage::Spec.next(), Some(GauntletStage::Red));
-        assert_eq!(GauntletStage::Evidence.next(), None);
+        assert_eq!(_GauntletStage::Spec.next(), Some(_GauntletStage::Red));
+        assert_eq!(_GauntletStage::Evidence.next(), None);
     }
 
     #[test]
     fn gauntlet_spec_requires_spec() {
-        let spec = GauntletMachine::evaluate_stage(GauntletStage::Spec, "", 0, false, false, 0, 0, &[]);
+        let spec = GauntletMachine::_evaluate_stage(_GauntletStage::Spec, "", 0, false, false, 0, 0, &[]);
         assert!(!spec.pass);
         assert!(spec.reason.contains("spec-before"));
-        let ok = GauntletMachine::evaluate_stage(GauntletStage::Spec, "do X", 0, false, false, 0, 0, &[]);
+        let ok = GauntletMachine::_evaluate_stage(_GauntletStage::Spec, "do X", 0, false, false, 0, 0, &[]);
         assert!(ok.pass);
     }
 
     #[test]
     fn gauntlet_red_requires_failing_test() {
-        let red = GauntletMachine::evaluate_stage(GauntletStage::Red, "spec", 0, false, false, 0, 0, &[]);
+        let red = GauntletMachine::_evaluate_stage(_GauntletStage::Red, "spec", 0, false, false, 0, 0, &[]);
         assert!(!red.pass, "RED needs a failing test (TDD)");
-        let ok = GauntletMachine::evaluate_stage(GauntletStage::Red, "spec", 1, false, false, 0, 0, &[]);
+        let ok = GauntletMachine::_evaluate_stage(_GauntletStage::Red, "spec", 1, false, false, 0, 0, &[]);
         assert!(ok.pass);
     }
 
     #[test]
     fn gauntlet_gauntlet_blocks_on_lint_todos_unwraps() {
-        let clean = GauntletMachine::evaluate_stage(GauntletStage::Gauntlet, "spec", 1, true, true, 0, 0, &[]);
+        let clean = GauntletMachine::_evaluate_stage(_GauntletStage::Gauntlet, "spec", 1, true, true, 0, 0, &[]);
         assert!(clean.pass);
-        let dirty = GauntletMachine::evaluate_stage(GauntletStage::Gauntlet, "spec", 1, true, false, 3, 1, &[]);
+        let dirty = GauntletMachine::_evaluate_stage(_GauntletStage::Gauntlet, "spec", 1, true, false, 3, 1, &[]);
         assert!(!dirty.pass);
         assert!(dirty.reason.contains("lint"));
         assert!(dirty.reason.contains("TODO"));
@@ -869,9 +869,9 @@ mod tests {
 
     #[test]
     fn gauntlet_evidence_requires_evidence() {
-        let no_ev = GauntletMachine::evaluate_stage(GauntletStage::Evidence, "spec", 1, true, true, 0, 0, &[]);
+        let no_ev = GauntletMachine::_evaluate_stage(_GauntletStage::Evidence, "spec", 1, true, true, 0, 0, &[]);
         assert!(!no_ev.pass, "evidence-after: must attach evidence");
-        let ok = GauntletMachine::evaluate_stage(GauntletStage::Evidence, "spec", 1, true, true, 0, 0, &["cargo check: 0 errors".to_string()]);
+        let ok = GauntletMachine::_evaluate_stage(_GauntletStage::Evidence, "spec", 1, true, true, 0, 0, &["cargo check: 0 errors".to_string()]);
         assert!(ok.pass);
     }
 
@@ -900,7 +900,7 @@ mod tests {
         // GREEN 失败 → 卡住, 不推进
         let v = m.advance("spec ok", 1, false, false, 0, 0, &[]);
         assert!(!v.pass);
-        assert_eq!(m.current(), Some(GauntletStage::Green), "blocked at GREEN");
+        assert_eq!(m.current(), Some(_GauntletStage::Green), "blocked at GREEN");
         assert!(m.blocked().is_some());
         assert_eq!(m.passed.len(), 2, "only SPEC+RED passed");
     }
@@ -916,12 +916,12 @@ mod tests {
     #[test]
     fn gauntlet_verdict_carries_diagnosis() {
         // SPEC 空规格失败 → 必须携带诊断 (J-Space: retry-with-diagnosis)
-        let v = GauntletMachine::evaluate_stage(GauntletStage::Spec, "", 0, false, false, 0, 0, &[]);
+        let v = GauntletMachine::_evaluate_stage(_GauntletStage::Spec, "", 0, false, false, 0, 0, &[]);
         assert!(!v.pass);
         assert!(!v.diagnosis.is_empty(), "failed verdict must carry diagnosis");
         assert!(v.diagnosis().contains("spec"));
         // 通过时诊断为空 (无重试需求)
-        let ok = GauntletMachine::evaluate_stage(GauntletStage::Spec, "do X", 0, false, false, 0, 0, &[]);
+        let ok = GauntletMachine::_evaluate_stage(_GauntletStage::Spec, "do X", 0, false, false, 0, 0, &[]);
         assert!(ok.pass);
         assert!(ok.diagnosis.is_empty());
     }
@@ -934,7 +934,7 @@ mod tests {
         assert!(m.advance("spec ok", 0, false, false, 0, 0, &[]).pass); // SPEC
         let v = m.advance("spec ok", 0, false, false, 0, 0, &[]); // RED fails
         assert!(!v.pass);
-        let diag = m.retry_diagnosis().expect("failure must yield diagnosis");
+        let diag = m._retry_diagnosis().expect("failure must yield diagnosis");
         assert!(diag.contains("red"));
         // 空白重试被拒绝 (J-Space: blank retry = same attempt again)
         assert!(!m.retry_with_diagnosis(""), "blank diagnosis rejected");
@@ -945,26 +945,26 @@ mod tests {
     #[test]
     fn resolve_exit_forces_three_choice_closure() {
         // T17: 监控闭环只有三个出口 — trust / retry-with-diagnosis / reconcile
-        assert_eq!(ResolveExit::ALL.len(), 3);
-        assert_eq!(ResolveExit::ALL[0], ResolveExit::Trust);
-        assert_eq!(ResolveExit::ALL[1], ResolveExit::RetryWithDiagnosis);
-        assert_eq!(ResolveExit::ALL[2], ResolveExit::Reconcile);
-        assert_eq!(ResolveExit::RetryWithDiagnosis.label(), "retry-with-diagnosis");
-        assert_eq!(ResolveExit::Reconcile.label(), "reconcile");
+        assert_eq!(_ResolveExit::ALL.len(), 3);
+        assert_eq!(_ResolveExit::ALL[0], _ResolveExit::Trust);
+        assert_eq!(_ResolveExit::ALL[1], _ResolveExit::RetryWithDiagnosis);
+        assert_eq!(_ResolveExit::ALL[2], _ResolveExit::Reconcile);
+        assert_eq!(_ResolveExit::RetryWithDiagnosis.label(), "retry-with-diagnosis");
+        assert_eq!(_ResolveExit::Reconcile.label(), "reconcile");
         // retry 出口必须携带诊断, 否则就不是有效出口
         let mut m = GauntletMachine::new();
         m.start();
         m.advance("spec ok", 0, false, false, 0, 0, &[]);
         let v = m.advance("spec ok", 0, false, false, 0, 0, &[]);
         assert!(!v.pass);
-        let diag = m.retry_diagnosis().expect("diagnosis present");
+        let diag = m._retry_diagnosis().expect("diagnosis present");
         assert!(m.retry_with_diagnosis(&diag));
         // reconcile: 失败揭示了前提问题 — 修正规格后再走
         let mut m2 = GauntletMachine::new();
         m2.start();
         let v = m2.advance("", 0, false, false, 0, 0, &[]);
         assert!(!v.pass);
-        let diag = m2.retry_diagnosis().expect("spec failure yields diagnosis");
+        let diag = m2._retry_diagnosis().expect("spec failure yields diagnosis");
         assert!(m2.retry_with_diagnosis(&diag), "reconcile then retry");
     }
 
@@ -980,7 +980,7 @@ mod tests {
         .unwrap();
 
         let mut reg = HealerRegistry::new();
-        let todos = reg.scan_todos(dir.path());
+        let todos = reg._scan_todos(dir.path());
         assert_eq!(todos.len(), 1, "one file has TODOs");
         assert_eq!(todos[0].dimension, "todo");
         assert_eq!(todos[0].auto_fixable, false);
@@ -992,7 +992,7 @@ mod tests {
         std::fs::write(dir.path().join("prod.rs"), "fn main() { let x = opt.unwrap(); }\n").unwrap();
 
         let mut reg = HealerRegistry::new();
-        let unwraps = reg.scan_unwraps(dir.path());
+        let unwraps = reg._scan_unwraps(dir.path());
         assert_eq!(unwraps.len(), 1);
         assert_eq!(unwraps[0].dimension, "unwraps");
         assert_eq!(unwraps[0].action, "1 unwrap() calls in production path");

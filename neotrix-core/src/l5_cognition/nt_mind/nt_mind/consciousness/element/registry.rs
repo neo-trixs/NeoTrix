@@ -48,7 +48,7 @@ impl ElementRegistry {
         Ok(())
     }
 
-    pub fn resolve_and_init(&mut self) -> Result<(), ElementError> {
+    pub(crate) fn _resolve_and_init(&mut self) -> Result<(), ElementError> {
         if self.state != RegistryState::Constructed {
             return Err(ElementError::RuntimeError(
                 "can only resolve from Constructed state".into(),
@@ -69,7 +69,7 @@ impl ElementRegistry {
         Ok(())
     }
 
-    pub fn start_all(&mut self) -> Result<(), ElementError> {
+    pub(crate) fn _start_all(&mut self) -> Result<(), ElementError> {
         if self.state != RegistryState::Initialized {
             return Err(ElementError::RuntimeError(
                 "can only start from Initialized state".into(),
@@ -88,8 +88,8 @@ impl ElementRegistry {
 
     pub fn bootstrap(&mut self, elements: Vec<Box<dyn Element>>) -> Result<(), ElementError> {
         self.register_all(elements)?;
-        self.resolve_and_init()?;
-        self.start_all()
+        self._resolve_and_init()?;
+        self._start_all()
     }
 
     pub fn shutdown(&mut self) -> Result<(), ElementError> {
@@ -300,7 +300,7 @@ mod tests {
         let a = Box::new(TestElement::new("A", "Base", vec![]));
         let b = Box::new(TestElement::new("B", "Depends on A", vec!["A"]));
         reg.register_all(vec![a, b]).expect("register_all should register all elements");
-        reg.resolve_and_init().expect("resolve_and_init should initialize in dependency order");
+        reg._resolve_and_init().expect("_resolve_and_init should initialize in dependency order");
 
         let order = reg.load_order.clone();
         let pos_a = order.iter().position(|id| id == "A").expect("element A must be in load_order");
@@ -313,7 +313,7 @@ mod tests {
         let mut reg = ElementRegistry::new();
         let e = Box::new(TestElement::new("orphan", "Orphan", vec!["missing"]));
         reg.register(e).expect("register orphan element should succeed");
-        let result = reg.resolve_and_init();
+        let result = reg._resolve_and_init();
         assert!(result.is_err());
     }
 
@@ -392,7 +392,7 @@ mod tests {
         // Try to start without initializing
         let e = Box::new(TestElement::new("bad-start", "Bad", vec![]));
         reg.register(e).expect("register element for wrong-state test");
-        let result = reg.start_all();
+        let result = reg._start_all();
         assert!(result.is_err());
     }
 }

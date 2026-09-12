@@ -19,22 +19,22 @@ pub struct ModelRouter {
     providers: HashMap<String, Provider>,
     models: HashMap<String, ModelInfo>,
     #[allow(dead_code)]
-    routing_table: RoutingTable,
+    routing_table: _RoutingTable,
     stats: RouterStats,
 }
 
 /// 路由配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RoutingTable {
+pub(crate) struct _RoutingTable {
     pub task_routes: HashMap<String, String>,
     pub fallback_chain: Vec<String>,
-    pub cost_weights: CostWeights,
-    pub latency_weights: LatencyWeights,
+    pub cost_weights: _CostWeights,
+    pub latency_weights: _LatencyWeights,
 }
 
 /// 成本权重
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CostWeights {
+pub(crate) struct _CostWeights {
     pub input_token_cost: f64,
     pub output_token_cost: f64,
     pub fixed_cost: f64,
@@ -42,7 +42,7 @@ pub struct CostWeights {
 
 /// 延迟权重
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LatencyWeights {
+pub(crate) struct _LatencyWeights {
     pub first_token_latency: f64,
     pub throughput: f64,
     pub p99_latency: f64,
@@ -112,15 +112,15 @@ impl ModelRouter {
         Self {
             providers: HashMap::new(),
             models: HashMap::new(),
-            routing_table: RoutingTable {
+            routing_table: _RoutingTable {
                 task_routes: HashMap::new(),
                 fallback_chain: vec!["openai".into(), "anthropic".into(), "local".into()],
-                cost_weights: CostWeights {
+                cost_weights: _CostWeights {
                     input_token_cost: 1.0,
                     output_token_cost: 1.0,
                     fixed_cost: 0.0,
                 },
-                latency_weights: LatencyWeights {
+                latency_weights: _LatencyWeights {
                     first_token_latency: 1.0,
                     throughput: 0.5,
                     p99_latency: 0.3,
@@ -148,7 +148,7 @@ impl ModelRouter {
     }
 
     /// 路由请求
-    pub fn route(&mut self, task_type: &str, requirements: &RoutingRequirements) -> Result<RoutingResult, String> {
+    pub fn route(&mut self, task_type: &str, requirements: &_RoutingRequirements) -> Result<RoutingResult, String> {
         self.stats.total_requests += 1;
 
         // 查找适合任务类型的模型
@@ -196,7 +196,7 @@ impl ModelRouter {
     }
 
     /// 计算模型分数
-    fn calculate_score(&self, model: &ModelInfo, requirements: &RoutingRequirements) -> f64 {
+    fn calculate_score(&self, model: &ModelInfo, requirements: &_RoutingRequirements) -> f64 {
         let mut score = 0.0;
 
         // 质量分数
@@ -219,7 +219,7 @@ impl ModelRouter {
     }
 
     /// 估算成本
-    fn estimate_cost(&self, model: &ModelInfo, requirements: &RoutingRequirements) -> f64 {
+    fn estimate_cost(&self, model: &ModelInfo, requirements: &_RoutingRequirements) -> f64 {
         let input_tokens = requirements.estimated_input_tokens as f64;
         let output_tokens = requirements.estimated_output_tokens as f64;
 
@@ -235,7 +235,7 @@ impl ModelRouter {
 
 /// 路由需求
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RoutingRequirements {
+pub(crate) struct _RoutingRequirements {
     pub task_type: String,
     pub required_capabilities: Vec<String>,
     pub max_cost: Option<f64>,
@@ -249,7 +249,7 @@ pub struct RoutingRequirements {
 /// Implements Axiom A1 (Cost-Aware Routing): not all tasks need the strongest
 /// model. Simple tasks route to cheap models, complex tasks to powerful ones.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskDifficulty {
+pub(crate) enum _TaskDifficulty {
     /// Simple factual queries, format conversions, short answers.
     /// Target: cheapest capable model.
     Trivial,
@@ -267,10 +267,10 @@ pub enum TaskDifficulty {
     Expert,
 }
 
-impl TaskDifficulty {
+impl _TaskDifficulty {
     /// Cost sensitivity factor: 0.0 = ignore cost, 1.0 = maximize savings.
     /// Higher difficulty → lower sensitivity (quality matters more).
-    pub fn cost_sensitivity(&self) -> f64 {
+    pub(crate) fn _cost_sensitivity(&self) -> f64 {
         match self {
             Self::Trivial => 0.9,
             Self::Easy => 0.7,
@@ -281,7 +281,7 @@ impl TaskDifficulty {
     }
 
     /// Maximum acceptable cost multiplier relative to cheapest option.
-    pub fn max_cost_multiplier(&self) -> f64 {
+    pub(crate) fn _max_cost_multiplier(&self) -> f64 {
         match self {
             Self::Trivial => 1.2,
             Self::Easy => 2.0,
@@ -333,17 +333,17 @@ impl ModelRouter {
     /// Filters models by minimum quality threshold, then scores with
     /// difficulty-adjusted cost sensitivity. Cheap models are preferred
     /// for trivial tasks; powerful models for expert tasks.
-    pub fn difficulty_route(
+    pub(crate) fn _difficulty_route(
         &mut self,
         _task_type: &str,
-        requirements: &RoutingRequirements,
-        difficulty: TaskDifficulty,
+        requirements: &_RoutingRequirements,
+        difficulty: _TaskDifficulty,
     ) -> Result<RoutingResult, String> {
         self.stats.total_requests += 1;
 
         let min_quality = difficulty.min_quality();
-        let max_cost_mult = difficulty.max_cost_multiplier();
-        let cost_sensitivity = difficulty.cost_sensitivity();
+        let max_cost_mult = difficulty._max_cost_multiplier();
+        let _cost_sensitivity = difficulty._cost_sensitivity();
 
         // Find candidates meeting minimum quality
         let candidates: Vec<&ModelInfo> = self.models.values()
@@ -378,9 +378,9 @@ impl ModelRouter {
                     return None;
                 }
 
-                // Score = quality × (1 - cost_sensitivity × normalized_cost)
+                // Score = quality × (1 - _cost_sensitivity × normalized_cost)
                 let normalized_cost = cost_ratio.min(max_cost_mult) / max_cost_mult;
-                let score = model.quality_score * (1.0 - cost_sensitivity * normalized_cost);
+                let score = model.quality_score * (1.0 - _cost_sensitivity * normalized_cost);
 
                 Some((*model, score))
             })
@@ -404,8 +404,8 @@ impl ModelRouter {
                 estimated_latency: best_model.avg_latency_ms,
                 confidence: *score,
                 reason: format!(
-                    "Difficulty {:?}: quality>={:.2}, cost_sensitivity={:.1}, model={}",
-                    difficulty, min_quality, cost_sensitivity, best_model.name
+                    "Difficulty {:?}: quality>={:.2}, _cost_sensitivity={:.1}, model={}",
+                    difficulty, min_quality, _cost_sensitivity, best_model.name
                 ),
             };
 
@@ -420,17 +420,17 @@ impl ModelRouter {
     }
 
     /// Auto-estimate difficulty and route.
-    pub fn auto_route(
+    pub(crate) fn _auto_route(
         &mut self,
         task_type: &str,
-        requirements: &RoutingRequirements,
+        requirements: &_RoutingRequirements,
     ) -> Result<RoutingResult, String> {
-        let difficulty = TaskDifficulty::estimate(
+        let difficulty = _TaskDifficulty::estimate(
             task_type,
             requirements.estimated_input_tokens,
             requirements.estimated_output_tokens,
         );
-        self.difficulty_route(task_type, requirements, difficulty)
+        self._difficulty_route(task_type, requirements, difficulty)
     }
 }
 
@@ -476,8 +476,8 @@ mod difficulty_tests {
         router
     }
 
-    fn req() -> RoutingRequirements {
-        RoutingRequirements {
+    fn req() -> _RoutingRequirements {
+        _RoutingRequirements {
             task_type: "qa".into(),
             required_capabilities: vec!["text".into()],
             max_cost: None,
@@ -490,41 +490,41 @@ mod difficulty_tests {
     #[test]
     fn test_trivial_uses_cheapest() {
         let mut router = test_router();
-        let result = router.difficulty_route("qa", &req(), TaskDifficulty::Trivial).unwrap();
+        let result = router._difficulty_route("qa", &req(), _TaskDifficulty::Trivial).unwrap();
         assert_eq!(result.model_id, "cheap-v1");
     }
 
     #[test]
     fn test_expensive_task_uses_best() {
         let mut router = test_router();
-        let result = router.difficulty_route("security audit", &req(), TaskDifficulty::Expert).unwrap();
+        let result = router._difficulty_route("security audit", &req(), _TaskDifficulty::Expert).unwrap();
         assert_eq!(result.model_id, "premium-v1");
     }
 
     #[test]
     fn test_medium_balances_cost_quality() {
         let mut router = test_router();
-        let result = router.difficulty_route("code", &req(), TaskDifficulty::Medium).unwrap();
+        let result = router._difficulty_route("code", &req(), _TaskDifficulty::Medium).unwrap();
         // Should pick mid or premium based on quality threshold
         assert!(result.model_id == "mid-v1" || result.model_id == "premium-v1");
     }
 
     #[test]
     fn test_difficulty_estimate_trivial() {
-        let d = TaskDifficulty::estimate("simple_qa", 50, 20);
-        assert_eq!(d, TaskDifficulty::Trivial);
+        let d = _TaskDifficulty::estimate("simple_qa", 50, 20);
+        assert_eq!(d, _TaskDifficulty::Trivial);
     }
 
     #[test]
     fn test_difficulty_estimate_expert() {
-        let d = TaskDifficulty::estimate("security audit", 1000, 500);
-        assert_eq!(d, TaskDifficulty::Expert);
+        let d = _TaskDifficulty::estimate("security audit", 1000, 500);
+        assert_eq!(d, _TaskDifficulty::Expert);
     }
 
     #[test]
     fn test_difficulty_estimate_by_token_count() {
-        let d = TaskDifficulty::estimate("general", 60_000, 10_000);
-        assert_eq!(d, TaskDifficulty::Hard);
+        let d = _TaskDifficulty::estimate("general", 60_000, 10_000);
+        assert_eq!(d, _TaskDifficulty::Hard);
     }
 
     #[test]
@@ -532,13 +532,13 @@ mod difficulty_tests {
         let mut router = test_router();
         let mut r = req();
         r.task_type = "simple_qa".into();
-        let result = router.auto_route("simple_qa", &r).unwrap();
+        let result = router._auto_route("simple_qa", &r).unwrap();
         assert_eq!(result.model_id, "cheap-v1");
     }
 
     #[test]
     fn test_cost_sensitivity_decreases_with_difficulty() {
-        assert!(TaskDifficulty::Trivial.cost_sensitivity() > TaskDifficulty::Hard.cost_sensitivity());
-        assert!(TaskDifficulty::Easy.cost_sensitivity() > TaskDifficulty::Expert.cost_sensitivity());
+        assert!(_TaskDifficulty::Trivial._cost_sensitivity() > _TaskDifficulty::Hard._cost_sensitivity());
+        assert!(_TaskDifficulty::Easy._cost_sensitivity() > _TaskDifficulty::Expert._cost_sensitivity());
     }
 }

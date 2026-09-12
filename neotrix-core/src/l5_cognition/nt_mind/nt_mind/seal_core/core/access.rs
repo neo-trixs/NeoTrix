@@ -21,7 +21,7 @@ impl AccessContext {
         }
     }
 
-    pub fn with_task_type(mut self, task_type: &str) -> Self {
+    pub(crate) fn _with_task_type(mut self, task_type: &str) -> Self {
         self.task_type = Some(task_type.to_string());
         self
     }
@@ -39,7 +39,7 @@ impl Default for AccessContext {
     }
 }
 
-pub fn route_sources_by_context<'a>(
+pub(crate) fn _route_sources_by_context<'a>(
     sources: &'a [KnowledgeSource],
     context: &AccessContext,
     _task_type: Option<&str>,
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn test_access_context_with_task_type() {
-        let ctx = AccessContext::new("bob", 0.5).with_task_type("code_review");
+        let ctx = AccessContext::new("bob", 0.5)._with_task_type("code_review");
         assert_eq!(ctx.task_type, Some("code_review".to_string()));
     }
 
@@ -103,7 +103,7 @@ mod tests {
             KnowledgeSource::BaseUI,
         ];
         let ctx = AccessContext::new("untrusted", 0.2);
-        let routed = route_sources_by_context(&sources, &ctx, None);
+        let routed = _route_sources_by_context(&sources, &ctx, None);
         assert_eq!(routed.len(), 1);
         assert_eq!(*routed[0], KnowledgeSource::DesignPhilosophy);
     }
@@ -117,7 +117,7 @@ mod tests {
             KnowledgeSource::ArcUI,
         ];
         let ctx = AccessContext::new("semi_trusted", 0.5);
-        let routed = route_sources_by_context(&sources, &ctx, None);
+        let routed = _route_sources_by_context(&sources, &ctx, None);
         assert_eq!(routed.len(), 2);
         assert!(routed.contains(&&KnowledgeSource::DesignPhilosophy));
         assert!(routed.contains(&&KnowledgeSource::BaseUI));
@@ -132,7 +132,7 @@ mod tests {
             KnowledgeSource::CortexUI,
         ];
         let ctx = AccessContext::new("trusted", 0.9);
-        let routed = route_sources_by_context(&sources, &ctx, None);
+        let routed = _route_sources_by_context(&sources, &ctx, None);
         assert_eq!(routed.len(), 4);
     }
 
@@ -145,7 +145,7 @@ mod tests {
             KnowledgeSource::Hyperframes,
         ];
         let ctx = AccessContext { max_sources: 3, ..AccessContext::default() };
-        let routed = route_sources_by_context(&sources, &ctx, None);
+        let routed = _route_sources_by_context(&sources, &ctx, None);
         assert_eq!(routed.len(), 3);
     }
 
@@ -153,7 +153,7 @@ mod tests {
     fn test_route_sources_empty_sources() {
         let sources: Vec<KnowledgeSource> = vec![];
         let ctx = AccessContext::default();
-        let routed = route_sources_by_context(&sources, &ctx, None);
+        let routed = _route_sources_by_context(&sources, &ctx, None);
         assert!(routed.is_empty());
     }
 
@@ -161,7 +161,7 @@ mod tests {
     fn test_route_sources_low_trust_with_no_design_philosophy() {
         let sources = vec![KnowledgeSource::HeroUI, KnowledgeSource::BaseUI];
         let ctx = AccessContext::new("untrusted", 0.2);
-        let routed = route_sources_by_context(&sources, &ctx, None);
+        let routed = _route_sources_by_context(&sources, &ctx, None);
         assert!(routed.is_empty());
     }
 
@@ -172,7 +172,7 @@ mod tests {
             KnowledgeSource::DesignPhilosophy,
         ];
         let ctx = AccessContext::new("boundary", 0.3);
-        let routed = route_sources_by_context(&sources, &ctx, None);
+        let routed = _route_sources_by_context(&sources, &ctx, None);
         assert_eq!(routed.len(), 1);
         assert_eq!(*routed[0], KnowledgeSource::DesignPhilosophy);
     }
@@ -185,7 +185,7 @@ mod tests {
             KnowledgeSource::DesignPhilosophy,
         ];
         let ctx = AccessContext::new("boundary", 0.7);
-        let routed = route_sources_by_context(&sources, &ctx, None);
+        let routed = _route_sources_by_context(&sources, &ctx, None);
         assert_eq!(routed.len(), 3);
     }
 }

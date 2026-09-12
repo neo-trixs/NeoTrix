@@ -10,18 +10,18 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// FSM 行为拓扑引擎
-pub struct FSMBehaviorTopologyEngine {
-    states: Vec<FSMState>,
-    transitions: Vec<FSMTransition>,
-    predictions: Vec<BehaviorPrediction>,
+pub(crate) struct _FSMBehaviorTopologyEngine {
+    states: Vec<_FSMState>,
+    transitions: Vec<_FSMTransition>,
+    predictions: Vec<_BehaviorPrediction>,
     #[allow(dead_code)]
-    config: FSMConfig,
-    stats: FSMStats,
+    config: _FSMConfig,
+    stats: _FSMStats,
 }
 
 /// FSM 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FSMConfig {
+pub(crate) struct _FSMConfig {
     pub max_states: usize,
     pub max_transitions: usize,
     pub prediction_horizon: u32,
@@ -29,7 +29,7 @@ pub struct FSMConfig {
     pub enable_goal_prediction: bool,
 }
 
-impl Default for FSMConfig {
+impl Default for _FSMConfig {
     fn default() -> Self {
         Self {
             max_states: 100,
@@ -43,18 +43,18 @@ impl Default for FSMConfig {
 
 /// FSM 状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FSMState {
+pub(crate) struct _FSMState {
     pub state_id: String,
     pub name: String,
-    pub state_type: StateType,
-    pub metrics: StateMetrics,
+    pub state_type: _StateType,
+    pub metrics: _StateMetrics,
     pub metadata: HashMap<String, String>,
 }
 
 /// 状态类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum StateType {
+pub(crate) enum _StateType {
     Initial,
     Normal,
     Warning,
@@ -64,7 +64,7 @@ pub enum StateType {
 
 /// 状态指标
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StateMetrics {
+pub(crate) struct _StateMetrics {
     pub visit_count: u64,
     pub avg_duration: f64,
     pub success_rate: f64,
@@ -73,7 +73,7 @@ pub struct StateMetrics {
 
 /// FSM 转换
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FSMTransition {
+pub(crate) struct _FSMTransition {
     pub transition_id: String,
     pub from_state: String,
     pub to_state: String,
@@ -84,19 +84,19 @@ pub struct FSMTransition {
 
 /// 行为预测
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BehaviorPrediction {
+pub(crate) struct _BehaviorPrediction {
     pub prediction_id: String,
     pub current_state: String,
     pub predicted_states: Vec<String>,
     pub confidence: f64,
-    pub prediction_type: PredictionType,
+    pub prediction_type: _PredictionType,
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 /// 预测类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PredictionType {
+pub(crate) enum _PredictionType {
     NextState,
     Failure,
     Goal,
@@ -105,7 +105,7 @@ pub enum PredictionType {
 
 /// FSM 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FSMStats {
+pub(crate) struct _FSMStats {
     pub total_states: u64,
     pub total_transitions: u64,
     pub total_predictions: u64,
@@ -114,15 +114,15 @@ pub struct FSMStats {
     pub avg_prediction_accuracy: f64,
 }
 
-impl FSMBehaviorTopologyEngine {
+impl _FSMBehaviorTopologyEngine {
     /// 创建新的 FSM 行为拓扑引擎
     pub fn new() -> Self {
         Self {
             states: Vec::new(),
             transitions: Vec::new(),
             predictions: Vec::new(),
-            config: FSMConfig::default(),
-            stats: FSMStats {
+            config: _FSMConfig::default(),
+            stats: _FSMStats {
                 total_states: 0,
                 total_transitions: 0,
                 total_predictions: 0,
@@ -134,20 +134,20 @@ impl FSMBehaviorTopologyEngine {
     }
 
     /// 添加状态
-    pub fn add_state(&mut self, state: FSMState) {
+    pub fn add_state(&mut self, state: _FSMState) {
         self.states.push(state);
         self.stats.total_states += 1;
     }
 
     /// 添加转换
-    pub fn add_transition(&mut self, transition: FSMTransition) {
+    pub fn add_transition(&mut self, transition: _FSMTransition) {
         self.transitions.push(transition);
         self.stats.total_transitions += 1;
     }
 
     /// 预测下一个状态
-    pub fn predict_next_state(&mut self, current_state: &str) -> Option<BehaviorPrediction> {
-        let possible_transitions: Vec<&FSMTransition> = self.transitions
+    pub fn predict_next_state(&mut self, current_state: &str) -> Option<_BehaviorPrediction> {
+        let possible_transitions: Vec<&_FSMTransition> = self.transitions
             .iter()
             .filter(|t| t.from_state == current_state)
             .collect();
@@ -161,12 +161,12 @@ impl FSMBehaviorTopologyEngine {
             .iter()
             .max_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap())?;
 
-        let prediction = BehaviorPrediction {
+        let prediction = _BehaviorPrediction {
             prediction_id: uuid::Uuid::new_v4().to_string(),
             current_state: current_state.to_string(),
             predicted_states: vec![best_transition.to_state.clone()],
             confidence: best_transition.probability,
-            prediction_type: PredictionType::NextState,
+            prediction_type: _PredictionType::NextState,
             timestamp: chrono::Utc::now(),
         };
 
@@ -179,11 +179,11 @@ impl FSMBehaviorTopologyEngine {
     /// 预测失败
     pub fn predict_failure(&self, current_state: &str) -> Option<f64> {
         // 查找从当前状态到失败状态的转换
-        let failure_transitions: Vec<&FSMTransition> = self.transitions
+        let failure_transitions: Vec<&_FSMTransition> = self.transitions
             .iter()
             .filter(|t| {
                 t.from_state == current_state && 
-                self.states.iter().any(|s| s.state_id == t.to_state && s.state_type == StateType::Critical)
+                self.states.iter().any(|s| s.state_id == t.to_state && s.state_type == _StateType::Critical)
             })
             .collect();
 
@@ -200,17 +200,17 @@ impl FSMBehaviorTopologyEngine {
     }
 
     /// 获取所有状态
-    pub fn states(&self) -> &[FSMState] {
+    pub fn states(&self) -> &[_FSMState] {
         &self.states
     }
 
     /// 获取所有转换
-    pub fn transitions(&self) -> &[FSMTransition] {
+    pub fn transitions(&self) -> &[_FSMTransition] {
         &self.transitions
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &FSMStats {
+    pub fn stats(&self) -> &_FSMStats {
         &self.stats
     }
 }

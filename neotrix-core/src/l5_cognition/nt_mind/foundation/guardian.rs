@@ -3,7 +3,7 @@
 //! 由 shell 脚本 Rust 化而来 (cycle 207 事故教训):
 //!   - kb-guard.sh      → KbGuard        (KB 备份/校验/自动恢复)
 //!   - workspace-guard.sh → WorkspaceGuard (git 工作区异常检测)
-//!   - file-edit-safety.sh → FileEditSafety (编辑前备份 + 完整性校验)
+//!   - file-edit-safety.sh → _FileEditSafety (编辑前备份 + 完整性校验)
 //!
 //! 接入点: BackgroundLoop 的 spawn_handler! (每 10min guard / 每 6h backup)。
 //! 设计原则:
@@ -126,18 +126,18 @@ fn find_latest_backup(dir: &Path) -> Option<PathBuf> {
 // ═══════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub struct KbGuardConfig {
+pub(crate) struct _KbGuardConfig {
     pub keep_n: usize,
 }
 
-impl Default for KbGuardConfig {
+impl Default for _KbGuardConfig {
     fn default() -> Self {
         Self { keep_n: 10 }
     }
 }
 
 #[derive(Debug, Default)]
-pub struct KbGuardReport {
+pub(crate) struct _KbGuardReport {
     pub backed_up: bool,
     pub restored: bool,
     pub backup_path: Option<PathBuf>,
@@ -147,11 +147,11 @@ pub struct KbGuardReport {
 /// KB 守卫: 备份/校验/恢复
 #[derive(Debug, Default)]
 pub struct KbGuard {
-    config: KbGuardConfig,
+    config: _KbGuardConfig,
 }
 
 impl KbGuard {
-    pub fn new(config: KbGuardConfig) -> Self {
+    pub fn new(config: _KbGuardConfig) -> Self {
         Self { config }
     }
 
@@ -225,7 +225,7 @@ impl KbGuard {
     }
 
     /// 从最近备份恢复主库
-    pub fn restore_latest(&self) -> Result<(), String> {
+    pub(crate) fn _restore_latest(&self) -> Result<(), String> {
         let dir = backup_root();
         let latest = find_latest_backup(&dir)
             .ok_or_else(|| format!("no backup found in {}", dir.display()))?;
@@ -240,14 +240,14 @@ impl KbGuard {
     }
 
     /// 守卫主流程: 健康则无事, 缺失/损坏则自动恢复
-    pub fn guard(&self) -> KbGuardReport {
+    pub fn guard(&self) -> _KbGuardReport {
         let src = kb_path();
-        let mut report = KbGuardReport::default();
+        let mut report = _KbGuardReport::default();
         if db_healthy_fast(&src) {
             report.healthy = true;
             return report;
         }
-        match self.restore_latest() {
+        match self._restore_latest() {
             Ok(()) => {
                 report.restored = true;
                 report.healthy = db_healthy(&src);
@@ -303,7 +303,7 @@ pub struct MetricEval {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MapeVerdict {
+pub(crate) struct _MapeVerdict {
     pub candidate: String,
     pub evaluations: u32,
     pub accepted: bool,
@@ -340,7 +340,7 @@ impl MapeGate {
     }
 
     /// 测试/可注入状态目录 (隔离真实备份域)
-    pub fn with_state_dir(config: MapeGateConfig, state_dir: PathBuf) -> Self {
+    pub(crate) fn _with_state_dir(config: MapeGateConfig, state_dir: PathBuf) -> Self {
         Self { config, state_dir }
     }
 
@@ -376,10 +376,10 @@ impl MapeGate {
 
     /// 记录一次评估, 累计 burn-in; 达到阈值晋升, 未达回滚。幂等: 同一 candidate
     /// 晋升后不再重复晋升 (committed 标记)。
-    pub fn evaluate(&mut self, candidate: &str, metrics: Vec<MetricEval>) -> MapeVerdict {
+    pub fn evaluate(&mut self, candidate: &str, metrics: Vec<MetricEval>) -> _MapeVerdict {
         let mut state = self.load(candidate);
         if state.committed {
-            return MapeVerdict {
+            return _MapeVerdict {
                 candidate: candidate.to_string(),
                 evaluations: state.evaluations,
                 accepted: true,
@@ -401,7 +401,7 @@ impl MapeGate {
             if avg_pass >= self.config.min_metrics_pass as f64 && last_pass >= self.config.min_metrics_pass {
                 state.committed = true;
                 self.save(candidate, &state);
-                return MapeVerdict {
+                return _MapeVerdict {
                     candidate: candidate.to_string(),
                     evaluations: state.evaluations,
                     accepted: true,
@@ -411,7 +411,7 @@ impl MapeGate {
                     note: format!("burn-in complete, avg_pass={:.2} → promoted", avg_pass),
                 };
             }
-            let verdict = MapeVerdict {
+            let verdict = _MapeVerdict {
                 candidate: candidate.to_string(),
                 evaluations: state.evaluations,
                 accepted: false,
@@ -426,7 +426,7 @@ impl MapeGate {
 
         // burn-in 早期提前回滚: 连续从未通过任何指标且已采样 ≥3 次 → 不值得继续
         if state.pass_count == 0 && state.evaluations >= 3 {
-            let verdict = MapeVerdict {
+            let verdict = _MapeVerdict {
                 candidate: candidate.to_string(),
                 evaluations: state.evaluations,
                 accepted: false,
@@ -440,7 +440,7 @@ impl MapeGate {
         }
 
         self.save(candidate, &state);
-        MapeVerdict {
+        _MapeVerdict {
             candidate: candidate.to_string(),
             evaluations: state.evaluations,
             accepted: true,
@@ -463,14 +463,14 @@ impl MapeGate {
 // ═══════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub struct WorkspaceGuardConfig {
+pub(crate) struct _WorkspaceGuardConfig {
     pub repo_root: PathBuf,
     pub snapshot_dir: PathBuf,
     pub max_snapshots: usize,
 }
 
 #[derive(Debug, Default)]
-pub struct WorkspaceGuardReport {
+pub(crate) struct _WorkspaceGuardReport {
     pub staged_lost: bool,
     pub modified_reverted: bool,
     pub prev_staged: usize,
@@ -482,17 +482,17 @@ pub struct WorkspaceGuardReport {
 /// 工作区守卫: 检测 git status 未预期清空 (R-P53 并发 reset 盲区)
 #[derive(Debug)]
 pub struct WorkspaceGuard {
-    config: WorkspaceGuardConfig,
+    config: _WorkspaceGuardConfig,
 }
 
 impl WorkspaceGuard {
-    pub fn new(config: WorkspaceGuardConfig) -> Self {
+    pub fn new(config: _WorkspaceGuardConfig) -> Self {
         Self { config }
     }
 
     pub fn default_for(repo_root: PathBuf) -> Self {
         Self {
-            config: WorkspaceGuardConfig {
+            config: _WorkspaceGuardConfig {
                 repo_root,
                 snapshot_dir: PathBuf::from("/tmp/neotrix-ws-guard"),
                 max_snapshots: 10,
@@ -523,8 +523,8 @@ impl WorkspaceGuard {
     }
 
     /// 对比前后快照, 检测 staged 文件消失 / modified 被还原
-    pub fn check(&mut self) -> WorkspaceGuardReport {
-        let mut report = WorkspaceGuardReport::default();
+    pub fn check(&mut self) -> _WorkspaceGuardReport {
+        let mut report = _WorkspaceGuardReport::default();
         let curr = match self.git_status_short() {
             Ok(s) => s,
             Err(_) => return report,
@@ -585,11 +585,11 @@ impl WorkspaceGuard {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// FileEditSafety — 编辑前备份 + 完整性校验
+// _FileEditSafety — 编辑前备份 + 完整性校验
 // ═══════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Default)]
-pub struct FileEditSafetyReport {
+pub(crate) struct _FileEditSafetyReport {
     pub backed_up: bool,
     pub backup_path: Option<PathBuf>,
     pub verified: bool,
@@ -597,13 +597,13 @@ pub struct FileEditSafetyReport {
 
 /// 文件编辑安全: 编辑前备份原文件, 编辑后校验行数
 #[derive(Debug, Default)]
-pub struct FileEditSafety;
+pub(crate) struct _FileEditSafety;
 
-impl FileEditSafety {
+impl _FileEditSafety {
     /// 编辑前备份 (原子写)
-    pub fn protect_file(&self, file: &Path) -> Result<FileEditSafetyReport, String> {
+    pub(crate) fn _protect_file(&self, file: &Path) -> Result<_FileEditSafetyReport, String> {
         if !file.is_file() {
-            return Ok(FileEditSafetyReport::default());
+            return Ok(_FileEditSafetyReport::default());
         }
         let dir = PathBuf::from(std::env::var("NEOTRIX_SAFETY_BACKUP_DIR")
             .unwrap_or_else(|_| "/tmp/neotrix-edit-backups".into()));
@@ -611,7 +611,7 @@ impl FileEditSafety {
         let safe_name = file.to_string_lossy().replace('/', "_");
         let dst = dir.join(format!("{safe_name}.bak"));
         fs::copy(file, &dst).map_err(|e| format!("backup copy: {e}"))?;
-        Ok(FileEditSafetyReport {
+        Ok(_FileEditSafetyReport {
             backed_up: true,
             backup_path: Some(dst),
             verified: true,
@@ -619,7 +619,7 @@ impl FileEditSafety {
     }
 
     /// 编辑后校验: 文件存在且行数 >= 期望
-    pub fn verify_file(&self, file: &Path, min_lines: usize) -> Result<FileEditSafetyReport, String> {
+    pub(crate) fn _verify_file(&self, file: &Path, min_lines: usize) -> Result<_FileEditSafetyReport, String> {
         if !file.is_file() {
             return Err(format!("file {} no longer exists", file.display()));
         }
@@ -631,7 +631,7 @@ impl FileEditSafety {
                 file.display()
             ));
         }
-        Ok(FileEditSafetyReport {
+        Ok(_FileEditSafetyReport {
             verified: true,
             ..Default::default()
         })
@@ -661,7 +661,7 @@ mod tests {
             std::process::id()
         ));
         std::env::set_var("HOME", &test_home);
-        let guard = KbGuard::new(KbGuardConfig { keep_n: 3 });
+        let guard = KbGuard::new(_KbGuardConfig { keep_n: 3 });
         let report = guard.guard();
         // 无备份可恢复, 但不应 panic
         assert!(!report.healthy);
@@ -689,7 +689,7 @@ mod tests {
         assert!(db_healthy(&kb));
 
         std::env::set_var("HOME", &test_home);
-        let guard = KbGuard::new(KbGuardConfig { keep_n: 3 });
+        let guard = KbGuard::new(_KbGuardConfig { keep_n: 3 });
 
         // 备份
         let backup_path = guard.backup().expect("backup should succeed");
@@ -762,7 +762,7 @@ mod tests {
 
         // rotate 应清理坏文件
         std::env::set_var("HOME", &test_home);
-        let guard = KbGuard::new(KbGuardConfig { keep_n: 10 });
+        let guard = KbGuard::new(_KbGuardConfig { keep_n: 10 });
         guard.rotate(&bdir);
         assert!(!bad_empty.exists(), "0-byte corrupt backup must be cleaned");
         assert!(!bad_noschema.exists(), "noschema corrupt backup must be cleaned");
@@ -784,17 +784,17 @@ mod tests {
     fn test_file_edit_safety_verify_truncated() {
         let tmp = std::env::temp_dir().join("neotrix-edit-safety-test.txt");
         fs::write(&tmp, "line1\nline2\n").unwrap();
-        let safety = FileEditSafety;
-        let r = safety.verify_file(&tmp, 5);
+        let safety = _FileEditSafety;
+        let r = safety._verify_file(&tmp, 5);
         assert!(r.is_err());
-        let r2 = safety.verify_file(&tmp, 1);
+        let r2 = safety._verify_file(&tmp, 1);
         assert!(r2.is_ok());
         let _ = fs::remove_file(&tmp);
     }
 
     #[test]
     fn test_mape_gate_burn_in_promotes_good_candidate() {
-        let mut gate = MapeGate::with_state_dir(
+        let mut gate = MapeGate::_with_state_dir(
             MapeGateConfig {
                 burn_in_cycles: 3,
                 min_metrics_pass: 2,
@@ -821,7 +821,7 @@ mod tests {
 
     #[test]
     fn test_mape_gate_early_rollback_on_persistent_failure() {
-        let mut gate = MapeGate::with_state_dir(
+        let mut gate = MapeGate::_with_state_dir(
             MapeGateConfig {
                 burn_in_cycles: 10,
                 min_metrics_pass: 2,
@@ -845,7 +845,7 @@ mod tests {
 
     #[test]
     fn test_mape_gate_rollback_on_burn_in_underperformance() {
-        let mut gate = MapeGate::with_state_dir(
+        let mut gate = MapeGate::_with_state_dir(
             MapeGateConfig {
                 burn_in_cycles: 3,
                 min_metrics_pass: 2,
@@ -868,7 +868,7 @@ mod tests {
 
     #[test]
     fn test_mape_gate_state_isolated_per_candidate() {
-        let mut gate = MapeGate::with_state_dir(
+        let mut gate = MapeGate::_with_state_dir(
             MapeGateConfig {
                 burn_in_cycles: 2,
                 min_metrics_pass: 1,

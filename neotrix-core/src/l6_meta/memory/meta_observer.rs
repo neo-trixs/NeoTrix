@@ -35,7 +35,7 @@ impl Default for MetaObserverConfig {
 
 /// 单分支元观察项
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BranchObservation {
+pub(crate) struct _BranchObservation {
     pub branch: String,
     pub health: f64,
     pub fog: f64,
@@ -54,7 +54,7 @@ pub struct MetaObservationReport {
     /// GWT 谐振是否激活
     pub gwt_resonance_active: bool,
     /// 分支观察明细
-    pub branches: Vec<BranchObservation>,
+    pub branches: Vec<_BranchObservation>,
     /// 观察失真标志 (低相干性 → 观察不可靠)
     pub observation_distorted: bool,
     /// 元观察置信度
@@ -90,7 +90,7 @@ impl MetaObserver {
                 } else {
                     health.abs().min(1.0)
                 };
-                BranchObservation {
+                _BranchObservation {
                     branch: branch.clone(),
                     health,
                     fog,

@@ -25,10 +25,10 @@ pub enum EmotionLabel {
 
 /// 情绪信号 — 从文本/语音/视觉检测
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmotionSignal {
+pub(crate) struct _EmotionSignal {
     pub label: EmotionLabel,
     pub intensity: f64, // 0.0 - 1.0
-    pub source: SignalSource,
+    pub source: _SignalSource,
     pub raw_input: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
@@ -36,7 +36,7 @@ pub struct EmotionSignal {
 /// 信号来源
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SignalSource {
+pub(crate) enum _SignalSource {
     Text,
     Voice,
     Visual,
@@ -76,8 +76,8 @@ pub struct VoiceConfig {
 /// 情感调节结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegulationResult {
-    pub original: EmotionSignal,
-    pub regulated: EmotionSignal,
+    pub original: _EmotionSignal,
+    pub regulated: _EmotionSignal,
     pub strategy: RegulationStrategy,
     pub reason: String,
 }
@@ -99,29 +99,29 @@ pub trait EmotionLayer: Send + Sync {
     fn initialize(&mut self) -> Result<(), String>;
 
     /// 从文本检测情绪 (基础, FeelEngine 已有)
-    fn detect_from_text(&self, text: &str) -> EmotionSignal;
+    fn detect_from_text(&self, text: &str) -> _EmotionSignal;
 
     /// 从语音检测情绪 (Open-LLM-VTuber 吸收)
-    fn detect_from_voice(&self, audio: &[u8]) -> Result<EmotionSignal, String>;
+    fn detect_from_voice(&self, audio: &[u8]) -> Result<_EmotionSignal, String>;
 
     /// 从视觉检测情绪 (Open-LLM-VTuber 吸收)
-    fn detect_from_visual(&self, image: &[u8]) -> Result<EmotionSignal, String>;
+    fn detect_from_visual(&self, image: &[u8]) -> Result<_EmotionSignal, String>;
 
     /// 情绪调节 (FeelEngine 已有, 扩展)
-    fn regulate(&self, signal: EmotionSignal) -> RegulationResult;
+    fn regulate(&self, signal: _EmotionSignal) -> RegulationResult;
 
     /// 应用角色人格 (Open-LLM-VTuber 吸收)
     fn apply_persona(
         &self,
-        signal: EmotionSignal,
+        signal: _EmotionSignal,
         persona: &CharacterPersona,
-    ) -> EmotionSignal;
+    ) -> _EmotionSignal;
 
     /// TTS 输出 — 情绪驱动语音合成 (Open-LLM-VTuber 吸收)
     fn synthesize_speech(
         &self,
         text: &str,
-        emotion: &EmotionSignal,
+        emotion: &_EmotionSignal,
         voice: &VoiceConfig,
     ) -> Result<Vec<u8>, String>;
 

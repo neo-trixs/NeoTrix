@@ -77,7 +77,7 @@ impl KnowledgeEntry {
         self.tags = tags; self
     }
 
-    pub fn with_dimensions(mut self, dims: Vec<String>) -> Self {
+    pub(crate) fn _with_dimensions(mut self, dims: Vec<String>) -> Self {
         self.dimensions = dims; self
     }
 

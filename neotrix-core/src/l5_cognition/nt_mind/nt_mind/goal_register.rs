@@ -44,7 +44,7 @@ impl Goal {
     }
 
     /// Whether the goal is fully achieved.
-    pub fn is_achieved(&self) -> bool {
+    pub(crate) fn _is_achieved(&self) -> bool {
         self.current >= self.target
     }
 }
@@ -100,18 +100,18 @@ impl GoalRegister {
     }
 
     /// Aggregate remaining gap across all goals.
-    pub fn overall_gap(&self) -> f64 {
+    pub(crate) fn _overall_gap(&self) -> f64 {
         1.0 - self.overall_progress()
     }
 
     /// Number of achieved goals.
-    pub fn achieved_count(&self) -> usize {
-        self.goals.values().filter(|g| g.is_achieved()).count()
+    pub(crate) fn _achieved_count(&self) -> usize {
+        self.goals.values().filter(|g| g._is_achieved()).count()
     }
 
     /// Number of active (not yet achieved) goals.
     pub fn active_count(&self) -> usize {
-        self.goals.values().filter(|g| !g.is_achieved()).count()
+        self.goals.values().filter(|g| !g._is_achieved()).count()
     }
 
     /// Advance iteration counter.
@@ -161,9 +161,9 @@ mod tests {
     #[test]
     fn test_goal_is_achieved() {
         let mut g = Goal::new("test", "", 100.0, 1.0, 0);
-        assert!(!g.is_achieved());
+        assert!(!g._is_achieved());
         g.current = 100.0;
-        assert!(g.is_achieved());
+        assert!(g._is_achieved());
     }
 
     #[test]
@@ -191,7 +191,7 @@ mod tests {
         let mut reg = GoalRegister::new();
         reg.register("x", "", 100.0, 1.0);
         reg.update_progress("x", 40.0);
-        assert!((reg.overall_gap() - 0.6).abs() < 1e-9);
+        assert!((reg._overall_gap() - 0.6).abs() < 1e-9);
     }
 
     #[test]
@@ -200,7 +200,7 @@ mod tests {
         reg.register("a", "", 100.0, 1.0);
         reg.register("b", "", 100.0, 1.0);
         reg.update_progress("a", 100.0);
-        assert_eq!(reg.achieved_count(), 1);
+        assert_eq!(reg._achieved_count(), 1);
         assert_eq!(reg.active_count(), 1);
     }
 

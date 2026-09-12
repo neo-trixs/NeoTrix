@@ -148,7 +148,7 @@ pub struct OutputContract {
 
 impl OutputContract {
     /// 生成可嵌入 prompt 的契约描述 (LLM 直接按此返回)
-    pub fn to_prompt_snippet(&self) -> String {
+    pub(crate) fn _to_prompt_snippet(&self) -> String {
         let fields = self.fields.join(", ");
         match self.format {
             OutputFormat::Json => format!(
@@ -231,7 +231,7 @@ pub struct DecompositionPlan {
 
 impl DecompositionPlan {
     /// 全部原子单元 (parallel 在前)
-    pub fn all_units(&self) -> Vec<&AtomicUnit> {
+    pub(crate) fn _all_units(&self) -> Vec<&AtomicUnit> {
         self.parallel
             .iter()
             .chain(self.sequential.iter())
@@ -270,7 +270,7 @@ pub struct AtomicDecomposer;
 ///
 /// 与 `.neotrix/capability_registry.json` 中 `nt_core_parallel::*` 节点保持镜像一致;
 /// 未来 AttentionRouter 按 provides 标签做运行时路由时, 以此声明为锚点。
-pub fn capability_provides() -> &'static [&'static str] {
+pub(crate) fn _capability_provides() -> &'static [&'static str] {
     &["intent_isolation", "need_to_know", "atomic_decomposition", "output_contract"]
 }
 
@@ -567,7 +567,7 @@ mod tests {
             format: OutputFormat::PlainText,
             success_criteria: vec![],
         };
-        let s = c.to_prompt_snippet();
+        let s = c._to_prompt_snippet();
         assert!(s.contains("直接返回"), "契约应要求直接返回: {}", s);
     }
 
@@ -670,7 +670,7 @@ mod tests {
     fn test_decompose_atomic_single_unit() {
         let d = AtomicDecomposer::new();
         let plan = d.decompose("什么是向量嵌入", TaskKind::Atomic);
-        assert_eq!(plan.all_units().len(), 1);
+        assert_eq!(plan._all_units().len(), 1);
         assert!(!plan.needs_sequential);
         assert!(plan.is_empty() == false);
     }
@@ -705,7 +705,7 @@ mod tests {
         assert!(!plan.needs_sequential);
         // 每个原子单元带输出契约 (LLM 可直接返回)
         for u in &plan.parallel {
-            assert!(!u.output_contract.to_prompt_snippet().is_empty());
+            assert!(!u.output_contract._to_prompt_snippet().is_empty());
         }
     }
 
@@ -729,7 +729,7 @@ mod tests {
         assert_eq!(plan.parallel.len(), 2, "隔离后仍可拆为并行收集: {}", isolated.exposed_prompt);
 
         // 每个单元指令不含核心目的
-        for u in plan.all_units() {
+        for u in plan._all_units() {
             assert!(
                 !u.instruction.contains("投资") && !u.instruction.contains("评估"),
                 "原子指令不得泄露核心目的: {}",
@@ -743,7 +743,7 @@ mod tests {
     #[test]
     fn test_capability_provides_declared() {
         // 能力网单一事实源: 代码侧 provides 声明必须完整覆盖本模块能力
-        let provides = capability_provides();
+        let provides = _capability_provides();
         assert!(provides.contains(&"intent_isolation"), "意图隔离能力必须声明");
         assert!(provides.contains(&"need_to_know"), "need-to-know 能力必须声明");
         assert!(provides.contains(&"atomic_decomposition"), "原子拆解能力必须声明");

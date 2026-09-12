@@ -34,18 +34,18 @@ impl HebbianUpdater {
         }
     }
 
-//     pub fn compute_forget_gate(&self, memory: &ReasoningMemory, state: &SelectiveState) -> f64 {
-//         let sim = self.memory_state_similarity(memory, state);
+//     pub(crate) fn _compute_forget_gate(&self, memory: &ReasoningMemory, state: &SelectiveState) -> f64 {
+//         let sim = self._memory_state_similarity(memory, state);
 //         (sim + self.forget_gate_bias).clamp(0.1, 0.99)
 //     }
 
-    pub fn compute_input_gate(&self, memory: &ReasoningMemory) -> f64 {
+    pub(crate) fn _compute_input_gate(&self, memory: &ReasoningMemory) -> f64 {
         let reward_gate = (memory.reward + self.input_gate_bias).clamp(0.01, 0.99);
         let success_boost = if memory.success { 1.2 } else { 0.8 };
         (reward_gate * success_boost).clamp(0.01, 0.99)
     }
 
-//     pub fn memory_state_similarity(&self, memory: &ReasoningMemory, _state: &SelectiveState) -> f64 {
+//     pub(crate) fn _memory_state_similarity(&self, memory: &ReasoningMemory, _state: &SelectiveState) -> f64 {
 //         if let Some(ref emb) = memory.embedding {
 //             let avg = emb.iter().take(self.dim.min(emb.len())).map(|x| x.abs()).sum::<f64>()
 //                 / self.dim.min(emb.len()) as f64;
@@ -97,7 +97,7 @@ impl HebbianUpdater {
         0.0
     }
 
-//     pub fn add_transition_noise(&self, state: &mut SelectiveState, noise_level: f64) {
+//     pub(crate) fn _add_transition_noise(&self, state: &mut SelectiveState, noise_level: f64) {
 //         if noise_level <= 0.0 {
 //             return;
 //         }
@@ -152,8 +152,8 @@ mod tests {
     #[test]
     fn test_input_gate_scales_with_reward() {
         let updater = HebbianUpdater::new(23, 64);
-        let low = updater.compute_input_gate(&dummy_memory(0.1, false, "low"));
-        let high = updater.compute_input_gate(&dummy_memory(0.9, true, "high"));
+        let low = updater._compute_input_gate(&dummy_memory(0.1, false, "low"));
+        let high = updater._compute_input_gate(&dummy_memory(0.9, true, "high"));
         assert!(high > low, "high-reward memory should have higher input gate");
     }
 

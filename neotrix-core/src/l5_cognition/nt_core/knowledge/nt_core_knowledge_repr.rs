@@ -11,17 +11,17 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 知识表示引擎
-pub struct KnowledgeRepresentationEngine {
+pub(crate) struct _KnowledgeRepresentationEngine {
     ontology: Ontology,
     knowledge_base: KnowledgeBase,
     reasoner: Reasoner,
-    config: KRConfig,
-    stats: KRStats,
+    config: _KRConfig,
+    stats: _KRStats,
 }
 
 /// KR 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KRConfig {
+pub(crate) struct _KRConfig {
     pub ontology_format: String,
     pub reasoning_depth: u32,
     pub enable_inference: bool,
@@ -29,7 +29,7 @@ pub struct KRConfig {
     pub max_entities: usize,
 }
 
-impl Default for KRConfig {
+impl Default for _KRConfig {
     fn default() -> Self {
         Self {
             ontology_format: "owl".into(),
@@ -44,15 +44,15 @@ impl Default for KRConfig {
 /// 本体
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ontology {
-    pub classes: Vec<OntologyClass>,
-    pub properties: Vec<OntologyProperty>,
-    pub individuals: Vec<OntologyIndividual>,
+    pub classes: Vec<_OntologyClass>,
+    pub properties: Vec<_OntologyProperty>,
+    pub individuals: Vec<_OntologyIndividual>,
     pub axioms: Vec<Axiom>,
 }
 
 /// 本体类
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OntologyClass {
+pub(crate) struct _OntologyClass {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
@@ -62,10 +62,10 @@ pub struct OntologyClass {
 
 /// 本体属性
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OntologyProperty {
+pub(crate) struct _OntologyProperty {
     pub id: String,
     pub name: String,
-    pub property_type: PropertyType,
+    pub property_type: _PropertyType,
     pub domain: Option<String>,
     pub range: Option<String>,
 }
@@ -73,7 +73,7 @@ pub struct OntologyProperty {
 /// 属性类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PropertyType {
+pub(crate) enum _PropertyType {
     Object,
     Data,
     Annotation,
@@ -81,7 +81,7 @@ pub enum PropertyType {
 
 /// 本体个体
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OntologyIndividual {
+pub(crate) struct _OntologyIndividual {
     pub id: String,
     pub name: String,
     pub class: String,
@@ -137,13 +137,13 @@ pub struct Fact {
 
 /// 推理器
 pub struct Reasoner {
-    inference_rules: Vec<InferenceRule>,
+    inference_rules: Vec<_InferenceRule>,
     inference_cache: HashMap<String, Vec<String>>,
 }
 
 /// 推理规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InferenceRule {
+pub(crate) struct _InferenceRule {
     pub id: String,
     pub name: String,
     pub preconditions: Vec<String>,
@@ -153,7 +153,7 @@ pub struct InferenceRule {
 
 /// 推理结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InferenceResult {
+pub(crate) struct _InferenceResult {
     pub inferred_facts: Vec<Fact>,
     pub reasoning_chain: Vec<String>,
     pub confidence: f64,
@@ -170,7 +170,7 @@ pub struct RetrievalResult {
 
 /// KR 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KRStats {
+pub(crate) struct _KRStats {
     pub entities_stored: u64,
     pub relations_stored: u64,
     pub facts_stored: u64,
@@ -178,9 +178,9 @@ pub struct KRStats {
     pub avg_retrieval_time: f64,
 }
 
-impl KnowledgeRepresentationEngine {
+impl _KnowledgeRepresentationEngine {
     /// 创建新的知识表示引擎
-    pub fn new(config: KRConfig) -> Self {
+    pub fn new(config: _KRConfig) -> Self {
         Self {
             ontology: Ontology {
                 classes: Vec::new(),
@@ -198,7 +198,7 @@ impl KnowledgeRepresentationEngine {
                 inference_cache: HashMap::new(),
             },
             config,
-            stats: KRStats {
+            stats: _KRStats {
                 entities_stored: 0,
                 relations_stored: 0,
                 facts_stored: 0,
@@ -209,12 +209,12 @@ impl KnowledgeRepresentationEngine {
     }
 
     /// 添加本体类
-    pub fn add_class(&mut self, class: OntologyClass) {
+    pub(crate) fn _add_class(&mut self, class: _OntologyClass) {
         self.ontology.classes.push(class);
     }
 
     /// 添加本体属性
-    pub fn add_property(&mut self, property: OntologyProperty) {
+    pub(crate) fn _add_property(&mut self, property: _OntologyProperty) {
         self.ontology.properties.push(property);
     }
 
@@ -237,12 +237,12 @@ impl KnowledgeRepresentationEngine {
     }
 
     /// 添加推理规则
-    pub fn add_inference_rule(&mut self, rule: InferenceRule) {
+    pub(crate) fn _add_inference_rule(&mut self, rule: _InferenceRule) {
         self.reasoner.inference_rules.push(rule);
     }
 
     /// 推理
-    pub fn infer(&self, query: &str) -> InferenceResult {
+    pub fn infer(&self, query: &str) -> _InferenceResult {
         let mut inferred_facts = Vec::new();
         let mut reasoning_chain = Vec::new();
 
@@ -261,7 +261,7 @@ impl KnowledgeRepresentationEngine {
             }
         }
 
-        InferenceResult {
+        _InferenceResult {
             inferred_facts,
             reasoning_chain,
             confidence: 0.8,
@@ -274,7 +274,7 @@ impl KnowledgeRepresentationEngine {
     }
 
     /// 语义检索
-    pub fn semantic_retrieve(&self, query: &str, top_k: usize) -> RetrievalResult {
+    pub(crate) fn _semantic_retrieve(&self, query: &str, top_k: usize) -> RetrievalResult {
         let mut entities: Vec<Entity> = self.knowledge_base.entities.values()
             .filter(|e| e.name.contains(query) || e.properties.values().any(|v| v.to_string().contains(query)))
             .cloned()
@@ -303,7 +303,7 @@ impl KnowledgeRepresentationEngine {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &KRStats {
+    pub fn stats(&self) -> &_KRStats {
         &self.stats
     }
 }

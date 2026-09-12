@@ -32,7 +32,7 @@ impl AlertLevel {
 pub struct BMonitorReport {
     pub health_score: f64,
     pub alert_level: AlertLevel,
-    pub component_scores: ComponentScores,
+    pub component_scores: _ComponentScores,
     pub flags: Vec<String>,
     pub needs_intervention: bool,
     pub report_id: usize,
@@ -40,7 +40,7 @@ pub struct BMonitorReport {
 }
 
 #[derive(Debug, Clone)]
-pub struct ComponentScores {
+pub(crate) struct _ComponentScores {
     pub cognitive_health: f64,
     pub motivation_health: f64,
     pub plan_quality: f64,
@@ -48,7 +48,7 @@ pub struct ComponentScores {
     pub skill_richness: f64,
 }
 
-impl ComponentScores {
+impl _ComponentScores {
     pub fn breakdown(&self) -> Vec<(&str, f64)> {
         vec![
             ("cognitive", self.cognitive_health),
@@ -61,7 +61,7 @@ impl ComponentScores {
 }
 
 #[derive(Debug, Clone)]
-pub struct BMonitorConfig {
+pub(crate) struct _BMonitorConfig {
     pub cognitive_weight: f64,
     pub motivation_weight: f64,
     pub plan_weight: f64,
@@ -78,7 +78,7 @@ pub struct BMonitorConfig {
     pub max_history: usize,
 }
 
-impl Default for BMonitorConfig {
+impl Default for _BMonitorConfig {
     fn default() -> Self {
         Self {
             cognitive_weight: 0.30,
@@ -103,7 +103,7 @@ pub struct BMonitor {
     pub report_count: usize,
     pub history: VecDeque<BMonitorReport>,
     pub max_history: usize,
-    pub config: BMonitorConfig,
+    pub config: _BMonitorConfig,
 }
 
 impl Default for BMonitor {
@@ -117,8 +117,8 @@ impl BMonitor {
         Self {
             report_count: 0,
             history: VecDeque::new(),
-            max_history: BMonitorConfig::default().max_history,
-            config: BMonitorConfig::default(),
+            max_history: _BMonitorConfig::default().max_history,
+            config: _BMonitorConfig::default(),
         }
     }
 
@@ -137,7 +137,7 @@ impl BMonitor {
         let archive_depth = self.score_archive(archive);
         let skill_richness = self.score_skills(skills);
 
-        let component_scores = ComponentScores {
+        let component_scores = _ComponentScores {
             cognitive_health,
             motivation_health,
             plan_quality,
@@ -284,7 +284,7 @@ impl BMonitor {
         let report = BMonitorReport {
             health_score,
             alert_level,
-            component_scores: ComponentScores {
+            component_scores: _ComponentScores {
                 cognitive_health,
                 motivation_health,
                 plan_quality: 50.0,
@@ -350,7 +350,7 @@ impl BMonitor {
         }
     }
 
-    pub fn summary_for_repl(&self) -> Vec<String> {
+    pub(crate) fn _summary_for_repl(&self) -> Vec<String> {
         let mut lines: Vec<String> = Vec::new();
         lines.push("╭─ B-Brain Monitor ─────────────────────────────╮".into());
         match self.latest_report() {
@@ -597,7 +597,7 @@ mod tests {
         let skills = make_skills_with_count(3);
 
         bm.evaluate(&eval, &mot, &mon, &archive, &skills, 1);
-        let lines = bm.summary_for_repl();
+        let lines = bm._summary_for_repl();
         assert!(!lines.is_empty());
         assert!(lines[0].contains("B-Brain Monitor"));
     }

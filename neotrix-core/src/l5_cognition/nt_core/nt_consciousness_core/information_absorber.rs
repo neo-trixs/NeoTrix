@@ -85,11 +85,11 @@ pub struct AbsorptionRecord {
     /// 周期
     pub cycle: u32,
     /// 请求
-    pub request: AbsorptionRequest,
+    pub request: _AbsorptionRequest,
     /// 响应
-    pub response: Option<AbsorptionResponse>,
+    pub response: Option<_AbsorptionResponse>,
     /// 状态
-    pub status: AbsorptionStatus,
+    pub status: _AbsorptionStatus,
     /// 时间戳
     pub timestamp: String,
     /// 耗时（毫秒）
@@ -98,7 +98,7 @@ pub struct AbsorptionRecord {
 
 /// 吸收请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbsorptionRequest {
+pub(crate) struct _AbsorptionRequest {
     /// 请求ID
     pub id: String,
     /// 目标资源
@@ -106,14 +106,14 @@ pub struct AbsorptionRequest {
     /// 查询内容
     pub query: String,
     /// 查询类型
-    pub query_type: QueryType,
+    pub query_type: _QueryType,
     /// 上下文
     pub context: HashMap<String, String>,
 }
 
 /// 查询类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum QueryType {
+pub(crate) enum _QueryType {
     /// 知识查询
     Knowledge,
     /// 代码查询
@@ -128,7 +128,7 @@ pub enum QueryType {
 
 /// 吸收响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbsorptionResponse {
+pub(crate) struct _AbsorptionResponse {
     /// 响应ID
     pub id: String,
     /// 内容
@@ -143,7 +143,7 @@ pub struct AbsorptionResponse {
 
 /// 吸收状态
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum AbsorptionStatus {
+pub(crate) enum _AbsorptionStatus {
     Pending,
     InProgress,
     Completed,
@@ -163,12 +163,12 @@ impl InformationAbsorber {
     }
 
     /// 注册资源
-    pub fn register_resource(&mut self, resource: Resource) {
+    pub(crate) fn _register_resource(&mut self, resource: Resource) {
         self.resources.insert(resource.id.clone(), resource);
     }
 
     /// 吸收信息
-    pub fn absorb(&mut self, cycle: u32, request: AbsorptionRequest) -> AbsorptionResponse {
+    pub fn absorb(&mut self, cycle: u32, request: _AbsorptionRequest) -> _AbsorptionResponse {
         let start_time = std::time::Instant::now();
         
         // 查找资源
@@ -188,7 +188,7 @@ impl InformationAbsorber {
             });
 
         // 模拟吸收过程
-        let response = AbsorptionResponse {
+        let response = _AbsorptionResponse {
             id: format!("resp_{}", uuid::Uuid::new_v4()),
             content: format!("从{}吸收: {}", resource.name, request.query),
             confidence: resource.quality_score,
@@ -207,7 +207,7 @@ impl InformationAbsorber {
             cycle,
             request,
             response: Some(response.clone()),
-            status: AbsorptionStatus::Completed,
+            status: _AbsorptionStatus::Completed,
             timestamp: chrono::Utc::now().to_rfc3339(),
             duration_ms: duration,
         };
@@ -224,10 +224,10 @@ impl InformationAbsorber {
     }
 
     /// 获取吸收统计
-    pub fn stats(&self) -> AbsorberStats {
+    pub fn stats(&self) -> _AbsorberStats {
         let total_absorptions = self.absorption_history.len();
         let successful_absorptions = self.absorption_history.iter()
-            .filter(|r| r.status == AbsorptionStatus::Completed)
+            .filter(|r| r.status == _AbsorptionStatus::Completed)
             .count();
         
         let avg_duration = if total_absorptions > 0 {
@@ -247,7 +247,7 @@ impl InformationAbsorber {
             0.0
         };
 
-        AbsorberStats {
+        _AbsorberStats {
             total_absorptions,
             successful_absorptions,
             success_rate: if total_absorptions > 0 {
@@ -271,7 +271,7 @@ impl InformationAbsorber {
 
 /// 吸收统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbsorberStats {
+pub(crate) struct _AbsorberStats {
     pub total_absorptions: usize,
     pub successful_absorptions: usize,
     pub success_rate: f64,
@@ -280,7 +280,7 @@ pub struct AbsorberStats {
     pub registered_resources: usize,
 }
 
-impl std::fmt::Display for AbsorberStats {
+impl std::fmt::Display for _AbsorberStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "═══════════════════════════════════════════════")?;
         writeln!(f, "        InformationAbsorber 统计")?;
@@ -309,11 +309,11 @@ mod tests {
     #[test]
     fn test_absorb_information() {
         let mut absorber = InformationAbsorber::new(AbsorberConfig::default());
-        let request = AbsorptionRequest {
+        let request = _AbsorptionRequest {
             id: "req_1".to_string(),
             resource_id: "default".to_string(),
             query: "测试查询".to_string(),
-            query_type: QueryType::Knowledge,
+            query_type: _QueryType::Knowledge,
             context: HashMap::new(),
         };
         

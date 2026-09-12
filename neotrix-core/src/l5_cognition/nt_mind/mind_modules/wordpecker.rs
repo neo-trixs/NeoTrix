@@ -13,7 +13,7 @@ pub struct Entity {
 }
 
 /// 中英文 NLP 处理 trait。
-pub trait NlpProcessor {
+pub(crate) trait _NlpProcessor {
     /// 分词 (中英文混合): 按空白 + 连续 ASCII 词 + 单汉字切分。
     fn tokenize(&self, text: &str) -> Vec<String>;
     /// 实体抽取 (stub: 抽取含大写的英文专有名词与 @中文 标记)。
@@ -21,23 +21,23 @@ pub trait NlpProcessor {
 }
 
 /// WordPecker 中英文 NLP 处理实现。
-pub struct WordPeckerNlp {
+pub(crate) struct _WordPeckerNlp {
     min_entity_len: usize,
 }
 
-impl WordPeckerNlp {
+impl _WordPeckerNlp {
     pub fn new() -> Self {
         Self { min_entity_len: 2 }
     }
 }
 
-impl Default for WordPeckerNlp {
+impl Default for _WordPeckerNlp {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl NlpProcessor for WordPeckerNlp {
+impl _NlpProcessor for _WordPeckerNlp {
     fn tokenize(&self, text: &str) -> Vec<String> {
         let mut tokens = Vec::new();
         for raw in text.split_whitespace() {
@@ -72,9 +72,9 @@ impl NlpProcessor for WordPeckerNlp {
     }
 }
 
-impl SelfTest for WordPeckerNlp {
+impl SelfTest for _WordPeckerNlp {
     fn name(&self) -> &'static str {
-        "WordPeckerNlp"
+        "_WordPeckerNlp"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_tokenize_mixed() {
-        let p = WordPeckerNlp::new();
+        let p = _WordPeckerNlp::new();
         let toks = p.tokenize("Hello 世界 world");
         assert!(toks.contains(&"Hello".to_string()));
         assert!(toks.contains(&"世".to_string()));
@@ -105,14 +105,14 @@ mod tests {
 
     #[test]
     fn test_extract_entities_proper_noun() {
-        let p = WordPeckerNlp::new();
+        let p = _WordPeckerNlp::new();
         let ents = p.extract_entities("Beijing is great 北京");
         assert!(ents.iter().any(|e| e.text == "Beijing"));
     }
 
     #[test]
     fn test_selftest_pass() {
-        let p = WordPeckerNlp::new();
+        let p = _WordPeckerNlp::new();
         assert!(p.self_test().is_ok());
     }
 }

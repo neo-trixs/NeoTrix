@@ -107,7 +107,7 @@ mod tests {
             pause_duration_secs: 0,
             ..Default::default()
         };
-        assert!(!d.is_paused());
+        assert!(!d._is_paused());
         for _ in 0..8 {
             d.observe(false, false, 2, 0.0, false, false);
         }
@@ -426,7 +426,7 @@ impl StagnationDetector {
         Self::default()
     }
 
-    pub fn is_paused(&self) -> bool {
+    pub(crate) fn _is_paused(&self) -> bool {
         self.pause_until.is_some_and(|t| Instant::now() < t)
     }
 
@@ -441,7 +441,7 @@ impl StagnationDetector {
     ) -> StagnationSignal {
         self.total_cycles += 1;
 
-        if self.is_paused() {
+        if self._is_paused() {
             return StagnationSignal::Continue;
         }
 
@@ -704,7 +704,7 @@ impl StagnationDetector {
             consecutive_zero_reward: self.consecutive_zero_reward,
             consecutive_no_new_sources: self.consecutive_no_new_sources,
             consecutive_minor_errors: self.consecutive_minor_errors,
-            paused: self.is_paused(),
+            paused: self._is_paused(),
         }
     }
 }

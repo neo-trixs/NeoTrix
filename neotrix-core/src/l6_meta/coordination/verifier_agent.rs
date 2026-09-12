@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
 
 /// 验证维度
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum VerificationDimension {
+pub(crate) enum _VerificationDimension {
     /// 实体一致性
     EntityConsistency,
     /// 环境一致性
@@ -37,20 +37,20 @@ pub enum VerificationDimension {
 
 /// 验证维度组
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DimensionGroup {
+pub(crate) struct _DimensionGroup {
     /// 组名
     pub name: String,
     /// 包含的维度
-    pub dimensions: Vec<VerificationDimension>,
+    pub dimensions: Vec<_VerificationDimension>,
     /// 权重
     pub weight: f32,
 }
 
 /// 验证评分
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerificationScore {
+pub(crate) struct _VerificationScore {
     /// 维度
-    pub dimension: VerificationDimension,
+    pub dimension: _VerificationDimension,
     /// 分数 (1-10)
     pub score: u8,
     /// 说明
@@ -65,7 +65,7 @@ pub struct VerificationResult {
     /// 总分 (0.0-1.0)
     pub total_score: f32,
     /// 各维度分数
-    pub scores: Vec<VerificationScore>,
+    pub scores: Vec<_VerificationScore>,
     /// 错误类型
     pub error_types: Vec<String>,
     /// 建议修正
@@ -78,9 +78,9 @@ pub struct VerificationResult {
 
 /// 验证配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerifierConfig {
+pub(crate) struct _VerifierConfig {
     /// 维度组
-    pub dimension_groups: Vec<DimensionGroup>,
+    pub dimension_groups: Vec<_DimensionGroup>,
     /// 通过阈值 (0.0-1.0)
     pub pass_threshold: f32,
     /// 最大重生成次数
@@ -93,7 +93,7 @@ pub struct VerifierConfig {
 
 /// 重生成请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegenerationRequest {
+pub(crate) struct _RegenerationRequest {
     /// 原始提示词
     pub original_prompt: String,
     /// 验证结果
@@ -101,12 +101,12 @@ pub struct RegenerationRequest {
     /// 修正后的提示词
     pub corrected_prompt: String,
     /// 重生成模式
-    pub regeneration_mode: RegenerationMode,
+    pub regeneration_mode: _RegenerationMode,
 }
 
 /// 重生成模式
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum RegenerationMode {
+pub(crate) enum _RegenerationMode {
     /// 重新生成（新种子）
     Regenerate,
     /// 编辑（保持主体）
@@ -121,44 +121,44 @@ pub enum RegenerationMode {
 
 /// 验证器引导器
 /// 实现 VLM 验证 + 自动重生成循环
-pub struct VerifierAgent {
+pub(crate) struct _VerifierAgent {
     /// 配置
-    config: VerifierConfig,
+    config: _VerifierConfig,
     /// 验证历史
     history: Vec<VerificationResult>,
     /// 重生成历史
-    regeneration_history: Vec<RegenerationRequest>,
+    regeneration_history: Vec<_RegenerationRequest>,
 }
 
-impl VerifierAgent {
+impl _VerifierAgent {
     /// 创建验证器
     pub fn new() -> Self {
         Self {
-            config: VerifierConfig {
+            config: _VerifierConfig {
                 dimension_groups: vec![
-                    DimensionGroup {
+                    _DimensionGroup {
                         name: "一致性检查".to_string(),
                         dimensions: vec![
-                            VerificationDimension::EntityConsistency,
-                            VerificationDimension::EnvironmentConsistency,
-                            VerificationDimension::CameraConsistency,
+                            _VerificationDimension::EntityConsistency,
+                            _VerificationDimension::EnvironmentConsistency,
+                            _VerificationDimension::CameraConsistency,
                         ],
                         weight: 0.4,
                     },
-                    DimensionGroup {
+                    _DimensionGroup {
                         name: "叙事检查".to_string(),
                         dimensions: vec![
-                            VerificationDimension::NarrativeProgression,
-                            VerificationDimension::SpatialLogicalness,
+                            _VerificationDimension::NarrativeProgression,
+                            _VerificationDimension::SpatialLogicalness,
                         ],
                         weight: 0.3,
                     },
-                    DimensionGroup {
+                    _DimensionGroup {
                         name: "质量检查".to_string(),
                         dimensions: vec![
-                            VerificationDimension::InstructionFollowing,
-                            VerificationDimension::PhysicalPlausibility,
-                            VerificationDimension::MotionConsistency,
+                            _VerificationDimension::InstructionFollowing,
+                            _VerificationDimension::PhysicalPlausibility,
+                            _VerificationDimension::MotionConsistency,
                         ],
                         weight: 0.3,
                     },
@@ -174,7 +174,7 @@ impl VerifierAgent {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: VerifierConfig) -> Self {
+    pub fn with_config(config: _VerifierConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -183,7 +183,7 @@ impl VerifierAgent {
     }
     
     /// 验证视频片段
-    pub fn verify_shot(
+    pub(crate) fn _verify_shot(
         &mut self,
         _shot_id: &str,
         _video_path: &str,
@@ -217,25 +217,25 @@ impl VerifierAgent {
     }
     
     /// 模拟验证
-    fn simulate_verification(&self, _description: &str, _context: Option<&str>) -> Vec<VerificationScore> {
+    fn simulate_verification(&self, _description: &str, _context: Option<&str>) -> Vec<_VerificationScore> {
         vec![
-            VerificationScore {
-                dimension: VerificationDimension::EntityConsistency,
+            _VerificationScore {
+                dimension: _VerificationDimension::EntityConsistency,
                 score: 8,
                 explanation: Some("实体外观保持一致".to_string()),
             },
-            VerificationScore {
-                dimension: VerificationDimension::EnvironmentConsistency,
+            _VerificationScore {
+                dimension: _VerificationDimension::EnvironmentConsistency,
                 score: 7,
                 explanation: Some("环境光照略有变化".to_string()),
             },
-            VerificationScore {
-                dimension: VerificationDimension::NarrativeProgression,
+            _VerificationScore {
+                dimension: _VerificationDimension::NarrativeProgression,
                 score: 8,
                 explanation: Some("叙事进展自然".to_string()),
             },
-            VerificationScore {
-                dimension: VerificationDimension::InstructionFollowing,
+            _VerificationScore {
+                dimension: _VerificationDimension::InstructionFollowing,
                 score: 9,
                 explanation: Some("遵循提示词指令".to_string()),
             },
@@ -243,7 +243,7 @@ impl VerifierAgent {
     }
     
     /// 计算总分
-    fn calculate_total_score(&self, scores: &[VerificationScore]) -> f32 {
+    fn calculate_total_score(&self, scores: &[_VerificationScore]) -> f32 {
         let mut weighted_sum = 0.0;
         let mut total_weight = 0.0;
         
@@ -268,11 +268,11 @@ impl VerifierAgent {
     }
     
     /// 生成重生成请求
-    pub fn generate_regeneration_request(
+    pub(crate) fn _generate_regeneration_request(
         &self,
         original_prompt: &str,
         verification_result: &VerificationResult,
-    ) -> RegenerationRequest {
+    ) -> _RegenerationRequest {
         let corrected_prompt = if self.config.enable_auto_correction {
             self.auto_correct_prompt(original_prompt, verification_result)
         } else {
@@ -280,12 +280,12 @@ impl VerifierAgent {
         };
         
         let regeneration_mode = if verification_result.total_score < 0.5 {
-            RegenerationMode::Regenerate
+            _RegenerationMode::Regenerate
         } else {
-            RegenerationMode::Edit
+            _RegenerationMode::Edit
         };
         
-        RegenerationRequest {
+        _RegenerationRequest {
             original_prompt: original_prompt.to_string(),
             verification_result: verification_result.clone(),
             corrected_prompt,
@@ -306,7 +306,7 @@ impl VerifierAgent {
     }
     
     /// 获取验证统计
-    pub fn statistics(&self) -> VerifierStats {
+    pub fn statistics(&self) -> _VerifierStats {
         let total_verifications = self.history.len();
         let passed = self.history.iter().filter(|r| r.passed).count();
         let avg_score = if total_verifications > 0 {
@@ -316,7 +316,7 @@ impl VerifierAgent {
         };
         let total_regenerations = self.regeneration_history.len();
         
-        VerifierStats {
+        _VerifierStats {
             total_verifications,
             passed,
             failed: total_verifications - passed,
@@ -328,7 +328,7 @@ impl VerifierAgent {
 
 /// 验证统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerifierStats {
+pub(crate) struct _VerifierStats {
     /// 总验证次数
     pub total_verifications: usize,
     /// 通过次数
@@ -351,9 +351,9 @@ mod tests {
     
     #[test]
     fn test_verifier_agent() {
-        let mut verifier = VerifierAgent::new();
+        let mut verifier = _VerifierAgent::new();
         
-        let result = verifier.verify_shot(
+        let result = verifier._verify_shot(
             "shot_001",
             "/output/shot_001.mp4",
             "主角在教室学习",
@@ -369,7 +369,7 @@ mod tests {
     
     #[test]
     fn test_regeneration_request() {
-        let verifier = VerifierAgent::new();
+        let verifier = _VerifierAgent::new();
         
         let result = VerificationResult {
             passed: false,
@@ -381,11 +381,11 @@ mod tests {
             verification_time_ms: 100,
         };
         
-        let request = verifier.generate_regeneration_request(
+        let request = verifier._generate_regeneration_request(
             "主角在教室",
             &result,
         );
         
-        assert_eq!(request.regeneration_mode, RegenerationMode::Edit);
+        assert_eq!(request.regeneration_mode, _RegenerationMode::Edit);
     }
 }

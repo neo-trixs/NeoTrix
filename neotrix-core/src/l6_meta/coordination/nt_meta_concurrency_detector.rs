@@ -10,25 +10,25 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 并发冲突检测器
-pub struct ConcurrencyConflictDetector {
-    monitored_files: Vec<MonitoredFile>,
+pub(crate) struct _ConcurrencyConflictDetector {
+    _monitored_files: Vec<_MonitoredFile>,
     conflicts: Vec<Conflict>,
-    lock_states: HashMap<String, LockState>,
+    lock_states: HashMap<String, _LockState>,
     #[allow(dead_code)]
-    config: ConflictDetectorConfig,
-    stats: ConflictDetectorStats,
+    config: _ConflictDetectorConfig,
+    stats: _ConflictDetectorStats,
 }
 
 /// 冲突检测器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConflictDetectorConfig {
+pub(crate) struct _ConflictDetectorConfig {
     pub enable_file_locking: bool,
     pub lock_timeout_ms: u64,
     pub max_conflict_history: usize,
     pub enable_auto_resolution: bool,
 }
 
-impl Default for ConflictDetectorConfig {
+impl Default for _ConflictDetectorConfig {
     fn default() -> Self {
         Self {
             enable_file_locking: true,
@@ -41,9 +41,9 @@ impl Default for ConflictDetectorConfig {
 
 /// 监控文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MonitoredFile {
+pub(crate) struct _MonitoredFile {
     pub file_path: String,
-    pub file_type: FileType,
+    pub file_type: _FileType,
     pub last_modified: chrono::DateTime<chrono::Utc>,
     pub locked_by: Option<String>,
     pub conflict_count: u64,
@@ -52,7 +52,7 @@ pub struct MonitoredFile {
 /// 文件类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum FileType {
+pub(crate) enum _FileType {
     SharedConfig,
     SharedState,
     PublicAPI,
@@ -84,14 +84,14 @@ pub enum ConflictType {
 /// 锁状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum LockState {
+pub(crate) enum _LockState {
     Unlocked,
     Locked { holder: String, since: chrono::DateTime<chrono::Utc> },
 }
 
 /// 冲突检测器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConflictDetectorStats {
+pub(crate) struct _ConflictDetectorStats {
     pub total_files_monitored: u64,
     pub total_conflicts: u64,
     pub resolved_conflicts: u64,
@@ -108,15 +108,15 @@ pub struct ConflictResolution {
     pub message: String,
 }
 
-impl ConcurrencyConflictDetector {
+impl _ConcurrencyConflictDetector {
     /// 创建新的并发冲突检测器
     pub fn new() -> Self {
         Self {
-            monitored_files: Vec::new(),
+            _monitored_files: Vec::new(),
             conflicts: Vec::new(),
             lock_states: HashMap::new(),
-            config: ConflictDetectorConfig::default(),
-            stats: ConflictDetectorStats {
+            config: _ConflictDetectorConfig::default(),
+            stats: _ConflictDetectorStats {
                 total_files_monitored: 0,
                 total_conflicts: 0,
                 resolved_conflicts: 0,
@@ -127,8 +127,8 @@ impl ConcurrencyConflictDetector {
     }
 
     /// 监控文件
-    pub fn monitor_file(&mut self, file_path: &str, file_type: FileType) {
-        let file = MonitoredFile {
+    pub fn monitor_file(&mut self, file_path: &str, file_type: _FileType) {
+        let file = _MonitoredFile {
             file_path: file_path.to_string(),
             file_type,
             last_modified: chrono::Utc::now(),
@@ -136,16 +136,16 @@ impl ConcurrencyConflictDetector {
             conflict_count: 0,
         };
 
-        self.monitored_files.push(file);
-        self.lock_states.insert(file_path.to_string(), LockState::Unlocked);
+        self._monitored_files.push(file);
+        self.lock_states.insert(file_path.to_string(), _LockState::Unlocked);
         self.stats.total_files_monitored += 1;
     }
 
     /// 尝试获取锁
     pub fn try_lock(&mut self, file_path: &str, session_id: &str) -> bool {
         if let Some(state) = self.lock_states.get(file_path) {
-            if *state == LockState::Unlocked {
-                *self.lock_states.get_mut(file_path).unwrap() = LockState::Locked {
+            if *state == _LockState::Unlocked {
+                *self.lock_states.get_mut(file_path).unwrap() = _LockState::Locked {
                     holder: session_id.to_string(),
                     since: chrono::Utc::now(),
                 };
@@ -157,10 +157,10 @@ impl ConcurrencyConflictDetector {
     }
 
     /// 释放锁
-    pub fn release_lock(&mut self, file_path: &str) -> bool {
+    pub(crate) fn _release_lock(&mut self, file_path: &str) -> bool {
         if let Some(state) = self.lock_states.get_mut(file_path) {
-            if *state != LockState::Unlocked {
-                *state = LockState::Unlocked;
+            if *state != _LockState::Unlocked {
+                *state = _LockState::Unlocked;
                 self.stats.active_locks -= 1;
                 return true;
             }
@@ -169,10 +169,10 @@ impl ConcurrencyConflictDetector {
     }
 
     /// 检测冲突
-    pub fn detect_conflict(&mut self, file_path: &str, session_a: &str, session_b: &str) -> Option<Conflict> {
+    pub(crate) fn _detect_conflict(&mut self, file_path: &str, session_a: &str, session_b: &str) -> Option<Conflict> {
         // 检查是否有锁冲突
         if let Some(state) = self.lock_states.get(file_path) {
-            if let LockState::Locked { holder, .. } = state {
+            if let _LockState::Locked { holder, .. } = state {
                 if holder != session_a && holder != session_b {
                     let conflict = Conflict {
                         conflict_id: uuid::Uuid::new_v4().to_string(),
@@ -195,8 +195,8 @@ impl ConcurrencyConflictDetector {
     }
 
     /// 获取所有监控文件
-    pub fn monitored_files(&self) -> &[MonitoredFile] {
-        &self.monitored_files
+    pub(crate) fn _monitored_files(&self) -> &[_MonitoredFile] {
+        &self._monitored_files
     }
 
     /// 获取所有冲突
@@ -205,7 +205,7 @@ impl ConcurrencyConflictDetector {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &ConflictDetectorStats {
+    pub fn stats(&self) -> &_ConflictDetectorStats {
         &self.stats
     }
 }

@@ -12,7 +12,7 @@ use neotrix_types::shared::Severity;
 
 /// 根因假设
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RootCauseHypothesis {
+pub(crate) struct _RootCauseHypothesis {
     pub hypothesis: String,
     pub confidence: f32,           // 0.0-1.0
     pub evidence: Vec<String>,
@@ -23,14 +23,14 @@ pub struct RootCauseHypothesis {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Diagnosis {
     pub description: String,
-    pub root_causes: Vec<RootCauseHypothesis>,
+    pub root_causes: Vec<_RootCauseHypothesis>,
     pub severity: Severity,
 }
 
 /// 严重度
 /// 修复选项类型 (参考 APR 文献: GenProg/Prophet/Template/LLM-based)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum RepairStrategyType {
+pub(crate) enum _RepairStrategyType {
     /// 回滚到已知良好版本
     Rollback,
     /// 补丁修复 (基于模式/模板/LLM)
@@ -45,28 +45,28 @@ pub enum RepairStrategyType {
     TestStub,
 }
 
-impl std::str::FromStr for RepairStrategyType {
+impl std::str::FromStr for _RepairStrategyType {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "rollback" => Ok(RepairStrategyType::Rollback),
-            "patch" => Ok(RepairStrategyType::Patch),
-            "reconfigure" => Ok(RepairStrategyType::Reconfigure),
-            "restart" => Ok(RepairStrategyType::Restart),
-            "compilefix" => Ok(RepairStrategyType::CompileFix),
-            "teststub" => Ok(RepairStrategyType::TestStub),
-            _ => Err(format!("Unknown RepairStrategyType: {}", s)),
+            "rollback" => Ok(_RepairStrategyType::Rollback),
+            "patch" => Ok(_RepairStrategyType::Patch),
+            "reconfigure" => Ok(_RepairStrategyType::Reconfigure),
+            "restart" => Ok(_RepairStrategyType::Restart),
+            "compilefix" => Ok(_RepairStrategyType::CompileFix),
+            "teststub" => Ok(_RepairStrategyType::TestStub),
+            _ => Err(format!("Unknown _RepairStrategyType: {}", s)),
         }
     }
 }
 
 /// 单个修复选项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RepairOption {
-    pub strategy: RepairStrategyType,
+pub(crate) struct _RepairOption {
+    pub strategy: _RepairStrategyType,
     pub description: String,
     pub target_files: Vec<String>,
-    pub estimated_effort: EffortLevel,
+    pub estimated_effort: _EffortLevel,
     pub risk: RiskLevel,
     pub confidence: f32,           // 基于历史成功率 + 根因匹配度
     pub prerequisites: Vec<String>,
@@ -84,7 +84,7 @@ pub enum RiskLevel {
 
 /// 工作量估算
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EffortLevel {
+pub(crate) enum _EffortLevel {
     Trivial,
     Low,
     Medium,
@@ -95,7 +95,7 @@ pub enum EffortLevel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepairPlan {
     pub strategy: String,               // 选定策略描述
-    pub steps: Vec<RepairStep>,
+    pub steps: Vec<_RepairStep>,
     pub risk: RiskAssessment,
     pub rollback_point: Option<String>, // git commit / snapshot id
     pub confidence: f32,
@@ -104,8 +104,8 @@ pub struct RepairPlan {
 
 /// 修复步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RepairStep {
-    pub action: RepairStrategyType,
+pub(crate) struct _RepairStep {
+    pub action: _RepairStrategyType,
     pub target: String,
     pub details: String,
     pub verification: String,           // 步骤后如何验证
@@ -124,7 +124,7 @@ pub struct RiskAssessment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FixResult {
     pub plan: RepairPlan,
-    pub executed_steps: Vec<StepExecution>,
+    pub executed_steps: Vec<_StepExecution>,
     pub tests_pass: bool,
     pub health_delta: f32,
     pub artifacts_changed: Vec<String>,
@@ -132,8 +132,8 @@ pub struct FixResult {
 
 /// 步骤执行记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StepExecution {
-    pub step: RepairStep,
+pub(crate) struct _StepExecution {
+    pub step: _RepairStep,
     pub success: bool,
     pub output: String,
     pub duration_ms: u64,
@@ -171,34 +171,34 @@ pub struct VerifyResult {
 pub struct PatternUpdate {
     pub promoted_trap: Option<String>,
     pub flaky_reason: Option<String>,
-    pub new_pattern: Option<RepairPattern>,
+    pub new_pattern: Option<_RepairPattern>,
 }
 
 /// 修复模式 (用于模式库学习)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RepairPattern {
+pub(crate) struct _RepairPattern {
     pub signature: String,              // 根因特征签名
-    pub strategy: RepairStrategyType,
+    pub strategy: _RepairStrategyType,
     pub success_rate: f32,
     pub usage_count: u32,
     pub applicable_contexts: Vec<String>,
 }
 
 /// 修复计划生成器
-pub struct RepairPlanner {
-    pattern_library: HashMap<String, RepairPattern>,
-    strategy_weights: HashMap<RepairStrategyType, f32>,
+pub(crate) struct _RepairPlanner {
+    pattern_library: HashMap<String, _RepairPattern>,
+    strategy_weights: HashMap<_RepairStrategyType, f32>,
 }
 
-impl RepairPlanner {
+impl _RepairPlanner {
     pub fn new() -> Self {
         let mut weights = HashMap::new();
-        weights.insert(RepairStrategyType::Rollback, 0.9);       // 高成功率、低风险
-        weights.insert(RepairStrategyType::Restart, 0.8);
-        weights.insert(RepairStrategyType::Reconfigure, 0.7);
-        weights.insert(RepairStrategyType::CompileFix, 0.6);
-        weights.insert(RepairStrategyType::Patch, 0.5);          // 需匹配模式
-        weights.insert(RepairStrategyType::TestStub, 0.3);       // 临时规避、最后手段
+        weights.insert(_RepairStrategyType::Rollback, 0.9);       // 高成功率、低风险
+        weights.insert(_RepairStrategyType::Restart, 0.8);
+        weights.insert(_RepairStrategyType::Reconfigure, 0.7);
+        weights.insert(_RepairStrategyType::CompileFix, 0.6);
+        weights.insert(_RepairStrategyType::Patch, 0.5);          // 需匹配模式
+        weights.insert(_RepairStrategyType::TestStub, 0.3);       // 临时规避、最后手段
 
         Self {
             pattern_library: HashMap::new(),
@@ -231,7 +231,7 @@ impl RepairPlanner {
     }
 
     /// 策略选择 (核心决策逻辑)
-    fn select_strategy(&self, diagnosis: &Diagnosis) -> RepairStrategyType {
+    fn select_strategy(&self, diagnosis: &Diagnosis) -> _RepairStrategyType {
         let max_confidence = diagnosis.root_causes.iter()
             .map(|rc| rc.confidence)
             .fold(0.0, f32::max);
@@ -243,64 +243,64 @@ impl RepairPlanner {
                 .collect::<Vec<_>>()
                 .join(" ");
             if hyp.contains("compile") || hyp.contains("type") || hyp.contains("编译") || hyp.contains("类型") {
-                return RepairStrategyType::CompileFix;
+                return _RepairStrategyType::CompileFix;
             }
-            return RepairStrategyType::Patch;
+            return _RepairStrategyType::Patch;
         }
 
         // 低置信度或暂态 -> Rollback/Restart/Reconfigure
         if max_confidence < 0.5 {
-            return RepairStrategyType::Rollback;
+            return _RepairStrategyType::Rollback;
         }
 
         // 中等置信度 -> 尝试 Reconfigure
-        RepairStrategyType::Reconfigure
+        _RepairStrategyType::Reconfigure
     }
 
-    fn generate_steps(&self, strategy: &RepairStrategyType, _diagnosis: &Diagnosis) -> Vec<RepairStep> {
+    fn generate_steps(&self, strategy: &_RepairStrategyType, _diagnosis: &Diagnosis) -> Vec<_RepairStep> {
         match strategy {
-            RepairStrategyType::Rollback => vec![
-                RepairStep {
+            _RepairStrategyType::Rollback => vec![
+                _RepairStep {
                     action: *strategy,
                     target: "git".into(),
                     details: "回滚到最后已知良好提交".into(),
                     verification: "cargo test --lib 通过".into(),
                 }
             ],
-            RepairStrategyType::Restart => vec![
-                RepairStep {
+            _RepairStrategyType::Restart => vec![
+                _RepairStep {
                     action: *strategy,
                     target: "process".into(),
                     details: "重启受影响服务/进程".into(),
                     verification: "健康检查通过".into(),
                 }
             ],
-            RepairStrategyType::Reconfigure => vec![
-                RepairStep {
+            _RepairStrategyType::Reconfigure => vec![
+                _RepairStep {
                     action: *strategy,
                     target: "config".into(),
                     details: "调整特性开关/降级配置".into(),
                     verification: "功能烟测通过".into(),
                 }
             ],
-            RepairStrategyType::CompileFix => vec![
-                RepairStep {
+            _RepairStrategyType::CompileFix => vec![
+                _RepairStep {
                     action: *strategy,
                     target: "source".into(),
                     details: "运行 cargo fix / 自动导入修正".into(),
                     verification: "cargo check --lib 无错误".into(),
                 }
             ],
-            RepairStrategyType::Patch => vec![
-                RepairStep {
+            _RepairStrategyType::Patch => vec![
+                _RepairStep {
                     action: *strategy,
                     target: "source".into(),
                     details: "应用模式匹配补丁 / LLM 生成修复".into(),
                     verification: "单测通过 + 相关集成测试通过".into(),
                 }
             ],
-            RepairStrategyType::TestStub => vec![
-                RepairStep {
+            _RepairStrategyType::TestStub => vec![
+                _RepairStep {
                     action: *strategy,
                     target: "test".into(),
                     details: "为失败测试添加存根 / 标记 ignored".into(),
@@ -310,14 +310,14 @@ impl RepairPlanner {
         }
     }
 
-    fn assess_risk(&self, strategy: &RepairStrategyType, _diagnosis: &Diagnosis) -> RiskAssessment {
+    fn assess_risk(&self, strategy: &_RepairStrategyType, _diagnosis: &Diagnosis) -> RiskAssessment {
         let (level, impact) = match strategy {
-            RepairStrategyType::Rollback => (RiskLevel::Low, "仅回滚代码, 状态可恢复"),
-            RepairStrategyType::Restart => (RiskLevel::Low, "暂态中断, 无数据风险"),
-            RepairStrategyType::Reconfigure => (RiskLevel::Medium, "配置变更可能影响其他模块"),
-            RepairStrategyType::CompileFix => (RiskLevel::Medium, "自动修正可能引入语义变更"),
-            RepairStrategyType::Patch => (RiskLevel::High, "代码修改可能引入新缺陷"),
-            RepairStrategyType::TestStub => (RiskLevel::Critical, "规避测试掩盖真实问题"),
+            _RepairStrategyType::Rollback => (RiskLevel::Low, "仅回滚代码, 状态可恢复"),
+            _RepairStrategyType::Restart => (RiskLevel::Low, "暂态中断, 无数据风险"),
+            _RepairStrategyType::Reconfigure => (RiskLevel::Medium, "配置变更可能影响其他模块"),
+            _RepairStrategyType::CompileFix => (RiskLevel::Medium, "自动修正可能引入语义变更"),
+            _RepairStrategyType::Patch => (RiskLevel::High, "代码修改可能引入新缺陷"),
+            _RepairStrategyType::TestStub => (RiskLevel::Critical, "规避测试掩盖真实问题"),
         }.into();
 
         RiskAssessment {
@@ -328,14 +328,14 @@ impl RepairPlanner {
         }
     }
 
-    fn suggest_mitigations(&self, strategy: &RepairStrategyType) -> Vec<String> {
+    fn suggest_mitigations(&self, strategy: &_RepairStrategyType) -> Vec<String> {
         match strategy {
-            RepairStrategyType::Patch => vec![
+            _RepairStrategyType::Patch => vec![
                 "先在隔离分支验证".into(),
                 "运行完整测试套件".into(),
                 "准备快速回滚".into(),
             ],
-            RepairStrategyType::TestStub => vec![
+            _RepairStrategyType::TestStub => vec![
                 "记录技术债务工单".into(),
                 "设定恢复期限".into(),
                 "仅作临时过渡".into(),
@@ -349,7 +349,7 @@ impl RepairPlanner {
         Some("HEAD~1".into())
     }
 
-    fn estimate_confidence(&self, strategy: &RepairStrategyType, diagnosis: &Diagnosis) -> f32 {
+    fn estimate_confidence(&self, strategy: &_RepairStrategyType, diagnosis: &Diagnosis) -> f32 {
         let base = self.strategy_weights.get(strategy).copied().unwrap_or(0.5);
         let rc_boost = diagnosis.root_causes.iter()
             .map(|rc| rc.confidence)
@@ -368,12 +368,12 @@ impl RepairPlanner {
     }
 
     /// 学习新模式 (供 recovery_verify 调用)
-    pub fn learn_pattern(&mut self, pattern: RepairPattern) {
+    pub(crate) fn _learn_pattern(&mut self, pattern: _RepairPattern) {
         self.pattern_library.insert(pattern.signature.clone(), pattern);
     }
 }
 
-impl Default for RepairPlanner {
+impl Default for _RepairPlanner {
     fn default() -> Self {
         Self::new()
     }
@@ -449,9 +449,9 @@ impl RecoveryVerifier {
     fn learn_from_success(&mut self, plan: &RepairPlan, count: usize) -> Option<PatternUpdate> {
         if count == 0 && plan.confidence > 0.7 {
             // 首次成功且高置信度 -> 记录新模式
-            let pattern = RepairPattern {
+            let pattern = _RepairPattern {
                 signature: self.plan_signature(plan),
-                strategy: plan.strategy.parse().unwrap_or(RepairStrategyType::Patch),
+                strategy: plan.strategy.parse().unwrap_or(_RepairStrategyType::Patch),
                 success_rate: plan.confidence,
                 usage_count: 1,
                 applicable_contexts: vec!["auto".into()],
@@ -504,17 +504,17 @@ pub struct RepairHistory {
     pub total_attempts: usize,
 }
 
-/// SelfTest for RepairPlanner
+/// SelfTest for _RepairPlanner
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_repair_planner_basic() {
-        let planner = RepairPlanner::new();
+        let planner = _RepairPlanner::new();
         let diagnosis = Diagnosis {
             description: "编译错误: 类型不匹配".into(),
-            root_causes: vec![RootCauseHypothesis {
+            root_causes: vec![_RootCauseHypothesis {
                 hypothesis: "类型不匹配导致编译失败".into(),
                 confidence: 0.9,
                 evidence: vec!["cargo check 报错".into()],
@@ -531,10 +531,10 @@ mod tests {
 
     #[test]
     fn test_repair_planner_low_confidence_rollback() {
-        let planner = RepairPlanner::new();
+        let planner = _RepairPlanner::new();
         let diagnosis = Diagnosis {
             description: "间歇性故障".into(),
-            root_causes: vec![RootCauseHypothesis {
+            root_causes: vec![_RootCauseHypothesis {
                 hypothesis: "未知根因".into(),
                 confidence: 0.3,
                 evidence: vec![],

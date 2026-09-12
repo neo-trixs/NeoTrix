@@ -52,7 +52,7 @@ impl RecursiveDepthReward {
 
     /// Progress metric in 0..=1: deeper depth with less branching approaches 1,
     /// saturating at `max_depth`.
-    pub fn depth_progress(&self, current_depth: usize, branching: usize) -> f64 {
+    pub(crate) fn _depth_progress(&self, current_depth: usize, branching: usize) -> f64 {
         let depth_term = (current_depth as f64 / self.max_depth.max(1) as f64).min(1.0);
         let branch_term = 1.0 / branching.max(1) as f64;
         (depth_term * branch_term).clamp(0.0, 1.0)
@@ -67,7 +67,7 @@ impl RecursiveDepthReward {
             total_steps,
             bonus: final_reward - reward,
             final_reward,
-            progress: self.depth_progress(depth, branching),
+            progress: self._depth_progress(depth, branching),
         }
     }
 
@@ -102,11 +102,11 @@ mod tests {
     #[test]
     fn test_max_depth_saturation() {
         let rdr = RecursiveDepthReward { max_depth: 4, depth_bonus: 0.1 };
-        assert_eq!(rdr.depth_progress(4, 1), 1.0);
+        assert_eq!(rdr._depth_progress(4, 1), 1.0);
         // beyond max_depth → still saturated at 1.0
-        assert_eq!(rdr.depth_progress(400, 1), 1.0);
+        assert_eq!(rdr._depth_progress(400, 1), 1.0);
         // branching > 1 reduces progress
-        assert!(rdr.depth_progress(4, 2) < 1.0);
+        assert!(rdr._depth_progress(4, 2) < 1.0);
     }
 
     #[test]
@@ -141,7 +141,7 @@ mod tests {
         let rdr = RecursiveDepthReward { max_depth: 8, depth_bonus: 0.1 };
         let mut prev = 0.0;
         for d in 0..=8 {
-            let p = rdr.depth_progress(d, 1);
+            let p = rdr._depth_progress(d, 1);
             assert!(p >= prev, "progress must be monotonic, d={} p={}", d, p);
             prev = p;
         }

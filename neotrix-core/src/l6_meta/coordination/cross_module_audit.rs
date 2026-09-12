@@ -13,7 +13,7 @@ use crate::core::nt_core_narrative_types::{SegmentData, SegmentType};
 
 /// 一致性检查配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrossModuleConfig {
+pub(crate) struct _CrossModuleConfig {
     /// 动态等级与情绪一致性阈值
     pub dynamic_emotion_threshold: f32,
     /// 节奏与转场一致性检查
@@ -22,7 +22,7 @@ pub struct CrossModuleConfig {
     pub param_bounds_check: bool,
 }
 
-impl Default for CrossModuleConfig {
+impl Default for _CrossModuleConfig {
     fn default() -> Self {
         Self {
             dynamic_emotion_threshold: 0.8,
@@ -38,11 +38,11 @@ impl Default for CrossModuleConfig {
 
 /// 一致性检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrossModuleCheckResult {
+pub(crate) struct _CrossModuleCheckResult {
     /// 是否通过
     pub passed: bool,
     /// 检查详情
-    pub details: Vec<CrossModuleDetail>,
+    pub details: Vec<_CrossModuleDetail>,
     /// 建议
     pub suggestions: Vec<String>,
     /// 一致性评分 (0-100)
@@ -51,7 +51,7 @@ pub struct CrossModuleCheckResult {
 
 /// 一致性检查详情
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrossModuleDetail {
+pub(crate) struct _CrossModuleDetail {
     /// 检查维度
     pub dimension: String,
     /// 是否通过
@@ -68,18 +68,18 @@ pub struct CrossModuleDetail {
 
 /// 跨模块一致性检查器
 pub struct CrossModuleAudit {
-    config: CrossModuleConfig,
+    config: _CrossModuleConfig,
 }
 
 impl CrossModuleAudit {
     /// 创建检查器
-    pub fn new(config: CrossModuleConfig) -> Self {
+    pub fn new(config: _CrossModuleConfig) -> Self {
         Self { config }
     }
     
     /// 使用默认配置创建检查器
     pub fn default_checker() -> Self {
-        Self::new(CrossModuleConfig::default())
+        Self::new(_CrossModuleConfig::default())
     }
     
     /// 执行跨模块一致性检查
@@ -88,7 +88,7 @@ impl CrossModuleAudit {
         dynamic_params: &[DynamicParams],
         segments: &[SegmentData],
         dynamic_ratings: &[ScalingRating],
-    ) -> CrossModuleCheckResult {
+    ) -> _CrossModuleCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;
@@ -122,7 +122,7 @@ impl CrossModuleAudit {
         // 计算一致性评分
         let consistency_score = self.calculate_consistency_score(&details);
         
-        CrossModuleCheckResult {
+        _CrossModuleCheckResult {
             passed,
             details,
             suggestions,
@@ -135,7 +135,7 @@ impl CrossModuleAudit {
         &self,
         dynamic_params: &[DynamicParams],
         dynamic_ratings: &[ScalingRating],
-    ) -> CrossModuleCheckResult {
+    ) -> _CrossModuleCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;
@@ -147,7 +147,7 @@ impl CrossModuleAudit {
                 let actual_rating = dynamic_ratings[i];
                 if expected_rating != actual_rating {
                     passed = false;
-                    details.push(CrossModuleDetail {
+                    details.push(_CrossModuleDetail {
                         dimension: "动态等级一致性".to_string(),
                         passed: false,
                         detail: format!(
@@ -160,7 +160,7 @@ impl CrossModuleAudit {
                         "建议调整动态参数或重新标记等级以保持一致"
                     ));
                 } else {
-                    details.push(CrossModuleDetail {
+                    details.push(_CrossModuleDetail {
                         dimension: "动态等级一致性".to_string(),
                         passed: true,
                         detail: format!("动态参数与等级匹配: {:?}", actual_rating),
@@ -170,11 +170,11 @@ impl CrossModuleAudit {
             }
         }
         
-        CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
+        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
     /// 检查节奏与段落类型一致性
-    fn check_rhythm_segment_consistency(&self, segments: &[SegmentData]) -> CrossModuleCheckResult {
+    fn check_rhythm_segment_consistency(&self, segments: &[SegmentData]) -> _CrossModuleCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;
@@ -188,7 +188,7 @@ impl CrossModuleAudit {
                 consecutive_count += 1;
                 if consecutive_count >= 2 {
                     passed = false;
-                    details.push(CrossModuleDetail {
+                    details.push(_CrossModuleDetail {
                         dimension: "节奏段落类型".to_string(),
                         passed: false,
                         detail: format!(
@@ -212,7 +212,7 @@ impl CrossModuleAudit {
             
             if first.r#type == SegmentType::Climax {
                 passed = false;
-                details.push(CrossModuleDetail {
+                details.push(_CrossModuleDetail {
                     dimension: "节奏段落顺序".to_string(),
                     passed: false,
                     detail: "爽点段在开头，不合理".to_string(),
@@ -222,11 +222,11 @@ impl CrossModuleAudit {
             }
         }
         
-        CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
+        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
     /// 检查参数边界
-    fn check_parameter_bounds(&self, dynamic_params: &[DynamicParams]) -> CrossModuleCheckResult {
+    fn check_parameter_bounds(&self, dynamic_params: &[DynamicParams]) -> _CrossModuleCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;
@@ -234,7 +234,7 @@ impl CrossModuleAudit {
         for params in dynamic_params {
             if !DynamicParams::validate(params) {
                 passed = false;
-                details.push(CrossModuleDetail {
+                details.push(_CrossModuleDetail {
                     dimension: "参数边界".to_string(),
                     passed: false,
                     detail: format!(
@@ -247,11 +247,11 @@ impl CrossModuleAudit {
             }
         }
         
-        CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
+        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
     /// 计算一致性评分
-    fn calculate_consistency_score(&self, details: &[CrossModuleDetail]) -> u32 {
+    fn calculate_consistency_score(&self, details: &[_CrossModuleDetail]) -> u32 {
         if details.is_empty() {
             return 100;
         }

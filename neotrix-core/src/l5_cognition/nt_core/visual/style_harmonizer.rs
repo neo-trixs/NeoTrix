@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
 
 /// 风格特征
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Style特征 {
+pub(crate) struct _Style特征 {
     /// 色彩分布
     pub color_distribution: Vec<f32>,
     /// 对比度
@@ -29,7 +29,7 @@ pub struct Style特征 {
 
 /// 风格协调配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StyleHarmonizerConfig {
+pub(crate) struct _StyleHarmonizerConfig {
     /// 目标风格
     pub target_style: Option<String>,
     /// 参考图片路径
@@ -46,7 +46,7 @@ pub struct StyleHarmonizerConfig {
 
 /// 风格协调结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StyleHarmonizationResult {
+pub(crate) struct _StyleHarmonizationResult {
     /// 是否成功
     pub success: bool,
     /// 输出文件路径
@@ -61,9 +61,9 @@ pub struct StyleHarmonizationResult {
 
 /// 风格分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StyleAnalysis {
+pub(crate) struct _StyleAnalysis {
     /// 风格特征
-    pub features: Style特征,
+    pub features: _Style特征,
     /// 主要色彩
     pub dominant_colors: Vec<(u8, u8, u8)>,
     /// 风格标签
@@ -77,19 +77,19 @@ pub struct StyleAnalysis {
 // ============================================================================
 
 /// 风格协调器
-pub struct StyleHarmonizer {
+pub(crate) struct _StyleHarmonizer {
     /// 配置
     #[allow(dead_code)]
-    config: StyleHarmonizerConfig,
+    config: _StyleHarmonizerConfig,
     /// 协调历史
-    history: Vec<StyleHarmonizationResult>,
+    history: Vec<_StyleHarmonizationResult>,
 }
 
-impl StyleHarmonizer {
+impl _StyleHarmonizer {
     /// 创建协调器
     pub fn new() -> Self {
         Self {
-            config: StyleHarmonizerConfig {
+            config: _StyleHarmonizerConfig {
                 target_style: None,
                 reference_image: None,
                 style_strength: 0.7,
@@ -102,7 +102,7 @@ impl StyleHarmonizer {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: StyleHarmonizerConfig) -> Self {
+    pub fn with_config(config: _StyleHarmonizerConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -110,10 +110,10 @@ impl StyleHarmonizer {
     }
     
     /// 分析风格
-    pub fn analyze_style(&self, _image_path: &str) -> StyleAnalysis {
+    pub(crate) fn _analyze_style(&self, _image_path: &str) -> _StyleAnalysis {
         // TODO: 实际调用风格分析
-        StyleAnalysis {
-            features: Style特征 {
+        _StyleAnalysis {
+            features: _Style特征 {
                 color_distribution: vec![0.3, 0.4, 0.3],
                 contrast: 0.7,
                 saturation: 0.6,
@@ -128,15 +128,15 @@ impl StyleHarmonizer {
     }
     
     /// 协调风格
-    pub fn harmonize(
+    pub(crate) fn _harmonize(
         &mut self,
         input_path: &str,
         _reference_path: Option<&str>,
-    ) -> StyleHarmonizationResult {
+    ) -> _StyleHarmonizationResult {
         let start = std::time::Instant::now();
         
         // TODO: 实际调用风格迁移
-        let result = StyleHarmonizationResult {
+        let result = _StyleHarmonizationResult {
             success: true,
             output_path: Some(format!("{}_harmonized.png", input_path)),
             style_similarity: 0.88,
@@ -149,13 +149,13 @@ impl StyleHarmonizer {
     }
     
     /// 匹配色彩
-    pub fn match_colors(
+    pub(crate) fn _match_colors(
         &self,
         source_path: &str,
         _target_path: &str,
-    ) -> StyleHarmonizationResult {
+    ) -> _StyleHarmonizationResult {
         // TODO: 实际调用色彩匹配
-        StyleHarmonizationResult {
+        _StyleHarmonizationResult {
             success: true,
             output_path: Some(format!("{}_color_matched.png", source_path)),
             style_similarity: 0.92,
@@ -165,7 +165,7 @@ impl StyleHarmonizer {
     }
     
     /// 获取统计信息
-    pub fn statistics(&self) -> HarmonizerStats {
+    pub fn statistics(&self) -> _HarmonizerStats {
         let total_harmonized = self.history.len();
         let successful = self.history.iter().filter(|r| r.success).count();
         let avg_similarity = if total_harmonized > 0 {
@@ -174,7 +174,7 @@ impl StyleHarmonizer {
             0.0
         };
         
-        HarmonizerStats {
+        _HarmonizerStats {
             total_harmonized,
             successful,
             failed: total_harmonized - successful,
@@ -185,7 +185,7 @@ impl StyleHarmonizer {
 
 /// 协调统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HarmonizerStats {
+pub(crate) struct _HarmonizerStats {
     /// 总协调次数
     pub total_harmonized: usize,
     /// 成功次数
@@ -206,12 +206,12 @@ mod tests {
     
     #[test]
     fn test_style_harmonizer() {
-        let mut harmonizer = StyleHarmonizer::new();
+        let mut harmonizer = _StyleHarmonizer::new();
         
-        let analysis = harmonizer.analyze_style("/input/image.png");
+        let analysis = harmonizer._analyze_style("/input/image.png");
         assert!(!analysis.style_tags.is_empty());
         
-        let result = harmonizer.harmonize("/input/image.png", Some("/ref/style.png"));
+        let result = harmonizer._harmonize("/input/image.png", Some("/ref/style.png"));
         assert!(result.success);
         
         let stats = harmonizer.statistics();

@@ -99,7 +99,7 @@ impl ConsciousnessGoldStandard {
         }
     }
 
-    pub fn with_oscillator(mut self, osc: OscillatorNetwork) -> Self {
+    pub(crate) fn _with_oscillator(mut self, osc: OscillatorNetwork) -> Self {
         self.oscillator_network = Some(osc);
         self
     }
@@ -162,7 +162,7 @@ impl ConsciousnessGoldStandard {
     }
 
     /// Analyze the trend across the evaluation history.
-    pub fn detection_trend(&self) -> DetectionTrend {
+    pub(crate) fn _detection_trend(&self) -> DetectionTrend {
         let n = self.history.len();
         if n < 3 {
             return DetectionTrend::InsufficientData;
@@ -429,7 +429,7 @@ mod tests {
         gs.evaluate(&vec![0.5; 64], &hex_active);
         gs.evaluate(&vec![0.75; 64], &hex_active);
         gs.evaluate(&vec![1.0; 64], &hex_active);
-        assert_eq!(gs.detection_trend(), DetectionTrend::Improving,
+        assert_eq!(gs._detection_trend(), DetectionTrend::Improving,
             "inactive→active → improving");
 
         // Declining: active → inactive
@@ -439,7 +439,7 @@ mod tests {
         gs2.evaluate(&vec![0.5; 64], &hex_active);
         gs2.evaluate(&vec![0.25; 64], &hex_active);
         gs2.evaluate(&vec![0.0; 64], &hex_inactive);
-        assert_eq!(gs2.detection_trend(), DetectionTrend::Declining,
+        assert_eq!(gs2._detection_trend(), DetectionTrend::Declining,
             "active→inactive → declining");
 
         // Stable
@@ -447,14 +447,14 @@ mod tests {
         for _ in 0..5 {
             gs3.evaluate(&vec![1.0; 64], &hex_active);
         }
-        assert_eq!(gs3.detection_trend(), DetectionTrend::Stable,
+        assert_eq!(gs3._detection_trend(), DetectionTrend::Stable,
             "identical states → stable");
     }
 
     #[test]
     fn test_insufficient_data_trend() {
         let gs = ConsciousnessGoldStandard::new();
-        assert_eq!(gs.detection_trend(), DetectionTrend::InsufficientData);
+        assert_eq!(gs._detection_trend(), DetectionTrend::InsufficientData);
     }
 
     #[test]
@@ -503,7 +503,7 @@ mod tests {
     #[test]
     fn test_with_oscillator() {
         let osc = OscillatorNetwork::new(11);
-        let mut gs = ConsciousnessGoldStandard::new().with_oscillator(osc);
+        let mut gs = ConsciousnessGoldStandard::new()._with_oscillator(osc);
         assert!(gs.oscillator_network.is_some());
 
         let state = make_state(1.0);

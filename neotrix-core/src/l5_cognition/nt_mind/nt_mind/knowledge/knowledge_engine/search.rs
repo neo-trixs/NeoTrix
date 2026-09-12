@@ -70,7 +70,7 @@ impl LiteratureSearcher {
         entries
     }
 
-    pub fn search_semantic_scholar(&mut self, query: &str, limit: usize) -> Vec<KnowledgeEntry> {
+    pub(crate) fn _search_semantic_scholar(&mut self, query: &str, limit: usize) -> Vec<KnowledgeEntry> {
         let url = format!(
             "https://api.semanticscholar.org/graph/v1/paper/search?query={}&limit={}&fields=title,abstract,authors,year,externalIds",
             urlencoding(query), limit.min(100)
@@ -143,7 +143,7 @@ impl LiteratureSearcher {
             let key = entry.title.clone();
             if seen.insert(key) { results.push(entry); }
         }
-        for entry in self.search_semantic_scholar(query, max_per_source) {
+        for entry in self._search_semantic_scholar(query, max_per_source) {
             let key = entry.title.clone();
             if seen.insert(key) { results.push(entry); }
         }
@@ -223,7 +223,7 @@ impl KnowledgeEngine {
         entries
     }
 
-    pub fn search_by_dimension(&self, dimension: &str, limit: usize) -> Vec<&KnowledgeEntry> {
+    pub(crate) fn _search_by_dimension(&self, dimension: &str, limit: usize) -> Vec<&KnowledgeEntry> {
         let mut entries: Vec<&KnowledgeEntry> = self.entries.values()
             .filter(|e| e.dimensions.iter().any(|d| d.contains(dimension)))
             .collect();
@@ -253,7 +253,7 @@ impl KnowledgeEngine {
         related
     }
 
-    pub fn literature_search_and_ingest(&mut self, query: &str, max_results: usize) -> Vec<String> {
+    pub(crate) fn _literature_search_and_ingest(&mut self, query: &str, max_results: usize) -> Vec<String> {
         let mut ids = Vec::new();
         if let Some(ref mut searcher) = self.literature_searcher {
             let papers = searcher.search_all(query, max_results);

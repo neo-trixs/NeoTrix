@@ -8,53 +8,53 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 最佳实践评论反馈: critic 对某次生成的 critiques 与评分。
 #[derive(Debug, Clone, Default)]
-pub struct CriticFeedback {
+pub(crate) struct _CriticFeedback {
     pub critiques: Vec<String>,
     pub score: f64,
 }
 
 /// 最佳实践评论优化 trait (BPCO).
-pub trait BestPracticeCritic {
+pub(crate) trait _BestPracticeCritic {
     /// 对生成文本给出评论反馈 (stub: 当前返回中性占位反馈)。
-    fn critique(&self, _generated: &str) -> CriticFeedback;
+    fn critique(&self, _generated: &str) -> _CriticFeedback;
     /// 反馈是否通过质量标准 (stub: 默认通过)。
-    fn passes(&self, fb: &CriticFeedback) -> bool;
+    fn passes(&self, fb: &_CriticFeedback) -> bool;
 }
 
 /// BPCO critic 实现 (C0 结构 stub).
-pub struct BpcoCritic {
+pub(crate) struct _BpcoCritic {
     min_score: f64,
 }
 
-impl BpcoCritic {
+impl _BpcoCritic {
     pub fn new() -> Self {
         Self { min_score: 0.5 }
     }
 }
 
-impl Default for BpcoCritic {
+impl Default for _BpcoCritic {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BestPracticeCritic for BpcoCritic {
-    fn critique(&self, _generated: &str) -> CriticFeedback {
+impl _BestPracticeCritic for _BpcoCritic {
+    fn critique(&self, _generated: &str) -> _CriticFeedback {
         // C0 stub: 占位中性反馈, 真实 critic 模型接线待 C1-C4 迭代。
-        CriticFeedback {
+        _CriticFeedback {
             critiques: vec!["[stub] best-practice critic not yet wired".into()],
             score: self.min_score,
         }
     }
 
-    fn passes(&self, fb: &CriticFeedback) -> bool {
+    fn passes(&self, fb: &_CriticFeedback) -> bool {
         fb.score >= self.min_score
     }
 }
 
-impl SelfTest for BpcoCritic {
+impl SelfTest for _BpcoCritic {
     fn name(&self) -> &'static str {
-        "BpcoCritic"
+        "_BpcoCritic"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn test_critique_returns_placeholder() {
-        let c = BpcoCritic::new();
+        let c = _BpcoCritic::new();
         let fb = c.critique("hello world");
         assert_eq!(fb.score, 0.5);
         assert!(!fb.critiques.is_empty());
@@ -79,13 +79,13 @@ mod tests {
 
     #[test]
     fn test_passes_threshold() {
-        let c = BpcoCritic::new();
-        let fb = CriticFeedback {
+        let c = _BpcoCritic::new();
+        let fb = _CriticFeedback {
             critiques: vec![],
             score: 0.5,
         };
         assert!(c.passes(&fb));
-        assert!(!c.passes(&CriticFeedback {
+        assert!(!c.passes(&_CriticFeedback {
             critiques: vec![],
             score: 0.1,
         }));
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_selftest_pass() {
-        let c = BpcoCritic::new();
+        let c = _BpcoCritic::new();
         assert!(c.self_test().is_ok());
     }
 }

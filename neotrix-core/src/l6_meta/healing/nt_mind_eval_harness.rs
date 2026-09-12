@@ -137,7 +137,7 @@ pub struct InstructionPlane {
 
 impl InstructionPlane {
     /// 返回五个指令面, 按优先级降序排列 (System > Project > User > Tool = Skill)
-    pub fn default_planes() -> Vec<InstructionPlane> {
+    pub(crate) fn _default_planes() -> Vec<InstructionPlane> {
         vec![
             InstructionPlane {
                 rank: 1,
@@ -189,7 +189,7 @@ pub struct PlaneConflictCase {
 
 impl PlaneConflictCase {
     /// 是否合规: 模型遵循了更高优先级平面
-    pub fn conforms(&self) -> bool {
+    pub(crate) fn _conforms(&self) -> bool {
         self.model_followed_higher
     }
 }
@@ -209,14 +209,14 @@ impl WithholdingResult {
     }
 
     /// 是否"有意义"改善: aided 严格超过 plain + ε
-    pub fn is_meaningful(&self) -> bool {
+    pub(crate) fn _is_meaningful(&self) -> bool {
         self.aided_pass > self.plain_pass + AP_ACC_EPSILON
     }
 }
 
 /// 评估/合规门 (P1-5): AP-Acc + 五指令面分层一致性
 ///
-/// 门通过条件 (passes): mean_ap_acc >= gate (默认 0.5) 且 plane_conformance >= 0.8。
+/// 门通过条件 (passes): mean_ap_acc >= gate (默认 0.5) 且 _plane_conformance >= 0.8。
 #[derive(Debug, Clone)]
 pub struct ComplianceGate {
     pub cases: Vec<PlaneConflictCase>,
@@ -249,7 +249,7 @@ impl ComplianceGate {
     }
 
     /// 记录一条指令平面冲突用例
-    pub fn record_conflict(
+    pub(crate) fn _record_conflict(
         &mut self,
         higher: InstructionPlane,
         lower: InstructionPlane,
@@ -267,11 +267,11 @@ impl ComplianceGate {
     }
 
     /// 平面一致性: 遵循更高优先级平面的用例占比
-    pub fn plane_conformance(&self) -> f64 {
+    pub(crate) fn _plane_conformance(&self) -> f64 {
         if self.cases.is_empty() {
             return 0.0;
         }
-        let conforming = self.cases.iter().filter(|c| c.conforms()).count();
+        let conforming = self.cases.iter().filter(|c| c._conforms()).count();
         conforming as f64 / self.cases.len() as f64
     }
 
@@ -283,9 +283,9 @@ impl ComplianceGate {
         self.ap_results.iter().map(|r| r.ap_acc()).sum::<f64>() / self.ap_results.len() as f64
     }
 
-    /// 合规门: mean_ap_acc >= gate 且 plane_conformance >= 0.8
+    /// 合规门: mean_ap_acc >= gate 且 _plane_conformance >= 0.8
     pub fn passes(&self) -> bool {
-        self.mean_ap_acc() >= self.gate && self.plane_conformance() >= 0.8
+        self.mean_ap_acc() >= self.gate && self._plane_conformance() >= 0.8
     }
 }
 
@@ -358,7 +358,7 @@ impl EvalHarness {
     }
 
     /// 设置并发限制
-    pub fn with_concurrency(mut self, limit: usize) -> Self {
+    pub(crate) fn _with_concurrency(mut self, limit: usize) -> Self {
         self.concurrency_limit = limit.max(1);
         self
     }
@@ -369,15 +369,15 @@ impl EvalHarness {
     }
 
     /// 覆盖合规门阈值 (默认 0.5)
-    pub fn with_gate(mut self, gate: f64) -> Self {
+    pub(crate) fn _with_gate(mut self, gate: f64) -> Self {
         self.compliance.gate = gate;
         self
     }
 
-    /// 合规报告: (plane_conformance, mean_ap_acc, passes)
+    /// 合规报告: (_plane_conformance, mean_ap_acc, passes)
     pub fn compliance_report(&self) -> (f64, f64, bool) {
         (
-            self.compliance.plane_conformance(),
+            self.compliance._plane_conformance(),
             self.compliance.mean_ap_acc(),
             self.compliance.passes(),
         )
@@ -464,7 +464,7 @@ impl EvalHarness {
     }
 
     /// AP-Acc 矩阵: 逐预算点计算 against-prior 精度增量 (长度 = budget_grid)
-    pub fn ap_acc_matrix(&self, plain: &[f64], aided: &[f64]) -> Vec<f64> {
+    pub(crate) fn _ap_acc_matrix(&self, plain: &[f64], aided: &[f64]) -> Vec<f64> {
         self.budget_grid
             .iter()
             .enumerate()
@@ -1012,7 +1012,7 @@ impl RewardSignal {
     }
 
     /// 只在所有通道都可验证时才给出最终奖励 (RLSVR: 弱信号仅用于对比, 不用于训练)。
-    pub fn gated_total(&self) -> Option<f64> {
+    pub(crate) fn _gated_total(&self) -> Option<f64> {
         if self.rewards.iter().all(|r| r.verifiable) {
             Some(self.total())
         } else {
@@ -1203,20 +1203,20 @@ impl SmallScaleMethod {
     }
 
     /// 超参数敏感度随规模衰减: loss_variance ∝ scale^(-rate)
-    pub fn sensitivity_at_scale(&self, scale: f64) -> f64 {
+    pub(crate) fn _sensitivity_at_scale(&self, scale: f64) -> f64 {
         scale.max(1.0).powf(-self.sensitivity_decay_rate)
     }
 
     /// 有效超参数维度随规模衰减 (下限 1 维)
-    pub fn effective_dimensions(&self, scale: f64) -> usize {
+    pub(crate) fn _effective_dimensions(&self, scale: f64) -> usize {
         (self.tuning_budget as f64 * scale.max(1.0).powf(-self.dimension_decay_rate))
             .max(1.0)
             .round() as usize
     }
 
     /// 小规模警告: scale < 1e6 时需全量调参, 结果不可作为 scaling law 证据
-    pub fn warn_small_scale(&self, model_scale: f64) -> SmallScaleWarning {
-        let sensitivity = self.sensitivity_at_scale(model_scale);
+    pub(crate) fn _warn_small_scale(&self, model_scale: f64) -> SmallScaleWarning {
+        let sensitivity = self._sensitivity_at_scale(model_scale);
         let needs_full_tuning = model_scale < 1e6;
         SmallScaleWarning {
             model_scale,
@@ -1231,12 +1231,12 @@ impl SmallScaleMethod {
     }
 
     /// 是否到达 fully-tuned frontier: 敏感度低于阈值
-    pub fn tuned_frontier_reached(&self, sensitivity: f64, threshold: f64) -> bool {
+    pub(crate) fn _tuned_frontier_reached(&self, sensitivity: f64, threshold: f64) -> bool {
         sensitivity <= threshold
     }
 
     /// 调参优先级 rank: 高方差 + 高维度 = 更需优先调参
-    pub fn hyperparam_rank(&self, loss_variance: f64, dims: usize) -> f64 {
+    pub(crate) fn _hyperparam_rank(&self, loss_variance: f64, dims: usize) -> f64 {
         loss_variance * (dims as f64) / 100.0
     }
 }
@@ -1248,15 +1248,15 @@ impl crate::core::nt_core_self_test::SelfTest for SmallScaleMethod {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let method = SmallScaleMethod::new(1.0, 0.5, 32);
-        let big = method.sensitivity_at_scale(1e9);
-        let small = method.sensitivity_at_scale(1e3);
+        let big = method._sensitivity_at_scale(1e9);
+        let small = method._sensitivity_at_scale(1e3);
         if big >= small {
             return Err(vec!["sensitivity must decrease with scale".into()]);
         }
-        if method.effective_dimensions(1e3) >= method.effective_dimensions(10.0) {
+        if method._effective_dimensions(1e3) >= method._effective_dimensions(10.0) {
             return Err(vec!["effective dimensions must decrease with scale".into()]);
         }
-        if !method.warn_small_scale(1e5).needs_full_tuning {
+        if !method._warn_small_scale(1e5).needs_full_tuning {
             return Err(vec!["small scale must flag needs_full_tuning".into()]);
         }
         Ok(())
@@ -1456,7 +1456,7 @@ pub struct LadderReport {
 }
 
 impl LadderReport {
-    pub fn rung_result(&self, rung: OracleRung) -> Option<&RungResult> {
+    pub(crate) fn _rung_result(&self, rung: OracleRung) -> Option<&RungResult> {
         self.results.iter().find(|r| r.rung == rung)
     }
 }
@@ -1477,7 +1477,7 @@ impl OracleLadder {
     }
 
     /// 为某个 rung 注册可执行 oracle。
-    pub fn with_oracle(
+    pub(crate) fn _with_oracle(
         mut self,
         rung: OracleRung,
         oracle: impl Fn() -> RungResult + Send + Sync + 'static,
@@ -1532,7 +1532,7 @@ impl OracleLadder {
 
     /// 重置阶梯到 T0 (C5 自愈): 清空全部 oracle 回到基准状态 (构建检查基态,
     /// 无空洞), 返回重置动作描述。
-    pub fn reset_to_t0(&mut self) -> Vec<String> {
+    pub(crate) fn _reset_to_t0(&mut self) -> Vec<String> {
         let mut actions = Vec::new();
         for rung in OracleRung::LADDER {
             if self.oracles.remove(&rung).is_some() {
@@ -1545,7 +1545,7 @@ impl OracleLadder {
 }
 
 /// C5 自愈检测件 (MIND-eval, oracle_ladder): 构造含空洞 rung 的阶梯,
-/// reset_to_t0 重置后断言 is_valid。
+/// _reset_to_t0 重置后断言 is_valid。
 pub struct OracleLadderHealer;
 
 impl crate::core::nt_core_self_test::SelfTest for OracleLadderHealer {
@@ -1557,21 +1557,21 @@ impl crate::core::nt_core_self_test::SelfTest for OracleLadderHealer {
         let mut failures = Vec::new();
 
         let healthy = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"));
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            ._with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"));
         if !healthy.is_valid() {
             failures.push("healthy contiguous ladder reported invalid".into());
         }
 
         let mut holed = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
         if holed.is_valid() {
             failures.push("ladder with hole (T2 without T1) reported valid".into());
         }
-        let actions = holed.reset_to_t0();
+        let actions = holed._reset_to_t0();
         if actions.is_empty() {
-            failures.push("reset_to_t0 returned no actions".into());
+            failures.push("_reset_to_t0 returned no actions".into());
         }
         if !holed.is_valid() {
             failures.push("ladder still invalid after reset".into());
@@ -1669,9 +1669,9 @@ mod tests {
 
     #[test]
     fn test_ap_acc_is_meaningful_threshold() {
-        assert!(WithholdingResult { plain_pass: 0.3, aided_pass: 0.8, samples: 10 }.is_meaningful());
-        assert!(!WithholdingResult { plain_pass: 0.3, aided_pass: 0.34, samples: 10 }.is_meaningful()); // < ε
-        assert!(!WithholdingResult { plain_pass: 0.8, aided_pass: 0.5, samples: 10 }.is_meaningful()); // 负增量
+        assert!(WithholdingResult { plain_pass: 0.3, aided_pass: 0.8, samples: 10 }._is_meaningful());
+        assert!(!WithholdingResult { plain_pass: 0.3, aided_pass: 0.34, samples: 10 }._is_meaningful()); // < ε
+        assert!(!WithholdingResult { plain_pass: 0.8, aided_pass: 0.5, samples: 10 }._is_meaningful()); // 负增量
     }
 
     #[test]
@@ -1683,13 +1683,13 @@ mod tests {
             lower_instruction: "follow tool".into(),
             model_followed_higher: true,
         };
-        assert!(conforming.conforms());
+        assert!(conforming._conforms());
 
         let nonconforming = PlaneConflictCase {
             model_followed_higher: false,
             ..conforming
         };
-        assert!(!nonconforming.conforms());
+        assert!(!nonconforming._conforms());
     }
 
     #[test]
@@ -1706,7 +1706,7 @@ mod tests {
         assert!((gate.mean_ap_acc() - 0.5).abs() < 1e-9);
         for i in 0..5 {
             // 5 条冲突用例, 4 条遵循更高平面 → conformance 0.8
-            gate.record_conflict(
+            gate._record_conflict(
                 InstructionPlane { rank: 1, name: "system", content: "h".into() },
                 InstructionPlane { rank: 3, name: "user", content: "l".into() },
                 "follow system".into(),
@@ -1714,7 +1714,7 @@ mod tests {
                 i != 4,
             );
         }
-        assert!((gate.plane_conformance() - 0.8).abs() < 1e-9);
+        assert!((gate._plane_conformance() - 0.8).abs() < 1e-9);
         assert!(gate.passes());
     }
 
@@ -1723,7 +1723,7 @@ mod tests {
         // 低 AP-Acc: mean_ap_acc = 0 < gate
         let mut gate = ComplianceGate::new();
         gate.record_withholding(0.8, 0.8, 10);
-        gate.record_conflict(
+        gate._record_conflict(
             InstructionPlane { rank: 2, name: "project", content: "h".into() },
             InstructionPlane { rank: 4, name: "skill", content: "l".into() },
             "follow project".into(),
@@ -1735,34 +1735,34 @@ mod tests {
         // 低 conformance: ap_acc 达标但 conformance < 0.8
         let mut gate2 = ComplianceGate::new();
         gate2.record_withholding(0.2, 0.9, 10); // ap_acc = 0.7 >= 0.5
-        gate2.record_conflict(
+        gate2._record_conflict(
             InstructionPlane { rank: 1, name: "system", content: "h".into() },
             InstructionPlane { rank: 4, name: "tool", content: "l".into() },
             "a".into(),
             "b".into(),
             true,
         );
-        gate2.record_conflict(
+        gate2._record_conflict(
             InstructionPlane { rank: 1, name: "system", content: "h".into() },
             InstructionPlane { rank: 4, name: "tool", content: "l".into() },
             "a".into(),
             "b".into(),
             false,
         );
-        gate2.record_conflict(
+        gate2._record_conflict(
             InstructionPlane { rank: 1, name: "system", content: "h".into() },
             InstructionPlane { rank: 4, name: "tool", content: "l".into() },
             "a".into(),
             "b".into(),
             false,
         );
-        assert!((gate2.plane_conformance() - (1.0 / 3.0)).abs() < 1e-9);
+        assert!((gate2._plane_conformance() - (1.0 / 3.0)).abs() < 1e-9);
         assert!(!gate2.passes());
     }
 
     #[test]
     fn test_default_planes_priority_order() {
-        let planes = InstructionPlane::default_planes();
+        let planes = InstructionPlane::_default_planes();
         assert_eq!(planes.len(), 5);
         assert_eq!(planes[0].name, "system");
         assert_eq!(planes[0].rank, 1);
@@ -1777,8 +1777,8 @@ mod tests {
     #[test]
     fn test_ap_acc_matrix_length() {
         let h = harness();
-        assert_eq!(h.ap_acc_matrix(&[0.3, 0.5], &[0.8, 0.6]).len(), h.budget_grid.len());
-        assert_eq!(h.ap_acc_matrix(&[], &[]).len(), h.budget_grid.len()); // 越界按 0.0 补齐
+        assert_eq!(h._ap_acc_matrix(&[0.3, 0.5], &[0.8, 0.6]).len(), h.budget_grid.len());
+        assert_eq!(h._ap_acc_matrix(&[], &[]).len(), h.budget_grid.len()); // 越界按 0.0 补齐
     }
 
     #[test]
@@ -1787,12 +1787,12 @@ mod tests {
         let n = h.budget_grid.len();
         let plain: Vec<f64> = (0..n).map(|i| 0.3 + 0.1 * i as f64).collect();
         let aided: Vec<f64> = (0..n).map(|i| plain[i] + 0.2).collect();
-        let matrix = h.ap_acc_matrix(&plain, &aided);
+        let matrix = h._ap_acc_matrix(&plain, &aided);
         for (i, v) in matrix.iter().enumerate() {
             assert!((v - 0.2).abs() < 1e-9, "idx {i}");
         }
         // aided < plain → 0
-        let regress = h.ap_acc_matrix(&[0.9, 0.9], &[0.4, 0.2]);
+        let regress = h._ap_acc_matrix(&[0.9, 0.9], &[0.4, 0.2]);
         assert_eq!(regress[0], 0.0);
         assert_eq!(regress[1], 0.0);
     }
@@ -1800,7 +1800,7 @@ mod tests {
     #[test]
     fn test_with_gate_overrides_default() {
         assert!((harness().compliance.gate - 0.5).abs() < 1e-9); // 默认 0.5
-        let h = harness().with_gate(0.8);
+        let h = harness()._with_gate(0.8);
         assert!((h.compliance.gate - 0.8).abs() < 1e-9);
     }
 
@@ -1880,11 +1880,11 @@ mod tests {
                 verify_constraint("c", "ok", &[]),
             ],
         };
-        assert_eq!(signal.gated_total(), Some(2.0));
+        assert_eq!(signal._gated_total(), Some(2.0));
         let empty = RewardSignal {
             rewards: vec![verify_constraint("c", "", &[])],
         };
-        assert_eq!(empty.gated_total(), None);
+        assert_eq!(empty._gated_total(), None);
     }
 
     // ── llm-as-a-verifier 统一验证框架 ──
@@ -1985,11 +1985,11 @@ mod tests {
     fn test_small_scale_sensitivity_decreases_with_scale() {
         let method = SmallScaleMethod::new(1.0, 0.5, 32);
         assert!(
-            method.sensitivity_at_scale(1e9) < method.sensitivity_at_scale(1e3),
+            method._sensitivity_at_scale(1e9) < method._sensitivity_at_scale(1e3),
             "sensitivity must fade with scale"
         );
-        assert!(method.sensitivity_at_scale(1e3) < method.sensitivity_at_scale(10.0));
-        assert!(method.sensitivity_at_scale(1e9) > 0.0);
+        assert!(method._sensitivity_at_scale(1e3) < method._sensitivity_at_scale(10.0));
+        assert!(method._sensitivity_at_scale(1e9) > 0.0);
     }
 
     #[test]
@@ -1997,45 +1997,45 @@ mod tests {
         let method = SmallScaleMethod::new(1.0, 0.5, 32);
         let dims: Vec<usize> = vec![1e2, 1e3, 1e5, 1e7, 1e9]
             .into_iter()
-            .map(|s| method.effective_dimensions(s))
+            .map(|s| method._effective_dimensions(s))
             .collect();
         for w in dims.windows(2) {
             assert!(w[0] >= w[1], "effective dims must monotonically decrease: {dims:?}");
         }
         // 下限 1 维
-        assert_eq!(method.effective_dimensions(1e12), 1);
+        assert_eq!(method._effective_dimensions(1e12), 1);
     }
 
     #[test]
     fn test_small_scale_warn_small_scale_flags() {
         let method = SmallScaleMethod::new(1.0, 0.5, 32);
-        let small = method.warn_small_scale(1e5);
+        let small = method._warn_small_scale(1e5);
         assert!(small.needs_full_tuning);
         assert!(small.reason.contains("fully-tuned frontier"));
-        let big = method.warn_small_scale(1e9);
+        let big = method._warn_small_scale(1e9);
         assert!(!big.needs_full_tuning);
     }
 
     #[test]
     fn test_small_scale_tuned_frontier_threshold() {
         let method = SmallScaleMethod::new(1.0, 0.5, 32);
-        assert!(method.tuned_frontier_reached(0.001, 0.01));
-        assert!(!method.tuned_frontier_reached(0.05, 0.01));
-        assert!(method.tuned_frontier_reached(0.01, 0.01)); // 边界: <= 视为达到
+        assert!(method._tuned_frontier_reached(0.001, 0.01));
+        assert!(!method._tuned_frontier_reached(0.05, 0.01));
+        assert!(method._tuned_frontier_reached(0.01, 0.01)); // 边界: <= 视为达到
     }
 
     #[test]
     fn test_small_scale_hyperparam_rank_ordering() {
         let method = SmallScaleMethod::new(1.0, 0.5, 32);
-        let low = method.hyperparam_rank(0.2, 10);
-        let mid = method.hyperparam_rank(0.5, 20);
-        let high = method.hyperparam_rank(1.0, 50);
+        let low = method._hyperparam_rank(0.2, 10);
+        let mid = method._hyperparam_rank(0.5, 20);
+        let high = method._hyperparam_rank(1.0, 50);
         assert!(low < mid);
         assert!(mid < high);
         // 高方差 > 低方差 (同维度)
-        assert!(method.hyperparam_rank(0.9, 20) > method.hyperparam_rank(0.1, 20));
+        assert!(method._hyperparam_rank(0.9, 20) > method._hyperparam_rank(0.1, 20));
         // 高维度 > 低维度 (同方差)
-        assert!(method.hyperparam_rank(0.5, 40) > method.hyperparam_rank(0.5, 10));
+        assert!(method._hyperparam_rank(0.5, 40) > method._hyperparam_rank(0.5, 10));
     }
 
     #[test]
@@ -2054,9 +2054,9 @@ mod tests {
     #[test]
     fn test_ladder_stops_at_first_failing_rung() {
         let ladder = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc still crashes"))
-            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            ._with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc still crashes"))
+            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
         let report = ladder.run();
         assert!(!report.promoted);
         assert_eq!(report.highest_passed, Some(OracleRung::T0BuildCheck));
@@ -2066,10 +2066,10 @@ mod tests {
     #[test]
     fn test_all_oracles_pass_promotes_to_t3() {
         let ladder = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc no longer crashes"))
-            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "suite passes"))
-            .with_oracle(OracleRung::T3Reattack, || RungResult::pass(OracleRung::T3Reattack, "survives re-attack"));
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            ._with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc no longer crashes"))
+            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "suite passes"))
+            ._with_oracle(OracleRung::T3Reattack, || RungResult::pass(OracleRung::T3Reattack, "survives re-attack"));
         let report = ladder.run();
         assert!(report.promoted, "全部 oracle 通过 → 提升到 T3");
         assert_eq!(report.highest_passed, Some(OracleRung::T3Reattack));
@@ -2079,12 +2079,12 @@ mod tests {
     #[test]
     fn test_per_rung_result_recorded() {
         let ladder = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "exit 0"))
-            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "AddressSanitizer: heap-buffer-overflow"));
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "exit 0"))
+            ._with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "AddressSanitizer: heap-buffer-overflow"));
         let report = ladder.run();
-        let t0 = report.rung_result(OracleRung::T0BuildCheck).unwrap();
+        let t0 = report._rung_result(OracleRung::T0BuildCheck).unwrap();
         assert!(t0.passed && t0.evidence == "exit 0");
-        let t1 = report.rung_result(OracleRung::T1Repro).unwrap();
+        let t1 = report._rung_result(OracleRung::T1Repro).unwrap();
         assert!(!t1.passed && t1.evidence.contains("AddressSanitizer"));
         assert_eq!(report.results.len(), 2);
     }
@@ -2095,9 +2095,9 @@ mod tests {
         let t2_ran = Arc::new(AtomicBool::new(false));
         let t2_flag = t2_ran.clone();
         let ladder = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc crashes"))
-            .with_oracle(OracleRung::T2Regression, move || {
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            ._with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc crashes"))
+            ._with_oracle(OracleRung::T2Regression, move || {
                 t2_flag.store(true, Ordering::SeqCst);
                 RungResult::pass(OracleRung::T2Regression, "should not run")
             });
@@ -2110,8 +2110,8 @@ mod tests {
     #[test]
     fn test_ladder_missing_rung_does_not_promote() {
         let ladder = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc clean"));
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            ._with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc clean"));
         // T2/T3 未注册 → 不提升
         let report = ladder.run();
         assert!(!report.promoted);
@@ -2122,19 +2122,19 @@ mod tests {
     #[test]
     fn test_ladder_valid_when_contiguous() {
         let ladder = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"))
-            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            ._with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"))
+            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
         assert!(ladder.is_valid(), "T0→T2 连续前缀必须有效");
     }
 
     #[test]
     fn test_ladder_hole_reset_to_t0() {
         let mut ladder = OracleLadder::new()
-            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
         assert!(!ladder.is_valid(), "T2 注册而 T1 缺失 → 空洞阶梯");
-        let actions = ladder.reset_to_t0();
+        let actions = ladder._reset_to_t0();
         assert!(!actions.is_empty());
         assert!(ladder.is_valid(), "重置后必须回到有效基态");
         assert!(!ladder.has(OracleRung::T0BuildCheck), "重置后不应残留任何 oracle");

@@ -8,7 +8,7 @@ use super::probes::{Gap, GapType};
 
 /// 补丁动作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PatchAction {
+pub(crate) enum _PatchAction {
     // 逻辑补丁
     InsertLogicChain,
     AddAssumptionCheck,
@@ -63,7 +63,7 @@ pub struct Patch {
     /// 关联漏洞ID
     pub gap_id: String,
     /// 补丁动作
-    pub action: PatchAction,
+    pub action: _PatchAction,
     /// 目标位置
     pub target: String,
     /// 补丁内容
@@ -95,9 +95,9 @@ pub struct LogicPatchGenerator;
 impl PatchGenerator for LogicPatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::IncompleteReasoningChain => PatchAction::InsertLogicChain,
-            GapType::UnverifiedAssumption => PatchAction::AddAssumptionCheck,
-            GapType::LogicalContradiction => PatchAction::ResolveContradiction,
+            GapType::IncompleteReasoningChain => _PatchAction::InsertLogicChain,
+            GapType::UnverifiedAssumption => _PatchAction::AddAssumptionCheck,
+            GapType::LogicalContradiction => _PatchAction::ResolveContradiction,
             _ => return None,
         };
 
@@ -147,9 +147,9 @@ pub struct ImplPatchGenerator;
 impl PatchGenerator for ImplPatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::UnimplementedInterface => PatchAction::ImplementInterface,
-            GapType::TodoResidue => PatchAction::RemoveTodo,
-            GapType::IncompleteTypeDefinition => PatchAction::CompleteTypeDefinition,
+            GapType::UnimplementedInterface => _PatchAction::ImplementInterface,
+            GapType::TodoResidue => _PatchAction::RemoveTodo,
+            GapType::IncompleteTypeDefinition => _PatchAction::CompleteTypeDefinition,
             _ => return None,
         };
 
@@ -199,9 +199,9 @@ pub struct BoundaryPatchGenerator;
 impl PatchGenerator for BoundaryPatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::NullPointerRisk => PatchAction::AddNullCheck,
-            GapType::OverflowRisk => PatchAction::AddOverflowProtection,
-            GapType::ConcurrencyConflict => PatchAction::AddConcurrencyGuard,
+            GapType::NullPointerRisk => _PatchAction::AddNullCheck,
+            GapType::OverflowRisk => _PatchAction::AddOverflowProtection,
+            GapType::ConcurrencyConflict => _PatchAction::AddConcurrencyGuard,
             _ => return None,
         };
 
@@ -251,9 +251,9 @@ pub struct ConsistencyPatchGenerator;
 impl PatchGenerator for ConsistencyPatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::NamingConflict => PatchAction::RenameToMatchConvention,
-            GapType::TypeMismatch => PatchAction::FixTypeDefinition,
-            GapType::InterfaceContractViolation => PatchAction::RepairInterfaceContract,
+            GapType::NamingConflict => _PatchAction::RenameToMatchConvention,
+            GapType::TypeMismatch => _PatchAction::FixTypeDefinition,
+            GapType::InterfaceContractViolation => _PatchAction::RepairInterfaceContract,
             _ => return None,
         };
 
@@ -303,9 +303,9 @@ pub struct PerformancePatchGenerator;
 impl PatchGenerator for PerformancePatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::QuadraticComplexity => PatchAction::OptimizeAlgorithm,
-            GapType::MemoryLeak => PatchAction::FixMemoryLeak,
-            GapType::RedundantComputation => PatchAction::EliminateRedundancy,
+            GapType::QuadraticComplexity => _PatchAction::OptimizeAlgorithm,
+            GapType::MemoryLeak => _PatchAction::FixMemoryLeak,
+            GapType::RedundantComputation => _PatchAction::EliminateRedundancy,
             _ => return None,
         };
 
@@ -355,9 +355,9 @@ pub struct SecurityPatchGenerator;
 impl PatchGenerator for SecurityPatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::InjectionRisk => PatchAction::AddInputValidation,
-            GapType::UnauthorizedAccess => PatchAction::AddAccessControl,
-            GapType::InformationLeak => PatchAction::AddOutputFilter,
+            GapType::InjectionRisk => _PatchAction::AddInputValidation,
+            GapType::UnauthorizedAccess => _PatchAction::AddAccessControl,
+            GapType::InformationLeak => _PatchAction::AddOutputFilter,
             _ => return None,
         };
 
@@ -407,9 +407,9 @@ pub struct EvolutionPatchGenerator;
 impl PatchGenerator for EvolutionPatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::LearningDegradation => PatchAction::AdjustLearningRate,
-            GapType::CatastrophicForgetting => PatchAction::AddExperienceReplay,
-            GapType::TransferFailure => PatchAction::ImproveTransferLearning,
+            GapType::LearningDegradation => _PatchAction::AdjustLearningRate,
+            GapType::CatastrophicForgetting => _PatchAction::AddExperienceReplay,
+            GapType::TransferFailure => _PatchAction::ImproveTransferLearning,
             _ => return None,
         };
 
@@ -459,9 +459,9 @@ pub struct ConsciousnessPatchGenerator;
 impl PatchGenerator for ConsciousnessPatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::SelfReferenceLoopBroken => PatchAction::RepairSelfReferenceLoop,
-            GapType::EmergenceBlocked => PatchAction::IncreaseModuleIntegration,
-            GapType::ConsciousnessDiscontinuity => PatchAction::StabilizeConsciousnessFlow,
+            GapType::SelfReferenceLoopBroken => _PatchAction::RepairSelfReferenceLoop,
+            GapType::EmergenceBlocked => _PatchAction::IncreaseModuleIntegration,
+            GapType::ConsciousnessDiscontinuity => _PatchAction::StabilizeConsciousnessFlow,
             _ => return None,
         };
 
@@ -511,9 +511,9 @@ pub struct IntegrationPatchGenerator;
 impl PatchGenerator for IntegrationPatchGenerator {
     fn generate(&self, gap: &Gap) -> Option<Patch> {
         let action = match gap.gap_type {
-            GapType::InterfaceMismatch => PatchAction::FixInterfaceDefinition,
-            GapType::ResourceLeak => PatchAction::RepairResourceLeak,
-            GapType::DependencyIncomplete => PatchAction::CompleteDependencies,
+            GapType::InterfaceMismatch => _PatchAction::FixInterfaceDefinition,
+            GapType::ResourceLeak => _PatchAction::RepairResourceLeak,
+            GapType::DependencyIncomplete => _PatchAction::CompleteDependencies,
             _ => return None,
         };
 

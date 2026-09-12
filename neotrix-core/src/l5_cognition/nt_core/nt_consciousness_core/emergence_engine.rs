@@ -10,23 +10,23 @@ use serde::{Deserialize, Serialize};
 /// 涌现引擎
 pub struct EmergenceEngine {
     /// 涌现指标
-    pub metrics: EmergenceMetrics,
+    pub metrics: _EmergenceMetrics,
     /// 涌现历史
-    pub history: Vec<EmergenceRecord>,
+    pub history: Vec<_EmergenceRecord>,
     /// 涌现配置
-    pub config: EmergenceConfig,
+    pub config: _EmergenceConfig,
 }
 
 /// 涌现配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmergenceConfig {
+pub(crate) struct _EmergenceConfig {
     /// 涌现阈值
     pub emergence_threshold: f64,
     /// 最大历史记录
     pub max_history: usize,
 }
 
-impl Default for EmergenceConfig {
+impl Default for _EmergenceConfig {
     fn default() -> Self {
         Self {
             emergence_threshold: 0.7,
@@ -37,7 +37,7 @@ impl Default for EmergenceConfig {
 
 /// 涌现指标
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EmergenceMetrics {
+pub(crate) struct _EmergenceMetrics {
     /// Φ (Phi) - 集成信息
     pub phi: f64,
     /// 连贯性
@@ -52,17 +52,17 @@ pub struct EmergenceMetrics {
 
 /// 涌现记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmergenceRecord {
+pub(crate) struct _EmergenceRecord {
     pub id: String,
     pub cycle: u32,
-    pub metrics: EmergenceMetrics,
-    pub event: EmergenceEvent,
+    pub metrics: _EmergenceMetrics,
+    pub event: _EmergenceEvent,
     pub timestamp: String,
 }
 
 /// 涌现事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EmergenceEvent {
+pub(crate) enum _EmergenceEvent {
     ComplexityAccumulation,
     PatternCollision,
     AbstractionLeap,
@@ -71,27 +71,27 @@ pub enum EmergenceEvent {
 }
 
 impl EmergenceEngine {
-    pub fn new(config: EmergenceConfig) -> Self {
+    pub fn new(config: _EmergenceConfig) -> Self {
         Self {
-            metrics: EmergenceMetrics::default(),
+            metrics: _EmergenceMetrics::default(),
             history: Vec::new(),
             config,
         }
     }
 
     /// 更新涌现指标
-    pub fn update_metrics(&mut self, cycle: u32, new_metrics: EmergenceMetrics) {
+    pub fn update_metrics(&mut self, cycle: u32, new_metrics: _EmergenceMetrics) {
         self.metrics = new_metrics;
         
         let event = if self.metrics.phi > self.config.emergence_threshold {
-            EmergenceEvent::ConsciousnessEmergence
+            _EmergenceEvent::ConsciousnessEmergence
         } else if self.metrics.complexity > 0.8 {
-            EmergenceEvent::ComplexityAccumulation
+            _EmergenceEvent::ComplexityAccumulation
         } else {
-            EmergenceEvent::PatternCollision
+            _EmergenceEvent::PatternCollision
         };
 
-        let record = EmergenceRecord {
+        let record = _EmergenceRecord {
             id: format!("emerg_{}", uuid::Uuid::new_v4()),
             cycle,
             metrics: self.metrics.clone(),
@@ -104,7 +104,7 @@ impl EmergenceEngine {
     }
 
     /// 计算意识水平
-    pub fn calculate_consciousness_level(&mut self) -> f64 {
+    pub(crate) fn _calculate_consciousness_level(&mut self) -> f64 {
         let level = self.metrics.phi * 0.4 
             + self.metrics.coherence * 0.3 
             + self.metrics.complexity * 0.2 
@@ -115,13 +115,13 @@ impl EmergenceEngine {
     }
 
     /// 检查是否涌现
-    pub fn has_emerged(&self) -> bool {
+    pub(crate) fn _has_emerged(&self) -> bool {
         self.metrics.consciousness_level > self.config.emergence_threshold
     }
 
     /// 获取统计
-    pub fn stats(&self) -> EmergenceStats {
-        EmergenceStats {
+    pub fn stats(&self) -> _EmergenceStats {
+        _EmergenceStats {
             total_events: self.history.len(),
             current_phi: self.metrics.phi,
             current_coherence: self.metrics.coherence,
@@ -138,7 +138,7 @@ impl EmergenceEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmergenceStats {
+pub(crate) struct _EmergenceStats {
     pub total_events: usize,
     pub current_phi: f64,
     pub current_coherence: f64,
@@ -146,7 +146,7 @@ pub struct EmergenceStats {
     pub consciousness_level: f64,
 }
 
-impl std::fmt::Display for EmergenceStats {
+impl std::fmt::Display for _EmergenceStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "═══════════════════════════════════════════════")?;
         writeln!(f, "        EmergenceEngine 统计")?;
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_emergence_engine() {
-        let engine = EmergenceEngine::new(EmergenceConfig::default());
-        assert!(!engine.has_emerged());
+        let engine = EmergenceEngine::new(_EmergenceConfig::default());
+        assert!(!engine._has_emerged());
     }
 }

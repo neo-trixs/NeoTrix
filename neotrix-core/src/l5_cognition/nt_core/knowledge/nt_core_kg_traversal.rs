@@ -12,14 +12,14 @@ use serde::{Deserialize, Serialize};
 
 /// 知识图谱
 pub struct KnowledgeGraph {
-    nodes: HashMap<String, KGNode>,
-    edges: HashMap<String, Vec<KGEdge>>,
-    reverse_edges: HashMap<String, Vec<KGEdge>>,
+    nodes: HashMap<String, _KGNode>,
+    edges: HashMap<String, Vec<_KGEdge>>,
+    reverse_edges: HashMap<String, Vec<_KGEdge>>,
 }
 
 /// 图节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KGNode {
+pub(crate) struct _KGNode {
     pub id: String,
     pub node_type: String,
     pub properties: HashMap<String, serde_json::Value>,
@@ -28,7 +28,7 @@ pub struct KGNode {
 
 /// 图边
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KGEdge {
+pub(crate) struct _KGEdge {
     pub source: String,
     pub target: String,
     pub edge_type: String,
@@ -39,8 +39,8 @@ pub struct KGEdge {
 /// 遍历结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraversalResult {
-    pub nodes: Vec<KGNode>,
-    pub edges: Vec<KGEdge>,
+    pub nodes: Vec<_KGNode>,
+    pub edges: Vec<_KGEdge>,
     pub paths: Vec<Vec<String>>,
     pub distances: HashMap<String, f64>,
 }
@@ -56,9 +56,9 @@ pub struct Community {
 
 /// 中心性指标
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CentralityMetrics {
+pub(crate) struct _CentralityMetrics {
     pub node_id: String,
-    pub degree_centrality: f64,
+    pub _degree_centrality: f64,
     pub betweenness_centrality: f64,
     pub closeness_centrality: f64,
     pub eigenvector_centrality: f64,
@@ -75,12 +75,12 @@ impl KnowledgeGraph {
     }
 
     /// 添加节点
-    pub fn add_node(&mut self, node: KGNode) {
+    pub fn add_node(&mut self, node: _KGNode) {
         self.nodes.insert(node.id.clone(), node);
     }
 
     /// 添加边
-    pub fn add_edge(&mut self, edge: KGEdge) {
+    pub fn add_edge(&mut self, edge: _KGEdge) {
         self.edges.entry(edge.source.clone()).or_insert_with(Vec::new).push(edge.clone());
         self.reverse_edges.entry(edge.target.clone()).or_insert_with(Vec::new).push(edge);
     }
@@ -174,7 +174,7 @@ impl KnowledgeGraph {
     }
 
     /// Dijkstra 最短路径
-    pub fn dijkstra(&self, start: &str, end: &str) -> Option<(Vec<String>, f64)> {
+    pub(crate) fn _dijkstra(&self, start: &str, end: &str) -> Option<(Vec<String>, f64)> {
         let mut distances: HashMap<String, f64> = HashMap::new();
         let mut previous: HashMap<String, String> = HashMap::new();
         let mut visited = HashSet::new();
@@ -217,7 +217,7 @@ impl KnowledgeGraph {
     }
 
     /// 计算度中心性
-    pub fn degree_centrality(&self) -> HashMap<String, f64> {
+    pub(crate) fn _degree_centrality(&self) -> HashMap<String, f64> {
         let n = self.nodes.len() as f64;
         let mut centrality = HashMap::new();
 
@@ -291,22 +291,22 @@ impl KnowledgeGraph {
     }
 
     /// 获取节点
-    pub fn get_node(&self, id: &str) -> Option<&KGNode> {
+    pub fn get_node(&self, id: &str) -> Option<&_KGNode> {
         self.nodes.get(id)
     }
 
     /// 获取边
-    pub fn get_edges(&self, node_id: &str) -> Option<&Vec<KGEdge>> {
+    pub fn get_edges(&self, node_id: &str) -> Option<&Vec<_KGEdge>> {
         self.edges.get(node_id)
     }
 
     /// 获取所有节点
-    pub fn get_all_nodes(&self) -> &HashMap<String, KGNode> {
+    pub fn get_all_nodes(&self) -> &HashMap<String, _KGNode> {
         &self.nodes
     }
 
     /// 获取所有边
-    pub fn get_all_edges(&self) -> &HashMap<String, Vec<KGEdge>> {
+    pub fn get_all_edges(&self) -> &HashMap<String, Vec<_KGEdge>> {
         &self.edges
     }
 }

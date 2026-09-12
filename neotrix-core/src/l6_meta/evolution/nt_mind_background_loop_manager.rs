@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 背景循环管理器
-pub struct BackgroundLoopManager {
+pub(crate) struct _BackgroundLoopManager {
     loops: Vec<BackgroundLoop>,
     config: LoopConfig,
     stats: LoopStats,
@@ -45,8 +45,8 @@ impl Default for LoopConfig {
 pub struct BackgroundLoop {
     pub loop_id: String,
     pub name: String,
-    pub loop_type: LoopType,
-    pub status: LoopStatus,
+    pub loop_type: _LoopType,
+    pub status: _LoopStatus,
     pub interval: u64,
     pub last_run: Option<chrono::DateTime<chrono::Utc>>,
     pub next_run: Option<chrono::DateTime<chrono::Utc>>,
@@ -56,7 +56,7 @@ pub struct BackgroundLoop {
 /// 循环类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum LoopType {
+pub(crate) enum _LoopType {
     Evolution,      // 进化循环
     HealthCheck,    // 健康检查
     KnowledgeSync,  // 知识同步
@@ -67,7 +67,7 @@ pub enum LoopType {
 /// 循环状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum LoopStatus {
+pub(crate) enum _LoopStatus {
     Running,
     Paused,
     Stopped,
@@ -95,7 +95,7 @@ pub struct LoopStats {
 
 /// 循环事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoopEvent {
+pub(crate) struct _LoopEvent {
     pub event_id: String,
     pub loop_id: String,
     pub event_type: String,
@@ -103,7 +103,7 @@ pub struct LoopEvent {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
-impl BackgroundLoopManager {
+impl _BackgroundLoopManager {
     /// 创建新的背景循环管理器
     pub fn new() -> Self {
         Self {
@@ -121,14 +121,14 @@ impl BackgroundLoopManager {
     }
 
     /// 创建新的背景循环
-    pub fn create_loop(&mut self, name: &str, loop_type: LoopType, interval: u64) -> String {
+    pub(crate) fn _create_loop(&mut self, name: &str, loop_type: _LoopType, interval: u64) -> String {
         let loop_id = uuid::Uuid::new_v4().to_string();
 
         let loop_obj = BackgroundLoop {
             loop_id: loop_id.clone(),
             name: name.to_string(),
             loop_type,
-            status: LoopStatus::Stopped,
+            status: _LoopStatus::Stopped,
             interval,
             last_run: None,
             next_run: None,
@@ -146,13 +146,13 @@ impl BackgroundLoopManager {
     }
 
     /// 启动循环
-    pub fn start_loop(&mut self, loop_id: &str) -> bool {
+    pub(crate) fn _start_loop(&mut self, loop_id: &str) -> bool {
         if let Some(loop_obj) = self.loops.iter_mut().find(|l| l.loop_id == loop_id) {
             if self.stats.running_loops >= self.config.max_concurrent_loops as u64 {
                 return false;
             }
 
-            loop_obj.status = LoopStatus::Running;
+            loop_obj.status = _LoopStatus::Running;
             loop_obj.next_run = Some(chrono::Utc::now() + chrono::Duration::seconds(loop_obj.interval as i64));
             self.stats.running_loops += 1;
             true
@@ -162,9 +162,9 @@ impl BackgroundLoopManager {
     }
 
     /// 停止循环
-    pub fn stop_loop(&mut self, loop_id: &str) -> bool {
+    pub(crate) fn _stop_loop(&mut self, loop_id: &str) -> bool {
         if let Some(loop_obj) = self.loops.iter_mut().find(|l| l.loop_id == loop_id) {
-            loop_obj.status = LoopStatus::Stopped;
+            loop_obj.status = _LoopStatus::Stopped;
             loop_obj.next_run = None;
             self.stats.running_loops -= 1;
             true
@@ -174,9 +174,9 @@ impl BackgroundLoopManager {
     }
 
     /// 暂停循环
-    pub fn pause_loop(&mut self, loop_id: &str) -> bool {
+    pub(crate) fn _pause_loop(&mut self, loop_id: &str) -> bool {
         if let Some(loop_obj) = self.loops.iter_mut().find(|l| l.loop_id == loop_id) {
-            loop_obj.status = LoopStatus::Paused;
+            loop_obj.status = _LoopStatus::Paused;
             true
         } else {
             false
@@ -184,7 +184,7 @@ impl BackgroundLoopManager {
     }
 
     /// 检查资源使用
-    pub fn check_resources(&self, loop_id: &str) -> Option<ResourceUsage> {
+    pub(crate) fn _check_resources(&self, loop_id: &str) -> Option<ResourceUsage> {
         self.loops.iter()
             .find(|l| l.loop_id == loop_id)
             .map(|l| l.resource_usage.clone())
@@ -201,7 +201,7 @@ impl BackgroundLoopManager {
     }
 
     /// 清理已停止的循环
-    pub fn cleanup_stopped(&mut self) {
-        self.loops.retain(|l| l.status != LoopStatus::Stopped);
+    pub(crate) fn _cleanup_stopped(&mut self) {
+        self.loops.retain(|l| l.status != _LoopStatus::Stopped);
     }
 }

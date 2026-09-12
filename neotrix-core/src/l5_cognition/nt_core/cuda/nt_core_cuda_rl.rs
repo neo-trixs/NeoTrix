@@ -10,18 +10,18 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// CUDA Agent RL优化器
-pub struct CUDAAgentRLOptimizer {
-    strategies: Vec<RLStrategy>,
-    curriculum: Vec<CurriculumItem>,
+pub(crate) struct _CUDAAgentRLOptimizer {
+    strategies: Vec<_RLStrategy>,
+    curriculum: Vec<_CurriculumItem>,
     #[allow(dead_code)]
     optimization_history: Vec<OptimizationResult>,
-    config: RLOptimizerConfig,
-    stats: RLOptimizerStats,
+    config: _RLOptimizerConfig,
+    stats: _RLOptimizerStats,
 }
 
 /// RL优化器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RLOptimizerConfig {
+pub(crate) struct _RLOptimizerConfig {
     pub max_strategies: usize,
     pub learning_rate: f64,
     pub exploration_rate: f64,
@@ -29,7 +29,7 @@ pub struct RLOptimizerConfig {
     pub batch_size: usize,
 }
 
-impl Default for RLOptimizerConfig {
+impl Default for _RLOptimizerConfig {
     fn default() -> Self {
         Self {
             max_strategies: 50,
@@ -43,7 +43,7 @@ impl Default for RLOptimizerConfig {
 
 /// RL策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RLStrategy {
+pub(crate) struct _RLStrategy {
     pub strategy_id: String,
     pub name: String,
     pub strategy_type: StrategyType,
@@ -65,7 +65,7 @@ pub enum StrategyType {
 
 /// 课程项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CurriculumItem {
+pub(crate) struct _CurriculumItem {
     pub item_id: String,
     pub name: String,
     pub difficulty: f64,
@@ -86,7 +86,7 @@ pub struct OptimizationResult {
 
 /// RL优化器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RLOptimizerStats {
+pub(crate) struct _RLOptimizerStats {
     pub total_strategies: u64,
     pub total_optimizations: u64,
     pub avg_improvement: f64,
@@ -94,15 +94,15 @@ pub struct RLOptimizerStats {
     pub total_reward: f64,
 }
 
-impl CUDAAgentRLOptimizer {
+impl _CUDAAgentRLOptimizer {
     /// 创建新的 CUDA Agent RL优化器
     pub fn new() -> Self {
         Self {
             strategies: Vec::new(),
             curriculum: Vec::new(),
             optimization_history: Vec::new(),
-            config: RLOptimizerConfig::default(),
-            stats: RLOptimizerStats {
+            config: _RLOptimizerConfig::default(),
+            stats: _RLOptimizerStats {
                 total_strategies: 0,
                 total_optimizations: 0,
                 avg_improvement: 0.0,
@@ -113,29 +113,29 @@ impl CUDAAgentRLOptimizer {
     }
 
     /// 添加策略
-    pub fn add_strategy(&mut self, strategy: RLStrategy) {
+    pub fn add_strategy(&mut self, strategy: _RLStrategy) {
         self.strategies.push(strategy);
         self.stats.total_strategies += 1;
     }
 
     /// 选择最佳策略
-    pub fn select_best_strategy(&self) -> Option<&RLStrategy> {
+    pub(crate) fn _select_best_strategy(&self) -> Option<&_RLStrategy> {
         self.strategies.iter().max_by(|a, b| a.performance.partial_cmp(&b.performance).unwrap())
     }
 
     /// 探索新策略
-    pub fn explore(&mut self) -> Option<&RLStrategy> {
+    pub fn explore(&mut self) -> Option<&_RLStrategy> {
         if rand::random::<f64>() < self.config.exploration_rate {
             // 随机选择一个策略
             let index = (rand::random::<f64>() * self.strategies.len() as f64) as usize;
             self.strategies.get(index)
         } else {
-            self.select_best_strategy()
+            self._select_best_strategy()
         }
     }
 
     /// 更新策略性能
-    pub fn update_performance(&mut self, strategy_id: &str, reward: f64) {
+    pub(crate) fn _update_performance(&mut self, strategy_id: &str, reward: f64) {
         if let Some(strategy) = self.strategies.iter_mut().find(|s| s.strategy_id == strategy_id) {
             strategy.performance = strategy.performance * 0.9 + reward * 0.1;
             strategy.usage_count += 1;
@@ -144,22 +144,22 @@ impl CUDAAgentRLOptimizer {
     }
 
     /// 创建课程
-    pub fn create_curriculum(&mut self, items: Vec<CurriculumItem>) {
+    pub(crate) fn _create_curriculum(&mut self, items: Vec<_CurriculumItem>) {
         self.curriculum = items;
     }
 
     /// 获取所有策略
-    pub fn strategies(&self) -> &[RLStrategy] {
+    pub fn strategies(&self) -> &[_RLStrategy] {
         &self.strategies
     }
 
     /// 获取课程
-    pub fn curriculum(&self) -> &[CurriculumItem] {
+    pub fn curriculum(&self) -> &[_CurriculumItem] {
         &self.curriculum
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &RLOptimizerStats {
+    pub fn stats(&self) -> &_RLOptimizerStats {
         &self.stats
     }
 }

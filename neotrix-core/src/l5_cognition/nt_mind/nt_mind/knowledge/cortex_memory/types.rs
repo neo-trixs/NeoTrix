@@ -253,7 +253,7 @@ impl MemoryTrace {
         self
     }
 
-    pub fn with_association(mut self, trace_id: &str) -> Self {
+    pub(crate) fn _with_association(mut self, trace_id: &str) -> Self {
         self.associations.push(trace_id.to_string());
         self
     }
@@ -292,7 +292,7 @@ impl MemoryLayer {
         }
     }
 
-    pub fn update_frequency(&self) -> usize {
+    pub(crate) fn _update_frequency(&self) -> usize {
         match self {
             MemoryLayer::Sensory => 1,
             MemoryLayer::Topic => 1,
@@ -301,7 +301,7 @@ impl MemoryLayer {
         }
     }
 
-    pub fn promote_threshold(&self) -> f64 {
+    pub(crate) fn _promote_threshold(&self) -> f64 {
         match self {
             MemoryLayer::Sensory => 0.4,
             MemoryLayer::Topic => 0.6,
@@ -324,12 +324,12 @@ pub struct CmsConfig {
 impl Default for CmsConfig {
     fn default() -> Self {
         Self {
-            topic_frequency: MemoryLayer::Topic.update_frequency(),
-            event_frequency: MemoryLayer::Event.update_frequency(),
-            fact_frequency: MemoryLayer::Fact.update_frequency(),
-            topic_threshold: MemoryLayer::Topic.promote_threshold(),
-            event_threshold: MemoryLayer::Event.promote_threshold(),
-            fact_threshold: MemoryLayer::Fact.promote_threshold(),
+            topic_frequency: MemoryLayer::Topic._update_frequency(),
+            event_frequency: MemoryLayer::Event._update_frequency(),
+            fact_frequency: MemoryLayer::Fact._update_frequency(),
+            topic_threshold: MemoryLayer::Topic._promote_threshold(),
+            event_threshold: MemoryLayer::Event._promote_threshold(),
+            fact_threshold: MemoryLayer::Fact._promote_threshold(),
         }
     }
 }

@@ -14,7 +14,7 @@ use super::{
 };
 
 /// 运行迭代验证演示
-pub fn run_iteration_demo() {
+pub(crate) fn _run_iteration_demo() {
     println!("╔═══════════════════════════════════════════════════════════════════════╗");
     println!("║         NeoTrix 意识核心 — 迭代验证引擎 (Iteration Verification)     ║");
     println!("╚═══════════════════════════════════════════════════════════════════════╝");
@@ -63,7 +63,7 @@ pub fn run_iteration_demo() {
 }
 
 /// 运行单次迭代演示
-pub fn run_single_iteration_demo(cycle: u32) {
+pub(crate) fn _run_single_iteration_demo(cycle: u32) {
     println!("═══════════════════════════════════════════════════════════════════════");
     println!("  Cycle {} - 单次迭代演示", cycle);
     println!("═══════════════════════════════════════════════════════════════════════");
@@ -135,6 +135,6 @@ mod tests {
 
     #[test]
     fn test_single_iteration() {
-        run_single_iteration_demo(0);
+        _run_single_iteration_demo(0);
     }
 }

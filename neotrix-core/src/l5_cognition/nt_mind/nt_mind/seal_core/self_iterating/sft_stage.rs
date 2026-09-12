@@ -138,7 +138,7 @@ impl SftStage {
 
     /// 计算 SFT loss（质量加权的模式分布偏差）。
     /// 类比 token-level cross-entropy：模型输出分布 vs 监督目标分布。
-    pub fn compute_sft_loss(&self) -> f64 {
+    pub(crate) fn _compute_sft_loss(&self) -> f64 {
         if self.buffer.is_empty() {
             return 0.0;
         }
@@ -190,7 +190,7 @@ impl SftStage {
         self.total_updates += 1;
 
         // SFT loss 是训练诊断指标，不直接惩罚奖励（SFT 是前置阶段）
-        let loss = self.compute_sft_loss();
+        let loss = self._compute_sft_loss();
         log::trace!(
             "[sft_stage] loss={:.4} avg_quality={:.4} examples={} updates={}",
             loss, self.avg_quality(), self.buffer.len(), self.total_updates
@@ -200,7 +200,7 @@ impl SftStage {
     }
 
     /// 当前对某模式的对齐度（作为 DPO 的 π_ref 质量估计）
-    pub fn reference_quality(&self, mode: u8) -> f64 {
+    pub(crate) fn _reference_quality(&self, mode: u8) -> f64 {
         self.mode_quality.get(mode as usize).copied().unwrap_or(0.0)
     }
 
@@ -215,7 +215,7 @@ impl SftStage {
         SftReport {
             total_updates: self.total_updates,
             buffer_size: self.buffer.len(),
-            last_loss: self.compute_sft_loss(),
+            last_loss: self._compute_sft_loss(),
             avg_quality: self.avg_quality(),
             aligned_modes,
         }
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn test_sft_loss_empty_buffer() {
         let stage = SftStage::new();
-        assert_eq!(stage.compute_sft_loss(), 0.0);
+        assert_eq!(stage._compute_sft_loss(), 0.0);
     }
 
     #[test]
@@ -264,7 +264,7 @@ mod tests {
         let mut stage = SftStage::new();
         stage.mode_quality[2] = 0.9;
         stage.buffer.push(example("task", 2, 0.95));
-        let loss = stage.compute_sft_loss();
+        let loss = stage._compute_sft_loss();
         assert!(loss >= 0.0);
         assert!(loss < 1.0, "aligned mode should have small loss");
     }
@@ -274,7 +274,7 @@ mod tests {
         let mut stage = SftStage::new();
         stage.mode_quality[2] = 0.1;
         stage.buffer.push(example("task", 2, 0.95));
-        let loss = stage.compute_sft_loss();
+        let loss = stage._compute_sft_loss();
         assert!(loss >= 0.0);
         assert!(loss > 0.1, "unaligned mode should have larger loss");
     }
@@ -288,7 +288,7 @@ mod tests {
         assert!(!result.stage_name.is_empty());
         assert_eq!(stage.total_updates, 1);
         // 模式 5 的对齐度应被推动
-        assert!(stage.reference_quality(5) > 0.0);
+        assert!(stage._reference_quality(5) > 0.0);
     }
 
     #[test]
@@ -304,7 +304,7 @@ mod tests {
         stage.learning_rate = 0.5;
         stage.process(vec![example("t", 3, 1.0)], 0.0);
         // EMA: 0.0*(1-0.5) + 1.0*0.5 = 0.5
-        assert!((stage.reference_quality(3) - 0.5).abs() < 1e-6);
+        assert!((stage._reference_quality(3) - 0.5).abs() < 1e-6);
     }
 
     #[test]
@@ -330,7 +330,7 @@ mod tests {
         let mut stage = SftStage::new();
         // 模式 200 越界应被 clamp 到最后一个索引
         stage.process(vec![example("t", 200, 0.9)], 0.0);
-        assert!((stage.reference_quality(15) - stage.mode_quality[15]).abs() < 1e-9);
+        assert!((stage._reference_quality(15) - stage.mode_quality[15]).abs() < 1e-9);
     }
 
     #[test]

@@ -8,12 +8,12 @@ use crate::core::default_specialist_states;
 use crate::core::nt_core_self::SiliconSelfModel;
 
 #[derive(Debug, Clone)]
-pub struct BenchPhase {
+pub(crate) struct _BenchPhase {
     pub label: String,
     pub durations: Vec<Duration>,
 }
 
-impl BenchPhase {
+impl _BenchPhase {
     pub fn new(label: &str) -> Self {
         Self { label: label.to_string(), durations: Vec::new() }
     }
@@ -22,7 +22,7 @@ impl BenchPhase {
         self.durations.push(d);
     }
 
-    pub fn avg_ms(&self) -> f64 {
+    pub(crate) fn _avg_ms(&self) -> f64 {
         if self.durations.is_empty() { return 0.0; }
         let total: Duration = self.durations.iter().cloned().sum();
         total.as_secs_f64() * 1000.0 / self.durations.len() as f64
@@ -64,7 +64,7 @@ fn build_full_engine() -> ReasoningEngine {
     engine
 }
 
-pub fn bench_plan_reasoning(iterations: usize) -> Vec<BenchPhase> {
+pub fn bench_plan_reasoning(iterations: usize) -> Vec<_BenchPhase> {
     let prompts = [
         "review the code for error handling gaps in the network layer",
         "design an event-driven architecture with Kafka and microservices",
@@ -73,9 +73,9 @@ pub fn bench_plan_reasoning(iterations: usize) -> Vec<BenchPhase> {
         "plan the migration from REST to GraphQL API",
     ];
 
-    let mut e8_phase = BenchPhase::new("E8 compute (select_mode)");
-    let mut gwt_phase = BenchPhase::new("GWT resonant broadcast");
-    let mut total_phase = BenchPhase::new("plan_reasoning (total)");
+    let mut e8_phase = _BenchPhase::new("E8 compute (select_mode)");
+    let mut gwt_phase = _BenchPhase::new("GWT resonant broadcast");
+    let mut total_phase = _BenchPhase::new("plan_reasoning (total)");
 
     for i in 0..iterations {
         let prompt = prompts[i % prompts.len()];
@@ -111,7 +111,7 @@ pub fn bench_plan_reasoning(iterations: usize) -> Vec<BenchPhase> {
     vec![e8_phase, gwt_phase, total_phase]
 }
 
-pub fn print_benchmark_table(phases: &[BenchPhase]) {
+pub fn print_benchmark_table(phases: &[_BenchPhase]) {
     println!();
     println!("╭───── E8 → GWT → SelfIteration Pipeline Benchmark ────────────────╮");
     println!("│ {:<34} {:>10} {:>10} {:>10} {:>6} │",
@@ -119,7 +119,7 @@ pub fn print_benchmark_table(phases: &[BenchPhase]) {
     println!("├──────────────────────────────────────────────────────────────────┤");
     for p in phases {
         println!("│ {:<34} {:>10.3} {:>10.3} {:>10.3} {:>6} │",
-            p.label, p.avg_ms(), p.min_ms(), p.max_ms(), p.calls());
+            p.label, p._avg_ms(), p.min_ms(), p.max_ms(), p.calls());
     }
     println!("╰──────────────────────────────────────────────────────────────────╯");
     println!();
@@ -135,7 +135,7 @@ mod tests {
         assert!(!phases.is_empty(), "Should produce phase results");
         let total = phases.iter().find(|p| p.label.contains("total"))
             .expect("Should have total phase");
-        let avg = total.avg_ms();
+        let avg = total._avg_ms();
         assert!(avg < 5000.0,
             "Simple plan_reasoning avg {:.1}ms exceeds 5s limit", avg);
     }
@@ -146,7 +146,7 @@ mod tests {
         print_benchmark_table(&phases);
         let total = phases.iter().find(|p| p.label.contains("total"))
             .expect("Should have total phase");
-        assert!(total.avg_ms() < 5000.0, "Total avg {:.1}ms exceeds 5s limit", total.avg_ms());
+        assert!(total._avg_ms() < 5000.0, "Total avg {:.1}ms exceeds 5s limit", total._avg_ms());
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
              and design a rate-limiting strategy with Redis",
         ];
 
-        let mut phase = BenchPhase::new("plan_reasoning (compound)");
+        let mut phase = _BenchPhase::new("plan_reasoning (compound)");
         for prompt in &compound_prompts {
             let mut engine = build_full_engine();
             let start = Instant::now();
@@ -171,7 +171,7 @@ mod tests {
             phase.record(start.elapsed());
         }
 
-        let avg = phase.avg_ms();
+        let avg = phase._avg_ms();
         assert!(avg < 5000.0,
             "Compound plan_reasoning avg {:.1}ms exceeds 5s limit", avg);
     }

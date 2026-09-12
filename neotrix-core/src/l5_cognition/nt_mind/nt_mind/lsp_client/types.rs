@@ -1,20 +1,20 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LspPosition {
+pub(crate) struct _LspPosition {
     pub line: u32,
     pub character: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LspRange {
-    pub start: LspPosition,
-    pub end: LspPosition,
+pub(crate) struct _LspRange {
+    pub start: _LspPosition,
+    pub end: _LspPosition,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LspDiagnostic {
-    pub range: LspRange,
+pub(crate) struct _LspDiagnostic {
+    pub range: _LspRange,
     pub severity: Option<DiagnosticSeverity>,
     pub message: String,
     pub source: Option<String>,
@@ -30,21 +30,21 @@ pub enum DiagnosticSeverity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LspHover {
+pub(crate) struct _LspHover {
     pub contents: Vec<String>,
-    pub range: Option<LspRange>,
+    pub range: Option<_LspRange>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LspCompletionItem {
+pub(crate) struct _LspCompletionItem {
     pub label: String,
-    pub kind: Option<CompletionItemKind>,
+    pub kind: Option<_CompletionItemKind>,
     pub detail: Option<String>,
     pub documentation: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CompletionItemKind {
+pub(crate) enum _CompletionItemKind {
     Text = 1,
     Method = 2,
     Function = 3,
@@ -60,22 +60,22 @@ pub enum CompletionItemKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LspLocation {
+pub(crate) struct _LspLocation {
     pub uri: String,
-    pub range: LspRange,
+    pub range: _LspRange,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LspDocumentSymbol {
+pub(crate) struct _LspDocumentSymbol {
     pub name: String,
-    pub kind: SymbolKind,
-    pub range: LspRange,
-    pub selection_range: LspRange,
-    pub children: Vec<LspDocumentSymbol>,
+    pub kind: _SymbolKind,
+    pub range: _LspRange,
+    pub selection_range: _LspRange,
+    pub children: Vec<_LspDocumentSymbol>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SymbolKind {
+pub(crate) enum _SymbolKind {
     File = 1,
     Module = 2,
     Namespace = 3,
@@ -91,13 +91,13 @@ pub enum SymbolKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceEdit {
-    pub changes: Vec<TextEdit>,
+pub(crate) struct _WorkspaceEdit {
+    pub changes: Vec<_TextEdit>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TextEdit {
-    pub range: LspRange,
+pub(crate) struct _TextEdit {
+    pub range: _LspRange,
     pub new_text: String,
 }
 
@@ -116,18 +116,18 @@ mod tests {
 
     #[test]
     fn test_lsp_position_serde_roundtrip() {
-        let pos = LspPosition { line: 42, character: 7 };
+        let pos = _LspPosition { line: 42, character: 7 };
         let json = serde_json::to_string(&pos).unwrap();
-        let deserialized: LspPosition = serde_json::from_str(&json).unwrap();
+        let deserialized: _LspPosition = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.line, 42);
         assert_eq!(deserialized.character, 7);
     }
 
     #[test]
     fn test_lsp_range_ordering() {
-        let range = LspRange {
-            start: LspPosition { line: 1, character: 0 },
-            end: LspPosition { line: 1, character: 10 },
+        let range = _LspRange {
+            start: _LspPosition { line: 1, character: 0 },
+            end: _LspPosition { line: 1, character: 10 },
         };
         assert!(range.start.line <= range.end.line);
     }
@@ -142,10 +142,10 @@ mod tests {
 
     #[test]
     fn test_lsp_diagnostic_full() {
-        let diag = LspDiagnostic {
-            range: LspRange {
-                start: LspPosition { line: 0, character: 0 },
-                end: LspPosition { line: 0, character: 5 },
+        let diag = _LspDiagnostic {
+            range: _LspRange {
+                start: _LspPosition { line: 0, character: 0 },
+                end: _LspPosition { line: 0, character: 5 },
             },
             severity: Some(DiagnosticSeverity::Error),
             message: "unused variable".into(),
@@ -158,19 +158,19 @@ mod tests {
 
     #[test]
     fn test_completion_item_kind_values() {
-        assert_eq!(CompletionItemKind::Text as i32, 1);
-        assert_eq!(CompletionItemKind::Function as i32, 3);
-        assert_eq!(CompletionItemKind::Keyword as i32, 14);
-        assert_eq!(CompletionItemKind::Snippet as i32, 15);
+        assert_eq!(_CompletionItemKind::Text as i32, 1);
+        assert_eq!(_CompletionItemKind::Function as i32, 3);
+        assert_eq!(_CompletionItemKind::Keyword as i32, 14);
+        assert_eq!(_CompletionItemKind::Snippet as i32, 15);
     }
 
     #[test]
     fn test_lsp_hover_with_range() {
-        let hover = LspHover {
+        let hover = _LspHover {
             contents: vec!["```rust\nfn foo()\n```".into()],
-            range: Some(LspRange {
-                start: LspPosition { line: 5, character: 0 },
-                end: LspPosition { line: 5, character: 3 },
+            range: Some(_LspRange {
+                start: _LspPosition { line: 5, character: 0 },
+                end: _LspPosition { line: 5, character: 3 },
             }),
         };
         assert_eq!(hover.contents.len(), 1);
@@ -192,11 +192,11 @@ mod tests {
 
     #[test]
     fn test_lsp_location_uri() {
-        let loc = LspLocation {
+        let loc = _LspLocation {
             uri: "file:///test.rs".into(),
-            range: LspRange {
-                start: LspPosition { line: 0, character: 0 },
-                end: LspPosition { line: 0, character: 0 },
+            range: _LspRange {
+                start: _LspPosition { line: 0, character: 0 },
+                end: _LspPosition { line: 0, character: 0 },
             },
         };
         assert_eq!(loc.uri, "file:///test.rs");
@@ -204,11 +204,11 @@ mod tests {
 
     #[test]
     fn test_workspace_edit_single_change() {
-        let edit = WorkspaceEdit {
-            changes: vec![TextEdit {
-                range: LspRange {
-                    start: LspPosition { line: 1, character: 0 },
-                    end: LspPosition { line: 1, character: 5 },
+        let edit = _WorkspaceEdit {
+            changes: vec![_TextEdit {
+                range: _LspRange {
+                    start: _LspPosition { line: 1, character: 0 },
+                    end: _LspPosition { line: 1, character: 5 },
                 },
                 new_text: "foo".into(),
             }],
@@ -219,25 +219,25 @@ mod tests {
 
     #[test]
     fn test_symbol_kind_values() {
-        assert_eq!(SymbolKind::Function as i32, 12);
-        assert_eq!(SymbolKind::Class as i32, 5);
-        assert_eq!(SymbolKind::Module as i32, 2);
+        assert_eq!(_SymbolKind::Function as i32, 12);
+        assert_eq!(_SymbolKind::Class as i32, 5);
+        assert_eq!(_SymbolKind::Module as i32, 2);
     }
 
     #[test]
     fn test_lsp_document_symbol_nested() {
-        let child = LspDocumentSymbol {
+        let child = _LspDocumentSymbol {
             name: "nested_fn".into(),
-            kind: SymbolKind::Function,
-            range: LspRange { start: LspPosition { line: 0, character: 0 }, end: LspPosition { line: 0, character: 0 } },
-            selection_range: LspRange { start: LspPosition { line: 0, character: 0 }, end: LspPosition { line: 0, character: 0 } },
+            kind: _SymbolKind::Function,
+            range: _LspRange { start: _LspPosition { line: 0, character: 0 }, end: _LspPosition { line: 0, character: 0 } },
+            selection_range: _LspRange { start: _LspPosition { line: 0, character: 0 }, end: _LspPosition { line: 0, character: 0 } },
             children: vec![],
         };
-        let parent = LspDocumentSymbol {
+        let parent = _LspDocumentSymbol {
             name: "module".into(),
-            kind: SymbolKind::Module,
-            range: LspRange { start: LspPosition { line: 0, character: 0 }, end: LspPosition { line: 10, character: 0 } },
-            selection_range: LspRange { start: LspPosition { line: 0, character: 0 }, end: LspPosition { line: 2, character: 0 } },
+            kind: _SymbolKind::Module,
+            range: _LspRange { start: _LspPosition { line: 0, character: 0 }, end: _LspPosition { line: 10, character: 0 } },
+            selection_range: _LspRange { start: _LspPosition { line: 0, character: 0 }, end: _LspPosition { line: 2, character: 0 } },
             children: vec![child],
         };
         assert_eq!(parent.children.len(), 1);

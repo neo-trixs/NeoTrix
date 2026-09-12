@@ -52,7 +52,7 @@ impl CoreValue {
     }
 
     /// 检查某行为是否触发此价值观
-    pub fn matches_behavior(&self, behavior: &str) -> bool {
+    pub(crate) fn _matches_behavior(&self, behavior: &str) -> bool {
         self.behavioral_markers.iter().any(|m| behavior.contains(m))
     }
 }
@@ -188,7 +188,7 @@ impl ValueCompass {
     /// 仲裁单个行动的价值一致性。
     pub fn arbitrate(&self, action: &ValueAction) -> ArbitrationResult {
         let mut triggered: Vec<&CoreValue> = self.values.values()
-            .filter(|v| v.matches_behavior(&action.description))
+            .filter(|v| v._matches_behavior(&action.description))
             .collect();
 
         if triggered.is_empty() {
@@ -378,7 +378,7 @@ impl ValueCompassStore {
         kv_set(conn, NS_VALUE, &version_key, &json)?;
         kv_set(conn, NS_VALUE, &Self::latest_key(), &json)?;
         // 索引
-        let mut index: Vec<u32> = Self::list_versions(conn)?;
+        let mut index: Vec<u32> = Self::_list_versions(conn)?;
         if !index.contains(&compass.version) {
             index.push(compass.version);
             index.sort();
@@ -389,21 +389,21 @@ impl ValueCompassStore {
     }
 
     /// 加载最新指南针。
-    pub fn load_latest(conn: &Connection) -> Result<ValueCompass, String> {
+    pub(crate) fn _load_latest(conn: &Connection) -> Result<ValueCompass, String> {
         let json = kv_get(conn, NS_VALUE, &Self::latest_key())?
             .ok_or_else(|| "指南针不存在，需初始化".to_string())?;
         serde_json::from_str(&json).map_err(|e| e.to_string())
     }
 
     /// 加载指定版本。
-    pub fn load_version(conn: &Connection, version: u32) -> Result<ValueCompass, String> {
+    pub(crate) fn _load_version(conn: &Connection, version: u32) -> Result<ValueCompass, String> {
         let json = kv_get(conn, NS_VALUE, &Self::compass_key(version))?
             .ok_or_else(|| format!("版本 {} 不存在", version))?;
         serde_json::from_str(&json).map_err(|e| e.to_string())
     }
 
     /// 列出所有版本。
-    pub fn list_versions(conn: &Connection) -> Result<Vec<u32>, String> {
+    pub(crate) fn _list_versions(conn: &Connection) -> Result<Vec<u32>, String> {
         let json = kv_get(conn, NS_VALUE, "compass:versions")?;
         match json {
             Some(j) => serde_json::from_str(&j).map_err(|e| e.to_string()),
@@ -412,8 +412,8 @@ impl ValueCompassStore {
     }
 
     /// 删除旧版本（保留最近 N 个）。
-    pub fn prune_old(conn: &Connection, keep: usize) -> Result<usize, String> {
-        let mut versions = Self::list_versions(conn)?;
+    pub(crate) fn _prune_old(conn: &Connection, keep: usize) -> Result<usize, String> {
+        let mut versions = Self::_list_versions(conn)?;
         if versions.len() <= keep {
             return Ok(0);
         }
@@ -441,7 +441,7 @@ impl ValueCompassRuntime {
 
     pub fn from_kb(conn: &Connection) -> Result<Self, String> {
         // 首次启动 (KB 无记录) → 种子初始化并落盘, 保证开箱即用
-        let compass = match ValueCompassStore::load_latest(conn) {
+        let compass = match ValueCompassStore::_load_latest(conn) {
             Ok(c) => c,
             Err(_) => {
                 let seed = ValueCompass::default();
@@ -562,7 +562,7 @@ mod tests {
         c.adjust_weight("privacy", 0.99).unwrap();
         ValueCompassStore::save(&conn, &c).unwrap();
 
-        let loaded = ValueCompassStore::load_latest(&conn).unwrap();
+        let loaded = ValueCompassStore::_load_latest(&conn).unwrap();
         assert_eq!(loaded.values["privacy"].weight, 0.99);
         assert_eq!(loaded.version, 2, "adjust_weight 应使指南针版本 +1");
     }
@@ -576,10 +576,10 @@ mod tests {
             c.version = i;
             ValueCompassStore::save(&conn, &c).unwrap();
         }
-        assert_eq!(ValueCompassStore::list_versions(&conn).unwrap().len(), 5);
-        let pruned = ValueCompassStore::prune_old(&conn, 2).unwrap();
+        assert_eq!(ValueCompassStore::_list_versions(&conn).unwrap().len(), 5);
+        let pruned = ValueCompassStore::_prune_old(&conn, 2).unwrap();
         assert_eq!(pruned, 3);
-        assert_eq!(ValueCompassStore::list_versions(&conn).unwrap().len(), 2);
+        assert_eq!(ValueCompassStore::_list_versions(&conn).unwrap().len(), 2);
     }
 
     #[test]

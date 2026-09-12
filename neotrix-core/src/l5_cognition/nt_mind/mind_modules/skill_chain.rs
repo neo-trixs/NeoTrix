@@ -10,12 +10,12 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 技能链管理器
-pub struct SkillChainManager {
-    chains: HashMap<String, SkillChain>,
-    executors: HashMap<String, Box<dyn SkillExecutor>>,
+pub(crate) struct _SkillChainManager {
+    chains: HashMap<String, _SkillChain>,
+    executors: HashMap<String, Box<dyn _SkillExecutor>>,
     #[allow(dead_code)]
     config: ChainConfig,
-    stats: ChainStats,
+    stats: _ChainStats,
 }
 
 /// 链配置
@@ -58,18 +58,18 @@ impl Default for RetryPolicy {
 
 /// 技能链
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SkillChain {
+pub(crate) struct _SkillChain {
     pub id: String,
     pub name: String,
     pub description: String,
-    pub steps: Vec<ChainStep>,
+    pub steps: Vec<_ChainStep>,
     pub config: ChainConfig,
-    pub metadata: ChainMetadata,
+    pub metadata: _ChainMetadata,
 }
 
 /// 链步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainStep {
+pub(crate) struct _ChainStep {
     pub id: String,
     pub skill_id: String,
     pub config: serde_json::Value,
@@ -80,7 +80,7 @@ pub struct ChainStep {
 
 /// 链元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainMetadata {
+pub(crate) struct _ChainMetadata {
     pub author: Option<String>,
     pub version: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -89,16 +89,16 @@ pub struct ChainMetadata {
 }
 
 /// 链执行器
-pub struct ChainExecutor {
-    chain: SkillChain,
-    state: ChainState,
+pub(crate) struct _ChainExecutor {
+    chain: _SkillChain,
+    state: _ChainState,
     results: HashMap<String, StepResult>,
 }
 
 /// 链状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainState {
-    pub status: ChainStatus,
+pub(crate) struct _ChainState {
+    pub status: _ChainStatus,
     pub current_step: Option<String>,
     pub started_at: Option<chrono::DateTime<chrono::Utc>>,
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -108,7 +108,7 @@ pub struct ChainState {
 /// 链状态枚举
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ChainStatus {
+pub(crate) enum _ChainStatus {
     Pending,
     Running,
     Completed,
@@ -139,7 +139,7 @@ pub enum StepStatus {
 }
 
 /// 技能执行器 trait
-pub trait SkillExecutor: Send + Sync {
+pub(crate) trait _SkillExecutor: Send + Sync {
     fn execute(&self, config: &serde_json::Value, input: Option<&serde_json::Value>) -> Result<serde_json::Value, String>;
     fn rollback(&self, config: &serde_json::Value, output: &serde_json::Value) -> Result<(), String>;
     fn name(&self) -> &str;
@@ -147,7 +147,7 @@ pub trait SkillExecutor: Send + Sync {
 
 /// 链统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainStats {
+pub(crate) struct _ChainStats {
     pub total_chains: u64,
     pub running_chains: u64,
     pub completed_chains: u64,
@@ -157,23 +157,23 @@ pub struct ChainStats {
 
 /// 链执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainExecutionResult {
+pub(crate) struct _ChainExecutionResult {
     pub chain_id: String,
-    pub status: ChainStatus,
+    pub status: _ChainStatus,
     pub results: HashMap<String, StepResult>,
     pub output: Option<serde_json::Value>,
     pub error: Option<String>,
     pub duration_ms: u64,
 }
 
-impl SkillChainManager {
+impl _SkillChainManager {
     /// 创建新的技能链管理器
     pub fn new(config: ChainConfig) -> Self {
         Self {
             chains: HashMap::new(),
             executors: HashMap::new(),
             config,
-            stats: ChainStats {
+            stats: _ChainStats {
                 total_chains: 0,
                 running_chains: 0,
                 completed_chains: 0,
@@ -184,24 +184,24 @@ impl SkillChainManager {
     }
 
     /// 注册技能链
-    pub fn register_chain(&mut self, chain: SkillChain) {
+    pub(crate) fn _register_chain(&mut self, chain: _SkillChain) {
         self.chains.insert(chain.id.clone(), chain);
     }
 
     /// 注册技能执行器
-    pub fn register_executor(&mut self, skill_id: &str, executor: Box<dyn SkillExecutor>) {
+    pub fn register_executor(&mut self, skill_id: &str, executor: Box<dyn _SkillExecutor>) {
         self.executors.insert(skill_id.to_string(), executor);
     }
 
     /// 创建执行器
-    pub fn create_executor(&self, chain_id: &str) -> Result<ChainExecutor, String> {
+    pub(crate) fn _create_executor(&self, chain_id: &str) -> Result<_ChainExecutor, String> {
         let chain = self.chains.get(chain_id)
             .ok_or_else(|| format!("Chain {} not found", chain_id))?;
 
-        Ok(ChainExecutor {
+        Ok(_ChainExecutor {
             chain: chain.clone(),
-            state: ChainState {
-                status: ChainStatus::Pending,
+            state: _ChainState {
+                status: _ChainStatus::Pending,
                 current_step: None,
                 started_at: None,
                 completed_at: None,
@@ -212,15 +212,15 @@ impl SkillChainManager {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &ChainStats {
+    pub fn stats(&self) -> &_ChainStats {
         &self.stats
     }
 }
 
-impl ChainExecutor {
+impl _ChainExecutor {
     /// 执行链
-    pub fn execute(&mut self, initial_input: Option<&serde_json::Value>) -> Result<ChainExecutionResult, String> {
-        self.state.status = ChainStatus::Running;
+    pub fn execute(&mut self, initial_input: Option<&serde_json::Value>) -> Result<_ChainExecutionResult, String> {
+        self.state.status = _ChainStatus::Running;
         self.state.started_at = Some(chrono::Utc::now());
 
         let mut current_input = initial_input.cloned();
@@ -258,8 +258,8 @@ impl ChainExecutor {
             // 执行步骤
             self.state.current_step = Some(step_id.clone());
 
-            // executors field not yet implemented on ChainExecutor
-            tracing::warn!("ChainExecutor.executors not yet implemented; using placeholder");
+            // executors field not yet implemented on _ChainExecutor
+            tracing::warn!("_ChainExecutor.executors not yet implemented; using placeholder");
             {
                 let start = std::time::Instant::now();
                 // Placeholder: pass through current input as output
@@ -276,7 +276,7 @@ impl ChainExecutor {
             }
         }
 
-        self.state.status = ChainStatus::Completed;
+        self.state.status = _ChainStatus::Completed;
         self.state.completed_at = Some(chrono::Utc::now());
 
         Ok(self.build_result())
@@ -330,7 +330,7 @@ impl ChainExecutor {
     /// 回滚
     #[allow(dead_code)]
     fn rollback(&mut self) -> Result<(), String> {
-        self.state.status = ChainStatus::RollingBack;
+        self.state.status = _ChainStatus::RollingBack;
 
         // 按逆序回滚已完成的步骤
         let completed_steps: Vec<String> = self.results.iter()
@@ -344,8 +344,8 @@ impl ChainExecutor {
         for step_id in completed_steps {
             let step = self.chain.steps.iter().find(|s| s.id == step_id);
             if let Some(_step) = step {
-            // executors field not yet implemented on ChainExecutor
-            tracing::warn!("ChainExecutor.executors not yet implemented; using placeholder");
+            // executors field not yet implemented on _ChainExecutor
+            tracing::warn!("_ChainExecutor.executors not yet implemented; using placeholder");
                 if let Some(result) = self.results.get(&step_id) {
                     if let Some(ref _output) = result.output {
                         // let _ = executor.rollback(&step.config, output);
@@ -362,14 +362,14 @@ impl ChainExecutor {
     }
 
     /// 构建结果
-    fn build_result(&self) -> ChainExecutionResult {
+    fn build_result(&self) -> _ChainExecutionResult {
         let duration = if let (Some(start), Some(end)) = (self.state.started_at, self.state.completed_at) {
             end.signed_duration_since(start).num_milliseconds() as u64
         } else {
             0
         };
 
-        ChainExecutionResult {
+        _ChainExecutionResult {
             chain_id: self.chain.id.clone(),
             status: self.state.status.clone(),
             results: self.results.clone(),

@@ -16,7 +16,7 @@ pub struct PeakWindow {
     /// Current estimated performance capacity [0, 1]
     pub capacity: f64,
     /// Whether currently in a peak window
-    pub in_peak: bool,
+    pub _in_peak: bool,
     /// Time until next peak (in iterations)
     pub ticks_to_peak: f64,
 }
@@ -51,7 +51,7 @@ impl PeakWindow {
     pub fn new(phase: f64, cycle_length: f64) -> Self {
         let schedule = PeakSchedule::default();
         let dist = (phase - schedule.peak_phase).abs().min(1.0 - (phase - schedule.peak_phase).abs());
-        let in_peak = dist < schedule.peak_width / 2.0;
+        let _in_peak = dist < schedule.peak_width / 2.0;
         let capacity = Self::compute_capacity(phase, &schedule);
         let ticks_to_peak = Self::ticks_to_next_peak(phase, &schedule, cycle_length);
         Self {
@@ -59,7 +59,7 @@ impl PeakWindow {
             energy: 0.8,
             cycle_length,
             capacity,
-            in_peak,
+            _in_peak,
             ticks_to_peak,
         }
     }
@@ -92,19 +92,19 @@ impl PeakWindow {
         }
         let dist = (self.phase - schedule.peak_phase).abs()
             .min(1.0 - (self.phase - schedule.peak_phase).abs());
-        self.in_peak = dist < schedule.peak_width / 2.0;
+        self._in_peak = dist < schedule.peak_width / 2.0;
         self.capacity = Self::compute_capacity(self.phase, &schedule) * self.energy;
         self.ticks_to_peak = Self::ticks_to_next_peak(self.phase, &schedule, self.cycle_length);
     }
 
     /// Whether it is advisable to start a high-cost operation now.
-    pub fn should_execute_high_cost(&self, cost: f64) -> bool {
+    pub(crate) fn _should_execute_high_cost(&self, cost: f64) -> bool {
         self.capacity >= cost
     }
 
     /// Recommend optimal delay for a high-cost operation (in iterations).
-    pub fn recommend_delay(&self, cost: f64) -> f64 {
-        if self.should_execute_high_cost(cost) {
+    pub(crate) fn _recommend_delay(&self, cost: f64) -> f64 {
+        if self._should_execute_high_cost(cost) {
             return 0.0;
         }
         let _schedule = PeakSchedule::default();
@@ -123,7 +123,7 @@ impl PeakWindow {
 
     pub fn capacity(&self) -> f64 { self.capacity }
     pub fn energy(&self) -> f64 { self.energy }
-    pub fn in_peak(&self) -> bool { self.in_peak }
+    pub(crate) fn _in_peak(&self) -> bool { self.in_peak }
 }
 
 #[cfg(test)]
@@ -133,14 +133,14 @@ mod tests {
     #[test]
     fn test_peak_at_default_phase() {
         let pw = PeakWindow::new(0.25, 100.0);
-        assert!(pw.in_peak);
+        assert!(pw._in_peak);
         assert!(pw.capacity > 0.8);
     }
 
     #[test]
     fn test_off_peak_low_capacity() {
         let pw = PeakWindow::new(0.75, 100.0);
-        assert!(!pw.in_peak);
+        assert!(!pw._in_peak);
         assert!(pw.capacity < 0.5);
     }
 
@@ -162,13 +162,13 @@ mod tests {
     #[test]
     fn test_recommend_delay_returns_zero_when_ready() {
         let pw = PeakWindow::new(0.25, 100.0);
-        assert_eq!(pw.recommend_delay(0.3), 0.0);
+        assert_eq!(pw._recommend_delay(0.3), 0.0);
     }
 
     #[test]
     fn test_recommend_delay_positive_when_not_ready() {
         let pw = PeakWindow::new(0.75, 100.0);
-        let delay = pw.recommend_delay(0.8);
+        let delay = pw._recommend_delay(0.8);
         assert!(delay > 0.0);
     }
 }

@@ -12,24 +12,24 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// JIT-Agent 协议编排器
-pub struct JITAgentProtocolOrchestrator {
-    modules: Vec<JITModule>,
-    protocols: Vec<JITProtocol>,
-    active_sessions: Vec<ProtocolSession>,
-    config: JITConfig,
-    stats: JITStats,
+pub(crate) struct _JITAgentProtocolOrchestrator {
+    modules: Vec<_JITModule>,
+    protocols: Vec<_JITProtocol>,
+    active_sessions: Vec<_ProtocolSession>,
+    config: _JITConfig,
+    stats: _JITStats,
 }
 
 /// JIT 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JITConfig {
+pub(crate) struct _JITConfig {
     pub max_modules: usize,
     pub max_protocols: usize,
     pub enable_dynamic_composition: bool,
     pub session_timeout: u64,
 }
 
-impl Default for JITConfig {
+impl Default for _JITConfig {
     fn default() -> Self {
         Self {
             max_modules: 20,
@@ -42,10 +42,10 @@ impl Default for JITConfig {
 
 /// JIT 模块
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JITModule {
+pub(crate) struct _JITModule {
     pub module_id: String,
     pub name: String,
-    pub module_type: ModuleType,
+    pub module_type: _ModuleType,
     pub capabilities: Vec<String>,
     pub performance: f64,
 }
@@ -53,7 +53,7 @@ pub struct JITModule {
 /// 模块类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ModuleType {
+pub(crate) enum _ModuleType {
     Memory,
     Planning,
     Action,
@@ -62,7 +62,7 @@ pub enum ModuleType {
 
 /// JIT 协议
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JITProtocol {
+pub(crate) struct _JITProtocol {
     pub protocol_id: String,
     pub name: String,
     pub modules: Vec<String>,
@@ -72,7 +72,7 @@ pub struct JITProtocol {
 
 /// 协议会话
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProtocolSession {
+pub(crate) struct _ProtocolSession {
     pub session_id: String,
     pub protocol_id: String,
     pub task: String,
@@ -93,7 +93,7 @@ pub enum SessionStatus {
 
 /// JIT 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JITStats {
+pub(crate) struct _JITStats {
     pub total_modules: u64,
     pub total_protocols: u64,
     pub total_sessions: u64,
@@ -104,7 +104,7 @@ pub struct JITStats {
 
 /// 协议执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProtocolExecutionResult {
+pub(crate) struct _ProtocolExecutionResult {
     pub success: bool,
     pub session_id: String,
     pub modules_executed: Vec<String>,
@@ -112,15 +112,15 @@ pub struct ProtocolExecutionResult {
     pub duration_ms: u64,
 }
 
-impl JITAgentProtocolOrchestrator {
+impl _JITAgentProtocolOrchestrator {
     /// 创建新的 JIT-Agent 协议编排器
     pub fn new() -> Self {
         Self {
             modules: Vec::new(),
             protocols: Vec::new(),
             active_sessions: Vec::new(),
-            config: JITConfig::default(),
-            stats: JITStats {
+            config: _JITConfig::default(),
+            stats: _JITStats {
                 total_modules: 0,
                 total_protocols: 0,
                 total_sessions: 0,
@@ -132,26 +132,26 @@ impl JITAgentProtocolOrchestrator {
     }
 
     /// 添加模块
-    pub fn add_module(&mut self, module: JITModule) {
+    pub(crate) fn _add_module(&mut self, module: _JITModule) {
         self.modules.push(module);
         self.stats.total_modules += 1;
     }
 
     /// 添加协议
-    pub fn add_protocol(&mut self, protocol: JITProtocol) {
+    pub(crate) fn _add_protocol(&mut self, protocol: _JITProtocol) {
         self.protocols.push(protocol);
         self.stats.total_protocols += 1;
     }
 
     /// 执行协议
-    pub fn execute_protocol(&mut self, protocol_id: &str, task: &str) -> ProtocolExecutionResult {
+    pub(crate) fn _execute_protocol(&mut self, protocol_id: &str, task: &str) -> _ProtocolExecutionResult {
         let session_id = uuid::Uuid::new_v4().to_string();
 
         // 查找协议
         let protocol = self.protocols.iter().find(|p| p.protocol_id == protocol_id);
 
         if protocol.is_none() {
-            return ProtocolExecutionResult {
+            return _ProtocolExecutionResult {
                 success: false,
                 session_id,
                 modules_executed: Vec::new(),
@@ -171,7 +171,7 @@ impl JITAgentProtocolOrchestrator {
             *self.stats.module_utilization.entry(module_id.clone()).or_insert(0) += 1;
         }
 
-        ProtocolExecutionResult {
+        _ProtocolExecutionResult {
             success: true,
             session_id,
             modules_executed: modules_used,
@@ -181,17 +181,17 @@ impl JITAgentProtocolOrchestrator {
     }
 
     /// 获取所有模块
-    pub fn modules(&self) -> &[JITModule] {
+    pub fn modules(&self) -> &[_JITModule] {
         &self.modules
     }
 
     /// 获取所有协议
-    pub fn protocols(&self) -> &[JITProtocol] {
+    pub fn protocols(&self) -> &[_JITProtocol] {
         &self.protocols
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &JITStats {
+    pub fn stats(&self) -> &_JITStats {
         &self.stats
     }
 }

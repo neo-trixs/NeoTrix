@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// 资源路由器
 pub struct ResourceRouter {
     /// 资源池
-    pub resource_pool: Vec<ResourceEntry>,
+    pub resource_pool: Vec<_ResourceEntry>,
     /// 路由历史
     pub routing_history: Vec<RoutingRecord>,
     /// 路由配置
@@ -60,7 +60,7 @@ pub enum LoadBalanceStrategy {
 
 /// 资源条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceEntry {
+pub(crate) struct _ResourceEntry {
     /// 资源ID
     pub id: String,
     /// 资源名称
@@ -68,9 +68,9 @@ pub struct ResourceEntry {
     /// 资源类型
     pub resource_type: ResourceType,
     /// 能力列表
-    pub capabilities: Vec<TaskCapability>,
+    pub capabilities: Vec<_TaskCapability>,
     /// 成本模型
-    pub cost_model: CostModel,
+    pub cost_model: _CostModel,
     /// 质量评分
     pub quality_score: f64,
     /// 当前负载
@@ -102,7 +102,7 @@ pub enum ResourceType {
 
 /// 任务能力
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskCapability {
+pub(crate) struct _TaskCapability {
     /// 任务类型
     pub task_type: TaskType,
     /// 能力等级 (0.0 - 1.0)
@@ -132,7 +132,7 @@ pub enum TaskType {
 
 /// 成本模型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CostModel {
+pub(crate) struct _CostModel {
     /// 每1K token 成本
     pub cost_per_1k_tokens: f64,
     /// 每次请求基础成本
@@ -177,7 +177,7 @@ pub struct RoutingResult {
     /// 结果ID
     pub id: String,
     /// 选择的资源
-    pub selected_resource: ResourceEntry,
+    pub selected_resource: _ResourceEntry,
     /// 路由分数
     pub routing_score: f64,
     /// 预估成本
@@ -232,7 +232,7 @@ impl ResourceRouter {
     }
 
     /// 添加资源
-    pub fn add_resource(&mut self, resource: ResourceEntry) {
+    pub(crate) fn _add_resource(&mut self, resource: _ResourceEntry) {
         self.resource_pool.push(resource);
     }
 
@@ -251,12 +251,12 @@ impl ResourceRouter {
         if scored_resources.is_empty() {
             return RoutingResult {
                 id: format!("route_{}", uuid::Uuid::new_v4()),
-                selected_resource: ResourceEntry {
+                selected_resource: _ResourceEntry {
                     id: "default".to_string(),
                     name: "Default Resource".to_string(),
                     resource_type: ResourceType::LLM,
                     capabilities: vec![],
-                    cost_model: CostModel {
+                    cost_model: _CostModel {
                         cost_per_1k_tokens: 0.01,
                         base_cost: 0.001,
                         free_quota: 1000,
@@ -311,7 +311,7 @@ impl ResourceRouter {
     }
 
     /// 计算路由分数
-    fn calculate_routing_score(&self, resource: &ResourceEntry, request: &RoutingRequest) -> f64 {
+    fn calculate_routing_score(&self, resource: &_ResourceEntry, request: &RoutingRequest) -> f64 {
         let mut score = 0.0;
 
         // 质量分数 (权重: 0.3)

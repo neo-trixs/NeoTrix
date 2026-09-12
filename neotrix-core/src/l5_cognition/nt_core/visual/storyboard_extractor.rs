@@ -127,7 +127,7 @@ pub struct StoryboardScript {
 
 /// 分镜拆解配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StoryboardConfig {
+pub(crate) struct _StoryboardConfig {
     /// 目标时长模式
     pub duration_mode: DurationMode,
     /// 默认镜头时长 (秒)
@@ -153,7 +153,7 @@ pub struct StoryboardConfig {
 /// 分镜智能拆解器
 pub struct StoryboardExtractor {
     /// 配置
-    config: StoryboardConfig,
+    config: _StoryboardConfig,
     /// 拆解历史
     history: Vec<StoryboardScript>,
 }
@@ -162,7 +162,7 @@ impl StoryboardExtractor {
     /// 创建拆解器
     pub fn new() -> Self {
         Self {
-            config: StoryboardConfig {
+            config: _StoryboardConfig {
                 duration_mode: DurationMode::Dynamic,
                 default_shot_duration: 3.0,
                 min_shot_duration: 1.5,
@@ -177,7 +177,7 @@ impl StoryboardExtractor {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: StoryboardConfig) -> Self {
+    pub fn with_config(config: _StoryboardConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -185,7 +185,7 @@ impl StoryboardExtractor {
     }
     
     /// 从剧本文本拆解分镜
-    pub fn extract_from_script(
+    pub(crate) fn _extract_from_script(
         &mut self,
         episode_id: &str,
         episode_number: u32,
@@ -360,7 +360,7 @@ mod tests {
         发现没有人，感到困惑
         "#;
         
-        let script = extractor.extract_from_script("ep001", 1, script_text);
+        let script = extractor._extract_from_script("ep001", 1, script_text);
         assert_eq!(script.episode_number, 1);
         assert!(!script.shots.is_empty());
         

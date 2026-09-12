@@ -19,13 +19,13 @@ use std::collections::HashMap;
 
 /// 一次 RSI 改进的可见/隐藏评测集合标识。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct DatasetSplit {
+pub(crate) struct _DatasetSplit {
     pub name: String,
 }
 
 /// 可运行工件: 智能体继承的起点 (代码 / 配置 / 技能权重等)。
 #[derive(Debug, Clone, Default)]
-pub struct InheritedArtifact {
+pub(crate) struct _InheritedArtifact {
     pub id: String,
     pub kind: String,
     pub payload_ref: String,
@@ -51,7 +51,7 @@ pub struct VersionHistory {
 
 impl VersionHistory {
     /// 构造空版本历史, 以给定根工件为起点。
-    pub fn new(root: InheritedArtifact) -> Self {
+    pub fn new(root: _InheritedArtifact) -> Self {
         Self {
             root_artifact_id: root.id,
             rollouts: Vec::new(),
@@ -59,7 +59,7 @@ impl VersionHistory {
     }
 
     /// 追加一次 rollout, 验证其父工件须为当前根或已有 rollout 产出。
-    pub fn append_rollout(&mut self, r: Rollout) -> Result<(), String> {
+    pub(crate) fn _append_rollout(&mut self, r: Rollout) -> Result<(), String> {
         if r.parent_artifact_id != self.root_artifact_id
             && !self.rollouts.iter().any(|x| x.id == r.parent_artifact_id)
         {
@@ -74,7 +74,7 @@ impl VersionHistory {
 
     /// 迁移性指标: 隐藏集相对可见集的评分保留比 (kept rollouts 平均)。
     /// 空时返回 0.0 (无迁移证据)。
-    pub fn transfer_ratio(&self) -> f64 {
+    pub(crate) fn _transfer_ratio(&self) -> f64 {
         let kept: Vec<&Rollout> = self
             .rollouts
             .iter()
@@ -95,9 +95,9 @@ impl VersionHistory {
 
 /// RSI-Exam 评测结构: 聚合可见/隐藏集与版本历史。
 #[derive(Debug, Clone, Default)]
-pub struct RsiExam {
-    pub visible_set: DatasetSplit,
-    pub hidden_set: DatasetSplit,
+pub(crate) struct _RsiExam {
+    pub visible_set: _DatasetSplit,
+    pub hidden_set: _DatasetSplit,
     pub history: VersionHistory,
     /// 外部源标注 (rsi-exam.ai), 用于追溯吸收来源。
     pub source: String,
@@ -105,8 +105,8 @@ pub struct RsiExam {
     pub seal_mapping: HashMap<String, String>,
 }
 
-impl RsiExam {
-    pub fn new(root: InheritedArtifact) -> Self {
+impl _RsiExam {
+    pub fn new(root: _InheritedArtifact) -> Self {
         let mut seal_mapping = HashMap::new();
         seal_mapping.insert(
             "inherited_artifact".into(),
@@ -125,14 +125,14 @@ impl RsiExam {
             "KB `experience` namespace 的 cycle 指针链".into(),
         );
         seal_mapping.insert(
-            "transfer_ratio".into(),
+            "_transfer_ratio".into(),
             "改进可迁移性 ↔ ConsciousnessTree 自进化闭环跨 cycle 稳定增长".into(),
         );
         Self {
-            visible_set: DatasetSplit {
+            visible_set: _DatasetSplit {
                 name: "visible".into(),
             },
-            hidden_set: DatasetSplit {
+            hidden_set: _DatasetSplit {
                 name: "hidden".into(),
             },
             history: VersionHistory::new(root),
@@ -142,9 +142,9 @@ impl RsiExam {
     }
 }
 
-impl SelfTest for RsiExam {
+impl SelfTest for _RsiExam {
     fn name(&self) -> &'static str {
-        "RsiExam"
+        "_RsiExam"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -172,12 +172,12 @@ mod tests {
 
     #[test]
     fn test_rsi_exam_construct() {
-        let root = InheritedArtifact {
+        let root = _InheritedArtifact {
             id: "a0".into(),
             kind: "skill".into(),
             payload_ref: "kb://experience/cycle-001".into(),
         };
-        let exam = RsiExam::new(root);
+        let exam = _RsiExam::new(root);
         assert_eq!(exam.source, "rsi-exam.ai");
         assert_eq!(exam.visible_set.name, "visible");
         assert_eq!(exam.hidden_set.name, "hidden");
@@ -187,14 +187,14 @@ mod tests {
 
     #[test]
     fn test_rollout_append_and_transfer() {
-        let root = InheritedArtifact {
+        let root = _InheritedArtifact {
             id: "a0".into(),
             kind: "skill".into(),
             payload_ref: "kb://experience/cycle-001".into(),
         };
-        let mut exam = RsiExam::new(root);
+        let mut exam = _RsiExam::new(root);
         exam.history
-            .append_rollout(Rollout {
+            ._append_rollout(Rollout {
                 id: "r1".into(),
                 parent_artifact_id: "a0".into(),
                 changes: vec!["tune temperature".into()],
@@ -206,7 +206,7 @@ mod tests {
         // 非法父工件应被拒绝。
         assert!(exam
             .history
-            .append_rollout(Rollout {
+            ._append_rollout(Rollout {
                 id: "r2".into(),
                 parent_artifact_id: "ghost".into(),
                 changes: vec![],
@@ -216,16 +216,16 @@ mod tests {
             })
             .is_err());
         assert!(
-            (exam.history.transfer_ratio() - 0.9).abs() < 1e-9,
-            "transfer_ratio 应≈0.9 (float), got {}",
-            exam.history.transfer_ratio()
+            (exam.history._transfer_ratio() - 0.9).abs() < 1e-9,
+            "_transfer_ratio 应≈0.9 (float), got {}",
+            exam.history._transfer_ratio()
         );
     }
 
     #[test]
     fn test_transfer_ratio_empty() {
-        let root = InheritedArtifact::default();
-        let exam = RsiExam::new(root);
-        assert_eq!(exam.history.transfer_ratio(), 0.0);
+        let root = _InheritedArtifact::default();
+        let exam = _RsiExam::new(root);
+        assert_eq!(exam.history._transfer_ratio(), 0.0);
     }
 }

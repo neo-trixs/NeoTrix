@@ -2,7 +2,7 @@
 //!
 //! three-scope-map-skill: 三范围映射推理 — 将问题/系统映射到三个范围层
 //! (micro/local/global 或 concrete/abstract/systemic) 进行分层推理与映射。
-//! 本模块实现 `ThreeScopeMap` trait (C1: trait 存在 + 基础逻辑 + SelfTest T1
+//! 本模块实现 `_ThreeScopeMap` trait (C1: trait 存在 + 基础逻辑 + SelfTest T1
 //! + 3 测试), 建模范围划分与跨范围映射。
 
 use crate::core::nt_core_self_test::SelfTest;
@@ -17,7 +17,7 @@ pub enum Scope {
 }
 
 /// 三范围映射推理 trait。
-pub trait ThreeScopeMap {
+pub(crate) trait _ThreeScopeMap {
     /// 将一项元素登记到指定范围。
     fn map(&mut self, scope: Scope, item: &str);
     /// 返回某范围登记的元素数。
@@ -32,11 +32,11 @@ pub trait ThreeScopeMap {
 }
 
 /// three-scope-map 实现。
-pub struct ThreeScopeMapImpl {
+pub(crate) struct _ThreeScopeMapImpl {
     scopes: HashMap<Scope, Vec<String>>,
 }
 
-impl ThreeScopeMapImpl {
+impl _ThreeScopeMapImpl {
     pub fn new() -> Self {
         Self {
             scopes: HashMap::new(),
@@ -48,13 +48,13 @@ impl ThreeScopeMapImpl {
     }
 }
 
-impl Default for ThreeScopeMapImpl {
+impl Default for _ThreeScopeMapImpl {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ThreeScopeMap for ThreeScopeMapImpl {
+impl _ThreeScopeMap for _ThreeScopeMapImpl {
     fn map(&mut self, scope: Scope, item: &str) {
         self.scopes
             .entry(scope)
@@ -90,9 +90,9 @@ impl ThreeScopeMap for ThreeScopeMapImpl {
     }
 }
 
-impl SelfTest for ThreeScopeMapImpl {
+impl SelfTest for _ThreeScopeMapImpl {
     fn name(&self) -> &'static str {
-        "ThreeScopeMap"
+        "_ThreeScopeMap"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_map_partitions_by_scope() {
-        let mut m = ThreeScopeMapImpl::new();
+        let mut m = _ThreeScopeMapImpl::new();
         m.map(Scope::Micro, "fn_a");
         m.map(Scope::Macro, "system");
         assert_eq!(m.count(Scope::Micro), 1);
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_elevate_moves_across_scopes() {
-        let mut m = ThreeScopeMapImpl::new();
+        let mut m = _ThreeScopeMapImpl::new();
         m.map(Scope::Micro, "fn_a");
         let moved = m.elevate(Scope::Micro, Scope::Macro, "fn_a");
         assert_eq!(moved, 1);
@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_self_test_consistency() {
-        let mut m = ThreeScopeMapImpl::new();
+        let mut m = _ThreeScopeMapImpl::new();
         m.map(Scope::Meso, "x");
         assert!(m.self_test().is_ok());
     }

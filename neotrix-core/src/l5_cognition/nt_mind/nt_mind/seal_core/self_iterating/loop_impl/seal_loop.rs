@@ -371,7 +371,7 @@ impl SelfIteratingBrain {
                 self._current_task = format!("{}\n{}", task, suffix);
             }
         } else {
-            self.init_attention_router();
+            self._init_attention_router();
             if let Some(ref mut router) = self.attention_router {
                 let ctx = router.route(task);
                 let suffix = router.build_knowledge_prompt_suffix(&ctx);
@@ -605,7 +605,7 @@ impl SelfIteratingBrain {
         if self.iteration.is_multiple_of(5) {
             self.save_e8();
             // 缺陷④: 同频落盘证据文件, 失败不致命 (日志记录)
-            if let Err(e) = self.save_evidence() {
+            if let Err(e) = self._save_evidence() {
                 log::warn!("[seal] evidence 落盘失败: {}", e);
             }
         }
@@ -629,7 +629,7 @@ impl SelfIteratingBrain {
                 // 由外部 (其他意识维度 agent) 注入 EvalHarness 或 BenchmarkSuite 触发真实回归闸门。
                 {
                     let cand = self._current_task.clone();
-                    if let Ok(false) = self.close_iteration_loop(&cand, None, None) {
+                    if let Ok(false) = self._close_iteration_loop(&cand, None, None) {
                         // 回归失败: E3 钩子内部已发 CritiqueResult 信号并回滚候选。
                         log::warn!("[seal][E3] 候选未通过回归闸门 (默认透传不应触发)");
                     }
@@ -659,7 +659,7 @@ impl SelfIteratingBrain {
     /// - `bench_suite`: 可选 scope 内 `BenchmarkSuite` 回归基准 (benchmark_gate.rs)。
     ///
     /// 返回 `Ok(true)` = 候选可持久化; `Ok(false)` = 回归失败, 候选已拒并回滚。
-    pub fn close_iteration_loop(
+    pub(crate) fn _close_iteration_loop(
         &mut self,
         candidate: &str,
         harness: Option<&EvalHarness>,
@@ -841,7 +841,7 @@ impl SelfIteratingBrain {
     }
 
     /// 缺陷④: 证据持久化 (每 5 轮跨阶段证据 → KB kv_store state.seal_evidence)。
-    pub fn save_evidence(&self) -> NeoTrixResult<()> {
+    pub(crate) fn _save_evidence(&self) -> NeoTrixResult<()> {
         let (lvl, lvl_name) = self.stagnation.escalation_level();
         let evidence = serde_json::json!({
             "iteration": self.iteration,
@@ -858,7 +858,7 @@ impl SelfIteratingBrain {
     }
 
     /// 缺陷④: 读取证据 — 重规划/steer 时慢进程可见此前各轮留下的证据历史。
-    pub fn load_evidence(&self) -> serde_json::Value {
+    pub(crate) fn _load_evidence(&self) -> serde_json::Value {
         crate::core::nt_core_state::load("seal_evidence")
             .and_then(|d| serde_json::from_str(&d).ok())
             .unwrap_or_else(|| serde_json::json!({}))
@@ -1079,7 +1079,7 @@ impl SelfIteratingBrain {
         self.e8_policy = Some(e8_policy);
 
         self.reasoning_engine = Some(engine);
-        self.load_e8();
+        self._load_e8();
     }
 
     pub fn save_e8(&self) {
@@ -1116,7 +1116,7 @@ impl SelfIteratingBrain {
         }
     }
 
-    pub fn load_e8(&mut self) {
+    pub(crate) fn _load_e8(&mut self) {
         if let Some(ref mut engine) = self.reasoning_engine {
             if let Some(json) = crate::core::nt_core_state::load("e8_state") {
                 if let Err(e) = engine.load_e8_state_json(&json) {
@@ -1154,7 +1154,7 @@ impl SelfIteratingBrain {
         log::info!("[E8] state saved on shutdown");
     }
 
-    pub fn init_attention_router(&mut self) {
+    pub(crate) fn _init_attention_router(&mut self) {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
         // 接通真实知识库：超立方体检索 + analyze_gaps/sparse_topics 落到实际知识
@@ -1169,12 +1169,12 @@ impl SelfIteratingBrain {
         self.attention_router = Some(router);
     }
 
-    pub fn init_select_operator(&mut self, _dim: usize, _hidden_dim: usize) {
+    pub(crate) fn _init_select_operator(&mut self, _dim: usize, _hidden_dim: usize) {
 //         self.select_operator = Some(SelectableOperator::new(dim, hidden_dim));
 //         self.selective_state = Some(SelectiveState::new(dim, hidden_dim));
     }
 
-    pub fn init_sleep_engine(&mut self, passes: usize) {
+    pub(crate) fn _init_sleep_engine(&mut self, passes: usize) {
         self.sleep_engine = Some(SleepEngine::with_passes(passes));
     }
 }
@@ -1321,7 +1321,7 @@ mod tests {
     }
 
     // 4. 子组件装配：attention_router（GWT + HyperCube 路由）初始化并驱动上下文。
-    //   （init_attention_router 内部 consume 真实 KB 的 all_nodes()，在 20 万节点库上过慢，
+    //   （_init_attention_router 内部 consume 真实 KB 的 all_nodes()，在 20 万节点库上过慢，
     //   故退而直接验证其相同装配：AttentionRouter::new + seed_knowledge + route。）
     #[test]
     fn seal_loop_attention_router_assembly() {

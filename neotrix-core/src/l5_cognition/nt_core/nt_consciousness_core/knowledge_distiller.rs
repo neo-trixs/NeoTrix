@@ -8,16 +8,16 @@ use serde::{Deserialize, Serialize};
 /// 知识蒸馏器
 pub struct KnowledgeDistiller {
     /// 蒸馏历史
-    pub distillation_history: Vec<DistillationRecord>,
+    pub distillation_history: Vec<_DistillationRecord>,
     /// 知识图谱
     pub knowledge_graph: KnowledgeGraph,
     /// 蒸馏配置
-    pub config: DistillerConfig,
+    pub config: _DistillerConfig,
 }
 
 /// 蒸馏配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DistillerConfig {
+pub(crate) struct _DistillerConfig {
     /// 最大历史记录
     pub max_history: usize,
     /// 最小置信度阈值
@@ -28,7 +28,7 @@ pub struct DistillerConfig {
     pub compression_ratio: f64,
 }
 
-impl Default for DistillerConfig {
+impl Default for _DistillerConfig {
     fn default() -> Self {
         Self {
             max_history: 500,
@@ -41,7 +41,7 @@ impl Default for DistillerConfig {
 
 /// 蒸馏记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DistillationRecord {
+pub(crate) struct _DistillationRecord {
     /// 记录ID
     pub id: String,
     /// 周期
@@ -49,7 +49,7 @@ pub struct DistillationRecord {
     /// 输入内容
     pub input: String,
     /// 输出知识
-    pub output: KnowledgeUnit,
+    pub output: _KnowledgeUnit,
     /// 压缩率
     pub compression_rate: f64,
     /// 时间戳
@@ -58,13 +58,13 @@ pub struct DistillationRecord {
 
 /// 知识单元
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KnowledgeUnit {
+pub(crate) struct _KnowledgeUnit {
     /// 知识ID
     pub id: String,
     /// 知识内容
     pub content: String,
     /// 知识类型
-    pub knowledge_type: KnowledgeType,
+    pub knowledge_type: _KnowledgeType,
     /// 置信度
     pub confidence: f64,
     /// 来源
@@ -77,7 +77,7 @@ pub struct KnowledgeUnit {
 
 /// 知识类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum KnowledgeType {
+pub(crate) enum _KnowledgeType {
     /// 概念知识
     Concept,
     /// 事实知识
@@ -107,7 +107,7 @@ pub struct KnowledgeNode {
     /// 节点ID
     pub id: String,
     /// 知识内容
-    pub knowledge: KnowledgeUnit,
+    pub knowledge: _KnowledgeUnit,
     /// 重要性分数
     pub importance: f64,
     /// 访问次数
@@ -148,7 +148,7 @@ pub struct KnowledgeCluster {
 
 impl KnowledgeDistiller {
     /// 创建新的知识蒸馏器
-    pub fn new(config: DistillerConfig) -> Self {
+    pub fn new(config: _DistillerConfig) -> Self {
         Self {
             distillation_history: Vec::new(),
             knowledge_graph: KnowledgeGraph::default(),
@@ -157,7 +157,7 @@ impl KnowledgeDistiller {
     }
 
     /// 蒸馏知识
-    pub fn distill(&mut self, cycle: u32, input: &str, source: &str) -> KnowledgeUnit {
+    pub fn distill(&mut self, cycle: u32, input: &str, source: &str) -> _KnowledgeUnit {
         // 提取核心知识
         let core_content = self.extract_core(input);
         
@@ -168,7 +168,7 @@ impl KnowledgeDistiller {
         let confidence = self.calculate_confidence(&core_content);
         
         // 创建知识单元
-        let knowledge = KnowledgeUnit {
+        let knowledge = _KnowledgeUnit {
             id: format!("k_{}", uuid::Uuid::new_v4()),
             content: core_content.clone(),
             knowledge_type,
@@ -186,7 +186,7 @@ impl KnowledgeDistiller {
         let compression_rate = core_content.len() as f64 / input.len().max(1) as f64;
 
         // 记录
-        let record = DistillationRecord {
+        let record = _DistillationRecord {
             id: format!("dist_{}", uuid::Uuid::new_v4()),
             cycle,
             input: input.to_string(),
@@ -218,21 +218,21 @@ impl KnowledgeDistiller {
     }
 
     /// 分类知识类型
-    fn classify_knowledge(&self, content: &str) -> KnowledgeType {
+    fn classify_knowledge(&self, content: &str) -> _KnowledgeType {
         let content_lower = content.to_lowercase();
         
         if content_lower.contains("定义") || content_lower.contains("概念") || content_lower.contains("是什么") {
-            KnowledgeType::Concept
+            _KnowledgeType::Concept
         } else if content_lower.contains("事实") || content_lower.contains("数据") || content_lower.contains("统计") {
-            KnowledgeType::Fact
+            _KnowledgeType::Fact
         } else if content_lower.contains("步骤") || content_lower.contains("如何") || content_lower.contains("流程") {
-            KnowledgeType::Procedure
+            _KnowledgeType::Procedure
         } else if content_lower.contains("策略") || content_lower.contains("方法") || content_lower.contains("技巧") {
-            KnowledgeType::Strategy
+            _KnowledgeType::Strategy
         } else if content_lower.contains("建议") || content_lower.contains("启发") || content_lower.contains("经验") {
-            KnowledgeType::Heuristic
+            _KnowledgeType::Heuristic
         } else {
-            KnowledgeType::Concept
+            _KnowledgeType::Concept
         }
     }
 
@@ -260,7 +260,7 @@ impl KnowledgeDistiller {
     }
 
     /// 添加到知识图谱
-    fn add_to_graph(&mut self, knowledge: KnowledgeUnit) {
+    fn add_to_graph(&mut self, knowledge: _KnowledgeUnit) {
         let node = KnowledgeNode {
             id: knowledge.id.clone(),
             knowledge: knowledge.clone(),
@@ -289,7 +289,7 @@ impl KnowledgeDistiller {
     }
 
     /// 获取蒸馏统计
-    pub fn stats(&self) -> DistillerStats {
+    pub fn stats(&self) -> _DistillerStats {
         let total_distillations = self.distillation_history.len();
         let avg_compression = if total_distillations > 0 {
             self.distillation_history.iter()
@@ -312,7 +312,7 @@ impl KnowledgeDistiller {
             *type_counts.entry(format!("{:?}", record.output.knowledge_type)).or_insert(0) += 1;
         }
 
-        DistillerStats {
+        _DistillerStats {
             total_distillations,
             avg_compression_rate: avg_compression,
             avg_confidence,
@@ -332,7 +332,7 @@ impl KnowledgeDistiller {
 
 /// 蒸馏统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DistillerStats {
+pub(crate) struct _DistillerStats {
     pub total_distillations: usize,
     pub avg_compression_rate: f64,
     pub avg_confidence: f64,
@@ -341,7 +341,7 @@ pub struct DistillerStats {
     pub type_distribution: HashMap<String, u32>,
 }
 
-impl std::fmt::Display for DistillerStats {
+impl std::fmt::Display for _DistillerStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "═══════════════════════════════════════════════")?;
         writeln!(f, "        KnowledgeDistiller 统计")?;
@@ -366,14 +366,14 @@ mod tests {
 
     #[test]
     fn test_distiller_creation() {
-        let distiller = KnowledgeDistiller::new(DistillerConfig::default());
+        let distiller = KnowledgeDistiller::new(_DistillerConfig::default());
         assert_eq!(distiller.distillation_history.len(), 0);
         assert_eq!(distiller.knowledge_graph.nodes.len(), 0);
     }
 
     #[test]
     fn test_distill_knowledge() {
-        let mut distiller = KnowledgeDistiller::new(DistillerConfig::default());
+        let mut distiller = KnowledgeDistiller::new(_DistillerConfig::default());
         let knowledge = distiller.distill(0, "这是一个重要的概念定义", "test_source");
         
         assert_eq!(distiller.distillation_history.len(), 1);

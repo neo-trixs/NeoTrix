@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// 集成模式库
 pub struct IntegrationPatternLibrary {
     patterns: Vec<IntegrationPattern>,
-    active_integrations: Vec<ActiveIntegration>,
+    _active_integrations: Vec<ActiveIntegration>,
     #[allow(dead_code)]
     config: IntegrationConfig,
 }
@@ -134,7 +134,7 @@ impl IntegrationPatternLibrary {
     pub fn new() -> Self {
         let mut lib = Self {
             patterns: Vec::new(),
-            active_integrations: Vec::new(),
+            _active_integrations: Vec::new(),
             config: IntegrationConfig::default(),
         };
         lib.register_default_patterns();
@@ -211,7 +211,7 @@ impl IntegrationPatternLibrary {
     }
 
     /// 推荐集成模式
-    pub fn recommend_pattern(&self, source: &str, target: &str) -> Option<&IntegrationPattern> {
+    pub(crate) fn _recommend_pattern(&self, source: &str, target: &str) -> Option<&IntegrationPattern> {
         // 根据模块类型推荐模式
         if source.starts_with("nt_") && target.starts_with("nt_") {
             // 同域模块: 委托模式
@@ -247,7 +247,7 @@ impl IntegrationPatternLibrary {
     }
 
     /// 检查集成是否符合规则
-    pub fn check_integration(&self, source: &str, target: &str, pattern_id: &str) -> IntegrationCheck {
+    pub(crate) fn _check_integration(&self, source: &str, target: &str, pattern_id: &str) -> IntegrationCheck {
         let mut violations = Vec::new();
 
         // 检查是否创建平行适配器
@@ -286,7 +286,7 @@ impl IntegrationPatternLibrary {
     }
 
     /// 获取活跃集成
-    pub fn active_integrations(&self) -> &[ActiveIntegration] {
-        &self.active_integrations
+    pub(crate) fn _active_integrations(&self) -> &[ActiveIntegration] {
+        &self._active_integrations
     }
 }

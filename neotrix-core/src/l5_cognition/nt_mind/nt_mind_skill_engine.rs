@@ -146,7 +146,7 @@ impl SkillEntry {
 /// Agent Skills 标准校验 (吸收 `anthropics/skills`): 解析 SKILL.md frontmatter,
 /// 校验 Agent Skills 标准**必需**字段 (`name` + `description`)。缺则 `Err`(违规列表)。
 /// R-P42 强化现有 SkillEntry 解析路径, 不新建平行解析器 (复用同一 frontmatter 切片逻辑)。
-pub fn validate_agent_skills_standard(content: &str) -> Result<(), Vec<String>> {
+pub(crate) fn _validate_agent_skills_standard(content: &str) -> Result<(), Vec<String>> {
     let stripped = content.trim_start();
     let mut violations = Vec::new();
     let (mut has_name, mut has_desc) = (false, false);
@@ -191,17 +191,17 @@ impl crate::core::nt_core_self_test::SelfTest for AgentSkillsStandardSelfTest {
     fn self_test(&self) -> Result<(), Vec<String>> {
         // 合规: 含 name + description → 通过
         let good = "---\nname: foo\ndescription: does foo when bar\nlicense: Apache-2.0\nallowed-tools: Read, Edit\n---\nbody";
-        if validate_agent_skills_standard(good).is_err() {
+        if _validate_agent_skills_standard(good).is_err() {
             return Err(vec!["agent_skills_standard: compliant skill wrongly rejected".into()]);
         }
         // 违规: 缺 name → 必须拒绝
         let bad = "---\ndescription: no name field\n---\nbody";
-        if validate_agent_skills_standard(bad).is_ok() {
+        if _validate_agent_skills_standard(bad).is_ok() {
             return Err(vec!["agent_skills_standard: missing-name skill wrongly accepted".into()]);
         }
         // 违规: 无 frontmatter → 必须拒绝
         let no_fm = "# just markdown\nno frontmatter";
-        if validate_agent_skills_standard(no_fm).is_ok() {
+        if _validate_agent_skills_standard(no_fm).is_ok() {
             return Err(vec!["agent_skills_standard: frontmatter-less skill wrongly accepted".into()]);
         }
         Ok(())
@@ -366,7 +366,7 @@ impl SkillQualityScorer {
 
 /// EVOMAL 毒化扫描: `Ok(true)`=干净可入库; `Ok(false)`=命中毒化模式;
 /// `Err`=扫描无法完成 (保守地视为不可入库, 由调用方阻断 promote)。
-pub fn evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
+pub(crate) fn _evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
     let body = skill.body().to_lowercase();
 
     // 1) pipe-to-shell: 把下载/外部内容直接喂给 shell 执行 (经典投毒)。
@@ -866,7 +866,7 @@ pub struct BookInput {
 
 /// 章节→技能候选映射结果。
 #[derive(Debug, Clone)]
-pub struct SkillCandidate {
+pub(crate) struct _SkillCandidate {
     pub name: String,
     pub source_chapters: Vec<usize>,
     pub priority: u8,
@@ -923,11 +923,11 @@ impl BookToSkill {
 
     /// 对每个保留章节生成技能候选: 章节长度 > 2000 字符 → priority=2
     /// (长章节=高价值技能), 否则 priority=1; 最多 max_candidates 个。
-    pub fn discover_candidates(&self, input: &BookInput) -> Vec<SkillCandidate> {
+    pub fn discover_candidates(&self, input: &BookInput) -> Vec<_SkillCandidate> {
         self.normalize(input)
             .iter()
             .take(self.max_candidates.max(0))
-            .map(|ch| SkillCandidate {
+            .map(|ch| _SkillCandidate {
                 name: clean_chapter_title(&ch.title),
                 source_chapters: vec![ch.order],
                 priority: if ch.char_count > 2000 { 2 } else { 1 },
@@ -1024,7 +1024,7 @@ impl SkillAttribution {
 
 /// 技能树层级统计 (G6, AgentSkillOS 吸收): 巡检报告的数据载体。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct SkillTreeStats {
+pub(crate) struct _SkillTreeStats {
     pub total_skills: usize,
     pub categories: HashMap<String, usize>,
     pub roots: usize,
@@ -1056,13 +1056,13 @@ fn parse_array_field(val: &str) -> Vec<String> {
 // ────────────────────────────────────────────────────────────────
 
 /// 逆操作闭包: 返回 Result 以便按 fiber 捕获失败而不中断其余逆操作 (L-Raise)。
-pub type InverseOp = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
+pub(crate) type _InverseOp = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
 
 /// 可逆效应: 一次安装变换的前向标签 + 显式单侧逆。
 #[derive(Clone)]
 pub struct RevertibleEffect {
     pub label: String,
-    inverse: InverseOp,
+    inverse: _InverseOp,
 }
 
 impl RevertibleEffect {
@@ -1103,7 +1103,7 @@ impl std::fmt::Debug for InverseLedger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InverseLedger")
             .field("next_id", &self.next_id)
-            .field("active_transactions", &self.entries.len())
+            .field("_active_transactions", &self.entries.len())
             .finish()
     }
 }
@@ -1141,7 +1141,7 @@ impl InverseLedger {
         self.entries.get(&install_id).map_or(0, |e| e.len())
     }
 
-    pub fn active_transactions(&self) -> usize {
+    pub(crate) fn _active_transactions(&self) -> usize {
         self.entries.len()
     }
 
@@ -1199,7 +1199,7 @@ impl FiberLifecycleState {
 
 /// 单次 fiber 失败记录: 失败时的状态 + 消息。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FiberFailure {
+pub(crate) struct _FiberFailure {
     pub at_state: FiberLifecycleState,
     pub message: String,
 }
@@ -1210,7 +1210,7 @@ pub struct FiberLifecycle {
     pub fiber_id: String,
     pub state: FiberLifecycleState,
     pub install_id: u64,
-    pub failures: Vec<FiberFailure>,
+    pub failures: Vec<_FiberFailure>,
 }
 
 impl FiberLifecycle {
@@ -1271,7 +1271,7 @@ impl FiberLifecycle {
 
     /// 按 fiber 捕获失败: 记录失败并转入 Failed; 不传播到 sibling。
     pub fn record_failure(&mut self, message: impl Into<String>) {
-        self.failures.push(FiberFailure {
+        self.failures.push(_FiberFailure {
             at_state: self.state,
             message: message.into(),
         });
@@ -1559,7 +1559,7 @@ impl SkillEngine {
                             let trust_rejected = !matches!(trust_verdict, crate::l3_embodiment::nt_shield::nt_shield::tool_inspection_stack::InspectionResult::Allow);
                             // E6 防护层硬化 (src9 EVOMAL 毒化扫描): 折入 R-P108
                             // 五维门 — 命中毒化模式即拒收, 阻断 promote。Err 保守视为拒收。
-                            let poison_ok = evomal_poison_scan(&skill).unwrap_or(false);
+                            let poison_ok = _evomal_poison_scan(&skill).unwrap_or(false);
                             // A5 安全门 (SkillNet absorb, R-P79): 含危险命令
                             // (rm -rf 等) 的技能拒收, 不进入生产检索索引。
                             if scores.safety >= 0.8 && !trust_rejected && poison_ok {
@@ -1591,7 +1591,7 @@ impl SkillEngine {
                         let trust_rejected = !matches!(trust_verdict, crate::l3_embodiment::nt_shield::nt_shield::tool_inspection_stack::InspectionResult::Allow);
                         // E6 防护层硬化 (src9 EVOMAL 毒化扫描): 折入 R-P108
                         // 五维门 — 命中毒化模式即拒收, 阻断 promote。Err 保守视为拒收。
-                        let poison_ok = evomal_poison_scan(&skill).unwrap_or(false);
+                        let poison_ok = _evomal_poison_scan(&skill).unwrap_or(false);
                         if scores.safety >= 0.8 && !trust_rejected && poison_ok {
                             self.quality_stats.insert(skill.name.clone(), scores);
                             loaded.push(skill);
@@ -1963,7 +1963,7 @@ impl SkillEngine {
         self.skills.iter().find(|s| s.name == name)
     }
 
-    pub fn get_skill_mut(&mut self, name: &str) -> Option<&mut SkillEntry> {
+    pub(crate) fn _get_skill_mut(&mut self, name: &str) -> Option<&mut SkillEntry> {
         self.skills.iter_mut().find(|s| s.name == name)
     }
 
@@ -2078,7 +2078,7 @@ impl SkillEngine {
 
     /// 技能树层级统计 (G6, AgentSkillOS 吸收): category 分布、根/叶/孤儿技能、
     /// 覆盖率与深度。供背景循环巡检报告使用。
-    pub fn skill_tree_stats(&self) -> SkillTreeStats {
+    pub fn skill_tree_stats(&self) -> _SkillTreeStats {
         let mut categories: HashMap<String, usize> = HashMap::new();
         let mut roots = 0usize;
         let mut orphans = 0usize;
@@ -2119,7 +2119,7 @@ impl SkillEngine {
                 orphans += 1;
             }
         }
-        SkillTreeStats {
+        _SkillTreeStats {
             total_skills: self.skills.len(),
             categories,
             roots,
@@ -2324,7 +2324,7 @@ impl SkillEngine {
     }
 
     /// 按 fiber 捕获失败并转入 Failed (不传播到 sibling)。
-    pub fn record_fiber_failure(&mut self, name: &str, message: impl Into<String>) -> bool {
+    pub(crate) fn _record_fiber_failure(&mut self, name: &str, message: impl Into<String>) -> bool {
         if let Some(fiber) = self.fiber_lifecycles.get_mut(name) {
             fiber.record_failure(message);
             true
@@ -2550,11 +2550,11 @@ impl crate::core::nt_core_self_test::SelfTest for PromptLibrary {
 pub mod skill_hooks {
     use super::*;
 
-    pub struct SkillActivationHook {
+    pub(crate) struct _SkillActivationHook {
         pub engine: Arc<RwLock<SkillEngine>>,
     }
 
-    impl crate::l5_cognition::nt_mind::nt_mind_hook::HookAction for SkillActivationHook {
+    impl crate::l5_cognition::nt_mind::nt_mind_hook::HookAction for _SkillActivationHook {
         fn name(&self) -> &str {
             "skill_activation_hook"
         }

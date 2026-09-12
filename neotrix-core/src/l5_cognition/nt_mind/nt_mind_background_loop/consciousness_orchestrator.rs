@@ -117,7 +117,7 @@ impl ConsciousnessOrchestrator {
     }
 
     /// E1c: 智慧周期。
-    pub fn wisdom_cycle(&self) -> Result<(usize, usize), String> {
+    pub(crate) fn _wisdom_cycle(&self) -> Result<(usize, usize), String> {
         let conn = open_raw_conn()
             .unwrap_or_else(|| rusqlite::Connection::open_in_memory().expect("mem"));
         crate::core::nt_core_kb_primitives::schema_initialize(&conn)

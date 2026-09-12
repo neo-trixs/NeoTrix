@@ -21,7 +21,7 @@
 //! |------|-----------|------|
 //! | C0 身份映射 | `CausalNode::new` 节点建模 | 编译 |
 //! | C1 因果链步行 | `CausalChainWalker::walk` | 单测 |
-//! | C2 单一赢家 | `SourceAdjudicator::adjudicate` | 单测 |
+//! | C2 单一赢家 | `SourceAdjudicator::_adjudicate` | 单测 |
 //! | C3 证据门控 | `EvidenceGate::evaluate` | 单测 |
 //! | C4 契约输出 | `CausalTrace::trace` 聚合 | 集成 (SelfTest) |
 //! | C5 跨面复用 | 架构审计注册 | 生产接线 (T3) |
@@ -58,7 +58,7 @@ impl CausalNode {
         }
     }
 
-    pub fn with_parent(mut self, parent: impl Into<String>) -> Self {
+    pub(crate) fn _with_parent(mut self, parent: impl Into<String>) -> Self {
         self.parent = Some(parent.into());
         self
     }
@@ -145,7 +145,7 @@ pub enum SourceVerdict {
 }
 
 impl SourceVerdict {
-    pub fn is_identified(&self) -> bool {
+    pub(crate) fn _is_identified(&self) -> bool {
         matches!(self, Self::Identified { .. })
     }
 }
@@ -184,7 +184,7 @@ impl SourceAdjudicator {
     }
 
     /// 裁决: 返回恰好一个主源。全部未命中 → `SourceUnknown`。
-    pub fn adjudicate(&self, chain: &[CausalNode]) -> SourceVerdict {
+    pub(crate) fn _adjudicate(&self, chain: &[CausalNode]) -> SourceVerdict {
         for detector in &self.detectors {
             if let Some(evidence) = (detector.detect)(chain) {
                 return SourceVerdict::Identified {
@@ -302,7 +302,7 @@ impl EvidenceGate {
         Self { rules }
     }
 
-    pub fn with_default_rules() -> Self {
+    pub(crate) fn _with_default_rules() -> Self {
         Self::new(vec![
             EvidenceRule {
                 name: "root_owned",
@@ -385,7 +385,7 @@ impl CausalTrace {
                 warnings: Vec::new(),
             };
         }
-        let verdict = adjudicator.adjudicate(&chain);
+        let verdict = adjudicator._adjudicate(&chain);
         let warnings = gate.evaluate(&chain);
         CausalTrace {
             chain,
@@ -407,7 +407,7 @@ impl CausalTrace {
         hops.join(" → ")
     }
 
-    pub fn source_summary(&self) -> String {
+    pub(crate) fn _source_summary(&self) -> String {
         match &self.verdict {
             SourceVerdict::Identified { source, evidence } => format!("{} [{}]", source, evidence),
             SourceVerdict::Unknown => "unknown (explicit uncertainty)".to_string(),
@@ -440,7 +440,7 @@ impl SelfTest for CausalTraceSelfTest {
                 _ => None,
             }
         };
-        let target = CausalNode::new("leaf", "web_server").with_parent("srv");
+        let target = CausalNode::new("leaf", "web_server")._with_parent("srv");
         let chain = walker.walk(&target, &mut resolve);
         if chain.is_empty() {
             failures.push("walk returned empty chain".into());
@@ -454,9 +454,9 @@ impl SelfTest for CausalTraceSelfTest {
         // 循环保护: self-parenting 链不得无限
         let self_loop = CausalChainWalker::new(8);
         let mut resolve_loop = |id: &str| -> Option<CausalNode> {
-            Some(CausalNode::new(id.to_string(), "loop").with_parent(id.to_string()))
+            Some(CausalNode::new(id.to_string(), "loop")._with_parent(id.to_string()))
         };
-        let loop_target = CausalNode::new("x", "loop").with_parent("x");
+        let loop_target = CausalNode::new("x", "loop")._with_parent("x");
         let loop_chain = self_loop.walk(&loop_target, &mut resolve_loop);
         if loop_chain.len() > 2 {
             failures.push(format!("loop protection failed: len={}", loop_chain.len()));
@@ -466,25 +466,25 @@ impl SelfTest for CausalTraceSelfTest {
         let adj = default_adjudicator();
         let chain2 = vec![
             CausalNode::new("1", "systemd"),
-            CausalNode::new("2", "pm2").with_parent("1"),
-            CausalNode::new("3", "node").with_parent("2"),
+            CausalNode::new("2", "pm2")._with_parent("1"),
+            CausalNode::new("3", "node")._with_parent("2"),
         ];
-        let verdict = adj.adjudicate(&chain2);
+        let verdict = adj._adjudicate(&chain2);
         if !matches!(&verdict, SourceVerdict::Identified { source, .. } if source == "systemd/launchd")
         {
             failures.push(format!("expected systemd winner, got {:?}", verdict));
         }
         // 无证据链 → Unknown (显式不确定)
         let empty_chain: Vec<CausalNode> = Vec::new();
-        if !matches!(adj.adjudicate(&empty_chain), SourceVerdict::Unknown) {
+        if !matches!(adj._adjudicate(&empty_chain), SourceVerdict::Unknown) {
             failures.push("empty chain should be Unknown".into());
         }
 
         // C3: 证据门控 — 根身份 + 公网绑定命中
-        let gate = EvidenceGate::with_default_rules();
+        let gate = EvidenceGate::_with_default_rules();
         let chain3 = vec![
             CausalNode::new("1", "root@systemd").with_evidence("0.0.0.0:80"),
-            CausalNode::new("2", "web_server").with_parent("1"),
+            CausalNode::new("2", "web_server")._with_parent("1"),
         ];
         let warnings = gate.evaluate(&chain3);
         if warnings.iter().all(|w| w.name != "public_bind") {
@@ -494,13 +494,13 @@ impl SelfTest for CausalTraceSelfTest {
         // C4: 聚合入口 — trace + narrative
         let mut resolve4 = |id: &str| -> Option<CausalNode> {
             match id {
-                "srv" => Some(CausalNode::new("pm2", "pm2").with_parent("sys")),
+                "srv" => Some(CausalNode::new("pm2", "pm2")._with_parent("sys")),
                 "sys" => Some(CausalNode::new("systemd", "systemd")),
                 _ => None,
             }
         };
         let trace = CausalTrace::trace(
-            &CausalNode::new("srv", "web_server").with_parent("srv"),
+            &CausalNode::new("srv", "web_server")._with_parent("srv"),
             &walker,
             &adj,
             &gate,
@@ -509,10 +509,10 @@ impl SelfTest for CausalTraceSelfTest {
         if trace.narrative().is_empty() {
             failures.push("narrative should be non-empty".into());
         }
-        if !trace.source_summary().contains("systemd") {
+        if !trace._source_summary().contains("systemd") {
             failures.push(format!(
-                "source_summary should identify systemd, got {}",
-                trace.source_summary()
+                "_source_summary should identify systemd, got {}",
+                trace._source_summary()
             ));
         }
 
@@ -538,8 +538,8 @@ mod tests {
             }
         };
         let target = CausalNode::new("c", "node")
-            .with_parent("b")
-            .with_parent("b");
+            ._with_parent("b")
+            ._with_parent("b");
         let chain = walker.walk(&target, &mut resolve);
         assert_eq!(chain.first().map(|n| n.id.as_str()), Some("a"));
         assert_eq!(chain.last().map(|n| n.id.as_str()), Some("c"));
@@ -550,7 +550,7 @@ mod tests {
         // 中间节点证据消失 → 优雅截断, 不 panic
         let walker = CausalChainWalker::default();
         let mut resolve = |_id: &str| -> Option<CausalNode> { None };
-        let target = CausalNode::new("leaf", "app").with_parent("missing_parent");
+        let target = CausalNode::new("leaf", "app")._with_parent("missing_parent");
         let chain = walker.walk(&target, &mut resolve);
         assert_eq!(chain.len(), 1, "should truncate to available evidence");
         assert_eq!(chain[0].id, "leaf");
@@ -560,9 +560,9 @@ mod tests {
     fn test_chain_walk_loop_protection() {
         let walker = CausalChainWalker::new(100);
         let mut resolve = |id: &str| -> Option<CausalNode> {
-            Some(CausalNode::new(id.to_string(), "cycle").with_parent(id.to_string()))
+            Some(CausalNode::new(id.to_string(), "cycle")._with_parent(id.to_string()))
         };
-        let target = CausalNode::new("a", "cycle").with_parent("a");
+        let target = CausalNode::new("a", "cycle")._with_parent("a");
         let chain = walker.walk(&target, &mut resolve);
         assert!(chain.len() <= 2, "loop must terminate, got {}", chain.len());
     }
@@ -572,22 +572,22 @@ mod tests {
         let adj = default_adjudicator();
         let chain = vec![
             CausalNode::new("1", "systemd"),
-            CausalNode::new("2", "pm2").with_parent("1"),
-            CausalNode::new("3", "node").with_parent("2"),
+            CausalNode::new("2", "pm2")._with_parent("1"),
+            CausalNode::new("3", "node")._with_parent("2"),
         ];
-        assert!(adj.adjudicate(&chain).is_identified());
+        assert!(adj._adjudicate(&chain)._is_identified());
     }
 
     #[test]
     fn test_adjudicator_unknown_explicit() {
         let adj = default_adjudicator();
         let chain = vec![CausalNode::new("1", "orphan_proc")];
-        assert_eq!(adj.adjudicate(&chain), SourceVerdict::Unknown);
+        assert_eq!(adj._adjudicate(&chain), SourceVerdict::Unknown);
     }
 
     #[test]
     fn test_evidence_gate_warnings() {
-        let gate = EvidenceGate::with_default_rules();
+        let gate = EvidenceGate::_with_default_rules();
         let chain = vec![CausalNode::new("1", "root@systemd").with_evidence("0.0.0.0:443")];
         let warnings = gate.evaluate(&chain);
         let names: Vec<&str> = warnings.iter().map(|w| w.name).collect();
@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_evidence_gate_clean() {
-        let gate = EvidenceGate::with_default_rules();
+        let gate = EvidenceGate::_with_default_rules();
         let chain = vec![CausalNode::new("1", "user@systemd").with_evidence("127.0.0.1:8080")];
         assert!(gate.is_clean(&chain));
     }
@@ -616,22 +616,22 @@ mod tests {
     fn test_narrative_output() {
         let walker = CausalChainWalker::default();
         let adj = default_adjudicator();
-        let gate = EvidenceGate::with_default_rules();
+        let gate = EvidenceGate::_with_default_rules();
         let mut resolve = |id: &str| -> Option<CausalNode> {
             match id {
-                "srv" => Some(CausalNode::new("pm2", "pm2").with_parent("sys")),
+                "srv" => Some(CausalNode::new("pm2", "pm2")._with_parent("sys")),
                 "sys" => Some(CausalNode::new("systemd", "systemd")),
                 _ => None,
             }
         };
         let trace = CausalTrace::trace(
-            &CausalNode::new("srv", "web_server").with_parent("srv"),
+            &CausalNode::new("srv", "web_server")._with_parent("srv"),
             &walker,
             &adj,
             &gate,
             &mut resolve,
         );
         assert!(trace.narrative().contains("systemd"));
-        assert!(trace.source_summary().contains("systemd"));
+        assert!(trace._source_summary().contains("systemd"));
     }
 }

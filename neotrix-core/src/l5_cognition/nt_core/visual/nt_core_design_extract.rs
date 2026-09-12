@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 一个被识别的设计模式实例。
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct DesignPattern {
+pub(crate) struct _DesignPattern {
     pub name: String,
     /// 模式类别 (creational/structural/behavioral/idiom)。
     pub category: String,
@@ -22,7 +22,7 @@ pub struct DesignPattern {
     pub confidence: f32,
 }
 
-impl DesignPattern {
+impl _DesignPattern {
     pub fn new(name: impl Into<String>, category: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -54,25 +54,25 @@ pub struct CapabilityNode {
 }
 
 /// design-extract 核心接口: 模式提取 → 能力节点映射。
-pub trait DesignPatternExtractor {
+pub(crate) trait _DesignPatternExtractor {
     /// 从源文本 (代码/图序列化) 抽取候选模式 (C0: 基于关键词启发式)。
-    fn extract(&self, source: &str) -> Vec<DesignPattern>;
+    fn extract(&self, source: &str) -> Vec<_DesignPattern>;
 
     /// 将一个模式映射为能力节点 (写入 KB 前的结构化表示)。
-    fn map_to_capability(&self, pattern: &DesignPattern) -> CapabilityNode;
+    fn map_to_capability(&self, pattern: &_DesignPattern) -> CapabilityNode;
 
     /// 批量映射并去重合并 (同名模式取最高置信度)。
-    fn build_mapping(&self, patterns: &[DesignPattern]) -> Vec<CapabilityNode>;
+    fn build_mapping(&self, patterns: &[_DesignPattern]) -> Vec<CapabilityNode>;
 }
 
 /// C0 基础提取器 — 关键词启发式, 无需 AST 依赖即可编译运行。
 #[derive(Default)]
-pub struct DesignExtractor {
+pub(crate) struct _DesignExtractor {
     /// 模式关键词 → 目标 NeoTrix 域 的查找表。
     rules: HashMap<String, String>,
 }
 
-impl DesignExtractor {
+impl _DesignExtractor {
     pub fn new() -> Self {
         let mut rules = HashMap::new();
         rules.insert("factory".into(), "nt_core_capability_tree".into());
@@ -84,8 +84,8 @@ impl DesignExtractor {
     }
 }
 
-impl DesignPatternExtractor for DesignExtractor {
-    fn extract(&self, source: &str) -> Vec<DesignPattern> {
+impl _DesignPatternExtractor for _DesignExtractor {
+    fn extract(&self, source: &str) -> Vec<_DesignPattern> {
         let lower = source.to_lowercase();
         let mut out = Vec::new();
         for kw in ["factory", "builder", "observer", "adapter", "strategy"] {
@@ -93,7 +93,7 @@ impl DesignPatternExtractor for DesignExtractor {
                 let count = lower.matches(kw).count() as f32;
                 let conf = (0.4 + count * 0.1).min(0.95);
                 out.push(
-                    DesignPattern::new(kw, "structural")
+                    _DesignPattern::new(kw, "structural")
                         .with_source("code")
                         .with_confidence(conf),
                 );
@@ -102,7 +102,7 @@ impl DesignPatternExtractor for DesignExtractor {
         out
     }
 
-    fn map_to_capability(&self, pattern: &DesignPattern) -> CapabilityNode {
+    fn map_to_capability(&self, pattern: &_DesignPattern) -> CapabilityNode {
         let domain = self
             .rules
             .get(&pattern.name)
@@ -116,8 +116,8 @@ impl DesignPatternExtractor for DesignExtractor {
         }
     }
 
-    fn build_mapping(&self, patterns: &[DesignPattern]) -> Vec<CapabilityNode> {
-        let mut best: HashMap<String, DesignPattern> = HashMap::new();
+    fn build_mapping(&self, patterns: &[_DesignPattern]) -> Vec<CapabilityNode> {
+        let mut best: HashMap<String, _DesignPattern> = HashMap::new();
         for p in patterns {
             best.entry(p.name.clone())
                 .and_modify(|e| {
@@ -133,15 +133,15 @@ impl DesignPatternExtractor for DesignExtractor {
 
 /// T1 SelfTest: 提取与映射基础不变量在 C0 可用。
 #[derive(Default)]
-pub struct DesignExtractSelfTest;
+pub(crate) struct _DesignExtractSelfTest;
 
-impl SelfTest for DesignExtractSelfTest {
+impl SelfTest for _DesignExtractSelfTest {
     fn name(&self) -> &str {
         "nt_core_design_extract"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let ex = DesignExtractor::new();
+        let ex = _DesignExtractor::new();
         let src = "class Factory { build() { return new Builder().observe(new Observer()) } }";
         let patterns = ex.extract(src);
         let mut errs = Vec::new();
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_extract_finds_keyword_patterns() {
-        let ex = DesignExtractor::new();
+        let ex = _DesignExtractor::new();
         let ps = ex.extract("use Factory and Builder pattern");
         let names: Vec<&str> = ps.iter().map(|p| p.name.as_str()).collect();
         assert!(names.contains(&"factory"));
@@ -180,8 +180,8 @@ mod tests {
 
     #[test]
     fn test_map_to_capability_domain_routing() {
-        let ex = DesignExtractor::new();
-        let p = DesignPattern::new("observer", "behavioral").with_confidence(0.8);
+        let ex = _DesignExtractor::new();
+        let p = _DesignPattern::new("observer", "behavioral").with_confidence(0.8);
         let node = ex.map_to_capability(&p);
         assert_eq!(node.target_domain, "nt_core_event_bus");
         assert_eq!(node.weight, 0.8);
@@ -190,11 +190,11 @@ mod tests {
 
     #[test]
     fn test_build_mapping_dedups_keeps_max_confidence() {
-        let ex = DesignExtractor::new();
+        let ex = _DesignExtractor::new();
         let ps = vec![
-            DesignPattern::new("factory", "structural").with_confidence(0.4),
-            DesignPattern::new("factory", "structural").with_confidence(0.9),
-            DesignPattern::new("adapter", "structural").with_confidence(0.6),
+            _DesignPattern::new("factory", "structural").with_confidence(0.4),
+            _DesignPattern::new("factory", "structural").with_confidence(0.9),
+            _DesignPattern::new("adapter", "structural").with_confidence(0.6),
         ];
         let mapping = ex.build_mapping(&ps);
         assert_eq!(mapping.len(), 2);
@@ -204,14 +204,14 @@ mod tests {
 
     #[test]
     fn test_extract_empty_when_no_pattern() {
-        let ex = DesignExtractor::new();
+        let ex = _DesignExtractor::new();
         let ps = ex.extract("just some plain logic with no structure");
         assert!(ps.is_empty());
     }
 
     #[test]
     fn test_confidence_clamped() {
-        let p = DesignPattern::new("x", "y").with_confidence(2.0);
+        let p = _DesignPattern::new("x", "y").with_confidence(2.0);
         assert_eq!(p.confidence, 1.0);
     }
 }

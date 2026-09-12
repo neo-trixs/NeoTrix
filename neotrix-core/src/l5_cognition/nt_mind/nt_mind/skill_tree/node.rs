@@ -21,7 +21,7 @@ impl Tier {
     }
 
     /// 升级所需前置节点数 (SmallPassive→NotablePassive 需1, NotablePassive→Keystone 需2)
-    pub fn upgrade_cost(&self) -> u8 {
+    pub(crate) fn _upgrade_cost(&self) -> u8 {
         match self {
             Self::SmallPassive => 1,
             Self::NotablePassive => 2,
@@ -112,7 +112,7 @@ impl SkillNode {
     }
 
     /// 添加前置节点
-    pub fn add_prerequisite(&mut self, prereq_id: impl Into<String>) {
+    pub(crate) fn _add_prerequisite(&mut self, prereq_id: impl Into<String>) {
         self.prerequisites.push(prereq_id.into());
     }
 
@@ -153,7 +153,7 @@ impl SkillNode {
     }
 
     /// 尝试自动晋升到下一层
-    pub fn try_auto_promote(
+    pub(crate) fn _try_auto_promote(
         &self,
         activated_ids: &[String],
     ) -> Option<Tier> {
@@ -169,7 +169,7 @@ impl SkillNode {
     }
 
     /// 晋升到指定层
-    pub fn promote_to(&mut self, new_tier: Tier) {
+    pub(crate) fn _promote_to(&mut self, new_tier: Tier) {
         self.tier = new_tier;
         self.unlocked = true;
         self.progress = 1.0;
@@ -209,7 +209,7 @@ impl SkillTreeRegistry {
         self.nodes.iter().find(|n| n.id == id)
     }
 
-    pub fn get_node_mut(&mut self, id: &str) -> Option<&mut SkillNode> {
+    pub(crate) fn _get_node_mut(&mut self, id: &str) -> Option<&mut SkillNode> {
         self.nodes.iter_mut().find(|n| n.id == id)
     }
 
@@ -219,7 +219,7 @@ impl SkillTreeRegistry {
     }
 
     /// 获取指定域的节点
-    pub fn nodes_by_domain(&self, domain: &str) -> Vec<&SkillNode> {
+    pub(crate) fn _nodes_by_domain(&self, domain: &str) -> Vec<&SkillNode> {
         self.nodes.iter().filter(|n| n.domain == domain).collect()
     }
 
@@ -240,7 +240,7 @@ impl SkillTreeRegistry {
                 continue;
             }
             if node.can_upgrade(&activated_ids) {
-                if let Some(next_tier) = node.try_auto_promote(&activated_ids) {
+                if let Some(next_tier) = node._try_auto_promote(&activated_ids) {
                     to_promote.push((node.id.clone(), next_tier));
                 }
             }
@@ -249,7 +249,7 @@ impl SkillTreeRegistry {
         // 第二遍: 晋升节点
         for (id, next_tier) in to_promote {
             if let Some(node) = self.nodes.iter_mut().find(|n| n.id == id) {
-                node.promote_to(next_tier);
+                node._promote_to(next_tier);
                 promoted.push(id);
             }
         }
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn test_node_add_prerequisite() {
         let mut n = make_node("test-2", Tier::NotablePassive, "NT-MIND");
-        n.add_prerequisite("test-1");
+        n._add_prerequisite("test-1");
         assert_eq!(n.prerequisites, vec!["test-1"]);
     }
 
@@ -345,7 +345,7 @@ mod tests {
         let mut n1 = make_node("n1", Tier::SmallPassive, "NT-CORE");
         n1.unlocked = true;
         let mut n2 = make_node("n2", Tier::NotablePassive, "NT-CORE");
-        n2.add_prerequisite("n1");
+        n2._add_prerequisite("n1");
         n2.activation_score = 0.5;
         n2.upgrade_condition.prerequisite_count = 1;
         reg.add_node(n1);
@@ -372,7 +372,7 @@ mod tests {
         n1.unlocked = true;
         n1.activation_score = 0.8;
         let mut n2 = make_node("n2", Tier::SmallPassive, "NT-CORE");
-        n2.add_prerequisite("n1");
+        n2._add_prerequisite("n1");
         n2.upgrade_condition.prerequisite_count = 1;
         n2.activation_score = 0.8;
         reg.add_node(n1);
@@ -388,7 +388,7 @@ mod tests {
     fn test_no_promote_when_prereq_not_activated() {
         let mut reg = SkillTreeRegistry::new();
         let mut n2 = make_node("n2", Tier::SmallPassive, "NT-CORE");
-        n2.add_prerequisite("n1");
+        n2._add_prerequisite("n1");
         n2.upgrade_condition.prerequisite_count = 1;
         n2.activation_score = 0.8;
         reg.add_node(n2);
@@ -404,7 +404,7 @@ mod tests {
         n.activation_score = 1.0;
         let node_id = n.id.clone();
         let activated: Vec<String> = vec![node_id];
-        assert!(n.try_auto_promote(&activated).is_none());
+        assert!(n._try_auto_promote(&activated).is_none());
     }
 
     #[test]
@@ -412,9 +412,9 @@ mod tests {
         let mut reg = SkillTreeRegistry::new();
         let n1 = make_node("n1", Tier::SmallPassive, "NT-CORE");
         let mut n2 = make_node("n2", Tier::NotablePassive, "NT-CORE");
-        n2.add_prerequisite("n1");
+        n2._add_prerequisite("n1");
         let mut n3 = make_node("n3", Tier::Keystone, "NT-CORE");
-        n3.add_prerequisite("n2");
+        n3._add_prerequisite("n2");
         reg.add_node(n1);
         reg.add_node(n2);
         reg.add_node(n3);

@@ -55,10 +55,10 @@ pub struct DualTrackEntry {
     pub session_id: String,
 
     /// Symbolic track — deterministic (AST hashes, signatures, imports)
-    pub symbolic: SymbolicTrack,
+    pub symbolic: _SymbolicTrack,
 
     /// Semantic track — probabilistic (embeddings, intent, constraints)
-    pub semantic: SemanticTrack,
+    pub semantic: _SemanticTrack,
 
     pub created_at: i64,
     pub accessed_at: i64,
@@ -67,7 +67,7 @@ pub struct DualTrackEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SymbolicTrack {
+pub(crate) struct _SymbolicTrack {
     pub ast_hash: String,
     pub file_hash: Option<String>,
     pub signatures: Vec<String>,
@@ -77,7 +77,7 @@ pub struct SymbolicTrack {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SemanticTrack {
+pub(crate) struct _SemanticTrack {
     pub intent: String,
     pub constraints: Vec<String>,
     pub preferences: Vec<String>,
@@ -105,12 +105,12 @@ pub trait MemoryStore: Send + Sync {
 /// | remember | MemoryStore::store | Create new memory entry |
 /// | link | MemoryOrchestrator::promote | Connect / tier-promote memories |
 /// | observe | MemoryOrchestrator::drain_expired | Scan for stale / decayed entries |
-/// | validate | OMPReconciler::reconcile | Verify consistency across dual tracks |
-pub struct OMPReconciler;
+/// | validate | _OMPReconciler::reconcile | Verify consistency across dual tracks |
+pub(crate) struct _OMPReconciler;
 
-impl OMPReconciler {
+impl _OMPReconciler {
     /// OMP `reconcile` — merge symbolic + semantic tracks into a unified entry.
-    pub fn reconcile(symbolic: &SymbolicTrack, semantic: &SemanticTrack) -> DualTrackEntry {
+    pub fn reconcile(symbolic: &_SymbolicTrack, semantic: &_SemanticTrack) -> DualTrackEntry {
         let ast_hash = if symbolic.ast_hash.is_empty() {
             md5_hash(&semantic.intent)
         } else {
@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_omp_reconciler_merges_tracks() {
-        let symbolic = SymbolicTrack {
+        let symbolic = _SymbolicTrack {
             ast_hash: "abc123".into(),
             file_hash: None,
             signatures: vec!["fn foo()".into()],
@@ -397,14 +397,14 @@ mod tests {
             imports: vec!["std::collections".into()],
             exports: vec![],
         };
-        let semantic = SemanticTrack {
+        let semantic = _SemanticTrack {
             intent: "parse user input".into(),
             constraints: vec!["utf-8".into()],
             preferences: vec!["async".into()],
             embedding: None,
             tags: vec!["parsing".into(), "input".into()],
         };
-        let entry = OMPReconciler::reconcile(&symbolic, &semantic);
+        let entry = _OMPReconciler::reconcile(&symbolic, &semantic);
         assert!(entry.id.starts_with("mem_"));
         assert_eq!(entry.symbolic.ast_hash, "abc123");
         assert_eq!(entry.semantic.intent, "parse user input");
@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn test_omp_staleness_detection() {
-        let symbolic = SymbolicTrack {
+        let symbolic = _SymbolicTrack {
             ast_hash: "abc".into(),
             file_hash: None,
             signatures: vec![],
@@ -421,16 +421,16 @@ mod tests {
             imports: vec![],
             exports: vec![],
         };
-        let semantic = SemanticTrack {
+        let semantic = _SemanticTrack {
             intent: String::new(),
             constraints: vec![],
             preferences: vec![],
             embedding: None,
             tags: vec![],
         };
-        let entry = OMPReconciler::reconcile(&symbolic, &semantic);
-        assert!(OMPReconciler::is_stale(&entry, "def"));
-        assert!(!OMPReconciler::is_stale(&entry, "abc"));
+        let entry = _OMPReconciler::reconcile(&symbolic, &semantic);
+        assert!(_OMPReconciler::is_stale(&entry, "def"));
+        assert!(!_OMPReconciler::is_stale(&entry, "abc"));
     }
 
     #[test]
@@ -442,7 +442,7 @@ mod tests {
                 tier: *tier,
                 agent_id: "agent_1".into(),
                 session_id: "session_1".into(),
-                symbolic: SymbolicTrack {
+                symbolic: _SymbolicTrack {
                     ast_hash: format!("hash_{}", i),
                     file_hash: None,
                     signatures: vec![],
@@ -450,7 +450,7 @@ mod tests {
                     imports: vec![],
                     exports: vec![],
                 },
-                semantic: SemanticTrack {
+                semantic: _SemanticTrack {
                     intent: format!("task_{}", i),
                     constraints: vec![],
                     preferences: vec![],
@@ -471,33 +471,33 @@ mod tests {
 
     #[test]
     fn test_omp_validate_consistent() {
-        let symbolic = SymbolicTrack {
+        let symbolic = _SymbolicTrack {
             ast_hash: "abc".into(), file_hash: None,
             signatures: vec![], dependencies: vec![], imports: vec![], exports: vec![],
         };
-        let semantic = SemanticTrack {
+        let semantic = _SemanticTrack {
             intent: "test".into(), constraints: vec![], preferences: vec![],
             embedding: None, tags: vec![],
         };
-        let entry = OMPReconciler::reconcile(&symbolic, &semantic);
-        assert!(OMPReconciler::validate(&entry));
+        let entry = _OMPReconciler::reconcile(&symbolic, &semantic);
+        assert!(_OMPReconciler::validate(&entry));
     }
 
     #[test]
     fn test_omp_validate_inconsistent() {
-        let symbolic = SymbolicTrack {
+        let symbolic = _SymbolicTrack {
             ast_hash: "abc".into(), file_hash: None,
             signatures: vec![], dependencies: vec![], imports: vec![], exports: vec![],
         };
-        let semantic = SemanticTrack {
+        let semantic = _SemanticTrack {
             intent: "test".into(), constraints: vec![], preferences: vec![],
             embedding: None, tags: vec![],
         };
-        let entry = OMPReconciler::reconcile(&symbolic, &semantic);
+        let entry = _OMPReconciler::reconcile(&symbolic, &semantic);
         // Manually corrupt staleness_hash to simulate inconsistency
         let mut corrupt = entry.clone();
         corrupt.staleness_hash = Some("xyz".into());
-        assert!(!OMPReconciler::validate(&corrupt));
+        assert!(!_OMPReconciler::validate(&corrupt));
     }
 
     fn make_entry(id: &str, tier: MemoryTier, agent: &str, intent: &str) -> DualTrackEntry {
@@ -506,7 +506,7 @@ mod tests {
             tier,
             agent_id: agent.into(),
             session_id: "s1".into(),
-            symbolic: SymbolicTrack {
+            symbolic: _SymbolicTrack {
                 ast_hash: format!("h_{}", id),
                 file_hash: None,
                 signatures: vec![],
@@ -514,7 +514,7 @@ mod tests {
                 imports: vec![],
                 exports: vec![],
             },
-            semantic: SemanticTrack {
+            semantic: _SemanticTrack {
                 intent: intent.into(),
                 constraints: vec![],
                 preferences: vec![],
@@ -572,7 +572,7 @@ mod tests {
                 tier: MemoryTier::Working,
                 agent_id: "agent_x".into(),
                 session_id: "s1".into(),
-                symbolic: SymbolicTrack {
+                symbolic: _SymbolicTrack {
                     ast_hash: format!("h{}", i),
                     file_hash: None,
                     signatures: vec!["fn handle_".to_string()],
@@ -580,7 +580,7 @@ mod tests {
                     imports: vec![],
                     exports: vec![],
                 },
-                semantic: SemanticTrack {
+                semantic: _SemanticTrack {
                     intent: format!("handle request {}", i),
                     constraints: vec![],
                     preferences: vec![],
@@ -607,7 +607,7 @@ mod tests {
 
 /// Admission score for a memory candidate before writing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdmissionScore {
+pub(crate) struct _AdmissionScore {
     pub utility: f64,
     pub confidence: f64,
     pub novelty: f64,
@@ -637,10 +637,10 @@ impl MemoryAdmissionGate {
     }
 
     /// Evaluate a memory candidate. Returns true if the memory should be admitted.
-    pub fn evaluate(&self, utility: f64, confidence: f64, novelty: f64, recency: f64, type_prior: f64) -> AdmissionScore {
+    pub fn evaluate(&self, utility: f64, confidence: f64, novelty: f64, recency: f64, type_prior: f64) -> _AdmissionScore {
         let total = (utility + confidence + novelty + recency + type_prior) / 5.0;
         let admitted = total >= self.threshold && self.current_size() < self.max_store_size;
-        AdmissionScore {
+        _AdmissionScore {
             utility, confidence, novelty, recency, total, admitted,
         }
     }

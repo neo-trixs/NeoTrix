@@ -6,7 +6,7 @@
 //! lineage / journal 机制 (原 ConsciousnessTree 已有 cycle / current_contract / fruits
 //! 但缺显式 journal 与 lineage 维度)。
 //!
-//! 本模块为 **C2 集成**: 定义 `GaspRepo` 五维度结构体 + 与 `ConsciousnessTree`
+//! 本模块为 **C2 集成**: 定义 `_GaspRepo` 五维度结构体 + 与 `ConsciousnessTree`
 //! 字段的对应表 (文档注释), 作为 NeoTrix 自进化 schema 的采纳落点。
 //!
 //! # GASP 五维度 → ConsciousnessTree 字段 对应表
@@ -23,7 +23,7 @@ use std::collections::HashMap;
 
 /// GASP identity 维度 — 映射 `awakened` + `SystemIdentity`。
 #[derive(Debug, Clone, PartialEq)]
-pub struct GaspIdentity {
+pub(crate) struct _GaspIdentity {
     pub id: String,
     pub awakened: bool,
     pub species: String,
@@ -31,25 +31,25 @@ pub struct GaspIdentity {
 
 /// GASP skills 维度 — 映射 `branches` / `atoms` (36 原子能力)。
 #[derive(Debug, Clone, PartialEq)]
-pub struct GaspSkill {
+pub(crate) struct _GaspSkill {
     pub name: String,
     pub promoted: bool,
 }
 
 /// GASP memory 维度 — 映射 `soil` (kb_node_count) + `kb` handle。
 #[derive(Debug, Clone, PartialEq)]
-pub struct GaspMemory {
+pub(crate) struct _GaspMemory {
     pub kb_node_count: u64,
     pub experience_cycles: u64,
 }
 
 /// GASP journal 维度 — **补强 ConsciousnessTree 原缺的显式审计轨迹**。
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct GaspJournal {
+pub(crate) struct _GaspJournal {
     pub entries: Vec<String>,
 }
 
-impl GaspJournal {
+impl _GaspJournal {
     pub fn append(&mut self, stage: &str, detail: &str) {
         self.entries.push(format!("[{}] {}", stage, detail));
     }
@@ -57,7 +57,7 @@ impl GaspJournal {
 
 /// GASP lineage 维度 — 映射 `cycle` / `current_contract` 代际血缘。
 #[derive(Debug, Clone, PartialEq)]
-pub struct GaspLineage {
+pub(crate) struct _GaspLineage {
     pub parent_id: Option<String>,
     pub generation: u64,
     pub cycle: u64,
@@ -67,30 +67,30 @@ pub struct GaspLineage {
 ///
 /// 直接对齐 ConsciousnessTree 字段 (见模块级对应表), 作为 NeoTrix 把 GASP 标准
 /// 收编为自进化 schema 的单一事实源节点 (R-P42: 强化现有节点, 禁止平行适配器)。
-pub struct GaspRepo {
-    pub identity: GaspIdentity,
-    pub skills: HashMap<String, GaspSkill>,
-    pub memory: GaspMemory,
-    pub journal: GaspJournal,
-    pub lineage: GaspLineage,
+pub(crate) struct _GaspRepo {
+    pub identity: _GaspIdentity,
+    pub skills: HashMap<String, _GaspSkill>,
+    pub memory: _GaspMemory,
+    pub journal: _GaspJournal,
+    pub lineage: _GaspLineage,
 }
 
-impl GaspRepo {
+impl _GaspRepo {
     /// 构造一个完整 GASP 仓库 (五维度全部初始化)。
     pub fn new(id: &str, parent_id: Option<&str>, cycle: u64, gen: u64) -> Self {
         Self {
-            identity: GaspIdentity {
+            identity: _GaspIdentity {
                 id: id.to_string(),
                 awakened: false,
                 species: "gasp".into(),
             },
             skills: HashMap::new(),
-            memory: GaspMemory {
+            memory: _GaspMemory {
                 kb_node_count: 0,
                 experience_cycles: 0,
             },
-            journal: GaspJournal::default(),
-            lineage: GaspLineage {
+            journal: _GaspJournal::default(),
+            lineage: _GaspLineage {
                 parent_id: parent_id.map(|s| s.to_string()),
                 generation: gen,
                 cycle,
@@ -102,7 +102,7 @@ impl GaspRepo {
     pub fn register_skill(&mut self, name: &str) {
         self.skills.insert(
             name.to_string(),
-            GaspSkill {
+            _GaspSkill {
                 name: name.to_string(),
                 promoted: true,
             },
@@ -125,9 +125,9 @@ impl GaspRepo {
     }
 }
 
-impl SelfTest for GaspRepo {
+impl SelfTest for _GaspRepo {
     fn name(&self) -> &'static str {
-        "GaspRepo"
+        "_GaspRepo"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn test_gasp_repo_five_dimensions_complete() {
-        let mut r = GaspRepo::new("gasp-1", None, 1, 0);
+        let mut r = _GaspRepo::new("gasp-1", None, 1, 0);
         r.awaken();
         r.memory.kb_node_count = 42;
         r.register_skill("self-edit");
@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_gasp_lineage_cycle_mapping() {
-        let r = GaspRepo::new("gasp-2", Some("gasp-1"), 7, 3);
+        let r = _GaspRepo::new("gasp-2", Some("gasp-1"), 7, 3);
         assert_eq!(r.lineage.parent_id.as_deref(), Some("gasp-1"));
         assert_eq!(r.lineage.cycle, 7);
         assert_eq!(r.lineage.generation, 3);
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_selftest_flags_unawakened_repo() {
-        let r = GaspRepo::new("gasp-3", None, 1, 0);
+        let r = _GaspRepo::new("gasp-3", None, 1, 0);
         // not awakened, kb 0, journal empty → 三处缺口
         assert!(r.self_test().is_err());
         let errs = r.self_test().unwrap_err();

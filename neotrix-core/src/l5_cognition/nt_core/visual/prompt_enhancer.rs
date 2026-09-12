@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
 
 /// 增强策略
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum EnhancementStrategy {
+pub(crate) enum _EnhancementStrategy {
     /// 质量增强
     Quality,
     /// 风格增强
@@ -27,7 +27,7 @@ pub enum EnhancementStrategy {
 
 /// 风格预设
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StylePreset {
+pub(crate) struct _StylePreset {
     /// 预设ID
     pub id: String,
     /// 预设名称
@@ -44,11 +44,11 @@ pub struct StylePreset {
 
 /// 增强配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnhancerConfig {
+pub(crate) struct _EnhancerConfig {
     /// 默认策略
-    pub default_strategy: EnhancementStrategy,
+    pub default_strategy: _EnhancementStrategy,
     /// 风格预设
-    pub style_presets: Vec<StylePreset>,
+    pub style_presets: Vec<_StylePreset>,
     /// 质量标签库
     pub quality_tags: Vec<String>,
     /// 负面提示词库
@@ -61,7 +61,7 @@ pub struct EnhancerConfig {
 
 /// 增强结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnhancementResult {
+pub(crate) struct _EnhancementResult {
     /// 原始提示词
     pub original: String,
     /// 增强后的提示词
@@ -69,7 +69,7 @@ pub struct EnhancementResult {
     /// 生成的负面提示词
     pub negative: String,
     /// 应用的策略
-    pub strategy: EnhancementStrategy,
+    pub strategy: _EnhancementStrategy,
     /// 添加的标签
     pub added_tags: Vec<String>,
     /// 增强耗时 (毫秒)
@@ -81,21 +81,21 @@ pub struct EnhancementResult {
 // ============================================================================
 
 /// 提示词增强器
-pub struct PromptEnhancer {
+pub(crate) struct _PromptEnhancer {
     /// 配置
-    config: EnhancerConfig,
+    config: _EnhancerConfig,
     /// 增强历史
-    history: Vec<EnhancementResult>,
+    history: Vec<_EnhancementResult>,
 }
 
-impl PromptEnhancer {
+impl _PromptEnhancer {
     /// 创建增强器
     pub fn new() -> Self {
         Self {
-            config: EnhancerConfig {
-                default_strategy: EnhancementStrategy::Combined,
+            config: _EnhancerConfig {
+                default_strategy: _EnhancementStrategy::Combined,
                 style_presets: vec![
-                    StylePreset {
+                    _StylePreset {
                         id: "cinematic".to_string(),
                         name: "电影感".to_string(),
                         positive_prefix: "cinematic lighting, film grain, ".to_string(),
@@ -103,7 +103,7 @@ impl PromptEnhancer {
                         quality_tags: vec!["masterpiece".to_string(), "best quality".to_string(), "highly detailed".to_string()],
                         style_tags: vec!["cinematic".to_string(), "film".to_string()],
                     },
-                    StylePreset {
+                    _StylePreset {
                         id: "anime".to_string(),
                         name: "动漫风格".to_string(),
                         positive_prefix: "anime style, ".to_string(),
@@ -134,7 +134,7 @@ impl PromptEnhancer {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: EnhancerConfig) -> Self {
+    pub fn with_config(config: _EnhancerConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -145,9 +145,9 @@ impl PromptEnhancer {
     pub fn enhance(
         &mut self,
         prompt: &str,
-        strategy: EnhancementStrategy,
+        strategy: _EnhancementStrategy,
         style_id: Option<&str>,
-    ) -> EnhancementResult {
+    ) -> _EnhancementResult {
         let start = std::time::Instant::now();
         
         let mut enhanced = prompt.to_string();
@@ -155,7 +155,7 @@ impl PromptEnhancer {
         let mut added_tags = vec![];
         
         // 应用质量标签
-        if strategy == EnhancementStrategy::Quality || strategy == EnhancementStrategy::Combined {
+        if strategy == _EnhancementStrategy::Quality || strategy == _EnhancementStrategy::Combined {
             for tag in &self.config.quality_tags {
                 if !enhanced.contains(tag) {
                     enhanced = format!("{}, {}", tag, enhanced);
@@ -183,7 +183,7 @@ impl PromptEnhancer {
             enhanced.truncate(self.config.max_prompt_length);
         }
         
-        let result = EnhancementResult {
+        let result = _EnhancementResult {
             original: prompt.to_string(),
             enhanced,
             negative,
@@ -197,7 +197,7 @@ impl PromptEnhancer {
     }
     
     /// 增强负面提示词
-    pub fn enhance_negative(&self, base_negative: &str, additional: &[String]) -> String {
+    pub(crate) fn _enhance_negative(&self, base_negative: &str, additional: &[String]) -> String {
         let mut negative = base_negative.to_string();
         
         for tag in additional {
@@ -210,7 +210,7 @@ impl PromptEnhancer {
     }
     
     /// 获取统计信息
-    pub fn statistics(&self) -> EnhancerStats {
+    pub fn statistics(&self) -> _EnhancerStats {
         let total_enhanced = self.history.len();
         let avg_added_tags = if total_enhanced > 0 {
             self.history.iter().map(|r| r.added_tags.len()).sum::<usize>() as f32 / total_enhanced as f32
@@ -218,7 +218,7 @@ impl PromptEnhancer {
             0.0
         };
         
-        EnhancerStats {
+        _EnhancerStats {
             total_enhanced,
             avg_added_tags,
         }
@@ -227,7 +227,7 @@ impl PromptEnhancer {
 
 /// 增强统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnhancerStats {
+pub(crate) struct _EnhancerStats {
     /// 总增强次数
     pub total_enhanced: usize,
     /// 平均添加标签数
@@ -244,11 +244,11 @@ mod tests {
     
     #[test]
     fn test_prompt_enhancer() {
-        let mut enhancer = PromptEnhancer::new();
+        let mut enhancer = _PromptEnhancer::new();
         
         let result = enhancer.enhance(
             "a girl in a garden",
-            EnhancementStrategy::Combined,
+            _EnhancementStrategy::Combined,
             Some("cinematic"),
         );
         

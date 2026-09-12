@@ -38,12 +38,12 @@ impl MetaPanelEngine {
         Self { depth, strict_review, viewpoint_registry: registry, tools: Vec::new() }
     }
 
-    pub fn set_depth(&mut self, depth: AnalysisDepth) {
+    pub(crate) fn _set_depth(&mut self, depth: AnalysisDepth) {
         self.depth = depth;
     }
 
     /// 注册动作路径工具 (不可逆/扩权工具会升级门控到人工)。
-    pub fn set_tools(&mut self, tools: Vec<ToolSpec>) {
+    pub(crate) fn _set_tools(&mut self, tools: Vec<ToolSpec>) {
         self.tools = tools;
     }
 

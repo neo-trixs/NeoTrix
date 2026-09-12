@@ -241,27 +241,27 @@ impl Default for GoalConfig {
 }
 
 impl GoalConfig {
-    pub fn with_crt_scale(mut self, scale: CrtTimeScale) -> Self {
+    pub(crate) fn _with_crt_scale(mut self, scale: CrtTimeScale) -> Self {
         self.crt_scale = scale;
         self
     }
 
     /// Get CRT-aware max iterations: CRT scale overrides if more specific.
-    pub fn crt_adjusted_max_iterations(&self) -> u64 {
+    pub(crate) fn _crt_adjusted_max_iterations(&self) -> u64 {
         let scale_iterations = self.crt_scale.max_iterations();
         scale_iterations.min(self.max_iterations)
     }
 
     /// Build a CrtPlan from this config.
-    pub fn to_crt_plan(&self) -> crate::core::CrtPlan {
+    pub(crate) fn _to_crt_plan(&self) -> crate::core::CrtPlan {
         crate::core::CrtPlan::new(self.crt_scale, self.max_duration_secs as f64)
     }
 
-    pub fn crt_scale_label(&self) -> &str {
+    pub(crate) fn _crt_scale_label(&self) -> &str {
         self.crt_scale.label()
     }
 
-    pub fn crt_chinese_name(&self) -> &str {
+    pub(crate) fn _crt_chinese_name(&self) -> &str {
         self.crt_scale.chinese_name()
     }
 

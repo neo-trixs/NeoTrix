@@ -49,7 +49,7 @@ impl Stage {
     }
 
     /// 该阶段映射到的 SEAL `make_stage!` 阶段名 (GASP→SEAL 对照)。
-    pub fn seal_stage(&self) -> &'static str {
+    pub fn _seal_stage(&self) -> &'static str {
         match self {
             Stage::Proposed => "Explore/Distill (propose mutation)",
             Stage::Eval => "SelfTest (R-P42 eval gate)",
@@ -59,7 +59,7 @@ impl Stage {
     }
 
     /// 该阶段对应的 GASP 事件名。
-    pub fn gasp_event(&self) -> &'static str {
+    pub(crate) fn _gasp_event(&self) -> &'static str {
         match self {
             Stage::Proposed => "patch.proposed",
             Stage::Eval => "eval.finished",
@@ -71,7 +71,7 @@ impl Stage {
 
 /// 阶段机错误: 非法转移 (后退/越级/未定义)。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TransitionError {
+pub(crate) enum _TransitionError {
     IllegalBackward,
     IllegalJump,
     AlreadyTerminal,
@@ -81,13 +81,13 @@ pub enum TransitionError {
 ///
 /// 状态转移严格单向: Proposed→Eval→Decision→Promoted→(新代际)Proposed。
 /// 每步 `transition` 即一次 `make_stage!` 阶段推进。
-pub struct EvolutionMachine {
+pub(crate) struct _EvolutionMachine {
     stage: Stage,
     generation: u64,
     eval_passed: bool,
 }
 
-impl EvolutionMachine {
+impl _EvolutionMachine {
     pub fn new() -> Self {
         Self {
             stage: Stage::Proposed,
@@ -110,7 +110,7 @@ impl EvolutionMachine {
     /// - Eval → Decision: 必须 `eval_passed` (R-P42 验证门槛), 否则 IllegalJump。
     /// - Decision → Promoted: 决策通过, 晋升落地。
     /// - Promoted → Proposed: 开启下一代际 (代际 +1)。
-    pub fn transition(&mut self) -> Result<Stage, TransitionError> {
+    pub fn transition(&mut self) -> Result<Stage, _TransitionError> {
         match self.stage {
             Stage::Proposed => {
                 self.stage = Stage::Eval;
@@ -118,7 +118,7 @@ impl EvolutionMachine {
             }
             Stage::Eval => {
                 if !self.eval_passed {
-                    return Err(TransitionError::IllegalJump);
+                    return Err(_TransitionError::IllegalJump);
                 }
                 self.stage = Stage::Decision;
                 Ok(self.stage)
@@ -137,25 +137,25 @@ impl EvolutionMachine {
     }
 
     /// 标记评估通过 (R-P42 eval gate), 允许 Eval→Decision。
-    pub fn mark_eval_passed(&mut self) {
+    pub(crate) fn _mark_eval_passed(&mut self) {
         self.eval_passed = true;
     }
 
     /// 当前阶段映射到 SEAL make_stage! 名。
-    pub fn seal_stage(&self) -> &'static str {
-        self.stage.seal_stage()
+    pub(crate) fn _seal_stage(&self) -> &'static str {
+        self.stage._seal_stage()
     }
 }
 
-impl Default for EvolutionMachine {
+impl Default for _EvolutionMachine {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl SelfTest for EvolutionMachine {
+impl SelfTest for _EvolutionMachine {
     fn name(&self) -> &'static str {
-        "EvolutionMachine"
+        "_EvolutionMachine"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -179,18 +179,18 @@ mod tests {
     #[test]
     fn test_four_stage_lifecycle_matches_make_stage() {
         assert_eq!(Stage::lifecycle().len(), 4);
-        assert_eq!(Stage::Proposed.seal_stage(), "Explore/Distill (propose mutation)");
-        assert_eq!(Stage::Promoted.seal_stage(), "Promote (wire to production path)");
+        assert_eq!(Stage::Proposed._seal_stage(), "Explore/Distill (propose mutation)");
+        assert_eq!(Stage::Promoted._seal_stage(), "Promote (wire to production path)");
     }
 
     #[test]
     fn test_transition_requires_rp42_eval_gate() {
-        let mut m = EvolutionMachine::new();
+        let mut m = _EvolutionMachine::new();
         assert_eq!(m.stage(), Stage::Proposed);
         assert_eq!(m.transition().unwrap(), Stage::Eval);
         // Eval 未过 R-P42 门禁 → 拒绝跳转 Decision
-        assert_eq!(m.transition(), Err(TransitionError::IllegalJump));
-        m.mark_eval_passed();
+        assert_eq!(m.transition(), Err(_TransitionError::IllegalJump));
+        m._mark_eval_passed();
         assert_eq!(m.transition().unwrap(), Stage::Decision);
         assert_eq!(m.transition().unwrap(), Stage::Promoted);
         // Promoted → 新代际 Proposed
@@ -200,11 +200,11 @@ mod tests {
 
     #[test]
     fn test_selftest_flags_unevaluated_eval_stage() {
-        let mut m = EvolutionMachine::new();
+        let mut m = _EvolutionMachine::new();
         m.transition().unwrap(); // → Eval, eval_passed=false
         assert_eq!(m.stage(), Stage::Eval);
         assert!(m.self_test().is_err());
-        m.mark_eval_passed();
+        m._mark_eval_passed();
         assert!(m.self_test().is_ok());
     }
 }

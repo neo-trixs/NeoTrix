@@ -13,24 +13,24 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 可解释AI引擎
-pub struct ExplainableAIEngine {
-    explainer: ModelExplainer,
-    feature_analyzer: FeatureAnalyzer,
-    attention_visualizer: AttentionVisualizer,
-    config: XAIConfig,
-    stats: XAIStats,
+pub(crate) struct _ExplainableAIEngine {
+    explainer: _ModelExplainer,
+    feature_analyzer: _FeatureAnalyzer,
+    attention_visualizer: _AttentionVisualizer,
+    config: _XAIConfig,
+    stats: _XAIStats,
 }
 
 /// XAI 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct XAIConfig {
+pub(crate) struct _XAIConfig {
     pub explanation_method: String,
     pub num_features: usize,
     pub enable_counterfactuals: bool,
     pub enable_attention: bool,
 }
 
-impl Default for XAIConfig {
+impl Default for _XAIConfig {
     fn default() -> Self {
         Self {
             explanation_method: "shap".into(),
@@ -42,29 +42,29 @@ impl Default for XAIConfig {
 }
 
 /// 模型解释器
-pub struct ModelExplainer {
+pub(crate) struct _ModelExplainer {
     method: String,
     background_data: Option<Vec<HashMap<String, f64>>>,
 }
 
 /// 特征分析器
-pub struct FeatureAnalyzer {
+pub(crate) struct _FeatureAnalyzer {
     feature_importance: HashMap<String, f64>,
     feature_correlations: HashMap<String, HashMap<String, f64>>,
 }
 
 /// 注意力可视化器
-pub struct AttentionVisualizer {
+pub(crate) struct _AttentionVisualizer {
     #[allow(dead_code)]
     attention_weights: HashMap<String, Vec<f64>>,
 }
 
 /// 解释结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExplanationResult {
+pub(crate) struct _ExplanationResult {
     pub prediction: serde_json::Value,
     pub confidence: f64,
-    pub feature_importance: Vec<FeatureImportance>,
+    pub feature_importance: Vec<_FeatureImportance>,
     pub attention_weights: Option<Vec<AttentionWeight>>,
     pub counterfactuals: Option<Vec<Counterfactual>>,
     pub summary: String,
@@ -72,7 +72,7 @@ pub struct ExplanationResult {
 
 /// 特征重要性
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FeatureImportance {
+pub(crate) struct _FeatureImportance {
     pub feature_name: String,
     pub importance: f64,
     pub direction: String,
@@ -102,15 +102,15 @@ pub struct Counterfactual {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditReport {
     pub model_id: String,
-    pub fairness_metrics: FairnessMetrics,
-    pub robustness_metrics: RobustnessMetrics,
+    pub fairness_metrics: _FairnessMetrics,
+    pub robustness_metrics: _RobustnessMetrics,
     pub interpretability_score: f64,
     pub recommendations: Vec<String>,
 }
 
 /// 公平性指标
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FairnessMetrics {
+pub(crate) struct _FairnessMetrics {
     pub demographic_parity: f64,
     pub equal_opportunity: f64,
     pub equalized_odds: f64,
@@ -119,7 +119,7 @@ pub struct FairnessMetrics {
 
 /// 鲁棒性指标
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RobustnessMetrics {
+pub(crate) struct _RobustnessMetrics {
     pub adversarial_robustness: f64,
     pub distribution_shift: f64,
     pub noise_tolerance: f64,
@@ -127,30 +127,30 @@ pub struct RobustnessMetrics {
 
 /// XAI 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct XAIStats {
+pub(crate) struct _XAIStats {
     pub explanations_generated: u64,
     pub audits_performed: u64,
     pub avg_explanation_time: f64,
     pub user_satisfaction: f64,
 }
 
-impl ExplainableAIEngine {
+impl _ExplainableAIEngine {
     /// 创建新的可解释AI引擎
-    pub fn new(config: XAIConfig) -> Self {
+    pub fn new(config: _XAIConfig) -> Self {
         Self {
-            explainer: ModelExplainer {
+            explainer: _ModelExplainer {
                 method: config.explanation_method.clone(),
                 background_data: None,
             },
-            feature_analyzer: FeatureAnalyzer {
+            feature_analyzer: _FeatureAnalyzer {
                 feature_importance: HashMap::new(),
                 feature_correlations: HashMap::new(),
             },
-            attention_visualizer: AttentionVisualizer {
+            attention_visualizer: _AttentionVisualizer {
                 attention_weights: HashMap::new(),
             },
             config,
-            stats: XAIStats {
+            stats: _XAIStats {
                 explanations_generated: 0,
                 audits_performed: 0,
                 avg_explanation_time: 0.0,
@@ -160,12 +160,12 @@ impl ExplainableAIEngine {
     }
 
     /// 生成解释
-    pub fn explain_prediction(
+    pub(crate) fn _explain_prediction(
         &mut self,
         prediction: &serde_json::Value,
         input: &HashMap<String, serde_json::Value>,
         model_output: Option<&HashMap<String, f64>>,
-    ) -> ExplanationResult {
+    ) -> _ExplanationResult {
         let _start = std::time::Instant::now();
 
         // 计算特征重要性
@@ -190,7 +190,7 @@ impl ExplainableAIEngine {
 
         self.stats.explanations_generated += 1;
 
-        ExplanationResult {
+        _ExplanationResult {
             prediction: prediction.clone(),
             confidence: 0.85,
             feature_importance,
@@ -205,8 +205,8 @@ impl ExplainableAIEngine {
         &self,
         input: &HashMap<String, serde_json::Value>,
         _model_output: Option<&HashMap<String, f64>>,
-    ) -> Vec<FeatureImportance> {
-        let mut importance: Vec<FeatureImportance> = input.iter()
+    ) -> Vec<_FeatureImportance> {
+        let mut importance: Vec<_FeatureImportance> = input.iter()
             .map(|(name, value)| {
                 let imp = match value {
                     serde_json::Value::Number(n) => n.as_f64().unwrap_or(0.0).abs(),
@@ -215,7 +215,7 @@ impl ExplainableAIEngine {
                     _ => 0.5,
                 };
 
-                FeatureImportance {
+                _FeatureImportance {
                     feature_name: name.clone(),
                     importance: imp,
                     direction: if imp > 0.5 { "positive".into() } else { "negative".into() },
@@ -270,7 +270,7 @@ impl ExplainableAIEngine {
     }
 
     /// 生成摘要
-    fn generate_summary(&self, feature_importance: &[FeatureImportance], prediction: &serde_json::Value) -> String {
+    fn generate_summary(&self, feature_importance: &[_FeatureImportance], prediction: &serde_json::Value) -> String {
         let top_features: Vec<String> = feature_importance.iter()
             .take(3)
             .map(|f| format!("{} ({:.2})", f.feature_name, f.importance))
@@ -284,18 +284,18 @@ impl ExplainableAIEngine {
     }
 
     /// 执行审计
-    pub fn audit_model(&mut self, model_id: &str, _test_data: &[HashMap<String, serde_json::Value>]) -> AuditReport {
+    pub(crate) fn _audit_model(&mut self, model_id: &str, _test_data: &[HashMap<String, serde_json::Value>]) -> AuditReport {
         self.stats.audits_performed += 1;
 
         AuditReport {
             model_id: model_id.to_string(),
-            fairness_metrics: FairnessMetrics {
+            fairness_metrics: _FairnessMetrics {
                 demographic_parity: 0.85,
                 equal_opportunity: 0.82,
                 equalized_odds: 0.80,
                 calibration: 0.90,
             },
-            robustness_metrics: RobustnessMetrics {
+            robustness_metrics: _RobustnessMetrics {
                 adversarial_robustness: 0.75,
                 distribution_shift: 0.70,
                 noise_tolerance: 0.85,
@@ -310,7 +310,7 @@ impl ExplainableAIEngine {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &XAIStats {
+    pub fn stats(&self) -> &_XAIStats {
         &self.stats
     }
 }

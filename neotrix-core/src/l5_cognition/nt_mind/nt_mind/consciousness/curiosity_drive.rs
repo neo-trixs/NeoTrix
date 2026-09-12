@@ -5,25 +5,25 @@ use crate::core::nt_core_hcube::gap::GapReport;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExploreDomain;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CuriosityLevel {
+pub(crate) enum _CuriosityLevel {
     Calm,
     Interested,
     Curious,
     IntenselyCurious,
 }
 
-impl CuriosityLevel {
-    pub fn salience_multiplier(&self) -> f64 {
+impl _CuriosityLevel {
+    pub(crate) fn _salience_multiplier(&self) -> f64 {
         match self {
-            CuriosityLevel::Calm => 0.0,
-            CuriosityLevel::Interested => 0.3,
-            CuriosityLevel::Curious => 0.6,
-            CuriosityLevel::IntenselyCurious => 0.9,
+            _CuriosityLevel::Calm => 0.0,
+            _CuriosityLevel::Interested => 0.3,
+            _CuriosityLevel::Curious => 0.6,
+            _CuriosityLevel::IntenselyCurious => 0.9,
         }
     }
 }
 
-pub struct CuriositySignal {
+pub(crate) struct _CuriositySignal {
     pub domain: ExploreDomain,
     pub intensity: f64,
     pub description: String,
@@ -32,9 +32,9 @@ pub struct CuriositySignal {
 }
 
 pub struct CuriosityDrive {
-    pub signals: VecDeque<CuriositySignal>,
+    pub signals: VecDeque<_CuriositySignal>,
     pub max_signals: usize,
-    pub curiosity_level: CuriosityLevel,
+    pub curiosity_level: _CuriosityLevel,
     pub total_gaps_detected: u64,
     pub last_curiosity_ignition: Option<i64>,
     pub exploration_queries_generated: u64,
@@ -45,7 +45,7 @@ impl CuriosityDrive {
         Self {
             signals: VecDeque::new(),
             max_signals: 20,
-            curiosity_level: CuriosityLevel::Calm,
+            curiosity_level: _CuriosityLevel::Calm,
             total_gaps_detected: 0,
             last_curiosity_ignition: None,
             exploration_queries_generated: 0,
@@ -60,20 +60,20 @@ impl CuriosityDrive {
         self.total_gaps_detected += high_gap_count as u64;
 
         self.curiosity_level = if avg_sparsity > 0.7 {
-            CuriosityLevel::IntenselyCurious
+            _CuriosityLevel::IntenselyCurious
         } else if avg_sparsity > 0.4 {
-            CuriosityLevel::Curious
+            _CuriosityLevel::Curious
         } else if avg_sparsity > 0.2 {
-            CuriosityLevel::Interested
+            _CuriosityLevel::Interested
         } else {
-            CuriosityLevel::Calm
+            _CuriosityLevel::Calm
         };
 
         for report in reports.iter().filter(|r| r.gap > 0.3 || r.sparsity_score > 0.4) {
             let domain = self.gap_to_domain(report);
             let search_terms = self.generate_search_terms(report);
 
-            self.signals.push_back(CuriositySignal {
+            self.signals.push_back(_CuriositySignal {
                 domain,
                 intensity: (report.gap + report.sparsity_score) / 2.0,
                 description: format!("dim={}: gap={:.2}, sparsity={:.2}, empty={}", report.dim_index, report.gap, report.sparsity_score, report.empty_regions.len()),
@@ -106,14 +106,14 @@ impl CuriosityDrive {
         terms
     }
 
-    pub fn top_signals(&self, n: usize) -> Vec<&CuriositySignal> {
+    pub fn top_signals(&self, n: usize) -> Vec<&_CuriositySignal> {
         let mut sorted: Vec<_> = self.signals.iter().collect();
         sorted.sort_by(|a, b| b.intensity.partial_cmp(&a.intensity).unwrap_or(std::cmp::Ordering::Equal));
         sorted.into_iter().take(n).collect()
     }
 
-    pub fn register_into_gwt(&self, gw: &mut GlobalWorkspace) {
-        let intensity = self.curiosity_level.salience_multiplier();
+    pub(crate) fn _register_into_gwt(&self, gw: &mut GlobalWorkspace) {
+        let intensity = self.curiosity_level._salience_multiplier();
         if intensity < 0.3 {
             return;
         }
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn test_new_curiosity_is_calm() {
         let drive = CuriosityDrive::new();
-        assert_eq!(drive.curiosity_level, CuriosityLevel::Calm);
+        assert_eq!(drive.curiosity_level, _CuriosityLevel::Calm);
     }
 
     #[test]
@@ -187,7 +187,7 @@ mod tests {
             sample_gap_report(2, 0.6),
         ];
         drive.ingest_gap_reports(&reports);
-        assert_eq!(drive.curiosity_level, CuriosityLevel::IntenselyCurious);
+        assert_eq!(drive.curiosity_level, _CuriosityLevel::IntenselyCurious);
         assert!(drive.total_gaps_detected >= 3);
     }
 
@@ -196,7 +196,7 @@ mod tests {
         let mut drive = CuriosityDrive::new();
         let reports = vec![sample_gap_report(0, 0.1)];
         drive.ingest_gap_reports(&reports);
-        assert_eq!(drive.curiosity_level, CuriosityLevel::Calm);
+        assert_eq!(drive.curiosity_level, _CuriosityLevel::Calm);
     }
 
     #[test]

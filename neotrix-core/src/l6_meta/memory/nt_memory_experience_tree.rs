@@ -10,24 +10,24 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 经验树管理器
-pub struct ExperienceTreeManager {
+pub(crate) struct _ExperienceTreeManager {
     experiences: Vec<Experience>,
     #[allow(dead_code)]
-    branches: Vec<ExperienceBranch>,
-    config: ExperienceConfig,
-    stats: ExperienceStats,
+    branches: Vec<_ExperienceBranch>,
+    config: _ExperienceConfig,
+    stats: _ExperienceStats,
 }
 
 /// 经验配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExperienceConfig {
+pub(crate) struct _ExperienceConfig {
     pub max_experiences: usize,
     pub enable_auto_distill: bool,
     pub retention_days: u32,
     pub min_confidence: f64,
 }
 
-impl Default for ExperienceConfig {
+impl Default for _ExperienceConfig {
     fn default() -> Self {
         Self {
             max_experiences: 1000,
@@ -46,18 +46,18 @@ pub struct Experience {
     pub cycle: String,
     pub domain: String,
     pub content: String,
-    pub experience_type: ExperienceType,
+    pub experience_type: _ExperienceType,
     pub confidence: f64,
     pub importance: f64,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub concepts: Vec<String>,
-    pub feedback: ExperienceFeedback,
+    pub feedback: _ExperienceFeedback,
 }
 
 /// 经验类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ExperienceType {
+pub(crate) enum _ExperienceType {
     Pattern,
     Rule,
     Defect,
@@ -65,7 +65,7 @@ pub enum ExperienceType {
     Cycle,
 }
 
-impl std::fmt::Display for ExperienceType {
+impl std::fmt::Display for _ExperienceType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Pattern => write!(f, "pattern"),
@@ -79,7 +79,7 @@ impl std::fmt::Display for ExperienceType {
 
 /// 经验反馈
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExperienceFeedback {
+pub(crate) struct _ExperienceFeedback {
     pub success: u32,
     pub failure: u32,
     pub reuse: u32,
@@ -87,7 +87,7 @@ pub struct ExperienceFeedback {
 
 /// 经验分支
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExperienceBranch {
+pub(crate) struct _ExperienceBranch {
     pub branch_id: String,
     pub experience_id: String,
     pub branch_type: String,
@@ -97,7 +97,7 @@ pub struct ExperienceBranch {
 
 /// 经验统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExperienceStats {
+pub(crate) struct _ExperienceStats {
     pub total_experiences: u64,
     pub by_domain: HashMap<String, u64>,
     pub by_type: HashMap<String, u64>,
@@ -108,7 +108,7 @@ pub struct ExperienceStats {
 /// 吸收阶段
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum AbsorptionStage {
+pub(crate) enum _AbsorptionStage {
     Snapshot,    // 快照
     Distill,     // 蒸馏
     Classify,    // 分类
@@ -121,18 +121,18 @@ pub enum AbsorptionStage {
 pub struct AbsorptionResult {
     pub success: bool,
     pub experience_id: String,
-    pub stage: AbsorptionStage,
+    pub stage: _AbsorptionStage,
     pub message: String,
 }
 
-impl ExperienceTreeManager {
+impl _ExperienceTreeManager {
     /// 创建新的经验树管理器
     pub fn new() -> Self {
         Self {
             experiences: Vec::new(),
             branches: Vec::new(),
-            config: ExperienceConfig::default(),
-            stats: ExperienceStats {
+            config: _ExperienceConfig::default(),
+            stats: _ExperienceStats {
                 total_experiences: 0,
                 by_domain: HashMap::new(),
                 by_type: HashMap::new(),
@@ -165,7 +165,7 @@ impl ExperienceTreeManager {
         AbsorptionResult {
             success: true,
             experience_id,
-            stage: AbsorptionStage::Feedback,
+            stage: _AbsorptionStage::Feedback,
             message: "经验已成功吸收".into(),
         }
     }
@@ -195,14 +195,14 @@ impl ExperienceTreeManager {
     }
 
     /// 获取按重要性排序的经验
-    pub fn get_by_importance(&self, limit: usize) -> Vec<&Experience> {
+    pub(crate) fn _get_by_importance(&self, limit: usize) -> Vec<&Experience> {
         let mut sorted: Vec<&Experience> = self.experiences.iter().collect();
         sorted.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap());
         sorted.into_iter().take(limit).collect()
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &ExperienceStats {
+    pub fn stats(&self) -> &_ExperienceStats {
         &self.stats
     }
 
@@ -217,7 +217,7 @@ impl ExperienceTreeManager {
 #[derive(Debug, Clone)]
 pub struct ExperienceQuery {
     pub domain: Option<String>,
-    pub experience_type: Option<ExperienceType>,
+    pub experience_type: Option<_ExperienceType>,
     pub min_confidence: Option<f64>,
     pub max_results: Option<usize>,
 }

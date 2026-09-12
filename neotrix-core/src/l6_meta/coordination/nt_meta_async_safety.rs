@@ -111,7 +111,7 @@ impl AsyncSafetyWrapper {
     }
 
     /// 设置门禁状态
-    pub fn set_gate(&mut self, key: &str, state: bool) {
+    pub(crate) fn _set_gate(&mut self, key: &str, state: bool) {
         self.gate_states.insert(key.to_string(), state);
         if state {
             self.stats.active_gates += 1;
@@ -119,7 +119,7 @@ impl AsyncSafetyWrapper {
     }
 
     /// 检查门禁状态
-    pub fn check_gate(&self, key: &str) -> bool {
+    pub(crate) fn _check_gate(&self, key: &str) -> bool {
         self.gate_states.get(key).copied().unwrap_or(self.config.default_gate_state)
     }
 

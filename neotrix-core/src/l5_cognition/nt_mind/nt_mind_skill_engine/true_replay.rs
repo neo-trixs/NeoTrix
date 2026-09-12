@@ -12,7 +12,7 @@ use super::SkillEntry;
 
 /// 验证清单项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChecklistItem {
+pub(crate) struct _ChecklistItem {
     pub name: String,
     pub description: String,
     pub weight: f64,
@@ -22,8 +22,8 @@ pub struct ChecklistItem {
 
 /// 验证结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChecklistResult {
-    pub item: ChecklistItem,
+pub(crate) struct _ChecklistResult {
+    pub item: _ChecklistItem,
     pub baseline_score: f64,
     pub candidate_score: f64,
     pub passed: bool,
@@ -32,34 +32,34 @@ pub struct ChecklistResult {
 
 /// 完整验证报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReplayReport {
+pub(crate) struct _ReplayReport {
     pub skill_name: String,
     pub baseline_version: String,
     pub candidate_version: String,
-    pub results: Vec<ChecklistResult>,
+    pub results: Vec<_ChecklistResult>,
     pub overall_passed: bool,
     pub candidate_accepted: bool,
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 /// Baseline 运行器 trait
-pub trait BaselineRunner: Send + Sync {
+pub(crate) trait _BaselineRunner: Send + Sync {
     fn run(&self, skill: &SkillEntry, input: &str) -> Result<String, String>;
 }
 
 /// Candidate 运行器 trait
-pub trait CandidateRunner: Send + Sync {
+pub(crate) trait _CandidateRunner: Send + Sync {
     fn run(&self, skill: &SkillEntry, input: &str) -> Result<String, String>;
 }
 
 /// True Replay 验证器
-pub struct TrueReplayValidator {
-    checklist: Vec<ChecklistItem>,
-    baseline_runner: Option<Arc<dyn BaselineRunner>>,
-    candidate_runner: Option<Arc<dyn CandidateRunner>>,
+pub(crate) struct _TrueReplayValidator {
+    checklist: Vec<_ChecklistItem>,
+    baseline_runner: Option<Arc<dyn _BaselineRunner>>,
+    candidate_runner: Option<Arc<dyn _CandidateRunner>>,
 }
 
-impl TrueReplayValidator {
+impl _TrueReplayValidator {
     pub fn new() -> Self {
         Self {
             checklist: Self::default_checklist(),
@@ -68,52 +68,52 @@ impl TrueReplayValidator {
         }
     }
 
-    pub fn with_baseline_runner(mut self, runner: Arc<dyn BaselineRunner>) -> Self {
+    pub(crate) fn _with_baseline_runner(mut self, runner: Arc<dyn _BaselineRunner>) -> Self {
         self.baseline_runner = Some(runner);
         self
     }
 
-    pub fn with_candidate_runner(mut self, runner: Arc<dyn CandidateRunner>) -> Self {
+    pub(crate) fn _with_candidate_runner(mut self, runner: Arc<dyn _CandidateRunner>) -> Self {
         self.candidate_runner = Some(runner);
         self
     }
 
-    pub fn with_checklist(mut self, checklist: Vec<ChecklistItem>) -> Self {
+    pub(crate) fn _with_checklist(mut self, checklist: Vec<_ChecklistItem>) -> Self {
         self.checklist = checklist;
         self
     }
 
-    fn default_checklist() -> Vec<ChecklistItem> {
+    fn default_checklist() -> Vec<_ChecklistItem> {
         vec![
-            ChecklistItem {
+            _ChecklistItem {
                 name: "functional_correctness".to_string(),
                 description: "Output matches expected functional behavior".to_string(),
                 weight: 0.3,
                 threshold: 0.9,
                 mandatory: true,
             },
-            ChecklistItem {
+            _ChecklistItem {
                 name: "regression_free".to_string(),
                 description: "No regression in existing test cases".to_string(),
                 weight: 0.25,
                 threshold: 1.0,
                 mandatory: true,
             },
-            ChecklistItem {
+            _ChecklistItem {
                 name: "performance".to_string(),
                 description: "Latency/throughput not degraded >5%".to_string(),
                 weight: 0.2,
                 threshold: 0.95,
                 mandatory: false,
             },
-            ChecklistItem {
+            _ChecklistItem {
                 name: "resource_usage".to_string(),
                 description: "Memory/CPU within acceptable bounds".to_string(),
                 weight: 0.1,
                 threshold: 0.9,
                 mandatory: false,
             },
-            ChecklistItem {
+            _ChecklistItem {
                 name: "safety".to_string(),
                 description: "No new safety violations".to_string(),
                 weight: 0.15,
@@ -123,7 +123,7 @@ impl TrueReplayValidator {
         ]
     }
 
-    pub fn validate(&self, skill: &SkillEntry, test_inputs: &[String]) -> Result<ReplayReport, String> {
+    pub fn validate(&self, skill: &SkillEntry, test_inputs: &[String]) -> Result<_ReplayReport, String> {
         let mut results = Vec::new();
         let mut all_mandatory_passed = true;
         let mut weighted_score = 0.0;
@@ -157,7 +157,7 @@ impl TrueReplayValidator {
             weighted_score += item.weight * avg_candidate;
             total_weight += item.weight;
 
-            results.push(ChecklistResult {
+            results.push(_ChecklistResult {
                 item: item.clone(),
                 baseline_score: avg_baseline,
                 candidate_score: avg_candidate,
@@ -169,7 +169,7 @@ impl TrueReplayValidator {
         let overall_passed = all_mandatory_passed && (weighted_score / total_weight) >= 0.7;
         let candidate_accepted = overall_passed && (weighted_score / total_weight) > 0.5;
 
-        Ok(ReplayReport {
+        Ok(_ReplayReport {
             skill_name: "unknown".to_string(),
             baseline_version: "0".to_string(),
             candidate_version: "0_candidate".to_string(),

@@ -73,7 +73,7 @@ impl HpaAxisState {
 
     /// Modulate learning rate based on HPA phase.
     /// Baseline → normal LR, Alert → increased, Overload → decreased.
-    pub fn modulated_learning_rate(&self, base_lr: f64) -> f64 {
+    pub(crate) fn _modulated_learning_rate(&self, base_lr: f64) -> f64 {
         match self.phase() {
             HpaPhase::Baseline => base_lr,
             HpaPhase::Alert => base_lr * (1.0 + (self.cortisol - self.basal - 0.3) * 2.0).min(1.5),
@@ -83,7 +83,7 @@ impl HpaAxisState {
     }
 
     /// Modulate exploration rate: higher cortisol = more exploitation (conservatism).
-    pub fn modulated_exploration(&self, base_explore: f64) -> f64 {
+    pub(crate) fn _modulated_exploration(&self, base_explore: f64) -> f64 {
         match self.phase() {
             HpaPhase::Baseline => base_explore,
             HpaPhase::Alert => base_explore * (1.0 - (self.cortisol - self.basal - 0.3) * 0.5).max(0.3),
@@ -93,7 +93,7 @@ impl HpaAxisState {
     }
 
     /// Decision quality penalty: 0 = no penalty, 1 = total impairment.
-    pub fn decision_impairment(&self) -> f64 {
+    pub(crate) fn _decision_impairment(&self) -> f64 {
         match self.phase() {
             HpaPhase::Baseline => 0.0,
             HpaPhase::Alert => ((self.cortisol - self.basal - 0.3) * 0.5).max(0.0),
@@ -135,7 +135,7 @@ mod tests {
         for _ in 0..20 {
             hpa.update(1.0, 1.0);
         }
-        let lr = hpa.modulated_learning_rate(0.1);
+        let lr = hpa._modulated_learning_rate(0.1);
         assert!(lr < 0.09, "Overload should reduce learning rate, got {}", lr);
     }
 
@@ -145,7 +145,7 @@ mod tests {
         for _ in 0..20 {
             hpa.update(1.0, 1.0);
         }
-        let explore = hpa.modulated_exploration(0.5);
+        let explore = hpa._modulated_exploration(0.5);
         assert!(explore < 0.2, "Overload should reduce exploration, got {}", explore);
     }
 

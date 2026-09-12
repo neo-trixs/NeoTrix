@@ -14,7 +14,7 @@ use crate::core::nt_core_kb_types::NodeType;
 // ============================================================
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum KbSourceType {
+pub(crate) enum _KbSourceType {
     GitHub,
     ArXiv,
     Wikipedia,
@@ -25,17 +25,17 @@ pub enum KbSourceType {
     Blog,
 }
 
-impl std::fmt::Display for KbSourceType {
+impl std::fmt::Display for _KbSourceType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            KbSourceType::GitHub => write!(f, "GitHub"),
-            KbSourceType::ArXiv => write!(f, "ArXiv"),
-            KbSourceType::Wikipedia => write!(f, "Wikipedia"),
-            KbSourceType::WebArticle => write!(f, "WebArticle"),
-            KbSourceType::Paper => write!(f, "Paper"),
-            KbSourceType::Documentation => write!(f, "Documentation"),
-            KbSourceType::CodeRepository => write!(f, "CodeRepository"),
-            KbSourceType::Blog => write!(f, "Blog"),
+            _KbSourceType::GitHub => write!(f, "GitHub"),
+            _KbSourceType::ArXiv => write!(f, "ArXiv"),
+            _KbSourceType::Wikipedia => write!(f, "Wikipedia"),
+            _KbSourceType::WebArticle => write!(f, "WebArticle"),
+            _KbSourceType::Paper => write!(f, "Paper"),
+            _KbSourceType::Documentation => write!(f, "Documentation"),
+            _KbSourceType::CodeRepository => write!(f, "CodeRepository"),
+            _KbSourceType::Blog => write!(f, "Blog"),
         }
     }
 }
@@ -43,7 +43,7 @@ impl std::fmt::Display for KbSourceType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SourceEntry {
     pub url: String,
-    pub source_type: KbSourceType,
+    pub source_type: _KbSourceType,
     pub title: String,
     pub kb_node_id: Option<String>,
     pub last_absorbed: i64,
@@ -56,7 +56,7 @@ pub struct SourceEntry {
 const SOURCE_MAP_LIMIT: usize = 2000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbsorbState {
+pub(crate) struct _AbsorbState {
     pub source_map: HashMap<String, SourceEntry>,
     pub total_absorbed: usize,
     pub last_panorama_update: i64,
@@ -80,7 +80,7 @@ pub struct DistillResult {
 
 pub struct KnowledgeAbsorptionPipeline {
     pub kb: Option<Arc<KnowledgeBase>>,
-    state: AbsorbState,
+    state: _AbsorbState,
 }
 
 impl Default for KnowledgeAbsorptionPipeline {
@@ -93,7 +93,7 @@ impl KnowledgeAbsorptionPipeline {
     pub fn new() -> Self {
         Self {
             kb: None,
-            state: AbsorbState {
+            state: _AbsorbState {
                 source_map: HashMap::new(),
                 total_absorbed: 0,
                 last_panorama_update: 0,
@@ -109,7 +109,7 @@ impl KnowledgeAbsorptionPipeline {
         self.kb.clone()
     }
 
-    pub fn absorb_url(&mut self, url: &str) -> Result<AbsorptionReport, String> {
+    pub fn absorb_url(&mut self, url: &str) -> Result<_AbsorptionReport, String> {
         let store = L1KnowledgeStore;
         if !store.is_safe_fetch_url(url) {
             return Err(format!("URL rejected (SSRF guard): {}", url));
@@ -125,7 +125,7 @@ impl KnowledgeAbsorptionPipeline {
         self.finish_absorb(url, &content, &domain)
     }
 
-    pub async fn absorb_url_async(&mut self, url: &str) -> Result<AbsorptionReport, String> {
+    pub async fn absorb_url_async(&mut self, url: &str) -> Result<_AbsorptionReport, String> {
         let store = L1KnowledgeStore;
         if !store.is_safe_fetch_url(url) {
             return Err(format!("URL rejected (SSRF guard): {}", url));
@@ -142,12 +142,12 @@ impl KnowledgeAbsorptionPipeline {
     }
 
     /// 去重：source_map 24h 内已吸收 或 KB 已存在同 URL 节点 → 返回 cached 报告
-    fn cached_report(&self, url: &str) -> Option<AbsorptionReport> {
+    fn cached_report(&self, url: &str) -> Option<_AbsorptionReport> {
         if let Some(entry) = self.state.source_map.get(url) {
             let age = Utc::now().timestamp() - entry.last_absorbed;
             if age < 86400 {
-                return Some(AbsorptionReport {
-                    url: url.into(), source_type: KbSourceType::WebArticle,
+                return Some(_AbsorptionReport {
+                    url: url.into(), source_type: _KbSourceType::WebArticle,
                     action: "cached".into(), nodes_created: 0, edges_created: 0,
                     distil_summary: None,
                 });
@@ -155,8 +155,8 @@ impl KnowledgeAbsorptionPipeline {
         }
         if let Some(ref kb) = self.kb {
             if let Ok(Some(_existing)) = kb.find_node_by_url(url) {
-                return Some(AbsorptionReport {
-                    url: url.into(), source_type: KbSourceType::WebArticle,
+                return Some(_AbsorptionReport {
+                    url: url.into(), source_type: _KbSourceType::WebArticle,
                     action: "cached".into(), nodes_created: 0, edges_created: 0,
                     distil_summary: None,
                 });
@@ -166,7 +166,7 @@ impl KnowledgeAbsorptionPipeline {
     }
 
     /// 提取 → 插入 → 记录来源 (同步/异步共用)
-    fn finish_absorb(&mut self, url: &str, content: &str, domain: &str) -> Result<AbsorptionReport, String> {
+    fn finish_absorb(&mut self, url: &str, content: &str, domain: &str) -> Result<_AbsorptionReport, String> {
         let store = L1KnowledgeStore;
         let summary = store.extract_html_content(content).1;
         let summary_short = if summary.len() > 5000 {
@@ -187,15 +187,15 @@ impl KnowledgeAbsorptionPipeline {
             .map_err(|e| format!("KB insert failed for {}: {}", url, e))?;
 
         self.record_source(url.to_string(), SourceEntry {
-            url: url.into(), source_type: KbSourceType::WebArticle,
+            url: url.into(), source_type: _KbSourceType::WebArticle,
             title: url.into(), kb_node_id: Some(node_id.clone()),
             last_absorbed: Utc::now().timestamp(),
             sha_hash: None, distill_summary: None, tags: vec![],
         });
         self.state.total_absorbed += 1;
 
-        Ok(AbsorptionReport {
-            url: url.into(), source_type: KbSourceType::WebArticle,
+        Ok(_AbsorptionReport {
+            url: url.into(), source_type: _KbSourceType::WebArticle,
             action: "absorbed".into(),
             nodes_created: 1,
             edges_created: 0,
@@ -203,7 +203,7 @@ impl KnowledgeAbsorptionPipeline {
         })
     }
 
-    pub fn absorb_github(&mut self, url: &str) -> Result<AbsorptionReport, String> {
+    pub fn absorb_github(&mut self, url: &str) -> Result<_AbsorptionReport, String> {
         let parts: Vec<&str> = url.trim_end_matches('/').split('/').collect();
         let repo = parts.last().ok_or("无法解析仓库名")?.to_string();
         let owner = if parts.len() >= 2 { parts[parts.len()-2].to_string() } else { String::new() };
@@ -213,8 +213,8 @@ impl KnowledgeAbsorptionPipeline {
         // 去重检查
         if let Some(entry) = self.state.source_map.get(&url_key) {
             if Utc::now().timestamp() - entry.last_absorbed < 3600 {
-                return Ok(AbsorptionReport {
-                    url: url.into(), source_type: KbSourceType::GitHub,
+                return Ok(_AbsorptionReport {
+                    url: url.into(), source_type: _KbSourceType::GitHub,
                     action: "skipped".into(), nodes_created: 0, edges_created: 0,
                     distil_summary: None,
                 });
@@ -234,7 +234,7 @@ impl KnowledgeAbsorptionPipeline {
         };
 
         self.record_source(url_key.clone(), SourceEntry {
-            url: url.into(), source_type: KbSourceType::GitHub,
+            url: url.into(), source_type: _KbSourceType::GitHub,
             title: repo, kb_node_id: None,
             last_absorbed: Utc::now().timestamp(),
             sha_hash: None,
@@ -243,8 +243,8 @@ impl KnowledgeAbsorptionPipeline {
         });
         self.state.total_absorbed += 1;
 
-        Ok(AbsorptionReport {
-            url: url.into(), source_type: KbSourceType::GitHub,
+        Ok(_AbsorptionReport {
+            url: url.into(), source_type: _KbSourceType::GitHub,
             action: "absorbed".into(), nodes_created: 1, edges_created: 0,
             distil_summary: Some(distill.summary),
         })
@@ -271,8 +271,8 @@ impl KnowledgeAbsorptionPipeline {
         entries.into_iter().take(n).collect()
     }
 
-    pub fn stats(&self) -> KbPipelineStats {
-        KbPipelineStats {
+    pub fn stats(&self) -> _KbPipelineStats {
+        _KbPipelineStats {
             total_sources: self.state.source_map.len(),
             total_absorbed: self.state.total_absorbed,
         }
@@ -300,9 +300,9 @@ impl KnowledgeAbsorptionPipeline {
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbsorptionReport {
+pub(crate) struct _AbsorptionReport {
     pub url: String,
-    pub source_type: KbSourceType,
+    pub source_type: _KbSourceType,
     pub action: String,
     pub nodes_created: usize,
     pub edges_created: usize,
@@ -317,7 +317,7 @@ pub struct PanoramaReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KbPipelineStats {
+pub(crate) struct _KbPipelineStats {
     pub total_sources: usize,
     pub total_absorbed: usize,
 }
@@ -340,16 +340,16 @@ mod tests {
     fn test_absorb_url_dedup() {
         let mut pipe = KnowledgeAbsorptionPipeline::new();
         let r1 = pipe.absorb_github("https://github.com/x/y").expect("github first");
-        assert_eq!(r1.source_type, KbSourceType::GitHub);
+        assert_eq!(r1.source_type, _KbSourceType::GitHub);
         let r2 = pipe.absorb_github("https://github.com/x/y").expect("github second");
-        assert_eq!(r2.source_type, KbSourceType::GitHub);
+        assert_eq!(r2.source_type, _KbSourceType::GitHub);
     }
 
     #[test]
     fn test_absorb_github() {
         let mut pipe = KnowledgeAbsorptionPipeline::new();
         let r = pipe.absorb_github("https://github.com/rust-lang/rust").expect("github");
-        assert_eq!(r.source_type, KbSourceType::GitHub);
+        assert_eq!(r.source_type, _KbSourceType::GitHub);
     }
 
     #[test]
@@ -362,8 +362,8 @@ mod tests {
 
     #[test]
     fn test_source_type_display() {
-        assert_eq!(KbSourceType::GitHub.to_string(), "GitHub");
-        assert_eq!(KbSourceType::ArXiv.to_string(), "ArXiv");
+        assert_eq!(_KbSourceType::GitHub.to_string(), "GitHub");
+        assert_eq!(_KbSourceType::ArXiv.to_string(), "ArXiv");
     }
 
     #[test]

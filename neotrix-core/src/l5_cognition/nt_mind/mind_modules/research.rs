@@ -11,25 +11,25 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 科研自动化引擎
-pub struct ResearchAutomationEngine {
+pub(crate) struct _ResearchAutomationEngine {
     hypotheses: Vec<Hypothesis>,
     experiments: Vec<Experiment>,
     results: Vec<ExperimentResult>,
-    papers: Vec<PaperDraft>,
-    config: ResearchConfig,
-    stats: ResearchStats,
+    papers: Vec<_PaperDraft>,
+    config: _ResearchConfig,
+    stats: _ResearchStats,
 }
 
 /// 科研配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResearchConfig {
+pub(crate) struct _ResearchConfig {
     pub max_hypotheses: usize,
     pub auto_experiment_design: bool,
     pub auto_analysis: bool,
     pub auto_paper_generation: bool,
 }
 
-impl Default for ResearchConfig {
+impl Default for _ResearchConfig {
     fn default() -> Self {
         Self {
             max_hypotheses: 50,
@@ -78,8 +78,8 @@ pub struct Experiment {
     pub id: String,
     pub hypothesis_id: String,
     pub design: ExperimentDesign,
-    pub procedure: Vec<ProcedureStep>,
-    pub status: ExperimentStatus,
+    pub procedure: Vec<_ProcedureStep>,
+    pub status: _ExperimentStatus,
     pub start_date: Option<chrono::DateTime<chrono::Utc>>,
     pub end_date: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -97,7 +97,7 @@ pub struct ExperimentDesign {
 
 /// 步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcedureStep {
+pub(crate) struct _ProcedureStep {
     pub step_number: u32,
     pub description: String,
     pub duration: Option<String>,
@@ -107,7 +107,7 @@ pub struct ProcedureStep {
 /// 实验状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ExperimentStatus {
+pub(crate) enum _ExperimentStatus {
     Designed,
     Running,
     Completed,
@@ -120,7 +120,7 @@ pub enum ExperimentStatus {
 pub struct ExperimentResult {
     pub experiment_id: String,
     pub data: HashMap<String, serde_json::Value>,
-    pub statistical_analysis: Option<StatisticalAnalysis>,
+    pub statistical_analysis: Option<_StatisticalAnalysis>,
     pub conclusion: String,
     pub supports_hypothesis: bool,
     pub confidence: f64,
@@ -128,7 +128,7 @@ pub struct ExperimentResult {
 
 /// 统计分析
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StatisticalAnalysis {
+pub(crate) struct _StatisticalAnalysis {
     pub test_type: String,
     pub p_value: f64,
     pub effect_size: Option<f64>,
@@ -138,18 +138,18 @@ pub struct StatisticalAnalysis {
 
 /// 论文草稿
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaperDraft {
+pub(crate) struct _PaperDraft {
     pub id: String,
     pub title: String,
     pub abstract_text: String,
-    pub sections: Vec<PaperSection>,
+    pub sections: Vec<_PaperSection>,
     pub references: Vec<String>,
     pub status: String,
 }
 
 /// 论文章节
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaperSection {
+pub(crate) struct _PaperSection {
     pub section_type: String,
     pub title: String,
     pub content: String,
@@ -157,7 +157,7 @@ pub struct PaperSection {
 
 /// 科研统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResearchStats {
+pub(crate) struct _ResearchStats {
     pub hypotheses_generated: u64,
     pub experiments_conducted: u64,
     pub papers_draft: u64,
@@ -165,16 +165,16 @@ pub struct ResearchStats {
     pub success_rate: f64,
 }
 
-impl ResearchAutomationEngine {
+impl _ResearchAutomationEngine {
     /// 创建新的科研自动化引擎
-    pub fn new(config: ResearchConfig) -> Self {
+    pub fn new(config: _ResearchConfig) -> Self {
         Self {
             hypotheses: Vec::new(),
             experiments: Vec::new(),
             results: Vec::new(),
             papers: Vec::new(),
             config,
-            stats: ResearchStats {
+            stats: _ResearchStats {
                 hypotheses_generated: 0,
                 experiments_conducted: 0,
                 papers_draft: 0,
@@ -185,7 +185,7 @@ impl ResearchAutomationEngine {
     }
 
     /// 生成假设
-    pub fn generate_hypothesis(&mut self, topic: &str, context: &str) -> Hypothesis {
+    pub(crate) fn _generate_hypothesis(&mut self, topic: &str, context: &str) -> Hypothesis {
         let hypothesis = Hypothesis {
             id: uuid::Uuid::new_v4().to_string(),
             statement: format!("Hypothesis about: {}", topic),
@@ -215,7 +215,7 @@ impl ResearchAutomationEngine {
     }
 
     /// 设计实验
-    pub fn design_experiment(&mut self, hypothesis_id: &str) -> Option<Experiment> {
+    pub(crate) fn _design_experiment(&mut self, hypothesis_id: &str) -> Option<Experiment> {
         let hypothesis = self.hypotheses.iter().find(|h| h.id == hypothesis_id)?;
 
         let experiment = Experiment {
@@ -230,32 +230,32 @@ impl ResearchAutomationEngine {
                 variables: hypothesis.variables.clone(),
             },
             procedure: vec![
-                ProcedureStep {
+                _ProcedureStep {
                     step_number: 1,
                     description: "Prepare materials and setup".into(),
                     duration: Some("30 minutes".into()),
                     materials: vec!["Equipment A".into(), "Software B".into()],
                 },
-                ProcedureStep {
+                _ProcedureStep {
                     step_number: 2,
                     description: "Collect baseline measurements".into(),
                     duration: Some("1 hour".into()),
                     materials: vec!["Measurement tool".into()],
                 },
-                ProcedureStep {
+                _ProcedureStep {
                     step_number: 3,
                     description: "Apply treatment".into(),
                     duration: Some("2 hours".into()),
                     materials: vec!["Treatment material".into()],
                 },
-                ProcedureStep {
+                _ProcedureStep {
                     step_number: 4,
                     description: "Collect post-treatment measurements".into(),
                     duration: Some("1 hour".into()),
                     materials: vec!["Measurement tool".into()],
                 },
             ],
-            status: ExperimentStatus::Designed,
+            status: _ExperimentStatus::Designed,
             start_date: None,
             end_date: None,
         };
@@ -269,7 +269,7 @@ impl ResearchAutomationEngine {
         let _experiment = self.experiments.iter().find(|e| e.id == experiment_id)?;
 
         // 简化版: 模拟统计分析
-        let statistical_analysis = Some(StatisticalAnalysis {
+        let statistical_analysis = Some(_StatisticalAnalysis {
             test_type: "t-test".into(),
             p_value: 0.03,
             effect_size: Some(0.5),
@@ -292,7 +292,7 @@ impl ResearchAutomationEngine {
     }
 
     /// 生成论文草稿
-    pub fn generate_paper(&mut self, experiment_id: &str) -> Option<PaperDraft> {
+    pub(crate) fn _generate_paper(&mut self, experiment_id: &str) -> Option<_PaperDraft> {
         if !self.config.auto_paper_generation {
             return None;
         }
@@ -301,27 +301,27 @@ impl ResearchAutomationEngine {
         let experiment = self.experiments.iter().find(|e| e.id == experiment_id)?;
         let hypothesis = self.hypotheses.iter().find(|h| h.id == experiment.hypothesis_id)?;
 
-        let paper = PaperDraft {
+        let paper = _PaperDraft {
             id: uuid::Uuid::new_v4().to_string(),
             title: format!("Study on: {}", hypothesis.statement),
             abstract_text: format!("This study investigated {}. Results showed {}.", hypothesis.statement, result.conclusion),
             sections: vec![
-                PaperSection {
+                _PaperSection {
                     section_type: "introduction".into(),
                     title: "Introduction".into(),
                     content: format!("Background: {}", hypothesis.rationale),
                 },
-                PaperSection {
+                _PaperSection {
                     section_type: "methods".into(),
                     title: "Methods".into(),
                     content: "Experimental design was used.".into(),
                 },
-                PaperSection {
+                _PaperSection {
                     section_type: "results".into(),
                     title: "Results".into(),
                     content: format!("Findings: {}", result.conclusion),
                 },
-                PaperSection {
+                _PaperSection {
                     section_type: "discussion".into(),
                     title: "Discussion".into(),
                     content: "The results have implications for...".into(),
@@ -337,7 +337,7 @@ impl ResearchAutomationEngine {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &ResearchStats {
+    pub fn stats(&self) -> &_ResearchStats {
         &self.stats
     }
 }

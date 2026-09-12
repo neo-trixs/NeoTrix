@@ -71,7 +71,7 @@ pub enum DurationMode {
 
 /// 镜头单元
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShotUnit {
+pub(crate) struct _ShotUnit {
     /// 镜头ID
     pub id: String,
     /// 镜头序号
@@ -114,13 +114,13 @@ pub struct ShotUnit {
 
 /// 叙事脚本
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NarrativeScript {
+pub(crate) struct _NarrativeScript {
     /// 内容ID
     pub content_id: String,
     /// 内容标题
     pub content_title: String,
     /// 所有镜头
-    pub shots: Vec<ShotUnit>,
+    pub shots: Vec<_ShotUnit>,
     /// 总时长 (秒)
     pub total_duration_secs: f32,
     /// 元素列表
@@ -131,7 +131,7 @@ pub struct NarrativeScript {
 
 /// 叙事结构化配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NarrativeConfig {
+pub(crate) struct _NarrativeConfig {
     /// 目标时长模式
     pub duration_mode: DurationMode,
     /// 默认镜头时长 (秒)
@@ -179,18 +179,18 @@ pub enum ContentType {
 
 /// 叙事结构化器
 /// 将文本转换为结构化叙事脚本
-pub struct NarrativeStructuring {
+pub(crate) struct _NarrativeStructuring {
     /// 配置
-    config: NarrativeConfig,
+    config: _NarrativeConfig,
     /// 结构化历史
-    history: Vec<NarrativeScript>,
+    history: Vec<_NarrativeScript>,
 }
 
-impl NarrativeStructuring {
+impl _NarrativeStructuring {
     /// 创建结构化器
     pub fn new() -> Self {
         Self {
-            config: NarrativeConfig {
+            config: _NarrativeConfig {
                 duration_mode: DurationMode::Dynamic,
                 default_shot_duration: 3.0,
                 min_shot_duration: 1.5,
@@ -206,7 +206,7 @@ impl NarrativeStructuring {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: NarrativeConfig) -> Self {
+    pub fn with_config(config: _NarrativeConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -214,11 +214,11 @@ impl NarrativeStructuring {
     }
     
     /// 从文本结构化叙事
-    pub fn structure_from_text(
+    pub(crate) fn _structure_from_text(
         &mut self,
         content_id: &str,
         text: &str,
-    ) -> NarrativeScript {
+    ) -> _NarrativeScript {
         // TODO: 实际调用 LLM 进行叙事结构化
         let shots = self.parse_text_to_shots(text);
         
@@ -226,7 +226,7 @@ impl NarrativeStructuring {
         let elements = self.extract_elements(&shots);
         let scenes = self.extract_scenes(&shots);
         
-        let script = NarrativeScript {
+        let script = _NarrativeScript {
             content_id: content_id.to_string(),
             content_title: format!("内容_{}", content_id),
             shots,
@@ -240,12 +240,12 @@ impl NarrativeStructuring {
     }
     
     /// 解析文本为镜头
-    fn parse_text_to_shots(&self, text: &str) -> Vec<ShotUnit> {
+    fn parse_text_to_shots(&self, text: &str) -> Vec<_ShotUnit> {
         // TODO: 实际调用 LLM 解析
         let paragraphs: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
         
         paragraphs.iter().enumerate().map(|(i, p)| {
-            ShotUnit {
+            _ShotUnit {
                 id: format!("shot_{}", i + 1),
                 shot_number: (i + 1) as u32,
                 description: p.to_string(),
@@ -270,7 +270,7 @@ impl NarrativeStructuring {
     }
     
     /// 提取元素列表
-    fn extract_elements(&self, shots: &[ShotUnit]) -> Vec<String> {
+    fn extract_elements(&self, shots: &[_ShotUnit]) -> Vec<String> {
         let mut elements = std::collections::HashSet::new();
         for shot in shots {
             for elem in &shot.elements {
@@ -281,7 +281,7 @@ impl NarrativeStructuring {
     }
     
     /// 提取场景列表
-    fn extract_scenes(&self, shots: &[ShotUnit]) -> Vec<String> {
+    fn extract_scenes(&self, shots: &[_ShotUnit]) -> Vec<String> {
         let mut scenes = std::collections::HashSet::new();
         for shot in shots {
             scenes.insert(shot.scene.clone());
@@ -290,7 +290,7 @@ impl NarrativeStructuring {
     }
     
     /// 优化镜头时长
-    pub fn optimize_durations(&self, script: &mut NarrativeScript) {
+    pub fn optimize_durations(&self, script: &mut _NarrativeScript) {
         for shot in &mut script.shots {
             if let Some(ref dialogue) = shot.dialogue {
                 let dialogue_duration = dialogue.len() as f32 * 0.15;
@@ -310,7 +310,7 @@ impl NarrativeStructuring {
     }
     
     /// 生成镜头运动规划
-    pub fn plan_camera_movements(&self, script: &mut NarrativeScript) {
+    pub fn plan_camera_movements(&self, script: &mut _NarrativeScript) {
         for shot in &mut script.shots {
             if shot.camera_movement == CameraMovement::Static {
                 shot.camera_movement = match shot.shot_size {
@@ -326,7 +326,7 @@ impl NarrativeStructuring {
     }
     
     /// 获取结构化统计
-    pub fn statistics(&self) -> NarrativeStats {
+    pub fn statistics(&self) -> _NarrativeStats {
         let total_scripts = self.history.len();
         let total_shots: usize = self.history.iter().map(|s| s.shots.len()).sum();
         let avg_shots_per_script = if total_scripts > 0 {
@@ -343,7 +343,7 @@ impl NarrativeStructuring {
             0.0
         };
         
-        NarrativeStats {
+        _NarrativeStats {
             total_scripts,
             total_shots,
             avg_shots_per_script,
@@ -354,7 +354,7 @@ impl NarrativeStructuring {
 
 /// 结构化统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NarrativeStats {
+pub(crate) struct _NarrativeStats {
     /// 总脚本数
     pub total_scripts: usize,
     /// 总镜头数
@@ -370,13 +370,13 @@ pub struct NarrativeStats {
 // ============================================================================
 
 /// 分镜智能拆解器 (向后兼容别名)
-pub type StoryboardExtractor = NarrativeStructuring;
+pub type StoryboardExtractor = _NarrativeStructuring;
 
 /// 分镜脚本 (向后兼容别名)
-pub type StoryboardScript = NarrativeScript;
+pub type StoryboardScript = _NarrativeScript;
 
 /// 分镜 (向后兼容别名)
-pub type Storyboard = ShotUnit;
+pub type Storyboard = _ShotUnit;
 
 // ============================================================================
 // 测试模块
@@ -388,7 +388,7 @@ mod tests {
     
     #[test]
     fn test_narrative_structuring() {
-        let mut structuring = NarrativeStructuring::new();
+        let mut structuring = _NarrativeStructuring::new();
         
         let text = r#"
         第一幕：主角登场
@@ -396,7 +396,7 @@ mod tests {
         发现没有人，感到困惑
         "#;
         
-        let script = structuring.structure_from_text("content_001", text);
+        let script = structuring._structure_from_text("content_001", text);
         assert!(!script.shots.is_empty());
         
         let stats = structuring.statistics();
@@ -405,13 +405,13 @@ mod tests {
     
     #[test]
     fn test_optimize_durations() {
-        let mut structuring = NarrativeStructuring::new();
+        let mut structuring = _NarrativeStructuring::new();
         
-        let mut script = NarrativeScript {
+        let mut script = _NarrativeScript {
             content_id: "content_001".to_string(),
             content_title: "测试".to_string(),
             shots: vec![
-                ShotUnit {
+                _ShotUnit {
                     id: "shot_1".to_string(),
                     shot_number: 1,
                     description: "测试".to_string(),

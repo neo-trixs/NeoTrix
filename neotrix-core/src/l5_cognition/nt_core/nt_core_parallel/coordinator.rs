@@ -18,11 +18,11 @@ pub struct AgentResult {
 pub struct MultiAgentCoordinator {
     _executor: ParallelExecutor,
     allocator: OptimalTaskAllocator,
-    pub agents: Vec<AgentConfig>,
+    pub agents: Vec<_AgentConfig>,
     engine: Option<Arc<Mutex<Box<dyn ReasoningProvider>>>>,
 }
 
-pub struct AgentConfig {
+pub(crate) struct _AgentConfig {
     pub id: AgentId,
     pub capability: Vec<f64>,
     pub throughput: f64,
@@ -44,14 +44,14 @@ impl MultiAgentCoordinator {
     }
 
     pub fn register_agent(&mut self, id: &str, capability: Vec<f64>) {
-        self.agents.push(AgentConfig {
+        self.agents.push(_AgentConfig {
             id: id.to_string(),
             capability,
             throughput: 1.0,
         });
     }
 
-    pub fn set_allocation_strategy(&mut self, strategy: AllocationStrategy) {
+    pub(crate) fn _set_allocation_strategy(&mut self, strategy: AllocationStrategy) {
         self.allocator = OptimalTaskAllocator::new(strategy);
     }
 
@@ -141,7 +141,7 @@ impl MultiAgentCoordinator {
     ///
     /// 每个成功结果被建模为一个候选: 质量分取 1.0 (成功)/0.0 (失败),
     /// 特征向量取 agent 能力向量 (作为多样覆盖的度量维度)。
-    pub fn select_winners(&self, results: &[AgentResult], keep: usize) -> Vec<AgentResult> {
+    pub(crate) fn _select_winners(&self, results: &[AgentResult], keep: usize) -> Vec<AgentResult> {
         if results.is_empty() || keep == 0 {
             return Vec::new();
         }
@@ -156,7 +156,7 @@ impl MultiAgentCoordinator {
 
 /// 共享上下文中的一个共享条目 — 跨阶段累积, 供后续阶段 agent 消费。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SharedContextItem {
+pub(crate) struct _SharedContextItem {
     /// 来源阶段名。
     pub stage: String,
     /// 来源 agent。
@@ -169,14 +169,14 @@ pub struct SharedContextItem {
 
 /// 共享上下文窗口 — 累积各阶段产出, 受 token 预算硬约束。
 #[derive(Debug, Clone, Default)]
-pub struct SharedContextWindow {
-    pub items: Vec<SharedContextItem>,
+pub(crate) struct _SharedContextWindow {
+    pub items: Vec<_SharedContextItem>,
     pub seq: u64,
     /// 硬 token 上限 (0 = 无上限)。
     pub budget_tokens: usize,
 }
 
-impl SharedContextWindow {
+impl _SharedContextWindow {
     pub fn new(budget_tokens: usize) -> Self {
         Self {
             items: Vec::new(),
@@ -192,13 +192,13 @@ impl SharedContextWindow {
 
     /// 尝试注入一条共享上下文。若注入后超预算 → 拒绝 (返回 None),
     /// 由调用方决定降级 (截断/丢弃)。硬约束保证: 窗口永不超过 budget。
-    pub fn try_push(&mut self, stage: &str, agent: &str, text: &str) -> Option<u64> {
+    pub(crate) fn _try_push(&mut self, stage: &str, agent: &str, text: &str) -> Option<u64> {
         let added = estimate_tokens(text);
         if self.budget_tokens > 0 && self.token_count() + added > self.budget_tokens {
             return None;
         }
         self.seq += 1;
-        self.items.push(SharedContextItem {
+        self.items.push(_SharedContextItem {
             stage: stage.to_string(),
             agent: agent.to_string(),
             text: text.to_string(),
@@ -208,7 +208,7 @@ impl SharedContextWindow {
     }
 
     /// 查询某阶段之后的共享上下文 (供后续阶段检索)。
-    pub fn after(&self, stage: &str) -> Vec<&SharedContextItem> {
+    pub fn after(&self, stage: &str) -> Vec<&_SharedContextItem> {
         self.items.iter().filter(|i| i.stage != stage).collect()
     }
 
@@ -222,14 +222,14 @@ impl SharedContextWindow {
     }
 
     /// 硬约束验证: 当前 token 总量 ≤ budget (0 = 无上限)。
-    pub fn budget_ok(&self) -> bool {
+    pub fn _budget_ok(&self) -> bool {
         self.budget_tokens == 0 || self.token_count() <= self.budget_tokens
     }
 }
 
 /// 一次阶段执行结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StageOutcome {
+pub(crate) struct _StageOutcome {
     pub stage: String,
     pub agents: usize,
     pub items_injected: usize,
@@ -244,22 +244,22 @@ pub struct StageOutcome {
 /// - 共享窗口: 前阶段结论作为后阶段输入;
 /// - 预算门禁: context_budget 硬约束防止上下文无限膨胀。
 #[derive(Debug, Clone)]
-pub struct StagedContextOrchestrator {
+pub(crate) struct _StagedContextOrchestrator {
     /// 阶段执行顺序。
     pub stages: Vec<String>,
     /// 共享窗口。
-    pub window: SharedContextWindow,
+    pub window: _SharedContextWindow,
     /// 各阶段产出记录。
-    pub outcomes: Vec<StageOutcome>,
+    pub outcomes: Vec<_StageOutcome>,
     /// 拒绝计数 (超预算被拒的注入数)。
     pub rejected: u64,
 }
 
-impl StagedContextOrchestrator {
+impl _StagedContextOrchestrator {
     pub fn new(budget_tokens: usize) -> Self {
         Self {
             stages: vec!["plan".into(), "execute".into(), "review".into()],
-            window: SharedContextWindow::new(budget_tokens),
+            window: _SharedContextWindow::new(budget_tokens),
             outcomes: Vec::new(),
             rejected: 0,
         }
@@ -268,11 +268,11 @@ impl StagedContextOrchestrator {
     /// 执行一个阶段: 模拟 N 个 agent 的产出, 逐条经预算门禁注入窗口。
     /// 纯确定性 (无 engine 依赖), 供编排语义验证; engine 注入见
     /// `run_stage_with_provider`。
-    pub fn run_stage(&mut self, stage: &str, agent_outputs: &[(&str, &str)]) -> StageOutcome {
+    pub fn run_stage(&mut self, stage: &str, agent_outputs: &[(&str, &str)]) -> _StageOutcome {
         let mut injected = 0usize;
         let mut rejected = 0usize;
         for (agent, text) in agent_outputs {
-            match self.window.try_push(stage, agent, text) {
+            match self.window._try_push(stage, agent, text) {
                 Some(_) => injected += 1,
                 None => {
                     rejected += 1;
@@ -280,7 +280,7 @@ impl StagedContextOrchestrator {
                 }
             }
         }
-        let outcome = StageOutcome {
+        let outcome = _StageOutcome {
             stage: stage.to_string(),
             agents: agent_outputs.len(),
             items_injected: injected,
@@ -296,7 +296,7 @@ impl StagedContextOrchestrator {
         stage: &str,
         coord: &MultiAgentCoordinator,
         tasks: &[Task],
-    ) -> StageOutcome {
+    ) -> _StageOutcome {
         let results = coord.execute_tasks(tasks).await;
         let mut agent_outputs = Vec::new();
         for r in &results {
@@ -308,18 +308,18 @@ impl StagedContextOrchestrator {
     }
 
     /// 检索指定阶段可见的共享上下文 (前阶段累积, 排除当前阶段)。
-    pub fn context_for(&self, stage: &str) -> Vec<&SharedContextItem> {
+    pub(crate) fn _context_for(&self, stage: &str) -> Vec<&_SharedContextItem> {
         self.window.after(stage)
     }
 
     /// 硬约束验证: 窗口 token 总量 ≤ budget (若设了 budget)。
-    pub fn budget_ok(&self) -> bool {
+    pub(crate) fn _budget_ok(&self) -> bool {
         self.window.budget_tokens == 0
             || self.window.token_count() <= self.window.budget_tokens
     }
 
     /// 汇总: 已注入条目数。
-    pub fn injected_total(&self) -> usize {
+    pub(crate) fn _injected_total(&self) -> usize {
         self.window.len()
     }
 }
@@ -369,11 +369,11 @@ mod tests {
     #[test]
     fn test_select_winners_empty() {
         let coord = MultiAgentCoordinator::new(2);
-        assert!(coord.select_winners(&[], 3).is_empty());
+        assert!(coord._select_winners(&[], 3).is_empty());
         let results = vec![
             AgentResult { agent_id: "a1".to_string(), task_index: 0, output: "x".to_string(), success: true },
         ];
-        assert!(coord.select_winners(&results, 0).is_empty());
+        assert!(coord._select_winners(&results, 0).is_empty());
     }
 
     #[test]
@@ -388,7 +388,7 @@ mod tests {
             AgentResult { agent_id: "w3".to_string(), task_index: 0, output: "fail".to_string(), success: false },
             AgentResult { agent_id: "w1".to_string(), task_index: 1, output: "ok".to_string(), success: true },
         ];
-        let winners = coord.select_winners(&results, 2);
+        let winners = coord._select_winners(&results, 2);
         assert!(winners.len() <= 2);
         assert!(winners.iter().all(|w| w.success), "failures excluded");
     }
@@ -397,9 +397,9 @@ mod tests {
 
     #[test]
     fn shared_window_injects_within_budget() {
-        let mut w = SharedContextWindow::new(1000);
-        assert!(w.try_push("plan", "a1", "step one").is_some());
-        assert!(w.try_push("plan", "a2", "step two").is_some());
+        let mut w = _SharedContextWindow::new(1000);
+        assert!(w._try_push("plan", "a1", "step one").is_some());
+        assert!(w._try_push("plan", "a2", "step two").is_some());
         assert_eq!(w.len(), 2);
         assert_eq!(w.items[0].seq, 1);
         assert_eq!(w.items[1].seq, 2);
@@ -407,20 +407,20 @@ mod tests {
 
     #[test]
     fn shared_window_rejects_over_budget() {
-        let mut w = SharedContextWindow::new(50);
-        assert!(w.try_push("plan", "a1", "short").is_some());
+        let mut w = _SharedContextWindow::new(50);
+        assert!(w._try_push("plan", "a1", "short").is_some());
         // 长文本单条即超 50 token → 拒绝 (硬约束)
         let long = "x".repeat(500);
-        assert!(w.try_push("plan", "a2", &long).is_none());
+        assert!(w._try_push("plan", "a2", &long).is_none());
         assert_eq!(w.len(), 1);
-        assert!(w.budget_ok());
+        assert!(w._budget_ok());
     }
 
     #[test]
     fn shared_window_after_excludes_current_stage() {
-        let mut w = SharedContextWindow::new(0);
-        w.try_push("plan", "a1", "p1");
-        w.try_push("execute", "b1", "e1");
+        let mut w = _SharedContextWindow::new(0);
+        w._try_push("plan", "a1", "p1");
+        w._try_push("execute", "b1", "e1");
         let for_execute = w.after("execute");
         assert_eq!(for_execute.len(), 1, "plan context visible to execute");
         assert_eq!(for_execute[0].stage, "plan");
@@ -430,30 +430,30 @@ mod tests {
 
     #[test]
     fn orchestrator_stages_accumulate_context() {
-        let mut orch = StagedContextOrchestrator::new(0);
+        let mut orch = _StagedContextOrchestrator::new(0);
         orch.run_stage("plan", &[("p1", "design doc"), ("p2", "constraints")]);
-        let execute_ctx = orch.context_for("execute");
+        let execute_ctx = orch._context_for("execute");
         assert_eq!(execute_ctx.len(), 2, "plan outputs feed execute");
-        assert!(orch.budget_ok());
-        assert_eq!(orch.injected_total(), 2);
+        assert!(orch._budget_ok());
+        assert_eq!(orch._injected_total(), 2);
     }
 
     #[test]
     fn orchestrator_rejects_overflow_and_counts() {
-        let mut orch = StagedContextOrchestrator::new(60);
+        let mut orch = _StagedContextOrchestrator::new(60);
         orch.run_stage("plan", &[("p1", "brief")]);
         let long = "y".repeat(1000);
         let outcome = orch.run_stage("execute", &[("b1", &long)]);
         assert_eq!(outcome.items_injected, 0);
         assert_eq!(outcome.items_rejected, 1);
         assert_eq!(orch.rejected, 1);
-        assert!(orch.budget_ok(), "hard constraint never violated");
+        assert!(orch._budget_ok(), "hard constraint never violated");
     }
 
     #[tokio::test]
     async fn orchestrator_with_provider_gates_output() {
         // 小预算 → engine 输出超限被拒; 窗口仍满足硬约束。
-        let mut orch = StagedContextOrchestrator::new(100);
+        let mut orch = _StagedContextOrchestrator::new(100);
         let mut coord = MultiAgentCoordinator::new(2);
         coord.register_agent("worker1", vec![1.0, 0.0]);
         let tasks = vec![Task::new("t1".to_string(), vec![1.0], 0)];
@@ -462,12 +462,12 @@ mod tests {
             .await;
         // 无 engine → fallback 输出 `[processed task 0]` 短文本, 应在预算内
         assert_eq!(outcome.items_injected, 1);
-        assert!(orch.budget_ok());
+        assert!(orch._budget_ok());
     }
 
     #[test]
     fn orchestrator_default_stage_order() {
-        let orch = StagedContextOrchestrator::new(0);
+        let orch = _StagedContextOrchestrator::new(0);
         assert_eq!(orch.stages, vec!["plan", "execute", "review"]);
     }
 }

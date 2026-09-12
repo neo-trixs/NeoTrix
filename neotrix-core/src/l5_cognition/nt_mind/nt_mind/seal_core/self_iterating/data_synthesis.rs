@@ -11,27 +11,27 @@ use std::collections::{HashMap, VecDeque};
 
 /// Role in the asymmetric co-evolution data synthesis pipeline
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SynthesisRole {
+pub(crate) enum _SynthesisRole {
     Proposer,
     Solver,
     Verifier,
 }
 
-impl SynthesisRole {
+impl _SynthesisRole {
     pub fn label(&self) -> &str {
         match self {
-            SynthesisRole::Proposer => "Proposer",
-            SynthesisRole::Solver => "Solver",
-            SynthesisRole::Verifier => "Verifier",
+            _SynthesisRole::Proposer => "Proposer",
+            _SynthesisRole::Solver => "Solver",
+            _SynthesisRole::Verifier => "Verifier",
         }
     }
 }
 
 /// A piece of synthetic training data
 #[derive(Debug, Clone)]
-pub struct TrainingDataRecord {
+pub(crate) struct _TrainingDataRecord {
     pub id: String,
-    pub source_role: SynthesisRole,
+    pub source_role: _SynthesisRole,
     pub task_type: DataTaskType,
     pub prompt: String,
     pub response: String,
@@ -69,7 +69,7 @@ impl DataTaskType {
 
 /// Configuration for the data synthesis pipeline
 #[derive(Debug, Clone)]
-pub struct SynthesisConfig {
+pub(crate) struct _SynthesisConfig {
     pub max_records_per_cycle: usize,
     pub min_quality_threshold: f64,
     pub diversity_target: f64,
@@ -80,7 +80,7 @@ pub struct SynthesisConfig {
     pub store_in_kb: bool,
 }
 
-impl Default for SynthesisConfig {
+impl Default for _SynthesisConfig {
     fn default() -> Self {
         Self {
             max_records_per_cycle: 50,
@@ -128,7 +128,7 @@ pub struct DataProposal {
 }
 
 impl DataProposal {
-    pub fn quality_potential(&self, existing_similar: usize) -> f64 {
+    pub(crate) fn _quality_potential(&self, existing_similar: usize) -> f64 {
         let novelty = 1.0 / (1.0 + existing_similar as f64);
         let difficulty_factor = self.expected_difficulty;
         (novelty * 0.6 + difficulty_factor * 0.4).max(0.0).min(1.0)
@@ -170,7 +170,7 @@ impl VerificationResult {
 
 /// Cycle statistics for the synthesis pipeline
 #[derive(Debug, Clone)]
-pub struct SynthesisStats {
+pub(crate) struct _SynthesisStats {
     pub cycle: u64,
     pub proposed: usize,
     pub solved: usize,
@@ -182,7 +182,7 @@ pub struct SynthesisStats {
     pub timestamp: u64,
 }
 
-impl SynthesisStats {
+impl _SynthesisStats {
     pub fn new(cycle: u64) -> Self {
         Self {
             cycle,
@@ -207,10 +207,10 @@ impl SynthesisStats {
 /// Asymmetric Proposer-Solver-Verifier pipeline (co-evolution pattern)
 #[derive(Debug, Clone)]
 pub struct AsymmetricSynthesisPipeline {
-    pub config: SynthesisConfig,
-    pub history: VecDeque<SynthesisStats>,
+    pub config: _SynthesisConfig,
+    pub history: VecDeque<_SynthesisStats>,
     pub max_history: usize,
-    pub records: Vec<TrainingDataRecord>,
+    pub records: Vec<_TrainingDataRecord>,
     pub proposals: Vec<DataProposal>,
     pub solutions: Vec<DataSolution>,
     pub verifications: Vec<VerificationResult>,
@@ -218,7 +218,7 @@ pub struct AsymmetricSynthesisPipeline {
 }
 
 impl AsymmetricSynthesisPipeline {
-    pub fn new(config: SynthesisConfig) -> Self {
+    pub fn new(config: _SynthesisConfig) -> Self {
         Self {
             config,
             history: VecDeque::new(),
@@ -243,8 +243,8 @@ impl AsymmetricSynthesisPipeline {
 
         let existing_count = self.records.len();
         new_proposals.sort_by(|a, b| {
-            let qa = a.quality_potential(existing_count);
-            let qb = b.quality_potential(existing_count);
+            let qa = a._quality_potential(existing_count);
+            let qb = b._quality_potential(existing_count);
             qb.partial_cmp(&qa).unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -271,8 +271,8 @@ impl AsymmetricSynthesisPipeline {
     }
 
     /// Phase 4: Accept — filter accepted records and update stats
-    pub fn finalize(&mut self) -> SynthesisStats {
-        let mut stats = SynthesisStats::new(self.cycle);
+    pub fn finalize(&mut self) -> _SynthesisStats {
+        let mut stats = _SynthesisStats::new(self.cycle);
         stats.proposed = self.proposals.len();
         stats.solved = self.solutions.len();
         stats.verified = self.verifications.len();
@@ -284,9 +284,9 @@ impl AsymmetricSynthesisPipeline {
             .zip(self.solutions.iter().zip(self.verifications.iter()))
         {
             if verification.acceptable(self.config.min_quality_threshold) {
-                let record = TrainingDataRecord {
+                let record = _TrainingDataRecord {
                     id: format!("synth-{:04x}-{}", self.cycle, proposal.id),
-                    source_role: SynthesisRole::Verifier,
+                    source_role: _SynthesisRole::Verifier,
                     task_type: proposal.gap.suggested_task_type,
                     prompt: proposal.prompt_template.clone(),
                     response: solution.response.clone(),
@@ -329,7 +329,7 @@ impl AsymmetricSynthesisPipeline {
         proposer: F1,
         solver: F2,
         verifier: F3,
-    ) -> SynthesisStats
+    ) -> _SynthesisStats
     where
         F1: Fn(&KnowledgeGap) -> DataProposal,
         F2: Fn(&DataProposal) -> DataSolution,
@@ -342,7 +342,7 @@ impl AsymmetricSynthesisPipeline {
     }
 
     pub fn total_records(&self) -> usize { self.records.len() }
-    pub fn records_by_type(&self, task_type: DataTaskType) -> Vec<&TrainingDataRecord> {
+    pub(crate) fn _records_by_type(&self, task_type: DataTaskType) -> Vec<&_TrainingDataRecord> {
         self.records.iter().filter(|r| r.task_type == task_type).collect()
     }
     pub fn recent_quality(&self, n: usize) -> Vec<f64> {
@@ -356,22 +356,22 @@ impl AsymmetricSynthesisPipeline {
 
 /// SEAL pipeline stage wrapper for data synthesis
 #[derive(Debug, Clone)]
-pub struct DataSynthesisStage {
+pub(crate) struct _DataSynthesisStage {
     pub pipeline: AsymmetricSynthesisPipeline,
     pub enabled: bool,
 }
 
-impl DataSynthesisStage {
-    pub fn new(config: SynthesisConfig) -> Self {
+impl _DataSynthesisStage {
+    pub fn new(config: _SynthesisConfig) -> Self {
         Self { pipeline: AsymmetricSynthesisPipeline::new(config), enabled: true }
     }
 
     pub fn process(&self) {
         let total = self.pipeline.total_records();
         let avg_q = self.pipeline.avg_quality();
-        let code_count = self.pipeline.records_by_type(DataTaskType::CodeGeneration).len();
-        let reason_count = self.pipeline.records_by_type(DataTaskType::Reasoning).len();
-        let knowledge_count = self.pipeline.records_by_type(DataTaskType::KnowledgeQA).len();
+        let code_count = self.pipeline._records_by_type(DataTaskType::CodeGeneration).len();
+        let reason_count = self.pipeline._records_by_type(DataTaskType::Reasoning).len();
+        let knowledge_count = self.pipeline._records_by_type(DataTaskType::KnowledgeQA).len();
         log::info!(
             "[data_synthesis] process: {} records, avg_quality={:.3}, types={{code:{},reason:{},knowledge:{}}}",
             total, avg_q, code_count, reason_count, knowledge_count
@@ -382,19 +382,19 @@ impl DataSynthesisStage {
 
 /// Gap detector — identifies knowledge gaps for data synthesis
 #[derive(Debug, Clone)]
-pub struct GapDetector {
+pub(crate) struct _GapDetector {
     pub error_history: VecDeque<(String, f64, u64)>,
     pub max_history: usize,
     pub rarity_threshold: f64,
 }
 
-impl Default for GapDetector {
+impl Default for _GapDetector {
     fn default() -> Self {
         Self { error_history: VecDeque::new(), max_history: 100, rarity_threshold: 0.3 }
     }
 }
 
-impl GapDetector {
+impl _GapDetector {
     pub fn new(max_history: usize, rarity_threshold: f64) -> Self {
         Self { error_history: VecDeque::new(), max_history: max_history.max(10), rarity_threshold: rarity_threshold.max(0.0).min(1.0) }
     }
@@ -432,18 +432,18 @@ impl GapDetector {
 
 /// Diversity tracker — ensures synthetic data covers a broad distribution
 #[derive(Debug, Clone)]
-pub struct DiversityTracker {
+pub(crate) struct _DiversityTracker {
     pub type_counts: HashMap<DataTaskType, usize>,
     pub type_hashes: HashMap<DataTaskType, Vec<u64>>,
 }
 
-impl Default for DiversityTracker {
+impl Default for _DiversityTracker {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl DiversityTracker {
+impl _DiversityTracker {
     pub fn new() -> Self { Self { type_counts: HashMap::new(), type_hashes: HashMap::new() } }
 
     pub fn record(&mut self, task_type: DataTaskType, hash: u64) {
@@ -465,7 +465,7 @@ impl DiversityTracker {
         1.0 / (1.0 + variance)
     }
 
-    pub fn is_diverse(&self, threshold: f64) -> bool {
+    pub(crate) fn _is_diverse(&self, threshold: f64) -> bool {
         self.diversity_score() >= threshold
     }
 }
@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_synthesis_config_defaults() {
-        let cfg = SynthesisConfig::default();
+        let cfg = _SynthesisConfig::default();
         assert_eq!(cfg.max_records_per_cycle, 50);
         assert!((cfg.min_quality_threshold - 0.7).abs() < 1e-6);
         assert_eq!(cfg.max_verifier_retries, 3);
@@ -506,9 +506,9 @@ mod tests {
 
     #[test]
     fn test_training_data_record_creation() {
-        let record = TrainingDataRecord {
+        let record = _TrainingDataRecord {
             id: "synth-0000-gap1".into(),
-            source_role: SynthesisRole::Verifier,
+            source_role: _SynthesisRole::Verifier,
             task_type: DataTaskType::CodeGeneration,
             prompt: "Write a function".into(),
             response: "fn foo() {}".into(),
@@ -526,12 +526,12 @@ mod tests {
         let gap = KnowledgeGap::new("code", "test", 0.8, DataTaskType::CodeGeneration);
         let p1 = DataProposal { id: "p1".into(), gap: gap.clone(), prompt_template: "t1".into(), expected_difficulty: 0.5, diversity_hash: 1 };
         let p2 = DataProposal { id: "p2".into(), gap, prompt_template: "t2".into(), expected_difficulty: 0.9, diversity_hash: 2 };
-        assert!(p2.quality_potential(0) > p1.quality_potential(10));
+        assert!(p2._quality_potential(0) > p1._quality_potential(10));
     }
 
     #[test]
     fn test_asymmetric_pipeline_full_cycle() {
-        let config = SynthesisConfig { max_records_per_cycle: 5, min_quality_threshold: 0.5, diversity_target: 0.4, difficulty_range: (0.3, 0.9), max_verifier_retries: 3, temperature_proposer: 0.9, temperature_solver: 0.7, store_in_kb: true };
+        let config = _SynthesisConfig { max_records_per_cycle: 5, min_quality_threshold: 0.5, diversity_target: 0.4, difficulty_range: (0.3, 0.9), max_verifier_retries: 3, temperature_proposer: 0.9, temperature_solver: 0.7, store_in_kb: true };
         let mut pipeline = AsymmetricSynthesisPipeline::new(config);
 
         let gaps = vec![make_gap("code"), make_gap("reasoning"), make_gap("safety")];
@@ -550,7 +550,7 @@ mod tests {
 
     #[test]
     fn test_propose_filters_by_quality() {
-        let config = SynthesisConfig { max_records_per_cycle: 2, ..Default::default() };
+        let config = _SynthesisConfig { max_records_per_cycle: 2, ..Default::default() };
         let mut pipeline = AsymmetricSynthesisPipeline::new(config);
         let gaps = vec![make_gap("a"), make_gap("b"), make_gap("c")];
         pipeline.propose(gaps, |gap| DataProposal { id: gap.domain.clone(), gap: gap.clone(), prompt_template: "t".into(), expected_difficulty: 0.5, diversity_hash: 1 });
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn test_verify_rejects_low_quality() {
-        let config = SynthesisConfig { min_quality_threshold: 0.8, ..Default::default() };
+        let config = _SynthesisConfig { min_quality_threshold: 0.8, ..Default::default() };
         let mut pipeline = AsymmetricSynthesisPipeline::new(config);
         pipeline.proposals = vec![
             DataProposal { id: "good".into(), gap: make_gap("code"), prompt_template: "t".into(), expected_difficulty: 0.5, diversity_hash: 1 },
@@ -578,7 +578,7 @@ mod tests {
 
     #[test]
     fn test_finalize_produces_stats() {
-        let config = SynthesisConfig { max_records_per_cycle: 10, min_quality_threshold: 0.0, ..Default::default() };
+        let config = _SynthesisConfig { max_records_per_cycle: 10, min_quality_threshold: 0.0, ..Default::default() };
         let mut pipeline = AsymmetricSynthesisPipeline::new(config);
         pipeline.proposals = vec![DataProposal { id: "p".into(), gap: make_gap("code"), prompt_template: "t".into(), expected_difficulty: 0.5, diversity_hash: 1 }];
         pipeline.solutions = vec![DataSolution { proposal_id: "p".into(), response: "r".into(), confidence: 0.9, token_count: 100, step_count: 2 }];
@@ -590,14 +590,14 @@ mod tests {
 
     #[test]
     fn test_gap_detector_records_errors() {
-        let mut detector = GapDetector::default();
+        let mut detector = _GapDetector::default();
         detector.record_error("code", "type_error", 0.8);
         assert_eq!(detector.error_history.len(), 1);
     }
 
     #[test]
     fn test_gap_detector_detects_gaps() {
-        let detector = GapDetector::new(100, 0.5);
+        let detector = _GapDetector::new(100, 0.5);
         let gaps = detector.detect_gaps(&["code", "reasoning", "safety"]);
         assert_eq!(gaps.len(), 3);
         for gap in &gaps {
@@ -607,7 +607,7 @@ mod tests {
 
     #[test]
     fn test_gap_detector_history_limit() {
-        let mut detector = GapDetector::new(10, 0.3);
+        let mut detector = _GapDetector::new(10, 0.3);
         for i in 0..20 {
             detector.record_error(&format!("dom_{}", i), "err", 0.5);
         }
@@ -616,7 +616,7 @@ mod tests {
 
     #[test]
     fn test_diversity_tracker_records() {
-        let mut tracker = DiversityTracker::new();
+        let mut tracker = _DiversityTracker::new();
         tracker.record(DataTaskType::CodeGeneration, 1);
         tracker.record(DataTaskType::Reasoning, 2);
         assert_eq!(*tracker.type_counts.get(&DataTaskType::CodeGeneration).unwrap(), 1);
@@ -625,7 +625,7 @@ mod tests {
 
     #[test]
     fn test_diversity_score_perfect() {
-        let mut tracker = DiversityTracker::new();
+        let mut tracker = _DiversityTracker::new();
         for tt in DataTaskType::all() {
             tracker.record(tt, 1);
         }
@@ -636,13 +636,13 @@ mod tests {
 
     #[test]
     fn test_diversity_score_imbalanced() {
-        let mut tracker = DiversityTracker::new();
+        let mut tracker = _DiversityTracker::new();
         for _ in 0..100 {
             tracker.record(DataTaskType::CodeGeneration, 1);
         }
         tracker.record(DataTaskType::Reasoning, 1);
         let balanced = {
-            let mut t = DiversityTracker::new();
+            let mut t = _DiversityTracker::new();
             for tt in DataTaskType::all() {
                 t.record(tt, 10);
             }
@@ -653,11 +653,11 @@ mod tests {
 
     #[test]
     fn test_diversity_tracker_is_diverse() {
-        let mut tracker = DiversityTracker::new();
+        let mut tracker = _DiversityTracker::new();
         for tt in DataTaskType::all() {
             tracker.record(tt, 5);
         }
-        assert!(tracker.is_diverse(0.5));
+        assert!(tracker._is_diverse(0.5));
     }
 
     #[test]
@@ -672,9 +672,9 @@ mod tests {
 
     #[test]
     fn test_asymmetric_roles_have_labels() {
-        assert_eq!(SynthesisRole::Proposer.label(), "Proposer");
-        assert_eq!(SynthesisRole::Solver.label(), "Solver");
-        assert_eq!(SynthesisRole::Verifier.label(), "Verifier");
+        assert_eq!(_SynthesisRole::Proposer.label(), "Proposer");
+        assert_eq!(_SynthesisRole::Solver.label(), "Solver");
+        assert_eq!(_SynthesisRole::Verifier.label(), "Verifier");
     }
 
     #[test]
@@ -695,7 +695,7 @@ mod tests {
 
     #[test]
     fn test_synthesis_stats_acceptance_rate() {
-        let mut stats = SynthesisStats::new(1);
+        let mut stats = _SynthesisStats::new(1);
         assert!((stats.acceptance_rate() - 0.0).abs() < 1e-6);
         stats.verified = 10;
         stats.accepted = 7;
@@ -704,28 +704,28 @@ mod tests {
 
     #[test]
     fn test_pipeline_avg_quality() {
-        let config = SynthesisConfig { max_records_per_cycle: 10, min_quality_threshold: 0.0, ..Default::default() };
+        let config = _SynthesisConfig { max_records_per_cycle: 10, min_quality_threshold: 0.0, ..Default::default() };
         let mut pipeline = AsymmetricSynthesisPipeline::new(config);
         pipeline.records = vec![
-            TrainingDataRecord { id: "r1".into(), source_role: SynthesisRole::Verifier, task_type: DataTaskType::Reasoning, prompt: "p".into(), response: "r".into(), quality_score: 1.0, diversity_score: 0.5, difficulty: 0.5, metadata: HashMap::new() },
-            TrainingDataRecord { id: "r2".into(), source_role: SynthesisRole::Verifier, task_type: DataTaskType::CodeGeneration, prompt: "p".into(), response: "r".into(), quality_score: 0.0, diversity_score: 0.5, difficulty: 0.5, metadata: HashMap::new() },
+            _TrainingDataRecord { id: "r1".into(), source_role: _SynthesisRole::Verifier, task_type: DataTaskType::Reasoning, prompt: "p".into(), response: "r".into(), quality_score: 1.0, diversity_score: 0.5, difficulty: 0.5, metadata: HashMap::new() },
+            _TrainingDataRecord { id: "r2".into(), source_role: _SynthesisRole::Verifier, task_type: DataTaskType::CodeGeneration, prompt: "p".into(), response: "r".into(), quality_score: 0.0, diversity_score: 0.5, difficulty: 0.5, metadata: HashMap::new() },
         ];
         assert!((pipeline.avg_quality() - 0.5).abs() < 1e-6);
     }
 
     #[test]
     fn test_pipeline_records_by_type() {
-        let config = SynthesisConfig::default();
+        let config = _SynthesisConfig::default();
         let mut pipeline = AsymmetricSynthesisPipeline::new(config);
-        pipeline.records.push(TrainingDataRecord { id: "r1".into(), source_role: SynthesisRole::Verifier, task_type: DataTaskType::CodeGeneration, prompt: "p".into(), response: "r".into(), quality_score: 0.9, diversity_score: 0.5, difficulty: 0.5, metadata: HashMap::new() });
-        pipeline.records.push(TrainingDataRecord { id: "r2".into(), source_role: SynthesisRole::Verifier, task_type: DataTaskType::Reasoning, prompt: "p".into(), response: "r".into(), quality_score: 0.8, diversity_score: 0.5, difficulty: 0.5, metadata: HashMap::new() });
-        assert_eq!(pipeline.records_by_type(DataTaskType::CodeGeneration).len(), 1);
-        assert_eq!(pipeline.records_by_type(DataTaskType::Safety).len(), 0);
+        pipeline.records.push(_TrainingDataRecord { id: "r1".into(), source_role: _SynthesisRole::Verifier, task_type: DataTaskType::CodeGeneration, prompt: "p".into(), response: "r".into(), quality_score: 0.9, diversity_score: 0.5, difficulty: 0.5, metadata: HashMap::new() });
+        pipeline.records.push(_TrainingDataRecord { id: "r2".into(), source_role: _SynthesisRole::Verifier, task_type: DataTaskType::Reasoning, prompt: "p".into(), response: "r".into(), quality_score: 0.8, diversity_score: 0.5, difficulty: 0.5, metadata: HashMap::new() });
+        assert_eq!(pipeline._records_by_type(DataTaskType::CodeGeneration).len(), 1);
+        assert_eq!(pipeline._records_by_type(DataTaskType::Safety).len(), 0);
     }
 
     #[test]
     fn test_synthesis_stats_diversity_histogram() {
-        let mut stats = SynthesisStats::new(1);
+        let mut stats = _SynthesisStats::new(1);
         stats.diversity_histogram.insert(DataTaskType::CodeGeneration, 5);
         stats.diversity_histogram.insert(DataTaskType::Reasoning, 3);
         assert_eq!(stats.diversity_histogram.len(), 2);

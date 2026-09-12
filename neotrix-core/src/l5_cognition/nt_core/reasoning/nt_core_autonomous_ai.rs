@@ -13,17 +13,17 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 自主AI框架
-pub struct AutonomousAIFramework {
+pub(crate) struct _AutonomousAIFramework {
     goals: Vec<Goal>,
     capabilities: Vec<Capability>,
-    learning_loop: LearningLoop,
-    config: AutonomousConfig,
-    stats: AutonomousStats,
+    learning_loop: _LearningLoop,
+    config: _AutonomousConfig,
+    stats: _AutonomousStats,
 }
 
 /// 自主配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AutonomousConfig {
+pub(crate) struct _AutonomousConfig {
     pub max_goals: usize,
     pub learning_rate: f64,
     pub exploration_rate: f64,
@@ -31,7 +31,7 @@ pub struct AutonomousConfig {
     pub capability_evolution: bool,
 }
 
-impl Default for AutonomousConfig {
+impl Default for _AutonomousConfig {
     fn default() -> Self {
         Self {
             max_goals: 20,
@@ -86,12 +86,12 @@ pub struct Capability {
     pub proficiency: f64,
     pub usage_count: u64,
     pub last_used: Option<chrono::DateTime<chrono::Utc>>,
-    pub improvement_history: Vec<ImprovementRecord>,
+    pub improvement_history: Vec<_ImprovementRecord>,
 }
 
 /// 改进记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ImprovementRecord {
+pub(crate) struct _ImprovementRecord {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub old_proficiency: f64,
     pub new_proficiency: f64,
@@ -99,9 +99,9 @@ pub struct ImprovementRecord {
 }
 
 /// 学习循环
-pub struct LearningLoop {
+pub(crate) struct _LearningLoop {
     experiences: Vec<Experience>,
-    patterns: Vec<LearningPattern>,
+    patterns: Vec<_LearningPattern>,
     adjustments: Vec<Adjustment>,
 }
 
@@ -119,7 +119,7 @@ pub struct Experience {
 
 /// 学习模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LearningPattern {
+pub(crate) struct _LearningPattern {
     pub id: String,
     pub pattern_type: String,
     pub description: String,
@@ -139,7 +139,7 @@ pub struct Adjustment {
 
 /// 自主统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AutonomousStats {
+pub(crate) struct _AutonomousStats {
     pub goals_pursued: u64,
     pub goals_achieved: u64,
     pub capabilities_developed: u64,
@@ -149,7 +149,7 @@ pub struct AutonomousStats {
 
 /// 决策结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DecisionResult {
+pub(crate) struct _DecisionResult {
     pub action: String,
     pub target: String,
     pub confidence: f64,
@@ -159,7 +159,7 @@ pub struct DecisionResult {
 
 /// 自我评估结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SelfEvaluationResult {
+pub(crate) struct _SelfEvaluationResult {
     pub overall_score: f64,
     pub strength_areas: Vec<String>,
     pub weakness_areas: Vec<String>,
@@ -167,19 +167,19 @@ pub struct SelfEvaluationResult {
     pub improvement_plan: Vec<String>,
 }
 
-impl AutonomousAIFramework {
+impl _AutonomousAIFramework {
     /// 创建新的自主AI框架
-    pub fn new(config: AutonomousConfig) -> Self {
+    pub fn new(config: _AutonomousConfig) -> Self {
         Self {
             goals: Vec::new(),
             capabilities: Vec::new(),
-            learning_loop: LearningLoop {
+            learning_loop: _LearningLoop {
                 experiences: Vec::new(),
                 patterns: Vec::new(),
                 adjustments: Vec::new(),
             },
             config,
-            stats: AutonomousStats {
+            stats: _AutonomousStats {
                 goals_pursued: 0,
                 goals_achieved: 0,
                 capabilities_developed: 0,
@@ -208,7 +208,7 @@ impl AutonomousAIFramework {
     }
 
     /// 决策
-    pub fn decide(&self, _context: &serde_json::Value) -> DecisionResult {
+    pub fn decide(&self, _context: &serde_json::Value) -> _DecisionResult {
         // 简化版: 基于当前目标和能力做出决策
         let active_goals: Vec<&Goal> = self.goals.iter()
             .filter(|g| g.status == GoalStatus::Active)
@@ -219,7 +219,7 @@ impl AutonomousAIFramework {
             .map(|g| g.description.clone())
             .unwrap_or_else(|| "No active goal".into());
 
-        DecisionResult {
+        _DecisionResult {
             action: "pursue_goal".into(),
             target: best_goal,
             confidence: 0.7,
@@ -229,7 +229,7 @@ impl AutonomousAIFramework {
     }
 
     /// 自我评估
-    pub fn self_evaluate(&self) -> SelfEvaluationResult {
+    pub(crate) fn _self_evaluate(&self) -> _SelfEvaluationResult {
         let avg_proficiency: f64 = if self.capabilities.is_empty() {
             0.0
         } else {
@@ -250,7 +250,7 @@ impl AutonomousAIFramework {
             .map(|w| format!("Improve capability: {}", w))
             .collect();
 
-        SelfEvaluationResult {
+        _SelfEvaluationResult {
             overall_score: avg_proficiency,
             strength_areas,
             weakness_areas,
@@ -260,7 +260,7 @@ impl AutonomousAIFramework {
     }
 
     /// 进化能力
-    pub fn evolve_capabilities(&mut self) {
+    pub(crate) fn _evolve_capabilities(&mut self) {
         if !self.config.capability_evolution {
             return;
         }
@@ -271,7 +271,7 @@ impl AutonomousAIFramework {
             let new_proficiency = (capability.proficiency + improvement).min(1.0);
 
             if new_proficiency > capability.proficiency {
-                capability.improvement_history.push(ImprovementRecord {
+                capability.improvement_history.push(_ImprovementRecord {
                     timestamp: chrono::Utc::now(),
                     old_proficiency: capability.proficiency,
                     new_proficiency,
@@ -285,7 +285,7 @@ impl AutonomousAIFramework {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &AutonomousStats {
+    pub fn stats(&self) -> &_AutonomousStats {
         &self.stats
     }
 }

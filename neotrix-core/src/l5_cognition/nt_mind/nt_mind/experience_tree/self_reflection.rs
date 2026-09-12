@@ -137,7 +137,7 @@ impl SelfReflectionEngine {
     }
 
     /// Retrieve recent reflections for injection into the agent loop.
-    pub fn recent_reflections(&self, n: usize) -> Vec<ReflectionRecord> {
+    pub(crate) fn _recent_reflections(&self, n: usize) -> Vec<ReflectionRecord> {
         self.buffer.lock().unwrap().recent(n).into_iter().cloned().collect()
     }
 
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(record.action_summary, "run test");
         assert!(record.confidence > 0.5);
         assert!(record.improved);
-        assert_eq!(engine.recent_reflections(1).len(), 1);
+        assert_eq!(engine._recent_reflections(1).len(), 1);
     }
 
     #[test]

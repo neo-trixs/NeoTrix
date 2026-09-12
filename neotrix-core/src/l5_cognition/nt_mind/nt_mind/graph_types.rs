@@ -91,7 +91,7 @@ pub struct ImpactHop {
 
 /// 函数调用信息
 #[derive(Debug, Clone)]
-pub struct FunctionInfo {
+pub(crate) struct _FunctionInfo {
     pub name: String,
     pub file_path: PathBuf,
     pub start_line: usize,

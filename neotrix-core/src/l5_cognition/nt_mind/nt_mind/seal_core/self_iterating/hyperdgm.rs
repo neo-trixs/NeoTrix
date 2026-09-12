@@ -80,7 +80,7 @@ impl DGMMetaAgent {
         let engine = crate::core::nt_core_hcube::vsa::VSAEngine::new(self.vsa_dim);
         let mut rng = rand::thread_rng();
 
-        let parents = self.select_top_k(archive);
+        let parents = self._select_top_k(archive);
 
         if parents.is_empty() {
             let delta: Vec<f64> = (0..self.vsa_dim)
@@ -157,7 +157,7 @@ impl DGMMetaAgent {
         }
     }
 
-    pub fn select_top_k<'a>(&self, archive: &'a HyperAgentArchive) -> Vec<&'a HyperAgentRecord> {
+    pub(crate) fn _select_top_k<'a>(&self, archive: &'a HyperAgentArchive) -> Vec<&'a HyperAgentRecord> {
         let mut scored: Vec<&HyperAgentRecord> = archive.records.iter().collect();
         scored.sort_by(|a, b| {
             let sa = a.score.unwrap_or(0.0);

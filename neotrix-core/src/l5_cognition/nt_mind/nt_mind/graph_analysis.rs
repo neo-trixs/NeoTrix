@@ -143,7 +143,7 @@ impl CodeGraph {
         }
     }
 
-    pub fn search_enriched(&self, query: &str, max_results: usize) -> Vec<EnrichedSearchResult> {
+    pub(crate) fn _search_enriched(&self, query: &str, max_results: usize) -> Vec<EnrichedSearchResult> {
         let query_lower = query.to_lowercase();
         let mut scored: Vec<(i32, &GraphNode)> = self.nodes.values()
             .filter(|n| n.name.to_lowercase().contains(&query_lower))
@@ -179,7 +179,7 @@ impl CodeGraph {
         }).collect()
     }
 
-    pub fn get_enriched_context(&self, node_id: &str) -> Option<EnrichedSearchResult> {
+    pub(crate) fn _get_enriched_context(&self, node_id: &str) -> Option<EnrichedSearchResult> {
         self.nodes.get(node_id).map(|node| {
             let outgoing: Vec<String> = self.edges.iter()
                 .filter(|e| e.from == node.id && e.to != node.id)

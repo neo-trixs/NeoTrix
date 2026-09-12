@@ -1,7 +1,7 @@
 //! EvolutionDaemon — 自进化守护进程
 //!
 //! 零 LLM 依赖的持续自修复引擎, 由 BackgroundLoop 驱动。
-//! 集成 SelfDiagnose + AutoFixer + PersistentIssueTracker。
+//! 集成 SelfDiagnose + AutoFixer + _PersistentIssueTracker。
 //!
 //! 真实实现来自 L1 nt_act_goal 与 L2 nt_world_infer，替代原本的本地存根。
 
@@ -28,7 +28,7 @@ pub use crate::core::nt_core_iit_phi::PhiReport;
 
 /// 问题生命周期
 #[derive(Debug, Clone, PartialEq)]
-pub enum IssueLifecycle {
+pub(crate) enum _IssueLifecycle {
     AttemptingFix(u32),
     Fixed(u64),
     Stale,
@@ -60,11 +60,11 @@ impl Default for EvolutionConfig {
 
 /// 追踪中的问题项
 #[derive(Debug, Clone)]
-pub struct IssueTrackerItem {
+pub(crate) struct _IssueTrackerItem {
     pub id: String,
     pub file: Option<String>,
     pub issue_type: IssueType,
-    pub lifecycle: IssueLifecycle,
+    pub lifecycle: _IssueLifecycle,
     pub fix_attempts: u32,
     pub created_at: u64,
     pub last_seen_at: u64,
@@ -87,14 +87,14 @@ pub enum IssueType {
 
 /// 持久化问题追踪器
 #[derive(Debug, Clone)]
-pub struct PersistentIssueTracker {
-    pub issues: Vec<IssueTrackerItem>,
+pub(crate) struct _PersistentIssueTracker {
+    pub issues: Vec<_IssueTrackerItem>,
     #[allow(dead_code)]
     storage_path: String,
     counter: u64,
 }
 
-impl PersistentIssueTracker {
+impl _PersistentIssueTracker {
     pub fn new(storage_path: &str) -> Self {
         Self {
             issues: Vec::new(),
@@ -103,14 +103,14 @@ impl PersistentIssueTracker {
         }
     }
 
-    pub fn register_issue(&mut self, file: Option<String>, issue_type: IssueType) -> String {
+    pub(crate) fn _register_issue(&mut self, file: Option<String>, issue_type: IssueType) -> String {
         self.counter += 1;
         let id = format!("ISSUE-{}", self.counter);
-        self.issues.push(IssueTrackerItem {
+        self.issues.push(_IssueTrackerItem {
             id: id.clone(),
             file,
             issue_type,
-            lifecycle: IssueLifecycle::AttemptingFix(0),
+            lifecycle: _IssueLifecycle::AttemptingFix(0),
             fix_attempts: 0,
             created_at: self.counter,
             last_seen_at: self.counter,
@@ -119,16 +119,16 @@ impl PersistentIssueTracker {
     }
 
     /// 获取未尝试或尝试次数不足的问题
-    pub fn get_unattempted(&self, max_attempts: u32) -> Vec<String> {
+    pub(crate) fn _get_unattempted(&self, max_attempts: u32) -> Vec<String> {
         self.issues.iter()
-            .filter(|t| matches!(t.lifecycle, IssueLifecycle::AttemptingFix(n) if n < max_attempts))
+            .filter(|t| matches!(t.lifecycle, _IssueLifecycle::AttemptingFix(n) if n < max_attempts))
             .map(|t| t.id.clone())
             .collect()
     }
 
     pub fn mark_fixed(&mut self, id: &str, cycle: u64) {
         if let Some(ti) = self.issues.iter_mut().find(|t| t.id == id) {
-            ti.lifecycle = IssueLifecycle::Fixed(cycle);
+            ti.lifecycle = _IssueLifecycle::Fixed(cycle);
         }
     }
 
@@ -136,17 +136,17 @@ impl PersistentIssueTracker {
         if let Some(ti) = self.issues.iter_mut().find(|t| t.id == id) {
             ti.fix_attempts += 1;
             if ti.fix_attempts >= 3 {
-                ti.lifecycle = IssueLifecycle::Failed(ti.fix_attempts);
+                ti.lifecycle = _IssueLifecycle::Failed(ti.fix_attempts);
             }
         }
     }
 
     /// 标记超过 max_cycles 周期未更新的问题为 Stale
-    pub fn mark_stale(&mut self, max_cycles: u64, current_cycle: u64) {
+    pub(crate) fn _mark_stale(&mut self, max_cycles: u64, current_cycle: u64) {
         for ti in self.issues.iter_mut() {
             if current_cycle.saturating_sub(ti.last_seen_at) > max_cycles
-                && matches!(ti.lifecycle, IssueLifecycle::Fixed(_) | IssueLifecycle::Failed(_)) {
-                    ti.lifecycle = IssueLifecycle::Stale;
+                && matches!(ti.lifecycle, _IssueLifecycle::Fixed(_) | _IssueLifecycle::Failed(_)) {
+                    ti.lifecycle = _IssueLifecycle::Stale;
                 }
         }
     }
@@ -161,7 +161,7 @@ impl PersistentIssueTracker {
 ///   4. 返回本轮修复数
 #[derive(Debug, Clone)]
 pub struct EvolutionDaemon {
-    pub tracker: PersistentIssueTracker,
+    pub tracker: _PersistentIssueTracker,
     pub config: EvolutionConfig,
     pub cycle_count: u64,
     pub evolution_loop: EvolutionLoop,
@@ -190,7 +190,7 @@ pub struct EvolutionDaemon {
 impl EvolutionDaemon {
     pub fn new(config: EvolutionConfig) -> Self {
         Self {
-            tracker: PersistentIssueTracker::new(
+            tracker: _PersistentIssueTracker::new(
                 &shellexpand::tilde("~/.neotrix/issues.json"),
             ),
             config,
@@ -218,7 +218,7 @@ impl EvolutionDaemon {
 
     /// 单次自修复循环 — 扫描 + 尝试修复 + 标记
     /// 仅在 mutation_enabled 时落盘变更 (真实 AutoFixer 调用)。
-    pub fn autofix_attempt(&mut self) -> u32 {
+    pub(crate) fn _autofix_attempt(&mut self) -> u32 {
         if !self.config.mutation_enabled {
             if self.config.verbose {
                 println!("[daemon] mutation disabled — skipping autofix");
@@ -226,7 +226,7 @@ impl EvolutionDaemon {
             return 0;
         }
         let max_attempts = self.config.max_fix_attempts;
-        let unattempted = self.tracker.get_unattempted(max_attempts);
+        let unattempted = self.tracker._get_unattempted(max_attempts);
         let mut fixes = 0u32;
 
         for id in unattempted {
@@ -282,14 +282,14 @@ impl EvolutionDaemon {
             }
         }
 
-        self.tracker.mark_stale(10, self.cycle_count);
+        self.tracker._mark_stale(10, self.cycle_count);
         fixes
     }
 
     /// 运行完整 cycle
     pub fn run_cycle(&mut self) -> u32 {
         self.cycle_count += 1;
-        self.autofix_attempt()
+        self._autofix_attempt()
     }
 
     /// A2 有界迭代预算 (autoresearch absorb, R-P79): 单周期修复迭代上限,
@@ -298,7 +298,7 @@ impl EvolutionDaemon {
 
     /// FEP 目标选择: 用预期自由能对目标排序
     /// 低自由能 = 高认识价值 + 低预测能量 = 最优探索
-    pub fn select_goal_by_fe(&mut self, goals: &[EvolutionGoal]) -> Vec<(usize, f64)> {
+    pub(crate) fn _select_goal_by_fe(&mut self, goals: &[EvolutionGoal]) -> Vec<(usize, f64)> {
         let mut scored = Vec::new();
         for (i, goal) in goals.iter().enumerate() {
             // 目标复杂度作为预测能量代理
@@ -330,7 +330,7 @@ impl EvolutionDaemon {
     /// Compute JEPA prediction energy from system state
     /// Higher = more prediction error = less certain
     pub fn compute_jepa_energy(&self) -> f64 {
-        let unresolved = self.tracker.get_unattempted(self.config.max_fix_attempts).len() as f64;
+        let unresolved = self.tracker._get_unattempted(self.config.max_fix_attempts).len() as f64;
         let total = self.tracker.issues.len() as f64;
         if total == 0.0 { return 0.3; }
         let uncertainty_ratio = unresolved / total;
@@ -370,7 +370,7 @@ impl EvolutionDaemon {
         let _verifications = self.spec_pipeline.verify_all(&codebase_summary);
 
         // FEP 目标优先级排序: 选择预期自由能最低 (最优) 的目标优先执行
-        let ordered = self.select_goal_by_fe(&goals);
+        let ordered = self._select_goal_by_fe(&goals);
 
         // 按 FEP 排序处理目标 (低自由能优先)
         let mut applied_fixes: u32 = 0;
@@ -434,9 +434,9 @@ impl EvolutionDaemon {
                     let commit_reward = if verified { 1.0 } else { 0.0 };
                     let reward = self.rl_feedback.process_result(&file, "evolution", &result);
                     let reward = reward * (0.5 + 0.5 * commit_reward);
-                    let phi_reward = self.compute_phi_reward();
+                    let phi_reward = self._compute_phi_reward();
                     self.phi_reward_history.push(phi_reward);
-                    let causal_coherence = self.compute_causal_coherence();
+                    let causal_coherence = self._compute_causal_coherence();
                     self.causal_coherence_history.push(causal_coherence);
                     // 记录变更 diff 到 spec 管线 (版本化演进追踪)
                     self.spec_pipeline.record_diff(SpecDiff {
@@ -460,17 +460,17 @@ impl EvolutionDaemon {
             }
         }
 
-        self.tracker.mark_stale(10, self.cycle_count);
+        self.tracker._mark_stale(10, self.cycle_count);
         (fixes, total_reward)
     }
 
     /// 计算 Φ 奖励信号 — 使用 IITPhiCalculator 真实计算
-    pub fn compute_phi_reward(&self) -> f64 {
+    pub(crate) fn _compute_phi_reward(&self) -> f64 {
         // Use real IITPhiCalculator with system state vector
         let state: Vec<f64> = vec![
             self.cycle_count as f64 / 100.0,
             self.tracker.issues.len() as f64 / 50.0,
-            self.tracker.get_unattempted(self.config.max_fix_attempts).len() as f64 / 20.0,
+            self.tracker._get_unattempted(self.config.max_fix_attempts).len() as f64 / 20.0,
         ];
         let report = self.phi_calculator.compute_phi(&state);
         report.phi
@@ -478,10 +478,10 @@ impl EvolutionDaemon {
 
     /// 计算因果相干性奖励 — 模拟 CausalJEPA 预测一致性
     /// High = 系统状态转移可预测 = 低预测误差
-    pub fn compute_causal_coherence(&self) -> f64 {
+    pub(crate) fn _compute_causal_coherence(&self) -> f64 {
         let total = self.tracker.issues.len() as f64;
         let fixed = self.tracker.issues.iter()
-            .filter(|t| matches!(t.lifecycle, IssueLifecycle::Fixed(_)))
+            .filter(|t| matches!(t.lifecycle, _IssueLifecycle::Fixed(_)))
             .count() as f64;
         if total == 0.0 { return 0.5; }
         let fix_rate = fixed / total;
@@ -492,8 +492,8 @@ impl EvolutionDaemon {
     /// 仪表盘
     pub fn dashboard(&self) -> String {
         let total = self.tracker.issues.len();
-        let fixed = self.tracker.issues.iter().filter(|t| matches!(t.lifecycle, IssueLifecycle::Fixed(_))).count();
-        let failed = self.tracker.issues.iter().filter(|t| matches!(t.lifecycle, IssueLifecycle::Failed(_))).count();
+        let fixed = self.tracker.issues.iter().filter(|t| matches!(t.lifecycle, _IssueLifecycle::Fixed(_))).count();
+        let failed = self.tracker.issues.iter().filter(|t| matches!(t.lifecycle, _IssueLifecycle::Failed(_))).count();
         let coverage_report = self.coverage_analyzer.analyze();
         let spec_stats = self.spec_pipeline.stats();
         format!(
@@ -505,7 +505,7 @@ impl EvolutionDaemon {
     }
 
     /// 四相循环目标: 扫描 → 修复 → 蒸馏 → 自我进化
-    pub fn run_cycle_goal(&mut self) -> CycleGoalReport {
+    pub fn run_cycle_goal(&mut self) -> _CycleGoalReport {
         let start = std::time::Instant::now();
         self.cycle_count += 1;
 
@@ -514,24 +514,24 @@ impl EvolutionDaemon {
 
         // Phase 2: 蒸馏 — 统计已修复模式
         let fixed_patterns = self.tracker.issues.iter()
-            .filter(|t| matches!(t.lifecycle, IssueLifecycle::Fixed(_)))
+            .filter(|t| matches!(t.lifecycle, _IssueLifecycle::Fixed(_)))
             .count() as u32;
 
         // Phase 3: 自我进化 — 检测大量失败问题并做出调整
         let failed_count = self.tracker.issues.iter()
-            .filter(|t| matches!(t.lifecycle, IssueLifecycle::Failed(_)))
+            .filter(|t| matches!(t.lifecycle, _IssueLifecycle::Failed(_)))
             .count() as u32;
         let thresholds_changed = failed_count > 2;
 
         let phi_reward_total: f64 = self.phi_reward_history.iter().sum();
 
-        CycleGoalReport {
+        _CycleGoalReport {
             cycle: self.cycle_count,
             fixes_applied: fixes,
             patterns_distilled: fixed_patterns,
             thresholds_evolved: thresholds_changed,
             total_tracked: self.tracker.issues.len(),
-            unresolved: self.tracker.get_unattempted(self.config.max_fix_attempts).len(),
+            unresolved: self.tracker._get_unattempted(self.config.max_fix_attempts).len(),
             elapsed_ms: start.elapsed().as_millis() as u64,
             phi_reward_total,
         }
@@ -561,7 +561,7 @@ impl EvolutionDaemon {
 
 /// 循环目标报告
 #[derive(Debug, Clone)]
-pub struct CycleGoalReport {
+pub(crate) struct _CycleGoalReport {
     pub cycle: u64,
     pub fixes_applied: u32,
     pub patterns_distilled: u32,
@@ -592,40 +592,40 @@ mod tests {
     #[test]
     fn test_register_and_mark_fixed() {
         let mut d = EvolutionDaemon::default();
-        let id = d.tracker.register_issue(Some("foo.rs".into()), IssueType::MissingTests);
+        let id = d.tracker._register_issue(Some("foo.rs".into()), IssueType::MissingTests);
         d.tracker.mark_fixed(&id, 1);
         let ti = d.tracker.issues.iter().find(|t| t.id == id).unwrap();
-        assert_eq!(ti.lifecycle, IssueLifecycle::Fixed(1));
+        assert_eq!(ti.lifecycle, _IssueLifecycle::Fixed(1));
     }
 
     #[test]
     fn test_register_and_record_failure() {
         let mut d = EvolutionDaemon::default();
-        let id = d.tracker.register_issue(Some("foo.rs".into()), IssueType::CompileWarning);
+        let id = d.tracker._register_issue(Some("foo.rs".into()), IssueType::CompileWarning);
         d.tracker.record_failure(&id, "test error");
         let ti = d.tracker.issues.iter().find(|t| t.id == id).unwrap();
         assert_eq!(ti.fix_attempts, 1);
-        assert!(matches!(ti.lifecycle, IssueLifecycle::AttemptingFix(_)));
+        assert!(matches!(ti.lifecycle, _IssueLifecycle::AttemptingFix(_)));
     }
 
     #[test]
     fn test_max_failures_mark_failed() {
         let mut d = EvolutionDaemon::default();
-        let id = d.tracker.register_issue(Some("foo.rs".into()), IssueType::Other);
+        let id = d.tracker._register_issue(Some("foo.rs".into()), IssueType::Other);
         for _ in 0..3 {
             d.tracker.record_failure(&id, "err");
         }
         let ti = d.tracker.issues.iter().find(|t| t.id == id).unwrap();
-        assert!(matches!(ti.lifecycle, IssueLifecycle::Failed(_)));
+        assert!(matches!(ti.lifecycle, _IssueLifecycle::Failed(_)));
     }
 
     #[test]
     fn test_get_unattempted_filters_marked() {
         let mut d = EvolutionDaemon::default();
-        let id1 = d.tracker.register_issue(Some("a.rs".into()), IssueType::MissingTests);
-        let id2 = d.tracker.register_issue(Some("b.rs".into()), IssueType::LargeFile);
+        let id1 = d.tracker._register_issue(Some("a.rs".into()), IssueType::MissingTests);
+        let id2 = d.tracker._register_issue(Some("b.rs".into()), IssueType::LargeFile);
         d.tracker.mark_fixed(&id1, 1);
-        let unattempted = d.tracker.get_unattempted(3);
+        let unattempted = d.tracker._get_unattempted(3);
         assert!(!unattempted.contains(&id1));
         assert!(unattempted.contains(&id2));
     }
@@ -641,12 +641,12 @@ mod tests {
     #[test]
     fn test_stale_marking() {
         let mut d = EvolutionDaemon::default();
-        let id = d.tracker.register_issue(Some("x.rs".into()), IssueType::Other);
+        let id = d.tracker._register_issue(Some("x.rs".into()), IssueType::Other);
         d.tracker.mark_fixed(&id, 1);
         d.cycle_count = 20;
-        d.tracker.mark_stale(10, d.cycle_count);
+        d.tracker._mark_stale(10, d.cycle_count);
         let ti = d.tracker.issues.iter().find(|t| t.id == id).unwrap();
-        assert_eq!(ti.lifecycle, IssueLifecycle::Stale);
+        assert_eq!(ti.lifecycle, _IssueLifecycle::Stale);
     }
 
     #[test]
@@ -664,7 +664,7 @@ mod tests {
         // 只读模式: 不触发真实 AutoFixer (避免测试内嵌套 cargo 死锁)
         let mut d = EvolutionDaemon::default();
         d.config.mutation_enabled = false;
-        d.tracker.register_issue(None, IssueType::TodoLeftovers);
+        d.tracker._register_issue(None, IssueType::TodoLeftovers);
         let report = d.run_cycle_goal();
         assert!(report.fixes_applied > 0 || report.total_tracked >= 1);
         assert_eq!(report.cycle, 1);
@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_cycle_goal_report_structure() {
-        let r = CycleGoalReport {
+        let r = _CycleGoalReport {
             cycle: 5,
             fixes_applied: 3,
             patterns_distilled: 1,
@@ -727,7 +727,7 @@ mod tests {
     #[test]
     fn test_phi_reward_finite() {
         let d = EvolutionDaemon::default();
-        let reward = d.compute_phi_reward();
+        let reward = d._compute_phi_reward();
         assert!(reward.is_finite());
         assert!(reward >= 0.0 && reward <= 1.0);
     }
@@ -735,10 +735,10 @@ mod tests {
     #[test]
     fn test_phi_reward_increases_with_cycles() {
         let mut d = EvolutionDaemon::default();
-        let r1 = d.compute_phi_reward();
+        let r1 = d._compute_phi_reward();
         d.cycle_count = 50;
-        d.tracker.register_issue(Some("test.rs".into()), IssueType::MissingTests);
-        let r2 = d.compute_phi_reward();
+        d.tracker._register_issue(Some("test.rs".into()), IssueType::MissingTests);
+        let r2 = d._compute_phi_reward();
         assert!(r2 >= r1, "phi should increase with cycles: r1={}, r2={}", r1, r2);
     }
 
@@ -758,8 +758,8 @@ mod tests {
     #[test]
     fn test_autofix_gated_by_mutation_flag() {
         let mut d = EvolutionDaemon::default();
-        d.tracker.register_issue(Some("gated.rs".into()), IssueType::TodoLeftovers);
-        let fixes = d.autofix_attempt();
+        d.tracker._register_issue(Some("gated.rs".into()), IssueType::TodoLeftovers);
+        let fixes = d._autofix_attempt();
         assert_eq!(fixes, 0, "autofix must not mutate when mutation_enabled=false");
     }
 
@@ -791,7 +791,7 @@ mod tests {
     #[test]
     fn test_causal_coherence_finite() {
         let d = EvolutionDaemon::default();
-        let coherence = d.compute_causal_coherence();
+        let coherence = d._compute_causal_coherence();
         assert!(coherence.is_finite());
         assert!(coherence >= 0.3 && coherence <= 1.0);
     }
@@ -799,13 +799,13 @@ mod tests {
     #[test]
     fn test_causal_coherence_increases_with_fixes() {
         let mut d = EvolutionDaemon::default();
-        let c1 = d.compute_causal_coherence();
-        d.tracker.register_issue(Some("test.rs".into()), IssueType::MissingTests);
+        let c1 = d._compute_causal_coherence();
+        d.tracker._register_issue(Some("test.rs".into()), IssueType::MissingTests);
         // Mark it as fixed
         if let Some(item) = d.tracker.issues.last_mut() {
-            item.lifecycle = IssueLifecycle::Fixed(0);
+            item.lifecycle = _IssueLifecycle::Fixed(0);
         }
-        let c2 = d.compute_causal_coherence();
+        let c2 = d._compute_causal_coherence();
         assert!(c2 >= c1, "coherence should increase with fix rate");
     }
 }

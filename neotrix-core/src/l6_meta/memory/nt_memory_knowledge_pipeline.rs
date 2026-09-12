@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 知识管线增强
-pub struct KnowledgePipelineEnhanced {
-    pipelines: Vec<KnowledgePipeline>,
-    concepts: Vec<ConceptNode>,
+pub(crate) struct _KnowledgePipelineEnhanced {
+    pipelines: Vec<_KnowledgePipeline>,
+    concepts: Vec<_ConceptNode>,
     route_table: HashMap<String, String>,
     #[allow(dead_code)]
     config: PipelineConfig,
@@ -44,10 +44,10 @@ impl Default for PipelineConfig {
 
 /// 知识管线
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KnowledgePipeline {
+pub(crate) struct _KnowledgePipeline {
     pub pipeline_id: String,
     pub name: String,
-    pub pipeline_type: PipelineType,
+    pub pipeline_type: _PipelineType,
     pub status: PipelineStatus,
     pub stages: Vec<PipelineStage>,
     pub last_run: Option<chrono::DateTime<chrono::Utc>>,
@@ -56,7 +56,7 @@ pub struct KnowledgePipeline {
 /// 管线类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PipelineType {
+pub(crate) enum _PipelineType {
     Absorption,     // 吸收管线
     Distillation,   // 蒸馏管线
     Classification, // 分类管线
@@ -79,14 +79,14 @@ pub struct PipelineStage {
     pub stage_id: String,
     pub name: String,
     pub stage_type: String,
-    pub status: StageStatus,
+    pub status: _StageStatus,
     pub duration_ms: Option<u64>,
 }
 
 /// 阶段状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum StageStatus {
+pub(crate) enum _StageStatus {
     Pending,
     Running,
     Completed,
@@ -95,7 +95,7 @@ pub enum StageStatus {
 
 /// 概念节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConceptNode {
+pub(crate) struct _ConceptNode {
     pub concept_id: String,
     pub name: String,
     pub description: String,
@@ -114,7 +114,7 @@ pub struct PipelineStats {
     pub avg_pipeline_duration: f64,
 }
 
-impl KnowledgePipelineEnhanced {
+impl _KnowledgePipelineEnhanced {
     /// 创建新的知识管线增强
     pub fn new() -> Self {
         Self {
@@ -133,51 +133,51 @@ impl KnowledgePipelineEnhanced {
     }
 
     /// 创建新管线
-    pub fn create_pipeline(&mut self, name: &str, pipeline_type: PipelineType) -> String {
+    pub fn create_pipeline(&mut self, name: &str, pipeline_type: _PipelineType) -> String {
         let pipeline_id = uuid::Uuid::new_v4().to_string();
 
         let stages = match pipeline_type {
-            PipelineType::Absorption => vec![
+            _PipelineType::Absorption => vec![
                 PipelineStage {
                     stage_id: "snapshot".into(),
                     name: "快照".into(),
                     stage_type: "snapshot".into(),
-                    status: StageStatus::Pending,
+                    status: _StageStatus::Pending,
                     duration_ms: None,
                 },
                 PipelineStage {
                     stage_id: "distill".into(),
                     name: "蒸馏".into(),
                     stage_type: "distill".into(),
-                    status: StageStatus::Pending,
+                    status: _StageStatus::Pending,
                     duration_ms: None,
                 },
                 PipelineStage {
                     stage_id: "classify".into(),
                     name: "分类".into(),
                     stage_type: "classify".into(),
-                    status: StageStatus::Pending,
+                    status: _StageStatus::Pending,
                     duration_ms: None,
                 },
                 PipelineStage {
                     stage_id: "store".into(),
                     name: "落盘".into(),
                     stage_type: "store".into(),
-                    status: StageStatus::Pending,
+                    status: _StageStatus::Pending,
                     duration_ms: None,
                 },
                 PipelineStage {
                     stage_id: "feedback".into(),
                     name: "反馈".into(),
                     stage_type: "feedback".into(),
-                    status: StageStatus::Pending,
+                    status: _StageStatus::Pending,
                     duration_ms: None,
                 },
             ],
             _ => vec![],
         };
 
-        let pipeline = KnowledgePipeline {
+        let pipeline = _KnowledgePipeline {
             pipeline_id: pipeline_id.clone(),
             name: name.to_string(),
             pipeline_type,
@@ -194,7 +194,7 @@ impl KnowledgePipelineEnhanced {
     }
 
     /// 添加概念
-    pub fn add_concept(&mut self, concept: ConceptNode) {
+    pub fn add_concept(&mut self, concept: _ConceptNode) {
         // 添加到路由表
         for route in &concept.routes {
             self.route_table.insert(route.clone(), concept.concept_id.clone());
@@ -206,18 +206,18 @@ impl KnowledgePipelineEnhanced {
     }
 
     /// 查询概念
-    pub fn query_concept(&self, query: &str) -> Option<&ConceptNode> {
+    pub(crate) fn _query_concept(&self, query: &str) -> Option<&_ConceptNode> {
         self.concepts.iter().find(|c| c.name.contains(query))
     }
 
     /// 通过路由查询
-    pub fn query_by_route(&self, route: &str) -> Option<&ConceptNode> {
+    pub(crate) fn _query_by_route(&self, route: &str) -> Option<&_ConceptNode> {
         self.route_table.get(route)
             .and_then(|concept_id| self.concepts.iter().find(|c| c.concept_id == *concept_id))
     }
 
     /// 获取所有管线
-    pub fn pipelines(&self) -> &[KnowledgePipeline] {
+    pub fn pipelines(&self) -> &[_KnowledgePipeline] {
         &self.pipelines
     }
 

@@ -1,4 +1,4 @@
-//! PromptCache — 提示词缓存
+//! _PromptCache — 提示词缓存
 //!
 //! 提示词缓存和去重，支持相似度检测、模板化、版本管理。
 //! 减少重复计算，提升响应速度。
@@ -47,7 +47,7 @@ impl Default for CacheConfig {
 }
 
 /// 提示词缓存
-pub struct PromptCache {
+pub(crate) struct _PromptCache {
     /// 缓存存储
     entries: HashMap<String, CacheEntry>,
     /// 配置
@@ -56,7 +56,7 @@ pub struct PromptCache {
     stats: CacheStats,
 }
 
-impl PromptCache {
+impl _PromptCache {
     pub fn new(config: CacheConfig) -> Self {
         Self {
             entries: HashMap::new(),
@@ -149,7 +149,7 @@ impl PromptCache {
     }
 }
 
-impl Default for PromptCache {
+impl Default for _PromptCache {
     fn default() -> Self {
         Self::new(CacheConfig::default())
     }
@@ -179,14 +179,14 @@ mod tests {
 
     #[test]
     fn test_cache_hit() {
-        let mut cache = PromptCache::default();
+        let mut cache = _PromptCache::default();
         cache.set("hello", "world");
         assert_eq!(cache.get("hello"), Some("world".to_string()));
     }
 
     #[test]
     fn test_cache_miss() {
-        let mut cache = PromptCache::default();
+        let mut cache = _PromptCache::default();
         assert_eq!(cache.get("hello"), None);
     }
 }

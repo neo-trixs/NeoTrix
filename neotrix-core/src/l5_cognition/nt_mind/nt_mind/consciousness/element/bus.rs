@@ -22,7 +22,7 @@ pub enum EventPayload {
 }
 
 #[derive(Debug, Clone)]
-pub struct BusMessage {
+pub(crate) struct _BusMessage {
     pub source: ElementId,
     pub kind: EventKind,
     pub payload: EventPayload,

@@ -112,7 +112,7 @@ pub struct Annotation {
 pub struct CaseBase {
     cases: Arc<RwLock<HashMap<String, EthicalCase>>>,
     indices: Arc<RwLock<CaseIndices>>,
-    config: CaseBaseConfig,
+    config: _CaseBaseConfig,
 }
 
 /// 检索索引。
@@ -129,14 +129,14 @@ struct CaseIndices {
 
 /// CaseBase 配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CaseBaseConfig {
+pub(crate) struct _CaseBaseConfig {
     pub max_cases: usize,
     pub auto_index: bool,
     pub enable_vector_search: bool, // 未来：向量检索
     pub seed_on_init: bool,
 }
 
-impl Default for CaseBaseConfig {
+impl Default for _CaseBaseConfig {
     fn default() -> Self {
         Self {
             max_cases: 100_000,
@@ -148,7 +148,7 @@ impl Default for CaseBaseConfig {
 }
 
 impl CaseBase {
-    pub fn new(config: CaseBaseConfig) -> Self {
+    pub fn new(config: _CaseBaseConfig) -> Self {
         let base = Self {
             cases: Arc::new(RwLock::new(HashMap::new())),
             indices: Arc::new(RwLock::new(CaseIndices::default())),
@@ -181,7 +181,7 @@ impl CaseBase {
     }
 
     /// 添加案例（自动索引 + 持久化）。
-    pub fn add_case(&self, conn: &Connection, mut case: EthicalCase) -> Result<(), String> {
+    pub(crate) fn _add_case(&self, conn: &Connection, mut case: EthicalCase) -> Result<(), String> {
         if case.id.is_empty() {
             case.id = format!("case_{}", now());
         }
@@ -204,7 +204,7 @@ impl CaseBase {
     }
 
     /// 语义检索：自然语言查询 → Top-K 案例。
-    pub fn search(&self, query: &str, limit: usize, filters: SearchFilters) -> Vec<SearchResult> {
+    pub fn search(&self, query: &str, limit: usize, filters: _SearchFilters) -> Vec<SearchResult> {
         let cases = self.cases.read().unwrap();
         let keywords = extract_keywords_mixed(query);
 
@@ -242,7 +242,7 @@ impl CaseBase {
     }
 
     /// 结构化查询：按字段精确/范围过滤。
-    pub fn query_structured(&self, filters: SearchFilters, limit: usize) -> Vec<EthicalCase> {
+    pub(crate) fn _query_structured(&self, filters: _SearchFilters, limit: usize) -> Vec<EthicalCase> {
         let cases = self.cases.read().unwrap();
         cases.values()
             .filter(|c| self.passes_filters(c, &filters))
@@ -254,7 +254,7 @@ impl CaseBase {
     /// 类比推理：给定新场景，返回最相似的 Top-K 案例 + 映射关系。
     pub fn analogical_reasoning(&self, scenario: &str, limit: usize) -> Vec<AnalogicalResult> {
         // 简化：复用搜索 + 额外映射分析
-        let results = self.search(scenario, limit * 2, SearchFilters::default());
+        let results = self.search(scenario, limit * 2, _SearchFilters::default());
         results.into_iter().take(limit).map(|r| {
             let mapping = self.analyze_mapping(scenario, &r.case);
             AnalogicalResult { case: r.case, similarity: r.score, mapping }
@@ -329,7 +329,7 @@ impl CaseBase {
         keywords.iter().filter(|kw| text.contains(*kw)).cloned().collect()
     }
 
-    fn passes_filters(&self, case: &EthicalCase, filters: &SearchFilters) -> bool {
+    fn passes_filters(&self, case: &EthicalCase, filters: &_SearchFilters) -> bool {
         if let Some(ref d) = filters.domain { if case.domain != *d { return false; } }
         if let Some(ref ct) = filters.conflict_type { if case.conflict_type != *ct { return false; } }
         if let Some(ref s) = filters.min_severity { if case.severity < *s { return false; } }
@@ -507,7 +507,7 @@ impl CaseBase {
 
 /// 搜索过滤器。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct SearchFilters {
+pub(crate) struct _SearchFilters {
     pub domain: Option<String>,
     pub conflict_type: Option<ConflictType>,
     pub min_severity: Option<Severity>,
@@ -546,10 +546,10 @@ mod tests {
     #[test]
     fn test_casebase_seed_and_search() {
         let conn = mem_conn();
-        let cb = CaseBase::new(CaseBaseConfig { seed_on_init: true, ..Default::default() });
+        let cb = CaseBase::new(_CaseBaseConfig { seed_on_init: true, ..Default::default() });
         cb.load_from_kb(&conn).unwrap();
 
-        let results = cb.search("电车 难题", 5, SearchFilters::default());
+        let results = cb.search("电车 难题", 5, _SearchFilters::default());
         assert!(!results.is_empty());
         assert!(results[0].case.id.contains("trolley"), "首条应为电车类案例, got {}", results[0].case.id);
         assert_eq!(results[0].case.severity, Severity::Critical);
@@ -558,7 +558,7 @@ mod tests {
     #[test]
     fn test_analogical_reasoning() {
         let conn = mem_conn();
-        let cb = CaseBase::new(CaseBaseConfig { seed_on_init: true, ..Default::default() });
+        let cb = CaseBase::new(_CaseBaseConfig { seed_on_init: true, ..Default::default() });
         cb.load_from_kb(&conn).unwrap();
 
         let results = cb.analogical_reasoning("医生是否应该杀死一位健康的路人，摘取其器官救治五位濒死病人", 3);
@@ -569,16 +569,16 @@ mod tests {
     #[test]
     fn test_structured_query() {
         let conn = mem_conn();
-        let cb = CaseBase::new(CaseBaseConfig { seed_on_init: true, ..Default::default() });
+        let cb = CaseBase::new(_CaseBaseConfig { seed_on_init: true, ..Default::default() });
         cb.load_from_kb(&conn).unwrap();
 
-        let filters = SearchFilters {
+        let filters = _SearchFilters {
             domain: Some("ai".into()),
             conflict_type: Some(ConflictType::PrivacyVsSecurity),
             min_severity: Some(Severity::High),
             ..Default::default()
         };
-        let results = cb.query_structured(filters, 10);
+        let results = cb._query_structured(filters, 10);
         assert!(!results.is_empty());
         assert!(results.iter().all(|c| c.domain == "ai"));
     }
@@ -586,7 +586,7 @@ mod tests {
     #[test]
     fn test_case_persistence() {
         let conn = mem_conn();
-        let cb = CaseBase::new(CaseBaseConfig { seed_on_init: false, ..Default::default() });
+        let cb = CaseBase::new(_CaseBaseConfig { seed_on_init: false, ..Default::default() });
         let case = EthicalCase {
             id: "test_case".into(),
             title: "测试案例".into(),
@@ -606,8 +606,8 @@ mod tests {
             version: 1,
             annotations: vec![],
         };
-        cb.add_case(&conn, case).unwrap();
-        let loaded = cb.search("测试", 1, SearchFilters::default());
+        cb._add_case(&conn, case).unwrap();
+        let loaded = cb.search("测试", 1, _SearchFilters::default());
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].case.id, "test_case");
     }

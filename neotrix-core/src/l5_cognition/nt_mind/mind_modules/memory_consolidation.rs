@@ -11,11 +11,11 @@ use serde::{Deserialize, Serialize};
 
 /// 记忆整合管理器
 pub struct MemoryConsolidation {
-    short_term: ShortTermMemory,
-    long_term: LongTermMemory,
+    short_term: _ShortTermMemory,
+    long_term: _LongTermMemory,
     consolidation_queue: Vec<MemoryItem>,
     config: ConsolidationConfig,
-    stats: ConsolidationStats,
+    stats: _ConsolidationStats,
 }
 
 /// 整合配置
@@ -66,13 +66,13 @@ pub enum MemoryType {
 }
 
 /// 短期记忆
-pub struct ShortTermMemory {
+pub(crate) struct _ShortTermMemory {
     items: Vec<MemoryItem>,
     capacity: usize,
 }
 
 /// 长期记忆
-pub struct LongTermMemory {
+pub(crate) struct _LongTermMemory {
     items: HashMap<String, MemoryItem>,
     categories: HashMap<String, Vec<String>>,
 }
@@ -89,7 +89,7 @@ pub struct ConsolidationResult {
 
 /// 整合统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsolidationStats {
+pub(crate) struct _ConsolidationStats {
     pub total_consolidations: u64,
     pub total_items_consolidated: u64,
     pub total_items_forgotten: u64,
@@ -97,7 +97,7 @@ pub struct ConsolidationStats {
     pub memory_utilization: f64,
 }
 
-impl ShortTermMemory {
+impl _ShortTermMemory {
     /// 创建新的短期记忆
     pub fn new(capacity: usize) -> Self {
         Self {
@@ -138,7 +138,7 @@ impl ShortTermMemory {
     }
 
     /// 获取可整合的记忆项 (超过阈值)
-    pub fn get_consolidatable(&self, threshold: f64) -> Vec<MemoryItem> {
+    pub(crate) fn _get_consolidatable(&self, threshold: f64) -> Vec<MemoryItem> {
         self.items.iter()
             .filter(|item| {
                 let score = item.importance * 0.5 + item.recency * 0.3 + (item.frequency as f64) * 0.2;
@@ -149,12 +149,12 @@ impl ShortTermMemory {
     }
 
     /// 移除已整合的项
-    pub fn remove_consolidated(&mut self, ids: &[String]) {
+    pub(crate) fn _remove_consolidated(&mut self, ids: &[String]) {
         self.items.retain(|item| !ids.contains(&item.id));
     }
 }
 
-impl LongTermMemory {
+impl _LongTermMemory {
     /// 创建新的长期记忆
     pub fn new() -> Self {
         Self {
@@ -185,7 +185,7 @@ impl LongTermMemory {
     }
 
     /// 应用遗忘曲线
-    pub fn apply_forgetting(&mut self, rate: f64) {
+    pub(crate) fn _apply_forgetting(&mut self, rate: f64) {
         let now = chrono::Utc::now();
         let ids_to_forget: Vec<String> = self.items.iter()
             .filter(|(_, item)| {
@@ -211,11 +211,11 @@ impl MemoryConsolidation {
     /// 创建新的记忆整合管理器
     pub fn new(config: ConsolidationConfig) -> Self {
         Self {
-            short_term: ShortTermMemory::new(config.short_term_capacity),
-            long_term: LongTermMemory::new(),
+            short_term: _ShortTermMemory::new(config.short_term_capacity),
+            long_term: _LongTermMemory::new(),
             consolidation_queue: Vec::new(),
             config,
-            stats: ConsolidationStats {
+            stats: _ConsolidationStats {
                 total_consolidations: 0,
                 total_items_consolidated: 0,
                 total_items_forgotten: 0,
@@ -226,7 +226,7 @@ impl MemoryConsolidation {
     }
 
     /// 添加到短期记忆
-    pub fn add_memory(&mut self, item: MemoryItem) {
+    pub(crate) fn _add_memory(&mut self, item: MemoryItem) {
         if let Some(evicted) = self.short_term.add(item) {
             self.consolidation_queue.push(evicted);
         }
@@ -241,7 +241,7 @@ impl MemoryConsolidation {
         let mut compressed_summaries = Vec::new();
 
         // 从短期记忆中获取可整合的项
-        let consolidatable = self.short_term.get_consolidatable(self.config.consolidation_threshold);
+        let consolidatable = self.short_term._get_consolidatable(self.config.consolidation_threshold);
 
         for item in consolidatable {
             // 压缩内容
@@ -263,10 +263,10 @@ impl MemoryConsolidation {
 
         // 移除已整合的项
         let consolidated_ids: Vec<String> = new_long_term_items.iter().map(|i| i.id.clone()).collect();
-        self.short_term.remove_consolidated(&consolidated_ids);
+        self.short_term._remove_consolidated(&consolidated_ids);
 
         // 应用遗忘曲线
-        self.long_term.apply_forgetting(self.config.forgetting_rate);
+        self.long_term._apply_forgetting(self.config.forgetting_rate);
 
         // 更新统计
         self.stats.total_consolidations += 1;
@@ -295,17 +295,17 @@ impl MemoryConsolidation {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &ConsolidationStats {
+    pub fn stats(&self) -> &_ConsolidationStats {
         &self.stats
     }
 
     /// 获取短期记忆
-    pub fn short_term(&self) -> &ShortTermMemory {
+    pub fn short_term(&self) -> &_ShortTermMemory {
         &self.short_term
     }
 
     /// 获取长期记忆
-    pub fn long_term(&self) -> &LongTermMemory {
+    pub fn long_term(&self) -> &_LongTermMemory {
         &self.long_term
     }
 }

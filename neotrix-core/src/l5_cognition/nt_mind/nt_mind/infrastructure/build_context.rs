@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum DependencySource {
+pub(crate) enum _DependencySource {
     CratesIo,
     Git(String),
     Path(PathBuf),
@@ -11,24 +11,24 @@ pub enum DependencySource {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct DependencyInfo {
+pub(crate) struct _DependencyInfo {
     pub name: String,
     pub version_req: String,
     pub is_optional: bool,
-    pub source: DependencySource,
+    pub source: _DependencySource,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PackageInfo {
+pub(crate) struct _PackageInfo {
     pub name: String,
     pub version: String,
     pub path: PathBuf,
-    pub dependencies: Vec<DependencyInfo>,
+    pub dependencies: Vec<_DependencyInfo>,
     pub features: HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct BuildContextStats {
+pub(crate) struct _BuildContextStats {
     pub total_packages: usize,
     pub total_dependencies: usize,
     pub external_count: usize,
@@ -36,15 +36,15 @@ pub struct BuildContextStats {
     pub cycle_count: usize,
 }
 
-pub struct BuildContext {
-    pub packages: Vec<PackageInfo>,
+pub(crate) struct _BuildContext {
+    pub packages: Vec<_PackageInfo>,
     pub workspace_members: Vec<String>,
     pub package_index: HashMap<String, usize>,
 }
 
-impl BuildContext {
+impl _BuildContext {
     pub fn analyze(root: &Path) -> Result<Self, String> {
-        let mut packages: Vec<PackageInfo> = Vec::new();
+        let mut packages: Vec<_PackageInfo> = Vec::new();
         let mut workspace_members: Vec<String> = Vec::new();
         let mut seen_paths: HashSet<PathBuf> = HashSet::new();
         let canonical_root = root
@@ -94,7 +94,7 @@ impl BuildContext {
                 .unwrap_or("0.0.0")
                 .to_string();
 
-            let mut dependencies: Vec<DependencyInfo> = Vec::new();
+            let mut dependencies: Vec<_DependencyInfo> = Vec::new();
             let table = match value.as_table() {
                 Some(t) => t,
                 None => continue,
@@ -104,7 +104,7 @@ impl BuildContext {
                 if let Some(deps) = table.get(*dep_section).and_then(|v| v.as_table()) {
                     for (dep_name, dep_value) in deps {
                         let (version_req, is_optional, source) = parse_dep(dep_value, dep_name);
-                        dependencies.push(DependencyInfo {
+                        dependencies.push(_DependencyInfo {
                             name: dep_name.clone(),
                             version_req,
                             is_optional,
@@ -134,7 +134,7 @@ impl BuildContext {
                 })
                 .unwrap_or_default();
 
-            packages.push(PackageInfo {
+            packages.push(_PackageInfo {
                 name: name.clone(),
                 version,
                 path: dir,
@@ -148,20 +148,20 @@ impl BuildContext {
             package_index.entry(pkg.name.clone()).or_insert(i);
         }
 
-        Ok(BuildContext {
+        Ok(_BuildContext {
             packages,
             workspace_members,
             package_index,
         })
     }
 
-    pub fn find_package(&self, name: &str) -> Option<&PackageInfo> {
+    pub(crate) fn _find_package(&self, name: &str) -> Option<&_PackageInfo> {
         self.package_index
             .get(name)
             .and_then(|&i| self.packages.get(i))
     }
 
-    pub fn get_dependency_graph(&self, package: &str) -> Vec<Vec<String>> {
+    pub(crate) fn _get_dependency_graph(&self, package: &str) -> Vec<Vec<String>> {
         let mut levels: Vec<Vec<String>> = Vec::new();
         let mut visited: HashSet<String> = HashSet::new();
         let mut queue: VecDeque<(String, usize)> = VecDeque::new();
@@ -177,7 +177,7 @@ impl BuildContext {
             }
             levels[level].push(current.clone());
 
-            if let Some(pkg) = self.find_package(&current) {
+            if let Some(pkg) = self._find_package(&current) {
                 for dep in &pkg.dependencies {
                     if !visited.contains(&dep.name) && self.package_index.contains_key(&dep.name) {
                         visited.insert(dep.name.clone());
@@ -250,7 +250,7 @@ impl BuildContext {
         cycles
     }
 
-    pub fn stats(&self) -> BuildContextStats {
+    pub fn stats(&self) -> _BuildContextStats {
         let total_packages = self.packages.len();
         let mut total_dependencies = 0;
         let mut external_count = 0;
@@ -269,7 +269,7 @@ impl BuildContext {
 
         let cycle_count = self.detect_cycles().len();
 
-        BuildContextStats {
+        _BuildContextStats {
             total_packages,
             total_dependencies,
             external_count,
@@ -279,9 +279,9 @@ impl BuildContext {
     }
 }
 
-fn parse_dep(dep_value: &toml::Value, _dep_name: &str) -> (String, bool, DependencySource) {
+fn parse_dep(dep_value: &toml::Value, _dep_name: &str) -> (String, bool, _DependencySource) {
     match dep_value {
-        toml::Value::String(ver) => (ver.clone(), false, DependencySource::CratesIo),
+        toml::Value::String(ver) => (ver.clone(), false, _DependencySource::CratesIo),
         toml::Value::Table(t) => {
             let version_req = t
                 .get("version")
@@ -293,29 +293,29 @@ fn parse_dep(dep_value: &toml::Value, _dep_name: &str) -> (String, bool, Depende
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
             let source = if let Some(git_url) = t.get("git").and_then(|v| v.as_str()) {
-                DependencySource::Git(git_url.to_string())
+                _DependencySource::Git(git_url.to_string())
             } else if let Some(path_str) = t.get("path").and_then(|v| v.as_str()) {
-                DependencySource::Path(PathBuf::from(path_str))
+                _DependencySource::Path(PathBuf::from(path_str))
             } else if t.get("workspace").and_then(|v| v.as_bool()).unwrap_or(false) {
-                DependencySource::Workspace
+                _DependencySource::Workspace
             } else {
-                DependencySource::CratesIo
+                _DependencySource::CratesIo
             };
             (version_req, is_optional, source)
         }
         _ => (
             "*".to_string(),
             false,
-            DependencySource::CratesIo,
+            _DependencySource::CratesIo,
         ),
     }
 }
 
-impl std::fmt::Display for BuildContextStats {
+impl std::fmt::Display for _BuildContextStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "BuildContextStats {{ packages: {}, total_deps: {}, external: {}, workspace: {}, cycles: {} }}",
+            "_BuildContextStats {{ packages: {}, total_deps: {}, external: {}, workspace: {}, cycles: {} }}",
             self.total_packages,
             self.total_dependencies,
             self.external_count,
@@ -355,7 +355,7 @@ serde = "1"
 tokio = { version = "1", features = ["full"] }
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze single-package temp project");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze single-package temp project");
         assert_eq!(ctx.packages.len(), 1);
         assert_eq!(ctx.packages[0].name, "test_pkg");
         assert_eq!(ctx.packages[0].version, "1.0.0");
@@ -389,7 +389,7 @@ version = "0.1.0"
 serde = "1"
 "#;
         create_temp_toml(&crates_a, "a", a_toml);
-        let ctx = BuildContext::analyze(&dir).expect("analyze workspace temp project");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze workspace temp project");
         assert_eq!(ctx.packages.len(), 2);
         assert!(ctx.package_index.contains_key("a"));
         assert!(ctx.package_index.contains_key("root"));
@@ -409,10 +409,10 @@ name = "mycrate"
 version = "2.0.0"
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze project for find_package test");
-        let pkg = ctx.find_package("mycrate").expect("mycrate must exist in analyzed context");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze project for _find_package test");
+        let pkg = ctx._find_package("mycrate").expect("mycrate must exist in analyzed context");
         assert_eq!(pkg.version, "2.0.0");
-        assert_eq!(ctx.find_package("nonexistent"), None);
+        assert_eq!(ctx._find_package("nonexistent"), None);
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -454,8 +454,8 @@ name = "lib_b"
 version = "0.1.0"
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze project for dependency graph test");
-        let graph = ctx.get_dependency_graph("app");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze project for dependency graph test");
+        let graph = ctx._get_dependency_graph("app");
         assert!(!graph.is_empty());
         assert_eq!(graph[0][0], "app");
         let _ = fs::remove_dir_all(&dir);
@@ -501,7 +501,7 @@ version = "0.1.0"
 a = { path = "../a" }
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze project for cycle detection test");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze project for cycle detection test");
         let cycles = ctx.detect_cycles();
         assert!(!cycles.is_empty(), "expected at least one cycle");
         let _ = fs::remove_dir_all(&dir);
@@ -524,7 +524,7 @@ serde = "1"
 tokio = { version = "1", optional = true }
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze project for stats test");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze project for stats test");
         let s = ctx.stats();
         assert_eq!(s.total_packages, 1);
         assert_eq!(s.total_dependencies, 2);
@@ -551,8 +551,8 @@ std = []
 extra = ["dep::extra_dep"]
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze project for features test");
-        let pkg = ctx.find_package("feat_pkg").expect("feat_pkg must exist in analyzed context");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze project for features test");
+        let pkg = ctx._find_package("feat_pkg").expect("feat_pkg must exist in analyzed context");
         assert!(pkg.features.contains_key("default"));
         assert!(pkg.features.contains_key("extra"));
         assert_eq!(pkg.features["default"], vec!["std"]);
@@ -575,8 +575,8 @@ version = "1.0.0"
 serde = { version = "1", optional = true }
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze project for optional dep test");
-        let pkg = ctx.find_package("opt_pkg").expect("opt_pkg must exist in analyzed context");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze project for optional dep test");
+        let pkg = ctx._find_package("opt_pkg").expect("opt_pkg must exist in analyzed context");
         let dep = &pkg.dependencies[0];
         assert!(dep.is_optional);
         let _ = fs::remove_dir_all(&dir);
@@ -598,11 +598,11 @@ version = "1.0.0"
 my_lib = { git = "https://github.com/user/my_lib.git", branch = "main" }
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze project for git dep test");
-        let pkg = ctx.find_package("git_pkg").expect("git_pkg must exist in analyzed context");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze project for git dep test");
+        let pkg = ctx._find_package("git_pkg").expect("git_pkg must exist in analyzed context");
         let dep = &pkg.dependencies[0];
         assert_eq!(dep.name, "my_lib");
-        assert!(matches!(dep.source, DependencySource::Git(_)));
+        assert!(matches!(dep.source, _DependencySource::Git(_)));
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -619,8 +619,8 @@ name = "only"
 version = "0.1.0"
 "#,
         );
-        let ctx = BuildContext::analyze(&dir).expect("analyze project for non-existent dep graph test");
-        let graph = ctx.get_dependency_graph("nope");
+        let ctx = _BuildContext::analyze(&dir).expect("analyze project for non-existent dep graph test");
+        let graph = ctx._get_dependency_graph("nope");
         assert!(graph.is_empty());
         let _ = fs::remove_dir_all(&dir);
     }

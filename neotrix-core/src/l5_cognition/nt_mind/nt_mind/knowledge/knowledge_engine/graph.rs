@@ -37,7 +37,7 @@ impl KnowledgeEngine {
         }
     }
 
-    pub fn with_lit_searcher(mut self) -> Self {
+    pub(crate) fn _with_lit_searcher(mut self) -> Self {
         self.literature_searcher = Some(LiteratureSearcher::new());
         self
     }
@@ -78,7 +78,7 @@ impl KnowledgeEngine {
         id
     }
 
-    pub fn add_entries(&mut self, entries: Vec<KnowledgeEntry>) -> Vec<String> {
+    pub(crate) fn _add_entries(&mut self, entries: Vec<KnowledgeEntry>) -> Vec<String> {
         entries.into_iter().map(|e| self.add_entry(e)).collect()
     }
 
@@ -138,7 +138,7 @@ impl KnowledgeEngine {
         Ok(())
     }
 
-    pub fn reset_dirty(&mut self) {
+    pub(crate) fn _reset_dirty(&mut self) {
         self.dirty_since_compact = 0;
     }
 
@@ -169,7 +169,7 @@ impl KnowledgeEngine {
     }
 
     pub fn load_from(path: &PathBuf) -> Self {
-        let mut engine = Self::new(1000).with_lit_searcher();
+        let mut engine = Self::new(1000)._with_lit_searcher();
         engine.set_persist_path(path.clone());
 
         if path.exists() {
@@ -259,7 +259,7 @@ impl KnowledgeEngine {
         r
     }
 
-    pub fn export_graph(&self) -> serde_json::Value {
+    pub(crate) fn _export_graph(&self) -> serde_json::Value {
         let nodes: Vec<serde_json::Value> = self.entries.values().map(|e| {
             serde_json::json!({
                 "id": e.id, "title": e.title, "source": e.source.name(),

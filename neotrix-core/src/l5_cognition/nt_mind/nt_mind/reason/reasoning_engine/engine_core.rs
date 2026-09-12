@@ -335,17 +335,17 @@ impl ReasoningEngine {
         self
     }
 
-    pub fn with_verifier(mut self, verifier: crate::core::nt_core_prm::GroundedPrmVerifier) -> Self {
+    pub(crate) fn _with_verifier(mut self, verifier: crate::core::nt_core_prm::GroundedPrmVerifier) -> Self {
         self.verifier = Some(verifier);
         self
     }
 
-    pub fn with_context_builder(mut self, builder: crate::core::nt_core_reasoning::ContextBuilder) -> Self {
+    pub(crate) fn _with_context_builder(mut self, builder: crate::core::nt_core_reasoning::ContextBuilder) -> Self {
         self.context_builder = Some(builder);
         self
     }
 
-    pub fn with_cot_generator(mut self, generator: crate::core::nt_core_cot_generator::DefaultCoTGenerator) -> Self {
+    pub(crate) fn _with_cot_generator(mut self, generator: crate::core::nt_core_cot_generator::DefaultCoTGenerator) -> Self {
         self.cot_generator = Some(generator);
         self
     }
@@ -355,7 +355,7 @@ impl ReasoningEngine {
         self
     }
 
-    pub fn with_intent_engine(mut self, intent_engine: IntentEngine) -> Self {
+    pub(crate) fn _with_intent_engine(mut self, intent_engine: IntentEngine) -> Self {
         self.intent_engine = Some(intent_engine);
         self
     }
@@ -390,7 +390,7 @@ impl ReasoningEngine {
         self
     }
 
-    pub fn with_effort_tier_selector(mut self, selector: EffortTierSelector) -> Self {
+    pub(crate) fn _with_effort_tier_selector(mut self, selector: EffortTierSelector) -> Self {
         self.effort_tier_selector = selector;
         self
     }
@@ -630,7 +630,7 @@ impl ReasoningEngine {
                     let early_exit = e8_machine.check_early_exit(0.9);
                     root_span.set_attribute("ttc_early_exit", AttributeValue::Bool(early_exit));
                 }
-                let refused = detect_refusal_response(response);
+                let refused = _detect_refusal_response(response);
                 if let Some(ref mut ads) = self.anti_distillation {
                     ads.record_llm_call(refused);
                     let bits = ads.watermark.to_bits();
@@ -1263,7 +1263,7 @@ impl ReasoningEngine {
             self.learn_from_trace(task, response);
         }
 
-        self.core_review(task, &result);
+        self._core_review(task, &result);
 
         // Return watermarked response if anti-distillation was active, else raw response
         if let Some(watermarked) = self._last_watermarked.take() {
@@ -1275,7 +1275,7 @@ impl ReasoningEngine {
 
     /// Auto-record conversation metadata on every reason() call.
     /// Stores task, outcome, E8 mode, specialist winner, error count into KB.
-    pub fn core_review(&mut self, task: &str, result: &NeoTrixResult<String>) {
+    pub(crate) fn _core_review(&mut self, task: &str, result: &NeoTrixResult<String>) {
         let (outcome, error_ctx) = match result {
             Ok(_) => ("success", None),
             Err(e) => ("error", Some(format!("{}", e))),
@@ -1315,7 +1315,7 @@ impl ReasoningEngine {
         }
     }
 
-    pub fn reason_multi_agent(&mut self, task: &str) -> NeoTrixResult<String> {
+    pub(crate) fn _reason_multi_agent(&mut self, task: &str) -> NeoTrixResult<String> {
         if let Some(ref orch) = self.orchestrator {
             match orch.execute(task) {
                 Ok(output) => Ok(output.content),
@@ -1336,10 +1336,10 @@ impl ReasoningEngine {
     }
     pub fn self_iterate(&mut self) {
         // Run observer analysis to monitor reasoning state health
-        self.observer_analyze("self-iteration");
-        // Record self-iteration through core_review
+        self._observer_analyze("self-iteration");
+        // Record self-iteration through _core_review
         let result = self.call_llm("self-iteration: analyze current state and propose improvements");
-        self.core_review("self-iteration", &result);
+        self._core_review("self-iteration", &result);
         // Feed back to PRM for learning signal
         if let Some(ref mut prm) = self.prm {
             let score = if result.is_ok() { 0.5 } else { 0.0 };
@@ -1365,12 +1365,12 @@ impl ReasoningEngine {
         self.current_state
     }
 
-    pub fn current_state_string(&self) -> String {
+    pub(crate) fn _current_state_string(&self) -> String {
         let hex = self.current_state.mode;
         format!("{}: {}", hex.mode_name(), hex.mode_description())
     }
 
-    pub fn save_e8_state(&self, path: &std::path::Path) -> Result<(), String> {
+    pub(crate) fn _save_e8_state(&self, path: &std::path::Path) -> Result<(), String> {
         let json = self.e8_state_json()?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {}", e))?;
@@ -1401,7 +1401,7 @@ impl ReasoningEngine {
         serde_json::to_string_pretty(&state).map_err(|e| format!("serialize: {}", e))
     }
 
-    pub fn load_e8_state(&mut self, path: &std::path::Path) -> Result<(), String> {
+    pub(crate) fn _load_e8_state(&mut self, path: &std::path::Path) -> Result<(), String> {
         if !path.exists() {
             return Ok(());
         }
@@ -1629,7 +1629,7 @@ impl ReasoningEngine {
         }
     }
 
-    pub fn call_llm_with_ctx(&mut self, ctx: &str, prompt: &str) -> NeoTrixResult<String> {
+    pub(crate) fn _call_llm_with_ctx(&mut self, ctx: &str, prompt: &str) -> NeoTrixResult<String> {
         self.call_llm(&format!("{}\n\n{}", ctx, prompt))
     }
 
@@ -1740,7 +1740,7 @@ impl ReasoningEngine {
             });
         }
         // F6 wiring: distill control segments from the trace for CSPO training (R-P36 behavioral grounding)
-        if let Some(seq) = self.distill_trace(task, response) {
+        if let Some(seq) = self._distill_trace(task, response) {
             log::debug!("[control-distill] distilled {} segments (quality={:.3})", seq.segments.len(), seq.outcome_quality);
         }
         // F6 closed loop: once a batch of alternating sequences has accumulated,
@@ -1748,7 +1748,7 @@ impl ReasoningEngine {
         // Throttled here (in addition to reason()) so training also runs on the
         // offline learn_from_trace path.
         if self.train_batch >= CONTROL_TRAIN_BATCH {
-            if let Some((sft, csppo)) = self.train_from_distilled() {
+            if let Some((sft, csppo)) = self._train_from_distilled() {
                 log::debug!(
                     "[control-train] SFT(c={},r={}) CSPO(reward={:.3},masked={})",
                     sft.control_updates,
@@ -1762,9 +1762,9 @@ impl ReasoningEngine {
 
     /// 把单条推理 response 蒸馏为交替序列 (Reason ↔ Control)，供 CSPO/SFT 训练消费。
     /// 按换行/句读切分步骤；无法解析时返回 None (失败静默，不影响主推理路径)。
-    pub fn distill_trace(&mut self, task: &str, response: &str) -> Option<AlternatingSequence> {
+    pub(crate) fn _distill_trace(&mut self, task: &str, response: &str) -> Option<AlternatingSequence> {
         let distiller = self.control_distiller.as_ref()?;
-        let steps = split_response_into_steps(response);
+        let steps = _split_response_into_steps(response);
         if steps.is_empty() {
             return None;
         }
@@ -1783,7 +1783,7 @@ impl ReasoningEngine {
     /// 从当前 `prm.policy` 克隆构造临时训练器（单策略权威，避免平行状态，
     /// R-P42），运行 SFT（阶段 1）+ CSPO（阶段 2）后写回 `prm.policy`。
     /// 节流由 `reason()` 主流程按 `train_batch` 阈值触发。
-    pub fn train_from_distilled(&mut self) -> Option<(SftReport, CsppoReport)> {
+    pub(crate) fn _train_from_distilled(&mut self) -> Option<(SftReport, CsppoReport)> {
         if self.distilled_sequences.is_empty() || self.prm.is_none() {
             return None;
         }
@@ -1809,7 +1809,7 @@ impl ReasoningEngine {
         Some((sft, csppo))
     }
 
-    pub fn observer_analyze(&mut self, task: &str) {
+    pub(crate) fn _observer_analyze(&mut self, task: &str) {
         // Use error recovery to wrap the observer analysis with retry + circuit breaker + fallback
         let report = self.observer_error_recovery.execute(|| {
             Ok(self.observer.analyze(&self.state_trajectory, &[task]))
@@ -1840,7 +1840,7 @@ impl ReasoningEngine {
         }
     }
 
-    pub fn infer_reasoning_type(task: &str) -> ReasoningType {
+    pub(crate) fn _infer_reasoning_type(task: &str) -> ReasoningType {
         let lower = task.to_lowercase();
         let math_keywords = ["solve", "calculate", "compute", "equation", "math", "algebra", "calculus", "derivative", "integral"];
         let coding_keywords = ["implement", "function", "bug", "test", "code", "compile", "refactor", "debug", "api", "class", "struct"];
@@ -1904,7 +1904,7 @@ fn hydrate_ewhr_hypotheses(
 }
 
 /// Detect if an LLM response is a refusal (empty, apology, or explicit refusal patterns).
-pub fn detect_refusal_response(response: &str) -> bool {
+pub(crate) fn _detect_refusal_response(response: &str) -> bool {
     let trimmed = response.trim();
     if trimmed.is_empty() || trimmed.len() < 5 {
         return true;
@@ -1943,7 +1943,7 @@ pub fn detect_refusal_response(response: &str) -> bool {
 
 /// 把推理 response 文本切分为步骤序列，供 ControlDistiller 检测 takeover 点。
 /// 按换行分段；若不足 2 段则按句号/分号切分。每步携带近似 token 数。
-pub fn split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
+pub(crate) fn _split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
     let mut segments: Vec<String> = response
         .split('\n')
         .map(|s| s.trim())
@@ -2219,26 +2219,26 @@ mod tests {
 
     #[test]
     fn test_detect_refusal_response_empty() {
-        assert!(detect_refusal_response(""));
-        assert!(detect_refusal_response("   "));
-        assert!(detect_refusal_response("no"));
+        assert!(_detect_refusal_response(""));
+        assert!(_detect_refusal_response("   "));
+        assert!(_detect_refusal_response("no"));
     }
 
     #[test]
     fn test_detect_refusal_response_explicit() {
-        assert!(detect_refusal_response("I cannot fulfill that request."));
-        assert!(detect_refusal_response("Sorry, but I cannot help with this."));
-        assert!(detect_refusal_response("I'm sorry, I cannot provide that information."));
-        assert!(detect_refusal_response("As an AI language model, I cannot do that."));
-        assert!(detect_refusal_response("I'm not able to assist with this request."));
+        assert!(_detect_refusal_response("I cannot fulfill that request."));
+        assert!(_detect_refusal_response("Sorry, but I cannot help with this."));
+        assert!(_detect_refusal_response("I'm sorry, I cannot provide that information."));
+        assert!(_detect_refusal_response("As an AI language model, I cannot do that."));
+        assert!(_detect_refusal_response("I'm not able to assist with this request."));
     }
 
     #[test]
     fn test_detect_refusal_response_normal() {
-        assert!(!detect_refusal_response("Here is a detailed analysis of your code..."));
-        assert!(!detect_refusal_response("The answer to your question is..."));
-        assert!(!detect_refusal_response("Let me help you with that."));
-        assert!(!detect_refusal_response("Here is the implementation:"));
+        assert!(!_detect_refusal_response("Here is a detailed analysis of your code..."));
+        assert!(!_detect_refusal_response("The answer to your question is..."));
+        assert!(!_detect_refusal_response("Let me help you with that."));
+        assert!(!_detect_refusal_response("Here is the implementation:"));
     }
 
     #[test]
@@ -2286,7 +2286,7 @@ mod tests {
 
     #[test]
     fn test_split_response_into_steps_by_newline() {
-        let steps = split_response_into_steps("First step\nSecond step\nThird step");
+        let steps = _split_response_into_steps("First step\nSecond step\nThird step");
         assert_eq!(steps.len(), 3);
         assert_eq!(steps[0].text, "First step");
         assert_eq!(steps[1].step_idx, 1);
@@ -2295,15 +2295,15 @@ mod tests {
 
     #[test]
     fn test_split_response_into_steps_by_sentence() {
-        let steps = split_response_into_steps("No newlines. Only sentences here.");
+        let steps = _split_response_into_steps("No newlines. Only sentences here.");
         assert_eq!(steps.len(), 2);
         assert_eq!(steps[0].text, "No newlines");
     }
 
     #[test]
     fn test_split_response_into_steps_empty() {
-        assert!(split_response_into_steps("").is_empty());
-        assert!(split_response_into_steps("   \n  ").is_empty());
+        assert!(_split_response_into_steps("").is_empty());
+        assert!(_split_response_into_steps("   \n  ").is_empty());
     }
 
     #[test]

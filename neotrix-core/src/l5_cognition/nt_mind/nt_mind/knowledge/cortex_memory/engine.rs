@@ -118,7 +118,7 @@ impl CortexMemory {
     }
 
     /// 强制所有短期 → 长期
-    pub fn consolidate_all(&mut self) -> usize {
+    pub(crate) fn _consolidate_all(&mut self) -> usize {
         let count = self.nt_world_sense_buffer.len();
         while let Some(trace) = self.nt_world_sense_buffer.pop_front() {
             if self.long_term.len() >= self.long_term_capacity {
@@ -134,7 +134,7 @@ impl CortexMemory {
 
     // ==================== CMS — Continuum Memory System ====================
 
-    pub fn consolidate_layer(&mut self, from: MemoryLayer, threshold: f64) -> usize {
+    pub(crate) fn _consolidate_layer(&mut self, from: MemoryLayer, threshold: f64) -> usize {
         let next = match from.next() {
             Some(l) => l,
             None => return 0,
@@ -155,15 +155,15 @@ impl CortexMemory {
         promoted
     }
 
-    pub fn consolidate_cms(&mut self, iteration: u64, config: &CmsConfig) -> CmsResult {
+    pub(crate) fn _consolidate_cms(&mut self, iteration: u64, config: &CmsConfig) -> CmsResult {
         let mut result = CmsResult::default();
         let _old_topic = self.layer_index.get(&MemoryLayer::Topic).map(|s| s.len()).unwrap_or(0);
         result.nt_world_sense_to_topic = self.consolidate(config.topic_threshold);
         if iteration.is_multiple_of(config.topic_frequency as u64) {
-            result.topic_to_event = self.consolidate_layer(MemoryLayer::Topic, config.event_threshold);
+            result.topic_to_event = self._consolidate_layer(MemoryLayer::Topic, config.event_threshold);
         }
         if iteration.is_multiple_of(config.event_frequency as u64) {
-            result.event_to_fact = self.consolidate_layer(MemoryLayer::Event, config.fact_threshold);
+            result.event_to_fact = self._consolidate_layer(MemoryLayer::Event, config.fact_threshold);
         }
         result.topic_layer_size = self.layer_index.get(&MemoryLayer::Topic).map(|s| s.len()).unwrap_or(0);
         result.event_layer_size = self.layer_index.get(&MemoryLayer::Event).map(|s| s.len()).unwrap_or(0);
@@ -188,7 +188,7 @@ impl CortexMemory {
     }
 
     /// 按多维度组合检索
-    pub fn query_by_dimensions(&self, dims: &[DimensionTag], limit: usize) -> Vec<&MemoryTrace> {
+    pub(crate) fn _query_by_dimensions(&self, dims: &[DimensionTag], limit: usize) -> Vec<&MemoryTrace> {
         let mut all_ids: HashSet<String> = HashSet::new();
         for dim in dims {
             if let Some(ids) = self.dimension_index.get(dim) {
@@ -235,7 +235,7 @@ impl CortexMemory {
     }
 
     /// 时间线查询（按 epoch）
-    pub fn query_timeline(&self, epoch: &str, limit: usize) -> Vec<&MemoryTrace> {
+    pub(crate) fn _query_timeline(&self, epoch: &str, limit: usize) -> Vec<&MemoryTrace> {
         self.timeline_index.get(epoch)
             .map(|ids| {
                 let mut traces: Vec<&MemoryTrace> = ids.iter()
@@ -249,7 +249,7 @@ impl CortexMemory {
     }
 
     /// 按来源类型查询
-    pub fn query_by_source(&self, source_type: &str, limit: usize) -> Vec<&MemoryTrace> {
+    pub(crate) fn _query_by_source(&self, source_type: &str, limit: usize) -> Vec<&MemoryTrace> {
         self.source_index.get(source_type)
             .map(|ids| {
                 let mut traces: Vec<&MemoryTrace> = ids.iter()
@@ -263,7 +263,7 @@ impl CortexMemory {
     }
 
     /// 关联检索：给定一条记忆，找出相关联的记忆
-    pub fn get_associations(&self, trace_id: &str, limit: usize) -> Vec<&MemoryTrace> {
+    pub(crate) fn _get_associations(&self, trace_id: &str, limit: usize) -> Vec<&MemoryTrace> {
         self.trace_map.get(trace_id)
             .map(|trace| {
                 let mut assoc: Vec<&MemoryTrace> = trace.associations.iter()
@@ -289,7 +289,7 @@ impl CortexMemory {
         let dims: Vec<DimensionTag> = DimensionTag::all().into_iter()
             .filter(|d| d.category() == category)
             .collect();
-        self.query_by_dimensions(&dims, limit)
+        self._query_by_dimensions(&dims, limit)
     }
 
     /// Iterate over all stored traces (nt_world_sense + long-term)
@@ -369,14 +369,14 @@ impl CortexMemory {
 
     // ==================== HyperMem 超图记忆 (EverOS) ====================
 
-    pub fn store_with_layer(&mut self, trace: MemoryTrace, layer: MemoryLayer) -> String {
+    pub(crate) fn _store_with_layer(&mut self, trace: MemoryTrace, layer: MemoryLayer) -> String {
         let id = self.store(trace);
         self.layer_index.entry(MemoryLayer::Sensory).or_default().remove(&id);
         self.layer_index.entry(layer).or_default().insert(id.clone());
         id
     }
 
-    pub fn create_hyperedge(&mut self, hyperedge_id: &str, trace_ids: &[&str]) -> bool {
+    pub(crate) fn _create_hyperedge(&mut self, hyperedge_id: &str, trace_ids: &[&str]) -> bool {
         if self.hyperedge_index.contains_key(hyperedge_id) {
             return false;
         }
@@ -392,14 +392,14 @@ impl CortexMemory {
         true
     }
 
-    pub fn get_hyperedges(&self, trace_id: &str) -> Vec<&str> {
+    pub(crate) fn _get_hyperedges(&self, trace_id: &str) -> Vec<&str> {
         self.hyperedge_index.iter()
             .filter(|(_, ids)| ids.contains(&trace_id.to_string()))
             .map(|(id, _)| id.as_str())
             .collect()
     }
 
-    pub fn retrieve_coarse_to_fine(&mut self, query: &str, k: usize) -> (Vec<MemoryTrace>, Vec<MemoryTrace>, Vec<MemoryTrace>) {
+    pub(crate) fn _retrieve_coarse_to_fine(&mut self, query: &str, k: usize) -> (Vec<MemoryTrace>, Vec<MemoryTrace>, Vec<MemoryTrace>) {
         let query_embed = self.embedder.embed(query);
         let mut topic_scores: Vec<(f64, &MemoryTrace)> = Vec::new();
         let mut event_scores: Vec<(f64, &MemoryTrace)> = Vec::new();
@@ -426,7 +426,7 @@ impl CortexMemory {
         (topic, event, fact)
     }
 
-    pub fn promote_layer(&mut self, trace_id: &str, target_layer: MemoryLayer) -> bool {
+    pub(crate) fn _promote_layer(&mut self, trace_id: &str, target_layer: MemoryLayer) -> bool {
         let current = self.detect_layer(trace_id);
         if current == target_layer {
             return false;
@@ -453,7 +453,7 @@ impl CortexMemory {
 }
 
 /// 从 KnowledgeSource 来源自动注入 cortex
-pub fn inject_from_web_miner(
+pub(crate) fn _inject_from_web_miner(
     cortex: &mut CortexMemory,
     source_url: &str,
     _source_name: &str,

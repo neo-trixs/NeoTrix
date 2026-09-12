@@ -13,7 +13,7 @@ use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEntry;
 
 /// 技能检索查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SkillQuery {
+pub(crate) struct _SkillQuery {
     pub text: String,
     pub category: Option<String>,
     pub top_k: usize,
@@ -31,16 +31,16 @@ pub struct RetrievalResult {
 
 /// 技能嵌入缓存
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SkillEmbedding {
+pub(crate) struct _SkillEmbedding {
     pub skill_name: String,
     pub embedding: Vec<f32>,
     pub category: String,
-    pub quality_scores: QualityScores,
+    pub quality_scores: _QualityScores,
 }
 
 /// 质量分数 (SkillCorpus 3 维度)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct QualityScores {
+pub(crate) struct _QualityScores {
     pub utility: f64,
     pub robustness: f64,
     pub safety: f64,
@@ -49,7 +49,7 @@ pub struct QualityScores {
 
 /// 技能分类 (SkillCorpus 16 类别)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SkillCategory {
+pub(crate) enum _SkillCategory {
     CodeGeneration,
     CodeAnalysis,
     Testing,
@@ -68,60 +68,60 @@ pub enum SkillCategory {
     General,
 }
 
-impl SkillCategory {
-    pub fn all() -> Vec<SkillCategory> {
+impl _SkillCategory {
+    pub fn all() -> Vec<_SkillCategory> {
         vec![
-            SkillCategory::CodeGeneration,
-            SkillCategory::CodeAnalysis,
-            SkillCategory::Testing,
-            SkillCategory::Documentation,
-            SkillCategory::Refactoring,
-            SkillCategory::Architecture,
-            SkillCategory::Security,
-            SkillCategory::Performance,
-            SkillCategory::DataProcessing,
-            SkillCategory::MachineLearning,
-            SkillCategory::DevOps,
-            SkillCategory::Debugging,
-            SkillCategory::APIDesign,
-            SkillCategory::Database,
-            SkillCategory::Frontend,
-            SkillCategory::General,
+            _SkillCategory::CodeGeneration,
+            _SkillCategory::CodeAnalysis,
+            _SkillCategory::Testing,
+            _SkillCategory::Documentation,
+            _SkillCategory::Refactoring,
+            _SkillCategory::Architecture,
+            _SkillCategory::Security,
+            _SkillCategory::Performance,
+            _SkillCategory::DataProcessing,
+            _SkillCategory::MachineLearning,
+            _SkillCategory::DevOps,
+            _SkillCategory::Debugging,
+            _SkillCategory::APIDesign,
+            _SkillCategory::Database,
+            _SkillCategory::Frontend,
+            _SkillCategory::General,
         ]
     }
 
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
-            "code_generation" | "code-generation" => Some(SkillCategory::CodeGeneration),
-            "code_analysis" | "code-analysis" => Some(SkillCategory::CodeAnalysis),
-            "testing" => Some(SkillCategory::Testing),
-            "documentation" => Some(SkillCategory::Documentation),
-            "refactoring" => Some(SkillCategory::Refactoring),
-            "architecture" => Some(SkillCategory::Architecture),
-            "security" => Some(SkillCategory::Security),
-            "performance" => Some(SkillCategory::Performance),
-            "data_processing" | "data-processing" => Some(SkillCategory::DataProcessing),
-            "machine_learning" | "ml" => Some(SkillCategory::MachineLearning),
-            "devops" => Some(SkillCategory::DevOps),
-            "debugging" => Some(SkillCategory::Debugging),
-            "api_design" | "api-design" => Some(SkillCategory::APIDesign),
-            "database" => Some(SkillCategory::Database),
-            "frontend" => Some(SkillCategory::Frontend),
-            _ => Some(SkillCategory::General),
+            "code_generation" | "code-generation" => Some(_SkillCategory::CodeGeneration),
+            "code_analysis" | "code-analysis" => Some(_SkillCategory::CodeAnalysis),
+            "testing" => Some(_SkillCategory::Testing),
+            "documentation" => Some(_SkillCategory::Documentation),
+            "refactoring" => Some(_SkillCategory::Refactoring),
+            "architecture" => Some(_SkillCategory::Architecture),
+            "security" => Some(_SkillCategory::Security),
+            "performance" => Some(_SkillCategory::Performance),
+            "data_processing" | "data-processing" => Some(_SkillCategory::DataProcessing),
+            "machine_learning" | "ml" => Some(_SkillCategory::MachineLearning),
+            "devops" => Some(_SkillCategory::DevOps),
+            "debugging" => Some(_SkillCategory::Debugging),
+            "api_design" | "api-design" => Some(_SkillCategory::APIDesign),
+            "database" => Some(_SkillCategory::Database),
+            "frontend" => Some(_SkillCategory::Frontend),
+            _ => Some(_SkillCategory::General),
         }
     }
 }
 
 /// 技能检索引擎 (bi-encoder + reranker)
-pub struct SkillRetriever {
-    bi_encoder: Arc<dyn BiEncoder>,
+pub(crate) struct _SkillRetriever {
+    bi_encoder: Arc<dyn _BiEncoder>,
     reranker: Arc<dyn Reranker>,
-    embeddings: Arc<Mutex<HashMap<String, SkillEmbedding>>>,
+    embeddings: Arc<Mutex<HashMap<String, _SkillEmbedding>>>,
     category_index: Arc<Mutex<HashMap<String, Vec<String>>>>, // category -> skill names
 }
 
 /// Bi-encoder trait (快速检索)
-pub trait BiEncoder: Send + Sync {
+pub(crate) trait _BiEncoder: Send + Sync {
     fn encode(&self, text: &str) -> Result<Vec<f32>, String>;
     fn batch_encode(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String>;
     fn dim(&self) -> usize;
@@ -133,10 +133,10 @@ pub trait Reranker: Send + Sync {
 }
 
 /// 默认实现 (占位, 生产需接入 Qwen3-Embedding-0.6B / Qwen3-Reranker-0.6B)
-pub struct PlaceholderBiEncoder;
-pub struct PlaceholderReranker;
+pub(crate) struct _PlaceholderBiEncoder;
+pub(crate) struct _PlaceholderReranker;
 
-impl BiEncoder for PlaceholderBiEncoder {
+impl _BiEncoder for _PlaceholderBiEncoder {
     fn encode(&self, text: &str) -> Result<Vec<f32>, String> {
         // 占位: 随机向量 (实际应接入 Qwen3-Embedding-0.6B)
         let dim = 1024;
@@ -154,7 +154,7 @@ impl BiEncoder for PlaceholderBiEncoder {
     fn dim(&self) -> usize { 1024 }
 }
 
-impl Reranker for PlaceholderReranker {
+impl Reranker for _PlaceholderReranker {
     fn rerank(&self, query: &str, candidates: &[&str]) -> Result<Vec<f32>, String> {
         // 占位: 基于字符串相似度
         let scores: Vec<f32> = candidates.iter().map(|c| {
@@ -169,39 +169,39 @@ impl Reranker for PlaceholderReranker {
     }
 }
 
-impl SkillRetriever {
+impl _SkillRetriever {
     pub fn new() -> Self {
         Self {
-            bi_encoder: Arc::new(PlaceholderBiEncoder),
-            reranker: Arc::new(PlaceholderReranker),
-            embeddings: Arc::new(Mutex::new(HashMap::<String, SkillEmbedding>::new())),
+            bi_encoder: Arc::new(_PlaceholderBiEncoder),
+            reranker: Arc::new(_PlaceholderReranker),
+            embeddings: Arc::new(Mutex::new(HashMap::<String, _SkillEmbedding>::new())),
             category_index: Arc::new(Mutex::new(HashMap::<String, Vec<String>>::new())),
         }
     }
 
-    pub fn with_bi_encoder(mut self, encoder: Arc<dyn BiEncoder>) -> Self {
+    pub(crate) fn _with_bi_encoder(mut self, encoder: Arc<dyn _BiEncoder>) -> Self {
         self.bi_encoder = encoder;
         self
     }
 
-    pub fn with_reranker(mut self, reranker: Arc<dyn Reranker>) -> Self {
+    pub(crate) fn _with_reranker(mut self, reranker: Arc<dyn Reranker>) -> Self {
         self.reranker = reranker;
         self
     }
 
     /// 索引技能 (计算嵌入 + 分类)
-    pub fn index_skill(&self, skill: &SkillEntry) -> Result<(), String> {
+    pub(crate) fn _index_skill(&self, skill: &SkillEntry) -> Result<(), String> {
         let text = format!("{} {}", skill.name, skill.description);
         let embedding = self.bi_encoder.encode(&text)?;
 
-        let category = SkillCategory::from_str(&skill.category).unwrap_or(SkillCategory::General);
+        let category = _SkillCategory::from_str(&skill.category).unwrap_or(_SkillCategory::General);
         let category_str = format!("{:?}", category);
 
-        let embedding = SkillEmbedding {
+        let embedding = _SkillEmbedding {
             skill_name: skill.name.clone(),
             embedding,
             category: category_str.clone(),
-            quality_scores: QualityScores::default(),
+            quality_scores: _QualityScores::default(),
         };
 
         self.embeddings.lock().unwrap().insert(skill.name.clone(), embedding);
@@ -214,10 +214,10 @@ impl SkillRetriever {
     }
 
     /// 批量索引
-    pub fn index_skills(&self, skills: &[SkillEntry]) -> Result<usize, String> {
+    pub(crate) fn _index_skills(&self, skills: &[SkillEntry]) -> Result<usize, String> {
         let mut count = 0;
         for skill in skills {
-            if self.index_skill(skill).is_ok() {
+            if self._index_skill(skill).is_ok() {
                 count += 1;
             }
         }
@@ -225,7 +225,7 @@ impl SkillRetriever {
     }
 
     /// 检索技能 (bi-encoder 召回 + reranker 重排)
-    pub fn retrieve(&self, query: &SkillQuery) -> Result<Vec<RetrievalResult>, String> {
+    pub fn retrieve(&self, query: &_SkillQuery) -> Result<Vec<RetrievalResult>, String> {
         let embeddings = self.embeddings.lock().unwrap();
         if embeddings.is_empty() {
             return Ok(Vec::new());
@@ -292,7 +292,7 @@ impl SkillRetriever {
     }
 
     /// 按类别检索
-    pub fn retrieve_by_category(&self, category: SkillCategory, top_k: usize) -> Vec<RetrievalResult> {
+    pub(crate) fn _retrieve_by_category(&self, category: _SkillCategory, top_k: usize) -> Vec<RetrievalResult> {
         let cat_str = format!("{:?}", category);
         let index = self.category_index.lock().unwrap();
         if let Some(names) = index.get(&cat_str) {
@@ -313,7 +313,7 @@ impl SkillRetriever {
     }
 
     /// 更新质量分数
-    pub fn update_quality(&self, skill_name: &str, scores: QualityScores) {
+    pub fn update_quality(&self, skill_name: &str, scores: _QualityScores) {
         if let Some(emb) = self.embeddings.lock().unwrap().get_mut(skill_name) {
             emb.quality_scores = scores;
         }
@@ -322,7 +322,7 @@ impl SkillRetriever {
 
 use crate::core::nt_core_math::cosine_similarity_f32_f32 as cosine_similarity;
 
-impl Default for SkillRetriever {
+impl Default for _SkillRetriever {
     fn default() -> Self {
         Self::new()
     }
@@ -341,8 +341,8 @@ mod tests {
 
     #[test]
     fn test_category_from_str() {
-        assert_eq!(SkillCategory::from_str("code_generation"), Some(SkillCategory::CodeGeneration));
-        assert_eq!(SkillCategory::from_str("testing"), Some(SkillCategory::Testing));
-        assert_eq!(SkillCategory::from_str("unknown"), Some(SkillCategory::General));
+        assert_eq!(_SkillCategory::from_str("code_generation"), Some(_SkillCategory::CodeGeneration));
+        assert_eq!(_SkillCategory::from_str("testing"), Some(_SkillCategory::Testing));
+        assert_eq!(_SkillCategory::from_str("unknown"), Some(_SkillCategory::General));
     }
 }

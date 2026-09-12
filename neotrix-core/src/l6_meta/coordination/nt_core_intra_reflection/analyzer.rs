@@ -25,7 +25,7 @@ pub fn compute_coherence(trace: &[String]) -> f64 {
     sum / (trace.len() - 1) as f64
 }
 
-pub fn compute_efficiency(trace_len: usize, outcome_success: Option<bool>) -> f64 {
+pub(crate) fn _compute_efficiency(trace_len: usize, outcome_success: Option<bool>) -> f64 {
     match outcome_success {
         Some(true) => {
             if trace_len == 0 {
@@ -38,7 +38,7 @@ pub fn compute_efficiency(trace_len: usize, outcome_success: Option<bool>) -> f6
     }
 }
 
-pub fn compute_error_density(error_count: u32, trace_len: usize) -> f64 {
+pub(crate) fn _compute_error_density(error_count: u32, trace_len: usize) -> f64 {
     if trace_len == 0 {
         return 0.0;
     }
@@ -56,7 +56,7 @@ pub fn compute_mode_stability(history: &[u8]) -> f64 {
     1.0 - (switches as f64 / max_possible as f64)
 }
 
-pub fn find_bottlenecks(trace: &[String], execution_time_ms: u64, error_count: u32) -> Vec<String> {
+pub(crate) fn _find_bottlenecks(trace: &[String], execution_time_ms: u64, error_count: u32) -> Vec<String> {
     let mut bottlenecks = Vec::new();
     if trace.is_empty() {
         return bottlenecks;
@@ -127,10 +127,10 @@ pub fn generate_suggestions(
 
 pub fn analyze(input: &ReflectionInput) -> ReflectionReport {
     let coherence = compute_coherence(&input.reasoning_trace);
-    let efficiency = compute_efficiency(input.reasoning_trace.len(), input.outcome_success);
-    let error_density = compute_error_density(input.error_count, input.reasoning_trace.len());
+    let efficiency = _compute_efficiency(input.reasoning_trace.len(), input.outcome_success);
+    let error_density = _compute_error_density(input.error_count, input.reasoning_trace.len());
     let mode_stability = compute_mode_stability(&input.e8_mode_history);
-    let bottleneck_hops = find_bottlenecks(
+    let bottleneck_hops = _find_bottlenecks(
         &input.reasoning_trace,
         input.execution_time_ms,
         input.error_count,
@@ -209,40 +209,40 @@ mod tests {
 
     #[test]
     fn test_efficiency_success_short_trace() {
-        let eff = compute_efficiency(3, Some(true));
+        let eff = _compute_efficiency(3, Some(true));
         assert!((eff - 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_efficiency_success_long_trace() {
-        let eff = compute_efficiency(10, Some(true));
+        let eff = _compute_efficiency(10, Some(true));
         assert!((eff - 0.3).abs() < 1e-6);
     }
 
     #[test]
     fn test_efficiency_failure() {
-        assert_eq!(compute_efficiency(5, Some(false)), 0.0);
+        assert_eq!(_compute_efficiency(5, Some(false)), 0.0);
     }
 
     #[test]
     fn test_efficiency_none() {
-        assert_eq!(compute_efficiency(5, None), 0.0);
+        assert_eq!(_compute_efficiency(5, None), 0.0);
     }
 
     #[test]
     fn test_error_density_clean() {
-        assert_eq!(compute_error_density(0, 10), 0.0);
+        assert_eq!(_compute_error_density(0, 10), 0.0);
     }
 
     #[test]
     fn test_error_density_high() {
-        let density = compute_error_density(8, 10);
+        let density = _compute_error_density(8, 10);
         assert!((density - 0.8).abs() < 1e-6);
     }
 
     #[test]
     fn test_error_density_zero_trace() {
-        assert_eq!(compute_error_density(5, 0), 0.0);
+        assert_eq!(_compute_error_density(5, 0), 0.0);
     }
 
     #[test]
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn test_bottlenecks_high_latency() {
         let trace = vec!["a".to_string(); 5];
-        let bt = find_bottlenecks(&trace, 30000, 0);
+        let bt = _find_bottlenecks(&trace, 30000, 0);
         assert!(!bt.is_empty());
         assert!(bt.iter().any(|b| b.contains("latency")));
     }
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn test_bottlenecks_error_cluster() {
         let trace = vec!["a".to_string(); 10];
-        let bt = find_bottlenecks(&trace, 100, 8);
+        let bt = _find_bottlenecks(&trace, 100, 8);
         assert!(!bt.is_empty());
         assert!(bt.iter().any(|b| b.contains("error cluster")));
     }
@@ -293,13 +293,13 @@ mod tests {
     #[test]
     fn test_bottlenecks_clean() {
         let trace = vec!["a".to_string(); 10];
-        let bt = find_bottlenecks(&trace, 100, 1);
+        let bt = _find_bottlenecks(&trace, 100, 1);
         assert!(bt.is_empty());
     }
 
     #[test]
     fn test_bottlenecks_empty_trace() {
-        let bt = find_bottlenecks(&[], 0, 0);
+        let bt = _find_bottlenecks(&[], 0, 0);
         assert!(bt.is_empty());
     }
 

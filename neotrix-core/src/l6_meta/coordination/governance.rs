@@ -10,17 +10,17 @@
 use serde::{Deserialize, Serialize};
 
 /// 治理合规检查器
-pub struct GovernanceComplianceChecker {
-    rules: Vec<GovernanceRule>,
+pub(crate) struct _GovernanceComplianceChecker {
+    rules: Vec<_GovernanceRule>,
     violations: Vec<ComplianceViolation>,
     #[allow(dead_code)]
-    config: ComplianceConfig,
-    stats: ComplianceStats,
+    config: _ComplianceConfig,
+    stats: _ComplianceStats,
 }
 
 /// 合规配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceConfig {
+pub(crate) struct _ComplianceConfig {
     pub enable_pre_commit_checks: bool,
     pub enable_pre_push_checks: bool,
     pub enable_runtime_checks: bool,
@@ -28,7 +28,7 @@ pub struct ComplianceConfig {
     pub max_violations: usize,
 }
 
-impl Default for ComplianceConfig {
+impl Default for _ComplianceConfig {
     fn default() -> Self {
         Self {
             enable_pre_commit_checks: true,
@@ -42,7 +42,7 @@ impl Default for ComplianceConfig {
 
 /// 治理规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GovernanceRule {
+pub(crate) struct _GovernanceRule {
     pub rule_id: String,
     pub name: String,
     pub description: String,
@@ -87,7 +87,7 @@ pub struct ComplianceViolation {
 
 /// 合规统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceStats {
+pub(crate) struct _ComplianceStats {
     pub total_checks: u64,
     pub passed_checks: u64,
     pub failed_checks: u64,
@@ -97,20 +97,20 @@ pub struct ComplianceStats {
 
 /// 检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceCheckResult {
+pub(crate) struct _ComplianceCheckResult {
     pub passed: bool,
     pub violations: Vec<ComplianceViolation>,
     pub suggestions: Vec<String>,
 }
 
-impl GovernanceComplianceChecker {
+impl _GovernanceComplianceChecker {
     /// 创建新的治理合规检查器
     pub fn new() -> Self {
         let mut checker = Self {
             rules: Vec::new(),
             violations: Vec::new(),
-            config: ComplianceConfig::default(),
-            stats: ComplianceStats {
+            config: _ComplianceConfig::default(),
+            stats: _ComplianceStats {
                 total_checks: 0,
                 passed_checks: 0,
                 failed_checks: 0,
@@ -125,7 +125,7 @@ impl GovernanceComplianceChecker {
     /// 注册默认规则
     fn register_default_rules(&mut self) {
         // 规则1: 禁止推送到远程仓库
-        self.rules.push(GovernanceRule {
+        self.rules.push(_GovernanceRule {
             rule_id: "no_remote_push".into(),
             name: "禁止推送到远程仓库".into(),
             description: "用户明确要求禁止将核心代码推送到远程 GitHub 仓库".into(),
@@ -136,7 +136,7 @@ impl GovernanceComplianceChecker {
         });
 
         // 规则2: 禁止杀未授权进程
-        self.rules.push(GovernanceRule {
+        self.rules.push(_GovernanceRule {
             rule_id: "no_unauthorized_kill".into(),
             name: "禁止杀未授权进程".into(),
             description: "禁止在用户未明确点名的情况下杀其他进程".into(),
@@ -147,7 +147,7 @@ impl GovernanceComplianceChecker {
         });
 
         // 规则3: P0 编译闸门 - 提交前
-        self.rules.push(GovernanceRule {
+        self.rules.push(_GovernanceRule {
             rule_id: "pre_commit_build_gate".into(),
             name: "P0 编译闸门 (提交前)".into(),
             description: "提交前必须通过 cargo check --tests".into(),
@@ -158,7 +158,7 @@ impl GovernanceComplianceChecker {
         });
 
         // 规则4: P0 编译闸门 - 推送前
-        self.rules.push(GovernanceRule {
+        self.rules.push(_GovernanceRule {
             rule_id: "pre_push_build_gate".into(),
             name: "P0 编译闸门 (推送前)".into(),
             description: "推送前必须通过 cargo check --lib".into(),
@@ -169,7 +169,7 @@ impl GovernanceComplianceChecker {
         });
 
         // 规则5: 代码质量 - 禁止 unsafe
-        self.rules.push(GovernanceRule {
+        self.rules.push(_GovernanceRule {
             rule_id: "no_unsafe_code".into(),
             name: "禁止 unsafe 代码".into(),
             description: "核心代码禁止使用 unsafe (R-P1)".into(),
@@ -180,7 +180,7 @@ impl GovernanceComplianceChecker {
         });
 
         // 规则6: 知识库写入门禁
-        self.rules.push(GovernanceRule {
+        self.rules.push(_GovernanceRule {
             rule_id: "kb_write_gate".into(),
             name: "知识库写入门禁".into(),
             description: "AGENTS.md 禁止内联经验表、cycle 正文或增长区".into(),
@@ -192,7 +192,7 @@ impl GovernanceComplianceChecker {
     }
 
     /// 执行合规检查
-    pub fn check(&mut self, check_type: &str) -> ComplianceCheckResult {
+    pub fn check(&mut self, check_type: &str) -> _ComplianceCheckResult {
         self.stats.total_checks += 1;
 
         let mut violations = Vec::new();
@@ -227,7 +227,7 @@ impl GovernanceComplianceChecker {
             suggestions.push("修复违规后再继续".into());
         }
 
-        ComplianceCheckResult {
+        _ComplianceCheckResult {
             passed: violations.is_empty(),
             violations,
             suggestions,
@@ -235,7 +235,7 @@ impl GovernanceComplianceChecker {
     }
 
     /// 检查单个规则
-    fn check_rule(&self, rule: &GovernanceRule, check_type: &str) -> bool {
+    fn check_rule(&self, rule: &_GovernanceRule, check_type: &str) -> bool {
         match rule.check_fn.as_str() {
             "check_no_remote_push" => {
                 // 检查是否有 git push 命令
@@ -266,7 +266,7 @@ impl GovernanceComplianceChecker {
     }
 
     /// 解决违规
-    pub fn resolve_violation(&mut self, violation_id: &str) -> bool {
+    pub(crate) fn _resolve_violation(&mut self, violation_id: &str) -> bool {
         if let Some(violation) = self.violations.iter_mut().find(|v| v.violation_id == violation_id) {
             violation.resolved = true;
             self.stats.resolved_violations += 1;
@@ -277,12 +277,12 @@ impl GovernanceComplianceChecker {
     }
 
     /// 获取所有规则
-    pub fn rules(&self) -> &[GovernanceRule] {
+    pub fn rules(&self) -> &[_GovernanceRule] {
         &self.rules
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &ComplianceStats {
+    pub fn stats(&self) -> &_ComplianceStats {
         &self.stats
     }
 }

@@ -7,7 +7,7 @@ use super::code_graph::CodeGraph;
 use super::graph_types::{ImpactResult, CodeGraphStats};
 
 /// A single recorded tool invocation trace.
-pub struct ToolTrace {
+pub(crate) struct _ToolTrace {
     pub tool_name: String,
     pub params: HashMap<String, String>,
     pub result_size: usize,
@@ -31,7 +31,7 @@ pub struct EnrichedSearchResult {
 pub struct CountingExecutor {
     graph: Arc<Mutex<CodeGraph>>,
     call_count: Arc<AtomicUsize>,
-    traces: Arc<Mutex<Vec<ToolTrace>>>,
+    traces: Arc<Mutex<Vec<_ToolTrace>>>,
 }
 
 impl CountingExecutor {
@@ -53,7 +53,7 @@ impl CountingExecutor {
     ) {
         self.call_count.fetch_add(1, Ordering::Relaxed);
         if let Ok(mut traces) = self.traces.lock() {
-            traces.push(ToolTrace {
+            traces.push(_ToolTrace {
                 tool_name: tool_name.to_string(),
                 params,
                 result_size,
@@ -68,17 +68,17 @@ impl CountingExecutor {
     }
 
     /// Drain all recorded traces (for SEAL reward signal).
-    pub fn take_traces(&self) -> Vec<ToolTrace> {
+    pub(crate) fn _take_traces(&self) -> Vec<_ToolTrace> {
         let mut traces = self.traces.lock().unwrap_or_else(|e| e.into_inner());
         std::mem::take(&mut traces)
     }
 
-    pub fn reset_count(&self) {
+    pub(crate) fn _reset_count(&self) {
         self.call_count.store(0, Ordering::Relaxed);
     }
 
     /// Impact analysis for a target node.
-    pub fn execute_impact(&self, target: &str, max_depth: usize) -> Result<ImpactResult, String> {
+    pub(crate) fn _execute_impact(&self, target: &str, max_depth: usize) -> Result<ImpactResult, String> {
         let start = Instant::now();
         let graph = self.graph.lock().map_err(|e| format!("Lock error: {}", e))?;
         let resolved = graph.resolve_id(target);
@@ -87,7 +87,7 @@ impl CountingExecutor {
             let mut params = HashMap::new();
             params.insert("target".into(), target.into());
             params.insert("max_depth".into(), max_depth.to_string());
-            self.record("execute_impact", params, 0, duration, false);
+            self.record("_execute_impact", params, 0, duration, false);
             return Err(format!("Node not found: '{}' (resolved: '{}')", target, resolved));
         }
         let impact = graph.impact_analysis(&resolved, max_depth);
@@ -96,12 +96,12 @@ impl CountingExecutor {
         let mut params = HashMap::new();
         params.insert("target".into(), target.into());
         params.insert("max_depth".into(), max_depth.to_string());
-        self.record("execute_impact", params, result_size, duration, true);
+        self.record("_execute_impact", params, result_size, duration, true);
         Ok(impact)
     }
 
     /// Build graph from path and return stats.
-    pub fn execute_stats(&self, path: &str) -> Result<CodeGraphStats, String> {
+    pub(crate) fn _execute_stats(&self, path: &str) -> Result<CodeGraphStats, String> {
         let start = Instant::now();
         let mut graph = self.graph.lock().map_err(|e| format!("Lock error: {}", e))?;
         let node_count = graph.build(path)?;
@@ -109,12 +109,12 @@ impl CountingExecutor {
         let duration = start.elapsed().as_millis() as u64;
         let mut params = HashMap::new();
         params.insert("path".into(), path.into());
-        self.record("execute_stats", params, node_count, duration, true);
+        self.record("_execute_stats", params, node_count, duration, true);
         Ok(stats)
     }
 
     /// Dependencies of a file: what it imports.
-    pub fn execute_dependencies(&self, file_path: &str) -> Result<Vec<String>, String> {
+    pub(crate) fn _execute_dependencies(&self, file_path: &str) -> Result<Vec<String>, String> {
         let start = Instant::now();
         let graph = self.graph.lock().map_err(|e| format!("Lock error: {}", e))?;
         let path = Path::new(file_path);
@@ -123,12 +123,12 @@ impl CountingExecutor {
         let duration = start.elapsed().as_millis() as u64;
         let mut params = HashMap::new();
         params.insert("file_path".into(), file_path.into());
-        self.record("execute_dependencies", params, result_size, duration, true);
+        self.record("_execute_dependencies", params, result_size, duration, true);
         Ok(deps)
     }
 
     /// Dependents of a file: what imports it.
-    pub fn execute_dependents(&self, file_path: &str) -> Result<Vec<String>, String> {
+    pub(crate) fn _execute_dependents(&self, file_path: &str) -> Result<Vec<String>, String> {
         let start = Instant::now();
         let graph = self.graph.lock().map_err(|e| format!("Lock error: {}", e))?;
         let path = Path::new(file_path);
@@ -137,13 +137,13 @@ impl CountingExecutor {
         let duration = start.elapsed().as_millis() as u64;
         let mut params = HashMap::new();
         params.insert("file_path".into(), file_path.into());
-        self.record("execute_dependents", params, result_size, duration, true);
+        self.record("_execute_dependents", params, result_size, duration, true);
         Ok(deps)
     }
 
     /// Search graph nodes by name/ID matching the query string.
     /// Returns up to `max` results sorted by relevance.
-    pub fn execute_search_enriched(&self, query: &str, max: usize) -> Vec<EnrichedSearchResult> {
+    pub(crate) fn _execute_search_enriched(&self, query: &str, max: usize) -> Vec<EnrichedSearchResult> {
         let start = Instant::now();
         let query_lower = query.to_lowercase();
 
@@ -191,7 +191,7 @@ impl CountingExecutor {
                 let mut params = HashMap::new();
                 params.insert("query".into(), query.into());
                 params.insert("max".into(), max.to_string());
-                self.record("execute_search_enriched", params, 0, duration, false);
+                self.record("_execute_search_enriched", params, 0, duration, false);
                 return Vec::new();
             }
         };
@@ -201,7 +201,7 @@ impl CountingExecutor {
         let mut params = HashMap::new();
         params.insert("query".into(), query.into());
         params.insert("max".into(), max.to_string());
-        self.record("execute_search_enriched", params, result_size, duration, true);
+        self.record("_execute_search_enriched", params, result_size, duration, true);
         results
     }
 }
@@ -246,8 +246,8 @@ mod tests {
     fn test_search_enriched_on_built_graph() {
         let (_dir, src) = fixture_project();
         let e = executor();
-        e.execute_stats(src.to_str().expect("src path is valid utf-8")).expect("execute_stats should succeed");
-        let results = e.execute_search_enriched("main", 10);
+        e._execute_stats(src.to_str().expect("src path is valid utf-8")).expect("_execute_stats should succeed");
+        let results = e._execute_search_enriched("main", 10);
         assert!(!results.is_empty(), "should find nodes matching 'main'");
         for r in &results {
             assert!(!r.node_id.is_empty());
@@ -259,8 +259,8 @@ mod tests {
     fn test_search_enriched_respects_max() {
         let (_dir, src) = fixture_project();
         let e = executor();
-        e.execute_stats(src.to_str().expect("src path is valid utf-8")).expect("execute_stats should succeed");
-        let results = e.execute_search_enriched("e", 3);
+        e._execute_stats(src.to_str().expect("src path is valid utf-8")).expect("_execute_stats should succeed");
+        let results = e._execute_search_enriched("e", 3);
         assert!(results.len() <= 3);
     }
 
@@ -275,7 +275,7 @@ mod tests {
         let e = executor();
         e.call_count.fetch_add(5, Ordering::Relaxed);
         assert_eq!(e.call_count(), 5);
-        e.reset_count();
+        e._reset_count();
         assert_eq!(e.call_count(), 0);
     }
 
@@ -285,8 +285,8 @@ mod tests {
         let mut p = HashMap::new();
         p.insert("a".into(), "b".into());
         e.record("test", p, 10, 5, true);
-        assert_eq!(e.take_traces().len(), 1);
-        assert_eq!(e.take_traces().len(), 0);
+        assert_eq!(e._take_traces().len(), 1);
+        assert_eq!(e._take_traces().len(), 0);
     }
 
     #[test]
@@ -297,7 +297,7 @@ mod tests {
             return;
         }
         let e = executor();
-        let stats = e.execute_stats(src.to_str().expect("src path is valid utf-8")).expect("execute_stats should succeed");
+        let stats = e._execute_stats(src.to_str().expect("src path is valid utf-8")).expect("_execute_stats should succeed");
         assert!(stats.total_nodes > 0);
         assert!(stats.community_count >= 1);
         assert!(e.call_count() > 0);
@@ -306,43 +306,43 @@ mod tests {
     #[test]
     fn test_execute_impact_missing_node() {
         let e = executor();
-        let r = e.execute_impact("nonexistent", 3);
+        let r = e._execute_impact("nonexistent", 3);
         assert!(r.is_err());
         assert_eq!(e.call_count(), 1);
-        let traces = e.take_traces();
+        let traces = e._take_traces();
         assert!(!traces[0].success);
     }
 
     #[test]
     fn test_execute_dependencies_empty() {
         let e = executor();
-        let deps = e.execute_dependencies("src/main.rs").expect("execute_dependencies should succeed");
+        let deps = e._execute_dependencies("src/main.rs").expect("_execute_dependencies should succeed");
         assert!(deps.is_empty());
     }
 
     #[test]
     fn test_execute_dependents_empty() {
         let e = executor();
-        let deps = e.execute_dependents("src/main.rs").expect("execute_dependents should succeed");
+        let deps = e._execute_dependents("src/main.rs").expect("_execute_dependents should succeed");
         assert!(deps.is_empty());
     }
 
     #[test]
     fn test_trace_contains_tool_name() {
         let e = executor();
-        let _ = e.execute_impact("x", 1);
-        let traces = e.take_traces();
+        let _ = e._execute_impact("x", 1);
+        let traces = e._take_traces();
         assert_eq!(traces.len(), 1);
-        assert_eq!(traces[0].tool_name, "execute_impact");
+        assert_eq!(traces[0].tool_name, "_execute_impact");
     }
 
     #[test]
     fn test_sequential_calls_increment_count() {
         let e = executor();
         assert_eq!(e.call_count(), 0);
-        let _ = e.execute_impact("x", 1);
+        let _ = e._execute_impact("x", 1);
         assert_eq!(e.call_count(), 1);
-        let _ = e.execute_impact("y", 2);
+        let _ = e._execute_impact("y", 2);
         assert_eq!(e.call_count(), 2);
     }
 }

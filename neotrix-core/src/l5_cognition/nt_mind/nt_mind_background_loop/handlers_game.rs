@@ -29,7 +29,7 @@ pub struct GameTickReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GameDaemonState {
+pub(crate) struct _GameDaemonState {
     pub constellation: u8,
     pub total_ticks: usize,
     pub total_episodes: usize,
@@ -184,18 +184,18 @@ fn rng_step(cells: &mut [u8], seed: u64, step: usize) {
 // Game Training Daemon
 // ═══════════════════════════════════════════════════════════════════
 
-pub struct GameTrainingDaemon {
-    pub state: GameDaemonState,
+pub(crate) struct _GameTrainingDaemon {
+    pub state: _GameDaemonState,
     pub episodes_per_tick: usize,
     pub max_constellation: u8,
     pub advance_threshold: f64,
     pub min_episodes_before_advance: usize,
 }
 
-impl GameTrainingDaemon {
+impl _GameTrainingDaemon {
     pub fn new() -> Self {
         Self {
-            state: GameDaemonState {
+            state: _GameDaemonState {
                 constellation: 0,
                 total_ticks: 0,
                 total_episodes: 0,
@@ -283,7 +283,7 @@ impl GameTrainingDaemon {
     }
 }
 
-impl Default for GameTrainingDaemon {
+impl Default for _GameTrainingDaemon {
     fn default() -> Self { Self::new() }
 }
 
@@ -297,13 +297,13 @@ mod tests {
 
     #[test]
     fn test_daemon_creates() {
-        let d = GameTrainingDaemon::new();
+        let d = _GameTrainingDaemon::new();
         assert_eq!(d.state.constellation, 0);
     }
 
     #[test]
     fn test_tick_runs() {
-        let mut d = GameTrainingDaemon::new();
+        let mut d = _GameTrainingDaemon::new();
         let report = d.tick();
         assert_eq!(report.episodes, 10);
         assert!(report.avg_reward >= 0.0);
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_constellation_advance() {
-        let mut d = GameTrainingDaemon::new();
+        let mut d = _GameTrainingDaemon::new();
         d.advance_threshold = 0.0;
         d.min_episodes_before_advance = 1;
         let report = d.tick();
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_multi_tick() {
-        let mut d = GameTrainingDaemon::new();
+        let mut d = _GameTrainingDaemon::new();
         d.advance_threshold = 0.0;
         d.min_episodes_before_advance = 1;
         let reports = d.run(5);
@@ -337,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_status() {
-        let d = GameTrainingDaemon::new();
+        let d = _GameTrainingDaemon::new();
         let s = d.status();
         assert!(s.contains("constellation"));
     }
@@ -350,8 +350,8 @@ mod tests {
 use super::*;
 
 /// Static daemon instance — persists across ticks
-static GAME_DAEMON: std::sync::LazyLock<std::sync::Mutex<GameTrainingDaemon>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(GameTrainingDaemon::new()));
+static GAME_DAEMON: std::sync::LazyLock<std::sync::Mutex<_GameTrainingDaemon>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(_GameTrainingDaemon::new()));
 
 impl BackgroundLoopHandle {
     /// NT-PLAY autonomous training tick — called every 5 minutes by background loop.

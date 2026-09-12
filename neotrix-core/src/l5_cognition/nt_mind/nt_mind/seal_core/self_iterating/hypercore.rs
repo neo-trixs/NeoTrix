@@ -102,7 +102,7 @@ impl HyperMetaAgent {
         }
     }
 
-    pub fn filter_protected_paths(&self, diffs: &[FileDiff]) -> Vec<FileDiff> {
+    pub(crate) fn _filter_protected_paths(&self, diffs: &[FileDiff]) -> Vec<FileDiff> {
         diffs
             .iter()
             .filter(|d| {
@@ -115,7 +115,7 @@ impl HyperMetaAgent {
             .collect()
     }
 
-    pub fn evaluate_proposal(
+    pub(crate) fn _evaluate_proposal(
         &self,
         proposal: &SelfModificationProposal,
         forecast_cumulative_fe: f64,

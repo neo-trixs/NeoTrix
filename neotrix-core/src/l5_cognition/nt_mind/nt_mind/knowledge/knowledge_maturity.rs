@@ -3,7 +3,7 @@ use crate::l5_cognition::nt_mind::nt_mind::core::MaturityLevel;
 
 /// Pairs a KnowledgeSource with its assessed maturity level.
 #[derive(Debug, Clone)]
-pub struct MatureKnowledgeSource {
+pub(crate) struct _MatureKnowledgeSource {
     pub name: String,
     pub maturity: MaturityLevel,
 }
@@ -13,17 +13,17 @@ pub struct MatureKnowledgeSource {
 /// Provides multi-fidelity filtering: consolidated queries only return
 /// sources that have reached at least `Validated`.
 #[derive(Debug, Clone)]
-pub struct KnowledgeMaturityTracker {
+pub(crate) struct _KnowledgeMaturityTracker {
     levels: HashMap<String, MaturityLevel>,
 }
 
-impl Default for KnowledgeMaturityTracker {
+impl Default for _KnowledgeMaturityTracker {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl KnowledgeMaturityTracker {
+impl _KnowledgeMaturityTracker {
     pub fn new() -> Self {
         Self { levels: HashMap::new() }
     }
@@ -58,7 +58,7 @@ impl KnowledgeMaturityTracker {
 
     /// Return only sources that have reached at least `Validated` maturity,
     /// paired with their confidence score.
-    pub fn consolidated_knowledge(&self, sources: &[String]) -> Vec<(String, f64)> {
+    pub(crate) fn _consolidated_knowledge(&self, sources: &[String]) -> Vec<(String, f64)> {
         sources
             .iter()
             .filter_map(|name| {
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn test_promote_chain() {
-        let mut tracker = KnowledgeMaturityTracker::new();
+        let mut tracker = _KnowledgeMaturityTracker::new();
         tracker.register("test_source", MaturityLevel::Candidate);
 
         assert_eq!(tracker.get_confidence("test_source"), 0.25);
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_confidence_values() {
-        let mut tracker = KnowledgeMaturityTracker::new();
+        let mut tracker = _KnowledgeMaturityTracker::new();
         tracker.register("a", MaturityLevel::Candidate);
         tracker.register("b", MaturityLevel::Reviewed);
         tracker.register("c", MaturityLevel::Validated);
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_consolidated_knowledge_filters() {
-        let mut tracker = KnowledgeMaturityTracker::new();
+        let mut tracker = _KnowledgeMaturityTracker::new();
         tracker.register("unreviewed", MaturityLevel::Candidate);
         tracker.register("validated_one", MaturityLevel::Validated);
         tracker.register("ground_truth", MaturityLevel::GroundTruth);
@@ -127,7 +127,7 @@ mod tests {
             "reviewed_only".to_string(),
         ];
 
-        let consolidated = tracker.consolidated_knowledge(&all);
+        let consolidated = tracker._consolidated_knowledge(&all);
         let names: Vec<&str> = consolidated.iter().map(|(n, _)| n.as_str()).collect();
 
         assert_eq!(consolidated.len(), 2);
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_promote_unregistered_returns_false() {
-        let mut tracker = KnowledgeMaturityTracker::new();
+        let mut tracker = _KnowledgeMaturityTracker::new();
         assert!(!tracker.promote("nonexistent"));
     }
 }

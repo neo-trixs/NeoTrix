@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionPattern {
+pub(crate) struct _SessionPattern {
     pub name: String,
     pub description: String,
     pub frequency: u32,
@@ -15,13 +15,13 @@ pub struct SessionPattern {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DistillationReport {
     pub session_count: u32,
-    pub patterns: Vec<SessionPattern>,
+    pub patterns: Vec<_SessionPattern>,
     pub suggestions: Vec<String>,
     pub generated_at: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct VerbalizedSampling {
+pub(crate) struct _VerbalizedSampling {
     pub num_candidates: usize,
     pub rng_seed: u64,
     pub sampled: usize,
@@ -29,18 +29,18 @@ pub struct VerbalizedSampling {
     state: u64,
 }
 
-impl Default for VerbalizedSampling {
+impl Default for _VerbalizedSampling {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl VerbalizedSampling {
+impl _VerbalizedSampling {
     pub fn new() -> Self {
-        Self::with_seed(0x9E3779B97F4A7C15)
+        Self::_with_seed(0x9E3779B97F4A7C15)
     }
 
-    pub fn with_seed(seed: u64) -> Self {
+    pub(crate) fn _with_seed(seed: u64) -> Self {
         Self {
             num_candidates: 5,
             rng_seed: seed,
@@ -50,14 +50,14 @@ impl VerbalizedSampling {
         }
     }
 
-    pub fn candidates_prompt(&self, task: &str) -> String {
+    pub(crate) fn _candidates_prompt(&self, task: &str) -> String {
         format!(
             "Generate {} distinct candidate responses for the following task. For each candidate, output a probability between 0 and 1 such that all probabilities sum to 1:\n\nTask: {}\n\nReturn as a numbered list '1. <candidate> (p=<prob>)'.",
             self.num_candidates, task
         )
     }
 
-    pub fn parse_candidates(&self, raw: &str) -> Vec<(String, f64)> {
+    pub(crate) fn _parse_candidates(&self, raw: &str) -> Vec<(String, f64)> {
         let mut candidates: Vec<(String, f64)> = Vec::new();
         for line in raw.lines() {
             let line = line.trim();
@@ -99,9 +99,9 @@ impl VerbalizedSampling {
         candidates.last().map(|(text, _)| text.clone())
     }
 
-    pub fn apply_to_patterns(
+    pub(crate) fn _apply_to_patterns(
         &mut self,
-        patterns: &[SessionPattern],
+        patterns: &[_SessionPattern],
         suggestions: &[String],
     ) -> Vec<String> {
         let mut output: Vec<String> = Vec::new();
@@ -113,7 +113,7 @@ impl VerbalizedSampling {
                 // Diversity signal: the same suggestion recurs across patterns.
                 // Re-inject via VS: build the candidate prompt and mark the
                 // diversified variant so sampling is visible downstream.
-                let _prompt = self.candidates_prompt(suggestion);
+                let _prompt = self._candidates_prompt(suggestion);
                 self.used += 1;
                 output.push(format!("[VS] {}", suggestion));
             } else {
@@ -205,8 +205,8 @@ fn extract_probability(rest: &str) -> Option<(String, f64)> {
 pub struct SessionDistiller {
     pub session_logs_dir: PathBuf,
     pub agents_path: PathBuf,
-    pub patterns: Vec<SessionPattern>,
-    pub vs: VerbalizedSampling,
+    pub patterns: Vec<_SessionPattern>,
+    pub vs: _VerbalizedSampling,
 }
 
 impl Default for SessionDistiller {
@@ -222,7 +222,7 @@ impl SessionDistiller {
             session_logs_dir: home.join(".neotrix").join("session-logs"),
             agents_path: PathBuf::from("AGENTS.md"),
             patterns: Vec::new(),
-            vs: VerbalizedSampling::new(),
+            vs: _VerbalizedSampling::new(),
         }
     }
 
@@ -231,7 +231,7 @@ impl SessionDistiller {
             session_logs_dir,
             agents_path,
             patterns: Vec::new(),
-            vs: VerbalizedSampling::new(),
+            vs: _VerbalizedSampling::new(),
         }
     }
 
@@ -255,7 +255,7 @@ impl SessionDistiller {
         logs
     }
 
-    pub fn extract_patterns(&mut self, logs: &[(String, String)]) -> Vec<SessionPattern> {
+    pub fn extract_patterns(&mut self, logs: &[(String, String)]) -> Vec<_SessionPattern> {
         let mut pattern_map: HashMap<String, (String, Vec<String>, bool)> = HashMap::new();
 
         // Pattern: parallel execution ("同步执行")
@@ -312,9 +312,9 @@ impl SessionDistiller {
             }
         }
 
-        let mut patterns: Vec<SessionPattern> = pattern_map
+        let mut patterns: Vec<_SessionPattern> = pattern_map
             .into_iter()
-            .map(|(name, (desc, sessions, actionable))| SessionPattern {
+            .map(|(name, (desc, sessions, actionable))| _SessionPattern {
                 name,
                 description: desc,
                 frequency: sessions.len() as u32,
@@ -328,7 +328,7 @@ impl SessionDistiller {
         patterns
     }
 
-    pub fn generate_suggestions(&mut self, patterns: &[SessionPattern]) -> Vec<String> {
+    pub fn generate_suggestions(&mut self, patterns: &[_SessionPattern]) -> Vec<String> {
         let mut suggestions = Vec::new();
 
         for p in patterns {
@@ -356,12 +356,12 @@ impl SessionDistiller {
         }
 
         // VS diversity injection: repeated patterns yield duplicate suggestion
-        // content, which triggers VerbalizedSampling diversification instead of
+        // content, which triggers _VerbalizedSampling diversification instead of
         // collapsing to a single answer (R-P42: wired into the existing dedup path).
-        self.vs.apply_to_patterns(patterns, &suggestions)
+        self.vs._apply_to_patterns(patterns, &suggestions)
     }
 
-    pub fn vs_stats(&self) -> (usize, usize) {
+    pub(crate) fn _vs_stats(&self) -> (usize, usize) {
         (self.vs.sampled, self.vs.used)
     }
 
@@ -378,7 +378,7 @@ impl SessionDistiller {
         }
     }
 
-    pub fn update_agents_md(&self) -> Result<(), String> {
+    pub(crate) fn _update_agents_md(&self) -> Result<(), String> {
         use std::io::Write;
 
         let now_secs = SystemTime::now()
@@ -421,10 +421,10 @@ impl SessionDistiller {
         Ok(())
     }
 
-    pub fn distill_and_write(&mut self) -> Result<DistillationReport, String> {
+    pub(crate) fn _distill_and_write(&mut self) -> Result<DistillationReport, String> {
         let report = self.generate_distillation_report();
         self.patterns = report.patterns.clone();
-        self.update_agents_md()?;
+        self._update_agents_md()?;
         Ok(report)
     }
 }
@@ -628,8 +628,8 @@ mod tests {
 
     #[test]
     fn test_vs_candidates_prompt() {
-        let vs = VerbalizedSampling::new();
-        let prompt = vs.candidates_prompt("write a limerick");
+        let vs = _VerbalizedSampling::new();
+        let prompt = vs._candidates_prompt("write a limerick");
         assert!(prompt.contains("probabilities"));
         assert!(prompt.contains("5"));
         assert!(prompt.contains("write a limerick"));
@@ -637,9 +637,9 @@ mod tests {
 
     #[test]
     fn test_vs_parse_candidates_normalizes() {
-        let vs = VerbalizedSampling::new();
+        let vs = _VerbalizedSampling::new();
         let raw = "1. rust pun (p=0.5)\n2. inside joke 0.3\n3. dad joke (30%)\n";
-        let candidates = vs.parse_candidates(raw);
+        let candidates = vs._parse_candidates(raw);
         assert_eq!(candidates.len(), 3);
         assert!(candidates[0].0.contains("rust pun"));
         assert!(candidates[1].0.contains("inside joke"));
@@ -650,11 +650,11 @@ mod tests {
 
     #[test]
     fn test_vs_parse_candidates_malformed() {
-        let vs = VerbalizedSampling::new();
-        assert!(vs.parse_candidates("no candidates here, just garbage").is_empty());
-        assert!(vs.parse_candidates("").is_empty());
-        assert!(vs.parse_candidates("1. no probability attached").is_empty());
-        assert!(vs.parse_candidates("1. zero probability (p=0)\n2. neg (p=-0.5)").is_empty());
+        let vs = _VerbalizedSampling::new();
+        assert!(vs._parse_candidates("no candidates here, just garbage").is_empty());
+        assert!(vs._parse_candidates("").is_empty());
+        assert!(vs._parse_candidates("1. no probability attached").is_empty());
+        assert!(vs._parse_candidates("1. zero probability (p=0)\n2. neg (p=-0.5)").is_empty());
     }
 
     #[test]
@@ -664,25 +664,25 @@ mod tests {
             ("mid".to_string(), 0.05),
             ("rest".to_string(), 0.05),
         ];
-        let mut vs = VerbalizedSampling::with_seed(42);
+        let mut vs = _VerbalizedSampling::_with_seed(42);
         assert_eq!(vs.sample(candidates.clone()).unwrap(), "top");
         assert_eq!(vs.sampled, 1);
         // Same seed repeats the same pick deterministically.
-        let mut again = VerbalizedSampling::with_seed(42);
+        let mut again = _VerbalizedSampling::_with_seed(42);
         assert_eq!(again.sample(candidates).unwrap(), "top");
     }
 
     #[test]
     fn test_vs_sample_empty() {
-        let mut vs = VerbalizedSampling::new();
+        let mut vs = _VerbalizedSampling::new();
         assert!(vs.sample(Vec::new()).is_none());
         assert_eq!(vs.sampled, 1);
     }
 
     #[test]
     fn test_vs_apply_to_patterns() {
-        let mut vs = VerbalizedSampling::new();
-        let patterns = vec![SessionPattern {
+        let mut vs = _VerbalizedSampling::new();
+        let patterns = vec![_SessionPattern {
             name: "parallel_dispatch".to_string(),
             description: "d".to_string(),
             frequency: 2,
@@ -694,7 +694,7 @@ mod tests {
             "use Task tool".to_string(),
             "unique".to_string(),
         ];
-        let out = vs.apply_to_patterns(&patterns, &suggestions);
+        let out = vs._apply_to_patterns(&patterns, &suggestions);
         assert_eq!(out.len(), 3);
         assert_eq!(out[0], "use Task tool");
         assert_eq!(out[1], "[VS] use Task tool");
@@ -705,7 +705,7 @@ mod tests {
     #[test]
     fn test_generate_suggestions_vs_wiring() {
         let mut d = SessionDistiller::new();
-        let p = SessionPattern {
+        let p = _SessionPattern {
             name: "parallel_dispatch".to_string(),
             description: "d".to_string(),
             frequency: 2,
@@ -715,15 +715,15 @@ mod tests {
         let suggestions = d.generate_suggestions(&[p.clone(), p]);
         assert_eq!(suggestions.len(), 2);
         assert_eq!(suggestions[1], format!("[VS] {}", suggestions[0]));
-        assert_eq!(d.vs_stats(), (0, 1));
+        assert_eq!(d._vs_stats(), (0, 1));
     }
 
     #[test]
     fn test_vs_stats() {
         let mut d = SessionDistiller::new();
-        assert_eq!(d.vs_stats(), (0, 0));
+        assert_eq!(d._vs_stats(), (0, 0));
         let _ = d.vs.sample(vec![("a".to_string(), 1.0)]);
-        let _ = d.vs.apply_to_patterns(&[], &["x".to_string(), "x".to_string()]);
-        assert_eq!(d.vs_stats(), (1, 1));
+        let _ = d.vs._apply_to_patterns(&[], &["x".to_string(), "x".to_string()]);
+        assert_eq!(d._vs_stats(), (1, 1));
     }
 }

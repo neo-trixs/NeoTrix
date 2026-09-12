@@ -10,18 +10,18 @@
 use serde::{Deserialize, Serialize};
 
 /// 黄金比例频率架构
-pub struct GoldenRatioFrequencyArchitecture {
+pub(crate) struct _GoldenRatioFrequencyArchitecture {
     fundamental_frequency: f64,
     phi: f64,
-    frequency_bands: Vec<GoldenBand>,
-    fibonacci_couplings: Vec<FibonacciCoupling>,
-    config: GoldenRatioConfig,
-    stats: GoldenRatioStats,
+    _frequency_bands: Vec<_GoldenBand>,
+    _fibonacci_couplings: Vec<_FibonacciCoupling>,
+    config: _GoldenRatioConfig,
+    stats: _GoldenRatioStats,
 }
 
 /// 黄金比例配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoldenRatioConfig {
+pub(crate) struct _GoldenRatioConfig {
     pub base_frequency_hz: f64,
     pub phi: f64,
     pub max_harmonics: usize,
@@ -29,7 +29,7 @@ pub struct GoldenRatioConfig {
     pub enable_noble_positions: bool,
 }
 
-impl Default for GoldenRatioConfig {
+impl Default for _GoldenRatioConfig {
     fn default() -> Self {
         Self {
             base_frequency_hz: 7.6,
@@ -43,11 +43,11 @@ impl Default for GoldenRatioConfig {
 
 /// 黄金比例频带
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoldenBand {
+pub(crate) struct _GoldenBand {
     pub band_id: String,
     pub n: i32,
     pub frequency_hz: f64,
-    pub band_type: BandType,
+    pub band_type: _BandType,
     pub stability: f64,
     pub fibonacci_index: Option<usize>,
     pub noble_position: bool,
@@ -56,7 +56,7 @@ pub struct GoldenBand {
 /// 频带类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum BandType {
+pub(crate) enum _BandType {
     UltraSlow,
     Delta,
     Theta,
@@ -68,7 +68,7 @@ pub enum BandType {
 
 /// Fibonacci 耦合
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FibonacciCoupling {
+pub(crate) struct _FibonacciCoupling {
     pub coupling_id: String,
     pub source_band: String,
     pub target_band: String,
@@ -79,10 +79,10 @@ pub struct FibonacciCoupling {
 
 /// 黄金比例统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoldenRatioStats {
+pub(crate) struct _GoldenRatioStats {
     pub total_bands: u64,
     pub noble_positions: u64,
-    pub fibonacci_couplings: u64,
+    pub _fibonacci_couplings: u64,
     pub avg_stability: f64,
     pub frequency_coverage: f64,
     pub segregation_integration_balance: f64,
@@ -90,7 +90,7 @@ pub struct GoldenRatioStats {
 
 /// 共振对齐结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResonanceAlignment {
+pub(crate) struct _ResonanceAlignment {
     pub aligned: bool,
     pub alignment_score: f64,
     pub active_bands: Vec<String>,
@@ -98,19 +98,19 @@ pub struct ResonanceAlignment {
     pub consciousness_potential: f64,
 }
 
-impl GoldenRatioFrequencyArchitecture {
+impl _GoldenRatioFrequencyArchitecture {
     /// 创建新的黄金比例频率架构
     pub fn new() -> Self {
         let mut arch = Self {
             fundamental_frequency: 7.6,
             phi: 1.618033988749895,
-            frequency_bands: Vec::new(),
-            fibonacci_couplings: Vec::new(),
-            config: GoldenRatioConfig::default(),
-            stats: GoldenRatioStats {
+            _frequency_bands: Vec::new(),
+            _fibonacci_couplings: Vec::new(),
+            config: _GoldenRatioConfig::default(),
+            stats: _GoldenRatioStats {
                 total_bands: 0,
                 noble_positions: 0,
-                fibonacci_couplings: 0,
+                _fibonacci_couplings: 0,
                 avg_stability: 0.0,
                 frequency_coverage: 0.0,
                 segregation_integration_balance: 0.0,
@@ -126,19 +126,19 @@ impl GoldenRatioFrequencyArchitecture {
             let frequency = self.fundamental_frequency * self.phi.powi(n as i32);
 
             let band_type = match frequency {
-                f if f < 0.5 => BandType::UltraSlow,
-                f if f < 4.0 => BandType::Delta,
-                f if f < 8.0 => BandType::Theta,
-                f if f < 13.0 => BandType::Alpha,
-                f if f < 30.0 => BandType::Beta,
-                f if f < 100.0 => BandType::Gamma,
-                _ => BandType::HighGamma,
+                f if f < 0.5 => _BandType::UltraSlow,
+                f if f < 4.0 => _BandType::Delta,
+                f if f < 8.0 => _BandType::Theta,
+                f if f < 13.0 => _BandType::Alpha,
+                f if f < 30.0 => _BandType::Beta,
+                f if f < 100.0 => _BandType::Gamma,
+                _ => _BandType::HighGamma,
             };
 
             let fibonacci_index = Self::closest_fibonacci(n);
             let noble_position = Self::is_noble_position(n as f64);
 
-            let band = GoldenBand {
+            let band = _GoldenBand {
                 band_id: uuid::Uuid::new_v4().to_string(),
                 n: n as i32,
                 frequency_hz: frequency,
@@ -148,7 +148,7 @@ impl GoldenRatioFrequencyArchitecture {
                 noble_position,
             };
 
-            self.frequency_bands.push(band);
+            self._frequency_bands.push(band);
             self.stats.total_bands += 1;
 
             if noble_position {
@@ -170,14 +170,14 @@ impl GoldenRatioFrequencyArchitecture {
     }
 
     /// 创建 Fibonacci 耦合
-    pub fn create_fibonacci_coupling(&mut self, source_idx: usize, target_idx: usize) -> FibonacciCoupling {
-        let source = &self.frequency_bands[source_idx];
-        let target = &self.frequency_bands[target_idx];
+    pub(crate) fn _create_fibonacci_coupling(&mut self, source_idx: usize, target_idx: usize) -> _FibonacciCoupling {
+        let source = &self._frequency_bands[source_idx];
+        let target = &self._frequency_bands[target_idx];
 
         let ratio = target.frequency_hz / source.frequency_hz;
         let closest_fib = Self::find_closest_fibonacci_ratio(ratio);
 
-        let coupling = FibonacciCoupling {
+        let coupling = _FibonacciCoupling {
             coupling_id: uuid::Uuid::new_v4().to_string(),
             source_band: source.band_id.clone(),
             target_band: target.band_id.clone(),
@@ -186,8 +186,8 @@ impl GoldenRatioFrequencyArchitecture {
             phase_locking: true,
         };
 
-        self.fibonacci_couplings.push(coupling.clone());
-        self.stats.fibonacci_couplings += 1;
+        self._fibonacci_couplings.push(coupling.clone());
+        self.stats._fibonacci_couplings += 1;
 
         coupling
     }
@@ -202,29 +202,29 @@ impl GoldenRatioFrequencyArchitecture {
     }
 
     /// 评估共振对齐
-    pub fn evaluate_alignment(&self) -> ResonanceAlignment {
-        let active_bands: Vec<String> = self.frequency_bands.iter()
+    pub(crate) fn _evaluate_alignment(&self) -> _ResonanceAlignment {
+        let active_bands: Vec<String> = self._frequency_bands.iter()
             .filter(|b| b.stability > 0.7)
             .map(|b| b.band_id.clone())
             .collect();
 
-        let alignment_score = if !self.frequency_bands.is_empty() {
-            self.frequency_bands.iter()
+        let alignment_score = if !self._frequency_bands.is_empty() {
+            self._frequency_bands.iter()
                 .map(|b| b.stability)
-                .sum::<f64>() / self.frequency_bands.len() as f64
+                .sum::<f64>() / self._frequency_bands.len() as f64
         } else {
             0.0
         };
 
-        let coupling_efficiency = if !self.fibonacci_couplings.is_empty() {
-            self.fibonacci_couplings.iter()
+        let coupling_efficiency = if !self._fibonacci_couplings.is_empty() {
+            self._fibonacci_couplings.iter()
                 .map(|c| c.coupling_strength)
-                .sum::<f64>() / self.fibonacci_couplings.len() as f64
+                .sum::<f64>() / self._fibonacci_couplings.len() as f64
         } else {
             0.0
         };
 
-        ResonanceAlignment {
+        _ResonanceAlignment {
             aligned: alignment_score > 0.7,
             alignment_score,
             active_bands,
@@ -234,17 +234,17 @@ impl GoldenRatioFrequencyArchitecture {
     }
 
     /// 获取所有频带
-    pub fn frequency_bands(&self) -> &[GoldenBand] {
-        &self.frequency_bands
+    pub(crate) fn _frequency_bands(&self) -> &[_GoldenBand] {
+        &self._frequency_bands
     }
 
     /// 获取所有 Fibonacci 耦合
-    pub fn fibonacci_couplings(&self) -> &[FibonacciCoupling] {
-        &self.fibonacci_couplings
+    pub(crate) fn _fibonacci_couplings(&self) -> &[_FibonacciCoupling] {
+        &self._fibonacci_couplings
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &GoldenRatioStats {
+    pub fn stats(&self) -> &_GoldenRatioStats {
         &self.stats
     }
 }

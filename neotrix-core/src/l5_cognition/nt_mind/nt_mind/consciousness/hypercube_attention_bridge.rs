@@ -49,7 +49,7 @@ impl AttentionHypercubeBridge {
         let mut results: Vec<AttentionRecallItem> = Vec::new();
 
         for head in active {
-            let Some(dim) = self.domain_dimension(&head.domain) else { continue };
+            let Some(dim) = self._domain_dimension(&head.domain) else { continue };
             let mut coord = HyperCoord::with(dim, 0.9);
             coord.set(DimensionAxis::Abstraction, 0.5);
 
@@ -73,7 +73,7 @@ impl AttentionHypercubeBridge {
         results
     }
 
-    pub fn domain_dimension(&self, domain: &AttentionDomain) -> Option<DimensionAxis> {
+    pub(crate) fn _domain_dimension(&self, domain: &AttentionDomain) -> Option<DimensionAxis> {
         self.domain_to_dimension.iter()
             .find(|(d, _)| d == domain)
             .map(|(_, axis)| *axis)
@@ -124,7 +124,7 @@ mod tests {
         let bridge = make_bridge();
         for domain in AttentionDomain::all() {
             assert!(
-                bridge.domain_dimension(&domain).is_some(),
+                bridge._domain_dimension(&domain).is_some(),
                 "domain {:?} is missing a dimension mapping",
                 domain
             );
@@ -135,16 +135,16 @@ mod tests {
     fn test_domain_dimension_mapping() {
         let bridge = make_bridge();
 
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::Code), Some(DimensionAxis::CodeUnderstanding));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::Planning), Some(DimensionAxis::SystemDesign));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::Creativity), Some(DimensionAxis::Creativity));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::PatternMatch), Some(DimensionAxis::Abstraction));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::Semantic), Some(DimensionAxis::KnowledgeRetrieval));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::Temporal), Some(DimensionAxis::Time));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::SelfReflection), Some(DimensionAxis::Safety));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::ToolUse), Some(DimensionAxis::Performance));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::GoalAlignment), Some(DimensionAxis::Agency));
-        assert_eq!(bridge.domain_dimension(&AttentionDomain::RiskAssessment), Some(DimensionAxis::Certainty));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::Code), Some(DimensionAxis::CodeUnderstanding));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::Planning), Some(DimensionAxis::SystemDesign));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::Creativity), Some(DimensionAxis::Creativity));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::PatternMatch), Some(DimensionAxis::Abstraction));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::Semantic), Some(DimensionAxis::KnowledgeRetrieval));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::Temporal), Some(DimensionAxis::Time));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::SelfReflection), Some(DimensionAxis::Safety));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::ToolUse), Some(DimensionAxis::Performance));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::GoalAlignment), Some(DimensionAxis::Agency));
+        assert_eq!(bridge._domain_dimension(&AttentionDomain::RiskAssessment), Some(DimensionAxis::Certainty));
     }
 
     #[test]

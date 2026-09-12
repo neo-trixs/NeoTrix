@@ -5,11 +5,11 @@ use serde_json::Value;
 use super::types::*;
 
 pub struct LspManager {
-    pub servers: HashMap<String, LspSession>,
+    pub servers: HashMap<String, _LspSession>,
     configs: Vec<LspServerConfig>,
 }
 
-pub struct LspSession {
+pub(crate) struct _LspSession {
     pub language_id: String,
     process: Option<Child>,
     seq_id: u64,
@@ -55,7 +55,7 @@ impl LspManager {
         ]
     }
 
-    pub fn detect_and_start(&mut self, file_path: &str) -> Option<String> {
+    pub(crate) fn _detect_and_start(&mut self, file_path: &str) -> Option<String> {
         let configs = self.configs.clone();
         for config in &configs {
             if self.servers.contains_key(&config.name) {
@@ -81,7 +81,7 @@ impl LspManager {
             .stderr(Stdio::null())
             .spawn()
             .ok()?;
-        let session = LspSession {
+        let session = _LspSession {
             language_id: config.language_id.clone(),
             process: Some(process),
             seq_id: 0,
@@ -97,7 +97,7 @@ impl LspManager {
         })
     }
 
-    pub fn has_server(&self, name: &str) -> bool {
+    pub(crate) fn _has_server(&self, name: &str) -> bool {
         self.servers.contains_key(name)
     }
 
@@ -142,7 +142,7 @@ impl LspManager {
         None
     }
 
-    pub fn shutdown_all(&mut self) {
+    pub(crate) fn _shutdown_all(&mut self) {
         for (_, session) in self.servers.iter_mut() {
             if let Some(ref mut p) = session.process {
                 let _ = p.kill();
@@ -155,7 +155,7 @@ impl LspManager {
 
 impl Drop for LspManager {
     fn drop(&mut self) {
-        self.shutdown_all();
+        self._shutdown_all();
     }
 }
 
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_has_server_unknown() {
         let mgr = LspManager::new();
-        assert!(!mgr.has_server("nonexistent-server"));
+        assert!(!mgr._has_server("nonexistent-server"));
     }
 
     #[test]
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn test_shutdown_all_empty() {
         let mut mgr = LspManager::new();
-        mgr.shutdown_all();
+        mgr._shutdown_all();
         assert!(mgr.servers.is_empty());
     }
 
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn test_detect_and_start_unknown_file() {
         let mut mgr = LspManager::new();
-        assert!(mgr.detect_and_start("/tmp/random.xyz").is_none());
+        assert!(mgr._detect_and_start("/tmp/random.xyz").is_none());
     }
 
     #[test]

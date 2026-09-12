@@ -10,12 +10,12 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// WikiSkill 三层知识架构
-pub struct WikiSkillThreeLayerKB {
-    raw_layer: RawLayer,
+pub(crate) struct _WikiSkillThreeLayerKB {
+    raw_layer: _RawLayer,
     knowledge_layer: KnowledgeLayer,
-    skills_layer: SkillsLayer,
+    _skills_layer: _SkillsLayer,
     config: WikiSkillConfig,
-    stats: WikiSkillStats,
+    stats: _WikiSkillStats,
 }
 
 /// WikiSkill 配置
@@ -42,14 +42,14 @@ impl Default for WikiSkillConfig {
 
 /// 原始层 (Raw Layer)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawLayer {
-    pub entries: Vec<RawEntry>,
-    pub stats: LayerStats,
+pub(crate) struct _RawLayer {
+    pub entries: Vec<_RawEntry>,
+    pub stats: _LayerStats,
 }
 
 /// 原始条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawEntry {
+pub(crate) struct _RawEntry {
     pub entry_id: String,
     pub content: String,
     pub source: String,
@@ -63,7 +63,7 @@ pub struct RawEntry {
 pub struct KnowledgeLayer {
     pub entries: Vec<KnowledgeEntry>,
     pub relations: Vec<KnowledgeRelation>,
-    pub stats: LayerStats,
+    pub stats: _LayerStats,
 }
 
 /// 知识条目
@@ -90,9 +90,9 @@ pub struct KnowledgeRelation {
 
 /// 技能层 (Skills Layer)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SkillsLayer {
+pub(crate) struct _SkillsLayer {
     pub skills: Vec<Skill>,
-    pub stats: LayerStats,
+    pub stats: _LayerStats,
 }
 
 /// 技能
@@ -119,7 +119,7 @@ pub enum SkillType {
 
 /// 层统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayerStats {
+pub(crate) struct _LayerStats {
     pub total_entries: u64,
     pub promoted_entries: u64,
     pub avg_quality: f64,
@@ -127,7 +127,7 @@ pub struct LayerStats {
 
 /// WikiSkill 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WikiSkillStats {
+pub(crate) struct _WikiSkillStats {
     pub total_raw: u64,
     pub total_knowledge: u64,
     pub total_skills: u64,
@@ -144,13 +144,13 @@ pub struct EvolutionResult {
     pub message: String,
 }
 
-impl WikiSkillThreeLayerKB {
+impl _WikiSkillThreeLayerKB {
     /// 创建新的 WikiSkill 三层知识架构
     pub fn new() -> Self {
         Self {
-            raw_layer: RawLayer {
+            raw_layer: _RawLayer {
                 entries: Vec::new(),
-                stats: LayerStats {
+                stats: _LayerStats {
                     total_entries: 0,
                     promoted_entries: 0,
                     avg_quality: 0.0,
@@ -159,22 +159,22 @@ impl WikiSkillThreeLayerKB {
             knowledge_layer: KnowledgeLayer {
                 entries: Vec::new(),
                 relations: Vec::new(),
-                stats: LayerStats {
+                stats: _LayerStats {
                     total_entries: 0,
                     promoted_entries: 0,
                     avg_quality: 0.0,
                 },
             },
-            skills_layer: SkillsLayer {
+            _skills_layer: _SkillsLayer {
                 skills: Vec::new(),
-                stats: LayerStats {
+                stats: _LayerStats {
                     total_entries: 0,
                     promoted_entries: 0,
                     avg_quality: 0.0,
                 },
             },
             config: WikiSkillConfig::default(),
-            stats: WikiSkillStats {
+            stats: _WikiSkillStats {
                 total_raw: 0,
                 total_knowledge: 0,
                 total_skills: 0,
@@ -185,13 +185,13 @@ impl WikiSkillThreeLayerKB {
     }
 
     /// 添加原始条目
-    pub fn add_raw_entry(&mut self, entry: RawEntry) {
+    pub(crate) fn _add_raw_entry(&mut self, entry: _RawEntry) {
         self.raw_layer.entries.push(entry);
         self.stats.total_raw += 1;
     }
 
     /// 演进: 从原始层提升到知识层
-    pub fn promote_to_knowledge(&mut self, entry_id: &str) -> bool {
+    pub(crate) fn _promote_to_knowledge(&mut self, entry_id: &str) -> bool {
         if let Some(pos) = self.raw_layer.entries.iter().position(|e| e.entry_id == entry_id) {
             let raw_entry = self.raw_layer.entries.remove(pos);
 
@@ -217,7 +217,7 @@ impl WikiSkillThreeLayerKB {
     }
 
     /// 演进: 从知识层提升到技能层
-    pub fn promote_to_skill(&mut self, entry_id: &str, skill_type: SkillType) -> bool {
+    pub(crate) fn _promote_to_skill(&mut self, entry_id: &str, skill_type: SkillType) -> bool {
         if let Some(pos) = self.knowledge_layer.entries.iter().position(|e| e.entry_id == entry_id) {
             let knowledge_entry = self.knowledge_layer.entries.remove(pos);
 
@@ -231,7 +231,7 @@ impl WikiSkillThreeLayerKB {
                 success_rate: 0.0,
             };
 
-            self.skills_layer.skills.push(skill);
+            self._skills_layer.skills.push(skill);
             self.stats.total_skills += 1;
             self.knowledge_layer.stats.promoted_entries += 1;
 
@@ -252,7 +252,7 @@ impl WikiSkillThreeLayerKB {
             .collect();
 
         for entry_id in &raw_ids {
-            if self.promote_to_knowledge(entry_id) {
+            if self._promote_to_knowledge(entry_id) {
                 promoted_count += 1;
             }
         }
@@ -264,7 +264,7 @@ impl WikiSkillThreeLayerKB {
             .collect();
 
         for entry_id in &knowledge_ids {
-            if self.promote_to_skill(entry_id, SkillType::Task) {
+            if self._promote_to_skill(entry_id, SkillType::Task) {
                 new_skills.push(entry_id.clone());
             }
         }
@@ -279,7 +279,7 @@ impl WikiSkillThreeLayerKB {
     }
 
     /// 获取所有层
-    pub fn raw_layer(&self) -> &RawLayer {
+    pub fn raw_layer(&self) -> &_RawLayer {
         &self.raw_layer
     }
 
@@ -287,12 +287,12 @@ impl WikiSkillThreeLayerKB {
         &self.knowledge_layer
     }
 
-    pub fn skills_layer(&self) -> &SkillsLayer {
-        &self.skills_layer
+    pub(crate) fn _skills_layer(&self) -> &_SkillsLayer {
+        &self._skills_layer
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &WikiSkillStats {
+    pub fn stats(&self) -> &_WikiSkillStats {
         &self.stats
     }
 }

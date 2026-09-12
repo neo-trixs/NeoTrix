@@ -12,7 +12,7 @@ use crate::neotrix::nt_world_crawl::unified::UnifiedCrawler;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 /// 路由结果 — GWT 竞争 + 知识检索的产出
-pub struct RoutedContext {
+pub(crate) struct _RoutedContext {
     pub winning_topic: String,
     pub active_specialists: Vec<SpecialistType>,
     pub knowledge_lines: Vec<String>,
@@ -60,8 +60,8 @@ impl AttentionRouter {
         &mut self.workspace
     }
 
-    /// 主入口：分析上下文 → GWT 竞争 → 知识检索 → RoutedContext
-    pub fn route(&mut self, context: &str) -> RoutedContext {
+    /// 主入口：分析上下文 → GWT 竞争 → 知识检索 → _RoutedContext
+    pub fn route(&mut self, context: &str) -> _RoutedContext {
         let lower = context.to_lowercase();
         let specialist_salience = self.compute_salience(&lower);
 
@@ -94,15 +94,15 @@ impl AttentionRouter {
             let entries = self.retrieve_for_specialist(*st, context);
             for e in entries {
                 knowledge_lines
-                    .push(format!("[{}] {} ({})", st.short_name(), e.label, e.source));
+                    .push(format!("[{}] {} ({})", st._short_name(), e.label, e.source));
             }
         }
         // 真实 KB 知识补充 — KnowledgeRetriever 的实际数据源
-        self.append_kb_knowledge_lines(context, &mut knowledge_lines);
+        self._append_kb_knowledge_lines(context, &mut knowledge_lines);
 
         self.workspace.decay_all(0.3);
 
-        RoutedContext {
+        _RoutedContext {
             winning_topic: winner,
             active_specialists: active,
             knowledge_lines,
@@ -206,7 +206,7 @@ impl AttentionRouter {
 
     /// 从真实 KB 检索与上下文关联的知识条目 (title)。
     /// 未挂接 KB 或检索失败时返回空。
-    pub fn retrieve_kb(&self, context: &str, limit: usize) -> Vec<String> {
+    pub(crate) fn _retrieve_kb(&self, context: &str, limit: usize) -> Vec<String> {
         let kb = match self.kb.as_ref() {
             Some(kb) => kb,
             None => return Vec::new(),
@@ -222,11 +222,11 @@ impl AttentionRouter {
 
     /// 将真实 KB 检索结果并入路由上下文的知识行。
     /// 在 route() 中调用，使知识检索覆盖实际知识库而不仅是静态种子。
-    pub fn append_kb_knowledge_lines(&self, context: &str, lines: &mut Vec<String>) {
+    pub(crate) fn _append_kb_knowledge_lines(&self, context: &str, lines: &mut Vec<String>) {
         if self.kb.is_none() {
             return;
         }
-        for title in self.retrieve_kb(context, 4) {
+        for title in self._retrieve_kb(context, 4) {
             lines.push(format!("[KB] {}", title));
         }
     }
@@ -255,7 +255,7 @@ impl AttentionRouter {
     }
 
     /// Seed the nt_world_crawl with URLs from sparse hypercube domains
-    pub fn seed_nt_world_crawl_from_gaps(&self, nt_world_crawl: &mut UnifiedCrawler) {
+    pub(crate) fn _seed_nt_world_crawl_from_gaps(&self, nt_world_crawl: &mut UnifiedCrawler) {
         let sparse_topics = self.sparse_topics();
         for topic in sparse_topics {
             let url = format!("https://en.wikipedia.org/wiki/{}", topic.name());
@@ -270,7 +270,7 @@ impl AttentionRouter {
     }
 
     /// 吸收推理结果到超立方体
-    pub fn absorb_reasoning_result(
+    pub(crate) fn _absorb_reasoning_result(
         &mut self,
         topic: &str,
         _result: &str,
@@ -281,13 +281,13 @@ impl AttentionRouter {
     }
 
     /// Set the environment context for Life-Harness adaptation.
-    pub fn set_environment(&mut self, env: &str) {
+    pub(crate) fn _set_environment(&mut self, env: &str) {
         self.workspace.current_environment = Some(env.to_string());
     }
 
     /// Register a harness profile for the current environment.
     /// Returns true if the profile was registered and specialists got activation boosts.
-    pub fn register_harness_profile(&mut self, env: &str, profile: &crate::l5_cognition::nt_mind::nt_mind::self_iterating::harness_adapter::HarnessProfile) -> bool {
+    pub(crate) fn _register_harness_profile(&mut self, env: &str, profile: &crate::l5_cognition::nt_mind::nt_mind::self_iterating::harness_adapter::HarnessProfile) -> bool {
         self.workspace.harness_adapter.register_profile(env, profile.clone());
         let activated = self.workspace.harness_adapter.activate(env).is_some();
         if activated {
@@ -302,7 +302,7 @@ impl AttentionRouter {
         activated
     }
 
-    pub fn harness_adapter_mut(&mut self) -> &mut HarnessAdapter {
+    pub(crate) fn _harness_adapter_mut(&mut self) -> &mut HarnessAdapter {
         &mut self.workspace.harness_adapter
     }
 
@@ -347,7 +347,7 @@ impl AttentionRouter {
     }
 
     /// 构建可注入 ReasoningEngine prompt 的知识上下文
-    pub fn build_knowledge_prompt_suffix(&self, context: &RoutedContext) -> String {
+    pub fn build_knowledge_prompt_suffix(&self, context: &_RoutedContext) -> String {
         if context.knowledge_lines.is_empty() {
             return String::new();
         }
@@ -478,7 +478,7 @@ impl SpecialistType {
         }
     }
 
-    pub fn short_name(&self) -> &'static str {
+    pub(crate) fn _short_name(&self) -> &'static str {
         match self {
             SpecialistType::PatternMatcher => "PM",
             SpecialistType::AnomalyDetector => "AD",
@@ -569,7 +569,7 @@ mod tests {
     fn test_absorb_reasoning_result_adds_entry() {
         let mut router = AttentionRouter::new();
         let before = router.bridge.hypercube.cell_count();
-        router.absorb_reasoning_result("test-topic", "test result", "test-source");
+        router._absorb_reasoning_result("test-topic", "test result", "test-source");
         assert_eq!(router.bridge.hypercube.cell_count(), before + 1);
     }
 
@@ -613,12 +613,12 @@ mod tests {
     #[test]
     fn test_specialist_type_name_and_shortname() {
         assert_eq!(SpecialistType::PatternMatcher.name(), "pattern-matcher");
-        assert_eq!(SpecialistType::AnomalyDetector.short_name(), "AD");
-        assert_eq!(SpecialistType::KnowledgeIntegrator.short_name(), "KI");
-        assert_eq!(SpecialistType::GoalPrioritizer.short_name(), "GP");
-        assert_eq!(SpecialistType::RiskAssessor.short_name(), "RA");
-        assert_eq!(SpecialistType::CreativityGenerator.short_name(), "CG");
-        assert_eq!(SpecialistType::ReflectionEngine.short_name(), "RE");
+        assert_eq!(SpecialistType::AnomalyDetector._short_name(), "AD");
+        assert_eq!(SpecialistType::KnowledgeIntegrator._short_name(), "KI");
+        assert_eq!(SpecialistType::GoalPrioritizer._short_name(), "GP");
+        assert_eq!(SpecialistType::RiskAssessor._short_name(), "RA");
+        assert_eq!(SpecialistType::CreativityGenerator._short_name(), "CG");
+        assert_eq!(SpecialistType::ReflectionEngine._short_name(), "RE");
     }
 
     #[test]
@@ -641,7 +641,7 @@ mod tests {
     fn test_new_router_has_no_kb() {
         let router = AttentionRouter::new();
         assert!(router.kb.is_none());
-        assert!(router.retrieve_kb("test", 4).is_empty());
+        assert!(router._retrieve_kb("test", 4).is_empty());
     }
 
     #[test]
@@ -662,7 +662,7 @@ mod tests {
         let mut router = AttentionRouter::new();
         router.attach_kb(kb);
         assert!(router.kb.is_some());
-        let titles = router.retrieve_kb("wire test topic", 4);
+        let titles = router._retrieve_kb("wire test topic", 4);
         assert!(
             titles.iter().any(|t| t.contains("KB-Wire-Test-Topic")),
             "expected KB node retrieved, got {:?}",
@@ -675,7 +675,7 @@ mod tests {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
         let mut lines: Vec<String> = Vec::new();
-        router.append_kb_knowledge_lines("test", &mut lines);
+        router._append_kb_knowledge_lines("test", &mut lines);
         assert!(lines.is_empty());
         let result = router.route("test context");
         assert!(result.knowledge_lines.iter().all(|l| !l.starts_with("[KB]")));

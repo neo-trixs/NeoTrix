@@ -10,7 +10,7 @@ pub struct Extrapolator {
     /// 历史数据点
     pub data_points: Vec<DataPoint>,
     /// 外推历史
-    pub history: Vec<ExtrapolationRecord>,
+    pub history: Vec<_ExtrapolationRecord>,
 }
 
 /// 数据点
@@ -23,18 +23,18 @@ pub struct DataPoint {
 
 /// 外推记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtrapolationRecord {
+pub(crate) struct _ExtrapolationRecord {
     pub id: String,
     pub cycle: u32,
-    pub extrapolation_type: ExtrapolationType,
+    pub extrapolation_type: _ExtrapolationType,
     pub input_points: Vec<DataPoint>,
-    pub output: ExtrapolationResult,
+    pub output: _ExtrapolationResult,
     pub timestamp: String,
 }
 
 /// 外推类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ExtrapolationType {
+pub(crate) enum _ExtrapolationType {
     Linear,
     Polynomial,
     Exponential,
@@ -44,7 +44,7 @@ pub enum ExtrapolationType {
 
 /// 外推结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtrapolationResult {
+pub(crate) struct _ExtrapolationResult {
     pub predicted_value: f64,
     pub confidence: f64,
     pub trend: TrendDirection,
@@ -70,12 +70,12 @@ impl Extrapolator {
     }
 
     /// 添加数据点
-    pub fn add_data_point(&mut self, point: DataPoint) {
+    pub(crate) fn _add_data_point(&mut self, point: DataPoint) {
         self.data_points.push(point);
     }
 
     /// 线性外推
-    pub fn linear_extrapolate(&mut self, cycle: u32, steps: u32) -> ExtrapolationResult {
+    pub(crate) fn _linear_extrapolate(&mut self, cycle: u32, steps: u32) -> _ExtrapolationResult {
         let result = if self.data_points.len() >= 2 {
             let n = self.data_points.len() as f64;
             let sum_x: f64 = (0..self.data_points.len() as u64).sum::<u64>() as f64;
@@ -90,7 +90,7 @@ impl Extrapolator {
 
             let predicted = slope * (self.data_points.len() as f64 + steps as f64) + intercept;
             
-            ExtrapolationResult {
+            _ExtrapolationResult {
                 predicted_value: predicted,
                 confidence: 0.8,
                 trend: if slope > 0.01 { TrendDirection::Increasing }
@@ -99,7 +99,7 @@ impl Extrapolator {
                 next_points: vec![],
             }
         } else {
-            ExtrapolationResult {
+            _ExtrapolationResult {
                 predicted_value: 0.0,
                 confidence: 0.3,
                 trend: TrendDirection::Unknown,
@@ -108,10 +108,10 @@ impl Extrapolator {
         };
 
         // 记录
-        let record = ExtrapolationRecord {
+        let record = _ExtrapolationRecord {
             id: format!("ext_{}", uuid::Uuid::new_v4()),
             cycle,
-            extrapolation_type: ExtrapolationType::Linear,
+            extrapolation_type: _ExtrapolationType::Linear,
             input_points: self.data_points.clone(),
             output: result.clone(),
             timestamp: chrono::Utc::now().to_rfc3339(),
@@ -122,8 +122,8 @@ impl Extrapolator {
     }
 
     /// 获取统计
-    pub fn stats(&self) -> ExtrapolatorStats {
-        ExtrapolatorStats {
+    pub fn stats(&self) -> _ExtrapolatorStats {
+        _ExtrapolatorStats {
             total_data_points: self.data_points.len(),
             total_extrapolations: self.history.len(),
         }
@@ -131,12 +131,12 @@ impl Extrapolator {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtrapolatorStats {
+pub(crate) struct _ExtrapolatorStats {
     pub total_data_points: usize,
     pub total_extrapolations: usize,
 }
 
-impl std::fmt::Display for ExtrapolatorStats {
+impl std::fmt::Display for _ExtrapolatorStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Extrapolator: {} data points, {} extrapolations",
             self.total_data_points, self.total_extrapolations)

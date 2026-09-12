@@ -102,7 +102,7 @@ impl TaskContract {
     }
 
     /// C4: 验收通过 (成功)
-    pub fn accept_mut(&mut self) {
+    pub(crate) fn _accept_mut(&mut self) {
         self.state = ContractState::InFlight;
         self.touch();
     }
@@ -140,7 +140,7 @@ impl TaskContract {
     }
 
     /// 是否已超时 (基于 timeout_secs)
-    pub fn is_timed_out(&self) -> bool {
+    pub(crate) fn _is_timed_out(&self) -> bool {
         if self.timeout_secs == 0 {
             return false;
         }
@@ -149,7 +149,7 @@ impl TaskContract {
     }
 
     /// 合法状态迁移校验
-    pub fn can_transition_to(&self, next: ContractState) -> bool {
+    pub(crate) fn _can_transition_to(&self, next: ContractState) -> bool {
         if self.state.is_terminal() {
             return false; // 终态不可再迁移
         }
@@ -162,7 +162,7 @@ impl TaskContract {
     }
 
     /// 从 TodoTask 生成契约 (复用已有拆解数据类型)
-    pub fn from_todo(todo: &TodoTask) -> Self {
+    pub(crate) fn _from_todo(todo: &TodoTask) -> Self {
         Self::define(&todo.description, &todo.task_type, todo.priority)
     }
 
@@ -314,10 +314,10 @@ mod tests {
     #[test]
     fn test_legal_transitions() {
         let c = TaskContract::define("t", "x", 0);
-        assert!(c.can_transition_to(ContractState::Accepted));
-        assert!(!c.can_transition_to(ContractState::Done)); // Defined → Done 非法
+        assert!(c._can_transition_to(ContractState::Accepted));
+        assert!(!c._can_transition_to(ContractState::Done)); // Defined → Done 非法
         let done = c.accept(vec![]).start().complete(false);
-        assert!(!done.can_transition_to(ContractState::InFlight)); // 终态不可迁移
+        assert!(!done._can_transition_to(ContractState::InFlight)); // 终态不可迁移
     }
 
     #[test]
@@ -332,7 +332,7 @@ mod tests {
         let mut c = TaskContract::define("t", "x", 0);
         c.timeout_secs = 1;
         c.updated_at = chrono::Utc::now().timestamp() - 5;
-        assert!(c.is_timed_out());
+        assert!(c._is_timed_out());
     }
 
     #[test]

@@ -28,7 +28,7 @@ impl EvolutionTrigger {
 }
 
 #[derive(Debug, Clone)]
-pub struct FixTriggerRecord {
+pub(crate) struct _FixTriggerRecord {
     pub module_name: String,
     pub issue_type: String,
     pub applied_patch: String,
@@ -37,7 +37,7 @@ pub struct FixTriggerRecord {
 }
 
 #[derive(Debug, Clone)]
-pub struct DerivedSkillRecord {
+pub(crate) struct _DerivedSkillRecord {
     pub parent_skill: String,
     pub child_skill: String,
     pub domain: String,
@@ -46,7 +46,7 @@ pub struct DerivedSkillRecord {
 }
 
 #[derive(Debug, Clone)]
-pub struct CapturedPatternRecord {
+pub(crate) struct _CapturedPatternRecord {
     pub pattern_name: String,
     pub source: String,
     pub frequency: usize,
@@ -55,9 +55,9 @@ pub struct CapturedPatternRecord {
 
 #[derive(Clone)]
 pub struct OpenSpaceEvolveStage {
-    pub fix_history: Vec<FixTriggerRecord>,
-    pub derived_history: Vec<DerivedSkillRecord>,
-    pub captured_patterns: Vec<CapturedPatternRecord>,
+    pub fix_history: Vec<_FixTriggerRecord>,
+    pub derived_history: Vec<_DerivedSkillRecord>,
+    pub captured_patterns: Vec<_CapturedPatternRecord>,
     pub max_history: usize,
     pub fix_enabled: bool,
     pub derived_enabled: bool,
@@ -98,7 +98,7 @@ impl OpenSpaceEvolveStage {
         self
     }
 
-    fn run_fix_trigger(&self, brain: &SelfIteratingBrain) -> Vec<FixTriggerRecord> {
+    fn run_fix_trigger(&self, brain: &SelfIteratingBrain) -> Vec<_FixTriggerRecord> {
         let mut records = Vec::new();
         if !self.fix_enabled {
             return records;
@@ -117,7 +117,7 @@ impl OpenSpaceEvolveStage {
             let issue_type = format!("low_capability_{:.3}", val);
             let applied_patch = "boost_to_0.2".to_string();
             let success = *val < 0.15;
-            records.push(FixTriggerRecord {
+            records.push(_FixTriggerRecord {
                 module_name,
                 issue_type,
                 applied_patch,
@@ -134,7 +134,7 @@ impl OpenSpaceEvolveStage {
         records
     }
 
-    fn run_derived_trigger(&self, brain: &SelfIteratingBrain) -> Vec<DerivedSkillRecord> {
+    fn run_derived_trigger(&self, brain: &SelfIteratingBrain) -> Vec<_DerivedSkillRecord> {
         let mut records = Vec::new();
         if !self.derived_enabled {
             return records;
@@ -155,7 +155,7 @@ impl OpenSpaceEvolveStage {
             let child_idx = (i + 3) % arr.len();
             let parent_name = format!("skill_{}", label);
             let child_name = format!("skill_{}_variant_{}", label, mode.0);
-            records.push(DerivedSkillRecord {
+            records.push(_DerivedSkillRecord {
                 parent_skill: parent_name,
                 child_skill: child_name,
                 domain: label.to_string(),
@@ -172,7 +172,7 @@ impl OpenSpaceEvolveStage {
         records
     }
 
-    fn run_captured_trigger(&self, brain: &SelfIteratingBrain) -> Vec<CapturedPatternRecord> {
+    fn run_captured_trigger(&self, brain: &SelfIteratingBrain) -> Vec<_CapturedPatternRecord> {
         let mut records = Vec::new();
         if !self.captured_enabled {
             return records;
@@ -184,7 +184,7 @@ impl OpenSpaceEvolveStage {
         if !stage_results.is_empty() {
             let stage_count = stage_results.len();
             let pattern_name = format!("stage_pattern_iter_{}", brain.iteration);
-            records.push(CapturedPatternRecord {
+            records.push(_CapturedPatternRecord {
                 pattern_name,
                 source: "pipeline_execution".to_string(),
                 frequency: stage_count,
@@ -195,7 +195,7 @@ impl OpenSpaceEvolveStage {
         if eval_hist.len() >= 3 {
             let recent: Vec<f64> = eval_hist.iter().rev().take(3).map(|r| r.score_after).collect();
             if recent.windows(2).all(|w| w[1] > w[0]) {
-                records.push(CapturedPatternRecord {
+                records.push(_CapturedPatternRecord {
                     pattern_name: format!("improving_trend_iter_{}", brain.iteration),
                     source: "evaluation_history".to_string(),
                     frequency: 3,
@@ -211,7 +211,7 @@ impl OpenSpaceEvolveStage {
         records
     }
 
-    pub fn evolution_stats(&self) -> OpenSpaceStats {
+    pub(crate) fn _evolution_stats(&self) -> OpenSpaceStats {
         OpenSpaceStats {
             total_fixes: self.fix_history.len(),
             total_derived: self.derived_history.len(),
@@ -278,22 +278,22 @@ impl BrainStage for OpenSpaceEvolveStage {
 }
 
 impl OpenSpaceEvolveStage {
-    pub fn total_activity(&self) -> usize {
+    pub(crate) fn _total_activity(&self) -> usize {
         self.fix_history.len() + self.derived_history.len() + self.captured_patterns.len()
     }
 
-    pub fn recent_fixes(&self, n: usize) -> &[FixTriggerRecord] {
+    pub(crate) fn _recent_fixes(&self, n: usize) -> &[_FixTriggerRecord] {
         let start = self.fix_history.len().saturating_sub(n);
         &self.fix_history[start..]
     }
 
-    pub fn recent_derived(&self, n: usize) -> &[DerivedSkillRecord] {
+    pub(crate) fn _recent_derived(&self, n: usize) -> &[_DerivedSkillRecord] {
         let start = self.derived_history.len().saturating_sub(n);
         &self.derived_history[start..]
     }
 
-    pub fn most_frequent_patterns(&self, n: usize) -> Vec<&CapturedPatternRecord> {
-        let mut sorted: Vec<&CapturedPatternRecord> = self.captured_patterns.iter().collect();
+    pub(crate) fn _most_frequent_patterns(&self, n: usize) -> Vec<&_CapturedPatternRecord> {
+        let mut sorted: Vec<&_CapturedPatternRecord> = self.captured_patterns.iter().collect();
         sorted.sort_by(|a, b| b.frequency.cmp(&a.frequency));
         sorted.into_iter().take(n).collect()
     }
@@ -346,33 +346,33 @@ mod tests {
     #[test]
     fn test_total_activity_aggregation() {
         let mut stage = OpenSpaceEvolveStage::new();
-        stage.fix_history.push(FixTriggerRecord {
+        stage.fix_history.push(_FixTriggerRecord {
             module_name: "test".into(), issue_type: "low".into(),
             applied_patch: "boost".into(), iteration: 1, success: true,
         });
-        stage.derived_history.push(DerivedSkillRecord {
+        stage.derived_history.push(_DerivedSkillRecord {
             parent_skill: "a".into(), child_skill: "b".into(),
             domain: "test".into(), iteration: 1, quality_score: 0.5,
         });
-        stage.captured_patterns.push(CapturedPatternRecord {
+        stage.captured_patterns.push(_CapturedPatternRecord {
             pattern_name: "p".into(), source: "exec".into(),
             frequency: 1, effectiveness: 0.5,
         });
-        assert_eq!(stage.total_activity(), 3);
+        assert_eq!(stage._total_activity(), 3);
     }
 
     #[test]
     fn test_evolution_stats() {
         let mut stage = OpenSpaceEvolveStage::new();
-        stage.fix_history.push(FixTriggerRecord {
+        stage.fix_history.push(_FixTriggerRecord {
             module_name: "m1".into(), issue_type: "t1".into(),
             applied_patch: "p1".into(), iteration: 1, success: true,
         });
-        stage.fix_history.push(FixTriggerRecord {
+        stage.fix_history.push(_FixTriggerRecord {
             module_name: "m2".into(), issue_type: "t2".into(),
             applied_patch: "p2".into(), iteration: 2, success: false,
         });
-        let stats = stage.evolution_stats();
+        let stats = stage._evolution_stats();
         assert_eq!(stats.total_fixes, 2);
         assert!((stats.fix_success_rate - 0.5).abs() < 1e-6);
     }
@@ -382,7 +382,7 @@ mod tests {
         let mut stage = OpenSpaceEvolveStage::new();
         stage.max_history = 3;
         for i in 0..10 {
-            stage.fix_history.push(FixTriggerRecord {
+            stage.fix_history.push(_FixTriggerRecord {
                 module_name: format!("m{}", i), issue_type: "t".into(),
                 applied_patch: "p".into(), iteration: i, success: true,
             });
@@ -397,24 +397,24 @@ mod tests {
     fn test_recent_fixes() {
         let mut stage = OpenSpaceEvolveStage::new();
         for i in 0..5 {
-            stage.fix_history.push(FixTriggerRecord {
+            stage.fix_history.push(_FixTriggerRecord {
                 module_name: format!("m{}", i), issue_type: "t".into(),
                 applied_patch: "p".into(), iteration: i, success: true,
             });
         }
-        assert_eq!(stage.recent_fixes(3).len(), 3);
+        assert_eq!(stage._recent_fixes(3).len(), 3);
     }
 
     #[test]
     fn test_most_frequent_patterns() {
         let mut stage = OpenSpaceEvolveStage::new();
-        stage.captured_patterns.push(CapturedPatternRecord {
+        stage.captured_patterns.push(_CapturedPatternRecord {
             pattern_name: "p1".into(), source: "exec".into(), frequency: 10, effectiveness: 0.8,
         });
-        stage.captured_patterns.push(CapturedPatternRecord {
+        stage.captured_patterns.push(_CapturedPatternRecord {
             pattern_name: "p2".into(), source: "exec".into(), frequency: 5, effectiveness: 0.6,
         });
-        let top = stage.most_frequent_patterns(1);
+        let top = stage._most_frequent_patterns(1);
         assert_eq!(top.len(), 1);
         assert_eq!(top[0].pattern_name, "p1");
     }

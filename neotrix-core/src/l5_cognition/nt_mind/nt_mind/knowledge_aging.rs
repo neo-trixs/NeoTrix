@@ -18,12 +18,12 @@ impl KnowledgeFreshness {
         }
     }
 
-    pub fn should_rescan(&self) -> bool {
+    pub(crate) fn _should_rescan(&self) -> bool {
         matches!(self, KnowledgeFreshness::Stale | KnowledgeFreshness::Expired)
     }
 }
 
-pub struct KnowledgeAgingEntry {
+pub(crate) struct _KnowledgeAgingEntry {
     pub source_url: String,
     pub source_name: String,
     pub domain: String,
@@ -35,7 +35,7 @@ pub struct KnowledgeAgingEntry {
 }
 
 pub struct KnowledgeAging {
-    pub entries: Vec<KnowledgeAgingEntry>,
+    pub entries: Vec<_KnowledgeAgingEntry>,
     pub max_entries: usize,
     pub rescans_triggered: u64,
     pub expired_entries: u64,
@@ -60,7 +60,7 @@ impl KnowledgeAging {
 
     pub fn register(&mut self, url: &str, name: &str, domain: &str, confidence: f64) {
         let now = Self::now();
-        self.entries.push(KnowledgeAgingEntry {
+        self.entries.push(_KnowledgeAgingEntry {
             source_url: url.to_string(),
             source_name: name.to_string(),
             domain: domain.to_string(),
@@ -85,7 +85,7 @@ impl KnowledgeAging {
         }
     }
 
-    pub fn freshness(&self, entry: &KnowledgeAgingEntry) -> KnowledgeFreshness {
+    pub fn freshness(&self, entry: &_KnowledgeAgingEntry) -> KnowledgeFreshness {
         let now = Self::now();
         let age_days = (now - entry.created_at) as f64 / 86400.0;
         let half_life = entry.half_life_days;
@@ -101,9 +101,9 @@ impl KnowledgeAging {
         }
     }
 
-    pub fn stale_and_expired(&self) -> Vec<&KnowledgeAgingEntry> {
+    pub(crate) fn _stale_and_expired(&self) -> Vec<&_KnowledgeAgingEntry> {
         self.entries.iter()
-            .filter(|e| self.freshness(e).should_rescan())
+            .filter(|e| self.freshness(e)._should_rescan())
             .collect()
     }
 
@@ -161,7 +161,7 @@ impl KnowledgeAging {
     }
 
     pub fn summary(&self) -> String {
-        let stale = self.stale_and_expired();
+        let stale = self._stale_and_expired();
         format!(
             "KnowledgeAging: {} entries | {} stale/expired | {} rescans triggered | {} total expired",
             self.entries.len(),

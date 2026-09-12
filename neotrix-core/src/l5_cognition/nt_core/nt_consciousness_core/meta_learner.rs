@@ -10,27 +10,27 @@ use serde::{Deserialize, Serialize};
 /// 元学习器
 pub struct MetaLearner {
     /// 元知识
-    pub meta_knowledge: MetaKnowledge,
+    pub meta_knowledge: _MetaKnowledge,
     /// 学习策略
-    pub strategies: Vec<LearningStrategy>,
+    pub strategies: Vec<_LearningStrategy>,
     /// 学习历史
-    pub history: Vec<MetaLearningRecord>,
+    pub history: Vec<_MetaLearningRecord>,
 }
 
 /// 元知识
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MetaKnowledge {
+pub(crate) struct _MetaKnowledge {
     /// 学习方法有效性
     pub method_effectiveness: HashMap<String, f64>,
     /// 任务类型适配
     pub task_adaptation: HashMap<String, String>,
     /// 错误模式
-    pub error_patterns: Vec<ErrorPattern>,
+    pub error_patterns: Vec<_ErrorPattern>,
 }
 
 /// 错误模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ErrorPattern {
+pub(crate) struct _ErrorPattern {
     pub pattern_type: String,
     pub frequency: u32,
     pub correction_strategy: String,
@@ -38,7 +38,7 @@ pub struct ErrorPattern {
 
 /// 学习策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LearningStrategy {
+pub(crate) struct _LearningStrategy {
     pub id: String,
     pub name: String,
     pub strategy_type: StrategyType,
@@ -58,7 +58,7 @@ pub enum StrategyType {
 
 /// 元学习记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetaLearningRecord {
+pub(crate) struct _MetaLearningRecord {
     pub id: String,
     pub cycle: u32,
     pub learning_task: String,
@@ -71,14 +71,14 @@ pub struct MetaLearningRecord {
 impl MetaLearner {
     pub fn new() -> Self {
         Self {
-            meta_knowledge: MetaKnowledge::default(),
+            meta_knowledge: _MetaKnowledge::default(),
             strategies: Vec::new(),
             history: Vec::new(),
         }
     }
 
     /// 学习如何学习
-    pub fn meta_learn(&mut self, cycle: u32, task: &str, results: &[String]) -> Vec<String> {
+    pub(crate) fn _meta_learn(&mut self, cycle: u32, task: &str, results: &[String]) -> Vec<String> {
         let insights = vec![
             format!("Learned from task: {}", task),
             format!("Results analyzed: {}", results.len()),
@@ -91,7 +91,7 @@ impl MetaLearner {
             effectiveness,
         );
 
-        let record = MetaLearningRecord {
+        let record = _MetaLearningRecord {
             id: format!("meta_{}", uuid::Uuid::new_v4()),
             cycle,
             learning_task: task.to_string(),
@@ -106,15 +106,15 @@ impl MetaLearner {
     }
 
     /// 选择最佳策略
-    pub fn select_strategy(&self, task_type: &str) -> Option<&LearningStrategy> {
+    pub fn select_strategy(&self, task_type: &str) -> Option<&_LearningStrategy> {
         self.strategies.iter()
             .filter(|s| s.applicable_tasks.contains(&task_type.to_string()))
             .max_by(|a, b| a.effectiveness.partial_cmp(&b.effectiveness).unwrap())
     }
 
     /// 获取统计
-    pub fn stats(&self) -> MetaLearnerStats {
-        MetaLearnerStats {
+    pub fn stats(&self) -> _MetaLearnerStats {
+        _MetaLearnerStats {
             total_meta_learnings: self.history.len(),
             total_strategies: self.strategies.len(),
             avg_effectiveness: if self.history.is_empty() {
@@ -127,13 +127,13 @@ impl MetaLearner {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetaLearnerStats {
+pub(crate) struct _MetaLearnerStats {
     pub total_meta_learnings: usize,
     pub total_strategies: usize,
     pub avg_effectiveness: f64,
 }
 
-impl std::fmt::Display for MetaLearnerStats {
+impl std::fmt::Display for _MetaLearnerStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "MetaLearner: {} learnings, {} strategies, avg effectiveness {:.4}",
             self.total_meta_learnings, self.total_strategies, self.avg_effectiveness)
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_meta_learner() {
         let mut learner = MetaLearner::new();
-        let insights = learner.meta_learn(0, "test_task", &["result1".to_string()]);
+        let insights = learner._meta_learn(0, "test_task", &["result1".to_string()]);
         assert_eq!(insights.len(), 2);
     }
 }

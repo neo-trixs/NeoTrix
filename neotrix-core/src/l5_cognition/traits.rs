@@ -57,7 +57,7 @@ pub struct AgentResult {
 
 /// 质量信号 — Sentrux 吸收
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualitySignal {
+pub(crate) struct _QualitySignal {
     pub score: u32, // 0-10000
     pub metrics: QualityMetrics,
     pub violations: Vec<QualityViolation>,
@@ -85,7 +85,7 @@ pub struct QualityViolation {
 
 /// R&D 自动化任务 — RD-Agent 吸收
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RndTask {
+pub(crate) struct _RndTask {
     pub hypothesis: String,
     pub experiment_design: String,
     pub expected_outcome: String,
@@ -94,7 +94,7 @@ pub struct RndTask {
 
 /// R&D 自动化结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RndResult {
+pub(crate) struct _RndResult {
     pub hypothesis: String,
     pub outcome: String,
     pub success: bool,
@@ -104,7 +104,7 @@ pub struct RndResult {
 
 /// 认知状态快照
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CognitionSnapshot {
+pub(crate) struct _CognitionSnapshot {
     pub active_tasks: usize,
     pub completed_tasks: u64,
     pub quality_score: Option<u32>,

@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 /// 一致性修复策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ConsistencyFixStrategy {
+pub(crate) enum _ConsistencyFixStrategy {
     /// ADetailer 自动修复
     ADetailer,
     /// FaceDetailer 自动修复
@@ -32,7 +32,7 @@ pub enum ConsistencyFixStrategy {
 
 /// 视觉元素类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum VisualElementType {
+pub(crate) enum _VisualElementType {
     /// 角色
     Character,
     /// 物体
@@ -47,9 +47,9 @@ pub enum VisualElementType {
 
 /// 一致性修复配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsistencyFixConfig {
+pub(crate) struct _ConsistencyFixConfig {
     /// 修复策略
-    pub strategy: ConsistencyFixStrategy,
+    pub strategy: _ConsistencyFixStrategy,
     /// 检测阈值 (0.0-1.0)
     pub detection_threshold: f32,
     /// 修复强度 (0.0-1.0)
@@ -66,7 +66,7 @@ pub struct ConsistencyFixConfig {
 
 /// 一致性修复结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsistencyFixResult {
+pub(crate) struct _ConsistencyFixResult {
     /// 是否成功
     pub success: bool,
     /// 修复后的图片路径
@@ -106,7 +106,7 @@ pub struct RegionConfig {
 
 /// 分区控制配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegionalControlConfig {
+pub(crate) struct _RegionalControlConfig {
     /// 是否启用
     pub enabled: bool,
     /// 分区模式
@@ -140,24 +140,24 @@ pub enum RegionalMode {
 
 /// 视觉一致性管理器
 /// 管理视觉元素跨帧/跨镜头的一致性
-pub struct VisualConsistencyManager {
+pub(crate) struct _VisualConsistencyManager {
     /// 一致性修复配置
     #[allow(dead_code)]
-    fix_config: ConsistencyFixConfig,
+    fix_config: _ConsistencyFixConfig,
     /// 分区控制配置
-    regional_config: RegionalControlConfig,
+    regional_config: _RegionalControlConfig,
     /// 参考图缓存 (元素ID -> 图片路径)
     reference_cache: HashMap<String, String>,
     /// 修复历史
-    fix_history: Vec<ConsistencyFixResult>,
+    fix_history: Vec<_ConsistencyFixResult>,
 }
 
-impl VisualConsistencyManager {
+impl _VisualConsistencyManager {
     /// 创建管理器
     pub fn new() -> Self {
         Self {
-            fix_config: ConsistencyFixConfig {
-                strategy: ConsistencyFixStrategy::FaceDetailer,
+            fix_config: _ConsistencyFixConfig {
+                strategy: _ConsistencyFixStrategy::FaceDetailer,
                 detection_threshold: 0.5,
                 fix_strength: 0.8,
                 max_retries: 2,
@@ -165,7 +165,7 @@ impl VisualConsistencyManager {
                 model_name: None,
                 model_weight: 0.7,
             },
-            regional_config: RegionalControlConfig {
+            regional_config: _RegionalControlConfig {
                 enabled: false,
                 mode: RegionalMode::Horizontal,
                 regions: vec![],
@@ -178,7 +178,7 @@ impl VisualConsistencyManager {
     }
     
     /// 使用配置创建
-    pub fn with_config(fix_config: ConsistencyFixConfig, regional_config: RegionalControlConfig) -> Self {
+    pub fn with_config(fix_config: _ConsistencyFixConfig, regional_config: _RegionalControlConfig) -> Self {
         Self {
             fix_config,
             regional_config,
@@ -198,14 +198,14 @@ impl VisualConsistencyManager {
     }
     
     /// 执行一致性修复
-    pub fn fix_consistency(
+    pub(crate) fn _fix_consistency(
         &mut self,
         image_path: &str,
         _element_id: Option<&str>,
-        _element_type: VisualElementType,
-    ) -> ConsistencyFixResult {
+        _element_type: _VisualElementType,
+    ) -> _ConsistencyFixResult {
         // TODO: 实际调用修复逻辑
-        let result = ConsistencyFixResult {
+        let result = _ConsistencyFixResult {
             success: true,
             fixed_image_path: Some(format!("{}_fixed.png", image_path)),
             detected_elements: 1,
@@ -220,14 +220,14 @@ impl VisualConsistencyManager {
     }
     
     /// 批量修复
-    pub fn batch_fix(
+    pub(crate) fn _batch_fix(
         &mut self,
         image_paths: &[String],
         element_id: Option<&str>,
-        element_type: VisualElementType,
-    ) -> Vec<ConsistencyFixResult> {
+        element_type: _VisualElementType,
+    ) -> Vec<_ConsistencyFixResult> {
         image_paths.iter()
-            .map(|path| self.fix_consistency(path, element_id, element_type))
+            .map(|path| self._fix_consistency(path, element_id, element_type))
             .collect()
     }
     
@@ -250,7 +250,7 @@ impl VisualConsistencyManager {
     }
     
     /// 设置分区配置
-    pub fn set_regional_config(&mut self, config: RegionalControlConfig) {
+    pub fn set_regional_config(&mut self, config: _RegionalControlConfig) {
         self.regional_config = config;
     }
     
@@ -294,7 +294,7 @@ pub struct ConsistencyStats {
 // ============================================================================
 
 /// 角色一致性增强器 (向后兼容别名)
-pub type FaceConsistencyManager = VisualConsistencyManager;
+pub type FaceConsistencyManager = _VisualConsistencyManager;
 
 // ============================================================================
 // 测试模块
@@ -306,17 +306,17 @@ mod tests {
     
     #[test]
     fn test_visual_consistency_manager() {
-        let mut manager = VisualConsistencyManager::new();
+        let mut manager = _VisualConsistencyManager::new();
         
         // 设置参考图
         manager.set_reference("element_001", "/ref/element_001.png");
         assert!(manager.get_reference("element_001").is_some());
         
         // 执行修复
-        let result = manager.fix_consistency(
+        let result = manager._fix_consistency(
             "/input/test.png",
             Some("element_001"),
-            VisualElementType::Character,
+            _VisualElementType::Character,
         );
         assert!(result.success);
         assert!(result.consistency_score > 0.9);
@@ -329,9 +329,9 @@ mod tests {
     
     #[test]
     fn test_regional_control() {
-        let mut manager = VisualConsistencyManager::new();
+        let mut manager = _VisualConsistencyManager::new();
         
-        let config = RegionalControlConfig {
+        let config = _RegionalControlConfig {
             enabled: true,
             mode: RegionalMode::Horizontal,
             regions: vec![

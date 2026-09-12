@@ -29,7 +29,7 @@ pub struct CodeGraph {
 
 /// 图谱过期报告 (W2.5): stale = mtime 晚于构建快照; missing = 已删除。
 #[derive(Debug, Clone, Default)]
-pub struct StalenessReport {
+pub(crate) struct _StalenessReport {
     pub scanned: usize,
     pub stale_files: Vec<PathBuf>,
     pub missing_files: Vec<PathBuf>,
@@ -37,9 +37,9 @@ pub struct StalenessReport {
     pub stale_ratio_bp: u32,
 }
 
-impl StalenessReport {
+impl _StalenessReport {
     /// 新鲜判定: 过期率 ≤5% 视为图谱仍可信, 否则建议重建。
-    pub fn is_fresh(&self) -> bool {
+    pub(crate) fn _is_fresh(&self) -> bool {
         self.stale_ratio_bp <= 500
     }
 }
@@ -62,7 +62,7 @@ impl CodeGraph {
         }
     }
 
-    pub fn with_project_id(mut self, pid: &str) -> Self {
+    pub(crate) fn _with_project_id(mut self, pid: &str) -> Self {
         self.project_id = Some(pid.to_string());
         self
     }
@@ -197,8 +197,8 @@ impl CodeGraph {
 
     /// W2.5 staleness 报告: 对比构建快照与当前文件系统 mtime。
     /// Ix 语义 — 图谱是"持续维护的模型", 过期必须可观测。
-    pub fn staleness_report<P: AsRef<Path>>(&self, root: P) -> StalenessReport {
-        let mut report = StalenessReport::default();
+    pub(crate) fn _staleness_report<P: AsRef<Path>>(&self, root: P) -> _StalenessReport {
+        let mut report = _StalenessReport::default();
         report.scanned = self.build_mtimes.len();
         for (path, built_at) in &self.build_mtimes {
             match std::fs::metadata(path).and_then(|m| m.modified()) {
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_parse_function() {
-        let content = "pub fn test_function() {\n    helper_call();\n}\nfn helper_call() {}\n";
+        let content = "pub(crate) fn _test_function() {\n    helper_call();\n}\nfn helper_call() {}\n";
         let items = parse_rust_file(content);
         let fns: Vec<&ParsedItem> = items.iter().filter(|i| matches!(i, ParsedItem::Function { .. })).collect();
         assert_eq!(fns.len(), 2);
@@ -247,16 +247,16 @@ mod tests {
 
     #[test]
     fn test_parse_struct() {
-        let content = "pub struct TestStruct {\n    field: i32,\n}\n";
+        let content = "pub(crate) struct _TestStruct {\n    field: i32,\n}\n";
         let items = parse_rust_file(content);
-        assert!(items.iter().any(|i| matches!(i, ParsedItem::StructDef { name, .. } if name == "TestStruct")));
+        assert!(items.iter().any(|i| matches!(i, ParsedItem::StructDef { name, .. } if name == "_TestStruct")));
     }
 
     #[test]
     fn test_parse_trait() {
-        let content = "pub trait TestTrait {\n    fn method();\n}\n";
+        let content = "pub(crate) trait _TestTrait {\n    fn method();\n}\n";
         let items = parse_rust_file(content);
-        assert!(items.iter().any(|i| matches!(i, ParsedItem::TraitDef { name, .. } if name == "TestTrait")));
+        assert!(items.iter().any(|i| matches!(i, ParsedItem::TraitDef { name, .. } if name == "_TestTrait")));
     }
 
     fn fixture_project() -> (tempfile::TempDir, PathBuf) {
@@ -267,7 +267,7 @@ mod tests {
             ("main.rs", "mod math;\nmod utils;\nfn main() { math::add(1, 2); utils::greet(); }\n"),
             ("math.rs", "pub fn add(a: i32, b: i32) -> i32 { a + b }\npub fn sub(a: i32, b: i32) -> i32 { a - b }\n"),
             ("utils.rs", "pub struct Config { pub name: String }\npub fn greet() -> String { \"Hello\".into() }\npub struct Helper;\nimpl Helper { pub fn run(&self) {} }\n"),
-            ("lib.rs", "pub mod math;\npub mod utils;\npub trait TestTrait { fn method(&self); }\n"),
+            ("lib.rs", "pub mod math;\npub mod utils;\npub trait _TestTrait { fn method(&self); }\n"),
             ("extra.rs", "use crate::math;\npub fn compute() -> i32 { math::add(10, 20) }\n"),
         ];
         for (name, content) in &files {
@@ -357,8 +357,8 @@ mod tests {
         assert!(n > 0);
 
         // 刚构建 → 新鲜
-        let r0 = g.staleness_report(&dir);
-        assert!(r0.is_fresh(), "{r0:?}");
+        let r0 = g._staleness_report(&dir);
+        assert!(r0._is_fresh(), "{r0:?}");
         assert_eq!(r0.scanned, 2);
 
         // 等待 mtime 前进 + 修改一个 + 删除一个
@@ -367,11 +367,11 @@ mod tests {
         let _ = filetime::set_file_mtime(&a, filetime::FileTime::now());
         fs::remove_file(&b).unwrap();
 
-        let r1 = g.staleness_report(&dir);
+        let r1 = g._staleness_report(&dir);
         assert_eq!(r1.stale_files.len(), 1, "{r1:?}");
         assert_eq!(r1.missing_files.len(), 1, "{r1:?}");
         assert_eq!(r1.stale_ratio_bp, 10_000);
-        assert!(!r1.is_fresh());
+        assert!(!r1._is_fresh());
 
         fs::remove_dir_all(&dir).ok();
     }

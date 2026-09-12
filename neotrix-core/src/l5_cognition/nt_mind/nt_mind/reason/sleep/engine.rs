@@ -40,11 +40,11 @@ impl SleepConfig {
         Self { passes, ..Default::default() }
     }
 
-    pub fn light_sleep() -> Self {
+    pub(crate) fn _light_sleep() -> Self {
         Self { passes: 1, consolidation_rate: 0.02, transition_noise: 0.005, ..Default::default() }
     }
 
-    pub fn deep_sleep() -> Self {
+    pub(crate) fn _deep_sleep() -> Self {
         Self { passes: 6, consolidation_rate: 0.08, transition_noise: 0.02, ..Default::default() }
     }
 }
@@ -58,7 +58,7 @@ pub struct SleepResult {
 pub struct SleepEngine {
     pub config: SleepConfig,
     updater: HebbianUpdater,
-    consolidator: MemoryConsolidation,
+    _consolidator: MemoryConsolidation,
 }
 
 impl SleepEngine {
@@ -67,8 +67,8 @@ impl SleepEngine {
             consolidation_rate: config.consolidation_rate,
             ..Default::default()
         };
-        let consolidator = MemoryConsolidation::new(config.consolidation.clone());
-        Self { config, updater, consolidator }
+        let _consolidator = MemoryConsolidation::new(config.consolidation.clone());
+        Self { config, updater, _consolidator }
     }
 
     pub fn with_passes(passes: usize) -> Self {
@@ -102,7 +102,7 @@ impl SleepEngine {
         let mut total_sim = 0.0;
 
         for _pass_idx in 0..passes {
-            let result = self.consolidator.run_consolidation_pass(
+            let result = self._consolidator.run_consolidation_pass(
                 bank, brain, &self.updater,
             );
             total_delta += result.total_delta;
@@ -125,7 +125,7 @@ impl SleepEngine {
         })
     }
 
-    pub fn should_sleep(&self, bank: &ReasoningBank) -> bool {
+    pub(crate) fn _should_sleep(&self, bank: &ReasoningBank) -> bool {
         let mems = bank.memories();
         let recent_count = mems.iter()
             .filter(|m| m.reward >= self.config.consolidation.min_reward)
@@ -137,8 +137,8 @@ impl SleepEngine {
         &self.updater
     }
 
-    pub fn consolidator(&self) -> &MemoryConsolidation {
-        &self.consolidator
+    pub(crate) fn _consolidator(&self) -> &MemoryConsolidation {
+        &self._consolidator
     }
 }
 
@@ -221,26 +221,26 @@ mod tests {
             }
             b
         };
-        assert!(engine.should_sleep(&bank), "should sleep with 5 qualifying memories");
+        assert!(engine._should_sleep(&bank), "should sleep with 5 qualifying memories");
     }
 
     #[test]
     fn test_should_sleep_with_few_memories() {
         let engine = SleepEngine::with_passes(3);
         let bank = ReasoningBank::new(100);
-        assert!(!engine.should_sleep(&bank), "should not sleep with empty bank");
+        assert!(!engine._should_sleep(&bank), "should not sleep with empty bank");
     }
 
     #[test]
     fn test_light_sleep_config() {
-        let config = SleepConfig::light_sleep();
+        let config = SleepConfig::_light_sleep();
         assert_eq!(config.passes, 1, "light sleep has 1 pass");
         assert!(config.transition_noise < 0.01, "light sleep has less noise");
     }
 
     #[test]
     fn test_deep_sleep_config() {
-        let config = SleepConfig::deep_sleep();
+        let config = SleepConfig::_deep_sleep();
         assert_eq!(config.passes, 6, "deep sleep has 6 passes");
         assert!(config.consolidation_rate > 0.05, "deep sleep has higher consolidation rate");
     }

@@ -172,8 +172,8 @@ pub struct DiagnosticIssue {
 /// 五阶段闭环:
 ///   1. collect_metrics — 采集系统指标
 ///   2. diagnose — 诊断瓶颈/退化
-///   3. generate_plans — 生成改进方案
-///   4. evaluate_and_apply — 评估收益, 采纳最优方案
+///   3. _generate_plans — 生成改进方案
+///   4. _evaluate_and_apply — 评估收益, 采纳最优方案
 ///   5. verify — 验证改进效果, 必要时回滚
 #[derive(Debug)]
 pub struct SelfImprovementLoop {
@@ -350,7 +350,7 @@ impl SelfImprovementLoop {
     // ── Stage 3: 生成改进方案 ──
 
     /// 基于诊断结果生成改进方案
-    pub fn generate_plans(&mut self, diagnosis: &DiagnosticResult) -> Vec<ImprovementPlan> {
+    pub(crate) fn _generate_plans(&mut self, diagnosis: &DiagnosticResult) -> Vec<ImprovementPlan> {
         let mut plans = Vec::new();
 
         for issue in &diagnosis.issues {
@@ -379,7 +379,7 @@ impl SelfImprovementLoop {
     // ── Stage 4: 评估并执行 ──
 
     /// 评估方案收益, 采纳最优方案 (最多 3 个)
-    pub fn evaluate_and_apply(&mut self, max_applied: usize) -> Vec<ImprovementPlan> {
+    pub(crate) fn _evaluate_and_apply(&mut self, max_applied: usize) -> Vec<ImprovementPlan> {
         let mut applied = Vec::new();
 
         // 过滤出 Generated 状态的方案, 按优先级排序
@@ -447,7 +447,7 @@ impl SelfImprovementLoop {
             token_delta,
             skill_delta,
             overall_improved: improved,
-            executed_plans: self.executed.len(),
+            _executed_plans: self.executed.len(),
             timestamp: timestamp_now(),
         })
     }
@@ -462,10 +462,10 @@ impl SelfImprovementLoop {
         let diagnosis = self.diagnose();
 
         // 生成方案
-        let plans = self.generate_plans(&diagnosis);
+        let plans = self._generate_plans(&diagnosis);
 
         // 执行 (最多 3 个方案)
-        let applied = self.evaluate_and_apply(3);
+        let applied = self._evaluate_and_apply(3);
 
         // 验证
         let verification = self.verify();
@@ -637,7 +637,7 @@ impl SelfImprovementLoop {
     }
 
     /// 获取待执行方案
-    pub fn pending_plans(&self) -> Vec<&ImprovementPlan> {
+    pub(crate) fn _pending_plans(&self) -> Vec<&ImprovementPlan> {
         self.plans
             .iter()
             .filter(|p| p.status == PlanStatus::Generated)
@@ -645,7 +645,7 @@ impl SelfImprovementLoop {
     }
 
     /// 获取已执行方案
-    pub fn executed_plans(&self) -> &[ImprovementPlan] {
+    pub(crate) fn _executed_plans(&self) -> &[ImprovementPlan] {
         &self.executed
     }
 
@@ -686,7 +686,7 @@ pub struct VerificationResult {
     pub token_delta: f64,
     pub skill_delta: f64,
     pub overall_improved: bool,
-    pub executed_plans: usize,
+    pub _executed_plans: usize,
     pub timestamp: i64,
 }
 
@@ -758,7 +758,7 @@ mod tests {
         loop_engine.collect_metrics(sample_metrics(0.6));
 
         let diagnosis = loop_engine.diagnose();
-        let plans = loop_engine.generate_plans(&diagnosis);
+        let plans = loop_engine._generate_plans(&diagnosis);
         assert!(!plans.is_empty());
         assert!(plans[0].priority >= 1);
     }
@@ -804,10 +804,10 @@ mod tests {
         loop_engine.collect_metrics(sample_metrics(0.6));
         loop_engine.run_cycle();
 
-        if let Some(plan) = loop_engine.executed_plans().first() {
+        if let Some(plan) = loop_engine._executed_plans().first() {
             let id = plan.plan_id.clone();
             assert!(loop_engine.rollback(&id));
-            assert!(loop_engine.executed_plans().iter().all(|p| p.plan_id != id));
+            assert!(loop_engine._executed_plans().iter().all(|p| p.plan_id != id));
             assert!(!loop_engine.rolled_back.is_empty());
         }
     }

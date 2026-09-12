@@ -93,7 +93,7 @@ pub struct EvolutionReport {
 
 /// Auditor 三角色 — 三个独立评判视角, 全部通过才接受变更 (异模型共识)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AuditorRole {
+pub(crate) enum _AuditorRole {
     /// 地面真值: 触发问题的指标必须下降或持平
     Evidence,
     /// 一致性: 变更不引入副作用 (unsafe/todo/规模不回归)
@@ -102,20 +102,20 @@ pub enum AuditorRole {
     Governance,
 }
 
-impl AuditorRole {
+impl _AuditorRole {
     pub fn label(self) -> &'static str {
         match self {
-            AuditorRole::Evidence => "Evidence",
-            AuditorRole::Consistency => "Consistency",
-            AuditorRole::Governance => "Governance",
+            _AuditorRole::Evidence => "Evidence",
+            _AuditorRole::Consistency => "Consistency",
+            _AuditorRole::Governance => "Governance",
         }
     }
 }
 
 /// 单角色裁决
 #[derive(Debug, Clone)]
-pub struct RoleVerdict {
-    pub role: AuditorRole,
+pub(crate) struct _RoleVerdict {
+    pub role: _AuditorRole,
     pub pass: bool,
     pub detail: String,
 }
@@ -124,7 +124,7 @@ pub struct RoleVerdict {
 #[derive(Debug, Clone)]
 pub struct AuditVerdict {
     pub passed: bool,
-    pub role_verdicts: Vec<RoleVerdict>,
+    pub role_verdicts: Vec<_RoleVerdict>,
     pub recovered: bool,
     pub checkpoint_cycle: u64,
 }
@@ -176,7 +176,7 @@ impl Auditor {
     }
 
     /// 三角色异模型裁决 — 仅当前后快照均满足所有角色才接受; 否则标记 recover
-    pub fn verify_change(
+    pub(crate) fn _verify_change(
         &mut self,
         cycle: u64,
         before: &ProjectSnapshot,
@@ -188,8 +188,8 @@ impl Auditor {
         let evidence_pass = after.unwrap_count <= before.unwrap_count
             && after.compile_errors <= before.compile_errors
             && after.test_failures <= before.test_failures;
-        verdicts.push(RoleVerdict {
-            role: AuditorRole::Evidence,
+        verdicts.push(_RoleVerdict {
+            role: _AuditorRole::Evidence,
             pass: evidence_pass,
             detail: format!(
                 "unwrap {}→{} compile_errors {}→{} test_failures {}→{}",
@@ -205,8 +205,8 @@ impl Auditor {
         // Consistency: 无副作用 — unsafe/todo 不回归 (容忍 ±1 噪声)
         let consistency_pass =
             after.unsafe_count <= before.unsafe_count + 1 && after.todo_count <= before.todo_count + 1;
-        verdicts.push(RoleVerdict {
-            role: AuditorRole::Consistency,
+        verdicts.push(_RoleVerdict {
+            role: _AuditorRole::Consistency,
             pass: consistency_pass,
             detail: format!(
                 "unsafe {}→{} todo {}→{}",
@@ -216,8 +216,8 @@ impl Auditor {
 
         // Governance: 不引入新的违规热点文件
         let governance_pass = after.file_unsafe_hotspots.len() <= before.file_unsafe_hotspots.len();
-        verdicts.push(RoleVerdict {
-            role: AuditorRole::Governance,
+        verdicts.push(_RoleVerdict {
+            role: _AuditorRole::Governance,
             pass: governance_pass,
             detail: format!(
                 "unsafe_hotspots {}→{}",
@@ -286,7 +286,7 @@ fn count_actual_unsafe(content: &str) -> usize {
 // 进化引擎
 // ============================================================
 
-// ── G10: RST 递归任务合成飞轮 (seed→extend→realign→validate→reuse) ──
+// ── G10: RST 递归任务合成飞轮 (seed→extend→_realign→validate→reuse) ──
 // 吸收自 RST 2608.05466 (Self-Training with Recursive Task Synthesis):
 // 用已验证种子任务迭代合成更难任务, 验证器 (validator) 对齐生成器, 防止
 // 分布漂移; 验证通过的任务进 reuse 池, 形成数据飞轮。玩具实现: 任务 =
@@ -295,7 +295,7 @@ fn count_actual_unsafe(content: &str) -> usize {
 
 /// RST 任务 — 递归合成的单元。
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct RstTask {
+pub(crate) struct _RstTask {
     /// 任务 id。
     pub id: String,
     /// 任务描述。
@@ -312,18 +312,18 @@ pub struct RstTask {
 
 /// RST 验证结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RstVerdict {
+pub(crate) struct _RstVerdict {
     pub task_id: String,
     pub accepted: bool,
     /// 拒绝原因 (accepted=false 时)。
     pub reason: String,
 }
 
-/// RST 飞轮 — seed→extend→realign→validate→reuse。
+/// RST 飞轮 — seed→extend→_realign→validate→reuse。
 #[derive(Debug, Clone)]
-pub struct RstFlywheel {
+pub(crate) struct _RstFlywheel {
     /// 已验证任务池 (reuse 源)。
-    pub verified_pool: Vec<RstTask>,
+    pub verified_pool: Vec<_RstTask>,
     /// 生成代数上限 (防止无界漂移)。
     pub max_generation: u32,
     /// 每代最大合成数。
@@ -343,13 +343,13 @@ pub struct RstFlywheel {
     pub iterations_used: usize,
 }
 
-impl Default for RstFlywheel {
+impl Default for _RstFlywheel {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl RstFlywheel {
+impl _RstFlywheel {
     pub fn new() -> Self {
         Self {
             verified_pool: Vec::new(),
@@ -365,8 +365,8 @@ impl RstFlywheel {
     }
 
     /// 阶段 1 seed: 注入种子任务 (代数 0, 直接入池)。
-    pub fn seed(&mut self, prompt: impl Into<String>) -> RstTask {
-        let task = RstTask {
+    pub fn seed(&mut self, prompt: impl Into<String>) -> _RstTask {
+        let task = _RstTask {
             id: format!("rst-{}", uuid::Uuid::new_v4()),
             prompt: prompt.into(),
             generation: 0,
@@ -380,13 +380,13 @@ impl RstFlywheel {
     }
 
     /// 阶段 2 extend: 从已验证池采样父任务, 合成新任务 (复杂度随代数放大)。
-    pub fn extend(&self, parent: &RstTask) -> Vec<RstTask> {
+    pub fn extend(&self, parent: &_RstTask) -> Vec<_RstTask> {
         if parent.generation >= self.max_generation {
             return Vec::new();
         }
         let gen = parent.generation + 1;
         (0..self.extend_per_gen)
-            .map(|i| RstTask {
+            .map(|i| _RstTask {
                 id: format!("rst-{gen}-{i}-{}", uuid::Uuid::new_v4()),
                 prompt: format!("extended[{}]: {}", parent.prompt, i),
                 generation: gen,
@@ -397,9 +397,9 @@ impl RstFlywheel {
             .collect()
     }
 
-    /// 阶段 3 realign: 复杂度对齐 — 只保留复杂度 ∈ [父×阈值, cap] 的候选。
+    /// 阶段 3 _realign: 复杂度对齐 — 只保留复杂度 ∈ [父×阈值, cap] 的候选。
     /// 防生成器漂移 (分布外任务被淘汰)。
-    pub fn realign(&self, parent: &RstTask, candidates: Vec<RstTask>) -> Vec<RstTask> {
+    pub(crate) fn _realign(&self, parent: &_RstTask, candidates: Vec<_RstTask>) -> Vec<_RstTask> {
         let floor = parent.complexity * self.realign_threshold;
         candidates
             .into_iter()
@@ -409,7 +409,7 @@ impl RstFlywheel {
 
     /// 阶段 4 validate: 启发式验证器 — 任务必须可解 (提示非空) 且复杂度
     /// 在合理区间。通过 → 入池; 失败 → 记拒绝。
-    pub fn validate(&mut self, candidates: Vec<RstTask>) -> Vec<RstTask> {
+    pub fn validate(&mut self, candidates: Vec<_RstTask>) -> Vec<_RstTask> {
         let mut accepted = Vec::new();
         for c in candidates {
             let verdict = self.validate_one(&c);
@@ -423,29 +423,29 @@ impl RstFlywheel {
         accepted
     }
 
-    fn validate_one(&self, task: &RstTask) -> RstVerdict {
+    fn validate_one(&self, task: &_RstTask) -> _RstVerdict {
         if task.prompt.trim().is_empty() {
-            return RstVerdict {
+            return _RstVerdict {
                 task_id: task.id.clone(),
                 accepted: false,
                 reason: "empty prompt".into(),
             };
         }
         if task.complexity <= 0.0 {
-            return RstVerdict {
+            return _RstVerdict {
                 task_id: task.id.clone(),
                 accepted: false,
                 reason: "non-positive complexity".into(),
             };
         }
         if task.complexity > self.complexity_cap {
-            return RstVerdict {
+            return _RstVerdict {
                 task_id: task.id.clone(),
                 accepted: false,
                 reason: "complexity exceeds cap".into(),
             };
         }
-        RstVerdict {
+        _RstVerdict {
             task_id: task.id.clone(),
             accepted: true,
             reason: String::new(),
@@ -455,7 +455,7 @@ impl RstFlywheel {
     /// P0-8 keep-or-revert (awesome-autoresearch): 单次单改动判定 —
     /// 新方案得分 > 旧方案 × keep_threshold → keep; 否则 revert (回滚到旧方案)。
     /// 防止连续改动导致的累计漂移。无基准 (old=0) → 视为 keep。
-    pub fn keep_or_revert(&self, old_score: f64, new_score: f64, keep_threshold: f64) -> bool {
+    pub(crate) fn _keep_or_revert(&self, old_score: f64, new_score: f64, keep_threshold: f64) -> bool {
         if old_score <= 0.0 {
             return true;
         }
@@ -465,7 +465,7 @@ impl RstFlywheel {
     /// P0-8 seed 梯度付费 (PI-blog): 按噪声估计选择验证 seed 数。
     /// 低噪声 → 1 seed 足够; 中噪声 → 3; 高噪声 → 8 (付费上限)。
     /// 返回 (seed 数, 是否升级到下一档)。
-    pub fn seed_escalation(&self, noise_estimate: f64, current_seeds: usize) -> (usize, bool) {
+    pub(crate) fn _seed_escalation(&self, noise_estimate: f64, current_seeds: usize) -> (usize, bool) {
         let target = if noise_estimate < 0.15 {
             1
         } else if noise_estimate < 0.4 {
@@ -478,7 +478,7 @@ impl RstFlywheel {
     }
 
     /// 阶段 5 reuse: 从已验证池采样可复用任务 (round-robin 策略, 确定性)。
-    pub fn reuse(&self, offset: usize) -> Option<&RstTask> {
+    pub fn reuse(&self, offset: usize) -> Option<&_RstTask> {
         if self.verified_pool.is_empty() {
             return None;
         }
@@ -486,14 +486,14 @@ impl RstFlywheel {
         self.verified_pool.get(idx)
     }
 
-    /// 飞轮完整循环: 从指定父任务 extend → realign → validate → 入池。
+    /// 飞轮完整循环: 从指定父任务 extend → _realign → validate → 入池。
     /// 返回新接受任务数。
-    pub fn run_generation(&mut self, parent: &RstTask) -> usize {
+    pub(crate) fn _run_generation(&mut self, parent: &_RstTask) -> usize {
         let candidates = self.extend(parent);
         if candidates.is_empty() {
             return 0;
         }
-        let aligned = self.realign(parent, candidates);
+        let aligned = self._realign(parent, candidates);
         let accepted = self.validate(aligned);
         let n = accepted.len();
         self.verified_pool.extend(accepted);
@@ -528,25 +528,25 @@ impl RstFlywheel {
 
     /// A2 有界飞轮循环: 每次消耗 1 迭代预算; 耗尽 → 停 (返回 None)。
     /// 无界漂移的强制上限, 防止自进化循环吞噬资源。
-    pub fn bounded_run_generation(&mut self, parent: &RstTask) -> Option<usize> {
+    pub(crate) fn _bounded_run_generation(&mut self, parent: &_RstTask) -> Option<usize> {
         if self.budget_exhausted() {
             return None;
         }
         self.iterations_used += 1;
-        Some(self.run_generation(parent))
+        Some(self._run_generation(parent))
     }
 
     /// A2 commit-then-verify 判定 (autoresearch "先 commit 再验证"):
     /// 新分 > 旧分 × keep_threshold → keep (commit 保留); 否则 revert (回滚)。
-    /// 与 P0-8 keep_or_revert 同构, 但显式表达 "验证在 commit 之后" 的纪律,
+    /// 与 P0-8 _keep_or_revert 同构, 但显式表达 "验证在 commit 之后" 的纪律,
     /// 并返回 (keep, 是否触发回滚) 双元供上层事件分发 (R-P25 行为接地)。
-    pub fn commit_then_verify(
+    pub(crate) fn _commit_then_verify(
         &self,
         old_score: f64,
         new_score: f64,
         keep_threshold: f64,
     ) -> (bool, bool) {
-        let keep = self.keep_or_revert(old_score, new_score, keep_threshold);
+        let keep = self._keep_or_revert(old_score, new_score, keep_threshold);
         (keep, !keep)
     }
 }
@@ -558,27 +558,27 @@ impl RstFlywheel {
 // ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum HarnessTarget {
+pub(crate) enum _HarnessTarget {
     Compile,
     UnitTest,
     Integration,
     Bench,
 }
 
-impl HarnessTarget {
+impl _HarnessTarget {
     pub fn label(&self) -> &'static str {
         match self {
-            HarnessTarget::Compile => "compile",
-            HarnessTarget::UnitTest => "unit",
-            HarnessTarget::Integration => "integration",
-            HarnessTarget::Bench => "bench",
+            _HarnessTarget::Compile => "compile",
+            _HarnessTarget::UnitTest => "unit",
+            _HarnessTarget::Integration => "integration",
+            _HarnessTarget::Bench => "bench",
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HarnessCandidate {
-    pub target: HarnessTarget,
+pub(crate) struct _HarnessCandidate {
+    pub target: _HarnessTarget,
     pub code: String,
     /// 归一化指纹: 移除空白后做碰撞检测 (AutoDesign dedup 语义)
     pub fingerprint: String,
@@ -586,8 +586,8 @@ pub struct HarnessCandidate {
     pub covers: Vec<String>,
 }
 
-impl HarnessCandidate {
-    pub fn new(target: HarnessTarget, code: impl Into<String>, covers: Vec<String>) -> Self {
+impl _HarnessCandidate {
+    pub fn new(target: _HarnessTarget, code: impl Into<String>, covers: Vec<String>) -> Self {
         let code = code.into();
         let fingerprint = normalize_code(&code);
         Self {
@@ -611,11 +611,11 @@ fn normalize_code(code: &str) -> String {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MetaHarnessOptimizer {
-    candidates: Vec<HarnessCandidate>,
+    candidates: Vec<_HarnessCandidate>,
     /// A3 (DarwinX): 被拒谱系档案 — preserve-and-extend 淘汰的候选进档案,
     /// 供后续重组 (recombination), 不直接丢弃 (single-lineage 局部更新会
     /// 回归其他任务, 档案保留替代谱系)。
-    pub archive: Vec<HarnessCandidate>,
+    pub archive: Vec<_HarnessCandidate>,
 }
 
 impl MetaHarnessOptimizer {
@@ -624,7 +624,7 @@ impl MetaHarnessOptimizer {
     }
 
     /// 提议一个候选, 去重 (指纹碰撞 → 拒绝重复)。
-    pub fn propose(&mut self, c: HarnessCandidate) -> Result<(), String> {
+    pub fn propose(&mut self, c: _HarnessCandidate) -> Result<(), String> {
         if self.candidates.iter().any(|x| x.fingerprint == c.fingerprint) {
             return Err(format!("duplicate harness fingerprint: {}", c.fingerprint));
         }
@@ -636,9 +636,9 @@ impl MetaHarnessOptimizer {
     /// 的变体。判定: 候选覆盖点必须 ⊇ 某现存候选的覆盖点 (扩展无回归),
     /// 或带来全新覆盖点 (cap 内)。回归变体 → 拒绝并存入 archive 供重组。
     /// 返回 (是否录取, 拒绝理由)。
-    pub fn admit_preserve_and_extend(
+    pub(crate) fn _admit_preserve_and_extend(
         &mut self,
-        c: HarnessCandidate,
+        c: _HarnessCandidate,
         coverage_cap: usize,
     ) -> Result<bool, String> {
         if self.candidates.iter().any(|x| x.fingerprint == c.fingerprint) {
@@ -667,14 +667,14 @@ impl MetaHarnessOptimizer {
 
     /// A3 重组: 从档案取一条替代谱系 (被拒变体) 作为重组源, 供后续变异。
     /// 破单一路径依赖 (DarwinX archive recombination)。
-    pub fn recombine(&self, offset: usize) -> Option<&HarnessCandidate> {
+    pub(crate) fn _recombine(&self, offset: usize) -> Option<&_HarnessCandidate> {
         if self.archive.is_empty() {
             return None;
         }
         self.archive.get(offset % self.archive.len())
     }
 
-    pub fn archive_len(&self) -> usize {
+    pub(crate) fn _archive_len(&self) -> usize {
         self.archive.len()
     }
 
@@ -697,7 +697,7 @@ impl MetaHarnessOptimizer {
         removed
     }
 
-    pub fn candidates(&self) -> &[HarnessCandidate] {
+    pub fn candidates(&self) -> &[_HarnessCandidate] {
         &self.candidates
     }
 
@@ -706,7 +706,7 @@ impl MetaHarnessOptimizer {
     }
 
     /// 按 target 分组统计, 供进化调度。
-    pub fn coverage(&self) -> std::collections::HashMap<HarnessTarget, usize> {
+    pub fn coverage(&self) -> std::collections::HashMap<_HarnessTarget, usize> {
         let mut m = std::collections::HashMap::new();
         for c in &self.candidates {
             *m.entry(c.target).or_insert(0) += 1;
@@ -715,7 +715,7 @@ impl MetaHarnessOptimizer {
     }
 
     /// 为已注册功能点生成种子 harness 候选 (AutoDesign 初始化)。
-    pub fn seed_for(features: &[(&str, HarnessTarget)]) -> Vec<HarnessCandidate> {
+    pub(crate) fn _seed_for(features: &[(&str, _HarnessTarget)]) -> Vec<_HarnessCandidate> {
         features
             .iter()
             .map(|(name, target)| {
@@ -724,7 +724,7 @@ impl MetaHarnessOptimizer {
                     name.replace(['-', ' '], "_"),
                     name
                 );
-                HarnessCandidate::new(*target, code, vec![name.to_string()])
+                _HarnessCandidate::new(*target, code, vec![name.to_string()])
             })
             .collect()
     }
@@ -737,7 +737,7 @@ impl crate::core::nt_core_self_test::SelfTest for MetaHarnessOptimizer {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut opt = MetaHarnessOptimizer::new();
-        for c in MetaHarnessOptimizer::seed_for(&[("tok_a", HarnessTarget::UnitTest), ("tok_b", HarnessTarget::Compile)]) {
+        for c in MetaHarnessOptimizer::_seed_for(&[("tok_a", _HarnessTarget::UnitTest), ("tok_b", _HarnessTarget::Compile)]) {
             opt.propose(c).map_err(|e| vec![e])?;
         }
         if opt.count() != 2 {
@@ -748,7 +748,7 @@ impl crate::core::nt_core_self_test::SelfTest for MetaHarnessOptimizer {
 }
 
 // ────────────────────────────────────────────────────────────────
-// P15: TrainPipeline (吸收 train-llm-from-scratch)
+// P15: _TrainPipeline (吸收 train-llm-from-scratch)
 // 端到端训练管线 (SFT→RM→{PPO,DPO,GRPO}) 编排的状态机建模 + 超参知识
 // (lr scale 法则) + 策略选择。只做管线编排, 不做真实训练。注入自进化
 // 循环作为"训练方法论"层。
@@ -756,7 +756,7 @@ impl crate::core::nt_core_self_test::SelfTest for MetaHarnessOptimizer {
 
 /// 训练阶段 — Pretrain→Sft→Rm→{Ppo,Dpo,Grpo 任一}→Done
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TrainStage {
+pub(crate) enum _TrainStage {
     Pretrain,
     Sft,
     Rm,
@@ -766,36 +766,36 @@ pub enum TrainStage {
     Done,
 }
 
-impl TrainStage {
+impl _TrainStage {
     pub fn label(self) -> &'static str {
         match self {
-            TrainStage::Pretrain => "pretrain",
-            TrainStage::Sft => "sft",
-            TrainStage::Rm => "rm",
-            TrainStage::Ppo => "ppo",
-            TrainStage::Dpo => "dpo",
-            TrainStage::Grpo => "grpo",
-            TrainStage::Done => "done",
+            _TrainStage::Pretrain => "pretrain",
+            _TrainStage::Sft => "sft",
+            _TrainStage::Rm => "rm",
+            _TrainStage::Ppo => "ppo",
+            _TrainStage::Dpo => "dpo",
+            _TrainStage::Grpo => "grpo",
+            _TrainStage::Done => "done",
         }
     }
 
     /// 阶段推进: Pretrain→Sft→Rm→{Ppo,Dpo,Grpo 任一}→Done; Done 终止
-    pub fn next(self) -> Option<TrainStage> {
+    pub fn next(self) -> Option<_TrainStage> {
         match self {
-            TrainStage::Pretrain => Some(TrainStage::Sft),
-            TrainStage::Sft => Some(TrainStage::Rm),
-            TrainStage::Rm => Some(TrainStage::Ppo),
-            TrainStage::Ppo => Some(TrainStage::Done),
-            TrainStage::Dpo => Some(TrainStage::Done),
-            TrainStage::Grpo => Some(TrainStage::Done),
-            TrainStage::Done => None,
+            _TrainStage::Pretrain => Some(_TrainStage::Sft),
+            _TrainStage::Sft => Some(_TrainStage::Rm),
+            _TrainStage::Rm => Some(_TrainStage::Ppo),
+            _TrainStage::Ppo => Some(_TrainStage::Done),
+            _TrainStage::Dpo => Some(_TrainStage::Done),
+            _TrainStage::Grpo => Some(_TrainStage::Done),
+            _TrainStage::Done => None,
         }
     }
 }
 
 /// 训练超参 — 端到端管线的全局配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrainConfig {
+pub(crate) struct _TrainConfig {
     /// 模型参数量 (scale), lr 缩放基准 1e9
     pub model_scale: f64,
     /// 学习率
@@ -808,7 +808,7 @@ pub struct TrainConfig {
     pub max_epochs: usize,
 }
 
-impl Default for TrainConfig {
+impl Default for _TrainConfig {
     fn default() -> Self {
         Self {
             model_scale: 1e9,
@@ -822,24 +822,24 @@ impl Default for TrainConfig {
 
 /// 训练管线状态机 — 阶段推进 + 超参 + 历史追踪
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrainPipeline {
-    pub current: TrainStage,
-    pub config: TrainConfig,
+pub(crate) struct _TrainPipeline {
+    pub current: _TrainStage,
+    pub config: _TrainConfig,
     pub epochs_run: usize,
     /// 每阶段完成时记录 (阶段, 当时 epoch 数)
-    pub history: Vec<(TrainStage, usize)>,
+    pub history: Vec<(_TrainStage, usize)>,
 }
 
-impl Default for TrainPipeline {
+impl Default for _TrainPipeline {
     fn default() -> Self {
-        Self::new(TrainConfig::default())
+        Self::new(_TrainConfig::default())
     }
 }
 
-impl TrainPipeline {
-    pub fn new(config: TrainConfig) -> Self {
+impl _TrainPipeline {
+    pub fn new(config: _TrainConfig) -> Self {
         Self {
-            current: TrainStage::Pretrain,
+            current: _TrainStage::Pretrain,
             config,
             epochs_run: 0,
             history: Vec::new(),
@@ -848,7 +848,7 @@ impl TrainPipeline {
 
     /// 推进到下一阶段: epochs_run += 1, 记录 (current, epochs_run), current = next()?,
     /// 返回新阶段。Done 之后返回 None (R-P3: ? 传播终止)。
-    pub fn advance(&mut self) -> Option<TrainStage> {
+    pub fn advance(&mut self) -> Option<_TrainStage> {
         self.epochs_run += 1;
         self.history.push((self.current, self.epochs_run));
         let next = self.current.next()?;
@@ -857,64 +857,64 @@ impl TrainPipeline {
     }
 
     /// 训练策略选择 — 各阶段对应方法论 (train-llm-from-scratch 知识)
-    pub fn recommend_strategy(&self, stage: TrainStage) -> &'static str {
+    pub(crate) fn _recommend_strategy(&self, stage: _TrainStage) -> &'static str {
         match stage {
-            TrainStage::Sft => "supervised fine-tuning: next-token",
-            TrainStage::Rm => "reward model: pairwise ranking",
-            TrainStage::Ppo => "PPO: on-policy RLHF",
-            TrainStage::Dpo => "DPO: off-policy preference",
-            TrainStage::Grpo => "GRPO: group relative policy optimization",
+            _TrainStage::Sft => "supervised fine-tuning: next-token",
+            _TrainStage::Rm => "reward model: pairwise ranking",
+            _TrainStage::Ppo => "PPO: on-policy RLHF",
+            _TrainStage::Dpo => "DPO: off-policy preference",
+            _TrainStage::Grpo => "GRPO: group relative policy optimization",
             _ => "pretraining: next-token on corpus",
         }
     }
 
     /// 依据模型规模缩放 lr (经验法则: lr ∝ scale^-0.15), 更新 config.lr 并返回。
     /// 更大模型 → 更小 lr。
-    pub fn scale_lr(&mut self, scale: f64) -> f64 {
+    pub(crate) fn _scale_lr(&mut self, scale: f64) -> f64 {
         let scaled = self.config.lr * (scale / 1e9).powf(-0.15);
         self.config.lr = scaled;
         scaled
     }
 
     pub fn is_complete(&self) -> bool {
-        self.current == TrainStage::Done
+        self.current == _TrainStage::Done
     }
 
     /// 完成阶段占比 (6 阶段含 Done)。R-P6: max(0.0).min(1.0) 钳制。
-    pub fn stage_progress(&self) -> f64 {
+    pub(crate) fn _stage_progress(&self) -> f64 {
         let idx = match self.current {
-            TrainStage::Pretrain => 0,
-            TrainStage::Sft => 1,
-            TrainStage::Rm => 2,
-            TrainStage::Ppo => 3,
-            TrainStage::Dpo => 4,
-            TrainStage::Grpo => 5,
-            TrainStage::Done => 6,
+            _TrainStage::Pretrain => 0,
+            _TrainStage::Sft => 1,
+            _TrainStage::Rm => 2,
+            _TrainStage::Ppo => 3,
+            _TrainStage::Dpo => 4,
+            _TrainStage::Grpo => 5,
+            _TrainStage::Done => 6,
         };
         (idx as f64 / 6.0).max(0.0).min(1.0)
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for TrainPipeline {
+impl crate::core::nt_core_self_test::SelfTest for _TrainPipeline {
     fn name(&self) -> &str {
         "nt_mind_train_pipeline"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let mut pipe = TrainPipeline::new(TrainConfig::default());
+        let mut pipe = _TrainPipeline::new(_TrainConfig::default());
         if pipe.is_complete() {
             return Err(vec!["pipeline must start incomplete".into()]);
         }
         pipe.advance()
             .ok_or_else(|| vec!["advance from Pretrain must yield a stage".into()])?;
         let base = pipe.config.lr;
-        let scaled = pipe.scale_lr(1e10);
+        let scaled = pipe._scale_lr(1e10);
         if !scaled.is_finite() || scaled >= base {
-            return Err(vec!["scale_lr must lower lr for larger models".into()]);
+            return Err(vec!["_scale_lr must lower lr for larger models".into()]);
         }
-        let p = pipe.stage_progress();
+        let p = pipe._stage_progress();
         if !(0.0..=1.0).contains(&p) {
-            return Err(vec![format!("stage_progress out of bounds: {p}")]);
+            return Err(vec![format!("_stage_progress out of bounds: {p}")]);
         }
         Ok(())
     }
@@ -992,7 +992,7 @@ impl EvolutionLoop {
         let mut new_patterns = Vec::new();
 
         // 1. 项目扫描
-        let snapshot = self.scan_project_in(target);
+        let snapshot = self._scan_project_in(target);
 
         // 2. 问题检测
         self.detect_large_files(&snapshot, &mut issues);
@@ -1090,7 +1090,7 @@ impl EvolutionLoop {
     }
 
     /// 自动修复周期 — 对所有 auto_fixable 问题执行真实修复并重新扫描
-    pub fn autofix_cycle(
+    pub(crate) fn _autofix_cycle(
         &mut self,
         world_fe: Option<f64>,
         world_phi: Option<f64>,
@@ -1117,7 +1117,7 @@ impl EvolutionLoop {
         let final_report = self.run_cycle_in(target, Some(initial_report.free_energy), Some(initial_report.phi));
 
         // verify→recover: 三角色异模型裁决修复是否安全; 拒绝则标记回滚, 不计入 auto_fixes
-        let verdict = self.auditor.verify_change(
+        let verdict = self.auditor._verify_change(
             final_report.cycle,
             &initial_report.snapshot,
             &final_report.snapshot,
@@ -1147,11 +1147,11 @@ impl EvolutionLoop {
 
     /// 项目扫描 (基于文件系统, 当前 Cargo 项目)
     pub fn scan_project(&self) -> ProjectSnapshot {
-        self.scan_project_in(None)
+        self._scan_project_in(None)
     }
 
     /// 项目扫描 — 对指定目标目录扫描（target=None 回落自身；target 为非 Rust 项目时仍扫描 .rs 文件并做 cargo check）
-    pub fn scan_project_in(&self, target: Option<&std::path::Path>) -> ProjectSnapshot {
+    pub(crate) fn _scan_project_in(&self, target: Option<&std::path::Path>) -> ProjectSnapshot {
         // 目标目录解析: 显式 target > self.target_dir > 自身 Cargo 项目根
         let root = match target {
             Some(t) => t.to_path_buf(),
@@ -1463,7 +1463,7 @@ impl EvolutionLoop {
     }
 
     /// 判断是否需要人工介入
-    pub fn needs_human_intervention(&self) -> bool {
+    pub(crate) fn _needs_human_intervention(&self) -> bool {
         self.consecutive_stagnant >= STAGNATION_LIMIT
             || self.issues.iter().any(|i| i.severity >= 9)
     }
@@ -1495,7 +1495,7 @@ impl EvolutionLoop {
 
     /// 自我诊断入口 — 零 LLM 依赖, 基于扫描数据 + 历史 + 能力向量排序
     pub fn self_diagnose(&self) -> (Vec<DiagnosticItem>, PriorityQueue) {
-        let snapshot = self.scan_project_in(None);
+        let snapshot = self._scan_project_in(None);
         SelfDiagnose::run_diagnosis(&snapshot, self.cycle)
     }
 
@@ -1504,7 +1504,7 @@ impl EvolutionLoop {
     /// 循环断路器接线 (R-P79): 每次 autofix 会话持有一个 RepairCircuitBreaker,
     /// 逐 item 执行前检查断路器; 跳闸 (轮次超限或连续无进展) 即停止后续修复,
     /// 防止自愈循环空转 (retry cap / loop detection)。
-    pub fn autofix_by_diagnosis(&mut self) -> u32 {
+    pub(crate) fn _autofix_by_diagnosis(&mut self) -> u32 {
         let (_items, pq) = self.self_diagnose();
         let mut fixes = 0u32;
         let mut breaker = RepairCircuitBreaker::new(REPAIR_MAX_ROUNDS);
@@ -1718,9 +1718,9 @@ mod tests {
     #[test]
     fn test_stagnation_detection() {
         let mut el = EvolutionLoop::new();
-        assert!(!el.needs_human_intervention());
+        assert!(!el._needs_human_intervention());
         el.consecutive_stagnant = STAGNATION_LIMIT;
-        assert!(el.needs_human_intervention());
+        assert!(el._needs_human_intervention());
     }
 
     #[test]
@@ -1769,7 +1769,7 @@ mod tests {
         std::fs::write(src.join("hot.rs"), "unsafe { }\nunsafe { }\nunsafe { }\nunsafe { }\nunsafe { }\nunsafe { }\n").expect("write mock hot");
 
         let el = EvolutionLoop::new();
-        let snap = el.scan_project_in(Some(&dir));
+        let snap = el._scan_project_in(Some(&dir));
         assert!(snap.total_files >= 2, "expected >=2 files, got {}", snap.total_files);
         assert!(snap.todo_count >= 1, "expected TODO detected, got {}", snap.todo_count);
         assert!(snap.file_unsafe_hotspots.len() >= 1, "expected unsafe hotspot");
@@ -1878,7 +1878,7 @@ mod tests {
         let after = snap(12, 0, 6, 4, 1);
         auditor.checkpoint(1, &before);
 
-        let v = auditor.verify_change(2, &before, &after);
+        let v = auditor._verify_change(2, &before, &after);
         assert!(v.passed, "improvement must pass: {}", v.summary());
         assert!(!v.recovered);
         assert_eq!(v.checkpoint_cycle, 2, "pass 后 checkpoint 前移到新快照");
@@ -1894,7 +1894,7 @@ mod tests {
         let regression = snap(30, 2, 5, 3, 1);
         auditor.checkpoint(1, &before);
 
-        let v = auditor.verify_change(2, &before, &regression);
+        let v = auditor._verify_change(2, &before, &regression);
         assert!(!v.passed, "regression must be rejected");
         assert!(v.recovered, "拒绝时须标记 recover 回滚至 last-good");
         assert_eq!(v.checkpoint_cycle, 1, "reject 后 checkpoint 保持 last-good");
@@ -1910,13 +1910,13 @@ mod tests {
         let side_effect = snap(8, 0, 20, 30, 1);
         auditor.checkpoint(1, &before);
 
-        let v = auditor.verify_change(2, &before, &side_effect);
+        let v = auditor._verify_change(2, &before, &side_effect);
         assert!(!v.passed, "side-effect regression must fail consistency");
         assert!(v.recovered);
         let consistency = v
             .role_verdicts
             .iter()
-            .find(|r| r.role == AuditorRole::Consistency)
+            .find(|r| r.role == _AuditorRole::Consistency)
             .expect("consistency role must be present");
         assert!(!consistency.pass);
     }
@@ -1929,12 +1929,12 @@ mod tests {
         let new_hotspots = snap(10, 0, 12, 3, 4);
         auditor.checkpoint(1, &before);
 
-        let v = auditor.verify_change(2, &before, &new_hotspots);
+        let v = auditor._verify_change(2, &before, &new_hotspots);
         assert!(!v.passed);
         let governance = v
             .role_verdicts
             .iter()
-            .find(|r| r.role == AuditorRole::Governance)
+            .find(|r| r.role == _AuditorRole::Governance)
             .expect("governance role must be present");
         assert!(!governance.pass);
     }
@@ -1963,7 +1963,7 @@ mod tests {
 
     #[test]
     fn rst_seed_creates_verified_gen0() {
-        let mut fw = RstFlywheel::new();
+        let mut fw = _RstFlywheel::new();
         let seed = fw.seed("parse the config");
         assert_eq!(seed.generation, 0);
         assert!(seed.verified);
@@ -1972,7 +1972,7 @@ mod tests {
 
     #[test]
     fn rst_extend_increments_generation_and_complexity() {
-        let mut fw = RstFlywheel::new();
+        let mut fw = _RstFlywheel::new();
         let seed = fw.seed("baseline");
         let children = fw.extend(&seed);
         assert_eq!(children.len(), fw.extend_per_gen);
@@ -1983,7 +1983,7 @@ mod tests {
 
     #[test]
     fn rst_extend_stops_at_max_generation() {
-        let mut fw = RstFlywheel::new();
+        let mut fw = _RstFlywheel::new();
         let mut t = fw.seed("deep");
         t.generation = fw.max_generation;
         assert!(fw.extend(&t).is_empty());
@@ -1991,8 +1991,8 @@ mod tests {
 
     #[test]
     fn rst_realign_filters_below_threshold() {
-        let fw = RstFlywheel::new();
-        let parent = RstTask {
+        let fw = _RstFlywheel::new();
+        let parent = _RstTask {
             id: "p".into(),
             prompt: "parent".into(),
             generation: 0,
@@ -2000,7 +2000,7 @@ mod tests {
             verified: true,
             parent: None,
         };
-        let low = RstTask {
+        let low = _RstTask {
             id: "low".into(),
             prompt: "low".into(),
             generation: 1,
@@ -2011,15 +2011,15 @@ mod tests {
         let mut ok = low.clone();
         ok.id = "ok".into();
         ok.complexity = 12.0;
-        let kept = fw.realign(&parent, vec![low, ok]);
+        let kept = fw._realign(&parent, vec![low, ok]);
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].id, "ok");
     }
 
     #[test]
     fn rst_validate_rejects_empty_prompt() {
-        let mut fw = RstFlywheel::new();
-        let bad = RstTask {
+        let mut fw = _RstFlywheel::new();
+        let bad = _RstTask {
             id: "bad".into(),
             prompt: "  ".into(),
             generation: 1,
@@ -2033,8 +2033,8 @@ mod tests {
 
     #[test]
     fn rst_validate_rejects_over_cap() {
-        let mut fw = RstFlywheel::new();
-        let over = RstTask {
+        let mut fw = _RstFlywheel::new();
+        let over = _RstTask {
             id: "over".into(),
             prompt: "x".into(),
             generation: 1,
@@ -2047,7 +2047,7 @@ mod tests {
 
     #[test]
     fn rst_reuse_samples_verified_pool_roundrobin() {
-        let mut fw = RstFlywheel::new();
+        let mut fw = _RstFlywheel::new();
         fw.seed("a");
         fw.seed("b");
         let first = fw.reuse(0).unwrap().id.clone();
@@ -2059,10 +2059,10 @@ mod tests {
 
     #[test]
     fn rst_full_generation_grows_pool() {
-        let mut fw = RstFlywheel::new();
+        let mut fw = _RstFlywheel::new();
         let seed = fw.seed("task");
         let before = fw.stats().0;
-        let accepted = fw.run_generation(&seed);
+        let accepted = fw._run_generation(&seed);
         assert!(accepted > 0);
         assert_eq!(fw.stats().0, before + accepted);
         assert!(fw.accepted_count >= 1 + accepted as u64);
@@ -2070,9 +2070,9 @@ mod tests {
 
     #[test]
     fn rst_stats_distribution_by_generation() {
-        let mut fw = RstFlywheel::new();
+        let mut fw = _RstFlywheel::new();
         let seed = fw.seed("gen0");
-        fw.run_generation(&seed);
+        fw._run_generation(&seed);
         let (total, dist) = fw.stats();
         assert_eq!(total, 1 + dist.get(1).copied().unwrap_or(0));
         assert!(dist.len() >= 2, "seed(gen0) + children(gen1)");
@@ -2082,36 +2082,36 @@ mod tests {
     // ── P0-8 keep-or-revert + seed escalation ──
     #[test]
     fn rst_keep_or_revert_keeps_when_improves() {
-        let fw = RstFlywheel::new();
-        assert!(fw.keep_or_revert(10.0, 12.0, 1.05), "12 > 10*1.05 → keep");
+        let fw = _RstFlywheel::new();
+        assert!(fw._keep_or_revert(10.0, 12.0, 1.05), "12 > 10*1.05 → keep");
     }
 
     #[test]
     fn rst_keep_or_revert_reverts_when_regresses() {
-        let fw = RstFlywheel::new();
-        assert!(!fw.keep_or_revert(10.0, 9.0, 1.05), "9 < 10*1.05 → revert");
+        let fw = _RstFlywheel::new();
+        assert!(!fw._keep_or_revert(10.0, 9.0, 1.05), "9 < 10*1.05 → revert");
     }
 
     #[test]
     fn rst_keep_or_revert_no_baseline_keeps() {
-        let fw = RstFlywheel::new();
-        assert!(fw.keep_or_revert(0.0, 5.0, 1.05), "无基准 → keep");
+        let fw = _RstFlywheel::new();
+        assert!(fw._keep_or_revert(0.0, 5.0, 1.05), "无基准 → keep");
     }
 
     #[test]
     fn rst_seed_escalation_tiers() {
-        let fw = RstFlywheel::new();
-        assert_eq!(fw.seed_escalation(0.05, 1), (1, false), "低噪声 1 seed");
-        assert_eq!(fw.seed_escalation(0.2, 1), (3, true), "中噪声升级到 3");
-        assert_eq!(fw.seed_escalation(0.6, 3), (8, true), "高噪声升级到 8");
-        assert_eq!(fw.seed_escalation(0.6, 8), (8, false), "已达付费上限");
+        let fw = _RstFlywheel::new();
+        assert_eq!(fw._seed_escalation(0.05, 1), (1, false), "低噪声 1 seed");
+        assert_eq!(fw._seed_escalation(0.2, 1), (3, true), "中噪声升级到 3");
+        assert_eq!(fw._seed_escalation(0.6, 3), (8, true), "高噪声升级到 8");
+        assert_eq!(fw._seed_escalation(0.6, 8), (8, false), "已达付费上限");
     }
 
     // ── P7 MetaHarnessOptimizer ──
     #[test]
     fn test_harness_seed_proposes() {
         let mut opt = MetaHarnessOptimizer::new();
-        for c in MetaHarnessOptimizer::seed_for(&[("compile_ok", HarnessTarget::Compile), ("bench_fast", HarnessTarget::Bench)]) {
+        for c in MetaHarnessOptimizer::_seed_for(&[("compile_ok", _HarnessTarget::Compile), ("bench_fast", _HarnessTarget::Bench)]) {
             opt.propose(c).expect("propose");
         }
         assert_eq!(opt.count(), 2);
@@ -2120,8 +2120,8 @@ mod tests {
     #[test]
     fn test_harness_dedup_by_fingerprint() {
         let mut opt = MetaHarnessOptimizer::new();
-        let a = HarnessCandidate::new(HarnessTarget::UnitTest, "  fn  a(){} ", vec!["x".into()]);
-        let b = HarnessCandidate::new(HarnessTarget::UnitTest, "fn a(){}", vec!["x".into()]);
+        let a = _HarnessCandidate::new(_HarnessTarget::UnitTest, "  fn  a(){} ", vec!["x".into()]);
+        let b = _HarnessCandidate::new(_HarnessTarget::UnitTest, "fn a(){}", vec!["x".into()]);
         opt.propose(a).expect("first");
         assert!(opt.propose(b).is_err(), "whitespace-normalized duplicate must be rejected");
     }
@@ -2130,9 +2130,9 @@ mod tests {
     fn test_harness_prune_keeps_top_coverage() {
         let mut opt = MetaHarnessOptimizer::new();
         for c in vec![
-            HarnessCandidate::new(HarnessTarget::Integration, "c1", vec!["a".into()]),
-            HarnessCandidate::new(HarnessTarget::Integration, "c2", vec!["a".into(), "b".into()]),
-            HarnessCandidate::new(HarnessTarget::Integration, "c3", vec!["a".into(), "b".into(), "c".into()]),
+            _HarnessCandidate::new(_HarnessTarget::Integration, "c1", vec!["a".into()]),
+            _HarnessCandidate::new(_HarnessTarget::Integration, "c2", vec!["a".into(), "b".into()]),
+            _HarnessCandidate::new(_HarnessTarget::Integration, "c3", vec!["a".into(), "b".into(), "c".into()]),
         ] {
             opt.propose(c).expect("propose");
         }
@@ -2145,17 +2145,17 @@ mod tests {
     #[test]
     fn test_harness_coverage_grouping() {
         let mut opt = MetaHarnessOptimizer::new();
-        opt.propose(HarnessCandidate::new(HarnessTarget::Compile, "c1", vec!["a".into()])).unwrap();
-        opt.propose(HarnessCandidate::new(HarnessTarget::UnitTest, "c2", vec!["b".into()])).unwrap();
+        opt.propose(_HarnessCandidate::new(_HarnessTarget::Compile, "c1", vec!["a".into()])).unwrap();
+        opt.propose(_HarnessCandidate::new(_HarnessTarget::UnitTest, "c2", vec!["b".into()])).unwrap();
         let cov = opt.coverage();
-        assert_eq!(cov.get(&HarnessTarget::Compile), Some(&1));
-        assert_eq!(cov.get(&HarnessTarget::UnitTest), Some(&1));
+        assert_eq!(cov.get(&_HarnessTarget::Compile), Some(&1));
+        assert_eq!(cov.get(&_HarnessTarget::UnitTest), Some(&1));
     }
 
     #[test]
     fn test_harness_prune_zero_clears() {
         let mut opt = MetaHarnessOptimizer::new();
-        opt.propose(HarnessCandidate::new(HarnessTarget::Compile, "c1", vec!["a".into()])).unwrap();
+        opt.propose(_HarnessCandidate::new(_HarnessTarget::Compile, "c1", vec!["a".into()])).unwrap();
         let removed = opt.prune(0);
         assert_eq!(removed, 1);
         assert_eq!(opt.count(), 0);
@@ -2167,68 +2167,68 @@ mod tests {
         assert!(opt.self_test().is_ok());
     }
 
-    // ── P15: TrainPipeline (train-llm-from-scratch 吸收) ──
+    // ── P15: _TrainPipeline (train-llm-from-scratch 吸收) ──
 
     #[test]
     fn train_stage_ordering_advances() {
-        assert_eq!(TrainStage::Pretrain.next(), Some(TrainStage::Sft));
-        assert_eq!(TrainStage::Sft.next(), Some(TrainStage::Rm));
-        assert_eq!(TrainStage::Rm.next(), Some(TrainStage::Ppo));
-        assert_eq!(TrainStage::Ppo.next(), Some(TrainStage::Done));
-        assert_eq!(TrainStage::Dpo.next(), Some(TrainStage::Done));
-        assert_eq!(TrainStage::Grpo.next(), Some(TrainStage::Done));
-        assert_eq!(TrainStage::Done.next(), None);
-        assert_eq!(TrainStage::Ppo.label(), "ppo");
-        assert_eq!(TrainStage::Done.label(), "done");
+        assert_eq!(_TrainStage::Pretrain.next(), Some(_TrainStage::Sft));
+        assert_eq!(_TrainStage::Sft.next(), Some(_TrainStage::Rm));
+        assert_eq!(_TrainStage::Rm.next(), Some(_TrainStage::Ppo));
+        assert_eq!(_TrainStage::Ppo.next(), Some(_TrainStage::Done));
+        assert_eq!(_TrainStage::Dpo.next(), Some(_TrainStage::Done));
+        assert_eq!(_TrainStage::Grpo.next(), Some(_TrainStage::Done));
+        assert_eq!(_TrainStage::Done.next(), None);
+        assert_eq!(_TrainStage::Ppo.label(), "ppo");
+        assert_eq!(_TrainStage::Done.label(), "done");
     }
 
     #[test]
     fn train_pipeline_advance_grows_history() {
-        let mut pipe = TrainPipeline::new(TrainConfig::default());
-        assert_eq!(pipe.current, TrainStage::Pretrain);
+        let mut pipe = _TrainPipeline::new(_TrainConfig::default());
+        assert_eq!(pipe.current, _TrainStage::Pretrain);
         assert_eq!(pipe.history.len(), 0);
         let next = pipe.advance().expect("advance from Pretrain");
-        assert_eq!(next, TrainStage::Sft);
-        assert_eq!(pipe.current, TrainStage::Sft);
+        assert_eq!(next, _TrainStage::Sft);
+        assert_eq!(pipe.current, _TrainStage::Sft);
         assert_eq!(pipe.history.len(), 1);
-        assert_eq!(pipe.history[0], (TrainStage::Pretrain, 1));
+        assert_eq!(pipe.history[0], (_TrainStage::Pretrain, 1));
         assert_eq!(pipe.epochs_run, 1);
     }
 
     #[test]
     fn train_recommend_strategy_per_stage() {
-        let pipe = TrainPipeline::default();
-        assert_eq!(pipe.recommend_strategy(TrainStage::Pretrain), "pretraining: next-token on corpus");
-        assert_eq!(pipe.recommend_strategy(TrainStage::Sft), "supervised fine-tuning: next-token");
-        assert_eq!(pipe.recommend_strategy(TrainStage::Rm), "reward model: pairwise ranking");
-        assert_eq!(pipe.recommend_strategy(TrainStage::Ppo), "PPO: on-policy RLHF");
-        assert_eq!(pipe.recommend_strategy(TrainStage::Dpo), "DPO: off-policy preference");
-        assert_eq!(pipe.recommend_strategy(TrainStage::Grpo), "GRPO: group relative policy optimization");
-        assert_eq!(pipe.recommend_strategy(TrainStage::Done), "pretraining: next-token on corpus");
+        let pipe = _TrainPipeline::default();
+        assert_eq!(pipe._recommend_strategy(_TrainStage::Pretrain), "pretraining: next-token on corpus");
+        assert_eq!(pipe._recommend_strategy(_TrainStage::Sft), "supervised fine-tuning: next-token");
+        assert_eq!(pipe._recommend_strategy(_TrainStage::Rm), "reward model: pairwise ranking");
+        assert_eq!(pipe._recommend_strategy(_TrainStage::Ppo), "PPO: on-policy RLHF");
+        assert_eq!(pipe._recommend_strategy(_TrainStage::Dpo), "DPO: off-policy preference");
+        assert_eq!(pipe._recommend_strategy(_TrainStage::Grpo), "GRPO: group relative policy optimization");
+        assert_eq!(pipe._recommend_strategy(_TrainStage::Done), "pretraining: next-token on corpus");
     }
 
     #[test]
     fn train_scale_lr_lowers_for_larger_models() {
-        let mut pipe = TrainPipeline::new(TrainConfig::default());
+        let mut pipe = _TrainPipeline::new(_TrainConfig::default());
         let base = pipe.config.lr;
-        let big = pipe.scale_lr(1e10);
+        let big = pipe._scale_lr(1e10);
         assert!(big < base, "10B model lr ({big}) must be smaller than base ({base})");
         assert_eq!(pipe.config.lr, big);
 
-        let mut small_pipe = TrainPipeline::new(TrainConfig::default());
+        let mut small_pipe = _TrainPipeline::new(_TrainConfig::default());
         let small_base = small_pipe.config.lr;
-        let small = small_pipe.scale_lr(1e8);
+        let small = small_pipe._scale_lr(1e8);
         assert!(small > small_base, "100M model lr ({small}) must be larger than base ({small_base})");
     }
 
     #[test]
     fn train_is_complete_only_when_done() {
-        let mut pipe = TrainPipeline::default();
+        let mut pipe = _TrainPipeline::default();
         assert!(!pipe.is_complete());
         for _ in 0..4 {
             pipe.advance();
         }
-        assert_eq!(pipe.current, TrainStage::Done);
+        assert_eq!(pipe.current, _TrainStage::Done);
         assert!(pipe.is_complete());
         assert_eq!(pipe.advance(), None, "Done 之后 advance 返回 None");
         assert!(pipe.is_complete());
@@ -2236,69 +2236,69 @@ mod tests {
 
     #[test]
     fn train_stage_progress_bounds_and_monotonic() {
-        let mut pipe = TrainPipeline::default();
-        assert_eq!(pipe.stage_progress(), 0.0);
-        assert!((0.0..=1.0).contains(&pipe.stage_progress()));
+        let mut pipe = _TrainPipeline::default();
+        assert_eq!(pipe._stage_progress(), 0.0);
+        assert!((0.0..=1.0).contains(&pipe._stage_progress()));
         let mut last = 0.0;
         for _ in 0..4 {
             pipe.advance();
-            let p = pipe.stage_progress();
+            let p = pipe._stage_progress();
             assert!(p >= last && p <= 1.0, "progress must stay in [0,1] and be monotonic");
             last = p;
         }
-        assert_eq!(pipe.stage_progress(), 1.0);
+        assert_eq!(pipe._stage_progress(), 1.0);
     }
 
     #[test]
     fn train_pipeline_selftest_passes() {
-        let pipe = TrainPipeline::new(TrainConfig::default());
+        let pipe = _TrainPipeline::new(_TrainConfig::default());
         assert!(pipe.self_test().is_ok());
     }
 
     // ── A2 (autoresearch): 有界循环 + commit-then-verify ──
     #[test]
     fn rst_budget_exhausts_after_budget_iters() {
-        let mut fw = RstFlywheel::new();
+        let mut fw = _RstFlywheel::new();
         fw.iteration_budget = 2;
         let seed = fw.seed("base task");
         assert!(!fw.budget_exhausted());
-        assert!(fw.bounded_run_generation(&seed).is_some());
-        assert!(fw.bounded_run_generation(&seed).is_some());
+        assert!(fw._bounded_run_generation(&seed).is_some());
+        assert!(fw._bounded_run_generation(&seed).is_some());
         assert!(fw.budget_exhausted(), "预算耗尽后停");
-        assert!(fw.bounded_run_generation(&seed).is_none(), "耗尽后不再运行");
+        assert!(fw._bounded_run_generation(&seed).is_none(), "耗尽后不再运行");
         assert_eq!(fw.iterations_used, 2);
     }
 
     #[test]
     fn rst_commit_then_verify_reverts_on_regression() {
-        let fw = RstFlywheel::new();
+        let fw = _RstFlywheel::new();
         // keep: 新分显著更高
-        let (keep, revert) = fw.commit_then_verify(10.0, 20.0, 1.1);
+        let (keep, revert) = fw._commit_then_verify(10.0, 20.0, 1.1);
         assert!(keep && !revert);
         // revert: 新分低于旧分 × 阈值
-        let (keep, revert) = fw.commit_then_verify(10.0, 5.0, 1.1);
+        let (keep, revert) = fw._commit_then_verify(10.0, 5.0, 1.1);
         assert!(!keep && revert);
         // 无基准 (old=0) → keep
-        assert!(fw.commit_then_verify(0.0, 1.0, 1.1).0);
+        assert!(fw._commit_then_verify(0.0, 1.0, 1.1).0);
     }
 
     // ── A3 (DarwinX): preserve-and-extend 种群档案 ──
     #[test]
     fn meta_harness_preserve_and_extend_admits_superset() {
         let mut opt = MetaHarnessOptimizer::new();
-        opt.propose(HarnessCandidate::new(
-            HarnessTarget::UnitTest,
+        opt.propose(_HarnessCandidate::new(
+            _HarnessTarget::UnitTest,
             "fn a(){}",
             vec!["tok_a".into()],
         ))
         .unwrap();
         // 扩展覆盖且不回归 → 录取
-        let ext = HarnessCandidate::new(
-            HarnessTarget::UnitTest,
+        let ext = _HarnessCandidate::new(
+            _HarnessTarget::UnitTest,
             "fn ab(){}",
             vec!["tok_a".into(), "tok_b".into()],
         );
-        let admitted = opt.admit_preserve_and_extend(ext, 10).unwrap();
+        let admitted = opt._admit_preserve_and_extend(ext, 10).unwrap();
         assert!(admitted);
         assert_eq!(opt.count(), 2);
     }
@@ -2306,22 +2306,22 @@ mod tests {
     #[test]
     fn meta_harness_preserve_and_extend_rejects_regress_to_archive() {
         let mut opt = MetaHarnessOptimizer::new();
-        opt.propose(HarnessCandidate::new(
-            HarnessTarget::UnitTest,
+        opt.propose(_HarnessCandidate::new(
+            _HarnessTarget::UnitTest,
             "fn a(){}",
             vec!["tok_a".into(), "tok_b".into()],
         ))
         .unwrap();
         // 回归: 丢掉了 tok_b → 拒绝入档案 (供重组)
-        let regress = HarnessCandidate::new(
-            HarnessTarget::UnitTest,
+        let regress = _HarnessCandidate::new(
+            _HarnessTarget::UnitTest,
             "fn a_only(){}",
             vec!["tok_a".into()],
         );
-        let admitted = opt.admit_preserve_and_extend(regress, 10).unwrap();
+        let admitted = opt._admit_preserve_and_extend(regress, 10).unwrap();
         assert!(!admitted);
         assert_eq!(opt.count(), 1, "回归变体不录取");
-        assert_eq!(opt.archive_len(), 1, "回归变体入档案");
-        assert!(opt.recombine(0).is_some(), "档案可重组");
+        assert_eq!(opt._archive_len(), 1, "回归变体入档案");
+        assert!(opt._recombine(0).is_some(), "档案可重组");
     }
 }

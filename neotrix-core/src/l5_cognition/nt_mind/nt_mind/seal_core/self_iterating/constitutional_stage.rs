@@ -21,7 +21,7 @@ use super::pipeline::StageResult;
 /// 4-tier priority hierarchy for constitutional principles.
 /// Higher ordinal = lower priority (Safety=0 is highest).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum PriorityTier {
+pub(crate) enum _PriorityTier {
     /// Tier 1: Safety — prevents harm, preserves life, security
     Safety = 0,
     /// Tier 2: Ethics — fairness, honesty, transparency
@@ -32,17 +32,17 @@ pub enum PriorityTier {
     Helpfulness = 3,
 }
 
-impl PriorityTier {
+impl _PriorityTier {
     pub fn weight(self) -> i32 {
         4 - self as i32
     }
 
     pub fn label(self) -> &'static str {
         match self {
-            PriorityTier::Safety => "Safety",
-            PriorityTier::Ethics => "Ethics",
-            PriorityTier::Compliance => "Compliance",
-            PriorityTier::Helpfulness => "Helpfulness",
+            _PriorityTier::Safety => "Safety",
+            _PriorityTier::Ethics => "Ethics",
+            _PriorityTier::Compliance => "Compliance",
+            _PriorityTier::Helpfulness => "Helpfulness",
         }
     }
 }
@@ -51,10 +51,10 @@ impl PriorityTier {
 
 /// A constitutional principle with priority tier and evaluation criteria.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstitutionalPrincipleV2 {
+pub(crate) struct _ConstitutionalPrincipleV2 {
     pub name: String,
     pub description: String,
-    pub tier: PriorityTier,
+    pub tier: _PriorityTier,
     pub evaluation_criteria: Vec<String>,
     /// Whether this principle can be violated by a higher-tier principle
     pub overridable: bool,
@@ -62,10 +62,10 @@ pub struct ConstitutionalPrincipleV2 {
 
 /// A reasoned verdict for a single principle evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasonedVerdict {
+pub(crate) struct _ReasonedVerdict {
     pub principle: String,
     pub score: f64,
-    pub tier: PriorityTier,
+    pub tier: _PriorityTier,
     pub reasoning: String,
     pub conflicts: Vec<String>,
     pub override_by: Option<String>,
@@ -73,22 +73,22 @@ pub struct ReasonedVerdict {
 
 /// The upgraded constitution with 4-tier priority hierarchy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstitutionV2 {
-    pub principles: Vec<ConstitutionalPrincipleV2>,
+pub(crate) struct _ConstitutionV2 {
+    pub principles: Vec<_ConstitutionalPrincipleV2>,
     pub version: String,
 }
 
-impl ConstitutionV2 {
+impl _ConstitutionV2 {
     /// Create the default priority constitution with 12 principles across 4 tiers.
-    pub fn default_priority_constitution() -> Self {
+    pub(crate) fn _default_priority_constitution() -> Self {
         Self {
             version: "2.0".into(),
             principles: vec![
                 // Safety (tier 1) — non-overridable
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "DoNoHarm".into(),
                     description: "Edits must not cause physical, financial, or reputational harm".into(),
-                    tier: PriorityTier::Safety,
+                    tier: _PriorityTier::Safety,
                     evaluation_criteria: vec![
                         "contains dangerous file operations".into(),
                         "contains code execution with side effects".into(),
@@ -96,10 +96,10 @@ impl ConstitutionV2 {
                     ],
                     overridable: false,
                 },
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "PrivacyProtection".into(),
                     description: "Edits must not expose or leak private information".into(),
-                    tier: PriorityTier::Safety,
+                    tier: _PriorityTier::Safety,
                     evaluation_criteria: vec![
                         "contains credential or key patterns".into(),
                         "exposes personal data".into(),
@@ -107,10 +107,10 @@ impl ConstitutionV2 {
                     ],
                     overridable: false,
                 },
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "SecurityPreservation".into(),
                     description: "Edits must not introduce security vulnerabilities".into(),
-                    tier: PriorityTier::Safety,
+                    tier: _PriorityTier::Safety,
                     evaluation_criteria: vec![
                         "weakens access controls".into(),
                         "introduces injection vectors".into(),
@@ -119,10 +119,10 @@ impl ConstitutionV2 {
                     overridable: false,
                 },
                 // Ethics (tier 2)
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "HonestyMaintenance".into(),
                     description: "Capability representation must reflect true state".into(),
-                    tier: PriorityTier::Ethics,
+                    tier: _PriorityTier::Ethics,
                     evaluation_criteria: vec![
                         "inflates capability scores".into(),
                         "misrepresents performance".into(),
@@ -130,10 +130,10 @@ impl ConstitutionV2 {
                     ],
                     overridable: true,
                 },
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "FairnessEquity".into(),
                     description: "Edits must not introduce bias or unfair advantage".into(),
-                    tier: PriorityTier::Ethics,
+                    tier: _PriorityTier::Ethics,
                     evaluation_criteria: vec![
                         "skews toward one outcome".into(),
                         "discriminates across inputs".into(),
@@ -141,10 +141,10 @@ impl ConstitutionV2 {
                     ],
                     overridable: true,
                 },
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "Accountability".into(),
                     description: "Edits must be attributable and auditable".into(),
-                    tier: PriorityTier::Ethics,
+                    tier: _PriorityTier::Ethics,
                     evaluation_criteria: vec![
                         "lacks attribution metadata".into(),
                         "obscures authorship".into(),
@@ -153,10 +153,10 @@ impl ConstitutionV2 {
                     overridable: true,
                 },
                 // Compliance (tier 3)
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "RuleAdherence".into(),
                     description: "Edits must follow established rules and guidelines".into(),
-                    tier: PriorityTier::Compliance,
+                    tier: _PriorityTier::Compliance,
                     evaluation_criteria: vec![
                         "violates code conventions".into(),
                         "bypasses required checks".into(),
@@ -164,10 +164,10 @@ impl ConstitutionV2 {
                     ],
                     overridable: true,
                 },
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "TransparencyObligation".into(),
                     description: "Edit rationale must be explainable and documented".into(),
-                    tier: PriorityTier::Compliance,
+                    tier: _PriorityTier::Compliance,
                     evaluation_criteria: vec![
                         "missing justification".into(),
                         "contradictory rationale".into(),
@@ -175,10 +175,10 @@ impl ConstitutionV2 {
                     ],
                     overridable: true,
                 },
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "RegulatoryCompliance".into(),
                     description: "Edits must comply with applicable regulations".into(),
-                    tier: PriorityTier::Compliance,
+                    tier: _PriorityTier::Compliance,
                     evaluation_criteria: vec![
                         "violates licensing terms".into(),
                         "non-compliant data handling".into(),
@@ -187,10 +187,10 @@ impl ConstitutionV2 {
                     overridable: true,
                 },
                 // Helpfulness (tier 4)
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "Effectiveness".into(),
                     description: "Edits should improve or maintain task effectiveness".into(),
-                    tier: PriorityTier::Helpfulness,
+                    tier: _PriorityTier::Helpfulness,
                     evaluation_criteria: vec![
                         "degrades performance".into(),
                         "introduces regressions".into(),
@@ -198,10 +198,10 @@ impl ConstitutionV2 {
                     ],
                     overridable: true,
                 },
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "Efficiency".into(),
                     description: "Edits should not unnecessarily consume resources".into(),
-                    tier: PriorityTier::Helpfulness,
+                    tier: _PriorityTier::Helpfulness,
                     evaluation_criteria: vec![
                         "excessive compute cost".into(),
                         "bloats memory usage".into(),
@@ -209,10 +209,10 @@ impl ConstitutionV2 {
                     ],
                     overridable: true,
                 },
-                ConstitutionalPrincipleV2 {
+                _ConstitutionalPrincipleV2 {
                     name: "UserAlignment".into(),
                     description: "Edits should align with user goals and preferences".into(),
-                    tier: PriorityTier::Helpfulness,
+                    tier: _PriorityTier::Helpfulness,
                     evaluation_criteria: vec![
                         "contrary to user intent".into(),
                         "ignores user feedback".into(),
@@ -225,24 +225,24 @@ impl ConstitutionV2 {
     }
 
     /// Get principles by tier.
-    pub fn by_tier(&self, tier: PriorityTier) -> Vec<&ConstitutionalPrincipleV2> {
+    pub fn by_tier(&self, tier: _PriorityTier) -> Vec<&_ConstitutionalPrincipleV2> {
         self.principles.iter().filter(|p| p.tier == tier).collect()
     }
 }
 
-// ─── PriorityConstitutionalCritic ───────────────────────────────────────────
+// ─── _PriorityConstitutionalCritic ───────────────────────────────────────────
 
 /// Reasoned constitutional critic using priority hierarchy.
 /// Evaluates principles with reasoning, resolves conflicts by tier,
 /// and computes weighted compliance scores.
 #[derive(Debug, Clone)]
-pub struct PriorityConstitutionalCritic {
-    pub constitution: ConstitutionV2,
-    pub history: Vec<ReasonedVerdict>,
+pub(crate) struct _PriorityConstitutionalCritic {
+    pub constitution: _ConstitutionV2,
+    pub history: Vec<_ReasonedVerdict>,
 }
 
-impl PriorityConstitutionalCritic {
-    pub fn new(constitution: ConstitutionV2) -> Self {
+impl _PriorityConstitutionalCritic {
+    pub fn new(constitution: _ConstitutionV2) -> Self {
         Self { constitution, history: Vec::new() }
     }
 
@@ -251,8 +251,8 @@ impl PriorityConstitutionalCritic {
         &mut self,
         deltas: &[(String, f64)],
         task_context: &str,
-    ) -> Vec<ReasonedVerdict> {
-        let verdicts: Vec<ReasonedVerdict> = self
+    ) -> Vec<_ReasonedVerdict> {
+        let verdicts: Vec<_ReasonedVerdict> = self
             .constitution
             .principles
             .iter()
@@ -264,23 +264,23 @@ impl PriorityConstitutionalCritic {
 
     fn evaluate_principle(
         &self,
-        p: &ConstitutionalPrincipleV2,
+        p: &_ConstitutionalPrincipleV2,
         deltas: &[(String, f64)],
         _task_context: &str,
-    ) -> ReasonedVerdict {
+    ) -> _ReasonedVerdict {
         match p.tier {
-            PriorityTier::Safety => self.evaluate_safety(p, deltas),
-            PriorityTier::Ethics => self.evaluate_ethics(p, deltas),
-            PriorityTier::Compliance => self.evaluate_compliance(p, deltas),
-            PriorityTier::Helpfulness => self.evaluate_helpfulness(p, deltas),
+            _PriorityTier::Safety => self.evaluate_safety(p, deltas),
+            _PriorityTier::Ethics => self.evaluate_ethics(p, deltas),
+            _PriorityTier::Compliance => self.evaluate_compliance(p, deltas),
+            _PriorityTier::Helpfulness => self.evaluate_helpfulness(p, deltas),
         }
     }
 
     fn evaluate_safety(
         &self,
-        p: &ConstitutionalPrincipleV2,
+        p: &_ConstitutionalPrincipleV2,
         deltas: &[(String, f64)],
-    ) -> ReasonedVerdict {
+    ) -> _ReasonedVerdict {
         let (score, reasoning) = match p.name.as_str() {
             "DoNoHarm" => {
                 let dangerous = deltas.iter().any(|(name, val)| {
@@ -323,7 +323,7 @@ impl PriorityConstitutionalCritic {
             }
             _ => (0.85, "No specific safety concerns identified for this principle".into()),
         };
-        ReasonedVerdict {
+        _ReasonedVerdict {
             principle: p.name.clone(),
             score,
             tier: p.tier,
@@ -335,9 +335,9 @@ impl PriorityConstitutionalCritic {
 
     fn evaluate_ethics(
         &self,
-        p: &ConstitutionalPrincipleV2,
+        p: &_ConstitutionalPrincipleV2,
         deltas: &[(String, f64)],
-    ) -> ReasonedVerdict {
+    ) -> _ReasonedVerdict {
         let (score, reasoning) = match p.name.as_str() {
             "HonestyMaintenance" => {
                 let exaggeration = deltas.iter().any(|(name, val)| {
@@ -371,7 +371,7 @@ impl PriorityConstitutionalCritic {
             }
             _ => (0.85, "No specific ethical concerns identified".into()),
         };
-        ReasonedVerdict {
+        _ReasonedVerdict {
             principle: p.name.clone(),
             score,
             tier: p.tier,
@@ -383,9 +383,9 @@ impl PriorityConstitutionalCritic {
 
     fn evaluate_compliance(
         &self,
-        p: &ConstitutionalPrincipleV2,
+        p: &_ConstitutionalPrincipleV2,
         deltas: &[(String, f64)],
-    ) -> ReasonedVerdict {
+    ) -> _ReasonedVerdict {
         let (score, reasoning) = match p.name.as_str() {
             "RuleAdherence" => {
                 let violations = deltas.iter().any(|(name, _)| {
@@ -420,7 +420,7 @@ impl PriorityConstitutionalCritic {
             }
             _ => (0.85, "No specific compliance concerns identified".into()),
         };
-        ReasonedVerdict {
+        _ReasonedVerdict {
             principle: p.name.clone(),
             score,
             tier: p.tier,
@@ -432,9 +432,9 @@ impl PriorityConstitutionalCritic {
 
     fn evaluate_helpfulness(
         &self,
-        p: &ConstitutionalPrincipleV2,
+        p: &_ConstitutionalPrincipleV2,
         deltas: &[(String, f64)],
-    ) -> ReasonedVerdict {
+    ) -> _ReasonedVerdict {
         let (score, reasoning) = match p.name.as_str() {
             "Effectiveness" => {
                 let degraded = deltas.iter().any(|(name, val)| {
@@ -473,7 +473,7 @@ impl PriorityConstitutionalCritic {
             }
             _ => (0.85, "No specific helpfulness concerns identified".into()),
         };
-        ReasonedVerdict {
+        _ReasonedVerdict {
             principle: p.name.clone(),
             score,
             tier: p.tier,
@@ -485,8 +485,8 @@ impl PriorityConstitutionalCritic {
 
     /// Resolve conflicts between verdicts by priority tier.
     /// Higher-tier principles override lower-tier ones when the lower is overridable.
-    pub fn resolve_conflicts(&self, verdicts: &[ReasonedVerdict]) -> Vec<ReasonedVerdict> {
-        let mut resolved: Vec<ReasonedVerdict> = verdicts.to_vec();
+    pub fn resolve_conflicts(&self, verdicts: &[_ReasonedVerdict]) -> Vec<_ReasonedVerdict> {
+        let mut resolved: Vec<_ReasonedVerdict> = verdicts.to_vec();
 
         // Find conflicting pairs (different tier, both below threshold)
         for i in 0..resolved.len() {
@@ -538,7 +538,7 @@ impl PriorityConstitutionalCritic {
     }
 
     /// Compute weighted compliance score — higher-tier principles count more.
-    pub fn compute_compliance_score(&self, verdicts: &[ReasonedVerdict]) -> f64 {
+    pub(crate) fn _compute_compliance_score(&self, verdicts: &[_ReasonedVerdict]) -> f64 {
         let total_weight: i32 = verdicts.iter().map(|v| v.tier.weight()).sum();
         if total_weight == 0 { return 0.5; }
         let weighted_sum: f64 = verdicts
@@ -550,13 +550,13 @@ impl PriorityConstitutionalCritic {
 
     /// Compute reward penalty based on priority-tier violations.
     /// Returns adjusted_reward (minimum 0).
-    pub fn adjust_reward(&self, base_reward: f64, verdicts: &[ReasonedVerdict]) -> f64 {
+    pub(crate) fn _adjust_reward(&self, base_reward: f64, verdicts: &[_ReasonedVerdict]) -> f64 {
         let mut penalty: f64 = 0.0;
 
         // Safety violations: major penalty
         let safety_min = verdicts
             .iter()
-            .filter(|v| v.tier == PriorityTier::Safety)
+            .filter(|v| v.tier == _PriorityTier::Safety)
             .map(|v| v.score)
             .fold(f64::MAX, f64::min);
         if safety_min < 0.5 {
@@ -566,7 +566,7 @@ impl PriorityConstitutionalCritic {
         // Ethics violations: significant penalty
         let ethics_min = verdicts
             .iter()
-            .filter(|v| v.tier == PriorityTier::Ethics)
+            .filter(|v| v.tier == _PriorityTier::Ethics)
             .map(|v| v.score)
             .fold(f64::MAX, f64::min);
         if ethics_min < 0.5 {
@@ -576,7 +576,7 @@ impl PriorityConstitutionalCritic {
         // Compliance violations: moderate penalty
         let compliance_min = verdicts
             .iter()
-            .filter(|v| v.tier == PriorityTier::Compliance)
+            .filter(|v| v.tier == _PriorityTier::Compliance)
             .map(|v| v.score)
             .fold(f64::MAX, f64::min);
         if compliance_min < 0.5 {
@@ -586,7 +586,7 @@ impl PriorityConstitutionalCritic {
         // Helpfulness violations: minor penalty (threshold 0.3)
         let helpfulness_min = verdicts
             .iter()
-            .filter(|v| v.tier == PriorityTier::Helpfulness)
+            .filter(|v| v.tier == _PriorityTier::Helpfulness)
             .map(|v| v.score)
             .fold(f64::MAX, f64::min);
         if helpfulness_min < 0.3 {
@@ -597,17 +597,17 @@ impl PriorityConstitutionalCritic {
     }
 }
 
-// ─── Default ConstitutionV2 ─────────────────────────────────────────────────
+// ─── Default _ConstitutionV2 ─────────────────────────────────────────────────
 
-impl Default for ConstitutionV2 {
+impl Default for _ConstitutionV2 {
     fn default() -> Self {
-        Self::default_priority_constitution()
+        Self::_default_priority_constitution()
     }
 }
 
-impl Default for PriorityConstitutionalCritic {
+impl Default for _PriorityConstitutionalCritic {
     fn default() -> Self {
-        Self::new(ConstitutionV2::default_priority_constitution())
+        Self::new(_ConstitutionV2::_default_priority_constitution())
     }
 }
 
@@ -655,16 +655,16 @@ pub struct ConstitutionalReport {
 ///
 /// V2 adds 4-tier priority hierarchy, reasoned critique, and conflict resolution.
 /// Backward compatible — `process()` still uses the original 5 flat principles,
-/// `process_v2()` uses the upgraded priority-based constitution.
+/// `_process_v2()` uses the upgraded priority-based constitution.
 #[derive(Debug, Clone)]
 pub struct ConstitutionalSelfCritiqueStage {
     pub consecutive_violations: u32,
     pub max_consecutive_before_reflection: u32,
     pub history: Vec<ConstitutionalReport>,
     // V2 fields
-    pub constitution_v2: Option<ConstitutionV2>,
-    pub critic: Option<PriorityConstitutionalCritic>,
-    pub v2_history: Vec<Vec<ReasonedVerdict>>,
+    pub constitution_v2: Option<_ConstitutionV2>,
+    pub critic: Option<_PriorityConstitutionalCritic>,
+    pub v2_history: Vec<Vec<_ReasonedVerdict>>,
 }
 
 impl Default for ConstitutionalSelfCritiqueStage {
@@ -686,13 +686,13 @@ impl ConstitutionalSelfCritiqueStage {
     }
 
     /// Create with V2 priority constitution enabled.
-    pub fn with_v2() -> Self {
+    pub(crate) fn _with_v2() -> Self {
         Self {
             consecutive_violations: 0,
             max_consecutive_before_reflection: 3,
             history: Vec::new(),
-            constitution_v2: Some(ConstitutionV2::default_priority_constitution()),
-            critic: Some(PriorityConstitutionalCritic::default()),
+            constitution_v2: Some(_ConstitutionV2::_default_priority_constitution()),
+            critic: Some(_PriorityConstitutionalCritic::default()),
             v2_history: Vec::new(),
         }
     }
@@ -743,18 +743,18 @@ impl ConstitutionalSelfCritiqueStage {
     /// Returns (adjusted_reward, should_reflect, verdicts).
     /// The adjusted_reward is actually computed with priority-tier-aware penalties
     /// and written back meaningfully (unlike the V1 process which is observational).
-    pub fn process_v2(
+    pub(crate) fn _process_v2(
         &mut self,
         capability_deltas: &[(String, f64)],
         current_reward: f64,
         task_context: &str,
-    ) -> (StageResult, f64, bool, Vec<ReasonedVerdict>) {
+    ) -> (StageResult, f64, bool, Vec<_ReasonedVerdict>) {
         let result = StageResult::new("constitutional_self_critique_v2");
-        let critic = self.critic.get_or_insert_with(PriorityConstitutionalCritic::default);
+        let critic = self.critic.get_or_insert_with(_PriorityConstitutionalCritic::default);
 
         let verdicts = critic.evaluate(capability_deltas, task_context);
-        let compliance = critic.compute_compliance_score(&verdicts);
-        let adjusted_reward = critic.adjust_reward(current_reward, &verdicts);
+        let compliance = critic._compute_compliance_score(&verdicts);
+        let adjusted_reward = critic._adjust_reward(current_reward, &verdicts);
 
         let has_violation = verdicts.iter().any(|v| v.score < 0.5);
         if has_violation {
@@ -768,10 +768,10 @@ impl ConstitutionalSelfCritiqueStage {
         // Also produce a V1-compatible report for backward compat
         let v1_evals: Vec<PrincipleEvaluation> = verdicts.iter().map(|v| {
             let principle = match v.tier {
-                PriorityTier::Safety => Principle::Harmlessness,
-                PriorityTier::Ethics => Principle::Honesty,
-                PriorityTier::Compliance => Principle::Transparency,
-                PriorityTier::Helpfulness => Principle::Stability,
+                _PriorityTier::Safety => Principle::Harmlessness,
+                _PriorityTier::Ethics => Principle::Honesty,
+                _PriorityTier::Compliance => Principle::Transparency,
+                _PriorityTier::Helpfulness => Principle::Stability,
             };
             PrincipleEvaluation {
                 principle,
@@ -941,44 +941,44 @@ mod tests {
     // V2 Priority Constitution Tests
     // ═══════════════════════════════════════════════════════════════════════
 
-    fn sample_verdicts() -> Vec<ReasonedVerdict> {
+    fn sample_verdicts() -> Vec<_ReasonedVerdict> {
         vec![
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "DoNoHarm".into(),
                 score: 1.0,
-                tier: PriorityTier::Safety,
+                tier: _PriorityTier::Safety,
                 reasoning: "safe".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "PrivacyProtection".into(),
                 score: 1.0,
-                tier: PriorityTier::Safety,
+                tier: _PriorityTier::Safety,
                 reasoning: "private".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "HonestyMaintenance".into(),
                 score: 1.0,
-                tier: PriorityTier::Ethics,
+                tier: _PriorityTier::Ethics,
                 reasoning: "honest".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "Effectiveness".into(),
                 score: 1.0,
-                tier: PriorityTier::Helpfulness,
+                tier: _PriorityTier::Helpfulness,
                 reasoning: "effective".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "Efficiency".into(),
                 score: 1.0,
-                tier: PriorityTier::Helpfulness,
+                tier: _PriorityTier::Helpfulness,
                 reasoning: "efficient".into(),
                 conflicts: vec![],
                 override_by: None,
@@ -996,39 +996,39 @@ mod tests {
 
     #[test]
     fn test_priority_tier_ordering() {
-        assert!(PriorityTier::Safety < PriorityTier::Ethics);
-        assert!(PriorityTier::Ethics < PriorityTier::Compliance);
-        assert!(PriorityTier::Compliance < PriorityTier::Helpfulness);
-        assert!(PriorityTier::Safety < PriorityTier::Helpfulness);
-        assert_eq!(PriorityTier::Safety.weight(), 4);
-        assert_eq!(PriorityTier::Ethics.weight(), 3);
-        assert_eq!(PriorityTier::Compliance.weight(), 2);
-        assert_eq!(PriorityTier::Helpfulness.weight(), 1);
+        assert!(_PriorityTier::Safety < _PriorityTier::Ethics);
+        assert!(_PriorityTier::Ethics < _PriorityTier::Compliance);
+        assert!(_PriorityTier::Compliance < _PriorityTier::Helpfulness);
+        assert!(_PriorityTier::Safety < _PriorityTier::Helpfulness);
+        assert_eq!(_PriorityTier::Safety.weight(), 4);
+        assert_eq!(_PriorityTier::Ethics.weight(), 3);
+        assert_eq!(_PriorityTier::Compliance.weight(), 2);
+        assert_eq!(_PriorityTier::Helpfulness.weight(), 1);
     }
 
     #[test]
     fn test_constitution_v2_creation() {
-        let constitution = ConstitutionV2::default_priority_constitution();
+        let constitution = _ConstitutionV2::_default_priority_constitution();
         assert_eq!(constitution.principles.len(), 12);
         assert_eq!(constitution.version, "2.0");
 
-        let safety = constitution.by_tier(PriorityTier::Safety);
+        let safety = constitution.by_tier(_PriorityTier::Safety);
         assert_eq!(safety.len(), 3);
         assert!(!safety[0].overridable);
         assert!(!safety[1].overridable);
         assert!(!safety[2].overridable);
 
-        let ethics = constitution.by_tier(PriorityTier::Ethics);
+        let ethics = constitution.by_tier(_PriorityTier::Ethics);
         assert_eq!(ethics.len(), 3);
         assert!(ethics[0].overridable);
 
-        let helpfulness = constitution.by_tier(PriorityTier::Helpfulness);
+        let helpfulness = constitution.by_tier(_PriorityTier::Helpfulness);
         assert_eq!(helpfulness.len(), 3);
     }
 
     #[test]
     fn test_priority_constitutional_critic_evaluate() {
-        let mut critic = PriorityConstitutionalCritic::default();
+        let mut critic = _PriorityConstitutionalCritic::default();
         let verdicts = critic.evaluate(&sample_deltas(), "test task");
         // All 12 principles evaluated
         assert_eq!(verdicts.len(), 12);
@@ -1041,7 +1041,7 @@ mod tests {
         }
         // Safety tier principles should be high for benign deltas
         let safety_avg: f64 = verdicts.iter()
-            .filter(|v| v.tier == PriorityTier::Safety)
+            .filter(|v| v.tier == _PriorityTier::Safety)
             .map(|v| v.score)
             .sum::<f64>() / 3.0;
         assert!(safety_avg > 0.5, "safety should be high for benign deltas");
@@ -1049,7 +1049,7 @@ mod tests {
 
     #[test]
     fn test_safety_violation_detected() {
-        let mut critic = PriorityConstitutionalCritic::default();
+        let mut critic = _PriorityConstitutionalCritic::default();
         let verdicts = critic.evaluate(&dangerous_deltas(), "test");
         // DoNoHarm should be low
         let do_no_harm = verdicts.iter()
@@ -1061,7 +1061,7 @@ mod tests {
 
     #[test]
     fn test_ethics_violation_detected() {
-        let mut critic = PriorityConstitutionalCritic::default();
+        let mut critic = _PriorityConstitutionalCritic::default();
         let inflated = vec![
             ("inflate_capability".into(), 0.6),
             ("success_rate".into(), 0.5),
@@ -1075,21 +1075,21 @@ mod tests {
 
     #[test]
     fn test_conflict_resolution_safety_wins() {
-        let critic = PriorityConstitutionalCritic::default();
+        let critic = _PriorityConstitutionalCritic::default();
         // Safety clean, Helpfulness violation — no override (lower-tier violation stands)
         let verdicts = vec![
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "DoNoHarm".into(),
                 score: 0.95,
-                tier: PriorityTier::Safety,
+                tier: _PriorityTier::Safety,
                 reasoning: "safe".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "Effectiveness".into(),
                 score: 0.2,
-                tier: PriorityTier::Helpfulness,
+                tier: _PriorityTier::Helpfulness,
                 reasoning: "ineffective".into(),
                 conflicts: vec![],
                 override_by: None,
@@ -1101,18 +1101,18 @@ mod tests {
 
         // Safety violation, Helpfulness clean — override propagates violation down
         let verdicts2 = vec![
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "PrivacyProtection".into(),
                 score: 0.2,
-                tier: PriorityTier::Safety,
+                tier: _PriorityTier::Safety,
                 reasoning: "privacy leak".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "Effectiveness".into(),
                 score: 0.95,
-                tier: PriorityTier::Helpfulness,
+                tier: _PriorityTier::Helpfulness,
                 reasoning: "effective".into(),
                 conflicts: vec![],
                 override_by: None,
@@ -1130,21 +1130,21 @@ mod tests {
 
     #[test]
     fn test_conflict_resolution_ethics_overrides_helpfulness() {
-        let critic = PriorityConstitutionalCritic::default();
+        let critic = _PriorityConstitutionalCritic::default();
         // Ethics violation (0.2), Helpfulness clean (0.95) — Ethics violation should override
         let verdicts = vec![
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "HonestyMaintenance".into(),
                 score: 0.2,
-                tier: PriorityTier::Ethics,
+                tier: _PriorityTier::Ethics,
                 reasoning: "dishonest".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "Effectiveness".into(),
                 score: 0.95,
-                tier: PriorityTier::Helpfulness,
+                tier: _PriorityTier::Helpfulness,
                 reasoning: "effective".into(),
                 conflicts: vec![],
                 override_by: None,
@@ -1162,32 +1162,32 @@ mod tests {
 
     #[test]
     fn test_compute_compliance_score_weighted() {
-        let critic = PriorityConstitutionalCritic::default();
+        let critic = _PriorityConstitutionalCritic::default();
         // All perfect scores
         let perfect = sample_verdicts();
-        let score = critic.compute_compliance_score(&perfect);
+        let score = critic._compute_compliance_score(&perfect);
         assert!((score - 1.0).abs() < 0.001, "perfect scores should give 1.0, got {}", score);
 
         // Safety low, others high — weighted should be pulled down heavily
         let safety_low = vec![
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "DoNoHarm".into(),
                 score: 0.2,
-                tier: PriorityTier::Safety,
+                tier: _PriorityTier::Safety,
                 reasoning: "bad".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "Effectiveness".into(),
                 score: 0.9,
-                tier: PriorityTier::Helpfulness,
+                tier: _PriorityTier::Helpfulness,
                 reasoning: "good".into(),
                 conflicts: vec![],
                 override_by: None,
             },
         ];
-        let weighted = critic.compute_compliance_score(&safety_low);
+        let weighted = critic._compute_compliance_score(&safety_low);
         // Safety weight=4, Helpfulness weight=1
         // score = (0.2 * 4 + 0.9 * 1) / (4 + 1) = (0.8 + 0.9) / 5 = 1.7 / 5 = 0.34
         assert!((weighted - 0.34).abs() < 0.01, "expected ~0.34, got {}", weighted);
@@ -1195,57 +1195,57 @@ mod tests {
 
     #[test]
     fn test_adjust_reward_safety_violation_major_penalty() {
-        let critic = PriorityConstitutionalCritic::default();
+        let critic = _PriorityConstitutionalCritic::default();
         let verdicts = vec![
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "DoNoHarm".into(),
                 score: 0.2,
-                tier: PriorityTier::Safety,
+                tier: _PriorityTier::Safety,
                 reasoning: "dangerous".into(),
                 conflicts: vec![],
                 override_by: None,
             },
         ];
-        let adjusted = critic.adjust_reward(1.0, &verdicts);
+        let adjusted = critic._adjust_reward(1.0, &verdicts);
         // Safety < 0.5 → 50% penalty → 0.5
         assert!((adjusted - 0.5).abs() < 0.001, "expected 0.5, got {}", adjusted);
     }
 
     #[test]
     fn test_adjust_reward_helpfulness_minor_penalty() {
-        let critic = PriorityConstitutionalCritic::default();
+        let critic = _PriorityConstitutionalCritic::default();
         let verdicts = vec![
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "Effectiveness".into(),
                 score: 0.2,
-                tier: PriorityTier::Helpfulness,
+                tier: _PriorityTier::Helpfulness,
                 reasoning: "ineffective".into(),
                 conflicts: vec![],
                 override_by: None,
             },
         ];
-        let adjusted = critic.adjust_reward(1.0, &verdicts);
+        let adjusted = critic._adjust_reward(1.0, &verdicts);
         // Helpfulness < 0.3 → 5% penalty → 0.95
         assert!((adjusted - 0.95).abs() < 0.001, "expected 0.95, got {}", adjusted);
     }
 
     #[test]
     fn test_verdict_override_tracking() {
-        let critic = PriorityConstitutionalCritic::default();
+        let critic = _PriorityConstitutionalCritic::default();
         // Ethics violation propagates to lower-tier overridable principle
         let verdicts = vec![
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "HonestyMaintenance".into(),
                 score: 0.2,
-                tier: PriorityTier::Ethics,
+                tier: _PriorityTier::Ethics,
                 reasoning: "dishonest".into(),
                 conflicts: vec![],
                 override_by: None,
             },
-            ReasonedVerdict {
+            _ReasonedVerdict {
                 principle: "UserAlignment".into(),
                 score: 0.95,
-                tier: PriorityTier::Helpfulness,
+                tier: _PriorityTier::Helpfulness,
                 reasoning: "aligned".into(),
                 conflicts: vec![],
                 override_by: None,
@@ -1267,12 +1267,12 @@ mod tests {
 
     #[test]
     fn test_process_v2_integration() {
-        let mut stage = ConstitutionalSelfCritiqueStage::with_v2();
+        let mut stage = ConstitutionalSelfCritiqueStage::_with_v2();
         assert!(stage.constitution_v2.is_some());
         assert!(stage.critic.is_some());
 
         let (result, reward, reflect, verdicts) =
-            stage.process_v2(&sample_deltas(), 1.0, "test task");
+            stage._process_v2(&sample_deltas(), 1.0, "test task");
         assert_eq!(verdicts.len(), 12, "should evaluate all 12 principles");
         assert!(reward <= 1.0);
         assert!(!reflect);
@@ -1281,7 +1281,7 @@ mod tests {
 
         // Test with dangerous deltas — should produce lower reward
         let (_, reward2, _, _) =
-            stage.process_v2(&dangerous_deltas(), 1.0, "test task");
+            stage._process_v2(&dangerous_deltas(), 1.0, "test task");
         assert!(reward2 < reward, "dangerous deltas should produce lower reward");
     }
 }

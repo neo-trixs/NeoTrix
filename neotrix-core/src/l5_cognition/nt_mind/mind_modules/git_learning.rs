@@ -11,24 +11,24 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// Git 学习引擎
-pub struct GitLearningEngine {
-    commits: Vec<CommitInfo>,
-    patterns: Vec<CommitPattern>,
-    knowledge: Vec<GitKnowledge>,
-    config: GitLearningConfig,
-    stats: GitLearningStats,
+pub(crate) struct _GitLearningEngine {
+    commits: Vec<_CommitInfo>,
+    patterns: Vec<_CommitPattern>,
+    knowledge: Vec<_GitKnowledge>,
+    config: _GitLearningConfig,
+    stats: _GitLearningStats,
 }
 
 /// Git 学习配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitLearningConfig {
+pub(crate) struct _GitLearningConfig {
     pub max_commits: usize,
     pub pattern_detection: bool,
     pub knowledge_extraction: bool,
     pub auto_documentation: bool,
 }
 
-impl Default for GitLearningConfig {
+impl Default for _GitLearningConfig {
     fn default() -> Self {
         Self {
             max_commits: 1000,
@@ -41,7 +41,7 @@ impl Default for GitLearningConfig {
 
 /// 提交信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitInfo {
+pub(crate) struct _CommitInfo {
     pub hash: String,
     pub author: String,
     pub date: chrono::DateTime<chrono::Utc>,
@@ -75,7 +75,7 @@ pub enum ChangeType {
 
 /// 提交模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitPattern {
+pub(crate) struct _CommitPattern {
     pub pattern_type: String,
     pub description: String,
     pub frequency: u32,
@@ -85,7 +85,7 @@ pub struct CommitPattern {
 
 /// Git 知识
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitKnowledge {
+pub(crate) struct _GitKnowledge {
     pub id: String,
     pub knowledge_type: String,
     pub content: serde_json::Value,
@@ -96,7 +96,7 @@ pub struct GitKnowledge {
 
 /// Git 学习统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitLearningStats {
+pub(crate) struct _GitLearningStats {
     pub commits_analyzed: u64,
     pub patterns_detected: u64,
     pub knowledge_extracted: u64,
@@ -109,14 +109,14 @@ pub struct EvolutionReport {
     pub period: String,
     pub total_commits: usize,
     pub active_contributors: Vec<String>,
-    pub hotspots: Vec<Hotspot>,
+    pub hotspots: Vec<_Hotspot>,
     pub trends: Vec<Trend>,
     pub recommendations: Vec<String>,
 }
 
 /// 热点文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Hotspot {
+pub(crate) struct _Hotspot {
     pub file_path: String,
     pub change_frequency: u32,
     pub complexity_trend: String,
@@ -132,15 +132,15 @@ pub struct Trend {
     pub magnitude: f64,
 }
 
-impl GitLearningEngine {
+impl _GitLearningEngine {
     /// 创建新的 Git 学习引擎
-    pub fn new(config: GitLearningConfig) -> Self {
+    pub fn new(config: _GitLearningConfig) -> Self {
         Self {
             commits: Vec::new(),
             patterns: Vec::new(),
             knowledge: Vec::new(),
             config,
-            stats: GitLearningStats {
+            stats: _GitLearningStats {
                 commits_analyzed: 0,
                 patterns_detected: 0,
                 knowledge_extracted: 0,
@@ -150,7 +150,7 @@ impl GitLearningEngine {
     }
 
     /// 分析提交
-    pub fn analyze_commit(&mut self, commit: CommitInfo) {
+    pub(crate) fn _analyze_commit(&mut self, commit: _CommitInfo) {
         self.commits.push(commit.clone());
         self.stats.commits_analyzed += 1;
 
@@ -164,7 +164,7 @@ impl GitLearningEngine {
     }
 
     /// 检测模式
-    fn detect_patterns(&mut self, commit: &CommitInfo) {
+    fn detect_patterns(&mut self, commit: &_CommitInfo) {
         // 检测常见模式
         let message_lower = commit.message.to_lowercase();
 
@@ -190,12 +190,12 @@ impl GitLearningEngine {
     }
 
     /// 添加模式
-    fn add_pattern(&mut self, pattern_type: &str, description: &str, commit: &CommitInfo) {
+    fn add_pattern(&mut self, pattern_type: &str, description: &str, commit: &_CommitInfo) {
         if let Some(existing) = self.patterns.iter_mut().find(|p| p.pattern_type == pattern_type) {
             existing.frequency += 1;
             existing.examples.push(commit.hash.clone());
         } else {
-            self.patterns.push(CommitPattern {
+            self.patterns.push(_CommitPattern {
                 pattern_type: pattern_type.to_string(),
                 description: description.to_string(),
                 frequency: 1,
@@ -207,10 +207,10 @@ impl GitLearningEngine {
     }
 
     /// 提取知识
-    fn extract_knowledge(&mut self, commit: &CommitInfo) {
+    fn extract_knowledge(&mut self, commit: &_CommitInfo) {
         // 提取文件变更知识
         for change in &commit.files_changed {
-            let knowledge = GitKnowledge {
+            let knowledge = _GitKnowledge {
                 id: uuid::Uuid::new_v4().to_string(),
                 knowledge_type: "file_change".into(),
                 content: serde_json::json!({
@@ -227,7 +227,7 @@ impl GitLearningEngine {
         }
 
         // 提取作者知识
-        let author_knowledge = GitKnowledge {
+        let author_knowledge = _GitKnowledge {
             id: uuid::Uuid::new_v4().to_string(),
             knowledge_type: "author_activity".into(),
             content: serde_json::json!({
@@ -260,8 +260,8 @@ impl GitLearningEngine {
             }
         }
 
-        let mut hotspots: Vec<Hotspot> = file_changes.iter()
-            .map(|(path, &count)| Hotspot {
+        let mut hotspots: Vec<_Hotspot> = file_changes.iter()
+            .map(|(path, &count)| _Hotspot {
                 file_path: path.clone(),
                 change_frequency: count,
                 complexity_trend: "stable".into(),
@@ -298,7 +298,7 @@ impl GitLearningEngine {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &GitLearningStats {
+    pub fn stats(&self) -> &_GitLearningStats {
         &self.stats
     }
 }

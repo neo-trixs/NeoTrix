@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// Compute mode for a hybrid layer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ComputeMode {
+pub(crate) enum _ComputeMode {
     /// Full self-attention (quadratic cost, precise retrieval)
     Attention,
     /// State-space model (linear cost, long-range pattern)
@@ -26,14 +26,14 @@ pub enum ComputeMode {
 /// When `ssm_weight` is high, it behaves like Mamba/Jamba SSM layers.
 /// The ratio can shift dynamically based on sequence length or task type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HybridLayer {
+pub(crate) struct _HybridLayer {
     pub transformer_weight: f64,
     pub ssm_weight: f64,
     /// Sequence length threshold: below this, prefer attention; above, prefer SSM
     pub ss_threshold: usize,
 }
 
-impl HybridLayer {
+impl _HybridLayer {
     pub fn new(transformer_weight: f64, ssm_weight: f64) -> Self {
         let total = transformer_weight + ssm_weight;
         Self {
@@ -49,16 +49,16 @@ impl HybridLayer {
     }
 
     /// Select the optimal compute mode for a given sequence length
-    pub fn select_mode(&self, seq_len: usize) -> ComputeMode {
+    pub fn select_mode(&self, seq_len: usize) -> _ComputeMode {
         if seq_len <= self.ss_threshold {
-            ComputeMode::Attention
+            _ComputeMode::Attention
         } else {
-            ComputeMode::Ssm
+            _ComputeMode::Ssm
         }
     }
 
     /// Adaptive weight blend: short sequences favor attention, long favor SSM
-    pub fn adaptive_weights(&self, seq_len: usize) -> (f64, f64) {
+    pub(crate) fn _adaptive_weights(&self, seq_len: usize) -> (f64, f64) {
         let ratio = (seq_len as f64 / self.ss_threshold as f64).clamp(0.0, 2.0);
         // At threshold: 50/50; below: attention-heavy; above: ssm-heavy
         let attn_w = self.transformer_weight * (1.0 - ratio * 0.5);
@@ -71,11 +71,11 @@ impl HybridLayer {
     ///
     /// In production, this dispatches to real attention/SSM kernels.
     /// Here we model the interface and gating logic.
-    pub fn compute(&self, input_len: usize) -> HybridOutput {
-        let (attn_w, ssm_w) = self.adaptive_weights(input_len);
+    pub fn compute(&self, input_len: usize) -> _HybridOutput {
+        let (attn_w, ssm_w) = self._adaptive_weights(input_len);
         let mode = self.select_mode(input_len);
 
-        HybridOutput {
+        _HybridOutput {
             mode,
             transformer_weight: attn_w,
             ssm_weight: ssm_w,
@@ -85,7 +85,7 @@ impl HybridLayer {
     }
 }
 
-impl Default for HybridLayer {
+impl Default for _HybridLayer {
     fn default() -> Self {
         Self::new(0.5, 0.5)
     }
@@ -93,8 +93,8 @@ impl Default for HybridLayer {
 
 /// Result of hybrid layer computation
 #[derive(Debug, Clone)]
-pub struct HybridOutput {
-    pub mode: ComputeMode,
+pub(crate) struct _HybridOutput {
+    pub mode: _ComputeMode,
     pub transformer_weight: f64,
     pub ssm_weight: f64,
     /// Estimated cost of the SSM path (linear in seq_len)
@@ -109,35 +109,35 @@ mod tests {
 
     #[test]
     fn test_short_seq_uses_attention() {
-        let layer = HybridLayer::new(0.5, 0.5);
-        assert_eq!(layer.select_mode(512), ComputeMode::Attention);
+        let layer = _HybridLayer::new(0.5, 0.5);
+        assert_eq!(layer.select_mode(512), _ComputeMode::Attention);
     }
 
     #[test]
     fn test_long_seq_uses_ssm() {
-        let layer = HybridLayer::new(0.5, 0.5);
-        assert_eq!(layer.select_mode(4096), ComputeMode::Ssm);
+        let layer = _HybridLayer::new(0.5, 0.5);
+        assert_eq!(layer.select_mode(4096), _ComputeMode::Ssm);
     }
 
     #[test]
     fn test_adaptive_weights_short_favors_attention() {
-        let layer = HybridLayer::new(0.5, 0.5).with_threshold(2048);
-        let (attn, ssm) = layer.adaptive_weights(512);
+        let layer = _HybridLayer::new(0.5, 0.5).with_threshold(2048);
+        let (attn, ssm) = layer._adaptive_weights(512);
         assert!(attn > ssm, "short seq should favor attention");
     }
 
     #[test]
     fn test_adaptive_weights_long_favors_ssm() {
-        let layer = HybridLayer::new(0.5, 0.5).with_threshold(2048);
-        let (attn, ssm) = layer.adaptive_weights(8192);
+        let layer = _HybridLayer::new(0.5, 0.5).with_threshold(2048);
+        let (attn, ssm) = layer._adaptive_weights(8192);
         assert!(ssm > attn, "long seq should favor SSM");
     }
 
     #[test]
     fn test_compute_at_threshold_balanced() {
-        let layer = HybridLayer::new(0.5, 0.5).with_threshold(2048);
+        let layer = _HybridLayer::new(0.5, 0.5).with_threshold(2048);
         let out = layer.compute(2048);
-        assert_eq!(out.mode, ComputeMode::Attention);
+        assert_eq!(out.mode, _ComputeMode::Attention);
         // At threshold, weights should be roughly balanced
         let diff = (out.transformer_weight - out.ssm_weight).abs();
         assert!(diff < 0.15, "should be balanced at threshold: diff={diff}");
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn test_compute_long_seq_ssm_dominates() {
-        let layer = HybridLayer::new(0.5, 0.5).with_threshold(2048);
+        let layer = _HybridLayer::new(0.5, 0.5).with_threshold(2048);
         let out = layer.compute(16384);
         assert!(out.ssm_weight > out.transformer_weight);
         assert!(out.estimated_cost_linear < out.estimated_cost_quadratic);
@@ -153,15 +153,15 @@ mod tests {
 
     #[test]
     fn test_weights_normalized() {
-        let layer = HybridLayer::new(0.3, 0.7);
-        let (attn, ssm) = layer.adaptive_weights(1024);
+        let layer = _HybridLayer::new(0.3, 0.7);
+        let (attn, ssm) = layer._adaptive_weights(1024);
         let sum = attn + ssm;
         assert!((sum - 1.0).abs() < 1e-6, "weights should sum to 1.0");
     }
 
     #[test]
     fn test_default_hybrid_layer() {
-        let layer = HybridLayer::default();
+        let layer = _HybridLayer::default();
         assert!((layer.transformer_weight - 0.5).abs() < 1e-6);
         assert!((layer.ssm_weight - 0.5).abs() < 1e-6);
     }

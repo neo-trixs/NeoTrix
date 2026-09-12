@@ -35,7 +35,7 @@ impl ReactRuleCategory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReactRule {
+pub(crate) struct _ReactRule {
     pub id: &'static str,
     pub category: ReactRuleCategory,
     pub severity: RuleSeverity,
@@ -59,7 +59,7 @@ pub struct ReactDiagnostic {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CategoryBreakdown {
+pub(crate) struct _CategoryBreakdown {
     pub category: ReactRuleCategory,
     pub count: usize,
 }
@@ -71,7 +71,7 @@ pub struct ReactHealthReport {
     pub total_diagnostics: usize,
     pub unique_error_rules: usize,
     pub unique_warning_rules: usize,
-    pub category_breakdown: Vec<CategoryBreakdown>,
+    pub category_breakdown: Vec<_CategoryBreakdown>,
     pub diagnostics: Vec<ReactDiagnostic>,
 }
 
@@ -79,20 +79,20 @@ pub struct ReactHealthReport {
 pub struct SuppressionAnalysis {
     pub is_suppressed: bool,
     pub suppression_hint: Option<String>,
-    pub near_miss: Option<String>,
+    pub _near_miss: Option<String>,
 }
 
 impl SuppressionAnalysis {
     pub fn suppressed() -> Self {
-        Self { is_suppressed: true, suppression_hint: None, near_miss: None }
+        Self { is_suppressed: true, suppression_hint: None, _near_miss: None }
     }
 
-    pub fn not_suppressed(hint: String) -> Self {
-        Self { is_suppressed: false, suppression_hint: Some(hint), near_miss: None }
+    pub(crate) fn _not_suppressed(hint: String) -> Self {
+        Self { is_suppressed: false, suppression_hint: Some(hint), _near_miss: None }
     }
 
-    pub fn near_miss(reason: String) -> Self {
-        Self { is_suppressed: false, suppression_hint: None, near_miss: Some(reason) }
+    pub(crate) fn _near_miss(reason: String) -> Self {
+        Self { is_suppressed: false, suppression_hint: None, _near_miss: Some(reason) }
     }
 }
 
@@ -143,7 +143,7 @@ impl ReactDoctorEngine {
                 })
                 .count();
             if count > 0 {
-                breakdown.push(CategoryBreakdown { category: cat, count });
+                breakdown.push(_CategoryBreakdown { category: cat, count });
             }
         }
 
@@ -158,135 +158,135 @@ impl ReactDoctorEngine {
         }
     }
 
-    pub fn builtin_rules() -> Vec<ReactRule> {
+    pub(crate) fn _builtin_rules() -> Vec<_ReactRule> {
         vec![
             // State & Effects (6 rules)
-            ReactRule {
+            _ReactRule {
                 id: "no-cascading-set-state",
                 category: ReactRuleCategory::StateAndEffects,
                 severity: RuleSeverity::Error,
                 description: "Avoid cascading setState calls in useEffect that cause re-render chains",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-derived-useState",
                 category: ReactRuleCategory::StateAndEffects,
                 severity: RuleSeverity::Warning,
                 description: "Derived state should use useMemo instead of redundant useState",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-fetch-in-effect",
                 category: ReactRuleCategory::StateAndEffects,
                 severity: RuleSeverity::Error,
                 description: "Fetch requests in useEffect should be wrapped in a data-fetching library or custom hook",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-stale-callback",
                 category: ReactRuleCategory::StateAndEffects,
                 severity: RuleSeverity::Error,
                 description: "Callbacks with stale closures should include updated dependencies",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-missing-deps",
                 category: ReactRuleCategory::StateAndEffects,
                 severity: RuleSeverity::Error,
                 description: "useEffect/useCallback/useMemo is missing required dependencies",
             },
-            ReactRule {
+            _ReactRule {
                 id: "rerender-state-only-in-handlers",
                 category: ReactRuleCategory::StateAndEffects,
                 severity: RuleSeverity::Warning,
                 description: "State updates that trigger re-renders should be in event handlers, not during render",
             },
             // Performance (3 rules)
-            ReactRule {
+            _ReactRule {
                 id: "no-array-index-as-key",
                 category: ReactRuleCategory::Performance,
                 severity: RuleSeverity::Warning,
                 description: "Using array index as key can cause rendering bugs and poor reconciliation",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-unnecessary-memo",
                 category: ReactRuleCategory::Performance,
                 severity: RuleSeverity::Warning,
                 description: "useMemo/useCallback wrapping simple computations adds overhead without benefit",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-large-components",
                 category: ReactRuleCategory::Performance,
                 severity: RuleSeverity::Warning,
                 description: "Components over 300 lines should be split into smaller units",
             },
             // Architecture (3 rules)
-            ReactRule {
+            _ReactRule {
                 id: "no-barrel-import",
                 category: ReactRuleCategory::Architecture,
                 severity: RuleSeverity::Warning,
                 description: "Barrel index.ts imports cause tree-shaking issues and circular dependencies",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-direct-dom-access",
                 category: ReactRuleCategory::Architecture,
                 severity: RuleSeverity::Error,
                 description: "Direct DOM access (document.querySelector) breaks SSR and React abstraction",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-hooks-in-conditions",
                 category: ReactRuleCategory::Architecture,
                 severity: RuleSeverity::Error,
                 description: "React hooks must not be called inside conditions, loops, or nested functions",
             },
             // Security (3 rules)
-            ReactRule {
+            _ReactRule {
                 id: "no-dangerous-html",
                 category: ReactRuleCategory::Security,
                 severity: RuleSeverity::Error,
                 description: "dangerouslySetInnerHTML without sanitization opens XSS vulnerabilities",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-suspicious-link",
                 category: ReactRuleCategory::Security,
                 severity: RuleSeverity::Warning,
                 description: "Anchor tags with href='#' or javascript: URIs should use button elements instead",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-hardcoded-secrets",
                 category: ReactRuleCategory::Security,
                 severity: RuleSeverity::Error,
                 description: "Hardcoded API keys, tokens, or passwords detected in source code",
             },
             // Accessibility (3 rules)
-            ReactRule {
+            _ReactRule {
                 id: "no-missing-alt",
                 category: ReactRuleCategory::Accessibility,
                 severity: RuleSeverity::Error,
                 description: "Image elements must have alt text for screen readers",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-missing-aria",
                 category: ReactRuleCategory::Accessibility,
                 severity: RuleSeverity::Warning,
                 description: "Interactive elements should have appropriate ARIA attributes",
             },
-            ReactRule {
+            _ReactRule {
                 id: "no-non-interactive-tabindex",
                 category: ReactRuleCategory::Accessibility,
                 severity: RuleSeverity::Warning,
                 description: "Non-interactive elements should not have positive tabIndex values",
             },
             // Dead Code (3 rules)
-            ReactRule {
+            _ReactRule {
                 id: "unused-import",
                 category: ReactRuleCategory::DeadCode,
                 severity: RuleSeverity::Warning,
                 description: "Unused imports increase bundle size and reduce readability",
             },
-            ReactRule {
+            _ReactRule {
                 id: "unused-component",
                 category: ReactRuleCategory::DeadCode,
                 severity: RuleSeverity::Warning,
                 description: "Exported component is never imported anywhere in the project",
             },
-            ReactRule {
+            _ReactRule {
                 id: "unreachable-code",
                 category: ReactRuleCategory::DeadCode,
                 severity: RuleSeverity::Error,
@@ -295,7 +295,7 @@ impl ReactDoctorEngine {
         ]
     }
 
-    pub fn detect_react_project(root: &str) -> bool {
+    pub(crate) fn _detect_react_project(root: &str) -> bool {
         let path = std::path::Path::new(root).join("package.json");
         let content = match std::fs::read_to_string(&path) {
             Ok(c) => c,
@@ -304,13 +304,13 @@ impl ReactDoctorEngine {
         content.contains("\"react\"") || content.contains("'react'")
     }
 
-    pub fn explain_diagnostic(
+    pub(crate) fn _explain_diagnostic(
         diagnostic: &ReactDiagnostic,
         source_lines: &[String],
     ) -> SuppressionAnalysis {
         let line_idx = diagnostic.line.saturating_sub(1);
         if line_idx >= source_lines.len() {
-            return SuppressionAnalysis::not_suppressed("Line out of range".to_string());
+            return SuppressionAnalysis::_not_suppressed("Line out of range".to_string());
         }
 
         let current_line = &source_lines[line_idx];
@@ -326,7 +326,7 @@ impl ReactDoctorEngine {
                 if listed.contains(&diagnostic.rule_id) {
                     return SuppressionAnalysis::suppressed();
                 }
-                return SuppressionAnalysis::near_miss(format!(
+                return SuppressionAnalysis::_near_miss(format!(
                     "Adjacent suppression lists different rules: {}. Use comma form to add {}",
                     listed.trim(),
                     diagnostic.rule_id
@@ -343,7 +343,7 @@ impl ReactDoctorEngine {
             return SuppressionAnalysis::suppressed();
         }
 
-        SuppressionAnalysis::not_suppressed(format!(
+        SuppressionAnalysis::_not_suppressed(format!(
             "No suppression comment found above line {}. Add: // react-doctor-disable-next-line {}",
             diagnostic.line, diagnostic.rule_id
         ))
@@ -436,7 +436,7 @@ mod tests {
             "// react-doctor-disable-next-line no-fetch-in-effect".to_string(),
             "useEffect(() => { fetch('/api') }, [])".to_string(),
         ];
-        let analysis = ReactDoctorEngine::explain_diagnostic(&diag, &lines);
+        let analysis = ReactDoctorEngine::_explain_diagnostic(&diag, &lines);
         assert!(analysis.is_suppressed);
     }
 
@@ -447,7 +447,7 @@ mod tests {
         let lines = vec![
             "useEffect(() => { fetch('/api') }, [])".to_string(),
         ];
-        let analysis = ReactDoctorEngine::explain_diagnostic(&diag, &lines);
+        let analysis = ReactDoctorEngine::_explain_diagnostic(&diag, &lines);
         assert!(!analysis.is_suppressed);
         assert!(analysis.suppression_hint.is_some());
     }
@@ -460,20 +460,20 @@ mod tests {
             "// react-doctor-disable-next-line no-array-index-as-key".to_string(),
             "useEffect(() => { fetch('/api') }, [])".to_string(),
         ];
-        let analysis = ReactDoctorEngine::explain_diagnostic(&diag, &lines);
+        let analysis = ReactDoctorEngine::_explain_diagnostic(&diag, &lines);
         assert!(!analysis.is_suppressed);
-        assert!(analysis.near_miss.is_some());
+        assert!(analysis._near_miss.is_some());
     }
 
     #[test]
     fn test_builtin_rules_count() {
-        let rules = ReactDoctorEngine::builtin_rules();
+        let rules = ReactDoctorEngine::_builtin_rules();
         assert!(rules.len() >= 20, "only {} rules", rules.len());
     }
 
     #[test]
     fn test_all_categories_covered() {
-        let rules = ReactDoctorEngine::builtin_rules();
+        let rules = ReactDoctorEngine::_builtin_rules();
         let mut categories = std::collections::HashSet::new();
         for rule in &rules {
             categories.insert(format!("{:?}", rule.category));

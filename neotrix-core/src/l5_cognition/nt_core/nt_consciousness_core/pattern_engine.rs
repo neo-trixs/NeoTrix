@@ -12,7 +12,7 @@ pub struct PatternEngine {
     /// 模式匹配器
     pub matchers: Vec<Box<dyn PatternMatcher>>,
     /// 模式历史
-    pub history: Vec<PatternRecord>,
+    pub history: Vec<_PatternRecord>,
 }
 
 /// 模式
@@ -57,7 +57,7 @@ pub trait PatternMatcher: Send + Sync {
 
 /// 模式记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PatternRecord {
+pub(crate) struct _PatternRecord {
     pub id: String,
     pub cycle: u32,
     pub pattern: Pattern,
@@ -85,7 +85,7 @@ impl PatternEngine {
         
         // 记录
         for pattern in &discovered {
-            let record = PatternRecord {
+            let record = _PatternRecord {
                 id: format!("pat_{}", uuid::Uuid::new_v4()),
                 cycle,
                 pattern: pattern.clone(),
@@ -107,8 +107,8 @@ impl PatternEngine {
     }
 
     /// 获取统计
-    pub fn stats(&self) -> PatternStats {
-        PatternStats {
+    pub fn stats(&self) -> _PatternStats {
+        _PatternStats {
             total_patterns: self.patterns.len(),
             total_discoveries: self.history.len(),
             patterns_by_type: self.patterns.iter()
@@ -121,13 +121,13 @@ impl PatternEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PatternStats {
+pub(crate) struct _PatternStats {
     pub total_patterns: usize,
     pub total_discoveries: usize,
     pub patterns_by_type: HashMap<String, u32>,
 }
 
-impl std::fmt::Display for PatternStats {
+impl std::fmt::Display for _PatternStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "PatternEngine: {} patterns, {} discoveries", 
             self.total_patterns, self.total_discoveries)

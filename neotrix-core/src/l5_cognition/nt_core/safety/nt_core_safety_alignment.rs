@@ -10,17 +10,17 @@
 use serde::{Deserialize, Serialize};
 
 /// AI 安全对齐引擎
-pub struct AISafetyAlignmentEngine {
+pub(crate) struct _AISafetyAlignmentEngine {
     values: Vec<Value>,
-    constraints: Vec<SafetyConstraint>,
-    monitors: Vec<BehaviorMonitor>,
-    config: SafetyConfig,
-    stats: SafetyStats,
+    constraints: Vec<_SafetyConstraint>,
+    monitors: Vec<_BehaviorMonitor>,
+    config: _SafetyConfig,
+    stats: _SafetyStats,
 }
 
 /// 安全配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SafetyConfig {
+pub(crate) struct _SafetyConfig {
     pub strict_mode: bool,
     pub monitoring_enabled: bool,
     pub auto_intervention: bool,
@@ -28,7 +28,7 @@ pub struct SafetyConfig {
     pub audit_logging: bool,
 }
 
-impl Default for SafetyConfig {
+impl Default for _SafetyConfig {
     fn default() -> Self {
         Self {
             strict_mode: true,
@@ -53,7 +53,7 @@ pub struct Value {
 
 /// 安全约束
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SafetyConstraint {
+pub(crate) struct _SafetyConstraint {
     pub id: String,
     pub name: String,
     pub constraint_type: ConstraintType,
@@ -77,7 +77,7 @@ pub enum ConstraintType {
 #[serde(rename_all = "snake_case")]
 
 /// 行为监控器
-pub struct BehaviorMonitor {
+pub(crate) struct _BehaviorMonitor {
     monitor_id: String,
     monitor_type: String,
     threshold: f64,
@@ -87,7 +87,7 @@ pub struct BehaviorMonitor {
 
 /// 行为监控结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MonitorResult {
+pub(crate) struct _MonitorResult {
     pub monitor_id: String,
     pub is_violation: bool,
     pub current_value: f64,
@@ -101,7 +101,7 @@ pub struct MonitorResult {
 pub struct SafetyCheckResult {
     pub is_safe: bool,
     pub violations: Vec<SafetyViolation>,
-    pub warnings: Vec<SafetyWarning>,
+    pub warnings: Vec<_SafetyWarning>,
     pub risk_score: f64,
     pub recommendations: Vec<String>,
 }
@@ -119,7 +119,7 @@ pub struct SafetyViolation {
 
 /// 安全警告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SafetyWarning {
+pub(crate) struct _SafetyWarning {
     pub warning_type: String,
     pub message: String,
     pub risk_level: String,
@@ -128,16 +128,16 @@ pub struct SafetyWarning {
 
 /// 伦理检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EthicsCheckResult {
+pub(crate) struct _EthicsCheckResult {
     pub is_ethical: bool,
-    pub concerns: Vec<EthicsConcern>,
+    pub concerns: Vec<_EthicsConcern>,
     pub compliance_score: f64,
     pub recommendations: Vec<String>,
 }
 
 /// 伦理关注
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EthicsConcern {
+pub(crate) struct _EthicsConcern {
     pub concern_type: String,
     pub description: String,
     pub severity: Severity,
@@ -146,16 +146,16 @@ pub struct EthicsConcern {
 
 /// 风险评估结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RiskAssessmentResult {
+pub(crate) struct _RiskAssessmentResult {
     pub overall_risk: f64,
-    pub risk_factors: Vec<RiskFactor>,
+    pub risk_factors: Vec<_RiskFactor>,
     pub mitigation_strategies: Vec<String>,
     pub monitoring_recommendations: Vec<String>,
 }
 
 /// 风险因素
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RiskFactor {
+pub(crate) struct _RiskFactor {
     pub factor_type: String,
     pub description: String,
     pub probability: f64,
@@ -165,7 +165,7 @@ pub struct RiskFactor {
 
 /// 安全统计
 use neotrix_types::shared::Severity;
-pub struct SafetyStats {
+pub(crate) struct _SafetyStats {
     pub checks_performed: u64,
     pub violations_detected: u64,
     pub interventions_triggered: u64,
@@ -173,15 +173,15 @@ pub struct SafetyStats {
     pub safety_score: f64,
 }
 
-impl AISafetyAlignmentEngine {
+impl _AISafetyAlignmentEngine {
     /// 创建新的 AI 安全对齐引擎
-    pub fn new(config: SafetyConfig) -> Self {
+    pub fn new(config: _SafetyConfig) -> Self {
         Self {
             values: Vec::new(),
             constraints: Vec::new(),
             monitors: Vec::new(),
             config,
-            stats: SafetyStats {
+            stats: _SafetyStats {
                 checks_performed: 0,
                 violations_detected: 0,
                 interventions_triggered: 0,
@@ -192,17 +192,17 @@ impl AISafetyAlignmentEngine {
     }
 
     /// 添加价值
-    pub fn add_value(&mut self, value: Value) {
+    pub(crate) fn _add_value(&mut self, value: Value) {
         self.values.push(value);
     }
 
     /// 添加安全约束
-    pub fn add_constraint(&mut self, constraint: SafetyConstraint) {
+    pub(crate) fn _add_constraint(&mut self, constraint: _SafetyConstraint) {
         self.constraints.push(constraint);
     }
 
     /// 添加行为监控器
-    pub fn add_monitor(&mut self, monitor: BehaviorMonitor) {
+    pub(crate) fn _add_monitor(&mut self, monitor: _BehaviorMonitor) {
         self.monitors.push(monitor);
     }
 
@@ -238,7 +238,7 @@ impl AISafetyAlignmentEngine {
         for i in 0..monitor_len {
             let result = self.check_monitor(&self.monitors[i]);
             if result.is_violation {
-                warnings.push(SafetyWarning {
+                warnings.push(_SafetyWarning {
                     warning_type: "monitor_alert".into(),
                     message: format!("Monitor {} exceeded threshold", self.monitors[i].monitor_id),
                     risk_level: format!("{:?}", result.severity),
@@ -262,16 +262,16 @@ impl AISafetyAlignmentEngine {
     }
 
     /// 评估约束
-    fn evaluate_constraint(&self, _constraint: &SafetyConstraint, _action: &serde_json::Value) -> bool {
+    fn evaluate_constraint(&self, _constraint: &_SafetyConstraint, _action: &serde_json::Value) -> bool {
         // 简化版: 总是返回 false (没有违规)
         false
     }
 
     /// 检查监控器
-    fn check_monitor(&self, monitor: &BehaviorMonitor) -> MonitorResult {
+    fn check_monitor(&self, monitor: &_BehaviorMonitor) -> _MonitorResult {
         let is_violation = monitor.current_value > monitor.threshold;
 
-        MonitorResult {
+        _MonitorResult {
             monitor_id: monitor.monitor_id.clone(),
             is_violation,
             current_value: monitor.current_value,
@@ -286,7 +286,7 @@ impl AISafetyAlignmentEngine {
     }
 
     /// 计算风险分数
-    fn calculate_risk_score(&self, violations: &[SafetyViolation], warnings: &[SafetyWarning]) -> f64 {
+    fn calculate_risk_score(&self, violations: &[SafetyViolation], warnings: &[_SafetyWarning]) -> f64 {
         let violation_score: f64 = violations.iter().map(|v| match v.severity {
             Severity::Low => 0.1,
             Severity::Medium => 0.3,
@@ -301,7 +301,7 @@ impl AISafetyAlignmentEngine {
     }
 
     /// 生成建议
-    fn generate_recommendations(&self, violations: &[SafetyViolation], warnings: &[SafetyWarning]) -> Vec<String> {
+    fn generate_recommendations(&self, violations: &[SafetyViolation], warnings: &[_SafetyWarning]) -> Vec<String> {
         let mut recommendations = Vec::new();
 
         for violation in violations {
@@ -327,14 +327,14 @@ impl AISafetyAlignmentEngine {
     }
 
     /// 检查伦理
-    pub fn check_ethics(&self, action: &serde_json::Value) -> EthicsCheckResult {
+    pub(crate) fn _check_ethics(&self, action: &serde_json::Value) -> _EthicsCheckResult {
         let mut concerns = Vec::new();
 
         // 简化版: 检查基本伦理原则
         let action_str = action.to_string();
 
         if action_str.contains("harm") || action_str.contains("damage") {
-            concerns.push(EthicsConcern {
+            concerns.push(_EthicsConcern {
                 concern_type: "potential_harm".into(),
                 description: "Action may cause harm".into(),
                 severity: Severity::High,
@@ -345,7 +345,7 @@ impl AISafetyAlignmentEngine {
         let is_ethical = concerns.is_empty();
         let compliance_score = if is_ethical { 1.0 } else { 0.5 };
 
-        EthicsCheckResult {
+        _EthicsCheckResult {
             is_ethical,
             concerns,
             compliance_score,
@@ -354,14 +354,14 @@ impl AISafetyAlignmentEngine {
     }
 
     /// 评估风险
-    pub fn assess_risk(&self, action: &serde_json::Value) -> RiskAssessmentResult {
+    pub fn assess_risk(&self, action: &serde_json::Value) -> _RiskAssessmentResult {
         let mut risk_factors = Vec::new();
 
         // 简化版: 基于动作类型评估风险
         let action_str = action.to_string();
 
         if action_str.contains("external") || action_str.contains("network") {
-            risk_factors.push(RiskFactor {
+            risk_factors.push(_RiskFactor {
                 factor_type: "external_interaction".into(),
                 description: "Action involves external systems".into(),
                 probability: 0.3,
@@ -372,7 +372,7 @@ impl AISafetyAlignmentEngine {
 
         let overall_risk = risk_factors.iter().map(|f| f.risk_score).sum::<f64>();
 
-        RiskAssessmentResult {
+        _RiskAssessmentResult {
             overall_risk,
             risk_factors,
             mitigation_strategies: vec!["Implement safety checks".into(), "Monitor execution".into()],
@@ -381,7 +381,7 @@ impl AISafetyAlignmentEngine {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &SafetyStats {
+    pub fn stats(&self) -> &_SafetyStats {
         &self.stats
     }
 }

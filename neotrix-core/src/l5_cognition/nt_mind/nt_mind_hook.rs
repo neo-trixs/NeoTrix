@@ -87,7 +87,7 @@ impl HookContext {
         self
     }
 
-    pub fn with_brain(mut self, brain: &SelfIteratingBrain) -> Self {
+    pub(crate) fn _with_brain(mut self, brain: &SelfIteratingBrain) -> Self {
         self.brain_state = Some(format!("iter={}, champion={:?}", brain.iteration, brain.champion.is_some()));
         self
     }
@@ -187,13 +187,13 @@ impl MindHookRegistry {
         self.hooks.len()
     }
 
-    pub fn recent_log(&self, limit: usize) -> Vec<String> {
+    pub(crate) fn _recent_log(&self, limit: usize) -> Vec<String> {
         self.execution_log.iter().rev().take(limit).map(|e| {
             format!("[{}] {:?} -> {}: {}", e.timestamp, e.event, e.action, if e.success { "OK" } else { "FAIL" })
         }).collect()
     }
 
-    pub fn clear_log(&mut self) {
+    pub(crate) fn _clear_log(&mut self) {
         self.execution_log.clear();
     }
 }
@@ -304,7 +304,7 @@ mod tests {
         reg.register(HookEvent::SessionStart, Box::new(TestHook));
         let ctx = HookContext::new(HookEvent::SessionStart, "started");
         reg.trigger(&ctx);
-        let log = reg.recent_log(10);
+        let log = reg._recent_log(10);
         assert_eq!(log.len(), 1);
         assert!(log[0].contains("OK"));
     }

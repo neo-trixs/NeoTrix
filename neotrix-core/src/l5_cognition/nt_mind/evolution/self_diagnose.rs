@@ -360,7 +360,7 @@ impl RepairCircuitBreaker {
     }
 
     /// 每轮修复尝试前调用 — 已跳闸或轮次超限时返回 Err("circuit breaker tripped")
-    pub fn before_round(&mut self) -> Result<(), String> {
+    pub(crate) fn _before_round(&mut self) -> Result<(), String> {
         if self.tripped || self.round >= self.max_repair_rounds {
             self.tripped = true;
             return Err("circuit breaker tripped".into());
@@ -370,7 +370,7 @@ impl RepairCircuitBreaker {
     }
 
     /// 记录本轮修复是否有进展。连续无进展 ≥ max_repair_rounds 时跳闸。
-    pub fn record_progress(&mut self, made_progress: bool) {
+    pub(crate) fn _record_progress(&mut self, made_progress: bool) {
         if made_progress {
             self.consecutive_no_progress = 0;
             return;
@@ -446,8 +446,8 @@ impl ActionExecutor {
 
     /// 带断路器保护的执行 — 循环调用修复时先检查断路器。
     ///
-    /// 每轮尝试前调用 `before_round` (跳闸则停止); 成功 → `record_progress(true)`,
-    /// 失败且无进展 → `record_progress(false)`。断路器因连续无进展跳闸时,
+    /// 每轮尝试前调用 `_before_round` (跳闸则停止); 成功 → `_record_progress(true)`,
+    /// 失败且无进展 → `_record_progress(false)`。断路器因连续无进展跳闸时,
     /// 返回明确错误说明而非原始失败 (self-healing-agent 原则: 无进展 → halt)。
     /// 保持原 `execute` 签名兼容。
     pub fn execute_with_breaker(
@@ -455,14 +455,14 @@ impl ActionExecutor {
         plan: &ActionPlan,
         breaker: &mut RepairCircuitBreaker,
     ) -> Result<String, String> {
-        breaker.before_round()?;
+        breaker._before_round()?;
         match Self::execute(plan) {
             Ok(msg) => {
-                breaker.record_progress(true);
+                breaker._record_progress(true);
                 Ok(msg)
             }
             Err(e) => {
-                breaker.record_progress(false);
+                breaker._record_progress(false);
                 if breaker.is_tripped() {
                     Err(format!(
                         "circuit breaker tripped: 连续 {} 轮无进展, 最近错误: {}",
@@ -626,12 +626,12 @@ mod tests {
         let mut breaker = RepairCircuitBreaker::new(3);
         assert!(!breaker.is_tripped());
         // 前 max_repair_rounds 轮允许执行
-        assert!(breaker.before_round().is_ok());
-        assert!(breaker.before_round().is_ok());
-        assert!(breaker.before_round().is_ok());
+        assert!(breaker._before_round().is_ok());
+        assert!(breaker._before_round().is_ok());
+        assert!(breaker._before_round().is_ok());
         assert_eq!(breaker.round, 3);
         // 第 4 轮超过上限 → 跳闸
-        let err = breaker.before_round().unwrap_err();
+        let err = breaker._before_round().unwrap_err();
         assert!(err.contains("circuit breaker tripped"), "got: {}", err);
         assert!(breaker.is_tripped());
     }
@@ -640,14 +640,14 @@ mod tests {
     fn test_breaker_never_trips_with_progress() {
         let mut breaker = RepairCircuitBreaker::new(5);
         for _ in 0..5 {
-            assert!(breaker.before_round().is_ok());
-            breaker.record_progress(true);
+            assert!(breaker._before_round().is_ok());
+            breaker._record_progress(true);
         }
         assert!(!breaker.is_tripped());
         // 有进展 → 连续无进展计数归零
-        breaker.record_progress(false);
-        breaker.record_progress(false);
-        breaker.record_progress(true);
+        breaker._record_progress(false);
+        breaker._record_progress(false);
+        breaker._record_progress(true);
         assert_eq!(breaker.consecutive_no_progress, 0);
         assert!(!breaker.is_tripped());
     }
@@ -655,13 +655,13 @@ mod tests {
     #[test]
     fn test_breaker_trips_on_consecutive_no_progress() {
         let mut breaker = RepairCircuitBreaker::new(3);
-        breaker.record_progress(true);   // 1 次成功
-        breaker.record_progress(false);  // 1
-        breaker.record_progress(false);  // 2
+        breaker._record_progress(true);   // 1 次成功
+        breaker._record_progress(false);  // 1
+        breaker._record_progress(false);  // 2
         assert!(!breaker.is_tripped());
-        breaker.record_progress(false);  // 3 → 达到连续无进展阈值
+        breaker._record_progress(false);  // 3 → 达到连续无进展阈值
         assert!(breaker.is_tripped());
-        assert!(breaker.before_round().is_err());
+        assert!(breaker._before_round().is_err());
     }
 
     #[test]

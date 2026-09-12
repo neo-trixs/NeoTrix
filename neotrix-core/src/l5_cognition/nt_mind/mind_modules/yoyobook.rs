@@ -12,7 +12,7 @@ use crate::core::nt_core_self_test::SelfTest;
 ///
 /// 每个变体对应书中一个反复出现的演化主题, 后续 C1+ 阶段可扩展为具体策略。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SelfEvolutionLesson {
+pub(crate) enum _SelfEvolutionLesson {
     /// identity 先于 capability: 智能体须先确立"我是谁"再演化技能。
     IdentityBeforeCapability,
     /// skill 通过失败而非成功习得 (failure-driven crystallization)。
@@ -25,31 +25,31 @@ pub enum SelfEvolutionLesson {
     ClosedLoopNonNull,
 }
 
-impl SelfEvolutionLesson {
+impl _SelfEvolutionLesson {
     /// 返回该 lesson 在 yoyobook 中的一句话陈述。
     pub fn statement(&self) -> &'static str {
         match self {
-            SelfEvolutionLesson::IdentityBeforeCapability =>
+            _SelfEvolutionLesson::IdentityBeforeCapability =>
                 "identity precedes capability: an agent must know who it is before evolving skills",
-            SelfEvolutionLesson::SkillViaFailure =>
+            _SelfEvolutionLesson::SkillViaFailure =>
                 "skills crystallize through failure, not success",
-            SelfEvolutionLesson::MemoryIsLineage =>
+            _SelfEvolutionLesson::MemoryIsLineage =>
                 "memory is the carrier of lineage; transmission crosses generations via experience",
-            SelfEvolutionLesson::JournalForAuditability =>
+            _SelfEvolutionLesson::JournalForAuditability =>
                 "without journaling, self-evolution cannot be audited",
-            SelfEvolutionLesson::ClosedLoopNonNull =>
+            _SelfEvolutionLesson::ClosedLoopNonNull =>
                 "the patch→eval→decision→promote loop tolerates no skipped stage",
         }
     }
 
     /// 全部 lesson 枚举 (迭代/注册用)。
-    pub fn all() -> &'static [SelfEvolutionLesson] {
+    pub fn all() -> &'static [_SelfEvolutionLesson] {
         &[
-            SelfEvolutionLesson::IdentityBeforeCapability,
-            SelfEvolutionLesson::SkillViaFailure,
-            SelfEvolutionLesson::MemoryIsLineage,
-            SelfEvolutionLesson::JournalForAuditability,
-            SelfEvolutionLesson::ClosedLoopNonNull,
+            _SelfEvolutionLesson::IdentityBeforeCapability,
+            _SelfEvolutionLesson::SkillViaFailure,
+            _SelfEvolutionLesson::MemoryIsLineage,
+            _SelfEvolutionLesson::JournalForAuditability,
+            _SelfEvolutionLesson::ClosedLoopNonNull,
         ]
     }
 }
@@ -57,33 +57,33 @@ impl SelfEvolutionLesson {
 /// 叙事 pattern 提取 trait — 从一段自进化叙事文本中抽取可复用 lesson。
 ///
 /// C0 占位: 结构化提取逻辑留待 C1 实现, 此处仅定义契约。
-pub trait NarrativePatternExtractor {
+pub(crate) trait _NarrativePatternExtractor {
     /// 从叙事片段识别命中的 lesson 集合 (C0: 返回全部声明式 lesson)。
-    fn extract_lessons(&self, _narrative: &str) -> Vec<SelfEvolutionLesson> {
-        SelfEvolutionLesson::all().to_vec()
+    fn extract_lessons(&self, _narrative: &str) -> Vec<_SelfEvolutionLesson> {
+        _SelfEvolutionLesson::all().to_vec()
     }
     /// 已收录的 lesson 总数。
     fn lesson_count(&self) -> usize {
-        SelfEvolutionLesson::all().len()
+        _SelfEvolutionLesson::all().len()
     }
 }
 
 /// yoyobook 文献节点默认提取器。
-pub struct YoyoBookExtractor;
+pub(crate) struct _YoyoBookExtractor;
 
-impl NarrativePatternExtractor for YoyoBookExtractor {}
+impl _NarrativePatternExtractor for _YoyoBookExtractor {}
 
-impl SelfTest for YoyoBookExtractor {
+impl SelfTest for _YoyoBookExtractor {
     fn name(&self) -> &'static str {
-        "YoyoBookExtractor"
+        "_YoyoBookExtractor"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut errs = Vec::new();
-        if SelfEvolutionLesson::all().is_empty() {
+        if _SelfEvolutionLesson::all().is_empty() {
             errs.push("lesson set must not be empty".into());
         }
-        for lesson in SelfEvolutionLesson::all() {
+        for lesson in _SelfEvolutionLesson::all() {
             if lesson.statement().is_empty() {
                 errs.push(format!("lesson {:?} has empty statement", lesson));
             }
@@ -98,24 +98,24 @@ mod tests {
 
     #[test]
     fn test_lesson_statement_nonempty() {
-        let e = YoyoBookExtractor;
+        let e = _YoyoBookExtractor;
         assert!(e.self_test().is_ok());
-        for lesson in SelfEvolutionLesson::all() {
+        for lesson in _SelfEvolutionLesson::all() {
             assert!(!lesson.statement().is_empty());
         }
     }
 
     #[test]
     fn test_extract_returns_all_declared_lessons() {
-        let e = YoyoBookExtractor;
+        let e = _YoyoBookExtractor;
         let got = e.extract_lessons("a self-evolving agent story");
         assert_eq!(got.len(), 5);
-        assert!(got.contains(&SelfEvolutionLesson::ClosedLoopNonNull));
+        assert!(got.contains(&_SelfEvolutionLesson::ClosedLoopNonNull));
     }
 
     #[test]
     fn test_lesson_count_matches_enum() {
-        let e = YoyoBookExtractor;
+        let e = _YoyoBookExtractor;
         assert_eq!(e.lesson_count(), 5);
     }
 }

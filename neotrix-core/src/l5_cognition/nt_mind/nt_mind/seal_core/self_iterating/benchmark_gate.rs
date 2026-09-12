@@ -5,13 +5,13 @@ use crate::neotrix::nt_core_error::NeoTrixError;
 use std::collections::HashMap;
 
 /// A benchmark task consisting of a prompt and an expected output pattern.
-pub struct BenchmarkTask {
+pub(crate) struct _BenchmarkTask {
     pub name: String,
     pub prompt: String,
     pub task_type: TaskType,
 }
 
-impl BenchmarkTask {
+impl _BenchmarkTask {
     pub fn new(name: &str, prompt: &str, task_type: TaskType) -> Self {
         Self {
             name: name.to_string(),
@@ -23,7 +23,7 @@ impl BenchmarkTask {
 
 /// Configuration for the BenchmarkGate stage.
 pub struct BenchmarkSuite {
-    pub tasks: Vec<BenchmarkTask>,
+    pub tasks: Vec<_BenchmarkTask>,
     /// Minimum acceptable improvement delta (default: -0.05 = allow 5% regression).
     pub threshold: f64,
     /// Cached pre-edit scores.
@@ -34,11 +34,11 @@ impl Default for BenchmarkSuite {
     fn default() -> Self {
         Self {
             tasks: vec![
-                BenchmarkTask::new("reasoning", "Solve: if x + 5 = 12, what is x?", TaskType::General),
-                BenchmarkTask::new("code_gen", "Write a Rust function that sums a Vec<i32>", TaskType::CodeGeneration),
-                BenchmarkTask::new("tool_use", "Search for the capital of France and summarize", TaskType::Research),
-                BenchmarkTask::new("creative", "Write a haiku about artificial intelligence", TaskType::UIDesign),
-                BenchmarkTask::new("analysis", "Compare REST and GraphQL APIs", TaskType::CodeAnalysis),
+                _BenchmarkTask::new("reasoning", "Solve: if x + 5 = 12, what is x?", TaskType::General),
+                _BenchmarkTask::new("code_gen", "Write a Rust function that sums a Vec<i32>", TaskType::CodeGeneration),
+                _BenchmarkTask::new("tool_use", "Search for the capital of France and summarize", TaskType::Research),
+                _BenchmarkTask::new("creative", "Write a haiku about artificial intelligence", TaskType::UIDesign),
+                _BenchmarkTask::new("analysis", "Compare REST and GraphQL APIs", TaskType::CodeAnalysis),
             ],
             threshold: -0.05,
             pre_scores: HashMap::new(),
@@ -113,7 +113,7 @@ impl BenchmarkGateStage {
         }
     }
 
-    pub fn with_suite(suite: BenchmarkSuite) -> Self {
+    pub(crate) fn _with_suite(suite: BenchmarkSuite) -> Self {
         Self {
             suite,
             baseline: std::sync::Mutex::new(None),

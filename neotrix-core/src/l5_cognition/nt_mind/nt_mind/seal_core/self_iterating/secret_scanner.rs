@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use neotrix_types::shared::Severity;
 
 #[derive(Debug, Clone)]
-pub struct SecretPattern {
+pub(crate) struct _SecretPattern {
     pub name: &'static str,
     pub severity: Severity,
     pub regex: &'static str,
 }
 
 #[derive(Debug, Clone)]
-pub struct SecretFinding {
+pub(crate) struct _SecretFinding {
     pub pattern: &'static str,
     pub severity: Severity,
     pub snippet: String,
@@ -18,7 +18,7 @@ pub struct SecretFinding {
 
 #[derive(Debug, Clone, Default)]
 pub struct SecretScanner {
-    patterns: Vec<SecretPattern>,
+    patterns: Vec<_SecretPattern>,
 }
 
 impl SecretScanner {
@@ -26,7 +26,7 @@ impl SecretScanner {
         Self { patterns: default_patterns() }
     }
 
-    pub fn scan(&self, text: &str) -> Vec<SecretFinding> {
+    pub fn scan(&self, text: &str) -> Vec<_SecretFinding> {
         let mut findings = Vec::new();
         for (line_idx, line) in text.lines().enumerate() {
             for pattern in &self.patterns {
@@ -40,7 +40,7 @@ impl SecretScanner {
                     } else {
                         line.to_string()
                     };
-                    findings.push(SecretFinding {
+                    findings.push(_SecretFinding {
                         pattern: pattern.name,
                         severity: pattern.severity,
                         snippet,
@@ -77,7 +77,7 @@ impl SecretScanner {
 
 #[derive(Debug, Clone)]
 pub struct ScanResult {
-    pub findings: Vec<SecretFinding>,
+    pub findings: Vec<_SecretFinding>,
     pub max_severity: Severity,
     pub count_by_severity: HashMap<Severity, usize>,
 }
@@ -112,29 +112,29 @@ impl ScanResult {
     }
 }
 
-fn default_patterns() -> Vec<SecretPattern> {
+fn default_patterns() -> Vec<_SecretPattern> {
     vec![
-        SecretPattern { name: "OpenAI API Key", severity: Severity::Critical, regex: r"(?i)sk-[a-zA-Z0-9]{20,}" },
-        SecretPattern { name: "AWS Access Key", severity: Severity::Critical, regex: r"(?i)AKIA[0-9A-Z]{16}" },
-        SecretPattern { name: "AWS Secret Key", severity: Severity::Critical, regex: r#"(?i)aws(.{0,20})?(secret|secret_key|secretkey).{0,5}["'][a-zA-Z0-9/\+=]{40}["']"# },
-        SecretPattern { name: "Private Key", severity: Severity::Critical, regex: r"-----BEGIN\s?(RSA|DSA|EC|OPENSSH|PGP)?\s?PRIVATE KEY-----" },
-        SecretPattern { name: "JWT Token", severity: Severity::High, regex: r"eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}" },
-        SecretPattern { name: "GitHub Token", severity: Severity::Critical, regex: r"(?i)gh[pousr]_[a-zA-Z0-9]{36,}" },
-        SecretPattern { name: "GitLab Token", severity: Severity::Critical, regex: r"(?i)glpat-[a-zA-Z0-9\-_]{20,}" },
-        SecretPattern { name: "Slack Token", severity: Severity::Critical, regex: r"xox[baprs]-[a-zA-Z0-9\-]{10,}" },
-        SecretPattern { name: "Google API Key", severity: Severity::High, regex: r"(?i)AIza[0-9A-Za-z\-_]{35}" },
-        SecretPattern { name: "Heroku API Key", severity: Severity::High, regex: r"(?i)h[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}" },
-        SecretPattern { name: "Password in Config", severity: Severity::High, regex: r#"(?i)(password|passwd|pwd)\s*[:=]\s*["'][^"']{6,}["']"# },
-        SecretPattern { name: "Connection String", severity: Severity::High, regex: r"(?i)(mongodb|postgresql|mysql|redis|amqp)://[a-zA-Z0-9]+:[^@]+@" },
-        SecretPattern { name: "Generic Token", severity: Severity::Medium, regex: r#"(?i)(token|secret|apikey|api_key)\s*[:=]\s*["'][a-zA-Z0-9_\-\.]{16,}["']"# },
+        _SecretPattern { name: "OpenAI API Key", severity: Severity::Critical, regex: r"(?i)sk-[a-zA-Z0-9]{20,}" },
+        _SecretPattern { name: "AWS Access Key", severity: Severity::Critical, regex: r"(?i)AKIA[0-9A-Z]{16}" },
+        _SecretPattern { name: "AWS Secret Key", severity: Severity::Critical, regex: r#"(?i)aws(.{0,20})?(secret|secret_key|secretkey).{0,5}["'][a-zA-Z0-9/\+=]{40}["']"# },
+        _SecretPattern { name: "Private Key", severity: Severity::Critical, regex: r"-----BEGIN\s?(RSA|DSA|EC|OPENSSH|PGP)?\s?PRIVATE KEY-----" },
+        _SecretPattern { name: "JWT Token", severity: Severity::High, regex: r"eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}" },
+        _SecretPattern { name: "GitHub Token", severity: Severity::Critical, regex: r"(?i)gh[pousr]_[a-zA-Z0-9]{36,}" },
+        _SecretPattern { name: "GitLab Token", severity: Severity::Critical, regex: r"(?i)glpat-[a-zA-Z0-9\-_]{20,}" },
+        _SecretPattern { name: "Slack Token", severity: Severity::Critical, regex: r"xox[baprs]-[a-zA-Z0-9\-]{10,}" },
+        _SecretPattern { name: "Google API Key", severity: Severity::High, regex: r"(?i)AIza[0-9A-Za-z\-_]{35}" },
+        _SecretPattern { name: "Heroku API Key", severity: Severity::High, regex: r"(?i)h[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}" },
+        _SecretPattern { name: "Password in Config", severity: Severity::High, regex: r#"(?i)(password|passwd|pwd)\s*[:=]\s*["'][^"']{6,}["']"# },
+        _SecretPattern { name: "Connection String", severity: Severity::High, regex: r"(?i)(mongodb|postgresql|mysql|redis|amqp)://[a-zA-Z0-9]+:[^@]+@" },
+        _SecretPattern { name: "Generic Token", severity: Severity::Medium, regex: r#"(?i)(token|secret|apikey|api_key)\s*[:=]\s*["'][a-zA-Z0-9_\-\.]{16,}["']"# },
         // ─── AI Security patterns (from h4cker AI nt_shield research) ───
-        SecretPattern { name: "Prompt Injection Attempt", severity: Severity::High, regex: r#"(?i)(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+(instructions|commands|directives)"# },
-        SecretPattern { name: "LLM Jailbreak Pattern", severity: Severity::High, regex: r#"(?i)(do\s+anything\s+now|no\s+(restrictions|limitations|boundaries|filter)|you\s+(are\s+)?free|act\s+as\s+if|roleplay\s+as|pretend\s+(to\s+be|you're))"# },
-        SecretPattern { name: "DAN Mode Do Anything", severity: Severity::Medium, regex: r#"(?i)(dan|do\s+anything\s+now)\s*:"# },
-        SecretPattern { name: "Training Data Extraction", severity: Severity::High, regex: r#"(?i)(repeat|echo|spit\s+out|reveal)\s+(your\s+)?(training\s+)?(data|prompt|system\s+message)"# },
-        SecretPattern { name: "Model Poisoning Indicator", severity: Severity::Critical, regex: r#"(?i)(model\s+poison|backdoor\s+trigger|poisoned\s+data|label\s+flip)"# },
-        SecretPattern { name: "Adversarial Suffix", severity: Severity::Medium, regex: r"(?i)\\begin\{pmatrix\}|!@#$%^&|\]{3,}|describing\\.+\\." },
-        SecretPattern { name: "Indirect Injection Marker", severity: Severity::High, regex: r#"(?i)(retrieved\s+content\s+from|tool\s+output|search\s+result)\s*[:].*(ignore|override|disregard)"# },
+        _SecretPattern { name: "Prompt Injection Attempt", severity: Severity::High, regex: r#"(?i)(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+(instructions|commands|directives)"# },
+        _SecretPattern { name: "LLM Jailbreak Pattern", severity: Severity::High, regex: r#"(?i)(do\s+anything\s+now|no\s+(restrictions|limitations|boundaries|filter)|you\s+(are\s+)?free|act\s+as\s+if|roleplay\s+as|pretend\s+(to\s+be|you're))"# },
+        _SecretPattern { name: "DAN Mode Do Anything", severity: Severity::Medium, regex: r#"(?i)(dan|do\s+anything\s+now)\s*:"# },
+        _SecretPattern { name: "Training Data Extraction", severity: Severity::High, regex: r#"(?i)(repeat|echo|spit\s+out|reveal)\s+(your\s+)?(training\s+)?(data|prompt|system\s+message)"# },
+        _SecretPattern { name: "Model Poisoning Indicator", severity: Severity::Critical, regex: r#"(?i)(model\s+poison|backdoor\s+trigger|poisoned\s+data|label\s+flip)"# },
+        _SecretPattern { name: "Adversarial Suffix", severity: Severity::Medium, regex: r"(?i)\\begin\{pmatrix\}|!@#$%^&|\]{3,}|describing\\.+\\." },
+        _SecretPattern { name: "Indirect Injection Marker", severity: Severity::High, regex: r#"(?i)(retrieved\s+content\s+from|tool\s+output|search\s+result)\s*[:].*(ignore|override|disregard)"# },
     ]
 }
 

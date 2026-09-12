@@ -1,11 +1,11 @@
-//! NullNormalizer — 空值标准化器
+//! _NullNormalizer — 空值标准化器
 //!
 //! 标准化 LLM 输出中的 null/空值，确保下游处理一致性。
 //! 支持多种空值模式检测和替换策略。
 
 /// 空值模式
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NullPattern {
+pub(crate) enum _NullPattern {
     /// JSON null
     JsonNull,
     /// 空字符串
@@ -24,7 +24,7 @@ pub enum NullPattern {
 
 /// 标准化策略
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NormalizeStrategy {
+pub(crate) enum _NormalizeStrategy {
     /// 替换为默认值
     ReplaceDefault,
     /// 移除该字段
@@ -37,36 +37,36 @@ pub enum NormalizeStrategy {
 
 /// 标准化规则
 #[derive(Debug, Clone)]
-pub struct NormalizeRule {
-    pub pattern: NullPattern,
-    pub strategy: NormalizeStrategy,
+pub(crate) struct _NormalizeRule {
+    pub pattern: _NullPattern,
+    pub strategy: _NormalizeStrategy,
     pub default_value: Option<String>,
     pub template: Option<String>,
 }
 
 /// 空值标准化器
-pub struct NullNormalizer {
+pub(crate) struct _NullNormalizer {
     /// 规则集
-    rules: Vec<NormalizeRule>,
+    rules: Vec<_NormalizeRule>,
     /// 统计信息
-    stats: NormalizeStats,
+    stats: _NormalizeStats,
 }
 
-impl NullNormalizer {
+impl _NullNormalizer {
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
-            stats: NormalizeStats::default(),
+            stats: _NormalizeStats::default(),
         }
     }
 
     /// 添加规则
-    pub fn add_rule(&mut self, rule: NormalizeRule) {
+    pub fn add_rule(&mut self, rule: _NormalizeRule) {
         self.rules.push(rule);
     }
 
     /// 标准化字符串值
-    pub fn normalize_string(&mut self, value: &str) -> String {
+    pub(crate) fn _normalize_string(&mut self, value: &str) -> String {
         self.stats.total_checks += 1;
 
         for rule in &self.rules {
@@ -80,7 +80,7 @@ impl NullNormalizer {
     }
 
     /// 标准化 JSON 值
-    pub fn normalize_json(&mut self, json: &str) -> String {
+    pub(crate) fn _normalize_json(&mut self, json: &str) -> String {
         // 简化的 JSON 空值处理
         let mut result = json.to_string();
 
@@ -92,60 +92,60 @@ impl NullNormalizer {
     }
 
     /// 匹配模式
-    fn matches_pattern(&self, value: &str, pattern: &NullPattern) -> bool {
+    fn matches_pattern(&self, value: &str, pattern: &_NullPattern) -> bool {
         match pattern {
-            NullPattern::JsonNull => value == "null",
-            NullPattern::EmptyString => value.is_empty(),
-            NullPattern::NullString => value.to_lowercase() == "null",
-            NullPattern::UndefinedString => value.to_lowercase() == "undefined",
-            NullPattern::NaString => value.to_uppercase() == "N/A",
-            NullPattern::NoneValue => value.to_lowercase() == "none",
-            NullPattern::Custom(pattern) => value.contains(pattern),
+            _NullPattern::JsonNull => value == "null",
+            _NullPattern::EmptyString => value.is_empty(),
+            _NullPattern::NullString => value.to_lowercase() == "null",
+            _NullPattern::UndefinedString => value.to_lowercase() == "undefined",
+            _NullPattern::NaString => value.to_uppercase() == "N/A",
+            _NullPattern::NoneValue => value.to_lowercase() == "none",
+            _NullPattern::Custom(pattern) => value.contains(pattern),
         }
     }
 
     /// 应用策略
-    fn apply_strategy(&self, value: &str, strategy: &NormalizeStrategy, default_value: &Option<String>, template: &Option<String>) -> String {
+    fn apply_strategy(&self, value: &str, strategy: &_NormalizeStrategy, default_value: &Option<String>, template: &Option<String>) -> String {
         match strategy {
-            NormalizeStrategy::ReplaceDefault => {
+            _NormalizeStrategy::ReplaceDefault => {
                 default_value.clone().unwrap_or_else(|| value.to_string())
             }
-            NormalizeStrategy::RemoveField => {
+            _NormalizeStrategy::RemoveField => {
                 String::new() // 标记为删除
             }
-            NormalizeStrategy::Skip => {
+            _NormalizeStrategy::Skip => {
                 value.to_string()
             }
-            NormalizeStrategy::UseTemplate => {
+            _NormalizeStrategy::UseTemplate => {
                 template.clone().unwrap_or_else(|| value.to_string())
             }
         }
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> NormalizeStats {
+    pub fn stats(&self) -> _NormalizeStats {
         self.stats.clone()
     }
 }
 
-impl Default for NullNormalizer {
+impl Default for _NullNormalizer {
     fn default() -> Self {
         let mut normalizer = Self::new();
-        normalizer.add_rule(NormalizeRule {
-            pattern: NullPattern::JsonNull,
-            strategy: NormalizeStrategy::ReplaceDefault,
+        normalizer.add_rule(_NormalizeRule {
+            pattern: _NullPattern::JsonNull,
+            strategy: _NormalizeStrategy::ReplaceDefault,
             default_value: Some(String::new()),
             template: None,
         });
-        normalizer.add_rule(NormalizeRule {
-            pattern: NullPattern::EmptyString,
-            strategy: NormalizeStrategy::ReplaceDefault,
+        normalizer.add_rule(_NormalizeRule {
+            pattern: _NullPattern::EmptyString,
+            strategy: _NormalizeStrategy::ReplaceDefault,
             default_value: Some(String::new()),
             template: None,
         });
-        normalizer.add_rule(NormalizeRule {
-            pattern: NullPattern::NullString,
-            strategy: NormalizeStrategy::ReplaceDefault,
+        normalizer.add_rule(_NormalizeRule {
+            pattern: _NullPattern::NullString,
+            strategy: _NormalizeStrategy::ReplaceDefault,
             default_value: Some(String::new()),
             template: None,
         });
@@ -155,13 +155,13 @@ impl Default for NullNormalizer {
 
 /// 标准化统计
 #[derive(Debug, Clone, Default)]
-pub struct NormalizeStats {
+pub(crate) struct _NormalizeStats {
     pub total_checks: u32,
     pub nulls_found: u32,
 }
 
-impl NormalizeStats {
-    pub fn null_rate(&self) -> f64 {
+impl _NormalizeStats {
+    pub(crate) fn _null_rate(&self) -> f64 {
         if self.total_checks == 0 {
             return 0.0;
         }
@@ -175,19 +175,19 @@ mod tests {
 
     #[test]
     fn test_normalize_null() {
-        let mut normalizer = NullNormalizer::default();
-        assert_eq!(normalizer.normalize_string("null"), "");
+        let mut normalizer = _NullNormalizer::default();
+        assert_eq!(normalizer._normalize_string("null"), "");
     }
 
     #[test]
     fn test_normalize_empty() {
-        let mut normalizer = NullNormalizer::default();
-        assert_eq!(normalizer.normalize_string(""), "");
+        let mut normalizer = _NullNormalizer::default();
+        assert_eq!(normalizer._normalize_string(""), "");
     }
 
     #[test]
     fn test_normalize_valid() {
-        let mut normalizer = NullNormalizer::default();
-        assert_eq!(normalizer.normalize_string("hello"), "hello");
+        let mut normalizer = _NullNormalizer::default();
+        assert_eq!(normalizer._normalize_string("hello"), "hello");
     }
 }

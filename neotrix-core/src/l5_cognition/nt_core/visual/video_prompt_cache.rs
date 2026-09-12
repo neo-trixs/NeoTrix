@@ -1,4 +1,4 @@
-//! VideoPromptCache — 视频提示词缓存
+//! _VideoPromptCache — 视频提示词缓存
 //!
 //! 语义相似度缓存 + 去重 + 版本管理。
 //! 减少 15-30% 的冗余调用。
@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 /// 缓存条目
 #[derive(Debug, Clone)]
-pub struct PromptCacheEntry {
+pub(crate) struct _PromptCacheEntry {
     /// 提示词 ID
     pub id: String,
     /// 原始提示词
@@ -31,7 +31,7 @@ pub struct PromptCacheEntry {
 
 /// 缓存配置
 #[derive(Debug, Clone)]
-pub struct PromptCacheConfig {
+pub(crate) struct _PromptCacheConfig {
     /// 最大缓存条目数
     pub max_entries: usize,
     /// 缓存过期时间
@@ -44,7 +44,7 @@ pub struct PromptCacheConfig {
     pub versioning: bool,
 }
 
-impl Default for PromptCacheConfig {
+impl Default for _PromptCacheConfig {
     fn default() -> Self {
         Self {
             max_entries: 10000,
@@ -57,21 +57,21 @@ impl Default for PromptCacheConfig {
 }
 
 /// 视频提示词缓存
-pub struct VideoPromptCache {
+pub(crate) struct _VideoPromptCache {
     /// 缓存存储
-    entries: HashMap<String, PromptCacheEntry>,
+    entries: HashMap<String, _PromptCacheEntry>,
     /// 配置
-    config: PromptCacheConfig,
+    config: _PromptCacheConfig,
     /// 统计信息
-    stats: PromptCacheStats,
+    stats: _PromptCacheStats,
 }
 
-impl VideoPromptCache {
-    pub fn new(config: PromptCacheConfig) -> Self {
+impl _VideoPromptCache {
+    pub fn new(config: _PromptCacheConfig) -> Self {
         Self {
             entries: HashMap::new(),
             config,
-            stats: PromptCacheStats::default(),
+            stats: _PromptCacheStats::default(),
         }
     }
 
@@ -126,7 +126,7 @@ impl VideoPromptCache {
             1
         };
 
-        self.entries.insert(id.clone(), PromptCacheEntry {
+        self.entries.insert(id.clone(), _PromptCacheEntry {
             id,
             prompt: prompt.to_string(),
             embedding,
@@ -218,20 +218,20 @@ impl VideoPromptCache {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> PromptCacheStats {
+    pub fn stats(&self) -> _PromptCacheStats {
         self.stats.clone()
     }
 }
 
-impl Default for VideoPromptCache {
+impl Default for _VideoPromptCache {
     fn default() -> Self {
-        Self::new(PromptCacheConfig::default())
+        Self::new(_PromptCacheConfig::default())
     }
 }
 
 /// 缓存统计
 #[derive(Debug, Clone, Default)]
-pub struct PromptCacheStats {
+pub(crate) struct _PromptCacheStats {
     pub total_requests: u32,
     pub hits: u32,
     pub semantic_hits: u32,
@@ -239,7 +239,7 @@ pub struct PromptCacheStats {
     pub total_entries: u32,
 }
 
-impl PromptCacheStats {
+impl _PromptCacheStats {
     pub fn hit_rate(&self) -> f64 {
         if self.total_requests == 0 {
             return 0.0;
@@ -254,14 +254,14 @@ mod tests {
 
     #[test]
     fn test_cache_hit() {
-        let mut cache = VideoPromptCache::default();
+        let mut cache = _VideoPromptCache::default();
         cache.set("hello world", "response", vec![]);
         assert_eq!(cache.get("hello world"), Some("response".to_string()));
     }
 
     #[test]
     fn test_cache_miss() {
-        let mut cache = VideoPromptCache::default();
+        let mut cache = _VideoPromptCache::default();
         assert_eq!(cache.get("hello"), None);
     }
 }

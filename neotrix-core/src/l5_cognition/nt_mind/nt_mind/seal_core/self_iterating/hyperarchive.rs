@@ -65,7 +65,7 @@ impl HyperAgentArchive {
         }
     }
 
-    pub fn add_record(&mut self, record: HyperAgentRecord) {
+    pub(crate) fn _add_record(&mut self, record: HyperAgentRecord) {
         self.records.push(record);
         if self.records.len() > self.config.archive_capacity {
             self.records.sort_by(|a, b| {
@@ -159,7 +159,7 @@ impl HyperAgentArchive {
             .or_else(|| self.records.last())
     }
 
-    pub fn compute_novelty(&self, latent: &[f64]) -> f64 {
+    pub(crate) fn _compute_novelty(&self, latent: &[f64]) -> f64 {
         if self.records.is_empty() {
             return 1.0;
         }
@@ -169,7 +169,7 @@ impl HyperAgentArchive {
             .fold(0.0_f64, f64::max)
     }
 
-    pub fn latest_generation(&self) -> u64 {
+    pub(crate) fn _latest_generation(&self) -> u64 {
         self.records.iter().map(|r| r.generation).max().unwrap_or(0)
     }
 

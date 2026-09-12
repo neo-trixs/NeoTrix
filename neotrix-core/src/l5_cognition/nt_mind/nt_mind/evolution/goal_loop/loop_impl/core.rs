@@ -44,7 +44,7 @@ pub struct GoalLoop {
     pub plan_stack: Vec<PlanTemplate>,
     pub oscillator_network: Option<OscillatorNetwork>,
     /// 最近一次可逆蒸馏输出 — CommandDistiller 生产接线 (R-P79):
-    /// run_distillation 蒸馏原始会话日志源后保留, 供 expand_last_distillation 还原。
+    /// run_distillation 蒸馏原始会话日志源后保留, 供 _expand_last_distillation 还原。
     pub last_distilled_output: Option<DistilledOutput>,
     /// 最近一次可逆蒸馏落盘目录 — expand 时按同一 artifact_dir 还原。
     last_distill_dir: Option<PathBuf>,
@@ -206,7 +206,7 @@ impl GoalLoop {
         self.active_goal.as_ref().expect("active_goal set above")
     }
 
-    pub fn achieve_goal(&mut self) {
+    pub(crate) fn _achieve_goal(&mut self) {
         if let Some(mut tracker) = self.active_goal.take() {
             tracker.state = GoalState::Achieved;
             tracker.updated_at = chrono::Utc::now().to_rfc3339();
@@ -334,7 +334,7 @@ impl GoalLoop {
     /// 带显式路径的可逆蒸馏 — 生产路径 (run_distillation, pursue.rs) 与
     /// 集成测试共用同一实现。CommandDistiller 直接蒸馏原始会话日志源
     /// (而非序列化报告, 报告不含错误行), 错误行优先保留并落盘 artifact;
-    /// 记录 error_lines 最多的输出, 供 expand_last_distillation 还原。
+    /// 记录 error_lines 最多的输出, 供 _expand_last_distillation 还原。
     pub(crate) fn run_distillation_with_paths(
         &mut self,
         session_logs_dir: PathBuf,
@@ -380,7 +380,7 @@ impl GoalLoop {
     }
 
     /// 生产路径 expand — 还原最近一次可逆蒸馏的原始会话日志内容。
-    pub fn expand_last_distillation(&self) -> Result<String, String> {
+    pub(crate) fn _expand_last_distillation(&self) -> Result<String, String> {
         let out = self.last_distilled_output.as_ref().ok_or_else(|| "no distillation stored yet".to_string())?;
         let dir = self.last_distill_dir.clone().unwrap_or_else(|| CommandDistiller::new().artifact_dir);
         CommandDistiller::with_dir(dir).expand(&out.id)
@@ -536,7 +536,7 @@ mod tests {
 
     // 集成测试: CommandDistiller 在生产蒸馏路径中真实运行 —
     // 会话日志源流过 run_distillation_with_paths, error_lines 被保留,
-    // DistilledOutput 落盘存储, expand_last_distillation 还原原始内容。
+    // DistilledOutput 落盘存储, _expand_last_distillation 还原原始内容。
     #[test]
     fn test_run_distillation_wires_command_distiller_production_path() {
         use std::path::PathBuf;
@@ -564,8 +564,8 @@ mod tests {
         assert!(out.error_lines >= 1, "error lines from session log must be retained, got {}", out.error_lines);
         assert!(out.artifact_path.contains("distill-artifacts"), "artifact must land in configured dir: {}", out.artifact_path);
 
-        let expanded = gl.expand_last_distillation()
-            .expect("expand_last_distillation must restore original");
+        let expanded = gl._expand_last_distillation()
+            .expect("_expand_last_distillation must restore original");
         assert!(expanded.contains("E0277"), "expand must restore error lines: {}", expanded);
         assert!(expanded.contains("cargo check"));
     }
@@ -573,6 +573,6 @@ mod tests {
     #[test]
     fn test_expand_last_distillation_without_distill_errors() {
         let gl = GoalLoop::new();
-        assert!(gl.expand_last_distillation().is_err(), "no distillation stored yet → Err");
+        assert!(gl._expand_last_distillation().is_err(), "no distillation stored yet → Err");
     }
 }

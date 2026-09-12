@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// 集成点管理器
 pub struct IntegrationPointManager {
-    integration_points: Vec<IntegrationPoint>,
+    _integration_points: Vec<IntegrationPoint>,
     #[allow(dead_code)]
     modules: Vec<ModuleIntegration>,
     config: IntegrationPointConfig,
@@ -79,7 +79,7 @@ pub enum IntegrationStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleIntegration {
     pub module_name: String,
-    pub integration_points: Vec<String>,
+    pub _integration_points: Vec<String>,
     pub compliance_status: ComplianceStatus,
     pub last_audit: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -119,7 +119,7 @@ impl IntegrationPointManager {
     /// 创建新的集成点管理器
     pub fn new() -> Self {
         Self {
-            integration_points: Vec::new(),
+            _integration_points: Vec::new(),
             modules: Vec::new(),
             config: IntegrationPointConfig::default(),
             stats: IntegrationPointStats {
@@ -133,14 +133,14 @@ impl IntegrationPointManager {
     }
 
     /// 添加集成点
-    pub fn add_integration_point(&mut self, point: IntegrationPoint) {
-        self.integration_points.push(point);
+    pub(crate) fn _add_integration_point(&mut self, point: IntegrationPoint) {
+        self._integration_points.push(point);
         self.stats.total_points += 1;
     }
 
     /// 审计模块集成
-    pub fn audit_module(&self, module_name: &str) -> IntegrationAuditResult {
-        let module_points: Vec<&IntegrationPoint> = self.integration_points
+    pub(crate) fn _audit_module(&self, module_name: &str) -> IntegrationAuditResult {
+        let module_points: Vec<&IntegrationPoint> = self._integration_points
             .iter()
             .filter(|p| p.module_name == module_name)
             .collect();
@@ -198,8 +198,8 @@ impl IntegrationPointManager {
     }
 
     /// 获取所有集成点
-    pub fn integration_points(&self) -> &[IntegrationPoint] {
-        &self.integration_points
+    pub(crate) fn _integration_points(&self) -> &[IntegrationPoint] {
+        &self._integration_points
     }
 
     /// 获取统计信息

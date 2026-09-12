@@ -47,7 +47,7 @@ pub fn calculate_adjustment_magnitude(task_type: &TaskType) -> f64 {
     f64::min(base_magnitude + task_factor, 0.5f64)
 }
 
-pub fn generate_tool_calls(task_type: &TaskType, _task: &str) -> Vec<ToolCall> {
+pub(crate) fn _generate_tool_calls(task_type: &TaskType, _task: &str) -> Vec<ToolCall> {
     let mut calls = Vec::new();
 
     calls.push(ToolCall {

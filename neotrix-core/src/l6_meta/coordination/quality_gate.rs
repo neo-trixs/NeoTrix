@@ -37,7 +37,7 @@ pub enum ReviewStatus {
 
 /// 审核维度
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReviewDimension {
+pub(crate) struct _ReviewDimension {
     /// 维度名称
     pub name: String,
     /// 维度描述
@@ -58,7 +58,7 @@ pub struct ReviewResult {
     /// 审核状态
     pub status: ReviewStatus,
     /// 审核维度分数
-    pub dimension_scores: Vec<DimensionScore>,
+    pub dimension_scores: Vec<_DimensionScore>,
     /// 总分 (0.0-1.0)
     pub total_score: f32,
     /// 是否通过
@@ -73,7 +73,7 @@ pub struct ReviewResult {
 
 /// 维度分数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DimensionScore {
+pub(crate) struct _DimensionScore {
     /// 维度名称
     pub dimension: String,
     /// 分数 (0.0-1.0)
@@ -91,7 +91,7 @@ pub struct DimensionScore {
 /// 质量控制审核器
 pub struct QualityGate {
     /// 审核维度
-    dimensions: Vec<ReviewDimension>,
+    dimensions: Vec<_ReviewDimension>,
     /// 审核历史
     history: Vec<ReviewResult>,
 }
@@ -101,37 +101,37 @@ impl QualityGate {
     pub fn new() -> Self {
         Self {
             dimensions: vec![
-                ReviewDimension {
+                _ReviewDimension {
                     name: "角色一致性".to_string(),
                     description: "角色在不同镜头中的外观一致性".to_string(),
                     weight: 0.25,
                     threshold: 0.8,
                 },
-                ReviewDimension {
+                _ReviewDimension {
                     name: "画面质量".to_string(),
                     description: "画面清晰度、构图、色彩".to_string(),
                     weight: 0.20,
                     threshold: 0.7,
                 },
-                ReviewDimension {
+                _ReviewDimension {
                     name: "动态流畅度".to_string(),
                     description: "动画帧率、运动连贯性".to_string(),
                     weight: 0.20,
                     threshold: 0.75,
                 },
-                ReviewDimension {
+                _ReviewDimension {
                     name: "音画同步".to_string(),
                     description: "配音、音效与画面的同步程度".to_string(),
                     weight: 0.15,
                     threshold: 0.8,
                 },
-                ReviewDimension {
+                _ReviewDimension {
                     name: "叙事节奏".to_string(),
                     description: "剧情节奏、转场合理性".to_string(),
                     weight: 0.10,
                     threshold: 0.7,
                 },
-                ReviewDimension {
+                _ReviewDimension {
                     name: "情感表达".to_string(),
                     description: "角色情感、氛围营造".to_string(),
                     weight: 0.10,
@@ -143,7 +143,7 @@ impl QualityGate {
     }
     
     /// AI 初检
-    pub fn ai_initial_review(&mut self, content_id: &str, scores: Vec<DimensionScore>) -> ReviewResult {
+    pub(crate) fn _ai_initial_review(&mut self, content_id: &str, scores: Vec<_DimensionScore>) -> ReviewResult {
         let total_score = self.calculate_total_score(&scores);
         let passed = self.check_passed(&scores, total_score);
         
@@ -168,11 +168,11 @@ impl QualityGate {
     }
     
     /// 人工复审
-    pub fn manual_review(
+    pub(crate) fn _manual_review(
         &mut self,
         content_id: &str,
         reviewer: &str,
-        scores: Vec<DimensionScore>,
+        scores: Vec<_DimensionScore>,
         comments: Vec<String>,
     ) -> ReviewResult {
         let total_score = self.calculate_total_score(&scores);
@@ -195,11 +195,11 @@ impl QualityGate {
     }
     
     /// 平台终审
-    pub fn platform_final_review(
+    pub(crate) fn _platform_final_review(
         &mut self,
         content_id: &str,
         reviewer: &str,
-        scores: Vec<DimensionScore>,
+        scores: Vec<_DimensionScore>,
         comments: Vec<String>,
     ) -> ReviewResult {
         let total_score = self.calculate_total_score(&scores);
@@ -222,7 +222,7 @@ impl QualityGate {
     }
     
     /// 计算总分
-    fn calculate_total_score(&self, scores: &[DimensionScore]) -> f32 {
+    fn calculate_total_score(&self, scores: &[_DimensionScore]) -> f32 {
         let mut weighted_sum = 0.0;
         let mut total_weight = 0.0;
         
@@ -241,7 +241,7 @@ impl QualityGate {
     }
     
     /// 检查是否通过
-    fn check_passed(&self, scores: &[DimensionScore], total_score: f32) -> bool {
+    fn check_passed(&self, scores: &[_DimensionScore], total_score: f32) -> bool {
         // 总分必须达到 0.7
         if total_score < 0.7 {
             return false;
@@ -326,37 +326,37 @@ mod tests {
         let mut gate = QualityGate::new();
         
         let scores = vec![
-            DimensionScore {
+            _DimensionScore {
                 dimension: "角色一致性".to_string(),
                 score: 0.9,
                 passed: true,
                 notes: None,
             },
-            DimensionScore {
+            _DimensionScore {
                 dimension: "画面质量".to_string(),
                 score: 0.85,
                 passed: true,
                 notes: None,
             },
-            DimensionScore {
+            _DimensionScore {
                 dimension: "动态流畅度".to_string(),
                 score: 0.8,
                 passed: true,
                 notes: None,
             },
-            DimensionScore {
+            _DimensionScore {
                 dimension: "音画同步".to_string(),
                 score: 0.85,
                 passed: true,
                 notes: None,
             },
-            DimensionScore {
+            _DimensionScore {
                 dimension: "叙事节奏".to_string(),
                 score: 0.75,
                 passed: true,
                 notes: None,
             },
-            DimensionScore {
+            _DimensionScore {
                 dimension: "情感表达".to_string(),
                 score: 0.8,
                 passed: true,
@@ -364,7 +364,7 @@ mod tests {
             },
         ];
         
-        let result = gate.ai_initial_review("content_001", scores);
+        let result = gate._ai_initial_review("content_001", scores);
         assert!(result.passed);
         assert!(result.total_score >= 0.7);
     }
@@ -374,13 +374,13 @@ mod tests {
         let mut gate = QualityGate::new();
         
         let scores = vec![
-            DimensionScore {
+            _DimensionScore {
                 dimension: "角色一致性".to_string(),
                 score: 0.5,  // 低于阈值
                 passed: false,
                 notes: None,
             },
-            DimensionScore {
+            _DimensionScore {
                 dimension: "画面质量".to_string(),
                 score: 0.9,
                 passed: true,
@@ -388,7 +388,7 @@ mod tests {
             },
         ];
         
-        let result = gate.ai_initial_review("content_002", scores);
+        let result = gate._ai_initial_review("content_002", scores);
         assert!(!result.passed);
     }
     
@@ -398,20 +398,20 @@ mod tests {
         
         // 通过
         let scores1 = vec![
-            DimensionScore { dimension: "角色一致性".to_string(), score: 0.9, passed: true, notes: None },
-            DimensionScore { dimension: "画面质量".to_string(), score: 0.9, passed: true, notes: None },
-            DimensionScore { dimension: "动态流畅度".to_string(), score: 0.9, passed: true, notes: None },
-            DimensionScore { dimension: "音画同步".to_string(), score: 0.9, passed: true, notes: None },
-            DimensionScore { dimension: "叙事节奏".to_string(), score: 0.9, passed: true, notes: None },
-            DimensionScore { dimension: "情感表达".to_string(), score: 0.9, passed: true, notes: None },
+            _DimensionScore { dimension: "角色一致性".to_string(), score: 0.9, passed: true, notes: None },
+            _DimensionScore { dimension: "画面质量".to_string(), score: 0.9, passed: true, notes: None },
+            _DimensionScore { dimension: "动态流畅度".to_string(), score: 0.9, passed: true, notes: None },
+            _DimensionScore { dimension: "音画同步".to_string(), score: 0.9, passed: true, notes: None },
+            _DimensionScore { dimension: "叙事节奏".to_string(), score: 0.9, passed: true, notes: None },
+            _DimensionScore { dimension: "情感表达".to_string(), score: 0.9, passed: true, notes: None },
         ];
-        gate.ai_initial_review("c1", scores1);
+        gate._ai_initial_review("c1", scores1);
         
         // 拒绝
         let scores2 = vec![
-            DimensionScore { dimension: "角色一致性".to_string(), score: 0.5, passed: false, notes: None },
+            _DimensionScore { dimension: "角色一致性".to_string(), score: 0.5, passed: false, notes: None },
         ];
-        gate.ai_initial_review("c2", scores2);
+        gate._ai_initial_review("c2", scores2);
         
         let stats = gate.statistics();
         assert_eq!(stats.total_reviews, 2);

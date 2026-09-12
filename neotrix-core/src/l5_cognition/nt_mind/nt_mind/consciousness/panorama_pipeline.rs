@@ -19,7 +19,7 @@ use super::predictive_cortex::{PredictiveCortex, HorizonForecast};
 
 /// 前瞻预测标签
 #[derive(Debug, Clone)]
-pub struct LookaheadTag {
+pub(crate) struct _LookaheadTag {
     pub horizon_anomaly_prob: f64,
     pub horizon_divergence: Vec<f64>,
 }

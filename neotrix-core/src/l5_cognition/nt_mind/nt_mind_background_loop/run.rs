@@ -53,13 +53,13 @@ const GAME_TRAINING_INTERVAL_SECS: u64 = 300; // 5min NT-PLAY 自主进化训练
 const CLUSTERING_INTERVAL_SECS: u64 = 3600; // 1h KB 域聚类巡检
 const SELF_IMPROVEMENT_INTERVAL_SECS: u64 = 3600; // 1h 自我改进循环 (L6 元认知)
 
-pub struct ConsciousnessThresholds {
+pub(crate) struct _ConsciousnessThresholds {
     pub warn_quality: f64,
     pub critical_quality: f64,
     pub eventbus_critical: f64,
 }
 
-impl Default for ConsciousnessThresholds {
+impl Default for _ConsciousnessThresholds {
     fn default() -> Self {
         Self {
             warn_quality: 0.3,
@@ -69,8 +69,8 @@ impl Default for ConsciousnessThresholds {
     }
 }
 
-pub static CONSCIOUSNESS_THRESHOLDS: LazyLock<ConsciousnessThresholds> =
-    LazyLock::new(ConsciousnessThresholds::default);
+pub static CONSCIOUSNESS_THRESHOLDS: LazyLock<_ConsciousnessThresholds> =
+    LazyLock::new(_ConsciousnessThresholds::default);
 
 // ────────────────────────────────────────────────────────────────
 // ConvergencePulse — 分形收敛循环状态机 (Cycle 115/155 模式固化)
@@ -78,7 +78,7 @@ pub static CONSCIOUSNESS_THRESHOLDS: LazyLock<ConsciousnessThresholds> =
 // 每层迭代推进 gap 关闭, 全部 gap 清空 + 外部验证通过后晋升下一层。
 // ────────────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConvergenceLayer {
+pub(crate) enum _ConvergenceLayer {
     Artifact,
     Task,
     Session,
@@ -86,7 +86,7 @@ pub enum ConvergenceLayer {
     Pr,
 }
 
-impl ConvergenceLayer {
+impl _ConvergenceLayer {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Artifact => "artifact",
@@ -96,7 +96,7 @@ impl ConvergenceLayer {
             Self::Pr => "pr",
         }
     }
-    pub fn next(&self) -> Option<ConvergenceLayer> {
+    pub fn next(&self) -> Option<_ConvergenceLayer> {
         match self {
             Self::Artifact => Some(Self::Task),
             Self::Task => Some(Self::Session),
@@ -105,13 +105,13 @@ impl ConvergenceLayer {
             Self::Pr => None,
         }
     }
-    pub fn all() -> [ConvergenceLayer; 5] {
+    pub fn all() -> [_ConvergenceLayer; 5] {
         [Self::Artifact, Self::Task, Self::Session, Self::Epic, Self::Pr]
     }
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct ConvergenceGap {
+pub(crate) struct _ConvergenceGap {
     pub domain: String,
     pub description: String,
     pub severity: String,
@@ -119,9 +119,9 @@ pub struct ConvergenceGap {
 
 #[derive(Debug, Clone)]
 pub struct ConvergencePulse {
-    pub layer: ConvergenceLayer,
+    pub layer: _ConvergenceLayer,
     pub iteration: u32,
-    pub gaps: Vec<ConvergenceGap>,
+    pub gaps: Vec<_ConvergenceGap>,
     pub verified: bool,
     pub last_action: String,
     pub updated_at: i64,
@@ -130,7 +130,7 @@ pub struct ConvergencePulse {
 impl Default for ConvergencePulse {
     fn default() -> Self {
         Self {
-            layer: ConvergenceLayer::Artifact,
+            layer: _ConvergenceLayer::Artifact,
             iteration: 0,
             gaps: Vec::new(),
             verified: false,
@@ -153,7 +153,7 @@ impl ConvergencePulse {
     }
 
     /// 当前层是否已完成: 无 gap 且已通过外部验证。
-    pub fn layer_complete(&self) -> bool {
+    pub(crate) fn _layer_complete(&self) -> bool {
         self.gaps.is_empty() && self.verified
     }
 
@@ -163,7 +163,7 @@ impl ConvergencePulse {
     pub fn gaps_from_self_tests(&mut self, results: &[(String, bool)]) {
         self.gaps = results.iter()
             .filter(|(_, ok)| !*ok)
-            .map(|(name, _)| ConvergenceGap {
+            .map(|(name, _)| _ConvergenceGap {
                 domain: self.layer.name().to_string(),
                 description: format!("self_test '{}' failing at {} layer", name, self.layer.name()),
                 severity: "medium".to_string(),
@@ -177,8 +177,8 @@ impl ConvergencePulse {
     }
 
     /// 推进迭代: 若层完成 → 晋升; 否则 iteration++ (自动修复动作占位)。
-    pub fn advance(&mut self) -> Option<ConvergenceLayer> {
-        if self.layer_complete() {
+    pub fn advance(&mut self) -> Option<_ConvergenceLayer> {
+        if self._layer_complete() {
             let old = self.layer;
             if let Some(nxt) = old.next() {
                 self.layer = nxt;
@@ -203,7 +203,7 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergencePulse {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         // 5 级分形层完整
-        let layers = ConvergenceLayer::all();
+        let layers = _ConvergenceLayer::all();
         if layers.len() != 5 {
             failures.push(format!("expected 5 convergence layers, got {}", layers.len()));
         }
@@ -221,7 +221,7 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergencePulse {
         }
         // gap 存在时不应晋升
         let mut q = ConvergencePulse {
-            gaps: vec![ConvergenceGap { domain: "test".into(), description: "open gap".into(), severity: "high".into() }],
+            gaps: vec![_ConvergenceGap { domain: "test".into(), description: "open gap".into(), severity: "high".into() }],
             ..Default::default()
         };
         let before = q.layer;
@@ -254,7 +254,7 @@ use crate::core::nt_core_simulate_engine::SimulateEngine;
 // ============================================================
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AutonomyTier {
+pub(crate) enum _AutonomyTier {
     /// 仅监控与报告, 不自动修复
     L1 = 1,
     /// 自动修复, 不自主进化
@@ -263,19 +263,19 @@ pub enum AutonomyTier {
     L3 = 3,
 }
 
-impl AutonomyTier {
+impl _AutonomyTier {
     pub fn label(self) -> &'static str {
         match self {
-            AutonomyTier::L1 => "监控报告",
-            AutonomyTier::L2 => "自动修复",
-            AutonomyTier::L3 => "自主进化",
+            _AutonomyTier::L1 => "监控报告",
+            _AutonomyTier::L2 => "自动修复",
+            _AutonomyTier::L3 => "自主进化",
         }
     }
 }
 
 /// Loop Ready 评分 — 从循环健康信号计算 (0-100)
 #[derive(Debug, Clone, Copy)]
-pub struct LoopReadyScore {
+pub(crate) struct _LoopReadyScore {
     pub score: u8,
     pub handlers_ok: bool,
     pub kb_ok: bool,
@@ -283,13 +283,13 @@ pub struct LoopReadyScore {
     pub cadence_ok: bool,
 }
 
-impl Default for LoopReadyScore {
+impl Default for _LoopReadyScore {
     fn default() -> Self {
         Self::compute(true, false, true, true)
     }
 }
 
-impl LoopReadyScore {
+impl _LoopReadyScore {
     /// 权重: handlers 40 / kb 25 / no_stall 20 / cadence 15
     pub fn compute(handlers_ok: bool, kb_ok: bool, no_stall: bool, cadence_ok: bool) -> Self {
         let mut score = 0u8;
@@ -315,13 +315,13 @@ impl LoopReadyScore {
     }
 
     /// 派生自治梯度: >=80 → L3, >=50 → L2, else L1
-    pub fn autonomy_tier(&self) -> AutonomyTier {
+    pub(crate) fn _autonomy_tier(&self) -> _AutonomyTier {
         if self.score >= 80 {
-            AutonomyTier::L3
+            _AutonomyTier::L3
         } else if self.score >= 50 {
-            AutonomyTier::L2
+            _AutonomyTier::L2
         } else {
-            AutonomyTier::L1
+            _AutonomyTier::L1
         }
     }
 }
@@ -332,17 +332,17 @@ impl LoopReadyScore {
 // ============================================================
 
 #[derive(Debug, Clone)]
-pub struct PathDenylist {
+pub(crate) struct _PathDenylist {
     patterns: Vec<String>,
 }
 
-impl Default for PathDenylist {
+impl Default for _PathDenylist {
     fn default() -> Self {
         Self::default_gates()
     }
 }
 
-impl PathDenylist {
+impl _PathDenylist {
     /// 默认禁止模式 — 破坏性/不可逆/越权动作
     pub fn default_gates() -> Self {
         Self {
@@ -710,9 +710,9 @@ impl BackgroundLoop {
             ),
             last_consumed_fruit_cycle: 0,
             last_capability_evolve_ts: std::sync::atomic::AtomicU64::new(0),
-            denylist: PathDenylist::default_gates(),
-            readiness: LoopReadyScore::default(),
-            autonomy_tier: AutonomyTier::L1,
+            denylist: _PathDenylist::default_gates(),
+            readiness: _LoopReadyScore::default(),
+            _autonomy_tier: _AutonomyTier::L1,
             refiner: crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner::new(),
             self_improvement: crate::l6_meta::coordination::self_improvement::SelfImprovementLoop::new(),
         }));
@@ -1014,11 +1014,11 @@ pub struct BackgroundLoopHandle {
     /// 但能力网补齐独立节流, 默认 3600s 一次)。
     last_capability_evolve_ts: std::sync::atomic::AtomicU64,
     /// 路径/动作 denylist gate (G12) — 每个 handler tick 前置 fail-closed
-    denylist: PathDenylist,
+    denylist: _PathDenylist,
     /// Loop Ready 评分 (G9) — 最近一次重算值
-    readiness: LoopReadyScore,
+    readiness: _LoopReadyScore,
     /// L1-L3 自治梯度 (G9) — 由 readiness 派生
-    autonomy_tier: AutonomyTier,
+    _autonomy_tier: _AutonomyTier,
     /// Continual Harness Refinement — 审查轨迹，应用有证据支持的状态更新
     refiner: crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner,
     /// L6 自我改进循环 — 采集指标→诊断→生成方案→执行→验证闭环
@@ -1031,29 +1031,29 @@ impl BackgroundLoopHandle {
     }
 
     /// G9: 从真实运行时信号重算 Loop Ready 评分 + 自治梯度
-    pub fn recompute_readiness(&mut self) -> LoopReadyScore {
+    pub(crate) fn _recompute_readiness(&mut self) -> _LoopReadyScore {
         let kb_ok = self.kb.is_some();
         // handlers_ok/cadence_ok/no_stall: 循环启动即视为真 (本方法运行于 handler 内)
-        let score = LoopReadyScore::compute(true, kb_ok, true, true);
+        let score = _LoopReadyScore::compute(true, kb_ok, true, true);
         self.readiness = score;
-        self.autonomy_tier = score.autonomy_tier();
+        self._autonomy_tier = score._autonomy_tier();
         score
     }
 
     /// G12: 暴露 denylist 门禁供 handler 在执行风险动作前咨询
-    pub fn check_denylist(&self, action: &str) -> Result<(), String> {
+    pub(crate) fn _check_denylist(&self, action: &str) -> Result<(), String> {
         self.denylist.check(action)
     }
 
     /// G9 巡检 handler — 每 tick 重算 readiness 并报告当前自治梯度;
     /// 同时自检一次 denylist 命中率 (gate 日志)。
     pub async fn handle_loop_readiness(&mut self) {
-        let score = self.recompute_readiness();
+        let score = self._recompute_readiness();
         log::info!(
             "[bg-loop] LoopReady score={} tier=L{} ({}) kb_ok={} handlers_ok={}",
             score.score,
-            score.autonomy_tier() as u8,
-            score.autonomy_tier().label(),
+            score._autonomy_tier() as u8,
+            score._autonomy_tier().label(),
             score.kb_ok,
             score.handlers_ok,
         );
@@ -1143,13 +1143,13 @@ impl BackgroundLoopHandle {
             );
         }
         // 注入意识监控: 复用一个现有公开通道 — 若不存在则仅记录日志。
-        self.inject_telemetry_alerts(&fresh);
+        self._inject_telemetry_alerts(&fresh);
     }
 
     /// 把遥测告警注入意识监控 — 经 EventBus 广播 `SystemError` 事件 (severity
     /// 按告警类型标记), 供 ConsciousnessTree/GWT 等层消费者订阅。无总线时
     /// 降级为日志, 不影响主循环。
-    pub fn inject_telemetry_alerts(
+    pub(crate) fn _inject_telemetry_alerts(
         &self,
         alerts: &[crate::core::nt_core_telemetry::TelemetryAlert],
     ) {
@@ -1223,7 +1223,7 @@ mod tests {
     }
 
     use super::ConvergencePulse;
-    use super::{AutonomyTier, LoopReadyScore, PathDenylist};
+    use super::{_AutonomyTier, _LoopReadyScore, _PathDenylist};
     use crate::core::nt_core_self_test::SelfTest;
 
     #[test]
@@ -1271,38 +1271,38 @@ mod tests {
 
     #[test]
     fn test_loop_ready_score_full_kit() {
-        let s = LoopReadyScore::compute(true, true, true, true);
+        let s = _LoopReadyScore::compute(true, true, true, true);
         assert_eq!(s.score, 100);
-        assert_eq!(s.autonomy_tier(), AutonomyTier::L3);
+        assert_eq!(s._autonomy_tier(), _AutonomyTier::L3);
     }
 
     #[test]
     fn test_loop_ready_score_no_kb_downgrades_tier() {
         // KB 缺失 → 75 分 → L2 (自动修复), 不能 L3 自主进化
-        let s = LoopReadyScore::compute(true, false, true, true);
+        let s = _LoopReadyScore::compute(true, false, true, true);
         assert_eq!(s.score, 75);
-        assert_eq!(s.autonomy_tier(), AutonomyTier::L2);
+        assert_eq!(s._autonomy_tier(), _AutonomyTier::L2);
     }
 
     #[test]
     fn test_loop_ready_score_low_is_l1() {
-        let s = LoopReadyScore::compute(false, false, false, false);
+        let s = _LoopReadyScore::compute(false, false, false, false);
         assert_eq!(s.score, 0);
-        assert_eq!(s.autonomy_tier(), AutonomyTier::L1);
+        assert_eq!(s._autonomy_tier(), _AutonomyTier::L1);
     }
 
     #[test]
     fn test_loop_ready_bounds() {
-        assert!(AutonomyTier::L1 < AutonomyTier::L2);
-        assert!(AutonomyTier::L2 < AutonomyTier::L3);
-        assert_eq!(AutonomyTier::L3.label(), "自主进化");
+        assert!(_AutonomyTier::L1 < _AutonomyTier::L2);
+        assert!(_AutonomyTier::L2 < _AutonomyTier::L3);
+        assert_eq!(_AutonomyTier::L3.label(), "自主进化");
     }
 
     // ── G12 路径/动作 denylist gate ───────────────────────────
 
     #[test]
     fn test_denylist_blocks_destructive_patterns() {
-        let gate = PathDenylist::default_gates();
+        let gate = _PathDenylist::default_gates();
         assert!(gate.check("rm -rf /home/neo").is_err(), "rm -rf 必须被拒");
         assert!(gate.check("git push --force origin main").is_err(), "force push 必须被拒");
         assert!(gate.check("mkfs.ext4 /dev/sdb").is_err(), "mkfs 必须被拒");
@@ -1311,7 +1311,7 @@ mod tests {
 
     #[test]
     fn test_denylist_allows_safe_actions() {
-        let gate = PathDenylist::default_gates();
+        let gate = _PathDenylist::default_gates();
         assert!(gate.check("read ./src/main.rs").is_ok());
         assert!(gate.check("search kb experience").is_ok());
         assert!(gate.check("cargo check -p neotrix").is_ok());
@@ -1319,7 +1319,7 @@ mod tests {
 
     #[test]
     fn test_denylist_extensible_and_fail_closed() {
-        let mut gate = PathDenylist::default_gates();
+        let mut gate = _PathDenylist::default_gates();
         gate.add_pattern("delete_branch");
         assert!(gate.check("git delete_branch feature-x").is_err(), "自定义模式同样 fail-closed");
         assert_eq!(gate.patterns().len(), 9, "默认8 + 自定义1");

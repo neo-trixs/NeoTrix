@@ -5,7 +5,7 @@
 /// 可验证环境
 #[derive(Clone, Debug)]
 
-pub struct VerifiableEnvironment {
+pub(crate) struct _VerifiableEnvironment {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -24,7 +24,7 @@ pub struct TestCase {
 /// Harness 变异
 #[derive(Clone, Debug)]
 
-pub struct HarnessMutation {
+pub(crate) struct _HarnessMutation {
     pub id: String,
     pub mutation_type: MutationType,
     pub description: String,
@@ -50,7 +50,7 @@ pub enum MutationType {
 /// 变异评估结果
 #[derive(Clone, Debug)]
 
-pub struct MutationEvaluation {
+pub(crate) struct _MutationEvaluation {
     pub mutation_id: String,
     pub environment_id: String,
     pub score: f64, // 0.0-1.0
@@ -62,33 +62,33 @@ pub struct MutationEvaluation {
 /// 3 轮筛选结果
 #[derive(Clone, Debug)]
 
-pub struct ScreeningResult {
+pub(crate) struct _ScreeningResult {
     pub round: u32,
-    pub candidates: Vec<HarnessMutation>,
-    pub evaluations: Vec<MutationEvaluation>,
-    pub winner: Option<HarnessMutation>,
+    pub candidates: Vec<_HarnessMutation>,
+    pub evaluations: Vec<_MutationEvaluation>,
+    pub winner: Option<_HarnessMutation>,
 }
 
 /// Harness 进化引擎
 
 #[derive(Debug)]
-pub struct HarnessEvolution {
+pub(crate) struct _HarnessEvolution {
     /// 可验证环境
-    environments: Vec<VerifiableEnvironment>,
+    environments: Vec<_VerifiableEnvironment>,
     /// 待评估变异
-    candidates: Vec<HarnessMutation>,
+    candidates: Vec<_HarnessMutation>,
     /// 历史评估
-    evaluations: Vec<MutationEvaluation>,
+    evaluations: Vec<_MutationEvaluation>,
     /// 已采纳的变异
-    adopted: Vec<HarnessMutation>,
+    adopted: Vec<_HarnessMutation>,
     /// 被拒绝的变异（反模式）
-    rejected: Vec<(HarnessMutation, String)>,
+    rejected: Vec<(_HarnessMutation, String)>,
     /// 当前基线分数
     baseline_score: f64,
 }
 
 
-impl HarnessEvolution {
+impl _HarnessEvolution {
     pub fn new() -> Self {
         Self {
             environments: Vec::new(),
@@ -101,17 +101,17 @@ impl HarnessEvolution {
     }
 
     /// 注册可验证环境
-    pub fn register_environment(&mut self, env: VerifiableEnvironment) {
+    pub(crate) fn _register_environment(&mut self, env: _VerifiableEnvironment) {
         self.environments.push(env);
     }
 
     /// 提议变异
-    pub fn propose_mutation(&mut self, mutation: HarnessMutation) {
+    pub(crate) fn _propose_mutation(&mut self, mutation: _HarnessMutation) {
         self.candidates.push(mutation);
     }
 
     /// 评估变异（在所有环境中测试）
-    pub fn evaluate_mutation(&mut self, mutation_id: &str) -> Vec<MutationEvaluation> {
+    pub(crate) fn _evaluate_mutation(&mut self, mutation_id: &str) -> Vec<_MutationEvaluation> {
         let mut results = Vec::new();
 
         for env in &self.environments {
@@ -121,7 +121,7 @@ impl HarnessEvolution {
             let score = tests_passed as f64 / tests_total as f64;
             let improvement = score - self.baseline_score;
 
-            let evaluation = MutationEvaluation {
+            let evaluation = _MutationEvaluation {
                 mutation_id: mutation_id.to_string(),
                 environment_id: env.id.clone(),
                 score,
@@ -138,12 +138,12 @@ impl HarnessEvolution {
     }
 
     /// 3 轮筛选
-    pub fn three_round_screening(&mut self) -> ScreeningResult {
+    pub(crate) fn _three_round_screening(&mut self) -> _ScreeningResult {
         let mut candidates = self.candidates.clone();
 
         // Round 1: 初始筛选（score > 0.5）
         for candidate in &candidates {
-            let evals = self.evaluate_mutation(&candidate.id);
+            let evals = self._evaluate_mutation(&candidate.id);
             let avg_score = evals.iter().map(|e| e.score).sum::<f64>() / evals.len() as f64;
             if avg_score <= 0.5 {
                 self.rejected
@@ -154,7 +154,7 @@ impl HarnessEvolution {
 
         // Round 2: 改进筛选（improvement > 0）
         for candidate in &candidates {
-            let evals = self.evaluate_mutation(&candidate.id);
+            let evals = self._evaluate_mutation(&candidate.id);
             let avg_improvement =
                 evals.iter().map(|e| e.improvement).sum::<f64>() / evals.len() as f64;
             if avg_improvement <= 0.0 {
@@ -183,7 +183,7 @@ impl HarnessEvolution {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        ScreeningResult {
+        _ScreeningResult {
             round: 3,
             candidates: self.candidates.clone(),
             evaluations: self.evaluations.clone(),
@@ -192,7 +192,7 @@ impl HarnessEvolution {
     }
 
     /// 采纳变异
-    pub fn adopt_mutation(&mut self, mutation: HarnessMutation) {
+    pub(crate) fn _adopt_mutation(&mut self, mutation: _HarnessMutation) {
         self.baseline_score = self
             .evaluations
             .iter()
@@ -208,13 +208,13 @@ impl HarnessEvolution {
     }
 
     /// 拒绝变异
-    pub fn reject_mutation(&mut self, mutation: HarnessMutation, reason: &str) {
+    pub(crate) fn _reject_mutation(&mut self, mutation: _HarnessMutation, reason: &str) {
         self.rejected.push((mutation, reason.to_string()));
     }
 
     /// 获取统计
-    pub fn stats(&self) -> EvolutionStats {
-        EvolutionStats {
+    pub fn stats(&self) -> _EvolutionStats {
+        _EvolutionStats {
             environments: self.environments.len(),
             candidates: self.candidates.len(),
             adopted: self.adopted.len(),
@@ -226,7 +226,7 @@ impl HarnessEvolution {
 
 #[derive(Clone, Debug)]
 
-pub struct EvolutionStats {
+pub(crate) struct _EvolutionStats {
     pub environments: usize,
     pub candidates: usize,
     pub adopted: usize,

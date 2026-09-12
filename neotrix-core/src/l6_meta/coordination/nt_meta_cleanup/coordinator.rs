@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 /// 清理事件类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CleanupEventType {
+pub(crate) enum _CleanupEventType {
     ScanStarted,
     ScanCompleted,
     CleanStarted,
@@ -21,22 +21,22 @@ pub enum CleanupEventType {
 
 /// 清理事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CleanupEvent {
+pub(crate) struct _CleanupEvent {
     pub timestamp: String,
-    pub event_type: CleanupEventType,
+    pub event_type: _CleanupEventType,
     pub details: String,
     pub size_bytes: Option<u64>,
 }
 
-pub struct CleanupCoordinator {
+pub(crate) struct _CleanupCoordinator {
     current_strategy: CleanupStrategy,
     cleanup_plan: CleanupPlan,
     stats: CleanupStats,
     rule_weights: HashMap<String, f64>,
-    event_log: Vec<CleanupEvent>,
+    event_log: Vec<_CleanupEvent>,
 }
 
-impl CleanupCoordinator {
+impl _CleanupCoordinator {
     pub fn new() -> Self {
         Self {
             current_strategy: CleanupStrategy::Balanced,
@@ -63,8 +63,8 @@ impl CleanupCoordinator {
         self.cleanup_plan.strategy = self.current_strategy.clone();
     }
 
-    pub fn get_strategy(&self) -> &CleanupStrategy { &self.current_strategy }
-    pub fn get_plan(&self) -> &CleanupPlan { &self.cleanup_plan }
+    pub(crate) fn _get_strategy(&self) -> &CleanupStrategy { &self.current_strategy }
+    pub(crate) fn _get_plan(&self) -> &CleanupPlan { &self.cleanup_plan }
 
     pub fn calculate_priority(&self, category: &str, size_bytes: u64, age_days: u32) -> f64 {
         let mut p = match category {
@@ -76,7 +76,7 @@ impl CleanupCoordinator {
         p
     }
 
-    pub fn sort_by_priority(&self, items: &mut Vec<CleanupItem>) {
+    pub(crate) fn _sort_by_priority(&self, items: &mut Vec<CleanupItem>) {
         items.sort_by(|a, b| {
             let pa = self.calculate_priority(&a.category, a.size_bytes, a.age_days);
             let pb = self.calculate_priority(&b.category, b.size_bytes, b.age_days);
@@ -93,16 +93,16 @@ impl CleanupCoordinator {
     }
 
     pub fn get_stats(&self) -> &CleanupStats { &self.stats }
-    pub fn set_rule_weight(&mut self, category: &str, weight: f64) { self.rule_weights.insert(category.into(), weight); }
+    pub(crate) fn _set_rule_weight(&mut self, category: &str, weight: f64) { self.rule_weights.insert(category.into(), weight); }
 
-    pub fn log_event(&mut self, event_type: CleanupEventType, details: String, size_bytes: Option<u64>) {
-        self.event_log.push(CleanupEvent {
+    pub fn log_event(&mut self, event_type: _CleanupEventType, details: String, size_bytes: Option<u64>) {
+        self.event_log.push(_CleanupEvent {
             timestamp: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
             event_type, details, size_bytes,
         });
     }
 
-    pub fn get_event_log(&self) -> &[CleanupEvent] { &self.event_log }
+    pub fn get_event_log(&self) -> &[_CleanupEvent] { &self.event_log }
 
     pub fn generate_report(&self) -> CleanupReport {
         let mut recs = Vec::new();
@@ -113,7 +113,7 @@ impl CleanupCoordinator {
     }
 }
 
-impl Default for CleanupCoordinator { fn default() -> Self { Self::new() } }
+impl Default for _CleanupCoordinator { fn default() -> Self { Self::new() } }
 
 #[cfg(test)]
 mod tests {
@@ -121,13 +121,13 @@ mod tests {
 
     #[test]
     fn test_coordinator_new() {
-        let c = CleanupCoordinator::new();
+        let c = _CleanupCoordinator::new();
         assert!(matches!(c.current_strategy, CleanupStrategy::Balanced));
     }
 
     #[test]
     fn test_set_strategy() {
-        let mut c = CleanupCoordinator::new();
+        let mut c = _CleanupCoordinator::new();
         c.set_strategy(CleanupStrategy::Aggressive);
         assert!(matches!(c.current_strategy, CleanupStrategy::Aggressive));
         assert_eq!(c.cleanup_plan.max_risk_level, "risky");
@@ -135,21 +135,21 @@ mod tests {
 
     #[test]
     fn test_calculate_priority() {
-        let c = CleanupCoordinator::new();
+        let c = _CleanupCoordinator::new();
         let p = c.calculate_priority("system", 1024 * 1024 * 1024, 30);
         assert!(p > 0.0);
     }
 
     #[test]
     fn test_log_event() {
-        let mut c = CleanupCoordinator::new();
-        c.log_event(CleanupEventType::ScanStarted, "扫描开始".into(), None);
+        let mut c = _CleanupCoordinator::new();
+        c.log_event(_CleanupEventType::ScanStarted, "扫描开始".into(), None);
         assert_eq!(c.event_log.len(), 1);
     }
 
     #[test]
     fn test_generate_report() {
-        let mut c = CleanupCoordinator::new();
+        let mut c = _CleanupCoordinator::new();
         c.update_stats(100, 50, 40, 10, 1024 * 1024);
         let r = c.generate_report();
         assert_eq!(r.stats.total_scanned, 100);

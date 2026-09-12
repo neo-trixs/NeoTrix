@@ -1,4 +1,4 @@
-//! VideoAuditTrail — 视频审计追踪
+//! _VideoAuditTrail — 视频审计追踪
 //!
 //! 合规日志 + 溯源追踪 + 元数据嵌入。
 //! 支持 C2PA 标准的内容真实性验证。
@@ -31,7 +31,7 @@ pub enum AuditEventType {
 
 /// 审计事件
 #[derive(Debug, Clone)]
-pub struct AuditEvent {
+pub(crate) struct _AuditEvent {
     /// 事件 ID
     pub id: String,
     /// 事件类型
@@ -52,7 +52,7 @@ pub struct AuditEvent {
 
 /// 溯源信息
 #[derive(Debug, Clone)]
-pub struct ProvenanceInfo {
+pub(crate) struct _ProvenanceInfo {
     /// 内容 ID
     pub content_id: String,
     /// 创建者
@@ -75,7 +75,7 @@ pub struct ProvenanceInfo {
 
 /// 审计日志配置
 #[derive(Debug, Clone)]
-pub struct AuditConfig {
+pub(crate) struct _AuditConfig {
     /// 最大日志条目数
     pub max_entries: usize,
     /// 日志保留时间
@@ -86,7 +86,7 @@ pub struct AuditConfig {
     pub watermark_enabled: bool,
 }
 
-impl Default for AuditConfig {
+impl Default for _AuditConfig {
     fn default() -> Self {
         Self {
             max_entries: 100_000,
@@ -98,31 +98,31 @@ impl Default for AuditConfig {
 }
 
 /// 视频审计追踪
-pub struct VideoAuditTrail {
+pub(crate) struct _VideoAuditTrail {
     /// 审计日志
-    events: Vec<AuditEvent>,
+    events: Vec<_AuditEvent>,
     /// 溯源信息
-    provenance: HashMap<String, ProvenanceInfo>,
+    provenance: HashMap<String, _ProvenanceInfo>,
     /// 配置
-    config: AuditConfig,
+    config: _AuditConfig,
     /// 统计信息
-    stats: AuditStats,
+    stats: _AuditStats,
 }
 
-impl VideoAuditTrail {
-    pub fn new(config: AuditConfig) -> Self {
+impl _VideoAuditTrail {
+    pub fn new(config: _AuditConfig) -> Self {
         Self {
             events: Vec::new(),
             provenance: HashMap::new(),
             config,
-            stats: AuditStats::default(),
+            stats: _AuditStats::default(),
         }
     }
 
     /// 记录审计事件
     pub fn log_event(&mut self, event_type: AuditEventType, job_id: &str, user_id: Option<String>, data: HashMap<String, String>) -> String {
         let event_id = format!("audit-{}", uuid::Uuid::new_v4());
-        let event = AuditEvent {
+        let event = _AuditEvent {
             id: event_id.clone(),
             event_type,
             job_id: job_id.to_string(),
@@ -144,8 +144,8 @@ impl VideoAuditTrail {
     }
 
     /// 创建溯源信息
-    pub fn create_provenance(&mut self, content_id: &str, creator: &str, model_id: &str, prompt_hash: &str, input_hash: &str, output_hash: &str) -> ProvenanceInfo {
-        let provenance = ProvenanceInfo {
+    pub(crate) fn _create_provenance(&mut self, content_id: &str, creator: &str, model_id: &str, prompt_hash: &str, input_hash: &str, output_hash: &str) -> _ProvenanceInfo {
+        let provenance = _ProvenanceInfo {
             content_id: content_id.to_string(),
             creator: creator.to_string(),
             created_at: Instant::now(),
@@ -164,7 +164,7 @@ impl VideoAuditTrail {
     }
 
     /// 更新 C2PA 签名
-    pub fn update_c2pa_signature(&mut self, content_id: &str, signature: &str) -> bool {
+    pub(crate) fn _update_c2pa_signature(&mut self, content_id: &str, signature: &str) -> bool {
         if let Some(provenance) = self.provenance.get_mut(content_id) {
             provenance.c2pa_signature = Some(signature.to_string());
             self.stats.total_c2pa_signed += 1;
@@ -174,7 +174,7 @@ impl VideoAuditTrail {
     }
 
     /// 查询审计日志
-    pub fn query_events(&self, job_id: Option<&str>, user_id: Option<&str>, event_type: Option<&AuditEventType>) -> Vec<&AuditEvent> {
+    pub(crate) fn _query_events(&self, job_id: Option<&str>, user_id: Option<&str>, event_type: Option<&AuditEventType>) -> Vec<&_AuditEvent> {
         self.events.iter()
             .filter(|e| {
                 if let Some(jid) = job_id {
@@ -198,25 +198,25 @@ impl VideoAuditTrail {
     }
 
     /// 获取溯源信息
-    pub fn get_provenance(&self, content_id: &str) -> Option<&ProvenanceInfo> {
+    pub(crate) fn _get_provenance(&self, content_id: &str) -> Option<&_ProvenanceInfo> {
         self.provenance.get(content_id)
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> AuditStats {
+    pub fn stats(&self) -> _AuditStats {
         self.stats.clone()
     }
 }
 
-impl Default for VideoAuditTrail {
+impl Default for _VideoAuditTrail {
     fn default() -> Self {
-        Self::new(AuditConfig::default())
+        Self::new(_AuditConfig::default())
     }
 }
 
 /// 审计统计
 #[derive(Debug, Clone, Default)]
-pub struct AuditStats {
+pub(crate) struct _AuditStats {
     pub total_events: u32,
     pub total_provenance: u32,
     pub total_c2pa_signed: u32,
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_log_event() {
-        let mut audit = VideoAuditTrail::default();
+        let mut audit = _VideoAuditTrail::default();
         let event_id = audit.log_event(
             AuditEventType::JobCreated,
             "job-1",
@@ -240,8 +240,8 @@ mod tests {
 
     #[test]
     fn test_create_provenance() {
-        let mut audit = VideoAuditTrail::default();
-        let provenance = audit.create_provenance(
+        let mut audit = _VideoAuditTrail::default();
+        let provenance = audit._create_provenance(
             "content-1",
             "creator-1",
             "model-1",

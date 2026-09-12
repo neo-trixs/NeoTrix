@@ -9,23 +9,23 @@
 use serde::{Deserialize, Serialize};
 
 /// Human Approval 审批工作流
-pub struct HumanApprovalWorkflow {
+pub(crate) struct _HumanApprovalWorkflow {
     pending_approvals: Vec<ApprovalRequest>,
-    completed_approvals: Vec<ApprovalResult>,
-    config: ApprovalConfig,
+    completed_approvals: Vec<_ApprovalResult>,
+    config: _ApprovalConfig,
     stats: ApprovalStats,
 }
 
 /// 审批配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApprovalConfig {
+pub(crate) struct _ApprovalConfig {
     pub timeout_seconds: u64,
     pub require_justification: bool,
     pub auto_approve_low_risk: bool,
     pub high_risk_threshold: f64,
 }
 
-impl Default for ApprovalConfig {
+impl Default for _ApprovalConfig {
     fn default() -> Self {
         Self {
             timeout_seconds: 300,
@@ -40,7 +40,7 @@ impl Default for ApprovalConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApprovalRequest {
     pub request_id: String,
-    pub operation_type: OperationType,
+    pub operation_type: _OperationType,
     pub description: String,
     pub risk_level: RiskLevel,
     pub context: String,
@@ -51,7 +51,7 @@ pub struct ApprovalRequest {
 /// 操作类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum OperationType {
+pub(crate) enum _OperationType {
     SEALPhase,
     GoalLoop,
     Cleanup,
@@ -82,7 +82,7 @@ pub enum ApprovalStatus {
 
 /// 审批结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApprovalResult {
+pub(crate) struct _ApprovalResult {
     pub request_id: String,
     pub status: ApprovalStatus,
     pub approver: String,
@@ -101,13 +101,13 @@ pub struct ApprovalStats {
     pub avg_approval_time: f64,
 }
 
-impl HumanApprovalWorkflow {
+impl _HumanApprovalWorkflow {
     /// 创建新的 Human Approval 审批工作流
     pub fn new() -> Self {
         Self {
             pending_approvals: Vec::new(),
             completed_approvals: Vec::new(),
-            config: ApprovalConfig::default(),
+            config: _ApprovalConfig::default(),
             stats: ApprovalStats {
                 total_requests: 0,
                 approved: 0,
@@ -120,7 +120,7 @@ impl HumanApprovalWorkflow {
     }
 
     /// 创建审批请求
-    pub fn create_request(&mut self, operation_type: OperationType, description: &str, risk_level: RiskLevel) -> ApprovalRequest {
+    pub fn create_request(&mut self, operation_type: _OperationType, description: &str, risk_level: RiskLevel) -> ApprovalRequest {
         let request = ApprovalRequest {
             request_id: uuid::Uuid::new_v4().to_string(),
             operation_type,
@@ -147,7 +147,7 @@ impl HumanApprovalWorkflow {
         if let Some(pos) = self.pending_approvals.iter().position(|r| r.request_id == request_id) {
             let request = self.pending_approvals.remove(pos);
 
-            let result = ApprovalResult {
+            let result = _ApprovalResult {
                 request_id: request.request_id.clone(),
                 status: ApprovalStatus::Approved,
                 approver: approver.to_string(),
@@ -168,7 +168,7 @@ impl HumanApprovalWorkflow {
         if let Some(pos) = self.pending_approvals.iter().position(|r| r.request_id == request_id) {
             let request = self.pending_approvals.remove(pos);
 
-            let result = ApprovalResult {
+            let result = _ApprovalResult {
                 request_id: request.request_id.clone(),
                 status: ApprovalStatus::Rejected,
                 approver: approver.to_string(),
@@ -193,7 +193,7 @@ impl HumanApprovalWorkflow {
     }
 
     /// 检查操作是否需要审批
-    pub fn requires_approval(&self, _operation_type: &OperationType, risk_level: &RiskLevel) -> bool {
+    pub fn requires_approval(&self, _operation_type: &_OperationType, risk_level: &RiskLevel) -> bool {
         match risk_level {
             RiskLevel::Low => !self.config.auto_approve_low_risk,
             RiskLevel::Medium => true,
@@ -208,7 +208,7 @@ impl HumanApprovalWorkflow {
     }
 
     /// 获取所有已完成审批
-    pub fn completed(&self) -> &[ApprovalResult] {
+    pub fn completed(&self) -> &[_ApprovalResult] {
         &self.completed_approvals
     }
 

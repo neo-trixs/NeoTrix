@@ -10,7 +10,7 @@ pub struct ReasoningGenerator {
     /// 推理规则库
     pub rules: Vec<ReasoningRule>,
     /// 推理历史
-    pub history: Vec<ReasoningRecord>,
+    pub history: Vec<_ReasoningRecord>,
     /// 世界模型
     pub world_model: WorldModel,
 }
@@ -67,7 +67,7 @@ pub struct Episode {
 
 /// 推理记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningRecord {
+pub(crate) struct _ReasoningRecord {
     pub id: String,
     pub cycle: u32,
     pub reasoning_type: RuleType,
@@ -87,10 +87,10 @@ impl ReasoningGenerator {
     }
 
     /// 逻辑推理
-    pub fn deductive_reasoning(&mut self, cycle: u32, premises: &[String]) -> String {
+    pub(crate) fn _deductive_reasoning(&mut self, cycle: u32, premises: &[String]) -> String {
         let conclusion = format!("Deduced from {} premises", premises.len());
         
-        let record = ReasoningRecord {
+        let record = _ReasoningRecord {
             id: format!("reason_{}", uuid::Uuid::new_v4()),
             cycle,
             reasoning_type: RuleType::Deductive,
@@ -105,10 +105,10 @@ impl ReasoningGenerator {
     }
 
     /// 证据推理
-    pub fn abductive_reasoning(&mut self, cycle: u32, observation: &str) -> String {
+    pub(crate) fn _abductive_reasoning(&mut self, cycle: u32, observation: &str) -> String {
         let hypothesis = format!("Hypothesis for: {}", observation);
         
-        let record = ReasoningRecord {
+        let record = _ReasoningRecord {
             id: format!("reason_{}", uuid::Uuid::new_v4()),
             cycle,
             reasoning_type: RuleType::Abductive,
@@ -126,7 +126,7 @@ impl ReasoningGenerator {
     pub fn counterfactual_reasoning(&mut self, cycle: u32, actual: &str, alternative: &str) -> String {
         let result = format!("If {}, then {}", alternative, actual);
         
-        let record = ReasoningRecord {
+        let record = _ReasoningRecord {
             id: format!("reason_{}", uuid::Uuid::new_v4()),
             cycle,
             reasoning_type: RuleType::Counterfactual,
@@ -171,7 +171,7 @@ mod tests {
     #[test]
     fn test_reasoning_generator() {
         let mut gen = ReasoningGenerator::new();
-        let result = gen.deductive_reasoning(0, &["A".to_string(), "B".to_string()]);
+        let result = gen._deductive_reasoning(0, &["A".to_string(), "B".to_string()]);
         assert!(!result.is_empty());
     }
 }

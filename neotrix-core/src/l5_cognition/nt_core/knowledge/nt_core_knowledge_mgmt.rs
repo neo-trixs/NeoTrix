@@ -11,17 +11,17 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 知识管理引擎
-pub struct KnowledgeManagementEngine {
-    knowledge_graph: EnhancedKnowledgeGraph,
-    semantic_index: SemanticIndex,
+pub(crate) struct _KnowledgeManagementEngine {
+    knowledge_graph: _EnhancedKnowledgeGraph,
+    semantic_index: _SemanticIndex,
     reasoning_engine: ReasoningEngine,
-    config: KnowledgeConfig,
+    config: _KnowledgeConfig,
     stats: KnowledgeStats,
 }
 
 /// 知识配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KnowledgeConfig {
+pub(crate) struct _KnowledgeConfig {
     pub max_entities: usize,
     pub embedding_dim: usize,
     pub similarity_threshold: f64,
@@ -29,7 +29,7 @@ pub struct KnowledgeConfig {
     pub enable_fusion: bool,
 }
 
-impl Default for KnowledgeConfig {
+impl Default for _KnowledgeConfig {
     fn default() -> Self {
         Self {
             max_entities: 100000,
@@ -43,7 +43,7 @@ impl Default for KnowledgeConfig {
 
 /// 增强知识图谱
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnhancedKnowledgeGraph {
+pub(crate) struct _EnhancedKnowledgeGraph {
     pub entities: HashMap<String, Entity>,
     pub relations: Vec<Relation>,
     pub embeddings: HashMap<String, Vec<f32>>,
@@ -83,7 +83,7 @@ pub struct Community {
 }
 
 /// 语义索引
-pub struct SemanticIndex {
+pub(crate) struct _SemanticIndex {
     index: HashMap<String, Vec<f32>>,
     metadata: HashMap<String, HashMap<String, String>>,
 }
@@ -106,17 +106,17 @@ pub struct ReasoningRule {
 
 /// 知识查询结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KnowledgeQueryResult {
+pub(crate) struct _KnowledgeQueryResult {
     pub query: String,
     pub entities: Vec<Entity>,
     pub relations: Vec<Relation>,
-    pub inferred_facts: Vec<InferredFact>,
+    pub inferred_facts: Vec<_InferredFact>,
     pub relevance_score: f64,
 }
 
 /// 推断事实
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InferredFact {
+pub(crate) struct _InferredFact {
     pub fact: String,
     pub confidence: f64,
     pub reasoning_chain: Vec<String>,
@@ -132,17 +132,17 @@ pub struct KnowledgeStats {
     pub knowledge_quality: f64,
 }
 
-impl KnowledgeManagementEngine {
+impl _KnowledgeManagementEngine {
     /// 创建新的知识管理引擎
-    pub fn new(config: KnowledgeConfig) -> Self {
+    pub fn new(config: _KnowledgeConfig) -> Self {
         Self {
-            knowledge_graph: EnhancedKnowledgeGraph {
+            knowledge_graph: _EnhancedKnowledgeGraph {
                 entities: HashMap::new(),
                 relations: Vec::new(),
                 embeddings: HashMap::new(),
                 communities: Vec::new(),
             },
-            semantic_index: SemanticIndex {
+            semantic_index: _SemanticIndex {
                 index: HashMap::new(),
                 metadata: HashMap::new(),
             },
@@ -195,13 +195,13 @@ impl KnowledgeManagementEngine {
     }
 
     /// 推理查询
-    pub fn reason(&self, query: &str) -> Vec<InferredFact> {
+    pub fn reason(&self, query: &str) -> Vec<_InferredFact> {
         let mut inferred = Vec::new();
 
         // 简化版: 基于规则的推理
         for rule in &self.reasoning_engine.rules {
             if query.contains(&rule.antecedent) {
-                inferred.push(InferredFact {
+                inferred.push(_InferredFact {
                     fact: rule.consequent.clone(),
                     confidence: rule.confidence,
                     reasoning_chain: vec![
@@ -217,7 +217,7 @@ impl KnowledgeManagementEngine {
     }
 
     /// 知识融合
-    pub fn fuse_knowledge(&mut self, new_entities: Vec<Entity>, new_relations: Vec<Relation>) {
+    pub(crate) fn _fuse_knowledge(&mut self, new_entities: Vec<Entity>, new_relations: Vec<Relation>) {
         if !self.config.enable_fusion {
             return;
         }
@@ -248,7 +248,7 @@ impl KnowledgeManagementEngine {
     }
 
     /// 添加推理规则
-    pub fn add_reasoning_rule(&mut self, rule: ReasoningRule) {
+    pub(crate) fn _add_reasoning_rule(&mut self, rule: ReasoningRule) {
         self.reasoning_engine.rules.push(rule);
     }
 

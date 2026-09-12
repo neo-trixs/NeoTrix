@@ -13,12 +13,12 @@ pub struct TaskCategorizer {
     /// 分类规则
     pub categories: HashMap<String, Vec<String>>,
     /// 分类历史
-    pub history: Vec<ClassificationRecord>,
+    pub history: Vec<_ClassificationRecord>,
 }
 
 /// 分类记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClassificationRecord {
+pub(crate) struct _ClassificationRecord {
     /// 记录ID
     pub id: String,
     /// 输入
@@ -41,7 +41,7 @@ impl TaskCategorizer {
     }
 
     /// 添加分类规则
-    pub fn add_category(&mut self, name: String, keywords: Vec<String>) {
+    pub(crate) fn _add_category(&mut self, name: String, keywords: Vec<String>) {
         self.categories.insert(name, keywords);
     }
 
@@ -65,7 +65,7 @@ impl TaskCategorizer {
         }
 
         // 记录分类
-        let record = ClassificationRecord {
+        let record = _ClassificationRecord {
             id: format!("cls_{}", uuid::Uuid::new_v4()),
             input: input.to_string(),
             category: best_category.clone(),
@@ -79,18 +79,18 @@ impl TaskCategorizer {
     }
 
     /// 批量分类
-    pub fn categorize_batch(&mut self, inputs: &[String]) -> Vec<(String, f64)> {
+    pub(crate) fn _categorize_batch(&mut self, inputs: &[String]) -> Vec<(String, f64)> {
         inputs.iter().map(|input| self.categorize(input)).collect()
     }
 
     /// 获取分类统计
-    pub fn stats(&self) -> CategorizerStats {
+    pub fn stats(&self) -> _CategorizerStats {
         let mut category_counts = HashMap::new();
         for record in &self.history {
             *category_counts.entry(record.category.clone()).or_insert(0) += 1;
         }
 
-        CategorizerStats {
+        _CategorizerStats {
             total_categories: self.categories.len(),
             total_classifications: self.history.len(),
             category_distribution: category_counts,
@@ -98,10 +98,10 @@ impl TaskCategorizer {
     }
 
     /// 创建默认分类器
-    pub fn default_categories() -> Self {
+    pub(crate) fn _default_categories() -> Self {
         let mut categorizer = Self::new();
         
-        categorizer.add_category(
+        categorizer._add_category(
             "reasoning".to_string(),
             vec![
                 "推理".to_string(),
@@ -113,7 +113,7 @@ impl TaskCategorizer {
             ],
         );
         
-        categorizer.add_category(
+        categorizer._add_category(
             "coding".to_string(),
             vec![
                 "代码".to_string(),
@@ -125,7 +125,7 @@ impl TaskCategorizer {
             ],
         );
         
-        categorizer.add_category(
+        categorizer._add_category(
             "research".to_string(),
             vec![
                 "研究".to_string(),
@@ -137,7 +137,7 @@ impl TaskCategorizer {
             ],
         );
         
-        categorizer.add_category(
+        categorizer._add_category(
             "creative".to_string(),
             vec![
                 "创作".to_string(),
@@ -155,13 +155,13 @@ impl TaskCategorizer {
 
 /// 分类器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CategorizerStats {
+pub(crate) struct _CategorizerStats {
     pub total_categories: usize,
     pub total_classifications: usize,
     pub category_distribution: HashMap<String, u32>,
 }
 
-impl std::fmt::Display for CategorizerStats {
+impl std::fmt::Display for _CategorizerStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "═══════════════════════════════════════════════")?;
         writeln!(f, "        TaskCategorizer 统计")?;
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_categorizer() {
-        let mut categorizer = TaskCategorizer::default_categories();
+        let mut categorizer = TaskCategorizer::_default_categories();
         let (category, confidence) = categorizer.categorize("请帮我分析这段代码");
         
         assert_eq!(category, "reasoning");
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_general_category() {
-        let mut categorizer = TaskCategorizer::default_categories();
+        let mut categorizer = TaskCategorizer::_default_categories();
         let (category, _) = categorizer.categorize("今天天气真好");
         
         assert_eq!(category, "general");

@@ -33,7 +33,7 @@ pub struct IterationAgent {
     /// 验证器
     pub checker: ConvergenceChecker,
     /// 统计
-    pub stats: IterationStats,
+    pub stats: _IterationStats,
 }
 
 /// 漏洞注册表
@@ -76,7 +76,7 @@ impl GapRegistry {
         }
     }
 
-    pub fn coverage_rate(&self) -> f64 {
+    pub(crate) fn _coverage_rate(&self) -> f64 {
         if self.total_gaps == 0 {
             return 1.0;
         }
@@ -122,7 +122,7 @@ pub struct MetaPattern {
 
 /// 迭代统计
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct IterationStats {
+pub(crate) struct _IterationStats {
     /// 总周期数
     pub total_cycles: u32,
     /// 总漏洞发现数
@@ -141,9 +141,9 @@ pub struct IterationStats {
 
 /// 迭代报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IterationReport {
+pub(crate) struct _IterationReport {
     /// 统计
-    pub stats: IterationStats,
+    pub stats: _IterationStats,
     /// 最终状态
     pub final_state: StateSnapshot,
     /// 漏洞注册表
@@ -186,7 +186,7 @@ impl IterationAgent {
             probe_engines: Vec::new(),
             patch_generators: Vec::new(),
             checker: ConvergenceChecker::new(convergence_threshold),
-            stats: IterationStats::default(),
+            stats: _IterationStats::default(),
         }
     }
 
@@ -203,7 +203,7 @@ impl IterationAgent {
     }
 
     /// 运行迭代验证
-    pub fn run(&mut self) -> IterationReport {
+    pub fn run(&mut self) -> _IterationReport {
         let start_time = std::time::Instant::now();
 
         while self.cycle < self.max_cycles {
@@ -371,7 +371,7 @@ impl IterationAgent {
     }
 
     /// 生成报告
-    fn generate_report(&self) -> IterationReport {
+    fn generate_report(&self) -> _IterationReport {
         let proof = ConvergenceProof {
             consecutive_no_gap_cycles: self.checker.consecutive_no_gap,
             covered_dimensions: self.gap_registry.dimensions().len() as u32,
@@ -381,7 +381,7 @@ impl IterationAgent {
             converged: self.stats.converged,
         };
 
-        IterationReport {
+        _IterationReport {
             stats: self.stats.clone(),
             final_state: self.state_snapshot.clone(),
             gap_registry: self.gap_registry.clone(),
@@ -401,7 +401,7 @@ mod tests {
         let mut registry = GapRegistry::new();
         assert_eq!(registry.total_gaps, 0);
         assert_eq!(registry.fixed_gaps, 0);
-        assert_eq!(registry.coverage_rate(), 1.0);
+        assert_eq!(registry._coverage_rate(), 1.0);
     }
 
     #[test]

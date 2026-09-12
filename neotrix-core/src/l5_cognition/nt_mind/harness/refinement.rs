@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 /// 快照（用于回滚）
 #[derive(Debug, Clone)]
-pub struct HarnessSnapshot {
+pub(crate) struct _HarnessSnapshot {
     pub snapshot_id: String,
     pub timestamp: i64,
     pub state: HashMap<String, String>,
@@ -17,7 +17,7 @@ pub struct HarnessSnapshot {
 
 /// 精炼更新
 #[derive(Debug, Clone)]
-pub struct RefinementUpdate {
+pub(crate) struct _RefinementUpdate {
     pub update_id: String,
     pub target: String, // 要更新的配置/提示词/规则
     pub before: String,
@@ -28,18 +28,18 @@ pub struct RefinementUpdate {
 
 /// 精炼结果
 #[derive(Debug, Clone)]
-pub struct RefinementResult {
+pub(crate) struct _RefinementResult {
     pub snapshot_id: String,
-    pub updates_applied: Vec<RefinementUpdate>,
-    pub updates_rejected: Vec<(RefinementUpdate, String)>,
+    pub updates_applied: Vec<_RefinementUpdate>,
+    pub updates_rejected: Vec<(_RefinementUpdate, String)>,
     pub rolled_back: bool,
 }
 
 /// Continual Harness 精炼器
 #[derive(Debug, Clone)]
 pub struct ContinualRefiner {
-    snapshots: Vec<HarnessSnapshot>,
-    updates: Vec<RefinementUpdate>,
+    snapshots: Vec<_HarnessSnapshot>,
+    updates: Vec<_RefinementUpdate>,
     current_state: HashMap<String, String>,
     next_snapshot_id: u32,
 }
@@ -59,7 +59,7 @@ impl ContinualRefiner {
         self.next_snapshot_id += 1;
         let id = format!("snap_{}", self.next_snapshot_id);
 
-        self.snapshots.push(HarnessSnapshot {
+        self.snapshots.push(_HarnessSnapshot {
             snapshot_id: id.clone(),
             timestamp: now_ts(),
             state: self.current_state.clone(),
@@ -72,9 +72,9 @@ impl ContinualRefiner {
     /// 应用精炼更新
     pub fn refine(
         &mut self,
-        updates: Vec<RefinementUpdate>,
+        updates: Vec<_RefinementUpdate>,
         min_confidence: f64,
-    ) -> RefinementResult {
+    ) -> _RefinementResult {
         let snapshot_id = self.snapshot("refine_start");
         let mut applied = Vec::new();
         let mut rejected = Vec::new();
@@ -93,7 +93,7 @@ impl ContinualRefiner {
             }
         }
 
-        RefinementResult {
+        _RefinementResult {
             snapshot_id,
             updates_applied: applied,
             updates_rejected: rejected,
@@ -117,7 +117,7 @@ impl ContinualRefiner {
     }
 
     /// 获取快照列表
-    pub fn snapshots(&self) -> &Vec<HarnessSnapshot> {
+    pub fn snapshots(&self) -> &Vec<_HarnessSnapshot> {
         &self.snapshots
     }
 

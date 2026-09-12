@@ -52,7 +52,7 @@ impl DppSelector {
     }
 
     /// 设置质量/多样性平衡权重。
-    pub fn with_quality_weight(mut self, w: f64) -> Self {
+    pub(crate) fn _with_quality_weight(mut self, w: f64) -> Self {
         self.quality_weight = w.max(0.0);
         self
     }
@@ -132,7 +132,7 @@ impl DppSelector {
     /// 扇出-比较-合并 (orca parallel worktree 模式):
     /// 从多个 agent 的独立结果中, 用 DPP 挑选一组高质且互不重复的候选,
     /// 用于后续合并 (如保留最优 + 多样备选, 而非仅保留一个 winner)。
-    pub fn merge_winners(&self, candidates: &[Candidate], keep: usize) -> Vec<Candidate> {
+    pub(crate) fn _merge_winners(&self, candidates: &[Candidate], keep: usize) -> Vec<Candidate> {
         self.select(candidates, keep)
     }
 
@@ -185,12 +185,12 @@ mod tests {
     fn test_empty_input() {
         let sel = DppSelector::new(2);
         assert!(sel.select(&[], 3).is_empty());
-        assert_eq!(sel.merge_winners(&[], 2).len(), 0);
+        assert_eq!(sel._merge_winners(&[], 2).len(), 0);
     }
 
     #[test]
     fn test_select_quality_dominant() {
-        let sel = DppSelector::new(2).with_quality_weight(10.0);
+        let sel = DppSelector::new(2)._with_quality_weight(10.0);
         let cands = vec![
             c("a", 1.0, &[0.0, 0.0]),
             c("b", 5.0, &[0.0, 0.0]),
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_diversity_prefers_different_features() {
-        let sel = DppSelector::new(2).with_quality_weight(0.0);
+        let sel = DppSelector::new(2)._with_quality_weight(0.0);
         // 质量全等, 多样性应优先选出特征差异大的组合
         let cands = vec![
             c("a", 1.0, &[1.0, 0.0]),
@@ -234,7 +234,7 @@ mod tests {
             c("a", 2.0, &[0.0, 1.0]),
             c("m", 3.0, &[0.5, 0.5]),
         ];
-        let winners = sel.merge_winners(&cands, 2);
+        let winners = sel._merge_winners(&cands, 2);
         assert!(winners.len() <= 2);
         // 输出顺序应与原始输入顺序一致
         let pos: Vec<usize> = winners

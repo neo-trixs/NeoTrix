@@ -20,7 +20,7 @@ pub fn default_config_path() -> PathBuf {
 }
 
 /// 从 TOML 文件加载路由配置
-pub fn load_router_config(path: Option<PathBuf>) -> RouterConfig {
+pub(crate) fn _load_router_config(path: Option<PathBuf>) -> RouterConfig {
     let path = path.unwrap_or_else(default_config_path);
     if path.exists() {
         let content = match std::fs::read_to_string(&path) {
@@ -43,7 +43,7 @@ pub fn load_router_config(path: Option<PathBuf>) -> RouterConfig {
 }
 
 /// 保存路由配置到 TOML 文件
-pub fn save_router_config(config: &RouterConfig, path: Option<PathBuf>) -> Result<(), String> {
+pub(crate) fn _save_router_config(config: &RouterConfig, path: Option<PathBuf>) -> Result<(), String> {
     let path = path.unwrap_or_else(default_config_path);
     let toml_str = toml::to_string_pretty(config).map_err(|e| format!("序列化失败: {}", e))?;
     if let Some(parent) = path.parent() {
@@ -74,7 +74,7 @@ impl ModelTier {
     }
 
     /// 从整数创建
-    pub fn from_int(v: u8) -> Self {
+    pub(crate) fn _from_int(v: u8) -> Self {
         match v {
             0 => Self::T0, 1 => Self::T1, 2 => Self::T2, 3 => Self::T3, _ => Self::T4,
         }
@@ -94,9 +94,9 @@ impl ModelTier {
 
 /// 路由特征 — 用于分类 prompt 到合适的 tier
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouterFeatures {
+pub(crate) struct _RouterFeatures {
     pub prompt_length: usize,
-    pub language: LanguageType,
+    pub language: _LanguageType,
     pub code_ratio: f64,
     pub keyword_score: f64,
     pub has_reasoning_triggers: bool,
@@ -112,7 +112,7 @@ pub struct RouterFeatures {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LanguageType {
+pub(crate) enum _LanguageType {
     Chinese,
     English,
     Mixed,
@@ -120,7 +120,7 @@ pub enum LanguageType {
     Other,
 }
 
-impl RouterFeatures {
+impl _RouterFeatures {
     pub fn extract(prompt: &str) -> Self {
         let prompt_length = prompt.len();
         let token_estimate = estimate_tokens(prompt);
@@ -181,15 +181,15 @@ impl RouterFeatures {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouterConfig {
     pub enabled: bool,
-    pub tier_thresholds: TierThresholds,
-    pub model_map: Vec<TierModelMapping>,
+    pub tier_thresholds: _TierThresholds,
+    pub model_map: Vec<_TierModelMapping>,
     pub fallback_chain: Vec<ModelTier>,
     pub enable_embedding: bool,
     pub max_retries_per_tier: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TierThresholds {
+pub(crate) struct _TierThresholds {
     pub t0_max_tokens: usize,
     pub t1_max_tokens: usize,
     pub t2_max_tokens: usize,
@@ -199,7 +199,7 @@ pub struct TierThresholds {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TierModelMapping {
+pub(crate) struct _TierModelMapping {
     pub tier: ModelTier,
     pub provider: String,
     pub model: String,
@@ -211,7 +211,7 @@ impl Default for RouterConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            tier_thresholds: TierThresholds {
+            tier_thresholds: _TierThresholds {
                 t0_max_tokens: 50,
                 t1_max_tokens: 200,
                 t2_max_tokens: 800,
@@ -220,7 +220,7 @@ impl Default for RouterConfig {
                 t4_analysis_threshold: 0.8,
             },
             model_map: vec![
-                TierModelMapping {
+                _TierModelMapping {
                     tier: ModelTier::T0,
                     provider: "llm7".into(),
                     // 2026-08 实测: llm7 keyless 匿名可用 (codestral-latest 200 OK)。
@@ -229,28 +229,28 @@ impl Default for RouterConfig {
                     max_tokens: 256,
                     fallback_models: vec!["deepseek-v4-flash:0731".into()],
                 },
-                TierModelMapping {
+                _TierModelMapping {
                     tier: ModelTier::T1,
                     provider: "llm7".into(),
                     model: "codestral-latest".into(),
                     max_tokens: 1024,
                     fallback_models: vec!["deepseek-v4-flash:0731".into()],
                 },
-                TierModelMapping {
+                _TierModelMapping {
                     tier: ModelTier::T2,
                     provider: "llm7".into(),
                     model: "codestral-latest".into(),
                     max_tokens: 4096,
                     fallback_models: vec!["claude-fable-5".into()],
                 },
-                TierModelMapping {
+                _TierModelMapping {
                     tier: ModelTier::T3,
                     provider: "llm7".into(),
                     model: "claude-opus-5".into(),
                     max_tokens: 8192,
                     fallback_models: vec!["codestral-latest".into()],
                 },
-                TierModelMapping {
+                _TierModelMapping {
                     tier: ModelTier::T4,
                     provider: "llm7".into(),
                     model: "claude-opus-5".into(),
@@ -272,7 +272,7 @@ pub struct RouteDecision {
     pub model: String,
     pub provider: String,
     pub max_tokens: usize,
-    pub features: RouterFeatures,
+    pub features: _RouterFeatures,
     pub fallback_used: Option<String>,
     pub confidence: f64,
     /// 推荐的 gateway 注册模型名 (如 "aihub/glm-5.2")，为空则让 gateway 自动选
@@ -395,23 +395,23 @@ fn calc_keyword_score(s: &str) -> f64 {
     (count as f64) / (technical.len() as f64).max(1.0)
 }
 
-fn detect_language(s: &str) -> LanguageType {
+fn detect_language(s: &str) -> _LanguageType {
     let chinese_count = s.chars().filter(|&c| ('\u{4e00}'..='\u{9fff}').contains(&c)).count();
     let total = s.chars().count().max(1);
     let ratio = chinese_count as f64 / total as f64;
     let code_chars = s.chars().filter(|&c| c == ';' || c == '{' || c == '}').count();
     if code_chars as f64 / total as f64 > 0.05 {
-        return LanguageType::Code;
+        return _LanguageType::Code;
     }
-    if ratio > 0.4 { LanguageType::Chinese }
-    else if ratio > 0.05 { LanguageType::Mixed }
-    else { LanguageType::English }
+    if ratio > 0.4 { _LanguageType::Chinese }
+    else if ratio > 0.05 { _LanguageType::Mixed }
+    else { _LanguageType::English }
 }
 
 /// 历史路由记录 — 用于自适应学习
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouteHistoryEntry {
-    pub features: RouterFeatures,
+pub(crate) struct _RouteHistoryEntry {
+    pub features: _RouterFeatures,
     pub assigned_tier: ModelTier,
     pub used_fallback: bool,
     pub success: bool,
@@ -420,14 +420,14 @@ pub struct RouteHistoryEntry {
 
 /// 自适应学习参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdaptiveParams {
+pub(crate) struct _AdaptiveParams {
     pub success_threshold: f64,
     pub upgrade_threshold: f64,
     pub downgrade_threshold: f64,
     pub min_samples: u64,
 }
 
-impl Default for AdaptiveParams {
+impl Default for _AdaptiveParams {
     fn default() -> Self {
         Self {
             success_threshold: 0.8,
@@ -440,25 +440,25 @@ impl Default for AdaptiveParams {
 
 pub struct ModelRouter {
     pub config: RouterConfig,
-    pub history: Vec<RouteHistoryEntry>,
-    pub adaptive_params: AdaptiveParams,
+    pub history: Vec<_RouteHistoryEntry>,
+    pub adaptive_params: _AdaptiveParams,
     config_path: Option<std::path::PathBuf>,
 }
 
 impl ModelRouter {
-    pub fn with_config_path(path: std::path::PathBuf) -> Self {
-        let config = load_router_config(Some(path.clone()));
+    pub(crate) fn _with_config_path(path: std::path::PathBuf) -> Self {
+        let config = _load_router_config(Some(path.clone()));
         Self {
             config,
             history: Vec::new(),
-            adaptive_params: AdaptiveParams::default(),
+            adaptive_params: _AdaptiveParams::default(),
             config_path: Some(path),
         }
     }
 
     /// 记录一次路由结果
-    pub fn record_result(&mut self, features: RouterFeatures, tier: ModelTier, success: bool, duration_ms: u64, fallback: bool) {
-        self.history.push(RouteHistoryEntry {
+    pub fn record_result(&mut self, features: _RouterFeatures, tier: ModelTier, success: bool, duration_ms: u64, fallback: bool) {
+        self.history.push(_RouteHistoryEntry {
             features,
             assigned_tier: tier,
             used_fallback: fallback,
@@ -484,12 +484,12 @@ impl ModelRouter {
 
             // 如果成功率太低，下次同类请求上升一级
             if rate < self.adaptive_params.downgrade_threshold && tier < ModelTier::T4 {
-                let next_tier = ModelTier::from_int(tier as u8 + 1);
+                let next_tier = ModelTier::_from_int(tier as u8 + 1);
                 log::info!("[router] auto upgrade {:?} -> {:?} (success rate {:.1}%)", tier, next_tier, rate * 100.0);
             }
             // 如果成功率很高，可考虑降级省钱
             if rate > self.adaptive_params.upgrade_threshold && tier > ModelTier::T0 {
-                let prev_tier = ModelTier::from_int(tier as u8 - 1);
+                let prev_tier = ModelTier::_from_int(tier as u8 - 1);
                 log::info!("[router] auto downgrade {:?} -> {:?} (success rate {:.1}%)", tier, prev_tier, rate * 100.0);
             }
         }
@@ -497,7 +497,7 @@ impl ModelRouter {
         // 定期持久化
         if len.is_multiple_of(50) {
             if let Some(ref path) = self.config_path {
-                let _ = save_router_config(&self.config, Some(path.clone()));
+                let _ = _save_router_config(&self.config, Some(path.clone()));
             }
         }
     }
@@ -505,7 +505,7 @@ impl ModelRouter {
     /// 热重载配置（监听 SIGHUP 时调用）
     pub fn reload_config(&mut self) -> Result<(), String> {
         if let Some(ref path) = self.config_path.clone() {
-            let new_config = load_router_config(Some(path.clone()));
+            let new_config = _load_router_config(Some(path.clone()));
             self.config = new_config;
             log::info!("[router] config reloaded from {:?}", path);
             Ok(())
@@ -547,14 +547,14 @@ impl ModelRouter {
         Self {
             config: RouterConfig::default(),
             history: Vec::new(),
-            adaptive_params: AdaptiveParams::default(),
+            adaptive_params: _AdaptiveParams::default(),
             config_path: None,
         }
     }
 
     /// 路由 prompt 到最佳模型
     pub fn route(&self, prompt: &str) -> RouteDecision {
-        let features = RouterFeatures::extract(prompt);
+        let features = _RouterFeatures::extract(prompt);
         let tier = features.estimated_tier;
 
         let mapping = self.config.model_map.iter()
@@ -594,12 +594,12 @@ impl ModelRouter {
     }
 
     /// 获取 prompt 对应的 ContextTier（供 tier_prompts 使用）
-    pub fn context_tier_for(&self, prompt: &str) -> ContextTier {
+    pub(crate) fn _context_tier_for(&self, prompt: &str) -> ContextTier {
         ContextTier::from_model_tier(self.route(prompt).tier)
     }
 
     /// 失败时回退到更低 tier
-    pub fn fallback(&self, current_tier: ModelTier) -> Option<TierModelMapping> {
+    pub fn fallback(&self, current_tier: ModelTier) -> Option<_TierModelMapping> {
         let idx = self.config.fallback_chain.iter().position(|t| *t == current_tier)?;
         self.config.fallback_chain.get(idx + 1)
             .and_then(|t| self.config.model_map.iter().find(|m| m.tier == *t).cloned())
@@ -643,8 +643,8 @@ mod tests {
     #[test]
     fn test_language_detection() {
         let cn = detect_language("什么是量子计算？");
-        assert!(matches!(cn, LanguageType::Chinese));
+        assert!(matches!(cn, _LanguageType::Chinese));
         let en = detect_language("What is quantum computing?");
-        assert!(matches!(en, LanguageType::English));
+        assert!(matches!(en, _LanguageType::English));
     }
 }

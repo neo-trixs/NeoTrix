@@ -8,7 +8,7 @@ use std::collections::HashMap;
 /// 结晶状态
 
 #[derive(Clone, Debug)]
-pub enum CrystallizationStatus {
+pub(crate) enum _CrystallizationStatus {
     /// 模板阶段（成功 < 3 次）
     Template { success_count: u32 },
     /// 候选阶段（成功 3+ 次，待审批）
@@ -22,7 +22,7 @@ pub enum CrystallizationStatus {
 /// I/O 契约 — 定义技能的输入输出规范
 #[derive(Clone, Debug)]
 
-pub struct IoContract {
+pub(crate) struct _IoContract {
     /// 输入 JSON schema
     pub input_schema: String,
     /// 输出 JSON schema
@@ -38,7 +38,7 @@ pub struct IoContract {
 /// 已结晶技能 — 从模板晋升为正式技能
 #[derive(Clone, Debug)]
 
-pub struct CrystallizedSkill {
+pub(crate) struct _CrystallizedSkill {
     /// 技能唯一标识
     pub id: String,
     /// 技能名称
@@ -46,7 +46,7 @@ pub struct CrystallizedSkill {
     /// 技能描述
     pub description: String,
     /// I/O 契约
-    pub contract: IoContract,
+    pub contract: _IoContract,
     /// 成功率
     pub success_rate: f64,
     /// 总调用次数
@@ -60,7 +60,7 @@ pub struct CrystallizedSkill {
 /// 结晶统计信息
 #[derive(Clone, Debug)]
 
-pub struct CrystallizationStats {
+pub(crate) struct _CrystallizationStats {
     /// 候选模板数量
     pub candidates: usize,
     /// 已结晶技能数量
@@ -78,7 +78,7 @@ pub struct CrystallizationEngine {
     /// 待结晶模板 (template_id → success_count)
     candidates: HashMap<String, u32>,
     /// 已结晶技能
-    crystallized: Vec<CrystallizedSkill>,
+    crystallized: Vec<_CrystallizedSkill>,
     /// 被拒绝的模板 (template_id, reason)
     rejected: Vec<(String, String)>,
     /// 结晶阈值（默认 3）
@@ -115,13 +115,13 @@ impl CrystallizationEngine {
     }
 
     /// 获取模板当前状态
-    pub fn status_of(&self, template_id: &str) -> CrystallizationStatus {
+    pub(crate) fn _status_of(&self, template_id: &str) -> _CrystallizationStatus {
         match self.candidates.get(template_id) {
             Some(&count) if count >= self.threshold => {
                 let confidence = (count as f64 / self.threshold as f64).min(1.0);
-                CrystallizationStatus::Candidate { confidence }
+                _CrystallizationStatus::Candidate { confidence }
             }
-            Some(&count) => CrystallizationStatus::Template {
+            Some(&count) => _CrystallizationStatus::Template {
                 success_count: count,
             },
             None => {
@@ -137,7 +137,7 @@ impl CrystallizationEngine {
                         .unwrap()
                         .id
                         .clone();
-                    CrystallizationStatus::Crystallized { skill_id }
+                    _CrystallizationStatus::Crystallized { skill_id }
                 } else if self.rejected.iter().any(|(id, _)| id == template_id) {
                     let reason = self
                         .rejected
@@ -146,9 +146,9 @@ impl CrystallizationEngine {
                         .unwrap()
                         .1
                         .clone();
-                    CrystallizationStatus::Rejected { reason }
+                    _CrystallizationStatus::Rejected { reason }
                 } else {
-                    CrystallizationStatus::Template { success_count: 0 }
+                    _CrystallizationStatus::Template { success_count: 0 }
                 }
             }
         }
@@ -160,15 +160,15 @@ impl CrystallizationEngine {
         template_id: &str,
         name: &str,
         description: &str,
-        contract: IoContract,
-    ) -> Option<CrystallizedSkill> {
+        contract: _IoContract,
+    ) -> Option<_CrystallizedSkill> {
         let success_count = match self.candidates.get(template_id) {
             Some(&c) if c >= self.threshold => c,
             _ => return None,
         };
 
         self.next_skill_id += 1;
-        let skill = CrystallizedSkill {
+        let skill = _CrystallizedSkill {
             id: format!("skill_{}", self.next_skill_id),
             name: name.to_string(),
             description: description.to_string(),
@@ -192,13 +192,13 @@ impl CrystallizationEngine {
     }
 
     /// 获取所有已结晶技能
-    pub fn crystallized_skills(&self) -> &[CrystallizedSkill] {
+    pub(crate) fn _crystallized_skills(&self) -> &[_CrystallizedSkill] {
         &self.crystallized
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> CrystallizationStats {
-        CrystallizationStats {
+    pub fn stats(&self) -> _CrystallizationStats {
+        _CrystallizationStats {
             candidates: self.candidates.len(),
             crystallized: self.crystallized.len(),
             rejected: self.rejected.len(),
@@ -215,7 +215,7 @@ impl CrystallizationEngine {
     }
 
     /// 生成 SKILL.md 格式模板
-    pub fn to_skill_md(&self, skill: &CrystallizedSkill) -> String {
+    pub(crate) fn _to_skill_md(&self, skill: &_CrystallizedSkill) -> String {
         let prereqs = if skill.contract.prerequisites.is_empty() {
             "None".to_string()
         } else {
@@ -266,8 +266,8 @@ fn chrono_now() -> i64 {
 mod tests {
     use super::*;
 
-    fn test_contract() -> IoContract {
-        IoContract {
+    fn test_contract() -> _IoContract {
+        _IoContract {
             input_schema: r#"{"type":"object","properties":{"text":{"type":"string"}}"#.to_string(),
             output_schema: r#"{"type":"object","properties":{"result":{"type":"string"}}"#
                 .to_string(),
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(skill.name, "Test Skill");
         assert_eq!(skill.total_invocations, 3);
         assert!(engine.candidates().is_empty());
-        assert_eq!(engine.crystallized_skills().len(), 1);
+        assert_eq!(engine._crystallized_skills().len(), 1);
     }
 
     #[test]
@@ -328,9 +328,9 @@ mod tests {
         assert!(engine.candidates().is_empty());
         assert_eq!(engine.rejected.len(), 1);
 
-        let status = engine.status_of("tmpl_a");
+        let status = engine._status_of("tmpl_a");
         match status {
-            CrystallizationStatus::Rejected { reason } => assert_eq!(reason, "质量不达标"),
+            _CrystallizationStatus::Rejected { reason } => assert_eq!(reason, "质量不达标"),
             _ => panic!("Expected Rejected"),
         }
     }
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn test_to_skill_md() {
         let engine = CrystallizationEngine::new(3);
-        let skill = CrystallizedSkill {
+        let skill = _CrystallizedSkill {
             id: "skill_1".to_string(),
             name: "My Skill".to_string(),
             description: "Does things".to_string(),
@@ -361,7 +361,7 @@ mod tests {
             crystallized_at: 1700000000,
             source_templates: vec!["tmpl_1".to_string()],
         };
-        let md = engine.to_skill_md(&skill);
+        let md = engine._to_skill_md(&skill);
         assert!(md.contains("# My Skill"));
         assert!(md.contains("95.0%"));
         assert!(md.contains("base_nlp"));

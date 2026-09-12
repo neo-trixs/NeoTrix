@@ -10,7 +10,7 @@ pub struct GoalSetter {
     /// 目标库
     pub goals: Vec<Goal>,
     /// 目标历史
-    pub history: Vec<GoalRecord>,
+    pub history: Vec<_GoalRecord>,
 }
 
 /// 目标
@@ -57,17 +57,17 @@ pub enum GoalStatus {
 
 /// 目标记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoalRecord {
+pub(crate) struct _GoalRecord {
     pub id: String,
     pub cycle: u32,
-    pub action: GoalAction,
+    pub action: _GoalAction,
     pub goal: Goal,
     pub timestamp: String,
 }
 
 /// 目标动作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum GoalAction {
+pub(crate) enum _GoalAction {
     Created,
     Updated,
     Completed,
@@ -85,10 +85,10 @@ impl GoalSetter {
 
     /// 设定目标
     pub fn set_goal(&mut self, cycle: u32, goal: Goal) {
-        let record = GoalRecord {
+        let record = _GoalRecord {
             id: format!("goal_{}", uuid::Uuid::new_v4()),
             cycle,
-            action: GoalAction::Created,
+            action: _GoalAction::Created,
             goal: goal.clone(),
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
@@ -102,10 +102,10 @@ impl GoalSetter {
         if let Some(goal) = self.goals.iter_mut().find(|g| g.id == goal_id) {
             goal.progress = progress;
             
-            let record = GoalRecord {
+            let record = _GoalRecord {
                 id: format!("goal_{}", uuid::Uuid::new_v4()),
                 cycle,
-                action: GoalAction::Updated,
+                action: _GoalAction::Updated,
                 goal: goal.clone(),
                 timestamp: chrono::Utc::now().to_rfc3339(),
             };
@@ -122,8 +122,8 @@ impl GoalSetter {
     }
 
     /// 获取统计
-    pub fn stats(&self) -> GoalStats {
-        GoalStats {
+    pub fn stats(&self) -> _GoalStats {
+        _GoalStats {
             total_goals: self.goals.len(),
             active_goals: self.active_goals().len(),
             completed_goals: self.goals.iter().filter(|g| g.status == GoalStatus::Completed).count(),
@@ -132,13 +132,13 @@ impl GoalSetter {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoalStats {
+pub(crate) struct _GoalStats {
     pub total_goals: usize,
     pub active_goals: usize,
     pub completed_goals: usize,
 }
 
-impl std::fmt::Display for GoalStats {
+impl std::fmt::Display for _GoalStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "GoalSetter: {} total, {} active, {} completed",
             self.total_goals, self.active_goals, self.completed_goals)

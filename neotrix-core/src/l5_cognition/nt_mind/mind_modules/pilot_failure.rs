@@ -10,17 +10,17 @@
 use serde::{Deserialize, Serialize};
 
 /// PILOT 失败模式检测器
-pub struct PILOTFailureDetector {
-    detectors: Vec<FailureDetector>,
+pub(crate) struct _PILOTFailureDetector {
+    detectors: Vec<_FailureDetector>,
     patterns: Vec<FailurePattern>,
-    detections: Vec<FailureDetection>,
-    config: PILOTConfig,
-    stats: PILOTStats,
+    detections: Vec<_FailureDetection>,
+    config: _PILOTConfig,
+    stats: _PILOTStats,
 }
 
 /// PILOT 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PILOTConfig {
+pub(crate) struct _PILOTConfig {
     pub max_detectors: usize,
     pub max_patterns: usize,
     pub detection_threshold: f64,
@@ -29,7 +29,7 @@ pub struct PILOTConfig {
     pub enable_goal_integration: bool,
 }
 
-impl Default for PILOTConfig {
+impl Default for _PILOTConfig {
     fn default() -> Self {
         Self {
             max_detectors: 50,
@@ -44,11 +44,11 @@ impl Default for PILOTConfig {
 
 /// 失败检测器
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FailureDetector {
+pub(crate) struct _FailureDetector {
     pub detector_id: String,
     pub name: String,
-    pub detector_type: DetectorType,
-    pub status: DetectorStatus,
+    pub detector_type: _DetectorType,
+    pub status: _DetectorStatus,
     pub last_detection: Option<chrono::DateTime<chrono::Utc>>,
     pub accuracy: f64,
 }
@@ -56,7 +56,7 @@ pub struct FailureDetector {
 /// 检测器类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum DetectorType {
+pub(crate) enum _DetectorType {
     Signature,
     Anomaly,
     Behavioral,
@@ -66,7 +66,7 @@ pub enum DetectorType {
 /// 检测器状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum DetectorStatus {
+pub(crate) enum _DetectorStatus {
     Active,
     Inactive,
     Warning,
@@ -79,7 +79,7 @@ pub struct FailurePattern {
     pub pattern_id: String,
     pub name: String,
     pub description: String,
-    pub severity: FailureSeverity,
+    pub severity: _FailureSeverity,
     pub indicators: Vec<String>,
     pub remediation: String,
 }
@@ -87,7 +87,7 @@ pub struct FailurePattern {
 /// 失败严重程度
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
-pub enum FailureSeverity {
+pub(crate) enum _FailureSeverity {
     Low = 0,
     Medium = 1,
     High = 2,
@@ -96,7 +96,7 @@ pub enum FailureSeverity {
 
 /// 失败检测
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FailureDetection {
+pub(crate) struct _FailureDetection {
     pub detection_id: String,
     pub pattern_id: String,
     pub detector_id: String,
@@ -108,7 +108,7 @@ pub struct FailureDetection {
 
 /// PILOT 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PILOTStats {
+pub(crate) struct _PILOTStats {
     pub total_detectors: u64,
     pub active_detectors: u64,
     pub total_detections: u64,
@@ -119,22 +119,22 @@ pub struct PILOTStats {
 
 /// SEAL 集成结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SEALIntegrationResult {
+pub(crate) struct _SEALIntegrationResult {
     pub integrated: bool,
     pub phase: String,
     pub impact_score: f64,
     pub recommendations: Vec<String>,
 }
 
-impl PILOTFailureDetector {
+impl _PILOTFailureDetector {
     /// 创建新的 PILOT 失败模式检测器
     pub fn new() -> Self {
         Self {
             detectors: Vec::new(),
             patterns: Vec::new(),
             detections: Vec::new(),
-            config: PILOTConfig::default(),
-            stats: PILOTStats {
+            config: _PILOTConfig::default(),
+            stats: _PILOTStats {
                 total_detectors: 0,
                 active_detectors: 0,
                 total_detections: 0,
@@ -146,13 +146,13 @@ impl PILOTFailureDetector {
     }
 
     /// 检测失败模式
-    pub fn detect(&mut self, input: &str) -> Vec<FailureDetection> {
+    pub fn detect(&mut self, input: &str) -> Vec<_FailureDetection> {
         let mut detections = Vec::new();
 
         for pattern in &self.patterns {
             let confidence = self.calculate_pattern_confidence(pattern, input);
             if confidence >= self.config.detection_threshold {
-                let detection = FailureDetection {
+                let detection = _FailureDetection {
                     detection_id: uuid::Uuid::new_v4().to_string(),
                     pattern_id: pattern.pattern_id.clone(),
                     detector_id: "primary".into(),
@@ -185,8 +185,8 @@ impl PILOTFailureDetector {
     }
 
     /// 集成到 SEAL pipeline
-    pub fn integrate_seal(&self) -> SEALIntegrationResult {
-        SEALIntegrationResult {
+    pub(crate) fn _integrate_seal(&self) -> _SEALIntegrationResult {
+        _SEALIntegrationResult {
             integrated: self.config.enable_seal_integration,
             phase: "Phase-0".into(),
             impact_score: 0.8,
@@ -199,7 +199,7 @@ impl PILOTFailureDetector {
     }
 
     /// 获取所有检测器
-    pub fn detectors(&self) -> &[FailureDetector] {
+    pub fn detectors(&self) -> &[_FailureDetector] {
         &self.detectors
     }
 
@@ -209,7 +209,7 @@ impl PILOTFailureDetector {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &PILOTStats {
+    pub fn stats(&self) -> &_PILOTStats {
         &self.stats
     }
 }

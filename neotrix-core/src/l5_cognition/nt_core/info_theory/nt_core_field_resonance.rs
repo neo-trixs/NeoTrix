@@ -9,17 +9,17 @@
 use serde::{Deserialize, Serialize};
 
 /// 场共振协调器
-pub struct FieldResonanceCoordinator {
-    field_components: Vec<FieldComponent>,
-    coupling_mechanisms: Vec<CouplingMechanism>,
-    coordination_states: Vec<CoordinationState>,
-    config: FieldCoordinationConfig,
-    stats: FieldCoordinationStats,
+pub(crate) struct _FieldResonanceCoordinator {
+    _field_components: Vec<_FieldComponent>,
+    _coupling_mechanisms: Vec<_CouplingMechanism>,
+    coordination_states: Vec<_CoordinationState>,
+    config: _FieldCoordinationConfig,
+    stats: _FieldCoordinationStats,
 }
 
 /// 场协调配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldCoordinationConfig {
+pub(crate) struct _FieldCoordinationConfig {
     pub propagation_speed_km_s: f64,
     pub min_entrainment_threshold: f64,
     pub enable_cross_frequency_coupling: bool,
@@ -27,7 +27,7 @@ pub struct FieldCoordinationConfig {
     pub integration_window_ms: f64,
 }
 
-impl Default for FieldCoordinationConfig {
+impl Default for _FieldCoordinationConfig {
     fn default() -> Self {
         Self {
             propagation_speed_km_s: 50.0,
@@ -41,7 +41,7 @@ impl Default for FieldCoordinationConfig {
 
 /// 场组件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldComponent {
+pub(crate) struct _FieldComponent {
     pub component_id: String,
     pub component_type: FieldType,
     pub spatial_extent: f64,
@@ -62,9 +62,9 @@ pub enum FieldType {
 
 /// 耦合机制
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CouplingMechanism {
+pub(crate) struct _CouplingMechanism {
     pub mechanism_id: String,
-    pub coupling_type: CouplingType,
+    pub coupling_type: _CouplingType,
     pub source_frequency: f64,
     pub target_frequency: f64,
     pub coupling_strength: f64,
@@ -74,7 +74,7 @@ pub struct CouplingMechanism {
 /// 耦合类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum CouplingType {
+pub(crate) enum _CouplingType {
     PhaseAmplitude,     // 相位-振幅耦合
     FrequencyFrequency, // 频率-频率耦合
     PhasePhase,         // 相位-相位耦合
@@ -83,7 +83,7 @@ pub enum CouplingType {
 
 /// 协调状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoordinationState {
+pub(crate) struct _CoordinationState {
     pub state_id: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub field_coherence: f64,
@@ -94,7 +94,7 @@ pub struct CoordinationState {
 
 /// 场协调统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldCoordinationStats {
+pub(crate) struct _FieldCoordinationStats {
     pub total_components: u64,
     pub active_components: u64,
     pub total_couplings: u64,
@@ -105,7 +105,7 @@ pub struct FieldCoordinationStats {
 
 /// 全脑整合结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WholeBrainIntegration {
+pub(crate) struct _WholeBrainIntegration {
     pub integration_achieved: bool,
     pub integration_time_ms: f64,
     pub coherence_level: f64,
@@ -113,15 +113,15 @@ pub struct WholeBrainIntegration {
     pub consciousness_emergent: bool,
 }
 
-impl FieldResonanceCoordinator {
+impl _FieldResonanceCoordinator {
     /// 创建新的场共振协调器
     pub fn new() -> Self {
         Self {
-            field_components: Vec::new(),
-            coupling_mechanisms: Vec::new(),
+            _field_components: Vec::new(),
+            _coupling_mechanisms: Vec::new(),
             coordination_states: Vec::new(),
-            config: FieldCoordinationConfig::default(),
-            stats: FieldCoordinationStats {
+            config: _FieldCoordinationConfig::default(),
+            stats: _FieldCoordinationStats {
                 total_components: 0,
                 active_components: 0,
                 total_couplings: 0,
@@ -133,41 +133,41 @@ impl FieldResonanceCoordinator {
     }
 
     /// 添加场组件
-    pub fn add_field_component(&mut self, component: FieldComponent) {
-        self.field_components.push(component);
+    pub(crate) fn _add_field_component(&mut self, component: _FieldComponent) {
+        self._field_components.push(component);
         self.stats.total_components += 1;
     }
 
     /// 添加耦合机制
-    pub fn add_coupling_mechanism(&mut self, mechanism: CouplingMechanism) {
-        self.coupling_mechanisms.push(mechanism);
+    pub(crate) fn _add_coupling_mechanism(&mut self, mechanism: _CouplingMechanism) {
+        self._coupling_mechanisms.push(mechanism);
         self.stats.total_couplings += 1;
     }
 
     /// 计算全脑整合时间
-    pub fn calculate_integration_time(&self, brain_volume: f64) -> f64 {
+    pub(crate) fn _calculate_integration_time(&self, brain_volume: f64) -> f64 {
         // 50 km/s 传播速度，3ms 内整合全脑
         let distance = brain_volume.cbrt(); // 立方根近似直径
         (distance / self.config.propagation_speed_km_s) * 1000.0 // 转换为 ms
     }
 
     /// 评估场协调状态
-    pub fn evaluate_coordination(&self) -> CoordinationState {
-        let active_components = self.field_components.iter().filter(|c| c.active).count();
-        let total_components = self.field_components.len();
+    pub(crate) fn _evaluate_coordination(&self) -> _CoordinationState {
+        let active_components = self._field_components.iter().filter(|c| c.active).count();
+        let total_components = self._field_components.len();
 
         let field_coherence = if total_components > 0 {
-            self.field_components.iter()
+            self._field_components.iter()
                 .map(|c| c.coherence_level)
                 .sum::<f64>() / total_components as f64
         } else {
             0.0
         };
 
-        let coupling_efficiency = if !self.coupling_mechanisms.is_empty() {
-            self.coupling_mechanisms.iter()
+        let coupling_efficiency = if !self._coupling_mechanisms.is_empty() {
+            self._coupling_mechanisms.iter()
                 .map(|m| m.coupling_strength)
-                .sum::<f64>() / self.coupling_mechanisms.len() as f64
+                .sum::<f64>() / self._coupling_mechanisms.len() as f64
         } else {
             0.0
         };
@@ -183,7 +183,7 @@ impl FieldResonanceCoordinator {
             consciousness_markers.push("widespread_activation".into());
         }
 
-        CoordinationState {
+        _CoordinationState {
             state_id: uuid::Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now(),
             field_coherence,
@@ -194,9 +194,9 @@ impl FieldResonanceCoordinator {
     }
 
     /// 执行全脑整合
-    pub fn integrate_whole_brain(&mut self) -> WholeBrainIntegration {
-        let state = self.evaluate_coordination();
-        let integration_time = self.calculate_integration_time(1400.0); // 1400 cm³ 大脑体积
+    pub(crate) fn _integrate_whole_brain(&mut self) -> _WholeBrainIntegration {
+        let state = self._evaluate_coordination();
+        let integration_time = self._calculate_integration_time(1400.0); // 1400 cm³ 大脑体积
 
         let consciousness_emergent = state.field_coherence > 0.7 &&
                                    state.coupling_efficiency > 0.6 &&
@@ -204,7 +204,7 @@ impl FieldResonanceCoordinator {
 
         self.coordination_states.push(state.clone());
 
-        WholeBrainIntegration {
+        _WholeBrainIntegration {
             integration_achieved: integration_time < 5.0,
             integration_time_ms: integration_time,
             coherence_level: state.field_coherence,
@@ -214,17 +214,17 @@ impl FieldResonanceCoordinator {
     }
 
     /// 获取所有场组件
-    pub fn field_components(&self) -> &[FieldComponent] {
-        &self.field_components
+    pub(crate) fn _field_components(&self) -> &[_FieldComponent] {
+        &self._field_components
     }
 
     /// 获取所有耦合机制
-    pub fn coupling_mechanisms(&self) -> &[CouplingMechanism] {
-        &self.coupling_mechanisms
+    pub(crate) fn _coupling_mechanisms(&self) -> &[_CouplingMechanism] {
+        &self._coupling_mechanisms
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &FieldCoordinationStats {
+    pub fn stats(&self) -> &_FieldCoordinationStats {
         &self.stats
     }
 }

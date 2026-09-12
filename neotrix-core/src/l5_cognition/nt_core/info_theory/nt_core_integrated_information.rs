@@ -9,17 +9,17 @@
 use serde::{Deserialize, Serialize};
 
 /// 整合信息量化器
-pub struct IntegratedInformationQuantifier {
+pub(crate) struct _IntegratedInformationQuantifier {
     mechanisms: Vec<Mechanism>,
     concepts: Vec<Concept>,
-    causes: Vec<CauseEffect>,
-    config: PhiConfig,
-    stats: PhiStats,
+    causes: Vec<_CauseEffect>,
+    config: _PhiConfig,
+    stats: _PhiStats,
 }
 
 /// Phi 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhiConfig {
+pub(crate) struct _PhiConfig {
     pub phi_threshold: f64,
     pub max_partitions: usize,
     pub enable_exclusion: bool,
@@ -27,7 +27,7 @@ pub struct PhiConfig {
     pub integration_depth: usize,
 }
 
-impl Default for PhiConfig {
+impl Default for _PhiConfig {
     fn default() -> Self {
         Self {
             phi_threshold: 1.0,
@@ -61,7 +61,7 @@ pub struct Concept {
 
 /// 因果关系
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CauseEffect {
+pub(crate) struct _CauseEffect {
     pub cause_effect_id: String,
     pub mechanism: String,
     pub cause_state: Vec<f64>,
@@ -73,7 +73,7 @@ pub struct CauseEffect {
 
 /// Phi 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhiStats {
+pub(crate) struct _PhiStats {
     pub total_mechanisms: u64,
     pub total_concepts: u64,
     pub total_causes: u64,
@@ -84,18 +84,18 @@ pub struct PhiStats {
 
 /// Phi 计算结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhiResult {
+pub(crate) struct _PhiResult {
     pub phi: f64,
     pub conceptual_structure: f64,
     pub cause_effect_power: f64,
     pub integrated: bool,
-    pub rank: PhiRank,
+    pub rank: _PhiRank,
 }
 
 /// Phi 排名
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PhiRank {
+pub(crate) enum _PhiRank {
     Zero,       // Φ = 0: 无意识
     Minimal,    // Φ > 0: 最小意识
     Moderate,   // Φ > 1: 中等意识
@@ -105,22 +105,22 @@ pub enum PhiRank {
 
 /// 因果分割分析
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PartitionAnalysis {
+pub(crate) struct _PartitionAnalysis {
     pub partition_type: String,
     pub information_loss: f64,
     pub integrated: bool,
     pub best_partition: String,
 }
 
-impl IntegratedInformationQuantifier {
+impl _IntegratedInformationQuantifier {
     /// 创建新的整合信息量化器
     pub fn new() -> Self {
         Self {
             mechanisms: Vec::new(),
             concepts: Vec::new(),
             causes: Vec::new(),
-            config: PhiConfig::default(),
-            stats: PhiStats {
+            config: _PhiConfig::default(),
+            stats: _PhiStats {
                 total_mechanisms: 0,
                 total_concepts: 0,
                 total_causes: 0,
@@ -132,7 +132,7 @@ impl IntegratedInformationQuantifier {
     }
 
     /// 添加机制
-    pub fn add_mechanism(&mut self, mechanism: Mechanism) {
+    pub(crate) fn _add_mechanism(&mut self, mechanism: Mechanism) {
         self.mechanisms.push(mechanism);
         self.stats.total_mechanisms += 1;
     }
@@ -144,13 +144,13 @@ impl IntegratedInformationQuantifier {
     }
 
     /// 添加因果关系
-    pub fn add_cause_effect(&mut self, cause_effect: CauseEffect) {
+    pub(crate) fn _add_cause_effect(&mut self, cause_effect: _CauseEffect) {
         self.causes.push(cause_effect);
         self.stats.total_causes += 1;
     }
 
     /// 计算 Phi 值
-    pub fn calculate_phi(&mut self) -> PhiResult {
+    pub(crate) fn _calculate_phi(&mut self) -> _PhiResult {
         let conceptual_structure = self.calculate_conceptual_structure();
         let cause_effect_power = self.calculate_cause_effect_power();
 
@@ -160,17 +160,17 @@ impl IntegratedInformationQuantifier {
         let integrated = phi >= self.config.phi_threshold;
 
         let rank = match phi {
-            f if f <= 0.0 => PhiRank::Zero,
-            f if f < 1.0 => PhiRank::Minimal,
-            f if f < 5.0 => PhiRank::Moderate,
-            f if f < 10.0 => PhiRank::High,
-            _ => PhiRank::Transcendent,
+            f if f <= 0.0 => _PhiRank::Zero,
+            f if f < 1.0 => _PhiRank::Minimal,
+            f if f < 5.0 => _PhiRank::Moderate,
+            f if f < 10.0 => _PhiRank::High,
+            _ => _PhiRank::Transcendent,
         };
 
         self.stats.phi_value = phi;
         self.stats.integrated = integrated;
 
-        PhiResult {
+        _PhiResult {
             phi,
             conceptual_structure,
             cause_effect_power,
@@ -202,11 +202,11 @@ impl IntegratedInformationQuantifier {
     }
 
     /// 分析因果分割
-    pub fn analyze_partition(&self) -> PartitionAnalysis {
+    pub(crate) fn _analyze_partition(&self) -> _PartitionAnalysis {
         let information_loss = 0.3; // 模拟信息损失
         let integrated = information_loss < 0.5;
 
-        PartitionAnalysis {
+        _PartitionAnalysis {
             partition_type: "bipartition".into(),
             information_loss,
             integrated,
@@ -225,12 +225,12 @@ impl IntegratedInformationQuantifier {
     }
 
     /// 获取所有因果关系
-    pub fn causes(&self) -> &[CauseEffect] {
+    pub fn causes(&self) -> &[_CauseEffect] {
         &self.causes
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &PhiStats {
+    pub fn stats(&self) -> &_PhiStats {
         &self.stats
     }
 }

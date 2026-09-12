@@ -20,12 +20,12 @@ pub struct Value {
     pub name: String,
     pub description: String,
     pub weight: f64,
-    pub value_type: ValueType,
+    pub value_type: _ValueType,
 }
 
 /// 价值类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ValueType {
+pub(crate) enum _ValueType {
     Ethical,
     Practical,
     Aesthetic,
@@ -70,7 +70,7 @@ impl ValueJudge {
     }
 
     /// 权衡利弊
-    pub fn weigh_pros_cons(&self, pros: &[String], cons: &[String]) -> f64 {
+    pub(crate) fn _weigh_pros_cons(&self, pros: &[String], cons: &[String]) -> f64 {
         let pros_score: f64 = pros.iter().map(|p| p.len() as f64 * 0.1).sum();
         let cons_score: f64 = cons.iter().map(|c| c.len() as f64 * 0.1).sum();
         
@@ -82,8 +82,8 @@ impl ValueJudge {
     }
 
     /// 获取统计
-    pub fn stats(&self) -> ValueStats {
-        ValueStats {
+    pub fn stats(&self) -> _ValueStats {
+        _ValueStats {
             total_values: self.values.len(),
             total_judgments: self.history.len(),
             avg_score: if self.history.is_empty() {
@@ -96,13 +96,13 @@ impl ValueJudge {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValueStats {
+pub(crate) struct _ValueStats {
     pub total_values: usize,
     pub total_judgments: usize,
     pub avg_score: f64,
 }
 
-impl std::fmt::Display for ValueStats {
+impl std::fmt::Display for _ValueStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "ValueJudge: {} values, {} judgments, avg score {:.4}",
             self.total_values, self.total_judgments, self.avg_score)

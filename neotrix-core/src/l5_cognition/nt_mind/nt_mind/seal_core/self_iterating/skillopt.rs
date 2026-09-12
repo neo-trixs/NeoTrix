@@ -41,7 +41,7 @@ pub enum LrScheduler {
 }
 
 impl LrScheduler {
-    pub fn current_budget(&self) -> usize {
+    pub(crate) fn _current_budget(&self) -> usize {
         match self {
             LrScheduler::Constant(lr) => *lr,
             LrScheduler::Cosine { max_lr, min_lr, total_steps, current } => {
@@ -116,7 +116,7 @@ impl RejectedEditBuffer {
         self.entries.iter()
     }
 
-    pub fn recent_failure_patterns(&self, n: usize) -> Vec<String> {
+    pub(crate) fn _recent_failure_patterns(&self, n: usize) -> Vec<String> {
         self.entries.iter().rev().take(n).map(|r| {
             let edit_desc: Vec<String> = r.edits.iter().map(|e| format!("{:?}", e)).collect();
             format!("[iter {}] {} (drop: {:.3})", r.iteration, edit_desc.join(", "), r.score_drop)
@@ -159,7 +159,7 @@ impl ValidationGate {
         improved
     }
 
-    pub fn score_trend(&self, window: usize) -> f64 {
+    pub(crate) fn _score_trend(&self, window: usize) -> f64 {
         let n = self.selection_history.len();
         if n < 2 {
             return 0.0;
@@ -188,7 +188,7 @@ impl BoundedEditStage { pub fn new() -> Self { Self } }
 impl BrainStage for BoundedEditStage {
     fn name(&self) -> &str { "bounded_edit" }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let budget = brain._lr_scheduler.current_budget();
+        let budget = brain._lr_scheduler._current_budget();
         let edits = brain._take_micro_edits();
 
         // ── G5 S 门控 (灵境引擎 L4「自指闭环」转译) ──
@@ -263,7 +263,7 @@ impl RejectedBufferFeedbackStage { pub fn new() -> Self { Self } }
 impl BrainStage for RejectedBufferFeedbackStage {
     fn name(&self) -> &str { "rejected_feedback" }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let patterns = brain._rejected_buffer.recent_failure_patterns(5);
+        let patterns = brain._rejected_buffer._recent_failure_patterns(5);
         if !patterns.is_empty() {
             let insights = patterns.join(" | ");
             let existing = brain._open_source_insights.clone().unwrap_or_default();
@@ -285,7 +285,7 @@ impl BrainStage for EpochSlowUpdateStage {
     fn name(&self) -> &str { "epoch_slow_update" }
     fn frequency(&self) -> usize { 10 }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let trend = brain._validation_gate.score_trend(10);
+        let trend = brain._validation_gate._score_trend(10);
         log::info!("[epoch-slow] score trend (last 10): {:.4}", trend);
         if trend < -0.05 {
             log::warn!("[epoch-slow] negative trend detected ({:.4}), consider revision", trend);

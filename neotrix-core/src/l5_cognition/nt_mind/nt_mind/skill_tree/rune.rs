@@ -126,7 +126,7 @@ impl Runeword {
     }
 
     /// 检查是否满足组合条件
-    pub fn check_active(&self, slots: &[RuneSlot]) -> bool {
+    pub(crate) fn _check_active(&self, slots: &[RuneSlot]) -> bool {
         let inserted_colors: Vec<RuneColor> = slots
             .iter()
             .filter(|s| s.occupied)
@@ -158,7 +158,7 @@ impl ModuleRunes {
         }
     }
 
-    pub fn add_runeword(&mut self, rw: Runeword) {
+    pub(crate) fn _add_runeword(&mut self, rw: Runeword) {
         self.runewords.push(rw);
     }
 
@@ -175,16 +175,16 @@ impl ModuleRunes {
     }
 
     /// 移除符文
-    pub fn remove_rune(&mut self, color: &RuneColor) {
+    pub fn _remove_rune(&mut self, color: &RuneColor) {
         if let Some(slot) = self.slots.iter_mut().find(|s| s.color == *color) {
             slot.remove();
         }
     }
 
     /// 检查所有 Runeword 并更新激活状态
-    pub fn check_runewords(&mut self) {
+    pub(crate) fn _check_runewords(&mut self) {
         for rw in &mut self.runewords {
-            rw.active = rw.check_active(&self.slots);
+            rw.active = rw._check_active(&self.slots);
         }
     }
 
@@ -198,7 +198,7 @@ impl ModuleRunes {
     }
 
     /// 获取激活的符文颜色列表
-    pub fn active_colors(&self) -> Vec<RuneColor> {
+    pub(crate) fn _active_colors(&self) -> Vec<RuneColor> {
         self.slots
             .iter()
             .filter(|s| s.occupied)
@@ -211,7 +211,7 @@ impl ModuleRunes {
         self.slots.iter().find(|s| s.color == *color)
     }
 
-    pub fn slot_mut(&mut self, color: &RuneColor) -> Option<&mut RuneSlot> {
+    pub(crate) fn _slot_mut(&mut self, color: &RuneColor) -> Option<&mut RuneSlot> {
         self.slots.iter_mut().find(|s| s.color == *color)
     }
 }
@@ -236,7 +236,7 @@ impl RuneSystem {
         self.modules.insert(id.clone(), ModuleRunes::new(id, slot_colors));
     }
 
-    pub fn add_global_runeword(&mut self, rw: Runeword) {
+    pub(crate) fn _add_global_runeword(&mut self, rw: Runeword) {
         self.global_runewords.push(rw);
     }
 
@@ -244,7 +244,7 @@ impl RuneSystem {
         self.modules.get(module_id)
     }
 
-    pub fn module_mut(&mut self, module_id: &str) -> Option<&mut ModuleRunes> {
+    pub(crate) fn _module_mut(&mut self, module_id: &str) -> Option<&mut ModuleRunes> {
         self.modules.get_mut(module_id)
     }
 
@@ -257,7 +257,7 @@ impl RuneSystem {
     ) -> Result<(), String> {
         if let Some(mod_runes) = self.modules.get_mut(module_id) {
             mod_runes.insert_rune(color, rune)?;
-            mod_runes.check_runewords();
+            mod_runes._check_runewords();
             return Ok(());
         }
         Err(format!("Module {} not found", module_id))
@@ -266,10 +266,10 @@ impl RuneSystem {
     /// 检查所有模块的 Runeword
     pub fn check_all_runewords(&mut self) {
         for mod_runes in self.modules.values_mut() {
-            mod_runes.check_runewords();
+            mod_runes._check_runewords();
         }
         for rw in &mut self.global_runewords {
-            rw.active = rw.check_active(&Vec::new());
+            rw.active = rw._check_active(&Vec::new());
         }
     }
 
@@ -290,10 +290,10 @@ impl RuneSystem {
     }
 
     /// 移除符文
-    pub fn remove_rune(&mut self, module_id: &str, color: &RuneColor) {
+    pub(crate) fn _remove_rune(&mut self, module_id: &str, color: &RuneColor) {
         if let Some(mod_runes) = self.modules.get_mut(module_id) {
-            mod_runes.remove_rune(color);
-            mod_runes.check_runewords();
+            mod_runes._remove_rune(color);
+            mod_runes._check_runewords();
         }
     }
 }
@@ -375,8 +375,8 @@ mod tests {
         let rune2 = Rune::new("r2", "Shift", RuneColor::Indigo, 0.7);
         mr.insert_rune(RuneColor::Crimson, &rune1).unwrap();
         mr.insert_rune(RuneColor::Indigo, &rune2).unwrap();
-        mr.add_runeword(rw);
-        mr.check_runewords();
+        mr._add_runeword(rw);
+        mr._check_runewords();
         assert!(mr.runewords[0].active);
         assert_eq!(mr.total_bonus(), 0.5);
     }
@@ -392,8 +392,8 @@ mod tests {
         let mut mr = ModuleRunes::new("nt-core", vec![RuneColor::Crimson, RuneColor::Indigo]);
         let rune1 = Rune::new("r1", "Fire", RuneColor::Crimson, 0.8);
         mr.insert_rune(RuneColor::Crimson, &rune1).unwrap();
-        mr.add_runeword(rw);
-        mr.check_runewords();
+        mr._add_runeword(rw);
+        mr._check_runewords();
         assert!(!mr.runewords[0].active);
         assert_eq!(mr.total_bonus(), 0.0);
     }
@@ -423,8 +423,8 @@ mod tests {
             0.5,
             "Test",
         );
-        if let Some(mod_runes) = rs.module_mut("nt-core") {
-            mod_runes.add_runeword(rw);
+        if let Some(mod_runes) = rs._module_mut("nt-core") {
+            mod_runes._add_runeword(rw);
         }
         let rune1 = Rune::new("r1", "Fire", RuneColor::Crimson, 0.8);
         let rune2 = Rune::new("r2", "Shift", RuneColor::Indigo, 0.7);
@@ -441,7 +441,7 @@ mod tests {
         let rune = Rune::new("r1", "Fire", RuneColor::Crimson, 0.8);
         rs.insert_rune("nt-core", RuneColor::Crimson, &rune).unwrap();
         assert!(rs.module("nt-core").unwrap().slot(&RuneColor::Crimson).unwrap().occupied);
-        rs.remove_rune("nt-core", &RuneColor::Crimson);
+        rs._remove_rune("nt-core", &RuneColor::Crimson);
         assert!(!rs.module("nt-core").unwrap().slot(&RuneColor::Crimson).unwrap().occupied);
     }
 
@@ -450,7 +450,7 @@ mod tests {
         let mut mr = ModuleRunes::new("nt-core", vec![RuneColor::Crimson, RuneColor::Indigo]);
         let rune1 = Rune::new("r1", "Fire", RuneColor::Crimson, 0.8);
         mr.insert_rune(RuneColor::Crimson, &rune1).unwrap();
-        let colors = mr.active_colors();
+        let colors = mr._active_colors();
         assert_eq!(colors.len(), 1);
         assert!(colors.contains(&RuneColor::Crimson));
     }

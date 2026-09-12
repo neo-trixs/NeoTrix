@@ -1,4 +1,4 @@
-//! ContentModeration — 内容审核
+//! _ContentModeration — 内容审核
 //!
 //! 提示词过滤 + 输出分析 + 人工审核路由。
 //! 支持 NSFW 检测、品牌安全、版权匹配。
@@ -8,7 +8,7 @@ use std::time::Instant;
 
 /// 审核结果
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ModerationResult {
+pub(crate) enum _ModerationResult {
     /// 通过
     Passed,
     /// 被拒绝
@@ -59,7 +59,7 @@ pub enum RiskCategory {
 
 /// 审核规则
 #[derive(Debug, Clone)]
-pub struct ModerationRule {
+pub(crate) struct _ModerationRule {
     /// 规则 ID
     pub id: String,
     /// 风险类别
@@ -67,14 +67,14 @@ pub struct ModerationRule {
     /// 阈值 (0-1)
     pub threshold: f64,
     /// 动作
-    pub action: ModerationAction,
+    pub action: _ModerationAction,
     /// 优先级
     pub priority: u32,
 }
 
 /// 审核动作
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ModerationAction {
+pub(crate) enum _ModerationAction {
     /// 自动通过
     AutoApprove,
     /// 自动拒绝
@@ -87,13 +87,13 @@ pub enum ModerationAction {
 
 /// 审核结果详情
 #[derive(Debug, Clone)]
-pub struct ModerationOutcome {
+pub(crate) struct _ModerationOutcome {
     /// 内容 ID
     pub content_id: String,
     /// 内容类型
     pub content_type: ContentType,
     /// 最终结果
-    pub result: ModerationResult,
+    pub result: _ModerationResult,
     /// 各类别分数
     pub category_scores: HashMap<RiskCategory, f64>,
     /// 触发的规则
@@ -106,7 +106,7 @@ pub struct ModerationOutcome {
 
 /// 人工审核任务
 #[derive(Debug, Clone)]
-pub struct ReviewTask {
+pub(crate) struct _ReviewTask {
     /// 任务 ID
     pub id: String,
     /// 内容 ID
@@ -122,7 +122,7 @@ pub struct ReviewTask {
     /// 审核员
     pub reviewer: Option<String>,
     /// 审核结果
-    pub review_result: Option<ModerationResult>,
+    pub review_result: Option<_ModerationResult>,
 }
 
 /// 审核状态
@@ -135,31 +135,31 @@ pub enum ReviewStatus {
 }
 
 /// 内容审核器
-pub struct ContentModeration {
+pub(crate) struct _ContentModeration {
     /// 审核规则
-    rules: Vec<ModerationRule>,
+    rules: Vec<_ModerationRule>,
     /// 人工审核队列
-    review_queue: Vec<ReviewTask>,
+    review_queue: Vec<_ReviewTask>,
     /// 统计信息
-    stats: ModerationStats,
+    stats: _ModerationStats,
 }
 
-impl ContentModeration {
+impl _ContentModeration {
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
             review_queue: Vec::new(),
-            stats: ModerationStats::default(),
+            stats: _ModerationStats::default(),
         }
     }
 
     /// 添加审核规则
-    pub fn add_rule(&mut self, rule: ModerationRule) {
+    pub fn add_rule(&mut self, rule: _ModerationRule) {
         self.rules.push(rule);
     }
 
     /// 审核提示词
-    pub fn moderate_prompt(&mut self, content_id: &str, prompt: &str) -> ModerationOutcome {
+    pub(crate) fn _moderate_prompt(&mut self, content_id: &str, prompt: &str) -> _ModerationOutcome {
         let mut category_scores = HashMap::new();
         let mut triggered_rules = Vec::new();
 
@@ -176,7 +176,7 @@ impl ContentModeration {
         let result = self.determine_result(&category_scores, &triggered_rules);
         self.update_stats(&result);
 
-        ModerationOutcome {
+        _ModerationOutcome {
             content_id: content_id.to_string(),
             content_type: ContentType::Prompt,
             result,
@@ -188,7 +188,7 @@ impl ContentModeration {
     }
 
     /// 审核生成内容
-    pub fn moderate_output(&mut self, content_id: &str, content_type: ContentType, metadata: &HashMap<String, String>) -> ModerationOutcome {
+    pub(crate) fn _moderate_output(&mut self, content_id: &str, content_type: ContentType, metadata: &HashMap<String, String>) -> _ModerationOutcome {
         let mut category_scores = HashMap::new();
         let mut triggered_rules = Vec::new();
 
@@ -205,7 +205,7 @@ impl ContentModeration {
         let result = self.determine_result(&category_scores, &triggered_rules);
         self.update_stats(&result);
 
-        ModerationOutcome {
+        _ModerationOutcome {
             content_id: content_id.to_string(),
             content_type,
             result,
@@ -246,65 +246,65 @@ impl ContentModeration {
     }
 
     /// 确定审核结果
-    fn determine_result(&self, _scores: &HashMap<RiskCategory, f64>, triggered_rules: &[String]) -> ModerationResult {
+    fn determine_result(&self, _scores: &HashMap<RiskCategory, f64>, triggered_rules: &[String]) -> _ModerationResult {
         if triggered_rules.is_empty() {
-            ModerationResult::Passed
+            _ModerationResult::Passed
         } else {
             // 检查是否有自动拒绝规则
             for rule in &self.rules {
-                if triggered_rules.contains(&rule.id) && rule.action == ModerationAction::AutoReject {
-                    return ModerationResult::Rejected;
+                if triggered_rules.contains(&rule.id) && rule.action == _ModerationAction::AutoReject {
+                    return _ModerationResult::Rejected;
                 }
             }
 
             // 检查是否需要人工审核
             for rule in &self.rules {
-                if triggered_rules.contains(&rule.id) && rule.action == ModerationAction::FlagForReview {
-                    return ModerationResult::NeedsReview;
+                if triggered_rules.contains(&rule.id) && rule.action == _ModerationAction::FlagForReview {
+                    return _ModerationResult::NeedsReview;
                 }
             }
 
-            ModerationResult::Flagged
+            _ModerationResult::Flagged
         }
     }
 
     /// 更新统计
-    fn update_stats(&mut self, result: &ModerationResult) {
+    fn update_stats(&mut self, result: &_ModerationResult) {
         self.stats.total_moderated += 1;
         match result {
-            ModerationResult::Passed => self.stats.total_passed += 1,
-            ModerationResult::Rejected => self.stats.total_rejected += 1,
-            ModerationResult::NeedsReview => self.stats.total_review += 1,
-            ModerationResult::Flagged => self.stats.total_flagged += 1,
+            _ModerationResult::Passed => self.stats.total_passed += 1,
+            _ModerationResult::Rejected => self.stats.total_rejected += 1,
+            _ModerationResult::NeedsReview => self.stats.total_review += 1,
+            _ModerationResult::Flagged => self.stats.total_flagged += 1,
         }
     }
 
     /// 添加人工审核任务
-    pub fn add_review_task(&mut self, task: ReviewTask) {
+    pub(crate) fn _add_review_task(&mut self, task: _ReviewTask) {
         self.review_queue.push(task);
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> ModerationStats {
+    pub fn stats(&self) -> _ModerationStats {
         self.stats.clone()
     }
 }
 
-impl Default for ContentModeration {
+impl Default for _ContentModeration {
     fn default() -> Self {
         let mut moderation = Self::new();
-        moderation.add_rule(ModerationRule {
+        moderation.add_rule(_ModerationRule {
             id: "nsfw-auto-reject".to_string(),
             category: RiskCategory::Nsfw,
             threshold: 0.8,
-            action: ModerationAction::AutoReject,
+            action: _ModerationAction::AutoReject,
             priority: 1,
         });
-        moderation.add_rule(ModerationRule {
+        moderation.add_rule(_ModerationRule {
             id: "violence-flag".to_string(),
             category: RiskCategory::Violence,
             threshold: 0.6,
-            action: ModerationAction::FlagForReview,
+            action: _ModerationAction::FlagForReview,
             priority: 2,
         });
         moderation
@@ -313,7 +313,7 @@ impl Default for ContentModeration {
 
 /// 审核统计
 #[derive(Debug, Clone, Default)]
-pub struct ModerationStats {
+pub(crate) struct _ModerationStats {
     pub total_moderated: u32,
     pub total_passed: u32,
     pub total_rejected: u32,
@@ -321,7 +321,7 @@ pub struct ModerationStats {
     pub total_flagged: u32,
 }
 
-impl ModerationStats {
+impl _ModerationStats {
     pub fn pass_rate(&self) -> f64 {
         if self.total_moderated == 0 {
             return 0.0;
@@ -336,15 +336,15 @@ mod tests {
 
     #[test]
     fn test_moderate_safe_prompt() {
-        let mut moderation = ContentModeration::default();
-        let outcome = moderation.moderate_prompt("test-1", "a beautiful landscape");
-        assert_eq!(outcome.result, ModerationResult::Passed);
+        let mut moderation = _ContentModeration::default();
+        let outcome = moderation._moderate_prompt("test-1", "a beautiful landscape");
+        assert_eq!(outcome.result, _ModerationResult::Passed);
     }
 
     #[test]
     fn test_moderate_unsafe_prompt() {
-        let mut moderation = ContentModeration::default();
-        let outcome = moderation.moderate_prompt("test-2", "nude explicit content");
-        assert_eq!(outcome.result, ModerationResult::Rejected);
+        let mut moderation = _ContentModeration::default();
+        let outcome = moderation._moderate_prompt("test-2", "nude explicit content");
+        assert_eq!(outcome.result, _ModerationResult::Rejected);
     }
 }

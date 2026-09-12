@@ -11,7 +11,7 @@ pub use crate::core::nt_core_narrative_types::{SegmentType, SegmentData};
 // 节段分配结果
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AllocatedSegment {
+pub(crate) struct _AllocatedSegment {
     pub r#type: SegmentType,
     pub allocated_length: f32,
     pub content_priority: f32,
@@ -41,13 +41,13 @@ pub const SERIES_10COL_RATIOS: [[f32; 4]; 10] = [
 // ============================================================================
 // 核心重算函数
 
-pub fn recalculate_rhythm_segments(
+pub(crate) fn _recalculate_rhythm_segments(
     default_duration: f32,
     target_duration: f32,
     segments: &[SegmentData],
-) -> Vec<AllocatedSegment> {
+) -> Vec<_AllocatedSegment> {
     let ratio = target_duration / default_duration;
-    segments.iter().map(|seg| AllocatedSegment {
+    segments.iter().map(|seg| _AllocatedSegment {
         r#type: seg.r#type,
         allocated_length: seg.base_length * ratio.powf(0.8),
         content_priority: seg.content_priority,
@@ -56,7 +56,7 @@ pub fn recalculate_rhythm_segments(
     }).collect()
 }
 
-pub fn generate_default_segments(default_duration: f32) -> Vec<SegmentData> {
+pub(crate) fn _generate_default_segments(default_duration: f32) -> Vec<SegmentData> {
     let ratios = DEFAULT_SEGMENT_RATIOS;
     let total_ratio: f32 = ratios.iter().sum();
     (0..ratios.len())
@@ -74,7 +74,7 @@ pub fn generate_default_segments(default_duration: f32) -> Vec<SegmentData> {
         .collect()
 }
 
-pub fn generate_quick_segments(default_duration: f32) -> Vec<SegmentData> {
+pub(crate) fn _generate_quick_segments(default_duration: f32) -> Vec<SegmentData> {
     let ratios = QUICK_SEGMENT_RATIOS;
     let total_ratio: f32 = ratios.iter().sum();
     (0..ratios.len())
@@ -94,7 +94,7 @@ pub fn generate_quick_segments(default_duration: f32) -> Vec<SegmentData> {
 // ============================================================================
 // 系列剧节奏布局
 
-pub fn get_series_segment_raters(episode: usize) -> [f32; 4] {
+pub(crate) fn _get_series_segment_raters(episode: usize) -> [f32; 4] {
     if episode > 0 && episode <= 10 {
         SERIES_10COL_RATIOS[episode - 1]
     } else {
@@ -105,7 +105,7 @@ pub fn get_series_segment_raters(episode: usize) -> [f32; 4] {
 // ============================================================================
 // 验证与工具
 
-pub fn validate_segments(segments: &[SegmentData], total_duration: f32) -> bool {
+pub(crate) fn _validate_segments(segments: &[SegmentData], total_duration: f32) -> bool {
     let allocated_total: f32 = segments.iter().map(|s| s.base_length).sum();
     let tolerance = 0.1;
     let length_ok = (allocated_total - total_duration).abs() / total_duration < tolerance;
@@ -113,11 +113,11 @@ pub fn validate_segments(segments: &[SegmentData], total_duration: f32) -> bool 
     length_ok && content_ok
 }
 
-pub fn get_core_scuang_index(segments: &[SegmentData]) -> Option<usize> {
+pub(crate) fn _get_core_scuang_index(segments: &[SegmentData]) -> Option<usize> {
     segments.iter().position(|s| s.is_core_scuang)
 }
 
-pub fn check_emotion_beat_interval(segments: &[SegmentData], _total_duration: f32) -> bool {
+pub(crate) fn _check_emotion_beat_interval(segments: &[SegmentData], _total_duration: f32) -> bool {
     let core_count = segments.iter().filter(|s| s.is_core_scuang).count();
     if core_count == 0 {
         return false;
@@ -145,7 +145,7 @@ mod tests {
             SegmentData { r#type: SegmentType::Climax, base_length: 80.0, content_priority: 1.0, is_core_scuang: true },
         ];
         
-        let allocated = recalculate_rhythm_segments(default_dur, target_dur, &segments);
+        let allocated = _recalculate_rhythm_segments(default_dur, target_dur, &segments);
         assert_eq!(allocated.len(), 3);
         let expected_factor = (target_dur / default_dur).powf(0.8);
         assert!(allocated[0].allocated_length > 0.0);
@@ -155,7 +155,7 @@ mod tests {
     
     #[test]
     fn test_generate_default_segments() {
-        let segments = generate_default_segments(240.0);
+        let segments = _generate_default_segments(240.0);
         assert_eq!(segments.len(), 4);
         let total: f32 = segments.iter().map(|s| s.base_length).sum();
         assert!((total - 240.0).abs() / 240.0 < 0.1);
@@ -168,7 +168,7 @@ mod tests {
     
     #[test]
     fn test_quick_segments() {
-        let segments = generate_quick_segments(180.0);
+        let segments = _generate_quick_segments(180.0);
         assert_eq!(segments.len(), 3);
         let total: f32 = segments.iter().map(|s| s.base_length).sum();
         assert!((total - 180.0).abs() / 180.0 < 0.1);
@@ -182,7 +182,7 @@ mod tests {
             SegmentData { r#type: SegmentType::Conflict, base_length: 80.0, content_priority: 1.0, is_core_scuang: false },
             SegmentData { r#type: SegmentType::Climax, base_length: 100.0, content_priority: 1.0, is_core_scuang: true },
         ];
-        assert!(validate_segments(&segments, 240.0));
+        assert!(_validate_segments(&segments, 240.0));
     }
     
     #[test]
@@ -192,14 +192,14 @@ mod tests {
             SegmentData { r#type: SegmentType::Climax, base_length: 80.0, content_priority: 1.0, is_core_scuang: true },
             SegmentData { r#type: SegmentType::Transition, base_length: 70.0, content_priority: 0.5, is_core_scuang: false },
         ];
-        let idx = get_core_scuang_index(&segments);
+        let idx = _get_core_scuang_index(&segments);
         assert_eq!(idx, Some(1));
     }
     
     #[test]
     fn test_series_ratios() {
         for i in 1..=10 {
-            let ratios = get_series_segment_raters(i);
+            let ratios = _get_series_segment_raters(i);
             let total: f32 = ratios.iter().sum();
             assert!((total - 1.0).abs() < 0.001, "Episode {} ratios sum to {}", i, total);
         }
@@ -212,6 +212,6 @@ mod tests {
             SegmentData { r#type: SegmentType::Climax, base_length: 80.0, content_priority: 1.0, is_core_scuang: true },
             SegmentData { r#type: SegmentType::Transition, base_length: 60.0, content_priority: 0.6, is_core_scuang: false },
         ];
-        assert!(check_emotion_beat_interval(&segments, 200.0));
+        assert!(_check_emotion_beat_interval(&segments, 200.0));
     }
 }

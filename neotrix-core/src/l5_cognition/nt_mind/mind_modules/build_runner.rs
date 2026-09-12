@@ -1,4 +1,4 @@
-//! BuildRunner — 统一 cargo 工具层 (GAP-4 修复, 设计文档 L1/L2/L3 分层映射)。
+//! _BuildRunner — 统一 cargo 工具层 (GAP-4 修复, 设计文档 L1/L2/L3 分层映射)。
 //!
 //! 设计文档 "Rust 多智能体自审计系统" 的确定性工具层在本项目落地为分层 cargo 调用:
 //! - L1 Fast: check / clippy / fmt --check / test --lib / tree / metadata (秒级, 每次可用)
@@ -8,7 +8,7 @@
 //! 相比既有散落调用 (behavioral_verifier::run_bounded / AutoFixer::cargo_check /
 //! self_audit d42 / safe_applier / nt_shield::audit), 本模块统一:
 //! 1. 超时 + kill (防 cargo 构建锁/网络挂起卡死持有全局锁的后台 handler)
-//! 2. 证据收集 (exit/errors/warnings/stdout/stderr → 结构化 BuildEvidence)
+//! 2. 证据收集 (exit/errors/warnings/stdout/stderr → 结构化 _BuildEvidence)
 //! 3. Denylist gate (fail-closed 阻断破坏性 cargo 子命令: publish/vendor/install)
 //!
 //! 设计约束对齐: Deterministic Tools First — 工具层只用确定性 CLI, 不引入 LLM 语义推理。
@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 
 /// 工具层 — 映射设计文档 L1/L2/L3。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum BuildLayer {
+pub(crate) enum _BuildLayer {
     /// L1 快速确定性层 — check/clippy/fmt/test/tree/metadata
     Fast,
     /// L2 审计层 — audit/deny/outdated (安全 + 供应链)
@@ -29,7 +29,7 @@ pub enum BuildLayer {
     Heavy,
 }
 
-impl BuildLayer {
+impl _BuildLayer {
     pub fn label(self) -> &'static str {
         match self {
             Self::Fast => "L1-fast",
@@ -51,8 +51,8 @@ const DENYLISTED_SUBCOMMANDS: &[&str] = &["publish", "install", "vendor", "clean
 
 /// 构建结果证据 — 结构化收集 (exit/计数/输出), 供调用方作为 R-P9/R-P16 双验证证据。
 #[derive(Debug, Clone)]
-pub struct BuildEvidence {
-    pub layer: BuildLayer,
+pub(crate) struct _BuildEvidence {
+    pub layer: _BuildLayer,
     pub tool: String,
     pub args: Vec<String>,
     pub exit_code: Option<i32>,
@@ -64,7 +64,7 @@ pub struct BuildEvidence {
     pub duration_ms: u64,
 }
 
-impl BuildEvidence {
+impl _BuildEvidence {
     pub fn success(&self) -> bool {
         !self.timed_out && self.exit_code == Some(0) && self.error_count == 0
     }
@@ -89,14 +89,14 @@ impl BuildEvidence {
 
 /// 统一 cargo 构建执行器。
 #[derive(Debug, Clone)]
-pub struct BuildRunner {
+pub(crate) struct _BuildRunner {
     /// 默认超时秒数 (L1 短, L2/L3 长)。
     pub timeout_secs: u64,
     /// 工作目录 (None = 进程当前目录)。
     pub workdir: Option<std::path::PathBuf>,
 }
 
-impl Default for BuildRunner {
+impl Default for _BuildRunner {
     fn default() -> Self {
         Self {
             timeout_secs: 300,
@@ -105,12 +105,12 @@ impl Default for BuildRunner {
     }
 }
 
-impl BuildRunner {
+impl _BuildRunner {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn with_workdir<P: AsRef<Path>>(mut self, dir: P) -> Self {
+    pub(crate) fn _with_workdir<P: AsRef<Path>>(mut self, dir: P) -> Self {
         self.workdir = Some(dir.as_ref().to_path_buf());
         self
     }
@@ -126,23 +126,23 @@ impl BuildRunner {
     }
 
     /// 运行一个构建工具 (layer 从工具名推断)。
-    pub fn run(&self, tool: &str, extra_args: &[&str]) -> Result<BuildEvidence, String> {
+    pub fn run(&self, tool: &str, extra_args: &[&str]) -> Result<_BuildEvidence, String> {
         let layer = if L1_TOOLS.contains(&tool) {
-            BuildLayer::Fast
+            _BuildLayer::Fast
         } else if L2_TOOLS.contains(&tool) {
-            BuildLayer::Audit
+            _BuildLayer::Audit
         } else if L3_TOOLS.contains(&tool) {
-            BuildLayer::Heavy
+            _BuildLayer::Heavy
         } else {
             // 未知工具拒绝执行 (Deterministic Tools First: 只跑已知确定性工具)
             return Err(format!(
-                "BuildRunner: unknown cargo tool '{tool}' (must be in L1/L2/L3)"
+                "_BuildRunner: unknown cargo tool '{tool}' (must be in L1/L2/L3)"
             ));
         };
         let timeout = match layer {
-            BuildLayer::Fast => self.timeout_secs.min(180),
-            BuildLayer::Audit => self.timeout_secs,
-            BuildLayer::Heavy => self.timeout_secs.max(600),
+            _BuildLayer::Fast => self.timeout_secs.min(180),
+            _BuildLayer::Audit => self.timeout_secs,
+            _BuildLayer::Heavy => self.timeout_secs.max(600),
         };
         self.run_internal(layer, tool, extra_args, timeout)
     }
@@ -150,17 +150,17 @@ impl BuildRunner {
     /// 完整执行: 超时 kill + 证据收集。
     fn run_internal(
         &self,
-        layer: BuildLayer,
+        layer: _BuildLayer,
         tool: &str,
         extra_args: &[&str],
         timeout_secs: u64,
-    ) -> Result<BuildEvidence, String> {
+    ) -> Result<_BuildEvidence, String> {
         let start = Instant::now();
 
         // Denylist gate (fail-closed)
         if Self::is_blocked(tool) {
             return Err(format!(
-                "BuildRunner: tool '{tool}' is on the destructive denylist — blocked (fail-closed)"
+                "_BuildRunner: tool '{tool}' is on the destructive denylist — blocked (fail-closed)"
             ));
         }
 
@@ -220,7 +220,7 @@ impl BuildRunner {
                 let all = format!("{stdout}\n{stderr}");
                 let error_count = all.matches("error[").count() + all.matches("error:").count();
                 let warning_count = all.matches("warning:").count();
-                Ok(BuildEvidence {
+                Ok(_BuildEvidence {
                     layer,
                     tool: tool.to_string(),
                     args: extra_args.iter().map(|s| s.to_string()).collect(),
@@ -239,7 +239,7 @@ impl BuildRunner {
                     let _ = g.kill();
                     let _ = g.wait();
                 }
-                Ok(BuildEvidence {
+                Ok(_BuildEvidence {
                     layer,
                     tool: tool.to_string(),
                     args: extra_args.iter().map(|s| s.to_string()).collect(),
@@ -262,16 +262,16 @@ mod tests {
 
     #[test]
     fn denylist_blocks_destructive() {
-        assert!(BuildRunner::is_blocked("publish"));
-        assert!(BuildRunner::is_blocked("install"));
-        assert!(BuildRunner::is_blocked("vendor"));
-        assert!(!BuildRunner::is_blocked("check"));
-        assert!(!BuildRunner::is_blocked("test"));
+        assert!(_BuildRunner::is_blocked("publish"));
+        assert!(_BuildRunner::is_blocked("install"));
+        assert!(_BuildRunner::is_blocked("vendor"));
+        assert!(!_BuildRunner::is_blocked("check"));
+        assert!(!_BuildRunner::is_blocked("test"));
     }
 
     #[test]
     fn unknown_tool_rejected() {
-        let r = BuildRunner::new();
+        let r = _BuildRunner::new();
         let res = r.run("totally-bogus-tool", &[]);
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("unknown"));
@@ -289,16 +289,16 @@ mod tests {
             return;
         }
         assert_eq!(
-            BuildRunner::new().run("check", &["--lib"]).map(|e| e.layer),
-            Ok(BuildLayer::Fast)
+            _BuildRunner::new().run("check", &["--lib"]).map(|e| e.layer),
+            Ok(_BuildLayer::Fast)
         );
         assert_eq!(
-            BuildRunner::new().run("audit", &[]).map(|e| e.layer),
-            Ok(BuildLayer::Audit)
+            _BuildRunner::new().run("audit", &[]).map(|e| e.layer),
+            Ok(_BuildLayer::Audit)
         );
         assert_eq!(
-            BuildRunner::new().run("llvm-cov", &[]).map(|e| e.layer),
-            Ok(BuildLayer::Heavy)
+            _BuildRunner::new().run("llvm-cov", &[]).map(|e| e.layer),
+            Ok(_BuildLayer::Heavy)
         );
     }
 
@@ -313,7 +313,7 @@ mod tests {
             log::info!("skipped: set NT_E2E_CARGO=1 to run real-cargo evidence collection");
             return;
         }
-        let runner = BuildRunner::new().with_timeout(300);
+        let runner = _BuildRunner::new().with_timeout(300);
         match runner.run("check", &["--lib"]) {
             Ok(ev) => {
                 assert!(!ev.timed_out);
@@ -326,8 +326,8 @@ mod tests {
 
     #[test]
     fn summary_format() {
-        let ev = BuildEvidence {
-            layer: BuildLayer::Fast,
+        let ev = _BuildEvidence {
+            layer: _BuildLayer::Fast,
             tool: "check".into(),
             args: vec!["--lib".into()],
             exit_code: Some(0),

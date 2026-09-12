@@ -20,17 +20,17 @@ impl PredictiveCortex {
         }
     }
 
-    pub fn with_horizon(mut self, horizon: usize) -> Self {
+    pub(crate) fn _with_horizon(mut self, horizon: usize) -> Self {
         self.horizon = horizon;
         self
     }
 
-    pub fn with_n_samples(mut self, n: usize) -> Self {
+    pub(crate) fn _with_n_samples(mut self, n: usize) -> Self {
         self.n_samples = n;
         self
     }
 
-    pub fn with_action_dim(mut self, dim: usize) -> Self {
+    pub(crate) fn _with_action_dim(mut self, dim: usize) -> Self {
         self.action_dim = dim;
         self
     }
@@ -117,7 +117,7 @@ impl PredictiveCortex {
         })
     }
 
-    pub fn reset_quality_tracking(&mut self) {
+    pub(crate) fn _reset_quality_tracking(&mut self) {
         self.forecast_quality = 1.0;
         self.consecutive_degradations = 0;
     }
@@ -343,7 +343,7 @@ mod tests {
         }
         assert!(cortex.forecast_quality < 0.5);
 
-        cortex.reset_quality_tracking();
+        cortex._reset_quality_tracking();
         assert!((cortex.forecast_quality - 1.0).abs() < 1e-6);
         assert_eq!(cortex.consecutive_degradations, 0);
     }

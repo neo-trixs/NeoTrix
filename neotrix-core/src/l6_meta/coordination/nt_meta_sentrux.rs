@@ -4,7 +4,7 @@
 //! - 5 个根因指标: modularity, acyclicity, depth, equality, redundancy
 //! - 连续质量分数 0-10000
 //! - 规则引擎: 约束定义 + CI 强制
-//! - MCP 集成: 9 个工具 (scan, health, session_start, session_end, rescan, check_rules, evolution, dsm, test_gaps)
+//! - MCP 集成: 9 个工具 (scan, health, session_start, session_end, rescan, _check_rules, evolution, dsm, test_gaps)
 //! - Treemap 可视化: 实时依赖图
 //! - Quality Gate: 会话前后对比检测退化
 
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// Sentrux 传感器 — 架构质量监控核心
 pub struct SentruxSensor {
-    rules: RulesEngine,
+    rules: _RulesEngine,
     baseline: Option<QualitySnapshot>,
     #[allow(dead_code)]
     history: Vec<QualitySnapshot>,
@@ -20,10 +20,10 @@ pub struct SentruxSensor {
 
 /// 规则引擎
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RulesEngine {
+pub(crate) struct _RulesEngine {
     pub constraints: Constraints,
-    pub layers: Vec<LayerRule>,
-    pub boundaries: Vec<BoundaryRule>,
+    pub layers: Vec<_LayerRule>,
+    pub boundaries: Vec<_BoundaryRule>,
 }
 
 /// 约束
@@ -37,7 +37,7 @@ pub struct Constraints {
 
 /// 层规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayerRule {
+pub(crate) struct _LayerRule {
     pub name: String,
     pub paths: Vec<String>,
     pub order: u32,
@@ -45,7 +45,7 @@ pub struct LayerRule {
 
 /// 边界规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BoundaryRule {
+pub(crate) struct _BoundaryRule {
     pub from: String,
     pub to: String,
     pub reason: String,
@@ -112,7 +112,7 @@ impl SentruxSensor {
     /// 创建新的传感器
     pub fn new() -> Self {
         Self {
-            rules: RulesEngine {
+            rules: _RulesEngine {
                 constraints: Constraints {
                     max_cycles: 0,
                     max_coupling: "B".into(),
@@ -142,7 +142,7 @@ impl SentruxSensor {
             + metrics.equality + metrics.redundancy)
             / 5.0 * 10000.0) as u32;
 
-        let violations = self.check_rules(path)?;
+        let violations = self._check_rules(path)?;
 
         Ok(QualitySnapshot {
             score,
@@ -155,7 +155,7 @@ impl SentruxSensor {
     }
 
     /// 检查规则
-    pub fn check_rules(&self, _path: &str) -> Result<Vec<QualityViolation>, String> {
+    pub(crate) fn _check_rules(&self, _path: &str) -> Result<Vec<QualityViolation>, String> {
         let mut violations = Vec::new();
 
         // 检查循环依赖
@@ -174,12 +174,12 @@ impl SentruxSensor {
     }
 
     /// 保存 baseline
-    pub fn save_baseline(&mut self, snapshot: QualitySnapshot) {
+    pub(crate) fn _save_baseline(&mut self, snapshot: QualitySnapshot) {
         self.baseline = Some(snapshot);
     }
 
     /// 比较当前与 baseline
-    pub fn compare_with_baseline(&self, current: &QualitySnapshot) -> Option<SessionComparison> {
+    pub(crate) fn _compare_with_baseline(&self, current: &QualitySnapshot) -> Option<SessionComparison> {
         self.baseline.as_ref().map(|baseline| {
             let delta = current.score as i64 - baseline.score as i64;
             let passed = delta >= 0;
@@ -199,7 +199,7 @@ impl SentruxSensor {
     }
 
     /// MCP 工具: scan
-    pub fn mcp_scan(&self, path: &str) -> McpToolResult {
+    pub(crate) fn _mcp_scan(&self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(snapshot) => McpToolResult {
                 tool: "scan".into(),
@@ -219,10 +219,10 @@ impl SentruxSensor {
     }
 
     /// MCP 工具: session_start
-    pub fn mcp_session_start(&mut self, path: &str) -> McpToolResult {
+    pub(crate) fn _mcp_session_start(&mut self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(snapshot) => {
-                self.save_baseline(snapshot.clone());
+                self._save_baseline(snapshot.clone());
                 McpToolResult {
                     tool: "session_start".into(),
                     output: serde_json::json!({
@@ -241,10 +241,10 @@ impl SentruxSensor {
     }
 
     /// MCP 工具: session_end
-    pub fn mcp_session_end(&self, path: &str) -> McpToolResult {
+    pub(crate) fn _mcp_session_end(&self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(current) => {
-                let comparison = self.compare_with_baseline(&current);
+                let comparison = self._compare_with_baseline(&current);
                 McpToolResult {
                     tool: "session_end".into(),
                     output: serde_json::json!({
@@ -264,13 +264,13 @@ impl SentruxSensor {
         }
     }
 
-    /// MCP 工具: check_rules
-    pub fn mcp_check_rules(&self, path: &str) -> McpToolResult {
-        match self.check_rules(path) {
+    /// MCP 工具: _check_rules
+    pub(crate) fn _mcp_check_rules(&self, path: &str) -> McpToolResult {
+        match self._check_rules(path) {
             Ok(violations) => {
                 let passed = violations.is_empty();
                 McpToolResult {
-                    tool: "check_rules".into(),
+                    tool: "_check_rules".into(),
                     output: serde_json::json!({
                         "pass": passed,
                         "violations": violations,
@@ -279,7 +279,7 @@ impl SentruxSensor {
                 }
             }
             Err(e) => McpToolResult {
-                tool: "check_rules".into(),
+                tool: "_check_rules".into(),
                 output: serde_json::json!({"error": e}),
                 success: false,
             },

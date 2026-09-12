@@ -38,7 +38,7 @@ impl CapabilityElement {
         &self.capability
     }
 
-    pub fn vector_mut(&mut self) -> &mut CapabilityVector {
+    pub(crate) fn _vector_mut(&mut self) -> &mut CapabilityVector {
         &mut self.capability
     }
 }
@@ -135,7 +135,7 @@ mod tests {
         el.absorb(KnowledgeSource::HeroUI);
         let v = el.vector();
         assert_eq!(v.arr.len(), 23);
-        let vm = el.vector_mut();
+        let vm = el._vector_mut();
         vm.arr[0] = 0.99;
         assert!((el.capability.arr[0] - 0.99).abs() < 1e-10);
     }
