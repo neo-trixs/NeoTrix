@@ -4,6 +4,7 @@ use crate::game::weather::Weather;
 use crate::game::inventory::Inventory;
 use crate::game::npc::Position;
 use once_cell::sync::Lazy;
+use std::fs;
 use std::sync::Mutex;
 
 static GAME_STATE: Lazy<Mutex<Option<GameLoop>>> = Lazy::new(|| Mutex::new(None));
@@ -264,4 +265,53 @@ pub fn game_tick(dt: f32) -> Result<String, String> {
 pub fn cleanup() {
     let mut state = GAME_STATE.lock().unwrap();
     *state = None;
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct SaveData {
+    pub snapshot: GameSnapshot,
+    pub inventory: InventorySnapshot,
+    pub farm: Vec<FarmPlotSnapshot>,
+    pub npcs: Vec<NpcSnapshot>,
+    pub tick: u64,
+    pub timestamp: u64,
+}
+
+pub fn save_game_to_file(slot: u32) -> Result<String, String> {
+    let snapshot = get_game_snapshot()?;
+    let inventory = get_inventory_snapshot()?;
+    let farm = get_farm_snapshot()?;
+    let npcs = get_npc_snapshot()?;
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let state = GAME_STATE.lock().map_err(|e| e.to_string())?;
+    let game = state.as_ref().ok_or("Game not initialized")?;
+
+    let data = SaveData {
+        snapshot,
+        inventory,
+        farm,
+        npcs,
+        tick: game.tick_count,
+        timestamp,
+    };
+
+    let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    let path = format!("save_slot_{}.json", slot);
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+
+    Ok(format!("Saved to {}", path))
+}
+
+pub fn load_game_from_file(slot: u32) -> Result<String, String> {
+    let path = format!("save_slot_{}.json", slot);
+    let json = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let _data: SaveData = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+
+    // TODO: Restore game state from data
+    Ok(format!("Loaded from {}", path))
 }

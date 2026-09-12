@@ -10,6 +10,11 @@ pub mod farming;
 pub mod crafting;
 pub mod weather;
 pub mod game_loop;
+pub mod quest;
+pub mod events;
+pub mod economy;
+pub mod shopping;
+pub mod artisan;
 
 pub use time::{GameTime, Season, TimeOfDay};
 pub use inventory::{Inventory, InventorySlot};
@@ -18,3 +23,6 @@ pub use farming::{CropTile, CropState, FarmingSystem};
 pub use crafting::{CraftingRecipe, CraftingRegistry};
 pub use weather::{Weather, WeatherType, WeatherSystem};
 pub use game_loop::{GameLoop, GameState, GameAction};
+pub use economy::Economy;
+pub use shopping::{Shop, ShopItem, ShippingBin};
+pub use artisan::{ArtisanMachine, MachineType, ArtisanWorkshop};

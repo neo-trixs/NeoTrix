@@ -9,6 +9,7 @@ members = [
     "crates/nt-lang",
     "neotrix-sim",
     "nt-world-sim",
+    "nt-world-sim/src-tauri",
 ]
 
 resolver = "2"

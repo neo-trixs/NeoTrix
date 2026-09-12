@@ -1,17 +1,10 @@
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{params, Connection};
 use uuid::Uuid;
 
 use super::nt_memory_types::*;
-
-fn now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
-}
+use super::shared_utils::{now, row_to_knowledge_node, NODE_COLUMNS};
 
 /// 归一化标题: 小写 + 去标点/空白, 用于跨阶段去重 (digest_sample 与 ingest_causal_graph
 /// 对同一外部概念可能因 url/标题不同而双写 Concept 节点, 归一化后可识别近似重复)。
@@ -266,29 +259,7 @@ pub fn find_node_by_title_and_type(conn: &Connection, title: &str, node_type: &N
     )?;
     let mut rows = stmt.query(params![title, node_type.as_str()])?;
     match rows.next()? {
-        Some(row) => Ok(Some(KnowledgeNode {
-            id: row.get(0)?,
-            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-            title: row.get(2)?,
-            summary: row.get(3)?,
-            content: row.get(4)?,
-            url: row.get(5)?,
-            domain: row.get(6)?,
-            language: row.get(7)?,
-            confidence: row.get(8)?,
-            importance: row.get(9)?,
-            recall_weight: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-            access_count: row.get(13)?,
-            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
-            temporal: None,
-            supersedes: row.get(15)?,
-            source_episode: None,
-            parent_id: row.get(16)?,
-            depth: row.get(17)?,
-            cluster_id: row.get(18)?,
-        })),
+        Some(row) => Ok(Some(row_to_knowledge_node(&row)?)),
         None => Ok(None),
     }
 }
@@ -306,29 +277,7 @@ pub(crate) fn find_node_by_norm_title_and_type(
     )?;
     let mut rows = stmt.query(params![norm_title, node_type.as_str()])?;
     match rows.next()? {
-        Some(row) => Ok(Some(KnowledgeNode {
-            id: row.get(0)?,
-            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-            title: row.get(2)?,
-            summary: row.get(3)?,
-            content: row.get(4)?,
-            url: row.get(5)?,
-            domain: row.get(6)?,
-            language: row.get(7)?,
-            confidence: row.get(8)?,
-            importance: row.get(9)?,
-            recall_weight: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-            access_count: row.get(13)?,
-            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
-            temporal: None,
-            supersedes: row.get(15)?,
-            source_episode: None,
-            parent_id: row.get(16)?,
-            depth: row.get(17)?,
-            cluster_id: row.get(18)?,
-        })),
+        Some(row) => Ok(Some(row_to_knowledge_node(&row)?)),
         None => Ok(None),
     }
 }
@@ -385,29 +334,7 @@ pub fn find_node_by_url(conn: &Connection, url: &str) -> rusqlite::Result<Option
     )?;
     let mut rows = stmt.query(params![url])?;
     match rows.next()? {
-        Some(row) => Ok(Some(KnowledgeNode {
-            id: row.get(0)?,
-            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-            title: row.get(2)?,
-            summary: row.get(3)?,
-            content: row.get(4)?,
-            url: row.get(5)?,
-            domain: row.get(6)?,
-            language: row.get(7)?,
-            confidence: row.get(8)?,
-            importance: row.get(9)?,
-            recall_weight: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-            access_count: row.get(13)?,
-            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
-            temporal: None,
-            supersedes: row.get(15)?,
-            source_episode: None,
-            parent_id: row.get(16)?,
-            depth: row.get(17)?,
-            cluster_id: row.get(18)?,
-        })),
+        Some(row) => Ok(Some(row_to_knowledge_node(&row)?)),
         None => Ok(None),
     }
 }
@@ -866,29 +793,7 @@ pub(crate) fn get_nodes_in_cluster(conn: &Connection, cluster_id: &str) -> rusql
          FROM nodes WHERE cluster_id=?1 ORDER BY depth, title",
     )?;
     let rows = stmt.query_map(params![cluster_id], |row| {
-        Ok(KnowledgeNode {
-            id: row.get(0)?,
-            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-            title: row.get(2)?,
-            summary: row.get(3)?,
-            content: row.get(4)?,
-            url: row.get(5)?,
-            domain: row.get(6)?,
-            language: row.get(7)?,
-            confidence: row.get(8)?,
-            importance: row.get(9)?,
-            recall_weight: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-            access_count: row.get(13)?,
-            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
-            temporal: None,
-            supersedes: row.get(15)?,
-            source_episode: None,
-            parent_id: row.get(16)?,
-            depth: row.get(17)?,
-            cluster_id: row.get(18)?,
-        })
+        row_to_knowledge_node(row)
     })?;
     let mut nodes = Vec::new();
     for row in rows {
@@ -905,29 +810,7 @@ pub(crate) fn get_node_children(conn: &Connection, parent_id: &str) -> rusqlite:
          FROM nodes WHERE parent_id=?1 ORDER BY depth, title",
     )?;
     let rows = stmt.query_map(params![parent_id], |row| {
-        Ok(KnowledgeNode {
-            id: row.get(0)?,
-            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-            title: row.get(2)?,
-            summary: row.get(3)?,
-            content: row.get(4)?,
-            url: row.get(5)?,
-            domain: row.get(6)?,
-            language: row.get(7)?,
-            confidence: row.get(8)?,
-            importance: row.get(9)?,
-            recall_weight: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-            access_count: row.get(13)?,
-            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
-            temporal: None,
-            supersedes: row.get(15)?,
-            source_episode: None,
-            parent_id: row.get(16)?,
-            depth: row.get(17)?,
-            cluster_id: row.get(18)?,
-        })
+        row_to_knowledge_node(row)
     })?;
     let mut nodes = Vec::new();
     for row in rows {
@@ -988,29 +871,7 @@ pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlit
         "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes, parent_id, depth, cluster_id FROM nodes ORDER BY rowid LIMIT ?1 OFFSET ?2"
     )?;
     let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
-        Ok(KnowledgeNode {
-            id: row.get(0)?,
-            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-            title: row.get(2)?,
-            summary: row.get(3)?,
-            content: row.get(4)?,
-            url: row.get(5)?,
-            domain: row.get(6)?,
-            language: row.get(7)?,
-            confidence: row.get(8)?,
-            importance: row.get(9)?,
-            recall_weight: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-            access_count: row.get(13)?,
-            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
-            temporal: None,
-            supersedes: row.get(15)?,
-            source_episode: None,
-            parent_id: row.get(16)?,
-            depth: row.get(17)?,
-            cluster_id: row.get(18)?,
-        })
+        row_to_knowledge_node(row)
     })?;
     let mut nodes = Vec::with_capacity(limit.min(4096));
     for row in rows {
@@ -1047,29 +908,7 @@ pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeNode>> 
         "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes, parent_id, depth, cluster_id FROM nodes"
     )?;
     let rows = stmt.query_map([], |row| {
-        Ok(KnowledgeNode {
-            id: row.get(0)?,
-            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-            title: row.get(2)?,
-            summary: row.get(3)?,
-            content: row.get(4)?,
-            url: row.get(5)?,
-            domain: row.get(6)?,
-            language: row.get(7)?,
-            confidence: row.get(8)?,
-            importance: row.get(9)?,
-            recall_weight: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-            access_count: row.get(13)?,
-            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
-            temporal: None,
-            supersedes: row.get(15)?,
-            source_episode: None,
-            parent_id: row.get(16)?,
-            depth: row.get(17)?,
-            cluster_id: row.get(18)?,
-        })
+        row_to_knowledge_node(row)
     })?;
     let mut nodes = Vec::new();
     for row in rows {

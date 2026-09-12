@@ -9,15 +9,9 @@ use uuid::Uuid;
 
 use super::nt_memory_store::*;
 use super::nt_memory_types::*;
+use super::shared_utils::now;
 
 use super::nt_memory_cortex_sync::enrich_cortex_metadata;
-
-fn now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
-}
 
 #[derive(Debug, Clone)]
 pub(crate) enum ResourceSource {
