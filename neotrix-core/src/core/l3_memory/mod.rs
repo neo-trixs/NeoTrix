@@ -8,6 +8,14 @@
 //! - L3 不验证数据真实性（那是 L2 的工作）
 //! - 四层记忆梯度不可逆
 
+pub mod nt_core_graph;
+pub mod nt_core_hcube;
+pub mod nt_core_knowledge;
+pub mod nt_core_kron;
+pub mod nt_core_walsh;
+pub mod nt_core_memory_budget;
+pub mod nt_core_vector_store;
+
 pub use crate::core::nt_core_bank as bank;
 pub use crate::core::nt_core_hcube as hcube;
 

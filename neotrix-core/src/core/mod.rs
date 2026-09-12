@@ -48,9 +48,14 @@ pub use l2_perception::nt_core_sense;
 // ═══════════════════════════════════════════════════════════════════
 pub mod l3_memory;
 pub mod nt_core_bank;
- pub mod nt_core_knowledge;
- pub mod nt_core_kron;
- pub mod nt_core_walsh;
+// These modules live in l3_memory/ — re-export from there
+pub use l3_memory::nt_core_graph;
+pub use l3_memory::nt_core_hcube;
+pub use l3_memory::nt_core_knowledge;
+pub use l3_memory::nt_core_kron;
+pub use l3_memory::nt_core_walsh;
+pub use l3_memory::nt_core_memory_budget;
+pub use l3_memory::nt_core_vector_store;
 
 // ═══════════════════════════════════════════════════════════════════
 // L4 — 认知层 (Cognition)
