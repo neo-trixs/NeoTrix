@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::core::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
-use crate::core::nt_core_error_parse::{self, CompilerDiagnostic, DiagnosticSeverity};
+use crate::core::nt_core_error::parse::{self, CompilerDiagnostic, DiagnosticSeverity};
 
 /// 自愈快照 — 修复前记录文件原内容作为 ∂Γ inverse (写回原状)。
 pub(crate) struct _HealSnapshot {
@@ -303,14 +303,14 @@ impl AutoFixer {
 
     /// 解析 cargo check 输出 → 按错误码生成修复建议 (NT-REPAIR 经验库接线)。
     ///
-    /// 把 `nt_core_error_parse` 的解析 + `suggest_fix` 映射暴露给生产修复路径,
+    /// 把 `parse` 的解析 + `suggest_fix` 映射暴露给生产修复路径,
     /// 使编译错误从"仅检测"升级为"可执行修复指引" (T3 生产接线)。
     pub(crate) fn _suggest_fixes_from_output(output: &str) -> Vec<(String, String, String)> {
-        let diags = nt_core_error_parse::parse_compiler_output(output);
+        let diags = parse::parse_compiler_output(output);
         diags
             .iter()
             .filter_map(|d| {
-                nt_core_error_parse::suggest_fix(d).map(|f| {
+                parse::suggest_fix(d).map(|f| {
                     (f.code, f.action.to_string(), f.guidance.clone())
                 })
             })
@@ -328,7 +328,7 @@ impl AutoFixer {
             message: String::new(),
             span_text: None,
         };
-        nt_core_error_parse::suggest_fix(&d).map(|f| (f.action.to_string(), f.guidance.clone()))
+        parse::suggest_fix(&d).map(|f| (f.action.to_string(), f.guidance.clone()))
     }
 }
 

@@ -63,14 +63,7 @@ pub mod nt_world_semantic_extract;
 // 资产测绘系统
 pub mod asset_map;
 
-// NLP能力模块
-pub mod nt_nlp_capability;
-pub mod nt_nlp_regex;
-pub mod nt_nlp_similarity;
-pub mod nt_nlp_detect;
-pub mod nt_nlp_keyword;
-pub mod nt_nlp_tokenizer;
-pub mod nt_nlp_sentiment;
+
 
 // 通用能力模块
 pub mod media_asset_registry;

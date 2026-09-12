@@ -5,8 +5,7 @@ pub mod nt_world_sense {
     pub use crate::l2_perception::nt_world::nt_world_sense::*;
 }
 
-// 计算机视觉模块
-pub mod nt_sense_cv;
+
 
 
 

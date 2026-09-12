@@ -104,18 +104,6 @@ pub(crate) fn load_embedding_map(
     Ok(map)
 }
 
-/// 余弦相似度
-// pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-//     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-//     let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-//     let nb: f32 = b.iter().map(|y| y * y).sum::<f32>().sqrt();
-//     if na * nb > 0.0 {
-//         (dot / (na * nb)) as f64
-//     } else {
-//         0.0
-//     }
-// }
-
 /// 语义搜索：找到与指定节点最相似的 K 个节点
 pub fn semantic_search(
     conn: &Connection,
@@ -124,7 +112,7 @@ pub fn semantic_search(
     min_sim: f64,
 ) -> Result<Vec<SearchResult>, String> {
     let embs = load_embedding_map(conn, 256)?;
-    let _target_vec = embs
+    let target_vec = embs
         .get(target_id)
         .ok_or_else(|| format!("node {target_id} has no embedding"))?;
 
@@ -138,12 +126,14 @@ pub fn semantic_search(
         .filter_map(|r| r.ok())
         .collect();
 
+    use crate::l1_action::nt_memory::shared_utils::cosine_similarity;
+
     let mut results: Vec<SearchResult> = embs
         .iter()
         .filter(|(nid, _)| nid.as_str() != target_id)
-        .map(|(nid, _vec)| SearchResult {
+        .map(|(nid, vec)| SearchResult {
             node_id: nid.clone(),
-            similarity: 0.0, // TODO: compute cosine_similarity
+            similarity: cosine_similarity(target_vec, vec),
             title: titles.get(nid).cloned().unwrap_or_default(),
         })
         .filter(|r| r.similarity >= min_sim)
