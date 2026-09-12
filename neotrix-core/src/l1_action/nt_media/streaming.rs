@@ -17,6 +17,7 @@
 //! └──────────────────────────────────────────────────────────────────┘
 //! ```
 
+use super::auth::{AuthConfig, CookieJar};
 use super::detect::{self, MediaKind};
 use super::router::{self, TransportType};
 use crate::l1_action::nt_io::nt_io_http_factory;
@@ -80,6 +81,7 @@ pub struct PipelineConfig {
     pub proxy: Option<String>,
     pub timeout: Duration,
     pub chunk_size: usize,
+    pub auth: Option<AuthConfig>,
 }
 
 impl Default for PipelineConfig {
@@ -94,6 +96,7 @@ impl Default for PipelineConfig {
             proxy: None,
             timeout: Duration::from_secs(30),
             chunk_size: 256 * 1024,
+            auth: None,
         }
     }
 }

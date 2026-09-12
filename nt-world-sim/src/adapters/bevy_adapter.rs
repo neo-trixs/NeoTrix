@@ -1,4 +1,4 @@
-use crate::core::{UniversalEntity, UniversalWorld, EntityId, ArchetypeId};
+use crate::core::{UniversalEntity, UniversalWorld, Component, EntityId, ArchetypeId};
 
 pub trait ExternalEntity: Send + Sync + 'static {
     fn index(&self) -> u32;

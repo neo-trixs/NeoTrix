@@ -41,6 +41,7 @@ pub mod acp_cmds;
 pub mod chain_cmds;
 pub mod pool_health_cmds;
 pub mod game_cmds;
+pub mod media_cmds;
 
 pub use types::*;
 pub use bench_cmds::*;
@@ -77,3 +78,4 @@ pub use acp_cmds::*;
 pub use chain_cmds::*;
 pub use pool_health_cmds::*;
 pub use game_cmds::*;
+pub use media_cmds::*;

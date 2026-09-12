@@ -167,6 +167,7 @@ pub fn create_stardew_valley_game() -> GameEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codegen::{CodeGenerator, EntityDef, GameDefinition};
 
     #[test]
     fn test_ecs() {
