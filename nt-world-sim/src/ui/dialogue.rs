@@ -173,7 +173,8 @@ mod tests {
 
     #[test]
     fn test_render_some_when_visible() {
-        let db = make_dialogue();
+        let mut db = make_dialogue();
+        db.text_progress = "Hello, traveler.".len() as u32;
         let result = db.render();
         assert!(result.is_some());
         let (rect, speaker, text, _) = result.unwrap();

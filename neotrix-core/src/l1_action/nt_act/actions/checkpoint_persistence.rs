@@ -235,7 +235,7 @@ impl CheckpointPersistence {
                     operation_time_ms: start.elapsed().as_millis() as u64,
                 },
             }
-        } else if let Some(meta) = self.index.get(checkpoint_id) {
+        } else if let Some(_meta) = self.index.get(checkpoint_id) {
             // 文件不存在但索引中有记录 — 数据不一致
             CheckpointResult {
                 success: false,

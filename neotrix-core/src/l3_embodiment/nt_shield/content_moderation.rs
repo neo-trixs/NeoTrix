@@ -245,21 +245,24 @@ impl _ContentModeration {
 
         // 基于内容类型的基础风险
         risk += match content_type {
-            ContentType::Code => 0.1,        // 代码有执行风险
-            ContentType::Text => 0.05,        // 纯文本风险低
-            ContentType::Data => 0.15,        // 数据可能含敏感信息
-            ContentType::Media => 0.2,        // 媒体内容审核更难
-            _ => 0.1,
+            ContentType::Prompt => 0.05,
+            ContentType::GeneratedImage => 0.2,
+            ContentType::GeneratedVideo => 0.25,
+            ContentType::Audio => 0.15,
+            ContentType::Text => 0.05,
         };
 
         // 基于风险类别的调整
         risk += match category {
-            RiskCategory::Safety => 0.3,      // 安全类内容高风险
-            RiskCategory::Privacy => 0.25,    // 隐私类中高风险
-            RiskCategory::Ethics => 0.2,      // 伦理类中等风险
-            RiskCategory::Legal => 0.15,      // 法律类中低风险
-            RiskCategory::Quality => 0.05,    // 质量类低风险
-            _ => 0.1,
+            RiskCategory::Nsfw => 0.3,
+            RiskCategory::Violence => 0.25,
+            RiskCategory::Hate => 0.2,
+            RiskCategory::Harassment => 0.2,
+            RiskCategory::SelfHarm => 0.3,
+            RiskCategory::Copyright => 0.15,
+            RiskCategory::BrandSafety => 0.1,
+            RiskCategory::Misinformation => 0.15,
+            RiskCategory::PrivacyViolation => 0.25,
         };
 
         // 检查元数据中的风险信号

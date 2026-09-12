@@ -28,6 +28,7 @@ pub trait AudioBackend: Send + Sync {
 pub struct AudioManager {
     backends: Vec<Box<dyn AudioBackend>>,
     loaded_sounds: HashMap<String, AudioHandle>,
+    #[allow(dead_code)]
     next_handle: u32,
     master_volume: f32,
     music_volume: f32,

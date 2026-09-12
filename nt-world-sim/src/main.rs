@@ -16,6 +16,7 @@ struct Velocity {
 impl Component for Velocity {}
 
 struct GameTime {
+    #[allow(dead_code)]
     delta: f32,
     elapsed: f32,
 }

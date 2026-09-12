@@ -20,6 +20,7 @@ impl PathNode {
 #[derive(Clone)]
 struct OpenNode {
     node: PathNode,
+    #[allow(dead_code)]
     g_score: i32,
     f_score: i32,
 }
@@ -149,10 +150,12 @@ mod tests {
 
     #[test]
     fn test_astar_no_path() {
-        // Two-wide wall blocks all movement
+        // Two-wide wall blocks all movement within a bounded grid
         let walls: std::collections::HashSet<(i32, i32)> =
             (0..10).flat_map(|y| [(5, y), (6, y)]).collect();
-        let walkable = |x: i32, y: i32| !walls.contains(&(x, y));
+        let walkable = |x: i32, y: i32| {
+            x >= 0 && y >= 0 && x < 10 && y < 10 && !walls.contains(&(x, y))
+        };
 
         let path = astar(
             PathNode::new(0, 5),

@@ -1,4 +1,4 @@
-use crate::core::{UniversalWorld, Resource};
+use crate::core::UniversalWorld;
 use crate::core::scheduler::{ParallelScheduler, UniversalSystem, SystemDependency};
 use crate::engine::renderer::{CanvasRenderer, Camera, Color, Renderer};
 use crate::engine::physics::{SimplePhysicsWorld, PhysicsWorld};
@@ -72,7 +72,7 @@ impl GameBuilder {
 
     /// Build the game engine (consumes builder)
     pub fn build(self) -> BuiltGame {
-        let mut world = UniversalWorld::new();
+        let world = UniversalWorld::new();
         let mut renderer = CanvasRenderer::new(self.width as f32, self.height as f32);
         renderer.clear(self.background_color);
 

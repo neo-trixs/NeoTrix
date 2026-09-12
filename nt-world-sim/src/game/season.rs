@@ -3,6 +3,7 @@ use super::time::Season;
 pub struct SeasonEffects {
     growth_modifier: f32,
     spawn_modifier: f32,
+    #[allow(dead_code)]
     weather_weights: [f32; 4],
 }
 
