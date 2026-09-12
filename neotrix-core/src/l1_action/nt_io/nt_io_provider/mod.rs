@@ -20,7 +20,7 @@ pub use catalog::{discovery, free_catalog, provider_catalog, registry};
 pub use common::{factory, generation_classifier, privacy_guard, types};
 pub use health::{circuit_breaker, compaction, context_budget, rate_limiter, rate_profiles};
 pub use pool::{account_pool, free_pool, provider_pool};
-pub use routing::{failover_history, provider_swap};
+pub use routing::provider_swap;
 
 // Re-export key types at module level
 pub use gateway::{
@@ -30,10 +30,10 @@ pub use gateway::{
     CapabilityRouter,
     InferenceRouter, RouterConfig,
 };
-pub use gateway::universal_adapter::*;
-pub use gateway::unified_inference::*;
-pub use gateway::search_router::*;
-pub use gateway::free_providers::*;
+pub use gateway::execution::universal_adapter::*;
+pub use gateway::execution::unified_inference::*;
+pub use gateway::routing::search_router::*;
+pub use gateway::routing::free_providers::*;
 pub use catalog::{
     find_by_capabilities, find_by_capabilities_in_category,
     keyless_providers, lookup_provider, providers_by_category, providers_with_key,

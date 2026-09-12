@@ -8,6 +8,9 @@
 //! - L6 可修改 L4 的策略参数（通过 L7 能力调度）
 //! - L6 向 L9 提供自我报告用于元认知
 
+// --- L6 子模块 ---
+pub mod nt_core_self_model;
+
 pub use crate::core::nt_core_self as self_model;
 
 pub use crate::core::nt_core_self::affective_interface::{

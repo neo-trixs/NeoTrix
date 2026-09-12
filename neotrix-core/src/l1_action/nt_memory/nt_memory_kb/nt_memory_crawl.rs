@@ -1007,7 +1007,7 @@ pub fn ingest_geo_cities(
         if existing.contains(&title) {
             continue;
         }
-        let node_id = store::insert_or_get_node_rows(
+        let node_id = store::insert_or_get_node(
             &tx,
             &title,
             NodeType::Resource,
@@ -1054,7 +1054,7 @@ pub fn ingest_geo_cities(
 /// 支持 `file://` 本地路径与 HTTP URL (zip 需先解压为 txt)。
 /// 列索引: 0=geonameid, 1=name, 4=lat, 5=lng, 6=featureClass, 7=featureCode, 8=country, 15=elevation
 ///
-/// 只摄取 T 类峰点; 复用 cities 管线的 BATCH 事务模式 (insert_or_get_node_rows 无内部事务)。
+/// 只摄取 T 类峰点; 复用 cities 管线的 BATCH 事务模式 (insert_or_get_node 无内部事务)。
 /// node_id = geo:peak:{geonameid} (用 geonameid 保证唯一, 避免同名山峰覆盖)。
 pub fn ingest_geo_peaks(
     conn: &mut Connection,
@@ -1130,7 +1130,7 @@ pub fn ingest_geo_peaks(
             continue;
         }
         let title = format!("{} ({})", name, country);
-        store::insert_or_get_node_rows(
+        store::insert_or_get_node(
             &tx,
             &title,
             NodeType::Resource,
@@ -1434,7 +1434,7 @@ pub fn ingest_geo_airports(
         }
         let title = format!("{} ({})", name, ident);
         let elev_m = if elev_ft != 0.0 { (elev_ft * 0.3048) as i64 } else { 0 };
-        store::insert_or_get_node_rows(
+        store::insert_or_get_node(
             &tx,
             &title,
             NodeType::Resource,
@@ -1617,7 +1617,7 @@ pub fn ingest_geo_boundaries(
             if level == "admin1" { "省/州" } else { "国家" },
             name
         );
-        store::insert_or_get_node_rows(
+        store::insert_or_get_node(
             &tx,
             &title,
             NodeType::Resource,

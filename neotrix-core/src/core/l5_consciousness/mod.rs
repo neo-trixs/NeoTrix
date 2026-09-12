@@ -8,6 +8,10 @@
 //! - 在各专家模块间广播显著信息 (GWT)，支持共鸣路由
 //! - 由 L8 自主进化层驱动反馈，L6 自我层观察
 
+// --- L5 子模块 ---
+pub mod nt_core_consciousness_core;
+pub mod nt_core_consciousness_tree;
+
 // --- 子模块转发别名 ---
 pub use crate::core::nt_core_consciousness as conscious;
 pub use crate::core::nt_core_context as context;

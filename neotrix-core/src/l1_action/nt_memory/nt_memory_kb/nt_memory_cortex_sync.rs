@@ -903,6 +903,7 @@ mod tests {
         .map_err(|e| e.to_string())?;
         insert_or_get_node(
             &conn, "live", NodeType::from_str("article"), Some("s"), Some("zimid://live/2"), Some("d"),
+            false,
         )
         .map_err(|e| e.to_string())?;
         // dry-run 先计数

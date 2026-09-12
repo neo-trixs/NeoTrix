@@ -8,6 +8,10 @@
 //! - L8 可读取 L3 和 L7，但不可直接修改推理状态
 //! - L8 的输出通过 L7 的 Capability 机制提交
 
+// --- L8 子模块 ---
+pub mod nt_core_self_test;
+pub mod nt_core_self_test_integration;
+
 pub use crate::core::nt_core_iter as iter;
 pub use crate::core::nt_core_iter::self_ref_code::{
     CodeMutation, MutationRequest, MutationResult, MutationRisk, MutationType, RollbackPlan,
