@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use crate::l1_action::nt_io::nt_io_provider::health::circuit_breaker::CircuitBreaker;
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
 use crate::l1_action::nt_io::nt_io_provider::health::rate_limiter::RateLimiter;
-use super::GatewayV2;
+use super::super::GatewayV2;
 
 // ═══════════════════════════════════════════════════════════════════
 // Auto Exacto 周期重估注册表 (R-P79 生产接线)

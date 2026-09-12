@@ -108,7 +108,7 @@ impl EventBus {
                     use std::io::Write;
                     // 隐私脱敏挂载点: 落盘前净化 secrets/PII (R-P42 强化 nt_shield 节点)。
                     // 用 JSON 感知脱敏 — 只替换字符串值, 不破坏数值/结构 (R-P86 类教训)。
-                    let redacted = crate::l3_embodiment::nt_shield::core::redaction::redact_json_line(&line);
+                    let redacted = crate::l3_embodiment::nt_shield::shield_core::redaction::redact_json_line(&line);
                     let _ = writeln!(file, "{}", redacted);
                 }
             }

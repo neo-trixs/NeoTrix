@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 
 use crate::l1_action::nt_io::nt_io_provider/common::generation_classifier::{GenerationRecord, LlmPurpose, TaskType};
-use super::GatewayV2;
+use super::super::GatewayV2;
 use super::*;
 
 // ═══════════════════════════════════════════════════════════════════

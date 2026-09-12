@@ -4,10 +4,10 @@ use std::sync::Mutex;
 use crate::cli::approval::{ActionType, ApprovalEngine, ApprovalMode};
 use crate::cli::sandbox::{SandboxEnforcer, SandboxMode};
 use crate::cli::laws::{LawViolation, ProjectLaws};
-use crate::l3_embodiment::nt_shield::core::guard::{GuardDecision, SecurityGuard};
-use crate::l3_embodiment::nt_shield::core::guardrails::{GuardrailConfig, GuardrailSystem};
-use crate::l3_embodiment::nt_shield::core::perm_chain::{PermissionChain, PermissionMode, PermissionResult};
-use crate::l3_embodiment::nt_shield::core::policy::{ActionPolicy, PolicyDecision};
+use crate::l3_embodiment::nt_shield::shield_core::guard::{GuardDecision, SecurityGuard};
+use crate::l3_embodiment::nt_shield::shield_core::guardrails::{GuardrailConfig, GuardrailSystem};
+use crate::l3_embodiment::nt_shield::shield_core::perm_chain::{PermissionChain, PermissionMode, PermissionResult};
+use crate::l3_embodiment::nt_shield::shield_core::policy::{ActionPolicy, PolicyDecision};
 use crate::l3_embodiment::nt_shield::defense::unified_defense::UnifiedDefenseLayer;
 
 /// G4: 安全审计结果
@@ -268,7 +268,7 @@ impl ShieldEnforcer {
     }
 
     /// Get pending guard requests.
-    pub fn pending_guard_requests(&self) -> Vec<crate::l3_embodiment::nt_shield::core::guard::GuardRequest> {
+    pub fn pending_guard_requests(&self) -> Vec<crate::l3_embodiment::nt_shield::shield_core::guard::GuardRequest> {
         self.guard.pending_requests()
     }
 
@@ -458,7 +458,7 @@ mod tests {
             s.resolve_guard_request(&req.id, GuardDecision::AllowedOnce);
         }
         // Add policy rule for file_read
-        s.policy.add_rule("file_read", crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::Allow);
+        s.policy.add_rule("file_read", crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Allow);
         let result = s.check_all("file_read", "/tmp/test.txt", None, None);
         assert!(result.is_ok(), "read within project should be allowed");
     }
@@ -476,7 +476,7 @@ mod tests {
         // Use file_read — SecurityGuard auto-allows within project root
         s.guard.set_project_root("/tmp");
         // Add policy rule for file_read
-        s.policy.add_rule("file_read", crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::Allow);
+        s.policy.add_rule("file_read", crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Allow);
         // Bypass ApprovalEngine
         s.set_approval_mode(ApprovalMode::FullAuto);
         // Enable read-only sandbox — should block even reads
@@ -608,7 +608,7 @@ mod tests {
         };
         // Use file_read — SecurityGuard auto-allows within project root
         s.guard.set_project_root("/tmp");
-        s.policy.add_rule("file_read", crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::Allow);
+        s.policy.add_rule("file_read", crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Allow);
         s.set_approval_mode(ApprovalMode::FullAuto);
         // Guardrail blocks long input
         let result = s.check_all("file_read", "/tmp/test.txt", Some("very long input that exceeds the limit"), None);
@@ -624,7 +624,7 @@ mod tests {
         if let Err(req) = s.guard.check("file_read", "/project/src/lib.rs") {
             s.resolve_guard_request(&req.id, GuardDecision::AllowedOnce);
         }
-        s.policy.add_rule("file_read", crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::Allow);
+        s.policy.add_rule("file_read", crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Allow);
         s.set_approval_mode(ApprovalMode::FullAuto);
         let result = s.check_all("file_read", "/project/src/lib.rs", None, None);
         assert!(result.is_ok(), "full chain should allow clean read");
@@ -648,7 +648,7 @@ mod tests {
         if let Err(req) = s.guard.check("file_write", "/project/test.txt") {
             s.resolve_guard_request(&req.id, GuardDecision::AllowedOnce);
         }
-        s.policy.add_rule("file_write", crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::Allow);
+        s.policy.add_rule("file_write", crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Allow);
         let action = ActionType::FileWrite { path: "/project/test.txt".into(), content_preview: "data".into() };
         let result = s.check_all("file_write", "/project/test.txt", None, Some(&action));
         assert!(result.is_err(), "approval should block in suggest mode");
@@ -661,9 +661,9 @@ mod tests {
         if let Err(req) = s.guard.check("file_write", "/project/test.txt") {
             s.resolve_guard_request(&req.id, GuardDecision::AllowedOnce);
         }
-        s.policy.add_rule("file_write", crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::Allow);
+        s.policy.add_rule("file_write", crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Allow);
         s.set_approval_mode(ApprovalMode::FullAuto);
-        s.set_perm_chain_mode(crate::l3_embodiment::nt_shield::core::perm_chain::PermissionMode::BypassPermissions);
+        s.set_perm_chain_mode(crate::l3_embodiment::nt_shield::shield_core::perm_chain::PermissionMode::BypassPermissions);
         let action = ActionType::FileWrite { path: "/project/test.txt".into(), content_preview: "data".into() };
         let result = s.check_all("file_write", "/project/test.txt", None, Some(&action));
         assert!(result.is_ok(), "approval should allow in FullAuto mode: {:?}", result);
