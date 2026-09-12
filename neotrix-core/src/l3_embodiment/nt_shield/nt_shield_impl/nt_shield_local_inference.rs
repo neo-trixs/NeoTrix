@@ -34,6 +34,10 @@
 
 // 子模块已迁移到 nt_io_inference (l1_action/nt_io/nt_io_inference/)
 // 保留对新位置的 re-export 以维持向后兼容
+pub use crate::l1_action::nt_io::nt_io_inference::{
+    quantization_engine, kv_cache_optimizer, inference_runtime,
+    model_selector, apple_silicon, speculative_decoding,
+};
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};

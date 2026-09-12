@@ -939,32 +939,7 @@ impl QuantizationEngine {
         
         rules
     }
-}
 
-/// Auto-quantize recommendation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AutoQuantRecommendation {
-    pub model_path: String,
-    pub architecture: String,
-    pub parameter_count: u64,
-    pub is_moe: bool,
-    pub recommended_quant: String,
-    pub quant_format: String,
-    pub memory_estimate_gb: f64,
-    pub quality_loss: f64,
-    pub mixed_precision_rules: Vec<MixedPrecisionRule>,
-    pub flash_attention: bool,
-    pub kv_cache_quant: String,
-}
-
-/// Mixed-precision quantization rule (gguf-org/quantizer concept)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MixedPrecisionRule {
-    pub tensor_pattern: String,
-    pub quant_type: String,
-    pub description: String,
-}
-    
     /// Select best quantization format for model and hardware
     pub fn select_best_quantization(
         &self,
@@ -1042,7 +1017,32 @@ pub struct MixedPrecisionRule {
             quality_loss: 0.003,
         }
     }
-    
+}
+
+/// Auto-quantize recommendation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoQuantRecommendation {
+    pub model_path: String,
+    pub architecture: String,
+    pub parameter_count: u64,
+    pub is_moe: bool,
+    pub recommended_quant: String,
+    pub quant_format: String,
+    pub memory_estimate_gb: f64,
+    pub quality_loss: f64,
+    pub mixed_precision_rules: Vec<MixedPrecisionRule>,
+    pub flash_attention: bool,
+    pub kv_cache_quant: String,
+}
+
+/// Mixed-precision quantization rule (gguf-org/quantizer concept)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MixedPrecisionRule {
+    pub tensor_pattern: String,
+    pub quant_type: String,
+    pub description: String,
+}
+
 /// TurboQuant KV cache configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _TurboQuantConfig {

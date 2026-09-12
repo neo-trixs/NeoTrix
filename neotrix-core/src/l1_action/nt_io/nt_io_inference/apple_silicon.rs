@@ -252,7 +252,6 @@ impl AppleSiliconOptimizer {
             warnings: vec![],
         }
     }
-}
     
     /// Check if MLX backend is available (requires 32GB+)
     pub fn _mlx_available(&self) -> bool {
