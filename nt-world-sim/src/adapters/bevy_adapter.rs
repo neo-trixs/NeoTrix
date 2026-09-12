@@ -46,13 +46,6 @@ impl ExternalPlugin for NullPlugin {
 mod tests {
     use super::*;
 
-    #[derive(Clone)]
-    struct TestComponent {
-        value: i32,
-    }
-
-    impl ExternalComponent for TestComponent {}
-
     struct TestEntity {
         idx: u32,
         gen: u32,

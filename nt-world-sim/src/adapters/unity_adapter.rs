@@ -1,5 +1,5 @@
 use std::any::TypeId;
-use crate::core::{UniversalEntity, EntityId, ArchetypeId, Component};
+use crate::core::{UniversalEntity, EntityId, ArchetypeId};
 
 pub struct UnityAdapter;
 
@@ -14,10 +14,6 @@ impl UnityAdapter {
 
     pub fn to_unity_entity(entity: UniversalEntity) -> (i32, i32) {
         (entity.id.0 as i32, entity.generation as i32)
-    }
-
-    pub fn map_component<T: Component>(component: T) -> Box<dyn Component> {
-        Box::new(component)
     }
 
     pub fn to_unity_query(required: &[TypeId], excluded: &[TypeId]) -> String {

@@ -2,47 +2,12 @@
 //! rather than model names.
 //!
 //! Infers required capabilities from the request (vision, tools, streaming)
-//! and matches against provider catalog metadata.
+//! and matches against provider catalog metadata via `ProviderCapabilities`.
 
-use crate::core::nt_core_llm::{LlmError, LlmRequest, Message};
-use super::provider_catalog::{ProviderCategory, ProviderInfo, PROVIDER_CATALOG};
-
-/// Wrapper around the static provider catalog with capability-based query support.
-pub struct ProviderCatalog;
-
-impl ProviderCatalog {
-    /// Find providers that satisfy the required capabilities.
-    pub fn find_by_capabilities(required: &RequiredCapabilities) -> Vec<&'static ProviderInfo> {
-        PROVIDER_CATALOG
-            .iter()
-            .filter(|p| Self::satisfies(p, required))
-            .collect()
-    }
-
-    fn satisfies(info: &ProviderInfo, required: &RequiredCapabilities) -> bool {
-        // Vision: only check if required — local providers always satisfy via passthrough
-        if required.vision && info.category == ProviderCategory::Cloud {
-            // Most cloud providers support vision; skip those known not to
-            // (conservative: allow all cloud, filter later if needed)
-        }
-        // Free preference
-        if required.prefer_free && !info.is_free {
-            return false;
-        }
-        true
-    }
-}
-
-/// Required capabilities inferred from a request.
-#[derive(Debug, Clone, Default)]
-pub struct RequiredCapabilities {
-    /// Request needs vision (image input).
-    pub vision: bool,
-    /// Request uses function calling / tools.
-    pub function_calling: bool,
-    /// Prefer free providers.
-    pub prefer_free: bool,
-}
+use crate::core::nt_core_llm::{LlmError, LlmRequest};
+use super::provider_catalog::{
+    find_by_capabilities, ProviderCapabilities, PROVIDER_CATALOG,
+};
 
 /// Capability-based router — selects providers based on required capabilities.
 pub struct CapabilityRouter {
@@ -61,25 +26,31 @@ impl CapabilityRouter {
     }
 
     /// Infer required capabilities from request.
-    pub fn infer_capabilities(request: &LlmRequest) -> RequiredCapabilities {
+    pub fn infer_capabilities(request: &LlmRequest) -> ProviderCapabilities {
         let vision = request.image_data.is_some()
             || request.messages.iter().any(|m| {
                 m.content.contains("![") || m.content.contains("<image>")
             });
         let function_calling = !request.tools.is_empty();
-        RequiredCapabilities {
+        ProviderCapabilities {
+            text: true,
             vision,
+            audio: false,
             function_calling,
-            prefer_free: false,
+            streaming: true,
+            context_window: 0, // no limit
+            cost_per_1k_tokens: 0.0,
         }
     }
 
     /// Route request to best matching provider name.
     pub fn route(&self, request: &LlmRequest) -> Result<String, LlmError> {
         let mut required = Self::infer_capabilities(request);
-        required.prefer_free = self.prefer_free;
+        if self.prefer_free {
+            required.cost_per_1k_tokens = 0.0;
+        }
 
-        let candidates = ProviderCatalog::find_by_capabilities(&required);
+        let candidates = find_by_capabilities(&required);
 
         if candidates.is_empty() {
             return Err(LlmError::Unknown(
@@ -87,12 +58,19 @@ impl CapabilityRouter {
             ));
         }
 
-        // Sort: free first, then by category priority (Local > Proxy > Cloud)
+        // Sort: free first, then by category priority (Local > Proxy > Cloud),
+        // then by cost ascending, then by name for determinism.
         let mut sorted = candidates;
         sorted.sort_by(|a, b| {
             b.is_free
                 .cmp(&a.is_free)
                 .then(a.category.route_priority().cmp(&b.category.route_priority()))
+                .then(
+                    a.capabilities
+                        .cost_per_1k_tokens
+                        .partial_cmp(&b.capabilities.cost_per_1k_tokens)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                )
                 .then(a.name.cmp(&b.name))
         });
 
@@ -109,7 +87,7 @@ impl Default for CapabilityRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_llm::{Role, Tool};
+    use crate::core::nt_core_llm::{Message, Role, Tool};
 
     fn user_msg(content: &str) -> Message {
         Message::new(Role::User, content)
@@ -121,6 +99,8 @@ mod tests {
         let cap = CapabilityRouter::infer_capabilities(&req);
         assert!(!cap.vision);
         assert!(!cap.function_calling);
+        assert!(cap.text);
+        assert!(cap.streaming);
     }
 
     #[test]
@@ -158,27 +138,15 @@ mod tests {
     }
 
     #[test]
-    fn test_catalog_find_returns_providers() {
-        let candidates = ProviderCatalog::find_by_capabilities(&RequiredCapabilities::default());
-        assert!(!candidates.is_empty(), "catalog should have providers");
-    }
-
-    #[test]
-    fn test_catalog_free_filter() {
-        let req_cap = RequiredCapabilities {
-            prefer_free: true,
-            ..Default::default()
-        };
-        let candidates = ProviderCatalog::find_by_capabilities(&req_cap);
-        assert!(candidates.iter().all(|p| p.is_free));
-    }
-
-    #[test]
     fn test_route_returns_provider_name() {
         let router = CapabilityRouter::new();
         let req = LlmRequest::new("test", "hello");
         let name = router.route(&req).unwrap();
         assert!(!name.is_empty());
+        assert!(
+            PROVIDER_CATALOG.iter().any(|p| p.name == name),
+            "route should return a known provider: {name}"
+        );
     }
 
     #[test]
@@ -188,5 +156,33 @@ mod tests {
         let name = router.route(&req).unwrap();
         let info = PROVIDER_CATALOG.iter().find(|p| p.name == name).unwrap();
         assert!(info.is_free, "prefer_free should select free provider: {name}");
+    }
+
+    #[test]
+    fn test_route_vision_prefers_vision_capable() {
+        let router = CapabilityRouter::new();
+        let req = LlmRequest::new("test", "describe").with_image_b64("iVBORw0KGgo=");
+        let name = router.route(&req).unwrap();
+        let info = PROVIDER_CATALOG.iter().find(|p| p.name == name).unwrap();
+        assert!(
+            info.capabilities.vision,
+            "vision request should route to vision-capable provider: {name}"
+        );
+    }
+
+    #[test]
+    fn test_route_tool_calling_prefers_capable() {
+        let router = CapabilityRouter::new();
+        let req = LlmRequest::new("test", "use tools").with_tools(vec![Tool {
+            name: "search".into(),
+            description: "search".into(),
+            parameters: "{}".into(),
+        }]);
+        let name = router.route(&req).unwrap();
+        let info = PROVIDER_CATALOG.iter().find(|p| p.name == name).unwrap();
+        assert!(
+            info.capabilities.function_calling,
+            "tool request should route to function-calling-capable provider: {name}"
+        );
     }
 }

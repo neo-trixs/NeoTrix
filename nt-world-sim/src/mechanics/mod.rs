@@ -1,8 +1,8 @@
-use crate::ecs::{World, System};
+use crate::ecs::{System, World};
 use crate::engine::Vec2;
 
-pub mod core_pet;
 pub mod core_hook;
+pub mod core_pet;
 pub mod core_theme;
 
 /// 意识实体组件

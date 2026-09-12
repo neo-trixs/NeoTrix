@@ -1,4 +1,4 @@
-use crate::core::{UniversalWorld, UniversalEntity, Component};
+use crate::core::{Component, UniversalWorld};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PetStateEnum {
@@ -189,11 +189,14 @@ mod tests {
     fn test_typing_progress() {
         let mut world = UniversalWorld::new();
         let entity = world.spawn();
-        world.insert_component(entity, CorePetState {
-            state: PetStateEnum::Typing { progress: 0.0 },
-            state_timer: 0.0,
-            idle_timer: 0.0,
-        });
+        world.insert_component(
+            entity,
+            CorePetState {
+                state: PetStateEnum::Typing { progress: 0.0 },
+                state_timer: 0.0,
+                idle_timer: 0.0,
+            },
+        );
 
         CorePetSystem::update(&mut world, 1.0);
 
@@ -210,11 +213,14 @@ mod tests {
     fn test_happy_timeout() {
         let mut world = UniversalWorld::new();
         let entity = world.spawn();
-        world.insert_component(entity, CorePetState {
-            state: PetStateEnum::Happy,
-            state_timer: 2.5,
-            idle_timer: 0.0,
-        });
+        world.insert_component(
+            entity,
+            CorePetState {
+                state: PetStateEnum::Happy,
+                state_timer: 2.5,
+                idle_timer: 0.0,
+            },
+        );
 
         CorePetSystem::update(&mut world, 1.0);
 

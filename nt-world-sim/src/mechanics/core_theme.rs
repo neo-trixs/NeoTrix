@@ -1,4 +1,4 @@
-use crate::core::{UniversalWorld, Resource};
+use crate::core::{Resource, UniversalWorld};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -135,8 +135,7 @@ mod tests {
         let mut world = UniversalWorld::new();
         CoreThemeManager::load_default_theme(&mut world);
 
-        let custom = CoreTheme::new("Dark")
-            .with_state("idle", "dark_idle.gif");
+        let custom = CoreTheme::new("Dark").with_state("idle", "dark_idle.gif");
         CoreThemeManager::replace_theme(&mut world, custom);
 
         let theme = world.get_resource::<CoreTheme>().unwrap();

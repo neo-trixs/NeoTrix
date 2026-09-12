@@ -108,6 +108,7 @@ pub use provider_catalog::{
     keyless_providers, lookup_provider, providers_by_category, providers_with_key,
     CommunicationProfile, ProviderCapabilities, ProviderCategory, ProviderInfo, PROVIDER_CATALOG,
 };
+pub use capability_router::CapabilityRouter;
 pub use provider_swap::{
     ProviderHealth, ProviderHealthSummary, ProviderSwapManager, SwapRule, GLOBAL_SWAP_MANAGER,
 };

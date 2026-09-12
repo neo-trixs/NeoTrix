@@ -1,4 +1,4 @@
-use crate::core::{UniversalWorld, Event};
+use crate::core::{Event, UniversalWorld};
 use crate::mechanics::core_pet::{CorePetState, PetStateEnum};
 
 #[derive(Clone, Debug)]
@@ -109,10 +109,13 @@ mod tests {
         let entity = world.spawn();
         world.insert_component(entity, CorePetState::new());
 
-        CoreHookManager::process_event(&mut world, CoreHookEvent::SessionStart {
-            agent: "test".to_string(),
-            session_id: "s1".to_string(),
-        });
+        CoreHookManager::process_event(
+            &mut world,
+            CoreHookEvent::SessionStart {
+                agent: "test".to_string(),
+                session_id: "s1".to_string(),
+            },
+        );
 
         let pet = world.get_component::<CorePetState>(entity).unwrap();
         assert_eq!(pet.state, PetStateEnum::Thinking { duration: 0.0 });
@@ -124,9 +127,12 @@ mod tests {
         let entity = world.spawn();
         world.insert_component(entity, CorePetState::new());
 
-        CoreHookManager::process_event(&mut world, CoreHookEvent::ToolStart {
-            tool: "edit".to_string(),
-        });
+        CoreHookManager::process_event(
+            &mut world,
+            CoreHookEvent::ToolStart {
+                tool: "edit".to_string(),
+            },
+        );
 
         let pet = world.get_component::<CorePetState>(entity).unwrap();
         assert_eq!(pet.state, PetStateEnum::Typing { progress: 0.0 });
@@ -138,9 +144,12 @@ mod tests {
         let entity = world.spawn();
         world.insert_component(entity, CorePetState::new());
 
-        CoreHookManager::process_event(&mut world, CoreHookEvent::ToolStart {
-            tool: "read".to_string(),
-        });
+        CoreHookManager::process_event(
+            &mut world,
+            CoreHookEvent::ToolStart {
+                tool: "read".to_string(),
+            },
+        );
 
         let pet = world.get_component::<CorePetState>(entity).unwrap();
         assert_eq!(pet.state, PetStateEnum::Thinking { duration: 0.0 });
@@ -152,10 +161,13 @@ mod tests {
         let entity = world.spawn();
         world.insert_component(entity, CorePetState::new());
 
-        CoreHookManager::process_event(&mut world, CoreHookEvent::ToolEnd {
-            tool: "bash".to_string(),
-            success: true,
-        });
+        CoreHookManager::process_event(
+            &mut world,
+            CoreHookEvent::ToolEnd {
+                tool: "bash".to_string(),
+                success: true,
+            },
+        );
 
         let pet = world.get_component::<CorePetState>(entity).unwrap();
         assert_eq!(pet.state, PetStateEnum::Happy);
@@ -167,10 +179,13 @@ mod tests {
         let entity = world.spawn();
         world.insert_component(entity, CorePetState::new());
 
-        CoreHookManager::process_event(&mut world, CoreHookEvent::ToolEnd {
-            tool: "bash".to_string(),
-            success: false,
-        });
+        CoreHookManager::process_event(
+            &mut world,
+            CoreHookEvent::ToolEnd {
+                tool: "bash".to_string(),
+                success: false,
+            },
+        );
 
         let pet = world.get_component::<CorePetState>(entity).unwrap();
         assert_eq!(pet.state, PetStateEnum::Error);
@@ -184,10 +199,13 @@ mod tests {
         pet.state = PetStateEnum::Thinking { duration: 5.0 };
         world.insert_component(entity, pet);
 
-        CoreHookManager::process_event(&mut world, CoreHookEvent::SessionEnd {
-            agent: "test".to_string(),
-            session_id: "s1".to_string(),
-        });
+        CoreHookManager::process_event(
+            &mut world,
+            CoreHookEvent::SessionEnd {
+                agent: "test".to_string(),
+                session_id: "s1".to_string(),
+            },
+        );
 
         let pet = world.get_component::<CorePetState>(entity).unwrap();
         assert_eq!(pet.state, PetStateEnum::Idle);

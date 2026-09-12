@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
 use super::account_pool::{AccountPool, AccountPoolConfig};
+use super::capability_router::CapabilityRouter;
 use super::generation_classifier::{GenerationAnalytics, GenerationClassifier};
 use super::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::rate_limiter::{AdaptivePacer, TieredSemaphore};
@@ -140,6 +141,8 @@ pub struct GatewayV2 {
     pub ml_predictor: RwLock<MLPredictor>,
     /// Anomaly Detector — 统计异常检测
     pub anomaly_detector: RwLock<AnomalyDetector>,
+    /// Capability Router — 基于能力的路由
+    pub capability_router: CapabilityRouter,
 }
 
 impl GatewayV2 {
@@ -175,6 +178,7 @@ impl GatewayV2 {
             auto_recovery: RwLock::new(AutoRecovery::default()),
             ml_predictor: RwLock::new(MLPredictor::new()),
             anomaly_detector: RwLock::new(AnomalyDetector::default()),
+            capability_router: CapabilityRouter::new(),
         }
     }
 
