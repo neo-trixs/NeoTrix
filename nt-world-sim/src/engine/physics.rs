@@ -1,10 +1,6 @@
 use super::renderer::{Vec2, Rect};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Entity {
-    pub id: u32,
-    pub generation: u32,
-}
+pub type PhysicsEntity = crate::core::entity::EntityId;
 
 /// 刚体类型
 #[derive(Debug, Clone, Copy, PartialEq)]

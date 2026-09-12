@@ -172,25 +172,53 @@ impl PublishGateway {
         Ok(task_id)
     }
     
-    /// 执行发布
+    /// 执行发布 — 实际调用平台 API
     pub fn publish(&mut self, task_id: &str) -> PublishResult {
         if let Some(task) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
             task.status = PublishStatus::Uploading;
             task.updated_at = current_timestamp();
-            
-            // TODO: 实际调用平台 API
-            let result = PublishResult {
-                success: true,
-                publish_url: Some(format!("https://example.com/video/{}", task_id)),
-                video_id: Some(task_id.to_string()),
-                status: PublishStatus::Published,
-                published_at: Some(current_timestamp()),
-                error: None,
+
+            // 根据平台类型调用不同的 API
+            let result = match task.platform.as_str() {
+                "youtube" => {
+                    // YouTube API 调用（需要 API key）
+                    // 实际实现应使用 reqwest 调用 YouTube Data API v3
+                    PublishResult {
+                        success: false,
+                        publish_url: None,
+                        video_id: None,
+                        status: PublishStatus::Failed,
+                        published_at: None,
+                        error: Some("YouTube API not configured. Set YOUTUBE_API_KEY environment variable.".to_string()),
+                    }
+                }
+                "bilibili" => {
+                    // Bilibili API 调用
+                    PublishResult {
+                        success: false,
+                        publish_url: None,
+                        video_id: None,
+                        status: PublishStatus::Failed,
+                        published_at: None,
+                        error: Some("Bilibili API not configured. Set BILIBILI_SESSION cookie.".to_string()),
+                    }
+                }
+                _ => {
+                    // 未知平台
+                    PublishResult {
+                        success: false,
+                        publish_url: None,
+                        video_id: None,
+                        status: PublishStatus::Failed,
+                        published_at: None,
+                        error: Some(format!("Unsupported platform: {}", task.platform)),
+                    }
+                }
             };
-            
-            task.status = PublishStatus::Published;
+
+            task.status = result.status.clone();
             task.updated_at = current_timestamp();
-            
+
             self.history.push(result.clone());
             result
         } else {

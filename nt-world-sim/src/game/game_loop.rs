@@ -96,6 +96,11 @@ impl GameLoop {
         self.world.insert_component(player, Position::new(50, 30));
         self.player_entity = Some(player);
 
+        let player_node = SceneNode::new(player)
+            .with_parent(self.scene.root())
+            .with_tag("player");
+        self.scene.add_node(player_node);
+
         self.generate_initial_farm();
         self.spawn_npcs();
 
@@ -128,6 +133,15 @@ impl GameLoop {
         self.tick_count += 1;
 
         self.scheduler.run(&mut self.world, dt);
+
+        self.physics.step(dt);
+
+        if let Some(player) = self.player_entity {
+            if let Some(pos) = self.world.get_component::<Position>(player) {
+                let player_vec2 = RendererVec2 { x: pos.x as f32 * 16.0, y: pos.y as f32 * 16.0 };
+                self.camera.follow(player_vec2);
+            }
+        }
 
         self.check_day_transition();
         self.update_npc_schedules();
@@ -334,6 +348,26 @@ impl GameLoop {
 
     pub fn load_game(&mut self) {
         println!("Game loaded");
+    }
+
+    pub fn process_raw_input(&mut self, pressed_keys: &[InputKeyCode]) {
+        for key in pressed_keys {
+            if let Some(action) = self.input_map.get(key) {
+                self.handle_input(action.clone());
+            }
+        }
+    }
+
+    pub fn update_camera(&mut self) {
+        if let Some(player) = self.player_entity {
+            if let Some(pos) = self.world.get_component::<Position>(player) {
+                let target = RendererVec2 {
+                    x: pos.x as f32 * 16.0 + 8.0,
+                    y: pos.y as f32 * 16.0 + 8.0,
+                };
+                self.camera.follow(target);
+            }
+        }
     }
 
     pub fn get_state_summary(&self) -> String {

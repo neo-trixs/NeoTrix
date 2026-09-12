@@ -166,11 +166,9 @@ impl _C2paProvenance {
             }
 
             // 检查时间戳合理性：创建时间不能是未来
-            if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&claim.created_at) {
-                if created.timestamp() > chrono::Utc::now().timestamp() + 3600 {
-                    self.stats.total_failed += 1;
-                    return VerificationResult::Tampered;
-                }
+            if claim.created_at > std::time::Instant::now() + std::time::Duration::from_secs(3600) {
+                self.stats.total_failed += 1;
+                return VerificationResult::Tampered;
             }
 
             // 验证通过（实际生产环境应验证密码学签名）
@@ -209,6 +207,7 @@ pub struct _ProvenanceStats {
     pub total_claims: u32,
     pub total_watermarked: u32,
     pub total_verified: u32,
+    pub total_failed: u32,
 }
 
 #[cfg(test)]

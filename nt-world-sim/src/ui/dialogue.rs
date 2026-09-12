@@ -1,4 +1,5 @@
 use crate::engine::renderer::Rect;
+use crate::game::dialogue::DialogueTree;
 
 #[derive(Debug, Clone)]
 pub struct DialogueNode {
@@ -30,6 +31,26 @@ impl DialogueBox {
     
     pub fn start_dialogue(&mut self, nodes: Vec<DialogueNode>) {
         self.nodes = nodes;
+        self.current_node = 0;
+        self.text_progress = 0;
+        self.visible = true;
+    }
+
+    pub fn start_from_tree(&mut self, tree: &DialogueTree) {
+        self.nodes = tree.lines.iter().map(|line| {
+            DialogueNode {
+                speaker: line.speaker.clone(),
+                text: line.text.clone(),
+                responses: line.responses.iter().map(|c| {
+                    DialogueResponse {
+                        text: c.text.clone(),
+                        next_node: c.next_line,
+                        resonance_change: None,
+                    }
+                }).collect(),
+                portrait_id: 0,
+            }
+        }).collect();
         self.current_node = 0;
         self.text_progress = 0;
         self.visible = true;
