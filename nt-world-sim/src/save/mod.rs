@@ -3,13 +3,12 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::error::{GameError, GameResult};
-use crate::core::UniversalWorld;
 use crate::game::inventory::Inventory;
 use crate::game::time::GameTime;
 use crate::game::energy::Energy;
 use crate::game::farming::{CropTile, CropState};
 use crate::game::npc::Npc;
-use crate::world::tile::{WorldMap, Tile, TileType};
+use crate::world::tile::WorldMap;
 
 // ---------------------------------------------------------------------------
 // Save data structures
@@ -220,8 +219,8 @@ impl SaveData {
 
         let farm_data: Vec<FarmTileData> = farm_tiles.iter().enumerate().map(|(i, tile)| {
             FarmTileData {
-                x: (i as u32) % world_map.current().width,
-                y: (i as u32) / world_map.current().width,
+                x: (i as u32) % world_map.width,
+                y: (i as u32) / world_map.width,
                 state: CropStateData::from(&tile.state),
                 watered: tile.watered,
                 fertilized: tile.fertilized,
@@ -242,11 +241,11 @@ impl SaveData {
             slot: 0,
             player_name: player_name.to_string(),
             play_time_seconds: play_time,
-            day: game_time.day(),
-            season: format!("{:?}", game_time.season()),
-            year: game_time.year(),
-            hour: game_time.hour(),
-            minute: game_time.minute(),
+            day: game_time.day,
+            season: format!("{:?}", game_time.season),
+            year: game_time.year,
+            hour: game_time.hour,
+            minute: game_time.minute,
             energy: energy.current,
             max_energy: energy.max,
             insight_points: 0,
@@ -255,14 +254,14 @@ impl SaveData {
             inventory: inventory.slots.iter().map(|s| {
                 InventorySlotData {
                     item_id: s.item_id,
-                    count: s.count,
+                    count: s.quantity,
                 }
             }).collect(),
-            hotbar_index: inventory.hotbar_index(),
-            gold: inventory.gold,
+            hotbar_index: inventory.selected_hotbar,
+            gold: inventory.gold as u32,
             farm_tiles: farm_data,
             npcs: npc_data,
-            current_zone: world_map.current_zone,
+            current_zone: 0,
             unlocked_zones: vec![0, 1, 2, 3, 4],
         }
     }

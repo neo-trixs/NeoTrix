@@ -111,20 +111,24 @@ pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Re
     Ok(())
 }
 
-/// 无事务的 insert-or-get: 批量摄取路径复用 (外层事务由调用方负责)。
-pub fn insert_or_get_node_rows(
+/// 插入或查找已有节点 (insert-or-get)。
+///
+/// - `use_transaction = true`: 函数内部创建事务，适用于单条插入场景。
+/// - `use_transaction = false`: 调用方自行管理事务（批量摄取路径复用）。
+pub fn insert_or_get_node(
     conn: &Connection,
     title: &str,
     node_type: NodeType,
     summary: Option<&str>,
     url: Option<&str>,
     domain: Option<&str>,
+    use_transaction: bool,
 ) -> rusqlite::Result<String> {
     if let Some(url) = url {
         if let Some(existing) = find_node_by_url(conn, url)? {
             return Ok(existing.id);
         }
-    } else if let Some(existing) = find_node_by_title_and_type(conn, title, &node_type)? {
+    } else if let Some(existing) = find_node_by_title_and_type(conn, title, &node_type, false)? {
         return Ok(existing.id);
     }
 
@@ -135,6 +139,7 @@ pub fn insert_or_get_node_rows(
         node_type,
         title: title.to_string(),
         summary: summary.map(|s| s.to_string()),
+        // content 与 summary 镜像写入，修复 content/summary 双列分裂问题
         content: summary.map(|s| s.to_string()),
         url: url.map(|s| s.to_string()),
         domain: domain.map(|s| s.to_string()),
@@ -153,8 +158,15 @@ pub fn insert_or_get_node_rows(
         depth: 0,
         cluster_id: None,
     };
-    // cluster_id auto-assigned inside insert_node_rows
-    insert_node_rows(conn, &node)?;
+    if use_transaction {
+        // 单条插入: 内部事务保证 nodes + nodes_fts 原子性
+        let tx = conn.unchecked_transaction()?;
+        insert_node_rows(&tx, &node)?;
+        tx.commit()?;
+    } else {
+        // 批量路径: 调用方已持有事务
+        insert_node_rows(conn, &node)?;
+    }
     Ok(id)
 }
 
@@ -250,32 +262,34 @@ pub fn get_node(conn: &Connection, id: &str) -> rusqlite::Result<Option<Knowledg
     }
 }
 
-pub fn find_node_by_title_and_type(conn: &Connection, title: &str, node_type: &NodeType) -> rusqlite::Result<Option<KnowledgeNode>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain, language,
-            confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
-            supersedes, parent_id, depth, cluster_id
-         FROM nodes WHERE title=?1 AND node_type=?2 AND url IS NULL LIMIT 1",
-    )?;
-    let mut rows = stmt.query(params![title, node_type.as_str()])?;
-    match rows.next()? {
-        Some(row) => Ok(Some(row_to_knowledge_node(&row)?)),
-        None => Ok(None),
-    }
-}
-
-pub(crate) fn find_node_by_norm_title_and_type(
+/// 按标题和节点类型查找节点。
+/// `use_norm_title = false`: 精确匹配 title 列 (原始标题)，仅限无 url 的节点。
+/// `use_norm_title = true`: 匹配 norm_title 列 (归一化标题)，用于跨阶段去重。
+pub fn find_node_by_title_and_type(
     conn: &Connection,
-    norm_title: &str,
+    title: &str,
     node_type: &NodeType,
+    use_norm_title: bool,
 ) -> rusqlite::Result<Option<KnowledgeNode>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain, language,
-            confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
-            supersedes, parent_id, depth, cluster_id
-         FROM nodes WHERE norm_title=?1 AND node_type=?2 LIMIT 1",
-    )?;
-    let mut rows = stmt.query(params![norm_title, node_type.as_str()])?;
+    let (sql, param_value): (&str, String) = if use_norm_title {
+        (
+            "SELECT id, node_type, title, summary, content, url, domain, language,
+                confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
+                supersedes, parent_id, depth, cluster_id
+             FROM nodes WHERE norm_title=?1 AND node_type=?2 LIMIT 1",
+            normalize_title(title),
+        )
+    } else {
+        (
+            "SELECT id, node_type, title, summary, content, url, domain, language,
+                confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
+                supersedes, parent_id, depth, cluster_id
+             FROM nodes WHERE title=?1 AND node_type=?2 AND url IS NULL LIMIT 1",
+            title.to_string(),
+        )
+    };
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params![param_value, node_type.as_str()])?;
     match rows.next()? {
         Some(row) => Ok(Some(row_to_knowledge_node(&row)?)),
         None => Ok(None),
@@ -502,55 +516,6 @@ pub fn get_stats(conn: &Connection) -> Result<KnowledgeStats, rusqlite::Error> {
         db_size_bytes: db_size,
         total_clusters,
     })
-}
-
-pub fn insert_or_get_node(
-    conn: &Connection,
-    title: &str,
-    node_type: NodeType,
-    summary: Option<&str>,
-    url: Option<&str>,
-    domain: Option<&str>,
-) -> rusqlite::Result<String> {
-    if let Some(url) = url {
-        if let Some(existing) = find_node_by_url(conn, url)? {
-            return Ok(existing.id);
-        }
-    } else if let Some(existing) = find_node_by_title_and_type(conn, title, &node_type)? {
-        return Ok(existing.id);
-    }
-
-    let id = Uuid::new_v4().to_string();
-    let ts = now();
-    let node = KnowledgeNode {
-        id: id.clone(),
-        node_type,
-        title: title.to_string(),
-        summary: summary.map(|s| s.to_string()),
-        // P0 根治 (content/summary 双列分裂): write_memory_entry 把正文作为
-        // summary 传入, 此前 content 硬编码 None → 所有读 content 列的下游
-        // (conflict_detect / crawl 回填 / absorb_mapper / search 返回) 全部漏掉。
-        // 镜像写入两列, 一处修复覆盖所有下游。
-        content: summary.map(|s| s.to_string()),
-        url: url.map(|s| s.to_string()),
-        domain: domain.map(|s| s.to_string()),
-        language: "en".to_string(),
-        recall_weight: 1.0,
-        confidence: 1.0,
-        importance: 0.5,
-        created_at: ts,
-        updated_at: ts,
-        access_count: 0,
-        metadata: None,
-        temporal: None,
-        supersedes: None,
-        source_episode: None,
-        parent_id: None,
-        depth: 0,
-        cluster_id: None,
-    };
-    insert_node(conn, &node)?;
-    Ok(id)
 }
 
 /// upsert_edge 的 metadata 增强版 (T0.1 类型化边, 来源: codebase-memory-mcp 类型化边

@@ -22,21 +22,19 @@
 // ═══════════════════════════════════════════════════════════════════
 // L0 — 基底层 (Substrate)
 // ═══════════════════════════════════════════════════════════════════
-pub mod nt_core_harness;
-
-pub mod nt_core_error;
+pub mod l0_substrate;
 
 // ═══════════════════════════════════════════════════════════════════
 // L1 — 身体层 (Body)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l1_body;
-// L1 实现模块 (部分在 neotrix/)
+pub use l1_body::{nt_core_edit, nt_core_mcp, nt_core_guard_chain};
 
 // ═══════════════════════════════════════════════════════════════════
 // L2 — 感知层 (Perception)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l2_perception;
-pub mod nt_core_sense;
+pub use l2_perception::{nt_core_llm, nt_core_embed, nt_core_sense};
 
 // ═══════════════════════════════════════════════════════════════════
 // L3 — 记忆层 (Memory)
@@ -86,25 +84,23 @@ pub mod nt_core_narrative_types;
 // L5 — 意识层 (Consciousness)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l5_consciousness;
+pub use l5_consciousness::{nt_core_consciousness_core, nt_core_consciousness_tree};
 pub mod nt_core_context;
 pub mod nt_core_dispatch;
 pub mod nt_core_gwt;
 pub mod nt_core_heartbeat; // 统一系统健康聚合器
 // L5 意识组件（过渡期保留原路径，供 l5_consciousness 门面转发）
 pub mod nt_core_consciousness;
-pub mod nt_core_consciousness_core;
-pub mod nt_core_consciousness_tree;
 pub mod nt_core_echo_terminal;
 
 // ═══════════════════════════════════════════════════════════════════
 // L6 — 自我层 (Self)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l6_self;
+pub use l6_self::{nt_core_self_model};
 pub mod nt_core_aware;
 pub mod nt_core_self;
-pub mod nt_core_self_model;
 pub mod nt_core_self_constitution;
-pub mod nt_core_guard_chain;
 pub mod nt_core_kb_primitives;
 pub mod nt_core_kb_types;
 pub mod nt_core_memory_asset;
@@ -122,6 +118,7 @@ pub mod nt_core_capability;
 // L8 — 自主神经层 (Autonomic)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l8_autonomic;
+pub use l8_autonomic::{nt_core_self_test, nt_core_self_test_integration};
 pub mod nt_core_absorb;
 pub mod nt_core_iter;
 pub mod nt_core_scheduler;
@@ -142,12 +139,9 @@ pub mod nt_core_accessor;
 pub mod nt_core_axiom_tree;
 pub mod nt_core_cap;
 pub mod nt_core_conn;
-pub mod nt_core_edit;
-pub mod nt_core_embed;
 pub mod nt_core_event;
 pub use nt_core_event::{CoreEvent};
 pub use crate::neotrix::nt_core_event_bus::{EventBus};
-pub mod nt_core_mcp;
 pub mod nt_core_retrieval;
 pub mod nt_core_router;
 pub mod nt_core_self_review;
@@ -155,7 +149,6 @@ pub mod nt_core_traits;
  pub mod nt_core_ws;
  pub mod nt_core_cache;
 pub mod nt_core_span;
-pub mod nt_core_llm;
 
 pub mod nt_core_answer_engine;
 pub mod nt_core_arch_fitness;
@@ -167,17 +160,13 @@ pub mod nt_core_resource_pool;
 pub mod nt_core_schema_watchdog;
 pub mod nt_core_scoring_substrate;
 pub mod nt_core_second_brain;
-pub mod nt_core_self_test;
 pub mod nt_core_orchestration_failure_taxonomy;
-pub mod nt_core_self_test_integration;
 pub mod nt_core_cad_consciousness;
 pub mod nt_core_simulate_engine;
 pub mod nt_core_state_substrate;
 pub mod nt_core_subagent;
 pub mod nt_core_telemetry;
 pub mod nt_core_vector_store;
-pub mod nt_core_deploy;
-pub mod nt_core_deploy_cache;
 // Formal verification proof harnesses
 #[cfg(test)]
 pub mod kani_proofs;
@@ -299,7 +288,7 @@ pub use nt_core_self_constitution::{
     global_constitution, reload_constitution, ComplianceReport, ComplianceViolation, Constitution,
     ConstitutionLoader, DevRule, ExperienceEntry, RuleCategory,
 };
-pub use nt_core_self_test::{
+pub use l8_autonomic::nt_core_self_test::{
     report as selftest_report, ConstitutionComplianceTest, SelfTest, SelfTestRegistry,
     SelfTestResult,
 };
@@ -335,7 +324,7 @@ pub use nt_core_bank::{
     TemporalContext,
 };
 pub use nt_core_cap::CapabilityVector;
-pub use nt_core_edit::{MicroEdit, ToolCall};
+pub use l1_body::nt_core_edit::{MicroEdit, ToolCall};
 pub use nt_core_graph::{Community, EdgeRelation, GraphEdge, GraphNode, HyperEdge, HyperGraph, HyperNode, HyperNodeType, KnowledgeGraph};
 // nt_core_hcube::aif::belief: removed (empty shell)
 pub use nt_core_hcube::aif::{AiStepReport, FreeEnergyEngine, GenerativeModel, PolicyEvaluator};
@@ -357,7 +346,7 @@ pub use nt_core_knowledge::{
     KnowledgeProvider, KnowledgeSource, RewardSource, SourceAccessRecord, SourceAccessTracker,
     TaskType,
 };
-pub use nt_core_mcp::McpServer;
+pub use l1_body::nt_core_mcp::McpServer;
 pub use nt_core_traits::{
     AgentExecutor, BrainProvider, EngineProvider, MemoryProvider, NativeTool, RichMemoryProvider,
     SealResult, SessionProvider, ToolDef, ToolOutput, ToolProvider,

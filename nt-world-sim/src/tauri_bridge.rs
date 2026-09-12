@@ -282,7 +282,7 @@ pub fn save_game_to_file(slot: u32) -> GameResult<String> {
     skills.insert("empathy".into(), 0u32);
     skills.insert("logic".into(), 0u32);
 
-    let save_data = SaveDataFile {
+    let save_data = SaveData {
         version: 1,
         slot,
         player_name: "Player".to_string(),

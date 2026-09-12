@@ -29,7 +29,7 @@ impl QuestTracker {
             for (i, quest) in self.quests.iter().take(5).enumerate() {
                 let qy = self.y + 28.0 + i as f32 * 24.0;
 
-                let name_color = match quest.status {
+                let _name_color = match quest.status {
                     QuestStatus::Active => theme.gold_text,
                     QuestStatus::Completed => Color { r: 0.2, g: 0.8, b: 0.2, a: 1.0 },
                     _ => Color { r: 0.6, g: 0.6, b: 0.6, a: 1.0 },

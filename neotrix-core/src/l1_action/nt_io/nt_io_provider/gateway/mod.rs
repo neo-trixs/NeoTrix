@@ -10,74 +10,41 @@ use crate::core::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator}
 use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
 
-// ── 新增文件: 从 nt_io_provider 移入 ──────────────────────────
-mod capability_router;
-pub use capability_router::CapabilityRouter;
-mod agent_routing;
-pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
-mod inference_router;
-pub use inference_router::{InferenceRouter, RouterConfig};
-mod unified_inference;
-pub use unified_inference::*;
-mod universal_adapter;
-pub use universal_adapter::*;
-mod search_router;
-pub use search_router::*;
-mod free_providers;
-pub use free_providers::*;
+// ── 子目录模块 ──────────────────────────────────────────────
+pub mod routing;
+pub mod resilience;
+pub mod execution;
+pub mod observability;
+pub mod types;
 
 #[cfg(test)]
-use AgentRoutingTable;
+use routing::AgentRoutingTable;
 #[cfg(test)]
 use super::routing::provider_swap::ProviderSwapManager;
-
-// ── Routing ──────────────────────────────────────────────────
-mod intelligence;
-mod learned_router;
-mod market_router;
-mod routing_utils;
-mod selection;
-mod subgrid;
-
-// ── Resilience ───────────────────────────────────────────────
-mod drift;
-mod health;
-mod resilience;
-mod response_cache;
-mod response_healer;
-
-// ── Execution ────────────────────────────────────────────────
-mod coordinator;
-mod execution;
-mod keyless;
-
-// ── Observability ────────────────────────────────────────────
-mod plugin;
-
-// ── Types & Registry ─────────────────────────────────────────
-mod benchmark;
-mod registry_core;
 
 // ── Feature-gated ────────────────────────────────────────────
 #[cfg(feature = "stealth-net")]
 mod stealth_middleware;
 
-// ── Re-exports ───────────────────────────────────────────────
-// Routing
-pub use intelligence::*;
-pub use market_router::*;
-pub use routing_utils::*;
-// Resilience
-
-pub use health::*;
+// ── Re-exports (向后兼容) ────────────────────────────────────
+// 路由
+pub use routing::{
+    AgentRoutingTable, ProviderProfile, ProviderProfileManager,
+    CapabilityRouter, InferenceRouter, RouterConfig,
+};
+pub use routing::intelligence::*;
+pub use routing::market_router::*;
+pub use routing::routing_utils::*;
+pub use routing::search_router::*;
+pub use routing::free_providers::*;
+// 韧性
 pub use resilience::*;
-pub use response_cache::*;
-pub use response_healer::*;
-// Execution
-pub use coordinator::*;
-pub use registry_core::*;
-// Observability
-pub use plugin::*;
+// 执行
+pub use execution::*;
+// 可观测性
+pub use observability::*;
+// 类型 & 注册表
+pub use types::*;
 // Feature-gated
 #[cfg(feature = "stealth-net")]
 pub use stealth_middleware::*;

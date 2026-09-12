@@ -15,7 +15,7 @@ use std::path::Path;
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use super::nt_memory_store::{get_node, insert_or_get_node_rows, update_node_metadata};
+use super::nt_memory_store::{get_node, insert_or_get_node, update_node_metadata};
 use super::nt_memory_types::NodeType;
 use super::nt_normalizer::validate_node_type;
 use super::shared_utils::now;

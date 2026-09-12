@@ -271,7 +271,7 @@ impl KnowledgeBase {
         let existing = if let Some(url) = &entry.url {
             nt_memory_store::find_node_by_url(&conn, url).map_err(|e| e.to_string())?
         } else {
-            nt_memory_store::find_node_by_title_and_type(&conn, &entry.title, &node_type)
+            nt_memory_store::find_node_by_title_and_type(&conn, &entry.title, &node_type, false)
                 .map_err(|e| e.to_string())?
         };
 
@@ -373,7 +373,7 @@ impl KnowledgeBase {
                     .as_ref()
                     .map(|s| NodeType::from_str(s))
                     .unwrap_or(NodeType::Concept);
-                nt_memory_store::find_node_by_title_and_type(&conn, ttitle, &ttype)
+                nt_memory_store::find_node_by_title_and_type(&conn, ttitle, &ttype, false)
                     .map_err(|e| e.to_string())?
                     .map(|n| n.id)
                     .unwrap_or_default()
@@ -605,7 +605,7 @@ mod tests {
         kb.absorb_core(&a).expect("a");
         let rb = kb.absorb_core(&b).expect("b");
         let conn = kb.conn.lock().expect("lock");
-        let gid = nt_memory_store::find_node_by_title_and_type(&conn, "GWT", &NodeType::Concept)
+        let gid = nt_memory_store::find_node_by_title_and_type(&conn, "GWT", &NodeType::Concept, false)
             .expect("find").expect("gwt").id;
         drop(conn);
         let _ = kb.upsert_edge(&gid, &rb.node_id, RelationType::RelatedTo, 1.0, None);
@@ -631,7 +631,7 @@ mod tests {
         };
         kb.absorb_core(&base).expect("base");
         let conn = kb.conn.lock().expect("lock");
-        let base_id = nt_memory_store::find_node_by_title_and_type(&conn, "Base", &NodeType::Concept)
+        let base_id = nt_memory_store::find_node_by_title_and_type(&conn, "Base", &NodeType::Concept, false)
             .expect("find").expect("id").id;
         drop(conn);
         let entry = AbsorbEntry {
