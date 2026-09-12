@@ -390,17 +390,16 @@ impl System for EyeTrackingSystem {
     }
 
     fn update(&mut self, world: &mut World, dt: f32) {
-        let entities = world.query::<(PetStateComponent, EyeTracking)>();
+        let entities = world.query::<PetStateComponent>();
         for entity in entities {
-            if let (Some(pet), Some(eye)) = (
-                world.get_component_mut::<PetStateComponent>(entity),
-                world.get_component_mut::<EyeTracking>(entity),
-            ) {
-                // 只在空闲状态启用眼睛追踪
+            // 只在空闲状态启用眼睛追踪
+            if let Some(pet) = world.get_component::<PetStateComponent>(entity) {
                 if let PetState::Idle { .. } = &pet.state {
                     // 需要获取宠物位置来计算眼睛位置
                     // 这里假设位置在TransformComponent中
-                    eye.update(dt, Vec2::zero());
+                    if let Some(eye) = world.get_component_mut::<EyeTracking>(entity) {
+                        eye.update(dt, Vec2::zero());
+                    }
                 }
             }
         }

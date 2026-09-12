@@ -3,7 +3,6 @@ pub mod physics;
 pub mod input;
 pub mod events;
 pub mod pet_state;
-pub mod clawd_integration;
 
 pub use renderer::{Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer};
 pub use physics::{BodyType, RigidBody, Collider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld};
