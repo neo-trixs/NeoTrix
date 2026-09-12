@@ -87,36 +87,108 @@ impl WorldGenerator {
     }
 
     fn place_farm(map: &mut WorldMap, config: &GeneratorConfig) {
+        Self::generate_farm_area(map, config);
+    }
+
+    pub fn generate_farm_area(map: &mut WorldMap, config: &GeneratorConfig) {
         let (fx, fy) = config.farm_position;
         let (fw, fh) = config.farm_size;
-        for y in fy..fy + fh {
-            for x in fx..fx + fw {
-                map.set_tile(0, x, y, Tile::new(TileType::Dirt));
-                map.set_tile(1, x, y, Tile::new(TileType::Void));
+
+        // Create farm plots in a grid pattern
+        for row in 0..fh {
+            for col in 0..fw {
+                let x = fx + col;
+                let y = fy + row;
+
+                // Leave paths between plots
+                if col % 4 == 0 || row % 4 == 0 {
+                    map.set_tile(0, x, y, Tile::new(TileType::Path));
+                } else {
+                    map.set_tile(0, x, y, Tile::new(TileType::Dirt));
+                }
             }
         }
 
-        // Farm path
-        let mid_y = fy + fh / 2;
-        for x in fx..fx + fw {
-            map.set_tile(0, x, mid_y, Tile::new(TileType::Path));
+        // Add water source nearby
+        for x in fx..fx + 5 {
+            if x < map.width && fy + fh < map.height {
+                map.set_tile(0, x, fy + fh, Tile::new(TileType::Water));
+            }
         }
 
-        // Placeholder — spawn point placed after paths in place_special_tiles
+        // Add house
+        if fx + 3 < map.width && fy + 2 < map.height {
+            map.set_tile(0, fx + 2, fy + 2, Tile::new(TileType::Door));
+            map.set_tile(0, fx + 3, fy + 2, Tile::new(TileType::Door));
+            map.set_tile(0, fx + 2, fy + 1, Tile::new(TileType::Wall));
+            map.set_tile(0, fx + 3, fy + 1, Tile::new(TileType::Wall));
+        }
+
+        // Add fence around farm perimeter
+        for x in fx..fx + fw {
+            if x < map.width {
+                if fy < map.height {
+                    map.set_tile(0, x, fy, Tile::new(TileType::Fence));
+                }
+                if fy + fh - 1 < map.height {
+                    map.set_tile(0, x, fy + fh - 1, Tile::new(TileType::Fence));
+                }
+            }
+        }
+        for y in fy..fy + fh {
+            if y < map.height {
+                if fx < map.width {
+                    map.set_tile(0, fx, y, Tile::new(TileType::Fence));
+                }
+                if fx + fw - 1 < map.width {
+                    map.set_tile(0, fx + fw - 1, y, Tile::new(TileType::Fence));
+                }
+            }
+        }
+    }
+
+    pub fn generate_town(map: &mut WorldMap, config: &GeneratorConfig) {
+        let (tx, ty) = (50, 30);
+
+        // Create town square
+        for x in tx..tx + 20 {
+            for y in ty..ty + 20 {
+                if x < map.width && y < map.height {
+                    map.set_tile(0, x, y, Tile::new(TileType::Path));
+                }
+            }
+        }
+
+        // Add buildings
+        if tx + 5 < map.width && ty + 6 < map.height {
+            map.set_tile(0, tx + 5, ty + 5, Tile::new(TileType::Wall));
+            map.set_tile(0, tx + 5, ty + 6, Tile::new(TileType::Door));
+        }
+
+        // Add NPC spots
+        let npc_positions = [(10u32, 10u32), (12, 10), (14, 10), (16, 10)];
+        for &(nx, ny) in &npc_positions {
+            let ax = tx + nx;
+            let ay = ty + ny;
+            if ax < map.width && ay < map.height {
+                map.set_tile(0, ax, ay, Tile::new(TileType::NPCSpot));
+            }
+        }
+
+        // Add shop
+        if tx + 8 < map.width && ty + 15 < map.height {
+            map.set_tile(0, tx + 8, ty + 15, Tile::new(TileType::ShopTile));
+        }
     }
 
     fn generate_zones(map: &mut WorldMap, config: &GeneratorConfig) {
         let zones = vec![
-            Zone::new(
-                ZoneType::Farm,
-                config.farm_position,
-                config.farm_size,
-                "Thought Meadow",
-            ),
-            Zone::new(ZoneType::Town, (50, 30), (20, 20), "Neural Hub"),
-            Zone::new(ZoneType::Mine, (70, 10), (15, 15), "Knowledge Mines"),
-            Zone::new(ZoneType::Forest, (10, 50), (25, 25), "Memory Forest"),
-            Zone::new(ZoneType::Lake, (60, 60), (20, 15), "Dream Lake"),
+            Zone::thought_meadow()
+                .with_resource(config.farm_position.0 + 5, config.farm_position.1 + 3, "starter_crop"),
+            Zone::neural_hub(),
+            Zone::knowledge_mines(),
+            Zone::memory_forest(),
+            Zone::dream_lake(),
         ];
         map.zones = zones;
     }

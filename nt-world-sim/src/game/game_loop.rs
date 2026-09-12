@@ -14,6 +14,16 @@ use super::weather::{Weather, WeatherSystem};
 use super::inventory::Inventory;
 use super::farming::FarmPlot;
 use super::npc::{Npc, Position};
+use super::relationship::RelationshipSystem;
+use super::perfection::PerfectionTracker;
+use super::cooking::CookingSystem;
+use super::fishing::FishingSystem;
+use super::foraging::ForagingSystem;
+use super::skill::SkillSystem;
+use super::mining::MineState;
+use super::economy::Economy;
+use super::quest::QuestDatabase;
+use super::events::EventCalendar;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameState {
@@ -43,6 +53,16 @@ pub struct GameLoop {
     pub event_bus: TypedEventBus,
     pub audio: AudioManager,
     pub particles: ParticleSystem,
+    pub relationships: RelationshipSystem,
+    pub perfection: PerfectionTracker,
+    pub cooking: CookingSystem,
+    pub fishing: FishingSystem,
+    pub foraging: ForagingSystem,
+    pub skills: SkillSystem,
+    pub mine: MineState,
+    pub economy: Economy,
+    pub quests: QuestDatabase,
+    pub events: EventCalendar,
 }
 
 fn create_default_input_map() -> HashMap<InputKeyCode, GameAction> {
@@ -97,6 +117,16 @@ impl GameLoop {
             event_bus: TypedEventBus::new(),
             audio,
             particles: ParticleSystem::new(1024),
+            relationships: RelationshipSystem::new(),
+            perfection: PerfectionTracker::new(),
+            cooking: CookingSystem::new(),
+            fishing: FishingSystem::new(),
+            foraging: ForagingSystem::new(),
+            skills: SkillSystem::new(),
+            mine: MineState::new(),
+            economy: Economy::new(500),
+            quests: QuestDatabase::new(),
+            events: EventCalendar::new(),
         }
     }
 
@@ -185,6 +215,10 @@ impl GameLoop {
                 super::time::Season::Stillness => 0.5,
             };
             println!("New day! Season modifier: {}", season_mod);
+
+            self.relationships.advance_day();
+            self.events.advance_day(time.day, time.season);
+            self.foraging.advance_day(time.season);
         }
     }
 
@@ -404,7 +438,13 @@ impl GameLoop {
             .map(|t| format!("Day {} {:02}:{:02} {}", t.day, t.hour, t.minute, t.season_name()))
             .unwrap_or_else(|| "No time".to_string());
 
-        format!("State: {:?} | {} | Tick: {}", self.state, time_str, self.tick_count)
+        format!(
+            "State: {:?} | {} | Tick: {} | Gold: {} | Skills: {} | Perfection: {:.1}%",
+            self.state, time_str, self.tick_count,
+            self.economy.gold,
+            self.skills.get_total_level(),
+            self.perfection.overall_progress() * 100.0,
+        )
     }
 }
 
