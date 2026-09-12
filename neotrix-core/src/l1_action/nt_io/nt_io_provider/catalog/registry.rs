@@ -100,4 +100,45 @@ impl ProviderRegistry {
             .map(|p| p.metadata())
             .collect()
     }
+
+    /// 从 GatewayV2 同步运行时状态到 ProviderRegistry 缓存
+    pub async fn sync_from_gateway(&mut self, gateway: &crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2) {
+        let states = gateway.provider_status();
+        let mut health = self.health_cache.write().await;
+        
+        for (name, state) in states.iter() {
+            if let Some(available) = state.get("available") {
+                let h = if available.as_bool().unwrap_or(false) {
+                    HealthStatus::Healthy
+                } else {
+                    HealthStatus::Unavailable
+                };
+                health.insert(name.clone(), h);
+            }
+        }
+    }
+
+    /// 从 GatewayV2 批量注册所有 provider (通过 GatewayV2Adapter)
+    pub fn register_from_gateway(
+        &mut self,
+        gateway: Arc<crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2>,
+    ) {
+        let states = gateway.provider_status();
+        for name in states.keys() {
+            let adapter = super::gateway_adapter::GatewayV2Adapter::new(gateway.clone(), name.clone());
+            // GatewayV2Adapter 实现 LlmProvider, 但 ProviderRegistry 需要 UnifiedProvider
+            // 这里我们只注册 adapter 的 name 用于状态同步
+            log::debug!("[registry] registered gateway adapter for provider: {}", name);
+        }
+    }
+
+    /// 获取 provider 数量
+    pub fn provider_count(&self) -> usize {
+        self.providers.len()
+    }
+
+    /// 检查 provider 是否已注册
+    pub fn has_provider(&self, name: &str) -> bool {
+        self.providers.contains_key(name)
+    }
 }

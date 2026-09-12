@@ -8,7 +8,7 @@
 
 // ─── Six-Layer Architecture Modules ──────────────────────────────────────
 pub use crate::l1_action::{nt_act, nt_io, nt_memory};
-pub use crate::l2_perception::{nt_world, nt_sense};
+pub use crate::l2_perception::nt_world;
 pub use crate::l3_embodiment::{nt_shield, nt_physical};
 pub use crate::l4_emotion::nt_feel;
 pub use crate::l5_cognition::{nt_core, nt_mind};
