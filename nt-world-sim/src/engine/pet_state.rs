@@ -1,4 +1,4 @@
-use crate::ecs::{Entity, World, System};
+use crate::ecs::{World, System};
 use crate::engine::Vec2;
 
 /// 12-State Pet FSM (from Clawd on Desk)
@@ -39,7 +39,7 @@ impl Default for PetState {
 }
 
 /// Zzz粒子
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ZzzParticle {
     pub position: Vec2,
     pub velocity: Vec2,

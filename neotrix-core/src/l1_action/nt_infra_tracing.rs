@@ -113,12 +113,12 @@ impl TracingCollector {
     }
 
     /// 查询最近 N 条 span
-    pub fn recent_spans(&self, n: usize) -> Vec<&CapabilitySpan> {
+    pub(crate) fn _recent_spans(&self, n: usize) -> Vec<&CapabilitySpan> {
         self.spans.iter().rev().take(n).collect()
     }
 
     /// 查询指定 capability 的 span
-    pub fn spans_for(&self, capability_id: &str) -> Vec<&CapabilitySpan> {
+    pub(crate) fn _spans_for(&self, capability_id: &str) -> Vec<&CapabilitySpan> {
         self.spans.iter().filter(|s| s.capability_id == capability_id).collect()
     }
 }

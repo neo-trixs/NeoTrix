@@ -138,7 +138,7 @@ impl AgentCardRegistry {
         self.cards.retain(|_, c| now - c.last_heartbeat < 300);
     }
 
-    pub fn all_cards(&self) -> Vec<&AgentCard> {
+    pub(crate) fn _all_cards(&self) -> Vec<&AgentCard> {
         self.cards.values().collect()
     }
 }

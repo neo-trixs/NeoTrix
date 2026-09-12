@@ -131,13 +131,13 @@ impl PipelineCheckpointing {
     }
 
     /// 获取指定阶段的检查点
-    pub fn get_stage_checkpoint(&self, job_id: &str, stage: &str) -> Option<&CheckpointInfo> {
+    pub(crate) fn _get_stage_checkpoint(&self, job_id: &str, stage: &str) -> Option<&CheckpointInfo> {
         self.checkpoints.get(job_id)
             .and_then(|cps| cps.iter().find(|cp| cp.stage == stage && cp.status == CheckpointStatus::Active))
     }
 
     /// 获取所有检查点
-    pub fn get_all_checkpoints(&self, job_id: &str) -> Vec<&CheckpointInfo> {
+    pub(crate) fn _get_all_checkpoints(&self, job_id: &str) -> Vec<&CheckpointInfo> {
         self.checkpoints.get(job_id)
             .map(|cps| cps.iter().collect())
             .unwrap_or_default()

@@ -7,7 +7,6 @@
 //! MagnetTransport            ←  aria2c RPC for magnet links
 //! ```
 
-use bytes::Bytes;
 use futures::StreamExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;

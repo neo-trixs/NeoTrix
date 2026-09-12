@@ -1,6 +1,7 @@
 pub mod traits;
 pub mod nt_act;
 pub mod nt_io;
+pub mod nt_media; // 统一媒体能力 (detect/router/streaming)
 pub mod nt_io_download; // 下载引擎 (自研，无外部依赖)
 pub mod nt_stream; // 流式下载+播放 (边下载边播放)
 pub mod nt_memory;

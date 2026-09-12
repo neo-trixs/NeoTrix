@@ -78,7 +78,7 @@ impl ResourceQuota {
     }
     
     /// 是否接近上限
-    pub fn is_near_limit(&self, threshold: f64) -> bool {
+    pub(crate) fn _is_near_limit(&self, threshold: f64) -> bool {
         self.usage_rate() >= threshold
     }
 }
@@ -323,7 +323,7 @@ impl ResourceBudgetManager {
     }
     
     /// 重置周期使用量
-    pub fn reset_period_usage(&mut self) {
+    pub(crate) fn _reset_period_usage(&mut self) {
         self.period_usage.clear();
         for quota in &mut self.config.quotas {
             quota.used = 0.0;

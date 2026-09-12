@@ -111,7 +111,7 @@ impl RouterLearner {
         self.records.get(provider_id)
     }
 
-    pub fn all_records(&self) -> &HashMap<String, ProviderLearning> {
+    pub(crate) fn _all_records(&self) -> &HashMap<String, ProviderLearning> {
         &self.records
     }
 }
