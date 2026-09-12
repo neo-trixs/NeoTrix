@@ -23,12 +23,17 @@
 // L0 — 基底层 (Substrate)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l0_substrate;
+pub mod nt_core_deploy;
+pub mod nt_core_deploy_cache;
+pub mod nt_core_harness;
 
 // ═══════════════════════════════════════════════════════════════════
 // L1 — 身体层 (Body)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l1_body;
-pub use l1_body::{nt_core_edit, nt_core_mcp, nt_core_guard_chain};
+pub mod nt_core_edit;
+pub mod nt_core_mcp;
+pub use l1_body::{nt_core_guard_chain};
 
 // ═══════════════════════════════════════════════════════════════════
 // L2 — 感知层 (Perception)

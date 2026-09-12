@@ -813,7 +813,7 @@ impl KnowledgeBase {
         domain: Option<&str>,
     ) -> Result<String, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_store::insert_or_get_node(&conn, title, node_type, summary, url, domain, true)
+        nt_memory_store::insert_or_get_node(&conn, title, node_type, summary, url, domain)
             .map_err(|e| format!("insert_or_get_node: {}", e))
     }
 

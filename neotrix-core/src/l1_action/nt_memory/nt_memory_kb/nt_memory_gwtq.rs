@@ -78,7 +78,7 @@ impl super::KnowledgeBase {
         let title = format!("Consciousness Snapshot φ={:.3} coh={:.3}", phi, coherence);
         let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
         let summary = format!("phi={}, coherence={}, is_conscious={}, level={}, details={}", phi, coherence, is_conscious, level, details);
-        let node_id = store::insert_or_get_node(&conn, &title, NodeType::Insight, Some(&summary), None, Some("consciousness"), true)
+        let node_id = store::insert_or_get_node(&conn, &title, NodeType::Insight, Some(&summary), None, Some("consciousness"))
             .map_err(|e| format!("Insert error: {}", e))?;
         Ok(node_id)
     }

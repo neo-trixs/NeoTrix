@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn test_profession_choice_at_level_5() {
         let mut skill = Skill::new(SkillType::Creativity);
-        skill.add_xp(1200);
+        skill.add_xp(1700); // 100+280+500+800 = 1680 needed for level 5
         assert_eq!(skill.level, 5);
         assert!(skill.choose_profession(Profession::Artistry));
         assert!(skill.has_profession(Profession::Artistry));

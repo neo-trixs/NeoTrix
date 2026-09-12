@@ -112,9 +112,7 @@ pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Re
 }
 
 /// 插入或查找已有节点 (insert-or-get)。
-///
-/// - `use_transaction = true`: 函数内部创建事务，适用于单条插入场景。
-/// - `use_transaction = false`: 调用方自行管理事务（批量摄取路径复用）。
+/// 内部自动创建事务，保证 nodes + nodes_fts 原子写入。
 pub fn insert_or_get_node(
     conn: &Connection,
     title: &str,
@@ -122,7 +120,6 @@ pub fn insert_or_get_node(
     summary: Option<&str>,
     url: Option<&str>,
     domain: Option<&str>,
-    use_transaction: bool,
 ) -> rusqlite::Result<String> {
     if let Some(url) = url {
         if let Some(existing) = find_node_by_url(conn, url)? {
@@ -158,15 +155,10 @@ pub fn insert_or_get_node(
         depth: 0,
         cluster_id: None,
     };
-    if use_transaction {
-        // 单条插入: 内部事务保证 nodes + nodes_fts 原子性
-        let tx = conn.unchecked_transaction()?;
-        insert_node_rows(&tx, &node)?;
-        tx.commit()?;
-    } else {
-        // 批量路径: 调用方已持有事务
-        insert_node_rows(conn, &node)?;
-    }
+    // 内部事务保证 nodes + nodes_fts 原子性
+    let tx = conn.unchecked_transaction()?;
+    insert_node_rows(&tx, &node)?;
+    tx.commit()?;
     Ok(id)
 }
 
