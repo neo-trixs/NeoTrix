@@ -1,0 +1,29 @@
+name: MinimalGame
+version: "0.1.0"
+engine:
+  target: bevy
+  features:
+    - 2d
+
+entities:
+  ball:
+    components:
+      - Transform
+      - Velocity
+      - Collider
+    systems:
+      - MovementSystem
+
+systems:
+  MovementSystem:
+    priority: 10
+    read:
+      - Transform
+      - Velocity
+    write:
+      - Transform
+
+resources:
+  Time:
+    fields:
+      delta: f32

@@ -6,27 +6,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// 情绪标签 — 统一 11 变体 (CONTEXT.md 定义)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum _EmotionLabel {
-    Neutral,
-    Joy,
-    Sadness,
-    Anger,
-    Fear,
-    Trust,
-    Disgust,
-    Surprise,
-    Anticipation,
-    Confused,
-    Thinking,
-}
+// 统一 EmotionLabel 事实源: core::nt_core_self::emotion_state::EmotionLabel
+pub use crate::core::nt_core_self::emotion_state::EmotionLabel;
 
 /// 情绪信号 — 从文本/语音/视觉检测
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct _EmotionSignal {
-    pub label: _EmotionLabel,
+    pub label: EmotionLabel,
     pub intensity: f64, // 0.0 - 1.0
     pub source: _SignalSource,
     pub raw_input: String,
@@ -49,17 +35,17 @@ pub(crate) struct _CharacterPersona {
     pub name: String,
     pub personality_traits: Vec<String>,
     pub response_style: _ResponseStyle,
-    pub emotional_baseline: HashMap<_EmotionLabel, f64>,
+    pub emotional_baseline: HashMap<EmotionLabel, f64>,
     pub voice_config: Option<_VoiceConfig>,
 }
 
 /// 响应风格
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct _ResponseStyle {
-    pub formality: f64,     // 0.0 casual - 1.0 formal
-    pub enthusiasm: f64,    // 0.0 calm - 1.0 excited
-    pub empathy: f64,       // 0.0 analytical - 1.0 empathetic
-    pub humor: f64,         // 0.0 serious - 1.0 playful
+    pub formality: f64,  // 0.0 casual - 1.0 formal
+    pub enthusiasm: f64, // 0.0 calm - 1.0 excited
+    pub empathy: f64,    // 0.0 analytical - 1.0 empathetic
+    pub humor: f64,      // 0.0 serious - 1.0 playful
 }
 
 /// 语音配置 — Open-LLM-VTuber 吸收
@@ -111,11 +97,7 @@ pub(crate) trait _EmotionLayer: Send + Sync {
     fn regulate(&self, signal: _EmotionSignal) -> _RegulationResult;
 
     /// 应用角色人格 (Open-LLM-VTuber 吸收)
-    fn apply_persona(
-        &self,
-        signal: _EmotionSignal,
-        persona: &_CharacterPersona,
-    ) -> _EmotionSignal;
+    fn apply_persona(&self, signal: _EmotionSignal, persona: &_CharacterPersona) -> _EmotionSignal;
 
     /// TTS 输出 — 情绪驱动语音合成 (Open-LLM-VTuber 吸收)
     fn synthesize_speech(
@@ -135,7 +117,7 @@ pub(crate) trait _EmotionLayer: Send + Sync {
 /// 情感状态快照
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct _EmotionSnapshot {
-    pub current_emotion: _EmotionLabel,
+    pub current_emotion: EmotionLabel,
     pub intensity: f64,
     pub social_state: HashMap<String, f64>,
     pub attention_signals: Vec<String>,

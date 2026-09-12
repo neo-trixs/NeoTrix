@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -271,11 +271,7 @@ impl AutoSave {
 
 pub fn attach_persistence(config: &mut super::streaming::PipelineConfig) -> Arc<DownloadStore> {
     let store = Arc::new(DownloadStore::new());
-    let store_clone = store.clone();
-
-    let persistence_store = Arc::new(DownloadStore::new());
-    config.persistence = Some(Arc::try_unwrap(persistence_store).unwrap_or_else(|arc| (*arc).clone()));
-
+    config.persistence = Some(store.clone());
     store
 }
 

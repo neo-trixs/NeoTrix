@@ -62,9 +62,18 @@ impl SelfModel {
             identity: "neotrix-core".to_string(),
             goals: Vec::new(),
             value_weights: vec![
-                ValueWeight { dimension: "coherence".to_string(), weight: 1.0 / 3.0 },
-                ValueWeight { dimension: "safety".to_string(), weight: 1.0 / 3.0 },
-                ValueWeight { dimension: "growth".to_string(), weight: 1.0 / 3.0 },
+                ValueWeight {
+                    dimension: "coherence".to_string(),
+                    weight: 1.0 / 3.0,
+                },
+                ValueWeight {
+                    dimension: "safety".to_string(),
+                    weight: 1.0 / 3.0,
+                },
+                ValueWeight {
+                    dimension: "growth".to_string(),
+                    weight: 1.0 / 3.0,
+                },
             ],
             revision: 0,
         }
@@ -112,6 +121,9 @@ impl SelfModel {
         Ok(())
     }
 }
+
+/// 价值函数模型类型别名，消除三个 SelfModel 之间的歧义
+pub type ValueFunctionModel = SelfModel;
 
 #[cfg(test)]
 mod tests {

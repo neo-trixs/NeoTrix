@@ -18,18 +18,22 @@ use tokio::sync::RwLock;
 // CookieJar — thread-safe cookie storage
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// A single cookie entry, serializable to JSON for file persistence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct StoredCookie {
-    name: String,
-    value: String,
-    path: Option<String>,
-    domain: Option<String>,
-    expires: Option<u64>,
+pub struct CookieEntry {
+    pub name: String,
+    pub value: String,
+    pub domain: String,
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires: Option<u64>,
+    #[serde(default)]
+    pub secure: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CookieStore {
-    cookies: HashMap<String, Vec<StoredCookie>>,
+    cookies: HashMap<String, Vec<CookieEntry>>,
 }
 
 impl Default for CookieStore {
@@ -42,7 +46,7 @@ impl Default for CookieStore {
 
 #[derive(Debug, Clone)]
 pub struct CookieJar {
-    inner: Arc<RwLock<HashMap<String, HashMap<String, StoredCookie>>>>,
+    inner: Arc<RwLock<HashMap<String, HashMap<String, CookieEntry>>>>,
     file_path: Option<PathBuf>,
 }
 
@@ -125,21 +129,27 @@ impl CookieJar {
     }
 
     /// Add a cookie for a domain.
-    pub async fn add_cookie(&self, domain: &str, name: &str, value: &str) {
+    pub async fn add_cookie(&self, entry: CookieEntry) {
         let mut jar = self.inner.write().await;
-        let entry = jar
-            .entry(domain.to_string())
+        let domain = entry.domain.clone();
+        let name = entry.name.clone();
+        let bucket = jar
+            .entry(domain)
             .or_insert_with(HashMap::new);
-        entry.insert(
-            name.to_string(),
-            StoredCookie {
-                name: name.to_string(),
-                value: value.to_string(),
-                path: None,
-                domain: Some(domain.to_string()),
-                expires: None,
-            },
-        );
+        bucket.insert(name, entry);
+    }
+
+    /// Convenience: add a simple name=value cookie for a domain.
+    pub async fn add_cookie_simple(&self, domain: &str, name: &str, value: &str) {
+        let entry = CookieEntry {
+            name: name.to_string(),
+            value: value.to_string(),
+            domain: domain.to_string(),
+            path: "/".to_string(),
+            expires: None,
+            secure: false,
+        };
+        self.add_cookie(entry).await;
     }
 
     /// Get a "Cookie" header value for the domain (e.g. "name1=val1; name2=val2").
@@ -171,14 +181,15 @@ impl CookieJar {
     /// Parse a `Set-Cookie` header and store the cookie for the given domain.
     pub async fn parse_set_cookie(&self, header: &str, domain: &str) {
         let mut jar = self.inner.write().await;
-        let entry = jar
+        let bucket = jar
             .entry(domain.to_string())
             .or_insert_with(HashMap::new);
 
         let mut name = String::new();
         let mut value = String::new();
-        let mut path = None;
+        let mut path = "/".to_string();
         let mut expires = None;
+        let mut secure = false;
 
         for part in header.split(';') {
             let part = part.trim();
@@ -186,28 +197,32 @@ impl CookieJar {
                 let k = k.trim().to_lowercase();
                 let v = v.trim().to_string();
                 match k.as_str() {
-                    "path" => path = Some(v),
+                    "path" => path = v,
                     "expires" => {
                         expires = parse_cookie_expires(&v);
                     }
+                    "secure" => secure = true,
                     _ if name.is_empty() => {
                         name = k;
                         value = v;
                     }
                     _ => {}
                 }
+            } else if part.trim().to_lowercase() == "secure" {
+                secure = true;
             }
         }
 
         if !name.is_empty() {
-            entry.insert(
+            bucket.insert(
                 name.clone(),
-                StoredCookie {
+                CookieEntry {
                     name,
                     value,
+                    domain: domain.to_string(),
                     path,
-                    domain: Some(domain.to_string()),
                     expires,
+                    secure,
                 },
             );
         }
@@ -381,8 +396,8 @@ mod tests {
     #[tokio::test]
     async fn test_cookie_jar_memory() {
         let jar = CookieJar::new();
-        jar.add_cookie("example.com", "session", "abc123").await;
-        jar.add_cookie("example.com", "lang", "en").await;
+        jar.add_cookie_simple("example.com", "session", "abc123").await;
+        jar.add_cookie_simple("example.com", "lang", "en").await;
 
         let header = jar.get_cookies("example.com").await.unwrap();
         assert!(header.contains("session=abc123"));
@@ -396,7 +411,7 @@ mod tests {
     async fn test_cookie_jar_file_persist() {
         let path = std::env::temp_dir().join("nt_test_cookies.json");
         let jar = CookieJar::with_file(path.clone());
-        jar.add_cookie("test.com", "token", "xyz789").await;
+        jar.add_cookie_simple("test.com", "token", "xyz789").await;
         jar.save().await.unwrap();
 
         let jar2 = CookieJar::with_file(path.clone());
@@ -405,6 +420,23 @@ mod tests {
         assert!(header.contains("token=xyz789"));
 
         let _ = tokio::fs::remove_file(&path).await;
+    }
+
+    #[tokio::test]
+    async fn test_cookie_entry_api() {
+        let jar = CookieJar::new();
+        jar.add_cookie(CookieEntry {
+            name: "sid".into(),
+            value: "val123".into(),
+            domain: "example.com".into(),
+            path: "/".into(),
+            expires: None,
+            secure: true,
+        })
+        .await;
+
+        let header = jar.get_cookies("example.com").await.unwrap();
+        assert!(header.contains("sid=val123"));
     }
 
     #[test]

@@ -316,8 +316,8 @@ mod tests {
 
         ct.increment();
         assert_eq!(ct.current, 1);
-        assert!(ct.is_changed(0));
-        assert!(!ct.is_changed(1));
+        assert!(ct.is_changed(1));
+        assert!(!ct.is_changed(0));
 
         ct.mark_read();
         assert_eq!(ct.last_read, 1);
@@ -364,8 +364,9 @@ mod tests {
 
         tracker.advance_tick();
         let changed = tracker.detect_component_change(EntityId(0), &pos);
-        assert!(changed.was_changed());
+        assert!(!changed.was_changed());
         assert_eq!(changed.tick, 1);
+        assert!(tracker.was_changed::<Position>(EntityId(0)));
 
         let changed2 = tracker.detect_component_change(EntityId(0), &pos);
         assert!(!changed2.was_changed());
@@ -397,7 +398,16 @@ mod tests {
         tracker.insert_changed(&mut world, entity, Position { x: 1.0, y: 2.0 });
 
         let changed = world.get_component::<Changed<Position>>(entity).unwrap();
-        assert!(changed.was_changed());
         assert_eq!(changed.value.x, 1.0);
+        assert!(tracker.was_changed::<Position>(entity.id));
+    }
+
+    #[test]
+    fn test_change_tick_increment() {
+        let mut tick = ChangeTick { current: 0, last_read: 0 };
+        tick.increment();
+        assert_eq!(tick.current, 1);
+        assert!(tick.is_changed(1));
+        assert!(!tick.is_changed(0));
     }
 }

@@ -28,7 +28,6 @@ mod subgrid;
 mod drift;
 mod health;
 mod resilience;
-mod circuit_breaker;
 mod response_cache;
 mod response_healer;
 
@@ -60,7 +59,6 @@ pub use routing_utils::*;
 
 pub use health::*;
 pub use resilience::*;
-pub use circuit_breaker::{CircuitBreaker, CircuitState};
 pub use response_cache::*;
 pub use response_healer::*;
 // Execution

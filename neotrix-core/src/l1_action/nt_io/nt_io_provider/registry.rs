@@ -40,11 +40,11 @@ impl ProviderRegistry {
             .filter(|(name, _)| {
                 health.get(*name)
                     .map(|h| matches!(h, HealthStatus::Healthy))
-                    .unwrap_or(true)  // 未检查的默认为健康
+                    .unwrap_or(true)
             })
             .filter(|(_, provider)| {
                 let caps = provider.capabilities();
-                caps.text  // 至少支持文本
+                caps.text
             })
             .collect();
 
@@ -60,7 +60,7 @@ impl ProviderRegistry {
         });
 
         let (name, provider) = candidates.first().unwrap();
-        Ok((name.to_string(), Arc::clone(provider)))
+        Ok((name.to_string(), provider.clone()))
     }
 
     /// Health check all providers — updates cache.

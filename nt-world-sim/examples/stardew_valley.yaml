@@ -1,0 +1,138 @@
+name: StardewValleyClone
+version: "0.1.0"
+
+engine:
+  target: bevy
+  features:
+    - 2d
+    - physics
+    - audio
+    - ui
+    - tilemap
+
+entities:
+  player:
+    components:
+      - Transform
+      - Sprite
+      - PlayerController
+      - Inventory
+      - Health
+    systems:
+      - PlayerInputSystem
+      - MovementSystem
+      - CollisionSystem
+
+  npc_villager:
+    components:
+      - Transform
+      - Sprite
+      - AiController
+      - DialogueData
+      - Schedule
+    systems:
+      - AiSchedulerSystem
+      - DialogueSystem
+
+  crop:
+    components:
+      - Transform
+      - Sprite
+      - CropData
+      - GrowthStage
+      - WaterLevel
+    systems:
+      - GrowthSystem
+      - WaterSystem
+
+  animal:
+    components:
+      - Transform
+      - Sprite
+      - AnimalData
+      - Happiness
+      - PetLevel
+    systems:
+      - AnimalBehaviorSystem
+      - HappinessSystem
+
+  pet:
+    components:
+      - Transform
+      - Sprite
+      - CorePetState
+      - EyeTracking
+    systems:
+      - CorePetSystem
+
+systems:
+  PlayerInputSystem:
+    priority: 100
+    read:
+      - InputState
+    write:
+      - Velocity
+
+  MovementSystem:
+    priority: 50
+    read:
+      - Transform
+      - Velocity
+    write:
+      - Transform
+
+  CollisionSystem:
+    priority: 45
+    read:
+      - Transform
+      - Collider
+    write:
+      - CollisionEvent
+
+  AiSchedulerSystem:
+    priority: 40
+    read:
+      - Schedule
+      - Time
+    write:
+      - AiState
+
+  GrowthSystem:
+    priority: 30
+    read:
+      - CropData
+      - WaterLevel
+      - Time
+    write:
+      - GrowthStage
+
+  CorePetSystem:
+    priority: 20
+    read:
+      - CorePetState
+    write:
+      - CorePetState
+
+resources:
+  Time:
+    fields:
+      delta: f32
+      elapsed: f32
+      day: u32
+
+  Input:
+    fields:
+      keys_pressed: HashSet<KeyCode>
+      mouse_position: Vec2
+
+  GameProgress:
+    fields:
+      current_day: u32
+      gold: i32
+      unlocked_areas: Vec<String>
+
+  WorldMap:
+    fields:
+      width: u32
+      height: u32
+      tile_size: u32

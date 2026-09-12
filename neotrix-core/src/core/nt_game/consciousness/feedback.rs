@@ -122,39 +122,8 @@ pub fn compute_pressure(turns_played: usize, max_turns: usize) -> PressureSignal
 // Feedback Report
 // ═══════════════════════════════════════════════════════════════════
 
-/// Emotion label mapped from appraisal.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum EmotionLabel {
-    Neutral,
-    Joy,
-    Sadness,
-    Anger,
-    Fear,
-    Trust,
-    Disgust,
-    Surprise,
-    Anticipation,
-    Confused,
-    Thinking,
-}
-
-impl EmotionLabel {
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::Neutral => "neutral",
-            Self::Joy => "joy",
-            Self::Sadness => "sadness",
-            Self::Anger => "anger",
-            Self::Fear => "fear",
-            Self::Trust => "trust",
-            Self::Disgust => "disgust",
-            Self::Surprise => "surprise",
-            Self::Anticipation => "anticipation",
-            Self::Confused => "confused",
-            Self::Thinking => "thinking",
-        }
-    }
-}
+/// 统一 EmotionLabel 事实源: core::nt_core_self::emotion_state::EmotionLabel
+pub use crate::core::nt_core_self::emotion_state::EmotionLabel;
 
 /// Map appraisal to dominant emotion label.
 fn appraisal_to_emotion(appraisal: &AppraisalSignal) -> EmotionLabel {

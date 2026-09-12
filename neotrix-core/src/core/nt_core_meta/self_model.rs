@@ -403,6 +403,9 @@ pub enum EventKind {
     MetaCognitionUpdated,
 }
 
+/// 静态结构身份模型类型别名，消除三个 SelfModel 之间的歧义
+pub type StaticIdentityModel = SelfModel;
+
 #[cfg(test)]
 mod tests {
     use super::*;

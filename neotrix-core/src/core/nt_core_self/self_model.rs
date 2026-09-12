@@ -193,6 +193,9 @@ impl SelfModel {
     }
 }
 
+/// 动态性能模型类型别名，消除三个 SelfModel 之间的歧义
+pub type DynamicPerformanceModel = SelfModel;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,10 +308,16 @@ mod tests {
     #[test]
     fn test_working_memory_accessor_e5() {
         let mut m = SelfModel::new();
-        assert!(m.working_memory().is_none(), "no buffer attached by default");
+        assert!(
+            m.working_memory().is_none(),
+            "no buffer attached by default"
+        );
         m.attach_working_memory(DualBrainWorkingMemory::default());
         let wm = m.working_memory().expect("buffer attached");
-        assert_eq!(wm.capacity(), crate::l1_action::nt_memory::nt_memory_kb::DEFAULT_WORKING_CAPACITY);
+        assert_eq!(
+            wm.capacity(),
+            crate::l1_action::nt_memory::nt_memory_kb::DEFAULT_WORKING_CAPACITY
+        );
         assert!(wm.is_empty());
     }
 

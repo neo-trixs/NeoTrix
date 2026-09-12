@@ -173,4 +173,35 @@ mod tests {
         chunk.add_entity(EntityId(2));
         assert!(chunk.is_full());
     }
+
+    #[test]
+    fn test_archetype_creation() {
+        let mut types = HashSet::new();
+        types.insert(TypeId::of::<i32>());
+        let arch = Archetype::new(ArchetypeId(1), types);
+        assert_eq!(arch.id, ArchetypeId(1));
+    }
+
+    #[test]
+    fn test_chunk_capacity_three() {
+        let mut chunk = Chunk::new(3);
+        assert!(!chunk.is_full());
+        chunk.add_entity(EntityId(1));
+        chunk.add_entity(EntityId(2));
+        chunk.add_entity(EntityId(3));
+        assert!(chunk.is_full());
+    }
+
+    #[test]
+    fn test_archetype_query_match() {
+        let mut types = HashSet::new();
+        types.insert(TypeId::of::<i32>());
+        types.insert(TypeId::of::<String>());
+        let arch = Archetype::new(ArchetypeId(1), types);
+
+        let mut required = HashSet::new();
+        required.insert(TypeId::of::<i32>());
+        let excluded = HashSet::new();
+        assert!(arch.matches_query(&required, &excluded));
+    }
 }

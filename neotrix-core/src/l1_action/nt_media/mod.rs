@@ -6,13 +6,15 @@
 //! - Streaming pipeline (new: download→player end-to-end)
 //! - Progress types (unified, replaces per-module definitions)
 
+pub mod audio_decode;
 pub mod auth;
 pub mod detect;
+pub mod hls;
 pub mod persistence;
 pub mod router;
 pub mod streaming;
 
-pub use auth::{AuthConfig, AuthStrategy, CookieJar};
+pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};
 pub use detect::MediaKind;
 pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use streaming::{

@@ -318,22 +318,24 @@ impl Default for UniversalWorld {
 mod tests {
     use super::*;
 
-    #[derive(Component, Clone, Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     struct Position {
         x: f32,
         y: f32,
     }
+    impl Component for Position {}
 
-    #[derive(Component, Clone, Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     struct Velocity {
         x: f32,
         y: f32,
     }
+    impl Component for Velocity {}
 
-    #[derive(Resource)]
     struct Time {
         delta: f32,
     }
+    impl Resource for Time {}
 
     #[test]
     fn test_entity_spawn() {
@@ -379,5 +381,44 @@ mod tests {
         
         let time = world.get_resource::<Time>().unwrap();
         assert_eq!(time.delta, 0.016);
+    }
+
+    #[test]
+    fn test_spawn_despawn() {
+        let mut world = UniversalWorld::new();
+        let e = world.spawn();
+        assert_eq!(world.entity_count(), 1);
+        world.despawn(e);
+        assert_eq!(world.entity_count(), 0);
+    }
+
+    #[test]
+    fn test_insert_get_component() {
+        let mut world = UniversalWorld::new();
+        let e = world.spawn();
+        world.insert_component(e, Position { x: 1.0, y: 2.0 });
+        let pos = world.get_component::<Position>(e).unwrap();
+        assert_eq!(pos.x, 1.0);
+    }
+
+    #[test]
+    fn test_query_two_components() {
+        let mut world = UniversalWorld::new();
+        let e1 = world.spawn();
+        world.insert_component(e1, Position { x: 0.0, y: 0.0 });
+        world.insert_component(e1, Velocity { x: 1.0, y: 1.0 });
+        let e2 = world.spawn();
+        world.insert_component(e2, Position { x: 5.0, y: 5.0 });
+
+        let results = world.query::<(Position, Velocity)>();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_resource_insert_get() {
+        let mut world = UniversalWorld::new();
+        world.insert_resource(Time { delta: 0.016 });
+        let t = world.get_resource::<Time>().unwrap();
+        assert_eq!(t.delta, 0.016);
     }
 }

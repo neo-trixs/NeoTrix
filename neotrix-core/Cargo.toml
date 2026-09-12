@@ -123,6 +123,7 @@ unicode-normalization = "0.1"
 flate2 = "1"
 tar = "0.4"
 anydoc = { version = "0.2", optional = true }
+symphonia = { version = "0.5", features = ["mp3", "flac", "wav", "ogg", "isomp4", "pcm"], optional = true }
 semver = "1.0"
 zstd = "0.13"
 crc32fast = "1"
@@ -249,6 +250,7 @@ anydoc = ["dep:anydoc"]
 simd-vsa = ["dep:holon"]
 self-update = ["dep:self_update"]
 ios-bridge = ["dep:uniffi"]
+audio-decode = ["symphonia"]
 onnx = ["dep:ort", "dep:ndarray", "dep:ureq"]
 full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "ios-bridge", "onnx"]
 # Internal features (not for external use)

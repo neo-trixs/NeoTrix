@@ -15,7 +15,7 @@ pub enum CircuitState {
     HalfOpen,
 }
 
-/// 熔断器 — 防止级联故障
+/// 熔断器 — 防止级联故障，含完整 half-open 状态机
 pub struct CircuitBreaker {
     state: Arc<AtomicBool>,
     failure_count: AtomicU32,
@@ -23,6 +23,8 @@ pub struct CircuitBreaker {
     threshold: u32,
     recovery_timeout: Duration,
     last_failure: Mutex<Option<Instant>>,
+    half_open_max_calls: u32,
+    half_open_calls: AtomicU32,
 }
 
 impl CircuitBreaker {
@@ -34,6 +36,34 @@ impl CircuitBreaker {
             threshold,
             recovery_timeout,
             last_failure: std::sync::Mutex::new(None),
+            half_open_max_calls: 1,
+            half_open_calls: AtomicU32::new(0),
+        }
+    }
+
+    pub fn with_half_open_max(mut self, max: u32) -> Self {
+        self.half_open_max_calls = max;
+        self
+    }
+
+    /// 检查当前是否应允许请求通过（含 half-open 状态机逻辑）
+    pub fn should_allow(&self) -> bool {
+        if self.state.load(Ordering::Relaxed) {
+            // Open 状态：检查冷却期是否已过，尝试进入 half-open
+            if let Some(last) = self.last_failure.lock().unwrap().as_ref() {
+                if last.elapsed() > self.recovery_timeout {
+                    // 冷却期已过 → 进入 half-open，允许探测
+                    self.half_open_calls.store(0, Ordering::Relaxed);
+                    return true;
+                }
+            }
+            false
+        } else if self.half_open_calls.load(Ordering::Relaxed) > 0 {
+            // Half-open 状态：限制探测次数
+            self.half_open_calls.load(Ordering::Relaxed) < self.half_open_max_calls
+        } else {
+            // Closed 状态：正常放行
+            true
         }
     }
 
@@ -43,6 +73,7 @@ impl CircuitBreaker {
                 if last.elapsed() > self.recovery_timeout {
                     self.state.store(false, Ordering::Relaxed);
                     self.failure_count.store(0, Ordering::Relaxed);
+                    self.half_open_calls.store(0, Ordering::Relaxed);
                     return false;
                 }
             }
@@ -54,14 +85,46 @@ impl CircuitBreaker {
     pub fn record_failure(&self) {
         let count = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
         *self.last_failure.lock().unwrap() = Some(Instant::now());
+        if self.state.load(Ordering::Relaxed) {
+            // Already open — stay open, reset cooldown
+            return;
+        }
         if count >= self.threshold {
             self.state.store(true, Ordering::Relaxed);
         }
     }
 
+    pub fn record_failure_allow_transition(&self) {
+        if self.state.load(Ordering::Relaxed) {
+            // Open 状态下的 failure — 保持 open 并重置冷却
+            *self.last_failure.lock().unwrap() = Some(Instant::now());
+            return;
+        }
+        let calls = self.half_open_calls.fetch_add(1, Ordering::Relaxed) + 1;
+        if self.state.load(Ordering::Relaxed) {
+            // half-open probe failed → 回退 open
+            self.state.store(true, Ordering::Relaxed);
+            *self.last_failure.lock().unwrap() = Some(Instant::now());
+            self.half_open_calls.store(0, Ordering::Relaxed);
+        } else {
+            let count = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
+            *self.last_failure.lock().unwrap() = Some(Instant::now());
+            if count >= self.threshold {
+                self.state.store(true, Ordering::Relaxed);
+            }
+        }
+    }
+
     pub fn record_success(&self) {
         self.success_count.fetch_add(1, Ordering::Relaxed);
-        self.failure_count.store(0, Ordering::Relaxed);
+        if self.state.load(Ordering::Relaxed) {
+            // half-open probe succeeded → 恢复 closed
+            self.state.store(false, Ordering::Relaxed);
+            self.failure_count.store(0, Ordering::Relaxed);
+            self.half_open_calls.store(0, Ordering::Relaxed);
+        } else {
+            self.failure_count.store(0, Ordering::Relaxed);
+        }
     }
 
     pub fn state(&self) -> CircuitState {

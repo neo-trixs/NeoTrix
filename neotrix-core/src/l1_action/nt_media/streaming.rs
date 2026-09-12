@@ -81,7 +81,8 @@ pub struct PipelineConfig {
     pub proxy: Option<String>,
     pub timeout: Duration,
     pub chunk_size: usize,
-    pub persistence: Option<super::persistence::DownloadStore>,
+    pub persistence: Option<Arc<super::persistence::DownloadStore>>,
+    pub auth: Option<AuthConfig>,
 }
 
 impl Default for PipelineConfig {
@@ -97,6 +98,7 @@ impl Default for PipelineConfig {
             timeout: Duration::from_secs(30),
             chunk_size: 256 * 1024,
             persistence: None,
+            auth: None,
         }
     }
 }
@@ -151,6 +153,7 @@ impl StreamingPipeline {
                         progress_tx.clone(),
                         media_kind,
                         auth.as_ref(),
+                        config.persistence.clone(),
                     )
                     .await
                 });
@@ -302,8 +305,23 @@ async fn stream_http_download(
     progress_tx: mpsc::Sender<PipelineProgress>,
     media_kind: MediaKind,
     auth: Option<&AuthConfig>,
+    persistence: Option<Arc<super::persistence::DownloadStore>>,
 ) -> Result<(), PipelineError> {
     let started = Instant::now();
+
+    let record_id = if let Some(ref store) = persistence {
+        let record = super::persistence::DownloadRecord::new(
+            url.to_string(),
+            output.to_path_buf(),
+            format!("{:?}", media_kind),
+        );
+        let id = record.id.clone();
+        store.add_record(record).await;
+        let _ = store.save().await;
+        Some(id)
+    } else {
+        None
+    };
 
     let req = client
         .get(url)
@@ -353,6 +371,7 @@ async fn stream_http_download(
 
     let mut speed_samples: Vec<f64> = Vec::new();
     let mut last_sample = Instant::now();
+    let mut last_persist = Instant::now();
     let mut recent_bytes: u64 = 0;
 
     let _ = progress_tx
@@ -367,6 +386,15 @@ async fn stream_http_download(
 
     while let Some(chunk) = stream.next().await {
         if cancel.load(Ordering::Relaxed) {
+            if let (Some(ref store), Some(ref id)) = (&persistence, &record_id) {
+                let _ = store
+                    .update_record(id, |r| {
+                        r.mark_failed("cancelled".into());
+                    })
+                    .await;
+                let _ = store.save().await;
+            }
+
             let _ = progress_tx
                 .send(PipelineProgress {
                     url: url.to_string(),
@@ -423,9 +451,30 @@ async fn stream_http_download(
                             elapsed: started.elapsed(),
                         })
                         .await;
+
+                    if let (Some(ref store), Some(ref id)) = (&persistence, &record_id) {
+                        if last_persist.elapsed() > Duration::from_secs(5) {
+                            let _ = store
+                                .update_record(id, |r| {
+                                    r.update_progress(written, total_size, avg_speed);
+                                })
+                                .await;
+                            let _ = store.save().await;
+                            last_persist = Instant::now();
+                        }
+                    }
                 }
             }
             Err(e) => {
+                if let (Some(ref store), Some(ref id)) = (&persistence, &record_id) {
+                    let _ = store
+                        .update_record(id, |r| {
+                            r.mark_failed(e.to_string());
+                        })
+                        .await;
+                    let _ = store.save().await;
+                }
+
                 let _ = progress_tx
                     .send(PipelineProgress {
                         url: url.to_string(),
@@ -445,6 +494,15 @@ async fn stream_http_download(
         .await
         .map_err(|e| PipelineError::Io(e.to_string()))?;
     let final_bytes = bytes_written.load(Ordering::Relaxed);
+
+    if let (Some(ref store), Some(ref id)) = (&persistence, &record_id) {
+        let _ = store
+            .update_record(id, |r| {
+                r.mark_complete(final_bytes);
+            })
+            .await;
+        let _ = store.save().await;
+    }
 
     let _ = progress_tx
         .send(PipelineProgress {

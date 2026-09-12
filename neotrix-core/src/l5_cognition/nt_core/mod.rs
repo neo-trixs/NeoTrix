@@ -17,8 +17,6 @@ pub mod nt_consciousness_core;
 
 // 保留的独立模块
 pub mod context_assembly;
-pub mod nt_core_prompt_template;
-pub mod nt_core_xai;
 pub mod nt_core_parallel;
 pub mod seal;
 pub mod hybrid_layer;

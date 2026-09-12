@@ -44,7 +44,6 @@ pub mod nt_core_sense;
 pub mod l3_memory;
 pub mod nt_core_bank;
 pub mod nt_core_graph;
-pub mod nt_core_graph_types;
 pub mod nt_core_concept_emergence;
 pub mod nt_core_hcube;
  pub mod nt_core_knowledge;
@@ -347,7 +346,7 @@ pub use nt_core_bank::{
 };
 pub use nt_core_cap::CapabilityVector;
 pub use nt_core_edit::{MicroEdit, ToolCall};
-pub use nt_core_graph::{EdgeRelation, HyperEdge, HyperGraph, HyperNode, HyperNodeType};
+pub use nt_core_graph::{Community, EdgeRelation, GraphEdge, GraphNode, HyperEdge, HyperGraph, HyperNode, HyperNodeType, KnowledgeGraph};
 // nt_core_hcube::aif::belief: removed (empty shell)
 pub use nt_core_hcube::aif::{AiStepReport, FreeEnergyEngine, GenerativeModel, PolicyEvaluator};
 pub use nt_core_hcube::fhrr_vsa::{

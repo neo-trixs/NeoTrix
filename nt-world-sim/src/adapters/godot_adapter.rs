@@ -23,7 +23,7 @@ impl GodotAdapter {
     }
 }
 
-#[derive(Clone)]
+#[allow(dead_code)]
 struct GodotSignalEvent {
     name: String,
     args: Vec<String>,
