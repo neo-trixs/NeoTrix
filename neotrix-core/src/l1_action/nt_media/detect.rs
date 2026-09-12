@@ -13,10 +13,10 @@
 //! │  Reads first 8KB, matches file signatures│
 //! ├──────────────────────────────────────────┤
 //! │  L2 HTTP Content-Type header             │
-║ │  Fallback when magic bytes insufficient  │
+//! │  Fallback when magic bytes insufficient  │
 //! ├──────────────────────────────────────────┤
 //! │  L3 URL extension                        │
-║ │  Last resort                             │
+//! │  Last resort                             │
 //! └──────────────────────────────────────────┘
 //! ```
 
