@@ -649,6 +649,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   setEnterBehavior={setEnterBehavior}
                   restoreLastSession={restoreLastSession}
                   setRestoreLastSession={setRestoreLastSessionPref}
+                  autostartEnabled={autostartEnabled}
+                  setAutostartEnabled={setAutostartPref}
                   onClearDemoData={clearDemoData}
                 />
               </Show>

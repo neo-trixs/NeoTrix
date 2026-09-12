@@ -218,6 +218,21 @@ export function GeneralSection(props: Props) {
               <span class={clsx('absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform', props.restoreLastSession() ? 'left-0.5 translate-x-5' : 'left-0.5')} />
             </button>
           </div>
+          <div class="ss-row">
+            <div>
+              <div class="ss-row-label">开机自启</div>
+              <div class="ss-row-desc">登录时自动启动 NeoTrix</div>
+            </div>
+            <button
+              class={clsx('relative w-11 h-6 rounded-full transition-colors flex-shrink-0', props.autostartEnabled() ? 'bg-nt-io-500' : 'bg-zinc-300')}
+              onClick={() => props.setAutostartEnabled(!props.autostartEnabled())}
+              role="switch"
+              aria-checked={props.autostartEnabled()}
+              aria-label="开机自启"
+            >
+              <span class={clsx('absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform', props.autostartEnabled() ? 'left-0.5 translate-x-5' : 'left-0.5')} />
+            </button>
+          </div>
         </div>
       </div>
 
