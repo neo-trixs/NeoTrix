@@ -312,7 +312,7 @@ impl crate::core::nt_core_capability::UnifiedCapability for PdfEnhanceCapability
                         crate::core::nt_core_capability::FileEnhanceOutput {
                             success: result.success,
                             input_path: result.input_pdf,
-                            output_path: result.output_pdf,
+                        output_path: Some(result.output_pdf),
                             message: format!("Extracted {} images, enhanced {}", result.images_extracted, result.images_enhanced),
                         },
                     )),

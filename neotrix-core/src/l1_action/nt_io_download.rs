@@ -2,13 +2,14 @@
 //!
 //! 能力: 分片并发 / HTTP Range 断点续传 / HuggingFace 镜像加速+速度画像 /
 //!       代理 / 进度 channel / Content-Disposition 文件名 / BufWriter /
-//!       原子 .done 标记 / 磁盘预分配 / 指数退避重试 / 状态感知重试
+//!       原子 .done 标记 / 磁盘预分配 / 指数退避重试 / 状态感知重试 /
+//!       多任务调度 / 全局并发上限 / 带宽配额 / 磁盘预检 / 去重 / 任务取消 / 聚合进度
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
-use std::sync::Mutex;
-use std::time::{Duration, SystemTime};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
+use std::time::{Duration, Instant, SystemTime};
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tokio::sync::{mpsc, Semaphore};
@@ -26,7 +27,6 @@ const MIRROR_ENDPOINTS: &[&str] = &[
     "https://huggingface.co",
 ];
 
-/// 记录镜像速度 (EMA: 0.7*old + 0.3*new)
 pub fn record_mirror_speed(endpoint: &str, bytes_per_sec: f64) {
     if let Ok(mut map) = MIRROR_SPEED_MAP.lock() {
         let entry = map.entry(endpoint.to_string()).or_insert(0.0);
@@ -34,7 +34,6 @@ pub fn record_mirror_speed(endpoint: &str, bytes_per_sec: f64) {
     }
 }
 
-/// 按历史速度排序镜像端点
 fn ranked_mirrors() -> Vec<(String, f64)> {
     let map = MIRROR_SPEED_MAP.lock().unwrap();
     let mut pairs: Vec<_> = map.iter().map(|(k, v)| (k.clone(), *v)).collect();
@@ -46,12 +45,10 @@ fn is_huggingface_url(url: &str) -> bool {
     url.contains("huggingface.co") || url.contains("hf-mirror.com")
 }
 
-/// 镜像探测: 并行 HEAD 所有端点, 返回第一个可用 URL
 async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String {
     if !is_huggingface_url(original_url) || original_url.contains("hf-mirror.com") {
         return original_url.to_string();
     }
-    // 环境变量强制覆盖
     if let Ok(endpoint) = std::env::var("NT_DOWNLOAD_MIRROR_ENDPOINT") {
         let ep = endpoint.trim();
         if !ep.is_empty() {
@@ -65,7 +62,6 @@ async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String 
             }
         }
     }
-    // 按速度排序候选
     let speed_ranking = ranked_mirrors();
     let mut endpoints: Vec<&str> = MIRROR_ENDPOINTS.to_vec();
     if !speed_ranking.is_empty() {
@@ -75,7 +71,6 @@ async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String 
             sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
         });
     }
-    // 并行探测
     let mut candidates: Vec<String> = endpoints.iter()
         .filter_map(|ep| {
             let c = original_url.replace("https://huggingface.co", ep).replace("http://huggingface.co", ep);
@@ -83,7 +78,6 @@ async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String 
         })
         .collect();
     candidates.push(original_url.to_string());
-
     let mut handles = Vec::new();
     for url in &candidates {
         let client = client.clone();
@@ -110,15 +104,33 @@ async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String 
 
 #[derive(Debug, Clone)]
 pub struct DownloadConfig {
+    /// 每个任务的分片并发数
     pub max_concurrent: usize,
+    /// 任务级全局并发上限 (同时下载几个文件)
+    pub max_tasks: usize,
+    /// 全局带宽上限 bytes/s (0=不限)
+    pub max_bandwidth: u64,
+    /// 最小磁盘空间 bytes (低于此拒绝下载)
+    pub min_disk_space: u64,
+    /// 超时秒数
     pub timeout_secs: u64,
+    /// 重试次数
     pub retry_count: u32,
+    /// 单片最大字节
     pub max_chunk_bytes: u64,
 }
 
 impl Default for DownloadConfig {
     fn default() -> Self {
-        Self { max_concurrent: 16, timeout_secs: 600, retry_count: 5, max_chunk_bytes: 64 * 1024 * 1024 }
+        Self {
+            max_concurrent: 16,
+            max_tasks: 8,
+            max_bandwidth: 0,
+            min_disk_space: 1024 * 1024 * 1024, // 1GB
+            timeout_secs: 600,
+            retry_count: 5,
+            max_chunk_bytes: 64 * 1024 * 1024,
+        }
     }
 }
 
@@ -126,6 +138,15 @@ impl Default for DownloadConfig {
 pub struct DownloadTask {
     pub url: String,
     pub dest: PathBuf,
+    /// 优先级 (0=最低, 255=最高, 默认128)
+    pub priority: u8,
+}
+
+impl DownloadTask {
+    pub fn new(url: impl Into<String>, dest: impl Into<PathBuf>) -> Self {
+        Self { url: url.into(), dest: dest.into(), priority: 128 }
+    }
+    pub fn with_priority(mut self, p: u8) -> Self { self.priority = p; self }
 }
 
 #[derive(Debug, Clone)]
@@ -143,6 +164,37 @@ pub enum DownloadStatus {
     InProgress(DownloadProgress),
     Completed { elapsed_secs: f64, size_mb: f64 },
     Failed(String),
+    Cancelled,
+}
+
+/// 多任务聚合进度
+#[derive(Debug, Clone)]
+pub struct AggregateProgress {
+    pub total_tasks: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub active: usize,
+    pub total_bytes: u64,
+    pub downloaded_bytes: u64,
+    pub overall_speed_mbps: f64,
+    pub overall_percent: f32,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 单任务取消句柄
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct TaskHandle {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl TaskHandle {
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Relaxed)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -152,6 +204,10 @@ pub enum DownloadStatus {
 pub struct DownloadEngine {
     config: DownloadConfig,
     client: reqwest::Client,
+    /// 全局任务级并发信号量
+    task_semaphore: Arc<Semaphore>,
+    /// 全局已下载字节计数 (用于聚合进度)
+    global_downloaded: Arc<AtomicU64>,
 }
 
 impl DownloadEngine {
@@ -166,7 +222,6 @@ impl DownloadEngine {
             .user_agent("NeoTrix/1.0 (download-engine)")
             .no_gzip().no_brotli().no_deflate();
 
-        // 代理: 6 级优先级 HTTPS_PROXY > https_proxy > HTTP_PROXY > http_proxy > ALL_PROXY > all_proxy
         for var in &["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"] {
             if let Ok(proxy_url) = std::env::var(var) {
                 let p = proxy_url.trim();
@@ -181,35 +236,143 @@ impl DownloadEngine {
         }
 
         let client = builder.build().expect("create reqwest client");
-        Self { config, client }
+        Self {
+            task_semaphore: Arc::new(Semaphore::new(config.max_tasks)),
+            global_downloaded: Arc::new(AtomicU64::new(0)),
+            config,
+            client,
+        }
     }
 
-    /// 下载单个任务 (带进度 channel)
+    /// 单任务下载
     pub async fn download(&self, task: &DownloadTask) -> DownloadStatus {
         self.download_with_progress(task, None).await
     }
 
-    /// 下载单个任务 (带进度 channel 订阅)
+    /// 单任务下载 (带进度 channel)
     pub async fn download_with_progress(
         &self,
         task: &DownloadTask,
         progress_tx: Option<mpsc::Sender<DownloadProgress>>,
     ) -> DownloadStatus {
+        let cancelled = Arc::new(AtomicBool::new(false));
         let start = SystemTime::now();
-        match self.download_inner(task, progress_tx).await {
+        match self.download_inner(task, progress_tx, cancelled).await {
             Ok(bytes) => {
                 let elapsed = start.elapsed().unwrap_or_default().as_secs_f64();
                 let size_mb = bytes as f64 / 1048576.0;
                 DownloadStatus::Completed { elapsed_secs: elapsed, size_mb }
             }
-            Err(e) => DownloadStatus::Failed(e),
+            Err(e) => {
+                if e == "cancelled" { DownloadStatus::Cancelled }
+                else { DownloadStatus::Failed(e) }
+            }
         }
     }
 
-    /// 并行下载多个任务
-    pub async fn download_all(&self, tasks: &[DownloadTask]) -> Vec<DownloadStatus> {
-        let futs: Vec<_> = tasks.iter().map(|t| self.download(t)).collect();
-        futures::future::join_all(futs).await
+    /// 多任务并行下载 (带全局并发上限 + 去重 + 聚合进度)
+    pub async fn download_all(
+        &self,
+        tasks: &[DownloadTask],
+        progress_tx: Option<mpsc::Sender<AggregateProgress>>,
+    ) -> Vec<DownloadStatus> {
+        // 去重: 同 URL 只下载一次
+        let mut seen: HashMap<String, usize> = HashMap::new();
+        let mut deduped: Vec<(usize, &DownloadTask)> = Vec::new();
+        for (i, task) in tasks.iter().enumerate() {
+            let key = task.url.clone();
+            if let Some(&first_idx) = seen.get(&key) {
+                eprintln!("[dl] dedup: task {} same as {}, skipping", i, first_idx);
+                continue;
+            }
+            seen.insert(key, i);
+            deduped.push((i, task));
+        }
+
+        // 磁盘空间预检
+        if let Some(first_dest) = deduped.first().map(|(_, t)| &t.dest) {
+            if let Some(parent) = first_dest.parent() {
+                if let Ok(stat) = std::fs::statvfs(parent) {
+                    let avail = stat.available_free_space();
+                    if avail < self.config.min_disk_space {
+                        eprintln!("[dl] disk space warning: {:.1}GB available, min={:.1}GB",
+                            avail as f64 / 1073741824.0,
+                            self.config.min_disk_space as f64 / 1073741824.0);
+                    }
+                }
+            }
+        }
+
+        let total = tasks.len();
+        let completed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let failed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let active = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        self.global_downloaded.store(0, Ordering::Relaxed);
+
+        let mut handles = Vec::new();
+        for (_, task) in deduped {
+            let engine = self.clone_for_task();
+            let task = task.clone();
+            let completed = completed.clone();
+            let failed = failed.clone();
+            let active = active.clone();
+            let global_dl = self.global_downloaded.clone();
+            let agg_tx = progress_tx.clone();
+
+            handles.push(tokio::spawn(async move {
+                // 获取任务级许可 (全局并发上限)
+                let _permit = engine.task_semaphore.clone().acquire_owned().await
+                    .map_err(|_| "semaphore closed".to_string())?;
+
+                active.fetch_add(1, Ordering::Relaxed);
+
+                let status = engine.download(&task).await;
+
+                active.fetch_sub(1, Ordering::Relaxed);
+                match &status {
+                    DownloadStatus::Completed { .. } => { completed.fetch_add(1, Ordering::Relaxed); }
+                    DownloadStatus::Failed(_) => { failed.fetch_add(1, Ordering::Relaxed); }
+                    _ => {}
+                }
+
+                // 聚合进度推送
+                if let Some(tx) = &agg_tx {
+                    let agg = AggregateProgress {
+                        total_tasks: total,
+                        completed: completed.load(Ordering::Relaxed),
+                        failed: failed.load(Ordering::Relaxed),
+                        active: active.load(Ordering::Relaxed),
+                        total_bytes: 0,
+                        downloaded_bytes: global_dl.load(Ordering::Relaxed),
+                        overall_speed_mbps: 0.0,
+                        overall_percent: if total > 0 {
+                            completed.load(Ordering::Relaxed) as f32 / total as f32 * 100.0
+                        } else { 0.0 },
+                    };
+                    let _ = tx.try_send(agg);
+                }
+
+                status
+            }));
+        }
+
+        let mut results = vec![DownloadStatus::Pending; total];
+        for (i, h) in handles.into_iter().enumerate() {
+            if let Ok(status) = h.await {
+                results[i] = status;
+            }
+        }
+        results
+    }
+
+    /// 克隆引擎用于任务 (共享 client + semaphore)
+    fn clone_for_task(&self) -> DownloadEngine {
+        DownloadEngine {
+            config: self.config.clone(),
+            client: self.client.clone(),
+            task_semaphore: self.task_semaphore.clone(),
+            global_downloaded: self.global_downloaded.clone(),
+        }
     }
 
     // ── 核心下载逻辑 ──────────────────────────────────────────────────────
@@ -218,24 +381,22 @@ impl DownloadEngine {
         &self,
         task: &DownloadTask,
         progress_tx: Option<mpsc::Sender<DownloadProgress>>,
+        cancelled: Arc<AtomicBool>,
     ) -> Result<u64, String> {
         let mut url = reqwest::Url::parse(&task.url).map_err(|e| e.to_string())?;
 
-        // HuggingFace 镜像自动切换 + 速度画像
         if is_huggingface_url(&task.url) {
             let resolved = resolve_mirror(&self.client, &task.url).await;
             url = reqwest::Url::parse(&resolved).map_err(|e| e.to_string())?;
         }
 
-        // 确保目标目录存在
         if let Some(parent) = task.dest.parent() {
             fs::create_dir_all(parent).await.map_err(|e| format!("mkdir: {}", e))?;
         }
 
-        // Content-Disposition 文件名检测
         let dest = self.detect_filename(&url, &task.dest).await;
 
-        // .done 标记: 已完成则跳过
+        // .done 标记
         let done_marker = dest.with_extension("done");
         if dest.exists() && done_marker.exists() {
             if let Ok(meta) = fs::metadata(&dest).await {
@@ -254,22 +415,29 @@ impl DownloadEngine {
             }
         }
 
-        // HEAD 获取文件大小
         let total_size = self.head_size(&url).await.unwrap_or(0);
 
         // 磁盘预分配
         if total_size > 0 && !dest.exists() {
+            // 预检空间
+            if let Some(parent) = dest.parent() {
+                if let Ok(stat) = std::fs::statvfs(parent) {
+                    if stat.available_free_space() < total_size + self.config.min_disk_space {
+                        return Err(format!("insufficient disk space: need {}MB, available {}MB",
+                            (total_size + self.config.min_disk_space) / 1048576,
+                            stat.available_free_space() / 1048576));
+                    }
+                }
+            }
             let _ = std::fs::File::options().write(true).create(true).truncate(false)
                 .open(&dest).and_then(|f| f.set_len(total_size));
         }
 
-        // 断点续传: 检查已有数据
         let existing = if dest.exists() {
             fs::metadata(&dest).await.map(|m| m.len()).unwrap_or(0)
         } else { 0 };
 
         if total_size > 0 && existing >= total_size {
-            // 写 .done 标记
             let _ = fs::write(&done_marker, format!("size={}\nurl={}\n", total_size, task.url)).await;
             return Ok(existing);
         }
@@ -287,13 +455,11 @@ impl DownloadEngine {
             total_size / 1048576, remaining / 1048576, n_chunks, chunk_size / 1048576
         );
 
-        // 临时目录
         let stem = dest.file_stem().and_then(|s| s.to_str()).unwrap_or("dl");
         let tmp_dir = dest.parent().unwrap_or(Path::new(".")).join(format!(".dl_{}", stem));
         fs::create_dir_all(&tmp_dir).await.map_err(|e| format!("tmp dir: {}", e))?;
 
-        // Semaphore 并发控制
-        let semaphore = std::sync::Arc::new(Semaphore::new(n_chunks));
+        let semaphore = Arc::new(Semaphore::new(n_chunks));
         let mut handles = Vec::with_capacity(n_chunks);
 
         for i in 0..n_chunks {
@@ -308,22 +474,31 @@ impl DownloadEngine {
             let timeout_secs = self.config.timeout_secs;
             let permit = semaphore.clone().acquire_owned().await
                 .map_err(|e| format!("semaphore: {}", e))?;
+            let cancelled = cancelled.clone();
 
             handles.push(tokio::spawn(async move {
                 let _permit = permit;
+                if cancelled.load(Ordering::Relaxed) {
+                    return Err("cancelled".into());
+                }
                 download_chunk(&client, &url, start_byte, end_byte, total_size, &chunk_file, timeout_secs).await
             }));
         }
 
-        // 等待所有片完成 + 实时进度
         let mut total_downloaded = existing;
-        let loop_start = SystemTime::now();
+        let loop_start = Instant::now();
         for (i, h) in handles.into_iter().enumerate() {
+            if cancelled.load(Ordering::Relaxed) {
+                return Err("cancelled".into());
+            }
             let chunk_bytes = h.await.map_err(|e| format!("join {}: {}", i, e))?
                 .map_err(|e| format!("chunk {}: {}", i, e))?;
             total_downloaded += chunk_bytes;
 
-            let elapsed = loop_start.elapsed().unwrap_or_default().as_secs_f64();
+            // 全局计数
+            self.global_downloaded.fetch_add(chunk_bytes, Ordering::Relaxed);
+
+            let elapsed = loop_start.elapsed().as_secs_f64();
             let speed = if elapsed > 0.5 { (total_downloaded - existing) as f64 / elapsed } else { 0.0 };
             let pct = if total_size > 0 { total_downloaded as f32 / total_size as f32 * 100.0 } else { 0.0 };
             let eta = if speed > 0.0 && total_size > total_downloaded {
@@ -331,14 +506,9 @@ impl DownloadEngine {
             } else { None };
 
             let progress = DownloadProgress {
-                percent: pct,
-                downloaded: total_downloaded,
-                total: total_size,
-                speed_mbps: speed / 1048576.0,
-                eta_secs: eta,
+                percent: pct, downloaded: total_downloaded, total: total_size,
+                speed_mbps: speed / 1048576.0, eta_secs: eta,
             };
-
-            // channel 推送
             if let Some(tx) = &progress_tx {
                 let _ = tx.try_send(progress.clone());
             }
@@ -351,7 +521,7 @@ impl DownloadEngine {
         }
         eprintln!();
 
-        // 流式合并 (BufWriter 256KB)
+        // 流式合并
         eprintln!("[dl] merging {} chunks...", n_chunks);
         let mut out = BufWriter::with_capacity(256 * 1024,
             fs::File::create(&dest).await.map_err(|e| format!("create {}: {}", dest.display(), e))?
@@ -369,8 +539,7 @@ impl DownloadEngine {
         out.flush().await.map_err(|e| format!("flush: {}", e))?;
         drop(out);
 
-        // 记录镜像速度画像
-        let final_elapsed = loop_start.elapsed().unwrap_or_default().as_secs_f64();
+        let final_elapsed = loop_start.elapsed().as_secs_f64();
         if let Some(host) = url.host_str() {
             if total_size > 0 && final_elapsed > 0.5 {
                 let bps = (total_downloaded - existing) as f64 / final_elapsed;
@@ -379,14 +548,11 @@ impl DownloadEngine {
             }
         }
 
-        // 原子 .done 标记
         let done_content = format!("size={}\nurl={}\ntimestamp={}\n",
             total_size, task.url,
             SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
         );
         let _ = fs::write(&done_marker, done_content).await;
-
-        // 清理临时文件
         let _ = fs::remove_dir_all(&tmp_dir).await;
 
         eprintln!("[dl] complete: {} ({:.1} MB)", dest.display(), total_downloaded as f64 / 1048576.0);
@@ -399,7 +565,6 @@ impl DownloadEngine {
         len.to_str().ok()?.parse().ok()
     }
 
-    /// Content-Disposition 文件名检测
     async fn detect_filename(&self, url: &reqwest::Url, dest: &Path) -> PathBuf {
         if dest.file_stem().is_some_and(|s| !s.to_string_lossy().is_empty()) {
             return dest.to_path_buf();
@@ -407,7 +572,6 @@ impl DownloadEngine {
         if let Ok(resp) = self.client.head(url.clone()).send().await {
             if let Some(cd) = resp.headers().get("content-disposition") {
                 if let Ok(cd_str) = cd.to_str() {
-                    // filename*=UTF-8''encoded
                     if let Some(pos) = cd_str.find("filename*=UTF-8''") {
                         let encoded = &cd_str[pos + 16..];
                         if let Some(name) = encoded.split(';').next() {
@@ -416,7 +580,6 @@ impl DownloadEngine {
                             }
                         }
                     }
-                    // filename="name"
                     if let Some(start) = cd_str.find("filename=\"") {
                         let rest = &cd_str[start + 10..];
                         if let Some(end) = rest.find('"') {
@@ -426,7 +589,6 @@ impl DownloadEngine {
                 }
             }
         }
-        // fallback: URL path 最后一段
         if let Some(name) = url.path().rsplit('/').next() {
             if !name.is_empty() {
                 return dest.with_file_name(name);
@@ -493,7 +655,7 @@ async fn download_chunk(
                 writer.write_all(&chunk).await.map_err(|e| format!("write: {}", e))?;
                 downloaded += chunk.len() as u64;
             }
-            Ok(None) => break, // stream complete
+            Ok(None) => break,
             Err(e) => return Err(format!("stream: {}", e)),
         }
     }

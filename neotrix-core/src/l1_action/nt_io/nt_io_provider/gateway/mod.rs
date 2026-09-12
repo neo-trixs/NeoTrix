@@ -27,7 +27,8 @@ mod subgrid;
 mod drift;
 mod health;
 mod resilience;
-mod response_quality;
+mod response_cache;
+mod response_healer;
 
 // ── Execution ────────────────────────────────────────────────
 mod coordinator;
@@ -40,7 +41,6 @@ mod plugin;
 
 // ── Types & Registry ─────────────────────────────────────────
 mod benchmark;
-pub mod pool_health;
 mod registry_core;
 
 // ── Feature-gated ────────────────────────────────────────────
@@ -56,15 +56,14 @@ pub use routing_utils::*;
 pub use drift::*;
 pub use health::*;
 pub use resilience::*;
-pub use response_quality::*;
+pub use response_cache::*;
+pub use response_healer::*;
 // Execution
 pub use coordinator::*;
 pub use modular_gateway::*;
 pub use registry_core::*;
 // Observability
 pub use plugin::*;
-// Types & Registry
-pub use registry_core::*;
 // Feature-gated
 #[cfg(feature = "stealth-net")]
 pub use stealth_middleware::*;
