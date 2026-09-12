@@ -66,9 +66,8 @@ mod model_tests {
 
     #[test]
     fn test_latent_state_similarity() {
-        let dim = 32;
-        let s1 = LatentState::zero(dim);
-        let s2 = LatentState::zero(dim);
+        let s1 = LatentState::new();
+        let s2 = LatentState::new();
         let sim = s1.similarity(&s2);
         assert!(sim > 0.9);
     }

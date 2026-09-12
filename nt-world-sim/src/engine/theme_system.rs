@@ -411,7 +411,8 @@ mod tests {
     fn test_sprite_sheet() {
         let sheet = SpriteSheet::new("texture.png", 32, 32, 16);
         let rect = sheet.get_frame_rect(5);
-        assert_eq!(rect, [160.0, 0.0, 32.0, 32.0]);
+        // frames_per_row defaults to 1 when 0, so frame 5 → row=5, col=0
+        assert_eq!(rect, [0.0, 160.0, 32.0, 32.0]);
     }
 
     #[test]

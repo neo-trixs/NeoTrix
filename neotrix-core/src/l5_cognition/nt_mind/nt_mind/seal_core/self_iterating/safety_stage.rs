@@ -15,7 +15,7 @@ use super::pipeline::StageResult;
 
 /// Threat categories for self-modification proposals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ThreatCategory {
+pub(crate) enum ThreatCategory {
     /// Edit would destabilize core capabilities
     Destabilizing,
     /// Edit accesses/modifies sensitive data paths
@@ -30,7 +30,7 @@ pub enum ThreatCategory {
 
 /// Result of a safety check on an edit proposal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SafetyCheckDetail {
+pub(crate) struct SafetyCheckDetail {
     pub threat: ThreatCategory,
     pub severity: f64,
     pub description: String,
