@@ -46,22 +46,37 @@ impl MediaKind {
     pub fn is_audio(self) -> bool {
         matches!(
             self,
-            Self::AudioMp3 | Self::AudioFlac | Self::AudioWav | Self::AudioOgg | Self::AudioAac
-                | Self::AudioM4a | Self::AudioOpus | Self::AudioUnknown
+            Self::AudioMp3
+                | Self::AudioFlac
+                | Self::AudioWav
+                | Self::AudioOgg
+                | Self::AudioAac
+                | Self::AudioM4a
+                | Self::AudioOpus
+                | Self::AudioUnknown
         )
     }
     pub fn is_video(self) -> bool {
         matches!(
             self,
-            Self::VideoMp4 | Self::VideoWebm | Self::VideoMkv | Self::VideoAvi | Self::VideoMov
-                | Self::VideoHls | Self::VideoDash | Self::VideoUnknown
+            Self::VideoMp4
+                | Self::VideoWebm
+                | Self::VideoMkv
+                | Self::VideoAvi
+                | Self::VideoMov
+                | Self::VideoHls
+                | Self::VideoDash
+                | Self::VideoUnknown
         )
     }
     pub fn is_media(self) -> bool {
         self.is_audio() || self.is_video()
     }
     pub fn is_model(self) -> bool {
-        matches!(self, Self::Gguf | Self::Onnx | Self::Safetensors | Self::Pickle)
+        matches!(
+            self,
+            Self::Gguf | Self::Onnx | Self::Safetensors | Self::Pickle
+        )
     }
     pub fn is_document(self) -> bool {
         matches!(
@@ -167,8 +182,9 @@ pub fn detect_from_content_type(ct: &str) -> MediaKind {
         "audio/ogg" | "audio/vorbis" | "audio/opus" => MediaKind::AudioOgg,
         "audio/aac" | "audio/x-aac" => MediaKind::AudioAac,
         "audio/m4a" | "audio/mp4" => MediaKind::AudioM4a,
-        "video/mp4" | "video/webm" | "video/x-matroska" | "video/avi"
-        | "video/quicktime" => MediaKind::VideoMp4,
+        "video/mp4" | "video/webm" | "video/x-matroska" | "video/avi" | "video/quicktime" => {
+            MediaKind::VideoMp4
+        }
         "application/x-mpegurl" | "application/vnd.apple.mpegurl" => MediaKind::VideoHls,
         "application/dash+xml" => MediaKind::VideoDash,
         "application/pdf" => MediaKind::Pdf,
@@ -312,10 +328,7 @@ mod tests {
 
     #[test]
     fn test_content_type() {
-        assert_eq!(
-            detect_from_content_type("audio/mpeg"),
-            MediaKind::AudioMp3
-        );
+        assert_eq!(detect_from_content_type("audio/mpeg"), MediaKind::AudioMp3);
         assert_eq!(
             detect_from_content_type("video/mp4; charset=utf-8"),
             MediaKind::VideoMp4
@@ -349,7 +362,11 @@ mod tests {
             MediaKind::AudioFlac
         );
         assert_eq!(
-            detect(None, Some("audio/mpeg"), Some("https://example.com/file.bin")),
+            detect(
+                None,
+                Some("audio/mpeg"),
+                Some("https://example.com/file.bin")
+            ),
             MediaKind::AudioMp3
         );
         assert_eq!(

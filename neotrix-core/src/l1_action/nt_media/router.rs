@@ -148,10 +148,7 @@ mod tests {
             UrlScheme::parse("magnet:?xt=urn:btih:abc"),
             UrlScheme::Magnet
         );
-        assert_eq!(
-            UrlScheme::parse("/tmp/local.bin"),
-            UrlScheme::Unknown
-        );
+        assert_eq!(UrlScheme::parse("/tmp/local.bin"), UrlScheme::Unknown);
     }
 
     #[test]
