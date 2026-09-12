@@ -23,8 +23,8 @@ pub mod streaming;
 
 // Re-export key types
 pub use detect::MediaKind;
-pub use router::{UrlScheme, TransportType, MediaRoute};
+pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use streaming::{
-    StreamingPipeline, PipelineConfig, PipelineHandle,
-    PipelineProgress, PipelineStatus, PipelineError,
+    PipelineConfig, PipelineError, PipelineHandle, PipelineProgress, PipelineStatus,
+    StreamingPipeline,
 };

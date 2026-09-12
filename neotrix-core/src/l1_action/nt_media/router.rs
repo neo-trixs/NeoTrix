@@ -23,13 +23,21 @@ pub enum UrlScheme {
 
 impl UrlScheme {
     pub fn parse(url: &str) -> Self {
-        if url.starts_with("magnet:") { Self::Magnet }
-        else if url.starts_with("https://") { Self::Https }
-        else if url.starts_with("http://") { Self::Http }
-        else if url.starts_with("ftp://") { Self::Ftp }
-        else if url.starts_with("file://") { Self::File }
-        else if url.starts_with("data:") { Self::Data }
-        else { Self::Unknown }
+        if url.starts_with("magnet:") {
+            Self::Magnet
+        } else if url.starts_with("https://") {
+            Self::Https
+        } else if url.starts_with("http://") {
+            Self::Http
+        } else if url.starts_with("ftp://") {
+            Self::Ftp
+        } else if url.starts_with("file://") {
+            Self::File
+        } else if url.starts_with("data:") {
+            Self::Data
+        } else {
+            Self::Unknown
+        }
     }
 
     /// Is this a network URL (requires download)?
@@ -77,11 +85,7 @@ pub struct MediaRoute {
 /// - `http(s)://*` → HttpRange (default: parallel download)
 /// - `file://*` or local path → FileCopy
 /// - `ftp://*` → HttpRange (via reqwest FTP)
-pub fn route_url(
-    url: &str,
-    output_dir: &PathBuf,
-    prefer_streaming: bool,
-) -> MediaRoute {
+pub fn route_url(url: &str, output_dir: &PathBuf, prefer_streaming: bool) -> MediaRoute {
     let scheme = UrlScheme::parse(url);
     let is_hf = is_huggingface_url(url);
 
@@ -138,7 +142,9 @@ pub fn extract_filename(url: &str) -> Option<String> {
     // Get last path segment
     let name = path.rsplit('/').next()?;
 
-    if name.is_empty() { return None; }
+    if name.is_empty() {
+        return None;
+    }
 
     // URL-decode
     let decoded = urlencoding::decode(name).ok()?.into_owned();
@@ -181,9 +187,18 @@ mod tests {
 
     #[test]
     fn test_scheme_parsing() {
-        assert_eq!(UrlScheme::parse("https://example.com/file.mp4"), UrlScheme::Https);
-        assert_eq!(UrlScheme::parse("http://example.com/file.mp4"), UrlScheme::Http);
-        assert_eq!(UrlScheme::parse("magnet:?xt=urn:btih:abc"), UrlScheme::Magnet);
+        assert_eq!(
+            UrlScheme::parse("https://example.com/file.mp4"),
+            UrlScheme::Https
+        );
+        assert_eq!(
+            UrlScheme::parse("http://example.com/file.mp4"),
+            UrlScheme::Http
+        );
+        assert_eq!(
+            UrlScheme::parse("magnet:?xt=urn:btih:abc"),
+            UrlScheme::Magnet
+        );
         assert_eq!(UrlScheme::parse("ftp://server/file.bin"), UrlScheme::Ftp);
         assert_eq!(UrlScheme::parse("file:///tmp/test.bin"), UrlScheme::File);
         assert_eq!(UrlScheme::parse("/tmp/local.bin"), UrlScheme::Unknown);

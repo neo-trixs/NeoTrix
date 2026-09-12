@@ -40,8 +40,8 @@ pub enum MediaKind {
     VideoMkv,
     VideoAvi,
     VideoMov,
-    VideoHls,      // .m3u8
-    VideoDash,     // .mpd
+    VideoHls,  // .m3u8
+    VideoDash, // .mpd
     VideoUnknown,
     // Documents
     Pdf,
@@ -70,16 +70,32 @@ pub enum MediaKind {
 impl MediaKind {
     /// Is this a playable audio format?
     pub fn is_audio(self) -> bool {
-        matches!(self, Self::AudioMp3 | Self::AudioFlac | Self::AudioWav |
-                       Self::AudioOgg | Self::AudioAac | Self::AudioM4a |
-                       Self::AudioOpus | Self::AudioUnknown)
+        matches!(
+            self,
+            Self::AudioMp3
+                | Self::AudioFlac
+                | Self::AudioWav
+                | Self::AudioOgg
+                | Self::AudioAac
+                | Self::AudioM4a
+                | Self::AudioOpus
+                | Self::AudioUnknown
+        )
     }
 
     /// Is this a playable video format?
     pub fn is_video(self) -> bool {
-        matches!(self, Self::VideoMp4 | Self::VideoWebm | Self::VideoMkv |
-                       Self::VideoAvi | Self::VideoMov | Self::VideoHls |
-                       Self::VideoDash | Self::VideoUnknown)
+        matches!(
+            self,
+            Self::VideoMp4
+                | Self::VideoWebm
+                | Self::VideoMkv
+                | Self::VideoAvi
+                | Self::VideoMov
+                | Self::VideoHls
+                | Self::VideoDash
+                | Self::VideoUnknown
+        )
     }
 
     /// Is this a playable media (audio or video)?
@@ -89,30 +105,55 @@ impl MediaKind {
 
     /// Is this a model/binary file?
     pub fn is_model(self) -> bool {
-        matches!(self, Self::Gguf | Self::Onnx | Self::Safetensors | Self::Pickle)
+        matches!(
+            self,
+            Self::Gguf | Self::Onnx | Self::Safetensors | Self::Pickle
+        )
     }
 
     /// Is this a document?
     pub fn is_document(self) -> bool {
-        matches!(self, Self::Pdf | Self::Docx | Self::Xlsx | Self::Pptx | Self::Markdown)
+        matches!(
+            self,
+            Self::Pdf | Self::Docx | Self::Xlsx | Self::Pptx | Self::Markdown
+        )
     }
 
     /// Human-readable label
     pub fn label(self) -> &'static str {
         match self {
-            Self::AudioMp3 => "MP3", Self::AudioFlac => "FLAC", Self::AudioWav => "WAV",
-            Self::AudioOgg => "OGG", Self::AudioAac => "AAC", Self::AudioM4a => "M4A",
-            Self::AudioOpus => "Opus", Self::AudioUnknown => "Audio",
-            Self::VideoMp4 => "MP4", Self::VideoWebm => "WebM", Self::VideoMkv => "MKV",
-            Self::VideoAvi => "AVI", Self::VideoMov => "MOV", Self::VideoHls => "HLS",
-            Self::VideoDash => "DASH", Self::VideoUnknown => "Video",
-            Self::Pdf => "PDF", Self::Docx => "DOCX", Self::Xlsx => "XLSX",
-            Self::Pptx => "PPTX", Self::Markdown => "Markdown",
-            Self::Zip => "ZIP", Self::Gzip => "GZIP", Self::Tar => "TAR",
-            Self::Xz => "XZ", Self::SevenZip => "7Z",
-            Self::Gguf => "GGUF", Self::Onnx => "ONNX",
-            Self::Safetensors => "SafeTensors", Self::Pickle => "Pickle",
-            Self::Json => "JSON", Self::Csv => "CSV",
+            Self::AudioMp3 => "MP3",
+            Self::AudioFlac => "FLAC",
+            Self::AudioWav => "WAV",
+            Self::AudioOgg => "OGG",
+            Self::AudioAac => "AAC",
+            Self::AudioM4a => "M4A",
+            Self::AudioOpus => "Opus",
+            Self::AudioUnknown => "Audio",
+            Self::VideoMp4 => "MP4",
+            Self::VideoWebm => "WebM",
+            Self::VideoMkv => "MKV",
+            Self::VideoAvi => "AVI",
+            Self::VideoMov => "MOV",
+            Self::VideoHls => "HLS",
+            Self::VideoDash => "DASH",
+            Self::VideoUnknown => "Video",
+            Self::Pdf => "PDF",
+            Self::Docx => "DOCX",
+            Self::Xlsx => "XLSX",
+            Self::Pptx => "PPTX",
+            Self::Markdown => "Markdown",
+            Self::Zip => "ZIP",
+            Self::Gzip => "GZIP",
+            Self::Tar => "TAR",
+            Self::Xz => "XZ",
+            Self::SevenZip => "7Z",
+            Self::Gguf => "GGUF",
+            Self::Onnx => "ONNX",
+            Self::Safetensors => "SafeTensors",
+            Self::Pickle => "Pickle",
+            Self::Json => "JSON",
+            Self::Csv => "CSV",
             Self::Unknown => "Unknown",
         }
     }
@@ -125,23 +166,39 @@ impl MediaKind {
 /// Detect media kind from magic bytes (first 8KB of content).
 /// Single fact source for all Content-Type detection in NeoTrix.
 pub fn detect_from_bytes(data: &[u8]) -> MediaKind {
-    if data.len() < 4 { return MediaKind::Unknown; }
+    if data.len() < 4 {
+        return MediaKind::Unknown;
+    }
 
     // Audio signatures
-    if data.starts_with(b"ID3") || data.starts_with(b"\xFF\xFB") || data.starts_with(b"\xFF\xF3") || data.starts_with(b"\xFF\xF2") {
+    if data.starts_with(b"ID3")
+        || data.starts_with(b"\xFF\xFB")
+        || data.starts_with(b"\xFF\xF3")
+        || data.starts_with(b"\xFF\xF2")
+    {
         return MediaKind::AudioMp3;
     }
-    if data.starts_with(b"fLaC") { return MediaKind::AudioFlac; }
-    if data.starts_with(b"RIFF") && data.len() > 12 && &data[8..12] == b"WAVE" { return MediaKind::AudioWav; }
-    if data.starts_with(b"OggS") { return MediaKind::AudioOgg; } // could be Vorbis/Opus
-    if data.starts_with(b"Usac") || data.starts_with(b"ftyp") { return MediaKind::AudioAac; }
+    if data.starts_with(b"fLaC") {
+        return MediaKind::AudioFlac;
+    }
+    if data.starts_with(b"RIFF") && data.len() > 12 && &data[8..12] == b"WAVE" {
+        return MediaKind::AudioWav;
+    }
+    if data.starts_with(b"OggS") {
+        return MediaKind::AudioOgg;
+    } // could be Vorbis/Opus
+    if data.starts_with(b"Usac") || data.starts_with(b"ftyp") {
+        return MediaKind::AudioAac;
+    }
 
     // Video signatures
     if data.len() > 12 {
         // MP4/MOV: ftyp box at offset 4
         if &data[4..8] == b"ftyp" {
             let brand = &data[8..12];
-            if brand == b"qt  " || brand == b"mqt " { return MediaKind::VideoMov; }
+            if brand == b"qt  " || brand == b"mqt " {
+                return MediaKind::VideoMov;
+            }
             return MediaKind::VideoMp4;
         }
         // WebM/Matroska: EBML header
@@ -154,7 +211,9 @@ pub fn detect_from_bytes(data: &[u8]) -> MediaKind {
     }
 
     // Model signatures
-    if data.starts_with(b"GGUF") { return MediaKind::Gguf; }
+    if data.starts_with(b"GGUF") {
+        return MediaKind::Gguf;
+    }
     if data.starts_with(b"PK\x03\x04") {
         // ZIP — could be SafeTensors, ONNX, DOCX, etc.
         // Check for specific signatures within
@@ -162,16 +221,28 @@ pub fn detect_from_bytes(data: &[u8]) -> MediaKind {
     }
 
     // Compressed
-    if data[0] == 0x1F && data[1] == 0x8B { return MediaKind::Gzip; }
-    if data.starts_with(b"\xfd7zXZ") { return MediaKind::Xz; }
-    if data.starts_with(b"7z\xBC\xAF\x27\x1C") { return MediaKind::SevenZip; }
+    if data[0] == 0x1F && data[1] == 0x8B {
+        return MediaKind::Gzip;
+    }
+    if data.starts_with(b"\xfd7zXZ") {
+        return MediaKind::Xz;
+    }
+    if data.starts_with(b"7z\xBC\xAF\x27\x1C") {
+        return MediaKind::SevenZip;
+    }
 
     // Documents
-    if data.starts_with(b"%PDF") { return MediaKind::Pdf; }
-    if data.starts_with(b"{") || data.starts_with(b"[") { return MediaKind::Json; }
+    if data.starts_with(b"%PDF") {
+        return MediaKind::Pdf;
+    }
+    if data.starts_with(b"{") || data.starts_with(b"[") {
+        return MediaKind::Json;
+    }
 
     // Text that might be CSV
-    if data.starts_with(b",") || data.starts_with(b"\"") { return MediaKind::Csv; }
+    if data.starts_with(b",") || data.starts_with(b"\"") {
+        return MediaKind::Csv;
+    }
 
     MediaKind::Unknown
 }
@@ -186,7 +257,9 @@ pub fn detect_from_content_type(ct: &str) -> MediaKind {
         "audio/ogg" | "audio/vorbis" | "audio/opus" => MediaKind::AudioOgg,
         "audio/aac" | "audio/x-aac" => MediaKind::AudioAac,
         "audio/m4a" | "audio/mp4" => MediaKind::AudioM4a,
-        "video/mp4" | "video/webm" | "video/x-matroska" | "video/avi" | "video/quicktime" => MediaKind::VideoMp4,
+        "video/mp4" | "video/webm" | "video/x-matroska" | "video/avi" | "video/quicktime" => {
+            MediaKind::VideoMp4
+        }
         "application/x-mpegurl" | "application/vnd.apple.mpegurl" => MediaKind::VideoHls,
         "application/dash+xml" => MediaKind::VideoDash,
         "application/pdf" => MediaKind::Pdf,
@@ -195,9 +268,13 @@ pub fn detect_from_content_type(ct: &str) -> MediaKind {
         "application/json" | "text/json" => MediaKind::Json,
         "text/csv" => MediaKind::Csv,
         "text/markdown" | "text/x-markdown" => MediaKind::Markdown,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => MediaKind::Docx,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
+            MediaKind::Docx
+        }
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => MediaKind::Xlsx,
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation" => MediaKind::Pptx,
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" => {
+            MediaKind::Pptx
+        }
         _ => MediaKind::Unknown,
     }
 }
@@ -251,19 +328,25 @@ pub fn detect(
     // L1: Magic bytes (most reliable)
     if let Some(bytes) = first_bytes {
         let kind = detect_from_bytes(bytes);
-        if kind != MediaKind::Unknown { return kind; }
+        if kind != MediaKind::Unknown {
+            return kind;
+        }
     }
 
     // L2: HTTP Content-Type header
     if let Some(ct) = content_type {
         let kind = detect_from_content_type(ct);
-        if kind != MediaKind::Unknown { return kind; }
+        if kind != MediaKind::Unknown {
+            return kind;
+        }
     }
 
     // L3: URL extension (fallback)
     if let Some(url) = url {
         let kind = detect_from_url(url);
-        if kind != MediaKind::Unknown { return kind; }
+        if kind != MediaKind::Unknown {
+            return kind;
+        }
     }
 
     MediaKind::Unknown
@@ -291,13 +374,11 @@ pub async fn detect_from_file(path: &Path) -> MediaKind {
 
 /// Probe URL headers and first bytes for detection.
 /// Makes a HEAD request (or GET with Range for first bytes) to classify remote content.
-pub async fn detect_remote(
-    client: &reqwest::Client,
-    url: &str,
-) -> (MediaKind, Option<String>) {
+pub async fn detect_remote(client: &reqwest::Client, url: &str) -> (MediaKind, Option<String>) {
     // HEAD request for Content-Type
     if let Ok(resp) = client.head(url).send().await {
-        let ct = resp.headers()
+        let ct = resp
+            .headers()
             .get("content-type")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
@@ -315,12 +396,9 @@ pub async fn detect_remote(
     }
 
     // GET first bytes if HEAD fails
-    if let Ok(resp) = client.get(url)
-        .header("Range", "bytes=0-8191")
-        .send()
-        .await
-    {
-        let ct = resp.headers()
+    if let Ok(resp) = client.get(url).header("Range", "bytes=0-8191").send().await {
+        let ct = resp
+            .headers()
             .get("content-type")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
@@ -347,7 +425,10 @@ mod tests {
     fn test_magic_bytes() {
         assert_eq!(detect_from_bytes(b"ID3\x04\x00\x00"), MediaKind::AudioMp3);
         assert_eq!(detect_from_bytes(b"fLaC"), MediaKind::AudioFlac);
-        assert_eq!(detect_from_bytes(b"RIFF\x00\x00\x00\x00WAVE"), MediaKind::AudioWav);
+        assert_eq!(
+            detect_from_bytes(b"RIFF\x00\x00\x00\x00WAVE"),
+            MediaKind::AudioWav
+        );
         assert_eq!(detect_from_bytes(b"OggS"), MediaKind::AudioOgg);
         assert_eq!(detect_from_bytes(b"%PDF-1.4"), MediaKind::Pdf);
         assert_eq!(detect_from_bytes(b"GGUF"), MediaKind::Gguf);
@@ -366,27 +447,58 @@ mod tests {
     #[test]
     fn test_content_type() {
         assert_eq!(detect_from_content_type("audio/mpeg"), MediaKind::AudioMp3);
-        assert_eq!(detect_from_content_type("video/mp4; charset=utf-8"), MediaKind::VideoMp4);
-        assert_eq!(detect_from_content_type("application/x-mpegurl"), MediaKind::VideoHls);
+        assert_eq!(
+            detect_from_content_type("video/mp4; charset=utf-8"),
+            MediaKind::VideoMp4
+        );
+        assert_eq!(
+            detect_from_content_type("application/x-mpegurl"),
+            MediaKind::VideoHls
+        );
         assert_eq!(detect_from_content_type("application/pdf"), MediaKind::Pdf);
     }
 
     #[test]
     fn test_url_extension() {
-        assert_eq!(detect_from_url("https://example.com/song.mp3"), MediaKind::AudioMp3);
-        assert_eq!(detect_from_url("https://example.com/video.mp4?token=abc"), MediaKind::VideoMp4);
-        assert_eq!(detect_from_url("https://example.com/model.gguf"), MediaKind::Gguf);
-        assert_eq!(detect_from_url("https://example.com/playlist.m3u8"), MediaKind::VideoHls);
+        assert_eq!(
+            detect_from_url("https://example.com/song.mp3"),
+            MediaKind::AudioMp3
+        );
+        assert_eq!(
+            detect_from_url("https://example.com/video.mp4?token=abc"),
+            MediaKind::VideoMp4
+        );
+        assert_eq!(
+            detect_from_url("https://example.com/model.gguf"),
+            MediaKind::Gguf
+        );
+        assert_eq!(
+            detect_from_url("https://example.com/playlist.m3u8"),
+            MediaKind::VideoHls
+        );
     }
 
     #[test]
     fn test_three_layer_priority() {
         // Magic bytes win over Content-Type
-        assert_eq!(detect(Some(b"fLaC"), Some("application/octet-stream"), None), MediaKind::AudioFlac);
+        assert_eq!(
+            detect(Some(b"fLaC"), Some("application/octet-stream"), None),
+            MediaKind::AudioFlac
+        );
         // Content-Type wins over URL
-        assert_eq!(detect(None, Some("audio/mpeg"), Some("https://example.com/file.bin")), MediaKind::AudioMp3);
+        assert_eq!(
+            detect(
+                None,
+                Some("audio/mpeg"),
+                Some("https://example.com/file.bin")
+            ),
+            MediaKind::AudioMp3
+        );
         // URL fallback
-        assert_eq!(detect(None, None, Some("https://example.com/song.mp3")), MediaKind::AudioMp3);
+        assert_eq!(
+            detect(None, None, Some("https://example.com/song.mp3")),
+            MediaKind::AudioMp3
+        );
     }
 
     #[test]

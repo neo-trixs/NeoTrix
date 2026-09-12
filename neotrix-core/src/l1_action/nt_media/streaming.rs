@@ -163,7 +163,8 @@ impl StreamingPipeline {
         let (media_kind, _content_type) = detect::detect_remote(&client, &config.url).await;
 
         // 4. Ensure output directory exists
-        fs::create_dir_all(&config.output_dir).await
+        fs::create_dir_all(&config.output_dir)
+            .await
             .map_err(|e| PipelineError::Io(e.to_string()))?;
 
         // 5. Dispatch to transport
@@ -190,7 +191,8 @@ impl StreamingPipeline {
                         cancel_rx_flag,
                         progress_tx.clone(),
                         media_kind,
-                    ).await
+                    )
+                    .await
                 });
 
                 // Spawn player
@@ -199,7 +201,8 @@ impl StreamingPipeline {
                     config.buffer_threshold,
                     config.player_bin.as_deref(),
                     &config.player_args,
-                ).await;
+                )
+                .await;
 
                 Ok(PipelineHandle {
                     download_task: download_handle,
@@ -218,7 +221,8 @@ impl StreamingPipeline {
                         cancel_rx_flag,
                         progress_tx.clone(),
                         media_kind,
-                    ).await
+                    )
+                    .await
                 });
 
                 let player_handle = spawn_player(
@@ -226,7 +230,8 @@ impl StreamingPipeline {
                     config.buffer_threshold,
                     config.player_bin.as_deref(),
                     &config.player_args,
-                ).await;
+                )
+                .await;
 
                 Ok(PipelineHandle {
                     download_task: download_handle,
@@ -243,19 +248,22 @@ impl StreamingPipeline {
                     0, // no buffer needed
                     config.player_bin.as_deref(),
                     &config.player_args,
-                ).await;
+                )
+                .await;
 
                 // Signal complete immediately
-                let _ = progress_tx.send(PipelineProgress {
-                    url,
-                    status: PipelineStatus::Complete {
-                        total_bytes: fs::metadata(&output).await.map(|m| m.len()).unwrap_or(0),
+                let _ = progress_tx
+                    .send(PipelineProgress {
+                        url,
+                        status: PipelineStatus::Complete {
+                            total_bytes: fs::metadata(&output).await.map(|m| m.len()).unwrap_or(0),
+                            elapsed: Duration::ZERO,
+                        },
+                        media_kind,
+                        output: output.clone(),
                         elapsed: Duration::ZERO,
-                    },
-                    media_kind,
-                    output: output.clone(),
-                    elapsed: Duration::ZERO,
-                }).await;
+                    })
+                    .await;
 
                 Ok(PipelineHandle {
                     download_task: tokio::spawn(async { Ok::<(), PipelineError>(()) }),
@@ -267,7 +275,8 @@ impl StreamingPipeline {
 
             TransportType::FifoPipe => {
                 // FIFO pipe: zero-disk streaming
-                let fifo_path = config.output_dir.join(format!("stream-{}.fifo",
+                let fifo_path = config.output_dir.join(format!(
+                    "stream-{}.fifo",
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -277,8 +286,8 @@ impl StreamingPipeline {
                 // Create FIFO
                 #[cfg(unix)]
                 {
-                    use std::os::unix::fs::OpenOptionsExt;
                     use std::os::unix::fs::FileTypeExt;
+                    use std::os::unix::fs::OpenOptionsExt;
 
                     // mkfifo via nix or manual
                     unsafe {
@@ -297,7 +306,8 @@ impl StreamingPipeline {
                     &fifo_path,
                     config.player_bin.as_deref(),
                     &config.player_args,
-                ).await;
+                )
+                .await;
 
                 // Spawn download writing to FIFO
                 let download_handle = tokio::spawn(async move {
@@ -309,7 +319,8 @@ impl StreamingPipeline {
                         cancel_rx_flag,
                         progress_tx.clone(),
                         media_kind,
-                    ).await
+                    )
+                    .await
                 });
 
                 Ok(PipelineHandle {
@@ -359,7 +370,10 @@ async fn stream_http_download(
         req
     };
 
-    let resp = req.send().await.map_err(|e| PipelineError::Network(e.to_string()))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| PipelineError::Network(e.to_string()))?;
 
     if !resp.status().is_success() && resp.status().as_u16() != 206 {
         return Err(PipelineError::Http(resp.status().as_u16()));
@@ -372,7 +386,8 @@ async fn stream_http_download(
         fs::OpenOptions::new().append(true).open(output).await
     } else {
         File::create(output).await
-    }.map_err(|e| PipelineError::Io(e.to_string()))?;
+    }
+    .map_err(|e| PipelineError::Io(e.to_string()))?;
 
     let mut writer = BufWriter::with_capacity(chunk_size, file);
     bytes_written.store(start_byte, Ordering::Relaxed);
@@ -382,31 +397,39 @@ async fn stream_http_download(
     let mut recent_bytes: u64 = 0;
 
     // Send initial progress
-    let _ = progress_tx.send(PipelineProgress {
-        url: url.to_string(),
-        status: PipelineStatus::Resolving,
-        media_kind,
-        output: output.to_path_buf(),
-        elapsed: Duration::ZERO,
-    }).await;
+    let _ = progress_tx
+        .send(PipelineProgress {
+            url: url.to_string(),
+            status: PipelineStatus::Resolving,
+            media_kind,
+            output: output.to_path_buf(),
+            elapsed: Duration::ZERO,
+        })
+        .await;
 
     while let Some(chunk) = stream.next().await {
         if cancel.load(Ordering::Relaxed) {
-            let _ = progress_tx.send(PipelineProgress {
-                url: url.to_string(),
-                status: PipelineStatus::Cancelled,
-                media_kind,
-                output: output.to_path_buf(),
-                elapsed: started.elapsed(),
-            }).await;
+            let _ = progress_tx
+                .send(PipelineProgress {
+                    url: url.to_string(),
+                    status: PipelineStatus::Cancelled,
+                    media_kind,
+                    output: output.to_path_buf(),
+                    elapsed: started.elapsed(),
+                })
+                .await;
             writer.flush().await.ok();
             return Ok(());
         }
 
         match chunk {
             Ok(data) => {
-                writer.write_all(&data).await.map_err(|e| PipelineError::Io(e.to_string()))?;
-                let written = bytes_written.fetch_add(data.len() as u64, Ordering::Relaxed) + data.len() as u64;
+                writer
+                    .write_all(&data)
+                    .await
+                    .map_err(|e| PipelineError::Io(e.to_string()))?;
+                let written = bytes_written.fetch_add(data.len() as u64, Ordering::Relaxed)
+                    + data.len() as u64;
                 recent_bytes += data.len() as u64;
 
                 // Speed calculation every 500ms
@@ -414,49 +437,70 @@ async fn stream_http_download(
                     let elapsed_s = last_sample.elapsed().as_secs_f64();
                     let speed = (recent_bytes as f64) / elapsed_s;
                     speed_samples.push(speed);
-                    if speed_samples.len() > 10 { speed_samples.remove(0); }
+                    if speed_samples.len() > 10 {
+                        speed_samples.remove(0);
+                    }
                     let avg_speed = speed_samples.iter().sum::<f64>() / speed_samples.len() as f64;
                     recent_bytes = 0;
                     last_sample = Instant::now();
 
                     let status = if Some(written) >= total_size {
-                        PipelineStatus::Complete { total_bytes: written, elapsed: started.elapsed() }
+                        PipelineStatus::Complete {
+                            total_bytes: written,
+                            elapsed: started.elapsed(),
+                        }
                     } else {
-                        PipelineStatus::Downloading { downloaded: written, total: total_size, speed_bps: avg_speed }
+                        PipelineStatus::Downloading {
+                            downloaded: written,
+                            total: total_size,
+                            speed_bps: avg_speed,
+                        }
                     };
 
-                    let _ = progress_tx.send(PipelineProgress {
-                        url: url.to_string(),
-                        status,
-                        media_kind,
-                        output: output.to_path_buf(),
-                        elapsed: started.elapsed(),
-                    }).await;
+                    let _ = progress_tx
+                        .send(PipelineProgress {
+                            url: url.to_string(),
+                            status,
+                            media_kind,
+                            output: output.to_path_buf(),
+                            elapsed: started.elapsed(),
+                        })
+                        .await;
                 }
             }
             Err(e) => {
-                let _ = progress_tx.send(PipelineProgress {
-                    url: url.to_string(),
-                    status: PipelineStatus::Failed(e.to_string()),
-                    media_kind,
-                    output: output.to_path_buf(),
-                    elapsed: started.elapsed(),
-                }).await;
+                let _ = progress_tx
+                    .send(PipelineProgress {
+                        url: url.to_string(),
+                        status: PipelineStatus::Failed(e.to_string()),
+                        media_kind,
+                        output: output.to_path_buf(),
+                        elapsed: started.elapsed(),
+                    })
+                    .await;
                 return Err(PipelineError::Network(e.to_string()));
             }
         }
     }
 
-    writer.flush().await.map_err(|e| PipelineError::Io(e.to_string()))?;
+    writer
+        .flush()
+        .await
+        .map_err(|e| PipelineError::Io(e.to_string()))?;
     let final_bytes = bytes_written.load(Ordering::Relaxed);
 
-    let _ = progress_tx.send(PipelineProgress {
-        url: url.to_string(),
-        status: PipelineStatus::Complete { total_bytes: final_bytes, elapsed: started.elapsed() },
-        media_kind,
-        output: output.to_path_buf(),
-        elapsed: started.elapsed(),
-    }).await;
+    let _ = progress_tx
+        .send(PipelineProgress {
+            url: url.to_string(),
+            status: PipelineStatus::Complete {
+                total_bytes: final_bytes,
+                elapsed: started.elapsed(),
+            },
+            media_kind,
+            output: output.to_path_buf(),
+            elapsed: started.elapsed(),
+        })
+        .await;
 
     Ok(())
 }
@@ -486,24 +530,31 @@ async fn stream_magnet_download(
         }],
     });
 
-    let resp = client.post(rpc_url)
+    let resp = client
+        .post(rpc_url)
         .json(&rpc_body)
         .send()
         .await
         .map_err(|e| PipelineError::Network(format!("aria2c connect failed: {}", e)))?;
 
-    let body: serde_json::Value = resp.json().await
+    let body: serde_json::Value = resp
+        .json()
+        .await
         .map_err(|e| PipelineError::Network(format!("aria2c response parse: {}", e)))?;
 
     if let Some(error) = body.get("error") {
         return Err(PipelineError::Rpc(format!(
             "aria2c error {}: {}",
             error.get("code").and_then(|c| c.as_i64()).unwrap_or(0),
-            error.get("message").and_then(|m| m.as_str()).unwrap_or("unknown")
+            error
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("unknown")
         )));
     }
 
-    let gid = body["result"].as_str()
+    let gid = body["result"]
+        .as_str()
         .ok_or_else(|| PipelineError::Rpc("no GID returned".into()))?
         .to_string();
 
@@ -512,13 +563,15 @@ async fn stream_magnet_download(
     // Poll status
     loop {
         if cancel.load(Ordering::Relaxed) {
-            let _ = progress_tx.send(PipelineProgress {
-                url: url.to_string(),
-                status: PipelineStatus::Cancelled,
-                media_kind,
-                output: output_dir.to_path_buf(),
-                elapsed: started.elapsed(),
-            }).await;
+            let _ = progress_tx
+                .send(PipelineProgress {
+                    url: url.to_string(),
+                    status: PipelineStatus::Cancelled,
+                    media_kind,
+                    output: output_dir.to_path_buf(),
+                    elapsed: started.elapsed(),
+                })
+                .await;
             return Ok(());
         }
 
@@ -542,9 +595,21 @@ async fn stream_magnet_download(
         };
 
         let status = body["result"]["status"].as_str().unwrap_or("unknown");
-        let total = body["result"]["totalLength"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
-        let completed = body["result"]["completedLength"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
-        let speed = body["result"]["downloadSpeed"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
+        let total = body["result"]["totalLength"]
+            .as_str()
+            .unwrap_or("0")
+            .parse::<u64>()
+            .unwrap_or(0);
+        let completed = body["result"]["completedLength"]
+            .as_str()
+            .unwrap_or("0")
+            .parse::<u64>()
+            .unwrap_or(0);
+        let speed = body["result"]["downloadSpeed"]
+            .as_str()
+            .unwrap_or("0")
+            .parse::<u64>()
+            .unwrap_or(0);
 
         let pipeline_status = match status {
             "active" => PipelineStatus::Downloading {
@@ -552,22 +617,29 @@ async fn stream_magnet_download(
                 total: if total > 0 { Some(total) } else { None },
                 speed_bps: speed as f64,
             },
-            "complete" => PipelineStatus::Complete { total_bytes: completed, elapsed: started.elapsed() },
+            "complete" => PipelineStatus::Complete {
+                total_bytes: completed,
+                elapsed: started.elapsed(),
+            },
             "error" => PipelineStatus::Failed("aria2c error".into()),
             _ => PipelineStatus::Cancelled,
         };
 
-        let _ = progress_tx.send(PipelineProgress {
-            url: url.to_string(),
-            status: pipeline_status.clone(),
-            media_kind,
-            output: output_dir.to_path_buf(),
-            elapsed: started.elapsed(),
-        }).await;
+        let _ = progress_tx
+            .send(PipelineProgress {
+                url: url.to_string(),
+                status: pipeline_status.clone(),
+                media_kind,
+                output: output_dir.to_path_buf(),
+                elapsed: started.elapsed(),
+            })
+            .await;
 
         match status {
             "complete" => return Ok(()),
-            "error" | "removed" => return Err(PipelineError::Rpc(format!("aria2c status: {}", status))),
+            "error" | "removed" => {
+                return Err(PipelineError::Rpc(format!("aria2c status: {}", status)))
+            }
             _ => {}
         }
     }
@@ -585,69 +657,91 @@ async fn stream_http_to_fifo(
 ) -> Result<(), PipelineError> {
     let started = Instant::now();
 
-    let req = client
-        .get(url)
-        .header("Accept-Encoding", "identity");
+    let req = client.get(url).header("Accept-Encoding", "identity");
 
-    let mut resp = req.send().await.map_err(|e| PipelineError::Network(e.to_string()))?;
+    let mut resp = req
+        .send()
+        .await
+        .map_err(|e| PipelineError::Network(e.to_string()))?;
 
     if !resp.status().is_success() {
         return Err(PipelineError::Http(resp.status().as_u16()));
     }
 
     // Open FIFO for writing (blocks until reader opens)
-    let file = File::create(fifo_path).await.map_err(|e| PipelineError::Io(e.to_string()))?;
+    let file = File::create(fifo_path)
+        .await
+        .map_err(|e| PipelineError::Io(e.to_string()))?;
     let mut writer = BufWriter::with_capacity(chunk_size, file);
 
     let mut downloaded: u64 = 0;
 
-    let _ = progress_tx.send(PipelineProgress {
-        url: url.to_string(),
-        status: PipelineStatus::Resolving,
-        media_kind,
-        output: fifo_path.to_path_buf(),
-        elapsed: Duration::ZERO,
-    }).await;
+    let _ = progress_tx
+        .send(PipelineProgress {
+            url: url.to_string(),
+            status: PipelineStatus::Resolving,
+            media_kind,
+            output: fifo_path.to_path_buf(),
+            elapsed: Duration::ZERO,
+        })
+        .await;
 
-    while let Some(chunk) = resp.chunk().await
+    while let Some(chunk) = resp
+        .chunk()
+        .await
         .map_err(|e| PipelineError::Network(e.to_string()))?
     {
         if cancel.load(Ordering::Relaxed) {
-            let _ = progress_tx.send(PipelineProgress {
-                url: url.to_string(),
-                status: PipelineStatus::Cancelled,
-                media_kind,
-                output: fifo_path.to_path_buf(),
-                elapsed: started.elapsed(),
-            }).await;
+            let _ = progress_tx
+                .send(PipelineProgress {
+                    url: url.to_string(),
+                    status: PipelineStatus::Cancelled,
+                    media_kind,
+                    output: fifo_path.to_path_buf(),
+                    elapsed: started.elapsed(),
+                })
+                .await;
             return Ok(());
         }
 
-        writer.write_all(&chunk).await.map_err(|e| PipelineError::Io(e.to_string()))?;
+        writer
+            .write_all(&chunk)
+            .await
+            .map_err(|e| PipelineError::Io(e.to_string()))?;
         downloaded += chunk.len() as u64;
 
-        let _ = progress_tx.send(PipelineProgress {
+        let _ = progress_tx
+            .send(PipelineProgress {
+                url: url.to_string(),
+                status: PipelineStatus::Downloading {
+                    downloaded,
+                    total: None,
+                    speed_bps: 0.0,
+                },
+                media_kind,
+                output: fifo_path.to_path_buf(),
+                elapsed: started.elapsed(),
+            })
+            .await;
+    }
+
+    writer
+        .flush()
+        .await
+        .map_err(|e| PipelineError::Io(e.to_string()))?;
+
+    let _ = progress_tx
+        .send(PipelineProgress {
             url: url.to_string(),
-            status: PipelineStatus::Downloading {
-                downloaded,
-                total: None,
-                speed_bps: 0.0,
+            status: PipelineStatus::Complete {
+                total_bytes: downloaded,
+                elapsed: started.elapsed(),
             },
             media_kind,
             output: fifo_path.to_path_buf(),
             elapsed: started.elapsed(),
-        }).await;
-    }
-
-    writer.flush().await.map_err(|e| PipelineError::Io(e.to_string()))?;
-
-    let _ = progress_tx.send(PipelineProgress {
-        url: url.to_string(),
-        status: PipelineStatus::Complete { total_bytes: downloaded, elapsed: started.elapsed() },
-        media_kind,
-        output: fifo_path.to_path_buf(),
-        elapsed: started.elapsed(),
-    }).await;
+        })
+        .await;
 
     Ok(())
 }
@@ -660,15 +754,27 @@ async fn stream_http_to_fifo(
 fn detect_player(preferred: Option<&str>) -> Option<&'static str> {
     if let Some(p) = preferred {
         // Check if the preferred player is available
-        if std::process::Command::new(p).arg("--version").output().is_ok() {
+        if std::process::Command::new(p)
+            .arg("--version")
+            .output()
+            .is_ok()
+        {
             return Some(Box::leak(p.to_string().into_boxed_str()));
         }
     }
     // Auto-detect: ffplay first (lighter), then mpv
-    if std::process::Command::new("ffplay").arg("-version").output().is_ok() {
+    if std::process::Command::new("ffplay")
+        .arg("-version")
+        .output()
+        .is_ok()
+    {
         return Some("ffplay");
     }
-    if std::process::Command::new("mpv").arg("--version").output().is_ok() {
+    if std::process::Command::new("mpv")
+        .arg("--version")
+        .output()
+        .is_ok()
+    {
         return Some("mpv");
     }
     None
@@ -692,8 +798,13 @@ async fn spawn_player(
         // Wait for buffer
         if wait_bytes > 0 {
             loop {
-                let size = fs::metadata(&file_clone).await.map(|m| m.len()).unwrap_or(0);
-                if size >= wait_bytes { break; }
+                let size = fs::metadata(&file_clone)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0);
+                if size >= wait_bytes {
+                    break;
+                }
                 tokio::time::sleep(Duration::from_millis(200)).await;
             }
         }
@@ -734,7 +845,11 @@ async fn spawn_player(
         Some(())
     });
 
-    Some(PlayerHandle { handle, stop_tx, file: file.to_path_buf() })
+    Some(PlayerHandle {
+        handle,
+        stop_tx,
+        file: file.to_path_buf(),
+    })
 }
 
 /// Spawn a player that reads from a FIFO pipe.
@@ -783,7 +898,11 @@ async fn spawn_fifo_player(
         Some(())
     });
 
-    Some(PlayerHandle { handle, stop_tx, file: fifo_path.to_path_buf() })
+    Some(PlayerHandle {
+        handle,
+        stop_tx,
+        file: fifo_path.to_path_buf(),
+    })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -798,7 +917,9 @@ pub struct PipelineHandle {
 }
 
 impl PipelineHandle {
-    pub fn output_path(&self) -> &Path { &self.output }
+    pub fn output_path(&self) -> &Path {
+        &self.output
+    }
 
     pub fn cancel(&self) {
         if let Some(tx) = self.cancel_tx.as_ref() {
