@@ -36,6 +36,7 @@ pub mod rate_limiter;
 pub mod rate_profiles;
 pub mod search_router;
 pub mod types;
+pub mod unified_inference;
 pub mod universal_adapter;
 pub use universal_adapter::{
     UniversalAdapter, ModelConfig, ModelCapabilities, FormatConverter,

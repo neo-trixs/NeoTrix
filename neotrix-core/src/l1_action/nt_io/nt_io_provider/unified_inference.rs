@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::types::*;
+use super::provider_catalog::ProviderCategory;
 
 // ══════════════════════════════════════════════════════════════
 // Request Types
@@ -366,16 +367,19 @@ pub trait UnifiedInference: Send + Sync {
 impl InferenceRequest {
     /// 转换为 LlmRequest
     pub fn to_llm_request(&self) -> LlmRequest {
-        let model = self.model.clone().unwrap_or_default();
-        let mut req = LlmRequest::new(&model, &self.messages.iter().map(|m| m.content.as_str()).collect::<Vec<_>>().join("\n"));
-        req.messages = self.messages.clone();
-        req.temperature = self.temperature;
-        req.max_tokens = self.max_tokens.unwrap_or(4096);
-        req.tools = self.tools.clone();
-        req.image_data = self.image_data.clone();
-        req.thinking_budget = self.thinking_budget;
-        req.structured_output = self.structured_output.clone();
-        req
+        LlmRequest {
+            model: self.model.clone().unwrap_or_default(),
+            messages: self.messages.clone(),
+            temperature: self.temperature,
+            max_tokens: self.max_tokens.unwrap_or(4096),
+            tools: self.tools.clone(),
+            image_data: self.image_data.clone(),
+            thinking_budget: self.thinking_budget,
+            provider_params: HashMap::new(),
+            constraint_json: None,
+            structured_output: self.structured_output.clone(),
+            cacheable_prefix_tokens: None,
+        }
     }
 }
 
