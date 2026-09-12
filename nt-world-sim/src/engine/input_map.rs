@@ -170,7 +170,7 @@ impl InputMap {
         bindings.insert(
             InputAction::Pause,
             vec![InputBinding {
-                keys: vec![KeyCode::P],
+                keys: vec![KeyCode::Escape],
                 gamepad_button: None,
                 mouse_button: None,
             }],
@@ -194,7 +194,7 @@ impl InputMap {
         bindings.insert(
             InputAction::UseItem,
             vec![InputBinding {
-                keys: vec![KeyCode::F],
+                keys: vec![KeyCode::E],
                 gamepad_button: None,
                 mouse_button: None,
             }],
@@ -210,7 +210,7 @@ impl InputMap {
         bindings.insert(
             InputAction::ZoomIn,
             vec![InputBinding {
-                keys: vec![KeyCode::Plus, KeyCode::Equals],
+                keys: vec![KeyCode::Up],
                 gamepad_button: None,
                 mouse_button: None,
             }],
@@ -218,7 +218,7 @@ impl InputMap {
         bindings.insert(
             InputAction::ZoomOut,
             vec![InputBinding {
-                keys: vec![KeyCode::Minus],
+                keys: vec![KeyCode::Down],
                 gamepad_button: None,
                 mouse_button: None,
             }],

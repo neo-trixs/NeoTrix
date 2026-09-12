@@ -7,6 +7,113 @@ use crate::game::time::GameTime;
 use crate::game::weather::Weather;
 use crate::engine::renderer::Color;
 
+pub struct StardewButton {
+    pub label: String,
+    pub x: f32, pub y: f32,
+    pub width: f32, pub height: f32,
+    pub enabled: bool,
+    pub hovered: bool,
+}
+
+impl StardewButton {
+    pub fn new(label: &str, x: f32, y: f32, width: f32, height: f32) -> Self {
+        Self { label: label.to_string(), x, y, width, height, enabled: true, hovered: false }
+    }
+
+    pub fn render(&self, theme: &StardewTheme) -> Vec<UiDrawCommand> {
+        let mut cmds = Vec::new();
+        let bg = if !self.enabled {
+            Color { r: 0.2, g: 0.2, b: 0.2, a: 0.5 }
+        } else if self.hovered {
+            theme.slot_hover
+        } else {
+            theme.slot_bg
+        };
+        cmds.push(UiDrawCommand::Rect { x: self.x, y: self.y, width: self.width, height: self.height, color: bg });
+        cmds.push(UiDrawCommand::RectBorder { x: self.x, y: self.y, width: self.width, height: self.height, color: theme.wood_light, thickness: 2.0 });
+        let text_color = if self.enabled { theme.gold_text } else { Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 } };
+        cmds.push(UiDrawCommand::Text { text: self.label.clone(), x: self.x + 8.0, y: self.y + (self.height - 12.0) / 2.0, size: 12.0, color: text_color });
+        cmds
+    }
+}
+
+pub struct StardewSlider {
+    pub label: String,
+    pub value: f32,
+    pub min: f32, pub max: f32,
+    pub x: f32, pub y: f32,
+    pub width: f32,
+}
+
+impl StardewSlider {
+    pub fn new(label: &str, value: f32, min: f32, max: f32, x: f32, y: f32, width: f32) -> Self {
+        Self { label: label.to_string(), value, min, max, x, y, width }
+    }
+
+    pub fn render(&self, theme: &StardewTheme) -> Vec<UiDrawCommand> {
+        let mut cmds = Vec::new();
+        cmds.extend(UiRenderer::draw_text(theme, &self.label, self.x, self.y, 10.0));
+        let track_y = self.y + 16.0;
+        let track_h = 6.0;
+        cmds.push(UiDrawCommand::Rect { x: self.x, y: track_y, width: self.width, height: track_h, color: theme.slot_bg });
+        let pct = if self.max > self.min { (self.value - self.min) / (self.max - self.min) } else { 0.0 };
+        cmds.push(UiDrawCommand::Rect { x: self.x, y: track_y, width: self.width * pct, height: track_h, color: theme.xp_blue });
+        let thumb_x = self.x + self.width * pct - 4.0;
+        cmds.push(UiDrawCommand::Rect { x: thumb_x, y: track_y - 2.0, width: 8.0, height: 10.0, color: theme.gold_text });
+        cmds
+    }
+}
+
+pub struct StardewProgressBar {
+    pub value: f32,
+    pub max: f32,
+    pub x: f32, pub y: f32,
+    pub width: f32, pub height: f32,
+    pub color: Color,
+}
+
+impl StardewProgressBar {
+    pub fn new(value: f32, max: f32, x: f32, y: f32, width: f32, height: f32, color: Color) -> Self {
+        Self { value, max, x, y, width, height, color }
+    }
+
+    pub fn render(&self, theme: &StardewTheme) -> Vec<UiDrawCommand> {
+        UiRenderer::draw_bar(theme, self.x, self.y, self.width, self.height,
+            if self.max > 0.0 { self.value / self.max } else { 0.0 }, self.color)
+    }
+}
+
+pub struct StardewTooltip {
+    pub text: String,
+    pub lines: Vec<String>,
+    pub x: f32, pub y: f32,
+    pub visible: bool,
+}
+
+impl StardewTooltip {
+    pub fn new(text: &str, x: f32, y: f32) -> Self {
+        Self { text: text.to_string(), lines: Vec::new(), x, y, visible: true }
+    }
+
+    pub fn with_lines(mut self, lines: Vec<String>) -> Self {
+        self.lines = lines;
+        self
+    }
+
+    pub fn render(&self, theme: &StardewTheme) -> Vec<UiDrawCommand> {
+        if !self.visible { return Vec::new(); }
+        let mut cmds = Vec::new();
+        let line_count = (1 + self.lines.len()) as f32;
+        let h = 8.0 + line_count * 14.0;
+        cmds.extend(UiRenderer::draw_panel(theme, self.x + 10.0, self.y + 10.0, 180.0, h));
+        cmds.extend(UiRenderer::draw_text(theme, &self.text, self.x + 18.0, self.y + 14.0, 11.0));
+        for (i, line) in self.lines.iter().enumerate() {
+            cmds.extend(UiRenderer::draw_text(theme, line, self.x + 18.0, self.y + 28.0 + i as f32 * 14.0, 10.0));
+        }
+        cmds
+    }
+}
+
 pub struct GameUI {
     pub theme: StardewTheme,
     pub hud: HUD,

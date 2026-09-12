@@ -1,3 +1,4 @@
+use crate::core::Resource;
 use super::time::Season;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -174,6 +175,8 @@ pub struct EventCalendar {
     pub active_event: Option<ActiveEvent>,
     pub event_history: Vec<(SeasonalEvent, u32)>,
 }
+
+impl Resource for EventCalendar {}
 
 impl EventCalendar {
     pub fn new() -> Self {

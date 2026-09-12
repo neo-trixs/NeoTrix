@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::error::{GameError, GameResult};
 use crate::core::UniversalWorld;
 use crate::game::inventory::Inventory;
 use crate::game::time::GameTime;
@@ -135,33 +136,28 @@ impl SaveManager {
     }
 
     /// Save game state to a slot
-    pub fn save(&self, slot: u32, data: &SaveData) -> Result<(), String> {
-        std::fs::create_dir_all(&self.save_dir)
-            .map_err(|e| format!("Failed to create save dir: {}", e))?;
+    pub fn save(&self, slot: u32, data: &SaveData) -> GameResult<()> {
+        std::fs::create_dir_all(&self.save_dir)?;
 
         let path = self.save_dir.join(format!("slot_{}.json", slot));
-        let json = serde_json::to_string_pretty(data)
-            .map_err(|e| format!("Failed to serialize: {}", e))?;
+        let json = serde_json::to_string_pretty(data)?;
 
-        std::fs::write(&path, json)
-            .map_err(|e| format!("Failed to write save file: {}", e))?;
+        std::fs::write(&path, json)?;
 
         Ok(())
     }
 
     /// Load game state from a slot
-    pub fn load(&self, slot: u32) -> Result<SaveData, String> {
+    pub fn load(&self, slot: u32) -> GameResult<SaveData> {
         let path = self.save_dir.join(format!("slot_{}.json", slot));
 
         if !path.exists() {
-            return Err(format!("Save slot {} does not exist", slot));
+            return Err(GameError::Load(format!("Save slot {} does not exist", slot)));
         }
 
-        let json = std::fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read save file: {}", e))?;
-
-        serde_json::from_str(&json)
-            .map_err(|e| format!("Failed to deserialize: {}", e))
+        let json = std::fs::read_to_string(&path)?;
+        let data = serde_json::from_str(&json)?;
+        Ok(data)
     }
 
     /// Check if a save slot exists
@@ -171,11 +167,10 @@ impl SaveManager {
     }
 
     /// Delete a save slot
-    pub fn delete(&self, slot: u32) -> Result<(), String> {
+    pub fn delete(&self, slot: u32) -> GameResult<()> {
         let path = self.save_dir.join(format!("slot_{}.json", slot));
         if path.exists() {
-            std::fs::remove_file(&path)
-                .map_err(|e| format!("Failed to delete save: {}", e))?;
+            std::fs::remove_file(&path)?;
         }
         Ok(())
     }

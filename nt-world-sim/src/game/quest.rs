@@ -1,3 +1,4 @@
+use crate::core::Resource;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,6 +116,8 @@ pub struct QuestDatabase {
     pub active_quests: Vec<u32>,
     pub completed_quests: Vec<u32>,
 }
+
+impl Resource for QuestDatabase {}
 
 impl QuestDatabase {
     pub fn new() -> Self {

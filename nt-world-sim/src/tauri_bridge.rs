@@ -3,6 +3,8 @@ use crate::game::time::GameTime;
 use crate::game::weather::Weather;
 use crate::game::inventory::Inventory;
 use crate::game::npc::Position;
+use crate::error::{GameError, GameResult};
+use crate::save::{SaveManager, SaveData as SaveDataFile};
 use once_cell::sync::Lazy;
 use std::fs;
 use std::sync::Mutex;
@@ -56,19 +58,19 @@ pub struct NpcSnapshot {
     pub dialogue_hint: String,
 }
 
-pub fn init_game() -> Result<String, String> {
+pub fn init_game() -> GameResult<String> {
     let mut game = GameLoop::new();
     game.start_game();
 
-    let mut state = GAME_STATE.lock().map_err(|e| e.to_string())?;
+    let mut state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
     *state = Some(game);
 
     Ok("Game initialized".to_string())
 }
 
-pub fn get_game_snapshot() -> Result<GameSnapshot, String> {
-    let state = GAME_STATE.lock().map_err(|e| e.to_string())?;
-    let game = state.as_ref().ok_or("Game not initialized")?;
+pub fn get_game_snapshot() -> GameResult<GameSnapshot> {
+    let state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
+    let game = state.as_ref().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
 
     let time = game.world.get_resource::<GameTime>();
     let weather = game.world.get_resource::<Weather>();
@@ -103,9 +105,9 @@ pub fn get_game_snapshot() -> Result<GameSnapshot, String> {
     })
 }
 
-pub fn get_inventory_snapshot() -> Result<InventorySnapshot, String> {
-    let state = GAME_STATE.lock().map_err(|e| e.to_string())?;
-    let game = state.as_ref().ok_or("Game not initialized")?;
+pub fn get_inventory_snapshot() -> GameResult<InventorySnapshot> {
+    let state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
+    let game = state.as_ref().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
 
     let inv = game.world.get_resource::<Inventory>();
 
@@ -160,9 +162,9 @@ pub fn get_inventory_snapshot() -> Result<InventorySnapshot, String> {
     Ok(InventorySnapshot { slots })
 }
 
-pub fn get_farm_snapshot() -> Result<Vec<FarmPlotSnapshot>, String> {
-    let state = GAME_STATE.lock().map_err(|e| e.to_string())?;
-    let _game = state.as_ref().ok_or("Game not initialized")?;
+pub fn get_farm_snapshot() -> GameResult<Vec<FarmPlotSnapshot>> {
+    let state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
+    let _game = state.as_ref().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
 
     Ok(vec![
         FarmPlotSnapshot {
@@ -184,8 +186,8 @@ pub fn get_farm_snapshot() -> Result<Vec<FarmPlotSnapshot>, String> {
     ])
 }
 
-pub fn get_npc_snapshot() -> Result<Vec<NpcSnapshot>, String> {
-    let _state = GAME_STATE.lock().map_err(|e| e.to_string())?;
+pub fn get_npc_snapshot() -> GameResult<Vec<NpcSnapshot>> {
+    let _state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
 
     Ok(vec![
         NpcSnapshot {
@@ -219,9 +221,9 @@ pub fn get_npc_snapshot() -> Result<Vec<NpcSnapshot>, String> {
     ])
 }
 
-pub fn game_action(action: String, params: Option<String>) -> Result<String, String> {
-    let mut state = GAME_STATE.lock().map_err(|e| e.to_string())?;
-    let game = state.as_mut().ok_or("Game not initialized")?;
+pub fn game_action(action: String, params: Option<String>) -> GameResult<String> {
+    let mut state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
+    let game = state.as_mut().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
 
     let game_action = match action.as_str() {
         "move" => {
@@ -245,7 +247,7 @@ pub fn game_action(action: String, params: Option<String>) -> Result<String, Str
         "sleep" => GameAction::Sleep,
         "save" => GameAction::Save,
         "load" => GameAction::Load,
-        _ => return Err(format!("Unknown action: {}", action)),
+        _ => return Err(GameError::Game(format!("Unknown action: {}", action))),
     };
 
     game.handle_input(game_action);
@@ -253,9 +255,9 @@ pub fn game_action(action: String, params: Option<String>) -> Result<String, Str
     Ok(format!("Action '{}' executed", action))
 }
 
-pub fn game_tick(dt: f32) -> Result<String, String> {
-    let mut state = GAME_STATE.lock().map_err(|e| e.to_string())?;
-    let game = state.as_mut().ok_or("Game not initialized")?;
+pub fn game_tick(dt: f32) -> GameResult<String> {
+    let mut state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
+    let game = state.as_mut().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
 
     game.update(dt);
 
@@ -267,51 +269,49 @@ pub fn cleanup() {
     *state = None;
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct SaveData {
-    pub snapshot: GameSnapshot,
-    pub inventory: InventorySnapshot,
-    pub farm: Vec<FarmPlotSnapshot>,
-    pub npcs: Vec<NpcSnapshot>,
-    pub tick: u64,
-    pub timestamp: u64,
-}
-
 pub fn save_game_to_file(slot: u32) -> Result<String, String> {
-    let snapshot = get_game_snapshot()?;
-    let inventory = get_inventory_snapshot()?;
-    let farm = get_farm_snapshot()?;
-    let npcs = get_npc_snapshot()?;
+    let state = GAME_STATE.lock().map_err(|e| e.to_string())?;
+    let game = state.as_ref().ok_or("Game not initialized")?;
 
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
 
-    let state = GAME_STATE.lock().map_err(|e| e.to_string())?;
-    let game = state.as_ref().ok_or("Game not initialized")?;
-
     let data = SaveData {
-        snapshot,
-        inventory,
-        farm,
-        npcs,
-        tick: game.tick_count,
-        timestamp,
+        version: 1,
+        slot,
+        player_name: "Player".to_string(),
+        play_time_seconds: timestamp as f64,
+        day: 1,
+        season: "Clarity".to_string(),
+        year: 1,
+        hour: 6,
+        minute: 0,
+        energy: 100.0,
+        max_energy: 100.0,
+        insight_points: 0,
+        resonance: 0,
+        skills: std::collections::HashMap::new(),
+        inventory: vec![],
+        hotbar_index: 0,
+        gold: 500,
+        farm_tiles: vec![],
+        npcs: vec![],
+        current_zone: 0,
+        unlocked_zones: vec![0],
     };
 
-    let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
-    let path = format!("save_slot_{}.json", slot);
-    fs::write(&path, json).map_err(|e| e.to_string())?;
+    let manager = crate::save::SaveManager::default_dir();
+    manager.save(slot, &data).map_err(|e| e.to_string())?;
 
-    Ok(format!("Saved to {}", path))
+    Ok(format!("Saved to save slot {}", slot))
 }
 
 pub fn load_game_from_file(slot: u32) -> Result<String, String> {
-    let path = format!("save_slot_{}.json", slot);
-    let json = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let _data: SaveData = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+    let manager = crate::save::SaveManager::default_dir();
+    let _data = manager.load(slot).map_err(|e| e.to_string())?;
 
     // TODO: Restore game state from data
-    Ok(format!("Loaded from {}", path))
+    Ok(format!("Loaded from save slot {}", slot))
 }

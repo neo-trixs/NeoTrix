@@ -320,42 +320,38 @@ impl PhysicsWorld for SimplePhysicsWorld {
     }
 
     fn resolve_collisions(&mut self) {
-        // 计算所有碰撞的冲量
-        let mut impulses: Vec<(PhysicsEntity, Vec2, PhysicsEntity, Vec2)> = Vec::new();
-        
-        for collision in &self.collisions {
+        // Collect collision pairs to resolve (avoid borrow issues)
+        let pairs: Vec<(PhysicsEntity, PhysicsEntity, Vec2, f32)> = self.collisions.iter().map(|c| {
+            (c.entity_a, c.entity_b, c.normal, c.penetration)
+        }).collect();
+
+        for (entity_a, entity_b, normal, penetration) in pairs {
             if let (Some(body_a), Some(body_b)) = (
-                self.bodies.get(&collision.entity_a),
-                self.bodies.get(&collision.entity_b),
+                self.bodies.get_mut(&entity_a),
+                self.bodies.get_mut(&entity_b),
             ) {
-                let relative_velocity = body_b.velocity - body_a.velocity;
-                let velocity_along_normal = relative_velocity.dot(&collision.normal);
+                let push = penetration * 0.5;
 
-                if velocity_along_normal > 0.0 {
-                    continue;
+                // Determine axis from normal direction
+                if normal.x.abs() > normal.y.abs() {
+                    // Horizontal separation
+                    if normal.x > 0.0 {
+                        body_a.position.x -= push;
+                        body_b.position.x += push;
+                    } else {
+                        body_a.position.x += push;
+                        body_b.position.x -= push;
+                    }
+                } else {
+                    // Vertical separation
+                    if normal.y > 0.0 {
+                        body_a.position.y -= push;
+                        body_b.position.y += push;
+                    } else {
+                        body_a.position.y += push;
+                        body_b.position.y -= push;
+                    }
                 }
-
-                let e = body_a.friction.min(body_b.friction);
-                let j = -(1.0 + e) * velocity_along_normal;
-                let j = j / (1.0 / body_a.mass + 1.0 / body_b.mass);
-
-                let impulse = collision.normal * j;
-                impulses.push((
-                    collision.entity_a,
-                    -impulse * (1.0 / body_a.mass),
-                    collision.entity_b,
-                    impulse * (1.0 / body_b.mass),
-                ));
-            }
-        }
-
-        // 应用冲量
-        for (entity_a, impulse_a, entity_b, impulse_b) in impulses {
-            if let Some(body_a) = self.bodies.get_mut(&entity_a) {
-                body_a.velocity = body_a.velocity + impulse_a;
-            }
-            if let Some(body_b) = self.bodies.get_mut(&entity_b) {
-                body_b.velocity = body_b.velocity + impulse_b;
             }
         }
     }

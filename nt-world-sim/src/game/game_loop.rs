@@ -5,7 +5,9 @@ use crate::engine::physics::{SimplePhysicsWorld, PhysicsWorld};
 use crate::engine::camera::Camera2D;
 use crate::engine::scene::{SceneGraph, SceneNode};
 use crate::engine::input::KeyCode as InputKeyCode;
-use crate::engine::renderer::Vec2 as RendererVec2;
+use crate::engine::event_bus::TypedEventBus;
+use crate::engine::audio::{AudioManager, StubAudioBackend};
+use crate::engine::renderer::{Vec2 as RendererVec2, ParticleSystem};
 use super::time::{GameTime, TimeSystem};
 use super::weather::{Weather, WeatherSystem};
 use super::inventory::Inventory;
@@ -37,6 +39,9 @@ pub struct GameLoop {
     pub camera: Camera2D,
     pub scene: SceneGraph,
     pub input_map: HashMap<InputKeyCode, GameAction>,
+    pub event_bus: TypedEventBus,
+    pub audio: AudioManager,
+    pub particles: ParticleSystem,
 }
 
 fn create_default_input_map() -> HashMap<InputKeyCode, GameAction> {
@@ -63,6 +68,8 @@ impl GameLoop {
     pub fn new() -> Self {
         let mut world = UniversalWorld::new();
         let mut scheduler = ParallelScheduler::new();
+        let mut audio = AudioManager::new();
+        audio.add_backend(Box::new(StubAudioBackend));
 
         scheduler.add_system(Box::new(TimeSystem), SystemDependency::new());
         scheduler.add_system(Box::new(WeatherSystem), SystemDependency::new());
@@ -86,6 +93,9 @@ impl GameLoop {
             camera: Camera2D::new(800.0, 600.0),
             scene: SceneGraph::new(root_entity),
             input_map: create_default_input_map(),
+            event_bus: TypedEventBus::new(),
+            audio,
+            particles: ParticleSystem::new(1024),
         }
     }
 
@@ -134,6 +144,8 @@ impl GameLoop {
 
         self.scheduler.run(&mut self.world, dt);
 
+        self.event_bus.process_all();
+
         self.physics.step(dt);
 
         if let Some(player) = self.player_entity {
@@ -142,6 +154,9 @@ impl GameLoop {
                 self.camera.follow(player_vec2);
             }
         }
+
+        self.particles.update(dt);
+        self.camera.update_shake(dt);
 
         self.check_day_transition();
         self.update_npc_schedules();
@@ -213,7 +228,7 @@ impl GameLoop {
     }
 
     fn spawn_npcs(&mut self) {
-        use super::npcs::NpcDefinition;
+        use super::npc::NpcDefinition;
 
         for npc_def in NpcDefinition::all_npcs() {
             let entity = self.world.spawn();
@@ -306,9 +321,17 @@ impl GameLoop {
                 match tool_type {
                     super::inventory::ToolType::Hoe => {
                         println!("Hoeing tile at ({}, {})", target_x, target_y);
+                        self.camera.shake(2.0);
                     }
                     super::inventory::ToolType::WateringCan => {
                         println!("Watering tile at ({}, {})", target_x, target_y);
+                        self.camera.shake(1.0);
+                    }
+                    super::inventory::ToolType::Pickaxe => {
+                        self.camera.shake(4.0);
+                    }
+                    super::inventory::ToolType::Axe => {
+                        self.camera.shake(3.0);
                     }
                     _ => {}
                 }
@@ -331,6 +354,7 @@ impl GameLoop {
             }
             println!("Slept until next day. Day {}, {}", time.day, time.season_name());
         }
+        self.camera.shake(5.0);
     }
 
     fn render(&self, _dt: f32) {
