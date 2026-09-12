@@ -10,7 +10,26 @@ use std::path::PathBuf;
 use office_oxide::DocumentFormat;
 use serde::{Deserialize, Serialize};
 
-pub use crate::core::nt_core_traits::SpecialistType;
+/// 本地 SpecialistType — 消除对 crate::core::nt_core_traits 的硬耦合。
+/// 与 NT-CORE 的 SpecialistType 保持枚举值一致 (L1→L5 依赖倒置)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SpecialistType {
+    PatternMatcher,
+    AnomalyDetector,
+    KnowledgeRetriever,
+    CodeAnalyzer,
+    Planner,
+    KnowledgeIntegrator,
+    GoalPrioritizer,
+    RiskAssessor,
+    CreativityGenerator,
+    ReflectionEngine,
+    MetaCognitionAnalyst,
+    AISecurity,
+    ImageGenerator,
+    EvidenceWeightedHypothesis,
+    Orchestrator,
+}
 
 
 // ─── NT-CORE 能力抽象 trait (L1→L5 解耦) ────────────────────────────────

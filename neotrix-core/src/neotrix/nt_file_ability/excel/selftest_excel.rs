@@ -4,7 +4,7 @@
 //! T2: 注册到 SelfTestRegistry
 //! T3: 生产路径测试 (实际调用检测函数)
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::neotrix::nt_file_ability::selftest::SelfTest;
 
 /// Excel 解析能力自检
 pub struct ExcelSelfTest;
@@ -101,14 +101,14 @@ impl SelfTest for ExcelSelfTest {
 }
 
 /// 注册 Excel SelfTest 到主 registry
-pub fn register_excel_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
+pub fn register_excel_self_tests(registry: &mut crate::neotrix::nt_file_ability::selftest::SelfTestRegistry) {
     registry.register(Box::new(ExcelSelfTest));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTestRegistry;
+    use crate::neotrix::nt_file_ability::selftest::SelfTestRegistry;
 
     #[test]
     fn test_excel_selftest() {
@@ -159,7 +159,7 @@ mod tests {
         ];
         for case in cases {
             let config =
-                super::crate::neotrix::nt_file_ability::config_parser::ConfigFields::parse(case);
+                crate::neotrix::nt_file_ability::config_parser::ConfigFields::parse(case);
             // 不应 panic
             let _ = config.is_empty();
         }
@@ -200,7 +200,7 @@ mod tests {
         ];
         for case in cases {
             let (_, _) =
-                super::crate::neotrix::nt_file_ability::template_engine::ColumnMap::detect(&case);
+                crate::neotrix::nt_file_ability::template_engine::ColumnMap::detect(&case);
             // 不应 panic
         }
     }

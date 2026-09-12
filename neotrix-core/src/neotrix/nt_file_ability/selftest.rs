@@ -5,7 +5,41 @@
 //! T2 验证: 注册到意识树 SelfTestRegistry
 //! T3 验证: 实际功能测试（类型检查、默认值、错误处理）
 
-use crate::core::nt_core_self_test::SelfTest;
+use std::collections::HashMap;
+
+// ─── 本地 SelfTest trait — 消除对 crate::core::nt_core_self_test 的硬耦合 ───
+
+/// 跨模块共享的自检 trait (与 NT-CORE SelfTest 接口一致，L1→L5 依赖倒置)
+pub trait SelfTest: Send + Sync {
+    fn name(&self) -> &str;
+    fn self_test(&self) -> Result<(), Vec<String>>;
+}
+
+/// 自检注册表 (精简版，仅保留 nt_file_ability 需要的接口)
+#[derive(Default)]
+pub struct SelfTestRegistry {
+    tests: HashMap<String, Box<dyn SelfTest>>,
+}
+
+impl SelfTestRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, test: Box<dyn SelfTest>) {
+        self.tests.insert(test.name().to_string(), test);
+    }
+
+    pub fn register_all(&mut self, tests: Vec<Box<dyn SelfTest>>) {
+        for t in tests {
+            self.register(t);
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        self.tests.len()
+    }
+}
 
 /// PDF 图标增强能力自检
 pub struct PdfIconEnhanceSelfTest;
@@ -169,7 +203,7 @@ impl SelfTest for FileAbilitySelfTest {
 }
 
 /// 注册 PDF/SR SelfTest 到主 registry
-pub fn register_pdf_sr_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
+pub fn register_pdf_sr_self_tests(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(PdfIconEnhanceSelfTest));
     registry.register(Box::new(ImageSuperResolutionSelfTest));
     registry.register(Box::new(PdfImageExtractSelfTest));
@@ -179,7 +213,6 @@ pub fn register_pdf_sr_self_tests(registry: &mut crate::core::nt_core_self_test:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTestRegistry;
     
     #[test]
     fn test_pdf_icon_enhance_selftest() {
