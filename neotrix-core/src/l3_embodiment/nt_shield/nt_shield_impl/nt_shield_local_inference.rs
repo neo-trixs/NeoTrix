@@ -32,12 +32,8 @@
 //! | Qwen3.5-9B | Q5_K_M | f16 | ON | 4 | 9.0 | 23.0 |
 //! | Qwen3.5-9B | Q5_K_M | q4_0 | OFF | 8 | 8.4 | 23.0 |
 
-pub mod quantization_engine;
-pub mod kv_cache_optimizer;
-pub mod inference_runtime;
-pub mod model_selector;
-pub mod apple_silicon;
-pub mod speculative_decoding;
+// 子模块已迁移到 nt_io_inference (l1_action/nt_io/nt_io_inference/)
+// 保留对新位置的 re-export 以维持向后兼容
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};

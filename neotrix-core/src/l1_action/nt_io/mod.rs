@@ -93,6 +93,9 @@ pub mod model_routing;
 
 // Cache-Aware Compaction — 基于缓存命中率的智能压缩
 pub mod cache_compaction;
+
+// 推理运行时（从 nt_shield_local_inference 迁移）
+pub mod nt_io_inference;
 pub use cache_compaction::{CacheCompactor, CompactionStrategy, CacheEntry, CompactionResult};
 
 // 向后兼容别名

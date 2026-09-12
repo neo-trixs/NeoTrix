@@ -56,12 +56,6 @@ pub use nt_shield_mobile_analyzer::ObjectionAdapter;
 pub use nt_shield_web_scanner::W3afEngine;
 pub use nt_shield_ai_security::ARTToolbox;
 pub use nt_shield_local_inference::{LocalInferenceEngine, QuantizationEngine, KVCacheOptimizer};
-pub use nt_shield_local_inference::quantization_engine::{QuantizationConfig, QuantFormatConfig, QualityBenchmark, GGUFModel, QuantLevel, ModelScore, DynamicQuantSelection, EvoPressResult, LayerQuantConfig, GptqGgufConfig, EvoPressConfig, GptqConfig, ImportanceMatrix, IMMethod, GgufHeaderInfo, HardwareFit, read_gguf_header, check_hardware_fit, AutoQuantRecommendation, MixedPrecisionRule};
-pub use nt_shield_local_inference::kv_cache_optimizer::{KVCacheLayout, MemorySavingsReport, ContextCapacity, ContinuousBatchingConfig, KVCACHEType};
-pub use nt_shield_local_inference::inference_runtime::{InferenceRuntime, BackendEngine, RuntimeConfig, ThroughputBenchmark};
-pub use nt_shield_local_inference::model_selector::{ModelSelector, ModelRecommendation, ModelInfo, HardwareProfile};
-pub use nt_shield_local_inference::apple_silicon::{AppleSiliconOptimizer, AppleChip, MLXPerfData, RuntimeSelection};
-pub use nt_shield_local_inference::speculative_decoding::{SpeculativeDecoder, SpeculativeResult, AcceptanceStats, M5SpeculativeBenchmarks, SpecBenchmark, spec_decode_args};
 pub use nt_shield_local_inference::{OptimalServerCmd};
 
 /// Shield capability orchestrator

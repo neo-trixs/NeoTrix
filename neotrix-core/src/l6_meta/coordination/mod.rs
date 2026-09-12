@@ -1,8 +1,5 @@
 pub mod governance;
 pub mod nt_governance;
-pub mod nt_core_intra_reflection;
-pub mod nt_shield_approval;
-pub mod nt_shield_audit;
 pub mod nt_mind_repair;
 pub mod nt_meta_sentrux;
 pub mod nt_meta_build_watchdog;
@@ -18,16 +15,10 @@ pub mod quality_control;
 pub mod verifier_agent;
 pub mod layered_qa;
 pub mod null_normalizer;
-pub mod video_quality_scorer;
-pub mod content_moderation;
-pub mod video_audit_trail;
 pub mod self_improvement;
 
 pub use governance::*;
 pub use nt_governance::*;
-pub use nt_core_intra_reflection::*;
-pub use nt_shield_approval::*;
-pub use nt_shield_audit::*;
 pub use nt_mind_repair::*;
 pub use nt_meta_sentrux::{SentruxSensor, QualitySnapshot, SessionComparison};
 pub use nt_meta_build_watchdog::{
