@@ -596,19 +596,15 @@ impl KnowledgeBase {
 
     pub fn persist_commitments(&self) -> Result<(), String> {
         let store = self.commitment_store.read().map_err(|e| format!("Lock: {}", e))?;
-        let json = serde_json::to_string(&*store).map_err(|e| format!("serde: {}", e))?;
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_unify::kv_set(&conn, "commitment", "store", &json)
+        shared_utils::save_kv_state(self, "commitment", "store", &*store)
     }
 
     pub fn load_commitments(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let json = nt_memory_unify::kv_get(&conn, "commitment", "store")?;
-        if let Some(data) = json {
-            let loaded: nt_memory_commitment::EmbeddingCommitmentStore = serde_json::from_str(&data)
-                .map_err(|e| format!("deser: {}", e))?;
+        let loaded: Option<nt_memory_commitment::EmbeddingCommitmentStore> =
+            shared_utils::load_kv_state(self, "commitment", "store")?;
+        if let Some(data) = loaded {
             let mut store = self.commitment_store.write().map_err(|e| format!("Lock: {}", e))?;
-            *store = loaded;
+            *store = data;
         }
         Ok(())
     }
@@ -632,19 +628,15 @@ impl KnowledgeBase {
 
     pub fn persist_confidence_store(&self) -> Result<(), String> {
         let store = self.confidence_store.read().map_err(|e| format!("Lock: {}", e))?;
-        let json = serde_json::to_string(&*store).map_err(|e| format!("serde: {}", e))?;
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_unify::kv_set(&conn, "confidence", "store", &json)
+        shared_utils::save_kv_state(self, "confidence", "store", &*store)
     }
 
     pub fn load_confidence_store(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let json = nt_memory_unify::kv_get(&conn, "confidence", "store")?;
-        if let Some(data) = json {
-            let loaded: nt_memory_confidence::ConfidenceStore = serde_json::from_str(&data)
-                .map_err(|e| format!("deser: {}", e))?;
+        let loaded: Option<nt_memory_confidence::ConfidenceStore> =
+            shared_utils::load_kv_state(self, "confidence", "store")?;
+        if let Some(data) = loaded {
             let mut store = self.confidence_store.write().map_err(|e| format!("Lock: {}", e))?;
-            *store = loaded;
+            *store = data;
         }
         Ok(())
     }
@@ -1949,20 +1941,15 @@ impl KnowledgeBase {
 
     pub fn save_agent_memory(&self) -> Result<(), String> {
         let mem = self.agent_memory.read().map_err(|e| format!("Lock: {}", e))?;
-        let json = serde_json::to_string(&*mem).map_err(|e| format!("serde: {}", e))?;
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_unify::kv_set(&conn, "agent_memory", "state", &json)
+        shared_utils::save_kv_state(self, "agent_memory", "state", &*mem)
     }
 
     pub fn load_agent_memory(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let json = nt_memory_unify::kv_get(&conn, "agent_memory", "state")?;
-        drop(conn);
-        if let Some(data) = json {
-            let loaded: nt_memory_agent_driven::AgentMemory = serde_json::from_str(&data)
-                .map_err(|e| format!("deser: {}", e))?;
+        let loaded: Option<nt_memory_agent_driven::AgentMemory> =
+            shared_utils::load_kv_state(self, "agent_memory", "state")?;
+        if let Some(data) = loaded {
             let mut mem = self.agent_memory.write().map_err(|e| format!("Lock: {}", e))?;
-            *mem = loaded;
+            *mem = data;
         }
         Ok(())
     }
@@ -2077,20 +2064,15 @@ impl KnowledgeBase {
 
     pub fn save_svaf_gate(&self) -> Result<(), String> {
         let gate = self.svaf_gate.read().map_err(|e| format!("Lock: {}", e))?;
-        let json = serde_json::to_string(&*gate).map_err(|e| format!("serde: {}", e))?;
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_unify::kv_set(&conn, "svaf_gate", "config", &json)
+        shared_utils::save_kv_state(self, "svaf_gate", "config", &*gate)
     }
 
     pub fn load_svaf_gate(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let json = nt_memory_unify::kv_get(&conn, "svaf_gate", "config")?;
-        drop(conn);
-        if let Some(data) = json {
-            let loaded: nt_memory_svaf_gate::SvafGate = serde_json::from_str(&data)
-                .map_err(|e| format!("deser: {}", e))?;
+        let loaded: Option<nt_memory_svaf_gate::SvafGate> =
+            shared_utils::load_kv_state(self, "svaf_gate", "config")?;
+        if let Some(data) = loaded {
             let mut gate = self.svaf_gate.write().map_err(|e| format!("Lock: {}", e))?;
-            *gate = loaded;
+            *gate = data;
         }
         Ok(())
     }
@@ -2125,20 +2107,15 @@ impl KnowledgeBase {
 
     pub fn save_proficiency(&self) -> Result<(), String> {
         let p = self.proficiency.read().map_err(|e| format!("Lock: {}", e))?;
-        let json = serde_json::to_string(&*p).map_err(|e| format!("serde: {}", e))?;
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_unify::kv_set(&conn, "proficiency", "state", &json)
+        shared_utils::save_kv_state(self, "proficiency", "state", &*p)
     }
 
     pub fn load_proficiency(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let json = nt_memory_unify::kv_get(&conn, "proficiency", "state")?;
-        drop(conn);
-        if let Some(data) = json {
-            let loaded: nt_memory_proficiency::MemoryProficiency = serde_json::from_str(&data)
-                .map_err(|e| format!("deser: {}", e))?;
+        let loaded: Option<nt_memory_proficiency::MemoryProficiency> =
+            shared_utils::load_kv_state(self, "proficiency", "state")?;
+        if let Some(data) = loaded {
             let mut p = self.proficiency.write().map_err(|e| format!("Lock: {}", e))?;
-            *p = loaded;
+            *p = data;
         }
         Ok(())
     }
@@ -2207,20 +2184,15 @@ impl KnowledgeBase {
     pub fn save_graphrag(&self) -> Result<(), String> {
         let gs = self.graphrag_store.read().map_err(|e| format!("Lock: {}", e))?;
         let store = gs.as_ref().ok_or("GraphRAG not initialized")?;
-        let json = serde_json::to_string(store).map_err(|e| format!("serde: {}", e))?;
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_unify::kv_set(&conn, "graphrag", "store", &json)
+        shared_utils::save_kv_state(self, "graphrag", "store", store)
     }
 
     pub fn load_graphrag(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let json = nt_memory_unify::kv_get(&conn, "graphrag", "store")?;
-        drop(conn);
-        if let Some(data) = json {
-            let loaded: nt_memory_graphrag::GraphRagStore = serde_json::from_str(&data)
-                .map_err(|e| format!("deser: {}", e))?;
+        let loaded: Option<nt_memory_graphrag::GraphRagStore> =
+            shared_utils::load_kv_state(self, "graphrag", "store")?;
+        if let Some(data) = loaded {
             let mut gs = self.graphrag_store.write().map_err(|e| format!("Lock: {}", e))?;
-            *gs = Some(loaded);
+            *gs = Some(data);
         }
         Ok(())
     }

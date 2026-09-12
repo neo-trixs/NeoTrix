@@ -12,9 +12,9 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use super::super::execution::unified_inference::*;
-use super::super::GatewayV2;
-use super::super::super::common::types::*;
+use crate::l1_action::nt_io::nt_io_provider::gateway::execution::unified_inference::*;
+use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
+use crate::l1_action::nt_io::nt_io_provider::common::types::*;
 
 /// 路由器配置
 #[derive(Debug, Clone)]
@@ -197,7 +197,7 @@ impl UnifiedInference for InferenceRouter {
             .map(|m| m.content.as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        let prompt_tokens = super::context_budget::estimate_tokens(&prompt);
+        let prompt_tokens = crate::l1_action::nt_io::nt_io_provider::common::context_budget::estimate_tokens(&prompt);
         let completion_tokens = request.max_tokens.unwrap_or(4096) as usize;
 
         // 简单估算: $0.002/1K tokens (可替换为 per-provider 定价)
