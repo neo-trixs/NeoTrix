@@ -4,6 +4,9 @@ use std::collections::HashMap;
 use super::world::{Component, UniversalWorld};
 use super::entity::{EntityId, UniversalEntity};
 
+impl<T: Component> Component for Changed<T> {}
+
+#[derive(Clone)]
 pub struct Changed<T: Component> {
     pub value: T,
     pub tick: u64,
