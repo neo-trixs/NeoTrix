@@ -29,7 +29,7 @@ impl KBIngester {
             Ok(c) => c,
             Err(_) => { log::warn!("concept {}: lock poisoned", title); return String::new(); }
         };
-        match store::insert_or_get_node(&conn, title, NodeType::Concept, Some(summary), None, Some(domain)) {
+        match store::insert_or_get_node(&conn, title, NodeType::Concept, Some(summary), None, Some(domain), true) {
             Ok(id) => id,
             Err(e) => { self.kb.mark_bm25_dirty(); log::error!("concept {}: {}", title, e); String::new() }
         }
@@ -41,7 +41,7 @@ impl KBIngester {
             Ok(c) => c,
             Err(_) => { log::warn!("article {}: lock poisoned", title); return String::new(); }
         };
-        match store::insert_or_get_node(&conn, title, NodeType::Article, Some(summary), Some(url), Some(domain)) {
+        match store::insert_or_get_node(&conn, title, NodeType::Article, Some(summary), Some(url), Some(domain), true) {
             Ok(id) => id,
             Err(e) => { self.kb.mark_bm25_dirty(); log::error!("article {}: {}", title, e); String::new() }
         }
@@ -53,7 +53,7 @@ impl KBIngester {
             Ok(c) => c,
             Err(_) => { log::warn!("theory {}: lock poisoned", title); return String::new(); }
         };
-        match store::insert_or_get_node(&conn, title, NodeType::Theory, Some(summary), None, Some(domain)) {
+        match store::insert_or_get_node(&conn, title, NodeType::Theory, Some(summary), None, Some(domain), true) {
             Ok(id) => id,
             Err(e) => { self.kb.mark_bm25_dirty(); log::error!("theory {}: {}", title, e); String::new() }
         }
@@ -62,7 +62,7 @@ impl KBIngester {
     /// Fallible insert — returns None on error without panicking.
     pub(crate) fn _try_concept(&mut self, title: &str, summary: &str, domain: &str) -> Option<String> {
         let conn = self.kb.conn.lock().unwrap_or_else(|e| e.into_inner());
-        match store::insert_or_get_node(&conn, title, NodeType::Concept, Some(summary), None, Some(domain)) {
+        match store::insert_or_get_node(&conn, title, NodeType::Concept, Some(summary), None, Some(domain), true) {
             Ok(id) => { self.kb.mark_bm25_dirty(); Some(id) }
             Err(e) => { self.errors.push(format!("concept {}: {}", title, e)); None }
         }
@@ -71,7 +71,7 @@ impl KBIngester {
     /// Fallible insert with arbitrary NodeType.
     pub fn try_node(&mut self, title: &str, ntype: NodeType, summary: &str, url: Option<&str>, domain: &str) -> Option<String> {
         let conn = self.kb.conn.lock().unwrap_or_else(|e| e.into_inner());
-        match store::insert_or_get_node(&conn, title, ntype, Some(summary), url, Some(domain)) {
+        match store::insert_or_get_node(&conn, title, ntype, Some(summary), url, Some(domain), true) {
             Ok(id) => { self.kb.mark_bm25_dirty(); Some(id) }
             Err(e) => { self.errors.push(format!("node {}: {}", title, e)); None }
         }
