@@ -6,7 +6,7 @@ use crate::l1_action::nt_io::nt_io_provider::common::factory::{create_provider, 
 use crate::l1_action::nt_io::nt_io_provider::catalog::free_catalog::{FreeModelCatalog, FreeModelEntry};
 use crate::l1_action::nt_io::nt_io_provider::health::rate_limiter::RateLimiter;
 use crate::l1_action::nt_io::nt_io_provider::health::rate_profiles::get_rate_profile;
-use super::*;
+use super::super::*;
 
 impl GatewayV2 {
     // ── Safe RwLock helpers (poison-resistant) ──

@@ -7,7 +7,7 @@ mod execution;
 
 mod keyless;
 
-mod unified_inference;
+pub mod unified_inference;
 pub use unified_inference::*;
 
 mod universal_adapter;

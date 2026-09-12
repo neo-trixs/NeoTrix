@@ -20,7 +20,7 @@ mod subgrid;
 mod capability_router;
 pub use capability_router::CapabilityRouter;
 
-mod agent_routing;
+pub mod agent_routing;
 pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
 
 mod inference_router;

@@ -1,6 +1,7 @@
 use super::super::routing::agent_routing::AgentRoutingTable;
 use crate::l1_action::nt_io::nt_io_provider::common::factory::LlmProviderType;
 use crate::l1_action::nt_io::nt_io_provider::routing::provider_swap::ProviderSwapManager;
+use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::*;
 
 /// 能力自主协调层 — 任务目标驱动的已有能力组合器 (R-P42 强化已有节点)
