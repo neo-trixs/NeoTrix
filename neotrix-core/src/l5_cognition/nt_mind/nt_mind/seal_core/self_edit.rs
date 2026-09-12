@@ -105,12 +105,6 @@ pub fn world_to_knowledge_task_type(t: &crate::neotrix::nt_world_model::TaskType
         W::CodeReview => K::CodeReview,
         W::Learning => K::Learning,
         W::Debugging => K::Debugging,
-        W::Prediction | W::Classification | W::Generation | W::CharacterGeneration
-        | W::Code | W::CodeExample | W::Creative | W::Extraction | W::FactLookup
-        | W::InstructionFollowing | W::Knowledge | W::KnowledgeQA | W::Math
-        | W::MetaCognition | W::MultiTurn | W::Reasoning | W::Verification
-        |         W::Reflection | W::Research | W::ResearchSurvey | W::Safety
-        | W::ScriptParsing | W::Summarization | W::TechnicalQuery | W::ToolUse
-        | W::TrendAnalysis => K::General,
+        _ => K::General,
     }
 }

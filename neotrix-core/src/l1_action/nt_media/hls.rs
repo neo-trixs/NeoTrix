@@ -129,7 +129,7 @@ pub fn parse_m3u8(content: &str) -> Result<M3u8Manifest, HlsError> {
         if line.starts_with("#EXT-X-KEY:") {
             let attrs = parse_attributes(line.trim_start_matches("#EXT-X-KEY:"));
             current_encryption = Some(Encryption {
-                method: attrs.get("METHOD").unwrap_or(&"NONE").to_string(),
+                method: attrs.get("METHOD").cloned().unwrap_or_else(|| "NONE".to_string()),
                 uri: attrs.get("URI").map(|s| s.trim_matches('"').to_string()),
                 iv: attrs.get("IV").map(|s| s.to_string()),
             });

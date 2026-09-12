@@ -104,8 +104,8 @@ impl DevelopmentalWindow {
     }
 
     pub(crate) fn _is_in_window(&self) -> bool { self.in_window }
-    pub(crate) fn _plasticity(&self) -> f64 { self.plasticity }
-    pub(crate) fn _acceleration(&self) -> f64 { self.acceleration }
+    pub(crate) fn _plasticity(&self) -> f64 { self._plasticity }
+    pub(crate) fn _acceleration(&self) -> f64 { self._acceleration }
 }
 
 #[cfg(test)]

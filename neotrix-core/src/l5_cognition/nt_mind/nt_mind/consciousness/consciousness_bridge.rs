@@ -64,7 +64,6 @@ impl ConsciousnessBridge {
             TaskType::Reflection => SpecialistType::ReflectionEngine,
             TaskType::Research | TaskType::Learning => SpecialistType::KnowledgeRetriever,
             TaskType::Debugging => SpecialistType::MetaCognitionAnalyst,
-            _ => SpecialistType::KnowledgeIntegrator,
         };
 
         let mut module = SpecialistModule::new(specialist_type, task_name);

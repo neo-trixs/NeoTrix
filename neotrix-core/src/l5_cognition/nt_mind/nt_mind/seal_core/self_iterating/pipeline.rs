@@ -2884,7 +2884,7 @@ impl BrainStage for MemoryConsolidationStage {
         let csm_info = brain
             ._cross_session_memory
             .as_ref()
-            .map(|csm| format!(" csm={}", csm.len()))
+            .map(|csm: std::collections::HashMap<String, Vec<u8>>| format!(" csm={}", csm.len()))
             .unwrap_or_default();
         let msg = format!(
             "memory_consolidation: size={} promoted={} persisted={}{}",

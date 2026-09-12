@@ -13,7 +13,6 @@ pub use cleanup_engine::*;
 pub use guardian::*;
 pub use distiller::*;
 pub use repair::*;
-pub use recovery_verify::*;
 pub use memory_bank::*;
 pub use l1_wrappers::*;
 pub use knowledge_store::*;

@@ -123,7 +123,7 @@ impl PeakWindow {
 
     pub fn capacity(&self) -> f64 { self.capacity }
     pub fn energy(&self) -> f64 { self.energy }
-    pub(crate) fn _in_peak(&self) -> bool { self.in_peak }
+    pub(crate) fn _in_peak(&self) -> bool { self._in_peak }
 }
 
 #[cfg(test)]
