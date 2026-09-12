@@ -1,3 +1,4 @@
+use crate::core::Component;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -252,6 +253,8 @@ impl CropTile {
 impl Default for CropTile {
     fn default() -> Self { Self::new() }
 }
+
+impl Component for FarmPlot {}
 
 pub struct FarmingSystem;
 

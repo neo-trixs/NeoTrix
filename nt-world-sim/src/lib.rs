@@ -4,6 +4,7 @@ pub mod codegen;
 pub mod core;
 pub mod engine;
 pub mod game;
+pub mod tauri_bridge;
 pub mod ui;
 pub mod world;
 

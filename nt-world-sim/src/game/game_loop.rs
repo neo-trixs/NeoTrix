@@ -1,5 +1,5 @@
 use crate::core::{UniversalWorld, UniversalEntity, Component};
-use crate::core::scheduler::{UniversalSystem, ParallelScheduler, SystemDependency};
+use crate::core::scheduler::{ParallelScheduler, SystemDependency};
 use super::time::{GameTime, TimeSystem};
 use super::weather::{Weather, WeatherSystem};
 use super::inventory::Inventory;
@@ -132,7 +132,7 @@ impl GameLoop {
 
     fn update_weather(&mut self) {
         if let Some(time) = self.world.get_resource::<GameTime>() {
-            if time.tick_count % 100 == 0 {
+            if time.tick_counter % 100 == 0 {
                 if let Some(weather) = self.world.get_resource_mut::<Weather>() {
                     use std::time::{SystemTime, UNIX_EPOCH};
                     let nanos = SystemTime::now()

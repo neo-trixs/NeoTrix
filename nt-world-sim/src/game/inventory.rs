@@ -1,4 +1,5 @@
 use super::item::ItemQuality;
+use crate::core::Resource;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -188,6 +189,8 @@ impl Inventory {
         self.count_item(item_id) > 0
     }
 }
+
+impl Resource for Inventory {}
 
 pub struct ItemDatabase {
     pub items: HashMap<u32, Item>,
