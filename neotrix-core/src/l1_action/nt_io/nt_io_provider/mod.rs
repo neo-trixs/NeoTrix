@@ -19,6 +19,13 @@ pub mod free_catalog;
 pub mod free_pool;
 pub mod free_providers;
 pub mod gateway;
+pub mod unified_inference;
+pub use unified_inference::{
+    UnifiedInference, InferenceRequest, InferenceResponse, InferenceError,
+    InferenceCapabilities, ProviderInfo, ProviderCapabilities,
+    HealthStatus, CostEstimate, RouterHealth, StreamHandle,
+    RequestMetadata, ResponseMetadata, Priority,
+};
 pub mod generation_classifier;
 pub mod gemini;
 pub mod llama_process;

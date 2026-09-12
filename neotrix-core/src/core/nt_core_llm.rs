@@ -365,6 +365,55 @@ impl std::fmt::Display for LlmError {
 
 impl std::error::Error for LlmError {}
 
+impl LlmError {
+    /// 是否可重试 (速率限制/网络/超时)
+    pub fn is_retryable(&self) -> bool {
+        matches!(self, LlmError::RateLimit(_) | LlmError::Network(_) | LlmError::Server(_))
+    }
+
+    /// 是否应故障转移 (非认证/验证错误)
+    pub fn should_fallback(&self) -> bool {
+        !matches!(self, LlmError::Authentication(_) | LlmError::InvalidRequest(_))
+    }
+
+    /// 是否为配额耗尽 (应熔断而非重试)
+    pub fn is_quota_exhaustion(&self) -> bool {
+        match self {
+            LlmError::RateLimit(msg) | LlmError::Server(msg) => {
+                let m = msg.to_lowercase();
+                m.contains("quota exceeded")
+                    || m.contains("out of quota")
+                    || m.contains("insufficient quota")
+                    || m.contains("credit limit")
+                    || m.contains("out of credits")
+                    || m.contains("billing")
+            }
+            LlmError::Authentication(msg) => {
+                let m = msg.to_lowercase();
+                m.contains("quota") || m.contains("billing")
+            }
+            _ => false,
+        }
+    }
+
+    /// 是否为模型不可用 (应锁定模型而非熔断 provider)
+    pub fn is_model_unavailable(&self) -> bool {
+        match self {
+            LlmError::Server(msg) | LlmError::InvalidRequest(msg) => {
+                let m = msg.to_lowercase();
+                m.contains("model not found")
+                    || m.contains("model does not exist")
+                    || m.contains("model unavailable")
+                    || m.contains("unknown model")
+                    || m.contains("decommissioned")
+                    || m.contains("no longer available")
+                    || m.contains("invalid model")
+            }
+            _ => false,
+        }
+    }
+}
+
 impl From<String> for LlmError {
     fn from(s: String) -> Self {
         LlmError::Unknown(s)
