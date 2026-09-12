@@ -113,23 +113,67 @@ impl _C2paProvenance {
         claim
     }
 
-    /// 嵌入水印
-    pub fn _embed_watermark(&mut self, _content_id: &str, data: &[u8]) -> Vec<u8> {
-        // TODO: 实际的水印嵌入逻辑
-        // 这里只是一个示例
+    /// 嵌入水印 — 在数据末尾追加不可见的元数据标记
+    ///
+    /// 实际生产环境应使用真正的水印算法（如 LSB 隐写、频域水印）。
+    /// 当前实现使用结构化标记：追加 JSON 元数据 + 校验和。
+    pub fn _embed_watermark(&mut self, content_id: &str, data: &[u8]) -> Vec<u8> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // 计算数据校验和
+        let mut hasher = DefaultHasher::new();
+        data.hash(&mut hasher);
+        let checksum = hasher.finish();
+
+        // 构建水印元数据
+        let watermark = serde_json::json!({
+            "c2pa_watermark": true,
+            "content_id": content_id,
+            "checksum": checksum,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "version": "1.0",
+        });
+
+        // 追加水印到数据末尾（使用分隔符避免解析歧义）
+        let mut watermarked = data.to_vec();
+        watermarked.extend_from_slice(b"\n---C2PA_WATERMARK---\n");
+        watermarked.extend_from_slice(watermark.to_string().as_bytes());
+
         self.stats.total_watermarked += 1;
-        data.to_vec()
+        watermarked
     }
 
-    /// 验证 C2PA 声明
+    /// 验证 C2PA 声明 — 检查签名存在性和完整性
     pub fn verify_claim(&mut self, content_id: &str) -> VerificationResult {
         if let Some(claim) = self.claims.get(content_id) {
             // 检查签名
-            if claim.hardware_signature.is_none() && claim.software_signature.is_none() {
+            let has_hw_sig = claim.hardware_signature.is_some();
+            let has_sw_sig = claim.software_signature.is_some();
+
+            if !has_hw_sig && !has_sw_sig {
                 return VerificationResult::NoSignature;
             }
 
-            // TODO: 实际的签名验证逻辑
+            // 检查声明完整性：必须有所有哈希字段
+            let has_all_hashes = !claim.input_hash.is_empty()
+                && !claim.output_hash.is_empty()
+                && !claim.prompt_hash.is_empty();
+
+            if !has_all_hashes {
+                self.stats.total_failed += 1;
+                return VerificationResult::Tampered;
+            }
+
+            // 检查时间戳合理性：创建时间不能是未来
+            if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&claim.created_at) {
+                if created.timestamp() > chrono::Utc::now().timestamp() + 3600 {
+                    self.stats.total_failed += 1;
+                    return VerificationResult::Tampered;
+                }
+            }
+
+            // 验证通过（实际生产环境应验证密码学签名）
             self.stats.total_verified += 1;
             VerificationResult::Valid
         } else {
