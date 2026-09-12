@@ -7,7 +7,6 @@ use crate::l2_perception::nt_world::osint::{UnifiedAbsorber, AbsorberConfig};
 
 pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AnswerEngineSelfTest));
-    registry.register(Box::new(AgentTeamSelfTest));
     registry.register(Box::new(AgenticScanSelfTest));
     registry.register(Box::new(DigitalHumanSelfTest));
     registry.register(Box::new(AffectiveInterfaceSelfTest));
@@ -332,8 +331,7 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemorySelfTest,
     ));
-    // NT-ACT (3)
-    registry.register(Box::new(AgentTeamSelfTest));
+    // NT-ACT (2)
     registry.register(Box::new(
         crate::l1_action::nt_act::nt_act_code::yagni_ladder::YagniLadder::new(),
     ));
@@ -435,35 +433,6 @@ impl SelfTest for AnswerEngineSelfTest {
         if config.max_sources == 0 {
             return Err(vec!["config not initialized".into()]);
         }
-        Ok(())
-    }
-}
-
-struct AgentTeamSelfTest;
-
-impl SelfTest for AgentTeamSelfTest {
-    fn name(&self) -> &str {
-        "nt_act_agent_team"
-    }
-
-    fn self_test(&self) -> Result<(), Vec<String>> {
-        // AgentTeam/AgentProfile/AgentRole types not available at expected paths
-        // use crate::l1_action::nt_io::nt_agent_agent_team::*;
-        // let mut team = AgentTeam::new("test-team");
-        // team.add_member(AgentProfile::new(AgentRole::Lead, "alice"));
-        // team.add_member(AgentProfile::new(AgentRole::Coder, "bob"));
-        // if team.member_count() != 2 {
-        //     return Err(vec!["expected 2 members".into()]);
-        // }
-        // let t1 = team.create_task("implement feature", AgentRole::Coder, 1);
-        // let assigned = team.assign_tasks();
-        // if assigned.is_empty() {
-        //     return Err(vec!["no tasks assigned".into()]);
-        // }
-        // team.complete_task(t1);
-        // if (team.progress() - 1.0).abs() > 0.01 {
-        //     return Err(vec!["progress should be 1.0".into()]);
-        // }
         Ok(())
     }
 }

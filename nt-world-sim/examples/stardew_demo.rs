@@ -2,9 +2,6 @@ use nt_world_sim::core::{
     Component, UniversalWorld, UniversalSystem,
     ParallelScheduler, SystemDependency,
 };
-use nt_world_sim::mechanics::core_pet::{CorePetState, CorePetSystem};
-use nt_world_sim::mechanics::core_hook::{CoreHookEvent, CoreHookManager};
-use nt_world_sim::mechanics::core_theme::CoreThemeManager;
 use nt_world_sim::codegen::parser::GameDefParser;
 use nt_world_sim::codegen::generator::CodeGenerator;
 
@@ -68,7 +65,7 @@ fn main() {
     // 1. Create world
     let mut world = UniversalWorld::new();
 
-    // 2. Spawn player with Position, Velocity, CorePetState
+    // 2. Spawn player with Position, Velocity
     let player = world.spawn();
     world.insert_component(
         player,
@@ -78,7 +75,6 @@ fn main() {
         player,
         Velocity { x: 1.5, y: 0.5 },
     );
-    world.insert_component(player, CorePetState::new());
     println!("Spawned player (entity {:?})", player.id);
 
     // 3. Spawn 2 NPC entities
@@ -108,12 +104,7 @@ fn main() {
     world.insert_component(npc2, NpcTag);
     println!("Spawned 2 NPCs (entity {:?}, {:?})", npc1.id, npc2.id);
 
-    // 4. Load default theme
-    CoreThemeManager::load_default_theme(&mut world);
-    let anim_path = CoreThemeManager::get_animation_path(&world, "idle").unwrap_or_default();
-    println!("Loaded default theme — idle animation: {}", anim_path);
-
-    // 5. Create ParallelScheduler with MovementSystem
+    // 4. Create ParallelScheduler with MovementSystem
     let mut scheduler = ParallelScheduler::new();
     scheduler.add_system(
         Box::new(MovementSystem),
@@ -125,46 +116,13 @@ fn main() {
         scheduler.wave_count()
     );
 
-    // 6-8. Run 10 frames, hook events on frame 3 and 7
+    // 5. Run 10 frames
     let total_frames = 10;
     let dt = 0.016; // ~60 fps
 
     for frame in 1..=total_frames {
-        // Hook events at specific frames
-        if frame == 3 {
-            println!(">>> Frame {}: sending SessionStart hook", frame);
-            CoreHookManager::send_event(
-                &mut world,
-                CoreHookEvent::SessionStart {
-                    agent: "stardew_demo".into(),
-                    session_id: "demo-001".into(),
-                },
-            );
-            let events = CoreHookManager::receive_events(&mut world);
-            for ev in events {
-                CoreHookManager::process_event(&mut world, ev);
-            }
-        }
-        if frame == 7 {
-            println!(">>> Frame {}: sending ToolEnd hook (success)", frame);
-            CoreHookManager::send_event(
-                &mut world,
-                CoreHookEvent::ToolEnd {
-                    tool: "bash".into(),
-                    success: true,
-                },
-            );
-            let events = CoreHookManager::receive_events(&mut world);
-            for ev in events {
-                CoreHookManager::process_event(&mut world, ev);
-            }
-        }
-
         // Run systems
         scheduler.run(&mut world, dt);
-
-        // Run pet system
-        CorePetSystem::update(&mut world, dt);
 
         // Print positions
         let all_entities = world.entities();
@@ -180,20 +138,7 @@ fn main() {
         println!();
     }
 
-    // 9. Final pet state
-    println!();
-    println!("--- Final Pet State ---");
-    let all_entities = world.entities();
-    for entity in &all_entities {
-        if let Some(pet) = world.get_component::<CorePetState>(*entity) {
-            println!(
-                "  Entity {:?}: state={:?}  timer={:.2}  idle_timer={:.2}",
-                entity.id, pet.state, pet.state_timer, pet.idle_timer
-            );
-        }
-    }
-
-    // 10. Parse YAML and generate Bevy code
+    // 6. Parse YAML and generate Bevy code
     println!();
     println!("--- Code Generation ---");
     let yaml_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/stardew_valley.yaml");
