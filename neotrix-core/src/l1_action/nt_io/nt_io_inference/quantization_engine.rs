@@ -189,15 +189,6 @@ pub struct LayerQuantConfig {
     pub importance_score: f64, // I-Matrix based criticality
 }
 
-/// I-Matrix (Importance Matrix) configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct _IMatrixConfig {
-    pub enabled: bool,
-    pub calibration_size: usize,   // Number of calibration tokens
-    pub method: IMMethod,           // Activation-based or gradient-based
-    pub threshold: f64,             // Importance threshold for critical layers
-}
-
 /// I-Matrix computation method
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IMMethod {
@@ -554,7 +545,7 @@ impl QuantizationEngine {
     /// GPTQ-GGUF hybrid quantization (IST-DASLab approach)
     pub fn _gptq_gguf_quantize(
         &self,
-        config: &GptqGgufConfig,
+        _config: &GptqGgufConfig,
     ) -> Result<EvoPressResult, String> {
         // Phase 1: Create quantized variants
         // Phase 2: EvoPress search for optimal per-layer config
@@ -876,8 +867,7 @@ impl QuantizationEngine {
     /// Attention layers: higher precision; FFN layers: lower precision
     fn generate_mixed_precision_rules(
         &self,
-        architecture: &str,
-        _param_count: u64,
+        _architecture: &str,        _param_count: u64,
         is_moe: bool,
     ) -> Vec<MixedPrecisionRule> {
         let mut rules = Vec::new();
@@ -1041,14 +1031,6 @@ pub struct MixedPrecisionRule {
     pub tensor_pattern: String,
     pub quant_type: String,
     pub description: String,
-}
-
-/// TurboQuant KV cache configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct _TurboQuantConfig {
-    pub k_type: String,
-    pub v_type: String,
-    pub kv_tail_tokens: usize,
 }
 
 /// GGUF model format (llama.cpp native)

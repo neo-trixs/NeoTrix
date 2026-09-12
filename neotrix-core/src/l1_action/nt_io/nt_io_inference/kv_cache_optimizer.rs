@@ -176,8 +176,8 @@ impl KVCacheOptimizer {
         context_length: usize,
     ) -> MemorySavingsReport {
         let fp16_bytes = 2 * head_dim * kv_heads * 2;  // K+V, fp16
-        let quant_bytes = self.quantization.bits as f64 / 8.0 * head_dim * kv_heads * 2;
-        let fp16_total = fp16_bytes * model_layers as f64 * context_length as f64;
+        let quant_bytes = self.quantization.bits as f64 / 8.0 * head_dim as f64 * kv_heads as f64 * 2.0;
+        let fp16_total = fp16_bytes as f64 * model_layers as f64 * context_length as f64;
         let quant_total = quant_bytes * model_layers as f64 * context_length as f64;
         
         MemorySavingsReport {
@@ -230,8 +230,8 @@ impl KVCacheOptimizer {
     /// Get context capacity for different KV cache types
     pub fn _get_context_capacity(
         &self,
-        model: &str,
-        layers: usize,
+        _model: &str,
+        _layers: usize,
     ) -> Vec<ContextCapacity> {
         vec![
             ContextCapacity {
@@ -282,15 +282,6 @@ pub enum _SchedulePolicy {
     RequestLevel,
     /// Memory-aware scheduling
     MemoryAware,
-}
-
-/// Disaggregated serving configuration (prefill/decode separation)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct _DisaggregatedServingConfig {
-    pub enabled: bool,
-    pub prefill_gpu_count: usize,
-    pub decode_gpu_count: usize,
-    pub kv_transfer_backend: String,  // "ray", "tcp", "ib"
 }
 
 impl ContinuousBatchingConfig {
@@ -389,10 +380,10 @@ impl _KvCacheCompressor {
             return 0.0;
         }
         let mean = data.iter().sum::<f32>() / data.len() as f32;
-        data.iter()
+        (data.iter()
             .map(|v| (*v - mean).powi(2))
             .sum::<f32>()
-            / data.len() as f32
+            / data.len() as f32) as f64
     }
 }
 

@@ -210,41 +210,6 @@ impl SpeculativeDecoder {
     }
 }
 
-/// TokenSpeed: Custom MLA kernel for agentic traces
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct _TokenSpeedConfig {
-    /// Enable TokenSpeed backend in vLLM
-    pub enabled: bool,
-    /// Custom MLA kernel for agentic trace patterns
-    pub kernel_type: String,
-    /// Draft head depth (number of prediction heads)
-    pub num_draft_heads: usize,
-    /// Acceptance threshold
-    pub acceptance_threshold: f64,
-}
-
-impl _TokenSpeedConfig {
-    pub fn production_defaults() -> Self {
-        Self {
-            enabled: true,
-            kernel_type: "MLA".to_string(),
-            num_draft_heads: 4,
-            acceptance_threshold: 0.5,
-        }
-    }
-}
-
-/// DeepSeek V4 MTP configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct _MTPConfig {
-    /// Number of MTP heads (check model docs)
-    pub num_mtp_heads: usize,
-    /// Prediction depth per step
-    pub prediction_depth: usize,
-    /// Enable verified MTP heads
-    pub verified: bool,
-}
-
 /// Multi-model speculative setup
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _MultiModelSetup {

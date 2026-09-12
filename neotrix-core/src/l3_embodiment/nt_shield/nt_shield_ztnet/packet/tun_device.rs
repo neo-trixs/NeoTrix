@@ -2,30 +2,6 @@
 //!
 //! 跨平台TUN设备封装 (macOS/Linux/Windows)
 
-/// TUN设备配置
-#[derive(Debug, Clone)]
-pub struct _TunConfig {
-    /// 设备名称 (None=自动分配)
-    pub name: Option<String>,
-    /// IP地址
-    pub address: std::net::Ipv4Addr,
-    /// 子网掩码
-    pub netmask: std::net::Ipv4Addr,
-    /// MTU
-    pub mtu: u16,
-}
-
-impl Default for _TunConfig {
-    fn default() -> Self {
-        Self {
-            name: None,
-            address: std::net::Ipv4Addr::new(10, 0, 0, 1),
-            netmask: std::net::Ipv4Addr::new(255, 255, 255, 0),
-            mtu: 1420,  // WireGuard标准MTU
-        }
-    }
-}
-
 /// TUN设备错误
 #[derive(Debug, thiserror::Error)]
 pub enum _TunError {

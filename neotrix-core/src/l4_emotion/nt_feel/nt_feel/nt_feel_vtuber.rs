@@ -68,7 +68,7 @@ pub(crate) struct __EmotionReading {
 /// 情绪类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum __EmotionType {
+pub(crate) enum _EmotionType {
     Neutral,
     Happy,
     Sad,
@@ -85,7 +85,7 @@ pub(crate) enum __EmotionType {
 /// 情绪来源
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum __EmotionSource {
+pub(crate) enum _EmotionSource {
     Text,
     Voice,
     Visual,

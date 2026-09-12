@@ -247,17 +247,15 @@ impl ModelSelector {
         apple_silicon: bool,
     ) -> ModelRecommendation {
         let hw = HardwareCapabilities {
+            gpu_arch: if apple_silicon { "Apple Silicon".to_string() } else { "NVIDIA".to_string() },
             vram_gb,
             supports_metal: apple_silicon,
             memory_bandwidth_gbps: if apple_silicon { 200.0 } else { 80.0 },
             system_ram_gb: vram_gb * 1.0, // assume 1:1
             compute_tflops: 0.0,
-            supports_fp16: true,
-            supports_bf16: apple_silicon,
             supports_fp8: false,
-            supports_avx512: !apple_silicon,
-            supports_neon: apple_silicon,
-            compute_units: if apple_silicon { 32 } else { 8 },
+            supports_nvfp4: false,
+            supports_flash_attention: true,
         };
         
         // Score all candidates using quantization engine's multi-dimensional scoring
@@ -273,16 +271,11 @@ impl ModelSelector {
                     parameter_count: m.parameter_count,
                     architecture: m.architecture.clone(),
                     attention_type: m.attention_type.clone(),
-                    has_rotary_embeddings: true,
-                    has_swiglu: true,
-                    has_rms_norm: true,
-                    is_moe: m.is_moe,
-                    active_params_b: Some(m.active_params_b),
-                    default_context_length: m.context_length,
-                    supports_flash_attention: true,
-                    supports_kv_quantization: true,
-                    supports_speculative_decoding: m.parameter_count <= 35_000_000_000,
-                    supports_mlp_quantization: true,
+                    hidden_dim: 0,
+                    num_layers: 0,
+                    num_heads: 0,
+                    head_dim: 0,
+                    kv_channels: 0,
                 };
                 
                 let score = self.quant_engine.score_model(&params, &hw);
