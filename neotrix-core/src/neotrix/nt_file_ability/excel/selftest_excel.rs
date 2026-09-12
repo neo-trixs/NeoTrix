@@ -4,7 +4,7 @@
 //! T2: 注册到 SelfTestRegistry
 //! T3: 生产路径测试 (实际调用检测函数)
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::neotrix::nt_file_ability::selftest::SelfTest;
 
 /// Excel 解析能力自检
 pub struct ExcelSelfTest;

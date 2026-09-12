@@ -1,11 +1,50 @@
 //! SelfTest 实现 — PDF 图标增强能力自检
 //!
-//! 设计 (R-P42): 复用 core SelfTest trait，标记 ConstellationLevel 成熟度
+//! 设计 (R-P42): 本地 SelfTest trait 定义，标记 ConstellationLevel 成熟度
 //! Dark Forest: 模块经 SelfTest T1-T3 接线到意识树健康链
 //! T2 验证: 注册到意识树 SelfTestRegistry
 //! T3 验证: 实际功能测试（类型检查、默认值、错误处理）
+//!
+//! 桥接策略: 本地 SelfTest trait 供 nt_file_ability 内部解耦使用，
+//! 跨层注册通过 CoreXxxBridge 包装器适配核心 nt_core_self_test::SelfTest。
 
-use crate::core::nt_core_self_test::SelfTest;
+use std::collections::HashMap;
+
+// ─── 本地 SelfTest trait — 消除对 crate::core::nt_core_self_test 的硬耦合 ───
+
+/// 跨模块共享的自检 trait (与 NT-CORE SelfTest 接口一致，L1→L5 依赖倒置)
+pub trait SelfTest: Send + Sync {
+    fn name(&self) -> &str;
+    fn self_test(&self) -> Result<(), Vec<String>>;
+}
+
+/// 自检注册表 (精简版，仅保留 nt_file_ability 需要的接口)
+#[derive(Default)]
+pub struct SelfTestRegistry {
+    tests: HashMap<String, Box<dyn SelfTest>>,
+}
+
+impl SelfTestRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, test: Box<dyn SelfTest>) {
+        self.tests.insert(test.name().to_string(), test);
+    }
+
+    pub fn register_all(&mut self, tests: Vec<Box<dyn SelfTest>>) {
+        for t in tests {
+            self.register(t);
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        self.tests.len()
+    }
+}
+
+// ─── SelfTest 实现 ────────────────────────────────────────────────────────
 
 /// PDF 图标增强能力自检
 pub struct PdfIconEnhanceSelfTest;
@@ -21,19 +60,16 @@ impl SelfTest for PdfIconEnhanceSelfTest {
         // T1: 检查模块是否存在 (通过编译即证明)
         
         // T3: 功能验证
-        // 1. 验证配置类型可以创建
         let config = super::pdf::pdf_icon_enhance::PdfIconEnhanceConfig::default();
         if !config.embed_back {
             errors.push("PdfIconEnhanceConfig.embed_back should default to true".to_string());
         }
         
-        // 2. 验证增强器可以创建
         let enhancer = super::pdf::pdf_icon_enhance::PdfIconEnhancer::new();
         if !enhancer.config().embed_back {
             errors.push("PdfIconEnhancer should have embed_back=true by default".to_string());
         }
         
-        // 3. 验证错误处理
         let result = super::pdf::pdf_icon_enhance::enhance_pdf_icons(
             std::path::Path::new("/nonexistent.pdf")
         );
@@ -60,10 +96,7 @@ impl SelfTest for ImageSuperResolutionSelfTest {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
         
-        // T1: 检查模块是否存在
-        
         // T3: 功能验证
-        // 1. 验证 SuperResolutionModel 枚举变体
         use super::image_super_resolution::SuperResolutionModel;
         let models = vec![
             SuperResolutionModel::RealEsrganGeneral,
@@ -80,19 +113,16 @@ impl SelfTest for ImageSuperResolutionSelfTest {
             let _tile_size = model.recommended_tile_size();
             let overlap = model.recommended_overlap();
             
-            // Lanczos 不应有 overlap
             if matches!(model, SuperResolutionModel::Lanczos) && overlap > 0 {
                 errors.push("Lanczos should have 0 overlap".to_string());
             }
         }
         
-        // 2. 验证配置默认值
         let config = super::image_super_resolution::SuperResolutionConfig::default();
         if config.scale == 0 {
             errors.push("SuperResolutionConfig.scale should not be 0".to_string());
         }
         
-        // 3. 验证处理器可以创建
         let resolver = super::image_super_resolution::ImageSuperResolver::new();
         if resolver.config().scale == 0 {
             errors.push("ImageSuperResolver should have non-zero scale".to_string());
@@ -117,10 +147,6 @@ impl SelfTest for PdfImageExtractSelfTest {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
         
-        // T1: 检查模块是否存在
-        
-        // T3: 功能验证
-        // 1. 验证配置默认值
         let config = super::pdf::pdf_image_extract::PdfImageExtractConfig::default();
         if config.min_dimension == 0 {
             errors.push("PdfImageExtractConfig.min_dimension should not be 0".to_string());
@@ -129,7 +155,6 @@ impl SelfTest for PdfImageExtractSelfTest {
             errors.push("PdfImageExtractConfig.min_bytes should not be 0".to_string());
         }
         
-        // 2. 验证错误处理
         let result = super::pdf::pdf_image_extract::pdf_has_images(
             std::path::Path::new("/nonexistent.pdf")
         );
@@ -137,7 +162,6 @@ impl SelfTest for PdfImageExtractSelfTest {
             errors.push("Should return error for nonexistent PDF".to_string());
         }
         
-        // pdf_image_stats 位于 pdf 子模块, 需通过 super::pdf 访问
         let result = super::pdf::pdf_image_stats(
             std::path::Path::new("/nonexistent.pdf")
         );
@@ -162,24 +186,48 @@ impl SelfTest for FileAbilitySelfTest {
     }
     
     fn self_test(&self) -> Result<(), Vec<String>> {
-        // T1: 检查模块是否存在
-        // 通过编译即证明
         Ok(())
     }
 }
 
-/// 注册 PDF/SR SelfTest 到主 registry
+// ─── 核心 trait 桥接包装器 (跨层注册用) ──────────────────────────────────
+
+struct CorePdfIconEnhanceBridge;
+impl crate::core::nt_core_self_test::SelfTest for CorePdfIconEnhanceBridge {
+    fn name(&self) -> &str { "nt_file_ability::pdf_icon_enhance" }
+    fn self_test(&self) -> Result<(), Vec<String>> { PdfIconEnhanceSelfTest.self_test() }
+}
+
+struct CoreImageSRBridge;
+impl crate::core::nt_core_self_test::SelfTest for CoreImageSRBridge {
+    fn name(&self) -> &str { "nt_file_ability::image_super_resolution" }
+    fn self_test(&self) -> Result<(), Vec<String>> { ImageSuperResolutionSelfTest.self_test() }
+}
+
+struct CorePdfImageExtractBridge;
+impl crate::core::nt_core_self_test::SelfTest for CorePdfImageExtractBridge {
+    fn name(&self) -> &str { "nt_file_ability::pdf_image_extract" }
+    fn self_test(&self) -> Result<(), Vec<String>> { PdfImageExtractSelfTest.self_test() }
+}
+
+/// 双 trait 实现: 使 FileAbilitySelfTest 可被 NT-MIND 意识树 SelfTestRegistry 注册。
+impl crate::core::nt_core_self_test::SelfTest for FileAbilitySelfTest {
+    fn name(&self) -> &str { "nt_file_ability" }
+    fn self_test(&self) -> Result<(), Vec<String>> { Ok(()) }
+}
+
+/// 注册 PDF/SR SelfTest 到核心 registry
+/// 接受核心 SelfTestRegistry (跨层调用契约)
 pub fn register_pdf_sr_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
-    registry.register(Box::new(PdfIconEnhanceSelfTest));
-    registry.register(Box::new(ImageSuperResolutionSelfTest));
-    registry.register(Box::new(PdfImageExtractSelfTest));
+    registry.register(Box::new(CorePdfIconEnhanceBridge));
+    registry.register(Box::new(CoreImageSRBridge));
+    registry.register(Box::new(CorePdfImageExtractBridge));
     registry.register(Box::new(FileAbilitySelfTest));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTestRegistry;
     
     #[test]
     fn test_pdf_icon_enhance_selftest() {
