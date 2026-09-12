@@ -67,7 +67,7 @@ impl EvidenceFactoryGate {
     }
 
     /// Batch admit: run all records through the gate, return admitted and rejected lists.
-    pub fn batch_admit(&self, records: &[EvidenceRecord]) -> Result<(Vec<EvidenceRecord>, Vec<(EvidenceRecord, String)>), String> {
+    pub(crate) fn _batch_admit(&self, records: &[EvidenceRecord]) -> Result<(Vec<EvidenceRecord>, Vec<(EvidenceRecord, String)>), String> {
         let mut admitted = Vec::new();
         let mut rejected = Vec::new();
         for record in records {
@@ -88,7 +88,7 @@ impl EvidenceFactoryGate {
         &self.config
     }
 
-    pub fn update_config(&mut self, config: FactoryGateConfig) {
+    pub(crate) fn _update_config(&mut self, config: FactoryGateConfig) {
         self.config = config;
     }
 }

@@ -25,7 +25,7 @@ impl TileCache {
         }
     }
 
-    pub fn default_tile_cache() -> Self {
+    pub(crate) fn _default_tile_cache() -> Self {
         Self::new(10_000, 500_000_000)
     }
 

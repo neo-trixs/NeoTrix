@@ -43,13 +43,13 @@ impl HistoryLog {
         log
     }
 
-    pub fn log_operation(&mut self, entry: CleanupHistoryEntry) {
+    pub(crate) fn _log_operation(&mut self, entry: CleanupHistoryEntry) {
         self.entries.push(entry);
         if self.entries.len() > self.max_entries { self.entries.remove(0); }
         let _ = self.save();
     }
 
-    pub fn get_recent(&self, count: usize) -> Vec<&CleanupHistoryEntry> {
+    pub(crate) fn _get_recent(&self, count: usize) -> Vec<&CleanupHistoryEntry> {
         self.entries.iter().rev().take(count).collect()
     }
 

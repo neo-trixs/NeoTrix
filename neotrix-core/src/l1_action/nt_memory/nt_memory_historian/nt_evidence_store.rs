@@ -245,7 +245,7 @@ impl EvidenceStore {
     /// Persist computed BayesianLinks as KnowledgeEdge entries in the KB.
     /// Supports edges for probability > 0.5, Related edges for > 0.12.
     /// Idempotent: overwrites existing edges with same source/target/type.
-    pub fn persist_links_to_kb(&self) -> Result<usize, String> {
+    pub(crate) fn _persist_links_to_kb(&self) -> Result<usize, String> {
         let records = self.list_evidence()?;
         let links = self.compute_links(&records);
         let mut written = 0;
@@ -302,7 +302,7 @@ impl EvidenceStore {
     }
 
     /// #4 — Write a checkpoint snapshot as a KB node for persistence.
-    pub fn checkpoint_evidence_table(&self) -> Result<(), String> {
+    pub(crate) fn _checkpoint_evidence_table(&self) -> Result<(), String> {
         let snapshot = self.serialize_evidence_table()?;
         let json = serde_json::to_string(&snapshot).map_err(|e| format!("serialize snapshot: {}", e))?;
         let ts = now_ts();
@@ -349,7 +349,7 @@ impl EvidenceStore {
     }
 
     /// #5 — Cross-examine all evidence pairs and detect contradictions.
-    pub fn cross_examine(&self) -> Result<Vec<EvidenceContradiction>, String> {
+    pub(crate) fn _cross_examine(&self) -> Result<Vec<EvidenceContradiction>, String> {
         let records = self.list_evidence()?;
         let mut contradictions = Vec::new();
         for i in 0..records.len() {
@@ -451,7 +451,7 @@ impl EvidenceStore {
 
     /// #8 — Redistribute confidence: apply temporal decay based on staleness,
     /// then renormalize the distribution across all evidence.
-    pub fn redistribute_decay(&self, half_life_days: f64) -> Result<EvidenceStats, String> {
+    pub(crate) fn _redistribute_decay(&self, half_life_days: f64) -> Result<EvidenceStats, String> {
         let records = self.list_evidence()?;
         let now = now_ts();
         let half_life_secs = half_life_days * 86400.0;

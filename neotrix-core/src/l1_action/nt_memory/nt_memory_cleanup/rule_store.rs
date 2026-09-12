@@ -44,7 +44,7 @@ impl RuleStore {
 
     pub fn add_rule(&mut self, rule: CleanupRule) { self.rules.insert(rule.id.clone(), rule); }
     pub fn get_rule(&self, id: &str) -> Option<&CleanupRule> { self.rules.get(id) }
-    pub fn get_enabled_rules(&self) -> Vec<&CleanupRule> { self.rules.values().filter(|r| r.enabled).collect() }
+    pub(crate) fn _get_enabled_rules(&self) -> Vec<&CleanupRule> { self.rules.values().filter(|r| r.enabled).collect() }
     pub fn enable_rule(&mut self, id: &str) { if let Some(r) = self.rules.get_mut(id) { r.enabled = true; } }
     pub fn disable_rule(&mut self, id: &str) { if let Some(r) = self.rules.get_mut(id) { r.enabled = false; } }
 

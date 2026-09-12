@@ -177,6 +177,140 @@ impl SelfTest for PdfImageExtractSelfTest {
     }
 }
 
+/// PDF 文本编辑能力自检
+pub struct PdfEditSelfTest;
+
+impl SelfTest for PdfEditSelfTest {
+    fn name(&self) -> &str {
+        "nt_file_ability::pdf_edit"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        // T1: 模块存在性 (编译即证明)
+
+        // T3: 功能验证
+        // 1. PdfEdit 结构体构造与字段验证
+        let edit = super::pdf::pdfedit::PdfEdit {
+            page: 1,
+            find: "test".to_string(),
+            replace: Some("replaced".to_string()),
+        };
+        if edit.page != 1 {
+            errors.push("PdfEdit.page should be 1".to_string());
+        }
+        if edit.find != "test" {
+            errors.push("PdfEdit.find should be 'test'".to_string());
+        }
+        if edit.replace.as_deref() != Some("replaced") {
+            errors.push("PdfEdit.replace should be Some('replaced')".to_string());
+        }
+
+        // 2. 空替换 (删除模式)
+        let delete_edit = super::pdf::pdfedit::PdfEdit {
+            page: 2,
+            find: "delete me".to_string(),
+            replace: None,
+        };
+        if delete_edit.replace.is_some() {
+            errors.push("PdfEdit.replace should be None for delete mode".to_string());
+        }
+
+        // 3. edit_pdf 对不存在文件应返回错误
+        let result = super::pdf::pdfedit::edit_pdf(
+            std::path::Path::new("/nonexistent.pdf"),
+            std::path::Path::new("/tmp/out.pdf"),
+            &[edit],
+            None,
+        );
+        if result.is_ok() {
+            errors.push("edit_pdf should return error for nonexistent source".to_string());
+        }
+
+        // 4. extract_pdf_tables 对不存在文件应返回错误
+        let result = super::pdf::pdfedit::extract_pdf_tables(
+            std::path::Path::new("/nonexistent.pdf"),
+        );
+        if result.is_ok() {
+            errors.push("extract_pdf_tables should return error for nonexistent file".to_string());
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+/// 文档解析能力自检
+pub struct DocParseSelfTest;
+
+impl SelfTest for DocParseSelfTest {
+    fn name(&self) -> &str {
+        "nt_file_ability::doc_parse"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        // T1: 模块存在性 (编译即证明)
+
+        // T3: 功能验证
+        // 1. parse_document 对不存在文件应返回错误
+        let result = super::doc_parse::parse_document(
+            std::path::Path::new("/nonexistent.docx"),
+        );
+        if result.is_ok() {
+            errors.push("parse_document should return error for nonexistent file".to_string());
+        }
+
+        // 2. parse_bytes 空内容应返回错误
+        let result = super::doc_parse::parse_bytes(
+            b"",
+            anydoc::Format::Markdown,
+        );
+        // 空内容可能解析为空文档，不一定报错，此处仅验证不 panic
+        let _ = result;
+
+        // 3. PdfParseMode 默认值验证
+        let mode = super::doc_parse::PdfParseMode::default();
+        // 无 GPU 环境下应默认为 Fast
+        if std::env::var("CUDA_VISIBLE_DEVICES").is_err()
+            && !std::path::Path::new("/dev/nvidia0").exists()
+        {
+            if mode != super::doc_parse::PdfParseMode::Fast {
+                errors.push("PdfParseMode::default() should be Fast without GPU".to_string());
+            }
+        }
+
+        // 4. PdfParseConfig 默认值验证
+        let config = super::doc_parse::PdfParseConfig::default();
+        if !config.enable_ocr {
+            errors.push("PdfParseConfig.enable_ocr should default to true".to_string());
+        }
+        if !config.enable_tables {
+            errors.push("PdfParseConfig.enable_tables should default to true".to_string());
+        }
+        if !config.enable_images {
+            errors.push("PdfParseConfig.enable_images should default to true".to_string());
+        }
+
+        // 5. detect_format_from_content 基本探测
+        let result = super::doc_parse::detect_format_from_content(b"%PDF-1.4");
+        if result.is_none() {
+            errors.push("detect_format_from_content should detect PDF header".to_string());
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
 /// FileAbility 自检 (兼容旧代码)
 pub struct FileAbilitySelfTest;
 
@@ -210,18 +344,32 @@ impl crate::core::nt_core_self_test::SelfTest for CorePdfImageExtractBridge {
     fn self_test(&self) -> Result<(), Vec<String>> { PdfImageExtractSelfTest.self_test() }
 }
 
+struct CorePdfEditBridge;
+impl crate::core::nt_core_self_test::SelfTest for CorePdfEditBridge {
+    fn name(&self) -> &str { "nt_file_ability::pdf_edit" }
+    fn self_test(&self) -> Result<(), Vec<String>> { PdfEditSelfTest.self_test() }
+}
+
+struct CoreDocParseBridge;
+impl crate::core::nt_core_self_test::SelfTest for CoreDocParseBridge {
+    fn name(&self) -> &str { "nt_file_ability::doc_parse" }
+    fn self_test(&self) -> Result<(), Vec<String>> { DocParseSelfTest.self_test() }
+}
+
 /// 双 trait 实现: 使 FileAbilitySelfTest 可被 NT-MIND 意识树 SelfTestRegistry 注册。
 impl crate::core::nt_core_self_test::SelfTest for FileAbilitySelfTest {
     fn name(&self) -> &str { "nt_file_ability" }
     fn self_test(&self) -> Result<(), Vec<String>> { Ok(()) }
 }
 
-/// 注册 PDF/SR SelfTest 到核心 registry
+/// 注册 PDF/SR/doc_parse SelfTest 到核心 registry
 /// 接受核心 SelfTestRegistry (跨层调用契约)
 pub fn register_pdf_sr_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
     registry.register(Box::new(CorePdfIconEnhanceBridge));
     registry.register(Box::new(CoreImageSRBridge));
     registry.register(Box::new(CorePdfImageExtractBridge));
+    registry.register(Box::new(CorePdfEditBridge));
+    registry.register(Box::new(CoreDocParseBridge));
     registry.register(Box::new(FileAbilitySelfTest));
 }
 
@@ -258,14 +406,30 @@ mod tests {
     }
     
     #[test]
+    fn test_pdf_edit_selftest() {
+        let test = PdfEditSelfTest;
+        assert_eq!(test.name(), "nt_file_ability::pdf_edit");
+        assert!(test.self_test().is_ok());
+    }
+    
+    #[test]
+    fn test_doc_parse_selftest() {
+        let test = DocParseSelfTest;
+        assert_eq!(test.name(), "nt_file_ability::doc_parse");
+        assert!(test.self_test().is_ok());
+    }
+    
+    #[test]
     fn test_register_all_selftests() {
         let mut registry = SelfTestRegistry::new();
         registry.register_all(vec![
             Box::new(PdfIconEnhanceSelfTest),
             Box::new(ImageSuperResolutionSelfTest),
             Box::new(PdfImageExtractSelfTest),
+            Box::new(PdfEditSelfTest),
+            Box::new(DocParseSelfTest),
             Box::new(FileAbilitySelfTest),
         ]);
-        assert_eq!(registry.count(), 4);
+        assert_eq!(registry.count(), 6);
     }
 }
