@@ -1037,13 +1037,25 @@ impl crate::core::nt_core_traits::SecurityCheckRegistry for CheckRegistry {
     }
 
     fn run_all_checks(&self) -> Result<Vec<String>, Vec<String>> {
-        let passed: Vec<String> = self.checks.iter()
-            .map(|c| c.name.clone())
-            .collect();
-        if passed.is_empty() {
+        let mut passed = Vec::new();
+        let mut failed = Vec::new();
+
+        for check in &self.checks {
+            let verdict = (check.check_fn)(&());
+            match verdict {
+                CheckVerdict::Pass => passed.push(check.name.clone()),
+                CheckVerdict::Fail(reason) => failed.push(format!("{}: {}", check.name, reason)),
+                CheckVerdict::Warn(reason) => {
+                    // 警告不阻止通过，但记录
+                    passed.push(format!("{} (warn: {})", check.name, reason));
+                }
+            }
+        }
+
+        if failed.is_empty() {
             Ok(passed)
         } else {
-            Ok(passed)
+            Err(failed)
         }
     }
 }

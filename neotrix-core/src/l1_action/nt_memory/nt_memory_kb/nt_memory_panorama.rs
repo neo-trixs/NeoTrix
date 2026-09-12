@@ -4,17 +4,13 @@
 //! 链路图谱生成，持续完善知识库全景视图。
 
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
 use super::nt_memory_store as store;
 use super::nt_memory_types::*;
+use super::shared_utils::now;
 use super::KnowledgeBase;
-
-fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
-}
 
 // ── Types ──
 

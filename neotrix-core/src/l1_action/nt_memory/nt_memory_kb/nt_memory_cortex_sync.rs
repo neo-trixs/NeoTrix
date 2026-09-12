@@ -18,15 +18,12 @@ use serde::{Deserialize, Serialize};
 use super::nt_memory_store::{get_node, insert_or_get_node_rows, update_node_metadata};
 use super::nt_memory_types::NodeType;
 use super::nt_normalizer::validate_node_type;
+use super::shared_utils::now;
 use crate::core::nt_core_e8::abduction::causal_graph::CausalGraph;
 
 const SCHEMA_VERSION: u32 = 1;
 /// 超过该体积的文件不计算 sha256 (避免 68GB corpus 卡死); 仅小文件 (因果图) 取指纹。
 const SHA_SIZE_CAP: u64 = 100 * 1024 * 1024;
-
-fn now() -> i64 {
-    chrono::Utc::now().timestamp()
-}
 
 /// 外置大脑节点的血缘块 (存于 `nodes.metadata` 的 `lineage` 字段, 增量、无 schema 迁移)。
 #[derive(Debug, Clone, Serialize, Deserialize)]

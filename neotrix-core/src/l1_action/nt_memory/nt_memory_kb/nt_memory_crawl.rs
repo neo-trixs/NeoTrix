@@ -1,10 +1,9 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use log::warn;
 use rusqlite::Connection;
 
 use super::nt_memory_store as store;
 use super::nt_memory_types::*;
+use super::shared_utils::now;
 
 /// DI-aware HTTP 客户端访问 — 优先从容器解析，回退到共享客户端
 fn http_client() -> &'static reqwest::blocking::Client {
@@ -24,13 +23,6 @@ pub fn resolve_blocking_client() -> reqwest::blocking::Client {
 /// 单一校验实现委托 `nt_http::resolve_safe_origin` (含 IPv4-mapped、编码绕过、DNS pin 校验)。
 pub fn is_safe_fetch_url(url: &str) -> bool {
     super::nt_http::resolve_safe_origin(url).is_ok()
-}
-
-fn now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
 }
 
 pub fn on_node_inserted(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {

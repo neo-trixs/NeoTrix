@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use log::warn;
 use rusqlite::Connection;
@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use super::nt_memory_store as store;
 use super::nt_memory_types::*;
+use super::shared_utils::now;
 
 fn http_client() -> &'static reqwest::blocking::Client {
     static CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
@@ -25,13 +26,6 @@ fn http_client() -> &'static reqwest::blocking::Client {
         })
     });
     &CLIENT
-}
-
-fn now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
 }
 
 fn github_token() -> Option<String> {

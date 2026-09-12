@@ -1,17 +1,9 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use rusqlite::Connection;
 use uuid::Uuid;
 
 use super::nt_discovery_github_topics::{self, DiscoveryPipelineConfig, GithubDiscoveryStats};
 use super::nt_discovery_sources::{self, ExternalDiscoveryStats};
-
-fn now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
-}
+use super::shared_utils::now;
 
 /// Which discovery modules to run in a cycle
 #[derive(Debug, Clone)]
