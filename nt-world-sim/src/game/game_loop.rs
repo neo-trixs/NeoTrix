@@ -285,10 +285,10 @@ impl GameLoop {
                 }
             }
             GameAction::Save => {
-                let _ = self.save_game();
+                let _ = self.save_game(0);
             }
             GameAction::Load => {
-                let _ = self.load_game();
+                let _ = self.load_game(0);
             }
         }
     }

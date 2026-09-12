@@ -272,7 +272,7 @@ pub fn save_game_to_file(slot: u32) -> GameResult<String> {
     let state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
     let game = state.as_ref().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
     let manager = crate::save::SaveManager::new();
-    manager.save(slot, &game.world, game.tick_count)?;
+    manager.save_from_world(slot, &game.world, game.tick_count)?;
     Ok(format!("Saved to slot {}", slot))
 }
 

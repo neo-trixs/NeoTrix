@@ -199,6 +199,46 @@ pub fn empathy_dialogue() -> DialogueTree {
     tree
 }
 
+pub fn memory_dialogue() -> DialogueTree {
+    let mut tree = DialogueTree::new();
+    let i0 = tree.add_line("Memory", "Every leaf in this forest holds a story. Shall I share one?");
+    tree.add_response(i0, "Tell me about the forest's history.", Some(1));
+    tree.add_response(i0, "How do I improve my memory?", Some(2));
+    tree.add_line("Memory", "The oldest trees remember when this valley was young. Their roots are libraries of bark and moss.");
+    tree.add_line("Memory", "Practice recall each evening. Write three things you learned before sleep. The mind is a garden — tend it daily.");
+    tree
+}
+
+pub fn logic_dialogue() -> DialogueTree {
+    let mut tree = DialogueTree::new();
+    let i0 = tree.add_line("Logic", "Every problem is a puzzle. Every puzzle has pieces. Find the edges first.");
+    tree.add_response(i0, "Teach me to think clearly.", Some(1));
+    tree.add_response(i0, "What are you mining for?", Some(2));
+    tree.add_line("Logic", "Start with what you know. Build from certainty to uncertainty. Never assume the shape before examining all pieces.");
+    tree.add_line("Logic", "Ore of course! But the truest mine is the one between your ears. I extract reasoning from raw thought.");
+    tree
+}
+
+pub fn wisdom_dialogue() -> DialogueTree {
+    let mut tree = DialogueTree::new();
+    let i0 = tree.add_line("Wisdom", "The lake at dusk teaches patience. What wisdom do you seek?");
+    tree.add_response(i0, "How do I gain wisdom?", Some(1));
+    tree.add_response(i0, "What is the meaning of this valley?", Some(2));
+    tree.add_line("Wisdom", "Wisdom is not knowledge accumulated — it is knowledge applied. Fail, reflect, adapt. Repeat.");
+    tree.add_line("Wisdom", "This valley exists to teach that growth and peace are not opposites. They are partners in the dance of being.");
+    tree
+}
+
+pub fn dreams_dialogue() -> DialogueTree {
+    let mut tree = DialogueTree::new();
+    let i0 = tree.add_line("Dreams", "I wander between waking and sleep, collecting fragments of what might be.");
+    tree.add_response(i0, "What do you dream about?", Some(1));
+    tree.add_response(i0, "Can dreams help my farm?", Some(2));
+    tree.add_line("Dreams", "I dream of futures not yet born. A crop that grows in starlight. A tool shaped by thought alone.");
+    tree.add_line("Dreams", "Sleep well each night — a rested mind notices opportunities a tired mind overlooks. Dreams plant seeds of intuition.");
+    tree
+}
+
 impl Npc {
     pub fn new(name: &str, role: NpcRole) -> Self {
         Self {

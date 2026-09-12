@@ -1,4 +1,4 @@
-use crate::engine::renderer::{Vec2, Rect};
+use crate::core::{Vec2, Rect};
 
 /// Axis-aligned bounding box for camera clamping.
 pub struct CameraBounds {

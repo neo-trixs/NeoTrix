@@ -105,7 +105,7 @@ impl Inventory {
             gold: 500,
         }
     }
-    
+
     pub fn add_item(&mut self, item_id: u32, quantity: u32, quality: ItemQuality) -> u32 {
         let mut remaining = quantity;
         
@@ -188,6 +188,10 @@ impl Inventory {
     pub fn has_item(&self, item_id: u32) -> bool {
         self.count_item(item_id) > 0
     }
+}
+
+impl Default for Inventory {
+    fn default() -> Self { Self::new(20, 12) }
 }
 
 impl Resource for Inventory {}

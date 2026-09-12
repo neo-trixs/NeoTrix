@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use crate::core::{EntityId, UniversalEntity};
-use crate::engine::renderer::{Transform, Vec2, Rect, Camera};
+use crate::core::{EntityId, UniversalEntity, Transform, Vec2, Rect};
+use crate::engine::renderer::Camera;
 
 /// Query predicate for `find_entity`.
 pub enum EntityQuery {
