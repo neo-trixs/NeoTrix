@@ -13,8 +13,9 @@ use std::collections::HashMap;
 use rusqlite::Connection;
 use serde_json::Value;
 
-use super::kb::{safe_insert_edge, now};
+use super::kb::safe_insert_edge;
 use crate::neotrix::nt_memory_kb::nt_memory_types::{KnowledgeEdge, RelationType};
+use crate::neotrix::nt_memory_kb::shared_utils::now;
 
 /// 查询所有 shanhai 节点 (id, node_type, title, metadata)。
 fn load_shanhai_nodes(conn: &Connection) -> rusqlite::Result<Vec<(String, String, String, Option<String>)>> {

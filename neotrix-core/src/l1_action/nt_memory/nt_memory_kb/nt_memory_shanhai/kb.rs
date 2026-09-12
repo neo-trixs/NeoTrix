@@ -2,6 +2,7 @@
 /// Uses INSERT OR IGNORE so running multiple times won't fail.
 use rusqlite::Connection;
 use crate::neotrix::nt_memory_kb::nt_memory_types::*;
+use crate::neotrix::nt_memory_kb::shared_utils::now;
 
 pub fn safe_insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
     conn.execute(
@@ -44,11 +45,4 @@ pub fn safe_insert_edge(conn: &Connection, edge: &KnowledgeEdge) -> rusqlite::Re
         ],
     )?;
     Ok(())
-}
-
-pub fn now() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
 }

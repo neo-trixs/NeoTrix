@@ -219,32 +219,32 @@ impl QuestDatabase {
         self.register(Quest::new(30, "Achievement: Farmer", "Reach Farming level 10", QuestType::Achievement, "System")
             .add_objective("Reach level", Some(1001), 10)
             .add_reward(QuestReward::Gold(1000))
-            .add_reward(QuestReward::Unlock("Golden Hoe".to_string()));
+            .add_reward(QuestReward::Unlock("Golden Hoe".to_string())));
 
         self.register(Quest::new(31, "Achievement: Miner", "Reach Mining level 10", QuestType::Achievement, "System")
             .add_objective("Reach level", Some(1002), 10)
             .add_reward(QuestReward::Gold(1000))
-            .add_reward(QuestReward::Unlock("Iridium Pickaxe".to_string()));
+            .add_reward(QuestReward::Unlock("Iridium Pickaxe".to_string())));
 
         self.register(Quest::new(32, "Achievement: Socialite", "Reach max resonance with all NPCs", QuestType::Achievement, "System")
             .add_objective("Max resonance", None, 2500)
             .add_reward(QuestReward::Gold(2000))
-            .add_reward(QuestReward::Unlock("Golden Star Pendant".to_string()));
+            .add_reward(QuestReward::Unlock("Golden Star Pendant".to_string())));
 
         self.register(Quest::new(33, "Achievement: Explorer", "Visit every location in the valley", QuestType::Achievement, "System")
             .add_objective("Visit locations", None, 8)
             .add_reward(QuestReward::Gold(750))
-            .add_reward(QuestReward::Unlock("Explorer's Compass".to_string()));
+            .add_reward(QuestReward::Unlock("Explorer's Compass".to_string())));
 
         self.register(Quest::new(34, "Achievement: Collector", "Collect 100 unique items", QuestType::Achievement, "System")
             .add_objective("Unique items", None, 100)
             .add_reward(QuestReward::Gold(1500))
-            .add_reward(QuestReward::Unlock("Collector's Bag".to_string()));
+            .add_reward(QuestReward::Unlock("Collector's Bag".to_string())));
 
         self.register(Quest::new(40, "Season's Greeting", "Complete all seasonal events in one year", QuestType::Special, "System")
             .add_objective("Complete events", None, 8)
             .add_reward(QuestReward::Gold(3000))
-            .add_reward(QuestReward::Unlock("Calendar of Seasons".to_string()));
+            .add_reward(QuestReward::Unlock("Calendar of Seasons".to_string())));
 
         self.register(Quest::new(41, "The Lost Recipe", "Find the ancient recipe hidden in the mines", QuestType::Special, "Focus")
             .add_objective("Find recipe fragment", Some(5003), 3)
@@ -260,7 +260,7 @@ impl QuestDatabase {
         self.register(Quest::new(43, "Harvest King", "Win the Harvest Festival competition", QuestType::Special, "Empathy")
             .add_objective("Win competition", None, 1)
             .add_reward(QuestReward::Gold(1500))
-            .add_reward(QuestReward::Unlock("Harvest Crown".to_string()));
+            .add_reward(QuestReward::Unlock("Harvest Crown".to_string())));
     }
 
     pub fn register(&mut self, quest: Quest) {
