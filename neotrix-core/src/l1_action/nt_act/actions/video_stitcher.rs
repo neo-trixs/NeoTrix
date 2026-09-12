@@ -182,19 +182,48 @@ impl VideoStitcher {
         }
     }
     
-    /// 拼接视频
+    /// 拼接视频 — 实际调用 FFmpeg 执行拼接
     pub fn stitch(&mut self, timeline: &Timeline, output_path: &str) -> StitchResult {
         let start = std::time::Instant::now();
-        
-        // TODO: 实际调用 FFmpeg 进行拼接
-        let result = StitchResult {
-            success: true,
-            output_path: Some(output_path.to_string()),
-            total_duration: timeline.total_duration,
-            processing_time_ms: start.elapsed().as_millis() as u64,
-            error: None,
+
+        // 生成 FFmpeg 命令
+        let ffmpeg_cmd = self.generate_ffmpeg_command(timeline, output_path);
+
+        // 执行 FFmpeg 命令
+        let result = match std::process::Command::new("sh")
+            .arg("-c")
+            .arg(&ffmpeg_cmd)
+            .output()
+        {
+            Ok(output) => {
+                if output.status.success() {
+                    StitchResult {
+                        success: true,
+                        output_path: Some(output_path.to_string()),
+                        total_duration: timeline.total_duration,
+                        processing_time_ms: start.elapsed().as_millis() as u64,
+                        error: None,
+                    }
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    StitchResult {
+                        success: false,
+                        output_path: None,
+                        total_duration: 0.0,
+                        processing_time_ms: start.elapsed().as_millis() as u64,
+                        error: Some(format!("FFmpeg failed: {}", stderr)),
+                    }
+                }
+            }
+            Err(e) => StitchResult {
+                success: false,
+                output_path: None,
+                total_duration: 0.0,
+                processing_time_ms: start.elapsed().as_millis() as u64,
+                error: Some(format!("Failed to execute FFmpeg: {}", e)),
+            },
         };
-        
+
         self.history.push(result.clone());
         result
     }
