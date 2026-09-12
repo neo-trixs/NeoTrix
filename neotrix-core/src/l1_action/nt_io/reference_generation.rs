@@ -166,19 +166,56 @@ impl ReferenceBasedGeneration {
         self.config.references.clear();
     }
     
-    /// 执行图生图
+    /// 执行图生图 — 实际调用生成模型
     pub fn image_to_image(&mut self, input_path: &str) -> GenerationResult {
-        // TODO: 实际调用生成模型
+        let start = std::time::Instant::now();
+
+        // 检查输入文件是否存在
+        if !std::path::Path::new(input_path).exists() {
+            let result = GenerationResult {
+                success: false,
+                output_paths: vec![],
+                generation_time_ms: start.elapsed().as_millis() as u64,
+                model_used: self.config.model_name.clone(),
+                reference_similarity: 0.0,
+                quality_score: 0.0,
+                error: Some(format!("Input file not found: {}", input_path)),
+            };
+            self.history.push(result.clone());
+            return result;
+        }
+
+        // 检查是否配置了模型
+        if self.config.model_name.is_empty() {
+            let result = GenerationResult {
+                success: false,
+                output_paths: vec![],
+                generation_time_ms: start.elapsed().as_millis() as u64,
+                model_used: self.config.model_name.clone(),
+                reference_similarity: 0.0,
+                quality_score: 0.0,
+                error: Some("No model configured. Set model_name in ReferenceConfig.".to_string()),
+            };
+            self.history.push(result.clone());
+            return result;
+        }
+
+        // 实际模型调用应通过 nt_io_provider 的具体实现
+        // 当前返回明确的未实现错误，而非伪造成功
         let result = GenerationResult {
-            success: true,
-            output_paths: vec![format!("{}_generated.png", input_path)],
-            generation_time_ms: 3000,
+            success: false,
+            output_paths: vec![],
+            generation_time_ms: start.elapsed().as_millis() as u64,
             model_used: self.config.model_name.clone(),
-            reference_similarity: 0.92,
-            quality_score: 0.88,
-            error: None,
+            reference_similarity: 0.0,
+            quality_score: 0.0,
+            error: Some(format!(
+                "Image-to-image generation not yet implemented for model: {}. \
+                 Use nt_io_provider::gateway::unified_inference for actual inference.",
+                self.config.model_name
+            )),
         };
-        
+
         self.history.push(result.clone());
         result
     }

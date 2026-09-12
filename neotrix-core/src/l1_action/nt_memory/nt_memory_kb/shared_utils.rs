@@ -12,6 +12,9 @@ pub fn now() -> i64 {
         .as_secs() as i64
 }
 
+/// 向后兼容别名
+pub use now as now_ts;
+
 /// 标准 SELECT 列索引: id, node_type, title, summary, content, url, domain, language,
 /// confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
 /// supersedes, parent_id, depth, cluster_id
