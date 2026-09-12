@@ -47,7 +47,6 @@ pub use gateway::{
 pub use gateway::execution::universal_adapter::*;
 pub use gateway::execution::unified_inference::*;
 pub use gateway::routing::search_router::*;
-pub use gateway::routing::free_providers::*;
 
 // ── 目录 / 发现 / 注册 ─────────────────────────────────────
 pub use catalog::{

@@ -1,7 +1,7 @@
 /// Guardrails system — inspired by CrewAI's Task and Agent-level validation.
 /// Pre-execution checks, post-execution validation, and output screening.
 use serde::{Deserialize, Serialize};
-use crate::l3_embodiment::nt_shield::core::tool_permissions::ToolPermission;
+use crate::l3_embodiment::nt_shield::shield_core::tool_permissions::ToolPermission;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuardrailConfig {
