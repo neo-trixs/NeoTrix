@@ -14,6 +14,7 @@ use std::time::Instant;
 
 use super::unified_inference::*;
 use super::gateway::GatewayV2;
+use super::types::CostEstimate;
 
 /// 路由器配置
 #[derive(Debug, Clone)]

@@ -238,8 +238,9 @@ mod tests {
     fn test_snap_to() {
         let mut cam = Camera2D::new(100.0, 100.0);
         cam.snap_to(Vec2::new(50.0, 50.0));
-        assert!((cam.position.x - 50.0).abs() < 0.01);
-        assert!((cam.position.y - 50.0).abs() < 0.01);
+        // snap_to centers target: pos = target - viewport/2
+        assert!((cam.position.x - 0.0).abs() < 0.01);
+        assert!((cam.position.y - 0.0).abs() < 0.01);
     }
 
     #[test]
@@ -249,6 +250,6 @@ mod tests {
         cam.shake_offset = Vec2::new(5.0, -3.0);
         let ep = cam.effective_position();
         assert!((ep.x - 105.0).abs() < 0.01);
-        assert!((ep.y - 103.0).abs() < 0.01);
+        assert!((ep.y - 97.0).abs() < 0.01);
     }
 }

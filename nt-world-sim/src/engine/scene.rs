@@ -445,7 +445,7 @@ mod tests {
         assert!(!graph.has_dirty());
         graph.mark_dirty(child.id);
         assert!(graph.has_dirty());
-        assert_eq!(graph.dirty_count(), 2); // child + descendants (none)
+        assert_eq!(graph.dirty_count(), 1); // child marked dirty (no descendants)
     }
 
     #[test]
