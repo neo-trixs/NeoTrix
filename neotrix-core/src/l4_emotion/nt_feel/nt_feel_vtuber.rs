@@ -16,27 +16,27 @@ use crate::core::nt_core_self::emotion_state::EmotionLabel;
 /// VTuber 情感引擎 — Open-LLM-VTuber 核心
 /// 委托文本情绪检测给 FeelEngine，自身负责角色人格与表达
 pub(crate) struct _VTuberEmotionEngine {
-    persona: __CharacterPersona,
+    persona: _CharacterPersona,
     feel_engine: _FeelEngine,
-    emotion_history: Vec<__EmotionReading>,
+    emotion_history: Vec<_EmotionReading>,
     #[allow(dead_code)]
-    voice_config: __VoiceConfig,
+    voice_config: _VoiceConfig,
 }
 
 /// 角色人格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct __CharacterPersona {
+pub(crate) struct _CharacterPersona {
     pub name: String,
-    pub personality_traits: Vec<__PersonalityTrait>,
-    pub response_style: __ResponseStyle,
+    pub personality_traits: Vec<_PersonalityTrait>,
+    pub response_style: _ResponseStyle,
     pub emotional_baseline: HashMap<String, f64>,
     pub catchphrases: Vec<String>,
-    pub speaking_patterns: Vec<__SpeakingPattern>,
+    pub speaking_patterns: Vec<_SpeakingPattern>,
 }
 
 /// 性格特质
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct __PersonalityTrait {
+pub(crate) struct _PersonalityTrait {
     pub name: String,
     pub intensity: f64, // 0.0-1.0
     pub description: String,
@@ -44,7 +44,7 @@ pub(crate) struct __PersonalityTrait {
 
 /// 响应风格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct __ResponseStyle {
+pub(crate) struct _ResponseStyle {
     pub formality: f64,
     pub enthusiasm: f64,
     pub empathy: f64,
@@ -54,7 +54,7 @@ pub(crate) struct __ResponseStyle {
 
 /// 说话模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct __SpeakingPattern {
+pub(crate) struct _SpeakingPattern {
     pub pattern_type: String, // "filler", "emphasis", "question"
     pub frequency: f64,
     pub examples: Vec<String>,
@@ -62,10 +62,10 @@ pub(crate) struct __SpeakingPattern {
 
 /// 情绪读数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct __EmotionReading {
+pub(crate) struct _EmotionReading {
     pub emotion: _EmotionType,
     pub intensity: f64,
-    pub source: __EmotionSource,
+    pub source: _EmotionSource,
     pub raw_data: Option<String>,
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
@@ -99,7 +99,7 @@ pub(crate) enum _EmotionSource {
 
 /// 语音配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct __VoiceConfig {
+pub(crate) struct _VoiceConfig {
     pub tts_provider: String,
     pub stt_provider: String,
     pub voice_id: Option<String>,
@@ -121,7 +121,7 @@ pub(crate) struct _EmotionRegulation {
 /// 调节策略
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum __RegulationStrategy {
+pub(crate) enum _RegulationStrategy {
     Amplify,
     Dampen,
     Redirect,
@@ -132,7 +132,7 @@ pub(crate) enum __RegulationStrategy {
 
 /// 语音输出
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct __VoiceOutput {
+pub(crate) struct _VoiceOutput {
     pub audio: Vec<u8>,
     pub text: String,
     pub emotion: _EmotionType,
@@ -141,7 +141,7 @@ pub(crate) struct __VoiceOutput {
 
 /// 情绪响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct __EmotionResponse {
+pub(crate) struct _EmotionResponse {
     pub text: String,
     pub emotion: _EmotionType,
     pub intensity: f64,
