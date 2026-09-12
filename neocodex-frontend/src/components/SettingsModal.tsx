@@ -4,7 +4,7 @@ import { PluginMarketplace } from './PluginMarketplace'
 import { TrafficLights } from './TrafficLights'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
 import { tagsStore, RECOMMENDED_TAGS } from '../stores/tags'
-import { memory, neocodex, errText, fs as fsApi } from '../api'
+import { memory, neocodex, errText, fs as fsApi, autostartIsEnabled, autostartEnable, autostartDisable } from '../api'
 import { storageGet, storageSet } from '../lib/env'
 import { themeMode, setThemeMode } from '../stores/theme'
 import type { MemoryStats, ProviderConfig, ProviderMeta, CustomProviderReq } from '../api/types'
@@ -68,6 +68,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [messageWidthPref, setMessageWidthPref] = createSignal<MessageWidthPref>('normal')
   const [enterBehavior, setEnterBehaviorPref] = createSignal<'send' | 'newline'>('send')
   const [restoreLastSession, setRestoreLastSession] = createSignal<boolean>(true)
+  const [autostartEnabled, setAutostartEnabled] = createSignal<boolean>(false)
   const [memStats, setMemStats] = createSignal<MemoryStats | null>(null)
   const [memStatsLoaded, setMemStatsLoaded] = createSignal(false)
   const [dataBusy, setDataBusy] = createSignal(false)
@@ -164,6 +165,20 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     applyInputPrefs(enterBehavior(), v)
   }
 
+  const setAutostartPref = async (v: boolean) => {
+    try {
+      if (v) {
+        await autostartEnable()
+      } else {
+        await autostartDisable()
+      }
+      setAutostartEnabled(v)
+      showNotice(v ? '已开启开机自启' : '已关闭开机自启')
+    } catch (e) {
+      showNotice(`开机自启设置失败: ${errText(e)}`)
+    }
+  }
+
   const clearDemoData = async () => {
     setDataBusy(true)
     setNotice(null)
@@ -206,6 +221,11 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
           applyPrefs('comfortable', 'full', 'md', 'normal')
         }
       } catch { /* 解析失败用默认 */ }
+
+      // 加载开机自启状态
+      autostartIsEnabled()
+        .then(setAutostartEnabled)
+        .catch(() => { /* 后端不可用时保持默认 */ })
     }
   })
 

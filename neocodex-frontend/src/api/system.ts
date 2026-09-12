@@ -42,6 +42,23 @@ export function voiceGetTranscription(audioData: string, language?: string, mode
   })
 }
 
+/* ── 开机自启 ── */
+export function autostartIsEnabled(): Promise<boolean> {
+  return call('autostart_is_enabled', {})
+}
+
+export function autostartEnable(): Promise<void> {
+  return call('autostart_enable', {})
+}
+
+export function autostartDisable(): Promise<void> {
+  return call('autostart_disable', {})
+}
+
+export function autostartToggle(): Promise<boolean> {
+  return call('autostart_toggle', {})
+}
+
 /* ── 更新事件监听（热更新进度） ── */
 export interface UpdateEventHandlers {
   onProgress?: (p: UpdateProgress) => void

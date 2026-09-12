@@ -1,4 +1,4 @@
-use crate::game::game_loop::{GameLoop, GameState, GameAction};
+use crate::game::game_loop::{GameLoop, GameAction};
 use crate::game::time::GameTime;
 use crate::game::weather::Weather;
 use crate::game::inventory::Inventory;

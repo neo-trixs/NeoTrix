@@ -10,7 +10,6 @@ pub mod farming;
 pub mod crafting;
 pub mod weather;
 pub mod game_loop;
-pub mod game_loop;
 
 pub use time::{GameTime, Season, TimeOfDay};
 pub use inventory::{Inventory, InventorySlot};

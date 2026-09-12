@@ -46,6 +46,10 @@ export {
   readFile,
   writeFile,
   listenUpdateEvents,
+  autostartIsEnabled,
+  autostartEnable,
+  autostartDisable,
+  autostartToggle,
 } from './system';
 
 // 导出 kb 模块

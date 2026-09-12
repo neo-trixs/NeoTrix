@@ -31,6 +31,8 @@ interface Props {
   setEnterBehavior: (v: 'send' | 'newline') => void
   restoreLastSession: () => boolean
   setRestoreLastSession: (v: boolean) => void
+  autostartEnabled: () => boolean
+  setAutostartEnabled: (v: boolean) => void
   onClearDemoData: () => void
 }
 
