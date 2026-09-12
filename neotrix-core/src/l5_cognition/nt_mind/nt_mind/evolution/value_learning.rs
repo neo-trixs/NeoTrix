@@ -86,7 +86,7 @@ pub enum ChangeType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum LearningEventStatus {
+pub(crate) enum LearningEventStatus {
     Pending,      // 待审核/待应用
     Applied,      // 已应用到指南针
     Rejected,     // 被拒绝
