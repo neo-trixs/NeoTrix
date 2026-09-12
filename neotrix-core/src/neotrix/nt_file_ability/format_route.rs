@@ -2,7 +2,7 @@
 //! 按扩展名/内容探测文档格式并路由到对应解析器。R-P42 强化 `nt_file_ability`
 //! (复用既有 Office6/PDF/图像探测路径), 不平行重造格式枚举。
 
-use super::selftest::SelfTest;
+use crate::core::nt_core_self_test::SelfTest;
 use std::path::Path;
 
 /// 文档格式 — 路由目标。覆盖 anydoc 支持的多格式 + 通用类型。

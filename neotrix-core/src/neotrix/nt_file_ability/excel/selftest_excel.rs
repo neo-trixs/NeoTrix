@@ -4,7 +4,7 @@
 //! T2: 注册到 SelfTestRegistry
 //! T3: 生产路径测试 (实际调用检测函数)
 
-use crate::neotrix::nt_file_ability::selftest::SelfTest;
+use crate::core::nt_core_self_test::SelfTest;
 
 /// Excel 解析能力自检
 pub struct ExcelSelfTest;
@@ -114,7 +114,7 @@ pub fn register_excel_self_tests(registry: &mut crate::core::nt_core_self_test::
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_file_ability::selftest::SelfTestRegistry;
+    use crate::core::nt_core_self_test::SelfTestRegistry;
 
     #[test]
     fn test_excel_selftest() {
