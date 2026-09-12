@@ -55,6 +55,8 @@ pub use nt_world_model_object_partition::*;
 // WorldModel / ContextEncoder / WifiStatus 统一定义在 sense::world_model (单一事实源)
 // 此处仅做 re-export，不再内联定义
 
+use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
+
 pub use crate::neotrix::nt_world_model_v2::WorldModelV2;
 
 #[cfg(test)]
