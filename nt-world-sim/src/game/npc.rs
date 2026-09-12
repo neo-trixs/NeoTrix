@@ -327,9 +327,11 @@ mod tests {
     #[test]
     fn test_npc_definition_all_npcs() {
         let npcs = NpcDefinition::all_npcs();
-        assert_eq!(npcs.len(), 4);
+        assert_eq!(npcs.len(), 8);
         assert_eq!(npcs[0].name, "Awareness");
         assert_eq!(npcs[1].name, "Focus");
+        assert_eq!(npcs[6].name, "Wisdom");
+        assert_eq!(npcs[7].name, "Dreams");
     }
 
     #[test]

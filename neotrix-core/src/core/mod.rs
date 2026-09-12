@@ -48,8 +48,6 @@ pub use l2_perception::nt_core_sense;
 // ═══════════════════════════════════════════════════════════════════
 pub mod l3_memory;
 pub mod nt_core_bank;
-pub mod nt_core_graph;
-pub mod nt_core_hcube;
  pub mod nt_core_knowledge;
  pub mod nt_core_kron;
  pub mod nt_core_walsh;
@@ -161,7 +159,6 @@ pub mod nt_core_span;
 pub mod nt_core_answer_engine;
 pub mod nt_core_arch_fitness;
 pub mod nt_core_data_pipeline;
-pub mod nt_core_memory_budget;
 pub mod nt_core_qtest;
 pub mod nt_core_quantum_fusion;
 pub mod nt_core_resource_pool;
@@ -174,7 +171,6 @@ pub mod nt_core_simulate_engine;
 pub mod nt_core_state_substrate;
 pub mod nt_core_subagent;
 pub mod nt_core_telemetry;
-pub mod nt_core_vector_store;
 // Formal verification proof harnesses
 #[cfg(test)]
 pub mod kani_proofs;

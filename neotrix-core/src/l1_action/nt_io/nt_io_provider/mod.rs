@@ -57,6 +57,7 @@ pub use catalog::{
 };
 pub use catalog::registry::ProviderRegistry;
 pub use catalog::{discovery, free_catalog, provider_catalog, registry};
+pub use catalog::gateway_adapter::GatewayV2Adapter;
 
 // ── 公共类型 / 工厂 ────────────────────────────────────────
 pub use common::{

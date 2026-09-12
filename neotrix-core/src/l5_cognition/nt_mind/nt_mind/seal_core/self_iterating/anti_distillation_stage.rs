@@ -4,7 +4,7 @@
 //! The underlying algorithms (watermark/tracer/detector/decompose) remain in L7's
 //! nt_core_antidistil module.
 
-use crate::core::nt_core_error::NeoTrixError;
+use crate::core::l0_substrate::nt_core_error::NeoTrixError;
 use super::SelfIteratingBrain;
 use super::pipeline::{BrainStage, StageDecision, BrainSnapshot};
 

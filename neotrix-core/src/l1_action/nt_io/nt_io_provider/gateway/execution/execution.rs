@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crate::core::nt_core_error::recovery::{ErrorContext, ErrorType, RecoveryAction};
+use crate::core::l0_substrate::nt_core_error::recovery::{ErrorContext, ErrorType, RecoveryAction};
 use crate::core::nt_core_cache::text_to_embedding;
 use crate::core::nt_core_span::{SpanKind, Tracer};
 

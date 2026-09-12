@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::core::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
-use crate::core::nt_core_error::parse::{self, CompilerDiagnostic, DiagnosticSeverity};
+use crate::core::l0_substrate::nt_core_error::parse::{self, CompilerDiagnostic, DiagnosticSeverity};
 
 /// 自愈快照 — 修复前记录文件原内容作为 ∂Γ inverse (写回原状)。
 pub(crate) struct _HealSnapshot {

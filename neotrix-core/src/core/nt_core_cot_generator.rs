@@ -6,7 +6,7 @@
 
 use crate::core::nt_core_reasoning::ReasoningTrace;
 use crate::core::nt_core_llm::{LlmError, LlmProvider, LlmRequest, Message, Role};
-use crate::core::nt_core_error::NeoTrixError;
+use crate::core::l0_substrate::nt_core_error::NeoTrixError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

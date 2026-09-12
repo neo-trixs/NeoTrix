@@ -6,7 +6,7 @@ use super::common::generation_classifier::{GenerationAnalytics, GenerationClassi
 use super::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::health::rate_limiter::{AdaptivePacer, TieredSemaphore};
 use super::common::types::*;
-use crate::core::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator};
+use crate::core::l0_substrate::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator};
 use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
 
