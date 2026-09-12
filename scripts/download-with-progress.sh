@@ -60,6 +60,8 @@ EXISTED=0
 [ -f "$OUT" ] && EXISTED=$(stat -f%z "$OUT" 2>/dev/null || echo 0)
 
 REMOTE=$(get_remote_size)
+# 去除前导零，防止 bash 八进制解析
+REMOTE=$(echo "$REMOTE" | sed 's/^0*//')
 if [ -z "$REMOTE" ] || [ "$REMOTE" = "0" ]; then
     echo "⚠️  无法获取远端大小，简单模式下载"
     curl -L -C - -o "$OUT" "$URL" --progress-bar \
@@ -116,6 +118,15 @@ while kill -0 "$CURL_PID" 2>/dev/null; do
         SPEED=$(( DELTA / ELAPSED ))
     fi
 
+    # 格式化速度输出
+    if [ "$SPEED" -ge 1048576 ]; then
+        SPEED_STR="$(echo "scale=1; $SPEED/1048576" | bc -l 2>/dev/null) MB/s"
+    elif [ "$SPEED" -ge 1024 ]; then
+        SPEED_STR="$(echo "scale=1; $SPEED/1024" | bc -l 2>/dev/null) KB/s"
+    else
+        SPEED_STR="${SPEED} B/s"
+    fi
+
     ETA="..."
     if [ "$SPEED" -gt 0 ] && [ "$TOTAL" -gt "$CURRENT" ]; then
         REMAIN=$(( (TOTAL - CURRENT) / SPEED ))
@@ -124,7 +135,7 @@ while kill -0 "$CURL_PID" 2>/dev/null; do
 
     printf "\r\033[K  %3d%% %s %s/%s | %s | %s" \
         "$PCT" "$BAR" "$(fmt_bytes $CURRENT)" "$(fmt_bytes $TOTAL)" \
-        "$(fmt_speed $SPEED)" "$ETA"
+        "$SPEED_STR" "$ETA"
 
     LAST_SIZE=$CURRENT
     LAST_SEC=$NOW

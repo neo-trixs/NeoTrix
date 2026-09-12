@@ -111,7 +111,7 @@ impl ProviderRegistry {
                 let h = if available.as_bool().unwrap_or(false) {
                     HealthStatus::Healthy
                 } else {
-                    HealthStatus::Unavailable
+                    HealthStatus::Unavailable { reason: "marked unavailable by gateway".into() }
                 };
                 health.insert(name.clone(), h);
             }

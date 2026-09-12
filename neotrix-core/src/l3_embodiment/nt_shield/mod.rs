@@ -8,7 +8,7 @@
 // 原有模块 (保持兼容)
 // ============================================
 
-pub mod nt_shield;
+pub mod core;
 pub mod nt_shield_agentic_scan;
 pub mod nt_shield_approval;
 pub mod nt_shield_audit;

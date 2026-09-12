@@ -31,18 +31,22 @@ pub mod port_service;
 pub mod nt_world_code_search;
 pub mod nt_world_e8;
 pub mod nt_world_github_absorber;
-pub mod nt_world_edgar;
-pub mod nt_world_gdelt;
-pub mod nt_world_usgs;
-pub mod nt_world_gdacs;
-pub mod nt_world_ucdp;
-pub mod nt_world_urlhaus;
-pub mod nt_world_ofac;
-pub mod nt_world_polymarket;
-pub mod nt_world_aoi;
-pub mod nt_world_adsb;
-pub mod nt_world_bgpview;
-pub mod nt_world_opencorporates;
+// 数据源子目录 (12 个外部数据源采集器)
+pub mod data_source;
+
+// 向后兼容别名 — 旧路径 nt_world::nt_world_xxx 仍可用
+pub use data_source::nt_world_edgar;
+pub use data_source::nt_world_gdelt;
+pub use data_source::nt_world_usgs;
+pub use data_source::nt_world_gdacs;
+pub use data_source::nt_world_ucdp;
+pub use data_source::nt_world_urlhaus;
+pub use data_source::nt_world_ofac;
+pub use data_source::nt_world_polymarket;
+pub use data_source::nt_world_aoi;
+pub use data_source::nt_world_adsb;
+pub use data_source::nt_world_bgpview;
+pub use data_source::nt_world_opencorporates;
 pub mod nt_world_intel_selftest;
 pub mod nt_world_infer;
 pub mod nt_world_scrape;
