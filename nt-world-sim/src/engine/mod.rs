@@ -5,6 +5,7 @@ pub mod events;
 pub mod pet_state;
 pub mod hook_system;
 pub mod theme_system;
+pub mod audio;
 
 pub use renderer::{Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer};
 pub use physics::{BodyType, RigidBody, Collider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld};
