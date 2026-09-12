@@ -1,4 +1,63 @@
 use super::item::ItemQuality;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ToolType {
+    Hoe,
+    WateringCan,
+    Pickaxe,
+    Axe,
+    Scythe,
+    FishingRod,
+}
+
+#[derive(Debug, Clone)]
+pub struct Tool {
+    pub tool_type: ToolType,
+    pub level: u8,
+    pub energy_cost: u32,
+}
+
+impl Tool {
+    pub fn new(tool_type: ToolType) -> Self {
+        let energy_cost = match tool_type {
+            ToolType::Hoe | ToolType::WateringCan => 5,
+            ToolType::Pickaxe | ToolType::Axe => 5,
+            ToolType::Scythe => 3,
+            ToolType::FishingRod => 0,
+        };
+        Self { tool_type, level: 0, energy_cost }
+    }
+
+    pub fn upgrade_cost(&self) -> u32 {
+        (self.level as u32 + 1) * 5000
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ItemCategory {
+    Seed,
+    Crop,
+    Tool,
+    Material,
+    Food,
+    Forage,
+    Mineral,
+    Fish,
+    Crafted,
+}
+
+#[derive(Debug, Clone)]
+pub struct Item {
+    pub id: u32,
+    pub name: String,
+    pub description: String,
+    pub stack: u32,
+    pub max_stack: u32,
+    pub base_value: u32,
+    pub category: ItemCategory,
+    pub quality: ItemQuality,
+}
 
 #[derive(Debug, Clone)]
 pub struct InventorySlot {
@@ -11,13 +70,20 @@ impl InventorySlot {
     pub fn empty() -> Self {
         Self { item_id: None, quantity: 0, quality: ItemQuality::Normal }
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.item_id.is_none() || self.quantity == 0
     }
-    
+
     pub fn new(item_id: u32, quantity: u32, quality: ItemQuality) -> Self {
         Self { item_id: Some(item_id), quantity, quality }
+    }
+
+    pub fn can_add(&self, item_id: u32, max_stack: u32) -> bool {
+        match self.item_id {
+            None => true,
+            Some(id) => id == item_id && self.quantity < max_stack,
+        }
     }
 }
 
@@ -121,6 +187,36 @@ impl Inventory {
     pub fn has_item(&self, item_id: u32) -> bool {
         self.count_item(item_id) > 0
     }
+}
+
+pub struct ItemDatabase {
+    pub items: HashMap<u32, Item>,
+}
+
+impl ItemDatabase {
+    pub fn new() -> Self {
+        Self { items: HashMap::new() }
+    }
+
+    pub fn register(&mut self, item: Item) {
+        self.items.insert(item.id, item);
+    }
+
+    pub fn get(&self, id: u32) -> Option<&Item> {
+        self.items.get(&id)
+    }
+
+    pub fn get_mut(&mut self, id: u32) -> Option<&mut Item> {
+        self.items.get_mut(&id)
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+}
+
+impl Default for ItemDatabase {
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]

@@ -1,44 +1,87 @@
-use super::widget::ProgressBar;
+use crate::engine::renderer::{Color, Rect};
 use crate::game::time::GameTime;
-use crate::game::energy::Energy;
+use crate::game::weather::Weather;
 
-pub struct Hud {
-    pub energy_bar: ProgressBar,
-    pub resonance_bar: ProgressBar,
-    pub gold_display: i32,
-    pub time_display: String,
-    pub season_display: String,
-    pub day_display: String,
+pub struct HUD {
     pub visible: bool,
+    pub energy: u32,
+    pub max_energy: u32,
+    pub gold: i32,
 }
 
-impl Hud {
+impl HUD {
     pub fn new() -> Self {
-        Self {
-            energy_bar: ProgressBar::new(10.0, 560.0, 150.0, 15.0),
-            resonance_bar: ProgressBar::new(10.0, 540.0, 150.0, 15.0),
-            gold_display: 500,
-            time_display: "06:00".to_string(),
-            season_display: "Clarity".to_string(),
-            day_display: "Day 1, Year 1".to_string(),
-            visible: true,
-        }
+        Self { visible: true, energy: 100, max_energy: 100, gold: 500 }
     }
-
-    pub fn update(&mut self, time: &GameTime, energy: &Energy, gold: i32) {
-        self.time_display = time.time_string();
-        self.season_display = time.season.name().to_string();
-        self.day_display = time.date_string();
-        self.gold_display = gold;
-        self.energy_bar.set_value(energy.current);
-        self.energy_bar.max = energy.max;
-    }
-
-    pub fn toggle(&mut self) {
-        self.visible = !self.visible;
+    
+    pub fn render(&self, time: &GameTime, weather: &Weather) -> Vec<(Rect, Color, Option<String>)> {
+        let mut elements = Vec::new();
+        if !self.visible { return elements; }
+        
+        elements.push((
+            Rect { x: 620.0, y: 8.0, width: 120.0, height: 30.0 },
+            Color { r: 0.1, g: 0.1, b: 0.15, a: 0.8 },
+            Some(format!("{:02}:{:02}", time.hour, time.minute)),
+        ));
+        
+        elements.push((
+            Rect { x: 620.0, y: 42.0, width: 120.0, height: 24.0 },
+            Color { r: 0.1, g: 0.1, b: 0.15, a: 0.8 },
+            Some(format!("Day {} - {}", time.day, time.season.season_name())),
+        ));
+        
+        elements.push((
+            Rect { x: 620.0, y: 70.0, width: 120.0, height: 20.0 },
+            Color { r: 0.05, g: 0.05, b: 0.1, a: 0.7 },
+            Some(format!("{} {}", weather.current.icon(), weather.current.name())),
+        ));
+        
+        let energy_pct = self.energy as f32 / self.max_energy as f32;
+        elements.push((
+            Rect { x: 8.0, y: 560.0, width: 150.0, height: 20.0 },
+            Color { r: 0.2, g: 0.2, b: 0.2, a: 0.8 },
+            Some(format!("Resonance {}/{}", self.energy, self.max_energy)),
+        ));
+        elements.push((
+            Rect { x: 8.0, y: 560.0, width: 150.0 * energy_pct, height: 20.0 },
+            Color { r: 0.2, g: 0.7, b: 0.3, a: 0.9 },
+            None,
+        ));
+        
+        elements.push((
+            Rect { x: 620.0, y: 560.0, width: 120.0, height: 24.0 },
+            Color { r: 0.1, g: 0.1, b: 0.15, a: 0.8 },
+            Some(format!("{} IP", self.gold)),
+        ));
+        
+        elements
     }
 }
 
-impl Default for Hud {
+impl Default for HUD {
     fn default() -> Self { Self::new() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::time::Season;
+
+    #[test]
+    fn test_hud_elements() {
+        let hud = HUD::new();
+        let time = GameTime::new();
+        let weather = Weather::new();
+        let elements = hud.render(&time, &weather);
+        assert_eq!(elements.len(), 6);
+    }
+
+    #[test]
+    fn test_hud_hidden() {
+        let mut hud = HUD::new();
+        hud.visible = false;
+        let time = GameTime::new();
+        let weather = Weather::new();
+        assert!(hud.render(&time, &weather).is_empty());
+    }
 }

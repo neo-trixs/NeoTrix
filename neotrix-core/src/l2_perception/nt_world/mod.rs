@@ -63,7 +63,8 @@ pub mod nt_world_semantic_extract;
 // 资产测绘系统
 pub mod asset_map;
 
-
+// NLP能力模块
+pub mod nt_nlp_capability;
 
 // 通用能力模块
 pub mod media_asset_registry;

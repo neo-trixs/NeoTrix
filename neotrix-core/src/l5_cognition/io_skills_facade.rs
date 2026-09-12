@@ -2,5 +2,5 @@
 //!
 //! L5 认知层通过此模块访问 IO 技能模块，避免散布 `use crate::l1_action::nt_io::*`。
 
-pub use crate::l1_action::nt_io::nt_io_excalidraw::*;
-pub use crate::l1_action::nt_io::nt_io_hermes_community::*;
+pub use crate::l1_action::nt_io::l3_vendor_skills::nt_io_excalidraw::*;
+pub use crate::l1_action::nt_io::l3_vendor_skills::nt_io_hermes_community::*;

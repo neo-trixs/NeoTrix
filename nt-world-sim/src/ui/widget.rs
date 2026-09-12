@@ -1,106 +1,106 @@
-use crate::engine::renderer::{Color, Vec2, Rect};
+use crate::engine::renderer::{Color, Rect};
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum WidgetState {
-    Normal,
-    Hovered,
-    Pressed,
-    Disabled,
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct WidgetId(pub u64);
 
-pub trait Widget {
-    fn update(&mut self, dt: f32, mouse_pos: Vec2, mouse_clicked: bool);
-    fn render(&self, canvas: &mut dyn std::any::Any);
-    fn bounds(&self) -> Rect;
-    fn state(&self) -> &WidgetState;
-}
-
-pub struct Button {
-    pub rect: Rect,
-    pub text: String,
-    pub color: Color,
-    pub state: WidgetState,
-    pub on_click: Option<Box<dyn FnOnce()>>,
-}
-
-impl Button {
-    pub fn new(x: f32, y: f32, width: f32, height: f32, text: &str) -> Self {
-        Self {
-            rect: Rect::new(x, y, width, height),
-            text: text.to_string(),
-            color: Color { r: 0.3, g: 0.3, b: 0.4, a: 1.0 },
-            state: WidgetState::Normal,
-            on_click: None,
-        }
-    }
-
-    pub fn with_color(mut self, r: f32, g: f32, b: f32) -> Self {
-        self.color = Color { r, g, b, a: 1.0 };
-        self
-    }
-}
-
-impl Widget for Button {
-    fn update(&mut self, _dt: f32, mouse_pos: Vec2, mouse_clicked: bool) {
-        if self.rect.contains(&mouse_pos) {
-            if mouse_clicked {
-                self.state = WidgetState::Pressed;
-            } else {
-                self.state = WidgetState::Hovered;
-            }
-        } else {
-            self.state = WidgetState::Normal;
-        }
-    }
-
-    fn render(&self, _canvas: &mut dyn std::any::Any) {}
-
-    fn bounds(&self) -> Rect { self.rect }
-    fn state(&self) -> &WidgetState { &self.state }
-}
-
-pub struct Label {
-    pub rect: Rect,
-    pub text: String,
-    pub color: Color,
+#[derive(Debug, Clone)]
+pub struct UiStyle {
+    pub background: Color,
+    pub border: Color,
+    pub border_width: f32,
+    pub text_color: Color,
     pub font_size: f32,
+    pub padding: f32,
+    pub corner_radius: f32,
 }
 
-impl Label {
-    pub fn new(x: f32, y: f32, text: &str) -> Self {
+impl Default for UiStyle {
+    fn default() -> Self {
         Self {
-            rect: Rect::new(x, y, 200.0, 30.0),
-            text: text.to_string(),
-            color: Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
-            font_size: 16.0,
+            background: Color { r: 0.15, g: 0.12, b: 0.08, a: 0.95 },
+            border: Color { r: 0.55, g: 0.42, b: 0.2, a: 1.0 },
+            border_width: 3.0,
+            text_color: Color { r: 0.96, g: 0.84, b: 0.25, a: 1.0 },
+            font_size: 14.0,
+            padding: 8.0,
+            corner_radius: 4.0,
         }
     }
 }
 
-pub struct ProgressBar {
-    pub rect: Rect,
-    pub value: f32,
-    pub max: f32,
-    pub color: Color,
-    pub bg_color: Color,
-}
-
-impl ProgressBar {
-    pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
+impl UiStyle {
+    pub fn stardew_wood() -> Self {
         Self {
-            rect: Rect::new(x, y, width, height),
-            value: 0.0, max: 1.0,
-            color: Color { r: 0.2, g: 0.8, b: 0.2, a: 1.0 },
-            bg_color: Color { r: 0.1, g: 0.1, b: 0.1, a: 0.8 },
+            background: Color { r: 0.36, g: 0.22, b: 0.1, a: 0.95 },
+            border: Color { r: 0.55, g: 0.42, b: 0.2, a: 1.0 },
+            border_width: 4.0,
+            text_color: Color { r: 0.96, g: 0.84, b: 0.25, a: 1.0 },
+            font_size: 14.0,
+            padding: 12.0,
+            corner_radius: 6.0,
         }
     }
-
-    pub fn set_value(&mut self, value: f32) {
-        self.value = value.clamp(0.0, self.max);
+    
+    pub fn stardew_button() -> Self {
+        Self {
+            background: Color { r: 0.45, g: 0.3, b: 0.15, a: 1.0 },
+            border: Color { r: 0.65, g: 0.5, b: 0.25, a: 1.0 },
+            border_width: 2.0,
+            text_color: Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            font_size: 12.0,
+            padding: 6.0,
+            corner_radius: 4.0,
+        }
     }
+}
 
-    pub fn percentage(&self) -> f32 {
-        self.value / self.max
+#[derive(Debug, Clone)]
+pub enum UiLayout {
+    Fixed { x: f32, y: f32, width: f32, height: f32 },
+    Anchor { top: Option<f32>, bottom: Option<f32>, left: Option<f32>, right: Option<f32> },
+    Center { width: f32, height: f32 },
+}
+
+#[derive(Debug, Clone)]
+pub struct Widget {
+    pub id: WidgetId,
+    pub layout: UiLayout,
+    pub style: UiStyle,
+    pub visible: bool,
+    pub children: Vec<WidgetId>,
+}
+
+impl Widget {
+    pub fn new(id: u64, layout: UiLayout) -> Self {
+        Self {
+            id: WidgetId(id), layout, style: UiStyle::default(),
+            visible: true, children: Vec::new(),
+        }
+    }
+    
+    pub fn with_style(mut self, style: UiStyle) -> Self { self.style = style; self }
+    pub fn with_child(mut self, child: WidgetId) -> Self { self.children.push(child); self }
+    
+    pub fn bounds(&self, screen_width: f32, screen_height: f32) -> Rect {
+        match &self.layout {
+            UiLayout::Fixed { x, y, width, height } => {
+                Rect { x: *x, y: *y, width: *width, height: *height }
+            }
+            UiLayout::Center { width, height } => {
+                Rect {
+                    x: (screen_width - width) / 2.0,
+                    y: (screen_height - height) / 2.0,
+                    width: *width, height: *height,
+                }
+            }
+            UiLayout::Anchor { top, bottom, left, right } => {
+                let w = 200.0;
+                let h = 100.0;
+                let x = left.unwrap_or_else(|| screen_width - right.unwrap_or(0.0) - w);
+                let y = top.unwrap_or_else(|| screen_height - bottom.unwrap_or(0.0) - h);
+                Rect { x, y, width: w, height: h }
+            }
+        }
     }
 }
 
@@ -109,16 +109,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rect_contains() {
-        let rect = Rect::new(0.0, 0.0, 100.0, 50.0);
-        assert!(rect.contains(&Vec2 { x: 50.0, y: 25.0 }));
-        assert!(!rect.contains(&Vec2 { x: 150.0, y: 25.0 }));
+    fn test_widget_fixed_bounds() {
+        let w = Widget::new(1, UiLayout::Fixed { x: 10.0, y: 20.0, width: 100.0, height: 50.0 });
+        let b = w.bounds(800.0, 600.0);
+        assert_eq!(b.x, 10.0);
+        assert_eq!(b.width, 100.0);
     }
 
     #[test]
-    fn test_progress_bar() {
-        let mut bar = ProgressBar::new(0.0, 0.0, 100.0, 10.0);
-        bar.set_value(0.5);
-        assert!((bar.percentage() - 0.5).abs() < 0.01);
+    fn test_widget_center_bounds() {
+        let w = Widget::new(1, UiLayout::Center { width: 200.0, height: 100.0 });
+        let b = w.bounds(800.0, 600.0);
+        assert_eq!(b.x, 300.0);
+        assert_eq!(b.y, 250.0);
+    }
+
+    #[test]
+    fn test_ui_style_defaults() {
+        let s = UiStyle::default();
+        assert_eq!(s.border_width, 3.0);
+        let sw = UiStyle::stardew_wood();
+        assert_eq!(sw.border_width, 4.0);
     }
 }

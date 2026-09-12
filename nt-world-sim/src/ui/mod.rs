@@ -1,5 +1,9 @@
 pub mod widget;
-pub mod hud;
 pub mod inventory_ui;
-pub mod dialogue_ui;
-pub mod menu;
+pub mod hud;
+pub mod dialogue;
+
+pub use widget::{Widget, WidgetId, UiLayout, UiStyle};
+pub use inventory_ui::InventoryUI;
+pub use hud::HUD;
+pub use dialogue::{DialogueBox, DialogueNode};

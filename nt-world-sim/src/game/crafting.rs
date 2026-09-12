@@ -71,9 +71,49 @@ impl CraftingRegistry {
             None
         }
     }
+
+    pub fn all_recipes(&self) -> impl Iterator<Item = &CraftingRecipe> {
+        self.recipes.values()
+    }
+
+    pub fn recipe_count(&self) -> usize {
+        self.recipes.len()
+    }
 }
 
-impl Default for CraftingRegistry {
+pub struct RecipeDatabase {
+    pub recipes: HashMap<u32, CraftingRecipe>,
+}
+
+impl RecipeDatabase {
+    pub fn new() -> Self {
+        Self { recipes: HashMap::new() }
+    }
+
+    pub fn register(&mut self, recipe: CraftingRecipe) {
+        self.recipes.insert(recipe.id, recipe);
+    }
+
+    pub fn get(&self, id: u32) -> Option<&CraftingRecipe> {
+        self.recipes.get(&id)
+    }
+
+    pub fn can_craft(&self, recipe: &CraftingRecipe, inventory: &super::inventory::Inventory) -> bool {
+        recipe.ingredients.iter().all(|(item_id, qty)| inventory.count_item(*item_id) >= *qty)
+    }
+
+    pub fn recipes_for_skill(&self, _skill_name: &str, level: u32) -> Vec<&CraftingRecipe> {
+        self.recipes.values().filter(|r| {
+            r.required_level <= level
+        }).collect()
+    }
+
+    pub fn recipe_count(&self) -> usize {
+        self.recipes.len()
+    }
+}
+
+impl Default for RecipeDatabase {
     fn default() -> Self { Self::new() }
 }
 

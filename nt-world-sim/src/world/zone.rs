@@ -1,120 +1,60 @@
-use super::tile::TileMap;
-use super::terrain::TerrainGenerator;
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ZoneType {
     Farm,
     Town,
     Mine,
     Forest,
     Lake,
-    Hub,
-    Subconscious,
+    Beach,
+    Cave,
+    Special,
+}
+
+#[derive(Debug, Clone)]
+pub struct ZoneConnection {
+    pub target_zone: String,
+    pub entry_point: (u32, u32),
 }
 
 #[derive(Debug, Clone)]
 pub struct Zone {
-    pub id: u32,
-    pub name: String,
     pub zone_type: ZoneType,
-    pub width: u32,
-    pub height: u32,
-    pub tile_map: TileMap,
-    pub spawn_x: f32,
-    pub spawn_y: f32,
-    pub connections: Vec<u32>,
+    pub position: (u32, u32),
+    pub size: (u32, u32),
+    pub name: String,
+    pub connections: Vec<ZoneConnection>,
 }
 
 impl Zone {
-    pub fn new(id: u32, name: &str, zone_type: ZoneType, width: u32, height: u32) -> Self {
-        let mut tile_map = TileMap::new(width, height, 16.0);
-        let gen = TerrainGenerator::new(id as u64);
-
-        match zone_type {
-            ZoneType::Farm => gen.generate_farm(&mut tile_map),
-            ZoneType::Mine => gen.generate_mine_floor(&mut tile_map, 1),
-            _ => gen.generate_farm(&mut tile_map),
-        }
-
+    pub fn new(zone_type: ZoneType, position: (u32, u32), size: (u32, u32), name: &str) -> Self {
         Self {
-            id,
-            name: name.to_string(),
             zone_type,
-            width,
-            height,
-            tile_map,
-            spawn_x: width as f32 * 8.0,
-            spawn_y: height as f32 * 8.0,
+            position,
+            size,
+            name: name.to_string(),
             connections: Vec::new(),
         }
     }
 
-    pub fn connect_to(&mut self, other_id: u32) {
-        if !self.connections.contains(&other_id) {
-            self.connections.push(other_id);
-        }
-    }
-}
-
-pub struct WorldMap {
-    pub zones: Vec<Zone>,
-    pub current_zone: u32,
-}
-
-impl WorldMap {
-    pub fn new() -> Self {
-        Self {
-            zones: Vec::new(),
-            current_zone: 0,
-        }
+    pub fn contains(&self, x: u32, y: u32) -> bool {
+        x >= self.position.0
+            && x < self.position.0 + self.size.0
+            && y >= self.position.1
+            && y < self.position.1 + self.size.1
     }
 
-    pub fn add_zone(&mut self, zone: Zone) -> u32 {
-        let id = zone.id;
-        self.zones.push(zone);
-        id
+    pub fn center(&self) -> (u32, u32) {
+        (
+            self.position.0 + self.size.0 / 2,
+            self.position.1 + self.size.1 / 2,
+        )
     }
 
-    pub fn get_zone(&self, id: u32) -> Option<&Zone> {
-        self.zones.iter().find(|z| z.id == id)
-    }
-
-    pub fn current(&self) -> &Zone {
-        &self.zones[self.current_zone as usize]
-    }
-
-    pub fn current_mut(&mut self) -> &mut Zone {
-        &mut self.zones[self.current_zone as usize]
-    }
-
-    pub fn travel_to(&mut self, zone_id: u32) -> bool {
-        if self.get_zone(zone_id).is_some() {
-            self.current_zone = zone_id;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Default for WorldMap {
-    fn default() -> Self {
-        let mut map = Self::new();
-
-        // Create starter zones
-        let farm = Zone::new(0, "Thought Meadow", ZoneType::Farm, 40, 40);
-        let town = Zone::new(1, "Neural Hub", ZoneType::Hub, 30, 30);
-        let mine = Zone::new(2, "Knowledge Mines", ZoneType::Mine, 20, 20);
-        let forest = Zone::new(3, "Memory Forest", ZoneType::Forest, 35, 35);
-        let lake = Zone::new(4, "Dream Lake", ZoneType::Lake, 25, 25);
-
-        map.add_zone(farm);
-        map.add_zone(town);
-        map.add_zone(mine);
-        map.add_zone(forest);
-        map.add_zone(lake);
-
-        map
+    pub fn connect_to(&mut self, target: &str, entry: (u32, u32)) {
+        self.connections.push(ZoneConnection {
+            target_zone: target.to_string(),
+            entry_point: entry,
+        });
     }
 }
 
@@ -124,26 +64,35 @@ mod tests {
 
     #[test]
     fn test_zone_creation() {
-        let zone = Zone::new(0, "Farm", ZoneType::Farm, 20, 20);
-        assert_eq!(zone.name, "Farm");
-        assert_eq!(zone.width, 20);
+        let zone = Zone::new(ZoneType::Farm, (10, 10), (20, 15), "Test Farm");
+        assert_eq!(zone.name, "Test Farm");
+        assert_eq!(zone.zone_type, ZoneType::Farm);
+        assert_eq!(zone.position, (10, 10));
+        assert_eq!(zone.size, (20, 15));
     }
 
     #[test]
-    fn test_world_map() {
-        let mut map = WorldMap::default();
-        assert!(map.get_zone(0).is_some());
-        assert!(map.get_zone(5).is_none());
+    fn test_zone_contains() {
+        let zone = Zone::new(ZoneType::Town, (10, 10), (20, 15), "Town");
+        assert!(zone.contains(10, 10));
+        assert!(zone.contains(29, 24));
+        assert!(!zone.contains(30, 24));
+        assert!(!zone.contains(9, 10));
+    }
 
-        assert!(map.travel_to(1));
-        assert_eq!(map.current().name, "Neural Hub");
+    #[test]
+    fn test_zone_center() {
+        let zone = Zone::new(ZoneType::Forest, (10, 10), (20, 20), "Forest");
+        assert_eq!(zone.center(), (20, 20));
     }
 
     #[test]
     fn test_zone_connections() {
-        let mut farm = Zone::new(0, "Farm", ZoneType::Farm, 20, 20);
-        farm.connect_to(1);
-        farm.connect_to(2);
-        assert_eq!(farm.connections.len(), 2);
+        let mut zone = Zone::new(ZoneType::Mine, (0, 0), (10, 10), "Mine");
+        zone.connect_to("Town", (5, 5));
+        zone.connect_to("Forest", (0, 5));
+        assert_eq!(zone.connections.len(), 2);
+        assert_eq!(zone.connections[0].target_zone, "Town");
+        assert_eq!(zone.connections[1].entry_point, (0, 5));
     }
 }
