@@ -219,6 +219,14 @@ mod tests {
                 systems: vec!["movement".to_string()],
             },
         );
+        def.systems.insert(
+            "movement".to_string(),
+            SystemDef {
+                priority: 0,
+                read: vec![],
+                write: vec![],
+            },
+        );
         let gen = CodeGenerator::new(def);
         let code = gen.generate_bevy();
         assert!(code.contains("struct Player"));

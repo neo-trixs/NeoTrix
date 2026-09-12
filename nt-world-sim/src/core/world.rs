@@ -185,20 +185,15 @@ impl UniversalWorld {
 
     /// Receive events
     pub fn receive_events<T: Event>(&mut self) -> Vec<T> {
-        let type_id = TypeId::of::<T>();
         let mut events = Vec::new();
         let mut remaining = Vec::new();
-        
         for event in self.events.drain(..) {
-            if event.type_id() == type_id {
-                if let Ok(event) = event.downcast::<T>() {
-                    events.push(*event);
-                }
+            if let Ok(event) = event.downcast::<T>() {
+                events.push(*event);
             } else {
                 remaining.push(event);
             }
         }
-        
         self.events = remaining;
         events
     }
