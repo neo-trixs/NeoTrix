@@ -358,8 +358,26 @@ fn cmd_diff(args: &[String]) -> CommandOutput {
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
-    // TODO: EmbedMode/EmbeddingConfig imports commented out; stub implementation
-    CommandOutput::ok("Embed command stub — embedding module not yet wired")
+    let conn = match open_raw_conn() {
+        Some(c) => c,
+        None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
+    };
+
+    let kb = match crate::neotrix::nt_memory_kb::KnowledgeBase::new(conn) {
+        Ok(k) => k,
+        Err(e) => return CommandOutput::err(&format!("知识库初始化失败: {}", e)),
+    };
+
+    match kb.ensure_embeddings() {
+        Ok(count) => {
+            if count == 0 {
+                CommandOutput::ok("所有节点已有嵌入向量")
+            } else {
+                CommandOutput::ok(&format!("成功为 {} 个节点生成嵌入向量", count))
+            }
+        }
+        Err(e) => CommandOutput::err(&format!("嵌入生成失败: {}", e)),
+    }
 }
 
 /// /kb distill [--pairs N] [--epochs N] — DistilVDR 蒸馏学生训练 (R-P79 生产接线)。

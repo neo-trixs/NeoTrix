@@ -298,8 +298,12 @@ impl CheckpointPersistence {
         
         let count = expired.len();
         for id in &expired {
+            // 删除文件
+            let file_path = std::path::Path::new(&self.config.storage_path)
+                .join(format!("{}.json", id));
+            let _ = std::fs::remove_file(file_path); // 忽略删除错误（文件可能不存在）
+            
             self.index.remove(id);
-            // TODO: 实际删除文件
         }
         
         count
