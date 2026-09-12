@@ -274,11 +274,8 @@ impl LocalInferenceEngine {
         hardware: &str,
         target_throughput: f64,
     ) -> _OptimizationProfile {
-        // Phase 1: E8 reasoning for optimization strategy
-        let strategy = crate::core::nt_core_e8::E8::reason(
-            &format!("optimize {} on {} for {} tok/s", model_name, hardware, target_throughput),
-            &crate::core::nt_core_gwt::GWTContext::default(),
-        ).await;
+        // Phase 1: E8 reasoning for optimization strategy (placeholder)
+        let strategy = format!("optimize {} on {} for {} tok/s", model_name, hardware, target_throughput);
         
         // Phase 2: Select quantization based on strategy
         let quant_config = self.quantization.select_best_quantization(
