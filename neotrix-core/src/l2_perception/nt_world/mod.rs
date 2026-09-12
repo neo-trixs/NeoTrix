@@ -72,9 +72,6 @@ pub mod nt_nlp_keyword;
 pub mod nt_nlp_tokenizer;
 pub mod nt_nlp_sentiment;
 
-// 主体库管理
-pub mod asset_registry;
-
 // 通用能力模块
 pub mod media_asset_registry;
 

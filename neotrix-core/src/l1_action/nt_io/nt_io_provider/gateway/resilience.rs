@@ -85,10 +85,6 @@ impl CircuitBreaker {
     pub fn record_failure(&self) {
         let count = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
         *self.last_failure.lock().unwrap() = Some(Instant::now());
-        if self.state.load(Ordering::Relaxed) {
-            // Already open — stay open, reset cooldown
-            return;
-        }
         if count >= self.threshold {
             self.state.store(true, Ordering::Relaxed);
         }
@@ -100,18 +96,10 @@ impl CircuitBreaker {
             *self.last_failure.lock().unwrap() = Some(Instant::now());
             return;
         }
-        let calls = self.half_open_calls.fetch_add(1, Ordering::Relaxed) + 1;
-        if self.state.load(Ordering::Relaxed) {
-            // half-open probe failed → 回退 open
+        let count = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
+        *self.last_failure.lock().unwrap() = Some(Instant::now());
+        if count >= self.threshold {
             self.state.store(true, Ordering::Relaxed);
-            *self.last_failure.lock().unwrap() = Some(Instant::now());
-            self.half_open_calls.store(0, Ordering::Relaxed);
-        } else {
-            let count = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
-            *self.last_failure.lock().unwrap() = Some(Instant::now());
-            if count >= self.threshold {
-                self.state.store(true, Ordering::Relaxed);
-            }
         }
     }
 
