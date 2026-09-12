@@ -11,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use neotrix::neotrix::nt_memory_kb::nt_memory_resource_ingest::*;
 use neotrix::neotrix::nt_memory_kb::nt_memory_types::*;
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
-use neotrix::neotrix::nt_shanhai_geo::*;
+use neotrix::neotrix::nt_memory_kb::nt_memory_shanhai::*;
 use rusqlite::Connection;
 use uuid::Uuid;
 

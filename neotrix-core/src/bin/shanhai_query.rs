@@ -1,6 +1,6 @@
 //! neotrix-shanhai-query — 山海世界数据查询与GeoJSON导出
 //!
-//! 薄壳: 查询逻辑已吸收归档到 `nt_shanhai_geo::query` (R-P42)。
+//! 薄壳: 查询逻辑已吸收归档到 `nt_memory_shanhai::query` (R-P42)。
 //!
 //! Usage:
 //!   cargo run -p neotrix --bin neotrix-shanhai-query stats
@@ -12,7 +12,7 @@
 
 #![forbid(unsafe_code)]
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
-use neotrix::neotrix::nt_shanhai_geo::{export_geojson, shanhai_evidence, shanhai_mappings, shanhai_peaks, shanhai_schools, shanhai_stats};
+use neotrix::neotrix::nt_memory_kb::nt_memory_shanhai::{export_geojson, shanhai_evidence, shanhai_mappings, shanhai_peaks, shanhai_schools, shanhai_stats};
 use rusqlite::Connection;
 
 fn open_kb() -> Connection {

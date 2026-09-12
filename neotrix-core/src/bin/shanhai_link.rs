@@ -1,12 +1,12 @@
 //! neotrix-shanhai-link — 跨引用关系推断
 //!
-//! 薄壳: 推断逻辑已吸收归档到 `nt_shanhai_geo::linking` (R-P42)。
+//! 薄壳: 推断逻辑已吸收归档到 `nt_memory_shanhai::linking` (R-P42)。
 //!
 //! Usage: cargo run -p neotrix --bin neotrix-shanhai-link
 
 #![forbid(unsafe_code)]
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
-use neotrix::neotrix::nt_shanhai_geo::{infer_shanhai_links, shanhai_edge_count};
+use neotrix::neotrix::nt_memory_kb::nt_memory_shanhai::{infer_shanhai_links, shanhai_edge_count};
 use rusqlite::Connection;
 
 fn open_kb() -> Connection {

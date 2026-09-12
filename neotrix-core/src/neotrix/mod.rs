@@ -34,7 +34,6 @@ pub mod nt_core_event_bus;
 pub use crate::l5_cognition::nt_core::nt_consciousness_core;
 
 // ─── Standalone modules at neotrix level ────────────────────────────────
-pub mod nt_shanhai_geo;
 pub mod nt_harness;
 pub mod nt_file_ability;
 pub mod proxy_daemon_wrapper;
@@ -77,6 +76,7 @@ pub use crate::l1_action::nt_act::nt_act_autonomy::nt_mind_automation::{
 pub use crate::l1_action::nt_memory::{
     nt_memory_historian, nt_memory_kb, nt_memory_leann_store,
 };
+pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_shanhai;
 pub use crate::l1_action::nt_memory_spatial;
 
 // L2 Perception — nt_world re-exports

@@ -1,4 +1,4 @@
-use crate::neotrix::nt_shanhai_geo::types::*;
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_shanhai::types::*;
 
 /// Mountains that have been identified with moderate-to-high confidence
 /// by one or more scholarly schools.

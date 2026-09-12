@@ -712,7 +712,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                            match crate::neotrix::nt_shanhai_geo::geo_sync::sync_shanhai_to_geo(&conn) {
+                            match crate::l1_action::nt_memory::nt_memory_kb::nt_memory_shanhai::geo_sync::sync_shanhai_to_geo(&conn) {
                                 Ok(n) => CommandOutput::ok(&format!(
                                     "🌍 地理索引同步: {} 条坐标入库 (shanhai 山峰+全球映射)",
                                     n

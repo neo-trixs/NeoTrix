@@ -1,14 +1,14 @@
 //! neotrix-shanhai-geo — 山海世界地理坐标系统
 //!
 //! Populates the KB with coordinate data and geographic mappings
-//! from the nt_shanhai_geo module.
+//! from the nt_memory_shanhai module.
 //!
 //! Usage: cargo run -p neotrix --bin neotrix-shanhai-geo
 
 #![forbid(unsafe_code)]
 use neotrix::neotrix::nt_memory_kb::nt_memory_types::*;
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
-use neotrix::neotrix::nt_shanhai_geo::*;
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_shanhai::*;
 use rusqlite::Connection;
 
 fn main() {

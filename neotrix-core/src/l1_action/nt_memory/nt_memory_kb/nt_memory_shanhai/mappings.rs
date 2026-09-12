@@ -1,4 +1,4 @@
-use crate::neotrix::nt_shanhai_geo::types::*;
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_shanhai::types::*;
 
 /// All known global place mappings with scholarly attributions.
 pub fn all_mappings() -> Vec<PlaceMapping> {
