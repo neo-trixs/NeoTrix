@@ -75,7 +75,7 @@ impl Quest {
 
     pub fn update_progress(&mut self, item_id: u32, count: u32) {
         for obj in &mut self.objectives {
-            if obj.target_id == Some(item_id) && !obj.completed {
+            if !obj.completed && (obj.target_id == Some(item_id) || obj.target_id.is_none()) {
                 obj.current_count = (obj.current_count + count).min(obj.target_count);
                 if obj.current_count >= obj.target_count {
                     obj.completed = true;
@@ -160,7 +160,7 @@ impl QuestDatabase {
         self.register(Quest::new(11, "Community Builder", "Reach 500 resonance with any NPC", QuestType::Side, "Empathy")
             .add_objective("Build resonance", None, 500)
             .add_reward(QuestReward::Gold(500))
-            .add_reward(QuestReward::Unlock("Special Dialogues".to_string()));
+            .add_reward(QuestReward::Unlock("Special Dialogues".to_string())));
 
         self.register(Quest::new(12, "Master Crafter", "Craft 20 items", QuestType::Side, "Creativity")
             .add_objective("Craft items", Some(2001), 20)
@@ -175,7 +175,7 @@ impl QuestDatabase {
         self.register(Quest::new(14, "Recipe Collector", "Discover 10 crafting recipes", QuestType::Side, "Creativity")
             .add_objective("Discover recipes", Some(2002), 10)
             .add_reward(QuestReward::Gold(300))
-            .add_reward(QuestReward::Unlock("Recipe Book Upgrade".to_string()));
+            .add_reward(QuestReward::Unlock("Recipe Book Upgrade".to_string())));
 
         self.register(Quest::new(15, "Nature's Friend", "Befriend all 4 NPCs to at least Friend level", QuestType::Side, "Empathy")
             .add_objective("Friend with Awareness", None, 750)

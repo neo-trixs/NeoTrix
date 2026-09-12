@@ -1872,7 +1872,7 @@ impl KnowledgeBase {
 
     /// 三值可见性过滤的检索入口 (x-algorithm visibility-filtering 吸收):
     /// 在 `hybrid_rerank_search` 之后对候选做 ALLOW/INTERSTITIAL/DROP 末端裁定。
-    /// 返回 (可展示结果, 可见性裁定)。仅 Allow/Interstitial 进入可展示集。
+    /// 仅执行一次查询，复用结果做可见性过滤，返回通过裁定的可展示结果。
     pub fn search_with_visibility(
         &self,
         query: &str,
