@@ -527,12 +527,12 @@ pub(crate) fn network_access_allowed(provider_type: LlmProviderType, base_url: O
     }
     match crate::cli::shield_enforcer::global_shield().lock() {
         Ok(shield) => match shield.policy.evaluate_network(&host) {
-            crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Allow => true,
-            crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::RequireConfirmation => {
+            crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::Allow => true,
+            crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::RequireConfirmation => {
                 log::info!("[network-isolation] provider domain '{}' requires confirmation — allowing", host);
                 true
             }
-            crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Deny => {
+            crate::l3_embodiment::nt_shield::core::policy::PolicyDecision::Deny => {
                 log::warn!("[network-isolation] BLOCKED provider domain '{}' (not in allowlist, default deny)", host);
                 false
             }

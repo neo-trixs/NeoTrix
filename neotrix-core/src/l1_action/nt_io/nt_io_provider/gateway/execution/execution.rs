@@ -4,13 +4,14 @@ use crate::core::l0_substrate::nt_core_error::recovery::{ErrorContext, ErrorType
 use crate::core::nt_core_cache::text_to_embedding;
 use crate::core::nt_core_span::{SpanKind, Tracer};
 
-use super::super::pool::account_pool::AccountPoolError;
-use super::super::routing::agent_routing::ModelTier;
-use super::super::health::circuit_breaker::BreakerState;
-use super::super::health::context_budget::estimate_tokens;
-use super::super::pool::free_pool::global_free_pool;
-use super::super::health::rate_limiter::BrainTier;
-use super::super::common::privacy_guard::{egress_privacy_guard, trust_from_name};
+use crate::l1_action::nt_io::nt_io_provider::pool::account_pool::AccountPoolError;
+use crate::l1_action::nt_io::nt_io_provider::gateway::routing::agent_routing::ModelTier;
+use crate::l1_action::nt_io::nt_io_provider::health::circuit_breaker::BreakerState;
+use crate::l1_action::nt_io::nt_io_provider::health::context_budget::estimate_tokens;
+use crate::l1_action::nt_io::nt_io_provider::pool::free_pool::global_free_pool;
+use crate::l1_action::nt_io::nt_io_provider::health::rate_limiter::BrainTier;
+use crate::l1_action::nt_io::nt_io_provider::common::privacy_guard::{egress_privacy_guard, trust_from_name};
+use crate::l1_action::nt_io::nt_io_provider::gateway::types::registry_core::AttemptPhase;
 use super::*;
 
 /// 检测 provider 返回的维护窗提示 (如 empero "switching to new models" / "retrying in"),

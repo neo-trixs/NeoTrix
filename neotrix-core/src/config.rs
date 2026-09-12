@@ -1,4 +1,4 @@
-use crate::l3_embodiment::nt_shield::shield_core::key_encryption;
+use crate::l3_embodiment::nt_shield::core::key_encryption;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

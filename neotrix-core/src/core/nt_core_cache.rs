@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -40,6 +41,45 @@ struct EmbeddingEntry {
     hit_count: u64,
 }
 
+/// 缓存统计 trait — 为所有缓存实现提供统一的可观测性接口
+pub trait CacheStats {
+    /// 缓存命中次数
+    fn hits(&self) -> u64;
+    /// 缓存未命中次数
+    fn misses(&self) -> u64;
+    /// 淘汰次数
+    fn evictions(&self) -> u64;
+    /// 命中率 (0.0 - 1.0)
+    fn hit_rate(&self) -> f64 {
+        let total = self.hits() + self.misses();
+        if total == 0 {
+            0.0
+        } else {
+            self.hits() as f64 / total as f64
+        }
+    }
+    /// 重置统计计数器
+    fn reset_stats(&mut self);
+}
+
+/// 缓存统计快照 — 用于导出和报告
+#[derive(Debug, Clone, Default)]
+pub struct CacheStatsSnapshot {
+    pub hits: u64,
+    pub misses: u64,
+    pub evictions: u64,
+    pub hit_rate: f64,
+    pub size: usize,
+    pub capacity: usize,
+}
+
+#[derive(Debug, Default)]
+struct CacheStatsInner {
+    hits: AtomicU64,
+    misses: AtomicU64,
+    evictions: AtomicU64,
+}
+
 /// Two-tier cache: exact-match via string key + semantic via embedding cosine similarity.
 ///
 /// The exact tier (entries) is the primary storage used by the Gateway for identical prompt hits.
@@ -55,6 +95,7 @@ pub struct SemanticCache {
     ttl_secs: u64,
     semantic_threshold: f64,
     eviction_policy: EvictionPolicy,
+    stats: CacheStatsInner,
 }
 
 impl std::fmt::Debug for SemanticCache {
@@ -76,6 +117,7 @@ impl SemanticCache {
             ttl_secs: config.ttl_secs,
             semantic_threshold: 0.98,
             eviction_policy: config.eviction_policy,
+            stats: CacheStatsInner::default(),
         }
     }
 
@@ -91,13 +133,19 @@ impl SemanticCache {
 
     pub fn get_exact(&self, namespace: &str, key: &str) -> Option<String> {
         let full_key = format!("{}:{}", namespace, key);
-        self.entries.get(&full_key).and_then(|e| {
+        let result = self.entries.get(&full_key).and_then(|e| {
             if e.inserted_at.elapsed().as_secs() > self.ttl_secs {
                 None
             } else {
                 Some(e.value.clone())
             }
-        })
+        });
+        if result.is_some() {
+            self.stats.hits.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.stats.misses.fetch_add(1, Ordering::Relaxed);
+        }
+        result
     }
 
     pub fn set_exact(&mut self, namespace: &str, key: &str, value: String) {
@@ -192,12 +240,17 @@ impl SemanticCache {
             Some(key) if best_sim >= self.semantic_threshold => {
                 if let Some(entry) = self.embedding_entries.get_mut(&key) {
                     entry.hit_count += 1;
+                    self.stats.hits.fetch_add(1, Ordering::Relaxed);
                     Some(entry.value.as_str())
                 } else {
+                    self.stats.misses.fetch_add(1, Ordering::Relaxed);
                     None
                 }
             }
-            _ => None,
+            _ => {
+                self.stats.misses.fetch_add(1, Ordering::Relaxed);
+                None
+            }
         }
     }
 
@@ -215,6 +268,7 @@ impl SemanticCache {
                     .map(|(k, _)| *k);
                 if let Some(key) = victim {
                     self.embedding_entries.remove(&key);
+                    self.stats.evictions.fetch_add(1, Ordering::Relaxed);
                 }
             }
             EvictionPolicy::Lru => {
@@ -225,6 +279,7 @@ impl SemanticCache {
                     .map(|(k, _)| *k);
                 if let Some(key) = victim {
                     self.embedding_entries.remove(&key);
+                    self.stats.evictions.fetch_add(1, Ordering::Relaxed);
                 }
             }
         }
@@ -237,6 +292,35 @@ impl SemanticCache {
 
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty() && self.embedding_entries.is_empty()
+    }
+
+    /// 导出缓存统计快照
+    pub fn snapshot(&self) -> CacheStatsSnapshot {
+        CacheStatsSnapshot {
+            hits: self.hits(),
+            misses: self.misses(),
+            evictions: self.evictions(),
+            hit_rate: self.hit_rate(),
+            size: self.entries.len() + self.embedding_entries.len(),
+            capacity: self.capacity,
+        }
+    }
+}
+
+impl CacheStats for SemanticCache {
+    fn hits(&self) -> u64 {
+        self.stats.hits.load(Ordering::Relaxed)
+    }
+    fn misses(&self) -> u64 {
+        self.stats.misses.load(Ordering::Relaxed)
+    }
+    fn evictions(&self) -> u64 {
+        self.stats.evictions.load(Ordering::Relaxed)
+    }
+    fn reset_stats(&mut self) {
+        self.stats.hits.store(0, Ordering::Relaxed);
+        self.stats.misses.store(0, Ordering::Relaxed);
+        self.stats.evictions.store(0, Ordering::Relaxed);
     }
 }
 

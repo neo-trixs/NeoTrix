@@ -1581,8 +1581,8 @@ impl BackgroundLoopHandle {
             ),
         ));
         self_tests.register(Box::new(ConsciousnessBridge::new()));
-        self_tests.register(crate::l3_embodiment::nt_shield::shield_core::browser_security::create_browser_security_self_test());
-        self_tests.register(crate::l3_embodiment::nt_shield::shield_core::check_registry::create_check_registry_self_test());
+        self_tests.register(crate::l3_embodiment::nt_shield::core::browser_security::create_browser_security_self_test());
+        self_tests.register(crate::l3_embodiment::nt_shield::core::check_registry::create_check_registry_self_test());
         // ── P0 加密 CoT 生命周期守卫 (2608.09867, T2 注册) ──
         // CohGuard 会话绑定校验 + ReasoningTraceGuard 四项防护。T3 接线:
         // handle_architecture_audit 下方 scan_protected 消费 (生产路径)。
@@ -1986,7 +1986,7 @@ impl BackgroundLoopHandle {
         }
         // NT-SHIELD: 检查注册表
         let shield_ok =
-            crate::l3_embodiment::nt_shield::shield_core::check_registry::create_check_registry_self_test()
+            crate::l3_embodiment::nt_shield::core::check_registry::create_check_registry_self_test()
                 .self_test()
                 .is_ok();
         results.push(if shield_ok {

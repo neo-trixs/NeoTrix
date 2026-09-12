@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 
-use super::super::types::Message;
+use super::super::execution::universal_adapter::Message;
 
 /// G: Response Caching — LRU 响应缓存, key 为 (model_id, messages) 的哈希。
 /// 容量默认 256 条, 超出按最久未使用 (LRU) 驱逐; 命中/未命中计数器暴露给遥测。

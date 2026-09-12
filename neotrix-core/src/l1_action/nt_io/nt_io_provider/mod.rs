@@ -68,7 +68,7 @@ pub use common::types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, Tool,
     ToolCallFunction, ToolCallInfo, Usage,
 };
-pub use common::context_budget::{apply_context_budget, estimate_messages_tokens, estimate_tokens};
+pub use health::context_budget::{apply_context_budget, estimate_messages_tokens, estimate_tokens};
 pub use common::{factory, generation_classifier, privacy_guard, types};
 
 // ── 健康 / 限流 / 熔断 ─────────────────────────────────────

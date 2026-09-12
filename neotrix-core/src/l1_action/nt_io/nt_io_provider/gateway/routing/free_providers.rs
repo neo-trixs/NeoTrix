@@ -1,4 +1,4 @@
-use super::super::super::common::types::*;
+use crate::l1_action::nt_io::nt_io_provider::common::types::*;
 use crate::neotrix::nt_io_http_factory::global_client;
 
 const GROQ_BASE: &str = "https://api.groq.com/openai/v1";

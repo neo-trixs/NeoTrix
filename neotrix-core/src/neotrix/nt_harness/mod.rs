@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::core::nt_core_consciousness_core::TaskLoopReport;
-use crate::l3_embodiment::nt_shield::shield_core::receipt::AgentReceipt;
+use crate::l3_embodiment::nt_shield::core::receipt::AgentReceipt;
 
 /// `AgentReceipt` 的可序列化镜像 — 与 `HarnessExecuteResponse` 共用同一 serde 实例,
 /// 避免跨 crate 的 serde 实例不匹配 (test build 下 `config::_serde` 与 workspace `serde` 冲突)。
@@ -266,7 +266,7 @@ impl HarnessGateway {
         );
         // 可验证回放收据: agent 运行完成边界, 绑定 instruction(输入)+message(输出)。
         // run_id 用 instruction 的哈希, 保证同一指令可审计回放。
-        let run_id = crate::l3_embodiment::nt_shield::shield_core::receipt::hash_content(&req.instruction);
+        let run_id = crate::l3_embodiment::nt_shield::core::receipt::hash_content(&req.instruction);
         let receipt = AgentReceipt::emit(&run_id, &req.instruction, &message);
         // 镜像为可序列化结构 (与 HarnessExecuteResponse 同 serde 实例), 字段 1:1 对应。
         let receipt = AgentRunReceipt {
@@ -478,6 +478,6 @@ mod tests {
         assert!(receipt.verify(), "agent 运行收据应能通过签名完整性校验");
         // 输入应绑定 instruction, 输出应绑定 message
         assert!(receipt.input_hash.len() == 64, "input 为 instruction 的 SHA-256");
-        assert_eq!(receipt.output_hash, crate::l3_embodiment::nt_shield::shield_core::receipt::hash_content(&resp.message));
+        assert_eq!(receipt.output_hash, crate::l3_embodiment::nt_shield::core::receipt::hash_content(&resp.message));
     }
 }

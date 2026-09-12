@@ -27,6 +27,16 @@ pub struct Span {
     _parent_id: Option<u64>,
     attributes: Mutex<Vec<(String, AttributeValue)>>,
     start: Instant,
+
+    // GenAI semconv dedicated fields
+    pub gen_ai_operation_name: Option<String>,
+    pub gen_ai_provider_name: Option<String>,
+    pub gen_ai_request_stream: bool,
+    pub gen_ai_response_id: Option<String>,
+    pub gen_ai_response_model: Option<String>,
+    pub gen_ai_response_finish_reasons: Vec<String>,
+    pub gen_ai_usage_input_tokens: Option<u64>,
+    pub gen_ai_usage_output_tokens: Option<u64>,
 }
 
 impl Span {
@@ -38,6 +48,14 @@ impl Span {
             _parent_id,
             attributes: Mutex::new(Vec::new()),
             start: Instant::now(),
+            gen_ai_operation_name: None,
+            gen_ai_provider_name: None,
+            gen_ai_request_stream: false,
+            gen_ai_response_id: None,
+            gen_ai_response_model: None,
+            gen_ai_response_finish_reasons: Vec::new(),
+            gen_ai_usage_input_tokens: None,
+            gen_ai_usage_output_tokens: None,
         }
     }
 
@@ -66,6 +84,48 @@ impl Span {
             .lock()
             .ok()
             .and_then(|attrs| attrs.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone()))
+    }
+
+    // GenAI semconv setter methods
+
+    /// GenAI semconv: `gen_ai.operation.name` — operation name (e.g., "chat", "complete").
+    pub fn set_gen_ai_operation_name(&mut self, name: &str) {
+        self.gen_ai_operation_name = Some(name.to_string());
+    }
+
+    /// GenAI semconv: `gen_ai.provider.name` — provider name (e.g., "openai", "anthropic", "ollama").
+    pub fn set_gen_ai_provider_name(&mut self, name: &str) {
+        self.gen_ai_provider_name = Some(name.to_string());
+    }
+
+    /// GenAI semconv: `gen_ai.request.stream` — whether the request is streamed.
+    pub fn set_gen_ai_request_stream(&mut self, stream: bool) {
+        self.gen_ai_request_stream = stream;
+    }
+
+    /// GenAI semconv: `gen_ai.response.id` — response ID.
+    pub fn set_gen_ai_response_id(&mut self, id: &str) {
+        self.gen_ai_response_id = Some(id.to_string());
+    }
+
+    /// GenAI semconv: `gen_ai.response.model` — response model.
+    pub fn set_gen_ai_response_model(&mut self, model: &str) {
+        self.gen_ai_response_model = Some(model.to_string());
+    }
+
+    /// GenAI semconv: `gen_ai.response.finish_reasons` — finish reasons.
+    pub fn set_gen_ai_response_finish_reasons(&mut self, reasons: &[&str]) {
+        self.gen_ai_response_finish_reasons = reasons.iter().map(|s| s.to_string()).collect();
+    }
+
+    /// GenAI semconv: `gen_ai.usage.input_tokens` — input tokens count.
+    pub fn set_gen_ai_usage_input_tokens(&mut self, tokens: u64) {
+        self.gen_ai_usage_input_tokens = Some(tokens);
+    }
+
+    /// GenAI semconv: `gen_ai.usage.output_tokens` — output tokens count.
+    pub fn set_gen_ai_usage_output_tokens(&mut self, tokens: u64) {
+        self.gen_ai_usage_output_tokens = Some(tokens);
     }
 }
 

@@ -31,7 +31,11 @@ pub mod nt_act_voice;
 // Backward-compat re-exports
 // ============================================================================
 
-pub use actions::{action_cache as nt_act_action_cache, disk_guard as nt_act_disk_guard, media as nt_act_media, sandbox as nt_act_sandbox, security as nt_act_security};
+pub use actions::core::action_cache as nt_act_action_cache;
+pub use actions::security::disk_guard as nt_act_disk_guard;
+pub use actions::media::media as nt_act_media;
+pub use actions::security::sandbox as nt_act_sandbox;
+pub use actions::security::security as nt_act_security;
 
 pub mod resource_budget;
 pub mod temporal_continuity;
@@ -40,10 +44,10 @@ pub mod parallel_task;
 pub use resource_budget::CostManager;
 pub use temporal_continuity::ShotContinuityChecker;
 pub use parallel_task::TaskScheduler;
-pub use actions::production_orchestrator::BatchProductionManager;
+pub use actions::orchestration::production_orchestrator::BatchProductionManager;
 
-pub use actions::{error_classifier, observability_stack, cost_tracker, gpu_scheduler, model_router, multi_region_scheduler};
-pub use actions::{video_job_pipeline, video_object_storage, video_spec, video_stitcher, audio_orchestrator};
+pub use actions::infra::{error_classifier, observability_stack, cost_tracker, gpu_scheduler, model_router, multi_region_scheduler};
+pub use actions::video::{video_job_pipeline, video_object_storage, video_spec, video_stitcher, audio_orchestrator};
 
 pub mod pipeline_checkpointing;
 

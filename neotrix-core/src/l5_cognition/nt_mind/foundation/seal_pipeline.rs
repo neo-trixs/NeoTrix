@@ -194,13 +194,13 @@ impl crate::core::nt_core_self_test::SelfTest for L1SemanticEntropyGate {
 
 /// L1 implementation of _ActionSandboxContract
 pub struct L1ActionSandbox {
-    inner: crate::l1_action::nt_act::actions::sandbox::ActionSandbox,
+    inner: crate::l1_action::nt_act::actions::security::sandbox::ActionSandbox,
 }
 
 impl L1ActionSandbox {
     pub fn new() -> Self {
         Self {
-            inner: crate::l1_action::nt_act::actions::sandbox::ActionSandbox::new(),
+            inner: crate::l1_action::nt_act::actions::security::sandbox::ActionSandbox::new(),
         }
     }
 }
@@ -208,17 +208,17 @@ impl L1ActionSandbox {
 impl _ActionSandboxContract for L1ActionSandbox {
     fn evaluate(&mut self, action: &str) -> SandboxVerdict {
         match self.inner.evaluate(action) {
-            crate::l1_action::nt_act::actions::sandbox::SandboxVerdict::Approved => SandboxVerdict::Approved,
-            crate::l1_action::nt_act::actions::sandbox::SandboxVerdict::Denied => SandboxVerdict::Denied,
-            crate::l1_action::nt_act::actions::sandbox::SandboxVerdict::RequiresApproval => SandboxVerdict::RequiresApproval,
+            crate::l1_action::nt_act::actions::security::sandbox::SandboxVerdict::Approved => SandboxVerdict::Approved,
+            crate::l1_action::nt_act::actions::security::sandbox::SandboxVerdict::Denied => SandboxVerdict::Denied,
+            crate::l1_action::nt_act::actions::security::sandbox::SandboxVerdict::RequiresApproval => SandboxVerdict::RequiresApproval,
         }
     }
     
     fn evaluate_with_path(&mut self, action: &str) -> SandboxVerdict {
         match self.inner.evaluate_with_path(action) {
-            crate::l1_action::nt_act::actions::sandbox::SandboxVerdict::Approved => SandboxVerdict::Approved,
-            crate::l1_action::nt_act::actions::sandbox::SandboxVerdict::Denied => SandboxVerdict::Denied,
-            crate::l1_action::nt_act::actions::sandbox::SandboxVerdict::RequiresApproval => SandboxVerdict::RequiresApproval,
+            crate::l1_action::nt_act::actions::security::sandbox::SandboxVerdict::Approved => SandboxVerdict::Approved,
+            crate::l1_action::nt_act::actions::security::sandbox::SandboxVerdict::Denied => SandboxVerdict::Denied,
+            crate::l1_action::nt_act::actions::security::sandbox::SandboxVerdict::RequiresApproval => SandboxVerdict::RequiresApproval,
         }
     }
     
@@ -232,7 +232,7 @@ impl _ActionSandboxContract for L1ActionSandbox {
     
     fn new_sandbox() -> Self {
         Self {
-            inner: crate::l1_action::nt_act::actions::sandbox::ActionSandbox::new(),
+            inner: crate::l1_action::nt_act::actions::security::sandbox::ActionSandbox::new(),
         }
     }
 }
