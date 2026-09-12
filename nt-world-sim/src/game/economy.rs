@@ -1,5 +1,4 @@
 use crate::core::Resource;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct DailyEarning {
