@@ -1,3 +1,4 @@
+use crate::commands::model_pool::{self, ModelPoolEntry, ModelPoolStatus};
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};

@@ -61,18 +61,8 @@ pub mod hooks;
 // ACP (Agent Client Protocol) — IDE 集成协议
 pub mod acp;
 
-// L3 vendor skill modules (read-only capability branches)
-pub mod nt_io_ai_image_prompts;
-pub mod nt_io_cozyclay;
-pub mod nt_io_excalidraw;
-pub mod nt_io_generative_media_skills;
-pub mod nt_io_hermes_community;
-pub mod nt_io_hermes_quota;
-pub mod nt_io_pi_agent_desktop;
-pub mod nt_io_promo_bgm;
-pub mod nt_io_show_me;
-pub mod nt_io_unslop;
-pub mod nt_io_video_shotcraft;
+// L3 厂商技能 (read-only capability branches)
+pub mod l3_vendor_skills;
 
 // MCP server — 将 NT 能力暴露为 MCP 工具
 pub mod mcp_server;

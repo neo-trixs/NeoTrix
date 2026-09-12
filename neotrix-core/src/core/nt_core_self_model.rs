@@ -91,20 +91,48 @@ impl SelfModel {
 
     /// 价值函数：评估某个动作/状态相对自我价值权重的契合度。
     ///
-    /// TODO(T6): 当前为占位启发式——返回价值权重之和的归一化代理分，
-    /// 不解析 `action` 语义。真实实现应：
-    /// 1. 将 `action` 投影到各价值维度得分 (coherence/safety/growth)，
-    /// 2. 按 `value_weights` 加权求和并 clamp 到 [0,1]，
-    /// 3. 可结合 FEP 自由能 (nt_core_hcube::aif) 与 IIT Φ (nt_core_iit_phi)。
+    /// 将 action 文本投影到各价值维度得分，按 value_weights 加权求和。
+    /// 当前实现使用关键词匹配做简单投影；未来可结合 FEP/IIT 信号。
     pub fn value_function(&self, action: &str) -> f64 {
         if action.is_empty() {
             return 0.0;
         }
-        // 占位：权重总和恒为 1.0（归一化），以 action 长度做确定性的伪信号。
+        let action_lower = action.to_lowercase();
+
+        // 关键词投影：每个价值维度用关键词匹配计算得分
+        let dimension_scores: Vec<f64> = self.value_weights.iter().map(|vw| {
+            let keywords = match vw.dimension.as_str() {
+                "coherence" => vec!["consistent", "aligned", "unified", "coherent", "integrate"],
+                "safety" => vec!["safe", "secure", "protect", "guard", "defend", "harden"],
+                "growth" => vec!["learn", "evolve", "improve", "grow", "adapt", "optimize"],
+                "efficiency" => vec!["fast", "efficient", "optimize", "cache", "batch", "parallel"],
+                "autonomy" => vec!["autonomous", "self", "independent", "decide", "choose"],
+                _ => vec![], // 未知维度得 0 分
+            };
+
+            // 匹配关键词数量 / 总关键词数 = 维度得分
+            let matches = keywords.iter()
+                .filter(|kw| action_lower.contains(*kw))
+                .count();
+            if keywords.is_empty() {
+                0.5 // 未知维度给中性分
+            } else {
+                (matches as f64) / (keywords.len() as f64)
+            }
+        }).collect();
+
+        // 加权求和
         let total_weight: f64 = self.value_weights.iter().map(|w| w.weight).sum();
-        let _ = total_weight; // 预留真实加权逻辑
-        let signal = (action.len() as f64).clamp(0.0, 64.0) / 64.0;
-        signal.clamp(0.0, 1.0)
+        if total_weight <= 0.0 {
+            return 0.5; // 无权重时返回中性分
+        }
+
+        let weighted_sum: f64 = dimension_scores.iter()
+            .zip(self.value_weights.iter())
+            .map(|(score, vw)| score * vw.weight)
+            .sum();
+
+        (weighted_sum / total_weight).clamp(0.0, 1.0)
     }
 
     /// SEAL 钩子：候选行为变更产出后更新自我模型。
