@@ -1,4 +1,4 @@
-use crate::engine::renderer::{Color, Vec2, Rect, DrawCommand};
+use crate::engine::renderer::{Color, Rect, DrawCommand};
 use std::collections::HashMap;
 
 pub struct SpriteBatchExt {
@@ -6,6 +6,7 @@ pub struct SpriteBatchExt {
     pub max_batch_size: usize,
 }
 
+#[derive(Clone)]
 pub struct BatchEntry {
     pub x: f32,
     pub y: f32,
@@ -43,7 +44,7 @@ impl SpriteBatchExt {
         for (texture, entries) in &self.batches {
             let mut sorted = entries.clone();
             sorted.sort_by_key(|e| e.z_order);
-            for entry in &sorted {
+            for entry in sorted {
                 cmds.push(DrawCommand::DrawSprite {
                     texture: texture.clone(),
                     dest: Rect::new(entry.x, entry.y, entry.width, entry.height),

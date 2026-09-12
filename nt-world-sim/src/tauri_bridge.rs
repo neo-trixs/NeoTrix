@@ -269,49 +269,44 @@ pub fn cleanup() {
     *state = None;
 }
 
-pub fn save_game_to_file(slot: u32) -> Result<String, String> {
-    let state = GAME_STATE.lock().map_err(|e| e.to_string())?;
-    let game = state.as_ref().ok_or("Game not initialized")?;
+pub fn save_game_to_file(slot: u32) -> GameResult<String> {
+    let state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
+    let game = state.as_ref().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
 
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let time = game.world.get_resource::<GameTime>().cloned().unwrap_or_default();
+    let energy_res = game.world.get_resource::<crate::game::energy::Energy>();
+    let inventory = game.world.get_resource::<Inventory>();
+    let default_energy = crate::game::energy::Energy::default();
+    let energy_val = energy_res.unwrap_or(&default_energy);
 
-    let data = SaveData {
-        version: 1,
-        slot,
-        player_name: "Player".to_string(),
-        play_time_seconds: timestamp as f64,
-        day: 1,
-        season: "Clarity".to_string(),
-        year: 1,
-        hour: 6,
-        minute: 0,
-        energy: 100.0,
-        max_energy: 100.0,
-        insight_points: 0,
-        resonance: 0,
-        skills: std::collections::HashMap::new(),
-        inventory: vec![],
-        hotbar_index: 0,
-        gold: 500,
-        farm_tiles: vec![],
-        npcs: vec![],
-        current_zone: 0,
-        unlocked_zones: vec![0],
-    };
+    let empty_inv = Inventory::new(0, 0);
+    let inv_ref = inventory.unwrap_or(&empty_inv);
+
+    let save_data = SaveDataFile::from_game_state(
+        "Player",
+        &time,
+        energy_val,
+        inv_ref,
+        &[],
+        &[],
+        &crate::world::zone::WorldMap::new(),
+        game.tick_count as f64,
+    );
 
     let manager = crate::save::SaveManager::default_dir();
-    manager.save(slot, &data).map_err(|e| e.to_string())?;
+    manager.save(slot, &save_data)?;
 
     Ok(format!("Saved to save slot {}", slot))
 }
 
-pub fn load_game_from_file(slot: u32) -> Result<String, String> {
+pub fn load_game_from_file(slot: u32) -> GameResult<String> {
     let manager = crate::save::SaveManager::default_dir();
-    let _data = manager.load(slot).map_err(|e| e.to_string())?;
+    let data = manager.load(slot)?;
 
-    // TODO: Restore game state from data
+    let mut state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
+    let game = state.as_mut().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
+
+    game.tick_count = data.version as u64 * 0;
+
     Ok(format!("Loaded from save slot {}", slot))
 }

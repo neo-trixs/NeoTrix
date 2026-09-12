@@ -284,10 +284,10 @@ impl GameLoop {
                 }
             }
             GameAction::Save => {
-                self.save_game();
+                let _ = self.save_game();
             }
             GameAction::Load => {
-                self.load_game();
+                let _ = self.load_game();
             }
         }
     }
@@ -366,12 +366,29 @@ impl GameLoop {
         }
     }
 
-    pub fn save_game(&self) {
-        println!("Game saved at tick {}", self.tick_count);
+    pub fn save_game(&self) -> crate::error::GameResult<()> {
+        let manager = crate::save::SaveManager::default_dir();
+        let time = self.world.get_resource::<super::time::GameTime>().cloned().unwrap_or_default();
+        let energy = self.world.get_resource::<super::energy::Energy>().cloned().unwrap_or_default();
+        let inventory = self.world.get_resource::<Inventory>().cloned().unwrap_or(Inventory::new(0, 0));
+        let save_data = crate::save::SaveData::from_game_state(
+            "Player",
+            &time,
+            &energy,
+            &inventory,
+            &[],
+            &[],
+            &crate::world::zone::WorldMap::new(),
+            self.tick_count as f64,
+        );
+        manager.save(0, &save_data)
     }
 
-    pub fn load_game(&mut self) {
-        println!("Game loaded");
+    pub fn load_game(&mut self) -> crate::error::GameResult<()> {
+        let manager = crate::save::SaveManager::default_dir();
+        let data = manager.load(0)?;
+        self.tick_count = data.tick_count;
+        Ok(())
     }
 
     pub fn process_raw_input(&mut self, pressed_keys: &[InputKeyCode]) {

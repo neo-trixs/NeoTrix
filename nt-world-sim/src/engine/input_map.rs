@@ -260,7 +260,7 @@ impl InputMap {
             dx += 1.0;
         }
         if dx != 0.0 && dy != 0.0 {
-            let len = (dx * dx + dy * dy).sqrt();
+            let len: f32 = ((dx * dx + dy * dy) as f32).sqrt();
             dx /= len;
             dy /= len;
         }
@@ -341,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bind.unbind() {
+    fn test_bind_unbind() {
         let mut map = InputMap::new();
         map.bind_action(
             InputAction::Tool1,
