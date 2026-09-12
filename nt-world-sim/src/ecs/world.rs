@@ -171,8 +171,8 @@ impl World {
             .iter()
             .enumerate()
             .filter_map(|(id, &gen)| {
-                if gen.is_some() {
-                    Some(Entity::new(id as u32, gen))
+                if let Some(generation) = gen {
+                    Some(Entity::new(id as u32, generation))
                 } else {
                     None
                 }

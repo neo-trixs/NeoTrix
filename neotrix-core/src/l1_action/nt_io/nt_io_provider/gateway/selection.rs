@@ -381,7 +381,7 @@ impl GatewayV2 {
             self.reconcile_pool_from_catalog(cooldown_secs).await;
             log::info!(
                 "[gateway] {}",
-                super::pool_health::LlmPoolHealth::summarize(self, min_free)
+                super::LlmPoolHealth::summarize(self, min_free)
             );
         }
     }

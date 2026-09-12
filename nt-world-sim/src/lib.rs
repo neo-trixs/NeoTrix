@@ -3,6 +3,7 @@ pub mod engine;
 pub mod mechanics;
 
 pub use ecs::{Entity, World, System, SystemScheduler};
+pub use ecs::world::Component;
 pub use engine::{
     Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer,
     BodyType, RigidBody, Collider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld,
@@ -65,17 +66,17 @@ impl GameEngine {
     }
 
     /// 添加组件
-    pub fn add_component<T: ecs::Component + 'static>(&mut self, entity: Entity, component: T) {
+    pub fn add_component<T: Component + 'static>(&mut self, entity: Entity, component: T) {
         self.world.insert_component(entity, component);
     }
 
     /// 获取组件
-    pub fn get_component<T: ecs::Component + 'static>(&self, entity: Entity) -> Option<&T> {
+    pub fn get_component<T: Component + 'static>(&self, entity: Entity) -> Option<&T> {
         self.world.get_component(entity)
     }
 
     /// 获取可变组件
-    pub fn get_component_mut<T: ecs::Component + 'static>(
+    pub fn get_component_mut<T: Component + 'static>(
         &mut self,
         entity: Entity,
     ) -> Option<&mut T> {

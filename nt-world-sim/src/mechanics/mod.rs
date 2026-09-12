@@ -107,7 +107,7 @@ impl MaslowNeeds {
             ("esteem", self.esteem),
             ("self_actualization", self.self_actualization),
         ];
-        levels
+        *levels
             .iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .unwrap()

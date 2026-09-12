@@ -41,7 +41,9 @@ mod plugin;
 
 // ── Types & Registry ─────────────────────────────────────────
 mod benchmark;
+mod pool_health;
 mod registry_core;
+mod response_quality;
 
 // ── Feature-gated ────────────────────────────────────────────
 #[cfg(feature = "stealth-net")]
@@ -53,7 +55,7 @@ pub use intelligence::*;
 pub use market_router::*;
 pub use routing_utils::*;
 // Resilience
-pub use drift::*;
+use drift::*;
 pub use health::*;
 pub use resilience::*;
 pub use response_cache::*;

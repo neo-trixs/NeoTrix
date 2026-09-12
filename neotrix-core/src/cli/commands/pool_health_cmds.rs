@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
-use crate::neotrix::nt_io_provider::gateway::pool_health::LlmPoolHealth;
+use crate::neotrix::nt_io_provider::gateway::LlmPoolHealth;
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 pub struct PoolHealthCmd;

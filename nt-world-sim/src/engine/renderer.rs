@@ -44,7 +44,7 @@ impl Color {
 }
 
 /// 2D 向量
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32,
