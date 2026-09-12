@@ -6,6 +6,7 @@ import { ConfirmModal, type ModalReq } from './ConfirmModal'
 import { tagsStore, RECOMMENDED_TAGS } from '../stores/tags'
 import { memory, neocodex, errText, fs as fsApi } from '../api'
 import { storageGet, storageSet } from '../lib/env'
+import { themeMode, setThemeMode } from '../stores/theme'
 import type { MemoryStats, ProviderConfig, ProviderMeta, CustomProviderReq } from '../api/types'
 import { GeneralSection } from './settings/GeneralSection'
 import { ModelsSection } from './settings/ModelsSection'
@@ -658,6 +659,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   setMotion={setMotion}
                   setDensity={setDensity}
                   setMessageWidth={setMessageWidth}
+                  themeMode={themeMode}
+                  setThemeMode={setThemeMode}
                 />
               </Show>
               <Show when={section() === 'market'}>

@@ -1,5 +1,10 @@
 use super::renderer::{Vec2, Rect};
-use crate::ecs::Entity;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Entity {
+    pub id: u32,
+    pub generation: u32,
+}
 
 /// 刚体类型
 #[derive(Debug, Clone, Copy, PartialEq)]

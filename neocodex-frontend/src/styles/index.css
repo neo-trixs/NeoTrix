@@ -2657,6 +2657,15 @@
   --text-primary: #1f2937;
   --text-secondary: #374151;
   --text-muted: #6b7280;
+  /* Tailwind 语义色 CSS 变量 — dark mode 由 :root[data-theme-mode="dark"] 覆盖 */
+  --tw-bg-primary: #fbfaf7;
+  --tw-bg-secondary: #f5f3ef;
+  --tw-bg-tertiary: #efedea;
+  --tw-text-primary: #1a1a20;
+  --tw-text-secondary: #5a5a62;
+  --tw-text-muted: #909098;
+  --tw-border-primary: #e5e4e0;
+  --tw-border-focus: #f0913a;
 }
 [data-theme='gold'],
 [data-theme='lilac'],
@@ -2785,4 +2794,87 @@
   background: rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.08);
   color: var(--nt-color-gold-800);
+}
+
+/* ===== 深色模式 =====
+   data-theme-mode="dark" 由 stores/theme.ts 管理。
+   覆盖 :root 的 surface tokens + accent palette，
+   同时覆盖 Tailwind 语义色（bg-primary 等）以保持 @apply 一致性。 */
+:root[data-theme-mode="dark"] {
+  /* Surface tokens — dark palette */
+  --color-canvas: #111113;
+  --color-panel: #1a1a1e;
+  --color-panel-2: #222226;
+  --color-panel-hover: #2a2a2e;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.14);
+  --color-ink: #e8e8ec;
+  --color-muted: #7a7a82;
+  --color-btn-fill: #222226;
+  --color-btn-fill-hover: #2a2a2e;
+  --color-btn-ink: #e8e8ec;
+  --color-btn-border: rgba(255, 255, 255, 0.08);
+  --color-btn-hover: rgba(255, 255, 255, 0.04);
+  --color-btn-active: rgba(255, 255, 255, 0.08);
+  --color-nav-hover: rgba(255, 255, 255, 0.04);
+  --color-nav-active: rgba(255, 255, 255, 0.08);
+  --color-scroll-thumb: rgba(255, 255, 255, 0.12);
+  --color-scroll-thumb-strong: rgba(255, 255, 255, 0.2);
+  /* Accent colors — slightly muted for dark bg */
+  --color-accent: #e0a030;
+  --color-accent-2: #c96823;
+  --color-danger: #ef4444;
+  --color-ok: #34d399;
+  /* Legacy gold palette — dark variants */
+  --nt-color-gold-50: #1c1a14;
+  --nt-color-gold-100: #242018;
+  --nt-color-gold-200: #302a1c;
+  --nt-color-gold-300: #4a3f28;
+  --nt-color-gold-500: #f0913a;
+  --nt-color-gold-600: #e0a030;
+  --nt-color-gold-700: #c96823;
+  --nt-color-gold-800: #a3501c;
+  --nt-glow-1: rgba(255, 179, 102, 0.06);
+  --nt-glow-2: rgba(255, 168, 86, 0.04);
+  /* a11y：深色主题文本对比度 */
+  --text-primary: #e8e8ec;
+  --text-secondary: #b0b0b8;
+  --text-muted: #7a7a82;
+}
+
+/* 深色模式下 Tailwind 语义色覆盖 */
+:root[data-theme-mode="dark"] {
+  --tw-bg-primary: #111113;
+  --tw-bg-secondary: #1a1a1e;
+  --tw-bg-tertiary: #222226;
+  --tw-text-primary: #e8e8ec;
+  --tw-text-secondary: #b0b0b8;
+  --tw-text-muted: #7a7a82;
+  --tw-border-primary: rgba(255, 255, 255, 0.1);
+  --tw-border-focus: #e0a030;
+}
+
+/* 深色模式滚动条 */
+:root[data-theme-mode="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+:root[data-theme-mode="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 深色模式 glass 效果调整 */
+:root[data-theme-mode="dark"] .glass-modal {
+  background: rgba(22, 22, 26, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* 深色模式主题切换按钮 */
+:root[data-theme-mode="dark"] .theme-toggle {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--nt-color-gold-200);
+}
+:root[data-theme-mode="dark"] .theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
 }

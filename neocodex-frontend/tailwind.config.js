@@ -4,6 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: ['selector', '[data-theme-mode="dark"]'],
   theme: {
     extend: {
       colors: {
@@ -106,14 +107,25 @@ export default {
         },
         // Semantic colors for UI — 雪域白浅橙 (Snowfield White, 极致单主题)
         // 纯白为体, 一丝浅橙仅出现在焦点/选中/品牌强调处
-        'bg-primary': '#fbfaf7',     // --bg-base (snowfield white)
-        'bg-secondary': '#f5f3ef',   // --glass-L1
-        'bg-tertiary': '#efedea',    // --glass-L0
-        'text-primary': '#1a1a20',   // --tx (gray-900)
-        'text-secondary': '#5a5a62', // --tx2 (gray-600)
-        'text-muted': '#909098',     // --tx3 (gray-400)
-        'border-primary': '#e5e4e0', // --gray-200,暖白描边
-        'border-focus': '#f0913a',   // --pri (浅橙, 一丝)品牌强调
+        'bg-primary': 'var(--tw-bg-primary, #fbfaf7)',
+        'bg-secondary': 'var(--tw-bg-secondary, #f5f3ef)',
+        'bg-tertiary': 'var(--tw-bg-tertiary, #efedea)',
+        'text-primary': 'var(--tw-text-primary, #1a1a20)',
+        'text-secondary': 'var(--tw-text-secondary, #5a5a62)',
+        'text-muted': 'var(--tw-text-muted, #909098)',
+        'border-primary': 'var(--tw-border-primary, #e5e4e0)',
+        'border-focus': 'var(--tw-border-focus, #f0913a)',
+      },
+      // 深色模式语义色 — CSS 变量由 :root[data-theme-mode="dark"] 覆盖
+      dark: {
+        'bg-primary': 'var(--tw-bg-primary)',
+        'bg-secondary': 'var(--tw-bg-secondary)',
+        'bg-tertiary': 'var(--tw-bg-tertiary)',
+        'text-primary': 'var(--tw-text-primary)',
+        'text-secondary': 'var(--tw-text-secondary)',
+        'text-muted': 'var(--tw-text-muted)',
+        'border-primary': 'var(--tw-border-primary)',
+        'border-focus': 'var(--tw-border-focus)',
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'Noto Sans SC', 'sans-serif'],

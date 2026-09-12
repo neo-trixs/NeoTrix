@@ -10,6 +10,7 @@ export type FontSize = 'sm' | 'md' | 'lg'
 export type MotionPref = 'full' | 'reduced'
 export type DensityPref = 'comfortable' | 'compact'
 export type MessageWidthPref = 'narrow' | 'normal' | 'wide'
+import type { ThemeMode } from '../../stores/theme'
 
 interface Props {
   fontSizePref: () => FontSize
@@ -20,7 +21,15 @@ interface Props {
   setMotion: (v: MotionPref) => void
   setDensity: (v: DensityPref) => void
   setMessageWidth: (v: MessageWidthPref) => void
+  themeMode: () => ThemeMode
+  setThemeMode: (v: ThemeMode) => void
 }
+
+const THEME_MODES: { value: ThemeMode; label: string; desc: string }[] = [
+  { value: 'light', label: '浅色', desc: '始终使用浅色主题' },
+  { value: 'dark', label: '深色', desc: '始终使用深色主题' },
+  { value: 'system', label: '跟随系统', desc: '自动匹配系统外观' },
+]
 
 export function AppearanceSection(props: Props) {
   return (
@@ -28,16 +37,30 @@ export function AppearanceSection(props: Props) {
       <div class="ss-card">
         <div class="ss-card-header">
           <PaletteIcon />
-          主题
+          外观模式
         </div>
-        <div class="ss-card-body">
-          <div class="ss-row">
-            <div>
-              <div class="ss-row-label">雪域白 · 浅橙</div>
-              <div class="ss-row-desc">唯一主题 · 极简 Mac 圆角</div>
-            </div>
-            <span class="text-10px text-nt-io-600">✓ 当前</span>
-          </div>
+        <div class="ss-card-body space-y-2" role="radiogroup" aria-label="外观模式">
+          {THEME_MODES.map((mode) => (
+            <button
+              class={clsx(
+                'w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors',
+                props.themeMode() === mode.value
+                  ? 'border-nt-io-500/40 bg-nt-io-500/6'
+                  : 'border-border-primary/50 bg-white/40'
+              )}
+              onClick={() => props.setThemeMode(mode.value)}
+              role="radio"
+              aria-checked={props.themeMode() === mode.value}
+            >
+              <div>
+                <div class="text-[12.5px] text-text-primary">{mode.label}</div>
+                <div class="text-[10.5px] text-text-muted">{mode.desc}</div>
+              </div>
+              <Show when={props.themeMode() === mode.value}>
+                <span class="text-10px text-nt-io-600">✓ 当前</span>
+              </Show>
+            </button>
+          ))}
         </div>
       </div>
 
