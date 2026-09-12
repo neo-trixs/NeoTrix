@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 平台类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum PlatformType {
+pub(crate) enum PlatformType {
     /// ComfyUI
     ComfyUI,
     /// SD WebUI
@@ -33,7 +33,7 @@ pub enum PlatformType {
 
 /// 平台状态
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum PlatformStatus {
+pub(crate) enum PlatformStatus {
     /// 在线
     Online,
     /// 离线
@@ -46,7 +46,7 @@ pub enum PlatformStatus {
 
 /// 平台配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformConfig {
+pub(crate) struct PlatformConfig {
     /// 平台ID
     pub id: String,
     /// 平台名称
@@ -69,7 +69,7 @@ pub struct PlatformConfig {
 
 /// 平台能力
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformCapability {
+pub(crate) struct PlatformCapability {
     /// 支持的任务类型
     pub task_types: Vec<String>,
     /// 支持的输入格式
@@ -86,7 +86,7 @@ pub struct PlatformCapability {
 
 /// 平台请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformRequest {
+pub(crate) struct PlatformRequest {
     /// 任务类型
     pub task_type: String,
     /// 输入文件路径
@@ -103,7 +103,7 @@ pub struct PlatformRequest {
 
 /// 平台响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformResponse {
+pub(crate) struct PlatformResponse {
     /// 是否成功
     pub success: bool,
     /// 任务ID
@@ -120,7 +120,7 @@ pub struct PlatformResponse {
 
 /// 平台网关配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformGatewayConfig {
+pub(crate) struct PlatformGatewayConfig {
     /// 默认超时时间 (秒)
     pub default_timeout_secs: u32,
     /// 是否启用负载均衡
@@ -142,7 +142,7 @@ pub struct PlatformGatewayConfig {
 /// 平台网关
 /// 统一管理多平台集成
 #[derive(Debug)]
-pub struct PlatformGateway {
+pub(crate) struct PlatformGateway {
     /// 配置
     #[allow(dead_code)]
     config: PlatformGatewayConfig,
@@ -305,7 +305,7 @@ impl PlatformGateway {
 
 /// 网关统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GatewayStats {
+pub(crate) struct GatewayStats {
     /// 总平台数
     pub total_platforms: usize,
     /// 在线平台数

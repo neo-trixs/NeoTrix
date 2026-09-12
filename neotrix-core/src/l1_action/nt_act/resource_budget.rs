@@ -44,7 +44,7 @@ pub enum BudgetPeriod {
 
 /// 资源配额
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceQuota {
+pub(crate) struct ResourceQuota {
     /// 资源类型
     pub resource_type: ResourceType,
     /// 预算周期
@@ -132,7 +132,7 @@ pub struct ResourceUsage {
 
 /// 预算检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BudgetCheckResult {
+pub(crate) struct BudgetCheckResult {
     /// 是否在预算内
     pub within_budget: bool,
     /// 是否触发告警
@@ -149,7 +149,7 @@ pub struct BudgetCheckResult {
 
 /// 预算建议
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum BudgetRecommendation {
+pub(crate) enum BudgetRecommendation {
     /// 继续执行
     Continue,
     /// 降级执行
@@ -166,7 +166,7 @@ pub enum BudgetRecommendation {
 
 /// 资源预算管理器
 /// 管理 AI 生成任务的资源分配和成本控制
-pub struct ResourceBudgetManager {
+pub(crate) struct ResourceBudgetManager {
     /// 预算配置
     config: BudgetConfig,
     /// 使用历史

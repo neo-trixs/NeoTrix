@@ -7,7 +7,7 @@ use std::io::{Read, Seek, Write};
 use super::format::sha256;
 
 /// Lex Segment magic
-pub const LEX_MAGIC: &[u8; 4] = b"NTLX";
+pub(crate) const LEX_MAGIC: &[u8; 4] = b"NTLX";
 
 /// Lex 段: 存储 FTS5 数据库的原始字节
 pub struct LexSegment {

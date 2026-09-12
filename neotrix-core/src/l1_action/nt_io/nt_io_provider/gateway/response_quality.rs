@@ -4,7 +4,7 @@
 
 /// 响应质量评分
 #[derive(Debug, Clone)]
-pub struct ResponseQualityScore {
+pub(crate) struct ResponseQualityScore {
     pub coherence: f64,
     pub relevance: f64,
     pub completeness: f64,
@@ -25,7 +25,7 @@ impl ResponseQualityScore {
 }
 
 /// 评估响应质量
-pub fn evaluate_response_quality(content: &str) -> ResponseQualityScore {
+pub(crate) fn evaluate_response_quality(content: &str) -> ResponseQualityScore {
     let coherence = if content.is_empty() {
         0.0
     } else {

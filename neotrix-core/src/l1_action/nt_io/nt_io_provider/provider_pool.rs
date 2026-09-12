@@ -403,7 +403,7 @@ use crate::l1_action::traits::{
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// LLM 能力注册中心
-pub struct LlmRegistry {
+pub(crate) struct LlmRegistry {
     routers: Vec<Box<dyn LlmRouterTrait>>,
 }
 
@@ -433,7 +433,7 @@ impl LlmRegistry {
 }
 
 /// LLM 智能路由器 — 按请求上下文选择最佳 Provider
-pub struct LlmSmartRouter {
+pub(crate) struct LlmSmartRouter {
     registry: LlmRegistry,
 }
 
@@ -450,7 +450,7 @@ impl LlmSmartRouter {
 }
 
 /// LLM 桥接 — L5 领域技能 → LlmSmartRouter
-pub struct LlmBridge {
+pub(crate) struct LlmBridge {
     router: LlmSmartRouter,
 }
 

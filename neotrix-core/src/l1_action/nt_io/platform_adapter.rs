@@ -34,7 +34,7 @@ pub trait PlatformAdapter: Send + Sync {
 /// 内部统一提示词表示
 /// 所有平台适配都基于此结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InternalPrompt {
+pub(crate) struct InternalPrompt {
     /// 风格描述
     pub style: String,
     /// 时长 (秒)
@@ -53,7 +53,7 @@ pub struct InternalPrompt {
 
 /// 画幅比例
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum AspectRatio {
+pub(crate) enum AspectRatio {
     /// 16:9 横屏
     Landscape,
     /// 9:16 竖屏
@@ -83,7 +83,7 @@ pub struct TimeSegment {
 
 /// 镜头景别
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum ShotType {
+pub(crate) enum ShotType {
     /// 远景
     Wide,
     /// 全景
@@ -98,7 +98,7 @@ pub enum ShotType {
 
 /// 声音设计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SoundDesign {
+pub(crate) struct SoundDesign {
     /// 配乐风格
     pub music_style: String,
     /// 音效列表
@@ -109,7 +109,7 @@ pub struct SoundDesign {
 
 /// 参考素材
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReferenceMaterial {
+pub(crate) struct ReferenceMaterial {
     /// 素材类型
     pub material_type: MaterialType,
     /// 素材描述
@@ -135,7 +135,7 @@ pub enum MaterialType {
 
 /// 平台特定格式提示词
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformPrompt {
+pub(crate) struct PlatformPrompt {
     /// 平台名称
     pub platform: String,
     /// 格式化后的提示词
@@ -146,7 +146,7 @@ pub struct PlatformPrompt {
 
 /// 平台能力描述
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformCapabilities {
+pub(crate) struct PlatformCapabilities {
     /// 最大文件数
     pub max_files: usize,
     /// 最大视频时长 (秒)

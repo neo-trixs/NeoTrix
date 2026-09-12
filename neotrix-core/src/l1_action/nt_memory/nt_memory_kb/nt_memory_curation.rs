@@ -62,7 +62,7 @@ fn bow_sim(a: &str, b: &str) -> f64 {
 
 /// 冲突检测结果
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct ConflictHit {
+pub(crate) struct ConflictHit {
     pub older_id: String,
     pub newer_id: String,
     pub title: String,
@@ -73,7 +73,7 @@ pub struct ConflictHit {
 
 /// 遗忘 (归档) 决策结果
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct ForgetHit {
+pub(crate) struct ForgetHit {
     pub id: String,
     pub title: String,
     pub age_days: i64,
@@ -82,7 +82,7 @@ pub struct ForgetHit {
 
 /// 策展决策结果
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct CurationHit {
+pub(crate) struct CurationHit {
     pub id: String,
     pub title: String,
     pub access_count: i64,
@@ -151,7 +151,7 @@ pub fn conflict_detect(conn: &Connection, title_sim: f64) -> Result<Vec<Conflict
 
 /// D2 应用: 对冲突对新者胜出, 旧者 supersedes 指向新者 (保留证据链)。
 /// 返回被覆盖的节点数。
-pub fn apply_supersede(conn: &Connection, hits: &[ConflictHit]) -> Result<usize, String> {
+pub(crate) fn apply_supersede(conn: &Connection, hits: &[ConflictHit]) -> Result<usize, String> {
     let mut n = 0usize;
     for h in hits {
         let affected = conn
@@ -170,7 +170,7 @@ pub fn apply_supersede(conn: &Connection, hits: &[ConflictHit]) -> Result<usize,
 
 /// 单条冲突解决的差异记录 (diagram-design fidelity ledger 吸收)。
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct FidelityEntry {
+pub(crate) struct FidelityEntry {
     pub older_id: String,
     pub newer_id: String,
     pub title: String,
@@ -329,7 +329,7 @@ pub fn conflict_detect_for_write(
 
 /// D3: 自动遗忘 — access_count=0 且超龄且低重要性的节点降级 cold。
 /// 返回归档数。age_days 用 created_at 距今天数判断。
-pub fn forget_stale(
+pub(crate) fn forget_stale(
     conn: &Connection,
     max_age_days: i64,
     importance_threshold: f64,
@@ -368,7 +368,7 @@ pub fn forget_stale(
 
 /// D10: 成果反馈策展 — 低检索命中 (access_count 低且存在但从未被搜中/读取) 建议重写或下架。
 /// action ∈ {"rewrite", "archive"}。archive = 降级 cold (禁检索)。
-pub fn curate_by_hitrate(
+pub(crate) fn curate_by_hitrate(
     conn: &Connection,
     max_access: i64,
     min_age_days: i64,

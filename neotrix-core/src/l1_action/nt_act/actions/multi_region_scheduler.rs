@@ -8,7 +8,7 @@ use std::time::Duration;
 
 /// 区域信息
 #[derive(Debug, Clone)]
-pub struct RegionInfo {
+pub(crate) struct RegionInfo {
     /// 区域 ID
     pub id: String,
     /// 区域名
@@ -46,7 +46,7 @@ pub struct GeoLocation {
 
 /// 区域状态
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RegionStatus {
+pub(crate) enum RegionStatus {
     Available,
     Degraded,
     Offline,
@@ -55,7 +55,7 @@ pub enum RegionStatus {
 
 /// 路由决策
 #[derive(Debug, Clone)]
-pub struct RegionalRoutingDecision {
+pub(crate) struct RegionalRoutingDecision {
     /// 目标区域
     pub target_region: String,
     /// 预计延迟
@@ -68,7 +68,7 @@ pub struct RegionalRoutingDecision {
 
 /// 调度策略
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RegionalStrategy {
+pub(crate) enum RegionalStrategy {
     /// 延迟优先
     LatencyFirst,
     /// 成本优先
@@ -82,7 +82,7 @@ pub enum RegionalStrategy {
 }
 
 /// 多区域调度器
-pub struct MultiRegionScheduler {
+pub(crate) struct MultiRegionScheduler {
     /// 区域列表
     regions: HashMap<String, RegionInfo>,
     /// 调度策略
@@ -96,7 +96,7 @@ pub struct MultiRegionScheduler {
 
 /// 故障转移配置
 #[derive(Debug, Clone)]
-pub struct FailoverConfig {
+pub(crate) struct FailoverConfig {
     /// 是否启用自动故障转移
     pub auto_failover: bool,
     /// 健康检查间隔
@@ -212,7 +212,7 @@ impl Default for MultiRegionScheduler {
 
 /// 区域需求
 #[derive(Debug, Clone)]
-pub struct RegionalRequirements {
+pub(crate) struct RegionalRequirements {
     /// 所需模态
     pub modalities: Vec<String>,
     /// 请求来源位置
@@ -225,7 +225,7 @@ pub struct RegionalRequirements {
 
 /// 区域统计
 #[derive(Debug, Clone, Default)]
-pub struct RegionalStats {
+pub(crate) struct RegionalStats {
     pub total_regions: u32,
     pub total_routed: u32,
     pub total_failovers: u32,

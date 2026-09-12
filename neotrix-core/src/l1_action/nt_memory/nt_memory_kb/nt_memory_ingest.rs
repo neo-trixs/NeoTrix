@@ -7,7 +7,7 @@ use super::KnowledgeBase;
 #[allow(unused_imports)]
 use log::{info, warn, error, debug};
 
-pub struct KBIngester {
+pub(crate) struct KBIngester {
     kb: KnowledgeBase,
     log: Vec<String>,
     errors: Vec<String>,

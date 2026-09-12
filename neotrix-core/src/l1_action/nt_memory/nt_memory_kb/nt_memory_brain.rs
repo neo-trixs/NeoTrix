@@ -22,7 +22,7 @@ use crate::core::nt_core_math::cosine_similarity_f64;
 /// 实现 Kairos 验证门控：边增强仅在推理通过多维质量评估后发生，
 /// 防止幻觉强化。
 #[derive(Debug, Clone)]
-pub struct SynapticPlasticity {
+pub(crate) struct SynapticPlasticity {
     /// 学习率 (η): 控制边权重更新速度
     pub learning_rate: f64,
     /// 衰减因子 (α): 防止权重无限增长
@@ -248,7 +248,7 @@ impl ForgettingCurve {
 /// 基于 HippoRAG 的 Personalized PageRank 算法。
 /// 从查询实体种子出发，通过图结构扩散激活，找到关联节点。
 #[derive(Debug, Clone)]
-pub struct AssociativeRecall {
+pub(crate) struct AssociativeRecall {
     /// 阻尼因子 (d): PPR 阻尼因子，控制随机游走概率
     pub damping: f64,
     /// 迭代次数: PPR 迭代次数
@@ -367,7 +367,7 @@ impl AssociativeRecall {
 /// 基于 Graphiti 的 bi-temporal 模型和 Kontrast 分类法。
 /// 检测知识库中的矛盾信息。
 #[derive(Debug, Clone)]
-pub struct ContradictionDetector {
+pub(crate) struct ContradictionDetector {
     /// 语义相似度阈值: 高于此阈值的节点对可能矛盾
     pub semantic_threshold: f64,
     /// 矛盾置信度阈值: 高于此阈值的矛盾被标记
@@ -385,7 +385,7 @@ impl Default for ContradictionDetector {
 
 /// 矛盾类型
 #[derive(Debug, Clone, PartialEq)]
-pub enum ContradictionType {
+pub(crate) enum ContradictionType {
     /// 直接矛盾: 两个节点对同一主题有相反断言
     Direct,
     /// 时间矛盾: 同一实体在不同时间有不同状态
@@ -398,7 +398,7 @@ pub enum ContradictionType {
 
 /// 矛盾检测结果
 #[derive(Debug, Clone)]
-pub struct ContradictionResult {
+pub(crate) struct ContradictionResult {
     pub node_a: String,
     pub node_b: String,
     pub contradiction_type: ContradictionType,

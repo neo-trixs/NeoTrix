@@ -270,7 +270,7 @@ pub struct QuoteSheet {
 
 /// 产品配置 (从逗号分隔的 key:value 解析)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ProductConfig {
+pub(crate) struct ProductConfig {
     pub exec_std: Option<String>,     // 执行标准
     pub pressure: Option<String>,     // 压力
     pub valve_body: Option<String>,   // 阀体

@@ -7,10 +7,10 @@
 use std::collections::HashMap;
 
 /// 引用 ID
-pub type RefId = String;
+pub(crate) type RefId = String;
 
 /// 活对象引用
-pub struct LiveReference {
+pub(crate) struct LiveReference {
     pub id: RefId,
     pub object_type: String,
     pub preview: String,

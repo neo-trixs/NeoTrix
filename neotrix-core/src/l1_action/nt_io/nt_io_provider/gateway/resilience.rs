@@ -93,7 +93,7 @@ pub struct AnomalyDetector {
 }
 
 #[derive(Debug, Clone)]
-pub struct AnomalyConfig {
+pub(crate) struct AnomalyConfig {
     pub window_size: usize,
     pub z_score_threshold: f64,
     pub min_samples: usize,
@@ -170,7 +170,7 @@ impl SlidingWindow {
 }
 
 #[derive(Debug, Clone)]
-pub struct AnomalyAlert {
+pub(crate) struct AnomalyAlert {
     pub provider: String,
     pub metric: String,
     pub value: f64,
@@ -262,7 +262,7 @@ impl Default for AnomalyDetector {
 
 /// 自动恢复配置
 #[derive(Debug, Clone)]
-pub struct AutoRecoveryConfig {
+pub(crate) struct AutoRecoveryConfig {
     pub max_retries: u32,
     pub base_delay: Duration,
     pub max_delay: Duration,
@@ -286,7 +286,7 @@ impl Default for AutoRecoveryConfig {
 
 /// Provider 健康状态
 #[derive(Debug, Clone, PartialEq)]
-pub enum HealthState {
+pub(crate) enum HealthState {
     Healthy,
     Degraded,
     Recovering,

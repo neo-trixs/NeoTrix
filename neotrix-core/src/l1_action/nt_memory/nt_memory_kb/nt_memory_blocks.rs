@@ -6,7 +6,7 @@
 
 /// 结构化块类型 — 保留原文语义的单元划分。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BlockKind {
+pub(crate) enum BlockKind {
     /// 普通段落
     Paragraph,
     /// Markdown 表格 (连续含 `|` 分隔符的行)
@@ -40,7 +40,7 @@ impl BlockKind {
 
 /// 单个内容块 — 类型 + 原文。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ContentBlock {
+pub(crate) struct ContentBlock {
     pub kind: BlockKind,
     pub text: String,
 }

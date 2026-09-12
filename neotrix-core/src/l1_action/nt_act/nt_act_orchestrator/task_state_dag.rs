@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 /// 每次认领铸造的能力令牌。attempt_id 单调递增; 属主持令牌才可推进/提交。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AttemptToken {
+pub(crate) struct AttemptToken {
     pub task_id: String,
     pub attempt_id: String,
     pub attempt_seq: u64,
@@ -54,7 +54,7 @@ fn legal_transition(from: &ArtifactState, to: &ArtifactState) -> bool {
 
 /// 依赖感知任务 DAG: 逐任务状态机 + 依赖门禁领取 + attempt 能力令牌。
 #[derive(Debug, Clone)]
-pub struct TaskStateDag {
+pub(crate) struct TaskStateDag {
     nodes: HashMap<String, ArtifactNode>,
     edges: Vec<DagEdge>,
     attempts: HashMap<String, AttemptToken>,

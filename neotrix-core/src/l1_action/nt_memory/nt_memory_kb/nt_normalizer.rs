@@ -334,14 +334,14 @@ pub fn compute_quality_score(
 
 // ── Schema 校验 ───────────────────────────────────────────────────
 
-pub const NODE_TYPES: &[&str] = &[
+pub(crate) const NODE_TYPES: &[&str] = &[
     "Repository", "Resource", "Concept", "Article", "Insight", "CodeSnippet",
     "Framework", "Organization", "Paper", "Theory", "Tutorial", "Tool",
     "Project", "Book", "Course", "Video", "Audio", "Image", "Dataset",
     "API", "Standard",
 ];
 
-pub const RELATION_TYPES: &[&str] = &[
+pub(crate) const RELATION_TYPES: &[&str] = &[
     "contains", "related_to", "references", "depends_on", "part_of",
     "implements", "developed_by", "authored_by", "supports", "uses",
     "similar_to", "translates_to",

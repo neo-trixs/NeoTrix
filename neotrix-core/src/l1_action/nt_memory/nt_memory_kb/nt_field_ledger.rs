@@ -22,7 +22,7 @@ const GENESIS_HASH: &str = "GENESIS";
 
 /// 一条已提交的场写入 (审计/重放单元)。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct FieldEntry {
+pub(crate) struct FieldEntry {
     pub ns: String,
     pub key: String,
     pub value: String,
@@ -231,7 +231,7 @@ pub fn field_version(conn: &Connection) -> Result<u64, String> {
 }
 
 /// 当前头哈希。
-pub fn field_head_hash(conn: &Connection) -> Result<String, String> {
+pub(crate) fn field_head_hash(conn: &Connection) -> Result<String, String> {
     let _ = conn.busy_timeout(std::time::Duration::from_millis(BUSY_TIMEOUT_MS));
     ensure_tables(conn)?;
     Ok(read_head(conn)?.1)

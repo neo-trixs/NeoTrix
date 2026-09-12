@@ -23,7 +23,7 @@ pub struct ExtractedPattern {
 
 /// 相似编辑集群
 #[derive(Debug, Clone)]
-pub struct EditCluster {
+pub(crate) struct EditCluster {
     pub name: String,
     pub entries: Vec<usize>,  // indices into history
     pub common_issue_types: Vec<String>,

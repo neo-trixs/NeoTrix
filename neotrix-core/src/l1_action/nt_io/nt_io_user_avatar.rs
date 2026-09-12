@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use crate::neotrix::nt_io_avatar_channel::{AvatarIdentity, AvatarChain, MessageDirection};
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserAvatar {
+pub(crate) struct UserAvatar {
     pub identity_name: String,
     pub edition: u32,
     pub confidence: f64,
@@ -50,7 +50,7 @@ impl Default for UserAvatar {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DistillationNode {
+pub(crate) struct DistillationNode {
     pub id: String,
     pub label: String,
     pub status: String,
@@ -61,13 +61,13 @@ pub struct DistillationNode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DistillationEdge {
+pub(crate) struct DistillationEdge {
     pub source: String,
     pub target: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DistillationFlowEvent {
+pub(crate) struct DistillationFlowEvent {
     pub nodes: Vec<DistillationNode>,
     pub edges: Vec<DistillationEdge>,
     pub avatar_summary: String,

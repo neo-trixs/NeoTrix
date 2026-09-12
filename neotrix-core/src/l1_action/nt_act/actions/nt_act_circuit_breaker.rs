@@ -21,7 +21,7 @@ pub struct CircuitBreaker {
 
 /// 熔断器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CircuitBreakerConfig {
+pub(crate) struct CircuitBreakerConfig {
     pub failure_threshold: u32,
     pub success_threshold: u32,
     pub timeout: Duration,
@@ -53,7 +53,7 @@ pub enum CircuitState {
 /// 降级策略
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum FallbackStrategy {
+pub(crate) enum FallbackStrategy {
     ReturnDefault,
     ReturnCached,
     ReturnError,
@@ -63,7 +63,7 @@ pub enum FallbackStrategy {
 
 /// 熔断器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CircuitBreakerStats {
+pub(crate) struct CircuitBreakerStats {
     pub total_calls: u64,
     pub successful_calls: u64,
     pub failed_calls: u64,
@@ -74,7 +74,7 @@ pub struct CircuitBreakerStats {
 
 /// 熔断器结果
 #[derive(Debug, Clone)]
-pub enum CircuitBreakerResult<T> {
+pub(crate) enum CircuitBreakerResult<T> {
     Success(T),
     Fallback(T),
     Rejected(String),
@@ -234,7 +234,7 @@ impl CircuitBreaker {
 }
 
 /// 熔断器管理器 — 多实例管理
-pub struct CircuitBreakerManager {
+pub(crate) struct CircuitBreakerManager {
     breakers: std::collections::HashMap<String, CircuitBreaker>,
 }
 

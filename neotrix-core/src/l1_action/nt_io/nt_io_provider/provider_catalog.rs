@@ -607,7 +607,7 @@ pub fn keyless_providers() -> Vec<&'static ProviderInfo> {
 
 /// 获取模型能力分数 (0.0-1.0)，越新/越强的模型分数越高
 /// 基于 provider catalog 中 models 数组的顺序：第一个为最新/最强 (1.0)，递减
-pub fn model_capability_score(provider_name: &str, model_id: &str) -> f64 {
+pub(crate) fn model_capability_score(provider_name: &str, model_id: &str) -> f64 {
     if let Some(info) = lookup_provider(provider_name) {
         if let Some(idx) = info.models.iter().position(|m| *m == model_id) {
             // 线性递减: 第一个 1.0, 最后一个 0.1
@@ -622,7 +622,7 @@ pub fn model_capability_score(provider_name: &str, model_id: &str) -> f64 {
 }
 
 /// 从注册名 (如 "aihub/glm-5.2" 或 "llm7") 提取 provider 名和模型名
-pub fn parse_provider_model(registered_name: &str) -> (String, String) {
+pub(crate) fn parse_provider_model(registered_name: &str) -> (String, String) {
     if let Some((prov, model)) = registered_name.split_once('/') {
         (prov.to_string(), model.to_string())
     } else {

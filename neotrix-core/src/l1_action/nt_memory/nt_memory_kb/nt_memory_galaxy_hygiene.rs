@@ -72,7 +72,7 @@ impl Default for GalaxyHygieneConfig {
 /// 解析 hub 活跃时间字段 → epoch 秒。
 /// 真实 hub 用 ISO 字符串 `last_loaded` ("2026-08-11T13:18:23.829840" 或 "None")，
 /// 旧格式用 `updated_at` epoch 秒。返回 None 表示从未活跃。
-pub fn hub_active_epoch(hub: &Value) -> Option<u64> {
+pub(crate) fn hub_active_epoch(hub: &Value) -> Option<u64> {
     if let Some(ts) = hub.get("updated_at").and_then(|t| t.as_u64()) {
         return Some(ts);
     }
@@ -358,7 +358,7 @@ pub fn galaxy_hygiene_check(conn: &Connection, config: &GalaxyHygieneConfig) -> 
 }
 
 /// 便捷函数: 执行检查并返回人类可读摘要 (供 CLI / BackgroundLoop 接线)
-pub fn galaxy_hygiene_summary(report: &GalaxyHygieneReport) -> String {
+pub(crate) fn galaxy_hygiene_summary(report: &GalaxyHygieneReport) -> String {
     if report.is_clean() {
         format!(
             "[galaxy-hygiene] ✅ 星系卫生: {} hubs 全部健康 (0 ghost / 0 stale / 0 missing)",

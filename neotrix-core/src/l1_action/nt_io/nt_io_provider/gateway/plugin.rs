@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 // ═══════════════════════════════════════════════════════════════════
 
 /// Gateway Plugin trait — 所有网关插件必须实现此 trait
-pub trait GatewayPlugin: Send + Sync {
+pub(crate) trait GatewayPlugin: Send + Sync {
     /// 插件名称
     fn name(&self) -> &str;
     /// 插件版本
@@ -40,7 +40,7 @@ pub struct RequestContext {
 }
 
 #[derive(Debug, Clone)]
-pub struct ResponseContext {
+pub(crate) struct ResponseContext {
     pub provider: String,
     pub status: u16,
     pub headers: HashMap<String, String>,
@@ -57,7 +57,7 @@ pub struct ErrorContext {
 }
 
 #[derive(Debug, Clone)]
-pub enum PluginError {
+pub(crate) enum PluginError {
     SkipRequest(String),
     OverrideResponse(Vec<u8>),
     Abort(String),
@@ -160,7 +160,7 @@ impl Default for PluginManager {
 // ═══════════════════════════════════════════════════════════════════
 
 /// 插件热重载管理器 — 运行时加载/卸载插件
-pub struct PluginHotReload {
+pub(crate) struct PluginHotReload {
     plugins: RwLock<HashMap<String, PluginEntry>>,
     event_log: RwLock<Vec<ReloadEvent>>,
 }
@@ -175,7 +175,7 @@ struct PluginEntry {
 }
 
 #[derive(Debug, Clone)]
-pub struct ReloadEvent {
+pub(crate) struct ReloadEvent {
     pub plugin: String,
     pub action: ReloadAction,
     pub timestamp: Instant,
@@ -184,7 +184,7 @@ pub struct ReloadEvent {
 }
 
 #[derive(Debug, Clone)]
-pub enum ReloadAction {
+pub(crate) enum ReloadAction {
     Load,
     Unload,
     Reload,

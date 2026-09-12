@@ -48,7 +48,7 @@ impl Default for AccessContext {
 
 /// Heavy-Pass@K 验证结果
 #[derive(Debug, Clone)]
-pub struct HeavyPassResult {
+pub(crate) struct HeavyPassResult {
     pub hp_at_k: f64,
     pub hm_at_k: f64,
     pub vote_at_k: f64,
@@ -63,7 +63,7 @@ pub struct HeavyPassResult {
 /// - Vote@K: majority vote correctness
 /// - HM@K: heavy-weighted top-k mean
 /// - HP@K: deliberation-synthesized answer correctness
-pub fn heavy_pass_at_k(scores: &[f64], threshold: f64) -> HeavyPassResult {
+pub(crate) fn heavy_pass_at_k(scores: &[f64], threshold: f64) -> HeavyPassResult {
     let k = scores.len();
     if k == 0 {
         return HeavyPassResult {

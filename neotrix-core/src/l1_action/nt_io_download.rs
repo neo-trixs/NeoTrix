@@ -39,7 +39,7 @@ use tokio::sync::{mpsc, Semaphore};
 
 /// 单任务进度
 #[derive(Debug, Clone)]
-pub struct DownloadProgress {
+pub(crate) struct DownloadProgress {
     pub percent: f32,
     pub downloaded: u64,
     pub total: u64,
@@ -49,7 +49,7 @@ pub struct DownloadProgress {
 
 /// 多任务聚合进度
 #[derive(Debug, Clone)]
-pub struct AggregateProgress {
+pub(crate) struct AggregateProgress {
     pub total_tasks: usize,
     pub completed: usize,
     pub failed: usize,
@@ -103,7 +103,7 @@ fn ranked_mirrors() -> Vec<(String, f64)> {
 
 /// URL 协议类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UrlScheme {
+pub(crate) enum UrlScheme {
     Http,
     Https,
     Magnet,
@@ -323,7 +323,7 @@ impl DownloadTask {
 // L0 Task Handle — 取消控制
 // ═══════════════════════════════════════════════════════════════════════════
 
-pub struct TaskHandle {
+pub(crate) struct TaskHandle {
     cancelled: Arc<AtomicBool>,
 }
 

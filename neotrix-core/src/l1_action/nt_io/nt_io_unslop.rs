@@ -18,7 +18,7 @@ const SLOP_PHRASES: &[&str] = &[
 ];
 
 /// 去赘写作器 trait — 清理 slop 并评估密度。
-pub trait UnslopWriter: Send + Sync {
+pub(crate) trait UnslopWriter: Send + Sync {
     /// 清理文本中的已知 slop 短语 (大小写不敏感, 去除后折叠空格)。
     fn clean(&self, text: &str) -> String;
     /// 计算 slop 密度: 命中短语数 / 词数。
@@ -27,7 +27,7 @@ pub trait UnslopWriter: Send + Sync {
 
 /// 默认实现: 线性替换 + 词频密度估算。
 #[derive(Default)]
-pub struct UnslopEngine;
+pub(crate) struct UnslopEngine;
 
 impl UnslopWriter for UnslopEngine {
     fn clean(&self, text: &str) -> String {
@@ -57,7 +57,7 @@ impl UnslopWriter for UnslopEngine {
 
 /// T1 SelfTest: 验证去赘器存在且能移除 slop。
 #[derive(Default)]
-pub struct UnslopSelfTest;
+pub(crate) struct UnslopSelfTest;
 
 impl SelfTest for UnslopSelfTest {
     fn name(&self) -> &str {

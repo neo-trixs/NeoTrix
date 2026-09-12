@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CleanupRule {
+pub(crate) struct CleanupRule {
     pub id: String,
     pub name: String,
     pub category: String,
@@ -19,7 +19,7 @@ pub struct CleanupRule {
     pub enabled: bool,
 }
 
-pub struct RuleStore {
+pub(crate) struct RuleStore {
     rules: HashMap<String, CleanupRule>,
     config_path: PathBuf,
 }

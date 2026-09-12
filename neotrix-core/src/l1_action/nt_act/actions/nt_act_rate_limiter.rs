@@ -20,7 +20,7 @@ pub struct RateLimiter {
 
 /// 限流器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RateLimiterConfig {
+pub(crate) struct RateLimiterConfig {
     pub default_rate: u32,
     pub default_burst: u32,
     pub window_size: Duration,
@@ -51,7 +51,7 @@ pub struct TokenBucket {
 
 /// 桶统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BucketStats {
+pub(crate) struct BucketStats {
     pub total_requests: u64,
     pub allowed_requests: u64,
     pub denied_requests: u64,
@@ -60,7 +60,7 @@ pub struct BucketStats {
 
 /// 限流器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RateLimiterStats {
+pub(crate) struct RateLimiterStats {
     pub total_requests: u64,
     pub allowed_requests: u64,
     pub denied_requests: u64,
@@ -69,14 +69,14 @@ pub struct RateLimiterStats {
 
 /// 限流结果
 #[derive(Debug, Clone)]
-pub enum RateLimitResult {
+pub(crate) enum RateLimitResult {
     Allowed,
     Denied,
     WaitFor(Duration),
 }
 
 /// 滑动窗口计数器
-pub struct SlidingWindowCounter {
+pub(crate) struct SlidingWindowCounter {
     window: VecDeque<Instant>,
     window_size: Duration,
     max_count: u32,

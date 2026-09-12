@@ -39,7 +39,7 @@ pub fn apply_recency_decay(mut results: Vec<SearchResult>, now_secs: i64) -> Vec
 /// MMR 多样性重排 (D9): 贪心选择最大化 [λ·相关度 − (1−λ)·与已选的最大相似度]。
 /// `similarity(a, b)` 由调用方提供 (可用 VSA/embedding 余弦), 缺省 0 → 纯相关度排序。
 /// 返回 top-k 且去冗余的结果。
-pub fn diversify_mmr<F>(results: Vec<SearchResult>, k: usize, similarity: F) -> Vec<SearchResult>
+pub(crate) fn diversify_mmr<F>(results: Vec<SearchResult>, k: usize, similarity: F) -> Vec<SearchResult>
 where
     F: Fn(&KnowledgeNode, &KnowledgeNode) -> f64,
 {

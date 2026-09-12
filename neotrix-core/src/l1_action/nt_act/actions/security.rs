@@ -29,7 +29,7 @@ pub struct SecurityPolicy {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SecurityRule {
+pub(crate) struct SecurityRule {
     pub action_pattern: String,
     pub target_pattern: String,
     pub verdict: SecurityVerdict,
@@ -38,7 +38,7 @@ pub struct SecurityRule {
 
 /// 安全审计记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SecurityAuditLog {
+pub(crate) struct SecurityAuditLog {
     pub entries: Vec<AuditEntry>,
     pub max_entries: usize,
 }
@@ -71,7 +71,7 @@ impl SecurityAuditLog {
 // ════════════════════════════════════════════════════════════════
 
 /// 安全守卫管理器
-pub struct SecurityGuardManager {
+pub(crate) struct SecurityGuardManager {
     policies: Vec<SecurityPolicy>,
     audit_log: SecurityAuditLog,
     stats: CapabilityStats,
@@ -141,7 +141,7 @@ impl SecurityGuard for SecurityGuardManager {
 // ════════════════════════════════════════════════════════════════
 
 /// 安全能力注册中心
-pub struct SecurityRegistry {
+pub(crate) struct SecurityRegistry {
     guards: Vec<Box<dyn SecurityGuard>>,
 }
 
@@ -171,7 +171,7 @@ impl SecurityRegistry {
 }
 
 /// 安全路由器
-pub struct SecurityRouter {
+pub(crate) struct SecurityRouter {
     registry: SecurityRegistry,
 }
 

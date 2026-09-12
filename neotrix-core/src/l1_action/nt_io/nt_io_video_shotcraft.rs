@@ -10,14 +10,14 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// Shot card: 一个镜头卡片 (来自 152 卡库), 含时长与序号。
 #[derive(Debug, Clone, PartialEq)]
-pub struct ShotCard {
+pub(crate) struct ShotCard {
     pub index: usize,
     pub duration_sec: f64,
     pub label: String,
 }
 
 /// 生成式视频技能 trait — shot card 选取 + Remotion 渲染接口 stub。
-pub trait VideoShotcraft: Send + Sync {
+pub(crate) trait VideoShotcraft: Send + Sync {
     /// 选取有效 shot card: 序号非空、时长 > 0; 返回选取数量, 非法卡返回 None。
     fn select_cards(&self, cards: &[ShotCard]) -> Option<usize>;
     /// 生成 Remotion 渲染规格: 给定总时长返回 render 串, 时长 <= 0 返回 None。
@@ -26,7 +26,7 @@ pub trait VideoShotcraft: Send + Sync {
 
 /// 默认实现。
 #[derive(Default)]
-pub struct VideoShotcraftEngine;
+pub(crate) struct VideoShotcraftEngine;
 
 impl VideoShotcraft for VideoShotcraftEngine {
     fn select_cards(&self, cards: &[ShotCard]) -> Option<usize> {
@@ -48,7 +48,7 @@ impl VideoShotcraft for VideoShotcraftEngine {
 
 /// T1 SelfTest: 验证 shot 选取与渲染规格存在且生效。
 #[derive(Default)]
-pub struct VideoShotcraftSelfTest;
+pub(crate) struct VideoShotcraftSelfTest;
 
 impl SelfTest for VideoShotcraftSelfTest {
     fn name(&self) -> &str {

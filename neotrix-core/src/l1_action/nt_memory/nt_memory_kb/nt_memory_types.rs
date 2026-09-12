@@ -191,7 +191,7 @@ pub struct ProceduralMemoryRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdaptiveSearchResult {
+pub(crate) struct AdaptiveSearchResult {
     pub query: String,
     pub complexity: String,
     pub confidence: f64,

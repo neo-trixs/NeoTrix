@@ -167,7 +167,7 @@ impl Default for BridgeRegistry {
     }
 }
 
-pub struct BridgeOpportunity {
+pub(crate) struct BridgeOpportunity {
     pub route: BridgeRoute,
     pub amount_usd: f64,
     pub profit_after_fee: f64,

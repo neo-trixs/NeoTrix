@@ -25,7 +25,7 @@ pub enum CheckpointStatus {
 
 /// 检查点元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CheckpointMeta {
+pub(crate) struct CheckpointMeta {
     /// 检查点ID
     pub id: String,
     /// 工作流ID
@@ -46,7 +46,7 @@ pub struct CheckpointMeta {
 
 /// 检查点数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CheckpointData {
+pub(crate) struct CheckpointData {
     /// 元数据
     pub meta: CheckpointMeta,
     /// 阶段状态
@@ -59,7 +59,7 @@ pub struct CheckpointData {
 
 /// 检查点存储配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CheckpointStorageConfig {
+pub(crate) struct CheckpointStorageConfig {
     /// 存储路径
     pub storage_path: String,
     /// 最大检查点数
@@ -74,7 +74,7 @@ pub struct CheckpointStorageConfig {
 
 /// 检查点操作结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CheckpointResult {
+pub(crate) struct CheckpointResult {
     /// 是否成功
     pub success: bool,
     /// 检查点ID
@@ -91,7 +91,7 @@ pub struct CheckpointResult {
 
 /// 检查点持久化管理器
 /// 实现跨阶段检查点保存与恢复
-pub struct CheckpointPersistence {
+pub(crate) struct CheckpointPersistence {
     /// 配置
     config: CheckpointStorageConfig,
     /// 检查点索引

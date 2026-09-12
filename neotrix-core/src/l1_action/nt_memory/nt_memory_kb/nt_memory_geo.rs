@@ -55,7 +55,7 @@ pub fn upsert_geo(
 }
 
 /// 按地理范围查询 (包围盒)。返回按置信度降序的记录。
-pub fn query_bbox(
+pub(crate) fn query_bbox(
     conn: &Connection,
     min_lat: f64,
     min_lng: f64,
@@ -94,7 +94,7 @@ pub fn query_bbox(
 }
 
 /// 按国家/区域/城市过滤查询。
-pub fn query_by_place(
+pub(crate) fn query_by_place(
     conn: &Connection,
     country: &str,
     region: &str,
@@ -134,7 +134,7 @@ pub fn query_by_place(
 }
 
 /// 统计地理索引规模。
-pub fn geo_stats(conn: &Connection) -> Result<(i64, i64)> {
+pub(crate) fn geo_stats(conn: &Connection) -> Result<(i64, i64)> {
     let total: i64 = conn.query_row("SELECT COUNT(*) FROM geo_index", [], |r| r.get(0))?;
     let with_country: i64 = conn.query_row(
         "SELECT COUNT(*) FROM geo_index WHERE country != ''",
@@ -203,7 +203,7 @@ pub fn export_geojson(conn: &Connection) -> Result<String> {
 
 /// 国家 → (中文名, 首都坐标)。内置主要国家/地区词典, 供标题/摘要关键词匹配。
 /// 坐标取首都经纬度 (作为该国家知识节点的代表位置)。
-pub const COUNTRY_CAPITALS: &[(&str, &str, f64, f64)] = &[
+pub(crate) const COUNTRY_CAPITALS: &[(&str, &str, f64, f64)] = &[
     ("中国", "中国", 39.9042, 116.4074),
     ("China", "中国", 39.9042, 116.4074),
     ("美国", "美国", 38.9072, -77.0369),
@@ -303,7 +303,7 @@ pub const COUNTRY_CAPITALS: &[(&str, &str, f64, f64)] = &[
 /// 元组: (关键词, 城市名, 国家名, lat, lng)。覆盖知识库标题/摘要中
 /// 高频出现的城市 (论文机构、仓库名、新闻地域等)。城市级匹配比国家
 /// 首都坐标更精确, 大幅提升 geo-tag 覆盖率。
-pub const CITY_LATLNG: &[(&str, &str, &str, f64, f64)] = &[
+pub(crate) const CITY_LATLNG: &[(&str, &str, &str, f64, f64)] = &[
     // 中国
     ("北京", "北京", "中国", 39.9042, 116.4074),
     ("Beijing", "北京", "中国", 39.9042, 116.4074),
@@ -695,7 +695,7 @@ pub fn geo_coverage_report(conn: &Connection, min_threshold: i64) -> rusqlite::R
 // ─────────────────────────────────────────────────────────────────────────
 
 /// 确保 geo_elevation 表存在。
-pub fn ensure_elevation_table(conn: &Connection) -> rusqlite::Result<()> {
+pub(crate) fn ensure_elevation_table(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS geo_elevation (
             node_id TEXT PRIMARY KEY,
@@ -809,7 +809,7 @@ pub fn fetch_elevations(conn: &Connection, limit: usize) -> Result<usize, String
 }
 
 /// 查询已缓存的海拔记录 (node_id → 海拔米)。
-pub fn query_elevations(conn: &Connection, limit: usize) -> Result<Vec<(String, f64, f64, f64)>, String> {
+pub(crate) fn query_elevations(conn: &Connection, limit: usize) -> Result<Vec<(String, f64, f64, f64)>, String> {
     ensure_elevation_table(conn).map_err(|e| format!("elevation table: {}", e))?;
     let mut stmt = conn
         .prepare(
@@ -830,7 +830,7 @@ pub fn query_elevations(conn: &Connection, limit: usize) -> Result<Vec<(String, 
 
 /// 气象快照记录。
 #[derive(Debug, Clone)]
-pub struct WeatherRecord {
+pub(crate) struct WeatherRecord {
     pub node_id: String,
     pub lat: f64,
     pub lng: f64,
@@ -842,7 +842,7 @@ pub struct WeatherRecord {
     pub fetched_at: i64,
 }
 
-pub fn ensure_weather_table(conn: &Connection) -> rusqlite::Result<()> {
+pub(crate) fn ensure_weather_table(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS geo_weather (
             node_id TEXT PRIMARY KEY,
@@ -997,7 +997,7 @@ pub fn fetch_weather_snapshot(conn: &Connection, limit: usize) -> Result<usize, 
 }
 
 /// 查询已缓存的气象快照 (node_id → 温度/气压/风/降水)。
-pub fn query_weather(
+pub(crate) fn query_weather(
     conn: &Connection,
     limit: usize,
 ) -> Result<Vec<WeatherRecord>, String> {
@@ -1031,7 +1031,7 @@ pub fn query_weather(
 }
 
 /// 轨迹表: 记录一次行程的空间-时间片段 (B1 轨迹存储)。
-pub fn ensure_trajectory_table(conn: &Connection) -> rusqlite::Result<()> {
+pub(crate) fn ensure_trajectory_table(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS trajectory (
             id TEXT PRIMARY KEY,
@@ -1049,7 +1049,7 @@ pub fn ensure_trajectory_table(conn: &Connection) -> rusqlite::Result<()> {
 }
 
 /// 写入轨迹记录 (幂等 upsert)。
-pub fn insert_trajectory(
+pub(crate) fn insert_trajectory(
     conn: &Connection,
     id: &str,
     name: &str,
@@ -1090,7 +1090,7 @@ pub fn insert_trajectory(
 }
 
 /// 查询所有轨迹 (按 created_at 降序)。
-pub fn query_trajectories(conn: &Connection) -> Result<Vec<TrajectoryRow>, rusqlite::Error> {
+pub(crate) fn query_trajectories(conn: &Connection) -> Result<Vec<TrajectoryRow>, rusqlite::Error> {
     ensure_trajectory_table(conn)?;
     let sql = "SELECT id, name, kind, points_json, bbox_west, bbox_south, bbox_east, bbox_north, distance_km, created_at FROM trajectory ORDER BY created_at DESC";
     let mut stmt = conn.prepare(sql)?;
@@ -1113,7 +1113,7 @@ pub fn query_trajectories(conn: &Connection) -> Result<Vec<TrajectoryRow>, rusql
 
 /// 查询轨迹结果行。
 #[derive(Debug, Clone)]
-pub struct TrajectoryRow {
+pub(crate) struct TrajectoryRow {
     pub id: String,
     pub name: String,
     pub kind: Option<String>,
@@ -1311,7 +1311,7 @@ pub fn export_geo_ntpack(
 }
 
 /// 从 NT-Pack 文件解码回读 geo_index 数据 (验证/恢复用)
-pub fn import_geo_ntpack(path: &str) -> Result<(usize, Vec<crate::l1_action::nt_memory::nt_memory_kb::nt_memory_pack::GeoPoint>), String> {
+pub(crate) fn import_geo_ntpack(path: &str) -> Result<(usize, Vec<crate::l1_action::nt_memory::nt_memory_kb::nt_memory_pack::GeoPoint>), String> {
     use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_pack::PackDecoder;
     let bytes = std::fs::read(path).map_err(|e| format!("读文件 {}: {}", path, e))?;
     let (_dec, points) = PackDecoder::decode(&bytes)?;
@@ -1326,7 +1326,7 @@ pub fn import_geo_ntpack(path: &str) -> Result<(usize, Vec<crate::l1_action::nt_
 /// 当前规模 (50k 条 encode <1s) 下开销可接受; 若需避免全量重编, 需切分块格式 (A5)。
 ///
 /// `path` 不存在时等价于新建; 返回 (写入后总条数, 文件字节)。
-pub fn append_geo_ntpack(
+pub(crate) fn append_geo_ntpack(
     path: &str,
     new_points: &[crate::l1_action::nt_memory::nt_memory_kb::nt_memory_pack::GeoPoint],
 ) -> Result<(usize, usize), String> {
@@ -1557,7 +1557,7 @@ pub fn query_bbox_with_cold(
 }
 
 /// B1 透明读路径: 国家/区域/城市查询 + 冷层兜底 (同 [`query_bbox_with_cold`])。
-pub fn query_by_place_with_cold(
+pub(crate) fn query_by_place_with_cold(
     conn: &Connection,
     country: &str,
     region: &str,
@@ -1596,7 +1596,7 @@ pub fn query_by_place_with_cold(
 /// 修调研发现的"前端层计数突变"风险 — 归档后 `kb_geo_layers` 只统计热表,
 /// 层计数会骤减; 本函数冷热合并, 让层感知不被归档扭曲。返回
 /// Vec<(source, warm_count, cold_bytes, 冷层路径?)>。
-pub fn geo_layer_inventory(conn: &Connection, cold_dir: &str) -> Result<Vec<(String, i64, Option<(String, u64)>)>, String> {
+pub(crate) fn geo_layer_inventory(conn: &Connection, cold_dir: &str) -> Result<Vec<(String, i64, Option<(String, u64)>)>, String> {
     let mut stmt = conn
         .prepare("SELECT source, COUNT(*) FROM geo_index GROUP BY source ORDER BY source")
         .map_err(|e| format!("inventory query: {}", e))?;

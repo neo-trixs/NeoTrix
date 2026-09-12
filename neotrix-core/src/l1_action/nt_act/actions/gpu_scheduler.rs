@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 /// GPU 设备状态
 #[derive(Debug, Clone)]
-pub struct GpuDevice {
+pub(crate) struct GpuDevice {
     /// 设备 ID
     pub id: String,
     /// 设备名
@@ -34,7 +34,7 @@ pub struct GpuDevice {
 
 /// 设备状态
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DeviceStatus {
+pub(crate) enum DeviceStatus {
     Available,
     Busy,
     Overloaded,
@@ -44,7 +44,7 @@ pub enum DeviceStatus {
 
 /// 作业资源需求
 #[derive(Debug, Clone)]
-pub struct JobRequirements {
+pub(crate) struct JobRequirements {
     /// 最小显存 (GB)
     pub min_vram_gb: f64,
     /// 推荐显存 (GB)
@@ -67,7 +67,7 @@ pub enum JobPriority {
 
 /// 调度策略
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SchedulingStrategy {
+pub(crate) enum SchedulingStrategy {
     /// 最佳适配 (Best Fit)
     BestFit,
     /// 首次适配 (First Fit)
@@ -80,7 +80,7 @@ pub enum SchedulingStrategy {
 
 /// 调度决策
 #[derive(Debug, Clone)]
-pub struct ScheduleDecision {
+pub(crate) struct ScheduleDecision {
     /// 目标 GPU
     pub gpu_id: String,
     /// 预计等待时间
@@ -90,7 +90,7 @@ pub struct ScheduleDecision {
 }
 
 /// GPU 调度器
-pub struct GpuScheduler {
+pub(crate) struct GpuScheduler {
     /// GPU 设备列表
     devices: HashMap<String, GpuDevice>,
     /// 调度策略
@@ -105,7 +105,7 @@ pub struct GpuScheduler {
 
 /// 自动扩缩容配置
 #[derive(Debug, Clone)]
-pub struct AutoscaleConfig {
+pub(crate) struct AutoscaleConfig {
     /// 最小设备数
     pub min_devices: usize,
     /// 最大设备数

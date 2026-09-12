@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 /// Provider 指标快照
 
-pub struct ProviderMetric {
+pub(crate) struct ProviderMetric {
     /// Provider 唯一标识
     pub provider_id: String,
     /// 响应延迟 (毫秒)
@@ -20,7 +20,7 @@ pub struct ProviderMetric {
 /// 漂移检测结果
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum DriftStatus {
+pub(crate) enum DriftStatus {
     /// 正常范围，无需干预
     Normal,
     /// 轻微漂移，建议继续监控
@@ -48,7 +48,7 @@ pub enum DriftStatus {
 /// - 双阈值机制: 轻微漂移 (告警) vs 严重漂移 (触发切换)
 /// - 滚动窗口自动清理旧数据，避免内存膨胀
 
-pub struct DriftDetector {
+pub(crate) struct DriftDetector {
     /// 指标历史记录 (全 provider 共用)
     windows: VecDeque<ProviderMetric>,
     /// 单个 provider 的有效窗口大小

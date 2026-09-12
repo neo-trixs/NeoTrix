@@ -12,7 +12,7 @@ use super::graph_segment::{GraphSegment, GraphEdge, EdgeDirection};
 use rusqlite::Connection;
 
 /// NTX 索引管理器 (带文件缓存)
-pub struct NtxIndexManager {
+pub(crate) struct NtxIndexManager {
     ntx_path: PathBuf,
     cached_ntx: RefCell<Option<NtxFile>>,
 }

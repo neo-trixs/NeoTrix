@@ -11,7 +11,7 @@ use serde_json::Value as Json;
 
 /// SEO 分析器 — 内容可见性/关键词/排名分析的占位叶。
 #[derive(Debug, Clone, Default)]
-pub struct SeoAnalyzer {
+pub(crate) struct SeoAnalyzer {
     /// 已分析页面数 (telemetry, TODO 填充)
     pub analyzed_pages: u64,
 }

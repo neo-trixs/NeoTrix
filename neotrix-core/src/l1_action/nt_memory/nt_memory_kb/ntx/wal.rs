@@ -39,7 +39,7 @@ impl CompressionType {
 
 /// WAL 条目
 #[derive(Debug, Clone)]
-pub struct WalEntry {
+pub(crate) struct WalEntry {
     pub sequence: u64,
     pub entry_type: WalEntryType,
     pub payload: Vec<u8>,

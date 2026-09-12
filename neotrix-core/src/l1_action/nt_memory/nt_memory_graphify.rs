@@ -18,21 +18,21 @@ use super::shared_utils::now_ts;
 
 /// 抽取出的实体。
 #[derive(Debug, Clone, PartialEq)]
-pub struct ExtractedEntity {
+pub(crate) struct ExtractedEntity {
     pub label: String,
     pub entity_type: String,
 }
 
 /// 抽取出的关系 (head - rel -> tail)。
 #[derive(Debug, Clone, PartialEq)]
-pub struct ExtractedRelation {
+pub(crate) struct ExtractedRelation {
     pub head: String,
     pub relation: String,
     pub tail: String,
 }
 
 /// 知识图谱构建后端统一接口。
-pub trait KnowledgeGraphBuilder: Send + Sync {
+pub(crate) trait KnowledgeGraphBuilder: Send + Sync {
     /// 后端标识 (如 "graphify")。
     fn backend_id(&self) -> &str;
     /// 由文本抽取实体/关系 (stub: 行级 token 兜底抽取)。
@@ -48,7 +48,7 @@ pub trait KnowledgeGraphBuilder: Send + Sync {
 }
 
 /// Graphify 后端实现 (stub)。
-pub struct GraphifyBackend {
+pub(crate) struct GraphifyBackend {
     pub endpoint: String,
 }
 

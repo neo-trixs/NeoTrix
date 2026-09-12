@@ -35,7 +35,7 @@ pub struct GraphNode {
 
 /// 邻居
 #[derive(Debug, Clone)]
-pub struct GraphNeighbor {
+pub(crate) struct GraphNeighbor {
     pub node_id: [u8; 36],
     pub edge_type: u16,
     pub weight: f32,

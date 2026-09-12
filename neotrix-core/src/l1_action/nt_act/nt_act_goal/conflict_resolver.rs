@@ -8,7 +8,7 @@ use crate::neotrix::nt_act_goal::goal_generator::{EvolutionGoal, GoalCategory, G
 
 /// 两个目标之间的冲突描述
 #[derive(Debug, Clone)]
-pub struct GoalConflict {
+pub(crate) struct GoalConflict {
     pub goal_a_id: String,
     pub goal_b_id: String,
     pub reason: ConflictReason,
@@ -17,7 +17,7 @@ pub struct GoalConflict {
 
 /// 冲突原因分类
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConflictReason {
+pub(crate) enum ConflictReason {
     SameFile { file: String },
     SameCategory,
     OppositePriorities,
@@ -26,7 +26,7 @@ pub enum ConflictReason {
 
 /// 冲突严重程度
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConflictSeverity {
+pub(crate) enum ConflictSeverity {
     /// 同一文件 + 优先级对立 → 必须合并
     Critical,
     /// 同一类别超过阈值 → 可以重排

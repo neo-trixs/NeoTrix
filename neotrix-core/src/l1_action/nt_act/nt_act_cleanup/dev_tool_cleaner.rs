@@ -7,7 +7,7 @@
 use super::shared::*;
 use std::path::Path;
 
-pub struct DevToolCleaner {
+pub(crate) struct DevToolCleaner {
     config: CleanupConfig,
 }
 

@@ -41,7 +41,7 @@ impl MemoryItem {
 
 /// Selective memory manager — enforces capacity via importance-based eviction
 #[derive(Debug, Clone)]
-pub struct SelectiveMemory {
+pub(crate) struct SelectiveMemory {
     /// Maximum number of items to retain
     capacity: usize,
     /// Minimum importance threshold — items below this are always evicted

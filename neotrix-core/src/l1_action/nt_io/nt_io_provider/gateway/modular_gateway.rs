@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 /// 模块化网关 — 组件化架构，支持热插拔中间件
-pub struct ModularGateway {
+pub(crate) struct ModularGateway {
     middlewares: RwLock<Vec<Box<dyn Middleware>>>,
     routes: RwLock<HashMap<String, Route>>,
     config: ModularConfig,
 }
 
 #[derive(Debug, Clone)]
-pub struct ModularConfig {
+pub(crate) struct ModularConfig {
     pub max_middlewares: usize,
     pub request_timeout_ms: u64,
 }
@@ -24,7 +24,7 @@ impl Default for ModularConfig {
 }
 
 /// 中间件 trait
-pub trait Middleware: Send + Sync {
+pub(crate) trait Middleware: Send + Sync {
     fn name(&self) -> &str;
     fn priority(&self) -> i32;
     fn before_request(&self, ctx: &mut RequestCtx) -> Result<(), MiddlewareError>;
@@ -32,7 +32,7 @@ pub trait Middleware: Send + Sync {
 }
 
 #[derive(Debug, Clone)]
-pub struct RequestCtx {
+pub(crate) struct RequestCtx {
     pub method: String,
     pub path: String,
     pub headers: HashMap<String, String>,
@@ -41,7 +41,7 @@ pub struct RequestCtx {
 }
 
 #[derive(Debug, Clone)]
-pub struct ResponseCtx {
+pub(crate) struct ResponseCtx {
     pub status: u16,
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
@@ -49,7 +49,7 @@ pub struct ResponseCtx {
 }
 
 #[derive(Debug)]
-pub enum MiddlewareError {
+pub(crate) enum MiddlewareError {
     Abort(String),
     Skip,
 }

@@ -51,7 +51,7 @@ pub trait ConsistencyAdapter {
 
 /// 训练参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrainingParameters {
+pub(crate) struct TrainingParameters {
     /// 训练轮数
     pub epochs: u32,
     /// 学习率
@@ -66,7 +66,7 @@ pub struct TrainingParameters {
 
 /// 训练结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrainingResult {
+pub(crate) struct TrainingResult {
     /// 是否成功
     pub success: bool,
     /// 模型路径
@@ -81,7 +81,7 @@ pub struct TrainingResult {
 
 /// 生成参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerationParameters {
+pub(crate) struct GenerationParameters {
     /// 图片尺寸
     pub image_size: (u32, u32),
     /// 推理步数
@@ -111,7 +111,7 @@ pub struct GenerationResult {
 
 /// 一致性验证结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsistencyVerification {
+pub(crate) struct ConsistencyVerification {
     /// 是否一致
     pub is_consistent: bool,
     /// 一致性分数 (0.0-1.0)
@@ -124,7 +124,7 @@ pub struct ConsistencyVerification {
 
 /// 一致性维度
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsistencyDimension {
+pub(crate) struct ConsistencyDimension {
     /// 维度名称
     pub dimension: String,
     /// 分数 (0.0-1.0)
@@ -135,7 +135,7 @@ pub struct ConsistencyDimension {
 
 /// 一致性错误
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ConsistencyError {
+pub(crate) enum ConsistencyError {
     /// 模型不存在
     ModelNotFound,
     /// 训练失败
@@ -152,7 +152,7 @@ pub enum ConsistencyError {
 
 /// 适配器能力
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdapterCapabilities {
+pub(crate) struct AdapterCapabilities {
     /// 是否支持训练
     pub supports_training: bool,
     /// 是否支持生成
@@ -172,7 +172,7 @@ pub struct AdapterCapabilities {
 // ============================================================================
 
 /// LoRA 适配器
-pub struct LoRAAdapter {
+pub(crate) struct LoRAAdapter {
     name: String,
 }
 
@@ -280,7 +280,7 @@ impl ConsistencyAdapter for LoRAAdapter {
 }
 
 /// IP-Adapter 适配器
-pub struct IPAdapterAdapter {
+pub(crate) struct IPAdapterAdapter {
     name: String,
 }
 
@@ -385,7 +385,7 @@ impl ConsistencyAdapter for IPAdapterAdapter {
 // ============================================================================
 
 /// 一致性控制管理器
-pub struct ConsistencyManager {
+pub(crate) struct ConsistencyManager {
     /// 已注册的适配器
     adapters: Vec<Box<dyn ConsistencyAdapter>>,
 }

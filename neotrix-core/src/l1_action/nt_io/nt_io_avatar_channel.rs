@@ -28,7 +28,7 @@ pub enum MessageDirection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainEntry {
+pub(crate) struct ChainEntry {
     pub index: u64,
     pub timestamp: i64,
     pub previous_hash: String,
@@ -46,7 +46,7 @@ pub struct AvatarChain {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChannelMessage {
+pub(crate) struct ChannelMessage {
     pub from: String,
     pub msg_type: String,
     pub payload: String,
@@ -359,20 +359,20 @@ fn base64_decode(data: &str) -> Option<Vec<u8>> {
     Some(result)
 }
 
-pub fn generate_identity(name: &str) -> AvatarIdentity {
+pub(crate) fn generate_identity(name: &str) -> AvatarIdentity {
     let identity = AvatarIdentity::new(name);
     let _ = identity.save();
     identity
 }
 
-pub fn load_or_create_identity(name: Option<&str>) -> Option<AvatarIdentity> {
+pub(crate) fn load_or_create_identity(name: Option<&str>) -> Option<AvatarIdentity> {
     if let Some(loaded) = AvatarIdentity::load() {
         return Some(loaded);
     }
     name.map(generate_identity)
 }
 
-pub fn avatar_chain_save_path() -> PathBuf {
+pub(crate) fn avatar_chain_save_path() -> PathBuf {
     data_dir().join(CHAIN_FILE)
 }
 

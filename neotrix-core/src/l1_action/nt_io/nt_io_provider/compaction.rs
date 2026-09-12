@@ -1,6 +1,6 @@
 use super::types::{Message, Role};
 
-pub fn sanitize_history(messages: &mut Vec<Message>) {
+pub(crate) fn sanitize_history(messages: &mut Vec<Message>) {
     let mut i = 0;
     while i < messages.len() {
         if messages[i].role == Role::Tool {

@@ -1,7 +1,7 @@
 use crate::neotrix::nt_act_autonomy::awareness_monitor::AwarenessReport;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ArchIssueType {
+pub(crate) enum ArchIssueType {
     LargeModule { file: String, lines: usize },
     CircularDependency { modules: Vec<String> },
     MissingAbstraction { description: String },
@@ -10,7 +10,7 @@ pub enum ArchIssueType {
 }
 
 #[derive(Debug, Clone)]
-pub struct ArchSuggestion {
+pub(crate) struct ArchSuggestion {
     pub id: String,
     pub issue_type: ArchIssueType,
     pub description: String,
@@ -20,7 +20,7 @@ pub struct ArchSuggestion {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum EffortEstimate {
+pub(crate) enum EffortEstimate {
     Quick,
     Moderate,
     Large,
@@ -28,7 +28,7 @@ pub enum EffortEstimate {
 }
 
 #[derive(Debug, Clone)]
-pub struct ArchOptimizationReport {
+pub(crate) struct ArchOptimizationReport {
     pub suggestions: Vec<ArchSuggestion>,
     pub total_suggestions: u32,
     pub auto_fixable_count: u32,

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Product Knowledge Pack Trait - the plug mechanism
-pub trait ProductKnowledgePack: Send + Sync {
+pub(crate) trait ProductKnowledgePack: Send + Sync {
     fn product_type(&self) -> ProductType;
     fn bom_template(&self) -> Vec<BomTemplateItem>;
     fn routing_template(&self) -> Vec<RoutingTemplateStep>;
@@ -39,7 +39,7 @@ pub enum ProductType {
 
 /// BOM Template Item
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BomTemplateItem {
+pub(crate) struct BomTemplateItem {
     pub category: String,
     pub name: String,
     pub specification: String,
@@ -52,7 +52,7 @@ pub struct BomTemplateItem {
 
 /// Routing Template Step
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RoutingTemplateStep {
+pub(crate) struct RoutingTemplateStep {
     pub step_id: String,
     pub name: String,
     pub work_center_type: String,
@@ -62,7 +62,7 @@ pub struct RoutingTemplateStep {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SkillLevel {
+pub(crate) enum SkillLevel {
     Unskilled,
     SemiSkilled,
     Skilled,
@@ -82,7 +82,7 @@ pub struct PackagingSpec {
 
 /// Inspection Standard
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InspectionStandard {
+pub(crate) struct InspectionStandard {
     pub aql_level: String,
     pub sampling_plan: String,
     pub critical_defects: Vec<String>,
@@ -92,7 +92,7 @@ pub struct InspectionStandard {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestMethod {
+pub(crate) struct TestMethod {
     pub parameter: String,
     pub method: String,
     pub equipment: String,
@@ -101,7 +101,7 @@ pub struct TestMethod {
 
 /// Document Templates
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentTemplates {
+pub(crate) struct DocumentTemplates {
     pub commercial_invoice: String,
     pub packing_list: String,
     pub certificate_of_origin: String,
@@ -129,7 +129,7 @@ pub enum RiskCategory {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RiskAction {
+pub(crate) enum RiskAction {
     Block,
     Warn,
     RequireApproval,
@@ -139,7 +139,7 @@ pub enum RiskAction {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RiskSeverity {
+pub(crate) enum RiskSeverity {
     Low,
     Medium,
     High,
@@ -148,14 +148,14 @@ pub enum RiskSeverity {
 
 /// Compliance Map
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceMap {
+pub(crate) struct ComplianceMap {
     pub target_countries: HashMap<String, CountryCompliance>,
     pub international_standards: Vec<String>,
     pub trade_agreements: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CountryCompliance {
+pub(crate) struct CountryCompliance {
     pub country_code: String,
     pub required_certifications: Vec<String>,
     pub labeling_requirements: Vec<String>,
@@ -168,7 +168,7 @@ pub struct CountryCompliance {
 
 /// Machinery Knowledge Pack
 #[derive(Debug, Clone)]
-pub struct MachineryKnowledgePack;
+pub(crate) struct MachineryKnowledgePack;
 
 impl ProductKnowledgePack for MachineryKnowledgePack {
     fn product_type(&self) -> ProductType {
@@ -412,7 +412,7 @@ impl ProductKnowledgePack for MachineryKnowledgePack {
 
 /// Textile Knowledge Pack
 #[derive(Debug, Clone)]
-pub struct TextileKnowledgePack;
+pub(crate) struct TextileKnowledgePack;
 
 impl ProductKnowledgePack for TextileKnowledgePack {
     fn product_type(&self) -> ProductType {
@@ -640,7 +640,7 @@ impl ProductKnowledgePack for TextileKnowledgePack {
 
 /// Food Knowledge Pack
 #[derive(Debug, Clone)]
-pub struct FoodKnowledgePack;
+pub(crate) struct FoodKnowledgePack;
 
 impl ProductKnowledgePack for FoodKnowledgePack {
     fn product_type(&self) -> ProductType {
@@ -880,7 +880,7 @@ impl ProductKnowledgePack for FoodKnowledgePack {
 }
 
 /// Factory function to get the appropriate knowledge pack
-pub fn get_product_knowledge_pack(product_type: ProductType) -> Box<dyn ProductKnowledgePack> {
+pub(crate) fn get_product_knowledge_pack(product_type: ProductType) -> Box<dyn ProductKnowledgePack> {
     match product_type {
         ProductType::Machinery => Box::new(MachineryKnowledgePack),
         ProductType::Textile => Box::new(TextileKnowledgePack),
@@ -893,7 +893,7 @@ pub fn get_product_knowledge_pack(product_type: ProductType) -> Box<dyn ProductK
 
 /// Chemical Knowledge Pack (placeholder)
 #[derive(Debug, Clone)]
-pub struct ChemicalKnowledgePack;
+pub(crate) struct ChemicalKnowledgePack;
 
 impl ProductKnowledgePack for ChemicalKnowledgePack {
     fn product_type(&self) -> ProductType { ProductType::Chemical }
@@ -911,7 +911,7 @@ impl ProductKnowledgePack for ChemicalKnowledgePack {
 
 /// Electronics Knowledge Pack (placeholder)
 #[derive(Debug, Clone)]
-pub struct ElectronicsKnowledgePack;
+pub(crate) struct ElectronicsKnowledgePack;
 
 impl ProductKnowledgePack for ElectronicsKnowledgePack {
     fn product_type(&self) -> ProductType { ProductType::Electronics }
@@ -929,7 +929,7 @@ impl ProductKnowledgePack for ElectronicsKnowledgePack {
 
 /// Generic Knowledge Pack (fallback)
 #[derive(Debug, Clone)]
-pub struct GenericKnowledgePack;
+pub(crate) struct GenericKnowledgePack;
 
 impl ProductKnowledgePack for GenericKnowledgePack {
     fn product_type(&self) -> ProductType { ProductType::Other }
@@ -946,7 +946,7 @@ impl ProductKnowledgePack for GenericKnowledgePack {
 }
 
 /// Register the ProductSpec capability node
-pub fn register_product_spec_capability(registry: &mut CapabilityRegistry) -> CapabilityNode {
+pub(crate) fn register_product_spec_capability(registry: &mut CapabilityRegistry) -> CapabilityNode {
     let node = CapabilityNode::new_primitive(
         "NT-MEMORY::trade::trade_product_spec".to_string(),
         Domain::Memory,

@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 /// 检查点信息
 #[derive(Debug, Clone)]
-pub struct CheckpointInfo {
+pub(crate) struct CheckpointInfo {
     /// 检查点 ID
     pub id: String,
     /// 作业 ID
@@ -41,7 +41,7 @@ pub enum CheckpointStatus {
 
 /// 检查点配置
 #[derive(Debug, Clone)]
-pub struct CheckpointConfig {
+pub(crate) struct CheckpointConfig {
     /// 最大检查点数
     pub max_checkpoints: usize,
     /// 检查点保留时间
@@ -54,7 +54,7 @@ pub struct CheckpointConfig {
 
 /// 存储后端
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StorageBackend {
+pub(crate) enum StorageBackend {
     Local,
     S3,
     GCS,
@@ -73,7 +73,7 @@ impl Default for CheckpointConfig {
 }
 
 /// 管线检查点管理器
-pub struct PipelineCheckpointing {
+pub(crate) struct PipelineCheckpointing {
     /// 检查点存储
     checkpoints: HashMap<String, Vec<CheckpointInfo>>,
     /// 配置

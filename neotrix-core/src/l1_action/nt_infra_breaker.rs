@@ -12,7 +12,7 @@ use neotrix_types::shared::{BreakerState, CircuitBreaker as CanonicalCircuitBrea
 
 /// 断路器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BreakerConfig {
+pub(crate) struct BreakerConfig {
     /// 错误率阈值 (0.0-1.0), 超过则熔断
     pub error_threshold: f64,
     /// 熔断持续时间 (ms)
@@ -37,7 +37,7 @@ impl Default for BreakerConfig {
 /// Infrastructure circuit breaker — wraps canonical `CircuitBreaker` with
 /// error-rate sliding-window tracking and timestamp-based cooldown.
 #[derive(Debug, Clone)]
-pub struct InfraBreaker {
+pub(crate) struct InfraBreaker {
     inner: CanonicalCircuitBreaker,
     config: BreakerConfig,
     recent_results: Vec<bool>,
@@ -175,21 +175,21 @@ lazy_static::lazy_static! {
     static ref GLOBAL_BREAKERS: Mutex<BreakerRegistry> = Mutex::new(BreakerRegistry::new());
 }
 
-pub fn breaker_allow(capability_id: &str) -> bool {
+pub(crate) fn breaker_allow(capability_id: &str) -> bool {
     GLOBAL_BREAKERS
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .allow(capability_id)
 }
 
-pub fn breaker_record(capability_id: &str, success: bool) {
+pub(crate) fn breaker_record(capability_id: &str, success: bool) {
     GLOBAL_BREAKERS
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .record_result(capability_id, success);
 }
 
-pub fn breaker_states() -> HashMap<String, BreakerState> {
+pub(crate) fn breaker_states() -> HashMap<String, BreakerState> {
     GLOBAL_BREAKERS
         .lock()
         .unwrap_or_else(|e| e.into_inner())

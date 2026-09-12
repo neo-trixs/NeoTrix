@@ -75,7 +75,7 @@ pub fn subgraph(
 
 /// Trust score result for a single node.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrustScore {
+pub(crate) struct TrustScore {
     pub node_id: String,
     pub trust: f64,
     pub in_degree: usize,
@@ -93,7 +93,7 @@ pub struct TrustScore {
 ///
 /// `damping` is the PageRank damping factor (typically 0.85).
 /// `max_iter` controls convergence iterations (15-20 usually sufficient).
-pub fn compute_trust_scores(
+pub(crate) fn compute_trust_scores(
     conn: &Connection,
     damping: f64,
     max_iter: usize,

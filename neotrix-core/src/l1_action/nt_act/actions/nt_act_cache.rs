@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 /// 统一缓存层
-pub struct CacheLayer {
+pub(crate) struct CacheLayer {
     l1_cache: LRUCache<String, CacheEntry>,
     l2_cache: Option<DiskCache>,
     stats: CacheStats,
@@ -60,14 +60,14 @@ pub struct CacheEntry {
 }
 
 /// LRU 缓存
-pub struct LRUCache<K, V> {
+pub(crate) struct LRUCache<K, V> {
     entries: HashMap<K, V>,
     access_order: VecDeque<K>,
     max_entries: usize,
 }
 
 /// 磁盘缓存 (L2)
-pub struct DiskCache {
+pub(crate) struct DiskCache {
     path: String,
     max_size_mb: usize,
     current_size_mb: usize,
@@ -85,7 +85,7 @@ pub struct CacheStats {
 
 /// 缓存查询结果
 #[derive(Debug, Clone)]
-pub enum CacheResult {
+pub(crate) enum CacheResult {
     Hit(CacheEntry),
     Miss,
     Expired,

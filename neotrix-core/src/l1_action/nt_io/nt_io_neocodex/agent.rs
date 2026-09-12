@@ -21,7 +21,7 @@ use super::subagent::{SubagentDispatch, SubagentKind, SubagentResult};
 use super::wire::{WireEvent, WireSession};
 
 #[derive(Debug, Clone)]
-pub struct NeoCodexConfig {
+pub(crate) struct NeoCodexConfig {
     pub mode: NeoCodexMode,
     pub max_turn_tokens: usize,
     pub provider_name: String,
@@ -89,7 +89,7 @@ impl AgentState {
 /// 流式生成的最终结果。`error` 有值时表示 provider 阶段发生错误：
 /// 调用方应保留 `content`（已累积的 partial token）但**不**将其落盘为
 /// 合法助手消息（F1 修复：避免 `[provider error]` 污染 wire/context）。
-pub struct StreamOutcome {
+pub(crate) struct StreamOutcome {
     /// 完整或部分生成内容
     pub content: Option<String>,
     /// provider 错误信息（None = 正常完成）

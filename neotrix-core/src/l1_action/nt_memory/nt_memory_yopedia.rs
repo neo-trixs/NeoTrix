@@ -16,7 +16,7 @@ use uuid::Uuid;
 use super::shared_utils::now_ts;
 
 /// 智能体 wiki / KB 参考后端统一接口。
-pub trait AgentWikiRef: Send + Sync {
+pub(crate) trait AgentWikiRef: Send + Sync {
     /// 后端标识 (如 "yopedia")。
     fn backend_id(&self) -> &str;
     /// 由条目 (title + body) 生成 KB `WikiPage` 节点 key。
@@ -34,7 +34,7 @@ pub trait AgentWikiRef: Send + Sync {
 }
 
 /// Yopedia 后端实现 (stub)。
-pub struct YopediaBackend {
+pub(crate) struct YopediaBackend {
     pub endpoint: String,
 }
 

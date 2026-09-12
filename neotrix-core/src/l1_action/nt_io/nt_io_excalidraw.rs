@@ -23,7 +23,7 @@ pub struct DiagramEdge {
 }
 
 /// 图渲染器 trait — 把图规格转换为可序列化的场景表示。
-pub trait DiagramRenderer: Send + Sync {
+pub(crate) trait DiagramRenderer: Send + Sync {
     /// 渲染场景: 返回元素数量 (节点+连线), 或 None 当规格非法。
     fn render_scene(&self, nodes: &[DiagramNode], edges: &[DiagramEdge]) -> Option<usize>;
     /// 校验规格: 所有 edge 端点必须存在于节点集合。
@@ -32,7 +32,7 @@ pub trait DiagramRenderer: Send + Sync {
 
 /// 默认实现: 骨架计数式渲染 + 端点一致性校验。
 #[derive(Default)]
-pub struct ExcalidrawRenderer;
+pub(crate) struct ExcalidrawRenderer;
 
 impl DiagramRenderer for ExcalidrawRenderer {
     fn render_scene(&self, nodes: &[DiagramNode], edges: &[DiagramEdge]) -> Option<usize> {
@@ -51,7 +51,7 @@ impl DiagramRenderer for ExcalidrawRenderer {
 
 /// T1 SelfTest: 验证渲染器存在并正确校验端点。
 #[derive(Default)]
-pub struct ExcalidrawSelfTest;
+pub(crate) struct ExcalidrawSelfTest;
 
 impl SelfTest for ExcalidrawSelfTest {
     fn name(&self) -> &str {

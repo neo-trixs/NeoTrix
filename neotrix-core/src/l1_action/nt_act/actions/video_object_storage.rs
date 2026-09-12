@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 /// 存储对象
 #[derive(Debug, Clone)]
-pub struct StorageObject {
+pub(crate) struct StorageObject {
     /// 对象 ID
     pub id: String,
     /// 对象键
@@ -35,7 +35,7 @@ pub struct StorageObject {
 
 /// 存储类别
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StorageClass {
+pub(crate) enum StorageClass {
     /// 标准存储
     Standard,
     /// 低频访问
@@ -63,7 +63,7 @@ pub struct AccessControl {
 
 /// 生命周期规则
 #[derive(Debug, Clone)]
-pub struct LifecycleRule {
+pub(crate) struct LifecycleRule {
     /// 规则 ID
     pub id: String,
     /// 过期时间 (天)
@@ -80,7 +80,7 @@ pub struct LifecycleRule {
 
 /// 存储配置
 #[derive(Debug, Clone)]
-pub struct StorageConfig {
+pub(crate) struct StorageConfig {
     /// 存储桶名
     pub bucket_name: String,
     /// 区域
@@ -116,7 +116,7 @@ impl Default for StorageConfig {
 }
 
 /// 视频对象存储
-pub struct VideoObjectStorage {
+pub(crate) struct VideoObjectStorage {
     /// 存储对象
     objects: HashMap<String, StorageObject>,
     /// 配置
@@ -237,7 +237,7 @@ impl Default for VideoObjectStorage {
 
 /// 存储统计
 #[derive(Debug, Clone, Default)]
-pub struct StorageStats {
+pub(crate) struct StorageStats {
     pub total_uploads: u32,
     pub total_downloads: u32,
     pub total_deletes: u32,

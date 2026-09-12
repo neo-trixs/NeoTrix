@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// 域标识
-pub type DomainId = String;
+pub(crate) type DomainId = String;
 
 /// 反因果域样本
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AntiCausalSample {
+pub(crate) struct AntiCausalSample {
     /// 特征向量 X (由 Y 导致)
     pub features: Vec<f32>,
     /// 标签 Y (源域有, 目标域 None)
@@ -29,7 +29,7 @@ pub struct AntiCausalSample {
 
 /// 反因果域适配器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DomainAdapterConfig {
+pub(crate) struct DomainAdapterConfig {
     /// 不变性惩罚系数 (IRM 风格)
     pub invariance_penalty: f64,
     /// 目标域伪标签置信度阈值
@@ -56,7 +56,7 @@ impl Default for DomainAdapterConfig {
 
 /// 不变预测器 (invariant predictor)
 #[derive(Debug, Clone)]
-pub struct InvariantPredictor {
+pub(crate) struct InvariantPredictor {
     /// 线性权重 w (不变跨域)
     weights: Vec<f32>,
     bias: f32,
@@ -87,7 +87,7 @@ impl InvariantPredictor {
 
 /// 域适配结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdaptationReport {
+pub(crate) struct AdaptationReport {
     pub source_domains: Vec<DomainId>,
     pub target_domain: DomainId,
     pub epochs_run: usize,
@@ -101,7 +101,7 @@ pub struct AdaptationReport {
 }
 
 /// 反因果域适配器
-pub struct DomainAdapter {
+pub(crate) struct DomainAdapter {
     config: DomainAdapterConfig,
     predictor: Option<InvariantPredictor>,
     dim: usize,

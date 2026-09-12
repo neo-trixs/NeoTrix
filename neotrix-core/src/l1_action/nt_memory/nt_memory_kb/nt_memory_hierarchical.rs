@@ -17,7 +17,7 @@ use super::nt_memory_types::*;
 /// A semantic cluster: group of related entity nodes aggregated into a
 /// summary super-node.
 #[derive(Debug, Clone)]
-pub struct SemanticCluster {
+pub(crate) struct SemanticCluster {
     pub cluster_id: String,
     pub label: String,
     pub summary: String,

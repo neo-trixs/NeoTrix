@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 3D 开发引擎
-pub struct Development3DEngine {
+pub(crate) struct Development3DEngine {
     scenes: HashMap<String, Scene>,
     objects: HashMap<String, GameObject>,
     scripts: Vec<Script>,
@@ -23,7 +23,7 @@ pub struct Development3DEngine {
 
 /// 3D 开发配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Dev3DConfig {
+pub(crate) struct Dev3DConfig {
     pub engine_type: String,
     pub render_pipeline: String,
     pub physics_enabled: bool,
@@ -56,7 +56,7 @@ pub struct Scene {
 
 /// 灯光配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LightingConfig {
+pub(crate) struct LightingConfig {
     pub ambient_light: Color,
     pub directional_light: Option<DirectionalLight>,
     pub point_lights: Vec<PointLight>,
@@ -73,7 +73,7 @@ pub struct Color {
 
 /// 方向光
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DirectionalLight {
+pub(crate) struct DirectionalLight {
     pub intensity: f32,
     pub color: Color,
     pub rotation: Vector3,
@@ -81,7 +81,7 @@ pub struct DirectionalLight {
 
 /// 点光源
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PointLight {
+pub(crate) struct PointLight {
     pub position: Vector3,
     pub intensity: f32,
     pub range: f32,
@@ -90,7 +90,7 @@ pub struct PointLight {
 
 /// 相机配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CameraConfig {
+pub(crate) struct CameraConfig {
     pub position: Vector3,
     pub rotation: Vector3,
     pub fov: f32,
@@ -100,7 +100,7 @@ pub struct CameraConfig {
 
 /// 物理配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhysicsConfig {
+pub(crate) struct PhysicsConfig {
     pub gravity: Vector3,
     pub time_step: f32,
     pub solver_iterations: u32,
@@ -116,7 +116,7 @@ pub struct Vector3 {
 
 /// 游戏对象
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GameObject {
+pub(crate) struct GameObject {
     pub id: String,
     pub name: String,
     pub object_type: ObjectType,
@@ -128,7 +128,7 @@ pub struct GameObject {
 /// 对象类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ObjectType {
+pub(crate) enum ObjectType {
     Primitive,
     Model,
     Light,
@@ -175,7 +175,7 @@ pub struct Asset {
 
 /// 3D 开发统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Dev3DStats {
+pub(crate) struct Dev3DStats {
     pub scenes_created: u64,
     pub objects_instantiated: u64,
     pub scripts_generated: u64,
@@ -185,7 +185,7 @@ pub struct Dev3DStats {
 
 /// 脚本模板
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScriptTemplate {
+pub(crate) struct ScriptTemplate {
     pub name: String,
     pub template: String,
     pub language: String,

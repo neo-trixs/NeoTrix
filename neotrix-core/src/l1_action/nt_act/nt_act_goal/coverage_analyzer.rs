@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
-pub struct CoverageReport {
+pub(crate) struct CoverageReport {
     pub modules: Vec<ModuleCoverage>,
     pub total_files: usize,
     pub tested_files: usize,
@@ -18,7 +18,7 @@ pub struct CoverageReport {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModuleCoverage {
+pub(crate) struct ModuleCoverage {
     pub name: String,
     pub file_count: usize,
     pub tested_count: usize,

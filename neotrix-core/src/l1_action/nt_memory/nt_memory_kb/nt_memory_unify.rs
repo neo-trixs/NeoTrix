@@ -50,7 +50,7 @@ pub fn config_set(conn: &Connection, section: &str, key: &str, value: &str, is_s
     Ok(())
 }
 
-pub fn config_delete(conn: &Connection, section: &str, key: &str) -> Result<bool, String> {
+pub(crate) fn config_delete(conn: &Connection, section: &str, key: &str) -> Result<bool, String> {
     let rows = conn
         .execute(
             "DELETE FROM config_entries WHERE section=?1 AND key=?2",
@@ -60,7 +60,7 @@ pub fn config_delete(conn: &Connection, section: &str, key: &str) -> Result<bool
     Ok(rows > 0)
 }
 
-pub fn config_list_section(conn: &Connection, section: &str) -> Result<Vec<(String, String, bool)>, String> {
+pub(crate) fn config_list_section(conn: &Connection, section: &str) -> Result<Vec<(String, String, bool)>, String> {
     let mut stmt = conn
         .prepare("SELECT key, value, is_secret FROM config_entries WHERE section=?1 ORDER BY key")
         .map_err(|e| format!("config_list_section prepare: {}", e))?;
@@ -80,7 +80,7 @@ pub fn config_list_section(conn: &Connection, section: &str) -> Result<Vec<(Stri
     Ok(results)
 }
 
-pub fn config_all_sections(conn: &Connection) -> Result<Vec<String>, String> {
+pub(crate) fn config_all_sections(conn: &Connection) -> Result<Vec<String>, String> {
     let mut stmt = conn
         .prepare("SELECT DISTINCT section FROM config_entries ORDER BY section")
         .map_err(|e| format!("config_all_sections prepare: {}", e))?;
@@ -184,14 +184,14 @@ pub fn secret_get(conn: &Connection, key: &str) -> Result<Option<String>, String
     }
 }
 
-pub fn secret_delete(conn: &Connection, key: &str) -> Result<bool, String> {
+pub(crate) fn secret_delete(conn: &Connection, key: &str) -> Result<bool, String> {
     let rows = conn
         .execute("DELETE FROM secrets WHERE key=?1", rusqlite::params![key])
         .map_err(|e| format!("secret_delete: {}", e))?;
     Ok(rows > 0)
 }
 
-pub fn secret_list(conn: &Connection) -> Result<Vec<String>, String> {
+pub(crate) fn secret_list(conn: &Connection) -> Result<Vec<String>, String> {
     let mut stmt = conn
         .prepare("SELECT key FROM secrets ORDER BY key")
         .map_err(|e| format!("secret_list prepare: {}", e))?;
@@ -289,7 +289,7 @@ pub fn session_log_list_sessions(conn: &Connection) -> Result<Vec<(String, i64, 
 
 // ─── Cookies ────────────────────────────────────────────────────────────────
 
-pub fn cookie_set(
+pub(crate) fn cookie_set(
     conn: &Connection,
     domain: &str,
     name: &str,
@@ -314,7 +314,7 @@ pub fn cookie_set(
     Ok(())
 }
 
-pub fn cookie_get(
+pub(crate) fn cookie_get(
     conn: &Connection,
     domain: &str,
     name: &str,
@@ -329,7 +329,7 @@ pub fn cookie_get(
     Ok(result)
 }
 
-pub fn cookie_list_domain(conn: &Connection, domain: &str) -> Result<Vec<(String, String, String, bool, bool, Option<i64>)>, String> {
+pub(crate) fn cookie_list_domain(conn: &Connection, domain: &str) -> Result<Vec<(String, String, String, bool, bool, Option<i64>)>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT name, value, path, secure, http_only, expiry
@@ -355,7 +355,7 @@ pub fn cookie_list_domain(conn: &Connection, domain: &str) -> Result<Vec<(String
     Ok(results)
 }
 
-pub fn cookie_delete(conn: &Connection, domain: &str, name: &str, path: &str) -> Result<bool, String> {
+pub(crate) fn cookie_delete(conn: &Connection, domain: &str, name: &str, path: &str) -> Result<bool, String> {
     let rows = conn
         .execute(
             "DELETE FROM cookies WHERE domain=?1 AND name=?2 AND path=?3",
@@ -365,7 +365,7 @@ pub fn cookie_delete(conn: &Connection, domain: &str, name: &str, path: &str) ->
     Ok(rows > 0)
 }
 
-pub fn cookie_purge_expired(conn: &Connection) -> Result<usize, String> {
+pub(crate) fn cookie_purge_expired(conn: &Connection) -> Result<usize, String> {
     let now_ts = now();
     let rows = conn
         .execute("DELETE FROM cookies WHERE expiry IS NOT NULL AND expiry < ?1", rusqlite::params![now_ts])
@@ -450,7 +450,7 @@ pub fn asset_list(
     Ok(results)
 }
 
-pub fn asset_delete(conn: &Connection, id: &str) -> Result<bool, String> {
+pub(crate) fn asset_delete(conn: &Connection, id: &str) -> Result<bool, String> {
     let rows = conn
         .execute("DELETE FROM binary_assets WHERE id=?1", rusqlite::params![id])
         .map_err(|e| format!("asset_delete: {}", e))?;
@@ -513,7 +513,7 @@ pub fn skill_upsert(conn: &Connection, name: &str, record: &SkillRecord) -> Resu
 /// 技能域收编映射表: (skills 域源路径, NT-* 域, 星辰名)。
 /// 与 ADR"skills 域 → NT-* 域映射(收编对照)"表保持一致;
 /// L3 厂商技能(36+)为只读能力分支, 不进映射表。
-pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
+pub(crate) const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
     // Original 14 mappings (UCN Phase 2, R-P79)
     ("rev/officer", "NT-SHIELD", "Rev-明"),
     ("dev/implementer", "NT-ACT", "Dev-匠"),
@@ -624,7 +624,7 @@ pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
 ;
 
 // domain_nt_<slug>: NT-SHIELD → domain_nt_shield
-pub fn domain_ns(nt_domain: &str) -> String {
+pub(crate) fn domain_ns(nt_domain: &str) -> String {
     let slug = nt_domain
         .strip_prefix("NT-")
         .unwrap_or(nt_domain)
@@ -636,7 +636,7 @@ pub fn domain_ns(nt_domain: &str) -> String {
 /// 写入全部技能域映射到 KB (UCN Phase 2)。
 /// 幂等: kv_set ON CONFLICT upsert, 重复调用不产生脏数据。
 /// 返回写入/更新的映射条目数。
-pub fn unify_domain_mapping(conn: &Connection) -> Result<usize, String> {
+pub(crate) fn unify_domain_mapping(conn: &Connection) -> Result<usize, String> {
     use std::collections::BTreeMap;
     // (domain, star) → [source 路径...]; BTreeMap 保证稳定顺序
     let mut groups: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
@@ -661,7 +661,7 @@ pub fn domain_skills(conn: &Connection, nt_domain: &str) -> Result<Vec<(String, 
     kv_list(conn, &domain_ns(nt_domain))
 }
 
-pub fn skill_search(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SkillRecord>, String> {
+pub(crate) fn skill_search(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SkillRecord>, String> {
     let pattern = format!("%{}%", query);
     let mut stmt = conn
         .prepare(
@@ -710,7 +710,7 @@ pub fn skill_list_all(conn: &Connection, limit: usize) -> Result<Vec<SkillRecord
     collect_skills(rows)
 }
 
-pub fn skill_delete(conn: &Connection, name: &str) -> Result<bool, String> {
+pub(crate) fn skill_delete(conn: &Connection, name: &str) -> Result<bool, String> {
     let rows = conn
         .execute("DELETE FROM skills_index WHERE name=?1", rusqlite::params![name])
         .map_err(|e| format!("skill_delete: {}", e))?;
@@ -742,7 +742,7 @@ fn collect_skills(rows: impl Iterator<Item = Result<SkillRecord, rusqlite::Error
 
 // ─── Rkyv Blobs ─────────────────────────────────────────────────────────────
 
-pub fn rkyv_store(conn: &Connection, namespace: &str, data: &[u8]) -> Result<String, String> {
+pub(crate) fn rkyv_store(conn: &Connection, namespace: &str, data: &[u8]) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     let ts = now();
     let checksum = {
@@ -757,7 +757,7 @@ pub fn rkyv_store(conn: &Connection, namespace: &str, data: &[u8]) -> Result<Str
     Ok(id)
 }
 
-pub fn rkyv_load(conn: &Connection, id: &str) -> Result<Option<(Vec<u8>, String, String)>, String> {
+pub(crate) fn rkyv_load(conn: &Connection, id: &str) -> Result<Option<(Vec<u8>, String, String)>, String> {
     let mut stmt = conn
         .prepare("SELECT data, namespace, checksum FROM rkyv_blobs WHERE id=?1")
         .map_err(|e| format!("rkyv_load prepare: {}", e))?;
@@ -773,7 +773,7 @@ pub fn rkyv_load(conn: &Connection, id: &str) -> Result<Option<(Vec<u8>, String,
     Ok(result)
 }
 
-pub fn rkyv_list(conn: &Connection, namespace: &str) -> Result<Vec<(String, String, i64)>, String> {
+pub(crate) fn rkyv_list(conn: &Connection, namespace: &str) -> Result<Vec<(String, String, i64)>, String> {
     let mut stmt = conn
         .prepare("SELECT id, checksum, created_at FROM rkyv_blobs WHERE namespace=?1 ORDER BY created_at DESC")
         .map_err(|e| format!("rkyv_list prepare: {}", e))?;
@@ -793,7 +793,7 @@ pub fn rkyv_list(conn: &Connection, namespace: &str) -> Result<Vec<(String, Stri
     Ok(results)
 }
 
-pub fn rkyv_delete(conn: &Connection, id: &str) -> Result<bool, String> {
+pub(crate) fn rkyv_delete(conn: &Connection, id: &str) -> Result<bool, String> {
     let rows = conn
         .execute("DELETE FROM rkyv_blobs WHERE id=?1", rusqlite::params![id])
         .map_err(|e| format!("rkyv_delete: {}", e))?;

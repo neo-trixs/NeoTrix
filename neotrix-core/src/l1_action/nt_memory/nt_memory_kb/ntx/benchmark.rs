@@ -34,7 +34,7 @@ impl BenchResult {
 }
 
 /// 帧写入基准
-pub fn bench_frame_write(count: usize, iterations: u32) -> BenchResult {
+pub(crate) fn bench_frame_write(count: usize, iterations: u32) -> BenchResult {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("bench_frames.ntx");
     let data = vec![42u8; 1024]; // 1KB payload
@@ -71,7 +71,7 @@ pub fn bench_frame_write(count: usize, iterations: u32) -> BenchResult {
 }
 
 /// 帧读取基准
-pub fn bench_frame_read(count: usize, iterations: u32) -> BenchResult {
+pub(crate) fn bench_frame_read(count: usize, iterations: u32) -> BenchResult {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("bench_read.ntx");
 
@@ -111,7 +111,7 @@ pub fn bench_frame_read(count: usize, iterations: u32) -> BenchResult {
 }
 
 /// 向量搜索基准
-pub fn bench_vec_search(dimension: usize, vec_count: usize, k: usize, iterations: u32) -> BenchResult {
+pub(crate) fn bench_vec_search(dimension: usize, vec_count: usize, k: usize, iterations: u32) -> BenchResult {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("bench_vec.ntx");
 
@@ -155,7 +155,7 @@ pub fn bench_vec_search(dimension: usize, vec_count: usize, k: usize, iterations
 }
 
 /// 图谱 BFS 基准
-pub fn bench_graph_bfs(node_count: usize, edges_per_node: usize, iterations: u32) -> BenchResult {
+pub(crate) fn bench_graph_bfs(node_count: usize, edges_per_node: usize, iterations: u32) -> BenchResult {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("bench_graph.ntx");
 
@@ -247,7 +247,7 @@ pub fn bench_wal_recovery(entry_count: usize, iterations: u32) -> BenchResult {
 }
 
 /// 完整基准套件
-pub fn run_full_benchmark() -> Vec<BenchResult> {
+pub(crate) fn run_full_benchmark() -> Vec<BenchResult> {
     let mut results = Vec::new();
 
     println!("=== NTX Benchmark Suite ===\n");

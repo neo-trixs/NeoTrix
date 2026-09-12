@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// 聚合策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AggregateStrategy {
+pub(crate) enum AggregateStrategy {
     /// 取最高分
     BestScore,
     /// 多数投票
@@ -19,7 +19,7 @@ pub enum AggregateStrategy {
 
 /// Scatter 请求
 #[derive(Debug, Clone)]
-pub struct ScatterRequest {
+pub(crate) struct ScatterRequest {
     pub query: String,
     pub target_providers: Vec<String>,
     pub strategy: AggregateStrategy,

@@ -25,7 +25,7 @@ pub enum AudioType {
 
 /// TTS 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TTSConfig {
+pub(crate) struct TTSConfig {
     /// 语音ID
     pub voice_id: String,
     /// 语言
@@ -40,7 +40,7 @@ pub struct TTSConfig {
 
 /// 音频轨道配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AudioTrackConfig {
+pub(crate) struct AudioTrackConfig {
     /// 轨道ID
     pub id: String,
     /// 音频类型
@@ -63,7 +63,7 @@ pub struct AudioTrackConfig {
 
 /// 音频混合配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AudioMixConfig {
+pub(crate) struct AudioMixConfig {
     /// 主音量
     pub master_volume: f32,
     /// 是否启用闪避 (旁白时降低背景音乐)
@@ -82,7 +82,7 @@ pub struct AudioMixConfig {
 
 /// 音频编排结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AudioOrchestrationResult {
+pub(crate) struct AudioOrchestrationResult {
     /// 是否成功
     pub success: bool,
     /// 输出文件路径
@@ -97,7 +97,7 @@ pub struct AudioOrchestrationResult {
 
 /// 音频分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AudioAnalysis {
+pub(crate) struct AudioAnalysis {
     /// 时长 (秒)
     pub duration: f32,
     /// 采样率
@@ -115,7 +115,7 @@ pub struct AudioAnalysis {
 // ============================================================================
 
 /// 音频编排器
-pub struct AudioOrchestrator {
+pub(crate) struct AudioOrchestrator {
     /// 混合配置
     config: AudioMixConfig,
     /// 编排历史
@@ -251,7 +251,7 @@ impl AudioOrchestrator {
 
 /// 音频统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AudioStats {
+pub(crate) struct AudioStats {
     /// 总编排次数
     pub total_orchestrated: usize,
     /// 成功次数

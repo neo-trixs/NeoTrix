@@ -17,7 +17,7 @@ use std::sync::RwLock;
 
 /// 溢写策略配置。
 #[derive(Debug, Clone, Copy)]
-pub struct SpillConfig {
+pub(crate) struct SpillConfig {
     /// 达到或超过该字节数 → 溢写; 否则内联返回原内容。
     pub threshold_bytes: usize,
     /// 溢写 backend 标识 (future: "file" / "kv" / "object-store")。
@@ -41,7 +41,7 @@ impl Default for SpillConfig {
 ///
 /// **不泄露内容**: 只含定位 key、backend、字节长度; 不含原文。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SpillLocator {
+pub(crate) struct SpillLocator {
     key: String,
     backend: String,
     byte_len: usize,
@@ -61,7 +61,7 @@ impl SpillLocator {
 
 /// 存储结果 — 小结果内联, 大结果仅持 locator。
 #[derive(Debug, Clone)]
-pub enum StoredSpill {
+pub(crate) enum StoredSpill {
     Inline(Vec<u8>),
     Spilled(SpillLocator),
 }
@@ -81,7 +81,7 @@ impl StoredSpill {
 
 /// 溢出存储统计。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct SpillStats {
+pub(crate) struct SpillStats {
     pub stored: u64,
     pub retrieved: u64,
     pub spilled_bytes: u64,
@@ -89,7 +89,7 @@ pub struct SpillStats {
 }
 
 /// 超大结果溢写存储。
-pub struct SpillStorage {
+pub(crate) struct SpillStorage {
     /// key → 内容 (溢写 backend 为 memory 时的落盘位)。
     blobs: RwLock<HashMap<String, Vec<u8>>>,
     config: SpillConfig,

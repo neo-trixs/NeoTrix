@@ -1,7 +1,7 @@
 use crate::neotrix::nt_act_autonomy::awareness_monitor::{AwarenessReport, GapSeverity};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum OracleReason {
+pub(crate) enum OracleReason {
     CriticalCapabilityGap { dimension: String, gap: f64 },
     UnknownTask { task_description: String },
     RepeatedFailure { attempt_count: u32, dimension: String },
@@ -18,7 +18,7 @@ pub struct OracleRequest {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum OracleUrgency {
+pub(crate) enum OracleUrgency {
     Immediate,
     High,
     Normal,

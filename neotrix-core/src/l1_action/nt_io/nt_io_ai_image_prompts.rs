@@ -13,7 +13,7 @@ use crate::config::NeoTrixConfig;
 use crate::core::nt_core_self_test::SelfTest;
 
 /// 图像提示生成器 trait — 将语义意图映射为可投递给图像模型的 prompt 字符串。
-pub trait AiImagePromptGenerator: Send + Sync {
+pub(crate) trait AiImagePromptGenerator: Send + Sync {
     /// 给定主体与可选风格, 生成一个结构化提示词。
     fn generate(&self, subject: &str, style: Option<&str>) -> String;
     /// 校验生成结果是否满足最小结构化约束 (非空且含主体)。
@@ -24,7 +24,7 @@ pub trait AiImagePromptGenerator: Send + Sync {
 
 /// 默认实现: 拼接 subject + style + 固定镜头元参数。
 #[derive(Default)]
-pub struct ImagePromptEngine;
+pub(crate) struct ImagePromptEngine;
 
 /// 解析图像 API 端点
 fn resolve_endpoint() -> String {
@@ -106,7 +106,7 @@ impl AiImagePromptGenerator for ImagePromptEngine {
 
 /// T1 SelfTest: 验证生成器存在并能产出结构化提示词 (离线)。
 #[derive(Default)]
-pub struct AiImagePromptsSelfTest;
+pub(crate) struct AiImagePromptsSelfTest;
 
 impl SelfTest for AiImagePromptsSelfTest {
     fn name(&self) -> &str {

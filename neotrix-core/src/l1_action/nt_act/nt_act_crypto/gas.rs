@@ -172,7 +172,7 @@ impl Speed {
     }
 }
 
-pub fn estimate_tx_cost_usd(
+pub(crate) fn estimate_tx_cost_usd(
     gas_limit: u64,
     max_fee_gwei: f64,
     token_price_usd: f64,

@@ -15,7 +15,7 @@ use uuid::Uuid;
 use super::shared_utils::now_ts;
 
 /// 翻译后端统一接口 — 任何论文/文档翻译源均实现此 trait。
-pub trait TranslatorBackend: Send + Sync {
+pub(crate) trait TranslatorBackend: Send + Sync {
     /// 后端标识 (如 "pdfmathtranslate")。
     fn backend_id(&self) -> &str;
     /// 计算已翻译论文的 KB 节点 key (无副作用, 纯标识生成)。
@@ -34,7 +34,7 @@ pub trait TranslatorBackend: Send + Sync {
 }
 
 /// PDFMathTranslate 后端实现 (stub)。
-pub struct PdfMathTranslateBackend {
+pub(crate) struct PdfMathTranslateBackend {
     pub endpoint: String,
 }
 

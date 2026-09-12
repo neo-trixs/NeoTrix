@@ -21,7 +21,7 @@ pub struct CacheEntry {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct KvCacheMemory {
+pub(crate) struct KvCacheMemory {
     entries: HashMap<String, CacheEntry>,
     capacity: usize,
     clock: u64,
@@ -109,7 +109,7 @@ impl KvCacheMemory {
 // ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MutationKind {
+pub(crate) enum MutationKind {
     Insert,
     Update,
     Delete,
@@ -117,7 +117,7 @@ pub enum MutationKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MutationEvent {
+pub(crate) struct MutationEvent {
     pub kind: MutationKind,
     pub target: String,
     pub checksum: u64,
@@ -138,7 +138,7 @@ impl MutationEvent {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MutationGuard {
+pub(crate) struct MutationGuard {
     max_daily_bytes: usize,
     daily_bytes: HashMap<String, usize>,
     blocked: u64,
@@ -193,14 +193,14 @@ pub enum RetrievalChannel {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RetrievalHit {
+pub(crate) struct RetrievalHit {
     pub doc_id: String,
     pub score: f64,
     pub channel: RetrievalChannel,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct RetrievalMatrix {
+pub(crate) struct RetrievalMatrix {
     semantic_index: HashMap<String, Vec<f64>>,
     keyword_index: HashMap<String, Vec<(String, u32)>>,
 }
@@ -213,13 +213,13 @@ pub struct RetrievalMatrix {
 // ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FenceKind {
+pub(crate) enum FenceKind {
     Trusted,
     Untrusted,
 }
 
 #[derive(Debug, Clone)]
-pub struct FencedContent {
+pub(crate) struct FencedContent {
     pub doc_id: String,
     pub kind: FenceKind,
     pub source_url: Option<String>,
@@ -252,7 +252,7 @@ impl FencedContent {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct UntrustedFence {
+pub(crate) struct UntrustedFence {
     /// doc_id → 围栏元数据 (trusted/untrusted + 来源)。
     fences: HashMap<String, FencedContent>,
     /// 围栏边界标记 — untrusted 内容写入时包上, 读取时校验剥离。
@@ -261,8 +261,8 @@ pub struct UntrustedFence {
     pub marker_close: &'static str,
 }
 
-pub const UNTRUSTED_OPEN: &str = "\u{FFFD}__NT_UNTRUSTED__\u{FFFD}";
-pub const UNTRUSTED_CLOSE: &str = "\u{FFFD}__NT_UNTRUSTED_END__\u{FFFD}";
+pub(crate) const UNTRUSTED_OPEN: &str = "\u{FFFD}__NT_UNTRUSTED__\u{FFFD}";
+pub(crate) const UNTRUSTED_CLOSE: &str = "\u{FFFD}__NT_UNTRUSTED_END__\u{FFFD}";
 
 impl UntrustedFence {
     pub fn new() -> Self {
@@ -351,7 +351,7 @@ impl SourceTier {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct QualityRanker {
+pub(crate) struct QualityRanker {
     /// doc_id → 来源分级。
     tiers: HashMap<String, SourceTier>,
     /// doc_id → 引用权威度 [0,1]。
@@ -661,7 +661,7 @@ fn cosine(a: &[f64], b: &[f64]) -> f64 {
 // ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MemoryTierKind {
+pub(crate) enum MemoryTierKind {
     Permanent,
     Working,
     Ephemeral,
@@ -678,7 +678,7 @@ impl MemoryTierKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryRecord {
+pub(crate) struct MemoryRecord {
     pub id: String,
     pub tier: MemoryTierKind,
     pub content: String,
@@ -686,7 +686,7 @@ pub struct MemoryRecord {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct SingleFileMemory {
+pub(crate) struct SingleFileMemory {
     records: Vec<MemoryRecord>,
     next_id: u64,
 }

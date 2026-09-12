@@ -30,7 +30,7 @@ pub struct SearchResult {
 
 /// 图遍历路径
 #[derive(Debug, Clone)]
-pub struct WalkPath {
+pub(crate) struct WalkPath {
     pub path: Vec<String>,
     pub relations: Vec<String>,
     pub crosses_domain: bool,
@@ -46,7 +46,7 @@ pub struct Contradiction {
 
 /// 因果规则
 #[derive(Debug, Clone)]
-pub struct CausalRule {
+pub(crate) struct CausalRule {
     pub condition: String,
     pub action: String,
     pub outcome: String,
@@ -77,7 +77,7 @@ pub struct GapReport {
 // ══════════════════════════════════════════════════
 
 /// 加载全部 embeddings 为 HashMap（调用方缓存复用）
-pub fn load_embedding_map(
+pub(crate) fn load_embedding_map(
     conn: &Connection,
     dim: usize,
 ) -> Result<HashMap<String, Vec<f32>>, String> {
@@ -159,7 +159,7 @@ pub fn semantic_search(
 // ══════════════════════════════════════════════════
 
 /// 多跳图遍历（BFS），从指定节点发现跨域路径
-pub fn graph_walk(
+pub(crate) fn graph_walk(
     conn: &Connection,
     seed_ids: &[String],
     max_hops: usize,
@@ -279,7 +279,7 @@ pub fn graph_walk(
 // ══════════════════════════════════════════════════
 
 /// 矛盾检测：同一条件被不同疗法治疗但建议相反
-pub fn detect_contradictions(conn: &Connection) -> Result<Vec<Contradiction>, String> {
+pub(crate) fn detect_contradictions(conn: &Connection) -> Result<Vec<Contradiction>, String> {
     let mut result = Vec::new();
 
     let mut stmt = conn.prepare(
@@ -339,7 +339,7 @@ pub fn detect_contradictions(conn: &Connection) -> Result<Vec<Contradiction>, St
 // ══════════════════════════════════════════════════
 
 /// 因果规则提取：从 treats/causes 边构建 if-then 规则
-pub fn extract_causal_rules(
+pub(crate) fn extract_causal_rules(
     conn: &Connection,
     limit: usize,
 ) -> Result<Vec<CausalRule>, String> {
@@ -381,7 +381,7 @@ pub fn extract_causal_rules(
 // ══════════════════════════════════════════════════
 
 /// QA 索引构建：从 treats 边生成 question→answer 对
-pub fn build_qa_index(conn: &Connection) -> Result<usize, String> {
+pub(crate) fn build_qa_index(conn: &Connection) -> Result<usize, String> {
     let now_ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -461,7 +461,7 @@ pub fn build_qa_index(conn: &Connection) -> Result<usize, String> {
 // ══════════════════════════════════════════════════
 
 /// 预测验证：用 FTS 证据更新 predictions confidence
-pub fn verify_predictions(conn: &Connection) -> Result<usize, String> {
+pub(crate) fn verify_predictions(conn: &Connection) -> Result<usize, String> {
     let now_ts: i64 = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -527,7 +527,7 @@ fn re_extract_keywords(text: &str) -> std::collections::HashSet<String> {
 // ══════════════════════════════════════════════════
 
 /// 知识缺口检测：找出低连通度概念和 hub 概念
-pub fn detect_knowledge_gaps(
+pub(crate) fn detect_knowledge_gaps(
     conn: &Connection,
 ) -> Result<GapReport, String> {
     let mut stmt = conn.prepare(

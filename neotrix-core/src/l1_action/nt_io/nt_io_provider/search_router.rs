@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 /// 搜索能力类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SearchCapability {
+pub(crate) enum SearchCapability {
     MainSearch,
     DocsSearch,
     WebFetch,

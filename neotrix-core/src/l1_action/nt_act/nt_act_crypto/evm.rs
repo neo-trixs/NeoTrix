@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum EvmProviderMode {
+pub(crate) enum EvmProviderMode {
     Live,
     Mock,
 }
@@ -17,7 +17,7 @@ pub struct EvmClient {
 }
 
 /// Default RPC URLs for each chain.
-pub fn default_rpc_url(chain: &ChainType) -> &'static str {
+pub(crate) fn default_rpc_url(chain: &ChainType) -> &'static str {
     match chain {
         ChainType::Ethereum => "https://eth-mainnet.g.alchemy.com/v2/demo",
         ChainType::Bsc => "https://bsc-dataseed.binance.org/",
@@ -30,7 +30,7 @@ pub fn default_rpc_url(chain: &ChainType) -> &'static str {
 }
 
 /// Resolve RPC URL for a chain: env var override → default.
-pub fn resolve_rpc_url(chain: &ChainType) -> String {
+pub(crate) fn resolve_rpc_url(chain: &ChainType) -> String {
     let env_key = format!("NEOTRIX_{}_RPC_URL", chain.to_string().to_uppercase());
     std::env::var(&env_key).unwrap_or_else(|_| default_rpc_url(chain).to_string())
 }

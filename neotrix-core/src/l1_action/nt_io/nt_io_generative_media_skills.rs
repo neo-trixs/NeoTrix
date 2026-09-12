@@ -10,7 +10,7 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 媒体模态。
 #[derive(Debug, Clone, PartialEq)]
-pub enum MediaModality {
+pub(crate) enum MediaModality {
     Image,
     Video,
     Audio,
@@ -18,14 +18,14 @@ pub enum MediaModality {
 
 /// 生成请求: 模态 + 提示词 + 时长(仅视频/音频有意义)。
 #[derive(Debug, Clone, PartialEq)]
-pub struct GenRequest {
+pub(crate) struct GenRequest {
     pub modality: MediaModality,
     pub prompt: String,
     pub duration_sec: f64,
 }
 
 /// 多模态生成媒体 trait — 图/视频/音频生成接口 stub。
-pub trait GenerativeMedia: Send + Sync {
+pub(crate) trait GenerativeMedia: Send + Sync {
     /// 校验请求: 提示词非空; 视频/音频时长 > 0, 图像时长忽略。
     /// 返回 true 当可提交。
     fn is_submittable(&self, req: &GenRequest) -> bool;
@@ -35,7 +35,7 @@ pub trait GenerativeMedia: Send + Sync {
 
 /// 默认实现。
 #[derive(Default)]
-pub struct MuapiMedia;
+pub(crate) struct MuapiMedia;
 
 impl GenerativeMedia for MuapiMedia {
     fn is_submittable(&self, req: &GenRequest) -> bool {
@@ -71,7 +71,7 @@ impl GenerativeMedia for MuapiMedia {
 
 /// T1 SelfTest: 验证生成请求校验与网关规格存在且生效。
 #[derive(Default)]
-pub struct GenerativeMediaSelfTest;
+pub(crate) struct GenerativeMediaSelfTest;
 
 impl SelfTest for GenerativeMediaSelfTest {
     fn name(&self) -> &str {

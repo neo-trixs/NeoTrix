@@ -22,7 +22,7 @@ use crate::core::nt_core_context::revertible::{ClosureEffect, RevertibleContext}
 use crate::neotrix::nt_memory_kb::nt_memory_unify::{kv_delete, kv_get, kv_set};
 
 /// coeffect 依赖表的持久化 namespace。
-pub const COEFFECT_NS: &str = "coeffect_deps";
+pub(crate) const COEFFECT_NS: &str = "coeffect_deps";
 
 /// 单个依赖声明: key + 提供方 + 值 + 前置条件状态。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,7 +79,7 @@ impl CoeffectRegistry {
 
 /// 通知分类 (Def 26): activating / deactivating / neutral。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CoeffectNotif {
+pub(crate) enum CoeffectNotif {
     Activating,
     Deactivating,
     Neutral,
@@ -98,7 +98,7 @@ impl CoeffectNotif {
 
 /// 通知回调: 依赖 key 激活/去激活时被调用。
 /// `Activating` → 执行 effect (accumulator 记录); `Deactivating` → accumulator 恢复。
-pub type NotifyFn = Box<dyn Fn(&str, CoeffectNotif) + Send + Sync>;
+pub(crate) type NotifyFn = Box<dyn Fn(&str, CoeffectNotif) + Send + Sync>;
 
 /// 事务化注入批次 — 一组依赖声明原子提交, 任一前置条件违反整体回滚。
 ///
@@ -226,7 +226,7 @@ pub fn persist_bindings(conn: &Connection, bindings: &[CoeffectBinding]) -> Resu
 }
 
 /// 从 `kv_store` 恢复绑定到内存注册表。
-pub fn load_bindings(conn: &Connection, reg: &mut CoeffectRegistry) -> Result<usize, String> {
+pub(crate) fn load_bindings(conn: &Connection, reg: &mut CoeffectRegistry) -> Result<usize, String> {
     let mut stmt = conn
         .prepare("SELECT key, value FROM kv_store WHERE namespace=?1 ORDER BY key")
         .map_err(|e| format!("load_bindings prepare: {}", e))?;
@@ -247,7 +247,7 @@ pub fn load_bindings(conn: &Connection, reg: &mut CoeffectRegistry) -> Result<us
 }
 
 /// 清除持久化的依赖表 (namespace 整体删除)。
-pub fn clear_bindings(conn: &Connection) -> Result<usize, String> {
+pub(crate) fn clear_bindings(conn: &Connection) -> Result<usize, String> {
     let mut n = 0;
     let keys = kv_get_all_keys(conn)?;
     for k in keys {
@@ -274,7 +274,7 @@ fn kv_get_all_keys(conn: &Connection) -> Result<Vec<String>, String> {
 }
 
 /// 便捷读取: 从持久化读单个绑定 (不加载进内存表)。
-pub fn get_persisted_binding(conn: &Connection, key: &str) -> Result<Option<CoeffectBinding>, String> {
+pub(crate) fn get_persisted_binding(conn: &Connection, key: &str) -> Result<Option<CoeffectBinding>, String> {
     match kv_get(conn, COEFFECT_NS, key)? {
         Some(serialized) => {
             if let Some((provider, value)) = serialized.split_once('|') {

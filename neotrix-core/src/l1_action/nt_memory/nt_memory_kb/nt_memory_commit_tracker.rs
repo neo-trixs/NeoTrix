@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::core::nt_core_self_test::SelfTest;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CommitType {
+pub(crate) enum CommitType {
     Feature,
     Fix,
     Refactor,
@@ -25,7 +25,7 @@ impl CommitType {
 }
 
 #[derive(Debug, Clone)]
-pub struct CommitEvent {
+pub(crate) struct CommitEvent {
     pub id: String,
     pub timestamp: u64,
     pub author: String,
@@ -35,7 +35,7 @@ pub struct CommitEvent {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ArcStatus {
+pub(crate) enum ArcStatus {
     Active,
     Completed,
     Abandoned,
@@ -52,7 +52,7 @@ impl ArcStatus {
 }
 
 #[derive(Debug, Clone)]
-pub struct PlotArc {
+pub(crate) struct PlotArc {
     pub name: String,
     pub description: String,
     pub commits: Vec<String>,
@@ -60,7 +60,7 @@ pub struct PlotArc {
 }
 
 #[derive(Debug, Clone)]
-pub struct CharacterSheet {
+pub(crate) struct CharacterSheet {
     pub entity_name: String,
     pub first_seen: u64,
     pub last_modified: u64,
@@ -72,7 +72,7 @@ pub struct CharacterSheet {
 const MAX_EVENTS: usize = 1000;
 
 #[derive(Debug)]
-pub struct NarrativeState {
+pub(crate) struct NarrativeState {
     pub arcs: Vec<PlotArc>,
     pub characters: Vec<CharacterSheet>,
     pub events: VecDeque<CommitEvent>,

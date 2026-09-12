@@ -93,7 +93,7 @@ async fn rate_limit_middleware(
     next.run(req).await
 }
 
-pub fn build_router(state: AppState) -> Router {
+pub(crate) fn build_router(state: AppState) -> Router {
     Router::new()
         // Brain
         .route("/api/brain/stats", get(api::brain_stats_handler))

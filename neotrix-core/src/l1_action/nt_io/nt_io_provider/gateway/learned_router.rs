@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 
 /// 路由特征向量 (输入)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouteFeatures {
+pub(crate) struct RouteFeatures {
     /// Query embedding (768-d, Qwen3-Embedding-0.6B)
     pub query_embedding: Vec<f32>,
     /// Task type one-hot (CapabilityIntent 9 类)
@@ -36,7 +36,7 @@ pub struct RouteFeatures {
 /// - 对话阶段感知 (寒暄 → 探索 → 深度 → 收尾)
 /// - 工具链一致性 (agentic 场景同链路保持同一模型)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConversationState {
+pub(crate) struct ConversationState {
     /// 当前轮次 (0-indexed)
     pub turn_count: usize,
     /// 话题漂移度 (0-1, 相邻轮次语义距离 EMA)
@@ -134,7 +134,7 @@ pub enum ConversationStage {
 
 /// 候选模型信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CandidateModel {
+pub(crate) struct CandidateModel {
     pub name: String,                    // 如 "aihub/glm-5.2"
     pub provider: String,                // 如 "aihub"
     pub model_id: String,                // 如 "glm-5.2"
@@ -159,7 +159,7 @@ pub struct RouteDecision {
 }
 
 /// 抽象路由器 trait
-pub trait LearnedRouter: Send + Sync {
+pub(crate) trait LearnedRouter: Send + Sync {
     fn route(&self, features: &RouteFeatures, candidates: &[CandidateModel]) -> RouteDecision;
     fn update(&mut self, features: &RouteFeatures, chosen: &str, reward: f32);
     fn name(&self) -> &str;
@@ -176,7 +176,7 @@ pub trait LearnedRouter: Send + Sync {
 }
 
 /// KNN Router — 基线, 无需训练, 最近邻查询相似历史路由成功的模型
-pub struct KNNRouter {
+pub(crate) struct KNNRouter {
     k: usize,
     alpha: f32,
     beta: f32,
@@ -307,7 +307,7 @@ impl LearnedRouter for KNNRouter {
 }
 
 /// MLP Router — 轻量 MLP, 离线训练好权重, 在线仅前向传播
-pub struct MLPRouter {
+pub(crate) struct MLPRouter {
     // 简化: 只存权重矩阵, 实际可用 candle/onnx 加载
     input_dim: usize,
     hidden_dim: usize,
@@ -405,7 +405,7 @@ impl LearnedRouter for MLPRouter {
 }
 
 /// Hybrid Router — KNN + MLP 融合, 置信度加权
-pub struct HybridRouter {
+pub(crate) struct HybridRouter {
     knn: KNNRouter,
     mlp: MLPRouter,
     knn_weight: f32,
@@ -458,7 +458,7 @@ impl LearnedRouter for HybridRouter {
 /// - 收尾: 回落中等模型省钱
 /// - Agentic 工具链: **锚定当前模型** — 链中换模型会破坏上下文一致性
 /// - 预算感知: 会话超预算 → 强制降级到免费模型
-pub struct MultiTurnRouter {
+pub(crate) struct MultiTurnRouter {
     /// 底层基础路由器 (单轮决策用)
     base: HybridRouter,
     alpha: f32,
@@ -601,7 +601,7 @@ fn decision_from(c: &CandidateModel, confidence: f32) -> RouteDecision {
 }
 
 /// 路由器工厂
-pub struct RouterFactory;
+pub(crate) struct RouterFactory;
 
 impl RouterFactory {
     pub fn create_router(router_type: &str, candidates: &[CandidateModel], alpha: f32, beta: f32) -> Box<dyn LearnedRouter> {

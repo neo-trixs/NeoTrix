@@ -4,7 +4,7 @@ use super::nt_memory_types::*;
 
 /// Query complexity categories for adaptive retrieval routing
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QueryComplexity {
+pub(crate) enum QueryComplexity {
     Simple,
     Medium,
     Hard,
@@ -22,7 +22,7 @@ pub struct GradedDocument {
 /// 接地引用 — 吸收 robin: 从本次检索持久化的调查上下文生成接地对话引用,
 /// 回答基于已检索证据 (不再重新搜索), 即 robin 的 "answered from that investigation's own data"。
 #[derive(Debug, Clone)]
-pub struct GroundingCitation {
+pub(crate) struct GroundingCitation {
     pub node_id: String,
     pub title: String,
     pub score: f64,
@@ -330,7 +330,7 @@ impl AdaptiveRetrieval {
 
 /// Result of the full adaptive RAG pipeline
 #[derive(Debug, Clone)]
-pub struct AdaptiveRagResult {
+pub(crate) struct AdaptiveRagResult {
     pub query: String,
     pub rewritten_query: Option<String>,
     pub complexity: QueryComplexity,
@@ -394,7 +394,7 @@ pub enum RetrievalAction {
 
 /// Multi-step iterative retrieval for Hard queries.
 /// Appends new results to existing set, deduplicating by node_id.
-pub fn iterative_retrieval(
+pub(crate) fn iterative_retrieval(
     kb: &super::KnowledgeBase,
     query: &str,
     config: &AdaptiveRagConfig,

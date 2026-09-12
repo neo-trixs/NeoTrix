@@ -118,7 +118,7 @@ pub fn decrypt_from_hex(encrypted_hex: &str) -> Result<String, String> {
 }
 
 /// Encrypt a string to an encrypted hex string.
-pub fn encrypt_str(plaintext: &str) -> Result<String, String> {
+pub(crate) fn encrypt_str(plaintext: &str) -> Result<String, String> {
     let (nonce, ct) = encrypt_raw(plaintext.as_bytes())?;
     let mut combined = Vec::with_capacity(nonce.len() + ct.len());
     combined.extend_from_slice(&nonce);
@@ -127,7 +127,7 @@ pub fn encrypt_str(plaintext: &str) -> Result<String, String> {
 }
 
 /// Decrypt from combined hex format back to a string.
-pub fn decrypt_str(encrypted_hex: &str) -> Result<String, String> {
+pub(crate) fn decrypt_str(encrypted_hex: &str) -> Result<String, String> {
     let combined = hex::decode(encrypted_hex.strip_prefix("0x").unwrap_or(encrypted_hex))
         .map_err(|e| format!("decode hex failed: {}", e))?;
     if combined.len() < 12 {
@@ -140,7 +140,7 @@ pub fn decrypt_str(encrypted_hex: &str) -> Result<String, String> {
 }
 
 /// Encrypt arbitrary bytes -> hex string
-pub fn encrypt_bytes(plaintext: &[u8]) -> Result<String, String> {
+pub(crate) fn encrypt_bytes(plaintext: &[u8]) -> Result<String, String> {
     let (nonce, ct) = encrypt_raw(plaintext)?;
     let mut combined = Vec::with_capacity(nonce.len() + ct.len());
     combined.extend_from_slice(&nonce);
@@ -149,7 +149,7 @@ pub fn encrypt_bytes(plaintext: &[u8]) -> Result<String, String> {
 }
 
 /// Decrypt from hex string to bytes
-pub fn decrypt_bytes(encrypted_hex: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn decrypt_bytes(encrypted_hex: &str) -> Result<Vec<u8>, String> {
     let combined = hex::decode(encrypted_hex)
         .map_err(|e| format!("decode hex failed: {}", e))?;
     if combined.len() < 12 {
@@ -161,25 +161,25 @@ pub fn decrypt_bytes(encrypted_hex: &str) -> Result<Vec<u8>, String> {
 }
 
 /// Encrypt a JSON-serializable value
-pub fn encrypt_json<T: serde::Serialize>(value: &T) -> Result<String, String> {
+pub(crate) fn encrypt_json<T: serde::Serialize>(value: &T) -> Result<String, String> {
     let json = serde_json::to_string(value)
         .map_err(|e| format!("serialize failed: {}", e))?;
     encrypt_str(&json)
 }
 
 /// Decrypt a hex string back to a JSON-deserializable value
-pub fn decrypt_json<T: serde::de::DeserializeOwned>(encrypted_hex: &str) -> Result<T, String> {
+pub(crate) fn decrypt_json<T: serde::de::DeserializeOwned>(encrypted_hex: &str) -> Result<T, String> {
     let json = decrypt_str(encrypted_hex)?;
     serde_json::from_str(&json).map_err(|e| format!("deserialize failed: {}", e))
 }
 
 /// Check if master key exists
-pub fn has_master_key() -> bool {
+pub(crate) fn has_master_key() -> bool {
     master_key_path().exists()
 }
 
 /// Get master key path
-pub fn master_key_path_str() -> String {
+pub(crate) fn master_key_path_str() -> String {
     master_key_path().to_string_lossy().to_string()
 }
 

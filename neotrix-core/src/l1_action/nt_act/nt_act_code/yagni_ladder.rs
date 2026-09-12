@@ -9,7 +9,7 @@
 
 /// 单级阶梯
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct YagniLevel {
+pub(crate) struct YagniLevel {
     pub level: u8,
     pub name: &'static str,
     pub question: &'static str,
@@ -17,7 +17,7 @@ pub struct YagniLevel {
 
 /// 判定结果
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum YagniVerdict {
+pub(crate) enum YagniVerdict {
     /// 建议删除 (低 usage + 低 consumers)
     Cut,
     /// 建议重新考虑 (中等证据)

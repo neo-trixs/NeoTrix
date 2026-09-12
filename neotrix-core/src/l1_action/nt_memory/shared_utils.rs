@@ -9,7 +9,7 @@ pub fn now_ts() -> i64 {
 }
 
 /// 获取当前时间戳 (Unix seconds, u64)
-pub fn now_ts_u64() -> u64 {
+pub(crate) fn now_ts_u64() -> u64 {
     now_ts() as u64
 }
 
@@ -28,7 +28,7 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
 }
 
 /// 环形缓冲区 — 固定容量，FIFO 淘汰
-pub struct RingBuffer<T> {
+pub(crate) struct RingBuffer<T> {
     items: Vec<T>,
     max_size: usize,
 }

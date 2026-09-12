@@ -23,8 +23,8 @@ pub struct HookResult {
     pub duration_ms: u64,
 }
 
-pub type PreToolHook = Arc<dyn Fn(ToolCallContext) -> HookResult + Send + Sync>;
-pub type PostToolHook = Arc<dyn Fn(ToolCallContext, String, u64) + Send + Sync>;
+pub(crate) type PreToolHook = Arc<dyn Fn(ToolCallContext) -> HookResult + Send + Sync>;
+pub(crate) type PostToolHook = Arc<dyn Fn(ToolCallContext, String, u64) + Send + Sync>;
 
 pub struct LifecycleHookRegistry {
     pub pre_hooks: Vec<(String, PreToolHook)>,

@@ -32,7 +32,7 @@ impl Default for ConfidenceWeights {
     }
 }
 
-pub static CONFIDENCE_WEIGHTS: std::sync::LazyLock<ConfidenceWeights> =
+pub(crate) static CONFIDENCE_WEIGHTS: std::sync::LazyLock<ConfidenceWeights> =
     std::sync::LazyLock::new(ConfidenceWeights::default);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,7 +93,7 @@ impl EpistemicConfidence {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum ConfidenceSource {
+pub(crate) enum ConfidenceSource {
     LmInference,
     ToolObservation,
     UserInput,
@@ -103,7 +103,7 @@ pub enum ConfidenceSource {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContradictingFact {
+pub(crate) struct ContradictingFact {
     pub node_id: String,
     pub claim: String,
     pub confidence: f64,
@@ -150,21 +150,21 @@ impl Default for DecayConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConsensusInfo {
+pub(crate) struct ConsensusInfo {
     pub support_count: usize,
     pub contradict_count: usize,
     pub consensus_score: f64,
     pub contradictions: Vec<ContradictingFact>,
 }
 
-pub fn grounding_saturation(composite: f64, k: f64) -> f64 {
+pub(crate) fn grounding_saturation(composite: f64, k: f64) -> f64 {
     if composite <= 0.0 {
         return 0.0;
     }
     (composite / (composite + k)).max(0.0).min(1.0)
 }
 
-pub fn compute_grounding(
+pub(crate) fn compute_grounding(
     source_count: usize,
     supporting_count: usize,
     contradicting_count: usize,
@@ -187,12 +187,12 @@ pub fn compute_grounding(
     grounding_saturation(composite, 2.0)
 }
 
-pub fn michaelis_menten_saturation(confidence: f64, k: f64) -> f64 {
+pub(crate) fn michaelis_menten_saturation(confidence: f64, k: f64) -> f64 {
     let c = confidence.max(0.0);
     (c * c / (c * c + k * k)).max(0.0).min(1.0)
 }
 
-pub fn decay_lambda_for_fact_type(fact_type: &str) -> f64 {
+pub(crate) fn decay_lambda_for_fact_type(fact_type: &str) -> f64 {
     match fact_type {
         "permanent" => 0.001,
         "dynamic" => 0.05,
@@ -203,7 +203,7 @@ pub fn decay_lambda_for_fact_type(fact_type: &str) -> f64 {
     }
 }
 
-pub fn should_auto_archive(confidence: &EpistemicConfidence) -> bool {
+pub(crate) fn should_auto_archive(confidence: &EpistemicConfidence) -> bool {
     if confidence.recency_confidence >= 0.1 {
         return false;
     }
@@ -215,7 +215,7 @@ pub fn should_auto_archive(confidence: &EpistemicConfidence) -> bool {
     days_since > 30.0
 }
 
-pub fn authenticated_diversity(grounding: f64, domains: &[String]) -> f64 {
+pub(crate) fn authenticated_diversity(grounding: f64, domains: &[String]) -> f64 {
     if domains.is_empty() {
         return 0.0;
     }
@@ -231,7 +231,7 @@ pub fn authenticated_diversity(grounding: f64, domains: &[String]) -> f64 {
     saturated_grounding * diversity
 }
 
-pub fn newman_consensus(source_confidences: &[f64]) -> f64 {
+pub(crate) fn newman_consensus(source_confidences: &[f64]) -> f64 {
     if source_confidences.is_empty() {
         return 0.5;
     }
@@ -269,7 +269,7 @@ fn expand_contractions(s: &str) -> String {
     s
 }
 
-pub fn detect_simple_contradiction(claim_a: &str, claim_b: &str) -> bool {
+pub(crate) fn detect_simple_contradiction(claim_a: &str, claim_b: &str) -> bool {
     let a = expand_contractions(&claim_a.trim().to_lowercase());
     let b = expand_contractions(&claim_b.trim().to_lowercase());
 
@@ -328,7 +328,7 @@ pub fn detect_simple_contradiction(claim_a: &str, claim_b: &str) -> bool {
     false
 }
 
-pub fn detect_consensus(
+pub(crate) fn detect_consensus(
     support_count: usize,
     contradict_count: usize,
     _supporting_sources: Vec<String>,

@@ -161,7 +161,7 @@ impl PMNode {
 }
 
 /// Local priority estimator (replaces L8 PriorityEngine dependency)
-pub fn estimate_priority_local(description: &str, complexity: f64) -> f64 {
+pub(crate) fn estimate_priority_local(description: &str, complexity: f64) -> f64 {
     let lower = description.to_lowercase();
     let mut score = complexity * 5.0;
     if lower.contains("critical") || lower.contains("urgent") || lower.contains("security") {

@@ -56,7 +56,7 @@ fn execute_command(command: &str) -> Result<String, String> {
 }
 
 /// 单个命令 → NativeTool 适配。LLM 通过工具名 (`neotrix_<cmd>`) 调用。
-pub struct CommandNativeTool {
+pub(crate) struct CommandNativeTool {
     name: String,
     description: String,
 }
@@ -113,7 +113,7 @@ impl NativeTool for CommandNativeTool {
 ///
 /// 每个已注册命令生成一个 `neotrix_<cmd名去slash>` 工具, 描述引用命令原文,
 /// 让 LLM 意识核心能智能调度任意能力。附带 agent_all 兜底工具。
-pub fn neotrix_command_tools() -> Vec<Box<dyn NativeTool>> {
+pub(crate) fn neotrix_command_tools() -> Vec<Box<dyn NativeTool>> {
     use crate::cli::commands::registry::default_registry;
     let reg = default_registry();
     let mut tools: Vec<Box<dyn NativeTool>> = Vec::new();

@@ -71,7 +71,7 @@ pub struct Task {
 
 /// GPU 设备状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GPUDevice {
+pub(crate) struct GPUDevice {
     /// 设备ID
     pub device_id: u32,
     /// 设备名称
@@ -102,7 +102,7 @@ impl GPUDevice {
 
 /// 任务调度配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SchedulerConfig {
+pub(crate) struct SchedulerConfig {
     /// 最大并行任务数
     pub max_parallel_tasks: u32,
     /// 最大 GPU 显存使用率
@@ -121,7 +121,7 @@ pub struct SchedulerConfig {
 
 /// 调度算法
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum SchedulingAlgorithm {
+pub(crate) enum SchedulingAlgorithm {
     /// 先来先服务
     FCFS,
     /// 最短作业优先
@@ -159,7 +159,7 @@ pub struct TaskResult {
 
 /// 并行任务管理器
 /// 管理 GPU 资源和任务调度
-pub struct ParallelTaskManager {
+pub(crate) struct ParallelTaskManager {
     /// 调度配置
     config: SchedulerConfig,
     /// GPU 设备列表

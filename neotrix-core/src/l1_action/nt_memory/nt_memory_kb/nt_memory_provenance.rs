@@ -161,7 +161,7 @@ fn constant_time_eq_hex(a: &str, b: &str) -> bool {
 /// 独立复核通道: 记录写入后二次校验 (agent 白名单 + 签名 + 时间合理性)。
 /// 未过审记录标记 injection 嫌疑, 常规查询默认过滤, 仅显式审计可见。
 #[derive(Debug, Clone)]
-pub struct InjectionGuard {
+pub(crate) struct InjectionGuard {
     /// 可信 agent 白名单 (空 = 信任所有 agent, 仅签名校验)。
     pub trusted_agents: Vec<String>,
     /// 服务端签名密钥。
@@ -212,7 +212,7 @@ impl InjectionGuard {
 }
 
 /// 审计一次写入: 签名后落库, 并记录签名状态 (供 teacher pass 复核)。
-pub fn record_provenance_signed(
+pub(crate) fn record_provenance_signed(
     conn: &Connection,
     guard: &InjectionGuard,
     mut record: ProvenanceRecord,
@@ -222,7 +222,7 @@ pub fn record_provenance_signed(
 }
 
 /// 写入一条决策溯源记录 (kv_store `provenance` 命名空间)。
-pub fn record_provenance(
+pub(crate) fn record_provenance(
     conn: &Connection,
     record: &ProvenanceRecord,
 ) -> Result<(), String> {
@@ -289,7 +289,7 @@ pub fn record_with_index(
 /// 带签名复核的查询 — Teacher-Second-Pass 生产路径。
 /// 逐条 `guard.review()` 复核, 只返回通过复核的记录; 返回 (通过, 拒绝原因) 对。
 /// 用于常规审计查询: 未过审 (伪造签名 / 非白名单 agent / 时钟异常) 被静默过滤。
-pub fn query_provenance_verified(
+pub(crate) fn query_provenance_verified(
     conn: &Connection,
     guard: &InjectionGuard,
     agent: Option<&str>,
@@ -305,7 +305,7 @@ pub fn query_provenance_verified(
 
 /// 审计复核记录 (含被拒绝的) — 供审计链/告警消费。
 /// 返回 Vec<(record, is_verified, reason)>。
-pub fn audit_verified(
+pub(crate) fn audit_verified(
     conn: &Connection,
     guard: &InjectionGuard,
 ) -> Result<Vec<(ProvenanceRecord, bool, String)>, String> {

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 /// 单次技能加载成本记录。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SkillLoad {
+pub(crate) struct SkillLoad {
     pub skill: String,
     /// 本次消耗的 token 估计 (按字符数 / 4 粗估)。
     pub tokens: usize,
@@ -20,7 +20,7 @@ pub struct SkillLoad {
 
 /// 技能成本台账。
 #[derive(Debug, Clone, Default)]
-pub struct SkillCostLedger {
+pub(crate) struct SkillCostLedger {
     /// skill → 累计 token
     pub totals: HashMap<String, usize>,
     /// skill → 调用次数

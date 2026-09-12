@@ -50,7 +50,7 @@ impl OutputStyleId {
 
 /// 输出样式实现契约。
 /// `Send + Sync`: OutputStyleRegistry 经 AgentLoop 跨线程共享 (Arc + Mutex), trait 对象必须是线程安全。
-pub trait OutputStyle: Send + Sync {
+pub(crate) trait OutputStyle: Send + Sync {
     fn id(&self) -> OutputStyleId;
     /// 对一段模型原始文本应用样式，返回格式化文本。
     fn apply(&self, text: &str) -> String;
@@ -61,7 +61,7 @@ pub trait OutputStyle: Send + Sync {
 }
 
 /// 内置样式 — 骨架实现，规则粒度待完善。
-pub struct AnswerFirstStyle;
+pub(crate) struct AnswerFirstStyle;
 impl OutputStyle for AnswerFirstStyle {
     fn id(&self) -> OutputStyleId {
         OutputStyleId::AnswerFirst
@@ -86,7 +86,7 @@ impl OutputStyle for AnswerFirstStyle {
     }
 }
 
-pub struct SpartanStyle;
+pub(crate) struct SpartanStyle;
 impl OutputStyle for SpartanStyle {
     fn id(&self) -> OutputStyleId {
         OutputStyleId::Spartan
@@ -102,7 +102,7 @@ impl OutputStyle for SpartanStyle {
     }
 }
 
-pub struct RundownStyle;
+pub(crate) struct RundownStyle;
 impl OutputStyle for RundownStyle {
     fn id(&self) -> OutputStyleId {
         OutputStyleId::Rundown
@@ -183,7 +183,7 @@ impl OutputStyleRegistry {
     }
 }
 
-pub struct PlainStyle;
+pub(crate) struct PlainStyle;
 impl OutputStyle for PlainStyle {
     fn id(&self) -> OutputStyleId {
         OutputStyleId::Plain
@@ -199,7 +199,7 @@ impl OutputStyle for PlainStyle {
 
 /// 单条规则的检查结果。
 #[derive(Debug, Clone)]
-pub struct RuleResult {
+pub(crate) struct RuleResult {
     pub rule_id: u8,
     pub passed: bool,
     pub detail: String,
@@ -245,7 +245,7 @@ pub struct GovernanceReport {
 
 /// 单条 AI-smell 命中的结构化描述。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AiSmell {
+pub(crate) struct AiSmell {
     /// 模式标识 (如 `meta-speech` / `conclusion-signpost`)。
     pub pattern_id: &'static str,
     /// 命中行号 (1-based)。
@@ -257,14 +257,14 @@ pub struct AiSmell {
 }
 
 /// AI-smell 检测模式 — 正则 + 建议。
-pub struct SmellPattern {
+pub(crate) struct SmellPattern {
     pub id: &'static str,
     pub regex: Regex,
     pub suggestion: &'static str,
 }
 
 /// 机械式 AI 写作痕迹检测器 — 规则化 regex 检测 (非 LLM 打分)。
-pub struct AiSmellDetector {
+pub(crate) struct AiSmellDetector {
     patterns: Vec<SmellPattern>,
     /// 每模式最多上报的命中数 (防止噪声淹没报告)。
     max_per_pattern: usize,
@@ -351,7 +351,7 @@ impl AiSmellDetector {
 }
 
 /// 单条治理规则 — 独立可测、可审计。
-pub struct GovernorRule {
+pub(crate) struct GovernorRule {
     pub id: u8,
     pub description: &'static str,
     pub check_fn: Box<dyn Fn(&str, OutputStyleId) -> RuleResult + Send + Sync>,
@@ -727,7 +727,7 @@ pub struct OutputGovernor {
 }
 
 /// 默认单消息长度上限 (字符)。
-pub const DEFAULT_MAX_MESSAGE_CHARS: usize = 8_000;
+pub(crate) const DEFAULT_MAX_MESSAGE_CHARS: usize = 8_000;
 
 fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
     let root = root.to_path_buf();

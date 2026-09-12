@@ -20,7 +20,7 @@ const LRU_MAX: usize = 16;
 
 /// 项目规则 — 从 AGENTS.md/CLAUDE.md/.cursorrules 解析的结构化内容
 #[derive(Debug, Clone)]
-pub struct ProjectRules {
+pub(crate) struct ProjectRules {
     pub source_files: Vec<PathBuf>,
     pub raw_text: String,
     pub sections: HashMap<String, String>,

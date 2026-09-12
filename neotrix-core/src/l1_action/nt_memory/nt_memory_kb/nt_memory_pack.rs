@@ -23,7 +23,7 @@ pub const VERSION: u8 = 1;
 /// flags bit
 pub const FLAG_ZSTD: u16 = 0b0000_0000_0000_0001;
 pub const FLAG_DELTA: u16 = 0b0000_0000_0000_0010;
-pub const FLAG_TRUNCATE: u16 = 0b0000_0000_0000_0100;
+pub(crate) const FLAG_TRUNCATE: u16 = 0b0000_0000_0000_0100;
 /// 文件尾带 CRC32 校验 (C5 自愈基础, 损坏检测)
 pub const FLAG_CHECKSUM: u16 = 0b0000_0000_0000_1000;
 /// 分块模式 (v2, A5): 块表定位 → 随机访问单块解码; 见 nt_memory_pack_chunked
@@ -33,8 +33,8 @@ pub const FLAG_CHUNKED: u16 = 0b0000_0000_0001_0000;
 pub const COL_COORD_LAT: u8 = 0;
 pub const COL_COORD_LNG: u8 = 1;
 pub const COL_STRING_DICT: u8 = 2;
-pub const COL_U32: u8 = 3;
-pub const COL_F64: u8 = 4;
+pub(crate) const COL_U32: u8 = 3;
+pub(crate) const COL_F64: u8 = 4;
 /// node_id 专用列: 前缀入字典 + ident 原始字节流 (高基数 ID 不字典化, 省字典空间)
 pub const COL_NODE_ID: u8 = 5;
 

@@ -8,7 +8,7 @@ use super::nt_memory_types::*;
 // ─── Community ID ───────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CommunityId(pub u64);
+pub(crate) struct CommunityId(pub u64);
 
 impl std::fmt::Display for CommunityId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -50,7 +50,7 @@ impl Community {
 // ─── Community Hierarchy ────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommunityHierarchy {
+pub(crate) struct CommunityHierarchy {
     /// levels[l] = communities at level l (0 = finest, L-1 = root)
     pub levels: Vec<Vec<Community>>,
     /// entity_id → communities it belongs to (one per level)
@@ -709,7 +709,7 @@ pub struct CommunityResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WeightedResult {
+pub(crate) struct WeightedResult {
     pub community_result: CommunityResult,
     pub weight: f64,
     pub query_relevance: f64,
@@ -1008,7 +1008,7 @@ impl CommunityAwareSearch {
 // ─── In-Memory KB for testing / offline use ─────────────────────────
 
 /// Lightweight in-memory graph for community detection without a DB.
-pub struct InMemoryKB {
+pub(crate) struct InMemoryKB {
     pub nodes: Vec<KnowledgeNode>,
     pub edges: Vec<KnowledgeEdge>,
 }

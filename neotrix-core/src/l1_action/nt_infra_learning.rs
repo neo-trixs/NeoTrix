@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// Provider 学习记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProviderLearning {
+pub(crate) struct ProviderLearning {
     pub provider_id: String,
     pub total_calls: u64,
     pub successful: u64,
@@ -122,19 +122,19 @@ lazy_static::lazy_static! {
         std::sync::Mutex::new(RouterLearner::new());
 }
 
-pub fn learner_record_call(provider_id: &str, success: bool, latency_ms: f64) {
+pub(crate) fn learner_record_call(provider_id: &str, success: bool, latency_ms: f64) {
     GLOBAL_LEARNER.lock().unwrap().record_call(provider_id, success, latency_ms);
 }
 
-pub fn learner_record_feedback(provider_id: &str, score: f64) {
+pub(crate) fn learner_record_feedback(provider_id: &str, score: f64) {
     GLOBAL_LEARNER.lock().unwrap().record_feedback(provider_id, score);
 }
 
-pub fn learner_best_provider() -> Option<String> {
+pub(crate) fn learner_best_provider() -> Option<String> {
     GLOBAL_LEARNER.lock().unwrap().best_provider().map(String::from)
 }
 
-pub fn learner_weights() -> HashMap<String, f64> {
+pub(crate) fn learner_weights() -> HashMap<String, f64> {
     GLOBAL_LEARNER.lock().unwrap().weights()
 }
 

@@ -84,7 +84,7 @@ impl AgentCard {
 }
 
 /// Agent Card 注册表
-pub struct AgentCardRegistry {
+pub(crate) struct AgentCardRegistry {
     cards: HashMap<String, AgentCard>,
 }
 
@@ -148,19 +148,19 @@ lazy_static::lazy_static! {
     static ref GLOBAL_CARDS: Mutex<AgentCardRegistry> = Mutex::new(AgentCardRegistry::new());
 }
 
-pub fn agent_card_register(card: AgentCard) {
+pub(crate) fn agent_card_register(card: AgentCard) {
     GLOBAL_CARDS.lock().unwrap().register(card);
 }
 
-pub fn agent_card_get(id: &str) -> Option<AgentCard> {
+pub(crate) fn agent_card_get(id: &str) -> Option<AgentCard> {
     GLOBAL_CARDS.lock().unwrap().get(id).cloned()
 }
 
-pub fn agent_card_find_by_capability(cap: &str) -> Vec<AgentCard> {
+pub(crate) fn agent_card_find_by_capability(cap: &str) -> Vec<AgentCard> {
     GLOBAL_CARDS.lock().unwrap().find_by_capability(cap).into_iter().cloned().collect()
 }
 
-pub fn agent_card_alive() -> Vec<AgentCard> {
+pub(crate) fn agent_card_alive() -> Vec<AgentCard> {
     GLOBAL_CARDS.lock().unwrap().alive_agents().into_iter().cloned().collect()
 }
 

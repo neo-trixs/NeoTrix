@@ -17,7 +17,7 @@ use crate::core::nt_core_cap::CapabilityVector;
 
 /// 基准维度
 #[derive(Debug, Clone)]
-pub struct BenchScore {
+pub(crate) struct BenchScore {
     pub compile_health: f64,
     pub test_coverage: f64,
     pub code_hygiene: f64,

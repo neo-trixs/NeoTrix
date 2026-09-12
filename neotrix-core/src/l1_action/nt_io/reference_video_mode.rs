@@ -20,7 +20,7 @@ pub struct ReferenceVideoMode {
 
 /// 参考生模式配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReferenceModeConfig {
+pub(crate) struct ReferenceModeConfig {
     /// 角色资产库路径
     pub character_asset_path: String,
     /// 场景资产库路径
@@ -37,7 +37,7 @@ pub struct ReferenceModeConfig {
 
 /// 生成参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerationParams {
+pub(crate) struct GenerationParams {
     /// 图片尺寸
     pub image_size: (u32, u32),
     /// 推理步数
@@ -73,7 +73,7 @@ pub struct GenerationRecord {
 
 /// 生成记录结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerationRecordResult {
+pub(crate) struct GenerationRecordResult {
     /// 是否成功
     pub success: bool,
     /// 生成的图片路径
@@ -88,7 +88,7 @@ pub struct GenerationRecordResult {
 
 /// 生产步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ProductionStep {
+pub(crate) enum ProductionStep {
     /// 第一步：生成角色资产
     GenerateCharacterAssets,
     /// 第二步：生成场景图片
@@ -101,7 +101,7 @@ pub enum ProductionStep {
 
 /// 生产任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReferenceProductionTask {
+pub(crate) struct ReferenceProductionTask {
     /// 任务ID
     pub id: String,
     /// 任务名称

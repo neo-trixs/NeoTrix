@@ -13,7 +13,7 @@ use super::permissions::PermissionSystem;
 use super::provider::NeoCodexMode;
 
 #[derive(Debug, Clone)]
-pub enum AgentEvent {
+pub(crate) enum AgentEvent {
     TurnStart {
         turn: u64,
         mode: NeoCodexMode,

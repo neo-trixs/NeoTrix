@@ -19,7 +19,7 @@ struct ProviderStats {
 }
 
 #[derive(Debug, Clone)]
-pub struct LatencyPrediction {
+pub(crate) struct LatencyPrediction {
     pub p50: Duration,
     pub p95: Duration,
     pub p99: Duration,
@@ -105,7 +105,7 @@ impl Default for MLPredictor {
 
 /// 请求特征 — 用于智能路由决策
 #[derive(Debug, Clone)]
-pub struct RequestProfile {
+pub(crate) struct RequestProfile {
     pub complexity: f64,
     pub token_estimate: u32,
     pub latency_sla: Duration,
@@ -115,7 +115,7 @@ pub struct RequestProfile {
 
 /// Provider 路由权重
 #[derive(Debug, Clone)]
-pub struct ProviderWeight {
+pub(crate) struct ProviderWeight {
     pub provider: String,
     pub weight: f64,
     pub avg_latency: Duration,

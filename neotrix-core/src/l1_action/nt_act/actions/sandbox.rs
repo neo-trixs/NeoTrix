@@ -20,7 +20,7 @@ pub enum SandboxVerdict {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SandboxRule {
+pub(crate) struct SandboxRule {
     /// Action kind prefix (e.g. "read:", "shell:", "write:")
     pub action_prefix: String,
     /// If true, rules matching this prefix are allowed by default

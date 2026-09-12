@@ -212,13 +212,13 @@ pub struct CliInput {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct KeyInput {
+pub(crate) struct KeyInput {
     pub seed: Option<String>,          // base64 seed (32 bytes)
     pub existing: Option<String>,      // 现有密钥文件路径
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ArtifactInput {
+pub(crate) struct ArtifactInput {
     pub path: String,
     pub hash: Option<String>,          // 可选预计算 hash
 }

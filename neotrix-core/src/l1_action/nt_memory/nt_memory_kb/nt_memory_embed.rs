@@ -3,7 +3,7 @@ use rusqlite::{params, Connection};
 use std::sync::OnceLock;
 
 /// 本地 hash-kernel 嵌入提供者，实现 EmbeddingProvider trait。
-pub struct LocalEmbeddingProvider {
+pub(crate) struct LocalEmbeddingProvider {
     dim: usize,
 }
 
@@ -121,7 +121,7 @@ pub fn embed_text(config: &EmbeddingConfig, text: &str) -> Result<Vec<f32>, Stri
 ///
 /// 语义质量低于真 MiniLM, 但保证无外部 server 时 embedding 链路完整可用,
 /// 供 `ensure_embeddings` / `/kb embed` 兜底 (R-P79 接线而非死代码)。
-pub fn local_embed_texts(texts: &[&str], dim: usize) -> Vec<Vec<f32>> {
+pub(crate) fn local_embed_texts(texts: &[&str], dim: usize) -> Vec<Vec<f32>> {
     let dim = dim.max(16);
     texts.iter().map(|&t| hash_kernel_embed(t, dim)).collect()
 }
@@ -177,7 +177,7 @@ fn embedding_client() -> Result<&'static reqwest::blocking::Client, String> {
 }
 
 /// Generate embeddings for multiple texts in a single API call.
-pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
+pub(crate) fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
     if texts.is_empty() { return Ok(Vec::new()); }
 
     if config.mode == EmbedMode::Local {
@@ -261,7 +261,7 @@ pub fn store_embedding(conn: &Connection, node_id: &str, vector: &[f32], model: 
 }
 
 /// Retrieve a single node's embedding.
-pub fn get_embedding(conn: &Connection, node_id: &str) -> rusqlite::Result<Option<Vec<f32>>> {
+pub(crate) fn get_embedding(conn: &Connection, node_id: &str) -> rusqlite::Result<Option<Vec<f32>>> {
     let mut stmt = conn.prepare("SELECT vector, dimension FROM embeddings WHERE node_id=?1")?;
     let mut rows = stmt.query(params![node_id])?;
     if let Some(row) = rows.next()? {
@@ -276,7 +276,7 @@ pub fn embedding_count(conn: &Connection) -> rusqlite::Result<usize> {
     conn.query_row("SELECT COUNT(*) FROM embeddings JOIN nodes ON nodes.id = embeddings.node_id", [], |row| row.get(0))
 }
 
-pub fn load_embeddings_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
+pub(crate) fn load_embeddings_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
     let mut stmt = conn.prepare(
         "SELECT e.node_id, e.vector FROM embeddings e JOIN nodes n ON n.id = e.node_id ORDER BY e.node_id LIMIT ?1 OFFSET ?2"
     )?;
@@ -499,7 +499,7 @@ fn load_latest_codebook(conn: &Connection, codebook_id: Option<i64>) -> rusqlite
 
 /// Result of a PQ training run.
 #[derive(Debug)]
-pub struct PqTrainReport {
+pub(crate) struct PqTrainReport {
     pub codebook_id: i64,
     pub m: usize,
     pub ks: usize,
@@ -600,7 +600,7 @@ fn load_embeddings_raw(conn: &Connection, limit: Option<usize>) -> rusqlite::Res
 ///
 /// Errors (with a caller-facing message) if there aren't enough vectors to train
 /// the requested `ks`, or if `m` doesn't divide `dimension`.
-pub fn train_pq_codebook(
+pub(crate) fn train_pq_codebook(
     conn: &Connection,
     m: usize,
     ks: usize,
@@ -898,7 +898,7 @@ mod tests {
 
 /// 岭回归拟合线性映射 W: old_dim → new_dim, 最小化 ||old·W − new||² + λ||W||²。
 /// 按输出维独立解正规方程 (XᵀX + λI) w = Xᵀy, 高斯消元部分主元。
-pub fn fit_linear_map(old: &[Vec<f32>], new: &[Vec<f32>], lambda: f32) -> Result<Vec<Vec<f32>>, String> {
+pub(crate) fn fit_linear_map(old: &[Vec<f32>], new: &[Vec<f32>], lambda: f32) -> Result<Vec<Vec<f32>>, String> {
     if old.len() != new.len() || old.is_empty() {
         return Err("paired embeddings required".into());
     }
@@ -951,7 +951,7 @@ pub fn fit_linear_map(old: &[Vec<f32>], new: &[Vec<f32>], lambda: f32) -> Result
 }
 
 /// 应用映射: [old_vec, 1] · Wᵀ → new_space (含偏置项)
-pub fn apply_linear_map(w_t: &[Vec<f32>], old_vec: &[f32]) -> Vec<f32> {
+pub(crate) fn apply_linear_map(w_t: &[Vec<f32>], old_vec: &[f32]) -> Vec<f32> {
     w_t.iter()
         .map(|row| {
             row.iter()

@@ -32,7 +32,7 @@ pub struct Workflow {
 
 /// 工作流配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkflowConfig {
+pub(crate) struct WorkflowConfig {
     pub max_parallel: usize,
     pub timeout: Option<u64>,
     pub retry_policy: RetryPolicy,
@@ -80,7 +80,7 @@ pub enum ErrorHandling {
 
 /// 任务定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskDefinition {
+pub(crate) struct TaskDefinition {
     pub id: String,
     pub name: String,
     pub task_type: String,
@@ -99,7 +99,7 @@ pub struct TaskEdge {
 
 /// 工作流实例
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkflowInstance {
+pub(crate) struct WorkflowInstance {
     pub id: String,
     pub workflow_id: String,
     pub status: WorkflowStatus,
@@ -134,14 +134,14 @@ pub enum TaskState {
 }
 
 /// 任务执行器 trait
-pub trait TaskExecutor: Send + Sync {
+pub(crate) trait TaskExecutor: Send + Sync {
     fn execute(&self, task: &TaskDefinition, context: &HashMap<String, serde_json::Value>) -> Result<serde_json::Value, String>;
     fn name(&self) -> &str;
 }
 
 /// 工作流统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkflowStats {
+pub(crate) struct WorkflowStats {
     pub total_workflows: u64,
     pub running_workflows: u64,
     pub completed_workflows: u64,

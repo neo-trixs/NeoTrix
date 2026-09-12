@@ -23,7 +23,7 @@ pub struct EditEntry {
 
 /// 文件级别的编辑统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileEditStats {
+pub(crate) struct FileEditStats {
     pub file: String,
     pub total_edits: usize,
     pub successful_edits: usize,

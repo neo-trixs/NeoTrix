@@ -70,7 +70,7 @@ static PRIVACY_BLOCK_UNTRUSTED: AtomicBool = AtomicBool::new(true);
 static CONFIGURED: OnceLock<()> = OnceLock::new();
 
 /// 运行时配置入口 (main 初始化 / 测试可调用)。
-pub fn configure_privacy_guard(enabled: bool, block_untrusted: bool) {
+pub(crate) fn configure_privacy_guard(enabled: bool, block_untrusted: bool) {
     PRIVACY_ENABLED.store(enabled, Ordering::Relaxed);
     PRIVACY_BLOCK_UNTRUSTED.store(block_untrusted, Ordering::Relaxed);
     let _ = CONFIGURED.set(());
@@ -100,7 +100,7 @@ fn ensure_configured() {
     let _ = CONFIGURED.set(());
 }
 
-pub fn privacy_guard_enabled() -> bool {
+pub(crate) fn privacy_guard_enabled() -> bool {
     ensure_configured();
     PRIVACY_ENABLED.load(Ordering::Relaxed)
 }
@@ -185,7 +185,7 @@ pub fn domain_egress_route(provider: LlmProviderType) -> EgressRoute {
 }
 
 /// 出口策略失败闭环校验 — 委托 factory `EgressPolicy::enforce` (R-P42 单一逻辑源)。
-pub fn enforce_egress_policy(policy: &EgressPolicy, selected: EgressRoute) -> Result<(), String> {
+pub(crate) fn enforce_egress_policy(policy: &EgressPolicy, selected: EgressRoute) -> Result<(), String> {
     policy.enforce(selected)
 }
 

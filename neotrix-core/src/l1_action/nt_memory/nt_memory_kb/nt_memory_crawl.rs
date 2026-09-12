@@ -309,7 +309,7 @@ pub fn ingest_from_alphaxiv_feed(
 
 /// 填充 OpenLibrary 节点 (能力源自 `bin/kb_crawl_batch::crawl_openlibrary`, R-P95/R-P96 提炼并入)。
 /// 仅更新已有但 content 为空的 OpenLibrary URL 节点; 复用安全抓取原语 (guard + pin + retry)。
-pub fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
+pub(crate) fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
     let ts = now();
     let mut stmt = conn
         .prepare(

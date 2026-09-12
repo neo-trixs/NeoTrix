@@ -10,7 +10,7 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 3D 摆位: 一个角色/物体在场景中的位置 (x,y,z) 与朝向。
 #[derive(Debug, Clone, PartialEq)]
-pub struct StagePlacement {
+pub(crate) struct StagePlacement {
     pub name: String,
     pub x: f64,
     pub y: f64,
@@ -19,7 +19,7 @@ pub struct StagePlacement {
 
 /// 镜头: 摄像机位置 + 注视点。
 #[derive(Debug, Clone, PartialEq)]
-pub struct CameraShot {
+pub(crate) struct CameraShot {
     pub cam_x: f64,
     pub cam_y: f64,
     pub cam_z: f64,
@@ -29,7 +29,7 @@ pub struct CameraShot {
 }
 
 /// 3D 预可视化 trait — 场景摆位 + 镜头控制 + AI 导演接口 stub。
-pub trait CozyClay: Send + Sync {
+pub(crate) trait CozyClay: Send + Sync {
     /// 校验摆位: 名称非空、坐标有限 (非 NaN/Inf)。重复名返回 None。
     fn validate_placement(&self, placements: &[StagePlacement]) -> Option<usize>;
     /// 生成镜头控制规格: 给定镜头返回 control 串, 坐标非有限返回 None。
@@ -38,7 +38,7 @@ pub trait CozyClay: Send + Sync {
 
 /// 默认实现。
 #[derive(Default)]
-pub struct CozyClayPreviz;
+pub(crate) struct CozyClayPreviz;
 
 impl CozyClay for CozyClayPreviz {
     fn validate_placement(&self, placements: &[StagePlacement]) -> Option<usize> {
@@ -74,7 +74,7 @@ impl CozyClay for CozyClayPreviz {
 
 /// T1 SelfTest: 验证摆位校验与镜头控制存在且生效。
 #[derive(Default)]
-pub struct CozyClaySelfTest;
+pub(crate) struct CozyClaySelfTest;
 
 impl SelfTest for CozyClaySelfTest {
     fn name(&self) -> &str {

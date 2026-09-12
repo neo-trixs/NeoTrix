@@ -596,7 +596,7 @@ fn query_to_avg_embedding(query: &str, all_embeddings: &[(String, Vec<f32>)]) ->
 /// Entity graph scores: find seed nodes matching query keywords, then propagate
 /// probability via Personalized PageRank (1 iteration). Seeds get base score,
 /// 1-hop neighbors get edge-weight boost, 2-hop neighbors get attenuated boost.
-pub fn entity_graph_scores(conn: &Connection, query: &str) -> rusqlite::Result<HashMap<String, f64>> {
+pub(crate) fn entity_graph_scores(conn: &Connection, query: &str) -> rusqlite::Result<HashMap<String, f64>> {
     let query_lower = query.to_lowercase();
     let query_words: Vec<&str> = query_lower
         .split_whitespace()
@@ -689,7 +689,7 @@ pub fn entity_graph_scores(conn: &Connection, query: &str) -> rusqlite::Result<H
 
 /// Fuse 4 signals into a single ranked list via weighted linear combination.
 /// Returns Vec<(node_id, fused_score, [fts5, bm25, embed, graph])>.
-pub fn fuse_signals(
+pub(crate) fn fuse_signals(
     fts_results: &[SearchResult],
     bm25_results: &[(f64, String)],
     embed_results: &[(f64, String)],
@@ -756,7 +756,7 @@ pub fn fuse_signals(
 
 /// Configurable weights for the 4 SmartVector scoring signals.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SmartVectorWeights {
+pub(crate) struct SmartVectorWeights {
     /// Semantic relevance (FTS + BM25 + embedding cosine)
     pub semantic: f64,
     /// Temporal freshness (decay from last update)
@@ -819,7 +819,7 @@ pub fn confidence_score(
 /// More edges with higher weights → higher relational score.
 /// Trust-from-topology (PageRank) adds structural importance signal.
 /// Uses logarithmic scaling to prevent degree-1000 hub domination.
-pub fn relational_score(edge_count: usize, total_weight: f64, trust: f64) -> f64 {
+pub(crate) fn relational_score(edge_count: usize, total_weight: f64, trust: f64) -> f64 {
     if edge_count == 0 {
         return trust.min(1.0);
     }
@@ -831,7 +831,7 @@ pub fn relational_score(edge_count: usize, total_weight: f64, trust: f64) -> f64
 
 /// Result of SmartVector 4-signal scoring for a single node.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SmartVectorScore {
+pub(crate) struct SmartVectorScore {
     pub node_id: String,
     pub fused_score: f64,
     pub semantic: f64,
@@ -1052,7 +1052,7 @@ impl CraniMEMGate {
 }
 
 // ── FTS5 Optimization Configuration (absorbed from ZSTD+FTS5 180,000× pattern 2026) ──
-pub struct Fts5OptimizerConfig {
+pub(crate) struct Fts5OptimizerConfig {
     /// cache_size in KB (negative = KB, positive = pages). Default: -256000 (256MB)
     pub cache_size: i64,
     /// mmap_size for memory-mapped I/O. Default: 268435456 (256MB)
@@ -1140,7 +1140,7 @@ impl Fts5OptimizerConfig {
 // (VSA 扩召 top_k), 使检索机制自身随使用自评自调。
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RetrievalEvalPoint {
+pub(crate) struct RetrievalEvalPoint {
     pub query: String,
     pub results_len: usize,
     pub mean_score: f64,
@@ -1148,7 +1148,7 @@ pub struct RetrievalEvalPoint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct RetrievalTuning {
+pub(crate) struct RetrievalTuning {
     /// VSA 扩召 top_k 的召回加成 (self-evolved), clamp 到 [-2, +4]
     pub boost: f64,
     pub committed_at: i64,
@@ -1326,7 +1326,7 @@ impl RetrievalEvolver {
 
 /// f32 余弦相似度 (单遍计算 dot/|a|/|b|, 无额外分配)。
 #[inline]
-pub fn cosine_f32(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) fn cosine_f32(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;
     }
@@ -1954,7 +1954,7 @@ mod materialized_neighbors_tests {
 /// T3 SelfTest 接线 (NT-MEMORY nt_memory_search): 校验物化邻居缓存
 /// `MaterializedNeighborCache` 的命中正确性 — 最近邻必须被物化且按余弦相似度排序
 /// (核心不变量: 物化不能丢失最近邻)。
-pub struct MaterializedNeighborCacheSelfTest;
+pub(crate) struct MaterializedNeighborCacheSelfTest;
 
 impl SelfTest for MaterializedNeighborCacheSelfTest {
     fn name(&self) -> &str {
@@ -1996,7 +1996,7 @@ impl SelfTest for MaterializedNeighborCacheSelfTest {
     }
 }
 
-pub fn register_nt_memory_search_self_tests(registry: &mut SelfTestRegistry) {
+pub(crate) fn register_nt_memory_search_self_tests(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(MaterializedNeighborCacheSelfTest));
 }
 
@@ -2026,7 +2026,7 @@ use crate::l1_action::traits::{
 };
 
 /// KB Search wrapper implementing unified SearchEngine trait
-pub struct KbSearchEngine {
+pub(crate) struct KbSearchEngine {
     conn: std::sync::Arc<std::sync::Mutex<Connection>>,
 }
 
@@ -2077,7 +2077,7 @@ impl SearchEngineTrait for KbSearchEngine {
 // ════════════════════════════════════════════════════════════════
 
 /// 搜索能力注册中心
-pub struct SearchRegistry {
+pub(crate) struct SearchRegistry {
     engines: Vec<Box<dyn SearchEngineTrait>>,
 }
 
@@ -2122,7 +2122,7 @@ impl SearchRouter {
 }
 
 /// 搜索桥接 — L5 领域技能 → SearchRouter
-pub struct SearchBridge {
+pub(crate) struct SearchBridge {
     router: SearchRouter,
 }
 

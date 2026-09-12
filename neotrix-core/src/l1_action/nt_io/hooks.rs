@@ -51,10 +51,10 @@ pub enum HookDecision {
 }
 
 /// Hook 处理函数类型
-pub type HookHandler = Box<dyn Fn(&HookEvent) -> HookDecision + Send + Sync>;
+pub(crate) type HookHandler = Box<dyn Fn(&HookEvent) -> HookDecision + Send + Sync>;
 
 /// 单个 Hook 注册
-pub struct HookRegistration {
+pub(crate) struct HookRegistration {
     pub name: String,
     pub event_type: String,
     pub handler: HookHandler,
@@ -63,7 +63,7 @@ pub struct HookRegistration {
 }
 
 /// Hook 管理器 — 三拍子生命周期钩子
-pub struct HookManager {
+pub(crate) struct HookManager {
     hooks: Vec<HookRegistration>,
     hook_count: u32,
 }

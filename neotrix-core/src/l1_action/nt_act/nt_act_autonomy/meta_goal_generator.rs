@@ -2,7 +2,7 @@ use crate::neotrix::nt_act_autonomy::trend_analyzer::{TrendDirection, TrendRepor
 use crate::neotrix::nt_act_goal::goal_generator::{EvolutionGoal, GoalCategory, GoalPriority};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MetaGoalCategory {
+pub(crate) enum MetaGoalCategory {
     ProcessImprovement,
     PerformanceOptimization,
     QualityGate,

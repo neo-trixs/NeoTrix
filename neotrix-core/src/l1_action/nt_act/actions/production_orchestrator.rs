@@ -73,7 +73,7 @@ pub struct Workflow {
 
 /// 编排配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrchestratorConfig {
+pub(crate) struct OrchestratorConfig {
     /// 最大并行工作流数
     pub max_parallel_workflows: u32,
     /// 每个工作流最大并行步骤数
@@ -90,7 +90,7 @@ pub struct OrchestratorConfig {
 
 /// 编排结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrchestratorResult {
+pub(crate) struct OrchestratorResult {
     /// 工作流ID
     pub workflow_id: String,
     /// 是否成功
@@ -105,7 +105,7 @@ pub struct OrchestratorResult {
 
 /// 进度回调
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProgressUpdate {
+pub(crate) struct ProgressUpdate {
     /// 工作流ID
     pub workflow_id: String,
     /// 当前步骤
@@ -124,7 +124,7 @@ pub struct ProgressUpdate {
 
 /// 生产编排器
 /// 管理多任务并行、进度追踪、断点续传
-pub struct ProductionOrchestrator {
+pub(crate) struct ProductionOrchestrator {
     /// 配置
     #[allow(dead_code)]
     config: OrchestratorConfig,

@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 参考类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum ReferenceType {
+pub(crate) enum ReferenceType {
     /// 图片参考
     Image,
     /// 视频参考
@@ -29,7 +29,7 @@ pub enum ReferenceType {
 
 /// 生成模式
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum GenerationMode {
+pub(crate) enum GenerationMode {
     /// 图生图
     ImageToImage,
     /// 视频生视频
@@ -46,7 +46,7 @@ pub enum GenerationMode {
 
 /// 参考配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReferenceConfig {
+pub(crate) struct ReferenceConfig {
     /// 参考类型
     pub reference_type: ReferenceType,
     /// 参考文件路径
@@ -63,7 +63,7 @@ pub struct ReferenceConfig {
 
 /// 生成配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerationConfig {
+pub(crate) struct GenerationConfig {
     /// 生成模式
     pub mode: GenerationMode,
     /// 参考配置列表
@@ -118,7 +118,7 @@ pub struct GenerationResult {
 /// 基于参考的生成器
 /// 实现图生图、视频生成、风格迁移等能力
 #[derive(Debug)]
-pub struct ReferenceBasedGeneration {
+pub(crate) struct ReferenceBasedGeneration {
     /// 生成配置
     config: GenerationConfig,
     /// 生成历史
@@ -341,7 +341,7 @@ impl ReferenceBasedGeneration {
 
 /// 生成统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerationStats {
+pub(crate) struct GenerationStats {
     /// 总生成数
     pub total_generations: usize,
     /// 成功数

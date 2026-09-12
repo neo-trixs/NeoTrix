@@ -258,7 +258,7 @@ pub enum FrameError {
 // ============================================================
 
 /// 写入多帧到 writer
-pub fn write_frames(writer: &mut (impl Write + std::io::Seek), frames: &[KnowledgeFrame]) -> std::io::Result<u64> {
+pub(crate) fn write_frames(writer: &mut (impl Write + std::io::Seek), frames: &[KnowledgeFrame]) -> std::io::Result<u64> {
     let start_offset = writer.stream_position()?;
     for frame in frames {
         let bytes = frame.encode_bytes();
@@ -270,7 +270,7 @@ pub fn write_frames(writer: &mut (impl Write + std::io::Seek), frames: &[Knowled
 }
 
 /// 从 reader 读取多帧
-pub fn read_frames(reader: &mut impl Read, count: usize) -> Result<Vec<KnowledgeFrame>, FrameError> {
+pub(crate) fn read_frames(reader: &mut impl Read, count: usize) -> Result<Vec<KnowledgeFrame>, FrameError> {
     let mut frames = Vec::with_capacity(count);
     for _ in 0..count {
         let mut len_buf = [0u8; 4];
