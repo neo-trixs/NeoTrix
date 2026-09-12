@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use super::common::factory::LlmProviderType;
-use super::common::types::LlmError;
+use crate::l1_action::nt_io::nt_io_provider::common::factory::LlmProviderType;
+use crate::l1_action::nt_io::nt_io_provider::common::types::LlmError;
 
 #[derive(Debug, Clone)]
 pub struct ProviderHealth {

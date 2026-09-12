@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use super::unified_inference::*;
-use super::gateway::GatewayV2;
-use super::types::CostEstimate as LlmCostEstimate;
+use super::GatewayV2;
+use super::super::common::types::*;
 
 /// 路由器配置
 #[derive(Debug, Clone)]
@@ -197,18 +197,18 @@ impl UnifiedInference for InferenceRouter {
             .map(|m| m.content.as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        let input_tokens = super::context_budget::estimate_tokens(&prompt);
-        let output_tokens = request.max_tokens.unwrap_or(4096) as usize;
+        let prompt_tokens = super::context_budget::estimate_tokens(&prompt);
+        let completion_tokens = request.max_tokens.unwrap_or(4096) as usize;
 
         // 简单估算: $0.002/1K tokens (可替换为 per-provider 定价)
-        let cost = (input_tokens as f64 / 1000.0) * 0.002
-            + (output_tokens as f64 / 1000.0) * 0.002;
+        let cost = (prompt_tokens as f64 / 1000.0) * 0.002
+            + (completion_tokens as f64 / 1000.0) * 0.002;
 
         CostEstimate {
-            input_tokens,
-            output_tokens,
+            prompt_tokens,
+            completion_tokens,
             estimated_cost_usd: cost,
-            model: request.model.clone().unwrap_or_default(),
+            provider_name: request.model.clone().unwrap_or_default(),
         }
     }
 }

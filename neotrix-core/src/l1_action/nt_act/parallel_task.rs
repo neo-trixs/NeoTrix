@@ -67,6 +67,9 @@ pub struct Task {
     pub current_retries: u32,
     /// 超时时间 (秒)
     pub timeout_secs: u32,
+    /// 下次重试时间（用于指数退避）
+    #[serde(skip)]
+    pub next_retry_at: Option<std::time::Instant>,
 }
 
 /// GPU 设备状态
@@ -270,9 +273,10 @@ impl ParallelTaskManager {
                 if task.current_retries < task.max_retries {
                     task.status = TaskStatus::Pending;
                     // 指数退避重试
-                    let _delay = self.config.retry_interval_base_secs
+                    let delay_secs = self.config.retry_interval_base_secs
                         * (2u32.pow(task.current_retries).min(self.config.retry_max_multiplier));
-                    // TODO: 实际实现延迟调度
+                    // 设置下次执行时间（避免立即重试）
+                    task.next_retry_at = Some(std::time::Instant::now() + std::time::Duration::from_secs(delay_secs as u64));
                     self.task_queue.push(task);
                 } else {
                     self.completed_tasks.push(result);

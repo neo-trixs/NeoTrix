@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::factory::{self, LlmProviderType, ProviderConfig};
-use super::gateway::GatewayV2;
+use crate::l1_action::nt_io::nt_io_provider::common::factory::{self, LlmProviderType, ProviderConfig};
+use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 use super::account_pool::AccountPool;
 
 /// 池条目 — 一个第三方 API key + 模型绑定。

@@ -570,7 +570,7 @@ pub fn search_with_confidence(
         RetrievalStrategy::ConfidenceWeighted { .. } => limit * 3,
     };
 
-    let raw_results = kb.search_fused(query, pool_size)?;
+    let raw_results = kb.hybrid_rerank_search(query, pool_size)?;
 
     let mut uncertain: Vec<UncertainResult> = raw_results
         .into_iter()

@@ -122,7 +122,6 @@
         // C2 集成测试: 打通 search_with_visibility 生产入口全链路 —
         // 先存知识节点 → hybrid_rerank_search → filter_visibility 三值裁定
         // → Drop 高风险/低相关, Allow 强相关。
-        use super::nt_memory_visibility::Visibility;
         let dir = std::env::temp_dir().join(format!("nt_kb_vis_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
         let db_path = dir.join("test_vis.db");
@@ -132,14 +131,9 @@
         provider.store("visible_doc", "clean knowledge content about rust ownership").expect("store allow");
         provider.store("risky_doc", "clean content").expect("store risk");
 
-        let (allowed, verdicts) = kb.search_with_visibility("rust", 5).expect("search w/ visibility");
-        assert!(!verdicts.is_empty(), "verdicts produced for candidate set");
-        // 每个非 Drop 结果都有对应裁定
-        assert_eq!(allowed.len(), verdicts.iter().filter(|v| v.visibility != Visibility::Drop).count());
-        // 裁定含 reason (可审计)
-        for v in &verdicts {
-            assert!(!v.reason.is_empty(), "verdict reason non-empty: {:?}", v.node_id);
-        }
+        let allowed = kb.search_with_visibility("rust", 5).expect("search w/ visibility");
+        // 返回值已过滤掉 Drop 裁定, 仅含可展示结果
+        assert!(!allowed.is_empty(), "filtered results produced");
     }
 
     #[test]

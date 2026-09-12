@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use super::common::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, StructuredOutputConfig, ToolCallInfo, Usage};
+use crate::l1_action::nt_io::nt_io_provider::common::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, StructuredOutputConfig, ToolCallInfo, Usage};
 
 pub struct OpenAiProvider {
     api_key: String,

@@ -166,6 +166,19 @@ pub struct RouterHealth {
     pub pool_sufficient: bool,
 }
 
+/// 成本估算
+#[derive(Debug, Clone, Default)]
+pub struct CostEstimate {
+    /// 提示 token 数
+    pub prompt_tokens: usize,
+    /// 输出 token 数
+    pub completion_tokens: usize,
+    /// 估算成本 (USD)
+    pub estimated_cost_usd: f64,
+    /// Provider 名称
+    pub provider_name: String,
+}
+
 // ══════════════════════════════════════════════════════════════
 // Error Types
 // ══════════════════════════════════════════════════════════════

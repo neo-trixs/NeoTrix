@@ -917,36 +917,34 @@ impl KnowledgeBase {
             .map_err(|e| format!("update_node_metadata: {}", e))
     }
 
-    /// 统一写入弧 (Unified Ingestion Bus) — 记忆写入的唯一入口。
-    ///
-    /// Onyx/ai-knowledge-graph 吸收: 任何写记忆动作先落主库 (nodes), 再从主库
-    /// 派生 graph (graphrag_extract → entities/relations edges) 与 evidence
-    /// (source_id + run_id 元数据), 杜绝 5 条平行写入管线互不相通。
-    ///
-    /// 返回主库节点 id (已存在则复用, 不重复建点)。
-    pub fn write_memory_entry(
+    /// 子方法: 主库写入 — 插入或复用节点 + 时序事实记账。
+    fn write_memory_entry_core(
         &self,
         title: &str,
         node_type: NodeType,
         content: Option<&str>,
         url: Option<&str>,
         domain: Option<&str>,
-        evidence: Option<&serde_json::Value>,
     ) -> Result<String, String> {
-        // 1. 主库写入 (插入或复用)
         let node_id = self.insert_or_get_node(title, node_type, content, url, domain)?;
-
-        // 1b. 时序事实记账 (TemporalFactLedger 接线, R-P79): 事实型节点 (有正文)
-        //     写入 append-only temporal_facts, 知识变更获得 point-in-time 语义。
+        // 时序事实记账 (TemporalFactLedger 接线, R-P79): 事实型节点 (有正文)
+        // 写入 append-only temporal_facts, 知识变更获得 point-in-time 语义。
         if let Ok(Some(node)) = self.get_node(&node_id) {
             self.record_node_fact(&node);
         }
+        Ok(node_id)
+    }
 
-        // 2. 代际版本化 (generation stamp) — 同源重写 (同 URL/同标题) 每次
-        //    经统一弧落库都在 metadata 递增 generation, 形成可审计的版本链。
-        //    来源: skales 经验代际模式 + Claude-OSINT 溯源要求 (P1-2 接线)。
+    /// 子方法: 代际版本化 — generation stamp 递增 + written_at 时间戳 + 类型化块分块统计。
+    fn write_memory_entry_versioned(
+        &self,
+        node_id: &str,
+        content: Option<&str>,
+    ) -> Result<(), String> {
+        // 代际版本化: 同源重写 (同 URL/同标题) 每次经统一弧落库都在 metadata
+        // 递增 generation, 形成可审计的版本链。
         let mut meta = self
-            .get_node(&node_id)?
+            .get_node(node_id)?
             .and_then(|n| n.metadata.clone())
             .unwrap_or_else(|| serde_json::json!({}));
         let generation = meta
@@ -966,16 +964,15 @@ impl KnowledgeBase {
                 ),
             );
         }
-        self.update_node_metadata(&node_id, &meta)?;
+        self.update_node_metadata(node_id, &meta)?;
 
-        // 2b. 类型化块分块 (typed block stats) — 保留表格/公式/代码/标题结构。
-        //     来源: MinerU 结构化文档解析 + Claude-OSINT 溯源 (P2 接线)。
+        // 类型化块分块 (typed block stats) — 保留表格/公式/代码/标题结构。
         let text_now = content.unwrap_or_default();
         if !text_now.is_empty() {
             let blocks = nt_memory_blocks::split_typed_blocks(text_now);
             let stats = nt_memory_blocks::block_stats(&blocks);
             let mut meta2 = self
-                .get_node(&node_id)?
+                .get_node(node_id)?
                 .and_then(|n| n.metadata.clone())
                 .unwrap_or_else(|| serde_json::json!({}));
             if let Some(obj) = meta2.as_object_mut() {
@@ -984,28 +981,39 @@ impl KnowledgeBase {
                     serde_json::json!(stats),
                 );
             }
-            self.update_node_metadata(&node_id, &meta2)?;
+            self.update_node_metadata(node_id, &meta2)?;
         }
+        Ok(())
+    }
 
-        // 3. evidence 元数据 (source_id + run_id + sha256) 落到主节点
-        if let Some(ev) = evidence {
-            let mut meta = self
-                .get_node(&node_id)?
-                .and_then(|n| n.metadata.clone())
-                .unwrap_or_else(|| serde_json::json!({}));
-            if let Some(obj) = meta.as_object_mut() {
-                obj.insert("evidence".to_string(), ev.clone());
-            }
-            self.update_node_metadata(&node_id, &meta)?;
+    /// 子方法: evidence 元数据 — 将 source_id + run_id + sha256 落到主节点 metadata。
+    fn write_memory_entry_evidence(
+        &self,
+        node_id: &str,
+        evidence: &serde_json::Value,
+    ) -> Result<(), String> {
+        let mut meta = self
+            .get_node(node_id)?
+            .and_then(|n| n.metadata.clone())
+            .unwrap_or_else(|| serde_json::json!({}));
+        if let Some(obj) = meta.as_object_mut() {
+            obj.insert("evidence".to_string(), evidence.clone());
         }
+        self.update_node_metadata(node_id, &meta)
+    }
 
-        // 4. SVAF 写入门禁 (validated writeback, T0.4) — 来源: loopx "spend-slot 只在
-        //    validated writeback 后记账" + Awesome-AI-Memory 记忆操作原语。
-        //    评估写入质量并记录决策到 metadata (可审计); Reject/Redundant → 跳过
-        //    graphrag 派生 (不污染语义图), 但基础节点保留 (证据链完整)。
+    /// 子方法: SVAF 写入门禁 — 评估写入质量, 记录决策到 metadata, 返回 gate_passed 标志。
+    /// Reject/Redundant → 跳过后续 graphrag 派生 (不污染语义图), 但基础节点保留 (证据链完整)。
+    fn write_memory_entry_svaf(
+        &self,
+        node_id: &str,
+        content: Option<&str>,
+        url: Option<&str>,
+        domain: Option<&str>,
+    ) -> Result<bool, String> {
         let svaf_eval = self.evaluate_write_gate(content, url, domain);
         let mut svaf_meta = self
-            .get_node(&node_id)?
+            .get_node(node_id)?
             .and_then(|n| n.metadata.clone())
             .unwrap_or_else(|| serde_json::json!({}));
         if let Some(obj) = svaf_meta.as_object_mut() {
@@ -1021,85 +1029,133 @@ impl KnowledgeBase {
                 }),
             );
         }
-        self.update_node_metadata(&node_id, &svaf_meta)?;
-
+        self.update_node_metadata(node_id, &svaf_meta)?;
         let gate_passed = !matches!(
             svaf_eval.decision,
             nt_memory_svaf_gate::SvafDecision::Reject | nt_memory_svaf_gate::SvafDecision::Redundant
         );
+        Ok(gate_passed)
+    }
 
-        // 5. 冲突检测 (T0.3) — 来源: semantica "冲突标记而非静默覆盖" + D2 策展接线。
-        //    写后校验: 新节点与既有相似标题节点断言极性相反 → 新者胜出, 旧者
-        //    supersedes 指向新者 (保留证据链)。scoped 检测, 非全库 O(n²)。
-        //    与 SVAF 门禁解耦: 事实一致性独立于质量评估, 无论门禁结果都执行。
-        if let Some(text) = content {
-            if !text.trim().is_empty() {
-                let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-                let conflicts = nt_memory_curation::conflict_detect_for_write(&conn, &node_id, 0.4)
-                    .unwrap_or_default();
-                drop(conn);
-                if !conflicts.is_empty() {
-                    // fidelity ledger (diagram-design 吸收): 冲突解决留差异清单
-                    // + provenance 溯源, 供审计回查, 而非仅静默覆盖。
-                    let (applied, ledger) = {
-                        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-                        match nt_memory_curation::apply_supersede_with_ledger(&conn, &conflicts) {
-                            Ok(ok) => ok,
-                            Err(e) => {
-                                log::warn!("[curation] supersede ledger failed: {}", e);
-                                (0, nt_memory_curation::FidelityLedger::new())
-                            }
-                        }
-                    };
-                    if !ledger.is_empty() {
-                        log::info!(
-                            "[curation] superseded {} nodes w/ provenance ledger: {}",
-                            applied, ledger.len()
+    /// 子方法: 冲突检测 — 写后校验新节点与既有相似标题节点, 执行 supersede + PROV-O 溯源。
+    /// 与 SVAF 门禁解耦: 事实一致性独立于质量评估, 无论门禁结果都执行。
+    fn write_memory_entry_conflict(
+        &self,
+        node_id: &str,
+        content: Option<&str>,
+    ) -> Result<(), String> {
+        let text = match content {
+            Some(t) if !t.trim().is_empty() => t,
+            _ => return Ok(()),
+        };
+        let _ = text; // 仅用于空值守卫
+
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let conflicts = nt_memory_curation::conflict_detect_for_write(&conn, node_id, 0.4)
+            .unwrap_or_default();
+        drop(conn);
+
+        if conflicts.is_empty() {
+            return Ok(());
+        }
+
+        // fidelity ledger (diagram-design 吸收): 冲突解决留差异清单
+        // + provenance 溯源, 供审计回查, 而非仅静默覆盖。
+        let (applied, ledger) = {
+            let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+            match nt_memory_curation::apply_supersede_with_ledger(&conn, &conflicts) {
+                Ok(ok) => ok,
+                Err(e) => {
+                    log::warn!("[curation] supersede ledger failed: {}", e);
+                    (0, nt_memory_curation::FidelityLedger::new())
+                }
+            }
+        };
+
+        if ledger.is_empty() {
+            return Ok(());
+        }
+
+        log::info!(
+            "[curation] superseded {} nodes w/ provenance ledger: {}",
+            applied, ledger.len()
+        );
+
+        // PROV-O 决策溯源 (semantica 吸收): 每次覆盖解决记录谁/做什么/基于什么证据。
+        // 锁已释放, 避免非重入 Mutex 死锁。
+        for e in &ledger.entries {
+            let _ = self.record_decision_provenance(
+                "nt_memory_curation",
+                crate::l1_action::nt_memory::nt_memory_kb::nt_memory_provenance::ProvActivity::Supersede,
+                &e.older_id,
+                &format!("superseded by {}", e.newer_id),
+                vec![e.newer_id.clone(), format!("sim={:.3}", e.sim)],
+            );
+            // 时序事实账本 (R-P79): 旧节点事实沿版本链 supersede
+            // (append-only 更正), 新对象 = 胜出新节点正文。
+            if let Ok(Some(newer)) = self.get_node(&e.newer_id) {
+                if let Some(obj) = newer
+                    .content
+                    .as_ref()
+                    .filter(|c| !c.trim().is_empty())
+                {
+                    let obj: String = obj.chars().take(2048).collect();
+                    if let Err(terr) = self
+                        .temporal_ledger
+                        .lock()
+                        .map_err(|x| format!("{x}"))
+                        .and_then(|lg| {
+                            lg.supersede_node_fact(
+                                &e.older_id, &obj, None, "nt_memory_curation",
+                            )
+                            .map_err(|x| x.to_string())
+                        })
+                    {
+                        log::debug!(
+                            "[temporal] supersede skip {} -> {}: {}",
+                            e.older_id,
+                            e.newer_id,
+                            terr
                         );
-                        // PROV-O 决策溯源 (semantica 吸收): 每次覆盖解决
-                        // 记录谁/做什么/基于什么证据。锁已释放, 避免非重入 Mutex 死锁。
-                        for e in &ledger.entries {
-                            let _ = self.record_decision_provenance(
-                                "nt_memory_curation",
-                                crate::l1_action::nt_memory::nt_memory_kb::nt_memory_provenance::ProvActivity::Supersede,
-                                &e.older_id,
-                                &format!("superseded by {}", e.newer_id),
-                                vec![e.newer_id.clone(), format!("sim={:.3}", e.sim)],
-                            );
-                            // 时序事实账本 (R-P79): 旧节点事实沿版本链 supersede
-                            // (append-only 更正), 新对象 = 胜出新节点正文。
-                            if let Ok(Some(newer)) = self.get_node(&e.newer_id) {
-                                if let Some(obj) = newer
-                                    .content
-                                    .as_ref()
-                                    .filter(|c| !c.trim().is_empty())
-                                {
-                                    let obj: String = obj.chars().take(2048).collect();
-                                    if let Err(terr) = self
-                                        .temporal_ledger
-                                        .lock()
-                                        .map_err(|x| format!("{x}"))
-                                        .and_then(|lg| {
-                                            lg.supersede_node_fact(
-                                                &e.older_id, &obj, None, "nt_memory_curation",
-                                            )
-                                            .map_err(|x| x.to_string())
-                                        })
-                                    {
-                                        log::debug!(
-                                            "[temporal] supersede skip {} -> {}: {}",
-                                            e.older_id,
-                                            e.newer_id,
-                                            terr
-                                        );
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
         }
+        Ok(())
+    }
+
+    /// 统一写入弧 (Unified Ingestion Bus) — 记忆写入的唯一入口。
+    ///
+    /// Onyx/ai-knowledge-graph 吸收: 任何写记忆动作先落主库 (nodes), 再从主库
+    /// 派生 graph (graphrag_extract → entities/relations edges) 与 evidence
+    /// (source_id + run_id 元数据), 杜绝 5 条平行写入管线互不相通。
+    ///
+    /// 返回主库节点 id (已存在则复用, 不重复建点)。
+    pub fn write_memory_entry(
+        &self,
+        title: &str,
+        node_type: NodeType,
+        content: Option<&str>,
+        url: Option<&str>,
+        domain: Option<&str>,
+        evidence: Option<&serde_json::Value>,
+    ) -> Result<String, String> {
+        // 1. 主库写入 (插入或复用) + 时序事实记账
+        let node_id = self.write_memory_entry_core(title, node_type, content, url, domain)?;
+
+        // 2. 代际版本化 + 类型化块分块统计
+        self.write_memory_entry_versioned(&node_id, content)?;
+
+        // 3. evidence 元数据 (source_id + run_id + sha256) 落到主节点
+        if let Some(ev) = evidence {
+            self.write_memory_entry_evidence(&node_id, ev)?;
+        }
+
+        // 4. SVAF 写入门禁 — 评估质量, 决定是否跳过 graphrag 派生
+        let gate_passed = self.write_memory_entry_svaf(&node_id, content, url, domain)?;
+
+        // 5. 冲突检测 — 写后校验, supersede 旧节点 + PROV-O 溯源
+        self.write_memory_entry_conflict(&node_id, content)?;
 
         // 6. GraphRAG 派生: 实体/关系从主库内容提取, 落 graphrag_store。
         //    门禁未过 (Reject/Redundant) → 跳过派生 (不污染语义图), 基础节点保留。
@@ -1821,18 +1877,17 @@ impl KnowledgeBase {
         &self,
         query: &str,
         limit: usize,
-    ) -> Result<(Vec<SearchResult>, Vec<nt_memory_visibility::VisibilityVerdict>), String> {
+    ) -> Result<Vec<SearchResult>, String> {
+        // 只执行一次查询，复用结果做可见性过滤
         let results = self.hybrid_rerank_search(query, limit)?;
         let config = nt_memory_visibility::VisibilityConfig::default();
-        let verdicts = nt_memory_visibility::filter_visibility(results, &config);
-        let allowed: Vec<SearchResult> = self
-            .hybrid_rerank_search(query, limit)?
+        let verdicts = nt_memory_visibility::filter_visibility(results.clone(), &config);
+        Ok(results
             .into_iter()
             .zip(verdicts.iter())
             .filter(|(_, v)| v.visibility != nt_memory_visibility::Visibility::Drop)
             .map(|(r, _)| r)
-            .collect();
-        Ok((allowed, verdicts))
+            .collect())
     }
 
     /// 记录一条决策溯源 (PROV-O, semantica 吸收) 到 kv_store `provenance`。
@@ -2168,10 +2223,6 @@ impl KnowledgeBase {
             *gs = Some(loaded);
         }
         Ok(())
-    }
-
-    pub fn search_fused(&self, query: &str, pool_size: usize) -> Result<Vec<SearchResult>, String> {
-        self.hybrid_rerank_search(query, pool_size)
     }
 
     pub fn search_hierarchical(&self, query: &str, limit: usize) -> Result<Vec<nt_memory_hierarchical::HierarchicalSearchResult>, String> {

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use super::common::factory::LlmProviderType;
+use crate::l1_action::nt_io::nt_io_provider::common::factory::LlmProviderType;
 
 /// 免费模型条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
