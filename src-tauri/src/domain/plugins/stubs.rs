@@ -780,22 +780,26 @@ static PLUGIN_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
         m.insert(
             "plugins".into(),
             serde_json::json!({
-                "session": { "enabled": true, "description": "会话管理" },
-                "chat": { "enabled": true, "description": "对话/LLM" },
-                "kb": { "enabled": true, "description": "知识库" },
-                "file": { "enabled": true, "description": "文件操作" },
-                "memory": { "enabled": true, "description": "记忆管理" },
-                "world": { "enabled": true, "description": "世界感知" },
-                "workflow": { "enabled": true, "description": "工作流" },
-                "agent": { "enabled": true, "description": "Agent 状态/任务/provider" },
-                "tool": { "enabled": true, "description": "工具管理" },
-                "system": { "enabled": true, "description": "系统管理" },
-                "security": { "enabled": true, "description": "安全扫描/审计" },
-                "ext": { "enabled": true, "description": "扩展/协作" },
-                "git": { "enabled": true, "description": "Git 版本控制" },
-                "cli": { "enabled": true, "description": "CLI 命令执行" },
-                "llamacpp": { "enabled": true, "description": "llama.cpp 本地推理" },
+                "session": { "enabled": true, "description": "会话管理", "version": "0.1.0" },
+                "chat": { "enabled": true, "description": "对话/LLM", "version": "0.1.0" },
+                "kb": { "enabled": true, "description": "知识库", "version": "0.1.0" },
+                "file": { "enabled": true, "description": "文件操作", "version": "0.1.0" },
+                "memory": { "enabled": true, "description": "记忆管理", "version": "0.1.0" },
+                "world": { "enabled": true, "description": "世界感知", "version": "0.1.0" },
+                "workflow": { "enabled": true, "description": "工作流", "version": "0.1.0" },
+                "agent": { "enabled": true, "description": "Agent 状态/任务/provider", "version": "0.1.0" },
+                "tool": { "enabled": true, "description": "工具管理", "version": "0.1.0" },
+                "system": { "enabled": true, "description": "系统管理", "version": "0.1.0" },
+                "security": { "enabled": true, "description": "安全扫描/审计", "version": "0.1.0" },
+                "ext": { "enabled": true, "description": "扩展/协作", "version": "0.1.0" },
+                "git": { "enabled": true, "description": "Git 版本控制", "version": "0.1.0" },
+                "cli": { "enabled": true, "description": "CLI 命令执行", "version": "0.1.0" },
+                "llamacpp": { "enabled": true, "description": "llama.cpp 本地推理", "version": "0.1.0" },
             }),
+        );
+        m.insert(
+            "config".into(),
+            serde_json::json!({}),
         );
         Mutex::new(m)
     });
@@ -1000,12 +1004,228 @@ impl DomainPlugin for PluginPlugin {
                     }),
                 }
             }
-            _ => stub_call(
-                action,
-                &["marketplace", "update", "config"],
-            ),
+            "marketplace" => {
+                let installed = {
+                    let state = PLUGIN_STATE.lock().map_err(|e| DomainError {
+                        code: "LOCK_ERROR".into(),
+                        message: e.to_string(),
+                        recoverable: true,
+                    })?;
+                    state.get("plugins").cloned().unwrap_or(serde_json::json!({}))
+                };
+                let available = vec![
+                    serde_json::json!({
+                        "name": "session",
+                        "description": "会话管理",
+                        "version": "0.1.0",
+                        "installed": installed.get("session").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "chat",
+                        "description": "对话/LLM",
+                        "version": "0.1.0",
+                        "installed": installed.get("chat").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "kb",
+                        "description": "知识库",
+                        "version": "0.1.0",
+                        "installed": installed.get("kb").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "file",
+                        "description": "文件操作",
+                        "version": "0.1.0",
+                        "installed": installed.get("file").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "memory",
+                        "description": "记忆管理",
+                        "version": "0.1.0",
+                        "installed": installed.get("memory").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "world",
+                        "description": "世界感知",
+                        "version": "0.1.0",
+                        "installed": installed.get("world").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "workflow",
+                        "description": "工作流",
+                        "version": "0.1.0",
+                        "installed": installed.get("workflow").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "agent",
+                        "description": "Agent 状态/任务/provider",
+                        "version": "0.1.0",
+                        "installed": installed.get("agent").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "tool",
+                        "description": "工具管理",
+                        "version": "0.1.0",
+                        "installed": installed.get("tool").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "system",
+                        "description": "系统管理",
+                        "version": "0.1.0",
+                        "installed": installed.get("system").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "security",
+                        "description": "安全扫描/审计",
+                        "version": "0.1.0",
+                        "installed": installed.get("security").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "ext",
+                        "description": "扩展/协作",
+                        "version": "0.1.0",
+                        "installed": installed.get("ext").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "git",
+                        "description": "Git 版本控制",
+                        "version": "0.1.0",
+                        "installed": installed.get("git").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "cli",
+                        "description": "CLI 命令执行",
+                        "version": "0.1.0",
+                        "installed": installed.get("cli").is_some(),
+                    }),
+                    serde_json::json!({
+                        "name": "llamacpp",
+                        "description": "llama.cpp 本地推理",
+                        "version": "0.1.0",
+                        "installed": installed.get("llamacpp").is_some(),
+                    }),
+                ];
+                Ok(serde_json::json!({
+                    "marketplace": available,
+                    "count": available.len(),
+                }))
+            }
+            "update" => {
+                let name = args
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if name.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 name 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                let mut state = PLUGIN_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let plugins = state
+                    .get_mut("plugins")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Plugin state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                match plugins.get_mut(&name) {
+                    Some(p) => {
+                        if let Some(obj) = p.as_object_mut() {
+                            let current_version = obj.get("version").and_then(|v| v.as_str()).unwrap_or("0.0.0");
+                            let bumped = bump_version(current_version);
+                            obj.insert("version".into(), serde_json::json!(bumped));
+                            Ok(serde_json::json!({
+                                "ok": true,
+                                "name": name,
+                                "from_version": current_version,
+                                "to_version": bumped,
+                            }))
+                        } else {
+                            Err(DomainError {
+                                code: "STATE_ERROR".into(),
+                                message: format!("Plugin '{}' state corrupted", name),
+                                recoverable: true,
+                            })
+                        }
+                    }
+                    None => Err(DomainError {
+                        code: "NOT_FOUND".into(),
+                        message: format!("Plugin '{}' not found", name),
+                        recoverable: true,
+                    }),
+                }
+            }
+            "config" => {
+                let plugin_name = args
+                    .get("plugin")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let set_key = args.get("key").and_then(|v| v.as_str());
+                let set_value = args.get("value").cloned();
+                let mut state = PLUGIN_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let config = state
+                    .get_mut("config")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Config state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                if let Some(key) = set_key {
+                    // Set config value
+                    let target = if plugin_name.is_empty() { "_global" } else { &plugin_name };
+                    let plugin_cfg = config
+                        .entry(target.to_string())
+                        .or_insert_with(|| serde_json::json!({}))
+                        .as_object_mut()
+                        .ok_or_else(|| DomainError {
+                            code: "STATE_ERROR".into(),
+                            message: "Plugin config corrupted".into(),
+                            recoverable: true,
+                        })?;
+                    plugin_cfg.insert(key.to_string(), set_value.unwrap_or(serde_json::json!(null)));
+                    Ok(serde_json::json!({ "ok": true, "plugin": target, "key": key }))
+                } else {
+                    // Get config
+                    let target = if plugin_name.is_empty() { "_global" } else { &plugin_name };
+                    let plugin_cfg = config.get(target).cloned().unwrap_or(serde_json::json!({}));
+                    Ok(serde_json::json!({
+                        "plugin": target,
+                        "config": plugin_cfg,
+                    }))
+                }
+            }
+            _ => Err(DomainError {
+                code: "UNKNOWN_ACTION".into(),
+                message: format!("Unknown action: {}", action),
+                recoverable: true,
+            }),
         }
     }
+}
+
+fn bump_version(version: &str) -> String {
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() != 3 {
+        return "0.1.0".into();
+    }
+    let major = parts[0].parse::<u32>().unwrap_or(0);
+    let minor = parts[1].parse::<u32>().unwrap_or(0);
+    let patch = parts[2].parse::<u32>().unwrap_or(0);
+    format!("{}.{}.{}", major, minor, patch + 1)
 }
 
 // ========== Tool Plugin ==========
@@ -1452,6 +1672,32 @@ impl DomainPlugin for SecurityPlugin {
 
 // ========== Ext Plugin ==========
 
+static EXT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
+    LazyLock::new(|| {
+        let mut m = HashMap::new();
+        m.insert(
+            "connections".into(),
+            serde_json::json!({}),
+        );
+        m.insert(
+            "channels".into(),
+            serde_json::json!({}),
+        );
+        m.insert(
+            "cowork".into(),
+            serde_json::json!({
+                "active": false,
+                "session_id": null,
+                "participants": [],
+            }),
+        );
+        m.insert(
+            "notifications".into(),
+            serde_json::json!([]),
+        );
+        Mutex::new(m)
+    });
+
 pub struct ExtPlugin;
 
 impl DomainPlugin for ExtPlugin {
@@ -1478,20 +1724,276 @@ impl DomainPlugin for ExtPlugin {
     fn call(
         &self,
         action: &str,
-        _args: serde_json::Value,
+        args: serde_json::Value,
     ) -> Result<serde_json::Value, DomainError> {
-        stub_call(
-            action,
-            &[
-                "remote_connect",
-                "remote_disconnect",
-                "channel_send",
-                "channel_list",
-                "cowork_start",
-                "cowork_stop",
-                "notify",
-            ],
-        )
+        match action {
+            "remote_connect" => {
+                let host = args
+                    .get("host")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("127.0.0.1")
+                    .to_string();
+                let port = args
+                    .get("port")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u16;
+                let device_id = args
+                    .get("device_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default")
+                    .to_string();
+                let protocol = args
+                    .get("protocol")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("tcp")
+                    .to_string();
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let mut state = EXT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let connections = state
+                    .get_mut("connections")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Connections state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                let conn_id = format!("{}:{}", host, port);
+                connections.insert(
+                    conn_id.clone(),
+                    serde_json::json!({
+                        "host": host,
+                        "port": port,
+                        "device_id": device_id,
+                        "protocol": protocol,
+                        "connected_at": now,
+                        "status": "connected",
+                    }),
+                );
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "connection_id": conn_id,
+                    "connected_at": now,
+                }))
+            }
+            "remote_disconnect" => {
+                let host = args
+                    .get("host")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("127.0.0.1")
+                    .to_string();
+                let port = args
+                    .get("port")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u16;
+                let mut state = EXT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let connections = state
+                    .get_mut("connections")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Connections state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                let conn_id = format!("{}:{}", host, port);
+                let removed = connections.remove(&conn_id);
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "connection_id": conn_id,
+                    "was_connected": removed.is_some(),
+                }))
+            }
+            "channel_send" => {
+                let channel = args
+                    .get("channel")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default")
+                    .to_string();
+                let message = args
+                    .get("message")
+                    .cloned()
+                    .unwrap_or(serde_json::json!(null));
+                let sender = args
+                    .get("sender")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("local")
+                    .to_string();
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let mut state = EXT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let channels = state
+                    .get_mut("channels")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Channels state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                let msg = serde_json::json!({
+                    "sender": sender,
+                    "message": message,
+                    "timestamp": now,
+                });
+                let messages = channels
+                    .entry(channel.clone())
+                    .or_insert_with(|| serde_json::json!([]))
+                    .as_array_mut()
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Channel messages corrupted".into(),
+                        recoverable: true,
+                    })?;
+                messages.push(msg.clone());
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "channel": channel,
+                    "message": msg,
+                }))
+            }
+            "channel_list" => {
+                let state = EXT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let channels = state
+                    .get("channels")
+                    .and_then(|v| v.as_object())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Channels state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                let channel_list: Vec<serde_json::Value> = channels
+                    .iter()
+                    .map(|(name, msgs)| {
+                        let count = msgs.as_array().map(|a| a.len()).unwrap_or(0);
+                        serde_json::json!({
+                            "name": name,
+                            "message_count": count,
+                        })
+                    })
+                    .collect();
+                Ok(serde_json::json!({
+                    "channels": channel_list,
+                    "count": channel_list.len(),
+                }))
+            }
+            "cowork_start" => {
+                let session_id = args
+                    .get("session_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default")
+                    .to_string();
+                let participants: Vec<String> = args
+                    .get("participants")
+                    .and_then(|v| v.as_array())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let mut state = EXT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                state.insert(
+                    "cowork".into(),
+                    serde_json::json!({
+                        "active": true,
+                        "session_id": session_id,
+                        "participants": participants,
+                        "started_at": std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0),
+                    }),
+                );
+                Ok(serde_json::json!({ "ok": true, "session_id": session_id }))
+            }
+            "cowork_stop" => {
+                let mut state = EXT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                state.insert(
+                    "cowork".into(),
+                    serde_json::json!({
+                        "active": false,
+                        "session_id": null,
+                        "participants": [],
+                    }),
+                );
+                Ok(serde_json::json!({ "ok": true }))
+            }
+            "notify" => {
+                let title = args
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Notification")
+                    .to_string();
+                let body = args
+                    .get("body")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let level = args
+                    .get("level")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("info")
+                    .to_string();
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let mut state = EXT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let notifications = state
+                    .get_mut("notifications")
+                    .and_then(|v| v.as_array_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Notifications state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                let notification = serde_json::json!({
+                    "title": title,
+                    "body": body,
+                    "level": level,
+                    "timestamp": now,
+                    "read": false,
+                });
+                notifications.push(notification.clone());
+                Ok(serde_json::json!({ "ok": true, "notification": notification }))
+            }
+            _ => Err(DomainError {
+                code: "UNKNOWN_ACTION".into(),
+                message: format!("Unknown action: {}", action),
+                recoverable: true,
+            }),
+        }
     }
 }
 
