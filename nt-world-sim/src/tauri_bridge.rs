@@ -3,10 +3,8 @@ use crate::game::time::GameTime;
 use crate::game::weather::Weather;
 use crate::game::inventory::Inventory;
 use crate::game::npc::Position;
-use crate::error::{GameError, GameResult};
-use crate::save::{SaveManager, SaveData as SaveDataFile};
+use crate::save::SaveData;
 use once_cell::sync::Lazy;
-use std::fs;
 use std::sync::Mutex;
 
 static GAME_STATE: Lazy<Mutex<Option<GameLoop>>> = Lazy::new(|| Mutex::new(None));

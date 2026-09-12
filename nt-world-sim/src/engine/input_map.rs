@@ -245,8 +245,8 @@ impl InputMap {
     }
 
     pub fn get_movement(&self) -> (f32, f32) {
-        let mut dx = 0.0;
-        let mut dy = 0.0;
+        let mut dx: f32 = 0.0;
+        let mut dy: f32 = 0.0;
         if self.is_action_active(InputAction::MoveUp) {
             dy -= 1.0;
         }
@@ -260,7 +260,7 @@ impl InputMap {
             dx += 1.0;
         }
         if dx != 0.0 && dy != 0.0 {
-            let len: f32 = ((dx * dx + dy * dy) as f32).sqrt();
+            let len = (dx * dx + dy * dy).sqrt();
             dx /= len;
             dy /= len;
         }

@@ -326,31 +326,25 @@ impl PhysicsWorld for SimplePhysicsWorld {
         }).collect();
 
         for (entity_a, entity_b, normal, penetration) in pairs {
-            if let (Some(body_a), Some(body_b)) = (
-                self.bodies.get_mut(&entity_a),
-                self.bodies.get_mut(&entity_b),
-            ) {
-                let push = penetration * 0.5;
+            let push = penetration * 0.5;
 
-                // Determine axis from normal direction
-                if normal.x.abs() > normal.y.abs() {
-                    // Horizontal separation
-                    if normal.x > 0.0 {
-                        body_a.position.x -= push;
-                        body_b.position.x += push;
-                    } else {
-                        body_a.position.x += push;
-                        body_b.position.x -= push;
-                    }
+            if normal.x.abs() > normal.y.abs() {
+                // Horizontal separation
+                if normal.x > 0.0 {
+                    if let Some(body) = self.bodies.get_mut(&entity_a) { body.position.x -= push; }
+                    if let Some(body) = self.bodies.get_mut(&entity_b) { body.position.x += push; }
                 } else {
-                    // Vertical separation
-                    if normal.y > 0.0 {
-                        body_a.position.y -= push;
-                        body_b.position.y += push;
-                    } else {
-                        body_a.position.y += push;
-                        body_b.position.y -= push;
-                    }
+                    if let Some(body) = self.bodies.get_mut(&entity_a) { body.position.x += push; }
+                    if let Some(body) = self.bodies.get_mut(&entity_b) { body.position.x -= push; }
+                }
+            } else {
+                // Vertical separation
+                if normal.y > 0.0 {
+                    if let Some(body) = self.bodies.get_mut(&entity_a) { body.position.y -= push; }
+                    if let Some(body) = self.bodies.get_mut(&entity_b) { body.position.y += push; }
+                } else {
+                    if let Some(body) = self.bodies.get_mut(&entity_a) { body.position.y += push; }
+                    if let Some(body) = self.bodies.get_mut(&entity_b) { body.position.y -= push; }
                 }
             }
         }

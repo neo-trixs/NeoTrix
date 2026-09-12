@@ -387,7 +387,7 @@ impl GameLoop {
     pub fn load_game(&mut self) -> crate::error::GameResult<()> {
         let manager = crate::save::SaveManager::default_dir();
         let data = manager.load(0)?;
-        self.tick_count = data.tick_count;
+        self.tick_count = data.play_time_seconds as u64;
         Ok(())
     }
 
