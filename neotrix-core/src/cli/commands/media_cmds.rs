@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l1_action::nt_media::detect::{detect_from_file, detect_remote};
+use crate::l1_action::nt_media::download_progress::{DownloadProgress, ProgressConfig};
 use crate::l1_action::nt_media::streaming::{
     PipelineConfig, PipelineStatus, StreamingPipeline,
 };
@@ -200,18 +201,14 @@ impl CliCommand for MediaStreamCmd {
                 eprintln!("\r  {}", msg);
             }
 
-            let _ = handle.wait().await;
-
-            if last_msg.starts_with("Complete") {
-                CommandOutput::ok(&format!(
+            let result = handle.wait().await;
+            match result {
+                Ok(_) => CommandOutput::ok(&format!(
                     "Stream finished: {} → {}",
                     url,
                     output_path.display()
-                ))
-            } else if last_msg.starts_with("Failed") {
-                CommandOutput::err(&last_msg)
-            } else {
-                CommandOutput::ok(&format!("Stream: {} → {}", url, output_path.display()))
+                )),
+                Err(e) => CommandOutput::err(&format!("Stream failed: {}", e)),
             }
         })
     }

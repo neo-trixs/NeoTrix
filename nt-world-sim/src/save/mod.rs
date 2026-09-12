@@ -322,6 +322,7 @@ mod tests {
             slot: 1,
             player_name: "TestPlayer".into(),
             play_time_seconds: 3600.0,
+            tick_count: 0,
             day: 1,
             season: "Clarity".into(),
             year: 1,

@@ -4,13 +4,13 @@ use crate::core::nt_core_error::recovery::{ErrorContext, ErrorType, RecoveryActi
 use crate::core::nt_core_cache::text_to_embedding;
 use crate::core::nt_core_span::{SpanKind, Tracer};
 
-use super::super::account_pool::AccountPoolError;
-use super::super::agent_routing::ModelTier;
-use super::super::circuit_breaker::BreakerState;
-use super::super::context_budget::estimate_tokens;
-use super::super::free_pool::global_free_pool;
-use super::super::rate_limiter::BrainTier;
-use super::super::privacy_guard::{egress_privacy_guard, trust_from_name};
+use super::super::pool::account_pool::AccountPoolError;
+use super::super::routing::agent_routing::ModelTier;
+use super::super::health::circuit_breaker::BreakerState;
+use super::super::health::context_budget::estimate_tokens;
+use super::super::pool::free_pool::global_free_pool;
+use super::super::health::rate_limiter::BrainTier;
+use super::super::common::privacy_guard::{egress_privacy_guard, trust_from_name};
 use super::*;
 
 /// 检测 provider 返回的维护窗提示 (如 empero "switching to new models" / "retrying in"),
@@ -345,7 +345,11 @@ impl GatewayV2 {
         {
             if self.cost_budget_per_query > 0.0 {
                 let est_tokens = estimate_tokens(&self.prompt_text(request)) as f64;
-                let estimated_cost = (est_tokens / 1000.0) * 0.002;
+                // 动态查询 provider 成本: 从 model 名提取 provider 前缀
+                let provider_name = request.model.split('/').next().unwrap_or("");
+                let cost_per_1k = super::super::catalog::provider_catalog::lookup_provider_cost(provider_name)
+                    .unwrap_or(0.002);
+                let estimated_cost = (est_tokens / 1000.0) * cost_per_1k;
                 if estimated_cost > self.cost_budget_per_query {
                     log::warn!(
                         "[gateway] Per-query cost budget exceeded: ${:.4} > ${:.4}",

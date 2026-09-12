@@ -22,7 +22,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::core::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 /// 单一价值维度的权重（自我模型据此评估动作/状态）。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

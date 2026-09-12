@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::core::nt_core_error::NeoTrixError;
+use crate::core::l0_substrate::nt_core_error::NeoTrixError;
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// 数据信任分级 — core 层出网隐私守卫的核心依据 (NeoTrix 自身源码/对话不外泄给外部模型)。
