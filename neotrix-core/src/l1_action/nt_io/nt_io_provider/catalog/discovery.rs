@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::factory::{LlmProviderType, ProviderConfig};
+use super::common::factory::{LlmProviderType, ProviderConfig};
 
 /// 模型来源
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

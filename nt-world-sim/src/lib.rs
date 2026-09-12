@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn test_physics() {
         let mut physics = SimplePhysicsWorld::new();
-        let entity = PhysicsEntity(0);
+        let entity = crate::core::entity::EntityId(0);
         let body = RigidBody::dynamic();
         physics.add_body(entity, body);
         physics.step(0.016);

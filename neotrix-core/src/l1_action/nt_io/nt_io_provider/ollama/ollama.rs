@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Usage};
+use super::common::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Usage};
 
 pub struct OllamaProvider {
     base_url: String,

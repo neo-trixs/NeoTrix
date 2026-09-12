@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, ToolCallFunction, ToolCallInfo, Usage, Role};
+use super::common::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, ToolCallFunction, ToolCallInfo, Usage, Role};
 
 pub struct GeminiProvider {
     api_key: String,

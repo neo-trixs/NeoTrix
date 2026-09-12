@@ -9,14 +9,14 @@
 //! 逃生门: NEOTRIX_NETWORK_UNBLOCK=1 显式放行, 或切换 shield profile 为 general。
 
 use super::types::{LlmProvider, LlmRequest, LlmResponse, LlmError};
-use super::openai::OpenAiProvider;
-use super::anthropic::AnthropicProvider;
-use super::ollama::OllamaProvider;
-use super::gemini::GeminiProvider;
-use super::free_catalog::FreeModelCatalog;
-use super::free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvider, CerebrasProvider};
-use super::gateway::GatewayV2;
-use super::provider_catalog::{ProviderCategory, CommunicationProfile};
+use crate::l1_action::nt_io::nt_io_provider::openai::OpenAiProvider;
+use crate::l1_action::nt_io::nt_io_provider::anthropic::AnthropicProvider;
+use crate::l1_action::nt_io::nt_io_provider::ollama::OllamaProvider;
+use crate::l1_action::nt_io::nt_io_provider::gemini::GeminiProvider;
+use crate::l1_action::nt_io::nt_io_provider::catalog::free_catalog::FreeModelCatalog;
+use crate::l1_action::nt_io::nt_io_provider::gateway::free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvider, CerebrasProvider};
+use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
+use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::{ProviderCategory, CommunicationProfile};
 use crate::core::nt_core_span::CostTracker;
 use std::sync::Arc;
 

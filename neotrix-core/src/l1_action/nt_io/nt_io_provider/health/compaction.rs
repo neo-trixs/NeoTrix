@@ -1,4 +1,4 @@
-use super::types::{Message, Role};
+use super::common::types::{Message, Role};
 
 pub(crate) fn sanitize_history(messages: &mut Vec<Message>) {
     let mut i = 0;
