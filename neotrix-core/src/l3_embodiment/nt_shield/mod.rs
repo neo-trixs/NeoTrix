@@ -61,3 +61,9 @@ pub use reasoning_protection::ReasoningProtectionEngine;
 pub use anti_distillation::AntiDistillationEngine;
 pub use fullbreak::{AttackResult, AttackSurface, FullbreakEngine};
 pub use cloud_evade::{CloudEvadeEngine, EvasionResult, EvasionTechnique, ObfuscationType};
+
+// ============================================
+// Defense modules (in defense/ subdirectory)
+// ============================================
+pub mod defense;
+pub use defense::unified_defense;
