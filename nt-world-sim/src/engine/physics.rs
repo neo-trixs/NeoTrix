@@ -118,8 +118,8 @@ impl Collider {
 /// 碰撞信息
 #[derive(Debug, Clone)]
 pub struct CollisionInfo {
-    pub entity_a: Entity,
-    pub entity_b: Entity,
+    pub entity_a: PhysicsEntity,
+    pub entity_b: PhysicsEntity,
     pub normal: Vec2,
     pub penetration: f32,
     pub contact_point: Vec2,
@@ -128,37 +128,37 @@ pub struct CollisionInfo {
 /// 物理世界 trait
 pub trait PhysicsWorld {
     /// 添加刚体
-    fn add_body(&mut self, entity: Entity, body: RigidBody);
+    fn add_body(&mut self, entity: PhysicsEntity, body: RigidBody);
 
     /// 移除刚体
-    fn remove_body(&mut self, entity: Entity);
+    fn remove_body(&mut self, entity: PhysicsEntity);
 
     /// 添加碰撞体
-    fn add_collider(&mut self, entity: Entity, collider: Collider);
+    fn add_collider(&mut self, entity: PhysicsEntity, collider: Collider);
 
     /// 移除碰撞体
-    fn remove_collider(&mut self, entity: Entity);
+    fn remove_collider(&mut self, entity: PhysicsEntity);
 
     /// 获取刚体
-    fn get_body(&self, entity: Entity) -> Option<&RigidBody>;
+    fn get_body(&self, entity: PhysicsEntity) -> Option<&RigidBody>;
 
     /// 获取可变刚体
-    fn get_body_mut(&mut self, entity: Entity) -> Option<&mut RigidBody>;
+    fn get_body_mut(&mut self, entity: PhysicsEntity) -> Option<&mut RigidBody>;
 
     /// 应用力
-    fn apply_force(&mut self, entity: Entity, force: Vec2);
+    fn apply_force(&mut self, entity: PhysicsEntity, force: Vec2);
 
     /// 应用冲量
-    fn apply_impulse(&mut self, entity: Entity, impulse: Vec2);
+    fn apply_impulse(&mut self, entity: PhysicsEntity, impulse: Vec2);
 
     /// 步进物理模拟
     fn step(&mut self, dt: f32);
 
     /// 查询点上的实体
-    fn query_point(&self, point: Vec2) -> Vec<Entity>;
+    fn query_point(&self, point: Vec2) -> Vec<PhysicsEntity>;
 
     /// 查询矩形内的实体
-    fn query_rect(&self, rect: Rect) -> Vec<Entity>;
+    fn query_rect(&self, rect: Rect) -> Vec<PhysicsEntity>;
 
     /// 获取碰撞列表
     fn collisions(&self) -> &[CollisionInfo];
@@ -172,8 +172,8 @@ pub trait PhysicsWorld {
 
 /// 简单物理世界实现
 pub struct SimplePhysicsWorld {
-    bodies: std::collections::HashMap<Entity, RigidBody>,
-    colliders: std::collections::HashMap<Entity, Collider>,
+    bodies: std::collections::HashMap<PhysicsEntity, RigidBody>,
+    colliders: std::collections::HashMap<PhysicsEntity, Collider>,
     collisions: Vec<CollisionInfo>,
     gravity: Vec2,
 }
@@ -194,37 +194,37 @@ impl SimplePhysicsWorld {
 }
 
 impl PhysicsWorld for SimplePhysicsWorld {
-    fn add_body(&mut self, entity: Entity, body: RigidBody) {
+    fn add_body(&mut self, entity: PhysicsEntity, body: RigidBody) {
         self.bodies.insert(entity, body);
     }
 
-    fn remove_body(&mut self, entity: Entity) {
+    fn remove_body(&mut self, entity: PhysicsEntity) {
         self.bodies.remove(&entity);
     }
 
-    fn add_collider(&mut self, entity: Entity, collider: Collider) {
+    fn add_collider(&mut self, entity: PhysicsEntity, collider: Collider) {
         self.colliders.insert(entity, collider);
     }
 
-    fn remove_collider(&mut self, entity: Entity) {
+    fn remove_collider(&mut self, entity: PhysicsEntity) {
         self.colliders.remove(&entity);
     }
 
-    fn get_body(&self, entity: Entity) -> Option<&RigidBody> {
+    fn get_body(&self, entity: PhysicsEntity) -> Option<&RigidBody> {
         self.bodies.get(&entity)
     }
 
-    fn get_body_mut(&mut self, entity: Entity) -> Option<&mut RigidBody> {
+    fn get_body_mut(&mut self, entity: PhysicsEntity) -> Option<&mut RigidBody> {
         self.bodies.get_mut(&entity)
     }
 
-    fn apply_force(&mut self, entity: Entity, force: Vec2) {
+    fn apply_force(&mut self, entity: PhysicsEntity, force: Vec2) {
         if let Some(body) = self.bodies.get_mut(&entity) {
             body.acceleration = body.acceleration + force * (1.0 / body.mass);
         }
     }
 
-    fn apply_impulse(&mut self, entity: Entity, impulse: Vec2) {
+    fn apply_impulse(&mut self, entity: PhysicsEntity, impulse: Vec2) {
         if let Some(body) = self.bodies.get_mut(&entity) {
             body.velocity = body.velocity + impulse * (1.0 / body.mass);
         }
@@ -254,7 +254,7 @@ impl PhysicsWorld for SimplePhysicsWorld {
         self.resolve_collisions();
     }
 
-    fn query_point(&self, point: Vec2) -> Vec<Entity> {
+    fn query_point(&self, point: Vec2) -> Vec<PhysicsEntity> {
         let mut result = Vec::new();
         for (entity, body) in &self.bodies {
             if let Some(collider) = self.colliders.get(entity) {
@@ -267,7 +267,7 @@ impl PhysicsWorld for SimplePhysicsWorld {
         result
     }
 
-    fn query_rect(&self, rect: Rect) -> Vec<Entity> {
+    fn query_rect(&self, rect: Rect) -> Vec<PhysicsEntity> {
         let mut result = Vec::new();
         for (entity, body) in &self.bodies {
             if let Some(collider) = self.colliders.get(entity) {
@@ -286,7 +286,7 @@ impl PhysicsWorld for SimplePhysicsWorld {
 
     fn detect_collisions(&mut self) {
         self.collisions.clear();
-        let entities: Vec<Entity> = self.bodies.keys().copied().collect();
+        let entities: Vec<PhysicsEntity> = self.bodies.keys().copied().collect();
         for i in 0..entities.len() {
             for j in (i + 1)..entities.len() {
                 let a = entities[i];
@@ -321,7 +321,7 @@ impl PhysicsWorld for SimplePhysicsWorld {
 
     fn resolve_collisions(&mut self) {
         // 计算所有碰撞的冲量
-        let mut impulses: Vec<(Entity, Vec2, Entity, Vec2)> = Vec::new();
+        let mut impulses: Vec<(PhysicsEntity, Vec2, PhysicsEntity, Vec2)> = Vec::new();
         
         for collision in &self.collisions {
             if let (Some(body_a), Some(body_b)) = (

@@ -11,7 +11,7 @@ pub mod world;
 
 pub use engine::{
     Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer,
-    Entity, BodyType, RigidBody, Collider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld,
+    PhysicsEntity, BodyType, RigidBody, Collider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld,
     KeyCode, MouseButton, GamepadAxis, GamepadButton, InputState, InputProvider, SimpleInputProvider,
 };
 pub use engine::scene::{SceneGraph, SceneNode};
@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn test_physics() {
         let mut physics = SimplePhysicsWorld::new();
-        let entity = Entity { id: 0, generation: 0 };
+        let entity = PhysicsEntity(0);
         let body = RigidBody::dynamic();
         physics.add_body(entity, body);
         physics.step(0.016);

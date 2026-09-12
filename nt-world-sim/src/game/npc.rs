@@ -1,4 +1,5 @@
 use super::dialogue::DialogueTree;
+use crate::core::world::Component;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
@@ -210,6 +211,9 @@ impl Npc {
         }
     }
 }
+
+impl Component for Npc {}
+impl Component for Position {}
 
 #[cfg(test)]
 mod tests {

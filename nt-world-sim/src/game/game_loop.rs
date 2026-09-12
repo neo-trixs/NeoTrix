@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::core::{UniversalWorld, UniversalEntity, Component, EntityId};
 use crate::core::scheduler::{ParallelScheduler, SystemDependency};
-use crate::engine::physics::SimplePhysicsWorld;
+use crate::engine::physics::{SimplePhysicsWorld, PhysicsWorld};
 use crate::engine::camera::Camera2D;
 use crate::engine::scene::{SceneGraph, SceneNode};
 use crate::engine::input::KeyCode as InputKeyCode;
@@ -398,8 +398,7 @@ impl Default for GameLoop {
     }
 }
 
-impl Component for Npc {}
-impl Component for Position {}
+
 
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use crate::core::world::Component;
 
 /// 颜色
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -715,6 +716,10 @@ impl GameRenderer {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+impl Component for Transform {}
+impl Component for Sprite {}
+impl Component for TileMap {}
 
 fn rand_f32_range(min: f32, max: f32) -> f32 {
     use std::time::SystemTime;

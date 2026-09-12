@@ -1,20 +1,35 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
-use super::account_pool::{AccountPool, AccountPoolConfig};
-use super::capability_router::CapabilityRouter;
-use super::generation_classifier::{GenerationAnalytics, GenerationClassifier};
-use super::provider_catalog::{CommunicationProfile, ProviderCategory};
-use super::rate_limiter::{AdaptivePacer, TieredSemaphore};
-use super::types::*;
+use super::pool::account_pool::{AccountPool, AccountPoolConfig};
+use super::common::generation_classifier::{GenerationAnalytics, GenerationClassifier};
+use super::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
+use super::health::rate_limiter::{AdaptivePacer, TieredSemaphore};
+use super::common::types::*;
 use crate::core::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator};
 use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
 
+// ── 新增文件: 从 nt_io_provider 移入 ──────────────────────────
+mod capability_router;
+pub use capability_router::CapabilityRouter;
+mod agent_routing;
+pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
+mod inference_router;
+pub use inference_router::{InferenceRouter, RouterConfig};
+mod unified_inference;
+pub use unified_inference::*;
+mod universal_adapter;
+pub use universal_adapter::*;
+mod search_router;
+pub use search_router::*;
+mod free_providers;
+pub use free_providers::*;
+
 #[cfg(test)]
-use super::agent_routing::AgentRoutingTable;
+use AgentRoutingTable;
 #[cfg(test)]
-use super::provider_swap::ProviderSwapManager;
+use super::routing::provider_swap::ProviderSwapManager;
 
 // ── Routing ──────────────────────────────────────────────────
 mod intelligence;
