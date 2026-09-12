@@ -37,6 +37,7 @@ pub use routing::market_router::*;
 pub use routing::routing_utils::*;
 pub use routing::search_router::*;
 pub use routing::free_providers::*;
+pub use routing::free_providers;
 // 韧性
 pub use resilience::*;
 // 执行
