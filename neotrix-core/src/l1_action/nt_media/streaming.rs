@@ -83,6 +83,8 @@ pub struct PipelineConfig {
     pub chunk_size: usize,
     pub persistence: Option<Arc<super::persistence::DownloadStore>>,
     pub auth: Option<AuthConfig>,
+    /// When true, display real-time progress bar to terminal
+    pub display_progress: bool,
 }
 
 impl Default for PipelineConfig {
@@ -99,6 +101,7 @@ impl Default for PipelineConfig {
             chunk_size: 256 * 1024,
             persistence: None,
             auth: None,
+            display_progress: true,
         }
     }
 }
