@@ -375,8 +375,8 @@ pub fn action_type_to_key(action: &crate::cli::approval::ActionType) -> &'static
 
 use crate::cli::approval::ApprovalMode;
 use crate::cli::shield_enforcer::global_shield;
-use crate::l3_embodiment::nt_shield::nt_shield::perm_chain::PermissionMode;
-use crate::l3_embodiment::nt_shield::nt_shield::policy::PolicyDecision;
+use crate::l3_embodiment::nt_shield::core::perm_chain::PermissionMode;
+use crate::l3_embodiment::nt_shield::core::policy::PolicyDecision;
 
 /// 三轴权限快照
 #[derive(Debug, Clone, Serialize)]

@@ -3102,8 +3102,8 @@ impl BrainStage for SelfTestStage {
         // ));
         registry.register(Box::new(crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
         registry.register(Box::new(ConsciousnessBridge::new()));
-        registry.register(crate::l3_embodiment::nt_shield::nt_shield::browser_security::create_browser_security_self_test());
-        registry.register(crate::l3_embodiment::nt_shield::nt_shield::check_registry::create_check_registry_self_test());
+        registry.register(crate::l3_embodiment::nt_shield::core::browser_security::create_browser_security_self_test());
+        registry.register(crate::l3_embodiment::nt_shield::core::check_registry::create_check_registry_self_test());
         registry.register(Box::new(
             crate::core::nt_core_telemetry::TelemetryStore::new(100),
         ));

@@ -1,11 +1,12 @@
 //! L2 Perception Layer - World Modules
 //!
-//! 5 目录架构:
-//!   crawl/   — 爬虫类 (crawl + browse + browse_auto)
-//!   osint/   — 情报类 (osint + absorber)
-//!   sense/   — 感知类 (sense + jepa + model)
-//!   explore/ — 探索类 (map + cleanup)
-//!   source/  — 源类 (media_source)
+//! 6 目录架构:
+//!   crawl/       — 爬虫类 (crawl + browse + browse_auto)
+//!   osint/       — 情报类 (osint + absorber)
+//!   sense/       — 感知类 (sense + jepa + model)
+//!   explore/     — 探索类 (map + cleanup)
+//!   source/      — 源类 (media_source)
+//!   data_source/ — 外部数据源采集器 (edgar/gdelt/usgs/gdacs 等 12 个)
 
 pub mod l1_facade;
 pub mod crawl;

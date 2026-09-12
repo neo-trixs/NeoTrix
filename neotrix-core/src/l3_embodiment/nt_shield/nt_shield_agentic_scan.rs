@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use crate::l3_embodiment::nt_shield::nt_shield::poc_engine::{PoCExpectedResult, PoCStep, PoCHttpRequest};
-use crate::l3_embodiment::nt_shield::nt_shield::poc_engine::PocEngine;
-use crate::l3_embodiment::nt_shield::nt_shield::http_proxy::HttpInterceptor;
+use crate::l3_embodiment::nt_shield::core::poc_engine::{PoCExpectedResult, PoCStep, PoCHttpRequest};
+use crate::l3_embodiment::nt_shield::core::poc_engine::PocEngine;
+use crate::l3_embodiment::nt_shield::core::http_proxy::HttpInterceptor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum _HunterKind {

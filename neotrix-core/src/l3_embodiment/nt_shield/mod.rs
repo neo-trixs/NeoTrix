@@ -55,7 +55,7 @@ pub mod nt_shield_ztnet;
 // ============================================
 
 // 原有re-exports
-pub use nt_shield::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};
+pub use core::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};
 
 // 新增re-exports
 pub use unified_defense::UnifiedDefenseLayer;

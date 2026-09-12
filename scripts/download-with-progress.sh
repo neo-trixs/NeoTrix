@@ -58,6 +58,8 @@ fmt_speed() {
 # ── 已有文件 ──────────────────────────────────
 EXISTED=0
 [ -f "$OUT" ] && EXISTED=$(stat -f%z "$OUT" 2>/dev/null || echo 0)
+EXISTED=$(echo "$EXISTED" | sed 's/^0*//')
+[ -z "$EXISTED" ] && EXISTED=0
 
 REMOTE=$(get_remote_size)
 # 去除前导零，防止 bash 八进制解析
@@ -99,6 +101,8 @@ STABLE=0
 
 while kill -0 "$CURL_PID" 2>/dev/null; do
     CURRENT=$(stat -f%z "$OUT" 2>/dev/null || echo 0)
+    CURRENT=$(echo "$CURRENT" | sed 's/^0*//')
+    [ -z "$CURRENT" ] && CURRENT=0
     NOW=$(date +%s)
     ELAPSED=$((NOW - LAST_SEC))
 

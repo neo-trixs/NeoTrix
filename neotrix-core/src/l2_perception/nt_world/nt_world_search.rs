@@ -1,16 +1,16 @@
 use serde::{Deserialize, Serialize};
-use crate::l2_perception::nt_world::nt_world_edgar::EdgarBackend;
-use crate::l2_perception::nt_world::nt_world_gdelt::GdeltBackend;
-use crate::l2_perception::nt_world::nt_world_usgs::UsgsBackend;
-use crate::l2_perception::nt_world::nt_world_gdacs::GdacsBackend;
-use crate::l2_perception::nt_world::nt_world_ucdp::UcdpBackend;
-use crate::l2_perception::nt_world::nt_world_urlhaus::UrlhausBackend;
-use crate::l2_perception::nt_world::nt_world_ofac::OfacBackend;
-use crate::l2_perception::nt_world::nt_world_polymarket::PolymarketBackend;
-use crate::l2_perception::nt_world::nt_world_aoi::AoiBackend;
-use crate::l2_perception::nt_world::nt_world_adsb::AdsbBackend;
-use crate::l2_perception::nt_world::nt_world_bgpview::BgpviewBackend;
-use crate::l2_perception::nt_world::nt_world_opencorporates::OpencorporatesBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_edgar::EdgarBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_gdelt::GdeltBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_usgs::UsgsBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_gdacs::GdacsBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_ucdp::UcdpBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_urlhaus::UrlhausBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_ofac::OfacBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_polymarket::PolymarketBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_aoi::AoiBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_adsb::AdsbBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_bgpview::BgpviewBackend;
+use crate::l2_perception::nt_world::data_source::nt_world_opencorporates::OpencorporatesBackend;
 
 /// argo 吸收 (2026-08-17): 证据可信度评分管线 — selection(权威) ×
 /// absorption(证据密度) + freshness(时效) + 共识. 强化 nt_world_search 现有节点

@@ -10,7 +10,7 @@
 //! bgpview/opencorporates).
 
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
-use crate::l2_perception::nt_world::{
+use crate::l2_perception::nt_world::data_source::{
     nt_world_adsb, nt_world_aoi, nt_world_bgpview, nt_world_edgar, nt_world_gdacs,
     nt_world_gdelt, nt_world_ofac, nt_world_opencorporates, nt_world_polymarket,
     nt_world_ucdp, nt_world_usgs, nt_world_urlhaus,

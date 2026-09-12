@@ -1555,8 +1555,8 @@ impl SkillEngine {
                             // P6 SkillTrustBench 安全门 (Tencent AIG absorbed, R-P79):
                             // 静态 T01-T09 扫描 — 命中任一攻击分类即拒收, 不进入生产索引。
                             let (trust_findings, trust_verdict) =
-                                crate::l3_embodiment::nt_shield::nt_shield::tool_inspection_stack::scan_skill_content(&skill.content);
-                            let trust_rejected = !matches!(trust_verdict, crate::l3_embodiment::nt_shield::nt_shield::tool_inspection_stack::InspectionResult::Allow);
+                                crate::l3_embodiment::nt_shield::core::tool_inspection_stack::scan_skill_content(&skill.content);
+                            let trust_rejected = !matches!(trust_verdict, crate::l3_embodiment::nt_shield::core::tool_inspection_stack::InspectionResult::Allow);
                             // E6 防护层硬化 (src9 EVOMAL 毒化扫描): 折入 R-P108
                             // 五维门 — 命中毒化模式即拒收, 阻断 promote。Err 保守视为拒收。
                             let poison_ok = _evomal_poison_scan(&skill).unwrap_or(false);
@@ -1587,8 +1587,8 @@ impl SkillEngine {
                         let scores = SkillQualityScorer::evaluate(&skill);
                         // P6 SkillTrustBench 安全门 (同目录型技能, R-P79)。
                         let (trust_findings, trust_verdict) =
-                            crate::l3_embodiment::nt_shield::nt_shield::tool_inspection_stack::scan_skill_content(&skill.content);
-                        let trust_rejected = !matches!(trust_verdict, crate::l3_embodiment::nt_shield::nt_shield::tool_inspection_stack::InspectionResult::Allow);
+                            crate::l3_embodiment::nt_shield::core::tool_inspection_stack::scan_skill_content(&skill.content);
+                        let trust_rejected = !matches!(trust_verdict, crate::l3_embodiment::nt_shield::core::tool_inspection_stack::InspectionResult::Allow);
                         // E6 防护层硬化 (src9 EVOMAL 毒化扫描): 折入 R-P108
                         // 五维门 — 命中毒化模式即拒收, 阻断 promote。Err 保守视为拒收。
                         let poison_ok = _evomal_poison_scan(&skill).unwrap_or(false);

@@ -183,7 +183,7 @@ pub fn run_provider_wizard() {
     // Encrypt the API key before persisting to disk
     // 加密失败即拒绝保存，禁止明文回退 (fail-closed，防密钥落盘可读)
     let stored_key = if !api_key.is_empty() {
-        match neotrix::nt_shield::nt_shield::key_encryption::encrypt(&api_key) {
+        match neotrix::nt_shield::core::key_encryption::encrypt(&api_key) {
             Ok(enc) => enc,
             Err(e) => {
                 eprintln!("{}: key encryption failed ({}); refusing to store plaintext key", err("Error"), e);
@@ -1829,7 +1829,7 @@ pub fn run_features_list() {
 // ── Config commands ──
 
 pub fn run_config_encrypt_keys() {
-    use neotrix::nt_shield::nt_shield::key_encryption;
+    use neotrix::nt_shield::core::key_encryption;
     let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
@@ -1894,7 +1894,7 @@ pub fn run_config_encrypt_keys() {
 }
 
 pub fn run_config_decrypt_keys() {
-    use neotrix::nt_shield::nt_shield::key_encryption;
+    use neotrix::nt_shield::core::key_encryption;
     let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
