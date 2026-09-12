@@ -3,7 +3,7 @@
  * 
  * 通过 domain_call('llamacpp', action, args) 调用后端 LlamacppPlugin。
  */
-import { domainCall } from './domain-client'
+import { call as domainCall } from './domain'
 
 export interface LlamacppHealth {
   running: boolean

@@ -35,16 +35,13 @@ mod response_healer;
 mod coordinator;
 mod execution;
 mod keyless;
-mod modular_gateway;
 
 // ── Observability ────────────────────────────────────────────
 mod plugin;
 
 // ── Types & Registry ─────────────────────────────────────────
 mod benchmark;
-mod pool_health;
 mod registry_core;
-mod response_quality;
 
 // ── Feature-gated ────────────────────────────────────────────
 #[cfg(feature = "stealth-net")]
@@ -63,7 +60,6 @@ pub use response_cache::*;
 pub use response_healer::*;
 // Execution
 pub use coordinator::*;
-pub use modular_gateway::*;
 pub use registry_core::*;
 // Observability
 pub use plugin::*;

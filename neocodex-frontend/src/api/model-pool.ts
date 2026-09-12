@@ -4,7 +4,7 @@
  * 通过 domain_call('agent', action, args) 调用后端 AgentPlugin。
  * 统一走 Domain Plugin 架构。
  */
-import { domainCall } from './domain-client'
+import { call as domainCall } from './domain'
 
 /** 模型池条目 */
 export interface ModelPoolEntry {

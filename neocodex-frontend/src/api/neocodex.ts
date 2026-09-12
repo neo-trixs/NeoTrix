@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import * as sessionApi from './session'
-import * as chatApi from './chat'
+import * as domain from './domain'
 import type {
   AgentStatus,
   Checkpoint,
