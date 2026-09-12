@@ -12,6 +12,8 @@ pub use engine::{
     PetState, PetStateComponent, PetAnimation, EyeTracking, PermissionBubble,
     PermissionAction, SessionInfo, SubagentInfo, ZzzParticle,
     PetStateSystem, EyeTrackingSystem, PermissionBubbleSystem, SessionSystem,
+    HookEvent, HookConfig, HookManager, PermissionMode, PermissionRequest,
+    PermissionBubbleLayout, PermissionHotkeys, hook_event_to_pet_state,
 };
 pub use mechanics::{
     ConsciousnessEntity, TransformComponent, RenderComponent, AiComponent, MaslowNeeds,

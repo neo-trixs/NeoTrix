@@ -117,7 +117,7 @@ impl GasTracker {
         })
     }
 
-    pub fn is_gas_acceptable(
+    pub(crate) fn _is_gas_acceptable(
         &self,
         chain: &ChainType,
         max_acceptable_gwei: f64,

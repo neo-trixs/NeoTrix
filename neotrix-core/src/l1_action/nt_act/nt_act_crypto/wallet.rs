@@ -101,7 +101,7 @@ impl WalletManager {
         self.active.and_then(|i| self.wallets.get(i))
     }
 
-    pub fn active_wallet_mut(&mut self) -> Option<&mut CryptoWallet> {
+    pub(crate) fn _active_wallet_mut(&mut self) -> Option<&mut CryptoWallet> {
         self.active.and_then(|i| self.wallets.get_mut(i))
     }
 
@@ -134,7 +134,7 @@ impl WalletManager {
         }
     }
 
-    pub fn total_balance_usd(&self) -> f64 {
+    pub(crate) fn _total_balance_usd(&self) -> f64 {
         0.0
     }
 }

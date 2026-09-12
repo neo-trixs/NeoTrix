@@ -20,6 +20,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::Instant;
 
 // ── Progress types ──────────────────────────────────────────────
+// NOTE: For unified types, see nt_media::streaming::{PipelineStatus, PipelineProgress}
 
 #[derive(Debug, Clone)]
 pub enum StreamStatus {
@@ -123,10 +124,13 @@ impl StreamDownload {
         let progress_tx = self.progress_tx.clone();
         let stopped = self.stopped.clone();
         let cancel_rx = self.cancel_rx;
+        let bytes_written_inner = self.bytes_written.clone();
+        let stopped_inner = self.stopped.clone();
+        let url_inner = self.url.clone();
 
         let handle = tokio::spawn(async move {
             let _ = progress_tx.send(StreamProgress {
-                url: self.url.clone(),
+                url: url_inner.clone(),
                 status: StreamStatus::Connecting,
                 download_speed_bps: 0.0,
                 download_total: start_byte,
@@ -138,13 +142,13 @@ impl StreamDownload {
 
             while let Some(chunk) = stream.next().await {
                 // Check cancel
-                if stopped.load(Ordering::Relaxed) || (cancel_rx.as_ref().map(|rx| rx.try_recv().is_err()).unwrap_or(false)) {
+                if stopped_inner.load(Ordering::Relaxed) || (cancel_rx.as_ref().map(|rx| rx.try_recv().is_err()).unwrap_or(false)) {
                     let _ = progress_tx.send(StreamProgress {
-                        url: self.url.clone(),
+                        url: url_inner.clone(),
                         status: StreamStatus::Cancelled,
                         download_speed_bps: 0.0,
-                        download_total: bytes_written.load(Ordering::Relaxed),
-                        download_bytes: bytes_written.load(Ordering::Relaxed),
+                        download_total: bytes_written_inner.load(Ordering::Relaxed),
+                        download_bytes: bytes_written_inner.load(Ordering::Relaxed),
                         elapsed: started.elapsed(),
                         buffered_percent: None,
                     })
@@ -155,7 +159,7 @@ impl StreamDownload {
                 match chunk {
                     Ok(data) => {
                         file.write_all(&data).await?;
-                        let written = bytes_written.fetch_add(data.len() as u64, Ordering::Relaxed) + data.len() as u64;
+                        let written = bytes_written_inner.fetch_add(data.len() as u64, Ordering::Relaxed) + data.len() as u64;
                         recent_bytes += data.len() as u64;
 
                         // Calculate speed every 500ms
@@ -172,7 +176,7 @@ impl StreamDownload {
 
                             let buffered_pct = total_size.map(|t| (written as f32 / t as f32) * 100.0);
                             let _ = progress_tx.send(StreamProgress {
-                                url: self.url.clone(),
+                                url: url_inner.clone(),
                                 status: if written == total_size.unwrap_or(0) {
                                     StreamStatus::Complete
                                 } else {
@@ -189,11 +193,11 @@ impl StreamDownload {
                     }
                     Err(e) => {
                         let _ = progress_tx.send(StreamProgress {
-                            url: self.url.clone(),
+                            url: url_inner.clone(),
                             status: StreamStatus::Failed(e.to_string()),
                             download_speed_bps: 0.0,
-                            download_total: bytes_written.load(Ordering::Relaxed),
-                            download_bytes: bytes_written.load(Ordering::Relaxed),
+                            download_total: bytes_written_inner.load(Ordering::Relaxed),
+                            download_bytes: bytes_written_inner.load(Ordering::Relaxed),
                             elapsed: started.elapsed(),
                             buffered_percent: None,
                         })
@@ -205,11 +209,11 @@ impl StreamDownload {
 
             file.flush().await?;
             let _ = progress_tx.send(StreamProgress {
-                url: self.url,
+                url: url_inner,
                 status: StreamStatus::Complete,
                 download_speed_bps: 0.0,
-                download_total: bytes_written.load(Ordering::Relaxed),
-                download_bytes: bytes_written.load(Ordering::Relaxed),
+                download_total: bytes_written_inner.load(Ordering::Relaxed),
+                download_bytes: bytes_written_inner.load(Ordering::Relaxed),
                 elapsed: started.elapsed(),
                 buffered_percent: Some(100.0),
             })
@@ -369,9 +373,11 @@ impl StreamPlayer {
     /// Player will read from the file as it grows, and exit when the file stops growing or closes.
     pub fn spawn(self) -> Result<PlayerHandle, StreamError> {
         let player = self.detect_player()
-            .ok_or_else(|| StreamError::Config("no player found (ffplay/mpv)".into()))?;
+            .ok_or_else(|| StreamError::Config("no player found (ffplay/mpv)".into()))?
+            .to_string();
 
         let file_clone = self.file.clone();
+        let file_for_handle = self.file.clone();
 
         let (stop_tx, stop_rx) = oneshot::channel::<()>();
 
@@ -390,7 +396,7 @@ impl StreamPlayer {
             }
 
             // Spawn player
-            let mut cmd = Command::new(player);
+            let mut cmd = Command::new(&player);
             if player == "ffplay" {
                 // ffplay: loop, no video, just audio, use file as input
                 cmd.arg("-autoexit")
@@ -429,7 +435,7 @@ impl StreamPlayer {
             Ok::<(), StreamError>(())
         });
 
-        Ok(PlayerHandle { handle, stop_tx, file: file_clone })
+        Ok(PlayerHandle { handle, stop_tx, file: file_for_handle })
     }
 }
 
@@ -524,9 +530,9 @@ impl MagnetTransport {
 
         // Spawn polling task
         let rpc_url = self.rpc_url.clone();
-        let rpc_secret = self.rpc_secret.clone();
-        let (stop_tx, stop_rx) = oneshot::channel::<()>();
-
+        let _rpc_secret = self.rpc_secret.clone();
+        let (stop_tx, mut stop_rx) = oneshot::channel::<()>();
+        let gid_clone = gid.clone();
         let poll_handle = tokio::spawn(async move {
             let client = reqwest::Client::new();
             let mut interval = tokio::time::interval(Duration::from_millis(500));
@@ -541,7 +547,7 @@ impl MagnetTransport {
                     "jsonrpc": "2.0",
                     "id": "nt-status",
                     "method": "aria2.tellStatus",
-                    "params": [&gid, ["status", "totalLength", "completedLength", "downloadSpeed", "uploadSpeed", "files"]],
+                    "params": [&gid_clone, ["status", "totalLength", "completedLength", "downloadSpeed", "uploadSpeed", "files"]],
                 });
 
                 let resp = match client.post(&rpc_url).json(&rpc_body).send().await {

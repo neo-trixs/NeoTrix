@@ -21,12 +21,12 @@ impl DevToolCleaner {
         self.clean_directory(&path, "node_modules")
     }
 
-    pub fn clean_target(&self, project_dir: &Path) -> CleanResult {
+    pub(crate) fn _clean_target(&self, project_dir: &Path) -> CleanResult {
         let path = project_dir.join("target");
         self.clean_directory(&path, "target")
     }
 
-    pub fn clean_venv(&self, project_dir: &Path) -> CleanResult {
+    pub(crate) fn _clean_venv(&self, project_dir: &Path) -> CleanResult {
         let candidates = ["venv", ".venv", "__pycache__"];
         let mut total_freed = 0u64;
         let mut total_removed = 0usize;
@@ -50,7 +50,7 @@ impl DevToolCleaner {
         CleanResult { name: "python_artifacts".into(), success, items_removed: total_removed, bytes_freed: total_freed, errors }
     }
 
-    pub fn clean_next(&self, project_dir: &Path) -> CleanResult {
+    pub(crate) fn _clean_next(&self, project_dir: &Path) -> CleanResult {
         let path = project_dir.join(".next");
         self.clean_directory(&path, ".next")
     }

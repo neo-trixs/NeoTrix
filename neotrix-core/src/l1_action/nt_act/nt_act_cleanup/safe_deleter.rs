@@ -39,7 +39,7 @@ impl SafeDeleter {
         self.config.use_trash = use_trash;
     }
 
-    pub fn set_archive_before_delete(&mut self, archive: bool) {
+    pub(crate) fn _set_archive_before_delete(&mut self, archive: bool) {
         self.config.archive_before_delete = archive;
     }
 
@@ -171,7 +171,7 @@ impl SafeDeleter {
         Ok(())
     }
 
-    pub fn create_backup_manifest(&self, paths: &[PathBuf]) -> Result<PathBuf, String> {
+    pub(crate) fn _create_backup_manifest(&self, paths: &[PathBuf]) -> Result<PathBuf, String> {
         let timestamp = chrono::Local::now().format("%Y-%m-%d_%H%M%S");
         let manifest_dir = self.archive_path.join("manifests");
         std::fs::create_dir_all(&manifest_dir).map_err(|e| format!("创建清单目录失败: {}", e))?;

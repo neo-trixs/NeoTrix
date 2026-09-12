@@ -16,25 +16,25 @@ impl CacheCleaner {
     pub fn with_config(config: CleanupConfig) -> Self { Self { config } }
     pub fn set_dry_run(&mut self, dry_run: bool) { self.config.dry_run = dry_run; }
 
-    pub fn clean_npm(&self) -> CleanResult {
+    pub(crate) fn _clean_npm(&self) -> CleanResult {
         let home = dirs::home_dir().unwrap_or_default();
         let path = home.join(".npm");
         self.clean_directory(&path, "npm")
     }
 
-    pub fn clean_pip(&self) -> CleanResult {
+    pub(crate) fn _clean_pip(&self) -> CleanResult {
         let home = dirs::home_dir().unwrap_or_default();
         let path = home.join("Library/Caches/pip");
         self.clean_directory(&path, "pip")
     }
 
-    pub fn clean_cargo(&self) -> CleanResult {
+    pub(crate) fn _clean_cargo(&self) -> CleanResult {
         let home = dirs::home_dir().unwrap_or_default();
         let path = home.join(".cargo/registry");
         self.clean_directory(&path, "cargo")
     }
 
-    pub fn clean_brew(&self) -> CleanResult {
+    pub(crate) fn _clean_brew(&self) -> CleanResult {
         let output = std::process::Command::new("brew").arg("--cache").output();
         match output {
             Ok(o) if o.status.success() => {
@@ -46,7 +46,7 @@ impl CacheCleaner {
         }
     }
 
-    pub fn clean_chrome(&self) -> CleanResult {
+    pub(crate) fn _clean_chrome(&self) -> CleanResult {
         let home = dirs::home_dir().unwrap_or_default();
         let path = home.join("Library/Caches/Google/Chrome");
         self.clean_directory(&path, "chrome")

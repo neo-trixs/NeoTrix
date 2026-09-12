@@ -139,7 +139,7 @@ impl ChainMonitor {
             .collect()
     }
 
-    pub fn scan_new_pools(
+    pub(crate) fn _scan_new_pools(
         &mut self,
         _clients: &MultiEvmClient,
     ) -> Vec<NewPoolEvent> {

@@ -76,13 +76,13 @@ impl CryptoCollector {
         result
     }
 
-    pub fn recent_earnings(&self, limit: usize) -> Vec<&CryptoEarnings> {
+    pub(crate) fn _recent_earnings(&self, limit: usize) -> Vec<&CryptoEarnings> {
         let mut sorted: Vec<_> = self.earnings.iter().collect();
         sorted.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
         sorted.into_iter().take(limit).collect()
     }
 
-    pub fn all_earnings(&self) -> &[CryptoEarnings] {
+    pub(crate) fn _all_earnings(&self) -> &[CryptoEarnings] {
         &self.earnings
     }
 
@@ -90,13 +90,13 @@ impl CryptoCollector {
         self.earnings.len()
     }
 
-    pub fn best_opportunity_type(&self) -> Option<OpportunityType> {
+    pub(crate) fn _best_opportunity_type(&self) -> Option<OpportunityType> {
         self.earnings_by_type()
             .first()
             .map(|(t, _)| t.clone())
     }
 
-    pub fn best_chain(&self) -> Option<ChainType> {
+    pub(crate) fn _best_chain(&self) -> Option<ChainType> {
         self.earnings_by_chain()
             .first()
             .map(|(c, _)| c.clone())

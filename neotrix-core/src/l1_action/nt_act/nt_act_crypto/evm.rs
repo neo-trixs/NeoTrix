@@ -128,7 +128,7 @@ impl EvmClient {
         Ok(val as f64 / 1e18)
     }
 
-    pub fn get_token_balance(&self, address: &str, token_contract: &str) -> Result<f64, String> {
+    pub(crate) fn _get_token_balance(&self, address: &str, token_contract: &str) -> Result<f64, String> {
         let addr = address.strip_prefix("0x").unwrap_or(address);
         let token = token_contract.strip_prefix("0x").unwrap_or(token_contract);
         let data = format!(
@@ -187,7 +187,7 @@ impl EvmClient {
             .map_err(|e| format!("parse gas estimate: {}", e))
     }
 
-    pub fn get_fee_history(&self, block_count: u64) -> Result<serde_json::Value, String> {
+    pub(crate) fn _get_fee_history(&self, block_count: u64) -> Result<serde_json::Value, String> {
         self.rpc_call("eth_feeHistory", vec![
             serde_json::json!(format!("0x{:x}", block_count)),
             serde_json::json!("latest"),

@@ -310,7 +310,7 @@ impl CleanupPattern {
     }
 
     /// 按文件名匹配 (不递归)
-    pub fn matches_name(&self, name: &str) -> bool {
+    pub(crate) fn _matches_name(&self, name: &str) -> bool {
         for pattern in &self.patterns {
             if glob_match(pattern, name) {
                 return true;
