@@ -91,7 +91,7 @@ impl OriEvalSuite {
         model_name: &str,
         provider: &(dyn crate::core::nt_core_llm::LlmProvider + Send + Sync),
     ) -> Result<OriModelScore, crate::core::nt_core_llm::LlmError> {
-        use crate::l1_action::nt_io::nt_io_provider/gateway::types::LlmRequest;
+        use crate::l1_action::nt_io::nt_io_provider::gateway::types::LlmRequest;
 
         let mut correct = 0usize;
         let mut tool_correct = 0usize;
