@@ -10,8 +10,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::provider_catalog::{ProviderCategory, ProviderCapabilities as CatalogCapabilities};
 use super::types::*;
-use super::provider_catalog::ProviderCategory;
 
 // ══════════════════════════════════════════════════════════════
 // Request Types
@@ -113,7 +113,7 @@ pub struct ResponseMetadata {
 #[derive(Debug, Clone, Default)]
 pub struct InferenceCapabilities {
     /// 所有可用 provider
-    pub providers: Vec<ProviderInfo>,
+    pub providers: Vec<InferenceProviderInfo>,
     /// 免费 provider 数
     pub total_free: usize,
     /// 付费 provider 数
@@ -128,9 +128,9 @@ pub struct InferenceCapabilities {
     pub supports_streaming: bool,
 }
 
-/// Provider 信息
+/// Provider 信息 (Inference 层)
 #[derive(Debug, Clone)]
-pub struct ProviderInfo {
+pub struct InferenceProviderInfo {
     /// Provider 名称
     pub name: String,
     /// Provider 类别
@@ -138,48 +138,18 @@ pub struct ProviderInfo {
     /// 是否免费
     pub is_free: bool,
     /// 健康状态
-    pub health: HealthStatus,
-    /// 能力描述
-    pub capabilities: ProviderCapabilities,
-}
-
-/// Provider 能力
-#[derive(Debug, Clone, Default)]
-pub struct ProviderCapabilities {
-    /// 支持文本生成
-    pub text: bool,
-    /// 支持视觉
-    pub vision: bool,
-    /// 支持工具调用
-    pub function_calling: bool,
-    /// 支持流式
-    pub streaming: bool,
-    /// 最大上下文窗口
-    pub context_window: usize,
-    /// 每 1K token 成本 (USD)
-    pub cost_per_1k: f64,
+    pub health: InferenceHealthStatus,
+    /// 能力描述 (使用 catalog 的 ProviderCapabilities)
+    pub capabilities: CatalogCapabilities,
 }
 
 /// 健康状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum HealthStatus {
+pub enum InferenceHealthStatus {
     Healthy,
     Degraded,
     CircuitOpen,
     Unknown,
-}
-
-/// 成本估算
-#[derive(Debug, Clone, Default)]
-pub struct CostEstimate {
-    /// 提示 token 数
-    pub prompt_tokens: usize,
-    /// 输出 token 数
-    pub completion_tokens: usize,
-    /// 估算成本 (USD)
-    pub estimated_cost_usd: f64,
-    /// Provider 名称
-    pub provider_name: String,
 }
 
 /// 路由器健康状态

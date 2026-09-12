@@ -37,6 +37,12 @@ pub mod rate_profiles;
 pub mod search_router;
 pub mod types;
 pub mod unified_inference;
+pub use unified_inference::{
+    UnifiedInference, InferenceRequest, InferenceResponse, InferenceError,
+    InferenceCapabilities, InferenceProviderInfo, InferenceHealthStatus,
+    RouterHealth, StreamHandle,
+    RequestMetadata, ResponseMetadata, Priority,
+};
 pub mod universal_adapter;
 pub use universal_adapter::{
     UniversalAdapter, ModelConfig, ModelCapabilities, FormatConverter,

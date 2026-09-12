@@ -14,7 +14,6 @@ use std::time::Instant;
 
 use super::unified_inference::*;
 use super::gateway::GatewayV2;
-use super::types::*;
 
 /// 路由器配置
 #[derive(Debug, Clone)]

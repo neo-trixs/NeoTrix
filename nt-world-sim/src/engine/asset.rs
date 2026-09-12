@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 /// Typed handle into the asset server.
+#[derive(Debug)]
 pub struct AssetHandle<T> {
     pub id: u32,
     pub _marker: std::marker::PhantomData<T>,
@@ -21,6 +22,7 @@ impl<T> std::hash::Hash for AssetHandle<T> {
 }
 
 /// Texture data stored as RGBA pixels.
+#[derive(Debug)]
 pub struct TextureData {
     pub width: u32,
     pub height: u32,

@@ -182,8 +182,9 @@ mod tests {
         let mut cam = Camera2D::new(800.0, 600.0);
         cam.follow_smoothing = 1.0; // instant
         cam.follow(Vec2::new(100.0, 200.0));
-        assert!((cam.position.x - 100.0).abs() < 0.01);
-        assert!((cam.position.y - 200.0).abs() < 0.01);
+        // follow centers target: pos = target - viewport/2
+        assert!((cam.position.x - (100.0 - 400.0)).abs() < 0.01);
+        assert!((cam.position.y - (200.0 - 300.0)).abs() < 0.01);
     }
 
     #[test]
@@ -217,11 +218,11 @@ mod tests {
     fn test_fade() {
         let mut cam = Camera2D::new(800.0, 600.0);
         cam.fade_speed = 1.0;
-        assert!(!cam.fade_to_black(0.5));
-        assert!(!cam.fade_to_black(0.5));
-        assert!(cam.fade_to_black(0.1)); // now at 1.0
-        assert!(!cam.fade_from_black(0.5));
-        assert!(!cam.fade_from_black(0.6));
+        assert!(!cam.fade_to_black(0.5));  // 0.5
+        assert!(cam.fade_to_black(0.5));   // 1.0 — done
+        assert!(!cam.fade_from_black(0.5)); // 0.5
+        assert!(!cam.fade_from_black(0.4)); // 0.1
+        assert!(cam.fade_from_black(0.2));  // 0.0 — done
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use crate::engine::renderer::{Color, Vec2, Rect};
-use super::widget::UiStyle;
+use crate::engine::renderer::{Vec2, Rect};
+use super::theme::{StardewTheme, UiRenderer, UiDrawCommand};
 use crate::game::inventory::Inventory;
 
 pub struct InventoryUI {
@@ -17,9 +17,9 @@ impl InventoryUI {
             columns: 12, position: Vec2 { x: 50.0, y: 50.0 },
         }
     }
-    
+
     pub fn toggle(&mut self) { self.visible = !self.visible; }
-    
+
     pub fn slot_rect(&self, index: u32) -> Rect {
         let col = index % self.columns;
         let row = index / self.columns;
@@ -30,38 +30,42 @@ impl InventoryUI {
             height: self.slot_size,
         }
     }
-    
-    pub fn render(&self, inventory: &Inventory) -> Vec<(Rect, Color, Option<String>)> {
-        let mut elements = Vec::new();
-        if !self.visible { return elements; }
-        
+
+    pub fn render(&self, inventory: &Inventory) -> Vec<UiDrawCommand> {
+        let mut cmds = Vec::new();
+        if !self.visible { return cmds; }
+
+        let theme = StardewTheme::default();
         let total_rows = ((inventory.slots.len() as u32 + self.columns - 1) / self.columns) as f32;
-        elements.push((
-            Rect {
-                x: self.position.x - 8.0, y: self.position.y - 8.0,
-                width: self.columns as f32 * (self.slot_size + 4.0) + 16.0,
-                height: total_rows * (self.slot_size + 4.0) + 16.0,
-            },
-            UiStyle::stardew_wood().background,
-            None,
+
+        // Background panel
+        cmds.extend(UiRenderer::draw_panel(
+            &theme,
+            self.position.x - 8.0,
+            self.position.y - 8.0,
+            self.columns as f32 * (self.slot_size + 4.0) + 16.0,
+            total_rows * (self.slot_size + 4.0) + 16.0,
         ));
-        
+
+        // Inventory slots
         for (i, slot) in inventory.slots.iter().enumerate() {
             let rect = self.slot_rect(i as u32);
-            let bg = if i == self.selected_slot {
-                Color { r: 0.8, g: 0.7, b: 0.3, a: 0.8 }
-            } else {
-                Color { r: 0.2, g: 0.15, b: 0.1, a: 0.7 }
-            };
-            let label = if let Some(item_id) = slot.item_id {
-                Some(format!("ID:{}\nx{}", item_id, slot.quantity))
-            } else {
-                None
-            };
-            elements.push((rect, bg, label));
+            let selected = i == self.selected_slot;
+            cmds.extend(UiRenderer::draw_slot(&theme, rect.x, rect.y, selected, false));
+
+            if let Some(item_id) = slot.item_id {
+                cmds.push(UiDrawCommand::Text {
+                    text: format!("ID:{}", item_id),
+                    x: rect.x + 4.0, y: rect.y + 4.0, size: 9.0, color: theme.white_text,
+                });
+                cmds.push(UiDrawCommand::Text {
+                    text: format!("x{}", slot.quantity),
+                    x: rect.x + 4.0, y: rect.y + 16.0, size: 9.0, color: theme.gold_text,
+                });
+            }
         }
-        
-        elements
+
+        cmds
     }
 }
 
@@ -97,7 +101,18 @@ mod tests {
         let mut ui = InventoryUI::new();
         ui.visible = true;
         let inv = Inventory::new(24, 12);
-        let elements = ui.render(&inv);
-        assert!(!elements.is_empty());
+        let cmds = ui.render(&inv);
+        assert!(!cmds.is_empty());
+    }
+
+    #[test]
+    fn test_render_with_items() {
+        let mut ui = InventoryUI::new();
+        ui.visible = true;
+        let mut inv = Inventory::new(24, 12);
+        inv.add_item(42, 5, ItemQuality::Normal);
+        let cmds = ui.render(&inv);
+        // Panel(3) + slot(2) + 2 text labels = 7 minimum for 1 item
+        assert!(cmds.len() >= 7);
     }
 }
