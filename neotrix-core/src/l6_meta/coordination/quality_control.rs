@@ -257,12 +257,12 @@ impl _QualityControlPipeline {
         };
 
         // 根据历史数据调整（如果有）
-        let history_adjustment: f64 = if let Some(history) = self.history.last() {
-            // 如果最近一次审核通过率高，稍微提高预期
-            if history.pass_rate > 0.9 {
+        let history_adjustment: f32 = if let Some(history) = self.history.last() {
+            // 根据历史审核总分调整预期
+            if history.total_score > 0.9 {
                 0.05
-            } else if history.pass_rate < 0.5 {
-                -0.1 // 如果通过率低，降低预期分数
+            } else if history.total_score < 0.5 {
+                -0.1 // 分数低则降低预期
             } else {
                 0.0
             }

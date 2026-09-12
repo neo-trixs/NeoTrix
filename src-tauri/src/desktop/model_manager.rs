@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,7 +85,7 @@ impl ModelManager {
             .unwrap_or_default()
             .join(".neotrix")
             .join("models");
-        
+
         Self {
             cache_dir,
             models: HashMap::new(),
@@ -99,7 +99,7 @@ impl ModelManager {
         fs::create_dir_all(&self.cache_dir)
             .await
             .map_err(|e| format!("Failed to create cache dir: {}", e))?;
-        
+
         self.scan_local_models().await?;
         Ok(())
     }
@@ -109,19 +109,24 @@ impl ModelManager {
         let mut entries = fs::read_dir(&self.cache_dir)
             .await
             .map_err(|e| format!("Failed to read cache dir: {}", e))?;
-        
-        while let Some(entry) = entries.next_entry().await
-            .map_err(|e| format!("Failed to read entry: {}", e))? 
+
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| format!("Failed to read entry: {}", e))?
         {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "gguf" || ext == "onnx") {
+            if path
+                .extension()
+                .map_or(false, |ext| ext == "gguf" || ext == "onnx")
+            {
                 let metadata = self.load_model_metadata(&path).await;
                 if let Some(meta) = metadata {
                     self.models.insert(meta.id.clone(), meta);
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -129,7 +134,7 @@ impl ModelManager {
     async fn load_model_metadata(&self, path: &Path) -> Option<ModelMetadata> {
         let file_name = path.file_stem()?.to_str()?;
         let file_size = fs::metadata(path).await.ok()?.len();
-        
+
         // 尝试读取 model.json
         let json_path = path.with_extension("json");
         if let Ok(content) = fs::read_to_string(&json_path).await {
@@ -137,7 +142,7 @@ impl ModelManager {
                 return Some(meta);
             }
         }
-        
+
         // 创建默认元数据
         Some(ModelMetadata {
             id: file_name.to_string(),
@@ -177,19 +182,28 @@ impl ModelManager {
 
     /// 搜索模型
     pub fn search_models(&self, query: &str) -> Vec<&ModelMetadata> {
-        self.models.values()
+        self.models
+            .values()
             .filter(|m| {
-                m.display_name.to_lowercase().contains(&query.to_lowercase())
+                m.display_name
+                    .to_lowercase()
+                    .contains(&query.to_lowercase())
                     || m.id.to_lowercase().contains(&query.to_lowercase())
-                    || m.architecture.to_lowercase().contains(&query.to_lowercase())
+                    || m.architecture
+                        .to_lowercase()
+                        .contains(&query.to_lowercase())
             })
             .collect()
     }
 
     /// 创建下载任务
-    pub fn create_download_task(&mut self, model_id: String, download_url: String) -> Result<DownloadTask, String> {
+    pub fn create_download_task(
+        &mut self,
+        model_id: String,
+        download_url: String,
+    ) -> Result<DownloadTask, String> {
         let job_id = format!("job_{}", uuid::Uuid::new_v4());
-        
+
         let task = DownloadTask {
             job_id: job_id.clone(),
             model_id: model_id.clone(),
@@ -200,7 +214,7 @@ impl ModelManager {
             completed_at: None,
             error: None,
         };
-        
+
         self.download_queue.insert(job_id.clone(), task.clone());
         Ok(task)
     }
@@ -282,15 +296,17 @@ impl ModelManager {
         let mut entries = fs::read_dir(&self.cache_dir)
             .await
             .map_err(|e| format!("Failed to read cache dir: {}", e))?;
-        
-        while let Some(entry) = entries.next_entry().await
+
+        while let Some(entry) = entries
+            .next_entry()
+            .await
             .map_err(|e| format!("Failed to read entry: {}", e))?
         {
             if let Ok(metadata) = fs::metadata(entry.path()).await {
                 total_size += metadata.len();
             }
         }
-        
+
         Ok(total_size)
     }
 
@@ -299,14 +315,14 @@ impl ModelManager {
         fs::remove_dir_all(&self.cache_dir)
             .await
             .map_err(|e| format!("Failed to clear cache: {}", e))?;
-        
+
         fs::create_dir_all(&self.cache_dir)
             .await
             .map_err(|e| format!("Failed to recreate cache dir: {}", e))?;
-        
+
         self.models.clear();
         self.download_queue.clear();
-        
+
         Ok(())
     }
 }

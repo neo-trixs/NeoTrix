@@ -11,7 +11,11 @@ pub struct BrowserState {
 
 impl Default for BrowserState {
     fn default() -> Self {
-        Self { url: "about:blank".into(), title: "Browser".into(), is_open: false }
+        Self {
+            url: "about:blank".into(),
+            title: "Browser".into(),
+            is_open: false,
+        }
     }
 }
 
@@ -84,7 +88,9 @@ impl BrowserHost {
         let window = app
             .get_webview_window("neotrix-browser")
             .ok_or_else(|| "browser window not open".to_string())?;
-        window.eval(script).map_err(|e| format!("js eval error: {}", e))
+        window
+            .eval(script)
+            .map_err(|e| format!("js eval error: {}", e))
     }
 
     pub fn go_back(app: &AppHandle) -> Result<(), String> {
@@ -116,7 +122,10 @@ impl BrowserHost {
             .build()
             .map_err(|e| format!("http client error: {}", e))?;
 
-        let resp = client.get(url).send().map_err(|e| format!("fetch error: {}", e))?;
+        let resp = client
+            .get(url)
+            .send()
+            .map_err(|e| format!("fetch error: {}", e))?;
         let final_url = resp.url().to_string();
         let html = resp.text().map_err(|e| format!("read error: {}", e))?;
 
@@ -225,13 +234,28 @@ fn strip_html(html: &str) -> String {
                 match c {
                     '&' => {
                         let rest: String = chars[i..].iter().collect();
-                        if rest.starts_with("&amp;") { out.push('&'); skip_chars = 4; }
-                        else if rest.starts_with("&lt;") { out.push('<'); skip_chars = 3; }
-                        else if rest.starts_with("&gt;") { out.push('>'); skip_chars = 3; }
-                        else if rest.starts_with("&quot;") { out.push('"'); skip_chars = 5; }
-                        else if rest.starts_with("&#39;") || rest.starts_with("&#x27;") { out.push('\''); skip_chars = rest.starts_with("&#39;") as usize * 4 + rest.starts_with("&#x27;") as usize * 5; }
-                        else if rest.starts_with("&nbsp;") { out.push(' '); skip_chars = 5; }
-                        else { out.push('&'); }
+                        if rest.starts_with("&amp;") {
+                            out.push('&');
+                            skip_chars = 4;
+                        } else if rest.starts_with("&lt;") {
+                            out.push('<');
+                            skip_chars = 3;
+                        } else if rest.starts_with("&gt;") {
+                            out.push('>');
+                            skip_chars = 3;
+                        } else if rest.starts_with("&quot;") {
+                            out.push('"');
+                            skip_chars = 5;
+                        } else if rest.starts_with("&#39;") || rest.starts_with("&#x27;") {
+                            out.push('\'');
+                            skip_chars = rest.starts_with("&#39;") as usize * 4
+                                + rest.starts_with("&#x27;") as usize * 5;
+                        } else if rest.starts_with("&nbsp;") {
+                            out.push(' ');
+                            skip_chars = 5;
+                        } else {
+                            out.push('&');
+                        }
                     }
                     _ => out.push(c),
                 }
@@ -272,7 +296,8 @@ mod tests {
 
     #[test]
     fn test_strip_html_removes_script() {
-        let html = "<html><head><script>alert('xss');</script></head><body><p>Hello</p></body></html>";
+        let html =
+            "<html><head><script>alert('xss');</script></head><body><p>Hello</p></body></html>";
         let text = strip_html(html);
         assert!(text.contains("Hello"));
         assert!(!text.contains("alert"));

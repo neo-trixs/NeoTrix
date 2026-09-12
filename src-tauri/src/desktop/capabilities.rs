@@ -189,7 +189,10 @@ pub fn quick_notification(title: impl Into<String>, body: impl Into<String>) -> 
 }
 
 /// 构造高优先级通知配置
-pub fn urgent_notification(title: impl Into<String>, body: impl Into<String>) -> NotificationConfig {
+pub fn urgent_notification(
+    title: impl Into<String>,
+    body: impl Into<String>,
+) -> NotificationConfig {
     NotificationConfig {
         title: title.into(),
         body: body.into(),

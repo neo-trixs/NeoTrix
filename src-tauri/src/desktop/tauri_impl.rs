@@ -40,9 +40,7 @@ impl DesktopCapabilities for TauriDesktopCapabilities {
     // ----- 通知 -----
 
     async fn show_notification(&self, config: NotificationConfig) -> Result<(), String> {
-        let manager = self
-            .app
-            .state::<NotificationManager>();
+        let manager = self.app.state::<NotificationManager>();
         manager.show_notification(&config.title, &config.body)
     }
 
@@ -66,10 +64,7 @@ impl DesktopCapabilities for TauriDesktopCapabilities {
 
     // ----- 文件关联 -----
 
-    async fn register_file_association(
-        &self,
-        _association: FileAssociation,
-    ) -> Result<(), String> {
+    async fn register_file_association(&self, _association: FileAssociation) -> Result<(), String> {
         Ok(())
     }
 

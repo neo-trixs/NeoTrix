@@ -270,8 +270,7 @@ fn main() {
                     app.manage(notification_manager);
 
                     // 初始化开机自启管理器
-                    let autostart_manager =
-                        autostart::AutoStartManager::new(app.handle().clone());
+                    let autostart_manager = autostart::AutoStartManager::new(app.handle().clone());
                     app.manage(autostart_manager);
 
                     // 设置文件拖拽监听

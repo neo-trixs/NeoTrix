@@ -21,8 +21,7 @@ pub fn find_neotrix_binary() -> Option<String> {
 pub async fn run_cli(args: Vec<String>) -> Result<CliOutput, String> {
     let bin = find_neotrix_binary()
         .or_else(|| {
-            dirs::home_dir()
-                .map(|h| h.join(".cargo/bin/neotrix").to_string_lossy().to_string())
+            dirs::home_dir().map(|h| h.join(".cargo/bin/neotrix").to_string_lossy().to_string())
         })
         .ok_or("neotrix binary not found. Install with: cargo install neotrix")?;
 

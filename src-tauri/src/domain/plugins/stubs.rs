@@ -46,16 +46,10 @@ impl DomainPlugin for AgentPlugin {
         "Agent 生命周期：启动/停止/健康检查"
     }
     fn actions(&self) -> Vec<ActionSpec> {
-        vec![
-            "status",
-            "start",
-            "stop",
-            "health",
-            "app_version",
-        ]
-        .iter()
-        .map(|a| stub_action(a))
-        .collect()
+        vec!["status", "start", "stop", "health", "app_version"]
+            .iter()
+            .map(|a| stub_action(a))
+            .collect()
     }
     fn call(
         &self,

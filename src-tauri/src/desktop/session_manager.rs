@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
@@ -71,7 +71,7 @@ impl SessionManager {
     pub fn create_session(&mut self, title: &str, model: &str) -> Session {
         let id = format!("session_{}", uuid::Uuid::new_v4());
         let now = Utc::now();
-        
+
         let session = Session {
             id: id.clone(),
             title: title.to_string(),
@@ -86,10 +86,10 @@ impl SessionManager {
                 tags: Vec::new(),
             },
         };
-        
+
         self.sessions.insert(id.clone(), session.clone());
         self.active_session = Some(id);
-        
+
         session
     }
 
@@ -128,12 +128,13 @@ impl SessionManager {
 
     /// 搜索会话
     pub fn search_sessions(&self, query: &str) -> Vec<&Session> {
-        self.sessions.values()
+        self.sessions
+            .values()
             .filter(|s| {
                 s.title.to_lowercase().contains(&query.to_lowercase())
-                    || s.messages.iter().any(|m| {
-                        m.content.to_lowercase().contains(&query.to_lowercase())
-                    })
+                    || s.messages
+                        .iter()
+                        .any(|m| m.content.to_lowercase().contains(&query.to_lowercase()))
             })
             .collect()
     }
@@ -173,15 +174,19 @@ impl SessionManager {
 
     /// 获取活跃会话
     pub fn get_active_session(&self) -> Option<&Session> {
-        self.active_session.as_ref()
+        self.active_session
+            .as_ref()
             .and_then(|id| self.sessions.get(id))
     }
 
     /// 导出会话
-    pub async fn export_session(&self, session_id: &str, format: ExportFormat) -> Result<Vec<u8>, String> {
-        let session = self.sessions.get(session_id)
-            .ok_or("Session not found")?;
-        
+    pub async fn export_session(
+        &self,
+        session_id: &str,
+        format: ExportFormat,
+    ) -> Result<Vec<u8>, String> {
+        let session = self.sessions.get(session_id).ok_or("Session not found")?;
+
         match format {
             ExportFormat::Json => {
                 let json = serde_json::to_string_pretty(session)
@@ -192,7 +197,7 @@ impl SessionManager {
                 let mut md = format!("# {}\n\n", session.title);
                 md.push_str(&format!("Model: {}\n", session.model));
                 md.push_str(&format!("Created: {}\n\n", session.created_at));
-                
+
                 for msg in &session.messages {
                     let role = match msg.role {
                         MessageRole::User => "User",
@@ -201,13 +206,13 @@ impl SessionManager {
                     };
                     md.push_str(&format!("## {}\n\n{}\n\n", role, msg.content));
                 }
-                
+
                 Ok(md.into_bytes())
             }
             ExportFormat::Html => {
                 let mut html = format!("<h1>{}</h1>\n", session.title);
                 html.push_str(&format!("<p>Model: {}</p>\n", session.model));
-                
+
                 for msg in &session.messages {
                     let role = match msg.role {
                         MessageRole::User => "User",
@@ -216,7 +221,7 @@ impl SessionManager {
                     };
                     html.push_str(&format!("<h2>{}</h2>\n<p>{}</p>\n", role, msg.content));
                 }
-                
+
                 Ok(html.into_bytes())
             }
             ExportFormat::Csv => {
@@ -235,7 +240,7 @@ impl SessionManager {
                         msg.tokens.unwrap_or(0)
                     ));
                 }
-                
+
                 Ok(csv.into_bytes())
             }
         }
@@ -244,13 +249,17 @@ impl SessionManager {
     /// 获取会话统计
     pub fn get_stats(&self) -> SessionStats {
         let total_sessions = self.sessions.len() as u32;
-        let total_messages: u32 = self.sessions.values()
+        let total_messages: u32 = self
+            .sessions
+            .values()
             .map(|s| s.metadata.total_messages)
             .sum();
-        let total_tokens: u32 = self.sessions.values()
+        let total_tokens: u32 = self
+            .sessions
+            .values()
             .map(|s| s.metadata.total_tokens)
             .sum();
-        
+
         SessionStats {
             total_sessions,
             total_messages,
