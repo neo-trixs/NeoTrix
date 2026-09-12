@@ -9,8 +9,8 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use super::provider_catalog::{ProviderCategory, ProviderCapabilities as CatalogCapabilities};
-use super::types::*;
+use super::super::catalog::provider_catalog::{ProviderCategory, ProviderCapabilities as CatalogCapabilities};
+use super::super::common::types::*;
 
 // ══════════════════════════════════════════════════════════════
 // Request Types

@@ -5,119 +5,83 @@
 //! 2026-06-30 架构升级: GatewayProvider 包装所有中间件层
 #![deny(clippy::unwrap_used)]
 
-pub mod agent_routing;
 pub mod anthropic;
-pub mod inference_router;
-pub use inference_router::{InferenceRouter, RouterConfig};
-pub mod capability_router;
-pub mod account_pool;
-pub mod circuit_breaker;
-pub mod compaction;
-pub mod context_budget;
-pub mod discovery;
-pub mod factory;
-pub mod failover_history;
-pub mod free_catalog;
-pub mod free_pool;
-pub mod free_providers;
+pub mod catalog;
+pub mod common;
 pub mod gateway;
-pub mod generation_classifier;
 pub mod gemini;
-pub mod llama_process;
+pub mod health;
+pub mod llama;
 pub mod ollama;
 pub mod openai;
-pub mod provider_catalog;
-pub mod provider_pool;
-pub mod provider_swap;
-pub mod registry;
-pub use registry::ProviderRegistry;
-pub mod privacy_guard;
-pub mod rate_limiter;
-pub mod rate_profiles;
-pub mod search_router;
-pub mod types;
-pub mod unified_inference;
-pub use unified_inference::{
-    UnifiedInference, InferenceRequest, InferenceResponse, InferenceError,
-    InferenceCapabilities, InferenceProviderInfo, InferenceHealthStatus,
-    RouterHealth, StreamHandle,
-    RequestMetadata, ResponseMetadata, Priority,
-};
-pub mod universal_adapter;
-pub use universal_adapter::{
-    UniversalAdapter, ModelConfig, ModelCapabilities, FormatConverter,
-    OpenAiConverter, AnthropicConverter, GeminiConverter,
-    UnifiedRequest, UnifiedResponse, ToolCall,
-};
+pub mod pool;
+pub mod routing;
 
-// Re-export 核心类型
-pub use types::{
-    FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, Tool,
-    ToolCallFunction, ToolCallInfo, Usage,
-};
-
-// Re-export Token 预算引擎 (上下文压缩, AgentLoop/neocodex 共享)
-pub use context_budget::{apply_context_budget, estimate_messages_tokens, estimate_tokens};
-
-// Re-export 故障转移历史
-pub use failover_history::{
-    clear_history, failover_history, record_failover, report as failover_report, total_failovers,
-    FailoverEvent, FailoverHistory,
-};
-
-// Re-export Provider 实现
+// Re-export from anthropic
 pub use anthropic::AnthropicProvider;
-pub use gemini::GeminiProvider;
-pub use ollama::OllamaProvider;
-pub use openai::OpenAiProvider;
 
-// Re-export F6 生成分类器
-pub use generation_classifier::{
-    Classification, Complexity, Domain, GenerationAnalytics, GenerationClassifier,
-    GenerationRecord, TaskType,
-};
-
-// Re-export 免费 Provider
-pub use free_pool::FreePool;
-pub use free_providers::{
-    CerebrasProvider, GroqProvider, OpenRouterProvider, PollinationsProvider,
-};
-
-// Re-export 工厂和配置
-pub use factory::{
-    create_gateway, create_provider, create_provider_from_type, LlmProviderType, ProviderConfig,
-};
-
-// Re-export LLM 代理池
-pub use provider_pool::{global_provider_pool, PoolEntry, ProviderPool};
-
-// Re-export 路由和配置管理
-pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
-
-// Re-export 网关
-pub use gateway::{
-    AttemptPhase, CallEvent, CallObserver, CapabilityCoordinator, CapabilityIntent,
-    CoordinationOutcome, CoordinationRequest, GatewayV2, SubGrid, SubGridHealth,
-};
-
-// Re-export 断路器 + 限流器
-pub use circuit_breaker::CircuitBreaker;
-pub use rate_limiter::RateLimiter;
-pub use rate_limiter::TokenBucket;
-pub use rate_limiter::{AdaptivePacer, BrainTier, TieredSemaphore};
-
-// Re-export 账户池 (P7 吸收)
-pub use account_pool::{
-    AccountHealth, AccountLease, AccountPool, AccountPoolConfig, AccountPoolError,
-};
-
-// Re-export ProviderCatalog
-pub use provider_catalog::{
+// Re-export from catalog
+pub use catalog::{
     find_by_capabilities, find_by_capabilities_in_category,
     keyless_providers, lookup_provider, providers_by_category, providers_with_key,
     CommunicationProfile, ProviderCapabilities, ProviderCategory, ProviderInfo, PROVIDER_CATALOG,
 };
-pub use capability_router::CapabilityRouter;
-pub use provider_swap::{
+pub use catalog::ProviderRegistry;
+
+// Re-export from common
+pub use common::{
+    create_gateway, create_provider, create_provider_from_type, LlmProviderType, ProviderConfig,
+    Classification, Complexity, Domain, GenerationAnalytics, GenerationClassifier,
+    GenerationRecord, TaskType,
+};
+pub use common::types::{
+    FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, Tool,
+    ToolCallFunction, ToolCallInfo, Usage,
+};
+
+// Re-export from gemini
+pub use gemini::GeminiProvider;
+
+// Re-export from health
+pub use health::CircuitBreaker;
+pub use health::RateLimiter;
+pub use health::TokenBucket;
+pub use health::{AdaptivePacer, BrainTier, TieredSemaphore};
+pub use health::{apply_context_budget, estimate_messages_tokens, estimate_tokens};
+
+// Re-export from llama
+pub use llama::LlamaProcess;
+
+// Re-export from ollama
+pub use ollama::OllamaProvider;
+
+// Re-export from openai
+pub use openai::OpenAiProvider;
+
+// Re-export from pool
+pub use pool::{
+    AccountHealth, AccountLease, AccountPool, AccountPoolConfig, AccountPoolError,
+    FreePool,
+    global_provider_pool, PoolEntry, ProviderPool,
+};
+
+// Re-export from routing
+pub use routing::{
+    clear_history, failover_history, record_failover, report as failover_report, total_failovers,
+    FailoverEvent, FailoverHistory,
     ProviderHealth, ProviderHealthSummary, ProviderSwapManager, SwapRule, GLOBAL_SWAP_MANAGER,
+};
+
+// Re-export from gateway
+pub use gateway::{
+    AttemptPhase, CallEvent, CallObserver, CapabilityCoordinator, CapabilityIntent,
+    CoordinationOutcome, CoordinationRequest, GatewayV2, SubGrid, SubGridHealth,
+    AgentRoutingTable, ProviderProfile, ProviderProfileManager,
+    CapabilityRouter,
+    InferenceRouter, RouterConfig,
+};
+pub use gateway::universal_adapter::{
+    UniversalAdapter, ModelConfig, ModelCapabilities, FormatConverter,
+    OpenAiConverter, AnthropicConverter, GeminiConverter,
+    UnifiedRequest, UnifiedResponse, ToolCall,
 };

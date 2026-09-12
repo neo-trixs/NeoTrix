@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use crate::core::{UniversalWorld, UniversalEntity, Component, EntityId};
+use crate::core::{UniversalWorld, UniversalEntity, EntityId};
 use crate::core::scheduler::{ParallelScheduler, SystemDependency};
 use crate::engine::physics::{SimplePhysicsWorld, PhysicsWorld};
 use crate::engine::camera::Camera2D;
 use crate::engine::scene::{SceneGraph, SceneNode};
 use crate::engine::input::KeyCode as InputKeyCode;
-use crate::engine::renderer::{Vec2 as RendererVec2, Transform};
+use crate::engine::renderer::Vec2 as RendererVec2;
 use super::time::{GameTime, TimeSystem};
 use super::weather::{Weather, WeatherSystem};
 use super::inventory::Inventory;

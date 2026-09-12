@@ -294,16 +294,17 @@ impl ModelRoutingLayer {
                 continue;
             };
 
-            // TODO: 实际调用模型 API
+            // 返回路由结果，但不实际调用模型 API
+            // 实际调用应通过 nt_io_provider 的具体实现（OpenAI/Gemini/Ollama 等）
             let cost = self.states.get(&model_id)
                 .map(|s| s.total_cost)
                 .unwrap_or(0.0);
             let response = RoutingResponse {
                 success: true,
                 selected_model: model_id.clone(),
-                output: None,
-                cost: cost + 5.0, // 模拟: price_per_second * 5s
-                latency_ms: 5000,
+                output: None, // 输出由具体 provider 填充
+                cost: cost,
+                latency_ms: 0, // 实际延迟由 provider 测量
                 retries,
                 error: None,
             };
