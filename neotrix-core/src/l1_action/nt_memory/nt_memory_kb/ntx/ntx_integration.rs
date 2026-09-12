@@ -164,7 +164,7 @@ impl NtxIndexManager {
     }
 
     /// NTX 图谱邻居搜索
-    pub fn graph_neighbors(&self, node_id: &str, max_depth: usize) -> std::io::Result<Vec<(String, usize)>> {
+    pub(crate) fn _graph_neighbors(&self, node_id: &str, max_depth: usize) -> std::io::Result<Vec<(String, usize)>> {
         let ntx = NtxFile::open_read_only(&self.ntx_path)?;
         let graph = match ntx.graph_segment() {
             Some(g) => g,

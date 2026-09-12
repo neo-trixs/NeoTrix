@@ -133,7 +133,7 @@ impl NtxSearchBridge {
     }
 
     /// 获取单个节点向量
-    pub fn get_node_vector(&self, node_id: &[u8; 36]) -> Option<Vec<f32>> {
+    pub(crate) fn _get_node_vector(&self, node_id: &[u8; 36]) -> Option<Vec<f32>> {
         self.vec_segment.as_ref()?
             .find_by_id(node_id)
             .map(|idx| self.vec_segment.as_ref().unwrap().entries()[idx].vector.clone())

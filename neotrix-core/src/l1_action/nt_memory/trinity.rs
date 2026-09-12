@@ -137,7 +137,7 @@ impl TrinityMemory {
     }
 
     /// 关系搜索
-    pub fn search_relations(&self, entity: &str) -> Vec<(&str, &str)> {
+    pub(crate) fn _search_relations(&self, entity: &str) -> Vec<(&str, &str)> {
         self.entries
             .iter()
             .filter(|e| e.id == entity)

@@ -18,7 +18,7 @@ impl VoiceTrigger {
         }
     }
 
-    pub fn with_wake_words(mut self, words: Vec<String>) -> Self {
+    pub(crate) fn _with_wake_words(mut self, words: Vec<String>) -> Self {
         self.wake_words = words;
         self
     }
@@ -28,7 +28,7 @@ impl VoiceTrigger {
         self
     }
 
-    pub fn with_cooldown(mut self, secs: u64) -> Self {
+    pub(crate) fn _with_cooldown(mut self, secs: u64) -> Self {
         self.cooldown_secs = secs;
         self
     }

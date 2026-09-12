@@ -222,7 +222,7 @@ impl LeadManager {
         self.leads.get(&id).unwrap()
     }
 
-    pub fn update_lead(&mut self, id: &str, updates: LeadUpdate) -> Result<&Lead, String> {
+    pub(crate) fn _update_lead(&mut self, id: &str, updates: LeadUpdate) -> Result<&Lead, String> {
         let lead = self.leads.get_mut(id).ok_or_else(|| format!("Lead {} not found", id))?;
         if let Some(v) = updates.company_name { lead.company_name = Some(v); }
         if let Some(v) = updates.email { lead.email = Some(v); }
@@ -273,7 +273,7 @@ impl LeadManager {
         s
     }
 
-    pub fn needs_follow_up(&self) -> Vec<&Lead> {
+    pub(crate) fn _needs_follow_up(&self) -> Vec<&Lead> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         self.leads.values().filter(|l|
             l.stage != LeadStage::ClosedWon && l.stage != LeadStage::ClosedLost
@@ -282,8 +282,8 @@ impl LeadManager {
     }
 
     pub fn get_lead(&self, id: &str) -> Option<&Lead> { self.leads.get(id) }
-    pub fn list_leads(&self) -> Vec<&Lead> { self.leads.values().collect() }
-    pub fn total_leads(&self) -> usize { self.leads.len() }
+    pub(crate) fn _list_leads(&self) -> Vec<&Lead> { self.leads.values().collect() }
+    pub(crate) fn _total_leads(&self) -> usize { self.leads.len() }
 }
 
 impl L1Capability for LeadManager {

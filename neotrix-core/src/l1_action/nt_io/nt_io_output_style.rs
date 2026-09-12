@@ -172,7 +172,7 @@ impl OutputStyleRegistry {
     }
 
     /// 设置治理器工作区根目录 (R07/R08 文件引用校验基准)。
-    pub fn with_governor_root(mut self, root: impl AsRef<Path>) -> Self {
+    pub(crate) fn _with_governor_root(mut self, root: impl AsRef<Path>) -> Self {
         self.governor.set_workspace_root(root);
         self
     }
@@ -832,7 +832,7 @@ impl OutputGovernor {
     }
 
     /// 设置单消息长度上限, 重建 R05。
-    pub fn set_max_message_chars(&mut self, max: usize) {
+    pub(crate) fn _set_max_message_chars(&mut self, max: usize) {
         self.max_message_chars = max;
         self.rules = build_rules(&self.workspace_root, max);
     }

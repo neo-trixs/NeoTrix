@@ -363,10 +363,10 @@ impl NegotiationEngine {
         Some(c)
     }
 
-    pub fn is_at_bottom_line(&self) -> bool {
+    pub(crate) fn _is_at_bottom_line(&self) -> bool {
         self.current_quote <= self.bottom_line
     }
-    pub fn get_concession_history(&self) -> &[Concession] {
+    pub(crate) fn _get_concession_history(&self) -> &[Concession] {
         &self.concessions_made
     }
     pub fn reset(&mut self, initial_quote: f64) {
@@ -647,7 +647,7 @@ impl ProgressTracker {
         }
     }
 
-    pub fn get_overall_progress(&self) -> f64 {
+    pub(crate) fn _get_overall_progress(&self) -> f64 {
         if self.milestones.is_empty() {
             return 0.0;
         }

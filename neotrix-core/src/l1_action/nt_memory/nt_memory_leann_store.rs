@@ -268,7 +268,7 @@ impl LeannGraphStore {
         total as f64 / self.nodes.len() as f64
     }
 
-    pub fn estimate_storage(&self, embedding_dim: usize) -> StorageComparison {
+    pub(crate) fn _estimate_storage(&self, embedding_dim: usize) -> StorageComparison {
         StorageComparison::estimate(self.nodes.len(), embedding_dim, 4)
     }
 }

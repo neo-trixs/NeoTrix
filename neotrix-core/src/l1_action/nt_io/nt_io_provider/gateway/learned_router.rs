@@ -604,7 +604,7 @@ fn decision_from(c: &CandidateModel, confidence: f32) -> RouteDecision {
 pub(crate) struct RouterFactory;
 
 impl RouterFactory {
-    pub fn create_router(router_type: &str, candidates: &[CandidateModel], alpha: f32, beta: f32) -> Box<dyn LearnedRouter> {
+    pub(crate) fn _create_router(router_type: &str, candidates: &[CandidateModel], alpha: f32, beta: f32) -> Box<dyn LearnedRouter> {
         match router_type {
             "knn" => Box::new(KNNRouter::new(5, alpha, beta)),
             "mlp" => Box::new(MLPRouter::new(candidates, alpha, beta)),

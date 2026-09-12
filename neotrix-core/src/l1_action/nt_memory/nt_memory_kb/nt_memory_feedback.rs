@@ -130,7 +130,7 @@ impl FeedbackStore {
     }
 
     /// 重置聚合统计 (用于周期结算后)
-    pub fn reset_aggregates(&self) {
+    pub(crate) fn _reset_aggregates(&self) {
         if let Ok(mut agg) = self.aggregates.write() {
             agg.clear();
         }

@@ -174,7 +174,7 @@ impl NeoCodexAgent {
 
     /// P2-1: set generation params from the desktop settings panel. Applies on
     /// the next request built by build_request (was previously hardcoded).
-    pub fn set_generation_params(&mut self, temperature: Option<f64>, max_tokens: Option<u32>) {
+    pub(crate) fn _set_generation_params(&mut self, temperature: Option<f64>, max_tokens: Option<u32>) {
         if let Some(t) = temperature {
             self.config.temperature = t.clamp(0.0, 2.0);
         }
@@ -184,7 +184,7 @@ impl NeoCodexAgent {
     }
 
     /// Register a pre-tool lifecycle hook (from Kimi Code lifecycle hooks)
-    pub fn add_pre_hook<F>(&mut self, name: &str, hook: F)
+    pub(crate) fn _add_pre_hook<F>(&mut self, name: &str, hook: F)
     where
         F: Fn(ToolCallContext) -> HookResult + Send + Sync + 'static,
     {
@@ -216,14 +216,14 @@ impl NeoCodexAgent {
         }
     }
 
-    pub fn set_consciousness_tree(
+    pub(crate) fn _set_consciousness_tree(
         &mut self,
         tree: crate::core::nt_core_consciousness_tree::ConsciousnessTree,
     ) {
         self.consciousness = Some(tree);
     }
 
-    pub fn set_event_bus(&mut self, bus: crate::neotrix::nt_core_event_bus::EventBus) {
+    pub(crate) fn _set_event_bus(&mut self, bus: crate::neotrix::nt_core_event_bus::EventBus) {
         self.event_bus = Some(bus);
     }
 
@@ -280,7 +280,7 @@ impl NeoCodexAgent {
 
     /// Persist a tag onto the current session (deduped). Writes a new
     /// SessionMeta carrying the merged tag set.
-    pub fn tag_session(&mut self, tag: &str) {
+    pub(crate) fn _tag_session(&mut self, tag: &str) {
         let mut tags = self.read_session_tags();
         let clean = tag.trim().to_lowercase().replace(' ', "-");
         if clean.is_empty() || tags.contains(&clean) {
@@ -291,7 +291,7 @@ impl NeoCodexAgent {
     }
 
     /// Remove a tag from the current session. No-op when absent.
-    pub fn untag_session(&mut self, tag: &str) {
+    pub(crate) fn _untag_session(&mut self, tag: &str) {
         let mut tags = self.read_session_tags();
         let before = tags.len();
         tags.retain(|t| t != tag);
@@ -328,7 +328,7 @@ impl NeoCodexAgent {
     /// Record a side-chat message (branched question that must NOT pollute
     /// the main session context). Persisted to the same wire stream but
     /// filtered out of resume_session / get_session_messages.
-    pub fn record_side_chat(&mut self, content: &str, role: &str) {
+    pub(crate) fn _record_side_chat(&mut self, content: &str, role: &str) {
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -345,7 +345,7 @@ impl NeoCodexAgent {
     /// recreate the file on the next `record()` (`create+append`) and split
     /// the conversation into a divergent duplicate. Resets to a fresh empty
     /// session so the next turn starts clean.
-    pub fn detach_wire(&mut self) {
+    pub(crate) fn _detach_wire(&mut self) {
         self.wire = WireSession::new(&format!(
             "s-{}",
             std::time::SystemTime::now()
@@ -424,7 +424,7 @@ impl NeoCodexAgent {
 
     /// Set the streaming-path permission policy (P0-2). Called by the desktop
     /// command layer from the UI's permission_mode (auto/manual/accept_edits/plan).
-    pub fn set_permission_mode(&mut self, mode: &str) {
+    pub(crate) fn _set_permission_mode(&mut self, mode: &str) {
         self.state.permission_mode = mode.to_string();
         if mode == "plan" {
             self.set_plan_mode();
@@ -1396,7 +1396,7 @@ impl NeoCodexAgent {
     /// Clear in-memory context and re-restore it from the wire file. Used after
     /// an edit/delete/regenerate rewrites the JSONL so the agent's next turn is
     /// built from the corrected history, not stale in-memory state.
-    pub fn rebuild_context_from_wire(&mut self) -> usize {
+    pub(crate) fn _rebuild_context_from_wire(&mut self) -> usize {
         self.context.turns.clear();
         self.state.tokens_used = 0;
         self.state.tool_call_count = 0;

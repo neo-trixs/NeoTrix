@@ -52,7 +52,7 @@ impl SynapticPlasticity {
     /// - `activated_nodes`: 被同一查询激活的节点ID列表
     /// - `quality`: 检索质量分数 (0.0-1.0)
     /// - `conn`: SQLite连接
-    pub fn strengthen_coactivated(
+    pub(crate) fn _strengthen_coactivated(
         &self,
         activated_nodes: &[String],
         quality: f64,
@@ -126,7 +126,7 @@ impl SynapticPlasticity {
     /// w_ij(t+1) = α * w_ij(t)
     ///
     /// 防止权重无限增长，模拟遗忘曲线。
-    pub fn global_decay(&self, conn: &Connection) -> Result<usize, String> {
+    pub(crate) fn _global_decay(&self, conn: &Connection) -> Result<usize, String> {
         let changed = conn
             .execute(
                 "UPDATE edges SET weight = weight * ?1 WHERE weight > 0.01",
@@ -189,7 +189,7 @@ impl ForgettingCurve {
     /// 计算下次复习时间
     ///
     /// interval = S * interval_factor
-    pub fn next_review_interval(&self, access_count: i64) -> f64 {
+    pub(crate) fn _next_review_interval(&self, access_count: i64) -> f64 {
         self.stability(access_count) * self.interval_factor
     }
 
@@ -474,7 +474,7 @@ impl ContradictionDetector {
     }
 
     /// 批量检测矛盾
-    pub fn scan_contradictions(
+    pub(crate) fn _scan_contradictions(
         &self,
         conn: &Connection,
         embeddings: &[(String, Vec<f32>)],
@@ -566,7 +566,7 @@ impl MemoryConsolidation {
     }
 
     /// 清理过期的 STM 条目
-    pub fn prune_stm(
+    pub(crate) fn _prune_stm(
         &self,
         conn: &Connection,
     ) -> Result<usize, String> {

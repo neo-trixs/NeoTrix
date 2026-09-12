@@ -128,7 +128,7 @@ impl SelfCodeWriter {
         }
     }
 
-    pub fn new_with_registry(registry: CodeTemplateRegistry) -> Self {
+    pub(crate) fn _new_with_registry(registry: CodeTemplateRegistry) -> Self {
         Self {
             template_registry: registry,
             entropy_detector: None,
@@ -170,7 +170,7 @@ impl SelfCodeWriter {
 
     /// Generate with SemanticEntropyGate (ConSelf 2026) — checks prompt/context entropy before generation.
     /// Returns DeferredToLLM with entropy value if entropy exceeds threshold.
-    pub fn generate_with_gate(
+    pub(crate) fn _generate_with_gate(
         &self,
         req: &CodeGenRequest,
         gate: &SemanticEntropyGate,

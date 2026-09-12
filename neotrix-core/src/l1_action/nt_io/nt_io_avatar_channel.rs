@@ -259,11 +259,11 @@ impl AvatarChain {
         self.entries.iter().filter(|e| e.direction == *dir).collect()
     }
 
-    pub fn query_by_from(&self, from: &str) -> Vec<&ChainEntry> {
+    pub(crate) fn _query_by_from(&self, from: &str) -> Vec<&ChainEntry> {
         self.entries.iter().filter(|e| e.from == from).collect()
     }
 
-    pub fn query_latest(&self, n: usize, dir: Option<&MessageDirection>) -> Vec<&ChainEntry> {
+    pub(crate) fn _query_latest(&self, n: usize, dir: Option<&MessageDirection>) -> Vec<&ChainEntry> {
         let mut filtered: Vec<&ChainEntry> = match dir {
             Some(d) => self.entries.iter().filter(|e| e.direction == *d).collect(),
             None => self.entries.iter().collect(),

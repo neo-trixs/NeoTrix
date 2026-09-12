@@ -625,7 +625,7 @@ impl FreeModelCatalog {
     }
 
     /// 格式化显示
-    pub fn format_list(entries: &[FreeModelEntry]) -> String {
+    pub(crate) fn _format_list(entries: &[FreeModelEntry]) -> String {
         let mut output = format!("╭─ Free Models ({}) ─────────────────────────╮\n", entries.len());
         let mut by_tier: HashMap<String, Vec<&FreeModelEntry>> = HashMap::new();
         for e in entries {

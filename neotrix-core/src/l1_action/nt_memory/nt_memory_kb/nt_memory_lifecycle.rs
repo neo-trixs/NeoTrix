@@ -191,7 +191,7 @@ impl MemoryLifecycle {
     }
 
     /// Mark a document as fresh at the current clock tick (alias for `note_updated`).
-    pub fn mark_fresh(&mut self, doc_id: &str) {
+    pub(crate) fn _mark_fresh(&mut self, doc_id: &str) {
         let tick = self.freshness.tick();
         self.freshness.note_updated(doc_id, tick);
     }

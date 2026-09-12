@@ -155,7 +155,7 @@ impl MutationGuard {
         }
     }
 
-    pub fn default_budget() -> Self {
+    pub(crate) fn _default_budget() -> Self {
         Self::with_budget(50 * 1024 * 1024)
     }
 
@@ -246,7 +246,7 @@ impl FencedContent {
         self.kind == FenceKind::Trusted
     }
 
-    pub fn is_untrusted(&self) -> bool {
+    pub(crate) fn _is_untrusted(&self) -> bool {
         self.kind == FenceKind::Untrusted
     }
 }
@@ -307,7 +307,7 @@ impl UntrustedFence {
         self.fences.get(doc_id).and_then(|f| f.source_url.as_deref())
     }
 
-    pub fn fence_count(&self) -> usize {
+    pub(crate) fn _fence_count(&self) -> usize {
         self.fences.len()
     }
 }
@@ -375,7 +375,7 @@ impl QualityRanker {
         self.citation_authority.insert(doc_id.into(), a.clamp(0.0, 1.0));
     }
 
-    pub fn set_centrality(&mut self, doc_id: impl Into<String>, c: f64) {
+    pub(crate) fn _set_centrality(&mut self, doc_id: impl Into<String>, c: f64) {
         self.centrality.insert(doc_id.into(), c.clamp(0.0, 1.0));
     }
 

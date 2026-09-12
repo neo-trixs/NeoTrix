@@ -299,7 +299,7 @@ impl KnowledgeStorage {
     }
 
     /// 提供运行时递增序号 (供 CLI 用, 与 Python 主模块解耦)。
-    pub fn next_log_seq(&self) -> u32 {
+    pub(crate) fn _next_log_seq(&self) -> u32 {
         self.log_counter.fetch_add(1, Ordering::Relaxed)
     }
 }

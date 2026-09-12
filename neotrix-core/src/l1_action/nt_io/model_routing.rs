@@ -325,7 +325,7 @@ impl ModelRoutingLayer {
     }
     
     /// 获取模型状态
-    pub fn get_model_state(&self, model_id: &str) -> Option<&ModelState> {
+    pub(crate) fn _get_model_state(&self, model_id: &str) -> Option<&ModelState> {
         self.states.get(model_id)
     }
     

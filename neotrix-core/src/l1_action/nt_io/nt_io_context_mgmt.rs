@@ -452,7 +452,7 @@ impl ContextManager {
     }
 
     /// 搜索上下文
-    pub fn search_context(&self, window_id: &str, query: &str) -> Vec<&ContextItem> {
+    pub(crate) fn _search_context(&self, window_id: &str, query: &str) -> Vec<&ContextItem> {
         if let Some(window) = self.windows.get(window_id) {
             window.items.iter()
                 .filter(|item| item.content.contains(query))
@@ -463,7 +463,7 @@ impl ContextManager {
     }
 
     /// 协调多文件编辑
-    pub fn coordinate_multi_file_edit(&self, files: Vec<FileContext>, edit_plan: Vec<EditOperation>) -> MultiFileCoordination {
+    pub(crate) fn _coordinate_multi_file_edit(&self, files: Vec<FileContext>, edit_plan: Vec<EditOperation>) -> MultiFileCoordination {
         let dependencies = Vec::new();
         let mut conflicts = Vec::new();
 

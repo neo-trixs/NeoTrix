@@ -135,7 +135,7 @@ impl CriticNode {
     }
 
     /// 带上下文的评估（使用 AccessContext）
-    pub fn evaluate_with_context(&self, task_type: impl Into<TaskType>, capability: &CapabilityVector, context: &AccessContext) -> f64 {
+    pub(crate) fn _evaluate_with_context(&self, task_type: impl Into<TaskType>, capability: &CapabilityVector, context: &AccessContext) -> f64 {
         let task_type: TaskType = task_type.into();
         let base = self.evaluate(task_type, capability);
         // trust_score 调权：低信任 → 严格评分
@@ -144,7 +144,7 @@ impl CriticNode {
     }
 
     /// 从 LLM 响应文本中提取评分（独立启发式，不依赖 LLM）
-    pub fn evaluate_from_response(&self, response: &str) -> f64 {
+    pub(crate) fn _evaluate_from_response(&self, response: &str) -> f64 {
         let length_score = (response.len() as f64 / 2000.0).min(1.0) * 0.4;
         let has_steps = if response.contains("1)") || response.contains("Step") || response.contains("步骤") { 0.3 } else { 0.0 };
         let has_code = if response.contains("```") { 0.3 } else { 0.0 };
@@ -157,7 +157,7 @@ impl CriticNode {
         }
     }
 
-    pub fn needs_retry(&self, score: f64, threshold: f64) -> bool {
+    pub(crate) fn _needs_retry(&self, score: f64, threshold: f64) -> bool {
         let effective_threshold = if self.strict_mode { threshold + 0.1 } else { threshold };
         score < effective_threshold
     }
@@ -169,14 +169,14 @@ impl CriticNode {
     }
 
     /// P@K：评估 K 个推理轨迹中至少一个正确的概率
-    pub fn pass_at_k(&self, scores: &[f64], threshold: f64) -> f64 {
+    pub(crate) fn _pass_at_k(&self, scores: &[f64], threshold: f64) -> f64 {
         if scores.is_empty() { return 0.0; }
         let correct = scores.iter().filter(|&&s| s >= threshold).count();
         if correct > 0 { 1.0 } else { 0.0 }
     }
 
     /// 跨维度交叉验证（检查能力向量的内部一致性）
-    pub fn cross_validate(&self, capability: &CapabilityVector) -> Vec<String> {
+    pub(crate) fn _cross_validate(&self, capability: &CapabilityVector) -> Vec<String> {
         let mut issues = Vec::new();
         // 检查：verification 不应该高于相关的具体能力
         if capability.verification() > 0.9 && capability.analysis() < 0.5 {

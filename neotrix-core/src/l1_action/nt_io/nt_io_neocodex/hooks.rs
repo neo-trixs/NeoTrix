@@ -49,7 +49,7 @@ impl LifecycleHookRegistry {
         self.pre_hooks.push((name.to_string(), hook));
     }
 
-    pub fn register_post(&mut self, name: &str, hook: PostToolHook) {
+    pub(crate) fn _register_post(&mut self, name: &str, hook: PostToolHook) {
         self.post_hooks.push((name.to_string(), hook));
     }
 

@@ -445,7 +445,7 @@ impl TradeOrchestrator {
     // ════════════════════════════════════════════════════════════════
 
     /// FT01: 社交媒体内容创作与发布
-    pub fn create_social_content(
+    pub(crate) fn _create_social_content(
         &self,
         platform: Platform,
         body: &str,
@@ -477,7 +477,7 @@ impl TradeOrchestrator {
     }
 
     /// FT04: 跟进培育
-    pub fn send_follow_up(
+    pub(crate) fn _send_follow_up(
         &mut self,
         lead_id: &str,
         channel: Channel,
@@ -502,7 +502,7 @@ impl TradeOrchestrator {
     }
 
     /// FT05: 沟通互动
-    pub fn record_communication(
+    pub(crate) fn _record_communication(
         &mut self,
         lead_id: &str,
         channel: &str,
@@ -593,7 +593,7 @@ impl TradeOrchestrator {
     }
 
     /// 活跃交易统计
-    pub fn active_trade_count(&self) -> usize {
+    pub(crate) fn _active_trade_count(&self) -> usize {
         self.active_trades.len()
     }
 
@@ -704,7 +704,7 @@ impl TradeOrchestrator {
     }
 
     /// FT09: 合同审核签署
-    pub fn review_and_sign_contract(
+    pub(crate) fn _review_and_sign_contract(
         &mut self,
         order_id: &str,
         terms: &str,
@@ -850,7 +850,7 @@ impl TradeOrchestrator {
     }
 
     /// FT14: 质量检验放行
-    pub fn quality_inspect(&mut self, order_id: &str) -> Result<(), String> {
+    pub(crate) fn _quality_inspect(&mut self, order_id: &str) -> Result<(), String> {
         let ctx = self
             .active_trades
             .get_mut(order_id)
@@ -861,7 +861,7 @@ impl TradeOrchestrator {
     }
 
     /// FT15: 出货前终检
-    pub fn final_quality_check(&mut self, order_id: &str) -> Result<bool, String> {
+    pub(crate) fn _final_quality_check(&mut self, order_id: &str) -> Result<bool, String> {
         let ctx = self
             .active_trades
             .get_mut(order_id)
@@ -961,7 +961,7 @@ impl TradeOrchestrator {
     }
 
     /// FT19: 提单管理
-    pub fn manage_bill_of_lading(
+    pub(crate) fn _manage_bill_of_lading(
         &mut self,
         order_id: &str,
         bl: &PLBillOfLading,
@@ -1015,7 +1015,7 @@ impl TradeOrchestrator {
     // ════════════════════════════════════════════════════════════════
 
     /// FT21: 尾款收取
-    pub fn collect_final_payment(&mut self, order_id: &str) -> Result<(), String> {
+    pub(crate) fn _collect_final_payment(&mut self, order_id: &str) -> Result<(), String> {
         let ctx = self
             .active_trades
             .get_mut(order_id)

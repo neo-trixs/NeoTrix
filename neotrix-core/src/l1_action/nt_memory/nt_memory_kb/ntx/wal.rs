@@ -398,7 +398,7 @@ impl EmbeddedWal {
     }
 
     /// 恢复并解压条目 (返回解压后的 payload)
-    pub fn recover_decompressed(&self, file: &mut File) -> std::io::Result<Vec<WalEntry>> {
+    pub(crate) fn _recover_decompressed(&self, file: &mut File) -> std::io::Result<Vec<WalEntry>> {
         let entries = self.recover(file)?;
         let mut decompressed = Vec::with_capacity(entries.len());
         

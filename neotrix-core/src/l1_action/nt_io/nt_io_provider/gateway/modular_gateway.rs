@@ -104,7 +104,7 @@ impl ModularGateway {
         Ok(())
     }
 
-    pub fn process_response(&self, ctx: &mut ResponseCtx) -> Result<(), MiddlewareError> {
+    pub(crate) fn _process_response(&self, ctx: &mut ResponseCtx) -> Result<(), MiddlewareError> {
         let mws = self.middlewares.read().unwrap();
         for mw in mws.iter().rev() {
             mw.after_response(ctx)?;

@@ -90,20 +90,20 @@ impl MockErpSystem {
         self.orders.get(order_id).ok_or_else(|| format!("Order {} not found", order_id))
     }
 
-    pub fn list_orders(&self) -> Vec<&MockOrder> {
+    pub(crate) fn _list_orders(&self) -> Vec<&MockOrder> {
         self.orders.values().collect()
     }
 
-    pub fn get_production_milestones(&self, order_id: &str) -> Result<Vec<String>, String> {
+    pub(crate) fn _get_production_milestones(&self, order_id: &str) -> Result<Vec<String>, String> {
         let order = self.get_order(order_id)?;
         Ok(order.milestones.clone())
     }
 
-    pub fn update_inventory(&mut self, product: &str, quantity: i64) {
+    pub(crate) fn _update_inventory(&mut self, product: &str, quantity: i64) {
         *self.inventory.entry(product.to_string()).or_insert(0) += quantity;
     }
 
-    pub fn check_inventory(&self, product: &str) -> i64 {
+    pub(crate) fn _check_inventory(&self, product: &str) -> i64 {
         self.inventory.get(product).copied().unwrap_or(0)
     }
 }
@@ -208,7 +208,7 @@ impl MockBankSystem {
         Ok(self.lcs.get(lc_number).unwrap())
     }
 
-    pub fn amend_lc(&mut self, lc_number: &str, new_amount: Option<f64>, new_expiry: Option<u64>) -> Result<&MockLc, String> {
+    pub(crate) fn _amend_lc(&mut self, lc_number: &str, new_amount: Option<f64>, new_expiry: Option<u64>) -> Result<&MockLc, String> {
         let lc = self.lcs.get_mut(lc_number).ok_or_else(|| format!("LC {} not found", lc_number))?;
         if let Some(amount) = new_amount {
             lc.amount = amount;
@@ -275,7 +275,7 @@ impl MockBankSystem {
         self.lcs.get(lc_number).ok_or_else(|| format!("LC {} not found", lc_number))
     }
 
-    pub fn list_lcs(&self) -> Vec<&MockLc> {
+    pub(crate) fn _list_lcs(&self) -> Vec<&MockLc> {
         self.lcs.values().collect()
     }
 
@@ -383,12 +383,12 @@ impl MockCustomsSystem {
         Ok(())
     }
 
-    pub fn get_declaration(&self, declaration_id: &str) -> Result<&MockDeclaration, String> {
+    pub(crate) fn _get_declaration(&self, declaration_id: &str) -> Result<&MockDeclaration, String> {
         self.declarations.get(declaration_id)
             .ok_or_else(|| format!("Declaration {} not found", declaration_id))
     }
 
-    pub fn list_declarations(&self) -> Vec<&MockDeclaration> {
+    pub(crate) fn _list_declarations(&self) -> Vec<&MockDeclaration> {
         self.declarations.values().collect()
     }
 
@@ -512,11 +512,11 @@ impl MockShippingSystem {
             .ok_or_else(|| format!("Shipment {} not found", shipment_id))
     }
 
-    pub fn list_shipments(&self) -> Vec<&MockShipment> {
+    pub(crate) fn _list_shipments(&self) -> Vec<&MockShipment> {
         self.shipments.values().collect()
     }
 
-    pub fn generate_bl(&self, shipment_id: &str) -> Result<String, String> {
+    pub(crate) fn _generate_bl(&self, shipment_id: &str) -> Result<String, String> {
         let shipment = self.get_tracking(shipment_id)?;
         Ok(format!(
             "BILL OF LADING\n\nShipper: Exporter Ltd\nConsignee: Importer Co\n\nVessel: {} {}\nVoyage: {}\n\nPort of Loading: {}\nPort of Discharge: {}\n\nContainer: {}\n\nBL Number: {}\n\nDate: {}",

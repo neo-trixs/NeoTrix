@@ -989,7 +989,7 @@ pub mod kb_persistence {
     }
 
     /// Load a ProductKnowledgePack from KB by product type
-    pub fn load_knowledge_pack(kb: &KnowledgeBase, product_type: ProductType) -> Result<Option<serde_json::Value>, String> {
+    pub(crate) fn _load_knowledge_pack(kb: &KnowledgeBase, product_type: ProductType) -> Result<Option<serde_json::Value>, String> {
         let name = format!("product_spec_{:?}", product_type).to_lowercase();
         let id = format!("{}/{}", KB_NAMESPACE, name);
         
@@ -1005,13 +1005,13 @@ pub mod kb_persistence {
     }
 
     /// List all stored ProductKnowledgePacks
-    pub fn list_knowledge_packs(kb: &KnowledgeBase) -> Result<Vec<String>, String> {
+    pub(crate) fn _list_knowledge_packs(kb: &KnowledgeBase) -> Result<Vec<String>, String> {
         let assets = kb.asset_list(KB_NAMESPACE)?;
         Ok(assets.into_iter().map(|(id, name, _, _, _, _)| format!("{}/{}", id, name)).collect())
     }
 
     /// Store all built-in knowledge packs to KB
-    pub fn seed_knowledge_packs(kb: &KnowledgeBase) -> Result<Vec<String>, String> {
+    pub(crate) fn _seed_knowledge_packs(kb: &KnowledgeBase) -> Result<Vec<String>, String> {
         let mut stored = Vec::new();
         for pt in [ProductType::Machinery, ProductType::Textile, ProductType::Food, ProductType::Chemical, ProductType::Electronics] {
             let pack = super::get_product_knowledge_pack(pt);

@@ -259,22 +259,22 @@ impl AgentLoop {
         }
     }
 
-    pub fn with_multimodal_transform(mut self, stage: MultimodalTransform) -> Self {
+    pub(crate) fn _with_multimodal_transform(mut self, stage: MultimodalTransform) -> Self {
         self.multimodal = Some(std::sync::Arc::new(stage));
         self
     }
 
-    pub fn with_output_style(mut self, style: OutputStyleId) -> Self {
+    pub(crate) fn _with_output_style(mut self, style: OutputStyleId) -> Self {
         self.style = style;
         self
     }
 
-    pub fn with_secret_scanner(mut self, scanner: Box<dyn SecretScanner>) -> Self {
+    pub(crate) fn _with_secret_scanner(mut self, scanner: Box<dyn SecretScanner>) -> Self {
         self.secret_scanner = Some(scanner);
         self
     }
 
-    pub fn with_propagation_guard(mut self, guard: Box<dyn PropagationGuardLike>) -> Self {
+    pub(crate) fn _with_propagation_guard(mut self, guard: Box<dyn PropagationGuardLike>) -> Self {
         // 加固系统提示: 论文结论 — 一句话防线 → 近完全免疫。
         if guard.is_enabled() {
             if let Some(first) = self.messages.first_mut() {
@@ -332,7 +332,7 @@ impl AgentLoop {
     }
 
     /// 设置单条工具输出写入历史前的 token 截断上限 (0 = 不截断)。
-    pub fn with_tool_output_budget(mut self, max_tokens: usize) -> Self {
+    pub(crate) fn _with_tool_output_budget(mut self, max_tokens: usize) -> Self {
         self.max_tool_output_tokens = max_tokens;
         self
     }
@@ -340,7 +340,7 @@ impl AgentLoop {
     /// 按模型 context window 派生预算 (P1-B3, 入口模型感知):
     /// 上下文预算 = window × 0.8 (安全余量); 单条工具输出上限 ≥ 3k 且 ≤ window/8。
     /// 避免一律走默认 24k, 导致大窗口模型被过早驱逐 / 小窗口模型溢出。
-    pub fn with_context_window(mut self, window: usize) -> Self {
+    pub(crate) fn _with_context_window(mut self, window: usize) -> Self {
         let budget = ((window as f64) * 0.8).floor().max(1024.0) as usize;
         self.context_token_budget = budget;
         self.max_tool_output_tokens = self.max_tool_output_tokens.max(3_000).min(window / 8);

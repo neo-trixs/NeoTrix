@@ -139,7 +139,7 @@ impl DistillationEngine {
         }
     }
 
-    pub fn distill_message(&mut self, text: &str) -> DistillationFlowEvent {
+    pub(crate) fn _distill_message(&mut self, text: &str) -> DistillationFlowEvent {
         self.message_count += 1;
         let prev_confidence = self.avatar.confidence;
 
@@ -405,7 +405,7 @@ impl DistillationEngine {
         self.flow_edges.retain(|e| active_ids.contains(&e.source) && active_ids.contains(&e.target));
     }
 
-    pub fn set_identity(&mut self, name: &str) {
+    pub(crate) fn _set_identity(&mut self, name: &str) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -429,7 +429,7 @@ impl DistillationEngine {
         if let Err(e) = self.chain.save() { log::warn!("[avatar] save chain: {}", e); }
     }
 
-    pub fn record_brain_response(&mut self, response_text: &str) -> usize {
+    pub(crate) fn _record_brain_response(&mut self, response_text: &str) -> usize {
         let secret = self.identity.as_ref().map(|i| i.secret()).unwrap_or_default();
         self.chain.push(response_text.as_bytes(), &secret, MessageDirection::Inbound, "brain");
         self.avatar.chain_length = self.chain.len();
@@ -442,7 +442,7 @@ impl DistillationEngine {
         self.chain.len()
     }
 
-    pub fn get_avatar(&self) -> &UserAvatar {
+    pub(crate) fn _get_avatar(&self) -> &UserAvatar {
         &self.avatar
     }
 
@@ -455,7 +455,7 @@ impl DistillationEngine {
         }
     }
 
-    pub fn brain_write_back(&mut self, text: &str) -> usize {
+    pub(crate) fn _brain_write_back(&mut self, text: &str) -> usize {
         let secret = self.identity.as_ref().map(|i| i.secret()).unwrap_or_default();
         self.chain.push(text.as_bytes(), &secret, MessageDirection::Inbound, "brain");
         if let Err(e) = self.chain.save() { log::warn!("[avatar] save chain: {}", e); }
@@ -486,7 +486,7 @@ impl DistillationEngine {
     }
 
     /// 请求主脑授权某种能力
-    pub fn request_capability(&mut self, capability: &str, reasoning: &str) -> AuthRequest {
+    pub(crate) fn _request_capability(&mut self, capability: &str, reasoning: &str) -> AuthRequest {
         let mut reqs = load_auth_requests();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -509,13 +509,13 @@ impl DistillationEngine {
     }
 
     /// 检查某项能力是否已授权
-    pub fn check_auth(&self, capability: &str) -> bool {
+    pub(crate) fn _check_auth(&self, capability: &str) -> bool {
         let caps = load_capabilities();
         caps.iter().any(|c| c.name == capability && c.granted)
     }
 
     /// 主脑授予能力
-    pub fn grant_capability(&mut self, capability: &str) -> bool {
+    pub(crate) fn _grant_capability(&mut self, capability: &str) -> bool {
         let mut caps = load_capabilities();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -548,7 +548,7 @@ impl DistillationEngine {
     }
 
     /// 撤销能力
-    pub fn revoke_capability(&mut self, capability: &str) -> bool {
+    pub(crate) fn _revoke_capability(&mut self, capability: &str) -> bool {
         let mut caps = load_capabilities();
         if let Some(existing) = caps.iter_mut().find(|c| c.name == capability) {
             existing.granted = false;

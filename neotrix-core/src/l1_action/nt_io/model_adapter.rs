@@ -145,7 +145,7 @@ impl ModelAdapter {
     }
     
     /// 移除适配器
-    pub fn remove_adapter(&mut self, adapter_id: &str) -> Result<(), String> {
+    pub(crate) fn _remove_adapter(&mut self, adapter_id: &str) -> Result<(), String> {
         if self.adapters.remove(adapter_id).is_some() {
             Ok(())
         } else {
@@ -178,7 +178,7 @@ impl ModelAdapter {
     }
     
     /// 应用 IP-Adapter
-    pub fn apply_ip_adapter(
+    pub(crate) fn _apply_ip_adapter(
         &mut self,
         adapter_id: &str,
         content_path: &str,
@@ -203,7 +203,7 @@ impl ModelAdapter {
     }
     
     /// 应用 ControlNet
-    pub fn apply_controlnet(
+    pub(crate) fn _apply_controlnet(
         &mut self,
         adapter_id: &str,
         _prompt: &str,

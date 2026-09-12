@@ -460,7 +460,7 @@ impl AvatarController {
         self.animation = emotion.animation_key().to_string();
     }
 
-    pub fn should_blink(&mut self) -> bool {
+    pub(crate) fn _should_blink(&mut self) -> bool {
         if self.last_blink.elapsed() > Duration::from_millis(self.blink_interval_ms) {
             self.last_blink = Instant::now();
             true

@@ -398,7 +398,7 @@ impl ModelRegistry {
     }
 
     /// 按 tier 获取模型
-    pub fn models_by_tier(&self, tier: &str) -> Vec<&DiscoveredModel> {
+    pub(crate) fn _models_by_tier(&self, tier: &str) -> Vec<&DiscoveredModel> {
         self.models.iter().filter(|m| m.tier == tier).collect()
     }
 
@@ -415,7 +415,7 @@ impl ModelRegistry {
     }
 
     /// 获取活跃模型的 ProviderConfig
-    pub fn active_config(&self) -> Option<ProviderConfig> {
+    pub(crate) fn _active_config(&self) -> Option<ProviderConfig> {
         let model = self.models.iter().find(|m| {
             m.provider_id == self.default_provider && m.model_id == self.default_model
         })?;
@@ -430,7 +430,7 @@ impl ModelRegistry {
     }
 
     /// 通过 qualified ID 查找模型
-    pub fn find_by_qualified_id(&self, qid: &str) -> Option<&DiscoveredModel> {
+    pub(crate) fn _find_by_qualified_id(&self, qid: &str) -> Option<&DiscoveredModel> {
         self.models.iter().find(|m| m.qualified_id() == qid)
     }
 

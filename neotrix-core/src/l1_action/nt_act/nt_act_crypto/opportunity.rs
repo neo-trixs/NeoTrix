@@ -234,7 +234,7 @@ impl Opportunity {
         )
     }
 
-    pub fn effort_description(&self) -> String {
+    pub(crate) fn _effort_description(&self) -> String {
         format!("{} — effort: {}", self.title, self.opportunity_type.expected_effort())
     }
 
@@ -565,7 +565,7 @@ impl OpportunityScanner {
         self.scan_history.len()
     }
 
-    pub fn add_faucet(&mut self, faucet: FaucetInfo) {
+    pub(crate) fn _add_faucet(&mut self, faucet: FaucetInfo) {
         self.known_faucets.push(faucet);
     }
 

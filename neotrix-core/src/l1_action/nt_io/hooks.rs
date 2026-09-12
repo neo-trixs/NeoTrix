@@ -107,7 +107,7 @@ impl HookManager {
     }
 
     /// 检查是否有 hook 阻止了执行
-    pub fn should_block(&self, event: &HookEvent) -> Option<String> {
+    pub(crate) fn _should_block(&self, event: &HookEvent) -> Option<String> {
         for decision in self.trigger(event) {
             if let HookDecision::Deny { reason } = decision {
                 return Some(reason);

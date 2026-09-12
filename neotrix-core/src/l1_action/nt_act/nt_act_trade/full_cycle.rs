@@ -595,7 +595,7 @@ impl TradeStateMachine {
         next_idx == current_idx + 1
     }
 
-    pub fn add_risk(&mut self, alert: RiskAlert) {
+    pub(crate) fn _add_risk(&mut self, alert: RiskAlert) {
         self.risk_flags.push(alert);
     }
 }

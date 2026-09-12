@@ -103,7 +103,7 @@ impl ContextFileSystem {
     }
 
     /// 读取节点内容
-    pub fn read_node(&self, uri: &str) -> Option<(&str, usize)> {
+    pub(crate) fn _read_node(&self, uri: &str) -> Option<(&str, usize)> {
         self.nodes.get(uri).map(|n| (n.uri.as_str(), n.token_count))
     }
 

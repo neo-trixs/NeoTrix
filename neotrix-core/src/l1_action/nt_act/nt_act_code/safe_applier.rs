@@ -124,7 +124,7 @@ impl SafeCodeApplier {
     /// If the detector indicates high entropy (uncertainty), the write is
     /// skipped and `ApplyResult.deferred = Some(true)` is returned instead
     /// so the caller can route to LLM.
-    pub fn safe_write_with_entropy(
+    pub(crate) fn _safe_write_with_entropy(
         &mut self,
         file: &str,
         new_content: &str,
@@ -166,7 +166,7 @@ impl SafeCodeApplier {
         &self.tracker
     }
 
-    pub fn tracker_mut(&mut self) -> &mut EditHistoryTracker {
+    pub(crate) fn _tracker_mut(&mut self) -> &mut EditHistoryTracker {
         &mut self.tracker
     }
 

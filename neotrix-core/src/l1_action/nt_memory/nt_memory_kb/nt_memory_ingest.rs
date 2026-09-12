@@ -60,7 +60,7 @@ impl KBIngester {
     }
 
     /// Fallible insert — returns None on error without panicking.
-    pub fn try_concept(&mut self, title: &str, summary: &str, domain: &str) -> Option<String> {
+    pub(crate) fn _try_concept(&mut self, title: &str, summary: &str, domain: &str) -> Option<String> {
         let conn = self.kb.conn.lock().unwrap_or_else(|e| e.into_inner());
         match store::insert_or_get_node(&conn, title, NodeType::Concept, Some(summary), None, Some(domain)) {
             Ok(id) => { self.kb.mark_bm25_dirty(); Some(id) }
@@ -106,7 +106,7 @@ impl KBIngester {
     }
 
     /// Wire an edge using known node IDs directly.
-    pub fn relate_ids(&self, from_id: &str, to_id: &str, rel: &RelationType, weight: f64, desc: &str) -> bool {
+    pub(crate) fn _relate_ids(&self, from_id: &str, to_id: &str, rel: &RelationType, weight: f64, desc: &str) -> bool {
         let conn = self.kb.conn.lock().unwrap_or_else(|e| e.into_inner());
         store::upsert_edge(&conn, from_id, to_id, rel.clone(), weight, if desc.is_empty() { None } else { Some(desc) }).is_ok()
     }

@@ -202,7 +202,7 @@ impl ProviderSwapManager {
         report
     }
 
-    pub fn recent_swaps(&self, n: usize) -> &[SwapRecord] {
+    pub(crate) fn _recent_swaps(&self, n: usize) -> &[SwapRecord] {
         let start = self.swap_history.len().saturating_sub(n);
         &self.swap_history[start..]
     }

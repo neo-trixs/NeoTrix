@@ -448,7 +448,7 @@ impl FinanceEngine {
     }
 
     /// Process collection (FT14)
-    pub fn process_collection(
+    pub(crate) fn _process_collection(
         contract_id: &str,
         bl_number: &str,
         documents: Vec<CollectionDocument>,

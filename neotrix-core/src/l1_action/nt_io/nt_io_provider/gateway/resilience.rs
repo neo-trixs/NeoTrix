@@ -192,7 +192,7 @@ impl AnomalyDetector {
         self.record_metric(provider, "latency", latency_ms)
     }
 
-    pub fn record_error_rate(&self, provider: &str, rate: f64) -> Option<AnomalyAlert> {
+    pub(crate) fn _record_error_rate(&self, provider: &str, rate: f64) -> Option<AnomalyAlert> {
         self.record_metric(provider, "error_rate", rate)
     }
 
@@ -237,7 +237,7 @@ impl AnomalyDetector {
         }
     }
 
-    pub fn get_alerts(&self, provider: Option<&str>) -> Vec<AnomalyAlert> {
+    pub(crate) fn _get_alerts(&self, provider: Option<&str>) -> Vec<AnomalyAlert> {
         let alerts = self.alerts.read().unwrap();
         match provider {
             Some(p) => alerts.iter().filter(|a| a.provider == p).cloned().collect(),
@@ -245,7 +245,7 @@ impl AnomalyDetector {
         }
     }
 
-    pub fn clear_alerts(&self) {
+    pub(crate) fn _clear_alerts(&self) {
         self.alerts.write().unwrap().clear();
     }
 }

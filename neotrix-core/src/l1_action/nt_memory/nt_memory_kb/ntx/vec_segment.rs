@@ -74,7 +74,7 @@ impl VecSegment {
     }
 
     /// 批量添加向量
-    pub fn batch_insert(&mut self, entries: Vec<([u8; 36], Vec<f32>)>) {
+    pub(crate) fn _batch_insert(&mut self, entries: Vec<([u8; 36], Vec<f32>)>) {
         for (node_id, vector) in entries {
             assert_eq!(vector.len(), self.dimension);
             let entry = VecPoint { node_id, vector };
@@ -102,7 +102,7 @@ impl VecSegment {
     }
 
     /// 增量合并 HNSW (将 pending 向量合并到现有 HNSW)
-    pub fn merge_pending(&mut self) {
+    pub(crate) fn _merge_pending(&mut self) {
         if self.pending_entries.is_empty() {
             return;
         }

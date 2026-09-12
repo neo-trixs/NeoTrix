@@ -66,17 +66,17 @@ impl TripleMemoryStore {
     }
 
     /// 记录工作流
-    pub fn record_workflow(&mut self, workflow: WorkflowMemory) {
+    pub(crate) fn _record_workflow(&mut self, workflow: WorkflowMemory) {
         self.workflows.push(workflow);
     }
 
     /// 记录子任务
-    pub fn record_subtask(&mut self, subtask: SubtaskMemory) {
+    pub(crate) fn _record_subtask(&mut self, subtask: SubtaskMemory) {
         self.subtasks.push(subtask);
     }
 
     /// 记录函数调用
-    pub fn record_function_call(&mut self, name: &str, success: bool, latency_ms: u64) {
+    pub(crate) fn _record_function_call(&mut self, name: &str, success: bool, latency_ms: u64) {
         let func = self
             .functions
             .entry(name.to_string())
@@ -97,7 +97,7 @@ impl TripleMemoryStore {
     }
 
     /// 搜索工作流
-    pub fn search_workflows(&self, query: &str) -> Vec<&WorkflowMemory> {
+    pub(crate) fn _search_workflows(&self, query: &str) -> Vec<&WorkflowMemory> {
         self.workflows
             .iter()
             .filter(|w| w.task.contains(query))
@@ -105,7 +105,7 @@ impl TripleMemoryStore {
     }
 
     /// 获取函数统计
-    pub fn function_stats(&self, name: &str) -> Option<(&str, u32, u32, f64)> {
+    pub(crate) fn _function_stats(&self, name: &str) -> Option<(&str, u32, u32, f64)> {
         self.functions.get(name).map(|f| {
             let success_rate = if f.call_count > 0 {
                 f.success_count as f64 / f.call_count as f64

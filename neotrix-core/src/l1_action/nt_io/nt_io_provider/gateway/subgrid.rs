@@ -305,7 +305,7 @@ impl GatewayV2 {
     }
 
     /// 检查满足指定画像的子网格中是否有健康可用的 (Gap 4 前置判断)
-    pub fn has_healthy_sub_grid(&self, required: CommunicationProfile) -> bool {
+    pub(crate) fn _has_healthy_sub_grid(&self, required: CommunicationProfile) -> bool {
         self.sub_grids_meeting(required).iter().any(|grid_name| {
             self.sub_grid_health_report()
                 .iter()

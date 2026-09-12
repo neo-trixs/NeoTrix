@@ -154,7 +154,7 @@ impl PrivacyEnforcer {
         Ok(DataSovereigntyProof::sign(&record.id, &self.signing_secret))
     }
 
-    pub fn export_snapshot(&self, _path: &str) -> Result<(), String> {
+    pub(crate) fn _export_snapshot(&self, _path: &str) -> Result<(), String> {
         Err("Snapshot requires KB integration; use Sovereign mode with auto_export_path".to_string())
     }
 
@@ -174,7 +174,7 @@ impl PrivacyEnforcer {
         Ok(result)
     }
 
-    pub fn decrypt_content(&self, content: &str) -> Result<String, String> {
+    pub(crate) fn _decrypt_content(&self, content: &str) -> Result<String, String> {
         self.decrypt_node(content)
     }
 

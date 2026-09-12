@@ -128,7 +128,7 @@ impl AgentMemory {
         id
     }
 
-    pub fn insert_with_embedding(&mut self, content: &str, embedding: Vec<f32>) -> Uuid {
+    pub(crate) fn _insert_with_embedding(&mut self, content: &str, embedding: Vec<f32>) -> Uuid {
         let mut entry = AgentMemoryEntry::new(MemoryTier::Core, content);
         entry.embedding = Some(embedding);
         let id = entry.id;
@@ -199,7 +199,7 @@ impl AgentMemory {
         results
     }
 
-    pub fn recent_core(&self, n: usize) -> Vec<&AgentMemoryEntry> {
+    pub(crate) fn _recent_core(&self, n: usize) -> Vec<&AgentMemoryEntry> {
         let mut sorted: Vec<_> = self.core.iter().filter(|e| !e.superseded).collect();
         sorted.sort_by(|a, b| b.created_at.partial_cmp(&a.created_at).unwrap_or(std::cmp::Ordering::Equal));
         sorted.truncate(n);

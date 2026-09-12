@@ -87,7 +87,7 @@ pub struct OrderMetadata {
 
 impl OrderMetadata {
     /// 从业务员+文件路径提取完整元数据
-    pub fn from_salesperson_path(salesperson: &str, order_folder: &str) -> Self {
+    pub(crate) fn _from_salesperson_path(salesperson: &str, order_folder: &str) -> Self {
         let _ = salesperson;
         extract_order_metadata(order_folder)
     }

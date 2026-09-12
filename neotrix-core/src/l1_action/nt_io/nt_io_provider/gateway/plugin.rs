@@ -87,7 +87,7 @@ impl PluginManager {
         self.plugins.sort_by_key(|p| p.priority());
     }
 
-    pub fn run_pre_request(&self, ctx: &mut RequestContext) -> Result<(), PluginError> {
+    pub(crate) fn _run_pre_request(&self, ctx: &mut RequestContext) -> Result<(), PluginError> {
         for plugin in &self.plugins {
             let name = plugin.name();
             let enabled = self.enabled.read().unwrap();
@@ -98,7 +98,7 @@ impl PluginManager {
         Ok(())
     }
 
-    pub fn run_post_response(&self, ctx: &mut ResponseContext) -> Result<(), PluginError> {
+    pub(crate) fn _run_post_response(&self, ctx: &mut ResponseContext) -> Result<(), PluginError> {
         for plugin in &self.plugins {
             let name = plugin.name();
             let enabled = self.enabled.read().unwrap();
@@ -109,7 +109,7 @@ impl PluginManager {
         Ok(())
     }
 
-    pub fn run_on_error(&self, ctx: &mut ErrorContext) -> Result<(), PluginError> {
+    pub(crate) fn _run_on_error(&self, ctx: &mut ErrorContext) -> Result<(), PluginError> {
         for plugin in &self.plugins {
             let name = plugin.name();
             let enabled = self.enabled.read().unwrap();

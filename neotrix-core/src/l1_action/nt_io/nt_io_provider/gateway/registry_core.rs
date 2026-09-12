@@ -101,7 +101,7 @@ impl ProviderState {
     }
 
     /// 配额耗尽后是否已过冷却期可再次尝试 (配额恢复探测)
-    pub fn quota_recovery_elapsed(&self) -> bool {
+    pub(crate) fn _quota_recovery_elapsed(&self) -> bool {
         self.circuit_breaker.cooldown_elapsed()
     }
 

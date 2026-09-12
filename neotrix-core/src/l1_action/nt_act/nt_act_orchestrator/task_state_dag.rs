@@ -83,7 +83,7 @@ impl TaskStateDag {
         });
     }
 
-    pub fn add_task_node(&mut self, node: ArtifactNode) {
+    pub(crate) fn _add_task_node(&mut self, node: ArtifactNode) {
         self.nodes.entry(node.id.clone()).or_insert(node);
     }
 

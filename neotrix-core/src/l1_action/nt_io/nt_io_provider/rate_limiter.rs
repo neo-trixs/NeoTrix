@@ -43,7 +43,7 @@ impl AdaptivePacer {
     }
 
     /// 距下次可调用还需等待多少毫秒 (0 = 立即可发)。
-    pub fn wait_ms_until_next(&self) -> u64 {
+    pub(crate) fn _wait_ms_until_next(&self) -> u64 {
         let now = Instant::now();
         if self.next > now {
             self.next.duration_since(now).as_millis() as u64

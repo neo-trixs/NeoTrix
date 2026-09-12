@@ -204,7 +204,7 @@ impl HarnessScaffold {
     }
 
     /// 某 band 的尝试统计
-    pub fn band_stats(&self, band: u32) -> Option<&EffortStats> {
+    pub(crate) fn _band_stats(&self, band: u32) -> Option<&EffortStats> {
         self.efforts.get(&band)
     }
 

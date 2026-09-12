@@ -162,7 +162,7 @@ impl ReferenceBasedGeneration {
     }
     
     /// 清除所有参考
-    pub fn clear_references(&mut self) {
+    pub(crate) fn _clear_references(&mut self) {
         self.config.references.clear();
     }
     

@@ -194,7 +194,7 @@ impl ProviderPool {
     }
 
     /// 只将条目注册进 AccountPool (不注册 gateway provider)。
-    pub fn register_into_account_pool(&self, pool: &AccountPool) -> usize {
+    pub(crate) fn _register_into_account_pool(&self, pool: &AccountPool) -> usize {
         for entry in &self.entries {
             pool.register_default(&entry.provider, &entry.label);
         }

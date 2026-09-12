@@ -1084,7 +1084,7 @@ impl Default for Fts5OptimizerConfig {
 }
 
 impl Fts5OptimizerConfig {
-    pub fn apply_pragmas(&self, conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+    pub(crate) fn _apply_pragmas(&self, conn: &rusqlite::Connection) -> rusqlite::Result<()> {
         conn.pragma_update(None, "cache_size", self.cache_size)?;
         conn.pragma_update(None, "mmap_size", self.mmap_size)?;
         conn.pragma_update(None, "page_size", self.page_size)?;
@@ -1109,7 +1109,7 @@ impl Fts5OptimizerConfig {
         );";
 
     /// Triggers to keep FTS index in sync with nodes table changes
-    pub const FTS_SYNC_TRIGGERS: &'static str = r#"
+    pub(crate) const _FTS_SYNC_TRIGGERS: &'static str = r#"
         CREATE TRIGGER IF NOT EXISTS nodes_ai AFTER INSERT ON nodes BEGIN
             INSERT INTO nodes_fts(rowid, title, summary, content)
             VALUES (new.rowid, new.title, new.summary, new.content);
@@ -1126,7 +1126,7 @@ impl Fts5OptimizerConfig {
         END;
     "#;
 
-    pub fn rebuild_fts(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+    pub(crate) fn _rebuild_fts(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
         conn.execute_batch("INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild');")
     }
 }

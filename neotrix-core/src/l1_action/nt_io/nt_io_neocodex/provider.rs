@@ -170,7 +170,7 @@ impl ProviderCatalog {
     }
 
     /// True if the given provider name maps to a real LlmProvider type.
-    pub fn is_resolvable_for(&self, name: &str) -> bool {
+    pub(crate) fn _is_resolvable_for(&self, name: &str) -> bool {
         Self::provider_type_of(name).is_some()
     }
 

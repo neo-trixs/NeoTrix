@@ -211,7 +211,7 @@ impl PlatformGateway {
     }
     
     /// 选择最佳平台
-    pub fn select_best_platform(&self, task_type: &str) -> Option<&PlatformConfig> {
+    pub(crate) fn _select_best_platform(&self, task_type: &str) -> Option<&PlatformConfig> {
         let mut available = self.get_available_platforms(task_type);
         available.sort_by(|a, b| b.priority.cmp(&a.priority));
         available.into_iter().next()
@@ -252,7 +252,7 @@ impl PlatformGateway {
     }
     
     /// 带故障转移的请求
-    pub fn send_request_with_failover(
+    pub(crate) fn _send_request_with_failover(
         &mut self,
         task_type: &str,
         request: &PlatformRequest,
@@ -278,12 +278,12 @@ impl PlatformGateway {
     }
     
     /// 获取平台状态
-    pub fn get_platform_status(&self, platform_id: &str) -> Option<PlatformStatus> {
+    pub(crate) fn _get_platform_status(&self, platform_id: &str) -> Option<PlatformStatus> {
         self.statuses.get(platform_id).cloned()
     }
     
     /// 更新平台状态
-    pub fn update_platform_status(&mut self, platform_id: &str, status: PlatformStatus) {
+    pub(crate) fn _update_platform_status(&mut self, platform_id: &str, status: PlatformStatus) {
         self.statuses.insert(platform_id.to_string(), status);
     }
     

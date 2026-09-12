@@ -140,7 +140,7 @@ impl NtxSync {
     }
 
     /// 从 NTX 导入到 SQLite (恢复)
-    pub fn import_to_sqlite(&self, conn: &rusqlite::Connection) -> std::io::Result<ImportResult> {
+    pub(crate) fn _import_to_sqlite(&self, conn: &rusqlite::Connection) -> std::io::Result<ImportResult> {
         let ntx = NtxFile::open(&self.ntx_path)?;
         let stats = ntx.stats();
 

@@ -130,7 +130,7 @@ impl MarkdownIDE {
     }
 
     /// 打开文档
-    pub fn open_document(&mut self, path: &str, content: &str) -> Result<MarkdownDocument, String> {
+    pub(crate) fn _open_document(&mut self, path: &str, content: &str) -> Result<MarkdownDocument, String> {
         let doc = MarkdownDocument {
             id: uuid::Uuid::new_v4().to_string(),
             path: path.to_string(),
@@ -242,7 +242,7 @@ impl MarkdownIDE {
     }
 
     /// 同步到 Git
-    pub fn sync_to_git(&self) -> Result<String, String> {
+    pub(crate) fn _sync_to_git(&self) -> Result<String, String> {
         match &self.sync_config {
             Some(config) => {
                 // 实际实现会调用 git 命令
@@ -266,7 +266,7 @@ impl MarkdownIDE {
     }
 
     /// MCP 工具: open
-    pub fn mcp_open(&self, path: &str) -> McpToolResult {
+    pub(crate) fn _mcp_open(&self, path: &str) -> McpToolResult {
         match self.documents.values().find(|d| d.path == path) {
             Some(doc) => McpToolResult {
                 tool: "open".into(),
@@ -288,7 +288,7 @@ impl MarkdownIDE {
     }
 
     /// MCP 工具: graph
-    pub fn mcp_graph(&self) -> McpToolResult {
+    pub(crate) fn _mcp_graph(&self) -> McpToolResult {
         let graph = self.get_graph();
         McpToolResult {
             tool: "graph".into(),

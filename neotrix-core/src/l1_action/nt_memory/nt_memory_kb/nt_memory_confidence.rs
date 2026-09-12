@@ -516,7 +516,7 @@ impl ConfidenceStore {
         Ok(count)
     }
 
-    pub fn purge_archived(&self, older_than_days: i64) -> Result<u64, String> {
+    pub(crate) fn _purge_archived(&self, older_than_days: i64) -> Result<u64, String> {
         let mut map = self.inner.write().map_err(|e| format!("Lock: {}", e))?;
         let now = now_ts();
         let cutoff = now - older_than_days * 86400;

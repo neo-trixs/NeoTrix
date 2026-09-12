@@ -116,7 +116,7 @@ impl GatewayV2 {
     // ── F6: Generation Classification ─────────────────────────────
 
     /// 开关生成分类打标 (F6: Generation Classifier)
-    pub fn set_generation_classification(&mut self, enabled: bool) {
+    pub(crate) fn _set_generation_classification(&mut self, enabled: bool) {
         self.generation_classification_enabled = enabled;
     }
 
@@ -174,7 +174,7 @@ impl GatewayV2 {
     }
 
     /// F6: analytics 快照 — (total, by_task_type, by_complexity, by_domain)
-    pub fn generation_analytics_snapshot(&self) -> (u64, HashMap<String, u64>, HashMap<String, u64>, HashMap<String, u64>) {
+    pub(crate) fn _generation_analytics_snapshot(&self) -> (u64, HashMap<String, u64>, HashMap<String, u64>, HashMap<String, u64>) {
         match self.generation_analytics.lock() {
             Ok(a) => (
                 a.total,
