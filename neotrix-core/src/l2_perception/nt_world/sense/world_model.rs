@@ -12,8 +12,9 @@ use std::collections::HashMap;
 use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
 use super::nt_world_model_predict::{LatentTransition, ExpertPredictor};
 use super::nt_world_model_types::{
-    Vector, Matrix, LATENT_DIM, Context, LatentState,
+    Vector, Matrix, LATENT_DIM, Context,
 };
+use super::types::LatentState;
 
 // ═══════════════════════════════════════════════════════════
 // JepaWorldModel — JEPA 世界模型
@@ -542,7 +543,7 @@ impl WorldModel {
         expert_ids: &[usize],
     ) -> Vector {
         let z = self.context_encoder.encode(context);
-        let latent = LatentState { vector: z.clone(), timestamp: 0 };
+        let latent = LatentState { value: z.clone(), delta: vec![0.0; z.len()] };
 
         self.expert_predictor.predict_all(&latent, expert_ids)
     }

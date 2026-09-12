@@ -66,7 +66,8 @@ pub mod rsi_operators;
 pub use dpo_stage::{DpoStage, DpoBuffer, PreferencePair};
 pub use sft_stage::{SftStage, SftBuffer, SupervisedExample, SftReport};
 pub use constitutional_stage::{ConstitutionalSelfCritiqueStage, ConstitutionalReport, PrincipleEvaluation, Principle};
-pub use safety_stage::{SafetyCheckStage, SafetyCheckDetail, ThreatCategory};
+pub use safety_stage::SafetyCheckStage;
+pub(crate) use safety_stage::{SafetyCheckDetail, ThreatCategory};
 
 pub use dp_sgd_stage::DpSgdStage;
 pub use stage_contracts::ContractAwareStage;

@@ -152,7 +152,7 @@ impl ExpertPredictor {
 
     /// 为所有专家生成预测向量 (兼容旧接口)
     pub fn predict_all(&self, latent: &super::LatentState, _experts: &[usize]) -> Vector {
-        vec![self.predict(0, &latent.vector)]
+        vec![self.predict(0, &latent.value)]
     }
 
     /// 更新专家权重 (在线学习)
