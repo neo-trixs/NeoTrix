@@ -16,15 +16,15 @@ pub enum GameError {
 impl fmt::Display for GameError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Io(e) => write!(f, "IO error: {}", e),
-            Self::Serde(e) => write!(f, "Serialization error: {}", e),
-            Self::Game(e) => write!(f, "Game error: {}", e),
-            Self::Asset(e) => write!(f, "Asset error: {}", e),
-            Self::Physics(e) => write!(f, "Physics error: {}", e),
-            Self::Audio(e) => write!(f, "Audio error: {}", e),
-            Self::Save(e) => write!(f, "Save error: {}", e),
-            Self::Load(e) => write!(f, "Load error: {}", e),
-            Self::InvalidState(e) => write!(f, "Invalid state: {}", e),
+            Self::Io(e) => write!(f, "IO: {}", e),
+            Self::Serde(e) => write!(f, "Serde: {}", e),
+            Self::Game(e) => write!(f, "Game: {}", e),
+            Self::Asset(e) => write!(f, "Asset: {}", e),
+            Self::Physics(e) => write!(f, "Physics: {}", e),
+            Self::Audio(e) => write!(f, "Audio: {}", e),
+            Self::Save(e) => write!(f, "Save: {}", e),
+            Self::Load(e) => write!(f, "Load: {}", e),
+            Self::InvalidState(e) => write!(f, "State: {}", e),
         }
     }
 }

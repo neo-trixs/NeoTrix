@@ -33,13 +33,15 @@ pub mod nt_core_harness;
 pub mod l1_body;
 pub mod nt_core_edit;
 pub mod nt_core_mcp;
-pub use l1_body::{nt_core_guard_chain};
+pub use l1_body::nt_core_guard_chain;
 
 // ═══════════════════════════════════════════════════════════════════
 // L2 — 感知层 (Perception)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l2_perception;
-pub use l2_perception::{nt_core_llm, nt_core_embed, nt_core_sense};
+pub mod nt_core_llm;
+pub mod nt_core_embed;
+pub use l2_perception::nt_core_sense;
 
 // ═══════════════════════════════════════════════════════════════════
 // L3 — 记忆层 (Memory)
@@ -123,7 +125,8 @@ pub mod nt_core_capability;
 // L8 — 自主神经层 (Autonomic)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l8_autonomic;
-pub use l8_autonomic::{nt_core_self_test, nt_core_self_test_integration};
+pub mod nt_core_self_test;
+pub mod nt_core_self_test_integration;
 pub mod nt_core_absorb;
 pub mod nt_core_iter;
 pub mod nt_core_scheduler;

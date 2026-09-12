@@ -28,6 +28,10 @@ pub enum NpcType {
     Focus,
     Creativity,
     Empathy,
+    Memory,
+    Logic,
+    Wisdom,
+    Dreams,
 }
 
 #[derive(Debug, Clone)]
@@ -105,6 +109,50 @@ impl NpcDefinition {
                     NpcScheduleEntry { hour: 7, location: "Lake".to_string(), activity: "Fishing".to_string(), dialogue: Some(empathy_dialogue()) },
                     NpcScheduleEntry { hour: 12, location: "Hub".to_string(), activity: "Healing".to_string(), dialogue: None },
                     NpcScheduleEntry { hour: 18, location: "Meadow".to_string(), activity: "Singing".to_string(), dialogue: None },
+                ],
+            },
+            Self {
+                npc_type: NpcType::Memory,
+                name: "Memory".to_string(),
+                color: "#AB47BC".to_string(),
+                position: (48, 28),
+                schedule: vec![
+                    NpcScheduleEntry { hour: 7, location: "Forest".to_string(), activity: "Collecting".to_string(), dialogue: Some(memory_dialogue()) },
+                    NpcScheduleEntry { hour: 13, location: "Hub".to_string(), activity: "Archiving".to_string(), dialogue: None },
+                    NpcScheduleEntry { hour: 19, location: "Lake".to_string(), activity: "Reflecting".to_string(), dialogue: None },
+                ],
+            },
+            Self {
+                npc_type: NpcType::Logic,
+                name: "Logic".to_string(),
+                color: "#5C6BC0".to_string(),
+                position: (56, 28),
+                schedule: vec![
+                    NpcScheduleEntry { hour: 6, location: "Mines".to_string(), activity: "Analyzing".to_string(), dialogue: Some(logic_dialogue()) },
+                    NpcScheduleEntry { hour: 14, location: "Hub".to_string(), activity: "Teaching".to_string(), dialogue: None },
+                    NpcScheduleEntry { hour: 20, location: "Farm".to_string(), activity: "Planning".to_string(), dialogue: None },
+                ],
+            },
+            Self {
+                npc_type: NpcType::Wisdom,
+                name: "Wisdom".to_string(),
+                color: "#FFA726".to_string(),
+                position: (54, 26),
+                schedule: vec![
+                    NpcScheduleEntry { hour: 8, location: "Lake".to_string(), activity: "Meditating".to_string(), dialogue: Some(wisdom_dialogue()) },
+                    NpcScheduleEntry { hour: 15, location: "Hub".to_string(), activity: "Counseling".to_string(), dialogue: None },
+                    NpcScheduleEntry { hour: 21, location: "Forest".to_string(), activity: "Stargazing".to_string(), dialogue: None },
+                ],
+            },
+            Self {
+                npc_type: NpcType::Dreams,
+                name: "Dreams".to_string(),
+                color: "#EC407A".to_string(),
+                position: (62, 36),
+                schedule: vec![
+                    NpcScheduleEntry { hour: 10, location: "Lake".to_string(), activity: "Dreaming".to_string(), dialogue: Some(dreams_dialogue()) },
+                    NpcScheduleEntry { hour: 16, location: "Hub".to_string(), activity: "Sharing".to_string(), dialogue: None },
+                    NpcScheduleEntry { hour: 22, location: "Farm".to_string(), activity: "Nightwatching".to_string(), dialogue: None },
                 ],
             },
         ]

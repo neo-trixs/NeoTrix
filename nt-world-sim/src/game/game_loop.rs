@@ -7,7 +7,8 @@ use crate::engine::scene::{SceneGraph, SceneNode};
 use crate::engine::input::KeyCode as InputKeyCode;
 use crate::engine::event_bus::TypedEventBus;
 use crate::engine::audio::{AudioManager, StubAudioBackend};
-use crate::engine::renderer::{Vec2 as RendererVec2, ParticleSystem};
+use crate::core::Vec2;
+use crate::engine::renderer::ParticleSystem;
 use super::time::{GameTime, TimeSystem};
 use super::weather::{Weather, WeatherSystem};
 use super::inventory::Inventory;
@@ -150,7 +151,7 @@ impl GameLoop {
 
         if let Some(player) = self.player_entity {
             if let Some(pos) = self.world.get_component::<Position>(player) {
-                let player_vec2 = RendererVec2 { x: pos.x as f32 * 16.0, y: pos.y as f32 * 16.0 };
+                let player_vec2 = Vec2 { x: pos.x as f32 * 16.0, y: pos.y as f32 * 16.0 };
                 self.camera.follow(player_vec2);
             }
         }
@@ -366,48 +367,15 @@ impl GameLoop {
         }
     }
 
-    pub fn save_game(&self) -> crate::error::GameResult<()> {
-        let manager = crate::save::SaveManager::default_dir();
-        let time = self.world.get_resource::<super::time::GameTime>().cloned().unwrap_or_default();
-        let energy = self.world.get_resource::<super::energy::Energy>().cloned().unwrap_or_default();
-
-        let mut skills = std::collections::HashMap::new();
-        skills.insert("awareness".into(), 0u32);
-        skills.insert("focus".into(), 0u32);
-        skills.insert("creativity".into(), 0u32);
-        skills.insert("empathy".into(), 0u32);
-        skills.insert("logic".into(), 0u32);
-
-        let save_data = crate::save::SaveData {
-            version: 1,
-            slot: 0,
-            player_name: "Player".to_string(),
-            play_time_seconds: self.tick_count as f64,
-            day: time.day,
-            season: format!("{:?}", time.season),
-            year: time.year,
-            hour: time.hour,
-            minute: time.minute,
-            energy: energy.current,
-            max_energy: energy.max,
-            insight_points: 0,
-            resonance: 0,
-            skills,
-            inventory: vec![],
-            hotbar_index: 0,
-            gold: 500,
-            farm_tiles: vec![],
-            npcs: vec![],
-            current_zone: 0,
-            unlocked_zones: vec![0, 1, 2, 3, 4],
-        };
-        manager.save(0, &save_data)
+    pub fn save_game(&mut self, slot: u32) -> Result<(), String> {
+        let manager = crate::save::SaveManager::new();
+        manager.save_from_world(slot, &self.world, self.tick_count).map_err(|e| e.to_string())
     }
 
-    pub fn load_game(&mut self) -> crate::error::GameResult<()> {
-        let manager = crate::save::SaveManager::default_dir();
-        let data = manager.load(0)?;
-        self.tick_count = data.play_time_seconds as u64;
+    pub fn load_game(&mut self, slot: u32) -> Result<(), String> {
+        let manager = crate::save::SaveManager::new();
+        let tick_count = manager.load_tick_count(slot).map_err(|e| e.to_string())?;
+        self.tick_count = tick_count;
         Ok(())
     }
 
@@ -422,7 +390,7 @@ impl GameLoop {
     pub fn update_camera(&mut self) {
         if let Some(player) = self.player_entity {
             if let Some(pos) = self.world.get_component::<Position>(player) {
-                let target = RendererVec2 {
+                let target = Vec2 {
                     x: pos.x as f32 * 16.0 + 8.0,
                     y: pos.y as f32 * 16.0 + 8.0,
                 };

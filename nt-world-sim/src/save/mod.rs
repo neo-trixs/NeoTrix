@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::error::{GameError, GameResult};
+use crate::core::UniversalWorld;
 use crate::game::inventory::Inventory;
 use crate::game::time::GameTime;
 use crate::game::energy::Energy;
@@ -20,6 +21,7 @@ pub struct SaveData {
     pub slot: u32,
     pub player_name: String,
     pub play_time_seconds: f64,
+    pub tick_count: u64,
 
     // Time
     pub day: u32,
@@ -125,12 +127,12 @@ pub struct SaveManager {
 }
 
 impl SaveManager {
-    pub fn new(save_dir: &Path) -> Self {
-        Self { save_dir: save_dir.to_path_buf() }
+    pub fn new() -> Self {
+        Self { save_dir: PathBuf::from("saves") }
     }
 
-    pub fn default_dir() -> Self {
-        Self::new(Path::new("saves"))
+    pub fn with_dir(save_dir: &Path) -> Self {
+        Self { save_dir: save_dir.to_path_buf() }
     }
 
     /// Save game state to a slot
@@ -191,6 +193,47 @@ impl SaveManager {
         slots.sort();
         slots
     }
+
+    /// Save from UniversalWorld + tick_count
+    pub fn save_from_world(&self, slot: u32, world: &UniversalWorld, tick_count: u64) -> GameResult<()> {
+        let time = world.get_resource::<GameTime>().cloned().unwrap_or_default();
+        let energy = world.get_resource::<Energy>().cloned().unwrap_or_default();
+        let inventory = world.get_resource::<Inventory>().cloned().unwrap_or_default();
+
+        let data = SaveData {
+            version: 1,
+            slot,
+            player_name: "Player".to_string(),
+            play_time_seconds: tick_count as f64,
+            tick_count,
+            day: time.day,
+            season: format!("{:?}", time.season),
+            year: time.year,
+            hour: time.hour,
+            minute: time.minute,
+            energy: energy.current,
+            max_energy: energy.max,
+            insight_points: 0,
+            resonance: 0,
+            skills: HashMap::new(),
+            inventory: inventory.slots.iter().map(|s| {
+                InventorySlotData { item_id: s.item_id, count: s.quantity }
+            }).collect(),
+            hotbar_index: inventory.selected_hotbar,
+            gold: inventory.gold as u32,
+            farm_tiles: vec![],
+            npcs: vec![],
+            current_zone: 0,
+            unlocked_zones: vec![0, 1, 2, 3, 4],
+        };
+        self.save(slot, &data)
+    }
+
+    /// Load and return tick_count
+    pub fn load_tick_count(&self, slot: u32) -> GameResult<u64> {
+        let data = self.load(slot)?;
+        Ok(data.tick_count)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +284,7 @@ impl SaveData {
             slot: 0,
             player_name: player_name.to_string(),
             play_time_seconds: play_time,
+            tick_count: 0,
             day: game_time.day,
             season: format!("{:?}", game_time.season),
             year: game_time.year,

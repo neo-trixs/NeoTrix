@@ -271,55 +271,16 @@ pub fn cleanup() {
 pub fn save_game_to_file(slot: u32) -> GameResult<String> {
     let state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
     let game = state.as_ref().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
-
-    let time = game.world.get_resource::<GameTime>().cloned().unwrap_or_default();
-    let energy = game.world.get_resource::<crate::game::energy::Energy>().cloned().unwrap_or_default();
-
-    let mut skills = std::collections::HashMap::new();
-    skills.insert("awareness".into(), 0u32);
-    skills.insert("focus".into(), 0u32);
-    skills.insert("creativity".into(), 0u32);
-    skills.insert("empathy".into(), 0u32);
-    skills.insert("logic".into(), 0u32);
-
-    let save_data = SaveData {
-        version: 1,
-        slot,
-        player_name: "Player".to_string(),
-        play_time_seconds: game.tick_count as f64,
-        day: time.day,
-        season: format!("{:?}", time.season),
-        year: time.year,
-        hour: time.hour,
-        minute: time.minute,
-        energy: energy.current,
-        max_energy: energy.max,
-        insight_points: 0,
-        resonance: 0,
-        skills,
-        inventory: vec![],
-        hotbar_index: 0,
-        gold: 500,
-        farm_tiles: vec![],
-        npcs: vec![],
-        current_zone: 0,
-        unlocked_zones: vec![0, 1, 2, 3, 4],
-    };
-
-    let manager = crate::save::SaveManager::default_dir();
-    manager.save(slot, &save_data)?;
-
-    Ok(format!("Saved to save slot {}", slot))
+    let manager = crate::save::SaveManager::new();
+    manager.save(slot, &game.world, game.tick_count)?;
+    Ok(format!("Saved to slot {}", slot))
 }
 
 pub fn load_game_from_file(slot: u32) -> GameResult<String> {
-    let manager = crate::save::SaveManager::default_dir();
-    let data = manager.load(slot)?;
-
     let mut state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
     let game = state.as_mut().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
-
-    game.tick_count = data.version as u64 * 0;
-
-    Ok(format!("Loaded from save slot {}", slot))
+    let manager = crate::save::SaveManager::new();
+    let data = manager.load(slot)?;
+    game.tick_count = data.tick_count;
+    Ok(format!("Loaded from slot {}", slot))
 }
