@@ -1,17 +1,17 @@
-pub mod adapters;
-pub mod builder;
-pub mod codegen;
 pub mod core;
 pub mod engine;
-pub mod error;
 pub mod game;
-pub mod save;
-pub mod tauri_bridge;
-pub mod ui;
 pub mod world;
+pub mod ui;
+pub mod codegen;
+pub mod adapters;
+pub mod save;
+pub mod error;
+#[cfg(feature = "tauri")]
+pub mod tauri_bridge;
+pub mod builder;
 
 pub use error::{GameError, GameResult};
-
 
 pub use engine::{
     Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer,

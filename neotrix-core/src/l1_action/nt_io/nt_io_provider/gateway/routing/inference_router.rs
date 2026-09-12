@@ -135,18 +135,27 @@ impl UnifiedInference for InferenceRouter {
 
         // 4. 包装响应流
         let (tx_out, rx_out) = tokio::sync::mpsc::channel(64);
+        let provider_status = self.gateway.provider_status();
+        let default_provider = provider_status.first()
+            .and_then(|s| s.get("name").and_then(|v| v.as_str()))
+            .unwrap_or("unknown")
+            .to_string();
+        let stream_provider = default_provider.clone();
         tokio::spawn(async move {
             while let Some(item) = rx.recv().await {
                 let mapped: Result<InferenceResponse, InferenceError> = match item {
                     Ok(resp) => Ok(InferenceResponse {
                         content: resp.content,
                         model: resp.model,
-                        provider: String::new(),
+                        provider: stream_provider.clone(),
                         usage: resp.usage,
                         finish_reason: resp.finish_reason,
                         tool_calls: resp.tool_calls,
                         reasoning: resp.reasoning,
-                        metadata: ResponseMetadata::default(),
+                        metadata: ResponseMetadata {
+                            provider_selected: stream_provider.clone(),
+                            ..Default::default()
+                        },
                     }),
                     Err(e) => Err(InferenceError::from(e)),
                 };
@@ -158,7 +167,7 @@ impl UnifiedInference for InferenceRouter {
 
         Ok(StreamHandle {
             rx: rx_out,
-            provider: "auto".to_string(),
+            provider: default_provider,
         })
     }
 

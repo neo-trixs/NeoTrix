@@ -167,7 +167,46 @@ impl GatewayV2 {
         if let Err(reason) = egress_privacy_guard(&mut req, trust_from_name(name), name) {
             return Err(LlmError::InvalidRequest(reason));
         }
+        // Plugin pre-request hook
+        if let Ok(plugins) = self.plugin_manager.read() {
+            let mut ctx = super::super::observability::plugin::RequestContext {
+                provider: name.to_string(),
+                model: req.model.clone(),
+                headers: std::collections::HashMap::new(),
+                body: serde_json::to_vec(&req).unwrap_or_default(),
+                timestamp: std::time::Instant::now(),
+            };
+            if let Err(e) = plugins._run_pre_request(&mut ctx) {
+                return Err(LlmError::Unknown(format!("Plugin pre_request aborted: {:?}", e)));
+            }
+        }
         let result = provider.complete(&req).await;
+        // Plugin hooks
+        match &result {
+            Ok(response) => {
+                if let Ok(plugins) = self.plugin_manager.read() {
+                    let mut ctx = super::super::observability::plugin::ResponseContext {
+                        provider: name.to_string(),
+                        status: 200,
+                        headers: std::collections::HashMap::new(),
+                        body: serde_json::to_vec(response).unwrap_or_default(),
+                        latency: std::time::Duration::from_millis(0),
+                    };
+                    let _ = plugins._run_post_response(&mut ctx);
+                }
+            }
+            Err(e) => {
+                if let Ok(plugins) = self.plugin_manager.read() {
+                    let mut ctx = super::super::observability::plugin::ErrorContext {
+                        provider: name.to_string(),
+                        error: e.to_string(),
+                        retry_count: 0,
+                        timestamp: std::time::Instant::now(),
+                    };
+                    let _ = plugins._run_on_error(&mut ctx);
+                }
+            }
+        }
         // Per-provider 用量账本接线 (R-P79): 仅在真实请求完成后记录 provider
         // 自报 usage。活动记录，非权威账单数据 (诚实标注见 ProviderUsageLedger)。
         if let Ok(response) = result.as_ref() {

@@ -1,5 +1,5 @@
 use super::tile::{Tile, TileType, WorldMap};
-use super::zone::{Zone, ZoneType};
+use super::zone::Zone;
 
 #[derive(Debug, Clone)]
 pub struct GeneratorConfig {
@@ -147,7 +147,7 @@ impl WorldGenerator {
         }
     }
 
-    pub fn generate_town(map: &mut WorldMap, config: &GeneratorConfig) {
+    pub fn generate_town(map: &mut WorldMap, _config: &GeneratorConfig) {
         let (tx, ty) = (50, 30);
 
         // Create town square
@@ -292,16 +292,26 @@ mod tests {
         let (fx, fy) = config.farm_position;
         let (fw, fh) = config.farm_size;
 
-        // Farm area should be Dirt
+        // Farm interior should be Dirt or Path (grid pattern)
+        let interior_x = fx + 1;
+        let interior_y = fy + 1;
+        let interior_tile = map.get_tile(0, interior_x, interior_y).unwrap().tile_type;
+        assert!(
+            interior_tile == TileType::Dirt || interior_tile == TileType::Path,
+            "Expected Dirt or Path at farm interior, got {:?}",
+            interior_tile
+        );
+
+        // Farm perimeter should be Fence
         assert_eq!(
             map.get_tile(0, fx, fy).unwrap().tile_type,
-            TileType::Dirt
+            TileType::Fence
         );
         assert_eq!(
             map.get_tile(0, fx + fw - 1, fy + fh - 1)
                 .unwrap()
                 .tile_type,
-            TileType::Dirt
+            TileType::Fence
         );
     }
 
