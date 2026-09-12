@@ -104,6 +104,15 @@ pub struct ResponseMetadata {
     pub from_cache: bool,
 }
 
+/// 选择结果 — 包含响应和实际选中的 provider
+#[derive(Debug, Clone)]
+pub struct SelectionResult {
+    /// LLM 响应
+    pub response: LlmResponse,
+    /// 实际选中的 provider 名称
+    pub provider: String,
+}
+
 // ══════════════════════════════════════════════════════════════
 // Capability Types
 // ══════════════════════════════════════════════════════════════

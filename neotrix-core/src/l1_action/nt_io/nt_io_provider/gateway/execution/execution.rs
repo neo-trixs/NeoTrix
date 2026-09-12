@@ -290,7 +290,7 @@ impl GatewayV2 {
     pub async fn complete_with_selection(
         &self,
         request: &LlmRequest,
-    ) -> Result<LlmResponse, LlmError> {
+    ) -> Result<SelectionResult, LlmError> {
         // 需求驱动自愈 (T3): 每次请求入口检查自有 LLM 池是否仍有充足免费模型,
         // 偏薄时按需从 FreeModelCatalog 补充 (reconcile 内置 cooldown 节流)。
         // 对齐 OmniRoute Radar 刷新 + NeoTrix NT-REPAIR 自愈节点 — 池子始终"活着"。
@@ -473,7 +473,7 @@ impl GatewayV2 {
                             );
                         }
                     }
-                    return Ok(response);
+                    return Ok(SelectionResult { response, provider: name });
                 }
                 Err(err) => {
                     let error_msg = err.to_string();
@@ -611,13 +611,13 @@ impl GatewayV2 {
             }
         }
         // Record cost on success
-        if let Ok(ref response) = result {
+        if let Ok(ref selection) = result {
             if let Ok(mut ct) = self.cost_tracker.write() {
                 if let Some(ref mut tracker) = *ct {
                     tracker.record(
                         &request.model,
-                        response.usage.prompt_tokens.into(),
-                        response.usage.completion_tokens.into(),
+                        selection.response.usage.prompt_tokens.into(),
+                        selection.response.usage.completion_tokens.into(),
                     );
                 }
             }
@@ -631,7 +631,7 @@ impl GatewayV2 {
     async fn attempt_aggressive_retry(
         &self,
         request: &LlmRequest,
-    ) -> Result<LlmResponse, LlmError> {
+    ) -> Result<SelectionResult, LlmError> {
         let provider_names: Vec<String> = {
             let states = self.states.read().unwrap_or_else(|e| {
                 log::warn!("[gateway] states RwLock poisoned: {}", e);
@@ -755,7 +755,7 @@ impl GatewayV2 {
                             );
                         }
                     }
-                    return Ok(response);
+                    return Ok(SelectionResult { response, provider: name.clone() });
                 }
                 Err(err) => {
                     log::warn!("[gateway] Aggressive retry failed for '{}': {}", name, err);
