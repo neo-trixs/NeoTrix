@@ -723,7 +723,7 @@ impl QuantizationEngine {
         &self,
         imatrix: &ImportanceMatrix,
         target_compression: f64,
-        seed: usize,
+        _seed: usize,
     ) -> Vec<LayerQuantConfig> {
         let num_layers = 32; // Qwen3.5-9B
         let avg_bits = 4.0 / target_compression * 4.0; // Target average bits

@@ -155,15 +155,50 @@ impl CheckpointPersistence {
             intermediate_results: HashMap::new(),
         };
         
-        // TODO: 实际保存到文件系统
-        self.index.insert(checkpoint_id.clone(), meta);
-        self.current = Some(data);
+        // 保存到文件系统
+        let file_path = std::path::Path::new(&self.config.storage_path)
+            .join(format!("{}.json", checkpoint_id));
         
-        CheckpointResult {
-            success: true,
-            checkpoint_id: Some(checkpoint_id),
-            error: None,
-            operation_time_ms: start.elapsed().as_millis() as u64,
+        let save_result = if let Some(parent) = file_path.parent() {
+            std::fs::create_dir_all(parent)
+                .and_then(|_| {
+                    let json = serde_json::to_string_pretty(&data)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                    std::fs::write(&file_path, json)
+                })
+                .map(|_| {
+                    let file_size = std::fs::metadata(&file_path)
+                        .map(|m| m.len())
+                        .unwrap_or(0);
+                    file_size
+                })
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Invalid storage path",
+            ))
+        };
+
+        match save_result {
+            Ok(file_size) => {
+                let mut meta_with_size = meta;
+                meta_with_size.file_size = file_size;
+                self.index.insert(checkpoint_id.clone(), meta_with_size);
+                self.current = Some(data);
+                
+                CheckpointResult {
+                    success: true,
+                    checkpoint_id: Some(checkpoint_id),
+                    error: None,
+                    operation_time_ms: start.elapsed().as_millis() as u64,
+                }
+            }
+            Err(e) => CheckpointResult {
+                success: false,
+                checkpoint_id: None,
+                error: Some(format!("Failed to save checkpoint: {}", e)),
+                operation_time_ms: start.elapsed().as_millis() as u64,
+            },
         }
     }
     
@@ -171,21 +206,41 @@ impl CheckpointPersistence {
     pub fn load_checkpoint(&mut self, checkpoint_id: &str) -> CheckpointResult {
         let start = std::time::Instant::now();
         
-        if let Some(meta) = self.index.get(checkpoint_id) {
-            // TODO: 实际从文件系统加载
-            let data = CheckpointData {
-                meta: meta.clone(),
-                stage_state: HashMap::new(),
-                output_files: vec![],
-                intermediate_results: HashMap::new(),
-            };
-            
-            self.current = Some(data);
-            
+        let file_path = std::path::Path::new(&self.config.storage_path)
+            .join(format!("{}.json", checkpoint_id));
+        
+        if file_path.exists() {
+            match std::fs::read_to_string(&file_path) {
+                Ok(json) => match serde_json::from_str::<CheckpointData>(&json) {
+                    Ok(data) => {
+                        self.current = Some(data);
+                        CheckpointResult {
+                            success: true,
+                            checkpoint_id: Some(checkpoint_id.to_string()),
+                            error: None,
+                            operation_time_ms: start.elapsed().as_millis() as u64,
+                        }
+                    }
+                    Err(e) => CheckpointResult {
+                        success: false,
+                        checkpoint_id: None,
+                        error: Some(format!("Failed to parse checkpoint: {}", e)),
+                        operation_time_ms: start.elapsed().as_millis() as u64,
+                    },
+                },
+                Err(e) => CheckpointResult {
+                    success: false,
+                    checkpoint_id: None,
+                    error: Some(format!("Failed to read checkpoint file: {}", e)),
+                    operation_time_ms: start.elapsed().as_millis() as u64,
+                },
+            }
+        } else if let Some(meta) = self.index.get(checkpoint_id) {
+            // 文件不存在但索引中有记录 — 数据不一致
             CheckpointResult {
-                success: true,
-                checkpoint_id: Some(checkpoint_id.to_string()),
-                error: None,
+                success: false,
+                checkpoint_id: None,
+                error: Some(format!("Checkpoint {} index exists but file missing", checkpoint_id)),
                 operation_time_ms: start.elapsed().as_millis() as u64,
             }
         } else {
@@ -210,7 +265,11 @@ impl CheckpointPersistence {
         let start = std::time::Instant::now();
         
         if self.index.remove(checkpoint_id).is_some() {
-            // TODO: 实际删除文件
+            // 删除文件
+            let file_path = std::path::Path::new(&self.config.storage_path)
+                .join(format!("{}.json", checkpoint_id));
+            let _ = std::fs::remove_file(file_path); // 忽略删除错误（文件可能不存在）
+            
             CheckpointResult {
                 success: true,
                 checkpoint_id: Some(checkpoint_id.to_string()),

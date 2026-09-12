@@ -240,9 +240,41 @@ impl _ContentModeration {
     }
 
     /// 评估输出风险
-    fn evaluate_output_risk(&self, _content_type: ContentType, _metadata: &HashMap<String, String>, _category: &RiskCategory) -> f64 {
-        // TODO: 实际的输出审核逻辑
-        0.1
+    fn evaluate_output_risk(&self, content_type: ContentType, metadata: &HashMap<String, String>, category: &RiskCategory) -> f64 {
+        let mut risk: f64 = 0.0;
+
+        // 基于内容类型的基础风险
+        risk += match content_type {
+            ContentType::Code => 0.1,        // 代码有执行风险
+            ContentType::Text => 0.05,        // 纯文本风险低
+            ContentType::Data => 0.15,        // 数据可能含敏感信息
+            ContentType::Media => 0.2,        // 媒体内容审核更难
+            _ => 0.1,
+        };
+
+        // 基于风险类别的调整
+        risk += match category {
+            RiskCategory::Safety => 0.3,      // 安全类内容高风险
+            RiskCategory::Privacy => 0.25,    // 隐私类中高风险
+            RiskCategory::Ethics => 0.2,      // 伦理类中等风险
+            RiskCategory::Legal => 0.15,      // 法律类中低风险
+            RiskCategory::Quality => 0.05,    // 质量类低风险
+            _ => 0.1,
+        };
+
+        // 检查元数据中的风险信号
+        if let Some(contains_pii) = metadata.get("contains_pii") {
+            if contains_pii == "true" {
+                risk += 0.2; // 包含个人身份信息
+            }
+        }
+        if let Some(contains_secret) = metadata.get("contains_secret") {
+            if contains_secret == "true" {
+                risk += 0.3; // 包含密钥/密码
+            }
+        }
+
+        risk.clamp(0.0, 1.0)
     }
 
     /// 确定审核结果

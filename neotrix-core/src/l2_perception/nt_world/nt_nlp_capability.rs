@@ -22,11 +22,13 @@ impl NlpCapability {
                 tags: vec!["nlp".into(), "regex".into(), "similarity".into()],
                 status: CapabilityStatus::Healthy,
                 metrics: CapabilityMetrics::default(),
+                cost_weight: 0.1,
+                priority: 1.0,
             },
             health: CapabilityHealth {
                 state: CapabilityState::Ready,
                 success_rate: 1.0,
-                avg_latency_ms: 0,
+                avg_latency_ms: 0.0,
                 last_called: None,
                 call_count: 0,
             },
@@ -57,7 +59,7 @@ impl UnifiedCapability for NlpCapability {
                 }
                 Ok(CapabilityOutput::Text(nlp.text))
             }
-            _ => Err(CapabilityError::UnsupportedInput),
+            _ => Err(CapabilityError::UnsupportedInput("unsupported NLP input type".into())),
         }
     }
 

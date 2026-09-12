@@ -46,6 +46,7 @@ pub struct TokenBucket {
     max_tokens: f64,
     refill_rate: f64, // tokens per second
     last_refill: Instant,
+    last_access: Instant,
     stats: BucketStats,
 }
 
@@ -85,11 +86,13 @@ pub(crate) struct SlidingWindowCounter {
 impl TokenBucket {
     /// 创建新的令牌桶
     pub fn new(max_tokens: f64, refill_rate: f64) -> Self {
+        let now = Instant::now();
         Self {
             tokens: max_tokens,
             max_tokens,
             refill_rate,
-            last_refill: Instant::now(),
+            last_refill: now,
+            last_access: now,
             stats: BucketStats {
                 total_requests: 0,
                 allowed_requests: 0,
@@ -102,6 +105,7 @@ impl TokenBucket {
     /// 尝试获取令牌
     pub fn try_acquire(&mut self, tokens: u32) -> RateLimitResult {
         self.refill();
+        self.last_access = Instant::now();
         self.stats.total_requests += 1;
 
         if self.tokens >= tokens as f64 {
@@ -229,7 +233,21 @@ impl RateLimiter {
     }
 
     /// 清理不活跃的限流器
-    pub fn cleanup(&mut self, _max_age: Duration) {
-        // TODO: 实现基于最后访问时间的清理
+    pub fn cleanup(&mut self, max_age: Duration) {
+        let now = Instant::now();
+        let before_count = self.limiters.len();
+        
+        self.limiters.retain(|_name, bucket| {
+            now.duration_since(bucket.last_access) < max_age
+        });
+        
+        let after_count = self.limiters.len();
+        if before_count != after_count {
+            tracing::debug!(
+                "Rate limiter cleanup: removed {} inactive buckets ({} remaining)",
+                before_count - after_count,
+                after_count
+            );
+        }
     }
 }

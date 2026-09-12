@@ -174,10 +174,13 @@ impl WorldGenerator {
         let cy = fy + fh / 2;
         map.set_tile(0, cx, cy, Tile::new(TileType::SpawnPoint));
 
-        // Exit points at zone edges
-        for zone in &map.zones {
-            let (zx, zy) = zone.position;
-            let (zw, zh) = zone.size;
+        // Exit points at zone edges — collect positions first to avoid borrow conflict
+        let zone_positions: Vec<((u32, u32), (u32, u32))> = map
+            .zones
+            .iter()
+            .map(|z| (z.position, z.size))
+            .collect();
+        for ((zx, zy), (zw, zh)) in zone_positions {
             if zx + zw < map.width {
                 map.set_tile(0, zx + zw, zy + zh / 2, Tile::new(TileType::ExitPoint));
             }

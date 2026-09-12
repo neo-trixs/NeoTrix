@@ -310,7 +310,7 @@ impl ModelSelector {
         // Sort by total score descending
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         
-        if let Some((name, total, quality, speed)) = scored.first() {
+        if let Some((name, total, quality, _speed)) = scored.first() {
             let m = &self.known_models[name];
             let quant = if apple_silicon && vram_gb < 32.0 && m.active_params_b > 5.0 {
                 "Q4_K_M".to_string()

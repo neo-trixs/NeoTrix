@@ -5,8 +5,7 @@ pub mod nt_world_sense {
     pub use crate::l2_perception::nt_world::nt_world_sense::*;
 }
 
-
-
-
+// 基础设施模块
+pub mod nt_infra_semantic_router;
 
 // nt_infra_semantic_router: moved back to L1 (infrastructure, no L2 deps)

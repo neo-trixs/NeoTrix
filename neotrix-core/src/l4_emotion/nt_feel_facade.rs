@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 //! L4 NT-FEEL Facade — re-exports all public types from nt_feel submodules
 //!
 //! Single fact source lives in nt_feel submodules; this facade centralises
