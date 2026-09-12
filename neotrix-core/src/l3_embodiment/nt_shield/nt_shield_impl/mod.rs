@@ -15,8 +15,6 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use crate::core::nt_core_gwt::GWTContext;
-use crate::core::nt_core_e8::E8;
 
 /// Nuclei vulnerability scanner integration
 pub mod nt_shield_vuln_scanner;
@@ -122,7 +120,6 @@ impl ShieldCapability {
     pub async fn run_assessment(
         &mut self,
         target: &str,
-        gwt_context: &GWTContext,
     ) -> Vec<String> {
         let mut results = Vec::new();
         
@@ -132,8 +129,8 @@ impl ShieldCapability {
             self.findings.entry(target.to_string()).or_default().push(finding.clone());
         }
         
-        // Phase 2: AI-driven vulnerability detection (GWT routing)
-        if let Some(vulns) = self.pentest_agent.detect_vulnerabilities(target, gwt_context).await {
+        // Phase 2: AI-driven vulnerability detection
+        if let Some(vulns) = self.pentest_agent.detect_vulnerabilities(target).await {
             for vuln in vulns {
                 results.push(format!("{}: {}", target, vuln));
             }
