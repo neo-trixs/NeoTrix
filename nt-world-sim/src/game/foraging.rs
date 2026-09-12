@@ -136,7 +136,7 @@ mod tests {
     fn test_advance_day_respawns() {
         let mut system = ForagingSystem::new();
         system.spawn_items(100, 80, Season::Clarity);
-        let initial = system.spawn_points.len();
+        let _initial = system.spawn_points.len();
         system.advance_day(Season::Flow);
         assert!(system.spawn_points.len() > 0);
     }
