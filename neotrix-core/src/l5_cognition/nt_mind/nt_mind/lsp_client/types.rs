@@ -102,7 +102,7 @@ pub(crate) struct _TextEdit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LspServerConfig {
+pub(crate) struct LspServerConfig {
     pub name: String,
     pub language_id: String,
     pub command: String,

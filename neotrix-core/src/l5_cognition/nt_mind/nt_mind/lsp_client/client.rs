@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use serde_json::Value;
 use super::types::*;
 
-pub struct LspManager {
+pub(crate) struct LspManager {
     pub servers: HashMap<String, _LspSession>,
     configs: Vec<LspServerConfig>,
 }
@@ -22,7 +22,7 @@ impl Default for LspManager {
 }
 
 impl LspManager {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             servers: HashMap::new(),
             configs: Self::default_configs(),
@@ -90,7 +90,7 @@ impl LspManager {
         Some("started")
     }
 
-    pub fn next_seq(&mut self, server_name: &str) -> Option<u64> {
+    pub(crate) fn next_seq(&mut self, server_name: &str) -> Option<u64> {
         self.servers.get_mut(server_name).map(|s| {
             s.seq_id += 1;
             s.seq_id
@@ -101,7 +101,7 @@ impl LspManager {
         self.servers.contains_key(name)
     }
 
-    pub fn send_request(&mut self, server: &str, method: &str, params: Value) -> Option<Value> {
+    pub(crate) fn send_request(&mut self, server: &str, method: &str, params: Value) -> Option<Value> {
         let session = self.servers.get_mut(server)?;
         let id = session.seq_id + 1;
         session.seq_id = id;

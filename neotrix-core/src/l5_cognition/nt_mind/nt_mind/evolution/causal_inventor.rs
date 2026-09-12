@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 /// 因果发明引擎 — 跨域知识融合生成超越现有技术的发明
-pub struct CausalInventor {
+pub(crate) struct CausalInventor {
     /// 已有知识条目索引
     domain_index: HashMap<String, Vec<String>>,
     /// 跨域映射库
@@ -10,7 +10,7 @@ pub struct CausalInventor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrossDomainMapping {
+pub(crate) struct CrossDomainMapping {
     pub source_domain: String,
     pub target_domain: String,
     pub principle: String,
@@ -19,7 +19,7 @@ pub struct CrossDomainMapping {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Invention {
+pub(crate) struct Invention {
     pub id: String,
     pub name: String,
     pub domains: Vec<String>,

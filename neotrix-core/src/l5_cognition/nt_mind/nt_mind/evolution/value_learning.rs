@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 /// ValueLearning namespace — KB kv_store 命名空间。
-pub const NS_VALUE_LEARNING: &str = "value_learning";
+pub(crate) const NS_VALUE_LEARNING: &str = "value_learning";
 
 /// 观察记录：一次行动-后果观察。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ pub struct Outcome {
 
 /// 价值信号：某价值观被触发的强度与方向。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValueSignal {
+pub(crate) struct ValueSignal {
     pub value_id: String,                 // 如 "autonomy", "harm_prevention"
     pub intensity: f64,                   // 触发强度 [0,1]
     pub valence: f64,                     // 正向强化/负向违背 [-1,1]
@@ -53,7 +53,7 @@ pub struct ValueSignal {
 
 /// 学习事件：从观察中提炼的价值观更新提案。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LearningEvent {
+pub(crate) struct LearningEvent {
     pub id: String,
     pub source_observation_ids: Vec<String>,
     pub proposed_changes: Vec<ValueChangeProposal>,
@@ -65,7 +65,7 @@ pub struct LearningEvent {
 
 /// 价值观变更提案。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValueChangeProposal {
+pub(crate) struct ValueChangeProposal {
     pub value_id: String,
     pub change_type: ChangeType,
     pub rationale: String,
