@@ -296,15 +296,40 @@ impl _LayeredQA {
         }
     }
     
-    /// 执行单个检查
-    fn execute_check(&self, item: &_QACheckItem, _spec: &serde_json::Value, _output: &serde_json::Value) -> _QACheckResult {
-        // TODO: 实际执行检查逻辑
+    /// 执行单个检查 — 基于检查类型和规范进行验证
+    fn execute_check(&self, item: &_QACheckItem, spec: &serde_json::Value, output: &serde_json::Value) -> _QACheckResult {
+        let start = std::time::Instant::now();
+
+        // 根据检查名称进行不同类型的验证
+        let (passed, severity, message) = if item.name.contains("技术") || item.name.contains("technical") {
+            // 技术检查：验证输出是否包含必要字段
+            let has_output = output.get("content").or_else(|| output.get("result")).is_some();
+            (has_output, IssueSeverity::Error, if has_output { "技术检查通过".into() } else { "输出缺少必要字段".into() })
+        } else if item.name.contains("合规") || item.name.contains("compliance") {
+            // 合规检查：验证规范中的约束是否满足
+            let constraints = spec.get("constraints").and_then(|c| c.as_array()).cloned().unwrap_or_default();
+            let satisfied = constraints.iter().all(|c| {
+                // 简单检查：约束条件是否在输出中有对应
+                let key = c.as_str().unwrap_or("");
+                output.get(key).is_some() || key.is_empty()
+            });
+            (satisfied, IssueSeverity::Warning, if satisfied { "合规检查通过".into() } else { "未满足所有合规约束".into() })
+        } else if item.name.contains("视觉") || item.name.contains("visual") {
+            // 视觉检查：验证输出是否包含视觉元素
+            let has_visual = output.get("images").or_else(|| output.get("visual")).or_else(|| output.get("frames")).is_some();
+            (has_visual, IssueSeverity::Warning, if has_visual { "视觉检查通过".into() } else { "缺少视觉输出".into() })
+        } else {
+            // 默认检查：只要有输出就通过
+            let has_output = !output.as_object().map_or(true, |m| m.is_empty());
+            (has_output, IssueSeverity::Info, if has_output { format!("检查 {} 通过", item.name) } else { format!("检查 {} 无输出", item.name) })
+        };
+
         _QACheckResult {
             check_item_id: item.id.clone(),
-            passed: true,
-            severity: IssueSeverity::Info,
-            message: format!("检查 {} 通过", item.name),
-            check_time_ms: 10,
+            passed,
+            severity,
+            message,
+            check_time_ms: start.elapsed().as_millis() as u64,
         }
     }
     
