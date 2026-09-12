@@ -46,19 +46,19 @@ const CHROMIUM_ARGS: &[&str] = &[
     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
 ];
 
-pub struct StealthBrowser {
+pub struct _StealthBrowser {
     nt_world_browse: Arc<Mutex<Option<Browser>>>,
     proxy: Option<String>,
     current_fp: Arc<RwLock<Option<BrowserFingerprintProfile>>>,
 }
 
-impl Default for StealthBrowser {
+impl Default for _StealthBrowser {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl StealthBrowser {
+impl _StealthBrowser {
     pub fn new() -> Self {
         Self {
             nt_world_browse: Arc::new(Mutex::new(None)),
@@ -194,7 +194,7 @@ mod tests {
     #[ignore = "requires headless nt_world_browse binary (chromiumoxide)"]
     #[tokio::test]
     async fn test_nt_world_browse_launch_and_close() {
-        let nt_world_browse = StealthBrowser::new();
+        let nt_world_browse = _StealthBrowser::new();
         assert!(nt_world_browse.launch().await.is_ok());
         nt_world_browse.close().await;
     }
@@ -203,7 +203,7 @@ mod tests {
     #[ignore = "requires headless nt_world_browse and network access"]
     #[tokio::test]
     async fn test_nt_world_browse_fetch_title() {
-        let nt_world_browse = StealthBrowser::new();
+        let nt_world_browse = _StealthBrowser::new();
         nt_world_browse.launch().await.expect("await should be ok in test");
         let title = nt_world_browse.title("https://example.com").await.expect("await should be ok in test");
         assert!(title.contains("Example") || title.contains("example"));

@@ -81,7 +81,7 @@ pub struct IpResource {
 }
 
 impl IpResource {
-    pub fn to_proxy_node(&self) -> ProxyNode {
+    pub fn _to_proxy_node(&self) -> ProxyNode {
         ProxyNode {
             protocol: self.protocol,
             host: self.ip.clone(),
@@ -123,7 +123,7 @@ impl NetworkResourcePool {
         }
     }
 
-    pub fn with_refresh_interval(self, secs: u64) -> Self {
+    pub fn _with_refresh_interval(self, secs: u64) -> Self {
         self.refresh_interval_secs.store(secs, Ordering::Relaxed);
         self
     }
@@ -242,7 +242,7 @@ impl NetworkResourcePool {
     pub async fn get_effective_proxy_nodes(&self) -> Vec<ProxyNode> {
         self.ip_resources.read().await.iter()
             .filter(|r| r.effective)
-            .map(|r| r.to_proxy_node())
+            .map(|r| r._to_proxy_node())
             .collect()
     }
 
@@ -436,15 +436,15 @@ pub struct NetworkPoolSnapshot {
 }
 
 impl NetworkPoolSnapshot {
-    pub fn dns_effective_rate(&self) -> f64 {
+    pub fn _dns_effective_rate(&self) -> f64 {
         if self.dns_total == 0 { 0.0 } else { self.dns_effective as f64 / self.dns_total as f64 }
     }
 
-    pub fn route_effective_rate(&self) -> f64 {
+    pub fn _route_effective_rate(&self) -> f64 {
         if self.route_total == 0 { 0.0 } else { self.route_effective as f64 / self.route_total as f64 }
     }
 
-    pub fn ip_effective_rate(&self) -> f64 {
+    pub fn _ip_effective_rate(&self) -> f64 {
         if self.ip_total == 0 { 0.0 } else { self.ip_effective as f64 / self.ip_total as f64 }
     }
 }
@@ -624,7 +624,7 @@ mod tests {
         pool.add_ip("10.0.0.2", 8080, "US", ProxyProtocol::Http).await;
 
         let snap = pool.snapshot().await;
-        assert_eq!(snap.ip_effective_rate(), 0.0); // 都没验证过
+        assert_eq!(snap._ip_effective_rate(), 0.0); // 都没验证过
 
         // 手动标记一个有效
         {
@@ -633,7 +633,7 @@ mod tests {
         }
 
         let snap = pool.snapshot().await;
-        assert!((snap.ip_effective_rate() - 0.5).abs() < 0.01);
+        assert!((snap._ip_effective_rate() - 0.5).abs() < 0.01);
     }
 
     #[tokio::test]
@@ -674,7 +674,7 @@ mod tests {
             success_count: 10,
             fail_count: 0,
         };
-        let node = ip.to_proxy_node();
+        let node = ip._to_proxy_node();
         assert_eq!(node.host, "203.0.113.1");
         assert_eq!(node.port, 8080);
         assert_eq!(node.geo_tag.as_deref(), Some("US"));
@@ -691,8 +691,8 @@ mod tests {
             ip_effective: 15,
             refresh_count: 5,
         };
-        assert!((snap.dns_effective_rate() - 0.7).abs() < 0.01);
-        assert!((snap.route_effective_rate() - 0.6).abs() < 0.01);
-        assert!((snap.ip_effective_rate() - 0.75).abs() < 0.01);
+        assert!((snap._dns_effective_rate() - 0.7).abs() < 0.01);
+        assert!((snap._route_effective_rate() - 0.6).abs() < 0.01);
+        assert!((snap._ip_effective_rate() - 0.75).abs() < 0.01);
     }
 }

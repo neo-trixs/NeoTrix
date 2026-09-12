@@ -10,13 +10,13 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{LazyLock, RwLock, Arc};
 
-// DI: use resolve_config() for DI-aware access, or register via nt_core_di::register_global
+// DI: use _resolve_config() for DI-aware access, or register via nt_core_di::register_global
 pub static INSTANCE: LazyLock<RwLock<Arc<StealthNetConfig>>> = LazyLock::new(|| {
     RwLock::new(Arc::new(init_config()))
 });
 
 /// DI-aware 配置访问 — 优先从容器解析，回退到静态 INSTANCE
-pub fn resolve_config() -> Arc<StealthNetConfig> {
+pub fn _resolve_config() -> Arc<StealthNetConfig> {
     use crate::core::nt_core_di;
     if let Some(v) = nt_core_di::resolve_global::<Arc<StealthNetConfig>>() {
         return v;
@@ -27,28 +27,28 @@ pub fn resolve_config() -> Arc<StealthNetConfig> {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StealthNetConfig {
     pub proxy: ProxyConfig,
-    pub rotation: RotationConfig,
-    pub tor: TorConfigSection,
+    pub rotation: _RotationConfig,
+    pub tor: _TorConfigSection,
     pub pool: PoolConfig,
-    pub bandit: BanditConfig,
+    pub bandit: _BanditConfig,
     pub nt_world_browse: BrowserConfig,
     #[serde(default)]
-    pub firewall: FirewallConfigSection,
+    pub firewall: _FirewallConfigSection,
     #[serde(default)]
-    pub rule_api: RuleApiConfigSection,
+    pub rule_api: _RuleApiConfigSection,
     #[serde(default)]
-    pub ip_rotation: IpRotationConfigSection,
+    pub ip_rotation: _IpRotationConfigSection,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct FirewallConfigSection {
+pub struct _FirewallConfigSection {
     pub enabled: bool,
     pub divert_to_port: u16,
     pub sync_interval_secs: u64,
     pub auto_apply_rules: bool,
 }
 
-impl Default for FirewallConfigSection {
+impl Default for _FirewallConfigSection {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -60,20 +60,20 @@ impl Default for FirewallConfigSection {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RuleApiConfigSection {
+pub struct _RuleApiConfigSection {
     pub enabled: bool,
     pub auto_start: bool,
     pub max_external_rules: u32,
 }
 
-impl Default for RuleApiConfigSection {
+impl Default for _RuleApiConfigSection {
     fn default() -> Self {
         Self { enabled: true, auto_start: true, max_external_rules: 100 }
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct IpRotationConfigSection {
+pub struct _IpRotationConfigSection {
     pub enabled: bool,
     pub auto_add_alias_ips: bool,
     pub rotate_gateway: bool,
@@ -81,7 +81,7 @@ pub struct IpRotationConfigSection {
     pub interval_secs: u64,
 }
 
-impl Default for IpRotationConfigSection {
+impl Default for _IpRotationConfigSection {
     fn default() -> Self {
         Self {
             enabled: false,
@@ -101,7 +101,7 @@ pub struct ProxyConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RotationConfig {
+pub struct _RotationConfig {
     pub gaussian_mean_secs: f64,
     pub gaussian_std_dev_secs: f64,
     pub max_interval_secs: f64,
@@ -109,7 +109,7 @@ pub struct RotationConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TorConfigSection {
+pub struct _TorConfigSection {
     pub auto_start: bool,
     pub circuit_rotate_interval: u64,
     pub socks_addr: String,
@@ -128,7 +128,7 @@ pub struct PoolConfig {
 fn default_selection_strategy() -> String { "auto".into() }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BanditConfig {
+pub struct _BanditConfig {
     pub persistence_path: String,
 }
 
@@ -147,13 +147,13 @@ impl Default for StealthNetConfig {
                 socks_port: 9050,
                 direct_timeout_secs: 3,
             },
-            rotation: RotationConfig {
+            rotation: _RotationConfig {
                 gaussian_mean_secs: 7.5,
                 gaussian_std_dev_secs: 2.5,
                 max_interval_secs: 9.0,
                 min_interval_secs: 0.5,
             },
-            tor: TorConfigSection {
+            tor: _TorConfigSection {
                 auto_start: true,
                 circuit_rotate_interval: 300,
                 socks_addr: "127.0.0.1:9050".into(),
@@ -164,7 +164,7 @@ impl Default for StealthNetConfig {
                 health_check_interval_secs: 60,
                 selection_strategy: "auto".into(),
             },
-            bandit: BanditConfig {
+            bandit: _BanditConfig {
                 persistence_path: "~/.neotrix/bandit.json".into(),
             },
             nt_world_browse: BrowserConfig {
@@ -172,9 +172,9 @@ impl Default for StealthNetConfig {
                 window_width: 1920,
                 window_height: 1080,
             },
-            firewall: FirewallConfigSection::default(),
-            rule_api: RuleApiConfigSection::default(),
-            ip_rotation: IpRotationConfigSection::default(),
+            firewall: _FirewallConfigSection::default(),
+            rule_api: _RuleApiConfigSection::default(),
+            ip_rotation: _IpRotationConfigSection::default(),
         }
     }
 }

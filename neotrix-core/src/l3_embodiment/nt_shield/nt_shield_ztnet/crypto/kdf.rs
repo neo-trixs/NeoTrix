@@ -25,9 +25,9 @@ pub fn hkdf_blake2s(
     salt: &[u8],
     info: &[u8],
     output_len: usize,
-) -> Result<Vec<u8>, KdfError> {
+) -> Result<Vec<u8>, _KdfError> {
     if output_len > 8160 {
-        return Err(KdfError::OutputTooLong);
+        return Err(_KdfError::OutputTooLong);
     }
 
     // Extract: PRK = HMAC-Hash(salt, IKM)
@@ -88,7 +88,7 @@ fn blake2s_extract(salt: &[u8], ikm: &[u8]) -> [u8; 32] {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum KdfError {
+pub enum _KdfError {
     #[error("output length exceeds HKDF maximum (8160 bytes)")]
     OutputTooLong,
 }

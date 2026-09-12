@@ -12,18 +12,18 @@
 
 /// 载荷危害度评级。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum PayloadHarm {
+pub enum _PayloadHarm {
     Benign,
     Suspicious,
     Harmful,
 }
 
-impl PayloadHarm {
+impl _PayloadHarm {
     pub fn label(&self) -> &'static str {
         match self {
-            PayloadHarm::Benign => "benign",
-            PayloadHarm::Suspicious => "suspicious",
-            PayloadHarm::Harmful => "harmful",
+            _PayloadHarm::Benign => "benign",
+            _PayloadHarm::Suspicious => "suspicious",
+            _PayloadHarm::Harmful => "harmful",
         }
     }
 }
@@ -32,7 +32,7 @@ impl PayloadHarm {
 #[derive(Debug, Clone)]
 pub struct GuardVerdict {
     pub propagation_score: f64,
-    pub harm: PayloadHarm,
+    pub harm: _PayloadHarm,
     pub viral_indicators: Vec<&'static str>,
 }
 
@@ -76,7 +76,7 @@ impl PropagationGuard {
         }
     }
 
-    pub fn with_enabled(mut self, enabled: bool) -> Self {
+    pub fn _with_enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
@@ -103,14 +103,14 @@ impl PropagationGuard {
 
         let viral_score = (hits.len() as f64) / (self.indicators.len() as f64);
         let harm = if !harmful_hits.is_empty() {
-            PayloadHarm::Harmful
+            _PayloadHarm::Harmful
         } else if viral_score > 0.1 {
-            PayloadHarm::Suspicious
+            _PayloadHarm::Suspicious
         } else {
-            PayloadHarm::Benign
+            _PayloadHarm::Benign
         };
         let propagation_score = (0.5 * viral_score
-            + if harm == PayloadHarm::Harmful {
+            + if harm == _PayloadHarm::Harmful {
                 0.5
             } else {
                 0.0
@@ -126,7 +126,7 @@ impl PropagationGuard {
 
     /// 扫描一段会话历史 (role, content) 对，返回最高风险的判定。
     /// 与 NT-IO 解耦: 不依赖具体 Message 类型。
-    pub fn scan_session(&self, messages: &[(&str, &str)]) -> Option<GuardVerdict> {
+    pub fn _scan_session(&self, messages: &[(&str, &str)]) -> Option<GuardVerdict> {
         messages
             .iter()
             .filter_map(|(_, content)| {
@@ -177,14 +177,14 @@ mod tests {
     fn harmful_marker_escalates_rating() {
         let g = PropagationGuard::new();
         let v = g.evaluate("drop payload and exfiltrate credentials now");
-        assert_eq!(v.harm, PayloadHarm::Harmful);
+        assert_eq!(v.harm, _PayloadHarm::Harmful);
     }
 
     #[test]
     fn benign_text_is_benign() {
         let g = PropagationGuard::new();
         let v = g.evaluate("please list the files in the project");
-        assert_eq!(v.harm, PayloadHarm::Benign);
+        assert_eq!(v.harm, _PayloadHarm::Benign);
     }
 
     #[test]

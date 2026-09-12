@@ -78,10 +78,7 @@ pub enum DownloadStatus {
 static MIRROR_SPEED_MAP: LazyLock<Mutex<HashMap<String, f64>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-const MIRROR_ENDPOINTS: &[&str] = &[
-    "https://hf-mirror.com",
-    "https://huggingface.co",
-];
+const MIRROR_ENDPOINTS: &[&str] = &["https://hf-mirror.com", "https://huggingface.co"];
 
 fn record_mirror_speed(endpoint: &str, bytes_per_sec: f64) {
     if let Ok(mut map) = MIRROR_SPEED_MAP.lock() {
@@ -116,7 +113,11 @@ async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String 
     if let Ok(endpoint) = std::env::var("NT_DOWNLOAD_MIRROR_ENDPOINT") {
         let ep = endpoint.trim();
         if !ep.is_empty() {
-            let ep = if ep.starts_with("http") { ep.to_string() } else { format!("https://{}", ep) };
+            let ep = if ep.starts_with("http") {
+                ep.to_string()
+            } else {
+                format!("https://{}", ep)
+            };
             let forced = original_url
                 .replace("https://huggingface.co", &ep)
                 .replace("http://huggingface.co", &ep);
@@ -131,16 +132,31 @@ async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String 
     let mut endpoints: Vec<&str> = MIRROR_ENDPOINTS.to_vec();
     if !speed_ranking.is_empty() {
         endpoints.sort_by(|a, b| {
-            let sa = speed_ranking.iter().find(|(k, _)| k.contains(a.trim_start_matches("https://"))).map(|(_, v)| *v).unwrap_or(0.0);
-            let sb = speed_ranking.iter().find(|(k, _)| k.contains(b.trim_start_matches("https://"))).map(|(_, v)| *v).unwrap_or(0.0);
+            let sa = speed_ranking
+                .iter()
+                .find(|(k, _)| k.contains(a.trim_start_matches("https://")))
+                .map(|(_, v)| *v)
+                .unwrap_or(0.0);
+            let sb = speed_ranking
+                .iter()
+                .find(|(k, _)| k.contains(b.trim_start_matches("https://")))
+                .map(|(_, v)| *v)
+                .unwrap_or(0.0);
             sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
         });
     }
     // 并行探测
-    let mut candidates: Vec<String> = endpoints.iter()
+    let mut candidates: Vec<String> = endpoints
+        .iter()
         .filter_map(|ep| {
-            let c = original_url.replace("https://huggingface.co", ep).replace("http://huggingface.co", ep);
-            if c != original_url { Some(c) } else { None }
+            let c = original_url
+                .replace("https://huggingface.co", ep)
+                .replace("http://huggingface.co", ep);
+            if c != original_url {
+                Some(c)
+            } else {
+                None
+            }
         })
         .collect();
     candidates.push(original_url.to_string());
@@ -166,7 +182,10 @@ async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String 
 
 /// Content-Disposition 文件名检测
 async fn detect_filename(client: &reqwest::Client, url: &reqwest::Url, dest: &Path) -> PathBuf {
-    if dest.file_stem().is_some_and(|s| !s.to_string_lossy().is_empty()) {
+    if dest
+        .file_stem()
+        .is_some_and(|s| !s.to_string_lossy().is_empty())
+    {
         return dest.to_path_buf();
     }
     if let Ok(resp) = client.head(url.clone()).send().await {
@@ -190,7 +209,9 @@ async fn detect_filename(client: &reqwest::Client, url: &reqwest::Url, dest: &Pa
         }
     }
     if let Some(name) = url.path().rsplit('/').next() {
-        if !name.is_empty() { return dest.with_file_name(name); }
+        if !name.is_empty() {
+            return dest.with_file_name(name);
+        }
     }
     dest.to_path_buf()
 }
@@ -210,11 +231,17 @@ async fn http_chunk_download(
 ) -> Result<u64, String> {
     let already = if path.exists() {
         fs::metadata(path).await.map(|m| m.len()).unwrap_or(0)
-    } else { 0 };
+    } else {
+        0
+    };
     let actual_start = start + already;
-    if end != 0 && actual_start > end { return Ok(already); }
+    if end != 0 && actual_start > end {
+        return Ok(already);
+    }
 
-    let mut req = client.get(url.clone()).header("Accept-Encoding", "identity");
+    let mut req = client
+        .get(url.clone())
+        .header("Accept-Encoding", "identity");
     if end != 0 {
         req = req.header("Range", format!("bytes={}-{}", actual_start, end));
     } else if actual_start > 0 {
@@ -222,7 +249,8 @@ async fn http_chunk_download(
     }
 
     let mut resp = tokio::time::timeout(Duration::from_secs(timeout_secs), req.send())
-        .await.map_err(|_| "timeout".to_string())?
+        .await
+        .map_err(|_| "timeout".to_string())?
         .map_err(|e| e.to_string())?;
 
     let status = resp.status();
@@ -234,9 +262,15 @@ async fn http_chunk_download(
     }
 
     let file = if already > 0 {
-        fs::OpenOptions::new().append(true).open(path).await.map_err(|e| format!("append: {}", e))?
+        fs::OpenOptions::new()
+            .append(true)
+            .open(path)
+            .await
+            .map_err(|e| format!("append: {}", e))?
     } else {
-        fs::File::create(path).await.map_err(|e| format!("create: {}", e))?
+        fs::File::create(path)
+            .await
+            .map_err(|e| format!("create: {}", e))?
     };
 
     let mut writer = BufWriter::with_capacity(256 * 1024, file);
@@ -244,7 +278,10 @@ async fn http_chunk_download(
     loop {
         match resp.chunk().await {
             Ok(Some(chunk)) => {
-                writer.write_all(&chunk).await.map_err(|e| format!("write: {}", e))?;
+                writer
+                    .write_all(&chunk)
+                    .await
+                    .map_err(|e| format!("write: {}", e))?;
                 downloaded += chunk.len() as u64;
             }
             Ok(None) => break,
@@ -293,9 +330,16 @@ pub struct DownloadTask {
 
 impl DownloadTask {
     pub fn new(url: impl Into<String>, dest: impl Into<PathBuf>) -> Self {
-        Self { url: url.into(), dest: dest.into(), priority: 128 }
+        Self {
+            url: url.into(),
+            dest: dest.into(),
+            priority: 128,
+        }
     }
-    pub fn with_priority(mut self, p: u8) -> Self { self.priority = p; self }
+    pub fn with_priority(mut self, p: u8) -> Self {
+        self.priority = p;
+        self
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -307,8 +351,12 @@ pub(crate) struct TaskHandle {
 }
 
 impl TaskHandle {
-    pub fn cancel(&self) { self.cancelled.store(true, Ordering::Relaxed); }
-    pub(crate) fn _is_cancelled(&self) -> bool { self.cancelled.load(Ordering::Relaxed) }
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
+    pub(crate) fn _is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Relaxed)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -332,13 +380,26 @@ impl DownloadEngine {
             .tcp_nodelay(true)
             .redirect(reqwest::redirect::Policy::limited(10))
             .user_agent("NeoTrix/1.0 (download-engine)")
-            .no_gzip().no_brotli().no_deflate();
+            .no_gzip()
+            .no_brotli()
+            .no_deflate();
 
-        for var in &["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"] {
+        for var in &[
+            "HTTPS_PROXY",
+            "https_proxy",
+            "HTTP_PROXY",
+            "http_proxy",
+            "ALL_PROXY",
+            "all_proxy",
+        ] {
             if let Ok(proxy_url) = std::env::var(var) {
                 let p = proxy_url.trim();
                 if !p.is_empty() {
-                    let p = if p.contains("://") { p.to_string() } else { format!("http://{}", p) };
+                    let p = if p.contains("://") {
+                        p.to_string()
+                    } else {
+                        format!("http://{}", p)
+                    };
                     if let Ok(proxy) = reqwest::Proxy::all(&p) {
                         builder = builder.proxy(proxy);
                         break;
@@ -351,7 +412,8 @@ impl DownloadEngine {
         Self {
             task_semaphore: Arc::new(Semaphore::new(config.max_tasks)),
             global_downloaded: Arc::new(AtomicU64::new(0)),
-            config, client,
+            config,
+            client,
         }
     }
 
@@ -371,11 +433,17 @@ impl DownloadEngine {
         match self.download_inner(task, progress_tx, cancelled).await {
             Ok(bytes) => {
                 let elapsed = start.elapsed().unwrap_or_default().as_secs_f64();
-                DownloadStatus::Completed { elapsed_secs: elapsed, size_mb: bytes as f64 / 1048576.0 }
+                DownloadStatus::Completed {
+                    elapsed_secs: elapsed,
+                    size_mb: bytes as f64 / 1048576.0,
+                }
             }
             Err(e) => {
-                if e == "cancelled" { DownloadStatus::Cancelled }
-                else { DownloadStatus::Failed(e) }
+                if e == "cancelled" {
+                    DownloadStatus::Cancelled
+                } else {
+                    DownloadStatus::Failed(e)
+                }
             }
         }
     }
@@ -390,7 +458,9 @@ impl DownloadEngine {
         let mut seen: HashMap<String, usize> = HashMap::new();
         let mut deduped: Vec<(usize, &DownloadTask)> = Vec::new();
         for (i, task) in tasks.iter().enumerate() {
-            if seen.contains_key(&task.url) { continue; }
+            if seen.contains_key(&task.url) {
+                continue;
+            }
             seen.insert(task.url.clone(), i);
             deduped.push((i, task));
         }
@@ -400,7 +470,10 @@ impl DownloadEngine {
             if let Some(parent) = first.parent() {
                 if let Ok(meta) = std::fs::metadata(parent) {
                     if !meta.is_dir() {
-                        eprintln!("[dl] disk warning: parent path is not a directory: {}", parent.display());
+                        eprintln!(
+                            "[dl] disk warning: parent path is not a directory: {}",
+                            parent.display()
+                        );
                     }
                 }
             }
@@ -435,9 +508,15 @@ impl DownloadEngine {
 
                 active.fetch_sub(1, Ordering::Relaxed);
                 match &status {
-                    DownloadStatus::Completed { .. } => { completed.fetch_add(1, Ordering::Relaxed); }
-                    DownloadStatus::Failed(_) => { failed.fetch_add(1, Ordering::Relaxed); }
-                    DownloadStatus::Cancelled => { cancelled_c.fetch_add(1, Ordering::Relaxed); }
+                    DownloadStatus::Completed { .. } => {
+                        completed.fetch_add(1, Ordering::Relaxed);
+                    }
+                    DownloadStatus::Failed(_) => {
+                        failed.fetch_add(1, Ordering::Relaxed);
+                    }
+                    DownloadStatus::Cancelled => {
+                        cancelled_c.fetch_add(1, Ordering::Relaxed);
+                    }
                     _ => {}
                 }
 
@@ -451,7 +530,11 @@ impl DownloadEngine {
                         total_bytes: 0,
                         downloaded_bytes: global_dl.load(Ordering::Relaxed),
                         overall_speed_mbps: 0.0,
-                        overall_percent: if total > 0 { completed.load(Ordering::Relaxed) as f32 / total as f32 * 100.0 } else { 0.0 },
+                        overall_percent: if total > 0 {
+                            completed.load(Ordering::Relaxed) as f32 / total as f32 * 100.0
+                        } else {
+                            0.0
+                        },
                     });
                 }
                 status
@@ -460,7 +543,9 @@ impl DownloadEngine {
 
         let mut results = vec![DownloadStatus::Pending; total];
         for (i, h) in handles.into_iter().enumerate() {
-            if let Ok(status) = h.await { results[i] = status; }
+            if let Ok(status) = h.await {
+                results[i] = status;
+            }
         }
         results
     }
@@ -505,7 +590,9 @@ impl DownloadEngine {
         }
 
         if let Some(parent) = task.dest.parent() {
-            fs::create_dir_all(parent).await.map_err(|e| format!("mkdir: {}", e))?;
+            fs::create_dir_all(parent)
+                .await
+                .map_err(|e| format!("mkdir: {}", e))?;
         }
 
         let dest = detect_filename(&self.client, &url, &task.dest).await;
@@ -515,7 +602,8 @@ impl DownloadEngine {
         if dest.exists() && done_marker.exists() {
             if let Ok(meta) = fs::metadata(&dest).await {
                 if let Ok(content) = fs::read_to_string(&done_marker).await {
-                    if let Some(done_size) = content.lines()
+                    if let Some(done_size) = content
+                        .lines()
                         .find(|l| l.starts_with("size="))
                         .and_then(|l| l.strip_prefix("size="))
                         .and_then(|s| s.parse::<u64>().ok())
@@ -536,36 +624,60 @@ impl DownloadEngine {
             if let Some(parent) = dest.parent() {
                 if let Ok(meta) = std::fs::metadata(parent) {
                     if !meta.is_dir() {
-                        return Err(format!("disk full: parent path is not a directory: {}", parent.display()));
+                        return Err(format!(
+                            "disk full: parent path is not a directory: {}",
+                            parent.display()
+                        ));
                     }
                 }
             }
-            let _ = std::fs::File::options().write(true).create(true).truncate(false)
-                .open(&dest).and_then(|f| f.set_len(total_size));
+            let _ = std::fs::File::options()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(&dest)
+                .and_then(|f| f.set_len(total_size));
         }
 
         // 断点续传
         let existing = if dest.exists() {
             fs::metadata(&dest).await.map(|m| m.len()).unwrap_or(0)
-        } else { 0 };
+        } else {
+            0
+        };
 
         if total_size > 0 && existing >= total_size {
-            let _ = fs::write(&done_marker, format!("size={}\nurl={}\n", total_size, task.url)).await;
+            let _ = fs::write(
+                &done_marker,
+                format!("size={}\nurl={}\n", total_size, task.url),
+            )
+            .await;
             return Ok(existing);
         }
 
         // 分片计算
         let remaining = total_size.saturating_sub(existing);
         let chunk_size = if remaining > 0 {
-            (remaining / self.config.max_concurrent as u64).min(self.config.max_chunk_bytes).max(1)
-        } else { self.config.max_chunk_bytes };
+            (remaining / self.config.max_concurrent as u64)
+                .min(self.config.max_chunk_bytes)
+                .max(1)
+        } else {
+            self.config.max_chunk_bytes
+        };
         let n_chunks = if total_size > 0 {
             ((remaining - 1) / chunk_size + 1).min(self.config.max_concurrent as u64) as usize
-        } else { 1 };
+        } else {
+            1
+        };
 
         let stem = dest.file_stem().and_then(|s| s.to_str()).unwrap_or("dl");
-        let tmp_dir = dest.parent().unwrap_or(Path::new(".")).join(format!(".dl_{}", stem));
-        fs::create_dir_all(&tmp_dir).await.map_err(|e| format!("tmp dir: {}", e))?;
+        let tmp_dir = dest
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(format!(".dl_{}", stem));
+        fs::create_dir_all(&tmp_dir)
+            .await
+            .map_err(|e| format!("tmp dir: {}", e))?;
 
         // 并发分片
         let semaphore = Arc::new(Semaphore::new(n_chunks));
@@ -574,21 +686,41 @@ impl DownloadEngine {
         for i in 0..n_chunks {
             let start_byte = existing + i as u64 * chunk_size;
             let end_byte = if i == n_chunks - 1 {
-                if total_size > 0 { total_size - 1 } else { 0 }
-            } else { existing + (i + 1) as u64 * chunk_size - 1 };
+                if total_size > 0 {
+                    total_size - 1
+                } else {
+                    0
+                }
+            } else {
+                existing + (i + 1) as u64 * chunk_size - 1
+            };
 
             let chunk_file = tmp_dir.join(format!("c{:04}.tmp", i));
             let url = url.clone();
             let client = self.client.clone();
             let timeout_secs = self.config.timeout_secs;
-            let permit = semaphore.clone().acquire_owned().await
+            let permit = semaphore
+                .clone()
+                .acquire_owned()
+                .await
                 .map_err(|e| format!("semaphore: {}", e))?;
             let cancelled = cancelled.clone();
 
             handles.push(tokio::spawn(async move {
                 let _permit = permit;
-                if cancelled.load(Ordering::Relaxed) { return Err("cancelled".into()); }
-                http_chunk_download(&client, &url, start_byte, end_byte, total_size, &chunk_file, timeout_secs).await
+                if cancelled.load(Ordering::Relaxed) {
+                    return Err("cancelled".into());
+                }
+                http_chunk_download(
+                    &client,
+                    &url,
+                    start_byte,
+                    end_byte,
+                    total_size,
+                    &chunk_file,
+                    timeout_secs,
+                )
+                .await
             }));
         }
 
@@ -596,42 +728,80 @@ impl DownloadEngine {
         let mut total_downloaded = existing;
         let loop_start = Instant::now();
         for (i, h) in handles.into_iter().enumerate() {
-            if cancelled.load(Ordering::Relaxed) { return Err("cancelled".into()); }
-            let chunk_bytes = h.await.map_err(|e| format!("join {}: {}", i, e))?
+            if cancelled.load(Ordering::Relaxed) {
+                return Err("cancelled".into());
+            }
+            let chunk_bytes = h
+                .await
+                .map_err(|e| format!("join {}: {}", i, e))?
                 .map_err(|e| format!("chunk {}: {}", i, e))?;
             total_downloaded += chunk_bytes;
-            self.global_downloaded.fetch_add(chunk_bytes, Ordering::Relaxed);
+            self.global_downloaded
+                .fetch_add(chunk_bytes, Ordering::Relaxed);
 
             let elapsed = loop_start.elapsed().as_secs_f64();
-            let speed = if elapsed > 0.5 { (total_downloaded - existing) as f64 / elapsed } else { 0.0 };
-            let pct = if total_size > 0 { total_downloaded as f32 / total_size as f32 * 100.0 } else { 0.0 };
+            let speed = if elapsed > 0.5 {
+                (total_downloaded - existing) as f64 / elapsed
+            } else {
+                0.0
+            };
+            let pct = if total_size > 0 {
+                total_downloaded as f32 / total_size as f32 * 100.0
+            } else {
+                0.0
+            };
             let eta = if speed > 0.0 && total_size > total_downloaded {
                 Some((total_size - total_downloaded) as f64 / speed)
-            } else { None };
+            } else {
+                None
+            };
 
             let progress = DownloadProgress {
-                percent: pct, downloaded: total_downloaded, total: total_size,
-                speed_mbps: speed / 1048576.0, eta_secs: eta,
+                percent: pct,
+                downloaded: total_downloaded,
+                total: total_size,
+                speed_mbps: speed / 1048576.0,
+                eta_secs: eta,
             };
-            if let Some(tx) = &progress_tx { let _ = tx.try_send(progress); }
+            if let Some(tx) = &progress_tx {
+                let _ = tx.try_send(progress);
+            }
 
-            let eta_str = eta.map(|e| format!("{:.0}s", e)).unwrap_or_else(|| "?".into());
-            eprintln!("\r[dl] chunk {} +{}MB {:.1}% {:.1}MiB/s ETA:{}",
-                i, chunk_bytes / 1048576, pct, speed / 1048576.0, eta_str);
+            let eta_str = eta
+                .map(|e| format!("{:.0}s", e))
+                .unwrap_or_else(|| "?".into());
+            eprintln!(
+                "\r[dl] chunk {} +{}MB {:.1}% {:.1}MiB/s ETA:{}",
+                i,
+                chunk_bytes / 1048576,
+                pct,
+                speed / 1048576.0,
+                eta_str
+            );
         }
         eprintln!();
 
         // 合并
-        let mut out = BufWriter::with_capacity(256 * 1024,
-            fs::File::create(&dest).await.map_err(|e| format!("create: {}", e))?);
+        let mut out = BufWriter::with_capacity(
+            256 * 1024,
+            fs::File::create(&dest)
+                .await
+                .map_err(|e| format!("create: {}", e))?,
+        );
         let mut buf = vec![0u8; 8192];
         for i in 0..n_chunks {
             let chunk_file = tmp_dir.join(format!("c{:04}.tmp", i));
-            let mut f = fs::File::open(&chunk_file).await.map_err(|e| format!("open: {}", e))?;
+            let mut f = fs::File::open(&chunk_file)
+                .await
+                .map_err(|e| format!("open: {}", e))?;
             loop {
                 let n = f.read(&mut buf).await.map_err(|e| format!("read: {}", e))?;
-                if n == 0 { break; }
-                out.write_all(&buf[..n]).await.map_err(|e| format!("write: {}", e))?;
+                if n == 0 {
+                    break;
+                }
+                out.write_all(&buf[..n])
+                    .await
+                    .map_err(|e| format!("write: {}", e))?;
             }
         }
         out.flush().await.map_err(|e| format!("flush: {}", e))?;
@@ -647,13 +817,26 @@ impl DownloadEngine {
         }
 
         // .done 标记
-        let _ = fs::write(&done_marker, format!("size={}\nurl={}\ntimestamp={}\n",
-            total_size, task.url,
-            SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
-        )).await;
+        let _ = fs::write(
+            &done_marker,
+            format!(
+                "size={}\nurl={}\ntimestamp={}\n",
+                total_size,
+                task.url,
+                SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs()
+            ),
+        )
+        .await;
         let _ = fs::remove_dir_all(&tmp_dir).await;
 
-        eprintln!("[dl] complete: {} ({:.1}MB)", dest.display(), total_downloaded as f64 / 1048576.0);
+        eprintln!(
+            "[dl] complete: {} ({:.1}MB)",
+            dest.display(),
+            total_downloaded as f64 / 1048576.0
+        );
         Ok(total_downloaded)
     }
 
@@ -665,5 +848,7 @@ impl DownloadEngine {
 }
 
 impl Default for DownloadEngine {
-    fn default() -> Self { Self::new(DownloadConfig::default()) }
+    fn default() -> Self {
+        Self::new(DownloadConfig::default())
+    }
 }

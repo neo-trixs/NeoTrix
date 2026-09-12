@@ -17,15 +17,15 @@ pub enum Domain {
 
 /// 转换结果
 #[derive(Debug, Clone)]
-pub struct ConversionResult {
+pub struct _ConversionResult {
     pub original: String,
     pub converted: String,
     pub domain: Domain,
-    pub matched_terms: Vec<MatchedTerm>,
+    pub matched_terms: Vec<_MatchedTerm>,
 }
 
 #[derive(Debug, Clone)]
-pub struct MatchedTerm {
+pub struct _MatchedTerm {
     pub slang: String,
     pub professional: String,
     pub confidence: f64,
@@ -157,7 +157,7 @@ impl SlangNormEngine {
     }
 
     /// 转换黑话
-    pub fn convert(&self, input: &str) -> ConversionResult {
+    pub fn convert(&self, input: &str) -> _ConversionResult {
         let mut converted = input.to_string();
         let mut matched_terms = Vec::new();
         let mut detected_domain = Domain::General;
@@ -165,7 +165,7 @@ impl SlangNormEngine {
         // Trie最长匹配
         if let Some((professional, domain)) = self.trie.search(input) {
             converted = professional.clone();
-            matched_terms.push(MatchedTerm {
+            matched_terms.push(_MatchedTerm {
                 slang: input.to_string(),
                 professional,
                 confidence: 0.9,
@@ -173,7 +173,7 @@ impl SlangNormEngine {
             detected_domain = domain;
         }
 
-        ConversionResult {
+        _ConversionResult {
             original: input.to_string(),
             converted,
             domain: detected_domain,
@@ -188,7 +188,7 @@ impl SlangNormEngine {
     }
 
     /// 批量转换
-    pub fn convert_batch(&self, inputs: &[&str]) -> Vec<ConversionResult> {
+    pub fn _convert_batch(&self, inputs: &[&str]) -> Vec<_ConversionResult> {
         inputs.iter().map(|input| self.convert(input)).collect()
     }
 }
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn test_batch_convert() {
         let engine = SlangNormEngine::new();
-        let results = engine.convert_batch(&["杀猪盘", "脱壳", "打点"]);
+        let results = engine._convert_batch(&["杀猪盘", "脱壳", "打点"]);
         assert_eq!(results.len(), 3);
     }
 }

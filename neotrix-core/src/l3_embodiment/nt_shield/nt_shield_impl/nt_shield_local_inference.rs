@@ -63,12 +63,12 @@ pub struct LocalInferenceEngine {
     pub speculative: speculative_decoding::SpeculativeDecoder,
     
     /// Optimization profiles (persisted to KB)
-    pub profiles: HashMap<String, OptimizationProfile>,
+    pub profiles: HashMap<String, _OptimizationProfile>,
 }
 
 /// Optimization profile for a specific model/hardware combination
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OptimizationProfile {
+pub struct _OptimizationProfile {
     pub model_name: String,
     pub hardware: String,
     pub quantization_format: String,
@@ -126,7 +126,7 @@ impl LocalInferenceEngine {
     }
     
     /// Get optimal llama-server command for current hardware
-    pub fn optimal_server_cmd(&self) -> OptimalServerCmd {
+    pub fn _optimal_server_cmd(&self) -> OptimalServerCmd {
         let best = self.model_selector.best_for_m5_16gb()
             .unwrap_or(("Qwen3.5-9B", "Q5_K_M", 9.06));
         
@@ -149,7 +149,7 @@ impl LocalInferenceEngine {
     // ═══════════════════════════════════════════════════════════
     
     /// Save optimization profile to disk (TOML in ~/.neotrix/inference_profiles/)
-    pub fn save_profile(&self, profile: &OptimizationProfile) -> Result<(), String> {
+    pub fn _save_profile(&self, profile: &_OptimizationProfile) -> Result<(), String> {
         let dir = neotrix_dirs().join("inference_profiles");
         std::fs::create_dir_all(&dir).map_err(|e| format!("create dir: {}", e))?;
         
@@ -165,7 +165,7 @@ impl LocalInferenceEngine {
     }
     
     /// Load optimization profile from disk
-    pub fn load_profile(&self, model_name: &str, hardware: &str) -> Option<OptimizationProfile> {
+    pub fn _load_profile(&self, model_name: &str, hardware: &str) -> Option<_OptimizationProfile> {
         let dir = neotrix_dirs().join("inference_profiles");
         let key = format!("{}_{}", model_name, hardware);
         let path = dir.join(format!("{}.toml", key));
@@ -179,15 +179,15 @@ impl LocalInferenceEngine {
     }
     
     /// Load or create profile (with fallback to defaults)
-    pub fn load_or_create_profile(&mut self, model_name: &str, hardware: &str) -> OptimizationProfile {
+    pub fn _load_or_create_profile(&mut self, model_name: &str, hardware: &str) -> _OptimizationProfile {
         // Try loading from disk first
-        if let Some(profile) = self.load_profile(model_name, hardware) {
+        if let Some(profile) = self._load_profile(model_name, hardware) {
             log::info!("[inference] loaded cached profile for {} on {}", model_name, hardware);
             return profile;
         }
         
         // Create new profile with defaults
-        let profile = OptimizationProfile {
+        let profile = _OptimizationProfile {
             model_name: model_name.to_string(),
             hardware: hardware.to_string(),
             quantization_format: "GGUF".to_string(),
@@ -202,7 +202,7 @@ impl LocalInferenceEngine {
         };
         
         // Save for next session
-        let _ = self.save_profile(&profile);
+        let _ = self._save_profile(&profile);
         profile
     }
     
@@ -229,7 +229,7 @@ impl LocalInferenceEngine {
     // ═══════════════════════════════════════════════════════════
     
     /// Save profile to KB kv_store (cross-device sync ready)
-    pub fn save_profile_to_kb(&self, profile: &OptimizationProfile) -> Result<(), String> {
+    pub fn _save_profile_to_kb(&self, profile: &_OptimizationProfile) -> Result<(), String> {
         let conn = open_kb_connection()?;
         let key = format!("{}_{}", profile.model_name, profile.hardware);
         let value = serde_json::to_string(profile)
@@ -244,7 +244,7 @@ impl LocalInferenceEngine {
     }
     
     /// Load profile from KB kv_store
-    pub fn load_profile_from_kb(&self, model_name: &str, hardware: &str) -> Option<OptimizationProfile> {
+    pub fn _load_profile_from_kb(&self, model_name: &str, hardware: &str) -> Option<_OptimizationProfile> {
         let conn = open_kb_connection().ok()?;
         let key = format!("{}_{}", model_name, hardware);
         
@@ -256,7 +256,7 @@ impl LocalInferenceEngine {
     }
     
     /// List all profiles in KB
-    pub fn list_profiles_from_kb() -> Vec<String> {
+    pub fn _list_profiles_from_kb() -> Vec<String> {
         let conn = match open_kb_connection() {
             Ok(c) => c,
             Err(_) => return Vec::new(),
@@ -273,7 +273,7 @@ impl LocalInferenceEngine {
         model_name: &str,
         hardware: &str,
         target_throughput: f64,
-    ) -> OptimizationProfile {
+    ) -> _OptimizationProfile {
         // Phase 1: E8 reasoning for optimization strategy
         let strategy = crate::core::nt_core_e8::E8::reason(
             &format!("optimize {} on {} for {} tok/s", model_name, hardware, target_throughput),
@@ -291,7 +291,7 @@ impl LocalInferenceEngine {
         );
         
         // Phase 4: Build optimization profile
-        let profile = OptimizationProfile {
+        let profile = _OptimizationProfile {
             model_name: model_name.to_string(),
             hardware: hardware.to_string(),
             quantization_format: quant_config.format,
@@ -353,7 +353,7 @@ pub struct OptimalServerCmd {
 
 impl OptimalServerCmd {
     /// Generate full command line string for llama-server
-    pub fn to_command_string(&self) -> String {
+    pub fn _to_command_string(&self) -> String {
         format!(
             "llama-server -m {} -fa {} -ngl {} -ctk {} -ctv {} -t {} -c {} -b {} {}",
             self.model,

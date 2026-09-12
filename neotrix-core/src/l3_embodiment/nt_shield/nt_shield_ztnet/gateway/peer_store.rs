@@ -16,7 +16,7 @@ pub struct Peer {
     /// 已知地址
     pub endpoints: Vec<SocketAddr>,
     /// 连接状态
-    pub connection_state: ConnectionState,
+    pub connection_state: _ConnectionState,
     /// 最后活跃时间
     pub last_seen: Instant,
     /// 连接质量评分 (0-100)
@@ -31,7 +31,7 @@ pub struct Peer {
 
 /// 连接状态
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConnectionState {
+pub enum _ConnectionState {
     /// 未知
     Unknown,
     /// 正在连接
@@ -75,7 +75,7 @@ impl PeerStore {
             // 淘汰最低评分的节点
             if let Some(worst_id) = self.find_worst_peer() {
                 if self.peers[&worst_id].quality_score < peer.quality_score {
-                    self.remove_peer(&worst_id);
+                    self._remove_peer(&worst_id);
                 } else {
                     return false;
                 }
@@ -92,7 +92,7 @@ impl PeerStore {
     }
 
     /// 移除节点
-    pub fn remove_peer(&mut self, id: &[u8; 32]) -> Option<Peer> {
+    pub fn _remove_peer(&mut self, id: &[u8; 32]) -> Option<Peer> {
         if let Some(peer) = self.peers.remove(id) {
             for addr in &peer.endpoints {
                 self.addr_index.remove(addr);
@@ -109,7 +109,7 @@ impl PeerStore {
     }
 
     /// 通过地址查找节点
-    pub fn get_peer_by_addr(&self, addr: &SocketAddr) -> Option<&Peer> {
+    pub fn _get_peer_by_addr(&self, addr: &SocketAddr) -> Option<&Peer> {
         self.addr_index.get(addr).and_then(|id| self.peers.get(id))
     }
 
@@ -137,7 +137,7 @@ impl PeerStore {
     }
 
     /// 更新节点状态
-    pub fn update_state(&mut self, id: &[u8; 32], state: ConnectionState) {
+    pub fn update_state(&mut self, id: &[u8; 32], state: _ConnectionState) {
         if let Some(peer) = self.peers.get_mut(id) {
             peer.connection_state = state;
             peer.last_seen = Instant::now();
@@ -145,7 +145,7 @@ impl PeerStore {
     }
 
     /// 获取所有活跃节点 (未过期)
-    pub fn active_peers(&self) -> Vec<&Peer> {
+    pub fn _active_peers(&self) -> Vec<&Peer> {
         let now = Instant::now();
         self.peers.values()
             .filter(|p| now.duration_since(p.last_seen) < self.expiry)
@@ -153,14 +153,14 @@ impl PeerStore {
     }
 
     /// 按质量评分排序获取节点
-    pub fn peers_by_quality(&self) -> Vec<&Peer> {
+    pub fn _peers_by_quality(&self) -> Vec<&Peer> {
         let mut peers: Vec<&Peer> = self.peers.values().collect();
         peers.sort_by(|a, b| b.quality_score.cmp(&a.quality_score));
         peers
     }
 
     /// 按延迟排序获取节点
-    pub fn peers_by_latency(&self) -> Vec<&Peer> {
+    pub fn _peers_by_latency(&self) -> Vec<&Peer> {
         let mut peers: Vec<&Peer> = self.peers.values().collect();
         peers.sort_by(|a, b| {
             a.latency_ms.unwrap_or(u64::MAX).cmp(&b.latency_ms.unwrap_or(u64::MAX))
@@ -187,17 +187,17 @@ impl PeerStore {
             .collect();
 
         for id in &expired {
-            self.remove_peer(id);
+            self._remove_peer(id);
         }
 
         expired
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> PeerStoreStats {
+    pub fn stats(&self) -> _PeerStoreStats {
         let total = self.peers.len();
         let connected = self.peers.values()
-            .filter(|p| p.connection_state == ConnectionState::Connected)
+            .filter(|p| p.connection_state == _ConnectionState::Connected)
             .count();
         let avg_quality = if total > 0 {
             self.peers.values().map(|p| p.quality_score as u32).sum::<u32>() / total as u32
@@ -215,7 +215,7 @@ impl PeerStore {
             }
         };
 
-        PeerStoreStats {
+        _PeerStoreStats {
             total,
             connected,
             avg_quality,
@@ -226,7 +226,7 @@ impl PeerStore {
 
 /// 对等节点存储统计
 #[derive(Debug, Clone)]
-pub struct PeerStoreStats {
+pub struct _PeerStoreStats {
     pub total: usize,
     pub connected: usize,
     pub avg_quality: u32,
@@ -243,7 +243,7 @@ mod tests {
             id: [id; 32],
             public_key: [id + 100; 32],
             endpoints: vec![addr],
-            connection_state: ConnectionState::Connected,
+            connection_state: _ConnectionState::Connected,
             last_seen: Instant::now(),
             quality_score: 80,
             latency_ms: Some(50),
@@ -271,7 +271,7 @@ mod tests {
         let peer = create_test_peer(1, addr);
 
         store.add_peer(peer);
-        assert!(store.get_peer_by_addr(&addr).is_some());
+        assert!(store._get_peer_by_addr(&addr).is_some());
     }
 
     #[test]

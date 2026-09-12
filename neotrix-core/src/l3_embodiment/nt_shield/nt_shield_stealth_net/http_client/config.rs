@@ -42,12 +42,12 @@ impl EntropyBudget {
         Self { consumed: 0.0, limit, fingerprint_rotations: 0, chain_rotations: 0, total_requests: 0, last_full_reset: std::time::Instant::now() }
     }
 
-    pub fn record_fingerprint_rotation(&mut self) {
+    pub fn _record_fingerprint_rotation(&mut self) {
         self.fingerprint_rotations += 1;
         self.consumed += 0.5;
     }
 
-    pub fn record_chain_rotation(&mut self) {
+    pub fn _record_chain_rotation(&mut self) {
         self.chain_rotations += 1;
         self.consumed += 0.3;
     }
@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn test_entropy_budget_record_rotation() {
         let mut budget = EntropyBudget::new(10.0);
-        budget.record_fingerprint_rotation();
+        budget._record_fingerprint_rotation();
         assert_eq!(budget.fingerprint_rotations, 1);
         assert_eq!(budget.consumed, 0.5);
     }
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn test_entropy_budget_record_chain() {
         let mut budget = EntropyBudget::new(10.0);
-        budget.record_chain_rotation();
+        budget._record_chain_rotation();
         assert_eq!(budget.chain_rotations, 1);
         assert_eq!(budget.consumed, 0.3);
     }
@@ -131,16 +131,16 @@ mod tests {
     #[test]
     fn test_entropy_budget_is_exhausted() {
         let mut budget = EntropyBudget::new(1.0);
-        budget.record_fingerprint_rotation();
-        budget.record_fingerprint_rotation();
+        budget._record_fingerprint_rotation();
+        budget._record_fingerprint_rotation();
         assert!(budget.is_exhausted());
     }
 
     #[test]
     fn test_entropy_budget_reset() {
         let mut budget = EntropyBudget::new(10.0);
-        budget.record_fingerprint_rotation();
-        budget.record_chain_rotation();
+        budget._record_fingerprint_rotation();
+        budget._record_chain_rotation();
         budget.record_request();
         budget.reset();
         assert_eq!(budget.consumed, 0.0);

@@ -7,14 +7,14 @@ use bytes::Bytes;
 
 /// IP版本
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IpVersion {
+pub enum _IpVersion {
     V4,
     V6,
 }
 
 /// 传输层协议
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransportProtocol {
+pub enum _TransportProtocol {
     Tcp,
     Udp,
     Icmp,
@@ -24,7 +24,7 @@ pub enum TransportProtocol {
 
 /// IPv4 头部 (最小20字节)
 #[derive(Debug, Clone)]
-pub struct Ipv4Header {
+pub struct _Ipv4Header {
     pub version: u8,
     pub ihl: u8,  // Internet Header Length (32-bit words)
     pub dscp: u8,
@@ -43,7 +43,7 @@ pub struct Ipv4Header {
 
 /// IPv6 头部 (固定40字节)
 #[derive(Debug, Clone)]
-pub struct Ipv6Header {
+pub struct _Ipv6Header {
     pub version: u8,
     pub traffic_class: u8,
     pub flow_label: u32,
@@ -56,41 +56,41 @@ pub struct Ipv6Header {
 
 /// 解析后的IP包
 #[derive(Debug, Clone)]
-pub struct IpPacket {
-    pub version: IpVersion,
-    pub src_ip: IpAddress,
-    pub dst_ip: IpAddress,
-    pub transport: TransportProtocol,
+pub struct _IpPacket {
+    pub version: _IpVersion,
+    pub src_ip: _IpAddress,
+    pub dst_ip: _IpAddress,
+    pub transport: _TransportProtocol,
     pub payload: Bytes,
     pub ttl: u8,
 }
 
 /// IP地址 (v4或v6)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum IpAddress {
+pub enum _IpAddress {
     V4([u8; 4]),
     V6([u8; 16]),
 }
 
-impl IpAddress {
+impl _IpAddress {
     /// 从字节切片解析
-    pub fn from_bytes(version: IpVersion, bytes: &[u8]) -> Result<Self, ParseError> {
+    pub fn from_bytes(version: _IpVersion, bytes: &[u8]) -> Result<Self, ParseError> {
         match version {
-            IpVersion::V4 => {
+            _IpVersion::V4 => {
                 if bytes.len() < 4 {
                     return Err(ParseError::InsufficientData);
                 }
                 let mut ip = [0u8; 4];
                 ip.copy_from_slice(&bytes[..4]);
-                Ok(IpAddress::V4(ip))
+                Ok(_IpAddress::V4(ip))
             }
-            IpVersion::V6 => {
+            _IpVersion::V6 => {
                 if bytes.len() < 16 {
                     return Err(ParseError::InsufficientData);
                 }
                 let mut ip = [0u8; 16];
                 ip.copy_from_slice(&bytes[..16]);
-                Ok(IpAddress::V6(ip))
+                Ok(_IpAddress::V6(ip))
             }
         }
     }
@@ -98,8 +98,8 @@ impl IpAddress {
     /// 转换为字符串
     pub fn to_string(&self) -> String {
         match self {
-            IpAddress::V4(ip) => format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3]),
-            IpAddress::V6(ip) => {
+            _IpAddress::V4(ip) => format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3]),
+            _IpAddress::V6(ip) => {
                 let groups: Vec<String> = ip.chunks(2)
                     .map(|chunk| format!("{:02x}{:02x}", chunk[0], chunk[1]))
                     .collect();
@@ -109,7 +109,7 @@ impl IpAddress {
     }
 }
 
-impl std::fmt::Display for IpAddress {
+impl std::fmt::Display for _IpAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_string())
     }
@@ -129,7 +129,7 @@ pub enum ParseError {
 }
 
 /// 解析IPv4头部
-pub fn parse_ipv4(data: &[u8]) -> Result<(Ipv4Header, usize), ParseError> {
+pub fn _parse_ipv4(data: &[u8]) -> Result<(_Ipv4Header, usize), ParseError> {
     if data.len() < 20 {
         return Err(ParseError::InsufficientData);
     }
@@ -149,7 +149,7 @@ pub fn parse_ipv4(data: &[u8]) -> Result<(Ipv4Header, usize), ParseError> {
         return Err(ParseError::InsufficientData);
     }
 
-    let header = Ipv4Header {
+    let header = _Ipv4Header {
         version,
         ihl,
         dscp: (data[1] >> 2) & 0x3F,
@@ -170,7 +170,7 @@ pub fn parse_ipv4(data: &[u8]) -> Result<(Ipv4Header, usize), ParseError> {
 }
 
 /// 解析IPv6头部
-pub fn parse_ipv6(data: &[u8]) -> Result<(Ipv6Header, usize), ParseError> {
+pub fn _parse_ipv6(data: &[u8]) -> Result<(_Ipv6Header, usize), ParseError> {
     if data.len() < 40 {
         return Err(ParseError::InsufficientData);
     }
@@ -180,7 +180,7 @@ pub fn parse_ipv6(data: &[u8]) -> Result<(Ipv6Header, usize), ParseError> {
         return Err(ParseError::InvalidVersion(version));
     }
 
-    let header = Ipv6Header {
+    let header = _Ipv6Header {
         version,
         traffic_class: ((data[0] & 0x0F) << 4) | ((data[1] >> 4) & 0x0F),
         flow_label: u32::from_be_bytes([data[1] & 0x0F, data[2], data[3], 0]),
@@ -203,50 +203,50 @@ pub fn parse_ipv6(data: &[u8]) -> Result<(Ipv6Header, usize), ParseError> {
 }
 
 /// 协议号→传输协议
-pub fn protocol_from_number(num: u8) -> TransportProtocol {
+pub fn _protocol_from_number(num: u8) -> _TransportProtocol {
     match num {
-        1 => TransportProtocol::Icmp,
-        6 => TransportProtocol::Tcp,
-        17 => TransportProtocol::Udp,
-        58 => TransportProtocol::Icmpv6,
-        other => TransportProtocol::Other(other),
+        1 => _TransportProtocol::Icmp,
+        6 => _TransportProtocol::Tcp,
+        17 => _TransportProtocol::Udp,
+        58 => _TransportProtocol::Icmpv6,
+        other => _TransportProtocol::Other(other),
     }
 }
 
 /// 解析完整IP包
-pub fn parse_ip_packet(data: &[u8]) -> Result<IpPacket, ParseError> {
+pub fn _parse_ip_packet(data: &[u8]) -> Result<_IpPacket, ParseError> {
     if data.is_empty() {
         return Err(ParseError::InsufficientData);
     }
 
     let version = (data[0] >> 4) & 0x0F;
     let version = match version {
-        4 => IpVersion::V4,
-        6 => IpVersion::V6,
+        4 => _IpVersion::V4,
+        6 => _IpVersion::V6,
         v => return Err(ParseError::InvalidVersion(v)),
     };
 
     match version {
-        IpVersion::V4 => {
-            let (header, header_len) = parse_ipv4(data)?;
+        _IpVersion::V4 => {
+            let (header, header_len) = _parse_ipv4(data)?;
             let payload = Bytes::copy_from_slice(&data[header_len..]);
-            Ok(IpPacket {
+            Ok(_IpPacket {
                 version,
-                src_ip: IpAddress::V4(header.src_ip),
-                dst_ip: IpAddress::V4(header.dst_ip),
-                transport: protocol_from_number(header.protocol),
+                src_ip: _IpAddress::V4(header.src_ip),
+                dst_ip: _IpAddress::V4(header.dst_ip),
+                transport: _protocol_from_number(header.protocol),
                 payload,
                 ttl: header.ttl,
             })
         }
-        IpVersion::V6 => {
-            let (header, header_len) = parse_ipv6(data)?;
+        _IpVersion::V6 => {
+            let (header, header_len) = _parse_ipv6(data)?;
             let payload = Bytes::copy_from_slice(&data[header_len..]);
-            Ok(IpPacket {
+            Ok(_IpPacket {
                 version,
-                src_ip: IpAddress::V6(header.src_ip),
-                dst_ip: IpAddress::V6(header.dst_ip),
-                transport: protocol_from_number(header.next_header),
+                src_ip: _IpAddress::V6(header.src_ip),
+                dst_ip: _IpAddress::V6(header.dst_ip),
+                transport: _protocol_from_number(header.next_header),
                 payload,
                 ttl: header.hop_limit,
             })
@@ -274,7 +274,7 @@ mod tests {
         data[18] = 0;
         data[19] = 1;
 
-        let (header, len) = parse_ipv4(&data).unwrap();
+        let (header, len) = _parse_ipv4(&data).unwrap();
         assert_eq!(header.version, 4);
         assert_eq!(header.ihl, 5);
         assert_eq!(len, 20);
@@ -289,24 +289,24 @@ mod tests {
         data[6] = 59;   // next_header=NoNextHeader
         data[7] = 64;   // hop_limit
 
-        let (header, len) = parse_ipv6(&data).unwrap();
+        let (header, len) = _parse_ipv6(&data).unwrap();
         assert_eq!(header.version, 6);
         assert_eq!(len, 40);
     }
 
     #[test]
     fn ip_address_display() {
-        let ip4 = IpAddress::V4([192, 168, 1, 1]);
+        let ip4 = _IpAddress::V4([192, 168, 1, 1]);
         assert_eq!(ip4.to_string(), "192.168.1.1");
 
-        let ip6 = IpAddress::V6([0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+        let ip6 = _IpAddress::V6([0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
         assert_eq!(ip6.to_string(), "2001:0db8:0000:0000:0000:0000:0000:0001");
     }
 
     #[test]
     fn protocol_mapping() {
-        assert_eq!(protocol_from_number(6), TransportProtocol::Tcp);
-        assert_eq!(protocol_from_number(17), TransportProtocol::Udp);
-        assert_eq!(protocol_from_number(1), TransportProtocol::Icmp);
+        assert_eq!(_protocol_from_number(6), _TransportProtocol::Tcp);
+        assert_eq!(_protocol_from_number(17), _TransportProtocol::Udp);
+        assert_eq!(_protocol_from_number(1), _TransportProtocol::Icmp);
     }
 }

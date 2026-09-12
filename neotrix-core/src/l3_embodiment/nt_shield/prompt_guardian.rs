@@ -10,11 +10,11 @@
 pub struct ProtectedPrompt {
     pub system_prompt: String,
     pub user_input: String,
-    pub metadata: PromptMetadata,
+    pub metadata: _PromptMetadata,
 }
 
 #[derive(Debug, Clone)]
-pub struct PromptMetadata {
+pub struct _PromptMetadata {
     pub protection_level: ProtectionLevel,
     pub applied_defenses: Vec<String>,
     pub confidence: f64,
@@ -156,7 +156,7 @@ impl PromptGuardian {
         ProtectedPrompt {
             system_prompt: protected_system,
             user_input: protected_user,
-            metadata: PromptMetadata {
+            metadata: _PromptMetadata {
                 protection_level: self.protection_level,
                 applied_defenses,
                 confidence,
@@ -165,7 +165,7 @@ impl PromptGuardian {
     }
 
     /// 检测提示完整性
-    pub fn verify_integrity(&self, protected_prompt: &ProtectedPrompt) -> bool {
+    pub fn _verify_integrity(&self, protected_prompt: &ProtectedPrompt) -> bool {
         // 检查系统提示是否被修改
         if protected_prompt.system_prompt.contains("[USER - PRIORITY 2") {
             return false;
@@ -223,6 +223,6 @@ mod tests {
         let guardian = PromptGuardian::new(ProtectionLevel::Standard);
         let result = guardian.protect("You are a helpful assistant.", "Hello");
         
-        assert!(guardian.verify_integrity(&result));
+        assert!(guardian._verify_integrity(&result));
     }
 }

@@ -1,7 +1,7 @@
 //! X25519 密钥生成与交换
 //!
 //! 密钥对: `PrivateKey` (32 bytes) → `PublicKey` (32 bytes)
-//! ECDH 交换: `PrivateKey::diffie_hellman(&public_key) -> SharedSecret`
+//! ECDH 交换: `PrivateKey::diffie_hellman(&public_key) -> _SharedSecret`
 
 use rand::rngs::OsRng;
 
@@ -29,7 +29,7 @@ pub struct PublicKey {
 }
 
 /// ECDH 共享秘密
-pub struct SharedSecret([u8; 32]);
+pub struct _SharedSecret([u8; 32]);
 
 impl PrivateKey {
     /// 生成随机私钥
@@ -57,9 +57,9 @@ impl PrivateKey {
     }
 
     /// ECDH Diffie-Hellman 密钥交换
-    pub fn diffie_hellman(&self, peer: &PublicKey) -> SharedSecret {
+    pub fn diffie_hellman(&self, peer: &PublicKey) -> _SharedSecret {
         let secret = self.inner.diffie_hellman(&peer.inner);
-        SharedSecret(secret.as_bytes().clone())
+        _SharedSecret(secret.as_bytes().clone())
     }
 
     /// 零化内存中的私钥材料
@@ -92,7 +92,7 @@ impl PublicKey {
     }
 }
 
-impl SharedSecret {
+impl _SharedSecret {
     /// 获取共享秘密的字节引用
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0

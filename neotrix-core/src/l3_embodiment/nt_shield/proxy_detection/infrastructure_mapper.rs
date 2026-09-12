@@ -27,23 +27,23 @@ pub struct InfrastructureMap {
     /// account → IPs used
     pub account_to_ips: HashMap<String, Vec<String>>,
     /// Detected infrastructure cycles (account→IP→account loops)
-    pub cycles: Vec<InfrastructureCycle>,
+    pub cycles: Vec<_InfrastructureCycle>,
     /// Shared infrastructure groups
-    pub shared_infra_groups: Vec<SharedInfraGroup>,
+    pub shared_infra_groups: Vec<_SharedInfraGroup>,
     /// Overall infrastructure risk score
     pub risk_score: f64,
 }
 
 #[derive(Debug, Clone)]
-pub struct InfrastructureCycle {
-    pub cycle_type: CycleType,
+pub struct _InfrastructureCycle {
+    pub cycle_type: _CycleType,
     pub nodes: Vec<String>,
     pub length: usize,
     pub risk_weight: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CycleType {
+pub enum _CycleType {
     /// Two accounts sharing the same IP
     IpOverlap,
     /// Two accounts using the same email domain + IP
@@ -55,7 +55,7 @@ pub enum CycleType {
 }
 
 #[derive(Debug, Clone)]
-pub struct SharedInfraGroup {
+pub struct _SharedInfraGroup {
     pub group_id: String,
     pub accounts: Vec<String>,
     pub shared_ips: Vec<String>,
@@ -165,7 +165,7 @@ impl InfrastructureMapper {
         ip_to_accounts: &HashMap<String, HashSet<String>>,
         _account_to_email_domain: &HashMap<String, String>,
         _account_to_ips: &HashMap<String, Vec<String>>,
-    ) -> Vec<InfrastructureCycle> {
+    ) -> Vec<_InfrastructureCycle> {
         let mut cycles = Vec::new();
 
         // ── Cycle Type 1: IP → Multiple accounts ─────────────────────────
@@ -173,8 +173,8 @@ impl InfrastructureMapper {
             if accounts.len() >= self.config.ip_cluster_threshold {
                 let mut nodes = vec![ip.clone()];
                 nodes.extend(accounts.iter().cloned());
-                cycles.push(InfrastructureCycle {
-                    cycle_type: CycleType::IpOverlap,
+                cycles.push(_InfrastructureCycle {
+                    cycle_type: _CycleType::IpOverlap,
                     nodes,
                     length: accounts.len(),
                     risk_weight: 0.8,
@@ -195,8 +195,8 @@ impl InfrastructureMapper {
                     let mut nodes = vec![domain.clone()];
                     nodes.extend(ips.iter().cloned());
                     nodes.extend(accounts.iter().cloned());
-                    cycles.push(InfrastructureCycle {
-                        cycle_type: CycleType::DomainIpOverlap,
+                    cycles.push(_InfrastructureCycle {
+                        cycle_type: _CycleType::DomainIpOverlap,
                         nodes,
                         length: accounts.len(),
                         risk_weight: 0.85,
@@ -227,8 +227,8 @@ impl InfrastructureMapper {
                 let mut nodes = vec![domain.clone()];
                 nodes.extend(ips.iter().cloned());
                 nodes.extend(all_accounts.iter().cloned());
-                cycles.push(InfrastructureCycle {
-                    cycle_type: CycleType::AccountFarm,
+                cycles.push(_InfrastructureCycle {
+                    cycle_type: _CycleType::AccountFarm,
                     nodes,
                     length: account_count,
                     risk_weight: (ratio / 10.0).min(1.0),
@@ -244,7 +244,7 @@ impl InfrastructureMapper {
         &self,
         ip_to_accounts: &HashMap<String, HashSet<String>>,
         domain_to_ips: &HashMap<String, HashSet<String>>,
-    ) -> Vec<SharedInfraGroup> {
+    ) -> Vec<_SharedInfraGroup> {
         let mut groups = Vec::new();
         let mut visited_ips: HashSet<String> = HashSet::new();
 
@@ -325,7 +325,7 @@ impl InfrastructureMapper {
 
             let infra_score = (group_accounts.len() as f64 / 20.0).min(1.0);
 
-            groups.push(SharedInfraGroup {
+            groups.push(_SharedInfraGroup {
                 group_id: format!("infra_{}", &ip[..8.min(ip.len())].replace('.', "_")),
                 accounts: group_accounts.into_iter().collect(),
                 shared_ips: group_ips.iter().cloned().collect(),
@@ -346,8 +346,8 @@ impl InfrastructureMapper {
     /// Compute overall infrastructure risk score.
     fn compute_risk_score(
         &self,
-        cycles: &[InfrastructureCycle],
-        groups: &[SharedInfraGroup],
+        cycles: &[_InfrastructureCycle],
+        groups: &[_SharedInfraGroup],
         total_accounts: usize,
     ) -> f64 {
         if total_accounts == 0 {
@@ -499,7 +499,7 @@ mod tests {
         let map = mapper.build_map(refs).await.unwrap();
 
         let farm_cycles: Vec<_> = map.cycles.iter()
-            .filter(|c| c.cycle_type == CycleType::AccountFarm)
+            .filter(|c| c.cycle_type == _CycleType::AccountFarm)
             .collect();
         assert!(!farm_cycles.is_empty(), "Should detect account farm pattern");
     }
@@ -514,13 +514,13 @@ mod tests {
             ip_to_accounts: HashMap::new(),
             account_to_email_domain: HashMap::new(),
             account_to_ips: HashMap::new(),
-            cycles: vec![InfrastructureCycle {
-                cycle_type: CycleType::IpOverlap,
+            cycles: vec![_InfrastructureCycle {
+                cycle_type: _CycleType::IpOverlap,
                 nodes: vec!["1.2.3.4".into(), "a1".into(), "a2".into()],
                 length: 2,
                 risk_weight: 0.85,
             }],
-            shared_infra_groups: vec![SharedInfraGroup {
+            shared_infra_groups: vec![_SharedInfraGroup {
                 group_id: "test".into(),
                 accounts: vec!["a1".into(), "a2".into()],
                 shared_ips: vec!["1.2.3.4".into()],

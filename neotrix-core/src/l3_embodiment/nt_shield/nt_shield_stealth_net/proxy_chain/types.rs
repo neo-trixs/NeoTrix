@@ -56,7 +56,7 @@ impl ProxyProtocol {
     }
 
     /// CDN Relay 头部注入: 将真实目标地址编码到请求头中
-    pub fn relay_headers(&self, host: &str) -> Vec<(&'static str, String)> {
+    pub fn _relay_headers(&self, host: &str) -> Vec<(&'static str, String)> {
         if matches!(self, ProxyProtocol::CdnRelay) {
             vec![
                 ("X-Relay-Target", host.to_string()),

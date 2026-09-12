@@ -13,13 +13,13 @@ use serde::{Deserialize, Serialize};
 /// 内部网络扫描器 — fscan 抽象 (旧名称 FscanModule 兼容)
 pub struct FscanModule {
     /// 发现的内部主机
-    internal_hosts: Vec<HostInfo>,
+    internal_hosts: Vec<_HostInfo>,
     /// 每主机服务指纹
     services: HashMap<String, Vec<ServiceInfo>>,
     /// 漏洞发现
-    vulnerabilities: Vec<VulnerabilityInfo>,
+    vulnerabilities: Vec<_VulnerabilityInfo>,
     /// 攻击图
-    attack_graph: AttackGraph,
+    attack_graph: _AttackGraph,
     /// 扫描配置
     config: ScanConfig,
 }
@@ -50,19 +50,19 @@ impl Default for ScanConfig {
 
 /// 主机信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HostInfo {
+pub struct _HostInfo {
     pub ip: String,
     pub hostname: Option<String>,
     pub os: Option<String>,
     pub mac: Option<String>,
-    pub state: HostState,
+    pub state: _HostState,
     pub open_ports: Vec<u16>,
 }
 
 /// 主机状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum HostState {
+pub enum _HostState {
     Up,
     Down,
     Unknown,
@@ -82,7 +82,7 @@ pub struct ServiceInfo {
 
 /// 漏洞信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VulnerabilityInfo {
+pub struct _VulnerabilityInfo {
     pub id: String,
     pub host_ip: String,
     pub port: u16,
@@ -96,15 +96,15 @@ pub struct VulnerabilityInfo {
 
 /// 攻击图
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttackGraph {
-    pub nodes: Vec<AttackNode>,
-    pub edges: Vec<AttackEdge>,
+pub struct _AttackGraph {
+    pub nodes: Vec<_AttackNode>,
+    pub edges: Vec<_AttackEdge>,
     pub paths: Vec<AttackPath>,
 }
 
 /// 攻击节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttackNode {
+pub struct _AttackNode {
     pub id: String,
     pub node_type: String,
     pub label: String,
@@ -113,7 +113,7 @@ pub struct AttackNode {
 
 /// 攻击边
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttackEdge {
+pub struct _AttackEdge {
     pub source: String,
     pub target: String,
     pub edge_type: String,
@@ -137,7 +137,7 @@ impl FscanModule {
             internal_hosts: vec![],
             services: HashMap::new(),
             vulnerabilities: vec![],
-            attack_graph: AttackGraph {
+            attack_graph: _AttackGraph {
                 nodes: vec![],
                 edges: vec![],
                 paths: vec![],
@@ -152,7 +152,7 @@ impl FscanModule {
             internal_hosts: vec![],
             services: HashMap::new(),
             vulnerabilities: vec![],
-            attack_graph: AttackGraph {
+            attack_graph: _AttackGraph {
                 nodes: vec![],
                 edges: vec![],
                 paths: vec![],
@@ -170,34 +170,34 @@ impl FscanModule {
     }
 
     /// 发现内部主机 (ARP ping / ICMP)
-    pub async fn discover_hosts(&mut self) -> Result<Vec<HostInfo>, String> {
+    pub async fn discover_hosts(&mut self) -> Result<Vec<_HostInfo>, String> {
         // TODO: 实际调用 fscan 或系统命令
         // 示例: fscan -t 192.168.0.0/16 -p all
 
         // 模拟发现结果
         let hosts = vec![
-            HostInfo {
+            _HostInfo {
                 ip: "192.168.1.1".into(),
                 hostname: Some("gateway".into()),
                 os: Some("Linux".into()),
                 mac: Some("00:11:22:33:44:55".into()),
-                state: HostState::Up,
+                state: _HostState::Up,
                 open_ports: vec![22, 80, 443],
             },
-            HostInfo {
+            _HostInfo {
                 ip: "192.168.1.10".into(),
                 hostname: Some("webserver".into()),
                 os: Some("Ubuntu 20.04".into()),
                 mac: None,
-                state: HostState::Up,
+                state: _HostState::Up,
                 open_ports: vec![22, 80, 3306],
             },
-            HostInfo {
+            _HostInfo {
                 ip: "192.168.1.25".into(),
                 hostname: Some("database".into()),
                 os: Some("CentOS 7".into()),
                 mac: None,
-                state: HostState::Up,
+                state: _HostState::Up,
                 open_ports: vec![22, 3306, 5432],
             },
         ];
@@ -268,13 +268,13 @@ impl FscanModule {
     }
 
     /// 检测漏洞
-    pub async fn detect_vulnerabilities(&mut self, host: &str) -> Result<Vec<VulnerabilityInfo>, String> {
+    pub async fn detect_vulnerabilities(&mut self, host: &str) -> Result<Vec<_VulnerabilityInfo>, String> {
         let mut vulns = Vec::new();
 
         if let Some(services) = self.services.get(host) {
             for service in services {
                 if let Some(ref vuln_desc) = service.vulnerability {
-                    let vuln = VulnerabilityInfo {
+                    let vuln = _VulnerabilityInfo {
                         id: format!("VULN-{}-{}", host, service.port),
                         host_ip: host.to_string(),
                         port: service.port,
@@ -295,13 +295,13 @@ impl FscanModule {
     }
 
     /// 构建攻击图
-    pub fn build_attack_graph(&mut self) -> AttackGraph {
+    pub fn _build_attack_graph(&mut self) -> _AttackGraph {
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
 
         // 添加主机节点
         for host in &self.internal_hosts {
-            nodes.push(AttackNode {
+            nodes.push(_AttackNode {
                 id: host.ip.clone(),
                 node_type: "host".into(),
                 label: host.hostname.clone().unwrap_or_else(|| host.ip.clone()),
@@ -317,7 +317,7 @@ impl FscanModule {
         for (host_ip, services) in &self.services {
             for service in services {
                 let service_node_id = format!("{}:{}", host_ip, service.port);
-                nodes.push(AttackNode {
+                nodes.push(_AttackNode {
                     id: service_node_id.clone(),
                     node_type: "service".into(),
                     label: format!("{} ({})", service.service, service.port),
@@ -328,7 +328,7 @@ impl FscanModule {
                     }).as_object().unwrap().clone(),
                 });
 
-                edges.push(AttackEdge {
+                edges.push(_AttackEdge {
                     source: host_ip.clone(),
                     target: service_node_id.clone(),
                     edge_type: "hosts".into(),
@@ -342,7 +342,7 @@ impl FscanModule {
         for vuln in &self.vulnerabilities {
             if vuln.exploitable {
                 let vuln_node_id = format!("vuln:{}", vuln.id);
-                nodes.push(AttackNode {
+                nodes.push(_AttackNode {
                     id: vuln_node_id.clone(),
                     node_type: "vulnerability".into(),
                     label: format!("{} ({})", vuln.vuln_type, vuln.severity),
@@ -352,7 +352,7 @@ impl FscanModule {
                     }).as_object().unwrap().clone(),
                 });
 
-                edges.push(AttackEdge {
+                edges.push(_AttackEdge {
                     source: format!("{}:{}", vuln.host_ip, vuln.port),
                     target: vuln_node_id.clone(),
                     edge_type: "vulnerable_to".into(),
@@ -365,7 +365,7 @@ impl FscanModule {
         // 计算攻击路径
         let paths = self.find_attack_paths();
 
-        self.attack_graph = AttackGraph {
+        self.attack_graph = _AttackGraph {
             nodes,
             edges,
             paths,
@@ -400,22 +400,22 @@ impl FscanModule {
     }
 
     /// 获取发现的主机
-    pub fn get_hosts(&self) -> &[HostInfo] {
+    pub fn _get_hosts(&self) -> &[_HostInfo] {
         &self.internal_hosts
     }
 
     /// 获取服务信息
-    pub fn get_services(&self) -> &HashMap<String, Vec<ServiceInfo>> {
+    pub fn _get_services(&self) -> &HashMap<String, Vec<ServiceInfo>> {
         &self.services
     }
 
     /// 获取漏洞信息
-    pub fn get_vulnerabilities(&self) -> &[VulnerabilityInfo] {
+    pub fn _get_vulnerabilities(&self) -> &[_VulnerabilityInfo] {
         &self.vulnerabilities
     }
 
     /// 获取攻击图
-    pub fn get_attack_graph(&self) -> &AttackGraph {
+    pub fn _get_attack_graph(&self) -> &_AttackGraph {
         &self.attack_graph
     }
 }

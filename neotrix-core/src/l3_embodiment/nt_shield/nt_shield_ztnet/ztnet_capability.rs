@@ -6,7 +6,7 @@ use crate::core::nt_core_capability::*;
 
 /// Zero Trust状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ZeroTrustStatus {
+pub enum _ZeroTrustStatus {
     Verified,
     Unverified,
     Revoked,
@@ -15,20 +15,20 @@ pub enum ZeroTrustStatus {
 
 /// 网络能力
 #[derive(Debug, Clone)]
-pub struct NetworkCapability {
+pub struct _NetworkCapability {
     pub id: String,
     pub source: String,
     pub destination: String,
     pub permission: String,
-    pub status: ZeroTrustStatus,
+    pub status: _ZeroTrustStatus,
 }
 
 /// ZTNet能力管理器
-pub struct ZtNetCapabilityManager {
-    capabilities: Vec<NetworkCapability>,
+pub struct _ZtNetCapabilityManager {
+    capabilities: Vec<_NetworkCapability>,
 }
 
-impl ZtNetCapabilityManager {
+impl _ZtNetCapabilityManager {
     pub fn new() -> Self {
         Self {
             capabilities: Vec::new(),
@@ -38,21 +38,21 @@ impl ZtNetCapabilityManager {
     /// 添加能力
     pub fn add_capability(&mut self, source: &str, destination: &str, permission: &str) -> String {
         let id = format!("cap_{}", self.capabilities.len());
-        let capability = NetworkCapability {
+        let capability = _NetworkCapability {
             id: id.clone(),
             source: source.to_string(),
             destination: destination.to_string(),
             permission: permission.to_string(),
-            status: ZeroTrustStatus::Pending,
+            status: _ZeroTrustStatus::Pending,
         };
         self.capabilities.push(capability);
         id
     }
 
     /// 验证能力
-    pub fn verify_capability(&mut self, cap_id: &str) -> bool {
+    pub fn _verify_capability(&mut self, cap_id: &str) -> bool {
         if let Some(cap) = self.capabilities.iter_mut().find(|c| c.id == cap_id) {
-            cap.status = ZeroTrustStatus::Verified;
+            cap.status = _ZeroTrustStatus::Verified;
             true
         } else {
             false
@@ -65,7 +65,7 @@ impl ZtNetCapabilityManager {
             cap.source == source
                 && cap.destination == destination
                 && cap.permission == permission
-                && cap.status == ZeroTrustStatus::Verified
+                && cap.status == _ZeroTrustStatus::Verified
         })
     }
 
@@ -74,12 +74,12 @@ impl ZtNetCapabilityManager {
         let mut stats = HashMap::new();
         stats.insert("total_capabilities".to_string(), self.capabilities.len().to_string());
         stats.insert("verified".to_string(), 
-            self.capabilities.iter().filter(|c| c.status == ZeroTrustStatus::Verified).count().to_string());
+            self.capabilities.iter().filter(|c| c.status == _ZeroTrustStatus::Verified).count().to_string());
         stats
     }
 }
 
-impl Default for ZtNetCapabilityManager {
+impl Default for _ZtNetCapabilityManager {
     fn default() -> Self {
         Self::new()
     }
@@ -159,16 +159,16 @@ mod tests {
 
     #[test]
     fn test_add_capability() {
-        let mut manager = ZtNetCapabilityManager::new();
+        let mut manager = _ZtNetCapabilityManager::new();
         let id = manager.add_capability("source", "dest", "read");
         assert!(!id.is_empty());
     }
 
     #[test]
     fn test_check_permission() {
-        let mut manager = ZtNetCapabilityManager::new();
+        let mut manager = _ZtNetCapabilityManager::new();
         let id = manager.add_capability("source", "dest", "read");
-        manager.verify_capability(&id);
+        manager._verify_capability(&id);
         assert!(manager.check_permission("source", "dest", "read"));
     }
 }

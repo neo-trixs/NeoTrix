@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 /// 安全事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SecurityEvent {
-    pub event_type: SecurityEventType,
+pub struct _SecurityEvent {
+    pub event_type: _SecurityEventType,
     pub severity: Severity,
     pub source: String,
     pub details: String,
@@ -19,7 +19,7 @@ pub struct SecurityEvent {
 /// 安全事件类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SecurityEventType {
+pub enum _SecurityEventType {
     Vulnerability,
     Intrusion,
     DataExfiltration,
@@ -41,11 +41,11 @@ pub enum Severity {
 
 /// 具身状态 — 持久化 (PentestCode 吸收)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmbodimentState {
+pub struct _EmbodimentState {
     pub hosts: Vec<Host>,
     pub vulnerabilities: Vec<Vulnerability>,
     pub credentials: Vec<Credential>,
-    pub access_level: AccessLevel,
+    pub access_level: _AccessLevel,
     pub relationships: Vec<Relationship>,
 }
 
@@ -110,7 +110,7 @@ pub struct Credential {
 /// 访问级别
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum AccessLevel {
+pub enum _AccessLevel {
     None,
     User,
     Admin,
@@ -132,13 +132,13 @@ pub trait EmbodimentLayer: Send + Sync {
     fn initialize(&mut self) -> Result<(), String>;
 
     /// 处理安全事件
-    fn handle_security_event(&mut self, event: SecurityEvent) -> Result<(), String>;
+    fn handle_security_event(&mut self, event: _SecurityEvent) -> Result<(), String>;
 
     /// 获取当前具身状态 (PentestCode 持久状态吸收)
-    fn get_state(&self) -> &EmbodimentState;
+    fn get_state(&self) -> &_EmbodimentState;
 
     /// 更新具身状态
-    fn update_state(&mut self, state: EmbodimentState);
+    fn update_state(&mut self, state: _EmbodimentState);
 
     /// 攻击路径分析 — Dijkstra 最短路径 (PentestCode 吸收)
     fn find_attack_path(
@@ -156,14 +156,14 @@ pub trait EmbodimentLayer: Send + Sync {
     ) -> Result<serde_json::Value, String>;
 
     /// 具身状态快照
-    fn snapshot(&self) -> EmbodimentSnapshot;
+    fn snapshot(&self) -> _EmbodimentSnapshot;
 }
 
 /// 具身状态快照
-pub struct EmbodimentSnapshot {
+pub struct _EmbodimentSnapshot {
     pub host_count: usize,
     pub vuln_count: usize,
     pub credential_count: usize,
-    pub access_level: AccessLevel,
+    pub access_level: _AccessLevel,
     pub last_update: chrono::DateTime<chrono::Utc>,
 }

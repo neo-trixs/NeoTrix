@@ -6,9 +6,9 @@
 use std::time::Instant;
 use bytes::Bytes;
 
-/// Transmit 抽象 — 待发送的网络数据
+/// _Transmit 抽象 — 待发送的网络数据
 #[derive(Debug, Clone)]
-pub struct Transmit {
+pub struct _Transmit {
     /// 目标地址
     pub dst: std::net::SocketAddr,
     /// 载荷数据
@@ -19,9 +19,9 @@ pub struct Transmit {
 
 /// Protocol 事件 — 从状态机产出的事件
 #[derive(Debug, Clone)]
-pub enum ProtocolEvent {
+pub enum _ProtocolEvent {
     /// 需要发送数据
-    Transmit(Transmit),
+    _Transmit(_Transmit),
     /// 隧道就绪
     TunnelReady {
         /// 发送方向索引
@@ -69,8 +69,8 @@ pub trait NtProtocol {
 
     /// 获取待发送数据
     ///
-    /// 返回: Transmit 或 None
-    fn poll_output(&mut self) -> Option<Transmit>;
+    /// 返回: _Transmit 或 None
+    fn poll_output(&mut self) -> Option<_Transmit>;
 
     /// 处理超时
     ///
@@ -83,7 +83,7 @@ pub trait NtProtocol {
     fn poll_timeout(&self) -> Option<Instant>;
 
     /// 获取当前状态摘要 (用于调试/监控)
-    fn state_summary(&self) -> ProtocolState;
+    fn state_summary(&self) -> _ProtocolState;
 
     /// 重置状态机
     fn reset(&mut self);
@@ -91,7 +91,7 @@ pub trait NtProtocol {
 
 /// 协议状态摘要
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProtocolState {
+pub enum _ProtocolState {
     /// 初始状态
     Initial,
     /// 握手中
@@ -109,20 +109,20 @@ pub enum ProtocolState {
 /// 事件循环驱动器
 ///
 /// 将 NtProtocol 与 tokio 运行时集成
-pub struct EventLoop<P: NtProtocol> {
+pub struct _EventLoop<P: NtProtocol> {
     /// 协议引擎
     protocol: P,
     /// 发送通道
-    tx: Option<tokio::sync::mpsc::Sender<Transmit>>,
+    tx: Option<tokio::sync::mpsc::Sender<_Transmit>>,
     /// 事件通道
     event_tx: tokio::sync::mpsc::Sender<P::Event>,
 }
 
-impl<P: NtProtocol> EventLoop<P> {
+impl<P: NtProtocol> _EventLoop<P> {
     /// 创建新的事件循环
     pub fn new(
         protocol: P,
-        tx: tokio::sync::mpsc::Sender<Transmit>,
+        tx: tokio::sync::mpsc::Sender<_Transmit>,
         event_tx: tokio::sync::mpsc::Sender<P::Event>,
     ) -> Self {
         Self { protocol, tx: Some(tx), event_tx }
@@ -163,14 +163,14 @@ impl<P: NtProtocol> EventLoop<P> {
 }
 
 /// Peer 解复用器 — 根据来源地址分发到对应的状态机
-pub struct PeerDemux<P: NtProtocol> {
+pub struct _PeerDemux<P: NtProtocol> {
     /// 地址→状态机映射
     peers: std::collections::HashMap<std::net::SocketAddr, P>,
     /// 默认状态机工厂
     factory: Box<dyn Fn() -> P>,
 }
 
-impl<P: NtProtocol> PeerDemux<P> {
+impl<P: NtProtocol> _PeerDemux<P> {
     /// 创建新的解复用器
     pub fn new(factory: impl Fn() -> P + 'static) -> Self {
         Self {
@@ -191,14 +191,14 @@ impl<P: NtProtocol> PeerDemux<P> {
     }
 
     /// 获取活跃Peer数量
-    pub fn peer_count(&self) -> usize {
+    pub fn _peer_count(&self) -> usize {
         self.peers.len()
     }
 
     /// 移除不活跃的Peer
-    pub fn prune_inactive(&mut self, _threshold: Instant) {
+    pub fn _prune_inactive(&mut self, _threshold: Instant) {
         self.peers.retain(|_, peer| {
-            matches!(peer.state_summary(), ProtocolState::Established | ProtocolState::Handshaking)
+            matches!(peer.state_summary(), _ProtocolState::Established | _ProtocolState::Handshaking)
         });
     }
 }
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn transmit_creation() {
-        let transmit = Transmit {
+        let transmit = _Transmit {
             dst: "127.0.0.1:8080".parse().unwrap(),
             payload: Bytes::from_static(b"hello"),
             src: None,
@@ -220,19 +220,19 @@ mod tests {
     #[test]
     fn protocol_state_variants() {
         let states = vec![
-            ProtocolState::Initial,
-            ProtocolState::Handshaking,
-            ProtocolState::Established,
-            ProtocolState::Closing,
-            ProtocolState::Closed,
-            ProtocolState::Error { message: "test".into() },
+            _ProtocolState::Initial,
+            _ProtocolState::Handshaking,
+            _ProtocolState::Established,
+            _ProtocolState::Closing,
+            _ProtocolState::Closed,
+            _ProtocolState::Error { message: "test".into() },
         ];
         assert_eq!(states.len(), 6);
     }
 
     #[test]
     fn peer_demux_creation() {
-        let _demux: PeerDemux<DummyProtocol> = PeerDemux::new(|| DummyProtocol);
+        let _demux: _PeerDemux<DummyProtocol> = _PeerDemux::new(|| DummyProtocol);
         // 编译通过即成功
     }
 
@@ -246,7 +246,7 @@ mod tests {
             vec![]
         }
 
-        fn poll_output(&mut self) -> Option<Transmit> {
+        fn poll_output(&mut self) -> Option<_Transmit> {
             None
         }
 
@@ -258,8 +258,8 @@ mod tests {
             None
         }
 
-        fn state_summary(&self) -> ProtocolState {
-            ProtocolState::Initial
+        fn state_summary(&self) -> _ProtocolState {
+            _ProtocolState::Initial
         }
 
         fn reset(&mut self) {}

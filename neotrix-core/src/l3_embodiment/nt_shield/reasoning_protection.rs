@@ -5,7 +5,7 @@
 
 /// 保护结果
 #[derive(Debug, Clone)]
-pub struct ProtectionResult {
+pub struct _ProtectionResult {
     pub protected_output: String,
     pub original_signature: String,
     pub encrypted_signature: String,
@@ -40,7 +40,7 @@ impl ReasoningProtectionEngine {
     }
 
     /// 保护推理轨迹
-    pub fn protect(&self, reasoning: &str, signature: &str, level: ProtectionLevel) -> ProtectionResult {
+    pub fn protect(&self, reasoning: &str, signature: &str, level: ProtectionLevel) -> _ProtectionResult {
         let protected = match level {
             ProtectionLevel::None => reasoning.to_string(),
             ProtectionLevel::Basic => self.summarize(reasoning),
@@ -57,7 +57,7 @@ impl ReasoningProtectionEngine {
 
         let encrypted_signature = self.encrypt_signature(signature);
 
-        ProtectionResult {
+        _ProtectionResult {
             protected_output: protected,
             original_signature: signature.to_string(),
             encrypted_signature,
@@ -139,7 +139,7 @@ impl ReasoningProtectionEngine {
     }
 
     /// 检查上下文完整性
-    pub fn verify_context_integrity(&self, context: &[String]) -> bool {
+    pub fn _verify_context_integrity(&self, context: &[String]) -> bool {
         // 检查上下文是否被篡改
         context.windows(2).all(|window| {
             // 简化实现 - 实际应检查哈希

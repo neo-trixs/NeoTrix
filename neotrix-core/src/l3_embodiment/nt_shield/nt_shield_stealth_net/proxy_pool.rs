@@ -101,12 +101,12 @@ impl ProxyPool {
         Self { kb, ..self }
     }
 
-    pub fn with_min_nodes(mut self, n: u32) -> Self {
+    pub fn _with_min_nodes(mut self, n: u32) -> Self {
         self.min_nodes = n;
         self
     }
 
-    pub fn ensure_subs_file(&self) {
+    pub fn _ensure_subs_file(&self) {
         if !self.subs_file.exists() {
             let defaults = serde_json::json!(DEFAULT_SUBSCRIPTIONS);
             let _ = std::fs::create_dir_all(self.subs_file.parent().unwrap_or(std::path::Path::new("")));
@@ -126,7 +126,7 @@ impl ProxyPool {
                 }
             }
         }
-        self.ensure_subs_file();
+        self._ensure_subs_file();
         let content = match std::fs::read_to_string(&self.subs_file) {
             Ok(s) => s,
             Err(_) => return 0,
@@ -849,7 +849,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_heal_if_needed_replenishes_below_min_nodes() {
-        let pool = ProxyPool::new().with_min_nodes(3);
+        let pool = ProxyPool::new()._with_min_nodes(3);
         pool.add("socks5://a:1080", "a").await;
         assert_eq!(pool.total_count().await, 1);
 
@@ -873,7 +873,7 @@ mod tests {
     #[tokio::test]
     async fn test_supervisor_replenish_closure_when_below_min() {
         // 验证 start_supervisor 的补货闭包语义: 低于 min_nodes 才拉订阅, 达到后不再补。
-        let pool = Arc::new(ProxyPool::new().with_min_nodes(2));
+        let pool = Arc::new(ProxyPool::new()._with_min_nodes(2));
         pool.add_batch(&[
             ("socks5://a:1080".to_string(), "a".to_string()),
             ("socks5://b:1080".to_string(), "b".to_string()),

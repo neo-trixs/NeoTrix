@@ -11,17 +11,17 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// OSINT 侦察引擎
-pub struct OSINTReconEngine {
-    sources: Vec<OSINTSource>,
-    collected_data: Vec<OSINTData>,
-    analyses: Vec<OSINTAnalysis>,
-    config: OSINTConfig,
-    stats: OSINTStats,
+pub struct _OSINTReconEngine {
+    sources: Vec<_OSINTSource>,
+    collected_data: Vec<_OSINTData>,
+    analyses: Vec<_OSINTAnalysis>,
+    config: _OSINTConfig,
+    stats: _OSINTStats,
 }
 
 /// OSINT 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OSINTConfig {
+pub struct _OSINTConfig {
     pub max_sources: usize,
     pub depth: u32,
     pub timeout: u64,
@@ -29,7 +29,7 @@ pub struct OSINTConfig {
     pub proxy_rotation: bool,
 }
 
-impl Default for OSINTConfig {
+impl Default for _OSINTConfig {
     fn default() -> Self {
         Self {
             max_sources: 50,
@@ -43,7 +43,7 @@ impl Default for OSINTConfig {
 
 /// OSINT 数据源
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OSINTSource {
+pub struct _OSINTSource {
     pub id: String,
     pub name: String,
     pub source_type: SourceType,
@@ -69,9 +69,9 @@ pub enum SourceType {
 
 /// OSINT 数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OSINTData {
+pub struct _OSINTData {
     pub id: String,
-    pub data_type: DataType,
+    pub data_type: _DataType,
     pub content: serde_json::Value,
     pub source_id: String,
     pub confidence: f64,
@@ -82,7 +82,7 @@ pub struct OSINTData {
 /// 数据类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum DataType {
+pub enum _DataType {
     Domain,
     IP,
     Email,
@@ -95,26 +95,26 @@ pub enum DataType {
     ThreatActor,
 }
 
-impl std::fmt::Display for DataType {
+impl std::fmt::Display for _DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DataType::Domain => write!(f, "Domain"),
-            DataType::IP => write!(f, "IP"),
-            DataType::Email => write!(f, "Email"),
-            DataType::Phone => write!(f, "Phone"),
-            DataType::Username => write!(f, "Username"),
-            DataType::Organization => write!(f, "Organization"),
-            DataType::Person => write!(f, "Person"),
-            DataType::Vulnerability => write!(f, "Vulnerability"),
-            DataType::Malware => write!(f, "Malware"),
-            DataType::ThreatActor => write!(f, "ThreatActor"),
+            _DataType::Domain => write!(f, "Domain"),
+            _DataType::IP => write!(f, "IP"),
+            _DataType::Email => write!(f, "Email"),
+            _DataType::Phone => write!(f, "Phone"),
+            _DataType::Username => write!(f, "Username"),
+            _DataType::Organization => write!(f, "Organization"),
+            _DataType::Person => write!(f, "Person"),
+            _DataType::Vulnerability => write!(f, "Vulnerability"),
+            _DataType::Malware => write!(f, "Malware"),
+            _DataType::ThreatActor => write!(f, "ThreatActor"),
         }
     }
 }
 
 /// OSINT 分析
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OSINTAnalysis {
+pub struct _OSINTAnalysis {
     pub id: String,
     pub analysis_type: String,
     pub target: String,
@@ -136,20 +136,20 @@ pub struct Finding {
 
 /// 域名情报
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DomainIntel {
+pub struct _DomainIntel {
     pub domain: String,
     pub registrar: Option<String>,
     pub creation_date: Option<String>,
     pub expiration_date: Option<String>,
     pub name_servers: Vec<String>,
-    pub dns_records: Vec<DNSRecord>,
-    pub ssl_certificate: Option<SSLCertificate>,
-    pub whois_info: Option<WhoisInfo>,
+    pub dns_records: Vec<_DNSRecord>,
+    pub ssl_certificate: Option<_SSLCertificate>,
+    pub whois_info: Option<_WhoisInfo>,
 }
 
 /// DNS 记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DNSRecord {
+pub struct _DNSRecord {
     pub record_type: String,
     pub value: String,
     pub ttl: u32,
@@ -157,7 +157,7 @@ pub struct DNSRecord {
 
 /// SSL 证书
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SSLCertificate {
+pub struct _SSLCertificate {
     pub issuer: String,
     pub subject: String,
     pub valid_from: String,
@@ -167,7 +167,7 @@ pub struct SSLCertificate {
 
 /// Whois 信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WhoisInfo {
+pub struct _WhoisInfo {
     pub registrar: String,
     pub registrant: Option<String>,
     pub admin_contact: Option<String>,
@@ -177,7 +177,7 @@ pub struct WhoisInfo {
 
 /// IP 情报
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IPIntel {
+pub struct _IPIntel {
     pub ip: String,
     pub country: Option<String>,
     pub city: Option<String>,
@@ -210,7 +210,7 @@ pub struct ThreatIntel {
 
 /// OSINT 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OSINTStats {
+pub struct _OSINTStats {
     pub total_queries: u64,
     pub data_collected: u64,
     pub analyses_performed: u64,
@@ -218,15 +218,15 @@ pub struct OSINTStats {
     pub avg_query_time: f64,
 }
 
-impl OSINTReconEngine {
+impl _OSINTReconEngine {
     /// 创建新的 OSINT 侦察引擎
-    pub fn new(config: OSINTConfig) -> Self {
+    pub fn new(config: _OSINTConfig) -> Self {
         Self {
             sources: Vec::new(),
             collected_data: Vec::new(),
             analyses: Vec::new(),
             config,
-            stats: OSINTStats {
+            stats: _OSINTStats {
                 total_queries: 0,
                 data_collected: 0,
                 analyses_performed: 0,
@@ -237,16 +237,16 @@ impl OSINTReconEngine {
     }
 
     /// 添加数据源
-    pub fn add_source(&mut self, source: OSINTSource) {
+    pub fn add_source(&mut self, source: _OSINTSource) {
         self.sources.push(source);
     }
 
     /// 域名侦察
-    pub fn recon_domain(&mut self, domain: &str) -> Result<DomainIntel, String> {
+    pub fn _recon_domain(&mut self, domain: &str) -> Result<_DomainIntel, String> {
         self.stats.total_queries += 1;
 
         // 模拟域名情报收集
-        let intel = DomainIntel {
+        let intel = _DomainIntel {
             domain: domain.to_string(),
             registrar: Some("Example Registrar".into()),
             creation_date: Some("2020-01-01".into()),
@@ -256,25 +256,25 @@ impl OSINTReconEngine {
                 "ns2.example.com".into(),
             ],
             dns_records: vec![
-                DNSRecord {
+                _DNSRecord {
                     record_type: "A".into(),
                     value: "93.184.216.34".into(),
                     ttl: 3600,
                 },
-                DNSRecord {
+                _DNSRecord {
                     record_type: "MX".into(),
                     value: "mail.example.com".into(),
                     ttl: 3600,
                 },
             ],
-            ssl_certificate: Some(SSLCertificate {
+            ssl_certificate: Some(_SSLCertificate {
                 issuer: "Let's Encrypt".into(),
                 subject: domain.to_string(),
                 valid_from: "2024-01-01".into(),
                 valid_to: "2025-01-01".into(),
                 serial_number: "1234567890".into(),
             }),
-            whois_info: Some(WhoisInfo {
+            whois_info: Some(_WhoisInfo {
                 registrar: "Example Registrar".into(),
                 registrant: Some("Example Organization".into()),
                 admin_contact: Some("admin@example.com".into()),
@@ -287,9 +287,9 @@ impl OSINTReconEngine {
         };
 
         // 存储数据
-        self.collected_data.push(OSINTData {
+        self.collected_data.push(_OSINTData {
             id: uuid::Uuid::new_v4().to_string(),
-            data_type: DataType::Domain,
+            data_type: _DataType::Domain,
             content: serde_json::to_value(&intel).unwrap(),
             source_id: "whois".into(),
             confidence: 0.9,
@@ -302,11 +302,11 @@ impl OSINTReconEngine {
     }
 
     /// IP 侦察
-    pub fn recon_ip(&mut self, ip: &str) -> Result<IPIntel, String> {
+    pub fn _recon_ip(&mut self, ip: &str) -> Result<_IPIntel, String> {
         self.stats.total_queries += 1;
 
         // 模拟 IP 情报收集
-        let intel = IPIntel {
+        let intel = _IPIntel {
             ip: ip.to_string(),
             country: Some("US".into()),
             city: Some("San Francisco".into()),
@@ -338,9 +338,9 @@ impl OSINTReconEngine {
         };
 
         // 存储数据
-        self.collected_data.push(OSINTData {
+        self.collected_data.push(_OSINTData {
             id: uuid::Uuid::new_v4().to_string(),
-            data_type: DataType::IP,
+            data_type: _DataType::IP,
             content: serde_json::to_value(&intel).unwrap(),
             source_id: "shodan".into(),
             confidence: 0.85,
@@ -353,7 +353,7 @@ impl OSINTReconEngine {
     }
 
     /// 分析目标
-    pub fn analyze_target(&mut self, target: &str, _target_type: &str) -> Result<OSINTAnalysis, String> {
+    pub fn _analyze_target(&mut self, target: &str, _target_type: &str) -> Result<_OSINTAnalysis, String> {
         self.stats.analyses_performed += 1;
 
         let mut findings = Vec::new();
@@ -385,7 +385,7 @@ impl OSINTReconEngine {
             vec!["Low risk - continue monitoring".into()]
         };
 
-        Ok(OSINTAnalysis {
+        Ok(_OSINTAnalysis {
             id: uuid::Uuid::new_v4().to_string(),
             analysis_type: "target_analysis".into(),
             target: target.to_string(),
@@ -397,7 +397,7 @@ impl OSINTReconEngine {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &OSINTStats {
+    pub fn stats(&self) -> &_OSINTStats {
         &self.stats
     }
 }

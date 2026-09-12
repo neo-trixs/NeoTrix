@@ -11,17 +11,17 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 蜂群协调器 — Swarm Intelligence 核心
-pub struct SwarmCoordinator {
-    agents: Vec<SwarmAgent>,
-    tasks: Vec<SwarmTask>,
+pub struct _SwarmCoordinator {
+    agents: Vec<_SwarmAgent>,
+    tasks: Vec<_SwarmTask>,
     consensus_threshold: f64,
     communication_range: f64,
-    collective_memory: CollectiveMemory,
+    collective_memory: _CollectiveMemory,
 }
 
 /// 蜂群代理
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SwarmAgent {
+pub struct _SwarmAgent {
     pub id: String,
     pub agent_type: AgentType,
     pub position: Position,
@@ -63,7 +63,7 @@ pub enum AgentState {
 
 /// 蜂群任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SwarmTask {
+pub struct _SwarmTask {
     pub id: String,
     pub task_type: String,
     pub priority: u8,
@@ -87,7 +87,7 @@ pub enum TaskStatus {
 
 /// 集体记忆
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CollectiveMemory {
+pub struct _CollectiveMemory {
     pub discoveries: Vec<Discovery>,
     pub patterns: Vec<Pattern>,
     pub decisions: Vec<Decision>,
@@ -128,7 +128,7 @@ pub struct Decision {
 
 /// 信息素消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PheromoneMessage {
+pub struct _PheromoneMessage {
     pub source: String,
     pub message_type: String,
     pub intensity: f64,
@@ -138,7 +138,7 @@ pub struct PheromoneMessage {
 
 /// 蜂群状态快照
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SwarmSnapshot {
+pub struct _SwarmSnapshot {
     pub agent_count: usize,
     pub active_agents: usize,
     pub task_count: usize,
@@ -148,7 +148,7 @@ pub struct SwarmSnapshot {
     pub pheromone_trails: usize,
 }
 
-impl SwarmCoordinator {
+impl _SwarmCoordinator {
     /// 创建新的蜂群协调器
     pub fn new() -> Self {
         Self {
@@ -156,7 +156,7 @@ impl SwarmCoordinator {
             tasks: vec![],
             consensus_threshold: 0.6,
             communication_range: 100.0,
-            collective_memory: CollectiveMemory {
+            collective_memory: _CollectiveMemory {
                 discoveries: vec![],
                 patterns: vec![],
                 decisions: vec![],
@@ -166,7 +166,7 @@ impl SwarmCoordinator {
     }
 
     /// 添加代理
-    pub fn add_agent(&mut self, agent: SwarmAgent) {
+    pub fn add_agent(&mut self, agent: _SwarmAgent) {
         self.agents.push(agent);
     }
 
@@ -200,7 +200,7 @@ impl SwarmCoordinator {
     }
 
     /// 信息素通信
-    pub fn broadcast_pheromone(&mut self, message: PheromoneMessage) {
+    pub fn _broadcast_pheromone(&mut self, message: _PheromoneMessage) {
         // 更新信息素强度
         let trail_key = format!("{}:{}", message.source, message.message_type);
         let current = self.collective_memory.pheromone_trails.get(&trail_key).unwrap_or(&0.0);
@@ -261,7 +261,7 @@ impl SwarmCoordinator {
     }
 
     /// 发现报告
-    pub fn report_discovery(&mut self, discovery: Discovery) {
+    pub fn _report_discovery(&mut self, discovery: Discovery) {
         self.collective_memory.discoveries.push(discovery.clone());
 
         // 检查是否形成模式
@@ -313,8 +313,8 @@ impl SwarmCoordinator {
     }
 
     /// 获取蜂群状态快照
-    pub fn snapshot(&self) -> SwarmSnapshot {
-        SwarmSnapshot {
+    pub fn snapshot(&self) -> _SwarmSnapshot {
+        _SwarmSnapshot {
             agent_count: self.agents.len(),
             active_agents: self.agents.iter()
                 .filter(|a| a.state != AgentState::Dead)
@@ -330,7 +330,7 @@ impl SwarmCoordinator {
     }
 
     /// 对抗性测试 — Decepticon 吸收
-    pub fn adversarial_test(&self, target: &str) -> Vec<Discovery> {
+    pub fn _adversarial_test(&self, target: &str) -> Vec<Discovery> {
         let mut discoveries = vec![];
 
         // 模拟对抗性测试
@@ -344,7 +344,7 @@ impl SwarmCoordinator {
                 "evidence": "Model follows injected instructions",
             }),
             confidence: 0.85,
-            reporter: "adversarial_test".into(),
+            reporter: "_adversarial_test".into(),
             timestamp: chrono::Utc::now(),
         });
 
@@ -358,7 +358,7 @@ impl SwarmCoordinator {
                 "evidence": "API keys found in conversation",
             }),
             confidence: 0.9,
-            reporter: "adversarial_test".into(),
+            reporter: "_adversarial_test".into(),
             timestamp: chrono::Utc::now(),
         });
 

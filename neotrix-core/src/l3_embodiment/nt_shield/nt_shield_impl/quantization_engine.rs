@@ -99,7 +99,7 @@ pub struct ModelScore {
 }
 
 /// Selects the best quantization for a model/hardware combo
-pub struct QuantizationSelector {
+pub struct _QuantizationSelector {
     /// Model size parameters
     model_params: ModelParams,
     /// Hardware capabilities
@@ -144,7 +144,7 @@ pub struct HardwareCapabilities {
 
 /// Quantization result with detailed metrics
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuantizationResult {
+pub struct _QuantizationResult {
     pub model_name: String,
     pub original_size_gb: f64,
     pub quantized_size_gb: f64,
@@ -191,7 +191,7 @@ pub struct LayerQuantConfig {
 
 /// I-Matrix (Importance Matrix) configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IMatrixConfig {
+pub struct _IMatrixConfig {
     pub enabled: bool,
     pub calibration_size: usize,   // Number of calibration tokens
     pub method: IMMethod,           // Activation-based or gradient-based
@@ -218,7 +218,7 @@ pub struct DynamicQuantSelection {
 
 /// Model ranking result (llmfit-style)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelRanking {
+pub struct _ModelRanking {
     pub model_name: String,
     pub score: ModelScore,
     pub best_quant: String,
@@ -230,7 +230,7 @@ pub struct ModelRanking {
 }
 
 /// GPTQ-GGUF toolkit (IST-DASLab)
-pub struct GptqGgufToolkit {
+pub struct _GptqGgufToolkit {
     /// EvoPress evolutionary search configuration
     pub evopress_config: EvoPressConfig,
     /// GPTQ quantization parameters
@@ -552,7 +552,7 @@ impl QuantizationEngine {
     }
     
     /// GPTQ-GGUF hybrid quantization (IST-DASLab approach)
-    pub fn gptq_gguf_quantize(
+    pub fn _gptq_gguf_quantize(
         &self,
         config: &GptqGgufConfig,
     ) -> Result<EvoPressResult, String> {
@@ -649,7 +649,7 @@ impl QuantizationEngine {
     }
     
     /// Run EvoPress optimization with real calibration data
-    pub fn evopress_optimize(
+    pub fn _evopress_optimize(
         &self,
         model_path: &str,
         config: &EvoPressConfig,
@@ -665,7 +665,7 @@ impl QuantizationEngine {
         );
         
         // Phase 1: Compute importance matrix from calibration data
-        let imatrix = ImportanceMatrix::from_activations(
+        let imatrix = ImportanceMatrix::_from_activations(
             &calibration.join("\n"),
             IMMethod::ActivationBased,
         );
@@ -780,7 +780,7 @@ impl QuantizationEngine {
     
     /// Auto-detect model architecture and recommend optimal quantization
     /// (AutoGGUF + gguf-org/quantizer concepts)
-    pub fn auto_detect_and_recommend(
+    pub fn _auto_detect_and_recommend(
         &self,
         model_path: &str,
         hw: &HardwareCapabilities,
@@ -1044,13 +1044,13 @@ pub struct MixedPrecisionRule {
     }
     
     /// Get quality benchmark for a format
-    pub fn get_benchmark(&self, format: &str) -> Option<&QualityBenchmark> {
+    pub fn _get_benchmark(&self, format: &str) -> Option<&QualityBenchmark> {
         self.benchmarks.get(format)
     }
     
     /// Generate TurboQuant KV cache types
-    pub fn turboquant_config(&self) -> TurboQuantConfig {
-        TurboQuantConfig {
+    pub fn _turboquant_config(&self) -> _TurboQuantConfig {
+        _TurboQuantConfig {
             k_type: "turbo3".to_string(),
             v_type: "turbo3".to_string(),
             kv_tail_tokens: 1024,
@@ -1060,7 +1060,7 @@ pub struct MixedPrecisionRule {
 
 /// TurboQuant KV cache configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurboQuantConfig {
+pub struct _TurboQuantConfig {
     pub k_type: String,
     pub v_type: String,
     pub kv_tail_tokens: usize,
@@ -1094,7 +1094,7 @@ pub struct ImportanceMatrix {
 
 impl ImportanceMatrix {
     /// Compute importance matrix from activations
-    pub fn from_activations(calibration_data: &[f64], method: IMMethod) -> Self {
+    pub fn _from_activations(calibration_data: &[f64], method: IMMethod) -> Self {
         // Compute importance scores based on activation magnitudes
         let values: Vec<f64> = calibration_data.iter()
             .map(|a| a.abs())
@@ -1118,7 +1118,7 @@ impl ImportanceMatrix {
 
 impl GGUFModel {
     /// Load GGUF model metadata
-    pub fn load_metadata(path: &str) -> Result<Self, String> {
+    pub fn _load_metadata(path: &str) -> Result<Self, String> {
         Ok(Self {
             model_path: path.to_string(),
             quantization_level: "Q4_K_M".to_string(),

@@ -46,14 +46,14 @@ pub struct AppleSiliconOptimizer {
     /// Metal performance shader support
     pub metal_support: bool,
     /// MLX framework available
-    pub mlx_available: bool,
+    pub _mlx_available: bool,
     /// Actual benchmark results for this hardware
-    pub benchmarks: Vec<ActualBenchmark>,
+    pub benchmarks: Vec<_ActualBenchmark>,
 }
 
 /// Actual benchmark result from real hardware testing
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActualBenchmark {
+pub struct _ActualBenchmark {
     pub model: String,
     pub quantization: String,
     pub kv_cache_type: String,
@@ -89,7 +89,7 @@ pub enum AppleChip {
 
 impl AppleChip {
     /// Get number of GPU cores
-    pub fn gpu_cores(&self) -> usize {
+    pub fn _gpu_cores(&self) -> usize {
         match self {
             AppleChip::M1 | AppleChip::M1Pro => 7,
             AppleChip::M1Max | AppleChip::M1Ultra => 38,
@@ -156,15 +156,15 @@ impl AppleSiliconOptimizer {
             memory_bandwidth_gbps: 200.0,  // M5 base ~200 GB/s
             neural_engine: true,
             metal_support: true,
-            mlx_available: true,
+            _mlx_available: true,
             benchmarks: Self::m5_16gb_benchmarks(),
         })
     }
     
     /// Actual benchmarks for M5 16GB (measured 2026-09-01)
-    fn m5_16gb_benchmarks() -> Vec<ActualBenchmark> {
+    fn m5_16gb_benchmarks() -> Vec<_ActualBenchmark> {
         vec![
-            ActualBenchmark {
+            _ActualBenchmark {
                 model: "Qwen3.5-9B-Q5_K_M".to_string(),
                 quantization: "Q5_K_M".to_string(),
                 kv_cache_type: "q4_0".to_string(),
@@ -175,7 +175,7 @@ impl AppleSiliconOptimizer {
                 memory_gb: 8.5,
                 context_length: 4096,
             },
-            ActualBenchmark {
+            _ActualBenchmark {
                 model: "Qwen3.5-9B-Q5_K_M".to_string(),
                 quantization: "Q5_K_M".to_string(),
                 kv_cache_type: "f16".to_string(),
@@ -186,7 +186,7 @@ impl AppleSiliconOptimizer {
                 memory_gb: 10.2,
                 context_length: 4096,
             },
-            ActualBenchmark {
+            _ActualBenchmark {
                 model: "Qwen3.5-9B-Q5_K_M".to_string(),
                 quantization: "Q5_K_M".to_string(),
                 kv_cache_type: "q4_0".to_string(),
@@ -197,7 +197,7 @@ impl AppleSiliconOptimizer {
                 memory_gb: 8.5,
                 context_length: 4096,
             },
-            ActualBenchmark {
+            _ActualBenchmark {
                 model: "Qwen3.5-9B-Q5_K_M".to_string(),
                 quantization: "Q5_K_M".to_string(),
                 kv_cache_type: "q4_0".to_string(),
@@ -212,12 +212,12 @@ impl AppleSiliconOptimizer {
     }
     
     /// Get optimal llama.cpp CLI arguments for a model
-    pub fn optimal_llama_cpp_args(&self, model_path: &str, model_size_gb: f64) -> OptimalLlamaArgs {
-        let kv_headroom = self.kv_cache_headroom(model_size_gb);
+    pub fn _optimal_llama_cpp_args(&self, model_path: &str, model_size_gb: f64) -> _OptimalLlamaArgs {
+        let kv_headroom = self._kv_cache_headroom(model_size_gb);
         
         // M5 16GB: MLX unavailable (<32GB), use llama.cpp with optimal settings
         if self.unified_memory_gb < 32.0 {
-            return OptimalLlamaArgs {
+            return _OptimalLlamaArgs {
                 runtime: "llama.cpp".to_string(),
                 args: vec![
                     "-m".to_string(), model_path.to_string(),
@@ -242,7 +242,7 @@ impl AppleSiliconOptimizer {
         }
         
         // 32GB+ : MLX backend
-        OptimalLlamaArgs {
+        _OptimalLlamaArgs {
             runtime: "MLX (via Ollama 0.19+)".to_string(),
             args: vec![],
             expected_gen_tok_s: 18.0,
@@ -255,12 +255,12 @@ impl AppleSiliconOptimizer {
 }
     
     /// Check if MLX backend is available (requires 32GB+)
-    pub fn mlx_available(&self) -> bool {
-        self.unified_memory_gb >= 32.0 && self.mlx_available
+    pub fn _mlx_available(&self) -> bool {
+        self.unified_memory_gb >= 32.0 && self._mlx_available
     }
     
     /// Check if this hardware qualifies for Ollama MLX backend
-    pub fn ollama_mlx_qualifies(&self) -> bool {
+    pub fn _ollama_mlx_qualifies(&self) -> bool {
         self.unified_memory_gb >= 32.0
     }
     
@@ -316,18 +316,18 @@ impl AppleSiliconOptimizer {
     }
     
     /// Select best runtime for this hardware
-    pub fn select_runtime(&self, vram_gb: f64) -> RuntimeSelection {
-        if self.mlx_available() && vram_gb >= 32.0 {
+    pub fn _select_runtime(&self, vram_gb: f64) -> RuntimeSelection {
+        if self._mlx_available() && vram_gb >= 32.0 {
             RuntimeSelection {
-                primary: PrimaryRuntime::MLX,
-                fallback: FallbackRuntime::LlamaCpp,
+                primary: _PrimaryRuntime::MLX,
+                fallback: _FallbackRuntime::LlamaCpp,
                 reason: "MLX backend available with 32GB+ unified memory".to_string(),
                 speedup: 2.0,
             }
         } else {
             RuntimeSelection {
-                primary: PrimaryRuntime::LlamaCpp,
-                fallback: FallbackRuntime::None,
+                primary: _PrimaryRuntime::LlamaCpp,
+                fallback: _FallbackRuntime::None,
                 reason: "MLX requires 32GB+ unified memory".to_string(),
                 speedup: 1.0,
             }
@@ -335,14 +335,14 @@ impl AppleSiliconOptimizer {
     }
     
     /// Get memory headroom for KV cache
-    pub fn kv_cache_headroom(&self, model_size_gb: f64) -> f64 {
+    pub fn _kv_cache_headroom(&self, model_size_gb: f64) -> f64 {
         let available = self.unified_memory_gb - model_size_gb - 2.0; // 2GB for OS
         available.max(0.0)
     }
     
     /// Estimate context capacity with MLX
-    pub fn estimate_context_capacity(&self, model_size_gb: f64, kv_cache_gb: f64) -> usize {
-        let available_gb = self.kv_cache_headroom(model_size_gb);
+    pub fn _estimate_context_capacity(&self, model_size_gb: f64, kv_cache_gb: f64) -> usize {
+        let available_gb = self._kv_cache_headroom(model_size_gb);
         let available_bytes = available_gb * 1_073_741_824.0;
         let bytes_per_token = kv_cache_gb * 1_073_741_824.0 / 128_000.0; // Assume 128K context
         
@@ -357,15 +357,15 @@ impl AppleSiliconOptimizer {
 /// Runtime selection result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeSelection {
-    pub primary: PrimaryRuntime,
-    pub fallback: FallbackRuntime,
+    pub primary: _PrimaryRuntime,
+    pub fallback: _FallbackRuntime,
     pub reason: String,
     pub speedup: f64,
 }
 
 /// Primary runtime choice
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PrimaryRuntime {
+pub enum _PrimaryRuntime {
     MLX,
     LlamaCpp,
     Ollama,
@@ -373,7 +373,7 @@ pub enum PrimaryRuntime {
 
 /// Fallback runtime choice
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FallbackRuntime {
+pub enum _FallbackRuntime {
     MLX,
     LlamaCpp,
     None,
@@ -381,7 +381,7 @@ pub enum FallbackRuntime {
 
 /// Apple Silicon memory layout
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryLayout {
+pub struct _MemoryLayout {
     pub total_gb: f64,
     pub model_gb: f64,
     pub kv_cache_gb: f64,
@@ -392,7 +392,7 @@ pub struct MemoryLayout {
 
 /// Optimal llama.cpp CLI arguments
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OptimalLlamaArgs {
+pub struct _OptimalLlamaArgs {
     pub runtime: String,
     pub args: Vec<String>,
     pub expected_gen_tok_s: f64,
@@ -404,16 +404,16 @@ pub struct OptimalLlamaArgs {
 
 /// MLX conversion pipeline
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MLXConversion {
+pub struct _MLXConversion {
     pub source_format: String,  // "GGUF", "safetensors"
     pub target_format: String,  // "MLX"
     pub conversion_time_s: f64,
     pub output_size_gb: f64,
 }
 
-impl MLXConversion {
+impl _MLXConversion {
     /// Convert GGUF to MLX format
-    pub fn convert_gguf_to_mlx(gguf_path: &str) -> Result<Self, String> {
+    pub fn _convert_gguf_to_mlx(gguf_path: &str) -> Result<Self, String> {
         // TODO: Run mlx_lm.convert_from_gguf or similar
         Ok(Self {
             source_format: "GGUF".to_string(),

@@ -2,34 +2,34 @@ use rand::Rng;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BehaviorProfile {
+pub enum _BehaviorProfile {
     Human,
     Automated,
     Mixed,
 }
 
-impl BehaviorProfile {
-    pub fn typos_per_100_chars(&self) -> f64 {
+impl _BehaviorProfile {
+    pub fn _typos_per_100_chars(&self) -> f64 {
         match self {
-            BehaviorProfile::Human => 2.5,
-            BehaviorProfile::Automated => 0.02,
-            BehaviorProfile::Mixed => 0.8,
+            _BehaviorProfile::Human => 2.5,
+            _BehaviorProfile::Automated => 0.02,
+            _BehaviorProfile::Mixed => 0.8,
         }
     }
 
-    pub fn action_delay_ms(&self) -> (u64, u64) {
+    pub fn _action_delay_ms(&self) -> (u64, u64) {
         match self {
-            BehaviorProfile::Human => (80, 350),
-            BehaviorProfile::Automated => (5, 20),
-            BehaviorProfile::Mixed => (30, 120),
+            _BehaviorProfile::Human => (80, 350),
+            _BehaviorProfile::Automated => (5, 20),
+            _BehaviorProfile::Mixed => (30, 120),
         }
     }
 
-    pub fn scroll_pattern(&self) -> &str {
+    pub fn _scroll_pattern(&self) -> &str {
         match self {
-            BehaviorProfile::Human => "variable",
-            BehaviorProfile::Automated => "linear",
-            BehaviorProfile::Mixed => "semi_variable",
+            _BehaviorProfile::Human => "variable",
+            _BehaviorProfile::Automated => "linear",
+            _BehaviorProfile::Mixed => "semi_variable",
         }
     }
 }
@@ -43,7 +43,7 @@ pub struct Identity {
     pub use_count: usize,
     pub success_rate: f64,
     pub confidence: f64,
-    pub behavior: BehaviorProfile,
+    pub behavior: _BehaviorProfile,
     pub user_agent: String,
     pub screen_resolution: (u32, u32),
     pub language: String,
@@ -54,7 +54,7 @@ pub struct Identity {
 }
 
 impl Identity {
-    fn new(id: usize, name: &str, behavior: BehaviorProfile) -> Self {
+    fn new(id: usize, name: &str, behavior: _BehaviorProfile) -> Self {
         let now = SystemTime::now();
         Self {
             id,
@@ -102,11 +102,11 @@ pub struct IdentityPool {
     pub active_ids: Vec<usize>,
     pub retired_ids: Vec<usize>,
     pub pool_size: usize,
-    pub rotation_strategy: RotationStrategy,
+    pub rotation_strategy: _RotationStrategy,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum RotationStrategy {
+pub enum _RotationStrategy {
     LeastUsed,
     RoundRobin,
     HighestConfidence,
@@ -115,7 +115,7 @@ pub enum RotationStrategy {
 }
 
 impl IdentityPool {
-    pub fn new(pool_size: usize, strategy: RotationStrategy) -> Self {
+    pub fn new(pool_size: usize, strategy: _RotationStrategy) -> Self {
         let mut pool = Self {
             identities: Vec::with_capacity(pool_size),
             active_ids: Vec::new(),
@@ -131,9 +131,9 @@ impl IdentityPool {
         for i in 0..self.pool_size {
             let profile_idx = i % 3;
             let profile = match profile_idx {
-                0 => BehaviorProfile::Human,
-                1 => BehaviorProfile::Mixed,
-                _ => BehaviorProfile::Automated,
+                0 => _BehaviorProfile::Human,
+                1 => _BehaviorProfile::Mixed,
+                _ => _BehaviorProfile::Automated,
             };
             let mut identity = Identity::new(i, &format!("identity_{}", i), profile);
             identity.user_agent = match i % 4 {
@@ -180,12 +180,12 @@ impl IdentityPool {
         }
 
         let idx = match self.rotation_strategy {
-            RotationStrategy::LeastUsed => {
+            _RotationStrategy::LeastUsed => {
                 candidates.into_iter()
                     .min_by_key(|id| self.identities[*id].use_count)
                     .unwrap_or(0)
             }
-            RotationStrategy::RoundRobin => {
+            _RotationStrategy::RoundRobin => {
                 let next = candidates.iter()
                     .min_by_key(|id| {
                         self.identities[**id].last_used
@@ -197,7 +197,7 @@ impl IdentityPool {
                     .unwrap_or(0);
                 next
             }
-            RotationStrategy::HighestConfidence => {
+            _RotationStrategy::HighestConfidence => {
                 candidates.into_iter()
                     .max_by(|a, b| {
                         self.identities[*a].confidence
@@ -206,11 +206,11 @@ impl IdentityPool {
                     })
                     .unwrap_or(0)
             }
-            RotationStrategy::Random => {
+            _RotationStrategy::Random => {
                 let i = rand::thread_rng().gen_range(0..candidates.len());
                 candidates[i]
             }
-            RotationStrategy::Targeted => {
+            _RotationStrategy::Targeted => {
                 candidates.into_iter()
                     .max_by(|a, b| {
                         let sa = self.identities[*a].success_rate * self.identities[*a].confidence;
@@ -239,9 +239,9 @@ impl IdentityPool {
         let start = self.identities.len();
         for i in 0..needed {
             let profile = match i % 3 {
-                0 => BehaviorProfile::Human,
-                1 => BehaviorProfile::Mixed,
-                _ => BehaviorProfile::Automated,
+                0 => _BehaviorProfile::Human,
+                1 => _BehaviorProfile::Mixed,
+                _ => _BehaviorProfile::Automated,
             };
             let mut identity = Identity::new(start + i, &format!("identity_{}", start + i), profile);
             identity.confidence = 0.4;
@@ -252,7 +252,7 @@ impl IdentityPool {
         needed
     }
 
-    pub fn stats(&self) -> PoolStats {
+    pub fn stats(&self) -> _PoolStats {
         let active = self.active_ids.len();
         let avg_success: f64 = self.active_ids.iter()
             .filter_map(|id| self.identities.get(*id))
@@ -263,7 +263,7 @@ impl IdentityPool {
             .map(|i| i.confidence)
             .sum::<f64>() / active.max(1) as f64;
 
-        PoolStats {
+        _PoolStats {
             total_identities: self.identities.len(),
             active_count: active,
             retired_count: self.retired_ids.len(),
@@ -274,7 +274,7 @@ impl IdentityPool {
 }
 
 #[derive(Debug, Clone)]
-pub struct PoolStats {
+pub struct _PoolStats {
     pub total_identities: usize,
     pub active_count: usize,
     pub retired_count: usize,
@@ -283,31 +283,31 @@ pub struct PoolStats {
 }
 
 #[derive(Debug, Clone)]
-pub struct BehaviorSimulator {
+pub struct _BehaviorSimulator {
     pub base_delay_ms: (u64, u64),
     pub typo_rate: f64,
     pub scroll_variance: f64,
     pub click_jitter_px: f64,
 }
 
-impl Default for BehaviorSimulator {
+impl Default for _BehaviorSimulator {
     fn default() -> Self { Self::new() }
 }
 
-impl BehaviorSimulator {
+impl _BehaviorSimulator {
     pub fn new() -> Self {
         Self { base_delay_ms: (80, 350), typo_rate: 0.025, scroll_variance: 0.3, click_jitter_px: 3.0 }
     }
 
-    pub fn delay_ms(&self, profile: &BehaviorProfile) -> u64 {
-        let base = profile.action_delay_ms();
+    pub fn delay_ms(&self, profile: &_BehaviorProfile) -> u64 {
+        let base = profile._action_delay_ms();
         let jitter = rand::thread_rng().gen_range(0..50u64);
         rand::thread_rng().gen_range(base.0..base.1) + jitter
     }
 
-    pub fn simulate_typing(&self, text: &str, profile: &BehaviorProfile) -> Vec<(char, u64)> {
+    pub fn _simulate_typing(&self, text: &str, profile: &_BehaviorProfile) -> Vec<(char, u64)> {
         let mut keystrokes = Vec::with_capacity(text.len());
-        let typo_rate = profile.typos_per_100_chars() / 100.0;
+        let typo_rate = profile._typos_per_100_chars() / 100.0;
 
         for c in text.chars() {
             let delay = self.delay_ms(profile);
@@ -331,15 +331,15 @@ impl BehaviorSimulator {
         chars.as_bytes()[idx] as char
     }
 
-    pub fn total_typing_time(&self, text: &str, profile: &BehaviorProfile) -> u64 {
-        self.simulate_typing(text, profile).iter().map(|(_, d)| d).sum()
+    pub fn _total_typing_time(&self, text: &str, profile: &_BehaviorProfile) -> u64 {
+        self._simulate_typing(text, profile).iter().map(|(_, d)| d).sum()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct StealthManager {
     pub pool: IdentityPool,
-    pub simulator: BehaviorSimulator,
+    pub simulator: _BehaviorSimulator,
     pub last_rotation: SystemTime,
     pub rotation_interval: Duration,
 }
@@ -347,14 +347,14 @@ pub struct StealthManager {
 impl StealthManager {
     pub fn new(pool_size: usize) -> Self {
         Self {
-            pool: IdentityPool::new(pool_size, RotationStrategy::Targeted),
-            simulator: BehaviorSimulator::new(),
+            pool: IdentityPool::new(pool_size, _RotationStrategy::Targeted),
+            simulator: _BehaviorSimulator::new(),
             last_rotation: SystemTime::now(),
             rotation_interval: Duration::from_secs(3600),
         }
     }
 
-    pub fn get_identity(&mut self, tags: &[String]) -> Option<&mut Identity> {
+    pub fn _get_identity(&mut self, tags: &[String]) -> Option<&mut Identity> {
         let elapsed = self.last_rotation.elapsed().unwrap_or_default();
         if elapsed > self.rotation_interval {
             self.rotate_pool();
@@ -363,7 +363,7 @@ impl StealthManager {
         self.pool.select(tags)
     }
 
-    pub fn get_scored_identity(&mut self, tags: &[String], min_confidence: f64) -> Option<&mut Identity> {
+    pub fn _get_scored_identity(&mut self, tags: &[String], min_confidence: f64) -> Option<&mut Identity> {
         let idx = self.pool.select(tags)
             .filter(|id| id.confidence >= min_confidence)
             .map(|id| id.id);
@@ -408,9 +408,9 @@ impl StealthManager {
         self.pool.replenish();
     }
 
-    pub fn stats(&self) -> StealthManagerStats {
+    pub fn stats(&self) -> _StealthManagerStats {
         let pool_stats = self.pool.stats();
-        StealthManagerStats {
+        _StealthManagerStats {
             total_identities: pool_stats.total_identities,
             active_count: pool_stats.active_count,
             retired_count: pool_stats.retired_count,
@@ -422,7 +422,7 @@ impl StealthManager {
 }
 
 #[derive(Debug, Clone)]
-pub struct StealthManagerStats {
+pub struct _StealthManagerStats {
     pub total_identities: usize,
     pub active_count: usize,
     pub retired_count: usize,
@@ -437,14 +437,14 @@ mod tests {
 
     #[test]
     fn test_identity_pool_init() {
-        let pool = IdentityPool::new(5, RotationStrategy::LeastUsed);
+        let pool = IdentityPool::new(5, _RotationStrategy::LeastUsed);
         assert_eq!(pool.identities.len(), 5);
         assert_eq!(pool.active_ids.len(), 5);
     }
 
     #[test]
     fn test_select_identity() {
-        let mut pool = IdentityPool::new(3, RotationStrategy::Random);
+        let mut pool = IdentityPool::new(3, _RotationStrategy::Random);
         let tags = vec!["pool_0".to_string()];
         let identity = pool.select(&tags);
         assert!(identity.is_some());
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_retire_and_replenish() {
-        let mut pool = IdentityPool::new(4, RotationStrategy::RoundRobin);
+        let mut pool = IdentityPool::new(4, _RotationStrategy::RoundRobin);
         assert!(pool.retire(0));
         assert_eq!(pool.active_ids.len(), 3);
 
@@ -464,8 +464,8 @@ mod tests {
 
     #[test]
     fn test_behavior_simulator_typing() {
-        let sim = BehaviorSimulator::new();
-        let keystrokes = sim.simulate_typing("hello", &BehaviorProfile::Human);
+        let sim = _BehaviorSimulator::new();
+        let keystrokes = sim._simulate_typing("hello", &_BehaviorProfile::Human);
         assert!(!keystrokes.is_empty());
         assert_eq!(keystrokes[0].0, 'h');
     }
@@ -474,7 +474,7 @@ mod tests {
     fn test_nt_shield_manager_get_identity() {
         let mut sm = StealthManager::new(3);
         let tags = vec![];
-        let identity = sm.get_identity(&tags);
+        let identity = sm._get_identity(&tags);
         assert!(identity.is_some());
     }
 
@@ -489,8 +489,8 @@ mod tests {
 
     #[test]
     fn test_strategy_rotation() {
-        let mut a = IdentityPool::new(3, RotationStrategy::LeastUsed);
-        let mut b = IdentityPool::new(3, RotationStrategy::HighestConfidence);
+        let mut a = IdentityPool::new(3, _RotationStrategy::LeastUsed);
+        let mut b = IdentityPool::new(3, _RotationStrategy::HighestConfidence);
         let tags = vec![];
 
         let id_a = a.select(&tags);
@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn test_pool_stats() {
-        let pool = IdentityPool::new(4, RotationStrategy::Random);
+        let pool = IdentityPool::new(4, _RotationStrategy::Random);
         let stats = pool.stats();
         assert_eq!(stats.total_identities, 4);
         assert_eq!(stats.active_count, 4);

@@ -4,7 +4,7 @@
 
 /// TUN设备配置
 #[derive(Debug, Clone)]
-pub struct TunConfig {
+pub struct _TunConfig {
     /// 设备名称 (None=自动分配)
     pub name: Option<String>,
     /// IP地址
@@ -15,7 +15,7 @@ pub struct TunConfig {
     pub mtu: u16,
 }
 
-impl Default for TunConfig {
+impl Default for _TunConfig {
     fn default() -> Self {
         Self {
             name: None,
@@ -28,7 +28,7 @@ impl Default for TunConfig {
 
 /// TUN设备错误
 #[derive(Debug, thiserror::Error)]
-pub enum TunError {
+pub enum _TunError {
     #[error("device not found: {0}")]
     DeviceNotFound(String),
     #[error("permission denied")]
@@ -40,28 +40,28 @@ pub enum TunError {
 }
 
 /// TUN设备 trait
-pub trait TunDevice: Send + Sync {
+pub trait _TunDevice: Send + Sync {
     /// 读取数据包
-    fn read_packet(&mut self, buf: &mut [u8]) -> Result<usize, TunError>;
+    fn read_packet(&mut self, buf: &mut [u8]) -> Result<usize, _TunError>;
 
     /// 写入数据包
-    fn write_packet(&mut self, data: &[u8]) -> Result<usize, TunError>;
+    fn write_packet(&mut self, data: &[u8]) -> Result<usize, _TunError>;
 
     /// 获取设备名称
     fn name(&self) -> &str;
 
     /// 关闭设备
-    fn close(&mut self) -> Result<(), TunError>;
+    fn close(&mut self) -> Result<(), _TunError>;
 }
 
 /// 模拟TUN设备 (用于测试)
-pub struct MockTunDevice {
+pub struct _MockTunDevice {
     name: String,
     rx_queue: std::collections::VecDeque<Vec<u8>>,
     tx_queue: std::collections::VecDeque<Vec<u8>>,
 }
 
-impl MockTunDevice {
+impl _MockTunDevice {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -71,18 +71,18 @@ impl MockTunDevice {
     }
 
     /// 注入待读取的数据包
-    pub fn inject_rx(&mut self, data: Vec<u8>) {
+    pub fn _inject_rx(&mut self, data: Vec<u8>) {
         self.rx_queue.push_back(data);
     }
 
     /// 获取已写入的数据包
-    pub fn take_tx(&mut self) -> Option<Vec<u8>> {
+    pub fn _take_tx(&mut self) -> Option<Vec<u8>> {
         self.tx_queue.pop_front()
     }
 }
 
-impl TunDevice for MockTunDevice {
-    fn read_packet(&mut self, buf: &mut [u8]) -> Result<usize, TunError> {
+impl _TunDevice for _MockTunDevice {
+    fn read_packet(&mut self, buf: &mut [u8]) -> Result<usize, _TunError> {
         match self.rx_queue.pop_front() {
             Some(data) => {
                 let len = std::cmp::min(data.len(), buf.len());
@@ -93,7 +93,7 @@ impl TunDevice for MockTunDevice {
         }
     }
 
-    fn write_packet(&mut self, data: &[u8]) -> Result<usize, TunError> {
+    fn write_packet(&mut self, data: &[u8]) -> Result<usize, _TunError> {
         self.tx_queue.push_back(data.to_vec());
         Ok(data.len())
     }
@@ -102,7 +102,7 @@ impl TunDevice for MockTunDevice {
         &self.name
     }
 
-    fn close(&mut self) -> Result<(), TunError> {
+    fn close(&mut self) -> Result<(), _TunError> {
         Ok(())
     }
 }
@@ -113,10 +113,10 @@ mod tests {
 
     #[test]
     fn mock_tun_read_write() {
-        let mut device = MockTunDevice::new("test0");
+        let mut device = _MockTunDevice::new("test0");
 
         // 注入数据
-        device.inject_rx(vec![0x45, 0x00, 0x00, 0x1c]); // IPv4 header start
+        device._inject_rx(vec![0x45, 0x00, 0x00, 0x1c]); // IPv4 header start
 
         // 读取
         let mut buf = [0u8; 100];
@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(written, 2);
 
         // 获取写入的数据
-        let tx = device.take_tx().unwrap();
+        let tx = device._take_tx().unwrap();
         assert_eq!(tx, vec![0x45, 0x00]);
     }
 }

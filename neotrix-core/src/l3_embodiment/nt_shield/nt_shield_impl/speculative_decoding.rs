@@ -26,11 +26,11 @@ use serde::{Deserialize, Serialize};
 /// Speculative decoding engine
 pub struct SpeculativeDecoder {
     /// Draft model configuration
-    pub draft_model: DraftModelConfig,
+    pub draft_model: _DraftModelConfig,
     /// Target model configuration
-    pub target_model: TargetModelConfig,
+    pub target_model: _TargetModelConfig,
     /// Verification strategy
-    pub verification: VerificationStrategy,
+    pub verification: _VerificationStrategy,
     /// Acceptance tracking
     pub acceptance_stats: AcceptanceStats,
     /// Enabled speculative methods
@@ -39,7 +39,7 @@ pub struct SpeculativeDecoder {
 
 /// Draft model configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DraftModelConfig {
+pub struct _DraftModelConfig {
     pub model_name: String,
     pub model_path: String,
     pub quantization: String,
@@ -50,7 +50,7 @@ pub struct DraftModelConfig {
 
 /// Target model configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TargetModelConfig {
+pub struct _TargetModelConfig {
     pub model_name: String,
     pub model_path: String,
     pub quantization: String,
@@ -59,7 +59,7 @@ pub struct TargetModelConfig {
 
 /// Verification strategy
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum VerificationStrategy {
+pub enum _VerificationStrategy {
     /// EAGLE: Ensemble verification
     EAGLE,
     /// Medusa: Parallel multi-head verification
@@ -97,7 +97,7 @@ impl SpeculativeDecoder {
     /// Create default speculative decoder
     pub fn new() -> Self {
         Self {
-            draft_model: DraftModelConfig {
+            draft_model: _DraftModelConfig {
                 model_name: "small-llama".to_string(),
                 model_path: String::new(),
                 quantization: "Q4_K_M".to_string(),
@@ -105,13 +105,13 @@ impl SpeculativeDecoder {
                 use_flash_attention: true,
                 cache_type: "f16".to_string(),
             },
-            target_model: TargetModelConfig {
+            target_model: _TargetModelConfig {
                 model_name: String::new(),
                 model_path: String::new(),
                 quantization: "Q4_K_M".to_string(),
                 max_new_tokens: 512,
             },
-            verification: VerificationStrategy::EAGLE,
+            verification: _VerificationStrategy::EAGLE,
             acceptance_stats: AcceptanceStats {
                 total_draft_tokens: 0,
                 accepted_tokens: 0,
@@ -124,31 +124,31 @@ impl SpeculativeDecoder {
     }
     
     /// Enable EAGLE speculative decoding
-    pub fn enable_eagle(&mut self) {
-        self.verification = VerificationStrategy::EAGLE;
+    pub fn _enable_eagle(&mut self) {
+        self.verification = _VerificationStrategy::EAGLE;
         self.enabled_methods.insert("eagle".to_string(), true);
     }
     
     /// Enable Medusa speculative decoding
-    pub fn enable_medusa(&mut self) {
-        self.verification = VerificationStrategy::Medusa;
+    pub fn _enable_medusa(&mut self) {
+        self.verification = _VerificationStrategy::Medusa;
         self.enabled_methods.insert("medusa".to_string(), true);
     }
     
     /// Enable MTP (DeepSeek V4 style)
-    pub fn enable_mtp(&mut self) {
-        self.verification = VerificationStrategy::MTP;
+    pub fn _enable_mtp(&mut self) {
+        self.verification = _VerificationStrategy::MTP;
         self.enabled_methods.insert("mtp".to_string(), true);
     }
     
     /// Enable DFlash speculative decoding
-    pub fn enable_dflash(&mut self) {
-        self.verification = VerificationStrategy::DFlash;
+    pub fn _enable_dflash(&mut self) {
+        self.verification = _VerificationStrategy::DFlash;
         self.enabled_methods.insert("dflash".to_string(), true);
     }
     
     /// Configure draft model
-    pub fn with_draft_model(
+    pub fn _with_draft_model(
         &mut self,
         model_name: &str,
         num_tokens: usize,
@@ -185,7 +185,7 @@ impl SpeculativeDecoder {
     }
     
     /// Update acceptance stats from generation
-    pub fn update_acceptance(&mut self, task_type: &str, accepted: usize, total: usize) {
+    pub fn _update_acceptance(&mut self, task_type: &str, accepted: usize, total: usize) {
         if total > 0 {
             let rate = accepted as f64 / total as f64;
             self.acceptance_stats.by_task_type
@@ -200,19 +200,19 @@ impl SpeculativeDecoder {
     }
     
     /// Get best speculative method for task
-    pub fn get_best_method(&self, task_type: &str) -> VerificationStrategy {
+    pub fn _get_best_method(&self, task_type: &str) -> _VerificationStrategy {
         match task_type {
-            "coding" | "tool_calls" => VerificationStrategy::EAGLE,
-            "creative_writing" | "chat" => VerificationStrategy::Medusa,
-            "reasoning" => VerificationStrategy::MTP,
-            _ => VerificationStrategy::EAGLE,
+            "coding" | "tool_calls" => _VerificationStrategy::EAGLE,
+            "creative_writing" | "chat" => _VerificationStrategy::Medusa,
+            "reasoning" => _VerificationStrategy::MTP,
+            _ => _VerificationStrategy::EAGLE,
         }
     }
 }
 
 /// TokenSpeed: Custom MLA kernel for agentic traces
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TokenSpeedConfig {
+pub struct _TokenSpeedConfig {
     /// Enable TokenSpeed backend in vLLM
     pub enabled: bool,
     /// Custom MLA kernel for agentic trace patterns
@@ -223,7 +223,7 @@ pub struct TokenSpeedConfig {
     pub acceptance_threshold: f64,
 }
 
-impl TokenSpeedConfig {
+impl _TokenSpeedConfig {
     pub fn production_defaults() -> Self {
         Self {
             enabled: true,
@@ -236,7 +236,7 @@ impl TokenSpeedConfig {
 
 /// DeepSeek V4 MTP configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MTPConfig {
+pub struct _MTPConfig {
     /// Number of MTP heads (check model docs)
     pub num_mtp_heads: usize,
     /// Prediction depth per step
@@ -247,13 +247,13 @@ pub struct MTPConfig {
 
 /// Multi-model speculative setup
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MultiModelSetup {
+pub struct _MultiModelSetup {
     /// Target model (large, accurate)
-    pub target: TargetModelConfig,
+    pub target: _TargetModelConfig,
     /// Draft model 1 (small, fast)
-    pub draft_1: DraftModelConfig,
+    pub draft_1: _DraftModelConfig,
     /// Draft model 2 (optional, specialized)
-    pub draft_2: Option<DraftModelConfig>,
+    pub draft_2: Option<_DraftModelConfig>,
     /// Verification cascade order
     pub cascade_order: Vec<String>,
 }
@@ -268,7 +268,7 @@ pub struct M5SpeculativeBenchmarks;
 impl M5SpeculativeBenchmarks {
     /// 实测数据: Qwen3.5-9B Q5_K_M on M5 16GB
     /// Draft model: Qwen3-1.5B Q4_K_M (2.4 GiB)
-    pub fn qwen35_9b_benchmarks() -> Vec<SpecBenchmark> {
+    pub fn _qwen35_9b_benchmarks() -> Vec<SpecBenchmark> {
         vec![
             SpecBenchmark {
                 method: "ngram-simple".to_string(),
@@ -318,7 +318,7 @@ impl M5SpeculativeBenchmarks {
     }
     
     /// 推荐最优 speculative 方法 for M5 16GB
-    pub fn recommend_for_m5(task: &str) -> &'static str {
+    pub fn _recommend_for_m5(task: &str) -> &'static str {
         match task {
             "coding" | "tool_calls" | "agent" => "eagle",
             "chat" | "creative_writing" => "medusa",
@@ -328,7 +328,7 @@ impl M5SpeculativeBenchmarks {
     }
     
     /// 预估 M5 上的速度提升
-    pub fn estimate_speedup(method: &str, acceptance_rate: f64, base_tok_s: f64) -> f64 {
+    pub fn _estimate_speedup(method: &str, acceptance_rate: f64, base_tok_s: f64) -> f64 {
         match method {
             "eagle" => {
                 // EAGLE: draft 1.5B generates 4 tokens, ~65% accepted

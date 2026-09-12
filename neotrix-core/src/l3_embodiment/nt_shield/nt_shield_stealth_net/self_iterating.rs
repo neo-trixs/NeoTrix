@@ -71,7 +71,7 @@ impl FingerprintManager {
             generator: gen,
             store_path,
             current_timing_jitter: 50..300,
-            rotation_profiles: RotationProfile::default_pool(),
+            rotation_profiles: RotationProfile::_default_pool(),
             use_kb: true,
         }
     }
@@ -177,7 +177,7 @@ impl FingerprintManager {
         }
     }
 
-    pub fn report_result(&mut self, success: bool) {
+    pub fn _report_result(&mut self, success: bool) {
         let fp = &mut self.fingerprints[self.current_index];
         if success { fp.success_count += 1; } else { fp.fail_count += 1; }
         let interval = self.rotation_interval.load(Ordering::Relaxed);
@@ -187,7 +187,7 @@ impl FingerprintManager {
         self.save();
     }
 
-    pub fn apply_headers(&self) -> HashMap<String, String> {
+    pub fn _apply_headers(&self) -> HashMap<String, String> {
         let fp = self.current();
         let mut headers = fp.headers.clone();
         headers.insert("User-Agent".to_string(), self.ua_from_fingerprint(&fp.system));
@@ -248,20 +248,20 @@ impl FingerprintManager {
         self.save();
     }
 
-    pub fn reset_to_defaults(&mut self) {
+    pub fn _reset_to_defaults(&mut self) {
         self.fingerprints = Self::generate_initial(&self.generator);
         self.current_index = 0;
         self.save();
     }
 
-    pub fn purge_all(&mut self) {
+    pub fn _purge_all(&mut self) {
         self.fingerprints = Self::generate_initial(&self.generator);
         self.current_index = 0;
         self.save();
     }
 
     /// 生成新指纹变体 — 随机平台+浏览器组合
-    pub fn spawn_variant(&mut self) {
+    pub fn _spawn_variant(&mut self) {
         let mut rng = rand::thread_rng();
         let platforms = Platform::all();
         let nt_world_browses = Browser::all();
@@ -294,7 +294,7 @@ impl FingerprintManager {
         self.fingerprints.len()
     }
 
-    pub fn best_success_rate(&self) -> f64 {
+    pub fn _best_success_rate(&self) -> f64 {
         self.fingerprints.iter()
             .map(|f| f.success_rate())
             .fold(0.0f64, |a, b| a.max(b))
@@ -306,7 +306,7 @@ impl FingerprintManager {
     }
 
     /// Apply a RotationProfile — synchronously switch fingerprint + timing + TLS
-    pub fn apply_profile(&mut self, profile: &RotationProfile) {
+    pub fn _apply_profile(&mut self, profile: &RotationProfile) {
         let mut rng = rand::thread_rng();
         if !self.fingerprints.is_empty() {
             self.current_index = rng.gen_range(0..self.fingerprints.len());
@@ -317,11 +317,11 @@ impl FingerprintManager {
     /// Atomic rotation: pick random profile, apply all dimensions
     pub fn atomic_rotate(&mut self) {
         let profile = select_profile(&self.rotation_profiles).clone();
-        self.apply_profile(&profile);
+        self._apply_profile(&profile);
     }
 
     /// Replace the rotation profile pool
-    pub fn set_rotation_profiles(&mut self, profiles: Vec<RotationProfile>) {
+    pub fn _set_rotation_profiles(&mut self, profiles: Vec<RotationProfile>) {
         self.rotation_profiles = profiles;
     }
 }
@@ -331,18 +331,18 @@ impl FingerprintManager {
 pub struct StealthLearning {
     pub iteration: u64,
     pub fingerprint_count: usize,
-    pub best_success_rate: f64,
+    pub _best_success_rate: f64,
     pub total_requests: u64,
 }
 
 impl StealthLearning {
-    pub fn to_reasoning_memory(&self, task: &str) -> crate::core::nt_core_bank::ReasoningMemory {
+    pub fn _to_reasoning_memory(&self, task: &str) -> crate::core::nt_core_bank::ReasoningMemory {
         use crate::core::nt_core_knowledge::TaskType;
         crate::core::nt_core_bank::ReasoningMemory::new(
             task,
             TaskType::CodeAnalysis,
             &[],
-            self.best_success_rate,
+            self._best_success_rate,
         )
     }
 }
@@ -370,33 +370,33 @@ impl SelfIteratingStealth {
     }
 
     pub async fn stealth_fetch(&mut self, url: &str) -> Result<super::Response, String> {
-        let headers = self.fingerprint_manager.apply_headers();
+        let headers = self.fingerprint_manager._apply_headers();
         self.client.set_extra_headers(headers).await;
         let result = self.client.fetch(url).await;
         let success = result.is_ok();
-        self.fingerprint_manager.report_result(success);
+        self.fingerprint_manager._report_result(success);
         self.iteration += 1;
         result
     }
 
     pub fn self_iterate(&mut self) -> StealthLearning {
-        let best_rate = self.fingerprint_manager.best_success_rate();
+        let best_rate = self.fingerprint_manager._best_success_rate();
         if best_rate < 0.3 && self.fingerprint_manager.fingerprint_count() < 20 {
-            self.fingerprint_manager.spawn_variant();
+            self.fingerprint_manager._spawn_variant();
         }
         StealthLearning {
             iteration: self.iteration,
             fingerprint_count: self.fingerprint_manager.fingerprint_count(),
-            best_success_rate: best_rate,
+            _best_success_rate: best_rate,
             total_requests: self.fingerprint_manager.total_requests(),
         }
     }
 
-    pub fn learning_report(&self) -> StealthLearning {
+    pub fn _learning_report(&self) -> StealthLearning {
         StealthLearning {
             iteration: self.iteration,
             fingerprint_count: self.fingerprint_manager.fingerprint_count(),
-            best_success_rate: self.fingerprint_manager.best_success_rate(),
+            _best_success_rate: self.fingerprint_manager._best_success_rate(),
             total_requests: self.fingerprint_manager.total_requests(),
         }
     }
@@ -415,7 +415,7 @@ pub struct RotationProfile {
 
 impl RotationProfile {
     /// Chrome on Windows — common baseline profile
-    pub fn chrome_win_default() -> Self {
+    pub fn _chrome_win_default() -> Self {
         Self {
             proxy_node: None,
             fingerprint_idx: 0,
@@ -426,7 +426,7 @@ impl RotationProfile {
     }
 
     /// Firefox on macOS — longer jitter, different cipher order
-    pub fn firefox_mac_default() -> Self {
+    pub fn _firefox_mac_default() -> Self {
         Self {
             proxy_node: None,
             fingerprint_idx: 1,
@@ -437,7 +437,7 @@ impl RotationProfile {
     }
 
     /// Safari on iOS — mobile profile, legacy strict TLS
-    pub fn safari_ios_default() -> Self {
+    pub fn _safari_ios_default() -> Self {
         Self {
             proxy_node: None,
             fingerprint_idx: 2,
@@ -448,7 +448,7 @@ impl RotationProfile {
     }
 
     /// Edge on Windows — Edge fingerprint
-    pub fn edge_win_default() -> Self {
+    pub fn _edge_win_default() -> Self {
         Self {
             proxy_node: None,
             fingerprint_idx: 3,
@@ -459,12 +459,12 @@ impl RotationProfile {
     }
 
     /// Build the default 4-profile rotation pool
-    pub fn default_pool() -> Vec<Self> {
+    pub fn _default_pool() -> Vec<Self> {
         vec![
-            Self::chrome_win_default(),
-            Self::firefox_mac_default(),
-            Self::safari_ios_default(),
-            Self::edge_win_default(),
+            Self::_chrome_win_default(),
+            Self::_firefox_mac_default(),
+            Self::_safari_ios_default(),
+            Self::_edge_win_default(),
         ]
     }
 }
@@ -484,7 +484,7 @@ mod tests {
         let mut mgr = FingerprintManager::new();
         let _initial = mgr.current().system.platform;
         for _ in 0..20 {
-            mgr.report_result(true);
+            mgr._report_result(true);
         }
         assert!(mgr.current().headers.len() > 3);
         // cleanup
@@ -495,7 +495,7 @@ mod tests {
     fn test_spawn_variant() {
         let mut mgr = FingerprintManager::new();
         let count_before = mgr.fingerprint_count();
-        mgr.spawn_variant();
+        mgr._spawn_variant();
         assert_eq!(mgr.fingerprint_count(), count_before + 1);
         // cleanup
         let _ = std::fs::remove_file(&mgr.store_path);
@@ -505,11 +505,11 @@ mod tests {
     fn test_self_iterate_low_rate() {
         let mut mgr = FingerprintManager::new();
         for _ in 0..10 {
-            mgr.report_result(false);
+            mgr._report_result(false);
         }
         let count_before = mgr.fingerprint_count();
-        if mgr.best_success_rate() < 0.3 {
-            mgr.spawn_variant();
+        if mgr._best_success_rate() < 0.3 {
+            mgr._spawn_variant();
         }
         assert!(mgr.fingerprint_count() >= count_before);
         // cleanup
@@ -519,7 +519,7 @@ mod tests {
     #[test]
     fn test_stealth_learning_report() {
         let stealth = SelfIteratingStealth::new();
-        let report = stealth.learning_report();
+        let report = stealth._learning_report();
         assert_eq!(report.iteration, 0);
         assert!(report.fingerprint_count >= 4);
     }
@@ -531,8 +531,8 @@ mod tests {
             let mut mgr = FingerprintManager::new();
             mgr.use_kb = false;
             mgr.store_path = path.clone();
-            mgr.report_result(true);
-            mgr.report_result(false);
+            mgr._report_result(true);
+            mgr._report_result(false);
         }
         // verify saved
         assert!(path.exists());
@@ -545,7 +545,7 @@ mod tests {
     #[test]
     fn test_multi_platform_headers() {
         let mgr = FingerprintManager::new();
-        let headers = mgr.apply_headers();
+        let headers = mgr._apply_headers();
         assert!(headers.contains_key("User-Agent"));
         assert!(headers.contains_key("Sec-CH-UA"));
         assert!(headers.contains_key("Sec-CH-UA-Platform"));

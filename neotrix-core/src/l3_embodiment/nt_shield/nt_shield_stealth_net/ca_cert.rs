@@ -24,7 +24,7 @@ impl CaCertManager {
         }
     }
 
-    pub fn ensure_ca(&self) -> Result<(), String> {
+    pub fn _ensure_ca(&self) -> Result<(), String> {
         if self.ca_cert_path.exists() && self.ca_key_path.exists() {
             return Ok(());
         }
@@ -60,8 +60,8 @@ impl CaCertManager {
         Ok(())
     }
 
-    pub fn install_macos(&self) -> Result<(), String> {
-        self.ensure_ca()?;
+    pub fn _install_macos(&self) -> Result<(), String> {
+        self._ensure_ca()?;
         let status = std::process::Command::new("sudo")
             .args([
                 "nt_shield", "add-trusted-cert", "-d", "-r", "trustRoot",
@@ -77,7 +77,7 @@ impl CaCertManager {
         Ok(())
     }
 
-    pub fn uninstall_macos(&self) -> Result<(), String> {
+    pub fn _uninstall_macos(&self) -> Result<(), String> {
         let sha1_output = std::process::Command::new("openssl")
             .args([
                 "x509", "-in", &self.ca_cert_path.to_string_lossy(),
@@ -100,15 +100,15 @@ impl CaCertManager {
         Ok(())
     }
 
-    pub fn ca_cert_pem(&self) -> Result<String, String> {
+    pub fn _ca_cert_pem(&self) -> Result<String, String> {
         fs::read_to_string(&self.ca_cert_path).map_err(|e| format!("read ca.crt: {}", e))
     }
 
-    pub fn ca_key_pem(&self) -> Result<String, String> {
+    pub fn _ca_key_pem(&self) -> Result<String, String> {
         fs::read_to_string(&self.ca_key_path).map_err(|e| format!("read ca.key: {}", e))
     }
 
-    pub fn generate_server_cert(&self, hostname: &str) -> Result<(String, String), String> {
+    pub fn _generate_server_cert(&self, hostname: &str) -> Result<(String, String), String> {
         use rcgen::{CertificateParams, KeyPair};
 
         let params = CertificateParams::new(vec![hostname.to_string()])
@@ -116,10 +116,10 @@ impl CaCertManager {
 
         let key_pair = KeyPair::generate().map_err(|e| format!("rcgen keypair: {}", e))?;
 
-        let ca_key_pem = self.ca_key_pem()?;
-        let ca_cert_pem = self.ca_cert_pem()?;
-        let ca_key = KeyPair::from_pem(&ca_key_pem).map_err(|e| format!("parse ca key: {}", e))?;
-        let ca_params = rcgen::CertificateParams::from_ca_cert_pem(&ca_cert_pem)
+        let _ca_key_pem = self._ca_key_pem()?;
+        let _ca_cert_pem = self._ca_cert_pem()?;
+        let ca_key = KeyPair::from_pem(&_ca_key_pem).map_err(|e| format!("parse ca key: {}", e))?;
+        let ca_params = rcgen::CertificateParams::from_ca_cert_pem(&_ca_cert_pem)
             .map_err(|e| format!("parse ca cert: {}", e))?;
         let ca_cert = ca_params.self_signed(&ca_key)
             .map_err(|e| format!("self-sign ca: {}", e))?;
@@ -159,7 +159,7 @@ pub fn build_mitm_server_config(
     ca: &CaCertManager,
     hostname: &str,
 ) -> Result<Arc<rustls::ServerConfig>, String> {
-    let (cert_pem, key_pem) = ca.generate_server_cert(hostname)?;
+    let (cert_pem, key_pem) = ca._generate_server_cert(hostname)?;
 
     let cert_der = pem_to_der(&cert_pem, "CERTIFICATE")?;
     let cert = rustls::Certificate(cert_der);
@@ -200,7 +200,7 @@ pub fn build_client_tls_config(
         return Ok(Arc::new(
             rustls::ClientConfig::builder()
                 .with_safe_defaults()
-                .with_custom_certificate_verifier(Arc::new(NoCertVerifier))
+                .with_custom_certificate_verifier(Arc::new(_NoCertVerifier))
                 .with_no_client_auth()
         ));
     }
@@ -210,7 +210,7 @@ pub fn build_client_tls_config(
         .with_safe_default_kx_groups()
         .with_protocol_versions(&[&rustls::version::TLS13])
         .map_err(|e| format!("protocol versions: {}", e))?
-        .with_custom_certificate_verifier(Arc::new(NoCertVerifier))
+        .with_custom_certificate_verifier(Arc::new(_NoCertVerifier))
         .with_no_client_auth();
 
     Ok(Arc::new(config))
@@ -231,9 +231,9 @@ fn cipher_suite_name_match(suite: &rustls::CipherSuite, name: &str) -> bool {
     )
 }
 
-pub struct NoCertVerifier;
+pub struct _NoCertVerifier;
 
-impl rustls::client::ServerCertVerifier for NoCertVerifier {
+impl rustls::client::ServerCertVerifier for _NoCertVerifier {
     fn verify_server_cert(
         &self,
         _end_entity: &rustls::Certificate,
@@ -327,18 +327,18 @@ mod tests {
     #[test]
     fn test_ca_generation() {
         let mgr = CaCertManager::new();
-        assert!(mgr.ensure_ca().is_ok());
+        assert!(mgr._ensure_ca().is_ok());
         assert!(mgr.ca_cert_path.exists());
         assert!(mgr.ca_key_path.exists());
-        let cert_pem = mgr.ca_cert_pem().expect("value should be ok in test");
+        let cert_pem = mgr._ca_cert_pem().expect("value should be ok in test");
         assert!(cert_pem.contains("BEGIN CERTIFICATE"));
     }
 
     #[test]
     fn test_server_cert_generation() {
         let mgr = CaCertManager::new();
-        mgr.ensure_ca().expect("value should be ok in test");
-        let (cert, key) = mgr.generate_server_cert("example.com").expect("value should be ok in test");
+        mgr._ensure_ca().expect("value should be ok in test");
+        let (cert, key) = mgr._generate_server_cert("example.com").expect("value should be ok in test");
         assert!(cert.contains("BEGIN CERTIFICATE"));
         assert!(key.contains("BEGIN PRIVATE KEY"));
     }

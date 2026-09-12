@@ -67,10 +67,11 @@ impl UniversalWorld {
                     archetype.remove_entity(entity.id);
                 }
                 
+                *slot = None;
+                
                 // Remove components
                 self.remove_all_components(entity.id);
                 
-                *slot = None;
                 return true;
             }
         }

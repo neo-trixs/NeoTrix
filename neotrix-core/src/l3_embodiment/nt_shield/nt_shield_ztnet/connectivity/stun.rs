@@ -8,7 +8,7 @@ use super::turn::encode_xor_address;
 
 /// STUN消息类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StunMethod {
+pub enum _StunMethod {
     BindingRequest,
     BindingResponse,
     BindingError,
@@ -16,7 +16,7 @@ pub enum StunMethod {
 
 /// STUN属性
 #[derive(Debug, Clone)]
-pub enum StunAttribute {
+pub enum _StunAttribute {
     /// MAPPED-ADDRESS
     MappedAddress(SocketAddr),
     /// XOR-MAPPED-ADDRESS
@@ -37,10 +37,10 @@ pub enum StunAttribute {
 
 /// STUN消息
 #[derive(Debug, Clone)]
-pub struct StunMessage {
-    pub method: StunMethod,
+pub struct _StunMessage {
+    pub method: _StunMethod,
     pub transaction_id: [u8; 12],
-    pub attributes: Vec<StunAttribute>,
+    pub attributes: Vec<_StunAttribute>,
 }
 
 /// STUN编码错误
@@ -56,16 +56,16 @@ pub enum StunError {
     UnknownMethod(u16),
 }
 
-impl StunMessage {
+impl _StunMessage {
     /// 编码STUN消息为字节
     pub fn encode(&self) -> Bytes {
         let mut buf = Vec::with_capacity(20);
 
         // Header
         let method_num = match self.method {
-            StunMethod::BindingRequest => 0x0001,
-            StunMethod::BindingResponse => 0x0101,
-            StunMethod::BindingError => 0x0111,
+            _StunMethod::BindingRequest => 0x0001,
+            _StunMethod::BindingResponse => 0x0101,
+            _StunMethod::BindingError => 0x0111,
         };
 
         buf.put_u16(0x0000 | method_num);  // Type
@@ -77,16 +77,16 @@ impl StunMessage {
         let mut attr_len = 0u16;
         for attr in &self.attributes {
             let (attr_type, attr_data): (u16, Vec<u8>) = match attr {
-                StunAttribute::MappedAddress(addr) => {
+                _StunAttribute::MappedAddress(addr) => {
                     (0x0001, encode_address(addr))
                 }
-                StunAttribute::XorMappedAddress(addr) => {
+                _StunAttribute::XorMappedAddress(addr) => {
                     (0x0020, encode_xor_address(addr, &self.transaction_id))
                 }
-                StunAttribute::Software(software) => {
+                _StunAttribute::Software(software) => {
                     (0x0022, software.as_bytes().to_vec())
                 }
-                StunAttribute::Fingerprint(crc) => {
+                _StunAttribute::Fingerprint(crc) => {
                     (0x8028, crc.to_be_bytes().to_vec())
                 }
                 _ => continue,
@@ -125,9 +125,9 @@ impl StunMessage {
         }
 
         let method = match msg_type & 0x3EEF {
-            0x0001 => StunMethod::BindingRequest,
-            0x0101 => StunMethod::BindingResponse,
-            0x0111 => StunMethod::BindingError,
+            0x0001 => _StunMethod::BindingRequest,
+            0x0101 => _StunMethod::BindingResponse,
+            0x0111 => _StunMethod::BindingError,
             other => return Err(StunError::UnknownMethod(other)),
         };
 
@@ -150,19 +150,19 @@ impl StunMessage {
             let attr = match attr_type {
                 0x0001 => {
                     let addr = decode_address(attr_data)?;
-                    StunAttribute::MappedAddress(addr)
+                    _StunAttribute::MappedAddress(addr)
                 }
                 0x0020 => {
                     let addr = decode_xor_address(attr_data, &transaction_id)?;
-                    StunAttribute::XorMappedAddress(addr)
+                    _StunAttribute::XorMappedAddress(addr)
                 }
                 0x0022 => {
                     let software = String::from_utf8_lossy(attr_data).to_string();
-                    StunAttribute::Software(software)
+                    _StunAttribute::Software(software)
                 }
                 0x8028 => {
                     let crc = u32::from_be_bytes([attr_data[0], attr_data[1], attr_data[2], attr_data[3]]);
-                    StunAttribute::Fingerprint(crc)
+                    _StunAttribute::Fingerprint(crc)
                 }
                 _ => continue,
             };
@@ -174,15 +174,15 @@ impl StunMessage {
             pos += 4 + attr_len as usize + padding;
         }
 
-        Ok(StunMessage { method, transaction_id, attributes })
+        Ok(_StunMessage { method, transaction_id, attributes })
     }
 
     /// 查找MAPPED-ADDRESS或XOR-MAPPED-ADDRESS
-    pub fn mapped_address(&self) -> Option<SocketAddr> {
+    pub fn _mapped_address(&self) -> Option<SocketAddr> {
         for attr in &self.attributes {
             match attr {
-                StunAttribute::MappedAddress(addr) => return Some(*addr),
-                StunAttribute::XorMappedAddress(addr) => return Some(*addr),
+                _StunAttribute::MappedAddress(addr) => return Some(*addr),
+                _StunAttribute::XorMappedAddress(addr) => return Some(*addr),
                 _ => continue,
             }
         }
@@ -293,8 +293,8 @@ impl StunClient {
         use rand::Rng;
         rand::thread_rng().fill(&mut transaction_id);
 
-        let msg = StunMessage {
-            method: StunMethod::BindingRequest,
+        let msg = _StunMessage {
+            method: _StunMethod::BindingRequest,
             transaction_id,
             attributes: vec![],
         };
@@ -312,9 +312,9 @@ impl StunClient {
 
     /// 处理STUN响应
     pub fn handle_response(&mut self, data: &[u8]) -> Option<SocketAddr> {
-        let msg = StunMessage::decode(data).ok()?;
-        if msg.method == StunMethod::BindingResponse && msg.transaction_id == self.transaction_id {
-            msg.mapped_address()
+        let msg = _StunMessage::decode(data).ok()?;
+        if msg.method == _StunMethod::BindingResponse && msg.transaction_id == self.transaction_id {
+            msg._mapped_address()
         } else {
             None
         }
@@ -328,39 +328,39 @@ mod tests {
 
     #[test]
     fn stun_encode_decode_roundtrip() {
-        let msg = StunMessage {
-            method: StunMethod::BindingRequest,
+        let msg = _StunMessage {
+            method: _StunMethod::BindingRequest,
             transaction_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             attributes: vec![],
         };
 
         let encoded = msg.encode();
-        let decoded = StunMessage::decode(&encoded).unwrap();
+        let decoded = _StunMessage::decode(&encoded).unwrap();
 
-        assert_eq!(decoded.method, StunMethod::BindingRequest);
+        assert_eq!(decoded.method, _StunMethod::BindingRequest);
         assert_eq!(decoded.transaction_id, msg.transaction_id);
     }
 
     #[test]
     fn stun_mapped_address() {
         let addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)), 8080);
-        let msg = StunMessage {
-            method: StunMethod::BindingResponse,
+        let msg = _StunMessage {
+            method: _StunMethod::BindingResponse,
             transaction_id: [0; 12],
-            attributes: vec![StunAttribute::MappedAddress(addr)],
+            attributes: vec![_StunAttribute::MappedAddress(addr)],
         };
 
         let encoded = msg.encode();
-        let decoded = StunMessage::decode(&encoded).unwrap();
+        let decoded = _StunMessage::decode(&encoded).unwrap();
 
-        assert_eq!(decoded.mapped_address(), Some(addr));
+        assert_eq!(decoded._mapped_address(), Some(addr));
     }
 
     #[test]
     fn client_creates_binding_request() {
         let mut client = StunClient::new();
         let req = client.poll_request().unwrap();
-        let msg = StunMessage::decode(&req).unwrap();
-        assert_eq!(msg.method, StunMethod::BindingRequest);
+        let msg = _StunMessage::decode(&req).unwrap();
+        assert_eq!(msg.method, _StunMethod::BindingRequest);
     }
 }

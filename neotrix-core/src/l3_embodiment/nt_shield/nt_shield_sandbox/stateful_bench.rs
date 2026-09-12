@@ -148,15 +148,15 @@ fn scenarios() -> Vec<StatefulScenario> {
 
 /// 有状态基准报告
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct StatefulBenchReport {
+pub struct _StatefulBenchReport {
     pub scenarios_run: usize,
     pub passed: usize,
     pub failures: Vec<String>,
 }
 
 /// 运行全部有状态场景 (确定性, 零 IO)。
-pub fn run_stateful_bench() -> StatefulBenchReport {
-    let mut report = StatefulBenchReport::default();
+pub fn run_stateful_bench() -> _StatefulBenchReport {
+    let mut report = _StatefulBenchReport::default();
     for sc in scenarios() {
         report.scenarios_run += 1;
         match sc.run() {

@@ -43,7 +43,7 @@ impl Browser {
         }
     }
 
-    pub fn preferred_tls_variant(&self) -> TlsVariant {
+    pub fn _preferred_tls_variant(&self) -> TlsVariant {
         match self {
             Browser::Chrome | Browser::Edge => TlsVariant::ModernH2,
             Browser::Firefox => TlsVariant::LegacyHttp11,
@@ -51,7 +51,7 @@ impl Browser {
         }
     }
 
-    pub fn preferred_h2_profile(&self) -> H2SettingsProfile {
+    pub fn _preferred_h2_profile(&self) -> H2SettingsProfile {
         match self {
             Browser::Chrome => H2SettingsProfile::ChromeDefault,
             Browser::Firefox => H2SettingsProfile::FirefoxDefault,
@@ -60,7 +60,7 @@ impl Browser {
         }
     }
 
-    pub fn sec_ch_ua_brand(&self, major_version: &str) -> String {
+    pub fn _sec_ch_ua_brand(&self, major_version: &str) -> String {
         match self {
             Browser::Chrome => format!(
                 "\"Not)A;Brand\";v=\"99\", \"Google Chrome\";v=\"{}\", \"Chromium\";v=\"{}\"",
@@ -116,7 +116,7 @@ impl Platform {
         }
     }
 
-    pub fn navigator_platform(&self) -> &'static str {
+    pub fn _navigator_platform(&self) -> &'static str {
         match self {
             Platform::Windows => "Win32",
             Platform::MacOS => "MacIntel",
@@ -127,7 +127,7 @@ impl Platform {
         }
     }
 
-    pub fn default_timezone(&self) -> &'static str {
+    pub fn _default_timezone(&self) -> &'static str {
         match self {
             Platform::Windows => "America/New_York",
             Platform::MacOS => "America/New_York",
@@ -138,7 +138,7 @@ impl Platform {
         }
     }
 
-    pub fn default_locale(&self) -> &'static str {
+    pub fn _default_locale(&self) -> &'static str {
         match self {
             Platform::Windows => "en-US",
             Platform::MacOS => "en-US",
@@ -149,7 +149,7 @@ impl Platform {
         }
     }
 
-    pub fn concurrency_range(&self) -> (u8, u8) {
+    pub fn _concurrency_range(&self) -> (u8, u8) {
         match self {
             Platform::Windows => (4, 16),
             Platform::MacOS => (4, 12),
@@ -160,7 +160,7 @@ impl Platform {
         }
     }
 
-    pub fn memory_range(&self) -> (u8, u8) {
+    pub fn _memory_range(&self) -> (u8, u8) {
         match self {
             Platform::Windows => (4, 64),
             Platform::MacOS => (8, 32),
@@ -172,7 +172,7 @@ impl Platform {
     }
 
     /// 桌面端常用屏幕分辨率列表（宽,高）
-    pub fn desktop_screens() -> &'static [(u16, u16)] {
+    pub fn _desktop_screens() -> &'static [(u16, u16)] {
         &[
             (1920, 1080), (1366, 768), (2560, 1440), (1920, 1200),
             (1536, 864), (1440, 900), (1680, 1050), (1280, 720),
@@ -181,7 +181,7 @@ impl Platform {
     }
 
     /// 移动端常用屏幕分辨率
-    pub fn mobile_screens() -> &'static [(u16, u16)] {
+    pub fn _mobile_screens() -> &'static [(u16, u16)] {
         &[
             (390, 844), (393, 852), (430, 932), (414, 896),
             (375, 812), (412, 915), (360, 780), (1080, 2400),
@@ -249,7 +249,7 @@ pub struct BrowserFingerprintProfile {
 
 impl BrowserFingerprintProfile {
     /// 从平台 + H2 配置推导浏览器指纹
-    pub fn from_platform_and_h2(platform: Platform, h2: H2SettingsProfile) -> Self {
+    pub fn _from_platform_and_h2(platform: Platform, h2: H2SettingsProfile) -> Self {
         match (platform, h2) {
             (Platform::Windows, _) | (Platform::ChromeOS, _) => Self::chrome_windows(),
             (Platform::MacOS, H2SettingsProfile::SafariDefault) => Self::safari_macos(),
@@ -472,21 +472,21 @@ impl SystemFingerprintGenerator {
             compat[0]
         });
 
-        let h2 = config.h2_profile.unwrap_or_else(|| nt_world_browse.preferred_h2_profile());
-        let tls_variant = nt_world_browse.preferred_tls_variant();
+        let h2 = config.h2_profile.unwrap_or_else(|| nt_world_browse._preferred_h2_profile());
+        let tls_variant = nt_world_browse._preferred_tls_variant();
 
         let timezone = config.timezone.clone()
-            .unwrap_or_else(|| platform.default_timezone().to_string());
+            .unwrap_or_else(|| platform._default_timezone().to_string());
 
         let locale = config.locale.clone()
-            .unwrap_or_else(|| platform.default_locale().to_string());
+            .unwrap_or_else(|| platform._default_locale().to_string());
 
         let accept_language = Self::accept_language_from_locale(&locale);
 
-        let (concurrency_min, concurrency_max) = platform.concurrency_range();
+        let (concurrency_min, concurrency_max) = platform._concurrency_range();
         let hardware_concurrency = rng.gen_range(concurrency_min..=concurrency_max);
 
-        let (mem_min, mem_max) = platform.memory_range();
+        let (mem_min, mem_max) = platform._memory_range();
         let device_memory = {
             let mem = rng.gen_range(mem_min..=mem_max);
             mem.next_power_of_two()
@@ -505,7 +505,7 @@ impl SystemFingerprintGenerator {
         let (sec_ch_ua, sec_ch_ua_mobile, sec_ch_ua_platform) = match nt_world_browse {
             Browser::Chrome | Browser::Edge => {
                 let major_version = chrome_base.to_string();
-                let brand_str = nt_world_browse.sec_ch_ua_brand(&major_version);
+                let brand_str = nt_world_browse._sec_ch_ua_brand(&major_version);
                 (brand_str, if platform.is_mobile() { "?1".into() } else { "?0".into() }, platform.sec_ch_ua_platform().to_string())
             }
             Browser::Firefox | Browser::Safari => {
@@ -560,7 +560,7 @@ impl SystemFingerprintGenerator {
             dns_leak_protection: true,
             tls_fingerprint_hint,
             tls_variant,
-            nt_world_browse_fp: BrowserFingerprintProfile::from_platform_and_h2(platform, h2),
+            nt_world_browse_fp: BrowserFingerprintProfile::_from_platform_and_h2(platform, h2),
         }
     }
 
@@ -733,8 +733,8 @@ mod tests {
 
     #[test]
     fn test_platform_timezone_default() {
-        assert_eq!(Platform::Windows.default_timezone(), "America/New_York");
-        assert_eq!(Platform::MacOS.default_timezone(), "America/New_York");
-        assert!(Platform::Linux.default_timezone().len() > 0);
+        assert_eq!(Platform::Windows._default_timezone(), "America/New_York");
+        assert_eq!(Platform::MacOS._default_timezone(), "America/New_York");
+        assert!(Platform::Linux._default_timezone().len() > 0);
     }
 }

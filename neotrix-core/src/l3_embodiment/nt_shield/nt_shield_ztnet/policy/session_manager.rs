@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 /// 会话
 #[derive(Debug, Clone)]
-pub struct ZtaSession {
+pub struct _ZtaSession {
     pub id: String,
     pub subject: String,
     pub resource: String,
@@ -18,7 +18,7 @@ pub struct ZtaSession {
 
 /// 会话管理器
 pub struct SessionManager {
-    sessions: HashMap<String, ZtaSession>,
+    sessions: HashMap<String, _ZtaSession>,
     default_lifetime: Duration,
 }
 
@@ -32,7 +32,7 @@ impl SessionManager {
 
     pub fn create_session(&mut self, subject: String, resource: String) -> String {
         let id = format!("session-{}", self.sessions.len());
-        let session = ZtaSession {
+        let session = _ZtaSession {
             id: id.clone(),
             subject,
             resource,
@@ -44,7 +44,7 @@ impl SessionManager {
         id
     }
 
-    pub fn validate_session(&self, session_id: &str) -> bool {
+    pub fn _validate_session(&self, session_id: &str) -> bool {
         if let Some(session) = self.sessions.get(session_id) {
             session.active && Instant::now() < session.expires_at
         } else {
@@ -52,7 +52,7 @@ impl SessionManager {
         }
     }
 
-    pub fn destroy_session(&mut self, session_id: &str) -> bool {
+    pub fn _destroy_session(&mut self, session_id: &str) -> bool {
         if let Some(session) = self.sessions.get_mut(session_id) {
             session.active = false;
             true
@@ -70,7 +70,7 @@ impl SessionManager {
         }
     }
 
-    pub fn sessions(&self) -> &HashMap<String, ZtaSession> {
+    pub fn sessions(&self) -> &HashMap<String, _ZtaSession> {
         &self.sessions
     }
 }
@@ -84,9 +84,9 @@ mod tests {
         let mut manager = SessionManager::new(Duration::from_secs(3600));
 
         let id = manager.create_session("user1".into(), "tunnel/test".into());
-        assert!(manager.validate_session(&id));
+        assert!(manager._validate_session(&id));
 
-        manager.destroy_session(&id);
-        assert!(!manager.validate_session(&id));
+        manager._destroy_session(&id);
+        assert!(!manager._validate_session(&id));
     }
 }

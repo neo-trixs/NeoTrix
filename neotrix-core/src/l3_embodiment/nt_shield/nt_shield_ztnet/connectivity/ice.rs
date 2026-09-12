@@ -9,7 +9,7 @@ use bytes::Bytes;
 
 /// ICE候选类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CandidateType {
+pub enum _CandidateType {
     /// Host候选 (本地接口)
     Host,
     /// Server Reflexive候选 (STUN)
@@ -22,9 +22,9 @@ pub enum CandidateType {
 
 /// ICE候选
 #[derive(Debug, Clone)]
-pub struct IceCandidate {
+pub struct _IceCandidate {
     /// 候选类型
-    pub candidate_type: CandidateType,
+    pub candidate_type: _CandidateType,
     /// 地址
     pub address: SocketAddr,
     /// 优先级
@@ -39,8 +39,8 @@ pub struct IceCandidate {
 
 /// ICE对端候选
 #[derive(Debug, Clone)]
-pub struct RemoteCandidate {
-    pub candidate_type: CandidateType,
+pub struct _RemoteCandidate {
+    pub candidate_type: _CandidateType,
     pub address: SocketAddr,
     pub priority: u32,
     pub foundation: String,
@@ -50,11 +50,11 @@ pub struct RemoteCandidate {
 
 /// ICE连通性检查
 #[derive(Debug, Clone)]
-pub struct ConnectivityCheck {
+pub struct _ConnectivityCheck {
     /// 本地候选
-    pub local: IceCandidate,
+    pub local: _IceCandidate,
     /// 远端候选
-    pub remote: RemoteCandidate,
+    pub remote: _RemoteCandidate,
     /// 绑定请求数据
     pub binding_request: Bytes,
     /// 发送时间
@@ -65,7 +65,7 @@ pub struct ConnectivityCheck {
 
 /// ICE检查状态
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CheckState {
+pub enum _CheckState {
     /// 等待发送
     Waiting,
     /// 已发送，等待响应
@@ -80,13 +80,13 @@ pub enum CheckState {
 
 /// ICE对端
 #[derive(Debug, Clone)]
-pub struct IcePeer {
+pub struct _IcePeer {
     /// 本地候选
-    pub local: IceCandidate,
+    pub local: _IceCandidate,
     /// 远端候选
-    pub remote: RemoteCandidate,
+    pub remote: _RemoteCandidate,
     /// 检查状态
-    pub state: CheckState,
+    pub state: _CheckState,
     /// 最后一次检查
     pub last_check: Option<Instant>,
     /// 连通性分数 (0-100)
@@ -95,7 +95,7 @@ pub struct IcePeer {
 
 /// ICE状态
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum IceState {
+pub enum _IceState {
     /// 初始
     Initial,
     /// 收集候选中
@@ -113,15 +113,15 @@ pub enum IceState {
 }
 
 /// ICE Agent 状态机
-pub struct IceAgent {
+pub struct _IceAgent {
     /// 状态
-    pub state: IceState,
+    pub state: _IceState,
     /// 本地候选
-    pub local_candidates: Vec<IceCandidate>,
+    pub local_candidates: Vec<_IceCandidate>,
     /// 远端候选
-    pub remote_candidates: Vec<RemoteCandidate>,
+    pub remote_candidates: Vec<_RemoteCandidate>,
     /// 活跃对端
-    pub peers: Vec<IcePeer>,
+    pub peers: Vec<_IcePeer>,
     /// 最佳对端索引
     pub best_peer: Option<usize>,
     /// 检查超时时间
@@ -130,11 +130,11 @@ pub struct IceAgent {
     pub max_retries: u32,
 }
 
-impl IceAgent {
+impl _IceAgent {
     /// 创建新ICE Agent
     pub fn new() -> Self {
         Self {
-            state: IceState::Initial,
+            state: _IceState::Initial,
             local_candidates: Vec::new(),
             remote_candidates: Vec::new(),
             peers: Vec::new(),
@@ -145,31 +145,31 @@ impl IceAgent {
     }
 
     /// 添加本地候选
-    pub fn add_local_candidate(&mut self, candidate: IceCandidate) {
+    pub fn _add_local_candidate(&mut self, candidate: _IceCandidate) {
         self.local_candidates.push(candidate);
-        if self.state == IceState::Initial {
-            self.state = IceState::Gathering;
+        if self.state == _IceState::Initial {
+            self.state = _IceState::Gathering;
         }
     }
 
     /// 添加远端候选
-    pub fn add_remote_candidate(&mut self, candidate: RemoteCandidate) {
+    pub fn _add_remote_candidate(&mut self, candidate: _RemoteCandidate) {
         self.remote_candidates.push(candidate);
     }
 
     /// 开始连通性检查
-    pub fn start_checking(&mut self, stun_client: &mut super::stun::StunClient) -> Vec<ConnectivityCheck> {
-        self.state = IceState::Checking;
+    pub fn _start_checking(&mut self, stun_client: &mut super::stun::StunClient) -> Vec<_ConnectivityCheck> {
+        self.state = _IceState::Checking;
         let mut checks = Vec::new();
 
         for local in &self.local_candidates {
             for remote in &self.remote_candidates {
                 if local.component == remote.component {
                     if let Some(req) = self.create_binding_request(local, remote, stun_client) {
-                        self.peers.push(IcePeer {
+                        self.peers.push(_IcePeer {
                             local: local.clone(),
                             remote: remote.clone(),
-                            state: CheckState::InProgress,
+                            state: _CheckState::InProgress,
                             last_check: Some(Instant::now()),
                             score: self.calculate_priority(local, remote),
                         });
@@ -186,13 +186,13 @@ impl IceAgent {
     /// 创建绑定请求
     fn create_binding_request(
         &self,
-        local: &IceCandidate,
-        remote: &RemoteCandidate,
+        local: &_IceCandidate,
+        remote: &_RemoteCandidate,
         stun_client: &mut super::stun::StunClient,
-    ) -> Option<ConnectivityCheck> {
+    ) -> Option<_ConnectivityCheck> {
         let binding_request = stun_client.poll_request()?;
 
-        Some(ConnectivityCheck {
+        Some(_ConnectivityCheck {
             local: local.clone(),
             remote: remote.clone(),
             binding_request,
@@ -202,7 +202,7 @@ impl IceAgent {
     }
 
     /// 处理绑定响应
-    pub fn handle_binding_response(
+    pub fn _handle_binding_response(
         &mut self,
         remote_addr: SocketAddr,
         response: &[u8],
@@ -213,7 +213,7 @@ impl IceAgent {
             let mut found = false;
             for peer in &mut self.peers {
                 if peer.remote.address == remote_addr {
-                    peer.state = CheckState::Succeeded;
+                    peer.state = _CheckState::Succeeded;
                     found = true;
                     break;
                 }
@@ -222,7 +222,7 @@ impl IceAgent {
             if found {
                 // 更新所有peer的分数
                 for i in 0..self.peers.len() {
-                    if self.peers[i].state == CheckState::Succeeded {
+                    if self.peers[i].state == _CheckState::Succeeded {
                         let local = self.peers[i].local.clone();
                         let remote = self.peers[i].remote.clone();
                         self.peers[i].score = self.calculate_priority(&local, &remote);
@@ -243,7 +243,7 @@ impl IceAgent {
         let mut best_score = 0;
 
         for (i, peer) in self.peers.iter().enumerate() {
-            if peer.state == CheckState::Succeeded && peer.score > best_score {
+            if peer.state == _CheckState::Succeeded && peer.score > best_score {
                 best_score = peer.score;
                 best_idx = Some(i);
             }
@@ -252,17 +252,17 @@ impl IceAgent {
         self.best_peer = best_idx;
 
         if self.best_peer.is_some() {
-            self.state = IceState::Completed;
+            self.state = _IceState::Completed;
         }
     }
 
     /// 计算优先级 (简化版)
-    fn calculate_priority(&self, local: &IceCandidate, _remote: &RemoteCandidate) -> u32 {
+    fn calculate_priority(&self, local: &_IceCandidate, _remote: &_RemoteCandidate) -> u32 {
         let type_pref = match local.candidate_type {
-            CandidateType::Host => 126,
-            CandidateType::Srflx => 100,
-            CandidateType::Prflx => 110,
-            CandidateType::Relay => 0,
+            _CandidateType::Host => 126,
+            _CandidateType::Srflx => 100,
+            _CandidateType::Prflx => 110,
+            _CandidateType::Relay => 0,
         };
 
         let local_pref = type_pref * 65535 + (65535 - local.address.port() as u32);
@@ -270,24 +270,24 @@ impl IceAgent {
     }
 
     /// 获取最佳对端
-    pub fn get_best_peer(&self) -> Option<&IcePeer> {
+    pub fn _get_best_peer(&self) -> Option<&_IcePeer> {
         self.best_peer.map(|i| &self.peers[i])
     }
 
     /// 检查超时
-    pub fn check_timeouts(&mut self, now: Instant) -> Vec<ConnectivityCheck> {
+    pub fn check_timeouts(&mut self, now: Instant) -> Vec<_ConnectivityCheck> {
         let retries = Vec::new();
 
         for peer in &mut self.peers {
-            if peer.state == CheckState::InProgress {
+            if peer.state == _CheckState::InProgress {
                 if let Some(sent_at) = peer.last_check {
                     if now.duration_since(sent_at) > self.check_timeout {
-                        if peer.local.candidate_type == CandidateType::Host {
+                        if peer.local.candidate_type == _CandidateType::Host {
                             // Host候选不重试
-                            peer.state = CheckState::Failed;
-                        } else if peer.remote.candidate_type != CandidateType::Relay {
+                            peer.state = _CheckState::Failed;
+                        } else if peer.remote.candidate_type != _CandidateType::Relay {
                             // 非Relay候选重试
-                            peer.state = CheckState::Waiting;
+                            peer.state = _CheckState::Waiting;
                         }
                     }
                 }
@@ -299,7 +299,7 @@ impl IceAgent {
 
     /// 重置
     pub fn reset(&mut self) {
-        self.state = IceState::Initial;
+        self.state = _IceState::Initial;
         self.local_candidates.clear();
         self.remote_candidates.clear();
         self.peers.clear();
@@ -307,7 +307,7 @@ impl IceAgent {
     }
 }
 
-impl Default for IceAgent {
+impl Default for _IceAgent {
     fn default() -> Self {
         Self::new()
     }
@@ -320,16 +320,16 @@ mod tests {
 
     #[test]
     fn ice_agent_creation() {
-        let agent = IceAgent::new();
-        assert_eq!(agent.state, IceState::Initial);
+        let agent = _IceAgent::new();
+        assert_eq!(agent.state, _IceState::Initial);
     }
 
     #[test]
     fn add_candidates() {
-        let mut agent = IceAgent::new();
+        let mut agent = _IceAgent::new();
 
-        agent.add_local_candidate(IceCandidate {
-            candidate_type: CandidateType::Host,
+        agent._add_local_candidate(_IceCandidate {
+            candidate_type: _CandidateType::Host,
             address: SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)), 5000),
             priority: 2130706431,
             foundation: "1".into(),
@@ -337,8 +337,8 @@ mod tests {
             transport: "udp".into(),
         });
 
-        agent.add_remote_candidate(RemoteCandidate {
-            candidate_type: CandidateType::Host,
+        agent._add_remote_candidate(_RemoteCandidate {
+            candidate_type: _CandidateType::Host,
             address: SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 5000),
             priority: 2130706431,
             foundation: "1".into(),
@@ -346,17 +346,17 @@ mod tests {
             transport: "udp".into(),
         });
 
-        assert_eq!(agent.state, IceState::Gathering);
+        assert_eq!(agent.state, _IceState::Gathering);
         assert_eq!(agent.local_candidates.len(), 1);
         assert_eq!(agent.remote_candidates.len(), 1);
     }
 
     #[test]
     fn priority_calculation() {
-        let agent = IceAgent::new();
+        let agent = _IceAgent::new();
 
-        let host = IceCandidate {
-            candidate_type: CandidateType::Host,
+        let host = _IceCandidate {
+            candidate_type: _CandidateType::Host,
             address: SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)), 5000),
             priority: 0,
             foundation: "1".into(),
@@ -364,8 +364,8 @@ mod tests {
             transport: "udp".into(),
         };
 
-        let srflx = IceCandidate {
-            candidate_type: CandidateType::Srflx,
+        let srflx = _IceCandidate {
+            candidate_type: _CandidateType::Srflx,
             address: SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::new(203, 0, 113, 1)), 5000),
             priority: 0,
             foundation: "2".into(),
@@ -373,8 +373,8 @@ mod tests {
             transport: "udp".into(),
         };
 
-        let remote = RemoteCandidate {
-            candidate_type: CandidateType::Host,
+        let remote = _RemoteCandidate {
+            candidate_type: _CandidateType::Host,
             address: SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 5000),
             priority: 0,
             foundation: "1".into(),

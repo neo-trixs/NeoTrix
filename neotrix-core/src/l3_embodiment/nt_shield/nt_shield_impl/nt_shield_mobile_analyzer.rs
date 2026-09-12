@@ -7,7 +7,7 @@ pub struct ObjectionAdapter {
     /// Objection installation path
     objection_path: std::path::PathBuf,
     /// Explored app components
-    components: Vec<AppComponent>,
+    components: Vec<_AppComponent>,
 }
 
 impl ObjectionAdapter {
@@ -20,12 +20,12 @@ impl ObjectionAdapter {
     }
     
     /// Explore iOS/Android app via Objection
-    pub async fn explore_app(&mut self, app_id: &str) -> ExploreResult {
+    pub async fn explore_app(&mut self, app_id: &str) -> _ExploreResult {
         // TODO: objection explore -a app_id --express
         // Architecture: L1 Body (device interaction) → L2 Perception (app model)
         
         let components = vec![
-            AppComponent {
+            _AppComponent {
                 type_: "Activity".to_string(),
                 name: "LoginActivity".to_string(),
                 signature: "com.example.app.LoginActivity".to_string(),
@@ -33,7 +33,7 @@ impl ObjectionAdapter {
                     "Hardcoded API key in preferences".to_string(),
                 ],
             },
-            AppComponent {
+            _AppComponent {
                 type_: "Service".to_string(),
                 name: "DataSyncService".to_string(),
                 signature: "com.example.app.DataSyncService".to_string(),
@@ -43,12 +43,12 @@ impl ObjectionAdapter {
         
         self.components = components.clone();
         
-        ExploreResult { components }
+        _ExploreResult { components }
     }
     
     /// Check for root/jailbreak detection evasion
-    pub async fn check_evasion(&self) -> EvasionReport {
-        EvasionReport {
+    pub async fn check_evasion(&self) -> _EvasionReport {
+        _EvasionReport {
             is_rooted: false,
             is_jailbroken: false,
             detection_methods: vec![
@@ -62,7 +62,7 @@ impl ObjectionAdapter {
 
 /// Explored app component
 #[derive(Debug, Clone)]
-pub struct AppComponent {
+pub struct _AppComponent {
     pub type_: String,
     pub name: String,
     pub signature: String,
@@ -71,13 +71,13 @@ pub struct AppComponent {
 
 /// Exploration result
 #[derive(Debug, Clone)]
-pub struct ExploreResult {
-    pub components: Vec<AppComponent>,
+pub struct _ExploreResult {
+    pub components: Vec<_AppComponent>,
 }
 
 /// Evasion detection report
 #[derive(Debug, Clone)]
-pub struct EvasionReport {
+pub struct _EvasionReport {
     pub is_rooted: bool,
     pub is_jailbroken: bool,
     pub detection_methods: Vec<String>,

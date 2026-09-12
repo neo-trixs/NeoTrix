@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 /// Nuclei vulnerability finding
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NucleiFinding {
+pub struct _NucleiFinding {
     pub template_id: String,
     pub host: String,
     pub severity: String,
@@ -27,7 +27,7 @@ pub struct NucleiFinding {
 /// Nuclei engine abstraction
 pub struct NucleiEngine {
     templates_dir: PathBuf,
-    cache: HashMap<String, NucleiFinding>,
+    cache: HashMap<String, _NucleiFinding>,
     // In production: spawn nuclei subprocess with custom template paths
     // For now: stub implementation demonstrating architecture integration
 }
@@ -53,12 +53,12 @@ impl NucleiEngine {
     }
     
     /// Run reconnaissance scan against target
-    pub async fn reconnaissance(&self, target: &str) -> ReconResult {
+    pub async fn reconnaissance(&self, target: &str) -> _ReconResult {
         // TODO: Spawn nuclei with template: nuclei -t templates_dir -target target
         // For architecture demonstration:
         
         let findings = vec![
-            NucleiFinding {
+            _NucleiFinding {
                 template_id: "HTTP-Header-Check".to_string(),
                 host: target.to_string(),
                 severity: "info".to_string(),
@@ -66,7 +66,7 @@ impl NucleiEngine {
                 evidence: format!("{}: PHP/7.4.3", target),
                 cwe_id: Some("CWE-200".to_string()),
             },
-            NucleiFinding {
+            _NucleiFinding {
                 template_id: "SSRF-Detector".to_string(),
                 host: target.to_string(),
                 severity: "high".to_string(),
@@ -76,12 +76,12 @@ impl NucleiEngine {
             },
         ];
         
-        ReconResult { findings }
+        _ReconResult { findings }
     }
     
     /// Convert nuclei template to GWT attack pattern
-    pub fn template_to_gwt_pattern(&self, template_id: &str) -> GWTAttackPattern {
-        GWTAttackPattern {
+    pub fn _template_to_gwt_pattern(&self, template_id: &str) -> _GWTAttackPattern {
+        _GWTAttackPattern {
             template_id: template_id.to_string(),
             attention_key: format!("vuln_{}", template_id),
             priority: 1.0,
@@ -89,7 +89,7 @@ impl NucleiEngine {
     }
     
     /// Extract VSA embedding from findings
-    pub fn findings_to_vsa(&self, findings: &[NucleiFinding]) -> Vec<FhrrVector> {
+    pub fn _findings_to_vsa(&self, findings: &[_NucleiFinding]) -> Vec<FhrrVector> {
         findings.iter()
             .map(|f| {
                 // In production: use word2vec or BERT embedding
@@ -103,7 +103,7 @@ impl NucleiEngine {
 
 /// GWT attack pattern (attention-based template routing)
 #[derive(Debug, Clone)]
-pub struct GWTAttackPattern {
+pub struct _GWTAttackPattern {
     pub template_id: String,
     pub attention_key: String,
     pub priority: f64,
@@ -111,6 +111,6 @@ pub struct GWTAttackPattern {
 
 /// Reconnaissance result
 #[derive(Debug, Clone)]
-pub struct ReconResult {
-    pub findings: Vec<NucleiFinding>,
+pub struct _ReconResult {
+    pub findings: Vec<_NucleiFinding>,
 }

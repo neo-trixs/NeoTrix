@@ -96,7 +96,7 @@ impl StealthHttpClient {
         engine.as_ref().map(|e| e.evaluate(url).clone())
     }
 
-    pub fn compute_reward(status: u16, latency_ms: f64, success: bool) -> f64 {
+    pub fn _compute_reward(status: u16, latency_ms: f64, success: bool) -> f64 {
         if !success {
             return 0.05;
         }
@@ -116,8 +116,8 @@ impl StealthHttpClient {
         (base + latency_bonus).clamp(0.0, 1.0)
     }
 
-    pub fn compute_reward_with_body(status: u16, latency_ms: f64, body: &[u8]) -> f64 {
-        let base = Self::compute_reward(status, latency_ms, true);
+    pub fn _compute_reward_with_body(status: u16, latency_ms: f64, body: &[u8]) -> f64 {
+        let base = Self::_compute_reward(status, latency_ms, true);
         if status == 200 {
             let body_lower = String::from_utf8_lossy(body).to_lowercase();
             let captcha_signals = [
@@ -224,19 +224,19 @@ impl StealthHttpClient {
                 match self.send_request(&client, &parsed).await {
                     Ok(resp) => {
                         let elapsed = start.elapsed().as_secs_f64() * 1000.0;
-                        let reward = Self::compute_reward(resp.status, elapsed, true);
+                        let reward = Self::_compute_reward(resp.status, elapsed, true);
                         self.report_reward_for_host(reward, host).await;
                         return Ok(resp);
                     }
                     Err(e) if is_timeout_error(&e) => {
                         let elapsed = start.elapsed().as_secs_f64() * 1000.0;
-                        let reward = Self::compute_reward(0, elapsed, false);
+                        let reward = Self::_compute_reward(0, elapsed, false);
                         self.report_reward_for_host(reward, host).await;
                         return self.fetch_via_proxy(&parsed).await;
                     }
                     Err(e) => {
                         let elapsed = start.elapsed().as_secs_f64() * 1000.0;
-                        let reward = Self::compute_reward(0, elapsed, false);
+                        let reward = Self::_compute_reward(0, elapsed, false);
                         self.report_reward_for_host(reward, host).await;
                         return Err(e);
                     }
@@ -248,8 +248,8 @@ impl StealthHttpClient {
                 let result = self.send_request(&client, &parsed).await;
                 let elapsed = start.elapsed().as_secs_f64() * 1000.0;
                 let reward = match &result {
-                    Ok(r) => Self::compute_reward(r.status, elapsed, true),
-                    Err(_) => Self::compute_reward(0, elapsed, false),
+                    Ok(r) => Self::_compute_reward(r.status, elapsed, true),
+                    Err(_) => Self::_compute_reward(0, elapsed, false),
                 };
                 self.report_reward_for_host(reward, host).await;
                 return result;
@@ -260,8 +260,8 @@ impl StealthHttpClient {
                 let result = self.send_request(&client, &parsed).await;
                 let elapsed = start.elapsed().as_secs_f64() * 1000.0;
                 let reward = match &result {
-                    Ok(r) => Self::compute_reward(r.status, elapsed, true),
-                    Err(_) => Self::compute_reward(0, elapsed, false),
+                    Ok(r) => Self::_compute_reward(r.status, elapsed, true),
+                    Err(_) => Self::_compute_reward(0, elapsed, false),
                 };
                 self.report_reward_for_host(reward, host).await;
                 return result;
@@ -283,9 +283,9 @@ impl StealthHttpClient {
                             if let Some(label) = chain.current_exit_label().await {
                                 chain.update_latency(&label, elapsed).await;
                             }
-                            Self::compute_reward(r.status, elapsed, true)
+                            Self::_compute_reward(r.status, elapsed, true)
                         }
-                        Err(_) => Self::compute_reward(0, elapsed, false),
+                        Err(_) => Self::_compute_reward(0, elapsed, false),
                     };
                     self.report_reward_for_host(reward, Some(host)).await;
                     return result;
@@ -315,9 +315,9 @@ impl StealthHttpClient {
                         chain.update_latency(&label, elapsed).await;
                     }
                 }
-                Self::compute_reward(r.status, elapsed, true)
+                Self::_compute_reward(r.status, elapsed, true)
             }
-            Err(_) => Self::compute_reward(0, elapsed, false),
+            Err(_) => Self::_compute_reward(0, elapsed, false),
         };
         self.report_reward_for_host(reward, host).await;
         result
@@ -334,8 +334,8 @@ impl StealthHttpClient {
                     let result = self.send_request(&client, parsed).await;
                     let elapsed = start.elapsed().as_secs_f64() * 1000.0;
                     let reward = match &result {
-                        Ok(r) => Self::compute_reward(r.status, elapsed, true),
-                        Err(_) => Self::compute_reward(0, elapsed, false),
+                        Ok(r) => Self::_compute_reward(r.status, elapsed, true),
+                        Err(_) => Self::_compute_reward(0, elapsed, false),
                     };
                     self.report_reward_for_host(reward, parsed.host_str()).await;
                     return result;
@@ -347,8 +347,8 @@ impl StealthHttpClient {
         let result = self.send_request(&client, parsed).await;
         let elapsed = start.elapsed().as_secs_f64() * 1000.0;
         let reward = match &result {
-            Ok(r) => Self::compute_reward(r.status, elapsed, true),
-            Err(_) => Self::compute_reward(0, elapsed, false),
+            Ok(r) => Self::_compute_reward(r.status, elapsed, true),
+            Err(_) => Self::_compute_reward(0, elapsed, false),
         };
         self.report_reward_for_host(reward, parsed.host_str()).await;
         {
@@ -442,116 +442,116 @@ mod tests {
 
     #[test]
     fn test_compute_reward_success_200() {
-        let reward = StealthHttpClient::compute_reward(200, 500.0, true);
+        let reward = StealthHttpClient::_compute_reward(200, 500.0, true);
         assert!((reward - 0.95).abs() < 0.01); // 0.8 base + 0.15 latency bonus
     }
 
     #[test]
     fn test_compute_reward_success_204() {
-        let reward = StealthHttpClient::compute_reward(204, 100.0, true);
+        let reward = StealthHttpClient::_compute_reward(204, 100.0, true);
         assert!((reward - 0.95).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_redirect() {
-        let reward = StealthHttpClient::compute_reward(302, 300.0, true);
+        let reward = StealthHttpClient::_compute_reward(302, 300.0, true);
         assert!((reward - 0.75).abs() < 0.01); // 0.6 base + 0.15 latency bonus
     }
 
     #[test]
     fn test_compute_reward_client_error() {
-        let reward = StealthHttpClient::compute_reward(400, 500.0, true);
+        let reward = StealthHttpClient::_compute_reward(400, 500.0, true);
         assert!((reward - 0.45).abs() < 0.01); // 0.3 base + 0.15 latency
     }
 
     #[test]
     fn test_compute_reward_unauthorized() {
-        let reward = StealthHttpClient::compute_reward(401, 500.0, true);
+        let reward = StealthHttpClient::_compute_reward(401, 500.0, true);
         assert!((reward - 0.30).abs() < 0.01); // 0.15 base + 0.15 latency
     }
 
     #[test]
     fn test_compute_reward_rate_limited() {
-        let reward = StealthHttpClient::compute_reward(429, 500.0, true);
+        let reward = StealthHttpClient::_compute_reward(429, 500.0, true);
         assert!((reward - 0.25).abs() < 0.01); // 0.1 base + 0.15 latency
     }
 
     #[test]
     fn test_compute_reward_server_error() {
-        let reward = StealthHttpClient::compute_reward(500, 500.0, true);
+        let reward = StealthHttpClient::_compute_reward(500, 500.0, true);
         assert!((reward - 0.45).abs() < 0.01); // 0.3 base + 0.15 latency
     }
 
     #[test]
     fn test_compute_reward_failure() {
-        let reward = StealthHttpClient::compute_reward(0, 9999.0, false);
+        let reward = StealthHttpClient::_compute_reward(0, 9999.0, false);
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_latency_penalty() {
-        let slow = StealthHttpClient::compute_reward(200, 9000.0, true);
-        let fast = StealthHttpClient::compute_reward(200, 100.0, true);
+        let slow = StealthHttpClient::_compute_reward(200, 9000.0, true);
+        let fast = StealthHttpClient::_compute_reward(200, 100.0, true);
         assert!(slow < fast); // slow should be penalized
     }
 
     #[test]
     fn test_compute_reward_unknown_status() {
-        let reward = StealthHttpClient::compute_reward(999, 500.0, true);
+        let reward = StealthHttpClient::_compute_reward(999, 500.0, true);
         assert!((reward - 0.55).abs() < 0.01); // 0.4 base + 0.15 latency
     }
 
     #[test]
     fn test_compute_reward_with_body_no_captcha() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"normal content");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"normal content");
         assert!((reward - 0.95).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_captcha_detected() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"verify you're human");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"verify you're human");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_cloudflare() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"cf-ray: abc123");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"cf-ray: abc123");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_recaptcha() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"/recaptcha/api.js");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"/recaptcha/api.js");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_turnstile() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"turnstile");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"turnstile");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_challenge_platform() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"/challenge-platform");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"/challenge-platform");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_non_200() {
-        let reward = StealthHttpClient::compute_reward_with_body(404, 500.0, b"anything");
+        let reward = StealthHttpClient::_compute_reward_with_body(404, 500.0, b"anything");
         assert!((reward - 0.55).abs() < 0.01); // 0.4 base + 0.15 latency, no captcha check for non-200
     }
 
     #[test]
     fn test_compute_reward_with_body_waf_blocked() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"waf-blocked");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"waf-blocked");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_cf_nt_world_browse_verification() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"cf-nt_world_browse-verification");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"cf-nt_world_browse-verification");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
@@ -579,32 +579,32 @@ mod tests {
 
     #[test]
     fn test_compute_reward_with_body_x_served_by() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"x-served-by: cloudflare");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"x-served-by: cloudflare");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_cf_chl_opt() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"_cf_chl_opt");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"_cf_chl_opt");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_with_body_captcha_why() {
-        let reward = StealthHttpClient::compute_reward_with_body(200, 500.0, b"why do i have to complete a captcha");
+        let reward = StealthHttpClient::_compute_reward_with_body(200, 500.0, b"why do i have to complete a captcha");
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_clamp_low_extreme() {
-        let reward = StealthHttpClient::compute_reward(0, 999999.0, false);
+        let reward = StealthHttpClient::_compute_reward(0, 999999.0, false);
         assert!(reward >= 0.0);
         assert!((reward - 0.05).abs() < 0.01);
     }
 
     #[test]
     fn test_compute_reward_status_0_success() {
-        let reward = StealthHttpClient::compute_reward(0, 500.0, true);
+        let reward = StealthHttpClient::_compute_reward(0, 500.0, true);
         assert!((reward - 0.55).abs() < 0.01); // _ => 0.4 + 0.15 latency
     }
 }

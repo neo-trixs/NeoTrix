@@ -47,7 +47,7 @@ struct IpState {
 }
 
 /// Cookie 管理器
-pub struct CookieManager {
+pub struct _CookieManager {
     /// Per-IP 速率限制状态
     ip_states: HashMap<IpAddr, IpState>,
     /// Cookie 密钥 (32 bytes, 定期轮换)
@@ -56,8 +56,8 @@ pub struct CookieManager {
     last_key_rotation: Instant,
 }
 
-impl CookieManager {
-    /// 创建新的 CookieManager
+impl _CookieManager {
+    /// 创建新的 _CookieManager
     pub fn new() -> Self {
         let mut cookie_key = [0u8; 32];
         rand::Rng::fill(&mut rand::thread_rng(), &mut cookie_key);
@@ -72,7 +72,7 @@ impl CookieManager {
     /// 检查是否处于 under load 状态
     ///
     /// 如果某 IP 在一个窗口内发送超过阈值的握手请求，标记为 under load
-    pub fn is_under_load(&mut self, peer_ip: IpAddr) -> bool {
+    pub fn _is_under_load(&mut self, peer_ip: IpAddr) -> bool {
         let now = Instant::now();
         let state = self.ip_states.entry(peer_ip).or_insert_with(|| IpState {
             tokens: TOKEN_MAX,
@@ -107,7 +107,7 @@ impl CookieManager {
     /// 生成 cookie
     ///
     /// cookie = MAC(cookie_key, peer_ip || timestamp)
-    pub fn generate_cookie(&self, peer_ip: IpAddr) -> [u8; COOKIE_SIZE] {
+    pub fn _generate_cookie(&self, peer_ip: IpAddr) -> [u8; COOKIE_SIZE] {
         let mut hasher = Blake2s256::new();
         hasher.update(&self.cookie_key);
         hasher.update(&peer_ip.to_string().as_bytes());
@@ -118,8 +118,8 @@ impl CookieManager {
     }
 
     /// 验证 cookie
-    pub fn verify_cookie(&self, peer_ip: IpAddr, cookie: &[u8; COOKIE_SIZE]) -> bool {
-        let expected = self.generate_cookie(peer_ip);
+    pub fn _verify_cookie(&self, peer_ip: IpAddr, cookie: &[u8; COOKIE_SIZE]) -> bool {
+        let expected = self._generate_cookie(peer_ip);
         // 常数时间比较
         expected.iter().zip(cookie.iter()).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
     }
@@ -127,7 +127,7 @@ impl CookieManager {
     /// 生成 MAC1 (用于 handshake 消息)
     ///
     /// MAC1 = MAC(mac1_key, msg_without_mac)
-    pub fn compute_mac1(mac1_key: &[u8; 32], msg: &[u8]) -> [u8; MAC1_SIZE] {
+    pub fn _compute_mac1(mac1_key: &[u8; 32], msg: &[u8]) -> [u8; MAC1_SIZE] {
         let mut hasher = Blake2s256::new();
         hasher.update(mac1_key);
         hasher.update(msg);
@@ -138,13 +138,13 @@ impl CookieManager {
     }
 
     /// 验证 MAC1
-    pub fn verify_mac1(mac1_key: &[u8; 32], msg: &[u8], mac1: &[u8; MAC1_SIZE]) -> bool {
-        let computed = Self::compute_mac1(mac1_key, msg);
+    pub fn _verify_mac1(mac1_key: &[u8; 32], msg: &[u8], mac1: &[u8; MAC1_SIZE]) -> bool {
+        let computed = Self::_compute_mac1(mac1_key, msg);
         computed.iter().zip(mac1.iter()).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
     }
 
     /// 恢复 token (用于成功的 handshake 后)
-    pub fn on_handshake_success(&mut self, peer_ip: IpAddr) {
+    pub fn _on_handshake_success(&mut self, peer_ip: IpAddr) {
         if let Some(state) = self.ip_states.get_mut(&peer_ip) {
             state.tokens = TOKEN_MAX;
             state.request_count = 0;
@@ -152,7 +152,7 @@ impl CookieManager {
     }
 
     /// 定期轮换 cookie 密钥
-    pub fn rotate_key_if_needed(&mut self) {
+    pub fn _rotate_key_if_needed(&mut self) {
         if self.last_key_rotation.elapsed() > Duration::from_secs(60 * 5) {
             rand::Rng::fill(&mut rand::thread_rng(), &mut self.cookie_key);
             self.last_key_rotation = Instant::now();
@@ -160,7 +160,7 @@ impl CookieManager {
     }
 }
 
-impl Default for CookieManager {
+impl Default for _CookieManager {
     fn default() -> Self {
         Self::new()
     }
@@ -172,34 +172,34 @@ mod tests {
 
     #[test]
     fn cookie_generation_verification() {
-        let manager = CookieManager::new();
+        let manager = _CookieManager::new();
         let ip: IpAddr = "192.168.1.1".parse().unwrap();
 
-        let cookie = manager.generate_cookie(ip);
-        assert!(manager.verify_cookie(ip, &cookie));
-        assert!(!manager.verify_cookie("10.0.0.1".parse().unwrap(), &cookie));
+        let cookie = manager._generate_cookie(ip);
+        assert!(manager._verify_cookie(ip, &cookie));
+        assert!(!manager._verify_cookie("10.0.0.1".parse().unwrap(), &cookie));
     }
 
     #[test]
     fn under_load_detection() {
-        let mut manager = CookieManager::new();
+        let mut manager = _CookieManager::new();
         let ip: IpAddr = "192.168.1.1".parse().unwrap();
 
         // 发送 10 个请求 — 不应 under load
         for _ in 0..10 {
-            assert!(!manager.is_under_load(ip));
+            assert!(!manager._is_under_load(ip));
         }
 
         // 第 11 个 → under load
-        assert!(manager.is_under_load(ip));
+        assert!(manager._is_under_load(ip));
     }
 
     #[test]
     fn mac1_verification() {
         let key = [42u8; 32];
         let msg = b"hello wireguard";
-        let mac1 = CookieManager::compute_mac1(&key, msg);
-        assert!(CookieManager::verify_mac1(&key, msg, &mac1));
-        assert!(!CookieManager::verify_mac1(&[0u8; 32], msg, &mac1));
+        let mac1 = _CookieManager::_compute_mac1(&key, msg);
+        assert!(_CookieManager::_verify_mac1(&key, msg, &mac1));
+        assert!(!_CookieManager::_verify_mac1(&[0u8; 32], msg, &mac1));
     }
 }

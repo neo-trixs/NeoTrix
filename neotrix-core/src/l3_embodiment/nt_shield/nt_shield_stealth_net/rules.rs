@@ -68,7 +68,7 @@ impl RuleCondition {
         }
     }
 
-    pub fn matches_host(&self, host: &str) -> bool {
+    pub fn _matches_host(&self, host: &str) -> bool {
         match self {
             RuleCondition::DomainSuffix(suffix) => {
                 host == suffix.trim_start_matches('.') || host.ends_with(suffix)
@@ -86,7 +86,7 @@ impl RuleCondition {
         }
     }
 
-    pub fn matches_ip(&self, ip: IpAddr) -> bool {
+    pub fn _matches_ip(&self, ip: IpAddr) -> bool {
         match self {
             RuleCondition::Cidr(ref net_ip, prefix_len) => {
                 ip_is_in_cidr_pre(&ip, *net_ip, *prefix_len)
@@ -173,14 +173,14 @@ impl OutboundRule {
         self.condition.matches(url)
     }
 
-    pub fn matches_host(&self, host: &str) -> bool {
+    pub fn _matches_host(&self, host: &str) -> bool {
         if !self.enabled { return false; }
         if let Some(ttl) = self.ttl_secs {
             if self.created_at.elapsed().as_secs() > ttl {
                 return false;
             }
         }
-        self.condition.matches_host(host)
+        self.condition._matches_host(host)
     }
 
     pub fn is_expired(&self) -> bool {
@@ -291,7 +291,7 @@ impl RuleEngine {
         self
     }
 
-    pub fn no_persistence(mut self) -> Self {
+    pub fn _no_persistence(mut self) -> Self {
         self.persistence_path = None;
         self
     }
@@ -372,7 +372,7 @@ impl RuleEngine {
         Ok(())
     }
 
-    pub fn with_default(mut self, action: OutboundAction) -> Self {
+    pub fn _with_default(mut self, action: OutboundAction) -> Self {
         self.default_action = action;
         self
     }
@@ -388,7 +388,7 @@ impl RuleEngine {
         let _ = self.save();
     }
 
-    pub fn remove_expired(&mut self) {
+    pub fn _remove_expired(&mut self) {
         self.rules.retain(|r| !r.is_expired());
     }
 
@@ -402,7 +402,7 @@ impl RuleEngine {
         self.rules.retain(|r| !matches!(r.origin, RuleOrigin::External(_)));
     }
 
-    pub fn load_rules(&mut self, rules: Vec<OutboundRule>) {
+    pub fn _load_rules(&mut self, rules: Vec<OutboundRule>) {
         self.rules = rules;
         self.rules.sort_by_key(|r| r.priority);
     }
@@ -416,18 +416,18 @@ impl RuleEngine {
         &self.default_action
     }
 
-    pub fn evaluate_host(&self, host: &str) -> Option<&OutboundAction> {
+    pub fn _evaluate_host(&self, host: &str) -> Option<&OutboundAction> {
         for rule in &self.rules {
-            if rule.matches_host(host) {
+            if rule._matches_host(host) {
                 return Some(&rule.action);
             }
         }
         None
     }
 
-    pub fn evaluate_ip(&self, ip: IpAddr) -> &OutboundAction {
+    pub fn _evaluate_ip(&self, ip: IpAddr) -> &OutboundAction {
         for rule in &self.rules {
-            if rule.enabled && rule.condition.matches_ip(ip) {
+            if rule.enabled && rule.condition._matches_ip(ip) {
                 return &rule.action;
             }
         }
@@ -442,15 +442,15 @@ impl RuleEngine {
 
     pub fn rule_count(&self) -> usize { self.rules.len() }
 
-    pub fn external_rule_count(&self) -> usize {
+    pub fn _external_rule_count(&self) -> usize {
         self.rules.iter().filter(|r| matches!(r.origin, RuleOrigin::External(_))).count()
     }
 
-    pub fn has_rule(&self, label: &str) -> bool {
+    pub fn _has_rule(&self, label: &str) -> bool {
         self.rules.iter().any(|r| r.label == label)
     }
 
-    pub fn get_rule_by_label(&self, label: &str) -> Option<&OutboundRule> {
+    pub fn _get_rule_by_label(&self, label: &str) -> Option<&OutboundRule> {
         self.rules.iter().find(|r| r.label == label)
     }
 }
@@ -713,7 +713,7 @@ mod tests {
     fn test_load_rules_replaces_existing() {
         let mut engine = RuleEngine::new_empty();
         engine.add_rule(OutboundRule::new("old", RuleCondition::Always, OutboundAction::Block));
-        engine.load_rules(vec![OutboundRule::new("new", RuleCondition::Always, OutboundAction::Tor)]);
+        engine._load_rules(vec![OutboundRule::new("new", RuleCondition::Always, OutboundAction::Tor)]);
         assert_eq!(engine.rules().len(), 1);
         assert_eq!(engine.rules()[0].label, "new");
     }
@@ -766,8 +766,8 @@ mod tests {
     fn test_evaluate_host() {
         let mut engine = RuleEngine::new_empty();
         engine.add_rule(OutboundRule::new("block-google", RuleCondition::DomainExact("google.com".into()), OutboundAction::Block));
-        assert!(matches!(engine.evaluate_host("google.com"), Some(OutboundAction::Block)));
-        assert!(engine.evaluate_host("example.com").is_none());
+        assert!(matches!(engine._evaluate_host("google.com"), Some(OutboundAction::Block)));
+        assert!(engine._evaluate_host("example.com").is_none());
     }
 
     #[test]
@@ -776,6 +776,6 @@ mod tests {
         assert_eq!(engine.rule_count(), 0);
         engine.add_rule(OutboundRule::new("a", RuleCondition::Always, OutboundAction::Direct));
         assert_eq!(engine.rule_count(), 1);
-        assert_eq!(engine.external_rule_count(), 0);
+        assert_eq!(engine._external_rule_count(), 0);
     }
 }

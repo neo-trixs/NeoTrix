@@ -25,11 +25,11 @@ pub struct ClusterResult {
     pub window_duration_secs: u64,
     pub behavioral_similarity: f64,
     pub email_domain: Option<String>,
-    pub risk_assessment: ClusterRisk,
+    pub risk_assessment: _ClusterRisk,
 }
 
 #[derive(Debug, Clone)]
-pub struct ClusterRisk {
+pub struct _ClusterRisk {
     pub level: String,
     pub confidence: f64,
     pub primary_indicator: String,
@@ -346,19 +346,19 @@ impl AccountClusterEngine {
             let email_domain = self.dominant_email_domain(members, &observations).await;
 
             let risk = if creation_score >= 0.8 && members.len() >= 10 {
-                ClusterRisk {
+                _ClusterRisk {
                     level: "critical".into(),
                     confidence: 0.95,
                     primary_indicator: "coordinated_mass_creation".into(),
                 }
             } else if creation_score >= 0.6 || shared_ips.len() >= 3 {
-                ClusterRisk {
+                _ClusterRisk {
                     level: "high".into(),
                     confidence: 0.85,
                     primary_indicator: "ip_and_temporal_overlap".into(),
                 }
             } else {
-                ClusterRisk {
+                _ClusterRisk {
                     level: "medium".into(),
                     confidence: 0.65,
                     primary_indicator: "behavioral_similarity".into(),

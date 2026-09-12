@@ -120,7 +120,7 @@ impl LocalDockerProvider {
     /// - every bind mount (`-v`/`--volume`/`--mount`) must be read-only;
     /// - any published port (`-p`/`--publish`) must be bound to `127.0.0.1` —
     ///   a bare `"host:container"` spec binds 0.0.0.0 and is denied.
-    pub fn validate_docker_args(args: &[String]) -> Result<(), String> {
+    pub fn _validate_docker_args(args: &[String]) -> Result<(), String> {
         let mut i = 0;
         while i < args.len() {
             let flag = args[i].as_str();
@@ -236,7 +236,7 @@ impl CloudSandboxProvider for LocalDockerProvider {
 
         // Fail-closed structural gate: loopback-only publish / ro mounts /
         // no privileged. Runs on every execution before any container starts.
-        Self::validate_docker_args(&docker_args)?;
+        Self::_validate_docker_args(&docker_args)?;
 
         log::debug!("[sandbox] docker run: {}", redact_docker_args(&docker_args));
 
@@ -416,7 +416,7 @@ mod tests {
         args.push("python3".into());
         args.push("-c".into());
         args.push("print(1)".into());
-        LocalDockerProvider::validate_docker_args(&args).expect("production args must pass");
+        LocalDockerProvider::_validate_docker_args(&args).expect("production args must pass");
     }
 
     /// run_args 硬化结构: 无网络 / 只读根 fs / 上传挂载 :ro。
@@ -436,7 +436,7 @@ mod tests {
     fn test_gate_denies_privileged() {
         let mut args = vec!["run".to_string(), "--privileged".to_string()];
         args.push("img".into());
-        assert!(LocalDockerProvider::validate_docker_args(&args).is_err());
+        assert!(LocalDockerProvider::_validate_docker_args(&args).is_err());
     }
 
     #[test]
@@ -447,7 +447,7 @@ mod tests {
             to_owned(&["run", "--net", "host", "img"]),
         ] {
             assert!(
-                LocalDockerProvider::validate_docker_args(&form).is_err(),
+                LocalDockerProvider::_validate_docker_args(&form).is_err(),
                 "network host must be denied"
             );
         }
@@ -458,7 +458,7 @@ mod tests {
         for spec in ["/tmp/data:/workspace", "/tmp/data:/workspace:rw"] {
             let args = to_owned(&["run", "-v", spec, "img"]);
             assert!(
-                LocalDockerProvider::validate_docker_args(&args).is_err(),
+                LocalDockerProvider::_validate_docker_args(&args).is_err(),
                 "mount `{}` must be denied (rw default/explicit)",
                 spec
             );
@@ -469,7 +469,7 @@ mod tests {
     fn test_gate_allows_ro_mount() {
         for spec in ["/tmp/a:/workspace:ro", "/tmp/b:/workspace:ro,z"] {
             let args = to_owned(&["run", "-v", spec, "img"]);
-            LocalDockerProvider::validate_docker_args(&args)
+            LocalDockerProvider::_validate_docker_args(&args)
                 .unwrap_or_else(|e| panic!("mount `{}` should pass: {}", spec, e));
         }
     }
@@ -477,12 +477,12 @@ mod tests {
     #[test]
     fn test_publish_requires_loopback_bind() {
         let ok = to_owned(&["run", "-p", "127.0.0.1:8080:80", "img"]);
-        LocalDockerProvider::validate_docker_args(&ok).expect("loopback bind allowed");
+        LocalDockerProvider::_validate_docker_args(&ok).expect("loopback bind allowed");
 
         for bad in ["8080:80", "0.0.0.0:8080:80"] {
             let args = to_owned(&["run", "--publish", bad, "img"]);
             assert!(
-                LocalDockerProvider::validate_docker_args(&args).is_err(),
+                LocalDockerProvider::_validate_docker_args(&args).is_err(),
                 "publish `{}` must be denied (non-loopback bind)",
                 bad
             );

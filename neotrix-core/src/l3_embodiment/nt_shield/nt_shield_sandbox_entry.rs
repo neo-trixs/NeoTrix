@@ -11,7 +11,7 @@ pub enum SandboxMode {
 }
 
 #[derive(Debug)]
-pub struct SandboxResult {
+pub struct _SandboxResult {
     pub stdout: String,
     pub stderr: String,
     pub exit_code: i32,
@@ -57,12 +57,12 @@ impl Sandbox {
     }
 
     /// Execute a command in the sandbox without shell injection
-    pub fn execute(&self, cmd: &str) -> SandboxResult {
+    pub fn execute(&self, cmd: &str) -> _SandboxResult {
         match self.mode {
             SandboxMode::Local => self.exec_local(cmd),
             SandboxMode::Docker => self.exec_docker(cmd),
             SandboxMode::Wasm => self.exec_wasm(cmd),
-            SandboxMode::Remote => SandboxResult {
+            SandboxMode::Remote => _SandboxResult {
                 stdout: String::new(),
                 stderr: "Remote sandbox not implemented".to_string(),
                 exit_code: 1,
@@ -71,7 +71,7 @@ impl Sandbox {
     }
 
     /// Run a full agent loop inside the sandbox
-    pub fn run_agent(&self, task: &str) -> L1Result<String> {
+    pub fn _run_agent(&self, task: &str) -> L1Result<String> {
         let result = self.execute("echo sandbox_agent_ready");
         if result.exit_code == 0 {
             Ok(result.stdout)
@@ -84,21 +84,21 @@ impl Sandbox {
         }
     }
 
-    fn exec_local(&self, cmd: &str) -> SandboxResult {
+    fn exec_local(&self, cmd: &str) -> _SandboxResult {
         let (program, args) = Self::split_command(cmd);
         if program.is_empty() {
-            return SandboxResult { stdout: String::new(), stderr: "empty command".into(), exit_code: -1 };
+            return _SandboxResult { stdout: String::new(), stderr: "empty command".into(), exit_code: -1 };
         }
         let output = std::process::Command::new(program)
             .args(&args)
             .output();
         match output {
-            Ok(o) => SandboxResult {
+            Ok(o) => _SandboxResult {
                 stdout: String::from_utf8_lossy(&o.stdout).to_string(),
                 stderr: String::from_utf8_lossy(&o.stderr).to_string(),
                 exit_code: o.status.code().unwrap_or(-1),
             },
-            Err(e) => SandboxResult {
+            Err(e) => _SandboxResult {
                 stdout: String::new(),
                 stderr: format!("Failed to execute: {}", e),
                 exit_code: -1,
@@ -106,10 +106,10 @@ impl Sandbox {
         }
     }
 
-    fn exec_docker(&self, cmd: &str) -> SandboxResult {
+    fn exec_docker(&self, cmd: &str) -> _SandboxResult {
         let (program, args) = Self::split_command(cmd);
         if program.is_empty() {
-            return SandboxResult { stdout: String::new(), stderr: "empty command".into(), exit_code: -1 };
+            return _SandboxResult { stdout: String::new(), stderr: "empty command".into(), exit_code: -1 };
         }
         let output = std::process::Command::new("docker")
             .args(["run", "--rm", "-i"])
@@ -126,13 +126,13 @@ impl Sandbox {
                     // Docker not found, fallback to local
                     return self.exec_local(cmd);
                 }
-                SandboxResult {
+                _SandboxResult {
                     stdout: String::from_utf8_lossy(&o.stdout).to_string(),
                     stderr: String::from_utf8_lossy(&o.stderr).to_string(),
                     exit_code,
                 }
             }
-            Err(e) => SandboxResult {
+            Err(e) => _SandboxResult {
                 stdout: String::new(),
                 stderr: format!("Docker error: {} (fallback to local)", e),
                 exit_code: 127,
@@ -141,8 +141,8 @@ impl Sandbox {
     }
 
     #[cfg(not(feature = "sandbox"))]
-    fn exec_wasm(&self, _cmd: &str) -> SandboxResult {
-        SandboxResult {
+    fn exec_wasm(&self, _cmd: &str) -> _SandboxResult {
+        _SandboxResult {
             stdout: String::new(),
             stderr: "WASM sandbox not available (enable feature=sandbox)".into(),
             exit_code: -1,
@@ -150,10 +150,10 @@ impl Sandbox {
     }
 
     #[cfg(feature = "sandbox")]
-    fn exec_wasm(&self, cmd: &str) -> SandboxResult {
+    fn exec_wasm(&self, cmd: &str) -> _SandboxResult {
         match self.run_wasm_module(cmd) {
-            Ok(output) => SandboxResult { stdout: output, stderr: String::new(), exit_code: 0 },
-            Err(e) => SandboxResult { stdout: String::new(), stderr: e.to_string(), exit_code: -1 },
+            Ok(output) => _SandboxResult { stdout: output, stderr: String::new(), exit_code: 0 },
+            Err(e) => _SandboxResult { stdout: String::new(), stderr: e.to_string(), exit_code: -1 },
         }
     }
 
@@ -208,13 +208,13 @@ impl Sandbox {
 /// Provides a higher-level sandbox for executing JavaScript/WASM code
 /// with filesystem access, HTTP fetch (optional), and resource limits.
 #[cfg(feature = "sandbox")]
-pub struct WasmSandbox {
+pub struct _WasmSandbox {
     inner: agent_sandbox::Sandbox,
     rt: tokio::runtime::Runtime,
 }
 
 #[cfg(feature = "sandbox")]
-impl WasmSandbox {
+impl _WasmSandbox {
     /// Create a new WASM sandbox with the given host work directory.
     ///
     /// The work directory is exposed as `/work` inside the sandbox.
@@ -233,7 +233,7 @@ impl WasmSandbox {
     ///
     /// The `input` bytes are written to `/work/input` before execution.
     /// Returns stdout on success, error string on failure.
-    pub fn execute_wasm(&self, code: &str, input: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn _execute_wasm(&self, code: &str, input: &[u8]) -> Result<Vec<u8>, String> {
         if !input.is_empty() {
             self.rt
                 .block_on(self.inner.write_file("/input", input))
@@ -313,48 +313,48 @@ impl WasmSandbox {
 }
 
 #[cfg(not(feature = "sandbox"))]
-pub struct WasmSandbox(());
+pub struct _WasmSandbox(());
 
 #[cfg(not(feature = "sandbox"))]
-impl WasmSandbox {
+impl _WasmSandbox {
     pub fn new(_work_dir: &str) -> Result<Self, String> {
-        Err("WasmSandbox requires the 'sandbox' feature".into())
+        Err("_WasmSandbox requires the 'sandbox' feature".into())
     }
 
-    pub fn execute_wasm(&self, _code: &str, _input: &[u8]) -> Result<Vec<u8>, String> {
-        Err("WasmSandbox requires the 'sandbox' feature".into())
+    pub fn _execute_wasm(&self, _code: &str, _input: &[u8]) -> Result<Vec<u8>, String> {
+        Err("_WasmSandbox requires the 'sandbox' feature".into())
     }
 
     pub fn exec_command(&self, _command: &str, _args: &[String]) -> Result<Vec<u8>, String> {
-        Err("WasmSandbox requires the 'sandbox' feature".into())
+        Err("_WasmSandbox requires the 'sandbox' feature".into())
     }
 
     pub fn read_file(&self, _path: &str) -> Result<Vec<u8>, String> {
-        Err("WasmSandbox requires the 'sandbox' feature".into())
+        Err("_WasmSandbox requires the 'sandbox' feature".into())
     }
 
     pub fn write_file(&self, _path: &str, _contents: &[u8]) -> Result<(), String> {
-        Err("WasmSandbox requires the 'sandbox' feature".into())
+        Err("_WasmSandbox requires the 'sandbox' feature".into())
     }
 
     pub fn list_dir(&self, _path: &str) -> Result<Vec<String>, String> {
-        Err("WasmSandbox requires the 'sandbox' feature".into())
+        Err("_WasmSandbox requires the 'sandbox' feature".into())
     }
 
     pub fn diff(&self) -> Result<Vec<String>, String> {
-        Err("WasmSandbox requires the 'sandbox' feature".into())
+        Err("_WasmSandbox requires the 'sandbox' feature".into())
     }
 
     pub fn destroy(&self) -> Result<(), String> {
-        Err("WasmSandbox requires the 'sandbox' feature".into())
+        Err("_WasmSandbox requires the 'sandbox' feature".into())
     }
 }
 
-pub struct SandboxPool {
+pub struct _SandboxPool {
     sandboxes: Vec<Arc<Mutex<Sandbox>>>,
 }
 
-impl SandboxPool {
+impl _SandboxPool {
     pub fn new(count: usize, mode: SandboxMode) -> Self {
         let mut sandboxes = Vec::new();
         for _ in 0..count {
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_sandbox_pool() {
-        let pool = SandboxPool::new(3, SandboxMode::Local);
+        let pool = _SandboxPool::new(3, SandboxMode::Local);
         assert_eq!(pool.len(), 3);
         assert!(pool.acquire().is_some());
     }
@@ -421,7 +421,7 @@ mod tests {
     #[test]
     fn test_run_agent_fallback() {
         let s = Sandbox::new(SandboxMode::Local);
-        // run_agent tries to run neotrix-cli which won't be in PATH
+        // _run_agent tries to run neotrix-cli which won't be in PATH
         // but the echo fallback should work
         let result = s.execute("echo sandbox_test");
         assert_eq!(result.exit_code, 0);

@@ -11,18 +11,18 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 威胁检测引擎
-pub struct ThreatDetectionEngine {
-    rules: Vec<DetectionRule>,
-    anomalies: Vec<AnomalyEvent>,
-    threats: Vec<ThreatEvent>,
-    response_actions: Vec<ResponseAction>,
-    config: ThreatConfig,
-    stats: ThreatStats,
+pub struct _ThreatDetectionEngine {
+    rules: Vec<_DetectionRule>,
+    anomalies: Vec<_AnomalyEvent>,
+    threats: Vec<_ThreatEvent>,
+    response_actions: Vec<_ResponseAction>,
+    config: _ThreatConfig,
+    stats: _ThreatStats,
 }
 
 /// 威胁配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThreatConfig {
+pub struct _ThreatConfig {
     pub sensitivity: f64,
     pub auto_response: bool,
     pub alert_threshold: f64,
@@ -30,7 +30,7 @@ pub struct ThreatConfig {
     pub max_events: usize,
 }
 
-impl Default for ThreatConfig {
+impl Default for _ThreatConfig {
     fn default() -> Self {
         Self {
             sensitivity: 0.7,
@@ -44,7 +44,7 @@ impl Default for ThreatConfig {
 
 /// 检测规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DetectionRule {
+pub struct _DetectionRule {
     pub id: String,
     pub name: String,
     pub rule_type: RuleType,
@@ -90,7 +90,7 @@ pub enum Severity {
 
 /// 异常事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnomalyEvent {
+pub struct _AnomalyEvent {
     pub id: String,
     pub event_type: String,
     pub source: String,
@@ -102,7 +102,7 @@ pub struct AnomalyEvent {
 
 /// 威胁事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThreatEvent {
+pub struct _ThreatEvent {
     pub id: String,
     pub threat_type: String,
     pub severity: Severity,
@@ -125,7 +125,7 @@ pub struct Indicator {
 
 /// 响应动作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResponseAction {
+pub struct _ResponseAction {
     pub id: String,
     pub action_type: String,
     pub target: String,
@@ -136,7 +136,7 @@ pub struct ResponseAction {
 
 /// 威胁统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThreatStats {
+pub struct _ThreatStats {
     pub total_events: u64,
     pub threats_detected: u64,
     pub anomalies_detected: u64,
@@ -154,16 +154,16 @@ pub struct DetectionResult {
     pub recommended_action: Option<String>,
 }
 
-impl ThreatDetectionEngine {
+impl _ThreatDetectionEngine {
     /// 创建新的威胁检测引擎
-    pub fn new(config: ThreatConfig) -> Self {
+    pub fn new(config: _ThreatConfig) -> Self {
         Self {
             rules: Vec::new(),
             anomalies: Vec::new(),
             threats: Vec::new(),
             response_actions: Vec::new(),
             config,
-            stats: ThreatStats {
+            stats: _ThreatStats {
                 total_events: 0,
                 threats_detected: 0,
                 anomalies_detected: 0,
@@ -175,12 +175,12 @@ impl ThreatDetectionEngine {
     }
 
     /// 添加检测规则
-    pub fn add_rule(&mut self, rule: DetectionRule) {
+    pub fn add_rule(&mut self, rule: _DetectionRule) {
         self.rules.push(rule);
     }
 
     /// 分析事件
-    pub fn analyze_event(&mut self, event: &AnomalyEvent) -> DetectionResult {
+    pub fn _analyze_event(&mut self, event: &_AnomalyEvent) -> DetectionResult {
         self.stats.total_events += 1;
 
         let mut indicators = Vec::new();
@@ -231,7 +231,7 @@ impl ThreatDetectionEngine {
             self.stats.threats_detected += 1;
 
             // 创建威胁事件
-            let threat = ThreatEvent {
+            let threat = _ThreatEvent {
                 id: uuid::Uuid::new_v4().to_string(),
                 threat_type: "detected".into(),
                 severity: matched_severity.clone().unwrap_or(Severity::Medium),
@@ -264,7 +264,7 @@ impl ThreatDetectionEngine {
     }
 
     /// 评估规则
-    fn evaluate_rule(&self, rule: &DetectionRule, event: &AnomalyEvent) -> bool {
+    fn evaluate_rule(&self, rule: &_DetectionRule, event: &_AnomalyEvent) -> bool {
         // 简化版: 基于事件类型匹配
         match rule.rule_type {
             RuleType::Signature => event.event_type.contains(&rule.condition),
@@ -276,7 +276,7 @@ impl ThreatDetectionEngine {
     }
 
     /// 计算置信度
-    fn calculate_confidence(&self, rule: &DetectionRule, _event: &AnomalyEvent) -> f64 {
+    fn calculate_confidence(&self, rule: &_DetectionRule, _event: &_AnomalyEvent) -> f64 {
         match rule.severity {
             Severity::Low => 0.3,
             Severity::Medium => 0.6,
@@ -287,7 +287,7 @@ impl ThreatDetectionEngine {
     }
 
     /// 检测异常
-    fn detect_anomaly(&self, event: &AnomalyEvent) -> f64 {
+    fn detect_anomaly(&self, event: &_AnomalyEvent) -> f64 {
         // 简化版: 基于特征的异常检测
         let feature_sum: f64 = event.features.values().sum();
         let feature_count = event.features.len() as f64;
@@ -304,7 +304,7 @@ impl ThreatDetectionEngine {
     fn auto_respond(&mut self, indicators: &[Indicator], confidence: f64) {
         if confidence > 0.9 {
             // 高置信度: 立即阻断
-            self.response_actions.push(ResponseAction {
+            self.response_actions.push(_ResponseAction {
                 id: uuid::Uuid::new_v4().to_string(),
                 action_type: "block".into(),
                 target: "source".into(),
@@ -314,7 +314,7 @@ impl ThreatDetectionEngine {
             });
         } else if confidence > 0.7 {
             // 中置信度: 监控
-            self.response_actions.push(ResponseAction {
+            self.response_actions.push(_ResponseAction {
                 id: uuid::Uuid::new_v4().to_string(),
                 action_type: "monitor".into(),
                 target: "source".into(),
@@ -326,7 +326,7 @@ impl ThreatDetectionEngine {
     }
 
     /// 关联事件
-    pub fn correlate_events(&mut self) {
+    pub fn _correlate_events(&mut self) {
         let window = chrono::Duration::seconds(self.config.correlation_window as i64);
         let now = chrono::Utc::now();
 
@@ -345,12 +345,12 @@ impl ThreatDetectionEngine {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &ThreatStats {
+    pub fn stats(&self) -> &_ThreatStats {
         &self.stats
     }
 
     /// 获取检测到的威胁
-    pub fn get_threats(&self) -> &[ThreatEvent] {
+    pub fn _get_threats(&self) -> &[_ThreatEvent] {
         &self.threats
     }
 }

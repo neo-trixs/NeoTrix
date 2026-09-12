@@ -35,13 +35,13 @@ impl DaemonMode {
     }
 }
 
-pub struct ActivityTracker {
+pub struct _ActivityTracker {
     pub last_activity: Instant,
     pub active_count: u64,
     pub idle_timeout: Duration,
 }
 
-impl Default for ActivityTracker {
+impl Default for _ActivityTracker {
     fn default() -> Self {
         Self {
             last_activity: Instant::now(),
@@ -53,7 +53,7 @@ impl Default for ActivityTracker {
 
 pub struct ProxyControl {
     mode: Arc<RwLock<DaemonMode>>,
-    activity: Arc<RwLock<ActivityTracker>>,
+    activity: Arc<RwLock<_ActivityTracker>>,
     start_time: Instant,
 }
 
@@ -67,7 +67,7 @@ impl ProxyControl {
     pub fn new() -> Self {
         Self {
             mode: Arc::new(RwLock::new(DaemonMode::Off)),
-            activity: Arc::new(RwLock::new(ActivityTracker::default())),
+            activity: Arc::new(RwLock::new(_ActivityTracker::default())),
             start_time: Instant::now(),
         }
     }
@@ -76,7 +76,7 @@ impl ProxyControl {
         self.mode.clone()
     }
 
-    pub(crate) fn activity_ref(&self) -> Arc<RwLock<ActivityTracker>> {
+    pub(crate) fn activity_ref(&self) -> Arc<RwLock<_ActivityTracker>> {
         self.activity.clone()
     }
 

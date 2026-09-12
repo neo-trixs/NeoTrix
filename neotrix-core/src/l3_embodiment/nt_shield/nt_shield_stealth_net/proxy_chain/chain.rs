@@ -325,7 +325,7 @@ impl ProxyPool {
         self.active_index.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn stop_probe_loop(&self) {
+    pub fn _stop_probe_loop(&self) {
         self.running.store(false, Ordering::Relaxed);
     }
 

@@ -8,13 +8,13 @@ use futures::StreamExt;
 use super::{CloudResult, CloudRuntime, ResourceUsage};
 use super::provider::CloudSandboxProvider;
 
-pub struct RemoteApiProvider {
+pub struct _RemoteApiProvider {
     endpoint: String,
     api_key: Option<String>,
     client: reqwest::Client,
 }
 
-impl RemoteApiProvider {
+impl _RemoteApiProvider {
     pub fn new(endpoint: String, api_key: Option<String>) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(300))
@@ -52,7 +52,7 @@ impl RemoteApiProvider {
 }
 
 #[async_trait]
-impl CloudSandboxProvider for RemoteApiProvider {
+impl CloudSandboxProvider for _RemoteApiProvider {
     fn name(&self) -> &'static str {
         "remote-api"
     }
@@ -235,8 +235,8 @@ impl CloudSandboxProvider for RemoteApiProvider {
 mod tests {
     use super::*;
 
-    fn unreachable_provider() -> RemoteApiProvider {
-        RemoteApiProvider::new("http://127.0.0.1:0".to_string(), None)
+    fn unreachable_provider() -> _RemoteApiProvider {
+        _RemoteApiProvider::new("http://127.0.0.1:0".to_string(), None)
     }
 
     /// 门负例: endpoint 不可达 (port 0 必然拒连) → validate_ready fail-closed。
@@ -257,7 +257,7 @@ mod tests {
     /// health_url 拼接契约: endpoint + 固定 /api/v1/health 探针路径。
     #[test]
     fn test_health_url_contract() {
-        let p = RemoteApiProvider::new("https://sb.example.com".to_string(), None);
+        let p = _RemoteApiProvider::new("https://sb.example.com".to_string(), None);
         assert_eq!(p.health_url(), "https://sb.example.com/api/v1/health");
     }
 }

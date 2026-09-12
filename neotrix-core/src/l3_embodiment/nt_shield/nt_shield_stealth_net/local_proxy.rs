@@ -415,11 +415,11 @@ impl LocalProxy {
 }
 
 pub struct TorManager {
-    state: Arc<RwLock<TorState>>,
+    state: Arc<RwLock<_TorState>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum TorState {
+pub enum _TorState {
     Stopped,
     Starting,
     Running,
@@ -434,12 +434,12 @@ impl Default for TorManager {
 
 impl TorManager {
     pub fn new() -> Self {
-        Self { state: Arc::new(RwLock::new(TorState::Stopped)) }
+        Self { state: Arc::new(RwLock::new(_TorState::Stopped)) }
     }
 
     pub async fn auto_install_and_start(&self) {
         let mut state = self.state.write().await;
-        *state = TorState::Starting;
+        *state = _TorState::Starting;
         drop(state);
 
         match tokio::process::Command::new("tor")
@@ -455,24 +455,24 @@ impl TorManager {
                 match child.try_wait() {
                     Ok(Some(status)) => {
                         let mut s = self.state.write().await;
-                        *s = TorState::Error(format!("tor exited: {}", status));
+                        *s = _TorState::Error(format!("tor exited: {}", status));
                         eprintln!("[tor] failed to start: {}", status);
                     }
                     Ok(None) => {
                         let mut s = self.state.write().await;
-                        *s = TorState::Running;
+                        *s = _TorState::Running;
                         println!("[tor] running on 127.0.0.1:9050");
                     }
                     Err(e) => {
                         let mut s = self.state.write().await;
-                        *s = TorState::Error(e.to_string());
+                        *s = _TorState::Error(e.to_string());
                         eprintln!("[tor] spawn error: {}", e);
                     }
                 }
             }
             Err(e) => {
                 let mut s = self.state.write().await;
-                *s = TorState::Error(e.to_string());
+                *s = _TorState::Error(e.to_string());
                 eprintln!("[tor] not installed: {}", e);
             }
         }
@@ -484,18 +484,18 @@ impl TorManager {
             let reachable = Self::socks5_reachable().await;
             let mut state = self.state.write().await;
             if reachable {
-                if *state != TorState::Running {
-                    *state = TorState::Running;
+                if *state != _TorState::Running {
+                    *state = _TorState::Running;
                 }
             } else {
-                *state = TorState::Error("unreachable".to_string());
+                *state = _TorState::Error("unreachable".to_string());
             }
         }
     }
 
     pub async fn is_running(&self) -> bool {
         let s = self.state.read().await;
-        if *s == TorState::Running {
+        if *s == _TorState::Running {
             return true;
         }
         drop(s);

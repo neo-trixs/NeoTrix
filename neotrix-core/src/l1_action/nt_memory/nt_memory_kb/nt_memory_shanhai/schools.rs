@@ -1,4 +1,4 @@
-use crate::neotrix::nt_shanhai_geo::types::*;
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_shanhai::types::*;
 
 pub fn all_schools() -> Vec<SchoolParameters> {
     vec![

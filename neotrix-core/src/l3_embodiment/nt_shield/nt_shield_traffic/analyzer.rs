@@ -195,7 +195,7 @@ impl TrafficAnalyzer {
         }
     }
 
-    pub fn with_detector(detector: Box<dyn SensitivityDetector>) -> Self {
+    pub fn _with_detector(detector: Box<dyn SensitivityDetector>) -> Self {
         Self {
             sessions: Vec::with_capacity(RING_CAPACITY),
             next_id: 1,
@@ -352,11 +352,11 @@ impl TrafficAnalyzer {
         result
     }
 
-    pub fn recent_sessions(&self, n: usize) -> Vec<&TrafficSession> {
+    pub fn _recent_sessions(&self, n: usize) -> Vec<&TrafficSession> {
         self.sessions.iter().rev().take(n).collect()
     }
 
-    pub fn sessions_by_host(&self, host: &str) -> Vec<&TrafficSession> {
+    pub fn _sessions_by_host(&self, host: &str) -> Vec<&TrafficSession> {
         self.sessions.iter().filter(|s| s.host == host).collect()
     }
 
@@ -364,7 +364,7 @@ impl TrafficAnalyzer {
         self.sessions.len()
     }
 
-    pub fn traffic_volume_by_host(&self) -> Vec<(String, usize, usize)> {
+    pub fn _traffic_volume_by_host(&self) -> Vec<(String, usize, usize)> {
         let mut map: HashMap<String, (usize, usize)> = HashMap::new();
         for s in &self.sessions {
             let entry = map.entry(s.host.clone()).or_insert((0, 0));
@@ -566,7 +566,7 @@ mod tests {
         let mut analyzer = TrafficAnalyzer::new();
         let id = analyzer.capture_request("cdn.example.com", 443, "GET", "/large.bin", &[], &vec![0u8; 5000]);
         analyzer.capture_response(id, 200, "OK", &[], &vec![0u8; 20000]);
-        let volumes = analyzer.traffic_volume_by_host();
+        let volumes = analyzer._traffic_volume_by_host();
         assert_eq!(volumes[0].1, 5000);
         assert_eq!(volumes[0].2, 20000);
     }

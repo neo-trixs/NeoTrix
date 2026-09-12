@@ -48,7 +48,7 @@ impl OsIpRotator {
         }
     }
 
-    pub fn with_lan_router(self, router: Arc<LanRouter>) -> Self {
+    pub fn _with_lan_router(self, router: Arc<LanRouter>) -> Self {
         let s = self;
         *s.lan_router.blocking_write() = Some(router);
         s
@@ -205,7 +205,7 @@ impl OsIpRotator {
         { None }
     }
 
-    pub fn rotate_alias_ip(&self) -> Result<(String, String), String> {
+    pub fn _rotate_alias_ip(&self) -> Result<(String, String), String> {
         let cfg = loop {
             if let Ok(c) = self.config.try_read() { break c.clone(); }
         };
@@ -250,7 +250,7 @@ impl OsIpRotator {
         loop {
             sleep(Duration::from_secs(cfg.interval_secs)).await;
             if cfg.auto_add_alias_ips {
-                let _ = self.rotate_alias_ip();
+                let _ = self._rotate_alias_ip();
             }
             if cfg.rotate_gateway {
                 let _ = self.rotate_gateway();

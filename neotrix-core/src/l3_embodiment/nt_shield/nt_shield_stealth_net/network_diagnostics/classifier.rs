@@ -92,7 +92,7 @@ impl RootCauseClassifier {
         }
     }
 
-    pub fn classify_probabilistic(
+    pub fn _classify_probabilistic(
         health: &ApiHealth,
         env: &NetworkEnvironment,
         latency_z: f64,

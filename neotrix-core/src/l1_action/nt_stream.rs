@@ -25,8 +25,14 @@ use tokio::time::Instant;
 #[derive(Debug, Clone)]
 pub enum StreamStatus {
     Connecting,
-    Buffering { buffered_bytes: u64, total: Option<u64> },
-    Playing { played: u64, total: Option<u64> },
+    Buffering {
+        buffered_bytes: u64,
+        total: Option<u64>,
+    },
+    Playing {
+        played: u64,
+        total: Option<u64>,
+    },
     Complete,
     Failed(String),
     Cancelled,
@@ -84,13 +90,14 @@ impl StreamDownload {
             .map_err(|e| StreamError::Client(e.to_string()))?;
 
         // Disable compression to avoid chunked encoding bugs
-        let req = client
-            .get(&self.url)
-            .header("Accept-Encoding", "identity");
+        let req = client.get(&self.url).header("Accept-Encoding", "identity");
 
         // If resuming, set Range header
         let start_byte = if self.output.exists() {
-            fs::metadata(&self.output).await.map(|m| m.len()).unwrap_or(0)
+            fs::metadata(&self.output)
+                .await
+                .map(|m| m.len())
+                .unwrap_or(0)
         } else {
             0
         };
@@ -101,7 +108,10 @@ impl StreamDownload {
             req
         };
 
-        let resp: reqwest::Response = req.send().await.map_err(|e| StreamError::Network(e.to_string()))?;
+        let resp: reqwest::Response = req
+            .send()
+            .await
+            .map_err(|e| StreamError::Network(e.to_string()))?;
 
         if !resp.status().is_success() && resp.status().as_u16() != 206 {
             return Err(StreamError::Http(resp.status().as_u16()));
@@ -109,7 +119,8 @@ impl StreamDownload {
 
         let total_size = resp.content_length().map(|cl| cl + start_byte);
         let mut stream = resp.bytes_stream();
-        let mut file: BufWriter<File> = BufWriter::with_capacity(256 * 1024, File::create(&self.output).await?);
+        let mut file: BufWriter<File> =
+            BufWriter::with_capacity(256 * 1024, File::create(&self.output).await?);
 
         let bytes_written = self.bytes_written.clone();
         bytes_written.store(start_byte, Ordering::Relaxed);
@@ -129,37 +140,46 @@ impl StreamDownload {
         let url_inner = self.url.clone();
 
         let handle = tokio::spawn(async move {
-            let _ = progress_tx.send(StreamProgress {
-                url: url_inner.clone(),
-                status: StreamStatus::Connecting,
-                download_speed_bps: 0.0,
-                download_total: start_byte,
-                download_bytes: start_byte,
-                elapsed: Duration::ZERO,
-                buffered_percent: None,
-            })
-            .await;
+            let _ = progress_tx
+                .send(StreamProgress {
+                    url: url_inner.clone(),
+                    status: StreamStatus::Connecting,
+                    download_speed_bps: 0.0,
+                    download_total: start_byte,
+                    download_bytes: start_byte,
+                    elapsed: Duration::ZERO,
+                    buffered_percent: None,
+                })
+                .await;
 
             while let Some(chunk) = stream.next().await {
                 // Check cancel
-                if stopped_inner.load(Ordering::Relaxed) || (cancel_rx.as_ref().map(|rx| rx.try_recv().is_err()).unwrap_or(false)) {
-                    let _ = progress_tx.send(StreamProgress {
-                        url: url_inner.clone(),
-                        status: StreamStatus::Cancelled,
-                        download_speed_bps: 0.0,
-                        download_total: bytes_written_inner.load(Ordering::Relaxed),
-                        download_bytes: bytes_written_inner.load(Ordering::Relaxed),
-                        elapsed: started.elapsed(),
-                        buffered_percent: None,
-                    })
-                    .await;
+                if stopped_inner.load(Ordering::Relaxed)
+                    || (cancel_rx
+                        .as_ref()
+                        .map(|rx| rx.try_recv().is_err())
+                        .unwrap_or(false))
+                {
+                    let _ = progress_tx
+                        .send(StreamProgress {
+                            url: url_inner.clone(),
+                            status: StreamStatus::Cancelled,
+                            download_speed_bps: 0.0,
+                            download_total: bytes_written_inner.load(Ordering::Relaxed),
+                            download_bytes: bytes_written_inner.load(Ordering::Relaxed),
+                            elapsed: started.elapsed(),
+                            buffered_percent: None,
+                        })
+                        .await;
                     return Ok(());
                 }
 
                 match chunk {
                     Ok(data) => {
                         file.write_all(&data).await?;
-                        let written = bytes_written_inner.fetch_add(data.len() as u64, Ordering::Relaxed) + data.len() as u64;
+                        let written = bytes_written_inner
+                            .fetch_add(data.len() as u64, Ordering::Relaxed)
+                            + data.len() as u64;
                         recent_bytes += data.len() as u64;
 
                         // Calculate speed every 500ms
@@ -170,54 +190,62 @@ impl StreamDownload {
                             if speed_samples.len() > 10 {
                                 speed_samples.remove(0);
                             }
-                            let avg_speed = speed_samples.iter().sum::<f64>() / speed_samples.len() as f64;
+                            let avg_speed =
+                                speed_samples.iter().sum::<f64>() / speed_samples.len() as f64;
                             recent_bytes = 0;
                             last_sample = Instant::now();
 
-                            let buffered_pct = total_size.map(|t| (written as f32 / t as f32) * 100.0);
-                            let _ = progress_tx.send(StreamProgress {
-                                url: url_inner.clone(),
-                                status: if written == total_size.unwrap_or(0) {
-                                    StreamStatus::Complete
-                                } else {
-                                    StreamStatus::Buffering { buffered_bytes: written, total: total_size }
-                                },
-                                download_speed_bps: avg_speed,
-                                download_total: total_size.unwrap_or(0),
-                                download_bytes: written,
-                                elapsed: started.elapsed(),
-                                buffered_percent: buffered_pct,
-                            })
-                            .await;
+                            let buffered_pct =
+                                total_size.map(|t| (written as f32 / t as f32) * 100.0);
+                            let _ = progress_tx
+                                .send(StreamProgress {
+                                    url: url_inner.clone(),
+                                    status: if written == total_size.unwrap_or(0) {
+                                        StreamStatus::Complete
+                                    } else {
+                                        StreamStatus::Buffering {
+                                            buffered_bytes: written,
+                                            total: total_size,
+                                        }
+                                    },
+                                    download_speed_bps: avg_speed,
+                                    download_total: total_size.unwrap_or(0),
+                                    download_bytes: written,
+                                    elapsed: started.elapsed(),
+                                    buffered_percent: buffered_pct,
+                                })
+                                .await;
                         }
                     }
                     Err(e) => {
-                        let _ = progress_tx.send(StreamProgress {
-                            url: url_inner.clone(),
-                            status: StreamStatus::Failed(e.to_string()),
-                            download_speed_bps: 0.0,
-                            download_total: bytes_written_inner.load(Ordering::Relaxed),
-                            download_bytes: bytes_written_inner.load(Ordering::Relaxed),
-                            elapsed: started.elapsed(),
-                            buffered_percent: None,
-                        })
-                        .await;
+                        let _ = progress_tx
+                            .send(StreamProgress {
+                                url: url_inner.clone(),
+                                status: StreamStatus::Failed(e.to_string()),
+                                download_speed_bps: 0.0,
+                                download_total: bytes_written_inner.load(Ordering::Relaxed),
+                                download_bytes: bytes_written_inner.load(Ordering::Relaxed),
+                                elapsed: started.elapsed(),
+                                buffered_percent: None,
+                            })
+                            .await;
                         return Err(StreamError::Chunk(e.to_string()));
                     }
                 }
             }
 
             file.flush().await?;
-            let _ = progress_tx.send(StreamProgress {
-                url: url_inner,
-                status: StreamStatus::Complete,
-                download_speed_bps: 0.0,
-                download_total: bytes_written_inner.load(Ordering::Relaxed),
-                download_bytes: bytes_written_inner.load(Ordering::Relaxed),
-                elapsed: started.elapsed(),
-                buffered_percent: Some(100.0),
-            })
-            .await;
+            let _ = progress_tx
+                .send(StreamProgress {
+                    url: url_inner,
+                    status: StreamStatus::Complete,
+                    download_speed_bps: 0.0,
+                    download_total: bytes_written_inner.load(Ordering::Relaxed),
+                    download_bytes: bytes_written_inner.load(Ordering::Relaxed),
+                    elapsed: started.elapsed(),
+                    buffered_percent: Some(100.0),
+                })
+                .await;
 
             Ok::<(), StreamError>(())
         });
@@ -256,18 +284,43 @@ impl Default for StreamDownloadBuilder {
 }
 
 impl StreamDownloadBuilder {
-    pub fn url(mut self, url: impl Into<String>) -> Self { self.url = url.into(); self }
-    pub fn output(mut self, path: impl Into<PathBuf>) -> Self { self.output = path.into(); self }
-    pub fn chunk_size(mut self, size: usize) -> Self { self.chunk_size = size; self }
-    pub fn timeout(mut self, timeout: Duration) -> Self { self.timeout = timeout; self }
-    pub fn proxy(mut self, proxy: impl Into<String>) -> Self { self.proxy = Some(proxy.into()); self }
+    pub fn url(mut self, url: impl Into<String>) -> Self {
+        self.url = url.into();
+        self
+    }
+    pub fn output(mut self, path: impl Into<PathBuf>) -> Self {
+        self.output = path.into();
+        self
+    }
+    pub fn chunk_size(mut self, size: usize) -> Self {
+        self.chunk_size = size;
+        self
+    }
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
+    pub fn proxy(mut self, proxy: impl Into<String>) -> Self {
+        self.proxy = Some(proxy.into());
+        self
+    }
 
-    pub fn progress(mut self, tx: mpsc::Sender<StreamProgress>) -> Self { self.progress_tx = Some(tx); self }
-    pub fn cancel(mut self, rx: oneshot::Receiver<()>) -> Self { self.cancel_rx = Some(rx); self }
+    pub fn progress(mut self, tx: mpsc::Sender<StreamProgress>) -> Self {
+        self.progress_tx = Some(tx);
+        self
+    }
+    pub fn cancel(mut self, rx: oneshot::Receiver<()>) -> Self {
+        self.cancel_rx = Some(rx);
+        self
+    }
 
     pub fn build(self) -> Result<StreamDownload, StreamError> {
-        if self.url.is_empty() { return Err(StreamError::Config("url is required".into())); }
-        if self.output.as_os_str().is_empty() { return Err(StreamError::Config("output path is required".into())); }
+        if self.url.is_empty() {
+            return Err(StreamError::Config("url is required".into()));
+        }
+        if self.output.as_os_str().is_empty() {
+            return Err(StreamError::Config("output path is required".into()));
+        }
 
         Ok(StreamDownload {
             url: self.url,
@@ -275,7 +328,9 @@ impl StreamDownloadBuilder {
             chunk_size: self.chunk_size,
             timeout: self.timeout,
             proxy: self.proxy,
-            progress_tx: self.progress_tx.ok_or_else(|| StreamError::Config("progress channel required".into()))?,
+            progress_tx: self
+                .progress_tx
+                .ok_or_else(|| StreamError::Config("progress channel required".into()))?,
             cancel_rx: self.cancel_rx,
             bytes_written: Arc::new(AtomicU64::new(0)),
             stopped: Arc::new(AtomicBool::new(false)),
@@ -293,11 +348,17 @@ pub struct StreamHandle {
 }
 
 impl StreamHandle {
-    pub fn output_path(&self) -> &Path { &self.output }
-    pub fn bytes_written(&self) -> u64 { self.bytes_written.load(Ordering::Relaxed) }
+    pub fn output_path(&self) -> &Path {
+        &self.output
+    }
+    pub fn bytes_written(&self) -> u64 {
+        self.bytes_written.load(Ordering::Relaxed)
+    }
 
     pub fn available_bytes(&self) -> u64 {
-        std::fs::metadata(&self.output).map(|m| m.len()).unwrap_or(0)
+        std::fs::metadata(&self.output)
+            .map(|m| m.len())
+            .unwrap_or(0)
     }
 
     pub fn cancel(&self) {
@@ -305,7 +366,9 @@ impl StreamHandle {
     }
 
     pub async fn wait(self) -> Result<(), StreamError> {
-        self.task.await.map_err(|e| StreamError::Task(e.to_string()))?
+        self.task
+            .await
+            .map_err(|e| StreamError::Task(e.to_string()))?
     }
 }
 
@@ -346,24 +409,46 @@ impl StreamPlayer {
     }
 
     /// Bytes to wait for before starting playback
-    pub fn wait_for_bytes(mut self, bytes: u64) -> Self { self.wait_bytes = bytes; self }
+    pub fn wait_for_bytes(mut self, bytes: u64) -> Self {
+        self.wait_bytes = bytes;
+        self
+    }
 
     /// Poll interval for checking file growth
-    pub fn poll_interval(mut self, interval: Duration) -> Self { self.poll_interval = interval; self }
+    pub fn poll_interval(mut self, interval: Duration) -> Self {
+        self.poll_interval = interval;
+        self
+    }
 
     /// Custom player binary
-    pub fn player(mut self, bin: impl Into<String>) -> Self { self.player_bin = Some(bin.into()); self }
+    pub fn player(mut self, bin: impl Into<String>) -> Self {
+        self.player_bin = Some(bin.into());
+        self
+    }
 
     /// Additional player args
-    pub fn args(mut self, args: Vec<String>) -> Self { self.player_args = args; self }
+    pub fn args(mut self, args: Vec<String>) -> Self {
+        self.player_args = args;
+        self
+    }
 
     fn detect_player(&self) -> Option<&str> {
-        if self.player_bin.is_some() { return self.player_bin.as_deref(); }
+        if self.player_bin.is_some() {
+            return self.player_bin.as_deref();
+        }
         // Try ffplay first, then mpv
-        if std::process::Command::new("ffplay").arg("-version").output().is_ok() {
+        if std::process::Command::new("ffplay")
+            .arg("-version")
+            .output()
+            .is_ok()
+        {
             return Some("ffplay");
         }
-        if std::process::Command::new("mpv").arg("--version").output().is_ok() {
+        if std::process::Command::new("mpv")
+            .arg("--version")
+            .output()
+            .is_ok()
+        {
             return Some("mpv");
         }
         None
@@ -372,7 +457,8 @@ impl StreamPlayer {
     /// Spawn the player and return a handle.
     /// Player will read from the file as it grows, and exit when the file stops growing or closes.
     pub fn spawn(self) -> Result<PlayerHandle, StreamError> {
-        let player = self.detect_player()
+        let player = self
+            .detect_player()
             .ok_or_else(|| StreamError::Config("no player found (ffplay/mpv)".into()))?
             .to_string();
 
@@ -388,7 +474,10 @@ impl StreamPlayer {
         let handle = tokio::spawn(async move {
             // Wait for file to have enough bytes
             loop {
-                let size = fs::metadata(&file_clone).await.map(|m| m.len()).unwrap_or(0);
+                let size = fs::metadata(&file_clone)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0);
                 if size >= wait_bytes {
                     break;
                 }
@@ -400,7 +489,8 @@ impl StreamPlayer {
             if player == "ffplay" {
                 // ffplay: loop, no video, just audio, use file as input
                 cmd.arg("-autoexit")
-                    .arg("-loop").arg("0")
+                    .arg("-loop")
+                    .arg("0")
                     .args(&extra_args)
                     .arg(&file_clone);
             } else {
@@ -412,10 +502,10 @@ impl StreamPlayer {
                     .arg(&file_clone);
             }
 
-            cmd.stdout(Stdio::null())
-                .stderr(Stdio::null());
+            cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
-            let mut child = cmd.spawn()
+            let mut child = cmd
+                .spawn()
                 .map_err(|e| StreamError::Player(format!("failed to spawn {}: {}", player, e)))?;
 
             // Wait for stop signal or player exit
@@ -435,7 +525,11 @@ impl StreamPlayer {
             Ok::<(), StreamError>(())
         });
 
-        Ok(PlayerHandle { handle, stop_tx, file: file_for_handle })
+        Ok(PlayerHandle {
+            handle,
+            stop_tx,
+            file: file_for_handle,
+        })
     }
 }
 
@@ -452,7 +546,9 @@ impl PlayerHandle {
         Ok(())
     }
 
-    pub fn file(&self) -> &Path { &self.file }
+    pub fn file(&self) -> &Path {
+        &self.file
+    }
 }
 
 // ── MagnetTransport ─────────────────────────────────────────────
@@ -467,7 +563,10 @@ impl MagnetTransport {
     /// Connect to running aria2c RPC daemon.
     /// Default: http://127.0.0.1:6800/jsonrpc
     pub fn new(rpc_url: impl Into<String>) -> Self {
-        Self { rpc_url: rpc_url.into(), rpc_secret: None }
+        Self {
+            rpc_url: rpc_url.into(),
+            rpc_secret: None,
+        }
     }
 
     pub fn with_secret(mut self, secret: impl Into<String>) -> Self {
@@ -512,14 +611,19 @@ impl MagnetTransport {
             .await
             .map_err(|e| StreamError::Rpc(format!("aria2c connect failed: {}", e)))?;
 
-        let body: serde_json::Value = resp.json().await
+        let body: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| StreamError::Rpc(format!("aria2c response parse failed: {}", e)))?;
 
         if let Some(error) = body.get("error") {
             return Err(StreamError::Rpc(format!(
                 "aria2c error {}: {}",
                 error.get("code").and_then(|c| c.as_i64()).unwrap_or(0),
-                error.get("message").and_then(|m| m.as_str()).unwrap_or("unknown")
+                error
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("unknown")
             )));
         }
 
@@ -561,29 +665,52 @@ impl MagnetTransport {
                 };
 
                 let status = body["result"]["status"].as_str().unwrap_or("unknown");
-                let total = body["result"]["totalLength"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
-                let completed = body["result"]["completedLength"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
-                let speed = body["result"]["downloadSpeed"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
+                let total = body["result"]["totalLength"]
+                    .as_str()
+                    .unwrap_or("0")
+                    .parse::<u64>()
+                    .unwrap_or(0);
+                let completed = body["result"]["completedLength"]
+                    .as_str()
+                    .unwrap_or("0")
+                    .parse::<u64>()
+                    .unwrap_or(0);
+                let speed = body["result"]["downloadSpeed"]
+                    .as_str()
+                    .unwrap_or("0")
+                    .parse::<u64>()
+                    .unwrap_or(0);
 
                 let stream_status = match status {
-                    "active" => StreamStatus::Buffering { buffered_bytes: completed, total: if total > 0 { Some(total) } else { None } },
+                    "active" => StreamStatus::Buffering {
+                        buffered_bytes: completed,
+                        total: if total > 0 { Some(total) } else { None },
+                    },
                     "complete" => StreamStatus::Complete,
                     "error" => StreamStatus::Failed("aria2c error".into()),
                     "paused" => StreamStatus::Cancelled,
                     "removed" => StreamStatus::Cancelled,
-                    _ => StreamStatus::Buffering { buffered_bytes: completed, total: if total > 0 { Some(total) } else { None } },
+                    _ => StreamStatus::Buffering {
+                        buffered_bytes: completed,
+                        total: if total > 0 { Some(total) } else { None },
+                    },
                 };
 
-                let _ = progress_tx.send(StreamProgress {
-                    url: format!("magnet:...&dn={}", gid),
-                    status: stream_status.clone(),
-                    download_speed_bps: speed as f64,
-                    download_total: total,
-                    download_bytes: completed,
-                    elapsed: Duration::ZERO,
-                    buffered_percent: if total > 0 { Some((completed as f32 / total as f32) * 100.0) } else { None },
-                })
-                .await;
+                let _ = progress_tx
+                    .send(StreamProgress {
+                        url: format!("magnet:...&dn={}", gid),
+                        status: stream_status.clone(),
+                        download_speed_bps: speed as f64,
+                        download_total: total,
+                        download_bytes: completed,
+                        elapsed: Duration::ZERO,
+                        buffered_percent: if total > 0 {
+                            Some((completed as f32 / total as f32) * 100.0)
+                        } else {
+                            None
+                        },
+                    })
+                    .await;
 
                 if status == "complete" || status == "error" || status == "removed" {
                     break;
@@ -625,7 +752,9 @@ pub struct MagnetHandle {
 }
 
 impl MagnetHandle {
-    pub fn gid(&self) -> &str { &self.gid }
+    pub fn gid(&self) -> &str {
+        &self.gid
+    }
 
     pub fn cancel(mut self) {
         if let Some(tx) = self.stop_tx.take() {
@@ -641,7 +770,8 @@ impl MagnetHandle {
             if let Some(secret) = rpc_secret {
                 params.insert(0, serde_json::json!(format!("token:{}", secret)));
             }
-            let _ = client.post(&rpc_url)
+            let _ = client
+                .post(&rpc_url)
                 .json(&serde_json::json!({
                     "jsonrpc": "2.0",
                     "id": "nt-cancel",
@@ -654,7 +784,9 @@ impl MagnetHandle {
     }
 
     pub async fn wait(self) -> Result<(), StreamError> {
-        self.poll_handle.await.map_err(|e| StreamError::Task(e.to_string()))?
+        self.poll_handle
+            .await
+            .map_err(|e| StreamError::Task(e.to_string()))?
     }
 }
 
@@ -725,7 +857,8 @@ mod tests {
 
         // Test RPC connectivity
         let client = reqwest::Client::new();
-        let resp = client.post("http://127.0.0.1:6800/jsonrpc")
+        let resp = client
+            .post("http://127.0.0.1:6800/jsonrpc")
             .json(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": "nt-test",

@@ -25,12 +25,12 @@ impl ResourceDescriptor {
         }
     }
 
-    pub fn with_attribute(mut self, key: String, value: String) -> Self {
+    pub fn _with_attribute(mut self, key: String, value: String) -> Self {
         self.attributes.insert(key, value);
         self
     }
 
-    pub fn with_permission(mut self, permission: String) -> Self {
+    pub fn _with_permission(mut self, permission: String) -> Self {
         self.required_permissions.push(permission);
         self
     }
@@ -47,8 +47,8 @@ mod tests {
             "Test Tunnel".into(),
             "tunnel".into(),
         )
-        .with_attribute("max_bandwidth".into(), "100Mbps".into())
-        .with_permission("connect".into());
+        ._with_attribute("max_bandwidth".into(), "100Mbps".into())
+        ._with_permission("connect".into());
 
         assert_eq!(resource.id, "t1");
         assert_eq!(resource.required_permissions.len(), 1);

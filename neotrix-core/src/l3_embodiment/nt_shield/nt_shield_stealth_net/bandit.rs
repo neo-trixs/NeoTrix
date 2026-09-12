@@ -175,7 +175,7 @@ impl FingerprintBandit {
     }
 
     /// 将另一个 bandit 的经验合并到此 bandit (加权平均, other_weight=0.3)
-    pub fn migrate_from(&self, other: &FingerprintBandit, other_weight: f64) {
+    pub fn _migrate_from(&self, other: &FingerprintBandit, other_weight: f64) {
         let w = other_weight.clamp(0.0, 0.5);
         for (arm, stats) in &self.arms {
             if let Some((_, other_stats)) = other.arms.iter().find(|(a, _)| *a == *arm) {
@@ -195,14 +195,14 @@ impl FingerprintBandit {
     }
 
     /// 遍历所有 per-host bandits, 找到相似度 > 0.9 的自动迁移
-    pub fn auto_migrate(bandits: &[(String, FingerprintBandit)]) -> usize {
+    pub fn _auto_migrate(bandits: &[(String, FingerprintBandit)]) -> usize {
         let mut migration_count = 0;
         for i in 0..bandits.len() {
             for j in (i + 1)..bandits.len() {
                 let sim = bandits[i].1.similarity(&bandits[j].1);
                 if sim > 0.9 {
                     log::info!("[bandit] auto-migrate {} → {} (sim={:.3})", bandits[i].0, bandits[j].0, sim);
-                    bandits[i].1.migrate_from(&bandits[j].1, 0.3);
+                    bandits[i].1._migrate_from(&bandits[j].1, 0.3);
                     migration_count += 1;
                 }
             }

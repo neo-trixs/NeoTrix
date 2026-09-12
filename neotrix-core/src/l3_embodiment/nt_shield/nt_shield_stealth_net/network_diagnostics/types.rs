@@ -12,15 +12,15 @@ pub enum ErrorPhase {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorClass {
-    Dns { subtype: DnsErrorSubtype },
-    Tcp { subtype: TcpErrorSubtype },
-    Tls { subtype: TlsErrorSubtype },
-    Http { subtype: HttpErrorSubtype, status: Option<u16> },
+    Dns { subtype: _DnsErrorSubtype },
+    Tcp { subtype: _TcpErrorSubtype },
+    Tls { subtype: _TlsErrorSubtype },
+    Http { subtype: _HttpErrorSubtype, status: Option<u16> },
     Unknown(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DnsErrorSubtype {
+pub enum _DnsErrorSubtype {
     NameNotResolved,
     NoAddress,
     Timeout,
@@ -28,7 +28,7 @@ pub enum DnsErrorSubtype {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TcpErrorSubtype {
+pub enum _TcpErrorSubtype {
     TimedOut,
     ConnectionRefused,
     ConnectionReset,
@@ -38,7 +38,7 @@ pub enum TcpErrorSubtype {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TlsErrorSubtype {
+pub enum _TlsErrorSubtype {
     CertDateInvalid,
     CertAuthorityInvalid,
     CertNameInvalid,
@@ -46,7 +46,7 @@ pub enum TlsErrorSubtype {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HttpErrorSubtype {
+pub enum _HttpErrorSubtype {
     ServiceUnavailable,
     TooManyRequests,
     InternalError,

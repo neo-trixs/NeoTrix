@@ -394,7 +394,7 @@ impl ModelSelector {
 
     /// Rank models by real benchmarks (whichllm 风格), not parameter count
     /// Sorts by: actual_tok_s > task_fit > memory_efficiency
-    pub fn rank_by_real_benchmarks(&self, task: &str) -> Vec<(&ModelInfo, f64)> {
+    pub fn _rank_by_real_benchmarks(&self, task: &str) -> Vec<(&ModelInfo, f64)> {
         let mut scored: Vec<(&ModelInfo, f64)> = self.known_models.values()
             .map(|m| {
                 // Real benchmark score (M5 16GB actual tok/s)

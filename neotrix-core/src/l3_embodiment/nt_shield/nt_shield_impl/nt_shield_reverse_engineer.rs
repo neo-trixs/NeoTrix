@@ -12,7 +12,7 @@ pub struct GhidraAnalyzer {
     /// Ghidra installation path
     ghidra_path: std::path::PathBuf,
     /// Extracted function signatures
-    functions: Vec<FunctionSignature>,
+    functions: Vec<_FunctionSignature>,
 }
 
 impl GhidraAnalyzer {
@@ -41,14 +41,14 @@ impl GhidraAnalyzer {
         // Architecture: L1 Body execution, results → VSA embedding
         
         let functions = vec![
-            FunctionSignature {
+            _FunctionSignature {
                 name: "get_user_input".to_string(),
                 addr: "0x401000".to_string(),
                 returns: "char*".to_string(),
                 params: vec!["buffer".to_string(), "size".to_string()],
                 vulnerability: Some("Buffer overflow risk".to_string()),
             },
-            FunctionSignature {
+            _FunctionSignature {
                 name: "strcpy_safe".to_string(),
                 addr: "0x402000".to_string(),
                 returns: "int".to_string(),
@@ -68,9 +68,9 @@ impl GhidraAnalyzer {
     }
     
     /// Extract control flow graph
-    pub fn extract_cfg(&self) -> ControlFlowGraph {
+    pub fn _extract_cfg(&self) -> _ControlFlowGraph {
         // TODO: Parse Ghidra decompiled output for CFG
-        ControlFlowGraph {
+        _ControlFlowGraph {
             nodes: 12,
             edges: 18,
             loops: 3,
@@ -80,7 +80,7 @@ impl GhidraAnalyzer {
 
 /// Extracted function signature
 #[derive(Debug, Clone)]
-pub struct FunctionSignature {
+pub struct _FunctionSignature {
     pub name: String,
     pub addr: String,
     pub returns: String,
@@ -91,13 +91,13 @@ pub struct FunctionSignature {
 /// Analysis result
 #[derive(Debug, Clone)]
 pub struct AnalysisResult {
-    pub functions: Vec<FunctionSignature>,
+    pub functions: Vec<_FunctionSignature>,
     pub vulnerabilities: Vec<String>,
 }
 
 /// Control flow graph summary
 #[derive(Debug, Clone)]
-pub struct ControlFlowGraph {
+pub struct _ControlFlowGraph {
     pub nodes: usize,
     pub edges: usize,
     pub loops: usize,

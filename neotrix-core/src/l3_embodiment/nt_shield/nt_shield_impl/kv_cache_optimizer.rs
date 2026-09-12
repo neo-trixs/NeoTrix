@@ -23,18 +23,18 @@ use serde::{Deserialize, Serialize};
 /// KV cache optimization engine
 pub struct KVCacheOptimizer {
     /// Cache allocation strategy
-    strategy: CacheStrategy,
+    strategy: _CacheStrategy,
     /// Quantization settings for KV cache
-    quantization: KVQuantConfig,
+    quantization: _KVQuantConfig,
     /// FlashAttention configuration
-    flash_config: FlashAttentionConfig,
+    flash_config: _FlashAttentionConfig,
     /// RadixAttention prefix cache
-    radix_config: RadixAttentionConfig,
+    radix_config: _RadixAttentionConfig,
 }
 
 /// KV cache allocation strategy
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CacheStrategy {
+pub enum _CacheStrategy {
     /// PagedAttention: Non-contiguous blocks, OS-like virtual memory
     PagedAttention,
     /// RadixAttention: Prefix tree-based sharing
@@ -47,7 +47,7 @@ pub enum CacheStrategy {
 
 /// KV cache quantization configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KVQuantConfig {
+pub struct _KVQuantConfig {
     pub enabled: bool,
     pub k_type: String,  // "q8_0", "q4_0", "turbo3", "turbo4", "fp8", "kvarn5"
     pub v_type: String,  // "q8_0", "q4_1", "turbo3", "fp8", "kvarn4"
@@ -57,7 +57,7 @@ pub struct KVQuantConfig {
 
 /// FlashAttention configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlashAttentionConfig {
+pub struct _FlashAttentionConfig {
     pub enabled: bool,
     pub version: u8,        // 2 or 3
     pub dtype: String,      // "bf16", "fp8", "f16"
@@ -67,7 +67,7 @@ pub struct FlashAttentionConfig {
 
 /// RadixAttention configuration (prefix caching)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RadixAttentionConfig {
+pub struct _RadixAttentionConfig {
     pub enabled: bool,
     pub prefix_cache_size: usize,
     pub hit_rate_target: f64,
@@ -89,22 +89,22 @@ impl KVCacheOptimizer {
     /// Create default KV cache optimizer
     pub fn new() -> Self {
         Self {
-            strategy: CacheStrategy::PagedAttention,
-            quantization: KVQuantConfig {
+            strategy: _CacheStrategy::PagedAttention,
+            quantization: _KVQuantConfig {
                 enabled: true,
                 k_type: "q8_0".to_string(),
                 v_type: "q8_0".to_string(),
                 bits: 8,
                 compression_ratio: 0.5,
             },
-            flash_config: FlashAttentionConfig {
+            flash_config: _FlashAttentionConfig {
                 enabled: true,
                 version: 3,
                 dtype: "fp8".to_string(),
                 softcap: 0.0,
                 window_size: None,
             },
-            radix_config: RadixAttentionConfig {
+            radix_config: _RadixAttentionConfig {
                 enabled: true,
                 prefix_cache_size: 10000,
                 hit_rate_target: 0.85,
@@ -113,7 +113,7 @@ impl KVCacheOptimizer {
     }
     
     /// Select best KV cache configuration for hardware
-    pub fn select_best_config(
+    pub fn _select_best_config(
         &self,
         hw_vram_gb: f64,
         model_layers: usize,
@@ -142,7 +142,7 @@ impl KVCacheOptimizer {
     }
     
     /// Apply TurboQuant to KV cache
-    pub fn apply_turboquant(&mut self) {
+    pub fn _apply_turboquant(&mut self) {
         self.quantization.k_type = "turbo3".to_string();
         self.quantization.v_type = "turbo3".to_string();
         self.quantization.bits = 3;
@@ -150,25 +150,25 @@ impl KVCacheOptimizer {
     }
     
     /// Apply KVarN (variance-normalized KV cache quantization)
-    pub fn apply_kvarn(&mut self, k_bits: u8, v_bits: u8) {
+    pub fn _apply_kvarn(&mut self, k_bits: u8, v_bits: u8) {
         self.quantization.k_type = format!("kvarn{}", k_bits);
         self.quantization.v_type = format!("kvarn{}", v_bits);
         self.quantization.bits = k_bits;
     }
     
     /// Enable FlashAttention-3
-    pub fn enable_flash_attention_v3(&mut self) {
+    pub fn _enable_flash_attention_v3(&mut self) {
         self.flash_config.enabled = true;
         self.flash_config.version = 3;
     }
     
     /// Enable RadixAttention prefix caching
-    pub fn enable_radix_attention(&mut self) {
+    pub fn _enable_radix_attention(&mut self) {
         self.radix_config.enabled = true;
     }
     
     /// Compute memory savings from quantization
-    pub fn compute_memory_savings(
+    pub fn _compute_memory_savings(
         &self,
         model_layers: usize,
         head_dim: usize,
@@ -228,7 +228,7 @@ pub enum KVCACHEType {
 
 impl KVCacheOptimizer {
     /// Get context capacity for different KV cache types
-    pub fn get_context_capacity(
+    pub fn _get_context_capacity(
         &self,
         model: &str,
         layers: usize,
@@ -270,12 +270,12 @@ pub struct ContinuousBatchingConfig {
     pub max_num_batched_tokens: usize,
     pub chunked_prefill_size: usize,
     pub prefix_caching: bool,
-    pub schedule_policy: SchedulePolicy,
+    pub schedule_policy: _SchedulePolicy,
 }
 
 /// Batching schedule policy
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SchedulePolicy {
+pub enum _SchedulePolicy {
     /// Iteration-level scheduling (vLLM default)
     IterationLevel,
     /// Request-level scheduling
@@ -286,7 +286,7 @@ pub enum SchedulePolicy {
 
 /// Disaggregated serving configuration (prefill/decode separation)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DisaggregatedServingConfig {
+pub struct _DisaggregatedServingConfig {
     pub enabled: bool,
     pub prefill_gpu_count: usize,
     pub decode_gpu_count: usize,
@@ -301,7 +301,7 @@ impl ContinuousBatchingConfig {
             max_num_batched_tokens: 4096,
             chunked_prefill_size: 512,
             prefix_caching: true,
-            schedule_policy: SchedulePolicy::MemoryAware,
+            schedule_policy: _SchedulePolicy::MemoryAware,
         }
     }
 }
@@ -313,7 +313,7 @@ impl ContinuousBatchingConfig {
 /// - Zero out low-variance attention heads (sparsity ~87%)
 /// - Combined: ~7× compression with <2% quality degradation on long-context tasks
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KvCacheCompressor {
+pub struct _KvCacheCompressor {
     /// Target compression ratio (e.g. 7.0 for 7× compression)
     pub compression_ratio: f64,
     /// Bits per element after quantization (3 or 4 recommended)
@@ -322,7 +322,7 @@ pub struct KvCacheCompressor {
     pub sparsity_threshold: f64,
 }
 
-impl KvCacheCompressor {
+impl _KvCacheCompressor {
     pub fn new(compression_ratio: f64, quant_bits: u8) -> Self {
         Self {
             compression_ratio,
@@ -350,7 +350,7 @@ impl KvCacheCompressor {
     }
 
     /// Compress a KV cache block, returning compressed data and actual ratio
-    pub fn compress(&self, data: &[f32]) -> CompressedKvBlock {
+    pub fn compress(&self, data: &[f32]) -> _CompressedKvBlock {
         // Phase 1: Quantize — reduce precision per element
         let quantized: Vec<u8> = data.iter().map(|v| self.quantize(*v)).collect();
 
@@ -364,7 +364,7 @@ impl KvCacheCompressor {
             ((1.0 - keep_ratio) * quantized.len() as f64) as usize
         };
 
-        CompressedKvBlock {
+        _CompressedKvBlock {
             data: quantized,
             original_len: data.len(),
             sparse_zeros: sparse_count,
@@ -396,7 +396,7 @@ impl KvCacheCompressor {
     }
 }
 
-impl Default for KvCacheCompressor {
+impl Default for _KvCacheCompressor {
     fn default() -> Self {
         Self::aggressive()
     }
@@ -404,14 +404,14 @@ impl Default for KvCacheCompressor {
 
 /// Compressed KV cache block
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompressedKvBlock {
+pub struct _CompressedKvBlock {
     pub data: Vec<u8>,
     pub original_len: usize,
     pub sparse_zeros: usize,
     pub quant_bits: u8,
 }
 
-impl CompressedKvBlock {
+impl _CompressedKvBlock {
     /// Actual compression ratio achieved
     pub fn actual_ratio(&self) -> f64 {
         let original_bytes = self.original_len * 4; // f32 = 4 bytes
@@ -439,7 +439,7 @@ mod kv_compressor_tests {
 
     #[test]
     fn test_aggressive_7x_compression() {
-        let comp = KvCacheCompressor::aggressive();
+        let comp = _KvCacheCompressor::aggressive();
         let data: Vec<f32> = (0..1000).map(|i| (i as f32 / 1000.0) - 0.5).collect();
         let compressed = comp.compress(&data);
         let ratio = compressed.actual_ratio();
@@ -448,14 +448,14 @@ mod kv_compressor_tests {
 
     #[test]
     fn test_quantize_range() {
-        let comp = KvCacheCompressor::new(4.0, 4);
+        let comp = _KvCacheCompressor::new(4.0, 4);
         let q = comp.quantize(0.5);
         assert!(q <= 15, "4-bit quantize should be <= 15, got {q}");
     }
 
     #[test]
     fn test_sparsity_low_variance() {
-        let comp = KvCacheCompressor::aggressive();
+        let comp = _KvCacheCompressor::aggressive();
         let uniform = vec![0.5; 100]; // zero variance
         let compressed = comp.compress(&uniform);
         assert!(compressed.sparsity() > 0.9, "uniform data should be highly sparse");
@@ -463,8 +463,8 @@ mod kv_compressor_tests {
 
     #[test]
     fn test_conservative_less_compression() {
-        let aggressive = KvCacheCompressor::aggressive();
-        let conservative = KvCacheCompressor::conservative();
+        let aggressive = _KvCacheCompressor::aggressive();
+        let conservative = _KvCacheCompressor::conservative();
         let data: Vec<f32> = (0..500).map(|i| (i as f32 / 500.0) - 0.5).collect();
         let a = aggressive.compress(&data);
         let c = conservative.compress(&data);
@@ -474,7 +474,7 @@ mod kv_compressor_tests {
 
     #[test]
     fn test_actual_ratio_formula() {
-        let block = CompressedKvBlock {
+        let block = _CompressedKvBlock {
             data: vec![0; 100],
             original_len: 400,
             sparse_zeros: 0,

@@ -6,9 +6,9 @@ use std::sync::Arc;
 use crate::core::nt_core_capability::*;
 
 /// 零信任网络能力
-pub struct ZeroTrustCapability;
+pub struct _ZeroTrustCapability;
 
-impl UnifiedCapability for ZeroTrustCapability {
+impl UnifiedCapability for _ZeroTrustCapability {
     fn meta(&self) -> CapabilityMeta {
         CapabilityMeta {
             id: "nt-shield-ztnet".into(),
@@ -63,9 +63,9 @@ impl UnifiedCapability for ZeroTrustCapability {
 }
 
 /// 安全扫描能力
-pub struct SecurityScanCapability;
+pub struct _SecurityScanCapability;
 
-impl UnifiedCapability for SecurityScanCapability {
+impl UnifiedCapability for _SecurityScanCapability {
     fn meta(&self) -> CapabilityMeta {
         CapabilityMeta {
             id: "nt-shield-scan".into(),
@@ -127,9 +127,9 @@ impl UnifiedCapability for SecurityScanCapability {
 }
 
 /// 威胁检测能力
-pub struct ThreatDetectionCapability;
+pub struct _ThreatDetectionCapability;
 
-impl UnifiedCapability for ThreatDetectionCapability {
+impl UnifiedCapability for _ThreatDetectionCapability {
     fn meta(&self) -> CapabilityMeta {
         CapabilityMeta {
             id: "nt-shield-threat".into(),
@@ -185,9 +185,9 @@ impl UnifiedCapability for ThreatDetectionCapability {
 /// 创建NT-SHIELD能力
 pub fn create_shield_capabilities() -> Vec<Arc<dyn UnifiedCapability>> {
     vec![
-        Arc::new(ZeroTrustCapability),
-        Arc::new(SecurityScanCapability),
-        Arc::new(ThreatDetectionCapability),
+        Arc::new(_ZeroTrustCapability),
+        Arc::new(_SecurityScanCapability),
+        Arc::new(_ThreatDetectionCapability),
     ]
 }
 
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn zero_trust() {
-        let cap = ZeroTrustCapability;
+        let cap = _ZeroTrustCapability;
         let input = CapabilityInput::Network(NetworkInput {
             target: "server".into(),
             ports: vec![443],
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn security_scan() {
-        let cap = SecurityScanCapability;
+        let cap = _SecurityScanCapability;
         let input = CapabilityInput::Security(SecurityInput {
             query_type: "vulnerability".into(),
             parameters: [("target".into(), "localhost".into()), ("depth".into(), "1".into())].into(),
@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn threat_detection() {
-        let cap = ThreatDetectionCapability;
+        let cap = _ThreatDetectionCapability;
         let input = CapabilityInput::Text("检测威胁".into());
         let result = cap.execute(input);
         assert!(result.is_ok());

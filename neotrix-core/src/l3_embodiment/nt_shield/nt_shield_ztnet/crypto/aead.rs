@@ -38,7 +38,7 @@ impl AeadKey {
     }
 
     /// 使用 counter 构造 nonce (WireGuard 格式: counter || 4 bytes zero)
-    pub fn nonce_from_counter(counter: u64) -> Nonce {
+    pub fn _nonce_from_counter(counter: u64) -> Nonce {
         let mut nonce = [0u8; NONCE_LEN];
         nonce[..8].copy_from_slice(&counter.to_le_bytes());
         Nonce(nonce)
@@ -59,10 +59,10 @@ impl AeadKey {
     ///
     /// 输入: ciphertext || 16-byte tag
     /// 返回: plaintext (tag 已被 ring 原地剥离)
-    pub fn open<'a>(&self, nonce: &Nonce, ciphertext_with_tag: &'a mut [u8]) -> Result<&'a [u8], AeadError> {
+    pub fn open<'a>(&self, nonce: &Nonce, ciphertext_with_tag: &'a mut [u8]) -> Result<&'a [u8], _AeadError> {
         let open_nonce = aead::Nonce::assume_unique_for_key(nonce.0);
         let plaintext = self.inner.open_in_place(open_nonce, aead::Aad::empty(), ciphertext_with_tag)
-            .map_err(|_| AeadError::DecryptionFailed)?;
+            .map_err(|_| _AeadError::DecryptionFailed)?;
         Ok(plaintext)
     }
 
@@ -86,7 +86,7 @@ impl Nonce {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum AeadError {
+pub enum _AeadError {
     #[error("decryption failed: invalid key or ciphertext")]
     DecryptionFailed,
 }
@@ -99,7 +99,7 @@ mod tests {
     fn encrypt_decrypt_roundtrip() {
         let key_bytes = [42u8; 32];
         let key = AeadKey::new(&key_bytes);
-        let nonce = AeadKey::nonce_from_counter(1);
+        let nonce = AeadKey::_nonce_from_counter(1);
 
         let plaintext = b"hello wireguard";
         let mut ciphertext = key.seal(&nonce, plaintext);
@@ -113,7 +113,7 @@ mod tests {
     fn wrong_key_fails() {
         let key1 = AeadKey::new(&[1u8; 32]);
         let key2 = AeadKey::new(&[2u8; 32]);
-        let nonce = AeadKey::nonce_from_counter(0);
+        let nonce = AeadKey::_nonce_from_counter(0);
 
         let mut ciphertext = key1.seal(&nonce, b"secret");
         assert!(key2.open(&nonce, &mut ciphertext).is_err());
@@ -122,8 +122,8 @@ mod tests {
     #[test]
     fn wrong_nonce_fails() {
         let key = AeadKey::new(&[42u8; 32]);
-        let nonce1 = AeadKey::nonce_from_counter(0);
-        let nonce2 = AeadKey::nonce_from_counter(1);
+        let nonce1 = AeadKey::_nonce_from_counter(0);
+        let nonce2 = AeadKey::_nonce_from_counter(1);
 
         let mut ciphertext = key.seal(&nonce1, b"secret");
         assert!(key.open(&nonce2, &mut ciphertext).is_err());

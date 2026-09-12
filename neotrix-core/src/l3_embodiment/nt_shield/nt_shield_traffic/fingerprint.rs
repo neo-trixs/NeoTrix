@@ -72,7 +72,7 @@ impl TlsFingerprint {
         ],
     };
 
-    pub fn browser_headers(&self) -> BrowserHeaders {
+    pub fn _browser_headers(&self) -> BrowserHeaders {
         match self.name {
             "firefox128" => BrowserHeaders {
                 user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
@@ -126,11 +126,11 @@ impl FingerprintStore {
     /// 生成随请求头的模拟 (curl_easy_impersonate 语义): 指纹 + 浏览器头。
     pub fn impersonate(&self, name: &str) -> Option<(TlsFingerprint, BrowserHeaders)> {
         let fp = self.by_name(name)?;
-        Some((fp.clone(), fp.browser_headers()))
+        Some((fp.clone(), fp._browser_headers()))
     }
 
     /// 零配置人类化指纹选择 (crawlee human-like fingerprints): 确定性伪随机。
-    pub fn human_like(&self, seed: u64) -> TlsFingerprint {
+    pub fn _human_like(&self, seed: u64) -> TlsFingerprint {
         let all = Self::all();
         all[(seed as usize) % all.len()].clone()
     }
@@ -191,8 +191,8 @@ mod tests {
     #[test]
     fn test_human_like_deterministic() {
         let store = FingerprintStore::new();
-        let a = store.human_like(42);
-        let b = store.human_like(42);
+        let a = store._human_like(42);
+        let b = store._human_like(42);
         assert_eq!(a.name, b.name);
     }
 

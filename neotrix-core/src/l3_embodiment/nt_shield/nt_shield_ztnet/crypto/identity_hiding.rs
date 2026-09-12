@@ -17,7 +17,7 @@ pub const OBFUSCATION_SEED_SIZE: usize = 32;
 pub const MAX_PADDING: usize = 255;
 
 /// 混淆器
-pub struct IdentityHider {
+pub struct _IdentityHider {
     /// 当前混淆种子
     seed: [u8; OBFUSCATION_SEED_SIZE],
     /// 创建时间 (用于判断是否需要刷新)
@@ -26,7 +26,7 @@ pub struct IdentityHider {
     refresh_interval: std::time::Duration,
 }
 
-impl IdentityHider {
+impl _IdentityHider {
     /// 创建新的混淆器
     pub fn new() -> Self {
         let mut seed = [0u8; OBFUSCATION_SEED_SIZE];
@@ -44,7 +44,7 @@ impl IdentityHider {
     /// 混淆方法: pseudonym = Hash(seed || real_public)
     /// 注意: 这是轻量级混淆，不提供密码学安全性。
     /// 完整的身份隐藏需要使用 AES 密钥交换等协议。
-    pub fn obfuscate_public_key(&self, public_key: &[u8; 32]) -> [u8; 32] {
+    pub fn _obfuscate_public_key(&self, public_key: &[u8; 32]) -> [u8; 32] {
         use blake2::{Blake2s256, Digest};
         let mut hasher = Blake2s256::new();
         hasher.update(&self.seed);
@@ -56,12 +56,12 @@ impl IdentityHider {
     /// 生成随机填充 (防止消息长度分析)
     ///
     /// 返回: 填充字节的长度
-    pub fn random_padding_length(&self) -> usize {
+    pub fn _random_padding_length(&self) -> usize {
         rand::thread_rng().gen_range(0..=MAX_PADDING)
     }
 
     /// 生成填充字节
-    pub fn generate_padding(length: usize) -> Vec<u8> {
+    pub fn _generate_padding(length: usize) -> Vec<u8> {
         let mut padding = vec![0u8; length];
         rand::thread_rng().fill(&mut padding[..]);
         padding
@@ -86,22 +86,22 @@ impl IdentityHider {
     }
 }
 
-impl Default for IdentityHider {
+impl Default for _IdentityHider {
     fn default() -> Self {
         Self::new()
     }
 }
 
 /// 消息混淆器: 为 Noise 握手消息添加随机填充
-pub struct MessageObfuscator {
-    hider: IdentityHider,
+pub struct _MessageObfuscator {
+    hider: _IdentityHider,
 }
 
-impl MessageObfuscator {
+impl _MessageObfuscator {
     /// 创建新的消息混淆器
     pub fn new() -> Self {
         Self {
-            hider: IdentityHider::new(),
+            hider: _IdentityHider::new(),
         }
     }
 
@@ -112,10 +112,10 @@ impl MessageObfuscator {
     /// - 数据消息: 最大 65535 bytes
     ///
     /// 填充在解密后被剥离。
-    pub fn obfuscate_message(&mut self, msg: &mut Vec<u8>) {
+    pub fn _obfuscate_message(&mut self, msg: &mut Vec<u8>) {
         self.hider.refresh();
-        let padding_len = self.hider.random_padding_length();
-        let padding = IdentityHider::generate_padding(padding_len);
+        let padding_len = self.hider._random_padding_length();
+        let padding = _IdentityHider::_generate_padding(padding_len);
         msg.extend_from_slice(&padding);
     }
 
@@ -124,12 +124,12 @@ impl MessageObfuscator {
     /// # Arguments
     /// * `msg` - 消息 (会被修改)
     /// * `expected_len` - 期望的消息长度 (不含填充)
-    pub fn deobfuscate_message(msg: &mut Vec<u8>, expected_len: usize) {
+    pub fn _deobfuscate_message(msg: &mut Vec<u8>, expected_len: usize) {
         msg.truncate(expected_len);
     }
 }
 
-impl Default for MessageObfuscator {
+impl Default for _MessageObfuscator {
     fn default() -> Self {
         Self::new()
     }
@@ -141,16 +141,16 @@ mod tests {
 
     #[test]
     fn obfuscation_deterministic_with_same_seed() {
-        let mut hider = IdentityHider::new();
+        let mut hider = _IdentityHider::new();
         let seed = *hider.seed();
 
         let public_key = [42u8; 32];
-        let obfuscated1 = hider.obfuscate_public_key(&public_key);
+        let obfuscated1 = hider._obfuscate_public_key(&public_key);
 
         // 恢复种子
         hider.refresh();
         // 用不同种子
-        let obfuscated2 = hider.obfuscate_public_key(&public_key);
+        let obfuscated2 = hider._obfuscate_public_key(&public_key);
 
         // 不同种子产生不同混淆结果
         assert_ne!(obfuscated1, obfuscated2);
@@ -158,29 +158,29 @@ mod tests {
 
     #[test]
     fn padding_length_in_range() {
-        let hider = IdentityHider::new();
+        let hider = _IdentityHider::new();
         for _ in 0..100 {
-            let len = hider.random_padding_length();
+            let len = hider._random_padding_length();
             assert!(len <= MAX_PADDING);
         }
     }
 
     #[test]
     fn message_obfuscation_roundtrip() {
-        let mut obfuscator = MessageObfuscator::new();
+        let mut obfuscator = _MessageObfuscator::new();
         let original = vec![1u8, 2, 3, 4, 5];
         let mut msg = original.clone();
 
-        obfuscator.obfuscate_message(&mut msg);
+        obfuscator._obfuscate_message(&mut msg);
         assert!(msg.len() >= original.len());
 
-        MessageObfuscator::deobfuscate_message(&mut msg, original.len());
+        _MessageObfuscator::_deobfuscate_message(&mut msg, original.len());
         assert_eq!(msg, original);
     }
 
     #[test]
     fn refresh_interval() {
-        let mut hider = IdentityHider::new();
+        let mut hider = _IdentityHider::new();
         assert!(!hider.needs_refresh());
 
         // 模拟时间流逝

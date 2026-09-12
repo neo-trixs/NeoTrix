@@ -19,14 +19,14 @@ pub struct TorCrawler {
     visited: RwLock<HashSet<String>>,
     index: RwLock<OnionIndex>,
     store_path: PathBuf,
-    socks5_addr: String,
+    _socks5_addr: String,
     concurrency: usize,
     stats: RwLock<CrawlerStats>,
     running: AtomicBool,
     search_count: AtomicU64,
 }
 impl TorCrawler {
-    pub fn new(socks5_addr: String, store_path: PathBuf) -> Self {
+    pub fn new(_socks5_addr: String, store_path: PathBuf) -> Self {
         let path = store_path.join("tor_crawl");
         for sub in &["pages", "queue", "index"] {
             if let Err(e) = std::fs::create_dir_all(path.join(sub)) {
@@ -39,7 +39,7 @@ impl TorCrawler {
             visited: RwLock::new(HashSet::new()),
             index: RwLock::new(OnionIndex::new()),
             store_path: path,
-            socks5_addr,
+            _socks5_addr,
             concurrency: MAX_CONCURRENCY,
             stats: RwLock::new(CrawlerStats {
                 queued: 0,
@@ -58,12 +58,12 @@ impl TorCrawler {
         nt_world_crawl
     }
 
-    pub fn socks5_addr(&self) -> &str { &self.socks5_addr }
+    pub fn _socks5_addr(&self) -> &str { &self._socks5_addr }
 
     // ── HTTP client via Tor SOCKS5 ─────────────────────────────────
 
     async fn socks_client(&self) -> Result<reqwest::Client, String> {
-        let proxy_url = format!("socks5://{}", self.socks5_addr);
+        let proxy_url = format!("socks5://{}", self._socks5_addr);
         let proxy = reqwest::Proxy::all(&proxy_url)
             .map_err(|e| format!("SOCKS5 proxy failed: {}", e))?;
         reqwest::Client::builder()

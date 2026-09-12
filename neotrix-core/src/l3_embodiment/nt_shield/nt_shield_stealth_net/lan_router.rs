@@ -43,7 +43,7 @@ pub(crate) static SSID_POOL: &[&str] = &[
 
 /// 虚假 Wi-Fi 指纹 — 让系统 app 感知到 Wi-Fi 网络持续变化
 #[derive(Debug, Clone)]
-pub struct FakeWifiInfo {
+pub struct _FakeWifiInfo {
     pub ssid: String,
     pub bssid: String,
     pub rssi: i32,
@@ -52,7 +52,7 @@ pub struct FakeWifiInfo {
     pub last_seen: String,
 }
 
-impl FakeWifiInfo {
+impl _FakeWifiInfo {
     /// 生成随机 BSSID (MAC 地址格式)
     fn random_bssid(rng: &mut impl Rng) -> String {
         let bytes: [u8; 6] = rng.gen();
@@ -125,9 +125,9 @@ pub struct LanRouter {
     exclude_prefixes: std::sync::RwLock<Vec<String>>,
     coordinator: RwLock<Option<Arc<RotationCoordinator>>>,
     /// 虚假 Wi-Fi 指纹 (持续变化)
-    fake_wifi: RwLock<FakeWifiInfo>,
+    fake_wifi: RwLock<_FakeWifiInfo>,
     /// Wi-Fi 指纹轮转计数器
-    wifi_rotation_count: AtomicU64,
+    _wifi_rotation_count: AtomicU64,
 }
 
 impl Default for LanRouter {
@@ -139,7 +139,7 @@ impl Default for LanRouter {
 impl LanRouter {
     pub fn new() -> Self {
         let mut rng = rand::rngs::OsRng;
-        let fake_wifi = RwLock::new(FakeWifiInfo::generate(&mut rng));
+        let fake_wifi = RwLock::new(_FakeWifiInfo::generate(&mut rng));
         let router = Self {
             interfaces: std::sync::RwLock::new(Vec::new()),
             current_interface: AtomicUsize::new(0),
@@ -154,7 +154,7 @@ impl LanRouter {
             ]),
             coordinator: RwLock::new(None),
             fake_wifi,
-            wifi_rotation_count: AtomicU64::new(0),
+            _wifi_rotation_count: AtomicU64::new(0),
         };
         router.discover_sync();
         router
@@ -353,7 +353,7 @@ impl LanRouter {
     }
 
     /// 获取当前虚假 Wi-Fi 信息（用于注入 HTTP 请求头）
-    pub async fn current_wifi_info(&self) -> FakeWifiInfo {
+    pub async fn current_wifi_info(&self) -> _FakeWifiInfo {
         self.fake_wifi.read().await.clone()
     }
 
@@ -365,14 +365,14 @@ impl LanRouter {
         if rng.gen_bool(0.7) {
             wifi.mutate(&mut rng);
         } else {
-            *wifi = FakeWifiInfo::generate(&mut rng);
+            *wifi = _FakeWifiInfo::generate(&mut rng);
         }
-        self.wifi_rotation_count.fetch_add(1, Ordering::Relaxed);
+        self._wifi_rotation_count.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Wi-Fi 指纹轮转次数
-    pub fn wifi_rotation_count(&self) -> u64 {
-        self.wifi_rotation_count.load(Ordering::Relaxed)
+    pub fn _wifi_rotation_count(&self) -> u64 {
+        self._wifi_rotation_count.load(Ordering::Relaxed)
     }
 
     /// 切换到下一个 IP (循环轮转)
@@ -457,7 +457,7 @@ impl LanRouter {
             interfaces: interface_names,
             wifi_ssid: wifi.ssid.clone(),
             wifi_bssid: wifi.bssid.clone(),
-            wifi_rotation: self.wifi_rotation_count.load(Ordering::Relaxed),
+            wifi_rotation: self._wifi_rotation_count.load(Ordering::Relaxed),
         }
     }
 }

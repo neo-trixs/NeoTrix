@@ -30,7 +30,7 @@ pub struct InferenceRuntime {
     /// Runtime configuration parameters
     pub config: RuntimeConfig,
     /// Active session handles
-    pub sessions: HashMap<String, SessionHandle>,
+    pub sessions: HashMap<String, _SessionHandle>,
 }
 
 /// Backend engine type
@@ -77,7 +77,7 @@ pub struct RuntimeConfig {
 
 /// Session handle for active inference
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionHandle {
+pub struct _SessionHandle {
     pub session_id: String,
     pub model: String,
     pub backend: BackendEngine,
@@ -149,7 +149,7 @@ impl InferenceRuntime {
     }
     
     /// Initialize with MLX backend (Apple Silicon)
-    pub fn with_mlx() -> Self {
+    pub fn _with_mlx() -> Self {
         let mut runtime = Self::new();
         runtime.backend = BackendEngine::MLX;
         runtime.config.flash_attention = true;
@@ -157,7 +157,7 @@ impl InferenceRuntime {
     }
     
     /// Initialize with Ollama backend
-    pub fn with_ollama() -> Self {
+    pub fn _with_ollama() -> Self {
         let mut runtime = Self::new();
         runtime.backend = BackendEngine::Ollama;
         runtime.config.flash_attention = true;
@@ -166,7 +166,7 @@ impl InferenceRuntime {
     }
     
     /// Initialize with vLLM backend (production GPU)
-    pub fn with_vllm() -> Self {
+    pub fn _with_vllm() -> Self {
         let mut runtime = Self::new();
         runtime.backend = BackendEngine::VLLM;
         runtime.config.flash_attention = true;
@@ -176,7 +176,7 @@ impl InferenceRuntime {
     }
     
     /// Initialize with SGLang backend
-    pub fn with_sglang() -> Self {
+    pub fn _with_sglang() -> Self {
         let mut runtime = Self::new();
         runtime.backend = BackendEngine::SGLang;
         runtime.config.flash_attention = true;
@@ -186,8 +186,8 @@ impl InferenceRuntime {
     }
     
     /// Start inference session
-    pub async fn start_session(&mut self, session_id: &str) -> Result<SessionHandle, String> {
-        let handle = SessionHandle {
+    pub async fn start_session(&mut self, session_id: &str) -> Result<_SessionHandle, String> {
+        let handle = _SessionHandle {
             session_id: session_id.to_string(),
             model: self.config.model_path.clone(),
             backend: self.backend.clone(),

@@ -2,7 +2,7 @@
 //!
 //! 对标 arti / stem:
 //! - AUTHENTICATE + SAFECOOKIE 控制协议认证 (stem RFC 9051 §3.23)
-//! - 每流 IsolationToken (arti IsolationToken)
+//! - 每流 _IsolationToken (arti _IsolationToken)
 //! - 错误不静默吞，达上限发告警事件
 //! - 指数退避重连 (对标 stem reconnect)
 
@@ -51,11 +51,11 @@ impl Default for TorConfig {
 }
 
 impl TorConfig {
-    pub fn socks_proxy_url(&self) -> String {
+    pub fn _socks_proxy_url(&self) -> String {
         format!("socks5://{}", self.socks_addr)
     }
 
-    pub fn control_url(&self) -> String {
+    pub fn _control_url(&self) -> String {
         format!("tcp://{}", self.control_addr)
     }
 
@@ -73,36 +73,36 @@ impl TorConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct IsolationToken(u64);
+pub struct _IsolationToken(u64);
 
-impl Default for IsolationToken {
+impl Default for _IsolationToken {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl IsolationToken {
+impl _IsolationToken {
     pub fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(1);
-        IsolationToken(NEXT.fetch_add(1, Ordering::Relaxed))
+        _IsolationToken(NEXT.fetch_add(1, Ordering::Relaxed))
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum TorEvent {
+pub enum _TorEvent {
     Healthy,
     Unhealthy { reason: String },
     ReconnectFailed { attempts: u32 },
-    CircuitRotated { circuit_id: u64 },
+    CircuitRotated { _circuit_id: u64 },
 }
 
 pub struct TorClient {
     config: TorConfig,
     process: Arc<Mutex<Option<Child>>>,
     healthy: Arc<AtomicBool>,
-    circuit_id: Arc<AtomicU64>,
+    _circuit_id: Arc<AtomicU64>,
     reconnect_count: Arc<AtomicU64>,
-    event_sink: Arc<Mutex<Vec<TorEvent>>>,
+    event_sink: Arc<Mutex<Vec<_TorEvent>>>,
     coordinator: RwLock<Option<Arc<RotationCoordinator>>>,
 }
 
@@ -111,7 +111,7 @@ impl TorClient {
         Self {
             process: Arc::new(Mutex::new(None)),
             healthy: Arc::new(AtomicBool::new(false)),
-            circuit_id: Arc::new(AtomicU64::new(0)),
+            _circuit_id: Arc::new(AtomicU64::new(0)),
             reconnect_count: Arc::new(AtomicU64::new(0)),
             event_sink: Arc::new(Mutex::new(Vec::new())),
             config,
@@ -124,22 +124,22 @@ impl TorClient {
     }
 
     pub fn socks_addr(&self) -> &str { &self.config.socks_addr }
-    pub fn socks_proxy_url(&self) -> String { self.config.socks_proxy_url() }
+    pub fn _socks_proxy_url(&self) -> String { self.config._socks_proxy_url() }
     pub fn is_healthy(&self) -> bool { self.healthy.load(Ordering::Relaxed) }
-    pub fn circuit_id(&self) -> u64 { self.circuit_id.load(Ordering::Relaxed) }
+    pub fn _circuit_id(&self) -> u64 { self._circuit_id.load(Ordering::Relaxed) }
 
-    pub async fn drain_events(&self) -> Vec<TorEvent> {
+    pub async fn drain_events(&self) -> Vec<_TorEvent> {
         let mut sink = self.event_sink.lock().await;
         std::mem::take(&mut *sink)
     }
 
-    fn push_event(&self, event: TorEvent) {
+    fn push_event(&self, event: _TorEvent) {
         if let Ok(mut sink) = self.event_sink.try_lock() {
             sink.push(event);
         }
     }
 
-    pub fn into_reqwest_proxy(&self) -> L1Result<reqwest::Proxy> {
+    pub fn _into_reqwest_proxy(&self) -> L1Result<reqwest::Proxy> {
         let url = format!("socks5://{}", self.config.socks_addr);
         reqwest::Proxy::all(&url).map_err(|e| L1Error::Network(format!("Failed to create SOCKS5 proxy: {}", e)))
     }
@@ -254,7 +254,7 @@ impl TorClient {
         *proc = Some(child);
         sleep(Duration::from_secs(2)).await;
         self.healthy.store(true, Ordering::Relaxed);
-        self.push_event(TorEvent::Healthy);
+        self.push_event(_TorEvent::Healthy);
         Ok(())
     }
 
@@ -268,7 +268,7 @@ impl TorClient {
             }
         }
         self.healthy.store(false, Ordering::Relaxed);
-        self.push_event(TorEvent::Unhealthy { reason: "stopped".into() });
+        self.push_event(_TorEvent::Unhealthy { reason: "stopped".into() });
         Ok(())
     }
 
@@ -283,14 +283,14 @@ impl TorClient {
         }
         match self.send_control_command("SIGNAL NEWNYM\r\n").await {
             Ok(_) => {
-                let cid = self.circuit_id.fetch_add(1, Ordering::Relaxed) + 1;
+                let cid = self._circuit_id.fetch_add(1, Ordering::Relaxed) + 1;
                 self.healthy.store(true, Ordering::Relaxed);
-                self.push_event(TorEvent::CircuitRotated { circuit_id: cid });
+                self.push_event(_TorEvent::CircuitRotated { _circuit_id: cid });
                 Ok(())
             }
             Err(e) => {
                 self.healthy.store(false, Ordering::Relaxed);
-                self.push_event(TorEvent::Unhealthy { reason: format!("NEWNYM failed: {}", e) });
+                self.push_event(_TorEvent::Unhealthy { reason: format!("NEWNYM failed: {}", e) });
                 Err(L1Error::Network(format!("NEWNYM failed: {}", e)))
             }
         }
@@ -509,7 +509,7 @@ impl TorClient {
                 let attempts = self.reconnect_count.fetch_add(1, Ordering::Relaxed);
                 if attempts < MAX_RECONNECT_ATTEMPTS as u64 {
                     let backoff = BASE_BACKOFF_SECS * (1u64 << attempts.min(5));
-                    self.push_event(TorEvent::Unhealthy {
+                    self.push_event(_TorEvent::Unhealthy {
                         reason: format!("reconnect {}/{} (backoff {}s)", attempts + 1, MAX_RECONNECT_ATTEMPTS, backoff),
                     });
                     if let Err(e) = self.stop().await {
@@ -520,7 +520,7 @@ impl TorClient {
                         log::warn!("[tor-client] start failed during reconnect: {}", e);
                     }
                 } else {
-                    self.push_event(TorEvent::ReconnectFailed { attempts: MAX_RECONNECT_ATTEMPTS });
+                    self.push_event(_TorEvent::ReconnectFailed { attempts: MAX_RECONNECT_ATTEMPTS });
                     self.healthy.store(false, Ordering::Relaxed);
                     sleep(Duration::from_secs(60)).await;
                     self.reconnect_count.store(0, Ordering::Relaxed);
@@ -535,7 +535,7 @@ impl TorClient {
     pub fn status(&self) -> TorStatus {
         TorStatus {
             healthy: self.healthy.load(Ordering::Relaxed),
-            circuit_id: self.circuit_id.load(Ordering::Relaxed),
+            _circuit_id: self._circuit_id.load(Ordering::Relaxed),
             socks_addr: self.config.socks_addr.clone(),
             reconnect_attempts: self.reconnect_count.load(Ordering::Relaxed),
         }
@@ -545,7 +545,7 @@ impl TorClient {
 #[derive(Debug, Clone)]
 pub struct TorStatus {
     pub healthy: bool,
-    pub circuit_id: u64,
+    pub _circuit_id: u64,
     pub socks_addr: String,
     pub reconnect_attempts: u64,
 }
@@ -565,14 +565,14 @@ mod tests {
     #[test]
     fn test_socks_proxy_url() {
         let cfg = TorConfig::default();
-        assert_eq!(cfg.socks_proxy_url(), "socks5://127.0.0.1:9050");
+        assert_eq!(cfg._socks_proxy_url(), "socks5://127.0.0.1:9050");
     }
 
     #[test]
     fn test_tor_client_creation() {
         let client = TorClient::new(TorConfig::default());
         assert!(!client.is_healthy());
-        assert_eq!(client.circuit_id(), 0);
+        assert_eq!(client._circuit_id(), 0);
     }
 
     #[tokio::test]
@@ -591,13 +591,13 @@ mod tests {
     #[test]
     fn test_into_reqwest_proxy() {
         let client = TorClient::new(TorConfig::default());
-        assert!(client.into_reqwest_proxy().is_ok());
+        assert!(client._into_reqwest_proxy().is_ok());
     }
 
     #[test]
     fn test_isolation_token_unique() {
-        let a = IsolationToken::new();
-        let b = IsolationToken::new();
+        let a = _IsolationToken::new();
+        let b = _IsolationToken::new();
         assert_ne!(a, b);
     }
 
@@ -609,7 +609,7 @@ mod tests {
     #[tokio::test]
     async fn test_drain_events() {
         let client = TorClient::new(TorConfig::default());
-        client.push_event(TorEvent::Healthy);
+        client.push_event(_TorEvent::Healthy);
         assert_eq!(client.drain_events().await.len(), 1);
         assert_eq!(client.drain_events().await.len(), 0);
     }

@@ -263,7 +263,7 @@ impl IpFingerprintEngine {
     }
 
     /// Check if an email domain is disposable.
-    pub fn is_disposable_email(&self, domain: &str) -> bool {
+    pub fn _is_disposable_email(&self, domain: &str) -> bool {
         self.config.disposable_email_domains.iter().any(|d| d == domain)
             || EXTRA_DISPOSABLE_DOMAINS.iter().any(|d| *d == domain)
     }
@@ -360,10 +360,10 @@ mod tests {
     fn disposable_email_detection() {
         let config = ProxyDetectionConfig::default();
         let engine = IpFingerprintEngine::new(config);
-        assert!(engine.is_disposable_email("guerrillamail.com"));
-        assert!(engine.is_disposable_email("mohmal.com"));
-        assert!(!engine.is_disposable_email("gmail.com"));
-        assert!(!engine.is_disposable_email("protonmail.com"));
+        assert!(engine._is_disposable_email("guerrillamail.com"));
+        assert!(engine._is_disposable_email("mohmal.com"));
+        assert!(!engine._is_disposable_email("gmail.com"));
+        assert!(!engine._is_disposable_email("protonmail.com"));
     }
 
     #[test]

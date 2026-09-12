@@ -20,7 +20,7 @@ pub struct RuleRequest {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ApiResponse {
+pub struct _ApiResponse {
     pub success: bool,
     pub message: String,
     pub data: Option<serde_json::Value>,
@@ -103,7 +103,7 @@ impl RulesApiServer {
     }
 
     fn json_resp(success: bool, message: String, data: Option<serde_json::Value>) -> String {
-        serde_json::to_string(&ApiResponse { success, message, data })
+        serde_json::to_string(&_ApiResponse { success, message, data })
             .unwrap_or_else(|e| format!("{{\"success\":false,\"message\":\"serialization error: {}\",\"data\":null}}", e))
     }
 
@@ -187,7 +187,7 @@ impl RulesApiServer {
 
     pub fn is_running(&self) -> bool { self.ready.load(Ordering::Relaxed) }
 
-    pub fn discover_port() -> Option<u16> {
+    pub fn _discover_port() -> Option<u16> {
         let rt = match tokio::runtime::Runtime::new() {
             Ok(r) => r,
             Err(e) => {
@@ -347,13 +347,13 @@ mod tests {
 
     #[test]
     fn test_api_response_serde() {
-        let resp = ApiResponse {
+        let resp = _ApiResponse {
             success: true,
             message: "ok".into(),
             data: Some(serde_json::json!({"count": 42})),
         };
-        let json = serde_json::to_string(&resp).expect("serde_json to_string on ApiResponse should succeed");
-        let deserialized: ApiResponse = serde_json::from_str(&json).expect("serde_json from_str of roundtripped JSON should succeed");
+        let json = serde_json::to_string(&resp).expect("serde_json to_string on _ApiResponse should succeed");
+        let deserialized: _ApiResponse = serde_json::from_str(&json).expect("serde_json from_str of roundtripped JSON should succeed");
         assert!(deserialized.success);
         assert_eq!(deserialized.message, "ok");
     }
@@ -459,7 +459,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(parsed.success);
         assert!(parsed.message.contains("Rule registered"));
     }
@@ -471,7 +471,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(!parsed.success);
         assert!(parsed.message.contains("Missing label"));
     }
@@ -487,7 +487,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(parsed.success);
     }
 
@@ -502,7 +502,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(parsed.success);
         let data = parsed.data.expect("parsed.data should be Some in test response");
         assert_eq!(data["total"], 1);
@@ -519,7 +519,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(parsed.success);
         assert!(parsed.message.contains("Cleared"));
         assert_eq!(engine.blocking_read().rule_count(), 0);
@@ -537,7 +537,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(parsed.success);
         let data = parsed.data.expect("parsed.data should be Some in test response");
         assert_eq!(data["active_rules"], 2);
@@ -551,7 +551,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(!parsed.success);
         assert!(parsed.message.contains("JSON error"));
     }
@@ -563,7 +563,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(!parsed.success);
         assert!(parsed.message.contains("Unknown method"));
     }
@@ -575,7 +575,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(parsed.success);
         assert_eq!(engine.blocking_read().rule_count(), 1);
     }
@@ -587,7 +587,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(parsed.success);
     }
 
@@ -602,7 +602,7 @@ mod tests {
         let response = tokio::runtime::Runtime::new().expect("Runtime::new should succeed in test environment").block_on(
             RulesApiServer::handle_request(body, &engine),
         );
-        let parsed: ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
+        let parsed: _ApiResponse = serde_json::from_str(&response).expect("serde_json from_str of API response should succeed");
         assert!(parsed.success);
     }
 }

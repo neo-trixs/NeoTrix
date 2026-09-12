@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 /// 控制平面消息
 #[derive(Debug, Clone)]
-pub enum ControlMessage {
+pub enum _ControlMessage {
     /// 创建会话
     CreateSession {
         session_id: String,
@@ -29,7 +29,7 @@ pub enum ControlMessage {
 }
 
 /// 控制平面
-pub struct ControlPlane {
+pub struct _ControlPlane {
     sessions: HashMap<String, SessionInfo>,
 }
 
@@ -42,16 +42,16 @@ pub struct SessionInfo {
     pub active: bool,
 }
 
-impl ControlPlane {
+impl _ControlPlane {
     pub fn new() -> Self {
         Self {
             sessions: HashMap::new(),
         }
     }
 
-    pub fn handle_message(&mut self, msg: ControlMessage) -> Option<ControlMessage> {
+    pub fn _handle_message(&mut self, msg: _ControlMessage) -> Option<_ControlMessage> {
         match msg {
-            ControlMessage::CreateSession { session_id, subject, resource } => {
+            _ControlMessage::CreateSession { session_id, subject, resource } => {
                 self.sessions.insert(session_id.clone(), SessionInfo {
                     session_id: session_id.clone(),
                     subject,
@@ -60,7 +60,7 @@ impl ControlPlane {
                 });
                 None
             }
-            ControlMessage::DestroySession { session_id } => {
+            _ControlMessage::DestroySession { session_id } => {
                 if let Some(session) = self.sessions.get_mut(&session_id) {
                     session.active = false;
                 }
@@ -75,7 +75,7 @@ impl ControlPlane {
     }
 }
 
-impl Default for ControlPlane {
+impl Default for _ControlPlane {
     fn default() -> Self {
         Self::new()
     }
@@ -87,14 +87,14 @@ mod tests {
 
     #[test]
     fn create_session() {
-        let mut cp = ControlPlane::new();
-        let msg = ControlMessage::CreateSession {
+        let mut cp = _ControlPlane::new();
+        let msg = _ControlMessage::CreateSession {
             session_id: "s1".into(),
             subject: "user1".into(),
             resource: "tunnel/test".into(),
         };
 
-        cp.handle_message(msg);
+        cp._handle_message(msg);
         assert_eq!(cp.sessions().len(), 1);
     }
 }

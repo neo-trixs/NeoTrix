@@ -26,7 +26,7 @@ pub const COOKIE_ROTATION_INTERVAL: Duration = Duration::from_secs(120);
 
 /// 密钥轮换状态
 #[derive(Debug, Clone)]
-pub struct RekeyState {
+pub struct _RekeyState {
     /// 当前发送密钥
     send_private: Option<PrivateKey>,
     /// 当前发送密钥创建时间
@@ -41,7 +41,7 @@ pub struct RekeyState {
     recv_count: u64,
 }
 
-impl RekeyState {
+impl _RekeyState {
     /// 创建初始状态
     pub fn new() -> Self {
         Self {
@@ -55,7 +55,7 @@ impl RekeyState {
     }
 
     /// 检查发送密钥是否需要轮换
-    pub fn needs_send_rekey(&self) -> bool {
+    pub fn _needs_send_rekey(&self) -> bool {
         // 检查消息计数
         if self.send_count >= REKEY_AFTER_MESSAGES {
             return true;
@@ -72,7 +72,7 @@ impl RekeyState {
     }
 
     /// 检查接收密钥是否需要轮换
-    pub fn needs_recv_rekey(&self) -> bool {
+    pub fn _needs_recv_rekey(&self) -> bool {
         if self.recv_count >= REKEY_AFTER_MESSAGES {
             return true;
         }
@@ -106,7 +106,7 @@ impl RekeyState {
     }
 
     /// 轮换发送密钥 (延迟预计算 + 零化旧密钥)
-    pub fn rotate_send(&mut self) {
+    pub fn _rotate_send(&mut self) {
         // 1. 零化旧密钥
         if let Some(ref mut old_key) = self.send_private {
             old_key.zeroize();
@@ -119,7 +119,7 @@ impl RekeyState {
     }
 
     /// 轮换接收密钥
-    pub fn rotate_recv(&mut self) {
+    pub fn _rotate_recv(&mut self) {
         if let Some(ref mut old_key) = self.recv_private {
             old_key.zeroize();
         }
@@ -130,12 +130,12 @@ impl RekeyState {
     }
 
     /// 记录发送消息
-    pub fn on_send(&mut self) {
+    pub fn _on_send(&mut self) {
         self.send_count += 1;
     }
 
     /// 记录接收消息
-    pub fn on_recv(&mut self) {
+    pub fn _on_recv(&mut self) {
         self.recv_count += 1;
     }
 
@@ -150,7 +150,7 @@ impl RekeyState {
     }
 }
 
-impl Default for RekeyState {
+impl Default for _RekeyState {
     fn default() -> Self {
         Self::new()
     }
@@ -158,7 +158,7 @@ impl Default for RekeyState {
 
 /// 密钥轮换决策
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RekeyAction {
+pub enum _RekeyAction {
     /// 无需轮换
     None,
     /// 需要轮换发送密钥
@@ -172,19 +172,19 @@ pub enum RekeyAction {
 }
 
 /// 决策函数: 根据当前状态决定操作
-pub fn decide_rekey(state: &RekeyState) -> RekeyAction {
+pub fn _decide_rekey(state: &_RekeyState) -> _RekeyAction {
     if state.is_expired() {
-        return RekeyAction::Expired;
+        return _RekeyAction::Expired;
     }
 
-    let needs_send = state.needs_send_rekey();
-    let needs_recv = state.needs_recv_rekey();
+    let needs_send = state._needs_send_rekey();
+    let needs_recv = state._needs_recv_rekey();
 
     match (needs_send, needs_recv) {
-        (true, true) => RekeyAction::RotateBoth,
-        (true, false) => RekeyAction::RotateSend,
-        (false, true) => RekeyAction::RotateRecv,
-        (false, false) => RekeyAction::None,
+        (true, true) => _RekeyAction::RotateBoth,
+        (true, false) => _RekeyAction::RotateSend,
+        (false, true) => _RekeyAction::RotateRecv,
+        (false, false) => _RekeyAction::None,
     }
 }
 
@@ -194,25 +194,25 @@ mod tests {
 
     #[test]
     fn initial_state_no_rekey() {
-        let state = RekeyState::new();
-        assert_eq!(decide_rekey(&state), RekeyAction::None);
+        let state = _RekeyState::new();
+        assert_eq!(_decide_rekey(&state), _RekeyAction::None);
     }
 
     #[test]
     fn expired_after_reject_timeout() {
-        let mut state = RekeyState::new();
+        let mut state = _RekeyState::new();
         state.send_private = Some(PrivateKey::generate());
         state.send_created = Some(Instant::now() - REJECT_AFTER_TIME - Duration::from_secs(1));
         assert!(state.is_expired());
-        assert_eq!(decide_rekey(&state), RekeyAction::Expired);
+        assert_eq!(_decide_rekey(&state), _RekeyAction::Expired);
     }
 
     #[test]
     fn rotate_after_rekey_timeout() {
-        let mut state = RekeyState::new();
+        let mut state = _RekeyState::new();
         state.send_private = Some(PrivateKey::generate());
         state.send_created = Some(Instant::now() - REKEY_AFTER_TIME - Duration::from_secs(1));
-        assert!(state.needs_send_rekey());
+        assert!(state._needs_send_rekey());
         assert!(!state.is_expired());
     }
 }

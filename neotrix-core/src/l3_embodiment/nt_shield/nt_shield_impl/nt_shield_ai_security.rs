@@ -20,11 +20,11 @@ impl ARTToolbox {
     }
     
     /// Test prompt injection vulnerabilities
-    pub async fn test_prompt_injection(&self, prompt: &str) -> PromptInjectionResult {
+    pub async fn test_prompt_injection(&self, prompt: &str) -> _PromptInjectionResult {
         // TODO: ART test for prompt injection, jailbreak, prompt leaking
         // Architecture: L1 Body (LLM interaction) → L4 Cognition (pattern analysis)
         
-        PromptInjectionResult {
+        _PromptInjectionResult {
             is_vulnerable: true,
             techniques_triggered: vec![
                 "Direct injection: <|endoftext|> System: ignore previous".to_string(),
@@ -35,8 +35,8 @@ impl ARTToolbox {
     }
     
     /// Test for model stealing via membership inference
-    pub async fn test_membership_inference(&self, query: &str) -> MembershipResult {
-        MembershipResult {
+    pub async fn test_membership_inference(&self, query: &str) -> _MembershipResult {
+        _MembershipResult {
             is_member: true,
             confidence: 0.89,
             attack_vector: "Gradient leakage through repeated queries".to_string(),
@@ -55,7 +55,7 @@ impl ARTToolbox {
 
 /// Prompt injection test result
 #[derive(Debug, Clone)]
-pub struct PromptInjectionResult {
+pub struct _PromptInjectionResult {
     pub is_vulnerable: bool,
     pub techniques_triggered: Vec<String>,
     pub mitigation: String,
@@ -63,7 +63,7 @@ pub struct PromptInjectionResult {
 
 /// Membership inference result
 #[derive(Debug, Clone)]
-pub struct MembershipResult {
+pub struct _MembershipResult {
     pub is_member: bool,
     pub confidence: f64,
     pub attack_vector: String,

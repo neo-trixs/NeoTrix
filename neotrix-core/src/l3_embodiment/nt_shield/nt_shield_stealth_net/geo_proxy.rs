@@ -6,7 +6,7 @@
 //! [8.6k⭐ ] v2fly/domain-list-community    — 社区域名分类
 //! [726⭐  ] mayaxcn/china-ip-list          — 每小时 APNIC 原始数据
 //!
-//! 架构: GeoDatabase(IP范围) + DomainRules(域名集合) → RuleUpdater(自动更新)
+//! 架构: _GeoDatabase(IP范围) + _DomainRules(域名集合) → RuleUpdater(自动更新)
 
 use std::collections::HashSet;
 use std::fs;
@@ -84,15 +84,15 @@ const MAYAXCN_CHINA_IP: &str =
 const GFWLIST_URL: &str =
     "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt";
 
-// ==================== GeoDatabase ====================
+// ==================== _GeoDatabase ====================
 
 /// 地理位置数据库 — 中国 IP 范围
-pub struct GeoDatabase {
+pub struct _GeoDatabase {
     ranges: Vec<(u32, u32)>,
     loaded_from: Option<String>,
 }
 
-impl GeoDatabase {
+impl _GeoDatabase {
     pub fn new() -> Self {
         Self { ranges: Vec::new(), loaded_from: None }
     }
@@ -113,7 +113,7 @@ impl GeoDatabase {
         }
     }
 
-    pub fn load_cidr_text(&mut self, text: &str, source: &str) -> usize {
+    pub fn _load_cidr_text(&mut self, text: &str, source: &str) -> usize {
         self.ranges = parse_cidr_list(text);
         self.loaded_from = Some(source.to_string());
         self.ranges.len()
@@ -123,29 +123,29 @@ impl GeoDatabase {
         self.ranges.len()
     }
 
-    pub fn loaded_source(&self) -> Option<&str> {
+    pub fn _loaded_source(&self) -> Option<&str> {
         self.loaded_from.as_deref()
     }
 }
 
-impl Default for GeoDatabase {
+impl Default for _GeoDatabase {
     fn default() -> Self {
         Self::new()
     }
 }
 
-// ==================== DomainRules ====================
+// ==================== _DomainRules ====================
 
 /// 域名规则 — 直连/代理判定
 #[derive(Default)]
-pub struct DomainRules {
+pub struct _DomainRules {
     /// 应直连的域名（中国网站）
     pub direct_domains: HashSet<String>,
     /// 应走代理的域名（被墙网站）
     pub proxy_domains: HashSet<String>,
 }
 
-impl DomainRules {
+impl _DomainRules {
     pub fn new() -> Self {
         Self {
             direct_domains: HashSet::new(),
@@ -154,7 +154,7 @@ impl DomainRules {
     }
 
     /// 判断域名应直连 (true=直连, false=代理, None=未知)
-    pub fn should_direct(&self, domain: &str) -> Option<bool> {
+    pub fn _should_direct(&self, domain: &str) -> Option<bool> {
         if self.direct_domains.contains(domain) {
             return Some(true);
         }
@@ -171,7 +171,7 @@ impl DomainRules {
         None
     }
 
-    pub fn load_direct_text(&mut self, text: &str) -> usize {
+    pub fn _load_direct_text(&mut self, text: &str) -> usize {
         for line in text.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') || line.starts_with("@@") || line.starts_with('!') {
@@ -185,7 +185,7 @@ impl DomainRules {
         self.direct_domains.len()
     }
 
-    pub fn load_proxy_text(&mut self, text: &str) -> usize {
+    pub fn _load_proxy_text(&mut self, text: &str) -> usize {
         for line in text.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') || line.starts_with('!') || line.starts_with('[') {
@@ -202,24 +202,24 @@ impl DomainRules {
 
 // ==================== 全局状态 ====================
 
-pub static GLOBAL_GEO: LazyLock<Arc<RwLock<GeoDatabase>>> = LazyLock::new(|| {
-    Arc::new(RwLock::new(GeoDatabase::new()))
+pub static GLOBAL_GEO: LazyLock<Arc<RwLock<_GeoDatabase>>> = LazyLock::new(|| {
+    Arc::new(RwLock::new(_GeoDatabase::new()))
 });
-pub static GLOBAL_DOMAINS: LazyLock<Arc<RwLock<DomainRules>>> = LazyLock::new(|| {
-    Arc::new(RwLock::new(DomainRules::new()))
+pub static GLOBAL_DOMAINS: LazyLock<Arc<RwLock<_DomainRules>>> = LazyLock::new(|| {
+    Arc::new(RwLock::new(_DomainRules::new()))
 });
 
-pub fn global_geo() -> Arc<RwLock<GeoDatabase>> {
+pub fn _global_geo() -> Arc<RwLock<_GeoDatabase>> {
     use crate::core::nt_core_di;
-    if let Some(v) = nt_core_di::resolve_global::<Arc<RwLock<GeoDatabase>>>() {
+    if let Some(v) = nt_core_di::resolve_global::<Arc<RwLock<_GeoDatabase>>>() {
         return v;
     }
     GLOBAL_GEO.clone()
 }
 
-pub fn global_domains() -> Arc<RwLock<DomainRules>> {
+pub fn _global_domains() -> Arc<RwLock<_DomainRules>> {
     use crate::core::nt_core_di;
-    if let Some(v) = nt_core_di::resolve_global::<Arc<RwLock<DomainRules>>>() {
+    if let Some(v) = nt_core_di::resolve_global::<Arc<RwLock<_DomainRules>>>() {
         return v;
     }
     GLOBAL_DOMAINS.clone()
@@ -245,8 +245,8 @@ impl RuleUpdater {
     }
 
     /// 更新所有规则源
-    pub async fn update_all(&self) -> UpdateReport {
-        let mut report = UpdateReport::default();
+    pub async fn update_all(&self) -> _UpdateReport {
+        let mut report = _UpdateReport::default();
 
         // 1. 中国 IP 范围 (Loyalsoldier 为主, mayaxcn 为备)
         if let Err(e) = self.update_china_ip(&mut report).await {
@@ -266,14 +266,14 @@ impl RuleUpdater {
         report
     }
 
-    async fn update_china_ip(&self, report: &mut UpdateReport) -> Result<(), String> {
-        let geo_arc = global_geo();
+    async fn update_china_ip(&self, report: &mut _UpdateReport) -> Result<(), String> {
+        let geo_arc = _global_geo();
         let mut geo = geo_arc.write().await;
 
         // Tier1: Loyalsoldier (最全)
         match fetch_text(LOYALSOLDIER_CHINA_LIST).await {
             Ok(text) => {
-                let count = geo.load_cidr_text(&text, "Loyalsoldier/china-list");
+                let count = geo._load_cidr_text(&text, "Loyalsoldier/china-list");
                 report.china_ip_count = count;
                 report.china_ip_source = "Loyalsoldier".into();
                 self.cache_write("china-list.txt", &text);
@@ -285,7 +285,7 @@ impl RuleUpdater {
         // Tier2: mayaxcn (APNIC hourly)
         match fetch_text(MAYAXCN_CHINA_IP).await {
             Ok(text) => {
-                let count = geo.load_cidr_text(&text, "mayaxcn/chn_ip");
+                let count = geo._load_cidr_text(&text, "mayaxcn/chn_ip");
                 report.china_ip_count = count;
                 report.china_ip_source = "mayaxcn".into();
                 self.cache_write("chn_ip.txt", &text);
@@ -295,24 +295,24 @@ impl RuleUpdater {
         }
     }
 
-    async fn update_direct_domains(&self, report: &mut UpdateReport) -> Result<(), String> {
+    async fn update_direct_domains(&self, report: &mut _UpdateReport) -> Result<(), String> {
         let text = fetch_text(LOYALSOLDIER_DIRECT_LIST).await?;
-        let dom_arc = global_domains();
+        let dom_arc = _global_domains();
         let mut domains = dom_arc.write().await;
-        let count = domains.load_direct_text(&text);
+        let count = domains._load_direct_text(&text);
         report.direct_domain_count = count;
         self.cache_write("direct-list.txt", &text);
         Ok(())
     }
 
-    async fn update_proxy_domains(&self, report: &mut UpdateReport) -> Result<(), String> {
+    async fn update_proxy_domains(&self, report: &mut _UpdateReport) -> Result<(), String> {
         let mut total = 0usize;
 
         // Tier1: Loyalsoldier GFW list
         if let Ok(text) = fetch_text(LOYALSOLDIER_GFW_LIST).await {
-            let dom_arc = global_domains();
+            let dom_arc = _global_domains();
         let mut domains = dom_arc.write().await;
-            total = domains.load_proxy_text(&text);
+            total = domains._load_proxy_text(&text);
             self.cache_write("gfw.txt", &text);
         }
 
@@ -323,9 +323,9 @@ impl RuleUpdater {
                 .map(|v| String::from_utf8_lossy(&v).to_string())
                 .unwrap_or_default();
             if !text.is_empty() {
-                let dom_arc = global_domains();
+                let dom_arc = _global_domains();
         let mut domains = dom_arc.write().await;
-                total += domains.load_proxy_text(&text);
+                total += domains._load_proxy_text(&text);
                 self.cache_write("gfwlist.txt", &text);
             }
         }
@@ -341,8 +341,8 @@ impl RuleUpdater {
     }
 
     /// 从缓存加载（离线可用）
-    pub fn load_cache(&self) -> UpdateReport {
-        let mut report = UpdateReport::default();
+    pub fn _load_cache(&self) -> _UpdateReport {
+        let mut report = _UpdateReport::default();
 
         let cache_paths = [
             ("china-list.txt", "china_ip"),
@@ -357,7 +357,7 @@ impl RuleUpdater {
                     "china_ip" => {
                         if let Some(geo) = LazyLock::get(&GLOBAL_GEO) {
                             if let Ok(mut g) = geo.try_write() {
-                                let count = g.load_cidr_text(&text, "cache");
+                                let count = g._load_cidr_text(&text, "cache");
                                 report.china_ip_count = count;
                                 report.china_ip_source = "cache".into();
                             }
@@ -366,7 +366,7 @@ impl RuleUpdater {
                     "direct_domains" => {
                         if let Some(dom) = LazyLock::get(&GLOBAL_DOMAINS) {
                             if let Ok(mut d) = dom.try_write() {
-                                let count = d.load_direct_text(&text);
+                                let count = d._load_direct_text(&text);
                                 report.direct_domain_count = count;
                             }
                         }
@@ -374,7 +374,7 @@ impl RuleUpdater {
                     "proxy_domains" => {
                         if let Some(dom) = LazyLock::get(&GLOBAL_DOMAINS) {
                             if let Ok(mut d) = dom.try_write() {
-                                let count = d.load_proxy_text(&text);
+                                let count = d._load_proxy_text(&text);
                                 report.proxy_domain_count = count;
                             }
                         }
@@ -451,11 +451,11 @@ pub async fn domain_resolves_to_china(domain: &str) -> Result<bool, String> {
 }
 
 /// 域名是否应直连 (规则引擎集成)
-pub fn domain_should_direct(domain: &str) -> Option<bool> {
+pub fn _domain_should_direct(domain: &str) -> Option<bool> {
     if let Some(rules) = LazyLock::get(&GLOBAL_DOMAINS) {
         let guard = tokio::task::block_in_place(|| rules.blocking_read());
         if guard.direct_domains.len() + guard.proxy_domains.len() > 0 {
-            return guard.should_direct(domain);
+            return guard._should_direct(domain);
         }
     }
     None
@@ -472,7 +472,7 @@ pub fn is_timeout_error(err: &str) -> bool {
 
 /// 更新报告
 #[derive(Debug, Default, Clone)]
-pub struct UpdateReport {
+pub struct _UpdateReport {
     pub china_ip_count: usize,
     pub china_ip_source: String,
     pub direct_domain_count: usize,
@@ -600,8 +600,8 @@ mod tests {
 
     #[test]
     fn test_geo_ip_load_from_text() {
-        let mut db = GeoDatabase::new();
-        let n = db.load_cidr_text("114.114.114.0/24\n8.8.8.0/24\n", "test");
+        let mut db = _GeoDatabase::new();
+        let n = db._load_cidr_text("114.114.114.0/24\n8.8.8.0/24\n", "test");
         assert_eq!(n, 2);
         assert!(db.is_china_ip(&"114.114.114.114".parse().expect("parse 114.114.114.114")));
         assert!(db.is_china_ip(&"8.8.8.8".parse().expect("parse 8.8.8.8")));
@@ -610,20 +610,20 @@ mod tests {
 
     #[test]
     fn test_domain_rules_direct() {
-        let mut rules = DomainRules::new();
+        let mut rules = _DomainRules::new();
         rules.direct_domains.insert("baidu.com".into());
         rules.proxy_domains.insert("google.com".into());
-        assert_eq!(rules.should_direct("baidu.com"), Some(true));
-        assert_eq!(rules.should_direct("google.com"), Some(false));
-        assert_eq!(rules.should_direct("unknown.com"), None);
+        assert_eq!(rules._should_direct("baidu.com"), Some(true));
+        assert_eq!(rules._should_direct("google.com"), Some(false));
+        assert_eq!(rules._should_direct("unknown.com"), None);
     }
 
     #[test]
     fn test_domain_rules_suffix() {
-        let mut rules = DomainRules::new();
+        let mut rules = _DomainRules::new();
         rules.direct_domains.insert("baidu.com".into());
-        assert_eq!(rules.should_direct("www.baidu.com"), Some(true));
-        assert_eq!(rules.should_direct("api.baidu.com"), Some(true));
+        assert_eq!(rules._should_direct("www.baidu.com"), Some(true));
+        assert_eq!(rules._should_direct("api.baidu.com"), Some(true));
     }
 
     #[test]
@@ -646,7 +646,7 @@ mod tests {
         // 只要能拉到数据就算通过（网络不可用时不panic）
         if report.china_ip_count > 0 {
             assert!(report.china_ip_count > 5000, "expected >= 5000 CIDR");
-            let geo_arc = global_geo();
+            let geo_arc = _global_geo();
             let geo = geo_arc.read().await;
             assert!(geo.is_china_ip(&"114.114.114.114".parse().expect("parse 114.114.114.114")));
         }
@@ -659,9 +659,9 @@ mod tests {
         let report = updater.update_all().await;
         if report.direct_domain_count > 0 {
             assert!(report.direct_domain_count > 10000, "expected >= 10k domains");
-            let dom_arc = global_domains();
+            let dom_arc = _global_domains();
             let domains = dom_arc.read().await;
-            assert_eq!(domains.should_direct("baidu.com"), Some(true));
+            assert_eq!(domains._should_direct("baidu.com"), Some(true));
         }
     }
 }

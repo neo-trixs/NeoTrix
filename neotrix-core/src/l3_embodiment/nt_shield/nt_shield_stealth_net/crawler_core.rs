@@ -75,7 +75,7 @@ pub struct CrawledPage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OnionIndexEntry {
+pub struct _OnionIndexEntry {
     pub url: String,
     pub title: String,
     pub snippet: String,
@@ -145,7 +145,7 @@ pub(crate) fn detect_category(title: &str, body: &str, url: &str) -> ContentCate
 // ── OnionIndex ────────────────────────────────────────────────────────
 
 pub(crate) struct OnionIndex {
-    entries: Vec<OnionIndexEntry>,
+    entries: Vec<_OnionIndexEntry>,
     keyword_map: HashMap<String, Vec<usize>>,
     url_map: HashMap<String, usize>,
 }
@@ -157,7 +157,7 @@ impl OnionIndex {
 
     pub(crate) fn insert(&mut self, page: &CrawledPage) {
         if self.url_map.contains_key(&page.url) { return; }
-        let entry = OnionIndexEntry {
+        let entry = _OnionIndexEntry {
             url: page.url.clone(),
             title: page.title.clone(),
             snippet: page.text_snippet.clone(),
@@ -220,7 +220,7 @@ impl OnionIndex {
     pub(crate) fn load(&mut self, path: &PathBuf) {
         let file_path = path.join("tor_index.json");
         let data = std::fs::read_to_string(&file_path).ok();
-        let entries: Vec<OnionIndexEntry> = data
+        let entries: Vec<_OnionIndexEntry> = data
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         for e in entries {

@@ -11,12 +11,12 @@ use serde_json::Value as Json;
 
 /// 侦察扫描器 — 资产枚举/攻击面测绘的占位叶。
 #[derive(Debug, Clone, Default)]
-pub struct ReconScanner {
+pub struct _ReconScanner {
     /// 已扫描目标数 (telemetry, TODO 填充)
     pub scanned_targets: u64,
 }
 
-impl ReconScanner {
+impl _ReconScanner {
     /// 构造空侦察扫描器 (fresh bud)。
     pub fn new() -> Self {
         Self {
@@ -30,7 +30,7 @@ impl ReconScanner {
     /// fallback = 受限权限时回退至被动枚举。当前为桩, 返回未实现错误。
     pub fn scan(&self, _target: &str) -> Result<String, String> {
         // TODO(T15): 接入 nt_shield_* 既有侦察/审计路径, 实现真实侦察行为。
-        Err("nt_shield_recon::ReconScanner::scan not yet implemented (fresh bud)".into())
+        Err("nt_shield_recon::_ReconScanner::scan not yet implemented (fresh bud)".into())
     }
 }
 
@@ -49,7 +49,7 @@ pub fn register_capability(tree: &mut CapabilityRegistry) -> Result<(), Registry
     node.metadata.insert(
         "wiring_evidence".into(),
         Json::String(
-            "fresh bud (T15 R-P42): nt_shield_recon::ReconScanner::scan — not yet wired to production"
+            "fresh bud (T15 R-P42): nt_shield_recon::_ReconScanner::scan — not yet wired to production"
                 .into(),
         ),
     );

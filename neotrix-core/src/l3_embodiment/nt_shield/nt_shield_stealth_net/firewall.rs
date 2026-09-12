@@ -169,7 +169,7 @@ impl FirewallManager {
         }
     }
 
-    pub fn sync_now(rules: &[FirewallRule], fw_type: &FirewallType) -> Result<(), String> {
+    pub fn _sync_now(rules: &[FirewallRule], fw_type: &FirewallType) -> Result<(), String> {
         match fw_type {
             FirewallType::Pf => Self::write_pf_rules(rules),
             FirewallType::Nftables => Self::write_nftables_rules(rules),
@@ -177,7 +177,7 @@ impl FirewallManager {
         }
     }
 
-    pub fn clear_all_rules(fw_type: &FirewallType) -> Result<(), String> {
+    pub fn _clear_all_rules(fw_type: &FirewallType) -> Result<(), String> {
         match fw_type {
             FirewallType::Pf => {
                 let _ = std::process::Command::new("pfctl")
@@ -222,7 +222,7 @@ impl FirewallManager {
         let fw_rules = Self::derive_firewall_rules(rules);
         *self.active_rules.write().await = fw_rules.clone();
         let count = fw_rules.len();
-        let result = Self::sync_now(&fw_rules, &self.firewall_type);
+        let result = Self::_sync_now(&fw_rules, &self.firewall_type);
         match &result {
             Ok(_) => {
                 self.sync_count.fetch_add(1, Ordering::Relaxed);
@@ -235,7 +235,7 @@ impl FirewallManager {
 
     pub async fn clear_all(&self) -> Result<(), String> {
         *self.active_rules.write().await = Vec::new();
-        Self::clear_all_rules(&self.firewall_type)
+        Self::_clear_all_rules(&self.firewall_type)
     }
 
     pub async fn enable_divert(&self) -> Result<(), String> {
@@ -245,12 +245,12 @@ impl FirewallManager {
             FirewallRule { action: FirewallAction::DivertToProxy, protocol: "tcp".into(), dst_addr: None, dst_port: None, label: "divert-all".into(), priority: 0 },
             FirewallRule { action: FirewallAction::RedirectDns, protocol: "udp".into(), dst_addr: None, dst_port: None, label: "redirect-dns".into(), priority: 0 },
         ];
-        Self::sync_now(&rules, &self.firewall_type)
+        Self::_sync_now(&rules, &self.firewall_type)
     }
 
     pub async fn disable_divert(&self) -> Result<(), String> {
         self.enabled.store(false, Ordering::Relaxed);
-        Self::clear_all_rules(&self.firewall_type)
+        Self::_clear_all_rules(&self.firewall_type)
     }
 
     pub async fn start_auto_sync(self: Arc<Self>, rule_engine: Arc<RwLock<RuleEngine>>) {

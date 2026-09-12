@@ -42,7 +42,7 @@ impl EwmaDetector {
 
     pub fn mean(&self) -> f64 { self.mean }
     pub fn std(&self) -> f64 { self.variance.sqrt().max(1e-9) }
-    pub fn is_warmed_up(&self) -> bool { self.sample_count >= self.warmup }
+    pub fn _is_warmed_up(&self) -> bool { self.sample_count >= self.warmup }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -188,7 +188,7 @@ impl HoltWinters {
         (self.level + self.trend) * self.seasonal[i]
     }
 
-    pub fn is_warmed_up(&self) -> bool {
+    pub fn _is_warmed_up(&self) -> bool {
         self.t >= self.period * self.warmup_periods
     }
 }
@@ -478,7 +478,7 @@ mod tests {
         let mut hw = HoltWinters::new(0.4, 0.2, 0.2, 24, 2);
         // Warmup with stable values
         for _ in 0..48 { hw.step(1.0); }
-        assert!(hw.is_warmed_up());
+        assert!(hw._is_warmed_up());
         let (f, z) = hw.step(1.0);
         assert!(z.abs() < 3.0, "stable data should give low z, got {}", z);
         assert!((f - 1.0).abs() < 1.0, "forecast should be ~1.0, got {}", f);

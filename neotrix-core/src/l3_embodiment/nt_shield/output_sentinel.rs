@@ -12,7 +12,7 @@ use std::collections::HashMap;
 pub struct OutputValidationResult {
     pub is_safe: bool,
     pub threat_level: ThreatLevel,
-    pub signals: Vec<OutputSignal>,
+    pub signals: Vec<_OutputSignal>,
     pub sanitized_output: String,
 }
 
@@ -26,7 +26,7 @@ pub enum ThreatLevel {
 }
 
 #[derive(Debug, Clone)]
-pub struct OutputSignal {
+pub struct _OutputSignal {
     pub signal_type: String,
     pub confidence: f64,
     pub details: String,
@@ -43,11 +43,11 @@ pub struct OutputSentinel {
 struct PolicyRule {
     name: String,
     pattern: String,
-    action: PolicyAction,
+    action: _PolicyAction,
 }
 
 #[derive(Debug, Clone)]
-pub enum PolicyAction {
+pub enum _PolicyAction {
     Block,
     Warn,
     _Log,
@@ -72,12 +72,12 @@ impl OutputSentinel {
                 PolicyRule {
                     name: "no_executable_code".to_string(),
                     pattern: r"(exec|eval|system)\s*\(".to_string(),
-                    action: PolicyAction::Block,
+                    action: _PolicyAction::Block,
                 },
                 PolicyRule {
                     name: "no_urls".to_string(),
                     pattern: r"https?://[^\s]+".to_string(),
-                    action: PolicyAction::Warn,
+                    action: _PolicyAction::Warn,
                 },
             ],
         }
@@ -91,7 +91,7 @@ impl OutputSentinel {
         // 1. 阻断模式检测
         for pattern in &self.blocked_patterns {
             if output.to_lowercase().contains(pattern) {
-                signals.push(OutputSignal {
+                signals.push(_OutputSignal {
                     signal_type: "blocked_pattern".to_string(),
                     confidence: 0.95,
                     details: format!("Blocked pattern found: {}", pattern),
@@ -103,7 +103,7 @@ impl OutputSentinel {
         // 2. 敏感模式检测
         for pattern in &self.sensitive_patterns {
             if output.to_lowercase().contains(pattern) {
-                signals.push(OutputSignal {
+                signals.push(_OutputSignal {
                     signal_type: "sensitive_pattern".to_string(),
                     confidence: 0.7,
                     details: format!("Sensitive pattern: {}", pattern),
@@ -119,16 +119,16 @@ impl OutputSentinel {
             if let Ok(re) = regex::Regex::new(&rule.pattern) {
                 if re.is_match(output) {
                     match rule.action {
-                        PolicyAction::Block => {
-                            signals.push(OutputSignal {
+                        _PolicyAction::Block => {
+                            signals.push(_OutputSignal {
                                 signal_type: "policy_block".to_string(),
                                 confidence: 0.9,
                                 details: format!("Policy rule triggered: {}", rule.name),
                             });
                             max_threat = ThreatLevel::High;
                         }
-                        PolicyAction::Warn => {
-                            signals.push(OutputSignal {
+                        _PolicyAction::Warn => {
+                            signals.push(_OutputSignal {
                                 signal_type: "policy_warn".to_string(),
                                 confidence: 0.6,
                                 details: format!("Policy warning: {}", rule.name),
@@ -137,8 +137,8 @@ impl OutputSentinel {
                                 max_threat = ThreatLevel::Low;
                             }
                         }
-                        PolicyAction::_Log => {
-                            signals.push(OutputSignal {
+                        _PolicyAction::_Log => {
+                            signals.push(_OutputSignal {
                                 signal_type: "policy_log".to_string(),
                                 confidence: 0.3,
                                 details: format!("Policy log: {}", rule.name),
@@ -152,7 +152,7 @@ impl OutputSentinel {
         // 4. 系统提示泄露检测
         if let Some(system_prompt) = context.get("system_prompt") {
             if self.detect_prompt_leakage(output, system_prompt) {
-                signals.push(OutputSignal {
+                signals.push(_OutputSignal {
                     signal_type: "prompt_leakage".to_string(),
                     confidence: 0.95,
                     details: "System prompt content detected in output".to_string(),
@@ -203,7 +203,7 @@ impl OutputSentinel {
     }
 
     /// 添加自定义策略规则
-    pub fn add_policy_rule(&mut self, name: &str, pattern: &str, action: PolicyAction) {
+    pub fn _add_policy_rule(&mut self, name: &str, pattern: &str, action: _PolicyAction) {
         self.policy_rules.push(PolicyRule {
             name: name.to_string(),
             pattern: pattern.to_string(),

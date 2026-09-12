@@ -81,27 +81,27 @@ impl DeviceSandbox {
     }
 
     /// 安装 MITM/代理根证书 (res-downloader 语义: 抓包需先装证书)。
-    pub fn install_cert(&mut self) {
+    pub fn _install_cert(&mut self) {
         self.spec.cert_installed = true;
     }
 
-    pub fn has_cert(&self) -> bool {
+    pub fn _has_cert(&self) -> bool {
         self.spec.cert_installed
     }
 
     /// 暴露设备能力为工具面 (OpenMinis 设备集成 → tools)。
-    pub fn expose_tool(&mut self, tool: DeviceTool) {
+    pub fn _expose_tool(&mut self, tool: DeviceTool) {
         if !self.spec.tools.contains(&tool) {
             self.spec.tools.push(tool);
         }
     }
 
-    pub fn available_tools(&self) -> &[DeviceTool] {
+    pub fn _available_tools(&self) -> &[DeviceTool] {
         &self.spec.tools
     }
 
     pub fn provision(&mut self) -> Result<SandboxSession, String> {
-        if self.spec.engine == SandboxEngine::Chroot && !self.has_cert() {
+        if self.spec.engine == SandboxEngine::Chroot && !self._has_cert() {
             // chroot 需要先信任证书才能启动加密隧道
             return Err("sandbox requires certificate trust before provisioning".into());
         }
@@ -180,16 +180,16 @@ mod tests {
             ..SandboxSpec::default()
         });
         assert!(b.provision().is_err());
-        b.install_cert();
+        b._install_cert();
         assert!(b.provision().is_ok());
     }
 
     #[test]
     fn test_expose_tool_dedup() {
         let mut b = DeviceSandbox::new(SandboxSpec::default());
-        b.expose_tool(DeviceTool::Health);
-        b.expose_tool(DeviceTool::Health);
-        assert_eq!(b.available_tools().iter().filter(|t| **t == DeviceTool::Health).count(), 1);
+        b._expose_tool(DeviceTool::Health);
+        b._expose_tool(DeviceTool::Health);
+        assert_eq!(b._available_tools().iter().filter(|t| **t == DeviceTool::Health).count(), 1);
     }
 
     #[test]

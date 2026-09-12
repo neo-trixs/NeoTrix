@@ -87,7 +87,7 @@ impl StrategyLearner {
     pub fn select_strategy(&self, host: &str) -> NodeSelectionStrategy {
         let dk = Self::domain_key(host);
         let domain_counts = self.counts.get(&dk);
-        let eps = self.effective_epsilon();
+        let eps = self._effective_epsilon();
 
         if rand::thread_rng().gen::<f64>() < eps {
             let actions = Self::actions();
@@ -136,7 +136,7 @@ impl StrategyLearner {
         }
     }
 
-    pub fn effective_epsilon(&self) -> f64 {
+    pub fn _effective_epsilon(&self) -> f64 {
         self.epsilon
     }
 
@@ -163,9 +163,9 @@ impl StrategyLearner {
 
     pub fn epsilon(&self) -> f64 { self.epsilon }
 
-    pub fn set_epsilon(&mut self, eps: f64) { self.epsilon = eps.clamp(0.0, 1.0); }
+    pub fn _set_epsilon(&mut self, eps: f64) { self.epsilon = eps.clamp(0.0, 1.0); }
 
-    pub fn domain_stats(&self, host: &str) -> Vec<(String, f64, u64)> {
+    pub fn _domain_stats(&self, host: &str) -> Vec<(String, f64, u64)> {
         let dk = Self::domain_key(host);
         let Some(domain_counts) = self.counts.get(&dk) else { return vec![] };
         let mut stats: Vec<_> = domain_counts.iter()
@@ -223,12 +223,12 @@ mod tests {
     #[test]
     fn test_learner_epsilon_anneals() {
         let mut learner = StrategyLearner::new();
-        let initial = learner.effective_epsilon();
+        let initial = learner._effective_epsilon();
         assert!((initial - 0.3).abs() < 0.01, "initial epsilon should be ~0.3, got {initial}");
         for _ in 0..100 {
             learner.record_reward("example.com", &NodeSelectionStrategy::Fastest, true);
         }
-        let annealed = learner.effective_epsilon();
+        let annealed = learner._effective_epsilon();
         assert!(annealed <= 0.25, "epsilon should anneal <= 0.25, got {annealed}");
         assert!(annealed >= 0.05, "epsilon should not go below 0.05, got {annealed}");
     }
@@ -239,7 +239,7 @@ mod tests {
         learner.record_reward("example.com", &NodeSelectionStrategy::Fastest, true);
         learner.record_reward("example.com", &NodeSelectionStrategy::Fastest, true);
         learner.record_reward("example.com", &NodeSelectionStrategy::LeastLatency, false);
-        let stats = learner.domain_stats("example.com");
+        let stats = learner._domain_stats("example.com");
         assert!(!stats.is_empty());
         assert_eq!(stats[0].0, "fastest");
         assert!(stats[0].1 > 0.5);

@@ -241,7 +241,7 @@ impl PredictiveNetworkMonitor {
         self.global_root_cause.as_ref()
     }
 
-    pub fn global_lap_stats(&self) -> HashMap<String, LapStats> {
+    pub fn _global_lap_stats(&self) -> HashMap<String, LapStats> {
         let mut m = HashMap::new();
         for (name, mon) in &self.endpoints {
             m.insert(name.clone(), mon.summary());
@@ -249,7 +249,7 @@ impl PredictiveNetworkMonitor {
         m
     }
 
-    pub fn auto_remediate(&mut self) -> Option<(String, bool, String)> {
+    pub fn _auto_remediate(&mut self) -> Option<(String, bool, String)> {
         let cause = self.global_root_cause.as_ref()?;
         if !RemediationEngine::should_auto_remediate(&cause.cause) {
             return None;

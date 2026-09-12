@@ -273,61 +273,64 @@ impl StreamingPipeline {
             }
 
             TransportType::FifoPipe => {
-                // FIFO pipe: zero-disk streaming
-                let fifo_path = config.output_dir.join(format!(
-                    "stream-{}.fifo",
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos()
-                ));
-
-                // Create FIFO
+                // FIFO pipe: zero-disk streaming (Unix only)
                 #[cfg(unix)]
                 {
-                    use std::os::unix::fs::FileTypeExt;
-                    use std::os::unix::fs::OpenOptionsExt;
+                    let fifo_path = config.output_dir.join(format!(
+                        "stream-{}.fifo",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_nanos()
+                    ));
 
-                    // mkfifo via nix or manual
-                    unsafe {
-                        libc::mkfifo(
-                            fifo_path.as_os_str().as_encoded_bytes().as_ptr() as *const i8,
-                            0o644,
-                        );
-                    }
+                    // Create FIFO using Unix-specific file creation
+                    use std::os::unix::fs::OpenOptionsExt;
+                    let _ = std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o644)
+                        .open(&fifo_path);
+
+                    let fifo_path_clone = fifo_path.clone();
+                    let url_clone = url.clone();
+
+                    // Spawn player reading from FIFO
+                    let player_handle = spawn_fifo_player(
+                        &fifo_path,
+                        config.player_bin.as_deref(),
+                        &config.player_args,
+                    )
+                    .await;
+
+                    // Spawn download writing to FIFO
+                    let download_handle = tokio::spawn(async move {
+                        stream_http_to_fifo(
+                            &client,
+                            &url_clone,
+                            &fifo_path_clone,
+                            config.chunk_size,
+                            cancel_rx_flag,
+                            progress_tx.clone(),
+                            media_kind,
+                        )
+                        .await
+                    });
+
+                    Ok(PipelineHandle {
+                        download_task: download_handle,
+                        player_handle,
+                        cancel_tx: Some(cancel_tx),
+                        output: fifo_path,
+                    })
                 }
 
-                let fifo_path_clone = fifo_path.clone();
-                let url_clone = url.clone();
-
-                // Spawn player reading from FIFO
-                let player_handle = spawn_fifo_player(
-                    &fifo_path,
-                    config.player_bin.as_deref(),
-                    &config.player_args,
-                )
-                .await;
-
-                // Spawn download writing to FIFO
-                let download_handle = tokio::spawn(async move {
-                    stream_http_to_fifo(
-                        &client,
-                        &url_clone,
-                        &fifo_path_clone,
-                        config.chunk_size,
-                        cancel_rx_flag,
-                        progress_tx.clone(),
-                        media_kind,
-                    )
-                    .await
-                });
-
-                Ok(PipelineHandle {
-                    download_task: download_handle,
-                    player_handle,
-                    cancel_tx: Some(cancel_tx),
-                    output: fifo_path,
-                })
+                #[cfg(not(unix))]
+                {
+                    Err(PipelineError::Config(
+                        "FIFO pipe only supported on Unix".into(),
+                    ))
+                }
             }
         }
     }

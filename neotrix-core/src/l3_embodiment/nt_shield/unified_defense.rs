@@ -7,7 +7,7 @@ use super::*;
 
 /// 统一防御结果
 #[derive(Debug, Clone)]
-pub struct UnifiedDefenseResult {
+pub struct _UnifiedDefenseResult {
     pub is_safe: bool,
     pub threat_level: ThreatLevel,
     pub input_result: input_gatekeeper::ValidationResult,
@@ -63,7 +63,7 @@ impl UnifiedDefenseLayer {
         input: &str,
         system_prompt: &str,
         context: &HashMap<String, String>,
-    ) -> UnifiedDefenseResult {
+    ) -> _UnifiedDefenseResult {
         let mut signals = Vec::new();
 
         // 1. 输入验证
@@ -137,7 +137,7 @@ impl UnifiedDefenseLayer {
 
         let is_safe = threat_level == ThreatLevel::Safe || threat_level == ThreatLevel::Low;
 
-        UnifiedDefenseResult {
+        _UnifiedDefenseResult {
             is_safe,
             threat_level,
             input_result,
