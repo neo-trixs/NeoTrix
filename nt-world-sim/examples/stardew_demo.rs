@@ -26,22 +26,8 @@ struct Velocity {
 }
 impl Component for Velocity {}
 
-#[derive(Clone, Debug)]
-struct NpcTag {
-    name: String,
-}
+struct NpcTag;
 impl Component for NpcTag {}
-
-struct DeltaTime {
-    dt: f32,
-}
-impl Resource for DeltaTime {}
-
-#[derive(Clone, Debug)]
-struct GameEvent {
-    message: String,
-}
-impl Event for GameEvent {}
 
 // ---------------------------------------------------------------------------
 // MovementSystem — integrates velocity into position
@@ -104,12 +90,7 @@ fn main() {
         npc1,
         Velocity { x: -0.3, y: 0.1 },
     );
-    world.insert_component(
-        npc1,
-        NpcTag {
-            name: "Villager_A".into(),
-        },
-    );
+    world.insert_component(npc1, NpcTag);
 
     let npc2 = world.spawn();
     world.insert_component(
@@ -123,12 +104,7 @@ fn main() {
             y: -0.4,
         },
     );
-    world.insert_component(
-        npc2,
-        NpcTag {
-            name: "Villager_B".into(),
-        },
-    );
+    world.insert_component(npc2, NpcTag);
     println!("Spawned 2 NPCs (entity {:?}, {:?})", npc1.id, npc2.id);
 
     // 4. Load default theme

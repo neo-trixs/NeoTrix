@@ -2,6 +2,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 pub mod browser_host;
+pub mod desktop;
 
 use tauri::{Emitter, Manager};
 
