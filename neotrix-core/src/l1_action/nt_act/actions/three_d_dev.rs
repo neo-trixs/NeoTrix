@@ -246,7 +246,7 @@ impl Development3DEngine {
     }
 
     /// 实例化对象
-    pub fn instantiate_object(&mut self, object_type: ObjectType, name: &str, transform: Option<Transform>) -> GameObject {
+    pub(crate) fn _instantiate_object(&mut self, object_type: ObjectType, name: &str, transform: Option<Transform>) -> GameObject {
         let object = GameObject {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -276,7 +276,7 @@ impl Development3DEngine {
     }
 
     /// 生成脚本
-    pub fn generate_script(&mut self, template: &ScriptTemplate, object_id: &str) -> Script {
+    pub(crate) fn _generate_script(&mut self, template: &ScriptTemplate, object_id: &str) -> Script {
         let script = Script {
             id: uuid::Uuid::new_v4().to_string(),
             name: format!("{}_script", object_id),

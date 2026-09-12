@@ -71,7 +71,7 @@ impl ObservabilityStack {
     }
 
     /// 设置层延迟预算
-    pub fn set_latency_budget(&mut self, layer: &str, budget: Duration) {
+    pub(crate) fn _set_latency_budget(&mut self, layer: &str, budget: Duration) {
         self.latency_budgets.insert(layer.to_string(), budget);
     }
 

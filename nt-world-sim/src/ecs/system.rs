@@ -77,7 +77,7 @@ impl Default for SystemScheduler {
 pub struct MovementSystem;
 
 impl System for MovementSystem {
-    fn update(&mut self, world: &mut World, dt: f32) {
+    fn update(&mut self, _world: &mut World, _dt: f32) {
         // TODO: 实现移动逻辑
     }
 
@@ -94,7 +94,7 @@ impl System for MovementSystem {
 pub struct RenderingSystem;
 
 impl System for RenderingSystem {
-    fn update(&mut self, world: &mut World, dt: f32) {
+    fn update(&mut self, _world: &mut World, _dt: f32) {
         // TODO: 实现渲染逻辑
     }
 
@@ -111,7 +111,7 @@ impl System for RenderingSystem {
 pub struct PhysicsSystem;
 
 impl System for PhysicsSystem {
-    fn update(&mut self, world: &mut World, dt: f32) {
+    fn update(&mut self, _world: &mut World, _dt: f32) {
         // TODO: 实现物理逻辑
     }
 

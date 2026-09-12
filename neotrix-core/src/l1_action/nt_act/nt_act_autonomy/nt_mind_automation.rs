@@ -120,7 +120,7 @@ impl AutomationEngine {
     }
 
     /// 注入技能执行器 (生产接线: L8/bin 层传入闭包, 内部构造 SkillEngine)。
-    pub fn set_skill_runner<F>(&mut self, runner: F)
+    pub(crate) fn _set_skill_runner<F>(&mut self, runner: F)
     where
         F: Fn(&str) -> Result<String, String> + 'static,
     {

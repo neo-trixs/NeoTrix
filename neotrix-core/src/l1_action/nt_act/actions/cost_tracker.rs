@@ -98,7 +98,7 @@ impl CostTracker {
     }
 
     /// 添加预算告警
-    pub fn add_alert(&mut self, name: &str, limit_usd: f64, threshold_percent: f64) {
+    pub(crate) fn _add_alert(&mut self, name: &str, limit_usd: f64, threshold_percent: f64) {
         self.alerts.push(BudgetAlert {
             name: name.to_string(),
             limit_usd,
@@ -130,12 +130,12 @@ impl CostTracker {
     }
 
     /// 获取指定功能成本
-    pub fn cost_by_feature(&self, feature: &str) -> f64 {
+    pub(crate) fn _cost_by_feature(&self, feature: &str) -> f64 {
         self.by_feature.get(feature).copied().unwrap_or(0.0)
     }
 
     /// 获取指定提供商成本
-    pub fn cost_by_provider(&self, provider: &str) -> f64 {
+    pub(crate) fn _cost_by_provider(&self, provider: &str) -> f64 {
         self.by_provider.get(provider).copied().unwrap_or(0.0)
     }
 

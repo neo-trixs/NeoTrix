@@ -218,7 +218,7 @@ impl ModelingRenderingEngine {
     }
 
     /// 创建网格
-    pub fn create_mesh(&mut self, name: &str, vertices: Vec<Vertex>, faces: Vec<Face>) -> Mesh {
+    pub(crate) fn _create_mesh(&mut self, name: &str, vertices: Vec<Vertex>, faces: Vec<Face>) -> Mesh {
         let mesh = Mesh {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -237,7 +237,7 @@ impl ModelingRenderingEngine {
     }
 
     /// 创建材质
-    pub fn create_material(&mut self, name: &str, material_type: MaterialType) -> Material {
+    pub(crate) fn _create_material(&mut self, name: &str, material_type: MaterialType) -> Material {
         let material = Material {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),

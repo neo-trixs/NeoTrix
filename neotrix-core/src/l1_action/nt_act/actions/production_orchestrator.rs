@@ -179,7 +179,7 @@ impl ProductionOrchestrator {
     }
     
     /// 暂停工作流
-    pub fn pause_workflow(&mut self, workflow_id: &str) -> Result<(), String> {
+    pub(crate) fn _pause_workflow(&mut self, workflow_id: &str) -> Result<(), String> {
         if let Some(workflow) = self.workflows.get_mut(workflow_id) {
             workflow.status = WorkflowStatus::Paused;
             workflow.updated_at = current_timestamp();
@@ -190,7 +190,7 @@ impl ProductionOrchestrator {
     }
     
     /// 完成步骤
-    pub fn complete_step(
+    pub(crate) fn _complete_step(
         &mut self,
         workflow_id: &str,
         step_id: &str,

@@ -268,7 +268,7 @@ impl VideoStitcher {
     }
     
     /// 生成字幕滤镜
-    pub fn generate_subtitle_filter(&self, subtitles: &[SubtitleEntry]) -> String {
+    pub(crate) fn _generate_subtitle_filter(&self, subtitles: &[SubtitleEntry]) -> String {
         if subtitles.is_empty() {
             return String::new();
         }

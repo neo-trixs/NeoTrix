@@ -148,22 +148,22 @@ impl BatchProductionManager {
     }
     
     /// 获取流水线
-    pub fn get_pipeline(&self, id: &str) -> Option<&ProductionPipeline> {
+    pub(crate) fn _get_pipeline(&self, id: &str) -> Option<&ProductionPipeline> {
         self.pipelines.get(id)
     }
     
     /// 获取流水线可变引用
-    pub fn get_pipeline_mut(&mut self, id: &str) -> Option<&mut ProductionPipeline> {
+    pub(crate) fn _get_pipeline_mut(&mut self, id: &str) -> Option<&mut ProductionPipeline> {
         self.pipelines.get_mut(id)
     }
     
     /// 列出所有流水线
-    pub fn list_pipelines(&self) -> Vec<&ProductionPipeline> {
+    pub(crate) fn _list_pipelines(&self) -> Vec<&ProductionPipeline> {
         self.pipelines.values().collect()
     }
     
     /// 启动批次
-    pub fn start_batch(&mut self, pipeline_id: &str, batch_id: &str) -> Result<(), String> {
+    pub(crate) fn _start_batch(&mut self, pipeline_id: &str, batch_id: &str) -> Result<(), String> {
         if let Some(pipeline) = self.pipelines.get_mut(pipeline_id) {
             if let Some(batch) = pipeline.batches.iter_mut().find(|b| b.id == batch_id) {
                 batch.status = TaskStatus::Running;
@@ -178,7 +178,7 @@ impl BatchProductionManager {
     }
     
     /// 暂停批次
-    pub fn pause_batch(&mut self, pipeline_id: &str, batch_id: &str) -> Result<(), String> {
+    pub(crate) fn _pause_batch(&mut self, pipeline_id: &str, batch_id: &str) -> Result<(), String> {
         if let Some(pipeline) = self.pipelines.get_mut(pipeline_id) {
             if let Some(batch) = pipeline.batches.iter_mut().find(|b| b.id == batch_id) {
                 batch.status = TaskStatus::Paused;
@@ -193,7 +193,7 @@ impl BatchProductionManager {
     }
     
     /// 取消批次
-    pub fn cancel_batch(&mut self, pipeline_id: &str, batch_id: &str) -> Result<(), String> {
+    pub(crate) fn _cancel_batch(&mut self, pipeline_id: &str, batch_id: &str) -> Result<(), String> {
         if let Some(pipeline) = self.pipelines.get_mut(pipeline_id) {
             if let Some(batch) = pipeline.batches.iter_mut().find(|b| b.id == batch_id) {
                 batch.status = TaskStatus::Cancelled;
@@ -208,7 +208,7 @@ impl BatchProductionManager {
     }
     
     /// 更新任务状态
-    pub fn update_task_status(
+    pub(crate) fn _update_task_status(
         &mut self,
         pipeline_id: &str,
         batch_id: &str,
@@ -269,7 +269,7 @@ impl BatchProductionManager {
     }
     
     /// 获取批次进度
-    pub fn get_batch_progress(&self, pipeline_id: &str, batch_id: &str) -> Option<f32> {
+    pub(crate) fn _get_batch_progress(&self, pipeline_id: &str, batch_id: &str) -> Option<f32> {
         if let Some(pipeline) = self.pipelines.get(pipeline_id) {
             if let Some(batch) = pipeline.batches.iter().find(|b| b.id == batch_id) {
                 if batch.tasks.is_empty() {
@@ -295,7 +295,7 @@ impl BatchProductionManager {
     }
     
     /// 恢复断点
-    pub fn restore_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
+    pub(crate) fn _restore_checkpoint(&mut self, data: &[u8]) -> Result<(), String> {
         let pipeline: ProductionPipeline = serde_json::from_slice(data).map_err(|e| e.to_string())?;
         self.pipelines.insert(pipeline.id.clone(), pipeline);
         Ok(())

@@ -194,7 +194,7 @@ impl ProviderMigrationRouter {
     }
 
     /// 获取当前路由
-    pub fn get_current_provider(&self) -> Option<&ProviderInfo> {
+    pub(crate) fn _get_current_provider(&self) -> Option<&ProviderInfo> {
         self.providers.get(&self.routing_config.default_provider)
     }
 
@@ -226,7 +226,7 @@ impl ProviderMigrationRouter {
     }
 
     /// 创建迁移计划
-    pub fn create_migration_plan(&mut self, source: &str, target: &str, reason: MigrationReason) -> MigrationPlan {
+    pub(crate) fn _create_migration_plan(&mut self, source: &str, target: &str, reason: MigrationReason) -> MigrationPlan {
         let plan = MigrationPlan {
             source_provider: source.to_string(),
             target_provider: target.to_string(),
@@ -270,7 +270,7 @@ impl ProviderMigrationRouter {
     }
 
     /// 执行迁移
-    pub fn execute_migration(&mut self, plan_id: usize) -> bool {
+    pub(crate) fn _execute_migration(&mut self, plan_id: usize) -> bool {
         if let Some(plan) = self.migration_plans.get_mut(plan_id) {
             plan.status = MigrationStatus::InProgress;
             // TODO: 实际执行迁移逻辑

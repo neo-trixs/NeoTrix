@@ -235,7 +235,7 @@ impl GpuScheduler {
     }
 
     /// 检查是否需要扩容
-    pub fn should_scale_up(&self) -> bool {
+    pub(crate) fn _should_scale_up(&self) -> bool {
         let avg_utilization: f64 = self.devices.values()
             .map(|d| d.utilization_percent)
             .sum::<f64>() / self.devices.len() as f64;
@@ -245,7 +245,7 @@ impl GpuScheduler {
     }
 
     /// 检查是否需要缩容
-    pub fn should_scale_down(&self) -> bool {
+    pub(crate) fn _should_scale_down(&self) -> bool {
         let avg_utilization: f64 = self.devices.values()
             .map(|d| d.utilization_percent)
             .sum::<f64>() / self.devices.len() as f64;

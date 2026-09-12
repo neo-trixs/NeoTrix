@@ -182,7 +182,7 @@ impl VideoObjectStorage {
     }
 
     /// 生成预签名 URL
-    pub fn generate_presigned_url(&self, object_id: &str, expiration: Duration) -> Option<String> {
+    pub(crate) fn _generate_presigned_url(&self, object_id: &str, expiration: Duration) -> Option<String> {
         if let Some(object) = self.objects.get(object_id) {
             let base_url = &self.config.endpoint_url;
             let bucket = &self.config.bucket_name;
@@ -193,7 +193,7 @@ impl VideoObjectStorage {
     }
 
     /// 生成 CDN URL
-    pub fn generate_cdn_url(&self, object_id: &str) -> Option<String> {
+    pub(crate) fn _generate_cdn_url(&self, object_id: &str) -> Option<String> {
         if let Some(object) = self.objects.get(object_id) {
             if let Some(cdn_base) = &self.config.cdn_base_url {
                 Some(format!("{}/{}", cdn_base, object.key))

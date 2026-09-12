@@ -160,7 +160,7 @@ impl VideoJobPipeline {
     }
 
     /// 获取下一个作业
-    pub fn next_job(&mut self) -> Option<&mut VideoJob> {
+    pub(crate) fn _next_job(&mut self) -> Option<&mut VideoJob> {
         // 按优先级排序
         self.queue.sort_by(|a, b| {
             let job_a = self.jobs.get(a).unwrap();
@@ -198,7 +198,7 @@ impl VideoJobPipeline {
     }
 
     /// 恢复作业
-    pub fn resume_job(&mut self, job_id: &str) -> Option<&VideoJob> {
+    pub(crate) fn _resume_job(&mut self, job_id: &str) -> Option<&VideoJob> {
         if let Some(job) = self.jobs.get_mut(job_id) {
             if job.status == JobStatus::Checkpointed || job.status == JobStatus::Failed {
                 job.status = JobStatus::Queued;
@@ -212,7 +212,7 @@ impl VideoJobPipeline {
     }
 
     /// 完成作业
-    pub fn complete_job(&mut self, job_id: &str, output_path: &str) -> bool {
+    pub(crate) fn _complete_job(&mut self, job_id: &str, output_path: &str) -> bool {
         if let Some(job) = self.jobs.get_mut(job_id) {
             job.status = JobStatus::Completed;
             job.output_path = Some(output_path.to_string());
@@ -224,7 +224,7 @@ impl VideoJobPipeline {
     }
 
     /// 失败作业
-    pub fn fail_job(&mut self, job_id: &str, error: &str) -> bool {
+    pub(crate) fn _fail_job(&mut self, job_id: &str, error: &str) -> bool {
         if let Some(job) = self.jobs.get_mut(job_id) {
             job.status = JobStatus::Failed;
             job.error_message = Some(error.to_string());

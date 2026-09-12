@@ -148,7 +148,7 @@ impl AudioOrchestrator {
     }
     
     /// 生成 TTS
-    pub fn generate_tts(&self, text: &str, _config: &TTSConfig) -> String {
+    pub(crate) fn _generate_tts(&self, text: &str, _config: &TTSConfig) -> String {
         // TODO: 实际调用 TTS API
         format!("/tmp/tts_{}.wav", &text[..10.min(text.len())])
     }
@@ -220,7 +220,7 @@ impl AudioOrchestrator {
     }
     
     /// 分析音频
-    pub fn analyze_audio(&self, _audio_path: &str) -> AudioAnalysis {
+    pub(crate) fn _analyze_audio(&self, _audio_path: &str) -> AudioAnalysis {
         // TODO: 实际调用音频分析
         AudioAnalysis {
             duration: 10.0,
@@ -232,7 +232,7 @@ impl AudioOrchestrator {
     }
     
     /// 归一化响度
-    pub fn normalize_loudness(&self, target_lufs: f32) -> String {
+    pub(crate) fn _normalize_loudness(&self, target_lufs: f32) -> String {
         format!("loudnorm=I={}:TP=-1.5:LRA=11", target_lufs)
     }
     

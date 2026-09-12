@@ -222,7 +222,7 @@ impl CacheLayer {
     }
 
     /// 按标签失效
-    pub fn invalidate_by_tag(&mut self, tag: &str) {
+    pub(crate) fn _invalidate_by_tag(&mut self, tag: &str) {
         let keys_to_remove: Vec<String> = self.l1_cache.entries.iter()
             .filter(|(_, entry)| entry.tags.contains(&tag.to_string()))
             .map(|(key, _)| key.clone())

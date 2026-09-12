@@ -125,7 +125,7 @@ impl TokenBucket {
     }
 
     /// 获取当前令牌数
-    pub fn available_tokens(&self) -> f64 {
+    pub(crate) fn _available_tokens(&self) -> f64 {
         self.tokens
     }
 }

@@ -109,7 +109,7 @@ impl DiskGuard {
     /// - Danger → Blocked (拦截)
     ///
     /// 返回 (verdict, risk_level)。
-    pub fn check_risk(&mut self, operation: &str, target: &Path) -> (DiskVerdict, RiskLevel) {
+    pub(crate) fn _check_risk(&mut self, operation: &str, target: &Path) -> (DiskVerdict, RiskLevel) {
         if !self.is_within(target) {
             self.blocked_count += 1;
             return (

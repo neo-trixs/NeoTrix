@@ -195,7 +195,7 @@ impl RunbookManager {
     }
     
     /// 从模板创建手册
-    pub fn create_from_template(
+    pub(crate) fn _create_from_template(
         &mut self,
         template_id: &str,
         runbook_id: &str,
@@ -270,7 +270,7 @@ impl RunbookManager {
     }
     
     /// 获取手册
-    pub fn get_runbook(&self, runbook_id: &str) -> Option<&OperatorRunbook> {
+    pub(crate) fn _get_runbook(&self, runbook_id: &str) -> Option<&OperatorRunbook> {
         self.runbooks.get(runbook_id)
     }
     

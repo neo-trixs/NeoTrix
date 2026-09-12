@@ -167,7 +167,7 @@ impl WorkflowEngine {
     }
 
     /// 注册工作流
-    pub fn register_workflow(&mut self, workflow: Workflow) {
+    pub(crate) fn _register_workflow(&mut self, workflow: Workflow) {
         self.workflows.insert(workflow.id.clone(), workflow);
     }
 
@@ -313,7 +313,7 @@ impl WorkflowEngine {
     }
 
     /// 取消工作流
-    pub fn cancel_workflow(&mut self, instance_id: &str) -> Result<(), String> {
+    pub(crate) fn _cancel_workflow(&mut self, instance_id: &str) -> Result<(), String> {
         if let Some(instance) = self.running.get_mut(instance_id) {
             instance.status = WorkflowStatus::Cancelled;
             instance.completed_at = Some(chrono::Utc::now());

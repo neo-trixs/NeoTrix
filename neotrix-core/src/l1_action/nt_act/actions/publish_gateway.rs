@@ -206,7 +206,7 @@ impl PublishGateway {
     }
     
     /// 生成标题
-    pub fn generate_title(&self, base_title: &str, platform: &PublishPlatform) -> String {
+    pub(crate) fn _generate_title(&self, base_title: &str, platform: &PublishPlatform) -> String {
         match platform {
             PublishPlatform::YouTube => {
                 format!("{} | #Shorts", base_title)

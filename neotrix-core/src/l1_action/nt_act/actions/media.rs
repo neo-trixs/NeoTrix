@@ -406,14 +406,14 @@ impl ScheduleEngine {
         Ok(self.slots.last().unwrap())
     }
 
-    pub fn auto_schedule(&mut self, post: Post, best_times: &[(u32, u32)]) -> Result<&ScheduleSlot, String> {
+    pub(crate) fn _auto_schedule(&mut self, post: Post, best_times: &[(u32, u32)]) -> Result<&ScheduleSlot, String> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let tomorrow = now + 86400;
         let time = best_times.first().map_or(tomorrow + 3600, |&(h, _)| tomorrow + (h as u64 * 3600));
         self.schedule(post, time)
     }
 
-    pub fn pending_slots(&self) -> Vec<&ScheduleSlot> {
+    pub(crate) fn _pending_slots(&self) -> Vec<&ScheduleSlot> {
         self.slots.iter().filter(|s| s.status == ScheduleStatus::Pending).collect()
     }
 }
@@ -434,9 +434,9 @@ impl Default for SocialAnalytics {
 impl SocialAnalytics {
     pub fn new() -> Self { Self { posts: Vec::new() } }
 
-    pub fn add_post(&mut self, post: Post) { self.posts.push(post); }
+    pub(crate) fn _add_post(&mut self, post: Post) { self.posts.push(post); }
 
-    pub fn top_posts(&self, n: usize) -> Vec<&Post> {
+    pub(crate) fn _top_posts(&self, n: usize) -> Vec<&Post> {
         let mut sorted: Vec<&Post> = self.posts.iter().collect();
         sorted.sort_by(|a, b| b.id.cmp(&a.id)); // placeholder sort
         sorted.into_iter().take(n).collect()

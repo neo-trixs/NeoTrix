@@ -260,7 +260,7 @@ impl AIAssistantCoordinator {
     }
 
     /// 搜索工具
-    pub fn search_tools(&self, query: &str) -> Vec<&Tool> {
+    pub(crate) fn _search_tools(&self, query: &str) -> Vec<&Tool> {
         self.tools.values()
             .filter(|t| {
                 t.name.contains(query) || t.description.contains(query)

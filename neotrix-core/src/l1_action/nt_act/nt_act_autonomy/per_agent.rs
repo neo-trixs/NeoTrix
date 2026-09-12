@@ -294,7 +294,7 @@ pub struct ModifiedStep {
 }
 
 impl PlanRevision {
-    pub fn no_changes(score: f64) -> Self {
+    pub(crate) fn _no_changes(score: f64) -> Self {
         Self {
             new_steps: vec![],
             modified_steps: vec![],

@@ -213,7 +213,7 @@ impl EventBus {
     }
 
     /// 添加过滤器
-    pub fn add_filter(&mut self, filter: EventFilter) {
+    pub(crate) fn _add_filter(&mut self, filter: EventFilter) {
         self.filters.push(filter);
     }
 
@@ -251,7 +251,7 @@ impl EventBus {
     }
 
     /// 获取死信队列
-    pub fn get_dead_letters(&self) -> &[Event] {
+    pub(crate) fn _get_dead_letters(&self) -> &[Event] {
         &self.dead_letter_queue
     }
 
