@@ -23,6 +23,16 @@ fn is_maintenance_window(msg: &str) -> bool {
         || m.contains("temporarily unavailable for maintenance")
 }
 
+/// 指数退避重试延迟计算 (带 full jitter)
+/// 参考: AWS SDK 标准重试模式
+fn exponential_backoff(attempt: u32, base_ms: u64, cap_ms: u64) -> u64 {
+    let exp = 2u64.saturating_pow(attempt);
+    let delay = base_ms.saturating_mul(exp).min(cap_ms);
+    // Full jitter: random(0, delay)
+    let jitter = (rand::random::<f64>() * delay as f64) as u64;
+    delay.saturating_add(jitter)
+}
+
 /// 检测"模型不可用"类错误 (404 / model not found / does not exist / not supported 等),
 /// 对应 L3 模型级锁: 该模型下线/改名时只锁定模型, 不熔断整个 provider,
 /// 使 provider 对其它模型仍可用 → 池子不因单模型故障而缩水 (对齐 OmniRoute model lockout)。
