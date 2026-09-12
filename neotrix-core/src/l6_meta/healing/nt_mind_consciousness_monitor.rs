@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::core::nt_core_aware::*;
 use crate::core::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
-use crate::neotrix::nt_act_autonomy::awareness_monitor::SelfAwarenessMonitor;
+use crate::l5_cognition::nt_core::awareness_monitor::SelfAwarenessMonitor;
 
 const HISTORY_CAPACITY: usize = 100;
 // log2(GWT MODULE_COUNT) — 从 GWT 真实模块数派生, 避免与 resonance.rs 漂移。

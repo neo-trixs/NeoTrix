@@ -330,7 +330,7 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
         crate::core::nt_core_self_constitution::GovernanceConstitutionSelfTest,
     ));
     registry.register(Box::new(
-        crate::l1_action::nt_act::nt_act_autonomy::cross_session_memory::CrossSessionMemorySelfTest,
+        crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemorySelfTest,
     ));
     // NT-ACT (3)
     registry.register(Box::new(AgentTeamSelfTest));

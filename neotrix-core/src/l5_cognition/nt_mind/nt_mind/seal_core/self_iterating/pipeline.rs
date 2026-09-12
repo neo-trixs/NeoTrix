@@ -905,7 +905,7 @@ impl BrainStage for _DistillationStage {
             .map(|e| e.state_trajectory.len())
             .unwrap_or(0);
         if traj_len > 0 {
-            let session = crate::neotrix::nt_act_autonomy::knowledge_distiller::SessionRecord {
+            let session = crate::l5_cognition::nt_mind::knowledge_distiller::SessionRecord {
                 id: format!("pipeline-iter-{}", brain.iteration),
                 user_messages: vec![brain._current_task.clone()],
                 actions_taken: vec![format!("pipeline_iter_{}", brain.iteration)],
@@ -2691,7 +2691,7 @@ impl BrainStage for _ArchitectureOptimizerStage {
         15
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::neotrix::nt_act_autonomy::SelfArchitectureOptimizer;
+        use crate::l6_meta::nt_meta::arch_optimizer::SelfArchitectureOptimizer;
         let optimizer = SelfArchitectureOptimizer::new();
         // Pass module sizes as proxy file list
         let caps = brain.brain.capability.arr();
@@ -2745,7 +2745,7 @@ impl BrainStage for _TrendAnalysisStage {
         15
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::neotrix::nt_act_autonomy::EvolutionTrendAnalyzer;
+        use crate::l5_cognition::nt_mind::trend_analyzer::EvolutionTrendAnalyzer;
         let mut analyzer = EvolutionTrendAnalyzer::new();
         let caps = brain.brain.capability.arr();
         for (i, val) in caps.iter().enumerate() {
@@ -2795,7 +2795,8 @@ impl BrainStage for _MetaGoalStage {
         12
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::neotrix::nt_act_autonomy::{EvolutionTrendAnalyzer, MetaGoalGenerator};
+        use crate::l5_cognition::nt_mind::trend_analyzer::EvolutionTrendAnalyzer;
+        use crate::l5_cognition::nt_mind::meta_goal_generator::MetaGoalGenerator;
         let mut analyzer = EvolutionTrendAnalyzer::new();
         let caps = brain.brain.capability.arr();
         for (i, val) in caps.iter().enumerate() {
@@ -2829,7 +2830,7 @@ impl BrainStage for MemoryConsolidationStage {
         12
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::neotrix::nt_act_autonomy::cross_session_memory::MemoryCategory;
+        use crate::l6_meta::nt_nexus::cross_session_memory::MemoryCategory;
 
         let count_before = brain._memory_orch.size();
         let tiers = [

@@ -1,4 +1,4 @@
-use crate::neotrix::nt_act_autonomy::awareness_monitor::AwarenessReport;
+use crate::l5_cognition::nt_core::awareness_monitor::AwarenessReport;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ArchIssueType {

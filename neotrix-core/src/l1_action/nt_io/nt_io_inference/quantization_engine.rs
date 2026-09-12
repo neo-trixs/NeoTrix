@@ -142,6 +142,15 @@ pub struct HardwareCapabilities {
     pub system_ram_gb: f64,  // For llmfit-style memory-aware selection
 }
 
+/// Quantization configuration for a model/hardware combo
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuantizationConfig {
+    pub format: String,
+    pub level: String,
+    pub memory_multiplier: f64,
+    pub quality_loss: f64,
+}
+
 /// Quantization result with detailed metrics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _QuantizationResult {
@@ -736,7 +745,7 @@ impl QuantizationEngine {
             
             LayerQuantConfig {
                 layer_index: i,
-                bitwidth: bits,
+                bitwidth: bits as u8,
                 quant_type,
                 importance_score: importance,
             }
@@ -827,16 +836,11 @@ impl QuantizationEngine {
                 } else {
                     AttentionType::GroupedQueryAttention
                 },
-                has_rotary_embeddings: true,
-                has_swiglu: true,
-                has_rms_norm: true,
-                is_moe,
-                active_params_b: if is_moe { Some(param_count as f64 * 0.1) } else { None },
-                default_context_length: 128_000,
-                supports_flash_attention: true,
-                supports_kv_quantization: true,
-                supports_speculative_decoding: param_count <= 35_000_000_000,
-                supports_mlp_quantization: true,
+                hidden_dim: 4096,
+                num_layers: 32,
+                num_heads: 32,
+                head_dim: 128,
+                kv_channels: 128,
             },
             hw,
         );

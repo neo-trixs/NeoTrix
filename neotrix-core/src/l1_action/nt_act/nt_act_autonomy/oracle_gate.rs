@@ -1,4 +1,4 @@
-use crate::neotrix::nt_act_autonomy::awareness_monitor::{AwarenessReport, GapSeverity};
+use crate::l5_cognition::nt_core::awareness_monitor::{AwarenessReport, GapSeverity};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum OracleReason {
@@ -214,7 +214,7 @@ impl crate::core::nt_core_self_test::SelfTest for OracleGate {
         if gate.oracle_call_count != 0 {
             failures.push("oracle_call_count should start at 0".into());
         }
-        let report = crate::neotrix::nt_act_autonomy::awareness_monitor::AwarenessReport {
+        let report = crate::l5_cognition::nt_core::awareness_monitor::AwarenessReport {
             gaps: vec![],
             total_gap: 0.0,
             critical_count: 0,

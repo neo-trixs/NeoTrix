@@ -2078,7 +2078,7 @@ impl BackgroundLoopHandle {
             )
         });
         let nexus_ok =
-            crate::l1_action::nt_act::nt_act_autonomy::cross_session_memory::CrossSessionMemorySelfTest
+            crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemorySelfTest
                 .self_test()
                 .is_ok();
         results.push(if nexus_ok {

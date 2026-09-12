@@ -31,7 +31,7 @@ use crate::core::nt_core_consciousness::{
 };
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
-use crate::neotrix::nt_act_autonomy::knowledge_distiller::KnowledgeDistiller;
+use crate::l5_cognition::nt_mind::knowledge_distiller::KnowledgeDistiller;
 use crate::l5_cognition::nt_mind::foundation::memory_bank::{MemoryOrchestrator, MemoryTier};
 use crate::l5_cognition::nt_mind::nt_mind::element::registry::ElementRegistry;
 use crate::l5_cognition::nt_mind::nt_mind::element::{capability_element::CapabilityElement, memory_element::MemoryElement, skill_element::SkillElement};
@@ -123,7 +123,7 @@ pub struct SelfIteratingBrain {
     pub(crate) _memory_orch: MemoryOrchestrator,
     pub(crate) _per_loop: Option<crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop>,
     pub(crate) _oracle_gate: Option<crate::neotrix::nt_act_autonomy::OracleGate>,
-    pub(crate) _cross_session_memory: Option<crate::neotrix::nt_act_autonomy::CrossSessionMemory>,
+    pub(crate) _cross_session_memory: Option<crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemory>,
 
     /// Last consciousness quality score from InnerCritic (0.0–1.0)
     pub(crate) _last_consciousness_quality: f64,
@@ -244,7 +244,7 @@ impl SelfIteratingBrain {
                 crate::neotrix::nt_act_autonomy::PerConfig::default(),
             )),
             _oracle_gate: Some(crate::neotrix::nt_act_autonomy::OracleGate::new()),
-            _cross_session_memory: Some(crate::neotrix::nt_act_autonomy::CrossSessionMemory::new(
+            _cross_session_memory: Some(crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemory::new(
                 dirs::home_dir()
                     .unwrap_or_default()
                     .join(".neotrix")
