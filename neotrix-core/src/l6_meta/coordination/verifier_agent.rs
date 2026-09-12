@@ -216,28 +216,67 @@ impl _VerifierAgent {
         result
     }
     
-    /// 模拟验证
-    fn simulate_verification(&self, _description: &str, _context: Option<&str>) -> Vec<_VerificationScore> {
+    /// 模拟验证 — 基于描述和上下文计算验证分数
+    ///
+    /// 使用关键词匹配和启发式规则评估各维度。
+    fn simulate_verification(&self, description: &str, context: Option<&str>) -> Vec<_VerificationScore> {
+        let desc_lower = description.to_lowercase();
+        let ctx_lower = context.map(|c| c.to_lowercase()).unwrap_or_default();
+
+        // 实体一致性：检查描述中是否提及实体特征
+        let entity_score = if desc_lower.contains("character") || desc_lower.contains("角色")
+            || desc_lower.contains("person") || desc_lower.contains("face") {
+            7 // 有实体描述 → 中等分数（需要实际图像比对）
+        } else {
+            9 // 无实体 → 高分
+        };
+
+        // 环境一致性：检查上下文中的环境描述
+        let env_score = if ctx_lower.contains("lighting") || ctx_lower.contains("光照")
+            || ctx_lower.contains("scene") || ctx_lower.contains("场景") {
+            6 // 有环境描述 → 较低分数（需要实际比对）
+        } else {
+            8 // 无环境 → 较高分
+        };
+
+        // 叙事进展：检查描述中的动作词
+        let narrative_score = if desc_lower.contains("action") || desc_lower.contains("动作")
+            || desc_lower.contains("dialogue") || desc_lower.contains("对话")
+            || desc_lower.contains("move") || desc_lower.contains("移动") {
+            8 // 有叙事元素 → 中高分
+        } else {
+            7 // 无叙事 → 中等分
+        };
+
+        // 指令遵循：检查描述长度和完整性
+        let instruction_score = if description.len() > 50 {
+            8 // 详细描述 → 较高分
+        } else if description.len() > 10 {
+            7 // 中等描述
+        } else {
+            5 // 过短描述 → 低分
+        };
+
         vec![
             _VerificationScore {
                 dimension: _VerificationDimension::EntityConsistency,
-                score: 8,
-                explanation: Some("实体外观保持一致".to_string()),
+                score: entity_score,
+                explanation: Some(format!("基于描述分析: {}", if entity_score >= 8 { "未检测到实体冲突" } else { "检测到实体元素需比对" })),
             },
             _VerificationScore {
                 dimension: _VerificationDimension::EnvironmentConsistency,
-                score: 7,
-                explanation: Some("环境光照略有变化".to_string()),
+                score: env_score,
+                explanation: Some(format!("基于上下文分析: {}", if env_score >= 7 { "环境一致" } else { "环境可能有变化" })),
             },
             _VerificationScore {
                 dimension: _VerificationDimension::NarrativeProgression,
-                score: 8,
-                explanation: Some("叙事进展自然".to_string()),
+                score: narrative_score,
+                explanation: Some(format!("基于叙事分析: {}", if narrative_score >= 8 { "叙事进展正常" } else { "叙事元素较少" })),
             },
             _VerificationScore {
                 dimension: _VerificationDimension::InstructionFollowing,
-                score: 9,
-                explanation: Some("遵循提示词指令".to_string()),
+                score: instruction_score,
+                explanation: Some(format!("基于指令分析: {}", if instruction_score >= 7 { "指令遵循良好" } else { "指令描述不完整" })),
             },
         ]
     }

@@ -236,7 +236,7 @@ impl GameAdvantageEstimator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_game::framework::{Action, Observation, TrajectoryStep};
+    use crate::l5_cognition::nt_mind::nt_game::framework::{Action, Observation, TrajectoryStep};
 
     fn make_step(turn: usize, actor_id: ActorId, reward: f64) -> TrajectoryStep {
         TrajectoryStep {

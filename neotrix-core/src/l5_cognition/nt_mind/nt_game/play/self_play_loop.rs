@@ -293,7 +293,7 @@ impl SelfPlayLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_game::env::{Difficulty, GameMeta, GameState, RenderMode};
+    use crate::l5_cognition::nt_mind::nt_game::env::{Difficulty, GameMeta, GameState, RenderMode};
     use std::collections::HashMap;
 
     /// A trivial environment that always returns a win for the first player

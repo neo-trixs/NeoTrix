@@ -149,7 +149,7 @@ impl GameGrpoAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_game::framework::{Action, Observation, TrajectoryStep};
+    use crate::l5_cognition::nt_mind::nt_game::framework::{Action, Observation, TrajectoryStep};
 
     fn make_trajectory_with_advantages(length: usize) -> Trajectory {
         let mut t = Trajectory::new();

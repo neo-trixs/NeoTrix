@@ -1,6 +1,18 @@
 use super::dialogue::DialogueTree;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Position {
+    pub x: u32,
+    pub y: u32,
+}
+
+impl Position {
+    pub fn new(x: u32, y: u32) -> Self {
+        Self { x, y }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcRole {
     Merchant,
     Guide,

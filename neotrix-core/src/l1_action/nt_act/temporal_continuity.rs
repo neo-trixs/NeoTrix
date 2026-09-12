@@ -177,9 +177,41 @@ impl TemporalContinuityChecker {
     }
     
     /// 计算帧差异
-    fn calculate_frame_diff(&self, _frame_a: &str, _frame_b: &str) -> f32 {
-        // TODO: 实际调用帧差异计算
-        0.05
+    ///
+    /// 使用字符级差异作为帧内容差异的代理指标。
+    /// 差异越大 → 帧内容变化越大 → 可能存在连续性问题。
+    fn calculate_frame_diff(&self, frame_a: &str, frame_b: &str) -> f32 {
+        if frame_a.is_empty() && frame_b.is_empty() {
+            return 0.0;
+        }
+        if frame_a.is_empty() || frame_b.is_empty() {
+            return 1.0;
+        }
+
+        // 计算 Levenshtein 距离的归一化代理
+        let len_a = frame_a.len();
+        let len_b = frame_b.len();
+        let max_len = len_a.max(len_b) as f32;
+
+        if max_len == 0.0 {
+            return 0.0;
+        }
+
+        // 简单字符匹配：相同位置相同字符的比例
+        let min_len = len_a.min(len_b);
+        let mut matches = 0;
+        let bytes_a = frame_a.as_bytes();
+        let bytes_b = frame_b.as_bytes();
+
+        for i in 0..min_len {
+            if bytes_a[i] == bytes_b[i] {
+                matches += 1;
+            }
+        }
+
+        // 差异 = 1.0 - 相似度
+        let similarity = matches as f32 / max_len;
+        (1.0 - similarity).clamp(0.0, 1.0)
     }
     
     /// 检查场景转场

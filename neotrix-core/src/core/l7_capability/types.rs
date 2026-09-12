@@ -385,8 +385,6 @@ pub struct ConsciousnessState {
     pub active_layers: Vec<Layer>,
     /// 智慧池容量
     pub wisdom_pool_size: usize,
-    /// 能量核心状态
-    pub energy_core_status: String,
     /// 意识树健康度
     pub consciousness_tree_health: f64,
     /// SEAL 管线状态
@@ -399,7 +397,6 @@ impl ConsciousnessState {
         Self {
             active_layers: vec![],
             wisdom_pool_size: 0,
-            energy_core_status: "Initializing".to_string(),
             consciousness_tree_health: 1.0,
             seal_pipeline_status: "Idle".to_string(),
         }
