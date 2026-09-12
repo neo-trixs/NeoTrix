@@ -115,9 +115,8 @@ impl UnifiedInference for InferenceRouter {
         let latency = start.elapsed().as_millis() as u64;
 
         match result {
-            Ok(resp) => {
-                // TODO: 从 gateway 状态提取实际 provider 名称
-                Ok(InferenceResponse::from_llm_response(resp, "auto", latency, 0))
+            Ok(selection) => {
+                Ok(InferenceResponse::from_llm_response(selection.response, &selection.provider, latency, 0))
             }
             Err(e) => Err(InferenceError::from(e)),
         }

@@ -6,7 +6,6 @@
 //!   healing/      — 修复类 (repair)
 //!   evolution/    — 进化类 (mind + act)
 
-pub mod traits;
 pub mod coordination;
 pub mod memory;
 pub mod healing;

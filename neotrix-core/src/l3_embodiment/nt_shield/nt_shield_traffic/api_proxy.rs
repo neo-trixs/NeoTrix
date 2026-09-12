@@ -314,12 +314,12 @@ async fn messages_handler(
     }
 
     match state.gateway.complete_with_selection(&internal).await {
-        Ok(resp) => {
+        Ok(selection) => {
             let mut a = state.analyzer.lock().await;
-            let resp_text = serde_json::to_string(&resp).unwrap_or_default();
+            let resp_text = serde_json::to_string(&selection.response).unwrap_or_default();
             a.capture_response(session_id, 200, "OK", &[], resp_text.as_bytes());
 
-            let anthropic = to_anthropic_response(&resp, &model);
+            let anthropic = to_anthropic_response(&selection.response, &model);
             Ok(Json(anthropic).into_response())
         }
         Err(e) => {

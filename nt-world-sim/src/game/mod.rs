@@ -19,6 +19,16 @@ pub mod skill;
 pub mod mining;
 pub mod combat;
 pub mod crops;
+pub mod perfection;
+pub mod relationship;
+pub mod cooking;
+pub mod fishing;
+pub mod foraging;
+
+pub use relationship::{Relationship, RelationshipStage, Child, RelationshipSystem};
+pub use cooking::{CookingSystem, CookingRecipe};
+pub use fishing::{FishingSystem, Fish, FishQuality};
+pub use foraging::{ForagingSystem, ForageItem};
 
 pub use time::{GameTime, Season, TimeOfDay};
 pub use inventory::{Inventory, InventorySlot};
@@ -30,3 +40,4 @@ pub use game_loop::{GameLoop, GameState, GameAction};
 pub use economy::Economy;
 pub use shopping::{Shop, ShopItem, ShippingBin};
 pub use artisan::{ArtisanMachine, MachineType, ArtisanWorkshop};
+pub use perfection::{PerfectionTracker, PerfectionCategory};

@@ -42,7 +42,7 @@ impl LlmProvider for GatewayV2Adapter {
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
-        self.gateway.complete_with_selection(request).await
+        self.gateway.complete_with_selection(request).await.map(|s| s.response)
     }
 
     async fn stream_complete_raw(

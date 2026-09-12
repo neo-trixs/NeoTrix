@@ -536,8 +536,8 @@ mod tests {
             result.is_ok(),
             "aggressive retry should recover after transient failures"
         );
-        let resp = result.unwrap();
-        assert_eq!(resp.content, "recovered");
+        let selection = result.unwrap();
+        assert_eq!(selection.response.content, "recovered");
     }
 
     #[tokio::test]
@@ -1093,7 +1093,7 @@ mod tests {
         let req = LlmRequest::new("badmodel", "hi");
         let result = gw.complete_with_selection(&req).await;
         assert!(result.is_ok(), "must fail over to working provider");
-        assert_eq!(result.unwrap().content, "ok");
+        assert_eq!(result.unwrap().response.content, "ok");
 
         let states = gw.states.read().unwrap();
         let dead = states.get("model-dead").unwrap();
