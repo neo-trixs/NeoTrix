@@ -450,7 +450,7 @@ mod tests {
     #[test]
     fn test_completion_percentage() {
         let mut db = QuestDatabase::new();
-        let total = db.quests.len();
+        let _total = db.quests.len();
         assert_eq!(db.completion_percentage(), 0.0);
         db.completed_quests.push(1);
         let pct = db.completion_percentage();

@@ -184,6 +184,14 @@ impl EventCalendar {
     }
 
     pub fn advance_day(&mut self, day: u32, season: Season) {
+        // First: finalize any previous active event if we're past its day
+        if let Some(ref mut active) = self.active_event {
+            if day != active.day_started {
+                active.finalize();
+                self.event_history.push((active.event, active.player_score));
+            }
+        }
+
         let events: Vec<SeasonalEvent> = SeasonalEvent::all().into_iter()
             .filter(|e| e.day_of_season() == day && e.season() == season)
             .collect();
@@ -194,12 +202,6 @@ impl EventCalendar {
             self.event_season = season;
             self.active_event = Some(ActiveEvent::new(*event, day));
         } else {
-            if let Some(ref mut active) = self.active_event {
-                if !active.completed {
-                    active.finalize();
-                    self.event_history.push((active.event, active.player_score));
-                }
-            }
             self.current_event = None;
             self.active_event = None;
         }

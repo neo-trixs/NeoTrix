@@ -9,6 +9,7 @@
 pub mod audio_decode;
 pub mod auth;
 pub mod detect;
+pub mod download_progress;
 pub mod hls;
 pub mod persistence;
 pub mod playback;
@@ -19,6 +20,7 @@ pub mod yt_extract;
 
 pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};
 pub use detect::MediaKind;
+pub use download_progress::{format_bytes, DownloadProgress, ProgressConfig};
 pub use playback::{
     EnginePlaybackState, PlaybackController, PlaybackEngine, PlaybackHistory, PlaybackQueue,
     PlaybackRetry, PlaybackState, PlayMode, RepeatMode,
