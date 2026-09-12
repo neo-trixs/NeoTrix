@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// VTuber 情感引擎 — Open-LLM-VTuber 核心
-pub struct VTuberEmotionEngine {
+pub(crate) struct _VTuberEmotionEngine {
     persona: CharacterPersona,
     emotion_history: Vec<EmotionReading>,
     #[allow(dead_code)]
@@ -20,7 +20,7 @@ pub struct VTuberEmotionEngine {
 
 /// 角色人格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CharacterPersona {
+pub(crate) struct _CharacterPersona {
     pub name: String,
     pub personality_traits: Vec<PersonalityTrait>,
     pub response_style: ResponseStyle,
@@ -31,7 +31,7 @@ pub struct CharacterPersona {
 
 /// 性格特质
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PersonalityTrait {
+pub(crate) struct _PersonalityTrait {
     pub name: String,
     pub intensity: f64, // 0.0-1.0
     pub description: String,
@@ -39,7 +39,7 @@ pub struct PersonalityTrait {
 
 /// 响应风格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResponseStyle {
+pub(crate) struct _ResponseStyle {
     pub formality: f64,
     pub enthusiasm: f64,
     pub empathy: f64,
@@ -49,7 +49,7 @@ pub struct ResponseStyle {
 
 /// 说话模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpeakingPattern {
+pub(crate) struct _SpeakingPattern {
     pub pattern_type: String, // "filler", "emphasis", "question"
     pub frequency: f64,
     pub examples: Vec<String>,
@@ -57,7 +57,7 @@ pub struct SpeakingPattern {
 
 /// 情绪读数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmotionReading {
+pub(crate) struct _EmotionReading {
     pub emotion: EmotionType,
     pub intensity: f64,
     pub source: EmotionSource,

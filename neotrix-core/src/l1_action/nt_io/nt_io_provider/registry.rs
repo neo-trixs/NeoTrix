@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::core::nt_core_llm::{
-    UnifiedProvider, LlmRequest, LlmError,
-    HealthStatus, CostEstimate, ProviderMetadata,
+    UnifiedProvider, LlmRequest, LlmResponse, LlmError,
+    ModelCapabilities, HealthStatus, CostEstimate, ProviderMetadata,
 };
 
 /// Unified provider registry — wraps GatewayV2's provider management
@@ -49,7 +49,7 @@ impl ProviderRegistry {
             .collect();
 
         if candidates.is_empty() {
-            return Err(LlmError::Unknown("No healthy providers available".into()));
+            return Err(LlmError::ProviderError("No healthy providers available".into()));
         }
 
         // 按成本排序（升序）

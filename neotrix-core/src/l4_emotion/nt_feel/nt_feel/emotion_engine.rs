@@ -15,7 +15,7 @@ use crate::core::nt_core_self::emotion_state::{
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FeelConfig {
+pub(crate) struct _FeelConfig {
     /// Core emotion engine config (alpha, decay_rate, max_history).
     pub core: EmotionConfig,
     /// Threshold above which emotions are dampened (0.0–1.0).
@@ -30,7 +30,7 @@ pub struct FeelConfig {
     pub max_snapshots: usize,
 }
 
-impl Default for FeelConfig {
+impl Default for _FeelConfig {
     fn default() -> Self {
         Self {
             core: EmotionConfig::default(),
@@ -48,7 +48,7 @@ impl Default for FeelConfig {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmotionSnapshot {
+pub(crate) struct _EmotionSnapshot {
     pub id: String,
     pub label: EmotionLabel,
     pub report: EmotionReport,
@@ -61,7 +61,7 @@ pub struct EmotionSnapshot {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocialState {
+pub(crate) struct _SocialState {
     /// Accumulated trust toward the interlocutor (0.0–1.0).
     pub trust: f64,
     /// Empathy score derived from shared emotional cues (0.0–1.0).
@@ -70,7 +70,7 @@ pub struct SocialState {
     pub interaction_count: u64,
 }
 
-impl Default for SocialState {
+impl Default for _SocialState {
     fn default() -> Self {
         Self {
             trust: 0.5,
@@ -80,7 +80,7 @@ impl Default for SocialState {
     }
 }
 
-impl SocialState {
+impl _SocialState {
     /// Update trust based on conversation cues.
     /// Positive cues raise trust; negative cues lower it. Both are EMA-smoothed.
     fn update_trust(&mut self, positive_cue: bool, negative_cue: bool) {
@@ -110,7 +110,7 @@ impl SocialState {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttentionSignal {
+pub(crate) struct _AttentionSignal {
     /// Current emotion label after regulation.
     pub label: EmotionLabel,
     /// Arousal level (0.0–1.0), higher = more urgent attention demand.
@@ -133,26 +133,26 @@ pub struct AttentionSignal {
 /// regulation (dampening extremes), social emotion tracking, snapshot history,
 /// and attention routing for the ConsciousnessTree.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FeelEngine {
+pub(crate) struct _FeelEngine {
     core: CoreEmotionEngine,
-    config: FeelConfig,
-    social: SocialState,
-    snapshots: VecDeque<EmotionSnapshot>,
+    config: _FeelConfig,
+    social: _SocialState,
+    snapshots: VecDeque<_EmotionSnapshot>,
 }
 
-impl Default for FeelEngine {
+impl Default for _FeelEngine {
     fn default() -> Self {
-        Self::new(FeelConfig::default())
+        Self::new(_FeelConfig::default())
     }
 }
 
-impl FeelEngine {
-    pub fn new(config: FeelConfig) -> Self {
+impl _FeelEngine {
+    pub fn new(config: _FeelConfig) -> Self {
         let max_snapshots = config.max_snapshots;
         Self {
             core: CoreEmotionEngine::new(config.core.clone()),
             config,
-            social: SocialState::default(),
+            social: _SocialState::default(),
             snapshots: VecDeque::with_capacity(max_snapshots),
         }
     }
@@ -250,20 +250,20 @@ impl FeelEngine {
         self.core.report().confidence_score
     }
 
-    pub fn social_state(&self) -> &SocialState {
+    pub fn social_state(&self) -> &_SocialState {
         &self.social
     }
 
-    pub fn config(&self) -> &FeelConfig {
+    pub fn config(&self) -> &_FeelConfig {
         &self.config
     }
 
     // -- Snapshots -----------------------------------------------------------
 
     /// Take a snapshot of the current emotion state and append to history.
-    pub fn snapshot(&mut self) -> EmotionSnapshot {
+    pub fn snapshot(&mut self) -> _EmotionSnapshot {
         let report = self.core.report();
-        let snap = EmotionSnapshot {
+        let snap = _EmotionSnapshot {
             id: Uuid::new_v4().to_string(),
             label: report.emotion_label,
             report,
@@ -278,7 +278,7 @@ impl FeelEngine {
     }
 
     /// Return the last `n` snapshots (most recent first).
-    pub(crate) fn _recent_snapshots(&self, n: usize) -> Vec<&EmotionSnapshot> {
+    pub(crate) fn _recent_snapshots(&self, n: usize) -> Vec<&_EmotionSnapshot> {
         self.snapshots.iter().rev().take(n).collect()
     }
 
@@ -302,13 +302,13 @@ impl FeelEngine {
     /// Produce an attention signal that the ConsciousnessTree consumes to
     /// modulate attention allocation. High arousal + high social trust =
     /// higher salience.
-    pub(crate) fn _attention_signal(&self) -> AttentionSignal {
+    pub(crate) fn _attention_signal(&self) -> _AttentionSignal {
         let report = self.core.report();
         let arousal = report.arousal;
         let social_mod = self.config.social_trust_weight * self.social.trust
             + self.config.social_empathy_weight * self.social.empathy;
         let salience = arousal * (1.0 + social_mod);
-        AttentionSignal {
+        _AttentionSignal {
             label: report.emotion_label,
             arousal,
             valence: report.valence,
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_feel_engine_default_config() {
-        let engine = FeelEngine::default();
+        let engine = _FeelEngine::default();
         assert_eq!(engine._current_label(), EmotionLabel::Neutral);
         assert_eq!(engine.social_state().trust, 0.5);
         assert_eq!(engine.social_state().empathy, 0.0);
@@ -347,7 +347,7 @@ mod tests {
 
     #[test]
     fn test_observe_updates_state() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe(EmotionDimension::Joy, 0.8, "test_joy");
         let report = engine.report();
         assert!(report.joy > 0.5, "joy should rise above baseline");
@@ -355,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_regulation_dampens_extreme() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         // Feed extreme frustration that exceeds threshold
         engine.observe(EmotionDimension::Frustration, 0.99, "extreme");
         let report = engine.report();
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_regulation_passes_through_below_threshold() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe(EmotionDimension::Joy, 0.5, "mild");
         let report = engine.report();
         assert!(
@@ -381,28 +381,28 @@ mod tests {
 
     #[test]
     fn test_detect_from_text_joy() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         let label = engine.detect_from_text("太开心了，谢谢！");
         assert_eq!(label, EmotionLabel::Joy);
     }
 
     #[test]
     fn test_detect_from_text_anger() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         let label = engine.detect_from_text("I am so angry!");
         assert_eq!(label, EmotionLabel::Anger);
     }
 
     #[test]
     fn test_detect_from_text_neutral() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         let label = engine.detect_from_text("ordinary text nothing special");
         assert_eq!(label, EmotionLabel::Neutral);
     }
 
     #[test]
     fn test_social_trust_positive_cue() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.detect_from_text("thank you very much");
         assert!(
             engine.social_state().trust > 0.5,
@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_social_trust_negative_cue() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.detect_from_text("I am furious with you");
         assert!(
             engine.social_state().trust < 0.5,
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn test_social_empathy_builds() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         // Multiple emotional exchanges should build empathy
         engine.detect_from_text("I am happy today");
         engine.detect_from_text("thank you so much");
@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_social_interaction_count() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.detect_from_text("hello");
         engine.detect_from_text("thanks");
         engine.detect_from_text("wow");
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn test_snapshot_stored() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe(EmotionDimension::Curiosity, 0.7, "curious");
         let snap = engine.snapshot();
         assert_eq!(snap.label, engine._current_label());
@@ -452,7 +452,7 @@ mod tests {
 
     #[test]
     fn test_recent_snapshots_order() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe(EmotionDimension::Joy, 0.6, "first");
         let _ = engine.snapshot();
         engine.observe(EmotionDimension::Frustration, 0.6, "second");
@@ -464,11 +464,11 @@ mod tests {
 
     #[test]
     fn test_snapshot_max_capacity() {
-        let config = FeelConfig {
+        let config = _FeelConfig {
             max_snapshots: 3,
             ..Default::default()
         };
-        let mut engine = FeelEngine::new(config);
+        let mut engine = _FeelEngine::new(config);
         for i in 0..5 {
             engine.observe(EmotionDimension::Joy, 0.5, format!("obs_{i}"));
             let _ = engine.snapshot();
@@ -478,7 +478,7 @@ mod tests {
 
     #[test]
     fn test_attention_signal_arousal() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe(EmotionDimension::Frustration, 0.9, "frustrated");
         engine.observe(EmotionDimension::Urgency, 0.8, "urgent");
         let signal = engine._attention_signal();
@@ -491,7 +491,7 @@ mod tests {
 
     #[test]
     fn test_attention_signal_social_modulation() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         // Build trust
         engine.detect_from_text("thank you very much");
         engine.detect_from_text("太开心了");
@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn test_tick_decays() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe(EmotionDimension::Frustration, 0.9, "spike");
         let before = engine.report().frustration;
         engine.tick();
@@ -527,7 +527,7 @@ mod tests {
 
     #[test]
     fn test_confidence_score_range() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe(EmotionDimension::Confidence, 0.9, "confident");
         let score = engine.confidence_score();
         assert!(score >= 0.0 && score <= 1.0);
@@ -535,7 +535,7 @@ mod tests {
 
     #[test]
     fn test_appraisal_observation() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe_appraisal(0.9, 0.9, 0.9, "novel_and_coping");
         let report = engine.report();
         assert!(
@@ -550,11 +550,11 @@ mod tests {
 
     #[test]
     fn test_json_roundtrip() {
-        let mut engine = FeelEngine::default();
+        let mut engine = _FeelEngine::default();
         engine.observe(EmotionDimension::Joy, 0.7, "json_test");
         engine.detect_from_text("开心");
         let json = engine.to_json().unwrap();
-        let restored = FeelEngine::from_json(&json).unwrap();
+        let restored = _FeelEngine::from_json(&json).unwrap();
         assert_eq!(restored._current_label(), engine._current_label());
         assert_eq!(
             restored.social_state().interaction_count,
@@ -564,12 +564,12 @@ mod tests {
 
     #[test]
     fn test_attention_signal_salience_capped() {
-        let config = FeelConfig {
+        let config = _FeelConfig {
             social_trust_weight: 1.0,
             social_empathy_weight: 1.0,
             ..Default::default()
         };
-        let mut engine = FeelEngine::new(config);
+        let mut engine = _FeelEngine::new(config);
         // Max arousal + max social → salience should still be ≤ 2.0
         engine.observe(EmotionDimension::Frustration, 1.0, "max");
         engine.observe(EmotionDimension::Urgency, 1.0, "max");
@@ -585,20 +585,20 @@ mod tests {
 
     #[test]
     fn test_regulate_zero_passthrough() {
-        let engine = FeelEngine::default();
+        let engine = _FeelEngine::default();
         assert_eq!(engine.regulate(EmotionDimension::Joy, 0.0), 0.0);
     }
 
     #[test]
     fn test_regulate_clamp_above_one() {
-        let engine = FeelEngine::default();
+        let engine = _FeelEngine::default();
         let result = engine.regulate(EmotionDimension::Joy, 1.5);
         assert!(result <= 1.0);
     }
 
     #[test]
     fn test_regulate_clamp_below_zero() {
-        let engine = FeelEngine::default();
+        let engine = _FeelEngine::default();
         let result = engine.regulate(EmotionDimension::Joy, -0.5);
         assert!(result >= 0.0);
     }
