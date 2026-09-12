@@ -446,8 +446,10 @@ impl DownloadEngine {
             let agg_tx = progress_tx.clone();
 
             handles.push(tokio::spawn(async move {
-                let _permit = engine.task_semaphore.clone().acquire_owned().await
-                    .map_err(|_| "semaphore closed".to_string())?;
+                let _permit = match engine.task_semaphore.clone().acquire_owned().await {
+                    Ok(p) => p,
+                    Err(_) => return DownloadStatus::Failed("semaphore closed".to_string()),
+                };
                 active.fetch_add(1, Ordering::Relaxed);
 
                 let status = engine.download(&task).await;

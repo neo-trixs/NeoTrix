@@ -16,9 +16,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::{self, File};
 use tokio::io::{AsyncWriteExt, BufWriter};
-use tokio::net::unix::pipe;
 use tokio::process::Command;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::Instant;
 
 // ── Progress types ──────────────────────────────────────────────
@@ -87,8 +86,7 @@ impl StreamDownload {
         // Disable compression to avoid chunked encoding bugs
         let req = client
             .get(&self.url)
-            .header("Accept-Encoding", "identity")
-            .no_proxy();
+            .header("Accept-Encoding", "identity");
 
         // If resuming, set Range header
         let start_byte = if self.output.exists() {
@@ -103,7 +101,7 @@ impl StreamDownload {
             req
         };
 
-        let resp = req.send().await.map_err(|e| StreamError::Network(e.to_string()))?;
+        let resp: reqwest::Response = req.send().await.map_err(|e| StreamError::Network(e.to_string()))?;
 
         if !resp.status().is_success() && resp.status().as_u16() != 206 {
             return Err(StreamError::Http(resp.status().as_u16()));
@@ -111,7 +109,7 @@ impl StreamDownload {
 
         let total_size = resp.content_length().map(|cl| cl + start_byte);
         let mut stream = resp.bytes_stream();
-        let mut file = BufWriter::with_capacity(256 * 1024, File::create(&self.output).await?);
+        let mut file: BufWriter<File> = BufWriter::with_capacity(256 * 1024, File::create(&self.output).await?);
 
         let bytes_written = self.bytes_written.clone();
         bytes_written.store(start_byte, Ordering::Relaxed);
@@ -141,7 +139,7 @@ impl StreamDownload {
 
             while let Some(chunk) = stream.next().await {
                 // Check cancel
-                if stopped.load(Ordering::Relaxed) || (cancel_rx.as_ref().map(|rx| rx.is_closed()).unwrap_or(false)) {
+                if stopped.load(Ordering::Relaxed) || (cancel_rx.as_ref().map(|rx| rx.try_recv().is_err()).unwrap_or(false)) {
                     let _ = progress_tx.send(StreamProgress {
                         url: self.url.clone(),
                         status: StreamStatus::Cancelled,
@@ -445,7 +443,7 @@ pub struct PlayerHandle {
 impl PlayerHandle {
     pub fn stop(self) -> Result<(), StreamError> {
         let _ = self.stop_tx.send(());
-        self.handle.try_join().ok();
+        self.handle.abort();
         Ok(())
     }
 
@@ -537,7 +535,7 @@ impl MagnetTransport {
             loop {
                 tokio::select! {
                     _ = interval.tick() => {}
-                    _ = &mut stop_rx.into() => return Ok::<(), StreamError>(()),
+                    _ = &mut stop_rx => return Ok::<(), StreamError>(()),
                 }
 
                 let rpc_body = serde_json::json!({

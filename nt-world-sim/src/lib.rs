@@ -9,6 +9,9 @@ pub use engine::{
     BodyType, RigidBody, Collider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld,
     KeyCode, MouseButton, GamepadAxis, GamepadButton, InputState, InputProvider, SimpleInputProvider,
     Event, EventHandler, EventBus, MoveEvent, CollisionEvent, InputEvent, GameEvent,
+    PetState, PetStateComponent, PetAnimation, EyeTracking, PermissionBubble,
+    PermissionAction, SessionInfo, SubagentInfo, ZzzParticle,
+    PetStateSystem, EyeTrackingSystem, PermissionBubbleSystem, SessionSystem,
 };
 pub use mechanics::{
     ConsciousnessEntity, TransformComponent, RenderComponent, AiComponent, MaslowNeeds,
@@ -99,6 +102,12 @@ pub fn create_stardew_valley_game() -> GameEngine {
     engine.add_system(Box::new(MaslowSystem));
     engine.add_system(Box::new(AiSystem));
     engine.add_system(Box::new(ConsciousnessSystem));
+    
+    // 添加宠物状态系统
+    engine.add_system(Box::new(PetStateSystem));
+    engine.add_system(Box::new(EyeTrackingSystem));
+    engine.add_system(Box::new(PermissionBubbleSystem));
+    engine.add_system(Box::new(SessionSystem));
 
     // 创建玩家实体
     let player = engine.spawn();
