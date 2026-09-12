@@ -276,7 +276,7 @@ impl AuthStrategy {
             AuthStrategy::BasicAuth { username, password } => {
                 builder.basic_auth(username, Some(password))
             }
-            AuthStrategy::CookieAuth(jar) => {
+            AuthStrategy::CookieAuth(_jar) => {
                 // The cookie jar's caller is responsible for resolving the domain
                 // and injecting cookies via `.header()` before reaching this point.
                 // This variant exists so the pipeline can hold a reference to the

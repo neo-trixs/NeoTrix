@@ -33,7 +33,7 @@ pub enum ThumbFormat {
 /// - **Video**: ffmpeg first-frame extraction (`video-decode` feature), else error
 pub async fn extract_thumbnail(
     path: &Path,
-    time_offset: Option<&str>,
+    _time_offset: Option<&str>,
 ) -> Result<Thumbnail, ThumbError> {
     let kind = detect::detect_from_path(path);
     if kind.is_audio() {
@@ -256,7 +256,7 @@ async fn extract_video_frame_ffmpeg(
 /// For audio/video with `video-decode`/`audio-decode` features, samples evenly.
 pub async fn extract_grid(
     path: &Path,
-    count: usize,
+    _count: usize,
 ) -> Result<Vec<Thumbnail>, ThumbError> {
     let kind = detect::detect_from_path(path);
 

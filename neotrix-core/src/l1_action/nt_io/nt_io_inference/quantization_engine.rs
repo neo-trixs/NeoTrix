@@ -1152,7 +1152,7 @@ pub fn read_gguf_header(path: &str) -> Result<GgufHeaderInfo, String> {
     // Metadata KV count (u64 LE)
     let mut kv_count_bytes = [0u8; 8];
     reader.read_exact(&mut kv_count_bytes).map_err(|e| format!("read kv count: {}", e))?;
-    let kv_count = u64::from_le_bytes(kv_count_bytes);
+    let _kv_count = u64::from_le_bytes(kv_count_bytes);
     
     // Parse metadata KV pairs (simplified — read key strings and look for known fields)
     let mut info = GgufHeaderInfo {

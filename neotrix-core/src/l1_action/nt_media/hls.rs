@@ -100,7 +100,6 @@ pub fn parse_m3u8(content: &str) -> Result<M3u8Manifest, HlsError> {
                 resolution: attrs.get("RESOLUTION").map(|s| s.to_string()),
                 codecs: attrs.get("CODECS").map(|s| s.trim_matches('"').to_string()),
                 name: attrs.get("NAME").map(|s| s.trim_matches('"').to_string()),
-                ..VariantStream { uri: String::new() }
             });
             continue;
         }

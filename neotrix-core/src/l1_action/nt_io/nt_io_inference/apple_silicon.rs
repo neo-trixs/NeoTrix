@@ -213,7 +213,7 @@ impl AppleSiliconOptimizer {
     
     /// Get optimal llama.cpp CLI arguments for a model
     pub fn _optimal_llama_cpp_args(&self, model_path: &str, model_size_gb: f64) -> _OptimalLlamaArgs {
-        let kv_headroom = self._kv_cache_headroom(model_size_gb);
+        let _kv_headroom = self._kv_cache_headroom(model_size_gb);
         
         // M5 16GB: MLX unavailable (<32GB), use llama.cpp with optimal settings
         if self.unified_memory_gb < 32.0 {
@@ -412,7 +412,7 @@ pub struct _MLXConversion {
 
 impl _MLXConversion {
     /// Convert GGUF to MLX format
-    pub fn _convert_gguf_to_mlx(gguf_path: &str) -> Result<Self, String> {
+    pub fn _convert_gguf_to_mlx(_gguf_path: &str) -> Result<Self, String> {
         // TODO: Run mlx_lm.convert_from_gguf or similar
         Ok(Self {
             source_format: "GGUF".to_string(),

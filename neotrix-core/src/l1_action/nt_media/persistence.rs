@@ -195,7 +195,7 @@ impl DownloadStore {
 // ResumeSupport — integration helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-pub fn check_resume(url: &str, output: &Path) -> Option<u64> {
+pub fn check_resume(_url: &str, output: &Path) -> Option<u64> {
     let done_marker = output.with_extension("done");
 
     let file_size = std::fs::metadata(output).ok().map(|m| m.len()).unwrap_or(0);

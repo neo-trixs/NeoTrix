@@ -128,8 +128,8 @@ impl StreamingPipeline {
             .await
             .map_err(|e| PipelineError::Io(e.to_string()))?;
 
-        let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
-        let (stop_flag, cancel_rx_flag) = create_cancel_pair();
+        let (cancel_tx, _cancel_rx) = oneshot::channel::<()>();
+        let (_stop_flag, cancel_rx_flag) = create_cancel_pair();
 
         let output = route.output.clone();
         let url = config.url.clone();
@@ -139,7 +139,7 @@ impl StreamingPipeline {
                 let bytes_written = Arc::new(AtomicU64::new(0));
                 let output_clone = output.clone();
                 let auth = config.auth.clone();
-                let url_for_domain = config.url.clone();
+                let _url_for_domain = config.url.clone();
 
                 let download_handle = tokio::spawn(async move {
                     stream_http_download(
@@ -865,7 +865,7 @@ async fn spawn_player(
 
     Some(PlayerHandle {
         handle,
-        stop_tx,
+        stop_tx: Some(stop_tx),
         file: file.to_path_buf(),
     })
 }
@@ -915,7 +915,7 @@ async fn spawn_fifo_player(
 
     Some(PlayerHandle {
         handle,
-        stop_tx,
+        stop_tx: Some(stop_tx),
         file: fifo_path.to_path_buf(),
     })
 }
@@ -935,8 +935,8 @@ impl PipelineHandle {
     pub fn output_path(&self) -> &Path {
         &self.output
     }
-    pub fn cancel(&self) {
-        if let Some(tx) = self.cancel_tx.as_ref() {
+    pub fn cancel(&mut self) {
+        if let Some(tx) = self.cancel_tx.take() {
             let _ = tx.send(());
         }
     }
@@ -951,13 +951,15 @@ impl PipelineHandle {
 
 pub struct PlayerHandle {
     handle: tokio::task::JoinHandle<Option<()>>,
-    stop_tx: oneshot::Sender<()>,
+    stop_tx: Option<oneshot::Sender<()>>,
     file: PathBuf,
 }
 
 impl PlayerHandle {
-    pub fn stop(&self) {
-        let _ = self.stop_tx.send(());
+    pub fn stop(&mut self) {
+        if let Some(tx) = self.stop_tx.take() {
+            let _ = tx.send(());
+        }
     }
 }
 

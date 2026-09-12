@@ -160,7 +160,7 @@ impl SpeculativeDecoder {
     /// Generate with speculative decoding
     pub async fn generate(
         &self,
-        prompt: &str,
+        _prompt: &str,
         max_tokens: usize,
     ) -> SpeculativeResult {
         // TODO: Implement speculative decoding with draft verification
