@@ -49,9 +49,9 @@ pub async fn investigate(
     })
 }
 
-pub struct CryptoPubInvestigator;
+pub struct _CryptoPubInvestigator;
 
-impl super::OsintSource for CryptoPubInvestigator {
+impl super::OsintSource for _CryptoPubInvestigator {
     type Findings = CryptoPubFindings;
     fn name(&self) -> &'static str { "cryptopub" }
     fn priority(&self) -> u8 { 6 }

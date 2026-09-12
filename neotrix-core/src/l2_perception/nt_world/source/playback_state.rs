@@ -11,7 +11,7 @@ pub enum PlaybackState {
 }
 
 impl PlaybackState {
-    pub fn is_idle(&self) -> bool {
+    pub fn _is_idle(&self) -> bool {
         matches!(self, PlaybackState::Idle)
     }
 

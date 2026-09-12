@@ -7,7 +7,7 @@
 //!   `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson`
 //!   `&minlatitude={}&maxlatitude={}&minlongitude={}&maxlongitude={}`
 //!   通过地理包围盒 (bounding box) 参数检索 AOI 内的事件
-//! - **概念**: AOI = Area of Interest。本模块定义 `Geofence` (min_lat, max_lat, min_lon, max_lon)
+//! - **概念**: AOI = Area of Interest。本模块定义 `_Geofence` (min_lat, max_lat, min_lon, max_lon)
 //!   与 `AoiMonitor`，查询真实 GeoJSON 事件源并过滤到围栏内的事件。
 //! - **数据模型**: 自带最小 GeoJSON `FeatureCollection`/`Feature`/`Geometry` 模型 (`Aoi` 前缀，
 //!   不依赖 `nt_world_usgs`)，避免结构体冲突。
@@ -25,29 +25,29 @@ use serde::{Deserialize, Serialize};
 
 /// AOI GeoJSON FeatureCollection 顶层结构
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AoiFeatureCollection {
+pub struct _AoiFeatureCollection {
     #[serde(default)]
     pub r#type: String,
     #[serde(default)]
-    pub features: Vec<AoiFeature>,
+    pub features: Vec<_AoiFeature>,
 }
 
 /// 单个事件 Feature
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AoiFeature {
+pub struct _AoiFeature {
     #[serde(default)]
     pub r#type: String,
     #[serde(default)]
-    pub properties: AoiProps,
+    pub properties: _AoiProps,
     #[serde(default)]
-    pub geometry: AoiGeometry,
+    pub geometry: _AoiGeometry,
     #[serde(default)]
     pub id: String,
 }
 
 /// 事件属性 (核心数据)
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct AoiProps {
+pub struct _AoiProps {
     #[serde(default)]
     pub mag: Option<f64>,
     #[serde(default)]
@@ -62,7 +62,7 @@ pub struct AoiProps {
 
 /// 几何坐标
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct AoiGeometry {
+pub struct _AoiGeometry {
     #[serde(default)]
     pub r#type: String,
     #[serde(default)]
@@ -71,7 +71,7 @@ pub struct AoiGeometry {
 
 /// 内部标准化事件结构 (用于入库)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AoiEvent {
+pub struct _AoiEvent {
     pub id: String,
     pub magnitude: f64,
     pub place: String,
@@ -87,14 +87,14 @@ pub struct AoiEvent {
 
 /// 地理包围盒 (Area of Interest)
 #[derive(Debug, Clone, Copy)]
-pub struct Geofence {
+pub struct _Geofence {
     pub min_lat: f64,
     pub max_lat: f64,
     pub min_lon: f64,
     pub max_lon: f64,
 }
 
-impl Geofence {
+impl _Geofence {
     /// 判断坐标 (lat, lon) 是否落在围栏内 (闭区间)
     pub fn contains(&self, lat: f64, lon: f64) -> bool {
         lat >= self.min_lat && lat <= self.max_lat && lon >= self.min_lon && lon <= self.max_lon
@@ -103,7 +103,7 @@ impl Geofence {
 
 // ── 解析层 ────────────────────────────────────────────────────
 
-fn extract_event_from_feature(feature: &AoiFeature) -> AoiEvent {
+fn extract_event_from_feature(feature: &_AoiFeature) -> _AoiEvent {
     let coords = &feature.geometry.coordinates;
     let (longitude, latitude, depth) = if coords.len() >= 3 {
         (coords[0], coords[1], coords[2])
@@ -113,7 +113,7 @@ fn extract_event_from_feature(feature: &AoiFeature) -> AoiEvent {
         (0.0, 0.0, 0.0)
     };
 
-    AoiEvent {
+    _AoiEvent {
         id: feature.id.clone(),
         magnitude: feature.properties.mag.unwrap_or(0.0),
         place: feature.properties.place.clone(),
@@ -126,21 +126,21 @@ fn extract_event_from_feature(feature: &AoiFeature) -> AoiEvent {
     }
 }
 
-fn extract_events(features: &[AoiFeature]) -> Vec<AoiEvent> {
+fn extract_events(features: &[_AoiFeature]) -> Vec<_AoiEvent> {
     features.iter().map(extract_event_from_feature).collect()
 }
 
 // ── Fetch 层 ─────────────────────────────────────────────────
 
-/// AOI Geofence 监视器 — 免费无key，公开 GeoJSON，直喂 intel-watch。
+/// AOI _Geofence 监视器 — 免费无key，公开 GeoJSON，直喂 intel-watch。
 pub struct AoiMonitor {
-    fence: Geofence,
+    fence: _Geofence,
     client: std::sync::OnceLock<reqwest::blocking::Client>,
 }
 
 impl Default for AoiMonitor {
     fn default() -> Self {
-        Self::new(Geofence {
+        Self::new(_Geofence {
             min_lat: 35.0,
             max_lat: 36.0,
             min_lon: 139.0,
@@ -150,7 +150,7 @@ impl Default for AoiMonitor {
 }
 
 impl AoiMonitor {
-    pub fn new(fence: Geofence) -> Self {
+    pub fn new(fence: _Geofence) -> Self {
         Self {
             fence,
             client: std::sync::OnceLock::new(),
@@ -175,7 +175,7 @@ impl AoiMonitor {
         )
     }
 
-    pub fn fetch(&self) -> Result<Vec<AoiEvent>, String> {
+    pub fn fetch(&self) -> Result<Vec<_AoiEvent>, String> {
         let url = self.build_url();
         let resp = self.client().get(&url).send().map_err(|e| format!("AOI request failed: {}", e))?;
         if !resp.status().is_success() {
@@ -185,13 +185,13 @@ impl AoiMonitor {
         Self::parse_geojson(&text)
     }
 
-    pub fn parse_geojson(json: &str) -> Result<Vec<AoiEvent>, String> {
-        let collection: AoiFeatureCollection = serde_json::from_str(json).map_err(|e| format!("AOI parse failed: {}", e))?;
+    pub fn parse_geojson(json: &str) -> Result<Vec<_AoiEvent>, String> {
+        let collection: _AoiFeatureCollection = serde_json::from_str(json).map_err(|e| format!("AOI parse failed: {}", e))?;
         Ok(extract_events(&collection.features))
     }
 
     /// 按地理围栏过滤事件，仅保留围栏内事件
-    pub fn filter_events(events: &[AoiEvent], fence: Geofence) -> Vec<AoiEvent> {
+    pub fn filter_events(events: &[_AoiEvent], fence: _Geofence) -> Vec<_AoiEvent> {
         events
             .iter()
             .filter(|e| fence.contains(e.latitude, e.longitude))
@@ -203,7 +203,7 @@ impl AoiMonitor {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<AoiIngestReport, String> {
+    ) -> Result<_AoiIngestReport, String> {
         let events = Self::parse_geojson(json)?;
         Self::ingest_events(kb, &events)
     }
@@ -211,16 +211,16 @@ impl AoiMonitor {
     pub fn ingest(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-    ) -> Result<AoiIngestReport, String> {
+    ) -> Result<_AoiIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[AoiEvent],
-    ) -> Result<AoiIngestReport, String> {
-        let mut report = AoiIngestReport {
+        events: &[_AoiEvent],
+    ) -> Result<_AoiIngestReport, String> {
+        let mut report = _AoiIngestReport {
             events_fetched: events.len(),
             ..Default::default()
         };
@@ -242,7 +242,7 @@ impl AoiMonitor {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[AoiEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_AoiEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: format!("M{:.1} - {}", e.magnitude, e.place),
             url: e.url.clone(),
@@ -254,8 +254,8 @@ impl AoiMonitor {
 
 /// `parse_geojson` 无 `&self` 时使用的默认围栏 (Tokyo 区)
 #[allow(dead_code)]
-fn self_default_fence() -> Geofence {
-    Geofence {
+fn self_default_fence() -> _Geofence {
+    _Geofence {
         min_lat: 35.0,
         max_lat: 36.0,
         min_lon: 139.0,
@@ -274,7 +274,7 @@ pub fn aoi_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AoiIngestReport {
+pub struct _AoiIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -291,7 +291,7 @@ pub struct AoiBackend {
 impl Default for AoiBackend {
     fn default() -> Self {
         Self {
-            monitor: AoiMonitor::new(Geofence {
+            monitor: AoiMonitor::new(_Geofence {
                 min_lat: 35.0,
                 max_lat: 36.0,
                 min_lon: 139.0,
@@ -302,7 +302,7 @@ impl Default for AoiBackend {
 }
 
 impl AoiBackend {
-    pub fn new(fence: Geofence) -> Self {
+    pub fn new(fence: _Geofence) -> Self {
         Self { monitor: AoiMonitor::new(fence) }
     }
 }
@@ -313,9 +313,9 @@ impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for AoiBacke
     }
     fn search(&self, _query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         // 测试 / 离线场景：使用 fixture 数据；真实场景可通过 monitor.fetch() 拉取
-        let mut events: Vec<AoiEvent> = AoiMonitor::parse_geojson(AOI_FIXTURE_JSON)?;
+        let mut events: Vec<_AoiEvent> = AoiMonitor::parse_geojson(AOI_FIXTURE_JSON)?;
         events = AoiMonitor::filter_events(&events, self.monitor.fence);
-        let limited: Vec<AoiEvent> = events.into_iter().take(count).collect();
+        let limited: Vec<_AoiEvent> = events.into_iter().take(count).collect();
         Ok(AoiMonitor::to_search_results(&limited))
     }
 }
@@ -329,8 +329,8 @@ mod tests {
     use super::*;
     use crate::l2_perception::nt_world::nt_world_search::SearchBackend;
 
-    fn default_fence() -> Geofence {
-        Geofence { min_lat: 35.0, max_lat: 36.0, min_lon: 139.0, max_lon: 140.0 }
+    fn default_fence() -> _Geofence {
+        _Geofence { min_lat: 35.0, max_lat: 36.0, min_lon: 139.0, max_lon: 140.0 }
     }
 
     #[test]

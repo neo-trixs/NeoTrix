@@ -95,7 +95,7 @@ pub struct GitHubAbsorbReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RepoStatus {
+pub struct _RepoStatus {
     pub full_name: String,
     pub node_id: String,
     pub absorbed_at: i64,
@@ -351,7 +351,7 @@ impl GitHubAbsorber {
     /// 使用 nt_http 断点续传原语 (.tmp 暂存 + 原子 rename + Range 续传 + 网络重试)。
     ///
     /// 返回 (tarball 路径, 解压后目录路径)。tarball 保留在 `dest` 下, 解压目录同前缀。
-    pub fn download_archive(
+    pub fn _download_archive(
         &self,
         owner: &str,
         repo: &str,
@@ -437,12 +437,12 @@ impl GitHubAbsorber {
     }
 
     /// List all absorbed repositories with their status.
-    pub fn list_absorbed(&self) -> Result<Vec<RepoStatus>, String> {
+    pub fn _list_absorbed(&self) -> Result<Vec<_RepoStatus>, String> {
         let repos = self.kb.find_repositories("github.com", None)?;
         let mut statuses = Vec::new();
         for node in repos {
             let m = node.metadata.as_ref();
-            statuses.push(RepoStatus {
+            statuses.push(_RepoStatus {
                 full_name: node.title.clone(),
                 node_id: node.id.clone(),
                 absorbed_at: node.created_at,

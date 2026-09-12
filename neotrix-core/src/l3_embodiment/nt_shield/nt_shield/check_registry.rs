@@ -9,7 +9,7 @@ use super::tool_inspection_stack::{InspectionResult, ToolInspector};
 struct CheckResult {
     name: String,
     status: CheckStatus,
-    severity: CheckSeverity,
+    severity: _CheckSeverity,
     message: String,
     details: Option<String>,
 }
@@ -26,7 +26,7 @@ enum CheckStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum CheckSeverity {
+pub enum _CheckSeverity {
     Critical,
     High,
     Medium,
@@ -34,14 +34,14 @@ pub enum CheckSeverity {
     Info,
 }
 
-impl std::fmt::Display for CheckSeverity {
+impl std::fmt::Display for _CheckSeverity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            CheckSeverity::Critical => "CRITICAL",
-            CheckSeverity::High => "HIGH",
-            CheckSeverity::Medium => "MEDIUM",
-            CheckSeverity::Low => "LOW",
-            CheckSeverity::Info => "INFO",
+            _CheckSeverity::Critical => "CRITICAL",
+            _CheckSeverity::High => "HIGH",
+            _CheckSeverity::Medium => "MEDIUM",
+            _CheckSeverity::Low => "LOW",
+            _CheckSeverity::Info => "INFO",
         })
     }
 }
@@ -89,51 +89,51 @@ impl std::fmt::Display for ToolSource {
 // ── Config (TOML-loadable) ────────────────────────────────
 
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct CheckRuleConfig {
+pub struct _CheckRuleConfig {
     pub id: String,
     #[serde(default)]
     pub enabled: Option<bool>,
     #[serde(default)]
-    pub severity_override: Option<CheckSeverity>,
+    pub severity_override: Option<_CheckSeverity>,
     #[serde(default)]
     pub tool_patterns: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct CheckConfig {
+pub struct _CheckConfig {
     #[serde(default)]
-    pub rules: Vec<CheckRuleConfig>,
+    pub rules: Vec<_CheckRuleConfig>,
 }
 
-impl CheckConfig {
+impl _CheckConfig {
     pub fn apply_to(&self, registry: &mut CheckRegistry) {
         for rule in &self.rules {
             if let Some(enabled) = rule.enabled {
                 registry.set_enabled(&rule.id, enabled);
             }
             if let Some(sev) = rule.severity_override {
-                registry.set_severity(&rule.id, sev);
+                registry._set_severity(&rule.id, sev);
             }
             if let Some(patterns) = &rule.tool_patterns {
-                registry.set_tool_patterns(&rule.id, patterns.clone());
+                registry._set_tool_patterns(&rule.id, patterns.clone());
             }
         }
     }
 }
 
-// ── SecurityCheck ─────────────────────────────────────────
+// ── _SecurityCheck ─────────────────────────────────────────
 
-pub struct SecurityCheck {
+pub struct _SecurityCheck {
     pub id: String,
     pub name: String,
-    pub severity: CheckSeverity,
+    pub severity: _CheckSeverity,
     pub risk_description: String,
     pub check_fn: Box<dyn Fn(&ToolCallContext) -> CheckVerdict + Send + Sync>,
 }
 
-impl std::fmt::Debug for SecurityCheck {
+impl std::fmt::Debug for _SecurityCheck {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SecurityCheck")
+        f.debug_struct("_SecurityCheck")
             .field("id", &self.id)
             .field("name", &self.name)
             .field("severity", &self.severity)
@@ -246,9 +246,9 @@ const DANGEROUS_CHAIN_KEYWORDS: &[&str] = &["rm", "dd", "wget", "curl", "shutdow
 // ── CheckRegistry ─────────────────────────────────────────
 
 pub struct CheckRegistry {
-    checks: Vec<SecurityCheck>,
+    checks: Vec<_SecurityCheck>,
     enabled: HashMap<String, bool>,
-    severities: HashMap<String, CheckSeverity>,
+    severities: HashMap<String, _CheckSeverity>,
     tool_patterns_override: HashMap<String, Vec<String>>,
     call_counter: Arc<Mutex<HashMap<String, usize>>>,
     allowlisted_domains: Vec<String>,
@@ -309,10 +309,10 @@ impl CheckRegistry {
         let workspaces = self.workspace_paths.clone();
 
         // ── SEC-001: dangerous-system-commands ──
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-001".into(),
             name: "dangerous-system-commands".into(),
-            severity: CheckSeverity::Critical,
+            severity: _CheckSeverity::Critical,
             risk_description: "Blocks dangerous system commands (rm, dd, mkfs, shutdown, etc.)".into(),
             check_fn: Box::new(|ctx: &ToolCallContext| {
                 let cmd = extract_string_value(&ctx.args);
@@ -329,10 +329,10 @@ impl CheckRegistry {
         });
 
         // ── SEC-002: destructive-patterns ──
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-002".into(),
             name: "destructive-patterns".into(),
-            severity: CheckSeverity::Critical,
+            severity: _CheckSeverity::Critical,
             risk_description: "Blocks destructive patterns like rm -rf /, dd if=/dev/zero".into(),
             check_fn: Box::new(|ctx: &ToolCallContext| {
                 let cmd = extract_string_value(&ctx.args);
@@ -365,10 +365,10 @@ impl CheckRegistry {
 
         // ── SEC-003: filesystem-writes-outside-workspace ──
         let ws = workspaces.clone();
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-003".into(),
             name: "filesystem-writes-outside-workspace".into(),
-            severity: CheckSeverity::High,
+            severity: _CheckSeverity::High,
             risk_description: "Blocks file writes outside the permitted workspace directory".into(),
             check_fn: Box::new(move |ctx: &ToolCallContext| {
                 let path = extract_string_field(&ctx.args, "path")
@@ -407,10 +407,10 @@ impl CheckRegistry {
 
         // ── SEC-004: network-egress-to-unknown ──
         let domains2 = domains.clone();
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-004".into(),
             name: "network-egress-to-unknown".into(),
-            severity: CheckSeverity::High,
+            severity: _CheckSeverity::High,
             risk_description: "Blocks webfetch/websearch to non-allowlisted domains".into(),
             check_fn: Box::new(move |ctx: &ToolCallContext| {
                 let url = extract_url(&ctx.args);
@@ -458,10 +458,10 @@ impl CheckRegistry {
 
         // ── SEC-005: excessive-tool-calls ──
         let counter_a = Arc::clone(&counter);
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-005".into(),
             name: "excessive-tool-calls".into(),
-            severity: CheckSeverity::Medium,
+            severity: _CheckSeverity::Medium,
             risk_description: "Warns when >50 tool calls in a session".into(),
             check_fn: Box::new(move |ctx: &ToolCallContext| {
                 let mut counts = counter_a.lock().unwrap_or_else(|e| e.into_inner());
@@ -479,10 +479,10 @@ impl CheckRegistry {
         });
 
         // ── SEC-006: path-traversal ──
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-006".into(),
             name: "path-traversal".into(),
-            severity: CheckSeverity::Critical,
+            severity: _CheckSeverity::Critical,
             risk_description: "Blocks path traversal patterns (../) in file tool arguments".into(),
             check_fn: Box::new(|ctx: &ToolCallContext| {
                 let path_tools = ["read", "write", "edit", "glob", "grep", "bash"];
@@ -502,10 +502,10 @@ impl CheckRegistry {
         });
 
         // ── SEC-007: secret-in-args ──
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-007".into(),
             name: "secret-in-args".into(),
-            severity: CheckSeverity::Critical,
+            severity: _CheckSeverity::Critical,
             risk_description: "Detects API keys, tokens, and secrets in tool arguments".into(),
             check_fn: Box::new(|ctx: &ToolCallContext| {
                 for arg in collect_all_string_args(&ctx.args) {
@@ -526,10 +526,10 @@ impl CheckRegistry {
         });
 
         // ── SEC-008: command-injection ──
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-008".into(),
             name: "command-injection".into(),
-            severity: CheckSeverity::High,
+            severity: _CheckSeverity::High,
             risk_description: "Blocks shell metacharacters that enable command injection in bash args".into(),
             check_fn: Box::new(|ctx: &ToolCallContext| {
                 let cmd = extract_string_value(&ctx.args);
@@ -571,10 +571,10 @@ impl CheckRegistry {
         });
 
         // ── SEC-009: large-file-write ──
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-009".into(),
             name: "large-file-write".into(),
-            severity: CheckSeverity::Low,
+            severity: _CheckSeverity::Low,
             risk_description: "Warns when writing files larger than 1MB".into(),
             check_fn: Box::new(|ctx: &ToolCallContext| {
                 if let Some(content) = extract_string_field(&ctx.args, "content") {
@@ -603,10 +603,10 @@ impl CheckRegistry {
         });
 
         // ── SEC-010: dangerous-curl ──
-        self.register(SecurityCheck {
+        self.register(_SecurityCheck {
             id: "SEC-010".into(),
             name: "dangerous-curl".into(),
-            severity: CheckSeverity::High,
+            severity: _CheckSeverity::High,
             risk_description: "Blocks curl with pipe-to-shell pattern".into(),
             check_fn: Box::new(|ctx: &ToolCallContext| {
                 let cmd = extract_string_value(&ctx.args);
@@ -632,7 +632,7 @@ impl CheckRegistry {
 
     // ── Registry methods ──
 
-    pub fn register(&mut self, check: SecurityCheck) {
+    pub fn register(&mut self, check: _SecurityCheck) {
         let id = check.id.clone();
         self.enabled.entry(id).or_insert(true);
         self.checks.push(check);
@@ -679,11 +679,11 @@ impl CheckRegistry {
         self.enabled.insert(id.to_string(), enabled);
     }
 
-    pub fn set_severity(&mut self, id: &str, severity: CheckSeverity) {
+    pub fn _set_severity(&mut self, id: &str, severity: _CheckSeverity) {
         self.severities.insert(id.to_string(), severity);
     }
 
-    pub fn set_tool_patterns(&mut self, id: &str, patterns: Vec<String>) {
+    pub fn _set_tool_patterns(&mut self, id: &str, patterns: Vec<String>) {
         if patterns.is_empty() {
             self.tool_patterns_override.remove(id);
         } else {
@@ -691,7 +691,7 @@ impl CheckRegistry {
         }
     }
 
-    pub fn list_checks(&self) -> &[SecurityCheck] {
+    pub fn _list_checks(&self) -> &[_SecurityCheck] {
         &self.checks
     }
 
@@ -699,32 +699,32 @@ impl CheckRegistry {
         self.enabled.get(id).copied().unwrap_or(true)
     }
 
-    pub fn get_severity(&self, id: &str) -> CheckSeverity {
+    pub fn _get_severity(&self, id: &str) -> _CheckSeverity {
         self.severities
             .get(id)
             .copied()
             .or_else(|| self.checks.iter().find(|c| c.id == id).map(|c| c.severity))
-            .unwrap_or(CheckSeverity::Info)
+            .unwrap_or(_CheckSeverity::Info)
     }
 
-    pub fn reset_call_counter(&self) {
+    pub fn _reset_call_counter(&self) {
         self.call_counter.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
     pub fn load_config(&mut self, toml_str: &str) -> Result<(), String> {
-        let config: CheckConfig =
+        let config: _CheckConfig =
             toml::from_str(toml_str).map_err(|e| format!("TOML parse error: {}", e))?;
         config.apply_to(self);
         Ok(())
     }
 
-    pub fn add_allowlisted_domain(&mut self, domain: String) {
+    pub fn _add_allowlisted_domain(&mut self, domain: String) {
         if !self.allowlisted_domains.contains(&domain) {
             self.allowlisted_domains.push(domain);
         }
     }
 
-    pub fn add_workspace_path(&mut self, path: String) {
+    pub fn _add_workspace_path(&mut self, path: String) {
         if !self.workspace_paths.contains(&path) {
             self.workspace_paths.push(path);
         }
@@ -850,21 +850,21 @@ mod tests {
     #[test]
     fn test_register_and_remove_check() {
         let mut reg = fresh_registry();
-        let count_before = reg.list_checks().len();
-        reg.register(SecurityCheck {
+        let count_before = reg._list_checks().len();
+        reg.register(_SecurityCheck {
             id: "TEST-001".into(),
             name: "test-check".into(),
-            severity: CheckSeverity::Info,
+            severity: _CheckSeverity::Info,
             risk_description: "Test only".into(),
             check_fn: Box::new(|_| CheckVerdict::Fail("blocked".into())),
         });
-        assert_eq!(reg.list_checks().len(), count_before + 1);
+        assert_eq!(reg._list_checks().len(), count_before + 1);
         let results = reg.evaluate("any_tool", &json!(""), &ToolSource::User);
         assert!(results.iter().any(|(id, v)| {
             id == "TEST-001" && matches!(v, CheckVerdict::Fail(_))
         }));
         reg.remove("TEST-001");
-        assert_eq!(reg.list_checks().len(), count_before);
+        assert_eq!(reg._list_checks().len(), count_before);
     }
 
     #[test]
@@ -889,7 +889,7 @@ mod tests {
     #[test]
     fn test_tool_patterns_override() {
         let mut reg = fresh_registry();
-        reg.set_tool_patterns("SEC-001", vec!["webfetch".into()]);
+        reg._set_tool_patterns("SEC-001", vec!["webfetch".into()]);
         let results = reg.evaluate("bash", &json!("dd if=/dev/zero"), &ToolSource::User);
         for (id, v) in &results {
             if id == "SEC-001" {
@@ -902,7 +902,7 @@ mod tests {
                 assert!(matches!(v, CheckVerdict::Pass));
             }
         }
-        reg.set_tool_patterns("SEC-001", vec![]);
+        reg._set_tool_patterns("SEC-001", vec![]);
     }
 
     #[test]
@@ -926,14 +926,14 @@ enabled = false
     #[test]
     fn test_toml_severity_override() {
         let mut reg = fresh_registry();
-        assert_eq!(reg.get_severity("SEC-003"), CheckSeverity::High);
+        assert_eq!(reg._get_severity("SEC-003"), _CheckSeverity::High);
         let toml = r#"
 [[rules]]
 id = "SEC-003"
 severity_override = "critical"
 "#;
         reg.load_config(toml).unwrap();
-        assert_eq!(reg.get_severity("SEC-003"), CheckSeverity::Critical);
+        assert_eq!(reg._get_severity("SEC-003"), _CheckSeverity::Critical);
     }
 
     #[test]
@@ -991,7 +991,7 @@ tool_patterns = ["webfetch", "websearch"]
     #[test]
     fn test_inspect_returns_require_approval_for_warn() {
         let reg = fresh_registry();
-        reg.reset_call_counter();
+        reg._reset_call_counter();
         for _ in 0..55 {
             let _ = reg.evaluate("bash", &json!("echo x"), &ToolSource::User);
         }
@@ -1002,11 +1002,11 @@ tool_patterns = ["webfetch", "websearch"]
 
     #[test]
     fn test_check_severity_display() {
-        assert_eq!(format!("{}", CheckSeverity::Critical), "CRITICAL");
-        assert_eq!(format!("{}", CheckSeverity::High), "HIGH");
-        assert_eq!(format!("{}", CheckSeverity::Medium), "MEDIUM");
-        assert_eq!(format!("{}", CheckSeverity::Low), "LOW");
-        assert_eq!(format!("{}", CheckSeverity::Info), "INFO");
+        assert_eq!(format!("{}", _CheckSeverity::Critical), "CRITICAL");
+        assert_eq!(format!("{}", _CheckSeverity::High), "HIGH");
+        assert_eq!(format!("{}", _CheckSeverity::Medium), "MEDIUM");
+        assert_eq!(format!("{}", _CheckSeverity::Low), "LOW");
+        assert_eq!(format!("{}", _CheckSeverity::Info), "INFO");
     }
 
     #[test]
@@ -1027,10 +1027,10 @@ pub fn create_check_registry_self_test() -> Box<dyn crate::core::nt_core_self_te
 impl crate::core::nt_core_traits::SecurityCheckRegistry for CheckRegistry {
     fn register_check(&mut self, name: &str) {
         // 注册一个通过的检查项 (简化实现: 添加到 checks 列表)
-        self.checks.push(SecurityCheck {
+        self.checks.push(_SecurityCheck {
             id: name.to_string(),
             name: name.to_string(),
-            severity: CheckSeverity::Info,
+            severity: _CheckSeverity::Info,
             risk_description: "registered via trait".to_string(),
             check_fn: Box::new(|_| CheckVerdict::Pass),
         });

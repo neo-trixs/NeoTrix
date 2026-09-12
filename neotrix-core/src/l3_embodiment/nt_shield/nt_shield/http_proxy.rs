@@ -20,7 +20,7 @@ impl Drop for DecrementGuard {
 
 /// 拦截动作
 #[derive(Debug, Clone)]
-pub enum InterceptAction {
+pub enum _InterceptAction {
     Forward,
     ModifyRequest(Vec<(String, String)>),
     ModifyBody(String),
@@ -30,13 +30,13 @@ pub enum InterceptAction {
 
 /// 拦截规则
 #[derive(Debug, Clone)]
-pub struct InterceptRule {
+pub struct _InterceptRule {
     pub match_url: String,
     pub match_method: Option<String>,
-    pub action: InterceptAction,
+    pub action: _InterceptAction,
 }
 
-impl InterceptRule {
+impl _InterceptRule {
     pub fn matches(&self, url: &str, method: &str) -> bool {
         if let Some(ref m) = self.match_method {
             if m != method {
@@ -58,7 +58,7 @@ const INTERNAL_PATTERNS: &[(&str, &str)] = &[
 
 /// 剥离内部标识 —— 对每一个 header name/value 应用 INTERNAL_PATTERNS
 /// 等价于 Python HeaderObfuscator._strip_internal_headers()
-pub fn strip_internal_patterns(input: &str) -> String {
+pub fn _strip_internal_patterns(input: &str) -> String {
     let mut result = input.to_string();
     for (pattern, replacement) in INTERNAL_PATTERNS {
         if let Ok(re) = Regex::new(pattern) {
@@ -76,12 +76,12 @@ pub fn strip_internal_patterns(input: &str) -> String {
 }
 
 /// 对一组 header (name, value) 的 value 应用剥离
-pub fn strip_header_values(headers: &[(String, String)]) -> Vec<(String, String)> {
+pub fn _strip_header_values(headers: &[(String, String)]) -> Vec<(String, String)> {
     headers
         .iter()
         .map(|(k, v)| {
-            let k_clean = strip_internal_patterns(k);
-            let v_clean = strip_internal_patterns(v);
+            let k_clean = _strip_internal_patterns(k);
+            let v_clean = _strip_internal_patterns(v);
             (k_clean, v_clean)
         })
         .collect()
@@ -98,7 +98,7 @@ pub struct HttpRequest {
 
 /// 安全测试模板
 #[derive(Debug, Clone)]
-pub enum SecurityTest {
+pub enum _SecurityTest {
     XssReflected(String),
     XssStored(String),
     CsrfTokenBypass,
@@ -106,14 +106,14 @@ pub enum SecurityTest {
     SsrfCheck(String),
 }
 
-impl std::fmt::Display for SecurityTest {
+impl std::fmt::Display for _SecurityTest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SecurityTest::XssReflected(payload) => write!(f, "XSS-Reflected({})", payload),
-            SecurityTest::XssStored(payload) => write!(f, "XSS-Stored({})", payload),
-            SecurityTest::CsrfTokenBypass => write!(f, "CSRF-Token-Bypass"),
-            SecurityTest::SqlInjection(payload) => write!(f, "SQL-Injection({})", payload),
-            SecurityTest::SsrfCheck(target) => write!(f, "SSRF-Check({})", target),
+            _SecurityTest::XssReflected(payload) => write!(f, "XSS-Reflected({})", payload),
+            _SecurityTest::XssStored(payload) => write!(f, "XSS-Stored({})", payload),
+            _SecurityTest::CsrfTokenBypass => write!(f, "CSRF-Token-Bypass"),
+            _SecurityTest::SqlInjection(payload) => write!(f, "SQL-Injection({})", payload),
+            _SecurityTest::SsrfCheck(target) => write!(f, "SSRF-Check({})", target),
         }
     }
 }
@@ -123,7 +123,7 @@ impl std::fmt::Display for SecurityTest {
 pub struct HttpInterceptor {
     listen_addr: SocketAddr,
     upstream: String,
-    rules: Vec<InterceptRule>,
+    rules: Vec<_InterceptRule>,
     running: Arc<AtomicBool>,
     listener_handle: Option<std::thread::JoinHandle<()>>,
 }
@@ -139,7 +139,7 @@ impl HttpInterceptor {
         }
     }
 
-    pub fn add_rule(&mut self, rule: InterceptRule) {
+    pub fn add_rule(&mut self, rule: _InterceptRule) {
         self.rules.push(rule);
     }
 
@@ -205,7 +205,7 @@ impl HttpInterceptor {
         self.running.load(Ordering::SeqCst)
     }
 
-    pub fn rules(&self) -> &[InterceptRule] {
+    pub fn rules(&self) -> &[_InterceptRule] {
         &self.rules
     }
 
@@ -216,41 +216,41 @@ impl HttpInterceptor {
 
 fn handle_client(
     client: &mut TcpStream,
-    rules: &[InterceptRule],
+    rules: &[_InterceptRule],
     upstream: &str,
 ) -> std::io::Result<()> {
     let (method, url, headers, _body) = read_http_request(client)?;
 
     // Strip internal NeoTrix identifiers from headers and URL
-    let stripped_headers = strip_header_values(&headers);
-    let stripped_url = strip_internal_patterns(&url);
+    let stripped_headers = _strip_header_values(&headers);
+    let stripped_url = _strip_internal_patterns(&url);
 
     let action = rules
         .iter()
         .find(|rule| rule.matches(&stripped_url, &method))
         .map(|rule| rule.action.clone())
-        .unwrap_or(InterceptAction::Forward);
+        .unwrap_or(_InterceptAction::Forward);
 
     match action {
-        InterceptAction::Drop => {
+        _InterceptAction::Drop => {
             let response =
                 b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             client.write_all(response)?;
         }
-        InterceptAction::ModifyRequest(headers) => {
+        _InterceptAction::ModifyRequest(headers) => {
             let mut all_headers = stripped_headers.clone();
             all_headers.extend(headers);
             forward_with_modified_headers(client, upstream, &method, &stripped_url, &all_headers)?;
         }
-        InterceptAction::ModifyBody(body) => {
+        _InterceptAction::ModifyBody(body) => {
             forward_with_modified_body(client, upstream, &method, &stripped_url, &body)?;
         }
-        InterceptAction::Capture(name) => {
+        _InterceptAction::Capture(name) => {
             let response = forward_request(upstream, &method, &stripped_url)?;
             log::info!("[Capture:{}] {} {}", name, method, stripped_url);
             client.write_all(&response)?;
         }
-        InterceptAction::Forward => {
+        _InterceptAction::Forward => {
             let response = forward_request(upstream, &method, &stripped_url)?;
             client.write_all(&response)?;
         }
@@ -361,10 +361,10 @@ mod tests {
 
     #[test]
     fn test_rule_match_by_url_prefix() {
-        let rule = InterceptRule {
+        let rule = _InterceptRule {
             match_url: "/api".to_string(),
             match_method: None,
-            action: InterceptAction::Drop,
+            action: _InterceptAction::Drop,
         };
         assert!(rule.matches("/api/users", "GET"));
         assert!(rule.matches("/api", "POST"));
@@ -373,10 +373,10 @@ mod tests {
 
     #[test]
     fn test_rule_match_by_method() {
-        let rule = InterceptRule {
+        let rule = _InterceptRule {
             match_url: "/api".to_string(),
             match_method: Some("POST".to_string()),
-            action: InterceptAction::Drop,
+            action: _InterceptAction::Drop,
         };
         assert!(rule.matches("/api/data", "POST"));
         assert!(!rule.matches("/api/data", "GET"));
@@ -384,43 +384,43 @@ mod tests {
 
     #[test]
     fn test_no_matching_rule_falls_to_forward() {
-        let rules: Vec<InterceptRule> = vec![];
+        let rules: Vec<_InterceptRule> = vec![];
         let action = rules
             .iter()
             .find(|rule| rule.matches("/api", "GET"))
             .map(|rule| rule.action.clone())
-            .unwrap_or(InterceptAction::Forward);
-        assert!(matches!(action, InterceptAction::Forward));
+            .unwrap_or(_InterceptAction::Forward);
+        assert!(matches!(action, _InterceptAction::Forward));
     }
 
     #[test]
     fn test_first_match_wins() {
         let rules = vec![
-            InterceptRule {
+            _InterceptRule {
                 match_url: "/api".to_string(),
                 match_method: None,
-                action: InterceptAction::Drop,
+                action: _InterceptAction::Drop,
             },
-            InterceptRule {
+            _InterceptRule {
                 match_url: "/api/users".to_string(),
                 match_method: None,
-                action: InterceptAction::Forward,
+                action: _InterceptAction::Forward,
             },
         ];
         let action = rules
             .iter()
             .find(|rule| rule.matches("/api/users", "GET"))
             .map(|rule| rule.action.clone())
-            .unwrap_or(InterceptAction::Forward);
-        assert!(matches!(action, InterceptAction::Drop));
+            .unwrap_or(_InterceptAction::Forward);
+        assert!(matches!(action, _InterceptAction::Drop));
     }
 
     #[test]
     fn test_modify_request_action_headers() -> Result<(), String> {
         let headers = vec![("X-Test".to_string(), "value".to_string())];
-        let action = InterceptAction::ModifyRequest(headers.clone());
+        let action = _InterceptAction::ModifyRequest(headers.clone());
         match action {
-            InterceptAction::ModifyRequest(h) => {
+            _InterceptAction::ModifyRequest(h) => {
                 assert_eq!(h.len(), 1);
                 assert_eq!(h[0], ("X-Test".to_string(), "value".to_string()));
             }
@@ -431,30 +431,30 @@ mod tests {
 
     #[test]
     fn test_drop_action() {
-        let rule = InterceptRule {
+        let rule = _InterceptRule {
             match_url: "/block".to_string(),
             match_method: None,
-            action: InterceptAction::Drop,
+            action: _InterceptAction::Drop,
         };
         assert!(rule.matches("/block", "GET"));
-        assert!(matches!(rule.action, InterceptAction::Drop));
+        assert!(matches!(rule.action, _InterceptAction::Drop));
     }
 
     #[test]
     fn test_nt_shield_test_display() {
-        let xss = SecurityTest::XssReflected("<script>".to_string());
+        let xss = _SecurityTest::XssReflected("<script>".to_string());
         assert_eq!(xss.to_string(), "XSS-Reflected(<script>)");
 
-        let csrf = SecurityTest::CsrfTokenBypass;
+        let csrf = _SecurityTest::CsrfTokenBypass;
         assert_eq!(csrf.to_string(), "CSRF-Token-Bypass");
 
-        let sqli = SecurityTest::SqlInjection("' OR 1=1 --".to_string());
+        let sqli = _SecurityTest::SqlInjection("' OR 1=1 --".to_string());
         assert_eq!(sqli.to_string(), "SQL-Injection(' OR 1=1 --)");
 
-        let ssrf = SecurityTest::SsrfCheck("http://169.254.169.254".to_string());
+        let ssrf = _SecurityTest::SsrfCheck("http://169.254.169.254".to_string());
         assert_eq!(ssrf.to_string(), "SSRF-Check(http://169.254.169.254)");
 
-        let stored = SecurityTest::XssStored("<img src=x>".to_string());
+        let stored = _SecurityTest::XssStored("<img src=x>".to_string());
         assert_eq!(stored.to_string(), "XSS-Stored(<img src=x>)");
     }
 
@@ -470,10 +470,10 @@ mod tests {
     fn test_add_rule() {
         let addr: SocketAddr = "127.0.0.1:0".parse().expect("value should be ok in test");
         let mut interceptor = HttpInterceptor::new(addr, "http://example.com");
-        interceptor.add_rule(InterceptRule {
+        interceptor.add_rule(_InterceptRule {
             match_url: "/test".to_string(),
             match_method: None,
-            action: InterceptAction::Drop,
+            action: _InterceptAction::Drop,
         });
         assert_eq!(interceptor.rules().len(), 1);
         assert!(interceptor.rules()[0].matches("/test", "GET"));
@@ -519,10 +519,10 @@ mod tests {
 
     #[test]
     fn test_intercept_rule_clone() {
-        let rule = InterceptRule {
+        let rule = _InterceptRule {
             match_url: "/clone".to_string(),
             match_method: Some("GET".to_string()),
-            action: InterceptAction::Capture("test".to_string()),
+            action: _InterceptAction::Capture("test".to_string()),
         };
         let cloned = rule.clone();
         assert_eq!(rule.match_url, cloned.match_url);

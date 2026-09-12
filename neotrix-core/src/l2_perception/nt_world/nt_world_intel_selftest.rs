@@ -16,8 +16,8 @@ use crate::l2_perception::nt_world::{
     nt_world_ucdp, nt_world_usgs, nt_world_urlhaus,
 };
 
-pub struct GdeltIntelSelfTest;
-impl SelfTest for GdeltIntelSelfTest {
+pub struct _GdeltIntelSelfTest;
+impl SelfTest for _GdeltIntelSelfTest {
     fn name(&self) -> &str { "intel:gdelt" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_gdelt::GdeltFetcher::parse_articles(nt_world_gdelt::GDELT_FIXTURE_JSON)
@@ -27,8 +27,8 @@ impl SelfTest for GdeltIntelSelfTest {
     }
 }
 
-pub struct EdgarIntelSelfTest;
-impl SelfTest for EdgarIntelSelfTest {
+pub struct _EdgarIntelSelfTest;
+impl SelfTest for _EdgarIntelSelfTest {
     fn name(&self) -> &str { "intel:edgar" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         nt_world_edgar::EdgarFetcher::parse_submissions(nt_world_edgar::EDGAR_FIXTURE_JSON)
@@ -37,8 +37,8 @@ impl SelfTest for EdgarIntelSelfTest {
     }
 }
 
-pub struct UsgsIntelSelfTest;
-impl SelfTest for UsgsIntelSelfTest {
+pub struct _UsgsIntelSelfTest;
+impl SelfTest for _UsgsIntelSelfTest {
     fn name(&self) -> &str { "intel:usgs" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_usgs::UsgsFetcher::parse_geojson(nt_world_usgs::USGS_FIXTURE_JSON)
@@ -48,8 +48,8 @@ impl SelfTest for UsgsIntelSelfTest {
     }
 }
 
-pub struct GdacsIntelSelfTest;
-impl SelfTest for GdacsIntelSelfTest {
+pub struct _GdacsIntelSelfTest;
+impl SelfTest for _GdacsIntelSelfTest {
     fn name(&self) -> &str { "intel:gdacs" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_gdacs::GdacsFetcher::parse_json(nt_world_gdacs::GDACS_FIXTURE_JSON)
@@ -59,8 +59,8 @@ impl SelfTest for GdacsIntelSelfTest {
     }
 }
 
-pub struct UcdpIntelSelfTest;
-impl SelfTest for UcdpIntelSelfTest {
+pub struct _UcdpIntelSelfTest;
+impl SelfTest for _UcdpIntelSelfTest {
     fn name(&self) -> &str { "intel:ucdp" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_ucdp::UcdpFetcher::parse_json(nt_world_ucdp::UCDP_FIXTURE_JSON)
@@ -70,8 +70,8 @@ impl SelfTest for UcdpIntelSelfTest {
     }
 }
 
-pub struct UrlhausIntelSelfTest;
-impl SelfTest for UrlhausIntelSelfTest {
+pub struct _UrlhausIntelSelfTest;
+impl SelfTest for _UrlhausIntelSelfTest {
     fn name(&self) -> &str { "intel:urlhaus" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_urlhaus::UrlhausFetcher::parse_json(nt_world_urlhaus::URLHAUS_FIXTURE_JSON)
@@ -81,8 +81,8 @@ impl SelfTest for UrlhausIntelSelfTest {
     }
 }
 
-pub struct CisaKevIntelSelfTest;
-impl SelfTest for CisaKevIntelSelfTest {
+pub struct _CisaKevIntelSelfTest;
+impl SelfTest for _CisaKevIntelSelfTest {
     fn name(&self) -> &str { "intel:cisa-kev" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_urlhaus::CisaKevFetcher::parse_json(nt_world_urlhaus::CISA_KEV_FIXTURE_JSON)
@@ -92,8 +92,8 @@ impl SelfTest for CisaKevIntelSelfTest {
     }
 }
 
-pub struct OfacIntelSelfTest;
-impl SelfTest for OfacIntelSelfTest {
+pub struct _OfacIntelSelfTest;
+impl SelfTest for _OfacIntelSelfTest {
     fn name(&self) -> &str { "intel:ofac" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_ofac::OfacFetcher::parse_xml(nt_world_ofac::OFAC_FIXTURE_XML)
@@ -103,8 +103,8 @@ impl SelfTest for OfacIntelSelfTest {
     }
 }
 
-pub struct PolymarketIntelSelfTest;
-impl SelfTest for PolymarketIntelSelfTest {
+pub struct _PolymarketIntelSelfTest;
+impl SelfTest for _PolymarketIntelSelfTest {
     fn name(&self) -> &str { "intel:polymarket" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_polymarket::PolymarketFetcher::parse_json(nt_world_polymarket::POLYMARKET_FIXTURE_JSON)
@@ -114,8 +114,8 @@ impl SelfTest for PolymarketIntelSelfTest {
     }
 }
 
-pub struct AoiIntelSelfTest;
-impl SelfTest for AoiIntelSelfTest {
+pub struct _AoiIntelSelfTest;
+impl SelfTest for _AoiIntelSelfTest {
     fn name(&self) -> &str { "intel:aoi" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_aoi::AoiMonitor::parse_geojson(nt_world_aoi::AOI_FIXTURE_JSON)
@@ -125,8 +125,8 @@ impl SelfTest for AoiIntelSelfTest {
     }
 }
 
-pub struct AdsbIntelSelfTest;
-impl SelfTest for AdsbIntelSelfTest {
+pub struct _AdsbIntelSelfTest;
+impl SelfTest for _AdsbIntelSelfTest {
     fn name(&self) -> &str { "intel:adsb" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_adsb::AdsbFetcher::parse_json(nt_world_adsb::ADSB_FIXTURE_JSON)
@@ -136,8 +136,8 @@ impl SelfTest for AdsbIntelSelfTest {
     }
 }
 
-pub struct BgpviewIntelSelfTest;
-impl SelfTest for BgpviewIntelSelfTest {
+pub struct _BgpviewIntelSelfTest;
+impl SelfTest for _BgpviewIntelSelfTest {
     fn name(&self) -> &str { "intel:bgpview" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_bgpview::BgpviewFetcher::parse_json(nt_world_bgpview::BGPVIEW_FIXTURE_JSON)
@@ -147,8 +147,8 @@ impl SelfTest for BgpviewIntelSelfTest {
     }
 }
 
-pub struct OpencorporatesIntelSelfTest;
-impl SelfTest for OpencorporatesIntelSelfTest {
+pub struct _OpencorporatesIntelSelfTest;
+impl SelfTest for _OpencorporatesIntelSelfTest {
     fn name(&self) -> &str { "intel:opencorporates" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let v = nt_world_opencorporates::OpencorporatesFetcher::parse_json(nt_world_opencorporates::OC_FIXTURE_JSON)
@@ -160,17 +160,17 @@ impl SelfTest for OpencorporatesIntelSelfTest {
 
 /// 将情报工具注册进 SelfTestRegistry (T2 注册) — 由 `register_absorbed_modules` 调用。
 pub fn register_intel_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(GdeltIntelSelfTest));
-    registry.register(Box::new(EdgarIntelSelfTest));
-    registry.register(Box::new(UsgsIntelSelfTest));
-    registry.register(Box::new(GdacsIntelSelfTest));
-    registry.register(Box::new(UcdpIntelSelfTest));
-    registry.register(Box::new(UrlhausIntelSelfTest));
-    registry.register(Box::new(CisaKevIntelSelfTest));
-    registry.register(Box::new(OfacIntelSelfTest));
-    registry.register(Box::new(PolymarketIntelSelfTest));
-    registry.register(Box::new(AoiIntelSelfTest));
-    registry.register(Box::new(AdsbIntelSelfTest));
-    registry.register(Box::new(BgpviewIntelSelfTest));
-    registry.register(Box::new(OpencorporatesIntelSelfTest));
+    registry.register(Box::new(_GdeltIntelSelfTest));
+    registry.register(Box::new(_EdgarIntelSelfTest));
+    registry.register(Box::new(_UsgsIntelSelfTest));
+    registry.register(Box::new(_GdacsIntelSelfTest));
+    registry.register(Box::new(_UcdpIntelSelfTest));
+    registry.register(Box::new(_UrlhausIntelSelfTest));
+    registry.register(Box::new(_CisaKevIntelSelfTest));
+    registry.register(Box::new(_OfacIntelSelfTest));
+    registry.register(Box::new(_PolymarketIntelSelfTest));
+    registry.register(Box::new(_AoiIntelSelfTest));
+    registry.register(Box::new(_AdsbIntelSelfTest));
+    registry.register(Box::new(_BgpviewIntelSelfTest));
+    registry.register(Box::new(_OpencorporatesIntelSelfTest));
 }

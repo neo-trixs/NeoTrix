@@ -58,7 +58,7 @@ impl OfflineIndex {
         self.index.contains_key(id)
     }
 
-    pub fn update_path(&mut self, id: &str, new_path: String) -> bool {
+    pub fn _update_path(&mut self, id: &str, new_path: String) -> bool {
         if let Some(entry) = self.index.get_mut(id) {
             entry.local_path = new_path;
             true

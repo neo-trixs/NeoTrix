@@ -10,7 +10,7 @@ pub struct ArchetypeId(pub u64);
 pub struct EntityId(pub u64);
 
 /// Universal entity
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UniversalEntity {
     pub id: EntityId,
     pub generation: u32,

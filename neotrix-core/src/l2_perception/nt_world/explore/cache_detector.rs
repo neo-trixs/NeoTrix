@@ -132,7 +132,7 @@ impl CacheDetector {
         caches
     }
 
-    pub fn detect_by_type(&self, cache_type: &CacheType) -> Vec<CacheInfo> {
+    pub fn _detect_by_type(&self, cache_type: &CacheType) -> Vec<CacheInfo> {
         self.detect_all().into_iter().filter(|c| &c.cache_type == cache_type).collect()
     }
 }

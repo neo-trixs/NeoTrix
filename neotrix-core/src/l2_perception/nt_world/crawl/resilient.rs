@@ -46,10 +46,10 @@ impl Default for PersistentQueue {
 
 impl PersistentQueue {
     pub fn new() -> Self {
-        Self::with_backoff(1_000)
+        Self::_with_backoff(1_000)
     }
 
-    pub fn with_backoff(backoff_base_ms: u64) -> Self {
+    pub fn _with_backoff(backoff_base_ms: u64) -> Self {
         Self {
             requests: VecDeque::new(),
             retry_count: HashMap::new(),
@@ -71,7 +71,7 @@ impl PersistentQueue {
     }
 
     /// 失败重排 (队尾) + 指数退避; 返回模拟等待时长 (ms)。
-    pub fn requeue(&mut self, url: &str) -> u64 {
+    pub fn _requeue(&mut self, url: &str) -> u64 {
         let retries = self.retry_count.get(url).copied().unwrap_or(0);
         self.retry_count.insert(url.to_string(), retries + 1);
         self.requests.push_back(url.to_string());
@@ -138,7 +138,7 @@ impl AutoThrottle {
 
 /// 会话指标。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct CrawlSession {
+pub struct _CrawlSession {
     pub queued: usize,
     pub throttled: usize,
     pub completed: usize,
@@ -161,16 +161,16 @@ pub struct ResilientCrawler {
     pub policy: ThrottlePolicy,
     pub queue: PersistentQueue,
     pub throttle: AutoThrottle,
-    pub session: CrawlSession,
+    pub session: _CrawlSession,
     simulate_failure: Box<dyn Fn(&str) -> bool + Send + Sync>,
 }
 
 impl ResilientCrawler {
     pub fn new(policy: ThrottlePolicy) -> Self {
-        Self::with_failure(policy, Box::new(|url: &str| url.contains("fail")))
+        Self::_with_failure(policy, Box::new(|url: &str| url.contains("fail")))
     }
 
-    pub fn with_failure(
+    pub fn _with_failure(
         policy: ThrottlePolicy,
         simulate_failure: Box<dyn Fn(&str) -> bool + Send + Sync>,
     ) -> Self {
@@ -180,7 +180,7 @@ impl ResilientCrawler {
             policy,
             queue: PersistentQueue::new(),
             throttle: AutoThrottle::new(min_delay_ms, max_delay),
-            session: CrawlSession::default(),
+            session: _CrawlSession::default(),
             simulate_failure,
         }
     }
@@ -196,10 +196,10 @@ impl ResilientCrawler {
 
     /// 执行韧性爬取模拟: 每 URL 出队 → 节流(模拟 tick, 记入 total_delay_ms) →
     /// 失败则退避重排, 重试超 max_retries 则丢弃入 failed。
-    pub fn run_resilient(&mut self, urls: &[&str], max_retries: u8) -> CrawlReport {
-        self.session = CrawlSession {
+    pub fn _run_resilient(&mut self, urls: &[&str], max_retries: u8) -> CrawlReport {
+        self.session = _CrawlSession {
             queued: urls.len(),
-            ..CrawlSession::default()
+            .._CrawlSession::default()
         };
         self.queue = PersistentQueue::new();
         self.throttle = AutoThrottle::new(self.policy.min_delay_ms, self.throttle.max_delay_ms);
@@ -222,7 +222,7 @@ impl ResilientCrawler {
 
             if (self.simulate_failure)(&url) {
                 if retries < max_retries {
-                    let backoff = self.queue.requeue(&url);
+                    let backoff = self.queue._requeue(&url);
                     report.total_delay_ms = report.total_delay_ms.saturating_add(backoff);
                     report.retries_used += 1;
                 } else {
@@ -246,7 +246,7 @@ impl crate::core::nt_core_self_test::SelfTest for ResilientCrawler {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         let mut crawler = ResilientCrawler::new(ThrottlePolicy::default());
-        let report = crawler.run_resilient(&["ok.com", "fail.com"], 1);
+        let report = crawler._run_resilient(&["ok.com", "fail.com"], 1);
         if report.completed != ["ok.com".to_string()] {
             failures.push(format!("expected ok.com completed, got {:?}", report.completed));
         }
@@ -302,17 +302,17 @@ mod tests {
 
     #[test]
     fn test_queue_requeue_retry_count_and_backoff() {
-        let mut q = PersistentQueue::with_backoff(1_000);
+        let mut q = PersistentQueue::_with_backoff(1_000);
         q.push("x.com");
         assert_eq!(q.retry_count("x.com"), 0);
         assert_eq!(q.pop_front().as_deref(), Some("x.com"));
         assert!(q.is_empty());
-        let b1 = q.requeue("x.com");
+        let b1 = q._requeue("x.com");
         assert_eq!(q.len(), 1);
         assert_eq!(q.retry_count("x.com"), 1);
         assert_eq!(b1, 1_000, "1st retry backoff -> base*2^0");
         q.pop_front();
-        let b2 = q.requeue("x.com");
+        let b2 = q._requeue("x.com");
         assert_eq!(q.retry_count("x.com"), 2);
         assert_eq!(b2, 2_000, "2nd retry backoff -> base*2^1");
     }
@@ -373,7 +373,7 @@ mod tests {
     #[test]
     fn test_run_resilient_success_path() {
         let mut c = ResilientCrawler::new(ThrottlePolicy::default());
-        let report = c.run_resilient(&["ok.com", "great.io", "fine.net"], 3);
+        let report = c._run_resilient(&["ok.com", "great.io", "fine.net"], 3);
         assert_eq!(report.completed.len(), 3);
         assert!(report.failed.is_empty());
         assert_eq!(report.retries_used, 0);
@@ -391,14 +391,14 @@ mod tests {
         use std::sync::Arc;
         let attempts = Arc::new(AtomicU32::new(0));
         let counter = Arc::clone(&attempts);
-        let mut c = ResilientCrawler::with_failure(
+        let mut c = ResilientCrawler::_with_failure(
             ThrottlePolicy::default(),
             Box::new(move |_url: &str| {
                 let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
                 n <= 2 // 前两次尝试失败, 之后成功
             }),
         );
-        let report = c.run_resilient(&["flaky.io"], 3);
+        let report = c._run_resilient(&["flaky.io"], 3);
         assert_eq!(report.completed, vec!["flaky.io".to_string()]);
         assert!(report.failed.is_empty());
         assert_eq!(report.retries_used, 2, "two retries before success");
@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn test_run_resilient_drop_after_max_retries() {
         let mut c = ResilientCrawler::new(ThrottlePolicy::default());
-        let report = c.run_resilient(&["ok.com", "fail.com"], 2);
+        let report = c._run_resilient(&["ok.com", "fail.com"], 2);
         assert_eq!(report.completed, vec!["ok.com".to_string()]);
         assert_eq!(report.failed, vec!["fail.com".to_string()]);
         assert_eq!(report.retries_used, 2, "fail.com retried max_retries times then dropped");
@@ -421,7 +421,7 @@ mod tests {
     #[test]
     fn test_run_resilient_zero_retries_drops_immediately() {
         let mut c = ResilientCrawler::new(ThrottlePolicy::default());
-        let report = c.run_resilient(&["fail.com"], 0);
+        let report = c._run_resilient(&["fail.com"], 0);
         assert!(report.completed.is_empty());
         assert_eq!(report.failed, vec!["fail.com".to_string()]);
         assert_eq!(report.retries_used, 0);
@@ -435,7 +435,7 @@ mod tests {
             ..ThrottlePolicy::default()
         };
         let mut c = ResilientCrawler::new(policy);
-        let report = c.run_resilient(&["ok.com", "fail.com"], 1);
+        let report = c._run_resilient(&["ok.com", "fail.com"], 1);
         assert_eq!(report.throttled_count, 0, "adaptive off -> no throttle delay");
         assert_eq!(c.session.throttled, 0);
         // 退避重试仍计入模拟等待 (与节流无关)
@@ -448,8 +448,8 @@ mod tests {
     fn test_run_resilient_deterministic() {
         let mut a = ResilientCrawler::new(ThrottlePolicy::default());
         let mut b = ResilientCrawler::new(ThrottlePolicy::default());
-        let ra = a.run_resilient(&["ok.com", "fail.com", "slow.io"], 2);
-        let rb = b.run_resilient(&["ok.com", "fail.com", "slow.io"], 2);
+        let ra = a._run_resilient(&["ok.com", "fail.com", "slow.io"], 2);
+        let rb = b._run_resilient(&["ok.com", "fail.com", "slow.io"], 2);
         assert_eq!(ra, rb, "two identical runs must produce identical reports");
         assert_eq!(a.session, b.session);
     }

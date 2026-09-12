@@ -8,7 +8,7 @@ const INPUT_STRIDE: usize = 64;
 /// Paper: "TD-JEPA: Long-term Prediction with Temporal Difference
 /// Joint Embedding Predictive Architecture" (ICLR 2026)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemporalDifferenceJEPA {
+pub struct _TemporalDifferenceJEPA {
     pub latent_dim: usize,
     /// TD(λ) decay factor
     pub lambda: f64,
@@ -22,7 +22,7 @@ pub struct TemporalDifferenceJEPA {
     pub value_head: Vec<f64>,
 }
 
-impl TemporalDifferenceJEPA {
+impl _TemporalDifferenceJEPA {
     pub fn new(latent_dim: usize) -> Self {
         let n_weights = latent_dim * INPUT_STRIDE;
         let std = (2.0 / (latent_dim + INPUT_STRIDE) as f64).sqrt();
@@ -52,7 +52,7 @@ impl TemporalDifferenceJEPA {
 
     /// Predict the delta (change) in latent state given current state and action
     /// delta = W · concat(state, action)  (purely linear)
-    pub fn predict_delta(&self, state: &[f64], action: &[f64]) -> Vec<f64> {
+    pub fn _predict_delta(&self, state: &[f64], action: &[f64]) -> Vec<f64> {
         let mut delta = vec![0.0; self.latent_dim];
         for i in 0..self.latent_dim {
             let mut sum = 0.0;
@@ -89,7 +89,7 @@ impl TemporalDifferenceJEPA {
         let mut states = vec![initial_state.to_vec()];
         let mut current = initial_state.to_vec();
         for action in actions {
-            let delta = self.predict_delta(&current, action);
+            let delta = self._predict_delta(&current, action);
             for i in 0..self.latent_dim.min(current.len()) {
                 current[i] += delta[i];
             }
@@ -120,7 +120,7 @@ impl TemporalDifferenceJEPA {
         reward: f64,
     ) {
         let lr = 0.01;
-        let predicted_delta = self.predict_delta(state, action);
+        let predicted_delta = self._predict_delta(state, action);
 
         for i in 0..self.latent_dim {
             let target_delta = next_state[i] - state[i];
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_td_jepa_new() {
-        let jepa = TemporalDifferenceJEPA::new(8);
+        let jepa = _TemporalDifferenceJEPA::new(8);
         assert_eq!(jepa.latent_dim, 8);
         assert!((jepa.lambda - 0.9).abs() < 1e-10);
         assert!((jepa.gamma - 0.99).abs() < 1e-10);
@@ -197,10 +197,10 @@ mod tests {
 
     #[test]
     fn test_predict_delta_basic() {
-        let jepa = TemporalDifferenceJEPA::new(8);
+        let jepa = _TemporalDifferenceJEPA::new(8);
         let state = make_state();
         let action = make_action();
-        let delta = jepa.predict_delta(&state, &action);
+        let delta = jepa._predict_delta(&state, &action);
         assert_eq!(delta.len(), 8);
         for &d in &delta {
             assert!(d.is_finite(), "delta value should be finite");
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_rollout_multi_step() {
-        let jepa = TemporalDifferenceJEPA::new(8);
+        let jepa = _TemporalDifferenceJEPA::new(8);
         let initial = make_state();
         let actions = vec![make_action(), make_action(), make_action()];
         let states = jepa.rollout(&initial, &actions, 0.9);
@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_policy_basic() {
-        let jepa = TemporalDifferenceJEPA::new(8);
+        let jepa = _TemporalDifferenceJEPA::new(8);
         let initial = make_state();
         let actions = vec![make_action(), make_action()];
         let value = jepa.evaluate_policy(&initial, &actions);
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_update_reduces_error() {
-        let mut jepa = TemporalDifferenceJEPA::new(8);
+        let mut jepa = _TemporalDifferenceJEPA::new(8);
         let state = make_state();
         let action = make_action();
         let next_state = make_next_state(&state);
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_td_error_computation() {
-        let mut jepa = TemporalDifferenceJEPA::new(4);
+        let mut jepa = _TemporalDifferenceJEPA::new(4);
         jepa.value_head = vec![1.0, 0.5, -0.3, 0.2];
         let state = vec![1.0, 2.0, 3.0, 4.0];
         let next_state = vec![0.5, 1.0, 2.0, 3.0];
@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_rollout_convergence() {
-        let jepa = TemporalDifferenceJEPA::new(8);
+        let jepa = _TemporalDifferenceJEPA::new(8);
         let initial = make_state();
         let mut actions = Vec::new();
         for _ in 0..100 {
@@ -285,17 +285,17 @@ mod tests {
 
     #[test]
     fn test_invariant_under_scale() {
-        let jepa = TemporalDifferenceJEPA::new(8);
+        let jepa = _TemporalDifferenceJEPA::new(8);
         let state = make_state();
         let action = make_action();
-        let delta1 = jepa.predict_delta(&state, &action);
+        let delta1 = jepa._predict_delta(&state, &action);
         let scaled_state: Vec<f64> = state.iter().map(|s| s * 2.0).collect();
-        let delta2 = jepa.predict_delta(&scaled_state, &action);
+        let delta2 = jepa._predict_delta(&scaled_state, &action);
         assert_eq!(delta1.len(), delta2.len());
         for (_, &d2) in delta1.iter().zip(delta2.iter()) {
             assert!(d2.is_finite(), "scaled delta should be finite");
         }
-        let delta3 = jepa.predict_delta(&state, &action);
+        let delta3 = jepa._predict_delta(&state, &action);
         for (d_a, d_b) in delta1.iter().zip(delta3.iter()) {
             assert!((d_a - d_b).abs() < 1e-12, "deterministic prediction");
         }

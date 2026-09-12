@@ -75,12 +75,12 @@ impl JepaWorldModelV2 {
         }
     }
 
-    pub fn with_masking(mut self, strategy: MaskingStrategy) -> Self {
+    pub fn _with_masking(mut self, strategy: MaskingStrategy) -> Self {
         self.masking = strategy;
         self
     }
 
-    pub fn with_learning_rate(mut self, lr: f64) -> Self {
+    pub fn _with_learning_rate(mut self, lr: f64) -> Self {
         self.learning_rate = lr;
         self
     }
@@ -109,7 +109,7 @@ impl JepaWorldModelV2 {
     }
 
     /// Predict next state without masking (used at inference).
-    pub fn predict_no_mask(&self, patches: &[Vec<f64>], action: &[f64]) -> (Vector, f64) {
+    pub fn _predict_no_mask(&self, patches: &[Vec<f64>], action: &[f64]) -> (Vector, f64) {
         let state_encoding = self.vit_encoder.encode_cls(patches);
         let pred = self.predictor.predict(&state_encoding, action);
         let energy = self.energy_model.energy(&pred, &state_encoding);
@@ -244,7 +244,7 @@ mod tests {
         let model = make_model();
         let patches = sample_patches(8, 16);
         let action = vec![0.1; 4];
-        let (pred, energy) = model.predict_no_mask(&patches, &action);
+        let (pred, energy) = model._predict_no_mask(&patches, &action);
         assert_eq!(pred.len(), 32);
         assert!(energy >= 0.0);
     }
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_v2_with_masking_strategy() {
-        let model = make_model().with_masking(MaskingStrategy::RandomMasking { mask_ratio: 0.5 });
+        let model = make_model()._with_masking(MaskingStrategy::RandomMasking { mask_ratio: 0.5 });
         let patches = sample_patches(8, 16);
         let action = vec![0.1; 4];
         let (pred, _energy, mask_info) = model.predict(&patches, &action);
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_v2_with_custom_lr() {
-        let model = make_model().with_learning_rate(0.01);
+        let model = make_model()._with_learning_rate(0.01);
         assert!((model.learning_rate - 0.01).abs() < 1e-10);
     }
 
@@ -325,8 +325,8 @@ mod tests {
         let action_a = vec![0.1; 4];
         let action_b = vec![0.9; 4];
 
-        let (pred_a, _) = model.predict_no_mask(&patches, &action_a);
-        let (pred_b, _) = model.predict_no_mask(&patches, &action_b);
+        let (pred_a, _) = model._predict_no_mask(&patches, &action_a);
+        let (pred_b, _) = model._predict_no_mask(&patches, &action_b);
         let diff: f64 = pred_a.iter().zip(pred_b.iter()).map(|(a, b)| (a - b).abs()).sum();
         assert!(diff > 1e-6, "Different actions should give different predictions, got diff={}", diff);
     }

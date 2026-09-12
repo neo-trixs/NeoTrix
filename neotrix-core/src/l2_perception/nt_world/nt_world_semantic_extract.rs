@@ -11,23 +11,23 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 语义提取管线 — SIE/Superbrain 核心
-pub struct SemanticExtractionPipeline {
-    entity_extractor: EntityExtractor,
-    relation_extractor: RelationExtractor,
-    embedding_generator: EmbeddingGenerator,
+pub struct _SemanticExtractionPipeline {
+    entity_extractor: _EntityExtractor,
+    relation_extractor: _RelationExtractor,
+    embedding_generator: _EmbeddingGenerator,
     knowledge_graph: KnowledgeGraph,
 }
 
 /// 实体提取器
-pub struct EntityExtractor {
-    patterns: Vec<EntityPattern>,
+pub struct _EntityExtractor {
+    patterns: Vec<_EntityPattern>,
     #[allow(dead_code)]
     confidence_threshold: f64,
 }
 
 /// 实体模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityPattern {
+pub struct _EntityPattern {
     pub name: String,
     pub pattern_type: PatternType,
     pub regex: Option<String>,
@@ -72,15 +72,15 @@ pub enum EntityType {
 }
 
 /// 关系提取器
-pub struct RelationExtractor {
-    patterns: Vec<RelationPattern>,
+pub struct _RelationExtractor {
+    patterns: Vec<_RelationPattern>,
     #[allow(dead_code)]
     confidence_threshold: f64,
 }
 
 /// 关系模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RelationPattern {
+pub struct _RelationPattern {
     pub name: String,
     pub source_type: EntityType,
     pub target_type: EntityType,
@@ -99,7 +99,7 @@ pub struct Relation {
 }
 
 /// 嵌入生成器
-pub struct EmbeddingGenerator {
+pub struct _EmbeddingGenerator {
     #[allow(dead_code)]
     model: String,
     dimension: usize,
@@ -115,7 +115,7 @@ pub struct KnowledgeGraph {
 
 /// 语义搜索结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SemanticSearchResult {
+pub struct _SemanticSearchResult {
     pub entity: Entity,
     pub score: f64,
     pub highlights: Vec<String>,
@@ -131,25 +131,25 @@ pub struct ExtractionResult {
     pub confidence: f64,
 }
 
-impl SemanticExtractionPipeline {
+impl _SemanticExtractionPipeline {
     /// 创建新的提取管线
     pub fn new() -> Self {
         Self {
-            entity_extractor: EntityExtractor {
+            entity_extractor: _EntityExtractor {
                 patterns: vec![
-                    EntityPattern {
+                    _EntityPattern {
                         name: "person".into(),
                         pattern_type: PatternType::NER,
                         regex: None,
                         keywords: vec!["Mr.".into(), "Ms.".into(), "Dr.".into()],
                     },
-                    EntityPattern {
+                    _EntityPattern {
                         name: "organization".into(),
                         pattern_type: PatternType::NER,
                         regex: None,
                         keywords: vec!["Inc.".into(), "LLC".into(), "Corp.".into()],
                     },
-                    EntityPattern {
+                    _EntityPattern {
                         name: "technology".into(),
                         pattern_type: PatternType::Keyword,
                         regex: None,
@@ -158,7 +158,7 @@ impl SemanticExtractionPipeline {
                             "Docker".into(), "Kubernetes".into(), "MCP".into(),
                         ],
                     },
-                    EntityPattern {
+                    _EntityPattern {
                         name: "code".into(),
                         pattern_type: PatternType::Regex,
                         regex: Some(r"`[^`]+`".into()),
@@ -167,15 +167,15 @@ impl SemanticExtractionPipeline {
                 ],
                 confidence_threshold: 0.6,
             },
-            relation_extractor: RelationExtractor {
+            relation_extractor: _RelationExtractor {
                 patterns: vec![
-                    RelationPattern {
+                    _RelationPattern {
                         name: "depends_on".into(),
                         source_type: EntityType::Module,
                         target_type: EntityType::Module,
                         keywords: vec!["depends on".into(), "requires".into(), "uses".into()],
                     },
-                    RelationPattern {
+                    _RelationPattern {
                         name: "implements".into(),
                         source_type: EntityType::Technology,
                         target_type: EntityType::Concept,
@@ -184,7 +184,7 @@ impl SemanticExtractionPipeline {
                 ],
                 confidence_threshold: 0.6,
             },
-            embedding_generator: EmbeddingGenerator {
+            embedding_generator: _EmbeddingGenerator {
                 model: "default".into(),
                 dimension: 384,
             },
@@ -332,7 +332,7 @@ impl SemanticExtractionPipeline {
     }
 
     /// 语义搜索
-    pub fn search(&self, query: &str) -> Vec<SemanticSearchResult> {
+    pub fn search(&self, query: &str) -> Vec<_SemanticSearchResult> {
         let query_embedding = self.generate_embedding(query);
         let mut results = Vec::new();
 
@@ -353,7 +353,7 @@ impl SemanticExtractionPipeline {
             };
 
             if score > 0.1 {
-                results.push(SemanticSearchResult {
+                results.push(_SemanticSearchResult {
                     entity: entity.clone(),
                     score,
                     highlights: vec![entity.name.clone()],

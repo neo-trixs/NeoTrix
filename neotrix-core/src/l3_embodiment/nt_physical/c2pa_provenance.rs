@@ -1,4 +1,4 @@
-//! C2paProvenance — C2PA 溯源验证
+//! _C2paProvenance — C2PA 溯源验证
 //!
 //! 水印嵌入 + 元数据嵌入 + 真实性验证。
 //! 支持 C2PA 标准的内容真实性验证。
@@ -8,7 +8,7 @@ use std::time::Instant;
 
 /// C2PA 声明
 #[derive(Debug, Clone)]
-pub struct C2paClaim {
+pub struct _C2paClaim {
     /// 声明 ID
     pub id: String,
     /// 创建者
@@ -37,7 +37,7 @@ pub struct WatermarkConfig {
     /// 水印强度 (0-1)
     pub strength: f64,
     /// 水印类型
-    pub watermark_type: WatermarkType,
+    pub watermark_type: _WatermarkType,
     /// 是否可见
     pub visible: bool,
     /// 水印文本
@@ -46,7 +46,7 @@ pub struct WatermarkConfig {
 
 /// 水印类型
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum WatermarkType {
+pub enum _WatermarkType {
     /// 不可见数字水印
     Invisible,
     /// 可见水印
@@ -73,28 +73,28 @@ pub enum VerificationResult {
 }
 
 /// C2PA 溯源验证器
-pub struct C2paProvenance {
+pub struct _C2paProvenance {
     /// C2PA 声明存储
-    claims: HashMap<String, C2paClaim>,
+    claims: HashMap<String, _C2paClaim>,
     /// 水印配置
     #[allow(dead_code)]
     watermark_config: WatermarkConfig,
     /// 统计信息
-    stats: ProvenanceStats,
+    stats: _ProvenanceStats,
 }
 
-impl C2paProvenance {
+impl _C2paProvenance {
     pub fn new(watermark_config: WatermarkConfig) -> Self {
         Self {
             claims: HashMap::new(),
             watermark_config,
-            stats: ProvenanceStats::default(),
+            stats: _ProvenanceStats::default(),
         }
     }
 
     /// 创建 C2PA 声明
-    pub fn create_claim(&mut self, content_id: &str, creator: &str, model_id: &str, prompt_hash: &str, input_hash: &str, output_hash: &str) -> C2paClaim {
-        let claim = C2paClaim {
+    pub fn _create_claim(&mut self, content_id: &str, creator: &str, model_id: &str, prompt_hash: &str, input_hash: &str, output_hash: &str) -> _C2paClaim {
+        let claim = _C2paClaim {
             id: format!("claim-{}", uuid::Uuid::new_v4()),
             creator: creator.to_string(),
             created_at: Instant::now(),
@@ -114,7 +114,7 @@ impl C2paProvenance {
     }
 
     /// 嵌入水印
-    pub fn embed_watermark(&mut self, _content_id: &str, data: &[u8]) -> Vec<u8> {
+    pub fn _embed_watermark(&mut self, _content_id: &str, data: &[u8]) -> Vec<u8> {
         // TODO: 实际的水印嵌入逻辑
         // 这里只是一个示例
         self.stats.total_watermarked += 1;
@@ -138,21 +138,21 @@ impl C2paProvenance {
     }
 
     /// 获取声明
-    pub fn get_claim(&self, content_id: &str) -> Option<&C2paClaim> {
+    pub fn _get_claim(&self, content_id: &str) -> Option<&_C2paClaim> {
         self.claims.get(content_id)
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> ProvenanceStats {
+    pub fn stats(&self) -> _ProvenanceStats {
         self.stats.clone()
     }
 }
 
-impl Default for C2paProvenance {
+impl Default for _C2paProvenance {
     fn default() -> Self {
         Self::new(WatermarkConfig {
             strength: 0.5,
-            watermark_type: WatermarkType::Invisible,
+            watermark_type: _WatermarkType::Invisible,
             visible: false,
             text: None,
         })
@@ -161,7 +161,7 @@ impl Default for C2paProvenance {
 
 /// 溯源统计
 #[derive(Debug, Clone, Default)]
-pub struct ProvenanceStats {
+pub struct _ProvenanceStats {
     pub total_claims: u32,
     pub total_watermarked: u32,
     pub total_verified: u32,
@@ -173,8 +173,8 @@ mod tests {
 
     #[test]
     fn test_create_claim() {
-        let mut c2pa = C2paProvenance::default();
-        let claim = c2pa.create_claim(
+        let mut c2pa = _C2paProvenance::default();
+        let claim = c2pa._create_claim(
             "content-1",
             "creator-1",
             "model-1",
@@ -187,8 +187,8 @@ mod tests {
 
     #[test]
     fn test_verify_claim() {
-        let mut c2pa = C2paProvenance::default();
-        c2pa.create_claim("content-1", "creator-1", "model-1", "prompt-hash", "input-hash", "output-hash");
+        let mut c2pa = _C2paProvenance::default();
+        c2pa._create_claim("content-1", "creator-1", "model-1", "prompt-hash", "input-hash", "output-hash");
         let result = c2pa.verify_claim("content-1");
         assert_eq!(result, VerificationResult::NoSignature);
     }

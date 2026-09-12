@@ -40,7 +40,7 @@ impl PlaybackController {
         self.queue.push_back(item);
     }
 
-    pub fn play_next(&mut self) -> Option<&MediaItem> {
+    pub fn _play_next(&mut self) -> Option<&MediaItem> {
         if self.current.is_none() {
             self.current = self.queue.pop_front();
         }
@@ -85,7 +85,7 @@ impl PlaybackController {
         self.queue.len()
     }
 
-    pub fn clear_queue(&mut self) {
+    pub fn _clear_queue(&mut self) {
         self.queue.clear();
     }
 }

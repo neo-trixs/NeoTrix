@@ -7,12 +7,12 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 工具执行结果
 #[derive(Debug, Clone)]
-pub struct AgentActionResult {
+pub struct _AgentActionResult {
     pub ok: bool,
     pub message: String,
 }
 
-impl AgentActionResult {
+impl _AgentActionResult {
     pub fn ok(message: impl Into<String>) -> Self {
         Self { ok: true, message: message.into() }
     }
@@ -23,16 +23,16 @@ impl AgentActionResult {
 
 /// 一个可注册的浏览器工具动作 (fn 指针即可)
 #[derive(Debug, Clone, Copy)]
-pub struct ToolAction {
+pub struct _ToolAction {
     pub name: &'static str,
     pub description: &'static str,
-    pub run: fn(&str) -> AgentActionResult,
+    pub run: fn(&str) -> _AgentActionResult,
 }
 
 /// 工具注册表
 #[derive(Debug, Clone, Default)]
 pub struct ToolRegistry {
-    actions: Vec<ToolAction>,
+    actions: Vec<_ToolAction>,
 }
 
 impl ToolRegistry {
@@ -40,14 +40,14 @@ impl ToolRegistry {
         Self::default()
     }
 
-    pub fn register(&mut self, action: ToolAction) {
+    pub fn register(&mut self, action: _ToolAction) {
         self.actions.push(action);
     }
 
-    pub fn execute(&self, name: &str, arg: &str) -> AgentActionResult {
+    pub fn execute(&self, name: &str, arg: &str) -> _AgentActionResult {
         match self.actions.iter().find(|a| a.name == name) {
             Some(action) => (action.run)(arg),
-            None => AgentActionResult::err(format!("tool '{name}' not registered")),
+            None => _AgentActionResult::err(format!("tool '{name}' not registered")),
         }
     }
 
@@ -55,45 +55,45 @@ impl ToolRegistry {
         self.actions.iter().map(|a| a.name).collect()
     }
 
-    pub fn is_registered(&self, name: &str) -> bool {
+    pub fn _is_registered(&self, name: &str) -> bool {
         self.actions.iter().any(|a| a.name == name)
     }
 }
 
 /// 默认工具集 (click/type/extract/scroll/wait)
-pub fn default_tools() -> ToolRegistry {
+pub fn _default_tools() -> ToolRegistry {
     let mut reg = ToolRegistry::new();
-    reg.register(ToolAction {
+    reg.register(_ToolAction {
         name: "click",
         description: "click a selector",
-        run: |sel| AgentActionResult::ok(format!("clicked {sel}")),
+        run: |sel| _AgentActionResult::ok(format!("clicked {sel}")),
     });
-    reg.register(ToolAction {
+    reg.register(_ToolAction {
         name: "type",
         description: "type text into focused input",
-        run: |text| AgentActionResult::ok(format!("typed {text}")),
+        run: |text| _AgentActionResult::ok(format!("typed {text}")),
     });
-    reg.register(ToolAction {
+    reg.register(_ToolAction {
         name: "extract",
         description: "extract text from a selector",
-        run: |sel| AgentActionResult::ok(format!("extracted from {sel}")),
+        run: |sel| _AgentActionResult::ok(format!("extracted from {sel}")),
     });
-    reg.register(ToolAction {
+    reg.register(_ToolAction {
         name: "scroll",
         description: "scroll the page",
-        run: |_| AgentActionResult::ok("scrolled"),
+        run: |_| _AgentActionResult::ok("scrolled"),
     });
-    reg.register(ToolAction {
+    reg.register(_ToolAction {
         name: "wait",
         description: "wait some ticks",
-        run: |ticks| AgentActionResult::ok(format!("waited {ticks} ticks")),
+        run: |ticks| _AgentActionResult::ok(format!("waited {ticks} ticks")),
     });
     reg
 }
 
 /// Agent 决策的动作
 #[derive(Debug, Clone, PartialEq)]
-pub enum AgentAction {
+pub enum _AgentAction {
     Click { selector: &'static str },
     Type { text: &'static str },
     Extract { selector: &'static str },
@@ -104,7 +104,7 @@ pub enum AgentAction {
 
 /// 会话事件 (状态机转移产物)
 #[derive(Debug, Clone, PartialEq)]
-pub enum SessionEvent {
+pub enum _SessionEvent {
     Interact { tick: usize, action_taken: &'static str },
     Extracted { text: String },
     Done,
@@ -131,10 +131,10 @@ pub struct AgentSession {
 
 impl AgentSession {
     pub fn new() -> Self {
-        Self::with_max_steps(20)
+        Self::_with_max_steps(20)
     }
 
-    pub fn with_max_steps(max_steps: usize) -> Self {
+    pub fn _with_max_steps(max_steps: usize) -> Self {
         Self {
             ticks: 0,
             steps_taken: 0,
@@ -145,68 +145,68 @@ impl AgentSession {
     }
 
     /// 单步推进状态机
-    pub fn step(&mut self, action: AgentAction, page_text: &str) -> SessionEvent {
+    pub fn step(&mut self, action: _AgentAction, page_text: &str) -> _SessionEvent {
         if self.terminated {
-            return SessionEvent::Done;
+            return _SessionEvent::Done;
         }
         self.steps_taken += 1;
         self.ticks += 1;
         match action {
-            AgentAction::Done => {
+            _AgentAction::Done => {
                 self.terminated = true;
-                SessionEvent::Done
+                _SessionEvent::Done
             }
-            AgentAction::Wait { ticks } => {
+            _AgentAction::Wait { ticks } => {
                 self.ticks += ticks;
                 self.maybe_terminal("wait")
             }
-            AgentAction::Extract { .. } => {
+            _AgentAction::Extract { .. } => {
                 let trimmed = page_text.trim();
                 if !trimmed.is_empty() {
                     self.terminated = true;
                     self.extracted = Some(trimmed.to_string());
-                    SessionEvent::Extracted { text: trimmed.to_string() }
+                    _SessionEvent::Extracted { text: trimmed.to_string() }
                 } else {
                     self.maybe_terminal("extract")
                 }
             }
-            AgentAction::Click { .. } | AgentAction::Type { .. } | AgentAction::Scroll => {
+            _AgentAction::Click { .. } | _AgentAction::Type { .. } | _AgentAction::Scroll => {
                 self.maybe_terminal("interact")
             }
         }
     }
 
-    fn maybe_terminal(&mut self, action_taken: &'static str) -> SessionEvent {
+    fn maybe_terminal(&mut self, action_taken: &'static str) -> _SessionEvent {
         if self.steps_taken >= self.max_steps {
             self.terminated = true;
-            SessionEvent::MaxStepsReached
+            _SessionEvent::MaxStepsReached
         } else {
-            SessionEvent::Interact { tick: self.ticks, action_taken }
+            _SessionEvent::Interact { tick: self.ticks, action_taken }
         }
     }
 
     /// 启发式选工具: 按任务关键词优先, 未注册的工具不会选中
-    fn pick_action(&self, task: &str, page_text: &str, tools: &ToolRegistry) -> AgentAction {
+    fn pick_action(&self, task: &str, page_text: &str, tools: &ToolRegistry) -> _AgentAction {
         let task = task.to_lowercase();
-        if task.contains("click") && tools.is_registered("click") {
-            AgentAction::Click { selector: "main" }
-        } else if task.contains("type") && tools.is_registered("type") {
-            AgentAction::Type { text: "query" }
-        } else if task.contains("scroll") && tools.is_registered("scroll") {
-            AgentAction::Scroll
-        } else if task.contains("wait") && tools.is_registered("wait") {
-            AgentAction::Wait { ticks: 1 }
-        } else if task.contains("extract") && tools.is_registered("extract") {
-            AgentAction::Extract { selector: "main" }
+        if task.contains("click") && tools._is_registered("click") {
+            _AgentAction::Click { selector: "main" }
+        } else if task.contains("type") && tools._is_registered("type") {
+            _AgentAction::Type { text: "query" }
+        } else if task.contains("scroll") && tools._is_registered("scroll") {
+            _AgentAction::Scroll
+        } else if task.contains("wait") && tools._is_registered("wait") {
+            _AgentAction::Wait { ticks: 1 }
+        } else if task.contains("extract") && tools._is_registered("extract") {
+            _AgentAction::Extract { selector: "main" }
         } else if !page_text.trim().is_empty() && self.extracted.is_none() {
-            AgentAction::Extract { selector: "body" }
+            _AgentAction::Extract { selector: "body" }
         } else {
-            AgentAction::Done
+            _AgentAction::Done
         }
     }
 
     /// 确定性任务循环: 每步经 page_supplier 取页面文本, 启发式选工具并推进状态
-    pub fn run_task(
+    pub fn _run_task(
         &mut self,
         task: &str,
         tools: &ToolRegistry,
@@ -224,24 +224,24 @@ impl AgentSession {
             page = page_supplier(self, &page);
             let action = self.pick_action(task, &page, tools);
             match self.step(action, &page) {
-                SessionEvent::Extracted { .. } => {
+                _SessionEvent::Extracted { .. } => {
                     return TaskOutcome { completed: true, steps: self.steps_taken, reason: "extracted" };
                 }
-                SessionEvent::Done => {
+                _SessionEvent::Done => {
                     return TaskOutcome {
                         completed: self.extracted.is_some(),
                         steps: self.steps_taken,
                         reason: "done",
                     };
                 }
-                SessionEvent::MaxStepsReached => {
+                _SessionEvent::MaxStepsReached => {
                     return TaskOutcome {
                         completed: false,
                         steps: self.steps_taken,
                         reason: "max_steps_reached",
                     };
                 }
-                SessionEvent::Interact { .. } => {}
+                _SessionEvent::Interact { .. } => {}
             }
         }
     }
@@ -262,8 +262,8 @@ impl SelfTest for AgenticBrowseSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let tools = default_tools();
-        if !tools.is_registered("click") || !tools.is_registered("extract") {
+        let tools = _default_tools();
+        if !tools._is_registered("click") || !tools._is_registered("extract") {
             return Err(vec!["default tool registry incomplete".into()]);
         }
         if tools.execute("missing", "").ok {
@@ -271,13 +271,13 @@ impl SelfTest for AgenticBrowseSelfTest {
         }
 
         let mut session = AgentSession::new();
-        let ev = session.step(AgentAction::Click { selector: "main" }, "<html/>");
-        if !matches!(ev, SessionEvent::Interact { .. }) {
+        let ev = session.step(_AgentAction::Click { selector: "main" }, "<html/>");
+        if !matches!(ev, _SessionEvent::Interact { .. }) {
             return Err(vec!["interact step should yield Interact event".into()]);
         }
 
         let mut session = AgentSession::new();
-        let outcome = session.run_task("extract the headline", &tools, |_, _| "Headline: NeoTrix".into());
+        let outcome = session._run_task("extract the headline", &tools, |_, _| "Headline: NeoTrix".into());
         if !outcome.completed {
             return Err(vec![format!("task should complete, got {outcome:?}")]);
         }
@@ -300,15 +300,15 @@ mod tests {
     #[test]
     fn test_tool_register_list() {
         let mut reg = ToolRegistry::new();
-        reg.register(ToolAction {
+        reg.register(_ToolAction {
             name: "click",
             description: "click",
-            run: |_| AgentActionResult::ok("clicked"),
+            run: |_| _AgentActionResult::ok("clicked"),
         });
-        reg.register(ToolAction {
+        reg.register(_ToolAction {
             name: "extract",
             description: "extract",
-            run: |_| AgentActionResult::ok("extracted"),
+            run: |_| _AgentActionResult::ok("extracted"),
         });
         assert_eq!(reg.list(), vec!["click", "extract"]);
     }
@@ -316,10 +316,10 @@ mod tests {
     #[test]
     fn test_tool_execute_registered() {
         let mut reg = ToolRegistry::new();
-        reg.register(ToolAction {
+        reg.register(_ToolAction {
             name: "type",
             description: "type",
-            run: |arg| AgentActionResult::ok(format!("typed {arg}")),
+            run: |arg| _AgentActionResult::ok(format!("typed {arg}")),
         });
         let res = reg.execute("type", "hello");
         assert!(res.ok);
@@ -332,23 +332,23 @@ mod tests {
         let res = reg.execute("nope", "arg");
         assert!(!res.ok);
         assert!(res.message.contains("not registered"));
-        assert!(!reg.is_registered("nope"));
+        assert!(!reg._is_registered("nope"));
     }
 
     #[test]
     fn test_tool_is_registered() {
-        let tools = default_tools();
+        let tools = _default_tools();
         for name in ["click", "type", "extract", "scroll", "wait"] {
-            assert!(tools.is_registered(name));
+            assert!(tools._is_registered(name));
         }
-        assert!(!tools.is_registered("screenshot"));
+        assert!(!tools._is_registered("screenshot"));
     }
 
     #[test]
     fn test_session_step_click_transition() {
         let mut s = AgentSession::new();
-        let ev = s.step(AgentAction::Click { selector: "#a" }, "<div/>");
-        assert!(matches!(ev, SessionEvent::Interact { .. }));
+        let ev = s.step(_AgentAction::Click { selector: "#a" }, "<div/>");
+        assert!(matches!(ev, _SessionEvent::Interact { .. }));
         assert_eq!(s.steps_taken, 1);
         assert_eq!(s.ticks, 1);
         assert!(!s.terminated);
@@ -357,21 +357,21 @@ mod tests {
     #[test]
     fn test_session_extract_completes() {
         let mut s = AgentSession::new();
-        let ev = s.step(AgentAction::Extract { selector: "main" }, "  content here  ");
-        assert!(matches!(ev, SessionEvent::Extracted { .. }));
+        let ev = s.step(_AgentAction::Extract { selector: "main" }, "  content here  ");
+        assert!(matches!(ev, _SessionEvent::Extracted { .. }));
         assert!(s.terminated);
         assert_eq!(s.extracted.as_deref(), Some("content here"));
     }
 
     #[test]
     fn test_session_max_steps_cap() {
-        let mut s = AgentSession::with_max_steps(3);
-        let ev1 = s.step(AgentAction::Scroll, "<html/>");
-        let ev2 = s.step(AgentAction::Scroll, "<html/>");
-        let ev3 = s.step(AgentAction::Scroll, "<html/>");
-        assert!(matches!(ev1, SessionEvent::Interact { .. }));
-        assert!(matches!(ev2, SessionEvent::Interact { .. }));
-        assert_eq!(ev3, SessionEvent::MaxStepsReached);
+        let mut s = AgentSession::_with_max_steps(3);
+        let ev1 = s.step(_AgentAction::Scroll, "<html/>");
+        let ev2 = s.step(_AgentAction::Scroll, "<html/>");
+        let ev3 = s.step(_AgentAction::Scroll, "<html/>");
+        assert!(matches!(ev1, _SessionEvent::Interact { .. }));
+        assert!(matches!(ev2, _SessionEvent::Interact { .. }));
+        assert_eq!(ev3, _SessionEvent::MaxStepsReached);
         assert!(s.terminated);
         assert_eq!(s.steps_taken, 3);
     }
@@ -379,17 +379,17 @@ mod tests {
     #[test]
     fn test_session_done_terminal() {
         let mut s = AgentSession::new();
-        let ev = s.step(AgentAction::Done, "<html/>");
-        assert_eq!(ev, SessionEvent::Done);
+        let ev = s.step(_AgentAction::Done, "<html/>");
+        assert_eq!(ev, _SessionEvent::Done);
         assert!(s.terminated);
-        assert_eq!(s.step(AgentAction::Scroll, "<html/>"), SessionEvent::Done);
+        assert_eq!(s.step(_AgentAction::Scroll, "<html/>"), _SessionEvent::Done);
     }
 
     #[test]
     fn test_run_task_completion() {
-        let tools = default_tools();
+        let tools = _default_tools();
         let mut s = AgentSession::new();
-        let outcome = s.run_task("extract the headline", &tools, page_with_content);
+        let outcome = s._run_task("extract the headline", &tools, page_with_content);
         assert!(outcome.completed);
         assert_eq!(outcome.reason, "extracted");
         assert!(outcome.steps >= 1);
@@ -397,9 +397,9 @@ mod tests {
 
     #[test]
     fn test_run_task_max_steps_cap() {
-        let tools = default_tools();
-        let mut s = AgentSession::with_max_steps(2);
-        let outcome = s.run_task("click the button", &tools, empty_page);
+        let tools = _default_tools();
+        let mut s = AgentSession::_with_max_steps(2);
+        let outcome = s._run_task("click the button", &tools, empty_page);
         assert!(!outcome.completed);
         assert_eq!(outcome.reason, "max_steps_reached");
         assert_eq!(outcome.steps, 2);
@@ -409,7 +409,7 @@ mod tests {
     fn test_run_task_done_without_extraction() {
         let tools = ToolRegistry::new();
         let mut s = AgentSession::new();
-        let outcome = s.run_task("just browse around", &tools, empty_page);
+        let outcome = s._run_task("just browse around", &tools, empty_page);
         assert!(!outcome.completed);
         assert_eq!(outcome.reason, "done");
     }

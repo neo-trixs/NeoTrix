@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{OsintConfig, OsintTarget};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BreachEntry {
+pub struct _BreachEntry {
     pub source: String,
     pub email: String,
     pub breach_name: Option<String>,
@@ -18,7 +18,7 @@ pub struct BreachEntry {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CredentialFindings {
     pub email: Option<String>,
-    pub breaches: Vec<BreachEntry>,
+    pub breaches: Vec<_BreachEntry>,
     pub pwned_count: u64,
     pub domain_breaches: Vec<String>,
 }
@@ -44,7 +44,7 @@ impl std::fmt::Display for CredentialFindings {
     }
 }
 
-async fn check_hibp(email: &str, client: &Client) -> Vec<BreachEntry> {
+async fn check_hibp(email: &str, client: &Client) -> Vec<_BreachEntry> {
     let hash = sha1_hash(email.to_lowercase().trim());
     let prefix = &hash[..5];
     let suffix = &hash[5..];
@@ -58,7 +58,7 @@ async fn check_hibp(email: &str, client: &Client) -> Vec<BreachEntry> {
                 if let Some((suffix_found, count_str)) = line.split_once(':') {
                     if suffix_found.eq_ignore_ascii_case(suffix) {
                         let count: u64 = count_str.trim().parse().unwrap_or(0);
-                        breaches.push(BreachEntry {
+                        breaches.push(_BreachEntry {
                             source: "haveibeenpwned".to_string(),
                             email: email.to_string(),
                             breach_name: Some("Password exposed in breach".to_string()),
@@ -75,7 +75,7 @@ async fn check_hibp(email: &str, client: &Client) -> Vec<BreachEntry> {
     }
 }
 
-async fn check_hibp_breaches(email: &str, client: &Client, api_key: Option<&str>) -> Vec<BreachEntry> {
+async fn check_hibp_breaches(email: &str, client: &Client, api_key: Option<&str>) -> Vec<_BreachEntry> {
     let key = match api_key {
         Some(k) if !k.is_empty() => k,
         _ => return vec![],  // HIBP breach API requires API key
@@ -92,7 +92,7 @@ async fn check_hibp_breaches(email: &str, client: &Client, api_key: Option<&str>
         Ok(resp) if resp.status().is_success() => {
             match resp.json::<Vec<serde_json::Value>>().await {
                 Ok(breaches) => {
-                    breaches.iter().map(|b| BreachEntry {
+                    breaches.iter().map(|b| _BreachEntry {
                         source: "haveibeenpwned".to_string(),
                         email: email.to_string(),
                         breach_name: b["Name"].as_str().map(|s| s.to_string()),
@@ -169,7 +169,7 @@ fn sha1_hash(input: &str) -> String {
     hex.to_uppercase()
 }
 
-async fn check_firefox_monitor(email: &str, client: &Client) -> Vec<BreachEntry> {
+async fn check_firefox_monitor(email: &str, client: &Client) -> Vec<_BreachEntry> {
     let url = "https://monitor.firefox.com/api/v1/scan".to_string();
     match client.post(&url)
         .json(&serde_json::json!({"email": email}))
@@ -183,7 +183,7 @@ async fn check_firefox_monitor(email: &str, client: &Client) -> Vec<BreachEntry>
                     let mut breaches = Vec::new();
                     if let Some(breaches_arr) = json["breaches"].as_array() {
                         for b in breaches_arr {
-                            breaches.push(BreachEntry {
+                            breaches.push(_BreachEntry {
                                 source: "firefox-monitor".to_string(),
                                 email: email.to_string(),
                                 breach_name: b["Name"].as_str().map(|s| s.to_string()),

@@ -22,18 +22,18 @@ use serde::{Deserialize, Serialize};
 
 /// USGS GeoJSON FeatureCollection 顶层结构
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct UsgsFeatureCollection {
+pub struct _UsgsFeatureCollection {
     #[serde(default)]
     pub r#type: String,
     #[serde(default)]
-    pub metadata: UsgsMetadata,
+    pub metadata: _UsgsMetadata,
     #[serde(default)]
-    pub features: Vec<UsgsFeature>,
+    pub features: Vec<_UsgsFeature>,
 }
 
 /// Metadata 包含查询信息
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct UsgsMetadata {
+pub struct _UsgsMetadata {
     #[serde(default)]
     pub generated: i64,
     #[serde(default)]
@@ -50,20 +50,20 @@ pub struct UsgsMetadata {
 
 /// 单个地震事件 Feature
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct UsgsFeature {
+pub struct _UsgsFeature {
     #[serde(default)]
     pub r#type: String,
     #[serde(default)]
-    pub properties: UsgsProperties,
+    pub properties: _UsgsProperties,
     #[serde(default)]
-    pub geometry: UsgsGeometry,
+    pub geometry: _UsgsGeometry,
     #[serde(default)]
     pub id: String,
 }
 
 /// 地震属性 (核心数据)
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct UsgsProperties {
+pub struct _UsgsProperties {
     #[serde(default)]
     pub mag: Option<f64>,
     #[serde(default)]
@@ -120,7 +120,7 @@ pub struct UsgsProperties {
 
 /// 几何坐标
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct UsgsGeometry {
+pub struct _UsgsGeometry {
     #[serde(default)]
     pub r#type: String,
     #[serde(default)]
@@ -129,7 +129,7 @@ pub struct UsgsGeometry {
 
 /// 内部标准化事件结构 (用于入库)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UsgsEvent {
+pub struct _UsgsEvent {
     pub id: String,
     pub magnitude: f64,
     pub place: String,
@@ -155,7 +155,7 @@ pub struct UsgsEvent {
 
 // ── 解析层 ──────────────────────────────────────────────────────
 
-fn extract_event_from_feature(feature: &UsgsFeature) -> UsgsEvent {
+fn extract_event_from_feature(feature: &_UsgsFeature) -> _UsgsEvent {
     let coords = &feature.geometry.coordinates;
     let (longitude, latitude, depth) = if coords.len() >= 3 {
         (coords[0], coords[1], coords[2])
@@ -165,7 +165,7 @@ fn extract_event_from_feature(feature: &UsgsFeature) -> UsgsEvent {
         (0.0, 0.0, 0.0)
     };
 
-    UsgsEvent {
+    _UsgsEvent {
         id: feature.id.clone(),
         magnitude: feature.properties.mag.unwrap_or(0.0),
         place: feature.properties.place.clone(),
@@ -194,7 +194,7 @@ fn extract_event_from_feature(feature: &UsgsFeature) -> UsgsEvent {
 
 /// USGS Feed 类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UsgsFeedType {
+pub enum _UsgsFeedType {
     AllDay,
     AllWeek,
     AllMonth,
@@ -205,17 +205,17 @@ pub enum UsgsFeedType {
     M10Week,
 }
 
-impl UsgsFeedType {
+impl _UsgsFeedType {
     fn path(&self) -> &'static str {
         match self {
-            UsgsFeedType::AllDay => "all_day.geojson",
-            UsgsFeedType::AllWeek => "all_week.geojson",
-            UsgsFeedType::AllMonth => "all_month.geojson",
-            UsgsFeedType::SignificantWeek => "significant_week.geojson",
-            UsgsFeedType::SignificantMonth => "significant_month.geojson",
-            UsgsFeedType::M45Week => "4.5_week.geojson",
-            UsgsFeedType::M25Week => "2.5_week.geojson",
-            UsgsFeedType::M10Week => "1.0_week.geojson",
+            _UsgsFeedType::AllDay => "all_day.geojson",
+            _UsgsFeedType::AllWeek => "all_week.geojson",
+            _UsgsFeedType::AllMonth => "all_month.geojson",
+            _UsgsFeedType::SignificantWeek => "significant_week.geojson",
+            _UsgsFeedType::SignificantMonth => "significant_month.geojson",
+            _UsgsFeedType::M45Week => "4.5_week.geojson",
+            _UsgsFeedType::M25Week => "2.5_week.geojson",
+            _UsgsFeedType::M10Week => "1.0_week.geojson",
         }
     }
 }
@@ -223,7 +223,7 @@ impl UsgsFeedType {
 /// USGS Earthquakes Fetcher — 免费无key，公开 GeoJSON，直喂 intel-watch。
 pub struct UsgsFetcher {
     base_url: String,
-    feed_type: UsgsFeedType,
+    feed_type: _UsgsFeedType,
     client: std::sync::OnceLock<reqwest::blocking::Client>,
 }
 
@@ -235,14 +235,14 @@ impl Default for UsgsFetcher {
 
 impl UsgsFetcher {
     pub fn new() -> Self {
-        Self::with_feed(UsgsFeedType::AllDay)
+        Self::_with_feed(_UsgsFeedType::AllDay)
     }
 
-    pub fn with_feed(feed_type: UsgsFeedType) -> Self {
-        Self::with_base_and_feed("https://earthquake.usgs.gov", feed_type)
+    pub fn _with_feed(feed_type: _UsgsFeedType) -> Self {
+        Self::_with_base_and_feed("https://earthquake.usgs.gov", feed_type)
     }
 
-    pub fn with_base_and_feed(base_url: &str, feed_type: UsgsFeedType) -> Self {
+    pub fn _with_base_and_feed(base_url: &str, feed_type: _UsgsFeedType) -> Self {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             feed_type,
@@ -264,7 +264,7 @@ impl UsgsFetcher {
         format!("{}/earthquakes/feed/v1.0/summary/{}", self.base_url, self.feed_type.path())
     }
 
-    pub fn fetch(&self) -> Result<Vec<UsgsEvent>, String> {
+    pub fn fetch(&self) -> Result<Vec<_UsgsEvent>, String> {
         let url = self.build_url();
         let resp = self.client().get(&url).send().map_err(|e| format!("USGS request failed: {}", e))?;
         if !resp.status().is_success() {
@@ -274,8 +274,8 @@ impl UsgsFetcher {
         Self::parse_geojson(&text)
     }
 
-    pub fn parse_geojson(json: &str) -> Result<Vec<UsgsEvent>, String> {
-        let collection: UsgsFeatureCollection = serde_json::from_str(json).map_err(|e| format!("USGS parse failed: {}", e))?;
+    pub fn parse_geojson(json: &str) -> Result<Vec<_UsgsEvent>, String> {
+        let collection: _UsgsFeatureCollection = serde_json::from_str(json).map_err(|e| format!("USGS parse failed: {}", e))?;
         Ok(collection.features.iter().map(extract_event_from_feature).collect())
     }
 
@@ -283,7 +283,7 @@ impl UsgsFetcher {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<UsgsIngestReport, String> {
+    ) -> Result<_UsgsIngestReport, String> {
         let events = Self::parse_geojson(json)?;
         Self::ingest_events(kb, &events)
     }
@@ -291,16 +291,16 @@ impl UsgsFetcher {
     pub fn ingest(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-    ) -> Result<UsgsIngestReport, String> {
+    ) -> Result<_UsgsIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[UsgsEvent],
-    ) -> Result<UsgsIngestReport, String> {
-        let mut report = UsgsIngestReport {
+        events: &[_UsgsEvent],
+    ) -> Result<_UsgsIngestReport, String> {
+        let mut report = _UsgsIngestReport {
             events_fetched: events.len(),
             ..Default::default()
         };
@@ -322,7 +322,7 @@ impl UsgsFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[UsgsEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_UsgsEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: format!("M{:.1} - {}", e.magnitude, e.place),
             url: e.url.clone(),
@@ -343,7 +343,7 @@ pub fn usgs_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbo
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct UsgsIngestReport {
+pub struct _UsgsIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -362,14 +362,14 @@ impl Default for UsgsBackend {
 
 impl UsgsBackend {
     pub fn new() -> Self { Self::default() }
-    pub fn with_feed(feed_type: UsgsFeedType) -> Self { Self { fetcher: UsgsFetcher::with_feed(feed_type) } }
+    pub fn _with_feed(feed_type: _UsgsFeedType) -> Self { Self { fetcher: UsgsFetcher::_with_feed(feed_type) } }
 }
 
 impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for UsgsBackend {
     fn name(&self) -> &str { "usgs" }
     fn search(&self, _query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let events = self.fetcher.fetch()?;
-        let limited: Vec<UsgsEvent> = events.into_iter().take(count).collect();
+        let limited: Vec<_UsgsEvent> = events.into_iter().take(count).collect();
         Ok(UsgsFetcher::to_search_results(&limited))
     }
 }

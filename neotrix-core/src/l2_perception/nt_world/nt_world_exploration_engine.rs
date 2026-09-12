@@ -17,7 +17,7 @@ use crate::core::nt_core_traits::KnowledgeSink;
 
 /// 探索数据源类型
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ExplorationSource {
+pub enum _ExplorationSource {
     GitHubTrending,
     GitHubTopic,
     ArXiv,
@@ -27,26 +27,26 @@ pub enum ExplorationSource {
     Custom(String),
 }
 
-impl ExplorationSource {
+impl _ExplorationSource {
     pub fn label(&self) -> &str {
         match self {
-            ExplorationSource::GitHubTrending => "GitHub Trending",
-            ExplorationSource::GitHubTopic => "GitHub Topic",
-            ExplorationSource::ArXiv => "ArXiv",
-            ExplorationSource::Wikipedia => "Wikipedia",
-            ExplorationSource::WebSearch => "Web Search",
-            ExplorationSource::SeedUrls => "Seed URLs",
-            ExplorationSource::Custom(t) => t.as_str(),
+            _ExplorationSource::GitHubTrending => "GitHub Trending",
+            _ExplorationSource::GitHubTopic => "GitHub Topic",
+            _ExplorationSource::ArXiv => "ArXiv",
+            _ExplorationSource::Wikipedia => "Wikipedia",
+            _ExplorationSource::WebSearch => "Web Search",
+            _ExplorationSource::SeedUrls => "Seed URLs",
+            _ExplorationSource::Custom(t) => t.as_str(),
         }
     }
 }
 
 /// 探索条目 (单次发现的结果)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExplorationEntry {
+pub struct _ExplorationEntry {
     pub url: String,
     pub title: String,
-    pub source: ExplorationSource,
+    pub source: _ExplorationSource,
     pub summary: String,
     pub discovered_at: i64,
     pub ingested: bool,
@@ -55,7 +55,7 @@ pub struct ExplorationEntry {
 
 /// 探索周期报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExplorationCycleReport {
+pub struct _ExplorationCycleReport {
     pub discovered: usize,
     pub ingested: usize,
     pub skipped: usize,
@@ -101,7 +101,7 @@ impl Default for ExplorationConfig {
 pub struct ExplorationEngine {
     pub config: ExplorationConfig,
     pub kb: Option<Box<dyn KnowledgeSink>>,
-    discovered: Vec<ExplorationEntry>,
+    discovered: Vec<_ExplorationEntry>,
     ingested_urls: HashMap<String, i64>,  // URL → 上次摄入时间
     total_cycles: usize,
 }
@@ -122,9 +122,9 @@ impl ExplorationEngine {
     }
 
     /// 执行一次探索循环: 发现 → 去重 → 摄入
-    pub fn run_cycle(&mut self) -> ExplorationCycleReport {
+    pub fn run_cycle(&mut self) -> _ExplorationCycleReport {
         self.total_cycles += 1;
-        let mut report = ExplorationCycleReport {
+        let mut report = _ExplorationCycleReport {
             discovered: 0, ingested: 0, skipped: 0, failed: 0,
             by_source: HashMap::new(), total_in_kb: self.ingested_urls.len(),
         };
@@ -136,7 +136,7 @@ impl ExplorationEngine {
 
         // 2. 去重 + 冷却检查
         let now = Utc::now().timestamp();
-        let mut to_ingest: Vec<ExplorationEntry> = Vec::new();
+        let mut to_ingest: Vec<_ExplorationEntry> = Vec::new();
         self.discovered.retain(|e| {
             if e.ingested { return false; }
             let cooldown = (self.config.cooldown_hours * 3600) as i64;
@@ -173,7 +173,7 @@ impl ExplorationEngine {
     }
 
     /// 发现新资源
-    fn discover(&self) -> Vec<ExplorationEntry> {
+    fn discover(&self) -> Vec<_ExplorationEntry> {
         let mut entries = Vec::new();
         let now = Utc::now().timestamp();
 
@@ -191,10 +191,10 @@ impl ExplorationEngine {
 
         // 种子 URL
         for url in &self.config.seed_urls {
-            entries.push(ExplorationEntry {
+            entries.push(_ExplorationEntry {
                 url: url.clone(),
                 title: url.clone(),
-                source: ExplorationSource::SeedUrls,
+                source: _ExplorationSource::SeedUrls,
                 summary: String::new(),
                 discovered_at: now,
                 ingested: false,
@@ -206,7 +206,7 @@ impl ExplorationEngine {
     }
 
     /// 发现 GitHub Trending 仓库
-    fn discover_github_trending(&self) -> Result<Vec<ExplorationEntry>, String> {
+    fn discover_github_trending(&self) -> Result<Vec<_ExplorationEntry>, String> {
         let mut entries = Vec::new();
         let client = reqwest::blocking::Client::builder()
             .user_agent("NeoTrix/1.0")
@@ -231,10 +231,10 @@ impl ExplorationEngine {
                                 let desc = item.get("description")
                                     .and_then(|v| v.as_str()).unwrap_or("").to_string();
                                 if !repo_url.is_empty() {
-                                    entries.push(ExplorationEntry {
+                                    entries.push(_ExplorationEntry {
                                         url: repo_url,
                                         title: name,
-                                        source: ExplorationSource::GitHubTrending,
+                                        source: _ExplorationSource::GitHubTrending,
                                         summary: desc,
                                         discovered_at: Utc::now().timestamp(),
                                         ingested: false,
@@ -254,7 +254,7 @@ impl ExplorationEngine {
     }
 
     /// 发现 ArXiv 最新论文
-    fn discover_arxiv(&self, category: &str) -> Result<Vec<ExplorationEntry>, String> {
+    fn discover_arxiv(&self, category: &str) -> Result<Vec<_ExplorationEntry>, String> {
         let mut entries = Vec::new();
         let url = format!("http://export.arxiv.org/api/query?search_query=cat:{}&sortBy=submittedDate&sortOrder=descending&max_results=5",
             category);
@@ -272,10 +272,10 @@ impl ExplorationEngine {
                     let title = extract_xml(entry, "title").unwrap_or_default();
                     let summary = extract_xml(entry, "summary").unwrap_or_default();
                     if !id.is_empty() {
-                        entries.push(ExplorationEntry {
+                        entries.push(_ExplorationEntry {
                             url: id,
                             title: title.trim().to_string(),
-                            source: ExplorationSource::ArXiv,
+                            source: _ExplorationSource::ArXiv,
                             summary: summary.chars().take(200).collect(),
                             discovered_at: Utc::now().timestamp(),
                             ingested: false,
@@ -292,12 +292,12 @@ impl ExplorationEngine {
     }
 
     /// 摄入单个条目到 KB
-    fn ingest(&self, entry: &ExplorationEntry) -> Result<(), String> {
+    fn ingest(&self, entry: &_ExplorationEntry) -> Result<(), String> {
         match &self.kb {
             Some(kb) => {
                 let domain = match entry.source {
-                    ExplorationSource::ArXiv => "arxiv.org",
-                    ExplorationSource::GitHubTrending | ExplorationSource::GitHubTopic => "github.com",
+                    _ExplorationSource::ArXiv => "arxiv.org",
+                    _ExplorationSource::GitHubTrending | _ExplorationSource::GitHubTopic => "github.com",
                     _ => "web",
                 };
                 let summary = if entry.summary.is_empty() {
@@ -326,8 +326,8 @@ impl ExplorationEngine {
         self.discovered.iter().filter(|e| !e.ingested).count()
     }
 
-    pub fn stats(&self) -> ExplorationStats {
-        ExplorationStats {
+    pub fn stats(&self) -> _ExplorationStats {
+        _ExplorationStats {
             total_cycles: self.total_cycles,
             discovered: self.discovered.len(),
             ingested_urls: self.ingested_urls.len(),
@@ -336,7 +336,7 @@ impl ExplorationEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExplorationStats {
+pub struct _ExplorationStats {
     pub total_cycles: usize,
     pub discovered: usize,
     pub ingested_urls: usize,
@@ -404,7 +404,7 @@ mod tests {
         });
         let entries = engine.discover();
         assert!(!entries.is_empty(), "should have at least seed URLs");
-        assert!(entries.iter().any(|e| e.source == ExplorationSource::SeedUrls));
+        assert!(entries.iter().any(|e| e.source == _ExplorationSource::SeedUrls));
     }
 
     #[test]

@@ -27,7 +27,7 @@ pub struct Snapshot {
 
 /// 变更检测结果
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ChangeKind {
+pub enum _ChangeKind {
     Added,
     Removed,
     Modified,
@@ -35,11 +35,11 @@ pub enum ChangeKind {
 }
 
 /// 网站变更检测 + FTS5 索引契约 (worldmonitor 抽象)
-pub trait SiteChangeMonitor {
+pub trait _SiteChangeMonitor {
     /// 计算内容 hash 快照
     fn snapshot(&self, url: &str, content: &str) -> Snapshot;
     /// 比对前后快照，返回变更类型
-    fn detect(&self, previous: &Snapshot, current: &Snapshot) -> ChangeKind;
+    fn detect(&self, previous: &Snapshot, current: &Snapshot) -> _ChangeKind;
     /// 无 KB 句柄的轻量入口 (兼容旧调用方) — 仅校验可索引性。
     /// TODO(C2): 真实写入统一经 `index_fts5_to_kb`, 本方法保留为可用性探针。
     fn index_fts5(&self, url: &str, content: &str) -> bool;
@@ -50,7 +50,7 @@ pub trait SiteChangeMonitor {
 
 /// 默认 stub 实现
 #[derive(Default)]
-pub struct WorldMonitor;
+pub struct _WorldMonitor;
 
 fn simple_hash(content: &str) -> String {
     if content.is_empty() {
@@ -68,7 +68,7 @@ fn md5_like(content: &str) -> u64 {
     h
 }
 
-impl SiteChangeMonitor for WorldMonitor {
+impl _SiteChangeMonitor for _WorldMonitor {
     fn snapshot(&self, url: &str, content: &str) -> Snapshot {
         Snapshot {
             url: url.to_string(),
@@ -76,13 +76,13 @@ impl SiteChangeMonitor for WorldMonitor {
         }
     }
 
-    fn detect(&self, previous: &Snapshot, current: &Snapshot) -> ChangeKind {
+    fn detect(&self, previous: &Snapshot, current: &Snapshot) -> _ChangeKind {
         if previous.content_hash == current.content_hash {
-            ChangeKind::Unchanged
+            _ChangeKind::Unchanged
         } else if previous.content_hash.is_empty() {
-            ChangeKind::Added
+            _ChangeKind::Added
         } else {
-            ChangeKind::Modified
+            _ChangeKind::Modified
         }
     }
 
@@ -111,22 +111,22 @@ impl SiteChangeMonitor for WorldMonitor {
 }
 
 /// SelfTest (T1): 变更检测 + hash 比对存在性
-pub struct WorldMonitorSelfTest;
+pub struct _WorldMonitorSelfTest;
 
-impl SelfTest for WorldMonitorSelfTest {
+impl SelfTest for _WorldMonitorSelfTest {
     fn name(&self) -> &str {
         "nt_world_monitor"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let m = WorldMonitor;
+        let m = _WorldMonitor;
         let a = m.snapshot("https://x.com", "v1");
         let b = m.snapshot("https://x.com", "v1");
         let c = m.snapshot("https://x.com", "v2");
-        if m.detect(&a, &b) != ChangeKind::Unchanged {
+        if m.detect(&a, &b) != _ChangeKind::Unchanged {
             return Err(vec!["worldmonitor: identical content must be Unchanged".into()]);
         }
-        if m.detect(&a, &c) != ChangeKind::Modified {
+        if m.detect(&a, &c) != _ChangeKind::Modified {
             return Err(vec!["worldmonitor: differing content must be Modified".into()]);
         }
         if !m.index_fts5("https://x.com", "data") {
@@ -138,8 +138,8 @@ impl SelfTest for WorldMonitorSelfTest {
 }
 
 /// 注册 worldmonitor SelfTest
-pub fn register_monitor_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(WorldMonitorSelfTest));
+pub fn _register_monitor_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(_WorldMonitorSelfTest));
 }
 
 #[cfg(test)]
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_hash_stable() {
-        let m = WorldMonitor;
+        let m = _WorldMonitor;
         assert_eq!(
             m.snapshot("u", "same").content_hash,
             m.snapshot("u", "same").content_hash
@@ -157,19 +157,19 @@ mod tests {
 
     #[test]
     fn test_detect_added_and_modified() {
-        let m = WorldMonitor;
+        let m = _WorldMonitor;
         let empty = m.snapshot("u", "");
         let v1 = m.snapshot("u", "v1");
-        assert_eq!(m.detect(&empty, &v1), ChangeKind::Added);
-        assert_eq!(m.detect(&v1, &v1), ChangeKind::Unchanged);
-        assert_eq!(m.detect(&v1, &m.snapshot("u", "v2")), ChangeKind::Modified);
+        assert_eq!(m.detect(&empty, &v1), _ChangeKind::Added);
+        assert_eq!(m.detect(&v1, &v1), _ChangeKind::Unchanged);
+        assert_eq!(m.detect(&v1, &m.snapshot("u", "v2")), _ChangeKind::Modified);
     }
 
     #[test]
     fn test_fts5_index_stub() {
-        let m = WorldMonitor;
+        let m = _WorldMonitor;
         assert!(m.index_fts5("https://x.com", "content"));
-        let t = WorldMonitorSelfTest;
+        let t = _WorldMonitorSelfTest;
         assert_eq!(t.name(), "nt_world_monitor");
         assert!(t.self_test().is_ok());
     }
@@ -182,7 +182,7 @@ mod tests {
             eprintln!("skip: KB (FTS5) unavailable in this build");
             return;
         };
-        let m = WorldMonitor;
+        let m = _WorldMonitor;
         let id = m
             .index_fts5_to_kb(&kb, "https://example.com/page", "monitored content")
             .expect("index should succeed");

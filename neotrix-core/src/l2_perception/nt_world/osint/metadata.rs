@@ -9,8 +9,8 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 单个元数据 provider 的静态描述。
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MetadataProvider {
-    /// Provider 名 (与 `ProviderResult::provider` 对应)。
+pub struct _MetadataProvider {
+    /// Provider 名 (与 `_ProviderResult::provider` 对应)。
     pub name: &'static str,
     /// 聚合时该 provider 的基准权重。
     pub weight: f64,
@@ -19,20 +19,20 @@ pub struct MetadataProvider {
 }
 
 /// 内置 provider 静态表 (≥6, 与 task 契约对齐)。
-pub static METADATA_PROVIDERS: [MetadataProvider; 8] = [
-    MetadataProvider { name: "openlib", weight: 0.9, latency_ms: 120 },
-    MetadataProvider { name: "goodreads", weight: 1.0, latency_ms: 200 },
-    MetadataProvider { name: "amazon", weight: 0.7, latency_ms: 90 },
-    MetadataProvider { name: "google_books", weight: 0.85, latency_ms: 150 },
-    MetadataProvider { name: "douban", weight: 0.6, latency_ms: 110 },
-    MetadataProvider { name: "worldcat", weight: 0.75, latency_ms: 300 },
-    MetadataProvider { name: "isbn", weight: 0.5, latency_ms: 40 },
-    MetadataProvider { name: "wikidata", weight: 0.95, latency_ms: 80 },
+pub static METADATA_PROVIDERS: [_MetadataProvider; 8] = [
+    _MetadataProvider { name: "openlib", weight: 0.9, latency_ms: 120 },
+    _MetadataProvider { name: "goodreads", weight: 1.0, latency_ms: 200 },
+    _MetadataProvider { name: "amazon", weight: 0.7, latency_ms: 90 },
+    _MetadataProvider { name: "google_books", weight: 0.85, latency_ms: 150 },
+    _MetadataProvider { name: "douban", weight: 0.6, latency_ms: 110 },
+    _MetadataProvider { name: "worldcat", weight: 0.75, latency_ms: 300 },
+    _MetadataProvider { name: "isbn", weight: 0.5, latency_ms: 40 },
+    _MetadataProvider { name: "wikidata", weight: 0.95, latency_ms: 80 },
 ];
 
 /// 单个 provider 返回的原始结果。
 #[derive(Debug, Clone, PartialEq)]
-pub struct ProviderResult {
+pub struct _ProviderResult {
     pub provider: &'static str,
     pub title: Option<String>,
     pub author: Option<String>,
@@ -40,7 +40,7 @@ pub struct ProviderResult {
     pub confidence: f64,
 }
 
-impl ProviderResult {
+impl _ProviderResult {
     pub fn new(provider: &'static str) -> Self {
         Self {
             provider,
@@ -54,7 +54,7 @@ impl ProviderResult {
 
 /// 聚合后的统一元数据记录。
 #[derive(Debug, Clone, PartialEq)]
-pub struct AggregatedRecord {
+pub struct _AggregatedRecord {
     pub title: Option<String>,
     pub author: Option<String>,
     pub rating: Option<f64>,
@@ -67,7 +67,7 @@ pub struct AggregatedRecord {
 /// 多 provider 元数据聚合器 — 确定性加权融合。
 #[derive(Debug, Clone)]
 pub struct MetadataAggregator {
-    providers: Vec<MetadataProvider>,
+    providers: Vec<_MetadataProvider>,
 }
 
 impl Default for MetadataAggregator {
@@ -84,7 +84,7 @@ impl MetadataAggregator {
     }
 
     /// 以自定义 provider 表构建 (主要用于测试与注入式配置)。
-    pub fn with_providers(providers: Vec<MetadataProvider>) -> Self {
+    pub fn _with_providers(providers: Vec<_MetadataProvider>) -> Self {
         Self { providers }
     }
 
@@ -92,7 +92,7 @@ impl MetadataAggregator {
     /// - title/author 按 (provider weight × confidence) 加权投票, 并列取字典序最小 (输入序无关)。
     /// - rating 为加权均值, 权重 = provider weight × confidence。
     /// - consensus 为 title+author 各自符合比例的均值。
-    pub fn aggregate(&self, results: &[ProviderResult]) -> AggregatedRecord {
+    pub fn aggregate(&self, results: &[_ProviderResult]) -> _AggregatedRecord {
         let sources_used = results
             .iter()
             .filter(|r| r.title.is_some() || r.author.is_some() || r.rating.is_some())
@@ -114,7 +114,7 @@ impl MetadataAggregator {
 
         let consensus = self.compute_consensus(results, title.as_deref(), author.as_deref());
 
-        AggregatedRecord {
+        _AggregatedRecord {
             title,
             author,
             rating,
@@ -124,7 +124,7 @@ impl MetadataAggregator {
     }
 
     /// 共识分 (0..=1) — provider 在 title+author 上越一致, 分数越高。
-    pub fn consensus_score(&self, record: &AggregatedRecord) -> f64 {
+    pub fn consensus_score(&self, record: &_AggregatedRecord) -> f64 {
         record.consensus.clamp(0.0, 1.0)
     }
 
@@ -136,14 +136,14 @@ impl MetadataAggregator {
             .unwrap_or(1.0)
     }
 
-    fn effective_weight(&self, r: &ProviderResult) -> f64 {
+    fn effective_weight(&self, r: &_ProviderResult) -> f64 {
         self.provider_weight(r.provider) * r.confidence
     }
 
     /// 按有效权重对某字段候选值投票; 并列时取字典序最小, 保证输入序无关的确定性。
-    fn weighted_field_vote<F>(&self, results: &[ProviderResult], field: F) -> Option<String>
+    fn weighted_field_vote<F>(&self, results: &[_ProviderResult], field: F) -> Option<String>
     where
-        F: Fn(&ProviderResult) -> Option<String>,
+        F: Fn(&_ProviderResult) -> Option<String>,
     {
         let mut scores: Vec<(String, f64)> = Vec::new();
         for r in results {
@@ -167,7 +167,7 @@ impl MetadataAggregator {
     /// 一致性: 分别计算 title / author 与选定值的符合比例, 取平均。
     fn compute_consensus(
         &self,
-        results: &[ProviderResult],
+        results: &[_ProviderResult],
         title: Option<&str>,
         author: Option<&str>,
     ) -> f64 {
@@ -202,7 +202,7 @@ impl MetadataAggregator {
 
 /// 三路同步状态 (local / remote 各自版本 + 上次同步版本)。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ThreeWayState {
+pub struct _ThreeWayState {
     pub local: u32,
     pub remote: u32,
     pub last_sync: u32,
@@ -210,7 +210,7 @@ pub struct ThreeWayState {
 
 /// 三路同步动作。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SyncAction {
+pub enum _SyncAction {
     /// 本地较新, 推送本地。
     PushLocal,
     /// 远端较新, 拉取远端。
@@ -223,31 +223,31 @@ pub enum SyncAction {
 
 /// 同步动作计数报告。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct SyncReport {
+pub struct _SyncReport {
     pub pushes: u32,
     pub pulls: u32,
     pub merges: u32,
     pub noops: u32,
 }
 
-impl SyncReport {
-    fn record(&mut self, action: &SyncAction) {
+impl _SyncReport {
+    fn record(&mut self, action: &_SyncAction) {
         match action {
-            SyncAction::PushLocal => self.pushes += 1,
-            SyncAction::PullRemote => self.pulls += 1,
-            SyncAction::Merge => self.merges += 1,
-            SyncAction::NoOp => self.noops += 1,
+            _SyncAction::PushLocal => self.pushes += 1,
+            _SyncAction::PullRemote => self.pulls += 1,
+            _SyncAction::Merge => self.merges += 1,
+            _SyncAction::NoOp => self.noops += 1,
         }
     }
 }
 
 /// 三路同步解析器 — 确定性版本比较, 并维护累计报告。
 #[derive(Debug, Clone, Default)]
-pub struct ThreeWaySync {
-    pub report: SyncReport,
+pub struct _ThreeWaySync {
+    pub report: _SyncReport,
 }
 
-impl ThreeWaySync {
+impl _ThreeWaySync {
     pub fn new() -> Self {
         Self::default()
     }
@@ -259,32 +259,32 @@ impl ThreeWaySync {
     /// - local == remote → NoOp (两侧已在同一版本, 无传输需要)。
     /// - 仅一侧在 last_sync 之后有新版本 → PushLocal / PullRemote。
     /// - 两侧都在 last_sync 之后有新版本 → Merge。
-    pub fn resolve(&mut self, local_ver: u32, remote_ver: u32, last_sync_ver: u32) -> SyncAction {
+    pub fn resolve(&mut self, local_ver: u32, remote_ver: u32, last_sync_ver: u32) -> _SyncAction {
         let action = if local_ver == remote_ver || (last_sync_ver >= local_ver && last_sync_ver >= remote_ver) {
-            SyncAction::NoOp
+            _SyncAction::NoOp
         } else if local_ver > remote_ver {
             if last_sync_ver >= remote_ver {
-                SyncAction::PushLocal
+                _SyncAction::PushLocal
             } else {
-                SyncAction::Merge
+                _SyncAction::Merge
             }
         } else if last_sync_ver >= local_ver {
-            SyncAction::PullRemote
+            _SyncAction::PullRemote
         } else {
-            SyncAction::Merge
+            _SyncAction::Merge
         };
         self.report.record(&action);
         action
     }
 
     /// 便捷入口: 对可变状态解析并推进 last_sync, 返回动作。
-    pub fn sync(&mut self, state: &mut ThreeWayState) -> SyncAction {
+    pub fn sync(&mut self, state: &mut _ThreeWayState) -> _SyncAction {
         let action = self.resolve(state.local, state.remote, state.last_sync);
         state.last_sync = match action {
-            SyncAction::PushLocal => state.local,
-            SyncAction::PullRemote => state.remote,
-            SyncAction::Merge => state.local.max(state.remote),
-            SyncAction::NoOp => state.last_sync,
+            _SyncAction::PushLocal => state.local,
+            _SyncAction::PullRemote => state.remote,
+            _SyncAction::Merge => state.local.max(state.remote),
+            _SyncAction::NoOp => state.last_sync,
         };
         action
     }
@@ -300,21 +300,21 @@ impl SelfTest for MetadataAggregator {
         let mut failures: Vec<String> = Vec::new();
 
         let r = agg.aggregate(&[
-            ProviderResult {
+            _ProviderResult {
                 provider: "goodreads",
                 title: Some("Dune".into()),
                 author: Some("Frank Herbert".into()),
                 rating: Some(4.3),
                 confidence: 0.9,
             },
-            ProviderResult {
+            _ProviderResult {
                 provider: "amazon",
                 title: Some("Dune".into()),
                 author: Some("Frank Herbert".into()),
                 rating: Some(4.2),
                 confidence: 0.9,
             },
-            ProviderResult {
+            _ProviderResult {
                 provider: "isbn",
                 title: Some("DUNE".into()),
                 author: Some("Herbert, Frank".into()),
@@ -335,7 +335,7 @@ impl SelfTest for MetadataAggregator {
             failures.push("consensus mismatch".into());
         }
 
-        let mut sync = ThreeWaySync::new();
+        let mut sync = _ThreeWaySync::new();
         let _ = sync.resolve(4, 3, 2); // Merge
         let _ = sync.resolve(5, 3, 3); // PushLocal
         let _ = sync.resolve(2, 5, 2); // PullRemote
@@ -371,8 +371,8 @@ mod tests {
         author: Option<&str>,
         rating: Option<f64>,
         confidence: f64,
-    ) -> ProviderResult {
-        ProviderResult {
+    ) -> _ProviderResult {
+        _ProviderResult {
             provider,
             title: title.map(|s| s.to_string()),
             author: author.map(|s| s.to_string()),
@@ -420,9 +420,9 @@ mod tests {
     #[test]
     fn test_aggregate_title_tie_break_deterministic() {
         // 两个 provider 权重相同 → 并列, 取字典序最小, 与输入顺序无关。
-        let agg = MetadataAggregator::with_providers(vec![
-            MetadataProvider { name: "a", weight: 1.0, latency_ms: 1 },
-            MetadataProvider { name: "b", weight: 1.0, latency_ms: 1 },
+        let agg = MetadataAggregator::_with_providers(vec![
+            _MetadataProvider { name: "a", weight: 1.0, latency_ms: 1 },
+            _MetadataProvider { name: "b", weight: 1.0, latency_ms: 1 },
         ]);
         let forward = agg.aggregate(&[
             res("a", Some("banana"), None, None, 1.0),
@@ -507,62 +507,62 @@ mod tests {
 
     #[test]
     fn test_sync_push_local() {
-        let mut sync = ThreeWaySync::new();
+        let mut sync = _ThreeWaySync::new();
         let action = sync.resolve(5, 3, 3);
-        assert_eq!(action, SyncAction::PushLocal);
+        assert_eq!(action, _SyncAction::PushLocal);
         assert_eq!(sync.report.pushes, 1);
     }
 
     #[test]
     fn test_sync_pull_remote() {
-        let mut sync = ThreeWaySync::new();
+        let mut sync = _ThreeWaySync::new();
         let action = sync.resolve(2, 5, 2);
-        assert_eq!(action, SyncAction::PullRemote);
+        assert_eq!(action, _SyncAction::PullRemote);
         assert_eq!(sync.report.pulls, 1);
     }
 
     #[test]
     fn test_sync_merge() {
-        let mut sync = ThreeWaySync::new();
+        let mut sync = _ThreeWaySync::new();
         let action = sync.resolve(5, 4, 3);
-        assert_eq!(action, SyncAction::Merge);
+        assert_eq!(action, _SyncAction::Merge);
         assert_eq!(sync.report.merges, 1);
     }
 
     #[test]
     fn test_sync_noop() {
-        let mut sync = ThreeWaySync::new();
-        assert_eq!(sync.resolve(3, 3, 3), SyncAction::NoOp);
+        let mut sync = _ThreeWaySync::new();
+        assert_eq!(sync.resolve(3, 3, 3), _SyncAction::NoOp);
         // equal but ahead of last_sync → still NoOp (already in sync)
-        assert_eq!(sync.resolve(3, 3, 1), SyncAction::NoOp);
+        assert_eq!(sync.resolve(3, 3, 1), _SyncAction::NoOp);
         // nothing new since last sync
-        assert_eq!(sync.resolve(3, 2, 4), SyncAction::NoOp);
+        assert_eq!(sync.resolve(3, 2, 4), _SyncAction::NoOp);
         assert_eq!(sync.report.noops, 3);
     }
 
     #[test]
     fn test_sync_merge_counting() {
-        let mut sync = ThreeWaySync::new();
-        assert_eq!(sync.resolve(4, 3, 2), SyncAction::Merge);
-        assert_eq!(sync.resolve(6, 5, 4), SyncAction::Merge);
-        assert_eq!(sync.resolve(7, 4, 4), SyncAction::PushLocal);
+        let mut sync = _ThreeWaySync::new();
+        assert_eq!(sync.resolve(4, 3, 2), _SyncAction::Merge);
+        assert_eq!(sync.resolve(6, 5, 4), _SyncAction::Merge);
+        assert_eq!(sync.resolve(7, 4, 4), _SyncAction::PushLocal);
         assert_eq!(sync.report.merges, 2);
         assert_eq!(sync.report.pushes, 1);
     }
 
     #[test]
     fn test_sync_state_update() {
-        let mut sync = ThreeWaySync::new();
-        let mut st = ThreeWayState { local: 5, remote: 4, last_sync: 3 };
-        assert_eq!(sync.sync(&mut st), SyncAction::Merge);
+        let mut sync = _ThreeWaySync::new();
+        let mut st = _ThreeWayState { local: 5, remote: 4, last_sync: 3 };
+        assert_eq!(sync.sync(&mut st), _SyncAction::Merge);
         assert_eq!(st.last_sync, 5);
 
-        let mut st = ThreeWayState { local: 6, remote: 4, last_sync: 4 };
-        assert_eq!(sync.sync(&mut st), SyncAction::PushLocal);
+        let mut st = _ThreeWayState { local: 6, remote: 4, last_sync: 4 };
+        assert_eq!(sync.sync(&mut st), _SyncAction::PushLocal);
         assert_eq!(st.last_sync, 6);
 
-        let mut st = ThreeWayState { local: 2, remote: 6, last_sync: 2 };
-        assert_eq!(sync.sync(&mut st), SyncAction::PullRemote);
+        let mut st = _ThreeWayState { local: 2, remote: 6, last_sync: 2 };
+        assert_eq!(sync.sync(&mut st), _SyncAction::PullRemote);
         assert_eq!(st.last_sync, 6);
     }
 

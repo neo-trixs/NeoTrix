@@ -15,11 +15,11 @@ impl NowPlaying {
         }
     }
 
-    pub fn set_item(&mut self, item: MediaItem) {
+    pub fn _set_item(&mut self, item: MediaItem) {
         self.item = Some(item);
     }
 
-    pub fn set_lyric(&mut self, lyric: Lyric) {
+    pub fn _set_lyric(&mut self, lyric: Lyric) {
         self.lyric = Some(lyric);
     }
 

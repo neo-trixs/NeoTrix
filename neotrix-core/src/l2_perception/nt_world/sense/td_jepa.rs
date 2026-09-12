@@ -13,7 +13,7 @@ impl TDTarget {
         Self { gamma, n_step }
     }
 
-    pub fn compute_return(&self, rewards: &[f64]) -> f64 {
+    pub fn _compute_return(&self, rewards: &[f64]) -> f64 {
         if rewards.is_empty() {
             return 0.0;
         }
@@ -48,7 +48,7 @@ impl TDDynamics {
         reward + self.gamma * self.value(z_t_plus_n, critic_weights) - self.value(z_t, critic_weights)
     }
 
-    pub fn n_step_predict(
+    pub fn _n_step_predict(
         &self,
         z_current: &[f64],
         predictor: &JepaPredictor,

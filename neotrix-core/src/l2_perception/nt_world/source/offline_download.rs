@@ -44,7 +44,7 @@ impl OfflineDownloader {
         &self.index
     }
 
-    pub fn index_mut(&mut self) -> &mut OfflineIndex {
+    pub fn _index_mut(&mut self) -> &mut OfflineIndex {
         &mut self.index
     }
 

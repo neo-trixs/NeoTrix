@@ -14,17 +14,17 @@ use serde::{Deserialize, Serialize};
 // ── URLhaus 数据模型 ───────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct UrlhausResponse {
+pub struct _UrlhausResponse {
     #[serde(default)]
     pub url_count: String,
     #[serde(default)]
     pub result: String,
     #[serde(default)]
-    pub urls: Vec<UrlhausUrl>,
+    pub urls: Vec<_UrlhausUrl>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct UrlhausUrl {
+pub struct _UrlhausUrl {
     #[serde(default)]
     pub url: String,
     #[serde(default)]
@@ -45,7 +45,7 @@ pub struct UrlhausUrl {
 
 /// 内部标准化结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UrlhausEvent {
+pub struct _UrlhausEvent {
     pub url: String,
     pub url_status: String,
     pub threat: String,
@@ -59,18 +59,18 @@ pub struct UrlhausEvent {
 // ── CISA KEV 数据模型 ───────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct CisaKevResponse {
+pub struct _CisaKevResponse {
     #[serde(default)]
     pub title: String,
     #[serde(default)]
     pub catalog_version: String,
     #[serde(default)]
-    pub vulnerabilities: Vec<CisaKevVuln>,
+    pub vulnerabilities: Vec<_CisaKevVuln>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CisaKevVuln {
+pub struct _CisaKevVuln {
     #[serde(default, alias = "cveID")]
     pub cve_id: String,
     #[serde(default)]
@@ -94,7 +94,7 @@ pub struct CisaKevVuln {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CisaKevEvent {
+pub struct _CisaKevEvent {
     pub cve_id: String,
     pub vendor_project: String,
     pub product: String,
@@ -133,7 +133,7 @@ impl UrlhausFetcher {
         "https://urlhaus-api.abuse.ch/v1/url/recent/".to_string()
     }
 
-    pub fn fetch(&self) -> Result<Vec<UrlhausEvent>, String> {
+    pub fn fetch(&self) -> Result<Vec<_UrlhausEvent>, String> {
         let resp = self.client().post(self.build_url()).form(&[("limit", "50")]).send()
             .map_err(|e| format!("URLhaus request failed: {}", e))?;
         if !resp.status().is_success() {
@@ -143,9 +143,9 @@ impl UrlhausFetcher {
         Self::parse_json(&text)
     }
 
-    pub fn parse_json(json: &str) -> Result<Vec<UrlhausEvent>, String> {
-        let resp: UrlhausResponse = serde_json::from_str(json).map_err(|e| format!("URLhaus parse failed: {}", e))?;
-        Ok(resp.urls.into_iter().map(|u| UrlhausEvent {
+    pub fn parse_json(json: &str) -> Result<Vec<_UrlhausEvent>, String> {
+        let resp: _UrlhausResponse = serde_json::from_str(json).map_err(|e| format!("URLhaus parse failed: {}", e))?;
+        Ok(resp.urls.into_iter().map(|u| _UrlhausEvent {
             url: u.url, url_status: u.url_status, threat: u.threat,
             md5_hash: u.md5_hash, sha256_hash: u.sha256_hash, host: u.host,
             date_added: u.date_added, reporter: u.reporter,
@@ -156,16 +156,16 @@ impl UrlhausFetcher {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<UrlhausIngestReport, String> {
+    ) -> Result<_UrlhausIngestReport, String> {
         let events = Self::parse_json(json)?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[UrlhausEvent],
-    ) -> Result<UrlhausIngestReport, String> {
-        let mut report = UrlhausIngestReport { events_fetched: events.len(), ..Default::default() };
+        events: &[_UrlhausEvent],
+    ) -> Result<_UrlhausIngestReport, String> {
+        let mut report = _UrlhausIngestReport { events_fetched: events.len(), ..Default::default() };
         for evt in events {
             if evt.url.trim().is_empty() { report.errors.push("skip empty url".into()); continue; }
             let summary = format!("{} | {} | {}", evt.threat, evt.url_status, evt.host);
@@ -178,7 +178,7 @@ impl UrlhausFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[UrlhausEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_UrlhausEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: e.url.clone(),
             url: e.url.clone(),
@@ -213,7 +213,7 @@ impl CisaKevFetcher {
         "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json".to_string()
     }
 
-    pub fn fetch(&self) -> Result<Vec<CisaKevEvent>, String> {
+    pub fn fetch(&self) -> Result<Vec<_CisaKevEvent>, String> {
         let resp = self.client().get(self.build_url()).send().map_err(|e| format!("CISA KEV request failed: {}", e))?;
         if !resp.status().is_success() {
             return Err(format!("CISA KEV returned status: {}", resp.status()));
@@ -222,9 +222,9 @@ impl CisaKevFetcher {
         Self::parse_json(&text)
     }
 
-    pub fn parse_json(json: &str) -> Result<Vec<CisaKevEvent>, String> {
-        let resp: CisaKevResponse = serde_json::from_str(json).map_err(|e| format!("CISA KEV parse failed: {}", e))?;
-        Ok(resp.vulnerabilities.into_iter().map(|v| CisaKevEvent {
+    pub fn parse_json(json: &str) -> Result<Vec<_CisaKevEvent>, String> {
+        let resp: _CisaKevResponse = serde_json::from_str(json).map_err(|e| format!("CISA KEV parse failed: {}", e))?;
+        Ok(resp.vulnerabilities.into_iter().map(|v| _CisaKevEvent {
             cve_id: v.cve_id, vendor_project: v.vendor_project, product: v.product,
             vulnerability_name: v.vulnerability_name, date_added: v.date_added,
             short_description: v.short_description, required_action: v.required_action,
@@ -234,9 +234,9 @@ impl CisaKevFetcher {
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[CisaKevEvent],
-    ) -> Result<CisaKevIngestReport, String> {
-        let mut report = CisaKevIngestReport { events_fetched: events.len(), ..Default::default() };
+        events: &[_CisaKevEvent],
+    ) -> Result<_CisaKevIngestReport, String> {
+        let mut report = _CisaKevIngestReport { events_fetched: events.len(), ..Default::default() };
         for evt in events {
             if evt.cve_id.trim().is_empty() { report.errors.push("skip empty cve".into()); continue; }
             let url = format!("https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search={}", evt.cve_id);
@@ -250,7 +250,7 @@ impl CisaKevFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[CisaKevEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_CisaKevEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: e.cve_id.clone(),
             url: format!("https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search={}", e.cve_id),
@@ -278,7 +278,7 @@ pub fn cisa_kev_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sa
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct UrlhausIngestReport {
+pub struct _UrlhausIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -286,7 +286,7 @@ pub struct UrlhausIngestReport {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct CisaKevIngestReport {
+pub struct _CisaKevIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -311,7 +311,7 @@ impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for UrlhausB
     fn name(&self) -> &str { "urlhaus" }
     fn search(&self, _query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let events = self.fetcher.fetch()?;
-        let limited: Vec<UrlhausEvent> = events.into_iter().take(count).collect();
+        let limited: Vec<_UrlhausEvent> = events.into_iter().take(count).collect();
         Ok(UrlhausFetcher::to_search_results(&limited))
     }
 }

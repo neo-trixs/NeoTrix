@@ -8,7 +8,7 @@ use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// 受支持平台
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReachPlatform {
+pub enum _ReachPlatform {
     Twitter,
     Reddit,
     YouTube,
@@ -17,58 +17,58 @@ pub enum ReachPlatform {
     Xiaohongshu,
 }
 
-impl ReachPlatform {
-    pub fn all() -> &'static [ReachPlatform] {
+impl _ReachPlatform {
+    pub fn all() -> &'static [_ReachPlatform] {
         &[
-            ReachPlatform::Twitter,
-            ReachPlatform::Reddit,
-            ReachPlatform::YouTube,
-            ReachPlatform::GitHub,
-            ReachPlatform::Bilibili,
-            ReachPlatform::Xiaohongshu,
+            _ReachPlatform::Twitter,
+            _ReachPlatform::Reddit,
+            _ReachPlatform::YouTube,
+            _ReachPlatform::GitHub,
+            _ReachPlatform::Bilibili,
+            _ReachPlatform::Xiaohongshu,
         ]
     }
 
     pub fn as_str(&self) -> &'static str {
         match self {
-            ReachPlatform::Twitter => "twitter",
-            ReachPlatform::Reddit => "reddit",
-            ReachPlatform::YouTube => "youtube",
-            ReachPlatform::GitHub => "github",
-            ReachPlatform::Bilibili => "bilibili",
-            ReachPlatform::Xiaohongshu => "xiaohongshu",
+            _ReachPlatform::Twitter => "twitter",
+            _ReachPlatform::Reddit => "reddit",
+            _ReachPlatform::YouTube => "youtube",
+            _ReachPlatform::GitHub => "github",
+            _ReachPlatform::Bilibili => "bilibili",
+            _ReachPlatform::Xiaohongshu => "xiaohongshu",
         }
     }
 }
 
 /// 平台读取/搜索结果
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReachResult {
-    pub platform: ReachPlatform,
+pub struct _ReachResult {
+    pub platform: _ReachPlatform,
     pub target: String,
     pub accessible: bool,
     pub note: String,
 }
 
 /// 零 API 费互联网访问契约 (Agent-Reach 抽象)
-pub trait InternetReach: Send + Sync {
-    fn reach(&self, platform: ReachPlatform, target: &str) -> ReachResult;
+pub trait _InternetReach: Send + Sync {
+    fn reach(&self, platform: _ReachPlatform, target: &str) -> _ReachResult;
 }
 
 /// 公开页抓取访问器 (零 API 费: 拒绝付费 endpoint)
-pub struct PublicScrapeReach;
+pub struct _PublicScrapeReach;
 
-impl InternetReach for PublicScrapeReach {
-    fn reach(&self, platform: ReachPlatform, target: &str) -> ReachResult {
+impl _InternetReach for _PublicScrapeReach {
+    fn reach(&self, platform: _ReachPlatform, target: &str) -> _ReachResult {
         if target.trim().is_empty() {
-            return ReachResult {
+            return _ReachResult {
                 platform,
                 target: target.into(),
                 accessible: false,
                 note: "empty target".into(),
             };
         }
-        ReachResult {
+        _ReachResult {
             platform,
             target: target.into(),
             accessible: true,
@@ -78,24 +78,24 @@ impl InternetReach for PublicScrapeReach {
 }
 
 /// SelfTest (T1)
-pub struct AgentReachSelfTest;
+pub struct _AgentReachSelfTest;
 
-impl SelfTest for AgentReachSelfTest {
+impl SelfTest for _AgentReachSelfTest {
     fn name(&self) -> &str {
         "nt_world_agent_reach"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let r = PublicScrapeReach;
-        let res = r.reach(ReachPlatform::GitHub, "rust-lang/rust");
+        let r = _PublicScrapeReach;
+        let res = r.reach(_ReachPlatform::GitHub, "rust-lang/rust");
         if !res.accessible {
             return Err(vec!["agent_reach: github target should be reachable".into()]);
         }
-        let empty = r.reach(ReachPlatform::Twitter, "");
+        let empty = r.reach(_ReachPlatform::Twitter, "");
         if empty.accessible {
             return Err(vec!["agent_reach: empty target must be inaccessible".into()]);
         }
-        if ReachPlatform::all().len() != 6 {
+        if _ReachPlatform::all().len() != 6 {
             return Err(vec!["agent_reach: expected 6 platforms".into()]);
         }
         Ok(())
@@ -103,8 +103,8 @@ impl SelfTest for AgentReachSelfTest {
 }
 
 /// 注册 Agent-Reach SelfTest
-pub fn register_agent_reach_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(AgentReachSelfTest));
+pub fn _register_agent_reach_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(_AgentReachSelfTest));
 }
 
 #[cfg(test)]
@@ -113,19 +113,19 @@ mod tests {
 
     #[test]
     fn six_platforms() {
-        assert_eq!(ReachPlatform::all().len(), 6);
+        assert_eq!(_ReachPlatform::all().len(), 6);
     }
 
     #[test]
     fn github_reachable() {
-        let r = PublicScrapeReach.reach(ReachPlatform::GitHub, "neotrix");
+        let r = _PublicScrapeReach.reach(_ReachPlatform::GitHub, "neotrix");
         assert!(r.accessible);
         assert_eq!(r.platform.as_str(), "github");
     }
 
     #[test]
     fn empty_target_inaccessible() {
-        let r = PublicScrapeReach.reach(ReachPlatform::Reddit, "  ");
+        let r = _PublicScrapeReach.reach(_ReachPlatform::Reddit, "  ");
         assert!(!r.accessible);
     }
 }

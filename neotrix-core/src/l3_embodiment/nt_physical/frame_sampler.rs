@@ -1,4 +1,4 @@
-//! FrameSampler — 帧采样器
+//! _FrameSampler — 帧采样器
 //!
 //! 视频帧采样和去重，支持均匀采样、关键帧检测、场景变化检测。
 //! 优化视频处理性能，减少冗余计算。
@@ -7,7 +7,7 @@ use std::time::Instant;
 
 /// 采样策略
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SamplingStrategy {
+pub enum _SamplingStrategy {
     /// 均匀采样 (每N帧取1帧)
     Uniform,
     /// 关键帧采样 (基于I帧)
@@ -20,7 +20,7 @@ pub enum SamplingStrategy {
 
 /// 帧信息
 #[derive(Debug, Clone)]
-pub struct FrameInfo {
+pub struct _FrameInfo {
     /// 帧索引
     pub index: u32,
     /// 时间戳 (毫秒)
@@ -35,15 +35,15 @@ pub struct FrameInfo {
 
 /// 采样结果
 #[derive(Debug, Clone)]
-pub struct SampledFrame {
+pub struct _SampledFrame {
     pub original_index: u32,
     pub reason: String,
 }
 
 /// 帧采样器
-pub struct FrameSampler {
+pub struct _FrameSampler {
     /// 采样策略
-    strategy: SamplingStrategy,
+    strategy: _SamplingStrategy,
     /// 采样率 (0-1)
     sample_rate: f64,
     /// 关键帧阈值
@@ -51,62 +51,62 @@ pub struct FrameSampler {
     /// 场景变化阈值
     scene_change_threshold: f64,
     /// 统计信息
-    stats: SamplingStats,
+    stats: _SamplingStats,
 }
 
-impl FrameSampler {
-    pub fn new(strategy: SamplingStrategy, sample_rate: f64) -> Self {
+impl _FrameSampler {
+    pub fn new(strategy: _SamplingStrategy, sample_rate: f64) -> Self {
         Self {
             strategy,
             sample_rate,
             keyframe_threshold: 0.8,
             scene_change_threshold: 0.3,
-            stats: SamplingStats::default(),
+            stats: _SamplingStats::default(),
         }
     }
 
     /// 采样帧
-    pub fn sample(&mut self, frames: &[FrameInfo]) -> Vec<SampledFrame> {
+    pub fn sample(&mut self, frames: &[_FrameInfo]) -> Vec<_SampledFrame> {
         let start = Instant::now();
         let mut sampled = Vec::new();
 
         match self.strategy {
-            SamplingStrategy::Uniform => {
+            _SamplingStrategy::Uniform => {
                 let step = (1.0 / self.sample_rate) as u32;
                 for (i, frame) in frames.iter().enumerate() {
                     if i as u32 % step == 0 {
-                        sampled.push(SampledFrame {
+                        sampled.push(_SampledFrame {
                             original_index: frame.index,
                             reason: "uniform".to_string(),
                         });
                     }
                 }
             }
-            SamplingStrategy::Keyframe => {
+            _SamplingStrategy::Keyframe => {
                 for frame in frames {
                     if frame.is_keyframe || frame.diff_score > self.keyframe_threshold {
-                        sampled.push(SampledFrame {
+                        sampled.push(_SampledFrame {
                             original_index: frame.index,
                             reason: "keyframe".to_string(),
                         });
                     }
                 }
             }
-            SamplingStrategy::SceneChange => {
+            _SamplingStrategy::SceneChange => {
                 for frame in frames {
                     if frame.diff_score > self.scene_change_threshold {
-                        sampled.push(SampledFrame {
+                        sampled.push(_SampledFrame {
                             original_index: frame.index,
                             reason: "scene_change".to_string(),
                         });
                     }
                 }
             }
-            SamplingStrategy::Adaptive => {
+            _SamplingStrategy::Adaptive => {
                 for frame in frames {
                     let score = frame.diff_score * if frame.is_keyframe { 1.5 } else { 1.0 };
                     if score > (1.0 - self.sample_rate) {
-                        sampled.push(SampledFrame {
+                        sampled.push(_SampledFrame {
                             original_index: frame.index,
                             reason: "adaptive".to_string(),
                         });
@@ -123,7 +123,7 @@ impl FrameSampler {
     }
 
     /// 去重 (基于帧相似度)
-    pub fn dedup(&self, frames: &[FrameInfo], similarity_threshold: f64) -> Vec<u32> {
+    pub fn dedup(&self, frames: &[_FrameInfo], similarity_threshold: f64) -> Vec<u32> {
         let mut unique_indices = Vec::new();
         let mut last_diff_score = 0.0;
 
@@ -138,20 +138,20 @@ impl FrameSampler {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> SamplingStats {
+    pub fn stats(&self) -> _SamplingStats {
         self.stats.clone()
     }
 }
 
-impl Default for FrameSampler {
+impl Default for _FrameSampler {
     fn default() -> Self {
-        Self::new(SamplingStrategy::Uniform, 0.1)
+        Self::new(_SamplingStrategy::Uniform, 0.1)
     }
 }
 
 /// 采样统计
 #[derive(Debug, Clone, Default)]
-pub struct SamplingStats {
+pub struct _SamplingStats {
     pub total_frames: u32,
     pub sampled_frames: u32,
     pub total_time_ms: f64,
@@ -163,8 +163,8 @@ mod tests {
 
     #[test]
     fn test_uniform_sampling() {
-        let mut sampler = FrameSampler::new(SamplingStrategy::Uniform, 0.5);
-        let frames: Vec<FrameInfo> = (0..10).map(|i| FrameInfo {
+        let mut sampler = _FrameSampler::new(_SamplingStrategy::Uniform, 0.5);
+        let frames: Vec<_FrameInfo> = (0..10).map(|i| _FrameInfo {
             index: i,
             timestamp_ms: i as f64 * 33.33,
             size_bytes: 1024,

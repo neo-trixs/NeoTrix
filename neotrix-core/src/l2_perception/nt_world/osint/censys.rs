@@ -9,7 +9,7 @@ pub const CENSYS_API_BASE: &str = "https://search.censys.io/api/v2";
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct CensysFindings {
     pub ip: String,
-    pub services: Vec<CensysService>,
+    pub services: Vec<_CensysService>,
     pub protocols: Vec<String>,
     pub country: Option<String>,
     pub autonomous_system: Option<String>,
@@ -29,7 +29,7 @@ impl std::fmt::Display for CensysFindings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct CensysService {
+pub struct _CensysService {
     pub port: u16,
     pub service_name: String,
     pub transport_protocol: String,
@@ -77,13 +77,13 @@ pub async fn investigate(
 
     let result = body.get("result").unwrap_or(&body);
 
-    let services: Vec<CensysService> = result
+    let services: Vec<_CensysService> = result
         .get("services")
         .and_then(|v| v.as_array())
         .map(|a| {
             a.iter()
                 .filter_map(|s| {
-                    Some(CensysService {
+                    Some(_CensysService {
                         port: s.get("port")?.as_u64()? as u16,
                         service_name: s
                             .get("service_name")
@@ -135,14 +135,14 @@ pub async fn investigate(
     })
 }
 
-pub struct CensysInvestigator;
+pub struct _CensysInvestigator;
 
 pub const CENSYS_API_HOST: &str = "search.censys.io";
-pub fn censys_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
+pub fn _censys_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
     crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(CENSYS_API_HOST, "443")
 }
-pub fn censys_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![censys_egress_rule()], false)
+pub fn _censys_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![_censys_egress_rule()], false)
 }
 
 #[cfg(test)]
@@ -151,15 +151,15 @@ mod tests {
 
     #[test]
     fn test_censys_egress() {
-        assert!(censys_egress_policy().check("search.censys.io", 443));
-        assert!(!censys_egress_policy().check("evil.com", 443));
+        assert!(_censys_egress_policy().check("search.censys.io", 443));
+        assert!(!_censys_egress_policy().check("evil.com", 443));
     }
 
     #[test]
     fn test_censys_findings_display() {
         let findings = super::CensysFindings {
             ip: "93.184.216.34".into(),
-            services: vec![super::CensysService {
+            services: vec![super::_CensysService {
                 port: 443,
                 service_name: "HTTPS".into(),
                 transport_protocol: "TCP".into(),

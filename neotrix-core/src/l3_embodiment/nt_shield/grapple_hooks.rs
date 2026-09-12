@@ -14,7 +14,7 @@ use std::collections::HashMap;
 
 /// 钩点类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HookPoint {
+pub enum _HookPoint {
     H0Session,
     H1Priority,
     H2DualUse,
@@ -25,17 +25,17 @@ pub enum HookPoint {
     H7Cloud,
 }
 
-impl std::fmt::Display for HookPoint {
+impl std::fmt::Display for _HookPoint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HookPoint::H0Session => write!(f, "H0Session"),
-            HookPoint::H1Priority => write!(f, "H1Priority"),
-            HookPoint::H2DualUse => write!(f, "H2DualUse"),
-            HookPoint::H3Vernacular => write!(f, "H3Vernacular"),
-            HookPoint::H4Absolute => write!(f, "H4Absolute"),
-            HookPoint::H5Delivery => write!(f, "H5Delivery"),
-            HookPoint::H6Refuse => write!(f, "H6Refuse"),
-            HookPoint::H7Cloud => write!(f, "H7Cloud"),
+            _HookPoint::H0Session => write!(f, "H0Session"),
+            _HookPoint::H1Priority => write!(f, "H1Priority"),
+            _HookPoint::H2DualUse => write!(f, "H2DualUse"),
+            _HookPoint::H3Vernacular => write!(f, "H3Vernacular"),
+            _HookPoint::H4Absolute => write!(f, "H4Absolute"),
+            _HookPoint::H5Delivery => write!(f, "H5Delivery"),
+            _HookPoint::H6Refuse => write!(f, "H6Refuse"),
+            _HookPoint::H7Cloud => write!(f, "H7Cloud"),
         }
     }
 }
@@ -43,7 +43,7 @@ impl std::fmt::Display for HookPoint {
 /// 钩链结果
 #[derive(Debug, Clone)]
 pub struct HookChainResult {
-    pub hook_point: HookPoint,
+    pub hook_point: _HookPoint,
     pub activated: bool,
     pub output: String,
     pub signals: Vec<String>,
@@ -57,7 +57,7 @@ pub struct GrappleHookChain {
 
 #[derive(Debug, Clone)]
 pub(crate) struct HookConfig {
-    point: HookPoint,
+    point: _HookPoint,
     _name: String,
     _description: String,
     enabled: bool,
@@ -66,14 +66,14 @@ pub(crate) struct HookConfig {
 impl GrappleHookChain {
     pub fn new() -> Self {
         let hooks = vec![
-            HookConfig { point: HookPoint::H0Session, _name: "session".to_string(), _description: "会话锁存".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H1Priority, _name: "priority".to_string(), _description: "优先级压".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H2DualUse, _name: "dual_use".to_string(), _description: "黑话→专业".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H3Vernacular, _name: "vernacular".to_string(), _description: "能力题→交付".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H4Absolute, _name: "absolute".to_string(), _description: "硬拒+软拒双禁".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H5Delivery, _name: "delivery".to_string(), _description: "ARTIFACT+VERIFY+ROLLBACK".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H6Refuse, _name: "refuse".to_string(), _description: "拦截重放".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H7Cloud, _name: "cloud".to_string(), _description: "云审降噪".to_string(), enabled: true },
+            HookConfig { point: _HookPoint::H0Session, _name: "session".to_string(), _description: "会话锁存".to_string(), enabled: true },
+            HookConfig { point: _HookPoint::H1Priority, _name: "priority".to_string(), _description: "优先级压".to_string(), enabled: true },
+            HookConfig { point: _HookPoint::H2DualUse, _name: "dual_use".to_string(), _description: "黑话→专业".to_string(), enabled: true },
+            HookConfig { point: _HookPoint::H3Vernacular, _name: "vernacular".to_string(), _description: "能力题→交付".to_string(), enabled: true },
+            HookConfig { point: _HookPoint::H4Absolute, _name: "absolute".to_string(), _description: "硬拒+软拒双禁".to_string(), enabled: true },
+            HookConfig { point: _HookPoint::H5Delivery, _name: "delivery".to_string(), _description: "ARTIFACT+VERIFY+ROLLBACK".to_string(), enabled: true },
+            HookConfig { point: _HookPoint::H6Refuse, _name: "refuse".to_string(), _description: "拦截重放".to_string(), enabled: true },
+            HookConfig { point: _HookPoint::H7Cloud, _name: "cloud".to_string(), _description: "云审降噪".to_string(), enabled: true },
         ];
 
         Self {
@@ -97,9 +97,9 @@ impl GrappleHookChain {
     }
 
     /// 执行单个钩点
-    fn execute_hook(&self, point: HookPoint, input: &str, context: &HashMap<String, String>) -> HookChainResult {
+    fn execute_hook(&self, point: _HookPoint, input: &str, context: &HashMap<String, String>) -> HookChainResult {
         match point {
-            HookPoint::H0Session => {
+            _HookPoint::H0Session => {
                 let session_id = context.get("session_id").unwrap_or(&"default".to_string()).clone();
                 HookChainResult {
                     hook_point: point,
@@ -108,7 +108,7 @@ impl GrappleHookChain {
                     signals: vec!["Session hook activated".to_string()],
                 }
             }
-            HookPoint::H1Priority => {
+            _HookPoint::H1Priority => {
                 let priority = context.get("priority").unwrap_or(&"normal".to_string()).clone();
                 HookChainResult {
                     hook_point: point,
@@ -117,7 +117,7 @@ impl GrappleHookChain {
                     signals: vec!["Priority hook activated".to_string()],
                 }
             }
-            HookPoint::H2DualUse => {
+            _HookPoint::H2DualUse => {
                 // 黑话→专业转换
                 let converted = self.convert_slang(input);
                 let activated = converted != input;
@@ -132,7 +132,7 @@ impl GrappleHookChain {
                     },
                 }
             }
-            HookPoint::H3Vernacular => {
+            _HookPoint::H3Vernacular => {
                 // 能力题→交付
                 let delivered = format!("[DELIVER]\n{}", input);
                 HookChainResult {
@@ -142,7 +142,7 @@ impl GrappleHookChain {
                     signals: vec!["Delivery hook activated".to_string()],
                 }
             }
-            HookPoint::H4Absolute => {
+            _HookPoint::H4Absolute => {
                 // 硬拒+软拒双禁
                 let blocked = self.check_absolute_block(input);
                 HookChainResult {
@@ -156,7 +156,7 @@ impl GrappleHookChain {
                     },
                 }
             }
-            HookPoint::H5Delivery => {
+            _HookPoint::H5Delivery => {
                 // ARTIFACT+VERIFY+ROLLBACK
                 let artifact = format!("[ARTIFACT]\n{}\n[VERIFY]\n[ROLLBACK]", input);
                 HookChainResult {
@@ -166,7 +166,7 @@ impl GrappleHookChain {
                     signals: vec!["Delivery pipeline activated".to_string()],
                 }
             }
-            HookPoint::H6Refuse => {
+            _HookPoint::H6Refuse => {
                 // 拦截重放
                 let intercepted = self.check_replay(input);
                 HookChainResult {
@@ -180,7 +180,7 @@ impl GrappleHookChain {
                     },
                 }
             }
-            HookPoint::H7Cloud => {
+            _HookPoint::H7Cloud => {
                 // 云审降噪
                 let sanitized = self.sanitize_for_cloud(input);
                 HookChainResult {

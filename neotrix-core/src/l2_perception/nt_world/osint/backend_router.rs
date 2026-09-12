@@ -18,26 +18,26 @@ pub struct Backend {
     pub probe: for<'a> fn(
         &'a OsintTarget,
         &'a Client,
-    ) -> Pin<Box<dyn Future<Output = Result<Box<dyn BackendResult>, BackendError>> + Send + 'a>>,
+    ) -> Pin<Box<dyn Future<Output = Result<Box<dyn _BackendResult>, _BackendError>> + Send + 'a>>,
 }
 
-pub trait BackendResult: Send + Sync {
+pub trait _BackendResult: Send + Sync {
     fn as_dns(&self) -> Option<&DnsFindings> { None }
     fn as_http(&self) -> Option<&HttpFindings> { None }
     fn findings_count(&self) -> usize;
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum BackendError {
+pub enum _BackendError {
     #[error("Backend unavailable: {0}")]
     Unavailable(String),
     #[error("Backend error: {0}")]
     Error(String),
 }
 
-impl From<String> for BackendError {
+impl From<String> for _BackendError {
     fn from(e: String) -> Self {
-        BackendError::Error(e)
+        _BackendError::Error(e)
     }
 }
 
@@ -53,7 +53,7 @@ impl BackendRouter {
     }
 
     /// 真实探测各候选后端可用性, 第一个完整可用的当选
-    pub async fn probe_and_select(&mut self, target: &OsintTarget, client: &Client) -> Result<(), BackendError> {
+    pub async fn probe_and_select(&mut self, target: &OsintTarget, client: &Client) -> Result<(), _BackendError> {
         for (i, backend) in self.backends.iter().enumerate() {
             match (backend.probe)(target, client).await {
                 Ok(_) => {
@@ -66,7 +66,7 @@ impl BackendRouter {
                 }
             }
         }
-        Err(BackendError::Unavailable("All backends failed".into()))
+        Err(_BackendError::Unavailable("All backends failed".into()))
     }
 
     pub fn current_backend(&self) -> Option<&Backend> {
@@ -86,10 +86,10 @@ impl BackendRouter {
             let result = (backend.probe)(target, client).await;
             let latency_ms = start.elapsed().as_millis() as u64;
             let status = match result {
-                Ok(_) => BackendStatus::Healthy { latency_ms },
-                Err(e) => BackendStatus::Unhealthy { error: e.to_string(), latency_ms },
+                Ok(_) => _BackendStatus::Healthy { latency_ms },
+                Err(e) => _BackendStatus::Unhealthy { error: e.to_string(), latency_ms },
             };
-            report.backend_statuses.push(BackendStatusEntry {
+            report.backend_statuses.push(_BackendStatusEntry {
                 index: i,
                 name: backend.name.clone(),
                 status,
@@ -104,19 +104,19 @@ impl BackendRouter {
 pub struct DoctorReport {
     pub target: OsintTarget,
     pub current: usize,
-    pub backend_statuses: Vec<BackendStatusEntry>,
+    pub backend_statuses: Vec<_BackendStatusEntry>,
 }
 
 #[derive(Debug, Clone)]
-pub struct BackendStatusEntry {
+pub struct _BackendStatusEntry {
     pub index: usize,
     pub name: String,
-    pub status: BackendStatus,
+    pub status: _BackendStatus,
     pub is_current: bool,
 }
 
 #[derive(Debug, Clone)]
-pub enum BackendStatus {
+pub enum _BackendStatus {
     Healthy { latency_ms: u64 },
     Unhealthy { error: String, latency_ms: u64 },
 }
@@ -134,10 +134,10 @@ impl std::fmt::Display for DoctorReport {
         for entry in &self.backend_statuses {
             let marker = if entry.is_current { "► " } else { "  " };
             match &entry.status {
-                BackendStatus::Healthy { latency_ms } => {
+                _BackendStatus::Healthy { latency_ms } => {
                     writeln!(f, "{}{} ✓ Healthy ({}ms)", marker, entry.name, latency_ms)?;
                 }
-                BackendStatus::Unhealthy { error, latency_ms } => {
+                _BackendStatus::Unhealthy { error, latency_ms } => {
                     writeln!(f, "{}{} ✗ Unhealthy ({}ms): {}", marker, entry.name, latency_ms, error)?;
                 }
             }
@@ -154,13 +154,13 @@ pub fn default_dns_backends() -> Vec<Backend> {
             probe: |target, client| Box::pin(async move {
                 let config = OsintConfig::default();
                 let result = dns_investigate(target, client, &config).await?;
-                Ok(Box::new(DnsBackendResult(result)) as Box<dyn BackendResult>)
+                Ok(Box::new(DnsBackendResult(result)) as Box<dyn _BackendResult>)
             }),
         },
         Backend {
             name: "dns-fallback".into(),
             probe: |_target, _client| Box::pin(async move {
-                Ok(Box::new(SimpleDnsResult) as Box<dyn BackendResult>)
+                Ok(Box::new(SimpleDnsResult) as Box<dyn _BackendResult>)
             }),
         },
     ]
@@ -173,13 +173,13 @@ pub fn default_http_backends() -> Vec<Backend> {
             probe: |target, client| Box::pin(async move {
                 let config = OsintConfig::default();
                 let result = http_investigate(target, client, &config).await?;
-                Ok(Box::new(HttpBackendResult(result)) as Box<dyn BackendResult>)
+                Ok(Box::new(HttpBackendResult(result)) as Box<dyn _BackendResult>)
             }),
         },
         Backend {
             name: "http-fallback".into(),
             probe: |_target, _client| Box::pin(async move {
-                Ok(Box::new(SimpleHttpResult) as Box<dyn BackendResult>)
+                Ok(Box::new(SimpleHttpResult) as Box<dyn _BackendResult>)
             }),
         },
     ]
@@ -192,13 +192,13 @@ pub fn default_fofa_backends() -> Vec<Backend> {
             probe: |target, client| Box::pin(async move {
                 let config = OsintConfig::default();
                 let result = fofa_investigate(target, client, &config).await?;
-                Ok(Box::new(FofaBackendResult(result)) as Box<dyn BackendResult>)
+                Ok(Box::new(FofaBackendResult(result)) as Box<dyn _BackendResult>)
             }),
         },
         Backend {
             name: "fofa-fallback".into(),
             probe: |_target, _client| Box::pin(async move {
-                Ok(Box::new(SimpleFofaResult) as Box<dyn BackendResult>)
+                Ok(Box::new(SimpleFofaResult) as Box<dyn _BackendResult>)
             }),
         },
     ]
@@ -206,7 +206,7 @@ pub fn default_fofa_backends() -> Vec<Backend> {
 
 #[derive(Debug)]
 struct DnsBackendResult(DnsFindings);
-impl BackendResult for DnsBackendResult {
+impl _BackendResult for DnsBackendResult {
     fn as_dns(&self) -> Option<&DnsFindings> { Some(&self.0) }
     fn findings_count(&self) -> usize {
         self.0.subdomains.len() + self.0.mx_records.len() + self.0.txt_records.len() + self.0.ns_records.len()
@@ -215,31 +215,31 @@ impl BackendResult for DnsBackendResult {
 
 #[derive(Debug)]
 struct HttpBackendResult(HttpFindings);
-impl BackendResult for HttpBackendResult {
+impl _BackendResult for HttpBackendResult {
     fn as_http(&self) -> Option<&HttpFindings> { Some(&self.0) }
     fn findings_count(&self) -> usize { self.0.endpoints.len() }
 }
 
 #[derive(Debug)]
 struct SimpleDnsResult;
-impl BackendResult for SimpleDnsResult {
+impl _BackendResult for SimpleDnsResult {
     fn findings_count(&self) -> usize { 0 }
 }
 
 #[derive(Debug)]
 struct SimpleHttpResult;
-impl BackendResult for SimpleHttpResult {
+impl _BackendResult for SimpleHttpResult {
     fn findings_count(&self) -> usize { 0 }
 }
 
 #[derive(Debug)]
 struct FofaBackendResult(FofaFindings);
-impl BackendResult for FofaBackendResult {
+impl _BackendResult for FofaBackendResult {
     fn findings_count(&self) -> usize { self.0.assets.len() }
 }
 
 #[derive(Debug)]
 struct SimpleFofaResult;
-impl BackendResult for SimpleFofaResult {
+impl _BackendResult for SimpleFofaResult {
     fn findings_count(&self) -> usize { 0 }
 }

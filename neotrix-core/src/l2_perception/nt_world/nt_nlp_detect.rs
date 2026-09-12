@@ -18,9 +18,9 @@ pub enum Language {
 }
 
 /// 语言检测器
-pub struct LanguageDetector;
+pub struct _LanguageDetector;
 
-impl LanguageDetector {
+impl _LanguageDetector {
     /// 检测文本语言
     pub fn detect(text: &str) -> Language {
         if text.is_empty() {
@@ -111,7 +111,7 @@ impl LanguageDetector {
     }
 
     /// 检测是否包含中文
-    pub fn contains_chinese(text: &str) -> bool {
+    pub fn _contains_chinese(text: &str) -> bool {
         text.chars().any(|c| {
             let code = c as u32;
             matches!(code, 0x4E00..=0x9FFF)
@@ -119,7 +119,7 @@ impl LanguageDetector {
     }
 
     /// 检测是否混合语言
-    pub fn is_mixed_language(text: &str) -> bool {
+    pub fn _is_mixed_language(text: &str) -> bool {
         let mut has_chinese = false;
         let mut has_latin = false;
 
@@ -136,7 +136,7 @@ impl LanguageDetector {
     }
 
     /// 提取中文文本
-    pub fn extract_chinese(text: &str) -> String {
+    pub fn _extract_chinese(text: &str) -> String {
         text.chars()
             .filter(|c| {
                 let code = *c as u32;
@@ -152,32 +152,32 @@ mod tests {
 
     #[test]
     fn detect_chinese() {
-        assert_eq!(LanguageDetector::detect("你好世界"), Language::Chinese);
-        assert_eq!(LanguageDetector::detect("这是中文文本"), Language::Chinese);
+        assert_eq!(_LanguageDetector::detect("你好世界"), Language::Chinese);
+        assert_eq!(_LanguageDetector::detect("这是中文文本"), Language::Chinese);
     }
 
     #[test]
     fn detect_english() {
-        assert_eq!(LanguageDetector::detect("Hello World"), Language::English);
-        assert_eq!(LanguageDetector::detect("This is English text"), Language::English);
+        assert_eq!(_LanguageDetector::detect("Hello World"), Language::English);
+        assert_eq!(_LanguageDetector::detect("This is English text"), Language::English);
     }
 
     #[test]
     fn detect_mixed() {
-        assert!(LanguageDetector::is_mixed_language("Hello 你好"));
-        assert!(!LanguageDetector::is_mixed_language("Hello World"));
+        assert!(_LanguageDetector::_is_mixed_language("Hello 你好"));
+        assert!(!_LanguageDetector::_is_mixed_language("Hello World"));
     }
 
     #[test]
     fn extract_chinese_test() {
         let text = "Hello 你好 World 世界";
-        let chinese = LanguageDetector::extract_chinese(text);
+        let chinese = _LanguageDetector::_extract_chinese(text);
         assert_eq!(chinese, "你好世界");
     }
 
     #[test]
     fn contains_chinese_test() {
-        assert!(LanguageDetector::contains_chinese("Hello 你好"));
-        assert!(!LanguageDetector::contains_chinese("Hello World"));
+        assert!(_LanguageDetector::_contains_chinese("Hello 你好"));
+        assert!(!_LanguageDetector::_contains_chinese("Hello World"));
     }
 }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::{OsintConfig, OsintTarget};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HttpEndpoint {
+pub struct _HttpEndpoint {
     pub url: String,
     pub status: u16,
     pub title: Option<String>,
@@ -21,7 +21,7 @@ pub struct HttpEndpoint {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HttpFindings {
-    pub endpoints: Vec<HttpEndpoint>,
+    pub endpoints: Vec<_HttpEndpoint>,
 }
 
 impl std::fmt::Display for HttpFindings {
@@ -137,7 +137,7 @@ fn extract_title(body: &str) -> Option<String> {
     None
 }
 
-async fn probe_url(url: &str, client: &Client) -> Result<HttpEndpoint, String> {
+async fn probe_url(url: &str, client: &Client) -> Result<_HttpEndpoint, String> {
     let start = std::time::Instant::now();
     let resp = client.get(url)
         .timeout(Duration::from_secs(10))
@@ -159,7 +159,7 @@ async fn probe_url(url: &str, client: &Client) -> Result<HttpEndpoint, String> {
     let title = extract_title(body_preview);
     let tech_stack = detect_tech(&headers, &title, body_preview);
 
-    Ok(HttpEndpoint {
+    Ok(_HttpEndpoint {
         url: url.to_string(),
         status,
         title,

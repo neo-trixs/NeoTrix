@@ -13,7 +13,7 @@ use crate::core::nt_core_self_test::SelfTest;
 /// 情报源分类 (OSINT 军火库顶层维度).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum OsintCategory {
+pub enum _OsintCategory {
     People,
     Domains,
     Networks,
@@ -29,7 +29,7 @@ pub enum OsintCategory {
 pub struct OsintSource {
     pub name: String,
     pub url: String,
-    pub category: OsintCategory,
+    pub category: _OsintCategory,
     pub description: String,
     #[serde(default)]
     pub requires_api_key: bool,
@@ -39,7 +39,7 @@ impl OsintSource {
     pub fn new(
         name: &str,
         url: &str,
-        category: OsintCategory,
+        category: _OsintCategory,
         description: &str,
         requires_api_key: bool,
     ) -> Self {
@@ -63,11 +63,11 @@ impl OsintSource {
 
 /// OSINT 军火库目录索引 — 管理情报源列表与分类检索.
 #[derive(Debug, Clone, Default)]
-pub struct OsintArsenal {
+pub struct _OsintArsenal {
     sources: Vec<OsintSource>,
 }
 
-impl OsintArsenal {
+impl _OsintArsenal {
     pub fn new() -> Self {
         Self::default()
     }
@@ -85,7 +85,7 @@ impl OsintArsenal {
     }
 
     /// 按分类检索情报源 (返回该类别下全部条目).
-    pub fn by_category(&self, category: OsintCategory) -> Vec<&OsintSource> {
+    pub fn by_category(&self, category: _OsintCategory) -> Vec<&OsintSource> {
         self.sources
             .iter()
             .filter(|s| s.category == category)
@@ -104,59 +104,59 @@ impl OsintArsenal {
     }
 
     /// 返回全部无效 (is_valid 失败) 的条目, 供 SelfTest 暴露脏数据.
-    pub fn invalid_sources(&self) -> Vec<&OsintSource> {
+    pub fn _invalid_sources(&self) -> Vec<&OsintSource> {
         self.sources.iter().filter(|s| !s.is_valid()).collect()
     }
 }
 
 /// 基线目录 — 从 awesome-osint-arsenal 抽取的代表性条目 (stub 种子).
-pub fn baseline_arsenal() -> OsintArsenal {
-    let mut a = OsintArsenal::new();
+pub fn _baseline_arsenal() -> _OsintArsenal {
+    let mut a = _OsintArsenal::new();
     a.add(OsintSource::new(
         "BGPview",
         "https://bgpview.io",
-        OsintCategory::Networks,
+        _OsintCategory::Networks,
         "BGP/ASN/路由情报检索",
         false,
     ));
     a.add(OsintSource::new(
         "OpenCorporates",
         "https://opencorporates.com",
-        OsintCategory::People,
+        _OsintCategory::People,
         "全球公司注册数据库",
         false,
     ));
     a.add(OsintSource::new(
         "Shodan",
         "https://www.shodan.io",
-        OsintCategory::Networks,
+        _OsintCategory::Networks,
         "联网设备/端口搜索引擎",
         true,
     ));
     a.add(OsintSource::new(
         "Wayback Machine",
         "https://web.archive.org",
-        OsintCategory::Archives,
+        _OsintCategory::Archives,
         "网页历史快照归档",
         false,
     ));
     a
 }
 
-pub struct OsintArsenalSelfTest;
-impl SelfTest for OsintArsenalSelfTest {
+pub struct _OsintArsenalSelfTest;
+impl SelfTest for _OsintArsenalSelfTest {
     fn name(&self) -> &str {
         "world:osint_arsenal"
     }
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let a = baseline_arsenal();
+        let a = _baseline_arsenal();
         if a.is_empty() {
             return Err(vec!["osint arsenal baseline empty".into()]);
         }
-        if !a.invalid_sources().is_empty() {
+        if !a._invalid_sources().is_empty() {
             return Err(vec!["osint arsenal contains invalid sources".into()]);
         }
-        if a.by_category(OsintCategory::Networks).len() < 2 {
+        if a.by_category(_OsintCategory::Networks).len() < 2 {
             return Err(vec!["osint arsenal networks category sparse".into()]);
         }
         Ok(())
@@ -169,29 +169,29 @@ mod tests {
 
     #[test]
     fn baseline_nonempty_and_valid() {
-        let a = baseline_arsenal();
+        let a = _baseline_arsenal();
         assert!(!a.is_empty());
-        assert!(a.invalid_sources().is_empty());
+        assert!(a._invalid_sources().is_empty());
     }
 
     #[test]
     fn category_and_search_retrieval() {
-        let a = baseline_arsenal();
-        assert!(a.by_category(OsintCategory::Networks).len() >= 2);
+        let a = _baseline_arsenal();
+        assert!(a.by_category(_OsintCategory::Networks).len() >= 2);
         assert!(!a.search("bgp").is_empty());
         assert!(a.search("zzz-no-such-source").is_empty());
     }
 
     #[test]
     fn source_validation_flags_bad_url() {
-        let mut a = OsintArsenal::new();
+        let mut a = _OsintArsenal::new();
         a.add(OsintSource::new(
             "broken",
             "not-a-url",
-            OsintCategory::Other,
+            _OsintCategory::Other,
             "bad entry",
             false,
         ));
-        assert_eq!(a.invalid_sources().len(), 1);
+        assert_eq!(a._invalid_sources().len(), 1);
     }
 }

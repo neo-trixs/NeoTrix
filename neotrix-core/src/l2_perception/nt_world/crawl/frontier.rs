@@ -16,7 +16,7 @@ pub struct DualQueueFrontier {
     back_queues: HashMap<String, VecDeque<UrlEntry>>,
     seen: HashSet<String>,
     domain_pushed_count: HashMap<String, usize>,
-    domain_visited_count: HashMap<String, usize>,
+    _domain_visited_count: HashMap<String, usize>,
     domain_last_access: HashMap<String, u64>,
     max_per_domain: usize,
     max_priority_tiers: usize,
@@ -32,7 +32,7 @@ impl DualQueueFrontier {
             back_queues: HashMap::new(),
             seen: HashSet::new(),
             domain_pushed_count: HashMap::new(),
-            domain_visited_count: HashMap::new(),
+            _domain_visited_count: HashMap::new(),
             domain_last_access: HashMap::new(),
             max_per_domain,
             max_priority_tiers: 5,
@@ -89,7 +89,7 @@ impl DualQueueFrontier {
                     continue;
                 }
 
-                self.domain_visited_count
+                self._domain_visited_count
                     .entry(entry.domain.clone())
                     .and_modify(|c| *c += 1)
                     .or_insert(1);
@@ -109,7 +109,7 @@ impl DualQueueFrontier {
         self.len() == 0
     }
 
-    pub fn total_seen(&self) -> usize {
+    pub fn _total_seen(&self) -> usize {
         self.seen.len()
     }
 
@@ -124,8 +124,8 @@ impl DualQueueFrontier {
         }
     }
 
-    pub fn domain_visited_count(&self, domain: &str) -> usize {
-        self.domain_visited_count.get(domain).copied().unwrap_or(0)
+    pub fn _domain_visited_count(&self, domain: &str) -> usize {
+        self._domain_visited_count.get(domain).copied().unwrap_or(0)
     }
 }
 
@@ -185,31 +185,31 @@ pub fn extract_links(html: &str, base_url: &str) -> Vec<String> {
 /// 抑制导航/页脚噪音, 降低 agent 上下文切换 (deepcrawl README 核心主张)。
 /// 返回 (url, link_class); class 可直接映射 frontier priority。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LinkClass {
+pub enum _LinkClass {
     Main,   // <main>/<article>/<section> 正文区 → 高优先级
     Nav,    // <nav>/<header> 导航 → 低优先级
     Footer, // <footer> 页脚 → 最低优先级
     Other,
 }
 
-impl LinkClass {
+impl _LinkClass {
     /// 映射 frontier priority (0-4, 5 层): Main=4 最优先, Nav=2, Footer=1, Other=3。
     /// deepcrawl 分层树主张: 正文链接先于噪音链接。
     pub fn priority(self) -> u32 {
         match self {
-            LinkClass::Main => 4,
-            LinkClass::Other => 3,
-            LinkClass::Nav => 2,
-            LinkClass::Footer => 1,
+            _LinkClass::Main => 4,
+            _LinkClass::Other => 3,
+            _LinkClass::Nav => 2,
+            _LinkClass::Footer => 1,
         }
     }
 }
 
 /// 按 HTML 结构提取链接并分类 (分层链接树)。
 /// 滑动窗口判断每个 <a> 所在最近的上层结构标签, 无结构标签 → Other。
-pub fn extract_links_classified(html: &str, base_url: &str) -> Vec<(String, LinkClass)> {
+pub fn _extract_links_classified(html: &str, base_url: &str) -> Vec<(String, _LinkClass)> {
     let base_domain = extract_domain(base_url);
-    let mut links: Vec<(String, LinkClass)> = Vec::new();
+    let mut links: Vec<(String, _LinkClass)> = Vec::new();
     let mut section_stack: Vec<&str> = Vec::new();
 
     // 简化标记化: 逐标签扫描, 维护 open/close 栈判断当前上下文
@@ -247,12 +247,12 @@ pub fn extract_links_classified(html: &str, base_url: &str) -> Vec<(String, Link
                     if href.starts_with("http") && extract_domain(href) != base_domain {
                         let class = section_stack.last()
                             .map(|s| match *s {
-                                "main" | "article" | "section" => LinkClass::Main,
-                                "nav" | "header" => LinkClass::Nav,
-                                "footer" => LinkClass::Footer,
-                                _ => LinkClass::Other,
+                                "main" | "article" | "section" => _LinkClass::Main,
+                                "nav" | "header" => _LinkClass::Nav,
+                                "footer" => _LinkClass::Footer,
+                                _ => _LinkClass::Other,
                             })
-                            .unwrap_or(LinkClass::Other);
+                            .unwrap_or(_LinkClass::Other);
                         links.push((href.to_string(), class));
                     }
                 }
@@ -401,11 +401,11 @@ mod tests {
           <footer><a href="https://other.com/about">Footer Link</a></footer>
           <a href="https://other.com/loose">Loose</a>
         </html>"#;
-        let links = extract_links_classified(html, "https://example.com/page");
-        let main: Vec<&str> = links.iter().filter(|(_, c)| *c == LinkClass::Main).map(|(u, _)| u.as_str()).collect();
-        let nav: Vec<&str> = links.iter().filter(|(_, c)| *c == LinkClass::Nav).map(|(u, _)| u.as_str()).collect();
-        let footer: Vec<&str> = links.iter().filter(|(_, c)| *c == LinkClass::Footer).map(|(u, _)| u.as_str()).collect();
-        let other: Vec<&str> = links.iter().filter(|(_, c)| *c == LinkClass::Other).map(|(u, _)| u.as_str()).collect();
+        let links = _extract_links_classified(html, "https://example.com/page");
+        let main: Vec<&str> = links.iter().filter(|(_, c)| *c == _LinkClass::Main).map(|(u, _)| u.as_str()).collect();
+        let nav: Vec<&str> = links.iter().filter(|(_, c)| *c == _LinkClass::Nav).map(|(u, _)| u.as_str()).collect();
+        let footer: Vec<&str> = links.iter().filter(|(_, c)| *c == _LinkClass::Footer).map(|(u, _)| u.as_str()).collect();
+        let other: Vec<&str> = links.iter().filter(|(_, c)| *c == _LinkClass::Other).map(|(u, _)| u.as_str()).collect();
         assert!(main.contains(&"https://other.com/post1"));
         assert!(main.contains(&"https://other.com/post2"));
         assert!(nav.contains(&"https://other.com/nav"));
@@ -416,16 +416,16 @@ mod tests {
 
     #[test]
     fn test_link_class_priority_mapping() {
-        assert_eq!(LinkClass::Main.priority(), 4);
-        assert_eq!(LinkClass::Other.priority(), 3);
-        assert_eq!(LinkClass::Nav.priority(), 2);
-        assert_eq!(LinkClass::Footer.priority(), 1);
+        assert_eq!(_LinkClass::Main.priority(), 4);
+        assert_eq!(_LinkClass::Other.priority(), 3);
+        assert_eq!(_LinkClass::Nav.priority(), 2);
+        assert_eq!(_LinkClass::Footer.priority(), 1);
     }
 
     #[test]
     fn test_extract_links_classified_excludes_same_domain() {
         let html = r#"<main><a href="https://example.com/self">Self</a><a href="https://other.com/ext">Ext</a></main>"#;
-        let links = extract_links_classified(html, "https://example.com/page");
+        let links = _extract_links_classified(html, "https://example.com/page");
         let urls: Vec<&str> = links.iter().map(|(u, _)| u.as_str()).collect();
         assert!(urls.contains(&"https://other.com/ext"));
         assert!(!urls.contains(&"https://example.com/self"));

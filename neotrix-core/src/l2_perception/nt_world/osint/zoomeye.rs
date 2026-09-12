@@ -11,7 +11,7 @@ pub struct ZoomEyeFindings {
     pub host: String,
     pub ip: String,
     pub ports: Vec<u16>,
-    pub services: Vec<ZoomEyeService>,
+    pub services: Vec<_ZoomEyeService>,
     pub os: Option<String>,
     pub country: Option<String>,
 }
@@ -34,7 +34,7 @@ impl std::fmt::Display for ZoomEyeFindings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct ZoomEyeService {
+pub struct _ZoomEyeService {
     pub port: u16,
     pub service: String,
     pub product: Option<String>,
@@ -100,13 +100,13 @@ pub async fn investigate(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    let services: Vec<ZoomEyeService> = body
+    let services: Vec<_ZoomEyeService> = body
         .get("services")
         .and_then(|v| v.as_array())
         .map(|a| {
             a.iter()
                 .filter_map(|s| {
-                    Some(ZoomEyeService {
+                    Some(_ZoomEyeService {
                         port: s.get("port")?.as_u64()? as u16,
                         service: s
                             .get("service")
@@ -137,14 +137,14 @@ pub async fn investigate(
     })
 }
 
-pub struct ZoomEyeInvestigator;
+pub struct _ZoomEyeInvestigator;
 
 pub const ZOOMEYE_API_HOST: &str = "api.zoomeye.org";
-pub fn zoomeye_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
+pub fn _zoomeye_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
     crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(ZOOMEYE_API_HOST, "443")
 }
-pub fn zoomeye_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![zoomeye_egress_rule()], false)
+pub fn _zoomeye_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![_zoomeye_egress_rule()], false)
 }
 
 #[cfg(test)]
@@ -153,8 +153,8 @@ mod tests {
 
     #[test]
     fn test_zoomeye_egress() {
-        assert!(zoomeye_egress_policy().check("api.zoomeye.org", 443));
-        assert!(!zoomeye_egress_policy().check("evil.com", 443));
+        assert!(_zoomeye_egress_policy().check("api.zoomeye.org", 443));
+        assert!(!_zoomeye_egress_policy().check("evil.com", 443));
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
             host: "example.com".into(),
             ip: "93.184.216.34".into(),
             ports: vec![22, 80],
-            services: vec![super::ZoomEyeService {
+            services: vec![super::_ZoomEyeService {
                 port: 22,
                 service: "ssh".into(),
                 product: Some("OpenSSH".into()),

@@ -23,7 +23,7 @@ pub struct PoCHttpRequest {
 }
 
 impl PoCHttpRequest {
-    pub fn to_raw_request(&self) -> String {
+    pub fn _to_raw_request(&self) -> String {
         let mut req = format!("{} {} HTTP/1.1\r\n", self.method, self.url);
         for (k, v) in &self.headers {
             req.push_str(&format!("{}: {}\r\n", k, v));
@@ -121,7 +121,7 @@ pub struct Evidence {
     pub reproducible: bool,
 }
 
-pub fn severity_label(severity: &Severity) -> &'static str {
+pub fn _severity_label(severity: &Severity) -> &'static str {
     match severity {
         Severity::Critical => "Critical",
         Severity::High => "High",
@@ -156,7 +156,7 @@ impl PocEngine {
         let mut any_match = false;
 
         for step in &self.poc_steps {
-            let raw_request = step.request.to_raw_request();
+            let raw_request = step.request._to_raw_request();
             let request_snapshot = raw_request.clone();
 
             match TcpStream::connect_timeout(&addr, Duration::from_secs(5)) {
@@ -283,7 +283,7 @@ mod tests {
             ],
             body: Some(r#"{"user":"admin"}"#.to_string()),
         };
-        let raw = req.to_raw_request();
+        let raw = req._to_raw_request();
         assert!(raw.starts_with("POST /login HTTP/1.1\r\n"));
         assert!(raw.contains("Host: example.com"));
         assert!(raw.contains("Content-Type: application/json"));
@@ -299,7 +299,7 @@ mod tests {
             headers: vec![("Host".to_string(), "example.com".to_string())],
             body: None,
         };
-        let raw = req.to_raw_request();
+        let raw = req._to_raw_request();
         assert!(raw.starts_with("GET /health HTTP/1.1\r\n"));
         assert!(raw.contains("Host: example.com"));
         assert!(raw.ends_with("\r\n"));

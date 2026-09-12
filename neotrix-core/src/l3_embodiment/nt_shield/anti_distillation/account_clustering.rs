@@ -13,13 +13,13 @@ use super::{DetectionSignal, ThreatLevel, AntiDistillationConfig};
 
 pub struct AccountClustering {
     config: AntiDistillationConfig,
-    account_metadata: Arc<RwLock<HashMap<String, AccountInfo>>>,
+    account_metadata: Arc<RwLock<HashMap<String, _AccountInfo>>>,
     ip_to_accounts: Arc<RwLock<HashMap<String, HashSet<String>>>>,
-    creation_windows: Arc<RwLock<Vec<CreationWindow>>>,
+    creation_windows: Arc<RwLock<Vec<_CreationWindow>>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct AccountInfo {
+pub struct _AccountInfo {
     account_id: String,
     _creation_time: u64,
     ip_addresses: Vec<String>,
@@ -27,7 +27,7 @@ pub struct AccountInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct CreationWindow {
+pub struct _CreationWindow {
     start_time: u64,
     end_time: u64,
     account_ids: Vec<String>,
@@ -121,7 +121,7 @@ impl AccountClustering {
             })
     }
 
-    pub async fn record_account(&self, info: AccountInfo) {
+    pub async fn record_account(&self, info: _AccountInfo) {
         let mut accounts = self.account_metadata.write().await;
         let mut ip_map = self.ip_to_accounts.write().await;
 
@@ -136,7 +136,7 @@ impl AccountClustering {
         }
     }
 
-    pub async fn record_creation_window(&self, window: CreationWindow) {
+    pub async fn record_creation_window(&self, window: _CreationWindow) {
         let mut windows = self.creation_windows.write().await;
         windows.push(window);
     }

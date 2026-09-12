@@ -178,7 +178,7 @@ impl ScopeFrontier {
         self.queue.len()
     }
 
-    pub fn is_seen(&self, url: &str) -> bool {
+    pub fn _is_seen(&self, url: &str) -> bool {
         self.seen.contains(&normalize_url(url))
     }
 }
@@ -205,7 +205,7 @@ impl ExplorationGraph {
     }
 
     /// 全 scope 待爬总数。
-    pub fn total_pending(&self) -> usize {
+    pub fn _total_pending(&self) -> usize {
         self.frontiers.values().map(|f| f.len()).sum()
     }
 }
@@ -261,8 +261,8 @@ mod tests {
         let mut g = ExplorationGraph::new();
         g.frontier("agent_a").enqueue("https://a.com/1", 1);
         g.frontier("agent_b").enqueue("https://b.com/1", 1);
-        assert_eq!(g.total_pending(), 2);
-        assert!(!g.frontier("agent_a").is_seen("https://b.com/1"), "scope 应隔离");
+        assert_eq!(g._total_pending(), 2);
+        assert!(!g.frontier("agent_a")._is_seen("https://b.com/1"), "scope 应隔离");
         assert_eq!(g.scopes().len(), 2);
     }
 

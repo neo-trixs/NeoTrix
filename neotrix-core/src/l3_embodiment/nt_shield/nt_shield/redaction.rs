@@ -112,7 +112,7 @@ impl Redactor {
     }
 
     /// 仅替换 secrets (保留 PII) — 用于需保留 email 等但屏蔽密钥的场景
-    pub fn redact_secrets_only(&self, text: &str) -> String {
+    pub fn _redact_secrets_only(&self, text: &str) -> String {
         let mut result = text.to_string();
         for (_, re) in &self.secret_regexes {
             result = re.replace_all(&result, "[REDACTED]").to_string();
@@ -148,7 +148,7 @@ pub fn redact(text: &str) -> String {
 
 /// 便捷函数: 仅 secrets
 pub fn redact_secrets(text: &str) -> String {
-    Redactor::new().redact_secrets_only(text)
+    Redactor::new()._redact_secrets_only(text)
 }
 
 /// 便捷函数: 风险分析
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn test_redact_secrets_only_keeps_email() {
         let r = Redactor::new();
-        let out = r.redact_secrets_only("email user@example.com api_key=abcdef1234567890xxx");
+        let out = r._redact_secrets_only("email user@example.com api_key=abcdef1234567890xxx");
         assert!(out.contains("user@example.com"));
         assert!(!out.contains("abcdef1234567890xxx"));
     }

@@ -15,13 +15,13 @@ use serde::{Deserialize, Serialize};
 // ── GDACS JSON 数据模型 ───────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GdacsRoot {
+pub struct _GdacsRoot {
     #[serde(default)]
-    pub result: Vec<GdacsItem>,
+    pub result: Vec<_GdacsItem>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GdacsItem {
+pub struct _GdacsItem {
     #[serde(default)]
     pub eventid: String,
     #[serde(default)]
@@ -39,28 +39,28 @@ pub struct GdacsItem {
     #[serde(default)]
     pub todate: String,
     #[serde(default)]
-    pub severitydata: Option<GdacsSeverity>,
+    pub severitydata: Option<_GdacsSeverity>,
     #[serde(default)]
-    pub populationdata: Option<GdacsPopulation>,
+    pub populationdata: Option<_GdacsPopulation>,
     #[serde(default)]
     pub r#type: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GdacsSeverity {
+pub struct _GdacsSeverity {
     #[serde(default)]
     pub severity: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GdacsPopulation {
+pub struct _GdacsPopulation {
     #[serde(default)]
     pub value: String,
 }
 
 /// 内部标准化灾难事件结构 (用于入库)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GdacsEvent {
+pub struct _GdacsEvent {
     pub eventid: String,
     pub alert_level: String,
     pub event_type: String,
@@ -78,8 +78,8 @@ fn parse_coord(s: &str) -> f64 {
     s.trim().parse::<f64>().unwrap_or(0.0)
 }
 
-fn extract_event(item: &GdacsItem) -> GdacsEvent {
-    GdacsEvent {
+fn extract_event(item: &_GdacsItem) -> _GdacsEvent {
+    _GdacsEvent {
         eventid: item.eventid.clone(),
         alert_level: item.alertlevel.clone(),
         event_type: item.eventtype.clone(),
@@ -124,7 +124,7 @@ impl GdacsFetcher {
         "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH".to_string()
     }
 
-    pub fn fetch(&self) -> Result<Vec<GdacsEvent>, String> {
+    pub fn fetch(&self) -> Result<Vec<_GdacsEvent>, String> {
         let resp = self.client().get(self.build_url()).send().map_err(|e| format!("GDACS request failed: {}", e))?;
         if !resp.status().is_success() {
             return Err(format!("GDACS returned status: {}", resp.status()));
@@ -133,8 +133,8 @@ impl GdacsFetcher {
         Self::parse_json(&text)
     }
 
-    pub fn parse_json(json: &str) -> Result<Vec<GdacsEvent>, String> {
-        let root: GdacsRoot = serde_json::from_str(json).map_err(|e| format!("GDACS parse failed: {}", e))?;
+    pub fn parse_json(json: &str) -> Result<Vec<_GdacsEvent>, String> {
+        let root: _GdacsRoot = serde_json::from_str(json).map_err(|e| format!("GDACS parse failed: {}", e))?;
         Ok(root.result.iter().map(extract_event).collect())
     }
 
@@ -142,7 +142,7 @@ impl GdacsFetcher {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<GdacsIngestReport, String> {
+    ) -> Result<_GdacsIngestReport, String> {
         let events = Self::parse_json(json)?;
         Self::ingest_events(kb, &events)
     }
@@ -150,16 +150,16 @@ impl GdacsFetcher {
     pub fn ingest(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-    ) -> Result<GdacsIngestReport, String> {
+    ) -> Result<_GdacsIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[GdacsEvent],
-    ) -> Result<GdacsIngestReport, String> {
-        let mut report = GdacsIngestReport { events_fetched: events.len(), ..Default::default() };
+        events: &[_GdacsEvent],
+    ) -> Result<_GdacsIngestReport, String> {
+        let mut report = _GdacsIngestReport { events_fetched: events.len(), ..Default::default() };
         for evt in events {
             if evt.eventid.trim().is_empty() {
                 report.errors.push(format!("skip empty eventid: {:?}", evt.eventid));
@@ -178,7 +178,7 @@ impl GdacsFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[GdacsEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_GdacsEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: format!("[{}] {}", e.event_type, e.name),
             url: e.url.clone(),
@@ -199,7 +199,7 @@ pub fn gdacs_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandb
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct GdacsIngestReport {
+pub struct _GdacsIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -224,7 +224,7 @@ impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for GdacsBac
     fn name(&self) -> &str { "gdacs" }
     fn search(&self, _query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let events = self.fetcher.fetch()?;
-        let limited: Vec<GdacsEvent> = events.into_iter().take(count).collect();
+        let limited: Vec<_GdacsEvent> = events.into_iter().take(count).collect();
         Ok(GdacsFetcher::to_search_results(&limited))
     }
 }

@@ -39,7 +39,7 @@ impl WorldModelState {
         ]
     }
 
-    pub fn describe_trend(&self, prev: &WorldModelState) -> Vec<String> {
+    pub fn _describe_trend(&self, prev: &WorldModelState) -> Vec<String> {
         let mut trends = Vec::new();
         if self.cpu_usage > prev.cpu_usage + 0.05 {
             trends.push("CPU increasing".to_string());
@@ -114,7 +114,7 @@ impl LatentState {
     }
 
     /// Default zero state with default dimension.
-    pub fn default_state() -> Self {
+    pub fn _default_state() -> Self {
         Self::zeros(JEPA_LATENT_DIM)
     }
 

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{OsintConfig, OsintTarget};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VulnEntry {
+pub struct _VulnEntry {
     pub id: String,
     pub summary: String,
     pub severity: Option<String>,
@@ -18,7 +18,7 @@ pub struct VulnEntry {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VulnFindings {
-    pub vulnerabilities: Vec<VulnEntry>,
+    pub vulnerabilities: Vec<_VulnEntry>,
     pub advisories: Vec<String>,
     pub domain: String,
 }
@@ -37,7 +37,7 @@ impl std::fmt::Display for VulnFindings {
     }
 }
 
-async fn query_osv(ecosystem: &str, package: &str, client: &Client) -> Vec<VulnEntry> {
+async fn query_osv(ecosystem: &str, package: &str, client: &Client) -> Vec<_VulnEntry> {
     let url = "https://api.osv.dev/v1/query";
     let body = serde_json::json!({
         "package": {
@@ -75,7 +75,7 @@ async fn query_osv(ecosystem: &str, package: &str, client: &Client) -> Vec<VulnE
                                     }).collect()
                                 })
                                 .unwrap_or_default();
-                            vulns.push(VulnEntry {
+                            vulns.push(_VulnEntry {
                                 id,
                                 summary,
                                 severity,
@@ -95,7 +95,7 @@ async fn query_osv(ecosystem: &str, package: &str, client: &Client) -> Vec<VulnE
     }
 }
 
-async fn query_nvd(cpe: &str, client: &Client) -> Vec<VulnEntry> {
+async fn query_nvd(cpe: &str, client: &Client) -> Vec<_VulnEntry> {
     let url = format!("https://services.nvd.nist.gov/rest/json/cves/2.0?cpeName={cpe}&resultsPerPage=20");
     match client.get(&url)
         .timeout(Duration::from_secs(15))
@@ -129,7 +129,7 @@ async fn query_nvd(cpe: &str, client: &Client) -> Vec<VulnEntry> {
                                 .and_then(|v| v["cvssData"]["baseSeverity"].as_str())
                                 .map(|s| s.to_string());
                             let published = cve["published"].as_str().map(|s| s.to_string());
-                            vulns.push(VulnEntry {
+                            vulns.push(_VulnEntry {
                                 id,
                                 summary,
                                 severity,
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_vuln_entry_new() {
-        let v = VulnEntry {
+        let v = _VulnEntry {
             id: "CVE-2024-1234".to_string(),
             summary: "Test vuln".to_string(),
             severity: Some("CRITICAL".to_string()),

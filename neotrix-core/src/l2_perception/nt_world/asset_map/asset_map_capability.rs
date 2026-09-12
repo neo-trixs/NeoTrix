@@ -4,12 +4,12 @@ use std::sync::Arc;
 use crate::core::nt_core_capability::*;
 
 /// Asset Map能力实现
-pub struct AssetMapCapability {
+pub struct _AssetMapCapability {
     meta: CapabilityMeta,
     health: CapabilityHealth,
 }
 
-impl AssetMapCapability {
+impl _AssetMapCapability {
     /// 创建新的Asset Map能力
     pub fn new() -> Self {
         Self {
@@ -37,7 +37,7 @@ impl AssetMapCapability {
     }
 }
 
-impl UnifiedCapability for AssetMapCapability {
+impl UnifiedCapability for _AssetMapCapability {
     fn meta(&self) -> CapabilityMeta {
         self.meta.clone()
     }
@@ -80,7 +80,7 @@ impl UnifiedCapability for AssetMapCapability {
 
 /// 创建Asset Map能力实例
 pub fn create_asset_map_capability() -> Arc<dyn UnifiedCapability> {
-    Arc::new(AssetMapCapability::new())
+    Arc::new(_AssetMapCapability::new())
 }
 
 #[cfg(test)]
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn asset_map_capability_meta() {
-        let cap = AssetMapCapability::new();
+        let cap = _AssetMapCapability::new();
         let meta = cap.meta();
         assert_eq!(meta.id, "nt-world-asset-map");
         assert_eq!(meta.layer, Layer::L2Perception);
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn asset_map_query() {
-        let cap = AssetMapCapability::new();
+        let cap = _AssetMapCapability::new();
         let input = CapabilityInput::Asset(AssetInput {
             query: r#"port="80""#.into(),
             asset_type: None,

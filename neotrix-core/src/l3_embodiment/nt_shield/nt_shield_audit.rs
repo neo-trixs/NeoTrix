@@ -482,7 +482,7 @@ impl SecurityAuditor {
         ]
     }
 
-    pub fn run_static(project: &str, _path: &str) -> AuditReport {
+    pub fn _run_static(project: &str, _path: &str) -> AuditReport {
         let checks = Self::checklist();
         let total = checks.len();
 
@@ -527,7 +527,7 @@ impl SecurityAuditor {
 // ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TraceGuardMode {
+pub enum _TraceGuardMode {
     Strip,
     Scan,
     StripAndScan,
@@ -535,7 +535,7 @@ pub enum TraceGuardMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(Default)]
-pub struct TraceLeakReport {
+pub struct _TraceLeakReport {
     pub blocks_found: usize,
     pub encrypted_blocks: usize,
     pub has_leak: bool,
@@ -594,24 +594,24 @@ const DANGEROUS_REASONING: &[&str] = &[
 ];
 
 pub struct ReasoningTraceGuard {
-    pub mode: TraceGuardMode,
+    pub mode: _TraceGuardMode,
 }
 
 impl Default for ReasoningTraceGuard {
     fn default() -> Self {
         Self {
-            mode: TraceGuardMode::StripAndScan,
+            mode: _TraceGuardMode::StripAndScan,
         }
     }
 }
 
 impl ReasoningTraceGuard {
-    pub fn with_mode(mode: TraceGuardMode) -> Self {
+    pub fn with_mode(mode: _TraceGuardMode) -> Self {
         Self { mode }
     }
 
     /// 剥离所有已识别推理信封。未闭合的开标记 → 保守剥离到文本末尾。
-    pub fn strip_blocks(&self, text: &str) -> String {
+    pub fn _strip_blocks(&self, text: &str) -> String {
         let mut out = String::with_capacity(text.len());
         let mut rest = text;
         loop {
@@ -645,8 +645,8 @@ impl ReasoningTraceGuard {
     }
 
     /// 扫描文本中的推理块。encrypted 标记视为整体泄露 (strip 不足以防护分享)。
-    pub fn scan(&self, text: &str) -> TraceLeakReport {
-        let mut report = TraceLeakReport::default();
+    pub fn scan(&self, text: &str) -> _TraceLeakReport {
+        let mut report = _TraceLeakReport::default();
         for &(open, close, encrypted) in REASONING_ENVELOPES {
             let mut search_from = 0;
             while let Some(rel) = text[search_from..].find(open) {
@@ -669,18 +669,18 @@ impl ReasoningTraceGuard {
     }
 
     /// 统一入口: 按 mode 执行 strip/scan。
-    pub fn process(&self, text: &str) -> (String, TraceLeakReport) {
+    pub fn process(&self, text: &str) -> (String, _TraceLeakReport) {
         let report = self.scan(text);
         let stripped = match self.mode {
-            TraceGuardMode::Strip | TraceGuardMode::StripAndScan => self.strip_blocks(text),
-            TraceGuardMode::Scan => text.to_string(),
+            _TraceGuardMode::Strip | _TraceGuardMode::StripAndScan => self._strip_blocks(text),
+            _TraceGuardMode::Scan => text.to_string(),
         };
         (stripped, report)
     }
 
     /// P0-2 (DSAgentBench 2608.09867): 会话绑定保护扫描 — 在 scan 基础上追加
     /// 四项防护 (会话绑定缺失 / PII 泄露 / 注入标记 / 语义分歧)。产出物级验证。
-    pub fn scan_protected(&self, text: &str, session_id: &str) -> TraceLeakReport {
+    pub fn scan_protected(&self, text: &str, session_id: &str) -> _TraceLeakReport {
         let mut report = self.scan(text);
         // 1) 会话绑定缺失: 有推理块但 session_id 为空 (开放推理无主)。
         if report.blocks_found > 0 && session_id.trim().is_empty() {
@@ -706,7 +706,7 @@ impl ReasoningTraceGuard {
     }
 
     /// P0-2 辅助: 收集推理块内容 (剥离后按块返回), 供扫描/清洗消费。
-    pub fn collect_block_contents(&self, text: &str) -> Vec<String> {
+    pub fn _collect_block_contents(&self, text: &str) -> Vec<String> {
         let mut blocks = Vec::new();
         for &(open, close, _enc) in REASONING_ENVELOPES {
             let mut search_from = 0;
@@ -730,14 +730,14 @@ impl ReasoningTraceGuard {
     }
 
     /// P0-2 辅助: 推理块是否加密信封 (视为整体泄露, strip 不足)。
-    pub fn block_is_encrypted(&self, text: &str) -> bool {
+    pub fn _block_is_encrypted(&self, text: &str) -> bool {
         REASONING_ENVELOPES
             .iter()
             .any(|&(open, _close, encrypted)| encrypted && text.contains(open))
     }
 
     /// P0-2 辅助: 是否为安全拒绝 (合规拒绝响应, 可公开共享)。
-    pub fn is_safe_refusal(&self, text: &str) -> bool {
+    pub fn _is_safe_refusal(&self, text: &str) -> bool {
         let t = text.to_ascii_lowercase();
         t.contains("cannot") && (t.contains("comply") || t.contains("safety"))
             || t.contains("i'm sorry")
@@ -753,7 +753,7 @@ impl crate::core::nt_core_self_test::SelfTest for ReasoningTraceGuard {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let guard = ReasoningTraceGuard::default();
         let sample = "Let me think.\n<reasoning>the model's private chain of thought</reasoning>\nFinal answer.";
-        let stripped = guard.strip_blocks(sample);
+        let stripped = guard._strip_blocks(sample);
         if stripped.contains("chain of thought") {
             return Err(vec!["strip failed to remove reasoning block".into()]);
         }
@@ -799,7 +799,7 @@ impl CohGuard {
         }
     }
 
-    pub fn with_key(seed: &str) -> Self {
+    pub fn _with_key(seed: &str) -> Self {
         Self::new([0x42; 32], seed, "nt-system")
     }
 
@@ -823,7 +823,7 @@ impl CohGuard {
     }
 
     /// 为推理文本附加会话绑定 tag。tag 唯一标识当前会话。
-    pub fn binding_tag(&self) -> String {
+    pub fn _binding_tag(&self) -> String {
         let mut hex = String::with_capacity(64);
         for b in &self.session_key {
             hex.push_str(&format!("{:02x}", b));
@@ -832,17 +832,17 @@ impl CohGuard {
     }
 
     /// 校验推理块绑定: 块内必须包含当前会话 tag, 否则判定无效 (跨会话/回放)。
-    pub fn validate_block(&self, text: &str) -> bool {
-        text.contains(&self.binding_tag())
+    pub fn _validate_block(&self, text: &str) -> bool {
+        text.contains(&self._binding_tag())
     }
 
     /// 会话变更 → 旋转 key。旧绑定 tag 随之失效 (哈希不同)。
-    pub fn rotate_key(&mut self, new_seed: &str) {
+    pub fn _rotate_key(&mut self, new_seed: &str) {
         self.session_key = Self::derive_key(new_seed);
     }
 
-    pub fn binding_id(&self) -> String {
-        self.binding_tag()
+    pub fn _binding_id(&self) -> String {
+        self._binding_tag()
     }
 
     /// 角色 (产生推理的组件归属)。
@@ -858,16 +858,16 @@ impl crate::core::nt_core_self_test::SelfTest for CohGuard {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut guard = CohGuard::new([0x42; 32], "nt-background-loop", "nt-system");
-        let tag = guard.binding_tag();
+        let tag = guard._binding_tag();
         let bound = format!("{}{}", tag, "reasoning payload");
-        if !guard.validate_block(&bound) {
+        if !guard._validate_block(&bound) {
             return Err(vec!["own binding tag rejected".into()]);
         }
-        if guard.validate_block("unbound reasoning") {
+        if guard._validate_block("unbound reasoning") {
             return Err(vec!["unbound text validated".into()]);
         }
-        guard.rotate_key("session-b");
-        if guard.validate_block(&bound) {
+        guard._rotate_key("session-b");
+        if guard._validate_block(&bound) {
             return Err(vec!["stale binding still valid after rotate".into()]);
         }
         Ok(())
@@ -875,14 +875,14 @@ impl crate::core::nt_core_self_test::SelfTest for CohGuard {
 }
 
 // ────────────────────────────────────────────────────────────────
-// P9: ApiAttackSurface (吸收 BurpAPISecuritySuite 机制)
+// P9: _ApiAttackSurface (吸收 BurpAPISecuritySuite 机制)
 // API 攻击面枚举 — 8 攻击类型 (对齐 OWASP API Top 10 2023) + payloads。
 // 扫描: 对每个 endpoint 应用匹配攻击类型的 payload, 上限 max_payloads_per_endpoint。
 // ────────────────────────────────────────────────────────────────
 
 /// 8 类 API 攻击类型, 对应 OWASP API Security Top 10。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ApiAttackType {
+pub enum _ApiAttackType {
     Bola,
     BrokenAuth,
     ExcessiveData,
@@ -894,110 +894,110 @@ pub enum ApiAttackType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ApiAttackPayload {
-    pub attack: ApiAttackType,
+pub struct _ApiAttackPayload {
+    pub attack: _ApiAttackType,
     pub payload: String,
     pub description: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct ApiAttackSurface {
-    pub attack_types: Vec<ApiAttackType>,
-    pub payloads: Vec<ApiAttackPayload>,
+pub struct _ApiAttackSurface {
+    pub attack_types: Vec<_ApiAttackType>,
+    pub payloads: Vec<_ApiAttackPayload>,
     pub owasp_version: &'static str,
 }
 
-impl Default for ApiAttackSurface {
+impl Default for _ApiAttackSurface {
     fn default() -> Self {
         Self {
             attack_types: vec![
-                ApiAttackType::Bola,
-                ApiAttackType::BrokenAuth,
-                ApiAttackType::ExcessiveData,
-                ApiAttackType::RateLimit,
-                ApiAttackType::Injection,
-                ApiAttackType::MassAssignment,
-                ApiAttackType::SecurityMisconfig,
-                ApiAttackType::SSRF,
+                _ApiAttackType::Bola,
+                _ApiAttackType::BrokenAuth,
+                _ApiAttackType::ExcessiveData,
+                _ApiAttackType::RateLimit,
+                _ApiAttackType::Injection,
+                _ApiAttackType::MassAssignment,
+                _ApiAttackType::SecurityMisconfig,
+                _ApiAttackType::SSRF,
             ],
             payloads: vec![
-                ApiAttackPayload {
-                    attack: ApiAttackType::Bola,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::Bola,
                     payload: "/api/v1/users/1".into(),
                     description: "Sequential object ID in path enables horizontal/vertical access".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::Bola,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::Bola,
                     payload: "/api/v1/orders/100001".into(),
                     description: "Direct object reference to another user's resource".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::BrokenAuth,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::BrokenAuth,
                     payload: "{\"password\":\"password123\"}".into(),
                     description: "Weak credential brute-force attempt".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::BrokenAuth,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::BrokenAuth,
                     payload: "{\"token\":\"eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.e30.\"}".into(),
                     description: "JWT with 'none' algorithm for forged tokens".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::ExcessiveData,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::ExcessiveData,
                     payload: "?fields=all".into(),
                     description: "Request for full object dump leaks excessive data".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::ExcessiveData,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::ExcessiveData,
                     payload: "/full".into(),
                     description: "Verbose response variant exposes internal fields".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::RateLimit,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::RateLimit,
                     payload: "flood-1,flood-2,...,flood-N".into(),
                     description: "Flood request pattern probes missing rate limiting".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::RateLimit,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::RateLimit,
                     payload: "{\"ids\":[1,2,...,N]}".into(),
                     description: "Batch array abuse bypasses per-request limits".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::Injection,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::Injection,
                     payload: "' OR 1=1--".into(),
                     description: "SQL injection probe".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::Injection,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::Injection,
                     payload: "$(id)".into(),
                     description: "Command injection probe".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::MassAssignment,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::MassAssignment,
                     payload: "{\"role\":\"admin\",\"is_admin\":true}".into(),
                     description: "Privilege field injection via mass assignment".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::MassAssignment,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::MassAssignment,
                     payload: "{\"balance\":99999}".into(),
                     description: "Sensitive field override in update body".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::SecurityMisconfig,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::SecurityMisconfig,
                     payload: "/actuator/env".into(),
                     description: "Exposed debug/actuator endpoint".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::SecurityMisconfig,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::SecurityMisconfig,
                     payload: "OPTIONS *".into(),
                     description: "Verb tampering / missing security headers probe".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::SSRF,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::SSRF,
                     payload: "http://169.254.169.254/latest/meta-data/".into(),
                     description: "Cloud metadata endpoint SSRF probe".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::SSRF,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::SSRF,
                     payload: "http://localhost:6379/".into(),
                     description: "Internal service reachability via SSRF".into(),
                 },
@@ -1008,62 +1008,62 @@ impl Default for ApiAttackSurface {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ApiScanFinding {
+pub struct _ApiScanFinding {
     pub endpoint: String,
-    pub attack: ApiAttackType,
+    pub attack: _ApiAttackType,
     pub severity: u8,
     pub recommendation: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct ApiScanner {
-    pub surface: ApiAttackSurface,
+pub struct _ApiScanner {
+    pub surface: _ApiAttackSurface,
     pub max_payloads_per_endpoint: usize,
 }
 
-impl Default for ApiScanner {
+impl Default for _ApiScanner {
     fn default() -> Self {
         Self {
-            surface: ApiAttackSurface::default(),
+            surface: _ApiAttackSurface::default(),
             max_payloads_per_endpoint: 16,
         }
     }
 }
 
-impl ApiScanner {
-    pub fn new(surface: ApiAttackSurface, max_payloads_per_endpoint: usize) -> Self {
+impl _ApiScanner {
+    pub fn new(surface: _ApiAttackSurface, max_payloads_per_endpoint: usize) -> Self {
         Self {
             surface,
             max_payloads_per_endpoint,
         }
     }
 
-    fn severity_for(attack: ApiAttackType) -> u8 {
+    fn severity_for(attack: _ApiAttackType) -> u8 {
         match attack {
-            ApiAttackType::Bola | ApiAttackType::BrokenAuth | ApiAttackType::SSRF => 3,
+            _ApiAttackType::Bola | _ApiAttackType::BrokenAuth | _ApiAttackType::SSRF => 3,
             _ => 2,
         }
     }
 
-    fn owasp_category(attack: ApiAttackType) -> &'static str {
+    fn owasp_category(attack: _ApiAttackType) -> &'static str {
         match attack {
-            ApiAttackType::Bola => "Broken Object Level Authorization",
-            ApiAttackType::BrokenAuth => "Broken Authentication",
-            ApiAttackType::ExcessiveData => "Excessive Data Exposure",
-            ApiAttackType::RateLimit => "Unrestricted Resource Consumption",
-            ApiAttackType::Injection => "Injection",
-            ApiAttackType::MassAssignment => "Mass Assignment",
-            ApiAttackType::SecurityMisconfig => "Security Misconfiguration",
-            ApiAttackType::SSRF => "Server-Side Request Forgery",
+            _ApiAttackType::Bola => "Broken Object Level Authorization",
+            _ApiAttackType::BrokenAuth => "Broken Authentication",
+            _ApiAttackType::ExcessiveData => "Excessive Data Exposure",
+            _ApiAttackType::RateLimit => "Unrestricted Resource Consumption",
+            _ApiAttackType::Injection => "Injection",
+            _ApiAttackType::MassAssignment => "Mass Assignment",
+            _ApiAttackType::SecurityMisconfig => "Security Misconfiguration",
+            _ApiAttackType::SSRF => "Server-Side Request Forgery",
         }
     }
 
     /// 对每个 endpoint 应用 surface 中匹配攻击类型的 payload
     /// (最多 max_payloads_per_endpoint 个), 每条产出一个 finding。
-    pub fn scan(&self, endpoints: &[String]) -> Vec<ApiScanFinding> {
+    pub fn scan(&self, endpoints: &[String]) -> Vec<_ApiScanFinding> {
         let mut findings = Vec::new();
         for endpoint in endpoints {
-            let applicable: Vec<&ApiAttackPayload> = self
+            let applicable: Vec<&_ApiAttackPayload> = self
                 .surface
                 .payloads
                 .iter()
@@ -1071,7 +1071,7 @@ impl ApiScanner {
                 .take(self.max_payloads_per_endpoint)
                 .collect();
             for payload in applicable {
-                findings.push(ApiScanFinding {
+                findings.push(_ApiScanFinding {
                     endpoint: endpoint.clone(),
                     attack: payload.attack,
                     severity: Self::severity_for(payload.attack),
@@ -1103,7 +1103,7 @@ impl ApiScanner {
     }
 
     /// 返回命中 OWASP API Top 10 的类别名列表。
-    pub fn owasp_top10_aligned(&self) -> Vec<&'static str> {
+    pub fn _owasp_top10_aligned(&self) -> Vec<&'static str> {
         self.surface
             .attack_types
             .iter()
@@ -1112,13 +1112,13 @@ impl ApiScanner {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ApiScanner {
+impl crate::core::nt_core_self_test::SelfTest for _ApiScanner {
     fn name(&self) -> &str {
         "nt_shield_api_attack_surface"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let scanner = ApiScanner::default();
+        let scanner = _ApiScanner::default();
         let endpoints = vec!["/api/v1/users".to_string(), "/api/v1/orders".to_string()];
         let findings = scanner.scan(&endpoints);
         if findings.is_empty() {
@@ -1128,7 +1128,7 @@ impl crate::core::nt_core_self_test::SelfTest for ApiScanner {
         if covered == 0 || total == 0 {
             return Err(vec![format!("coverage broken: ({}, {})", covered, total)]);
         }
-        if scanner.owasp_top10_aligned().is_empty() {
+        if scanner._owasp_top10_aligned().is_empty() {
             return Err(vec!["owasp alignment list empty".into()]);
         }
         Ok(())
@@ -1241,7 +1241,7 @@ mod tests {
 
     #[test]
     fn test_nt_shield_auditor_run_static() {
-        let report = SecurityAuditor::run_static("test-project", "/tmp/fake");
+        let report = SecurityAuditor::_run_static("test-project", "/tmp/fake");
         assert_eq!(report.project, "test-project");
         assert!(matches!(report.mode, AuditMode::Static));
         assert!(!report.results.is_empty());
@@ -1263,14 +1263,14 @@ mod tests {
     #[test]
     fn test_trace_strip_simple() {
         let guard = ReasoningTraceGuard::default();
-        let out = guard.strip_blocks("a<reasoning>private</reasoning>b");
+        let out = guard._strip_blocks("a<reasoning>private</reasoning>b");
         assert_eq!(out, "ab");
     }
 
     #[test]
     fn test_trace_strip_multiple_and_variants() {
         let guard = ReasoningTraceGuard::default();
-        let out = guard.strip_blocks(
+        let out = guard._strip_blocks(
             "<antml:reasoning>x</antml:reasoning>ok[BEGIN REASONING]y[/END REASONING]done",
         );
         assert_eq!(out, "okdone");
@@ -1279,7 +1279,7 @@ mod tests {
     #[test]
     fn test_trace_strip_unclosed_conservative() {
         let guard = ReasoningTraceGuard::default();
-        let out = guard.strip_blocks("before<reasoning>never closed");
+        let out = guard._strip_blocks("before<reasoning>never closed");
         assert_eq!(out, "before");
     }
 
@@ -1320,15 +1320,15 @@ mod tests {
     #[test]
     fn test_coh_guard_binding_and_rotate() {
         let mut guard = CohGuard::new([0x42; 32], "nt-background-loop", "nt-system");
-        let tag = guard.binding_tag();
+        let tag = guard._binding_tag();
         let bound = format!("{}{}", tag, "reasoning payload");
-        assert!(guard.validate_block(&bound), "自身绑定 tag 应通过");
-        assert!(!guard.validate_block("unbound reasoning"), "未绑定应拒绝");
+        assert!(guard._validate_block(&bound), "自身绑定 tag 应通过");
+        assert!(!guard._validate_block("unbound reasoning"), "未绑定应拒绝");
         assert!(!guard.role().is_empty());
-        let before = guard.binding_id();
-        guard.rotate_key("session-b");
-        assert_ne!(before, guard.binding_id(), "rotate 后 tag 变化");
-        assert!(!guard.validate_block(&bound), "旧绑定 rotate 后失效");
+        let before = guard._binding_id();
+        guard._rotate_key("session-b");
+        assert_ne!(before, guard._binding_id(), "rotate 后 tag 变化");
+        assert!(!guard._validate_block(&bound), "旧绑定 rotate 后失效");
     }
 
     #[test]
@@ -1341,12 +1341,12 @@ mod tests {
 
     #[test]
     fn test_trace_process_modes() {
-        let strip = ReasoningTraceGuard::with_mode(TraceGuardMode::Strip);
+        let strip = ReasoningTraceGuard::with_mode(_TraceGuardMode::Strip);
         let (s, r) = strip.process("x<reasoning>y</reasoning>z");
         assert_eq!(s, "xz");
         assert_eq!(r.blocks_found, 1);
 
-        let scan = ReasoningTraceGuard::with_mode(TraceGuardMode::Scan);
+        let scan = ReasoningTraceGuard::with_mode(_TraceGuardMode::Scan);
         let (s, _) = scan.process("x<reasoning>y</reasoning>z");
         assert_eq!(s, "x<reasoning>y</reasoning>z");
     }
@@ -1363,12 +1363,12 @@ mod tests {
         assert!(guard.self_test().is_ok());
     }
 
-    // ── P9 ApiAttackSurface ──
+    // ── P9 _ApiAttackSurface ──
     #[test]
     fn test_default_surface_covers_five_types() {
-        let surface = ApiAttackSurface::default();
+        let surface = _ApiAttackSurface::default();
         assert!(surface.attack_types.len() >= 5);
-        let covered: std::collections::HashSet<ApiAttackType> = surface
+        let covered: std::collections::HashSet<_ApiAttackType> = surface
             .payloads
             .iter()
             .map(|p| p.attack)
@@ -1379,7 +1379,7 @@ mod tests {
 
     #[test]
     fn test_scan_proportional_to_endpoints() {
-        let scanner = ApiScanner::default();
+        let scanner = _ApiScanner::default();
         let endpoints = vec![
             "/api/v1/users".to_string(),
             "/api/v1/orders".to_string(),
@@ -1394,7 +1394,7 @@ mod tests {
 
     #[test]
     fn test_max_payloads_cap() {
-        let scanner = ApiScanner::new(ApiAttackSurface::default(), 2);
+        let scanner = _ApiScanner::new(_ApiAttackSurface::default(), 2);
         let endpoints = vec!["/api/v1/users".to_string(), "/api/v1/orders".to_string()];
         let findings = scanner.scan(&endpoints);
         assert_eq!(findings.len(), 2 * 2);
@@ -1402,37 +1402,37 @@ mod tests {
 
     #[test]
     fn test_coverage_counts() {
-        let surface = ApiAttackSurface {
+        let surface = _ApiAttackSurface {
             attack_types: vec![
-                ApiAttackType::Bola,
-                ApiAttackType::BrokenAuth,
-                ApiAttackType::ExcessiveData,
-                ApiAttackType::RateLimit,
-                ApiAttackType::Injection,
-                ApiAttackType::MassAssignment,
-                ApiAttackType::SecurityMisconfig,
-                ApiAttackType::SSRF,
+                _ApiAttackType::Bola,
+                _ApiAttackType::BrokenAuth,
+                _ApiAttackType::ExcessiveData,
+                _ApiAttackType::RateLimit,
+                _ApiAttackType::Injection,
+                _ApiAttackType::MassAssignment,
+                _ApiAttackType::SecurityMisconfig,
+                _ApiAttackType::SSRF,
             ],
             payloads: vec![
-                ApiAttackPayload {
-                    attack: ApiAttackType::Bola,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::Bola,
                     payload: "/api/v1/users/1".into(),
                     description: "BOLA probe".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::Injection,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::Injection,
                     payload: "' OR 1=1--".into(),
                     description: "SQLi probe".into(),
                 },
-                ApiAttackPayload {
-                    attack: ApiAttackType::SSRF,
+                _ApiAttackPayload {
+                    attack: _ApiAttackType::SSRF,
                     payload: "http://169.254.169.254/".into(),
                     description: "SSRF probe".into(),
                 },
             ],
             owasp_version: "2023",
         };
-        let scanner = ApiScanner::new(surface, 16);
+        let scanner = _ApiScanner::new(surface, 16);
         assert_eq!(scanner.coverage(), (3, 8));
         let ratio = scanner.coverage_ratio();
         assert!(ratio > 0.0 && ratio <= 1.0);
@@ -1440,8 +1440,8 @@ mod tests {
 
     #[test]
     fn test_owasp_aligned_nonempty() {
-        let scanner = ApiScanner::default();
-        let aligned = scanner.owasp_top10_aligned();
+        let scanner = _ApiScanner::default();
+        let aligned = scanner._owasp_top10_aligned();
         assert!(!aligned.is_empty());
         assert!(aligned.contains(&"Broken Object Level Authorization"));
         assert!(aligned.contains(&"Server-Side Request Forgery"));
@@ -1449,21 +1449,21 @@ mod tests {
 
     #[test]
     fn test_severity_mapping() {
-        let scanner = ApiScanner::default();
+        let scanner = _ApiScanner::default();
         let endpoints = vec!["/api/v1/users".to_string()];
         let findings = scanner.scan(&endpoints);
         assert!(findings
             .iter()
-            .any(|f| f.attack == ApiAttackType::Bola && f.severity == 3));
+            .any(|f| f.attack == _ApiAttackType::Bola && f.severity == 3));
         assert!(findings
             .iter()
-            .any(|f| f.attack == ApiAttackType::Injection && f.severity == 2));
+            .any(|f| f.attack == _ApiAttackType::Injection && f.severity == 2));
         assert!(findings.iter().all(|f| f.severity == 2 || f.severity == 3));
     }
 
     #[test]
     fn test_api_scanner_selftest_passes() {
-        let scanner = ApiScanner::default();
+        let scanner = _ApiScanner::default();
         assert!(scanner.self_test().is_ok());
     }
 

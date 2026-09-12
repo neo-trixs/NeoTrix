@@ -42,13 +42,13 @@ impl Default for GuardrailConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuardrailResult {
+pub struct _GuardrailResult {
     pub passed: bool,
-    pub violations: Vec<GuardrailViolation>,
+    pub violations: Vec<_GuardrailViolation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuardrailViolation {
+pub struct _GuardrailViolation {
     pub rule: String,
     pub detail: String,
     pub severity: ViolationSeverity,
@@ -62,22 +62,22 @@ pub enum ViolationSeverity {
 }
 
 /// Pre-execution guard: checks if a tool call should be allowed
-pub struct InputGuardrail {
+pub struct _InputGuardrail {
     config: GuardrailConfig,
 }
 
-impl InputGuardrail {
+impl _InputGuardrail {
     pub fn new(config: GuardrailConfig) -> Self {
         Self { config }
     }
 
     /// Validate a tool call before execution
-    pub fn validate(&self, tool_id: &str, input: &str, permission: Option<&ToolPermission>) -> GuardrailResult {
+    pub fn validate(&self, tool_id: &str, input: &str, permission: Option<&ToolPermission>) -> _GuardrailResult {
         let mut violations = Vec::new();
 
         // Check input length
         if input.len() > self.config.max_input_length {
-            violations.push(GuardrailViolation {
+            violations.push(_GuardrailViolation {
                 rule: "max_input_length".into(),
                 detail: format!("Input length {} exceeds max {}", input.len(), self.config.max_input_length),
                 severity: ViolationSeverity::Blocked,
@@ -87,7 +87,7 @@ impl InputGuardrail {
         // Check permission
         if let Some(perm) = permission {
             if self.config.require_confirmation.contains(perm) {
-                violations.push(GuardrailViolation {
+                violations.push(_GuardrailViolation {
                     rule: "require_confirmation".into(),
                     detail: format!("Tool '{}' requires confirmation for {:?}", tool_id, perm),
                     severity: ViolationSeverity::Warning,
@@ -99,7 +99,7 @@ impl InputGuardrail {
         if input.contains('/') || input.contains('\\') {
             for blocked in &self.config.blocked_paths {
                 if input.contains(blocked.as_str()) {
-                    violations.push(GuardrailViolation {
+                    violations.push(_GuardrailViolation {
                         rule: "blocked_path".into(),
                         detail: format!("Input references blocked path '{}'", blocked),
                         severity: ViolationSeverity::Blocked,
@@ -108,25 +108,25 @@ impl InputGuardrail {
             }
         }
 
-        GuardrailResult {
+        _GuardrailResult {
             passed: violations.iter().all(|v| v.severity != ViolationSeverity::Blocked),
             violations,
         }
     }
 
     /// Check if a tool call count exceeds the limit
-    pub fn check_tool_limit(&self, call_count: usize) -> GuardrailResult {
+    pub fn _check_tool_limit(&self, call_count: usize) -> _GuardrailResult {
         if call_count > self.config.max_tool_calls {
-            GuardrailResult {
+            _GuardrailResult {
                 passed: false,
-                violations: vec![GuardrailViolation {
+                violations: vec![_GuardrailViolation {
                     rule: "max_tool_calls".into(),
                     detail: format!("Tool call count {} exceeds max {}", call_count, self.config.max_tool_calls),
                     severity: ViolationSeverity::Critical,
                 }],
             }
         } else {
-            GuardrailResult {
+            _GuardrailResult {
                 passed: true,
                 violations: vec![],
             }
@@ -136,35 +136,35 @@ impl InputGuardrail {
     /// P1-9 三层预算检查 (omnigent 模式): server/agent/session 三层叠加,
     /// 任一 cap 突破即拦截 (最严格者生效)。
     /// 返回 (passed, 违规列表)。
-    pub fn check_three_layer_budget(
+    pub fn _check_three_layer_budget(
         &self,
         server_calls: usize,
         agent_calls: usize,
         session_calls: usize,
-    ) -> GuardrailResult {
+    ) -> _GuardrailResult {
         let mut violations = Vec::new();
         if server_calls > self.config.server_tool_cap {
-            violations.push(GuardrailViolation {
+            violations.push(_GuardrailViolation {
                 rule: "server_tool_cap".into(),
                 detail: format!("Server tool calls {} exceed cap {}", server_calls, self.config.server_tool_cap),
                 severity: ViolationSeverity::Critical,
             });
         }
         if agent_calls > self.config.agent_tool_cap {
-            violations.push(GuardrailViolation {
+            violations.push(_GuardrailViolation {
                 rule: "agent_tool_cap".into(),
                 detail: format!("Agent tool calls {} exceed cap {}", agent_calls, self.config.agent_tool_cap),
                 severity: ViolationSeverity::Critical,
             });
         }
         if session_calls > self.config.session_tool_cap {
-            violations.push(GuardrailViolation {
+            violations.push(_GuardrailViolation {
                 rule: "session_tool_cap".into(),
                 detail: format!("Session tool calls {} exceed cap {}", session_calls, self.config.session_tool_cap),
                 severity: ViolationSeverity::Critical,
             });
         }
-        GuardrailResult {
+        _GuardrailResult {
             passed: violations.is_empty(),
             violations,
         }
@@ -172,29 +172,29 @@ impl InputGuardrail {
 }
 
 /// Post-execution guard: validates tool output
-pub struct OutputGuardrail {
+pub struct _OutputGuardrail {
     config: GuardrailConfig,
 }
 
-impl OutputGuardrail {
+impl _OutputGuardrail {
     pub fn new(config: GuardrailConfig) -> Self {
         Self { config }
     }
 
     /// Validate tool output before returning to LLM
-    pub fn validate(&self, output: &str) -> GuardrailResult {
+    pub fn validate(&self, output: &str) -> _GuardrailResult {
         let mut violations = Vec::new();
 
         // Check output length (only warn, don't block)
         if output.len() > self.config.max_output_length {
-            violations.push(GuardrailViolation {
+            violations.push(_GuardrailViolation {
                 rule: "max_output_length".into(),
                 detail: format!("Output {} exceeds max {}", output.len(), self.config.max_output_length),
                 severity: ViolationSeverity::Warning,
             });
         }
 
-        GuardrailResult {
+        _GuardrailResult {
             passed: violations.iter().all(|v| v.severity == ViolationSeverity::Warning),
             violations,
         }
@@ -203,8 +203,8 @@ impl OutputGuardrail {
 
 /// Combined guardrail system
 pub struct GuardrailSystem {
-    pub input: InputGuardrail,
-    pub output: OutputGuardrail,
+    pub input: _InputGuardrail,
+    pub output: _OutputGuardrail,
     pub config: GuardrailConfig,
     tool_call_count: std::sync::atomic::AtomicUsize,
 }
@@ -212,37 +212,37 @@ pub struct GuardrailSystem {
 impl GuardrailSystem {
     pub fn new(config: GuardrailConfig) -> Self {
         Self {
-            input: InputGuardrail::new(config.clone()),
-            output: OutputGuardrail::new(config.clone()),
+            input: _InputGuardrail::new(config.clone()),
+            output: _OutputGuardrail::new(config.clone()),
             tool_call_count: std::sync::atomic::AtomicUsize::new(0),
             config,
         }
     }
 
-    pub fn check_tool_call(&self, tool_id: &str, input: &str, permission: Option<&ToolPermission>) -> GuardrailResult {
+    pub fn check_tool_call(&self, tool_id: &str, input: &str, permission: Option<&ToolPermission>) -> _GuardrailResult {
         let prev_count = self.tool_call_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let call_count = prev_count + 1; // post-increment — actual call number
         let mut violations = Vec::new();
 
         // Tool call limit
-        let limit_result = self.input.check_tool_limit(call_count);
+        let limit_result = self.input._check_tool_limit(call_count);
         violations.extend(limit_result.violations);
 
         // Input validation
         let input_result = self.input.validate(tool_id, input, permission);
         violations.extend(input_result.violations);
 
-        GuardrailResult {
+        _GuardrailResult {
             passed: violations.iter().all(|v| v.severity != ViolationSeverity::Blocked),
             violations,
         }
     }
 
-    pub fn check_output(&self, output: &str) -> GuardrailResult {
+    pub fn _check_output(&self, output: &str) -> _GuardrailResult {
         self.output.validate(output)
     }
 
-    pub fn reset_call_count(&self) {
+    pub fn _reset_call_count(&self) {
         self.tool_call_count.store(0, std::sync::atomic::Ordering::SeqCst);
     }
 }
@@ -263,7 +263,7 @@ mod tests {
             max_input_length: 10,
             ..Default::default()
         };
-        let guard = InputGuardrail::new(config);
+        let guard = _InputGuardrail::new(config);
         let result = guard.validate("test", "this is a very long input that exceeds the limit", None);
         assert!(!result.passed);
         assert!(result.violations.iter().any(|v| v.rule == "max_input_length"));
@@ -272,7 +272,7 @@ mod tests {
     #[test]
     fn test_input_guardrail_allows_short_input() {
         let config = GuardrailConfig::default();
-        let guard = InputGuardrail::new(config);
+        let guard = _InputGuardrail::new(config);
         let result = guard.validate("test", "short", None);
         assert!(result.passed);
     }
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn test_input_guardrail_blocks_path_traversal() {
         let config = GuardrailConfig::default();
-        let guard = InputGuardrail::new(config);
+        let guard = _InputGuardrail::new(config);
         let result = guard.validate("read_file", "../../etc/passwd", None);
         assert!(!result.passed);
     }
@@ -291,13 +291,13 @@ mod tests {
             max_tool_calls: 1,
             ..Default::default()
         };
-        let guard = InputGuardrail::new(config);
+        let guard = _InputGuardrail::new(config);
         // 0 calls → ok
-        assert!(guard.check_tool_limit(0).passed);
+        assert!(guard._check_tool_limit(0).passed);
         // 1 call → exactly at limit
-        assert!(guard.check_tool_limit(1).passed);
+        assert!(guard._check_tool_limit(1).passed);
         // 2 calls → exceeds
-        assert!(!guard.check_tool_limit(2).passed);
+        assert!(!guard._check_tool_limit(2).passed);
     }
 
     #[test]
@@ -314,7 +314,7 @@ mod tests {
             max_output_length: 5,
             ..Default::default()
         };
-        let guard = OutputGuardrail::new(config);
+        let guard = _OutputGuardrail::new(config);
         let result = guard.validate("very long output");
         assert!(result.passed); // Warnings don't block
         assert!(result.violations.iter().any(|v| v.rule == "max_output_length"));

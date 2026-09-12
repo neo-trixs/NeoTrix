@@ -14,13 +14,13 @@ use serde::{Deserialize, Serialize};
 // ── adsb.lol 数据模型 ───────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct AdsbResponse {
+pub struct _AdsbResponse {
     #[serde(default)]
-    pub ac: Vec<AdsbAircraftRaw>,
+    pub ac: Vec<_AdsbAircraftRaw>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct AdsbAircraftRaw {
+pub struct _AdsbAircraftRaw {
     #[serde(default)]
     pub icao: String,
     #[serde(default)]
@@ -49,7 +49,7 @@ pub struct AdsbAircraftRaw {
 
 /// 内部标准化结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdsbAircraft {
+pub struct _AdsbAircraft {
     pub icao: String,
     pub callsign: String,
     pub lat: f64,
@@ -63,8 +63,8 @@ pub struct AdsbAircraft {
     pub flight: String,
 }
 
-fn extract_aircraft(raw: &AdsbAircraftRaw) -> AdsbAircraft {
-    AdsbAircraft {
+fn extract_aircraft(raw: &_AdsbAircraftRaw) -> _AdsbAircraft {
+    _AdsbAircraft {
         icao: raw.icao.clone(),
         callsign: raw.callsign.clone(),
         lat: raw.lat,
@@ -110,7 +110,7 @@ impl AdsbFetcher {
         format!("https://api.adsb.lol/v2/point/{}/{}", self.lat, self.lon)
     }
 
-    pub fn fetch(&self) -> Result<Vec<AdsbAircraft>, String> {
+    pub fn fetch(&self) -> Result<Vec<_AdsbAircraft>, String> {
         let resp = self.client().get(self.build_url()).send().map_err(|e| format!("adsb.lol request failed: {}", e))?;
         if !resp.status().is_success() {
             return Err(format!("adsb.lol returned status: {}", resp.status()));
@@ -119,8 +119,8 @@ impl AdsbFetcher {
         Self::parse_json(&text)
     }
 
-    pub fn parse_json(json: &str) -> Result<Vec<AdsbAircraft>, String> {
-        let resp: AdsbResponse = serde_json::from_str(json).map_err(|e| format!("adsb.lol parse failed: {}", e))?;
+    pub fn parse_json(json: &str) -> Result<Vec<_AdsbAircraft>, String> {
+        let resp: _AdsbResponse = serde_json::from_str(json).map_err(|e| format!("adsb.lol parse failed: {}", e))?;
         Ok(resp.ac.iter().map(extract_aircraft).collect())
     }
 
@@ -128,7 +128,7 @@ impl AdsbFetcher {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<AdsbIngestReport, String> {
+    ) -> Result<_AdsbIngestReport, String> {
         let events = Self::parse_json(json)?;
         Self::ingest_events(kb, &events)
     }
@@ -136,16 +136,16 @@ impl AdsbFetcher {
     pub fn ingest(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-    ) -> Result<AdsbIngestReport, String> {
+    ) -> Result<_AdsbIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[AdsbAircraft],
-    ) -> Result<AdsbIngestReport, String> {
-        let mut report = AdsbIngestReport { events_fetched: events.len(), ..Default::default() };
+        events: &[_AdsbAircraft],
+    ) -> Result<_AdsbIngestReport, String> {
+        let mut report = _AdsbIngestReport { events_fetched: events.len(), ..Default::default() };
         for evt in events {
             if evt.icao.trim().is_empty() { report.errors.push("skip empty icao".into()); continue; }
             let url = format!("https://globe.adsb.lol/?icao={}", evt.icao);
@@ -159,7 +159,7 @@ impl AdsbFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[AdsbAircraft]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_AdsbAircraft]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: e.callsign.trim().to_string(),
             url: format!("https://globe.adsb.lol/?icao={}", e.icao),
@@ -180,7 +180,7 @@ pub fn adsb_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbo
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AdsbIngestReport {
+pub struct _AdsbIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -199,14 +199,14 @@ impl Default for AdsbBackend {
 
 impl AdsbBackend {
     pub fn new() -> Self { Self::default() }
-    pub fn with_point(lat: f64, lon: f64) -> Self { Self { fetcher: AdsbFetcher::new(lat, lon) } }
+    pub fn _with_point(lat: f64, lon: f64) -> Self { Self { fetcher: AdsbFetcher::new(lat, lon) } }
 }
 
 impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for AdsbBackend {
     fn name(&self) -> &str { "adsb" }
     fn search(&self, _query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let events = self.fetcher.fetch()?;
-        let limited: Vec<AdsbAircraft> = events.into_iter().take(count).collect();
+        let limited: Vec<_AdsbAircraft> = events.into_iter().take(count).collect();
         Ok(AdsbFetcher::to_search_results(&limited))
     }
 }

@@ -5,9 +5,9 @@ pub struct KbBridge;
 
 impl KbBridge {
     /// 将搜索结果存入 KB
-    pub fn store_search_result(result: &SearchResult) -> Vec<KbMediaNode> {
+    pub fn _store_search_result(result: &SearchResult) -> Vec<_KbMediaNode> {
         result.data.iter().map(|item| {
-            KbMediaNode {
+            _KbMediaNode {
                 id: format!("media:{}:{}", result.source, item.id),
                 title: item.title.clone(),
                 artist: item.artist.clone(),
@@ -21,7 +21,7 @@ impl KbBridge {
 }
 
 #[derive(Debug, Clone)]
-pub struct KbMediaNode {
+pub struct _KbMediaNode {
     pub id: String,
     pub title: String,
     pub artist: String,

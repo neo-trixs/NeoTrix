@@ -1,16 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-/// ObjectPartition — organizes state dimensions into discrete objects.
+/// _ObjectPartition — organizes state dimensions into discrete objects.
 ///
 /// Each object is a contiguous set of dimension indices representing
 /// a conceptually distinct entity within the state space.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ObjectPartition {
+pub struct _ObjectPartition {
     pub num_objects: usize,
     pub objects: Vec<Vec<usize>>,
 }
 
-impl ObjectPartition {
+impl _ObjectPartition {
     /// Create a new partition with uniform object sizes.
     /// Dimensions are divided as evenly as possible.
     pub fn new(num_objects: usize, state_dim: usize) -> Self {
@@ -23,7 +23,7 @@ impl ObjectPartition {
     /// Dimensions are grouped into objects where variance differences
     /// between adjacent dimensions are largest.
     pub fn adaptive(state: &[f64], max_objects: usize) -> Self {
-        AdaptivePartitioner::adaptive_partition(state, max_objects)
+        _AdaptivePartitioner::_adaptive_partition(state, max_objects)
     }
 
     fn uniform_partition(num_objects: usize, state_dim: usize) -> Vec<Vec<usize>> {
@@ -66,16 +66,16 @@ impl ObjectPartition {
     }
 }
 
-/// AdaptivePartitioner — determines optimal partition boundaries from state variance.
+/// _AdaptivePartitioner — determines optimal partition boundaries from state variance.
 ///
 /// Strategy: compute variance per dimension, find boundaries where adjacent
 /// dimension variances differ most, and split at those boundaries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdaptivePartitioner;
+pub struct _AdaptivePartitioner;
 
-impl AdaptivePartitioner {
+impl _AdaptivePartitioner {
     /// Compute variance per dimension of a state vector.
-    pub fn dimension_variances(state: &[f64]) -> Vec<f64> {
+    pub fn _dimension_variances(state: &[f64]) -> Vec<f64> {
         if state.is_empty() {
             return Vec::new();
         }
@@ -90,17 +90,17 @@ impl AdaptivePartitioner {
     /// 2. Find adjacent gaps: |var[i] - var[i-1]| for i = 1..state.len().
     /// 3. Cut at the (max_objects - 1) largest gaps.
     /// 4. Fall back to uniform partitioning if all variances are equal.
-    pub fn adaptive_partition(state: &[f64], max_objects: usize) -> ObjectPartition {
+    pub fn _adaptive_partition(state: &[f64], max_objects: usize) -> _ObjectPartition {
         let state_dim = state.len();
         if state_dim == 0 || max_objects == 0 {
-            return ObjectPartition { num_objects: 0, objects: Vec::new() };
+            return _ObjectPartition { num_objects: 0, objects: Vec::new() };
         }
         if max_objects >= state_dim {
             let objects: Vec<Vec<usize>> = (0..state_dim).map(|i| vec![i]).collect();
-            return ObjectPartition { num_objects: objects.len(), objects };
+            return _ObjectPartition { num_objects: objects.len(), objects };
         }
 
-        let variances = Self::dimension_variances(state);
+        let variances = Self::_dimension_variances(state);
 
         // Check if all variances are equal (within epsilon)
         let all_equal = if variances.is_empty() {
@@ -110,7 +110,7 @@ impl AdaptivePartitioner {
             variances.iter().all(|v| (*v - first).abs() < 1e-12)
         };
         if all_equal {
-            return ObjectPartition::new(max_objects, state_dim);
+            return _ObjectPartition::new(max_objects, state_dim);
         }
 
         // Compute boundary gaps: absolute difference in variance between adjacent dimensions
@@ -144,11 +144,11 @@ impl AdaptivePartitioner {
         }
 
         if objects.is_empty() {
-            return ObjectPartition::new(max_objects, state_dim);
+            return _ObjectPartition::new(max_objects, state_dim);
         }
 
         let num_objects = objects.len();
-        ObjectPartition { num_objects, objects }
+        _ObjectPartition { num_objects, objects }
     }
 
     /// Decide if repartitioning is needed based on prediction error and partition health.
@@ -156,9 +156,9 @@ impl AdaptivePartitioner {
     /// Returns true if:
     ///   - prediction error exceeds threshold, or
     ///   - the partition is empty or corrupted
-    pub fn repartition_strategy(
+    pub fn _repartition_strategy(
         state: &[f64],
-        current_partition: &ObjectPartition,
+        current_partition: &_ObjectPartition,
         prediction_error: f64,
         error_threshold: f64,
     ) -> bool {
@@ -176,7 +176,7 @@ impl AdaptivePartitioner {
 }
 
 // ============================================================
-// Adaptive ObjectPartition — WM-05
+// Adaptive _ObjectPartition — WM-05
 //
 // Replaces uniform object partitioning with dynamic, adaptive
 // partition sizes based on the information content of each region.
@@ -189,9 +189,9 @@ impl AdaptivePartitioner {
 //   5. Repeat until convergence (max 3 iterations)
 // ============================================================
 
-/// AdaptivePartition — a single tile in an adaptive partition of latent space.
+/// _AdaptivePartition — a single tile in an adaptive partition of latent space.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdaptivePartition {
+pub struct _AdaptivePartition {
     /// Start index in latent space (inclusive)
     pub start: usize,
     /// End index in latent space (exclusive)
@@ -204,7 +204,7 @@ pub struct AdaptivePartition {
     pub is_leaf: bool,
 }
 
-/// AdaptiveObjectPartition — dynamically partitions latent space based on information density.
+/// _AdaptiveObjectPartition — dynamically partitions latent space based on information density.
 ///
 /// Core design:
 ///   - base_tile_size: initial uniform tile size (default 16)
@@ -214,16 +214,16 @@ pub struct AdaptivePartition {
 ///
 /// Integration: call `partition()` to produce adaptive tiles from a latent vector.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdaptiveObjectPartition {
+pub struct _AdaptiveObjectPartition {
     pub base_tile_size: usize,
     pub min_tile_size: usize,
     pub max_tile_size: usize,
     pub activity_threshold: f64,
-    pub partitions: Vec<AdaptivePartition>,
+    pub partitions: Vec<_AdaptivePartition>,
 }
 
-impl AdaptiveObjectPartition {
-    /// Create a new AdaptiveObjectPartition.
+impl _AdaptiveObjectPartition {
+    /// Create a new _AdaptiveObjectPartition.
     pub fn new(
         base_tile_size: usize,
         min_tile_size: usize,
@@ -245,7 +245,7 @@ impl AdaptiveObjectPartition {
     }
 
     /// Builder constructor: enable adaptive partitioning with given threshold.
-    pub fn with_adaptive_partitioning(threshold: f64) -> Self {
+    pub fn _with_adaptive_partitioning(threshold: f64) -> Self {
         Self::new(16, 4, 64, threshold)
     }
 
@@ -255,7 +255,7 @@ impl AdaptiveObjectPartition {
     ///   - Empty tile → 0.0
     ///   - Single element → 0.0
     ///   - Uniform values → 0.0
-    pub fn activity_score(tile: &[f64]) -> f64 {
+    pub fn _activity_score(tile: &[f64]) -> f64 {
         if tile.len() <= 1 {
             return 0.0;
         }
@@ -277,23 +277,23 @@ impl AdaptiveObjectPartition {
     ///   - Latent < min_tile_size → single partition
     ///   - Uniform values → all merged to max_size
     ///   - All high activity → all split to min_size
-    pub fn partition(&mut self, latent: &[f64]) -> &[AdaptivePartition] {
+    pub fn partition(&mut self, latent: &[f64]) -> &[_AdaptivePartition] {
         self.partitions = self.compute_partition(latent);
         &self.partitions
     }
 
-    fn compute_partition(&self, latent: &[f64]) -> Vec<AdaptivePartition> {
+    fn compute_partition(&self, latent: &[f64]) -> Vec<_AdaptivePartition> {
         let len = latent.len();
         if len == 0 {
             return Vec::new();
         }
 
         if len <= self.min_tile_size {
-            return vec![AdaptivePartition {
+            return vec![_AdaptivePartition {
                 start: 0,
                 end: len,
                 size: len,
-                activity: Self::activity_score(latent),
+                activity: Self::_activity_score(latent),
                 is_leaf: true,
             }];
         }
@@ -312,22 +312,22 @@ impl AdaptiveObjectPartition {
         tiles
     }
 
-    fn initial_tiles(&self, latent: &[f64]) -> Vec<AdaptivePartition> {
+    fn initial_tiles(&self, latent: &[f64]) -> Vec<_AdaptivePartition> {
         let len = latent.len();
         let mut tiles = Vec::new();
         let mut start = 0;
         while start < len {
             let end = (start + self.base_tile_size).min(len);
             let size = end - start;
-            let activity = Self::activity_score(&latent[start..end]);
+            let activity = Self::_activity_score(&latent[start..end]);
             let is_leaf = size <= self.min_tile_size || size < 2;
-            tiles.push(AdaptivePartition { start, end, size, activity, is_leaf });
+            tiles.push(_AdaptivePartition { start, end, size, activity, is_leaf });
             start = end;
         }
         tiles
     }
 
-    fn split_pass(&self, latent: &[f64], tiles: &[AdaptivePartition]) -> Vec<AdaptivePartition> {
+    fn split_pass(&self, latent: &[f64], tiles: &[_AdaptivePartition]) -> Vec<_AdaptivePartition> {
         let mut result = Vec::with_capacity(tiles.len());
         for tile in tiles {
             if tile.activity > self.activity_threshold
@@ -337,17 +337,17 @@ impl AdaptiveObjectPartition {
                 let half = tile.size / 2;
                 let mid = tile.start + half;
 
-                let left_activity = Self::activity_score(&latent[tile.start..mid]);
-                let right_activity = Self::activity_score(&latent[mid..tile.end]);
+                let left_activity = Self::_activity_score(&latent[tile.start..mid]);
+                let right_activity = Self::_activity_score(&latent[mid..tile.end]);
 
-                result.push(AdaptivePartition {
+                result.push(_AdaptivePartition {
                     start: tile.start,
                     end: mid,
                     size: half,
                     activity: left_activity,
                     is_leaf: half <= self.min_tile_size,
                 });
-                result.push(AdaptivePartition {
+                result.push(_AdaptivePartition {
                     start: mid,
                     end: tile.end,
                     size: tile.size - half,
@@ -361,7 +361,7 @@ impl AdaptiveObjectPartition {
         result
     }
 
-    fn merge_pass(&self, latent: &[f64], tiles: &[AdaptivePartition]) -> Vec<AdaptivePartition> {
+    fn merge_pass(&self, latent: &[f64], tiles: &[_AdaptivePartition]) -> Vec<_AdaptivePartition> {
         if tiles.is_empty() {
             return Vec::new();
         }
@@ -377,8 +377,8 @@ impl AdaptiveObjectPartition {
                     && combined_size <= self.max_tile_size
                 {
                     let combined_activity =
-                        Self::activity_score(&latent[merged.start..next.end]);
-                    merged = AdaptivePartition {
+                        Self::_activity_score(&latent[merged.start..next.end]);
+                    merged = _AdaptivePartition {
                         start: merged.start,
                         end: next.end,
                         size: combined_size,
@@ -402,7 +402,7 @@ impl AdaptiveObjectPartition {
     }
 
     /// Human-readable summary: "N tiles: F fine + M medium + C coarse"
-    pub fn partition_summary(&self) -> String {
+    pub fn _partition_summary(&self) -> String {
         if self.partitions.is_empty() {
             return "0 tiles".to_string();
         }
@@ -430,14 +430,14 @@ impl AdaptiveObjectPartition {
     }
 }
 
-/// Convenience constructor on ObjectPartition for adaptive partitioning.
-impl ObjectPartition {
-    /// Create an AdaptiveObjectPartition from a latent vector using adaptive partitioning.
+/// Convenience constructor on _ObjectPartition for adaptive partitioning.
+impl _ObjectPartition {
+    /// Create an _AdaptiveObjectPartition from a latent vector using adaptive partitioning.
     ///
     /// If `threshold` is `None`, uses the default (0.1).
-    /// Returns the AdaptiveObjectPartition with computed partitions.
-    pub fn adaptive_v2(latent: &[f64], threshold: Option<f64>) -> AdaptiveObjectPartition {
-        let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(threshold.unwrap_or(0.1));
+    /// Returns the _AdaptiveObjectPartition with computed partitions.
+    pub fn _adaptive_v2(latent: &[f64], threshold: Option<f64>) -> _AdaptiveObjectPartition {
+        let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(threshold.unwrap_or(0.1));
         aop.partition(latent);
         aop
     }
@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn test_uniform_partition_basic() {
-        let p = ObjectPartition::new(3, 9);
+        let p = _ObjectPartition::new(3, 9);
         assert_eq!(p.num_objects, 3);
         assert_eq!(p.objects.len(), 3);
         assert_eq!(p.total_dimensions(), 9);
@@ -473,7 +473,7 @@ mod tests {
     #[test]
     fn test_adaptive_partition_dimensions() {
         let state = sample_state();
-        let p = ObjectPartition::adaptive(&state, 3);
+        let p = _ObjectPartition::adaptive(&state, 3);
         assert!(p.num_objects >= 1);
         assert!(p.num_objects <= 3);
         assert_eq!(p.total_dimensions(), state.len());
@@ -482,22 +482,22 @@ mod tests {
     #[test]
     fn test_repartition_trigger_high_error() {
         let state = sample_state();
-        let p = ObjectPartition::adaptive(&state, 3);
-        assert!(AdaptivePartitioner::repartition_strategy(&state, &p, 0.9, 0.5));
+        let p = _ObjectPartition::adaptive(&state, 3);
+        assert!(_AdaptivePartitioner::_repartition_strategy(&state, &p, 0.9, 0.5));
     }
 
     #[test]
     fn test_repartition_no_trigger_low_error() {
         let state = sample_state();
-        let p = ObjectPartition::adaptive(&state, 3);
-        assert!(!AdaptivePartitioner::repartition_strategy(&state, &p, 0.1, 0.5));
+        let p = _ObjectPartition::adaptive(&state, 3);
+        assert!(!_AdaptivePartitioner::_repartition_strategy(&state, &p, 0.1, 0.5));
     }
 
     #[test]
     fn test_variance_based_splitting() {
         // State with clear variance boundary at index 3
         let state = vec![0.1, 0.12, 0.11, 0.9, 0.05, 0.88];
-        let p = AdaptivePartitioner::adaptive_partition(&state, 2);
+        let p = _AdaptivePartitioner::_adaptive_partition(&state, 2);
         // Should split near the variance boundary
         assert!(p.num_objects >= 1);
         assert_eq!(p.total_dimensions(), state.len());
@@ -506,7 +506,7 @@ mod tests {
     #[test]
     fn test_fallback_to_uniform_constant_state() {
         let state = constant_state();
-        let p = AdaptivePartitioner::adaptive_partition(&state, 3);
+        let p = _AdaptivePartitioner::_adaptive_partition(&state, 3);
         // Constant state → uniform fallback
         assert_eq!(p.total_dimensions(), state.len());
         assert!(p.num_objects <= 3);
@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn test_max_objects_respected() {
         let state = (0..20).map(|i| (i as f64) * 0.1).collect::<Vec<f64>>();
-        let p = AdaptivePartitioner::adaptive_partition(&state, 5);
+        let p = _AdaptivePartitioner::_adaptive_partition(&state, 5);
         assert!(p.num_objects <= 5);
         assert_eq!(p.total_dimensions(), state.len());
     }
@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn test_empty_state_handling() {
         let state: Vec<f64> = Vec::new();
-        let p = AdaptivePartitioner::adaptive_partition(&state, 3);
+        let p = _AdaptivePartitioner::_adaptive_partition(&state, 3);
         assert_eq!(p.num_objects, 0);
         assert!(p.is_empty());
     }
@@ -531,8 +531,8 @@ mod tests {
     #[test]
     fn test_consistent_across_calls() {
         let state = sample_state();
-        let p1 = AdaptivePartitioner::adaptive_partition(&state, 3);
-        let p2 = AdaptivePartitioner::adaptive_partition(&state, 3);
+        let p1 = _AdaptivePartitioner::_adaptive_partition(&state, 3);
+        let p2 = _AdaptivePartitioner::_adaptive_partition(&state, 3);
         assert_eq!(p1.num_objects, p2.num_objects);
         assert_eq!(p1.total_dimensions(), p2.total_dimensions());
         for (o1, o2) in p1.objects.iter().zip(p2.objects.iter()) {
@@ -541,7 +541,7 @@ mod tests {
     }
 
     // ============================================================
-    // AdaptiveObjectPartition tests (WM-05)
+    // _AdaptiveObjectPartition tests (WM-05)
     // ============================================================
 
     /// Helper: uniform latent (all same value) → activity = 0
@@ -571,28 +571,28 @@ mod tests {
     #[test]
     fn test_adaptive_activity_score_uniform() {
         let tile = vec![0.5; 10];
-        let score = AdaptiveObjectPartition::activity_score(&tile);
+        let score = _AdaptiveObjectPartition::_activity_score(&tile);
         assert!((score - 0.0).abs() < 1e-12, "Uniform tile should have 0 activity");
     }
 
     #[test]
     fn test_adaptive_activity_score_high() {
         let tile: Vec<f64> = (0..10).map(|i| if i % 2 == 0 { 10.0 } else { -10.0 }).collect();
-        let score = AdaptiveObjectPartition::activity_score(&tile);
+        let score = _AdaptiveObjectPartition::_activity_score(&tile);
         assert!(score > 0.1, "Alternating values should have high activity: {}", score);
     }
 
     #[test]
     fn test_adaptive_activity_score_empty() {
         let tile: Vec<f64> = Vec::new();
-        let score = AdaptiveObjectPartition::activity_score(&tile);
+        let score = _AdaptiveObjectPartition::_activity_score(&tile);
         assert!((score - 0.0).abs() < 1e-12, "Empty tile should have 0 activity");
     }
 
     #[test]
     fn test_adaptive_activity_score_single() {
         let tile = vec![3.14];
-        let score = AdaptiveObjectPartition::activity_score(&tile);
+        let score = _AdaptiveObjectPartition::_activity_score(&tile);
         assert!((score - 0.0).abs() < 1e-12, "Single element should have 0 activity");
     }
 
@@ -600,7 +600,7 @@ mod tests {
     fn test_adaptive_partition_uniform_latent_merges_to_coarse() {
         // 128-dim uniform → all activity ≈ 0 → merges to max_tile_size (64)
         let latent = uniform_latent(128);
-        let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(0.1);
+        let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(0.1);
         let partitions = aop.partition(&latent);
 
         assert!(partitions.len() >= 2, "Expected ≥2 tiles from uniform 128-dim: got {}", partitions.len());
@@ -610,7 +610,7 @@ mod tests {
             assert!((p.activity - 0.0).abs() < 1e-12, "Uniform tile should have 0 activity");
         }
         // Summary should reflect coarse tiles
-        let summary = aop.partition_summary();
+        let summary = aop._partition_summary();
         assert!(summary.contains("coarse"), "Uniform partition summary should mention coarse tiles: {}", summary);
     }
 
@@ -618,7 +618,7 @@ mod tests {
     fn test_adaptive_partition_high_activity_splits_to_fine() {
         // High-activity latent → splits to min_tile_size (4)
         let latent = high_activity_latent(64);
-        let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(0.1);
+        let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(0.1);
         let partitions = aop.partition(&latent);
 
         // With activity > 0.1, all tiles should be fine (size ≤ min*2 = 8)
@@ -626,7 +626,7 @@ mod tests {
             assert!(p.size <= 8, "High-activity tile should be fine, got size {}", p.size);
             assert!(p.activity > 0.05, "High-activity tile should have high activity: {}", p.activity);
         }
-        let summary = aop.partition_summary();
+        let summary = aop._partition_summary();
         assert!(summary.contains("fine"), "High-activity partition should mention fine tiles: {}", summary);
     }
 
@@ -634,7 +634,7 @@ mod tests {
     fn test_adaptive_partition_mixed_activity() {
         // Mixed: first half uniform (low activity), second half alternating (high)
         let latent = mixed_latent(64);
-        let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(0.1);
+        let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(0.1);
         let partitions = aop.partition(&latent);
 
         // Should have both low-activity (coarse) and high-activity (fine) tiles
@@ -648,7 +648,7 @@ mod tests {
     fn test_adaptive_partition_too_small_for_min_tile() {
         // Latent smaller than min_tile_size → single partition
         let latent = vec![0.1, 0.2, 0.3];
-        let mut aop = AdaptiveObjectPartition::new(16, 4, 64, 0.1);
+        let mut aop = _AdaptiveObjectPartition::new(16, 4, 64, 0.1);
         let partitions = aop.partition(&latent);
 
         assert_eq!(partitions.len(), 1, "Latent < min_tile_size should produce 1 partition");
@@ -661,7 +661,7 @@ mod tests {
     fn test_adaptive_partition_convergence_max_three_iterations() {
         // Use a 256-dim ramp → moderate activity, should converge within 3 iterations
         let latent = ramp_latent(256);
-        let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(0.1);
+        let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(0.1);
         let partitions = aop.partition(&latent);
 
         assert!(!partitions.is_empty(), "Partitions should be non-empty");
@@ -669,26 +669,26 @@ mod tests {
         let covered: usize = partitions.iter().map(|p| p.size).sum();
         assert_eq!(covered, 256, "Partitions should cover entire latent");
 
-        let summary = aop.partition_summary();
+        let summary = aop._partition_summary();
         assert!(summary.contains("tiles:"), "Summary should have tile count");
     }
 
     #[test]
     fn test_adaptive_partition_empty_latent() {
         let latent: Vec<f64> = Vec::new();
-        let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(0.1);
+        let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(0.1);
         let partitions = aop.partition(&latent);
 
         assert!(partitions.is_empty(), "Empty latent should produce empty partitions");
         assert_eq!(aop.num_partitions(), 0);
-        assert_eq!(aop.partition_summary(), "0 tiles");
+        assert_eq!(aop._partition_summary(), "0 tiles");
     }
 
     #[test]
     fn test_adaptive_partition_not_divisible_by_base() {
         // 100-dim latent with base_tile_size=16 → last tile absorbs remainder (100 % 16 = 4)
         let latent = high_activity_latent(100);
-        let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(0.1);
+        let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(0.1);
         let partitions = aop.partition(&latent);
 
         let covered: usize = partitions.iter().map(|p| p.size).sum();
@@ -698,10 +698,10 @@ mod tests {
     #[test]
     fn test_adaptive_partition_summary_format() {
         let latent = uniform_latent(64);
-        let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(0.1);
+        let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(0.1);
         aop.partition(&latent);
 
-        let summary = aop.partition_summary();
+        let summary = aop._partition_summary();
         // Format: "N tiles: X fine + Y medium + Z coarse"
         assert!(summary.contains("tiles:"), "Summary should contain 'tiles:'");
         assert!(summary.contains("fine"), "Summary should contain 'fine'");
@@ -717,11 +717,11 @@ mod tests {
     #[test]
     fn test_object_partition_adaptive_v2_convenience() {
         let latent = high_activity_latent(64);
-        let aop = ObjectPartition::adaptive_v2(&latent, None);
+        let aop = _ObjectPartition::_adaptive_v2(&latent, None);
 
-        assert!(aop.num_partitions() > 0, "adaptive_v2 should produce partitions");
-        let summary = aop.partition_summary();
-        assert!(summary.contains("fine"), "High-activity using adaptive_v2 should produce fine tiles");
+        assert!(aop.num_partitions() > 0, "_adaptive_v2 should produce partitions");
+        let summary = aop._partition_summary();
+        assert!(summary.contains("fine"), "High-activity using _adaptive_v2 should produce fine tiles");
     }
 
     #[test]
@@ -729,7 +729,7 @@ mod tests {
         // 17-dim latent with base=16, min=4 → first tile of 16, last of 1
         // min_tile_size=4 > 1, so last tile is a leaf
         let latent = vec![0.5; 17];
-        let mut aop = AdaptiveObjectPartition::new(16, 4, 64, 0.1);
+        let mut aop = _AdaptiveObjectPartition::new(16, 4, 64, 0.1);
         let partitions = aop.partition(&latent);
 
         let covered: usize = partitions.iter().map(|p| p.size).sum();
@@ -740,7 +740,7 @@ mod tests {
     fn test_adaptive_partition_covers_all_dimensions() {
         // Verify invariants for various sizes
         for size in [16, 32, 64, 128, 200, 300].iter() {
-            let mut aop = AdaptiveObjectPartition::with_adaptive_partitioning(0.1);
+            let mut aop = _AdaptiveObjectPartition::_with_adaptive_partitioning(0.1);
             let latent = ramp_latent(*size);
             let partitions = aop.partition(&latent);
 

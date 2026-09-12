@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 // ── Polymarket 数据模型 ───────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct PolymarketMarketRaw {
+pub struct _PolymarketMarketRaw {
     #[serde(default)]
     pub id: String,
     #[serde(default)]
@@ -45,7 +45,7 @@ pub struct PolymarketMarketRaw {
 
 /// 内部标准化结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PolymarketMarket {
+pub struct _PolymarketMarket {
     pub id: String,
     pub question: String,
     pub description: String,
@@ -55,8 +55,8 @@ pub struct PolymarketMarket {
     pub active: bool,
 }
 
-fn extract_market(raw: &PolymarketMarketRaw) -> PolymarketMarket {
-    PolymarketMarket {
+fn extract_market(raw: &_PolymarketMarketRaw) -> _PolymarketMarket {
+    _PolymarketMarket {
         id: raw.id.clone(),
         question: raw.question.clone(),
         description: raw.description.clone(),
@@ -94,7 +94,7 @@ impl PolymarketFetcher {
         "https://gamma-api.polymarket.com/markets?limit=10&active=true".to_string()
     }
 
-    pub fn fetch(&self) -> Result<Vec<PolymarketMarket>, String> {
+    pub fn fetch(&self) -> Result<Vec<_PolymarketMarket>, String> {
         let resp = self.client().get(self.build_url()).send().map_err(|e| format!("Polymarket request failed: {}", e))?;
         if !resp.status().is_success() {
             return Err(format!("Polymarket returned status: {}", resp.status()));
@@ -103,8 +103,8 @@ impl PolymarketFetcher {
         Self::parse_json(&text)
     }
 
-    pub fn parse_json(json: &str) -> Result<Vec<PolymarketMarket>, String> {
-        let raw: Vec<PolymarketMarketRaw> = serde_json::from_str(json).map_err(|e| format!("Polymarket parse failed: {}", e))?;
+    pub fn parse_json(json: &str) -> Result<Vec<_PolymarketMarket>, String> {
+        let raw: Vec<_PolymarketMarketRaw> = serde_json::from_str(json).map_err(|e| format!("Polymarket parse failed: {}", e))?;
         Ok(raw.iter().map(extract_market).collect())
     }
 
@@ -112,7 +112,7 @@ impl PolymarketFetcher {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<PolymarketIngestReport, String> {
+    ) -> Result<_PolymarketIngestReport, String> {
         let events = Self::parse_json(json)?;
         Self::ingest_events(kb, &events)
     }
@@ -120,16 +120,16 @@ impl PolymarketFetcher {
     pub fn ingest(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-    ) -> Result<PolymarketIngestReport, String> {
+    ) -> Result<_PolymarketIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[PolymarketMarket],
-    ) -> Result<PolymarketIngestReport, String> {
-        let mut report = PolymarketIngestReport { events_fetched: events.len(), ..Default::default() };
+        events: &[_PolymarketMarket],
+    ) -> Result<_PolymarketIngestReport, String> {
+        let mut report = _PolymarketIngestReport { events_fetched: events.len(), ..Default::default() };
         for evt in events {
             if evt.id.trim().is_empty() { report.errors.push("skip empty id".into()); continue; }
             let summary = format!("Q: {} | vol={} | end={}", evt.question, evt.volume, evt.end_date);
@@ -142,7 +142,7 @@ impl PolymarketFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[PolymarketMarket]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_PolymarketMarket]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: e.question.clone(),
             url: e.url.clone(),
@@ -163,7 +163,7 @@ pub fn polymarket_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PolymarketIngestReport {
+pub struct _PolymarketIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -188,7 +188,7 @@ impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for Polymark
     fn name(&self) -> &str { "polymarket" }
     fn search(&self, _query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let events = self.fetcher.fetch()?;
-        let limited: Vec<PolymarketMarket> = events.into_iter().take(count).collect();
+        let limited: Vec<_PolymarketMarket> = events.into_iter().take(count).collect();
         Ok(PolymarketFetcher::to_search_results(&limited))
     }
 }

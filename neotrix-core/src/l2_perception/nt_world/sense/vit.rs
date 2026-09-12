@@ -21,11 +21,11 @@ pub struct JepaViTEncoder {
     /// CLS token: embed_dim
     pub cls_token: Vec<f64>,
     /// Transformer encoder layers
-    pub layers: Vec<TransformerLayer>,
+    pub layers: Vec<_TransformerLayer>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransformerLayer {
+pub struct _TransformerLayer {
     pub ln1_gamma: Vec<f64>,
     pub ln1_beta: Vec<f64>,
     pub q_proj: Vec<Vec<f64>>,
@@ -40,7 +40,7 @@ pub struct TransformerLayer {
     pub fc2_bias: Vec<f64>,
 }
 
-impl TransformerLayer {
+impl _TransformerLayer {
     fn new(embed_dim: usize, mlp_dim: usize, rng: &mut SimpleRng) -> Self {
         let std_attn = (2.0 / embed_dim as f64).sqrt();
         let std_mlp = (2.0 / (embed_dim + mlp_dim) as f64).sqrt();
@@ -217,7 +217,7 @@ impl JepaViTEncoder {
             .collect();
         let cls_token = (0..embed_dim).map(|_| (rng.uniform() - 0.5) * 0.1).collect();
         let layers = (0..num_layers)
-            .map(|_| TransformerLayer::new(embed_dim, mlp_dim, &mut rng))
+            .map(|_| _TransformerLayer::new(embed_dim, mlp_dim, &mut rng))
             .collect();
 
         Self {

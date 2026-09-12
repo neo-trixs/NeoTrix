@@ -3,7 +3,7 @@ pub struct SecurityBridge;
 
 impl SecurityBridge {
     /// 从环境变量获取 API Key
-    pub fn get_api_key(source: &str) -> Option<String> {
+    pub fn _get_api_key(source: &str) -> Option<String> {
         let env_key = format!(
             "NEOTRIX_MEDIA_{}_API_KEY",
             source.to_uppercase().replace('-', "_")
@@ -12,18 +12,18 @@ impl SecurityBridge {
     }
 
     /// 检查源是否有配置的 API Key
-    pub fn has_api_key(source: &str) -> bool {
-        Self::get_api_key(source).is_some()
+    pub fn _has_api_key(source: &str) -> bool {
+        Self::_get_api_key(source).is_some()
     }
 
     /// 获取所有已配置的源
-    pub fn configured_sources() -> Vec<String> {
+    pub fn _configured_sources() -> Vec<String> {
         let sources = vec![
             "kugou", "netease", "migu", "qqmusic", "kuwo",
             "spotify", "deezer", "soundcloud", "pixabay", "pexels",
         ];
         sources.into_iter()
-            .filter(|s| Self::has_api_key(s))
+            .filter(|s| Self::_has_api_key(s))
             .map(|s| s.to_string())
             .collect()
     }

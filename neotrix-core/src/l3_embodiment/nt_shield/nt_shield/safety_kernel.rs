@@ -25,7 +25,7 @@ pub enum SafetyDecision {
 
 /// Signed evidence of a safety decision, verifiable outside the agent's trust boundary
 #[derive(Debug, Clone)]
-pub struct SignedEvidence {
+pub struct _SignedEvidence {
     pub decision: SafetyDecision,
     pub kernel_version: String,
     pub signature: String,
@@ -87,7 +87,7 @@ pub struct SafetyKernel {
     version: String,
     signing_key: [u8; 32],
     policy: Arc<ActionPolicy>,
-    audit_log: std::sync::Mutex<Vec<SignedEvidence>>,
+    audit_log: std::sync::Mutex<Vec<_SignedEvidence>>,
 }
 
 impl SafetyKernel {
@@ -114,7 +114,7 @@ impl SafetyKernel {
     }
 
     /// THE core method — checks an action and returns signed evidence
-    pub fn check(&self, action: &ActionRequest) -> SignedEvidence {
+    pub fn check(&self, action: &ActionRequest) -> _SignedEvidence {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -185,14 +185,14 @@ impl SafetyKernel {
 
     /// External verification — re-computes HMAC and compares
     /// Can be called OUTSIDE the agent's process with a shared secret
-    pub fn verify(&self, evidence: &SignedEvidence, _action: &ActionRequest) -> bool {
+    pub fn verify(&self, evidence: &_SignedEvidence, _action: &ActionRequest) -> bool {
         let canonical = Self::canonical_string_static(&evidence.decision, evidence.timestamp, &evidence.kernel_version);
         let expected_sig = compute_hmac(&canonical, &self.signing_key);
         expected_sig == evidence.signature
     }
 
     /// Verify signed evidence with an external key (cross-process verification)
-    pub fn verify_with_key(evidence: &SignedEvidence, key: &[u8; 32], _action: &ActionRequest) -> bool {
+    pub fn _verify_with_key(evidence: &_SignedEvidence, key: &[u8; 32], _action: &ActionRequest) -> bool {
         let canonical = Self::canonical_string_static(&evidence.decision, evidence.timestamp, &evidence.kernel_version);
         let expected_sig = compute_hmac(&canonical, key);
         expected_sig == evidence.signature
@@ -216,11 +216,11 @@ impl SafetyKernel {
         }
     }
 
-    fn sign(&self, decision: SafetyDecision, timestamp: u64) -> SignedEvidence {
+    fn sign(&self, decision: SafetyDecision, timestamp: u64) -> _SignedEvidence {
         let canonical = self.canonical_string(&decision, timestamp);
         let signature = compute_hmac(&canonical, &self.signing_key);
 
-        let evidence = SignedEvidence {
+        let evidence = _SignedEvidence {
             decision,
             kernel_version: self.version.clone(),
             signature,
@@ -245,7 +245,7 @@ impl SafetyKernel {
         self.active.load(Ordering::SeqCst)
     }
 
-    pub fn audit_log(&self) -> Vec<SignedEvidence> {
+    pub fn audit_log(&self) -> Vec<_SignedEvidence> {
         self.audit_log.lock().map_or_else(|_| Vec::new(), |log| log.clone())
     }
 
@@ -260,23 +260,23 @@ impl Default for SafetyKernel {
     }
 }
 
-/// ExecutionTimeGuard wraps SafetyKernel with ergonomic integration hooks
-pub struct ExecutionTimeGuard {
+/// _ExecutionTimeGuard wraps SafetyKernel with ergonomic integration hooks
+pub struct _ExecutionTimeGuard {
     kernel: Arc<SafetyKernel>,
 }
 
-impl ExecutionTimeGuard {
+impl _ExecutionTimeGuard {
     pub fn new(kernel: Arc<SafetyKernel>) -> Self {
         Self { kernel }
     }
 
     /// Guard an action from string parameters
-    pub fn guard_action(
+    pub fn _guard_action(
         &self,
         action: &str,
         target: &str,
         args: HashMap<String, String>,
-    ) -> Result<SignedEvidence, String> {
+    ) -> Result<_SignedEvidence, String> {
         if action.is_empty() {
             return Err("Action string is empty".to_string());
         }
@@ -317,7 +317,7 @@ impl ExecutionTimeGuard {
     }
 
     /// Verify a signed decision matches an action ID
-    pub fn verify_decision(&self, evidence: &SignedEvidence, action_id: &str) -> bool {
+    pub fn _verify_decision(&self, evidence: &_SignedEvidence, action_id: &str) -> bool {
         let dummy = ActionRequest {
             action_id: action_id.to_string(),
             action_type: ActionType::ToolCall,
@@ -525,12 +525,12 @@ mod tests {
     #[test]
     fn test_execution_time_guard_basic() {
         let kernel = Arc::new(SafetyKernel::new());
-        let guard = ExecutionTimeGuard::new(kernel);
+        let guard = _ExecutionTimeGuard::new(kernel);
 
-        let result = guard.guard_action("read_file", "/tmp/test.txt", HashMap::new());
+        let result = guard._guard_action("read_file", "/tmp/test.txt", HashMap::new());
         assert!(result.is_ok(), "read_file should be allowed");
 
-        let result2 = guard.guard_action("network_request", "evil.com", HashMap::new());
+        let result2 = guard._guard_action("network_request", "evil.com", HashMap::new());
         assert!(result2.is_err(), "network_request should be denied");
     }
 
@@ -643,8 +643,8 @@ mod tests {
     #[test]
     fn test_guard_action_rejects_empty_action() {
         let kernel = Arc::new(SafetyKernel::new());
-        let guard = ExecutionTimeGuard::new(kernel);
-        let result = guard.guard_action("", "/tmp/test.txt", HashMap::new());
+        let guard = _ExecutionTimeGuard::new(kernel);
+        let result = guard._guard_action("", "/tmp/test.txt", HashMap::new());
         assert!(result.is_err(), "Empty action string should be rejected");
     }
 
@@ -655,7 +655,7 @@ mod tests {
         let evidence = kernel.check(&request);
 
         let key = kernel.signing_key;
-        assert!(SafetyKernel::verify_with_key(&evidence, &key, &request));
+        assert!(SafetyKernel::_verify_with_key(&evidence, &key, &request));
     }
 
     #[test]

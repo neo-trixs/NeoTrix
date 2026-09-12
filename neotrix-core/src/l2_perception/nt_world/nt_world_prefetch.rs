@@ -24,19 +24,19 @@ pub struct PrefetchedUrl {
 
 /// 统一文档输出模型 (D15): 任何端点都产出此 schema。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnifiedDoc {
+pub struct _UnifiedDoc {
     pub kind: String,          // "scrape" | "map" | "search" | "interact"
     pub source: String,
     pub title: String,
     pub url: String,
     pub text: String,
     pub links: Vec<String>,
-    pub items: Vec<DocItem>,
+    pub items: Vec<_DocItem>,
 }
 
 /// 端点明细项 (map 的站内 URL, search 的命中, interact 的观察)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocItem {
+pub struct _DocItem {
     pub url: String,
     pub title: String,
     pub snippet: String,
@@ -169,7 +169,7 @@ impl TwoPhaseCrawler {
         n
     }
 
-    pub fn fetched_count(&self) -> usize {
+    pub fn _fetched_count(&self) -> usize {
         self.fetched_urls.len()
     }
 
@@ -185,18 +185,18 @@ impl TwoPhaseCrawler {
 }
 
 /// D15 统一端点 — firecrawl 风格: 一个门面暴露 scrape/map/search/interact,
-/// 全部产出 UnifiedDoc 一致 schema。
-pub struct UnifiedEndpoints {
+/// 全部产出 _UnifiedDoc 一致 schema。
+pub struct _UnifiedEndpoints {
     pub crawler: TwoPhaseCrawler,
 }
 
-impl Default for UnifiedEndpoints {
+impl Default for _UnifiedEndpoints {
     fn default() -> Self {
         Self::new(vec![], 100, None)
     }
 }
 
-impl UnifiedEndpoints {
+impl _UnifiedEndpoints {
     pub fn new(
         bm25_keywords: Vec<String>,
         max_pages: usize,
@@ -208,20 +208,20 @@ impl UnifiedEndpoints {
     }
 
     /// search 端点: 对 prefetch 发现的 URL 过滤相关集, 输出统一文档。
-    pub fn search(&mut self, query: &str, count: usize) -> UnifiedDoc {
+    pub fn search(&mut self, query: &str, count: usize) -> _UnifiedDoc {
         let seeds = [query];
         let discovered = self.crawler.prefetch(&seeds, 0);
         let relevant = self.crawler.filter_relevant(&discovered);
-        let items: Vec<DocItem> = relevant
+        let items: Vec<_DocItem> = relevant
             .into_iter()
             .take(count)
-            .map(|u| DocItem {
+            .map(|u| _DocItem {
                 url: u.url.clone(),
                 title: u.url.clone(),
                 snippet: u.snippet.clone(),
             })
             .collect();
-        UnifiedDoc {
+        _UnifiedDoc {
             kind: "search".to_string(),
             source: query.to_string(),
             title: format!("search:{}", query),
@@ -233,17 +233,17 @@ impl UnifiedEndpoints {
     }
 
     /// map 端点: 全站 URL 发现 (max_depth 展开)。
-    pub fn map(&mut self, site_url: &str, max_depth: usize) -> UnifiedDoc {
+    pub fn map(&mut self, site_url: &str, max_depth: usize) -> _UnifiedDoc {
         let discovered = self.crawler.prefetch(&[site_url], max_depth);
-        let items: Vec<DocItem> = discovered
+        let items: Vec<_DocItem> = discovered
             .iter()
-            .map(|u| DocItem {
+            .map(|u| _DocItem {
                 url: u.url.clone(),
                 title: u.url.clone(),
                 snippet: u.snippet.clone(),
             })
             .collect();
-        UnifiedDoc {
+        _UnifiedDoc {
             kind: "map".to_string(),
             source: site_url.to_string(),
             title: format!("map:{}", site_url),
@@ -255,7 +255,7 @@ impl UnifiedEndpoints {
     }
 
     /// scrape 端点: 抓取单页正文。
-    pub fn scrape(&mut self, url: &str) -> UnifiedDoc {
+    pub fn scrape(&mut self, url: &str) -> _UnifiedDoc {
         let target = PrefetchedUrl {
             url: url.to_string(),
             depth: 0,
@@ -263,7 +263,7 @@ impl UnifiedEndpoints {
             fetched: false,
         };
         self.crawler.crawl(&[target]);
-        UnifiedDoc {
+        _UnifiedDoc {
             kind: "scrape".to_string(),
             source: url.to_string(),
             title: url.to_string(),
@@ -275,8 +275,8 @@ impl UnifiedEndpoints {
     }
 
     /// interact 端点: 记录一次交互观察 (stagehand act/observe 参照)。
-    pub fn interact(&mut self, url: &str, action: &str) -> UnifiedDoc {
-        UnifiedDoc {
+    pub fn interact(&mut self, url: &str, action: &str) -> _UnifiedDoc {
+        _UnifiedDoc {
             kind: "interact".to_string(),
             source: url.to_string(),
             title: format!("{}@{}", action, url),
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn prefetch_discovers_but_does_not_fetch_bodies() {
-        // D11: 阶段一不抓正文 — 用 fetcher 提供链接但断言 fetched_count==0
+        // D11: 阶段一不抓正文 — 用 fetcher 提供链接但断言 _fetched_count==0
         let mut c = TwoPhaseCrawler::new(
             vec!["rust".into()],
             100,
@@ -314,7 +314,7 @@ mod tests {
         );
         let discovered = c.prefetch(&["https://site.dev"], 2);
         assert_eq!(discovered.len(), 3, "home + /a + /b discovered");
-        assert_eq!(c.fetched_count(), 0, "prefetch must not fetch bodies");
+        assert_eq!(c._fetched_count(), 0, "prefetch must not fetch bodies");
         // 去重: 再次 prefetch 同种子不重复
         let again = c.prefetch(&["https://site.dev"], 2);
         assert!(again.is_empty(), "no duplicate prefetch of seen urls");
@@ -368,7 +368,7 @@ mod tests {
 
     #[test]
     fn unified_endpoints_share_schema() {
-        let mut u = UnifiedEndpoints::new(vec!["rust".into()], 100, Some(Box::new(fake_site)));
+        let mut u = _UnifiedEndpoints::new(vec!["rust".into()], 100, Some(Box::new(fake_site)));
         let s = u.search("rust", 3);
         let m = u.map("https://site.dev", 1);
         let sc = u.scrape("https://site.dev/a");
@@ -388,7 +388,7 @@ mod tests {
 
     #[test]
     fn map_discovers_site_urls() {
-        let mut u = UnifiedEndpoints::new(vec![], 100, Some(Box::new(fake_site)));
+        let mut u = _UnifiedEndpoints::new(vec![], 100, Some(Box::new(fake_site)));
         let m = u.map("https://site.dev", 2);
         assert!(m.links.contains(&"https://site.dev/a".to_string()));
         assert!(m.links.contains(&"https://site.dev/b".to_string()));

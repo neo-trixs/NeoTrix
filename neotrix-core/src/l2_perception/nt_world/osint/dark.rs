@@ -8,7 +8,7 @@ use super::{OsintConfig, OsintTarget};
 use crate::neotrix::nt_io_http_factory as http_factory;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DarkWebResult {
+pub struct _DarkWebResult {
     pub title: String,
     pub url: String,
     pub snippet: String,
@@ -18,7 +18,7 @@ pub struct DarkWebResult {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DarkFindings {
-    pub results: Vec<DarkWebResult>,
+    pub results: Vec<_DarkWebResult>,
     pub onion_links: Vec<String>,
     pub domain: String,
 }
@@ -41,7 +41,7 @@ impl std::fmt::Display for DarkFindings {
     }
 }
 
-async fn search_ahmia(query: &str, client: &Client) -> Vec<DarkWebResult> {
+async fn search_ahmia(query: &str, client: &Client) -> Vec<_DarkWebResult> {
     let url = format!("https://ahmia.fi/search/?q={}", urlencode(query));
     match client.get(&url)
         .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
@@ -59,7 +59,7 @@ async fn search_ahmia(query: &str, client: &Client) -> Vec<DarkWebResult> {
                         .or_else(|| extract_between(line, "<a", "</a>"))
                         .unwrap_or("result");
                     let snippet = extract_between(line, "<p>", "</p>").unwrap_or("");
-                    results.push(DarkWebResult {
+                    results.push(_DarkWebResult {
                         title: clean_html(title),
                         url: extract_href(line).unwrap_or_default(),
                         snippet: clean_html(snippet),
@@ -75,7 +75,7 @@ async fn search_ahmia(query: &str, client: &Client) -> Vec<DarkWebResult> {
     }
 }
 
-async fn search_facebook_watch(query: &str, client: &Client) -> Vec<DarkWebResult> {
+async fn search_facebook_watch(query: &str, client: &Client) -> Vec<_DarkWebResult> {
     // Facebook Watcher - indexes dark web forums and paste sites
     let url = format!("https://facebook.watch/search?q={}", urlencode(query));
     match client.get(&url)
@@ -91,7 +91,7 @@ async fn search_facebook_watch(query: &str, client: &Client) -> Vec<DarkWebResul
                 if line.contains("class=\"result\"") || line.contains("<article") {
                     let title = extract_between(line, "<h2", "</h2>").unwrap_or("result");
                     let snippet = extract_between(line, "<p", "</p>").unwrap_or("");
-                    results.push(DarkWebResult {
+                    results.push(_DarkWebResult {
                         title: clean_html(title),
                         url: extract_href(line).unwrap_or_default(),
                         snippet: clean_html(snippet),
@@ -188,7 +188,7 @@ fn build_tor_client(timeout_secs: u64) -> Result<Client, String> {
 }
 
 /// Search Ahmia through Tor for dark web content
-async fn search_ahmia_via_tor(query: &str, tor_client: &Client) -> Vec<DarkWebResult> {
+async fn search_ahmia_via_tor(query: &str, tor_client: &Client) -> Vec<_DarkWebResult> {
     // Ahmia .onion service
     let url = format!("http://juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion/search/?q={}", urlencode(query));
     match tor_client.get(&url)
@@ -206,7 +206,7 @@ async fn search_ahmia_via_tor(query: &str, tor_client: &Client) -> Vec<DarkWebRe
                         .or_else(|| extract_between(line, "<a", "</a>"))
                         .unwrap_or("result");
                     let snippet = extract_between(line, "<p>", "</p>").unwrap_or("");
-                    results.push(DarkWebResult {
+                    results.push(_DarkWebResult {
                         title: clean_html(title),
                         url: extract_href(line).unwrap_or_default(),
                         snippet: clean_html(snippet),

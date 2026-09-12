@@ -157,7 +157,7 @@ impl ContentClassifier {
         }
     }
 
-    pub fn with_provider(provider: Option<Arc<dyn LlmProvider>>) -> Self {
+    pub fn _with_provider(provider: Option<Arc<dyn LlmProvider>>) -> Self {
         let mut classifier = Self::new();
         classifier.provider = provider;
         classifier
@@ -506,7 +506,7 @@ mod tests {
     #[tokio::test]
     async fn test_try_llm_classify_with_mock() {
         let provider: Option<Arc<dyn LlmProvider>> = Some(Arc::new(MockLlmProvider));
-        let classifier = ContentClassifier::with_provider(provider);
+        let classifier = ContentClassifier::_with_provider(provider);
         let result = classifier.try_llm_classify(
             "https://arxiv.org/abs/2301.00001",
             "Deep Learning Advances",

@@ -100,32 +100,32 @@ impl SensoryIntegrationHub {
         }
     }
 
-    pub fn enable_real_sensors(&mut self) {
+    pub fn _enable_real_sensors(&mut self) {
         self.use_real_sensors = true;
     }
 
-    pub fn disable_real_sensors(&mut self) {
+    pub fn _disable_real_sensors(&mut self) {
         self.use_real_sensors = false;
     }
 
-    pub fn set_sight_path(&mut self, path: std::path::PathBuf) {
+    pub fn _set_sight_path(&mut self, path: std::path::PathBuf) {
         self.sight_path = Some(path);
     }
-    pub fn set_hearing_path(&mut self, path: std::path::PathBuf) {
+    pub fn _set_hearing_path(&mut self, path: std::path::PathBuf) {
         self.hearing_path = Some(path);
     }
 
     /// Set CraniMEM active goals for event gating.
-    pub fn set_crani_goals(&mut self, goals: Vec<GoalContext>) {
+    pub fn _set_crani_goals(&mut self, goals: Vec<GoalContext>) {
         self.crani_gate.set_goals(goals);
     }
 
     /// Enable/disable CraniMEM emergency override (system alerts bypass gating).
-    pub fn set_crani_emergency(&mut self, active: bool) {
+    pub fn _set_crani_emergency(&mut self, active: bool) {
         self.crani_gate.set_emergency(active);
     }
 
-    pub fn poll_all(&mut self) -> Vec<SensoryEvent> {
+    pub fn _poll_all(&mut self) -> Vec<SensoryEvent> {
         if !self.active {
             return vec![];
         }

@@ -175,7 +175,7 @@ impl ActiveInferenceEngine {
     }
 
     /// 自由能移动平均
-    pub fn fe_moving_avg(&self) -> f64 {
+    pub fn _fe_moving_avg(&self) -> f64 {
         if self.fe_history.is_empty() { return 0.0; }
         self.fe_history.iter().sum::<f64>() / self.fe_history.len() as f64
     }
@@ -266,7 +266,7 @@ mod tests {
         for _ in 0..5 {
             engine.compute_free_energy(0.5, 0.1, 0.01);
         }
-        let avg = engine.fe_moving_avg();
+        let avg = engine._fe_moving_avg();
         assert!(avg.is_finite());
     }
 
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn test_empty_history_fe_moving_avg() {
         let engine = ActiveInferenceEngine::new();
-        assert!((engine.fe_moving_avg() - 0.0).abs() < 1e-10);
+        assert!((engine._fe_moving_avg() - 0.0).abs() < 1e-10);
     }
 
     #[test]

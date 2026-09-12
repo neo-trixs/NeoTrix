@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{OsintConfig, OsintTarget};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UrlSnapshot {
+pub struct _UrlSnapshot {
     pub url: String,
     pub timestamp: String,
     pub status: Option<u16>,
@@ -16,7 +16,7 @@ pub struct UrlSnapshot {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UrlHistoryFindings {
-    pub snapshots: Vec<UrlSnapshot>,
+    pub snapshots: Vec<_UrlSnapshot>,
     pub domain: String,
 }
 
@@ -42,7 +42,7 @@ impl std::fmt::Display for UrlHistoryFindings {
     }
 }
 
-async fn query_cdx(domain: &str, client: &Client, from: &str, to: &str) -> Vec<UrlSnapshot> {
+async fn query_cdx(domain: &str, client: &Client, from: &str, to: &str) -> Vec<_UrlSnapshot> {
     // Use Wayback Machine CDX API: https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server
     let url = format!(
         "https://web.archive.org/cdx/search/cdx?url={domain}/*&output=json&from={from}&to={to}&limit=5000"
@@ -61,7 +61,7 @@ async fn query_cdx(domain: &str, client: &Client, from: &str, to: &str) -> Vec<U
                             let mimetype = row.get(3).cloned();
                             let length = row.get(5).and_then(|s| s.parse::<u64>().ok());
                             let archived_url = format!("https://web.archive.org/web/{timestamp}/{raw_url}");
-                            snapshots.push(UrlSnapshot {
+                            snapshots.push(_UrlSnapshot {
                                 url: if raw_url.is_empty() { archived_url } else { raw_url },
                                 timestamp: if timestamp.len() == 14 {
                                     format!("{}-{}-{} {}:{}:{}",

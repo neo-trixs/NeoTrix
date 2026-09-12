@@ -63,12 +63,12 @@ pub struct SearchResult {
     pub snippet: String,
     /// 证据可信度字段 (argo 吸收): None 表示未评分 (纯搜索引擎原始结果)。
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evidence: Option<EvidenceScore>,
+    pub evidence: Option<_EvidenceScore>,
 }
 
 /// 证据可信度分解 (argo evidence 管线移植)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvidenceScore {
+pub struct _EvidenceScore {
     /// 综合可信度 ∈ [0,1]
     pub final_score: f64,
     /// 权威性 (selection) ∈ [0,1]
@@ -88,7 +88,7 @@ pub struct EvidenceScore {
     pub has_disclose: bool,
 }
 
-impl EvidenceScore {
+impl _EvidenceScore {
     pub fn label(&self) -> String {
         let tier = match self.tier.as_str() {
             "official" => "官方",
@@ -148,7 +148,7 @@ enum DuckDuckGoTopic {
     },
 }
 
-pub struct WebSearchEngine {
+pub struct _WebSearchEngine {
     api_base_url: String,
     /// 惰性初始化: 避免在 tokio async 上下文创建 blocking client 触发
     /// "Cannot drop a runtime in a context where blocking is not allowed" panic。
@@ -156,7 +156,7 @@ pub struct WebSearchEngine {
     client: std::sync::OnceLock<reqwest::blocking::Client>,
 }
 
-impl Default for WebSearchEngine {
+impl Default for _WebSearchEngine {
     fn default() -> Self {
         let base = std::env::var("NEOTRIX_SEARCH_API")
             .unwrap_or_else(|_| "https://api.duckduckgo.com".to_string());
@@ -164,7 +164,7 @@ impl Default for WebSearchEngine {
     }
 }
 
-impl WebSearchEngine {
+impl _WebSearchEngine {
     pub fn new(api_base_url: &str) -> Self {
         Self {
             api_base_url: api_base_url.trim_end_matches('/').to_string(),
@@ -274,7 +274,7 @@ impl WebSearchEngine {
 // 搜索统一化 (R-P82 有序后端路由 — 借鉴 OSINT BackendRouter)
 // ============================================================
 //
-// 缺陷: 原 `WebSearchEngine` 单一后端 (仅 DuckDuckGo), 无 fallback — 一旦
+// 缺陷: 原 `_WebSearchEngine` 单一后端 (仅 DuckDuckGo), 无 fallback — 一旦
 // DDG 限流/封禁, 全网搜索即失效。R-P82 有序后端路由: 首选 + 备选的真实探测,
 // 第一个完整可用的当选, 接入方式换代只调整列表顺序不重写能力层。
 
@@ -388,8 +388,8 @@ fn score_authority(url: &str) -> (f64, String, bool) {
 }
 
 /// Absorption: 证据密度 (数字/定义/对比/howto/披露)。
-/// 移植自 argo content_signals.score_evidence_density。
-pub fn score_evidence_density(text: &str, title: &str) -> (f64, bool, bool, bool, bool) {
+/// 移植自 argo content_signals._score_evidence_density。
+pub fn _score_evidence_density(text: &str, title: &str) -> (f64, bool, bool, bool, bool) {
     let body = format!("{}\n{}", title, text).to_lowercase();
     // 数字: 千分位/百分比/计量单位/环比同比/Qn/年份
     let has_numbers = {
@@ -490,18 +490,18 @@ fn cross_validation(results: &[SearchResult], query: &str) -> (f64, usize, usize
 }
 
 /// 证据评分器 — 对搜索结果批量打分。
-pub struct EvidenceScorer;
+pub struct _EvidenceScorer;
 
-impl EvidenceScorer {
+impl _EvidenceScorer {
     /// 对单条结果评分。
-    pub fn score(r: &SearchResult, engine_score: f64) -> EvidenceScore {
+    pub fn score(r: &SearchResult, engine_score: f64) -> _EvidenceScore {
         let (selection, _tier, is_serp) = score_authority(&r.url);
         let (absorption, has_numbers, has_definition, has_comparison, has_disclose) =
-            score_evidence_density(&r.snippet, &r.title);
+            _score_evidence_density(&r.snippet, &r.title);
         let freshness = score_freshness(&r.title, &r.snippet, &r.url);
         let selection_eff = if is_serp { selection.min(0.15) } else { selection };
         let final_score = selection_eff * 0.40 + absorption * 0.35 + freshness * 0.15 + engine_score * 0.10;
-        EvidenceScore {
+        _EvidenceScore {
             final_score: (final_score * 100.0).round() / 100.0,
             selection: (selection * 100.0).round() / 100.0,
             absorption: (absorption * 100.0).round() / 100.0,
@@ -535,11 +535,11 @@ impl EvidenceScorer {
     }
 
     /// URL 去重 (跨后端: http/https/www/utm 变体合并)。
-    pub fn deduplicate_by_url(results: Vec<SearchResult>) -> Vec<SearchResult> {
+    pub fn _deduplicate_by_url(results: Vec<SearchResult>) -> Vec<SearchResult> {
         let mut seen: Vec<String> = Vec::new();
         let mut out = Vec::new();
         for r in results {
-            let key = normalize_url_key(&r.url);
+            let key = _normalize_url_key(&r.url);
             if !seen.contains(&key) {
                 seen.push(key);
                 out.push(r);
@@ -550,7 +550,7 @@ impl EvidenceScorer {
 }
 
 /// URL 归一键: 去协议/www/末尾斜杠/常见 tracking 参数。
-pub fn normalize_url_key(url: &str) -> String {
+pub fn _normalize_url_key(url: &str) -> String {
     let mut u = url.to_lowercase();
     for prefix in ["https://", "http://"] {
         if u.starts_with(prefix) {
@@ -573,13 +573,13 @@ pub fn normalize_url_key(url: &str) -> String {
     u
 }
 
-/// DuckDuckGo 后端 (首选) — 复用既有 WebSearchEngine 解析。
+/// DuckDuckGo 后端 (首选) — 复用既有 _WebSearchEngine 解析。
 #[derive(Default)]
-pub struct DuckDuckGoBackend {
-    engine: WebSearchEngine,
+pub struct _DuckDuckGoBackend {
+    engine: _WebSearchEngine,
 }
 
-impl SearchBackend for DuckDuckGoBackend {
+impl SearchBackend for _DuckDuckGoBackend {
     fn name(&self) -> &str {
         "duckduckgo"
     }
@@ -590,18 +590,18 @@ impl SearchBackend for DuckDuckGoBackend {
 }
 
 /// Wikipedia 后端 (备选) — 免费无 key, 用 search API 兜底。
-pub struct WikipediaBackend {
+pub struct _WikipediaBackend {
     /// 惰性初始化: 避免在 tokio async 上下文创建 blocking client 触发 panic
     client: std::sync::OnceLock<reqwest::blocking::Client>,
 }
 
-impl Default for WikipediaBackend {
+impl Default for _WikipediaBackend {
     fn default() -> Self {
         Self { client: std::sync::OnceLock::new() }
     }
 }
 
-impl WikipediaBackend {
+impl _WikipediaBackend {
     fn client(&self) -> &reqwest::blocking::Client {
         self.client.get_or_init(|| {
             reqwest::blocking::Client::builder()
@@ -631,7 +631,7 @@ struct WikipediaSearchItem {
     snippet: String,
 }
 
-impl SearchBackend for WikipediaBackend {
+impl SearchBackend for _WikipediaBackend {
     fn name(&self) -> &str {
         "wikipedia"
     }
@@ -670,7 +670,7 @@ impl SearchBackend for WikipediaBackend {
 }
 
 /// 有序搜索路由 — 首选 + 备选, 失败自动切换 (R-P82)。
-pub struct WebSearchRouter {
+pub struct _WebSearchRouter {
     backends: Vec<Box<dyn SearchBackend>>,
     /// 最近一次成功走的后端名 (doctor 体检展示)
     current: String,
@@ -678,7 +678,7 @@ pub struct WebSearchRouter {
     last_errors: Vec<(String, String)>,
 }
 
-impl WebSearchRouter {
+impl _WebSearchRouter {
     pub fn new(backends: Vec<Box<dyn SearchBackend>>) -> Self {
         Self {
             backends,
@@ -689,10 +689,10 @@ impl WebSearchRouter {
 
     /// 默认有序后端 (H4 Wave6 情报工具 + 外部吸收批次):
     /// DDG → Wikipedia → GDELT → EDGAR → USGS → GDACS → UCDP → URLhaus → OFAC → Polymarket → AOI → adsb.lol → BGPview → OpenCorporates
-    pub fn default_ordered() -> Self {
+    pub fn _default_ordered() -> Self {
         Self::new(vec![
-            Box::new(DuckDuckGoBackend::default()),
-            Box::new(WikipediaBackend::default()),
+            Box::new(_DuckDuckGoBackend::default()),
+            Box::new(_WikipediaBackend::default()),
             Box::new(GdeltBackend::new()),
             Box::new(EdgarBackend::new()),
             Box::new(UsgsBackend::new()),
@@ -762,14 +762,14 @@ impl WebSearchRouter {
                         name: name.clone(),
                         ok: false,
                         error: Some(err.clone()),
-                        prescription: Self::repair_prescription(&name, &err),
+                        prescription: Self::_repair_prescription(&name, &err),
                     }
                 }
                 Err(e) => BackendHealth {
                     name: name.clone(),
                     ok: false,
                     error: Some(e.clone()),
-                    prescription: Self::repair_prescription(&name, &e),
+                    prescription: Self::_repair_prescription(&name, &e),
                 },
             };
             report.push(health);
@@ -778,7 +778,7 @@ impl WebSearchRouter {
     }
 
     /// 修复处方: 按错误签名映射可执行动作 (Agent-Reach '坏掉的给修复处方')。
-    pub fn repair_prescription(backend: &str, err: &str) -> String {
+    pub fn _repair_prescription(backend: &str, err: &str) -> String {
         let e = err.to_lowercase();
         if e.contains("403") || e.contains("429") || e.contains("status: 403") || e.contains("status: 429") {
             "限流/封禁: 冷却后重试, 或调整 backend 顺序把更稳的备选提前 (R-P82 列表序即接入序)".to_string()
@@ -815,13 +815,13 @@ impl BackendHealth {
 
 /// 统一搜索表面 — 给 agent/工具一条路由, 封装 router 的可变状态。
 pub struct UnifiedSearch {
-    router: std::sync::Mutex<WebSearchRouter>,
+    router: std::sync::Mutex<_WebSearchRouter>,
 }
 
 impl Default for UnifiedSearch {
     fn default() -> Self {
         Self {
-            router: std::sync::Mutex::new(WebSearchRouter::default_ordered()),
+            router: std::sync::Mutex::new(_WebSearchRouter::_default_ordered()),
         }
     }
 }
@@ -836,12 +836,12 @@ impl UnifiedSearch {
     pub fn search(&self, query: &str, count: usize) -> Result<Vec<SearchResult>, String> {
         let mut guard = self.router.lock().map_err(|_| "router lock poisoned".to_string())?;
         let raw = guard.search(query, count)?;
-        let deduped = EvidenceScorer::deduplicate_by_url(raw);
-        let registry = SiteLearningRegistry::builtin();
-        let mut scored = EvidenceScorer::score_results(deduped, query);
+        let deduped = _EvidenceScorer::_deduplicate_by_url(raw);
+        let registry = _SiteLearningRegistry::builtin();
+        let mut scored = _EvidenceScorer::score_results(deduped, query);
         for r in &mut scored {
             let host = extract_host(&r.url);
-            let learns = registry.for_host(&host);
+            let learns = registry._for_host(&host);
             if !learns.is_empty() {
                 let cats: Vec<&str> = learns.iter().map(|l| l.category.as_str()).collect();
                 r.snippet = format!("[{}] {}", cats.join("/"), r.snippet);
@@ -851,7 +851,7 @@ impl UnifiedSearch {
     }
 
     /// 原始搜索 (不评分) — 兼容旧接口语义。
-    pub fn search_raw(&self, query: &str, count: usize) -> Result<Vec<SearchResult>, String> {
+    pub fn _search_raw(&self, query: &str, count: usize) -> Result<Vec<SearchResult>, String> {
         let mut guard = self.router.lock().map_err(|_| "router lock poisoned".to_string())?;
         guard.search(query, count)
     }
@@ -867,23 +867,23 @@ impl UnifiedSearch {
     }
 
     /// 修复处方 (静态): 按错误签名生成可执行动作。
-    pub fn repair_prescription(backend: &str, err: &str) -> String {
-        WebSearchRouter::repair_prescription(backend, err)
+    pub fn _repair_prescription(backend: &str, err: &str) -> String {
+        _WebSearchRouter::_repair_prescription(backend, err)
     }
 }
 
 /* ── ego-lite 吸收 (2026-08-17): 站点学习经验注册表 ──
  * 模式移植自 citrolabs/ego-lite (MIT) learnings 子系统:
- *   - manifest.json  (id / domains / nodeTools)  → SiteLearning { domain, extract, category }
+ *   - manifest.json  (id / domains / nodeTools)  → _SiteLearning { domain, extract, category }
  *   - domainMatches  (*.suffix 只匹配子域, 裸域名精确匹配) → domain_matches()
- *   - validateLearning (域名合法性/结构门控)     → SiteLearningRegistry::validate()
+ *   - validateLearning (域名合法性/结构门控)     → _SiteLearningRegistry::validate()
  * 强化 nt_world_search::ordered_backend_router 现有节点 (R-P42), 非平行模块。
  */
 
 /// 单条站点学习经验 — 域名 + 结构化提取知识 + 领域分类。
 /// 对应 ego-lite learning manifest 的核心字段。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SiteLearning {
+pub struct _SiteLearning {
     /// 域名模式: "github.com" 或 "*.github.com" (子域)。裸域名精确匹配, `*.` 只匹配子域。
     pub domain: String,
     /// 站点名 (用于展示, 对应 manifest.name)。
@@ -900,7 +900,7 @@ pub struct SiteLearning {
     pub validated: bool,
 }
 
-impl SiteLearning {
+impl _SiteLearning {
     /// 新建学习经验 (默认未验证 — 必须过 validate() 门控)。
     pub fn new(domain: &str, name: &str, category: &str) -> Self {
         Self {
@@ -931,42 +931,42 @@ impl SiteLearning {
 /// 站点学习经验注册表 — 域名 → 提取经验 的声明式注册 + 验证门控 + 查询。
 /// 对应 ego-lite learnings/ 目录 + siteSkillsForUrl()。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct SiteLearningRegistry {
-    learnings: Vec<SiteLearning>,
+pub struct _SiteLearningRegistry {
+    learnings: Vec<_SiteLearning>,
 }
 
-impl SiteLearningRegistry {
+impl _SiteLearningRegistry {
     /// 内建站点学习经验 (可扩展)。对应 ego-lite 内置 learnings/google + learnings/x-com。
     pub fn builtin() -> Self {
         let mut r = Self::default();
         // 搜索/知识类
-        r.add(SiteLearning::new("google.com", "Google Search", "knowledge"));
-        r.add(SiteLearning::new("x.com", "X (Twitter)", "community"));
-        r.add(SiteLearning::new("twitter.com", "X (Twitter)", "community"));
-        r.add(SiteLearning::new("wikipedia.org", "Wikipedia", "knowledge"));
-        r.add(SiteLearning::new("github.com", "GitHub", "code"));
-        r.add(SiteLearning::new("*.gov.cn", "中国政府网", "official"));
-        r.add(SiteLearning::new("arxiv.org", "arXiv", "academic"));
-        r.add(SiteLearning::new("reddit.com", "Reddit", "community"));
+        r.add(_SiteLearning::new("google.com", "Google Search", "knowledge"));
+        r.add(_SiteLearning::new("x.com", "X (Twitter)", "community"));
+        r.add(_SiteLearning::new("twitter.com", "X (Twitter)", "community"));
+        r.add(_SiteLearning::new("wikipedia.org", "Wikipedia", "knowledge"));
+        r.add(_SiteLearning::new("github.com", "GitHub", "code"));
+        r.add(_SiteLearning::new("*.gov.cn", "中国政府网", "official"));
+        r.add(_SiteLearning::new("arxiv.org", "arXiv", "academic"));
+        r.add(_SiteLearning::new("reddit.com", "Reddit", "community"));
         r
     }
 
     /// 注册一条学习经验, 跑验证门控 (validateLearning 语义)。
-    pub fn add(&mut self, learning: SiteLearning) {
-        let validated = validate_site_learning(&learning);
+    pub fn add(&mut self, learning: _SiteLearning) {
+        let validated = _validate_site_learning(&learning);
         let mut l = learning;
         l.validated = validated;
         self.learnings.push(l);
     }
 
     /// 查询 hostname 匹配的全部学习经验 (多域名可匹配)。
-    pub fn for_host(&self, hostname: &str) -> Vec<&SiteLearning> {
+    pub fn _for_host(&self, hostname: &str) -> Vec<&_SiteLearning> {
         self.learnings.iter().filter(|l| l.matches(hostname)).collect()
     }
 
     /// 查询某域名是否存在学习经验 (doctor 体检可报告)。
-    pub fn has_for(&self, hostname: &str) -> bool {
-        !self.for_host(hostname).is_empty()
+    pub fn _has_for(&self, hostname: &str) -> bool {
+        !self._for_host(hostname).is_empty()
     }
 
     /// 已注册条目数。
@@ -979,14 +979,14 @@ impl SiteLearningRegistry {
     }
 
     /// 列出所有学习经验 (CLI 展示)。
-    pub fn list(&self) -> &[SiteLearning] {
+    pub fn list(&self) -> &[_SiteLearning] {
         &self.learnings
     }
 }
 
 /// 站点学习经验验证门控 — 对应 ego-lite validateLearning:
 /// 域名格式合法性 (无协议/路径/起止点), `*.` 通配仅允许前缀, 结构化字段非空。
-pub fn validate_site_learning(l: &SiteLearning) -> bool {
+pub fn _validate_site_learning(l: &_SiteLearning) -> bool {
     let raw = l.domain.trim();
     if raw.is_empty() || raw.contains("://") || raw.contains('/') {
         return false;
@@ -1037,7 +1037,7 @@ mod tests {
     #[test]
     #[ignore] // 网络探测: 真实后端可达性 (Wikipedia 需 UA, 403 曾阻断 fallback)
     fn probe_real_backends() {
-        let mut router = WebSearchRouter::default_ordered();
+        let mut router = _WebSearchRouter::_default_ordered();
         let results = router.search("Rust async runtime", 5).unwrap_or_default();
         assert!(!results.is_empty(), "ordered router 应经 fallback 返回结果");
         assert_eq!(router.current_backend(), "wikipedia", "DDG 空 → 应切 Wikipedia");
@@ -1045,7 +1045,7 @@ mod tests {
 
     #[test]
     fn router_uses_first_working_backend() {
-        let mut router = WebSearchRouter::new(vec![
+        let mut router = _WebSearchRouter::new(vec![
             Box::new(ProbeBackend { name: "primary", succeed: true, results: 3 }),
             Box::new(ProbeBackend { name: "backup", succeed: true, results: 2 }),
         ]);
@@ -1057,7 +1057,7 @@ mod tests {
     #[test]
     fn router_falls_back_when_primary_fails() {
         // R-P82: 首选失败 → 自动切备选, 不整体失败。
-        let mut router = WebSearchRouter::new(vec![
+        let mut router = _WebSearchRouter::new(vec![
             Box::new(ProbeBackend { name: "primary", succeed: false, results: 0 }),
             Box::new(ProbeBackend { name: "backup", succeed: true, results: 4 }),
         ]);
@@ -1069,7 +1069,7 @@ mod tests {
     #[test]
     fn router_all_fail_reports_errors() {
         // 全失败 → 收集各后端错误, 诊断信息完整。
-        let mut router = WebSearchRouter::new(vec![
+        let mut router = _WebSearchRouter::new(vec![
             Box::new(ProbeBackend { name: "primary", succeed: false, results: 0 }),
             Box::new(ProbeBackend { name: "backup", succeed: false, results: 0 }),
         ]);
@@ -1081,7 +1081,7 @@ mod tests {
     #[test]
     fn router_empty_primary_uses_nonempty_backup() {
         // 首选返回空 (被限流/无结果) → 切换到有结果的备选。
-        let mut router = WebSearchRouter::new(vec![
+        let mut router = _WebSearchRouter::new(vec![
             Box::new(ProbeBackend { name: "primary", succeed: true, results: 0 }),
             Box::new(ProbeBackend { name: "backup", succeed: true, results: 2 }),
         ]);
@@ -1094,7 +1094,7 @@ mod tests {
     fn default_router_has_ordered_backends() {
         // 默认有序路由 (H4 Wave6 情报工具 + 外部吸收批次):
         // DDG 首选 → Wikipedia 备选 → GDELT/EDGAR/... 数据后端有序回退。
-        let router = WebSearchRouter::default_ordered();
+        let router = _WebSearchRouter::_default_ordered();
         let names: Vec<String> = router.backends().iter().map(|b| b.name().to_string()).collect();
         assert_eq!(names, vec![
             "duckduckgo", "wikipedia", "gdelt", "edgar", "usgs", "gdacs",
@@ -1166,7 +1166,7 @@ mod tests {
     #[test]
     fn evidence_density_detects_numbers_and_definitions() {
         let (score, has_num, has_def, has_cmp, _) =
-            score_evidence_density("GDP 增长 8.2%，环比上升 1.4 个百分点。是指国民经济总量。", "2026年经济");
+            _score_evidence_density("GDP 增长 8.2%，环比上升 1.4 个百分点。是指国民经济总量。", "2026年经济");
         assert!(has_num, "should detect numbers");
         assert!(has_def, "should detect definition");
         assert!(has_cmp, "should detect comparison (环比/上升)");
@@ -1175,7 +1175,7 @@ mod tests {
 
     #[test]
     fn evidence_density_low_for_plain_text() {
-        let (score, has_num, _, _, _) = score_evidence_density("hello world foo bar baz qux", "");
+        let (score, has_num, _, _, _) = _score_evidence_density("hello world foo bar baz qux", "");
         assert!(!has_num);
         assert!(score < 0.4, "plain text should score low, got {}", score);
     }
@@ -1195,7 +1195,7 @@ mod tests {
             "2026年国民经济运行数据",
             "上半年 GDP 同比增长 8.2%，环比上升 1.4%，数据由统计局披露。",
         );
-        let ev = EvidenceScorer::score(&r, 0.5);
+        let ev = _EvidenceScorer::score(&r, 0.5);
         assert!(ev.selection >= 0.9, "selection high, got {}", ev.selection);
         assert!(ev.absorption >= 0.6, "absorption high, got {}", ev.absorption);
         assert!(ev.final_score >= 0.7, "final should be high, got {}", ev.final_score);
@@ -1206,7 +1206,7 @@ mod tests {
     fn score_results_sorts_by_credibility_desc() {
         let good = sample("https://www.gov.cn/a", "权威源", "GDP 增长 8.2% 数据披露");
         let bad = sample("https://www.maigoo.com/b", "榜单页", "nothing much here just filler text");
-        let results = EvidenceScorer::score_results(vec![bad.clone(), good.clone()], "GDP");
+        let results = _EvidenceScorer::score_results(vec![bad.clone(), good.clone()], "GDP");
         assert_eq!(results.len(), 2);
         let first = results[0].evidence.as_ref().unwrap();
         let second = results[1].evidence.as_ref().unwrap();
@@ -1218,15 +1218,15 @@ mod tests {
     fn dedup_merges_url_variants() {
         let a = sample("https://example.com/article?a=1&utm_source=x", "A", "a");
         let b = sample("http://www.example.com/article?a=1", "B", "b");
-        let dedup = EvidenceScorer::deduplicate_by_url(vec![a, b]);
+        let dedup = _EvidenceScorer::_deduplicate_by_url(vec![a, b]);
         assert_eq!(dedup.len(), 1, "utm/www/http variants should merge");
     }
 
     #[test]
     fn unified_search_injects_evidence_into_results() {
-        // 用探针后端注入 UnifiedSearch 无法直接注入 backend, 验证 EvidenceScorer 管线本身即可 (C1)。
+        // 用探针后端注入 UnifiedSearch 无法直接注入 backend, 验证 _EvidenceScorer 管线本身即可 (C1)。
         let r = sample("https://arxiv.org/abs/2606.001", "paper", "We propose a method with 42% improvement");
-        let ev = EvidenceScorer::score(&r, 0.5);
+        let ev = _EvidenceScorer::score(&r, 0.5);
         assert!(ev.final_score > 0.0);
         assert_eq!(ev.tier, "official");
     }
@@ -1236,63 +1236,63 @@ mod tests {
     #[test]
     fn domain_matches_bare_and_wildcard() {
         // 裸域名精确匹配 (不匹配子域)
-        assert!(SiteLearning::new("github.com", "g", "code").matches("github.com"));
-        assert!(!SiteLearning::new("github.com", "g", "code").matches("foo.github.com"));
+        assert!(_SiteLearning::new("github.com", "g", "code").matches("github.com"));
+        assert!(!_SiteLearning::new("github.com", "g", "code").matches("foo.github.com"));
         // `*.suffix` 只匹配子域, 不匹配 apex (ego-lite domainMatches 语义)
-        let wild = SiteLearning::new("*.gov.cn", "gov", "official");
+        let wild = _SiteLearning::new("*.gov.cn", "gov", "official");
         assert!(wild.matches("www.gov.cn"));
         assert!(wild.matches("stats.gov.cn"));
         assert!(!wild.matches("gov.cn"));
         // 大小写与尾点不敏感
-        assert!(SiteLearning::new("arXiv.org", "a", "academic").matches("ARXIV.ORG"));
+        assert!(_SiteLearning::new("arXiv.org", "a", "academic").matches("ARXIV.ORG"));
     }
 
     #[test]
     fn validate_rejects_bad_domains() {
         // validateLearning 门控: 拒绝协议/路径/起止点/非法通配
-        assert!(validate_site_learning(&SiteLearning::new("github.com", "g", "code")));
-        assert!(!validate_site_learning(&SiteLearning::new("https://x.com", "g", "code")));
-        assert!(!validate_site_learning(&SiteLearning::new("x.com/path", "g", "code")));
-        assert!(!validate_site_learning(&SiteLearning::new(".x.com", "g", "code")));
-        assert!(!validate_site_learning(&SiteLearning::new("x.com.", "g", "code")));
-        assert!(!validate_site_learning(&SiteLearning::new("*x.com", "g", "code")));
+        assert!(_validate_site_learning(&_SiteLearning::new("github.com", "g", "code")));
+        assert!(!_validate_site_learning(&_SiteLearning::new("https://x.com", "g", "code")));
+        assert!(!_validate_site_learning(&_SiteLearning::new("x.com/path", "g", "code")));
+        assert!(!_validate_site_learning(&_SiteLearning::new(".x.com", "g", "code")));
+        assert!(!_validate_site_learning(&_SiteLearning::new("x.com.", "g", "code")));
+        assert!(!_validate_site_learning(&_SiteLearning::new("*x.com", "g", "code")));
         // 空 name 拒绝
-        let mut l = SiteLearning::new("a.com", " ", "code");
-        assert!(!validate_site_learning(&l));
-        l = SiteLearning::new("a.com", "A", "");
-        assert!(!validate_site_learning(&l));
+        let mut l = _SiteLearning::new("a.com", " ", "code");
+        assert!(!_validate_site_learning(&l));
+        l = _SiteLearning::new("a.com", "A", "");
+        assert!(!_validate_site_learning(&l));
     }
 
     #[test]
     fn registry_routes_by_hostname() {
-        let reg = SiteLearningRegistry::builtin();
-        assert!(reg.has_for("www.gov.cn"));
-        assert!(reg.has_for("arxiv.org"));
-        assert!(!reg.has_for("example.org"));
-        assert_eq!(reg.for_host("www.gov.cn").len(), 1);
+        let reg = _SiteLearningRegistry::builtin();
+        assert!(reg._has_for("www.gov.cn"));
+        assert!(reg._has_for("arxiv.org"));
+        assert!(!reg._has_for("example.org"));
+        assert_eq!(reg._for_host("www.gov.cn").len(), 1);
         // 同域名多别名去重: x.com + twitter.com 都注册
-        assert!(reg.has_for("x.com") && reg.has_for("twitter.com"));
+        assert!(reg._has_for("x.com") && reg._has_for("twitter.com"));
         assert!(reg.len() >= 8);
     }
 
 #[test]
     fn unified_search_tags_snippet_by_domain() {
-        // 通过 EvidenceScorer + registry 的组合验证: gov.cn 结果被注入 [official]
+        // 通过 _EvidenceScorer + registry 的组合验证: gov.cn 结果被注入 [official]
         // extract_domain 剥 www 得 gov.cn; registry 用 `*.gov.cn` 通配匹配子域。
-        let reg = SiteLearningRegistry::builtin();
+        let reg = _SiteLearningRegistry::builtin();
         let r = sample("https://www.gov.cn/news/2026/x.html", "政", "数据");
         let domain = extract_domain(&r.url);
         assert_eq!(domain, "gov.cn");
         // `*.gov.cn` 不匹配 apex gov.cn, 但 URL 宿主名带 www 时应匹配。
-        assert_eq!(reg.for_host("www.gov.cn").len(), 1);
-        assert_eq!(reg.for_host("www.gov.cn")[0].category, "official");
+        assert_eq!(reg._for_host("www.gov.cn").len(), 1);
+        assert_eq!(reg._for_host("www.gov.cn")[0].category, "official");
     }
 
     #[test]
     fn doctor_reports_all_backends_with_prescriptions() {
         // Agent-Reach 吸收: doctor 逐个探测所有后端 (非首个成功即停),
         // 坏后端必须带修复处方。
-        let mut router = WebSearchRouter::new(vec![
+        let mut router = _WebSearchRouter::new(vec![
             Box::new(ProbeBackend { name: "primary", succeed: true, results: 3 }),
             Box::new(ProbeBackend { name: "backup", succeed: false, results: 0 }),
         ]);
@@ -1306,13 +1306,13 @@ mod tests {
     #[test]
     fn repair_prescription_maps_error_signatures() {
         // 错误签名 → 可执行动作的映射 (403/429/网络/空结果)
-        let rate = WebSearchRouter::repair_prescription("ddg", "API returned status: 429");
+        let rate = _WebSearchRouter::_repair_prescription("ddg", "API returned status: 429");
         assert!(rate.contains("限流"), "429 → 限流处方: {rate}");
-        let net = WebSearchRouter::repair_prescription("wikipedia", "connect timed out");
+        let net = _WebSearchRouter::_repair_prescription("wikipedia", "connect timed out");
         assert!(net.contains("网络"), "timeout → 网络处方: {net}");
-        let empty = WebSearchRouter::repair_prescription("ddg", "empty results");
+        let empty = _WebSearchRouter::_repair_prescription("ddg", "empty results");
         assert!(empty.contains("空结果"), "empty → 空结果处方: {empty}");
-        let unk = WebSearchRouter::repair_prescription("ddg", "weird boom");
+        let unk = _WebSearchRouter::_repair_prescription("ddg", "weird boom");
         assert!(unk.contains("未知"), "未知 → 兜底处方: {unk}");
     }
 

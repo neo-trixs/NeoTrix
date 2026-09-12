@@ -25,7 +25,7 @@ pub fn guess_service_by_port(port: u16) -> Option<&'static str> {
 }
 
 /// 根据端口号获取协议
-pub fn guess_protocol_by_port(port: u16) -> Option<&'static str> {
+pub fn _guess_protocol_by_port(port: u16) -> Option<&'static str> {
     PORT_SERVICE_MAP.iter()
         .find(|(p, _, _)| *p == port)
         .map(|(_, _, proto)| *proto)
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn test_protocol() {
-        assert_eq!(guess_protocol_by_port(22), Some("tcp"));
-        assert_eq!(guess_protocol_by_port(80), Some("tcp"));
+        assert_eq!(_guess_protocol_by_port(22), Some("tcp"));
+        assert_eq!(_guess_protocol_by_port(80), Some("tcp"));
     }
 }

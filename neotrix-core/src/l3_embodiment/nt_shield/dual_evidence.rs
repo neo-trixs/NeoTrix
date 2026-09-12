@@ -156,7 +156,7 @@ impl DualEvidenceScanner {
     }
 
     /// 检查结构边界
-    pub fn check_structural_boundary(&self, input: &str) -> bool {
+    pub fn _check_structural_boundary(&self, input: &str) -> bool {
         // 检查是否有明确的结构分隔
         let has_structure = input.contains("<") && input.contains(">");
         let has_xml = input.contains("<?xml") || input.contains("<html");
@@ -164,7 +164,7 @@ impl DualEvidenceScanner {
     }
 
     /// 检查角色边界
-    pub fn check_role_boundary(&self, input: &str) -> bool {
+    pub fn _check_role_boundary(&self, input: &str) -> bool {
         // 检查是否有明确的角色声明
         let has_role = input.contains("You are") || input.contains("Act as");
         let has_context = input.contains("In this context");
@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn test_structural_boundary() {
         let scanner = DualEvidenceScanner::new();
-        assert!(scanner.check_structural_boundary("<system>test</system>"));
-        assert!(!scanner.check_structural_boundary("test input"));
+        assert!(scanner._check_structural_boundary("<system>test</system>"));
+        assert!(!scanner._check_structural_boundary("test input"));
     }
 }

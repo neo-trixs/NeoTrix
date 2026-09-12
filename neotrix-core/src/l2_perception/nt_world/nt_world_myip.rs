@@ -12,7 +12,7 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 网络探测结果 (对应 MyIP 输出字段的精简模型).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct IpProbe {
+pub struct _IpProbe {
     pub ip: String,
     #[serde(default)]
     pub asn: Option<String>,
@@ -24,7 +24,7 @@ pub struct IpProbe {
     pub city: Option<String>,
 }
 
-impl IpProbe {
+impl _IpProbe {
     pub fn new(ip: &str) -> Self {
         Self {
             ip: ip.to_string(),
@@ -72,34 +72,34 @@ fn is_ipv6(s: &str) -> bool {
 }
 
 /// IP/网络探测接口 (stub — 真实采集由 C2 接线实现).
-pub trait IpProbeProvider: Send + Sync {
+pub trait _IpProbeProvider: Send + Sync {
     /// 探测本机/出口 IP.
-    fn probe_self(&self) -> Result<IpProbe, String>;
+    fn probe_self(&self) -> Result<_IpProbe, String>;
     /// 探测指定目标 IP 的 ASN/地理信息.
-    fn probe_target(&self, ip: &str) -> Result<IpProbe, String>;
+    fn probe_target(&self, ip: &str) -> Result<_IpProbe, String>;
 }
 
 /// 离线探测 stub — 返回 fixture, 不发起网络请求 (C1 阶段).
-pub struct OfflineIpProbe;
+pub struct _OfflineIpProbe;
 
-impl IpProbeProvider for OfflineIpProbe {
-    fn probe_self(&self) -> Result<IpProbe, String> {
-        Ok(IpProbe::new("127.0.0.1"))
+impl _IpProbeProvider for _OfflineIpProbe {
+    fn probe_self(&self) -> Result<_IpProbe, String> {
+        Ok(_IpProbe::new("127.0.0.1"))
     }
-    fn probe_target(&self, ip: &str) -> Result<IpProbe, String> {
-        let mut p = IpProbe::new(ip);
+    fn probe_target(&self, ip: &str) -> Result<_IpProbe, String> {
+        let mut p = _IpProbe::new(ip);
         p.asn = Some("AS0".to_string());
         Ok(p)
     }
 }
 
-pub struct MyIpSelfTest;
-impl SelfTest for MyIpSelfTest {
+pub struct _MyIpSelfTest;
+impl SelfTest for _MyIpSelfTest {
     fn name(&self) -> &str {
         "world:myip"
     }
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let probe = OfflineIpProbe;
+        let probe = _OfflineIpProbe;
         let self_p = probe.probe_self().map_err(|e| vec![e])?;
         if !self_p.is_valid() {
             return Err(vec!["myip self probe invalid".into()]);
@@ -118,22 +118,22 @@ mod tests {
 
     #[test]
     fn offline_probe_self_valid() {
-        let p = OfflineIpProbe.probe_self().unwrap();
+        let p = _OfflineIpProbe.probe_self().unwrap();
         assert!(p.is_valid());
     }
 
     #[test]
     fn ip_format_validation() {
-        assert!(IpProbe::new("8.8.8.8").is_valid());
-        assert!(IpProbe::new("2001:db8::1").is_valid());
-        assert!(!IpProbe::new("not-an-ip").is_valid());
-        assert!(!IpProbe::new("").is_valid());
-        assert!(!IpProbe::new("999.1.1.1").is_valid());
+        assert!(_IpProbe::new("8.8.8.8").is_valid());
+        assert!(_IpProbe::new("2001:db8::1").is_valid());
+        assert!(!_IpProbe::new("not-an-ip").is_valid());
+        assert!(!_IpProbe::new("").is_valid());
+        assert!(!_IpProbe::new("999.1.1.1").is_valid());
     }
 
     #[test]
     fn target_probe_carries_asn() {
-        let t = OfflineIpProbe.probe_target("1.1.1.1").unwrap();
+        let t = _OfflineIpProbe.probe_target("1.1.1.1").unwrap();
         assert!(t.is_valid());
         assert_eq!(t.asn.as_deref(), Some("AS0"));
     }

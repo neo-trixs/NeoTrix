@@ -3,14 +3,14 @@
 //! 基于最大匹配法的中文分词器
 
 /// 中文分词器
-pub struct ChineseTokenizer {
+pub struct _ChineseTokenizer {
     /// 词典 (简化版)
     dictionary: std::collections::HashSet<String>,
     /// 最大词长
     max_word_len: usize,
 }
 
-impl ChineseTokenizer {
+impl _ChineseTokenizer {
     /// 创建新的分词器
     pub fn new() -> Self {
         let mut dictionary = std::collections::HashSet::new();
@@ -88,17 +88,17 @@ impl ChineseTokenizer {
     }
 
     /// 添加词汇到词典
-    pub fn add_word(&mut self, word: String) {
+    pub fn _add_word(&mut self, word: String) {
         self.dictionary.insert(word);
     }
 
     /// 获取词典大小
-    pub fn dictionary_size(&self) -> usize {
+    pub fn _dictionary_size(&self) -> usize {
         self.dictionary.len()
     }
 }
 
-impl Default for ChineseTokenizer {
+impl Default for _ChineseTokenizer {
     fn default() -> Self {
         Self::new()
     }
@@ -106,7 +106,7 @@ impl Default for ChineseTokenizer {
 
 /// 词性标注
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PosTag {
+pub enum _PosTag {
     /// 名词
     Noun,
     /// 动词
@@ -133,52 +133,52 @@ pub enum PosTag {
     Unknown,
 }
 
-impl PosTag {
-    pub fn from_char(c: char) -> Self {
+impl _PosTag {
+    pub fn _from_char(c: char) -> Self {
         match c {
-            'n' | 'N' => PosTag::Noun,
-            'v' | 'V' => PosTag::Verb,
-            'a' | 'A' => PosTag::Adjective,
-            'd' | 'D' => PosTag::Adverb,
-            'p' | 'P' => PosTag::Preposition,
-            'c' | 'C' => PosTag::Conjunction,
-            'r' | 'R' => PosTag::Pronoun,
-            'm' | 'M' => PosTag::Numeral,
-            'q' | 'Q' => PosTag::MeasureWord,
-            'u' | 'U' => PosTag::Particle,
-            _ => PosTag::Unknown,
+            'n' | 'N' => _PosTag::Noun,
+            'v' | 'V' => _PosTag::Verb,
+            'a' | 'A' => _PosTag::Adjective,
+            'd' | 'D' => _PosTag::Adverb,
+            'p' | 'P' => _PosTag::Preposition,
+            'c' | 'C' => _PosTag::Conjunction,
+            'r' | 'R' => _PosTag::Pronoun,
+            'm' | 'M' => _PosTag::Numeral,
+            'q' | 'Q' => _PosTag::MeasureWord,
+            'u' | 'U' => _PosTag::Particle,
+            _ => _PosTag::Unknown,
         }
     }
 }
 
 /// 带词性的分词结果
 #[derive(Debug, Clone)]
-pub struct TaggedToken {
+pub struct _TaggedToken {
     pub word: String,
-    pub pos: PosTag,
+    pub pos: _PosTag,
 }
 
 /// 词性标注器
-pub struct PosTagger;
+pub struct _PosTagger;
 
-impl PosTagger {
+impl _PosTagger {
     /// 简单规则词性标注
-    pub fn tag(tokens: &[String]) -> Vec<TaggedToken> {
+    pub fn tag(tokens: &[String]) -> Vec<_TaggedToken> {
         tokens.iter().map(|word| {
             let pos = if word.len() <= 2 && word.chars().all(|c| Self::is_chinese_char(c)) {
                 // 短词可能是名词或动词
-                PosTag::Noun
+                _PosTag::Noun
             } else if word.ends_with("了") || word.ends_with("过") || word.ends_with("着") {
-                PosTag::Verb
+                _PosTag::Verb
             } else if word.ends_with("的") || word.ends_with("地") || word.ends_with("得") {
-                PosTag::Particle
+                _PosTag::Particle
             } else if word.chars().all(|c| c.is_ascii_digit()) {
-                PosTag::Numeral
+                _PosTag::Numeral
             } else {
-                PosTag::Unknown
+                _PosTag::Unknown
             };
 
-            TaggedToken { word: word.clone(), pos }
+            _TaggedToken { word: word.clone(), pos }
         }).collect()
     }
 
@@ -194,14 +194,14 @@ mod tests {
 
     #[test]
     fn tokenize_chinese() {
-        let tokenizer = ChineseTokenizer::new();
+        let tokenizer = _ChineseTokenizer::new();
         let tokens = tokenizer.tokenize("自然语言处理是人工智能");
         assert!(!tokens.is_empty());
     }
 
     #[test]
     fn tokenize_mixed() {
-        let tokenizer = ChineseTokenizer::new();
+        let tokenizer = _ChineseTokenizer::new();
         let tokens = tokenizer.tokenize("Hello你好World世界");
         assert!(tokens.contains(&"Hello".to_string()));
         assert!(tokens.contains(&"World".to_string()));
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn pos_tagging() {
         let tokens = vec!["自然".to_string(), "语言".to_string(), "处理".to_string()];
-        let tagged = PosTagger::tag(&tokens);
+        let tagged = _PosTagger::tag(&tokens);
         assert_eq!(tagged.len(), 3);
     }
 }

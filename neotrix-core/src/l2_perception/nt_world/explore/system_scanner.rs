@@ -82,7 +82,7 @@ impl SystemScanner {
     pub fn set_min_age(&mut self, days: u32) { self.min_age_days = days; }
     pub fn set_min_size(&mut self, bytes: u64) { self.min_size_bytes = bytes; }
 
-    pub fn add_scan_path(&mut self, path: PathBuf, category: ScanCategory, risk_level: RiskLevel) {
+    pub fn _add_scan_path(&mut self, path: PathBuf, category: ScanCategory, risk_level: RiskLevel) {
         self.scan_paths.push(ScanPath { path, category, risk_level, recursive: true });
     }
 

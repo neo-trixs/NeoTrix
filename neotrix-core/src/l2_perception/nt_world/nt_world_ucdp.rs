@@ -21,16 +21,16 @@ use serde::{Deserialize, Serialize};
 
 /// UCDP 事件集合顶层结构
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct UcdpEventCollection {
+pub struct _UcdpEventCollection {
     #[serde(default)]
     pub r#type: String,
     #[serde(default)]
-    pub events: Vec<UcdpRawEvent>,
+    pub events: Vec<_UcdpRawEvent>,
 }
 
 /// 单个 UCDP 冲突事件原始结构 (贴合 UCDP GED/API 字段)
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct UcdpRawEvent {
+pub struct _UcdpRawEvent {
     #[serde(default)]
     pub id: String,
     #[serde(default)]
@@ -65,7 +65,7 @@ pub struct UcdpRawEvent {
 
 /// 内部标准化事件结构 (用于入库)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UcdpEvent {
+pub struct _UcdpEvent {
     pub id: String,
     pub country: String,
     pub region: String,
@@ -85,8 +85,8 @@ pub struct UcdpEvent {
 
 // ── 解析层 ──────────────────────────────────────────────────────
 
-fn extract_event_from_raw(raw: &UcdpRawEvent) -> UcdpEvent {
-    UcdpEvent {
+fn extract_event_from_raw(raw: &_UcdpRawEvent) -> _UcdpEvent {
+    _UcdpEvent {
         id: raw.id.clone(),
         country: raw.country.clone(),
         region: raw.region.clone(),
@@ -109,18 +109,18 @@ fn extract_event_from_raw(raw: &UcdpRawEvent) -> UcdpEvent {
 
 /// UCDP 数据集类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UcdpDataset {
+pub enum _UcdpDataset {
     GedEvents,
     UcdpEvents,
     StateBased,
 }
 
-impl UcdpDataset {
+impl _UcdpDataset {
     fn path(&self) -> &'static str {
         match self {
-            UcdpDataset::GedEvents => "ged_events",
-            UcdpDataset::UcdpEvents => "ucdp_events",
-            UcdpDataset::StateBased => "state_based",
+            _UcdpDataset::GedEvents => "ged_events",
+            _UcdpDataset::UcdpEvents => "ucdp_events",
+            _UcdpDataset::StateBased => "state_based",
         }
     }
 }
@@ -128,7 +128,7 @@ impl UcdpDataset {
 /// UCDP 冲突数据 Fetcher — UCDP REST API，可选 api_key，直喂 intel-watch。
 pub struct UcdpFetcher {
     base_url: String,
-    dataset: UcdpDataset,
+    dataset: _UcdpDataset,
     api_key: Option<String>,
     client: std::sync::OnceLock<reqwest::blocking::Client>,
 }
@@ -141,18 +141,18 @@ impl Default for UcdpFetcher {
 
 impl UcdpFetcher {
     pub fn new() -> Self {
-        Self::with_dataset(UcdpDataset::GedEvents)
+        Self::_with_dataset(_UcdpDataset::GedEvents)
     }
 
-    pub fn with_dataset(dataset: UcdpDataset) -> Self {
-        Self::with_base_dataset_key("https://ucdp.uu.se", dataset, None)
+    pub fn _with_dataset(dataset: _UcdpDataset) -> Self {
+        Self::_with_base_dataset_key("https://ucdp.uu.se", dataset, None)
     }
 
     pub fn with_api_key(api_key: impl Into<String>) -> Self {
-        Self::with_base_dataset_key("https://ucdp.uu.se", UcdpDataset::GedEvents, Some(api_key.into()))
+        Self::_with_base_dataset_key("https://ucdp.uu.se", _UcdpDataset::GedEvents, Some(api_key.into()))
     }
 
-    pub fn with_base_dataset_key(base_url: &str, dataset: UcdpDataset, api_key: Option<String>) -> Self {
+    pub fn _with_base_dataset_key(base_url: &str, dataset: _UcdpDataset, api_key: Option<String>) -> Self {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             dataset,
@@ -183,7 +183,7 @@ impl UcdpFetcher {
         }
     }
 
-    pub fn fetch(&self) -> Result<Vec<UcdpEvent>, String> {
+    pub fn fetch(&self) -> Result<Vec<_UcdpEvent>, String> {
         let url = self.build_url();
         let mut req = self.client().get(&url);
         if let Some(key) = &self.api_key {
@@ -197,8 +197,8 @@ impl UcdpFetcher {
         Self::parse_json(&text)
     }
 
-    pub fn parse_json(json: &str) -> Result<Vec<UcdpEvent>, String> {
-        let collection: UcdpEventCollection = serde_json::from_str(json).map_err(|e| format!("UCDP parse failed: {}", e))?;
+    pub fn parse_json(json: &str) -> Result<Vec<_UcdpEvent>, String> {
+        let collection: _UcdpEventCollection = serde_json::from_str(json).map_err(|e| format!("UCDP parse failed: {}", e))?;
         Ok(collection.events.iter().map(extract_event_from_raw).collect())
     }
 
@@ -206,7 +206,7 @@ impl UcdpFetcher {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<UcdpIngestReport, String> {
+    ) -> Result<_UcdpIngestReport, String> {
         let events = Self::parse_json(json)?;
         Self::ingest_events(kb, &events)
     }
@@ -214,16 +214,16 @@ impl UcdpFetcher {
     pub fn ingest(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-    ) -> Result<UcdpIngestReport, String> {
+    ) -> Result<_UcdpIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[UcdpEvent],
-    ) -> Result<UcdpIngestReport, String> {
-        let mut report = UcdpIngestReport {
+        events: &[_UcdpEvent],
+    ) -> Result<_UcdpIngestReport, String> {
+        let mut report = _UcdpIngestReport {
             events_fetched: events.len(),
             ..Default::default()
         };
@@ -246,7 +246,7 @@ impl UcdpFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[UcdpEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_UcdpEvent]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: format!("UCDP {} - {} ({})", e.id, e.country, e.year),
             url: format!("https://ucdp.uu.se/#/event/{}/{}", e.year, e.id),
@@ -279,7 +279,7 @@ pub fn ucdp_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbo
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct UcdpIngestReport {
+pub struct _UcdpIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -298,21 +298,21 @@ impl Default for UcdpBackend {
 
 impl UcdpBackend {
     pub fn new() -> Self { Self::default() }
-    pub fn with_dataset(dataset: UcdpDataset) -> Self { Self { fetcher: UcdpFetcher::with_dataset(dataset) } }
+    pub fn _with_dataset(dataset: _UcdpDataset) -> Self { Self { fetcher: UcdpFetcher::_with_dataset(dataset) } }
 }
 
 impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for UcdpBackend {
     fn name(&self) -> &str { "ucdp" }
     fn search(&self, _query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let events = self.fetcher.fetch()?;
-        let limited: Vec<UcdpEvent> = events.into_iter().take(count).collect();
+        let limited: Vec<_UcdpEvent> = events.into_iter().take(count).collect();
         Ok(UcdpFetcher::to_search_results(&limited))
     }
 }
 
 // ── Fixture ────────────────────────────────────────────────
 
-pub const UCDP_FIXTURE_JSON: &str = r#"{"type":"UcdpEventCollection","events":[{"id":"12345","country":"Ukraine","region":"Europe","year":"2024","start_date":"2024-01-01","end_date":"2024-03-15","best":"150","best_lo":"100","side_a":"Government of Ukraine","side_b":"Rebels","deaths_a":"100","deaths_b":"50","type":"5","type_of_violence":"1","intensity":"3"},{"id":"67890","country":"Syria","region":"Middle East","year":"2023","start_date":"2023-05-10","end_date":"2023-12-31","best":"300","best_lo":"250","side_a":"Government of Syria","side_b":"Opposition","deaths_a":"200","deaths_b":"100","type":"5","type_of_violence":"2","intensity":"4"}]}"#;
+pub const UCDP_FIXTURE_JSON: &str = r#"{"type":"_UcdpEventCollection","events":[{"id":"12345","country":"Ukraine","region":"Europe","year":"2024","start_date":"2024-01-01","end_date":"2024-03-15","best":"150","best_lo":"100","side_a":"Government of Ukraine","side_b":"Rebels","deaths_a":"100","deaths_b":"50","type":"5","type_of_violence":"1","intensity":"3"},{"id":"67890","country":"Syria","region":"Middle East","year":"2023","start_date":"2023-05-10","end_date":"2023-12-31","best":"300","best_lo":"250","side_a":"Government of Syria","side_b":"Opposition","deaths_a":"200","deaths_b":"100","type":"5","type_of_violence":"2","intensity":"4"}]}"#;
 
 #[cfg(test)]
 mod tests {

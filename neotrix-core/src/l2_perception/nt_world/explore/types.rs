@@ -15,7 +15,7 @@ impl GeoPoint {
         Self { lat: 0.0, lng: 0.0 }
     }
 
-    pub fn to_mercator(&self) -> (f64, f64) {
+    pub fn _to_mercator(&self) -> (f64, f64) {
         let x = self.lng.to_radians() * EARTH_RADIUS;
         let y = (PI / 4.0 + self.lat.to_radians() / 2.0).tan().ln() * EARTH_RADIUS;
         (x, y)
@@ -30,7 +30,7 @@ impl GeoPoint {
         EARTH_RADIUS * c
     }
 
-    pub fn bearing(&self, other: &Self) -> f64 {
+    pub fn _bearing(&self, other: &Self) -> f64 {
         let d_lng = (other.lng - self.lng).to_radians();
         let y = d_lng.sin() * other.lat.to_radians().cos();
         let x = self.lat.to_radians().cos() * other.lat.to_radians().sin()
@@ -39,12 +39,12 @@ impl GeoPoint {
     }
 
     pub fn destination(&self, bearing_deg: f64, distance_m: f64) -> Self {
-        let bearing = bearing_deg.to_radians();
+        let _bearing = bearing_deg.to_radians();
         let lat1 = self.lat.to_radians();
         let lng1 = self.lng.to_radians();
         let angular = distance_m / EARTH_RADIUS;
-        let lat2 = (lat1.sin() * angular.cos() + lat1.cos() * angular.sin() * bearing.cos()).asin();
-        let lng2 = lng1 + bearing.sin().atan2(angular.cos() - lat1.sin() * lat2.sin());
+        let lat2 = (lat1.sin() * angular.cos() + lat1.cos() * angular.sin() * _bearing.cos()).asin();
+        let lng2 = lng1 + _bearing.sin().atan2(angular.cos() - lat1.sin() * lat2.sin());
         Self::new(lat2.to_degrees(), lng2.to_degrees())
     }
 }
@@ -77,11 +77,11 @@ impl BoundingBox {
         GeoPoint::new((self.min_lat + self.max_lat) / 2.0, (self.min_lng + self.max_lng) / 2.0)
     }
 
-    pub fn width_deg(&self) -> f64 {
+    pub fn _width_deg(&self) -> f64 {
         self.max_lng - self.min_lng
     }
 
-    pub fn height_deg(&self) -> f64 {
+    pub fn _height_deg(&self) -> f64 {
         self.max_lat - self.min_lat
     }
 
@@ -131,12 +131,12 @@ impl ZoomLevel {
         Self(z.min(22))
     }
 
-    pub fn num_tiles(&self) -> u64 {
+    pub fn _num_tiles(&self) -> u64 {
         1u64 << self.0
     }
 
     pub fn resolution(&self) -> f64 {
-        360.0 / self.num_tiles() as f64 / 256.0
+        360.0 / self._num_tiles() as f64 / 256.0
     }
 
     pub fn min_zoom() -> Self { Self(0) }
@@ -156,21 +156,21 @@ pub struct TileCoord {
 
 impl TileCoord {
     pub fn new(x: u64, y: u64, z: ZoomLevel) -> Option<Self> {
-        let n = z.num_tiles();
+        let n = z._num_tiles();
         if x >= n || y >= n { return None; }
         Some(Self { x, y, z })
     }
 
-    pub fn from_latlng(point: &GeoPoint, z: ZoomLevel) -> Self {
-        let n = z.num_tiles() as f64;
+    pub fn _from_latlng(point: &GeoPoint, z: ZoomLevel) -> Self {
+        let n = z._num_tiles() as f64;
         let lat_rad = point.lat.to_radians();
         let x = ((point.lng + 180.0) / 360.0 * n) as u64;
         let y = ((1.0 - (lat_rad.tan() + 1.0 / lat_rad.cos()).ln() / PI) / 2.0 * n) as u64;
         Self { x, y, z }
     }
 
-    pub fn to_bbox(&self) -> BoundingBox {
-        let n = self.z.num_tiles() as f64;
+    pub fn _to_bbox(&self) -> BoundingBox {
+        let n = self.z._num_tiles() as f64;
         let min_lng = self.x as f64 / n * 360.0 - 180.0;
         let max_lng = (self.x as f64 + 1.0) / n * 360.0 - 180.0;
         let min_lat = (PI * (1.0 - 2.0 * (self.y as f64 + 1.0) / n)).exp().atan().atan() * 2.0 / PI * 180.0;
@@ -194,7 +194,7 @@ impl TileCoord {
         ]
     }
 
-    pub fn quadkey(&self) -> String {
+    pub fn _quadkey(&self) -> String {
         let mut key = String::new();
         for i in (0..self.z.0).rev() {
             let digit = ((self.x >> i) & 1) | (((self.y >> i) & 1) << 1);
@@ -203,7 +203,7 @@ impl TileCoord {
         key
     }
 
-    pub fn from_quadkey(qk: &str) -> Option<Self> {
+    pub fn _from_quadkey(qk: &str) -> Option<Self> {
         let z = qk.len() as u8;
         // 超过 31 层时 `(z-1-i)` 移位 ≥64 或下溢
         if z > 31 {
@@ -219,7 +219,7 @@ impl TileCoord {
     }
 }
 
-pub fn geo_json_stringify(features: &[GeoJsonFeature]) -> String {
+pub fn _geo_json_stringify(features: &[GeoJsonFeature]) -> String {
     let mut parts = Vec::new();
     for f in features {
         let props = f.properties.iter()
@@ -278,7 +278,7 @@ mod tests {
     fn test_bearing() {
         let nyc = GeoPoint::new(40.7128, -74.0060);
         let london = GeoPoint::new(51.5074, -0.1278);
-        let b = nyc.bearing(&london);
+        let b = nyc._bearing(&london);
         assert!(b > 30.0 && b < 80.0);
     }
 
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn test_tile_coord_from_latlng() {
         let p = GeoPoint::new(0.0, 0.0);
-        let t = TileCoord::from_latlng(&p, ZoomLevel(1));
+        let t = TileCoord::_from_latlng(&p, ZoomLevel(1));
         assert_eq!(t.x, 1);
         assert_eq!(t.y, 1);
     }
@@ -309,9 +309,9 @@ mod tests {
     #[test]
     fn test_tile_coord_quadkey_roundtrip() {
         let p = GeoPoint::new(40.7128, -74.0060);
-        let t = TileCoord::from_latlng(&p, ZoomLevel(12));
-        let qk = t.quadkey();
-        let t2 = TileCoord::from_quadkey(&qk).unwrap();
+        let t = TileCoord::_from_latlng(&p, ZoomLevel(12));
+        let qk = t._quadkey();
+        let t2 = TileCoord::_from_quadkey(&qk).unwrap();
         assert_eq!(t.x, t2.x);
         assert_eq!(t.y, t2.y);
         assert_eq!(t.z.0, t2.z.0);
@@ -336,7 +336,7 @@ mod tests {
     #[test]
     fn test_mercator_projection_roundtrip() {
         let p = GeoPoint::new(48.8566, 2.3522);
-        let (mx, my) = p.to_mercator();
+        let (mx, my) = p._to_mercator();
         assert!(mx > 0.0);
         assert!(my > 0.0);
     }
@@ -347,7 +347,7 @@ mod tests {
             geometry: GeoJsonGeometry::Point { lat: 48.8566, lng: 2.3522 },
             properties: vec![("name".to_string(), "Paris".to_string())],
         };
-        let json = geo_json_stringify(&[f]);
+        let json = _geo_json_stringify(&[f]);
         assert!(json.contains("Paris"));
         assert!(json.contains("Point"));
     }

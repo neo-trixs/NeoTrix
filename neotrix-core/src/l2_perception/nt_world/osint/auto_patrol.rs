@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// 巡检任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PatrolTask {
+pub struct _PatrolTask {
     pub target: OsintTarget,
     pub modules: Vec<String>,
     pub interval_secs: u64,
@@ -16,8 +16,8 @@ pub struct PatrolTask {
 
 /// 巡检结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PatrolResult {
-    pub task: PatrolTask,
+pub struct _PatrolResult {
+    pub task: _PatrolTask,
     pub findings_count: usize,
     pub new_findings: usize,
     pub errors: Vec<String>,
@@ -25,23 +25,23 @@ pub struct PatrolResult {
 }
 
 /// 巡检调度器
-pub struct PatrolScheduler {
-    tasks: Vec<PatrolTask>,
+pub struct _PatrolScheduler {
+    tasks: Vec<_PatrolTask>,
     config: OsintConfig,
 }
 
-impl PatrolScheduler {
+impl _PatrolScheduler {
     pub fn new(config: OsintConfig) -> Self {
         Self { tasks: Vec::new(), config }
     }
 
     /// 添加巡检任务
-    pub fn add_task(&mut self, task: PatrolTask) {
+    pub fn add_task(&mut self, task: _PatrolTask) {
         self.tasks.push(task);
     }
 
     /// 执行所有到期任务
-    pub async fn run_due_tasks(&self) -> Vec<PatrolResult> {
+    pub async fn run_due_tasks(&self) -> Vec<_PatrolResult> {
         let now = chrono::Utc::now().timestamp();
         let mut results = Vec::new();
 
@@ -59,7 +59,7 @@ impl PatrolScheduler {
         results
     }
 
-    async fn execute_task(&self, task: &PatrolTask) -> PatrolResult {
+    async fn execute_task(&self, task: &_PatrolTask) -> _PatrolResult {
         let client = super::default_client();
         let mut findings_count = 0;
         let mut errors = Vec::new();
@@ -94,7 +94,7 @@ impl PatrolScheduler {
             }
         }
 
-        PatrolResult {
+        _PatrolResult {
             task: task.clone(),
             findings_count,
             new_findings: 0,
@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn test_patrol_task_creation() {
-        let task = PatrolTask {
+        let task = _PatrolTask {
             target: OsintTarget { domain: Some("example.com".into()), ..Default::default() },
             modules: vec!["dns".into(), "http".into()],
             interval_secs: 3600,

@@ -27,22 +27,22 @@ pub struct ApiEntry {
 
 /// 分类目标树节点 — 吸收发现的目标类别层级。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ApiCategoryNode {
+pub struct _ApiCategoryNode {
     pub name: String,
-    pub children: Vec<ApiCategoryNode>,
+    pub children: Vec<_ApiCategoryNode>,
     /// 是否为叶子 (可直接挂 API)。
     pub leaf: bool,
 }
 
-impl ApiCategoryNode {
+impl _ApiCategoryNode {
     /// 构建一棵叶子分类目标树 (public-apis 大类)。
-    pub fn default_tree() -> Vec<ApiCategoryNode> {
+    pub fn _default_tree() -> Vec<_ApiCategoryNode> {
         [
             "Development", "Machine Learning", "Data", "Media",
             "Science & Math", "News", "Finance", "Weather",
         ]
         .iter()
-        .map(|c| ApiCategoryNode {
+        .map(|c| _ApiCategoryNode {
             name: c.to_string(),
             children: Vec::new(),
             leaf: true,
@@ -51,13 +51,13 @@ impl ApiCategoryNode {
     }
 
     /// 收集所有叶子分类名。
-    pub fn leaf_names(nodes: &[ApiCategoryNode]) -> Vec<String> {
+    pub fn _leaf_names(nodes: &[_ApiCategoryNode]) -> Vec<String> {
         let mut out = Vec::new();
         for n in nodes {
             if n.leaf && n.children.is_empty() {
                 out.push(n.name.clone());
             } else {
-                out.extend(Self::leaf_names(&n.children));
+                out.extend(Self::_leaf_names(&n.children));
             }
         }
         out
@@ -164,8 +164,8 @@ mod tests {
 
     #[test]
     fn test_default_category_tree_leaves() {
-        let tree = ApiCategoryNode::default_tree();
-        let leaves = ApiCategoryNode::leaf_names(&tree);
+        let tree = _ApiCategoryNode::_default_tree();
+        let leaves = _ApiCategoryNode::_leaf_names(&tree);
         assert!(leaves.contains(&"Machine Learning".to_string()));
         assert!(leaves.contains(&"Development".to_string()));
         assert!(leaves.contains(&"Finance".to_string()));

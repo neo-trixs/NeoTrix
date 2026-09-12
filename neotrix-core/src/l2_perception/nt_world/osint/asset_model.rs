@@ -36,7 +36,7 @@ pub struct OsintAsset {
     pub asset_type: AssetType,
     pub value: String,
     pub properties: HashMap<String, String>,
-    pub relations: Vec<AssetRelation>,
+    pub relations: Vec<_AssetRelation>,
     pub source: String,
     pub confidence: f64,
     pub first_seen: i64,
@@ -45,7 +45,7 @@ pub struct OsintAsset {
 
 /// 资产关系
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetRelation {
+pub struct _AssetRelation {
     pub target_id: String,
     pub relation_type: RelationType,
     pub confidence: f64,
@@ -67,7 +67,7 @@ pub enum RelationType {
 #[derive(Debug, Clone, Default)]
 pub struct AssetGraph {
     pub assets: HashMap<String, OsintAsset>,
-    pub relations: Vec<AssetRelation>,
+    pub relations: Vec<_AssetRelation>,
 }
 
 impl AssetGraph {
@@ -79,7 +79,7 @@ impl AssetGraph {
     }
 
     /// 添加关系
-    pub fn add_relation(&mut self, relation: AssetRelation) {
+    pub fn add_relation(&mut self, relation: _AssetRelation) {
         self.relations.push(relation);
     }
 
@@ -92,7 +92,7 @@ impl AssetGraph {
     }
 
     /// 计算攻击面评分
-    pub fn attack_surface_score(&self) -> f64 {
+    pub fn _attack_surface_score(&self) -> f64 {
         let domain_count = self.assets.values().filter(|a| a.asset_type == AssetType::Domain).count() as f64;
         let ip_count = self.assets.values().filter(|a| a.asset_type == AssetType::Ip).count() as f64;
         let port_count = self.assets.values().filter(|a| a.asset_type == AssetType::Port).count() as f64;
@@ -136,7 +136,7 @@ mod tests {
                 ..Default::default()
             });
         }
-        let score = graph.attack_surface_score();
+        let score = graph._attack_surface_score();
         assert!(score > 0.0);
     }
 }

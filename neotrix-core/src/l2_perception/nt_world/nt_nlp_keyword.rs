@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 /// 关键词提取器
-pub struct KeywordExtractor;
+pub struct _KeywordExtractor;
 
 /// 关键词及其分数
 #[derive(Debug, Clone)]
@@ -14,9 +14,9 @@ pub struct Keyword {
     pub score: f64,
 }
 
-impl KeywordExtractor {
+impl _KeywordExtractor {
     /// 基于TF的关键词提取 (简化版)
-    pub fn extract_by_tf(text: &str, top_k: usize) -> Vec<Keyword> {
+    pub fn _extract_by_tf(text: &str, top_k: usize) -> Vec<Keyword> {
         // 中文分词 (简单按字符分割)
         let words = Self::tokenize(text);
         let total_words = words.len() as f64;
@@ -42,7 +42,7 @@ impl KeywordExtractor {
     }
 
     /// 基于TextRank的关键词提取
-    pub fn extract_by_textrank(text: &str, top_k: usize) -> Vec<Keyword> {
+    pub fn _extract_by_textrank(text: &str, top_k: usize) -> Vec<Keyword> {
         let words = Self::tokenize(text);
         if words.is_empty() {
             return vec![];
@@ -158,7 +158,7 @@ impl KeywordExtractor {
     }
 
     /// 提取短语 (连续的关键词)
-    pub fn extract_phrases(text: &str, min_length: usize, max_length: usize) -> Vec<String> {
+    pub fn _extract_phrases(text: &str, min_length: usize, max_length: usize) -> Vec<String> {
         let tokens = Self::tokenize(text);
         let mut phrases = Vec::new();
 
@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn extract_keywords_tf() {
         let text = "自然语言处理是人工智能的重要方向 自然语言处理包括分词 词性标注 命名实体识别";
-        let keywords = KeywordExtractor::extract_by_tf(text, 5);
+        let keywords = _KeywordExtractor::_extract_by_tf(text, 5);
         assert!(!keywords.is_empty());
         assert!(keywords[0].score >= keywords[1].score);
     }
@@ -190,13 +190,13 @@ mod tests {
     #[test]
     fn extract_keywords_textrank() {
         let text = "自然语言处理是人工智能的重要方向 自然语言处理包括分词 词性标注 命名实体识别";
-        let keywords = KeywordExtractor::extract_by_textrank(text, 5);
+        let keywords = _KeywordExtractor::_extract_by_textrank(text, 5);
         assert!(!keywords.is_empty());
     }
 
     #[test]
     fn tokenize_test() {
-        let tokens = KeywordExtractor::tokenize("Hello 你好 World 世界");
+        let tokens = _KeywordExtractor::tokenize("Hello 你好 World 世界");
         assert!(tokens.contains(&"hello".to_string()));
         assert!(tokens.contains(&"world".to_string()));
         assert!(tokens.contains(&"你".to_string()));

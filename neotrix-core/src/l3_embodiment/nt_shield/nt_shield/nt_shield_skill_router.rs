@@ -7,7 +7,7 @@ use std::sync::RwLock;
 
 /// 技能路由决策。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SkillDecision {
+pub enum _SkillDecision {
     /// 直接放行
     Allow,
     /// 拒绝 (命中 deny 名单)
@@ -17,12 +17,12 @@ pub enum SkillDecision {
 }
 
 /// 安全技能路由器 — 自带自进化 deny/allow 名单 (reverse-skill "self-evolving knowledge base")。
-pub struct SkillRouter {
+pub struct _SkillRouter {
     deny: RwLock<Vec<String>>,
     allow: RwLock<Vec<String>>,
 }
 
-impl Default for SkillRouter {
+impl Default for _SkillRouter {
     fn default() -> Self {
         // 初始 deny 名单: 高危原语 (R-P79 安全基线)
         Self {
@@ -37,7 +37,7 @@ impl Default for SkillRouter {
     }
 }
 
-impl SkillRouter {
+impl _SkillRouter {
     pub fn new() -> Self {
         Self::default()
     }
@@ -46,66 +46,66 @@ impl SkillRouter {
     /// - 显式 deny 名单命中 (子串) → Deny
     /// - 风险 ≥ 0.7 且未在 allow → Sandbox
     /// - 否则 → Allow
-    pub fn route(&self, name: &str, risk: f64) -> SkillDecision {
+    pub fn route(&self, name: &str, risk: f64) -> _SkillDecision {
         let denied = self
             .deny
             .read()
             .map(|d| d.iter().any(|p| name.contains(p.as_str())))
             .unwrap_or(false);
         if denied {
-            return SkillDecision::Deny;
+            return _SkillDecision::Deny;
         }
         if risk >= 0.7 {
-            SkillDecision::Sandbox
+            _SkillDecision::Sandbox
         } else {
-            SkillDecision::Allow
+            _SkillDecision::Allow
         }
     }
 
     /// 自进化: 记录一次观测, 增补 deny/allow 名单 (reverse-skill 自进化经验库)。
-    pub fn learn(&self, name: &str, decision: SkillDecision) {
+    pub fn learn(&self, name: &str, decision: _SkillDecision) {
         match decision {
-            SkillDecision::Deny => {
+            _SkillDecision::Deny => {
                 if let Ok(mut d) = self.deny.write() {
                     if !d.iter().any(|x| x == name) {
                         d.push(name.to_string());
                     }
                 }
             }
-            SkillDecision::Allow => {
+            _SkillDecision::Allow => {
                 if let Ok(mut a) = self.allow.write() {
                     if !a.iter().any(|x| x == name) {
                         a.push(name.to_string());
                     }
                 }
             }
-            SkillDecision::Sandbox => {}
+            _SkillDecision::Sandbox => {}
         }
     }
 }
 
 /// NT-SHIELD 安全技能路由自测 (卫生层 P0)。
-pub struct SkillRouterSelfTest;
+pub struct _SkillRouterSelfTest;
 
-impl SelfTest for SkillRouterSelfTest {
+impl SelfTest for _SkillRouterSelfTest {
     fn name(&self) -> &str {
         "nt_shield_skill_router"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let r = SkillRouter::new();
-        if r.route("rm -rf disk", 0.1) != SkillDecision::Deny {
+        let r = _SkillRouter::new();
+        if r.route("rm -rf disk", 0.1) != _SkillDecision::Deny {
             return Err(vec!["deny list not enforced".into()]);
         }
-        if r.route("safe-skill", 0.2) != SkillDecision::Allow {
+        if r.route("safe-skill", 0.2) != _SkillDecision::Allow {
             return Err(vec!["low-risk should allow".into()]);
         }
-        if r.route("unknown-tool", 0.9) != SkillDecision::Sandbox {
+        if r.route("unknown-tool", 0.9) != _SkillDecision::Sandbox {
             return Err(vec!["high-risk should sandbox".into()]);
         }
         // 自进化: 学习后 deny 名单应包含新条目
-        r.learn("evil-wipe", SkillDecision::Deny);
-        if r.route("evil-wipe", 0.0) != SkillDecision::Deny {
+        r.learn("evil-wipe", _SkillDecision::Deny);
+        if r.route("evil-wipe", 0.0) != _SkillDecision::Deny {
             return Err(vec!["self-evolved deny not applied".into()]);
         }
         Ok(())
@@ -114,7 +114,7 @@ impl SelfTest for SkillRouterSelfTest {
 
 /// 注册安全技能路由 SelfTest 到全局注册表 (T2)。
 pub fn register_skill_router_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(SkillRouterSelfTest));
+    registry.register(Box::new(_SkillRouterSelfTest));
 }
 
 #[cfg(test)]
@@ -124,9 +124,9 @@ mod tests {
     #[test]
     fn test_skill_router_self_test_passes() {
         assert!(
-            SkillRouterSelfTest.self_test().is_ok(),
+            _SkillRouterSelfTest.self_test().is_ok(),
             "skill router self_test failed: {:?}",
-            SkillRouterSelfTest.self_test().err()
+            _SkillRouterSelfTest.self_test().err()
         );
     }
 }

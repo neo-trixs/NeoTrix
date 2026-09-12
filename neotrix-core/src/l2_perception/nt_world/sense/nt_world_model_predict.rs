@@ -65,12 +65,12 @@ impl LatentTransition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpertPredictor {
     pub expert_weights: HashMap<usize, Vector>,
-    pub performance_history: VecDeque<PerformanceRecord>,
+    pub performance_history: VecDeque<_PerformanceRecord>,
 }
 
 /// A single performance observation for an expert on a task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerformanceRecord {
+pub struct _PerformanceRecord {
     pub expert_id: usize,
     pub latent_state: Vector,
     pub performance: f64,
@@ -168,7 +168,7 @@ impl ExpertPredictor {
             *w += lr * error * z;
         }
 
-        self.performance_history.push_back(PerformanceRecord {
+        self.performance_history.push_back(_PerformanceRecord {
             expert_id,
             latent_state: latent.to_vec(),
             performance,

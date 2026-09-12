@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 /// OFAC SDN Entry (serde 模型, 供未来 serde_xml_rs 使用)
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct OfacSdnEntry {
+pub struct _OfacSdnEntry {
     #[serde(default)]
     pub uid: String,
     #[serde(default)]
@@ -35,7 +35,7 @@ pub struct OfacSdnEntry {
 
 /// 内部标准化结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OfacEntry {
+pub struct _OfacEntry {
     pub id: String,
     pub name: String,
     pub sdn_type: String,
@@ -52,7 +52,7 @@ fn extract_tag<'a>(xml: &'a str, tag: &str, from: usize) -> Option<&'a str> {
     Some(&xml[start..end])
 }
 
-fn parse_sdn_entries(xml: &str) -> Vec<OfacEntry> {
+fn parse_sdn_entries(xml: &str) -> Vec<_OfacEntry> {
     let mut out = Vec::new();
     let mut cursor = 0;
     while let Some(entry_start) = xml[cursor..].find("<sdnEntry>") {
@@ -77,7 +77,7 @@ fn parse_sdn_entries(xml: &str) -> Vec<OfacEntry> {
         }
         let name = if first.is_empty() { last.clone() } else { format!("{} {}", first, last) };
         if !uid.is_empty() && !name.is_empty() {
-            out.push(OfacEntry {
+            out.push(_OfacEntry {
                 id: uid.clone(),
                 name,
                 sdn_type,
@@ -117,7 +117,7 @@ impl OfacFetcher {
         "https://www.treasury.gov/ofac/downloads/sdn.xml".to_string()
     }
 
-    pub fn fetch(&self) -> Result<Vec<OfacEntry>, String> {
+    pub fn fetch(&self) -> Result<Vec<_OfacEntry>, String> {
         let resp = self.client().get(self.build_url()).send().map_err(|e| format!("OFAC request failed: {}", e))?;
         if !resp.status().is_success() {
             return Err(format!("OFAC returned status: {}", resp.status()));
@@ -126,15 +126,15 @@ impl OfacFetcher {
         Ok(parse_sdn_entries(&text))
     }
 
-    pub fn parse_xml(xml: &str) -> Result<Vec<OfacEntry>, String> {
+    pub fn parse_xml(xml: &str) -> Result<Vec<_OfacEntry>, String> {
         Ok(parse_sdn_entries(xml))
     }
 
-    pub fn ingest_from_xml(
+    pub fn _ingest_from_xml(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         xml: &str,
-    ) -> Result<OfacIngestReport, String> {
+    ) -> Result<_OfacIngestReport, String> {
         let events = parse_sdn_entries(xml);
         Self::ingest_events(kb, &events)
     }
@@ -142,16 +142,16 @@ impl OfacFetcher {
     pub fn ingest(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-    ) -> Result<OfacIngestReport, String> {
+    ) -> Result<_OfacIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        events: &[OfacEntry],
-    ) -> Result<OfacIngestReport, String> {
-        let mut report = OfacIngestReport { events_fetched: events.len(), ..Default::default() };
+        events: &[_OfacEntry],
+    ) -> Result<_OfacIngestReport, String> {
+        let mut report = _OfacIngestReport { events_fetched: events.len(), ..Default::default() };
         for evt in events {
             if evt.id.trim().is_empty() { report.errors.push("skip empty uid".into()); continue; }
             let summary = format!("{} | type={} | programs={}", evt.name, evt.sdn_type, evt.programs.join(","));
@@ -164,7 +164,7 @@ impl OfacFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(events: &[OfacEntry]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(events: &[_OfacEntry]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         events.iter().map(|e| crate::l2_perception::nt_world::nt_world_search::SearchResult {
             title: e.name.clone(),
             url: e.url.clone(),
@@ -185,7 +185,7 @@ pub fn ofac_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbo
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct OfacIngestReport {
+pub struct _OfacIngestReport {
     pub events_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -210,7 +210,7 @@ impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for OfacBack
     fn name(&self) -> &str { "ofac" }
     fn search(&self, _query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let events = self.fetcher.fetch()?;
-        let limited: Vec<OfacEntry> = events.into_iter().take(count).collect();
+        let limited: Vec<_OfacEntry> = events.into_iter().take(count).collect();
         Ok(OfacFetcher::to_search_results(&limited))
     }
 }
@@ -248,7 +248,7 @@ mod tests {
     fn test_ingest_fixture() {
         let dir = tempfile::tempdir().expect("tempdir");
         let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
-        let report = OfacFetcher::new().ingest_from_xml(&kb, OFAC_FIXTURE_XML).expect("ingest");
+        let report = OfacFetcher::new()._ingest_from_xml(&kb, OFAC_FIXTURE_XML).expect("ingest");
         assert_eq!(report.nodes_created, 2);
     }
 

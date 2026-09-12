@@ -19,7 +19,7 @@ impl WorldConsciousness {
         }
     }
 
-    pub fn record_conversation_turn(
+    pub fn _record_conversation_turn(
         &mut self,
         user_message: &str,
         system_response: &str,
@@ -41,11 +41,11 @@ impl WorldConsciousness {
         id
     }
 
-    pub fn god_view(&self) -> GodViewReport {
+    pub fn _god_view(&self) -> GodViewReport {
         self.conversation_observer.god_view_report()
     }
 
-    pub fn omniscient_status(&self) -> &OmniscientView {
+    pub fn _omniscient_status(&self) -> &OmniscientView {
         &self.omniscient_view
     }
 

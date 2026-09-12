@@ -7,14 +7,14 @@ use reqwest::Client;
 use super::{OsintConfig, OsintTarget};
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct DnsRecord {
+pub struct _DnsRecord {
     pub name: String,
     pub record_type: String,
     pub value: String,
     pub source: String,
 }
 
-impl std::fmt::Display for DnsRecord {
+impl std::fmt::Display for _DnsRecord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
     }
@@ -22,13 +22,13 @@ impl std::fmt::Display for DnsRecord {
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DnsFindings {
-    pub subdomains: Vec<DnsRecord>,
-    pub mx_records: Vec<DnsRecord>,
-    pub txt_records: Vec<DnsRecord>,
-    pub ns_records: Vec<DnsRecord>,
-    pub a_records: Vec<DnsRecord>,
-    pub aaaa_records: Vec<DnsRecord>,
-    pub cname_records: Vec<DnsRecord>,
+    pub subdomains: Vec<_DnsRecord>,
+    pub mx_records: Vec<_DnsRecord>,
+    pub txt_records: Vec<_DnsRecord>,
+    pub ns_records: Vec<_DnsRecord>,
+    pub a_records: Vec<_DnsRecord>,
+    pub aaaa_records: Vec<_DnsRecord>,
+    pub cname_records: Vec<_DnsRecord>,
 }
 
 impl std::fmt::Display for DnsFindings {
@@ -51,7 +51,7 @@ impl std::fmt::Display for DnsFindings {
     }
 }
 
-fn resolve_a(domain: &str) -> Vec<DnsRecord> {
+fn resolve_a(domain: &str) -> Vec<_DnsRecord> {
     let mut records = Vec::new();
     let addr = format!("{domain}:0");
     if let Ok(addrs) = addr.to_socket_addrs() {
@@ -59,7 +59,7 @@ fn resolve_a(domain: &str) -> Vec<DnsRecord> {
         for sa in addrs {
             let ip = sa.ip().to_string();
             if seen.insert(ip.clone()) {
-                records.push(DnsRecord {
+                records.push(_DnsRecord {
                     name: domain.to_string(),
                     record_type: "A".to_string(),
                     value: ip,
@@ -71,7 +71,7 @@ fn resolve_a(domain: &str) -> Vec<DnsRecord> {
     records
 }
 
-async fn query_doh(domain: &str, record_type: &str, client: &Client) -> Vec<DnsRecord> {
+async fn query_doh(domain: &str, record_type: &str, client: &Client) -> Vec<_DnsRecord> {
     let type_map: HashMap<&str, &str> = [
         ("A", "1"), ("AAAA", "28"), ("MX", "15"),
         ("TXT", "16"), ("NS", "2"), ("CNAME", "5"),
@@ -103,7 +103,7 @@ async fn query_doh(domain: &str, record_type: &str, client: &Client) -> Vec<DnsR
                                     16 => "TXT", 2 => "NS", 5 => "CNAME",
                                     _ => "UNKNOWN",
                                 };
-                                records.push(DnsRecord {
+                                records.push(_DnsRecord {
                                     name,
                                     record_type: rtype_str.to_string(),
                                     value,
@@ -235,7 +235,7 @@ pub async fn investigate(target: &OsintTarget, client: &Client, config: &OsintCo
     for (sub, source) in all_subs.iter().zip(sub_sources.iter()) {
         let recs = resolve_a(sub);
         for rec in recs {
-            findings.subdomains.push(DnsRecord {
+            findings.subdomains.push(_DnsRecord {
                 name: sub.clone(),
                 record_type: "A".to_string(),
                 value: rec.value,

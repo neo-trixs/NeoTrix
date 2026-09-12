@@ -20,10 +20,10 @@ impl PermissionManager {
         }
     }
 
-    pub fn check_permission(&self, path: &Path) -> PermissionCheck {
+    pub fn check_permission(&self, path: &Path) -> _PermissionCheck {
         let requires_sudo = self.requires_sudo(path);
         let requires_fda = self.requires_fda(path);
-        PermissionCheck {
+        _PermissionCheck {
             has_permission: !requires_sudo && !requires_fda,
             requires_sudo,
             requires_fda,
@@ -41,10 +41,10 @@ impl PermissionManager {
         self.fda_paths.iter().any(|fda| s.starts_with(fda.as_str()))
     }
 
-    pub fn add_fda_path(&mut self, path: String) { self.fda_paths.push(path); }
+    pub fn _add_fda_path(&mut self, path: String) { self.fda_paths.push(path); }
 }
 
-pub struct PermissionCheck {
+pub struct _PermissionCheck {
     pub has_permission: bool,
     pub requires_sudo: bool,
     pub requires_fda: bool,

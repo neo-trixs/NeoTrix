@@ -9,7 +9,7 @@ use super::types::{
 
 /// Default in-memory fetcher — creates a synthetic response with an empty body.
 /// Pass `None` to `crawl_with_checkpoint` to use this default.
-pub fn default_fetcher(req: &CrawlRequest) -> Result<CrawlResponse, String> {
+pub fn _default_fetcher(req: &CrawlRequest) -> Result<CrawlResponse, String> {
     Ok(CrawlResponse {
         url: req.url.clone(),
         status: 200,
@@ -207,7 +207,7 @@ impl CheckpointSpider {
 
             let resp = match fetch_fn {
                 Some(fetcher) => fetcher(&req)?,
-                None => default_fetcher(&req)?,
+                None => _default_fetcher(&req)?,
             };
 
             match process_page(&resp) {

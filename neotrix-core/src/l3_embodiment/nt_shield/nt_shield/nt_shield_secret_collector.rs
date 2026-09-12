@@ -12,7 +12,7 @@ use std::path::Path;
 
 /// 凭据来源层
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub enum SecretSource {
+pub enum _SecretSource {
     /// 进程环境变量
     Env,
     /// 工作区文件
@@ -21,21 +21,21 @@ pub enum SecretSource {
     Args,
 }
 
-impl std::fmt::Display for SecretSource {
+impl std::fmt::Display for _SecretSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SecretSource::Env => write!(f, "env"),
-            SecretSource::File => write!(f, "file"),
-            SecretSource::Args => write!(f, "args"),
+            _SecretSource::Env => write!(f, "env"),
+            _SecretSource::File => write!(f, "file"),
+            _SecretSource::Args => write!(f, "args"),
         }
     }
 }
 
 /// 单条密钥扫描命中
 #[derive(Debug, Clone, Serialize)]
-pub struct SecretHit {
+pub struct _SecretHit {
     /// 来源层
-    pub source: SecretSource,
+    pub source: _SecretSource,
     /// 环境变量名 / 文件路径 / 参数名
     pub location: String,
     /// 命中行号 (File 层)
@@ -48,9 +48,9 @@ pub struct SecretHit {
 
 /// 密钥扫描报告
 #[derive(Debug, Default, Serialize)]
-pub struct SecretReport {
+pub struct _SecretReport {
     pub total: usize,
-    pub hits: Vec<SecretHit>,
+    pub hits: Vec<_SecretHit>,
 }
 
 /// 多层 Secret Collector — 复用 Redactor 正则库
@@ -75,7 +75,7 @@ impl SecretCollector {
     ];
 
     /// 扫描进程环境变量 — 名字含 secret/api/key/token 的 key 视为暴露候选。
-    pub fn scan_env(&self) -> Vec<SecretHit> {
+    pub fn _scan_env(&self) -> Vec<_SecretHit> {
         let mut hits = Vec::new();
         for (key, value) in std::env::vars() {
             let k = key.to_lowercase();
@@ -89,16 +89,16 @@ impl SecretCollector {
             // 命中正则或敏感性名 + 非空值 → 暴露
             let rule_hit = self.redactor.find_secrets(&value);
             if sensitive_name && has_value {
-                hits.push(SecretHit {
-                    source: SecretSource::Env,
+                hits.push(_SecretHit {
+                    source: _SecretSource::Env,
                     location: key.clone(),
                     line: None,
                     rule: rule_hit.first().map(|(r, _)| r.clone()).unwrap_or_else(|| "stray".into()),
                     exposed: true,
                 });
             } else if !rule_hit.is_empty() {
-                hits.push(SecretHit {
-                    source: SecretSource::Env,
+                hits.push(_SecretHit {
+                    source: _SecretSource::Env,
                     location: key,
                     line: None,
                     rule: rule_hit[0].0.clone(),
@@ -111,13 +111,13 @@ impl SecretCollector {
 
     /// 扫描目录下所有文本文件 (递归, 跳过 target/node_modules 等)。
     /// 逐行用 Redactor 定位 secret, 记录 file:line。
-    pub fn scan_dir(&self, root: &Path) -> Vec<SecretHit> {
+    pub fn scan_dir(&self, root: &Path) -> Vec<_SecretHit> {
         let mut hits = Vec::new();
         self.walk(root, &mut hits);
         hits
     }
 
-    fn walk(&self, dir: &Path, out: &mut Vec<SecretHit>) {
+    fn walk(&self, dir: &Path, out: &mut Vec<_SecretHit>) {
         let Ok(read_dir) = std::fs::read_dir(dir) else { return };
         for entry in read_dir.flatten() {
             let path = entry.path();
@@ -133,13 +133,13 @@ impl SecretCollector {
         }
     }
 
-    fn scan_file(&self, path: &Path, out: &mut Vec<SecretHit>) {
+    fn scan_file(&self, path: &Path, out: &mut Vec<_SecretHit>) {
         let Ok(content) = std::fs::read_to_string(path) else { return };
         for (idx, line) in content.lines().enumerate() {
             let hits = self.redactor.find_secrets(line);
             for (rule, _) in hits {
-                out.push(SecretHit {
-                    source: SecretSource::File,
+                out.push(_SecretHit {
+                    source: _SecretSource::File,
                     location: path.display().to_string(),
                     line: Some((idx + 1) as u64),
                     rule,
@@ -157,13 +157,13 @@ impl SecretCollector {
     }
 
     /// 汇总为报告
-    pub fn collect(&self, dir: Option<&Path>) -> SecretReport {
-        let mut hits = self.scan_env();
+    pub fn collect(&self, dir: Option<&Path>) -> _SecretReport {
+        let mut hits = self._scan_env();
         if let Some(root) = dir {
             hits.extend(self.scan_dir(root));
         }
         let total = hits.len();
-        SecretReport { total, hits }
+        _SecretReport { total, hits }
     }
 }
 
@@ -190,7 +190,7 @@ mod tests {
 
         let c = SecretCollector::new();
         let hits = c.scan_dir(&dir);
-        let file_hits: Vec<_> = hits.iter().filter(|h| h.source == SecretSource::File).collect();
+        let file_hits: Vec<_> = hits.iter().filter(|h| h.source == _SecretSource::File).collect();
         assert!(!file_hits.is_empty(), "should find at least one sk- hit");
         // sk- 可能同时命中 openai 与 stripe 两条正则, 但都必须在第 2 行
         assert!(file_hits.iter().all(|h| h.line == Some(2)), "sk- key must be located on line 2");
@@ -218,6 +218,6 @@ mod tests {
         // 不依赖真实环境, 验证分类逻辑的纯函数路径不可测, 这里只断言模块可实例化
         let c = SecretCollector::new();
         let report = c.collect(None);
-        assert!(c.scan_env().len() == report.hits.len() || report.hits.len() >= c.scan_env().len());
+        assert!(c._scan_env().len() == report.hits.len() || report.hits.len() >= c._scan_env().len());
     }
 }

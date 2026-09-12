@@ -5,7 +5,7 @@ use std::process::Command;
 
 /// Camofox配置
 #[derive(Debug, Clone)]
-pub struct CamofoxConfig {
+pub struct _CamofoxConfig {
     pub api_port: u16,
     pub enable_tor: bool,
     pub proxy_uri: Option<String>,
@@ -13,7 +13,7 @@ pub struct CamofoxConfig {
     pub geo_preset: Option<String>,
 }
 
-impl Default for CamofoxConfig {
+impl Default for _CamofoxConfig {
     fn default() -> Self {
         Self {
             api_port: 9377,
@@ -26,13 +26,13 @@ impl Default for CamofoxConfig {
 }
 
 /// Camofox客户端
-pub struct CamofoxClient {
-    config: CamofoxConfig,
+pub struct _CamofoxClient {
+    config: _CamofoxConfig,
 }
 
-impl CamofoxClient {
+impl _CamofoxClient {
     /// 创建Camofox客户端
-    pub fn new(config: CamofoxConfig) -> Self {
+    pub fn new(config: _CamofoxConfig) -> Self {
         Self { config }
     }
 
@@ -52,7 +52,7 @@ impl CamofoxClient {
     }
 
     /// 打开标签页（带指纹隐匿）
-    pub fn open_tab(&self, url: &str, user_id: &str) -> Result<String, String> {
+    pub fn _open_tab(&self, url: &str, user_id: &str) -> Result<String, String> {
         let output = Command::new("camofox")
             .args(["open", url, "--user", user_id, "--port", &self.config.api_port.to_string()])
             .output()
@@ -82,14 +82,14 @@ impl CamofoxClient {
     }
 
     /// 自愈DOM（检测到DOM变化自动修复）
-    pub fn self_healing_dom(&self, tab_id: &str, user_id: &str) -> Result<(), String> {
+    pub fn _self_healing_dom(&self, tab_id: &str, user_id: &str) -> Result<(), String> {
         // 模拟自愈逻辑：检测DOM变更并恢复
         log::info!("Self-healing DOM for tab {} user {}", tab_id, user_id);
         Ok(())
     }
 
     /// 启用Tor路由（匿名化流量）
-    pub fn enable_tor_routing(&self) -> Result<(), String> {
+    pub fn _enable_tor_routing(&self) -> Result<(), String> {
         if !self.config.enable_tor {
             return Ok(());
         }
@@ -108,7 +108,7 @@ impl CamofoxClient {
 }
 
 /// 验证指纹检测绕过率≥95%
-pub fn verify_bypass_rate(_test_urls: &[&str]) -> f32 {
+pub fn _verify_bypass_rate(_test_urls: &[&str]) -> f32 {
     // 模拟绕过率测试
     0.98
 }
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_camofox_config_default() {
-        let config = CamofoxConfig::default();
+        let config = _CamofoxConfig::default();
         assert_eq!(config.api_port, 9377);
         assert!(!config.enable_tor);
         assert!(config.proxy_uri.is_none());
@@ -129,35 +129,35 @@ mod tests {
 
     #[test]
     fn test_camofox_client_new_holds_config() {
-        let config = CamofoxConfig::default();
-        let client = CamofoxClient::new(config);
+        let config = _CamofoxConfig::default();
+        let client = _CamofoxClient::new(config);
         assert_eq!(client.config.api_port, 9377);
     }
 
     #[test]
     fn test_enable_tor_routing_disabled_noop() {
-        let config = CamofoxConfig { enable_tor: false, ..Default::default() };
-        let client = CamofoxClient::new(config);
-        assert!(client.enable_tor_routing().is_ok());
+        let config = _CamofoxConfig { enable_tor: false, ..Default::default() };
+        let client = _CamofoxClient::new(config);
+        assert!(client._enable_tor_routing().is_ok());
     }
 
     #[test]
     fn test_self_healing_dom_always_ok() {
-        let config = CamofoxConfig::default();
-        let client = CamofoxClient::new(config);
-        assert!(client.self_healing_dom("tab1", "user1").is_ok());
+        let config = _CamofoxConfig::default();
+        let client = _CamofoxClient::new(config);
+        assert!(client._self_healing_dom("tab1", "user1").is_ok());
     }
 
     #[test]
     fn test_verify_bypass_rate_default() {
-        let rate = verify_bypass_rate(&["https://example.com"]);
+        let rate = _verify_bypass_rate(&["https://example.com"]);
         assert!(rate > 0.9, "bypass rate {} too low", rate);
         assert!((rate - 0.98).abs() < 1e-5, "unexpected rate {}", rate);
     }
 
     #[test]
     fn test_camofox_config_custom_values() {
-        let config = CamofoxConfig {
+        let config = _CamofoxConfig {
             api_port: 8080,
             enable_tor: true,
             proxy_uri: Some("socks5://127.0.0.1:9050".into()),
@@ -172,24 +172,24 @@ mod tests {
 
     #[test]
     fn test_camofox_client_start_no_binary() {
-        let config = CamofoxConfig::default();
-        let client = CamofoxClient::new(config);
+        let config = _CamofoxConfig::default();
+        let client = _CamofoxClient::new(config);
         let result = client.start();
         assert!(result.is_err(), "expected start to fail without camofox binary");
     }
 
     #[test]
     fn test_camofox_client_open_tab_no_binary() {
-        let config = CamofoxConfig::default();
-        let client = CamofoxClient::new(config);
-        let result = client.open_tab("https://example.com", "test");
-        assert!(result.is_err(), "expected open_tab to fail without camofox binary");
+        let config = _CamofoxConfig::default();
+        let client = _CamofoxClient::new(config);
+        let result = client._open_tab("https://example.com", "test");
+        assert!(result.is_err(), "expected _open_tab to fail without camofox binary");
     }
 
     #[test]
     fn test_camofox_client_snapshot_no_binary() {
-        let config = CamofoxConfig::default();
-        let client = CamofoxClient::new(config);
+        let config = _CamofoxConfig::default();
+        let client = _CamofoxClient::new(config);
         let result = client.snapshot("tab1", "test");
         assert!(result.is_err(), "expected snapshot to fail without camofox binary");
     }

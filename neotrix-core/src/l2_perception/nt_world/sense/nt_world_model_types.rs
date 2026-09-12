@@ -29,7 +29,7 @@ impl LatentState {
     }
 
     /// Encodes a Context directly into a latent state.
-    pub fn from_context(ctx: &Context) -> Self {
+    pub fn _from_context(ctx: &Context) -> Self {
         let mut state = Self::new();
         let features = ctx.to_features();
         for (i, &val) in features.iter().take(LATENT_DIM).enumerate() {

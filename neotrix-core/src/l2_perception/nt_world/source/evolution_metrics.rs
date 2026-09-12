@@ -16,7 +16,7 @@ impl EvolutionMetrics {
             source_health: HashMap::new(),
         }
     }
-    pub fn update_source_health(&mut self, source: &str, healthy: bool) {
+    pub fn _update_source_health(&mut self, source: &str, healthy: bool) {
         let entry = self.source_health.entry(source.to_string()).or_insert(1.0);
         *entry = if healthy { (*entry + 1.0) / 2.0 } else { *entry * 0.5 };
     }

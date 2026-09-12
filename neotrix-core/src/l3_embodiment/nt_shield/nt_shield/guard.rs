@@ -58,7 +58,7 @@ pub struct SecurityGuard {
     /// 待确认请求
     pending: Mutex<Vec<GuardRequest>>,
     /// Layer 2: 硬编码 denylist
-    denylist: DenyList,
+    denylist: _DenyList,
     /// Layer 3: audit log
     audit: AuditLog,
 }
@@ -69,7 +69,7 @@ impl SecurityGuard {
             session_memory: Mutex::new(HashMap::new()),
             project_root: Mutex::new(None),
             pending: Mutex::new(Vec::new()),
-            denylist: DenyList::new(),
+            denylist: _DenyList::new(),
             audit: AuditLog::new(),
         }
     }
@@ -173,19 +173,19 @@ impl Default for SecurityGuard {
 }
 
 /// 硬编码 denylist (不可绕过)
-pub struct DenyList {
+pub struct _DenyList {
     blocked_path_prefixes: Vec<&'static str>,
     blocked_path_exact: Vec<&'static str>,
     blocked_commands: Vec<&'static str>,
 }
 
-impl Default for DenyList {
+impl Default for _DenyList {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl DenyList {
+impl _DenyList {
     pub fn new() -> Self {
         Self {
             blocked_path_prefixes: vec![
@@ -378,40 +378,40 @@ mod tests {
 
     #[test]
     fn test_denylist_blocks_system_path() {
-        let dl = DenyList::new();
+        let dl = _DenyList::new();
         assert!(dl.is_blocked("file_write", "/etc/passwd"));
         assert!(dl.is_blocked("file_delete", "/etc/hosts"));
     }
 
     #[test]
     fn test_denylist_blocks_dot_ssh() {
-        let dl = DenyList::new();
+        let dl = _DenyList::new();
         assert!(dl.is_blocked("file_write", "/Users/test/.ssh/id_rsa"));
     }
 
     #[test]
     fn test_denylist_blocks_sudo() {
-        let dl = DenyList::new();
+        let dl = _DenyList::new();
         assert!(dl.is_blocked("command_exec", "sudo rm -rf /tmp"));
     }
 
     #[test]
     fn test_denylist_allows_normal_path() {
-        let dl = DenyList::new();
+        let dl = _DenyList::new();
         assert!(!dl.is_blocked("file_write", "/tmp/test.txt"));
         assert!(!dl.is_blocked("file_write", "/Users/test/Documents/code/main.rs"));
     }
 
     #[test]
     fn test_denylist_allows_normal_command() {
-        let dl = DenyList::new();
+        let dl = _DenyList::new();
         assert!(!dl.is_blocked("command_exec", "ls -la"));
         assert!(!dl.is_blocked("command_exec", "cargo check --lib"));
     }
 
     #[test]
     fn test_denylist_blocks_fork_bomb() {
-        let dl = DenyList::new();
+        let dl = _DenyList::new();
         assert!(dl.is_blocked("command_exec", ":(){ :|:& };:"));
     }
 
@@ -517,7 +517,7 @@ mod tests {
 
     #[test]
     fn test_denylist_count() {
-        let dl = DenyList::new();
+        let dl = _DenyList::new();
         assert!(dl.blocked_count() > 30);
     }
 }

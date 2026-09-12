@@ -19,7 +19,7 @@ pub struct ExtractionResult {
 }
 
 /// 信息提取器
-pub struct InfoExtractor {
+pub struct _InfoExtractor {
     /// 邮箱正则
     email_regex: Regex,
     /// 手机号正则
@@ -35,7 +35,7 @@ pub struct InfoExtractor {
     name_regex: Regex,
 }
 
-impl InfoExtractor {
+impl _InfoExtractor {
     /// 创建新的提取器
     pub fn new() -> Result<Self, regex::Error> {
         Ok(Self {
@@ -55,7 +55,7 @@ impl InfoExtractor {
     }
 
     /// 提取邮箱
-    pub fn extract_emails(&self, text: &str) -> Vec<ExtractionResult> {
+    pub fn _extract_emails(&self, text: &str) -> Vec<ExtractionResult> {
         self.email_regex.find_iter(text)
             .map(|m| ExtractionResult {
                 text: m.as_str().to_string(),
@@ -67,7 +67,7 @@ impl InfoExtractor {
     }
 
     /// 提取手机号
-    pub fn extract_phones(&self, text: &str) -> Vec<ExtractionResult> {
+    pub fn _extract_phones(&self, text: &str) -> Vec<ExtractionResult> {
         self.phone_regex.find_iter(text)
             .map(|m| ExtractionResult {
                 text: m.as_str().to_string(),
@@ -91,7 +91,7 @@ impl InfoExtractor {
     }
 
     /// 提取身份证号
-    pub fn extract_id_cards(&self, text: &str) -> Vec<ExtractionResult> {
+    pub fn _extract_id_cards(&self, text: &str) -> Vec<ExtractionResult> {
         self.id_card_regex.find_iter(text)
             .filter_map(|m| {
                 let id = m.as_str();
@@ -145,7 +145,7 @@ impl InfoExtractor {
     }
 
     /// 提取IP地址
-    pub fn extract_ips(&self, text: &str) -> Vec<ExtractionResult> {
+    pub fn _extract_ips(&self, text: &str) -> Vec<ExtractionResult> {
         self.ip_regex.find_iter(text)
             .filter_map(|m| {
                 let ip = m.as_str();
@@ -174,16 +174,16 @@ impl InfoExtractor {
     /// 提取所有信息
     pub fn extract_all(&self, text: &str) -> std::collections::HashMap<String, Vec<ExtractionResult>> {
         let mut results = std::collections::HashMap::new();
-        results.insert("emails".into(), self.extract_emails(text));
-        results.insert("phones".into(), self.extract_phones(text));
-        results.insert("id_cards".into(), self.extract_id_cards(text));
+        results.insert("emails".into(), self._extract_emails(text));
+        results.insert("phones".into(), self._extract_phones(text));
+        results.insert("id_cards".into(), self._extract_id_cards(text));
         results.insert("urls".into(), self.extract_urls(text));
-        results.insert("ips".into(), self.extract_ips(text));
+        results.insert("ips".into(), self._extract_ips(text));
         results
     }
 }
 
-impl Default for InfoExtractor {
+impl Default for _InfoExtractor {
     fn default() -> Self {
         Self::new().unwrap()
     }
@@ -194,47 +194,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extract_emails() {
-        let extractor = InfoExtractor::new().unwrap();
+    fn _extract_emails() {
+        let extractor = _InfoExtractor::new().unwrap();
         let text = "联系我们: admin@example.com 或 support@company.co.jp";
-        let emails = extractor.extract_emails(text);
+        let emails = extractor._extract_emails(text);
         assert_eq!(emails.len(), 2);
         assert_eq!(emails[0].text, "admin@example.com");
         assert_eq!(emails[1].text, "support@company.co.jp");
     }
 
     #[test]
-    fn extract_phones() {
-        let extractor = InfoExtractor::new().unwrap();
+    fn _extract_phones() {
+        let extractor = _InfoExtractor::new().unwrap();
         let text = "手机号: 13812345678, 座机: 010-12345678";
-        let phones = extractor.extract_phones(text);
+        let phones = extractor._extract_phones(text);
         assert_eq!(phones.len(), 1);
         assert_eq!(phones[0].text, "13812345678");
         assert_eq!(phones[0].metadata.get("carrier").unwrap(), "中国移动");
     }
 
     #[test]
-    fn extract_id_cards() {
-        let extractor = InfoExtractor::new().unwrap();
+    fn _extract_id_cards() {
+        let extractor = _InfoExtractor::new().unwrap();
         let text = "身份证: 110101199003077891";
-        let ids = extractor.extract_id_cards(text);
+        let ids = extractor._extract_id_cards(text);
         assert_eq!(ids.len(), 1);
         assert_eq!(ids[0].metadata.get("gender").unwrap(), "男");
     }
 
     #[test]
     fn extract_urls() {
-        let extractor = InfoExtractor::new().unwrap();
+        let extractor = _InfoExtractor::new().unwrap();
         let text = "访问 https://example.com/path?query=1 或 www.test.org";
         let urls = extractor.extract_urls(text);
         assert_eq!(urls.len(), 2);
     }
 
     #[test]
-    fn extract_ips() {
-        let extractor = InfoExtractor::new().unwrap();
+    fn _extract_ips() {
+        let extractor = _InfoExtractor::new().unwrap();
         let text = "服务器: 192.168.1.100, 网关: 10.0.0.1";
-        let ips = extractor.extract_ips(text);
+        let ips = extractor._extract_ips(text);
         assert_eq!(ips.len(), 2);
     }
 }

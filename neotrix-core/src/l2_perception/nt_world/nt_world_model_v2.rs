@@ -130,7 +130,7 @@ impl WorldModelV2 {
         (fe_report, phi_value, anomaly)
     }
 
-    pub fn train_jepa(&mut self, x: &[f64], y: &[f64]) -> f64 {
+    pub fn _train_jepa(&mut self, x: &[f64], y: &[f64]) -> f64 {
         let (loss, _, _, _) = self.jepa.train_step(x, y);
         loss
     }
@@ -139,7 +139,7 @@ impl WorldModelV2 {
         self.jepa.detect_anomaly(features, threshold)
     }
 
-    pub fn free_energy_report(&mut self) -> FreeEnergyReport {
+    pub fn _free_energy_report(&mut self) -> FreeEnergyReport {
         self.nt_world_infer.compute_free_energy(
             self.last_jepa_energy, 0.0, 0.0,
         )
@@ -159,7 +159,7 @@ impl WorldModelV2 {
         self
     }
 
-    pub fn with_phi_sigma(mut self, sigma: f64) -> Self {
+    pub fn _with_phi_sigma(mut self, sigma: f64) -> Self {
         self.iit = self.iit.with_sigma(sigma);
         self
     }
@@ -201,7 +201,7 @@ mod tests {
         let wm = WorldModelV2::new(4, 64)
             .with_precision(2.0)
             .with_temperature(1.0)
-            .with_phi_sigma(0.2);
+            ._with_phi_sigma(0.2);
         assert!((wm.nt_world_infer.nt_world_sense_precision - 2.0).abs() < 1e-10);
         assert!((wm.nt_world_infer.temperature - 1.0).abs() < 1e-10);
         assert!((wm.iit.sigma - 0.2).abs() < 1e-10);

@@ -15,7 +15,7 @@ use crate::neotrix::nt_file_ability::{SuperResolutionModel, ImageSuperResolver, 
 
 /// 色彩对齐模式
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum ColorAlignmentMode {
+pub enum _ColorAlignmentMode {
     /// 直方图均衡化
     HistogramEqualization,
     /// 亮度均衡
@@ -30,7 +30,7 @@ pub enum ColorAlignmentMode {
 
 /// 时序防抖模式
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum StabilizationMode {
+pub enum _StabilizationMode {
     /// 光流防抖
     OpticalFlow,
     /// 特征点防抖
@@ -45,11 +45,11 @@ pub enum StabilizationMode {
 
 /// 后处理配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PostProcessConfig {
+pub struct _PostProcessConfig {
     /// 色彩对齐模式
-    pub color_alignment_mode: ColorAlignmentMode,
+    pub color_alignment_mode: _ColorAlignmentMode,
     /// 时序防抖模式
-    pub stabilization_mode: StabilizationMode,
+    pub stabilization_mode: _StabilizationMode,
     /// 超分模型 (复用 image_super_resolution::SuperResolutionModel)
     pub super_resolution_model: SuperResolutionModel,
     /// 色彩对齐强度 (0.0-1.0)
@@ -74,7 +74,7 @@ pub struct PostProcessConfig {
 
 /// 后处理结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PostProcessResult {
+pub struct _PostProcessResult {
     /// 是否成功
     pub success: bool,
     /// 处理后的视频路径
@@ -99,20 +99,20 @@ pub struct PostProcessResult {
 
 /// 视频后处理器
 /// 通用视频后处理流水线
-pub struct VideoPostProcessor {
+pub struct _VideoPostProcessor {
     /// 配置
-    config: PostProcessConfig,
+    config: _PostProcessConfig,
     /// 处理历史
-    history: Vec<PostProcessResult>,
+    history: Vec<_PostProcessResult>,
 }
 
-impl VideoPostProcessor {
+impl _VideoPostProcessor {
     /// 创建后处理器
     pub fn new() -> Self {
         Self {
-            config: PostProcessConfig {
-                color_alignment_mode: ColorAlignmentMode::LuminanceBalancing,
-                stabilization_mode: StabilizationMode::Hybrid,
+            config: _PostProcessConfig {
+                color_alignment_mode: _ColorAlignmentMode::LuminanceBalancing,
+                stabilization_mode: _StabilizationMode::Hybrid,
                 super_resolution_model: SuperResolutionModel::RealEsrganGeneral,
                 color_alignment_strength: 0.7,
                 stabilization_strength: 0.6,
@@ -129,7 +129,7 @@ impl VideoPostProcessor {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: PostProcessConfig) -> Self {
+    pub fn with_config(config: _PostProcessConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -137,9 +137,9 @@ impl VideoPostProcessor {
     }
     
     /// 执行色彩对齐
-    pub fn align_colors(&self, video_path: &str) -> PostProcessResult {
+    pub fn _align_colors(&self, video_path: &str) -> _PostProcessResult {
         // TODO: 实际调用色彩对齐逻辑
-        PostProcessResult {
+        _PostProcessResult {
             success: true,
             processed_video_path: Some(format!("{}_color_aligned.mp4", video_path)),
             processed_frames: 150,
@@ -152,9 +152,9 @@ impl VideoPostProcessor {
     }
     
     /// 执行时序防抖
-    pub fn stabilize(&self, video_path: &str) -> PostProcessResult {
+    pub fn stabilize(&self, video_path: &str) -> _PostProcessResult {
         // TODO: 实际调用时序防抖逻辑
-        PostProcessResult {
+        _PostProcessResult {
             success: true,
             processed_video_path: Some(format!("{}_stabilized.mp4", video_path)),
             processed_frames: 150,
@@ -167,7 +167,7 @@ impl VideoPostProcessor {
     }
     
     /// 执行超分修复
-    pub fn super_resolve(&self, video_path: &str) -> PostProcessResult {
+    pub fn _super_resolve(&self, video_path: &str) -> _PostProcessResult {
         let start = std::time::Instant::now();
         
         // 创建超分辨率处理器
@@ -188,7 +188,7 @@ impl VideoPostProcessor {
         );
         
         if result.success {
-            PostProcessResult {
+            _PostProcessResult {
                 success: true,
                 processed_video_path: Some(output_path),
                 processed_frames: 1,
@@ -199,7 +199,7 @@ impl VideoPostProcessor {
                 error: None,
             }
         } else {
-            PostProcessResult {
+            _PostProcessResult {
                 success: false,
                 processed_video_path: None,
                 processed_frames: 0,
@@ -213,9 +213,9 @@ impl VideoPostProcessor {
     }
     
     /// 执行降噪
-    pub fn denoise(&self, video_path: &str) -> PostProcessResult {
+    pub fn denoise(&self, video_path: &str) -> _PostProcessResult {
         // TODO: 实际调用降噪逻辑
-        PostProcessResult {
+        _PostProcessResult {
             success: true,
             processed_video_path: Some(format!("{}_denoised.mp4", video_path)),
             processed_frames: 150,
@@ -228,9 +228,9 @@ impl VideoPostProcessor {
     }
     
     /// 执行锐化
-    pub fn sharpen(&self, video_path: &str) -> PostProcessResult {
+    pub fn sharpen(&self, video_path: &str) -> _PostProcessResult {
         // TODO: 实际调用锐化逻辑
-        PostProcessResult {
+        _PostProcessResult {
             success: true,
             processed_video_path: Some(format!("{}_sharpened.mp4", video_path)),
             processed_frames: 150,
@@ -243,9 +243,9 @@ impl VideoPostProcessor {
     }
     
     /// 执行完整后处理流程
-    pub fn process_full_pipeline(&mut self, video_path: &str) -> PostProcessResult {
+    pub fn _process_full_pipeline(&mut self, video_path: &str) -> _PostProcessResult {
         // 1. 色彩对齐
-        let color_result = self.align_colors(video_path);
+        let color_result = self._align_colors(video_path);
         if !color_result.success {
             return color_result;
         }
@@ -264,7 +264,7 @@ impl VideoPostProcessor {
         let denoised_result = if self.config.enable_denoising {
             self.denoise(&stabilized_path)
         } else {
-            PostProcessResult {
+            _PostProcessResult {
                 success: true,
                 processed_video_path: Some(stabilized_path.clone()),
                 ..Default::default()
@@ -274,7 +274,7 @@ impl VideoPostProcessor {
         let denoised_path = denoised_result.processed_video_path.unwrap_or_else(|| stabilized_path);
         
         // 4. 超分修复
-        let sr_result = self.super_resolve(&denoised_path);
+        let sr_result = self._super_resolve(&denoised_path);
         if !sr_result.success {
             return sr_result;
         }
@@ -285,7 +285,7 @@ impl VideoPostProcessor {
         let final_result = if self.config.enable_sharpening {
             self.sharpen(&sr_path)
         } else {
-            PostProcessResult {
+            _PostProcessResult {
                 success: true,
                 processed_video_path: Some(sr_path),
                 ..Default::default()
@@ -297,7 +297,7 @@ impl VideoPostProcessor {
     }
     
     /// 获取处理统计
-    pub fn statistics(&self) -> PostProcessStats {
+    pub fn statistics(&self) -> _PostProcessStats {
         let total_processed = self.history.len();
         let successful = self.history.iter().filter(|r| r.success).count();
         let avg_color_score = if total_processed > 0 {
@@ -316,7 +316,7 @@ impl VideoPostProcessor {
             0.0
         };
         
-        PostProcessStats {
+        _PostProcessStats {
             total_processed,
             successful,
             failed: total_processed - successful,
@@ -327,7 +327,7 @@ impl VideoPostProcessor {
     }
 }
 
-impl Default for PostProcessResult {
+impl Default for _PostProcessResult {
     fn default() -> Self {
         Self {
             success: true,
@@ -344,7 +344,7 @@ impl Default for PostProcessResult {
 
 /// 后处理统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PostProcessStats {
+pub struct _PostProcessStats {
     /// 总处理次数
     pub total_processed: usize,
     /// 成功次数
@@ -364,7 +364,7 @@ pub struct PostProcessStats {
 // ============================================================================
 
 /// 视频时序稳定性器 (向后兼容别名)
-pub type VideoTemporalStabilizer = VideoPostProcessor;
+pub type VideoTemporalStabilizer = _VideoPostProcessor;
 
 // ============================================================================
 // 测试模块
@@ -376,9 +376,9 @@ mod tests {
     
     #[test]
     fn test_video_post_processor() {
-        let mut processor = VideoPostProcessor::new();
+        let mut processor = _VideoPostProcessor::new();
         
-        let result = processor.process_full_pipeline("/input/video.mp4");
+        let result = processor._process_full_pipeline("/input/video.mp4");
         assert!(result.success);
         assert!(result.color_consistency_score > 0.8);
         assert!(result.temporal_stability_score > 0.8);
@@ -391,9 +391,9 @@ mod tests {
     
     #[test]
     fn test_custom_config() {
-        let config = PostProcessConfig {
-            color_alignment_mode: ColorAlignmentMode::ColorTransfer,
-            stabilization_mode: StabilizationMode::OpticalFlow,
+        let config = _PostProcessConfig {
+            color_alignment_mode: _ColorAlignmentMode::ColorTransfer,
+            stabilization_mode: _StabilizationMode::OpticalFlow,
             super_resolution_model: SuperResolutionModel::RealEsrganGeneral,
             color_alignment_strength: 0.8,
             stabilization_strength: 0.7,
@@ -406,7 +406,7 @@ mod tests {
             sharpening_strength: 0.6,
         };
         
-        let processor = VideoPostProcessor::with_config(config);
+        let processor = _VideoPostProcessor::with_config(config);
         assert_eq!(processor.config.super_resolution_scale, 4);
     }
 }

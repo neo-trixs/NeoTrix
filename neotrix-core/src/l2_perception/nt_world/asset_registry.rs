@@ -58,7 +58,7 @@ pub struct AssetMetadata {
 
 /// 角色资产
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CharacterAsset {
+pub struct _CharacterAsset {
     /// 基础元数据
     pub metadata: AssetMetadata,
     /// 视觉描述
@@ -89,7 +89,7 @@ pub struct CharacterAsset {
 
 /// 场景资产
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SceneAsset {
+pub struct _SceneAsset {
     /// 基础元数据
     pub metadata: AssetMetadata,
     /// 场景描述
@@ -112,7 +112,7 @@ pub struct SceneAsset {
 
 /// 特效资产
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EffectAsset {
+pub struct _EffectAsset {
     /// 基础元数据
     pub metadata: AssetMetadata,
     /// 特效描述
@@ -129,7 +129,7 @@ pub struct EffectAsset {
 
 /// 配音资产
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VoiceAsset {
+pub struct _VoiceAsset {
     /// 基础元数据
     pub metadata: AssetMetadata,
     /// 音色描述
@@ -154,13 +154,13 @@ pub struct VoiceAsset {
 /// 管理所有标准化资产
 pub struct AssetRegistry {
     /// 角色资产
-    characters: HashMap<String, CharacterAsset>,
+    characters: HashMap<String, _CharacterAsset>,
     /// 场景资产
-    scenes: HashMap<String, SceneAsset>,
+    scenes: HashMap<String, _SceneAsset>,
     /// 特效资产
-    effects: HashMap<String, EffectAsset>,
+    effects: HashMap<String, _EffectAsset>,
     /// 配音资产
-    voices: HashMap<String, VoiceAsset>,
+    voices: HashMap<String, _VoiceAsset>,
     /// 资产关系 (资产ID -> 关联资产ID列表)
     relations: HashMap<String, Vec<String>>,
 }
@@ -180,27 +180,27 @@ impl AssetRegistry {
     // ===== 角色管理 =====
     
     /// 添加角色
-    pub fn add_character(&mut self, character: CharacterAsset) {
+    pub fn _add_character(&mut self, character: _CharacterAsset) {
         self.characters.insert(character.metadata.id.clone(), character);
     }
     
     /// 获取角色
-    pub fn get_character(&self, id: &str) -> Option<&CharacterAsset> {
+    pub fn _get_character(&self, id: &str) -> Option<&_CharacterAsset> {
         self.characters.get(id)
     }
     
     /// 获取角色可变引用
-    pub fn get_character_mut(&mut self, id: &str) -> Option<&mut CharacterAsset> {
+    pub fn _get_character_mut(&mut self, id: &str) -> Option<&mut _CharacterAsset> {
         self.characters.get_mut(id)
     }
     
     /// 列出所有角色
-    pub fn list_characters(&self) -> Vec<&CharacterAsset> {
+    pub fn _list_characters(&self) -> Vec<&_CharacterAsset> {
         self.characters.values().collect()
     }
     
     /// 搜索角色
-    pub fn search_characters(&self, query: &str) -> Vec<&CharacterAsset> {
+    pub fn _search_characters(&self, query: &str) -> Vec<&_CharacterAsset> {
         self.characters.values()
             .filter(|c| {
                 c.metadata.name.contains(query) ||
@@ -214,22 +214,22 @@ impl AssetRegistry {
     // ===== 场景管理 =====
     
     /// 添加场景
-    pub fn add_scene(&mut self, scene: SceneAsset) {
+    pub fn add_scene(&mut self, scene: _SceneAsset) {
         self.scenes.insert(scene.metadata.id.clone(), scene);
     }
     
     /// 获取场景
-    pub fn get_scene(&self, id: &str) -> Option<&SceneAsset> {
+    pub fn _get_scene(&self, id: &str) -> Option<&_SceneAsset> {
         self.scenes.get(id)
     }
     
     /// 列出所有场景
-    pub fn list_scenes(&self) -> Vec<&SceneAsset> {
+    pub fn _list_scenes(&self) -> Vec<&_SceneAsset> {
         self.scenes.values().collect()
     }
     
     /// 搜索场景
-    pub fn search_scenes(&self, query: &str) -> Vec<&SceneAsset> {
+    pub fn _search_scenes(&self, query: &str) -> Vec<&_SceneAsset> {
         self.scenes.values()
             .filter(|s| {
                 s.metadata.name.contains(query) ||
@@ -242,34 +242,34 @@ impl AssetRegistry {
     // ===== 特效管理 =====
     
     /// 添加特效
-    pub fn add_effect(&mut self, effect: EffectAsset) {
+    pub fn add_effect(&mut self, effect: _EffectAsset) {
         self.effects.insert(effect.metadata.id.clone(), effect);
     }
     
     /// 获取特效
-    pub fn get_effect(&self, id: &str) -> Option<&EffectAsset> {
+    pub fn _get_effect(&self, id: &str) -> Option<&_EffectAsset> {
         self.effects.get(id)
     }
     
     /// 列出所有特效
-    pub fn list_effects(&self) -> Vec<&EffectAsset> {
+    pub fn _list_effects(&self) -> Vec<&_EffectAsset> {
         self.effects.values().collect()
     }
     
     // ===== 配音管理 =====
     
     /// 添加配音
-    pub fn add_voice(&mut self, voice: VoiceAsset) {
+    pub fn _add_voice(&mut self, voice: _VoiceAsset) {
         self.voices.insert(voice.metadata.id.clone(), voice);
     }
     
     /// 获取配音
-    pub fn get_voice(&self, id: &str) -> Option<&VoiceAsset> {
+    pub fn _get_voice(&self, id: &str) -> Option<&_VoiceAsset> {
         self.voices.get(id)
     }
     
     /// 列出所有配音
-    pub fn list_voices(&self) -> Vec<&VoiceAsset> {
+    pub fn _list_voices(&self) -> Vec<&_VoiceAsset> {
         self.voices.values().collect()
     }
     
@@ -284,7 +284,7 @@ impl AssetRegistry {
     }
     
     /// 获取关联资产
-    pub fn get_related_assets(&self, asset_id: &str) -> Vec<&str> {
+    pub fn _get_related_assets(&self, asset_id: &str) -> Vec<&str> {
         self.relations.get(asset_id)
             .map(|v| v.iter().map(|s| s.as_str()).collect())
             .unwrap_or_default()
@@ -293,7 +293,7 @@ impl AssetRegistry {
     // ===== 资产复用 =====
     
     /// 复用资产
-    pub fn reuse_asset(&self, asset_id: &str) -> Option<AssetMetadata> {
+    pub fn _reuse_asset(&self, asset_id: &str) -> Option<AssetMetadata> {
         match self.characters.get(asset_id) {
             Some(c) => {
                 let mut meta = c.metadata.clone();
@@ -367,7 +367,7 @@ mod tests {
         let mut registry = AssetRegistry::new();
         
         // 添加角色
-        let character = CharacterAsset {
+        let character = _CharacterAsset {
             metadata: AssetMetadata {
                 id: "char_001".to_string(),
                 name: "主角".to_string(),
@@ -396,10 +396,10 @@ mod tests {
             emotion_library: vec![],
         };
         
-        registry.add_character(character);
+        registry._add_character(character);
         
         // 添加场景
-        let scene = SceneAsset {
+        let scene = _SceneAsset {
             metadata: AssetMetadata {
                 id: "scene_001".to_string(),
                 name: "演武场".to_string(),
@@ -437,7 +437,7 @@ mod tests {
     fn test_search_characters() {
         let mut registry = AssetRegistry::new();
         
-        let character = CharacterAsset {
+        let character = _CharacterAsset {
             metadata: AssetMetadata {
                 id: "char_001".to_string(),
                 name: "林天".to_string(),
@@ -466,12 +466,12 @@ mod tests {
             emotion_library: vec![],
         };
         
-        registry.add_character(character);
+        registry._add_character(character);
         
-        let found = registry.search_characters("林天");
+        let found = registry._search_characters("林天");
         assert_eq!(found.len(), 1);
         
-        let found = registry.search_characters("不存在");
+        let found = registry._search_characters("不存在");
         assert_eq!(found.len(), 0);
     }
 }

@@ -20,7 +20,7 @@ impl MultiLyricSource {
 
     /// 解析逐字歌词 (增强版 LRC)
     #[allow(dead_code)]
-    fn parse_enhanced_lrc(line: &str) -> Vec<LyricWord> {
+    fn parse_enhanced_lrc(line: &str) -> Vec<_LyricWord> {
         let mut words = Vec::new();
         let mut remaining = line;
         while let Some(start) = remaining.find('<') {
@@ -29,7 +29,7 @@ impl MultiLyricSource {
                 if let Some(comma) = tag.find(',') {
                     if let Ok(time_ms) = tag[comma + 1..].parse::<i64>() {
                         let text = tag[..comma].to_string();
-                        words.push(LyricWord { time_ms, text });
+                        words.push(_LyricWord { time_ms, text });
                     }
                 }
                 remaining = &remaining[start + end + 1..];
@@ -103,7 +103,7 @@ impl MediaSource for MultiLyricSource {
 
 /// 歌词中的单个字
 #[derive(Debug, Clone)]
-pub struct LyricWord {
+pub struct _LyricWord {
     pub time_ms: i64,
     pub text: String,
 }

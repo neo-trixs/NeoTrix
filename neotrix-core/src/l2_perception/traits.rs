@@ -8,9 +8,9 @@ use std::collections::HashMap;
 
 /// 感知事件 — 从世界获取的原始信号
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerceptionEvent {
+pub struct _PerceptionEvent {
     pub source: String,
-    pub event_type: PerceptionEventType,
+    pub event_type: _PerceptionEventType,
     pub payload: serde_json::Value,
     pub confidence: f64,
     pub timestamp: chrono::DateTime<chrono::Utc>,
@@ -19,7 +19,7 @@ pub struct PerceptionEvent {
 /// 感知事件类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PerceptionEventType {
+pub enum _PerceptionEventType {
     Text,
     Image,
     Audio,
@@ -31,7 +31,7 @@ pub enum PerceptionEventType {
 
 /// 语义提取结果 — SIE/Superbrain 吸收
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SemanticExtraction {
+pub struct _SemanticExtraction {
     pub entities: Vec<Entity>,
     pub relations: Vec<Relation>,
     pub embedding: Option<Vec<f32>>,
@@ -61,27 +61,27 @@ pub trait PerceptionLayer: Send + Sync {
     fn initialize(&mut self) -> Result<(), String>;
 
     /// 处理感知事件
-    fn process_event(&mut self, event: PerceptionEvent) -> Result<PerceptionEvent, String>;
+    fn process_event(&mut self, event: _PerceptionEvent) -> Result<_PerceptionEvent, String>;
 
     /// 语义提取 — 从文本提取实体和关系 (SIE 吸收)
-    fn extract_semantics(&self, text: &str) -> Result<SemanticExtraction, String>;
+    fn extract_semantics(&self, text: &str) -> Result<_SemanticExtraction, String>;
 
     /// 知识图谱构建 — 从感知数据构建图谱 (Superbrain 吸收)
     fn build_knowledge_graph(
         &self,
-        extractions: &[SemanticExtraction],
+        extractions: &[_SemanticExtraction],
     ) -> Result<HashMap<String, Vec<(String, String)>>, String>;
 
     /// OSINT 情报收集 — OSINT Arsenal 吸收
-    fn gather_intelligence(&self, target: &str) -> Result<Vec<PerceptionEvent>, String>;
+    fn gather_intelligence(&self, target: &str) -> Result<Vec<_PerceptionEvent>, String>;
 
     /// 获取感知状态快照
-    fn snapshot(&self) -> PerceptionSnapshot;
+    fn snapshot(&self) -> _PerceptionSnapshot;
 }
 
 /// 感知状态快照
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerceptionSnapshot {
+pub struct _PerceptionSnapshot {
     pub active_sources: Vec<String>,
     pub event_count: u64,
     pub last_update: chrono::DateTime<chrono::Utc>,

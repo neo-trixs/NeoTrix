@@ -102,9 +102,9 @@ impl WorldModel {
     }
 }
 
-pub struct SimpleWorldModel;
+pub struct _SimpleWorldModel;
 
-impl SimpleWorldModel {
+impl _SimpleWorldModel {
     pub fn predict(&self, _context: &Context) -> Result<String, String> {
         Ok("prediction".to_string())
     }

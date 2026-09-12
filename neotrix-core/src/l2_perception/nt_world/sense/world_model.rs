@@ -69,7 +69,7 @@ impl JepaWorldModel {
         }
     }
 
-    pub fn with_loss_type(mut self, loss_type: JepaLossType) -> Self {
+    pub fn _with_loss_type(mut self, loss_type: JepaLossType) -> Self {
         self.loss_type = loss_type;
         self
     }
@@ -90,7 +90,7 @@ impl JepaWorldModel {
         self
     }
 
-    pub fn with_td_flows(mut self, config: TDFlowsConfig) -> Self {
+    pub fn _with_td_flows(mut self, config: TDFlowsConfig) -> Self {
         self.td_flows = Some(TemporalDifferenceFlows::new(config, self.latent_dim));
         self
     }
@@ -257,11 +257,11 @@ impl JepaWorldModel {
         self.context_encoder.encode(features)
     }
 
-    pub fn predict_next_latent(&self, z: &[f64]) -> Vector {
-        self.predict_next_latent_with_dt(z, 1.0)
+    pub fn _predict_next_latent(&self, z: &[f64]) -> Vector {
+        self._predict_next_latent_with_dt(z, 1.0)
     }
 
-    pub fn predict_next_latent_with_dt(&self, z: &[f64], dt: f64) -> Vector {
+    pub fn _predict_next_latent_with_dt(&self, z: &[f64], dt: f64) -> Vector {
         if let Some(ref td_flows) = self.td_flows {
             let z_f32: Vec<f32> = z.iter().map(|&x| x as f32).collect();
             let result_f32 = td_flows.predict_at_time(&z_f32, dt);
@@ -302,7 +302,7 @@ impl JepaWorldModel {
         let mut td_errors = Vec::with_capacity(n_steps);
 
         for _step in 0..n_steps {
-            let z_next = self.predict_next_latent(&z);
+            let z_next = self._predict_next_latent(&z);
 
             let delta: Vector = z_next.iter().zip(z.iter())
                 .map(|(nxt, cur)| (nxt - cur).clamp(-10.0, 10.0))
@@ -385,7 +385,7 @@ impl JepaWorldModel {
         let mut trajectory = Vec::with_capacity(horizon);
 
         for _step in 0..horizon {
-            let z_next = self.predict_next_latent(&z);
+            let z_next = self._predict_next_latent(&z);
 
             let delta: Vector = z_next.iter().zip(z.iter())
                 .map(|(nxt, cur)| (nxt - cur).clamp(-10.0, 10.0))
@@ -404,7 +404,7 @@ impl JepaWorldModel {
     }
 
     /// Check whether the rollout has stabilized (prediction energy below threshold).
-    pub fn check_rollout_stability(&self) -> bool {
+    pub fn _check_rollout_stability(&self) -> bool {
         let dummy = vec![0.0; self.latent_dim];
         let (_, energy) = self.predict(&dummy);
         energy < 1.0

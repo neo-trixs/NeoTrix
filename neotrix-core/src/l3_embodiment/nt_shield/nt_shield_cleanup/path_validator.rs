@@ -15,12 +15,12 @@ pub struct ValidationResult {
     pub error: Option<String>,
 }
 
-pub struct PathValidator {
+pub struct _PathValidator {
     protected_paths: Vec<PathBuf>,
     protected_prefixes: Vec<String>,
 }
 
-impl PathValidator {
+impl _PathValidator {
     pub fn new() -> Self {
         let mut v = Self { protected_paths: Vec::new(), protected_prefixes: Vec::new() };
         v.init_protection_rules();
@@ -73,11 +73,11 @@ impl PathValidator {
         self.protected_prefixes.iter().any(|p| s.starts_with(p))
     }
 
-    pub fn add_protected_path(&mut self, path: PathBuf) { self.protected_paths.push(path); }
-    pub fn add_protected_prefix(&mut self, prefix: String) { self.protected_prefixes.push(prefix); }
+    pub fn _add_protected_path(&mut self, path: PathBuf) { self.protected_paths.push(path); }
+    pub fn _add_protected_prefix(&mut self, prefix: String) { self.protected_prefixes.push(prefix); }
 }
 
-impl Default for PathValidator { fn default() -> Self { Self::new() } }
+impl Default for _PathValidator { fn default() -> Self { Self::new() } }
 
 #[cfg(test)]
 mod tests {
@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn test_validate_existing() {
-        let v = PathValidator::new();
+        let v = _PathValidator::new();
         let temp = TempDir::new().unwrap();
         let f = temp.path().join("test.txt");
         std::fs::write(&f, "x").unwrap();
@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn test_validate_protected() {
-        let v = PathValidator::new();
+        let v = _PathValidator::new();
         let r = v.validate(Path::new("/System/Library"));
         assert!(!r.is_valid);
         assert!(r.is_protected);
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_validate_nonexistent() {
-        let v = PathValidator::new();
+        let v = _PathValidator::new();
         let r = v.validate(Path::new("/nonexistent"));
         assert!(!r.is_valid);
     }

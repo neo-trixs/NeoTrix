@@ -22,7 +22,7 @@ use super::{OsintConfig, OsintTarget};
 
 /// FOFA API 搜索响应
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct FofaResponse {
+pub struct _FofaResponse {
     #[serde(default)]
     pub status: String,
     #[serde(default)]
@@ -43,7 +43,7 @@ pub struct FofaResponse {
 
 /// FOFA 资产信息
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct FofaAsset {
+pub struct _FofaAsset {
     pub host: String,
     pub ip: String,
     pub port: u16,
@@ -63,7 +63,7 @@ pub struct FofaAsset {
 
 /// FOFA 账号信息
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct FofaAccountInfo {
+pub struct _FofaAccountInfo {
     #[serde(default)]
     pub email: String,
     #[serde(default)]
@@ -78,7 +78,7 @@ pub struct FofaAccountInfo {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FofaFindings {
     /// 搜索到的资产列表
-    pub assets: Vec<FofaAsset>,
+    pub assets: Vec<_FofaAsset>,
     /// 匹配的资产总数
     pub total: usize,
     /// 查询消耗的 F 点
@@ -88,16 +88,16 @@ pub struct FofaFindings {
     /// 从资产中提取的开放端口
     pub open_ports: Vec<u16>,
     /// 从资产中提取的服务指纹
-    pub service_fingerprints: Vec<ServiceFingerprint>,
+    pub service_fingerprints: Vec<_ServiceFingerprint>,
     /// 发现的漏洞
-    pub vulns: Vec<VulnInfo>,
+    pub vulns: Vec<_VulnInfo>,
     /// 查询的域名/IP
     pub target: String,
 }
 
 /// 服务指纹
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceFingerprint {
+pub struct _ServiceFingerprint {
     pub product: String,
     pub version: String,
     pub protocol: String,
@@ -107,7 +107,7 @@ pub struct ServiceFingerprint {
 
 /// 漏洞信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VulnInfo {
+pub struct _VulnInfo {
     pub cve_id: String,
     pub affected_product: String,
     pub affected_ip: String,
@@ -151,14 +151,14 @@ impl std::fmt::Display for FofaFindings {
 // ═══════════════════════════════════════════════════════════════
 
 /// FOFA API 客户端
-pub struct FofaClient {
+pub struct _FofaClient {
     api_key: String,
     api_base: String,
 }
 
-impl std::fmt::Debug for FofaClient {
+impl std::fmt::Debug for _FofaClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FofaClient")
+        f.debug_struct("_FofaClient")
             .field(
                 "api_key",
                 &if self.api_key.len() > 8 {
@@ -172,13 +172,13 @@ impl std::fmt::Debug for FofaClient {
     }
 }
 
-impl Default for FofaClient {
+impl Default for _FofaClient {
     fn default() -> Self {
         Self::from_env()
     }
 }
 
-impl FofaClient {
+impl _FofaClient {
     /// 从环境变量创建 (NEOTRIX_FOFA_EMAIL + NEOTRIX_FOFA_KEY)
     pub fn from_env() -> Self {
         let email = std::env::var("NEOTRIX_FOFA_EMAIL").unwrap_or_default();
@@ -208,7 +208,7 @@ impl FofaClient {
     }
 
     /// 是否已配置 API Key
-    pub fn is_configured(&self) -> bool {
+    pub fn _is_configured(&self) -> bool {
         !self.api_key.is_empty()
     }
 
@@ -240,8 +240,8 @@ impl FofaClient {
         page: usize,
         size: usize,
         client: &Client,
-    ) -> Result<FofaResponse, String> {
-        if !self.is_configured() {
+    ) -> Result<_FofaResponse, String> {
+        if !self._is_configured() {
             return Err("FOFA API key 未配置 (设置 NEOTRIX_FOFA_EMAIL + NEOTRIX_FOFA_KEY)".into());
         }
         let url = self.build_search_url(query, fields, page, size);
@@ -257,7 +257,7 @@ impl FofaClient {
             .text()
             .await
             .map_err(|e| format!("FOFA read body: {}", e))?;
-        let parsed: FofaResponse =
+        let parsed: _FofaResponse =
             serde_json::from_str(&text).map_err(|e| format!("FOFA parse failed: {}", e))?;
         if parsed.error_code != 0 {
             return Err(format!(
@@ -269,8 +269,8 @@ impl FofaClient {
     }
 
     /// 异步获取账号信息
-    pub async fn get_account_info(&self, client: &Client) -> Result<FofaAccountInfo, String> {
-        if !self.is_configured() {
+    pub async fn get_account_info(&self, client: &Client) -> Result<_FofaAccountInfo, String> {
+        if !self._is_configured() {
             return Err("FOFA API key 未配置".into());
         }
         let url = format!(
@@ -290,18 +290,18 @@ impl FofaClient {
             .text()
             .await
             .map_err(|e| format!("FOFA account read body: {}", e))?;
-        let info: FofaAccountInfo =
+        let info: _FofaAccountInfo =
             serde_json::from_str(&text).map_err(|e| format!("FOFA account parse failed: {}", e))?;
         Ok(info)
     }
 
     /// 解析搜索结果为标准化资产
-    pub fn parse_assets(&self, resp: &FofaResponse) -> Vec<FofaAsset> {
+    pub fn _parse_assets(&self, resp: &_FofaResponse) -> Vec<_FofaAsset> {
         let field_names = &resp.fields;
         resp.results
             .iter()
             .map(|row| {
-                let mut asset = FofaAsset::default();
+                let mut asset = _FofaAsset::default();
                 for (i, field_name) in field_names.iter().enumerate() {
                     if let Some(value) = row.get(i) {
                         match field_name.as_str() {
@@ -344,8 +344,8 @@ pub async fn investigate(
     client: &Client,
     config: &OsintConfig,
 ) -> Result<FofaFindings, String> {
-    let fofa = FofaClient::from_config(config);
-    if !fofa.is_configured() {
+    let fofa = _FofaClient::from_config(config);
+    if !fofa._is_configured() {
         return Err("FOFA API key 未配置, 跳过 FOFA 调查".into());
     }
 
@@ -359,7 +359,7 @@ pub async fn investigate(
     let resp = fofa
         .search(&query, FOFA_DEFAULT_FIELDS, 1, 100, client)
         .await?;
-    let assets = fofa.parse_assets(&resp);
+    let assets = fofa._parse_assets(&resp);
 
     // 提取服务指纹
     let service_fingerprints = extract_service_fingerprints(&assets);
@@ -412,7 +412,7 @@ fn build_fofa_query(target: &OsintTarget) -> Result<String, String> {
 }
 
 /// 从资产列表提取服务指纹
-fn extract_service_fingerprints(assets: &[FofaAsset]) -> Vec<ServiceFingerprint> {
+fn extract_service_fingerprints(assets: &[_FofaAsset]) -> Vec<_ServiceFingerprint> {
     let mut map: HashMap<String, (String, String, String, u16, usize)> = HashMap::new();
     for a in assets {
         if a.product.is_empty() {
@@ -430,9 +430,9 @@ fn extract_service_fingerprints(assets: &[FofaAsset]) -> Vec<ServiceFingerprint>
         });
         entry.4 += 1;
     }
-    let mut fps: Vec<ServiceFingerprint> = map
+    let mut fps: Vec<_ServiceFingerprint> = map
         .values()
-        .map(|(p, v, proto, port, count)| ServiceFingerprint {
+        .map(|(p, v, proto, port, count)| _ServiceFingerprint {
             product: p.clone(),
             version: v.clone(),
             protocol: proto.clone(),
@@ -445,11 +445,11 @@ fn extract_service_fingerprints(assets: &[FofaAsset]) -> Vec<ServiceFingerprint>
 }
 
 /// 从资产列表提取漏洞
-fn extract_vulns(assets: &[FofaAsset]) -> Vec<VulnInfo> {
+fn extract_vulns(assets: &[_FofaAsset]) -> Vec<_VulnInfo> {
     assets
         .iter()
         .filter(|a| !a.vuln.is_empty())
-        .map(|a| VulnInfo {
+        .map(|a| _VulnInfo {
             cve_id: a.vuln.clone(),
             affected_product: a.product.clone(),
             affected_ip: a.ip.clone(),
@@ -468,29 +468,29 @@ fn target_str(target: &OsintTarget) -> String {
 // ═══════════════════════════════════════════════════════════════
 
 /// 同步 FOFA 客户端 — 供 `UnifiedCapability::execute` (sync) 调用
-pub struct FofaSyncClient {
-    inner: FofaClient,
+pub struct _FofaSyncClient {
+    inner: _FofaClient,
     client: reqwest::blocking::Client,
 }
 
-impl std::fmt::Debug for FofaSyncClient {
+impl std::fmt::Debug for _FofaSyncClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FofaSyncClient")
+        f.debug_struct("_FofaSyncClient")
             .field("inner", &self.inner)
             .finish()
     }
 }
 
-impl Default for FofaSyncClient {
+impl Default for _FofaSyncClient {
     fn default() -> Self {
         Self::from_env()
     }
 }
 
-impl FofaSyncClient {
+impl _FofaSyncClient {
     pub fn from_env() -> Self {
         Self {
-            inner: FofaClient::from_env(),
+            inner: _FofaClient::from_env(),
             client: reqwest::blocking::Client::builder()
                 .user_agent("NeoTrix/0.1 (OSINT-FOFA-Sync)")
                 .timeout(std::time::Duration::from_secs(30))
@@ -499,8 +499,8 @@ impl FofaSyncClient {
         }
     }
 
-    pub fn is_configured(&self) -> bool {
-        self.inner.is_configured()
+    pub fn _is_configured(&self) -> bool {
+        self.inner._is_configured()
     }
 
     /// 同步搜索 (供 Capability execute 调用)
@@ -510,8 +510,8 @@ impl FofaSyncClient {
         fields: &str,
         page: usize,
         size: usize,
-    ) -> Result<FofaResponse, String> {
-        if !self.is_configured() {
+    ) -> Result<_FofaResponse, String> {
+        if !self._is_configured() {
             return Err("FOFA API key 未配置".into());
         }
         let url = self.inner.build_search_url(query, fields, page, size);
@@ -524,7 +524,7 @@ impl FofaSyncClient {
             return Err(format!("FOFA HTTP {}", resp.status()));
         }
         let text = resp.text().map_err(|e| format!("FOFA read body: {}", e))?;
-        let parsed: FofaResponse =
+        let parsed: _FofaResponse =
             serde_json::from_str(&text).map_err(|e| format!("FOFA parse failed: {}", e))?;
         if parsed.error_code != 0 {
             return Err(format!(
@@ -535,8 +535,8 @@ impl FofaSyncClient {
         Ok(parsed)
     }
 
-    pub fn parse_assets(&self, resp: &FofaResponse) -> Vec<FofaAsset> {
-        self.inner.parse_assets(resp)
+    pub fn _parse_assets(&self, resp: &_FofaResponse) -> Vec<_FofaAsset> {
+        self.inner._parse_assets(resp)
     }
 }
 
@@ -546,13 +546,13 @@ impl FofaSyncClient {
 
 pub const FOFA_API_HOST: &str = "fofa.info";
 
-pub fn fofa_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
+pub fn _fofa_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
     crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(FOFA_API_HOST, "443")
 }
 
-pub fn fofa_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+pub fn _fofa_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
     crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(
-        vec![fofa_egress_rule()],
+        vec![_fofa_egress_rule()],
         false,
     )
 }
@@ -581,7 +581,7 @@ mod tests {
 
     #[test]
     fn test_parse_fofa_response() {
-        let resp: FofaResponse = serde_json::from_str(FOFA_FIXTURE_JSON).expect("parse");
+        let resp: _FofaResponse = serde_json::from_str(FOFA_FIXTURE_JSON).expect("parse");
         assert_eq!(resp.status, "ok");
         assert_eq!(resp.size, 2);
         assert_eq!(resp.results.len(), 2);
@@ -589,12 +589,12 @@ mod tests {
 
     #[test]
     fn test_parse_assets() {
-        let client = FofaClient {
+        let client = _FofaClient {
             api_key: String::new(),
             api_base: String::new(),
         };
-        let resp: FofaResponse = serde_json::from_str(FOFA_FIXTURE_JSON).unwrap();
-        let assets = client.parse_assets(&resp);
+        let resp: _FofaResponse = serde_json::from_str(FOFA_FIXTURE_JSON).unwrap();
+        let assets = client._parse_assets(&resp);
         assert_eq!(assets.len(), 2);
         assert_eq!(assets[0].ip, "1.2.3.4");
         assert_eq!(assets[0].port, 443);
@@ -652,21 +652,21 @@ mod tests {
     #[test]
     fn test_extract_service_fingerprints() {
         let assets = vec![
-            FofaAsset {
+            _FofaAsset {
                 product: "nginx".into(),
                 version: "1.18.0".into(),
                 protocol: "https".into(),
                 port: 443,
                 ..Default::default()
             },
-            FofaAsset {
+            _FofaAsset {
                 product: "nginx".into(),
                 version: "1.18.0".into(),
                 protocol: "https".into(),
                 port: 443,
                 ..Default::default()
             },
-            FofaAsset {
+            _FofaAsset {
                 product: "Apache httpd".into(),
                 version: "2.4.41".into(),
                 protocol: "http".into(),
@@ -683,14 +683,14 @@ mod tests {
     #[test]
     fn test_extract_vulns() {
         let assets = vec![
-            FofaAsset {
+            _FofaAsset {
                 vuln: "CVE-2021-41773".into(),
                 product: "Apache".into(),
                 ip: "1.2.3.5".into(),
                 port: 8080,
                 ..Default::default()
             },
-            FofaAsset {
+            _FofaAsset {
                 vuln: "".into(),
                 ..Default::default()
             },
@@ -702,24 +702,24 @@ mod tests {
 
     #[test]
     fn test_fofa_client_not_configured() {
-        let client = FofaClient::from_env();
+        let client = _FofaClient::from_env();
         if std::env::var("NEOTRIX_FOFA_EMAIL").is_err() {
-            assert!(!client.is_configured());
+            assert!(!client._is_configured());
         }
     }
 
     #[test]
     fn test_sync_client_not_configured() {
-        let client = FofaSyncClient::from_env();
+        let client = _FofaSyncClient::from_env();
         if std::env::var("NEOTRIX_FOFA_EMAIL").is_err() {
-            assert!(!client.is_configured());
+            assert!(!client._is_configured());
         }
     }
 
     #[test]
     fn test_egress_policy() {
-        assert!(fofa_egress_policy().check("fofa.info", 443));
-        assert!(!fofa_egress_policy().check("evil.com", 443));
+        assert!(_fofa_egress_policy().check("fofa.info", 443));
+        assert!(!_fofa_egress_policy().check("evil.com", 443));
     }
 
     #[test]
@@ -741,8 +741,8 @@ mod tests {
 
     #[test]
     fn test_debug_impl() {
-        let client = FofaClient::from_env();
+        let client = _FofaClient::from_env();
         let debug_str = format!("{:?}", client);
-        assert!(debug_str.contains("FofaClient"));
+        assert!(debug_str.contains("_FofaClient"));
     }
 }

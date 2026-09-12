@@ -42,7 +42,7 @@ impl LargeFileFinder {
 
     pub fn set_min_size(&mut self, bytes: u64) { self.min_size_bytes = bytes; }
     pub fn set_min_age(&mut self, days: u32) { self.min_age_days = days; }
-    pub fn add_search_path(&mut self, path: PathBuf) { self.search_paths.push(path); }
+    pub fn _add_search_path(&mut self, path: PathBuf) { self.search_paths.push(path); }
 
     pub fn find(&self) -> Vec<ScanResult> {
         use rayon::prelude::*;

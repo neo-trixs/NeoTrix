@@ -40,7 +40,7 @@ pub enum PermissionResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuditTrailEntry {
+pub struct _AuditTrailEntry {
     pub action: String,
     pub target: String,
     pub timestamp: i64,
@@ -49,7 +49,7 @@ pub struct AuditTrailEntry {
 
 pub struct PermissionChain {
     mode: Mutex<PermissionMode>,
-    audit_trail: Mutex<VecDeque<AuditTrailEntry>>,
+    _audit_trail: Mutex<VecDeque<_AuditTrailEntry>>,
     max_audit: usize,
 }
 
@@ -57,7 +57,7 @@ impl PermissionChain {
     pub fn new(mode: PermissionMode) -> Self {
         Self {
             mode: Mutex::new(mode),
-            audit_trail: Mutex::new(VecDeque::new()),
+            _audit_trail: Mutex::new(VecDeque::new()),
             max_audit: 1000,
         }
     }
@@ -98,8 +98,8 @@ impl PermissionChain {
     }
 
     fn log_audit(&self, action: &str, target: &str, mode: PermissionMode) {
-        if let Ok(mut trail) = self.audit_trail.lock() {
-            trail.push_back(AuditTrailEntry {
+        if let Ok(mut trail) = self._audit_trail.lock() {
+            trail.push_back(_AuditTrailEntry {
                 action: action.to_string(),
                 target: target.to_string(),
                 timestamp: Utc::now().timestamp(),
@@ -111,15 +111,15 @@ impl PermissionChain {
         }
     }
 
-    pub fn audit_trail(&self) -> Vec<AuditTrailEntry> {
-        self.audit_trail
+    pub fn _audit_trail(&self) -> Vec<_AuditTrailEntry> {
+        self._audit_trail
             .lock()
             .map(|t| t.iter().cloned().collect())
             .unwrap_or_default()
     }
 
-    pub fn clear_audit(&self) {
-        if let Ok(mut trail) = self.audit_trail.lock() {
+    pub fn _clear_audit(&self) {
+        if let Ok(mut trail) = self._audit_trail.lock() {
             trail.clear();
         }
     }
@@ -127,7 +127,7 @@ impl PermissionChain {
     pub fn summary(&self) -> String {
         let mode = *self.mode.lock().unwrap_or_else(|e| e.into_inner());
         let count = self
-            .audit_trail
+            ._audit_trail
             .lock()
             .map(|t| t.len())
             .unwrap_or(0);
@@ -217,7 +217,7 @@ mod tests {
     fn test_audit_trail_records_bypass() {
         let chain = PermissionChain::new(PermissionMode::BypassPermissions);
         chain.check("file_write", "/etc/shadow");
-        let trail = chain.audit_trail();
+        let trail = chain._audit_trail();
         assert_eq!(trail.len(), 1);
         assert_eq!(trail[0].action, "file_write");
         assert_eq!(trail[0].mode, PermissionMode::BypassPermissions);
@@ -264,15 +264,15 @@ mod tests {
         for i in 0..10 {
             chain.check(&format!("action_{}", i), "target");
         }
-        assert_eq!(chain.audit_trail().len(), max);
+        assert_eq!(chain._audit_trail().len(), max);
     }
 
     #[test]
     fn test_clear_audit() {
         let chain = PermissionChain::new(PermissionMode::BypassPermissions);
         chain.check("x", "y");
-        assert!(!chain.audit_trail().is_empty());
-        chain.clear_audit();
-        assert!(chain.audit_trail().is_empty());
+        assert!(!chain._audit_trail().is_empty());
+        chain._clear_audit();
+        assert!(chain._audit_trail().is_empty());
     }
 }

@@ -73,11 +73,11 @@ impl PlaybackQueue {
         self.queue.get(self.current_index)
     }
 
-    pub fn set_repeat(&mut self, mode: RepeatMode) {
+    pub fn _set_repeat(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
     }
 
-    pub fn toggle_shuffle(&mut self) {
+    pub fn _toggle_shuffle(&mut self) {
         self.shuffle = !self.shuffle;
     }
 

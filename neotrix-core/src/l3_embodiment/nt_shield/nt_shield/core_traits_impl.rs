@@ -45,9 +45,9 @@ impl PropagationGuardLike for PropagationGuard {
 
 // ── AbsorbTextScanner (free function wrapper) ──
 
-pub struct SelfPoisonScanner;
+pub struct _SelfPoisonScanner;
 
-impl AbsorbTextScanner for SelfPoisonScanner {
+impl AbsorbTextScanner for _SelfPoisonScanner {
     fn scan(&self, title: &str, summary: &Option<String>, content: &Option<String>) -> AbsorbVerdict {
         let v = self_poison::scan_absorb_text(title, summary, content);
         AbsorbVerdict {
@@ -59,9 +59,9 @@ impl AbsorbTextScanner for SelfPoisonScanner {
 
 // ── ReceiptEmitter (free function wrapper) ──
 
-pub struct AgentReceiptEmitter;
+pub struct _AgentReceiptEmitter;
 
-impl ReceiptEmitter for AgentReceiptEmitter {
+impl ReceiptEmitter for _AgentReceiptEmitter {
     fn emit_receipt(&self, run_id: &str, input: &str, output: &str) -> String {
         AgentReceipt::emit(run_id, input, output).signature
     }

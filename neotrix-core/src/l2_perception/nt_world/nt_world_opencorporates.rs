@@ -27,25 +27,25 @@ fn percent_encode(s: &str) -> String {
 // ── OpenCorporates 数据模型 ───────────────────────────────────
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct OcSearchResponse {
+pub struct _OcSearchResponse {
     #[serde(default)]
-    pub results: OcResults,
+    pub results: _OcResults,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct OcResults {
+pub struct _OcResults {
     #[serde(default)]
-    pub companies: Vec<OcCompany>,
+    pub companies: Vec<_OcCompany>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct OcCompany {
+pub struct _OcCompany {
     #[serde(default)]
-    pub company: OcCompanyDetail,
+    pub company: _OcCompanyDetail,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct OcCompanyDetail {
+pub struct _OcCompanyDetail {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -58,7 +58,7 @@ pub struct OcCompanyDetail {
     pub registered_address_in_full: String,
 }
 
-fn company_to_search(c: &OcCompanyDetail) -> crate::l2_perception::nt_world::nt_world_search::SearchResult {
+fn company_to_search(c: &_OcCompanyDetail) -> crate::l2_perception::nt_world::nt_world_search::SearchResult {
     let url = format!(
         "https://opencorporates.com/companies/{}/{}",
         c.jurisdiction_code, c.company_number
@@ -104,7 +104,7 @@ impl OpencorporatesFetcher {
         format!("https://api.opencorporates.com/v0.9/companies/search?q={}&per_page=10", percent_encode(query))
     }
 
-    pub fn fetch(&self, query: &str) -> Result<Vec<OcCompanyDetail>, String> {
+    pub fn fetch(&self, query: &str) -> Result<Vec<_OcCompanyDetail>, String> {
         let resp = self.client().get(self.build_url(query)).send()
             .map_err(|e| format!("opencorporates request failed: {}", e))?;
         if !resp.status().is_success() {
@@ -114,8 +114,8 @@ impl OpencorporatesFetcher {
         Self::parse_json(&text)
     }
 
-    pub fn parse_json(json: &str) -> Result<Vec<OcCompanyDetail>, String> {
-        let resp: OcSearchResponse = serde_json::from_str(json)
+    pub fn parse_json(json: &str) -> Result<Vec<_OcCompanyDetail>, String> {
+        let resp: _OcSearchResponse = serde_json::from_str(json)
             .map_err(|e| format!("opencorporates parse failed: {}", e))?;
         Ok(resp.results.companies.into_iter().map(|c| c.company).collect())
     }
@@ -124,9 +124,9 @@ impl OpencorporatesFetcher {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<OcIngestReport, String> {
+    ) -> Result<_OcIngestReport, String> {
         let companies = Self::parse_json(json)?;
-        let mut report = OcIngestReport { companies_fetched: companies.len(), ..Default::default() };
+        let mut report = _OcIngestReport { companies_fetched: companies.len(), ..Default::default() };
         for c in &companies {
             let key = if !c.company_number.is_empty() {
                 format!("{}/{}", c.jurisdiction_code, c.company_number)
@@ -145,7 +145,7 @@ impl OpencorporatesFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(companies: &[OcCompanyDetail]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(companies: &[_OcCompanyDetail]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         companies.iter().map(company_to_search).collect()
     }
 }
@@ -161,7 +161,7 @@ pub fn opencorporates_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shi
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct OcIngestReport {
+pub struct _OcIngestReport {
     pub companies_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -186,7 +186,7 @@ impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for Opencorp
     fn name(&self) -> &str { "opencorporates" }
     fn search(&self, query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let companies = self.fetcher.fetch(query)?;
-        let limited: Vec<OcCompanyDetail> = companies.into_iter().take(count).collect();
+        let limited: Vec<_OcCompanyDetail> = companies.into_iter().take(count).collect();
         Ok(OpencorporatesFetcher::to_search_results(&limited))
     }
 }

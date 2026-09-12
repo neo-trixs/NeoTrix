@@ -7,7 +7,7 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 仓库元数据快照 (由上游吸收管线填充)。
 #[derive(Debug, Clone, Default)]
-pub struct RepoMetadata {
+pub struct _RepoMetadata {
     pub name: String,
     pub description: String,
     pub language: String,
@@ -18,7 +18,7 @@ pub struct RepoMetadata {
 
 /// 合成后的单条用户 prompt 及其分解。
 #[derive(Debug, Clone, Default)]
-pub struct ReversePrompt {
+pub struct _ReversePrompt {
     pub prompt: String,
     pub tokens_used: usize,
     pub sections: Vec<String>,
@@ -26,12 +26,12 @@ pub struct ReversePrompt {
 
 /// 反向工程配置: 文件树截断上限 + prompt 最大字符数。
 #[derive(Debug, Clone)]
-pub struct RepoReversePrompt {
+pub struct _RepoReversePrompt {
     pub max_tree_entries: usize,
     pub max_prompt_chars: usize,
 }
 
-impl Default for RepoReversePrompt {
+impl Default for _RepoReversePrompt {
     fn default() -> Self {
         Self {
             max_tree_entries: 50,
@@ -40,7 +40,7 @@ impl Default for RepoReversePrompt {
     }
 }
 
-impl RepoReversePrompt {
+impl _RepoReversePrompt {
     pub fn new(max_tree_entries: usize, max_prompt_chars: usize) -> Self {
         Self {
             max_tree_entries: max_tree_entries.max(1),
@@ -49,7 +49,7 @@ impl RepoReversePrompt {
     }
 
     /// 项目简介 section (name + description + language + stars)。
-    fn intro_section(&self, meta: &RepoMetadata) -> String {
+    fn intro_section(&self, meta: &_RepoMetadata) -> String {
         let stars = meta.star_count;
         format!(
             "项目简介: {} (语言: {}, stars: {}) — {}",
@@ -58,7 +58,7 @@ impl RepoReversePrompt {
     }
 
     /// 文件结构 section, 截断到 max_tree_entries。
-    fn tree_section(&self, meta: &RepoMetadata) -> String {
+    fn tree_section(&self, meta: &_RepoMetadata) -> String {
         let mut lines: Vec<String> = Vec::new();
         lines.push("文件结构:".into());
         for entry in meta.file_tree.iter().take(self.max_tree_entries) {
@@ -71,12 +71,12 @@ impl RepoReversePrompt {
     }
 
     /// 依赖密度 section。
-    fn deps_section(&self, meta: &RepoMetadata) -> String {
+    fn deps_section(&self, meta: &_RepoMetadata) -> String {
         format!("依赖密度: {} 个 dependencies", meta.dependency_count)
     }
 
     /// 组装 sections → prompt, 超限截断并估算 tokens。
-    pub fn synthesize(&self, meta: &RepoMetadata) -> ReversePrompt {
+    pub fn synthesize(&self, meta: &_RepoMetadata) -> _ReversePrompt {
         let sections = vec![
             self.intro_section(meta),
             self.tree_section(meta),
@@ -85,7 +85,7 @@ impl RepoReversePrompt {
         let joined = sections.join("\n\n");
         let prompt = truncate_chars(&joined, self.max_prompt_chars);
         let tokens_used = prompt.chars().count() / 4;
-        ReversePrompt {
+        _ReversePrompt {
             prompt,
             tokens_used,
             sections,
@@ -93,7 +93,7 @@ impl RepoReversePrompt {
     }
 
     /// vibe-coding 前缀 + 截断 tree。
-    pub fn vibe_prompt(&self, meta: &RepoMetadata) -> String {
+    pub fn _vibe_prompt(&self, meta: &_RepoMetadata) -> String {
         let mut body = format!("请用 vibe-coding 方式基于以下仓库重建项目: {}", meta.name);
         let tree = self.tree_section(meta);
         if !tree.is_empty() {
@@ -104,7 +104,7 @@ impl RepoReversePrompt {
     }
 
     /// 已合成 sections 数量。
-    pub fn section_count(&self, rp: &ReversePrompt) -> usize {
+    pub fn _section_count(&self, rp: &_ReversePrompt) -> usize {
         rp.sections.len()
     }
 }
@@ -119,7 +119,7 @@ fn truncate_chars(s: &str, max: usize) -> String {
     out
 }
 
-impl SelfTest for RepoReversePrompt {
+impl SelfTest for _RepoReversePrompt {
     fn name(&self) -> &str {
         "nt_world_absorber_repo_reverse_prompt"
     }
@@ -128,7 +128,7 @@ impl SelfTest for RepoReversePrompt {
         let mut failures: Vec<String> = Vec::new();
 
         let eng = Self::default();
-        let meta = RepoMetadata {
+        let meta = _RepoMetadata {
             name: "demo-repo".into(),
             description: "A demo repo".into(),
             language: "Rust".into(),
@@ -137,8 +137,8 @@ impl SelfTest for RepoReversePrompt {
             dependency_count: 7,
         };
         let rp = eng.synthesize(&meta);
-        if eng.section_count(&rp) != 3 {
-            failures.push("section_count should be 3".into());
+        if eng._section_count(&rp) != 3 {
+            failures.push("_section_count should be 3".into());
         }
         if !rp.prompt.contains("demo-repo") {
             failures.push("prompt should contain repo name".into());
@@ -149,9 +149,9 @@ impl SelfTest for RepoReversePrompt {
         if rp.tokens_used == 0 {
             failures.push("tokens_used should be positive".into());
         }
-        let vibe = eng.vibe_prompt(&meta);
+        let vibe = eng._vibe_prompt(&meta);
         if !vibe.contains("demo-repo") {
-            failures.push("vibe_prompt should contain repo name".into());
+            failures.push("_vibe_prompt should contain repo name".into());
         }
 
         if failures.is_empty() {
@@ -166,8 +166,8 @@ impl SelfTest for RepoReversePrompt {
 mod tests {
     use super::*;
 
-    fn meta_with_tree(n: usize) -> RepoMetadata {
-        RepoMetadata {
+    fn meta_with_tree(n: usize) -> _RepoMetadata {
+        _RepoMetadata {
             name: "demo-repo".into(),
             description: "A demo repo".into(),
             language: "Rust".into(),
@@ -179,9 +179,9 @@ mod tests {
 
     #[test]
     fn synthesize_has_three_sections() {
-        let eng = RepoReversePrompt::default();
+        let eng = _RepoReversePrompt::default();
         let rp = eng.synthesize(&meta_with_tree(3));
-        assert_eq!(eng.section_count(&rp), 3);
+        assert_eq!(eng._section_count(&rp), 3);
         assert_eq!(rp.sections.len(), 3);
         assert!(rp.sections[0].contains("demo-repo"));
         assert!(rp.sections[0].contains("Rust"));
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn tree_truncation_limits_entries() {
-        let eng = RepoReversePrompt::new(5, 4000);
+        let eng = _RepoReversePrompt::new(5, 4000);
         let rp = eng.synthesize(&meta_with_tree(100));
         let in_tree = rp
             .sections
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn overlong_prompt_is_truncated() {
-        let eng = RepoReversePrompt::new(10, 120);
+        let eng = _RepoReversePrompt::new(10, 120);
         let rp = eng.synthesize(&meta_with_tree(10));
         assert!(rp.prompt.chars().count() <= 120);
         assert!(rp.prompt.ends_with("..."));
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn tokens_used_is_positive() {
-        let eng = RepoReversePrompt::default();
+        let eng = _RepoReversePrompt::default();
         let rp = eng.synthesize(&meta_with_tree(3));
         assert!(rp.tokens_used > 0);
         assert_eq!(rp.tokens_used, rp.prompt.chars().count() / 4);
@@ -224,9 +224,9 @@ mod tests {
 
     #[test]
     fn vibe_prompt_contains_repo_name() {
-        let eng = RepoReversePrompt::default();
+        let eng = _RepoReversePrompt::default();
         let meta = meta_with_tree(3);
-        let vibe = eng.vibe_prompt(&meta);
+        let vibe = eng._vibe_prompt(&meta);
         assert!(vibe.contains("vibe-coding"));
         assert!(vibe.contains("demo-repo"));
         assert!(vibe.contains("文件结构"));
@@ -234,17 +234,17 @@ mod tests {
 
     #[test]
     fn default_config_bounds() {
-        let eng = RepoReversePrompt::default();
+        let eng = _RepoReversePrompt::default();
         assert_eq!(eng.max_tree_entries, 50);
         assert_eq!(eng.max_prompt_chars, 4000);
-        let clamped = RepoReversePrompt::new(0, 0);
+        let clamped = _RepoReversePrompt::new(0, 0);
         assert!(clamped.max_tree_entries >= 1);
         assert!(clamped.max_prompt_chars >= 64);
     }
 
     #[test]
     fn self_test_passes() {
-        let eng = RepoReversePrompt::default();
+        let eng = _RepoReversePrompt::default();
         assert!(eng.self_test().is_ok());
     }
 }

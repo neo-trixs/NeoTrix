@@ -31,7 +31,7 @@ pub enum AssetType {
 
 /// 资产状态
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum AssetStatus {
+pub enum _AssetStatus {
     /// 草稿
     Draft,
     /// 审核中
@@ -52,7 +52,7 @@ pub struct AssetMetadata {
     /// 资产类型
     pub asset_type: AssetType,
     /// 状态
-    pub status: AssetStatus,
+    pub status: _AssetStatus,
     /// 文件路径
     pub file_path: String,
     /// 缩略图路径
@@ -75,7 +75,7 @@ pub struct AssetMetadata {
 
 /// 资产库配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetRegistryConfig {
+pub struct _AssetRegistryConfig {
     /// 存储路径
     pub storage_path: String,
     /// 最大资产数
@@ -92,13 +92,13 @@ pub struct AssetRegistryConfig {
 
 /// 搜索查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetSearchQuery {
+pub struct _AssetSearchQuery {
     /// 关键词
     pub keyword: Option<String>,
     /// 资产类型过滤
     pub asset_type: Option<AssetType>,
     /// 状态过滤
-    pub status: Option<AssetStatus>,
+    pub status: Option<_AssetStatus>,
     /// 标签过滤
     pub tags: Option<Vec<String>>,
     /// 排序字段
@@ -113,7 +113,7 @@ pub struct AssetSearchQuery {
 
 /// 搜索结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetSearchResult {
+pub struct _AssetSearchResult {
     /// 总数
     pub total: usize,
     /// 资产列表
@@ -128,9 +128,9 @@ pub struct AssetSearchResult {
 
 /// 媒体资产库
 /// 管理视觉资产的创建、存储、检索
-pub struct MediaAssetRegistry {
+pub struct _MediaAssetRegistry {
     /// 配置
-    config: AssetRegistryConfig,
+    config: _AssetRegistryConfig,
     /// 资产存储
     assets: HashMap<String, AssetMetadata>,
     /// 标签索引
@@ -139,11 +139,11 @@ pub struct MediaAssetRegistry {
     type_index: HashMap<AssetType, Vec<String>>,
 }
 
-impl MediaAssetRegistry {
+impl _MediaAssetRegistry {
     /// 创建资产库
     pub fn new(storage_path: &str) -> Self {
         Self {
-            config: AssetRegistryConfig {
+            config: _AssetRegistryConfig {
                 storage_path: storage_path.to_string(),
                 max_assets: 10000,
                 enable_versioning: true,
@@ -158,7 +158,7 @@ impl MediaAssetRegistry {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: AssetRegistryConfig) -> Self {
+    pub fn with_config(config: _AssetRegistryConfig) -> Self {
         Self {
             config,
             assets: HashMap::new(),
@@ -192,12 +192,12 @@ impl MediaAssetRegistry {
     }
     
     /// 获取资产
-    pub fn get_asset(&self, asset_id: &str) -> Option<&AssetMetadata> {
+    pub fn _get_asset(&self, asset_id: &str) -> Option<&AssetMetadata> {
         self.assets.get(asset_id)
     }
     
     /// 更新资产
-    pub fn update_asset(&mut self, asset_id: &str, metadata: AssetMetadata) -> Result<(), String> {
+    pub fn _update_asset(&mut self, asset_id: &str, metadata: AssetMetadata) -> Result<(), String> {
         if !self.assets.contains_key(asset_id) {
             return Err("资产不存在".to_string());
         }
@@ -207,7 +207,7 @@ impl MediaAssetRegistry {
     }
     
     /// 删除资产
-    pub fn delete_asset(&mut self, asset_id: &str) -> Result<(), String> {
+    pub fn _delete_asset(&mut self, asset_id: &str) -> Result<(), String> {
         if let Some(metadata) = self.assets.remove(asset_id) {
             // 清理标签索引
             for tag in &metadata.tags {
@@ -228,7 +228,7 @@ impl MediaAssetRegistry {
     }
     
     /// 搜索资产
-    pub fn search(&self, query: &AssetSearchQuery) -> AssetSearchResult {
+    pub fn search(&self, query: &_AssetSearchQuery) -> _AssetSearchResult {
         let start = std::time::Instant::now();
         
         let mut candidates: Vec<&AssetMetadata> = self.assets.values().collect();
@@ -281,7 +281,7 @@ impl MediaAssetRegistry {
         
         let query_time_ms = start.elapsed().as_millis() as u64;
         
-        AssetSearchResult {
+        _AssetSearchResult {
             total,
             assets,
             query_time_ms,
@@ -289,13 +289,13 @@ impl MediaAssetRegistry {
     }
     
     /// 获取统计信息
-    pub fn statistics(&self) -> AssetStats {
+    pub fn statistics(&self) -> _AssetStats {
         let total_assets = self.assets.len();
         let by_type: HashMap<String, usize> = self.type_index.iter()
             .map(|(k, v)| (format!("{:?}", k), v.len()))
             .collect();
         
-        AssetStats {
+        _AssetStats {
             total_assets,
             assets_by_type: by_type,
         }
@@ -304,7 +304,7 @@ impl MediaAssetRegistry {
 
 /// 资产统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetStats {
+pub struct _AssetStats {
     /// 总资产数
     pub total_assets: usize,
     /// 按类型统计
@@ -316,7 +316,7 @@ pub struct AssetStats {
 // ============================================================================
 
 /// 资产注册表 (向后兼容别名)
-pub type AssetRegistry = MediaAssetRegistry;
+pub type AssetRegistry = _MediaAssetRegistry;
 
 // ============================================================================
 // 测试模块
@@ -328,13 +328,13 @@ mod tests {
     
     #[test]
     fn test_asset_registry() {
-        let mut registry = MediaAssetRegistry::new("/assets");
+        let mut registry = _MediaAssetRegistry::new("/assets");
         
         let metadata = AssetMetadata {
             id: "asset_001".to_string(),
             name: "测试角色".to_string(),
             asset_type: AssetType::Character,
-            status: AssetStatus::Published,
+            status: _AssetStatus::Published,
             file_path: "/assets/character_001.png".to_string(),
             thumbnail_path: None,
             tags: vec!["主角".to_string(), "男性".to_string()],
@@ -349,13 +349,13 @@ mod tests {
         let id = registry.add_asset(metadata).unwrap();
         assert_eq!(id, "asset_001");
         
-        let asset = registry.get_asset("asset_001").unwrap();
+        let asset = registry._get_asset("asset_001").unwrap();
         assert_eq!(asset.name, "测试角色");
     }
     
     #[test]
     fn test_search() {
-        let mut registry = MediaAssetRegistry::new("/assets");
+        let mut registry = _MediaAssetRegistry::new("/assets");
         
         // 添加测试资产
         for i in 0..5 {
@@ -363,7 +363,7 @@ mod tests {
                 id: format!("asset_{}", i),
                 name: format!("角色{}", i),
                 asset_type: AssetType::Character,
-                status: AssetStatus::Published,
+                status: _AssetStatus::Published,
                 file_path: format!("/assets/character_{}.png", i),
                 thumbnail_path: None,
                 tags: vec!["测试".to_string()],
@@ -377,7 +377,7 @@ mod tests {
             registry.add_asset(metadata).unwrap();
         }
         
-        let result = registry.search(&AssetSearchQuery {
+        let result = registry.search(&_AssetSearchQuery {
             keyword: Some("角色".to_string()),
             asset_type: None,
             status: None,

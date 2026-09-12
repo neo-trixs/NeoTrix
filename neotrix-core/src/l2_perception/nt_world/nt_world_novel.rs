@@ -37,8 +37,8 @@ pub const REALM_KEYWORDS: &[&str] = &[
 ];
 
 /// 从书名/简介/分类/标签分类世界观。genre 命中 +3, 文本命中 +1, 最高胜出,
-/// 平局取列表顺序靠前者。Faithful port of `classify_setting`。
-pub fn classify_setting(title: &str, summary: &str, genre: &str, tags: &[String]) -> (String, String, String) {
+/// 平局取列表顺序靠前者。Faithful port of `_classify_setting`。
+pub fn _classify_setting(title: &str, summary: &str, genre: &str, tags: &[String]) -> (String, String, String) {
     let text = format!("{} {} {} {}", title, summary, genre, tags.join(" ")).to_lowercase();
     let genre_lower = genre.to_lowercase();
     let mut best_score = 0usize;
@@ -66,13 +66,13 @@ pub fn classify_setting(title: &str, summary: &str, genre: &str, tags: &[String]
 }
 
 /// 提取文本中出现的境界关键词。
-pub fn extract_realms(text: &str) -> Vec<String> {
+pub fn _extract_realms(text: &str) -> Vec<String> {
     REALM_KEYWORDS.iter().filter(|k| text.contains(**k)).map(|k| k.to_string()).collect()
 }
 
 /// 一本被吸收的起点书目(采集侧为外部 qidian-mcp-server)。
 #[derive(Debug, Clone)]
-pub struct QidianBook {
+pub struct _QidianBook {
     pub title: String,
     pub author: String,
     pub genre: String,
@@ -108,14 +108,14 @@ fn qidian_nid(url: &str) -> String {
 /// port of `ingest_batch`'s per-book body in novel-world-absorb.py。
 pub fn ingest_qidian_book(
     conn: &Connection,
-    book: &QidianBook,
+    book: &_QidianBook,
     ts: i64,
 ) -> QidianIngestReport {
     let mut report = QidianIngestReport::default();
 
     let full_cat = format!("{} {}", book.genre, book.sub_genre).trim().to_string();
-    let (stype, stier, spower) = classify_setting(&book.title, &book.synopsis, &full_cat, &book.tags);
-    let realms = extract_realms(&format!("{} {} {}", book.title, book.synopsis, full_cat));
+    let (stype, stier, spower) = _classify_setting(&book.title, &book.synopsis, &full_cat, &book.tags);
+    let realms = _extract_realms(&format!("{} {} {}", book.title, book.synopsis, full_cat));
 
     let nid = qidian_nid(&book.book_url);
 
@@ -200,9 +200,9 @@ pub fn ingest_qidian_book(
 }
 
 /// 批量吸收(按 title 去重)。port of `ingest_batch` loop。
-pub fn ingest_qidian_batch(
+pub fn _ingest_qidian_batch(
     conn: &Connection,
-    books: &[QidianBook],
+    books: &[_QidianBook],
     ts: i64,
 ) -> QidianIngestReport {
     let mut report = QidianIngestReport::default();
@@ -227,7 +227,7 @@ pub fn ingest_qidian_batch(
 // ============================================================================
 
 /// 入队一本已采集的起点书目(按 book_url 幂等)。
-pub fn enqueue_novel_book(conn: &Connection, book: &QidianBook, ts: i64) -> rusqlite::Result<()> {
+pub fn _enqueue_novel_book(conn: &Connection, book: &_QidianBook, ts: i64) -> rusqlite::Result<()> {
     let id = qidian_nid(&book.book_url);
     let tags = serde_json::to_string(&book.tags).unwrap_or_else(|_| "[]".to_string());
     conn.execute(
@@ -253,11 +253,11 @@ pub fn drain_novel_queue(conn: &Connection, limit: usize) -> QidianIngestReport 
         Ok(s) => s,
         Err(_) => return report,
     };
-    let items: Vec<(String, QidianBook)> = stmt
+    let items: Vec<(String, _QidianBook)> = stmt
         .query_map([&(limit as i64)], |r| {
             let tags_json: String = r.get(8)?;
             let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-            let book = QidianBook {
+            let book = _QidianBook {
                 title: r.get(1)?,
                 author: r.get(2)?,
                 genre: r.get(3)?,
@@ -314,7 +314,7 @@ pub fn classify_unanalyzed_books(conn: &Connection, limit: usize) -> (usize, usi
     let mut edges = 0usize;
     for (id, title, summary, content) in rows {
         let text = format!("{} {}", summary, content);
-        let (stype, stier, spower) = classify_setting(&title, &text, "", &[]);
+        let (stype, stier, spower) = _classify_setting(&title, &text, "", &[]);
         let cid = qidian_nid(&format!("ws_{}_{}", id, stype));
         store_qidian_concept(
             conn, &cid,
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_classify_setting_xuanhuan_by_tag() {
-        let (name, tier, power) = classify_setting("斗破", "", "玄幻", &["斗气".to_string()]);
+        let (name, tier, power) = _classify_setting("斗破", "", "玄幻", &["斗气".to_string()]);
         assert_eq!(name, "Xuanhuan");
         assert_eq!(tier, "Fantasy World");
         assert!(power.contains("斗气魔法"));
@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_classify_setting_default_general() {
-        let (name, tier, power) = classify_setting("偶然随笔", "平淡无物的一个故事", "随笔", &[]);
+        let (name, tier, power) = _classify_setting("偶然随笔", "平淡无物的一个故事", "随笔", &[]);
         assert_eq!(name, "General");
         assert_eq!(tier, "Unknown");
         assert_eq!(power, "Mixed");
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_extract_realms_subset() {
-        let realms = extract_realms("主角修炼金丹境与元婴，最后渡劫飞升");
+        let realms = _extract_realms("主角修炼金丹境与元婴，最后渡劫飞升");
         assert!(realms.contains(&"金丹".to_string()));
         assert!(realms.contains(&"元婴".to_string()));
         assert!(realms.contains(&"渡劫".to_string()));
@@ -413,7 +413,7 @@ mod tests {
         b2.title = "同名书".to_string();
         b2.rank = 2;
         let books = vec![b1, b2];
-        let report = ingest_qidian_batch(&mut conn, &books, 999);
+        let report = _ingest_qidian_batch(&mut conn, &books, 999);
         let book_count: i64 = conn.query_row("SELECT COUNT(*) FROM nodes WHERE node_type='Book'", [], |r| r.get(0)).unwrap();
         assert_eq!(book_count, 1);
         assert!(report.books >= 1);
@@ -434,9 +434,9 @@ mod tests {
         .unwrap();
 
         let book = sample_book();
-        enqueue_novel_book(&conn, &book, 100).unwrap();
+        _enqueue_novel_book(&conn, &book, 100).unwrap();
         // idempotent enqueue
-        enqueue_novel_book(&conn, &book, 100).unwrap();
+        _enqueue_novel_book(&conn, &book, 100).unwrap();
 
         let report = drain_novel_queue(&conn, 10);
         assert!(report.books >= 1);
@@ -471,8 +471,8 @@ mod tests {
         assert_eq!(classified2, 0);
     }
 
-    fn sample_book() -> QidianBook {
-        QidianBook {
+    fn sample_book() -> _QidianBook {
+        _QidianBook {
             title: "斗破苍穹".to_string(),
             author: "天蚕土豆".to_string(),
             genre: "玄幻".to_string(),

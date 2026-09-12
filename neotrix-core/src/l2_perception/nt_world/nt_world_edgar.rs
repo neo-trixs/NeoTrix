@@ -21,7 +21,7 @@ use std::collections::HashMap;
 
 /// SEC 公司文件提交记录 (submissions 端点返回的核心结构)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgarSubmission {
+pub struct _EdgarSubmission {
     #[serde(default)]
     pub cik: String,
     #[serde(default)]
@@ -53,31 +53,31 @@ pub struct EdgarSubmission {
     #[serde(default)]
     pub state_of_incorporation_description: String,
     #[serde(default)]
-    pub addresses: EdgarAddresses,
+    pub addresses: _EdgarAddresses,
     #[serde(default)]
     pub phone: String,
     #[serde(default)]
     pub flags: String,
     #[serde(default)]
-    pub former_names: Vec<EdgarFormerName>,
+    pub former_names: Vec<_EdgarFormerName>,
     /// 近期文件列表
     #[serde(default)]
-    pub filings: EdgarFilings,
+    pub filings: _EdgarFilings,
 }
 
 /// 近期文件列表
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EdgarFilings {
+pub struct _EdgarFilings {
     #[serde(default)]
-    pub recent: EdgarRecentFilings,
+    pub recent: _EdgarRecentFilings,
     #[serde(default)]
-    pub files: Vec<EdgarFilingFile>,
+    pub files: Vec<_EdgarFilingFile>,
 }
 
 /// 最近文件详情
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct EdgarRecentFilings {
+pub struct _EdgarRecentFilings {
     #[serde(default)]
     pub accession_number: Vec<String>,
     #[serde(default)]
@@ -110,7 +110,7 @@ pub struct EdgarRecentFilings {
 
 /// 历史文件索引文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgarFilingFile {
+pub struct _EdgarFilingFile {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -121,15 +121,15 @@ pub struct EdgarFilingFile {
 
 /// 公司地址
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EdgarAddresses {
+pub struct _EdgarAddresses {
     #[serde(default)]
-    pub mailing: EdgarAddress,
+    pub mailing: _EdgarAddress,
     #[serde(default)]
-    pub business: EdgarAddress,
+    pub business: _EdgarAddress,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EdgarAddress {
+pub struct _EdgarAddress {
     #[serde(default)]
     pub street1: String,
     #[serde(default)]
@@ -146,7 +146,7 @@ pub struct EdgarAddress {
 
 /// 前身名称
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgarFormerName {
+pub struct _EdgarFormerName {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -155,7 +155,7 @@ pub struct EdgarFormerName {
 
 /// 单个文件条目 (用于入库)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgarFiling {
+pub struct _EdgarFiling {
     pub cik: String,
     pub accession_number: String,
     pub filing_date: String,
@@ -177,27 +177,27 @@ pub struct EdgarFiling {
 
 /// XBRL 公司事实 (简化版，仅核心字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgarCompanyFacts {
+pub struct _EdgarCompanyFacts {
     #[serde(default)]
     pub cik: String,
     #[serde(default)]
     pub entity_name: String,
     #[serde(default)]
-    pub facts: HashMap<String, HashMap<String, EdgarFactValue>>,
+    pub facts: HashMap<String, HashMap<String, _EdgarFactValue>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgarFactValue {
+pub struct _EdgarFactValue {
     #[serde(default)]
     pub label: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
-    pub units: HashMap<String, Vec<EdgarFactUnit>>,
+    pub units: HashMap<String, Vec<_EdgarFactUnit>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgarFactUnit {
+pub struct _EdgarFactUnit {
     #[serde(default)]
     pub start: String,
     #[serde(default)]
@@ -221,13 +221,13 @@ pub struct EdgarFactUnit {
 // ── 解析层 ──────────────────────────────────────────────────────
 
 /// 从 submissions JSON 提取文件列表
-fn extract_filings_from_submission(sub: &EdgarSubmission) -> Vec<EdgarFiling> {
+fn extract_filings_from_submission(sub: &_EdgarSubmission) -> Vec<_EdgarFiling> {
     let recent = &sub.filings.recent;
     let n = recent.accession_number.len().min(recent.filing_date.len());
     let mut filings = Vec::with_capacity(n);
     
     for i in 0..n {
-        filings.push(EdgarFiling {
+        filings.push(_EdgarFiling {
             cik: sub.cik.clone(),
             accession_number: recent.accession_number.get(i).cloned().unwrap_or_default(),
             filing_date: recent.filing_date.get(i).cloned().unwrap_or_default(),
@@ -305,21 +305,21 @@ impl EdgarFetcher {
     }
 
     /// 构造 submissions 端点 URL (CIK 必须 10 位零填充)
-    pub fn build_submissions_url(&self, cik: &str) -> String {
+    pub fn _build_submissions_url(&self, cik: &str) -> String {
         let padded = format!("{:0>10}", cik.trim_start_matches('0'));
         format!("{}/submissions/CIK{}.json", self.base_url, padded)
     }
 
     /// 构造 companyfacts 端点 URL
-    pub fn build_companyfacts_url(&self, cik: &str) -> String {
+    pub fn _build_companyfacts_url(&self, cik: &str) -> String {
         let padded = format!("{:0>10}", cik.trim_start_matches('0'));
         format!("{}/api/xbrl/companyfacts/CIK{}.json", self.base_url, padded)
     }
 
     /// 抓取公司文件提交记录 (网络依赖)。
-    pub fn fetch_submissions(&self, cik: &str) -> Result<EdgarSubmission, String> {
+    pub fn _fetch_submissions(&self, cik: &str) -> Result<_EdgarSubmission, String> {
         self.rate_limit();
-        let url = self.build_submissions_url(cik);
+        let url = self._build_submissions_url(cik);
         let resp = self
             .client()
             .get(&url)
@@ -333,9 +333,9 @@ impl EdgarFetcher {
     }
 
     /// 抓取公司 XBRL 财务事实 (网络依赖)。
-    pub fn fetch_companyfacts(&self, cik: &str) -> Result<EdgarCompanyFacts, String> {
+    pub fn _fetch_companyfacts(&self, cik: &str) -> Result<_EdgarCompanyFacts, String> {
         self.rate_limit();
-        let url = self.build_companyfacts_url(cik);
+        let url = self._build_companyfacts_url(cik);
         let resp = self
             .client()
             .get(&url)
@@ -349,40 +349,40 @@ impl EdgarFetcher {
     }
 
     /// 纯解析 submissions JSON (无网络，用于 fixture/单测)。
-    pub fn parse_submissions(json: &str) -> Result<EdgarSubmission, String> {
+    pub fn parse_submissions(json: &str) -> Result<_EdgarSubmission, String> {
         serde_json::from_str(json).map_err(|e| format!("EDGAR parse failed: {}", e))
     }
 
     /// 从给定 submissions JSON 解析并入库 (无网络，用于 fixture E2E)。
-    pub fn ingest_submissions_from_json(
+    pub fn _ingest_submissions_from_json(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
         cik: &str,
-    ) -> Result<EdgarIngestReport, String> {
+    ) -> Result<_EdgarIngestReport, String> {
         let sub = Self::parse_submissions(json)?;
         let filings = extract_filings_from_submission(&sub);
-        Self::ingest_filings(kb, &filings, cik)
+        Self::_ingest_filings(kb, &filings, cik)
     }
 
     /// E2E 入库：fetch submissions → 解析 → KB `insert_or_get_node` (Filing, domain=edgar)。
-    pub fn ingest_submissions(
+    pub fn _ingest_submissions(
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         cik: &str,
-    ) -> Result<EdgarIngestReport, String> {
-        let sub = self.fetch_submissions(cik)?;
+    ) -> Result<_EdgarIngestReport, String> {
+        let sub = self._fetch_submissions(cik)?;
         let filings = extract_filings_from_submission(&sub);
-        Self::ingest_filings(kb, &filings, cik)
+        Self::_ingest_filings(kb, &filings, cik)
     }
 
     /// 将已解析的 filings 入库 — 可复用 (fetch/parse 解耦)。
-    pub fn ingest_filings(
+    pub fn _ingest_filings(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        filings: &[EdgarFiling],
+        filings: &[_EdgarFiling],
         cik: &str,
-    ) -> Result<EdgarIngestReport, String> {
-        let mut report = EdgarIngestReport {
+    ) -> Result<_EdgarIngestReport, String> {
+        let mut report = _EdgarIngestReport {
             cik: cik.to_string(),
             filings_fetched: filings.len(),
             ..Default::default()
@@ -413,7 +413,7 @@ impl EdgarFetcher {
     }
 
     /// 转 SearchResult (供 Ordered Backend Router 复用)。
-    pub fn to_search_results(filings: &[EdgarFiling]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(filings: &[_EdgarFiling]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         filings
             .iter()
             .map(|f| crate::l2_perception::nt_world::nt_world_search::SearchResult {
@@ -442,7 +442,7 @@ pub fn edgar_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandb
 // ── 入库报告 ───────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EdgarIngestReport {
+pub struct _EdgarIngestReport {
     pub cik: String,
     pub filings_fetched: usize,
     pub nodes_created: usize,
@@ -575,16 +575,16 @@ mod tests {
     #[test]
     fn test_build_submissions_url() {
         let f = EdgarFetcher::new();
-        let url = f.build_submissions_url("320193");
+        let url = f._build_submissions_url("320193");
         assert_eq!(url, "https://data.sec.gov/submissions/CIK0000320193.json");
-        let url2 = f.build_submissions_url("0000320193");
+        let url2 = f._build_submissions_url("0000320193");
         assert_eq!(url2, "https://data.sec.gov/submissions/CIK0000320193.json");
     }
 
     #[test]
     fn test_build_companyfacts_url() {
         let f = EdgarFetcher::new();
-        let url = f.build_companyfacts_url("320193");
+        let url = f._build_companyfacts_url("320193");
         assert_eq!(url, "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json");
     }
 
@@ -618,7 +618,7 @@ mod tests {
         let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
         let fetcher = EdgarFetcher::new();
         // 用 fixture 纯内存 ingest，无网络
-        let report = fetcher.ingest_submissions_from_json(&kb, EDGAR_FIXTURE_JSON, "320193").expect("ingest");
+        let report = fetcher._ingest_submissions_from_json(&kb, EDGAR_FIXTURE_JSON, "320193").expect("ingest");
         assert_eq!(report.filings_fetched, 2);
         assert_eq!(report.nodes_created, 2, "first ingest creates 2 nodes");
         assert_eq!(report.nodes_reused, 0);
@@ -633,7 +633,7 @@ mod tests {
         assert!(!hits.is_empty(), "FTS should recall ingested filing by keyword");
 
         // 幂等：二次 ingest 同 fixture → nodes_reused
-        let report2 = fetcher.ingest_submissions_from_json(&kb, EDGAR_FIXTURE_JSON, "320193").expect("re-ingest");
+        let report2 = fetcher._ingest_submissions_from_json(&kb, EDGAR_FIXTURE_JSON, "320193").expect("re-ingest");
         assert_eq!(report2.nodes_created, 0, "second ingest reuses nodes");
         assert_eq!(report2.nodes_reused, 2);
     }
@@ -655,7 +655,7 @@ mod tests {
         let bad_json = r#"{
             "cik":"0000320193","name":"Test","filings":{"recent":{"accessionNumber":[""],"filingDate":["2023-01-01"],"form":["10-K"],"acceptanceDateTime":["2023-01-01T00:00:00Z"],"fileNumber":[""],"filmNumber":[""],"items":[""],"size":[0],"isXBRL":[0],"isInlineXBRL":[0],"primaryDocument":[""],"primaryDocDescription":[""]}}
         }"#;
-        let report = fetcher.ingest_submissions_from_json(&kb, bad_json, "320193").expect("ingest bad");
+        let report = fetcher._ingest_submissions_from_json(&kb, bad_json, "320193").expect("ingest bad");
         assert_eq!(report.nodes_created, 0);
         assert_eq!(report.errors.len(), 1);
     }

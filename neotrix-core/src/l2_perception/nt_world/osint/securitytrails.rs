@@ -11,9 +11,9 @@ pub const SECURITYTRAILS_API_BASE: &str = "https://api.securitytrails.com/v1";
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct SecurityTrailsFindings {
     pub domain: String,
-    pub subdomains: Vec<SecurityTrailsSubdomain>,
-    pub records: Vec<SecurityTrailsDnsRecord>,
-    pub whois: Option<SecurityTrailsWhois>,
+    pub subdomains: Vec<_SecurityTrailsSubdomain>,
+    pub records: Vec<_SecurityTrailsDnsRecord>,
+    pub whois: Option<_SecurityTrailsWhois>,
 }
 
 impl std::fmt::Display for SecurityTrailsFindings {
@@ -30,7 +30,7 @@ impl std::fmt::Display for SecurityTrailsFindings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct SecurityTrailsSubdomain {
+pub struct _SecurityTrailsSubdomain {
     pub name: String,
     pub ip: Option<String>,
     pub first_seen: Option<String>,
@@ -38,7 +38,7 @@ pub struct SecurityTrailsSubdomain {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct SecurityTrailsDnsRecord {
+pub struct _SecurityTrailsDnsRecord {
     pub record_type: String,
     pub value: String,
     pub ttl: Option<u32>,
@@ -47,7 +47,7 @@ pub struct SecurityTrailsDnsRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct SecurityTrailsWhois {
+pub struct _SecurityTrailsWhois {
     pub registrar: Option<String>,
     pub registration_date: Option<String>,
     pub expiration_date: Option<String>,
@@ -92,7 +92,7 @@ async fn fetch_subdomains(
     config: &OsintConfig,
     domain: &str,
     api_key: &str,
-) -> Result<Vec<SecurityTrailsSubdomain>, String> {
+) -> Result<Vec<_SecurityTrailsSubdomain>, String> {
     let url = format!("{}/domain/{}/subdomains?apikey={}", SECURITYTRAILS_API_BASE, domain, api_key);
     
     let resp = client
@@ -111,14 +111,14 @@ async fn fetch_subdomains(
         .await
         .map_err(|e| format!("SecurityTrails subdomains 响应解析失败: {e}"))?;
 
-    let subdomains: Vec<SecurityTrailsSubdomain> = body
+    let subdomains: Vec<_SecurityTrailsSubdomain> = body
         .get("subdomains")
         .and_then(|v| v.as_array())
         .map(|a| {
             a.iter()
                 .filter_map(|s| {
                     let name = s.as_str()?;
-                    Some(SecurityTrailsSubdomain {
+                    Some(_SecurityTrailsSubdomain {
                         name: format!("{}.{}", name, domain),
                         ip: None,
                         first_seen: None,
@@ -137,7 +137,7 @@ async fn fetch_dns_records(
     config: &OsintConfig,
     domain: &str,
     api_key: &str,
-) -> Result<Vec<SecurityTrailsDnsRecord>, String> {
+) -> Result<Vec<_SecurityTrailsDnsRecord>, String> {
     let url = format!("{}/domain/{}/dns?apikey={}", SECURITYTRAILS_API_BASE, domain, api_key);
     
     let resp = client
@@ -163,7 +163,7 @@ async fn fetch_dns_records(
         if let Some(record_array) = body.get(record_type).and_then(|v| v.as_array()) {
             for record in record_array {
                 if let Some(value) = record.as_str() {
-                    records.push(SecurityTrailsDnsRecord {
+                    records.push(_SecurityTrailsDnsRecord {
                         record_type: record_type.to_uppercase(),
                         value: value.to_string(),
                         ttl: None,
@@ -183,7 +183,7 @@ async fn fetch_whois(
     config: &OsintConfig,
     domain: &str,
     api_key: &str,
-) -> Result<Option<SecurityTrailsWhois>, String> {
+) -> Result<Option<_SecurityTrailsWhois>, String> {
     let url = format!("{}/domain/{}/whois?apikey={}", SECURITYTRAILS_API_BASE, domain, api_key);
     
     let resp = client
@@ -202,7 +202,7 @@ async fn fetch_whois(
         .await
         .map_err(|e| format!("SecurityTrails WHOIS 响应解析失败: {e}"))?;
 
-    let whois = SecurityTrailsWhois {
+    let whois = _SecurityTrailsWhois {
         registrar: body.get("registrar").and_then(|v| v.as_str()).map(|s| s.to_string()),
         registration_date: body.get("created_date").and_then(|v| v.as_str()).map(|s| s.to_string()),
         expiration_date: body.get("expires_date").and_then(|v| v.as_str()).map(|s| s.to_string()),
@@ -219,14 +219,14 @@ async fn fetch_whois(
 // OsintSource trait 实现
 // ═══════════════════════════════════════════════════════════════
 
-pub struct SecurityTrailsInvestigator;
+pub struct _SecurityTrailsInvestigator;
 
 pub const SECURITYTRAILS_API_HOST: &str = "api.securitytrails.com";
-pub fn securitytrails_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
+pub fn _securitytrails_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
     crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(SECURITYTRAILS_API_HOST, "443")
 }
-pub fn securitytrails_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![securitytrails_egress_rule()], false)
+pub fn _securitytrails_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![_securitytrails_egress_rule()], false)
 }
 
 #[cfg(test)]
@@ -235,28 +235,28 @@ mod tests {
 
     #[test]
     fn test_securitytrails_egress() {
-        assert!(securitytrails_egress_policy().check("api.securitytrails.com", 443));
-        assert!(!securitytrails_egress_policy().check("evil.com", 443));
+        assert!(_securitytrails_egress_policy().check("api.securitytrails.com", 443));
+        assert!(!_securitytrails_egress_policy().check("evil.com", 443));
     }
 
     #[test]
     fn test_securitytrails_findings_display() {
         let findings = super::SecurityTrailsFindings {
             domain: "example.com".into(),
-            subdomains: vec![super::SecurityTrailsSubdomain {
+            subdomains: vec![super::_SecurityTrailsSubdomain {
                 name: "www.example.com".into(),
                 ip: Some("93.184.216.34".into()),
                 first_seen: Some("2020-01-01".into()),
                 last_seen: Some("2024-01-01".into()),
             }],
-            records: vec![super::SecurityTrailsDnsRecord {
+            records: vec![super::_SecurityTrailsDnsRecord {
                 record_type: "A".into(),
                 value: "93.184.216.34".into(),
                 ttl: Some(3600),
                 first_seen: None,
                 last_seen: None,
             }],
-            whois: Some(super::SecurityTrailsWhois {
+            whois: Some(super::_SecurityTrailsWhois {
                 registrar: Some("Example Registrar".into()),
                 registration_date: Some("2000-01-01".into()),
                 expiration_date: Some("2025-01-01".into()),

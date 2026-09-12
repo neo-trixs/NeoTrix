@@ -13,7 +13,7 @@ pub struct ShodanFindings {
     pub host: String,
     pub ip: String,
     pub ports: Vec<u16>,
-    pub services: Vec<ShodanService>,
+    pub services: Vec<_ShodanService>,
     pub vulns: Vec<String>,
     pub os: Option<String>,
     pub org: Option<String>,
@@ -39,7 +39,7 @@ impl std::fmt::Display for ShodanFindings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct ShodanService {
+pub struct _ShodanService {
     pub port: u16,
     pub protocol: String,
     pub product: Option<String>,
@@ -110,13 +110,13 @@ pub async fn investigate(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    let services: Vec<ShodanService> = body
+    let services: Vec<_ShodanService> = body
         .get("data")
         .and_then(|v| v.as_array())
         .map(|a| {
             a.iter()
                 .filter_map(|s| {
-                    Some(ShodanService {
+                    Some(_ShodanService {
                         port: s.get("port")?.as_u64()? as u16,
                         protocol: s
                             .get("transport")
@@ -167,14 +167,14 @@ pub async fn investigate(
 // OsintSource trait 实现
 // ═══════════════════════════════════════════════════════════════
 
-pub struct ShodanInvestigator;
+pub struct _ShodanInvestigator;
 
 pub const SHODAN_API_HOST: &str = "api.shodan.io";
-pub fn shodan_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
+pub fn _shodan_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
     crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(SHODAN_API_HOST, "443")
 }
-pub fn shodan_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![shodan_egress_rule()], false)
+pub fn _shodan_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![_shodan_egress_rule()], false)
 }
 
 #[cfg(test)]
@@ -183,8 +183,8 @@ mod tests {
 
     #[test]
     fn test_shodan_egress() {
-        assert!(shodan_egress_policy().check("api.shodan.io", 443));
-        assert!(!shodan_egress_policy().check("evil.com", 443));
+        assert!(_shodan_egress_policy().check("api.shodan.io", 443));
+        assert!(!_shodan_egress_policy().check("evil.com", 443));
     }
 
     #[test]
@@ -193,7 +193,7 @@ mod tests {
             host: "example.com".into(),
             ip: "93.184.216.34".into(),
             ports: vec![80, 443],
-            services: vec![super::ShodanService {
+            services: vec![super::_ShodanService {
                 port: 80,
                 protocol: "tcp".into(),
                 product: Some("nginx".into()),

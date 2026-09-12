@@ -10,7 +10,7 @@ use crate::core::nt_core_traits::KnowledgeSink;
 
 /// 支持的开放文档格式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OdsFormat {
+pub enum _OdsFormat {
     Markdown,
     Org,
     Rst,
@@ -20,18 +20,18 @@ pub enum OdsFormat {
 
 /// 解析后的文档节点
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OdsNode {
+pub struct _OdsNode {
     pub path: String,
     pub kind: String,
     pub body: String,
 }
 
 /// 开放文档系统解析器适配契约 (ODS 抽象)
-pub trait OdsParserAdapter {
+pub trait _OdsParserAdapter {
     /// 探测输入内容的格式
-    fn detect_format(&self, content: &str) -> OdsFormat;
+    fn detect_format(&self, content: &str) -> _OdsFormat;
     /// 将内容解析为节点树
-    fn parse(&self, content: &str) -> Vec<OdsNode>;
+    fn parse(&self, content: &str) -> Vec<_OdsNode>;
     /// C2 接线: 将解析出的节点树写入 KB (Article 节点) 并触发 FTS5 索引。
     /// 返回成功写入的节点 id 列表。
     fn ingest_nodes(&self, kb: &dyn KnowledgeSink, content: &str) -> Result<Vec<String>, String>;
@@ -39,28 +39,28 @@ pub trait OdsParserAdapter {
 
 /// 默认 stub 实现
 #[derive(Default)]
-pub struct OdsAdapter;
+pub struct _OdsAdapter;
 
-impl OdsParserAdapter for OdsAdapter {
-    fn detect_format(&self, content: &str) -> OdsFormat {
+impl _OdsParserAdapter for _OdsAdapter {
+    fn detect_format(&self, content: &str) -> _OdsFormat {
         let head = content.lines().next().unwrap_or("").trim();
         if head.starts_with("# ") {
-            OdsFormat::Markdown
+            _OdsFormat::Markdown
         } else if head.starts_with("* ") {
-            OdsFormat::Org
+            _OdsFormat::Org
         } else if head.starts_with("== ") {
-            OdsFormat::AsciiDoc
+            _OdsFormat::AsciiDoc
         } else if head.starts_with("===") {
-            OdsFormat::Rst
+            _OdsFormat::Rst
         } else {
-            OdsFormat::Unknown
+            _OdsFormat::Unknown
         }
     }
 
-    fn parse(&self, content: &str) -> Vec<OdsNode> {
+    fn parse(&self, content: &str) -> Vec<_OdsNode> {
         match self.detect_format(content) {
-            OdsFormat::Unknown => Vec::new(),
-            fmt => vec![OdsNode {
+            _OdsFormat::Unknown => Vec::new(),
+            fmt => vec![_OdsNode {
                 path: "root".into(),
                 kind: format!("{:?}", fmt),
                 body: content.to_string(),
@@ -87,16 +87,16 @@ impl OdsParserAdapter for OdsAdapter {
 }
 
 /// SelfTest (T1): 格式探测 + 解析存在性
-pub struct OdsSelfTest;
+pub struct _OdsSelfTest;
 
-impl SelfTest for OdsSelfTest {
+impl SelfTest for _OdsSelfTest {
     fn name(&self) -> &str {
         "nt_world_ods"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let a = OdsAdapter;
-        if a.detect_format("# Title") != OdsFormat::Markdown {
+        let a = _OdsAdapter;
+        if a.detect_format("# Title") != _OdsFormat::Markdown {
             return Err(vec!["ods: '# ' should detect Markdown".into()]);
         }
         let nodes = a.parse("* heading");
@@ -108,8 +108,8 @@ impl SelfTest for OdsSelfTest {
 }
 
 /// 注册 ODS SelfTest
-pub fn register_ods_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(OdsSelfTest));
+pub fn _register_ods_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(_OdsSelfTest));
 }
 
 #[cfg(test)]
@@ -118,14 +118,14 @@ mod tests {
 
     #[test]
     fn test_detect_markdown_and_org() {
-        let a = OdsAdapter;
-        assert_eq!(a.detect_format("# h"), OdsFormat::Markdown);
-        assert_eq!(a.detect_format("* h"), OdsFormat::Org);
+        let a = _OdsAdapter;
+        assert_eq!(a.detect_format("# h"), _OdsFormat::Markdown);
+        assert_eq!(a.detect_format("* h"), _OdsFormat::Org);
     }
 
     #[test]
     fn test_parse_returns_node() {
-        let a = OdsAdapter;
+        let a = _OdsAdapter;
         let nodes = a.parse("== Title");
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].kind, "AsciiDoc");
@@ -133,10 +133,10 @@ mod tests {
 
     #[test]
     fn test_unknown_format_empty() {
-        let a = OdsAdapter;
-        assert_eq!(a.detect_format("plain text"), OdsFormat::Unknown);
+        let a = _OdsAdapter;
+        assert_eq!(a.detect_format("plain text"), _OdsFormat::Unknown);
         assert!(a.parse("plain text").is_empty());
-        let t = OdsSelfTest;
+        let t = _OdsSelfTest;
         assert_eq!(t.name(), "nt_world_ods");
         assert!(t.self_test().is_ok());
     }
@@ -149,7 +149,7 @@ mod tests {
             eprintln!("skip: KB (FTS5) unavailable in this build");
             return;
         };
-        let a = OdsAdapter;
+        let a = _OdsAdapter;
         let ids = a
             .ingest_nodes(&kb, "# Title\nbody")
             .expect("ingest should succeed");

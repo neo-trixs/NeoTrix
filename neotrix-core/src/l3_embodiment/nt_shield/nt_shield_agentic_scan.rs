@@ -6,7 +6,7 @@ use crate::l3_embodiment::nt_shield::nt_shield::poc_engine::PocEngine;
 use crate::l3_embodiment::nt_shield::nt_shield::http_proxy::HttpInterceptor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum HunterKind {
+pub enum _HunterKind {
     Xss,
     SqlInjection,
     Csrf,
@@ -19,29 +19,29 @@ pub enum HunterKind {
     SecurityMisconfiguration,
 }
 
-impl HunterKind {
+impl _HunterKind {
     pub fn label(&self) -> &'static str {
         match self {
-            HunterKind::Xss => "Cross-Site Scripting",
-            HunterKind::SqlInjection => "SQL Injection",
-            HunterKind::Csrf => "Cross-Site Request Forgery",
-            HunterKind::CommandInjection => "Command Injection",
-            HunterKind::Ssrf => "Server-Side Request Forgery",
-            HunterKind::PathTraversal => "Path Traversal",
-            HunterKind::InsecureDeserialization => "Insecure Deserialization",
-            HunterKind::SensitiveDataExposure => "Sensitive Data Exposure",
-            HunterKind::BrokenAuth => "Broken Authentication",
-            HunterKind::SecurityMisconfiguration => "Security Misconfiguration",
+            _HunterKind::Xss => "Cross-Site Scripting",
+            _HunterKind::SqlInjection => "SQL Injection",
+            _HunterKind::Csrf => "Cross-Site Request Forgery",
+            _HunterKind::CommandInjection => "Command Injection",
+            _HunterKind::Ssrf => "Server-Side Request Forgery",
+            _HunterKind::PathTraversal => "Path Traversal",
+            _HunterKind::InsecureDeserialization => "Insecure Deserialization",
+            _HunterKind::SensitiveDataExposure => "Sensitive Data Exposure",
+            _HunterKind::BrokenAuth => "Broken Authentication",
+            _HunterKind::SecurityMisconfiguration => "Security Misconfiguration",
         }
     }
 
     pub fn risk_weight(&self) -> f64 {
         match self {
-            HunterKind::SqlInjection | HunterKind::CommandInjection => 9.0,
-            HunterKind::Ssrf | HunterKind::InsecureDeserialization => 8.0,
-            HunterKind::Xss | HunterKind::BrokenAuth => 7.0,
-            HunterKind::PathTraversal | HunterKind::SensitiveDataExposure => 6.0,
-            HunterKind::Csrf | HunterKind::SecurityMisconfiguration => 5.0,
+            _HunterKind::SqlInjection | _HunterKind::CommandInjection => 9.0,
+            _HunterKind::Ssrf | _HunterKind::InsecureDeserialization => 8.0,
+            _HunterKind::Xss | _HunterKind::BrokenAuth => 7.0,
+            _HunterKind::PathTraversal | _HunterKind::SensitiveDataExposure => 6.0,
+            _HunterKind::Csrf | _HunterKind::SecurityMisconfiguration => 5.0,
         }
     }
 }
@@ -66,7 +66,7 @@ impl ScanStage {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SeverityLevel {
+pub enum _SeverityLevel {
     None,
     Low,
     Medium,
@@ -88,17 +88,17 @@ pub struct CvssScore {
     pub base_score: f64,
     pub exploitability: f64,
     pub impact: f64,
-    pub severity: SeverityLevel,
+    pub severity: _SeverityLevel,
     pub vector: String,
 }
 
 impl CvssScore {
-    pub fn from_base(base: f64) -> Self {
-        let severity = if base >= 9.0 { SeverityLevel::Critical }
-            else if base >= 7.0 { SeverityLevel::High }
-            else if base >= 4.0 { SeverityLevel::Medium }
-            else if base > 0.0 { SeverityLevel::Low }
-            else { SeverityLevel::None };
+    pub fn _from_base(base: f64) -> Self {
+        let severity = if base >= 9.0 { _SeverityLevel::Critical }
+            else if base >= 7.0 { _SeverityLevel::High }
+            else if base >= 4.0 { _SeverityLevel::Medium }
+            else if base > 0.0 { _SeverityLevel::Low }
+            else { _SeverityLevel::None };
         Self {
             base_score: base.max(0.0).min(10.0),
             exploitability: (base * 0.4).max(0.0).min(10.0),
@@ -112,7 +112,7 @@ impl CvssScore {
 #[derive(Debug, Clone)]
 pub struct VulnerabilityFinding {
     pub id: usize,
-    pub hunter: HunterKind,
+    pub hunter: _HunterKind,
     pub title: String,
     pub description: String,
     pub file_path: String,
@@ -126,8 +126,8 @@ pub struct VulnerabilityFinding {
 
 #[derive(Debug, Clone)]
 pub struct ScanConfig {
-    pub enabled_hunters: Vec<HunterKind>,
-    pub min_severity: SeverityLevel,
+    pub enabled_hunters: Vec<_HunterKind>,
+    pub min_severity: _SeverityLevel,
     pub sandbox_enabled: bool,
     pub max_findings: usize,
     pub timeout_seconds: u64,
@@ -138,10 +138,10 @@ impl Default for ScanConfig {
     fn default() -> Self {
         Self {
             enabled_hunters: vec![
-                HunterKind::Xss, HunterKind::SqlInjection, HunterKind::Csrf,
-                HunterKind::CommandInjection, HunterKind::Ssrf, HunterKind::PathTraversal,
+                _HunterKind::Xss, _HunterKind::SqlInjection, _HunterKind::Csrf,
+                _HunterKind::CommandInjection, _HunterKind::Ssrf, _HunterKind::PathTraversal,
             ],
-            min_severity: SeverityLevel::Low,
+            min_severity: _SeverityLevel::Low,
             sandbox_enabled: false,
             max_findings: 100,
             timeout_seconds: 300,
@@ -155,7 +155,7 @@ pub struct AgenticScanner {
     findings: Vec<VulnerabilityFinding>,
     current_stage: ScanStage,
     scan_start: Option<Instant>,
-    hunter_stats: HashMap<HunterKind, usize>,
+    hunter_stats: HashMap<_HunterKind, usize>,
     finding_counter: usize,
 }
 
@@ -175,7 +175,7 @@ impl AgenticScanner {
         }
     }
 
-    pub fn start_scan(&mut self) {
+    pub fn _start_scan(&mut self) {
         self.scan_start = Some(Instant::now());
         self.current_stage = ScanStage::Recon;
         self.finding_counter = 0;
@@ -194,8 +194,8 @@ impl AgenticScanner {
         };
     }
 
-    pub fn recon_scan(&self, target: &str) -> ReconReport {
-        ReconReport {
+    pub fn recon_scan(&self, target: &str) -> _ReconReport {
+        _ReconReport {
             target: target.to_string(),
             estimated_files: target.len() / 10,
             languages_detected: vec!["Rust".to_string(), "TypeScript".to_string()],
@@ -205,7 +205,7 @@ impl AgenticScanner {
         }
     }
 
-    pub fn hunt(&mut self, target: &str) -> Vec<VulnerabilityFinding> {
+    pub fn _hunt(&mut self, target: &str) -> Vec<VulnerabilityFinding> {
         let mut new_findings = Vec::new();
         for hunter in &self.config.enabled_hunters {
             let count = self.config.max_findings / self.config.enabled_hunters.len();
@@ -220,7 +220,7 @@ impl AgenticScanner {
                     file_path: format!("src/{}.rs", target),
                     line_number: 10 + i * 20,
                     code_snippet: "// suspicious code pattern".into(),
-                    cvss: CvssScore::from_base(base.max(0.0).min(10.0)),
+                    cvss: CvssScore::_from_base(base.max(0.0).min(10.0)),
                     status: FindingStatus::Candidate,
                     fix_suggestion: format!("Apply {} mitigation: input validation, output encoding", hunter.label()),
                     discovered_at: Instant::now(),
@@ -236,7 +236,7 @@ impl AgenticScanner {
 
     /// Backward-compatible static fallback: no live HTTP target is available, so
     /// confirmation uses the cvss threshold only. Production callers should prefer
-    /// [`Self::validate_with_target`], which confirms findings with real PoC evidence.
+    /// [`Self::_validate_with_target`], which confirms findings with real PoC evidence.
     pub fn validate(&mut self) -> Vec<usize> {
         let mut confirmed = Vec::new();
         for finding in self.findings.iter_mut() {
@@ -261,7 +261,7 @@ impl AgenticScanner {
     /// reproduce (`Evidence.reproducible == true`) to become `Confirmed`. Findings
     /// that fail the pre-filter, have no verifiable request mapping, or whose PoC
     /// does not reproduce are `Rejected`.
-    pub fn validate_with_target(&mut self, interceptor: &HttpInterceptor) -> Vec<usize> {
+    pub fn _validate_with_target(&mut self, interceptor: &HttpInterceptor) -> Vec<usize> {
         let mut confirmed = Vec::new();
         for finding in self.findings.iter_mut() {
             if finding.status != FindingStatus::Candidate {
@@ -292,11 +292,11 @@ impl AgenticScanner {
         self.findings.iter().filter(|f| f.status == FindingStatus::Verified).count()
     }
 
-    pub fn confirmed_findings(&self) -> Vec<&VulnerabilityFinding> {
+    pub fn _confirmed_findings(&self) -> Vec<&VulnerabilityFinding> {
         self.findings.iter().filter(|f| matches!(f.status, FindingStatus::Confirmed | FindingStatus::Verified)).collect()
     }
 
-    pub fn by_severity(&self) -> HashMap<SeverityLevel, usize> {
+    pub fn by_severity(&self) -> HashMap<_SeverityLevel, usize> {
         let mut counts = HashMap::new();
         for f in &self.findings {
             *counts.entry(f.cvss.severity).or_insert(0) += 1;
@@ -304,14 +304,14 @@ impl AgenticScanner {
         counts
     }
 
-    pub fn scan_summary(&self) -> ScanReport {
+    pub fn _scan_summary(&self) -> ScanReport {
         let duration = self.scan_start.map(|s| s.elapsed()).unwrap_or(Duration::ZERO);
         let by_hunter: HashMap<String, usize> = self.hunter_stats.iter()
             .map(|(k, v)| (k.label().to_string(), *v))
             .collect();
         ScanReport {
             total_findings: self.findings.len(),
-            confirmed: self.confirmed_findings().len(),
+            confirmed: self._confirmed_findings().len(),
             verified: self.verified_count(),
             severity_distribution: self.by_severity(),
             by_hunter,
@@ -331,43 +331,43 @@ impl AgenticScanner {
 /// Returns `None` for hunts with no HTTP probe surface (kept as Rejected).
 fn poc_step_for_finding(finding: &VulnerabilityFinding) -> Option<PoCStep> {
     let (url, expected_result) = match finding.hunter {
-        HunterKind::Xss => (
+        _HunterKind::Xss => (
             "/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E".to_string(),
             PoCExpectedResult::BodyContains("<script>alert(1)</script>".to_string()),
         ),
-        HunterKind::SqlInjection => (
+        _HunterKind::SqlInjection => (
             "/login?user=admin'%20OR%201=1--".to_string(),
             PoCExpectedResult::StatusCode(500),
         ),
-        HunterKind::Ssrf => (
+        _HunterKind::Ssrf => (
             "/proxy?url=http%3A%2F%2F169.254.169.254%2Flatest%2Fmeta-data%2F".to_string(),
             PoCExpectedResult::BodyContains("ami-id".to_string()),
         ),
-        HunterKind::PathTraversal => (
+        _HunterKind::PathTraversal => (
             "/download?file=../../etc/passwd".to_string(),
             PoCExpectedResult::BodyContains("root:".to_string()),
         ),
-        HunterKind::CommandInjection => (
+        _HunterKind::CommandInjection => (
             "/exec?cmd=%3Bid".to_string(),
             PoCExpectedResult::BodyContains("uid=".to_string()),
         ),
-        HunterKind::Csrf => (
+        _HunterKind::Csrf => (
             "/transfer".to_string(),
             PoCExpectedResult::StatusCode(200),
         ),
-        HunterKind::BrokenAuth => (
+        _HunterKind::BrokenAuth => (
             "/admin".to_string(),
             PoCExpectedResult::StatusCode(200),
         ),
-        HunterKind::InsecureDeserialization => (
+        _HunterKind::InsecureDeserialization => (
             "/api/deserialize".to_string(),
             PoCExpectedResult::StatusCode(500),
         ),
-        HunterKind::SensitiveDataExposure => (
+        _HunterKind::SensitiveDataExposure => (
             "/api/users".to_string(),
             PoCExpectedResult::BodyContains("password".to_string()),
         ),
-        HunterKind::SecurityMisconfiguration => (
+        _HunterKind::SecurityMisconfiguration => (
             "/health".to_string(),
             PoCExpectedResult::HeaderPresent("X-Powered-By".to_string()),
         ),
@@ -385,7 +385,7 @@ fn poc_step_for_finding(finding: &VulnerabilityFinding) -> Option<PoCStep> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ReconReport {
+pub struct _ReconReport {
     pub target: String,
     pub estimated_files: usize,
     pub languages_detected: Vec<String>,
@@ -399,7 +399,7 @@ pub struct ScanReport {
     pub total_findings: usize,
     pub confirmed: usize,
     pub verified: usize,
-    pub severity_distribution: HashMap<SeverityLevel, usize>,
+    pub severity_distribution: HashMap<_SeverityLevel, usize>,
     pub by_hunter: HashMap<String, usize>,
     pub duration: Duration,
     pub stages_completed: usize,
@@ -414,8 +414,8 @@ mod tests {
 
     fn scanner() -> AgenticScanner {
         AgenticScanner::new(ScanConfig {
-            enabled_hunters: vec![HunterKind::Xss, HunterKind::SqlInjection],
-            min_severity: SeverityLevel::Low,
+            enabled_hunters: vec![_HunterKind::Xss, _HunterKind::SqlInjection],
+            min_severity: _SeverityLevel::Low,
             sandbox_enabled: false,
             max_findings: 10,
             timeout_seconds: 60,
@@ -426,11 +426,11 @@ mod tests {
     #[test]
     fn test_scan_lifecycle() {
         let mut s = scanner();
-        s.start_scan();
+        s._start_scan();
         assert_eq!(s.current_stage(), ScanStage::Recon);
         let recon = s.recon_scan("test-app");
         assert!(!recon.languages_detected.is_empty());
-        let findings = s.hunt("test-app");
+        let findings = s._hunt("test-app");
         assert!(!findings.is_empty());
         let confirmed = s.validate();
         assert!(!confirmed.is_empty());
@@ -438,19 +438,19 @@ mod tests {
 
     #[test]
     fn test_cvss_scoring() {
-        let crit = CvssScore::from_base(9.5);
-        assert_eq!(crit.severity, SeverityLevel::Critical);
-        let none = CvssScore::from_base(0.0);
-        assert_eq!(none.severity, SeverityLevel::None);
-        let high = CvssScore::from_base(7.5);
-        assert_eq!(high.severity, SeverityLevel::High);
+        let crit = CvssScore::_from_base(9.5);
+        assert_eq!(crit.severity, _SeverityLevel::Critical);
+        let none = CvssScore::_from_base(0.0);
+        assert_eq!(none.severity, _SeverityLevel::None);
+        let high = CvssScore::_from_base(7.5);
+        assert_eq!(high.severity, _SeverityLevel::High);
     }
 
     #[test]
     fn test_finding_status_flow() {
         let mut s = scanner();
-        s.start_scan();
-        s.hunt("app");
+        s._start_scan();
+        s._hunt("app");
         assert!(s.findings.iter().all(|f| f.status == FindingStatus::Candidate));
         s.validate();
         assert!(s.findings.iter().any(|f| f.status == FindingStatus::Confirmed));
@@ -459,15 +459,15 @@ mod tests {
 
     #[test]
     fn test_hunter_risk_weights() {
-        assert!(HunterKind::SqlInjection.risk_weight() > HunterKind::Csrf.risk_weight());
-        assert_eq!(HunterKind::Xss.risk_weight(), 7.0);
+        assert!(_HunterKind::SqlInjection.risk_weight() > _HunterKind::Csrf.risk_weight());
+        assert_eq!(_HunterKind::Xss.risk_weight(), 7.0);
     }
 
     #[test]
     fn test_severity_distribution() {
         let mut s = scanner();
-        s.start_scan();
-        s.hunt("app");
+        s._start_scan();
+        s._hunt("app");
         let dist = s.by_severity();
         assert!(!dist.is_empty());
     }
@@ -475,10 +475,10 @@ mod tests {
     #[test]
     fn test_scan_report() {
         let mut s = scanner();
-        s.start_scan();
-        s.hunt("app");
+        s._start_scan();
+        s._hunt("app");
         s.validate();
-        let report = s.scan_summary();
+        let report = s._scan_summary();
         assert!(report.total_findings > 0);
         assert!(report.confirmed > 0);
         assert!(report.stages_completed >= 2);
@@ -486,8 +486,8 @@ mod tests {
 
     #[test]
     fn test_hunter_labels() {
-        assert_eq!(HunterKind::Xss.label(), "Cross-Site Scripting");
-        assert_eq!(HunterKind::Ssrf.label(), "Server-Side Request Forgery");
+        assert_eq!(_HunterKind::Xss.label(), "Cross-Site Scripting");
+        assert_eq!(_HunterKind::Ssrf.label(), "Server-Side Request Forgery");
     }
 
     #[test]
@@ -498,7 +498,7 @@ mod tests {
         assert!(recon.estimated_files > 0);
     }
 
-    fn finding(id: usize, hunter: HunterKind, base: f64) -> VulnerabilityFinding {
+    fn finding(id: usize, hunter: _HunterKind, base: f64) -> VulnerabilityFinding {
         VulnerabilityFinding {
             id,
             hunter,
@@ -507,7 +507,7 @@ mod tests {
             file_path: "src/test.rs".into(),
             line_number: 1,
             code_snippet: "// test".into(),
-            cvss: CvssScore::from_base(base),
+            cvss: CvssScore::_from_base(base),
             status: FindingStatus::Candidate,
             fix_suggestion: "fix".into(),
             discovered_at: Instant::now(),
@@ -555,11 +555,11 @@ mod tests {
     #[test]
     fn test_validate_with_target_confirms_on_poc_reproduction() {
         let mut s = scanner();
-        s.findings.push(finding(1, HunterKind::Xss, 9.0));
+        s.findings.push(finding(1, _HunterKind::Xss, 9.0));
         let upstream = spawn_upstream("<script>alert(1)</script>", 200, 2);
         let mut ic = interceptor(upstream);
         ic.start().expect("start interceptor");
-        let confirmed = s.validate_with_target(&ic);
+        let confirmed = s._validate_with_target(&ic);
         ic.stop();
         assert_eq!(confirmed, vec![1]);
         assert_eq!(s.findings[0].status, FindingStatus::Confirmed);
@@ -568,11 +568,11 @@ mod tests {
     #[test]
     fn test_validate_with_target_rejects_on_poc_mismatch() {
         let mut s = scanner();
-        s.findings.push(finding(2, HunterKind::Xss, 9.0));
+        s.findings.push(finding(2, _HunterKind::Xss, 9.0));
         let upstream = spawn_upstream("nothing malicious here", 200, 2);
         let mut ic = interceptor(upstream);
         ic.start().expect("start interceptor");
-        let confirmed = s.validate_with_target(&ic);
+        let confirmed = s._validate_with_target(&ic);
         ic.stop();
         assert!(confirmed.is_empty());
         assert_eq!(s.findings[0].status, FindingStatus::Rejected);
@@ -581,11 +581,11 @@ mod tests {
     #[test]
     fn test_validate_with_target_cvss_prefilter_rejects_low_severity() {
         let mut s = scanner();
-        s.findings.push(finding(3, HunterKind::Xss, 3.0));
+        s.findings.push(finding(3, _HunterKind::Xss, 3.0));
         let upstream = spawn_upstream("<script>alert(1)</script>", 200, 1);
         let mut ic = interceptor(upstream);
         ic.start().expect("start interceptor");
-        let confirmed = s.validate_with_target(&ic);
+        let confirmed = s._validate_with_target(&ic);
         ic.stop();
         assert!(confirmed.is_empty());
         assert_eq!(s.findings[0].status, FindingStatus::Rejected);

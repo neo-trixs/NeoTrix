@@ -13,18 +13,18 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 计算机视觉管线
-pub struct ComputerVisionPipeline {
-    processors: Vec<ImageProcessor>,
-    detectors: Vec<ObjectDetector>,
-    segmenters: Vec<ImageSegmenter>,
+pub struct _ComputerVisionPipeline {
+    processors: Vec<_ImageProcessor>,
+    detectors: Vec<_ObjectDetector>,
+    segmenters: Vec<_ImageSegmenter>,
     #[allow(dead_code)]
-    config: CVConfig,
-    stats: CVStats,
+    config: _CVConfig,
+    stats: _CVStats,
 }
 
 /// CV 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CVConfig {
+pub struct _CVConfig {
     pub model_backend: String,
     pub confidence_threshold: f64,
     pub nms_threshold: f64,
@@ -32,7 +32,7 @@ pub struct CVConfig {
     pub enable_gpu: bool,
 }
 
-impl Default for CVConfig {
+impl Default for _CVConfig {
     fn default() -> Self {
         Self {
             model_backend: "opencv".into(),
@@ -45,20 +45,20 @@ impl Default for CVConfig {
 }
 
 /// 图像处理器
-pub struct ImageProcessor {
+pub struct _ImageProcessor {
     processor_type: String,
     parameters: HashMap<String, f64>,
 }
 
 /// 目标检测器
-pub struct ObjectDetector {
+pub struct _ObjectDetector {
     detector_type: String,
     model_path: Option<String>,
     classes: Vec<String>,
 }
 
 /// 图像分割器
-pub struct ImageSegmenter {
+pub struct _ImageSegmenter {
     segmenter_type: String,
     num_segments: u32,
 }
@@ -102,7 +102,7 @@ pub struct BoundingBox {
 
 /// 分割结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SegmentationResult {
+pub struct _SegmentationResult {
     pub image_id: String,
     pub segments: Vec<Segment>,
     pub processing_time_ms: u64,
@@ -129,22 +129,22 @@ pub struct Feature {
 
 /// CV 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CVStats {
+pub struct _CVStats {
     pub images_processed: u64,
     pub objects_detected: u64,
     pub segments_created: u64,
     pub avg_processing_time: f64,
 }
 
-impl ComputerVisionPipeline {
+impl _ComputerVisionPipeline {
     /// 创建新的 CV 管线
-    pub fn new(config: CVConfig) -> Self {
+    pub fn new(config: _CVConfig) -> Self {
         Self {
             processors: Vec::new(),
             detectors: Vec::new(),
             segmenters: Vec::new(),
             config,
-            stats: CVStats {
+            stats: _CVStats {
                 images_processed: 0,
                 objects_detected: 0,
                 segments_created: 0,
@@ -154,22 +154,22 @@ impl ComputerVisionPipeline {
     }
 
     /// 添加处理器
-    pub fn add_processor(&mut self, processor: ImageProcessor) {
+    pub fn _add_processor(&mut self, processor: _ImageProcessor) {
         self.processors.push(processor);
     }
 
     /// 添加检测器
-    pub fn add_detector(&mut self, detector: ObjectDetector) {
+    pub fn _add_detector(&mut self, detector: _ObjectDetector) {
         self.detectors.push(detector);
     }
 
     /// 添加分割器
-    pub fn add_segmenter(&mut self, segmenter: ImageSegmenter) {
+    pub fn _add_segmenter(&mut self, segmenter: _ImageSegmenter) {
         self.segmenters.push(segmenter);
     }
 
     /// 检测目标
-    pub fn detect_objects(&mut self, image: &Image) -> DetectionResult {
+    pub fn _detect_objects(&mut self, image: &Image) -> DetectionResult {
         let start = std::time::Instant::now();
 
         // 模拟检测
@@ -199,7 +199,7 @@ impl ComputerVisionPipeline {
     }
 
     /// 分割图像
-    pub fn segment_image(&mut self, image: &Image) -> SegmentationResult {
+    pub fn _segment_image(&mut self, image: &Image) -> _SegmentationResult {
         let start = std::time::Instant::now();
 
         // 模拟分割
@@ -224,7 +224,7 @@ impl ComputerVisionPipeline {
         self.stats.images_processed += 1;
         self.stats.segments_created += segments.len() as u64;
 
-        SegmentationResult {
+        _SegmentationResult {
             image_id: image.id.clone(),
             segments,
             processing_time_ms: processing_time,
@@ -256,7 +256,7 @@ impl ComputerVisionPipeline {
     }
 
     /// 增强图像
-    pub fn enhance_image(&self, image: &Image, enhancement_type: &str) -> Image {
+    pub fn _enhance_image(&self, image: &Image, enhancement_type: &str) -> Image {
         // 模拟增强
         let mut enhanced = image.clone();
         enhanced.metadata.insert("enhancement".into(), serde_json::json!(enhancement_type));
@@ -265,7 +265,7 @@ impl ComputerVisionPipeline {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &CVStats {
+    pub fn stats(&self) -> &_CVStats {
         &self.stats
     }
 

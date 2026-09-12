@@ -14,29 +14,29 @@ pub struct ParsedDoc {
     pub title: String,
     pub text: String,
     pub links: Vec<String>,
-    pub blocks: Vec<DocBlock>,
+    pub blocks: Vec<_DocBlock>,
     /// 滑窗分块 (可选, D14)
     pub chunks: Vec<String>,
     /// 滑窗元数据
-    pub chunk_params: Option<ChunkParams>,
+    pub chunk_params: Option<_ChunkParams>,
 }
 
 /// 文档块 (保留阅读顺序)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocBlock {
+pub struct _DocBlock {
     pub kind: String, // "heading" | "para" | "list" | "code"
     pub text: String,
 }
 
 /// 滑窗参数。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChunkParams {
+pub struct _ChunkParams {
     pub window: usize,
     pub overlap: usize,
 }
 
 impl ParsedDoc {
-    pub fn new(format: &str, title: &str, text: &str, links: Vec<String>, blocks: Vec<DocBlock>) -> Self {
+    pub fn new(format: &str, title: &str, text: &str, links: Vec<String>, blocks: Vec<_DocBlock>) -> Self {
         Self {
             format: format.to_string(),
             title: title.to_string(),
@@ -87,11 +87,11 @@ fn parse_html(raw: &str) -> ParsedDoc {
         }
         (acc, t)
     });
-    let stripped = strip_junk(&in_tag.0);
+    let stripped = _strip_junk(&in_tag.0);
     let title = stripped.lines().next().unwrap_or("untitled").to_string();
     let text = stripped.clone();
     for line in stripped.lines().filter(|l| !l.trim().is_empty()) {
-        blocks.push(DocBlock { kind: "para".to_string(), text: line.to_string() });
+        blocks.push(_DocBlock { kind: "para".to_string(), text: line.to_string() });
     }
     ParsedDoc::new("html", &title, &text, links, blocks)
 }
@@ -108,7 +108,7 @@ fn parse_md(raw: &str) -> ParsedDoc {
         } else {
             "para"
         };
-        blocks.push(DocBlock { kind: kind.to_string(), text: line.to_string() });
+        blocks.push(_DocBlock { kind: kind.to_string(), text: line.to_string() });
     }
     let text = raw.to_string();
     let title = blocks.first().map(|b| b.text.clone()).unwrap_or_else(|| "untitled".to_string());
@@ -119,22 +119,22 @@ fn parse_json(raw: &str) -> ParsedDoc {
     let links = Vec::new();
     let text = raw.to_string();
     let title = "json".to_string();
-    let blocks = vec![DocBlock { kind: "json".to_string(), text: raw.to_string() }];
+    let blocks = vec![_DocBlock { kind: "json".to_string(), text: raw.to_string() }];
     ParsedDoc::new("json", &title, &text, links, blocks)
 }
 
 fn parse_text(raw: &str) -> ParsedDoc {
-    let blocks: Vec<DocBlock> = raw
+    let blocks: Vec<_DocBlock> = raw
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .map(|l| DocBlock { kind: "para".to_string(), text: l.to_string() })
+        .map(|l| _DocBlock { kind: "para".to_string(), text: l.to_string() })
         .collect();
     let title = blocks.first().map(|b| b.text.clone()).unwrap_or_else(|| "untitled".to_string());
     ParsedDoc::new("text", &title, raw, Vec::new(), blocks)
 }
 
 /// 剥离典型页眉页脚噪声行 (D14: 阅读顺序输出去页眉页脚)。
-pub fn strip_junk(text: &str) -> String {
+pub fn _strip_junk(text: &str) -> String {
     text.lines()
         .filter(|l| {
             let t = l.trim().to_lowercase();
@@ -175,7 +175,7 @@ pub fn sliding_window(text: &str, window_tokens: usize, overlap: usize) -> Vec<S
 /// 应用滑窗到 ParsedDoc, 填 chunks 与 chunk_params。
 pub fn apply_chunking(doc: &mut ParsedDoc, window_tokens: usize, overlap: usize) {
     doc.chunks = sliding_window(&doc.text, window_tokens, overlap);
-    doc.chunk_params = Some(ChunkParams { window: window_tokens, overlap });
+    doc.chunk_params = Some(_ChunkParams { window: window_tokens, overlap });
 }
 
 #[cfg(test)]
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn strip_junk_removes_header_footer() {
-        let cleaned = strip_junk("Real content\n© 2026 Foo Inc.\nCopyright Bar\nmore real");
+        let cleaned = _strip_junk("Real content\n© 2026 Foo Inc.\nCopyright Bar\nmore real");
         assert!(cleaned.contains("Real content"));
         assert!(cleaned.contains("more real"));
         assert!(!cleaned.to_lowercase().contains("copyright"));

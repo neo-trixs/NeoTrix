@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 
 /// 动态-音效同步模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AudioSyncPattern {
+pub struct _AudioSyncPattern {
     /// 模式ID
     pub id: String,
     /// 模式名称
@@ -23,9 +23,9 @@ pub struct AudioSyncPattern {
     /// 适用音效类型
     pub audio_type: AudioType,
     /// 同步时机
-    pub sync_timing: SyncTiming,
+    pub sync_timing: _SyncTiming,
     /// 技术参数
-    pub technical_params: TechnicalParams,
+    pub technical_params: _TechnicalParams,
     /// 使用场景
     pub usage_scenarios: Vec<String>,
 }
@@ -47,7 +47,7 @@ pub enum AudioType {
 
 /// 同步时机
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncTiming {
+pub struct _SyncTiming {
     /// 开始偏移 (毫秒)
     pub start_offset_ms: i32,
     /// 结束偏移 (毫秒)
@@ -60,7 +60,7 @@ pub struct SyncTiming {
 
 /// 技术参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TechnicalParams {
+pub struct _TechnicalParams {
     /// 淡入时长 (毫秒)
     pub fade_in_ms: u32,
     /// 淡出时长 (毫秒)
@@ -77,24 +77,24 @@ pub struct TechnicalParams {
 // 预设同步模式
 // ============================================================================
 
-impl AudioSyncPattern {
+impl _AudioSyncPattern {
     /// 获取所有预设同步模式
-    pub fn preset_patterns() -> Vec<AudioSyncPattern> {
+    pub fn _preset_patterns() -> Vec<_AudioSyncPattern> {
         vec![
             // 动作音效同步
-            AudioSyncPattern {
+            _AudioSyncPattern {
                 id: "action_hit".to_string(),
                 name: "击打同步".to_string(),
                 description: "动作击打与音效精确同步".to_string(),
                 dynamic_level: "Macro".to_string(),
                 audio_type: AudioType::Action,
-                sync_timing: SyncTiming {
+                sync_timing: _SyncTiming {
                     start_offset_ms: 0,
                     end_offset_ms: 500,
                     precise_sync: true,
                     precision_ms: 16,
                 },
-                technical_params: TechnicalParams {
+                technical_params: _TechnicalParams {
                     fade_in_ms: 0,
                     fade_out_ms: 100,
                     volume: 0.8,
@@ -104,19 +104,19 @@ impl AudioSyncPattern {
                 usage_scenarios: vec!["打斗".to_string(), "击打".to_string(), "碰撞".to_string()],
             },
             // 环境音同步
-            AudioSyncPattern {
+            _AudioSyncPattern {
                 id: "ambient_wind".to_string(),
                 name: "风声同步".to_string(),
                 description: "环境风声与画面元素同步".to_string(),
                 dynamic_level: "Micro".to_string(),
                 audio_type: AudioType::Ambient,
-                sync_timing: SyncTiming {
+                sync_timing: _SyncTiming {
                     start_offset_ms: -200,
                     end_offset_ms: 200,
                     precise_sync: false,
                     precision_ms: 100,
                 },
-                technical_params: TechnicalParams {
+                technical_params: _TechnicalParams {
                     fade_in_ms: 500,
                     fade_out_ms: 500,
                     volume: 0.3,
@@ -126,19 +126,19 @@ impl AudioSyncPattern {
                 usage_scenarios: vec!["户外".to_string(), "高处".to_string(), "空旷".to_string()],
             },
             // 配乐节奏同步
-            AudioSyncPattern {
+            _AudioSyncPattern {
                 id: "music_beat".to_string(),
                 name: "配乐节拍同步".to_string(),
                 description: "画面动作与配乐节拍同步".to_string(),
                 dynamic_level: "Medium".to_string(),
                 audio_type: AudioType::Music,
-                sync_timing: SyncTiming {
+                sync_timing: _SyncTiming {
                     start_offset_ms: 0,
                     end_offset_ms: 0,
                     precise_sync: true,
                     precision_ms: 32,
                 },
-                technical_params: TechnicalParams {
+                technical_params: _TechnicalParams {
                     fade_in_ms: 200,
                     fade_out_ms: 200,
                     volume: 0.6,
@@ -148,19 +148,19 @@ impl AudioSyncPattern {
                 usage_scenarios: vec!["卡点".to_string(), "节奏感".to_string(), "舞蹈".to_string()],
             },
             // 对白口型同步
-            AudioSyncPattern {
+            _AudioSyncPattern {
                 id: "dialogue_lip_sync".to_string(),
                 name: "对白口型同步".to_string(),
                 description: "角色对白与口型动画同步".to_string(),
                 dynamic_level: "Medium".to_string(),
                 audio_type: AudioType::Dialogue,
-                sync_timing: SyncTiming {
+                sync_timing: _SyncTiming {
                     start_offset_ms: 0,
                     end_offset_ms: 0,
                     precise_sync: true,
                     precision_ms: 16,
                 },
-                technical_params: TechnicalParams {
+                technical_params: _TechnicalParams {
                     fade_in_ms: 0,
                     fade_out_ms: 0,
                     volume: 1.0,
@@ -170,19 +170,19 @@ impl AudioSyncPattern {
                 usage_scenarios: vec!["对话".to_string(), "独白".to_string(), "旁白".to_string()],
             },
             // 转场音效同步
-            AudioSyncPattern {
+            _AudioSyncPattern {
                 id: "transition_swoosh".to_string(),
                 name: "转场音效同步".to_string(),
                 description: "转场效果与音效同步".to_string(),
                 dynamic_level: "Medium".to_string(),
                 audio_type: AudioType::Special,
-                sync_timing: SyncTiming {
+                sync_timing: _SyncTiming {
                     start_offset_ms: -100,
                     end_offset_ms: 100,
                     precise_sync: true,
                     precision_ms: 32,
                 },
-                technical_params: TechnicalParams {
+                technical_params: _TechnicalParams {
                     fade_in_ms: 50,
                     fade_out_ms: 100,
                     volume: 0.7,
@@ -195,24 +195,24 @@ impl AudioSyncPattern {
     }
     
     /// 根据动态等级查找同步模式
-    pub fn find_by_dynamic_level(level: &str) -> Vec<AudioSyncPattern> {
-        Self::preset_patterns()
+    pub fn _find_by_dynamic_level(level: &str) -> Vec<_AudioSyncPattern> {
+        Self::_preset_patterns()
             .into_iter()
             .filter(|p| p.dynamic_level == level)
             .collect()
     }
     
     /// 根据音效类型查找同步模式
-    pub fn find_by_audio_type(audio_type: AudioType) -> Vec<AudioSyncPattern> {
-        Self::preset_patterns()
+    pub fn _find_by_audio_type(audio_type: AudioType) -> Vec<_AudioSyncPattern> {
+        Self::_preset_patterns()
             .into_iter()
             .filter(|p| p.audio_type == audio_type)
             .collect()
     }
     
     /// 根据使用场景查找同步模式
-    pub fn find_by_scenario(scenario: &str) -> Vec<AudioSyncPattern> {
-        Self::preset_patterns()
+    pub fn _find_by_scenario(scenario: &str) -> Vec<_AudioSyncPattern> {
+        Self::_preset_patterns()
             .into_iter()
             .filter(|p| p.usage_scenarios.iter().any(|s| s.contains(scenario)))
             .collect()
@@ -225,7 +225,7 @@ impl AudioSyncPattern {
 
 /// 同步检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncCheckResult {
+pub struct _SyncCheckResult {
     /// 是否同步
     pub is_synced: bool,
     /// 同步误差 (毫秒)
@@ -235,17 +235,17 @@ pub struct SyncCheckResult {
 }
 
 /// 同步检查器
-pub struct SyncChecker;
+pub struct _SyncChecker;
 
-impl SyncChecker {
+impl _SyncChecker {
     /// 检查动态和音效是否同步
-    pub fn check_sync(
+    pub fn _check_sync(
         dynamic_start_ms: u32,
         dynamic_end_ms: u32,
         audio_start_ms: u32,
         audio_end_ms: u32,
-        pattern: &AudioSyncPattern,
-    ) -> SyncCheckResult {
+        pattern: &_AudioSyncPattern,
+    ) -> _SyncCheckResult {
         let start_diff = dynamic_start_ms as i32 - audio_start_ms as i32 + pattern.sync_timing.start_offset_ms;
         let end_diff = dynamic_end_ms as i32 - audio_end_ms as i32 + pattern.sync_timing.end_offset_ms;
         
@@ -265,7 +265,7 @@ impl SyncChecker {
             format!("音效需要延后 {}ms", start_diff.abs())
         };
         
-        SyncCheckResult {
+        _SyncCheckResult {
             is_synced,
             sync_error_ms: avg_error,
             suggestion,
@@ -283,7 +283,7 @@ mod tests {
     
     #[test]
     fn test_preset_patterns() {
-        let patterns = AudioSyncPattern::preset_patterns();
+        let patterns = _AudioSyncPattern::_preset_patterns();
         assert!(patterns.len() > 0);
         
         let hit_pattern = patterns.iter().find(|p| p.id == "action_hit");
@@ -292,31 +292,31 @@ mod tests {
     
     #[test]
     fn test_find_by_dynamic_level() {
-        let patterns = AudioSyncPattern::find_by_dynamic_level("Macro");
+        let patterns = _AudioSyncPattern::_find_by_dynamic_level("Macro");
         assert!(patterns.iter().all(|p| p.dynamic_level == "Macro"));
     }
     
     #[test]
     fn test_find_by_audio_type() {
-        let patterns = AudioSyncPattern::find_by_audio_type(AudioType::Ambient);
+        let patterns = _AudioSyncPattern::_find_by_audio_type(AudioType::Ambient);
         assert!(patterns.iter().all(|p| p.audio_type == AudioType::Ambient));
     }
     
     #[test]
     fn test_sync_checker() {
-        let pattern = AudioSyncPattern {
+        let pattern = _AudioSyncPattern {
             id: "test".to_string(),
             name: "测试".to_string(),
             description: "测试".to_string(),
             dynamic_level: "Macro".to_string(),
             audio_type: AudioType::Action,
-            sync_timing: SyncTiming {
+            sync_timing: _SyncTiming {
                 start_offset_ms: 0,
                 end_offset_ms: 0,
                 precise_sync: true,
                 precision_ms: 16,
             },
-            technical_params: TechnicalParams {
+            technical_params: _TechnicalParams {
                 fade_in_ms: 0,
                 fade_out_ms: 0,
                 volume: 1.0,
@@ -327,11 +327,11 @@ mod tests {
         };
         
         // 同步
-        let result = SyncChecker::check_sync(100, 200, 100, 200, &pattern);
+        let result = _SyncChecker::_check_sync(100, 200, 100, 200, &pattern);
         assert!(result.is_synced);
         
         // 不同步
-        let result = SyncChecker::check_sync(100, 200, 150, 250, &pattern);
+        let result = _SyncChecker::_check_sync(100, 200, 150, 250, &pattern);
         assert!(!result.is_synced);
     }
 }

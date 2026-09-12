@@ -1,6 +1,6 @@
 use super::types::*;
 
-pub fn suggest_quality(bandwidth_kbps: u64) -> Quality {
+pub fn _suggest_quality(bandwidth_kbps: u64) -> Quality {
     if bandwidth_kbps > 1000 {
         Quality::Flac
     } else if bandwidth_kbps > 320 {
@@ -10,7 +10,7 @@ pub fn suggest_quality(bandwidth_kbps: u64) -> Quality {
     }
 }
 
-pub fn suggest_quality_detailed(bandwidth_kbps: u64) -> (Quality, &'static str) {
+pub fn _suggest_quality_detailed(bandwidth_kbps: u64) -> (Quality, &'static str) {
     if bandwidth_kbps > 4000 {
         (Quality::Master, "master - full lossless")
     } else if bandwidth_kbps > 2000 {
@@ -26,8 +26,8 @@ pub fn suggest_quality_detailed(bandwidth_kbps: u64) -> (Quality, &'static str) 
     }
 }
 
-pub fn select_best_quality(item: &MediaItem, bandwidth_kbps: u64) -> Quality {
-    let suggested = suggest_quality(bandwidth_kbps);
+pub fn _select_best_quality(item: &MediaItem, bandwidth_kbps: u64) -> Quality {
+    let suggested = _suggest_quality(bandwidth_kbps);
     item.qualities
         .iter()
         .find(|q| **q == suggested)
@@ -36,7 +36,7 @@ pub fn select_best_quality(item: &MediaItem, bandwidth_kbps: u64) -> Quality {
         .unwrap_or(Quality::Standard)
 }
 
-pub fn estimate_download_size(quality: Quality, duration_secs: u64) -> u64 {
+pub fn _estimate_download_size(quality: Quality, duration_secs: u64) -> u64 {
     let bitrate_kbps = quality.bitrate() as u64;
     bitrate_kbps * duration_secs / 8
 }

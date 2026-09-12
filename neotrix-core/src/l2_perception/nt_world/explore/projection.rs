@@ -99,7 +99,7 @@ pub struct ProjectionSet {
 }
 
 impl ProjectionSet {
-    pub fn default_set() -> Self {
+    pub fn _default_set() -> Self {
         Self {
             projections: vec![
                 Box::new(WebMercator),
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_projections_set() {
-        let set = ProjectionSet::default_set();
+        let set = ProjectionSet::_default_set();
         assert_eq!(set.all().len(), 3);
         assert!(set.by_name("WebMercator").is_some());
         assert!(set.by_name("Orthographic").is_some());

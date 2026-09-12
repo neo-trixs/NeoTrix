@@ -1,16 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-/// RGMScale — Renormalization Group coarse-graining operator.
+/// _RGMScale — Renormalization Group coarse-graining operator.
 ///
 /// Applies block-averaging at multiple scales to create multi-resolution
 /// representations of a state vector. Inspired by Friston's Renormalization
 /// Group approach to hierarchical state abstraction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RGMScale {
+pub struct _RGMScale {
     pub max_scale: usize,
 }
 
-impl RGMScale {
+impl _RGMScale {
     pub fn new(max_scale: usize) -> Self {
         Self { max_scale: max_scale.max(1) }
     }
@@ -38,12 +38,12 @@ impl RGMScale {
     }
 
     /// Apply RGM at all scales from 0 to max_scale.
-    pub fn apply_all(&self, state: &[f64]) -> Vec<Vec<f64>> {
+    pub fn _apply_all(&self, state: &[f64]) -> Vec<Vec<f64>> {
         (0..=self.max_scale).map(|k| self.apply(state, k)).collect()
     }
 
-    /// Nearest-neighbor upsample from coarse back to original dimension.
-    pub fn upsample(&self, coarse: &[f64], scale: usize, original_dim: usize) -> Vec<f64> {
+    /// Nearest-neighbor _upsample from coarse back to original dimension.
+    pub fn _upsample(&self, coarse: &[f64], scale: usize, original_dim: usize) -> Vec<f64> {
         if coarse.is_empty() || original_dim == 0 {
             return Vec::new();
         }
@@ -165,31 +165,31 @@ impl CausalJEPA {
     }
 }
 
-/// RGMJEPAFusion — Multi-scale prediction combining RGM coarse-graining with CausalJEPA.
+/// _RGMJEPAFusion — Multi-scale prediction combining RGM coarse-graining with CausalJEPA.
 ///
 /// Pipeline per scale:
-///   state → RGM coarse-grain → upsample to original dim → CausalJEPA → prediction
+///   state → RGM coarse-grain → _upsample to original dim → CausalJEPA → prediction
 /// Then consensus across scales with finer scales weighted higher.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RGMJEPAFusion {
-    pub rgm: RGMScale,
+pub struct _RGMJEPAFusion {
+    pub rgm: _RGMScale,
     pub jepa: CausalJEPA,
 }
 
-impl RGMJEPAFusion {
+impl _RGMJEPAFusion {
     pub fn new(max_scale: usize, latent_dim: usize, hidden_dim: usize) -> Self {
-        Self { rgm: RGMScale::new(max_scale), jepa: CausalJEPA::new(latent_dim, hidden_dim) }
+        Self { rgm: _RGMScale::new(max_scale), jepa: CausalJEPA::new(latent_dim, hidden_dim) }
     }
 
     /// Predict at n different coarse-graining levels.
     /// Returns Vec of (scale, prediction) pairs, each prediction in the original dimension.
-    pub fn multi_scale_predict(&self, state: &[f64], n_scales: usize) -> Vec<(usize, Vec<f64>)> {
+    pub fn _multi_scale_predict(&self, state: &[f64], n_scales: usize) -> Vec<(usize, Vec<f64>)> {
         let max_k = self.rgm.max_scale.min(n_scales.saturating_sub(1));
         let original_dim = state.len();
         (0..=max_k)
             .map(|k| {
                 let coarse = self.rgm.apply(state, k);
-                let upsampled = self.rgm.upsample(&coarse, k, original_dim);
+                let upsampled = self.rgm._upsample(&coarse, k, original_dim);
                 let pred = self.jepa.predict(&upsampled);
                 (k, pred)
             })
@@ -198,7 +198,7 @@ impl RGMJEPAFusion {
 
     /// Weighted average across scales. Finer scales (lower k) get higher weight.
     /// weights: w_k = 1 / (k + 1)
-    pub fn multi_scale_consensus(&self, predictions: &[(usize, Vec<f64>)]) -> Vec<f64> {
+    pub fn _multi_scale_consensus(&self, predictions: &[(usize, Vec<f64>)]) -> Vec<f64> {
         if predictions.is_empty() {
             return Vec::new();
         }
@@ -225,9 +225,9 @@ impl RGMJEPAFusion {
 
     /// Auto-select best scale based on prediction variance (lowest variance = most confident).
     /// Returns (selected_scale, prediction_at_that_scale).
-    pub fn predict_with_scale_selection(&self, state: &[f64]) -> (usize, Vec<f64>) {
+    pub fn _predict_with_scale_selection(&self, state: &[f64]) -> (usize, Vec<f64>) {
         let max_scales = self.rgm.max_scale + 1;
-        let predictions = self.multi_scale_predict(state, max_scales);
+        let predictions = self._multi_scale_predict(state, max_scales);
 
         let mut best_k = 0;
         let mut best_var = f64::MAX;
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_rgm_scale_identity() {
-        let rgm = RGMScale::new(3);
+        let rgm = _RGMScale::new(3);
         let state = sample_state();
         let out = rgm.apply(&state, 0);
         assert_eq!(out, state);
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_rgm_scale_block_average() {
-        let rgm = RGMScale::new(3);
+        let rgm = _RGMScale::new(3);
         let state = vec![2.0, 4.0, 6.0, 8.0]; // 4 elements
         let out = rgm.apply(&state, 1); // block_size=2 → 2 elements
         assert_eq!(out.len(), 2);
@@ -280,9 +280,9 @@ mod tests {
 
     #[test]
     fn test_rgm_upsample() {
-        let rgm = RGMScale::new(2);
+        let rgm = _RGMScale::new(2);
         let coarse = vec![3.0, 7.0];
-        let up = rgm.upsample(&coarse, 1, 4);
+        let up = rgm._upsample(&coarse, 1, 4);
         assert_eq!(up.len(), 4);
         assert!((up[0] - 3.0).abs() < 1e-10);
         assert!((up[1] - 3.0).abs() < 1e-10);
@@ -303,9 +303,9 @@ mod tests {
 
     #[test]
     fn test_multi_scale_prediction() {
-        let fusion = RGMJEPAFusion::new(3, 12, 16);
+        let fusion = _RGMJEPAFusion::new(3, 12, 16);
         let state = sample_state();
-        let predictions = fusion.multi_scale_predict(&state, 3);
+        let predictions = fusion._multi_scale_predict(&state, 3);
         assert_eq!(predictions.len(), 3); // scales 0,1,2
         for (k, pred) in &predictions {
             assert_eq!(pred.len(), state.len(), "scale {} prediction dim", k);
@@ -314,10 +314,10 @@ mod tests {
 
     #[test]
     fn test_multi_scale_consensus() {
-        let fusion = RGMJEPAFusion::new(2, 8, 16);
+        let fusion = _RGMJEPAFusion::new(2, 8, 16);
         let state = sample_state()[..8].to_vec();
-        let predictions = fusion.multi_scale_predict(&state, 3);
-        let consensus = fusion.multi_scale_consensus(&predictions);
+        let predictions = fusion._multi_scale_predict(&state, 3);
+        let consensus = fusion._multi_scale_consensus(&predictions);
         assert_eq!(consensus.len(), state.len());
         for &v in &consensus {
             assert!(v.is_finite());
@@ -326,19 +326,19 @@ mod tests {
 
     #[test]
     fn test_scale_selection() {
-        let fusion = RGMJEPAFusion::new(2, 12, 16);
+        let fusion = _RGMJEPAFusion::new(2, 12, 16);
         let state = sample_state();
-        let (selected_k, pred) = fusion.predict_with_scale_selection(&state);
+        let (selected_k, pred) = fusion._predict_with_scale_selection(&state);
         assert!(selected_k <= 2);
         assert_eq!(pred.len(), state.len());
     }
 
     #[test]
     fn test_scale_invariance_check() {
-        let fusion = RGMJEPAFusion::new(2, 8, 16);
+        let fusion = _RGMJEPAFusion::new(2, 8, 16);
         let state = sample_state()[..8].to_vec();
-        let p0 = fusion.multi_scale_predict(&state, 3);
-        let p1 = fusion.multi_scale_predict(&state, 3);
+        let p0 = fusion._multi_scale_predict(&state, 3);
+        let p1 = fusion._multi_scale_predict(&state, 3);
         // Same state → same predictions (deterministic)
         for ((k0, pred0), (k1, pred1)) in p0.iter().zip(p1.iter()) {
             assert_eq!(k0, k1);
@@ -350,19 +350,19 @@ mod tests {
 
     #[test]
     fn test_single_scale_fallback() {
-        let fusion = RGMJEPAFusion::new(3, 12, 16);
+        let fusion = _RGMJEPAFusion::new(3, 12, 16);
         let state = sample_state();
-        let predictions = fusion.multi_scale_predict(&state, 1);
+        let predictions = fusion._multi_scale_predict(&state, 1);
         assert_eq!(predictions.len(), 1);
         assert_eq!(predictions[0].0, 0);
     }
 
     #[test]
     fn test_scale_count_limits() {
-        let fusion = RGMJEPAFusion::new(2, 12, 16);
+        let fusion = _RGMJEPAFusion::new(2, 12, 16);
         let state = sample_state();
         // Request more scales than max_scale
-        let predictions = fusion.multi_scale_predict(&state, 10);
+        let predictions = fusion._multi_scale_predict(&state, 10);
         assert!(predictions.len() <= 3); // max_scale=2 → 0,1,2 = 3 scales
     }
 }

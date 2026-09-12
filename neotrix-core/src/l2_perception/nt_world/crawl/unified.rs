@@ -29,7 +29,7 @@ pub struct UnifiedCrawler {
     total_absorbed: u64,
     total_links_discovered: u64,
     start_time: Instant,
-    heal_history: Vec<HealAction>,
+    _heal_history: Vec<HealAction>,
     errors_since_last_heal: Vec<FetchError>,
     domain_blocklist: HashMap<String, u32>,
     pub cube: KnowledgeHyperCube,
@@ -104,7 +104,7 @@ impl UnifiedCrawler {
             total_absorbed: 0,
             total_links_discovered: 0,
             start_time: Instant::now(),
-            heal_history: Vec::new(),
+            _heal_history: Vec::new(),
             errors_since_last_heal: Vec::new(),
             domain_blocklist: HashMap::new(),
             cube: KnowledgeHyperCube::new(),
@@ -127,12 +127,12 @@ impl UnifiedCrawler {
     }
 
     /// 挂接两阶段抓取器 — 链接发现后先 BM25 过滤 (nt_world_prefetch 接线)。
-    pub fn attach_prefetch(&mut self, crawler: crate::l2_perception::nt_world::nt_world_prefetch::TwoPhaseCrawler) {
+    pub fn _attach_prefetch(&mut self, crawler: crate::l2_perception::nt_world::nt_world_prefetch::TwoPhaseCrawler) {
         self.prefetch = Some(crawler);
     }
 
     /// 切换抓取传输协议 (吸收 robin: Tor 传输用于暗网/匿名检索)。
-    pub fn set_transport(&mut self, protocol: FetcherProtocol) {
+    pub fn _set_transport(&mut self, protocol: FetcherProtocol) {
         self.transport = protocol;
     }
 
@@ -142,7 +142,7 @@ impl UnifiedCrawler {
     }
 
     /// prefetch 过滤后丢弃的链接数 (telemetry) — 从 filter_relevant 输入输出差计算。
-    pub fn prefetch_filtered_count(&self) -> usize {
+    pub fn _prefetch_filtered_count(&self) -> usize {
         0
     }
 
@@ -363,7 +363,7 @@ impl UnifiedCrawler {
     }
 
     fn minor_error_backoff(&mut self) -> bool {
-        let backoff_count = self.heal_history.iter()
+        let backoff_count = self._heal_history.iter()
             .rev()
             .take(10)
             .filter(|h| h.action.contains("minor errors"))
@@ -397,11 +397,11 @@ impl UnifiedCrawler {
                 action: "continue current strategy".into(),
                 applied: false,
             };
-            self.heal_history.push(action);
+            self._heal_history.push(action);
             let gap_reports = self.analyze_gaps();
             let sparse_dims = gap_reports.iter().filter(|r| r.sparsity_score > 0.7).count();
             if sparse_dims > 2 {
-                if let Some(last) = self.heal_history.last_mut() {
+                if let Some(last) = self._heal_history.last_mut() {
                     let seed_msg = format!("gap analysis: {} sparse dimensions → auto-generated seeds queued", sparse_dims);
                     last.action.push_str(&format!("; {}", seed_msg));
                 }
@@ -449,7 +449,7 @@ impl UnifiedCrawler {
             }
         };
 
-        self.heal_history.push(HealAction {
+        self._heal_history.push(HealAction {
             cycle: self.cycle_count,
             analysis,
             action,
@@ -459,7 +459,7 @@ impl UnifiedCrawler {
         let gap_reports = self.analyze_gaps();
         let sparse_dims = gap_reports.iter().filter(|r| r.sparsity_score > 0.7).count();
         if sparse_dims > 2 {
-            if let Some(last) = self.heal_history.last_mut() {
+            if let Some(last) = self._heal_history.last_mut() {
                 let seed_msg = format!("gap analysis: {} sparse dimensions → auto-generated seeds queued", sparse_dims);
                 last.action.push_str(&format!("; {}", seed_msg));
             }
@@ -490,15 +490,15 @@ impl UnifiedCrawler {
             frontier_size: self.frontier.len(),
             error_rate: fetcher_summary.error_rate,
             elapsed_secs: elapsed,
-            heal_actions: self.heal_history.len(),
+            heal_actions: self._heal_history.len(),
         }
     }
 
-    pub fn print_status(&self) {
+    pub fn _print_status(&self) {
         let s = self.summary();
-        let heal_count = self.heal_history.len();
+        let heal_count = self._heal_history.len();
         let last_heal = if heal_count > 0 {
-            let h = &self.heal_history[heal_count - 1];
+            let h = &self._heal_history[heal_count - 1];
             format!(" | last heal: {}", h.action)
         } else {
             String::new()
@@ -511,12 +511,12 @@ impl UnifiedCrawler {
         );
     }
 
-    pub fn frontier_stats(&self) -> String {
+    pub fn _frontier_stats(&self) -> String {
         format!("{}", self.frontier.stats())
     }
 
-    pub fn heal_history(&self) -> &[HealAction] {
-        &self.heal_history
+    pub fn _heal_history(&self) -> &[HealAction] {
+        &self._heal_history
     }
 
     pub fn add_seeds(&mut self, seeds: Vec<SeedEntry>) {
@@ -533,7 +533,7 @@ impl UnifiedCrawler {
         self.frontier.push_seeds(entries);
     }
 
-    pub fn active_protocol(&self) -> FetcherProtocol {
+    pub fn _active_protocol(&self) -> FetcherProtocol {
         FetcherProtocol::Http
     }
 }
@@ -625,8 +625,8 @@ mod tests {
         let mut nt_world_crawl = test_nt_world_crawl();
         nt_world_crawl.cycle_count = 5;
         nt_world_crawl.run_self_healing();
-        assert_eq!(nt_world_crawl.heal_history.len(), 1);
-        assert!(nt_world_crawl.heal_history[0].analysis.contains("0 errors"));
+        assert_eq!(nt_world_crawl._heal_history.len(), 1);
+        assert!(nt_world_crawl._heal_history[0].analysis.contains("0 errors"));
     }
 
     #[test]
@@ -666,8 +666,8 @@ mod tests {
             retries: 0,
         });
         nt_world_crawl.run_self_healing();
-        assert!(nt_world_crawl.heal_history.len() >= 1);
-        assert!(nt_world_crawl.heal_history[0].action.contains("downgraded") || nt_world_crawl.heal_history[0].action.contains("blocked"));
+        assert!(nt_world_crawl._heal_history.len() >= 1);
+        assert!(nt_world_crawl._heal_history[0].action.contains("downgraded") || nt_world_crawl._heal_history[0].action.contains("blocked"));
     }
 
     #[test]
@@ -679,7 +679,7 @@ mod tests {
     #[test]
     fn test_print_status_does_not_panic() {
         let nt_world_crawl = test_nt_world_crawl();
-        nt_world_crawl.print_status();
+        nt_world_crawl._print_status();
     }
 
     #[test]
@@ -756,7 +756,7 @@ mod tests {
             100,
             None,
         );
-        crawler.attach_prefetch(pf);
+        crawler._attach_prefetch(pf);
         assert!(crawler.prefetch.is_some());
     }
 
@@ -782,7 +782,7 @@ mod tests {
         // 吸收 robin: 默认 Http, 可切换 Tor 传输 (暗网/匿名检索)
         let mut crawler = test_nt_world_crawl();
         assert_eq!(crawler.transport(), FetcherProtocol::Http);
-        crawler.set_transport(FetcherProtocol::Tor);
+        crawler._set_transport(FetcherProtocol::Tor);
         assert_eq!(crawler.transport(), FetcherProtocol::Tor);
     }
 }

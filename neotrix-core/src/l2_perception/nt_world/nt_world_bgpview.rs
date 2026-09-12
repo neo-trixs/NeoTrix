@@ -26,21 +26,21 @@ fn percent_encode(s: &str) -> String {
 // ── BGPview 数据模型 ───────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct BgpviewSearchResponse {
+pub struct _BgpviewSearchResponse {
     #[serde(default)]
     pub status: String,
     #[serde(default)]
-    pub data: BgpviewSearchData,
+    pub data: _BgpviewSearchData,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct BgpviewSearchData {
+pub struct _BgpviewSearchData {
     #[serde(default)]
-    pub results: Vec<BgpviewResult>,
+    pub results: Vec<_BgpviewResult>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct BgpviewResult {
+pub struct _BgpviewResult {
     #[serde(default)]
     pub r#type: String,
     #[serde(default)]
@@ -55,7 +55,7 @@ pub struct BgpviewResult {
     pub country_code: String,
 }
 
-fn result_to_search(r: &BgpviewResult) -> crate::l2_perception::nt_world::nt_world_search::SearchResult {
+fn result_to_search(r: &_BgpviewResult) -> crate::l2_perception::nt_world::nt_world_search::SearchResult {
     let title = if !r.name.is_empty() {
         format!("[{}] {}", r.r#type, r.name)
     } else {
@@ -103,7 +103,7 @@ impl BgpviewFetcher {
         format!("https://api.bgpview.io/search?query={}", percent_encode(query))
     }
 
-    pub fn fetch(&self, query: &str) -> Result<Vec<BgpviewResult>, String> {
+    pub fn fetch(&self, query: &str) -> Result<Vec<_BgpviewResult>, String> {
         let resp = self.client().get(self.build_url(query)).send()
             .map_err(|e| format!("bgpview request failed: {}", e))?;
         if !resp.status().is_success() {
@@ -113,8 +113,8 @@ impl BgpviewFetcher {
         Self::parse_json(&text)
     }
 
-    pub fn parse_json(json: &str) -> Result<Vec<BgpviewResult>, String> {
-        let resp: BgpviewSearchResponse = serde_json::from_str(json)
+    pub fn parse_json(json: &str) -> Result<Vec<_BgpviewResult>, String> {
+        let resp: _BgpviewSearchResponse = serde_json::from_str(json)
             .map_err(|e| format!("bgpview parse failed: {}", e))?;
         Ok(resp.data.results)
     }
@@ -123,9 +123,9 @@ impl BgpviewFetcher {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
-    ) -> Result<BgpviewIngestReport, String> {
+    ) -> Result<_BgpviewIngestReport, String> {
         let results = Self::parse_json(json)?;
-        let mut report = BgpviewIngestReport { results_fetched: results.len(), ..Default::default() };
+        let mut report = _BgpviewIngestReport { results_fetched: results.len(), ..Default::default() };
         for r in &results {
             let key = if r.asn != 0 { format!("AS{}", r.asn) } else { r.ip.clone() };
             if key.trim().is_empty() { report.errors.push("skip empty key".into()); continue; }
@@ -140,7 +140,7 @@ impl BgpviewFetcher {
         Ok(report)
     }
 
-    pub fn to_search_results(results: &[BgpviewResult]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(results: &[_BgpviewResult]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         results.iter().map(result_to_search).collect()
     }
 }
@@ -156,7 +156,7 @@ pub fn bgpview_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_san
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct BgpviewIngestReport {
+pub struct _BgpviewIngestReport {
     pub results_fetched: usize,
     pub nodes_created: usize,
     pub nodes_reused: usize,
@@ -181,7 +181,7 @@ impl crate::l2_perception::nt_world::nt_world_search::SearchBackend for BgpviewB
     fn name(&self) -> &str { "bgpview" }
     fn search(&self, query: &str, count: usize) -> Result<Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult>, String> {
         let results = self.fetcher.fetch(query)?;
-        let limited: Vec<BgpviewResult> = results.into_iter().take(count).collect();
+        let limited: Vec<_BgpviewResult> = results.into_iter().take(count).collect();
         Ok(BgpviewFetcher::to_search_results(&limited))
     }
 }

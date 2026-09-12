@@ -4,12 +4,12 @@ use std::sync::Arc;
 use crate::core::nt_core_capability::*;
 
 /// NLP能力实现
-pub struct NlpCapability {
+pub struct _NlpCapability {
     meta: CapabilityMeta,
     health: CapabilityHealth,
 }
 
-impl NlpCapability {
+impl _NlpCapability {
     pub fn new() -> Self {
         Self {
             meta: CapabilityMeta {
@@ -36,7 +36,7 @@ impl NlpCapability {
     }
 }
 
-impl UnifiedCapability for NlpCapability {
+impl UnifiedCapability for _NlpCapability {
     fn meta(&self) -> CapabilityMeta {
         self.meta.clone()
     }
@@ -69,5 +69,5 @@ impl UnifiedCapability for NlpCapability {
 }
 
 pub fn create_nlp_capability() -> Arc<dyn UnifiedCapability> {
-    Arc::new(NlpCapability::new())
+    Arc::new(_NlpCapability::new())
 }

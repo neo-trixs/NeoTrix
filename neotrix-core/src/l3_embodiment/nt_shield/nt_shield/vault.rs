@@ -102,7 +102,7 @@ impl Vault {
     }
 
     /// Check if there are unsaved changes
-    pub fn is_dirty(&self) -> bool {
+    pub fn _is_dirty(&self) -> bool {
         self.dirty
     }
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum BrowserVulnType {
+pub enum _BrowserVulnType {
     XssReflected,
     XssStored,
     XssDomBased,
@@ -14,25 +14,25 @@ pub enum BrowserVulnType {
     AuthBypass,
 }
 
-impl BrowserVulnType {
+impl _BrowserVulnType {
     pub fn label(&self) -> &'static str {
         match self {
-            BrowserVulnType::XssReflected => "Reflected XSS",
-            BrowserVulnType::XssStored => "Stored XSS",
-            BrowserVulnType::XssDomBased => "DOM-based XSS",
-            BrowserVulnType::Csrf => "CSRF",
-            BrowserVulnType::CorsMisconfiguration => "CORS Misconfiguration",
-            BrowserVulnType::CspBypass => "CSP Bypass",
-            BrowserVulnType::OpenRedirect => "Open Redirect",
-            BrowserVulnType::Clickjacking => "Clickjacking",
-            BrowserVulnType::InsecureCookie => "Insecure Cookie",
-            BrowserVulnType::AuthBypass => "Auth Bypass",
+            _BrowserVulnType::XssReflected => "Reflected XSS",
+            _BrowserVulnType::XssStored => "Stored XSS",
+            _BrowserVulnType::XssDomBased => "DOM-based XSS",
+            _BrowserVulnType::Csrf => "CSRF",
+            _BrowserVulnType::CorsMisconfiguration => "CORS Misconfiguration",
+            _BrowserVulnType::CspBypass => "CSP Bypass",
+            _BrowserVulnType::OpenRedirect => "Open Redirect",
+            _BrowserVulnType::Clickjacking => "Clickjacking",
+            _BrowserVulnType::InsecureCookie => "Insecure Cookie",
+            _BrowserVulnType::AuthBypass => "Auth Bypass",
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SeverityRank {
+pub enum _SeverityRank {
     Info,
     Low,
     Medium,
@@ -40,33 +40,33 @@ pub enum SeverityRank {
     Critical,
 }
 
-impl SeverityRank {
+impl _SeverityRank {
     pub fn label(&self) -> &'static str {
         match self {
-            SeverityRank::Info => "Info",
-            SeverityRank::Low => "Low",
-            SeverityRank::Medium => "Medium",
-            SeverityRank::High => "High",
-            SeverityRank::Critical => "Critical",
+            _SeverityRank::Info => "Info",
+            _SeverityRank::Low => "Low",
+            _SeverityRank::Medium => "Medium",
+            _SeverityRank::High => "High",
+            _SeverityRank::Critical => "Critical",
         }
     }
 
-    pub fn numeric_value(&self) -> u8 {
+    pub fn _numeric_value(&self) -> u8 {
         match self {
-            SeverityRank::Info => 0,
-            SeverityRank::Low => 1,
-            SeverityRank::Medium => 2,
-            SeverityRank::High => 3,
-            SeverityRank::Critical => 4,
+            _SeverityRank::Info => 0,
+            _SeverityRank::Low => 1,
+            _SeverityRank::Medium => 2,
+            _SeverityRank::High => 3,
+            _SeverityRank::Critical => 4,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct BrowserSecurityResult {
-    pub vuln_type: BrowserVulnType,
+pub struct _BrowserSecurityResult {
+    pub vuln_type: _BrowserVulnType,
     pub url: String,
-    pub severity: SeverityRank,
+    pub severity: _SeverityRank,
     pub description: String,
     pub evidence: String,
     pub poc: Option<String>,
@@ -77,10 +77,10 @@ pub struct BrowserSecurityResult {
 #[derive(Debug, Clone)]
 pub struct BrowserSecurityConfig {
     pub target_url: String,
-    pub check_types: Vec<BrowserVulnType>,
+    pub check_types: Vec<_BrowserVulnType>,
     pub max_depth: u8,
     pub follow_redirects: bool,
-    pub custom_payloads: HashMap<BrowserVulnType, Vec<String>>,
+    pub custom_payloads: HashMap<_BrowserVulnType, Vec<String>>,
     pub timeout_seconds: u64,
     pub concurrent_checks: usize,
 }
@@ -99,18 +99,18 @@ impl Default for BrowserSecurityConfig {
     }
 }
 
-pub trait BrowserSecurityCheck: Send + Sync {
+pub trait _BrowserSecurityCheck: Send + Sync {
     fn name(&self) -> &str;
-    fn vuln_type(&self) -> BrowserVulnType;
-    fn check(&self, url: &str, config: &BrowserSecurityConfig) -> Vec<BrowserSecurityResult>;
-    fn severity_rank(&self, evidence: &str) -> SeverityRank;
+    fn vuln_type(&self) -> _BrowserVulnType;
+    fn check(&self, url: &str, config: &BrowserSecurityConfig) -> Vec<_BrowserSecurityResult>;
+    fn severity_rank(&self, evidence: &str) -> _SeverityRank;
 }
 
-pub struct XssReflectedCheck {
+pub struct _XssReflectedCheck {
     payloads: Vec<String>,
 }
 
-impl XssReflectedCheck {
+impl _XssReflectedCheck {
     pub fn new() -> Self {
         Self {
             payloads: vec![
@@ -122,31 +122,31 @@ impl XssReflectedCheck {
         }
     }
 
-    pub fn with_payloads(payloads: Vec<String>) -> Self {
+    pub fn _with_payloads(payloads: Vec<String>) -> Self {
         Self { payloads }
     }
 }
 
-impl Default for XssReflectedCheck {
+impl Default for _XssReflectedCheck {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BrowserSecurityCheck for XssReflectedCheck {
+impl _BrowserSecurityCheck for _XssReflectedCheck {
     fn name(&self) -> &str {
         "XSS Reflected Check"
     }
 
-    fn vuln_type(&self) -> BrowserVulnType {
-        BrowserVulnType::XssReflected
+    fn vuln_type(&self) -> _BrowserVulnType {
+        _BrowserVulnType::XssReflected
     }
 
-    fn check(&self, url: &str, config: &BrowserSecurityConfig) -> Vec<BrowserSecurityResult> {
+    fn check(&self, url: &str, config: &BrowserSecurityConfig) -> Vec<_BrowserSecurityResult> {
         let mut results = Vec::new();
         let payloads: Vec<&String> =
-            if config.custom_payloads.contains_key(&BrowserVulnType::XssReflected) {
-                config.custom_payloads[&BrowserVulnType::XssReflected]
+            if config.custom_payloads.contains_key(&_BrowserVulnType::XssReflected) {
+                config.custom_payloads[&_BrowserVulnType::XssReflected]
                     .iter()
                     .collect()
             } else {
@@ -163,8 +163,8 @@ impl BrowserSecurityCheck for XssReflectedCheck {
                 };
                 let fp_risk = if payload.contains("alert") { 0.15 } else { 0.25 };
 
-                results.push(BrowserSecurityResult {
-                    vuln_type: BrowserVulnType::XssReflected,
+                results.push(_BrowserSecurityResult {
+                    vuln_type: _BrowserVulnType::XssReflected,
                     url: url.to_string(),
                     severity,
                     description: format!("Reflected XSS via payload: {}", payload),
@@ -179,23 +179,23 @@ impl BrowserSecurityCheck for XssReflectedCheck {
         results
     }
 
-    fn severity_rank(&self, evidence: &str) -> SeverityRank {
+    fn severity_rank(&self, evidence: &str) -> _SeverityRank {
         if evidence.contains("<script>") || evidence.contains("onerror") {
-            SeverityRank::High
+            _SeverityRank::High
         } else if evidence.contains("\">") || evidence.contains("'-") {
-            SeverityRank::Medium
+            _SeverityRank::Medium
         } else {
-            SeverityRank::Low
+            _SeverityRank::Low
         }
     }
 }
 
-pub struct CsrfCheck {
+pub struct _CsrfCheck {
     form_indicators: Vec<String>,
     csrf_indicators: Vec<String>,
 }
 
-impl CsrfCheck {
+impl _CsrfCheck {
     pub fn new() -> Self {
         Self {
             form_indicators: vec![
@@ -217,22 +217,22 @@ impl CsrfCheck {
     }
 }
 
-impl Default for CsrfCheck {
+impl Default for _CsrfCheck {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BrowserSecurityCheck for CsrfCheck {
+impl _BrowserSecurityCheck for _CsrfCheck {
     fn name(&self) -> &str {
         "CSRF Check"
     }
 
-    fn vuln_type(&self) -> BrowserVulnType {
-        BrowserVulnType::Csrf
+    fn vuln_type(&self) -> _BrowserVulnType {
+        _BrowserVulnType::Csrf
     }
 
-    fn check(&self, url: &str, _config: &BrowserSecurityConfig) -> Vec<BrowserSecurityResult> {
+    fn check(&self, url: &str, _config: &BrowserSecurityConfig) -> Vec<_BrowserSecurityResult> {
         let mut results = Vec::new();
 
         let has_form = self
@@ -245,10 +245,10 @@ impl BrowserSecurityCheck for CsrfCheck {
             .any(|i| url.contains(i.as_str()));
 
         if has_form && !has_token {
-            results.push(BrowserSecurityResult {
-                vuln_type: BrowserVulnType::Csrf,
+            results.push(_BrowserSecurityResult {
+                vuln_type: _BrowserVulnType::Csrf,
                 url: url.to_string(),
-                severity: SeverityRank::High,
+                severity: _SeverityRank::High,
                 description: "Form without CSRF token detected".to_string(),
                 evidence: format!("No CSRF token found in form at {}", url),
                 poc: Some(format!("curl -X POST '{}' -d 'malicious=1'", url)),
@@ -260,42 +260,42 @@ impl BrowserSecurityCheck for CsrfCheck {
         results
     }
 
-    fn severity_rank(&self, _evidence: &str) -> SeverityRank {
-        SeverityRank::High
+    fn severity_rank(&self, _evidence: &str) -> _SeverityRank {
+        _SeverityRank::High
     }
 }
 
-pub struct CorsCheck;
+pub struct _CorsCheck;
 
-impl Default for CorsCheck {
+impl Default for _CorsCheck {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CorsCheck {
+impl _CorsCheck {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl BrowserSecurityCheck for CorsCheck {
+impl _BrowserSecurityCheck for _CorsCheck {
     fn name(&self) -> &str {
         "CORS Misconfiguration Check"
     }
 
-    fn vuln_type(&self) -> BrowserVulnType {
-        BrowserVulnType::CorsMisconfiguration
+    fn vuln_type(&self) -> _BrowserVulnType {
+        _BrowserVulnType::CorsMisconfiguration
     }
 
-    fn check(&self, url: &str, _config: &BrowserSecurityConfig) -> Vec<BrowserSecurityResult> {
+    fn check(&self, url: &str, _config: &BrowserSecurityConfig) -> Vec<_BrowserSecurityResult> {
         let mut results = Vec::new();
 
         if url.contains("cors") || url.contains("api") || url.contains("wildcard") {
-            results.push(BrowserSecurityResult {
-                vuln_type: BrowserVulnType::CorsMisconfiguration,
+            results.push(_BrowserSecurityResult {
+                vuln_type: _BrowserVulnType::CorsMisconfiguration,
                 url: url.to_string(),
-                severity: SeverityRank::Medium,
+                severity: _SeverityRank::Medium,
                 description: "CORS allows wildcard origin".to_string(),
                 evidence: "Access-Control-Allow-Origin: *".to_string(),
                 poc: Some(format!(
@@ -310,46 +310,46 @@ impl BrowserSecurityCheck for CorsCheck {
         results
     }
 
-    fn severity_rank(&self, evidence: &str) -> SeverityRank {
+    fn severity_rank(&self, evidence: &str) -> _SeverityRank {
         if evidence.contains('*') && evidence.contains("Access-Control") {
-            SeverityRank::Medium
+            _SeverityRank::Medium
         } else {
-            SeverityRank::Low
+            _SeverityRank::Low
         }
     }
 }
 
-pub struct InsecureCookieCheck;
+pub struct _InsecureCookieCheck;
 
-impl Default for InsecureCookieCheck {
+impl Default for _InsecureCookieCheck {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl InsecureCookieCheck {
+impl _InsecureCookieCheck {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl BrowserSecurityCheck for InsecureCookieCheck {
+impl _BrowserSecurityCheck for _InsecureCookieCheck {
     fn name(&self) -> &str {
         "Insecure Cookie Check"
     }
 
-    fn vuln_type(&self) -> BrowserVulnType {
-        BrowserVulnType::InsecureCookie
+    fn vuln_type(&self) -> _BrowserVulnType {
+        _BrowserVulnType::InsecureCookie
     }
 
-    fn check(&self, url: &str, _config: &BrowserSecurityConfig) -> Vec<BrowserSecurityResult> {
+    fn check(&self, url: &str, _config: &BrowserSecurityConfig) -> Vec<_BrowserSecurityResult> {
         let mut results = Vec::new();
 
         if url.contains("cookie") || url.contains("session") || url.contains("insecure") {
-            results.push(BrowserSecurityResult {
-                vuln_type: BrowserVulnType::InsecureCookie,
+            results.push(_BrowserSecurityResult {
+                vuln_type: _BrowserVulnType::InsecureCookie,
                 url: url.to_string(),
-                severity: SeverityRank::High,
+                severity: _SeverityRank::High,
                 description: "Cookie without HttpOnly and Secure flags".to_string(),
                 evidence: "Set-Cookie: session=abc123; Path=/".to_string(),
                 poc: Some(format!("Check Set-Cookie header at '{}'", url)),
@@ -361,23 +361,23 @@ impl BrowserSecurityCheck for InsecureCookieCheck {
         results
     }
 
-    fn severity_rank(&self, evidence: &str) -> SeverityRank {
+    fn severity_rank(&self, evidence: &str) -> _SeverityRank {
         if evidence.contains("HttpOnly") || evidence.contains("Secure") {
             if evidence.contains("SameSite=None") {
-                SeverityRank::Low
+                _SeverityRank::Low
             } else {
-                SeverityRank::Info
+                _SeverityRank::Info
             }
         } else {
-            SeverityRank::High
+            _SeverityRank::High
         }
     }
 }
 
 pub struct BrowserSecurityScanner {
     pub config: BrowserSecurityConfig,
-    pub checks: Vec<Box<dyn BrowserSecurityCheck>>,
-    pub results: Vec<BrowserSecurityResult>,
+    pub checks: Vec<Box<dyn _BrowserSecurityCheck>>,
+    pub results: Vec<_BrowserSecurityResult>,
 }
 
 impl BrowserSecurityScanner {
@@ -389,18 +389,18 @@ impl BrowserSecurityScanner {
         }
     }
 
-    pub fn register_check(&mut self, check: Box<dyn BrowserSecurityCheck>) {
+    pub fn register_check(&mut self, check: Box<dyn _BrowserSecurityCheck>) {
         self.checks.push(check);
     }
 
     pub fn register_default_checks(&mut self) {
-        self.register_check(Box::new(XssReflectedCheck::new()));
-        self.register_check(Box::new(CsrfCheck::new()));
-        self.register_check(Box::new(CorsCheck::new()));
-        self.register_check(Box::new(InsecureCookieCheck::new()));
+        self.register_check(Box::new(_XssReflectedCheck::new()));
+        self.register_check(Box::new(_CsrfCheck::new()));
+        self.register_check(Box::new(_CorsCheck::new()));
+        self.register_check(Box::new(_InsecureCookieCheck::new()));
     }
 
-    pub fn run_scan(&mut self) -> Vec<BrowserSecurityResult> {
+    pub fn _run_scan(&mut self) -> Vec<_BrowserSecurityResult> {
         self.results.clear();
         for check in &self.checks {
             let check_results = check.check(&self.config.target_url, &self.config);
@@ -411,36 +411,36 @@ impl BrowserSecurityScanner {
 
     pub fn summary(&self) -> String {
         let total = self.results.len();
-        let by_severity = |s: SeverityRank| -> usize {
+        let by_severity = |s: _SeverityRank| -> usize {
             self.results.iter().filter(|r| r.severity == s).count()
         };
 
         format!(
             "Browser Security Scan Summary:\n  Total findings: {}\n  Critical: {}\n  High: {}\n  Medium: {}\n  Low: {}\n  Info: {}",
             total,
-            by_severity(SeverityRank::Critical),
-            by_severity(SeverityRank::High),
-            by_severity(SeverityRank::Medium),
-            by_severity(SeverityRank::Low),
-            by_severity(SeverityRank::Info),
+            by_severity(_SeverityRank::Critical),
+            by_severity(_SeverityRank::High),
+            by_severity(_SeverityRank::Medium),
+            by_severity(_SeverityRank::Low),
+            by_severity(_SeverityRank::Info),
         )
     }
 
-    pub fn highest_severity(&self) -> Option<SeverityRank> {
+    pub fn _highest_severity(&self) -> Option<_SeverityRank> {
         self.results.iter().map(|r| r.severity.clone()).max()
     }
 
-    pub fn filter_by_type(&self, vuln_type: BrowserVulnType) -> Vec<&BrowserSecurityResult> {
+    pub fn _filter_by_type(&self, vuln_type: _BrowserVulnType) -> Vec<&_BrowserSecurityResult> {
         self.results
             .iter()
             .filter(|r| r.vuln_type == vuln_type)
             .collect()
     }
 
-    pub fn filter_by_severity(
+    pub fn _filter_by_severity(
         &self,
-        min_severity: SeverityRank,
-    ) -> Vec<&BrowserSecurityResult> {
+        min_severity: _SeverityRank,
+    ) -> Vec<&_BrowserSecurityResult> {
         self.results
             .iter()
             .filter(|r| r.severity >= min_severity)
@@ -487,19 +487,19 @@ mod tests {
 
     #[test]
     fn test_xss_reflected_detected() {
-        let check = XssReflectedCheck::new();
+        let check = _XssReflectedCheck::new();
         let config = BrowserSecurityConfig::default();
         let url = "http://test.com/search?q=<script>alert(1)</script>";
         let results = check.check(url, &config);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].vuln_type, BrowserVulnType::XssReflected);
+        assert_eq!(results[0].vuln_type, _BrowserVulnType::XssReflected);
         assert!(results[0].description.contains("Reflected XSS"));
         assert!(results[0].poc.is_some());
     }
 
     #[test]
     fn test_xss_reflected_clean() {
-        let check = XssReflectedCheck::new();
+        let check = _XssReflectedCheck::new();
         let config = BrowserSecurityConfig::default();
         let url = "http://test.com/search?q=hello";
         let results = check.check(url, &config);
@@ -508,18 +508,18 @@ mod tests {
 
     #[test]
     fn test_csrf_missing_token() {
-        let check = CsrfCheck::new();
+        let check = _CsrfCheck::new();
         let config = BrowserSecurityConfig::default();
         let url = "http://test.com/login?user=admin";
         let results = check.check(url, &config);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].vuln_type, BrowserVulnType::Csrf);
+        assert_eq!(results[0].vuln_type, _BrowserVulnType::Csrf);
         assert!(results[0].description.contains("CSRF token"));
     }
 
     #[test]
     fn test_csrf_with_token() {
-        let check = CsrfCheck::new();
+        let check = _CsrfCheck::new();
         let config = BrowserSecurityConfig::default();
         let url = "http://test.com/login?csrf_token=abc123";
         let results = check.check(url, &config);
@@ -528,18 +528,18 @@ mod tests {
 
     #[test]
     fn test_cors_wildcard() {
-        let check = CorsCheck::new();
+        let check = _CorsCheck::new();
         let config = BrowserSecurityConfig::default();
         let url = "http://api.test.com/cors";
         let results = check.check(url, &config);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].vuln_type, BrowserVulnType::CorsMisconfiguration);
+        assert_eq!(results[0].vuln_type, _BrowserVulnType::CorsMisconfiguration);
         assert!(results[0].evidence.contains("Access-Control-Allow-Origin: *"));
     }
 
     #[test]
     fn test_cors_restricted() {
-        let check = CorsCheck::new();
+        let check = _CorsCheck::new();
         let config = BrowserSecurityConfig::default();
         let url = "http://test.com/about";
         let results = check.check(url, &config);
@@ -548,12 +548,12 @@ mod tests {
 
     #[test]
     fn test_insecure_cookie() {
-        let check = InsecureCookieCheck::new();
+        let check = _InsecureCookieCheck::new();
         let config = BrowserSecurityConfig::default();
         let url = "http://test.com/session";
         let results = check.check(url, &config);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].vuln_type, BrowserVulnType::InsecureCookie);
+        assert_eq!(results[0].vuln_type, _BrowserVulnType::InsecureCookie);
         assert!(results[0].description.contains("HttpOnly"));
     }
 
@@ -574,7 +574,7 @@ mod tests {
             ..Default::default()
         });
         scanner.register_default_checks();
-        let results = scanner.run_scan();
+        let results = scanner._run_scan();
         assert!(!results.is_empty());
         assert_eq!(scanner.results.len(), results.len());
     }
@@ -583,20 +583,20 @@ mod tests {
     fn test_scanner_summary_format() {
         let mut scanner =
             BrowserSecurityScanner::new(BrowserSecurityConfig::default());
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::XssReflected,
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::XssReflected,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::High,
+            severity: _SeverityRank::High,
             description: "test".to_string(),
             evidence: "evidence".to_string(),
             poc: None,
             confidence: 0.8,
             false_positive_risk: 0.1,
         });
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::Csrf,
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::Csrf,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::Critical,
+            severity: _SeverityRank::Critical,
             description: "test2".to_string(),
             evidence: "evidence2".to_string(),
             poc: None,
@@ -615,71 +615,71 @@ mod tests {
     fn test_highest_severity() {
         let mut scanner =
             BrowserSecurityScanner::new(BrowserSecurityConfig::default());
-        assert_eq!(scanner.highest_severity(), None);
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::XssReflected,
+        assert_eq!(scanner._highest_severity(), None);
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::XssReflected,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::Medium,
+            severity: _SeverityRank::Medium,
             description: "test".to_string(),
             evidence: "ev".to_string(),
             poc: None,
             confidence: 0.5,
             false_positive_risk: 0.2,
         });
-        assert_eq!(scanner.highest_severity(), Some(SeverityRank::Medium));
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::Csrf,
+        assert_eq!(scanner._highest_severity(), Some(_SeverityRank::Medium));
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::Csrf,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::Critical,
+            severity: _SeverityRank::Critical,
             description: "test2".to_string(),
             evidence: "ev2".to_string(),
             poc: None,
             confidence: 0.9,
             false_positive_risk: 0.05,
         });
-        assert_eq!(scanner.highest_severity(), Some(SeverityRank::Critical));
+        assert_eq!(scanner._highest_severity(), Some(_SeverityRank::Critical));
     }
 
     #[test]
     fn test_filter_by_type() {
         let mut scanner =
             BrowserSecurityScanner::new(BrowserSecurityConfig::default());
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::XssReflected,
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::XssReflected,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::High,
+            severity: _SeverityRank::High,
             description: "xss".to_string(),
             evidence: "ev".to_string(),
             poc: None,
             confidence: 0.8,
             false_positive_risk: 0.1,
         });
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::Csrf,
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::Csrf,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::High,
+            severity: _SeverityRank::High,
             description: "csrf".to_string(),
             evidence: "ev2".to_string(),
             poc: None,
             confidence: 0.7,
             false_positive_risk: 0.2,
         });
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::XssReflected,
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::XssReflected,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::Medium,
+            severity: _SeverityRank::Medium,
             description: "xss2".to_string(),
             evidence: "ev3".to_string(),
             poc: None,
             confidence: 0.6,
             false_positive_risk: 0.3,
         });
-        let xss_results = scanner.filter_by_type(BrowserVulnType::XssReflected);
+        let xss_results = scanner._filter_by_type(_BrowserVulnType::XssReflected);
         assert_eq!(xss_results.len(), 2);
-        let csrf_results = scanner.filter_by_type(BrowserVulnType::Csrf);
+        let csrf_results = scanner._filter_by_type(_BrowserVulnType::Csrf);
         assert_eq!(csrf_results.len(), 1);
         let cors_results =
-            scanner.filter_by_type(BrowserVulnType::CorsMisconfiguration);
+            scanner._filter_by_type(_BrowserVulnType::CorsMisconfiguration);
         assert!(cors_results.is_empty());
     }
 
@@ -687,30 +687,30 @@ mod tests {
     fn test_filter_by_severity() {
         let mut scanner =
             BrowserSecurityScanner::new(BrowserSecurityConfig::default());
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::XssReflected,
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::XssReflected,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::Low,
+            severity: _SeverityRank::Low,
             description: "low".to_string(),
             evidence: "ev".to_string(),
             poc: None,
             confidence: 0.3,
             false_positive_risk: 0.5,
         });
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::Csrf,
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::Csrf,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::High,
+            severity: _SeverityRank::High,
             description: "high".to_string(),
             evidence: "ev2".to_string(),
             poc: None,
             confidence: 0.8,
             false_positive_risk: 0.1,
         });
-        scanner.results.push(BrowserSecurityResult {
-            vuln_type: BrowserVulnType::InsecureCookie,
+        scanner.results.push(_BrowserSecurityResult {
+            vuln_type: _BrowserVulnType::InsecureCookie,
             url: "http://test.com".to_string(),
-            severity: SeverityRank::Critical,
+            severity: _SeverityRank::Critical,
             description: "critical".to_string(),
             evidence: "ev3".to_string(),
             poc: None,
@@ -718,20 +718,20 @@ mod tests {
             false_positive_risk: 0.05,
         });
         let high_and_above =
-            scanner.filter_by_severity(SeverityRank::High);
+            scanner._filter_by_severity(_SeverityRank::High);
         assert_eq!(high_and_above.len(), 2);
-        assert_eq!(high_and_above[0].severity, SeverityRank::High);
-        assert_eq!(high_and_above[1].severity, SeverityRank::Critical);
+        assert_eq!(high_and_above[0].severity, _SeverityRank::High);
+        assert_eq!(high_and_above[1].severity, _SeverityRank::Critical);
 
         let critical_only =
-            scanner.filter_by_severity(SeverityRank::Critical);
+            scanner._filter_by_severity(_SeverityRank::Critical);
         assert_eq!(critical_only.len(), 1);
-        assert_eq!(critical_only[0].severity, SeverityRank::Critical);
+        assert_eq!(critical_only[0].severity, _SeverityRank::Critical);
     }
 
     #[test]
     fn test_confidence_scoring() {
-        let check = XssReflectedCheck::new();
+        let check = _XssReflectedCheck::new();
         let config = BrowserSecurityConfig::default();
         let results =
             check.check("http://test.com?q=<script>alert(1)</script>", &config);
@@ -745,7 +745,7 @@ mod tests {
 
     #[test]
     fn test_false_positive_risk() {
-        let check = XssReflectedCheck::new();
+        let check = _XssReflectedCheck::new();
         let config = BrowserSecurityConfig::default();
         let results =
             check.check("http://test.com?q=<script>alert(1)</script>", &config);
@@ -759,11 +759,11 @@ mod tests {
 
     #[test]
     fn test_severity_ordering() {
-        assert!(SeverityRank::Info < SeverityRank::Low);
-        assert!(SeverityRank::Low < SeverityRank::Medium);
-        assert!(SeverityRank::Medium < SeverityRank::High);
-        assert!(SeverityRank::High < SeverityRank::Critical);
-        assert!(SeverityRank::Info < SeverityRank::Critical);
+        assert!(_SeverityRank::Info < _SeverityRank::Low);
+        assert!(_SeverityRank::Low < _SeverityRank::Medium);
+        assert!(_SeverityRank::Medium < _SeverityRank::High);
+        assert!(_SeverityRank::High < _SeverityRank::Critical);
+        assert!(_SeverityRank::Info < _SeverityRank::Critical);
     }
 
     #[test]
@@ -773,13 +773,13 @@ mod tests {
         let mut config = BrowserSecurityConfig::default();
         config
             .custom_payloads
-            .insert(BrowserVulnType::XssReflected, custom);
-        let check = XssReflectedCheck::new();
+            .insert(_BrowserVulnType::XssReflected, custom);
+        let check = _XssReflectedCheck::new();
         let url = format!("http://test.com?q={}", custom_payload);
         let results = check.check(&url, &config);
         assert!(!results.is_empty());
-        assert_eq!(results[0].vuln_type, BrowserVulnType::XssReflected);
-        assert_eq!(results[0].severity, SeverityRank::Low);
+        assert_eq!(results[0].vuln_type, _BrowserVulnType::XssReflected);
+        assert_eq!(results[0].severity, _SeverityRank::Low);
     }
 
     #[test]
@@ -792,22 +792,22 @@ mod tests {
 
     #[test]
     fn test_severity_rank_label_and_value() {
-        assert_eq!(SeverityRank::Info.label(), "Info");
-        assert_eq!(SeverityRank::Low.label(), "Low");
-        assert_eq!(SeverityRank::Medium.label(), "Medium");
-        assert_eq!(SeverityRank::High.label(), "High");
-        assert_eq!(SeverityRank::Critical.label(), "Critical");
-        assert_eq!(SeverityRank::Info.numeric_value(), 0);
-        assert_eq!(SeverityRank::Critical.numeric_value(), 4);
+        assert_eq!(_SeverityRank::Info.label(), "Info");
+        assert_eq!(_SeverityRank::Low.label(), "Low");
+        assert_eq!(_SeverityRank::Medium.label(), "Medium");
+        assert_eq!(_SeverityRank::High.label(), "High");
+        assert_eq!(_SeverityRank::Critical.label(), "Critical");
+        assert_eq!(_SeverityRank::Info._numeric_value(), 0);
+        assert_eq!(_SeverityRank::Critical._numeric_value(), 4);
     }
 
     #[test]
     fn test_nt_world_browse_vuln_type_label() {
-        assert_eq!(BrowserVulnType::XssReflected.label(), "Reflected XSS");
-        assert_eq!(BrowserVulnType::Csrf.label(), "CSRF");
-        assert_eq!(BrowserVulnType::CorsMisconfiguration.label(), "CORS Misconfiguration");
-        assert_eq!(BrowserVulnType::InsecureCookie.label(), "Insecure Cookie");
-        assert_eq!(BrowserVulnType::AuthBypass.label(), "Auth Bypass");
+        assert_eq!(_BrowserVulnType::XssReflected.label(), "Reflected XSS");
+        assert_eq!(_BrowserVulnType::Csrf.label(), "CSRF");
+        assert_eq!(_BrowserVulnType::CorsMisconfiguration.label(), "CORS Misconfiguration");
+        assert_eq!(_BrowserVulnType::InsecureCookie.label(), "Insecure Cookie");
+        assert_eq!(_BrowserVulnType::AuthBypass.label(), "Auth Bypass");
     }
 
     #[test]
@@ -817,9 +817,9 @@ mod tests {
                 .to_string(),
             ..Default::default()
         });
-        scanner.register_check(Box::new(XssReflectedCheck::new()));
-        scanner.register_check(Box::new(CsrfCheck::new()));
-        let results = scanner.run_scan();
+        scanner.register_check(Box::new(_XssReflectedCheck::new()));
+        scanner.register_check(Box::new(_CsrfCheck::new()));
+        let results = scanner._run_scan();
         assert!(!results.is_empty());
         assert_eq!(scanner.results.len(), results.len());
     }

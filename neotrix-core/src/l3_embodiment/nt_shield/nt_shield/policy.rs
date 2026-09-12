@@ -39,7 +39,7 @@ pub struct ActionPolicy {
     /// 当前安全配置文件 (nt_shield / strict-nt_shield / general)
     pub profile: String,
     /// 网络请求域名白名单（自动放行的 LLM API 域名）
-    network_allowlist: HashSet<String>,
+    _network_allowlist: HashSet<String>,
 }
 
 /// LLM API 提供商默认域名白名单
@@ -103,7 +103,7 @@ impl ActionPolicy {
         Self {
             rules,
             profile: "nt_shield".to_string(),
-            network_allowlist: default_llm_domains(),
+            _network_allowlist: default_llm_domains(),
         }
     }
 
@@ -156,29 +156,29 @@ impl ActionPolicy {
     }
 
     /// 将域名加入网络白名单
-    pub fn allowlist_domain(&mut self, domain: &str) {
-        self.network_allowlist.insert(domain.to_string());
+    pub fn _allowlist_domain(&mut self, domain: &str) {
+        self._network_allowlist.insert(domain.to_string());
     }
 
     /// 从网络白名单移除域名
-    pub fn remove_domain(&mut self, domain: &str) {
-        self.network_allowlist.remove(domain);
+    pub fn _remove_domain(&mut self, domain: &str) {
+        self._network_allowlist.remove(domain);
     }
 
     /// 检查域名是否在白名单中
-    pub fn is_domain_allowed(&self, domain: &str) -> bool {
-        self.network_allowlist.contains(domain)
-            || self.network_allowlist.iter().any(|d| domain.ends_with(&format!(".{}", d)) || domain == d)
+    pub fn _is_domain_allowed(&self, domain: &str) -> bool {
+        self._network_allowlist.contains(domain)
+            || self._network_allowlist.iter().any(|d| domain.ends_with(&format!(".{}", d)) || domain == d)
     }
 
     /// 获取白名单引用
-    pub fn network_allowlist(&self) -> &HashSet<String> {
-        &self.network_allowlist
+    pub fn _network_allowlist(&self) -> &HashSet<String> {
+        &self._network_allowlist
     }
 
     /// 评估网络请求 — 先检查域名白名单，再查规则表
     pub fn evaluate_network(&self, domain: &str) -> PolicyDecision {
-        if self.is_domain_allowed(domain) {
+        if self._is_domain_allowed(domain) {
             return PolicyDecision::Allow;
         }
         self.decide("network_request")
@@ -290,23 +290,23 @@ mod tests {
     #[test]
     fn test_custom_domain_allowlist() {
         let mut p = ActionPolicy::new();
-        p.allowlist_domain("my.internal.api.com");
+        p._allowlist_domain("my.internal.api.com");
         assert_eq!(p.evaluate_network("my.internal.api.com"), PolicyDecision::Allow);
     }
 
     #[test]
     fn test_remove_domain_from_allowlist() {
         let mut p = ActionPolicy::new();
-        p.allowlist_domain("test.com");
-        assert!(p.is_domain_allowed("test.com"));
-        p.remove_domain("test.com");
-        assert!(!p.is_domain_allowed("test.com"));
+        p._allowlist_domain("test.com");
+        assert!(p._is_domain_allowed("test.com"));
+        p._remove_domain("test.com");
+        assert!(!p._is_domain_allowed("test.com"));
     }
 
     #[test]
     fn test_subdomain_matches_allowlist() {
         let p = ActionPolicy::new();
-        assert!(p.is_domain_allowed("eu.api.openai.com"));
+        assert!(p._is_domain_allowed("eu.api.openai.com"));
     }
 
     #[test]

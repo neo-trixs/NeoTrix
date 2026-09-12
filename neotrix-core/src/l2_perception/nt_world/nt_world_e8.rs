@@ -61,7 +61,7 @@ pub const RESONANCE_THRESHOLD: u32 = 2;
 
 /// Walsh-Hadamard 变换 (顺序排列)
 /// 将 64 维状态空间变换到频率域
-pub fn hadamard_transform(state: &[f64; 64]) -> [f64; 64] {
+pub fn _hadamard_transform(state: &[f64; 64]) -> [f64; 64] {
     let mut result = *state;
     let mut len = 1;
     while len < 64 {
@@ -85,8 +85,8 @@ pub fn hadamard_transform(state: &[f64; 64]) -> [f64; 64] {
 }
 
 /// 逆 Hadamard 变换（与正向相同，因为 Hadamard 是对称正交变换）
-pub fn inverse_hadamard_transform(freq: &[f64; 64]) -> [f64; 64] {
-    hadamard_transform(freq)
+pub fn _inverse_hadamard_transform(freq: &[f64; 64]) -> [f64; 64] {
+    _hadamard_transform(freq)
 }
 
 // ============================================================
@@ -107,25 +107,25 @@ fn vec_to_array64(v: &[f64]) -> [f64; 64] {
 
 /// 多模周期时间演化
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TimeEvolver {
+pub struct _TimeEvolver {
     /// 当前全局时间
     pub global_time: f64,
 }
 
-impl Default for TimeEvolver {
+impl Default for _TimeEvolver {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl TimeEvolver {
+impl _TimeEvolver {
     pub fn new() -> Self {
         Self { global_time: 0.0 }
     }
 
     /// 生成时间相位向量 (64 维)
     /// 每 8 维一组对应一个周期
-    pub fn phase_vector(&self) -> [f64; 64] {
+    pub fn _phase_vector(&self) -> [f64; 64] {
         let mut phase = [0.0; 64];
 
         for (i, item) in phase[..8].iter_mut().enumerate() {
@@ -182,17 +182,17 @@ impl TimeEvolver {
 
 /// 共振选择器 — 仅共振频率耦合的状态可传播
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResonanceSelector {
+pub struct _ResonanceSelector {
     pub threshold: u32,
 }
 
-impl Default for ResonanceSelector {
+impl Default for _ResonanceSelector {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ResonanceSelector {
+impl _ResonanceSelector {
     pub fn new() -> Self {
         Self { threshold: RESONANCE_THRESHOLD }
     }
@@ -263,7 +263,7 @@ impl HexagramState {
         Self { vector, dominant: 11 }
     }
 
-    pub fn from_vector(v: &[f64]) -> Self {
+    pub fn _from_vector(v: &[f64]) -> Self {
         let _n = v.len().min(64);
         let mut vector: Vec<f64> = v.iter().copied().take(64).collect();
         while vector.len() < 64 { vector.push(0.0); }
@@ -276,7 +276,7 @@ impl HexagramState {
     }
 
     /// 从 32 维 latent 空间投影到 64 卦空间
-    pub fn from_latent(latent: &[f64]) -> Self {
+    pub fn _from_latent(latent: &[f64]) -> Self {
         let mut vector = vec![0.0; 64];
         let n = latent.len().min(64);
         for (i, item) in vector.iter_mut().enumerate().take(n) { *item = latent[i].tanh(); }
@@ -290,7 +290,7 @@ impl HexagramState {
     }
 
     /// 观察者投影: 去掉一个维度（观察者自身）
-    pub fn observer_projection(&self) -> Vec<f64> {
+    pub fn _observer_projection(&self) -> Vec<f64> {
         let mut projected = Vec::with_capacity(49);
         for i in 0..64 {
             if i != OBSERVER_DOF { projected.push(self.vector[i]); }
@@ -309,8 +309,8 @@ impl HexagramState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct E8WorldModel {
     pub current_state: HexagramState,
-    pub time_evolver: TimeEvolver,
-    pub resonance_selector: ResonanceSelector,
+    pub time_evolver: _TimeEvolver,
+    pub resonance_selector: _ResonanceSelector,
     pub observer_position: usize,
     pub evolution_step: usize,
     pub prediction_history: Vec<HexagramState>,
@@ -326,8 +326,8 @@ impl E8WorldModel {
     pub fn new() -> Self {
         Self {
             current_state: HexagramState::new(),
-            time_evolver: TimeEvolver::new(),
-            resonance_selector: ResonanceSelector::new(),
+            time_evolver: _TimeEvolver::new(),
+            resonance_selector: _ResonanceSelector::new(),
             observer_position: OBSERVER_DOF,
             evolution_step: 0,
             prediction_history: Vec::with_capacity(100),
@@ -337,8 +337,8 @@ impl E8WorldModel {
     /// 一步演化: Ψ(t+1) = R(T · H(Ψ(t), O(t)))
     pub fn evolve(&mut self, dt: f64) -> &HexagramState {
         let arr = vec_to_array64(&self.current_state.vector);
-        let freq = hadamard_transform(&arr);
-        let phase = self.time_evolver.phase_vector();
+        let freq = _hadamard_transform(&arr);
+        let phase = self.time_evolver._phase_vector();
 
         let mut evolved_freq = [0.0; 64];
         for i in 0..64 {
@@ -346,13 +346,13 @@ impl E8WorldModel {
         }
 
         let filtered = self.resonance_selector.filter(&evolved_freq, &self.current_state.vector);
-        let new_state_arr = inverse_hadamard_transform(&filtered);
+        let new_state_arr = _inverse_hadamard_transform(&filtered);
 
         let mut normalized = new_state_arr.to_vec();
         let max = normalized.iter().cloned().fold(0.0_f64, f64::max);
         if max > 0.0 { for val in normalized.iter_mut() { *val /= max; } }
 
-        self.current_state = HexagramState::from_vector(&normalized);
+        self.current_state = HexagramState::_from_vector(&normalized);
         self.time_evolver.step(dt);
         self.evolution_step += 1;
 
@@ -371,7 +371,7 @@ impl E8WorldModel {
 
     /// 从 JEPA latent 状态初始化
     pub fn from_jepa_latent(&mut self, latent: &[f64]) {
-        self.current_state = HexagramState::from_latent(latent);
+        self.current_state = HexagramState::_from_latent(latent);
     }
 
     /// 预测未来 N 步
@@ -401,7 +401,7 @@ impl E8WorldModel {
     }
 
     /// 检测稳定态
-    pub fn is_stable(&self, lookback: usize) -> bool {
+    pub fn _is_stable(&self, lookback: usize) -> bool {
         if self.prediction_history.len() < lookback { return false; }
         let start = self.prediction_history.len().saturating_sub(lookback);
         let recent = &self.prediction_history[start..];
@@ -410,12 +410,12 @@ impl E8WorldModel {
 
     /// 融合 JEPA 预测到 E8 状态空间
     /// 将 JEPA 的 latent 预测投影到 64 卦，计算 E8 演化
-    pub fn fuse_jepa_prediction(&self, jepa_latent: &[f64], steps: usize) -> Vec<f64> {
+    pub fn _fuse_jepa_prediction(&self, jepa_latent: &[f64], steps: usize) -> Vec<f64> {
         let mut e8 = self.clone();
         e8.from_jepa_latent(jepa_latent);
         e8.evolve_n(steps, 1.0);
         // 返回投影到 observable 维度的状态
-        e8.current_state.observer_projection()
+        e8.current_state._observer_projection()
     }
 }
 
@@ -429,9 +429,9 @@ mod tests {
     #[test]
     fn test_hadamard_is_involutive() {
         let state = [1.0_f64; 64];
-        let freq = hadamard_transform(&state);
+        let freq = _hadamard_transform(&state);
         assert!((freq[0] - 8.0).abs() < 1e-10);
-        let back = inverse_hadamard_transform(&freq);
+        let back = _inverse_hadamard_transform(&freq);
         for i in 0..64 { assert!((back[i] - 1.0).abs() < 1e-10); }
     }
 
@@ -453,21 +453,21 @@ mod tests {
     #[test]
     fn test_observer_projection() {
         let state = HexagramState::new();
-        let p = state.observer_projection();
+        let p = state._observer_projection();
         // 64 维去掉 observer 维度 = 63
         assert_eq!(p.len(), 63);
     }
 
     #[test]
     fn test_from_latent() {
-        let state = HexagramState::from_latent(&[0.5; 32]);
+        let state = HexagramState::_from_latent(&[0.5; 32]);
         assert_eq!(state.vector.len(), 64);
     }
 
     #[test]
     fn test_fuse_jepa() {
         let model = E8WorldModel::new();
-        let fused = model.fuse_jepa_prediction(&[0.5; 32], 3);
+        let fused = model._fuse_jepa_prediction(&[0.5; 32], 3);
         // 64 维去掉 observer 维度 = 63
         assert_eq!(fused.len(), 63);
     }
@@ -484,7 +484,7 @@ mod tests {
     fn test_hexagram_normalization() {
         let mut v = vec![0.0; 64];
         v[5] = 3.0; v[10] = 1.0;
-        let state = HexagramState::from_vector(&v);
+        let state = HexagramState::_from_vector(&v);
         assert!((state.vector[5] - 1.0).abs() < 1e-10);
         assert!((state.vector[10] - 1.0 / 3.0).abs() < 1e-10);
         assert_eq!(state.dominant, 5);
@@ -499,10 +499,10 @@ mod tests {
 
     #[test]
     fn test_resonance_selector_works_with_vec() {
-        let _sel = ResonanceSelector::new();
+        let _sel = _ResonanceSelector::new();
         let a = vec![0.0; 64];
         let b = vec![1.0; 64];
-        let d = ResonanceSelector::hamming_distance(&a, &b);
+        let d = _ResonanceSelector::hamming_distance(&a, &b);
         assert_eq!(d, 64);
     }
 }

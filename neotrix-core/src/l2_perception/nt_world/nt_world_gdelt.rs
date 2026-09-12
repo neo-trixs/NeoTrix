@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 /// 单篇 GDELT 文章 (ArtList 模式)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GdeltArticle {
+pub struct _GdeltArticle {
     #[serde(default)]
     pub title: String,
     #[serde(default)]
@@ -40,11 +40,11 @@ pub struct GdeltArticle {
 #[derive(Debug, Deserialize)]
 struct GdeltDocResponse {
     #[serde(default)]
-    articles: Vec<GdeltArticle>,
+    articles: Vec<_GdeltArticle>,
 }
 
 /// 兜底：GDELT 有时返回 `{"status":...,"articles":[]}` 或顶层数组，直接容错。
-fn parse_gdelt_json(raw: &str) -> Result<Vec<GdeltArticle>, String> {
+fn parse_gdelt_json(raw: &str) -> Result<Vec<_GdeltArticle>, String> {
     // 1. 标准对象 {"articles":[...]}
     if let Ok(doc) = serde_json::from_str::<GdeltDocResponse>(raw) {
         if !doc.articles.is_empty() || raw.contains("\"articles\"") {
@@ -52,7 +52,7 @@ fn parse_gdelt_json(raw: &str) -> Result<Vec<GdeltArticle>, String> {
         }
     }
     // 2. 顶层数组 [...]
-    if let Ok(arr) = serde_json::from_str::<Vec<GdeltArticle>>(raw) {
+    if let Ok(arr) = serde_json::from_str::<Vec<_GdeltArticle>>(raw) {
         return Ok(arr);
     }
     // 3. 空或错误体 → 空列表
@@ -112,7 +112,7 @@ impl GdeltFetcher {
     }
 
     /// 抓取并解析 (网络依赖)。
-    pub fn fetch(&self, query: &str, max_records: usize) -> Result<Vec<GdeltArticle>, String> {
+    pub fn fetch(&self, query: &str, max_records: usize) -> Result<Vec<_GdeltArticle>, String> {
         let url = self.build_url(query, max_records);
         let resp = self
             .client()
@@ -127,7 +127,7 @@ impl GdeltFetcher {
     }
 
     /// 纯解析 (无网络，用于 fixture/单测)。
-    pub fn parse_articles(json: &str) -> Result<Vec<GdeltArticle>, String> {
+    pub fn parse_articles(json: &str) -> Result<Vec<_GdeltArticle>, String> {
         parse_gdelt_json(json)
     }
 
@@ -137,9 +137,9 @@ impl GdeltFetcher {
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         json: &str,
         query: &str,
-    ) -> Result<GdeltIngestReport, String> {
+    ) -> Result<_GdeltIngestReport, String> {
         let articles = parse_gdelt_json(json)?;
-        Self::ingest_articles(kb, &articles, query)
+        Self::_ingest_articles(kb, &articles, query)
     }
 
     /// E2E 入库：fetch → 解析 → KB `insert_or_get_node` (Article, domain=gdelt)。
@@ -148,18 +148,18 @@ impl GdeltFetcher {
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
         query: &str,
         max_records: usize,
-    ) -> Result<GdeltIngestReport, String> {
+    ) -> Result<_GdeltIngestReport, String> {
         let articles = self.fetch(query, max_records)?;
-        Self::ingest_articles(kb, &articles, query)
+        Self::_ingest_articles(kb, &articles, query)
     }
 
     /// 将已解析的 articles 入库 — 可复用 (fetch/parse 解耦)。
-    pub fn ingest_articles(
+    pub fn _ingest_articles(
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
-        articles: &[GdeltArticle],
+        articles: &[_GdeltArticle],
         query: &str,
-    ) -> Result<GdeltIngestReport, String> {
-        let mut report = GdeltIngestReport {
+    ) -> Result<_GdeltIngestReport, String> {
+        let mut report = _GdeltIngestReport {
             query: query.to_string(),
             articles_fetched: articles.len(),
             ..Default::default()
@@ -190,7 +190,7 @@ impl GdeltFetcher {
     }
 
     /// 转 SearchResult (供 Ordered Backend Router 复用)。
-    pub fn to_search_results(articles: &[GdeltArticle]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
+    pub fn to_search_results(articles: &[_GdeltArticle]) -> Vec<crate::l2_perception::nt_world::nt_world_search::SearchResult> {
         articles
             .iter()
             .map(|a| crate::l2_perception::nt_world::nt_world_search::SearchResult {
@@ -212,14 +212,14 @@ pub fn gdelt_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox
     crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(GDELT_HOST, "443")
 }
 /// GDELT 专用 Egress Policy (deny_all 基线 + 单条 allow) — 委托 `intel_egress_policy`。
-pub fn gdelt_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+pub fn _gdelt_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
     crate::l3_embodiment::nt_shield::nt_shield_sandbox::intel_egress_policy()
 }
 
 // ── 入库报告 ───────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct GdeltIngestReport {
+pub struct _GdeltIngestReport {
     pub query: String,
     pub articles_fetched: usize,
     pub nodes_created: usize,
@@ -319,12 +319,12 @@ mod tests {
 
     #[test]
     fn test_egress_policy_allows_gdelt_denies_other() {
-        let policy = gdelt_egress_policy();
+        let policy = _gdelt_egress_policy();
         assert!(policy.check(GDELT_HOST, 443), "gdelt host should be allowed on 443");
         assert!(!policy.check(GDELT_HOST, 80), "wrong port should be denied");
         assert!(!policy.check("evil.com", 443), "non-gdelt host denied");
         // deny-wins: 叠加 deny 规则应覆盖 allow
-        let mut with_deny = gdelt_egress_policy();
+        let mut with_deny = _gdelt_egress_policy();
         with_deny.rules.push(crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::deny(GDELT_HOST, "443"));
         assert!(!with_deny.check(GDELT_HOST, 443), "explicit deny wins over allow");
     }

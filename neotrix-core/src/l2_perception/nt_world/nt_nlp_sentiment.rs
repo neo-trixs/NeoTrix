@@ -15,7 +15,7 @@ pub enum Sentiment {
 
 /// 情感分数
 #[derive(Debug, Clone)]
-pub struct SentimentScore {
+pub struct _SentimentScore {
     pub polarity: Sentiment,
     pub positive_score: f64,
     pub negative_score: f64,
@@ -23,7 +23,7 @@ pub struct SentimentScore {
 }
 
 /// 情感分析器
-pub struct SentimentAnalyzer {
+pub struct _SentimentAnalyzer {
     /// 正面词典
     positive_words: std::collections::HashSet<String>,
     /// 负面词典
@@ -34,7 +34,7 @@ pub struct SentimentAnalyzer {
     degree_words: HashMap<String, f64>,
 }
 
-impl SentimentAnalyzer {
+impl _SentimentAnalyzer {
     /// 创建新的情感分析器
     pub fn new() -> Self {
         let mut positive_words = std::collections::HashSet::new();
@@ -81,7 +81,7 @@ impl SentimentAnalyzer {
     }
 
     /// 分析情感
-    pub fn analyze(&self, text: &str) -> SentimentScore {
+    pub fn analyze(&self, text: &str) -> _SentimentScore {
         let words = self.tokenize(text);
         let mut positive_score = 0.0;
         let mut negative_score = 0.0;
@@ -138,7 +138,7 @@ impl SentimentAnalyzer {
             Sentiment::Mixed
         };
 
-        SentimentScore {
+        _SentimentScore {
             polarity,
             positive_score,
             negative_score,
@@ -173,7 +173,7 @@ impl SentimentAnalyzer {
     }
 }
 
-impl Default for SentimentAnalyzer {
+impl Default for _SentimentAnalyzer {
     fn default() -> Self {
         Self::new()
     }
@@ -185,28 +185,28 @@ mod tests {
 
     #[test]
     fn positive_sentiment() {
-        let analyzer = SentimentAnalyzer::new();
+        let analyzer = _SentimentAnalyzer::new();
         let result = analyzer.analyze("这个产品非常好用");
         assert!(result.positive_score > result.negative_score);
     }
 
     #[test]
     fn negative_sentiment() {
-        let analyzer = SentimentAnalyzer::new();
+        let analyzer = _SentimentAnalyzer::new();
         let result = analyzer.analyze("这个服务太差了");
         assert!(result.negative_score > result.positive_score);
     }
 
     #[test]
     fn neutral_sentiment() {
-        let analyzer = SentimentAnalyzer::new();
+        let analyzer = _SentimentAnalyzer::new();
         let result = analyzer.analyze("今天天气不错");
         assert!(result.positive_score > 0.0);
     }
 
     #[test]
     fn negation_test() {
-        let analyzer = SentimentAnalyzer::new();
+        let analyzer = _SentimentAnalyzer::new();
         let result = analyzer.analyze("不好");
         assert!(result.negative_score > result.positive_score);
     }

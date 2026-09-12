@@ -78,7 +78,7 @@ impl Fingerprint {
         }
     }
 
-    pub fn chrome_args(&self) -> Vec<String> {
+    pub fn _chrome_args(&self) -> Vec<String> {
         let mut args = Vec::new();
         args.push("--disable-blink-features=AutomationControlled".into());
         args.push(format!("--user-agent={}", self.user_agent));
@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn test_chrome_args_has_expected_flags() {
         let fp = Fingerprint::random();
-        let args = fp.chrome_args();
+        let args = fp._chrome_args();
         assert!(args.iter().any(|a| a.starts_with("--user-agent=")));
         assert!(args.iter().any(|a| a.starts_with("--window-size=")));
         assert!(args.contains(&"--disable-blink-features=AutomationControlled".to_string()));
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_chrome_args_count() {
         let fp = Fingerprint::random();
-        assert_eq!(fp.chrome_args().len(), 14);
+        assert_eq!(fp._chrome_args().len(), 14);
     }
 
     #[test]

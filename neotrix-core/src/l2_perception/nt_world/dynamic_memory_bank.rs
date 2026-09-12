@@ -59,7 +59,7 @@ pub struct MemoryEntry {
 
 /// 记忆库配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryBankConfig {
+pub struct _MemoryBankConfig {
     /// 每个实体类型的最大记忆数
     pub max_entries_per_type: usize,
     /// 身份检索阈值
@@ -85,7 +85,7 @@ pub struct RetrievalResult {
 
 /// 双查询配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DualQueryConfig {
+pub struct _DualQueryConfig {
     /// 长上下文查询（身份保留）
     pub story_query: String,
     /// 短上下文查询（生成连续性）
@@ -102,20 +102,20 @@ pub struct DualQueryConfig {
 
 /// 动态记忆库
 /// 管理实体级一致性，支持双查询检索
-pub struct DynamicMemoryBank {
+pub struct _DynamicMemoryBank {
     /// 配置
-    config: MemoryBankConfig,
+    config: _MemoryBankConfig,
     /// 记忆库：实体类型 -> (实体ID -> 记忆条目)
     banks: HashMap<EntityType, HashMap<String, MemoryEntry>>,
     /// 候选池 (用于学习检索)
     candidate_pool: Vec<(String, String, f32)>, // (query, entity_id, score)
 }
 
-impl DynamicMemoryBank {
+impl _DynamicMemoryBank {
     /// 创建记忆库
     pub fn new() -> Self {
         Self {
-            config: MemoryBankConfig {
+            config: _MemoryBankConfig {
                 max_entries_per_type: 100,
                 identity_retrieval_threshold: 0.7,
                 context_retrieval_threshold: 0.5,
@@ -128,7 +128,7 @@ impl DynamicMemoryBank {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: MemoryBankConfig) -> Self {
+    pub fn with_config(config: _MemoryBankConfig) -> Self {
         Self {
             config,
             banks: HashMap::new(),
@@ -137,7 +137,7 @@ impl DynamicMemoryBank {
     }
     
     /// 存储实体
-    pub fn store_entity(&mut self, entity_id: &str, state: EntityState) {
+    pub fn _store_entity(&mut self, entity_id: &str, state: EntityState) {
         let bank = self.banks.entry(state.entity_type).or_insert_with(HashMap::new);
         
         let entry = MemoryEntry {
@@ -151,7 +151,7 @@ impl DynamicMemoryBank {
     }
     
     /// 长上下文检索（身份保留）
-    pub fn retrieve_identity(&self, query: &str, k: usize) -> RetrievalResult {
+    pub fn _retrieve_identity(&self, query: &str, k: usize) -> RetrievalResult {
         let start = std::time::Instant::now();
         let mut results: Vec<MemoryEntry> = vec![];
         
@@ -183,7 +183,7 @@ impl DynamicMemoryBank {
     }
     
     /// 短上下文检索（生成连续性）
-    pub fn retrieve_context(&self, query: &str, k: usize) -> RetrievalResult {
+    pub fn _retrieve_context(&self, query: &str, k: usize) -> RetrievalResult {
         let start = std::time::Instant::now();
         let mut results: Vec<MemoryEntry> = vec![];
         
@@ -215,9 +215,9 @@ impl DynamicMemoryBank {
     }
     
     /// 双查询检索
-    pub fn dual_query_retrieve(&self, config: &DualQueryConfig) -> (RetrievalResult, RetrievalResult) {
-        let identity_result = self.retrieve_identity(&config.story_query, config.long_context_k);
-        let context_result = self.retrieve_context(&config.shot_query, config.short_context_k);
+    pub fn _dual_query_retrieve(&self, config: &_DualQueryConfig) -> (RetrievalResult, RetrievalResult) {
+        let identity_result = self._retrieve_identity(&config.story_query, config.long_context_k);
+        let context_result = self._retrieve_context(&config.shot_query, config.short_context_k);
         
         (identity_result, context_result)
     }
@@ -238,7 +238,7 @@ impl DynamicMemoryBank {
     }
     
     /// 标记实体出现
-    pub fn mark_appearance(&mut self, entity_id: &str, entity_type: EntityType, shot_number: u32) {
+    pub fn _mark_appearance(&mut self, entity_id: &str, entity_type: EntityType, shot_number: u32) {
         if let Some(bank) = self.banks.get_mut(&entity_type) {
             if let Some(entry) = bank.get_mut(entity_id) {
                 entry.state.appeared_in_shots.push(shot_number);
@@ -268,7 +268,7 @@ impl DynamicMemoryBank {
     }
     
     /// 获取记忆库统计
-    pub fn statistics(&self) -> MemoryBankStats {
+    pub fn statistics(&self) -> _MemoryBankStats {
         let total_entities: usize = self.banks.values().map(|b| b.len()).sum();
         let by_type: HashMap<String, usize> = self.banks.iter()
             .map(|(k, v)| (format!("{:?}", k), v.len()))
@@ -279,7 +279,7 @@ impl DynamicMemoryBank {
             .filter(|e| e.is_identity_critical)
             .count();
         
-        MemoryBankStats {
+        _MemoryBankStats {
             total_entities,
             entities_by_type: by_type,
             identity_critical_entities: identity_critical,
@@ -290,7 +290,7 @@ impl DynamicMemoryBank {
 
 /// 记忆库统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryBankStats {
+pub struct _MemoryBankStats {
     /// 总实体数
     pub total_entities: usize,
     /// 按类型统计
@@ -319,10 +319,10 @@ mod tests {
     
     #[test]
     fn test_memory_bank() {
-        let mut bank = DynamicMemoryBank::new();
+        let mut bank = _DynamicMemoryBank::new();
         
         // 存储角色
-        bank.store_entity("char_001", EntityState {
+        bank._store_entity("char_001", EntityState {
             entity_type: EntityType::Character,
             name: "主角".to_string(),
             description: "年轻男性，棕色头发，蓝色眼睛".to_string(),
@@ -335,7 +335,7 @@ mod tests {
         });
         
         // 检索
-        let result = bank.retrieve_identity("年轻男性 棕色头发", 10);
+        let result = bank._retrieve_identity("年轻男性 棕色头发", 10);
         assert!(!result.entries.is_empty());
         
         let stats = bank.statistics();
@@ -344,9 +344,9 @@ mod tests {
     
     #[test]
     fn test_dual_query() {
-        let mut bank = DynamicMemoryBank::new();
+        let mut bank = _DynamicMemoryBank::new();
         
-        bank.store_entity("char_001", EntityState {
+        bank._store_entity("char_001", EntityState {
             entity_type: EntityType::Character,
             name: "主角".to_string(),
             description: "年轻男性，棕色头发".to_string(),
@@ -358,7 +358,7 @@ mod tests {
             appeared_in_shots: vec![],
         });
         
-        let (identity, context) = bank.dual_query_retrieve(&DualQueryConfig {
+        let (identity, context) = bank._dual_query_retrieve(&_DualQueryConfig {
             story_query: "主角的故事".to_string(),
             shot_query: "主角在教室".to_string(),
             long_context_k: 5,

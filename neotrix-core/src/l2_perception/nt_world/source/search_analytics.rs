@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
-pub struct QueryRecord {
+pub struct _QueryRecord {
     pub query: String,
     pub results_count: usize,
     pub latency_ms: u64,
@@ -11,7 +11,7 @@ pub struct QueryRecord {
 
 #[derive(Debug, Clone)]
 pub struct SearchAnalytics {
-    queries: Vec<QueryRecord>,
+    queries: Vec<_QueryRecord>,
     max_records: usize,
 }
 
@@ -36,7 +36,7 @@ impl SearchAnalytics {
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
 
-        self.queries.push(QueryRecord {
+        self.queries.push(_QueryRecord {
             query,
             results_count,
             latency_ms,
@@ -48,14 +48,14 @@ impl SearchAnalytics {
         }
     }
 
-    pub fn slow_queries(&self, threshold_ms: u64) -> Vec<&QueryRecord> {
+    pub fn _slow_queries(&self, threshold_ms: u64) -> Vec<&_QueryRecord> {
         self.queries
             .iter()
             .filter(|r| r.latency_ms >= threshold_ms)
             .collect()
     }
 
-    pub fn top_queries(&self, limit: usize) -> Vec<(String, usize)> {
+    pub fn _top_queries(&self, limit: usize) -> Vec<(String, usize)> {
         let mut counts: HashMap<String, usize> = HashMap::new();
         for record in &self.queries {
             *counts.entry(record.query.clone()).or_insert(0) += 1;
@@ -73,7 +73,7 @@ impl SearchAnalytics {
         total as f64 / self.queries.len() as f64
     }
 
-    pub fn zero_result_queries(&self) -> Vec<&QueryRecord> {
+    pub fn _zero_result_queries(&self) -> Vec<&_QueryRecord> {
         self.queries
             .iter()
             .filter(|r| r.results_count == 0)
@@ -113,7 +113,7 @@ mod tests {
         let mut analytics = SearchAnalytics::new();
         analytics.record("fast".into(), 5, 50);
         analytics.record("slow".into(), 5, 500);
-        let slow = analytics.slow_queries(200);
+        let slow = analytics._slow_queries(200);
         assert_eq!(slow.len(), 1);
         assert_eq!(slow[0].query, "slow");
     }
@@ -125,7 +125,7 @@ mod tests {
             analytics.record("popular".into(), 1, 10);
         }
         analytics.record("rare".into(), 1, 10);
-        let top = analytics.top_queries(1);
+        let top = analytics._top_queries(1);
         assert_eq!(top[0], ("popular".into(), 5));
     }
 
@@ -142,7 +142,7 @@ mod tests {
         let mut analytics = SearchAnalytics::new();
         analytics.record("a".into(), 0, 10);
         analytics.record("b".into(), 5, 10);
-        assert_eq!(analytics.zero_result_queries().len(), 1);
+        assert_eq!(analytics._zero_result_queries().len(), 1);
     }
 
     #[test]

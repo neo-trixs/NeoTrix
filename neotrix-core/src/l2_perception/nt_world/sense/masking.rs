@@ -110,7 +110,7 @@ impl MaskingStrategy {
     }
 
     /// Create a default block masking strategy (mask 30% of patches in blocks of 4).
-    pub fn default_block() -> Self {
+    pub fn _default_block() -> Self {
         MaskingStrategy::BlockMasking {
             block_size: 4,
             mask_ratio: 0.3,
@@ -118,7 +118,7 @@ impl MaskingStrategy {
     }
 
     /// Create a default random masking strategy (mask 25% of patches).
-    pub fn default_random() -> Self {
+    pub fn _default_random() -> Self {
         MaskingStrategy::RandomMasking { mask_ratio: 0.25 }
     }
 }
@@ -200,9 +200,9 @@ mod tests {
 
     #[test]
     fn test_mask_ratio_getter() {
-        let s1 = MaskingStrategy::default_block();
+        let s1 = MaskingStrategy::_default_block();
         assert!((s1.mask_ratio() - 0.3).abs() < 1e-10);
-        let s2 = MaskingStrategy::default_random();
+        let s2 = MaskingStrategy::_default_random();
         assert!((s2.mask_ratio() - 0.25).abs() < 1e-10);
         let s3 = MaskingStrategy::None;
         assert!((s3.mask_ratio() - 0.0).abs() < 1e-10);

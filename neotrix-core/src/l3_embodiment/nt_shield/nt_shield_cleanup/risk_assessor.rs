@@ -17,7 +17,7 @@ impl RiskAssessor {
     }
 
     pub fn add_whitelist(&mut self, path: String) { self.whitelist.push(path); }
-    pub fn set_confirmation_threshold(&mut self, threshold: u8) { self.confirmation_threshold = threshold; }
+    pub fn _set_confirmation_threshold(&mut self, threshold: u8) { self.confirmation_threshold = threshold; }
 
     fn is_whitelisted(&self, path: &str) -> bool {
         self.whitelist.iter().any(|w| path.starts_with(w))

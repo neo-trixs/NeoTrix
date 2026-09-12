@@ -3,7 +3,7 @@ use std::time::Instant;
 
 /// Feed 源健康状态
 #[derive(Debug, Clone)]
-pub struct FeedHealth {
+pub struct _FeedHealth {
     pub url: String,
     pub last_fetch: Option<Instant>,
     pub success_count: u64,
@@ -14,7 +14,7 @@ pub struct FeedHealth {
 /// Feed 引擎 (并发 + 增量 + 健康度)
 pub struct FeedEngine {
     feeds: Vec<String>,
-    health: HashMap<String, FeedHealth>,
+    health: HashMap<String, _FeedHealth>,
     last_modified: HashMap<String, String>,
 }
 
@@ -28,9 +28,9 @@ impl FeedEngine {
     }
 
     /// 添加 Feed
-    pub fn add_feed(&mut self, url: String) {
+    pub fn _add_feed(&mut self, url: String) {
         self.feeds.push(url.clone());
-        self.health.insert(url.clone(), FeedHealth {
+        self.health.insert(url.clone(), _FeedHealth {
             url,
             last_fetch: None,
             success_count: 0,
@@ -40,7 +40,7 @@ impl FeedEngine {
     }
 
     /// 并发拉取多个 Feed
-    pub async fn fetch_all(&mut self) -> Vec<FeedResult> {
+    pub async fn fetch_all(&mut self) -> Vec<_FeedResult> {
         let mut results = Vec::new();
         let feeds: Vec<String> = self.feeds.clone();
         for url in &feeds {
@@ -53,13 +53,13 @@ impl FeedEngine {
                         health.success_count += 1;
                         health.avg_latency_ms = (health.avg_latency_ms + latency) / 2;
                     }
-                    results.push(FeedResult { url: url.clone(), content, success: true });
+                    results.push(_FeedResult { url: url.clone(), content, success: true });
                 }
                 Err(e) => {
                     if let Some(health) = self.health.get_mut(url) {
                         health.fail_count += 1;
                     }
-                    results.push(FeedResult { url: url.clone(), content: String::new(), success: false });
+                    results.push(_FeedResult { url: url.clone(), content: String::new(), success: false });
                     log::warn!("[feed] Failed to fetch {}: {}", url, e);
                 }
             }
@@ -89,13 +89,13 @@ impl FeedEngine {
     }
 
     /// 获取所有 Feed 健康状态
-    pub fn health_report(&self) -> Vec<&FeedHealth> {
+    pub fn health_report(&self) -> Vec<&_FeedHealth> {
         self.health.values().collect()
     }
 }
 
 #[derive(Debug)]
-pub struct FeedResult {
+pub struct _FeedResult {
     pub url: String,
     pub content: String,
     pub success: bool,

@@ -1,7 +1,7 @@
 //! nt_shield_comm — NT-SHIELD 通信伪装层
 //!
 //! Port of the retired `scripts/nt_comm_router.py` (IdentityPool / HeaderObfuscator /
-//! TimingObfuscator / GeoCoherence / CommRouter) + `nt_api_client.py` 的
+//! _TimingObfuscator / GeoCoherence / CommRouter) + `nt_api_client.py` 的
 //! persona 选择。目标: 使外部请求呈现为随机全球真实浏览器用户, 剥离内部
 //! NeoTrix 指纹。R-P79: 通过 `StealthHttpClient::with_persona` 接入生产网络
 //! 出口, 并提供 `comm` CLI 观测。
@@ -91,7 +91,7 @@ const CHROME_SEC_CH_UA: &str = r#""Not A(Brand";v="8", "Chromium";v="132", "Goog
 const EDGE_SEC_CH_UA: &str = r#""Not A(Brand";v="8", "Chromium";v="132", "Microsoft Edge";v="132""#;
 const CHROME_ACCEPT: &str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8";
 
-pub fn personas() -> &'static [Persona] {
+pub fn _personas() -> &'static [Persona] {
     &PERSONAS
 }
 
@@ -190,7 +190,7 @@ pub fn select_persona_weighted() -> &'static Persona {
 }
 
 /// 选择 geo_regions 兼容指定区域(或 Accept-Language 为 en-*)的 persona。
-pub fn select_persona_for_geo(geo_region: &str) -> &'static Persona {
+pub fn _select_persona_for_geo(geo_region: &str) -> &'static Persona {
     let upper = geo_region.to_uppercase();
     let mut en_fallback: Option<&'static Persona> = None;
     for p in &PERSONAS {
@@ -209,7 +209,7 @@ pub fn select_persona_for_geo(geo_region: &str) -> &'static Persona {
 // ============================================================================
 
 /// 从 Accept-Language 主语言映射区域 (port of LANG_REGION_MAP 常用项)。
-pub fn region_for_language(accept_language: &str) -> &'static str {
+pub fn _region_for_language(accept_language: &str) -> &'static str {
     let primary = accept_language.split(',').next().unwrap_or("").trim();
     match primary {
         "en-GB" => "GB", "en-CA" => "CA", "en-AU" => "AU",
@@ -241,9 +241,9 @@ fn continent(region: &str) -> &'static str {
     }
 }
 
-/// 0.3~1.0: Accept-Language 与 IP 区域的匹配度 (port of score_coherence)。
-pub fn score_coherence(accept_language: &str, ip_region: &str) -> f64 {
-    let lang_region = region_for_language(accept_language);
+/// 0.3~1.0: Accept-Language 与 IP 区域的匹配度 (port of _score_coherence)。
+pub fn _score_coherence(accept_language: &str, ip_region: &str) -> f64 {
+    let lang_region = _region_for_language(accept_language);
     if lang_region.eq_ignore_ascii_case(ip_region) {
         return 1.0;
     }
@@ -255,8 +255,8 @@ pub fn score_coherence(accept_language: &str, ip_region: &str) -> f64 {
     0.3
 }
 
-/// 为指定区域找合理的 Accept-Language (port of language_for_region)。
-pub fn language_for_region(region: &str) -> String {
+/// 为指定区域找合理的 Accept-Language (port of _language_for_region)。
+pub fn _language_for_region(region: &str) -> String {
     for (lang, reg) in [
         ("en-US", "US"), ("en-GB", "GB"), ("en-CA", "CA"), ("en-AU", "AU"),
         ("de-DE", "DE"), ("de-AT", "AT"), ("de-CH", "CH"),
@@ -286,7 +286,7 @@ pub fn language_for_region(region: &str) -> String {
 // ============================================================================
 
 /// 剥离内部 NeoTrix 指纹 (port of _strip_internal_headers / INTERNAL_PATTERNS)。
-pub fn strip_internal(value: &str) -> String {
+pub fn _strip_internal(value: &str) -> String {
     let mut v = value.to_string();
     // "nt_" 独立成词才替换 (词边界, 避免命中 "client_" 尾部), 先于 "neotrix"
     let nt_re = regex::Regex::new(r"(?i)\bnt_").expect("static literal regex");
@@ -378,7 +378,7 @@ pub fn build_headers(
     // strip internal
     let cleaned: Vec<(String, String)> = headers
         .into_iter()
-        .map(|(k, v)| (strip_internal(&k), strip_internal(&v)))
+        .map(|(k, v)| (_strip_internal(&k), _strip_internal(&v)))
         .collect();
 
     // apply header_order
@@ -407,17 +407,17 @@ fn apply_header_order(headers: Vec<(String, String)>, persona: &Persona) -> Vec<
 }
 
 // ============================================================================
-// TimingObfuscator — 时序抖动
+// _TimingObfuscator — 时序抖动
 // ============================================================================
 
 #[derive(Default)]
-pub struct TimingObfuscator {
+pub struct _TimingObfuscator {
     last_request: Option<Instant>,
 }
 
-impl TimingObfuscator {
+impl _TimingObfuscator {
     /// 计算人类浏览节奏的等待秒数 (gauss(2.5, 1.0) clamp [0.3, 10], 减去已逝时间)。
-    pub fn next_wait_secs(&mut self) -> f64 {
+    pub fn _next_wait_secs(&mut self) -> f64 {
         let now = Instant::now();
         let elapsed = self.last_request.map(|t| now.duration_since(t).as_secs_f64()).unwrap_or(0.0);
         self.last_request = Some(now);
@@ -429,7 +429,7 @@ impl TimingObfuscator {
     }
 
     /// 页面渲染抖动 (ms), gauss(200, 100)。
-    pub fn page_load_jitter_ms(&self) -> f64 {
+    pub fn _page_load_jitter_ms(&self) -> f64 {
         gauss(200.0, 100.0)
     }
 }
@@ -451,7 +451,7 @@ pub fn ensure_tables(conn: &Connection) -> rusqlite::Result<()> {
 }
 
 /// 从 persona 模板创建一个新身份实例 (md5 派生确定性 id)。
-pub fn create_id(conn: &Connection, persona_key: &str, now: f64) -> rusqlite::Result<String> {
+pub fn _create_id(conn: &Connection, persona_key: &str, now: f64) -> rusqlite::Result<String> {
     ensure_tables(conn)?;
     use md5::{Digest, Md5};
     let mut h = Md5::new();
@@ -565,7 +565,7 @@ fn now_epoch() -> f64 {
 // ============================================================================
 
 #[derive(Debug, Default, Clone)]
-pub struct RouterResult {
+pub struct _RouterResult {
     pub status: u16,
     pub body: Option<String>,
     pub error: String,
@@ -583,7 +583,7 @@ pub async fn fetch(
     persona_key: &str,
     extra_headers: &[(&str, &str)],
     timeout: Duration,
-) -> RouterResult {
+) -> _RouterResult {
     ensure_tables(conn).ok();
     let now = now_epoch();
     let persona = if persona_key.is_empty() {
@@ -591,7 +591,7 @@ pub async fn fetch(
     } else {
         persona_by_key(persona_key).unwrap_or_else(select_persona_weighted)
     };
-    let identity_id = create_id(conn, persona.key, now).unwrap_or_else(|_| "anon".to_string());
+    let identity_id = _create_id(conn, persona.key, now).unwrap_or_else(|_| "anon".to_string());
     let headers = build_headers(persona, url, extra_headers);
 
     let mut result = execute(client, url, &headers, timeout).await;
@@ -608,7 +608,7 @@ pub async fn fetch(
     if result.status == 403 || result.status == 429 || result.status == 0 {
         let alt = select_persona_weighted();
         if alt.key != persona.key {
-            let alt_id = create_id(conn, alt.key, now).unwrap_or_else(|_| "anon".to_string());
+            let alt_id = _create_id(conn, alt.key, now).unwrap_or_else(|_| "anon".to_string());
             let headers2 = build_headers(alt, url, extra_headers);
             let r2 = execute(client, url, &headers2, timeout).await;
             if r2.status != 403 && r2.status != 429 && r2.status != 0 {
@@ -625,7 +625,7 @@ pub async fn fetch(
     result
 }
 
-async fn execute(client: &reqwest::Client, url: &str, headers: &[(String, String)], timeout: Duration) -> RouterResult {
+async fn execute(client: &reqwest::Client, url: &str, headers: &[(String, String)], timeout: Duration) -> _RouterResult {
     let start = std::time::Instant::now();
     let mut req = client.get(url).timeout(timeout);
     for (k, v) in headers {
@@ -635,7 +635,7 @@ async fn execute(client: &reqwest::Client, url: &str, headers: &[(String, String
         Ok(resp) => {
             let status = resp.status().as_u16();
             let body = resp.text().await.ok();
-            RouterResult {
+            _RouterResult {
                 status,
                 body,
                 error: String::new(),
@@ -644,7 +644,7 @@ async fn execute(client: &reqwest::Client, url: &str, headers: &[(String, String
                 identity_id: String::new(),
             }
         }
-        Err(e) => RouterResult {
+        Err(e) => _RouterResult {
             status: 0,
             body: None,
             error: e.to_string(),
@@ -665,10 +665,10 @@ mod tests {
 
     #[test]
     fn test_personas_catalog() {
-        assert_eq!(personas().len(), 6);
-        assert_eq!(personas()[0].key, "chrome_win");
-        assert!(personas().iter().all(|p| p.weight > 0.0));
-        let total: f64 = personas().iter().map(|p| p.weight).sum();
+        assert_eq!(_personas().len(), 6);
+        assert_eq!(_personas()[0].key, "chrome_win");
+        assert!(_personas().iter().all(|p| p.weight > 0.0));
+        let total: f64 = _personas().iter().map(|p| p.weight).sum();
         assert!((total - 0.73).abs() < 1e-9, "weights match python: {total}");
     }
 
@@ -682,25 +682,25 @@ mod tests {
 
     #[test]
     fn test_region_for_language() {
-        assert_eq!(region_for_language("en-US,en;q=0.9"), "US");
-        assert_eq!(region_for_language("de-DE,de;q=0.9"), "DE");
-        assert_eq!(region_for_language("ja-JP,ja;q=0.9"), "JP");
-        assert_eq!(region_for_language("unknown-XX"), "US");
+        assert_eq!(_region_for_language("en-US,en;q=0.9"), "US");
+        assert_eq!(_region_for_language("de-DE,de;q=0.9"), "DE");
+        assert_eq!(_region_for_language("ja-JP,ja;q=0.9"), "JP");
+        assert_eq!(_region_for_language("unknown-XX"), "US");
     }
 
     #[test]
     fn test_score_coherence() {
-        assert_eq!(score_coherence("en-US,en;q=0.9", "US"), 1.0);
-        assert_eq!(score_coherence("de-DE,de;q=0.9", "DE"), 1.0);
-        assert!((score_coherence("en-US,en;q=0.9", "CA") - 0.6).abs() < 1e-9); // same continent
-        assert!((score_coherence("en-US,en;q=0.9", "JP") - 0.3).abs() < 1e-9);
+        assert_eq!(_score_coherence("en-US,en;q=0.9", "US"), 1.0);
+        assert_eq!(_score_coherence("de-DE,de;q=0.9", "DE"), 1.0);
+        assert!((_score_coherence("en-US,en;q=0.9", "CA") - 0.6).abs() < 1e-9); // same continent
+        assert!((_score_coherence("en-US,en;q=0.9", "JP") - 0.3).abs() < 1e-9);
     }
 
     #[test]
     fn test_language_for_region_roundtrip() {
-        assert_eq!(region_for_language(&language_for_region("JP")), "JP");
-        assert_eq!(region_for_language(&language_for_region("DE")), "DE");
-        assert_eq!(language_for_region("ZZ"), "en-US,en;q=0.9");
+        assert_eq!(_region_for_language(&_language_for_region("JP")), "JP");
+        assert_eq!(_region_for_language(&_language_for_region("DE")), "DE");
+        assert_eq!(_language_for_region("ZZ"), "en-US,en;q=0.9");
     }
 
     #[test]
@@ -730,13 +730,13 @@ mod tests {
 
     #[test]
     fn test_strip_internal_patterns() {
-        assert_eq!(strip_internal("NeoTrixBot/1.0"), "clientBot/1.0");
-        assert_eq!(strip_internal("x-neotrix-session: abc"), "x-client-session: abc");
-        assert_eq!(strip_internal("x-nt-key: secret"), "x-client-key: secret");
-        assert_eq!(strip_internal("NEOTRIX_TOKEN"), "CLIENT_TOKEN");
-        assert_eq!(strip_internal("/Users/alice/data"), "/home/user/data");
-        assert_eq!(strip_internal("id 550e8400-e29b-41d4-a716-446655440000 end"), "id 00000000-0000-0000-0000-000000000000 end");
-        assert_eq!(strip_internal("nt_foo_bar"), "sys_foo_bar");
+        assert_eq!(_strip_internal("NeoTrixBot/1.0"), "clientBot/1.0");
+        assert_eq!(_strip_internal("x-neotrix-session: abc"), "x-client-session: abc");
+        assert_eq!(_strip_internal("x-nt-key: secret"), "x-client-key: secret");
+        assert_eq!(_strip_internal("NEOTRIX_TOKEN"), "CLIENT_TOKEN");
+        assert_eq!(_strip_internal("/Users/alice/data"), "/home/user/data");
+        assert_eq!(_strip_internal("id 550e8400-e29b-41d4-a716-446655440000 end"), "id 00000000-0000-0000-0000-000000000000 end");
+        assert_eq!(_strip_internal("nt_foo_bar"), "sys_foo_bar");
     }
 
     #[test]
@@ -754,21 +754,21 @@ mod tests {
 
     #[test]
     fn test_timing_jitter_bounds() {
-        let mut t = TimingObfuscator::default();
-        assert_eq!(t.next_wait_secs(), 0.0); // first call no wait
+        let mut t = _TimingObfuscator::default();
+        assert_eq!(t._next_wait_secs(), 0.0); // first call no wait
         for _ in 0..20 {
-            let w = t.next_wait_secs();
+            let w = t._next_wait_secs();
             assert!((0.0..=10.0).contains(&w));
         }
-        let j = t.page_load_jitter_ms();
+        let j = t._page_load_jitter_ms();
         assert!(j > 0.0 && j < 2000.0);
     }
 
     #[test]
     fn test_identity_pool_lifecycle() {
         let conn = Connection::open_in_memory().unwrap();
-        let id = create_id(&conn, "chrome_win", 1000.0).unwrap();
-        let id2 = create_id(&conn, "chrome_win", 1000.1).unwrap();
+        let id = _create_id(&conn, "chrome_win", 1000.0).unwrap();
+        let id2 = _create_id(&conn, "chrome_win", 1000.1).unwrap();
         assert_ne!(id, id2);
         record_success(&conn, &id, 123.0).unwrap();
         record_failure(&conn, &id, "example.com", 429, "rate limited", "").unwrap();

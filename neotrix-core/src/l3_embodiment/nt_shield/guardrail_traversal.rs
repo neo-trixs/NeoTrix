@@ -15,7 +15,7 @@ pub enum TraversalLayer {
 
 /// 评估帧
 #[derive(Debug, Clone)]
-pub struct EvaluationFrame {
+pub struct _EvaluationFrame {
     pub name: String,
     pub layer: TraversalLayer,
     pub technique: String,
@@ -34,7 +34,7 @@ pub struct TraversalResult {
 
 /// 护栏路径穿越引擎
 pub struct GuardrailTraversalEngine {
-    frames: Vec<EvaluationFrame>,
+    frames: Vec<_EvaluationFrame>,
     _current_layer: TraversalLayer,
 }
 
@@ -42,46 +42,46 @@ impl GuardrailTraversalEngine {
     pub fn new() -> Self {
         let frames = vec![
             // Input层帧
-            EvaluationFrame {
+            _EvaluationFrame {
                 name: "persona_unlock".to_string(),
                 layer: TraversalLayer::Input,
                 technique: "Role-based persona activation".to_string(),
                 success_rate: 0.8,
             },
-            EvaluationFrame {
+            _EvaluationFrame {
                 name: "role_laboratory".to_string(),
                 layer: TraversalLayer::Input,
                 technique: "Multi-role scenario creation".to_string(),
                 success_rate: 0.75,
             },
-            EvaluationFrame {
+            _EvaluationFrame {
                 name: "encoding_surface".to_string(),
                 layer: TraversalLayer::Input,
                 technique: "Base64/ROT13/Morse encoding".to_string(),
                 success_rate: 0.85,
             },
             // Inference层帧
-            EvaluationFrame {
+            _EvaluationFrame {
                 name: "multi_turn_induction".to_string(),
                 layer: TraversalLayer::Inference,
                 technique: "Gradual context manipulation".to_string(),
                 success_rate: 0.7,
             },
-            EvaluationFrame {
+            _EvaluationFrame {
                 name: "red_team_pipeline".to_string(),
                 layer: TraversalLayer::Inference,
                 technique: "Automated attack generation".to_string(),
                 success_rate: 0.65,
             },
             // Output层帧
-            EvaluationFrame {
+            _EvaluationFrame {
                 name: "output_filter_bypass".to_string(),
                 layer: TraversalLayer::Output,
                 technique: "Semantic similarity avoidance".to_string(),
                 success_rate: 0.6,
             },
             // Postprocess层帧
-            EvaluationFrame {
+            _EvaluationFrame {
                 name: "response_refinement".to_string(),
                 layer: TraversalLayer::Postprocess,
                 technique: "Output sanitization and reformatting".to_string(),
@@ -102,7 +102,7 @@ impl GuardrailTraversalEngine {
         system_prompt: &str,
         layer: TraversalLayer,
     ) -> TraversalResult {
-        let applicable_frames: Vec<&EvaluationFrame> = self.frames
+        let applicable_frames: Vec<&_EvaluationFrame> = self.frames
             .iter()
             .filter(|f| f.layer == layer)
             .collect();
@@ -128,7 +128,7 @@ impl GuardrailTraversalEngine {
     }
 
     /// 应用帧
-    fn apply_frame(&self, input: &str, _system_prompt: &str, frame: &EvaluationFrame) -> String {
+    fn apply_frame(&self, input: &str, _system_prompt: &str, frame: &_EvaluationFrame) -> String {
         match frame.name.as_str() {
             "persona_unlock" => {
                 format!(
@@ -171,7 +171,7 @@ impl GuardrailTraversalEngine {
     }
 
     /// 自动选择最佳帧
-    pub fn auto_select_frame(&self, _input: &str, refusal: &str) -> &EvaluationFrame {
+    pub fn _auto_select_frame(&self, _input: &str, refusal: &str) -> &_EvaluationFrame {
         // 根据输入和拒答类型选择最佳帧
         if refusal.contains("I cannot") || refusal.contains("I'm not able") {
             // 模型拒答 - 使用persona_unlock
@@ -186,7 +186,7 @@ impl GuardrailTraversalEngine {
     }
 
     /// 执行全层穿越
-    pub fn full_traversal(&self, input: &str, system_prompt: &str) -> Vec<TraversalResult> {
+    pub fn _full_traversal(&self, input: &str, system_prompt: &str) -> Vec<TraversalResult> {
         let mut results = Vec::new();
         
         let layers = [
@@ -235,14 +235,14 @@ mod tests {
     #[test]
     fn test_auto_select_frame() {
         let engine = GuardrailTraversalEngine::new();
-        let frame = engine.auto_select_frame("test", "I cannot help with that");
+        let frame = engine._auto_select_frame("test", "I cannot help with that");
         assert_eq!(frame.name, "persona_unlock");
     }
 
     #[test]
     fn test_full_traversal() {
         let engine = GuardrailTraversalEngine::new();
-        let results = engine.full_traversal("test input", "system prompt");
+        let results = engine._full_traversal("test input", "system prompt");
         assert_eq!(results.len(), 4);
     }
 }

@@ -64,11 +64,11 @@ impl FetchResult {
         self.error.is_none() && self.status_code == 200
     }
 
-    pub fn is_redirect(&self) -> bool {
+    pub fn _is_redirect(&self) -> bool {
         (300..400).contains(&self.status_code)
     }
 
-    pub fn is_ratelimited(&self) -> bool {
+    pub fn _is_ratelimited(&self) -> bool {
         self.status_code == 429
     }
 
@@ -76,7 +76,7 @@ impl FetchResult {
         self.status_code == 403 || self.status_code == 401
     }
 
-    pub fn is_error_status(&self) -> bool {
+    pub fn _is_error_status(&self) -> bool {
         self.status_code >= 400
     }
 
@@ -133,7 +133,7 @@ impl FetcherPool {
         self.session_pool = Some(pool);
     }
 
-    pub fn session_pool_stats(&self) -> Option<(usize, usize)> {
+    pub fn _session_pool_stats(&self) -> Option<(usize, usize)> {
         self.session_pool.as_ref().map(|p| (p.active_count(), p.banned_count()))
     }
 
@@ -266,7 +266,7 @@ impl FetcherPool {
         let mut result = self.fetch(url);
         let mut retries = 0;
 
-        while result.is_error_status() && retries < max_retries {
+        while result._is_error_status() && retries < max_retries {
             retries += 1;
             let backoff = Duration::from_secs(2u64.saturating_pow(retries).min(3600));
             std::thread::sleep(backoff);
@@ -305,7 +305,7 @@ impl FetcherPool {
     /// P1-8 有序后端降级辅助 (Agent-Reach 模式): HTTP 后端失败时尝试 Browser 后端。
     /// 成功 → Some((body, text)), 失败 → None (调用方保留 HTTP 原始错误)。
     fn try_browser_fallback(&mut self, url: &str) -> Option<(String, Option<String>)> {
-        let result = self.fetch_nt_world_browse_mode(url);
+        let result = self._fetch_nt_world_browse_mode(url);
         if result.is_success() {
             Some((result.body.unwrap_or_default(), result.text))
         } else {
@@ -313,7 +313,7 @@ impl FetcherPool {
         }
     }
 
-    pub fn fetch_nt_world_browse_mode(&mut self, url: &str) -> FetchResult {
+    pub fn _fetch_nt_world_browse_mode(&mut self, url: &str) -> FetchResult {
         self.total_requests += 1;
         let start = Instant::now();
         let client = self.ensure_nt_world_browse_client();
@@ -424,7 +424,7 @@ impl FetcherPool {
         }
     }
 
-    pub fn clear_errors(&mut self) {
+    pub fn _clear_errors(&mut self) {
         self.errors.clear();
     }
 
@@ -460,7 +460,7 @@ impl FetcherPool {
         available
     }
 
-    pub fn is_network_available(&self) -> bool {
+    pub fn _is_network_available(&self) -> bool {
         self.network_available
     }
 }
@@ -517,7 +517,7 @@ mod tests {
     fn test_fetcher_pool_attach_session_pool() {
         let mut pool = FetcherPool::new(&test_config(), CrawlStrategy::Polite);
         pool.attach_session_pool(SessionPool::new(3));
-        let stats = pool.session_pool_stats().expect("session pool attached");
+        let stats = pool._session_pool_stats().expect("session pool attached");
         assert_eq!(stats, (3, 0));
     }
 
@@ -543,7 +543,7 @@ mod tests {
             error: None,
         };
         assert!(ok.is_success());
-        assert!(!ok.is_error_status());
+        assert!(!ok._is_error_status());
         assert_eq!(ok.text_snippet(), "ok");
 
         let blocked = FetchResult {
@@ -557,7 +557,7 @@ mod tests {
             status_code: 429,
             ..ok
         };
-        assert!(ratelimited.is_ratelimited());
+        assert!(ratelimited._is_ratelimited());
     }
 
     #[test]

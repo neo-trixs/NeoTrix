@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{OsintConfig, OsintTarget};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocialPost {
+pub struct _SocialPost {
     pub platform: String,
     pub author: String,
     pub content: String,
@@ -18,7 +18,7 @@ pub struct SocialPost {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SocialFindings {
-    pub posts: Vec<SocialPost>,
+    pub posts: Vec<_SocialPost>,
     pub domain_mentions: Vec<String>,
 }
 

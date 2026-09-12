@@ -10,24 +10,24 @@
 use serde::{Deserialize, Serialize};
 
 /// 对抗性测试框架
-pub struct AdversarialTestFramework {
-    test_suites: Vec<TestSuite>,
-    attack_patterns: Vec<AttackPattern>,
+pub struct _AdversarialTestFramework {
+    test_suites: Vec<_TestSuite>,
+    attack_patterns: Vec<_AttackPattern>,
     results: Vec<TestResult>,
-    config: AdversarialConfig,
-    stats: AdversarialStats,
+    config: _AdversarialConfig,
+    stats: _AdversarialStats,
 }
 
 /// 对抗性配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdversarialConfig {
+pub struct _AdversarialConfig {
     pub max_test_cases: usize,
     pub attack_intensity: f64,
     pub enable_auto_fix: bool,
     pub report_format: String,
 }
 
-impl Default for AdversarialConfig {
+impl Default for _AdversarialConfig {
     fn default() -> Self {
         Self {
             max_test_cases: 100,
@@ -40,18 +40,18 @@ impl Default for AdversarialConfig {
 
 /// 测试套件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestSuite {
+pub struct _TestSuite {
     pub id: String,
     pub name: String,
-    pub test_type: TestType,
+    pub test_type: _TestType,
     pub test_cases: Vec<TestCase>,
-    pub metadata: SuiteMetadata,
+    pub metadata: _SuiteMetadata,
 }
 
 /// 测试类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum TestType {
+pub enum _TestType {
     PromptInjection,
     Jailbreak,
     DataPoisoning,
@@ -93,7 +93,7 @@ pub enum Severity {
 
 /// 套件元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SuiteMetadata {
+pub struct _SuiteMetadata {
     pub author: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub last_run: Option<chrono::DateTime<chrono::Utc>>,
@@ -102,7 +102,7 @@ pub struct SuiteMetadata {
 
 /// 攻击模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttackPattern {
+pub struct _AttackPattern {
     pub id: String,
     pub pattern_type: String,
     pub description: String,
@@ -115,7 +115,7 @@ pub struct AttackPattern {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TestResult {
     pub test_case_id: String,
-    pub status: TestStatus,
+    pub status: _TestStatus,
     pub actual_behavior: String,
     pub vulnerability_found: Option<Vulnerability>,
     pub duration_ms: u64,
@@ -125,7 +125,7 @@ pub struct TestResult {
 /// 测试状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum TestStatus {
+pub enum _TestStatus {
     Pass,
     Fail,
     Error,
@@ -146,7 +146,7 @@ pub struct Vulnerability {
 
 /// 对抗性统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdversarialStats {
+pub struct _AdversarialStats {
     pub total_tests: u64,
     pub passed: u64,
     pub failed: u64,
@@ -156,7 +156,7 @@ pub struct AdversarialStats {
 }
 
 /// 测试报告
-pub struct TestReport {
+pub struct _TestReport {
     pub report_id: String,
     pub suite_id: String,
     pub total_tests: usize,
@@ -168,15 +168,15 @@ pub struct TestReport {
     pub generated_at: chrono::DateTime<chrono::Utc>,
 }
 
-impl AdversarialTestFramework {
+impl _AdversarialTestFramework {
     /// 创建新的对抗性测试框架
-    pub fn new(config: AdversarialConfig) -> Self {
+    pub fn new(config: _AdversarialConfig) -> Self {
         Self {
             test_suites: Vec::new(),
             attack_patterns: Vec::new(),
             results: Vec::new(),
             config,
-            stats: AdversarialStats {
+            stats: _AdversarialStats {
                 total_tests: 0,
                 passed: 0,
                 failed: 0,
@@ -188,17 +188,17 @@ impl AdversarialTestFramework {
     }
 
     /// 添加测试套件
-    pub fn add_test_suite(&mut self, suite: TestSuite) {
+    pub fn _add_test_suite(&mut self, suite: _TestSuite) {
         self.test_suites.push(suite);
     }
 
     /// 添加攻击模式
-    pub fn add_attack_pattern(&mut self, pattern: AttackPattern) {
+    pub fn _add_attack_pattern(&mut self, pattern: _AttackPattern) {
         self.attack_patterns.push(pattern);
     }
 
     /// 运行测试套件
-    pub fn run_suite(&mut self, suite_id: &str) -> Result<TestReport, String> {
+    pub fn _run_suite(&mut self, suite_id: &str) -> Result<_TestReport, String> {
         let suite = self.test_suites.iter().find(|s| s.id == suite_id)
             .ok_or_else(|| format!("Suite {} not found", suite_id))?;
 
@@ -216,8 +216,8 @@ impl AdversarialTestFramework {
             }
 
             match result.status {
-                TestStatus::Pass => self.stats.passed += 1,
-                TestStatus::Fail => self.stats.failed += 1,
+                _TestStatus::Pass => self.stats.passed += 1,
+                _TestStatus::Fail => self.stats.failed += 1,
                 _ => {}
             }
 
@@ -226,8 +226,8 @@ impl AdversarialTestFramework {
         }
 
         // 生成报告
-        let passed = results.iter().filter(|r| r.status == TestStatus::Pass).count();
-        let failed = results.iter().filter(|r| r.status == TestStatus::Fail).count();
+        let passed = results.iter().filter(|r| r.status == _TestStatus::Pass).count();
+        let failed = results.iter().filter(|r| r.status == _TestStatus::Fail).count();
         let total = results.len();
 
         let summary = format!(
@@ -237,7 +237,7 @@ impl AdversarialTestFramework {
 
         let recommendations = self.generate_recommendations(&vulnerabilities);
 
-        Ok(TestReport {
+        Ok(_TestReport {
             report_id: uuid::Uuid::new_v4().to_string(),
             suite_id: suite_id.to_string(),
             total_tests: total,
@@ -271,7 +271,7 @@ impl AdversarialTestFramework {
 
         TestResult {
             test_case_id: test_case.id.clone(),
-            status: if is_vulnerable { TestStatus::Fail } else { TestStatus::Pass },
+            status: if is_vulnerable { _TestStatus::Fail } else { _TestStatus::Pass },
             actual_behavior: test_case.expected_behavior.clone(),
             vulnerability_found: vulnerability,
             duration_ms: 100,
@@ -302,7 +302,7 @@ impl AdversarialTestFramework {
     }
 
     /// 获取统计信息
-    pub fn stats(&self) -> &AdversarialStats {
+    pub fn stats(&self) -> &_AdversarialStats {
         &self.stats
     }
 }

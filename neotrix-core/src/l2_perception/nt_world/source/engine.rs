@@ -75,7 +75,7 @@ impl MediaEngine {
             entry.healthy = false;
         }
     }
-    pub fn mark_healthy(&mut self, source_id: &str) {
+    pub fn _mark_healthy(&mut self, source_id: &str) {
         if let Some(entry) = self.sources.iter_mut().find(|s| s.source.id() == source_id) {
             entry.healthy = true;
         }

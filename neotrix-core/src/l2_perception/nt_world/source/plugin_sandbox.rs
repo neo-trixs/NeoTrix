@@ -16,7 +16,7 @@ impl PluginSandbox {
             timeout_ms: 10000,
         }
     }
-    pub fn is_host_allowed(&self, url: &str) -> bool {
+    pub fn _is_host_allowed(&self, url: &str) -> bool {
         self.allowed_hosts.iter().any(|h| url.contains(&h.replace("*.", "")))
     }
     pub fn check_rate_limit(&self, requests_this_minute: u32) -> bool {

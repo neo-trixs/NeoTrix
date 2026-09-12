@@ -9,9 +9,9 @@
 use std::collections::HashMap;
 
 /// 文本相似度计算器
-pub struct TextSimilarity;
+pub struct _TextSimilarity;
 
-impl TextSimilarity {
+impl _TextSimilarity {
     /// 余弦相似度 (基于字符级向量)
     pub fn cosine_similarity(text1: &str, text2: &str) -> f64 {
         if text1.is_empty() || text2.is_empty() {
@@ -49,7 +49,7 @@ impl TextSimilarity {
     }
 
     /// 编辑距离 (Levenshtein距离)
-    pub fn edit_distance(text1: &str, text2: &str) -> usize {
+    pub fn _edit_distance(text1: &str, text2: &str) -> usize {
         let len1 = text1.len();
         let len2 = text2.len();
         let chars1: Vec<char> = text1.chars().collect();
@@ -80,17 +80,17 @@ impl TextSimilarity {
     }
 
     /// 编辑距离相似度 (归一化到0-1)
-    pub fn edit_distance_similarity(text1: &str, text2: &str) -> f64 {
+    pub fn _edit_distance_similarity(text1: &str, text2: &str) -> f64 {
         let max_len = text1.chars().count().max(text2.chars().count());
         if max_len == 0 {
             return 1.0;
         }
-        let distance = Self::edit_distance(text1, text2);
+        let distance = Self::_edit_distance(text1, text2);
         1.0 - (distance as f64 / max_len as f64)
     }
 
     /// Jaccard相似度 (基于字符集)
-    pub fn jaccard_similarity(text1: &str, text2: &str) -> f64 {
+    pub fn _jaccard_similarity(text1: &str, text2: &str) -> f64 {
         let set1: std::collections::HashSet<char> = text1.chars().collect();
         let set2: std::collections::HashSet<char> = text2.chars().collect();
 
@@ -109,7 +109,7 @@ impl TextSimilarity {
     }
 
     /// Jaccard相似度 (基于词组)
-    pub fn jaccard_similarity_words(text1: &str, text2: &str) -> f64 {
+    pub fn _jaccard_similarity_words(text1: &str, text2: &str) -> f64 {
         let words1: std::collections::HashSet<&str> = text1.split_whitespace().collect();
         let words2: std::collections::HashSet<&str> = text2.split_whitespace().collect();
 
@@ -128,7 +128,7 @@ impl TextSimilarity {
     }
 
     /// SimHash (局部敏感哈希，用于近似去重)
-    pub fn simhash(text: &str, hash_bits: usize) -> u64 {
+    pub fn _simhash(text: &str, hash_bits: usize) -> u64 {
         let mut v = vec![0i64; hash_bits];
         let words: Vec<&str> = text.split_whitespace().collect();
 
@@ -153,7 +153,7 @@ impl TextSimilarity {
     }
 
     /// SimHash距离 (汉明距离)
-    pub fn simhash_distance(hash1: u64, hash2: u64) -> u32 {
+    pub fn _simhash_distance(hash1: u64, hash2: u64) -> u32 {
         (hash1 ^ hash2).count_ones()
     }
 
@@ -167,7 +167,7 @@ impl TextSimilarity {
     }
 
     /// BM25相似度 (基于词频)
-    pub fn bm25_score(query: &str, document: &str, k1: f64, b: f64) -> f64 {
+    pub fn _bm25_score(query: &str, document: &str, k1: f64, b: f64) -> f64 {
         let query_words: Vec<&str> = query.split_whitespace().collect();
         let doc_words: Vec<&str> = document.split_whitespace().collect();
         let doc_len = doc_words.len() as f64;
@@ -202,36 +202,36 @@ mod tests {
     fn cosine_similarity_test() {
         let s1 = "hello world";
         let s2 = "hello rust";
-        let sim = TextSimilarity::cosine_similarity(s1, s2);
+        let sim = _TextSimilarity::cosine_similarity(s1, s2);
         assert!(sim > 0.5); // 共享 "hello" 和空格
     }
 
     #[test]
     fn edit_distance_test() {
-        assert_eq!(TextSimilarity::edit_distance("kitten", "sitting"), 3);
-        assert_eq!(TextSimilarity::edit_distance("hello", "hello"), 0);
-        assert_eq!(TextSimilarity::edit_distance("", "abc"), 3);
+        assert_eq!(_TextSimilarity::_edit_distance("kitten", "sitting"), 3);
+        assert_eq!(_TextSimilarity::_edit_distance("hello", "hello"), 0);
+        assert_eq!(_TextSimilarity::_edit_distance("", "abc"), 3);
     }
 
     #[test]
     fn jaccard_similarity_test() {
-        let sim = TextSimilarity::jaccard_similarity("abc", "abd");
+        let sim = _TextSimilarity::_jaccard_similarity("abc", "abd");
         assert!(sim > 0.0 && sim < 1.0);
     }
 
     #[test]
     fn simhash_test() {
-        let h1 = TextSimilarity::simhash("hello world", 64);
-        let h2 = TextSimilarity::simhash("hello world", 64);
-        assert_eq!(TextSimilarity::simhash_distance(h1, h2), 0);
+        let h1 = _TextSimilarity::_simhash("hello world", 64);
+        let h2 = _TextSimilarity::_simhash("hello world", 64);
+        assert_eq!(_TextSimilarity::_simhash_distance(h1, h2), 0);
 
-        let h3 = TextSimilarity::simhash("completely different", 64);
-        assert!(TextSimilarity::simhash_distance(h1, h3) > 10);
+        let h3 = _TextSimilarity::_simhash("completely different", 64);
+        assert!(_TextSimilarity::_simhash_distance(h1, h3) > 10);
     }
 
     #[test]
     fn bm25_test() {
-        let score = TextSimilarity::bm25_score("hello", "hello world hello rust", 1.5, 0.75);
+        let score = _TextSimilarity::_bm25_score("hello", "hello world hello rust", 1.5, 0.75);
         assert!(score > 0.0);
     }
 }

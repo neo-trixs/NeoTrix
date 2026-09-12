@@ -7,12 +7,12 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 // ──────────────────────────────────────────────
-// File 1: VideoFrame / VideoPipeline / process
+// File 1: _VideoFrame / _VideoPipeline / process
 // ──────────────────────────────────────────────
 
 /// A single decoded video frame with a 16×16 grayscale descriptor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VideoFrame {
+pub struct _VideoFrame {
     /// Timestamp in seconds from the start of the video.
     pub timestamp: f64,
     /// 64-bit hash of the raw frame data (e.g. dHash, xxhash).
@@ -21,9 +21,9 @@ pub struct VideoFrame {
     pub grayscale_16x16: [[u8; 16]; 16],
 }
 
-impl VideoFrame {
+impl _VideoFrame {
     /// Compute mean absolute pixel difference against another frame.
-    pub fn mean_diff(&self, other: &VideoFrame) -> f64 {
+    pub fn _mean_diff(&self, other: &_VideoFrame) -> f64 {
         let mut total = 0u64;
         for y in 0..16 {
             for x in 0..16 {
@@ -38,7 +38,7 @@ impl VideoFrame {
 
 /// Summary of a processed video.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VideoSummary {
+pub struct _VideoSummary {
     /// Total number of frames in the video.
     pub frame_count: u64,
     /// Number of unique / key frames after dedup.
@@ -49,22 +49,22 @@ pub struct VideoSummary {
 
 /// Video frame processing pipeline.
 ///
-/// Ingests a sequence of [`VideoFrame`]s, deduplicates via grayscale
-/// comparison, and produces a [`VideoSummary`].
-pub struct VideoPipeline {
+/// Ingests a sequence of [`_VideoFrame`]s, deduplicates via grayscale
+/// comparison, and produces a [`_VideoSummary`].
+pub struct _VideoPipeline {
     /// All ingested frames (in temporal order).
-    pub frames: Vec<VideoFrame>,
+    pub frames: Vec<_VideoFrame>,
     /// Indices into `frames` that were kept as key frames.
     pub key_frames: Vec<usize>,
 }
 
-impl Default for VideoPipeline {
+impl Default for _VideoPipeline {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl VideoPipeline {
+impl _VideoPipeline {
     /// Create an empty pipeline.
     pub fn new() -> Self {
         Self {
@@ -74,7 +74,7 @@ impl VideoPipeline {
     }
 
     /// Push a new frame into the pipeline.
-    pub fn push_frame(&mut self, frame: VideoFrame) {
+    pub fn _push_frame(&mut self, frame: _VideoFrame) {
         self.frames.push(frame);
     }
 
@@ -83,7 +83,7 @@ impl VideoPipeline {
     /// mean absolute pixel difference exceeds `threshold` (default 5.0).
     ///
     /// The very first frame is always kept.
-    pub fn dedup_frames(&mut self) {
+    pub fn _dedup_frames(&mut self) {
         if self.frames.is_empty() {
             return;
         }
@@ -94,7 +94,7 @@ impl VideoPipeline {
 
         for i in 1..self.frames.len() {
             let last_kept = &self.frames[*self.key_frames.last().unwrap_or(&0)];
-            let diff = self.frames[i].mean_diff(last_kept);
+            let diff = self.frames[i]._mean_diff(last_kept);
             if diff > 5.0 {
                 self.key_frames.push(i);
             }
@@ -102,10 +102,10 @@ impl VideoPipeline {
     }
 
     /// Run the full pipeline: dedup then produce a summary.
-    pub fn process(&mut self) -> VideoSummary {
-        self.dedup_frames();
+    pub fn process(&mut self) -> _VideoSummary {
+        self._dedup_frames();
         let duration = self.frames.last().map(|f| f.timestamp - self.frames[0].timestamp).unwrap_or(0.0);
-        VideoSummary {
+        _VideoSummary {
             frame_count: self.frames.len() as u64,
             key_frame_count: self.key_frames.len() as u64,
             duration_secs: duration,
@@ -113,9 +113,9 @@ impl VideoPipeline {
     }
 
     /// Produce a summary without deduplicating (uses all frames as key).
-    pub fn summary_raw(&self) -> VideoSummary {
+    pub fn _summary_raw(&self) -> _VideoSummary {
         let duration = self.frames.last().map(|f| f.timestamp - self.frames[0].timestamp).unwrap_or(0.0);
-        VideoSummary {
+        _VideoSummary {
             frame_count: self.frames.len() as u64,
             key_frame_count: self.frames.len() as u64,
             duration_secs: duration,
@@ -132,7 +132,7 @@ impl VideoPipeline {
 /// the `image` crate into the 16×16 grayscale descriptor the dedup comparator
 /// expects. When ffmpeg is unavailable or extraction fails, falls back to the
 /// previous file-size heuristic so the summary never hard-errors.
-pub fn process_video(path: &str) -> Result<VideoSummary, String> {
+pub fn _process_video(path: &str) -> Result<_VideoSummary, String> {
     let p = Path::new(path);
     if !p.exists() {
         return Err(format!("video file not found: {}", path));
@@ -175,9 +175,9 @@ pub fn process_video(path: &str) -> Result<VideoSummary, String> {
     }
 
     // Build VideoFrames from decoded pixels: 16×16 grayscale descriptor + phash.
-    let mut pipeline = VideoPipeline::new();
+    let mut pipeline = _VideoPipeline::new();
     for (i, bytes) in frames.iter().enumerate() {
-        let mut frame = VideoFrame {
+        let mut frame = _VideoFrame {
             timestamp: i as f64,
             data_hash: 0,
             grayscale_16x16: [[0u8; 16]; 16],
@@ -205,7 +205,7 @@ pub fn process_video(path: &str) -> Result<VideoSummary, String> {
             }
             frame.data_hash = hash;
         }
-        pipeline.push_frame(frame);
+        pipeline._push_frame(frame);
     }
     let _ = std::fs::remove_dir_all(&tmp);
 
@@ -214,15 +214,15 @@ pub fn process_video(path: &str) -> Result<VideoSummary, String> {
         let file_size = meta.len();
         let estimated_frames = (file_size / 50_000).max(1);
         let estimated_duration = estimated_frames as f64 / 30.0;
-        let frame = VideoFrame {
+        let frame = _VideoFrame {
             timestamp: 0.0,
             data_hash: file_size,
             grayscale_16x16: [[0u8; 16]; 16],
         };
-        let mut p2 = VideoPipeline::new();
-        p2.push_frame(frame);
-        p2.dedup_frames();
-        return Ok(VideoSummary {
+        let mut p2 = _VideoPipeline::new();
+        p2._push_frame(frame);
+        p2._dedup_frames();
+        return Ok(_VideoSummary {
             frame_count: estimated_frames,
             key_frame_count: p2.key_frames.len() as u64,
             duration_secs: duration.unwrap_or(estimated_duration),
@@ -299,8 +299,8 @@ fn cell_lum(rgb: &image::RgbImage, x0: u32, x1: u32, y0: u32, y1: u32) -> f64 {
 
 /// Build a pipeline from a pre-collected vector of frames,
 /// run dedup, and return a summary.
-pub fn process_frames(frames: Vec<VideoFrame>) -> VideoSummary {
-    let mut pipeline = VideoPipeline {
+pub fn _process_frames(frames: Vec<_VideoFrame>) -> _VideoSummary {
+    let mut pipeline = _VideoPipeline {
         frames,
         key_frames: Vec::new(),
     };
@@ -308,8 +308,8 @@ pub fn process_frames(frames: Vec<VideoFrame>) -> VideoSummary {
 }
 
 // ──────────────────────────────────────────────
-// File 2: VideoExtractor / Transcoder / Subtitle
-//         DeviceDiscovery / ExtractionPipeline
+// File 2: _VideoExtractor / _Transcoder / Subtitle
+//         _DeviceDiscovery / _ExtractionPipeline
 // ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -323,7 +323,7 @@ pub enum VideoCodec {
 }
 
 impl VideoCodec {
-    pub fn ffmpeg_name(&self) -> &'static str {
+    pub fn _ffmpeg_name(&self) -> &'static str {
         match self {
             VideoCodec::H264 => "h264",
             VideoCodec::H265 => "hevc",
@@ -336,7 +336,7 @@ impl VideoCodec {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum StreamProtocol {
+pub enum _StreamProtocol {
     HLS,
     DASH,
     Progressive,
@@ -345,9 +345,9 @@ pub enum StreamProtocol {
 }
 
 #[derive(Debug, Clone)]
-pub struct StreamInfo {
+pub struct _StreamInfo {
     pub url: String,
-    pub protocol: StreamProtocol,
+    pub protocol: _StreamProtocol,
     pub codec: VideoCodec,
     pub width: u32,
     pub height: u32,
@@ -383,7 +383,7 @@ impl Default for TranscodeConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct TranscodeResult {
+pub struct _TranscodeResult {
     pub output_path: String,
     pub duration_ms: u64,
     pub output_size_bytes: u64,
@@ -393,48 +393,48 @@ pub struct TranscodeResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CastProtocol {
+pub enum _CastProtocol {
     DLNA,
     Chromecast,
     AirPlay,
 }
 
 #[derive(Debug, Clone)]
-pub struct CastTarget {
+pub struct _CastTarget {
     pub name: String,
-    pub protocol: CastProtocol,
+    pub protocol: _CastProtocol,
     pub address: String,
     pub port: u16,
     pub supports_transcoding: bool,
 }
 
-pub struct VideoExtractor {
-    stream_cache: HashMap<String, StreamInfo>,
-    extraction_count: u64,
+pub struct _VideoExtractor {
+    stream_cache: HashMap<String, _StreamInfo>,
+    _extraction_count: u64,
     last_extraction: Option<Instant>,
 }
 
-impl Default for VideoExtractor {
+impl Default for _VideoExtractor {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl VideoExtractor {
+impl _VideoExtractor {
     pub fn new() -> Self {
         Self {
             stream_cache: HashMap::new(),
-            extraction_count: 0,
+            _extraction_count: 0,
             last_extraction: None,
         }
     }
 
-    pub fn extract_from_page(&mut self, url: &str) -> Vec<StreamInfo> {
-        self.extraction_count += 1;
+    pub fn _extract_from_page(&mut self, url: &str) -> Vec<_StreamInfo> {
+        self._extraction_count += 1;
         self.last_extraction = Some(Instant::now());
-        let stream = StreamInfo {
+        let stream = _StreamInfo {
             url: url.to_string(),
-            protocol: StreamProtocol::HLS,
+            protocol: _StreamProtocol::HLS,
             codec: VideoCodec::H264,
             width: 1920,
             height: 1080,
@@ -447,16 +447,16 @@ impl VideoExtractor {
         vec![stream]
     }
 
-    pub fn extract_from_page_with_page_param(&mut self, url: &str, html: &str) -> Vec<StreamInfo> {
-        self.extraction_count += 1;
+    pub fn _extract_from_page_with_page_param(&mut self, url: &str, html: &str) -> Vec<_StreamInfo> {
+        self._extraction_count += 1;
         self.last_extraction = Some(Instant::now());
         let mut streams = Vec::new();
         for line in html.lines() {
             if line.contains(".m3u8") {
                 let stream_url = Self::extract_url(line);
-                streams.push(StreamInfo {
+                streams.push(_StreamInfo {
                     url: stream_url,
-                    protocol: StreamProtocol::HLS,
+                    protocol: _StreamProtocol::HLS,
                     codec: VideoCodec::H264,
                     width: 1920,
                     height: 1080,
@@ -468,9 +468,9 @@ impl VideoExtractor {
             }
             if line.contains(".mpd") {
                 let stream_url = Self::extract_url(line);
-                streams.push(StreamInfo {
+                streams.push(_StreamInfo {
                     url: stream_url,
-                    protocol: StreamProtocol::DASH,
+                    protocol: _StreamProtocol::DASH,
                     codec: VideoCodec::H264,
                     width: 1280,
                     height: 720,
@@ -482,9 +482,9 @@ impl VideoExtractor {
             }
         }
         if streams.is_empty() {
-            streams.push(StreamInfo {
+            streams.push(_StreamInfo {
                 url: url.to_string(),
-                protocol: StreamProtocol::Progressive,
+                protocol: _StreamProtocol::Progressive,
                 codec: VideoCodec::Unknown,
                 width: 0,
                 height: 0,
@@ -511,15 +511,15 @@ impl VideoExtractor {
         }
     }
 
-    pub fn get_cached(&self, url: &str) -> Option<&StreamInfo> {
+    pub fn _get_cached(&self, url: &str) -> Option<&_StreamInfo> {
         self.stream_cache.get(url)
     }
 
-    pub fn extraction_count(&self) -> u64 {
-        self.extraction_count
+    pub fn _extraction_count(&self) -> u64 {
+        self._extraction_count
     }
 
-    pub fn best_stream<'a>(&self, streams: &'a [StreamInfo]) -> Option<&'a StreamInfo> {
+    pub fn _best_stream<'a>(&self, streams: &'a [_StreamInfo]) -> Option<&'a _StreamInfo> {
         streams.iter().max_by(|a, b| {
             (a.width * a.height).cmp(&(b.width * b.height))
                 .then_with(|| a.bitrate_kbps.cmp(&b.bitrate_kbps))
@@ -527,16 +527,16 @@ impl VideoExtractor {
     }
 }
 
-pub struct Transcoder {
+pub struct _Transcoder {
     config: TranscodeConfig,
 }
 
-impl Transcoder {
+impl _Transcoder {
     pub fn new(config: TranscodeConfig) -> Self {
         Self { config }
     }
 
-    pub fn transcode(&self, input: &StreamInfo) -> TranscodeResult {
+    pub fn _transcode(&self, input: &_StreamInfo) -> _TranscodeResult {
         let compression = if input.width > 0 && self.config.target_width > 0 {
             (input.width as f64 / self.config.target_width as f64)
                 .max(0.0)
@@ -544,8 +544,8 @@ impl Transcoder {
         } else {
             1.0
         };
-        TranscodeResult {
-            output_path: format!("/tmp/transcode_{}.mp4", input.codec.ffmpeg_name()),
+        _TranscodeResult {
+            output_path: format!("/tmp/transcode_{}.mp4", input.codec._ffmpeg_name()),
             duration_ms: 30000,
             output_size_bytes: (self.config.target_bitrate_kbps as u64 * 30000 / 8 / 1000),
             actual_codec: self.config.target_codec,
@@ -558,7 +558,7 @@ impl Transcoder {
         &self.config
     }
 
-    pub fn should_transcode(&self, stream: &StreamInfo) -> bool {
+    pub fn _should_transcode(&self, stream: &_StreamInfo) -> bool {
         stream.codec != self.config.target_codec
             || stream.width > self.config.target_width
             || stream.height > self.config.target_height
@@ -566,9 +566,9 @@ impl Transcoder {
     }
 }
 
-pub struct SubtitleEngine;
+pub struct _SubtitleEngine;
 
-impl SubtitleEngine {
+impl _SubtitleEngine {
     pub fn generate(text: &str, _language: &str) -> Vec<SubtitleEntry> {
         let words: Vec<&str> = text.split_whitespace().collect();
         let chunk_size = 10.max(words.len() / 5);
@@ -596,60 +596,60 @@ pub struct SubtitleEntry {
     pub text: String,
 }
 
-pub struct DeviceDiscovery;
+pub struct _DeviceDiscovery;
 
-impl DeviceDiscovery {
-    pub fn scan(protocol: CastProtocol) -> Vec<CastTarget> {
+impl _DeviceDiscovery {
+    pub fn scan(protocol: _CastProtocol) -> Vec<_CastTarget> {
         match protocol {
-            CastProtocol::DLNA => vec![CastTarget {
+            _CastProtocol::DLNA => vec![_CastTarget {
                 name: "Living Room TV (DLNA)".into(),
-                protocol: CastProtocol::DLNA,
+                protocol: _CastProtocol::DLNA,
                 address: "192.168.1.100".into(),
                 port: 8200,
                 supports_transcoding: false,
             }],
-            CastProtocol::Chromecast => vec![CastTarget {
+            _CastProtocol::Chromecast => vec![_CastTarget {
                 name: "Living Room TV (Chromecast)".into(),
-                protocol: CastProtocol::Chromecast,
+                protocol: _CastProtocol::Chromecast,
                 address: "192.168.1.101".into(),
                 port: 8009,
                 supports_transcoding: true,
             }],
-            CastProtocol::AirPlay => vec![],
+            _CastProtocol::AirPlay => vec![],
         }
     }
 }
 
-pub struct ExtractionPipeline {
-    extractor: VideoExtractor,
-    transcoder: Transcoder,
+pub struct _ExtractionPipeline {
+    extractor: _VideoExtractor,
+    transcoder: _Transcoder,
     pipeline_active: bool,
     total_processed: u64,
 }
 
-impl ExtractionPipeline {
+impl _ExtractionPipeline {
     pub fn new(transcode_config: TranscodeConfig) -> Self {
         Self {
-            extractor: VideoExtractor::new(),
-            transcoder: Transcoder::new(transcode_config),
+            extractor: _VideoExtractor::new(),
+            transcoder: _Transcoder::new(transcode_config),
             pipeline_active: false,
             total_processed: 0,
         }
     }
 
-    pub fn run(&mut self, page_url: &str) -> Result<PipelineOutput, String> {
+    pub fn run(&mut self, page_url: &str) -> Result<_PipelineOutput, String> {
         self.pipeline_active = true;
-        let streams = self.extractor.extract_from_page(page_url);
+        let streams = self.extractor._extract_from_page(page_url);
         if streams.is_empty() {
             return Err("No streams found".into());
         }
         let mut outputs = Vec::new();
         for stream in &streams {
-            let needs_transcode = self.transcoder.should_transcode(stream);
+            let needs_transcode = self.transcoder._should_transcode(stream);
             let result = if needs_transcode {
-                self.transcoder.transcode(stream)
+                self.transcoder._transcode(stream)
             } else {
-                TranscodeResult {
+                _TranscodeResult {
                     output_path: stream.url.clone(),
                     duration_ms: 0,
                     output_size_bytes: 0,
@@ -662,9 +662,9 @@ impl ExtractionPipeline {
         }
         self.total_processed += outputs.len() as u64;
         self.pipeline_active = false;
-        Ok(PipelineOutput {
+        Ok(_PipelineOutput {
             streams: outputs,
-            extraction_count: self.extractor.extraction_count(),
+            _extraction_count: self.extractor._extraction_count(),
         })
     }
 
@@ -678,9 +678,9 @@ impl ExtractionPipeline {
 }
 
 #[derive(Debug, Clone)]
-pub struct PipelineOutput {
-    pub streams: Vec<(StreamInfo, TranscodeResult)>,
-    pub extraction_count: u64,
+pub struct _PipelineOutput {
+    pub streams: Vec<(_StreamInfo, _TranscodeResult)>,
+    pub _extraction_count: u64,
 }
 
 // ──────────────────────────────────────────────
@@ -694,7 +694,7 @@ pub struct PipelineOutput {
 
 /// 视频生产链阶段。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum VideoStage {
+pub enum _VideoStage {
     Extract,
     Transcode,
     Dedup,
@@ -702,36 +702,36 @@ pub enum VideoStage {
     Publish,
 }
 
-impl VideoStage {
+impl _VideoStage {
     pub fn label(self) -> &'static str {
         match self {
-            VideoStage::Extract => "extract",
-            VideoStage::Transcode => "transcode",
-            VideoStage::Dedup => "dedup",
-            VideoStage::Subtitle => "subtitle",
-            VideoStage::Publish => "publish",
+            _VideoStage::Extract => "extract",
+            _VideoStage::Transcode => "_transcode",
+            _VideoStage::Dedup => "dedup",
+            _VideoStage::Subtitle => "subtitle",
+            _VideoStage::Publish => "publish",
         }
     }
 
     /// 阶段执行顺序索引 (供推进/恢复)。
     fn order(self) -> u8 {
         match self {
-            VideoStage::Extract => 0,
-            VideoStage::Transcode => 1,
-            VideoStage::Dedup => 2,
-            VideoStage::Subtitle => 3,
-            VideoStage::Publish => 4,
+            _VideoStage::Extract => 0,
+            _VideoStage::Transcode => 1,
+            _VideoStage::Dedup => 2,
+            _VideoStage::Subtitle => 3,
+            _VideoStage::Publish => 4,
         }
     }
 
     /// 顺序中的下一个阶段。
-    pub fn next(self) -> Option<VideoStage> {
+    pub fn next(self) -> Option<_VideoStage> {
         match self {
-            VideoStage::Extract => Some(VideoStage::Transcode),
-            VideoStage::Transcode => Some(VideoStage::Dedup),
-            VideoStage::Dedup => Some(VideoStage::Subtitle),
-            VideoStage::Subtitle => Some(VideoStage::Publish),
-            VideoStage::Publish => None,
+            _VideoStage::Extract => Some(_VideoStage::Transcode),
+            _VideoStage::Transcode => Some(_VideoStage::Dedup),
+            _VideoStage::Dedup => Some(_VideoStage::Subtitle),
+            _VideoStage::Subtitle => Some(_VideoStage::Publish),
+            _VideoStage::Publish => None,
         }
     }
 }
@@ -739,7 +739,7 @@ impl VideoStage {
 /// 单个阶段的 checkpoint 状态。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StageCheckpoint {
-    pub stage: VideoStage,
+    pub stage: _VideoStage,
     /// 该阶段是否已完成。
     pub done: bool,
     /// 完成时的时间戳 (unix 秒, 0 = 未完成)。
@@ -764,18 +764,18 @@ impl VideoChainCheckpoint {
         Self {
             source: source.to_string(),
             stages: vec![
-                StageCheckpoint { stage: VideoStage::Extract, done: false, finished_at: 0, artifact: String::new() },
-                StageCheckpoint { stage: VideoStage::Transcode, done: false, finished_at: 0, artifact: String::new() },
-                StageCheckpoint { stage: VideoStage::Dedup, done: false, finished_at: 0, artifact: String::new() },
-                StageCheckpoint { stage: VideoStage::Subtitle, done: false, finished_at: 0, artifact: String::new() },
-                StageCheckpoint { stage: VideoStage::Publish, done: false, finished_at: 0, artifact: String::new() },
+                StageCheckpoint { stage: _VideoStage::Extract, done: false, finished_at: 0, artifact: String::new() },
+                StageCheckpoint { stage: _VideoStage::Transcode, done: false, finished_at: 0, artifact: String::new() },
+                StageCheckpoint { stage: _VideoStage::Dedup, done: false, finished_at: 0, artifact: String::new() },
+                StageCheckpoint { stage: _VideoStage::Subtitle, done: false, finished_at: 0, artifact: String::new() },
+                StageCheckpoint { stage: _VideoStage::Publish, done: false, finished_at: 0, artifact: String::new() },
             ],
             budget_used: 0,
         }
     }
 
     /// 标记某阶段完成并记录产物。
-    pub fn complete(&mut self, stage: VideoStage, artifact: impl Into<String>) {
+    pub fn complete(&mut self, stage: _VideoStage, artifact: impl Into<String>) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
@@ -788,12 +788,12 @@ impl VideoChainCheckpoint {
     }
 
     /// 查询阶段是否已完成。
-    pub fn is_done(&self, stage: VideoStage) -> bool {
+    pub fn _is_done(&self, stage: _VideoStage) -> bool {
         self.stages.iter().find(|s| s.stage == stage).map(|s| s.done).unwrap_or(false)
     }
 
     /// 下一个未完成阶段 (从 Extract 顺序推进) — resume 起点。
-    pub fn next_pending(&self) -> Option<VideoStage> {
+    pub fn next_pending(&self) -> Option<_VideoStage> {
         self.stages.iter().find(|s| !s.done).map(|s| s.stage)
     }
 
@@ -813,7 +813,7 @@ impl VideoChainCheckpoint {
     }
 
     /// 记录预算消耗。
-    pub fn spend_budget(&mut self, tokens: u64) {
+    pub fn _spend_budget(&mut self, tokens: u64) {
         self.budget_used = self.budget_used.saturating_add(tokens);
     }
 }
@@ -838,14 +838,14 @@ impl VideoChainRunner {
     }
 
     /// 从最近 checkpoint 恢复: 返回下一个待执行阶段 (None = 已全部完成)。
-    pub fn resume(&self) -> Option<VideoStage> {
+    pub fn resume(&self) -> Option<_VideoStage> {
         self.checkpoint.next_pending()
     }
 
     /// 执行单个阶段 (玩具: 以 stage_budget 为 token 消耗模拟重活)。
     /// 若阶段已 done → 跳过 (resume 语义)。
-    pub fn run_stage(&mut self, stage: VideoStage) -> Result<StageCheckpoint, String> {
-        if self.checkpoint.is_done(stage) {
+    pub fn run_stage(&mut self, stage: _VideoStage) -> Result<StageCheckpoint, String> {
+        if self.checkpoint._is_done(stage) {
             // 已完成的阶段跳过 — 不重复执行
             return self
                 .checkpoint
@@ -861,7 +861,7 @@ impl VideoChainRunner {
         }
         let artifact = format!("{}-output", stage.label());
         self.checkpoint.complete(stage, &artifact);
-        self.checkpoint.spend_budget(cost);
+        self.checkpoint._spend_budget(cost);
         self.executed += 1;
         self.checkpoint
             .stages
@@ -873,7 +873,7 @@ impl VideoChainRunner {
 
     /// 全链执行: 从 resume 起点顺序推进到 Publish (或首个预算失败处)。
     /// 返回已完成阶段列表。
-    pub fn run_all(&mut self) -> Result<Vec<VideoStage>, String> {
+    pub fn run_all(&mut self) -> Result<Vec<_VideoStage>, String> {
         let mut done = Vec::new();
         let mut current = self.resume();
         while let Some(stage) = current {
@@ -938,7 +938,7 @@ impl ProductionStage {
 
 /// 生产链阶段产物。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProductionArtifact {
+pub struct _ProductionArtifact {
     pub stage: ProductionStage,
     pub done: bool,
     pub artifact: String,
@@ -948,7 +948,7 @@ pub struct ProductionArtifact {
 #[derive(Debug, Clone)]
 pub struct VideoProductionChain {
     pub topic: String,
-    pub stages: Vec<ProductionArtifact>,
+    pub stages: Vec<_ProductionArtifact>,
     /// 已消耗 token 预算。
     pub budget_used: u64,
     /// 已执行阶段计数。
@@ -960,11 +960,11 @@ impl VideoProductionChain {
         Self {
             topic: topic.to_string(),
             stages: vec![
-                ProductionArtifact { stage: ProductionStage::Script, done: false, artifact: String::new() },
-                ProductionArtifact { stage: ProductionStage::Material, done: false, artifact: String::new() },
-                ProductionArtifact { stage: ProductionStage::Tts, done: false, artifact: String::new() },
-                ProductionArtifact { stage: ProductionStage::Compose, done: false, artifact: String::new() },
-                ProductionArtifact { stage: ProductionStage::Publish, done: false, artifact: String::new() },
+                _ProductionArtifact { stage: ProductionStage::Script, done: false, artifact: String::new() },
+                _ProductionArtifact { stage: ProductionStage::Material, done: false, artifact: String::new() },
+                _ProductionArtifact { stage: ProductionStage::Tts, done: false, artifact: String::new() },
+                _ProductionArtifact { stage: ProductionStage::Compose, done: false, artifact: String::new() },
+                _ProductionArtifact { stage: ProductionStage::Publish, done: false, artifact: String::new() },
             ],
             budget_used: 0,
             executed: 0,
@@ -981,7 +981,7 @@ impl VideoProductionChain {
     }
 
     /// 执行单个阶段 (脚本为模板生成, 其余为确定性模拟重活)。
-    pub fn run_stage(&mut self, stage: ProductionStage) -> Result<ProductionArtifact, String> {
+    pub fn run_stage(&mut self, stage: ProductionStage) -> Result<_ProductionArtifact, String> {
         if self.stages.iter().any(|s| s.stage == stage && s.done) {
             return self
                 .stages
@@ -1003,7 +1003,7 @@ impl VideoProductionChain {
         }
         self.budget_used = self.budget_used.saturating_add(1 + stage.order() as u64);
         self.executed += 1;
-        Ok(ProductionArtifact { stage, done: true, artifact })
+        Ok(_ProductionArtifact { stage, done: true, artifact })
     }
 
     /// 全链推进到 Publish。
@@ -1019,7 +1019,7 @@ impl VideoProductionChain {
     }
 
     /// 产物摘要 (供入库描述)。
-    pub fn output_manifest(&self) -> Vec<(ProductionStage, String)> {
+    pub fn _output_manifest(&self) -> Vec<(ProductionStage, String)> {
         self.stages.iter().map(|s| (s.stage, s.artifact.clone())).collect()
     }
 }
@@ -1038,7 +1038,7 @@ fn slugify(s: &str) -> String {
 
 /// 单个媒体资产。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MediaAsset {
+pub struct _MediaAsset {
     pub id: String,
     pub path: String,
     /// 内容指纹 (如感知哈希 / 帧差分签名)。
@@ -1049,7 +1049,7 @@ pub struct MediaAsset {
 
 /// immich 风格资产富化结果。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetEnrichment {
+pub struct _AssetEnrichment {
     pub asset_id: String,
     /// 判定为重复的资产 id (去重)。
     pub dedup_of: Option<String>,
@@ -1061,18 +1061,18 @@ pub struct AssetEnrichment {
 
 /// 资产富化器 — immich 吸收: 内容去重 + 语义标签。
 #[derive(Debug, Clone, Default)]
-pub struct AssetEnricher {
+pub struct _AssetEnricher {
     pub seen: HashMap<String, String>,
-    pub enriched: Vec<AssetEnrichment>,
+    pub enriched: Vec<_AssetEnrichment>,
 }
 
-impl AssetEnricher {
+impl _AssetEnricher {
     pub fn new() -> Self {
         Self::default()
     }
 
     /// 富化单个资产: 指纹重复 → 标记去重; 否则提取语义标签。
-    pub fn enrich(&mut self, asset: &MediaAsset) -> AssetEnrichment {
+    pub fn _enrich(&mut self, asset: &_MediaAsset) -> _AssetEnrichment {
         let mut sem = asset.tags.clone();
         // 从路径/文件名提取主题词 (轻量语义标签)
         for token in asset.path.split(['/', '\\', '.', '_', '-']) {
@@ -1085,7 +1085,7 @@ impl AssetEnricher {
             }
         }
         let result = if let Some(orig) = self.seen.get(&asset.fingerprint) {
-            AssetEnrichment {
+            _AssetEnrichment {
                 asset_id: asset.id.clone(),
                 dedup_of: Some(orig.clone()),
                 semantic_tags: sem,
@@ -1093,7 +1093,7 @@ impl AssetEnricher {
             }
         } else {
             self.seen.insert(asset.fingerprint.clone(), asset.id.clone());
-            AssetEnrichment {
+            _AssetEnrichment {
                 asset_id: asset.id.clone(),
                 dedup_of: None,
                 semantic_tags: sem,
@@ -1114,28 +1114,28 @@ impl AssetEnricher {
 
 // ──────────────────────────────────────────────
 
-/// Unified orchestrator wrapping both frame-level [`VideoPipeline`]
-/// and web-based [`ExtractionPipeline`].
+/// Unified orchestrator wrapping both frame-level [`_VideoPipeline`]
+/// and web-based [`_ExtractionPipeline`].
 pub struct VideoOrchestrator {
-    pub frame_pipeline: VideoPipeline,
-    pub extraction_pipeline: ExtractionPipeline,
+    pub frame_pipeline: _VideoPipeline,
+    pub extraction_pipeline: _ExtractionPipeline,
     total_videos_processed: u64,
     transcode_config: TranscodeConfig,
     /// G19 视频生产全链 (MoneyPrinterTurbo 吸收)。
     pub production_chain: Option<VideoProductionChain>,
     /// G20 资产 ML 富化 (immich 吸收)。
-    pub asset_enricher: AssetEnricher,
+    pub asset_enricher: _AssetEnricher,
 }
 
 impl VideoOrchestrator {
     pub fn new(transcode_config: TranscodeConfig) -> Self {
         Self {
-            frame_pipeline: VideoPipeline::new(),
-            extraction_pipeline: ExtractionPipeline::new(transcode_config.clone()),
+            frame_pipeline: _VideoPipeline::new(),
+            extraction_pipeline: _ExtractionPipeline::new(transcode_config.clone()),
             total_videos_processed: 0,
             transcode_config,
             production_chain: None,
-            asset_enricher: AssetEnricher::new(),
+            asset_enricher: _AssetEnricher::new(),
         }
     }
 
@@ -1143,28 +1143,28 @@ impl VideoOrchestrator {
     pub fn produce_video(&mut self, topic: &str) -> Result<Vec<(ProductionStage, String)>, String> {
         let mut chain = VideoProductionChain::new(topic);
         chain.run_all()?;
-        let manifest = chain.output_manifest();
+        let manifest = chain._output_manifest();
         self.total_videos_processed += 1;
         self.production_chain = Some(chain);
         Ok(manifest)
     }
 
     /// G20 富化一批素材 (去重 + 语义标签)。
-    pub fn enrich_assets(&mut self, assets: &[MediaAsset]) -> Vec<AssetEnrichment> {
-        assets.iter().map(|a| self.asset_enricher.enrich(a)).collect()
+    pub fn _enrich_assets(&mut self, assets: &[_MediaAsset]) -> Vec<_AssetEnrichment> {
+        assets.iter().map(|a| self.asset_enricher._enrich(a)).collect()
     }
 
-    pub fn asset_enrichment_stats(&self) -> (usize, usize, usize) {
+    pub fn _asset_enrichment_stats(&self) -> (usize, usize, usize) {
         self.asset_enricher.stats()
     }
 
-    pub fn process_video_file(&mut self, path: &str) -> Result<VideoSummary, String> {
-        let result = process_video(path)?;
+    pub fn _process_video_file(&mut self, path: &str) -> Result<_VideoSummary, String> {
+        let result = _process_video(path)?;
         self.total_videos_processed += 1;
         Ok(result)
     }
 
-    pub fn extract_from_web(&mut self, url: &str) -> Result<PipelineOutput, String> {
+    pub fn _extract_from_web(&mut self, url: &str) -> Result<_PipelineOutput, String> {
         let result = self.extraction_pipeline.run(url);
         if result.is_ok() {
             self.total_videos_processed += 1;
@@ -1180,10 +1180,10 @@ impl VideoOrchestrator {
         let mut failures = Vec::new();
 
         if self.transcode_config.target_bitrate_kbps == 0 {
-            failures.push("transcode config has zero bitrate".into());
+            failures.push("_transcode config has zero bitrate".into());
         }
         if self.transcode_config.target_width == 0 || self.transcode_config.target_height == 0 {
-            failures.push("transcode config has zero dimensions".into());
+            failures.push("_transcode config has zero dimensions".into());
         }
         if self.extraction_pipeline.is_active() {
             failures.push("extraction pipeline stuck in active state".into());
@@ -1203,8 +1203,8 @@ mod tests {
 
     // ── File 1 tests (12) ─────────────────────
 
-    fn make_frame(ts: f64, pattern: u8) -> VideoFrame {
-        VideoFrame {
+    fn make_frame(ts: f64, pattern: u8) -> _VideoFrame {
+        _VideoFrame {
             timestamp: ts,
             data_hash: pattern as u64,
             grayscale_16x16: [[pattern; 16]; 16],
@@ -1213,7 +1213,7 @@ mod tests {
 
     #[test]
     fn test_empty_pipeline() {
-        let mut p = VideoPipeline::new();
+        let mut p = _VideoPipeline::new();
         let s = p.process();
         assert_eq!(s.frame_count, 0);
         assert_eq!(s.key_frame_count, 0);
@@ -1221,8 +1221,8 @@ mod tests {
 
     #[test]
     fn test_single_frame_always_kept() {
-        let mut p = VideoPipeline::new();
-        p.push_frame(make_frame(0.0, 128));
+        let mut p = _VideoPipeline::new();
+        p._push_frame(make_frame(0.0, 128));
         let s = p.process();
         assert_eq!(s.frame_count, 1);
         assert_eq!(s.key_frame_count, 1);
@@ -1230,31 +1230,31 @@ mod tests {
 
     #[test]
     fn test_identical_frames_deduped() {
-        let mut p = VideoPipeline::new();
-        p.push_frame(make_frame(0.0, 128));
-        p.push_frame(make_frame(1.0, 128));
-        p.push_frame(make_frame(2.0, 128));
-        p.dedup_frames();
+        let mut p = _VideoPipeline::new();
+        p._push_frame(make_frame(0.0, 128));
+        p._push_frame(make_frame(1.0, 128));
+        p._push_frame(make_frame(2.0, 128));
+        p._dedup_frames();
         assert_eq!(p.key_frames, vec![0]);
     }
 
     #[test]
     fn test_high_diff_frames_kept() {
-        let mut p = VideoPipeline::new();
-        p.push_frame(make_frame(0.0, 0));
-        p.push_frame(make_frame(1.0, 200));
-        p.push_frame(make_frame(2.0, 100));
-        p.dedup_frames();
+        let mut p = _VideoPipeline::new();
+        p._push_frame(make_frame(0.0, 0));
+        p._push_frame(make_frame(1.0, 200));
+        p._push_frame(make_frame(2.0, 100));
+        p._dedup_frames();
         assert_eq!(p.key_frames, vec![0, 1, 2]);
     }
 
     #[test]
     fn test_kept_vs_last_kept_not_previous() {
-        let mut p = VideoPipeline::new();
-        p.push_frame(make_frame(0.0, 0));
-        p.push_frame(make_frame(1.0, 2));
-        p.push_frame(make_frame(2.0, 200));
-        p.dedup_frames();
+        let mut p = _VideoPipeline::new();
+        p._push_frame(make_frame(0.0, 0));
+        p._push_frame(make_frame(1.0, 2));
+        p._push_frame(make_frame(2.0, 200));
+        p._dedup_frames();
         assert_eq!(p.key_frames, vec![0, 2]);
     }
 
@@ -1262,14 +1262,14 @@ mod tests {
     fn test_mean_diff_identical() {
         let a = make_frame(0.0, 100);
         let b = make_frame(1.0, 100);
-        assert!((a.mean_diff(&b) - 0.0).abs() < 1e-9);
+        assert!((a._mean_diff(&b) - 0.0).abs() < 1e-9);
     }
 
     #[test]
     fn test_mean_diff_maximum() {
         let a = make_frame(0.0, 0);
         let b = make_frame(1.0, 255);
-        assert!((a.mean_diff(&b) - 255.0).abs() < 1e-9);
+        assert!((a._mean_diff(&b) - 255.0).abs() < 1e-9);
     }
 
     #[test]
@@ -1281,14 +1281,14 @@ mod tests {
             }
         }
         let b = make_frame(1.0, 0);
-        let diff = a.mean_diff(&b);
+        let diff = a._mean_diff(&b);
         assert!((diff - 127.5).abs() < 1.0, "expected ~127.5, got {}", diff);
     }
 
     #[test]
     fn test_process_frames_function() {
         let frames = vec![make_frame(0.0, 0), make_frame(1.0, 0), make_frame(2.0, 100)];
-        let summary = process_frames(frames);
+        let summary = _process_frames(frames);
         assert_eq!(summary.frame_count, 3);
         assert_eq!(summary.key_frame_count, 2);
         assert!((summary.duration_secs - 2.0).abs() < 1e-9);
@@ -1296,7 +1296,7 @@ mod tests {
 
     #[test]
     fn test_process_video_missing_file() {
-        let result = process_video("/nonexistent/video.mp4");
+        let result = _process_video("/nonexistent/video.mp4");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
     }
@@ -1305,7 +1305,7 @@ mod tests {
     fn test_video_frame_serde() {
         let frame = make_frame(1.5, 42);
         let json = serde_json::to_string(&frame).unwrap();
-        let back: VideoFrame = serde_json::from_str(&json).unwrap();
+        let back: _VideoFrame = serde_json::from_str(&json).unwrap();
         assert!((back.timestamp - 1.5).abs() < 1e-9);
         assert_eq!(back.data_hash, 42);
         assert_eq!(back.grayscale_16x16[0][0], 42);
@@ -1313,13 +1313,13 @@ mod tests {
 
     #[test]
     fn test_video_summary_serde() {
-        let s = VideoSummary {
+        let s = _VideoSummary {
             frame_count: 100,
             key_frame_count: 12,
             duration_secs: 30.0,
         };
         let json = serde_json::to_string(&s).unwrap();
-        let back: VideoSummary = serde_json::from_str(&json).unwrap();
+        let back: _VideoSummary = serde_json::from_str(&json).unwrap();
         assert_eq!(back.frame_count, 100);
         assert_eq!(back.key_frame_count, 12);
     }
@@ -1328,61 +1328,61 @@ mod tests {
 
     #[test]
     fn test_video_extraction_from_html() {
-        let mut ext = VideoExtractor::new();
+        let mut ext = _VideoExtractor::new();
         let html = r#"<video src="https://example.com/stream.m3u8">"#;
-        let streams = ext.extract_from_page_with_page_param("https://example.com", html);
+        let streams = ext._extract_from_page_with_page_param("https://example.com", html);
         assert!(!streams.is_empty());
-        assert_eq!(streams[0].protocol, StreamProtocol::HLS);
+        assert_eq!(streams[0].protocol, _StreamProtocol::HLS);
     }
 
     #[test]
     fn test_dash_detection() {
-        let mut ext = VideoExtractor::new();
+        let mut ext = _VideoExtractor::new();
         let html = r#"<source src="https://example.com/video.mpd" type="application/dash+xml">"#;
-        let streams = ext.extract_from_page_with_page_param("https://example.com", html);
-        assert!(streams.iter().any(|s| s.protocol == StreamProtocol::DASH));
+        let streams = ext._extract_from_page_with_page_param("https://example.com", html);
+        assert!(streams.iter().any(|s| s.protocol == _StreamProtocol::DASH));
     }
 
     #[test]
     fn test_best_stream_selection() {
-        let ext = VideoExtractor::new();
+        let ext = _VideoExtractor::new();
         let streams = vec![
-            StreamInfo {
-                url: "low".into(), protocol: StreamProtocol::HLS, codec: VideoCodec::H264,
+            _StreamInfo {
+                url: "low".into(), protocol: _StreamProtocol::HLS, codec: VideoCodec::H264,
                 width: 640, height: 360, bitrate_kbps: 1000, fps: 30.0,
                 has_audio: true, has_subtitles: false,
             },
-            StreamInfo {
-                url: "high".into(), protocol: StreamProtocol::HLS, codec: VideoCodec::H264,
+            _StreamInfo {
+                url: "high".into(), protocol: _StreamProtocol::HLS, codec: VideoCodec::H264,
                 width: 1920, height: 1080, bitrate_kbps: 8000, fps: 60.0,
                 has_audio: true, has_subtitles: true,
             },
         ];
-        let best = ext.best_stream(&streams).unwrap();
+        let best = ext._best_stream(&streams).unwrap();
         assert_eq!(best.url, "high");
     }
 
     #[test]
     fn test_transcode_decision() {
         let config = TranscodeConfig::default();
-        let transcoder = Transcoder::new(config);
-        let stream = StreamInfo {
-            url: "test".into(), protocol: StreamProtocol::HLS, codec: VideoCodec::VP9,
+        let transcoder = _Transcoder::new(config);
+        let stream = _StreamInfo {
+            url: "test".into(), protocol: _StreamProtocol::HLS, codec: VideoCodec::VP9,
             width: 3840, height: 2160, bitrate_kbps: 20000, fps: 60.0,
             has_audio: true, has_subtitles: false,
         };
-        assert!(transcoder.should_transcode(&stream));
-        let h264_stream = StreamInfo {
-            url: "test".into(), protocol: StreamProtocol::HLS, codec: VideoCodec::H264,
+        assert!(transcoder._should_transcode(&stream));
+        let h264_stream = _StreamInfo {
+            url: "test".into(), protocol: _StreamProtocol::HLS, codec: VideoCodec::H264,
             width: 1920, height: 1080, bitrate_kbps: 8000, fps: 30.0,
             has_audio: true, has_subtitles: false,
         };
-        assert!(!transcoder.should_transcode(&h264_stream));
+        assert!(!transcoder._should_transcode(&h264_stream));
     }
 
     #[test]
     fn test_subtitle_generation() {
-        let entries = SubtitleEngine::generate("Hello world this is a test of subtitle generation from whisper", "eng");
+        let entries = _SubtitleEngine::generate("Hello world this is a test of subtitle generation from whisper", "eng");
         assert!(!entries.is_empty());
         assert_eq!(entries[0].index, 1);
         assert!(entries[0].end_ms > entries[0].start_ms);
@@ -1390,10 +1390,10 @@ mod tests {
 
     #[test]
     fn test_device_discovery() {
-        let dlna = DeviceDiscovery::scan(CastProtocol::DLNA);
+        let dlna = _DeviceDiscovery::scan(_CastProtocol::DLNA);
         assert!(!dlna.is_empty());
-        assert_eq!(dlna[0].protocol, CastProtocol::DLNA);
-        let airplay = DeviceDiscovery::scan(CastProtocol::AirPlay);
+        assert_eq!(dlna[0].protocol, _CastProtocol::DLNA);
+        let airplay = _DeviceDiscovery::scan(_CastProtocol::AirPlay);
         assert!(airplay.is_empty());
     }
 
@@ -1408,23 +1408,23 @@ mod tests {
             subtitle_burn: false,
             subtitle_language: "eng".into(),
         };
-        let mut pipeline = ExtractionPipeline::new(config);
+        let mut pipeline = _ExtractionPipeline::new(config);
         let result = pipeline.run("https://example.com/video");
         assert!(result.is_ok());
         let output = result.unwrap();
-        assert!(output.extraction_count > 0);
+        assert!(output._extraction_count > 0);
     }
 
     #[test]
     fn test_url_extraction() {
-        let url = VideoExtractor::extract_url(r#"src="https://example.com/stream.m3u8"#);
+        let url = _VideoExtractor::extract_url(r#"src="https://example.com/stream.m3u8"#);
         assert_eq!(url, "https://example.com/stream.m3u8");
     }
 
     #[test]
     fn test_codec_ffmpeg_names() {
-        assert_eq!(VideoCodec::H264.ffmpeg_name(), "h264");
-        assert_eq!(VideoCodec::AV1.ffmpeg_name(), "av1");
+        assert_eq!(VideoCodec::H264._ffmpeg_name(), "h264");
+        assert_eq!(VideoCodec::AV1._ffmpeg_name(), "av1");
     }
 
     // ── NEW test (1) ──────────────────────────
@@ -1437,17 +1437,17 @@ mod tests {
         assert!(orchestrator.self_test().is_ok());
         assert_eq!(orchestrator.total_processed(), 0);
 
-        let extract_result = orchestrator.extract_from_web("https://example.com/video");
+        let extract_result = orchestrator._extract_from_web("https://example.com/video");
         assert!(extract_result.is_ok());
         assert_eq!(orchestrator.total_processed(), 1);
 
-        let file_result = orchestrator.process_video_file("/nonexistent/video.mp4");
+        let file_result = orchestrator._process_video_file("/nonexistent/video.mp4");
         assert!(file_result.is_err());
         assert_eq!(orchestrator.total_processed(), 1);
 
         let output = extract_result.unwrap();
         assert!(!output.streams.is_empty());
-        assert_eq!(output.streams[0].0.protocol, StreamProtocol::HLS);
+        assert_eq!(output.streams[0].0.protocol, _StreamProtocol::HLS);
         assert_eq!(output.streams[0].1.actual_codec, VideoCodec::H264);
     }
 
@@ -1456,22 +1456,22 @@ mod tests {
     #[test]
     fn checkpoint_fresh_starts_at_extract() {
         let cp = VideoChainCheckpoint::new("video.mp4");
-        assert_eq!(cp.next_pending(), Some(VideoStage::Extract));
+        assert_eq!(cp.next_pending(), Some(_VideoStage::Extract));
         assert!(!cp.all_done());
     }
 
     #[test]
     fn checkpoint_complete_advances_pending() {
         let mut cp = VideoChainCheckpoint::new("v.mp4");
-        cp.complete(VideoStage::Extract, "frames/");
-        assert!(cp.is_done(VideoStage::Extract));
-        assert_eq!(cp.next_pending(), Some(VideoStage::Transcode));
+        cp.complete(_VideoStage::Extract, "frames/");
+        assert!(cp._is_done(_VideoStage::Extract));
+        assert_eq!(cp.next_pending(), Some(_VideoStage::Transcode));
     }
 
     #[test]
     fn checkpoint_all_done_returns_none_pending() {
         let mut cp = VideoChainCheckpoint::new("v.mp4");
-        for stage in [VideoStage::Extract, VideoStage::Transcode, VideoStage::Dedup, VideoStage::Subtitle, VideoStage::Publish] {
+        for stage in [_VideoStage::Extract, _VideoStage::Transcode, _VideoStage::Dedup, _VideoStage::Subtitle, _VideoStage::Publish] {
             cp.complete(stage, "ok");
         }
         assert!(cp.all_done());
@@ -1481,13 +1481,13 @@ mod tests {
     #[test]
     fn checkpoint_json_roundtrip() {
         let mut cp = VideoChainCheckpoint::new("v.mp4");
-        cp.complete(VideoStage::Extract, "frames/");
-        cp.spend_budget(42);
+        cp.complete(_VideoStage::Extract, "frames/");
+        cp._spend_budget(42);
         let json = cp.to_json().unwrap();
         let back = VideoChainCheckpoint::from_json(&json).unwrap();
         assert_eq!(back.source, "v.mp4");
-        assert!(back.is_done(VideoStage::Extract));
-        assert!(!back.is_done(VideoStage::Transcode));
+        assert!(back._is_done(_VideoStage::Extract));
+        assert!(!back._is_done(_VideoStage::Transcode));
         assert_eq!(back.budget_used, 42);
     }
 
@@ -1495,12 +1495,12 @@ mod tests {
     fn runner_skips_completed_stages_on_resume() {
         // 模拟中断: Extract+Transcode 已完成 → resume 从 Dedup 开始。
         let mut runner = VideoChainRunner::new("v.mp4");
-        runner.checkpoint.complete(VideoStage::Extract, "f/");
-        runner.checkpoint.complete(VideoStage::Transcode, "t/");
-        assert_eq!(runner.resume(), Some(VideoStage::Dedup));
-        runner.run_stage(VideoStage::Extract).unwrap(); // 已完成 → 跳过, 不重执行
+        runner.checkpoint.complete(_VideoStage::Extract, "f/");
+        runner.checkpoint.complete(_VideoStage::Transcode, "t/");
+        assert_eq!(runner.resume(), Some(_VideoStage::Dedup));
+        runner.run_stage(_VideoStage::Extract).unwrap(); // 已完成 → 跳过, 不重执行
         assert_eq!(runner.executed, 0, "completed stage must not re-execute");
-        runner.run_stage(VideoStage::Dedup).unwrap();
+        runner.run_stage(_VideoStage::Dedup).unwrap();
         assert_eq!(runner.executed, 1);
     }
 
@@ -1520,34 +1520,34 @@ mod tests {
         let err = runner.run_all().unwrap_err();
         assert!(err.contains("dedup"), "err: {err}");
         // Extract+Transcode 已落 checkpoint, 后续未执行
-        assert!(runner.checkpoint.is_done(VideoStage::Extract));
-        assert!(runner.checkpoint.is_done(VideoStage::Transcode));
-        assert!(!runner.checkpoint.is_done(VideoStage::Dedup));
+        assert!(runner.checkpoint._is_done(_VideoStage::Extract));
+        assert!(runner.checkpoint._is_done(_VideoStage::Transcode));
+        assert!(!runner.checkpoint._is_done(_VideoStage::Dedup));
     }
 
     #[test]
     fn runner_persist_and_recover() {
         let mut runner = VideoChainRunner::new("v.mp4");
-        runner.run_stage(VideoStage::Extract).unwrap();
-        runner.run_stage(VideoStage::Transcode).unwrap();
+        runner.run_stage(_VideoStage::Extract).unwrap();
+        runner.run_stage(_VideoStage::Transcode).unwrap();
         let json = runner.checkpoint.to_json().unwrap();
         drop(runner);
 
         let mut recovered = VideoChainRunner::new("v.mp4");
         recovered.checkpoint = VideoChainCheckpoint::from_json(&json).unwrap();
-        assert_eq!(recovered.resume(), Some(VideoStage::Dedup));
+        assert_eq!(recovered.resume(), Some(_VideoStage::Dedup));
         let done = recovered.run_all().unwrap();
-        assert_eq!(done, vec![VideoStage::Dedup, VideoStage::Subtitle, VideoStage::Publish]);
+        assert_eq!(done, vec![_VideoStage::Dedup, _VideoStage::Subtitle, _VideoStage::Publish]);
         assert!(recovered.checkpoint.all_done());
     }
 
     #[test]
     fn stage_order_and_next() {
-        assert_eq!(VideoStage::Extract.next(), Some(VideoStage::Transcode));
-        assert_eq!(VideoStage::Subtitle.next(), Some(VideoStage::Publish));
-        assert_eq!(VideoStage::Publish.next(), None);
-        assert_eq!(VideoStage::Extract.order(), 0);
-        assert_eq!(VideoStage::Publish.order(), 4);
+        assert_eq!(_VideoStage::Extract.next(), Some(_VideoStage::Transcode));
+        assert_eq!(_VideoStage::Subtitle.next(), Some(_VideoStage::Publish));
+        assert_eq!(_VideoStage::Publish.next(), None);
+        assert_eq!(_VideoStage::Extract.order(), 0);
+        assert_eq!(_VideoStage::Publish.order(), 4);
     }
 
     // ── G19 VideoProductionChain tests ─────────────────────────────────
@@ -1559,7 +1559,7 @@ mod tests {
         let done = chain.run_all().unwrap();
         assert_eq!(done.len(), 5, "全链 5 阶段");
         assert!(chain.all_done());
-        let manifest = chain.output_manifest();
+        let manifest = chain._output_manifest();
         assert!(manifest.iter().any(|(s, a)| *s == ProductionStage::Compose && a.contains("final.mp4")));
         assert!(chain.executed >= 5);
     }
@@ -1583,16 +1583,16 @@ mod tests {
         assert_eq!(chain.executed, before, "不重复执行");
     }
 
-    // ── G20 AssetEnricher tests ────────────────────────────────────────
+    // ── G20 _AssetEnricher tests ────────────────────────────────────────
 
     #[test]
     fn asset_enricher_dedups_by_fingerprint() {
-        let mut enr = AssetEnricher::new();
-        let a = MediaAsset { id: "a1".into(), path: "cats/happy_cat.png".into(), fingerprint: "fp1".into(), tags: vec!["cat".into()] };
-        let b = MediaAsset { id: "a2".into(), path: "cats/happy_cat_copy.png".into(), fingerprint: "fp1".into(), tags: vec![] };
-        let ea = enr.enrich(&a);
+        let mut enr = _AssetEnricher::new();
+        let a = _MediaAsset { id: "a1".into(), path: "cats/happy_cat.png".into(), fingerprint: "fp1".into(), tags: vec!["cat".into()] };
+        let b = _MediaAsset { id: "a2".into(), path: "cats/happy_cat_copy.png".into(), fingerprint: "fp1".into(), tags: vec![] };
+        let ea = enr._enrich(&a);
         assert_eq!(ea.keep, true);
-        let eb = enr.enrich(&b);
+        let eb = enr._enrich(&b);
         assert_eq!(eb.dedup_of.as_deref(), Some("a1"), "同指纹判定重复");
         assert_eq!(eb.keep, false);
         let (total, dup, kept) = enr.stats();
@@ -1601,14 +1601,14 @@ mod tests {
 
     #[test]
     fn asset_enricher_semantic_tags_from_path() {
-        let mut enr = AssetEnricher::new();
-        let asset = MediaAsset {
+        let mut enr = _AssetEnricher::new();
+        let asset = _MediaAsset {
             id: "a1".into(),
             path: "materials/nature_sunset_beach.png".into(),
             fingerprint: "f".into(),
             tags: vec!["photo".into()],
         };
-        let e = enr.enrich(&asset);
+        let e = enr._enrich(&asset);
         assert!(e.semantic_tags.contains(&"nature".to_string()), "路径 token 提取语义标签");
         assert!(e.semantic_tags.contains(&"photo".to_string()));
     }
@@ -1624,13 +1624,13 @@ mod tests {
         let mut orch = VideoOrchestrator::new(cfg);
         let manifest = orch.produce_video("Consciousness Engineering").unwrap();
         assert_eq!(manifest.len(), 5);
-        let enriched = orch.enrich_assets(&[
-            MediaAsset { id: "x".into(), path: "a/b_shot.png".into(), fingerprint: "F".into(), tags: vec![] },
-            MediaAsset { id: "y".into(), path: "a/b_shot.png".into(), fingerprint: "F".into(), tags: vec![] },
+        let enriched = orch._enrich_assets(&[
+            _MediaAsset { id: "x".into(), path: "a/b_shot.png".into(), fingerprint: "F".into(), tags: vec![] },
+            _MediaAsset { id: "y".into(), path: "a/b_shot.png".into(), fingerprint: "F".into(), tags: vec![] },
         ]);
         assert_eq!(enriched[1].dedup_of.as_deref(), Some("x"));
         assert_eq!(orch.total_processed(), 1);
-        let (_, dup, _) = orch.asset_enrichment_stats();
+        let (_, dup, _) = orch._asset_enrichment_stats();
         assert_eq!(dup, 1);
     }
 }
@@ -1666,7 +1666,7 @@ impl MediaKind {
 
 /// MITM 嗅探到的媒体资源。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SniffedMedia {
+pub struct _SniffedMedia {
     pub url: String,
     pub kind: MediaKind,
     pub headers: Vec<(String, String)>,
@@ -1674,13 +1674,13 @@ pub struct SniffedMedia {
 
 /// HTTP 响应快照 (嗅探输入, 本文件定义)。
 #[derive(Debug, Clone)]
-pub struct HttpSniff {
+pub struct _HttpSniff {
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub body: String,
 }
 
-impl HttpSniff {
+impl _HttpSniff {
     /// 小写化 Content-Type 头值 (无则空串)。
     pub fn content_type(&self) -> String {
         self.headers
@@ -1693,10 +1693,10 @@ impl HttpSniff {
 
 /// 确定性媒体类型检测: m3u8 → Hls; mpd → Dash; mp4/webm → Progressive;
 /// "live" token → Live; 其余 None。
-fn detect_kind(sniff: &HttpSniff) -> Option<MediaKind> {
-    let url = sniff.url.to_ascii_lowercase();
-    let ct = sniff.content_type();
-    let body = sniff.body.to_ascii_lowercase();
+fn detect_kind(_sniff: &_HttpSniff) -> Option<MediaKind> {
+    let url = _sniff.url.to_ascii_lowercase();
+    let ct = _sniff.content_type();
+    let body = _sniff.body.to_ascii_lowercase();
     if url.contains("m3u8") || ct.contains("application/vnd.apple.mpegurl") {
         return Some(MediaKind::Hls);
     }
@@ -1722,7 +1722,7 @@ pub struct Segment {
 
 /// 播放清单。
 #[derive(Debug, Clone)]
-pub struct MediaPlaylist {
+pub struct _MediaPlaylist {
     pub segments: Vec<Segment>,
     pub duration_total_s: f64,
 }
@@ -1732,7 +1732,7 @@ pub struct PipelineStatus {
     cursor: usize,
     cycle_len: usize,
     steps_in_cycle: usize,
-    cycles_completed: usize,
+    _cycles_completed: usize,
 }
 
 impl Default for PipelineStatus {
@@ -1747,12 +1747,12 @@ impl PipelineStatus {
             cursor: 0,
             cycle_len: 0,
             steps_in_cycle: 0,
-            cycles_completed: 0,
+            _cycles_completed: 0,
         }
     }
 
     /// 取下一分片 (循环播放); 空清单返回 None。
-    pub fn next_segment(&mut self, playlist: &MediaPlaylist) -> Option<Segment> {
+    pub fn next_segment(&mut self, playlist: &_MediaPlaylist) -> Option<Segment> {
         if playlist.segments.is_empty() {
             return None;
         }
@@ -1761,7 +1761,7 @@ impl PipelineStatus {
         self.cursor = (self.cursor + 1) % playlist.segments.len();
         self.steps_in_cycle = self.cursor;
         if self.cursor == 0 {
-            self.cycles_completed += 1;
+            self._cycles_completed += 1;
         }
         Some(seg)
     }
@@ -1775,14 +1775,14 @@ impl PipelineStatus {
         }
     }
 
-    pub fn cycles_completed(&self) -> usize {
-        self.cycles_completed
+    pub fn _cycles_completed(&self) -> usize {
+        self._cycles_completed
     }
 }
 
 /// 媒体嗅探器 — 记录嗅探历史 + 播放状态。
 pub struct MediaSniffer {
-    pub sniffed: Vec<SniffedMedia>,
+    pub sniffed: Vec<_SniffedMedia>,
     pub status: PipelineStatus,
 }
 
@@ -1801,9 +1801,9 @@ impl MediaSniffer {
     }
 
     /// 嗅探单条 HTTP 响应 → 命中则记录并返回; 未知返回 None。
-    pub fn sniff(&mut self, http_response: &HttpSniff) -> Option<SniffedMedia> {
+    pub fn _sniff(&mut self, http_response: &_HttpSniff) -> Option<_SniffedMedia> {
         let kind = detect_kind(http_response)?;
-        let media = SniffedMedia {
+        let media = _SniffedMedia {
             url: http_response.url.clone(),
             kind,
             headers: http_response.headers.clone(),
@@ -1813,13 +1813,13 @@ impl MediaSniffer {
     }
 
     /// 生成 variant URL + N 个顺序分片 (index 0..segments)。
-    pub fn build_playlist(
+    pub fn _build_playlist(
         &mut self,
         master_uri: &str,
         variant: &str,
         segments: u32,
         seg_dur: f64,
-    ) -> MediaPlaylist {
+    ) -> _MediaPlaylist {
         let base = format!("{}/{}", master_uri.trim_end_matches('/'), variant);
         let segs = (0..segments)
             .map(|i| Segment {
@@ -1828,13 +1828,13 @@ impl MediaSniffer {
                 index: i,
             })
             .collect();
-        MediaPlaylist {
+        _MediaPlaylist {
             segments: segs,
             duration_total_s: segments as f64 * seg_dur,
         }
     }
 
-    pub fn sniffed_count(&self) -> usize {
+    pub fn _sniffed_count(&self) -> usize {
         self.sniffed.len()
     }
 }
@@ -1848,20 +1848,20 @@ impl crate::core::nt_core_self_test::SelfTest for MediaSniffer {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         let mut s = MediaSniffer::new();
-        let hls = HttpSniff {
+        let hls = _HttpSniff {
             url: "https://cdn.example.com/playlist.m3u8".into(),
             headers: vec![("content-type".into(), "application/vnd.apple.mpegurl".into())],
             body: String::new(),
         };
-        match s.sniff(&hls) {
+        match s._sniff(&hls) {
             Some(m) => {
                 if m.kind != MediaKind::Hls {
-                    failures.push("m3u8 sniff must classify as Hls".into());
+                    failures.push("m3u8 _sniff must classify as Hls".into());
                 }
             }
-            None => failures.push("m3u8 sniff returned None".into()),
+            None => failures.push("m3u8 _sniff returned None".into()),
         }
-        let pl = s.build_playlist("https://cdn.example.com/master.m3u8", "720p", 3, 4.0);
+        let pl = s._build_playlist("https://cdn.example.com/master.m3u8", "720p", 3, 4.0);
         if pl.segments.len() != 3 {
             failures.push("playlist should have 3 segments".into());
         }
@@ -1888,8 +1888,8 @@ impl crate::core::nt_core_self_test::SelfTest for MediaSniffer {
 mod media_sniff_tests {
     use super::*;
 
-    fn sniff(url: &str, ct: &str, body: &str) -> HttpSniff {
-        HttpSniff {
+    fn _sniff(url: &str, ct: &str, body: &str) -> _HttpSniff {
+        _HttpSniff {
             url: url.to_string(),
             headers: vec![("content-type".into(), ct.into())],
             body: body.to_string(),
@@ -1899,54 +1899,54 @@ mod media_sniff_tests {
     #[test]
     fn media_sniff_hls_from_m3u8_url() {
         let mut s = MediaSniffer::new();
-        let m = s.sniff(&sniff("https://cdn.example.com/master.m3u8", "text/plain", "")).expect("sniffed");
+        let m = s._sniff(&_sniff("https://cdn.example.com/master.m3u8", "text/plain", "")).expect("sniffed");
         assert_eq!(m.kind, MediaKind::Hls);
-        assert_eq!(s.sniffed_count(), 1);
+        assert_eq!(s._sniffed_count(), 1);
     }
 
     #[test]
     fn media_sniff_hls_from_content_type() {
         let mut s = MediaSniffer::new();
-        let m = s.sniff(&sniff("https://cdn.example.com/stream", "application/vnd.apple.mpegurl", "")).expect("sniffed");
+        let m = s._sniff(&_sniff("https://cdn.example.com/stream", "application/vnd.apple.mpegurl", "")).expect("sniffed");
         assert_eq!(m.kind, MediaKind::Hls);
     }
 
     #[test]
     fn media_sniff_dash_from_mpd_url() {
         let mut s = MediaSniffer::new();
-        let m = s.sniff(&sniff("https://cdn.example.com/video.mpd", "application/dash+xml", "")).expect("sniffed");
+        let m = s._sniff(&_sniff("https://cdn.example.com/video.mpd", "application/dash+xml", "")).expect("sniffed");
         assert_eq!(m.kind, MediaKind::Dash);
     }
 
     #[test]
     fn media_sniff_progressive_from_video_content_type() {
         let mut s = MediaSniffer::new();
-        let mp4 = s.sniff(&sniff("https://cdn.example.com/movie.mp4", "video/mp4", "")).expect("sniffed");
+        let mp4 = s._sniff(&_sniff("https://cdn.example.com/movie.mp4", "video/mp4", "")).expect("sniffed");
         assert_eq!(mp4.kind, MediaKind::Progressive);
-        let webm = s.sniff(&sniff("https://cdn.example.com/clip", "video/webm", "")).expect("sniffed");
+        let webm = s._sniff(&_sniff("https://cdn.example.com/clip", "video/webm", "")).expect("sniffed");
         assert_eq!(webm.kind, MediaKind::Progressive);
     }
 
     #[test]
     fn media_sniff_live_from_token() {
         let mut s = MediaSniffer::new();
-        let url = s.sniff(&sniff("https://cdn.example.com/live/room1", "text/html", "")).expect("sniffed");
+        let url = s._sniff(&_sniff("https://cdn.example.com/live/room1", "text/html", "")).expect("sniffed");
         assert_eq!(url.kind, MediaKind::Live);
-        let body = s.sniff(&sniff("https://cdn.example.com/room", "text/html", "this is a live stream")).expect("sniffed");
+        let body = s._sniff(&_sniff("https://cdn.example.com/room", "text/html", "this is a live stream")).expect("sniffed");
         assert_eq!(body.kind, MediaKind::Live);
     }
 
     #[test]
     fn media_sniff_unknown_returns_none() {
         let mut s = MediaSniffer::new();
-        assert!(s.sniff(&sniff("https://cdn.example.com/other", "text/html", "static page")).is_none());
-        assert_eq!(s.sniffed_count(), 0);
+        assert!(s._sniff(&_sniff("https://cdn.example.com/other", "text/html", "static page")).is_none());
+        assert_eq!(s._sniffed_count(), 0);
     }
 
     #[test]
     fn media_sniff_playlist_segments_count_and_indices() {
         let mut s = MediaSniffer::new();
-        let pl = s.build_playlist("https://cdn.example.com/master.m3u8", "1080p", 5, 6.0);
+        let pl = s._build_playlist("https://cdn.example.com/master.m3u8", "1080p", 5, 6.0);
         assert_eq!(pl.segments.len(), 5);
         assert!((pl.duration_total_s - 30.0).abs() < 1e-9);
         for (i, seg) in pl.segments.iter().enumerate() {
@@ -1960,30 +1960,30 @@ mod media_sniff_tests {
     #[test]
     fn media_sniff_next_segment_cycles() {
         let mut s = MediaSniffer::new();
-        let pl = s.build_playlist("https://cdn.example.com/master.m3u8", "720p", 3, 4.0);
+        let pl = s._build_playlist("https://cdn.example.com/master.m3u8", "720p", 3, 4.0);
         let got: Vec<u32> = (0..5)
             .filter_map(|_| s.status.next_segment(&pl).map(|seg| seg.index))
             .collect();
         assert_eq!(got, vec![0, 1, 2, 0, 1], "sequential cursor must cycle");
-        assert_eq!(s.status.cycles_completed(), 1);
+        assert_eq!(s.status._cycles_completed(), 1);
     }
 
     #[test]
     fn media_sniff_next_segment_empty_playlist_none() {
         let mut s = MediaSniffer::new();
-        let pl = MediaPlaylist {
+        let pl = _MediaPlaylist {
             segments: vec![],
             duration_total_s: 0.0,
         };
         assert!(s.status.next_segment(&pl).is_none());
         assert_eq!(s.status.progress(), 0.0);
-        assert_eq!(s.status.cycles_completed(), 0);
+        assert_eq!(s.status._cycles_completed(), 0);
     }
 
     #[test]
     fn media_sniff_progress_tracks_cycle() {
         let mut s = MediaSniffer::new();
-        let pl = s.build_playlist("https://cdn.example.com/master.m3u8", "720p", 4, 4.0);
+        let pl = s._build_playlist("https://cdn.example.com/master.m3u8", "720p", 4, 4.0);
         s.status.next_segment(&pl);
         assert!((s.status.progress() - 0.25).abs() < 1e-9);
         s.status.next_segment(&pl);
@@ -2009,7 +2009,7 @@ mod media_sniff_tests {
 
 /// 配音链单个阶段 (order 决定执行顺序)。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct DubStage {
+pub struct _DubStage {
     pub order: u8,
     pub name: String,
     pub language: String,
@@ -2017,7 +2017,7 @@ pub struct DubStage {
 
 /// 待翻译的时间段 — 语音转写/翻译/配音对齐的最小单元。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct TranslationSegment {
+pub struct _TranslationSegment {
     pub start_ms: u64,
     pub end_ms: u64,
     pub source: String,
@@ -2026,24 +2026,24 @@ pub struct TranslationSegment {
 
 /// 配音作业 — 源/目标语言 + 阶段链 + 待处理时间段。
 #[derive(Debug, Clone)]
-pub struct DubJob {
+pub struct _DubJob {
     pub source_lang: String,
     pub target_lang: String,
-    pub stages: Vec<DubStage>,
-    pub segments: Vec<TranslationSegment>,
+    pub stages: Vec<_DubStage>,
+    pub segments: Vec<_TranslationSegment>,
 }
 
-impl Default for DubJob {
+impl Default for _DubJob {
     fn default() -> Self {
         Self {
             source_lang: "zh".into(),
             target_lang: "en".into(),
             stages: vec![
-                DubStage { order: 0, name: "transcribe".into(), language: "zh".into() },
-                DubStage { order: 1, name: "translate".into(), language: "en".into() },
-                DubStage { order: 2, name: "align".into(), language: "en".into() },
-                DubStage { order: 3, name: "tts".into(), language: "en".into() },
-                DubStage { order: 4, name: "merge".into(), language: "en".into() },
+                _DubStage { order: 0, name: "transcribe".into(), language: "zh".into() },
+                _DubStage { order: 1, name: "translate".into(), language: "en".into() },
+                _DubStage { order: 2, name: "align".into(), language: "en".into() },
+                _DubStage { order: 3, name: "tts".into(), language: "en".into() },
+                _DubStage { order: 4, name: "merge".into(), language: "en".into() },
             ],
             segments: Vec::new(),
         }
@@ -2052,13 +2052,13 @@ impl Default for DubJob {
 
 /// 配音流水线 — 按 `enabled_stages` 逐段驱动整个翻译+配音链。
 #[derive(Debug, Clone)]
-pub struct DubPipeline {
+pub struct _DubPipeline {
     pub enabled_stages: Vec<String>,
     pub max_segment_ms: u64,
     pub overlap_ms: u64,
 }
 
-impl Default for DubPipeline {
+impl Default for _DubPipeline {
     fn default() -> Self {
         Self {
             enabled_stages: vec![
@@ -2074,7 +2074,7 @@ impl Default for DubPipeline {
     }
 }
 
-impl DubPipeline {
+impl _DubPipeline {
     /// 内置 5 阶段 (顺序即执行顺序)。
     const BUILTIN_STAGES: [&'static str; 5] =
         ["transcribe", "translate", "align", "tts", "merge"];
@@ -2089,7 +2089,7 @@ impl DubPipeline {
     }
 
     /// 逐阶段逐段生成动作描述; 遇到非内置阶段即中止报错。
-    pub fn run(&self, job: &mut DubJob) -> Result<Vec<String>, String> {
+    pub fn run(&self, job: &mut _DubJob) -> Result<Vec<String>, String> {
         let mut actions = Vec::new();
         for stage in &self.enabled_stages {
             if !Self::BUILTIN_STAGES.contains(&stage.as_str()) {
@@ -2106,8 +2106,8 @@ impl DubPipeline {
     }
 
     /// 翻译单段: 在译文前加目标语言标记 (确定性玩具实现)。
-    pub fn translate_segment(&self, seg: &TranslationSegment, target: &str) -> TranslationSegment {
-        TranslationSegment {
+    pub fn _translate_segment(&self, seg: &_TranslationSegment, target: &str) -> _TranslationSegment {
+        _TranslationSegment {
             start_ms: seg.start_ms,
             end_ms: seg.end_ms,
             source: seg.source.clone(),
@@ -2116,7 +2116,7 @@ impl DubPipeline {
     }
 
     /// 估算配音总时长 = 各段 (end_ms - start_ms) 之和。
-    pub fn estimate_dub_duration(&self, job: &DubJob) -> u64 {
+    pub fn _estimate_dub_duration(&self, job: &_DubJob) -> u64 {
         job.segments
             .iter()
             .map(|s| s.end_ms.saturating_sub(s.start_ms))
@@ -2125,15 +2125,15 @@ impl DubPipeline {
 }
 
 /// SelfTest (T1): "nt_world_video_pipeline_dub" — 配音链自检。
-impl crate::core::nt_core_self_test::SelfTest for DubPipeline {
+impl crate::core::nt_core_self_test::SelfTest for _DubPipeline {
     fn name(&self) -> &str {
         "nt_world_video_pipeline_dub"
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
-        let mut job = DubJob::default();
-        job.segments.push(TranslationSegment {
+        let mut job = _DubJob::default();
+        job.segments.push(_TranslationSegment {
             start_ms: 0,
             end_ms: 10000,
             source: "hello".into(),
@@ -2147,15 +2147,15 @@ impl crate::core::nt_core_self_test::SelfTest for DubPipeline {
             }
             Err(e) => failures.push(format!("default run failed: {}", e)),
         }
-        let bad = DubPipeline::new(vec!["bogus".into()]);
+        let bad = _DubPipeline::new(vec!["bogus".into()]);
         if bad.run(&mut job).is_ok() {
             failures.push("unknown stage must error".into());
         }
-        let t = self.translate_segment(&job.segments[0], "en");
+        let t = self._translate_segment(&job.segments[0], "en");
         if t.translated != "[en] hello" {
-            failures.push("translate_segment must tag target language".into());
+            failures.push("_translate_segment must tag target language".into());
         }
-        if self.estimate_dub_duration(&job) != 10000 {
+        if self._estimate_dub_duration(&job) != 10000 {
             failures.push("duration estimate mismatch".into());
         }
         if failures.is_empty() {
@@ -2170,15 +2170,15 @@ impl crate::core::nt_core_self_test::SelfTest for DubPipeline {
 mod dub_pipeline_tests {
     use super::*;
 
-    fn sample_job() -> DubJob {
-        let mut job = DubJob::default();
-        job.segments.push(TranslationSegment {
+    fn sample_job() -> _DubJob {
+        let mut job = _DubJob::default();
+        job.segments.push(_TranslationSegment {
             start_ms: 0,
             end_ms: 10000,
             source: "hello world".into(),
             translated: String::new(),
         });
-        job.segments.push(TranslationSegment {
+        job.segments.push(_TranslationSegment {
             start_ms: 10000,
             end_ms: 15000,
             source: "second line".into(),
@@ -2189,14 +2189,14 @@ mod dub_pipeline_tests {
 
     #[test]
     fn dub_pipeline_default_has_five_stages() {
-        let p = DubPipeline::default();
+        let p = _DubPipeline::default();
         assert_eq!(
             p.enabled_stages,
             vec!["transcribe", "translate", "align", "tts", "merge"]
         );
         assert_eq!(p.max_segment_ms, 10000);
         assert_eq!(p.overlap_ms, 250);
-        let job = DubJob::default();
+        let job = _DubJob::default();
         assert_eq!(job.stages.len(), 5);
         assert_eq!(job.stages[0].name, "transcribe");
         assert_eq!(job.stages[4].name, "merge");
@@ -2206,7 +2206,7 @@ mod dub_pipeline_tests {
 
     #[test]
     fn dub_pipeline_unknown_stage_errors() {
-        let p = DubPipeline::new(vec!["transcribe".into(), "mix".into()]);
+        let p = _DubPipeline::new(vec!["transcribe".into(), "mix".into()]);
         let mut job = sample_job();
         let err = p.run(&mut job).unwrap_err();
         assert!(err.contains("unknown stage: mix"), "err: {}", err);
@@ -2214,14 +2214,14 @@ mod dub_pipeline_tests {
 
     #[test]
     fn dub_pipeline_translate_segment_marks_target_language() {
-        let p = DubPipeline::default();
-        let seg = TranslationSegment {
+        let p = _DubPipeline::default();
+        let seg = _TranslationSegment {
             start_ms: 0,
             end_ms: 5000,
             source: "你好".into(),
             translated: String::new(),
         };
-        let out = p.translate_segment(&seg, "en");
+        let out = p._translate_segment(&seg, "en");
         assert_eq!(out.translated, "[en] 你好");
         assert_eq!(out.start_ms, seg.start_ms);
         assert_eq!(out.end_ms, seg.end_ms);
@@ -2230,16 +2230,16 @@ mod dub_pipeline_tests {
 
     #[test]
     fn dub_pipeline_duration_estimate_sums_segments() {
-        let p = DubPipeline::default();
+        let p = _DubPipeline::default();
         let mut job = sample_job();
-        assert_eq!(p.estimate_dub_duration(&job), 15000);
+        assert_eq!(p._estimate_dub_duration(&job), 15000);
         job.segments.clear();
-        assert_eq!(p.estimate_dub_duration(&job), 0);
+        assert_eq!(p._estimate_dub_duration(&job), 0);
     }
 
     #[test]
     fn dub_pipeline_run_covers_all_enabled_stages() {
-        let p = DubPipeline::new(vec!["transcribe".into(), "tts".into()]);
+        let p = _DubPipeline::new(vec!["transcribe".into(), "tts".into()]);
         let mut job = sample_job();
         let actions = p.run(&mut job).unwrap();
         assert_eq!(actions.len(), 4, "2 stages x 2 segments");
@@ -2254,8 +2254,8 @@ mod dub_pipeline_tests {
 
     #[test]
     fn dub_pipeline_run_empty_segments_yields_no_actions() {
-        let p = DubPipeline::default();
-        let mut job = DubJob::default();
+        let p = _DubPipeline::default();
+        let mut job = _DubJob::default();
         let actions = p.run(&mut job).unwrap();
         assert!(actions.is_empty());
     }
@@ -2263,7 +2263,7 @@ mod dub_pipeline_tests {
     #[test]
     fn dub_pipeline_selftest_matches() {
         use crate::core::nt_core_self_test::SelfTest;
-        let p = DubPipeline::default();
+        let p = _DubPipeline::default();
         assert_eq!(p.name(), "nt_world_video_pipeline_dub");
         assert!(p.self_test().is_ok());
     }

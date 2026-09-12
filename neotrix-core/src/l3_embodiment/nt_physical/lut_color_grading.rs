@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 
 /// ASC-CDL 参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ASCCDLParams {
+pub struct _ASCCDLParams {
     /// Lift (阴影)
     pub lift: [f32; 3],
     /// Gamma (中间调)
@@ -41,7 +41,7 @@ pub enum ColorSpace {
 
 /// LUT 规格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LUTSpec {
+pub struct _LUTSpec {
     /// LUT 尺寸
     pub size: u32,
     /// 输入色彩空间
@@ -54,13 +54,13 @@ pub struct LUTSpec {
 
 /// 色彩分级配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColorGradingConfig {
+pub struct _ColorGradingConfig {
     /// 基础校正参数
-    pub base_correction: ASCCDLParams,
+    pub base_correction: _ASCCDLParams,
     /// 创意分级参数
-    pub creative_grading: ASCCDLParams,
+    pub creative_grading: _ASCCDLParams,
     /// LUT 规格
-    pub lut_spec: LUTSpec,
+    pub lut_spec: _LUTSpec,
     /// 是否启用时序平滑
     pub enable_temporal_smoothing: bool,
     /// 时序平滑强度 (0.0-1.0)
@@ -71,13 +71,13 @@ pub struct ColorGradingConfig {
 
 /// 色彩分级结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColorGradingResult {
+pub struct _ColorGradingResult {
     /// 是否成功
     pub success: bool,
     /// 输出文件路径
     pub output_path: Option<String>,
     /// 应用的 ASC-CDL 参数
-    pub applied_params: ASCCDLParams,
+    pub applied_params: _ASCCDLParams,
     /// LUT 文件路径
     pub lut_path: Option<String>,
     /// 处理耗时 (毫秒)
@@ -88,7 +88,7 @@ pub struct ColorGradingResult {
 
 /// 色彩分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColorAnalysis {
+pub struct _ColorAnalysis {
     /// 平均亮度
     pub avg_luminance: f32,
     /// 平均色温
@@ -107,31 +107,31 @@ pub struct ColorAnalysis {
 
 /// LUT 色彩分级器
 /// 实现 ASC-CDL 参数 + 3D LUT 生成
-pub struct LUTColorGrading {
+pub struct _LUTColorGrading {
     /// 配置
-    config: ColorGradingConfig,
+    config: _ColorGradingConfig,
     /// 处理历史
-    history: Vec<ColorGradingResult>,
+    history: Vec<_ColorGradingResult>,
 }
 
-impl LUTColorGrading {
+impl _LUTColorGrading {
     /// 创建色彩分级器
     pub fn new() -> Self {
         Self {
-            config: ColorGradingConfig {
-                base_correction: ASCCDLParams {
+            config: _ColorGradingConfig {
+                base_correction: _ASCCDLParams {
                     lift: [0.0, 0.0, 0.0],
                     gamma: [1.0, 1.0, 1.0],
                     gain: [1.0, 1.0, 1.0],
                     saturation: 1.0,
                 },
-                creative_grading: ASCCDLParams {
+                creative_grading: _ASCCDLParams {
                     lift: [0.0, 0.0, 0.0],
                     gamma: [1.0, 1.0, 1.0],
                     gain: [1.0, 1.0, 1.0],
                     saturation: 1.0,
                 },
-                lut_spec: LUTSpec {
+                lut_spec: _LUTSpec {
                     size: 33,
                     input_color_space: ColorSpace::SRGB,
                     output_color_space: ColorSpace::SRGB,
@@ -146,7 +146,7 @@ impl LUTColorGrading {
     }
     
     /// 使用配置创建
-    pub fn with_config(config: ColorGradingConfig) -> Self {
+    pub fn with_config(config: _ColorGradingConfig) -> Self {
         Self {
             config,
             history: vec![],
@@ -154,7 +154,7 @@ impl LUTColorGrading {
     }
     
     /// 应用 ASC-CDL 参数
-    pub fn apply_asc_cdl(&self, input: &[u8], params: &ASCCDLParams) -> Vec<u8> {
+    pub fn _apply_asc_cdl(&self, input: &[u8], params: &_ASCCDLParams) -> Vec<u8> {
         let mut output = Vec::with_capacity(input.len());
         
         for chunk in input.chunks(3) {
@@ -211,7 +211,7 @@ impl LUTColorGrading {
     }
     
     /// 生成 3D LUT
-    pub fn generate_3d_lut(&self, params: &ASCCDLParams) -> Vec<f32> {
+    pub fn _generate_3d_lut(&self, params: &_ASCCDLParams) -> Vec<f32> {
         let size = self.config.lut_spec.size as usize;
         let mut lut = Vec::with_capacity(size * size * size * 3);
         
@@ -238,9 +238,9 @@ impl LUTColorGrading {
     }
     
     /// 分析视频色彩
-    pub fn analyze_color(&self, _video_path: &str) -> ColorAnalysis {
+    pub fn _analyze_color(&self, _video_path: &str) -> _ColorAnalysis {
         // TODO: 实际调用色彩分析
-        ColorAnalysis {
+        _ColorAnalysis {
             avg_luminance: 0.5,
             avg_color_temperature: 6500.0,
             dynamic_range: 0.8,
@@ -250,9 +250,9 @@ impl LUTColorGrading {
     }
     
     /// 自动色彩校正
-    pub fn auto_correct(&self, analysis: &ColorAnalysis) -> ASCCDLParams {
+    pub fn _auto_correct(&self, analysis: &_ColorAnalysis) -> _ASCCDLParams {
         // TODO: 基于分析结果自动计算校正参数
-        ASCCDLParams {
+        _ASCCDLParams {
             lift: [0.0, 0.0, 0.0],
             gamma: [1.0 / analysis.avg_luminance, 1.0 / analysis.avg_luminance, 1.0 / analysis.avg_luminance],
             gain: [1.0, 1.0, 1.0],
@@ -261,15 +261,15 @@ impl LUTColorGrading {
     }
     
     /// 执行完整色彩分级
-    pub fn grade(&mut self, video_path: &str) -> ColorGradingResult {
+    pub fn grade(&mut self, video_path: &str) -> _ColorGradingResult {
         // 1. 分析
-        let analysis = self.analyze_color(video_path);
+        let analysis = self._analyze_color(video_path);
         
         // 2. 自动校正
-        let base_correction = self.auto_correct(&analysis);
+        let base_correction = self._auto_correct(&analysis);
         
         // 3. 合并参数
-        let final_params = ASCCDLParams {
+        let final_params = _ASCCDLParams {
             lift: [
                 base_correction.lift[0] + self.config.creative_grading.lift[0],
                 base_correction.lift[1] + self.config.creative_grading.lift[1],
@@ -289,11 +289,11 @@ impl LUTColorGrading {
         };
         
         // 4. 生成 LUT
-        let _lut = self.generate_3d_lut(&final_params);
+        let _lut = self._generate_3d_lut(&final_params);
         
         // TODO: 实际应用 LUT 到视频
         
-        let result = ColorGradingResult {
+        let result = _ColorGradingResult {
             success: true,
             output_path: Some(format!("{}_graded.mp4", video_path)),
             applied_params: final_params,
@@ -307,11 +307,11 @@ impl LUTColorGrading {
     }
     
     /// 获取统计信息
-    pub fn statistics(&self) -> ColorGradingStats {
+    pub fn statistics(&self) -> _ColorGradingStats {
         let total_graded = self.history.len();
         let successful = self.history.iter().filter(|r| r.success).count();
         
-        ColorGradingStats {
+        _ColorGradingStats {
             total_graded,
             successful,
             failed: total_graded - successful,
@@ -321,7 +321,7 @@ impl LUTColorGrading {
 
 /// 色彩分级统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColorGradingStats {
+pub struct _ColorGradingStats {
     /// 总分级数
     pub total_graded: usize,
     /// 成功数
@@ -340,9 +340,9 @@ mod tests {
     
     #[test]
     fn test_asc_cdl_application() {
-        let grading = LUTColorGrading::new();
+        let grading = _LUTColorGrading::new();
         
-        let params = ASCCDLParams {
+        let params = _ASCCDLParams {
             lift: [0.0, 0.0, 0.0],
             gamma: [1.0, 1.0, 1.0],
             gain: [1.2, 1.0, 0.8],
@@ -350,23 +350,23 @@ mod tests {
         };
         
         let input = vec![128, 128, 128];
-        let output = grading.apply_asc_cdl(&input, &params);
+        let output = grading._apply_asc_cdl(&input, &params);
         
         assert_eq!(output.len(), 3);
     }
     
     #[test]
     fn test_3d_lut_generation() {
-        let grading = LUTColorGrading::new();
+        let grading = _LUTColorGrading::new();
         
-        let params = ASCCDLParams {
+        let params = _ASCCDLParams {
             lift: [0.0, 0.0, 0.0],
             gamma: [1.0, 1.0, 1.0],
             gain: [1.0, 1.0, 1.0],
             saturation: 1.0,
         };
         
-        let lut = grading.generate_3d_lut(&params);
+        let lut = grading._generate_3d_lut(&params);
         assert_eq!(lut.len(), 33 * 33 * 33 * 3);
     }
 }

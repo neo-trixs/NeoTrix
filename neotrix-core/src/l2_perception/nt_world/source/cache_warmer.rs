@@ -9,7 +9,7 @@ impl CacheWarmer {
         queries: &[String],
         sources: &[Arc<dyn MediaSource>],
         cache: &mut MultiLevelCache,
-    ) -> WarmResult {
+    ) -> _WarmResult {
         let mut success = 0usize;
         let mut failed = 0usize;
 
@@ -36,14 +36,14 @@ impl CacheWarmer {
             }
         }
 
-        WarmResult { success, failed }
+        _WarmResult { success, failed }
     }
 
     pub async fn warm_concurrent(
         queries: Vec<String>,
         sources: Arc<Vec<Arc<dyn MediaSource>>>,
         cache: Arc<tokio::sync::RwLock<MultiLevelCache>>,
-    ) -> WarmResult {
+    ) -> _WarmResult {
         let mut handles = Vec::with_capacity(queries.len());
 
         for query in queries {
@@ -78,17 +78,17 @@ impl CacheWarmer {
             }
         }
 
-        WarmResult { success, failed }
+        _WarmResult { success, failed }
     }
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct WarmResult {
+pub struct _WarmResult {
     pub success: usize,
     pub failed: usize,
 }
 
-impl WarmResult {
+impl _WarmResult {
     pub fn total(&self) -> usize {
         self.success + self.failed
     }
@@ -109,14 +109,14 @@ mod tests {
 
     #[test]
     fn test_warm_result_stats() {
-        let r = WarmResult { success: 8, failed: 2 };
+        let r = _WarmResult { success: 8, failed: 2 };
         assert_eq!(r.total(), 10);
         assert!((r.hit_rate() - 0.8).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_warm_result_empty() {
-        let r = WarmResult::default();
+        let r = _WarmResult::default();
         assert_eq!(r.total(), 0);
         assert_eq!(r.hit_rate(), 0.0);
     }

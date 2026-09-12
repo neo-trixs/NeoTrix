@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{OsintConfig, OsintTarget};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProfileEntry {
+pub struct _ProfileEntry {
     pub platform: String,
     pub username: String,
     pub url: String,
@@ -21,7 +21,7 @@ pub struct ProfileEntry {
 pub struct PersonFindings {
     pub username: Option<String>,
     pub email: Option<String>,
-    pub profiles: Vec<ProfileEntry>,
+    pub profiles: Vec<_ProfileEntry>,
 }
 
 impl std::fmt::Display for PersonFindings {
@@ -71,13 +71,13 @@ const PLATFORMS: &[PlatformCheck] = &[
     PlatformCheck { name: "Crunchbase", url_fn: |u| format!("https://crunchbase.com/person/{u}") },
 ];
 
-async fn check_platform(username: &str, platform: &PlatformCheck, client: &Client) -> ProfileEntry {
+async fn check_platform(username: &str, platform: &PlatformCheck, client: &Client) -> _ProfileEntry {
     let url = (platform.url_fn)(username);
     let exists = match client.get(&url).timeout(Duration::from_secs(5)).send().await {
         Ok(resp) => resp.status().as_u16() < 400,
         Err(_) => false,
     };
-    ProfileEntry {
+    _ProfileEntry {
         platform: platform.name.to_string(),
         username: username.to_string(),
         url,
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_profile_entry_new() {
-        let p = ProfileEntry {
+        let p = _ProfileEntry {
             platform: "GitHub".to_string(),
             username: "test".to_string(),
             url: "https://github.com/test".to_string(),
