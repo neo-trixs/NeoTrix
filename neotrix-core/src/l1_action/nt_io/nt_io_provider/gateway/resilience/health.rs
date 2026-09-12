@@ -270,7 +270,7 @@ impl GatewayV2 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+use super::super::*;
 
     #[test]
     fn test_pool_health_evaluate_empty_pool() {
