@@ -44,7 +44,6 @@ pub mod nt_core_sense;
 pub mod l3_memory;
 pub mod nt_core_bank;
 pub mod nt_core_graph;
-pub mod nt_core_concept_emergence;
 pub mod nt_core_hcube;
  pub mod nt_core_knowledge;
  pub mod nt_core_kron;
@@ -186,8 +185,6 @@ pub mod nt_core_telemetry;
 pub mod nt_core_vector_store;
 pub mod nt_core_deploy;
 pub mod nt_core_deploy_cache;
-pub mod nt_core_bounded_collections;
-pub mod nt_core_source_edit;
 // Formal verification proof harnesses
 #[cfg(test)]
 pub mod kani_proofs;

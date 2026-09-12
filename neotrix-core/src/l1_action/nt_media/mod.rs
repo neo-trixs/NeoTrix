@@ -13,6 +13,7 @@ pub mod hls;
 pub mod persistence;
 pub mod router;
 pub mod streaming;
+pub mod thumbnail;
 
 pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};
 pub use detect::MediaKind;
