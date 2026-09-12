@@ -21,7 +21,6 @@ impl PerfectionCategory {
     pub fn is_complete(&self) -> bool { self.current >= self.target }
 }
 
-#[derive(Resource)]
 pub struct PerfectionTracker {
     pub categories: Vec<PerfectionCategory>,
     pub total_gold_earned: u32,
@@ -121,6 +120,8 @@ impl PerfectionTracker {
 impl Default for PerfectionTracker {
     fn default() -> Self { Self::new() }
 }
+
+impl Resource for PerfectionTracker {}
 
 #[cfg(test)]
 mod tests {

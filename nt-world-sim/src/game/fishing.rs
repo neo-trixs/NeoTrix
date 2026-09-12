@@ -45,7 +45,7 @@ impl FishQuality {
     }
 }
 
-#[derive(Resource)]
+#[derive(Debug, Clone)]
 pub struct FishingSystem {
     pub fish_caught: Vec<(Fish, FishQuality)>,
     pub total_caught: u32,
@@ -118,6 +118,8 @@ fn rand_f32() -> f32 {
 impl Default for FishingSystem {
     fn default() -> Self { Self::new() }
 }
+
+impl Resource for FishingSystem {}
 
 #[cfg(test)]
 mod tests {

@@ -12,7 +12,7 @@ pub struct CookingRecipe {
     pub skill_bonus: Option<(String, f32)>,
 }
 
-#[derive(Resource)]
+#[derive(Debug, Clone)]
 pub struct CookingSystem {
     pub recipes: HashMap<u32, CookingRecipe>,
     pub cooked_count: HashMap<u32, u32>,
@@ -70,6 +70,8 @@ impl CookingSystem {
 impl Default for CookingSystem {
     fn default() -> Self { Self::new() }
 }
+
+impl Resource for CookingSystem {}
 
 #[cfg(test)]
 mod tests {

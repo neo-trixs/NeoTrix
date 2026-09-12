@@ -30,7 +30,7 @@ impl ForageItem {
     }
 }
 
-#[derive(Resource)]
+#[derive(Debug, Clone)]
 pub struct ForagingSystem {
     pub items_collected: HashMap<u32, u32>,
     pub total_collected: u32,
@@ -85,6 +85,8 @@ fn pseudo_random(seed: u32) -> u32 {
 impl Default for ForagingSystem {
     fn default() -> Self { Self::new() }
 }
+
+impl Resource for ForagingSystem {}
 
 #[cfg(test)]
 mod tests {
