@@ -52,7 +52,7 @@ pub(crate) struct _EmotionSnapshot {
     pub id: String,
     pub label: EmotionLabel,
     pub report: EmotionReport,
-    pub social: SocialState,
+    pub social: _SocialState,
     pub timestamp: u64,
 }
 

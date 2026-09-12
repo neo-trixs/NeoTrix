@@ -269,7 +269,7 @@ impl SelfTest for DocParseSelfTest {
         // 2. parse_bytes 空内容应返回错误
         let result = super::doc_parse::parse_bytes(
             b"",
-            anydoc::Format::Markdown,
+            anydoc::Format::Rtf,
         );
         // 空内容可能解析为空文档，不一定报错，此处仅验证不 panic
         let _ = result;

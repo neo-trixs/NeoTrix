@@ -2,6 +2,7 @@ pub mod renderer;
 pub mod physics;
 pub mod input;
 pub mod events;
+pub mod event_bus;
 pub mod pet_state;
 pub mod hook_system;
 pub mod theme_system;

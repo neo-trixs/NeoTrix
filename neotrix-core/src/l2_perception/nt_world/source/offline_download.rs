@@ -4,7 +4,7 @@
 //! Uses `StreamingPipeline` for real HTTP/magnet/FIFO downloads with progress tracking.
 
 use crate::l1_action::nt_media::detect::MediaKind;
-use crate::l1_action::nt_media::{PipelineConfig, PipelineHandle, PipelineProgress, PipelineStatus, StreamingPipeline};
+use crate::l1_action::nt_media::{PipelineConfig, PipelineProgress, PipelineStatus, StreamingPipeline};
 use super::offline_index::OfflineIndex;
 use super::types::{MediaItem, Quality};
 use std::path::PathBuf;

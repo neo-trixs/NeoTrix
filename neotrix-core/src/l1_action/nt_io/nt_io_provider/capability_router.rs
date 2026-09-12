@@ -6,7 +6,7 @@
 
 use crate::core::nt_core_llm::{LlmError, LlmRequest};
 use super::provider_catalog::{
-    find_by_capabilities, ProviderCapabilities, PROVIDER_CATALOG,
+    find_by_capabilities, ProviderCapabilities,
 };
 
 /// Capability-based router — selects providers based on required capabilities.

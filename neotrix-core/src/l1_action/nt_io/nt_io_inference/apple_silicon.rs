@@ -30,7 +30,6 @@
 //! - Apple-only (not portable)
 //! - mlx-lm: HuggingFace-compatible CLI and Python API
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// Apple Silicon optimizer

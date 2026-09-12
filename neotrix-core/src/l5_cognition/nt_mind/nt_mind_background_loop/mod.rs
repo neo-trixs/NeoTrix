@@ -38,7 +38,7 @@ use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 mod builder;
 pub(crate) mod config;
 pub mod knowledge_pipeline;
-pub(crate) use config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
+pub(crate) use config::{BackgroundConfig, TelemetryCollector};
 mod run;
 mod handlers;
 pub mod always_on;

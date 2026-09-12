@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 mod commands;
 mod domain;
 pub mod market;
+mod notifications;
 mod stub;
 
 use crate::stub::{UnifiedApi as _, UnifiedApiImpl};
@@ -250,6 +251,11 @@ fn main() {
                     market_config,
                 ])
                 .setup(move |app| {
+                    // 初始化通知管理器
+                    let notification_manager =
+                        notifications::NotificationManager::new(app.handle().clone());
+                    app.manage(notification_manager);
+
                     // PTY 事件转发
                     let pty_handle = app.handle().clone();
                     tauri::async_runtime::spawn(async move {

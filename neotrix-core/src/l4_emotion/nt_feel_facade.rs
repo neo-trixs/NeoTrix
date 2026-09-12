@@ -7,7 +7,7 @@ pub(crate) use crate::l4_emotion::nt_feel::emotion_engine::{
     _AttentionSignal, _EmotionSnapshot, _FeelConfig, _FeelEngine, _SocialState,
 };
 pub(crate) use crate::l4_emotion::nt_feel::nt_feel_vtuber::{
-    _CharacterPersona, _EmotionReading, _EmotionRegulation, _EmotionResponse, _EmotionSource,
-    _EmotionType, _PersonalityTrait, _RegulationStrategy, _ResponseStyle, _SpeakingPattern,
-    _VTuberEmotionEngine, _VoiceConfig, _VoiceOutput,
+    _CharacterPersona, _EmotionReading, _EmotionResponse, _EmotionSource,
+    _PersonalityTrait, _RegulationStrategy, _ResponseStyle, _SpeakingPattern,
+    _VoiceConfig, _VoiceOutput,
 };

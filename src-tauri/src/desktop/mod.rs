@@ -8,5 +8,5 @@ pub mod model_manager;
 pub mod session_manager;
 
 pub use capabilities::{DesktopCapabilities, UpdateInfo};
-pub use model_manager::{DownloadProgress, DownloadTask, ModelManager, ModelMetadata};
+pub use model_manager::{DownloadProgress, DownloadStatus, DownloadTask, ModelCapabilities, ModelManager, ModelMetadata, ModelSource};
 pub use session_manager::{Message, Session, SessionManager};
