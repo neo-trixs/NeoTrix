@@ -1,6 +1,10 @@
 //! NeoTrix 统一错误类型 (L0)
 //!
 //! 定义在 core 层以防 L7/L5/L4 模块因依赖此类型而反向引用 neotrix 层。
+//! 子模块: parse (编译器错误解析), recovery (错误恢复策略)。
+
+pub mod parse;
+pub mod recovery;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;

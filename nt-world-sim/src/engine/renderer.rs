@@ -22,25 +22,13 @@ impl Color {
         Self { r, g, b, a }
     }
 
-    pub fn white() -> Self {
-        Self::rgb(1.0, 1.0, 1.0)
-    }
-
-    pub fn black() -> Self {
-        Self::rgb(0.0, 0.0, 0.0)
-    }
-
-    pub fn red() -> Self {
-        Self::rgb(1.0, 0.0, 0.0)
-    }
-
-    pub fn green() -> Self {
-        Self::rgb(0.0, 1.0, 0.0)
-    }
-
-    pub fn blue() -> Self {
-        Self::rgb(0.0, 0.0, 1.0)
-    }
+    pub fn white() -> Self { Self::rgb(1.0, 1.0, 1.0) }
+    pub fn black() -> Self { Self::rgb(0.0, 0.0, 0.0) }
+    pub fn red() -> Self { Self::rgb(1.0, 0.0, 0.0) }
+    pub fn green() -> Self { Self::rgb(0.0, 1.0, 0.0) }
+    pub fn blue() -> Self { Self::rgb(0.0, 0.0, 1.0) }
+    pub fn yellow() -> Self { Self::rgb(1.0, 1.0, 0.0) }
+    pub fn clear() -> Self { Self::rgba(0.0, 0.0, 0.0, 0.0) }
 }
 
 /// 2D 向量
@@ -51,17 +39,9 @@ pub struct Vec2 {
 }
 
 impl Vec2 {
-    pub fn new(x: f32, y: f32) -> Self {
-        Self { x, y }
-    }
-
-    pub fn zero() -> Self {
-        Self { x: 0.0, y: 0.0 }
-    }
-
-    pub fn one() -> Self {
-        Self { x: 1.0, y: 1.0 }
-    }
+    pub fn new(x: f32, y: f32) -> Self { Self { x, y } }
+    pub fn zero() -> Self { Self { x: 0.0, y: 0.0 } }
+    pub fn one() -> Self { Self { x: 1.0, y: 1.0 } }
 
     pub fn length(&self) -> f32 {
         (self.x * self.x + self.y * self.y).sqrt()
@@ -69,48 +49,28 @@ impl Vec2 {
 
     pub fn normalize(&self) -> Self {
         let len = self.length();
-        if len == 0.0 {
-            Self::zero()
-        } else {
-            Self::new(self.x / len, self.y / len)
-        }
+        if len == 0.0 { Self::zero() } else { Self::new(self.x / len, self.y / len) }
     }
 
-    pub fn dot(&self, other: &Self) -> f32 {
-        self.x * other.x + self.y * other.y
-    }
-
-    pub fn distance_to(&self, other: &Self) -> f32 {
-        (*self - *other).length()
-    }
+    pub fn dot(&self, other: &Self) -> f32 { self.x * other.x + self.y * other.y }
+    pub fn distance_to(&self, other: &Self) -> f32 { (*self - *other).length() }
 }
 
 impl std::ops::Add for Vec2 {
     type Output = Self;
-    fn add(self, rhs: Self) -> Self {
-        Self::new(self.x + rhs.x, self.y + rhs.y)
-    }
+    fn add(self, rhs: Self) -> Self { Self::new(self.x + rhs.x, self.y + rhs.y) }
 }
-
 impl std::ops::Sub for Vec2 {
     type Output = Self;
-    fn sub(self, rhs: Self) -> Self {
-        Self::new(self.x - rhs.x, self.y - rhs.y)
-    }
+    fn sub(self, rhs: Self) -> Self { Self::new(self.x - rhs.x, self.y - rhs.y) }
 }
-
 impl std::ops::Neg for Vec2 {
     type Output = Self;
-    fn neg(self) -> Self {
-        Self::new(-self.x, -self.y)
-    }
+    fn neg(self) -> Self { Self::new(-self.x, -self.y) }
 }
-
 impl std::ops::Mul<f32> for Vec2 {
     type Output = Self;
-    fn mul(self, scalar: f32) -> Self {
-        Self::new(self.x * scalar, self.y * scalar)
-    }
+    fn mul(self, scalar: f32) -> Self { Self::new(self.x * scalar, self.y * scalar) }
 }
 
 /// 矩形
@@ -128,17 +88,13 @@ impl Rect {
     }
 
     pub fn contains(&self, point: &Vec2) -> bool {
-        point.x >= self.x
-            && point.x <= self.x + self.width
-            && point.y >= self.y
-            && point.y <= self.y + self.height
+        point.x >= self.x && point.x <= self.x + self.width
+            && point.y >= self.y && point.y <= self.y + self.height
     }
 
     pub fn intersects(&self, other: &Rect) -> bool {
-        self.x < other.x + other.width
-            && self.x + self.width > other.x
-            && self.y < other.y + other.height
-            && self.y + self.height > other.y
+        self.x < other.x + other.width && self.x + self.width > other.x
+            && self.y < other.y + other.height && self.y + self.height > other.y
     }
 }
 
@@ -156,11 +112,7 @@ impl Transform {
     }
 
     pub fn default() -> Self {
-        Self {
-            position: Vec2::zero(),
-            rotation: 0.0,
-            scale: Vec2::one(),
-        }
+        Self { position: Vec2::zero(), rotation: 0.0, scale: Vec2::one() }
     }
 }
 
@@ -175,21 +127,11 @@ pub struct Sprite {
 
 impl Sprite {
     pub fn new(texture: &str) -> Self {
-        Self {
-            texture: Some(texture.to_string()),
-            rect: Rect::new(0.0, 0.0, 16.0, 16.0),
-            color: Color::white(),
-            z_index: 0,
-        }
+        Self { texture: Some(texture.to_string()), rect: Rect::new(0.0, 0.0, 16.0, 16.0), color: Color::white(), z_index: 0 }
     }
 
     pub fn colored(color: Color) -> Self {
-        Self {
-            texture: None,
-            rect: Rect::new(0.0, 0.0, 16.0, 16.0),
-            color,
-            z_index: 0,
-        }
+        Self { texture: None, rect: Rect::new(0.0, 0.0, 16.0, 16.0), color, z_index: 0 }
     }
 }
 
@@ -204,12 +146,7 @@ pub struct TileDef {
 
 impl TileDef {
     pub fn new(id: u32, color: Color, walkable: bool) -> Self {
-        Self {
-            id,
-            texture: None,
-            color,
-            walkable,
-        }
+        Self { id, texture: None, color, walkable }
     }
 }
 
@@ -223,11 +160,7 @@ pub struct TileMap {
 
 impl TileMap {
     pub fn new(width: usize, height: usize, tile_size: Vec2) -> Self {
-        Self {
-            tiles: vec![vec![0; width]; height],
-            tile_size,
-            palette: HashMap::new(),
-        }
+        Self { tiles: vec![vec![0; width]; height], tile_size, palette: HashMap::new() }
     }
 
     pub fn get_tile(&self, x: usize, y: usize) -> Option<u32> {
@@ -236,17 +169,13 @@ impl TileMap {
 
     pub fn set_tile(&mut self, x: usize, y: usize, tile_id: u32) {
         if let Some(row) = self.tiles.get_mut(y) {
-            if let Some(tile) = row.get_mut(x) {
-                *tile = tile_id;
-            }
+            if let Some(tile) = row.get_mut(x) { *tile = tile_id; }
         }
     }
 
     pub fn is_walkable(&self, x: usize, y: usize) -> bool {
         if let Some(tile_id) = self.get_tile(x, y) {
-            if let Some(tile_def) = self.palette.get(&tile_id) {
-                return tile_def.walkable;
-            }
+            if let Some(tile_def) = self.palette.get(&tile_id) { return tile_def.walkable; }
         }
         false
     }
@@ -263,12 +192,7 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(viewport_width: f32, viewport_height: f32) -> Self {
-        Self {
-            position: Vec2::zero(),
-            zoom: 1.0,
-            viewport_width,
-            viewport_height,
-        }
+        Self { position: Vec2::zero(), zoom: 1.0, viewport_width, viewport_height }
     }
 
     pub fn world_to_screen(&self, world_pos: Vec2) -> Vec2 {
@@ -286,79 +210,137 @@ impl Camera {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Draw commands — recorded by CanvasRenderer, consumed by a backend
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub enum DrawCommand {
+    Clear { color: Color },
+    DrawRect { rect: Rect, color: Color },
+    DrawCircle { center: Vec2, radius: f32, color: Color },
+    DrawLine { start: Vec2, end: Vec2, color: Color, width: f32 },
+    DrawText { text: String, position: Vec2, color: Color, size: f32 },
+    DrawSprite { texture: String, dest: Rect, color: Color, z_index: i32 },
+    DrawTilemap { tile_colors: Vec<(Rect, Color)>, z_index: i32 },
+    Present,
+}
+
 /// 渲染器 trait
 pub trait Renderer {
-    /// 清屏
     fn clear(&mut self, color: Color);
-
-    /// 绘制精灵
     fn draw_sprite(&mut self, sprite: &Sprite, transform: &Transform);
-
-    /// 绘制瓦片图
     fn draw_tilemap(&mut self, tilemap: &TileMap, camera: &Camera);
-
-    /// 绘制文本
     fn draw_text(&mut self, text: &str, position: Vec2, color: Color, size: f32);
-
-    /// 绘制矩形
     fn draw_rect(&mut self, rect: &Rect, color: Color);
-
-    /// 绘制圆
     fn draw_circle(&mut self, center: Vec2, radius: f32, color: Color);
-
-    /// 绘制线
     fn draw_line(&mut self, start: Vec2, end: Vec2, color: Color, width: f32);
-
-    /// 呈现
     fn present(&mut self);
-
-    /// 获取视口大小
     fn viewport_size(&self) -> Vec2;
 }
 
-/// Canvas 渲染器实现 (用于 Web)
+/// Canvas 渲染器实现 — records draw commands for later consumption
 pub struct CanvasRenderer {
     width: f32,
     height: f32,
+    commands: Vec<DrawCommand>,
+    frame_count: u64,
 }
 
 impl CanvasRenderer {
     pub fn new(width: f32, height: f32) -> Self {
-        Self { width, height }
+        Self { width, height, commands: Vec::new(), frame_count: 0 }
+    }
+
+    /// Drain all recorded draw commands (consumes them)
+    pub fn drain_commands(&mut self) -> Vec<DrawCommand> {
+        std::mem::take(&mut self.commands)
+    }
+
+    /// Peek at commands without draining
+    pub fn commands(&self) -> &[DrawCommand] {
+        &self.commands
+    }
+
+    /// Number of commands recorded this frame
+    pub fn command_count(&self) -> usize {
+        self.commands.len()
+    }
+
+    /// Current frame number
+    pub fn frame_count(&self) -> u64 {
+        self.frame_count
     }
 }
 
 impl Renderer for CanvasRenderer {
-    fn clear(&mut self, _color: Color) {
-        // TODO: 实现 Canvas 清屏
+    fn clear(&mut self, color: Color) {
+        self.commands.push(DrawCommand::Clear { color });
     }
 
-    fn draw_sprite(&mut self, _sprite: &Sprite, _transform: &Transform) {
-        // TODO: 实现精灵绘制
+    fn draw_sprite(&mut self, sprite: &Sprite, transform: &Transform) {
+        let dest = Rect::new(
+            transform.position.x + sprite.rect.x,
+            transform.position.y + sprite.rect.y,
+            sprite.rect.width * transform.scale.x,
+            sprite.rect.height * transform.scale.y,
+        );
+        let texture = sprite.texture.clone().unwrap_or_default();
+        self.commands.push(DrawCommand::DrawSprite {
+            texture,
+            dest,
+            color: sprite.color,
+            z_index: sprite.z_index,
+        });
     }
 
-    fn draw_tilemap(&mut self, _tilemap: &TileMap, _camera: &Camera) {
-        // TODO: 实现瓦片图绘制
+    fn draw_tilemap(&mut self, tilemap: &TileMap, camera: &Camera) {
+        let mut tile_colors = Vec::new();
+        for (y, row) in tilemap.tiles.iter().enumerate() {
+            for (x, &tile_id) in row.iter().enumerate() {
+                if let Some(tile_def) = tilemap.palette.get(&tile_id) {
+                    let world_pos = Vec2::new(
+                        x as f32 * tilemap.tile_size.x,
+                        y as f32 * tilemap.tile_size.y,
+                    );
+                    let screen_pos = camera.world_to_screen(world_pos);
+                    let rect = Rect::new(
+                        screen_pos.x,
+                        screen_pos.y,
+                        tilemap.tile_size.x * camera.zoom,
+                        tilemap.tile_size.y * camera.zoom,
+                    );
+                    tile_colors.push((rect, tile_def.color));
+                }
+            }
+        }
+        self.commands.push(DrawCommand::DrawTilemap { tile_colors, z_index: 0 });
     }
 
-    fn draw_text(&mut self, _text: &str, _position: Vec2, _color: Color, _size: f32) {
-        // TODO: 实现文本绘制
+    fn draw_text(&mut self, text: &str, position: Vec2, color: Color, size: f32) {
+        self.commands.push(DrawCommand::DrawText {
+            text: text.to_string(),
+            position,
+            color,
+            size,
+        });
     }
 
-    fn draw_rect(&mut self, _rect: &Rect, _color: Color) {
-        // TODO: 实现矩形绘制
+    fn draw_rect(&mut self, rect: &Rect, color: Color) {
+        self.commands.push(DrawCommand::DrawRect { rect: *rect, color });
     }
 
-    fn draw_circle(&mut self, _center: Vec2, _radius: f32, _color: Color) {
-        // TODO: 实现圆形绘制
+    fn draw_circle(&mut self, center: Vec2, radius: f32, color: Color) {
+        self.commands.push(DrawCommand::DrawCircle { center, radius, color });
     }
 
-    fn draw_line(&mut self, _start: Vec2, _end: Vec2, _color: Color, _width: f32) {
-        // TODO: 实现线段绘制
+    fn draw_line(&mut self, start: Vec2, end: Vec2, color: Color, width: f32) {
+        self.commands.push(DrawCommand::DrawLine { start, end, color, width });
     }
 
     fn present(&mut self) {
-        // TODO: 实现呈现
+        self.commands.push(DrawCommand::Present);
+        self.frame_count += 1;
     }
 
     fn viewport_size(&self) -> Vec2 {

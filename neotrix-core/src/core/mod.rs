@@ -148,8 +148,6 @@ pub mod nt_core_cap;
 pub mod nt_core_conn;
 pub mod nt_core_edit;
 pub mod nt_core_embed;
-pub mod nt_core_error_parse;
-pub mod nt_core_error_recovery;
 pub mod nt_core_event;
 pub use nt_core_event::{CoreEvent};
 pub use crate::neotrix::nt_core_event_bus::{EventBus};

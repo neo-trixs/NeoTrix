@@ -22,8 +22,6 @@ pub mod nt_io_agents_md;
 
 pub mod nt_io_avatar_channel;
 
-pub mod nt_io_awareness_core;
-
 pub mod nt_io_digital_human;
 
 pub mod nt_io_http_factory;
@@ -55,7 +53,6 @@ pub mod nt_io_user_avatar;
 pub mod context_sandbox;
 
 pub mod nt_io_messaging;
-pub mod nt_io_context_mgmt;
 pub mod nt_l1_error;
 
 // 三拍子 Hook 系统 — 基于 Grok Build 模式

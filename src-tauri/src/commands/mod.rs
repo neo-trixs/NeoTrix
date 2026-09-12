@@ -3,6 +3,7 @@
 //! 当前只保留 unified + PTY + model_pool + proxy_pool 命令，其他旧命令模块暂不编译。
 
 pub mod domain_cmd;
+pub mod file_drop;
 pub mod im;
 pub mod model_pool;
 pub mod neotrix_cli;

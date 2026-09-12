@@ -12,12 +12,14 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 
+mod autostart;
 mod commands;
 mod domain;
 pub mod market;
 mod notifications;
 mod stub;
 
+use crate::commands::file_drop::{handle_file_drop, setup_file_drop_listener};
 use crate::stub::{UnifiedApi as _, UnifiedApiImpl};
 use commands::domain_cmd::{
     domain_action_count, domain_call, domain_has, domain_list, DomainState,
@@ -162,6 +164,10 @@ fn main() {
                         let _ = window.set_focus();
                     }
                 }))
+                .plugin(tauri_plugin_autostart::init(
+                    tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                    None,
+                ))
                 .setup(|app| {
                     // 设置 chat plugin 的 app handle 以支持事件发射
                     set_app_handle(app.handle().clone());
@@ -204,6 +210,8 @@ fn main() {
                     unified_delete_session,
                     unified_exec_cli,
                     unified_cli_list,
+                    // ===== File Drop (文件拖拽) =====
+                    handle_file_drop,
                     // ===== PTY (硬件级接口) =====
                     crate::commands::pty::pty_spawn,
                     crate::commands::pty::pty_write,
@@ -249,12 +257,25 @@ fn main() {
                     market_list_installed,
                     market_check_updates,
                     market_config,
+                    // ===== AutoStart (开机自启) =====
+                    autostart::autostart_is_enabled,
+                    autostart::autostart_enable,
+                    autostart::autostart_disable,
+                    autostart::autostart_toggle,
                 ])
                 .setup(move |app| {
                     // 初始化通知管理器
                     let notification_manager =
                         notifications::NotificationManager::new(app.handle().clone());
                     app.manage(notification_manager);
+
+                    // 初始化开机自启管理器
+                    let autostart_manager =
+                        autostart::AutoStartManager::new(app.handle().clone());
+                    app.manage(autostart_manager);
+
+                    // 设置文件拖拽监听
+                    setup_file_drop_listener(app.handle());
 
                     // PTY 事件转发
                     let pty_handle = app.handle().clone();
