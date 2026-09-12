@@ -14,7 +14,7 @@ use std::time::Instant;
 
 use super::unified_inference::*;
 use super::gateway::GatewayV2;
-use super::types::CostEstimate;
+use super::types::CostEstimate as LlmCostEstimate;
 
 /// 路由器配置
 #[derive(Debug, Clone)]
@@ -138,16 +138,19 @@ impl UnifiedInference for InferenceRouter {
         let (tx_out, rx_out) = tokio::sync::mpsc::channel(64);
         tokio::spawn(async move {
             while let Some(item) = rx.recv().await {
-                let mapped = item.map(|resp| InferenceResponse {
-                    content: resp.content,
-                    model: resp.model,
-                    provider: String::new(),
-                    usage: resp.usage,
-                    finish_reason: resp.finish_reason,
-                    tool_calls: resp.tool_calls,
-                    reasoning: resp.reasoning,
-                    metadata: ResponseMetadata::default(),
-                });
+                let mapped: Result<InferenceResponse, InferenceError> = match item {
+                    Ok(resp) => Ok(InferenceResponse {
+                        content: resp.content,
+                        model: resp.model,
+                        provider: String::new(),
+                        usage: resp.usage,
+                        finish_reason: resp.finish_reason,
+                        tool_calls: resp.tool_calls,
+                        reasoning: resp.reasoning,
+                        metadata: ResponseMetadata::default(),
+                    }),
+                    Err(e) => Err(InferenceError::from(e)),
+                };
                 if tx_out.send(mapped).await.is_err() {
                     break;
                 }
@@ -194,18 +197,18 @@ impl UnifiedInference for InferenceRouter {
             .map(|m| m.content.as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        let prompt_tokens = super::context_budget::estimate_tokens(&prompt);
-        let completion_tokens = request.max_tokens.unwrap_or(4096) as usize;
+        let input_tokens = super::context_budget::estimate_tokens(&prompt);
+        let output_tokens = request.max_tokens.unwrap_or(4096) as usize;
 
         // 简单估算: $0.002/1K tokens (可替换为 per-provider 定价)
-        let cost = (prompt_tokens as f64 / 1000.0) * 0.002
-            + (completion_tokens as f64 / 1000.0) * 0.002;
+        let cost = (input_tokens as f64 / 1000.0) * 0.002
+            + (output_tokens as f64 / 1000.0) * 0.002;
 
         CostEstimate {
-            prompt_tokens,
-            completion_tokens,
+            input_tokens,
+            output_tokens,
             estimated_cost_usd: cost,
-            provider_name: "auto".to_string(),
+            model: request.model.clone().unwrap_or_default(),
         }
     }
 }

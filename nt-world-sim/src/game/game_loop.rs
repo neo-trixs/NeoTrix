@@ -1,5 +1,11 @@
-use crate::core::{UniversalWorld, UniversalEntity, Component};
+use std::collections::HashMap;
+use crate::core::{UniversalWorld, UniversalEntity, Component, EntityId};
 use crate::core::scheduler::{ParallelScheduler, SystemDependency};
+use crate::engine::physics::SimplePhysicsWorld;
+use crate::engine::camera::Camera2D;
+use crate::engine::scene::{SceneGraph, SceneNode};
+use crate::engine::input::KeyCode as InputKeyCode;
+use crate::engine::renderer::{Vec2 as RendererVec2, Transform};
 use super::time::{GameTime, TimeSystem};
 use super::weather::{Weather, WeatherSystem};
 use super::inventory::Inventory;
@@ -27,6 +33,30 @@ pub struct GameLoop {
     pub target_fps: u32,
     pub accumulator: f32,
     pub fixed_timestep: f32,
+    pub physics: SimplePhysicsWorld,
+    pub camera: Camera2D,
+    pub scene: SceneGraph,
+    pub input_map: HashMap<InputKeyCode, GameAction>,
+}
+
+fn create_default_input_map() -> HashMap<InputKeyCode, GameAction> {
+    let mut map = HashMap::new();
+    map.insert(InputKeyCode::W, GameAction::Move { dx: 0, dy: -1 });
+    map.insert(InputKeyCode::S, GameAction::Move { dx: 0, dy: 1 });
+    map.insert(InputKeyCode::A, GameAction::Move { dx: -1, dy: 0 });
+    map.insert(InputKeyCode::D, GameAction::Move { dx: 1, dy: 0 });
+    map.insert(InputKeyCode::Num1, GameAction::UseTool(1));
+    map.insert(InputKeyCode::Num2, GameAction::UseTool(2));
+    map.insert(InputKeyCode::Num3, GameAction::UseTool(3));
+    map.insert(InputKeyCode::Num4, GameAction::UseTool(4));
+    map.insert(InputKeyCode::Num5, GameAction::UseTool(5));
+    map.insert(InputKeyCode::E, GameAction::Interact);
+    map.insert(InputKeyCode::I, GameAction::ToggleInventory);
+    map.insert(InputKeyCode::C, GameAction::ToggleCrafting);
+    map.insert(InputKeyCode::Enter, GameAction::AdvanceDialogue);
+    map.insert(InputKeyCode::F5, GameAction::Save);
+    map.insert(InputKeyCode::F9, GameAction::Load);
+    map
 }
 
 impl GameLoop {
@@ -41,6 +71,8 @@ impl GameLoop {
         world.insert_resource(Weather::new());
         world.insert_resource(Inventory::new(20, 12));
 
+        let root_entity = UniversalEntity::new(EntityId(0), 0);
+
         Self {
             state: GameState::Title,
             world,
@@ -50,6 +82,10 @@ impl GameLoop {
             target_fps: 60,
             accumulator: 0.0,
             fixed_timestep: 1.0 / 60.0,
+            physics: SimplePhysicsWorld::new(),
+            camera: Camera2D::new(800.0, 600.0),
+            scene: SceneGraph::new(root_entity),
+            input_map: create_default_input_map(),
         }
     }
 

@@ -7,7 +7,6 @@
 //! - 成本感知: per-provider 定价 + 预算检查
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::provider_catalog::{ProviderCategory, ProviderCapabilities as CatalogCapabilities};
