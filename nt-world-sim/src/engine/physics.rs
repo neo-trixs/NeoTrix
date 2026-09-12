@@ -319,12 +319,14 @@ impl PhysicsWorld for SimplePhysicsWorld {
     }
 
     fn resolve_collisions(&mut self) {
+        // 计算所有碰撞的冲量
+        let mut impulses: Vec<(Entity, Vec2, Entity, Vec2)> = Vec::new();
+        
         for collision in &self.collisions {
             if let (Some(body_a), Some(body_b)) = (
-                self.bodies.get_mut(&collision.entity_a),
-                self.bodies.get_mut(&collision.entity_b),
+                self.bodies.get(&collision.entity_a),
+                self.bodies.get(&collision.entity_b),
             ) {
-                // 简单碰撞解决
                 let relative_velocity = body_b.velocity - body_a.velocity;
                 let velocity_along_normal = relative_velocity.dot(&collision.normal);
 
@@ -337,8 +339,22 @@ impl PhysicsWorld for SimplePhysicsWorld {
                 let j = j / (1.0 / body_a.mass + 1.0 / body_b.mass);
 
                 let impulse = collision.normal * j;
-                body_a.velocity = body_a.velocity - impulse * (1.0 / body_a.mass);
-                body_b.velocity = body_b.velocity + impulse * (1.0 / body_b.mass);
+                impulses.push((
+                    collision.entity_a,
+                    -impulse * (1.0 / body_a.mass),
+                    collision.entity_b,
+                    impulse * (1.0 / body_b.mass),
+                ));
+            }
+        }
+
+        // 应用冲量
+        for (entity_a, impulse_a, entity_b, impulse_b) in impulses {
+            if let Some(body_a) = self.bodies.get_mut(&entity_a) {
+                body_a.velocity = body_a.velocity + impulse_a;
+            }
+            if let Some(body_b) = self.bodies.get_mut(&entity_b) {
+                body_b.velocity = body_b.velocity + impulse_b;
             }
         }
     }
