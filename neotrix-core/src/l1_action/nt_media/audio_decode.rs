@@ -115,18 +115,13 @@ mod inner {
                         let spec = *audio_buf.spec();
                         let frames = audio_buf.frames();
                         let channels = spec.channels.count();
-                        let mut buf =
-                            SampleBuffer::<f32>::new(frames as u64, spec);
+                        let mut buf = SampleBuffer::<f32>::new(frames as u64, spec);
                         buf.copy_interleaved_ref(audio_buf);
 
                         let samples: Vec<f32> = if channels == 1 {
                             buf.samples().to_vec()
                         } else {
-                            buf.samples()
-                                .iter()
-                                .step_by(channels)
-                                .copied()
-                                .collect()
+                            buf.samples().iter().step_by(channels).copied().collect()
                         };
                         return Ok(Some(samples));
                     }

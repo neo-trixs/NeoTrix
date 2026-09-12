@@ -31,7 +31,7 @@ pub async fn extract_thumbnail(
 
     let output = Command::new("ffmpeg")
         .args([
-            "-y",                    // overwrite
+            "-y", // overwrite
             "-i",
             &path.to_string_lossy(),
             "-ss",
@@ -82,7 +82,7 @@ async fn extract_album_art(path: &Path) -> Result<Thumbnail, ThumbError> {
             "-y",
             "-i",
             &path.to_string_lossy(),
-            "-an",                   // no audio
+            "-an", // no audio
             "-vcodec",
             "copy",
             "-f",

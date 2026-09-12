@@ -113,8 +113,8 @@ impl CookieJar {
                 .insert(domain.clone(), cookies.values().cloned().collect());
         }
 
-        let data = serde_json::to_string_pretty(&store)
-            .map_err(|e| format!("cookie serialize: {}", e))?;
+        let data =
+            serde_json::to_string_pretty(&store).map_err(|e| format!("cookie serialize: {}", e))?;
 
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent)
@@ -133,9 +133,7 @@ impl CookieJar {
         let mut jar = self.inner.write().await;
         let domain = entry.domain.clone();
         let name = entry.name.clone();
-        let bucket = jar
-            .entry(domain)
-            .or_insert_with(HashMap::new);
+        let bucket = jar.entry(domain).or_insert_with(HashMap::new);
         bucket.insert(name, entry);
     }
 
@@ -163,11 +161,7 @@ impl CookieJar {
 
         let header: Vec<String> = cookies
             .values()
-            .filter(|c| {
-                c.expires
-                    .map(|exp| exp > now)
-                    .unwrap_or(true)
-            })
+            .filter(|c| c.expires.map(|exp| exp > now).unwrap_or(true))
             .map(|c| format!("{}={}", c.name, c.value))
             .collect();
 
@@ -181,9 +175,7 @@ impl CookieJar {
     /// Parse a `Set-Cookie` header and store the cookie for the given domain.
     pub async fn parse_set_cookie(&self, header: &str, domain: &str) {
         let mut jar = self.inner.write().await;
-        let bucket = jar
-            .entry(domain.to_string())
-            .or_insert_with(HashMap::new);
+        let bucket = jar.entry(domain.to_string()).or_insert_with(HashMap::new);
 
         let mut name = String::new();
         let mut value = String::new();
@@ -248,10 +240,9 @@ fn parse_cookie_expires(date_str: &str) -> Option<u64> {
         "%a %b %d %Y %H:%M:%S GMT",
     ];
     for fmt in &formats {
-        if let Ok(t) = chrono::NaiveDateTime::parse_from_str(
-            &date_str.replace("GMT", "").trim(),
-            fmt,
-        ) {
+        if let Ok(t) =
+            chrono::NaiveDateTime::parse_from_str(&date_str.replace("GMT", "").trim(), fmt)
+        {
             return Some(t.and_utc().timestamp() as u64);
         }
     }
@@ -269,10 +260,7 @@ pub enum AuthStrategy {
     /// Bearer token (e.g. OAuth, JWT).
     BearerToken(String),
     /// HTTP Basic authentication.
-    BasicAuth {
-        username: String,
-        password: String,
-    },
+    BasicAuth { username: String, password: String },
     /// Cookie-based authentication via a `CookieJar`.
     CookieAuth(CookieJar),
     /// Arbitrary custom header.
@@ -295,7 +283,9 @@ impl AuthStrategy {
                 // jar for lifecycle management.
                 builder
             }
-            AuthStrategy::CustomHeader { name, value } => builder.header(name.as_str(), value.as_str()),
+            AuthStrategy::CustomHeader { name, value } => {
+                builder.header(name.as_str(), value.as_str())
+            }
         }
     }
 
@@ -396,7 +386,8 @@ mod tests {
     #[tokio::test]
     async fn test_cookie_jar_memory() {
         let jar = CookieJar::new();
-        jar.add_cookie_simple("example.com", "session", "abc123").await;
+        jar.add_cookie_simple("example.com", "session", "abc123")
+            .await;
         jar.add_cookie_simple("example.com", "lang", "en").await;
 
         let header = jar.get_cookies("example.com").await.unwrap();

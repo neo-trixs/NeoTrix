@@ -61,7 +61,6 @@ fn main() {
             // 创建域注册表并注册 12 个插件
             let mut registry = DomainRegistry::new();
             registry.register(Box::new(SessionPlugin::new())).expect("failed to register session");
-            registry.register(Box::new(ChatPlugin::new())).expect("failed to register chat");
             registry.register(Box::new(AgentPlugin)).expect("failed to register agent");
             registry.register(Box::new(KbPlugin::new())).expect("failed to register kb");
             registry.register(Box::new(FilePlugin)).expect("failed to register file");
@@ -84,6 +83,13 @@ fn main() {
             }
 
             let domain_state: DomainState = Arc::new(RwLock::new(registry));
+            
+            // 创建 chat plugin 并注册到 domain_state
+            let chat_plugin = ChatPlugin::new(domain_state.clone());
+            {
+                let mut registry = domain_state.blocking_write();
+                registry.register(Box::new(chat_plugin)).expect("failed to register chat");
+            }
             let unified_api: UnifiedApiState = Arc::new(RwLock::new(UnifiedApiImpl::new()));
 
             let (pty_manager, pty_rx) = crate::commands::pty::PtyManager::new();

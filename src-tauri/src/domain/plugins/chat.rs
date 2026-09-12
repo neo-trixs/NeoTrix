@@ -1,4 +1,5 @@
 use crate::domain::{DomainPlugin, ActionSpec, DomainError, serde_json};
+use crate::domain::registry::DomainRegistry;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock, Arc};
 use rusqlite::Connection;
@@ -7,33 +8,17 @@ use neotrix::core::nt_core_consciousness_core::{
     ConsciousTask, SolutionExecutor, AttemptOutcome,
     ExternalClosureConfig, CORE,
 };
-use neotrix::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
-use neotrix::l1_action::nt_io::nt_io_provider::types::{LlmRequest, LlmResponse, LlmError, Usage, FinishReason, ChatMessage};
-use tokio_stream::StreamExt;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-static GATEWAY: OnceLock<Mutex<Option<Arc<GatewayV2>>>> = OnceLock::new();
 
 pub fn set_app_handle(app: AppHandle) {
     let _ = APP_HANDLE.set(app);
 }
 
-/// 获取或初始化 GatewayV2
-fn get_gateway() -> Arc<GatewayV2> {
-    let guard = GATEWAY.get_or_init(|| Mutex::new(None));
-    let mut lock = guard.lock().unwrap();
-    if let Some(gw) = lock.as_ref() {
-        return gw.clone();
-    }
-    // 同步创建基础 gateway，首次调用时初始化
-    let gw = Arc::new(GatewayV2::new());
-    *lock = Some(gw.clone());
-    gw
-}
-
 /// GatewayV2 LLM 执行器 — 实现 consciousness core 的 SolutionExecutor trait
+/// 通过 domain_call 统一调用，而非直接访问 GatewayV2
 struct GatewayExecutor {
-    gateway: Arc<GatewayV2>,
+    registry: std::sync::Arc<tokio::sync::RwLock<DomainRegistry>>,
 }
 
 impl SolutionExecutor for GatewayExecutor {
@@ -45,36 +30,29 @@ impl SolutionExecutor for GatewayExecutor {
             task.summary, task.domain, task.capability_tag, grounding
         );
 
-        let request = LlmRequest {
-            model: String::new(), // Gateway 会自动选择
-            messages: vec![
-                ChatMessage {
-                    role: "system".to_string(),
-                    content: system_prompt,
-                },
-                ChatMessage {
-                    role: "user".to_string(),
-                    content: task.summary.clone(),
-                },
+        let request = serde_json::json!({
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": task.summary}
             ],
-            temperature: Some(0.7),
-            max_tokens: Some(2048),
-            stream: false,
-            tools: None,
-        };
+            "temperature": 0.7,
+            "max_tokens": 2048,
+        });
 
-        // 使用 tokio runtime 执行异步操作
+        // 通过 domain_call 统一调用
         let rt = tokio::runtime::Handle::current();
         match rt.block_on(async {
-            // 先尝试 llamacpp provider
-            self.gateway.complete_single("llamacpp", &request).await
-                .or_else(|_| rt.block_on(self.gateway.complete_single("ollama", &request)))
-                .or_else(|_| rt.block_on(self.gateway.complete_single("openai", &request)))
+            let registry = self.registry.read().await;
+            registry.call_async("agent", "complete", request).await
         }) {
-            Ok(response) => AttemptOutcome::Solved {
-                solution: response.content,
-                tokens_used: response.usage.total_tokens,
-            },
+            Ok(response) => {
+                let content = response["content"].as_str().unwrap_or("");
+                let tokens = response["usage"]["total_tokens"].as_u64().unwrap_or(0) as u32;
+                AttemptOutcome::Solved {
+                    solution: content.to_string(),
+                    tokens_used: tokens,
+                }
+            }
             Err(e) => AttemptOutcome::Failed {
                 error: e.to_string(),
                 tokens_used: 0,
@@ -85,17 +63,17 @@ impl SolutionExecutor for GatewayExecutor {
 
 pub struct ChatPlugin {
     db_path: PathBuf,
-    _db: Mutex<()>,
+    registry: std::sync::Arc<tokio::sync::RwLock<DomainRegistry>>,
 }
 
 impl ChatPlugin {
-    pub fn new() -> Self {
+    pub fn new(registry: std::sync::Arc<tokio::sync::RwLock<DomainRegistry>>) -> Self {
         let db_path = dirs::home_dir()
             .map(|h| h.join(".neotrix").join("desktop.db"))
             .unwrap_or_else(|| PathBuf::from(".neotrix/desktop.db"));
         Self {
             db_path,
-            _db: Mutex::new(()),
+            registry,
         }
     }
 
@@ -157,9 +135,9 @@ impl ChatPlugin {
             let _ = app.emit("neocodex_stream_start", "");
         }
 
-        // 使用 GatewayV2 统一路由
+        // 使用 domain_call 统一路由
         let executor = GatewayExecutor {
-            gateway: get_gateway(),
+            registry: self.registry.clone(),
         };
         
         let config = ExternalClosureConfig {
@@ -210,36 +188,27 @@ impl ChatPlugin {
         Ok(combined)
     }
 
-    /// 流式 LLM 调用：通过 GatewayV2 stream_complete_with_selection 获取
+    /// 流式 LLM 调用：通过 domain_call 统一调用获取流式响应
     /// mpsc::Receiver，逐 token emit neocodex_stream_token 事件，返回完整内容。
     fn call_llm_stream(&self, content: &str) -> Result<String, DomainError> {
         if let Some(app) = APP_HANDLE.get() {
             let _ = app.emit("neocodex_stream_start", "");
         }
 
-        let gateway = get_gateway();
-
-        let request = LlmRequest {
-            model: String::new(),
-            messages: vec![
-                ChatMessage {
-                    role: "system".to_string(),
-                    content: "你是一个有帮助的AI助手。请用中文回答。".to_string(),
-                },
-                ChatMessage {
-                    role: "user".to_string(),
-                    content: content.to_string(),
-                },
+        let request = serde_json::json!({
+            "messages": [
+                {"role": "system", "content": "你是一个有帮助的AI助手。请用中文回答。"},
+                {"role": "user", "content": content}
             ],
-            temperature: Some(0.7),
-            max_tokens: Some(2048),
-            stream: true,
-            tools: None,
-        };
+            "temperature": 0.7,
+            "max_tokens": 2048,
+            "stream": true,
+        });
 
         let rt = tokio::runtime::Handle::current();
         let mut rx = rt.block_on(async {
-            gateway.stream_complete_with_selection(&request).await
+            let registry = self.registry.read().await;
+            registry.call_async("agent", "stream", request).await
         }).map_err(|e| DomainError {
             code: "LLM_STREAM_ERROR".into(),
             message: format!("流式请求失败: {}", e),
@@ -253,10 +222,10 @@ impl ChatPlugin {
             while let Some(result) = rx.recv().await {
                 match result {
                     Ok(response) => {
-                        let token = response.content.clone();
-                        full_content.push_str(&token);
+                        let token = response["content"].as_str().unwrap_or("");
+                        full_content.push_str(token);
                         if let Some(app) = APP_HANDLE.get() {
-                            let _ = app.emit("neocodex_stream_token", &token);
+                            let _ = app.emit("neocodex_stream_token", token);
                         }
                     }
                     Err(e) => {
@@ -422,22 +391,30 @@ impl DomainPlugin for ChatPlugin {
                 Ok(serde_json::json!({ "ok": true }))
             }
             "provider_health" => {
-                let gw = get_gateway();
-                let status_list = gw.provider_status();
-                let mut providers = Vec::with_capacity(status_list.len());
-                for status in &status_list {
-                    let name = status.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                    let healthy = status.get("available").and_then(|v| v.as_bool()).unwrap_or(false);
-                    let score = status.get("composite_score")
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| s.parse::<f64>().ok())
-                        .unwrap_or(0.0);
-                    providers.push(serde_json::json!({
-                        "name": name,
-                        "healthy": healthy,
-                        "score": score,
-                    }));
-                }
+                let rt = tokio::runtime::Handle::current();
+                let status_list = rt.block_on(async {
+                    let registry = self.registry.read().await;
+                    registry.call_async("agent", "provider_status", serde_json::json!({})).await
+                }).unwrap_or_else(|_| serde_json::json!([]));
+                
+                let providers = status_list.as_array()
+                    .map(|arr| {
+                        arr.iter().filter_map(|status| {
+                            let name = status.get("name")?.as_str()?.to_string();
+                            let healthy = status.get("available")?.as_bool()?;
+                            let score = status.get("composite_score")
+                                .and_then(|v| v.as_str())
+                                .and_then(|s| s.parse::<f64>().ok())
+                                .unwrap_or(0.0);
+                            Some(serde_json::json!({
+                                "name": name,
+                                "healthy": healthy,
+                                "score": score,
+                            }))
+                        }).collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                
                 Ok(serde_json::json!({ "providers": providers }))
             }
             "side_chat_get" | "side_chat_send" => {

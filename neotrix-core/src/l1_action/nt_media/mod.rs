@@ -14,6 +14,7 @@ pub mod persistence;
 pub mod router;
 pub mod streaming;
 pub mod thumbnail;
+pub mod yt_extract;
 
 pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};
 pub use detect::MediaKind;

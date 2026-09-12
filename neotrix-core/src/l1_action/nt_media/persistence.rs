@@ -117,8 +117,8 @@ impl DownloadStore {
             return Ok(());
         }
 
-        let loaded: Vec<DownloadRecord> = serde_json::from_slice(&data)
-            .map_err(|e| format!("parse store: {}", e))?;
+        let loaded: Vec<DownloadRecord> =
+            serde_json::from_slice(&data).map_err(|e| format!("parse store: {}", e))?;
 
         let mut records = self.records.write().await;
         *records = loaded;
@@ -314,7 +314,10 @@ mod tests {
 
         store.add_record(record).await;
         assert!(store.get_record(&id).await.is_some());
-        assert!(store.get_by_url("https://example.com/file.mp4").await.is_some());
+        assert!(store
+            .get_by_url("https://example.com/file.mp4")
+            .await
+            .is_some());
 
         let _ = tokio::fs::remove_file(&store.file_path).await;
     }

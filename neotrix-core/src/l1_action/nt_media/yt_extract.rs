@@ -23,9 +23,9 @@ pub struct VideoInfo {
 pub async fn extract_url(video_url: &str) -> Result<VideoInfo, YtError> {
     let output = Command::new("yt-dlp")
         .args([
-            "-j",                    // JSON output
+            "-j", // JSON output
             "--no-warnings",
-            "--no-playlist",         // single video only
+            "--no-playlist", // single video only
             "--no-check-certificates",
             video_url,
         ])
@@ -39,8 +39,8 @@ pub async fn extract_url(video_url: &str) -> Result<VideoInfo, YtError> {
     }
 
     let json_str = String::from_utf8_lossy(&output.stdout);
-    let v: serde_json::Value = serde_json::from_str(&json_str)
-        .map_err(|e| YtError::Parse(e.to_string()))?;
+    let v: serde_json::Value =
+        serde_json::from_str(&json_str).map_err(|e| YtError::Parse(e.to_string()))?;
 
     Ok(VideoInfo {
         title: v["title"].as_str().unwrap_or("unknown").to_string(),
@@ -69,8 +69,8 @@ pub async fn list_formats(video_url: &str) -> Result<Vec<FormatInfo>, YtError> {
     }
 
     let json_str = String::from_utf8_lossy(&output.stdout);
-    let v: serde_json::Value = serde_json::from_str(&json_str)
-        .map_err(|e| YtError::Parse(e.to_string()))?;
+    let v: serde_json::Value =
+        serde_json::from_str(&json_str).map_err(|e| YtError::Parse(e.to_string()))?;
 
     let mut formats = Vec::new();
     if let Some(arr) = v["formats"].as_array() {

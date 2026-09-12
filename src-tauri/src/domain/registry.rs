@@ -110,6 +110,17 @@ impl DomainRegistry {
     pub fn has_domain(&self, domain: &str) -> bool {
         self.plugin_index.contains_key(domain)
     }
+
+    /// 异步域调用 — 支持异步插件
+    pub async fn call_async(&self, domain: &str, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+        let idx = self.plugin_index.get(domain)
+            .ok_or_else(|| DomainError {
+                code: "DOMAIN_NOT_FOUND".into(),
+                message: format!("Domain '{}' not found", domain),
+                recoverable: true,
+            })?;
+        self.plugins[*idx].call(action, args)
+    }
 }
 
 impl Default for DomainRegistry {

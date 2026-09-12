@@ -1,341 +1,153 @@
-use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
-use tokio::sync::Mutex;
-use neotrix_sim::world_sim::{WorldSim, WorldSimConfig};
-use serde::{Deserialize, Serialize};
+use nt_world_sim::core::{UniversalWorld, Component, Resource};
+use nt_world_sim::core::scheduler::{ParallelScheduler, UniversalSystem, SystemDependency};
+use nt_world_sim::mechanics::core_pet::{CorePetState, PetStateEnum, CorePetSystem};
+use nt_world_sim::mechanics::core_hook::{CoreHookEvent, CoreHookManager};
+use nt_world_sim::mechanics::core_theme::CoreThemeManager;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimStateDto {
-    pub tick: u64,
-    pub agent_count: usize,
-    pub alive_count: usize,
-    pub world_width: f32,
-    pub world_height: f32,
-    pub mean_energy: f32,
-    pub mean_health: f32,
-    pub mean_hunger: f32,
+#[derive(Clone, Debug)]
+struct Position {
+    x: f32,
+    y: f32,
 }
+impl Component for Position {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentInfoDto {
-    pub id: String,
-    pub x: f32,
-    pub y: f32,
-    pub energy: f32,
-    pub health: f32,
-    pub hunger: f32,
-    pub age: u64,
-    pub alive: bool,
+#[derive(Clone, Debug)]
+struct Velocity {
+    x: f32,
+    y: f32,
 }
+impl Component for Velocity {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorldMapData {
-    pub width: f32,
-    pub height: f32,
-    pub agents: Vec<AgentInfoDto>,
-    pub tick: u64,
-    pub heightmap: Vec<Vec<f32>>,
-    pub biomes: Vec<Vec<String>>,
+struct GameTime {
+    delta: f32,
+    elapsed: f32,
 }
+impl Resource for GameTime {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimFullState {
-    pub tick: u64,
-    pub agents: Vec<AgentInfoDto>,
-    pub day_time: f32,
-    pub weather: String,
-    pub population: usize,
-    pub alive_count: usize,
-    pub mean_fitness: f32,
-    pub food_count: usize,
-    pub species_count: usize,
-}
+struct MovementSystem;
 
-pub struct SimState {
-    pub sim: Mutex<WorldSim>,
-}
-
-#[tauri::command]
-async fn sim_get_state(state: State<'_, Arc<SimState>>) -> Result<SimStateDto, String> {
-    let sim = state.sim.lock().await;
-    let alive: Vec<_> = sim.agents.iter().filter(|a| a.core.alive).collect();
-    let mean_energy = if alive.is_empty() { 0.0 } else { alive.iter().map(|a| a.core.energy).sum::<f32>() / alive.len() as f32 };
-    let mean_health = if alive.is_empty() { 0.0 } else { alive.iter().map(|a| a.core.health).sum::<f32>() / alive.len() as f32 };
-    let mean_hunger = if alive.is_empty() { 0.0 } else { alive.iter().map(|a| a.core.hunger).sum::<f32>() / alive.len() as f32 };
-
-    Ok(SimStateDto {
-        tick: sim.tick,
-        agent_count: sim.agents.len(),
-        alive_count: alive.len(),
-        world_width: sim.config.world_width,
-        world_height: sim.config.world_height,
-        mean_energy,
-        mean_health,
-        mean_hunger,
-    })
-}
-
-#[tauri::command]
-async fn sim_tick(state: State<'_, Arc<SimState>>, n: u32, app: AppHandle) -> Result<SimStateDto, String> {
-    let mut sim = state.sim.lock().await;
-    for _ in 0..n {
-        sim.tick().await;
+impl UniversalSystem for MovementSystem {
+    fn name(&self) -> &str {
+        "MovementSystem"
     }
-    let alive: Vec<_> = sim.agents.iter().filter(|a| a.core.alive).collect();
-    let mean_energy = if alive.is_empty() { 0.0 } else { alive.iter().map(|a| a.core.energy).sum::<f32>() / alive.len() as f32 };
-    let mean_health = if alive.is_empty() { 0.0 } else { alive.iter().map(|a| a.core.health).sum::<f32>() / alive.len() as f32 };
-    let mean_hunger = if alive.is_empty() { 0.0 } else { alive.iter().map(|a| a.core.hunger).sum::<f32>() / alive.len() as f32 };
 
-    let dto = SimStateDto {
-        tick: sim.tick,
-        agent_count: sim.agents.len(),
-        alive_count: alive.len(),
-        world_width: sim.config.world_width,
-        world_height: sim.config.world_height,
-        mean_energy,
-        mean_health,
-        mean_hunger,
-    };
-    let _ = app.emit("sim-update", &dto);
-    Ok(dto)
-}
-
-#[tauri::command]
-async fn sim_get_agents(state: State<'_, Arc<SimState>>) -> Result<Vec<AgentInfoDto>, String> {
-    let sim = state.sim.lock().await;
-    Ok(sim.agents.iter().map(|a| AgentInfoDto {
-        id: a.core.id.clone(),
-        x: a.core.position.x,
-        y: a.core.position.y,
-        energy: a.core.energy,
-        health: a.core.health,
-        hunger: a.core.hunger,
-        age: a.core.age,
-        alive: a.core.alive,
-    }).collect())
-}
-
-#[tauri::command]
-async fn sim_get_world_map(state: State<'_, Arc<SimState>>) -> Result<WorldMapData, String> {
-    let sim = state.sim.lock().await;
-    let heightmap: Vec<Vec<f32>> = sim.heightmap.data().iter().map(|row| row.clone()).collect();
-    let biomes: Vec<Vec<String>> = sim.biome_map.data().iter().map(|row| {
-        row.iter().map(|b| format!("{:?}", b)).collect()
-    }).collect();
-    Ok(WorldMapData {
-        width: sim.config.world_width,
-        height: sim.config.world_height,
-        agents: sim.agents.iter().map(|a| AgentInfoDto {
-            id: a.core.id.clone(),
-            x: a.core.position.x,
-            y: a.core.position.y,
-            energy: a.core.energy,
-            health: a.core.health,
-            hunger: a.core.hunger,
-            age: a.core.age,
-            alive: a.core.alive,
-        }).collect(),
-        tick: sim.tick,
-        heightmap,
-        biomes,
-    })
-}
-
-#[tauri::command]
-async fn sim_select_agent(
-    state: State<'_, Arc<SimState>>,
-    id: String,
-) -> Result<Option<AgentInfoDto>, String> {
-    let sim = state.sim.lock().await;
-    Ok(sim.agents.iter().find(|a| a.core.id == id).map(|a| AgentInfoDto {
-        id: a.core.id.clone(),
-        x: a.core.position.x,
-        y: a.core.position.y,
-        energy: a.core.energy,
-        health: a.core.health,
-        hunger: a.core.hunger,
-        age: a.core.age,
-        alive: a.core.alive,
-    }))
-}
-
-#[tauri::command]
-async fn sim_inject_action(
-    state: State<'_, Arc<SimState>>,
-    action: String,
-) -> Result<String, String> {
-    let _sim = state.sim.lock().await;
-    // TODO: map action string to AgentAction and inject
-    Ok(format!("action '{}' queued for next tick", action))
-}
-
-#[tauri::command]
-async fn sim_get_full_state(state: State<'_, Arc<SimState>>) -> Result<SimFullState, String> {
-    let sim = state.sim.lock().await;
-    let alive: Vec<_> = sim.agents.iter().filter(|a| a.core.alive).collect();
-    let alive_count = alive.len();
-    let mean_fitness = if alive.is_empty() {
-        0.0
-    } else {
-        alive.iter().map(|a| a.core.health).sum::<f32>() / alive.len() as f32
-    };
-
-    let food_count = sim.resources.total_nodes() - sim.resources.depleted_nodes();
-    let species_count = sim.speciation.species_count();
-    let day_time = sim.daynight.time_of_day;
-    let weather = sim.weather.display();
-
-    Ok(SimFullState {
-        tick: sim.tick,
-        agents: sim.agents.iter().map(|a| AgentInfoDto {
-            id: a.core.id.clone(),
-            x: a.core.position.x,
-            y: a.core.position.y,
-            energy: a.core.energy,
-            health: a.core.health,
-            hunger: a.core.hunger,
-            age: a.core.age,
-            alive: a.core.alive,
-        }).collect(),
-        day_time,
-        weather,
-        population: sim.agents.len(),
-        alive_count,
-        mean_fitness,
-        food_count,
-        species_count,
-    })
-}
-
-#[tauri::command]
-async fn sim_save(
-    state: State<'_, Arc<SimState>>,
-    name: String,
-) -> Result<String, String> {
-    let sim = state.sim.lock().await;
-    let pm = neotrix_sim::world_sim::persistence::PersistenceManager::new("saves");
-    pm.save_named(&sim, &name)
-}
-
-#[tauri::command]
-async fn sim_load(
-    state: State<'_, Arc<SimState>>,
-    name: String,
-) -> Result<serde_json::Value, String> {
-    let pm = neotrix_sim::world_sim::persistence::PersistenceManager::new("saves");
-    let path = format!("saves/{}.json", name);
-    let snapshot = pm.load(&path)?;
-    let restored = pm.restore_from_snapshot(snapshot.clone())?;
-    let mut sim = state.sim.lock().await;
-    *sim = restored;
-    Ok(serde_json::to_value(&snapshot).map_err(|e| e.to_string())?)
-}
-
-#[tauri::command]
-async fn sim_list_saves() -> Result<Vec<serde_json::Value>, String> {
-    let pm = neotrix_sim::world_sim::persistence::PersistenceManager::new("saves");
-    let saves = pm.list_saves();
-    Ok(saves.into_iter().map(|s| serde_json::json!({
-        "name": s.name,
-        "tick": s.tick,
-        "timestamp": s.timestamp_secs,
-        "agents": s.agent_count,
-        "size": s.file_size_bytes,
-    })).collect())
-}
-
-#[tauri::command]
-async fn sim_delete_save(name: String) -> Result<(), String> {
-    let pm = neotrix_sim::world_sim::persistence::PersistenceManager::new("saves");
-    pm.delete_save(&name)
-}
-
-fn start_tick_loop(app: AppHandle, state: Arc<SimState>) {
-    tauri::async_runtime::spawn(async move {
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            let full = {
-                let mut sim = state.sim.lock().await;
-                sim.tick().await;
-                let alive: Vec<_> = sim.agents.iter().filter(|a| a.core.alive).collect();
-                let alive_count = alive.len();
-                let mean_fitness = if alive.is_empty() {
-                    0.0
-                } else {
-                    alive.iter().map(|a| a.core.health).sum::<f32>() / alive.len() as f32
-                };
-                let food_count = sim.resources.total_nodes() - sim.resources.depleted_nodes();
-                let species_count = sim.speciation.species_count();
-                let day_time = sim.daynight.time_of_day;
-                let weather = sim.weather.display();
-                SimFullState {
-                    tick: sim.tick,
-                    agents: sim.agents.iter().map(|a| AgentInfoDto {
-                        id: a.core.id.clone(),
-                        x: a.core.position.x,
-                        y: a.core.position.y,
-                        energy: a.core.energy,
-                        health: a.core.health,
-                        hunger: a.core.hunger,
-                        age: a.core.age,
-                        alive: a.core.alive,
-                    }).collect(),
-                    day_time,
-                    weather,
-                    population: sim.agents.len(),
-                    alive_count,
-                    mean_fitness,
-                    food_count,
-                    species_count,
+    fn update(&mut self, world: &mut UniversalWorld, dt: f32) {
+        let entities: Vec<_> = world.entities();
+        for entity in entities {
+            let vel = world.get_component::<Velocity>(entity).cloned();
+            if let Some(vel) = vel {
+                if let Some(pos) = world.get_component_mut::<Position>(entity) {
+                    pos.x += vel.x * dt;
+                    pos.y += vel.y * dt;
                 }
-            };
-            let _ = app.emit("sim-update", &full);
+            }
         }
-    });
-}
-
-fn start_heartbeat_loop(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(500));
-        loop {
-            interval.tick().await;
-            let ts = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis();
-            let _ = app.emit("sim-heartbeat", serde_json::json!({"ts": ts}));
-        }
-    });
+    }
 }
 
 fn main() {
-    let config = WorldSimConfig::default();
-    let sim = WorldSim::new(config);
-    let state = Arc::new(SimState {
-        sim: Mutex::new(sim),
+    println!("=== NeoTrix Universal Game Engine ===");
+    println!();
+
+    // 1. Create world
+    let mut world = UniversalWorld::new();
+    world.insert_resource(GameTime {
+        delta: 0.016,
+        elapsed: 0.0,
     });
 
-    let state_clone = state.clone();
-    tauri::Builder::default()
-        .manage(state)
-        .setup(move |app| {
-            start_tick_loop(app.handle().clone(), state_clone);
-            start_heartbeat_loop(app.handle().clone());
-            Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            sim_get_state,
-            sim_tick,
-            sim_get_agents,
-            sim_get_world_map,
-            sim_select_agent,
-            sim_inject_action,
-            sim_get_full_state,
-            sim_save,
-            sim_load,
-            sim_list_saves,
-            sim_delete_save,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+    // 2. Spawn entities
+    let player = world.spawn();
+    world.insert_component(player, Position { x: 0.0, y: 0.0 });
+    world.insert_component(player, Velocity { x: 10.0, y: 5.0 });
+    world.insert_component(
+        player,
+        CorePetState {
+            state: PetStateEnum::Idle,
+            state_timer: 0.0,
+            idle_timer: 0.0,
+        },
+    );
+
+    let npc = world.spawn();
+    world.insert_component(npc, Position {
+        x: 100.0,
+        y: 100.0,
+    });
+    world.insert_component(npc, Velocity { x: -1.0, y: 0.0 });
+
+    println!("[1] Spawned {} entities", world.entity_count());
+
+    // 3. Load theme
+    CoreThemeManager::load_default_theme(&mut world);
+    println!("[2] Loaded default theme");
+
+    // 4. Create scheduler
+    let mut scheduler = ParallelScheduler::new();
+    scheduler.add_system(Box::new(MovementSystem), SystemDependency::new());
+    scheduler.build_schedule();
+    println!(
+        "[3] Scheduler built: {} systems in {} waves",
+        scheduler.system_count(),
+        scheduler.wave_count()
+    );
+
+    // 5. Simulate 5 frames
+    println!("[4] Simulating 5 frames...");
+    for frame in 0..5 {
+        let dt = 0.016;
+
+        // Update time resource
+        if let Some(time) = world.get_resource_mut::<GameTime>() {
+            time.elapsed += dt;
+        }
+
+        // Run movement system via scheduler
+        scheduler.run(&mut world, dt);
+
+        // Run pet system
+        CorePetSystem::update(&mut world, dt);
+
+        // Simulate hook event on frame 2
+        if frame == 2 {
+            CoreHookManager::process_event(
+                &mut world,
+                CoreHookEvent::SessionStart {
+                    agent: "claude".to_string(),
+                    session_id: "session-1".to_string(),
+                },
+            );
+            println!("    Frame {}: Hook event sent (SessionStart)", frame);
+        }
+
+        // Print positions
+        let pos = world.get_component::<Position>(player).unwrap();
+        let pet = world.get_component::<CorePetState>(player).unwrap();
+        println!(
+            "    Frame {}: player=({:.1}, {:.1}) pet={:?}",
+            frame, pos.x, pos.y, pet.state
+        );
+    }
+
+    // 6. Final state
+    println!();
+    println!("[5] Final state:");
+    let pos = world.get_component::<Position>(player).unwrap();
+    println!("    Player position: ({:.1}, {:.1})", pos.x, pos.y);
+    let pet = world.get_component::<CorePetState>(player).unwrap();
+    println!("    Pet state: {:?}", pet.state);
+
+    // 7. Code generation demo
+    println!();
+    println!("[6] Code generation demo:");
+    let game_def = nt_world_sim::codegen::GameDefinition::default();
+    let gen = nt_world_sim::codegen::CodeGenerator::new(game_def);
+    let code = gen.generate();
+    println!(
+        "    Generated {} lines of Bevy code",
+        code.lines().count()
+    );
+
+    println!();
+    println!("=== Engine Demo Complete ===");
 }
