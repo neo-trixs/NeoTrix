@@ -8,6 +8,7 @@ use super::health::rate_limiter::{AdaptivePacer, TieredSemaphore};
 use crate::core::l0_substrate::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator};
 use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
+use super::common::types::{LlmError, LlmProvider, LlmRequest, LlmResponse};
 
 // ── 子目录模块 ──────────────────────────────────────────────
 pub mod routing;
