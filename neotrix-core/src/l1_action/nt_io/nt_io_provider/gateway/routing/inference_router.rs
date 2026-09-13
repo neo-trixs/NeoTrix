@@ -205,7 +205,7 @@ impl UnifiedInference for InferenceRouter {
             .map(|m| m.content.as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        let prompt_tokens = crate::l1_action::nt_io::nt_io_provider::common::context_budget::estimate_tokens(&prompt);
+        let prompt_tokens = crate::l1_action::nt_io::nt_io_provider::health::context_budget::estimate_tokens(&prompt);
         let completion_tokens = request.max_tokens.unwrap_or(4096) as usize;
 
         // 简单估算: $0.002/1K tokens (可替换为 per-provider 定价)

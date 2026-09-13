@@ -4,6 +4,9 @@
 
 use std::collections::HashMap;
 use super::*;
+use crate::l3_embodiment::nt_shield::guard::input_gatekeeper;
+use crate::l3_embodiment::nt_shield::guard::output_sentinel;
+use crate::l3_embodiment::nt_shield::dual_evidence;
 
 /// 统一防御结果
 #[derive(Debug, Clone)]

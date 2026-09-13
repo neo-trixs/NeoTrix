@@ -179,7 +179,7 @@ impl ProviderPool {
                 &gateway_name,
                 provider.into(),
                 is_free,
-                super::provider_catalog::ProviderCategory::Cloud,
+                crate::l1_action::nt_io::nt_io_provider::provider_catalog::ProviderCategory::Cloud,
             );
             if let Ok(pool) = gateway.account_pool.lock() {
                 pool.register_default(&entry.provider, &entry.label);

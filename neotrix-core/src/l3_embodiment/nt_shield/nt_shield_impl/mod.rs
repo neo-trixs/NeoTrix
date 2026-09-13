@@ -16,6 +16,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::core::nt_core_hcube::{FhrrHyperCube, FhrrVector};
+
 /// Nuclei vulnerability scanner integration
 pub mod nt_shield_vuln_scanner;
 
@@ -149,8 +151,6 @@ impl ShieldCapability {
     }
     
     /// Extract VSA embedding from vulnerability findings
-    use crate::core::nt_core_hcube::{FhrrHyperCube, FhrrVector};
-    
     pub fn extract_finding_embedding(&self, finding: &str) -> FhrrVector {
         let vec = FhrrHyperCube::random_vector(1024);
         // In production: encode finding text into VSA using word2vec/BERT

@@ -114,7 +114,7 @@ impl GatewayV2 {
             if m.is_empty() {
                 // 模型被剥离为空 (如请求 model="llm7/codestral-latest" 且 provider="llm7/codestral-latest")
                 // 回退到该 provider 在 catalog 中的 default_model
-                super::super::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
+                crate::l1_action::nt_io::nt_io_provider::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
                     .map(|info| info.default_model.to_string())
                     .unwrap_or_else(|| req.model.clone())
             } else {
@@ -126,7 +126,7 @@ impl GatewayV2 {
             if name.contains('/') {
                 name.split('/').skip(1).collect::<Vec<_>>().join("/")
             } else {
-                super::super::provider_catalog::lookup_provider(name)
+                crate::l1_action::nt_io::nt_io_provider::provider_catalog::lookup_provider(name)
                     .map(|info| info.default_model.to_string())
                     .unwrap_or_else(|| "auto".to_string())
             }
@@ -397,7 +397,7 @@ impl GatewayV2 {
                 let est_tokens = estimate_tokens(&self.prompt_text(request)) as f64;
                 // 动态查询 provider 成本: 从 model 名提取 provider 前缀
                 let provider_name = request.model.split('/').next().unwrap_or("");
-                let cost_per_1k = super::super::catalog::provider_catalog::lookup_provider_cost(provider_name)
+                let cost_per_1k = crate::l1_action::nt_io::nt_io_provider::provider_catalog::lookup_provider_cost(provider_name)
                     .unwrap_or(0.002);
                 let estimated_cost = (est_tokens / 1000.0) * cost_per_1k;
                 if estimated_cost > self.cost_budget_per_query {
@@ -992,7 +992,7 @@ impl GatewayV2 {
         let mut req = request.clone();
         // 裸注册名等值 (model == name) 视作未指定 → 回退 catalog default_model (同 call_provider)
         if req.model == name {
-            req.model = super::super::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
+            req.model = crate::l1_action::nt_io::nt_io_provider::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
                 .map(|info| info.default_model.to_string())
                 .unwrap_or_default();
         } else if let Some(m) = stripped {
