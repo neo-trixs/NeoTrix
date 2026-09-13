@@ -198,25 +198,24 @@ impl _VisualConsistencyManager {
     }
     
     /// 执行一致性修复
+    ///
+    /// 注意：需要接入视觉一致性修复模型（如 ADetailer/IP-Adapter）。
+    /// 当前未接入时返回明确错误。
     pub(crate) fn _fix_consistency(
         &mut self,
-        image_path: &str,
+        _image_path: &str,
         _element_id: Option<&str>,
         _element_type: _VisualElementType,
     ) -> _ConsistencyFixResult {
-        // TODO: 实际调用修复逻辑
-        let result = _ConsistencyFixResult {
-            success: true,
-            fixed_image_path: Some(format!("{}_fixed.png", image_path)),
-            detected_elements: 1,
-            fixed_elements: 1,
-            consistency_score: 0.95,
-            fix_time_ms: 2000,
-            error: None,
-        };
-        
-        self.fix_history.push(result.clone());
-        result
+        _ConsistencyFixResult {
+            success: false,
+            fixed_image_path: None,
+            detected_elements: 0,
+            fixed_elements: 0,
+            consistency_score: 0.0,
+            fix_time_ms: 0,
+            error: Some("视觉一致性修复未接入: 需要接入 ADetailer/IP-Adapter 模型".to_string()),
+        }
     }
     
     /// 批量修复

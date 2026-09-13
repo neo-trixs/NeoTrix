@@ -106,14 +106,15 @@ impl ProviderRegistry {
         let states = gateway.provider_status();
         let mut health = self.health_cache.write().await;
         
-        for (name, state) in states.iter() {
+        for state in states.iter() {
+            let name = state.get("name").and_then(|v| v.as_str()).unwrap_or("");
             if let Some(available) = state.get("available") {
                 let h = if available.as_bool().unwrap_or(false) {
                     HealthStatus::Healthy
                 } else {
                     HealthStatus::Unavailable { reason: "marked unavailable by gateway".into() }
                 };
-                health.insert(name.clone(), h);
+                health.insert(name.to_string(), h);
             }
         }
     }
@@ -124,7 +125,9 @@ impl ProviderRegistry {
         gateway: Arc<crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2>,
     ) {
         let states = gateway.provider_status();
-        for name in states.keys() {
+        for state in states.iter() {
+            let name = state.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            if name.is_empty() { continue; }
             let adapter = super::gateway_adapter::GatewayV2Adapter::new(gateway.clone(), name.clone());
             // GatewayV2Adapter 实现 LlmProvider, 但 ProviderRegistry 需要 UnifiedProvider
             // 这里我们只注册 adapter 的 name 用于状态同步

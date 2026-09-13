@@ -36,7 +36,7 @@ impl GatewayV2 {
 
     /// 单 provider RateLimit 退避重试: 遇 `RateLimit` 按 `retry_after` (默认 1s)
     /// 退避, 最多重试 `MAX_ATTEMPTS` 次; 其它错误立即透传。
-    pub(super) async fn call_provider_backoff(
+    pub(crate) async fn call_provider_backoff(
         &self,
         name: &str,
         request: &LlmRequest,

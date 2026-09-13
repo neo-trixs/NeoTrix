@@ -28,12 +28,16 @@ pub struct AbductiveTransitionReport {
 impl E8AbductionBridge {
     pub fn new(blend_weight: f64) -> Self {
         let mut abductive_engine = AbductiveReasoningEngine::new();
-        // Wire the external Cortex-Brain causal graph (medical remedies etc.) into
-        // the abduction engine when the peripheral brain is mounted. Missing file
-        // is non-fatal — the engine degrades to its built-in graph only.
-        let cortex_path = Path::new("/Volumes/NeoTrixBrain/working/causal_graph.json");
-        if cortex_path.exists() {
-            if let Err(e) = abductive_engine.load_cortex_causal_graph(cortex_path) {
+        // 从环境变量或默认路径加载 Cortex-Brain 因果图
+        let cortex_path = std::env::var("NEOTRIX_CAUSAL_GRAPH_PATH")
+            .unwrap_or_else(|_| {
+                // 默认路径: 用户主目录下的 neotrix 配置
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                format!("{}/.neotrix/causal_graph.json", home)
+            });
+        let path = Path::new(&cortex_path);
+        if path.exists() {
+            if let Err(e) = abductive_engine.load_cortex_causal_graph(path) {
                 eprintln!("[e8-abduction-bridge] cortex causal graph load skipped: {}", e);
             }
         }

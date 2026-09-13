@@ -110,24 +110,29 @@ impl _StyleHarmonizer {
     }
     
     /// 分析风格
+    ///
+    /// 注意：需要接入风格分析模型（如 DINOv2/CLIP）。
+    /// 当前返回基础特征，不含真实图像分析。
     pub(crate) fn _analyze_style(&self, _image_path: &str) -> _StyleAnalysis {
-        // TODO: 实际调用风格分析
+        // 基础特征 — 无法从图像提取时的降级值
         _StyleAnalysis {
             features: _Style特征 {
-                color_distribution: vec![0.3, 0.4, 0.3],
-                contrast: 0.7,
-                saturation: 0.6,
-                color_temperature: 6500.0,
+                color_distribution: vec![0.33, 0.33, 0.34], // 均匀分布（无分析）
+                contrast: 0.5, // 中性值
+                saturation: 0.5,
+                color_temperature: 5500.0, // 日光色温
                 texture_features: vec![0.5, 0.5, 0.5],
-                style_tags: vec!["cinematic".to_string()],
+                style_tags: vec!["unknown".to_string()],
             },
-            dominant_colors: vec![(128, 128, 128), (64, 64, 64), (192, 192, 192)],
-            style_tags: vec!["cinematic".to_string()],
-            quality_score: 0.85,
+            dominant_colors: vec![(128, 128, 128)], // 灰色（无分析）
+            style_tags: vec!["unanalyzed".to_string()],
+            quality_score: 0.0, // 0.0 = 未分析，不可用于决策
         }
     }
     
     /// 协调风格
+    ///
+    /// 注意：需要接入风格迁移模型。当前返回明确错误。
     pub(crate) fn _harmonize(
         &mut self,
         input_path: &str,
@@ -135,32 +140,29 @@ impl _StyleHarmonizer {
     ) -> _StyleHarmonizationResult {
         let start = std::time::Instant::now();
         
-        // TODO: 实际调用风格迁移
-        let result = _StyleHarmonizationResult {
-            success: true,
-            output_path: Some(format!("{}_harmonized.png", input_path)),
-            style_similarity: 0.88,
+        _StyleHarmonizationResult {
+            success: false,
+            output_path: None,
+            style_similarity: 0.0,
             processing_time_ms: start.elapsed().as_millis() as u64,
-            error: None,
-        };
-        
-        self.history.push(result.clone());
-        result
+            error: Some("风格迁移未接入: 需要接入风格迁移模型（如 CycleGAN/Neural Style Transfer）".to_string()),
+        }
     }
     
     /// 匹配色彩
+    ///
+    /// 注意：需要接入色彩匹配算法。当前返回明确错误。
     pub(crate) fn _match_colors(
         &self,
-        source_path: &str,
+        _source_path: &str,
         _target_path: &str,
     ) -> _StyleHarmonizationResult {
-        // TODO: 实际调用色彩匹配
         _StyleHarmonizationResult {
-            success: true,
-            output_path: Some(format!("{}_color_matched.png", source_path)),
-            style_similarity: 0.92,
-            processing_time_ms: 1000,
-            error: None,
+            success: false,
+            output_path: None,
+            style_similarity: 0.0,
+            processing_time_ms: 0,
+            error: Some("色彩匹配未接入: 需要接入色彩匹配算法（如颜色直方图匹配）".to_string()),
         }
     }
     

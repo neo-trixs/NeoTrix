@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::lookup_provider;
 use super::*;
+use super::super::GatewayV2;
 
 // ═══════════════════════════════════════════════════════════════════
 // Benchmark Types — L1-local benchmark types for challenge evaluation

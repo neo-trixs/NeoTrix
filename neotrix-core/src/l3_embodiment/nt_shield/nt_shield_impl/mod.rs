@@ -152,7 +152,7 @@ impl ShieldCapability {
     
     /// Extract VSA embedding from vulnerability findings
     pub fn extract_finding_embedding(&self, finding: &str) -> FhrrVector {
-        let vec = FhrrHyperCube::random_vector(1024);
+        let vec = crate::core::l3_memory::nt_core_hcube::fhrr_vsa::FhrrVector::random_dim(1024, 0x42);
         // In production: encode finding text into VSA using word2vec/BERT
         vec
     }
