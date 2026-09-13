@@ -5,10 +5,8 @@
 //! cross-layer imports so consumers never scatter `use crate::l4_emotion::nt_feel::*`.
 
 pub(crate) use crate::l4_emotion::nt_feel::emotion_engine::{
-    _AttentionSignal, _EmotionSnapshot, _FeelConfig, _FeelEngine, _SocialState,
+    Emotion, EmotionalState, EmotionEngine, RegulationStrategy, EmotionalIntelligence,
 };
 pub(crate) use crate::l4_emotion::nt_feel::nt_feel_vtuber::{
-    _CharacterPersona, _EmotionReading, _EmotionResponse, _EmotionSource,
-    _PersonalityTrait, _RegulationStrategy, _ResponseStyle, _SpeakingPattern,
-    _VoiceConfig, _VoiceOutput,
+    _VTuberEmotionEngine, _CharacterPersona, _PersonalityTrait, _ResponseStyle, _SpeakingPattern,
 };

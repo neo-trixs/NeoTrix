@@ -63,7 +63,7 @@ impl CircuitBreaker {
     pub fn should_allow(&self) -> bool {
         if self.state.load(Ordering::Relaxed) {
             // Open 状态：检查冷却期是否已过，尝试进入 half-open
-            if let Some(last) = self.last_failure.lock().unwrap().as_ref() {
+            if let Some(last) = self.last_failure.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
                 if last.elapsed() > self.recovery_timeout {
                     // 冷却期已过 → 进入 half-open，允许探测
                     self.half_open_calls.store(0, Ordering::Relaxed);
@@ -82,7 +82,7 @@ impl CircuitBreaker {
 
     pub fn is_open(&self) -> bool {
         if self.state.load(Ordering::Relaxed) {
-            if let Some(last) = self.last_failure.lock().unwrap().as_ref() {
+            if let Some(last) = self.last_failure.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
                 if last.elapsed() > self.recovery_timeout {
                     self.state.store(false, Ordering::Relaxed);
                     self.failure_count.store(0, Ordering::Relaxed);
@@ -97,7 +97,7 @@ impl CircuitBreaker {
 
     pub fn record_failure(&self) {
         let count = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
-        *self.last_failure.lock().unwrap() = Some(Instant::now());
+        *self.last_failure.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
         if count >= self.threshold {
             self.state.store(true, Ordering::Relaxed);
         }
@@ -106,11 +106,11 @@ impl CircuitBreaker {
     pub fn record_failure_allow_transition(&self) {
         if self.state.load(Ordering::Relaxed) {
             // Open 状态下的 failure — 保持 open 并重置冷却
-            *self.last_failure.lock().unwrap() = Some(Instant::now());
+            *self.last_failure.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
             return;
         }
         let count = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
-        *self.last_failure.lock().unwrap() = Some(Instant::now());
+        *self.last_failure.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
         if count >= self.threshold {
             self.state.store(true, Ordering::Relaxed);
         }
@@ -267,7 +267,7 @@ impl AnomalyDetector {
         value: f64,
     ) -> Option<AnomalyAlert> {
         let key = format!("{}:{}", provider, metric);
-        let mut windows = self.windows.write().unwrap();
+        let mut windows = self.windows.write().unwrap_or_else(|e| e.into_inner());
         let window = windows
             .entry(key)
             .or_insert_with(|| SlidingWindow::new(self.config.window_size));
@@ -284,7 +284,7 @@ impl AnomalyDetector {
                 threshold: self.config.z_score_threshold,
                 timestamp: Instant::now(),
             };
-            self.alerts.write().unwrap().push(alert.clone());
+            self.alerts.write().unwrap_or_else(|e| e.into_inner()).push(alert.clone());
             return Some(alert);
         }
         None
@@ -292,7 +292,7 @@ impl AnomalyDetector {
 
     pub fn is_anomalous(&self, provider: &str, metric: &str, value: f64) -> bool {
         let key = format!("{}:{}", provider, metric);
-        let windows = self.windows.read().unwrap();
+        let windows = self.windows.read().unwrap_or_else(|e| e.into_inner());
         match windows.get(&key) {
             Some(w) if w.len() >= self.config.min_samples => {
                 w.z_score(value).abs() > self.config.z_score_threshold
@@ -302,7 +302,7 @@ impl AnomalyDetector {
     }
 
     pub(crate) fn _get_alerts(&self, provider: Option<&str>) -> Vec<AnomalyAlert> {
-        let alerts = self.alerts.read().unwrap();
+        let alerts = self.alerts.read().unwrap_or_else(|e| e.into_inner());
         match provider {
             Some(p) => alerts.iter().filter(|a| a.provider == p).cloned().collect(),
             None => alerts.clone(),
@@ -310,7 +310,7 @@ impl AnomalyDetector {
     }
 
     pub(crate) fn _clear_alerts(&self) {
-        self.alerts.write().unwrap().clear();
+        self.alerts.write().unwrap_or_else(|e| e.into_inner()).clear();
     }
 }
 
@@ -384,7 +384,7 @@ impl AutoRecovery {
     }
 
     pub fn record_failure(&self, provider: &str) {
-        let mut trackers = self.trackers.write().unwrap();
+        let mut trackers = self.trackers.write().unwrap_or_else(|e| e.into_inner());
         let tracker = trackers.entry(provider.to_string()).or_insert_with(|| RecoveryTracker {
             consecutive_failures: 0,
             last_failure: None,
@@ -403,7 +403,7 @@ impl AutoRecovery {
     }
 
     pub fn record_success(&self, provider: &str) {
-        let mut trackers = self.trackers.write().unwrap();
+        let mut trackers = self.trackers.write().unwrap_or_else(|e| e.into_inner());
         if let Some(tracker) = trackers.get_mut(provider) {
             tracker.consecutive_failures = 0;
             tracker.recovery_attempts = 0;
@@ -412,7 +412,7 @@ impl AutoRecovery {
     }
 
     pub fn should_skip(&self, provider: &str) -> bool {
-        let trackers = self.trackers.read().unwrap();
+        let trackers = self.trackers.read().unwrap_or_else(|e| e.into_inner());
         match trackers.get(provider) {
             Some(t) => t.state == HealthState::CircuitOpen,
             None => false,
@@ -420,7 +420,7 @@ impl AutoRecovery {
     }
 
     pub fn get_state(&self, provider: &str) -> HealthState {
-        let trackers = self.trackers.read().unwrap();
+        let trackers = self.trackers.read().unwrap_or_else(|e| e.into_inner());
         trackers
             .get(provider)
             .map(|t| t.state.clone())
@@ -428,7 +428,7 @@ impl AutoRecovery {
     }
 
     pub fn calculate_backoff(&self, provider: &str) -> Duration {
-        let trackers = self.trackers.read().unwrap();
+        let trackers = self.trackers.read().unwrap_or_else(|e| e.into_inner());
         match trackers.get(provider) {
             Some(t) => {
                 let delay = self.config.base_delay.as_millis() as f64
@@ -441,7 +441,7 @@ impl AutoRecovery {
     }
 
     pub fn try_recover(&self, provider: &str) -> bool {
-        let mut trackers = self.trackers.write().unwrap();
+        let mut trackers = self.trackers.write().unwrap_or_else(|e| e.into_inner());
         if let Some(tracker) = trackers.get_mut(provider) {
             if tracker.state == HealthState::CircuitOpen {
                 tracker.state = HealthState::Recovering;
@@ -453,7 +453,7 @@ impl AutoRecovery {
     }
 
     pub fn get_all_states(&self) -> HashMap<String, HealthState> {
-        let trackers = self.trackers.read().unwrap();
+        let trackers = self.trackers.read().unwrap_or_else(|e| e.into_inner());
         trackers
             .iter()
             .map(|(k, v)| (k.clone(), v.state.clone()))
@@ -551,7 +551,10 @@ impl DriftDetector {
             / recent.len() as f64;
         let std_quality = var_quality.sqrt();
 
-        let latest = recent.last().unwrap();
+        let latest = match recent.last() {
+            Some(m) => m,
+            None => return DriftStatus::Normal,
+        };
 
         let latency_z = if std_latency > 0.0 {
             (latest.latency_ms as f64 - avg_latency) / std_latency

@@ -346,9 +346,13 @@ impl GatewayV2 {
         // catalog.refresh() 为阻塞网络 I/O, 必须在 spawn_blocking 中执行,
         // 否则在 async 运行时内直接调用会触发 tokio 1.52+ 的 "blocking in async" panic。
         let mut catalog = FreeModelCatalog::new();
-        let discovered = tokio::task::spawn_blocking(move || catalog.refresh())
-            .await
-            .unwrap_or_default();
+        let discovered = match tokio::task::spawn_blocking(move || catalog.refresh()).await {
+            Ok(d) => d,
+            Err(e) => {
+                log::warn!("[gateway] catalog refresh task failed: {}", e);
+                Vec::new()
+            }
+        };
         let before = self.providers().len();
         self.register_from_catalog(&discovered);
         let after = self.providers().len();

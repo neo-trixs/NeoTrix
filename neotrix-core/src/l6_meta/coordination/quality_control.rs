@@ -257,35 +257,27 @@ impl _QualityControlPipeline {
         }
     }
     
-    /// 评估检查项 — 基于历史数据和启发式规则
+    /// 评估检查项 — 需要真实 AI 分析
     ///
-    /// 使用历史通过率和检查类型特征计算分数。
+    /// STUB: 当前实现返回硬编码基础分数, 不反映真实内容质量。
+    /// 真实实现需要: 调用多模态模型对 content_id 对应的媒体文件进行
+    /// 各维度评估, 返回基于实际内容的客观分数。
     fn evaluate_check_item(&self, check_type: &_QualityCheckType) -> f32 {
-        // 基础分数：基于检查类型的复杂度和历史经验
-        let base_score = match check_type {
-            _QualityCheckType::Technical => 0.85,      // 技术检查中等难度
-            _QualityCheckType::Compliance => 0.90,      // 合规检查较易通过
-            _QualityCheckType::VisualConsistency => 0.75, // 视觉一致性较难
-            _QualityCheckType::NarrativeCoherence => 0.80, // 叙事连贯性中等
-            _QualityCheckType::AudioVisualSync => 0.70,  // 音画同步最难
-            _QualityCheckType::Performance => 0.88,      // 性能检查较易
-        };
-
-        // 根据历史数据调整（如果有）
-        let history_adjustment: f32 = if let Some(history) = self.history.last() {
-            // 根据历史审核总分调整预期
-            if history.total_score > 0.9 {
-                0.05
-            } else if history.total_score < 0.5 {
-                -0.1 // 分数低则降低预期
-            } else {
-                0.0
-            }
-        } else {
-            0.0 // 无历史数据，使用基础分
-        };
-
-        (base_score + history_adjustment).clamp(0.0, 1.0)
+        tracing::warn!(
+            "STUB evaluate_check_item called for {:?}: returning hardcoded score, not real AI analysis. \
+             TODO: call VLM/LLM for actual content review.",
+            check_type
+        );
+        // STUB: 返回固定基线 — 不反映真实内容风险
+        // 真实实现应分析实际内容而非依赖类型/类别常数
+        match check_type {
+            _QualityCheckType::Technical => 0.85,
+            _QualityCheckType::Compliance => 0.90,
+            _QualityCheckType::VisualConsistency => 0.75,
+            _QualityCheckType::NarrativeCoherence => 0.80,
+            _QualityCheckType::AudioVisualSync => 0.70,
+            _QualityCheckType::Performance => 0.88,
+        }
     }
     
     /// 执行完整审核流程

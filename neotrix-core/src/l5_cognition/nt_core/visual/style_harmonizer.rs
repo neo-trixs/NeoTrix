@@ -119,6 +119,10 @@ impl _StyleHarmonizer {
     /// - Style tag classification from a trained model
     /// - Quality assessment (NIQUE/FID-based)
     pub(crate) fn _analyze_style(&self, _image_path: &str) -> _StyleAnalysis {
+        tracing::warn!(
+            "STUB _analyze_style called: returning placeholder features, not real image analysis. \
+             TODO: integrate DINOv2/CLIP for actual style embedding."
+        );
         // 基础特征 — 无法从图像提取时的降级值
         _StyleAnalysis {
             features: _Style特征 {

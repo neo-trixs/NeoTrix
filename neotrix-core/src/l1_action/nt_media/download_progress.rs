@@ -32,7 +32,7 @@ impl Default for ProgressConfig {
 }
 
 /// Tracks and displays download progress
-pub struct DownloadProgress {
+pub struct DownloadProgressBar {
     total_bytes: u64,
     downloaded_bytes: u64,
     start_time: Instant,
@@ -42,7 +42,7 @@ pub struct DownloadProgress {
     config: ProgressConfig,
 }
 
-impl DownloadProgress {
+impl DownloadProgressBar {
     pub fn new(total_bytes: u64, config: ProgressConfig) -> Self {
         let now = Instant::now();
         Self {
@@ -56,7 +56,7 @@ impl DownloadProgress {
         }
     }
 
-    /// Create a DownloadProgress directly from a PipelineStatus variant.
+    /// Create a DownloadProgressBar directly from a PipelineStatus variant.
     ///
     /// Extracts `downloaded`, `total`, and `speed_bps` from the status.
     /// Returns None for non-downloading statuses (Resolving, Complete, Failed, Cancelled).
@@ -165,7 +165,7 @@ impl DownloadProgress {
             "\r\033[K  {:3}% {} {:.1}/{:.1} MB{}{} | 已用 {}m{:02}s",
             pct, bar, down_mb, total_mb, speed_str, eta_str, elapsed_mins, elapsed_secs
         );
-        io::stdout().flush().unwrap();
+        let _ = io::stdout().flush();
     }
 
     pub fn finish(&self) {
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_progress_display() {
-        let mut progress = DownloadProgress::new(1_000_000_000, ProgressConfig::default());
+        let mut progress = DownloadProgressBar::new(1_000_000_000, ProgressConfig::default());
         progress.update(500_000_000);
         // Just verify it doesn't panic
         progress.display();
@@ -227,7 +227,7 @@ mod tests {
             total: Some(1024),
             speed_bps: 256.0,
         };
-        let progress = DownloadProgress::from_pipeline_status(&status, ProgressConfig::default());
+        let progress = DownloadProgressBar::from_pipeline_status(&status, ProgressConfig::default());
         assert!(progress.is_some());
         let p = progress.unwrap();
         assert_eq!(p.downloaded_bytes, 512);
@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn test_from_pipeline_status_non_downloading() {
         let status = PipelineStatus::Resolving;
-        let progress = DownloadProgress::from_pipeline_status(&status, ProgressConfig::default());
+        let progress = DownloadProgressBar::from_pipeline_status(&status, ProgressConfig::default());
         assert!(progress.is_none());
     }
 
@@ -249,7 +249,7 @@ mod tests {
             total: Some(512),
             speed_bps: 128.0,
         };
-        let mut progress = DownloadProgress::new(0, ProgressConfig::default());
+        let mut progress = DownloadProgressBar::new(0, ProgressConfig::default());
         let updated = progress.update_from_pipeline_status(&status);
         assert!(updated);
         assert_eq!(progress.downloaded_bytes, 256);

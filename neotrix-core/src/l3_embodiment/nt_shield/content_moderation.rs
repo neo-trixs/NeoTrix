@@ -225,10 +225,13 @@ impl _ContentModeration {
     /// - Copyright: training data / character name / style fingerprint matching
     /// - All categories: multi-language + semantic equivalence detection
     fn evaluate_prompt_risk(&self, prompt: &str, _category: &RiskCategory) -> f64 {
+        tracing::warn!(
+            "STUB evaluate_prompt_risk called: keyword-only matching, not real semantic analysis. \
+             TODO: integrate LLM-as-judge or dedicated classifier."
+        );
         let prompt_lower = prompt.to_lowercase();
         match _category {
             RiskCategory::Nsfw => {
-                // STUB: 仅检测最明显的关键词，真实实现需语义分析
                 if prompt_lower.contains("nude") || prompt_lower.contains("explicit") {
                     0.9
                 } else {
@@ -236,15 +239,12 @@ impl _ContentModeration {
                 }
             }
             RiskCategory::Violence => {
-                // STUB: 仅检测最明显的关键词
                 if prompt_lower.contains("violence") || prompt_lower.contains("blood") {
                     0.8
                 } else {
                     0.1
                 }
             }
-            // STUB: 所有其他类别返回基线 0.1 — 不代表真实风险
-            // 真实实现需为每个类别配置独立分类器
             _ => 0.1,
         }
     }
@@ -259,6 +259,10 @@ impl _ContentModeration {
     /// - Misinformation: fact-check API + knowledge graph cross-validation
     /// - Privacy: PII detector (Presidio / custom NER)
     fn evaluate_output_risk(&self, content_type: ContentType, metadata: &HashMap<String, String>, _category: &RiskCategory) -> f64 {
+        tracing::warn!(
+            "STUB evaluate_output_risk called: returning fixed baseline, not real content analysis. \
+             TODO: integrate CLIP/multimodal content safety model."
+        );
         // STUB: 返回固定基线 — 不反映真实内容风险
         // 真实实现应分析实际内容而非依赖类型/类别常数
         let baseline = match content_type {

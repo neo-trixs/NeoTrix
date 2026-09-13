@@ -180,39 +180,11 @@ impl FscanModule {
     /// - Concurrent scanning with rate limiting
     /// - Integration with fscan or system nmap binary
     pub async fn discover_hosts(&mut self) -> Result<Vec<_HostInfo>, String> {
-        // TODO: 实际调用 fscan 或系统命令
-        // 示例: fscan -t 192.168.0.0/16 -p all
-
-        // 模拟发现结果
-        let hosts = vec![
-            _HostInfo {
-                ip: "192.168.1.1".into(),
-                hostname: Some("gateway".into()),
-                os: Some("Linux".into()),
-                mac: Some("00:11:22:33:44:55".into()),
-                state: _HostState::Up,
-                open_ports: vec![22, 80, 443],
-            },
-            _HostInfo {
-                ip: "192.168.1.10".into(),
-                hostname: Some("webserver".into()),
-                os: Some("Ubuntu 20.04".into()),
-                mac: None,
-                state: _HostState::Up,
-                open_ports: vec![22, 80, 3306],
-            },
-            _HostInfo {
-                ip: "192.168.1.25".into(),
-                hostname: Some("database".into()),
-                os: Some("CentOS 7".into()),
-                mac: None,
-                state: _HostState::Up,
-                open_ports: vec![22, 3306, 5432],
-            },
-        ];
-
-        self.internal_hosts = hosts.clone();
-        Ok(hosts)
+        tracing::warn!(
+            "STUB discover_hosts called: returning hardcoded mock data, not real network scanning. \
+             TODO: integrate fscan or system nmap for actual subnet discovery."
+        );
+        Err("discover_hosts is a stub — requires fscan/nmap integration for real ARP/ICMP scanning".into())
     }
 
     /// 枚举主机服务
@@ -224,63 +196,15 @@ impl FscanModule {
     /// - NSE script execution for detailed service fingerprinting
     /// - Concurrent per-host scanning with timeout management
     pub async fn enumerate_services(&mut self, host: &str) -> Result<Vec<ServiceInfo>, String> {
-        // TODO: 实际调用 nmap 或服务枚举工具
-
-        let services = match host {
-            "192.168.1.1" => vec![
-                ServiceInfo {
-                    port: 22,
-                    protocol: "tcp".into(),
-                    service: "ssh".into(),
-                    version: Some("OpenSSH 8.2p1".into()),
-                    banner: "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.3".into(),
-                    vulnerability: None,
-                    confidence: 0.95,
-                },
-                ServiceInfo {
-                    port: 80,
-                    protocol: "tcp".into(),
-                    service: "http".into(),
-                    version: Some("nginx 1.18.0".into()),
-                    banner: "nginx/1.18.0 (Ubuntu)".into(),
-                    vulnerability: Some("Server version exposed".into()),
-                    confidence: 0.9,
-                },
-            ],
-            "192.168.1.10" => vec![
-                ServiceInfo {
-                    port: 22,
-                    protocol: "tcp".into(),
-                    service: "ssh".into(),
-                    version: Some("OpenSSH 8.2p1".into()),
-                    banner: "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.3".into(),
-                    vulnerability: None,
-                    confidence: 0.95,
-                },
-                ServiceInfo {
-                    port: 80,
-                    protocol: "tcp".into(),
-                    service: "http".into(),
-                    version: Some("Apache/2.4.41".into()),
-                    banner: "Apache/2.4.41 (Ubuntu)".into(),
-                    vulnerability: Some("HTTP-Only flag missing".into()),
-                    confidence: 0.9,
-                },
-                ServiceInfo {
-                    port: 3306,
-                    protocol: "tcp".into(),
-                    service: "mysql".into(),
-                    version: Some("MySQL 8.0.28".into()),
-                    banner: "MySQL 8.0.28-0ubuntu0.20.04.3".into(),
-                    vulnerability: Some("Default account 'root' accessible".into()),
-                    confidence: 0.85,
-                },
-            ],
-            _ => vec![],
-        };
-
-        self.services.insert(host.to_string(), services.clone());
-        Ok(services)
+        tracing::warn!(
+            "STUB enumerate_services called for host={}: returning empty, not real port scanning. \
+             TODO: integrate nmap for actual service detection.",
+            host
+        );
+        Err(format!(
+            "enumerate_services is a stub — requires nmap integration for real service detection on {}",
+            host
+        ))
     }
 
     /// 检测漏洞

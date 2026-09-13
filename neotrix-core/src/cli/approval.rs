@@ -416,4 +416,33 @@ mod tests {
         let benign = engine.submit(ActionType::ShellCommand { command: "ls".into() });
         assert_eq!(benign.disclosure_severity(), DisclosureSeverity::Detection);
     }
+
+    // ── Failure path tests (added by test-guardian) ──
+
+    #[test]
+    fn test_deny_on_unknown_id_returns_error() {
+        let mut engine = ApprovalEngine::new(ApprovalMode::Suggest);
+        let result = engine.deny("nonexistent-id-999");
+        assert!(result.is_err(), "denying unknown ID should return error");
+    }
+
+    #[test]
+    fn test_approve_already_approved_returns_error() {
+        let mut engine = ApprovalEngine::new(ApprovalMode::Suggest);
+        let pa = engine.submit(ActionType::FileWrite { path: "x".into(), content_preview: "".into() });
+        assert!(engine.approve(&pa.id).is_ok());
+        // Second approve should fail
+        let result = engine.approve(&pa.id);
+        assert!(result.is_err(), "approving already-approved action should error");
+    }
+
+    #[test]
+    fn test_deny_already_denied_returns_error() {
+        let mut engine = ApprovalEngine::new(ApprovalMode::Suggest);
+        let pa = engine.submit(ActionType::FileCreate { path: "x".into() });
+        assert!(engine.deny(&pa.id).is_ok());
+        // Second deny should fail
+        let result = engine.deny(&pa.id);
+        assert!(result.is_err(), "denying already-denied action should error");
+    }
 }

@@ -59,7 +59,8 @@ impl ProviderRegistry {
             cost_a.partial_cmp(&cost_b).unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let (name, provider) = candidates.first().unwrap();
+        let (name, provider) = candidates.first()
+            .ok_or_else(|| LlmError::Unknown("No provider matches after sorting".into()))?;
         Ok((name.to_string(), Arc::clone(provider)))
     }
 

@@ -17,8 +17,14 @@ pub struct AgentInfo { pub id: String, pub config: SubagentConfig, pub status: A
 pub enum AgentStatus { Idle, Running { progress: f64 }, Completed { result: String }, Failed { error: String }, Paused, Stale }
 impl SubagentManager {
     pub fn new() -> Self { Self { agents: Vec::new() } }
-    pub fn send_message(&mut self, _src: &str, _id: &str, _msg: &str, _mt: MessageType) -> Result<(), String> { Ok(()) }
-    pub fn kill(&mut self, _id: &str) -> Result<(), String> { Ok(()) }
+    pub fn send_message(&mut self, _src: &str, _id: &str, _msg: &str, _mt: MessageType) -> Result<(), String> {
+        tracing::warn!("STUB SubagentManager::send_message called: no-op, not real message delivery.");
+        Ok(())
+    }
+    pub fn kill(&mut self, _id: &str) -> Result<(), String> {
+        tracing::warn!("STUB SubagentManager::kill called: no-op, not real agent termination.");
+        Ok(())
+    }
     pub fn spawn_from_profile(&mut self, name: &str) -> Result<String, String> {
         let id = format!("agent_{}", self.agents.len());
         self.agents.push(AgentInfo { id: id.clone(), config: SubagentConfig { name: name.to_string(), description: String::new(), e8_mode: 0, goal: String::new(), capabilities: Vec::new(), max_context: 0, autostart: false }, status: AgentStatus::Idle });
@@ -37,8 +43,14 @@ impl SubagentManager {
         id
     }
     pub fn list_tasks(&self) -> Vec<&AgentInfo> { self.agents.iter().collect() }
-    pub fn load_from_kb(&mut self, _kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> { Ok(()) }
-    pub fn save_to_kb(&self, _kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> { Ok(()) }
+    pub fn load_from_kb(&mut self, _kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
+        tracing::warn!("STUB SubagentManager::load_from_kb called: no-op, not real KB load.");
+        Ok(())
+    }
+    pub fn save_to_kb(&self, _kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
+        tracing::warn!("STUB SubagentManager::save_to_kb called: no-op, not real KB save.");
+        Ok(())
+    }
     pub fn running_count(&self) -> usize { self.agents.iter().filter(|a| matches!(a.status, AgentStatus::Running { .. })).count() }
 }
 #[derive(Debug, Clone)]
@@ -48,16 +60,39 @@ pub struct McpToolInfo { pub name: String, pub description: String, pub server_n
 pub struct McpRegistry;
 impl McpRegistry {
     pub fn new() -> Self { Self }
-    pub fn gateway(&self) -> Option<String> { None }
-    pub fn list_tools(&self) -> Vec<McpToolInfo> { Vec::new() }
-    pub fn search(&self, _query: &str) -> Vec<McpToolInfo> { Vec::new() }
-    pub fn publish(&mut self, _name: &str, _command: &str, _args: &[String], _desc: &str) -> usize { 0 }
-    pub fn as_native_tools(&self) -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> { Vec::new() }
+    pub fn gateway(&self) -> Option<String> {
+        tracing::warn!("STUB McpRegistry::gateway called: returning None, not real gateway lookup.");
+        None
+    }
+    pub fn list_tools(&self) -> Vec<McpToolInfo> {
+        tracing::warn!("STUB McpRegistry::list_tools called: returning empty, not real tool listing.");
+        Vec::new()
+    }
+    pub fn search(&self, _query: &str) -> Vec<McpToolInfo> {
+        tracing::warn!("STUB McpRegistry::search called: returning empty, not real tool search.");
+        Vec::new()
+    }
+    pub fn publish(&mut self, _name: &str, _command: &str, _args: &[String], _desc: &str) -> usize {
+        tracing::warn!("STUB McpRegistry::publish called: returning 0, not real tool publish.");
+        0
+    }
+    pub fn as_native_tools(&self) -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> {
+        tracing::warn!("STUB McpRegistry::as_native_tools called: returning empty, not real tool conversion.");
+        Vec::new()
+    }
     pub fn tool_count(&self) -> usize { 0 }
     pub fn server_count(&self) -> usize { 0 }
-    pub fn list_servers(&self) -> Vec<String> { Vec::new() }
-    pub fn register_stdio(&mut self, _server: &str, _cmd: &str, _args: &[&str], _tools: Vec<crate::agent::tool::mcp::McpToolDef>) {}
-    pub fn recommend_tools(&self, _query: &str) -> Vec<McpToolInfo> { Vec::new() }
+    pub fn list_servers(&self) -> Vec<String> {
+        tracing::warn!("STUB McpRegistry::list_servers called: returning empty, not real server listing.");
+        Vec::new()
+    }
+    pub fn register_stdio(&mut self, _server: &str, _cmd: &str, _args: &[&str], _tools: Vec<crate::agent::tool::mcp::McpToolDef>) {
+        tracing::warn!("STUB McpRegistry::register_stdio called: no-op, not real server registration.");
+    }
+    pub fn recommend_tools(&self, _query: &str) -> Vec<McpToolInfo> {
+        tracing::warn!("STUB McpRegistry::recommend_tools called: returning empty, not real tool recommendation.");
+        Vec::new()
+    }
 }
 pub struct McpDiscovery;
 impl McpDiscovery {

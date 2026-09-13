@@ -13,7 +13,9 @@ pub enum Emotion {
     Sadness,      // Frustration, stuck
     Disgust,      // Rejection, bad patterns
     Anger,        // Determination, persistence
+    Determination,
     Anticipation, // Curiosity, exploration
+    Neutral,
     
     // Compound emotions
     Optimism,     // Joy + Anticipation
@@ -34,6 +36,7 @@ pub enum Emotion {
     Anxiety,      // When facing uncertainty
 }
 
+
 /// Emotional state snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionalState {
@@ -47,6 +50,7 @@ pub struct EmotionalState {
     pub context: String,
 }
 
+
 /// Emotion engine
 pub struct EmotionEngine {
     current_state: EmotionalState,
@@ -54,6 +58,7 @@ pub struct EmotionEngine {
     emotion_patterns: HashMap<String, Vec<Emotion>>,
     regulation_strategies: Vec<RegulationStrategy>,
 }
+
 
 /// Strategy for emotional regulation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +68,7 @@ pub struct RegulationStrategy {
     pub effectiveness: f64,
     pub applied_count: u32,
 }
+
 
 impl EmotionEngine {
     pub fn new() -> Self {
@@ -110,6 +116,8 @@ impl EmotionEngine {
         // Determine emotion based on event
         let (emotion, intensity, valence, arousal) = self.analyze_event(event, context);
 
+        let secondary = self.determine_secondary_emotions(emotion.clone());
+
         // Create new emotional state
         let new_state = EmotionalState {
             timestamp: Utc::now(),
@@ -117,7 +125,7 @@ impl EmotionEngine {
             intensity,
             valence,
             arousal,
-            secondary_emotions: self.determine_secondary_emotions(emotion),
+            secondary_emotions: secondary,
             triggers: vec![event.to_string()],
             context: context.to_string(),
         };
@@ -251,6 +259,41 @@ impl EmotionEngine {
         }
         distribution
     }
+
+    /// Detect emotion from text — keyword-based heuristic mapping to EmotionLabel
+    pub fn detect_from_text(&mut self, text: &str) -> crate::core::nt_core_self::emotion_state::EmotionLabel {
+        use crate::core::nt_core_self::emotion_state::EmotionLabel;
+        let lower = text.to_lowercase();
+        if lower.contains("success") || lower.contains("完成") || lower.contains("great") {
+            EmotionLabel::Joy
+        } else if lower.contains("error") || lower.contains("fail") || lower.contains("错误") {
+            EmotionLabel::Sadness
+        } else if lower.contains("warning") || lower.contains("注意") {
+            EmotionLabel::Fear
+        } else if lower.contains("surprise") || lower.contains("意外") {
+            EmotionLabel::Surprise
+        } else {
+            EmotionLabel::Neutral
+        }
+    }
+
+    /// Generate a brief emotion report from current state
+    pub fn report(&self) -> EmotionReport {
+        EmotionReport {
+            primary: format!("{:?}", self.current_state.primary_emotion),
+            intensity: self.current_state.intensity,
+            valence: self.current_state.valence,
+            arousal: self.current_state.arousal,
+        }
+    }
+}
+
+
+pub struct EmotionReport {
+    pub primary: String,
+    pub intensity: f64,
+    pub valence: f64,
+    pub arousal: f64,
 }
 
 /// Emotional intelligence metrics
@@ -263,6 +306,7 @@ pub struct EmotionalIntelligence {
     pub social_skills: f64,
 }
 
+
 impl Default for EmotionalIntelligence {
     fn default() -> Self {
         Self {
@@ -274,6 +318,7 @@ impl Default for EmotionalIntelligence {
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -302,3 +347,4 @@ mod tests {
         assert!(ei.self_awareness > 0.0);
     }
 }
+

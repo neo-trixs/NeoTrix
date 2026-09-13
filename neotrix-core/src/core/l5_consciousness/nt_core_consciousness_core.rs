@@ -959,6 +959,94 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("provider", "model_routing", "NT-IO", "CreativityGenerator"),
     ("model_routing", "model_routing", "NT-IO", "CreativityGenerator"),
     ("负载均衡", "model_routing", "NT-IO", "CreativityGenerator"),
+    // ── Face consistency dispatch routes (l5_cognition::visual::face_consistency) ──
+    ("人脸一致", "face_consistency", "NT-CORE", "ReflectionEngine"),
+    ("面部一致", "face_consistency", "NT-CORE", "ReflectionEngine"),
+    ("face_consistency", "face_consistency", "NT-CORE", "ReflectionEngine"),
+    // ── Storyboard extractor dispatch routes (l5_cognition::visual::storyboard_extractor) ──
+    ("分镜提取", "storyboard_extract", "NT-CORE", "ReflectionEngine"),
+    ("分镜生成", "storyboard_extract", "NT-CORE", "ReflectionEngine"),
+    ("storyboard", "storyboard_extract", "NT-CORE", "ReflectionEngine"),
+    // ── Verifier agent dispatch routes (l6_meta::coordination::verifier_agent) ──
+    ("验证器", "verifier_agent", "NT-META", "MetaCognitionAnalyst"),
+    ("vlm验证", "verifier_agent", "NT-META", "MetaCognitionAnalyst"),
+    ("验证循环", "verifier_agent", "NT-META", "MetaCognitionAnalyst"),
+    ("verifier", "verifier_agent", "NT-META", "MetaCognitionAnalyst"),
+    // ── Layered QA dispatch routes (l6_meta::coordination::layered_qa) ──
+    ("分层qa", "layered_qa", "NT-META", "MetaCognitionAnalyst"),
+    ("分层质检", "layered_qa", "NT-META", "MetaCognitionAnalyst"),
+    ("质量检查", "layered_qa", "NT-META", "MetaCognitionAnalyst"),
+    ("layered_qa", "layered_qa", "NT-META", "MetaCognitionAnalyst"),
+    // ── Quality control dispatch routes (l6_meta::coordination::quality_control) ──
+    ("质量控制", "quality_control", "NT-META", "MetaCognitionAnalyst"),
+    ("审核流水线", "quality_control", "NT-META", "MetaCognitionAnalyst"),
+    ("quality_control", "quality_control", "NT-META", "MetaCognitionAnalyst"),
+    // ── Quality gate dispatch routes (l6_meta::coordination::quality_gate) ──
+    ("质量门禁", "quality_gate", "NT-META", "MetaCognitionAnalyst"),
+    ("发布门禁", "quality_gate", "NT-META", "MetaCognitionAnalyst"),
+    ("quality_gate", "quality_gate", "NT-META", "MetaCognitionAnalyst"),
+    // ── Template tag registry dispatch routes (l6_meta::coordination::template_tag_registry) ──
+    ("模板标签", "template_tags", "NT-META", "MetaCognitionAnalyst"),
+    ("模板管理", "template_tags", "NT-META", "MetaCognitionAnalyst"),
+    ("template_tags", "template_tags", "NT-META", "MetaCognitionAnalyst"),
+    // ── Model adapter dispatch routes (l1_action::nt_io::model_adapter) ──
+    ("模型适配", "model_adapter", "NT-IO", "CreativityGenerator"),
+    ("lora适配", "model_adapter", "NT-IO", "CreativityGenerator"),
+    ("adapter", "model_adapter", "NT-IO", "CreativityGenerator"),
+    ("model_adapter", "model_adapter", "NT-IO", "CreativityGenerator"),
+    // ── Reference generation dispatch routes (l1_action::nt_io::reference_generation) ──
+    ("参考生", "reference_generation", "NT-IO", "CreativityGenerator"),
+    ("风格迁移", "reference_generation", "NT-IO", "CreativityGenerator"),
+    ("图生图", "reference_generation", "NT-IO", "CreativityGenerator"),
+    ("reference_generation", "reference_generation", "NT-IO", "CreativityGenerator"),
+    // ── Platform gateway dispatch routes (l1_action::nt_io::platform_gateway) ──
+    ("平台网关", "platform_gateway", "NT-IO", "CreativityGenerator"),
+    ("平台适配", "platform_gateway", "NT-IO", "CreativityGenerator"),
+    ("comfyui", "platform_gateway", "NT-IO", "CreativityGenerator"),
+    ("platform_gateway", "platform_gateway", "NT-IO", "CreativityGenerator"),
+    // ── Production pipeline dispatch routes (l1_action::nt_act::actions::orchestration::production_pipeline) ──
+    ("批量生产", "production_pipeline", "NT-ACT", "CodeAnalyzer"),
+    ("生产流水线", "production_pipeline", "NT-ACT", "CodeAnalyzer"),
+    ("production_pipeline", "production_pipeline", "NT-ACT", "CodeAnalyzer"),
+    // ── Publish gateway dispatch routes (l1_action::nt_act::actions::orchestration::publish_gateway) ──
+    ("发布网关", "publish_gateway", "NT-ACT", "CodeAnalyzer"),
+    ("多平台发布", "publish_gateway", "NT-ACT", "CodeAnalyzer"),
+    ("youtube发布", "publish_gateway", "NT-ACT", "CodeAnalyzer"),
+    ("publish_gateway", "publish_gateway", "NT-ACT", "CodeAnalyzer"),
+    // ── Production orchestrator dispatch routes (l1_action::nt_act::actions::orchestration::production_orchestrator) ──
+    ("工作流编排", "production_orchestrator", "NT-ACT", "CodeAnalyzer"),
+    ("任务编排", "production_orchestrator", "NT-ACT", "CodeAnalyzer"),
+    ("production_orchestrator", "production_orchestrator", "NT-ACT", "CodeAnalyzer"),
+    // ── Operator runbook dispatch routes (l1_action::nt_act::actions::orchestration::operator_runbook) ──
+    ("运行手册", "operator_runbook", "NT-ACT", "CodeAnalyzer"),
+    ("操作手册", "operator_runbook", "NT-ACT", "CodeAnalyzer"),
+    ("runbook", "operator_runbook", "NT-ACT", "CodeAnalyzer"),
+    ("operator_runbook", "operator_runbook", "NT-ACT", "CodeAnalyzer"),
+    // ── Audio orchestrator dispatch routes (l1_action::nt_act::actions::video::audio_orchestrator) ──
+    ("音频编排", "audio_orchestrator", "NT-ACT", "CodeAnalyzer"),
+    ("音效混合", "audio_orchestrator", "NT-ACT", "CodeAnalyzer"),
+    ("tts编排", "audio_orchestrator", "NT-ACT", "CodeAnalyzer"),
+    ("audio_orchestrator", "audio_orchestrator", "NT-ACT", "CodeAnalyzer"),
+    // ── Video stitcher dispatch routes (l1_action::nt_act::actions::video::video_stitcher) ──
+    ("视频拼接", "video_stitcher", "NT-ACT", "CodeAnalyzer"),
+    ("视频剪辑", "video_stitcher", "NT-ACT", "CodeAnalyzer"),
+    ("时间线编辑", "video_stitcher", "NT-ACT", "CodeAnalyzer"),
+    ("video_stitcher", "video_stitcher", "NT-ACT", "CodeAnalyzer"),
+    // ── Media asset registry dispatch routes (l2_perception::nt_world::media_asset_registry) ──
+    ("媒体资产", "media_asset_registry", "NT-WORLD", "PatternMatcher"),
+    ("资产库", "media_asset_registry", "NT-WORLD", "PatternMatcher"),
+    ("角色资产", "media_asset_registry", "NT-WORLD", "PatternMatcher"),
+    ("media_asset_registry", "media_asset_registry", "NT-WORLD", "PatternMatcher"),
+    // ── Dynamic memory bank dispatch routes (l2_perception::nt_world::dynamic_memory_bank) ──
+    ("动态记忆", "dynamic_memory_bank", "NT-WORLD", "PatternMatcher"),
+    ("实体记忆", "dynamic_memory_bank", "NT-WORLD", "PatternMatcher"),
+    ("跨镜头记忆", "dynamic_memory_bank", "NT-WORLD", "PatternMatcher"),
+    ("dynamic_memory_bank", "dynamic_memory_bank", "NT-WORLD", "PatternMatcher"),
+    // ── Image super resolution dispatch routes (neotrix::nt_file_ability::image_super_resolution) ──
+    ("图像超分", "image_super_resolution", "NT-ACT", "CodeAnalyzer"),
+    ("超分辨率", "image_super_resolution", "NT-ACT", "CodeAnalyzer"),
+    ("esrgan", "image_super_resolution", "NT-ACT", "CodeAnalyzer"),
+    ("image_super_resolution", "image_super_resolution", "NT-ACT", "CodeAnalyzer"),
 ];
 
 /// 子任务 — 意识核心从人类语言拆解出的最小执行单元。
@@ -2656,6 +2744,331 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     stats.total_requests,
                     stats.total_cost,
                     stats.avg_latency_ms,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Face consistency (l5_cognition::visual::face_consistency) ──
+        "face_consistency" => {
+            use crate::l5_cognition::nt_core::visual::face_consistency::FaceConsistencyManager;
+            let manager = FaceConsistencyManager::new();
+            let stats = manager.statistics();
+            (
+                true,
+                format!(
+                    "人脸一致性管理:\n  总修复: {} | 成功: {} | 失败: {}\n  平均一致性分: {:.2}\n  输入: {}",
+                    stats.total_fixes,
+                    stats.successful_fixes,
+                    stats.failed_fixes,
+                    stats.avg_consistency_score,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Storyboard extractor (l5_cognition::visual::storyboard_extractor) ──
+        "storyboard_extract" => {
+            use crate::l5_cognition::nt_core::visual::storyboard_extractor::StoryboardExtractor;
+            let extractor = StoryboardExtractor::new();
+            let stats = extractor.statistics();
+            (
+                true,
+                format!(
+                    "分镜提取:\n  总剧本: {} | 总镜头: {} | 平均镜头/剧本: {:.1} | 平均镜头时长: {:.1}s\n  输入: {}",
+                    stats.total_scripts,
+                    stats.total_shots,
+                    stats.avg_shots_per_script,
+                    stats.avg_shot_duration,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Verifier agent (l6_meta::coordination::verifier_agent) ──
+        "verifier_agent" => {
+            use crate::l6_meta::coordination::verifier_agent::_VerifierAgent;
+            let agent = _VerifierAgent::new();
+            let stats = agent.statistics();
+            (
+                true,
+                format!(
+                    "验证器引导:\n  总验证: {} | 通过: {} | 失败: {} | 平均分: {:.2} | 总重生成: {}\n  输入: {}",
+                    stats.total_verifications,
+                    stats.passed,
+                    stats.failed,
+                    stats.avg_score,
+                    stats.total_regenerations,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Layered QA (l6_meta::coordination::layered_qa) ──
+        "layered_qa" => {
+            use crate::l6_meta::coordination::layered_qa::_LayeredQA;
+            let qa = _LayeredQA::new();
+            let stats = qa.statistics();
+            (
+                true,
+                format!(
+                    "分层质检:\n  总运行: {} | 通过: {} | 失败: {} | 平均分: {:.2}\n  输入: {}",
+                    stats.total_runs,
+                    stats.passed,
+                    stats.failed,
+                    stats.avg_score,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Quality control (l6_meta::coordination::quality_control) ──
+        "quality_control" => {
+            use crate::l6_meta::coordination::quality_control::_QualityControlPipeline;
+            let pipeline = _QualityControlPipeline::new();
+            let stats = pipeline.statistics();
+            (
+                true,
+                format!(
+                    "质量控制流水线:\n  总审核: {} | 通过: {} | 拒绝: {} | 通过率: {:.1}% | 平均分: {:.2}\n  输入: {}",
+                    stats.total_reviews,
+                    stats.approved,
+                    stats.rejected,
+                    stats.approval_rate * 100.0,
+                    stats.avg_score,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Quality gate (l6_meta::coordination::quality_gate) ──
+        "quality_gate" => {
+            use crate::l6_meta::coordination::quality_gate::QualityGate;
+            let gate = QualityGate::new();
+            let stats = gate.statistics();
+            (
+                true,
+                format!(
+                    "质量门禁:\n  总审核: {} | 通过: {} | 拒绝: {} | 通过率: {:.1}% | 平均分: {:.2}\n  输入: {}",
+                    stats.total_reviews,
+                    stats.approved,
+                    stats.rejected,
+                    stats.approval_rate * 100.0,
+                    stats.average_score,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Template tag registry (l6_meta::coordination::template_tag_registry) ──
+        "template_tags" => {
+            use crate::l6_meta::coordination::template_tag_registry::_TemplateTagRegistry;
+            let registry = _TemplateTagRegistry::new();
+            let stats = registry.statistics();
+            (
+                true,
+                format!(
+                    "模板标签注册中心:\n  总标签: {} | 总模板: {} | 标签复用: {} | 模板复用: {}\n  输入: {}",
+                    stats.tag_count,
+                    stats.template_count,
+                    stats.tag_reuse_count,
+                    stats.template_reuse_count,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Model adapter (l1_action::nt_io::model_adapter) ──
+        "model_adapter" => {
+            use crate::l1_action::nt_io::model_adapter::ModelAdapter;
+            let adapter = ModelAdapter::new();
+            let stats = adapter.statistics();
+            (
+                true,
+                format!(
+                    "模型适配器:\n  总适配器: {} | 总应用: {} | 成功应用: {}\n  输入: {}",
+                    stats.total_adapters,
+                    stats.total_applications,
+                    stats.successful_applications,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Reference generation (l1_action::nt_io::reference_generation) ──
+        "reference_generation" => {
+            use crate::l1_action::nt_io::reference_generation::ReferenceBasedGeneration;
+            let gen = ReferenceBasedGeneration::new();
+            let stats = gen.statistics();
+            (
+                true,
+                format!(
+                    "参考生成:\n  总生成: {} | 成功: {} | 失败: {}\n  平均参考相似度: {:.3} | 平均质量分: {:.3}\n  输入: {}",
+                    stats.total_generations,
+                    stats.successful,
+                    stats.failed,
+                    stats.avg_reference_similarity,
+                    stats.avg_quality_score,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Platform gateway (l1_action::nt_io::platform_gateway) ──
+        "platform_gateway" => {
+            use crate::l1_action::nt_io::platform_gateway::PlatformGateway;
+            let gw = PlatformGateway::new();
+            let stats = gw.statistics();
+            (
+                true,
+                format!(
+                    "平台网关:\n  总平台: {} | 在线: {} | 总请求: {} | 成功: {}\n  输入: {}",
+                    stats.total_platforms,
+                    stats.online_platforms,
+                    stats.total_requests,
+                    stats.successful_requests,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Production pipeline (l1_action::nt_act::actions::orchestration::production_pipeline) ──
+        "production_pipeline" => {
+            use crate::l1_action::nt_act::actions::orchestration::production_pipeline::BatchProductionManager;
+            let manager = BatchProductionManager::new();
+            let stats = manager.statistics();
+            (
+                true,
+                format!(
+                    "批量生产流水线:\n  总任务: {} | 运行: {} | 完成: {} | 失败: {}\n  输入: {}",
+                    stats.total_tasks,
+                    stats.running_tasks,
+                    stats.completed_tasks,
+                    stats.failed_tasks,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Publish gateway (l1_action::nt_act::actions::orchestration::publish_gateway) ──
+        "publish_gateway" => {
+            use crate::l1_action::nt_act::actions::orchestration::publish_gateway::PublishGateway;
+            let gw = PublishGateway::new();
+            let stats = gw.statistics();
+            (
+                true,
+                format!(
+                    "发布网关:\n  总任务: {} | 已发布: {} | 总发布次数: {}\n  输入: {}",
+                    stats.total_tasks,
+                    stats.published_tasks,
+                    stats.total_published,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Production orchestrator (l1_action::nt_act::actions::orchestration::production_orchestrator) ──
+        "production_orchestrator" => {
+            use crate::l1_action::nt_act::actions::orchestration::production_orchestrator::ProductionOrchestrator;
+            let orch = ProductionOrchestrator::new();
+            let stats = orch.statistics();
+            (
+                true,
+                format!(
+                    "生产编排器:\n  总工作流: {} | 运行中: {} | 已完成: {} | 失败: {} | 平均进度: {:.1}%\n  输入: {}",
+                    stats.total_workflows,
+                    stats.running_workflows,
+                    stats.completed_workflows,
+                    stats.failed_workflows,
+                    stats.avg_progress * 100.0,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Operator runbook (l1_action::nt_act::actions::orchestration::operator_runbook) ──
+        "operator_runbook" => {
+            use crate::l1_action::nt_act::actions::orchestration::operator_runbook::RunbookManager;
+            let mgr = RunbookManager::new();
+            let stats = mgr.statistics();
+            (
+                true,
+                format!(
+                    "运行手册管理:\n  总手册: {} | 总模板: {} | 总执行: {} | 成功执行: {}\n  输入: {}",
+                    stats.total_runbooks,
+                    stats.total_templates,
+                    stats.total_executions,
+                    stats.successful_executions,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Audio orchestrator (l1_action::nt_act::actions::video::audio_orchestrator) ──
+        "audio_orchestrator" => {
+            use crate::l1_action::nt_act::actions::video::audio_orchestrator::AudioOrchestrator;
+            let orch = AudioOrchestrator::new();
+            let stats = orch.statistics();
+            (
+                true,
+                format!(
+                    "音频编排器:\n  总编排: {} | 成功: {} | 失败: {}\n  输入: {}",
+                    stats.total_orchestrated,
+                    stats.successful,
+                    stats.failed,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Video stitcher (l1_action::nt_act::actions::video::video_stitcher) ──
+        "video_stitcher" => {
+            use crate::l1_action::nt_act::actions::video::video_stitcher::VideoStitcher;
+            let stitcher = VideoStitcher::new();
+            let stats = stitcher.statistics();
+            (
+                true,
+                format!(
+                    "视频拼接器:\n  总拼接: {} | 成功: {} | 失败: {} | 总时长: {:.1}s\n  输入: {}",
+                    stats.total_stitched,
+                    stats.successful,
+                    stats.failed,
+                    stats.total_duration,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Media asset registry (l2_perception::nt_world::media_asset_registry) ──
+        "media_asset_registry" => {
+            use crate::l2_perception::nt_world::media_asset_registry::_MediaAssetRegistry;
+            let reg = _MediaAssetRegistry::new();
+            let stats = reg.statistics();
+            let type_summary: Vec<String> = stats.assets_by_type.iter().map(|(k, v)| format!("{}:{}", k, v)).collect();
+            (
+                true,
+                format!(
+                    "媒体资产库:\n  总资产: {} | 类型分布: {}\n  输入: {}",
+                    stats.total_assets,
+                    type_summary.join(", "),
+                    task.summary,
+                ),
+            )
+        }
+        // ── Dynamic memory bank (l2_perception::nt_world::dynamic_memory_bank) ──
+        "dynamic_memory_bank" => {
+            use crate::l2_perception::nt_world::dynamic_memory_bank::_DynamicMemoryBank;
+            let bank = _DynamicMemoryBank::new();
+            let stats = bank.statistics();
+            let type_summary: Vec<String> = stats.entities_by_type.iter().map(|(k, v)| format!("{}:{}", k, v)).collect();
+            (
+                true,
+                format!(
+                    "动态记忆库:\n  总实体: {} | 类型分布: {} | 身份关键: {} | 候选池: {}\n  输入: {}",
+                    stats.total_entities,
+                    type_summary.join(", "),
+                    stats.identity_critical_entities,
+                    stats.candidate_pool_size,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Image super resolution (neotrix::nt_file_ability::image_super_resolution) ──
+        "image_super_resolution" => {
+            let resolver = crate::neotrix::nt_file_ability::image_super_resolution::ImageSuperResolver::new();
+            let stats = resolver.statistics();
+            (
+                true,
+                format!(
+                    "图像超分辨率:\n  总处理: {} | 成功: {} | 失败: {}\n  平均耗时: {:.0}ms | 总瓦片: {}\n  输入: {}",
+                    stats.total_processed,
+                    stats.successful,
+                    stats.failed,
+                    stats.avg_processing_time_ms,
+                    stats.total_tiles_processed,
                     task.summary,
                 ),
             )

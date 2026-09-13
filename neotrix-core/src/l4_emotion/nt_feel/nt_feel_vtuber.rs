@@ -10,14 +10,14 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
-use super::emotion_engine::_FeelEngine;
+use super::emotion_engine::EmotionEngine;
 use crate::core::nt_core_self::emotion_state::EmotionLabel;
 
 /// VTuber 情感引擎 — Open-LLM-VTuber 核心
 /// 委托文本情绪检测给 FeelEngine，自身负责角色人格与表达
 pub(crate) struct _VTuberEmotionEngine {
     persona: _CharacterPersona,
-    feel_engine: _FeelEngine,
+    feel_engine: EmotionEngine,
     emotion_history: Vec<_EmotionReading>,
     #[allow(dead_code)]
     voice_config: _VoiceConfig,
@@ -151,7 +151,7 @@ pub(crate) struct _EmotionResponse {
 
 impl _VTuberEmotionEngine {
     /// 创建新的 VTuber 情感引擎
-    pub fn new(persona: _CharacterPersona, feel_engine: _FeelEngine) -> Self {
+    pub fn new(persona: _CharacterPersona, feel_engine: EmotionEngine) -> Self {
         Self {
             persona,
             feel_engine,

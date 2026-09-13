@@ -282,7 +282,18 @@ impl LearnedRouter for KNNRouter {
             }
         }
 
-        let chosen = candidates.iter().find(|c| c.name == best_model).unwrap();
+        let chosen = match candidates.iter().find(|c| c.name == best_model) {
+            Some(c) => c,
+            None => return RouteDecision {
+                selected_model: candidates.first().map(|c| c.name.clone()).unwrap_or_default(),
+                confidence: 0.0,
+                fallback_chain: candidates.iter().map(|c| c.name.clone()).collect(),
+                expected_quality: 0.0,
+                expected_cost: 0.0,
+                expected_latency_ms: 0,
+                pareto_score: f32::NEG_INFINITY,
+            },
+        };
         RouteDecision {
             selected_model: best_model,
             confidence: 0.7,
@@ -295,7 +306,7 @@ impl LearnedRouter for KNNRouter {
     }
 
     fn update(&mut self, features: &RouteFeatures, chosen: &str, reward: f32) {
-        let mut history = self.history.write().unwrap();
+        let mut history = self.history.write().unwrap_or_else(|e| e.into_inner());
         history.push((features.clone(), chosen.to_string(), reward));
         // 限制历史大小
         if history.len() > 10000 {
@@ -384,7 +395,7 @@ impl LearnedRouter for MLPRouter {
                 (c.name.clone(), combined, c.quality_score, c.avg_cost_per_1k, c.avg_latency_ms)
             })
             .collect();
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let chosen = &scored[0];
         RouteDecision {
             selected_model: chosen.0.clone(),
@@ -484,7 +495,18 @@ impl MultiTurnRouter {
         // 0. Agentic 锚定: 工具链中强制保持同一模型 (上下文一致性优先)
         if let Some(anchored) = &conv.tool_chain_model {
             if candidates.iter().any(|c| &c.name == anchored) {
-                let chosen = candidates.iter().find(|c| &c.name == anchored).unwrap();
+                let chosen = match candidates.iter().find(|c| &c.name == anchored) {
+                    Some(c) => c,
+                    None => return RouteDecision {
+                        selected_model: String::new(),
+                        confidence: 0.0,
+                        fallback_chain: Vec::new(),
+                        expected_quality: 0.0,
+                        expected_cost: 0.0,
+                        expected_latency_ms: 0,
+                        pareto_score: f32::NEG_INFINITY,
+                    },
+                };
                 return RouteDecision {
                     selected_model: chosen.name.clone(),
                     confidence: 1.0,
@@ -510,7 +532,7 @@ impl MultiTurnRouter {
                     // 超 80% 预算 → 免费模型中最优
                     if let Some(free_best) = candidates.iter()
                         .filter(|c| c.is_free)
-                        .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap())
+                        .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap_or(std::cmp::Ordering::Equal))
                     {
                         return RouteDecision {
                             selected_model: free_best.name.clone(),
@@ -539,7 +561,7 @@ impl MultiTurnRouter {
             ConversationStage::DeepDive => {
                 // 深度: 最强模型优先 — 忽略成本, 选 quality 最高
                 if let Some(strongest) = candidates.iter()
-                    .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap())
+                    .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap_or(std::cmp::Ordering::Equal))
                 {
                     return decision_from(strongest, 0.9);
                 }
@@ -549,7 +571,7 @@ impl MultiTurnRouter {
                 // 收尾/切换: 回落平衡型 (免费优先)
                 if let Some(free_best) = candidates.iter()
                     .filter(|c| c.is_free)
-                    .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap())
+                    .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap_or(std::cmp::Ordering::Equal))
                 {
                     return decision_from(free_best, 0.7);
                 }
@@ -581,10 +603,10 @@ impl LearnedRouter for MultiTurnRouter {
 fn fast_tier_pick(candidates: &[CandidateModel]) -> Option<&CandidateModel> {
     if candidates.is_empty() { return None; }
     let mut sorted: Vec<&CandidateModel> = candidates.iter().collect();
-    sorted.sort_by(|a, b| a.avg_latency_ms.partial_cmp(&b.avg_latency_ms).unwrap());
+    sorted.sort_by(|a, b| a.avg_latency_ms.partial_cmp(&b.avg_latency_ms).unwrap_or(std::cmp::Ordering::Equal));
     let tier_size = (sorted.len() * 4 / 10).max(1);
     sorted[..tier_size].iter()
-        .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap())
+        .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap_or(std::cmp::Ordering::Equal))
         .copied()
 }
 

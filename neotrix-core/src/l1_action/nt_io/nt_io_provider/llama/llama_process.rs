@@ -106,11 +106,11 @@ pub fn scan_models() -> Vec<GgufModel> {
     for dir in &search_dirs {
         if !dir.exists() { continue; }
         if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten() {
+            for entry in entries.filter_map(|e| e.ok()) {
                 let p = entry.path();
                 if p.is_dir() {
                     if let Ok(files) = std::fs::read_dir(&p) {
-                        for f in files.flatten() {
+                        for f in files.filter_map(|e| e.ok()) {
                             if f.path().extension().map(|e| e == "gguf").unwrap_or(false) {
                                 models.push(GgufModel::from_path(f.path()));
                             }

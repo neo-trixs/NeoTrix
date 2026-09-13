@@ -230,6 +230,10 @@ impl StoryboardExtractor {
     /// 4. Generate positive/negative prompts for video generation
     /// 5. Determine shot duration from dialogue length and action complexity
     fn parse_script_to_shots(&self, script_text: &str) -> Vec<Storyboard> {
+        tracing::warn!(
+            "STUB parse_script_to_shots called: naive paragraph splitting, not LLM-based parsing. \
+             TODO: integrate LLM for intelligent shot extraction."
+        );
         // Feature not wired: LLM-based parsing not implemented.
         // Falls back to naive paragraph splitting — each paragraph becomes a shot
         // with default values for all fields except description.

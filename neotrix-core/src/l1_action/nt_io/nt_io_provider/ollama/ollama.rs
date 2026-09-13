@@ -83,7 +83,8 @@ impl LlmProvider for OllamaProvider {
             .map_err(|e| LlmError::Network(e.to_string()))?;
 
         let status = response.status();
-        let text = response.text().await.unwrap_or_default();
+        let text = response.text().await
+            .map_err(|e| LlmError::Network(format!("Failed to read response body: {}", e)))?;
 
         match status.as_u16() {
             200 => {
@@ -146,7 +147,10 @@ impl LlmProvider for OllamaProvider {
                 .json(&body)
                 .send().await {
                 if !response.status().is_success() { return; }
-                let full = response.text().await.unwrap_or_default();
+                let full = match response.text().await {
+                    Ok(t) => t,
+                    Err(_) => return,
+                };
                 for line in full.lines() {
                     let line = line.trim();
                     if line.is_empty() { continue; }

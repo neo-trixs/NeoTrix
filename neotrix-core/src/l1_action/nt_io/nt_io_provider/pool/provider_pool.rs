@@ -366,7 +366,7 @@ impl crate::l1_action::traits::L1Capability for ProviderPool {
             healthy: !self.entries.is_empty(),
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             message: Some(format!("{} providers registered", self.entries.len())),
         }
     }

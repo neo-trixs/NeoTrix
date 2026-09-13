@@ -556,6 +556,10 @@ impl UnifiedApi for UnifiedApiImpl {
     }
 
     async fn list_sessions(&self) -> Result<Vec<SessionInfo>, UnifiedError> {
+        tracing::warn!(
+            "STUB list_sessions called: returning empty vec, not real session retrieval. \
+             TODO: implement session storage and retrieval."
+        );
         Ok(vec![])
     }
 

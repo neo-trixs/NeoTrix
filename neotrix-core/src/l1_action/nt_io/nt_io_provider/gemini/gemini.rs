@@ -71,7 +71,8 @@ fn set_proxy(&mut self, proxy_url: &str) {
             .map_err(|e| LlmError::Network(e.to_string()))?;
 
         let status = response.status();
-        let text = response.text().await.unwrap_or_default();
+        let text = response.text().await
+            .map_err(|e| LlmError::Network(format!("Failed to read response body: {}", e)))?;
 
         match status.as_u16() {
             200 => {
@@ -165,11 +166,14 @@ fn set_proxy(&mut self, proxy_url: &str) {
                 Ok(response) => {
                     let status = response.status();
                     if !status.is_success() {
-                        let text = response.text().await.unwrap_or_default();
+                        let text = response.text().await.unwrap_or_else(|_| status.canonical_reason().unwrap_or("unknown error").to_string());
                         let _ = tx.send(Err(LlmError::Server(text))).await;
                         return;
                     }
-                    let full = response.text().await.unwrap_or_default();
+                    let full = match response.text().await {
+                        Ok(t) => t,
+                        Err(_) => return,
+                    };
                     for line in full.lines() {
                         let line = line.trim();
                         if line.is_empty() || line == "[DONE]" { continue; }

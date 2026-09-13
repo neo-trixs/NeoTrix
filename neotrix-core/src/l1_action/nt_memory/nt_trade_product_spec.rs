@@ -1132,6 +1132,7 @@ mod tests {
         assert!(rules.iter().any(|r| r.category == RiskCategory::SupplyChain));
     }
 
+    // TODO: Knowledge pack data is hardcoded — needs real data source integration
     #[test]
     fn test_chemical_pack_placeholder() {
         let pack = ChemicalKnowledgePack;
@@ -1141,6 +1142,7 @@ mod tests {
         assert!(pack.packaging_spec().marks_required.contains(&"UN MARK".into()));
     }
 
+    // TODO: Knowledge pack data is hardcoded — needs real data source integration
     #[test]
     fn test_electronics_pack_placeholder() {
         let pack = ElectronicsKnowledgePack;

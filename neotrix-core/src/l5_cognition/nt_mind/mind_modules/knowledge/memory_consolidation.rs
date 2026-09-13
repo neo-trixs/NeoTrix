@@ -115,7 +115,7 @@ impl _ShortTermMemory {
                 .min_by(|a, b| {
                     let score_a = a.1.importance * 0.5 + a.1.recency * 0.3 + (a.1.frequency as f64) * 0.2;
                     let score_b = b.1.importance * 0.5 + b.1.recency * 0.3 + (b.1.frequency as f64) * 0.2;
-                    score_a.partial_cmp(&score_b).unwrap()
+                    score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
                 })
                 .map(|(idx, _)| idx);
 

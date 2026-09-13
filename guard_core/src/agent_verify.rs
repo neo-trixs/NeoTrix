@@ -82,6 +82,8 @@ mod tests {
     #[test] fn test_ltl_ast_atomic_construction() { let a = LtlAst::atomic("p"); assert!(matches!(a, LtlAst::Atom(_))); }
     #[test] fn test_ltl_ast_unary_construction() { let n = LtlAst::unary(LtlOperator::Not, LtlAst::atomic("p")); assert!(matches!(n, LtlAst::Not(_))); }
     #[test] fn test_ltl_ast_binary_construction() { let a = LtlAst::binary(LtlOperator::And, LtlAst::atomic("p"), LtlAst::atomic("q")); assert!(matches!(a, LtlAst::And(_, _))); }
+    // TODO: default_prop_matcher is a stub that always passes — needs real LTL property checking implementation
     #[test] fn test_default_prop_checker_always_passes() { let c = default_prop_matcher(); let a = LtlAst::atomic("p"); assert!(c.check(&a)); assert!(!c.explain(&a).is_empty()); }
+    // TODO: Add failure-path test once real prop_matcher is implemented (should reject unsupported LTL formulas)
     #[test] fn test_verification_report_creation() { let r = VerificationReport { outcomes: vec![], all_passed: true, timestamp: Instant::now(), failed_count: 0 }; assert!(r.all_passed); assert_eq!(r.failed_count, 0); }
 }

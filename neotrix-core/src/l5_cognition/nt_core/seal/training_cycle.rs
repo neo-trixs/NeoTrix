@@ -468,6 +468,7 @@ mod tests {
         assert!(result.absorb.is_some());
     }
 
+    // TODO: This test uses default stubs which always succeed — needs real failure injection to test absorb-skip logic
     #[test]
     fn test_failure_skips_absorb() {
         let config = TrainingCycleConfig {
@@ -477,9 +478,12 @@ mod tests {
         let ctx = KBContext::default();
         let result = run_training_cycle(2, &config, &ctx);
 
-        // With default stubs, test always passes
-        assert!(result.success);
-        assert!(result.absorb.is_some());
+        // Current stubs always return success — when real implementations are wired,
+        // this test should verify that absorb stage is skipped on test failure.
+        // For now, verify the structural invariant: absorb should exist in result.
+        assert!(result.absorb.is_some(),
+            "With stubs, absorb is always present. When real failure injection is added, \
+             this assertion should change to: assert!(result.absorb.is_none())");
     }
 
     #[test]

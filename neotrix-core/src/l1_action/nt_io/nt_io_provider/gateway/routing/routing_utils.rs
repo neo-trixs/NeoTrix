@@ -28,7 +28,7 @@ impl ConsistentHash {
     }
 
     pub fn add_node(&self, node: &str) {
-        let mut ring = self.ring.write().unwrap();
+        let mut ring = self.ring.write().unwrap_or_else(|e| e.into_inner());
         for i in 0..self.replicas {
             let key = format!("{}#{}", node, i);
             let hash = Self::hash(&key);
@@ -38,12 +38,12 @@ impl ConsistentHash {
     }
 
     pub fn remove_node(&self, node: &str) {
-        let mut ring = self.ring.write().unwrap();
+        let mut ring = self.ring.write().unwrap_or_else(|e| e.into_inner());
         ring.retain(|(_, n)| n != node);
     }
 
     pub fn get_node(&self, key: &str) -> Option<String> {
-        let ring = self.ring.read().unwrap();
+        let ring = self.ring.read().unwrap_or_else(|e| e.into_inner());
         if ring.is_empty() {
             return None;
         }

@@ -149,6 +149,10 @@ impl _VideoPromptCache {
     /// - Or domain-specific embedding trained on video prompt similarity
     /// - Persistent embedding index (FAISS/HNSW) for sub-linear similarity search
     fn embed_prompt(&self, prompt: &str) -> Vec<f64> {
+        tracing::warn!(
+            "STUB embed_prompt called: byte-frequency vector, not semantic embedding. \
+             TODO: integrate sentence-transformers for actual semantic embedding."
+        );
         // 简化的嵌入生成 (实际应使用模型)
         let mut embedding = vec![0.0; 128];
         for (i, byte) in prompt.bytes().enumerate() {

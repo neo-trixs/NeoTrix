@@ -36,7 +36,7 @@ impl MLPredictor {
     }
 
     pub fn record(&self, provider: &str, latency: Duration, success: bool) {
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write().unwrap_or_else(|e| e.into_inner());
         let stats = data.entry(provider.to_string()).or_insert_with(|| ProviderStats {
             latencies: Vec::new(),
             last_update: Instant::now(),
@@ -49,7 +49,7 @@ impl MLPredictor {
     }
 
     pub fn predict_latency(&self, provider: &str) -> Option<LatencyPrediction> {
-        let data = self.data.read().unwrap();
+        let data = self.data.read().unwrap_or_else(|e| e.into_inner());
         let stats = data.get(provider)?;
 
         let mut sorted: Vec<Duration> = stats
@@ -80,7 +80,7 @@ impl MLPredictor {
     }
 
     pub fn predict_success_rate(&self, provider: &str) -> f64 {
-        let data = self.data.read().unwrap();
+        let data = self.data.read().unwrap_or_else(|e| e.into_inner());
         match data.get(provider) {
             Some(stats) if !stats.latencies.is_empty() => {
                 stats.latencies.iter().filter(|(_, s)| *s).count() as f64
@@ -91,7 +91,7 @@ impl MLPredictor {
     }
 
     pub fn get_providers(&self) -> Vec<String> {
-        self.data.read().unwrap().keys().cloned().collect()
+        self.data.read().unwrap_or_else(|e| e.into_inner()).keys().cloned().collect()
     }
 }
 
@@ -153,13 +153,13 @@ impl IntelligentRouter {
     pub fn register_provider(&self, weight: ProviderWeight) {
         self.weights
             .write()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(weight.provider.clone(), weight);
     }
 
     pub fn route(&self, profile: &RequestProfile) -> Option<String> {
-        let weights = self.weights.read().unwrap();
-        let history = self.history.read().unwrap();
+        let weights = self.weights.read().unwrap_or_else(|e| e.into_inner());
+        let history = self.history.read().unwrap_or_else(|e| e.into_inner());
 
         let mut best: Option<(&str, f64)> = None;
 
@@ -208,7 +208,7 @@ impl IntelligentRouter {
     }
 
     pub fn record_decision(&self, decision: RouteDecision) {
-        let mut history = self.history.write().unwrap();
+        let mut history = self.history.write().unwrap_or_else(|e| e.into_inner());
         if history.len() >= self.max_history {
             history.pop_front();
         }
@@ -216,7 +216,7 @@ impl IntelligentRouter {
     }
 
     pub fn update_weight(&self, provider: &str, success: bool, latency: Duration) {
-        let mut weights = self.weights.write().unwrap();
+        let mut weights = self.weights.write().unwrap_or_else(|e| e.into_inner());
         if let Some(pw) = weights.get_mut(provider) {
             let alpha = 0.1;
             let lat_ms = latency.as_millis() as f64;

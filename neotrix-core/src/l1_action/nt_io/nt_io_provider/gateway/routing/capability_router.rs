@@ -74,7 +74,9 @@ impl CapabilityRouter {
                 .then(a.name.cmp(&b.name))
         });
 
-        Ok(sorted.first().unwrap().name.to_string())
+        Ok(sorted.first()
+            .ok_or_else(|| LlmError::Unknown("No provider matches after sorting".into()))?
+            .name.to_string())
     }
 }
 

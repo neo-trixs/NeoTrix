@@ -1182,8 +1182,14 @@ impl ParallelDownloader {
                     let speed_bps = {
                         let window = dl.speed_window.lock().await;
                         if window.len() >= 2 {
-                            let oldest = window.front().unwrap();
-                            let newest = window.back().unwrap();
+                            let oldest = match window.front() {
+                                Some(v) => v,
+                                None => continue,
+                            };
+                            let newest = match window.back() {
+                                Some(v) => v,
+                                None => continue,
+                            };
                             let bytes_delta = newest.1.saturating_sub(oldest.1);
                             let time_delta = newest.0.duration_since(oldest.0).as_secs_f64();
                             if time_delta > 0.0 {
@@ -1309,13 +1315,11 @@ pub async fn verify_sha256(path: &Path, expected: &str) -> Result<bool, Pipeline
 }
 
 /// Compute SHA-256 of a file (for storing in sidecar state).
+/// Delegates to streaming implementation to avoid loading entire file into memory.
 pub async fn compute_sha256(path: &Path) -> Result<String, PipelineError> {
-    let data = tokio::fs::read(path)
+    super::persistence::compute_sha256_streaming(path)
         .await
-        .map_err(|e| PipelineError::Io(format!("read for hash: {}", e)))?;
-    let mut hasher = Sha256::new();
-    hasher.update(&data);
-    Ok(format!("{:x}", hasher.finalize()))
+        .map_err(|e| PipelineError::Io(e))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

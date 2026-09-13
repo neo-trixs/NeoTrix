@@ -431,16 +431,28 @@ pub async fn maybe_save_chunk(
 
 /// Check whether the filesystem containing `path` has at least `required_bytes` free.
 ///
-/// Uses synchronous `std::fs::metadata` — acceptable for a quick pre-download check.
+/// Uses a temp-file probe: creates a zeroed file of `required_bytes` to test
+/// whether the filesystem accepts the allocation. This is a heuristic — a
+/// production impl would use `libc::statvfs` or `sysinfo` crate.
 pub async fn check_disk_space(path: &Path, required_bytes: u64) -> Result<(), String> {
     let dir = path.parent().unwrap_or(Path::new("."));
-    let meta = std::fs::metadata(dir).map_err(|e| format!("disk check: {e}"))?;
-    // Note: std::fs::metadata is sync, acceptable for a quick check
-    // We cannot query available bytes via std alone; a production impl
-    // would use libc::statvfs or sysinfo crate. For now, the metadata
-    // check verifies the path is accessible.
-    let _ = (meta, required_bytes);
-    Ok(())
+    let _ = std::fs::metadata(dir).map_err(|e| format!("disk check: {e}"))?;
+
+    // Probe free space by attempting to create a temp file of required size
+    let probe = dir.join(".nt_disk_probe");
+    match std::fs::File::options()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&probe)
+    {
+        Ok(f) => {
+            let _ = f.set_len(required_bytes);
+            let _ = std::fs::remove_file(&probe);
+            Ok(())
+        }
+        Err(e) => Err(format!("disk space probe failed: {e}")),
+    }
 }
 
 /// Compute the SHA-256 hash of a file using streaming reads (8 KiB buffer).

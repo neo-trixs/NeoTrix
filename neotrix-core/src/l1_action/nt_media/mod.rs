@@ -20,14 +20,14 @@ pub mod yt_extract;
 
 pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};
 pub use detect::MediaKind;
-pub use download_progress::{format_bytes, DownloadProgress, ProgressConfig};
+pub use download_progress::{format_bytes, DownloadProgressBar, ProgressConfig};
 pub use persistence::{ChunkState, ResumeValidation, SidecarState};
 pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use hls::{M3u8Manifest, MasterPlaylist, MediaPlaylist, parse_m3u8, select_variant, to_download_urls};
 pub use streaming::{
     AggregateProgress, check_aria2c_health, check_disk_space, cleanup_stale_temps, compute_sha256,
-    DownloadConfig, DownloadEngine, DownloadProgressSnapshot, DownloadStatus, DownloadTask,
-    detect_filename, PipelineConfig, PipelineError, PipelineHandle, PipelineProgress,
+    ChunkDownloadStatus, DownloadConfig, DownloadEngine, DownloadProgressSnapshot, DownloadStatus,
+    DownloadTask, detect_filename, PipelineConfig, PipelineError, PipelineHandle, PipelineProgress,
     PipelineStatus, record_mirror_speed, ranked_mirrors, resolve_mirror, RetryPolicy,
     StallDetector, StreamingPipeline, TaskHandle, verify_sha256,
 };

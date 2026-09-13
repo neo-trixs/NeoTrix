@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l1_action::nt_media::detect::{detect_from_file, detect_remote};
+use crate::l1_action::nt_media::download_progress::format_bytes;
 use crate::l1_action::nt_media::streaming::{
     PipelineConfig, PipelineStatus, StreamingPipeline,
 };
@@ -302,18 +303,6 @@ fn classify_media(kind: crate::l1_action::nt_media::detect::MediaKind) -> &'stat
         "ML Model"
     } else {
         "Other"
-    }
-}
-
-fn format_bytes(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{}B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1}KB", bytes as f64 / 1024.0)
-    } else if bytes < 1024 * 1024 * 1024 {
-        format!("{:.1}MB", bytes as f64 / (1024.0 * 1024.0))
-    } else {
-        format!("{:.2}GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
     }
 }
 

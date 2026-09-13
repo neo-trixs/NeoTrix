@@ -526,9 +526,12 @@ pub use team::{AgentTeam, AgentRole, ProcessType};
 
 #[cfg(test)]
 mod tests {
+    // TODO: Replace with real agent tests — current placeholder tests nothing meaningful
     #[test]
-    fn test_placeholder() {
-        assert!(true);
+    fn test_agent_tool_orchestrator_exists() {
+        // Verifies ToolOrchestrator can be instantiated (baseline existence test)
+        let orch = super::tool::ToolOrchestrator::default();
+        assert_eq!(orch.native_count(), 0, "default orchestrator should have no tools");
     }
 
     use crate::core::nt_core_traits::{NativeTool, ToolOutput};

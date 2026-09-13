@@ -148,19 +148,19 @@ impl _JITAgentProtocolOrchestrator {
         let session_id = uuid::Uuid::new_v4().to_string();
 
         // 查找协议
-        let protocol = self.protocols.iter().find(|p| p.protocol_id == protocol_id);
+        let protocol = match self.protocols.iter().find(|p| p.protocol_id == protocol_id) {
+            Some(p) => p,
+            None => {
+                return _ProtocolExecutionResult {
+                    success: false,
+                    session_id,
+                    modules_executed: Vec::new(),
+                    output: "Protocol not found".into(),
+                    duration_ms: 0,
+                };
+            }
+        };
 
-        if protocol.is_none() {
-            return _ProtocolExecutionResult {
-                success: false,
-                session_id,
-                modules_executed: Vec::new(),
-                output: "Protocol not found".into(),
-                duration_ms: 0,
-            };
-        }
-
-        let protocol = protocol.unwrap();
         let modules_used = protocol.modules.clone();
 
         // 更新统计

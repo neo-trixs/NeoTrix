@@ -83,7 +83,7 @@ impl PluginManager {
         let name = plugin.name().to_string();
         self.enabled
             .write()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(name, plugin.is_enabled());
         self.plugins.push(plugin);
         self.plugins.sort_by_key(|p| p.priority());
@@ -92,7 +92,7 @@ impl PluginManager {
     pub(crate) fn _run_pre_request(&self, ctx: &mut RequestContext) -> Result<(), PluginError> {
         for plugin in &self.plugins {
             let name = plugin.name();
-            let enabled = self.enabled.read().unwrap();
+            let enabled = self.enabled.read().unwrap_or_else(|e| e.into_inner());
             if enabled.get(name).copied().unwrap_or(true) {
                 plugin.pre_request(ctx)?;
             }
@@ -103,7 +103,7 @@ impl PluginManager {
     pub(crate) fn _run_post_response(&self, ctx: &mut ResponseContext) -> Result<(), PluginError> {
         for plugin in &self.plugins {
             let name = plugin.name();
-            let enabled = self.enabled.read().unwrap();
+            let enabled = self.enabled.read().unwrap_or_else(|e| e.into_inner());
             if enabled.get(name).copied().unwrap_or(true) {
                 plugin.post_response(ctx)?;
             }
@@ -114,7 +114,7 @@ impl PluginManager {
     pub(crate) fn _run_on_error(&self, ctx: &mut ErrorContext) -> Result<(), PluginError> {
         for plugin in &self.plugins {
             let name = plugin.name();
-            let enabled = self.enabled.read().unwrap();
+            let enabled = self.enabled.read().unwrap_or_else(|e| e.into_inner());
             if enabled.get(name).copied().unwrap_or(true) {
                 plugin.on_error(ctx)?;
             }
@@ -123,13 +123,13 @@ impl PluginManager {
     }
 
     pub fn enable(&self, name: &str) {
-        if let Some(v) = self.enabled.write().unwrap().get_mut(name) {
+        if let Some(v) = self.enabled.write().unwrap_or_else(|e| e.into_inner()).get_mut(name) {
             *v = true;
         }
     }
 
     pub fn disable(&self, name: &str) {
-        if let Some(v) = self.enabled.write().unwrap().get_mut(name) {
+        if let Some(v) = self.enabled.write().unwrap_or_else(|e| e.into_inner()).get_mut(name) {
             *v = false;
         }
     }
@@ -141,7 +141,7 @@ impl PluginManager {
                 let enabled = self
                     .enabled
                     .read()
-                    .unwrap()
+                    .unwrap_or_else(|e| e.into_inner())
                     .get(p.name())
                     .copied()
                     .unwrap_or(true);
@@ -202,7 +202,7 @@ impl PluginHotReload {
     }
 
     pub fn load(&self, name: &str, version: &str, checksum: u64) -> Result<(), String> {
-        let mut plugins = self.plugins.write().unwrap();
+        let mut plugins = self.plugins.write().unwrap_or_else(|e| e.into_inner());
         if plugins.contains_key(name) {
             return Err(format!("plugin {} already loaded", name));
         }
@@ -221,7 +221,7 @@ impl PluginHotReload {
     }
 
     pub fn unload(&self, name: &str) -> Result<(), String> {
-        let mut plugins = self.plugins.write().unwrap();
+        let mut plugins = self.plugins.write().unwrap_or_else(|e| e.into_inner());
         if plugins.remove(name).is_some() {
             self.log_event(name, ReloadAction::Unload, true, "unloaded");
             Ok(())
@@ -231,7 +231,7 @@ impl PluginHotReload {
     }
 
     pub fn reload(&self, name: &str, new_checksum: u64) -> Result<(), String> {
-        let mut plugins = self.plugins.write().unwrap();
+        let mut plugins = self.plugins.write().unwrap_or_else(|e| e.into_inner());
         match plugins.get_mut(name) {
             Some(entry) => {
                 entry.checksum = new_checksum;
@@ -244,13 +244,13 @@ impl PluginHotReload {
     }
 
     pub fn is_loaded(&self, name: &str) -> bool {
-        self.plugins.read().unwrap().contains_key(name)
+        self.plugins.read().unwrap_or_else(|e| e.into_inner()).contains_key(name)
     }
 
     pub fn has_changed(&self, name: &str, current_checksum: u64) -> bool {
         self.plugins
             .read()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get(name)
             .map(|e| e.checksum != current_checksum)
             .unwrap_or(true)
@@ -259,14 +259,14 @@ impl PluginHotReload {
     pub fn list(&self) -> Vec<(String, String, bool)> {
         self.plugins
             .read()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .values()
             .map(|e| (e.name.clone(), e.version.clone(), e.enabled))
             .collect()
     }
 
     pub fn get_events(&self, name: Option<&str>) -> Vec<ReloadEvent> {
-        let log = self.event_log.read().unwrap();
+        let log = self.event_log.read().unwrap_or_else(|e| e.into_inner());
         match name {
             Some(n) => log.iter().filter(|e| e.plugin == n).cloned().collect(),
             None => log.clone(),
@@ -274,7 +274,7 @@ impl PluginHotReload {
     }
 
     fn log_event(&self, plugin: &str, action: ReloadAction, success: bool, msg: &str) {
-        let mut log = self.event_log.write().unwrap();
+        let mut log = self.event_log.write().unwrap_or_else(|e| e.into_inner());
         log.push(ReloadEvent {
             plugin: plugin.to_string(),
             action,
@@ -370,7 +370,7 @@ impl ModularGateway {
     }
 
     pub fn add_middleware(&self, mw: Box<dyn Middleware>) -> Result<(), String> {
-        let mut mws = self.middlewares.write().unwrap();
+        let mut mws = self.middlewares.write().unwrap_or_else(|e| e.into_inner());
         if mws.len() >= self.config.max_middlewares {
             return Err("max middlewares reached".into());
         }
@@ -380,7 +380,7 @@ impl ModularGateway {
     }
 
     pub fn remove_middleware(&self, name: &str) -> bool {
-        let mut mws = self.middlewares.write().unwrap();
+        let mut mws = self.middlewares.write().unwrap_or_else(|e| e.into_inner());
         let before = mws.len();
         mws.retain(|m| m.name() != name);
         mws.len() < before
@@ -389,12 +389,12 @@ impl ModularGateway {
     pub fn add_route(&self, route: Route) {
         self.routes
             .write()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(route.path.clone(), route);
     }
 
     pub fn process_request(&self, ctx: &mut RequestCtx) -> Result<(), MiddlewareError> {
-        let mws = self.middlewares.read().unwrap();
+        let mws = self.middlewares.read().unwrap_or_else(|e| e.into_inner());
         for mw in mws.iter() {
             mw.before_request(ctx)?;
         }
@@ -402,7 +402,7 @@ impl ModularGateway {
     }
 
     pub(crate) fn _process_response(&self, ctx: &mut ResponseCtx) -> Result<(), MiddlewareError> {
-        let mws = self.middlewares.read().unwrap();
+        let mws = self.middlewares.read().unwrap_or_else(|e| e.into_inner());
         for mw in mws.iter().rev() {
             mw.after_response(ctx)?;
         }
@@ -412,14 +412,14 @@ impl ModularGateway {
     pub fn list_middlewares(&self) -> Vec<String> {
         self.middlewares
             .read()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .iter()
             .map(|m| m.name().to_string())
             .collect()
     }
 
     pub fn list_routes(&self) -> Vec<String> {
-        self.routes.read().unwrap().keys().cloned().collect()
+        self.routes.read().unwrap_or_else(|e| e.into_inner()).keys().cloned().collect()
     }
 }
 
