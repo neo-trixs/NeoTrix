@@ -260,6 +260,51 @@ impl GatewayV2 {
         }
     }
 
+    /// 从 UnifiedModelPool 注册所有模型 — 统一本地 GGUF + 云端免费 API
+    pub fn register_from_unified_pool(&self, pool: &crate::l1_action::nt_io::nt_io_provider::catalog::model_pool::UnifiedModelPool) {
+        let models = pool.refresh();
+        let mut registered = 0;
+        for entry in &models {
+            let name = entry.id.clone();
+            if self.providers.read().unwrap_or_else(|e| e.into_inner()).contains_key(&name) {
+                continue;
+            }
+            // API key check
+            let api_key = if entry.requires_api_key {
+                if let Some(ref env_var) = entry.api_key_env {
+                    match std::env::var(env_var) {
+                        Ok(key) if !key.is_empty() => Some(key),
+                        _ => continue,
+                    }
+                } else {
+                    continue;
+                }
+            } else {
+                None
+            };
+            let provider = create_provider(ProviderConfig {
+                provider_type: entry.provider_type,
+                api_key,
+                base_url: Some(entry.base_url.clone()),
+                model: Some(entry.model_id.clone()),
+                timeout_secs: 60,
+                proxy: proxy_from_env(),
+            });
+            self.register_provider_with_category(
+                &name,
+                provider.into(),
+                entry.is_free,
+                entry.category,
+            );
+            registered += 1;
+            log::info!(
+                "[gateway] Unified pool registered: {} ({}, {:?})",
+                name, entry.display_name, entry.category
+            );
+        }
+        log::info!("[gateway] UnifiedModelPool: {} models registered", registered);
+    }
+
     pub fn provider_status(&self) -> Vec<serde_json::Value> {        let states = self.states.read().unwrap_or_else(|e| {
             log::warn!("[gateway] states RwLock poisoned: {}", e);
             e.into_inner()

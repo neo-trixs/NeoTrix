@@ -1,27 +1,112 @@
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
+// DialogueCondition
+// ---------------------------------------------------------------------------
+
+/// A condition that gates a dialogue choice.
+#[derive(Debug, Clone)]
+pub enum DialogueCondition {
+    HasItem { item_id: String, count: u32 },
+    NotItem(String),
+    QuestState { quest_id: String, state: QuestConditionState },
+    Flag(String),
+    NotFlag(String),
+    Reputation { faction: String, min_value: i32 },
+    Gold(u64),
+    Level { min: u32, max: u32 },
+    And(Vec<DialogueCondition>),
+    Or(Vec<DialogueCondition>),
+    Not(Box<DialogueCondition>),
+}
+
+/// Quest state filter for dialogue conditions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuestConditionState {
+    Unavailable,
+    Available,
+    Active,
+    Complete,
+    Failed,
+}
+
+// ---------------------------------------------------------------------------
+// DialogueEffect
+// ---------------------------------------------------------------------------
+
+/// An effect applied when a dialogue choice is selected.
+#[derive(Debug, Clone)]
+pub enum DialogueEffect {
+    GiveItem { item_id: String, count: u32 },
+    RemoveItem { item_id: String, count: u32 },
+    AddGold(i64),
+    SetFlag(String),
+    ClearFlag(String),
+    StartQuest(String),
+    CompleteQuest(String),
+    ChangeReputation { faction: String, amount: i32 },
+    HealPlayer(f32),
+    DamagePlayer(f32),
+    Teleport { x: f32, y: f32 },
+    PlaySound(String),
+    ShowNotification(String),
+}
+
+// ---------------------------------------------------------------------------
+// DialoguePortrait
+// ---------------------------------------------------------------------------
+
+/// Portrait displayed alongside dialogue text.
+#[derive(Debug, Clone)]
+pub struct DialoguePortrait {
+    pub texture: String,
+    pub expression: String,
+    pub position: PortraitPosition,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortraitPosition {
+    Left,
+    Right,
+    Center,
+}
+
+impl DialoguePortrait {
+    pub fn new(texture: &str) -> Self {
+        Self {
+            texture: texture.to_string(),
+            expression: "neutral".to_string(),
+            position: PortraitPosition::Left,
+        }
+    }
+
+    pub fn with_expression(mut self, expr: &str) -> Self {
+        self.expression = expr.to_string();
+        self
+    }
+
+    pub fn with_position(mut self, pos: PortraitPosition) -> Self {
+        self.position = pos;
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
 // DialogueNode
 // ---------------------------------------------------------------------------
 
 /// A single node in a dialogue tree.
 #[derive(Debug, Clone)]
 pub struct DialogueNode {
-    /// Unique node ID within this tree.
     pub id: String,
-    /// Speaker name (displayed in UI).
     pub speaker: String,
-    /// Dialogue text (may contain `{variable}` placeholders).
     pub text: String,
-    /// Available choices from this node (empty = auto-advance).
     pub choices: Vec<DialogueChoice>,
-    /// If no choices, auto-advance to this node after a delay.
     pub next_node: Option<String>,
-    /// Optional events to fire when entering this node.
+    pub portrait: Option<DialoguePortrait>,
     pub on_enter: Vec<String>,
-    /// Optional events to fire when leaving this node.
     pub on_exit: Vec<String>,
-    /// Tags for filtering (e.g. "greeting", "shop", "quest").
+    pub effects: Vec<DialogueEffect>,
     pub tags: Vec<String>,
 }
 
@@ -33,8 +118,10 @@ impl DialogueNode {
             text: text.to_string(),
             choices: Vec::new(),
             next_node: None,
+            portrait: None,
             on_enter: Vec::new(),
             on_exit: Vec::new(),
+            effects: Vec::new(),
             tags: Vec::new(),
         }
     }
@@ -58,6 +145,16 @@ impl DialogueNode {
         self.on_enter.push(event.to_string());
         self
     }
+
+    pub fn with_portrait(mut self, portrait: DialoguePortrait) -> Self {
+        self.portrait = Some(portrait);
+        self
+    }
+
+    pub fn with_effect(mut self, effect: DialogueEffect) -> Self {
+        self.effects.push(effect);
+        self
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -67,17 +164,12 @@ impl DialogueNode {
 /// A choice presented to the player.
 #[derive(Debug, Clone)]
 pub struct DialogueChoice {
-    /// Display text (may contain `{variable}` placeholders).
     pub text: String,
-    /// Node to advance to when selected.
     pub next_node: String,
-    /// Conditions that must be met for this choice to appear.
     pub conditions: Vec<DialogueCondition>,
-    /// Whether this choice should end the dialogue.
+    pub effects: Vec<DialogueEffect>,
     pub ends_dialogue: bool,
-    /// Optional: hide this choice entirely if conditions fail (vs greyed out).
     pub hide_if_unavailable: bool,
-    /// Events to fire when this choice is selected.
     pub on_select: Vec<String>,
 }
 
@@ -87,6 +179,7 @@ impl DialogueChoice {
             text: text.to_string(),
             next_node: next_node.to_string(),
             conditions: Vec::new(),
+            effects: Vec::new(),
             ends_dialogue: false,
             hide_if_unavailable: false,
             on_select: Vec::new(),
@@ -95,6 +188,11 @@ impl DialogueChoice {
 
     pub fn with_condition(mut self, cond: DialogueCondition) -> Self {
         self.conditions.push(cond);
+        self
+    }
+
+    pub fn with_effect(mut self, effect: DialogueEffect) -> Self {
+        self.effects.push(effect);
         self
     }
 
@@ -110,46 +208,14 @@ impl DialogueChoice {
 }
 
 // ---------------------------------------------------------------------------
-// DialogueCondition
-// ---------------------------------------------------------------------------
-
-/// A condition that gates a dialogue choice.
-#[derive(Debug, Clone)]
-pub enum DialogueCondition {
-    /// Player has a specific item.
-    HasItem(String),
-    /// Player does NOT have an item.
-    NotItem(String),
-    /// Quest is in a specific state.
-    QuestState { quest_id: String, active: bool },
-    /// A boolean flag is set.
-    Flag(String),
-    /// A flag is NOT set.
-    NotFlag(String),
-    /// Reputation check: faction >= value.
-    Reputation { faction: String, min_value: i32 },
-    /// Level check: player level >= value.
-    MinLevel(u32),
-    /// Gold check: player gold >= amount.
-    MinGold(u64),
-    /// AND of multiple conditions.
-    All(Vec<DialogueCondition>),
-    /// OR of multiple conditions.
-    Any(Vec<DialogueCondition>),
-}
-
-// ---------------------------------------------------------------------------
 // DialogueTree
 // ---------------------------------------------------------------------------
 
 /// A complete dialogue tree with nodes and a starting point.
 #[derive(Debug, Clone)]
 pub struct DialogueTree {
-    /// All nodes indexed by ID.
     pub nodes: HashMap<String, DialogueNode>,
-    /// The starting node ID.
     pub start_node: String,
-    /// Tree-level metadata (quest_id, NPC id, etc).
     pub metadata: HashMap<String, String>,
 }
 
@@ -184,21 +250,96 @@ impl DialogueTree {
 }
 
 // ---------------------------------------------------------------------------
+// GameStateContext — external state for condition evaluation
+// ---------------------------------------------------------------------------
+
+/// Snapshot of game state used by DialogueRunner to evaluate conditions.
+pub struct GameStateContext {
+    pub flags: HashMap<String, bool>,
+    pub items: HashMap<String, u32>,
+    pub gold: i64,
+    pub level: u32,
+    pub reputation: HashMap<String, i32>,
+    pub quest_states: HashMap<String, QuestConditionState>,
+}
+
+impl GameStateContext {
+    pub fn new() -> Self {
+        Self {
+            flags: HashMap::new(),
+            items: HashMap::new(),
+            gold: 0,
+            level: 1,
+            reputation: HashMap::new(),
+            quest_states: HashMap::new(),
+        }
+    }
+
+    pub fn set_flag(&mut self, name: &str, value: bool) {
+        self.flags.insert(name.to_string(), value);
+    }
+
+    pub fn add_item(&mut self, item_id: &str, count: u32) {
+        *self.items.entry(item_id.to_string()).or_insert(0) += count;
+    }
+
+    pub fn remove_item(&mut self, item_id: &str, count: u32) -> bool {
+        if let Some(c) = self.items.get_mut(item_id) {
+            if *c >= count {
+                *c -= count;
+                if *c == 0 {
+                    self.items.remove(item_id);
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn has_item(&self, item_id: &str, count: u32) -> bool {
+        self.items.get(item_id).map_or(false, |c| *c >= count)
+    }
+
+    pub fn set_gold(&mut self, amount: i64) {
+        self.gold = amount.max(0);
+    }
+
+    pub fn modify_gold(&mut self, amount: i64) {
+        self.gold = (self.gold + amount).max(0);
+    }
+
+    pub fn set_level(&mut self, level: u32) {
+        self.level = level;
+    }
+
+    pub fn set_reputation(&mut self, faction: &str, amount: i32) {
+        self.reputation.insert(faction.to_string(), amount);
+    }
+
+    pub fn set_quest_state(&mut self, quest_id: &str, state: QuestConditionState) {
+        self.quest_states.insert(quest_id.to_string(), state);
+    }
+}
+
+impl Default for GameStateContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // DialogueRunner
 // ---------------------------------------------------------------------------
 
 /// Runtime state for an active dialogue.
 pub struct DialogueRunner {
-    /// The tree being executed.
     pub tree: DialogueTree,
-    /// Current node ID (None = dialogue ended).
     current_node: Option<String>,
-    /// Player-accessible variables for `{variable}` substitution.
     variables: HashMap<String, String>,
-    /// History of visited node IDs.
     history: Vec<String>,
-    /// Callbacks for events fired by nodes.
     event_log: Vec<String>,
+    effect_log: Vec<DialogueEffect>,
+    game_state: GameStateContext,
 }
 
 impl DialogueRunner {
@@ -210,7 +351,14 @@ impl DialogueRunner {
             variables: HashMap::new(),
             history: Vec::new(),
             event_log: Vec::new(),
+            effect_log: Vec::new(),
+            game_state: GameStateContext::new(),
         }
+    }
+
+    pub fn with_game_state(mut self, state: GameStateContext) -> Self {
+        self.game_state = state;
+        self
     }
 
     /// Start (or restart) the dialogue.
@@ -219,56 +367,102 @@ impl DialogueRunner {
         self.history.clear();
     }
 
-    /// Get the current node (with variables substituted).
-    pub fn current(&self) -> Option<DialogueNodeDisplay> {
-        let node = self.tree.get_node(self.current_node.as_deref()?)?;
-        let text = self.substitute(&node.text);
-        let speaker = node.speaker.clone();
-        let next_node = node.next_node.clone();
-
-        let choices: Vec<ChoiceDisplay> = node.choices.iter().map(|c| {
-            let available = c.conditions.iter().all(|cond| self.evaluate_condition(cond));
-            ChoiceDisplay {
-                text: if available { self.substitute(&c.text) } else { c.text.clone() },
-                index: node.choices.iter().position(|cc| cc.text == c.text).unwrap_or(0),
-                available,
-                ends_dialogue: c.ends_dialogue,
-            }
-        }).collect();
-
-        Some(DialogueNodeDisplay { speaker, text, choices, next_node })
-    }
-
-    /// Select a choice by index.
-    pub fn select_choice(&mut self, index: usize) -> bool {
-        let node_id = self.current_node.clone().unwrap_or_default();
-        let node = match self.tree.get_node(&node_id) {
-            Some(n) => n.clone(),
-            None => return false,
-        };
-
-        if let Some(choice) = node.choices.get(index) {
-            if !choice.conditions.iter().all(|c| self.evaluate_condition(c)) {
-                return false; // conditions not met
-            }
-
-            // Fire events
-            for event in &choice.on_select {
-                self.event_log.push(event.clone());
-            }
-
-            self.history.push(node_id);
-
-            if choice.ends_dialogue {
-                self.current_node = None;
-                return true;
-            }
-
-            self.current_node = Some(choice.next_node.clone());
+    /// Start a specific tree by id (multi-tree support).
+    pub fn start_tree(&mut self, tree_id: &str) -> bool {
+        if let Some(node_id) = self.tree.metadata.get(tree_id).cloned() {
+            self.current_node = Some(node_id);
+            self.history.clear();
             true
         } else {
             false
         }
+    }
+
+    /// Get the current node (with variables substituted).
+    pub fn get_current_node(&self) -> Option<DialogueNodeDisplay> {
+        let node = self.tree.get_node(self.current_node.as_deref()?)?;
+        let text = self.substitute(&node.text);
+        let speaker = node.speaker.clone();
+        let next_node = node.next_node.clone();
+        let portrait = node.portrait.clone();
+
+        let choices: Vec<ChoiceDisplay> = node.choices.iter().enumerate().map(|(i, c)| {
+            let available = c.conditions.iter().all(|cond| self.evaluate_condition(cond));
+            ChoiceDisplay {
+                text: if available { self.substitute(&c.text) } else { c.text.clone() },
+                index: i,
+                available,
+                ends_dialogue: c.ends_dialogue,
+                hide: c.hide_if_unavailable && !available,
+            }
+        }).filter(|c| !c.hide).collect();
+
+        Some(DialogueNodeDisplay { speaker, text, choices, next_node, portrait })
+    }
+
+    /// Get available (non-hidden) choices.
+    pub fn get_available_choices(&self) -> Vec<&DialogueChoice> {
+        let node_id = self.current_node.as_deref().unwrap_or("");
+        let node = match self.tree.get_node(node_id) {
+            Some(n) => n,
+            None => return Vec::new(),
+        };
+        node.choices.iter().filter(|c| {
+            !c.hide_if_unavailable || c.conditions.iter().all(|cond| self.evaluate_condition(cond))
+        }).collect()
+    }
+
+    /// Select a choice by index. Returns the effects applied.
+    pub fn select_choice(&mut self, index: usize) -> Option<Vec<DialogueEffect>> {
+        let node_id = self.current_node.clone().unwrap_or_default();
+        let node = match self.tree.get_node(&node_id) {
+            Some(n) => n.clone(),
+            None => return None,
+        };
+
+        let choice = node.choices.get(index)?;
+        if !choice.conditions.iter().all(|c| self.evaluate_condition(c)) {
+            return None;
+        }
+
+        let mut effects = Vec::new();
+
+        // Apply choice effects
+        for effect in &choice.effects {
+            self.apply_effect(effect);
+            effects.push(effect.clone());
+        }
+
+        // Apply node exit effects
+        for effect in &node.effects {
+            self.apply_effect(effect);
+            effects.push(effect.clone());
+        }
+
+        // Fire events
+        for event in &choice.on_select {
+            self.event_log.push(event.clone());
+        }
+
+        self.history.push(node_id);
+
+        if choice.ends_dialogue {
+            self.current_node = None;
+        } else {
+            self.current_node = Some(choice.next_node.clone());
+            // Fire enter events of next node
+            if let Some(next_node) = self.tree.get_node(&choice.next_node) {
+                for event in &next_node.on_enter {
+                    self.event_log.push(event.clone());
+                }
+                for effect in &next_node.effects {
+                    self.apply_effect(effect);
+                    effects.push(effect.clone());
+                }
+            }
+        }
+
+        Some(effects)
     }
 
     /// Advance to the next node (for auto-advance nodes with no choices).
@@ -280,10 +474,9 @@ impl DialogueRunner {
         };
 
         if !node.choices.is_empty() {
-            return false; // has choices, must use select_choice
+            return false;
         }
 
-        // Fire exit events
         for event in &node.on_exit {
             self.event_log.push(event.clone());
         }
@@ -291,7 +484,6 @@ impl DialogueRunner {
         self.history.push(node_id);
 
         if let Some(next) = &node.next_node {
-            // Fire enter events of next node
             if let Some(next_node) = self.tree.get_node(next) {
                 for event in &next_node.on_enter {
                     self.event_log.push(event.clone());
@@ -305,34 +497,53 @@ impl DialogueRunner {
         }
     }
 
-    /// Is the dialogue still active?
     pub fn is_active(&self) -> bool {
         self.current_node.is_some()
     }
 
-    /// Set a variable for substitution.
     pub fn set_variable(&mut self, key: &str, value: &str) {
         self.variables.insert(key.to_string(), value.to_string());
     }
 
-    /// Get a variable.
     pub fn get_variable(&self, key: &str) -> Option<&str> {
         self.variables.get(key).map(|s| s.as_str())
     }
 
-    /// Visit history.
+    pub fn set_game_state(&mut self, state: GameStateContext) {
+        self.game_state = state;
+    }
+
+    pub fn game_state(&self) -> &GameStateContext {
+        &self.game_state
+    }
+
+    pub fn game_state_mut(&mut self) -> &mut GameStateContext {
+        &mut self.game_state
+    }
+
     pub fn history(&self) -> &[String] {
         &self.history
     }
 
-    /// Drain event log.
     pub fn drain_events(&mut self) -> Vec<String> {
         std::mem::take(&mut self.event_log)
     }
 
-    /// Substitute `{variable}` placeholders in text.
+    pub fn drain_effects(&mut self) -> Vec<DialogueEffect> {
+        std::mem::take(&mut self.effect_log)
+    }
+
     fn substitute(&self, text: &str) -> String {
         let mut result = text.to_string();
+        // Built-in substitutions
+        let builtins: Vec<(&str, String)> = vec![
+            ("player_level".into(), self.game_state.level.to_string()),
+            ("player_gold".into(), self.game_state.gold.to_string()),
+        ];
+        for (key, value) in &builtins {
+            let placeholder = format!("{{{}}}", key);
+            result = result.replace(&placeholder, value);
+        }
         for (key, value) in &self.variables {
             let placeholder = format!("{{{}}}", key);
             result = result.replace(&placeholder, value);
@@ -340,25 +551,95 @@ impl DialogueRunner {
         result
     }
 
-    /// Evaluate a condition against current game state.
+    fn apply_effect(&mut self, effect: &DialogueEffect) {
+        match effect {
+            DialogueEffect::GiveItem { item_id, count } => {
+                self.game_state.add_item(item_id, *count);
+            }
+            DialogueEffect::RemoveItem { item_id, count } => {
+                self.game_state.remove_item(item_id, *count);
+            }
+            DialogueEffect::AddGold(amount) => {
+                self.game_state.modify_gold(*amount);
+            }
+            DialogueEffect::SetFlag(flag) => {
+                self.game_state.set_flag(flag, true);
+            }
+            DialogueEffect::ClearFlag(flag) => {
+                self.game_state.set_flag(flag, false);
+            }
+            DialogueEffect::StartQuest(quest_id) => {
+                self.event_log.push(format!("quest_start:{}", quest_id));
+            }
+            DialogueEffect::CompleteQuest(quest_id) => {
+                self.event_log.push(format!("quest_complete:{}", quest_id));
+            }
+            DialogueEffect::ChangeReputation { faction, amount } => {
+                let current = self.game_state.reputation.get(faction).copied().unwrap_or(0);
+                self.game_state.set_reputation(faction, current + amount);
+            }
+            DialogueEffect::HealPlayer(amount) => {
+                self.event_log.push(format!("heal_player:{}", amount));
+            }
+            DialogueEffect::DamagePlayer(amount) => {
+                self.event_log.push(format!("damage_player:{}", amount));
+            }
+            DialogueEffect::Teleport { x, y } => {
+                self.event_log.push(format!("teleport:{},{}", x, y));
+            }
+            DialogueEffect::PlaySound(s) => {
+                self.event_log.push(format!("play_sound:{}", s));
+            }
+            DialogueEffect::ShowNotification(s) => {
+                self.event_log.push(format!("notify:{}", s));
+            }
+        }
+        self.effect_log.push(effect.clone());
+    }
+
     fn evaluate_condition(&self, condition: &DialogueCondition) -> bool {
         match condition {
-            DialogueCondition::HasItem(_) => true, // Requires external state
-            DialogueCondition::NotItem(_) => true,
-            DialogueCondition::QuestState { .. } => true,
-            DialogueCondition::Flag(flag) => self.variables.get(flag).map_or(false, |v| v == "true"),
-            DialogueCondition::NotFlag(flag) => self.variables.get(flag).map_or(true, |v| v != "true"),
-            DialogueCondition::Reputation { .. } => true,
-            DialogueCondition::MinLevel(_) => true,
-            DialogueCondition::MinGold(_) => true,
-            DialogueCondition::All(conds) => conds.iter().all(|c| self.evaluate_condition(c)),
-            DialogueCondition::Any(conds) => conds.iter().any(|c| self.evaluate_condition(c)),
+            DialogueCondition::HasItem { item_id, count } => {
+                self.game_state.has_item(item_id, *count)
+            }
+            DialogueCondition::NotItem(item_id) => {
+                !self.game_state.has_item(item_id, 1)
+            }
+            DialogueCondition::QuestState { quest_id, state } => {
+                self.game_state.quest_states.get(quest_id).map_or(false, |s| s == state)
+            }
+            DialogueCondition::Flag(flag) => {
+                self.game_state.flags.get(flag).copied().unwrap_or(false)
+                    || self.variables.get(flag).map_or(false, |v| v == "true")
+            }
+            DialogueCondition::NotFlag(flag) => {
+                !self.game_state.flags.get(flag).copied().unwrap_or(false)
+                    && !self.variables.get(flag).map_or(false, |v| v == "true")
+            }
+            DialogueCondition::Reputation { faction, min_value } => {
+                self.game_state.reputation.get(faction).copied().unwrap_or(0) >= *min_value
+            }
+            DialogueCondition::Gold(amount) => {
+                self.game_state.gold >= *amount as i64
+            }
+            DialogueCondition::Level { min, max } => {
+                self.game_state.level >= *min && self.game_state.level <= *max
+            }
+            DialogueCondition::And(conds) => {
+                conds.iter().all(|c| self.evaluate_condition(c))
+            }
+            DialogueCondition::Or(conds) => {
+                conds.iter().any(|c| self.evaluate_condition(c))
+            }
+            DialogueCondition::Not(cond) => {
+                !self.evaluate_condition(cond)
+            }
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Display types (returned to UI)
+// Display types
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
@@ -367,6 +648,7 @@ pub struct DialogueNodeDisplay {
     pub text: String,
     pub choices: Vec<ChoiceDisplay>,
     pub next_node: Option<String>,
+    pub portrait: Option<DialoguePortrait>,
 }
 
 #[derive(Debug, Clone)]
@@ -375,6 +657,7 @@ pub struct ChoiceDisplay {
     pub index: usize,
     pub available: bool,
     pub ends_dialogue: bool,
+    pub hide: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +680,7 @@ mod tests {
                 .with_next("farewell")
         );
         tree.add_node(
-            DialogueNode::new("farewell", "Guard", "Safe travels!")
+            DialogueNode::new("farewell", "Guard", "Safe travels, {player_name}!")
         );
         tree.add_node(
             DialogueNode::new("combat", "Guard", "En garde!")
@@ -414,23 +697,15 @@ mod tests {
     }
 
     #[test]
-    fn test_runner_advance_no_choices() {
+    fn test_runner_advance() {
         let tree = build_test_tree();
         let mut runner = DialogueRunner::new(tree);
-
-        // Start node has choices, cannot auto-advance
         assert!(!runner.advance());
-
-        // Select "A traveler." (index 0)
-        assert!(runner.select_choice(0));
+        assert!(runner.select_choice(0).is_some());
         assert!(runner.is_active());
-
-        // greeting has no choices, auto-advance
-        let current = runner.current().unwrap();
+        let current = runner.get_current_node().unwrap();
         assert_eq!(current.speaker, "Guard");
         assert!(runner.advance());
-
-        // farewell — no next node, ends
         assert!(runner.advance());
         assert!(!runner.is_active());
     }
@@ -441,12 +716,12 @@ mod tests {
         tree.add_node(DialogueNode::new("talk", "NPC", "Hello, {player_name}!"));
         let mut runner = DialogueRunner::new(tree);
         runner.set_variable("player_name", "Hero");
-        let display = runner.current().unwrap();
+        let display = runner.get_current_node().unwrap();
         assert_eq!(display.text, "Hello, Hero!");
     }
 
     #[test]
-    fn test_choice_conditions() {
+    fn test_game_state_conditions() {
         let mut tree = DialogueTree::new("talk");
         tree.add_node(
             DialogueNode::new("talk", "NPC", "Choose:")
@@ -454,55 +729,149 @@ mod tests {
                     DialogueChoice::new("Free option", "free")
                 )
                 .with_choice(
-                    DialogueChoice::new("Locked option", "locked")
-                        .with_condition(DialogueCondition::Flag("has_key".to_string()))
+                    DialogueChoice::new("Requires sword", "has_sword")
+                        .with_condition(DialogueCondition::HasItem {
+                            item_id: "sword".into(), count: 1,
+                        })
                 )
         );
-        let mut runner = DialogueRunner::new(tree);
-        let display = runner.current().unwrap();
+        let mut state = GameStateContext::new();
+        state.add_item("sword", 1);
+        let mut runner = DialogueRunner::new(tree).with_game_state(state);
+        let display = runner.get_current_node().unwrap();
         assert_eq!(display.choices.len(), 2);
         assert!(display.choices[0].available);
-        assert!(!display.choices[1].available); // no flag set
+        assert!(display.choices[1].available);
     }
 
     #[test]
-    fn test_flag_condition() {
-        let mut tree = DialogueTree::new("talk");
-        tree.add_node(
-            DialogueNode::new("talk", "NPC", "Hello!")
-                .with_choice(
-                    DialogueChoice::new("Secret", "secret")
-                        .with_condition(DialogueCondition::Flag("know_secret".to_string()))
-                )
-        );
-        let mut runner = DialogueRunner::new(tree);
+    fn test_nested_and_or_conditions() {
+        let cond = DialogueCondition::And(vec![
+            DialogueCondition::Gold(100),
+            DialogueCondition::Level { min: 5, max: 99 },
+        ]);
+        let mut state = GameStateContext::new();
+        state.gold = 200;
+        state.level = 10;
+        let mut tree = DialogueTree::new("n");
+        tree.add_node(DialogueNode::new("n", "NPC", "Hi"));
+        let mut runner = DialogueRunner::new(tree).with_game_state(state);
+        assert!(runner.evaluate_condition(&cond));
 
-        // Without flag
-        let display = runner.current().unwrap();
-        assert!(!display.choices[0].available);
-
-        // With flag
-        runner.set_variable("know_secret", "true");
-        let display = runner.current().unwrap();
-        assert!(display.choices[0].available);
+        let cond_fail = DialogueCondition::Or(vec![
+            DialogueCondition::Gold(999),
+            DialogueCondition::Level { min: 99, max: 99 },
+        ]);
+        assert!(!runner.evaluate_condition(&cond_fail));
     }
 
     #[test]
-    fn test_event_log() {
+    fn test_not_condition() {
+        let cond = DialogueCondition::Not(Box::new(DialogueCondition::Flag("dead".into())));
+        let mut state = GameStateContext::new();
+        let mut tree = DialogueTree::new("n");
+        tree.add_node(DialogueNode::new("n", "NPC", "Hi"));
+        let mut runner = DialogueRunner::new(tree).with_game_state(state);
+        assert!(runner.evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_choice_effects() {
+        let mut tree = DialogueTree::new("talk");
+        tree.add_node(
+            DialogueNode::new("talk", "NPC", "Here's a reward.")
+                .with_choice(
+                    DialogueChoice::new("Accept", "done")
+                        .with_effect(DialogueEffect::GiveItem {
+                            item_id: "potion".into(), count: 3,
+                        })
+                        .with_effect(DialogueEffect::AddGold(50))
+                )
+        );
+        tree.add_node(DialogueNode::new("done", "NPC", "Done."));
+        let mut runner = DialogueRunner::new(tree);
+        let effects = runner.select_choice(0).unwrap();
+        assert_eq!(effects.len(), 2);
+        assert!(runner.game_state().has_item("potion", 3));
+        assert_eq!(runner.game_state().gold, 50);
+    }
+
+    #[test]
+    fn test_portrait() {
         let mut tree = DialogueTree::new("talk");
         tree.add_node(
             DialogueNode::new("talk", "NPC", "Hello!")
-                .with_on_enter("npc_greeted")
-                .with_choice(
-                    DialogueChoice::new("Bye", "end")
-                        .with_on_select("dialogue_end")
-                )
+                .with_portrait(DialoguePortrait::new("npc_portrait.png")
+                    .with_expression("happy")
+                    .with_position(PortraitPosition::Right))
         );
-        tree.add_node(DialogueNode::new("end", "NPC", "Bye!"));
-        let mut runner = DialogueRunner::new(tree);
-        runner.drain_events(); // clear on_enter
-        runner.select_choice(0);
-        let events = runner.drain_events();
-        assert!(events.contains(&"dialogue_end".to_string()));
+        let runner = DialogueRunner::new(tree);
+        let display = runner.get_current_node().unwrap();
+        assert!(display.portrait.is_some());
+        let p = display.portrait.unwrap();
+        assert_eq!(p.expression, "happy");
+        assert_eq!(p.position, PortraitPosition::Right);
+    }
+
+    #[test]
+    fn test_reputation_condition() {
+        let cond = DialogueCondition::Reputation { faction: "guards".into(), min_value: 50 };
+        let mut state = GameStateContext::new();
+        state.set_reputation("guards", 60);
+        let mut tree = DialogueTree::new("n");
+        tree.add_node(DialogueNode::new("n", "NPC", "Hi"));
+        let mut runner = DialogueRunner::new(tree).with_game_state(state);
+        assert!(runner.evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_quest_state_condition() {
+        let cond = DialogueCondition::QuestState {
+            quest_id: "q1".into(),
+            state: QuestConditionState::Complete,
+        };
+        let mut state = GameStateContext::new();
+        state.set_quest_state("q1", QuestConditionState::Complete);
+        let mut tree = DialogueTree::new("n");
+        tree.add_node(DialogueNode::new("n", "NPC", "Hi"));
+        let mut runner = DialogueRunner::new(tree).with_game_state(state);
+        assert!(runner.evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_gold_condition() {
+        let cond = DialogueCondition::Gold(100);
+        let mut state = GameStateContext::new();
+        state.gold = 50;
+        let mut tree = DialogueTree::new("n");
+        tree.add_node(DialogueNode::new("n", "NPC", "Hi"));
+        let mut runner = DialogueRunner::new(tree).with_game_state(state);
+        assert!(!runner.evaluate_condition(&cond));
+        runner.game_state_mut().gold = 150;
+        assert!(runner.evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_level_condition() {
+        let cond = DialogueCondition::Level { min: 5, max: 10 };
+        let mut state = GameStateContext::new();
+        state.level = 7;
+        let mut tree = DialogueTree::new("n");
+        tree.add_node(DialogueNode::new("n", "NPC", "Hi"));
+        let mut runner = DialogueRunner::new(tree).with_game_state(state);
+        assert!(runner.evaluate_condition(&cond));
+        runner.game_state_mut().level = 3;
+        assert!(!runner.evaluate_condition(&cond));
+    }
+
+    #[test]
+    fn test_builtin_substitution() {
+        let mut tree = DialogueTree::new("talk");
+        tree.add_node(DialogueNode::new("talk", "NPC", "You have {player_gold} gold."));
+        let mut state = GameStateContext::new();
+        state.gold = 42;
+        let runner = DialogueRunner::new(tree).with_game_state(state);
+        let display = runner.get_current_node().unwrap();
+        assert_eq!(display.text, "You have 42 gold.");
     }
 }

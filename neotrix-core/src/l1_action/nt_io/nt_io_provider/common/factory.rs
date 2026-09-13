@@ -1055,16 +1055,15 @@ pub async fn create_gateway_async() -> GatewayV2 {
     register_if!("MINIMAX_API_KEY", "minimax", LlmProviderType::MiniMax, false);
     register_if!("PERPLEXITY_API_KEY", "perplexity", LlmProviderType::Perplexity, false);
 
-    // ── 4. FreeModelCatalog: 从目录中发现并注册所有可用免费模型 ──
-    // Use spawn_blocking to avoid tokio 1.52+ panic when reqwest::blocking drops
-    // its internal Runtime while already inside a block_on context.
-    let mut catalog = FreeModelCatalog::new();
-    let discovered = tokio::task::spawn_blocking(move || catalog.refresh()).await.unwrap_or_default();
-    let registered_count = discovered.len();
-    gateway.register_from_catalog(&discovered);
-    if !discovered.is_empty() {
-        log::info!("[gateway] FreeModelCatalog: {} entries discovered, registered those with keys", registered_count);
-    }
+    // ── 4. UnifiedModelPool: 统一本地 GGUF + 云端免费 API ──
+    // 替代旧 FreeModelCatalog, 两套系统仅作为 ModelSource 插件。
+    let pool = crate::l1_action::nt_io::nt_io_provider::catalog::model_pool::UnifiedModelPool::default_pool();
+    let pool_clone = {
+        let models = pool.refresh();
+        log::info!("[gateway] UnifiedModelPool: {} models discovered (local GGUF + cloud free)", models.len());
+        pool
+    };
+    gateway.register_from_unified_pool(&pool_clone);
 
     // 始终注册 keyless 免费提供者
     // 代理注入: 本机常为 fake-ip 分流网络 (如 198.18.0.x + 系统代理), 直连会全部超时,

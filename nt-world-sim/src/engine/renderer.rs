@@ -4,25 +4,128 @@ use crate::core::world::Component;
 // Re-export math types from core — single fact source.
 pub use crate::core::{Vec2, Rect, Color, Transform};
 
-/// 精灵
+// ---------------------------------------------------------------------------
+// Sprite — renderable unit with atlas, flip, rotation, alpha
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Clone)]
 pub struct Sprite {
-    pub texture: Option<String>,
-    pub rect: Rect,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub texture_id: String,
+    pub frame: u32,
+    pub flip_x: bool,
+    pub flip_y: bool,
     pub color: Color,
+    pub alpha: f32,
+    pub rotation: f32,
     pub z_index: i32,
 }
 
 impl Sprite {
-    pub fn new(texture: &str) -> Self {
-        Self { texture: Some(texture.to_string()), rect: Rect::new(0.0, 0.0, 16.0, 16.0), color: Color::white(), z_index: 0 }
+    pub fn new(texture_id: &str) -> Self {
+        Self {
+            x: 0.0, y: 0.0, width: 16.0, height: 16.0,
+            texture_id: texture_id.to_string(),
+            frame: 0, flip_x: false, flip_y: false,
+            color: Color::white(), alpha: 1.0, rotation: 0.0, z_index: 0,
+        }
     }
-    pub fn colored(color: Color) -> Self {
-        Self { texture: None, rect: Rect::new(0.0, 0.0, 16.0, 16.0), color, z_index: 0 }
+
+    pub fn from_rect(texture_id: &str, x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self { x, y, width: w, height: h, texture_id: texture_id.to_string(), ..Self::new(texture_id) }
+    }
+
+    pub fn colored(color: Color, w: f32, h: f32) -> Self {
+        Self { color, width: w, height: h, texture_id: String::new(), ..Self::new("") }
+    }
+
+    pub fn with_position(mut self, x: f32, y: f32) -> Self { self.x = x; self.y = y; self }
+    pub fn with_frame(mut self, frame: u32) -> Self { self.frame = frame; self }
+    pub fn with_flip(mut self, flip_x: bool, flip_y: bool) -> Self { self.flip_x = flip_x; self.flip_y = flip_y; self }
+    pub fn with_alpha(mut self, alpha: f32) -> Self { self.alpha = alpha; self }
+    pub fn with_rotation(mut self, rotation: f32) -> Self { self.rotation = rotation; self }
+    pub fn with_z_index(mut self, z: i32) -> Self { self.z_index = z; self }
+
+    pub fn world_rect(&self) -> Rect {
+        Rect::new(self.x, self.y, self.width, self.height)
     }
 }
 
-/// 瓦片定义
+// ---------------------------------------------------------------------------
+// TextureAtlas — maps texture IDs to regions within an atlas texture
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct AtlasRegion {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct TextureAtlas {
+    pub texture_path: String,
+    pub regions: HashMap<String, AtlasRegion>,
+    pub tile_size: f32,
+    pub columns: u32,
+    pub total_frames: u32,
+}
+
+impl TextureAtlas {
+    pub fn new(texture_path: &str, tile_size: f32, columns: u32, total_frames: u32) -> Self {
+        Self {
+            texture_path: texture_path.to_string(),
+            regions: HashMap::new(),
+            tile_size, columns, total_frames,
+        }
+    }
+
+    pub fn add_region(&mut self, name: &str, region: AtlasRegion) {
+        self.regions.insert(name.to_string(), region);
+    }
+
+    pub fn auto_grid(&mut self) {
+        let rows = (self.total_frames + self.columns - 1) / self.columns;
+        for i in 0..self.total_frames {
+            let col = i % self.columns;
+            let row = i / self.columns;
+            let name = format!("frame_{}", i);
+            self.regions.insert(name, AtlasRegion {
+                x: col as f32 * self.tile_size,
+                y: row as f32 * self.tile_size,
+                width: self.tile_size,
+                height: self.tile_size,
+            });
+        }
+    }
+
+    pub fn get_region(&self, name: &str) -> Option<&AtlasRegion> {
+        self.regions.get(name)
+    }
+
+    pub fn get_frame_region(&self, frame: u32) -> Option<&AtlasRegion> {
+        self.regions.get(&format!("frame_{}", frame))
+    }
+
+    pub fn sprite_rect(&self, frame: u32) -> Rect {
+        self.get_frame_region(frame)
+            .map(|r| Rect::new(r.x, r.y, r.width, r.height))
+            .unwrap_or(Rect::new(0.0, 0.0, self.tile_size, self.tile_size))
+    }
+}
+
+impl Default for TextureAtlas {
+    fn default() -> Self { Self::new("", 16.0, 0, 0) }
+}
+
+// ---------------------------------------------------------------------------
+// TileDef — tile palette entry
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Clone)]
 pub struct TileDef {
     pub id: u32,
@@ -37,7 +140,10 @@ impl TileDef {
     }
 }
 
-/// 瓦片图
+// ---------------------------------------------------------------------------
+// TileMap — simple single-layer tile map
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Clone)]
 pub struct TileMap {
     pub tiles: Vec<Vec<u32>>,
@@ -68,7 +174,10 @@ impl TileMap {
     }
 }
 
-/// 相机
+// ---------------------------------------------------------------------------
+// Camera — simple 2D camera
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Clone)]
 pub struct Camera {
     pub position: Vec2,
@@ -111,7 +220,7 @@ pub enum DrawCommand {
     DrawCircle { center: Vec2, radius: f32, color: Color },
     DrawLine { start: Vec2, end: Vec2, color: Color, width: f32 },
     DrawText { text: String, position: Vec2, color: Color, size: f32 },
-    DrawSprite { texture: String, dest: Rect, color: Color, z_index: i32 },
+    DrawSprite { texture: String, dest: Rect, src_rect: Option<Rect>, color: Color, alpha: f32, flip_x: bool, flip_y: bool, rotation: f32, z_index: i32 },
     DrawTilemap { tile_colors: Vec<(Rect, Color)>, z_index: i32 },
     DrawQuad { dest: Rect, color: Color, rotation: f32, z_index: i32 },
     DrawParticles { particles: Vec<ParticleDrawVertex> },
@@ -164,14 +273,15 @@ impl Renderer for CanvasRenderer {
     fn clear(&mut self, color: Color) { self.commands.push(DrawCommand::Clear { color }); }
     fn draw_sprite(&mut self, sprite: &Sprite, transform: &Transform) {
         let dest = Rect::new(
-            transform.position.x + sprite.rect.x,
-            transform.position.y + sprite.rect.y,
-            sprite.rect.width * transform.scale.x,
-            sprite.rect.height * transform.scale.y,
+            transform.position.x + sprite.x,
+            transform.position.y + sprite.y,
+            sprite.width * transform.scale.x,
+            sprite.height * transform.scale.y,
         );
         self.commands.push(DrawCommand::DrawSprite {
-            texture: sprite.texture.clone().unwrap_or_default(),
-            dest, color: sprite.color, z_index: sprite.z_index,
+            texture: sprite.texture_id.clone(), dest, src_rect: None,
+            color: sprite.color, alpha: sprite.alpha, flip_x: sprite.flip_x, flip_y: sprite.flip_y,
+            rotation: sprite.rotation, z_index: sprite.z_index,
         });
     }
     fn draw_tilemap(&mut self, tilemap: &TileMap, camera: &Camera) {
@@ -201,36 +311,107 @@ impl Renderer for CanvasRenderer {
 // SpriteBatch — groups sprites by texture for batched draw calls
 // ---------------------------------------------------------------------------
 
-pub struct SpriteBatch {
-    batches: HashMap<String, Vec<SpriteInstance>>,
-    draw_order: Vec<String>,
-}
-
 pub struct SpriteInstance {
     pub dest: Rect,
+    pub src_rect: Option<Rect>,
     pub color: Color,
+    pub alpha: f32,
+    pub flip_x: bool,
+    pub flip_y: bool,
+    pub rotation: f32,
     pub z_index: i32,
 }
 
+pub struct SpriteBatch {
+    batches: HashMap<String, Vec<SpriteInstance>>,
+    draw_order: Vec<String>,
+    atlas: Option<TextureAtlas>,
+}
+
 impl SpriteBatch {
-    pub fn new() -> Self { Self { batches: HashMap::new(), draw_order: Vec::new() } }
+    pub fn new() -> Self {
+        Self { batches: HashMap::new(), draw_order: Vec::new(), atlas: None }
+    }
+
+    pub fn with_atlas(atlas: TextureAtlas) -> Self {
+        Self { atlas: Some(atlas), ..Self::new() }
+    }
+
+    pub fn set_atlas(&mut self, atlas: TextureAtlas) { self.atlas = Some(atlas); }
+
+    pub fn atlas(&self) -> Option<&TextureAtlas> { self.atlas.as_ref() }
 
     pub fn begin(&mut self) {
         self.batches.clear();
         self.draw_order.clear();
     }
 
+    /// Add a sprite by texture name. If an atlas is set, uses its region as src_rect.
     pub fn add_sprite(&mut self, texture: &str, dest: Rect, color: Color, z_index: i32) {
-        let key = texture.to_string();
-        if !self.batches.contains_key(&key) {
-            self.draw_order.push(key.clone());
-            self.batches.insert(key.clone(), Vec::new());
+        let src = self.atlas.as_ref().and_then(|a| a.get_region(texture)).map(|r| {
+            Rect::new(r.x, r.y, r.width, r.height)
+        });
+        let key = self.atlas.as_ref().map(|a| a.texture_path.clone()).unwrap_or_else(|| texture.to_string());
+        self.push_instance(&key, SpriteInstance {
+            dest, src_rect: src, color, alpha: 1.0,
+            flip_x: false, flip_y: false, rotation: 0.0, z_index,
+        });
+    }
+
+    /// Add a sprite from the atlas by frame index.
+    pub fn add_sprite_frame(&mut self, frame: u32, dest: Rect, color: Color, alpha: f32, z_index: i32) {
+        if let Some(atlas) = &self.atlas {
+            let src = atlas.get_frame_region(frame).map(|r| Rect::new(r.x, r.y, r.width, r.height));
+            self.push_instance(&atlas.texture_path, SpriteInstance {
+                dest, src_rect: src, color, alpha,
+                flip_x: false, flip_y: false, rotation: 0.0, z_index,
+            });
         }
-        self.batches.get_mut(&key).unwrap().push(SpriteInstance { dest, color, z_index });
+    }
+
+    /// Add a full Sprite struct.
+    pub fn add_sprite_struct(&mut self, sprite: &Sprite) {
+        let src = self.atlas.as_ref().and_then(|a| a.get_frame_region(sprite.frame)).map(|r| {
+            Rect::new(r.x, r.y, r.width, r.height)
+        });
+        let key = if !sprite.texture_id.is_empty() {
+            self.atlas.as_ref().map(|a| a.texture_path.clone()).unwrap_or_else(|| sprite.texture_id.clone())
+        } else {
+            String::from("__solid__")
+        };
+        self.push_instance(&key, SpriteInstance {
+            dest: Rect::new(sprite.x, sprite.y, sprite.width, sprite.height),
+            src_rect: src,
+            color: sprite.color,
+            alpha: sprite.alpha,
+            flip_x: sprite.flip_x,
+            flip_y: sprite.flip_y,
+            rotation: sprite.rotation,
+            z_index: sprite.z_index,
+        });
     }
 
     pub fn add_quad(&mut self, dest: Rect, color: Color, z_index: i32) {
-        self.add_sprite("__solid__", dest, color, z_index);
+        self.push_instance("__solid__", SpriteInstance {
+            dest, src_rect: None, color, alpha: 1.0,
+            flip_x: false, flip_y: false, rotation: 0.0, z_index,
+        });
+    }
+
+    pub fn add_quad_alpha(&mut self, dest: Rect, color: Color, alpha: f32, z_index: i32) {
+        self.push_instance("__solid__", SpriteInstance {
+            dest, src_rect: None, color, alpha,
+            flip_x: false, flip_y: false, rotation: 0.0, z_index,
+        });
+    }
+
+    fn push_instance(&mut self, key: &str, instance: SpriteInstance) {
+        let k = key.to_string();
+        if !self.batches.contains_key(&k) {
+            self.draw_order.push(k.clone());
+            self.batches.insert(k.clone(), Vec::new());
+        }
+        self.batches.get_mut(&k).unwrap().push(instance);
     }
 
     pub fn end(&self) -> Vec<DrawCommand> {
@@ -239,7 +420,9 @@ impl SpriteBatch {
             if let Some(sprites) = self.batches.get(tex) {
                 for s in sprites {
                     commands.push(DrawCommand::DrawSprite {
-                        texture: tex.clone(), dest: s.dest, color: s.color, z_index: s.z_index,
+                        texture: tex.clone(), dest: s.dest, src_rect: s.src_rect,
+                        color: s.color, alpha: s.alpha, flip_x: s.flip_x, flip_y: s.flip_y,
+                        rotation: s.rotation, z_index: s.z_index,
                     });
                 }
             }
@@ -254,25 +437,105 @@ impl SpriteBatch {
 impl Default for SpriteBatch { fn default() -> Self { Self::new() } }
 
 // ---------------------------------------------------------------------------
-// TilemapRenderer — chunk-culled tile rendering
+// TilemapRenderer — multi-layer, z-ordered, animated tile rendering
 // ---------------------------------------------------------------------------
+
+/// Tile animation definition: cycles through tile IDs over time.
+#[derive(Debug, Clone)]
+pub struct TileAnimation {
+    pub frames: Vec<u32>,
+    pub speed: f32,
+    pub timer: f32,
+    pub looping: bool,
+}
+
+impl TileAnimation {
+    pub fn new(frames: Vec<u32>, speed: f32) -> Self {
+        Self { frames, speed, timer: 0.0, looping: true }
+    }
+
+    pub fn current_tile(&self) -> u32 {
+        let idx = (self.timer * self.speed) as usize % self.frames.len();
+        self.frames[idx]
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        self.timer += dt;
+        if self.looping {
+            let total = self.frames.len() as f32 / self.speed;
+            if self.timer >= total { self.timer -= total; }
+        }
+    }
+
+    pub fn is_done(&self) -> bool {
+        !self.looping && self.timer * self.speed >= self.frames.len() as f32
+    }
+}
+
+/// Layer descriptor for multi-layer tilemap rendering.
+#[derive(Debug, Clone)]
+pub struct TileLayer {
+    pub name: String,
+    pub tiles: Vec<Vec<u32>>,
+    pub z_index: i32,
+    pub opacity: f32,
+    pub visible: bool,
+}
+
+impl TileLayer {
+    pub fn new(name: &str, width: usize, height: usize, z_index: i32) -> Self {
+        Self {
+            name: name.to_string(),
+            tiles: vec![vec![0; width]; height],
+            z_index, opacity: 1.0, visible: true,
+        }
+    }
+
+    pub fn get_tile(&self, x: usize, y: usize) -> Option<u32> {
+        self.tiles.get(y)?.get(x).copied()
+    }
+
+    pub fn set_tile(&mut self, x: usize, y: usize, tile_id: u32) {
+        if let Some(row) = self.tiles.get_mut(y) {
+            if let Some(t) = row.get_mut(x) { *t = tile_id; }
+        }
+    }
+
+    pub fn width(&self) -> usize { self.tiles.first().map_or(0, |r| r.len()) }
+    pub fn height(&self) -> usize { self.tiles.len() }
+}
 
 pub struct TilemapRenderer {
     pub chunk_size: usize,
     visible_chunks: Vec<(usize, usize)>,
+    pub animations: HashMap<(usize, usize, usize), TileAnimation>,
 }
 
 impl TilemapRenderer {
-    pub fn new(chunk_size: usize) -> Self { Self { chunk_size, visible_chunks: Vec::new() } }
+    pub fn new(chunk_size: usize) -> Self {
+        Self { chunk_size, visible_chunks: Vec::new(), animations: HashMap::new() }
+    }
 
-    pub fn compute_visible_chunks(&mut self, tilemap: &TileMap, camera: &Camera) {
+    /// Register an animation for layer_index, tile_x, tile_y.
+    pub fn set_animation(&mut self, layer: usize, x: usize, y: usize, anim: TileAnimation) {
+        self.animations.insert((layer, x, y), anim);
+    }
+
+    pub fn update_animations(&mut self, dt: f32) {
+        for anim in self.animations.values_mut() {
+            anim.update(dt);
+        }
+    }
+
+    /// Compute visible tile ranges (chunk-culled) for a single layer.
+    pub fn compute_visible_chunks(&mut self, layer_width: usize, layer_height: usize, tile_size: Vec2, camera: &Camera) {
         self.visible_chunks.clear();
         let cam_rect = camera.visible_world_rect();
-        let ts = tilemap.tile_size;
+        let ts = tile_size;
         let start_x = ((cam_rect.x / ts.x).floor() as usize).max(0);
         let start_y = ((cam_rect.y / ts.y).floor() as usize).max(0);
-        let end_x = ((cam_rect.right() / ts.x).ceil() as usize).min(tilemap.width());
-        let end_y = ((cam_rect.bottom() / ts.y).ceil() as usize).min(tilemap.height());
+        let end_x = ((cam_rect.right() / ts.x).ceil() as usize).min(layer_width);
+        let end_y = ((cam_rect.bottom() / ts.y).ceil() as usize).min(layer_height);
 
         for cy in (start_y..end_y).step_by(self.chunk_size) {
             for cx in (start_x..end_x).step_by(self.chunk_size) {
@@ -281,6 +544,48 @@ impl TilemapRenderer {
         }
     }
 
+    /// Render a single layer back-to-front within the viewport.
+    pub fn render_layer(&self, layer: &TileLayer, palette: &HashMap<u32, TileDef>, tile_size: Vec2, camera: &Camera) -> Vec<DrawCommand> {
+        let mut commands = Vec::new();
+        if !layer.visible { return commands; }
+
+        for &(cx, cy) in &self.visible_chunks {
+            let end_x = (cx + self.chunk_size).min(layer.width());
+            let end_y = (cy + self.chunk_size).min(layer.height());
+            for y in cy..end_y {
+                for x in cx..end_x {
+                    if let Some(tile_id) = layer.get_tile(x, y) {
+                        if tile_id == 0 { continue; }
+                        if let Some(td) = palette.get(&tile_id) {
+                            let wp = Vec2::new(x as f32 * tile_size.x, y as f32 * tile_size.y);
+                            let sp = camera.world_to_screen(wp);
+                            let alpha = if layer.opacity < 1.0 { layer.opacity } else { 1.0 };
+                            let color = if alpha < 1.0 { td.color.with_alpha(alpha) } else { td.color };
+                            commands.push(DrawCommand::DrawRect {
+                                rect: Rect::new(sp.x, sp.y, tile_size.x * camera.zoom, tile_size.y * camera.zoom),
+                                color,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        commands
+    }
+
+    /// Render all layers sorted by z_index.
+    pub fn render_all_layers(&self, layers: &[TileLayer], palette: &HashMap<u32, TileDef>, tile_size: Vec2, camera: &Camera) -> Vec<DrawCommand> {
+        let mut sorted: Vec<&TileLayer> = layers.iter().filter(|l| l.visible).collect();
+        sorted.sort_by_key(|l| l.z_index);
+
+        let mut all_cmds = Vec::new();
+        for layer in sorted {
+            all_cmds.extend(self.render_layer(layer, palette, tile_size, camera));
+        }
+        all_cmds
+    }
+
+    /// Legacy: render simple TileMap.
     pub fn render_tilemap(&self, tilemap: &TileMap, camera: &Camera) -> Vec<DrawCommand> {
         let mut commands = Vec::new();
         let ts = tilemap.tile_size;
@@ -448,9 +753,7 @@ impl DebugRenderer {
     pub fn render_collision_box(&self, camera: &Camera, rect: &Rect) -> Vec<DrawCommand> {
         let sp = camera.world_to_screen(Vec2::new(rect.x, rect.y));
         let screen_rect = Rect::new(sp.x, sp.y, rect.width * camera.zoom, rect.height * camera.zoom);
-        vec![
-            DrawCommand::DrawRect { rect: screen_rect, color: self.collision_color },
-        ]
+        vec![DrawCommand::DrawRect { rect: screen_rect, color: self.collision_color }]
     }
 
     pub fn render_text_overlays(&self) -> Vec<DrawCommand> {
@@ -468,7 +771,7 @@ impl DebugRenderer {
 impl Default for DebugRenderer { fn default() -> Self { Self::new() } }
 
 // ---------------------------------------------------------------------------
-// Screen effects — fade, flash, shake (pure data, no rendering dependency)
+// Screen effects — fade, flash, shake
 // ---------------------------------------------------------------------------
 
 pub struct ScreenEffects {
@@ -537,7 +840,7 @@ impl ScreenEffects {
 impl Default for ScreenEffects { fn default() -> Self { Self::new() } }
 
 // ---------------------------------------------------------------------------
-// Combined Renderer — holds all sub-renderers for ergonomic frame rendering
+// Combined Renderer — holds all sub-renderers
 // ---------------------------------------------------------------------------
 
 pub struct GameRenderer {
@@ -567,15 +870,11 @@ impl GameRenderer {
         }
     }
 
-    pub fn begin_frame(&mut self) {
-        self.sprite_batch.begin();
-    }
+    pub fn begin_frame(&mut self) { self.sprite_batch.begin(); }
 
     pub fn submit_tilemap(&mut self, tilemap: &TileMap) {
-        self.tilemap_renderer.compute_visible_chunks(tilemap, &self.camera);
+        self.tilemap_renderer.compute_visible_chunks(tilemap.width(), tilemap.height(), tilemap.tile_size, &self.camera);
         let cmds = self.tilemap_renderer.render_tilemap(tilemap, &self.camera);
-        // In a real renderer these would go to a render queue; here we
-        // re-inject them as raw draw rects into the sprite batch.
         for cmd in cmds {
             if let DrawCommand::DrawRect { rect, color } = cmd {
                 self.sprite_batch.add_quad(rect, color, 0);
@@ -592,30 +891,24 @@ impl GameRenderer {
         self.particle_system.update(dt);
         self.effects.update(dt);
         self.debug_renderer.record_frame_time(dt);
+        self.tilemap_renderer.update_animations(dt);
 
         let mut cmds = Vec::new();
 
-        // Grid debug
         if self.debug_renderer.show_grid {
             cmds.extend(self.debug_renderer.render_grid(&self.camera, 32.0));
         }
 
-        // Sprite batch
         cmds.extend(self.sprite_batch.end());
 
-        // Particles
         let pv = self.particle_system.render(&self.camera);
         if !pv.is_empty() {
             cmds.push(DrawCommand::DrawParticles { particles: pv });
         }
 
-        // Collision boxes from debug
         cmds.extend(self.debug_renderer.render_text_overlays());
-
-        // Screen effects on top
         cmds.extend(self.effects.render());
 
-        // Update performance metrics
         self.metrics.fps = self.frame_timer.fps();
         self.metrics.entities_rendered = self.sprite_batch.total_sprites() as u64;
         self.metrics.draw_calls = self.draw_call_batcher.draw_calls;
@@ -645,7 +938,7 @@ fn rand_f32_range(min: f32, max: f32) -> f32 {
 }
 
 // ---------------------------------------------------------------------------
-// FrameTimer — measures real FPS by wall-clock intervals
+// FrameTimer
 // ---------------------------------------------------------------------------
 
 pub struct FrameTimer {
@@ -656,14 +949,9 @@ pub struct FrameTimer {
 
 impl FrameTimer {
     pub fn new() -> Self {
-        Self {
-            frame_count: 0,
-            last_report: std::time::Instant::now(),
-            fps: 0.0,
-        }
+        Self { frame_count: 0, last_report: std::time::Instant::now(), fps: 0.0 }
     }
 
-    /// Call once per frame. After 1 s of wall time, recomputes FPS and resets.
     pub fn tick(&mut self) {
         self.frame_count += 1;
         let now = std::time::Instant::now();
@@ -675,19 +963,13 @@ impl FrameTimer {
         }
     }
 
-    pub fn fps(&self) -> f64 {
-        self.fps
-    }
+    pub fn fps(&self) -> f64 { self.fps }
 }
 
-impl Default for FrameTimer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl Default for FrameTimer { fn default() -> Self { Self::new() } }
 
 // ---------------------------------------------------------------------------
-// DrawCallBatcher — accumulates DrawCommands and flushes in fixed-size batches
+// DrawCallBatcher
 // ---------------------------------------------------------------------------
 
 pub struct DrawCallBatcher {
@@ -698,25 +980,14 @@ pub struct DrawCallBatcher {
 
 impl DrawCallBatcher {
     pub fn new(max_batch_size: usize) -> Self {
-        Self {
-            max_batch_size,
-            current_batch: Vec::new(),
-            draw_calls: 0,
-        }
+        Self { max_batch_size, current_batch: Vec::new(), draw_calls: 0 }
     }
 
-    /// Push a command. Returns `true` if the batch was flushed (full).
     pub fn add(&mut self, cmd: DrawCommand) -> bool {
         self.current_batch.push(cmd);
-        if self.current_batch.len() >= self.max_batch_size {
-            self.flush();
-            true
-        } else {
-            false
-        }
+        if self.current_batch.len() >= self.max_batch_size { self.flush(); true } else { false }
     }
 
-    /// Flush the current batch (counts as one draw call).
     pub fn flush(&mut self) {
         if !self.current_batch.is_empty() {
             self.draw_calls += 1;
@@ -724,24 +995,15 @@ impl DrawCallBatcher {
         }
     }
 
-    pub fn pending(&self) -> usize {
-        self.current_batch.len()
-    }
+    pub fn pending(&self) -> usize { self.current_batch.len() }
 
-    pub fn reset_stats(&mut self) {
-        self.draw_calls = 0;
-        self.current_batch.clear();
-    }
+    pub fn reset_stats(&mut self) { self.draw_calls = 0; self.current_batch.clear(); }
 }
 
-impl Default for DrawCallBatcher {
-    fn default() -> Self {
-        Self::new(256)
-    }
-}
+impl Default for DrawCallBatcher { fn default() -> Self { Self::new(256) } }
 
 // ---------------------------------------------------------------------------
-// PerformanceMetrics — snapshot of per-frame rendering stats
+// PerformanceMetrics
 // ---------------------------------------------------------------------------
 
 pub struct PerformanceMetrics {
@@ -753,17 +1015,8 @@ pub struct PerformanceMetrics {
 
 impl PerformanceMetrics {
     pub fn new() -> Self {
-        Self {
-            fps: 0.0,
-            entities_rendered: 0,
-            draw_calls: 0,
-            avg_frame_time_ms: 0.0,
-        }
+        Self { fps: 0.0, entities_rendered: 0, draw_calls: 0, avg_frame_time_ms: 0.0 }
     }
 }
 
-impl Default for PerformanceMetrics {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl Default for PerformanceMetrics { fn default() -> Self { Self::new() } }
