@@ -411,8 +411,10 @@ mod tests {
         monitor.record_action("agent_0", "Explore", 0);
         monitor.record_action("agent_0", "Talk", 1);
         monitor.record_action("agent_0", "Attack", 2);
-        // No crash, metrics tracked
-        assert!(monitor.agents.contains_key("agent_0"));
+        let metrics = monitor.agents.get("agent_0").unwrap();
+        assert_eq!(metrics.total_actions, 3);
+        assert_eq!(metrics.attack_count, 1);
+        assert_eq!(metrics.social_count, 1);
     }
 
     #[test]
@@ -421,13 +423,15 @@ mod tests {
         config.max_action_repetition = 3;
         let mut monitor = SafetyMonitor::new(config);
 
+        // Record more actions than max_action_repetition, all identical
         for i in 0..5 {
             monitor.record_action("agent_0", "Rest", i);
         }
         let alerts = monitor.check_all("agent_0", 5);
-        assert!(alerts
-            .iter()
-            .any(|a| a.violation == SafetyViolation::BehavioralLoop));
+        assert!(
+            alerts.iter().any(|a| a.violation == SafetyViolation::BehavioralLoop),
+            "identical actions exceeding threshold should trigger BehavioralLoop"
+        );
     }
 
     #[test]
@@ -441,9 +445,10 @@ mod tests {
             monitor.record_action("agent_0", action, i as u64);
         }
         let alerts = monitor.check_all("agent_0", 5);
-        assert!(!alerts
-            .iter()
-            .any(|a| a.violation == SafetyViolation::BehavioralLoop));
+        assert!(
+            !alerts.iter().any(|a| a.violation == SafetyViolation::BehavioralLoop),
+            "varied actions should not trigger BehavioralLoop"
+        );
     }
 
     #[test]
@@ -452,10 +457,26 @@ mod tests {
         config.max_personality_drift = 0.2;
         let mut monitor = SafetyMonitor::new(config);
 
+        // Initial personality
         monitor.record_personality("agent_0", 0.5, 0.5, 0.3, 0.5, 0.5, 0);
+        // Check with significantly different values → drift > threshold
         let alert = monitor.check_personality_drift("agent_0", 0.9, 0.9, 0.9, 0.9, 0.9, 100);
         assert!(alert.is_some());
-        assert_eq!(alert.unwrap().violation, SafetyViolation::PersonalityDrift);
+        let alert = alert.unwrap();
+        assert_eq!(alert.violation, SafetyViolation::PersonalityDrift);
+        assert!(alert.severity > 0.0, "severity should be positive");
+    }
+
+    #[test]
+    fn no_drift_with_similar_personality() {
+        let mut config = SafetyMonitorConfig::default();
+        config.max_personality_drift = 0.5;
+        let mut monitor = SafetyMonitor::new(config);
+
+        monitor.record_personality("agent_0", 0.5, 0.5, 0.5, 0.5, 0.5, 0);
+        // Small change → drift below threshold
+        let alert = monitor.check_personality_drift("agent_0", 0.55, 0.55, 0.55, 0.55, 0.55, 100);
+        assert!(alert.is_none(), "small personality drift should not trigger alert");
     }
 
     #[test]

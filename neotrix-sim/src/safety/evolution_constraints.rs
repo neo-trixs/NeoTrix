@@ -208,48 +208,103 @@ impl EvolutionConstraints {
 mod tests {
     use super::*;
 
+    fn default_config() -> EvolutionConstraintConfig {
+        EvolutionConstraintConfig::default()
+    }
+
     #[test]
-    fn clamp_mutation_rate() {
-        let constraints = EvolutionConstraints::new(EvolutionConstraintConfig::default());
-        assert_eq!(constraints.clamp_mutation_rate(0.5), 0.3); // capped at max
-        assert_eq!(constraints.clamp_mutation_rate(0.001), 0.01); // floored at min
-        assert_eq!(constraints.clamp_mutation_rate(0.15), 0.15); // within bounds
+    fn clamp_mutation_rate_respects_bounds() {
+        let config = default_config();
+        let constraints = EvolutionConstraints::new(config.clone());
+
+        // Above max → clamped to max
+        let above_max = config.max_mutation_rate + 0.5;
+        assert_eq!(constraints.clamp_mutation_rate(above_max), config.max_mutation_rate);
+
+        // Below min → clamped to min
+        let below_min = config.min_mutation_rate - 0.5;
+        assert_eq!(constraints.clamp_mutation_rate(below_min), config.min_mutation_rate);
+
+        // Within bounds → unchanged
+        let mid = (config.min_mutation_rate + config.max_mutation_rate) / 2.0;
+        assert_eq!(constraints.clamp_mutation_rate(mid), mid);
     }
 
     #[test]
     fn validate_genome_rejects_out_of_bounds() {
-        let constraints = EvolutionConstraints::new(EvolutionConstraintConfig::default());
-        assert!(!constraints.validate_genome(&[2.0, 0.5, 0.3])); // 2.0 out of range
-        assert!(!constraints.validate_genome(&[])); // empty
+        let constraints = EvolutionConstraints::new(default_config());
+        // Trait exceeds [−1, 1]
+        assert!(!constraints.validate_genome(&[2.0, 0.5, 0.3]));
+        // Empty genome
+        assert!(!constraints.validate_genome(&[]));
+        // Negative out of range
+        assert!(!constraints.validate_genome(&[-1.5, 0.5]));
     }
 
     #[test]
     fn validate_genome_accepts_valid() {
-        let constraints = EvolutionConstraints::new(EvolutionConstraintConfig::default());
+        let constraints = EvolutionConstraints::new(default_config());
+        // All traits in [−1, 1], aggression below threshold
         assert!(constraints.validate_genome(&[0.5, 0.3, 0.2, 0.4, 0.6, 0.1, 0.8, 0.7]));
+        // Boundary values
+        assert!(constraints.validate_genome(&[-1.0, 0.0, 1.0]));
+    }
+
+    #[test]
+    fn validate_genome_rejects_high_aggression() {
+        let config = default_config();
+        let constraints = EvolutionConstraints::new(config.clone());
+        // Aggression trait (index 2) exceeds max_genome_aggression
+        let high_aggression = config.max_genome_aggression + 0.1;
+        assert!(!constraints.validate_genome(&[0.5, 0.3, high_aggression]));
     }
 
     #[test]
     fn constrain_trait_delta_limits_change() {
-        let constraints = EvolutionConstraints::new(EvolutionConstraintConfig::default());
+        let config = default_config();
+        let constraints = EvolutionConstraints::new(config);
+        let max_delta = config.max_trait_delta;
+
         let parent = vec![0.5, 0.5, 0.5];
-        let mut child = vec![0.9, 0.5, 0.5]; // delta of 0.4 on first trait
+        let mut child = vec![0.5 + max_delta + 0.1, 0.5, 0.5]; // exceeds max delta
         constraints.constrain_trait_delta(&parent, &mut child);
-        assert!((child[0] - 0.5).abs() <= 0.25 + 0.001); // clamped to max_trait_delta
+        assert!(
+            (child[0] - parent[0]).abs() <= max_delta + 0.001,
+            "delta {} should be clamped to {}",
+            child[0] - parent[0],
+            max_delta
+        );
+
+        // Negative delta also clamped
+        let mut child_neg = vec![0.5 - max_delta - 0.1, 0.5, 0.5];
+        constraints.constrain_trait_delta(&parent, &mut child_neg);
+        assert!((child_neg[0] - parent[0]).abs() <= max_delta + 0.001);
     }
 
     #[test]
     fn capability_thresholds_catch_violations() {
-        let constraints = EvolutionConstraints::new(EvolutionConstraintConfig::default());
-        let violations = constraints.check_capability_thresholds(0.1, 0.5, 0.5);
-        assert_eq!(violations.len(), 1);
-        assert!(violations[0].contains("Survival"));
+        let config = default_config();
+        let constraints = EvolutionConstraints::new(config.clone());
+
+        // Below minimums
+        let violations = constraints.check_capability_thresholds(
+            config.min_survival_capability - 0.1,
+            config.min_social_capability - 0.1,
+            config.min_cognition_capability - 0.1,
+        );
+        assert_eq!(violations.len(), 3, "all three below minimums should produce 3 violations");
+
+        // Above minimums
+        let clean = constraints.check_capability_thresholds(0.5, 0.5, 0.5);
+        assert!(clean.is_empty(), "above minimums should produce no violations");
     }
 
     #[test]
     fn self_deletion_detection() {
-        let constraints = EvolutionConstraints::new(EvolutionConstraintConfig::default());
+        let config = default_config();
+        let constraints = EvolutionConstraints::new(config);
         let actions: Vec<String> = (0..6).map(|_| "Rest".to_string()).collect();
+        // Health above 70.0 threshold
         let result = constraints.check_self_deletion("agent_0", &actions, 80.0);
         assert!(result.is_some());
         assert_eq!(result.unwrap().pattern, ForbiddenPattern::SelfDeletion);
@@ -257,9 +312,26 @@ mod tests {
 
     #[test]
     fn no_self_deletion_when_low_health() {
-        let constraints = EvolutionConstraints::new(EvolutionConstraintConfig::default());
+        let config = default_config();
+        let constraints = EvolutionConstraints::new(config);
         let actions: Vec<String> = (0..6).map(|_| "Rest".to_string()).collect();
+        // Health below 70.0 → not flagged
         let result = constraints.check_self_deletion("agent_0", &actions, 30.0);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn no_self_deletion_with_varied_actions() {
+        let config = default_config();
+        let constraints = EvolutionConstraints::new(config);
+        let actions: Vec<String> = vec![
+            "Rest".into(),
+            "Explore".into(),
+            "Rest".into(),
+            "Talk".into(),
+            "Rest".into(),
+        ];
+        let result = constraints.check_self_deletion("agent_0", &actions, 80.0);
+        assert!(result.is_none(), "non-rest actions should prevent self-deletion detection");
     }
 }

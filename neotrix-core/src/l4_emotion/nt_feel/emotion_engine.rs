@@ -71,6 +71,11 @@ pub struct RegulationStrategy {
 
 
 impl EmotionEngine {
+    /// Create a new emotion engine with neutral baseline state.
+    ///
+    /// Note: Real implementation should load initial emotional state from
+    /// the KB or a persistent profile, and initialize regulation strategies
+    /// from learned patterns rather than hardcoded defaults.
     pub fn new() -> Self {
         Self {
             current_state: EmotionalState {
@@ -135,6 +140,10 @@ impl EmotionEngine {
     }
 
     /// Analyze event to determine emotion
+    ///
+    /// Note: Uses keyword matching with hardcoded valence/arousal values.
+    /// Real implementation should use an LLM or fine-tuned classifier for
+    /// nuanced emotion detection, and calibrate values from training data.
     fn analyze_event(&self, event: &str, _context: &str) -> (Emotion, f64, f64, f64) {
         let event_lower = event.to_lowercase();
 
@@ -167,6 +176,10 @@ impl EmotionEngine {
     }
 
     /// Determine secondary emotions
+    ///
+    /// Note: Returns hardcoded secondary emotion pairs. Real implementation
+    /// should compute secondary emotions based on Plutchik's wheel of
+    /// emotion (compound emotions from primary pairs) and intensity.
     fn determine_secondary_emotions(&self, primary: Emotion) -> Vec<(Emotion, f64)> {
         match primary {
             Emotion::Joy => vec![
@@ -261,6 +274,12 @@ impl EmotionEngine {
     }
 
     /// Detect emotion from text — keyword-based heuristic mapping to EmotionLabel
+    ///
+    /// STUB: This is a naive keyword matcher. Real implementation needs:
+    /// - LLM-based sentiment/emotion classification
+    /// - Multi-language support beyond Chinese/English keywords
+    /// - Context-aware detection (same word → different emotion in different contexts)
+    /// - Integration with PlutchikEmotion enum for richer emotion taxonomy
     pub fn detect_from_text(&mut self, text: &str) -> crate::core::nt_core_self::emotion_state::EmotionLabel {
         use crate::core::nt_core_self::emotion_state::EmotionLabel;
         let lower = text.to_lowercase();

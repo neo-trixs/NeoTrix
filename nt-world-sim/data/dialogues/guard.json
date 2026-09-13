@@ -1,0 +1,53 @@
+{
+  "id": "guard_gate",
+  "speaker": "守卫",
+  "portrait": "guard",
+  "nodes": [
+    {
+      "id": "start",
+      "text": "站住！这里是青云宗的入口。你有什么事？",
+      "choices": [
+        {"text": "我想加入青云宗", "next": "join"},
+        {"text": "我来找人", "next": "visit"},
+        {"text": "没什么", "next": null}
+      ]
+    },
+    {
+      "id": "join",
+      "text": "想加入青云宗？你需要有灵根资质。让我测试一下。",
+      "choices": [
+        {"text": "好的", "next": "test"}
+      ]
+    },
+    {
+      "id": "test",
+      "text": "测试结果...你有灵根资质！可以进去找张长老。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "flag_set", "flag": "can_enter_sect"}]}
+      ]
+    },
+    {
+      "id": "visit",
+      "text": "找谁？",
+      "choices": [
+        {"text": "找张长老", "next": "visit_zhang"},
+        {"text": "找李师兄", "next": "visit_li"},
+        {"text": "算了", "next": null}
+      ]
+    },
+    {
+      "id": "visit_zhang",
+      "text": "张长老在山顶的大殿里。你可以进去。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "flag_set", "flag": "can_enter_sect"}]}
+      ]
+    },
+    {
+      "id": "visit_li",
+      "text": "李师兄在练武场。你可以进去。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "flag_set", "flag": "can_enter_sect"}]}
+      ]
+    }
+  ]
+}

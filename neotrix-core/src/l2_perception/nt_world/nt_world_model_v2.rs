@@ -97,7 +97,10 @@ impl WorldModelV2 {
     }
 
     pub fn predict_all(&self, context_features: &[f64]) -> (f64, f64, f64) {
-        let (z_pred, jepa_energy) = self.jepa.predict(context_features);
+        let (z_pred, jepa_energy) = match self.jepa.predict(context_features) {
+            Ok(v) => v,
+            Err(_) => return (0.0, 0.0, 0.0),
+        };
         let e8_energy = {
             let mut e8 = self.e8.clone();
             e8.from_jepa_latent(&z_pred);
@@ -113,7 +116,10 @@ impl WorldModelV2 {
 
     pub fn run_prediction_cycle(&mut self, context_features: &[f64]) -> (FreeEnergyReport, f64, bool) {
         self.prediction_cycles += 1;
-        let (z_pred, jepa_energy) = self.jepa.predict(context_features);
+        let (z_pred, jepa_energy) = match self.jepa.predict(context_features) {
+            Ok(v) => v,
+            Err(_) => return (self.nt_world_infer.compute_free_energy(0.0, 0.0, 0.0), 0.0, false),
+        };
         self.last_jepa_energy = jepa_energy;
         self.e8.from_jepa_latent(&z_pred);
         self.e8.evolve_n(3, 1.0);
@@ -125,18 +131,17 @@ impl WorldModelV2 {
             jepa_energy, e8_entropy, e8_energy_gradient,
         );
         let phi_value = self.iit.analyze_state(&self.e8.current_state.vector).phi;
-        let anomaly = self.jepa.detect_anomaly(context_features, 2.0);
+        let anomaly = self.jepa.detect_anomaly(context_features, 2.0).unwrap_or(false);
         self.prediction_cache = z_pred;
         (fe_report, phi_value, anomaly)
     }
 
     pub fn _train_jepa(&mut self, x: &[f64], y: &[f64]) -> f64 {
-        let (loss, _, _, _) = self.jepa.train_step(x, y);
-        loss
+        self.jepa.train_step(x, y).map(|(loss, _, _, _)| loss).unwrap_or(0.0)
     }
 
     pub fn detect_anomaly(&self, features: &[f64], threshold: f64) -> bool {
-        self.jepa.detect_anomaly(features, threshold)
+        self.jepa.detect_anomaly(features, threshold).unwrap_or(false)
     }
 
     pub fn _free_energy_report(&mut self) -> FreeEnergyReport {

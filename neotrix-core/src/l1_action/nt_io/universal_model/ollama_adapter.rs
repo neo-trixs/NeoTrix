@@ -15,6 +15,10 @@ pub struct OllamaUniversal {
 }
 
 impl OllamaUniversal {
+    /// Create a new Ollama universal model adapter.
+    ///
+    /// Ollama is local-only (no API key needed). Detects model capabilities
+    /// from the `model_id` string and wraps `OllamaProvider`.
     pub fn new(model_id: &str) -> Self {
         let capabilities = Self::detect_capabilities(model_id);
         Self {
@@ -24,6 +28,7 @@ impl OllamaUniversal {
         }
     }
 
+    /// Override the Ollama server URL (default: http://localhost:11434).
     pub fn with_base_url(self, url: &str) -> Self {
         Self {
             inner: self.inner.with_base_url(url),
@@ -31,6 +36,11 @@ impl OllamaUniversal {
         }
     }
 
+    /// Detect model capabilities from the model ID string.
+    ///
+    /// Note: Real implementation should call `ollama list` or `/api/tags` to
+    /// discover available models and their capabilities dynamically, rather
+    /// than hardcoding. This enables support for user-pulled models.
     fn detect_capabilities(model_id: &str) -> ModelCapabilities {
         match model_id {
             "llama3" | "llama3:70b" | "llama3.1" | "llama3.1:70b" => ModelCapabilities {
@@ -85,6 +95,8 @@ impl UniversalModel for OllamaUniversal {
         self.inner.complete(request).await
     }
 
+    /// STUB: Returns default health. Real implementation should call `ollama ps`
+    /// to check running models and track local inference latency.
     fn health(&self) -> ModelHealth {
         ModelHealth::default()
     }
@@ -93,6 +105,7 @@ impl UniversalModel for OllamaUniversal {
         self.capabilities.clone()
     }
 
+    /// Local Ollama is Trusted — no secrets or user data leave the machine.
     fn data_trust(&self) -> DataTrust {
         DataTrust::Trusted
     }

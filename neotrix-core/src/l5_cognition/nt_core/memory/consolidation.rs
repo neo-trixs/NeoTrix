@@ -62,6 +62,11 @@ pub enum ConsolidationType {
 }
 
 impl MemoryConsolidation {
+    /// Create a new memory consolidation pipeline with the given configuration.
+    ///
+    /// Note: Real implementation should accept store references (Arc<RwLock<>>)
+    /// for shared access rather than owning the stores, allowing concurrent
+    /// reads from other subsystems during consolidation.
     pub fn new(config: ConsolidationConfig) -> Self {
         Self {
             episodic_store: EpisodicMemoryStore::new(),
@@ -207,6 +212,10 @@ impl MemoryConsolidation {
     }
 
     /// Convert episode to pattern
+    ///
+    /// Note: Currently uses first lesson_learned as pattern name. Real
+    /// implementation should use LLM-assisted summarization or clustering
+    /// to derive meaningful pattern names from multiple episodes.
     fn episode_to_pattern(&self, episode: &EpisodicMemory) -> super::semantic::ConceptNode {
         super::semantic::ConceptNode {
             name: episode.outcome.lessons_learned.first()
@@ -222,6 +231,10 @@ impl MemoryConsolidation {
     }
 
     /// Convert patterns to principle
+    ///
+    /// Note: Currently generates a generic "{domain} Principle" name. Real
+    /// implementation should synthesize a concise principle statement from
+    /// the shared invariants across input patterns.
     fn patterns_to_principle(&self, patterns: &[&SemanticMemory]) -> super::semantic::ConceptNode {
         let domain = patterns.first()
             .map(|p| p.concept.domain.clone())
@@ -239,6 +252,10 @@ impl MemoryConsolidation {
     }
 
     /// Convert principles to wisdom
+    ///
+    /// Note: Always produces "Core Wisdom". Real implementation should
+    /// generate a concise meta-insight statement from the convergent
+    /// themes across input principles.
     fn principles_to_wisdom(&self, principles: &[&SemanticMemory]) -> super::semantic::ConceptNode {
         super::semantic::ConceptNode {
             name: "Core Wisdom".to_string(),

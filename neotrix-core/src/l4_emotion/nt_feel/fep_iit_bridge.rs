@@ -39,6 +39,7 @@ impl Default for FepIitBridge {
 }
 
 impl FepIitBridge {
+    /// Create a new FEP-IIT bridge with default calibration parameters.
     pub fn new() -> Self {
         Self::default()
     }

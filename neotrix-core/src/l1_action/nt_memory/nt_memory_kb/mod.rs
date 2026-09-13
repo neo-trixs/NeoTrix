@@ -3,55 +3,55 @@
 use log::{warn, error};
 
 pub mod bm25;
-pub mod ntx;
+// pub mod ntx; // DEAD: cleanup
 pub mod spill_storage;
-pub mod nt_memory_blocks;
+// pub mod nt_memory_blocks; // DEAD: cleanup
 pub mod nt_discovery_github_topics;
-pub mod nt_discovery_orchestrator;
-pub mod nt_discovery_sources;
+// pub mod nt_discovery_orchestrator; // DEAD: cleanup
+// pub mod nt_discovery_sources; // DEAD: cleanup
 pub mod nt_memory_adaptive_rag;
 pub mod nt_memory_feedback;
 pub mod nt_memory_gwt_router;
-pub mod nt_memory_e8_agent;
+// pub mod nt_memory_e8_agent; // DEAD: cleanup
 pub mod nt_memory_vsa_expand;
-pub mod nt_memory_decompose;
-pub mod nt_memory_domain_adapter;
+// pub mod nt_memory_decompose; // DEAD: cleanup
+// pub mod nt_memory_domain_adapter; // DEAD: cleanup
 pub mod nt_memory_agent_driven;
-pub mod nt_memory_agent_session;
+// pub mod nt_memory_agent_session; // DEAD: cleanup
 pub mod nt_memory_api;
 pub mod nt_memory_commitment;
 pub mod nt_memory_community;
 pub mod nt_memory_confidence;
 pub mod nt_memory_crawl;
 pub mod nt_memory_pack;
-pub mod nt_memory_pack_chunked;
+// pub mod nt_memory_pack_chunked; // DEAD: cleanup
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_cortex_sync;
 pub mod nt_memory_embed;
-pub mod kb_cognition;
-pub mod kb_vector_index;
+// pub mod kb_cognition; // DEAD: cleanup
+// pub mod kb_vector_index; // DEAD: cleanup
 pub mod nt_memory_distill;
-pub mod nt_memory_graph;
+// pub mod nt_memory_graph; // DEAD: cleanup
 pub mod nt_memory_pipeline;
 pub mod nt_memory_geo;
-pub mod nt_memory_hierarchical;
-pub mod nt_memory_graphrag;
-pub mod nt_memory_gwtq;
+// pub mod nt_memory_hierarchical; // DEAD: cleanup
+// pub mod nt_memory_graphrag; // DEAD: cleanup
+// pub mod nt_memory_gwtq; // DEAD: cleanup
 pub mod nt_memory_diversity;
-pub mod nt_memory_curation;
+// pub mod nt_memory_curation; // DEAD: cleanup
 pub mod nt_memory_visibility;
-pub mod nt_memory_provenance;
-pub mod nt_temporal_audit;
+// pub mod nt_memory_provenance; // DEAD: cleanup
+// pub mod nt_temporal_audit; // DEAD: cleanup
 pub mod nt_memory_skill_cost;
-pub mod nt_memory_dual_brain;
-pub mod nt_memory_ingest;
+// pub mod nt_memory_dual_brain; // DEAD: cleanup
+// pub mod nt_memory_ingest; // DEAD: cleanup
 pub mod nt_memory_proficiency;
-pub mod nt_memory_primitives;
-pub mod nt_memory_integration;
+// pub mod nt_memory_primitives; // DEAD: cleanup
+// pub mod nt_memory_integration; // DEAD: cleanup
 pub mod nt_memory_schema;
 pub mod nt_memory_search;
-pub mod nt_memory_seed;
+// pub mod nt_memory_seed; // DEAD: cleanup
 // pub mod nt_memory_setting_consistency;
 pub mod nt_memory_store;
 pub mod shared_utils;
@@ -59,25 +59,25 @@ pub mod nt_memory_svaf_gate;
 pub mod nt_memory_types;
 pub mod nt_memory_unify;
 pub mod nt_field_ledger;
-pub mod nt_memory_panorama;
+// pub mod nt_memory_panorama; // DEAD: cleanup
 pub mod nt_memory_tech_reserve;
-pub mod nt_memory_wiki;
+// pub mod nt_memory_wiki; // DEAD: cleanup
 pub mod nt_memory_knowledge_assets;
 pub mod nt_memory_commit_tracker;
 pub mod nt_memory_coeffect;
 pub mod nt_memory_graph_cache;
 pub mod nt_memory_galaxy_hygiene;
-pub mod nt_memory_weave;
+// pub mod nt_memory_weave; // DEAD: cleanup
 pub mod privacy;
-pub mod user_memory;
-pub mod vector_adapter;
-pub mod nt_normalizer;
-pub mod knowledge_storage;
-pub mod nt_absorb_mapper;
+// pub mod user_memory; // DEAD: cleanup
+// pub mod vector_adapter; // DEAD: cleanup
+// pub mod nt_normalizer; // DEAD: cleanup
+// pub mod knowledge_storage; // DEAD: cleanup
+// pub mod nt_absorb_mapper; // DEAD: cleanup
 pub mod nt_memory_write_guard;
-pub mod nt_memory_snapshot;
-pub mod nt_memory_zim_absorber;
-pub mod nt_memory_brain;
+// pub mod nt_memory_snapshot; // DEAD: cleanup
+// pub mod nt_memory_zim_absorber; // DEAD: cleanup
+// pub mod nt_memory_brain; // DEAD: cleanup
 pub mod nt_memory_lifecycle;
 pub mod nt_memory_shanhai;
 
@@ -3089,7 +3089,7 @@ impl neotrix_types::knowledge_access::KnowledgeAccess for KnowledgeBase {
 #[cfg(test)]
 mod tests;
 // 2026-08-15 sweep absorption (P6/P15/P16/P17): 记忆层四能力注入
-pub mod nt_memory_sweep_20260815;
+// pub mod nt_memory_sweep_20260815; // DEAD: cleanup
 pub use nt_memory_sweep_20260815::*;
 
 

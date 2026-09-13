@@ -68,6 +68,7 @@ pub struct EpisodicMemoryStore {
 }
 
 impl EpisodicMemoryStore {
+    /// Create a new empty episodic memory store with empty indexes.
     pub fn new() -> Self {
         Self {
             memories: HashMap::new(),
@@ -144,6 +145,12 @@ impl EpisodicMemoryStore {
     }
 
     /// Apply decay to all memories (call periodically)
+    ///
+    /// Note: Decay uses exponential formula `e^(-rate * age_hours / 24)`.
+    /// Real implementation should also:
+    /// - Prune memories below a salience threshold to bound memory usage
+    /// - Support configurable decay functions (linear, power law)
+    /// - Track access frequency to modulate decay (rehearsal slows decay)
     pub fn apply_decay(&mut self) {
         let now = Utc::now();
         for memory in self.memories.values_mut() {
@@ -154,6 +161,11 @@ impl EpisodicMemoryStore {
     }
 
     /// Consolidate frequently recalled memories
+    ///
+    /// Note: Returns memories with `consolidation_count >= threshold` and
+    /// removes them from the store. Real implementation should merge similar
+    /// episodes (not just threshold-gate) and preserve index consistency
+    /// for emotion and domain indexes during removal.
     pub fn consolidate(&mut self, threshold: u32) -> Vec<EpisodicMemory> {
         let mut consolidated = Vec::new();
         let mut to_remove = Vec::new();

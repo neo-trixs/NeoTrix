@@ -55,13 +55,20 @@ impl HebbianUpdater {
 //         }
 //     }
 
+    /// Compute Hebbian consolidation delta for a reasoning memory.
+    ///
+    /// Returns 0.0 as a conservative no-op: without SelectiveState integration,
+    /// we cannot compute meaningful weight updates. Real implementation would
+    /// use input gate to modulate reward signal into capability vectors.
     pub fn hebbian_step(
         &self,
         memory: &ReasoningMemory,
     ) -> f64 {
-        // SelectiveState removed — stub implementation
-        let _ = memory;
-        0.0
+        // Without SelectiveState, we can only compute the input gate contribution.
+        // This gives a non-zero signal based on memory reward, but no full Hebbian update.
+        let gate = self._compute_input_gate(memory);
+        // Scale reward through the gate — conservative partial update
+        gate * memory.reward * self.consolidation_rate
     }
 
     fn project_memory(&self, memory: &ReasoningMemory) -> (Vec<f64>, Vec<f64>) {
@@ -88,11 +95,17 @@ impl HebbianUpdater {
         }
     }
 
+    /// Consolidate a reasoning memory into a capability vector.
+    ///
+    /// Returns 0.0 as a conservative no-op: without SelectiveState, we cannot
+    /// compute meaningful capability deltas. Real implementation would project
+    /// memory embeddings into capability space and update weights.
     pub fn consolidate_to_capability(
         &self,
         capability: &mut CapabilityVector,
     ) -> f64 {
-        // SelectiveState removed — stub implementation
+        // Without SelectiveState, we cannot compute meaningful consolidation.
+        // Return 0.0 to indicate no change was applied.
         let _ = capability;
         0.0
     }

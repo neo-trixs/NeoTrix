@@ -583,22 +583,26 @@ impl ReasoningEngine {
         // JEPA world-model prior: encode task text, predict next latent, and
         // surface predicted trajectory as a soft prior (absent if unwired).
         let jepa_prior = if let Some(ref jepa) = self.jepa {
-            let feats = jepa.encode(&task.as_bytes().iter().map(|&b| b as f64 / 255.0).collect::<Vec<f64>>());
-            let (pred, confidence, uncertainty) = jepa.predict_with_confidence(&feats);
-            root_span.set_attribute("jepa_prior_confidence", AttributeValue::Float(confidence));
-            root_span.set_attribute("jepa_prior_uncertainty", AttributeValue::Float(uncertainty));
-            // Quantize the predicted latent into a directional signal. High-magnitude
-            // coordinates carry the strongest next-state trend; low-magnitude ones are noise.
-            let direction: Vec<f64> = pred.iter().cloned().filter(|&x| x.abs() > 0.1).collect();
-            if direction.is_empty() {
-                String::new()
-            } else {
-                let top = direction[0];
-                let signal = if top > 0.0 { "positive" } else { "negative" };
-                format!(
-                    "\nWorld-model prior (confidence {:.3}, uncertainty {:.3}): latent trend {signal}, {n} active features — use as soft direction, not ground truth.\n",
-                    confidence, uncertainty, n = direction.len()
-                )
+            let input: Vec<f64> = task.as_bytes().iter().map(|&b| b as f64 / 255.0).collect();
+            match jepa.encode(&input).and_then(|feats| jepa.predict_with_confidence(&feats)) {
+                Ok((pred, confidence, uncertainty)) => {
+                    root_span.set_attribute("jepa_prior_confidence", AttributeValue::Float(confidence));
+                    root_span.set_attribute("jepa_prior_uncertainty", AttributeValue::Float(uncertainty));
+                    // Quantize the predicted latent into a directional signal. High-magnitude
+                    // coordinates carry the strongest next-state trend; low-magnitude ones are noise.
+                    let direction: Vec<f64> = pred.iter().cloned().filter(|&x| x.abs() > 0.1).collect();
+                    if direction.is_empty() {
+                        String::new()
+                    } else {
+                        let top = direction[0];
+                        let signal = if top > 0.0 { "positive" } else { "negative" };
+                        format!(
+                            "\nWorld-model prior (confidence {:.3}, uncertainty {:.3}): latent trend {signal}, {n} active features — use as soft direction, not ground truth.\n",
+                            confidence, uncertainty, n = direction.len()
+                        )
+                    }
+                }
+                Err(_) => String::new(),
             }
         } else {
             String::new()

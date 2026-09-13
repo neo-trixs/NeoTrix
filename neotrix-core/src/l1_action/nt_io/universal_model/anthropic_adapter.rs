@@ -15,6 +15,10 @@ pub struct AnthropicUniversal {
 }
 
 impl AnthropicUniversal {
+    /// Create a new Anthropic universal model adapter.
+    ///
+    /// Detects model capabilities from the `model_id` string and wraps
+    /// the underlying `AnthropicProvider` for unified `UniversalModel` access.
     pub fn new(api_key: String, model_id: &str) -> Self {
         let capabilities = Self::detect_capabilities(model_id);
         Self {
@@ -24,6 +28,11 @@ impl AnthropicUniversal {
         }
     }
 
+    /// Detect model capabilities from the model ID string.
+    ///
+    /// Note: Real implementation should query Anthropic's model endpoint
+    /// or use a remote capability registry. The hardcoded map covers known
+    /// Claude models; newer versions (Claude 4, etc.) will need manual addition.
     fn detect_capabilities(model_id: &str) -> ModelCapabilities {
         match model_id {
             "claude-sonnet-4-20250514" | "claude-3-5-sonnet-20241022" => ModelCapabilities {
@@ -85,6 +94,8 @@ impl UniversalModel for AnthropicUniversal {
         self.inner.complete(request).await
     }
 
+    /// STUB: Returns default health. Real implementation should probe Anthropic's
+    /// /v1/messages endpoint and track latency/error rate for circuit breaker.
     fn health(&self) -> ModelHealth {
         ModelHealth::default()
     }

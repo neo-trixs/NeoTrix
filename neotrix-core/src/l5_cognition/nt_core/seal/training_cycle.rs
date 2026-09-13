@@ -363,11 +363,12 @@ impl Default for KBContext {
 }
 
 fn execute_explore(_config: &TrainingCycleConfig, _ctx: &KBContext) -> _ExploreOutput {
-    // Real implementation: scan papers/repos/docs, diff against KB, return new discoveries
+    // Not wired: requires integration with NT-WORLD crawl pipeline,
+    // paper search, and KB diff to discover new knowledge.
     _ExploreOutput {
         sources_scanned: 0,
         discoveries: Vec::new(),
-        gaps: Vec::new(),
+        gaps: vec!["explore stage not wired: needs NT-WORLD crawl integration".into()],
     }
 }
 
@@ -376,7 +377,8 @@ fn execute_distill(
     _explore: Option<&_ExploreOutput>,
     _ctx: &KBContext,
 ) -> _DistillOutput {
-    // Real implementation: extract patterns from discoveries, compress, crystallize skills
+    // Not wired: requires LLM-based pattern extraction, compression,
+    // and skill crystallization from discovered knowledge.
     _DistillOutput {
         patterns: Vec::new(),
         skills_crystallized: 0,
@@ -385,32 +387,32 @@ fn execute_distill(
 }
 
 fn execute_test(
-    config: &TrainingCycleConfig,
+    _config: &TrainingCycleConfig,
     _distill: Option<&_DistillOutput>,
     _ctx: &KBContext,
 ) -> _TestOutput {
-    // Real implementation: run SelfTest T1/T2/T3 on extracted patterns
-    let t3_total = if config.run_t3_wiring { 5 } else { 0 };
+    // Not wired: requires SelfTest registry traversal and T1/T2/T3 evaluation
+    // of extracted patterns. Returns zero counts to indicate no tests were run.
     _TestOutput {
-        t1_existence: _TestTierResult { total: 10, passed: 10, failed: 0 },
-        t2_registration: _TestTierResult { total: 8, passed: 8, failed: 0 },
-        t3_production: _TestTierResult { total: t3_total, passed: t3_total, failed: 0 },
-        regression_pass_rate: 1.0,
-        failed_patterns: Vec::new(),
+        t1_existence: _TestTierResult { total: 0, passed: 0, failed: 0 },
+        t2_registration: _TestTierResult { total: 0, passed: 0, failed: 0 },
+        t3_production: _TestTierResult { total: 0, passed: 0, failed: 0 },
+        regression_pass_rate: 0.0,
+        failed_patterns: vec!["test stage not wired: needs SelfTest registry integration".into()],
     }
 }
 
 fn execute_absorb(
-    config: &TrainingCycleConfig,
+    _config: &TrainingCycleConfig,
     _distill: Option<&_DistillOutput>,
     _ctx: &KBContext,
 ) -> _AbsorbOutput {
-    // Real implementation: write to KB kv_store, register skills, archive experience
-    let writes = config.max_absorb_writes.min(5);
+    // Not wired: requires KB kv_store integration, skill registration,
+    // and experience archival. Returns zero counts to indicate no writes occurred.
     _AbsorbOutput {
-        kb_writes: writes,
+        kb_writes: 0,
         skills_registered: 0,
-        experiences_archived: writes,
+        experiences_archived: 0,
         namespace_updates: HashMap::new(),
     }
 }

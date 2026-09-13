@@ -18,7 +18,29 @@ pub fn check_path_access(path: &str, zone: &BoundaryZone) -> Result<String, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn test_boundary_zone_allows_subpath() { let z = BoundaryZone::new(vec!["/tmp".to_string()]); assert!(z.allows("/tmp/foo")); }
-    #[test] fn test_boundary_zone_denies_other() { let z = BoundaryZone::new(vec!["/tmp".to_string()]); assert!(!z.allows("/etc/passwd")); }
-    #[test] fn test_open_all() { let z = BoundaryZone::open_all(); assert!(z.allows("/any/path")); }
+
+    #[test]
+    fn boundary_zone_allows_subpath() {
+        let zone = BoundaryZone::new(vec!["/tmp".to_string()]);
+        assert!(zone.allows("/tmp/foo"), "subpath under allowed prefix should be allowed");
+    }
+
+    #[test]
+    fn boundary_zone_denies_other_prefix() {
+        let zone = BoundaryZone::new(vec!["/tmp".to_string()]);
+        assert!(!zone.allows("/etc/passwd"), "path under different prefix should be denied");
+    }
+
+    #[test]
+    fn open_all_allows_any_path() {
+        let zone = BoundaryZone::open_all();
+        assert!(zone.allows("/any/path"), "open_all should allow any path");
+        assert!(zone.allows("/etc/passwd"), "open_all should allow even sensitive paths");
+    }
+
+    #[test]
+    fn boundary_zone_empty_prefixes_denies_all() {
+        let zone = BoundaryZone::new(vec![]);
+        assert!(!zone.allows("/tmp/foo"), "empty allowed prefixes should deny everything");
+    }
 }

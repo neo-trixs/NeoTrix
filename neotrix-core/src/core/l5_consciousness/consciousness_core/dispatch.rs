@@ -233,6 +233,29 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("超分辨率", "image_super_resolution", "NT-ACT", "CodeAnalyzer"),
     ("esrgan", "image_super_resolution", "NT-ACT", "CodeAnalyzer"),
     ("image_super_resolution", "image_super_resolution", "NT-ACT", "CodeAnalyzer"),
+    // universal_model — 统一模型接口
+    ("universal_model", "universal_model", "NT-IO", "CreativityGenerator"),
+    ("统一模型", "universal_model", "NT-IO", "CreativityGenerator"),
+    ("模型接口", "universal_model", "NT-IO", "CreativityGenerator"),
+    ("llm接口", "universal_model", "NT-IO", "CreativityGenerator"),
+    // file_enhance — 文件增强能力
+    ("file_enhance", "file_enhance", "NT-ACT", "CodeAnalyzer"),
+    ("文件增强", "file_enhance", "NT-ACT", "CodeAnalyzer"),
+    ("增强文件", "file_enhance", "NT-ACT", "CodeAnalyzer"),
+    ("pdf增强", "file_enhance", "NT-ACT", "CodeAnalyzer"),
+    ("pdf清晰度", "file_enhance", "NT-ACT", "CodeAnalyzer"),
+    // kb_governance — KB 治理层
+    ("kb_governance", "kb_governance", "NT-MEMORY", "KnowledgeRetriever"),
+    ("知识库治理", "kb_governance", "NT-MEMORY", "KnowledgeRetriever"),
+    ("kb治理", "kb_governance", "NT-MEMORY", "KnowledgeRetriever"),
+    ("kb清理", "kb_governance", "NT-MEMORY", "KnowledgeRetriever"),
+    ("kb整理", "kb_governance", "NT-MEMORY", "KnowledgeRetriever"),
+    // seal_process — SEAL 流水线处理
+    ("seal_process", "seal_process", "NT-MIND", "KnowledgeIntegrator"),
+    ("seal流水线", "seal_process", "NT-MIND", "KnowledgeIntegrator"),
+    ("seal处理", "seal_process", "NT-MIND", "KnowledgeIntegrator"),
+    ("流水线处理", "seal_process", "NT-MIND", "KnowledgeIntegrator"),
+    ("执行流水线", "seal_process", "NT-MIND", "KnowledgeIntegrator"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -789,6 +812,73 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                     false,
                     format!("子任务 '{}' 未提供有效路径, 无法抽取", task.summary),
                 ),
+            }
+        }
+        "universal_model" => {
+            let model_name = task.summary.split_whitespace().find(|w| !w.contains('/') && !w.contains('\\')).unwrap_or("default");
+            match crate::neotrix::list_llm_providers() {
+                Ok(providers) => {
+                    let mut matched_providers: Vec<String> = providers.iter()
+                        .map(|p| p.to_lowercase())
+                        .filter(|p| p.contains(&model_name.to_lowercase()) || model_name.to_lowercase() == "default")
+                        .collect();
+                    if matched_providers.is_empty() { matched_providers = providers; }
+                    (true, format!("统一模型接口: {} 个可用 provider ({})",
+                        matched_providers.len(), matched_providers.join(", ")))
+                }
+                Err(e) => (false, format!("统一模型接口失败: {e}")),
+            }
+        }
+        "file_enhance" => {
+            let path = first_path(&task.summary);
+            match path {
+                Some(p) if p.exists() => {
+                    match crate::neotrix::enhance_file_icon(&p) {
+                        Ok(output) => (true, format!("文件增强完成: {}", output)),
+                        Err(e) => (false, format!("文件增强失败: {e}")),
+                    }
+                }
+                Some(p) => (false, format!("路径 '{}' 不存在, 无法增强", p.display())),
+                None => (false, format!("子任务 '{}' 未提供有效文件路径", task.summary)),
+            }
+        }
+        "kb_governance" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let edges = stats.get("edges").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    (true, format!("KB 治理层: {} nodes / {} edges / {} kv entries",
+                        nodes, edges, kv))
+                }
+                Err(e) => (false, format!("KB 治理层初始化失败: {e}")),
+            }
+        }
+        "seal_process" => {
+            let lower = task.summary.to_lowercase();
+            let action = if lower.contains("distill") || lower.contains("蒸馏") { "distill" }
+                else if lower.contains("absorb") || lower.contains("吸收") { "absorb" }
+                else { "iterate" };
+            match action {
+                "distill" => {
+                    match crate::neotrix::seal_distill() {
+                        Ok(report) => (true, format!("SEAL distill 完成: {report}")),
+                        Err(e) => (false, format!("SEAL distill 失败: {e}")),
+                    }
+                }
+                "absorb" => {
+                    match crate::neotrix::seal_absorb() {
+                        Ok(report) => (true, format!("SEAL absorb 完成: {report}")),
+                        Err(e) => (false, format!("SEAL absorb 失败: {e}")),
+                    }
+                }
+                _ => {
+                    match crate::neotrix::seal_iterate() {
+                        Ok(report) => (true, format!("SEAL iterate 完成: {report}")),
+                        Err(e) => (false, format!("SEAL iterate 失败: {e}")),
+                    }
+                }
             }
         }
         // ... (remaining dispatch branches are kept as-is, just referenced here)

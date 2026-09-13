@@ -1,0 +1,60 @@
+{
+  "id": "merchant_intro",
+  "speaker": "商人",
+  "portrait": "merchant",
+  "nodes": [
+    {
+      "id": "start",
+      "text": "客官，想买点什么？我这里什么都有。",
+      "choices": [
+        {"text": "看看商品", "next": "shop"},
+        {"text": "卖东西", "next": "sell"},
+        {"text": "不用了", "next": null}
+      ]
+    },
+    {
+      "id": "shop",
+      "text": "这些是我最好的货物。",
+      "choices": [
+        {"text": "购买回血丹 (50金)", "next": "buy_hp", "conditions": [{"type": "gold", "amount": 50}]},
+        {"text": "购买回蓝丹 (80金)", "next": "buy_mp", "conditions": [{"type": "gold", "amount": 80}]},
+        {"text": "购买铁剑 (200金)", "next": "buy_sword", "conditions": [{"type": "gold", "amount": 200}]},
+        {"text": "下次再来", "next": null}
+      ]
+    },
+    {
+      "id": "buy_hp",
+      "text": "好嘞，回血丹一颗。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "hp_potion", "cost": 50}]}]
+    },
+    {
+      "id": "buy_mp",
+      "text": "好嘞，回蓝丹一颗。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "mp_potion", "cost": 80}]}]
+    },
+    {
+      "id": "buy_sword",
+      "text": "好嘞，铁剑一把。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "iron_sword", "cost": 200}]}]
+    },
+    {
+      "id": "sell",
+      "text": "你想卖什么？",
+      "choices": [
+        {"text": "卖草药 (10金)", "next": "sell_herb", "conditions": [{"type": "has_item", "item": "herb", "count": 1}]},
+        {"text": "卖兽皮 (25金)", "next": "sell_fur", "conditions": [{"type": "has_item", "item": "wolf_fur", "count": 1}]},
+        {"text": "不卖了", "next": null}
+      ]
+    },
+    {
+      "id": "sell_herb",
+      "text": "好的，草药我收了。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_sell", "item": "herb", "gold": 10}]}]
+    },
+    {
+      "id": "sell_fur",
+      "text": "不错的兽皮。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_sell", "item": "wolf_fur", "gold": 25}]}]
+    }
+  ]
+}

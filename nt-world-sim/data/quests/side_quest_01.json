@@ -1,0 +1,16 @@
+{
+  "id": "side_01",
+  "name": "收集草药",
+  "description": "商人需要10株草药来制作丹药。",
+  "type": "side",
+  "level": 1,
+  "objectives": [
+    {"id": "collect_herbs", "type": "collect", "item": "herb", "count": 10, "text": "收集10株草药", "completed": false}
+  ],
+  "rewards": {
+    "exp": 50,
+    "gold": 100,
+    "items": ["hp_potion_x5"]
+  },
+  "prerequisites": []
+}

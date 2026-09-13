@@ -173,6 +173,10 @@ impl Default for ModelHealth {
 }
 
 impl ModelHealth {
+    /// Create an unhealthy status (available=false, no circuit breaker).
+    ///
+    /// Note: Real implementation should also set `circuit_breaker_open` and
+    /// record the failure timestamp for cooldown tracking.
     pub fn unhealthy(msg: &str) -> Self {
         Self {
             available: false,
@@ -181,6 +185,10 @@ impl ModelHealth {
         }
     }
 
+    /// Create a degraded status (available but with elevated error rate).
+    ///
+    /// Note: Real implementation should track error rate trend over a sliding
+    /// window (not just instantaneous) to avoid flapping between healthy/degraded.
     pub fn degraded(msg: &str, error_rate: f32) -> Self {
         Self {
             available: true,

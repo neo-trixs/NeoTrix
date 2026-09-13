@@ -126,11 +126,17 @@ impl ShieldCapability {
         let mut results = Vec::new();
         
         // Phase 1: Reconnaissance via Nuclei
-        let recon = self.scanner.reconnaissance(target).await;
-        for finding in &recon.findings {
-            self.findings.entry(target.to_string()).or_default().push(
-                format!("[{}] {} on {}: {}", finding.severity, finding.template_id, finding.host, finding.description)
-            );
+        match self.scanner.reconnaissance(target).await {
+            Ok(recon) => {
+                for finding in &recon.findings {
+                    self.findings.entry(target.to_string()).or_default().push(
+                        format!("[{}] {} on {}: {}", finding.severity, finding.template_id, finding.host, finding.description)
+                    );
+                }
+            }
+            Err(e) => {
+                log::warn!("[nuclei] reconnaissance unavailable: {}", e);
+            }
         }
         
         // Phase 2: AI-driven vulnerability detection (stub — returns Err until PentestGPT wired)

@@ -111,32 +111,12 @@ impl _StyleHarmonizer {
     
     /// 分析风格
     ///
-    /// STUB: Returns neutral/placeholder features — no actual image analysis.
-    /// Real implementation needs:
-    /// - DINOv2/CLIP feature extraction for style embedding
-    /// - Color histogram computation (HSV/LAB color space)
-    /// - Texture analysis via Gabor filters or learned features
-    /// - Style tag classification from a trained model
-    /// - Quality assessment (NIQUE/FID-based)
-    pub(crate) fn _analyze_style(&self, _image_path: &str) -> _StyleAnalysis {
-        tracing::warn!(
-            "STUB _analyze_style called: returning placeholder features, not real image analysis. \
-             TODO: integrate DINOv2/CLIP for actual style embedding."
-        );
-        // 基础特征 — 无法从图像提取时的降级值
-        _StyleAnalysis {
-            features: _Style特征 {
-                color_distribution: vec![0.33, 0.33, 0.34], // 均匀分布（无分析）
-                contrast: 0.5, // 中性值
-                saturation: 0.5,
-                color_temperature: 5500.0, // 日光色温
-                texture_features: vec![0.5, 0.5, 0.5],
-                style_tags: vec!["unknown".to_string()],
-            },
-            dominant_colors: vec![(128, 128, 128)], // 灰色（无分析）
-            style_tags: vec!["unanalyzed".to_string()],
-            quality_score: 0.0, // 0.0 = 未分析，不可用于决策
-        }
+    /// Returns `Err` because style analysis requires DINOv2/CLIP feature extraction
+    /// that is not yet integrated. No placeholder data is returned.
+    pub(crate) fn _analyze_style(&self, _image_path: &str) -> Result<_StyleAnalysis, String> {
+        Err("Style analysis not wired: requires DINOv2/CLIP feature extraction \
+             for color histogram, texture analysis, and style tag classification"
+            .into())
     }
     
     /// 协调风格
@@ -226,14 +206,17 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_style_harmonizer() {
+    fn test_style_harmonizer_returns_honest_errors() {
         let mut harmonizer = _StyleHarmonizer::new();
         
-        let analysis = harmonizer._analyze_style("/input/image.png");
-        assert!(!analysis.style_tags.is_empty());
+        // _analyze_style returns Err — not wired
+        let result = harmonizer._analyze_style("/input/image.png");
+        assert!(result.is_err(), "unwired analysis must return Err");
         
+        // _harmonize returns explicit failure — not wired
         let result = harmonizer._harmonize("/input/image.png", Some("/ref/style.png"));
-        assert!(result.success);
+        assert!(!result.success);
+        assert!(result.error.is_some());
         
         let stats = harmonizer.statistics();
         assert_eq!(stats.total_harmonized, 1);

@@ -1,0 +1,19 @@
+{
+  "name": "objects",
+  "tileSize": 32,
+  "tiles": [
+    {"id": 100, "name": "tree_pine", "blocking": true, "height": 64, "color": "#2d5a1e"},
+    {"id": 101, "name": "tree_bamboo", "blocking": true, "height": 48, "color": "#3a7a2a"},
+    {"id": 102, "name": "tree_cherry", "blocking": true, "height": 48, "color": "#ff69b4"},
+    {"id": 103, "name": "rock_large", "blocking": true, "height": 32, "color": "#555555"},
+    {"id": 104, "name": "rock_small", "blocking": false, "height": 16, "color": "#777777"},
+    {"id": 105, "name": "flower_red", "blocking": false, "height": 8, "color": "#ff4444"},
+    {"id": 106, "name": "flower_blue", "blocking": false, "height": 8, "color": "#4444ff"},
+    {"id": 107, "name": "bush", "blocking": false, "height": 24, "color": "#3a6a2a"},
+    {"id": 108, "name": "chest", "blocking": true, "height": 24, "color": "#8b4513", "interactable": true},
+    {"id": 109, "name": "sign", "blocking": true, "height": 32, "color": "#8b4513", "interactable": true},
+    {"id": 110, "name": "house", "blocking": true, "height": 96, "color": "#8b4513"},
+    {"id": 111, "name": "fence", "blocking": true, "height": 24, "color": "#8b4513"},
+    {"id": 112, "name": "bridge", "blocking": false, "height": 0, "color": "#8b4513"}
+  ]
+}

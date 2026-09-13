@@ -20,7 +20,10 @@ impl PredictiveCortex {
         let mut latent = current_latent.to_vec();
 
         for step in 0..horizon {
-            let (mean, variance) = self.jepa.predict_with_uncertainty(&latent, self.n_samples);
+            let (mean, variance) = match self.jepa.predict_with_uncertainty(&latent, self.n_samples) {
+                Ok(v) => v,
+                Err(_) => break,
+            };
             let confidence = self.compute_step_confidence(&variance);
 
             self.e8.evolve(1.0);

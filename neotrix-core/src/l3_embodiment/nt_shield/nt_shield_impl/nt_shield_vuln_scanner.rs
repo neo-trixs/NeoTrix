@@ -54,31 +54,23 @@ impl NucleiEngine {
         })
     }
     
-    /// Run reconnaissance scan against target
-    pub async fn reconnaissance(&self, target: &str) -> _ReconResult {
+    /// Run reconnaissance scan against target.
+    ///
+    /// Returns `Err` because the Nuclei subprocess is not wired.
+    /// Requires `nuclei` binary on PATH and a valid templates directory.
+    pub async fn reconnaissance(&self, _target: &str) -> Result<_ReconResult, String> {
+        if !self.templates_dir.exists() {
+            return Err(format!(
+                "Nuclei templates directory not found: {:?}. \
+                 Install nuclei and download templates first.",
+                self.templates_dir
+            ));
+        }
         // TODO: Spawn nuclei with template: nuclei -t templates_dir -target target
-        // For architecture demonstration:
-        
-        let findings = vec![
-            _NucleiFinding {
-                template_id: "HTTP-Header-Check".to_string(),
-                host: target.to_string(),
-                severity: "info".to_string(),
-                description: "X-Powered-By header detected".to_string(),
-                evidence: format!("{}: PHP/7.4.3", target),
-                cwe_id: Some("CWE-200".to_string()),
-            },
-            _NucleiFinding {
-                template_id: "SSRF-Detector".to_string(),
-                host: target.to_string(),
-                severity: "high".to_string(),
-                description: "Server-side request forgery endpoint".to_string(),
-                evidence: format!("{}: /api/fetch?url=*", target),
-                cwe_id: Some("CWE-918".to_string()),
-            },
-        ];
-        
-        _ReconResult { findings }
+        // Requires nix::unistd::fork or tokio::process::Command to invoke the binary.
+        Err("Nuclei subprocess not wired: requires `nuclei` binary on PATH and \
+             templates directory at {:?}. Run `nuclei -ut` to download templates."
+            .into())
     }
     
     /// Convert nuclei template to GWT attack pattern

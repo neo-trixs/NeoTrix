@@ -66,6 +66,7 @@ pub struct SemanticMemoryStore {
 }
 
 impl SemanticMemoryStore {
+    /// Create a new empty semantic memory store.
     pub fn new() -> Self {
         Self {
             concepts: HashMap::new(),
@@ -149,6 +150,10 @@ impl SemanticMemoryStore {
     }
 
     /// Abstraction pipeline: episode → pattern → principle → wisdom
+    ///
+    /// Note: Confidence is boosted by 10% on each abstraction step. Real
+    /// implementation should also update relation graph edges, propagate
+    /// confidence to related concepts, and merge overlapping abstractions.
     pub fn abstract_up(&mut self, concept_id: &str, new_level: AbstractionLevel) -> bool {
         if let Some(concept) = self.concepts.get_mut(concept_id) {
             concept.abstraction_level = new_level;

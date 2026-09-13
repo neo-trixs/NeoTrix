@@ -88,6 +88,7 @@ pub struct EmotionalMemoryStore {
 }
 
 impl EmotionalMemoryStore {
+    /// Create a new empty emotional memory store.
     pub fn new() -> Self {
         Self {
             memories: HashMap::new(),
@@ -157,6 +158,10 @@ impl EmotionalMemoryStore {
     }
 
     /// Get emotional trajectory over time
+    ///
+    /// Note: Returns recent emotions with a synthetic timestamp (Utc::now()).
+    /// Real implementation should use the actual timestamp from EmotionalContext
+    /// or derive it from the source episode's timestamp for accurate trajectory.
     pub fn emotional_trajectory(&self, limit: usize) -> Vec<(&EmotionalMemory, DateTime<Utc>)> {
         self.emotion_history
             .iter()
@@ -170,6 +175,10 @@ impl EmotionalMemoryStore {
     }
 
     /// Calculate emotional intelligence metrics
+    ///
+    /// Note: Uses simplified heuristics (e.g., emotion_range / 8.0 for
+    /// self-awareness). Real implementation should calibrate against
+    /// validated EI assessment frameworks and track metric changes over time.
     pub fn emotional_intelligence(&self) -> EmotionalIntelligence {
         let total_memories = self.memories.len() as f64;
         if total_memories == 0.0 {

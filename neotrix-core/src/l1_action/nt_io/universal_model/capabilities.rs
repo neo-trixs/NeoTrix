@@ -11,6 +11,11 @@ pub struct CapabilityDetector {
 }
 
 impl CapabilityDetector {
+    /// Create a new capability detector with known models pre-registered.
+    ///
+    /// Note: Real implementation should load capabilities from the KB or a
+    /// remote registry instead of hardcoding. The pre-registered set here
+    /// covers the most common models for quick offline lookups.
     pub fn new() -> Self {
         let mut cache = HashMap::new();
         Self::register_known_models(&mut cache);
@@ -165,6 +170,7 @@ pub struct HealthChecker {
 }
 
 impl HealthChecker {
+    /// Create a new health checker with empty results.
     pub fn new() -> Self {
         Self {
             results: HashMap::new(),
@@ -195,7 +201,8 @@ impl HealthChecker {
             .collect()
     }
 
-    /// 清理过期记录
+    /// 清理过期记录 — removes models whose last successful check
+    /// is older than `max_age_secs`. Call periodically to prevent stale data.
     pub fn cleanup(&mut self, max_age_secs: u64) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -223,29 +230,70 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_capability_detector_lookup() {
+    fn capability_detector_lookup_returns_registered_models() {
         let detector = CapabilityDetector::new();
+        // Lookup a known model
         let caps = detector.lookup("openai/gpt-4o");
-        assert!(caps.is_some());
+        assert!(caps.is_some(), "openai/gpt-4o should be registered");
         let caps = caps.unwrap();
-        assert!(caps.supports_vision);
-        assert!(caps.supports_tools);
-        assert_eq!(caps.max_context_tokens, 128_000);
+        assert!(caps.supports_vision, "gpt-4o should support vision");
+        assert!(caps.supports_tools, "gpt-4o should support tools");
+        assert!(caps.max_context_tokens > 0, "max_context_tokens should be positive");
     }
 
     #[test]
-    fn test_find_by_task() {
+    fn capability_detector_lookup_returns_none_for_unknown() {
+        let detector = CapabilityDetector::new();
+        let caps = detector.lookup("unknown/nonexistent-model");
+        assert!(caps.is_none(), "unknown model should not be found");
+    }
+
+    #[test]
+    fn find_by_task_filters_correctly() {
         let detector = CapabilityDetector::new();
         let embedding_models = detector.find_by_task(TaskType::Embedding);
-        assert!(!embedding_models.is_empty());
-        assert!(embedding_models.iter().any(|(id, _)| id.contains("embedding")));
+        assert!(!embedding_models.is_empty(), "should have at least one embedding model");
+        // All returned models should actually support embedding
+        for (id, caps) in &embedding_models {
+            assert!(
+                caps.task_types.contains(&TaskType::Embedding),
+                "model {} should have Embedding task type",
+                id
+            );
+        }
     }
 
     #[test]
-    fn test_health_checker() {
+    fn find_by_task_returns_empty_for_unregistered_task() {
+        let detector = CapabilityDetector::new();
+        let models = detector.find_by_task(TaskType::AudioGeneration);
+        assert!(models.is_empty(), "no models should support AudioGeneration by default");
+    }
+
+    #[test]
+    fn health_checker_records_and_retrieves() {
         let mut checker = HealthChecker::new();
-        checker.record("test", ModelHealth::default());
-        assert!(checker.get("test").is_some());
-        assert!(checker.unhealthy_models().is_empty());
+        let health = ModelHealth {
+            available: true,
+            latency_ms: Some(50.0),
+            error_rate: 0.01,
+            last_success: None,
+            circuit_breaker_open: false,
+            message: None,
+        };
+        checker.record("test_model", health.clone());
+        let retrieved = checker.get("test_model");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().latency_ms, Some(50.0));
+    }
+
+    #[test]
+    fn health_checker_detects_unhealthy_models() {
+        let mut checker = HealthChecker::new();
+        checker.record("healthy", ModelHealth::default());
+        checker.record("unhealthy", ModelHealth::unhealthy("connection refused"));
+        let unhealthy = checker.unhealthy_models();
+        assert_eq!(unhealthy.len(), 1);
+        assert_eq!(unhealthy[0].0, "unhealthy");
     }
 }

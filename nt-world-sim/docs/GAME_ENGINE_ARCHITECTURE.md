@@ -1,759 +1,1490 @@
 # Game Engine Architecture Patterns — Comprehensive Report
 
 > Research Date: 2026-09-13
-> Sources: Godot Engine, Redot Engine, Bevy, Bullet3, ImGui, and game-engine/game-development GitHub topics
+> Sources: Game Programming Patterns (Nystrom), Godot Engine, Bevy Engine, Unity DOTS, academic papers (ACM/SAC 2026, arXiv), MDN, LearnOpenGL, MonoGame, Vulkan Documentation, multiple GDC-style architecture analyses
 > Purpose: Extract architecture patterns applicable to NeoTrix NT-WORLD simulation capabilities
 
 ---
 
 ## Table of Contents
 
-1. [Godot Engine Architecture](#1-godot-engine-architecture)
-2. [Redot Engine](#2-redot-engine)
-3. [Game Engine Patterns](#3-game-engine-patterns)
-4. [Rendering Pipeline](#4-rendering-pipeline)
-5. [Scene System](#5-scene-system)
-6. [Physics System](#6-physics-system)
-7. [Scripting System](#7-scripting-system)
+1. [Game Loop](#1-game-loop)
+2. [Entity Component System (ECS)](#2-entity-component-system-ecs)
+3. [State Machine Pattern](#3-state-machine-pattern)
+4. [Rendering Architecture](#4-rendering-architecture)
+5. [Input System](#5-input-system)
+6. [Audio System](#6-audio-system)
+7. [Physics & Collision](#7-physics--collision)
 8. [Resource Management](#8-resource-management)
-9. [UI Framework](#9-ui-framework)
-10. [Key Takeaways for NeoTrix](#10-key-takeaways-for-neotrix)
+9. [Scene Graph](#9-scene-graph)
+10. [Cross-Cutting Patterns](#10-cross-cutting-patterns)
 
 ---
 
-## 1. Godot Engine Architecture
+## 1. Game Loop
 
-**Source**: godotengine/godot (117k★), DeepWiki architecture docs
+The game loop is the heart of every engine. It continuously runs while the game is active: process input → update state → render output.
 
-### 1.1 Repository Structure
+### 1.1 Fixed Timestep vs Variable Timestep
 
-```
-godot/
-├── core/          # Fundamental types, Object model, OS abstraction, I/O, config
-├── scene/         # Scene graph, nodes, GUI, animation, resources
-├── servers/       # Rendering, physics, audio, navigation, display servers
-├── modules/       # Optional modules (GDScript, C#/Mono, etc.)
-├── editor/        # Full editor UI and tools (TOOLS_ENABLED)
-├── platform/      # Platform-specific OS and display implementations
-├── drivers/       # Low-level hardware drivers (Vulkan, D3D12, GLES3)
-├── main/          # Engine entry point and initialization
-├── thirdparty/    # Bundled third-party libraries
-├── doc/           # XML class reference documentation
-└── tests/         # Unit and integration tests
-```
+**Source**: gameprogrammingpatterns.com (Nystrom), Gaffer on Games, MonoGame docs, Unity docs, NovaECS
 
-### 1.2 Build Configurations
+#### Variable Timestep (Simple)
 
-Three distinct binary types from the same source tree:
+Each update receives actual elapsed time. Logic scales by delta time.
 
-| Build Type | Flag | Contents |
-|-----------|------|----------|
-| Editor | `target=editor` | Runtime + full editor + import pipeline |
-| Debug export | `target=template_debug` | Runtime + debug helpers, no editor |
-| Release export | `target=template_release` | Minimal runtime only |
-
-### 1.3 Engine Initialization Sequence
-
-The `Main` class in `main/main.cpp` bootstraps the engine in phases:
-
-1. **Core Setup** — Initializes `Engine`, `ProjectSettings`, `Input`, `TranslationServer`
-2. **Platform Detection** — Configures display/rendering/audio drivers per platform
-3. **Server Initialization** — Creates `DisplayServer`, `RenderingServer`, `PhysicsServer2D/3D`, `AudioServer`
-4. **Scene System** — Registers node types, resources, theme system
-5. **MainLoop Creation** — Either `SceneTree` (games) or `EditorNode` (editor)
-
-### 1.4 Object and Type System
-
-```
-Object (base)
-├── Node (scene objects)
-│   ├── CanvasItem (2D)
-│   │   ├── Node2D
-│   │   └── Control (UI)
-│   ├── Node3D (3D)
-│   └── ...
-├── Resource (loadable/saveable data)
-└── ...
+```rust
+// Simple variable timestep
+while running {
+    let dt = clock.elapsed_since_last_frame();
+    process_input();
+    update(dt);
+    render();
+}
 ```
 
-- All objects inherit from `Object`
-- `ClassDB` singleton maintains class registry (methods, properties, signals)
-- Enables GDScript introspection, editor Inspector, and GDExtension API
+**Pros**: Simple, smooth on all frame rates.
+**Cons**: Non-deterministic physics. Floating-point accumulation errors cause divergence. High-speed objects tunnel through walls on slow frames.
 
-### 1.5 Layered Architecture
+#### Fixed Timestep with Accumulator (Recommended)
 
-| Layer | Responsibility |
-|-------|---------------|
-| Platform | OS abstraction (OS_Windows, OS_Unix, OS_Web) |
-| Core | Object model, math, I/O, config, resource management |
-| Servers | Thread-safe APIs: RenderingServer, PhysicsServer, AudioServer |
-| Scene | Node hierarchy, viewport, GUI controls, animation |
-| Editor | Full IDE built on top of the engine's own UI system |
+The gold standard. Decouples logic rate from display rate.
+
+```rust
+const FIXED_DT: f64 = 1.0 / 60.0; // 60 Hz logic
+const MAX_FRAME_TIME: f64 = 0.25;  // Spiral of death guard
+
+let mut previous_time = instant::now();
+let mut accumulator = 0.0;
+
+while running {
+    let current_time = instant::now();
+    let mut frame_time = current_time - previous_time;
+    previous_time = current_time;
+
+    // Clamp to prevent spiral of death
+    if frame_time > MAX_FRAME_TIME {
+        frame_time = MAX_FRAME_TIME;
+    }
+
+    accumulator += frame_time;
+
+    // Fixed-rate logic updates
+    while accumulator >= FIXED_DT {
+        process_input();
+        update(FIXED_DT);
+        accumulator -= FIXED_DT;
+    }
+
+    // Interpolation factor for smooth rendering
+    let alpha = accumulator / FIXED_DT;
+    render(alpha);
+}
+```
+
+**Key insight from Gaffer on Games**: The accumulator pattern separates update from render. The game simulates at constant rate using fixed steps; the visible frame rate can vary independently.
+
+#### Display Rate vs Logic Rate Table
+
+| Display Rate | Logic Rate | Logic Ticks Per Frame | Visual FPS |
+|-------------|-----------|----------------------|------------|
+| 60 Hz | 60 Hz | 1 | 60 |
+| 144 Hz | 60 Hz | 0 or 1 | 144 |
+| 30 Hz | 60 Hz | 2 | 30 |
+
+### 1.2 Spiral of Death Prevention
+
+When a frame takes longer than `FIXED_DT`, multiple update iterations run. If rendering also slows, you get exponential slowdown. Solution: cap `frame_time` to `MAX_FRAME_TIME` (typically 0.25s = 4 Hz minimum logic).
+
+### 1.3 Interpolation for Smooth Rendering
+
+```rust
+// Store previous and current state
+struct Interpolatable {
+    prev_position: Vec2,
+    curr_position: Vec2,
+}
+
+// Render with interpolation
+fn render(entity: &Interpolatable, alpha: f32) {
+    let render_pos = entity.prev_position.lerp(entity.curr_position, alpha);
+    draw_sprite(render_pos);
+}
+```
+
+Many 2D games skip interpolation and accept minor visual quantization — stutter is less noticeable with pixel art (GameCodex docs).
 
 ---
 
-## 2. Redot Engine
+## 2. Entity Component System (ECS)
 
-**Source**: Redot-Engine/redot-engine (6k★), forked from Godot September 2024
+**Sources**: ACM SAC 2026 "The Essence of ECS", arXiv 2508.15264 "Concurrency in ECS", Blubber Engine paper (SciTePress 2026), Bevy ECS docs, Unity DOTS, NovaECS, Stranne.EcsArchitecture
 
-### 2.1 What Redot Adds
+### 2.1 Core ECS Concepts
 
-Redot is a **community-driven fork** of Godot with the same architecture but:
+| Concept | Definition | Implementation |
+|---------|-----------|----------------|
+| **Entity** | Lightweight unique identifier (integer/UUID) | Index into component storage |
+| **Component** | Plain data record, no behavior | Struct/POD attached to entities |
+| **System** | Stateless function that iterates over entities with required components | Function operating on queries |
+| **World** | Container storing all entities, components, and resources | Central data store |
+| **Archetype** | Entities with identical component composition grouped together | Cache-friendly columnar storage |
+| **Query** | Mechanism to find entities matching component requirements | Filter specification |
 
-- **MCP Integration** — Built-in Model Context Protocol support for AI integration (`redot-mcp.sh`)
-- **Nix Build Support** — `nix run .` one-command build environment
-- **AI Policy** — `AI_POLICY.md` defining AI contribution guidelines
-- **Community Governance** — More open community-driven development model
+### 2.2 ECS in Rust — Bevy Pattern
 
-### 2.2 Same Core Architecture
+```rust
+use bevy::prelude::*;
 
-Redot preserves Godot's architecture exactly:
+// Components are normal Rust structs
+#[derive(Component)]
+struct Position { x: f32, y: f32 }
+
+#[derive(Component)]
+struct Velocity { x: f32, y: f32 }
+
+#[derive(Component)]
+struct Sprite {
+    texture: Handle<Image>,
+    size: Vec2,
+}
+
+// Systems are normal Rust functions
+fn movement_system(
+    mut query: Query<(&mut Position, &Velocity)>,
+    time: Res<Time>,
+) {
+    for (mut pos, vel) in &mut query {
+        pos.x += vel.x * time.delta_seconds();
+        pos.y += vel.y * time.delta_seconds();
+    }
+}
+
+// Resources are global singletons
+#[derive(Resource)]
+struct GameClock {
+    elapsed: f32,
+}
+
+// App assembly
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .insert_resource(GameClock { elapsed: 0.0 })
+        .add_systems(Update, movement_system)
+        .run();
+}
+```
+
+### 2.3 Archetype-Based ECS (Academic Foundation)
+
+From "The Essence of Entity Component System" (ACM SAC 2026):
+
+- Entities with identical component sets are grouped into **archetypes**
+- Archetypes are dense columnar tables (Structure of Arrays)
+- This maximizes spatial locality → cache-friendly iteration
+- Archetype ECS achieves higher frame rate and better frame stability than alternatives
+
+**Two ECS data layout approaches**:
+
+| Layout | Modification Cost | Iteration Cost | Best For |
+|--------|------------------|----------------|----------|
+| **Sparse Set** | Cheaper entity modifications | Slower iteration | Dynamic entities |
+| **Archetype** | Expensive (archetype change) | Fast iteration (cache-friendly) | Large-scale simulation |
+
+### 2.4 ECS Concurrency Model
+
+From arXiv 2508.15264:
 
 ```
-redot-engine/
-├── core/          # Same as Godot
-├── scene/         # Same as Godot
-├── servers/       # Same as Godot
-├── editor/        # Same as Godot
-├── modules/       # Same as Godot
-├── platform/      # Same as Godot
-├── drivers/       # Same as Godot
-└── ...
+ECS programs are inherently concurrent.
+Systems that read different components can run in parallel.
+Mutations are synchronized through archetype tables.
 ```
 
-### 2.3 Redot-Specific Files
+**Deterministic-by-construction**: A class of Core ECS programs behave deterministically regardless of scheduling. Systems are stateless; mutations are queued and flushed at synchronization points.
 
-| File | Purpose |
-|------|---------|
-| `AI_POLICY.md` | Guidelines for AI-generated contributions |
-| `REDOT_AUTHORS.md` | Redot-specific contributor credits |
-| `redot-mcp.sh` | MCP server integration script |
-| `flake.nix` | Nix build environment definition |
+### 2.5 ECS Layered Architecture (Production Pattern)
 
-### 2.4 Key Insight
+From Stranne.EcsArchitecture:
 
-Redot demonstrates that well-architected engines can fork cleanly. The Server pattern (decoupled simulation from scene) makes it possible to swap entire subsystems without breaking the node API.
+```
+{ProjectName}.sln
+├── {ProjectName}.Contracts/    # Cross-layer DTOs and interfaces
+├── {ProjectName}.Core/         # Pure ECS game logic (no engine dependency)
+├── {ProjectName}.Adapter/      # Core-to-Engine bridge
+├── {ProjectName}.Engine/       # Engine-specific implementation
+└── {ProjectName}.Core.Tests/   # Unit tests
+```
+
+**Design principles**:
+- Separation of Concerns: Game logic separated from rendering engine
+- Deterministic: Pure ECS logic with seed-based reproducibility
+- Engine Agnostic: Core logic works with any rendering engine
+
+### 2.6 Command Buffer Pattern
+
+For deferred mutations (can't modify world during iteration):
+
+```rust
+// NovaECS pattern
+const SpawnSystem = system('Spawn', (ctx) => {
+    const cmd = ctx.commandBuffer;
+    const e = cmd.create(true);           // Deferred entity creation
+    cmd.add(e, Position, { x: 10, y: 10 });
+    cmd.add(e, Velocity, { x: 1, y: 0 });
+}).stage('preUpdate')
+  .before('set:Gameplay')
+  .flushPolicy('afterStage')
+  .build();
+```
+
+### 2.7 System Scheduling
+
+```
+System execution stages:
+├── startup    → Run once on first tick
+├── preUpdate  → Pre-processing (spawning, input collection)
+├── update     → Main game logic (movement, combat)
+└── postUpdate → Cleanup, death removal, event processing
+```
+
+Systems declare dependencies:
+- `.before('set:Gameplay')` — run before this system set
+- `.after('Move')` — run after a specific system
+- `.inSet('Gameplay')` — belong to a named set
+- `.flushPolicy('afterStage')` — when to apply command buffer mutations
 
 ---
 
-## 3. Game Engine Patterns
+## 3. State Machine Pattern
 
-Extracted from 9,482+ game engine repos and 38,152+ game development repos.
+**Sources**: gameprogrammingpatterns.com, GDevelop docs, Unity Learn, GameDev.net forums, WebGameDev.com
 
-### 3.1 Server Pattern (Godot/Redot)
+### 3.1 Finite State Machine (FSM)
 
-**Most critical pattern**: Simulation logic runs in thread-safe "Server" singletons, decoupled from the scene tree.
+The fundamental pattern for game states, character states, and AI behavior.
 
-```
-Scene Layer          Server Layer
-─────────────        ─────────────
-Node3D ──RID──→ RenderingServer
-RigidBody3D ──RID──→ PhysicsServer3D
-AudioStreamPlayer ──RID──→ AudioServer
-```
+```rust
+// Enum-based FSM (simple approach)
+enum GameState {
+    Loading,
+    Menu,
+    Playing,
+    Paused,
+    GameOver,
+}
 
-**Why it matters**:
-- Physics can run on a separate thread
-- Rendering can be double-buffered
-- Scene tree stays responsive during heavy computation
-- RIDs (Resource IDs) enable zero-copy references
+struct StateMachine {
+    current: GameState,
+}
 
-### 3.2 ECS (Entity-Component-System)
+impl StateMachine {
+    fn transition(&mut self, new_state: GameState) {
+        self.exit_current();
+        self.current = new_state;
+        self.enter_current();
+    }
 
-**Source**: Bevy (48.2k★), EnTT (13.1k★)
+    fn enter_current(&self) {
+        match &self.current {
+            GameState::Menu => { /* show menu UI */ }
+            GameState::Playing => { /* start game loop */ }
+            GameState::Paused => { /* freeze updates, show pause overlay */ }
+            _ => {}
+        }
+    }
 
-```
-Entity = unique ID
-Component = data-only struct (Position { x, y })
-System = function that iterates over components
-```
-
-**Godot's approach**: Hybrid — Node tree + component-like properties (not pure ECS)
-**Bevy's approach**: Pure ECS with Rust's type system enforcing data-oriented design
-
-### 3.3 Scene Tree Pattern
-
-**Source**: Godot/Redot
-
-```
-SceneTree
-└── Root (Window)
-    ├── GameWorld
-    │   ├── Player (CharacterBody3D)
-    │   ├── Enemies (Node3D)
-    │   │   ├── Enemy1 (RigidBody3D)
-    │   │   └── Enemy2 (RigidBody3D)
-    │   └── Environment
-    └── UI (Control)
-        ├── HUD
-        └── PauseMenu
+    fn exit_current(&self) {
+        match &self.current {
+            GameState::Playing => { /* save state, cleanup */ }
+            _ => {}
+        }
+    }
+}
 ```
 
-Key properties:
-- **Hierarchical** — parent-child transforms cascade
-- **Instanced** — scenes within scenes (composition)
-- **Groups** — cross-tree tagging for queries
-- **Owner** — tracks which scene "owns" a node
+### 3.2 State Pattern (OOP Alternative)
 
-### 3.4 Signal/Observer Pattern
+```rust
+trait State {
+    fn enter(&mut self);
+    fn update(&mut self, dt: f32);
+    fn render(&self);
+    fn exit(&mut self);
+}
 
-```cpp
-// Godot signal system
-ADD_SIGNAL(MethodInfo("health_changed", PropertyInfo(Variant::INT, "new_health")));
-connect("health_changed", Callable(this, "_on_health_changed"));
-emit_signal("health_changed", current_health);
+struct PlayingState { /* ... */ }
+impl State for PlayingState {
+    fn enter(&mut self) { /* initialize level */ }
+    fn update(&mut self, dt: f32) { /* game logic */ }
+    fn render(&self) { /* draw world */ }
+    fn exit(&mut self) { /* cleanup */ }
+}
+
+struct StateManager {
+    states: Vec<Box<dyn State>>,
+}
+
+impl StateManager {
+    fn push(&mut self, state: Box<dyn State>) {
+        if let Some(current) = self.states.last_mut() {
+            current.exit();
+        }
+        state.enter();
+        self.states.push(state);
+    }
+
+    fn pop(&mut self) {
+        if let Some(mut state) = self.states.pop() {
+            state.exit();
+        }
+        if let Some(current) = self.states.last_mut() {
+            current.enter();
+        }
+    }
+}
 ```
 
-### 3.5 Resource-Reference Pattern
+### 3.3 Hierarchical State Machine (HSM)
 
-- `Resource` — base class for reusable data
-- `Ref<T>` — reference-counted smart pointer
-- `ResourceLoader` — async/threaded loading pipeline
-- `ResourceCache` — singleton cache prevents duplicate loads
-
-### 3.6 Platform Abstraction Pattern
+As states grow, flat FSMs become unmanageable. HSMs group related states:
 
 ```
-OS (abstract base)
-├── OS_Windows
-├── OS_Unix (Linux/macOS base)
-├── OS_Web (Emscripten)
-└── ...
+Grounded (parent)
+├── Idle
+├── Running
+├── Crouching
+└── Walking
 
-DisplayServer (abstract base)
-├── DisplayServerWindows
-├── DisplayServerX11
-├── DisplayServerWeb
-└── ...
+Airborne (parent)
+├── Jumping
+├── Falling
+└── DoubleJumping
 ```
 
----
+**Shared transitions**: "fall off ledge" works from any grounded sub-state.
 
-## 4. Rendering Pipeline
+### 3.4 Game Flow FSM
 
-### 4.1 Godot's Rendering Architecture
-
-```
-Scene Nodes → RenderingServer → RenderingDevice → GPU Drivers
-                                      │
-                              ┌───────┴───────┐
-                              │   Vulkan      │
-                              │   D3D12       │
-                              │   Metal       │
-                              │   OpenGL 3.3  │
-                              └───────────────┘
-```
-
-**Key design decisions**:
-1. **Server Decoupling** — Scene nodes never touch GPU directly; they submit commands to `RenderingServer`
-2. **Command Buffer** — RenderingServer queues commands, executes on render thread
-3. **Multi-backend** — Vulkan (primary), D3D12, Metal, GLES3 (compatibility)
-4. **RD Abstraction** — `RenderingDevice` provides unified API across backends
-
-### 4.2 Rendering Pipeline Stages
-
-| Stage | Function |
-|-------|----------|
-| **Culling** | Frustum/occlusion culling on scene tree |
-| **Sorting** | Depth sorting for transparency, Z-prepass for opaque |
-| **Shadow Maps** | Cascaded shadow maps (CSM) for directional lights |
-| **Geometry** | Forward+/Forward rendering path |
-| **Lighting** | PBR with clustered/forward lighting |
-| **Post-Processing** | SSAO, SSR, DOF, bloom, tonemapping |
-| **Output** | Swap chain presentation |
-
-### 4.3 Two Rendering Paths
-
-| Path | Target |
-|------|--------|
-| **Forward+** | Desktop, Vulkan/D3D12 (clustered lighting, SDFGI) |
-| **Mobile** | Mobile GPUs, optimized bandwidth |
-| **Compatibility** | OpenGL 3.3 / WebGL 2 (GLES3 backend) |
-
-### 4.4 Shader System
-
-GDScript shader language compiles to:
-- GLSL (Vulkan/GLES3)
-- HLSL (D3D12)
-- MSL (Metal)
-
-**Visual Shader** system provides node-graph shader editing that generates the same code.
-
----
-
-## 5. Scene System
-
-### 5.1 Node Lifecycle
+Typical transitions:
 
 ```
-Node lifecycle:
-  _enter_tree()    → Node added to SceneTree
-  _ready()         → All children ready (called bottom-up)
-  _process(delta)  → Every frame (game logic)
-  _physics_process(delta) → Fixed timestep (physics)
-  _exit_tree()     → Node removed from SceneTree
-```
-
-### 5.2 Node Hierarchy
-
-```
-Node (base)
-├── Node2D (2D transform)
-│   ├── Sprite2D
-│   ├── TileMapLayer
-│   └── ...
-├── Node3D (3D transform)
-│   ├── Camera3D
-│   ├── MeshInstance3D
-│   ├── Light3D
-│   └── ...
-├── Control (UI base)
-│   ├── Button
-│   ├── Label
-│   ├── VBoxContainer
-│   └── ...
-├── PhysicsBody2D/3D
-│   ├── CharacterBody2D/3D
-│   ├── RigidBody2D/3D
-│   └── StaticBody2D/3D
-├── AudioStreamPlayer
-└── ...
-```
-
-### 5.3 Scene Instancing
-
-Scenes are composable units:
-```
-Main Scene
-├── World.tscn (instanced)
-│   ├── Player.tscn (instanced)
-│   └── Enemy.tscn (instanced × 10)
-└── UI.tscn (instanced)
-```
-
-Format: `.tscn` (text), `.scn` (binary), `.tres`/`.res` (resources)
-
-### 5.4 Viewport System
-
-- `Viewport` — rendering context that displays scene content
-- `SubViewport` — renders to texture (picture-in-picture, portals)
-- `Window` — creates OS windows with Viewport
-
----
-
-## 6. Physics System
-
-### 6.1 Server-Client Architecture
-
-```
-Scene Nodes ←→ PhysicsServer ←→ Physics Engine Backend
+         load
+Initial ──────→ Menu
                   │
-         ┌────────┴────────┐
-         │  Godot Physics  │  (built-in)
-         │  Jolt Physics   │  (high-performance 3D)
-         └─────────────────┘
+              play│abandon
+                  ↓
+                Playing ←──→ Paused
+                  │            │
+              lose│quit    quit│
+                  ↓            │
+                GameOver ──────┘
+                   │
+                restart
+                   ↓
+                 Menu
 ```
 
-### 6.2 Body Types
+### 3.5 State Management with ECS
 
-| Type | Physics | Control | Use Case |
-|------|---------|---------|----------|
-| **RigidBody** | Full Newtonian | Forces/implosions | Projectiles, debris, vehicles |
-| **CharacterBody** | Kinematic | `move_and_slide()` | Player characters, NPCs |
-| **StaticBody** | None | None | Walls, floors, environment |
-| **AnimatableBody** | Sync | Scripted movement | Platforms, doors, elevators |
+From GameDev.net discussions: In ECS, game states are typically managed as **Resources** rather than entities:
 
-### 6.3 Physics Bodies Inheritance
+```rust
+#[derive(Resource)]
+struct AppState {
+    current: GameState,
+    transition_queue: Vec<GameState>,
+}
 
-```
-CollisionObject2D/3D
-├── PhysicsBody2D/3D
-│   ├── RigidBody2D/3D (full simulation)
-│   ├── CharacterBody2D/3D (kinematic)
-│   ├── StaticBody2D/3D (immobile)
-│   ├── AnimatableBody2D/3D (scripted)
-│   └── VehicleBody3D (car physics)
-└── Area2D/3D (detection zones)
-```
-
-### 6.4 Collision Shapes
-
-- **Primitives**: Box, Sphere, Capsule, Cylinder
-- **Complex**: Convex polygons, Concave (trimesh) meshes
-- **Shape Owners**: Multiple shapes per body without extra nodes
-
-### 6.5 Fixed Timestep
-
-Physics runs at fixed interval (default 60Hz), decoupled from rendering:
-```
-process_delta = variable (vsync rate)
-physics_delta = fixed (1/60s)
-interpolation = blends physics states for smooth rendering
+// Systems check state before running
+fn gameplay_system(
+    state: Res<AppState>,
+    mut query: Query<(&mut Position, &Velocity)>,
+) {
+    if state.current != GameState::Playing { return; }
+    // ... normal ECS logic
+}
 ```
 
 ---
 
-## 7. Scripting System
+## 4. Rendering Architecture
 
-### 7.1 GDScript Pipeline
+**Sources**: Godot docs, Unity Tilemap docs, MonoGame, LearnOpenGL, Stride docs, MDN, K-State CIS 580 textbook
 
+### 4.1 Sprite Batching
+
+The core optimization for 2D rendering: group sprites sharing the same texture into a single draw call.
+
+```rust
+struct SpriteBatch {
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+    current_texture: Option<TextureId>,
+    sort_mode: SpriteSortMode,
+}
+
+enum SpriteSortMode {
+    Deferred,       // Batch all, draw at once (default)
+    Immediate,      // Draw each sprite immediately
+    Texture,        // Sort by texture to minimize state changes
+    BackToFront,    // Sort by z-order (for transparency)
+    FrontToBack,    // Sort by z-depth (for occlusion culling)
+}
+
+impl SpriteBatch {
+    fn begin(&mut self, sort_mode: SpriteSortMode) {
+        self.vertices.clear();
+        self.indices.clear();
+        self.current_texture = None;
+        self.sort_mode = sort_mode;
+    }
+
+    fn draw(&mut self, texture: TextureId, pos: Vec2, src_rect: Rect, color: Color) {
+        // If sort by texture and texture changed, flush current batch
+        if self.sort_mode == SpriteSortMode::Texture
+            && self.current_texture != Some(texture)
+        {
+            self.flush();
+        }
+
+        // Add quad vertices and indices
+        let base_vertex = self.vertices.len() as u32;
+        self.vertices.extend_from_slice(&[
+            Vertex { position: pos, uv: src_rect.top_left(), color },
+            Vertex { position: pos + Vec2::new(src_rect.w, 0.0), uv: src_rect.top_right(), color },
+            Vertex { position: pos + src_rect.size, uv: src_rect.bottom_right(), color },
+            Vertex { position: pos + Vec2::new(0.0, src_rect.h), uv: src_rect.bottom_left(), color },
+        ]);
+        self.indices.extend_from_slice(&[
+            base_vertex, base_vertex+1, base_vertex+2,
+            base_vertex, base_vertex+2, base_vertex+3,
+        ]);
+        self.current_texture = Some(texture);
+    }
+
+    fn flush(&mut self) {
+        if self.vertices.is_empty() { return; }
+        // Submit batch to GPU
+        gpu_submit(self.current_texture, &self.vertices, &self.indices);
+        self.vertices.clear();
+        self.indices.clear();
+    }
+
+    fn end(&mut self) {
+        self.flush();
+    }
+}
 ```
-Source Code (.gd)
-    ↓ Tokenizer (lexical analysis)
-    ↓ Parser (AST construction)
-    ↓ Analyzer (semantic analysis, type resolution)
-    ↓ Compiler (bytecode generation)
-    ↓ VM (bytecode execution)
+
+**Optimization rules**:
+- Sort opaque sprites front-to-back (early z-rejection)
+- Sort transparent sprites back-to-front (correct alpha blending)
+- Trim transparent sprite boundaries tightly
+- Each full-screen post-processing effect adds 100% overdraw
+
+### 4.2 Tile Map Rendering
+
+**Sources**: Godot, Unity, MDN, MonoGame docs
+
+#### Tile Data Structure
+
+```rust
+struct TileMap {
+    tiles: Vec<Vec<TileId>>,  // 2D grid of tile IDs
+    tileset: Tileset,
+    quadrant_size: usize,      // Batch chunk size (default 16)
+}
+
+struct Tileset {
+    atlas: TextureAtlas,       // Single texture containing all tiles
+    tile_size: Vec2,           // Size of each tile in pixels
+    tiles: Vec<TileData>,      // Per-tile metadata (collision, animation, etc.)
+}
+
+struct TileData {
+    source_rect: Rect,         // Region in atlas
+    collision_shape: Option<CollisionShape>,
+    animation_frames: Option<Vec<Rect>>,
+}
 ```
 
-### 7.2 Language Integration Architecture
+#### Efficient Rendering Algorithm
 
-```cpp
-// ScriptLanguage abstraction
-class ScriptLanguage {
-    virtual Script *create_script() = 0;
-    virtual void finish() = 0;
-    virtual bool validate(const String &p_code) = 0;
-    virtual void reload_all_scripts() = 0;
-};
+```rust
+fn render_tilemap(
+    tilemap: &TileMap,
+    camera: &Camera,
+    spriteBatch: &mut SpriteBatch,
+) {
+    // Calculate visible tile range (frustum culling)
+    let start_col = (camera.left() / tilemap.tileset.tile_size.x).floor() as usize;
+    let end_col = (camera.right() / tilemap.tileset.tile_size.x).ceil() as usize;
+    let start_row = (camera.top() / tilemap.tileset.tile_size.y).floor() as usize;
+    let end_row = (camera.bottom() / tilemap.tileset.tile_size.y).ceil() as usize;
 
-// Registration
-ScriptServer::register_language(&gdscript_language);
-ScriptServer::register_language(&csharp_language);
+    spriteBatch.begin(SpriteSortMode::Texture);
+
+    // Render back-to-front for correct overlap
+    for row in start_row..=end_row.min(tilemap.tiles.len() - 1) {
+        for col in start_col..=end_col.min(tilemap.tiles[0].len() - 1) {
+            let tile_id = tilemap.tiles[row][col];
+            if tile_id == EMPTY_TILE { continue; }
+
+            let tile_data = &tilemap.tileset.tiles[tile_id as usize];
+            let screen_pos = Vec2::new(
+                col as f32 * tilemap.tileset.tile_size.x,
+                row as f32 * tilemap.tileset.tile_size.y,
+            );
+
+            spriteBatch.draw(
+                tilemap.tileset.atlas.texture,
+                screen_pos,
+                tile_data.source_rect,
+                Color::WHITE,
+            );
+        }
+    }
+
+    spriteBatch.end();
+}
 ```
 
-### 7.3 Supported Languages
+#### Tile Map Optimization Techniques
 
-| Language | Module | Backend |
-|----------|--------|---------|
-| GDScript | `modules/gdscript/` | Custom bytecode VM |
-| C# | `modules/mono/` | .NET runtime (GodotSharp) |
-| GDExtension | `modules/gdextension/` | C/C++/Rust native plugins |
-| VisualScript | Deprecated | (removed in Godot 4) |
+From Unity docs:
+- **Single Renderer**: Tilemap uses one Renderer for the whole map (vs. one per sprite). Less overhead.
+- **Quadrant Batching**: Groups tiles into chunks (default 16×16) for batched drawing.
+- **Reduce Serialization**: Tilemap data is compact (ID + position per tile) vs. full GameObjects.
+- **Y-Sort**: Draw tiles in Y-order for correct depth in top-down games.
 
-### 7.4 GDScript Language Server
+From MDN:
+- **Pre-render chunks**: Split map into sections, pre-render to textures, blit once per frame.
+- **Only render visible tiles**: Cull off-screen tiles before issuing draw calls.
+- **Static vs Scrolling**: Static maps (Pac-Man, Arkanoid) need no scrolling; scrolling maps need camera-relative rendering.
 
-LSP (Language Server Protocol) support for:
-- Auto-completion
-- Go-to-definition
-- Hover documentation
-- Refactoring
+### 4.3 Camera System
 
-### 7.5 Key Pattern: Script Extends Node
+```rust
+struct Camera {
+    position: Vec2,
+    viewport_size: Vec2,
+    zoom: f32,
+    bounds: Option<Rect>,      // World bounds to clamp within
+    target: Option<Entity>,    // Entity to follow
+    follow_speed: f32,
+    look_ahead: Vec2,          // Offset in movement direction
+}
 
-```gdscript
-extends CharacterBody3D  # Script inherits Node's class
+impl Camera {
+    fn update(&mut self, dt: f32) {
+        if let Some(target_pos) = self.get_target_position() {
+            // Smooth follow with lerp
+            let desired = target_pos + self.look_ahead;
+            let current = self.position;
+            self.position = current.lerp(desired, self.follow_speed * dt);
 
-@export var speed: float = 5.0
+            // Clamp to world bounds
+            if let Some(bounds) = self.bounds {
+                self.position = self.position.clamp(
+                    bounds.top_left() + self.viewport_size * 0.5,
+                    bounds.bottom_right() - self.viewport_size * 0.5,
+                );
+            }
+        }
+    }
 
-func _physics_process(delta):
-    velocity = direction * speed
-    move_and_slide()
+    fn world_to_screen(&self, world_pos: Vec2) -> Vec2 {
+        (world_pos - self.position) * self.zoom + self.viewport_size * 0.5
+    }
+
+    fn screen_to_world(&self, screen_pos: Vec2) -> Vec2 {
+        (screen_pos - self.viewport_size * 0.5) / self.zoom + self.position
+    }
+
+    fn visible_bounds(&self) -> Rect {
+        let half = self.viewport_size * 0.5 / self.zoom;
+        Rect::from_center(self.position, half * 2.0)
+    }
+}
+```
+
+### 4.4 Parallax Scrolling
+
+**Source**: Godot Parallax2D, K-State CIS 580, HaxeFlixel
+
+Create illusion of depth by scrolling layers at different speeds.
+
+```rust
+struct ParallaxLayer {
+    texture: TextureId,
+    scroll_factor: f32,    // 1.0 = same as camera, 0.5 = half speed (far), 0.0 = static
+    repeat: bool,          // Infinite scrolling
+    auto_scroll: Vec2,     // Constant movement (clouds, water)
+    offset: Vec2,
+}
+
+struct ParallaxBackground {
+    layers: Vec<ParallaxLayer>,
+}
+
+impl ParallaxBackground {
+    fn render(&self, camera: &Camera, spriteBatch: &mut SpriteBatch) {
+        for layer in &self.layers {
+            let parallax_offset = camera.position * layer.scroll_factor;
+
+            let transform = Mat4::from_translation(Vec3::new(
+                -parallax_offset.x + layer.offset.x,
+                -parallax_offset.y + layer.offset.y,
+                0.0,
+            ));
+
+            spriteBatch.begin_with_transform(transform);
+
+            if layer.repeat {
+                // Tile the texture to fill viewport
+                self.render_tiled(layer, camera, spriteBatch);
+            } else {
+                spriteBatch.draw(layer.texture, Vec2::ZERO, layer.full_rect(), Color::WHITE);
+            }
+
+            spriteBatch.end();
+        }
+    }
+}
+```
+
+**Godot Parallax2D properties**:
+- `scroll_scale`: Vector2 multiplier (1,1 = normal, 0.5,0.5 = half speed = appears farther)
+- `repeat_size`: For infinite scrolling backgrounds
+- `autoscroll`: Constant movement independent of camera
+- `limit_begin`/`limit_end`: Clamp scrolling range
+
+### 4.5 Particle Systems
+
+**Source**: LearnOpenGL, Vooga engine
+
+```rust
+struct Particle {
+    position: Vec2,
+    velocity: Vec2,
+    color: Color,
+    life: f32,          // Remaining lifetime
+    max_life: f32,       // Initial lifetime
+    size: f32,
+}
+
+struct ParticleEmitter {
+    particles: Vec<Particle>,
+    max_particles: usize,
+    spawn_rate: f32,          // Particles per second
+    spawn_accumulator: f32,
+    texture: TextureId,
+    // Emitter properties
+    position: Vec2,
+    direction: Vec2,
+    spread: f32,              // Angle spread in radians
+    min_speed: f32,
+    max_speed: f32,
+    min_life: f32,
+    max_life: f32,
+    min_size: f32,
+    max_size: f32,
+    start_color: Color,
+    end_color: Color,
+    gravity: Vec2,
+}
+
+impl ParticleEmitter {
+    fn update(&mut self, dt: f32) {
+        // Spawn new particles
+        self.spawn_accumulator += self.spawn_rate * dt;
+        while self.spawn_accumulator >= 1.0 && self.particles.len() < self.max_particles {
+            self.spawn_particle();
+            self.spawn_accumulator -= 1.0;
+        }
+
+        // Update existing particles
+        for particle in &mut self.particles {
+            particle.life -= dt;
+            particle.velocity += self.gravity * dt;
+            particle.position += particle.velocity * dt;
+
+            // Interpolate color over lifetime
+            let t = 1.0 - (particle.life / particle.max_life);
+            particle.color = self.start_color.lerp(self.end_color, t);
+        }
+
+        // Remove dead particles
+        self.particles.retain(|p| p.life > 0.0);
+    }
+
+    fn spawn_particle(&mut self) {
+        let angle = self.direction.angle() + random_range(-self.spread, self.spread);
+        let speed = random_range(self.min_speed, self.max_speed);
+        let life = random_range(self.min_life, self.max_life);
+
+        self.particles.push(Particle {
+            position: self.position,
+            velocity: Vec2::from_angle(angle) * speed,
+            color: self.start_color,
+            life,
+            max_life: life,
+            size: random_range(self.min_size, self.max_size),
+        });
+    }
+
+    fn render(&self, spriteBatch: &mut SpriteBatch) {
+        for particle in &self.particles {
+            let alpha = (particle.life / particle.max_life) * particle.color.a;
+            spriteBatch.draw(
+                self.texture,
+                particle.position - Vec2::splat(particle.size * 0.5),
+                self.source_rect,
+                Color { a: alpha, ..particle.color },
+            );
+        }
+    }
+}
+```
+
+---
+
+## 5. Input System
+
+**Sources**: Bevy input module, Godot input, various game dev articles
+
+### 5.1 Input Mapping (Keys to Actions)
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Action {
+    MoveLeft,
+    MoveRight,
+    Jump,
+    Attack,
+    Interact,
+    Pause,
+    MenuConfirm,
+    MenuCancel,
+}
+
+struct InputMapping {
+    key_bindings: HashMap<KeyCode, Action>,
+    gamepad_bindings: HashMap<GamepadButton, Action>,
+    mouse_bindings: HashMap<MouseButton, Action>,
+}
+
+impl InputMapping {
+    fn default_rpg() -> Self {
+        let mut key_bindings = HashMap::new();
+        key_bindings.insert(KeyCode::A, Action::MoveLeft);
+        key_bindings.insert(KeyCode::Left, Action::MoveLeft);
+        key_bindings.insert(KeyCode::D, Action::MoveRight);
+        key_bindings.insert(KeyCode::Right, Action::MoveRight);
+        key_bindings.insert(KeyCode::Space, Action::Jump);
+        key_bindings.insert(KeyCode::Z, Action::Attack);
+        key_bindings.insert(KeyCode::E, Action::Interact);
+        key_bindings.insert(KeyCode::Escape, Action::Pause);
+        key_bindings.insert(KeyCode::Return, Action::MenuConfirm);
+        key_bindings.insert(KeyCode::Back, Action::MenuCancel);
+        Self { key_bindings, gamepad_bindings: HashMap::new(), mouse_bindings: HashMap::new() }
+    }
+}
+```
+
+### 5.2 Input State Buffering
+
+```rust
+struct InputState {
+    current: HashSet<Action>,
+    previous: HashSet<Action>,
+    just_pressed: HashSet<Action>,
+    just_released: HashSet<Action>,
+    buffered_actions: VecDeque<(Action, f32)>, // (action, timestamp)
+    buffer_duration: f32,                      // e.g., 0.1s
+}
+
+impl InputState {
+    fn update(&mut self, mapping: &InputMapping, raw_keys: &HashSet<KeyCode>, time: f32) {
+        // Save previous frame
+        self.previous = self.current.clone();
+
+        // Map raw keys to actions
+        self.current.clear();
+        for key in raw_keys {
+            if let Some(action) = mapping.key_bindings.get(key) {
+                self.current.insert(*action);
+            }
+        }
+
+        // Compute edge detection
+        self.just_pressed = self.current.difference(&self.previous).cloned().collect();
+        self.just_released = self.previous.difference(&self.current).cloned().collect();
+
+        // Add pressed actions to buffer
+        for action in &self.just_pressed {
+            self.buffered_actions.push_back((*action, time));
+        }
+
+        // Expire old buffered actions
+        while let Some((_, timestamp)) = self.buffered_actions.front() {
+            if time - timestamp > self.buffer_duration {
+                self.buffered_actions.pop_front();
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn is_down(&self, action: Action) -> bool { self.current.contains(&action) }
+    fn just_pressed(&self, action: Action) -> bool { self.just_pressed.contains(&action) }
+    fn just_released(&self, action: Action) -> bool { self.just_released.contains(&action) }
+
+    fn consume_buffered(&mut self, action: Action) -> bool {
+        if let Some(pos) = self.buffered_actions.iter().position(|(a, _)| *a == action) {
+            self.buffered_actions.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+}
+```
+
+**Input buffering** is critical for responsive controls: if the player presses jump slightly before landing, the jump should still execute on landing.
+
+### 5.3 Touch/Mouse Handling
+
+```rust
+struct TouchState {
+    touches: Vec<Touch>,
+    mouse_position: Vec2,
+    mouse_buttons: HashSet<MouseButton>,
+}
+
+struct Touch {
+    id: usize,
+    position: Vec2,
+    start_position: Vec2,
+    phase: TouchPhase, // Began, Moved, Ended, Cancelled
+}
+
+enum TouchPhase {
+    Began,
+    Moved,
+    Ended,
+    Cancelled,
+}
+
+impl TouchState {
+    fn swipe_direction(&self) -> Option<Vec2> {
+        self.touches.first().map(|t| {
+            let delta = t.position - t.start_position;
+            if delta.length() > SWIPE_THRESHOLD {
+                delta.normalize()
+            } else {
+                Vec2::ZERO
+            }
+        })
+    }
+}
+```
+
+---
+
+## 6. Audio System
+
+**Sources**: Godot audio system docs, Unreal Engine audio docs, Godot Core System audio_system.md
+
+### 6.1 Sound Manager Architecture
+
+```rust
+enum AudioCategory {
+    Music,
+    SFX,
+    Voice,
+    Ambient,
+}
+
+struct AudioManager {
+    music_player: AudioStreamPlayer,
+    sfx_pool: SoundPool,
+    category_volumes: HashMap<AudioCategory, f32>,
+    master_volume: f32,
+    current_music: Option<AudioSource>,
+}
+
+impl AudioManager {
+    fn play_music(&mut self, source: AudioSource, fade_duration: f32) {
+        if let Some(current) = &self.current_music {
+            // Crossfade: fade out current, fade in new
+            self.music_player.fade_out(current, fade_duration);
+        }
+        self.music_player.fade_in(source.clone(), fade_duration);
+        self.current_music = Some(source);
+    }
+
+    fn play_sfx(&mut self, source: AudioSource) {
+        self.sfx_pool.play(source);
+    }
+
+    fn set_volume(&mut self, category: AudioCategory, volume: f32) {
+        self.category_volumes.insert(category, volume);
+        self.apply_volumes();
+    }
+
+    fn apply_volumes(&self) {
+        for (category, vol) in &self.category_volumes {
+            let effective = vol * self.master_volume;
+            // Apply to relevant audio streams
+        }
+    }
+}
+```
+
+### 6.2 Audio Pooling
+
+Pre-allocate audio instances to avoid runtime allocation.
+
+```rust
+struct SoundPool {
+    available: Vec<AudioStreamPlayer>,
+    active: Vec<AudioStreamPlayer>,
+    max_instances: usize,
+}
+
+impl SoundPool {
+    fn new(max_instances: usize) -> Self {
+        let available = (0..max_instances)
+            .map(|_| AudioStreamPlayer::new())
+            .collect();
+        Self { available, active: Vec::new(), max_instances }
+    }
+
+    fn play(&mut self, source: AudioSource) {
+        let player = if let Some(p) = self.available.pop() {
+            p
+        } else if self.active.len() < self.max_instances {
+            AudioStreamPlayer::new()
+        } else {
+            // Steal oldest active player
+            self.active.remove(0)
+        };
+
+        player.set_source(source);
+        player.play();
+        self.active.push(player);
+    }
+
+    fn update(&mut self) {
+        // Move finished players back to available pool
+        self.active.retain(|p| {
+            if p.is_playing() { true }
+            else { self.available.push(p.clone()); false }
+        });
+    }
+}
+```
+
+### 6.3 Spatial Audio
+
+For 2D games, spatial audio adjusts volume based on distance from listener:
+
+```rust
+fn spatial_audio_system(
+    listener_pos: Vec2,
+    query: Query<(&Position, &AudioSource)>,
+    audio: &mut AudioManager,
+) {
+    for (pos, source) in &query {
+        let distance = pos.distance_to(listener_pos);
+        let volume = (1.0 - (distance / MAX_AUDIO_DISTANCE).clamp(0.0, 1.0))
+            .powi(2); // Quadratic falloff
+
+        // Pan based on relative X position
+        let pan = ((pos.x - listener_pos.x) / MAX_AUDIO_DISTANCE).clamp(-1.0, 1.0);
+
+        audio.set_spatial_volume(source, volume, pan);
+    }
+}
+```
+
+---
+
+## 7. Physics & Collision
+
+**Sources**: LearnOpenGL collision detection, MDN 3D collision, gameprogrammingpatterns.com
+
+### 7.1 AABB Collision Detection
+
+The fastest 2D collision test — axis-aligned bounding boxes.
+
+```rust
+struct AABB {
+    min: Vec2,  // Top-left
+    max: Vec2,  // Bottom-right
+}
+
+impl AABB {
+    fn from_pos_size(pos: Vec2, size: Vec2) -> Self {
+        Self { min: pos, max: pos + size }
+    }
+
+    fn intersects(&self, other: &AABB) -> bool {
+        self.min.x <= other.max.x && self.max.x >= other.min.x
+            && self.min.y <= other.max.y && self.max.y >= other.min.y
+    }
+
+    fn contains_point(&self, point: Vec2) -> bool {
+        point.x >= self.min.x && point.x <= self.max.x
+            && point.y >= self.min.y && point.y <= self.max.y
+    }
+}
+```
+
+### 7.2 Circle Collision
+
+```rust
+fn circles_collide(pos_a: Vec2, radius_a: f32, pos_b: Vec2, radius_b: f32) -> bool {
+    let distance_sq = pos_a.distance_squared_to(pos_b);
+    let radii_sum = radius_a + radius_b;
+    distance_sq <= radii_sum * radii_sum
+}
+```
+
+### 7.3 Tile-Based Collision
+
+```rust
+fn check_tile_collision(
+    entity: &AABB,
+    tilemap: &TileMap,
+    velocity: Vec2,
+) -> CollisionResult {
+    let mut result = CollisionResult::default();
+
+    // Calculate tile range to check
+    let expanded = AABB::from_pos_size(
+        entity.min + velocity.min(Vec2::ZERO),
+        entity.max - entity.min + velocity.abs(),
+    );
+
+    let start_col = (expanded.min.x / tilemap.tile_size.x).floor() as i32;
+    let end_col = (expanded.max.x / tilemap.tile_size.x).ceil() as i32;
+    let start_row = (expanded.min.y / tilemap.tile_size.y).floor() as i32;
+    let end_row = (expanded.max.y / tilemap.tile_size.y).ceil() as i32;
+
+    for row in start_row..=end_row {
+        for col in start_col..=end_col {
+            let tile = tilemap.get_tile(col, row);
+            if tile.is_none() || !tile.unwrap().has_collision { continue; }
+
+            let tile_aabb = AABB::from_pos_size(
+                Vec2::new(col as f32 * tilemap.tile_size.x, row as f32 * tilemap.tile_size.y),
+                tilemap.tile_size,
+            );
+
+            if entity.intersects(&tile_aabb) {
+                result.collisions.push(TileCollision {
+                    tile_pos: IVec2::new(col, row),
+                    tile_aabb,
+                    // Calculate overlap for resolution
+                    overlap: calculate_overlap(entity, &tile_aabb),
+                });
+            }
+        }
+    }
+
+    result
+}
+
+fn calculate_overlap(a: &AABB, b: &AABB) -> Vec2 {
+    let overlap_x = (a.max.x - b.min.x).min(b.max.x - a.min.x);
+    let overlap_y = (a.max.y - b.min.y).min(b.max.y - a.min.y);
+    Vec2::new(overlap_x, overlap_y)
+}
+```
+
+### 7.4 Simple Physics (Gravity, Velocity)
+
+```rust
+const GRAVITY: f32 = 980.0;  // pixels/s²
+const TERMINAL_VELOCITY: f32 = 600.0;
+
+#[derive(Component)]
+struct PhysicsBody {
+    velocity: Vec2,
+    on_ground: bool,
+    mass: f32,
+}
+
+fn physics_system(
+    dt: f32,
+    mut bodies: Query<(&mut Position, &mut PhysicsBody)>,
+) {
+    for (mut pos, mut body) in &mut bodies {
+        // Apply gravity
+        if !body.on_ground {
+            body.velocity.y = (body.velocity.y + GRAVITY * dt).min(TERMINAL_VELOCITY);
+        }
+
+        // Apply velocity
+        pos.x += body.velocity.x * dt;
+        pos.y += body.velocity.y * dt;
+    }
+}
+```
+
+### 7.5 Collision Response
+
+```rust
+fn resolve_collision(entity: &mut PhysicsBody, collision: &TileCollision, dt: f32) {
+    let overlap = collision.overlap;
+
+    // Determine minimum penetration axis
+    if overlap.x < overlap.y {
+        // Horizontal resolution
+        if entity.velocity.x > 0.0 {
+            // Moving right, push left
+        } else {
+            // Moving left, push right
+        }
+        entity.velocity.x = 0.0;
+    } else {
+        // Vertical resolution
+        if entity.velocity.y > 0.0 {
+            // Moving down (landing)
+            entity.on_ground = true;
+        } else {
+            // Moving up (hitting ceiling)
+        }
+        entity.velocity.y = 0.0;
+    }
+}
 ```
 
 ---
 
 ## 8. Resource Management
 
-### 8.1 Resource Loading Pipeline
+**Sources**: Vulkan docs, Unity docs, Cocos Asset Manager, GameDev.net
 
-```
-User Code: load("res://textures/player.png")
-    ↓
-ResourceLoader::load()
-    ↓
-ResourceFormatLoader (per format)
-    ├── ResourceFormatLoaderText (.tres, .tscn)
-    ├── ResourceFormatLoaderBinary (.res, .scn)
-    ├── ResourceFormatLoaderImage (textures)
-    ├── ResourceFormatLoaderAudio (audio)
-    └── ...
-    ↓
-ResourceCache::add() (singleton cache)
-    ↓
-Ref<Resource> returned
-```
+### 8.1 Resource Manager Pattern
 
-### 8.2 Resource Types
+```rust
+struct ResourceManager {
+    cache: HashMap<String, Arc<dyn Resource>>,
+    ref_counts: HashMap<String, usize>,
+}
 
-| Type | Extension | Description |
-|------|-----------|-------------|
-| Scene | `.tscn`/`.scn` | Node tree + properties |
-| Texture | `.png`/`.jpg`/`.exr` | Image data |
-| Mesh | `.obj`/`.glb`/`.gltf` | 3D geometry |
-| Audio | `.wav`/`.ogg`/`.mp3` | Sound data |
-| Script | `.gd`/`.cs` | Code |
-| Material | `.tres` | Shader + parameters |
-| Theme | `.tres` | UI styling |
+trait Resource: Send + Sync + 'static {
+    fn load(path: &str) -> Result<Self> where Self: Sized;
+    fn as_any(&self) -> &dyn Any;
+}
 
-### 8.3 Import Pipeline
+impl ResourceManager {
+    fn load<T: Resource>(&mut self, path: &str) -> Arc<T> {
+        // Check cache
+        if let Some(cached) = self.cache.get(path) {
+            *self.ref_counts.get_mut(path).unwrap() += 1;
+            return Arc::clone(cached).downcast::<T>().unwrap();
+        }
 
-Assets go through an import system on first load:
-```
-raw_asset.png → import("res://.import/player.png.import")
-    ↓
-    ├── Resize (if needed)
-    ├── Compress (VRAM, lossless, etc.)
-    ├── Generate mipmaps
-    └── Save as .ctex (compressed texture)
-```
-
-### 8.4 Threaded Loading
-
-```gdscript
-ResourceLoader.load_threaded_request("res://large_scene.tscn")
-# Later...
-var scene = ResourceLoader.load_threaded_get("res://large_scene.tscn")
-```
-
-### 8.5 Resource Cache Behavior
-
-- Resources with same path share the same instance
-- `ResourceCache` is a global singleton
-- Prevents duplicate loads of expensive assets
-- `Resource.duplicate()` creates independent copies when needed
-
----
-
-## 9. UI Framework
-
-### 9.1 Control Hierarchy
-
-```
-Control (base)
-├── Container
-│   ├── VBoxContainer
-│   ├── HBoxContainer
-│   ├── GridContainer
-│   ├── MarginContainer
-│   └── ...
-├── Button
-│   ├── CheckBox
-│   ├── CheckBox
-│   └── OptionButton
-├── Label
-├── LineEdit
-├── TextEdit
-│   └── CodeEdit
-├── RichTextLabel
-├── Tree
-├── ItemList
-├── Panel
-├── ProgressBar
-├── ScrollContainer
-└── ...
-```
-
-### 9.2 Layout System
-
-**Anchors**: Relative positioning to parent edges
-```
-anchor_left = 0.0   (left edge)
-anchor_right = 1.0  (right edge)
-anchor_top = 0.0
-anchor_bottom = 0.5 (half height)
-```
-
-**Containers**: Automatic child layout
-- `VBoxContainer` — vertical stacking
-- `HBoxContainer` — horizontal stacking
-- `GridContainer` — grid with columns
-- `MarginContainer` — adds padding
-
-**Offsets**: Pixel-based fine-tuning within anchor constraints
-
-### 9.3 Theme System
-
-```gdscript
-# Theme resource defines styling for all Control types
-theme = Theme.new()
-theme.set_stylebox("normal", "Button", stylebox)
-theme.set_font("font", "Button", font)
-theme.set_color("font_color", "Button", Color.WHITE)
-```
-
-- Themes cascade down the tree
-- Per-control overrides
-- Support for dark/light modes
-
-### 9.4 Focus and Input
-
-- Keyboard navigation via focus neighbors
-- Mouse event routing through the tree
-- `gui_input` signal for custom handling
-
----
-
-## 10. Key Takeaways for NeoTrix
-
-### 10.1 Patterns to Adopt
-
-| Pattern | Godot Implementation | NeoTrix Application |
-|---------|---------------------|---------------------|
-| **Server Pattern** | RenderingServer, PhysicsServer, AudioServer decoupled from nodes | NT-ACT tools, NT-WORLD sensors as Server singletons; scene nodes send RIDs |
-| **RID Decoupling** | Scene objects hold lightweight RIDs to Server objects | SensoryIntegrationHub could use RIDs for observation streams |
-| **Resource Cache** | Global ResourceCache prevents duplicate loads | KB embedding cache with same-path deduplication |
-| **Fixed Timestep** | Physics at fixed Hz, rendering interpolates | ConsciousnessTree tick could use fixed-rate reasoning with async observation |
-| **Node Lifecycle** | _enter_tree → _ready → _process → _exit_tree | Module activation/deactivation hooks in NT-WORLD |
-| **Signal/Observer** | Type-safe signals with ADD_SIGNAL macro | EventBus already in place; formalize signal type registry |
-| **Scene Instancing** | Scenes compose via instancing | Skill trees compose via domain nodes |
-| **Threading Model** | Main thread + render thread + worker pool | NT-MIND background loop + worker thread pool |
-| **Module System** | Optional modules via SCons flags | Domain modules with compile-time feature flags |
-| **Platform Abstraction** | OS subclass per platform | NT-PHYSICAL sensors/motors per platform |
-
-### 10.2 Architecture Principles from Game Engines
-
-1. **Server Decoupling** — Never let high-level code talk to hardware directly. Always go through a thread-safe server. This is the single most important pattern.
-
-2. **RID + Server** — Scene objects are lightweight handles. All heavy state lives in servers. Enables:
-   - Thread-safe simulation
-   - Hot-swapping backends
-   - Zero-copy references
-
-3. **Resource Immutability by Default** — Resources are shared, not copied. Use `duplicate()` only when mutation is needed.
-
-4. **Lifecycle Hooks** — Every object has well-defined creation/destruction points. No orphaned state.
-
-5. **Fixed vs Variable Timestep** — Simulation (physics, AI reasoning) at fixed rate. Rendering/observation at variable rate. Interpolate between.
-
-6. **Composition Over Inheritance** — Scenes compose via instancing. Nodes compose via the tree. Avoid deep inheritance chains.
-
-7. **Signal-Based Communication** — Decouple modules via signals. Never direct function calls between distant modules.
-
-8. **Lazy Loading** — Resources loaded on demand. Threaded loading for large assets. Progress tracking.
-
-9. **Platform Abstraction Layer** — Never platform-specific code in core. Always through an abstract interface.
-
-10. **Build System as Configuration** — Feature flags, optional modules, platform detection — all via build config, not runtime checks.
-
-### 10.3 Code Examples
-
-#### Server Pattern (Godot-style)
-
-```cpp
-// Scene side: lightweight
-class RigidBody3D : public Node3D {
-    RID body;  // Handle to server object
-    
-    void _ready() {
-        body = PhysicsServer3D::get_singleton()->body_create();
-        PhysicsServer3D::get_singleton()->body_set_space(body, get_world_3d()->get_space());
+        // Load new resource
+        let resource = Arc::new(T::load(path).expect("Failed to load resource"));
+        self.cache.insert(path.to_string(), resource.clone() as Arc<dyn Resource>);
+        self.ref_counts.insert(path.to_string(), 1);
+        resource.downcast::<T>().unwrap()
     }
-    
-    void _physics_process(float delta) {
-        // Read state from server
-        Transform3D transform = PhysicsServer3D::get_singleton()->body_get_state(
-            body, PhysicsServer3D::BODY_STATE_TRANSFORM
+
+    fn release(&mut self, path: &str) {
+        if let Some(count) = self.ref_counts.get_mut(path) {
+            *count -= 1;
+            if *count == 0 {
+                self.cache.remove(path);
+                self.ref_counts.remove(path);
+            }
+        }
+    }
+}
+```
+
+### 8.2 Object Pooling
+
+Pre-allocate and reuse objects to avoid allocation spikes.
+
+```rust
+struct ObjectPool<T> {
+    available: Vec<T>,
+    active_count: usize,
+    factory: Box<dyn Fn() -> T>,
+}
+
+impl<T> ObjectPool<T> {
+    fn new(initial_size: usize, factory: impl Fn() -> T + 'static) -> Self {
+        let available = (0..initial_size).map(|_| factory()).collect();
+        Self { available, active_count: 0, factory: Box::new(factory) }
+    }
+
+    fn acquire(&mut self) -> T {
+        self.active_count += 1;
+        if let Some(obj) = self.available.pop() {
+            obj
+        } else {
+            (self.factory)()  // Pool exhausted, create new
+        }
+    }
+
+    fn release(&mut self, obj: T) {
+        self.active_count -= 1;
+        self.available.push(obj);
+    }
+
+    fn prewarm(&mut self, count: usize) {
+        for _ in 0..count {
+            self.available.push((self.factory)());
+        }
+    }
+}
+
+// Usage for projectiles
+let bullet_pool = ObjectPool::new(100, || Bullet {
+    position: Vec2::ZERO,
+    velocity: Vec2::ZERO,
+    active: false,
+});
+```
+
+### 8.3 Asset Bundle Pattern
+
+Partition resources for modular loading:
+
+```rust
+struct AssetBundle {
+    name: String,
+    assets: HashMap<String, Box<dyn Any>>,
+    loaded: bool,
+}
+
+impl AssetBundle {
+    async fn load(name: &str) -> Result<Self> {
+        // Load bundle manifest
+        let manifest = load_manifest(name).await?;
+        let mut assets = HashMap::new();
+
+        // Preload critical assets synchronously
+        for asset_path in &manifest.critical_assets {
+            let asset = load_asset(asset_path).await?;
+            assets.insert(asset_path.clone(), asset);
+        }
+
+        Ok(Self { name: name.to_string(), assets, loaded: true })
+    }
+
+    fn get<T: 'static>(&self, key: &str) -> Option<&T> {
+        self.assets.get(key)?.downcast_ref::<T>()
+    }
+}
+```
+
+---
+
+## 9. Scene Graph
+
+**Sources**: Godot scene system, academic papers on engine architecture
+
+### 9.1 Scene Tree Structure
+
+```
+SceneTree
+├── Root (Node2D)
+│   ├── TileMap (background)
+│   ├── Entities (Node2D)
+│   │   ├── Player
+│   │   │   ├── Sprite
+│   │   │   ├── Collider
+│   │   │   └── AnimationPlayer
+│   │   ├── Enemy_01
+│   │   └── Enemy_02
+│   ├── Foreground (Node2D)
+│   └── UI (CanvasLayer)
+│       ├── HealthBar
+│       └── ScoreDisplay
+```
+
+### 9.2 Node Hierarchy
+
+```rust
+struct Node2D {
+    name: String,
+    position: Vec2,
+    rotation: f32,
+    scale: Vec2,
+    visible: bool,
+    children: Vec<NodeId>,
+    parent: Option<NodeId>,
+    components: HashMap<TypeId, Box<dyn Component>>,
+}
+
+impl Node2D {
+    fn global_position(&self, tree: &SceneTree) -> Vec2 {
+        let local = self.position;
+        match self.parent {
+            Some(parent_id) => {
+                let parent = tree.get(parent_id);
+                parent.global_position(tree) + local.rotated(parent.global_rotation(tree))
+            }
+            None => local,
+        }
+    }
+}
+```
+
+### 9.3 Scene Composition
+
+Godot-style: Scenes are composable. A "Player" scene contains its own node tree, can be instanced into any other scene.
+
+```rust
+struct Scene {
+    root: NodeId,
+    nodes: SlotMap<NodeId, Node2D>,
+}
+
+impl Scene {
+    fn instantiate(&self, parent: &mut Scene) -> NodeId {
+        // Deep copy node tree, remap IDs
+        let new_root = self.clone_into(parent);
+        // Connect signals, set up groups
+        new_root
+    }
+}
+```
+
+---
+
+## 10. Cross-Cutting Patterns
+
+### 10.1 Event System (Publish/Subscribe)
+
+Decouple modules through events:
+
+```rust
+enum GameEvent {
+    EntityDamaged { entity: Entity, damage: f32 },
+    PlayerDied { entity: Entity },
+    ItemCollected { entity: Entity, item: ItemId },
+    LevelCompleted { level: usize },
+}
+
+struct EventBus {
+    listeners: HashMap<TypeId, Vec<Box<dyn Fn(&GameEvent)>>>,
+}
+
+impl EventBus {
+    fn subscribe<T: Fn(&GameEvent) + 'static>(&mut self, handler: T) {
+        // Register handler
+    }
+
+    fn publish(&self, event: &GameEvent) {
+        // Notify all relevant listeners
+    }
+}
+```
+
+### 10.2 Component Categories (ECS Taxonomy)
+
+From Stranne.EcsArchitecture:
+
+| Category | Purpose | Examples |
+|----------|---------|----------|
+| **Singleton** | One per game instance | `GameState`, `AudioManager`, `Camera` |
+| **Value** | Data attached to entities | `Position`, `Velocity`, `Health`, `Sprite` |
+| **Tag** | Marker components (no data) | `Player`, `Enemy`, `Static`, `Dirty` |
+| **Buffer** | Frame-lagged data | `PreviousPosition`, `InputSnapshot` |
+
+### 10.3 Time Management
+
+```rust
+struct Time {
+    delta: f32,           // Frame time
+    elapsed: f64,         // Total time
+    time_scale: f32,      // 1.0 = normal, 0.0 = paused, 0.5 = slow-mo
+    fixed_dt: f32,        // Physics timestep
+}
+
+impl Time {
+    fn scaled_delta(&self) -> f32 {
+        self.delta * self.time_scale
+    }
+}
+```
+
+### 10.4 Debug Rendering
+
+```rust
+#[cfg(debug_assertions)]
+fn debug_render(world: &World, camera: &Camera, spriteBatch: &mut SpriteBatch) {
+    // Draw AABBs
+    for (pos, aabb) in world.query::<(&Position, &AABB)>() {
+        spriteBatch.draw_rect_debug(
+            camera.world_to_screen(aabb.min),
+            aabb.max - aabb.min,
+            Color::GREEN.alpha(0.3),
         );
-        set_global_transform(transform);
     }
-};
 
-// Server side: heavy, thread-safe
-class PhysicsServer3D {
-    virtual RID body_create() = 0;
-    virtual void body_set_state(RID p_body, BodyState p_state, const Variant &p_variant) = 0;
-    virtual Variant body_get_state(RID p_body, BodyState p_state) const = 0;
-};
-```
-
-#### Resource Cache (Godot-style)
-
-```cpp
-// ResourceLoader with cache
-Ref<Resource> ResourceLoader::load(const String &p_path) {
-    // Check cache first
-    if (ResourceCache::has(p_path)) {
-        return ResourceCache::get(p_path);
+    // Draw velocity vectors
+    for (pos, vel) in world.query::<(&Position, &Velocity)>() {
+        let start = camera.world_to_screen(*pos);
+        let end = start + *vel * 0.05;
+        spriteBatch.draw_line_debug(start, end, Color::RED);
     }
-    
-    // Determine format
-    Ref<ResourceFormatLoader> loader = get_format_loader_for_path(p_path);
-    Ref<Resource> resource = loader->load(p_path);
-    
-    // Cache for future loads
-    ResourceCache::add(p_path, resource);
-    return resource;
+
+    // Draw tile grid
+    for row in 0..tilemap.rows {
+        for col in 0..tilemap.cols {
+            let screen_pos = camera.world_to_screen(Vec2::new(
+                col as f32 * TILE_SIZE, row as f32 * TILE_SIZE
+            ));
+            spriteBatch.draw_rect_debug(screen_pos, Vec2::splat(TILE_SIZE), Color::WHITE.alpha(0.1));
+        }
+    }
 }
 ```
 
-#### Signal System (Godot-style)
+---
 
-```cpp
-// Define signals
-ADD_SIGNAL(MethodInfo("damage_taken",
-    PropertyInfo(Variant::FLOAT, "amount"),
-    PropertyInfo(Variant::OBJECT, "source")
-));
+## Summary: Architecture Decision Matrix
 
-// Connect
-player->connect("damage_taken", Callable(this, "_on_player_damaged"));
-
-// Emit
-emit_signal("damage_taken", 25.0, enemy);
-```
-
-#### Fixed Timestep Loop (Godot-style)
-
-```cpp
-// SceneTree main loop
-void SceneTree::process(float p_delta) {
-    // Fixed physics step
-    physics_process_accumulator += p_delta;
-    while (physics_process_accumulator >= physics_step) {
-        _physics_process(physics_step);
-        physics_process_accumulator -= physics_step;
-    }
-    
-    // Variable render step
-    _process(p_delta);
-    
-    // Render
-    RenderingServer::get_singleton()->draw();
-}
-```
-
-### 10.4 Anti-Patterns to Avoid
-
-| Anti-Pattern | Why It's Bad | Better Approach |
-|-------------|-------------|-----------------|
-| Direct GPU calls from game code | Not thread-safe, breaks rendering pipeline | Always go through RenderingServer |
-| Deep inheritance chains | Fragile, hard to maintain | Composition via node tree |
-| Mutable shared resources | Race conditions, data corruption | Immutable resources + duplicate() |
-| No lifecycle management | Memory leaks, orphaned objects | Always implement _enter_tree/_exit_tree |
-| Tight coupling between systems | Can't swap backends, hard to test | Server pattern + RID decoupling |
-| Fixed timestep for rendering | Stuttering, wasted frames | Variable timestep with interpolation |
+| Pattern | Recommended Approach | Key Trade-off |
+|---------|---------------------|---------------|
+| **Game Loop** | Fixed timestep + accumulator + interpolation | Determinism vs visual smoothness |
+| **ECS** | Archetype-based (Bevy/DOTS style) | Iteration speed vs modification cost |
+| **State** | Hierarchical FSM or enum-based | Complexity vs flexibility |
+| **Rendering** | Sprite batch + texture sorting | Draw call count vs sort overhead |
+| **Tile Map** | Quadrant batching + frustum culling | Memory vs draw calls |
+| **Camera** | Smooth follow + world clamping | Latency vs responsiveness |
+| **Input** | Action mapping + buffering | Responsiveness vs complexity |
+| **Audio** | Pool-based + category mixing | Memory vs allocation spikes |
+| **Physics** | AABB + tile-based resolution | Accuracy vs performance |
+| **Resources** | Reference-counted cache + pooling | Memory vs load time |
 
 ---
 
-## Appendix A: Top Game Engine Repositories (2026)
+## References
 
-| Repository | Stars | Language | Key Pattern |
-|-----------|-------|----------|-------------|
-| godotengine/godot | 117k | C++ | Scene tree + Server pattern |
-| ocornut/imgui | 76.2k | C++ | Immediate mode GUI |
-| bevyengine/bevy | 48.2k | Rust | Pure ECS + data-oriented |
-| raysan5/raylib | 34.7k | C | Minimal C library |
-| 4ian/GDevelop | 26.5k | JS | No-code event system |
-| BabylonJS/Babylon.js | 26.1k | TS | WebGPU/WebGL engine |
-| libgdx/libgdx | 25.4k | Java | Cross-platform framework |
-| kitao/pyxel | 17.9k | Rust | Retro Python engine |
-| aframevr/aframe | 17.6k | JS | WebXR + ECS |
-| playcanvas/engine | 16.7k | JS | WebGL/WebGPU runtime |
-| skypjack/entt | 13.1k | C++ | Header-only ECS |
-| ebiten/ebiten | 13.5k | Go | Simple 2D engine |
-
-## Appendix B: Key Libraries Used Across Engines
-
-| Library | Purpose | Used By |
-|---------|---------|---------|
-| Bullet3 (14.7k★) | Physics simulation | Many engines |
-| Dear ImGui (76.2k★) | Immediate mode GUI | Editors, tools |
-| EnTT (13.1k★) | ECS framework | C++ engines |
-| SDL2 | Window/input/audio | Many engines |
-| Vulkan | GPU API | Godot, Bevy |
-| Spine | 2D skeletal animation | Multiple engines |
-
----
-
-*Report generated by NeoTrix NT-WORLD research agent. Last updated: 2026-09-13.*
+1. Nystrom, R. "Game Programming Patterns" — gameprogrammingpatterns.com
+2. Tasnim et al. "The Essence of Entity Component System" — ACM SAC 2026
+3. "Exploring the Theory and Practice of Concurrency in ECS" — arXiv 2508.15264
+4. Atwi & Sharafeddin "A Data-Oriented ECS Architecture for Real-Time Game Engines" — SciTePress 2026
+5. "Visualising Game Engine Subsystem Coupling Patterns" — arXiv 2309.06329
+6. Godot Engine docs — godotengine.org
+7. Bevy Engine docs — bevy.org / docs.rs/bevy
+8. Unity Manual — docs.unity3d.com
+9. MonoGame docs — docs.monogame.net
+10. MDN "Tiles and tilemaps overview" — developer.mozilla.org
+11. LearnOpenGL collision detection — learnopengl.com
+12. Vulkan Tutorial: Resource Management — docs.vulkan.org
+13. Stranne.EcsArchitecture — github.com/stranne
+14. NovaECS — github.com/esengine/NovaECS

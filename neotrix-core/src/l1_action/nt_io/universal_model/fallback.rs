@@ -106,6 +106,13 @@ impl FallbackRouter {
     }
 
     /// 筛选满足能力要求且健康的模型
+    ///
+    /// Note: The current implementation checks capability, circuit breaker,
+    /// and error rate. Real implementation should also factor in:
+    /// - Model latency (prefer faster models)
+    /// - Cost tier (prefer cheaper models when quality is equivalent)
+    /// - Rate limit state (skip models near quota)
+    /// - Recency of last failure (cooldown period)
     async fn eligible_models(
         &self,
         required_task: TaskType,
@@ -149,6 +156,11 @@ impl FallbackRouter {
     }
 
     /// 通过 fallback 链执行请求
+    ///
+    /// Note: Task type detection is simplified — both branches yield Chat.
+    /// Real implementation should inspect message structure, presence of
+    /// system prompts, and request metadata to distinguish Chat vs Completion
+    /// vs Embedding tasks for proper model selection.
     pub async fn complete(
         &self,
         request: &LlmRequest,

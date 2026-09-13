@@ -184,23 +184,18 @@ impl StoryboardExtractor {
         }
     }
     
-    /// 从剧本文本拆解分镜
+    /// Extract storyboard from script text.
     ///
-    /// **Feature not wired**: This currently uses naive paragraph splitting.
-    /// Real implementation needs an LLM call (via `nt_io::LlmProvider`) to parse
-    /// the script into structured shots with proper shot sizes, camera movements,
-    /// dialogue extraction, and emotion tagging. The naive split produces empty
-    /// characters/scenes and uniform shot sizes — unsuitable for production use.
+    /// Returns `Err` because LLM-based extraction is not wired.
+    /// Previously returned naive paragraph-split results which were
+    /// unsuitable for production use.
     pub(crate) fn _extract_from_script(
         &mut self,
         episode_id: &str,
         episode_number: u32,
         script_text: &str,
-    ) -> StoryboardScript {
-        // Feature not wired: LLM-based storyboard extraction is not implemented.
-        // Returns naive paragraph-split results. For production, wire to LLM provider
-        // with a structured prompt that extracts shots, dialogue, camera, and emotion.
-        let shots = self.parse_script_to_shots(script_text);
+    ) -> Result<StoryboardScript, String> {
+        let shots = self.parse_script_to_shots(script_text)?;
 
         let total_duration = shots.iter().map(|s| s.duration_secs).sum();
         let characters = self.extract_characters(&shots);
@@ -217,51 +212,19 @@ impl StoryboardExtractor {
         };
 
         self.history.push(script.clone());
-        script
+        Ok(script)
     }
 
-    /// 解析剧本为镜头（朴素段落拆分 — 非 LLM 驱动）
+    /// Parse script text into structured shots.
     ///
-    /// STUB: Splits by blank lines, assigns default shot size (Medium) and static camera.
-    /// Real implementation needs an LLM call to:
-    /// 1. Identify scene boundaries, dialogue, and action blocks
-    /// 2. Assign appropriate shot sizes and camera movements per narrative context
-    /// 3. Extract character names and emotions from dialogue/narration
-    /// 4. Generate positive/negative prompts for video generation
-    /// 5. Determine shot duration from dialogue length and action complexity
-    fn parse_script_to_shots(&self, script_text: &str) -> Vec<Storyboard> {
-        tracing::warn!(
-            "STUB parse_script_to_shots called: naive paragraph splitting, not LLM-based parsing. \
-             TODO: integrate LLM for intelligent shot extraction."
-        );
-        // Feature not wired: LLM-based parsing not implemented.
-        // Falls back to naive paragraph splitting — each paragraph becomes a shot
-        // with default values for all fields except description.
-        let paragraphs: Vec<&str> = script_text.lines().filter(|l| !l.trim().is_empty()).collect();
-
-        paragraphs.iter().enumerate().map(|(i, p)| {
-            Storyboard {
-                id: format!("shot_{}", i + 1),
-                shot_number: (i + 1) as u32,
-                description: p.to_string(),
-                characters: vec![],
-                scene: "默认场景".to_string(),
-                shot_size: ShotSize::Medium,
-                camera_movement: CameraMovement::Static,
-                duration_secs: self.config.default_shot_duration,
-                dialogue: None,
-                narration: None,
-                action: None,
-                emotion: None,
-                positive_prompt: String::new(),
-                negative_prompt: String::new(),
-                start_frame_desc: None,
-                end_frame_desc: None,
-                motion_script: None,
-                linked_characters: vec![],
-                tags: vec![],
-            }
-        }).collect()
+    /// Returns `Err` because LLM-based storyboard extraction is not wired.
+    /// The naive paragraph splitting that previously ran here produced empty
+    /// characters/scenes and uniform shot sizes — unsuitable for production use.
+    fn parse_script_to_shots(&self, _script_text: &str) -> Result<Vec<Storyboard>, String> {
+        Err("Storyboard extraction not wired: requires LLM call via nt_io::LlmProvider \
+             to parse script into structured shots with shot sizes, camera movements, \
+             dialogue extraction, and emotion tagging"
+            .into())
     }
     
     /// 提取角色列表
@@ -400,7 +363,7 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_storyboard_extractor() {
+    fn test_storyboard_extractor_returns_honest_error() {
         let mut extractor = StoryboardExtractor::new();
         
         let script_text = r#"
@@ -409,12 +372,9 @@ mod tests {
         发现没有人，感到困惑
         "#;
         
-        let script = extractor._extract_from_script("ep001", 1, script_text);
-        assert_eq!(script.episode_number, 1);
-        assert!(!script.shots.is_empty());
-        
-        let stats = extractor.statistics();
-        assert_eq!(stats.total_scripts, 1);
+        let result = extractor._extract_from_script("ep001", 1, script_text);
+        assert!(result.is_err(), "unwired extraction must return Err");
+        assert!(result.unwrap_err().contains("not wired"));
     }
     
     #[test]

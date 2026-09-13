@@ -86,8 +86,10 @@ impl _SiteChangeMonitor for _WorldMonitor {
         }
     }
 
-    fn index_fts5(&self, _url: &str, _content: &str) -> bool {
-        true
+    /// Returns `true` if the URL and content pass basic validation.
+    /// Does **not** persist to KB — use `index_fts5_to_kb` for actual writes.
+    fn index_fts5(&self, url: &str, content: &str) -> bool {
+        !url.trim().is_empty() && !content.trim().is_empty()
     }
 
     fn index_fts5_to_kb(&self, kb: &dyn KnowledgeSink, url: &str, _content: &str) -> Result<String, String> {

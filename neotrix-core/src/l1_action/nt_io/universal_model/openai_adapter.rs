@@ -15,6 +15,10 @@ pub struct OpenAIUniversal {
 }
 
 impl OpenAIUniversal {
+    /// Create a new OpenAI universal model adapter.
+    ///
+    /// Detects model capabilities from the `model_id` string and wraps
+    /// the underlying `OpenAiProvider` for unified `UniversalModel` access.
     pub fn new(api_key: String, model_id: &str) -> Self {
         let capabilities = Self::detect_capabilities(model_id);
         Self {
@@ -24,6 +28,7 @@ impl OpenAIUniversal {
         }
     }
 
+    /// Override the base URL for API requests (e.g., for proxied endpoints).
     pub fn with_base_url(self, url: &str) -> Self {
         Self {
             inner: self.inner.with_base_url(url),
@@ -31,6 +36,7 @@ impl OpenAIUniversal {
         }
     }
 
+    /// Enable/disable anonymous Zen mode (hides user-identifying headers).
     pub fn with_zen_anonymous(self, v: bool) -> Self {
         Self {
             inner: self.inner.with_zen_anonymous(v),
@@ -38,6 +44,11 @@ impl OpenAIUniversal {
         }
     }
 
+    /// Detect model capabilities from the model ID string.
+    ///
+    /// Note: Real implementation should query the provider's model list endpoint
+    /// dynamically rather than hardcoding known models. This ensures new models
+    /// (e.g., gpt-5, o1-pro) are supported without code changes.
     fn detect_capabilities(model_id: &str) -> ModelCapabilities {
         match model_id {
             "gpt-4o" | "gpt-4o-mini" => ModelCapabilities {
@@ -109,6 +120,8 @@ impl UniversalModel for OpenAIUniversal {
         self.inner.complete(request).await
     }
 
+    /// STUB: Returns default health. Real implementation should probe the OpenAI
+    /// /v1/models endpoint and track latency/error rate for circuit breaker.
     fn health(&self) -> ModelHealth {
         ModelHealth::default()
     }

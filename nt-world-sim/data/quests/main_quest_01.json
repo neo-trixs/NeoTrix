@@ -1,0 +1,20 @@
+{
+  "id": "main_01",
+  "name": "初入修仙",
+  "description": "村长让你去找青云宗的张长老，把一封信交给他。",
+  "type": "main",
+  "level": 1,
+  "objectives": [
+    {"id": "talk_elder", "type": "talk", "target": "elder", "text": "与村长对话", "completed": false},
+    {"id": "goto_sect", "type": "goto", "target": "sect_entrance", "text": "前往青云宗", "completed": false},
+    {"id": "talk_guard", "type": "talk", "target": "guard", "text": "与守卫对话", "completed": false},
+    {"id": "talk_zhang", "type": "talk", "target": "zhang", "text": "找到张长老", "completed": false}
+  ],
+  "rewards": {
+    "exp": 100,
+    "gold": 50,
+    "items": ["basic_sword", "hp_potion_x3"]
+  },
+  "dialogue_start": "elder_intro",
+  "dialogue_complete": "zhang_complete"
+}

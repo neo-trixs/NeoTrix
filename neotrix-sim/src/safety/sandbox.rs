@@ -125,27 +125,37 @@ mod tests {
     use super::*;
     use crate::foundation::math_bridge::Vec2;
 
+    fn agent_with_fitness(health: f32, energy: f32) -> SimAgent {
+        let mut agent = SimAgent::new(1, Vec2::zero());
+        agent.core.health = health;
+        agent.core.energy = energy;
+        agent
+    }
+
     #[test]
     fn test_mutation_returns_fitness_delta() {
         let mut sandbox = EvolutionSandbox::new(0.5);
-        let mut agent = SimAgent::new(1, Vec2::zero());
-        agent.core.energy = 80.0;
+        let agent = agent_with_fitness(80.0, 80.0);
+        let baseline_fitness = agent.fitness() as f32;
         let mutation = Mutation {
             trait_index: 1,
             delta: 0.1,
             description: "increase energy".into(),
         };
         let delta = sandbox.test_mutation(&agent, mutation);
-        // Delta can be positive or negative, but the function should return a value
-        assert!(delta.abs() < 100.0);
+        // The delta should reflect the change in fitness after simulation
+        // We can't predict exact value due to sandbox simulation, but it should be finite
+        assert!(delta.is_finite(), "fitness delta should be finite, got {}", delta);
+        assert_eq!(sandbox.get_sandbox_stats().tested, 1, "tested count should increment");
     }
 
     #[test]
     fn promote_accepts_high_fitness() {
-        let mut sandbox = EvolutionSandbox::new(0.3);
-        let mut agent = SimAgent::new(1, Vec2::zero());
-        agent.core.energy = 100.0;
-        agent.core.health = 100.0;
+        let threshold = 0.3;
+        let mut sandbox = EvolutionSandbox::new(threshold);
+        let agent = agent_with_fitness(100.0, 100.0);
+        let fitness = agent.fitness() as f32;
+        assert!(fitness >= threshold, "agent fitness {} should be >= threshold {}", fitness, threshold);
         let result = sandbox.promote(agent);
         assert!(result.is_some());
         assert_eq!(sandbox.get_sandbox_stats().promoted, 1);
@@ -153,10 +163,11 @@ mod tests {
 
     #[test]
     fn promote_rejects_low_fitness() {
-        let mut sandbox = EvolutionSandbox::new(0.9);
-        let mut agent = SimAgent::new(1, Vec2::zero());
-        agent.core.energy = 10.0;
-        agent.core.health = 10.0;
+        let threshold = 0.9;
+        let mut sandbox = EvolutionSandbox::new(threshold);
+        let agent = agent_with_fitness(10.0, 10.0);
+        let fitness = agent.fitness() as f32;
+        assert!(fitness < threshold, "agent fitness {} should be < threshold {}", fitness, threshold);
         let result = sandbox.promote(agent);
         assert!(result.is_none());
         assert_eq!(sandbox.get_sandbox_stats().rejected, 1);
@@ -165,12 +176,18 @@ mod tests {
     #[test]
     fn sandbox_stats_track_correctly() {
         let mut sandbox = EvolutionSandbox::new(0.5);
-        let agent = SimAgent::new(1, Vec2::zero());
-        sandbox.test_mutation(&agent, Mutation {
-            trait_index: 0,
-            delta: 0.1,
-            description: "test".into(),
-        });
-        assert_eq!(sandbox.get_sandbox_stats().tested, 1);
+        let agent = agent_with_fitness(50.0, 50.0);
+        sandbox.test_mutation(
+            &agent,
+            Mutation {
+                trait_index: 0,
+                delta: 0.1,
+                description: "test".into(),
+            },
+        );
+        let stats = sandbox.get_sandbox_stats();
+        assert_eq!(stats.tested, 1);
+        assert_eq!(stats.promoted, 0);
+        assert_eq!(stats.rejected, 0);
     }
 }

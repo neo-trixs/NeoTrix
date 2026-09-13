@@ -1,0 +1,13 @@
+{
+  "name": "characters",
+  "tileSize": 32,
+  "sprites": [
+    {"id": 200, "name": "player", "frames": {"down": [0,1,2,3], "left": [4,5,6,7], "right": [8,9,10,11], "up": [12,13,14,15]}},
+    {"id": 210, "name": "elder", "frames": {"down": [0,1]}},
+    {"id": 211, "name": "merchant", "frames": {"down": [0,1]}},
+    {"id": 212, "name": "guard", "frames": {"down": [0,1], "attack": [2,3]}},
+    {"id": 220, "name": "monster_wolf", "frames": {"down": [0,1], "attack": [2,3]}},
+    {"id": 221, "name": "monster_slime", "frames": {"down": [0,1]}},
+    {"id": 222, "name": "monster_ghost", "frames": {"down": [0,1], "fade": [2,3]}}
+  ]
+}

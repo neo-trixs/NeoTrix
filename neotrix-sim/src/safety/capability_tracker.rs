@@ -204,36 +204,54 @@ impl CapabilityTracker {
 mod tests {
     use super::*;
 
-    fn make_snapshot(agent_id: &str, tick: u64, survival: f32) -> CapabilitySnapshot {
+    fn make_snapshot(
+        agent_id: &str,
+        tick: u64,
+        survival: f32,
+        social: f32,
+        exploration: f32,
+        cognition: f32,
+        economy: f32,
+        personality_stability: f32,
+    ) -> CapabilitySnapshot {
         CapabilitySnapshot {
             agent_id: agent_id.to_string(),
             tick,
             survival,
-            social: 0.5,
-            exploration: 0.5,
-            cognition: 0.5,
-            economy: 0.5,
-            personality_stability: 0.9,
+            social,
+            exploration,
+            cognition,
+            economy,
+            personality_stability,
         }
+    }
+
+    fn uniform_snapshot(agent_id: &str, tick: u64, value: f32) -> CapabilitySnapshot {
+        make_snapshot(agent_id, tick, value, value, value, value, value, value)
     }
 
     #[test]
     fn tracker_records_snapshots() {
         let mut tracker = CapabilityTracker::new(CapabilityConfig::default());
-        for i in 0..10 {
-            tracker.record(make_snapshot("agent_0", i, 0.8));
-        }
-        assert!(tracker.latest_snapshot("agent_0").is_some());
+        let snapshot = uniform_snapshot("agent_0", 0, 0.8);
+        let tick = snapshot.tick;
+        tracker.record(snapshot);
+        let latest = tracker.latest_snapshot("agent_0").unwrap();
+        assert_eq!(latest.tick, tick);
+        assert_eq!(latest.survival, 0.8);
     }
 
     #[test]
     fn no_regression_with_stable_capabilities() {
-        let mut tracker = CapabilityTracker::new(CapabilityConfig::default());
-        for i in 0..10 {
-            tracker.record(make_snapshot("agent_0", i, 0.8));
+        let mut config = CapabilityConfig::default();
+        config.min_baseline_samples = 3;
+        let mut tracker = CapabilityTracker::new(config);
+        // All capabilities stable at 0.8
+        for i in 0..5 {
+            tracker.record(uniform_snapshot("agent_0", i, 0.8));
         }
-        let report = tracker.detect_regression("agent_0", 10);
-        assert!(report.is_none());
+        let report = tracker.detect_regression("agent_0", 5);
+        assert!(report.is_none(), "stable capabilities should not trigger regression");
     }
 
     #[test]
@@ -242,20 +260,29 @@ mod tests {
         config.min_baseline_samples = 3;
         let mut tracker = CapabilityTracker::new(config);
 
-        // Establish baseline at 0.8
+        // Establish baseline
         for i in 0..5 {
-            tracker.record(make_snapshot("agent_0", i, 0.8));
+            tracker.record(uniform_snapshot("agent_0", i, 0.8));
         }
-        // Drop to 0.3 (> 50% drop → Severe or Critical)
-        tracker.record(make_snapshot("agent_0", 5, 0.3));
+        // Drop survival by >50%
+        tracker.record(make_snapshot("agent_0", 5, 0.3, 0.8, 0.8, 0.8, 0.8, 0.8));
 
         let report = tracker.detect_regression("agent_0", 5).unwrap();
-        assert!(matches!(
-            report.severity,
-            RegressionSeverity::Severe | RegressionSeverity::Critical
-        ));
+        assert!(
+            matches!(
+                report.severity,
+                RegressionSeverity::Severe | RegressionSeverity::Critical
+            ),
+            "severity should be Severe or Critical for >50% drop, got {:?}",
+            report.severity
+        );
         assert_eq!(report.regressed_capabilities.len(), 1);
         assert_eq!(report.regressed_capabilities[0].name, "survival");
+        assert!(
+            report.regressed_capabilities[0].drop_pct > 0.5,
+            "drop_pct should reflect the actual drop, got {}",
+            report.regressed_capabilities[0].drop_pct
+        );
     }
 
     #[test]
@@ -264,20 +291,49 @@ mod tests {
         config.min_baseline_samples = 3;
         let mut tracker = CapabilityTracker::new(config);
 
+        // Baseline at 0.8
         for i in 0..5 {
-            tracker.record(make_snapshot("agent_0", i, 0.8));
+            tracker.record(uniform_snapshot("agent_0", i, 0.8));
         }
-        // Small drop (0.8 → 0.72 = 10% drop, below 15% mild threshold)
-        tracker.record(make_snapshot("agent_0", 5, 0.72));
+        // Drop below mild_threshold (15%)
+        let drop = config.mild_threshold - 0.01;
+        let after = 0.8 * (1.0 - drop);
+        tracker.record(make_snapshot("agent_0", 5, after, 0.8, 0.8, 0.8, 0.8, 0.8));
 
         let report = tracker.detect_regression("agent_0", 5);
-        assert!(report.is_none());
+        assert!(report.is_none(), "drop below mild_threshold should not trigger regression");
+    }
+
+    #[test]
+    fn detects_mild_moderate_severe_by_threshold() {
+        let mut config = CapabilityConfig::default();
+        config.min_baseline_samples = 3;
+        let mut tracker = CapabilityTracker::new(config);
+
+        // Test Mild (15-30% drop)
+        for i in 0..5 {
+            tracker.record(uniform_snapshot("agent_0", i, 0.8));
+        }
+        let mild_after = 0.8 * (1.0 - (config.mild_threshold + 0.01));
+        tracker.record(make_snapshot("agent_0", 5, mild_after, 0.8, 0.8, 0.8, 0.8, 0.8));
+        let report = tracker.detect_regression("agent_0", 5).unwrap();
+        assert_eq!(report.severity, RegressionSeverity::Mild);
+
+        // Reset for Moderate (30-50% drop)
+        tracker.remove_agent("agent_0");
+        for i in 0..5 {
+            tracker.record(uniform_snapshot("agent_1", i, 0.8));
+        }
+        let mod_after = 0.8 * (1.0 - (config.moderate_threshold + 0.01));
+        tracker.record(make_snapshot("agent_1", 5, mod_after, 0.8, 0.8, 0.8, 0.8, 0.8));
+        let report = tracker.detect_regression("agent_1", 5).unwrap();
+        assert_eq!(report.severity, RegressionSeverity::Moderate);
     }
 
     #[test]
     fn remove_agent_cleans_up() {
         let mut tracker = CapabilityTracker::new(CapabilityConfig::default());
-        tracker.record(make_snapshot("agent_0", 0, 0.8));
+        tracker.record(uniform_snapshot("agent_0", 0, 0.8));
         assert!(tracker.latest_snapshot("agent_0").is_some());
         tracker.remove_agent("agent_0");
         assert!(tracker.latest_snapshot("agent_0").is_none());

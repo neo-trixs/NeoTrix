@@ -125,7 +125,7 @@ impl PanoramaPipeline {
         // 2. 世界模型预测
         let features: Vec<f64> = brain.brain.capability.arr.iter().take(64).copied().collect();
         let (fe_report, phi_value, anomaly) = nt_world_model.run_prediction_cycle(&features);
-        let latent = nt_world_model.jepa.encode(&features);
+        let latent = nt_world_model.jepa.encode(&features).unwrap_or_default();
         let phi_report = PhiReport {
             phi: phi_value,
             phi_raw: phi_value,

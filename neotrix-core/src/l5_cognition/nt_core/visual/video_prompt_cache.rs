@@ -141,24 +141,16 @@ impl _VideoPromptCache {
         self.stats.total_entries += 1;
     }
 
-    /// 生成提示词嵌入
+    /// Generate prompt embedding for semantic similarity search.
     ///
-    /// STUB: Byte-frequency vector (128-dim) with L2 normalization — not semantically meaningful.
-    /// Real implementation needs:
-    /// - Text embedding model (e.g., sentence-transformers, OpenAI embeddings)
-    /// - Or domain-specific embedding trained on video prompt similarity
-    /// - Persistent embedding index (FAISS/HNSW) for sub-linear similarity search
+    /// Uses byte-frequency heuristic (128-dim L2-normalized) — **not semantically meaningful**.
+    /// This is a placeholder for sentence-transformers or domain-specific embedding model.
+    /// Cache hits via this embedding are unreliable for semantically different prompts.
     fn embed_prompt(&self, prompt: &str) -> Vec<f64> {
-        tracing::warn!(
-            "STUB embed_prompt called: byte-frequency vector, not semantic embedding. \
-             TODO: integrate sentence-transformers for actual semantic embedding."
-        );
-        // 简化的嵌入生成 (实际应使用模型)
         let mut embedding = vec![0.0; 128];
         for (i, byte) in prompt.bytes().enumerate() {
             embedding[i % 128] += byte as f64;
         }
-        // 归一化
         let norm: f64 = embedding.iter().map(|x| x * x).sum::<f64>().sqrt();
         if norm > 0.0 {
             for x in &mut embedding {

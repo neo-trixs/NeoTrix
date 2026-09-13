@@ -17,7 +17,6 @@
 //! ```
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::ProviderCategory;
 use crate::l1_action::nt_io::nt_io_provider::common::factory::LlmProviderType;

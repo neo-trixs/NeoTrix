@@ -15,6 +15,10 @@ pub struct GeminiUniversal {
 }
 
 impl GeminiUniversal {
+    /// Create a new Gemini universal model adapter.
+    ///
+    /// Detects model capabilities from the `model_id` string and wraps
+    /// the underlying `GeminiProvider` for unified `UniversalModel` access.
     pub fn new(api_key: String, model_id: &str) -> Self {
         let capabilities = Self::detect_capabilities(model_id);
         Self {
@@ -24,6 +28,7 @@ impl GeminiUniversal {
         }
     }
 
+    /// Override the base URL for API requests (e.g., for Vertex AI or proxied endpoints).
     pub fn with_base_url(self, url: &str) -> Self {
         Self {
             inner: self.inner.with_base_url(url),
@@ -31,6 +36,11 @@ impl GeminiUniversal {
         }
     }
 
+    /// Detect model capabilities from the model ID string.
+    ///
+    /// Note: Real implementation should query Gemini's model metadata endpoint
+    /// or maintain a remote capability registry. The hardcoded map here is a
+    /// subset; newer Gemini models (2.5, etc.) will need manual addition.
     fn detect_capabilities(model_id: &str) -> ModelCapabilities {
         match model_id {
             "gemini-1.5-pro" | "gemini-2.0-flash" => ModelCapabilities {
@@ -90,6 +100,8 @@ impl UniversalModel for GeminiUniversal {
         self.inner.complete(request).await
     }
 
+    /// STUB: Returns default health. Real implementation should probe the Gemini
+    /// /v1/models endpoint and track latency/error rate for circuit breaker.
     fn health(&self) -> ModelHealth {
         ModelHealth::default()
     }
