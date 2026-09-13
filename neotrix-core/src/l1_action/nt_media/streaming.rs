@@ -760,7 +760,7 @@ impl ParallelDownloader {
     ) -> Self {
         let chunks = Self::plan_chunks(total_size, chunk_size);
         let token_bucket = max_bandwidth_bps.map(|rate| {
-            Arc::new(Mutex::new(TokenBucket::new(rate * 2.0, rate)))
+            Arc::new(TokioMutex::new(TokenBucket::new(rate * 2.0, rate)))
         });
         Self {
             client,
@@ -2151,7 +2151,7 @@ impl DownloadEngine {
     pub async fn download_with_progress(
         &self,
         task: &DownloadTask,
-        progress_tx: Option<mpsc::Sender<DownloadProgress>>,
+        progress_tx: Option<mpsc::Sender<DownloadProgressSnapshot>>,
     ) -> DownloadStatus {
         let cancelled = Arc::new(AtomicBool::new(false));
         let start = SystemTime::now();
@@ -2288,7 +2288,7 @@ impl DownloadEngine {
     async fn download_inner(
         &self,
         task: &DownloadTask,
-        progress_tx: Option<mpsc::Sender<DownloadProgress>>,
+        progress_tx: Option<mpsc::Sender<DownloadProgressSnapshot>>,
         cancelled: Arc<AtomicBool>,
     ) -> Result<u64, String> {
         let scheme = router::UrlScheme::parse(&task.url);

@@ -176,8 +176,16 @@ fn run_hex_crucible(grid: usize, seed: u64, max_games: usize) -> (usize, usize, 
 }
 
 fn rng_step(cells: &mut [u8], seed: u64, step: usize) {
-    // No-op placeholder for deterministic behavior
+    // not wired: deterministic RNG step for game training.
+    // Previous implementation was a no-op placeholder that silently returned,
+    // masking the fact that game training produces no state transitions.
+    // This function must evolve the cellular automaton state for game-based
+    // training to produce meaningful phi measurements.
     let _ = (cells, seed, step);
+    log::trace!(
+        "not wired: rng_step is a no-op — game training cells are not mutated \
+         (step={step}, seed={seed})"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════

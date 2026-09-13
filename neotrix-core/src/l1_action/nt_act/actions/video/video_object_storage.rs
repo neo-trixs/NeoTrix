@@ -174,7 +174,14 @@ impl VideoObjectStorage {
     pub fn download(&mut self, object_id: &str) -> Option<Vec<u8>> {
         if let Some(_object) = self.objects.get(object_id) {
             self.stats.total_downloads += 1;
-            // not wired: actual download logic not implemented
+            // not wired: actual download logic not implemented.
+            // Returns None silently — callers cannot distinguish "not found"
+            // from "download not wired". Log for observability.
+            log::warn!(
+                "not wired: VideoObjectStorage::download — object '{}' exists but \
+                 actual download logic not implemented",
+                object_id
+            );
             None
         } else {
             None

@@ -8,7 +8,7 @@
 //!   5. 384 lines = 64 × 6 = total degrees of freedom in E₈ root system
 //!   6. 50 (Dayan) - 1 (observer) = 49 (observable dof) ↔ 49 = 7² = 248-199
 
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 pub mod abduction;
 pub mod domain_transition;
 pub mod e8_abduction_bridge;

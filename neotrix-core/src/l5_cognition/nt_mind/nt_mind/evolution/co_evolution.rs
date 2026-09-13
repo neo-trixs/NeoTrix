@@ -3,21 +3,22 @@
 //! MAGE 核心机制映射到 NeoTrix 派单/学习层:
 //!   1. **四子图共进化知识图谱 (EVOKG)**: 本模块把能力图 (capability)、任务图 (task)、
 //!      经验图 (experience)、环境图 (environment) 统一为一个 `CoEvoGraph`, 每次
+//      派单 reward 同时更新四个子图 — 知识在图上共进化, 而非散落各处。
+//   2. **双记忆索引**: 经验子图按成败建立双索引 — success index (自身正确轨迹)
+//      与 failure index (失败校正)。`guidance` 从成功索引取指导, `failure_warnings`
+//      从失败索引取警示。
+//   3. **两个 bandit 共享同一 reward 流**: 任务级搜索 bandit (`TaskSearchBandit`,
+//      选择检索策略) + 技能级路由 bandit (既有 `RouteLearner`)。`dispatch_and_execute`
+//      把同一次执行结果同时喂给两个 bandit — 派单组织与检索策略从同一观测共进化。
+//   4. **append-only 记忆增长 (信息单调)**: 经验记忆只追加、从不改写; 超上限时仅
+//      淘汰最旧条目 (bounded curriculum), 已沉淀的知识不被覆写。
+//   5. **frozen backbone**: 执行主干 (AgentExecutor) 不变, 学习信号只落在图与 bandit。
+//
+// 强化既有节点 (R-P42): 任务级搜索 bandit 选择的是 `nt_memory_kb::RetrievalStrategy`,
+// 经 `ProductionAgentExecutor::execute_with_strategy` 走既有的 `search_with_confidence`
+// 检索缝 — 不新建平行检索路径。
+
 use serde::{Serialize, Deserialize};
-//!      派单 reward 同时更新四个子图 — 知识在图上共进化, 而非散落各处。
-//!   2. **双记忆索引**: 经验子图按成败建立双索引 — success index (自身正确轨迹)
-//!      与 failure index (失败校正)。`guidance` 从成功索引取指导, `failure_warnings`
-//!      从失败索引取警示。
-//!   3. **两个 bandit 共享同一 reward 流**: 任务级搜索 bandit (`TaskSearchBandit`,
-//!      选择检索策略) + 技能级路由 bandit (既有 `RouteLearner`)。`dispatch_and_execute`
-//!      把同一次执行结果同时喂给两个 bandit — 派单组织与检索策略从同一观测共进化。
-//!   4. **append-only 记忆增长 (信息单调)**: 经验记忆只追加、从不改写; 超上限时仅
-//!      淘汰最旧条目 (bounded curriculum), 已沉淀的知识不被覆写。
-//!   5. **frozen backbone**: 执行主干 (AgentExecutor) 不变, 学习信号只落在图与 bandit。
-//!
-//! 强化既有节点 (R-P42): 任务级搜索 bandit 选择的是 `nt_memory_kb::RetrievalStrategy`,
-//! 经 `ProductionAgentExecutor::execute_with_strategy` 走既有的 `search_with_confidence`
-//! 检索缝 — 不新建平行检索路径。
 
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};

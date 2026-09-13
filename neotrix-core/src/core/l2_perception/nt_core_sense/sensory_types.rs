@@ -31,7 +31,7 @@ pub enum ChangeType {
     Deleted,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SensoryEventKind {
     Visual(AnalysisReport),
     Auditory(Transcription),

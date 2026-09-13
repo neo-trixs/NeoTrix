@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_hcube::{FhrrHyperCube, FhrrVector};
+use crate::core::nt_core_hcube::FhrrVector;
 
 /// Nuclei vulnerability finding
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,7 +93,7 @@ impl NucleiEngine {
     /// Extract VSA embedding from findings
     pub fn _findings_to_vsa(&self, findings: &[_NucleiFinding]) -> Vec<FhrrVector> {
         findings.iter()
-            .map(|f| {
+            .map(|_f| {
                 // In production: use word2vec or BERT embedding
                 // For now: deterministic hash-based vector
                 let vec = FhrrVector::random_dim(1024, 0x42);

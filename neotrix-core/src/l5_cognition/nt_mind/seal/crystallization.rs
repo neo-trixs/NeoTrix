@@ -20,8 +20,7 @@ pub(crate) enum _CrystallizationStatus {
 }
 
 /// I/O 契约 — 定义技能的输入输出规范
-#[derive(Clone, Debug)]
-
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct _IoContract {
     /// 输入 JSON schema
     pub input_schema: String,
@@ -36,8 +35,7 @@ pub(crate) struct _IoContract {
 }
 
 /// 已结晶技能 — 从模板晋升为正式技能
-#[derive(Clone, Debug)]
-
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct _CrystallizedSkill {
     /// 技能唯一标识
     pub id: String,
@@ -371,6 +369,7 @@ pub struct SkillEvolutionTrend {
 }
 
 /// 技能进化追踪器
+#[derive(Debug)]
 pub struct SkillEvolutionTracker {
     /// 技能进化记录 (skill_id → 版本历史)
     records: HashMap<String, Vec<SkillEvolutionRecord>>,

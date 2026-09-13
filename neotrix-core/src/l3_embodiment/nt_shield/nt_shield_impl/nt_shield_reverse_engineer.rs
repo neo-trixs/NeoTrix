@@ -37,7 +37,7 @@ impl GhidraAnalyzer {
     }
     
     /// Analyze binary for vulnerability patterns
-    pub async fn analyze_binary(&mut self, binary_path: &str) -> AnalysisResult {
+    pub async fn analyze_binary(&mut self, _binary_path: &str) -> AnalysisResult {
         // TODO: Launch Ghidra headless with Python API
         // Architecture: L1 Body execution, results → VSA embedding
         

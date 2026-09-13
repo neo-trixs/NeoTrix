@@ -152,7 +152,7 @@ impl CliCommand for MediaStreamCmd {
             };
 
             let output_path = handle.output_path().to_path_buf();
-            let mut last_msg = String::new();
+            let mut _last_msg = String::new();
 
             // Drain progress updates
             while let Ok(Some(progress)) =
@@ -200,7 +200,7 @@ impl CliCommand for MediaStreamCmd {
                     PipelineStatus::Failed(e) => format!("Failed: {}", e),
                     PipelineStatus::Cancelled => "Cancelled".to_string(),
                 };
-                last_msg = msg.clone();
+                _last_msg = msg.clone();
                 eprintln!("\r  {}", msg);
             }
 

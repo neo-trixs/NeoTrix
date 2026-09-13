@@ -258,22 +258,13 @@ impl _ChainExecutor {
             // 执行步骤
             self.state.current_step = Some(step_id.clone());
 
-            // executors field not yet implemented on _ChainExecutor
-            tracing::warn!("_ChainExecutor.executors not yet implemented; using placeholder");
-            {
-                let start = std::time::Instant::now();
-                // Placeholder: pass through current input as output
-                let output = current_input.clone().unwrap_or(serde_json::json!(null));
-                let duration = start.elapsed().as_millis() as u64;
-                self.results.insert(step_id.clone(), StepResult {
-                    step_id: step_id.clone(),
-                    status: StepStatus::Completed,
-                    output: Some(output.clone()),
-                    error: None,
-                    duration_ms: duration,
-                });
-                current_input = Some(output);
-            }
+            // not wired: _ChainExecutor.executors field not implemented.
+            // Cannot execute chain steps without real executors.
+            return Err(format!(
+                "not wired: _ChainExecutor.executors not implemented — \
+                 cannot execute step '{}' without a real executor backend",
+                step_id
+            ));
         }
 
         self.state.status = _ChainStatus::Completed;
@@ -344,17 +335,13 @@ impl _ChainExecutor {
         for step_id in completed_steps {
             let step = self.chain.steps.iter().find(|s| s.id == step_id);
             if let Some(_step) = step {
-            // executors field not yet implemented on _ChainExecutor
-            tracing::warn!("_ChainExecutor.executors not yet implemented; using placeholder");
-                if let Some(result) = self.results.get(&step_id) {
-                    if let Some(ref _output) = result.output {
-                        // let _ = executor.rollback(&step.config, output);
-                        self.results.insert(step_id, StepResult {
-                            status: StepStatus::RolledBack,
-                            ..result.clone()
-                        });
-                    }
-                }
+                // not wired: _ChainExecutor.executors not implemented.
+                // Cannot perform step rollback without real executor backend.
+                return Err(format!(
+                    "not wired: _ChainExecutor.executors not implemented — \
+                     cannot rollback step '{}' without a real executor backend",
+                    step_id
+                ));
             }
         }
 

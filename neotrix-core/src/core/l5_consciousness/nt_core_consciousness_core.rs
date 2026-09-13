@@ -883,6 +883,23 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("shield_audit", "shield_audit", "NT-SHIELD", "RiskAssessor"),
     ("shield", "shield_audit", "NT-SHIELD", "RiskAssessor"),
     ("security", "shield_audit", "NT-SHIELD", "RiskAssessor"),
+    // ── Privacy & security internal dispatch routes ──
+    ("隐私", "privacy_mask", "NT-SHIELD", "RiskAssessor"),
+    ("脱敏", "privacy_mask", "NT-SHIELD", "RiskAssessor"),
+    ("隐私遮罩", "privacy_mask", "NT-SHIELD", "RiskAssessor"),
+    ("privacy_mask", "privacy_mask", "NT-SHIELD", "RiskAssessor"),
+    // ── Evidence-first security scanning routes ──
+    ("证据扫描", "evidence_scan", "NT-SHIELD", "RiskAssessor"),
+    ("证据安全", "evidence_scan", "NT-SHIELD", "RiskAssessor"),
+    ("evidence_scan", "evidence_scan", "NT-SHIELD", "RiskAssessor"),
+    // ── Skill evolution tracking routes ──
+    ("技能进化", "skill_evolution", "NT-MIND", "KnowledgeIntegrator"),
+    ("技能演进", "skill_evolution", "NT-MIND", "KnowledgeIntegrator"),
+    ("skill_evolution", "skill_evolution", "NT-MIND", "KnowledgeIntegrator"),
+    // ── Experience-knowledge bridge routes ──
+    ("经验桥接", "experience_bridge", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("经验知识", "experience_bridge", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("experience_bridge", "experience_bridge", "NT-MEMORY", "KnowledgeIntegrator"),
 ];
 
 /// 子任务 — 意识核心从人类语言拆解出的最小执行单元。
@@ -2251,6 +2268,94 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     recon.estimated_complexity,
                 ),
             )
+        }
+        // ── Privacy egress masking (nt_shield) ──
+        "privacy_mask" => {
+            let input = first_path(&task.summary)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| task.summary.clone());
+            let redacted = crate::core::l2_perception::nt_core_llm::redact_internals(&input);
+            (
+                true,
+                format!(
+                    "隐私遮罩完成:\n  输入: {}\n  脱敏后: {} 字符",
+                    input,
+                    redacted.len(),
+                ),
+            )
+        }
+        // ── Evidence-first security scanning (nt_shield) ──
+        "evidence_scan" => {
+            use crate::l3_embodiment::nt_shield::nt_shield_agentic_scan::{AgenticScanner, ScanConfig};
+            let config = ScanConfig::default();
+            let mut scanner = AgenticScanner::new(config);
+            let target = first_path(&task.summary)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| ".".to_string());
+            let recon = scanner.recon_scan(&target);
+            let signals_count = recon.entry_points.len() + recon.frameworks.len();
+            let severity = if recon.estimated_complexity == "High" {
+                "高"
+            } else if recon.estimated_complexity == "Medium" {
+                "中"
+            } else {
+                "低"
+            };
+            (
+                true,
+                format!(
+                    "证据优先安全扫描 ({}):\n  入口点: {} | 框架: {} | 复杂度: {} ({}) | 预估文件: {}",
+                    target,
+                    recon.entry_points.join(", "),
+                    recon.frameworks.join(", "),
+                    recon.estimated_complexity,
+                    severity,
+                    recon.estimated_files,
+                ),
+            )
+        }
+        // ── Skill evolution tracking (nt_mind) ──
+        "skill_evolution" => {
+            let mut evo = crate::l5_cognition::nt_mind::evolution::EvolutionLoop::new();
+            let report = evo.run_cycle(None, None);
+            let patterns: Vec<String> = report.new_patterns.iter().take(5).cloned().collect();
+            (
+                true,
+                format!(
+                    "技能进化追踪完成 (cycle {}):\n  新模式: {} 个 | 建议: {} 个 | 健康: {:.1}\n  模式样本: {}",
+                    report.cycle,
+                    report.new_patterns.len(),
+                    report.suggestions.len(),
+                    report.evolution_score,
+                    if patterns.is_empty() { "无".to_string() } else { patterns.join(", ") },
+                ),
+            )
+        }
+        // ── Experience-knowledge bridge (nt_memory) ──
+        "experience_bridge" => {
+            let kb = KnowledgeBase::open(None);
+            match kb {
+                Ok(kb) => {
+                    let results = kb.serve_core(&task.summary, 5)
+                        .map(|sr| sr.results.len())
+                        .unwrap_or(0);
+                    let entries: Vec<String> = kb.serve_core(&task.summary, 3)
+                        .map(|sr| sr.results.iter().take(3)
+                            .map(|r| format!("  - [{}] {}", r.node.title, r.node.summary.as_deref().unwrap_or("")))
+                            .collect())
+                        .unwrap_or_default();
+                    (
+                        true,
+                        format!(
+                            "经验-知识桥接查询 ({}):\n  命中 {} 个相关经验节点\n{}",
+                            task.summary,
+                            results,
+                            if entries.is_empty() { "  无匹配经验".to_string() } else { entries.join("\n") },
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("经验-知识桥接失败 (KB 不可用): {e}")),
+            }
         }
         _ => (
             true,

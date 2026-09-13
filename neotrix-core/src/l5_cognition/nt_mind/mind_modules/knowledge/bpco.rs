@@ -40,10 +40,13 @@ impl Default for _BpcoCritic {
 
 impl _BestPracticeCritic for _BpcoCritic {
     fn critique(&self, _generated: &str) -> _CriticFeedback {
-        // C0 stub: 占位中性反馈, 真实 critic 模型接线待 C1-C4 迭代。
+        // not wired: C0 structural stub — no real critic model connected.
+        // Returns explicit rejection signal instead of silent neutral placeholder.
         _CriticFeedback {
-            critiques: vec!["[stub] best-practice critic not yet wired".into()],
-            score: self.min_score,
+            critiques: vec!["not wired: BPCO critic has no real model behind it — \
+             cannot evaluate best-practice compliance"
+                .into()],
+            score: 0.0,
         }
     }
 

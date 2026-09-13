@@ -128,7 +128,7 @@ impl ProviderRegistry {
         for state in states.iter() {
             let name = state.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
             if name.is_empty() { continue; }
-            let adapter = super::gateway_adapter::GatewayV2Adapter::new(gateway.clone(), name.clone());
+            let _adapter = super::gateway_adapter::GatewayV2Adapter::new(gateway.clone(), name.clone());
             // GatewayV2Adapter 实现 LlmProvider, 但 ProviderRegistry 需要 UnifiedProvider
             // 这里我们只注册 adapter 的 name 用于状态同步
             log::debug!("[registry] registered gateway adapter for provider: {}", name);

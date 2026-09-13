@@ -1037,7 +1037,13 @@ impl BrainStage for SleepStage {
             //         Err(e) => log::warn!("[sleep] engine error: {}", e),
             //     }
             // }
-            log::debug!("[sleep] engine present but select_operator/selective_state not wired");
+            // not wired: select_operator / selective_state not connected.
+            // Sleep stage cannot run memory consolidation with operator selection.
+            // Falls back to light consolidation only.
+            log::debug!(
+                "[sleep] not wired: select_operator/selective_state — \
+                 light consolidation only (operator-based consolidation unavailable)"
+            );
         } else {
             let result = brain.consolidate_memories();
             log::info!(

@@ -135,7 +135,7 @@ impl _StyleHarmonizer {
     /// 注意：需要接入风格迁移模型。当前返回明确错误。
     pub(crate) fn _harmonize(
         &mut self,
-        input_path: &str,
+        _input_path: &str,
         _reference_path: Option<&str>,
     ) -> _StyleHarmonizationResult {
         let start = std::time::Instant::now();

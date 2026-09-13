@@ -6,7 +6,7 @@
 
 pub mod skill_validator;
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestResult, SelfTestRegistry};
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// 人类监督治理自测
 pub struct HumanOversightSelfTest;
@@ -14,8 +14,14 @@ pub struct HumanOversightSelfTest;
 impl SelfTest for HumanOversightSelfTest {
     fn name(&self) -> &str { "human_oversight_governance" }
     fn self_test(&self) -> Result<(), Vec<String>> {
-        // 检查治理规则是否可访问
-        Ok(())
+        // not wired: human_oversight_governance has no concrete oversight rules
+        // to validate. The check previously returned Ok(()) unconditionally,
+        // silently passing even when governance was absent.
+        Err(vec![
+            "not wired: HumanOversightSelfTest has no governance rules to validate \
+             — needs concrete human-oversight policy definitions and enforcement hooks"
+                .into()
+        ])
     }
 }
 

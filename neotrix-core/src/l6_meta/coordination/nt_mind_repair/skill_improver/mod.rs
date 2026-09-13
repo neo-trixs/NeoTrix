@@ -404,8 +404,8 @@ rm -rf /dangerous
         let result = improver.improve_until_pass(&skill_path);
         
         // Should have detected safety issue and attempted fix
-        assert!(result.iterations > 0);
-        assert!(result.scores.safety >= 0.0); // After fix
+        assert!(result.unwrap().iterations > 0);
+        assert!(result.unwrap().scores.safety >= 0.0); // After fix
         
         Ok(())
     }

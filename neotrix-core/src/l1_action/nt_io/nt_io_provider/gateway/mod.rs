@@ -42,8 +42,6 @@ pub use routing::free_providers;
 pub use resilience::*;
 // 执行
 pub use execution::*;
-// 可观测性
-pub use observability::*;
 // 类型 & 注册表
 pub use types::*;
 // Feature-gated

@@ -12,9 +12,8 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::l1_action::nt_io::nt_io_provider::gateway::execution::unified_inference::{UnifiedInference, InferenceRequest, InferenceResponse, InferenceError, StreamHandle, RouterHealth, InferenceCapabilities, ResponseMetadata};
+use crate::l1_action::nt_io::nt_io_provider::gateway::execution::unified_inference::{UnifiedInference, InferenceRequest, InferenceResponse, InferenceError, CostEstimate, StreamHandle, RouterHealth, InferenceCapabilities, ResponseMetadata};
 use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
-use crate::l1_action::nt_io::nt_io_provider::common::types::{LlmRequest, LlmResponse, LlmError};
 
 /// 路由器配置
 #[derive(Debug, Clone)]
@@ -130,7 +129,7 @@ impl UnifiedInference for InferenceRouter {
         let llm_request = request.to_llm_request();
 
         // 3. 委托 Gateway 流式
-        let rx = self.gateway.stream_complete_with_selection(&llm_request).await
+        let mut rx = self.gateway.stream_complete_with_selection(&llm_request).await
             .map_err(InferenceError::from)?;
 
         // 4. 包装响应流
@@ -213,10 +212,10 @@ impl UnifiedInference for InferenceRouter {
             + (completion_tokens as f64 / 1000.0) * 0.002;
 
         CostEstimate {
-            input_tokens: prompt_tokens,
-            output_tokens: completion_tokens,
+            prompt_tokens,
+            completion_tokens,
             estimated_cost_usd: cost,
-            model: request.model.clone().unwrap_or_default(),
+            provider_name: request.model.clone().unwrap_or_default(),
         }
     }
 }

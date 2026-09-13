@@ -277,7 +277,7 @@ impl _ContentModeration {
         };
 
         // 元数据信号 (唯一真实的输入源)
-        let mut risk = baseline;
+        let mut risk: f64 = baseline;
         if metadata.get("contains_pii").map_or(false, |v| v == "true") {
             risk += 0.2;
         }

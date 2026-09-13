@@ -308,7 +308,7 @@ impl From<LlmError> for InferenceError {
         match e {
             LlmError::Network(s) => InferenceError::NetworkError { provider: String::new(), message: s },
             LlmError::Authentication(s) => InferenceError::AuthenticationError { provider: String::new(), message: s },
-            LlmError::RateLimit(s) => InferenceError::RateLimitError { provider: String::new(), retry_after: None },
+            LlmError::RateLimit(_s) => InferenceError::RateLimitError { provider: String::new(), retry_after: None },
             LlmError::InvalidRequest(s) => InferenceError::ValidationError(s),
             LlmError::Server(s) => InferenceError::ProviderError { provider: String::new(), message: s },
             LlmError::Unknown(s) => InferenceError::ProviderError { provider: String::new(), message: s },

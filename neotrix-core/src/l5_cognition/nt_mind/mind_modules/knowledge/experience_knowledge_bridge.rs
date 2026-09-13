@@ -189,8 +189,8 @@ impl ExperienceKnowledgeBridge {
         }
 
         for (skill_name, experiences) in &skill_groups {
-            let successes: Vec<&RawExperience> = experiences.iter().filter(|e| e.success).collect();
-            let failures: Vec<&RawExperience> = experiences.iter().filter(|e| !e.success).collect();
+            let successes: Vec<&RawExperience> = experiences.iter().copied().filter(|e| e.success).collect();
+            let failures: Vec<&RawExperience> = experiences.iter().copied().filter(|e| !e.success).collect();
 
             if experiences.len() >= self.config.distillation_threshold as usize {
                 let success_rate = successes.len() as f64 / experiences.len() as f64;

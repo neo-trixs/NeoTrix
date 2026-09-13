@@ -21,7 +21,7 @@ impl ObjectionAdapter {
     }
     
     /// Explore iOS/Android app via Objection
-    pub async fn explore_app(&mut self, app_id: &str) -> _ExploreResult {
+    pub async fn explore_app(&mut self, _app_id: &str) -> _ExploreResult {
         // TODO: objection explore -a app_id --express
         // Architecture: L1 Body (device interaction) → L2 Perception (app model)
         

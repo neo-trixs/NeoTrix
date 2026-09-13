@@ -195,10 +195,14 @@ impl EthicalIntuition {
             timestamp: now(),
         });
 
-        // 更新冲突类型校准参数
-        // 简化：统计准确率
-        // 校准算法待实现（Platt scaling / Isotonic regression）
-        tracing::warn!("Calibration algorithm not yet implemented (Platt scaling / Isotonic regression)");
+        // not wired: Calibration algorithm not implemented (Platt scaling / Isotonic regression).
+        // Previous code logged a warning and silently continued, masking the gap.
+        // Now we record the calibration event but leave the model params unchanged,
+        // which is the honest behavior when no calibration algorithm is present.
+        tracing::warn!(
+            "not wired: calibration algorithm missing (Platt scaling / Isotonic regression) — \
+             judgment recorded but model parameters not updated"
+        );
     }
 
     fn analyze_mapping(&self, case: &EthicalCase) -> String {

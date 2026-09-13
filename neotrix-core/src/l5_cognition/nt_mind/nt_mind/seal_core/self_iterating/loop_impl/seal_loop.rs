@@ -698,8 +698,13 @@ impl SelfIteratingBrain {
                 ));
             }
             // JIT-Agent test-benching / yoyo-gasp bench 旁路 (吸收源 l4 yoyo-gasp/gasp)。
-            // JIT bench backend not yet wired (nt_mind_yoyo_gasp / nt_mind_gasp)
-            tracing::warn!("JIT bench backend not yet wired");
+            // not wired: JIT bench backend not connected (nt_mind_yoyo_gasp / nt_mind_gasp).
+            // Bench step is skipped — regression testing proceeds without JIT bench data.
+            tracing::warn!(
+                "not wired: JIT bench backend not connected — \
+                 step '{}' skipped (no bench data available)",
+                step.id
+            );
         }
 
         // ── (b) 运行回归测试 (scope 内 BenchmarkGate 作为实际回归执行体) ──
