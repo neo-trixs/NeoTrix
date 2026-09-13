@@ -122,8 +122,9 @@ pub use crate::core::nt_core_reasoning::{
 
 pub use crate::core::nt_core_answer_engine::{
     AnswerEngine, AnswerEngineConfig, AnswerMode, AnswerResult, AnswerSegment, ContextSource,
-    PreparedQuery, SearchResult, SourceType, WidgetKind, WidgetProvider,
+    PreparedQuery, SourceType, WidgetKind, WidgetProvider,
 };
+pub use neotrix_types::search_backend::SearchResult;
 
 pub use crate::l1_action::nt_io::nt_io_mention::{resolve_mentions, MentionResult};
 pub use crate::l1_action::nt_io::nt_io_notify::{

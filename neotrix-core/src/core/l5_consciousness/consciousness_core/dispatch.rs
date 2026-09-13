@@ -335,6 +335,28 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("有无对比", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
     ("baseline", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
     ("效果度量", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
+    // second_brain — 组织知识分层隔离
+    ("second_brain", "second_brain", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("第二大脑", "second_brain", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("知识分层", "second_brain", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("组织知识", "second_brain", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("知识隔离", "second_brain", "NT-MEMORY", "KnowledgeIntegrator"),
+    // regression_test — experience-tree 回归测试
+    ("regression_test", "regression_test", "NT-MIND", "MetaCognitionAnalyst"),
+    ("回归测试", "regression_test", "NT-MIND", "MetaCognitionAnalyst"),
+    ("经验回归", "regression_test", "NT-MIND", "MetaCognitionAnalyst"),
+    ("experience regression", "regression_test", "NT-MIND", "MetaCognitionAnalyst"),
+    // declarative_knowledge — SEAL 陈述性知识
+    ("declarative_knowledge", "declarative_knowledge", "NT-MIND", "KnowledgeIntegrator"),
+    ("陈述性知识", "declarative_knowledge", "NT-MIND", "KnowledgeIntegrator"),
+    ("声明知识", "declarative_knowledge", "NT-MIND", "KnowledgeIntegrator"),
+    ("事实知识", "declarative_knowledge", "NT-MIND", "KnowledgeIntegrator"),
+    // procedural_recipes — SEAL 过程性配方
+    ("procedural_recipes", "procedural_recipes", "NT-MIND", "KnowledgeIntegrator"),
+    ("过程配方", "procedural_recipes", "NT-MIND", "KnowledgeIntegrator"),
+    ("操作配方", "procedural_recipes", "NT-MIND", "KnowledgeIntegrator"),
+    ("技能配方", "procedural_recipes", "NT-MIND", "KnowledgeIntegrator"),
+    ("how-to", "procedural_recipes", "NT-MIND", "KnowledgeIntegrator"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -1214,6 +1236,121 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                     )
                 }
                 Err(e) => (false, format!("with_without_baseline 度量失败: KB 不可用 — {e}")),
+            }
+        }
+        "second_brain" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let separation = if lower.contains("org") || lower.contains("组织") { "organizational" }
+                        else if lower.contains("personal") || lower.contains("个人") { "personal" }
+                        else { "hybrid" };
+                    let layers = ["inbox", "working", "archive", "public"];
+                    let mut layer_counts = Vec::new();
+                    for layer in &layers {
+                        let count = kb.kv_get("second_brain", &format!("layer:{}:count", layer))
+                            .and_then(|v| v.parse::<u64>().ok())
+                            .unwrap_or(0);
+                        layer_counts.push(format!("{}={}", layer, count));
+                    }
+                    (
+                        true,
+                        format!(
+                            "second_brain 组织知识分层隔离: {} 模式 | KB: {} nodes / {} kv | layers: {}",
+                            separation, nodes, kv, layer_counts.join(", ")
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("second_brain 失败: KB 不可用 — {e}")),
+            }
+        }
+        "regression_test" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let scope = if lower.contains("full") || lower.contains("全量") { "full" }
+                        else if lower.contains("delta") || lower.contains("增量") { "delta" }
+                        else { "smoke" };
+                    let last_run = kb.kv_get("experience", "regression:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    let pass_count = kb.kv_get("experience", "regression:pass_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let fail_count = kb.kv_get("experience", "regression:fail_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    (
+                        true,
+                        format!(
+                            "regression_test experience-tree 回归测试: {} 范围 | pass={} fail={} | 上次: {} | KB: {} nodes / {} kv",
+                            scope, pass_count, fail_count,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("regression_test 失败: KB 不可用 — {e}")),
+            }
+        }
+        "declarative_knowledge" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let category = if lower.contains("axiom") || lower.contains("公理") { "axiom" }
+                        else if lower.contains("pattern") || lower.contains("模式") { "pattern" }
+                        else if lower.contains("rule") || lower.contains("规则") { "rule" }
+                        else { "fact" };
+                    let dk_count = kb.kv_get("seal", "declarative:count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    (
+                        true,
+                        format!(
+                            "declarative_knowledge SEAL 陈述性知识: {} 类别 | 已积累 {} 条 | KB: {} nodes / {} kv",
+                            category, dk_count, nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("declarative_knowledge 失败: KB 不可用 — {e}")),
+            }
+        }
+        "procedural_recipes" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let recipe_type = if lower.contains("etl") || lower.contains("数据") { "etl" }
+                        else if lower.contains("build") || lower.contains("构建") { "build" }
+                        else if lower.contains("deploy") || lower.contains("部署") { "deploy" }
+                        else { "general" };
+                    let recipe_count = kb.kv_get("seal", "procedural:count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let recipe_list = kb.kv_get("seal", "procedural:registry")
+                        .unwrap_or_else(|| "[]".to_string());
+                    let parsed: Vec<String> = serde_json::from_str(&recipe_list).unwrap_or_default();
+                    (
+                        true,
+                        format!(
+                            "procedural_recipes SEAL 过程性配方: {} 类型 | 已注册 {} 条 ({}...) | KB: {} nodes / {} kv",
+                            recipe_type, recipe_count,
+                            parsed.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("procedural_recipes 失败: KB 不可用 — {e}")),
             }
         }
         _ => (

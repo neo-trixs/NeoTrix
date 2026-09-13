@@ -432,10 +432,14 @@ impl BackgroundLoop {
         // Session start event (obsidian-mind SessionStart pattern)
         if let Some(ref kb_ref) = kb {
             let _result: Result<usize, String> = kb_ref.rebuild_skills_library();
-            let _ = kb_ref.rebuild_graph_cache();
+            if let Err(e) = kb_ref.rebuild_graph_cache() {
+                log::warn!("[session-start] failed to rebuild graph cache: {}", e);
+            }
             let summary = format!("session_start: cycle_{}", chrono::Utc::now().timestamp());
             let title = format!("session-start-{}", chrono::Utc::now().timestamp());
-            let _ = kb_ref.insert_or_get_node(&title, crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Session, Some(&summary), None, Some("neotrix"));
+            if let Err(e) = kb_ref.insert_or_get_node(&title, crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Session, Some(&summary), None, Some("neotrix")) {
+                log::warn!("[session-start] failed to insert session node: {}", e);
+            }
             let issues = kb_ref.integrity_check();
             if !issues.is_empty() {
                 log::warn!("[session-start] KB integrity issues: {:?}", issues);

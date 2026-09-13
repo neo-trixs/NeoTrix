@@ -127,7 +127,9 @@ impl BackgroundLoopHandle {
                             "phi_trend": pr.phi_trend,
                             "is_conscious_like": pr.is_conscious_like,
                         });
-                        let _ = kb.kv_set("consciousness", "phi_report", &phi_json.to_string());
+                        if let Err(e) = kb.kv_set("consciousness", "phi_report", &phi_json.to_string()) {
+                            log::warn!("[consciousness] failed to persist phi_report: {}", e);
+                        }
                     }
 
                     // Persist full GoldStandardReport
@@ -143,7 +145,9 @@ impl BackgroundLoopHandle {
                             "detection_streak": gs.detection_streak,
                             "combined_confidence": gs.combined_confidence,
                         });
-                        let _ = kb.kv_set("consciousness", "gold_standard", &gs_json.to_string());
+                        if let Err(e) = kb.kv_set("consciousness", "gold_standard", &gs_json.to_string()) {
+                            log::warn!("[consciousness] failed to persist gold_standard: {}", e);
+                        }
                     }
 
                     // Persist trends (phi_trend, coherence_trend, health_trend)
@@ -152,7 +156,9 @@ impl BackgroundLoopHandle {
                         "coherence_trend": aw.trends.coherence_trend,
                         "health_trend": aw.trends.health_trend,
                     });
-                    let _ = kb.kv_set("consciousness", "trends", &trends_json.to_string());
+                    if let Err(e) = kb.kv_set("consciousness", "trends", &trends_json.to_string()) {
+                        log::warn!("[consciousness] failed to persist trends: {}", e);
+                    }
 
                     // Persist conversation awareness
                     let conv = &aw.current.conversation_awareness;
@@ -165,7 +171,9 @@ impl BackgroundLoopHandle {
                         "self_assessed_quality": conv.self_assessed_quality,
                         "depth_trend": conv.depth_trend,
                     });
-                    let _ = kb.kv_set("consciousness", "conversation", &conv_json.to_string());
+                    if let Err(e) = kb.kv_set("consciousness", "conversation", &conv_json.to_string()) {
+                        log::warn!("[consciousness] failed to persist conversation: {}", e);
+                    }
 
                     // Persist blind spots
                     let spots: Vec<serde_json::Value> = aw
@@ -182,7 +190,9 @@ impl BackgroundLoopHandle {
                         })
                         .collect();
                     let spots_json = serde_json::json!({ "blind_spots": spots });
-                    let _ = kb.kv_set("consciousness", "blind_spots", &spots_json.to_string());
+                    if let Err(e) = kb.kv_set("consciousness", "blind_spots", &spots_json.to_string()) {
+                        log::warn!("[consciousness] failed to persist blind_spots: {}", e);
+                    }
 
                     // L6 Self intra-reflection: analyze reasoning quality
                     // brain not available in this scope — need to obtain from self.bbrain
@@ -225,13 +235,15 @@ impl BackgroundLoopHandle {
                     // }
 
                     // Legacy snapshot for timeline view
-                    let _ = kb.record_consciousness_snapshot(
+                    if let Err(e) = kb.record_consciousness_snapshot(
                         phi,
                         coherence,
                         is_conscious,
                         tier_label,
                         &details,
-                    );
+                    ) {
+                        log::warn!("[consciousness] failed to record consciousness snapshot: {}", e);
+                    }
                 }
             }
 

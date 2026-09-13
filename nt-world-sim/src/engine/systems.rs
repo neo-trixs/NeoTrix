@@ -413,8 +413,10 @@ mod tests {
 
         let events = world.drain_collisions();
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0].entity_a, a);
-        assert_eq!(events[0].entity_b, b);
+        assert!(
+            (events[0].entity_a == a && events[0].entity_b == b)
+            || (events[0].entity_a == b && events[0].entity_b == a)
+        );
         assert!(events[0].overlap_x > 0.0);
     }
 

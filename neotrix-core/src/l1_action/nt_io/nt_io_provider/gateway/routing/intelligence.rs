@@ -35,6 +35,11 @@ impl MLPredictor {
         }
     }
 
+    /// Record a latency observation for a provider.
+    ///
+    /// Note: Real implementation needs — the sliding window caps at 1000 entries per provider.
+    /// Consider adding: decay-weighted recording (recent observations weighted higher),
+    /// outlier rejection before recording, and correlation with error rate.
     pub fn record(&self, provider: &str, latency: Duration, success: bool) {
         let mut data = self.data.write().unwrap_or_else(|e| e.into_inner());
         let stats = data.entry(provider.to_string()).or_insert_with(|| ProviderStats {
@@ -48,6 +53,14 @@ impl MLPredictor {
         stats.last_update = Instant::now();
     }
 
+    /// Predict latency percentiles for a provider based on historical data.
+    ///
+    /// Note: Real implementation needs — p95/p99 calculation uses simple indexing which
+    /// may be inaccurate for small sample sizes. Consider:
+    /// - Linear interpolation for percentile estimation
+    /// - Confidence intervals based on sample size
+    /// - Time-decay weighting (recent observations more relevant)
+    /// - Distribution fitting (log-normal is common for latency data)
     pub fn predict_latency(&self, provider: &str) -> Option<LatencyPrediction> {
         let data = self.data.read().unwrap_or_else(|e| e.into_inner());
         let stats = data.get(provider)?;
@@ -79,6 +92,11 @@ impl MLPredictor {
         })
     }
 
+    /// Predict success rate for a provider based on historical observations.
+    ///
+    /// Note: Real implementation needs — returns 0.5 (neutral prior) for unknown providers.
+    /// Consider adding: Bayesian updating with beta prior, time-decay for old observations,
+    /// and distinction between different error types (transient vs permanent).
     pub fn predict_success_rate(&self, provider: &str) -> f64 {
         let data = self.data.read().unwrap_or_else(|e| e.into_inner());
         match data.get(provider) {
@@ -157,6 +175,14 @@ impl IntelligentRouter {
             .insert(weight.provider.clone(), weight);
     }
 
+    /// Route a request to the best provider based on request profile and provider weights.
+    ///
+    /// Note: Real implementation needs — the scoring heuristic is simplistic (linear combination
+    /// of latency, cost, success rate, error rate). Consider:
+    /// - Multi-armed bandit approach (Thompson sampling or UCB)
+    /// - Context-aware scoring (different weights for different task types)
+    /// - Latency SLA enforcement (reject providers that can't meet the SLA)
+    /// - Cost optimization under budget constraints
     pub fn route(&self, profile: &RequestProfile) -> Option<String> {
         let weights = self.weights.read().unwrap_or_else(|e| e.into_inner());
         let history = self.history.read().unwrap_or_else(|e| e.into_inner());
@@ -215,6 +241,12 @@ impl IntelligentRouter {
         history.push_back(decision);
     }
 
+    /// Update provider weight based on observed outcome (EMA smoothing).
+    ///
+    /// Note: Real implementation needs — the alpha=0.1 smoothing factor is hardcoded.
+    /// Consider: adaptive alpha based on observation count (more data → lower alpha),
+    /// separate tracking of latency vs error rate EMA, and weight decay for providers
+    /// not recently observed.
     pub fn update_weight(&self, provider: &str, success: bool, latency: Duration) {
         let mut weights = self.weights.write().unwrap_or_else(|e| e.into_inner());
         if let Some(pw) = weights.get_mut(provider) {

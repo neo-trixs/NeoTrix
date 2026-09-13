@@ -79,24 +79,17 @@ impl SpatialHashGrid {
     /// Query all entities that might overlap a given AABB
     pub fn query_aabb(&self, rect: &Rect) -> Vec<u64> {
         let cells = self.aabb_cells(rect);
-        let mut seen = HashMap::new();
-        let mut result = Vec::new();
+        let mut seen = std::collections::HashSet::new();
 
         for key in &cells {
             if let Some(cell) = self.cells.get(key) {
                 for &entity_id in &cell.entities {
-                    *seen.entry(entity_id).or_insert(0u32) += 1;
+                    seen.insert(entity_id);
                 }
             }
         }
 
-        let threshold = cells.len().max(1) as u32;
-        for (id, count) in seen {
-            if count >= threshold {
-                result.push(id);
-            }
-        }
-        result
+        seen.into_iter().collect()
     }
 
     /// Query entities near a point
@@ -690,8 +683,9 @@ mod tests {
     #[test]
     fn test_perf_aggregator() {
         let mut agg = PerfAggregator::new();
-        agg.tick(1.0 / 60.0);
-        agg.tick(1.0 / 60.0);
+        for _ in 0..60 {
+            agg.tick(1.0 / 60.0);
+        }
         assert!(agg.stats.fps > 0.0);
     }
 

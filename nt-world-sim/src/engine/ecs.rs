@@ -69,6 +69,7 @@ impl ComponentVec {
         self.data.len()
     }
 
+    #[allow(dead_code)]
     fn is_empty(&self) -> bool {
         self.data.is_empty()
     }

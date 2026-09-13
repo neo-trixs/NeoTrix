@@ -13,13 +13,31 @@ pub mod builder;
 
 pub use error::{GameError, GameResult};
 
+// Re-export core math types
+pub use engine::{Color, Vec2, Rect, Transform};
+
+// Re-export renderer types
+pub use engine::{Sprite, TileDef, Renderer, CanvasRenderer};
+
+// Re-export physics (Collider renamed to PhysicsCollider in engine)
 pub use engine::{
-    Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer,
-    PhysicsEntity, BodyType, RigidBody, Collider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld,
-    KeyCode, MouseButton, GamepadAxis, GamepadButton, InputState, InputProvider, SimpleInputProvider,
+    PhysicsEntity, BodyType, RigidBody, PhysicsCollider, CollisionInfo,
+    PhysicsWorld, SimplePhysicsWorld,
 };
+
+// Re-export input
+pub use engine::{
+    KeyCode, MouseButton, GamepadAxis, GamepadButton,
+    InputState, InputProvider, SimpleInputProvider,
+};
+
+// Re-export scene graph
 pub use engine::scene::{SceneGraph, SceneNode};
+
+// Re-export event bus
 pub use engine::event_bus::{TypedEventBus, GameEventHandler};
+
+// Re-export audio
 pub use engine::audio::{AudioManager, AudioBackend, AudioHandle, StubAudioBackend};
 
 #[cfg(test)]

@@ -59,7 +59,13 @@ impl CircuitBreaker {
         self
     }
 
-    /// 检查当前是否应允许请求通过（含 half-open 状态机逻辑）
+    /// Check if the circuit breaker should allow a request through.
+    ///
+    /// Note: Real implementation needs — the half-open state transition is triggered
+    /// by checking `last_failure.elapsed() > recovery_timeout`. Consider adding:
+    /// - Probe count tracking to limit concurrent half-open requests
+    /// - Success rate threshold for half-open → closed transition
+    /// - Gradual traffic increase during half-open (not just probe limits)
     pub fn should_allow(&self) -> bool {
         if self.state.load(Ordering::Relaxed) {
             // Open 状态：检查冷却期是否已过，尝试进入 half-open
@@ -95,6 +101,12 @@ impl CircuitBreaker {
         false
     }
 
+    /// Record a failure and potentially trip the circuit breaker.
+    ///
+    /// Note: Real implementation needs — the threshold check is simple count-based.
+    /// Consider: time-windowed failure counting (failures in last N seconds),
+    /// error-type-aware tripping (transient errors count less than permanent ones),
+    /// and per-model circuit breaking in addition to per-provider.
     pub fn record_failure(&self) {
         let count = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
         *self.last_failure.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
@@ -116,6 +128,11 @@ impl CircuitBreaker {
         }
     }
 
+    /// Record a success, resetting failure count and potentially closing the circuit.
+    ///
+    /// Note: Real implementation needs — success during half-open immediately closes
+    /// the circuit. Consider: requiring N consecutive successes before closing,
+    /// and tracking success rate during half-open to detect flapping.
     pub fn record_success(&self) {
         self.success_count.fetch_add(1, Ordering::Relaxed);
         if self.state.load(Ordering::Relaxed) {
@@ -260,6 +277,13 @@ impl AnomalyDetector {
         self.record_metric(provider, "error_rate", rate)
     }
 
+    /// Record a metric value and check for anomaly (z-score based).
+    ///
+    /// Note: Real implementation needs — the z-score threshold is static (2.5). Consider:
+    /// - Adaptive thresholds based on provider volatility
+    /// - Separate thresholds per metric type (latency vs error rate)
+    /// - Exponential decay weighting for recent observations
+    /// - Alert deduplication (don't re-alert for same持续 anomaly)
     pub fn record_metric(
         &self,
         provider: &str,
@@ -520,6 +544,14 @@ impl DriftDetector {
         }
     }
 
+    /// Detect quality drift for a provider using z-score analysis on recent metrics.
+    ///
+    /// Note: Real implementation needs — the drift detection uses simple z-score on
+    /// the latest observation vs rolling mean. Consider:
+    /// - CUSUM (cumulative sum) control charts for trend detection
+    /// - Seasonal decomposition (latency patterns vary by time of day)
+    /// - Multivariate drift detection (correlated latency + error rate changes)
+    /// - Integration with circuit breaker for automatic failover on severe drift
     pub fn detect(&self, provider_id: &str) -> DriftStatus {
         let metrics: Vec<&ProviderMetric> = self
             .windows
@@ -847,6 +879,12 @@ impl ResponseHealer {
         Self::default()
     }
 
+    /// Heal malformed JSON response (extract, trim trailing commas, close unclosed brackets).
+    ///
+    /// Note: Real implementation needs — the healing pipeline is extract → trim → close.
+    /// Consider adding: Unicode normalization, escape sequence repair, and schema
+    /// validation after healing. Also track which providers commonly return malformed
+    /// JSON for targeted improvement.
     pub fn heal(&mut self, raw: &str) -> String {
         if serde_json::from_str::<serde_json::Value>(raw).is_ok() {
             return raw.to_string();

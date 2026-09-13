@@ -298,12 +298,12 @@ impl SaveBackend for FileSaveBackend {
 // ---------------------------------------------------------------------------
 
 pub struct MemorySaveBackend {
-    saves: HashMap<u32, String>,
+    saves: std::sync::Mutex<HashMap<u32, String>>,
 }
 
 impl MemorySaveBackend {
     pub fn new() -> Self {
-        Self { saves: HashMap::new() }
+        Self { saves: std::sync::Mutex::new(HashMap::new()) }
     }
 }
 
@@ -312,18 +312,22 @@ impl Default for MemorySaveBackend {
 }
 
 impl SaveBackend for MemorySaveBackend {
-    fn save(&self, _slot: u32, _data: &str) -> Result<(), String> {
-        // In-memory backend: in real HTML5 this would call localStorage
+    fn save(&self, slot: u32, data: &str) -> Result<(), String> {
+        if let Ok(mut saves) = self.saves.lock() {
+            saves.insert(slot, data.to_string());
+        }
         Ok(())
     }
 
     fn load(&self, slot: u32) -> Result<String, String> {
-        self.saves.get(&slot).cloned()
+        self.saves.lock()
+            .map_err(|e| format!("Lock error: {}", e))?
+            .get(&slot).cloned()
             .ok_or_else(|| format!("Save slot {} not found", slot))
     }
 
     fn exists(&self, slot: u32) -> bool {
-        self.saves.contains_key(&slot)
+        self.saves.lock().map(|s| s.contains_key(&slot)).unwrap_or(false)
     }
 
     fn delete(&self, _slot: u32) -> Result<(), String> { Ok(()) }

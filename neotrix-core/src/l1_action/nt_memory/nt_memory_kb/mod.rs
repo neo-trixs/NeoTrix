@@ -693,7 +693,7 @@ impl KnowledgeBase {
         Ok(())
     }
 
-    pub fn search_similar(&self, query_vector: &[u8], k: usize) -> Result<Vec<crate::core::nt_core_vector_store::types::SearchResult>, String> {
+    pub fn search_similar(&self, query_vector: &[u8], k: usize) -> Result<Vec<crate::core::nt_core_vector_store::types::VectorSearchResult>, String> {
         let va = self.vector_adapter.read().map_err(|e| format!("Lock: {}", e))?;
         match va.as_ref() {
             Some(adapter) => Ok(adapter.search_similar_nodes(query_vector, k)),

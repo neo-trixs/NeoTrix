@@ -132,6 +132,7 @@ pub struct Game {
     pub needs_save: bool,
 
     // Timing
+    #[allow(dead_code)]
     last_frame: Instant,
     pub fps: f64,
 }
@@ -202,11 +203,9 @@ impl Game {
 
     /// Start a new game
     pub fn new_game(&mut self, slot: u32, player_name: &str) {
-        if self.save_manager.is_some() {
-            let state = EngineSaveManager::new_game(slot, player_name);
-            self.current_save = Some(state);
-            self.current_save_slot = slot;
-        }
+        let state = EngineSaveManager::new_game(slot, player_name);
+        self.current_save = Some(state);
+        self.current_save_slot = slot;
         self.phase = GamePhase::Playing;
         self.tick_count = 0;
         self.play_time = 0.0;

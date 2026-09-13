@@ -29,6 +29,20 @@ pub struct RouteFeatures {
     pub code_ratio: f32,
     /// Historical preference scores (per model)
     pub hist_preference: Option<HashMap<String, f32>>,
+    /// Task complexity (0-1)
+    pub complexity: f32,
+    /// Urgency level (0-1)
+    pub urgency: f32,
+    /// Domain specificity (0-1, 0=general, 1=narrow)
+    pub domain_specificity: f32,
+    /// Estimated context length (归一化)
+    pub context_length: f32,
+    /// Requires tool use
+    pub requires_tool_use: bool,
+    /// Requires code generation
+    pub requires_code: bool,
+    /// Requires deep reasoning
+    pub requires_reasoning: bool,
 }
 
 /// 多轮对话状态 — MultiTurnRouter 输入
@@ -194,6 +208,13 @@ impl KNNRouter {
         }
     }
 
+    /// Cosine similarity between two vectors.
+    ///
+    /// Note: Real implementation needs — for production KNN routing, consider using
+    /// SIMD-optimized dot product (e.g., `packed_simd` or `wide` crate) for 768-d
+    /// embeddings. The current implementation is O(n) per comparison and may be
+    /// slow with large history (>10K entries). Consider approximate nearest neighbor
+    /// (ANN) indexes like HNSW for sub-linear lookup.
     fn cosine_sim(&self, a: &[f32], b: &[f32]) -> f32 {
         if a.len() != b.len() || a.is_empty() {
             return 0.0;
@@ -208,6 +229,14 @@ impl KNNRouter {
         }
     }
 
+    /// Flatten RouteFeatures into a single feature vector for KNN similarity computation.
+    ///
+    /// Note: Real implementation needs — concatenating 768-d embedding with 9-d task_type
+    /// one-hot and 2 scalar features creates a 779-d vector. Consider:
+    /// - Normalizing each component to [0,1] before concatenation to prevent embedding
+    ///   dominance
+    /// - Using separate similarity scores per component and weighting them
+    /// - PCA/dimensionality reduction for large history sets
     fn features_to_vec(&self, f: &RouteFeatures) -> Vec<f32> {
         let mut v = f.query_embedding.clone();
         v.extend(&f.task_type);
@@ -372,18 +401,28 @@ impl MLPRouter {
         output
     }
 
+    /// Flatten RouteFeatures into MLP input vector, pad/truncate to input_dim.
+    ///
+    /// Note: STUB: The current implementation pads with zeros or truncates, which loses
+    /// information for embeddings > input_dim. Real implementation needs:
+    /// - Proper tokenization-aware embedding extraction
+    /// - Dynamic input_dim based on actual embedding model output size
+    /// - Consider using candle/onnx for GPU-accelerated forward pass
     fn features_to_vec(&self, f: &RouteFeatures) -> Vec<f32> {
-        let mut v = f.query_embedding.clone();
-        v.extend(&f.task_type);
-        v.push(f.query_len_norm);
-        v.push(f.code_ratio);
-        // pad/truncate to input_dim
+        // STUB: placeholder feature extraction — pads/truncates to input_dim.
+        // Real implementation needs tokenization-aware embedding extraction.
+        let mut v = Vec::with_capacity(self.input_dim);
+        v.push(f.complexity);
+        v.push(f.urgency);
+        v.push(f.domain_specificity);
+        v.push(f.context_length);
+        v.push(f.requires_tool_use as i32 as f32);
+        v.push(f.requires_code as i32 as f32);
+        v.push(f.requires_reasoning as i32 as f32);
         v.resize(self.input_dim, 0.0);
+        v.truncate(self.input_dim);
         v
     }
-}
-
-impl LearnedRouter for MLPRouter {
     fn route(&self, features: &RouteFeatures, candidates: &[CandidateModel]) -> RouteDecision {
         let x = self.features_to_vec(features);
         let logits = self.forward(&x);
@@ -600,6 +639,10 @@ impl LearnedRouter for MultiTurnRouter {
 }
 
 /// 快速层挑选 — 延迟最低的 40% 候选中选质量最高者
+///
+/// Note: Real implementation needs — the 40% threshold is hardcoded. Consider making
+/// it configurable or adaptive based on current load. Also, for large candidate sets,
+/// sorting all candidates by latency is O(n log n); a partial sort or heap would be O(n log k).
 fn fast_tier_pick(candidates: &[CandidateModel]) -> Option<&CandidateModel> {
     if candidates.is_empty() { return None; }
     let mut sorted: Vec<&CandidateModel> = candidates.iter().collect();
@@ -610,6 +653,10 @@ fn fast_tier_pick(candidates: &[CandidateModel]) -> Option<&CandidateModel> {
         .copied()
 }
 
+/// Build a RouteDecision from a single candidate with given confidence.
+///
+/// Note: Real implementation needs — the fallback_chain is always a single-element vec.
+/// Consider populating it with runner-up candidates for downstream retry logic.
 fn decision_from(c: &CandidateModel, confidence: f32) -> RouteDecision {
     RouteDecision {
         selected_model: c.name.clone(),
@@ -626,6 +673,13 @@ fn decision_from(c: &CandidateModel, confidence: f32) -> RouteDecision {
 pub struct RouterFactory;
 
 impl RouterFactory {
+    /// Create a learned router by type name.
+    ///
+    /// Note: STUB: The `_create_router` method is prefixed with `_` indicating it's not
+    /// yet wired into production. Real implementation needs:
+    /// - Load pre-trained weights from disk (KNN history, MLP weights)
+    /// - Support model persistence (save/load trained state)
+    /// - Add "multiturn" as explicit router type in match arm
     pub(crate) fn _create_router(router_type: &str, candidates: &[CandidateModel], alpha: f32, beta: f32) -> Box<dyn LearnedRouter> {
         match router_type {
             "knn" => Box::new(KNNRouter::new(5, alpha, beta)),
@@ -661,6 +715,13 @@ mod tests {
             query_len_norm: 0.1,
             code_ratio: 0.0,
             hist_preference: None,
+            complexity: 0.3,
+            urgency: 0.2,
+            domain_specificity: 0.1,
+            context_length: 0.5,
+            requires_tool_use: false,
+            requires_code: false,
+            requires_reasoning: false,
         };
         let dec = router.route(&features, &candidates);
         assert!(!dec.selected_model.is_empty());
@@ -678,6 +739,13 @@ mod tests {
             query_len_norm: 0.1,
             code_ratio: 0.5,
             hist_preference: None,
+            complexity: 0.5,
+            urgency: 0.3,
+            domain_specificity: 0.2,
+            context_length: 0.6,
+            requires_tool_use: false,
+            requires_code: true,
+            requires_reasoning: false,
         };
         let dec = router.route(&features, &candidates);
         assert!(!dec.selected_model.is_empty());
@@ -713,6 +781,13 @@ mod tests {
             query_len_norm: 0.1,
             code_ratio: 0.0,
             hist_preference: None,
+            complexity: 0.3,
+            urgency: 0.2,
+            domain_specificity: 0.1,
+            context_length: 0.5,
+            requires_tool_use: false,
+            requires_code: false,
+            requires_reasoning: false,
         };
         // 工具链锚定 → 强制返回锚定模型
         let mut conv = ConversationState::default();
@@ -737,6 +812,13 @@ mod tests {
             query_len_norm: 0.5,
             code_ratio: 0.8,
             hist_preference: None,
+            complexity: 0.7,
+            urgency: 0.5,
+            domain_specificity: 0.3,
+            context_length: 0.8,
+            requires_tool_use: true,
+            requires_code: true,
+            requires_reasoning: true,
         };
         // 超预算 → 免费模型
         let conv = ConversationState {
@@ -761,6 +843,13 @@ mod tests {
             query_len_norm: 0.8,
             code_ratio: 0.9,
             hist_preference: None,
+            complexity: 0.9,
+            urgency: 0.7,
+            domain_specificity: 0.8,
+            context_length: 0.9,
+            requires_tool_use: true,
+            requires_code: true,
+            requires_reasoning: true,
         };
         // 深度讨论 → 应选质量最高的模型
         let mut conv = ConversationState::default();

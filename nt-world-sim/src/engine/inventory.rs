@@ -306,16 +306,18 @@ impl Inventory {
         };
 
         // Swap with equipped
-        let old = self.equipment.insert(equip_slot, taken).unwrap_or_else(InventorySlot::empty);
+        let old = self.equipment.insert(equip_slot, taken);
 
         // Return old equipment to inventory if not empty
-        if !old.is_empty() {
-            if let Some(old_id) = &old.item_id {
-                self.add_item(old_id, old.count);
+        if let Some(ref old_slot) = old {
+            if !old_slot.is_empty() {
+                if let Some(old_id) = &old_slot.item_id {
+                    self.add_item(old_id, old_slot.count);
+                }
             }
         }
 
-        Some(old)
+        old
     }
 
     /// Unequip item from equipment slot. Returns true if successful.
@@ -459,7 +461,7 @@ mod tests {
     fn test_add_overflow() {
         let mut inv = Inventory::new(2);
         inv.register_item(Item::new("x", "X", ItemType::Material).with_max_stack(5));
-        assert_eq!(inv.add_item("x", 10), 5); // only 2 slots × 5 = 10, but only 2 slots available
+        assert_eq!(inv.add_item("x", 10), 0); // 2 slots × 5 max = 10, all fit
         // Actually: first empty slot gets min(10, 5) = 5, second gets min(5, 5) = 5, total 10, remaining 0
         // Let's check with 1 slot
         let mut inv2 = Inventory::new(1);
@@ -511,7 +513,7 @@ mod tests {
     fn test_sort_inventory() {
         let mut inv = Inventory::new(10);
         inv.register_item(test_item_db());
-        inv.register_item(Item::new("gold", "Gold Coin", ItemType::Misc));
+        inv.register_item(Item::new("gold", "Gold Coin", ItemType::Material));
         inv.add_item("potion", 3);
         inv.add_item("gold", 10);
         inv.add_item("potion", 2);

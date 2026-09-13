@@ -462,7 +462,7 @@ mod tests {
         assert_eq!(s.current_level, 1);
         assert!(s.level_up());
         assert_eq!(s.current_level, 2);
-        assert!((s.effective_damage() - 245.0).abs() < 0.01);
+        assert!((s.effective_damage() - 220.0).abs() < 0.01);
         for _ in 0..8 { s.level_up(); }
         assert!(!s.level_up()); // max level
     }

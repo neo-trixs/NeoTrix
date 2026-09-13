@@ -262,7 +262,9 @@ impl BackgroundLoopHandle {
             }
             // 消费后清空 KB 队列
             if let Some(ref kb) = self.kb {
-                let _ = kb.kv_set("state", "exploration_queue", "[]");
+                if let Err(e) = kb.kv_set("state", "exploration_queue", "[]") {
+                    log::warn!("[bg] failed to clear exploration_queue: {}", e);
+                }
             }
         }
         if let Some(ref mut gd) = self.gap_detector {
@@ -370,7 +372,9 @@ impl BackgroundLoopHandle {
     pub(crate) async fn log_session_event(&self, event_type: &str, summary: &str) {
         let Some(ref kb) = self.kb else { return };
         let title = format!("session-{}-{}", event_type, chrono::Utc::now().timestamp());
-        let _ = kb.insert_or_get_node(&title, crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Session, Some(summary), None, Some("neotrix"));
+        if let Err(e) = kb.insert_or_get_node(&title, crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Session, Some(summary), None, Some("neotrix")) {
+            log::warn!("[bg] failed to log session event '{}': {}", event_type, e);
+        }
     }
 
     pub(crate) async fn handle_knowledge_chain(&mut self) {

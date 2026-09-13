@@ -73,40 +73,34 @@ impl NucleiEngine {
             .into())
     }
     
-    /// Convert nuclei template to GWT attack pattern
+    /// Convert nuclei template to GWT attack pattern — not wired.
     ///
-    /// Note: Maps a nuclei template ID to a GWT attention key for pattern-based routing.
-    /// Real implementation needs:
+    /// Returns `Err` because no real GWT mapping is connected.
+    /// Requires:
     /// - Parse nuclei YAML template metadata (severity, tags, classification)
     /// - Generate semantic attention key from template description + tags
     /// - Map to E8 Hexagram reasoning state for vulnerability classification
     /// - Store in HyperCube for associative retrieval during audit planning
-    pub fn _template_to_gwt_pattern(&self, template_id: &str) -> _GWTAttackPattern {
-        _GWTAttackPattern {
-            template_id: template_id.to_string(),
-            attention_key: format!("vuln_{}", template_id),
-            priority: 1.0,
-        }
+    pub fn _template_to_gwt_pattern(&self, template_id: &str) -> Result<_GWTAttackPattern, String> {
+        Err(format!(
+            "_template_to_gwt_pattern not wired: cannot map template '{}' to GWT pattern. \
+             Requires YAML template parser + E8 hexagram mapping + HyperCube storage.",
+            template_id
+        ))
     }
     
-    /// Extract VSA embedding from findings
+    /// Extract VSA embedding from findings — not wired.
     ///
-    /// Note: Converts nuclei findings into VSA HyperCube vectors for associative recall.
-    /// Current implementation uses deterministic random vectors (placeholder).
-    /// Real implementation needs:
+    /// Returns `Err` because no real embedding model is connected.
+    /// Requires:
     /// - Embed finding text (description + evidence) via word2vec/BERT
     /// - Combine with severity-weighted encoding for salience scoring
     /// - Store in KB VSA index for cross-audit pattern matching
     /// - Enable analogical reasoning between similar vulnerability classes
-    pub fn _findings_to_vsa(&self, findings: &[_NucleiFinding]) -> Vec<FhrrVector> {
-        findings.iter()
-            .map(|_f| {
-                // In production: use word2vec or BERT embedding
-                // For now: deterministic hash-based vector
-                let vec = FhrrVector::random_dim(1024, 0x42);
-                vec
-            })
-            .collect()
+    pub fn _findings_to_vsa(&self, _findings: &[_NucleiFinding]) -> Result<Vec<FhrrVector>, String> {
+        Err("_findings_to_vsa not wired: requires embedding model (word2vec/BERT) \
+             for vulnerability text encoding. No real embedding backend connected."
+            .into())
     }
 }
 

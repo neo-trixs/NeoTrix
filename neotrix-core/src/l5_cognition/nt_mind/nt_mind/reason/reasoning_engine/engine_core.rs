@@ -1315,7 +1315,9 @@ impl ReasoningEngine {
                 error_count,
                 timestamp: chrono::Utc::now().timestamp(),
             };
-            let _ = kb.store_conversation_record(&record);
+            if let Err(e) = kb.store_conversation_record(&record) {
+                log::warn!("[reasoning] failed to store conversation record: {}", e);
+            }
         }
     }
 

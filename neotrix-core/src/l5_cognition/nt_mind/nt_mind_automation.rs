@@ -136,7 +136,9 @@ impl AutomationEngine {
 
     pub fn save_to_file(&self) {
         if let Ok(data) = serde_json::to_string_pretty(&self.rules) {
-            let _ = crate::core::nt_core_state::save("automation", &data);
+            if let Err(e) = crate::core::nt_core_state::save("automation", &data) {
+                log::warn!("[automation] failed to save rules: {}", e);
+            }
         }
     }
 

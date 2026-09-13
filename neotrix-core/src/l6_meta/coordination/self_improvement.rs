@@ -715,14 +715,19 @@ fn timestamp_now() -> i64 {
 mod tests {
     use super::*;
 
+    // TODO: sample_metrics fabricates all metric values — avg_tokens, skill_hit_rate,
+    // crystallization_rate, knowledge_retention, error_recovery_rate are hardcoded constants,
+    // NOT derived from real system observation. Tests below verify loop mechanics
+    // (collect/diagnose/trend/plan) against fabricated inputs. Replace with real
+    // metrics collection from EventBus or KB once self-observation wiring exists.
     fn sample_metrics(success_rate: f64) -> SystemMetrics {
         SystemMetrics {
             success_rate,
-            avg_tokens: 1000.0,
-            skill_hit_rate: 0.4,
-            crystallization_rate: 0.2,
-            knowledge_retention: 0.8,
-            error_recovery_rate: 0.6,
+            avg_tokens: 1000.0,       // FABRICATED — not from real token accounting
+            skill_hit_rate: 0.4,      // FABRICATED — not from real skill命中率
+            crystallization_rate: 0.2, // FABRICATED — not from real crystallization
+            knowledge_retention: 0.8,  // FABRICATED — not from real KB retention
+            error_recovery_rate: 0.6,  // FABRICATED — not from real error recovery
             timestamp: timestamp_now(),
         }
     }
@@ -737,6 +742,10 @@ mod tests {
 
     #[test]
     fn test_collect_metrics_and_diagnose() {
+        // TODO: All inputs are fabricated via sample_metrics(). This test verifies
+        // that the diagnose() function reacts to declining success_rate values,
+        // but the declining values are manually chosen constants, not real observations.
+        // Once real metrics wiring exists, replace with assertions on actual system behavior.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.7));
@@ -754,6 +763,9 @@ mod tests {
 
     #[test]
     fn test_generate_plans() {
+        // TODO: Inputs fabricated. This only verifies plan generation produces
+        // non-empty output when given a declining metrics pattern. Plan quality
+        // and relevance to real system state are NOT validated.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.6));
@@ -766,6 +778,9 @@ mod tests {
 
     #[test]
     fn test_run_full_cycle() {
+        // TODO: Fabricated inputs. Verifies cycle executes without panic and
+        // produces non-zero counts. Does NOT verify plans address real issues
+        // or that applied plans have real effect.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.65));
@@ -784,6 +799,8 @@ mod tests {
 
     #[test]
     fn test_trends_update() {
+        // TODO: Fabricated declining sequence (0.9→0.8→0.7). Verifies trend
+        // detection math, but does NOT validate against real system degradation.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.8));
@@ -791,7 +808,6 @@ mod tests {
 
         let trends = loop_engine.trends();
         assert!(!trends.is_empty());
-        // success_rate 应该是 Degrading
         let sr_trend = trends.iter().find(|t| t.metric_name == "success_rate");
         assert!(sr_trend.is_some());
         assert_eq!(sr_trend.unwrap().direction, TrendDirection::Degrading);
@@ -800,6 +816,8 @@ mod tests {
 
     #[test]
     fn test_rollback() {
+        // TODO: Fabricated inputs. Verifies rollback removes a plan from executed
+        // list, but the plan was generated from fabricated metrics, not real issues.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.6));

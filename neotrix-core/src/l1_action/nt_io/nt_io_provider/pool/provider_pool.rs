@@ -116,7 +116,9 @@ impl ProviderPool {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600));
+            if let Err(e) = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600)) {
+                log::warn!("[provider_pool] failed to set permissions on {}: {}", p.display(), e);
+            }
         }
         Ok(())
     }
@@ -137,7 +139,9 @@ impl ProviderPool {
         self.entries.retain(|e| e.label != label);
         let removed = self.entries.len() != before;
         if removed {
-            let _ = self.save();
+            if let Err(e) = self.save() {
+                log::warn!("[provider_pool] failed to persist after removing '{}': {}", label, e);
+            }
         }
         removed
     }

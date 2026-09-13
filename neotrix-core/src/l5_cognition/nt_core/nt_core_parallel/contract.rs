@@ -267,7 +267,9 @@ impl TaskContractWarden {
     pub fn persist(&self, contract: &TaskContract) {
         if let Some(kb) = &self.kb {
             let json = serde_json::to_string(contract).unwrap_or_default();
-            let _ = kb.kv_set(&self.ns, &self.key(&contract.id), &json);
+            if let Err(e) = kb.kv_set(&self.ns, &self.key(&contract.id), &json) {
+                log::warn!("[contract] failed to persist contract {}: {}", contract.id, e);
+            }
         }
     }
 

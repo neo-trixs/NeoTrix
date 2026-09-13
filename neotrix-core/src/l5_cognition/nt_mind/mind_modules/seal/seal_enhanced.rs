@@ -215,22 +215,46 @@ impl _SEALPipelineEnhanced {
         let mut failures = Vec::new();
         let mut adjustments = Vec::new();
 
-        // 模拟执行各阶段
+        // Execute each SEAL stage; record failures honestly.
         for stage in &self.stages {
             match stage.stage_type {
                 _StageType::Exploration => {
-                    // 探索阶段
-                    let _candidates = self.explore(task, context);
-                    stages_completed.push("exploration".into());
+                    match self.explore(task, context) {
+                        Ok(_candidates) => stages_completed.push("exploration".into()),
+                        Err(e) => {
+                            failures.push(FailurePattern {
+                                id: uuid::Uuid::new_v4().to_string(),
+                                pattern_type: "exploration_failure".into(),
+                                description: e,
+                                root_cause: "not_wired".into(),
+                                fix_strategy: "wire exploration backend".into(),
+                                occurrences: 1,
+                                last_seen: chrono::Utc::now(),
+                            });
+                        }
+                    }
                 }
                 _StageType::Distillation => {
-                    // 蒸馏阶段
-                    let knowledge = self.distill(task);
-                    extracted_knowledge.extend(knowledge);
-                    stages_completed.push("distillation".into());
+                    match self.distill(task) {
+                        Ok(knowledge) => {
+                            extracted_knowledge.extend(knowledge);
+                            stages_completed.push("distillation".into());
+                        }
+                        Err(e) => {
+                            failures.push(FailurePattern {
+                                id: uuid::Uuid::new_v4().to_string(),
+                                pattern_type: "distillation_failure".into(),
+                                description: e,
+                                root_cause: "not_wired".into(),
+                                fix_strategy: "wire distillation backend".into(),
+                                occurrences: 1,
+                                last_seen: chrono::Utc::now(),
+                            });
+                        }
+                    }
                 }
                 _StageType::SelfTest => {
-                    // 自测阶段
+                    // Self-test stage
                     match self.self_test(&extracted_knowledge) {
                         Ok(_) => stages_completed.push("self_test".into()),
                         Err(e) => {
@@ -247,12 +271,23 @@ impl _SEALPipelineEnhanced {
                     }
                 }
                 _StageType::Absorption => {
-                    // 吸收阶段
-                    if self.absorb(&extracted_knowledge) {
-                        stages_completed.push("absorption".into());
-                        self.stats.successful_absorptions += 1;
-                    } else {
-                        self.stats.failed_absorptions += 1;
+                    match self.absorb(&extracted_knowledge) {
+                        Ok(()) => {
+                            stages_completed.push("absorption".into());
+                            self.stats.successful_absorptions += 1;
+                        }
+                        Err(e) => {
+                            failures.push(FailurePattern {
+                                id: uuid::Uuid::new_v4().to_string(),
+                                pattern_type: "absorption_failure".into(),
+                                description: e,
+                                root_cause: "not_wired".into(),
+                                fix_strategy: "wire absorption backend".into(),
+                                occurrences: 1,
+                                last_seen: chrono::Utc::now(),
+                            });
+                            self.stats.failed_absorptions += 1;
+                        }
                     }
                 }
                 _ => {}
@@ -281,38 +316,31 @@ impl _SEALPipelineEnhanced {
         }
     }
 
-    /// 探索阶段
-    fn explore(&self, task: &str, _context: &serde_json::Value) -> Vec<serde_json::Value> {
-        // 简化版: 返回模拟候选
-        vec![
-            serde_json::json!({
-                "type": "pattern",
-                "content": format!("Exploration result for: {}", task),
-                "confidence": 0.7,
-            }),
-        ]
+    /// Exploration stage — not wired.
+    ///
+    /// Returns `Err` because no real exploration backend is connected.
+    /// Requires an LLM/research API to generate genuine exploration candidates.
+    fn explore(&self, _task: &str, _context: &serde_json::Value) -> Result<Vec<serde_json::Value>, String> {
+        Err("SEAL explore not wired: no exploration backend connected. \
+             Requires LLM/research API to generate genuine exploration candidates."
+            .into())
     }
 
-    /// 蒸馏阶段
-    fn distill(&self, task: &str) -> Vec<_ExtractedKnowledge> {
-        vec![
-            _ExtractedKnowledge {
-                id: uuid::Uuid::new_v4().to_string(),
-                knowledge_type: "pattern".into(),
-                content: serde_json::json!({
-                    "pattern": "learned_pattern",
-                    "task": task,
-                }),
-                confidence: 0.8,
-                source: "exploration".into(),
-                verified: false,
-            },
-        ]
+    /// Distillation stage — not wired.
+    ///
+    /// Returns `Err` because no real distillation backend is connected.
+    /// Requires an LLM to extract verified knowledge from exploration results.
+    fn distill(&self, _task: &str) -> Result<Vec<_ExtractedKnowledge>, String> {
+        Err("SEAL distill not wired: no distillation backend connected. \
+             Requires LLM to extract verified knowledge from exploration results."
+            .into())
     }
 
-    /// 自测阶段
+    /// Self-test stage — validates extracted knowledge against quality threshold.
     fn self_test(&self, knowledge: &[_ExtractedKnowledge]) -> Result<(), String> {
-        // 检查置信度阈值
+        if knowledge.is_empty() {
+            return Err("self_test: no knowledge to validate".into());
+        }
         let avg_confidence: f64 = knowledge.iter().map(|k| k.confidence).sum::<f64>() / knowledge.len() as f64;
 
         if avg_confidence < self.config.distillation_threshold {
@@ -322,13 +350,22 @@ impl _SEALPipelineEnhanced {
         Ok(())
     }
 
-    /// 吸收阶段
-    fn absorb(&self, _knowledge: &[_ExtractedKnowledge]) -> bool {
-        // 简化版: 总是成功
-        true
+    /// Absorption stage — not wired.
+    ///
+    /// Returns `Err` because no real absorption backend is connected.
+    /// Requires KB write path to persist verified knowledge.
+    fn absorb(&self, _knowledge: &[_ExtractedKnowledge]) -> Result<(), String> {
+        Err("SEAL absorb not wired: no absorption backend connected. \
+             Requires KB write path to persist verified knowledge."
+            .into())
     }
 
-    /// 自适应学习率调整
+    /// Adapt learning rate based on success/failure history.
+    ///
+    /// Note: Real implementation needs — only adjusts exploration_budget when success_rate < 0.5.
+    /// Consider: adjusting distillation_threshold, absorption_confidence, and adding
+    /// learning rate scheduling (cosine annealing, warm restarts). Track adjustment
+    /// history to detect oscillation (adjusting back and forth).
     fn adapt_learning_rate(&mut self) -> Vec<_LearningAdjustment> {
         let mut adjustments = Vec::new();
 

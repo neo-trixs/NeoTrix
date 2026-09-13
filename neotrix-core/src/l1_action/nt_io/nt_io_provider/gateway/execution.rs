@@ -226,6 +226,10 @@ impl Default for CapabilityCoordinator {
 // Execution — 请求执行与重试
 // ═══════════════════════════════════════════════════════════════════
 
+/// Check if an error message indicates a maintenance window.
+///
+/// Note: Real implementation needs — string matching is fragile. Consider using
+/// structured error codes from provider APIs instead of parsing error messages.
 fn is_maintenance_window(msg: &str) -> bool {
     let m = msg.to_ascii_lowercase();
     m.contains("switching to new models")
@@ -234,6 +238,11 @@ fn is_maintenance_window(msg: &str) -> bool {
         || m.contains("temporarily unavailable for maintenance")
 }
 
+/// Calculate exponential backoff delay with jitter.
+///
+/// Note: Real implementation needs — the jitter is uniform random [0, delay]. Consider
+/// decorrelated jitter (AWS-style) for better spread, and per-provider backoff state
+/// to avoid thundering herd when multiple requests retry simultaneously.
 fn exponential_backoff(attempt: u32, base_ms: u64, cap_ms: u64) -> u64 {
     let exp = 2u64.saturating_pow(attempt);
     let delay = base_ms.saturating_mul(exp).min(cap_ms);
@@ -241,6 +250,11 @@ fn exponential_backoff(attempt: u32, base_ms: u64, cap_ms: u64) -> u64 {
     delay.saturating_add(jitter)
 }
 
+/// Check if an error message indicates the model is unavailable (not found, deprecated, etc.).
+///
+/// Note: Real implementation needs — string matching covers common patterns but may miss
+/// provider-specific error formats. Consider: maintaining a per-provider error code mapping,
+/// and distinguishing between temporary unavailability vs permanent model removal.
 fn is_model_unavailable(msg: &str) -> bool {
     let m = msg.to_ascii_lowercase();
     m.contains("model not found")
@@ -261,6 +275,17 @@ fn is_model_unavailable(msg: &str) -> bool {
 }
 
 impl GatewayV2 {
+    /// Execute a single LLM call to a named provider with full middleware stack.
+    ///
+    /// Note: Real implementation needs — this is the core call path. It handles:
+    /// - Model name stripping (removes provider prefix)
+    /// - Tiered semaphore acquisition (Big vs Triage concurrency)
+    /// - Adaptive pacing (rate limiting based on success/failure)
+    /// - Egress privacy guard (scrub secrets and internal fingerprints)
+    /// - Plugin pre/post hooks
+    /// - Telemetry recording
+    /// Consider adding: request timeout enforcement, response validation,
+    /// and provider-specific header injection.
     pub(crate) async fn call_provider(&self, name: &str, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let provider = {
             let guard = self.providers.read().unwrap_or_else(|e| e.into_inner());
@@ -344,7 +369,9 @@ impl GatewayV2 {
                         body: serde_json::to_vec(response).unwrap_or_default(),
                         latency: std::time::Duration::from_millis(0),
                     };
-                    let _ = plugins._run_post_response(&mut ctx);
+                    if let Err(e) = plugins._run_post_response(&mut ctx) {
+                        log::warn!("[gateway] post_response plugin hook failed: {:?}", e);
+                    }
                 }
             }
             Err(e) => {
@@ -355,7 +382,9 @@ impl GatewayV2 {
                         retry_count: 0,
                         timestamp: std::time::Instant::now(),
                     };
-                    let _ = plugins._run_on_error(&mut ctx);
+                    if let Err(e) = plugins._run_on_error(&mut ctx) {
+                        log::warn!("[gateway] on_error plugin hook failed: {:?}", e);
+                    }
                 }
             }
         }
@@ -386,6 +415,12 @@ impl GatewayV2 {
         self.call_provider(provider_name, request).await
     }
 
+    /// Complete a request using account pool rotation (for providers with multiple API keys).
+    ///
+    /// Note: Real implementation needs — this method leases an account from the pool,
+    /// executes the call, and records success/failure for the lease. Rate-limited
+    /// accounts are quarantined. Consider adding: account-level cost tracking,
+    /// concurrent lease limits per account, and account health scoring.
     pub async fn complete_with_account_pool(&self, provider: &str, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let scope = if provider.is_empty() {
             request.model.split('/').next().map(|s| s.to_string()).unwrap_or_default()
@@ -802,6 +837,11 @@ impl GatewayV2 {
 // ═══════════════════════════════════════════════════════════════════
 
 impl GatewayV2 {
+    /// List candidate providers for keyless (no API key) routing.
+    ///
+    /// Note: Real implementation needs — the hardcoded fallback list may become stale.
+    /// Consider: dynamic discovery from FreeModelCatalog, health-check filtering
+    /// (skip providers with open circuit breakers), and cost-aware selection.
     pub fn keyless_candidates(&self) -> Vec<String> {
         if let Ok(guard) = self.providers.read() {
             let mut v: Vec<String> = guard.keys().filter(|k| k.starts_with("opencode-zen/") || k.starts_with("llm7/")).cloned().collect();
@@ -828,6 +868,12 @@ impl GatewayV2 {
         }
     }
 
+    /// Route a request through keyless candidates with exponential backoff on rate limits.
+    ///
+    /// Note: Real implementation needs — this tries each candidate sequentially with
+    /// retry-after parsing. Consider: parallel candidate probing with first-success-wins,
+    /// circuit breaker integration per candidate, and candidate health caching to
+    /// avoid probing known-dead endpoints.
     pub async fn route_keyless(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let candidates = self.keyless_candidates();
         let mut last_err = LlmError::Unknown("no keyless candidates configured".into());

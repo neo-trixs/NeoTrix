@@ -122,7 +122,11 @@ impl _GovernanceComplianceChecker {
         checker
     }
 
-    /// 注册默认规则
+    /// Register default governance rules (no_remote_push, no_unauthorized_kill, etc.).
+    ///
+    /// Note: Real implementation needs — rules are hardcoded with string-based check_fn names.
+    /// Consider: rule loading from config file, dynamic rule registration via EventBus,
+    /// and rule versioning for backward compatibility.
     fn register_default_rules(&mut self) {
         // 规则1: 禁止推送到远程仓库
         self.rules.push(_GovernanceRule {
@@ -191,7 +195,11 @@ impl _GovernanceComplianceChecker {
         });
     }
 
-    /// 执行合规检查
+    /// Execute compliance check for all enabled rules against a check_type string.
+    ///
+    /// Note: Real implementation needs — the check_type is a free-form string matched
+    /// against rule patterns. Consider: structured check contexts (git diff, command
+    /// AST), rule dependency ordering, and parallel rule evaluation for performance.
     pub fn check(&mut self, check_type: &str) -> _ComplianceCheckResult {
         self.stats.total_checks += 1;
 
@@ -234,7 +242,11 @@ impl _GovernanceComplianceChecker {
         }
     }
 
-    /// 检查单个规则
+    /// Evaluate a single governance rule against the check_type.
+    ///
+    /// Note: STUB: Current implementation uses simple string contains() checks.
+    /// Real implementation needs: proper command AST parsing, git diff analysis,
+    /// and integration with actual build system for compile-time checks.
     fn check_rule(&self, rule: &_GovernanceRule, check_type: &str) -> bool {
         match rule.check_fn.as_str() {
             "check_no_remote_push" => {

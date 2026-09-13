@@ -1121,7 +1121,7 @@ mod tests {
         // Center tile should have all 4 neighbors → index 15
         assert_eq!(layer.get_tile_id(2, 2), Some(215));
         // Corner tile should have 2 neighbors
-        assert_eq!(layer.get_tile_id(1, 1), Some(203)); // N+E → 3
+        assert_eq!(layer.get_tile_id(1, 1), Some(206)); // E+S → 6
     }
 
     #[test]

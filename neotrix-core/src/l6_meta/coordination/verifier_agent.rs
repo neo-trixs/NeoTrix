@@ -374,34 +374,37 @@ mod tests {
     
     #[test]
     fn test_regeneration_request() {
-        // Validates regeneration mode selection logic (score < 0.5 → Regenerate,
-        // score >= 0.5 → Edit). When real verification is wired, mode selection
-        // should depend on VLM analysis results, not just the score heuristic.
+        // FABRICATED DATA: total_score, error_types, and suggested_corrections are
+        // all hardcoded constants. This test verifies mode-selection threshold logic
+        // (score < 0.5 → Regenerate, score >= 0.5 → Edit) against fabricated inputs.
+        // When real VLM verification is wired, mode selection should depend on
+        // actual analysis results, not just score heuristics.
         let verifier = _VerifierAgent::new();
-        
+
         let result = VerificationResult {
             passed: false,
-            total_score: 0.5,
+            total_score: 0.5,  // FABRICATED — not from real VLM analysis
             scores: vec![],
-            error_types: vec!["实体漂移".to_string()],
-            suggested_corrections: vec!["保持角色外观一致".to_string()],
+            error_types: vec!["实体漂移".to_string()],  // FABRICATED error type
+            suggested_corrections: vec!["保持角色外观一致".to_string()],  // FABRICATED
             needs_regeneration: true,
             verification_time_ms: 100,
         };
-        
+
         let request = verifier._generate_regeneration_request(
             "主角在教室",
             &result,
         );
-        
-        assert_eq!(request.regeneration_mode, _RegenerationMode::Edit);
-        // auto_correct_prompt appends suggested_corrections when enabled
+
+        // Tautological: we set total_score=0.5 (>= 0.5), so mode is Edit.
+        assert_eq!(request.regeneration_mode, _RegenerationMode::Edit,
+            "tautological: fabricated score=0.5 should trigger Edit mode");
         assert!(request.corrected_prompt.contains("保持角色外观一致"),
-            "auto-correct should append suggested corrections, got: {}", request.corrected_prompt);
-        
-        // Verify low score triggers Regenerate mode
+            "auto-correct should append fabricated corrections, got: {}", request.corrected_prompt);
+
+        // Verify low score triggers Regenerate mode — also tautological
         let low_result = VerificationResult {
-            total_score: 0.3,
+            total_score: 0.3,  // FABRICATED
             ..result
         };
         let low_request = verifier._generate_regeneration_request(
@@ -409,6 +412,7 @@ mod tests {
             &low_result,
         );
         assert_eq!(low_request.regeneration_mode, _RegenerationMode::Regenerate,
-            "score < 0.5 should trigger Regenerate, got {:?}", low_request.regeneration_mode);
+            "tautological: fabricated score=0.3 should trigger Regenerate, got {:?}",
+            low_request.regeneration_mode);
     }
 }

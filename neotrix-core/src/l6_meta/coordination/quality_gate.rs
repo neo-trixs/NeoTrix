@@ -234,7 +234,11 @@ impl QualityGate {
         result
     }
     
-    /// 计算总分
+    /// Calculate weighted total score from dimension scores.
+    ///
+    /// Note: Real implementation needs — dimensions not present in scores are skipped
+    /// (their weight doesn't contribute to total_weight normalization). Consider:
+    /// requiring all dimensions to be scored, or penalizing missing dimensions.
     fn calculate_total_score(&self, scores: &[_DimensionScore]) -> f32 {
         let mut weighted_sum = 0.0;
         let mut total_weight = 0.0;
@@ -253,7 +257,12 @@ impl QualityGate {
         }
     }
     
-    /// 检查是否通过
+    /// Check if content passes quality gate (total >= 0.7 and each dimension >= threshold).
+    ///
+    /// Note: Real implementation needs — the total threshold (0.7) is hardcoded.
+    /// Consider: per-level thresholds (AIInitial lower, PlatformFinal higher),
+    /// configurable per-dimension override thresholds, and grace period for
+    /// new content types with unknown baseline.
     fn check_passed(&self, scores: &[_DimensionScore], total_score: f32) -> bool {
         // 总分必须达到 0.7
         if total_score < 0.7 {
@@ -272,14 +281,21 @@ impl QualityGate {
         true
     }
     
-    /// 获取审核历史
+    /// Get review history for a specific content_id.
+    ///
+    /// Note: Real implementation needs — currently filters by ID prefix match on in-memory vec.
+    /// For production: persist reviews to KB, add pagination, and support date range filtering.
     pub fn get_history(&self, content_id: &str) -> Vec<&ReviewResult> {
         self.history.iter()
             .filter(|r| r.id.starts_with(&format!("review_{}_", content_id)))
             .collect()
     }
     
-    /// 获取审核统计
+    /// Get aggregate statistics across all reviews.
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory history.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn statistics(&self) -> GateStats {
         let total_reviews = self.history.len();
         let approved = self.history.iter().filter(|r| r.passed).count();
@@ -339,89 +355,95 @@ mod tests {
     
     #[test]
     fn test_quality_gate_aggregates_provided_scores() {
-        // TODO: _ai_initial_review is a STUB — scores are externally provided, not
-        // produced by real VLM analysis. This test verifies the aggregation/plumbing
-        // only. Replace with real VLM-backed tests once the gate calls an actual
-        // vision model to score content.
+        // FABRICATED DATA: All scores below are hand-picked constants passed by the
+        // test caller. _ai_initial_review does NOT analyze any content — it merely
+        // aggregates externally-provided scores. This test validates arithmetic
+        // plumbing only. Replace with real VLM-backed tests once the gate calls an
+        // actual vision model.
         let mut gate = QualityGate::new();
-        
+
         let scores = vec![
             _DimensionScore {
                 dimension: "角色一致性".to_string(),
-                score: 0.9,
+                score: 0.9,  // FABRICATED — not from real VLM
                 passed: true,
                 notes: None,
             },
             _DimensionScore {
                 dimension: "画面质量".to_string(),
-                score: 0.85,
+                score: 0.85,  // FABRICATED
                 passed: true,
                 notes: None,
             },
             _DimensionScore {
                 dimension: "动态流畅度".to_string(),
-                score: 0.8,
+                score: 0.8,  // FABRICATED
                 passed: true,
                 notes: None,
             },
             _DimensionScore {
                 dimension: "音画同步".to_string(),
-                score: 0.85,
+                score: 0.85,  // FABRICATED
                 passed: true,
                 notes: None,
             },
             _DimensionScore {
                 dimension: "叙事节奏".to_string(),
-                score: 0.75,
+                score: 0.75,  // FABRICATED
                 passed: true,
                 notes: None,
             },
             _DimensionScore {
                 dimension: "情感表达".to_string(),
-                score: 0.8,
+                score: 0.8,  // FABRICATED
                 passed: true,
                 notes: None,
             },
         ];
-        
+
         let result = gate._ai_initial_review("content_001", scores);
-        // Verify aggregation plumbing: high externally-provided scores produce a
-        // passing result. This does NOT validate real AI analysis — scores are
-        // caller-supplied. The reviewer field confirms the stub nature.
-        assert!(result.passed, "high externally-provided scores should aggregate to pass");
-        assert_eq!(result.reviewer, "External (not AI-analyzed)");
-        assert!(result.total_score >= 0.7, "weighted average of high scores should be >= 0.7, got {}", result.total_score);
+        // This assertion is tautological: we provided passing scores, so aggregation
+        // passes. It does NOT prove the gate can judge real content quality.
+        assert!(result.passed, "fabricated high scores should aggregate to pass (tautological)");
+        assert_eq!(result.reviewer, "External (not AI-analyzed)",
+            "reviewer confirms no real AI analysis occurred");
+        assert!(result.total_score >= 0.7,
+            "tautological: weighted average of fabricated high scores should be >= 0.7, got {}",
+            result.total_score);
     }
     
     #[test]
     fn test_quality_gate_reject() {
-        // Verifies threshold gating: a score below dimension threshold causes
-        // rejection. Input scores are caller-supplied (stub behavior).
+        // FABRICATED DATA: score=0.5 is caller-supplied, not from real analysis.
+        // Verifies threshold arithmetic: a fabricated low score causes rejection.
         let mut gate = QualityGate::new();
-        
+
         let scores = vec![
             _DimensionScore {
                 dimension: "角色一致性".to_string(),
-                score: 0.5,
+                score: 0.5,  // FABRICATED — not from real VLM
                 passed: false,
                 notes: None,
             },
             _DimensionScore {
                 dimension: "画面质量".to_string(),
-                score: 0.9,
+                score: 0.9,  // FABRICATED
                 passed: true,
                 notes: None,
             },
         ];
-        
+
         let result = gate._ai_initial_review("content_002", scores);
-        assert!(!result.passed, "low score on critical dimension should cause rejection");
+        // Tautological: we set passed=false on a dimension, so gate rejects.
+        assert!(!result.passed, "tautological: fabricated low score should cause rejection");
     }
-    
+
     #[test]
     fn test_statistics_tracks_reviews() {
+        // FABRICATED DATA: All scores are hand-picked. This verifies counter
+        // arithmetic, not real quality assessment accuracy.
         let mut gate = QualityGate::new();
-        
+
         let scores1 = vec![
             _DimensionScore { dimension: "角色一致性".to_string(), score: 0.9, passed: true, notes: None },
             _DimensionScore { dimension: "画面质量".to_string(), score: 0.9, passed: true, notes: None },
@@ -431,15 +453,17 @@ mod tests {
             _DimensionScore { dimension: "情感表达".to_string(), score: 0.9, passed: true, notes: None },
         ];
         gate._ai_initial_review("c1", scores1);
-        
+
         let scores2 = vec![
             _DimensionScore { dimension: "角色一致性".to_string(), score: 0.5, passed: false, notes: None },
         ];
         gate._ai_initial_review("c2", scores2);
-        
+
         let stats = gate.statistics();
-        assert_eq!(stats.total_reviews, 2, "should count both reviews");
-        assert_eq!(stats.approved, 1, "only the high-score review should be approved");
-        assert_eq!(stats.rejected, 1, "the low-score review should be rejected");
+        // Tautological: we submitted 2 reviews (one all-pass, one fail),
+        // so counters should be 2/1/1. This proves counter logic, not quality judgment.
+        assert_eq!(stats.total_reviews, 2, "tautological: counter should match submission count");
+        assert_eq!(stats.approved, 1, "tautological: only the all-pass review should be approved");
+        assert_eq!(stats.rejected, 1, "tautological: the fail review should be rejected");
     }
 }

@@ -201,7 +201,9 @@ impl BackgroundLoopHandle {
         }
         for (from, to) in export.edges {
             if registry.nodes.contains_key(&from) && registry.nodes.contains_key(&to) {
-                let _ = registry.add_dependency(&from, &to);
+                if let Err(e) = registry.add_dependency(&from, &to) {
+                    log::warn!("[bg] capability_auto_evolve: add_dependency {} -> {} failed: {}", from, to, e);
+                }
             }
         }
         registry.experience_targets = export.experience_targets;
@@ -471,7 +473,9 @@ impl BackgroundLoopHandle {
             log::warn!("[bg] auto-fix experience stage failed: {}", e);
             return;
         }
-        let _ = kb.field_tick();
+        if let Err(e) = kb.field_tick() {
+            log::warn!("[bg] field_tick failed after auto-fix experience: {}", e);
+        }
         log::info!("[bg] auto-fix experience recorded: {} ({} fixes)", key, landed.len());
         if let Ok(v) = kb.field_version() {
             log::debug!("[bg] field_version={v}");
@@ -565,7 +569,9 @@ impl BackgroundLoopHandle {
                         Some(kb) => kb, None => break,
                     };
                     let store = KbKnowledgeStore { kb: kb.clone() };
-                    let _ = store.mark_crawl_complete(&id, true, None);
+                    if let Err(e) = store.mark_crawl_complete(&id, true, None) {
+                        log::warn!("[bg] failed to mark crawl complete for {}: {}", url, e);
+                    }
                 }
                 Err(e) => {
                     log::warn!("[bg] crawl failed: {}: {:?}", url, e);
@@ -573,7 +579,9 @@ impl BackgroundLoopHandle {
                         Some(kb) => kb, None => break,
                     };
                     let store = KbKnowledgeStore { kb: kb.clone() };
-                    let _ = store.mark_crawl_complete(&id, false, Some(&e));
+                    if let Err(e) = store.mark_crawl_complete(&id, false, Some(&e)) {
+                        log::warn!("[bg] failed to mark crawl failed for {}: {}", url, e);
+                    }
                 }
             }
             processed += 1;
@@ -759,7 +767,9 @@ impl BackgroundLoopHandle {
             // Update stats for all clusters
             if let Ok(clusters) = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::list_clusters(&conn) {
                 for cluster in &clusters {
-                    let _ = update_cluster_stats(&conn, &cluster.id);
+                    if let Err(e) = update_cluster_stats(&conn, &cluster.id) {
+                        log::warn!("[bg] failed to update cluster stats for {}: {}", cluster.id, e);
+                    }
                 }
             }
 
@@ -929,7 +939,9 @@ impl BackgroundLoopHandle {
             log::warn!("[bg] heal experience stage failed: {}", e);
             return;
         }
-        let _ = kb.field_tick();
+        if let Err(e) = kb.field_tick() {
+            log::warn!("[bg] field_tick failed after heal experience: {}", e);
+        }
         log::info!("[bg] heal experience recorded: {} ({} signals)", key, unique_cats.len());
     }
 

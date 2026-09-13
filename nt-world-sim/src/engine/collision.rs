@@ -114,6 +114,7 @@ pub struct TileCollisionResult {
 // ---------------------------------------------------------------------------
 
 /// Tile-based collision detection and resolution system.
+#[allow(dead_code)]
 pub struct TileCollisionSystem {
     /// Temporary buffer for collision results.
     results: Vec<TileCollisionResult>,
@@ -227,7 +228,14 @@ impl TileCollisionSystem {
         for col in &collisions_y {
             match col.collision {
                 CollisionType::Solid => {
-                    resolved.y += col.displacement.y;
+                    // Compute Y-only displacement to avoid axis mixing
+                    let tile_aabb = Self::tile_aabb(tilemap, col.tile_pos.0, col.tile_pos.1);
+                    if aabb_y.overlaps(&tile_aabb) {
+                        let dy1 = tile_aabb.max.y - aabb_y.min.y;
+                        let dy2 = aabb_y.max.y - tile_aabb.min.y;
+                        let dy = if dy1 < dy2 { -dy1 } else { dy2 };
+                        resolved.y += dy;
+                    }
                     all_results.push(col.clone());
                 }
                 CollisionType::OneWay => {
@@ -489,7 +497,7 @@ mod tests {
         let end = Vec2::new(32.0, 128.0);
         let hit = system.raycast_tilemap(&map, start, end);
         assert!(hit.is_some());
-        let (_, _, (_tx, _ty)) = hit.unwrap();
+        let (_, _, (_tx, ty)) = hit.unwrap();
         assert_eq!(ty, 4);
     }
 

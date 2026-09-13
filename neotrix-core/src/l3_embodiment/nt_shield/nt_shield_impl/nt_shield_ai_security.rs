@@ -51,7 +51,6 @@ impl ARTToolbox {
             self.model_endpoint
         ))
     }
-    }
     
     /// Test for model stealing via membership inference.
     ///

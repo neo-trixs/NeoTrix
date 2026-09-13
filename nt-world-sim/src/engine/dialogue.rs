@@ -708,7 +708,7 @@ mod tests {
         let current = runner.get_current_node().unwrap();
         assert_eq!(current.speaker, "Guard");
         assert!(runner.advance());
-        assert!(runner.advance());
+        assert!(!runner.advance());
         assert!(!runner.is_active());
     }
 

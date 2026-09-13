@@ -132,7 +132,9 @@ impl BackgroundLoop {
         // CAD 能力 T3 生产接线: GWT 共振路由 (image→CAD 经意识核心) + 经验吸收落盘
         let _ = crate::core::nt_core_gwt::cad_route::register_cad_gwt(&mut shared_gwt);
         if let Ok(kb) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
-            let _ = crate::core::nt_core_knowledge::cad_absorb::absorb_cad_experience(&kb);
+            if let Err(e) = crate::core::nt_core_knowledge::cad_absorb::absorb_cad_experience(&kb) {
+                log::warn!("[bg-init] failed to absorb CAD experience: {}", e);
+            }
         }
         Self {
             cleanup_engine: Some(CleanupEngine::new()),

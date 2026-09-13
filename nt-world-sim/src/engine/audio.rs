@@ -156,19 +156,16 @@ impl MusicCrossfader {
     }
 
     pub fn update(&mut self, dt: f32) -> MusicCrossfadeState {
+        if self.fading_out || self.fading_in {
+            self.fade_timer += dt;
+        }
+
         if self.fade_timer >= self.fade_duration {
             if self.fading_out && self.next_track.is_some() {
                 self.current_track = self.next_track.take();
-                self.fading_out = false;
-                self.fading_in = true;
-                self.fade_timer = 0.0;
-            } else if self.fading_in {
-                self.fading_in = false;
             }
-        }
-
-        if self.fading_out || self.fading_in {
-            self.fade_timer += dt;
+            self.fading_out = false;
+            self.fading_in = false;
         }
 
         let progress = (self.fade_timer / self.fade_duration).clamp(0.0, 1.0);
@@ -309,6 +306,7 @@ impl Default for AudioTriggerSystem {
 // Audio Manager — full-featured
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 pub struct AudioManager {
     backends: Vec<Box<dyn AudioBackend>>,
     loaded_sounds: HashMap<String, AudioHandle>,

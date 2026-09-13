@@ -197,7 +197,7 @@ impl _ExperienceTreeManager {
     /// 获取按重要性排序的经验
     pub(crate) fn _get_by_importance(&self, limit: usize) -> Vec<&Experience> {
         let mut sorted: Vec<&Experience> = self.experiences.iter().collect();
-        sorted.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap());
+        sorted.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal));
         sorted.into_iter().take(limit).collect()
     }
 

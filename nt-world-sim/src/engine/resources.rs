@@ -46,6 +46,7 @@ impl<T: 'static> std::hash::Hash for ResourceHandle<T> {
 // ---------------------------------------------------------------------------
 
 /// Internal entry wrapping a resource with reference count.
+#[allow(dead_code)]
 struct ResourceEntry<T> {
     data: Arc<T>,
     ref_count: u32,
@@ -113,6 +114,7 @@ pub trait ResourceLoader: Send + Sync {
 // ---------------------------------------------------------------------------
 
 /// Registry mapping type names to loaders.
+#[allow(dead_code)]
 struct LoaderEntry {
     loader: Box<dyn std::any::Any + Send + Sync>,
     type_name: String,
@@ -302,6 +304,7 @@ impl<T: Send + Sync + 'static> Default for TypedResourceManager<T> {
 mod tests {
     use super::*;
 
+    #[derive(Debug)]
     struct TestImage {
         width: u32,
         height: u32,

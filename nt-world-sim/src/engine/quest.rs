@@ -221,7 +221,7 @@ impl Quest {
 
     pub fn all_objectives_complete(&self) -> bool {
         let mandatory: Vec<&Objective> = self.objectives.iter().filter(|o| o.is_mandatory()).collect();
-        !mandatory.is_empty() && mandatory.iter().all(|o| o.completed)
+        mandatory.iter().all(|o| o.completed)
     }
 
     pub fn complete(&mut self) -> bool {
@@ -411,11 +411,26 @@ impl QuestManager {
         let result = self.quests.get_mut(quest_id).and_then(|q| {
             if q.state != QuestState::Active { return None; }
             let completed = q.complete_objective_by_id(objective_id, 1);
-            if completed { Some(()) } else { None }
+            if completed {
+                // Auto-complete quest if all objectives done
+                if q.all_objectives_complete() {
+                    q.state = QuestState::Complete;
+                    q.repeat_count += 1;
+                }
+                Some(())
+            } else { None }
         });
         if result.is_some() {
             self.add_journal(quest_id, &format!("Objective completed: {}", objective_id));
             self.event_log.push(format!("objective_completed:{}:{}", quest_id, objective_id));
+            // Track quest completion
+            if let Some(q) = self.quests.get(quest_id) {
+                if q.state == QuestState::Complete && !self.completed_quests.contains(&quest_id.to_string()) {
+                    self.completed_quests.push(quest_id.to_string());
+                    self.add_journal(quest_id, &format!("Quest completed: {}", q.name));
+                    self.event_log.push(format!("quest_completed:{}", quest_id));
+                }
+            }
             true
         } else { false }
     }
@@ -587,7 +602,7 @@ mod tests {
         mgr.accept_quest("q1");
         mgr.complete_objective("q1", "kill1");
         mgr.complete_objective("q1", "kill1");
-        assert!(!mgr.complete_objective("q1", "kill1")); // completes quest
+        assert!(mgr.complete_objective("q1", "kill1"));
         assert!(mgr.is_completed("q1"));
     }
 

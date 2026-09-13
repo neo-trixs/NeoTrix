@@ -11,6 +11,15 @@ use super::super::*;
 
 impl GatewayV2 {
     // ── Safe RwLock helpers (poison-resistant) ──
+
+    /// Execute a closure with mutable access to provider states, recovering from RwLock poison.
+    ///
+    /// Note: Real implementation needs — if the RwLock is poisoned (panicked writer),
+    /// this method recovers by unwrapping the inner guard. This is safe because
+    /// provider states are self-healing (circuit breakers reset on next call).
+    /// However, partial writes from a panicking thread may leave inconsistent state.
+    /// A production implementation should log the poison event and consider
+    /// resetting affected provider states to a known-good default.
     pub(crate) fn states_write<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut HashMap<String, ProviderState>) -> R,
@@ -25,6 +34,11 @@ impl GatewayV2 {
         }
     }
 
+    /// Execute a closure with mutable access to the default provider name, recovering from poison.
+    ///
+    /// Note: Real implementation needs — the default name is set on first provider registration.
+    /// If the RwLock is poisoned, the recovered inner value may be stale. Consider
+    /// re-validating the default name against registered providers after recovery.
     fn default_name_write<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut String) -> R,
@@ -39,10 +53,21 @@ impl GatewayV2 {
         }
     }
 
+    /// Register a provider with default Cloud category.
+    ///
+    /// Note: Real implementation needs — this is a convenience wrapper. For providers
+    /// with specific trust boundaries (Local, Proxy), use `register_provider_with_category`
+    /// directly to ensure correct egress routing and privacy guard behavior.
     pub fn register_provider(&self, name: &str, provider: Arc<dyn LlmProvider>, is_free: bool) {
         self.register_provider_with_category(name, provider, is_free, ProviderCategory::Cloud)
     }
 
+    /// Register a provider with explicit category and rate limit profile.
+    ///
+    /// Note: Real implementation needs — rate profiles are looked up from `rate_profiles.rs`
+    /// by provider name. If no profile exists, default limits apply. Consider adding
+    /// a provider health check on registration (e.g., ping the endpoint) to avoid
+    /// registering dead providers. The first registered provider becomes the default.
     pub fn register_provider_with_category(
         &self,
         name: &str,
@@ -69,6 +94,14 @@ impl GatewayV2 {
         });
     }
 
+    /// Select the best available provider using a 3-tier strategy.
+    ///
+    /// Note: Real implementation needs — composite_score() combines EMA success rate,
+    /// latency, and cost. The total_calls ascending tiebreak ensures even distribution.
+    /// Consider adding:
+    /// - Staleness check: skip providers not called recently (EMA may be outdated)
+    /// - Capability matching: filter by required capabilities before scoring
+    /// - Load-awareness: factor in current concurrent request count
     pub async fn select_best(&self) -> Option<String> {
         let states = self.states.read().unwrap_or_else(|e| {
             log::warn!("[gateway] states RwLock poisoned: {}", e);
@@ -305,6 +338,11 @@ impl GatewayV2 {
         log::info!("[gateway] UnifiedModelPool: {} models registered", registered);
     }
 
+    /// Return JSON status of all registered providers (for CLI/telemetry).
+    ///
+    /// Note: Real implementation needs — this returns raw state without aggregation.
+    /// Consider adding: per-provider latency percentiles, cost tracking,
+    /// and circuit breaker history for observability dashboards.
     pub fn provider_status(&self) -> Vec<serde_json::Value> {        let states = self.states.read().unwrap_or_else(|e| {
             log::warn!("[gateway] states RwLock poisoned: {}", e);
             e.into_inner()

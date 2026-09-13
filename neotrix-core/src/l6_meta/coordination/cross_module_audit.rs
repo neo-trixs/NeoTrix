@@ -130,7 +130,11 @@ impl CrossModuleAudit {
         }
     }
     
-    /// 检查动态等级与情绪一致性
+    /// Check consistency between dynamic parameters and scaling ratings.
+    ///
+    /// Note: Real implementation needs — the check verifies that `DynamicParams.to_scaling_rating()`
+    /// matches the provided rating. Consider: fuzzy matching for borderline cases,
+    /// and reporting the actual parameter values that caused the mismatch.
     fn check_dynamic_emotion_consistency(
         &self,
         dynamic_params: &[DynamicParams],
@@ -173,7 +177,12 @@ impl CrossModuleAudit {
         _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
-    /// 检查节奏与段落类型一致性
+    /// Check rhythm consistency: no more than 2 consecutive segments of same type,
+    /// and climax segment not at the start.
+    ///
+    /// Note: Real implementation needs — the consecutive threshold (2) is hardcoded.
+    /// Consider: configurable max consecutive count per segment type, transition
+    /// probability matrix validation, and pacing curve analysis.
     fn check_rhythm_segment_consistency(&self, segments: &[SegmentData]) -> _CrossModuleCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
@@ -225,7 +234,11 @@ impl CrossModuleAudit {
         _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
-    /// 检查参数边界
+    /// Validate that all dynamic parameters are within physical bounds.
+    ///
+    /// Note: Real implementation needs — delegates to `DynamicParams::validate()`.
+    /// Consider: per-unit bounds (degrees vs radians have different ranges),
+    /// and warning thresholds (near-boundary values that are valid but risky).
     fn check_parameter_bounds(&self, dynamic_params: &[DynamicParams]) -> _CrossModuleCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
@@ -250,7 +263,12 @@ impl CrossModuleAudit {
         _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
-    /// 计算一致性评分
+    /// Calculate overall consistency score (0-100) from check details.
+    ///
+    /// Note: Real implementation needs — the score is simply (passed/total * 100).
+    /// Consider: weighted scoring (some dimensions more critical than others),
+    /// severity-aware scoring (Critical failures deduct more), and trend tracking
+    /// (is consistency improving or degrading over time?).
     fn calculate_consistency_score(&self, details: &[_CrossModuleDetail]) -> u32 {
         if details.is_empty() {
             return 100;

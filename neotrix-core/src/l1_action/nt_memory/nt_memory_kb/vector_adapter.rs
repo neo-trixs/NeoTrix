@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::core::nt_core_vector_store::store::VectorStore;
-use crate::core::nt_core_vector_store::types::{IndexConfig, VectorSearchResult, VectorRecord};
+use crate::core::nt_core_vector_store::types::{IndexConfig, VectorRecord, VectorSearchResult};
 
 pub struct KbVectorAdapter {
     pub store: Box<dyn VectorStore>,
@@ -12,7 +12,7 @@ impl KbVectorAdapter {
         Self { store }
     }
 
-    pub fn search_similar_nodes(&self, query_vector: &[u8], k: usize) -> Vec<SearchResult> {
+    pub fn search_similar_nodes(&self, query_vector: &[u8], k: usize) -> Vec<VectorSearchResult> {
         self.store.search(query_vector, k)
     }
 

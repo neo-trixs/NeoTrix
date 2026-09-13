@@ -234,15 +234,24 @@ impl _ChainExecutor {
 
             // 检查条件
             if let Some(ref condition) = step.condition {
-                if !self.evaluate_condition(condition) {
-                    self.results.insert(step_id.clone(), StepResult {
-                        step_id: step_id.clone(),
-                        status: StepStatus::Skipped,
-                        output: None,
-                        error: None,
-                        duration_ms: 0,
-                    });
-                    continue;
+                match self.evaluate_condition(condition) {
+                    Ok(true) => { /* condition met, proceed */ }
+                    Ok(false) => {
+                        self.results.insert(step_id.clone(), StepResult {
+                            step_id: step_id.clone(),
+                            status: StepStatus::Skipped,
+                            output: None,
+                            error: None,
+                            duration_ms: 0,
+                        });
+                        continue;
+                    }
+                    Err(e) => {
+                        self.state.status = _ChainStatus::Failed;
+                        self.state.error = Some(e.clone());
+                        self.state.completed_at = Some(chrono::Utc::now());
+                        return Ok(self.build_result());
+                    }
                 }
             }
 
@@ -312,10 +321,16 @@ impl _ChainExecutor {
         sorted
     }
 
-    /// 评估条件
-    fn evaluate_condition(&self, _condition: &str) -> bool {
-        // 简化版: 总是返回 true
-        true
+    /// 评估条件 — not wired.
+    ///
+    /// Returns `Err` because no real condition evaluator is connected.
+    /// Requires a DSL/expression evaluator to parse and evaluate step conditions.
+    fn evaluate_condition(&self, condition: &str) -> Result<bool, String> {
+        Err(format!(
+            "evaluate_condition not wired: cannot evaluate condition '{}'. \
+             Requires a DSL/expression evaluator to parse step conditions.",
+            condition
+        ))
     }
 
     /// 回滚
