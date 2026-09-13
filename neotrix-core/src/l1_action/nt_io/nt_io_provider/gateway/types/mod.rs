@@ -4,5 +4,5 @@ pub use super::super::common::types::*;
 
 mod benchmark;
 
-mod registry_core;
+pub mod registry_core;
 pub use registry_core::*;

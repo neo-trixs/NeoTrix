@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use crate::core::l0_substrate::nt_core_error::recovery::{ErrorContext, ErrorType, RecoveryAction};
@@ -12,7 +13,9 @@ use crate::l1_action::nt_io::nt_io_provider::health::context_budget::estimate_to
 use crate::l1_action::nt_io::nt_io_provider::pool::free_pool::global_free_pool;
 use crate::l1_action::nt_io::nt_io_provider::health::rate_limiter::BrainTier;
 use crate::l1_action::nt_io::nt_io_provider::common::privacy_guard::{egress_privacy_guard, trust_from_name};
-use crate::l1_action::nt_io::nt_io_provider::gateway::types::registry_core::AttemptPhase;
+use crate::l1_action::nt_io::nt_io_provider::gateway::types::registry_core::{AttemptPhase, ProviderState};
+use crate::l1_action::nt_io::nt_io_provider::gateway::resilience::ResponseCache;
+use crate::l1_action::nt_io::nt_io_provider::gateway::CallEvent;
 use super::*;
 
 /// 检测 provider 返回的维护窗提示 (如 empero "switching to new models" / "retrying in"),
@@ -58,7 +61,7 @@ fn is_model_unavailable(msg: &str) -> bool {
 }
 
 impl GatewayV2 {
-    pub(super) async fn call_provider(
+    pub(crate) async fn call_provider(
         &self,
         name: &str,
         request: &LlmRequest,
@@ -343,7 +346,7 @@ impl GatewayV2 {
         if let Ok(cache) = self.cache.lock() {
             if let Some(cached) = cache.get_exact(&request.model, &prompt_key) {
                     if let Ok(response) = serde_json::from_str::<LlmResponse>(&cached) {
-                        return Ok(response);
+                        return Ok(SelectionResult { response, provider: "cache".to_string() });
                     }
             }
         }
@@ -355,7 +358,7 @@ impl GatewayV2 {
             if let Ok(mut cache) = self.cache.lock() {
                 if let Some(cached) = cache.get_semantic(&embedding) {
                     if let Ok(response) = serde_json::from_str::<LlmResponse>(cached) {
-                        return Ok(response);
+                        return Ok(SelectionResult { response, provider: "cache".to_string() });
                     }
                 }
             }
@@ -370,7 +373,7 @@ impl GatewayV2 {
                     // 免于 LRU 驱逐 (限 MAX_PINNED 防挤占)。
                     rc.pin(&rc_key);
                 if let Ok(response) = serde_json::from_str::<LlmResponse>(&cached) {
-                        return Ok(response);
+                        return Ok(SelectionResult { response, provider: "cache".to_string() });
                     }
                 }
             }
@@ -930,7 +933,7 @@ impl GatewayV2 {
                             "[gateway] stream provider {} quota exhausted, marking",
                             name
                         );
-                        self.states_write(|states| {
+                        self.states_write(|states: &mut HashMap<String, ProviderState>| {
                             if let Some(state) = states.get_mut(&name) {
                                 state.circuit_breaker.force_open();
                             }

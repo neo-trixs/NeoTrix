@@ -10,7 +10,7 @@ use super::super::*;
 
 impl GatewayV2 {
     // ── Safe RwLock helpers (poison-resistant) ──
-    fn states_write<F, R>(&self, f: F) -> R
+    pub(crate) fn states_write<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut HashMap<String, ProviderState>) -> R,
     {
@@ -381,7 +381,7 @@ impl GatewayV2 {
             self.reconcile_pool_from_catalog(cooldown_secs).await;
             log::info!(
                 "[gateway] {}",
-                super::LlmPoolHealth::summarize(self, min_free)
+                super::super::LlmPoolHealth::summarize(self, min_free)
             );
         }
     }
