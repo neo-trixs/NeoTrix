@@ -43,6 +43,13 @@ pub struct UnifiedModelEntry {
 }
 
 impl UnifiedModelEntry {
+    /// Create a model entry from a local GGUF file.
+    ///
+    /// Note: Real implementation needs — extracts model name from filename stem,
+    /// hardcodes base_url to localhost:8080 (llama.cpp default). Consider:
+    /// - Reading GGUF header metadata for model name/description
+    /// - Auto-detecting the serving endpoint from running processes
+    /// - Supporting multiple backend formats (GGUF, GGML, safetensors)
     pub fn local_gguf(path: PathBuf, size_gb: f64) -> Self {
         let name = path.file_stem()
             .and_then(|s| s.to_str())
@@ -65,6 +72,11 @@ impl UnifiedModelEntry {
         }
     }
 
+    /// Create a model entry for a free cloud API.
+    ///
+    /// Note: Real implementation needs — currently all cloud_free entries are marked
+    /// `is_free: true`. Consider distinguishing between truly free (keyless) and
+    /// free-tier-with-key (rate-limited) models for better routing decisions.
     pub fn cloud_free(
         provider: &str,
         model_id: &str,

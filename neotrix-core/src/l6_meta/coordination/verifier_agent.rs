@@ -381,13 +381,19 @@ mod tests {
     }
     
     #[test]
-    fn test_regeneration_request() {
-        // TODO(R-P79): total_score, error_types, and suggested_corrections are
-        // hardcoded constants, not from real VLM analysis. This verifies
-        // mode-selection threshold logic only. To test real mode selection,
-        // wire a VLM and assert that actual analysis results drive the mode.
+    fn test_regeneration_mode_selection_by_score_threshold() {
+        // HONEST TEST: Verifies that _generate_regeneration_request selects the
+        // correct mode based on score thresholds. This tests threshold logic
+        // (mode routing), NOT real VLM analysis quality.
+        //
+        // TODO(R-P79): total_score is a hardcoded constant, not from real VLM
+        // analysis. To test real mode selection, wire a VLM and assert that actual
+        // analysis results drive the mode. Currently:
+        //   - score >= 0.5 → Edit (minor corrections)
+        //   - score < 0.5  → Regenerate (major issues)
         let verifier = _VerifierAgent::new();
 
+        // Edit mode: score >= threshold
         let result = VerificationResult {
             passed: false,
             total_score: 0.5,
@@ -402,14 +408,12 @@ mod tests {
             "主角在教室",
             &result,
         );
-
-        // TAUTOLOGICAL: We set total_score=0.5 (>= 0.5), so mode is Edit.
         assert_eq!(request.regeneration_mode, _RegenerationMode::Edit,
             "score >= 0.5 threshold should trigger Edit mode");
         assert!(request.corrected_prompt.contains("保持角色外观一致"),
             "auto-correct should append corrections, got: {}", request.corrected_prompt);
 
-        // Verify low score triggers Regenerate mode
+        // Regenerate mode: score < threshold
         let low_result = VerificationResult {
             total_score: 0.3,
             ..result

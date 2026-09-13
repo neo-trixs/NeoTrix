@@ -247,6 +247,12 @@ impl KNNRouter {
 }
 
 impl LearnedRouter for KNNRouter {
+    /// Route a request to the best candidate model using KNN similarity.
+    ///
+    /// Note: Real implementation needs — cold start falls back to Pareto scoring
+    /// (quality * alpha - cost * beta). Consider: adding exploration epsilon
+    /// (randomly try non-optimal models occasionally to discover better matches),
+    /// and supporting multi-embedding models (code vs text vs math).
     fn route(&self, features: &RouteFeatures, candidates: &[CandidateModel]) -> RouteDecision {
         let history = match self.history.read() {
             Ok(h) => h,
@@ -334,6 +340,11 @@ impl LearnedRouter for KNNRouter {
         }
     }
 
+    /// Update KNN history with a routing decision outcome.
+    ///
+    /// Note: Real implementation needs — caps history at 10K entries by draining
+    /// oldest 5K. Consider: importance-weighted eviction (keep high-reward entries),
+    /// and temporal decay (older entries contribute less to similarity voting).
     fn update(&mut self, features: &RouteFeatures, chosen: &str, reward: f32) {
         let mut history = self.history.write().unwrap_or_else(|e| e.into_inner());
         history.push((features.clone(), chosen.to_string(), reward));
@@ -379,6 +390,12 @@ impl MLPRouter {
         Self { input_dim, hidden_dim, output_dim, alpha, beta, w1, w2, b1, b2, _model_to_idx: model_to_idx }
     }
 
+    /// Forward pass through the MLP: hidden = relu(W1*x + b1), output = W2*hidden + b2.
+    ///
+    /// STUB: Uses random-initialized weights (Xavier). Real implementation needs:
+    /// - Load pre-trained weights from disk (ONNX/candle format)
+    /// - GPU-accelerated matrix multiplication for production latency
+    /// - Softmax activation on output (currently raw logits)
     fn forward(&self, x: &[f32]) -> Vec<f32> {
         // hidden = relu(w1 * x + b1)
         let mut hidden = vec![0.0; self.hidden_dim];
@@ -447,6 +464,12 @@ impl MLPRouter {
         }
     }
 
+    /// Online fine-tuning — currently a no-op stub.
+    ///
+    /// STUB: Requires backpropagation implementation. Real implementation needs:
+    /// - Gradient computation via chain rule
+    /// - Learning rate scheduling (warmup + decay)
+    /// - Experience replay buffer for stable training
     fn update(&mut self, _features: &RouteFeatures, _chosen: &str, _reward: f32) {
         // 在线微调: 可选, 需要反向传播实现
     }
@@ -455,6 +478,11 @@ impl MLPRouter {
 }
 
 impl LearnedRouter for MLPRouter {
+    /// Route using MLP forward pass + Pareto adjustment.
+    ///
+    /// Note: Real implementation needs — combines MLP logits (0.6) with Pareto score (0.4).
+    /// Consider: confidence calibration (MLP should output calibrated probabilities),
+    /// and online fine-tuning via backpropagation for continuous improvement.
     fn route(&self, features: &RouteFeatures, candidates: &[CandidateModel]) -> RouteDecision {
         MLPRouter::route(self, features, candidates)
     }
@@ -488,6 +516,11 @@ impl HybridRouter {
 }
 
 impl LearnedRouter for HybridRouter {
+    /// Route using KNN + MLP confidence-weighted fusion.
+    ///
+    /// Note: Real implementation needs — weights are static (knn_weight=0.4, mlp_weight=0.6).
+    /// Consider: adaptive weighting based on each router's recent accuracy, and
+    /// fallback to single router when one has insufficient data.
     fn route(&self, features: &RouteFeatures, candidates: &[CandidateModel]) -> RouteDecision {
         let knn_dec = self.knn.route(features, candidates);
         let mlp_dec = self.mlp.route(features, candidates);
@@ -636,11 +669,21 @@ impl MultiTurnRouter {
 }
 
 impl LearnedRouter for MultiTurnRouter {
+    /// Single-turn fallback — delegates to base HybridRouter.
+    ///
+    /// Note: Real implementation needs — when called without conversation state,
+    /// loses all multi-turn context. Consider: warning callers that multi-turn
+    /// awareness is disabled, or maintaining a default ConversationState.
     fn route(&self, features: &RouteFeatures, candidates: &[CandidateModel]) -> RouteDecision {
         // 单轮调用退化为基础路由 (无对话状态)
         self.base.route(features, candidates)
     }
 
+    /// Multi-turn routing — combines conversation state with base routing.
+    ///
+    /// Note: Real implementation needs — budget estimation uses simple linear projection.
+    /// Consider: token-per-turn forecasting based on conversation stage, and
+    /// supporting multiple budget types (per-turn, per-session, per-day).
     fn route_multi_turn(&self, features: &RouteFeatures, candidates: &[CandidateModel], conv: &ConversationState) -> RouteDecision {
         self.route_with_conversation(features, candidates, conv)
     }
@@ -711,6 +754,12 @@ mod tests {
     use crate::l1_action::nt_io::nt_io_provider::provider_catalog::ProviderCategory;
 
     fn make_candidates() -> Vec<CandidateModel> {
+        // HONESTY: quality_score values (0.95, 0.8, 0.85) are test fixtures for
+        // routing algorithm validation. They represent plausible model quality
+        // rankings but are NOT derived from real benchmark data. The routing
+        // algorithms (KNN, Hybrid, MLP) are tested on their selection logic,
+        // not on producing "correct" quality rankings.
+        // TODO(R-P79): Wire real benchmark scores from model evaluation pipeline.
         vec![
             CandidateModel { name: "aihub/glm-5.2".into(), provider: "aihub".into(), model_id: "glm-5.2".into(), category: ProviderCategory::Cloud, is_free: false, avg_latency_ms: 500.0, avg_cost_per_1k: 0.01, quality_score: 0.95, capability_tags: vec!["reasoning".into(), "analysis".into()] },
             CandidateModel { name: "llm7/codestral-latest".into(), provider: "llm7".into(), model_id: "codestral-latest".into(), category: ProviderCategory::Cloud, is_free: true, avg_latency_ms: 300.0, avg_cost_per_1k: 0.0, quality_score: 0.8, capability_tags: vec!["coding".into()] },

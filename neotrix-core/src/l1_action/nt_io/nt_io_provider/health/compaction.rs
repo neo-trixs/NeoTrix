@@ -1,5 +1,14 @@
 use crate::l1_action::nt_io::nt_io_provider::common::types::{Message, Role};
 
+/// Sanitize conversation history by removing orphaned tool results and tool calls.
+///
+/// Two-pass cleanup:
+/// 1. Remove Tool messages whose tool_call_id doesn't match any preceding Assistant tool_call
+/// 2. Remove Assistant messages with tool_calls where not ALL calls have matching Tool results
+///
+/// Note: Real implementation needs — operates in-place with O(n²) complexity due to
+/// backward scanning. Consider: single-pass with a HashMap for O(n) lookup, and
+/// handling edge cases like interleaved tool results from different call batches.
 pub fn sanitize_history(messages: &mut Vec<Message>) {
     let mut i = 0;
     while i < messages.len() {

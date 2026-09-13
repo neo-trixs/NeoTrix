@@ -24,7 +24,7 @@ pub mod nt_memory_community;
 pub mod nt_memory_confidence;
 pub mod nt_memory_crawl;
 pub mod nt_memory_pack;
-// pub mod nt_memory_pack_chunked; // DEAD: zero external references
+pub mod nt_memory_pack_chunked;
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_cortex_sync;
@@ -37,17 +37,17 @@ pub mod nt_memory_pipeline;
 pub mod nt_memory_geo;
 pub mod nt_memory_hierarchical;
 pub mod nt_memory_graphrag;
-// pub mod nt_memory_gwtq; // DEAD: zero external references
+pub mod nt_memory_gwtq;
 pub mod nt_memory_diversity;
 pub mod nt_memory_curation;
 pub mod nt_memory_visibility;
 pub mod nt_memory_provenance;
-pub mod nt_temporal_audit;
+// pub mod nt_temporal_audit; // DEAD: zero external references
 pub mod nt_memory_skill_cost;
 pub mod nt_memory_dual_brain;
 // pub mod nt_memory_ingest; // DEAD: zero external references
 pub mod nt_memory_proficiency;
-pub mod nt_memory_primitives;
+// pub mod nt_memory_primitives; // DEAD: zero external references
 pub mod nt_memory_integration;
 pub mod nt_memory_schema;
 pub mod nt_memory_search;
@@ -77,7 +77,7 @@ pub mod nt_absorb_mapper;
 pub mod nt_memory_write_guard;
 pub mod nt_memory_snapshot;
 pub mod nt_memory_zim_absorber;
-// pub mod nt_memory_brain; // DEAD: zero external references
+pub mod nt_memory_brain;
 pub mod nt_memory_lifecycle;
 pub mod nt_memory_shanhai;
 
@@ -106,7 +106,7 @@ pub use nt_memory_agent_driven::{AgentMemory, AgentMemoryEntry, MemoryConfig, Me
 pub use nt_memory_agent_session::{AgentSessionManager, AgentSession, AgentSessionEntry};
 pub use nt_memory_svaf_gate::{SvafGate, SvafDecision, SvafEvaluation};
 pub use nt_memory_proficiency::{MemoryProficiency, MemoryAction, MemoryActionRecord, MemoryProficiencyReport};
-pub use nt_memory_primitives::MemoryPrimitives;
+// pub use nt_memory_primitives::MemoryPrimitives; // DEAD: zero external references
 pub use nt_memory_dual_brain::{DualBrainWorkingMemory, ExperienceAnchor, DEFAULT_WORKING_CAPACITY};
 pub use nt_memory_wiki::{WikiSyncReport, WikiNode, WikiEdge, WikiGraph, WikiSearchResult};
 pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityNode, RelationEdge, GraphQueryMode, SubgraphResult, HybridResult, GlobalSummary, Community};
@@ -1881,20 +1881,20 @@ impl KnowledgeBase {
     /// G23 时序图审计 (opencontext 吸收): 记录一条带时序窗口 + 签名的
     /// NT-SHIELD 审计事件, 供审计链回查 (篡改检测 + supersession 演化)。
     /// 返回审计记录 id。
-    pub fn record_temporal_audit(
-        &self,
-        subject: &str,
-        action: &str,
-        detail: &str,
-        verdict: &str,
-        key: &[u8],
-    ) -> Result<String, String> {
-        let ledger = nt_temporal_audit::TemporalAuditLedger::open(Some(self.db_path.as_path()))?;
-        let mut rec = nt_temporal_audit::TemporalAuditRecord::new(subject, action, detail, verdict);
-        rec.sign(key);
-        ledger.append(&rec)?;
-        Ok(rec.id)
-    }
+    // pub fn record_temporal_audit(
+    //     &self,
+    //     subject: &str,
+    //     action: &str,
+    //     detail: &str,
+    //     verdict: &str,
+    //     key: &[u8],
+    // ) -> Result<String, String> {
+    //     let ledger = nt_temporal_audit::TemporalAuditLedger::open(Some(self.db_path.as_path()))?;
+    //     let mut rec = nt_temporal_audit::TemporalAuditRecord::new(subject, action, detail, verdict);
+    //     rec.sign(key);
+    //     ledger.append(&rec)?;
+    //     Ok(rec.id)
+    // }
 
     // ── Agent Memory ──
 

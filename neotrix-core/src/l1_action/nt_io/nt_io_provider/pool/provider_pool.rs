@@ -185,8 +185,9 @@ impl ProviderPool {
                 is_free,
                 crate::l1_action::nt_io::nt_io_provider::provider_catalog::ProviderCategory::Cloud,
             );
-            if let Ok(pool) = gateway.account_pool.lock() {
-                pool.register_default(&entry.provider, &entry.label);
+            match gateway.account_pool.lock() {
+                Ok(pool) => pool.register_default(&entry.provider, &entry.label),
+                Err(e) => log::warn!("[provider-pool] account_pool mutex poisoned, register '{}' failed: {}", entry.label, e),
             }
             registered += 1;
             log::info!(

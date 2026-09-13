@@ -82,11 +82,11 @@ impl CrossModuleAudit {
         Self::new(_CrossModuleConfig::default())
     }
     
-    /// 执行跨模块一致性检查
+    /// Execute cross-module consistency check across dynamic params, segments, and ratings.
     ///
-    /// Note: Real implementation needs — checks are executed sequentially.
-    /// Consider: parallel check execution, weighted scoring across dimensions,
-    /// and configurable severity thresholds for each check type.
+    /// Note: Real implementation needs — checks are sequential. Consider: parallel
+    /// check execution for performance, weighted scoring across dimensions, and
+    /// configurable severity thresholds per check type.
     pub fn check(
         &self,
         dynamic_params: &[DynamicParams],
@@ -136,9 +136,10 @@ impl CrossModuleAudit {
     
     /// Check consistency between dynamic parameters and scaling ratings.
     ///
-    /// Note: Real implementation needs — the check verifies that `DynamicParams.to_scaling_rating()`
-    /// matches the provided rating. Consider: fuzzy matching for borderline cases,
-    /// and reporting the actual parameter values that caused the mismatch.
+    /// Note: Real implementation needs — verifies DynamicParams.to_scaling_rating()
+    /// matches provided rating. Consider: fuzzy matching for borderline cases,
+    /// reporting actual parameter values that caused the mismatch, and supporting
+    /// custom rating mappings per content type.
     fn check_dynamic_emotion_consistency(
         &self,
         dynamic_params: &[DynamicParams],
@@ -178,13 +179,16 @@ impl CrossModuleAudit {
             }
         }
         
+        // TODO(R-P79): consistency_score is not computed in sub-checks — the main
+        // check() function computes it from aggregated details. Sub-check return
+        // values use 0 as a placeholder. Wire real per-dimension scoring here.
         _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
     /// Check rhythm consistency: no more than 2 consecutive segments of same type,
     /// and climax segment not at the start.
     ///
-    /// Note: Real implementation needs — the consecutive threshold (2) is hardcoded.
+    /// Note: Real implementation needs — consecutive threshold (2) is hardcoded.
     /// Consider: configurable max consecutive count per segment type, transition
     /// probability matrix validation, and pacing curve analysis.
     fn check_rhythm_segment_consistency(&self, segments: &[SegmentData]) -> _CrossModuleCheckResult {
@@ -235,14 +239,16 @@ impl CrossModuleAudit {
             }
         }
         
+        // TODO(R-P79): consistency_score placeholder — see check_dynamic_emotion_consistency.
         _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
     /// Validate that all dynamic parameters are within physical bounds.
     ///
-    /// Note: Real implementation needs — delegates to `DynamicParams::validate()`.
+    /// Note: Real implementation needs — delegates to DynamicParams::validate().
     /// Consider: per-unit bounds (degrees vs radians have different ranges),
-    /// and warning thresholds (near-boundary values that are valid but risky).
+    /// warning thresholds (near-boundary values that are valid but risky),
+    /// and auto-correction suggestions for out-of-bound parameters.
     fn check_parameter_bounds(&self, dynamic_params: &[DynamicParams]) -> _CrossModuleCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
@@ -264,12 +270,13 @@ impl CrossModuleAudit {
             }
         }
         
+        // TODO(R-P79): consistency_score placeholder — see check_dynamic_emotion_consistency.
         _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
     }
     
     /// Calculate overall consistency score (0-100) from check details.
     ///
-    /// Note: Real implementation needs — the score is simply (passed/total * 100).
+    /// Note: Real implementation needs — score is simply (passed/total * 100).
     /// Consider: weighted scoring (some dimensions more critical than others),
     /// severity-aware scoring (Critical failures deduct more), and trend tracking
     /// (is consistency improving or degrading over time?).

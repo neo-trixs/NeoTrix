@@ -1,5 +1,5 @@
 // Re-export from neotrix-types (single source of truth for nt_core_bank types)
-pub use neotrix_types::core::nt_core_bank::pipeline::{PipelineConfig, PipelineState};
+pub use neotrix_types::core::nt_core_bank::{PipelineConfig, PipelineState};
 
 // Inline tests from the original definition
 #[cfg(test)]

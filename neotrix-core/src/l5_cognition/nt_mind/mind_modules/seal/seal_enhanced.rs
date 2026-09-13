@@ -207,7 +207,14 @@ impl _SEALPipelineEnhanced {
         }
     }
 
-    /// 执行 SEAL 周期
+    /// Execute a complete SEAL cycle: explore → distill → self-test → absorb.
+    ///
+    /// STUB: All four stages return `Err("not wired")` — no real backends connected.
+    /// Real implementation needs:
+    /// - Exploration: LLM/research API to generate exploration candidates
+    /// - Distillation: LLM to extract verified knowledge from candidates
+    /// - Absorption: KB write path to persist verified knowledge
+    /// - Failure pattern deduplication (currently creates duplicate entries)
     pub(crate) fn _execute_cycle(&mut self, task: &str, context: &serde_json::Value) -> _SEALResult {
         let cycle_id = uuid::Uuid::new_v4().to_string();
         let mut stages_completed = Vec::new();
@@ -337,6 +344,10 @@ impl _SEALPipelineEnhanced {
     }
 
     /// Self-test stage — validates extracted knowledge against quality threshold.
+    ///
+    /// Note: Real implementation needs — only checks average confidence against
+    /// distillation_threshold. Consider: per-knowledge-type thresholds, validation
+    /// against KB schema, and cross-reference checking with existing knowledge.
     fn self_test(&self, knowledge: &[_ExtractedKnowledge]) -> Result<(), String> {
         if knowledge.is_empty() {
             return Err("self_test: no knowledge to validate".into());
@@ -362,10 +373,10 @@ impl _SEALPipelineEnhanced {
 
     /// Adapt learning rate based on success/failure history.
     ///
-    /// Note: Real implementation needs — only adjusts exploration_budget when success_rate < 0.5.
-    /// Consider: adjusting distillation_threshold, absorption_confidence, and adding
-    /// learning rate scheduling (cosine annealing, warm restarts). Track adjustment
-    /// history to detect oscillation (adjusting back and forth).
+    /// Note: Real implementation needs — only adjusts exploration_budget when
+    /// success_rate < 0.5. Consider: adjusting distillation_threshold,
+    /// absorption_confidence, and adding learning rate scheduling (cosine annealing,
+    /// warm restarts). Track adjustment history to detect oscillation.
     fn adapt_learning_rate(&mut self) -> Vec<_LearningAdjustment> {
         let mut adjustments = Vec::new();
 

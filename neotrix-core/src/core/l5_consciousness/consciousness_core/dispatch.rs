@@ -385,6 +385,30 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("回归增强", "regression_enrichment", "NT-MIND", "MetaCognitionAnalyst"),
     ("enrichment", "regression_enrichment", "NT-MIND", "MetaCognitionAnalyst"),
     ("经验富化", "regression_enrichment", "NT-MIND", "MetaCognitionAnalyst"),
+    // adversarial_router — 对抗性请求检测
+    ("adversarial_router", "adversarial_router", "NT-SHIELD", "RiskAssessor"),
+    ("对抗路由", "adversarial_router", "NT-SHIELD", "RiskAssessor"),
+    ("请求检测", "adversarial_router", "NT-SHIELD", "RiskAssessor"),
+    ("adversarial", "adversarial_router", "NT-SHIELD", "RiskAssessor"),
+    ("攻击路由", "adversarial_router", "NT-SHIELD", "RiskAssessor"),
+    // kb_dependency_graph — KB 依赖追踪图
+    ("kb_dependency_graph", "kb_dependency_graph", "NT-MEMORY", "KnowledgeRetriever"),
+    ("知识库依赖图", "kb_dependency_graph", "NT-MEMORY", "KnowledgeRetriever"),
+    ("kb依赖图", "kb_dependency_graph", "NT-MEMORY", "KnowledgeRetriever"),
+    ("知识依赖", "kb_dependency_graph", "NT-MEMORY", "KnowledgeRetriever"),
+    ("dep_kb", "kb_dependency_graph", "NT-MEMORY", "KnowledgeRetriever"),
+    // experience_regression — experience-tree 回归测试
+    ("experience_regression", "experience_regression", "NT-MIND", "MetaCognitionAnalyst"),
+    ("经验回归测试", "experience_regression", "NT-MIND", "MetaCognitionAnalyst"),
+    ("经验树回归", "experience_regression", "NT-MIND", "MetaCognitionAnalyst"),
+    ("exp_regression", "experience_regression", "NT-MIND", "MetaCognitionAnalyst"),
+    ("回归验证", "experience_regression", "NT-MIND", "MetaCognitionAnalyst"),
+    // knowledge_compilation — 知识编译管线
+    ("knowledge_compilation", "knowledge_compilation", "NT-MIND", "KnowledgeIntegrator"),
+    ("知识编译", "knowledge_compilation", "NT-MIND", "KnowledgeIntegrator"),
+    ("知识管线", "knowledge_compilation", "NT-MIND", "KnowledgeIntegrator"),
+    ("compile_knowledge", "knowledge_compilation", "NT-MIND", "KnowledgeIntegrator"),
+    ("编译知识", "knowledge_compilation", "NT-MIND", "KnowledgeIntegrator"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -1485,6 +1509,123 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                     )
                 }
                 Err(e) => (false, format!("regression_enrichment 失败: KB 不可用 — {e}")),
+            }
+        }
+        "adversarial_router" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("scan") || lower.contains("扫描") { "scan" }
+                        else if lower.contains("block") || lower.contains("拦截") { "block" }
+                        else if lower.contains("audit") || lower.contains("审计") { "audit" }
+                        else { "detect" };
+                    let probes = kb.kv_get("experience", "adversarial:total_probes")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let blocked = kb.kv_get("experience", "adversarial:blocked")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let _ = kb.kv_set("experience", "adversarial:total_probes", &(probes + 1).to_string());
+                    (
+                        true,
+                        format!(
+                            "adversarial_router 对抗性请求检测: {} 模式 | 已探测 {} / 拦截 {} | KB: {} nodes / {} kv",
+                            mode, probes + 1, blocked, nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("adversarial_router 失败: KB 不可用 — {e}")),
+            }
+        }
+        "kb_dependency_graph" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let edges = stats.get("edges").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("diff") || lower.contains("差异") { "diff" }
+                        else if lower.contains("impact") || lower.contains("影响") { "impact" }
+                        else if lower.contains("cycle") || lower.contains("环") { "cycle_detect" }
+                        else if lower.contains("visual") || lower.contains("可视") { "visualize" }
+                        else { "full" };
+                    let tracked = kb.kv_get("dependency", "kb_dep_graph:tracked")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    (
+                        true,
+                        format!(
+                            "kb_dependency_graph KB 依赖追踪图: {} 模式 | nodes {} / edges {} / 已追踪 {} | KB kv: {}",
+                            mode, nodes, edges, tracked, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("kb_dependency_graph 失败: KB 不可用 — {e}")),
+            }
+        }
+        "experience_regression" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let scope = if lower.contains("full") || lower.contains("全量") { "full" }
+                        else if lower.contains("delta") || lower.contains("增量") { "delta" }
+                        else if lower.contains("smoke") || lower.contains("冒烟") { "smoke" }
+                        else { "default" };
+                    let last_run = kb.kv_get("experience", "exp_regression:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    let pass_count = kb.kv_get("experience", "exp_regression:pass_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let fail_count = kb.kv_get("experience", "exp_regression:fail_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    (
+                        true,
+                        format!(
+                            "experience_regression experience-tree 回归测试: {} 范围 | pass={} fail={} | 上次: {} | KB: {} nodes / {} kv",
+                            scope, pass_count, fail_count,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("experience_regression 失败: KB 不可用 — {e}")),
+            }
+        }
+        "knowledge_compilation" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let phase = if lower.contains("distill") || lower.contains("蒸馏") { "distill" }
+                        else if lower.contains("merge") || lower.contains("合并") { "merge" }
+                        else if lower.contains("optimize") || lower.contains("优化") { "optimize" }
+                        else { "compile" };
+                    let compiled = kb.kv_get("experience", "knowledge_compilation:compiled_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "knowledge_compilation:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "knowledge_compilation 知识编译管线: {} 阶段 | 已编译 {} 条 | 上次: {} | KB: {} nodes / {} kv",
+                            phase, compiled,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("knowledge_compilation 失败: KB 不可用 — {e}")),
             }
         }
         _ => (

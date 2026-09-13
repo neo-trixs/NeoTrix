@@ -127,58 +127,25 @@ impl SentruxSensor {
         }
     }
 
-    /// 扫描项目质量
+    /// 扫描项目质量 — 返回 `Err` 因为未接线实际代码分析。
     ///
-    /// STUB: Currently returns hardcoded metric values (modularity=0.85, acyclicity=0.92, etc.)
-    /// without actual code analysis. Real implementation needs: AST parsing, dependency
-    /// graph analysis, and actual metric computation from source code.
+    /// 真实实现需要: AST 解析、依赖图分析、从源码计算实际指标。
+    /// 当前无法返回有意义的质量评分，因为没有接入代码分析工具。
     pub fn scan(&self, path: &str) -> Result<QualitySnapshot, String> {
-        // 简化版: 计算基础指标
-        let metrics = QualityMetrics {
-            modularity: 0.85,
-            acyclicity: 0.92,
-            depth: 0.78,
-            equality: 0.81,
-            redundancy: 0.88,
-        };
-
-        let score = ((metrics.modularity + metrics.acyclicity + metrics.depth
-            + metrics.equality + metrics.redundancy)
-            / 5.0 * 10000.0) as u32;
-
-        let violations = self._check_rules(path)?;
-
-        Ok(QualitySnapshot {
-            score,
-            metrics,
-            violations,
-            file_count: 0,
-            edge_count: 0,
-            timestamp: chrono::Utc::now(),
-        })
+        let _ = path; // 抑制未使用警告，路径参数保留供真实实现使用
+        Err("scan is not wired: requires AST parsing, dependency graph analysis, \
+             and actual metric computation from source code to return real quality metrics"
+            .into())
     }
 
-    /// 检查规则
+    /// 检查规则 — 返回 `Err` 因为未接线实际依赖图分析。
     ///
-    /// STUB: Currently always reports a cycle violation regardless of actual dependency graph.
-    /// Real implementation needs: actual dependency graph analysis, cycle detection algorithms,
-    /// and rule evaluation against real code structure.
+    /// 真实实现需要: 实际依赖图分析、环检测算法、基于真实代码结构的规则评估。
+    /// 当前无法判断是否存在循环依赖，因为没有接入依赖图解析器。
     pub(crate) fn _check_rules(&self, _path: &str) -> Result<Vec<QualityViolation>, String> {
-        let mut violations = Vec::new();
-
-        // 检查循环依赖
-        if self.rules.constraints.max_cycles == 0 {
-            // 需要零循环
-            violations.push(QualityViolation {
-                rule: "max_cycles".into(),
-                severity: ViolationSeverity::Critical,
-                location: "global".into(),
-                message: "Cycle detected in dependency graph".into(),
-                suggestion: Some("Refactor to break circular dependencies".into()),
-            });
-        }
-
-        Ok(violations)
+        Err("_check_rules is not wired: requires actual dependency graph analysis, \
+             cycle detection algorithms, and rule evaluation against real code structure"
+            .into())
     }
 
     /// 保存 baseline
@@ -214,10 +181,9 @@ impl SentruxSensor {
         })
     }
 
-    /// MCP 工具: scan
+    /// MCP 工具: scan — 返回 `Err` 因为未接线实际代码分析。
     ///
-    /// Note: Real implementation needs — delegates to self.scan() which returns hardcoded values.
-    /// Consider: integrating with actual code analysis tools and returning real metrics.
+    /// 真实实现需要: 接入代码分析工具 (AST 解析、依赖图) 并返回真实指标。
     pub(crate) fn _mcp_scan(&self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(snapshot) => McpToolResult {
@@ -237,10 +203,9 @@ impl SentruxSensor {
         }
     }
 
-    /// MCP 工具: session_start
+    /// MCP 工具: session_start — 返回 `Err` 因为未接线实际代码分析。
     ///
-    /// Note: Real implementation needs — delegates to self.scan() which returns hardcoded values.
-    /// Consider: integrating with actual code analysis tools and returning real baseline metrics.
+    /// 真实实现需要: 接入代码分析工具并返回真实基线指标。
     pub(crate) fn _mcp_session_start(&mut self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(snapshot) => {
@@ -262,10 +227,9 @@ impl SentruxSensor {
         }
     }
 
-    /// MCP 工具: session_end
+    /// MCP 工具: session_end — 返回 `Err` 因为未接线实际代码分析。
     ///
-    /// Note: Real implementation needs — delegates to self.scan() which returns hardcoded values.
-    /// Consider: integrating with actual code analysis tools and returning real comparison results.
+    /// 真实实现需要: 接入代码分析工具并返回真实对比结果。
     pub(crate) fn _mcp_session_end(&self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(current) => {
@@ -289,11 +253,9 @@ impl SentruxSensor {
         }
     }
 
-    /// MCP 工具: _check_rules
+    /// MCP 工具: _check_rules — 返回 `Err` 因为未接线实际依赖图分析。
     ///
-    /// Note: Real implementation needs — delegates to self._check_rules() which always
-    /// reports cycle violations. Consider: actual dependency graph analysis and rule
-    /// evaluation against real code structure.
+    /// 真实实现需要: 实际依赖图分析和基于真实代码结构的规则评估。
     pub(crate) fn _mcp_check_rules(&self, path: &str) -> McpToolResult {
         match self._check_rules(path) {
             Ok(violations) => {

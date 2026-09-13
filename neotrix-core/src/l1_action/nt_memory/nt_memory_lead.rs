@@ -147,7 +147,7 @@ impl LeadScorer {
         }
         total += (lead.interactions.len() as f64 * 2.0).min(20.0);
         if let Some(last) = lead.last_contact {
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
             let days = (now - last) / 86400;
             if days <= 1 { total += 10.0; } else if days <= 7 { total += 5.0; }
         }
@@ -208,7 +208,7 @@ impl LeadManager {
 
     pub fn capture_lead(&mut self, source: LeadSource, contact: &str, inquiry: &str, products: Vec<String>) -> &Lead {
         let id = format!("lead_{}", uuid::Uuid::new_v4());
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let lead = Lead {
             id: id.clone(), source, company_name: None, contact_name: contact.to_string(),
             email: None, phone: None, whatsapp: None, country: None,
@@ -232,14 +232,14 @@ impl LeadManager {
         if let Some(v) = updates.stage { lead.stage = v; }
         if let Some(v) = updates.tags { lead.tags = v; }
         if let Some(v) = updates.assigned_to { lead.assigned_to = Some(v); }
-        lead.updated_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        lead.updated_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         self.rescore(id);
         self.leads.get(id).ok_or_else(|| "Not found".into())
     }
 
     pub fn record_interaction(&mut self, id: &str, itype: InteractionType, channel: &str, direction: &str, content: &str) -> Result<(), String> {
         let lead = self.leads.get_mut(id).ok_or_else(|| format!("Lead {} not found", id))?;
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         lead.interactions.push(Interaction {
             id: format!("int_{}", uuid::Uuid::new_v4()), interaction_type: itype,
             channel: channel.to_string(), direction: direction.to_string(),
@@ -255,7 +255,7 @@ impl LeadManager {
         let lead = self.leads.get_mut(id).ok_or_else(|| format!("Lead {} not found", id))?;
         let idx = self.pipeline.iter().position(|s| *s == lead.stage).unwrap_or(0);
         if idx + 1 < self.pipeline.len() { lead.stage = self.pipeline[idx + 1]; }
-        lead.updated_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        lead.updated_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         self.leads.get(id).ok_or_else(|| "Not found".into())
     }
 
@@ -274,7 +274,7 @@ impl LeadManager {
     }
 
     pub(crate) fn _needs_follow_up(&self) -> Vec<&Lead> {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         self.leads.values().filter(|l|
             l.stage != LeadStage::ClosedWon && l.stage != LeadStage::ClosedLost
                 && l.next_follow_up.map_or(true, |t| t <= now)
@@ -295,7 +295,7 @@ impl L1Capability for LeadManager {
             healthy: true,
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             message: Some(format!("{} leads tracked", self.leads.len())),
         }
     }

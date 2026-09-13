@@ -359,11 +359,13 @@ impl SelfImprovementLoop {
 
     // ── Stage 3: 生成改进方案 ──
 
-    /// 基于诊断结果生成改进方案
+    /// Generate improvement plans based on diagnostic results.
     ///
-    /// Note: Real implementation needs — plans are generated from hardcoded templates.
-    /// Consider: LLM-based plan generation, historical effectiveness tracking,
-    /// and cost-benefit analysis for plan prioritization.
+    /// STUB: Plans are generated from hardcoded templates. Real implementation needs:
+    /// - LLM-based plan generation for novel issues
+    /// - Historical effectiveness tracking (which plans worked before)
+    /// - Cost-benefit analysis for plan prioritization
+    /// - Plan deduplication (avoid regenerating same plan each cycle)
     pub(crate) fn _generate_plans(&mut self, diagnosis: &DiagnosticResult) -> Vec<ImprovementPlan> {
         let mut plans = Vec::new();
 
@@ -421,11 +423,12 @@ impl SelfImprovementLoop {
         pending
     }
 
-    /// 回滚已执行的方案
+    /// Rollback an executed plan — moves it from executed to rolled_back.
     ///
-    /// Note: Real implementation needs — rollback only updates status without
-    /// restoring original parameter values. Consider: parameter snapshot storage,
-    /// rollback execution logic, and rollback verification.
+    /// Note: Real implementation needs — only updates status without restoring
+    /// original parameter values. Consider: parameter snapshot storage at execution
+    /// time, rollback execution logic, and rollback verification (confirm params
+    /// actually reverted).
     pub fn rollback(&mut self, plan_id: &str) -> bool {
         if let Some(plan) = self.executed.iter().find(|p| p.plan_id == plan_id) {
             let mut rolled = plan.clone();
@@ -442,12 +445,12 @@ impl SelfImprovementLoop {
 
     // ── Stage 5: 验证 ──
 
-    /// 验证改进效果 — 对比执行前后的指标
+    /// Verify improvement effect — compare metrics before and after execution.
     ///
-    /// Note: 执行引擎未接线 (`_evaluate_and_apply` 标记 Skipped),
-    /// `self.executed` 为空, 验证仅对比指标趋势变化, 不关联具体方案。
-    /// 真实实现需要在 `_evaluate_and_apply` 实际执行参数调整后,
-    /// 对比调整前后的系统指标变化。
+    /// Note: `_evaluate_and_apply` is STUB (plans marked Skipped), so `self.executed`
+    /// is always empty. Verification only compares metric trends, not specific plans.
+    /// Real implementation needs: link verification to specific executed plans,
+    /// and support A/B testing of improvement effects.
     pub fn verify(&self) -> Option<VerificationResult> {
         if self.metrics_history.len() < 2 {
             return None;
@@ -474,11 +477,11 @@ impl SelfImprovementLoop {
 
     // ── 完整循环 ──
 
-    /// 运行一次完整的自改进循环
+    /// Run a complete self-improvement cycle: diagnose → generate → apply → verify.
     ///
-    /// Note: Real implementation needs — cycle runs synchronously.
-    /// Consider: async execution with cancellation support, progress reporting
-    /// via EventBus, and configurable cycle intervals for background execution.
+    /// Note: Real implementation needs — runs synchronously. Consider: async execution
+    /// with cancellation support, progress reporting via EventBus, and configurable
+    /// cycle intervals for background execution.
     pub fn run_cycle(&mut self) -> CycleResult {
         let start = timestamp_now();
 
@@ -510,7 +513,7 @@ impl SelfImprovementLoop {
 
     // ── 内部工具 ──
 
-    /// 根据维度生成具体改进操作
+    /// Generate specific improvement actions for a given dimension.
     ///
     /// Note: Real implementation needs — actions are hardcoded templates.
     /// Consider: LLM-based action generation, historical effectiveness tracking,
@@ -580,7 +583,7 @@ impl SelfImprovementLoop {
         }
     }
 
-    /// 严重程度 → 优先级 (severity 0.0-1.0 → priority 1-10)
+    /// Convert severity (0.0-1.0) to priority (1-10).
     ///
     /// Note: Real implementation needs — linear mapping is simplistic.
     /// Consider: logarithmic scaling for high-severity issues, priority caps,
@@ -589,7 +592,7 @@ impl SelfImprovementLoop {
         ((severity * 9.0) + 1.0).round() as u8
     }
 
-    /// 保留最近 N 条历史
+    /// Prune metrics history to keep only the most recent entries.
     ///
     /// Note: Real implementation needs — simple drain from front.
     /// Consider: time-based pruning (keep last 7 days), size-based pruning
@@ -601,7 +604,7 @@ impl SelfImprovementLoop {
         }
     }
 
-    /// 基于指标历史更新趋势
+    /// Update trend analysis based on metrics history.
     ///
     /// Note: Real implementation needs — trend detection uses simple delta comparison.
     /// Consider: exponential moving averages, seasonality detection, and
@@ -801,52 +804,63 @@ mod tests {
 
     #[test]
     fn test_collect_metrics_and_diagnose() {
-        // Verifies diagnose() reacts to declining success_rate values.
-        // HONESTY: The declining values are manually chosen constants, not real
-        // observations. Once real metrics wiring exists, replace with assertions
-        // on actual system behavior.
+        // HONESTY: Verifies that diagnose() reacts to declining success_rate values.
+        // The declining values (0.9→0.7) are manually chosen constants, NOT real
+        // observations. This tests the diagnosis math (threshold detection, issue
+        // generation), NOT that the system actually degrades.
+        // TODO(R-P79): Replace with real metric wiring — collect_metrics should
+        // accept actual system telemetry, not synthetic data.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.7));
 
         let diagnosis = loop_engine.diagnose();
-        assert!(diagnosis.health_score < 1.0);
-        assert!(!diagnosis.issues.is_empty());
+        assert!(diagnosis.health_score < 1.0,
+            "declining metrics should produce health_score < 1.0, got {}",
+            diagnosis.health_score);
+        assert!(!diagnosis.issues.is_empty(),
+            "declining metrics should produce at least one issue");
         assert!(
             diagnosis
                 .issues
                 .iter()
-                .any(|i| i.description.contains("成功率"))
+                .any(|i| i.description.contains("成功率")),
+            "issues should mention success_rate degradation"
         );
     }
 
     #[test]
     fn test_generate_plans() {
-        // Verifies plan generation produces non-empty output for declining metrics.
-        // HONESTY: Plan quality and relevance to real system state are NOT validated.
+        // HONESTY: Verifies plan generation produces non-empty output for declining
+        // metrics. Plan quality and relevance to real system state are NOT validated.
+        // This tests that the plan generator produces output, NOT that plans are useful.
+        // TODO(R-P79): Wire real metric sources and validate plan relevance against
+        // actual system issues.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.6));
 
         let diagnosis = loop_engine.diagnose();
         let plans = loop_engine._generate_plans(&diagnosis);
-        assert!(!plans.is_empty());
-        assert!(plans[0].priority >= 1);
+        assert!(!plans.is_empty(), "declining metrics should produce at least one plan");
+        assert!(plans[0].priority >= 1, "plan priority should be >= 1");
     }
 
     #[test]
     fn test_run_full_cycle() {
-        // Verifies cycle executes without panic and produces non-zero counts.
-        // HONESTY: Does NOT verify plans address real issues or that applied
-        // plans have real effect.
+        // HONESTY: Verifies cycle executes without panic and produces non-zero counts.
+        // Does NOT verify plans address real issues or that applied plans have real
+        // effect. This tests cycle orchestration (plumbing), NOT improvement outcomes.
+        // TODO(R-P79): Wire real metric sources and verify that applied plans actually
+        // improve the metrics they target.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.65));
 
         let result = loop_engine.run_cycle();
-        assert!(result.issues_found > 0);
-        assert!(result.plans_generated > 0);
-        assert!(result.plans_applied <= 3);
+        assert!(result.issues_found > 0, "declining metrics should find issues");
+        assert!(result.plans_generated > 0, "should generate plans from issues");
+        assert!(result.plans_applied <= 3, "applied plans should be bounded");
     }
 
     #[test]
@@ -857,25 +871,35 @@ mod tests {
 
     #[test]
     fn test_trends_update() {
-        // Verifies trend detection math against a fabricated declining sequence.
-        // HONESTY: Does NOT validate against real system degradation.
+        // HONESTY: Verifies trend detection math against a fabricated declining
+        // sequence (0.9→0.8→0.7). Does NOT validate against real system degradation.
+        // This tests trend math (direction detection, streak counting), NOT that the
+        // system actually degrades in production.
+        // TODO(R-P79): Replace with real metric streaming — trends should be computed
+        // from actual system telemetry, not synthetic data.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.8));
         loop_engine.collect_metrics(sample_metrics(0.7));
 
         let trends = loop_engine.trends();
-        assert!(!trends.is_empty());
+        assert!(!trends.is_empty(), "declining metrics should produce trends");
         let sr_trend = trends.iter().find(|t| t.metric_name == "success_rate");
-        assert!(sr_trend.is_some());
-        assert_eq!(sr_trend.unwrap().direction, TrendDirection::Degrading);
-        assert_eq!(sr_trend.unwrap().streak, 2);
+        assert!(sr_trend.is_some(), "should detect success_rate trend");
+        assert_eq!(sr_trend.unwrap().direction, TrendDirection::Degrading,
+            "0.9→0.8→0.7 should be Degrading");
+        assert_eq!(sr_trend.unwrap().streak, 2,
+            "two consecutive declines should produce streak=2");
     }
 
     #[test]
     fn test_rollback() {
-        // Verifies rollback removes a plan from executed list.
-        // HONESTY: The plan was generated from fabricated metrics, not real issues.
+        // HONESTY: Verifies rollback removes a plan from executed list. The plan was
+        // generated from fabricated metrics (0.9→0.6), NOT real issues. This tests
+        // rollback plumbing (list removal, history tracking), NOT that rollback
+        // actually reverts a real improvement.
+        // TODO(R-P79): Wire real metric sources and verify rollback restores the
+        // previous system state.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.6));
@@ -883,9 +907,11 @@ mod tests {
 
         if let Some(plan) = loop_engine._executed_plans().first() {
             let id = plan.plan_id.clone();
-            assert!(loop_engine.rollback(&id));
-            assert!(loop_engine._executed_plans().iter().all(|p| p.plan_id != id));
-            assert!(!loop_engine.rolled_back.is_empty());
+            assert!(loop_engine.rollback(&id), "rollback should succeed for existing plan");
+            assert!(loop_engine._executed_plans().iter().all(|p| p.plan_id != id),
+                "rolled-back plan should be removed from executed list");
+            assert!(!loop_engine.rolled_back.is_empty(),
+                "rolled_back history should be non-empty");
         }
     }
 

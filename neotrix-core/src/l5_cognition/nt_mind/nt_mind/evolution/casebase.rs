@@ -177,7 +177,7 @@ impl CaseBase {
 
     fn add_case_internal(&self, case: EthicalCase) {
         let id = case.id.clone();
-        self.cases.write().unwrap().insert(id.clone(), case.clone());
+        self.cases.write().unwrap_or_else(|e| e.into_inner()).insert(id.clone(), case.clone());
     }
 
     /// 添加案例（自动索引 + 持久化）。
@@ -205,7 +205,7 @@ impl CaseBase {
 
     /// 语义检索：自然语言查询 → Top-K 案例。
     pub fn search(&self, query: &str, limit: usize, filters: _SearchFilters) -> Vec<SearchResult> {
-        let cases = self.cases.read().unwrap();
+        let cases = self.cases.read().unwrap_or_else(|e| e.into_inner());
         let keywords = extract_keywords_mixed(query);
 
         let mut scored: Vec<(f64, EthicalCase)> = cases
@@ -243,7 +243,7 @@ impl CaseBase {
 
     /// 结构化查询：按字段精确/范围过滤。
     pub(crate) fn _query_structured(&self, filters: _SearchFilters, limit: usize) -> Vec<EthicalCase> {
-        let cases = self.cases.read().unwrap();
+        let cases = self.cases.read().unwrap_or_else(|e| e.into_inner());
         cases.values()
             .filter(|c| self.passes_filters(c, &filters))
             .take(limit)
@@ -344,9 +344,9 @@ impl CaseBase {
     }
 
     fn rebuild_indices(&self) {
-        let mut indices = self.indices.write().unwrap();
+        let mut indices = self.indices.write().unwrap_or_else(|e| e.into_inner());
         *indices = CaseIndices::default();
-        for case in self.cases.read().unwrap().values() {
+        for case in self.cases.read().unwrap_or_else(|e| e.into_inner()).values() {
             self.index_case(&mut indices, case);
         }
     }
@@ -362,7 +362,7 @@ impl CaseBase {
     }
 
     fn update_indices(&self, case: &EthicalCase) {
-        self.index_case(&mut self.indices.write().unwrap(), case);
+        self.index_case(&mut self.indices.write().unwrap_or_else(|e| e.into_inner()), case);
     }
 
     fn persist_case(&self, conn: &Connection, case: &EthicalCase) -> Result<(), String> {

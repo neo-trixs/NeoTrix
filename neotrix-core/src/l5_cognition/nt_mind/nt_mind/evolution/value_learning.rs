@@ -144,12 +144,12 @@ impl ValueLearningEngine {
 
     /// 记录观察（外部调用：行动执行后记录后果）。
     pub fn record_observation(&self, obs: Observation) {
-        self.observations.write().unwrap().push(obs);
+        self.observations.write().unwrap_or_else(|e| e.into_inner()).push(obs);
     }
 
     /// 触发学习循环（后台循环/定期调用）。
     pub fn learn(&self) -> Result<Vec<LearningEvent>, String> {
-        let obs = self.observations.read().unwrap().clone();
+        let obs = self.observations.read().unwrap_or_else(|e| e.into_inner()).clone();
         if obs.len() < self.config.min_observations_for_learning {
             return Ok(Vec::new());
         }
@@ -169,7 +169,7 @@ impl ValueLearningEngine {
 
         // 3. 生成待应用事件
         for event in &events {
-            self.pending_events.write().unwrap().push(event.clone());
+            self.pending_events.write().unwrap_or_else(|e| e.into_inner()).push(event.clone());
         }
 
         Ok(events)
@@ -177,7 +177,7 @@ impl ValueLearningEngine {
 
     /// 应用待决事件到指南针（需显式调用或自动应用高置信度事件）。
     pub fn apply_pending(&self, auto_apply_threshold: f64) -> Result<usize, String> {
-        let mut pending = self.pending_events.write().unwrap();
+        let mut pending = self.pending_events.write().unwrap_or_else(|e| e.into_inner());
         let mut applied = 0;
         let mut remaining = Vec::new();
 

@@ -102,10 +102,13 @@ impl AccountLease {
 
 impl Drop for AccountLease {
     fn drop(&mut self) {
-        if let Ok(mut acc) = self.state.write() {
-            if let Some(s) = acc.get_mut(&self.name) {
-                s.in_flight = s.in_flight.saturating_sub(1);
+        match self.state.write() {
+            Ok(mut acc) => {
+                if let Some(s) = acc.get_mut(&self.name) {
+                    s.in_flight = s.in_flight.saturating_sub(1);
+                }
             }
+            Err(e) => log::warn!("[account_pool] lease drop: state lock poisoned for '{}': {}", self.name, e),
         }
     }
 }
@@ -423,38 +426,51 @@ impl ByokPool {
 
     /// 注册一条订阅 (覆盖同名)。
     pub fn register(&self, sub: ByokSubscription) {
-        if let Ok(mut m) = self.subs.write() {
-            m.insert(sub.name.clone(), sub);
+        match self.subs.write() {
+            Ok(mut m) => { m.insert(sub.name.clone(), sub); }
+            Err(e) => log::warn!("[byok_pool] subs lock poisoned, register '{}' failed: {}", sub.name, e),
         }
     }
 
     /// 移除订阅。
     pub fn unregister(&self, name: &str) -> bool {
-        self.subs
-            .write()
-            .map(|mut m| m.remove(name).is_some())
-            .unwrap_or(false)
+        match self.subs.write() {
+            Ok(mut m) => m.remove(name).is_some(),
+            Err(e) => {
+                log::warn!("[byok_pool] subs lock poisoned, unregister '{}' failed: {}", name, e);
+                false
+            }
+        }
     }
 
     pub fn get(&self, name: &str) -> Option<ByokSubscription> {
-        self.subs
-            .read()
-            .ok()
-            .and_then(|m| m.get(name).cloned())
+        match self.subs.read() {
+            Ok(m) => m.get(name).cloned(),
+            Err(e) => {
+                log::warn!("[byok_pool] subs read lock poisoned, get '{}' failed: {}", name, e);
+                None
+            }
+        }
     }
 
     pub fn all(&self) -> Vec<ByokSubscription> {
-        self.subs
-            .read()
-            .map(|m| m.values().cloned().collect())
-            .unwrap_or_default()
+        match self.subs.read() {
+            Ok(m) => m.values().cloned().collect(),
+            Err(e) => {
+                log::warn!("[byok_pool] subs read lock poisoned, listing all failed: {}", e);
+                Vec::new()
+            }
+        }
     }
 
     pub fn len(&self) -> usize {
-        self.subs
-            .read()
-            .map(|m| m.len())
-            .unwrap_or(0)
+        match self.subs.read() {
+            Ok(m) => m.len(),
+            Err(e) => {
+                log::warn!("[byok_pool] subs read lock poisoned, len query failed: {}", e);
+                0
+            }
+        }
     }
 
     pub fn is_empty(&self) -> bool {

@@ -57,7 +57,7 @@ impl MockErpSystem {
             return Err(format!("Order {} already exists", order_id));
         }
 
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let order = MockOrder {
             order_id: order_id.to_string(),
             product: product.to_string(),
@@ -82,7 +82,7 @@ impl MockErpSystem {
     pub fn update_status(&mut self, order_id: &str, new_status: MockOrderStatus) -> Result<&MockOrder, String> {
         let order = self.orders.get_mut(order_id).ok_or_else(|| format!("Order {} not found", order_id))?;
         order.status = new_status;
-        order.updated_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        order.updated_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         Ok(self.orders.get(order_id).unwrap())
     }
 
@@ -181,7 +181,7 @@ impl MockBankSystem {
             return Err(format!("LC {} already exists", lc_number));
         }
 
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let lc = MockLc {
             lc_number: lc_number.to_string(),
             issuer_bank: issuer_bank.to_string(),
@@ -254,7 +254,7 @@ impl MockBankSystem {
             return Err(format!("LC {} not accepted for payment", lc_number));
         }
 
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let payment_id = format!("PAY-{}-{}", lc_number, now);
         let payment = MockPayment {
             payment_id: payment_id.clone(),
@@ -345,7 +345,7 @@ impl MockCustomsSystem {
             return Err(format!("Declaration {} already exists", declaration_id));
         }
 
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let declaration = MockDeclaration {
             declaration_id: declaration_id.to_string(),
             order_id: order_id.to_string(),
@@ -366,7 +366,7 @@ impl MockCustomsSystem {
         let decl = self.declarations.get_mut(declaration_id)
             .ok_or_else(|| format!("Declaration {} not found", declaration_id))?;
 
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         decl.status = new_status.clone();
 
         if new_status == MockCustomsStatus::Cleared {
@@ -471,7 +471,7 @@ impl MockShippingSystem {
             return Err(format!("Shipment {} already exists", shipment_id));
         }
 
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let shipment = MockShipment {
             shipment_id: shipment_id.to_string(),
             order_id: order_id.to_string(),

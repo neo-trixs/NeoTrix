@@ -179,7 +179,7 @@ impl L1Capability for WhatsAppProvider {
             healthy: !self.access_token.is_empty(),
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             message: None,
         }
     }
@@ -257,7 +257,7 @@ impl L1Capability for EmailProvider {
             healthy: !self.smtp_host.is_empty(),
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             message: None,
         }
     }
@@ -409,7 +409,7 @@ impl MessagingRouter {
             to: to.to_string(),
             body,
             status: MessageStatus::Queued,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
         };
         self.send(&msg)
     }

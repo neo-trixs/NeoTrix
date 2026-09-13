@@ -286,7 +286,7 @@ impl _DeliberationEngine {
 
     /// 推进到下一阶段/轮次。
     pub fn advance_phase(&self, session_id: &str) -> Result<DeliberationPhase, String> {
-        let mut sessions = self.active_sessions.write().unwrap();
+        let mut sessions = self.active_sessions.write().unwrap_or_else(|e| e.into_inner());
         let session = sessions.get_mut(session_id).ok_or("会话不存在")?;
         
         let current = session.rounds.last_mut().unwrap();
@@ -351,7 +351,7 @@ impl _DeliberationEngine {
     /// 会话归档 (调用方必须已释放 active_sessions 写锁, 否则 RwLock 重入死锁)。
     fn archive_session(&self, session: DeliberationSession) {
         let id = session.id.clone();
-        self.completed_sessions.write().unwrap().insert(id, session);
+        self.completed_sessions.write().unwrap_or_else(|e| e.into_inner()).insert(id, session);
     }
 
     /// 计算共识度。
@@ -443,14 +443,14 @@ impl _DeliberationEngine {
 
     /// 获取会话状态。
     pub fn get_session(&self, session_id: &str) -> Option<DeliberationSession> {
-        self.active_sessions.read().unwrap().get(session_id).cloned()
-            .or_else(|| self.completed_sessions.read().unwrap().get(session_id).cloned())
+        self.active_sessions.read().unwrap_or_else(|e| e.into_inner()).get(session_id).cloned()
+            .or_else(|| self.completed_sessions.read().unwrap_or_else(|e| e.into_inner()).get(session_id).cloned())
     }
 
     /// 列出所有会话。
     pub fn list_sessions(&self) -> Vec<DeliberationSession> {
-        let mut sessions = self.active_sessions.read().unwrap().values().cloned().collect::<Vec<_>>();
-        sessions.extend(self.completed_sessions.read().unwrap().values().cloned());
+        let mut sessions = self.active_sessions.read().unwrap_or_else(|e| e.into_inner()).values().cloned().collect::<Vec<_>>();
+        sessions.extend(self.completed_sessions.read().unwrap_or_else(|e| e.into_inner()).values().cloned());
         sessions.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         sessions
     }

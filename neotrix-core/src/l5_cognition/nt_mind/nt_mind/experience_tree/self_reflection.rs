@@ -106,7 +106,7 @@ impl SelfReflectionEngine {
             confidence,
             improved: confidence > 0.5,
         };
-        self.buffer.lock().unwrap().push(record.clone());
+        self.buffer.lock().unwrap_or_else(|e| e.into_inner()).push(record.clone());
         record
     }
 
@@ -138,7 +138,7 @@ impl SelfReflectionEngine {
 
     /// Retrieve recent reflections for injection into the agent loop.
     pub(crate) fn _recent_reflections(&self, n: usize) -> Vec<ReflectionRecord> {
-        self.buffer.lock().unwrap().recent(n).into_iter().cloned().collect()
+        self.buffer.lock().unwrap_or_else(|e| e.into_inner()).recent(n).into_iter().cloned().collect()
     }
 
     /// Get the reflection buffer.
@@ -156,7 +156,7 @@ impl SelfTest for SelfReflectionEngine {
     fn self_test(&self) -> Result<(), Vec<String>> {
         // Verify engine can be created and buffer operations work
         drop(self.buffer.lock().map_err(|e| vec![format!("mutex poisoned: {}", e)])?);
-        let _ = self.buffer.lock().unwrap().push(ReflectionRecord::default());
+        let _ = self.buffer.lock().unwrap_or_else(|e| e.into_inner()).push(ReflectionRecord::default());
         Ok(())
     }
 }

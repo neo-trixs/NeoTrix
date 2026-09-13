@@ -213,7 +213,7 @@ impl Orchestrator {
                     execution_log.push(format!("  ✅ {}", node_id));
 
                     if node_id.contains("task_") {
-                        let _results = self.worker.lock().unwrap().execute_tasks(&tasks);
+                        let _results = self.worker.lock().unwrap_or_else(|e| e.into_inner()).execute_tasks(&tasks);
                         if let Some(ref team_arc) = self.agent_team {
                             if let Ok(team) = team_arc.lock() {
                                 let agent_results = team.execute(&desc);
@@ -267,7 +267,7 @@ impl Orchestrator {
                 hp_result.hp_at_k, hp_result.hm_at_k, hp_result.vote_at_k,
                 execution_log.join("\n"), self.graph.summary()))
         } else {
-            let _results = self.worker.lock().unwrap().execute_tasks(&tasks);
+            let _results = self.worker.lock().unwrap_or_else(|e| e.into_inner()).execute_tasks(&tasks);
             let total = self.graph.nodes.len();
             Ok(format!("DAG: {}/{} done (no engine)", total, total))
         }
@@ -287,7 +287,7 @@ impl L1Capability for Orchestrator {
             healthy: true,
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             message: Some(format!("engine={}", self.engine.is_some())),
         }
     }

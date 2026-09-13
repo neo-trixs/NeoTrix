@@ -186,7 +186,7 @@ impl EthicalIntuition {
     pub fn calibrate(&self, scenario: &str, actual_verdict: JudgmentVerdict, predicted: &IntuitionJudgment) {
         if !self.config.calibration_enabled { return; }
         
-        let mut data = self.calibration_data.write().unwrap();
+        let mut data = self.calibration_data.write().unwrap_or_else(|e| e.into_inner());
         data.judgment_history.push(JudgmentRecord {
             scenario: scenario.into(),
             predicted_verdict: predicted.judgment.clone(),
@@ -254,7 +254,7 @@ impl EthicalIntuition {
 
     fn calibrate_confidence(&self, confidence: f64, conflict_type: &ConflictType) -> f64 {
         // 简化：基于历史准确率调整
-        let data = self.calibration_data.read().unwrap();
+        let data = self.calibration_data.read().unwrap_or_else(|e| e.into_inner());
         if let Some(cal) = data.conflict_calibration.get(&format!("{:?}", conflict_type)) {
             (confidence * cal).clamp(0.0, 1.0)
         } else {

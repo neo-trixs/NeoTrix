@@ -180,47 +180,63 @@ impl FreePool {
     }
 
     pub fn record_usage(&self, provider_name: &str, tokens: u64) {
-        if let Ok(mut budgets) = self.budgets.write() {
-            if let Some(budget) = budgets.get_mut(provider_name) {
-                budget.tokens_used = budget.tokens_used.saturating_add(tokens);
-                budget.requests_used = budget.requests_used.saturating_add(1);
+        match self.budgets.write() {
+            Ok(mut budgets) => {
+                if let Some(budget) = budgets.get_mut(provider_name) {
+                    budget.tokens_used = budget.tokens_used.saturating_add(tokens);
+                    budget.requests_used = budget.requests_used.saturating_add(1);
+                }
             }
+            Err(e) => log::warn!("[free_pool] budgets lock poisoned, usage for '{}' lost: {}", provider_name, e),
         }
-        if let Ok(mut saved) = self.total_saved.write() {
-            *saved += (tokens as f64 / 1000.0) * 0.01;
+        match self.total_saved.write() {
+            Ok(mut saved) => *saved += (tokens as f64 / 1000.0) * 0.01,
+            Err(e) => log::warn!("[free_pool] total_saved lock poisoned, savings update lost: {}", e),
         }
     }
 
     pub fn get_budget(&self, provider_name: &str) -> Option<FreeTokenBudget> {
-        self.budgets
-            .read()
-            .ok()
-            .and_then(|b| b.get(provider_name).cloned())
+        match self.budgets.read() {
+            Ok(b) => b.get(provider_name).cloned(),
+            Err(e) => {
+                log::warn!("[free_pool] budgets read lock poisoned, query for '{}' failed: {}", provider_name, e);
+                None
+            }
+        }
     }
 
     pub fn all_budgets(&self) -> Vec<FreeTokenBudget> {
-        self.budgets
-            .read()
-            .ok()
-            .map(|b| b.values().cloned().collect())
-            .unwrap_or_default()
+        match self.budgets.read() {
+            Ok(b) => b.values().cloned().collect(),
+            Err(e) => {
+                log::warn!("[free_pool] budgets read lock poisoned, listing all failed: {}", e);
+                Vec::new()
+            }
+        }
     }
 
     pub fn total_savings(&self) -> f64 {
-        self.total_saved.read().map(|s| *s).unwrap_or(0.0)
+        match self.total_saved.read() {
+            Ok(s) => *s,
+            Err(e) => {
+                log::warn!("[free_pool] total_saved read lock poisoned: {}", e);
+                0.0
+            }
+        }
     }
 
     pub fn total_free_tokens_remaining(&self) -> u64 {
-        self.budgets
-            .read()
-            .ok()
-            .map(|b| {
-                b.values()
-                    .filter(|b| b.monthly_token_cap > 0)
-                    .map(|b| b.monthly_token_cap.saturating_sub(b.tokens_used))
-                    .sum()
-            })
-            .unwrap_or(0)
+        match self.budgets.read() {
+            Ok(b) => b
+                .values()
+                .filter(|b| b.monthly_token_cap > 0)
+                .map(|b| b.monthly_token_cap.saturating_sub(b.tokens_used))
+                .sum(),
+            Err(e) => {
+                log::warn!("[free_pool] budgets read lock poisoned, remaining tokens query failed: {}", e);
+                0
+            }
+        }
     }
 }
 

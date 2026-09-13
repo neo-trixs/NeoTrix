@@ -183,16 +183,14 @@ impl ConcurrencyIsolationTester {
         result
     }
 
-    /// 获取干净基线
+    /// 获取干净基线 — 返回 `Err` 因为未接线实际测试执行。
     ///
-    /// STUB: Currently returns hardcoded command and expected output.
-    /// Real implementation needs: actual cargo test execution, output parsing,
-    /// and baseline comparison logic for detecting race conditions.
-    pub(crate) fn _get_clean_baseline(&self) -> HashMap<String, String> {
-        let mut baseline = HashMap::new();
-        baseline.insert("command".into(), "CARGO_TARGET_DIR=/tmp/nt-target-clean cargo test -p neotrix --lib".into());
-        baseline.insert("expected".into(), "8123 passed, 0 failed".into());
-        baseline
+    /// 真实实现需要: 执行 `cargo test`、解析输出、比较基线以检测竞态条件。
+    /// 当前无法获取真实基线，因为没有接入测试执行引擎。
+    pub(crate) fn _get_clean_baseline(&self) -> Result<HashMap<String, String>, String> {
+        Err("_get_clean_baseline is not wired: requires actual cargo test execution, \
+             output parsing, and baseline comparison logic for race condition detection"
+            .into())
     }
 
     /// 获取所有会话

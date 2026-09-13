@@ -454,30 +454,30 @@ impl ValueCompassRuntime {
     }
 
     pub fn arbitrate(&self, action: &ValueAction) -> ArbitrationResult {
-        self.inner.read().unwrap().arbitrate(action)
+        self.inner.read().unwrap_or_else(|e| e.into_inner()).arbitrate(action)
     }
 
     pub fn upsert_value(&self, value: CoreValue) -> Result<(), String> {
-        let mut w = self.inner.write().unwrap();
+        let mut w = self.inner.write().unwrap_or_else(|e| e.into_inner());
         w.upsert_value(value)
     }
 
     pub fn adjust_weight(&self, id: &str, weight: f64) -> Result<(), String> {
-        let mut w = self.inner.write().unwrap();
+        let mut w = self.inner.write().unwrap_or_else(|e| e.into_inner());
         w.adjust_weight(id, weight)
     }
 
     pub fn snapshot(&self) -> ValueCompass {
-        self.inner.read().unwrap().clone()
+        self.inner.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     pub fn persist(&self, conn: &Connection) -> Result<(), String> {
-        let compass = self.inner.read().unwrap().clone();
+        let compass = self.inner.read().unwrap_or_else(|e| e.into_inner()).clone();
         ValueCompassStore::save(conn, &compass)
     }
 
     pub fn verify(&self) -> Result<(), String> {
-        self.inner.read().unwrap().verify_consistency()
+        self.inner.read().unwrap_or_else(|e| e.into_inner()).verify_consistency()
     }
 }
 

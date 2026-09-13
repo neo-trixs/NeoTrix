@@ -81,6 +81,12 @@ impl InternalState {
 static REGISTRY: std::sync::LazyLock<RwLock<InternalState>> =
     std::sync::LazyLock::new(|| RwLock::new(InternalState::new()));
 
+/// Register a capability absorber plugin.
+///
+/// STUB: Returns unique ID for later unregistration. Real implementation needs:
+/// - Plugin lifecycle hooks (init/destroy)
+/// - Capability-based routing (match absorber capabilities to incoming requests)
+/// - Hot-reload support (re-register with updated absorber without downtime)
 pub fn _register_absorber(
     plugin_name: &str,
     capabilities: &[&str],
@@ -111,6 +117,11 @@ pub fn _register_absorber(
     Ok(id)
 }
 
+/// Unregister a capability absorber plugin by name.
+///
+/// Note: Real implementation needs — does not wait for in-flight absorptions to
+/// complete before removing. Consider: reference counting or drain timeout to
+/// prevent use-after-unregister panics in concurrent scenarios.
 pub fn unregister(plugin_name: &str) -> Option<_AbsorberInstance> {
     let mut state = REGISTRY.write().ok()?;
     let id = state.by_name.remove(plugin_name)?;
@@ -120,6 +131,11 @@ pub fn unregister(plugin_name: &str) -> Option<_AbsorberInstance> {
     Some(instance)
 }
 
+/// Trigger absorption for a specific plugin and capability.
+///
+/// Note: Real implementation needs — holds read lock during absorb() call,
+/// which may block other registrations. Consider: snapshot absorber reference,
+/// release lock, then call absorb() for better concurrency.
 pub fn _trigger_absorption(
     plugin_name: &str,
     capability: &str,
@@ -156,6 +172,11 @@ pub fn _absorber_count() -> usize {
     REGISTRY.read().map(|state| state.by_id.len()).unwrap_or(0)
 }
 
+/// Get absorption statistics for a specific plugin.
+///
+/// Note: Real implementation needs — stats are in-memory only. Consider:
+/// persisting to KB for cross-session tracking, and adding time-windowed
+/// statistics (last hour/day/week).
 pub fn get_stats(plugin_name: &str) -> Option<_AbsorptionStats> {
     let state = REGISTRY.read().ok()?;
     let id = state.by_name.get(plugin_name)?;

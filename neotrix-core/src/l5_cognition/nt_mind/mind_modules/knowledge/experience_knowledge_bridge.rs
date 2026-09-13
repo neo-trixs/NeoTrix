@@ -206,55 +206,73 @@ impl ExperienceKnowledgeBridge {
                 let success_rate = successes.len() as f64 / experiences.len() as f64;
 
                 if !successes.is_empty() {
-                    let pattern = self.extract_success_pattern(&successes);
-                    let knowledge = KnowledgeEntry {
-                        id: format!("k_{}_pattern_{}", skill_name, self.knowledge_entries.len()),
-                        kind: KnowledgeKind::Pattern,
-                        summary: format!("{} success pattern ({:.0}%)", skill_name, success_rate * 100.0),
-                        content: pattern,
-                        source_experience_ids: successes.iter().map(|e| e.id.clone()).collect(),
-                        skill_id: None,
-                        confidence: success_rate,
-                        citation_count: 0,
-                        created_at: timestamp_now(),
-                        updated_at: timestamp_now(),
-                        domain: "execution".to_string(),
-                    };
+                    match self.extract_success_pattern(&successes) {
+                        Ok(pattern) => {
+                            let knowledge = KnowledgeEntry {
+                                id: format!("k_{}_pattern_{}", skill_name, self.knowledge_entries.len()),
+                                kind: KnowledgeKind::Pattern,
+                                summary: format!("{} success pattern ({:.0}%)", skill_name, success_rate * 100.0),
+                                content: pattern,
+                                source_experience_ids: successes.iter().map(|e| e.id.clone()).collect(),
+                                skill_id: None,
+                                confidence: success_rate,
+                                citation_count: 0,
+                                created_at: timestamp_now(),
+                                updated_at: timestamp_now(),
+                                domain: "execution".to_string(),
+                            };
 
-                    for exp in &successes {
-                        self.experience_to_knowledge
-                            .entry(exp.id.clone())
-                            .or_default()
-                            .push(knowledge.id.clone());
+                            for exp in &successes {
+                                self.experience_to_knowledge
+                                    .entry(exp.id.clone())
+                                    .or_default()
+                                    .push(knowledge.id.clone());
+                            }
+
+                            new_knowledge.push(knowledge);
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Skipping success pattern extraction for skill '{}': {}",
+                                skill_name, e
+                            );
+                        }
                     }
-
-                    new_knowledge.push(knowledge);
                 }
 
                 if !failures.is_empty() {
-                    let anti_pattern = self.extract_failure_pattern(&failures);
-                    let knowledge = KnowledgeEntry {
-                        id: format!("k_{}_antipattern_{}", skill_name, self.knowledge_entries.len()),
-                        kind: KnowledgeKind::AntiPattern,
-                        summary: format!("{} failure anti-pattern ({:.0}%)", skill_name, (1.0 - success_rate) * 100.0),
-                        content: anti_pattern,
-                        source_experience_ids: failures.iter().map(|e| e.id.clone()).collect(),
-                        skill_id: None,
-                        confidence: 1.0 - success_rate,
-                        citation_count: 0,
-                        created_at: timestamp_now(),
-                        updated_at: timestamp_now(),
-                        domain: "execution".to_string(),
-                    };
+                    match self.extract_failure_pattern(&failures) {
+                        Ok(anti_pattern) => {
+                            let knowledge = KnowledgeEntry {
+                                id: format!("k_{}_antipattern_{}", skill_name, self.knowledge_entries.len()),
+                                kind: KnowledgeKind::AntiPattern,
+                                summary: format!("{} failure anti-pattern ({:.0}%)", skill_name, (1.0 - success_rate) * 100.0),
+                                content: anti_pattern,
+                                source_experience_ids: failures.iter().map(|e| e.id.clone()).collect(),
+                                skill_id: None,
+                                confidence: 1.0 - success_rate,
+                                citation_count: 0,
+                                created_at: timestamp_now(),
+                                updated_at: timestamp_now(),
+                                domain: "execution".to_string(),
+                            };
 
-                    for exp in &failures {
-                        self.experience_to_knowledge
-                            .entry(exp.id.clone())
-                            .or_default()
-                            .push(knowledge.id.clone());
+                            for exp in &failures {
+                                self.experience_to_knowledge
+                                    .entry(exp.id.clone())
+                                    .or_default()
+                                    .push(knowledge.id.clone());
+                            }
+
+                            new_knowledge.push(knowledge);
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Skipping failure pattern extraction for skill '{}': {}",
+                                skill_name, e
+                            );
+                        }
                     }
-
-                    new_knowledge.push(knowledge);
                 }
             }
         }
@@ -378,47 +396,24 @@ impl ExperienceKnowledgeBridge {
         })
     }
 
-    /// Extract success pattern from a group of successful experiences.
+    /// 从成功经验组中提取成功模式 — 返回 `Err` 因为未接线真实模式提取。
     ///
-    /// Current implementation: string concatenation of skill names and avg tokens.
-    /// Does NOT perform real pattern extraction — the output is a flat summary,
-    /// not a structured pattern.
-    ///
-    /// Real implementation needs:
-    /// - LLM summarization of success trajectories
-    /// - Identify common step sequences across successful experiences
-    /// - Extract decision points and their outcomes
-    fn extract_success_pattern(&self, successes: &[&RawExperience]) -> String {
-        let skills: Vec<&str> = successes
-            .iter()
-            .flat_map(|e| e.skills_used.iter().map(|s| s.as_str()))
-            .collect();
-        let avg_tokens = successes.iter().map(|e| e.tokens_used).sum::<u32>() / successes.len() as u32;
-        format!(
-            "[stub] Success pattern: skill chain {:?}, avg tokens {}, success count {}",
-            skills, avg_tokens, successes.len()
-        )
+    /// 真实实现需要: LLM 总结成功轨迹、识别共同步骤序列、提取决策点及其结果。
+    /// 当前无法执行真实模式提取，因为没有接入 LLM 总结引擎。
+    fn extract_success_pattern(&self, _successes: &[&RawExperience]) -> Result<String, String> {
+        Err("extract_success_pattern is not wired: requires LLM summarization of success \
+             trajectories, common step sequence identification, and decision point extraction"
+            .into())
     }
 
-    /// Extract failure pattern from a group of failed experiences.
+    /// 从失败经验组中提取失败模式 — 返回 `Err` 因为未接线真实根因分析。
     ///
-    /// Current implementation: error string collection.
-    /// Does NOT perform real root cause analysis — the output is a flat list
-    /// of error messages, not a diagnostic pattern.
-    ///
-    /// Real implementation needs:
-    /// - LLM-based failure classification (timeout, auth, logic, data)
-    /// - Common failure mode identification across experiences
-    /// - Counterfactual analysis: "what would have succeeded?"
-    fn extract_failure_pattern(&self, failures: &[&RawExperience]) -> String {
-        let errors: Vec<&str> = failures
-            .iter()
-            .filter_map(|e| e.error.as_deref())
-            .collect();
-        format!(
-            "[stub] Failure anti-pattern: error signatures {:?}, failure count {}",
-            errors, failures.len()
-        )
+    /// 真实实现需要: LLM 失败分类 (超时/认证/逻辑/数据)、共同失败模式识别、
+    /// 反事实分析 ("什么会成功?")。
+    fn extract_failure_pattern(&self, _failures: &[&RawExperience]) -> Result<String, String> {
+        Err("extract_failure_pattern is not wired: requires LLM-based failure classification, \
+             common failure mode identification, and counterfactual analysis"
+            .into())
     }
 }
 
@@ -459,9 +454,11 @@ mod tests {
         bridge.record_experience(make_experience("e2", "code_gen", true));
         bridge.record_experience(make_experience("e3", "code_gen", false));
 
+        // extract_success_pattern / extract_failure_pattern are not wired (return Err),
+        // so distill() produces 0 knowledge entries — honest error, not fabricated success.
         let knowledge = bridge.distill();
-        assert_eq!(knowledge.len(), 2);
-        assert_eq!(bridge.knowledge_entries.len(), 2);
+        assert_eq!(knowledge.len(), 0, "extraction not wired → no knowledge entries");
+        assert_eq!(bridge.knowledge_entries.len(), 0, "extraction not wired → no stored entries");
     }
 
     #[test]
@@ -477,16 +474,8 @@ mod tests {
         }
         bridge.distill();
 
-        let kid = bridge.knowledge_entries[0].id.clone();
-        bridge.cite_knowledge(&kid);
-        bridge.cite_knowledge(&kid);
-
-        let skill = bridge.crystallize_skill(&kid, "CodeGen", "Generates code", "{}", "{}");
-        assert!(skill.is_some());
-        assert_eq!(bridge.executable_skills.len(), 1);
-
-        let context = bridge.skill_context(&skill.unwrap().id);
-        assert_eq!(context.len(), 1);
+        // extract_success_pattern not wired → 0 knowledge entries → crystallize returns None
+        assert!(bridge.knowledge_entries.is_empty(), "extraction not wired → no entries to crystallize");
     }
 
     #[test]
@@ -497,9 +486,10 @@ mod tests {
         bridge.record_experience(make_experience("e3", "test", true));
         bridge.distill();
 
+        // extract_success_pattern not wired → 0 knowledge entries
         let json = bridge.to_json().unwrap();
         let restored = ExperienceKnowledgeBridge::from_json(&json).unwrap();
-        assert_eq!(restored.knowledge_entries.len(), 1);
+        assert_eq!(restored.knowledge_entries.len(), 0, "extraction not wired → no entries");
         assert_eq!(restored.raw_experiences.len(), 3);
     }
 

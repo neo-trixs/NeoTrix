@@ -70,7 +70,7 @@ impl ScatterGather {
 
     /// 聚合多个响应
     pub fn gather(&self, responses: Vec<ProviderResponse>) -> GatherResult {
-        let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+        let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
         let successful: Vec<&ProviderResponse> = responses.iter()
             .filter(|r| r.success)
             .collect();
@@ -93,7 +93,7 @@ impl ScatterGather {
             }
         };
 
-        let end = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+        let end = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
         GatherResult {
             best_response: best,
             all_responses: responses,

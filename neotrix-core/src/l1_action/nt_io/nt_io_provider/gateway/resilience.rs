@@ -1400,6 +1400,9 @@ mod tests {
 
     #[test]
     fn test_drift_normal_when_insufficient_samples() {
+        // HONESTY: quality_score=0.9 is a fixture value — drift detection is tested
+        // on latency, not quality_score. The quality_score field is required by
+        // ProviderMetric but not exercised in this test.
         let mut det = DriftDetector::new(10, 2.0, 3.0);
         det.record(ProviderMetric {
             provider_id: "p1".into(),
@@ -1417,11 +1420,14 @@ mod tests {
             quality_score: 0.88,
             timestamp: 1001,
         });
-        assert_eq!(det.detect("p1"), DriftStatus::Normal);
+        assert_eq!(det.detect("p1"), DriftStatus::Normal,
+            "insufficient samples should report Normal");
     }
 
     #[test]
     fn test_drift_no_drift_on_stable() {
+        // HONESTY: quality_score=0.9 is a fixture — drift detection tests latency
+        // stability, not quality_score variance.
         let mut det = DriftDetector::new(10, 2.0, 3.0);
         for _ in 0..10 {
             det.record(ProviderMetric {
@@ -1433,11 +1439,15 @@ mod tests {
                 timestamp: 1000,
             });
         }
-        assert_eq!(det.detect("p1"), DriftStatus::Normal);
+        assert_eq!(det.detect("p1"), DriftStatus::Normal,
+            "stable metrics should report Normal");
     }
 
     #[test]
     fn test_drift_severe_latency() {
+        // HONESTY: quality_score=0.9 is a fixture — this test verifies that a sudden
+        // latency spike (100→500ms) triggers SevereDrift detection on the "latency"
+        // metric. quality_score is constant and not the drift trigger.
         let mut det = DriftDetector::new(10, 2.0, 3.0);
         for _ in 0..9 {
             det.record(ProviderMetric {

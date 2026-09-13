@@ -39,7 +39,7 @@ pub struct AgentCapability {
 
 impl AgentCard {
     pub fn new(id: &str, name: &str, description: &str) -> Self {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         Self {
             schema_version: "1.0".into(),
             id: id.to_string(),
@@ -73,12 +73,12 @@ impl AgentCard {
 
     /// 心跳更新
     pub fn heartbeat(&mut self) {
-        self.last_heartbeat = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        self.last_heartbeat = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
     }
 
     /// 是否存活 (最近 60s 有心跳)
     pub fn is_alive(&self) -> bool {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         now - self.last_heartbeat < 60
     }
 }
@@ -134,7 +134,7 @@ impl AgentCardRegistry {
 
     /// 清理过期
     pub fn cleanup_expired(&mut self) {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         self.cards.retain(|_, c| now - c.last_heartbeat < 300);
     }
 

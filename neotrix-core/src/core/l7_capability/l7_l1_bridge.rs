@@ -40,7 +40,7 @@ impl L1Capability for SupervisorL1Bridge {
             healthy: true,
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             message: Some(format!("pattern={}", self.inner.pattern_name())),
         }
     }

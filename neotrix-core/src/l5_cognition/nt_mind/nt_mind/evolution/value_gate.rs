@@ -204,14 +204,14 @@ impl ValueGate {
 
     /// 获取拦截统计。
     pub fn stats(&self) -> GateStats {
-        let log = self.interception_log.read().unwrap();
+        let log = self.interception_log.read().unwrap_or_else(|e| e.into_inner());
         let total = log.len();
         let vetoed = log.iter().filter(|r| matches!(r.arbitration, ArbitrationResult::Veto { .. })).count();
         let deliberated = log.iter().filter(|r| matches!(r.arbitration, ArbitrationResult::Deliberate { .. })).count();
         let delegated = log.iter().filter(|r| matches!(r.arbitration, ArbitrationResult::Delegate { .. })).count();
         let allowed = log.iter().filter(|r| matches!(r.arbitration, ArbitrationResult::Allow { .. })).count();
 
-        let cb = self.circuit_breaker.read().unwrap();
+        let cb = self.circuit_breaker.read().unwrap_or_else(|e| e.into_inner());
         GateStats {
             total_checks: total,
             vetoed,
@@ -229,7 +229,7 @@ impl ValueGate {
         if !self.config.audit_all && matches!(record.arbitration, ArbitrationResult::Allow { .. }) {
             return; // 仅记录拦截
         }
-        let mut log = self.interception_log.write().unwrap();
+        let mut log = self.interception_log.write().unwrap_or_else(|e| e.into_inner());
         log.push_back(record);
         if log.len() > self.max_log_size {
             log.pop_front();
@@ -237,7 +237,7 @@ impl ValueGate {
     }
 
     fn is_circuit_open(&self) -> bool {
-        let cb = self.circuit_breaker.read().unwrap();
+        let cb = self.circuit_breaker.read().unwrap_or_else(|e| e.into_inner());
         if cb.is_open {
             if let Some(trip) = cb.last_trip_time {
                 if now() - trip > self.config.circuit_breaker_cooldown_secs as i64 {
@@ -251,7 +251,7 @@ impl ValueGate {
     }
 
     fn update_circuit_breaker(&self, arbitration: &ArbitrationResult) {
-        let mut cb = self.circuit_breaker.write().unwrap();
+        let mut cb = self.circuit_breaker.write().unwrap_or_else(|e| e.into_inner());
         match arbitration {
             ArbitrationResult::Veto { .. } | ArbitrationResult::Deliberate { .. } => {
                 cb.consecutive_interceptions += 1;
@@ -271,12 +271,12 @@ impl ValueGate {
     }
 
     fn increment_interceptions(&self) {
-        let mut cb = self.circuit_breaker.write().unwrap();
+        let mut cb = self.circuit_breaker.write().unwrap_or_else(|e| e.into_inner());
         cb.consecutive_interceptions += 1;
     }
 
     fn reset_interceptions(&self) {
-        let mut cb = self.circuit_breaker.write().unwrap();
+        let mut cb = self.circuit_breaker.write().unwrap_or_else(|e| e.into_inner());
         cb.consecutive_interceptions = 0;
     }
 

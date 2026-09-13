@@ -156,13 +156,16 @@ impl GatewayV2 {
             .map(|(name, _)| name.clone())
     }
 
-    /// 构建候选链 — 从池子**实际注册名**动态排序, 而非硬编码。
+    /// Build candidate chain — dynamically sorted from actually registered provider names.
     ///
-    /// 规则 (按优先级):
-    /// 1. 请求 model 含 `{provider}/` 前缀且该 provider 已注册 → 前缀 provider 第一候选
-    ///    (如 `llm7/codestral-latest` → `llm7`; `api-airforce/grok-4.1-mini:free` → 该完整注册名)
-    /// 2. 其余按 free 优先 + is_available 优先 + composite_score 降序
-    /// 3. 去重; 候选全部来自 self.states 实际注册名, 数量上限 `limit`
+    /// Rules (by priority):
+    /// 1. Request model has `{provider}/` prefix and that provider is registered → prefix provider is first candidate
+    /// 2. Remaining sorted by: free优先 + is_available + composite_score descending
+    /// 3. Deduplicated; all candidates from self.states actual registered names, capped at `limit`
+    ///
+    /// Note: Real implementation needs — model_locks check uses `is_model_locked` but does
+    /// not distinguish between temporary (rate-limit) and permanent (deprecated) locks.
+    /// Consider: adding lock reason to skip logic, and supporting wildcard model patterns.
     pub fn build_candidate_chain(&self, model: &str, limit: usize) -> Vec<String> {
         let states = self.states.read().unwrap_or_else(|e| {
             log::warn!("[gateway] states RwLock poisoned: {}", e);
@@ -252,6 +255,11 @@ impl GatewayV2 {
     /// Register providers from FreeModelCatalog discovered entries.
     /// For each entry where the required API key env var is set (or keyless),
     /// create a provider and register it.
+    ///
+    /// Note: Real implementation needs — skips entries with missing API keys silently.
+    /// Consider: logging skipped entries, supporting lazy key resolution (key loaded
+    /// on first use rather than registration), and deduplication by model_id+base_url
+    /// (not just name).
     pub fn register_from_catalog(&self, entries: &[FreeModelEntry]) {
         for entry in entries {
             let name = format!("{}/{}", entry.provider, entry.model_id);
@@ -293,7 +301,11 @@ impl GatewayV2 {
         }
     }
 
-    /// 从 UnifiedModelPool 注册所有模型 — 统一本地 GGUF + 云端免费 API
+    /// Register all models from UnifiedModelPool — unified local GGUF + cloud free APIs.
+    ///
+    /// Note: Real implementation needs — same API key check pattern as register_from_catalog.
+    /// Consider: extracting common registration logic, and supporting provider hot-reload
+    /// (re-register with updated config without restarting).
     pub fn register_from_unified_pool(&self, pool: &crate::l1_action::nt_io::nt_io_provider::catalog::model_pool::UnifiedModelPool) {
         let models = pool.refresh();
         let mut registered = 0;
@@ -527,12 +539,16 @@ impl GatewayV2 {
             .clone()
     }
 
-    /// 解析默认模型 — 从池子**实际注册名**选最佳可用者, 而非硬编码。
+    /// Resolve default model — picks best available from actually registered names.
     ///
-    /// 当调用方未显式指定模型 (如 `default`) 时, 用候选链第一个可用注册名作为完整
-    /// model 名 (含 `{provider}/{model_id}` 或裸 `{provider}` 格式), 保证整体链路
-    /// 从池子真实状态出发, 而非写死某个 provider。
-    /// 同步版 (async 版见 `resolve_default_model`, 优先 llm7/codestral-latest)。
+    /// When caller doesn't specify a model (e.g., `default`), uses the first available
+    /// registered name from the candidate chain as the complete model name (in
+    /// `{provider}/{model_id}` or bare `{provider}` format).
+    /// Sync version (async version: `resolve_default_model`, prefers llm7/codestral-latest).
+    ///
+    /// Note: Real implementation needs — falls back to literal "default" string if no
+    /// providers registered. Consider: returning a Result with a clear error when the
+    /// pool is empty, rather than a magic string.
     pub fn resolve_default_model_sync(&self) -> String {
         let chain = self.build_candidate_chain("", 3);
         chain

@@ -59,7 +59,7 @@ impl TracingCollector {
     /// 开始追踪
     pub fn start_span(&mut self, capability_id: &str, action: &str) -> String {
         let span_id = format!("span_{}", uuid::Uuid::new_v4());
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         self.spans.push(CapabilitySpan {
             span_id: span_id.clone(),
             capability_id: capability_id.to_string(),
@@ -79,7 +79,7 @@ impl TracingCollector {
 
     /// 结束追踪
     pub fn end_span(&mut self, span_id: &str, success: bool, error_msg: Option<String>) {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         if let Some(span) = self.spans.iter_mut().find(|s| s.span_id == span_id) {
             span.end_ts = Some(now);
             span.latency_ms = Some(((now - span.start_ts) * 1000) as f64);
