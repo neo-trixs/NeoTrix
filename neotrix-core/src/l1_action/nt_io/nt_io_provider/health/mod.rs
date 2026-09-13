@@ -7,5 +7,4 @@ pub mod context_budget;
 pub use circuit_breaker::*;
 pub use rate_limiter::*;
 pub use rate_profiles::*;
-pub use compaction::*;
 pub use context_budget::*;

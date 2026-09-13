@@ -2,7 +2,6 @@
 /// Uses INSERT OR IGNORE so running multiple times won't fail.
 use rusqlite::Connection;
 use crate::neotrix::nt_memory_kb::nt_memory_types::*;
-use crate::neotrix::nt_memory_kb::shared_utils::now;
 
 pub fn safe_insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
     conn.execute(

@@ -156,6 +156,15 @@ impl ChatPlugin {
             let _ = app.emit("neocodex_stream_start", "");
         }
 
+        // Emit reasoning event
+        if let Some(app) = APP_HANDLE.get() {
+            if let Err(e) = app.emit("neocodex_stream_reasoning", serde_json::json!({
+                "content": format!("Starting reasoning for task: {}", content),
+            })) {
+                log::warn!("Failed to emit reasoning event: {}", e);
+            }
+        }
+
         // 使用 domain_call 统一路由
         let executor = GatewayExecutor {
             registry: self.registry.clone(),
@@ -168,6 +177,16 @@ impl ChatPlugin {
             acquire_knowledge: false,
         };
 
+        // Emit tool event
+        if let Some(app) = APP_HANDLE.get() {
+            if let Err(e) = app.emit("neocodex_stream_tool", serde_json::json!({
+                "tool_name": "consciousness_task_loop",
+                "status": "started",
+            })) {
+                log::warn!("Failed to emit tool event: {}", e);
+            }
+        }
+
         let report = {
             let mut core = CORE.write().map_err(|e| DomainError {
                 code: "CORE_LOCK".into(),
@@ -176,6 +195,25 @@ impl ChatPlugin {
             })?;
             core.execute_task_loop(content, &executor, &config)
         };
+
+        // Emit tool completion event
+        if let Some(app) = APP_HANDLE.get() {
+            if let Err(e) = app.emit("neocodex_stream_tool", serde_json::json!({
+                "tool_name": "consciousness_task_loop",
+                "status": "completed",
+            })) {
+                log::warn!("Failed to emit tool completion event: {}", e);
+            }
+        }
+
+        // Emit reasoning event for task decomposition
+        if let Some(app) = APP_HANDLE.get() {
+            if let Err(e) = app.emit("neocodex_stream_reasoning", serde_json::json!({
+                "content": format!("Task decomposed into {} subtasks", report.allocations.len()),
+            })) {
+                log::warn!("Failed to emit reasoning event: {}", e);
+            }
+        }
 
         // 聚合所有子任务的结果
         let mut results = Vec::new();
@@ -217,6 +255,16 @@ impl ChatPlugin {
     fn call_llm_stream(&self, content: &str) -> Result<String, DomainError> {
         if let Some(app) = APP_HANDLE.get() {
             let _ = app.emit("neocodex_stream_start", "");
+        }
+
+        // Emit tool event
+        if let Some(app) = APP_HANDLE.get() {
+            if let Err(e) = app.emit("neocodex_stream_tool", serde_json::json!({
+                "tool_name": "llm_stream",
+                "status": "started",
+            })) {
+                log::warn!("Failed to emit tool event: {}", e);
+            }
         }
 
         let request = serde_json::json!({
@@ -278,6 +326,16 @@ impl ChatPlugin {
                     "external_gaps": 0,
                 }),
             );
+        }
+
+        // Emit tool completion event
+        if let Some(app) = APP_HANDLE.get() {
+            if let Err(e) = app.emit("neocodex_stream_tool", serde_json::json!({
+                "tool_name": "llm_stream",
+                "status": "completed",
+            })) {
+                log::warn!("Failed to emit tool completion event: {}", e);
+            }
         }
 
         Ok(full_content)

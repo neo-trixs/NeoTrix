@@ -218,17 +218,17 @@ export interface DiscoveryResult {
 
 /** 获取所有 provider 的健康状态（电路/成功率/调用统计） */
 export function providerStatus(): Promise<ProviderHealthStatus[]> {
-  return invoke('provider_status', {})
+  return domain.call<ProviderHealthStatus[]>('llamacpp', 'provider_status')
 }
 
 /** 获取池子充足度报告 */
 export function poolSufficiency(minFree?: number): Promise<PoolSufficiencyReport> {
-  return invoke('pool_sufficiency', { min: minFree ?? 3 })
+  return domain.call<PoolSufficiencyReport>('agent', 'pool_sufficiency', { min: minFree ?? 3 })
 }
 
 /** 手动触发免费模型发现（刷新 FreeModelCatalog + 注册到 GatewayV2） */
 export function discoverModels(force?: boolean): Promise<DiscoveryResult> {
-  return invoke('discover_models', { force: force ?? false })
+  return domain.call<DiscoveryResult>('llamacpp', 'discover_models', { force: force ?? false })
 }
 
 /** 批量探测所有已注册 provider 的网络可达性 */

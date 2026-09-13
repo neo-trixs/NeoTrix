@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::{warn, info};
 use rusqlite::Connection;

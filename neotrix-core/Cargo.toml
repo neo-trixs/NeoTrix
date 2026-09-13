@@ -181,6 +181,7 @@ calamine = { version = "0.36.1", features = ["chrono"] }
 zim = "0.5"
 pmtiles = { version = "0.24", default-features = false, features = ["write", "tilejson", "zstd", "brotli", "http-async"] }
 num_cpus = "1.17.0"
+sys-info = "0.9"
 
 # NT-SHIELD ZT-Net: Zero Trust Networking
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }

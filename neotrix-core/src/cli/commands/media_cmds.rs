@@ -7,7 +7,6 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l1_action::nt_media::detect::{detect_from_file, detect_remote};
-use crate::l1_action::nt_media::download_progress::{DownloadProgress, ProgressConfig};
 use crate::l1_action::nt_media::streaming::{
     PipelineConfig, PipelineStatus, StreamingPipeline,
 };

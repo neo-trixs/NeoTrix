@@ -98,8 +98,8 @@ impl UnifiedGameWorld {
         for m in &mut self.minions {
             if m.alive {
                 if let Some(t) = self.towers.iter().find(|t| t.team != m.team && t.alive) {
-                    let dir = (t.position - m.position).normalized();
-                    m.position += dir * m.speed * dt;
+                    let dir = (t.position - m.position).normalize();
+                    m.position = m.position + dir * m.speed * dt;
                 }
             }
         }
@@ -115,8 +115,8 @@ impl UnifiedGameWorld {
     fn tick_evolution(&mut self, dt: f32) {
         for r in &mut self.rivals {
             if r.alive {
-                let dir = (self.player.position - r.position).normalized();
-                r.position += dir * r.speed * dt;
+                let dir = (self.player.position - r.position).normalize();
+                r.position = r.position + dir * r.speed * dt;
             } else {
                 r.respawn_timer -= dt;
                 if r.respawn_timer <= 0.0 { r.alive = true; r.hp = r.max_hp; }

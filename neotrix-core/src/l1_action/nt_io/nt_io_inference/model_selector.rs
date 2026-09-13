@@ -30,8 +30,8 @@ use super::quantization_engine::{QuantizationEngine, ModelParams, AttentionType,
 pub struct ModelSelector {
     /// Known models and their characteristics
     known_models: HashMap<String, ModelInfo>,
-    /// Hardware profiles
-    hardware_profiles: HashMap<String, HardwareProfile>,
+    /// 硬件能力配置（按环境名索引）
+    profiles: HashMap<String, HardwareCapabilities>,
     /// Quantization engine for advanced scoring
     quant_engine: QuantizationEngine,
 }
@@ -222,11 +222,9 @@ impl ModelSelector {
             active_params_b: 120.0,
         });
         
-        let hardware_profiles = HashMap::new();
-        
         Self {
             known_models,
-            hardware_profiles,
+            profiles: HashMap::new(),
             quant_engine: QuantizationEngine::new(),
         }
     }

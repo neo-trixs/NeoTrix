@@ -26,6 +26,7 @@ pub struct _NucleiFinding {
 }
 
 /// Nuclei engine abstraction
+#[derive(Debug)]
 pub struct NucleiEngine {
     templates_dir: PathBuf,
     cache: HashMap<String, _NucleiFinding>,

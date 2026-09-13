@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use uuid::Uuid;
 
 use super::nt_memory_types::*;
-use super::shared_utils::{now, row_to_knowledge_node, NODE_COLUMNS};
+use super::shared_utils::row_to_knowledge_node;
 
 /// 归一化标题: 小写 + 去标点/空白, 用于跨阶段去重 (digest_sample 与 ingest_causal_graph
 /// 对同一外部概念可能因 url/标题不同而双写 Concept 节点, 归一化后可识别近似重复)。

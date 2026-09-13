@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct W3afEngine {
     /// Discovered URL structure
     url_tree: Vec<_UrlNode>,
