@@ -12,7 +12,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::l1_action::nt_io::nt_io_provider::gateway::execution::unified_inference::{UnifiedInference, InferenceRequest, InferenceResponse, InferenceError, CostEstimate, StreamHandle, RouterHealth, InferenceCapabilities, ResponseMetadata};
+use crate::l1_action::nt_io::nt_io_provider::gateway::execution::{UnifiedInference, InferenceRequest, InferenceResponse, InferenceError, CostEstimate, StreamHandle, RouterHealth, InferenceCapabilities, ResponseMetadata};
 use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 
 /// 路由器配置

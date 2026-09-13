@@ -199,8 +199,23 @@ impl _QualityControlPipeline {
         }
     }
     
-    /// 执行 AI 自动审核
+    /// 执行 AI 自动审核 — **STUB: 使用硬编码基础分数, 非真实 AI 内容分析。**
+    ///
+    /// `evaluate_check_item` 返回的分数基于检查类型复杂度的启发式规则,
+    /// 不涉及对 `content_id` 对应内容的实际分析。
+    ///
+    /// 真实实现需要: 调用多模态模型对 content_id 对应的媒体文件进行
+    /// 各维度评估, 返回基于实际内容的客观分数。
+    ///
+    /// 注意: 此方法从 production 代码路径调用 (ReviewLevel::AI 分支),
+    /// 修改时需保持签名兼容。
     pub(crate) fn _review_by_ai(&self, content_id: &str) -> ReviewResult {
+        tracing::warn!(
+            "STUB _review_by_ai called for content_id={}: \
+             scores are heuristic-based, no real AI content analysis. \
+             TODO: call VLM/LLM for actual content review.",
+            content_id
+        );
         let mut check_scores = HashMap::new();
         let mut total_score = 0.0;
         let mut total_weight = 0.0;
@@ -236,7 +251,7 @@ impl _QualityControlPipeline {
             total_score,
             check_scores,
             issues: vec![],
-            comments: None,
+            comments: Some("STUB: heuristic-based scores, not real AI analysis".to_string()),
             review_time: 0,
             review_time_ms: 500,
         }

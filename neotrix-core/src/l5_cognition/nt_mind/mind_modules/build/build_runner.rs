@@ -326,6 +326,10 @@ mod tests {
 
     #[test]
     fn summary_format() {
+        // Unit test for summary() formatting contract — verifies the formatter
+        // produces expected output given known inputs. This tests the string
+        // format, not real cargo execution. For real evidence collection, see
+        // `run_check_collects_evidence` (gated behind NT_E2E_CARGO=1).
         let ev = _BuildEvidence {
             layer: _BuildLayer::Fast,
             tool: "check".into(),
@@ -338,9 +342,17 @@ mod tests {
             stderr: String::new(),
             duration_ms: 42,
         };
-        assert!(ev.summary().contains("[L1-fast]"));
-        assert!(ev.summary().contains("check"));
-        assert!(ev.summary().contains("0 errors, 2 warnings"));
-        assert!(ev.success());
+        let s = ev.summary();
+        assert!(s.contains("[L1-fast]"), "summary must include layer label");
+        assert!(s.contains("check"), "summary must include tool name");
+        assert!(s.contains("0 errors, 2 warnings"), "summary must include counts");
+        assert!(ev.success(), "exit=0 + no errors should be success");
+        // Verify failure path too
+        let fail_ev = _BuildEvidence {
+            exit_code: Some(1),
+            error_count: 3,
+            ..ev
+        };
+        assert!(!fail_ev.success(), "exit=1 or errors should not be success");
     }
 }

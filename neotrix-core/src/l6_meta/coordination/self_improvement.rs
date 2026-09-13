@@ -378,36 +378,18 @@ impl SelfImprovementLoop {
 
     // ── Stage 4: 评估并执行 ──
 
-    /// 评估方案收益, 采纳最优方案 (最多 3 个)
+    /// 评估方案收益, 采纳最优方案 (最多 3 个) — **STUB: 标记为 Executed 但未执行实际参数调整。**
+    ///
+    /// 当前实现将 `Generated` 状态的方案直接标记为 `Executed`,
+    /// 不执行任何实际的参数调整或系统修改。
+    ///
+    /// 真实实现需要: 对每个候选方案进行收益评估 (ROI estimation),
+    /// 然后调用对应的参数调整逻辑 (如修改模型配置、调整权重、更新阈值)。
+    ///
+    /// # Panics
+    /// 当前不 panic, 但返回的方案状态不反映真实执行。
     pub(crate) fn _evaluate_and_apply(&mut self, max_applied: usize) -> Vec<ImprovementPlan> {
-        let mut applied = Vec::new();
-
-        // 过滤出 Generated 状态的方案, 按优先级排序
-        let mut candidates: Vec<usize> = self
-            .plans
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| p.status == PlanStatus::Generated)
-            .map(|(i, _)| i)
-            .collect();
-        candidates.sort_by(|&a, &b| {
-            self.plans[b]
-                .priority
-                .cmp(&self.plans[a].priority)
-        });
-
-        for &idx in candidates.iter().take(max_applied) {
-            if let Some(plan) = self.plans.get_mut(idx) {
-                plan.status = PlanStatus::Adopted;
-                // 在生产环境中这里会调用实际的参数调整逻辑
-                // 目前标记为 Executed
-                plan.status = PlanStatus::Executed;
-                applied.push(plan.clone());
-                self.executed.push(plan.clone());
-            }
-        }
-
-        applied
+        todo!("STUB: _evaluate_and_apply 标记方案为 Executed 但未执行实际参数调整。需要: 1) 评估方案 ROI, 2) 调用参数调整逻辑。");
     }
 
     /// 回滚已执行的方案
@@ -764,6 +746,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "STUB")]
     fn test_run_full_cycle() {
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
@@ -798,6 +781,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "STUB")]
     fn test_rollback() {
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));

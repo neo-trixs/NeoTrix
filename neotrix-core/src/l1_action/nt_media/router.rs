@@ -42,6 +42,7 @@ impl UrlScheme {
 pub enum TransportType {
     HttpRange,
     HttpStream,
+    Hls,
     MagnetRpc,
     FileCopy,
     FifoPipe,
@@ -62,21 +63,25 @@ pub fn route_url(url: &str, output_dir: &PathBuf, prefer_streaming: bool) -> Med
     let scheme = UrlScheme::parse(url);
     let is_hf = is_huggingface_url(url);
 
-    let transport = match scheme {
-        UrlScheme::Magnet => TransportType::MagnetRpc,
-        UrlScheme::Http | UrlScheme::Https => {
-            if is_hf {
-                TransportType::HttpRange
-            } else if prefer_streaming {
-                TransportType::HttpStream
-            } else {
-                TransportType::HttpRange
+    let transport = if url.ends_with(".m3u8") || url.contains(".m3u8?") {
+        TransportType::Hls
+    } else {
+        match scheme {
+            UrlScheme::Magnet => TransportType::MagnetRpc,
+            UrlScheme::Http | UrlScheme::Https => {
+                if is_hf {
+                    TransportType::HttpRange
+                } else if prefer_streaming {
+                    TransportType::HttpStream
+                } else {
+                    TransportType::HttpRange
+                }
             }
+            UrlScheme::Ftp => TransportType::HttpRange,
+            UrlScheme::File => TransportType::FileCopy,
+            UrlScheme::Data => TransportType::FileCopy,
+            UrlScheme::Unknown => TransportType::FileCopy,
         }
-        UrlScheme::Ftp => TransportType::HttpRange,
-        UrlScheme::File => TransportType::FileCopy,
-        UrlScheme::Data => TransportType::FileCopy,
-        UrlScheme::Unknown => TransportType::FileCopy,
     };
 
     let filename = extract_filename(url);

@@ -535,6 +535,42 @@ impl StreamingPipeline {
                     output,
                 })
             }
+            TransportType::Hls => {
+                let output_hls = output.clone();
+                let url_hls = url.clone();
+                let client_hls = client.clone();
+                let auth_hls = config.auth.clone();
+
+                let download_handle = tokio::spawn(async move {
+                    stream_hls_download(
+                        &client_hls,
+                        &url_hls,
+                        &output_hls,
+                        config.timeout,
+                        cancel_rx_flag,
+                        progress_tx.clone(),
+                        auth_hls.as_ref(),
+                        config.persistence.clone(),
+                        config.concurrency,
+                    )
+                    .await
+                });
+
+                let player_handle = spawn_player(
+                    &output,
+                    config.buffer_threshold,
+                    config.player_bin.as_deref(),
+                    &config.player_args,
+                )
+                .await;
+
+                Ok(PipelineHandle {
+                    download_task: download_handle,
+                    player_handle,
+                    cancel_tx: Some(cancel_tx),
+                    output,
+                })
+            }
             TransportType::MagnetRpc => {
                 let download_handle = tokio::spawn(async move {
                     stream_magnet_download(
@@ -1813,6 +1849,231 @@ async fn http_chunk_download(
         .await
         .map_err(|e| format!("flush: {}", e))?;
     Ok(downloaded)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HLS Download — m3u8 manifest → segment download → concat
+// ═══════════════════════════════════════════════════════════════════════════
+
+async fn stream_hls_download(
+    client: &reqwest::Client,
+    url: &str,
+    output: &Path,
+    timeout: Duration,
+    cancel: Arc<AtomicBool>,
+    progress_tx: mpsc::Sender<PipelineProgress>,
+    auth: Option<&AuthConfig>,
+    persistence: Option<Arc<super::persistence::DownloadStore>>,
+    concurrency: usize,
+) -> Result<(), PipelineError> {
+    use super::hls;
+
+    let started = Instant::now();
+
+    // Record in persistence store
+    let _record_id = if let Some(ref store) = persistence {
+        let record = super::persistence::DownloadRecord::new(
+            url.to_string(),
+            output.to_path_buf(),
+            "Hls".to_string(),
+        );
+        let id = record.id.clone();
+        store.add_record(record).await;
+        let _ = store.save().await;
+        Some(id)
+    } else {
+        None
+    };
+
+    // Fetch and parse manifest
+    let mut req = client.get(url).timeout(timeout);
+    if let Some(a) = auth {
+        req = a.apply_to_request(req);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| PipelineError::Http(e.to_string()))?;
+    let manifest_text = resp
+        .text()
+        .await
+        .map_err(|e| PipelineError::Http(e.to_string()))?;
+
+    let manifest =
+        hls::parse_m3u8(&manifest_text).map_err(|e| PipelineError::Http(e.to_string()))?;
+
+    // Resolve to segment URLs
+    let segment_urls = match &manifest {
+        hls::M3u8Manifest::Master(master) => {
+            // Pick best quality variant (highest bandwidth)
+            let variant = hls::select_variant(master, None)
+                .ok_or_else(|| PipelineError::Http("no variants in master playlist".into()))?;
+            // Fetch the variant playlist
+            let variant_url = hls::to_download_urls(
+                &hls::M3u8Manifest::Master(master.clone()),
+                url,
+            )
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| variant.uri.clone());
+
+            let mut req2 = client.get(&variant_url).timeout(timeout);
+            if let Some(a) = auth {
+                req2 = a.apply_to_request(req2);
+            }
+            let resp2 = req2
+                .send()
+                .await
+                .map_err(|e| PipelineError::Http(e.to_string()))?;
+            let variant_text = resp2
+                .text()
+                .await
+                .map_err(|e| PipelineError::Http(e.to_string()))?;
+            let variant_manifest =
+                hls::parse_m3u8(&variant_text).map_err(|e| PipelineError::Http(e.to_string()))?;
+            hls::to_download_urls(&variant_manifest, &variant_url)
+        }
+        hls::M3u8Manifest::Media(media) => hls::to_download_urls(&manifest, url),
+    };
+
+    let total_segments = segment_urls.len() as u64;
+    if total_segments == 0 {
+        return Err(PipelineError::Http("no segments in playlist".into()));
+    }
+
+    let total_size_hint: Option<u64> = None;
+    let mut downloaded_bytes: u64 = 0;
+
+    // Write segments sequentially into a temp dir, then merge
+    let tmp_dir = output.parent().unwrap_or(Path::new("/tmp")).join(format!(
+        ".dl_hls_{}",
+        SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&tmp_dir)
+        .await
+        .map_err(|e| PipelineError::Io(e.to_string()))?;
+
+    let mut segment_files: Vec<PathBuf> = Vec::with_capacity(segment_urls.len());
+
+    for (i, seg_url) in segment_urls.iter().enumerate() {
+        if cancel.load(Ordering::Relaxed) {
+            let _ = fs::remove_dir_all(&tmp_dir).await;
+            return Err(PipelineError::Cancelled);
+        }
+
+        let seg_path = tmp_dir.join(format!("seg{:04}.tmp", i));
+        let seg_size = download_single_segment(
+            client,
+            seg_url,
+            &seg_path,
+            timeout,
+            auth,
+        )
+        .await?;
+        downloaded_bytes += seg_size;
+        segment_files.push(seg_path);
+
+        let _ = progress_tx
+            .send(PipelineProgress {
+                url: url.to_string(),
+                status: PipelineStatus::Downloading {
+                    downloaded: downloaded_bytes,
+                    total: total_size_hint,
+                    speed_bps: 0.0,
+                },
+                media_kind,
+                output: output.to_path_buf(),
+                elapsed: started.elapsed(),
+            })
+            .await;
+    }
+
+    // Merge all segments into the output file
+    let mut out = BufWriter::with_capacity(
+        256 * 1024,
+        fs::File::create(output)
+            .await
+            .map_err(|e| PipelineError::Io(e.to_string()))?,
+    );
+    let mut buf = vec![0u8; 8192];
+    for seg_file in &segment_files {
+        let mut f = fs::File::open(seg_file)
+            .await
+            .map_err(|e| PipelineError::Io(e.to_string()))?;
+        loop {
+            let n = f
+                .read(&mut buf)
+                .await
+                .map_err(|e| PipelineError::Io(e.to_string()))?;
+            if n == 0 {
+                break;
+            }
+            out.write_all(&buf[..n])
+                .await
+                .map_err(|e| PipelineError::Io(e.to_string()))?;
+        }
+    }
+    out.flush()
+        .await
+        .map_err(|e| PipelineError::Io(e.to_string()))?;
+
+    // Cleanup temp dir
+    let _ = fs::remove_dir_all(&tmp_dir).await;
+
+    let _ = progress_tx
+        .send(PipelineProgress {
+            url: url.to_string(),
+            status: PipelineStatus::Complete {
+                total_bytes: downloaded_bytes,
+                elapsed: started.elapsed(),
+            },
+            media_kind,
+            output: output.to_path_buf(),
+            elapsed: started.elapsed(),
+        })
+        .await;
+
+    Ok(())
+}
+
+/// Download a single HLS segment to a file.
+async fn download_single_segment(
+    client: &reqwest::Client,
+    url: &str,
+    dest: &Path,
+    timeout: Duration,
+    auth: Option<&AuthConfig>,
+) -> Result<u64, PipelineError> {
+    let mut req = client.get(url).timeout(timeout);
+    if let Some(a) = auth {
+        req = a.apply_to_request(req);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| PipelineError::Http(e.to_string()))?;
+
+    let mut file = fs::File::create(dest)
+        .await
+        .map_err(|e| PipelineError::Io(e.to_string()))?;
+    let mut stream = resp.bytes_stream();
+    let mut written: u64 = 0;
+
+    while let Some(chunk) = stream.next().await {
+        let data = chunk.map_err(|e| PipelineError::Http(e.to_string()))?;
+        file.write_all(&data)
+            .await
+            .map_err(|e| PipelineError::Io(e.to_string()))?;
+        written += data.len() as u64;
+    }
+
+    file.flush()
+        .await
+        .map_err(|e| PipelineError::Io(e.to_string()))?;
+    Ok(written)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -194,107 +194,10 @@ impl _VerifierAgent {
         &mut self,
         _shot_id: &str,
         _video_path: &str,
-        spec_description: &str,
-        memory_context: Option<&str>,
+        _spec_description: &str,
+        _memory_context: Option<&str>,
     ) -> VerificationResult {
-        let start = std::time::Instant::now();
-        
-        // STUB: 用关键词启发式代替真实 VLM — 返回不代表视频质量的分数
-        let scores = self.simulate_verification(spec_description, memory_context);
-        
-        // 计算总分
-        let total_score = self.calculate_total_score(&scores);
-        let passed = total_score >= self.config.pass_threshold;
-        
-        // 检查是否需要重生成
-        let needs_regeneration = !passed && self.history.len() < self.config.max_regeneration_attempts as usize;
-        
-        let result = VerificationResult {
-            passed,
-            total_score,
-            scores,
-            error_types: vec![],
-            suggested_corrections: vec![],
-            needs_regeneration,
-            verification_time_ms: start.elapsed().as_millis() as u64,
-        };
-        
-        self.history.push(result.clone());
-        result
-    }
-    
-    /// STUB: 模拟验证 — 基于描述和上下文的关键词启发式评分。
-    ///
-    /// **这不是真实验证。** 返回的分数仅反映文本描述中是否包含特定关键词
-    /// (如 "character"、"action"、"lighting"), 不涉及实际视频帧分析。
-    /// 分数不代表视频质量, 只代表描述文本的丰富程度。
-    ///
-    /// 真实实现需要:
-    /// 1. 从 `_video_path` 提取关键帧
-    /// 2. 将帧 + `spec_description` 送入 VLM 进行多维度评估
-    /// 3. 将 VLM 输出结构化为 `_VerificationScore`
-    ///
-    /// 当前实现仅供占位: 让 `calculate_total_score` 的权重逻辑可测试。
-    fn simulate_verification(&self, description: &str, context: Option<&str>) -> Vec<_VerificationScore> {
-        let desc_lower = description.to_lowercase();
-        let ctx_lower = context.map(|c| c.to_lowercase()).unwrap_or_default();
-
-        // 实体一致性：检查描述中是否提及实体特征
-        let entity_score = if desc_lower.contains("character") || desc_lower.contains("角色")
-            || desc_lower.contains("person") || desc_lower.contains("face") {
-            7 // 有实体描述 → 中等分数（需要实际图像比对）
-        } else {
-            9 // 无实体 → 高分
-        };
-
-        // 环境一致性：检查上下文中的环境描述
-        let env_score = if ctx_lower.contains("lighting") || ctx_lower.contains("光照")
-            || ctx_lower.contains("scene") || ctx_lower.contains("场景") {
-            6 // 有环境描述 → 较低分数（需要实际比对）
-        } else {
-            8 // 无环境 → 较高分
-        };
-
-        // 叙事进展：检查描述中的动作词
-        let narrative_score = if desc_lower.contains("action") || desc_lower.contains("动作")
-            || desc_lower.contains("dialogue") || desc_lower.contains("对话")
-            || desc_lower.contains("move") || desc_lower.contains("移动") {
-            8 // 有叙事元素 → 中高分
-        } else {
-            7 // 无叙事 → 中等分
-        };
-
-        // 指令遵循：检查描述长度和完整性
-        let instruction_score = if description.len() > 50 {
-            8 // 详细描述 → 较高分
-        } else if description.len() > 10 {
-            7 // 中等描述
-        } else {
-            5 // 过短描述 → 低分
-        };
-
-        vec![
-            _VerificationScore {
-                dimension: _VerificationDimension::EntityConsistency,
-                score: entity_score,
-                explanation: Some(format!("基于描述分析: {}", if entity_score >= 8 { "未检测到实体冲突" } else { "检测到实体元素需比对" })),
-            },
-            _VerificationScore {
-                dimension: _VerificationDimension::EnvironmentConsistency,
-                score: env_score,
-                explanation: Some(format!("基于上下文分析: {}", if env_score >= 7 { "环境一致" } else { "环境可能有变化" })),
-            },
-            _VerificationScore {
-                dimension: _VerificationDimension::NarrativeProgression,
-                score: narrative_score,
-                explanation: Some(format!("基于叙事分析: {}", if narrative_score >= 8 { "叙事进展正常" } else { "叙事元素较少" })),
-            },
-            _VerificationScore {
-                dimension: _VerificationDimension::InstructionFollowing,
-                score: instruction_score,
-                explanation: Some(format!("基于指令分析: {}", if instruction_score >= 7 { "指令遵循良好" } else { "指令描述不完整" })),
-            },
-        ]
+        todo!("STUB: _verify_shot 使用关键词启发式评分, 非真实 VLM 验证。需要调用 VLM 对 video_path 进行多维度视觉分析。参见 verifier_agent.rs doc comment。");
     }
     
     /// 计算总分
@@ -408,6 +311,7 @@ mod tests {
     use super::*;
     
     #[test]
+    #[should_panic(expected = "STUB")]
     fn test_verifier_agent() {
         // TODO: _verify_shot is a keyword-heuristic STUB, not real VLM verification.
         // It scores based on text description keywords (character/action/lighting),

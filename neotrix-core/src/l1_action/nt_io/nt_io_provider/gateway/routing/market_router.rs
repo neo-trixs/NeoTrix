@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use super::super::types::registry_core::ProviderState;
+use super::super::types::ProviderState;
 
 /// G: market-wisdom 路由 + Auto Exacto 周期重估。
 /// 维护每 provider 的市场权重 (success_rate / composite_score / avg_latency 加权混合),

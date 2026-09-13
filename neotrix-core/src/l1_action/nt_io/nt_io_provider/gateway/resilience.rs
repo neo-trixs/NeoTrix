@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 
 use crate::core::nt_core_llm::{LlmRequest, LlmResponse};
-use crate::l1_action::nt_io::nt_io_provider::common::generation_classifier::{GenerationAnalytics, GenerationClassifier, GenerationRecord, LlmPurpose, TaskType};
-use super::execution::universal_adapter::Message;
-use super::types::registry_core::ProviderState;
+use crate::l1_action::nt_io::nt_io_provider::common::generation_classifier::{GenerationRecord, LlmPurpose, TaskType};
+use crate::core::nt_core_llm::Message;
+use super::types::ProviderState;
 use super::GatewayV2;
 
 // ═══════════════════════════════════════════════════════════════════

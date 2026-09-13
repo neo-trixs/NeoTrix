@@ -73,25 +73,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_critique_returns_placeholder() {
+    fn test_critique_returns_rejection_signal() {
         let c = _BpcoCritic::new();
         let fb = c.critique("hello world");
-        assert_eq!(fb.score, 0.5);
-        assert!(!fb.critiques.is_empty());
+        // C0 stub returns explicit rejection: score=0.0, non-empty critique explaining why.
+        assert_eq!(fb.score, 0.0, "C0 stub must return 0.0 (not wired)");
+        assert!(!fb.critiques.is_empty(), "must include rejection explanation");
+        assert!(
+            fb.critiques[0].contains("not wired"),
+            "critique should explain the stub is unwired"
+        );
     }
 
     #[test]
     fn test_passes_threshold() {
         let c = _BpcoCritic::new();
-        let fb = _CriticFeedback {
-            critiques: vec![],
-            score: 0.5,
+        // Verify threshold logic against the critic's own min_score (0.5).
+        // Use the actual output from critique() to confirm it fails the threshold.
+        let fb = c.critique("any input");
+        assert!(!c.passes(&fb), "C0 stub output (score=0.0) must NOT pass threshold=0.5");
+        // Manually构造 a passing feedback to verify the threshold check itself works.
+        let passing = _CriticFeedback {
+            critiques: vec!["looks good".into()],
+            score: 0.8,
         };
-        assert!(c.passes(&fb));
-        assert!(!c.passes(&_CriticFeedback {
-            critiques: vec![],
-            score: 0.1,
-        }));
+        assert!(c.passes(&passing), "score 0.8 >= 0.5 should pass");
     }
 
     #[test]

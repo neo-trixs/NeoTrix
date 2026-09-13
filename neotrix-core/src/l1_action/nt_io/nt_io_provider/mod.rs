@@ -48,8 +48,7 @@ pub use gateway::{
     CapabilityRouter,
     InferenceRouter, RouterConfig,
 };
-pub use gateway::execution::universal_adapter::*;
-pub use gateway::execution::unified_inference::*;
+pub use gateway::execution::*;
 pub use gateway::routing::search_router::*;
 
 // ── 目录 / 发现 / 注册 ─────────────────────────────────────

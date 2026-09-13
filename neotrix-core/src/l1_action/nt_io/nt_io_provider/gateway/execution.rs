@@ -14,7 +14,7 @@ use crate::l1_action::nt_io::nt_io_provider::health::context_budget::estimate_to
 use crate::l1_action::nt_io::nt_io_provider::pool::free_pool::global_free_pool;
 use crate::l1_action::nt_io::nt_io_provider::health::rate_limiter::BrainTier;
 use crate::l1_action::nt_io::nt_io_provider::common::privacy_guard::{egress_privacy_guard, trust_from_name};
-use crate::l1_action::nt_io::nt_io_provider::gateway::types::registry_core::{AttemptPhase, ProviderState};
+use crate::l1_action::nt_io::nt_io_provider::gateway::types::{AttemptPhase, ProviderState};
 use crate::l1_action::nt_io::nt_io_provider::gateway::resilience::ResponseCache;
 use crate::l1_action::nt_io::nt_io_provider::gateway::CallEvent;
 use crate::l1_action::nt_io::nt_io_provider::common::factory::LlmProviderType;
