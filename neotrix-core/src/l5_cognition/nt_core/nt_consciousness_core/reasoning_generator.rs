@@ -67,7 +67,7 @@ pub struct Episode {
 
 /// 推理记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ReasoningRecord {
+pub struct _ReasoningRecord {
     pub id: String,
     pub cycle: u32,
     pub reasoning_type: RuleType,

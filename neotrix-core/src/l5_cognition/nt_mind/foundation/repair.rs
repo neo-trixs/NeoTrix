@@ -12,7 +12,7 @@ use neotrix_types::shared::Severity;
 
 /// 根因假设
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RootCauseHypothesis {
+pub struct _RootCauseHypothesis {
     pub hypothesis: String,
     pub confidence: f32,           // 0.0-1.0
     pub evidence: Vec<String>,
@@ -30,7 +30,7 @@ pub struct Diagnosis {
 /// 严重度
 /// 修复选项类型 (参考 APR 文献: GenProg/Prophet/Template/LLM-based)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum _RepairStrategyType {
+pub enum _RepairStrategyType {
     /// 回滚到已知良好版本
     Rollback,
     /// 补丁修复 (基于模式/模板/LLM)
@@ -62,7 +62,7 @@ impl std::str::FromStr for _RepairStrategyType {
 
 /// 单个修复选项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RepairOption {
+pub struct _RepairOption {
     pub strategy: _RepairStrategyType,
     pub description: String,
     pub target_files: Vec<String>,
@@ -84,7 +84,7 @@ pub enum RiskLevel {
 
 /// 工作量估算
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum _EffortLevel {
+pub enum _EffortLevel {
     Trivial,
     Low,
     Medium,
@@ -104,7 +104,7 @@ pub struct RepairPlan {
 
 /// 修复步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RepairStep {
+pub struct _RepairStep {
     pub action: _RepairStrategyType,
     pub target: String,
     pub details: String,
@@ -132,7 +132,7 @@ pub struct FixResult {
 
 /// 步骤执行记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StepExecution {
+pub struct _StepExecution {
     pub step: _RepairStep,
     pub success: bool,
     pub output: String,
@@ -176,7 +176,7 @@ pub struct PatternUpdate {
 
 /// 修复模式 (用于模式库学习)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RepairPattern {
+pub struct _RepairPattern {
     pub signature: String,              // 根因特征签名
     pub strategy: _RepairStrategyType,
     pub success_rate: f32,
@@ -185,7 +185,7 @@ pub(crate) struct _RepairPattern {
 }
 
 /// 修复计划生成器
-pub(crate) struct _RepairPlanner {
+pub struct _RepairPlanner {
     pattern_library: HashMap<String, _RepairPattern>,
     strategy_weights: HashMap<_RepairStrategyType, f32>,
 }

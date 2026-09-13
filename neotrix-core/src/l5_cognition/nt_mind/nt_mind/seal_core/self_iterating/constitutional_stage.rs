@@ -21,7 +21,7 @@ use super::pipeline::StageResult;
 /// 4-tier priority hierarchy for constitutional principles.
 /// Higher ordinal = lower priority (Safety=0 is highest).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub(crate) enum _PriorityTier {
+pub enum _PriorityTier {
     /// Tier 1: Safety — prevents harm, preserves life, security
     Safety = 0,
     /// Tier 2: Ethics — fairness, honesty, transparency
@@ -51,7 +51,7 @@ impl _PriorityTier {
 
 /// A constitutional principle with priority tier and evaluation criteria.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConstitutionalPrincipleV2 {
+pub struct _ConstitutionalPrincipleV2 {
     pub name: String,
     pub description: String,
     pub tier: _PriorityTier,
@@ -62,7 +62,7 @@ pub(crate) struct _ConstitutionalPrincipleV2 {
 
 /// A reasoned verdict for a single principle evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ReasonedVerdict {
+pub struct _ReasonedVerdict {
     pub principle: String,
     pub score: f64,
     pub tier: _PriorityTier,
@@ -73,7 +73,7 @@ pub(crate) struct _ReasonedVerdict {
 
 /// The upgraded constitution with 4-tier priority hierarchy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConstitutionV2 {
+pub struct _ConstitutionV2 {
     pub principles: Vec<_ConstitutionalPrincipleV2>,
     pub version: String,
 }
@@ -236,7 +236,7 @@ impl _ConstitutionV2 {
 /// Evaluates principles with reasoning, resolves conflicts by tier,
 /// and computes weighted compliance scores.
 #[derive(Debug, Clone)]
-pub(crate) struct _PriorityConstitutionalCritic {
+pub struct _PriorityConstitutionalCritic {
     pub constitution: _ConstitutionV2,
     pub history: Vec<_ReasonedVerdict>,
 }

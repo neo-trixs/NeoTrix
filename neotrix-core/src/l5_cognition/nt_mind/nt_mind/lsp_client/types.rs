@@ -1,19 +1,19 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LspPosition {
+pub struct _LspPosition {
     pub line: u32,
     pub character: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LspRange {
+pub struct _LspRange {
     pub start: _LspPosition,
     pub end: _LspPosition,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LspDiagnostic {
+pub struct _LspDiagnostic {
     pub range: _LspRange,
     pub severity: Option<DiagnosticSeverity>,
     pub message: String,
@@ -30,13 +30,13 @@ pub enum DiagnosticSeverity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LspHover {
+pub struct _LspHover {
     pub contents: Vec<String>,
     pub range: Option<_LspRange>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LspCompletionItem {
+pub struct _LspCompletionItem {
     pub label: String,
     pub kind: Option<_CompletionItemKind>,
     pub detail: Option<String>,
@@ -44,7 +44,7 @@ pub(crate) struct _LspCompletionItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _CompletionItemKind {
+pub enum _CompletionItemKind {
     Text = 1,
     Method = 2,
     Function = 3,
@@ -60,13 +60,13 @@ pub(crate) enum _CompletionItemKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LspLocation {
+pub struct _LspLocation {
     pub uri: String,
     pub range: _LspRange,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LspDocumentSymbol {
+pub struct _LspDocumentSymbol {
     pub name: String,
     pub kind: _SymbolKind,
     pub range: _LspRange,
@@ -75,7 +75,7 @@ pub(crate) struct _LspDocumentSymbol {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _SymbolKind {
+pub enum _SymbolKind {
     File = 1,
     Module = 2,
     Namespace = 3,
@@ -91,18 +91,18 @@ pub(crate) enum _SymbolKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _WorkspaceEdit {
+pub struct _WorkspaceEdit {
     pub changes: Vec<_TextEdit>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TextEdit {
+pub struct _TextEdit {
     pub range: _LspRange,
     pub new_text: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct LspServerConfig {
+pub struct LspServerConfig {
     pub name: String,
     pub language_id: String,
     pub command: String,

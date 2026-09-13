@@ -275,7 +275,7 @@ impl Default for SkillBridge {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _ThinkingCycleResult {
+pub struct _ThinkingCycleResult {
     pub iteration: usize,
     pub state: SiliconSelfState,
     pub trace: Option<ThinkingTrace>,

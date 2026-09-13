@@ -242,7 +242,7 @@ pub fn get_last_modified(path: &std::path::Path) -> Option<String> {
 }
 
 /// 格式化文件大小
-pub(crate) fn format_size(bytes: u64) -> String {
+pub fn format_size(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = 1024 * KB;
     const GB: u64 = 1024 * MB;
@@ -488,7 +488,7 @@ fn glob_segment_match_chars(pattern: &[char], text: &[char]) -> bool {
 }
 
 /// 按模式扫描目录
-pub(crate) fn scan_by_patterns(root: &Path, patterns: &[CleanupPattern]) -> Vec<ScanResult> {
+pub fn scan_by_patterns(root: &Path, patterns: &[CleanupPattern]) -> Vec<ScanResult> {
     let mut results = Vec::new();
 
     for pattern in patterns {

@@ -489,7 +489,7 @@ pub struct ProxyPoolSummary {
 }
 
 /// 从 URL 字符串解析为 ProxyNode（用于健康检查）
-pub(crate) fn parse_url_to_node(url_str: &str) -> Option<ProxyNode> {
+pub fn parse_url_to_node(url_str: &str) -> Option<ProxyNode> {
     let parsed = match url::Url::parse(url_str) {
         Ok(u) => u,
         Err(e) => {

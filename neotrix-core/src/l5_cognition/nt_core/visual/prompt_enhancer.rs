@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
 
 /// 增强策略
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _EnhancementStrategy {
+pub enum _EnhancementStrategy {
     /// 质量增强
     Quality,
     /// 风格增强
@@ -27,7 +27,7 @@ pub(crate) enum _EnhancementStrategy {
 
 /// 风格预设
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StylePreset {
+pub struct _StylePreset {
     /// 预设ID
     pub id: String,
     /// 预设名称
@@ -44,7 +44,7 @@ pub(crate) struct _StylePreset {
 
 /// 增强配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EnhancerConfig {
+pub struct _EnhancerConfig {
     /// 默认策略
     pub default_strategy: _EnhancementStrategy,
     /// 风格预设
@@ -61,7 +61,7 @@ pub(crate) struct _EnhancerConfig {
 
 /// 增强结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EnhancementResult {
+pub struct _EnhancementResult {
     /// 原始提示词
     pub original: String,
     /// 增强后的提示词
@@ -81,7 +81,7 @@ pub(crate) struct _EnhancementResult {
 // ============================================================================
 
 /// 提示词增强器
-pub(crate) struct _PromptEnhancer {
+pub struct _PromptEnhancer {
     /// 配置
     config: _EnhancerConfig,
     /// 增强历史
@@ -233,7 +233,7 @@ impl _PromptEnhancer {
 
 /// 增强统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EnhancerStats {
+pub struct _EnhancerStats {
     /// 总增强次数
     pub total_enhanced: usize,
     /// 平均添加标签数

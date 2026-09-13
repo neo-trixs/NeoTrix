@@ -38,7 +38,7 @@ pub enum ReviewStatus {
 
 /// 质量检查项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _QualityCheckItem {
+pub struct _QualityCheckItem {
     /// 检查项ID
     pub id: String,
     /// 检查项名称
@@ -53,7 +53,7 @@ pub(crate) struct _QualityCheckItem {
 
 /// 质量检查类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _QualityCheckType {
+pub enum _QualityCheckType {
     /// 技术质量
     Technical,
     /// 内容合规
@@ -123,7 +123,7 @@ pub enum IssueSeverity {
 
 /// 质量控制配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _QualityControlConfig {
+pub struct _QualityControlConfig {
     /// 检查项列表
     pub check_items: Vec<_QualityCheckItem>,
     /// 通过阈值 (0.0-1.0)
@@ -139,7 +139,7 @@ pub(crate) struct _QualityControlConfig {
 }
 
 /// 质量控制流水线
-pub(crate) struct _QualityControlPipeline {
+pub struct _QualityControlPipeline {
     /// 配置
     config: _QualityControlConfig,
     /// 审核历史
@@ -375,7 +375,7 @@ impl _QualityControlPipeline {
 
 /// 质量统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _QualityStats {
+pub struct _QualityStats {
     /// 总审核数
     pub total_reviews: usize,
     /// 通过数

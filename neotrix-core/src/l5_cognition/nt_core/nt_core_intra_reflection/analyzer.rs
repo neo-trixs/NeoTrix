@@ -25,7 +25,7 @@ pub fn compute_coherence(trace: &[String]) -> f64 {
     sum / (trace.len() - 1) as f64
 }
 
-pub(crate) fn _compute_efficiency(trace_len: usize, outcome_success: Option<bool>) -> f64 {
+pub fn _compute_efficiency(trace_len: usize, outcome_success: Option<bool>) -> f64 {
     match outcome_success {
         Some(true) => {
             if trace_len == 0 {
@@ -38,7 +38,7 @@ pub(crate) fn _compute_efficiency(trace_len: usize, outcome_success: Option<bool
     }
 }
 
-pub(crate) fn _compute_error_density(error_count: u32, trace_len: usize) -> f64 {
+pub fn _compute_error_density(error_count: u32, trace_len: usize) -> f64 {
     if trace_len == 0 {
         return 0.0;
     }
@@ -56,7 +56,7 @@ pub fn compute_mode_stability(history: &[u8]) -> f64 {
     1.0 - (switches as f64 / max_possible as f64)
 }
 
-pub(crate) fn _find_bottlenecks(trace: &[String], execution_time_ms: u64, error_count: u32) -> Vec<String> {
+pub fn _find_bottlenecks(trace: &[String], execution_time_ms: u64, error_count: u32) -> Vec<String> {
     let mut bottlenecks = Vec::new();
     if trace.is_empty() {
         return bottlenecks;

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 /// 追踪 Span — 单次能力调用记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CapabilitySpan {
+pub struct CapabilitySpan {
     pub span_id: String,
     pub capability_id: String,
     pub action: String,
@@ -25,7 +25,7 @@ pub(crate) struct CapabilitySpan {
 
 /// 能力统计聚合
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct CapabilityAggregate {
+pub struct CapabilityAggregate {
     pub capability_id: String,
     pub total_calls: u64,
     pub successful: u64,
@@ -37,7 +37,7 @@ pub(crate) struct CapabilityAggregate {
 }
 
 /// 追踪收集器 — 全局单例
-pub(crate) struct TracingCollector {
+pub struct TracingCollector {
     spans: Vec<CapabilitySpan>,
     aggregates: HashMap<String, CapabilityAggregate>,
     max_spans: usize,
@@ -137,11 +137,11 @@ pub fn trace_end(span_id: &str, success: bool, error: Option<String>) {
     GLOBAL_COLLECTOR.lock().unwrap().end_span(span_id, success, error);
 }
 
-pub(crate) fn trace_aggregate(capability_id: &str) -> Option<CapabilityAggregate> {
+pub fn trace_aggregate(capability_id: &str) -> Option<CapabilityAggregate> {
     GLOBAL_COLLECTOR.lock().unwrap().aggregate(capability_id).cloned()
 }
 
-pub(crate) fn trace_all_aggregates() -> HashMap<String, CapabilityAggregate> {
+pub fn trace_all_aggregates() -> HashMap<String, CapabilityAggregate> {
     GLOBAL_COLLECTOR.lock().unwrap().all_aggregates().clone()
 }
 

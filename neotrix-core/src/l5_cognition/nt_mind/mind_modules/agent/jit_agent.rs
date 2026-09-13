@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// JIT-Agent 协议编排器
-pub(crate) struct _JITAgentProtocolOrchestrator {
+pub struct _JITAgentProtocolOrchestrator {
     modules: Vec<_JITModule>,
     protocols: Vec<_JITProtocol>,
     active_sessions: Vec<_ProtocolSession>,
@@ -22,7 +22,7 @@ pub(crate) struct _JITAgentProtocolOrchestrator {
 
 /// JIT 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _JITConfig {
+pub struct _JITConfig {
     pub max_modules: usize,
     pub max_protocols: usize,
     pub enable_dynamic_composition: bool,
@@ -42,7 +42,7 @@ impl Default for _JITConfig {
 
 /// JIT 模块
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _JITModule {
+pub struct _JITModule {
     pub module_id: String,
     pub name: String,
     pub module_type: _ModuleType,
@@ -53,7 +53,7 @@ pub(crate) struct _JITModule {
 /// 模块类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _ModuleType {
+pub enum _ModuleType {
     Memory,
     Planning,
     Action,
@@ -62,7 +62,7 @@ pub(crate) enum _ModuleType {
 
 /// JIT 协议
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _JITProtocol {
+pub struct _JITProtocol {
     pub protocol_id: String,
     pub name: String,
     pub modules: Vec<String>,
@@ -72,7 +72,7 @@ pub(crate) struct _JITProtocol {
 
 /// 协议会话
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ProtocolSession {
+pub struct _ProtocolSession {
     pub session_id: String,
     pub protocol_id: String,
     pub task: String,
@@ -93,7 +93,7 @@ pub enum SessionStatus {
 
 /// JIT 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _JITStats {
+pub struct _JITStats {
     pub total_modules: u64,
     pub total_protocols: u64,
     pub total_sessions: u64,
@@ -104,7 +104,7 @@ pub(crate) struct _JITStats {
 
 /// 协议执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ProtocolExecutionResult {
+pub struct _ProtocolExecutionResult {
     pub success: bool,
     pub session_id: String,
     pub modules_executed: Vec<String>,

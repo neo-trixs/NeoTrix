@@ -13,7 +13,7 @@ use super::frames::FrameType;
 
 /// 搜索结果
 #[derive(Debug, Clone)]
-pub(crate) struct NtxSearchResult {
+pub struct NtxSearchResult {
     pub node_id: [u8; 36],
     pub score: f32,
     pub frame_type: FrameType,
@@ -21,7 +21,7 @@ pub(crate) struct NtxSearchResult {
 }
 
 /// NTX 搜索桥 — 直接从文件加载段, 不依赖 NtxFile 的所有权
-pub(crate) struct NtxSearchBridge {
+pub struct NtxSearchBridge {
     vec_segment: Option<VecSegment>,
     graph_segment: Option<GraphSegment>,
     frame_count: u64,
@@ -145,7 +145,7 @@ impl NtxSearchBridge {
 }
 
 /// 便捷: 从 NTX 文件执行向量搜索
-pub(crate) fn ntx_vector_search(
+pub fn ntx_vector_search(
     path: impl AsRef<Path>,
     query: &[f32],
     k: usize,

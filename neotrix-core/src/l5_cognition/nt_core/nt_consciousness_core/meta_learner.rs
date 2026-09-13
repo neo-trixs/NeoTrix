@@ -19,7 +19,7 @@ pub struct MetaLearner {
 
 /// 元知识
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct _MetaKnowledge {
+pub struct _MetaKnowledge {
     /// 学习方法有效性
     pub method_effectiveness: HashMap<String, f64>,
     /// 任务类型适配
@@ -30,7 +30,7 @@ pub(crate) struct _MetaKnowledge {
 
 /// 错误模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ErrorPattern {
+pub struct _ErrorPattern {
     pub pattern_type: String,
     pub frequency: u32,
     pub correction_strategy: String,
@@ -38,7 +38,7 @@ pub(crate) struct _ErrorPattern {
 
 /// 学习策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LearningStrategy {
+pub struct _LearningStrategy {
     pub id: String,
     pub name: String,
     pub strategy_type: StrategyType,
@@ -58,7 +58,7 @@ pub enum StrategyType {
 
 /// 元学习记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MetaLearningRecord {
+pub struct _MetaLearningRecord {
     pub id: String,
     pub cycle: u32,
     pub learning_task: String,
@@ -127,7 +127,7 @@ impl MetaLearner {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MetaLearnerStats {
+pub struct _MetaLearnerStats {
     pub total_meta_learnings: usize,
     pub total_strategies: usize,
     pub avg_effectiveness: f64,

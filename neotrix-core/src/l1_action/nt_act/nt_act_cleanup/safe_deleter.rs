@@ -9,7 +9,7 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 /// 安全删除器
-pub(crate) struct SafeDeleter {
+pub struct SafeDeleter {
     config: CleanupConfig,
     archive_path: PathBuf,
 }

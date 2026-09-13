@@ -235,7 +235,7 @@ impl SessionRecoveryManager {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RecoveryInfo {
+pub struct RecoveryInfo {
     pub session_id: String,
     pub has_snapshot: bool,
     pub has_git_backup: bool,

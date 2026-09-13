@@ -57,7 +57,7 @@ pub enum GoalStatus {
 
 /// 目标记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GoalRecord {
+pub struct _GoalRecord {
     pub id: String,
     pub cycle: u32,
     pub action: _GoalAction,
@@ -67,7 +67,7 @@ pub(crate) struct _GoalRecord {
 
 /// 目标动作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _GoalAction {
+pub enum _GoalAction {
     Created,
     Updated,
     Completed,
@@ -132,7 +132,7 @@ impl GoalSetter {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GoalStats {
+pub struct _GoalStats {
     pub total_goals: usize,
     pub active_goals: usize,
     pub completed_goals: usize,

@@ -12,7 +12,7 @@ use crate::neotrix::nt_world_crawl::unified::UnifiedCrawler;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 /// 路由结果 — GWT 竞争 + 知识检索的产出
-pub(crate) struct _RoutedContext {
+pub struct _RoutedContext {
     pub winning_topic: String,
     pub active_specialists: Vec<SpecialistType>,
     pub knowledge_lines: Vec<String>,

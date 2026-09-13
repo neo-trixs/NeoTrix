@@ -270,7 +270,7 @@ pub struct AtomicDecomposer;
 ///
 /// 与 `.neotrix/capability_registry.json` 中 `nt_core_parallel::*` 节点保持镜像一致;
 /// 未来 AttentionRouter 按 provides 标签做运行时路由时, 以此声明为锚点。
-pub(crate) fn _capability_provides() -> &'static [&'static str] {
+pub fn _capability_provides() -> &'static [&'static str] {
     &["intent_isolation", "need_to_know", "atomic_decomposition", "output_contract"]
 }
 

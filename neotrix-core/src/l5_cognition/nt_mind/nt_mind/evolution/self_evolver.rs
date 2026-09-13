@@ -15,7 +15,7 @@ use super::core::*;
 
 /// 三流分析结果（Skill_Seekers 风格）
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ThreeStreamAnalysis {
+pub struct ThreeStreamAnalysis {
     /// 代码流: API surface, module graph, deps
     pub code_insights: Vec<String>,
     pub code_edits: Vec<MicroEdit>,
@@ -29,7 +29,7 @@ pub(crate) struct ThreeStreamAnalysis {
 
 /// One row in the comparison matrix
 #[derive(Debug, Clone)]
-pub(crate) struct ComparedItem {
+pub struct ComparedItem {
     pub name: String,
     pub dimension_scores: HashMap<String, f64>,
     pub evidence: Vec<String>,
@@ -37,7 +37,7 @@ pub(crate) struct ComparedItem {
 
 /// Gap status between us and competitor
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum GapStatus {
+pub enum GapStatus {
     Has,
     Missing,
     BothMissing,
@@ -46,7 +46,7 @@ pub(crate) enum GapStatus {
 
 /// A single gap analysis row
 #[derive(Debug, Clone)]
-pub(crate) struct GapRow {
+pub struct GapRow {
     pub dimension: String,
     pub our_status: GapStatus,
     pub their_status: GapStatus,
@@ -56,7 +56,7 @@ pub(crate) struct GapRow {
 
 /// Full comparison matrix output
 #[derive(Debug, Clone)]
-pub(crate) struct ComparisonMatrix {
+pub struct ComparisonMatrix {
     pub dimensions: Vec<String>,
     pub items: Vec<ComparedItem>,
     pub gap_analysis: Vec<GapRow>,
@@ -554,7 +554,7 @@ impl SelfEvolver {
 
 /// 分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AnalysisResult {
+pub struct AnalysisResult {
     pub source_url: String,
     pub item_type: String,
     pub algebraic_insights: Vec<String>,

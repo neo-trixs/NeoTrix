@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 检查阶段
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub(crate) enum _QAStage {
+pub enum _QAStage {
     /// 结构验证 (规格级别)
     Structural,
     /// 确定性检查 (输出级别)
@@ -25,7 +25,7 @@ pub(crate) enum _QAStage {
 
 /// 检查项类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _CheckType {
+pub enum _CheckType {
     /// 必需字段存在
     RequiredField,
     /// 时长匹配
@@ -50,7 +50,7 @@ pub(crate) enum _CheckType {
 
 /// 检查项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _QACheckItem {
+pub struct _QACheckItem {
     /// 检查项ID
     pub id: String,
     /// 检查项名称
@@ -82,7 +82,7 @@ pub enum IssueSeverity {
 
 /// 检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _QACheckResult {
+pub struct _QACheckResult {
     /// 检查项ID
     pub check_item_id: String,
     /// 是否通过
@@ -97,7 +97,7 @@ pub(crate) struct _QACheckResult {
 
 /// 阶段结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _QAStageResult {
+pub struct _QAStageResult {
     /// 阶段
     pub stage: _QAStage,
     /// 是否通过
@@ -112,7 +112,7 @@ pub(crate) struct _QAStageResult {
 
 /// 完整 QA 结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LayeredQAResult {
+pub struct _LayeredQAResult {
     /// 是否通过
     pub passed: bool,
     /// 总体分数 (0.0-1.0)
@@ -127,7 +127,7 @@ pub(crate) struct _LayeredQAResult {
 
 /// QA 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LayeredQAConfig {
+pub struct _LayeredQAConfig {
     /// 检查项列表
     pub check_items: Vec<_QACheckItem>,
     /// 各阶段是否必须通过
@@ -140,7 +140,7 @@ pub(crate) struct _LayeredQAConfig {
 
 /// 发布决策
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PublishDecision {
+pub struct _PublishDecision {
     /// 是否发布
     pub publish: bool,
     /// 决策原因
@@ -159,7 +159,7 @@ pub(crate) struct _PublishDecision {
 
 /// 分层质量检查器
 /// 实现结构化检查 → 确定性检查 → 语义检查 → 发布门禁
-pub(crate) struct _LayeredQA {
+pub struct _LayeredQA {
     /// 配置
     config: _LayeredQAConfig,
     /// 检查历史
@@ -391,7 +391,7 @@ impl _LayeredQA {
 
 /// QA 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _QAStats {
+pub struct _QAStats {
     /// 总运行次数
     pub total_runs: usize,
     /// 通过次数

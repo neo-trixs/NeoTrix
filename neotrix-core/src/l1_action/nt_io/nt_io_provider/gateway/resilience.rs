@@ -157,7 +157,7 @@ pub struct AnomalyDetector {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct AnomalyConfig {
+pub struct AnomalyConfig {
     pub window_size: usize,
     pub z_score_threshold: f64,
     pub min_samples: usize,
@@ -234,7 +234,7 @@ impl SlidingWindow {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct AnomalyAlert {
+pub struct AnomalyAlert {
     pub provider: String,
     pub metric: String,
     pub value: f64,
@@ -326,7 +326,7 @@ impl Default for AnomalyDetector {
 
 /// 自动恢复配置
 #[derive(Debug, Clone)]
-pub(crate) struct AutoRecoveryConfig {
+pub struct AutoRecoveryConfig {
     pub max_retries: u32,
     pub base_delay: Duration,
     pub max_delay: Duration,
@@ -350,7 +350,7 @@ impl Default for AutoRecoveryConfig {
 
 /// Provider 健康状态
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum HealthState {
+pub enum HealthState {
     Healthy,
     Degraded,
     Recovering,
@@ -472,7 +472,7 @@ impl Default for AutoRecovery {
 // ═══════════════════════════════════════════════════════════════════
 
 /// Provider 指标快照
-pub(crate) struct ProviderMetric {
+pub struct ProviderMetric {
     pub provider_id: String,
     pub latency_ms: u64,
     pub cost_per_token: f64,
@@ -483,7 +483,7 @@ pub(crate) struct ProviderMetric {
 
 /// 漂移检测结果
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum DriftStatus {
+pub enum DriftStatus {
     Normal,
     MildDrift {
         metric: String,
@@ -496,7 +496,7 @@ pub(crate) enum DriftStatus {
     },
 }
 
-pub(crate) struct DriftDetector {
+pub struct DriftDetector {
     windows: VecDeque<ProviderMetric>,
     window_size: usize,
     drift_threshold: f64,
@@ -800,7 +800,7 @@ impl ResponseCache {
 // ═══════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub(crate) struct ResponseQualityScore {
+pub struct ResponseQualityScore {
     pub coherence: f64,
     pub relevance: f64,
     pub completeness: f64,
@@ -816,7 +816,7 @@ impl ResponseQualityScore {
     }
 }
 
-pub(crate) fn evaluate_response_quality(content: &str) -> ResponseQualityScore {
+pub fn evaluate_response_quality(content: &str) -> ResponseQualityScore {
     let coherence = if content.is_empty() {
         0.0
     } else {

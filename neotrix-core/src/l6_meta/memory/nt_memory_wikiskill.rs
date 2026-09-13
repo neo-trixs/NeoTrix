@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// WikiSkill 三层知识架构
-pub(crate) struct _WikiSkillThreeLayerKB {
+pub struct _WikiSkillThreeLayerKB {
     raw_layer: _RawLayer,
     knowledge_layer: KnowledgeLayer,
     _skills_layer: _SkillsLayer,
@@ -42,14 +42,14 @@ impl Default for WikiSkillConfig {
 
 /// 原始层 (Raw Layer)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RawLayer {
+pub struct _RawLayer {
     pub entries: Vec<_RawEntry>,
     pub stats: _LayerStats,
 }
 
 /// 原始条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RawEntry {
+pub struct _RawEntry {
     pub entry_id: String,
     pub content: String,
     pub source: String,
@@ -90,7 +90,7 @@ pub struct KnowledgeRelation {
 
 /// 技能层 (Skills Layer)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SkillsLayer {
+pub struct _SkillsLayer {
     pub skills: Vec<Skill>,
     pub stats: _LayerStats,
 }
@@ -119,7 +119,7 @@ pub enum SkillType {
 
 /// 层统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LayerStats {
+pub struct _LayerStats {
     pub total_entries: u64,
     pub promoted_entries: u64,
     pub avg_quality: f64,
@@ -127,7 +127,7 @@ pub(crate) struct _LayerStats {
 
 /// WikiSkill 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _WikiSkillStats {
+pub struct _WikiSkillStats {
     pub total_raw: u64,
     pub total_knowledge: u64,
     pub total_skills: u64,

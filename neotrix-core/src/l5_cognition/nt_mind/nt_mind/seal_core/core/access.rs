@@ -39,7 +39,7 @@ impl Default for AccessContext {
     }
 }
 
-pub(crate) fn _route_sources_by_context<'a>(
+pub fn _route_sources_by_context<'a>(
     sources: &'a [KnowledgeSource],
     context: &AccessContext,
     _task_type: Option<&str>,

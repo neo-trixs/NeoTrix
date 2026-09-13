@@ -7,7 +7,7 @@ use super::code_graph::CodeGraph;
 use super::graph_types::{ImpactResult, CodeGraphStats};
 
 /// A single recorded tool invocation trace.
-pub(crate) struct _ToolTrace {
+pub struct _ToolTrace {
     pub tool_name: String,
     pub params: HashMap<String, String>,
     pub result_size: usize,

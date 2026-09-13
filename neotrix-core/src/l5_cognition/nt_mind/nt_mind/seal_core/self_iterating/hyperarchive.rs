@@ -189,7 +189,7 @@ impl HyperAgentArchive {
     }
 }
 
-pub(crate) fn cosine_distance(a: &[f64], b: &[f64]) -> f64 {
+pub fn cosine_distance(a: &[f64], b: &[f64]) -> f64 {
     let dim = a.len().min(b.len());
     if dim == 0 {
         return 0.0;

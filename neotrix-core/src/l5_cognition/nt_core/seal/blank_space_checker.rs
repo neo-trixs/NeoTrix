@@ -12,7 +12,7 @@ use crate::l5_cognition::nt_core::seal::rhythm_recalculator::{SegmentData, Segme
 
 /// 留白检查配置
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct _BlankSpaceConfig {
+pub struct _BlankSpaceConfig {
     /// 爽点后最小留白时长 (秒)
     pub min_blank_after_climax: f32,
     /// 爽点后最大留白时长 (秒)
@@ -40,7 +40,7 @@ impl Default for _BlankSpaceConfig {
 
 /// 留白检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _BlankSpaceCheckResult {
+pub struct _BlankSpaceCheckResult {
     /// 是否通过检查
     pub passed: bool,
     /// 检查详情
@@ -53,7 +53,7 @@ pub(crate) struct _BlankSpaceCheckResult {
 
 /// 留白检查详情
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _BlankSpaceDetail {
+pub struct _BlankSpaceDetail {
     /// 检查项
     pub check_item: String,
     /// 是否通过

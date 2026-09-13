@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 规划引擎
-pub(crate) struct _PlanningEngine {
+pub struct _PlanningEngine {
     plans: HashMap<String, Plan>,
     task_graph: _TaskGraph,
     resource_manager: _ResourceManager,
@@ -22,7 +22,7 @@ pub(crate) struct _PlanningEngine {
 
 /// 规划配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PlanningConfig {
+pub struct _PlanningConfig {
     pub max_depth: u32,
     pub max_tasks: usize,
     pub enable_dynamic_planning: bool,
@@ -69,7 +69,7 @@ pub enum PlanStatus {
 
 /// 规划任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PlannedTask {
+pub struct _PlannedTask {
     pub id: String,
     pub name: String,
     pub task_type: String,
@@ -100,14 +100,14 @@ pub struct Dependency {
 }
 
 /// 任务图
-pub(crate) struct _TaskGraph {
+pub struct _TaskGraph {
     nodes: HashMap<String, _TaskNode>,
     edges: Vec<TaskEdge>,
 }
 
 /// 任务节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TaskNode {
+pub struct _TaskNode {
     pub id: String,
     pub task: _PlannedTask,
     pub in_degree: u32,
@@ -123,7 +123,7 @@ pub struct TaskEdge {
 }
 
 /// 资源管理器
-pub(crate) struct _ResourceManager {
+pub struct _ResourceManager {
     resources: HashMap<String, Resource>,
     allocations: Vec<_ResourceAllocation>,
 }
@@ -141,7 +141,7 @@ pub struct Resource {
 
 /// 资源分配
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResourceAllocation {
+pub struct _ResourceAllocation {
     pub resource_id: String,
     pub task_id: String,
     pub amount: f64,
@@ -150,7 +150,7 @@ pub(crate) struct _ResourceAllocation {
 
 /// 规划统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PlanningStats {
+pub struct _PlanningStats {
     pub plans_created: u64,
     pub tasks_planned: u64,
     pub tasks_completed: u64,
@@ -160,7 +160,7 @@ pub(crate) struct _PlanningStats {
 
 /// 执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExecutionResult {
+pub struct _ExecutionResult {
     pub plan_id: String,
     pub status: PlanStatus,
     pub completed_tasks: u32,

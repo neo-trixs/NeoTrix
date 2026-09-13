@@ -1,7 +1,7 @@
 // brain_impl.rs — shim re-exporting from split files + tests
 
 pub use super::brain_core::{ReasoningBrain, AbsorbValidator, DefaultAbsorbValidator, SelfIteration};
-pub(crate) use super::brain_core::BrainMetadata;
+pub use super::brain_core::BrainMetadata;
 pub use super::brain_ewc::{FisherMatrix, WeightUpdateRecord, RLAlgorithm, EvaluationRecord};
 pub use super::brain_seal::{SealEditStrategy, DefaultSealStrategy, CapabilityDelta, ConservativeSealStrategy, AggressiveSealStrategy};
 

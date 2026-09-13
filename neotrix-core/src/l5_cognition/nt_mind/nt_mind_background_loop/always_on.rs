@@ -6,7 +6,7 @@ use chrono::Datelike;
 
 /// Always-on task state
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _AlwaysOnState {
+pub enum _AlwaysOnState {
     Idle,
     Scanning,
     Working,
@@ -28,7 +28,7 @@ impl std::fmt::Display for _AlwaysOnState {
 
 /// Cron-like schedule expression: "every <N> <unit>" or "daily at <HH:MM>" or "hourly"
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _ScheduleExpr {
+pub enum _ScheduleExpr {
     Every { interval_secs: u64 },
     Daily { hour: u8, minute: u8 },
     Hourly,
@@ -156,7 +156,7 @@ impl _ScheduleExpr {
 
 /// A persistent always-on task
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AlwaysOnTask {
+pub struct _AlwaysOnTask {
     pub id: String,
     pub description: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -177,14 +177,14 @@ pub(crate) struct _AlwaysOnTask {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ScannedTask {
+pub struct _ScannedTask {
     pub description: String,
     pub priority: u8,
     pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _WorkReport {
+pub struct _WorkReport {
     pub task_id: String,
     pub description: String,
     pub success: bool,
@@ -194,7 +194,7 @@ pub(crate) struct _WorkReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CycleReport {
+pub struct _CycleReport {
     pub scan_count: usize,
     pub tasks_executed: usize,
     pub tasks_completed: usize,
@@ -203,7 +203,7 @@ pub(crate) struct _CycleReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EngineStatus {
+pub struct _EngineStatus {
     pub enabled: bool,
     pub state: String,
     pub total_tasks: usize,
@@ -214,7 +214,7 @@ pub(crate) struct _EngineStatus {
 }
 
 /// Always-on engine for persistent background task execution
-pub(crate) struct AlwaysOnEngine {
+pub struct AlwaysOnEngine {
     pub enabled: bool,
     pub state: _AlwaysOnState,
     pub tasks: Vec<_AlwaysOnTask>,

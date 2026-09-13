@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Human Approval 审批工作流
-pub(crate) struct _HumanApprovalWorkflow {
+pub struct _HumanApprovalWorkflow {
     pending_approvals: Vec<ApprovalRequest>,
     completed_approvals: Vec<_ApprovalResult>,
     config: _ApprovalConfig,
@@ -18,7 +18,7 @@ pub(crate) struct _HumanApprovalWorkflow {
 
 /// 审批配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ApprovalConfig {
+pub struct _ApprovalConfig {
     pub timeout_seconds: u64,
     pub require_justification: bool,
     pub auto_approve_low_risk: bool,
@@ -51,7 +51,7 @@ pub struct ApprovalRequest {
 /// 操作类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _OperationType {
+pub enum _OperationType {
     SEALPhase,
     GoalLoop,
     Cleanup,
@@ -82,7 +82,7 @@ pub enum ApprovalStatus {
 
 /// 审批结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ApprovalResult {
+pub struct _ApprovalResult {
     pub request_id: String,
     pub status: ApprovalStatus,
     pub approver: String,

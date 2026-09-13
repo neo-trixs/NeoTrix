@@ -148,7 +148,7 @@ impl MemoryPressure {
     }
 }
 
-pub(crate) static GLOBAL_BUDGET: std::sync::LazyLock<MemoryBudget> =
+pub static GLOBAL_BUDGET: std::sync::LazyLock<MemoryBudget> =
     std::sync::LazyLock::new(MemoryBudget::default);
 
 pub fn global() -> &'static MemoryBudget {

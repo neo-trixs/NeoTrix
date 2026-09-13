@@ -37,7 +37,7 @@ pub enum ReviewStatus {
 
 /// 审核维度
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ReviewDimension {
+pub struct _ReviewDimension {
     /// 维度名称
     pub name: String,
     /// 维度描述
@@ -73,7 +73,7 @@ pub struct ReviewResult {
 
 /// 维度分数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DimensionScore {
+pub struct _DimensionScore {
     /// 维度名称
     pub dimension: String,
     /// 分数 (0.0-1.0)

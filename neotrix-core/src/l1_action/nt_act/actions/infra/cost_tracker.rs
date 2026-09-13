@@ -8,7 +8,7 @@ use std::time::Instant;
 
 /// 成本条目
 #[derive(Debug, Clone)]
-pub(crate) struct CostEntry {
+pub struct CostEntry {
     /// 模型名
     pub model: String,
     /// 提供商
@@ -27,7 +27,7 @@ pub(crate) struct CostEntry {
 
 /// 预算告警阈值
 #[derive(Debug, Clone)]
-pub(crate) struct BudgetAlert {
+pub struct BudgetAlert {
     /// 告警名称
     pub name: String,
     /// 预算上限 (USD)
@@ -167,7 +167,7 @@ impl Default for CostTracker {
 
 /// 成本统计
 #[derive(Debug, Clone)]
-pub(crate) struct CostStats {
+pub struct CostStats {
     pub total_entries: u32,
     pub total_cost_usd: f64,
     pub total_input_tokens: u32,

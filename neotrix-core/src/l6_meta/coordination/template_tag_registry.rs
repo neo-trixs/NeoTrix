@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 模板标签
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TemplateTag {
+pub struct _TemplateTag {
     /// 标签ID
     pub id: String,
     /// 标签名称
@@ -37,7 +37,7 @@ pub(crate) struct _TemplateTag {
 
 /// 标签分类
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _TagCategory {
+pub enum _TagCategory {
     /// 动态等级
     DynamicLevel,
     /// 节奏模式
@@ -93,7 +93,7 @@ pub struct SkillTemplate {
 
 /// 模板复用标签系统
 /// 管理模板标签、模板、复用关系
-pub(crate) struct _TemplateTagRegistry {
+pub struct _TemplateTagRegistry {
     /// 所有标签
     tags: HashMap<String, _TemplateTag>,
     /// 所有模板
@@ -251,7 +251,7 @@ impl _TemplateTagRegistry {
 
 /// 注册中心统计信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RegistryStatistics {
+pub struct _RegistryStatistics {
     /// 标签数量
     pub tag_count: usize,
     /// 模板数量

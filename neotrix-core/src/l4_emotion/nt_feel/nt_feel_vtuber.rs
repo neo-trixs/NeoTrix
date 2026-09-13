@@ -15,7 +15,7 @@ use crate::core::nt_core_self::emotion_state::EmotionLabel;
 
 /// VTuber 情感引擎 — Open-LLM-VTuber 核心
 /// 委托文本情绪检测给 FeelEngine，自身负责角色人格与表达
-pub(crate) struct _VTuberEmotionEngine {
+pub struct _VTuberEmotionEngine {
     persona: _CharacterPersona,
     feel_engine: EmotionEngine,
     emotion_history: Vec<_EmotionReading>,
@@ -25,7 +25,7 @@ pub(crate) struct _VTuberEmotionEngine {
 
 /// 角色人格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CharacterPersona {
+pub struct _CharacterPersona {
     pub name: String,
     pub personality_traits: Vec<_PersonalityTrait>,
     pub response_style: _ResponseStyle,
@@ -36,7 +36,7 @@ pub(crate) struct _CharacterPersona {
 
 /// 性格特质
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PersonalityTrait {
+pub struct _PersonalityTrait {
     pub name: String,
     pub intensity: f64, // 0.0-1.0
     pub description: String,
@@ -44,7 +44,7 @@ pub(crate) struct _PersonalityTrait {
 
 /// 响应风格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResponseStyle {
+pub struct _ResponseStyle {
     pub formality: f64,
     pub enthusiasm: f64,
     pub empathy: f64,
@@ -54,7 +54,7 @@ pub(crate) struct _ResponseStyle {
 
 /// 说话模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SpeakingPattern {
+pub struct _SpeakingPattern {
     pub pattern_type: String, // "filler", "emphasis", "question"
     pub frequency: f64,
     pub examples: Vec<String>,
@@ -62,7 +62,7 @@ pub(crate) struct _SpeakingPattern {
 
 /// 情绪读数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EmotionReading {
+pub struct _EmotionReading {
     pub emotion: _EmotionType,
     pub intensity: f64,
     pub source: _EmotionSource,
@@ -73,7 +73,7 @@ pub(crate) struct _EmotionReading {
 /// 情绪类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _EmotionType {
+pub enum _EmotionType {
     Neutral,
     Happy,
     Sad,
@@ -90,7 +90,7 @@ pub(crate) enum _EmotionType {
 /// 情绪来源
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _EmotionSource {
+pub enum _EmotionSource {
     Text,
     Voice,
     Visual,
@@ -99,7 +99,7 @@ pub(crate) enum _EmotionSource {
 
 /// 语音配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _VoiceConfig {
+pub struct _VoiceConfig {
     pub tts_provider: String,
     pub stt_provider: String,
     pub voice_id: Option<String>,
@@ -111,7 +111,7 @@ pub(crate) struct _VoiceConfig {
 
 /// 情绪调节策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EmotionRegulation {
+pub struct _EmotionRegulation {
     pub strategy: _RegulationStrategy,
     pub target_emotion: _EmotionType,
     pub target_intensity: f64,
@@ -121,7 +121,7 @@ pub(crate) struct _EmotionRegulation {
 /// 调节策略
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _RegulationStrategy {
+pub enum _RegulationStrategy {
     Amplify,
     Dampen,
     Redirect,
@@ -132,7 +132,7 @@ pub(crate) enum _RegulationStrategy {
 
 /// 语音输出
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _VoiceOutput {
+pub struct _VoiceOutput {
     pub audio: Vec<u8>,
     pub text: String,
     pub emotion: _EmotionType,
@@ -141,7 +141,7 @@ pub(crate) struct _VoiceOutput {
 
 /// 情绪响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EmotionResponse {
+pub struct _EmotionResponse {
     pub text: String,
     pub emotion: _EmotionType,
     pub intensity: f64,

@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use neotrix_types::shared::Severity;
 
 #[derive(Debug, Clone)]
-pub(crate) struct _SecretPattern {
+pub struct _SecretPattern {
     pub name: &'static str,
     pub severity: Severity,
     pub regex: &'static str,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _SecretFinding {
+pub struct _SecretFinding {
     pub pattern: &'static str,
     pub severity: Severity,
     pub snippet: String,

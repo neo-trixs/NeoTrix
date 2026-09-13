@@ -53,7 +53,7 @@ pub enum ContentType {
 
 /// 内容状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum ContentStatus {
+pub enum ContentStatus {
     Draft,
     Scheduled,
     Publishing,
@@ -75,7 +75,7 @@ pub struct ContentStrategy {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ContentPillar {
+pub struct ContentPillar {
     pub name: String,
     pub description: String,
     pub percentage: f64,
@@ -97,7 +97,7 @@ pub struct HashtagStrategy {
 
 /// 排期槽
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ScheduleSlot {
+pub struct ScheduleSlot {
     pub id: String,
     pub platform: Platform,
     pub post: Post,
@@ -106,7 +106,7 @@ pub(crate) struct ScheduleSlot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum ScheduleStatus {
+pub enum ScheduleStatus {
     Pending,
     Confirmed,
     Published,
@@ -115,7 +115,7 @@ pub(crate) enum ScheduleStatus {
 
 /// 平台限制
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PlatformLimits {
+pub struct PlatformLimits {
     pub max_body_length: usize,
     pub max_hashtags: usize,
     pub max_media: usize,
@@ -126,7 +126,7 @@ pub(crate) struct PlatformLimits {
 // ════════════════════════════════════════════════════════════════
 
 /// LinkedIn Provider
-pub(crate) struct LinkedInProvider {
+pub struct LinkedInProvider {
     id: String,
     pub access_token: String,
     pub organization_id: Option<String>,
@@ -178,7 +178,7 @@ impl ContentProvider for LinkedInProvider {
 }
 
 /// Instagram Provider
-pub(crate) struct InstagramProvider {
+pub struct InstagramProvider {
     id: String,
     pub access_token: String,
     pub business_account_id: String,
@@ -233,7 +233,7 @@ impl ContentProvider for InstagramProvider {
 // ════════════════════════════════════════════════════════════════
 
 /// 内容能力注册中心
-pub(crate) struct ContentRegistry {
+pub struct ContentRegistry {
     providers: Vec<Box<dyn ContentProvider>>,
 }
 
@@ -277,7 +277,7 @@ impl ContentRegistry {
 // ════════════════════════════════════════════════════════════════
 
 /// 内容路由器 — 按平台选择最佳 Provider
-pub(crate) struct ContentRouter {
+pub struct ContentRouter {
     registry: ContentRegistry,
 }
 
@@ -308,7 +308,7 @@ impl ContentRouter {
 // ════════════════════════════════════════════════════════════════
 
 /// 内容能力桥接
-pub(crate) struct ContentBridge {
+pub struct ContentBridge {
     router: ContentRouter,
 }
 

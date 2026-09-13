@@ -5,7 +5,7 @@ use crate::core::nt_core_hcube::gap::GapReport;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExploreDomain;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _CuriosityLevel {
+pub enum _CuriosityLevel {
     Calm,
     Interested,
     Curious,
@@ -23,7 +23,7 @@ impl _CuriosityLevel {
     }
 }
 
-pub(crate) struct _CuriositySignal {
+pub struct _CuriositySignal {
     pub domain: ExploreDomain,
     pub intensity: f64,
     pub description: String,

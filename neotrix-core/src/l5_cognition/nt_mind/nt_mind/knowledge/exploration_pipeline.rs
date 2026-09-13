@@ -11,7 +11,7 @@ use super::knowledge_engine::{KnowledgeEngine, KnowledgeEntry, SourceType};
 
 /// 统一来源类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum _UnifiedSourceType {
+pub enum _UnifiedSourceType {
     Wikipedia,
     ArXiv,
     GitHub,
@@ -71,7 +71,7 @@ impl ExploreDomain {
 pub use super::exploration_seeds::seed_urls_by_domain;
 
 #[derive(Debug, Clone)]
-pub(crate) struct _ExploreRoundResult {
+pub struct _ExploreRoundResult {
     pub domains_processed: Vec<ExploreDomain>,
     pub total_mined: usize,
     pub total_absorbed: usize,

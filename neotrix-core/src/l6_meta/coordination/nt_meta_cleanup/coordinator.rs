@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 /// 清理事件类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _CleanupEventType {
+pub enum _CleanupEventType {
     ScanStarted,
     ScanCompleted,
     CleanStarted,
@@ -21,14 +21,14 @@ pub(crate) enum _CleanupEventType {
 
 /// 清理事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CleanupEvent {
+pub struct _CleanupEvent {
     pub timestamp: String,
     pub event_type: _CleanupEventType,
     pub details: String,
     pub size_bytes: Option<u64>,
 }
 
-pub(crate) struct _CleanupCoordinator {
+pub struct _CleanupCoordinator {
     current_strategy: CleanupStrategy,
     cleanup_plan: CleanupPlan,
     stats: CleanupStats,

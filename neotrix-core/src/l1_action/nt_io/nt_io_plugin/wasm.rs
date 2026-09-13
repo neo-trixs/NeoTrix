@@ -11,7 +11,7 @@ fn global_wasm_engine() -> &'static wasmtime::Engine {
 }
 
 /// 获取 wasmtime::Engine (DI-ready: 可从容器注入)
-pub(crate) fn resolve_wasm_engine() -> wasmtime::Engine {
+pub fn resolve_wasm_engine() -> wasmtime::Engine {
     use crate::core::nt_core_di;
     if let Some(v) = nt_core_di::resolve_global::<wasmtime::Engine>() {
         return v;

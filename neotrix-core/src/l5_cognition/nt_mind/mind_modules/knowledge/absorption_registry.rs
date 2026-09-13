@@ -25,19 +25,19 @@ const MAX_ABSORBERS: usize = 1024;
 const MAX_NAME_LEN: usize = 64;
 
 #[derive(Debug, Clone)]
-pub(crate) struct _AbsorberInstance {
+pub struct _AbsorberInstance {
     pub id: u64,
     pub plugin_name: String,
     pub capabilities: Vec<String>,
 }
 
-pub(crate) trait _CapabilityAbsorber: Send + Sync {
+pub trait _CapabilityAbsorber: Send + Sync {
     fn absorb(&self, capability: &str, context: &str) -> Vec<_AbsorptionEvent>;
     fn name(&self) -> &str;
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _AbsorptionEvent {
+pub struct _AbsorptionEvent {
     pub target: String,
     pub source: String,
     pub confidence: f64,
@@ -45,7 +45,7 @@ pub(crate) struct _AbsorptionEvent {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum _AbsorptionError {
+pub enum _AbsorptionError {
     NameTooLong(String),
     AlreadyRegistered(String),
     TooManyAbsorbers,
@@ -54,7 +54,7 @@ pub(crate) enum _AbsorptionError {
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _AbsorptionStats {
+pub struct _AbsorptionStats {
     pub total_absorptions: u64,
     pub total_events: u64,
     pub last_error: Option<String>,
@@ -81,7 +81,7 @@ impl InternalState {
 static REGISTRY: std::sync::LazyLock<RwLock<InternalState>> =
     std::sync::LazyLock::new(|| RwLock::new(InternalState::new()));
 
-pub(crate) fn _register_absorber(
+pub fn _register_absorber(
     plugin_name: &str,
     capabilities: &[&str],
     absorber: Arc<dyn _CapabilityAbsorber + Send + Sync>,
@@ -120,7 +120,7 @@ pub fn unregister(plugin_name: &str) -> Option<_AbsorberInstance> {
     Some(instance)
 }
 
-pub(crate) fn _trigger_absorption(
+pub fn _trigger_absorption(
     plugin_name: &str,
     capability: &str,
     context: &str,
@@ -146,13 +146,13 @@ pub(crate) fn _trigger_absorption(
     Ok(events)
 }
 
-pub(crate) fn _list_absorbers() -> Vec<_AbsorberInstance> {
+pub fn _list_absorbers() -> Vec<_AbsorberInstance> {
     REGISTRY.read()
         .map(|state| state.by_id.values().cloned().collect())
         .unwrap_or_default()
 }
 
-pub(crate) fn _absorber_count() -> usize {
+pub fn _absorber_count() -> usize {
     REGISTRY.read().map(|state| state.by_id.len()).unwrap_or(0)
 }
 

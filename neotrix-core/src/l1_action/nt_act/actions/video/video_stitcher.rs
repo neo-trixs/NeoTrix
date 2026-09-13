@@ -29,7 +29,7 @@ pub enum TransitionType {
 
 /// 字幕样式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SubtitleStyle {
+pub struct SubtitleStyle {
     /// 字体
     pub font: String,
     /// 字号
@@ -84,7 +84,7 @@ pub struct VideoClip {
 
 /// 音频轨道
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AudioTrack {
+pub struct AudioTrack {
     /// 轨道ID
     pub id: String,
     /// 文件路径
@@ -103,7 +103,7 @@ pub(crate) struct AudioTrack {
 
 /// 拼接配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StitchConfig {
+pub struct StitchConfig {
     /// 输出分辨率
     pub output_resolution: (u32, u32),
     /// 输出帧率
@@ -120,7 +120,7 @@ pub(crate) struct StitchConfig {
 
 /// 拼接结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StitchResult {
+pub struct StitchResult {
     /// 是否成功
     pub success: bool,
     /// 输出文件路径
@@ -151,7 +151,7 @@ pub struct Timeline {
 // ============================================================================
 
 /// 视频拼接器
-pub(crate) struct VideoStitcher {
+pub struct VideoStitcher {
     /// 配置
     config: StitchConfig,
     /// 拼接历史
@@ -352,7 +352,7 @@ impl VideoStitcher {
 
 /// 拼接统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StitchStats {
+pub struct StitchStats {
     /// 总拼接次数
     pub total_stitched: usize,
     /// 成功次数

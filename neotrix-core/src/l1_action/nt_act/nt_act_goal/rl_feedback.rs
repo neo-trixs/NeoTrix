@@ -12,7 +12,7 @@ use crate::neotrix::nt_act_goal::behavioral_verifier::VerificationResult;
 
 /// 奖励事件类型
 #[derive(Debug, Clone)]
-pub(crate) enum RewardEvent {
+pub enum RewardEvent {
     CompileSuccess { file: String, dim: String },
     TestPassed { file: String, dim: String },
     PropertyVerified { file: String, dim: String },

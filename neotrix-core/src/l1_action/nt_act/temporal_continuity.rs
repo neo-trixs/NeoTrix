@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 
 /// 检查类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum ContinuityCheckType {
+pub enum ContinuityCheckType {
     /// 首尾帧匹配
     FirstLastFrame,
     /// 场景转场
@@ -28,7 +28,7 @@ pub(crate) enum ContinuityCheckType {
 
 /// 检查配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ContinuityCheckConfig {
+pub struct ContinuityCheckConfig {
     /// 启用的检查类型
     pub check_types: Vec<ContinuityCheckType>,
     /// 匹配阈值 (0.0-1.0)
@@ -43,7 +43,7 @@ pub(crate) struct ContinuityCheckConfig {
 
 /// 连续性严重程度
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum ContinuitySeverity {
+pub enum ContinuitySeverity {
     /// 信息
     Info,
     /// 警告
@@ -56,7 +56,7 @@ pub(crate) enum ContinuitySeverity {
 
 /// 连续性问题
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ContinuityIssue {
+pub struct ContinuityIssue {
     /// 问题类型
     pub check_type: ContinuityCheckType,
     /// 严重程度
@@ -73,7 +73,7 @@ pub(crate) struct ContinuityIssue {
 
 /// 检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ContinuityCheckResult {
+pub struct ContinuityCheckResult {
     /// 是否通过
     pub passed: bool,
     /// 检查的帧数
@@ -96,7 +96,7 @@ pub(crate) struct ContinuityCheckResult {
 
 /// 时序连续性检查器
 /// 检查视频帧间/镜头间的时序连续性
-pub(crate) struct TemporalContinuityChecker {
+pub struct TemporalContinuityChecker {
     /// 配置
     config: ContinuityCheckConfig,
     /// 检查历史
@@ -351,7 +351,7 @@ impl TemporalContinuityChecker {
 
 /// 连续性统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ContinuityStats {
+pub struct ContinuityStats {
     /// 总检查次数
     pub total_checks: usize,
     /// 通过次数

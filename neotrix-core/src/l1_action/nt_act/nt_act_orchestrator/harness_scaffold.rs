@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// Harness 类型
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum HarnessKind {
+pub enum HarnessKind {
     /// 严格答案格式强制 (把输出包装进 `<answer>...</answer>`)
     FormatEnforcer,
     /// 把可确定步骤卸载为代码块
@@ -25,7 +25,7 @@ pub(crate) enum HarnessKind {
 
 /// 规则谓词 — 枚举形式, 便于 Debug/Clone/序列化
 #[derive(Debug, Clone)]
-pub(crate) enum CheckRule {
+pub enum CheckRule {
     /// 恰好一个 `<answer>...</answer>` 包裹, 且开闭顺序正确
     SingleAnswer,
     /// 文本必须以给定前缀开始
@@ -66,7 +66,7 @@ impl CheckRule {
 
 /// 单条检查
 #[derive(Debug, Clone)]
-pub(crate) struct HarnessCheck {
+pub struct HarnessCheck {
     pub id: String,
     pub description: String,
     pub rule: CheckRule,
@@ -80,7 +80,7 @@ impl HarnessCheck {
 
 /// Harness 规格
 #[derive(Debug, Clone)]
-pub(crate) struct HarnessSpec {
+pub struct HarnessSpec {
     pub kind: HarnessKind,
     pub name: String,
     pub checks: Vec<HarnessCheck>,
@@ -105,7 +105,7 @@ impl HarnessSpec {
 
 /// Harness 判定
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum HarnessVerdict {
+pub enum HarnessVerdict {
     /// 全部检查通过
     WeakPass,
     /// 存在检查失败 (非 Verifier 或 Verifier 通过)
@@ -116,7 +116,7 @@ pub(crate) enum HarnessVerdict {
 
 /// Harness 应用结果
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct HarnessResult {
+pub struct HarnessResult {
     pub formatted: String,
     pub passed_checks: usize,
     pub total_checks: usize,
@@ -125,7 +125,7 @@ pub(crate) struct HarnessResult {
 
 /// 单条 effort band 统计
 #[derive(Debug, Clone, Default)]
-pub(crate) struct EffortStats {
+pub struct EffortStats {
     pub attempts: u32,
     pub successes: u32,
 }
@@ -148,7 +148,7 @@ pub struct HarnessScaffold {
 }
 
 /// 把 effort [0,1] 映射到 band 0-9 (用于成功率分组)
-pub(crate) fn effort_band(effort: f64) -> u32 {
+pub fn effort_band(effort: f64) -> u32 {
     (effort.clamp(0.0, 1.0) * 10.0) as u32
 }
 

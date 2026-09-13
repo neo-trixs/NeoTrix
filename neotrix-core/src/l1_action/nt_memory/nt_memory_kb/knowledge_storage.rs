@@ -327,7 +327,7 @@ pub struct GraphEdge {
 
 /// 溯源步 — decision provenance 链的节点。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ProvenanceStep {
+pub struct ProvenanceStep {
     pub node_id: String,
     pub action: String,
     pub ts: u64,
@@ -335,7 +335,7 @@ pub(crate) struct ProvenanceStep {
 
 /// 上下文图 — 节点/边/溯源链, 支撑因果推理与决策溯源。
 #[derive(Debug, Clone, PartialEq, Default)]
-pub(crate) struct ContextGraph {
+pub struct ContextGraph {
     pub nodes: Vec<GraphNode>,
     pub edges: Vec<GraphEdge>,
     pub provenance: Vec<ProvenanceStep>,
@@ -473,7 +473,7 @@ impl ContextGraph {
 }
 
 /// SelfTest (T1): ContextGraph 能力自检。
-pub(crate) struct ContextGraphSelfTest;
+pub struct ContextGraphSelfTest;
 
 impl crate::core::nt_core_self_test::SelfTest for ContextGraphSelfTest {
     fn name(&self) -> &str {

@@ -28,7 +28,7 @@ pub use crate::core::nt_core_iit_phi::PhiReport;
 
 /// 问题生命周期
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum _IssueLifecycle {
+pub enum _IssueLifecycle {
     AttemptingFix(u32),
     Fixed(u64),
     Stale,
@@ -60,7 +60,7 @@ impl Default for EvolutionConfig {
 
 /// 追踪中的问题项
 #[derive(Debug, Clone)]
-pub(crate) struct _IssueTrackerItem {
+pub struct _IssueTrackerItem {
     pub id: String,
     pub file: Option<String>,
     pub issue_type: IssueType,
@@ -87,7 +87,7 @@ pub enum IssueType {
 
 /// 持久化问题追踪器
 #[derive(Debug, Clone)]
-pub(crate) struct _PersistentIssueTracker {
+pub struct _PersistentIssueTracker {
     pub issues: Vec<_IssueTrackerItem>,
     #[allow(dead_code)]
     storage_path: String,
@@ -561,7 +561,7 @@ impl EvolutionDaemon {
 
 /// 循环目标报告
 #[derive(Debug, Clone)]
-pub(crate) struct _CycleGoalReport {
+pub struct _CycleGoalReport {
     pub cycle: u64,
     pub fixes_applied: u32,
     pub patterns_distilled: u32,

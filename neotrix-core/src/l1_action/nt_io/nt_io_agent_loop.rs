@@ -43,7 +43,7 @@ const COMPACTION_SUMMARY_MAX_TOKENS: u32 = 1024;
 
 /// 一次工具执行的记录（供调用方观测/审计）。
 #[derive(Debug, Clone)]
-pub(crate) struct ToolInvocation {
+pub struct ToolInvocation {
     pub name: String,
     pub arguments: String,
     pub success: bool,

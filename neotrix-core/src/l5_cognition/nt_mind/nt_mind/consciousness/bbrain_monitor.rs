@@ -40,7 +40,7 @@ pub struct BMonitorReport {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _ComponentScores {
+pub struct _ComponentScores {
     pub cognitive_health: f64,
     pub motivation_health: f64,
     pub plan_quality: f64,
@@ -61,7 +61,7 @@ impl _ComponentScores {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _BMonitorConfig {
+pub struct _BMonitorConfig {
     pub cognitive_weight: f64,
     pub motivation_weight: f64,
     pub plan_weight: f64,

@@ -7,17 +7,17 @@ use sha2::{Sha256, Digest};
 use serde::{Serialize, Deserialize};
 
 /// NTX 魔数
-pub(crate) const NTX_MAGIC: &[u8; 4] = b"NTX\0";
+pub const NTX_MAGIC: &[u8; 4] = b"NTX\0";
 /// TOC 魔数
-pub(crate) const TOC_MAGIC: &[u8; 4] = b"NNTC";
+pub const TOC_MAGIC: &[u8; 4] = b"NNTC";
 /// 当前格式版本
-pub(crate) const NTX_VERSION: u16 = 0x0100;
+pub const NTX_VERSION: u16 = 0x0100;
 /// Header 大小 (4KB)
 pub const HEADER_SIZE: usize = 4096;
 /// WAL 最小大小
-pub(crate) const WAL_MIN_SIZE: u64 = 1024 * 1024; // 1MB
+pub const WAL_MIN_SIZE: u64 = 1024 * 1024; // 1MB
 /// WAL 最大大小
-pub(crate) const WAL_MAX_SIZE: u64 = 64 * 1024 * 1024; // 64MB
+pub const WAL_MAX_SIZE: u64 = 64 * 1024 * 1024; // 64MB
 
 // NTX 特性标志位图
 bitflags::bitflags! {

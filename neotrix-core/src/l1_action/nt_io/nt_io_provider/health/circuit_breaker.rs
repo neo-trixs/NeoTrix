@@ -7,7 +7,7 @@ pub use neotrix_types::shared::BreakerState;
 /// Provider circuit breaker — wraps canonical `CircuitBreaker` with
 /// sliding-window failure tracking, force-open, and health-penalty scoring.
 #[derive(Debug, Clone)]
-pub(crate) struct ProviderBreaker {
+pub struct ProviderBreaker {
     inner: CanonicalCircuitBreaker,
     sliding_window: VecDeque<bool>,
     window_size: usize,

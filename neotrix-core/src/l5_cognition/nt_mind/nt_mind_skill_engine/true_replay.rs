@@ -12,7 +12,7 @@ use super::SkillEntry;
 
 /// 验证清单项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ChecklistItem {
+pub struct _ChecklistItem {
     pub name: String,
     pub description: String,
     pub weight: f64,
@@ -22,7 +22,7 @@ pub(crate) struct _ChecklistItem {
 
 /// 验证结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ChecklistResult {
+pub struct _ChecklistResult {
     pub item: _ChecklistItem,
     pub baseline_score: f64,
     pub candidate_score: f64,
@@ -32,7 +32,7 @@ pub(crate) struct _ChecklistResult {
 
 /// 完整验证报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ReplayReport {
+pub struct _ReplayReport {
     pub skill_name: String,
     pub baseline_version: String,
     pub candidate_version: String,
@@ -43,17 +43,17 @@ pub(crate) struct _ReplayReport {
 }
 
 /// Baseline 运行器 trait
-pub(crate) trait _BaselineRunner: Send + Sync {
+pub trait _BaselineRunner: Send + Sync {
     fn run(&self, skill: &SkillEntry, input: &str) -> Result<String, String>;
 }
 
 /// Candidate 运行器 trait
-pub(crate) trait _CandidateRunner: Send + Sync {
+pub trait _CandidateRunner: Send + Sync {
     fn run(&self, skill: &SkillEntry, input: &str) -> Result<String, String>;
 }
 
 /// True Replay 验证器
-pub(crate) struct _TrueReplayValidator {
+pub struct _TrueReplayValidator {
     checklist: Vec<_ChecklistItem>,
     baseline_runner: Option<Arc<dyn _BaselineRunner>>,
     candidate_runner: Option<Arc<dyn _CandidateRunner>>,

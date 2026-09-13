@@ -7,7 +7,7 @@ use super::nt_memory_unify::{kv_get, kv_set};
 use super::shared_utils::now_ts;
 
 #[derive(Serialize, Deserialize)]
-pub(crate) struct UserProfile {
+pub struct UserProfile {
     pub user_id: String,
     pub preferences: HashMap<String, serde_json::Value>,
     pub interaction_style: String,
@@ -32,7 +32,7 @@ impl UserProfile {
     }
 }
 
-pub(crate) struct EpisodicLog {
+pub struct EpisodicLog {
     pub entries: VecDeque<EpisodeEntry>,
     pub max_entries: usize,
 }
@@ -66,7 +66,7 @@ impl EpisodicLog {
 }
 
 #[derive(Serialize, Deserialize)]
-pub(crate) struct EpisodeEntry {
+pub struct EpisodeEntry {
     pub timestamp: i64,
     pub episode_type: String,
     pub summary: String,
@@ -85,7 +85,7 @@ impl EpisodeEntry {
 }
 
 #[derive(Serialize, Deserialize)]
-pub(crate) struct AtomicFact {
+pub struct AtomicFact {
     pub fact: String,
     pub source: String,
     pub verified: bool,

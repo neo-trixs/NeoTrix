@@ -29,7 +29,7 @@ pub struct CodeGraph {
 
 /// 图谱过期报告 (W2.5): stale = mtime 晚于构建快照; missing = 已删除。
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _StalenessReport {
+pub struct _StalenessReport {
     pub scanned: usize,
     pub stale_files: Vec<PathBuf>,
     pub missing_files: Vec<PathBuf>,

@@ -9,7 +9,7 @@ pub struct StreamingMarkdown {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum MarkdownChunk {
+pub enum MarkdownChunk {
     Text(String),
     CodeBlock {
         language: Option<String>,

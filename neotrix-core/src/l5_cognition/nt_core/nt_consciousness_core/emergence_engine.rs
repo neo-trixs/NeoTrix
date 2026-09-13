@@ -19,7 +19,7 @@ pub struct EmergenceEngine {
 
 /// 涌现配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EmergenceConfig {
+pub struct _EmergenceConfig {
     /// 涌现阈值
     pub emergence_threshold: f64,
     /// 最大历史记录
@@ -37,7 +37,7 @@ impl Default for _EmergenceConfig {
 
 /// 涌现指标
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct _EmergenceMetrics {
+pub struct _EmergenceMetrics {
     /// Φ (Phi) - 集成信息
     pub phi: f64,
     /// 连贯性
@@ -52,7 +52,7 @@ pub(crate) struct _EmergenceMetrics {
 
 /// 涌现记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EmergenceRecord {
+pub struct _EmergenceRecord {
     pub id: String,
     pub cycle: u32,
     pub metrics: _EmergenceMetrics,
@@ -62,7 +62,7 @@ pub(crate) struct _EmergenceRecord {
 
 /// 涌现事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _EmergenceEvent {
+pub enum _EmergenceEvent {
     ComplexityAccumulation,
     PatternCollision,
     AbstractionLeap,
@@ -138,7 +138,7 @@ impl EmergenceEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EmergenceStats {
+pub struct _EmergenceStats {
     pub total_events: usize,
     pub current_phi: f64,
     pub current_coherence: f64,

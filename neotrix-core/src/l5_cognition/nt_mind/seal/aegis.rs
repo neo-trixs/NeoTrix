@@ -26,7 +26,7 @@ pub struct TraceStep {
 /// Digest 输出（压缩轨迹）
 
 #[derive(Clone, Debug)]
-pub(crate) struct _TraceDigest {
+pub struct _TraceDigest {
     pub trace_id: String,
     pub task_summary: String,
     pub success_patterns: Vec<String>,
@@ -38,7 +38,7 @@ pub(crate) struct _TraceDigest {
 /// 适应景观（Planner 输出）
 
 #[derive(Clone, Debug)]
-pub(crate) struct _AdaptationLandscape {
+pub struct _AdaptationLandscape {
     pub dimensions: Vec<_AdaptationDimension>,
     pub current_position: Vec<f64>,
     pub target_position: Vec<f64>,
@@ -47,7 +47,7 @@ pub(crate) struct _AdaptationLandscape {
 
 
 #[derive(Clone, Debug)]
-pub(crate) struct _AdaptationDimension {
+pub struct _AdaptationDimension {
     pub name: String,
     pub current_value: f64,
     pub optimal_value: f64,
@@ -57,7 +57,7 @@ pub(crate) struct _AdaptationDimension {
 /// 类型化编辑（Evolver 输出）
 
 #[derive(Clone, Debug)]
-pub(crate) struct _TypedEdit {
+pub struct _TypedEdit {
     pub edit_id: String,
     pub edit_type: EditType,
     pub target: String,
@@ -79,7 +79,7 @@ pub enum EditType {
 /// Critic 评估
 
 #[derive(Clone, Debug)]
-pub(crate) struct _CriticAssessment {
+pub struct _CriticAssessment {
     pub edit_id: String,
     pub supported: bool,
     pub evidence: String,
@@ -294,7 +294,7 @@ impl AegisEngine {
 
 
 #[derive(Clone, Debug)]
-pub(crate) struct _AegisStats {
+pub struct _AegisStats {
     pub traces: usize,
     pub digests: usize,
     pub edits: usize,

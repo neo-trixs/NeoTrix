@@ -23,7 +23,7 @@ pub struct DataPoint {
 
 /// 外推记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExtrapolationRecord {
+pub struct _ExtrapolationRecord {
     pub id: String,
     pub cycle: u32,
     pub extrapolation_type: _ExtrapolationType,
@@ -34,7 +34,7 @@ pub(crate) struct _ExtrapolationRecord {
 
 /// 外推类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _ExtrapolationType {
+pub enum _ExtrapolationType {
     Linear,
     Polynomial,
     Exponential,
@@ -44,7 +44,7 @@ pub(crate) enum _ExtrapolationType {
 
 /// 外推结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExtrapolationResult {
+pub struct _ExtrapolationResult {
     pub predicted_value: f64,
     pub confidence: f64,
     pub trend: TrendDirection,
@@ -131,7 +131,7 @@ impl Extrapolator {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExtrapolatorStats {
+pub struct _ExtrapolatorStats {
     pub total_data_points: usize,
     pub total_extrapolations: usize,
 }

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 // ════════════════════════════════════════════════════════════════
 
 /// 增强型 Registry — 自动集成基础设施
-pub(crate) struct EnhancedRegistry {
+pub struct EnhancedRegistry {
     pub entries: Vec<super::nt_infra_agent_card::AgentCard>,
     pub breaker: super::nt_infra_breaker::BreakerRegistry,
     pub persistence: super::nt_infra_persistence::RegistryPersistence,
@@ -93,7 +93,7 @@ impl EnhancedRegistry {
 // ════════════════════════════════════════════════════════════════
 
 /// 增强型 Router
-pub(crate) struct EnhancedRouter {
+pub struct EnhancedRouter {
     pub semantic: super::nt_infra_semantic_router::SemanticRouter,
     pub learner: super::nt_infra_learning::RouterLearner,
     pub scatter: super::nt_infra_scatter_gather::ScatterGather,
@@ -161,19 +161,19 @@ lazy_static::lazy_static! {
         std::sync::Mutex::new(EnhancedRouter::new());
 }
 
-pub(crate) fn enhanced_register(card: super::nt_infra_agent_card::AgentCard) {
+pub fn enhanced_register(card: super::nt_infra_agent_card::AgentCard) {
     ENHANCED_REGISTRY.lock().unwrap().register(card);
 }
 
-pub(crate) fn enhanced_is_available(id: &str) -> bool {
+pub fn enhanced_is_available(id: &str) -> bool {
     ENHANCED_REGISTRY.lock().unwrap().is_available(id)
 }
 
-pub(crate) fn enhanced_route(query: &str, intent: Option<&str>) -> Option<String> {
+pub fn enhanced_route(query: &str, intent: Option<&str>) -> Option<String> {
     ENHANCED_ROUTER.lock().unwrap().route(query, intent)
 }
 
-pub(crate) fn enhanced_record(provider_id: &str, success: bool, latency_ms: f64) {
+pub fn enhanced_record(provider_id: &str, success: bool, latency_ms: f64) {
     ENHANCED_REGISTRY.lock().unwrap().record_result(provider_id, success);
     ENHANCED_ROUTER.lock().unwrap().record_result(provider_id, success, latency_ms);
 }

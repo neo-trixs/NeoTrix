@@ -42,7 +42,7 @@ impl std::fmt::Display for ZimAbsorbStats {
     }
 }
 
-pub(crate) fn absorb_zim_file(
+pub fn absorb_zim_file(
     db: &mut rusqlite::Connection,
     zim_path: &Path,
     config: &ZimAbsorbConfig,

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CleanupHistoryEntry {
+pub struct CleanupHistoryEntry {
     pub timestamp: String,
     pub operation: String,
     pub paths: Vec<String>,
@@ -19,7 +19,7 @@ pub(crate) struct CleanupHistoryEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct HistoryStats {
+pub struct HistoryStats {
     pub total_operations: usize,
     pub successful_operations: usize,
     pub failed_operations: usize,
@@ -28,7 +28,7 @@ pub(crate) struct HistoryStats {
     pub average_duration_ms: u64,
 }
 
-pub(crate) struct HistoryLog {
+pub struct HistoryLog {
     entries: Vec<CleanupHistoryEntry>,
     log_path: PathBuf,
     max_entries: usize,

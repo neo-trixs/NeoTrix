@@ -126,7 +126,7 @@ fn find_latest_backup(dir: &Path) -> Option<PathBuf> {
 // ═══════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub(crate) struct _KbGuardConfig {
+pub struct _KbGuardConfig {
     pub keep_n: usize,
 }
 
@@ -137,7 +137,7 @@ impl Default for _KbGuardConfig {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct _KbGuardReport {
+pub struct _KbGuardReport {
     pub backed_up: bool,
     pub restored: bool,
     pub backup_path: Option<PathBuf>,
@@ -303,7 +303,7 @@ pub struct MetricEval {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MapeVerdict {
+pub struct _MapeVerdict {
     pub candidate: String,
     pub evaluations: u32,
     pub accepted: bool,
@@ -463,14 +463,14 @@ impl MapeGate {
 // ═══════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub(crate) struct _WorkspaceGuardConfig {
+pub struct _WorkspaceGuardConfig {
     pub repo_root: PathBuf,
     pub snapshot_dir: PathBuf,
     pub max_snapshots: usize,
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct _WorkspaceGuardReport {
+pub struct _WorkspaceGuardReport {
     pub staged_lost: bool,
     pub modified_reverted: bool,
     pub prev_staged: usize,
@@ -589,7 +589,7 @@ impl WorkspaceGuard {
 // ═══════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Default)]
-pub(crate) struct _FileEditSafetyReport {
+pub struct _FileEditSafetyReport {
     pub backed_up: bool,
     pub backup_path: Option<PathBuf>,
     pub verified: bool,
@@ -597,7 +597,7 @@ pub(crate) struct _FileEditSafetyReport {
 
 /// 文件编辑安全: 编辑前备份原文件, 编辑后校验行数
 #[derive(Debug, Default)]
-pub(crate) struct _FileEditSafety;
+pub struct _FileEditSafety;
 
 impl _FileEditSafety {
     /// 编辑前备份 (原子写)

@@ -16,7 +16,7 @@ pub struct Experience {
 }
 
 /// 递归经验工作记忆 trait。
-pub(crate) trait _WorkingMemory {
+pub trait _WorkingMemory {
     /// 写入一条经验, 返回其递归深度 (当前缓存长度)。
     fn remember(&mut self, input: &str, output: &str) -> usize;
     /// 按递归深度重访最近经验 (0 = 最新), 无则 None。
@@ -29,7 +29,7 @@ pub(crate) trait _WorkingMemory {
 }
 
 /// Recuris 递归经验工作记忆实现。
-pub(crate) struct _RecurisWorkingMemory {
+pub struct _RecurisWorkingMemory {
     buffer: VecDeque<Experience>,
     capacity: usize,
 }

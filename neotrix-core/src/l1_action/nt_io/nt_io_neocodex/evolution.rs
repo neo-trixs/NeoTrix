@@ -129,7 +129,7 @@ pub struct EvolutionLoop {
 
 /// Record of a single evolution iteration.
 #[derive(Debug, Clone)]
-pub(crate) struct EvolutionIteration {
+pub struct EvolutionIteration {
     pub iteration: u64,
     pub gaps: Vec<String>,
     pub fixes: Vec<String>,

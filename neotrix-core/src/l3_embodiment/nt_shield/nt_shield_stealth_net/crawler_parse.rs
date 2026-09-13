@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-pub(crate) fn urlencoding(input: &str) -> String {
+pub fn urlencoding(input: &str) -> String {
     input.chars().map(|c| match c {
         'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
         ' ' => "+".to_string(),
@@ -8,7 +8,7 @@ pub(crate) fn urlencoding(input: &str) -> String {
     }).collect()
 }
 
-pub(crate) fn extract_title(html: &str) -> Option<String> {
+pub fn extract_title(html: &str) -> Option<String> {
     html.find("<title")
         .and_then(|start| {
             let title_start = html[start..].find('>')?;
@@ -19,7 +19,7 @@ pub(crate) fn extract_title(html: &str) -> Option<String> {
         })
 }
 
-pub(crate) fn extract_body_text(html: &str, max_len: usize) -> String {
+pub fn extract_body_text(html: &str, max_len: usize) -> String {
     let mut text = String::new();
     let mut in_tag = false;
     let mut in_script = false;
@@ -58,7 +58,7 @@ pub(crate) fn extract_body_text(html: &str, max_len: usize) -> String {
     text.trim().to_string()
 }
 
-pub(crate) fn extract_keywords(body: &str, title: &str) -> Vec<String> {
+pub fn extract_keywords(body: &str, title: &str) -> Vec<String> {
     let mut freq: HashMap<String, usize> = HashMap::new();
     let combined = format!("{} {}", title, body).to_lowercase();
 
@@ -101,7 +101,7 @@ pub(crate) fn extract_keywords(body: &str, title: &str) -> Vec<String> {
     words.into_iter().map(|(_, w)| w).collect()
 }
 
-pub(crate) fn extract_onion_links(html: &str, base_url: &str) -> Vec<String> {
+pub fn extract_onion_links(html: &str, base_url: &str) -> Vec<String> {
     let mut links = Vec::new();
     let lower = html.to_lowercase();
     let mut pos = 0;

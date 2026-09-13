@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 知识管线增强
-pub(crate) struct _KnowledgePipelineEnhanced {
+pub struct _KnowledgePipelineEnhanced {
     pipelines: Vec<_KnowledgePipeline>,
     concepts: Vec<_ConceptNode>,
     route_table: HashMap<String, String>,
@@ -44,7 +44,7 @@ impl Default for PipelineConfig {
 
 /// 知识管线
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KnowledgePipeline {
+pub struct _KnowledgePipeline {
     pub pipeline_id: String,
     pub name: String,
     pub pipeline_type: _PipelineType,
@@ -56,7 +56,7 @@ pub(crate) struct _KnowledgePipeline {
 /// 管线类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _PipelineType {
+pub enum _PipelineType {
     Absorption,     // 吸收管线
     Distillation,   // 蒸馏管线
     Classification, // 分类管线
@@ -86,7 +86,7 @@ pub struct PipelineStage {
 /// 阶段状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _StageStatus {
+pub enum _StageStatus {
     Pending,
     Running,
     Completed,
@@ -95,7 +95,7 @@ pub(crate) enum _StageStatus {
 
 /// 概念节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConceptNode {
+pub struct _ConceptNode {
     pub concept_id: String,
     pub name: String,
     pub description: String,

@@ -93,7 +93,7 @@ pub struct EvolutionReport {
 
 /// Auditor 三角色 — 三个独立评判视角, 全部通过才接受变更 (异模型共识)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _AuditorRole {
+pub enum _AuditorRole {
     /// 地面真值: 触发问题的指标必须下降或持平
     Evidence,
     /// 一致性: 变更不引入副作用 (unsafe/todo/规模不回归)
@@ -114,7 +114,7 @@ impl _AuditorRole {
 
 /// 单角色裁决
 #[derive(Debug, Clone)]
-pub(crate) struct _RoleVerdict {
+pub struct _RoleVerdict {
     pub role: _AuditorRole,
     pub pass: bool,
     pub detail: String,
@@ -295,7 +295,7 @@ fn count_actual_unsafe(content: &str) -> usize {
 
 /// RST 任务 — 递归合成的单元。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RstTask {
+pub struct _RstTask {
     /// 任务 id。
     pub id: String,
     /// 任务描述。
@@ -312,7 +312,7 @@ pub(crate) struct _RstTask {
 
 /// RST 验证结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct _RstVerdict {
+pub struct _RstVerdict {
     pub task_id: String,
     pub accepted: bool,
     /// 拒绝原因 (accepted=false 时)。
@@ -321,7 +321,7 @@ pub(crate) struct _RstVerdict {
 
 /// RST 飞轮 — seed→extend→_realign→validate→reuse。
 #[derive(Debug, Clone)]
-pub(crate) struct _RstFlywheel {
+pub struct _RstFlywheel {
     /// 已验证任务池 (reuse 源)。
     pub verified_pool: Vec<_RstTask>,
     /// 生成代数上限 (防止无界漂移)。
@@ -558,7 +558,7 @@ impl _RstFlywheel {
 // ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum _HarnessTarget {
+pub enum _HarnessTarget {
     Compile,
     UnitTest,
     Integration,
@@ -577,7 +577,7 @@ impl _HarnessTarget {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _HarnessCandidate {
+pub struct _HarnessCandidate {
     pub target: _HarnessTarget,
     pub code: String,
     /// 归一化指纹: 移除空白后做碰撞检测 (AutoDesign dedup 语义)
@@ -756,7 +756,7 @@ impl crate::core::nt_core_self_test::SelfTest for MetaHarnessOptimizer {
 
 /// 训练阶段 — Pretrain→Sft→Rm→{Ppo,Dpo,Grpo 任一}→Done
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum _TrainStage {
+pub enum _TrainStage {
     Pretrain,
     Sft,
     Rm,
@@ -795,7 +795,7 @@ impl _TrainStage {
 
 /// 训练超参 — 端到端管线的全局配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TrainConfig {
+pub struct _TrainConfig {
     /// 模型参数量 (scale), lr 缩放基准 1e9
     pub model_scale: f64,
     /// 学习率
@@ -822,7 +822,7 @@ impl Default for _TrainConfig {
 
 /// 训练管线状态机 — 阶段推进 + 超参 + 历史追踪
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TrainPipeline {
+pub struct _TrainPipeline {
     pub current: _TrainStage,
     pub config: _TrainConfig,
     pub epochs_run: usize,

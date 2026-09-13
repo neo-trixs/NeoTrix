@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 内容类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum VideoContentType {
+pub enum VideoContentType {
     /// 广告
     Advertisement,
     /// 教育视频
@@ -67,7 +67,7 @@ pub enum SceneType {
 
 /// 资产引用
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AssetReference {
+pub struct AssetReference {
     /// 资产ID
     pub asset_id: String,
     /// 资产路径
@@ -82,7 +82,7 @@ pub(crate) struct AssetReference {
 
 /// 场景规格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SceneSpec {
+pub struct SceneSpec {
     /// 场景ID
     pub id: String,
     /// 场景序号
@@ -115,7 +115,7 @@ pub(crate) struct SceneSpec {
 
 /// CTA 结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CTASpec {
+pub struct CTASpec {
     /// CTA 文本
     pub text: String,
     /// CTA 类型
@@ -130,7 +130,7 @@ pub(crate) struct CTASpec {
 
 /// 视频规格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct VideoSpec {
+pub struct VideoSpec {
     /// 规格ID
     pub id: String,
     /// 内容类型
@@ -165,7 +165,7 @@ pub(crate) struct VideoSpec {
 
 /// 规格验证结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SpecValidationResult {
+pub struct SpecValidationResult {
     /// 是否有效
     pub valid: bool,
     /// 错误列表
@@ -176,7 +176,7 @@ pub(crate) struct SpecValidationResult {
 
 /// 规格错误
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SpecError {
+pub struct SpecError {
     /// 错误代码
     pub code: String,
     /// 错误描述
@@ -187,7 +187,7 @@ pub(crate) struct SpecError {
 
 /// 规格警告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SpecWarning {
+pub struct SpecWarning {
     /// 警告代码
     pub code: String,
     /// 警告描述
@@ -197,7 +197,7 @@ pub(crate) struct SpecWarning {
 }
 
 /// 规格构建器
-pub(crate) struct VideoSpecBuilder {
+pub struct VideoSpecBuilder {
     spec: VideoSpec,
 }
 
@@ -286,7 +286,7 @@ impl VideoSpecBuilder {
 // ============================================================================
 
 /// 规格验证器
-pub(crate) struct SpecValidator {
+pub struct SpecValidator {
     /// 验证规则
     rules: Vec<Box<dyn Fn(&VideoSpec) -> Vec<SpecError> + Send + Sync>>,
 }

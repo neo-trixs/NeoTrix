@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 /// 错误类型分类
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum ErrorCategory {
+pub enum ErrorCategory {
     /// 瞬态错误: 可重试 (429, 5xx, timeout)
     Transient,
     /// 永久错误: 不可重试 (400, 401, 403)
@@ -20,7 +20,7 @@ pub(crate) enum ErrorCategory {
 
 /// 单次错误信息
 #[derive(Debug, Clone)]
-pub(crate) struct ErrorRecord {
+pub struct ErrorRecord {
     pub category: ErrorCategory,
     pub message: String,
     pub timestamp: Instant,
@@ -28,7 +28,7 @@ pub(crate) struct ErrorRecord {
 }
 
 /// 错误分类器
-pub(crate) struct ErrorClassifier {
+pub struct ErrorClassifier {
     /// 分类历史
     history: Vec<ErrorRecord>,
     /// 最大历史记录数
@@ -149,7 +149,7 @@ impl Default for ErrorClassifier {
 
 /// 错误统计
 #[derive(Debug, Clone)]
-pub(crate) struct ErrorStats {
+pub struct ErrorStats {
     pub total: u32,
     pub transient: u32,
     pub permanent: u32,

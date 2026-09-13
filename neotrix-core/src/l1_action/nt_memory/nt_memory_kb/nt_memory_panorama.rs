@@ -15,7 +15,7 @@ use super::KnowledgeBase;
 // ── Types ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct KnowledgePanorama {
+pub struct KnowledgePanorama {
     /// 时间戳
     pub generated_at: i64,
     /// 全局统计
@@ -35,7 +35,7 @@ pub(crate) struct KnowledgePanorama {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct GlobalStats {
+pub struct GlobalStats {
     pub total_nodes: usize,
     pub total_edges: usize,
     pub total_repos: usize,
@@ -49,7 +49,7 @@ pub(crate) struct GlobalStats {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DomainCoverage {
+pub struct DomainCoverage {
     pub domain: String,
     pub node_count: usize,
     pub edge_count: usize,
@@ -59,7 +59,7 @@ pub(crate) struct DomainCoverage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct FreshnessReport {
+pub struct FreshnessReport {
     pub nodes_updated_today: usize,
     pub nodes_updated_this_week: usize,
     pub nodes_updated_this_month: usize,
@@ -68,13 +68,13 @@ pub(crate) struct FreshnessReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PanoramaGraph {
+pub struct PanoramaGraph {
     pub nodes: Vec<PanoramaNode>,
     pub links: Vec<PanoramaLink>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PanoramaNode {
+pub struct PanoramaNode {
     pub id: String,
     pub label: String,
     pub node_type: String,
@@ -84,7 +84,7 @@ pub(crate) struct PanoramaNode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PanoramaLink {
+pub struct PanoramaLink {
     pub source: String,
     pub target: String,
     pub relation: String,
@@ -124,7 +124,7 @@ pub enum GapSeverity {
 
 // ── KnowledgePanoramaBuilder ──
 
-pub(crate) struct KnowledgePanoramaBuilder {
+pub struct KnowledgePanoramaBuilder {
     kb: KnowledgeBase,
 }
 

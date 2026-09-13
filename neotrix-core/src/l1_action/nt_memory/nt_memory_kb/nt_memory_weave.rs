@@ -25,7 +25,7 @@ use serde_json::{json, Value};
 use super::nt_memory_unify::{kv_get, kv_list_namespaces, kv_set};
 
 /// 织网命名空间 (KB kv_store)
-pub(crate) const WEAVE_NS: &str = "nexus_weave";
+pub const WEAVE_NS: &str = "nexus_weave";
 /// 会话桥接记录 key 前缀
 const BRIDGE_KEY: &str = "bridge_";
 /// 图谱维护 key
@@ -37,7 +37,7 @@ const STALE_DAYS: u64 = 30;
 
 /// 模式连接记录
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct PatternLink {
+pub struct PatternLink {
     pub from_pattern: String,
     pub to_pattern: String,
     pub strength: u64,
@@ -86,7 +86,7 @@ fn days_ago(secs: u64) -> i64 {
 
 /// 列出已知的所有模式连接 (跨 namespace 聚合 skills/experience 分支关键词)。
 /// 真实数据源: 各技能 namespace 的 `hub` 中 `branches` 关键词 + 本命名空间既有 links。
-pub(crate) fn list_patterns(conn: &Connection) -> Vec<String> {
+pub fn list_patterns(conn: &Connection) -> Vec<String> {
     let mut patterns = std::collections::BTreeSet::new();
     // 从既有 links 聚合
     if let Ok(Some(raw)) = kv_get(conn, WEAVE_NS, GRAPH_KEY) {
@@ -210,7 +210,7 @@ pub fn connect_patterns(
 
 /// 图谱维护: 标记 30 天未引用的弱连接, 统计强连接 (Phase 4 graph update)。
 /// 返回 (弱连接数, 强连接数)。
-pub(crate) fn graph_curate(conn: &Connection) -> Result<(usize, usize), String> {
+pub fn graph_curate(conn: &Connection) -> Result<(usize, usize), String> {
     let cutoff = days_ago(STALE_DAYS * 86400);
     let raw = kv_get(conn, WEAVE_NS, GRAPH_KEY)
         .map_err(|e| format!("graph 读取失败: {e}"))?

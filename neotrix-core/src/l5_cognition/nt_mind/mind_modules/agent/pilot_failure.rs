@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// PILOT 失败模式检测器
-pub(crate) struct _PILOTFailureDetector {
+pub struct _PILOTFailureDetector {
     detectors: Vec<_FailureDetector>,
     patterns: Vec<FailurePattern>,
     detections: Vec<_FailureDetection>,
@@ -20,7 +20,7 @@ pub(crate) struct _PILOTFailureDetector {
 
 /// PILOT 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PILOTConfig {
+pub struct _PILOTConfig {
     pub max_detectors: usize,
     pub max_patterns: usize,
     pub detection_threshold: f64,
@@ -44,7 +44,7 @@ impl Default for _PILOTConfig {
 
 /// 失败检测器
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FailureDetector {
+pub struct _FailureDetector {
     pub detector_id: String,
     pub name: String,
     pub detector_type: _DetectorType,
@@ -56,7 +56,7 @@ pub(crate) struct _FailureDetector {
 /// 检测器类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _DetectorType {
+pub enum _DetectorType {
     Signature,
     Anomaly,
     Behavioral,
@@ -66,7 +66,7 @@ pub(crate) enum _DetectorType {
 /// 检测器状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _DetectorStatus {
+pub enum _DetectorStatus {
     Active,
     Inactive,
     Warning,
@@ -87,7 +87,7 @@ pub struct FailurePattern {
 /// 失败严重程度
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _FailureSeverity {
+pub enum _FailureSeverity {
     Low = 0,
     Medium = 1,
     High = 2,
@@ -96,7 +96,7 @@ pub(crate) enum _FailureSeverity {
 
 /// 失败检测
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FailureDetection {
+pub struct _FailureDetection {
     pub detection_id: String,
     pub pattern_id: String,
     pub detector_id: String,
@@ -108,7 +108,7 @@ pub(crate) struct _FailureDetection {
 
 /// PILOT 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PILOTStats {
+pub struct _PILOTStats {
     pub total_detectors: u64,
     pub active_detectors: u64,
     pub total_detections: u64,
@@ -119,7 +119,7 @@ pub(crate) struct _PILOTStats {
 
 /// SEAL 集成结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SEALIntegrationResult {
+pub struct _SEALIntegrationResult {
     pub integrated: bool,
     pub phase: String,
     pub impact_score: f64,

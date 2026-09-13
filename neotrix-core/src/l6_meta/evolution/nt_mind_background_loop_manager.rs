@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 背景循环管理器
-pub(crate) struct _BackgroundLoopManager {
+pub struct _BackgroundLoopManager {
     loops: Vec<BackgroundLoop>,
     config: LoopConfig,
     stats: LoopStats,
@@ -56,7 +56,7 @@ pub struct BackgroundLoop {
 /// 循环类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _LoopType {
+pub enum _LoopType {
     Evolution,      // 进化循环
     HealthCheck,    // 健康检查
     KnowledgeSync,  // 知识同步
@@ -67,7 +67,7 @@ pub(crate) enum _LoopType {
 /// 循环状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _LoopStatus {
+pub enum _LoopStatus {
     Running,
     Paused,
     Stopped,
@@ -95,7 +95,7 @@ pub struct LoopStats {
 
 /// 循环事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LoopEvent {
+pub struct _LoopEvent {
     pub event_id: String,
     pub loop_id: String,
     pub event_type: String,

@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 治理合规检查器
-pub(crate) struct _GovernanceComplianceChecker {
+pub struct _GovernanceComplianceChecker {
     rules: Vec<_GovernanceRule>,
     violations: Vec<ComplianceViolation>,
     #[allow(dead_code)]
@@ -20,7 +20,7 @@ pub(crate) struct _GovernanceComplianceChecker {
 
 /// 合规配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ComplianceConfig {
+pub struct _ComplianceConfig {
     pub enable_pre_commit_checks: bool,
     pub enable_pre_push_checks: bool,
     pub enable_runtime_checks: bool,
@@ -42,7 +42,7 @@ impl Default for _ComplianceConfig {
 
 /// 治理规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GovernanceRule {
+pub struct _GovernanceRule {
     pub rule_id: String,
     pub name: String,
     pub description: String,
@@ -87,7 +87,7 @@ pub struct ComplianceViolation {
 
 /// 合规统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ComplianceStats {
+pub struct _ComplianceStats {
     pub total_checks: u64,
     pub passed_checks: u64,
     pub failed_checks: u64,
@@ -97,7 +97,7 @@ pub(crate) struct _ComplianceStats {
 
 /// 检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ComplianceCheckResult {
+pub struct _ComplianceCheckResult {
     pub passed: bool,
     pub violations: Vec<ComplianceViolation>,
     pub suggestions: Vec<String>,

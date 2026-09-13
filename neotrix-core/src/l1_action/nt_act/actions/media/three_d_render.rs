@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 3D 建模渲染引擎
-pub(crate) struct ModelingRenderingEngine {
+pub struct ModelingRenderingEngine {
     meshes: HashMap<String, Mesh>,
     materials: HashMap<String, Material>,
     scenes: HashMap<String, RenderScene>,
@@ -21,7 +21,7 @@ pub(crate) struct ModelingRenderingEngine {
 
 /// 渲染配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RenderingConfig {
+pub struct RenderingConfig {
     pub engine: String,
     pub resolution: (u32, u32),
     pub samples: u32,
@@ -43,7 +43,7 @@ impl Default for RenderingConfig {
 
 /// 网格
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Mesh {
+pub struct Mesh {
     pub id: String,
     pub name: String,
     pub vertices: Vec<Vertex>,
@@ -87,7 +87,7 @@ pub struct Vector3 {
 
 /// 向量2
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Vector2 {
+pub struct Vector2 {
     pub x: f32,
     pub y: f32,
 }
@@ -116,7 +116,7 @@ pub enum MaterialType {
 
 /// 纹理
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct Texture {
+pub struct Texture {
     pub name: String,
     pub texture_type: String,
     pub path: Option<String>,
@@ -125,7 +125,7 @@ pub(crate) struct Texture {
 
 /// 渲染场景
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RenderScene {
+pub struct RenderScene {
     pub id: String,
     pub name: String,
     pub objects: Vec<SceneObject>,
@@ -136,7 +136,7 @@ pub(crate) struct RenderScene {
 
 /// 场景对象
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SceneObject {
+pub struct SceneObject {
     pub mesh_id: String,
     pub transform: Transform,
     pub visible: bool,
@@ -173,7 +173,7 @@ pub struct Light {
 
 /// 世界设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct WorldSettings {
+pub struct WorldSettings {
     pub background_color: Vector3,
     pub ambient_occlusion: bool,
     pub environment_texture: Option<String>,
@@ -191,7 +191,7 @@ pub struct RenderResult {
 
 /// 渲染统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RenderingStats {
+pub struct RenderingStats {
     pub meshes_created: u64,
     pub materials_created: u64,
     pub renders_completed: u64,

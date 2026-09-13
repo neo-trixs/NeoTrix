@@ -5,7 +5,7 @@ use crate::neotrix::nt_core_error::NeoTrixError;
 use std::collections::HashMap;
 
 /// A benchmark task consisting of a prompt and an expected output pattern.
-pub(crate) struct _BenchmarkTask {
+pub struct _BenchmarkTask {
     pub name: String,
     pub prompt: String,
     pub task_type: TaskType,

@@ -10,13 +10,13 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 可视化辅助条目 (一个可高亮/可点击的步骤或实体)。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct VisualStep {
+pub struct VisualStep {
     pub id: String,
     pub label: String,
 }
 
 /// 可视化辅助 trait — 把步骤序列映射为可交互 aid 规格。
-pub(crate) trait VisualAid: Send + Sync {
+pub trait VisualAid: Send + Sync {
     /// 生成 aid 规格: 返回步骤数, 或 None 当步骤为空/含重复 id。
     fn build_aid(&self, steps: &[VisualStep]) -> Option<usize>;
     /// 校验步骤 id 唯一且非空。
@@ -25,7 +25,7 @@ pub(crate) trait VisualAid: Send + Sync {
 
 /// 默认实现: 唯一 id 校验 + 计数式规格生成。
 #[derive(Default)]
-pub(crate) struct ShowMeAid;
+pub struct ShowMeAid;
 
 impl VisualAid for ShowMeAid {
     fn build_aid(&self, steps: &[VisualStep]) -> Option<usize> {
@@ -49,7 +49,7 @@ impl VisualAid for ShowMeAid {
 
 /// T1 SelfTest: 验证 aid 构建器存在且唯一性校验生效。
 #[derive(Default)]
-pub(crate) struct ShowMeSelfTest;
+pub struct ShowMeSelfTest;
 
 impl SelfTest for ShowMeSelfTest {
     fn name(&self) -> &str {

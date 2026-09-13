@@ -34,11 +34,11 @@ impl H2SettingsProfile {
 }
 
 /// 连接池配置
-pub(crate) const POOL_MAX_IDLE_PER_HOST: usize = 32;
-pub(crate) const POOL_IDLE_TIMEOUT_SECS: u64 = 90;
-pub(crate) const TCP_KEEPALIVE_SECS: u64 = 15;
+pub const POOL_MAX_IDLE_PER_HOST: usize = 32;
+pub const POOL_IDLE_TIMEOUT_SECS: u64 = 90;
+pub const TCP_KEEPALIVE_SECS: u64 = 15;
 pub const CONNECT_TIMEOUT_SECS: u64 = 10;
-pub(crate) const REQUEST_TIMEOUT_SECS: u64 = 60;
+pub const REQUEST_TIMEOUT_SECS: u64 = 60;
 
 /// 全局异步 HTTP 客户端（惰性初始化，自带连接池）
 pub fn global_client() -> &'static reqwest::Client {
@@ -49,7 +49,7 @@ pub fn global_client() -> &'static reqwest::Client {
 }
 
 /// 获取异步 HTTP 客户端 (DI-ready: 可从容器注入)
-pub(crate) fn resolve_async_client() -> reqwest::Client {
+pub fn resolve_async_client() -> reqwest::Client {
     use crate::core::nt_core_di;
     if let Some(v) = nt_core_di::resolve_global::<reqwest::Client>() {
         return v;
@@ -58,7 +58,7 @@ pub(crate) fn resolve_async_client() -> reqwest::Client {
 }
 
 /// 全局阻塞 HTTP 客户端
-pub(crate) fn global_blocking_client() -> &'static reqwest::blocking::Client {
+pub fn global_blocking_client() -> &'static reqwest::blocking::Client {
     static CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
         reqwest::blocking::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -91,7 +91,7 @@ pub fn build_async_client() -> reqwest::Client {
 }
 
 /// 按 TLS 变体 + 可选源地址构建异步客户端
-pub(crate) fn build_async_client_with_tls(variant: TlsVariant, local_addr: Option<std::net::IpAddr>) -> reqwest::Client {
+pub fn build_async_client_with_tls(variant: TlsVariant, local_addr: Option<std::net::IpAddr>) -> reqwest::Client {
     let mut builder = reqwest::Client::builder()
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
@@ -120,7 +120,7 @@ pub(crate) fn build_async_client_with_tls(variant: TlsVariant, local_addr: Optio
 }
 
 /// 构建自定义阻塞客户端
-pub(crate) fn build_blocking_client() -> reqwest::blocking::Client {
+pub fn build_blocking_client() -> reqwest::blocking::Client {
     reqwest::blocking::Client::builder()
         .danger_accept_invalid_certs(true)
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
@@ -149,7 +149,7 @@ pub fn proxy_from_env() -> Option<String> {
 }
 
 /// Tor SOCKS5 默认地址
-pub(crate) const TOR_PROXY_ADDR: &str = "socks5h://127.0.0.1:9050";
+pub const TOR_PROXY_ADDR: &str = "socks5h://127.0.0.1:9050";
 
 /// 检查本地 Tor SOCKS5 代理是否可用 (TCP connect 探测)
 pub fn tor_proxy_available() -> bool {
@@ -200,7 +200,7 @@ pub fn build_async_client_with_proxy(proxy_url: Option<&str>) -> reqwest::Client
 }
 
 /// 构建带代理的阻塞客户端
-pub(crate) fn build_blocking_client_with_proxy(proxy_url: Option<&str>) -> reqwest::blocking::Client {
+pub fn build_blocking_client_with_proxy(proxy_url: Option<&str>) -> reqwest::blocking::Client {
     let mut builder = reqwest::blocking::Client::builder()
         .danger_accept_invalid_certs(true)
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))

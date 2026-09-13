@@ -11,7 +11,7 @@ use super::repair::{
 };
 
 /// 恢复验证服务 (生产接线: 由 autofixer / 背景循环调用)
-pub(crate) struct _RecoveryVerifyService {
+pub struct _RecoveryVerifyService {
     verifier: RecoveryVerifier,
     pattern_callbacks: Vec<Box<dyn Fn(&PatternUpdate) + Send + Sync>>,
     trap_callbacks: Vec<Box<dyn Fn(&str) + Send + Sync>>,

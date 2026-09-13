@@ -50,7 +50,7 @@ pub enum TaskType {
 
 /// 生产任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ProductionTask {
+pub struct ProductionTask {
     /// 任务ID
     pub id: String,
     /// 任务名称
@@ -83,7 +83,7 @@ pub(crate) struct ProductionTask {
 
 /// 生产批次
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ProductionBatch {
+pub struct ProductionBatch {
     /// 批次ID
     pub id: String,
     /// 批次名称
@@ -102,7 +102,7 @@ pub(crate) struct ProductionBatch {
 
 /// 生产流水线
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ProductionPipeline {
+pub struct ProductionPipeline {
     /// 流水线ID
     pub id: String,
     /// 流水线名称
@@ -335,7 +335,7 @@ impl BatchProductionManager {
 
 /// 管理器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ManagerStats {
+pub struct ManagerStats {
     /// 流水线数量
     pub pipeline_count: usize,
     /// 总任务数

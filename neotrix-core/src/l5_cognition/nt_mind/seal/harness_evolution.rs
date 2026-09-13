@@ -5,7 +5,7 @@
 /// 可验证环境
 #[derive(Clone, Debug)]
 
-pub(crate) struct _VerifiableEnvironment {
+pub struct _VerifiableEnvironment {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -24,7 +24,7 @@ pub struct TestCase {
 /// Harness 变异
 #[derive(Clone, Debug)]
 
-pub(crate) struct _HarnessMutation {
+pub struct _HarnessMutation {
     pub id: String,
     pub mutation_type: MutationType,
     pub description: String,
@@ -50,7 +50,7 @@ pub enum MutationType {
 /// 变异评估结果
 #[derive(Clone, Debug)]
 
-pub(crate) struct _MutationEvaluation {
+pub struct _MutationEvaluation {
     pub mutation_id: String,
     pub environment_id: String,
     pub score: f64, // 0.0-1.0
@@ -62,7 +62,7 @@ pub(crate) struct _MutationEvaluation {
 /// 3 轮筛选结果
 #[derive(Clone, Debug)]
 
-pub(crate) struct _ScreeningResult {
+pub struct _ScreeningResult {
     pub round: u32,
     pub candidates: Vec<_HarnessMutation>,
     pub evaluations: Vec<_MutationEvaluation>,
@@ -72,7 +72,7 @@ pub(crate) struct _ScreeningResult {
 /// Harness 进化引擎
 
 #[derive(Debug)]
-pub(crate) struct _HarnessEvolution {
+pub struct _HarnessEvolution {
     /// 可验证环境
     environments: Vec<_VerifiableEnvironment>,
     /// 待评估变异
@@ -226,7 +226,7 @@ impl _HarnessEvolution {
 
 #[derive(Clone, Debug)]
 
-pub(crate) struct _EvolutionStats {
+pub struct _EvolutionStats {
     pub environments: usize,
     pub candidates: usize,
     pub adopted: usize,

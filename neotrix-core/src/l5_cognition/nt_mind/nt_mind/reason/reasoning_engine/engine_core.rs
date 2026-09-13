@@ -1904,7 +1904,7 @@ fn hydrate_ewhr_hypotheses(
 }
 
 /// Detect if an LLM response is a refusal (empty, apology, or explicit refusal patterns).
-pub(crate) fn _detect_refusal_response(response: &str) -> bool {
+pub fn _detect_refusal_response(response: &str) -> bool {
     let trimmed = response.trim();
     if trimmed.is_empty() || trimmed.len() < 5 {
         return true;
@@ -1943,7 +1943,7 @@ pub(crate) fn _detect_refusal_response(response: &str) -> bool {
 
 /// 把推理 response 文本切分为步骤序列，供 ControlDistiller 检测 takeover 点。
 /// 按换行分段；若不足 2 段则按句号/分号切分。每步携带近似 token 数。
-pub(crate) fn _split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
+pub fn _split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
     let mut segments: Vec<String> = response
         .split('\n')
         .map(|s| s.trim())

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 /// 执行轨迹摘要（蒸馏输入）
 #[derive(Debug, Clone)]
-pub(crate) struct _TraceSummary {
+pub struct _TraceSummary {
     /// 轨迹唯一标识
     pub trace_id: String,
     /// 任务描述
@@ -19,7 +19,7 @@ pub(crate) struct _TraceSummary {
 
 /// 单步执行摘要
 #[derive(Debug, Clone)]
-pub(crate) struct _StepSummary {
+pub struct _StepSummary {
     /// 使用的技能名称
     pub skill_name: String,
     /// 输入模式摘要
@@ -57,7 +57,7 @@ pub struct SkillTemplate {
 
 /// 失败反模式（避免重复犯错）
 #[derive(Debug, Clone)]
-pub(crate) struct _FailureAntiPattern {
+pub struct _FailureAntiPattern {
     /// 失败模式描述
     pub pattern: String,
     /// 错误签名（用于快速匹配）

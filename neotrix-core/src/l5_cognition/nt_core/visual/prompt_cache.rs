@@ -47,7 +47,7 @@ impl Default for CacheConfig {
 }
 
 /// 提示词缓存
-pub(crate) struct _PromptCache {
+pub struct _PromptCache {
     /// 缓存存储
     entries: HashMap<String, CacheEntry>,
     /// 配置

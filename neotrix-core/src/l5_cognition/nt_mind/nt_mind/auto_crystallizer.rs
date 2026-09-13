@@ -27,7 +27,7 @@ pub struct AutoCrystallizer {
 
 /// 幻觉桶条目 — 记录被反幻觉门拒绝的结晶候选及其拒绝原因。
 #[derive(Debug, Clone)]
-pub(crate) struct _HallucinationEntry {
+pub struct _HallucinationEntry {
     pub source_name: String,
     pub domain: String,
     pub reward: f64,
@@ -208,28 +208,28 @@ impl AutoCrystallizer {
 
 /// 蒸馏章节
 #[derive(Debug, Clone)]
-pub(crate) struct _DistilledChapter {
+pub struct _DistilledChapter {
     pub title: String,
     pub body: String,
 }
 
 /// 术语表条目
 #[derive(Debug, Clone)]
-pub(crate) struct _GlossaryTerm {
+pub struct _GlossaryTerm {
     pub term: String,
     pub definition: String,
 }
 
 /// 模式条目
 #[derive(Debug, Clone)]
-pub(crate) struct _PatternEntry {
+pub struct _PatternEntry {
     pub name: String,
     pub description: String,
 }
 
 /// book-to-skill 蒸馏五件套
 #[derive(Debug, Clone)]
-pub(crate) struct _DistillationSuite {
+pub struct _DistillationSuite {
     /// SKILL.md 主文件 — 技能入口 (标题 + 摘要 + 章节索引)
     pub skill_md: String,
     /// 章节 — 按 markdown 标题切分

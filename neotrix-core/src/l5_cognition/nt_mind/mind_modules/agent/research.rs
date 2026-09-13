@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 科研自动化引擎
-pub(crate) struct _ResearchAutomationEngine {
+pub struct _ResearchAutomationEngine {
     hypotheses: Vec<Hypothesis>,
     experiments: Vec<Experiment>,
     results: Vec<ExperimentResult>,
@@ -22,7 +22,7 @@ pub(crate) struct _ResearchAutomationEngine {
 
 /// 科研配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResearchConfig {
+pub struct _ResearchConfig {
     pub max_hypotheses: usize,
     pub auto_experiment_design: bool,
     pub auto_analysis: bool,
@@ -97,7 +97,7 @@ pub struct ExperimentDesign {
 
 /// 步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ProcedureStep {
+pub struct _ProcedureStep {
     pub step_number: u32,
     pub description: String,
     pub duration: Option<String>,
@@ -107,7 +107,7 @@ pub(crate) struct _ProcedureStep {
 /// 实验状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _ExperimentStatus {
+pub enum _ExperimentStatus {
     Designed,
     Running,
     Completed,
@@ -128,7 +128,7 @@ pub struct ExperimentResult {
 
 /// 统计分析
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StatisticalAnalysis {
+pub struct _StatisticalAnalysis {
     pub test_type: String,
     pub p_value: f64,
     pub effect_size: Option<f64>,
@@ -138,7 +138,7 @@ pub(crate) struct _StatisticalAnalysis {
 
 /// 论文草稿
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PaperDraft {
+pub struct _PaperDraft {
     pub id: String,
     pub title: String,
     pub abstract_text: String,
@@ -149,7 +149,7 @@ pub(crate) struct _PaperDraft {
 
 /// 论文章节
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PaperSection {
+pub struct _PaperSection {
     pub section_type: String,
     pub title: String,
     pub content: String,
@@ -157,7 +157,7 @@ pub(crate) struct _PaperSection {
 
 /// 科研统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResearchStats {
+pub struct _ResearchStats {
     pub hypotheses_generated: u64,
     pub experiments_conducted: u64,
     pub papers_draft: u64,

@@ -66,7 +66,7 @@ impl<S: State> StateMachine<S> {
 // 2. 成本计算骨架 — CostCalculator
 // ============================================================
 
-pub(crate) trait CostComponent: Send + Sync {
+pub trait CostComponent: Send + Sync {
     fn name(&self) -> &str;
     fn calculate(&self, ctx: &CostContext) -> f64;
 }
@@ -195,7 +195,7 @@ impl CostCalculator {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum MarginStrategy {
+pub enum MarginStrategy {
     Fixed(f64),
     Tiered(Vec<(f64, f64)>),
 }
@@ -580,7 +580,7 @@ pub struct ScheduleDeviation {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ProgressTracker {
+pub struct ProgressTracker {
     milestones: Vec<Milestone>,
     critical_path: Vec<String>,
 }
@@ -679,7 +679,7 @@ fn days_diff(planned: &str, actual: &str) -> i32 {
 /// AQL 抽样样本量公式
 /// 公式: SampleSize = f(LotSize, AQLLevel)
 /// 基于 ISO 2859-1 一般检验水平 II
-pub(crate) fn aql_sample_size(lot_size: u64, aql_level: f64) -> u32 {
+pub fn aql_sample_size(lot_size: u64, aql_level: f64) -> u32 {
     let base = match lot_size {
         0..=8 => 2,
         9..=15 => 3,
@@ -709,7 +709,7 @@ pub(crate) fn aql_sample_size(lot_size: u64, aql_level: f64) -> u32 {
 }
 
 /// AQL 判定: Ac (接收数) 和 Re (拒收数)
-pub(crate) fn aql_accept_reject(sample_size: u32, aql_level: f64) -> (u32, u32) {
+pub fn aql_accept_reject(sample_size: u32, aql_level: f64) -> (u32, u32) {
     let ac = ((sample_size as f64 * aql_level / 100.0) as u32).max(0);
     (ac, ac + 1)
 }
@@ -720,7 +720,7 @@ pub(crate) fn aql_accept_reject(sample_size: u32, aql_level: f64) -> (u32, u32) 
 
 /// 汇率换算
 /// 公式: TargetAmount = Amount × TargetRate / SourceRate
-pub(crate) fn convert_currency(amount: f64, source_rate: f64, target_rate: f64) -> f64 {
+pub fn convert_currency(amount: f64, source_rate: f64, target_rate: f64) -> f64 {
     if source_rate == 0.0 {
         return 0.0;
     }
@@ -729,7 +729,7 @@ pub(crate) fn convert_currency(amount: f64, source_rate: f64, target_rate: f64) 
 
 /// 结算金额计算
 /// 公式: Net = Received × (1 - FeeRatio), Settled = Net × FxRate
-pub(crate) fn settle_amount(received: f64, fx_rate: f64, bank_fee_ratio: f64) -> (f64, f64, f64) {
+pub fn settle_amount(received: f64, fx_rate: f64, bank_fee_ratio: f64) -> (f64, f64, f64) {
     let bank_fees = received * bank_fee_ratio;
     let net = received - bank_fees;
     let settled = net * fx_rate;
@@ -742,7 +742,7 @@ pub(crate) fn settle_amount(received: f64, fx_rate: f64, bank_fee_ratio: f64) ->
 
 /// 退税金额
 /// 公式: RefundAmount = ExportValue × RefundRate
-pub(crate) fn tax_refund_amount(export_value: f64, refund_rate: f64) -> f64 {
+pub fn tax_refund_amount(export_value: f64, refund_rate: f64) -> f64 {
     export_value * refund_rate
 }
 

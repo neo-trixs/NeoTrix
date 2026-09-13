@@ -12,7 +12,7 @@ pub use neotrix_types::write_guard_types::{WriteGuardVerdict, WriteGuardEvidence
 pub const WRITE_GUARD_NS: &str = "write_guard";
 
 /// 受保护 kv 命名空间 — agent 不得直接改写 (溯源/秘密/守卫自身)。
-pub(crate) const PROTECTED_NAMESPACES: &[&str] = &[
+pub const PROTECTED_NAMESPACES: &[&str] = &[
     "secrets",
     "provenance",
     "write_guard",
@@ -163,7 +163,7 @@ pub fn record_write_evidence(
 pub use neotrix_types::write_guard_types::WriteGuardStats;
 
 /// 把一条 kv_store `write_guard` 条目解析为结构化证据; 解析失败返回 None。
-pub(crate) fn parse_write_evidence(key: &str, raw: &str) -> Option<WriteGuardEvidence> {
+pub fn parse_write_evidence(key: &str, raw: &str) -> Option<WriteGuardEvidence> {
     let v: serde_json::Value = serde_json::from_str(raw).ok()?;
     let verdict: WriteGuardVerdict = serde_json::from_value(v.get("verdict").cloned()?).ok()?;
     Some(WriteGuardEvidence {

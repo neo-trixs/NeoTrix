@@ -30,7 +30,7 @@ const DOWNLOAD_CHUNK_SIZE: usize = 64 * 1024;
 /// ("Cannot drop a runtime in a context where blocking is not allowed")。
 /// 非 runtime 上下文直接执行; current_thread runtime 内 block_in_place
 /// 不支持, 退化为直接执行 (仅测试辅助场景, 不触网)。
-pub(crate) fn run_blocking<T>(f: impl FnOnce() -> T) -> T {
+pub fn run_blocking<T>(f: impl FnOnce() -> T) -> T {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
         if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
             tokio::task::block_in_place(f)
@@ -43,7 +43,7 @@ pub(crate) fn run_blocking<T>(f: impl FnOnce() -> T) -> T {
 }
 
 /// 单一 blocking client 工厂 (所有阻塞吞入路径共享连接池与安全策略)
-pub(crate) fn shared_blocking_client() -> &'static reqwest::blocking::Client {
+pub fn shared_blocking_client() -> &'static reqwest::blocking::Client {
     static CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
         run_blocking(|| {
             reqwest::blocking::Client::builder()
@@ -69,7 +69,7 @@ pub(crate) fn shared_blocking_client() -> &'static reqwest::blocking::Client {
 /// - 私有/回环/链路本地/保留段 (含 IPv4-mapped IPv6、CGNAT、benchmarking)
 /// - URL 内嵌 userinfo 凭据 (`user:pass@host`) — 凭据外泄 + 社工向量
 /// - 非 http/https scheme; localhost/.local 拒绝
-pub(crate) fn resolve_safe_origin(url: &str) -> Result<(SocketAddr, url::Url), String> {
+pub fn resolve_safe_origin(url: &str) -> Result<(SocketAddr, url::Url), String> {
     let parsed = url::Url::parse(url).map_err(|e| format!("URL parse: {e}"))?;
     if !matches!(parsed.scheme(), "http" | "https") {
         return Err("scheme must be http/https".into());
@@ -109,13 +109,13 @@ pub(crate) fn resolve_safe_origin(url: &str) -> Result<(SocketAddr, url::Url), S
 
 /// 单一「安全抓取」原语 (blocking): guard → pin → fetch → (body, final_host)。
 /// 所有阻塞吞入路径统一委托此处。
-pub(crate) fn fetch_safe_http(url: &str) -> Result<(String, String), String> {
+pub fn fetch_safe_http(url: &str) -> Result<(String, String), String> {
     fetch_safe_http_inner(url, &[])
 }
 
 /// 带额外 headers 的安全抓取 (blocking): 用于需要特定 Accept/Authorization 等头的 API。
 /// SSRF guard + connect pin 语义与 `fetch_safe_http` 完全一致。
-pub(crate) fn fetch_safe_http_with_headers(
+pub fn fetch_safe_http_with_headers(
     url: &str,
     extra_headers: &[(&str, &str)],
 ) -> Result<(String, String), String> {
@@ -233,7 +233,7 @@ if !extra_headers.is_empty() {
 /// 指数退避重试版安全抓取: 仅对 429/503 重试 (最多 3 次), 尊重 retry-after 头。
 /// 能力源自 `bin/kb_crawl_batch::fetch_with_retry` (R-P96 提炼并入)。
 /// SSRF guard + connect pin 语义与 `fetch_safe_http` 完全一致。
-pub(crate) fn fetch_safe_http_with_retry(url: &str) -> Result<(String, String), String> {
+pub fn fetch_safe_http_with_retry(url: &str) -> Result<(String, String), String> {
     // 重试循环含 sleep 与内部 fetch_safe_http (blocking), 统一经 run_blocking。
     run_blocking(|| {
         let mut wait = std::time::Duration::from_secs(2);
@@ -254,7 +254,7 @@ pub(crate) fn fetch_safe_http_with_retry(url: &str) -> Result<(String, String), 
 
 /// 单一「安全抓取」原语 (async): guard → pin → fetch → (body, final_host)。
 /// 所有异步吞入路径统一委托此处。
-pub(crate) async fn fetch_safe_http_async(url: &str) -> Result<(String, String), String> {
+pub async fn fetch_safe_http_async(url: &str) -> Result<(String, String), String> {
     let (addr, parsed) = resolve_safe_origin(url)?;
     let host = parsed.host_str().ok_or("no host")?.to_string();
 
@@ -315,7 +315,7 @@ pub struct DownloadOptions<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct DownloadResult {
+pub struct DownloadResult {
     pub path: PathBuf,
     pub bytes_written: u64,
     /// 是否从已有 .tmp 断点续传。
@@ -324,7 +324,7 @@ pub(crate) struct DownloadResult {
 
 /// 断点续传下载到文件 (blocking)。返回最终文件路径。
 /// 网络错误自动重试 (最多 3 次, 指数退避 2s→8s)。HTTP 4xx/5xx 不重试。
-pub(crate) fn download_to_file(opts: &DownloadOptions<'_>) -> Result<DownloadResult, String> {
+pub fn download_to_file(opts: &DownloadOptions<'_>) -> Result<DownloadResult, String> {
     download_to_file_with_retry(opts, 3)
 }
 
@@ -332,7 +332,7 @@ pub(crate) fn download_to_file(opts: &DownloadOptions<'_>) -> Result<DownloadRes
 /// 网络错误重试; 非网络错误 (SSRF guard / HTTP 4xx-5xx / MIME 拒绝) 立即返回。
 /// 启用 `proxy_pool` 时, 每次尝试前从全局代理池选最快节点轮换 egress,
 /// 失败记账回传池学习器 (`record_strategy_result_blocking`)。
-pub(crate) fn download_to_file_with_retry(
+pub fn download_to_file_with_retry(
     opts: &DownloadOptions<'_>,
     max_retries: u32,
 ) -> Result<DownloadResult, String> {

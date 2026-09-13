@@ -28,7 +28,7 @@ impl EvolutionTrigger {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _FixTriggerRecord {
+pub struct _FixTriggerRecord {
     pub module_name: String,
     pub issue_type: String,
     pub applied_patch: String,
@@ -37,7 +37,7 @@ pub(crate) struct _FixTriggerRecord {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _DerivedSkillRecord {
+pub struct _DerivedSkillRecord {
     pub parent_skill: String,
     pub child_skill: String,
     pub domain: String,
@@ -46,7 +46,7 @@ pub(crate) struct _DerivedSkillRecord {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _CapturedPatternRecord {
+pub struct _CapturedPatternRecord {
     pub pattern_name: String,
     pub source: String,
     pub frequency: usize,

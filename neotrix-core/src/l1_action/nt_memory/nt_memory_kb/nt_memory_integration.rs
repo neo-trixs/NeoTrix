@@ -5,7 +5,7 @@ use super::nt_memory_types::{NodeType, RelationType};
 
 /// Local types to break L3→L8 upward dependency on nt_mind::knowledge_engine
 #[derive(Debug, Clone)]
-pub(crate) enum KnowledgeSourceType {
+pub enum KnowledgeSourceType {
     Wikipedia,
     ArXiv,
     GitHub,
@@ -15,7 +15,7 @@ pub(crate) enum KnowledgeSourceType {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum KnowledgeRelationType {
+pub enum KnowledgeRelationType {
     References,
     SubclassOf,
     InstanceOf,
@@ -91,7 +91,7 @@ pub fn persist_mined_knowledge(conn: &Connection, title: &str, summary: &str, ur
 }
 
 /// 将 KnowledgeEngine 全量条目导入 KnowledgeBase
-pub(crate) fn import_from_knowledge_engine(conn: &Connection, entries: &[KnowledgeEntry], relations: &[KnowledgeRelation]) -> Result<(usize, usize), String> {
+pub fn import_from_knowledge_engine(conn: &Connection, entries: &[KnowledgeEntry], relations: &[KnowledgeRelation]) -> Result<(usize, usize), String> {
     let mut nodes = 0;
     let mut edges = 0;
 

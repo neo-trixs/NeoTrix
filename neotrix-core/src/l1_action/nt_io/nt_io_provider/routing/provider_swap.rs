@@ -80,7 +80,7 @@ impl Default for SwapRule {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SwapRecord {
+pub struct SwapRecord {
     pub from: LlmProviderType,
     pub to: LlmProviderType,
     pub reason: String,

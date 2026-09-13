@@ -15,7 +15,7 @@ pub struct Generator {
 
 /// 创意元素
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CreativeElement {
+pub struct _CreativeElement {
     pub id: String,
     pub element_type: ElementType,
     pub content: String,
@@ -47,7 +47,7 @@ pub struct GenerationRecord {
 
 /// 生成类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _GenerationType {
+pub enum _GenerationType {
     Content,
     Solution,
     Innovation,
@@ -112,7 +112,7 @@ impl Generator {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GeneratorStats {
+pub struct _GeneratorStats {
     pub total_generations: usize,
     pub avg_creativity: f64,
 }

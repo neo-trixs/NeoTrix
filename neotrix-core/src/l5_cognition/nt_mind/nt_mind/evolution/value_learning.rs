@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 /// ValueLearning namespace — KB kv_store 命名空间。
-pub(crate) const NS_VALUE_LEARNING: &str = "value_learning";
+pub const NS_VALUE_LEARNING: &str = "value_learning";
 
 /// 观察记录：一次行动-后果观察。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ pub struct Outcome {
 
 /// 价值信号：某价值观被触发的强度与方向。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ValueSignal {
+pub struct ValueSignal {
     pub value_id: String,                 // 如 "autonomy", "harm_prevention"
     pub intensity: f64,                   // 触发强度 [0,1]
     pub valence: f64,                     // 正向强化/负向违背 [-1,1]
@@ -53,7 +53,7 @@ pub(crate) struct ValueSignal {
 
 /// 学习事件：从观察中提炼的价值观更新提案。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct LearningEvent {
+pub struct LearningEvent {
     pub id: String,
     pub source_observation_ids: Vec<String>,
     pub proposed_changes: Vec<ValueChangeProposal>,
@@ -65,7 +65,7 @@ pub(crate) struct LearningEvent {
 
 /// 价值观变更提案。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ValueChangeProposal {
+pub struct ValueChangeProposal {
     pub value_id: String,
     pub change_type: ChangeType,
     pub rationale: String,
@@ -86,7 +86,7 @@ pub enum ChangeType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) enum LearningEventStatus {
+pub enum LearningEventStatus {
     Pending,      // 待审核/待应用
     Applied,      // 已应用到指南针
     Rejected,     // 被拒绝

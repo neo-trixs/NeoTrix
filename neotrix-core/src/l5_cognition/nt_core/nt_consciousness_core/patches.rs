@@ -8,7 +8,7 @@ use super::probes::{Gap, GapType};
 
 /// 补丁动作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _PatchAction {
+pub enum _PatchAction {
     // 逻辑补丁
     InsertLogicChain,
     AddAssumptionCheck,

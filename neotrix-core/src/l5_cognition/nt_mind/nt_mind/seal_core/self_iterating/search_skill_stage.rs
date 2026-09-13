@@ -83,7 +83,7 @@ pub struct Evidence {
 
 /// 搜索技能缓冲
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SearchSkillBuffer {
+pub struct _SearchSkillBuffer {
     pub exercises: VecDeque<SearchExercise>,
     pub max_size: usize,
 }
@@ -110,7 +110,7 @@ impl _SearchSkillBuffer {
 
 /// 搜索技能阶段报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SearchSkillReport {
+pub struct _SearchSkillReport {
     pub total_updates: u64,
     pub buffer_size: usize,
     pub avg_grounding: f64,

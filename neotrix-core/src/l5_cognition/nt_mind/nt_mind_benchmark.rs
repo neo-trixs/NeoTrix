@@ -412,7 +412,7 @@ impl OriEvalCase {
 
 /// Ori-Eval 模型执行接口 — 让测试注入 test-double, 生产用真实 provider
 #[async_trait::async_trait]
-pub(crate) trait _OriEvalModel: Send + Sync {
+pub trait _OriEvalModel: Send + Sync {
     /// 以指定模型名运行一次完整 prompt, 返回 (内容, tool 调用名列表)
     async fn run(&self, model: &str, prompt: &str) -> Result<(String, Vec<String>), LlmError>;
 }

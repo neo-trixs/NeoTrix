@@ -10,13 +10,13 @@ use std::collections::HashMap;
 
 /// 声明式分析点: 变量名 → 其指向的目标集 (points-to set)。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _AnalysisPoint {
+pub struct _AnalysisPoint {
     pub var: String,
     pub points_to: Vec<String>,
 }
 
 /// 声明式指针/静态分析 trait。
-pub(crate) trait _PointerAnalysis {
+pub trait _PointerAnalysis {
     /// 声明一个分析点并登记其初始指针集。
     fn declare(&mut self, var: &str, points_to: &[&str]);
     /// 查询某变量的声明式 points-to set, 无登记则空。
@@ -31,7 +31,7 @@ pub(crate) trait _PointerAnalysis {
 }
 
 /// doop 声明式指针分析实现。
-pub(crate) struct _DoopPointerAnalysis {
+pub struct _DoopPointerAnalysis {
     points: HashMap<String, Vec<String>>,
 }
 

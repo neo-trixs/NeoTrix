@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 /// 动作条目 — 一条可缓存的动作。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CachedAction {
+pub struct CachedAction {
     pub id: String,
     /// 语义签名: 当前状态 (URL + 页面摘要哈希 + 意图)
     pub signature: String,
@@ -35,7 +35,7 @@ impl CachedAction {
 
 /// 选择器组回退结果。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum FallbackOutcome {
+pub enum FallbackOutcome {
     /// 某选择器成功
     Success(String),
     /// 全部失败

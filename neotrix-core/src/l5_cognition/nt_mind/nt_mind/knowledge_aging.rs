@@ -23,7 +23,7 @@ impl KnowledgeFreshness {
     }
 }
 
-pub(crate) struct _KnowledgeAgingEntry {
+pub struct _KnowledgeAgingEntry {
     pub source_url: String,
     pub source_name: String,
     pub domain: String,

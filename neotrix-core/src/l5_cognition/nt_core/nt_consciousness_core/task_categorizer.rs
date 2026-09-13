@@ -18,7 +18,7 @@ pub struct TaskCategorizer {
 
 /// 分类记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ClassificationRecord {
+pub struct _ClassificationRecord {
     /// 记录ID
     pub id: String,
     /// 输入
@@ -155,7 +155,7 @@ impl TaskCategorizer {
 
 /// 分类器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CategorizerStats {
+pub struct _CategorizerStats {
     pub total_categories: usize,
     pub total_classifications: usize,
     pub category_distribution: HashMap<String, u32>,

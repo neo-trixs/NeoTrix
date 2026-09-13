@@ -8,7 +8,7 @@ use std::time::Duration;
 
 /// 质量分级
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum QualityTier {
+pub enum QualityTier {
     /// 草稿 (快速/低成本)
     Draft,
     /// 预览 (中等质量)
@@ -110,7 +110,7 @@ pub enum RoutingStrategy {
 
 /// 故障转移配置
 #[derive(Debug, Clone)]
-pub(crate) struct FallbackConfig {
+pub struct FallbackConfig {
     /// 是否启用故障转移
     pub enabled: bool,
     /// 最大重试次数

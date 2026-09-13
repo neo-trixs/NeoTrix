@@ -17,7 +17,7 @@ pub struct KnowledgeDistiller {
 
 /// 蒸馏配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DistillerConfig {
+pub struct _DistillerConfig {
     /// 最大历史记录
     pub max_history: usize,
     /// 最小置信度阈值
@@ -41,7 +41,7 @@ impl Default for _DistillerConfig {
 
 /// 蒸馏记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DistillationRecord {
+pub struct _DistillationRecord {
     /// 记录ID
     pub id: String,
     /// 周期
@@ -58,7 +58,7 @@ pub(crate) struct _DistillationRecord {
 
 /// 知识单元
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KnowledgeUnit {
+pub struct _KnowledgeUnit {
     /// 知识ID
     pub id: String,
     /// 知识内容
@@ -77,7 +77,7 @@ pub(crate) struct _KnowledgeUnit {
 
 /// 知识类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _KnowledgeType {
+pub enum _KnowledgeType {
     /// 概念知识
     Concept,
     /// 事实知识
@@ -332,7 +332,7 @@ impl KnowledgeDistiller {
 
 /// 蒸馏统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DistillerStats {
+pub struct _DistillerStats {
     pub total_distillations: usize,
     pub avg_compression_rate: f64,
     pub avg_confidence: f64,

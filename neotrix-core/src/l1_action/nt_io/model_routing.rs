@@ -149,7 +149,7 @@ pub struct RoutingResponse {
 
 /// 模型状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ModelState {
+pub struct ModelState {
     /// 当前并发数
     pub current_concurrent: u32,
     /// 当前速率 (请求/分钟)
@@ -173,7 +173,7 @@ pub(crate) struct ModelState {
 /// 多模型路由器
 /// 统一接口适配多模型
 #[derive(Debug)]
-pub(crate) struct ModelRoutingLayer {
+pub struct ModelRoutingLayer {
     /// 路由配置
     config: RoutingConfig,
     /// 模型配置
@@ -359,7 +359,7 @@ impl ModelRoutingLayer {
 
 /// 路由统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RoutingStats {
+pub struct RoutingStats {
     /// 总模型数
     pub total_models: usize,
     /// 可用模型数

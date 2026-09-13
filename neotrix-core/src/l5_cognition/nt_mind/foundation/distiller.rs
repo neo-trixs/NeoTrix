@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SessionPattern {
+pub struct _SessionPattern {
     pub name: String,
     pub description: String,
     pub frequency: u32,
@@ -21,7 +21,7 @@ pub struct DistillationReport {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _VerbalizedSampling {
+pub struct _VerbalizedSampling {
     pub num_candidates: usize,
     pub rng_seed: u64,
     pub sampled: usize,

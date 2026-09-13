@@ -34,7 +34,7 @@ pub struct LocalInterface {
 }
 
 /// 常见 SSID 池 (伪装不易被关联)
-pub(crate) static SSID_POOL: &[&str] = &[
+pub static SSID_POOL: &[&str] = &[
     "WiFi", "xfinitywifi", "Starbucks WiFi", "ATT", "Home",
     "Network", "Internet", "Linksys", "NETGEAR", "TP-LINK",
     "DIRECT-", "AndroidAP", "iPhone", "Wi-Fi", "CableWiFi",

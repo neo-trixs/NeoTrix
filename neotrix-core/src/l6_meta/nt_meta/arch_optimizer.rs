@@ -1,7 +1,7 @@
 use crate::l5_cognition::nt_core::awareness_monitor::AwarenessReport;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ArchIssueType {
+pub enum ArchIssueType {
     LargeModule { file: String, lines: usize },
     CircularDependency { modules: Vec<String> },
     MissingAbstraction { description: String },
@@ -10,7 +10,7 @@ pub(crate) enum ArchIssueType {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ArchSuggestion {
+pub struct ArchSuggestion {
     pub id: String,
     pub issue_type: ArchIssueType,
     pub description: String,
@@ -20,7 +20,7 @@ pub(crate) struct ArchSuggestion {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum EffortEstimate {
+pub enum EffortEstimate {
     Quick,
     Moderate,
     Large,
@@ -28,7 +28,7 @@ pub(crate) enum EffortEstimate {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ArchOptimizationReport {
+pub struct ArchOptimizationReport {
     pub suggestions: Vec<ArchSuggestion>,
     pub total_suggestions: u32,
     pub auto_fixable_count: u32,

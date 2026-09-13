@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 /// Rate limit profile for a provider (RPM = requests per minute, TPM = tokens per minute)
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct RateProfile {
+pub struct RateProfile {
     pub rpm: f64,
     pub tpm: f64,
 }

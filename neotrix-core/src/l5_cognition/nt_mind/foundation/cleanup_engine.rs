@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 // ============================================================
 
 /// 项目清理系统目录
-pub(crate) struct _CleanupDirs {
+pub struct _CleanupDirs {
     pub root: PathBuf,       // project/.cleanup/
     pub archive: PathBuf,    // project/.cleanup/archive/
     pub log: PathBuf,        // project/.cleanup/log/
@@ -81,7 +81,7 @@ pub struct ArchiveEntry {
 
 /// 归档清单 (每个批次一个)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ArchiveManifest {
+pub struct _ArchiveManifest {
     pub batch_id: String, // YYYY-MM-DD_HHMMSS
     pub created_at: i64,
     pub entries: Vec<ArchiveEntry>,
@@ -103,7 +103,7 @@ impl _ArchiveManifest {
 
 /// 归档索引 (全局, 用于搜索)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct _ArchiveIndex {
+pub struct _ArchiveIndex {
     pub entries: Vec<ArchiveEntry>,
     pub last_updated: i64,
 }
@@ -122,7 +122,7 @@ impl _ArchiveIndex {
 }
 
 /// 归档操作: 将匹配的文件移动到 .cleanup/archive/ 而非删除
-pub(crate) struct _Archiver {
+pub struct _Archiver {
     pub dirs: _CleanupDirs,
     pub index: _ArchiveIndex,
 }
@@ -268,7 +268,7 @@ impl _Archiver {
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CleanupLogEntry {
+pub struct _CleanupLogEntry {
     pub action: String, // "scan" | "clean" | "archive" | "backup"
     pub kind: String,
     pub items: usize,
@@ -278,7 +278,7 @@ pub(crate) struct _CleanupLogEntry {
     pub error: Option<String>,
 }
 
-pub(crate) struct _CleanupLog;
+pub struct _CleanupLog;
 
 impl _CleanupLog {
     pub fn log(log_dir: &Path, entry: &_CleanupLogEntry) {
@@ -311,7 +311,7 @@ impl _CleanupLog {
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _BackupManifest {
+pub struct _BackupManifest {
     pub backup_id: String,
     pub created_at: i64,
     pub project: String,
@@ -322,7 +322,7 @@ pub(crate) struct _BackupManifest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct _BackupIndex {
+pub struct _BackupIndex {
     pub backups: Vec<_BackupManifest>,
     pub last_backup: Option<i64>,
 }
@@ -829,7 +829,7 @@ impl CleanupPattern {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CleanupResult {
+pub struct _CleanupResult {
     pub kind: CleanupKind,
     pub scanned_count: usize,
     pub deletable_count: usize,
@@ -1331,7 +1331,7 @@ fn run_output(cmd: &str, args: &[&str]) -> Result<String, String> {
 
 /// 命令式清理项 — 一条可执行的外部清理命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CommandCleanup {
+pub struct _CommandCleanup {
     pub name: &'static str,
     pub kind: CleanupKind,
     /// 实际执行命令 (argv)
@@ -1400,7 +1400,7 @@ impl _CommandCleanup {
 
 /// 命令式清理执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CommandResult {
+pub struct _CommandResult {
     pub name: String,
     pub status: String, // "skipped" | "dry_run" | "executed" | "failed" | "needs_confirm"
     pub output: String,
@@ -1409,7 +1409,7 @@ pub(crate) struct _CommandResult {
 }
 
 /// 命令式清理执行器 — 挂载于 CleanupEngine
-pub(crate) struct _CommandCleaner {
+pub struct _CommandCleaner {
     pub items: Vec<_CommandCleanup>,
     pub dry_run: bool,
     pub risk_gate: RiskLevel,

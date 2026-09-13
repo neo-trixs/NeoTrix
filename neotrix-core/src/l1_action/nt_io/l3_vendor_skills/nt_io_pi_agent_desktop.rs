@@ -11,7 +11,7 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 会话节点: 一棵会话树中的一次对话/任务单元。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct SessionNode {
+pub struct SessionNode {
     pub id: String,
     pub parent_id: Option<String>,
     pub label: String,
@@ -19,13 +19,13 @@ pub(crate) struct SessionNode {
 
 /// 双轨分支: 主轨 (main) 与实验轨 (track), 可合并回主轨。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct DualTrack {
+pub struct DualTrack {
     pub main: String,
     pub track: String,
 }
 
 /// 智能体桌面客户端 trait — 会话树 + 双轨分支 + CodeGraph 接口 stub。
-pub(crate) trait AgentDesktopClient: Send + Sync {
+pub trait AgentDesktopClient: Send + Sync {
     /// 校验会话树合法: 空树否, 每个非根节点有合法 parent, 无环。
     fn is_valid_tree(&self, nodes: &[SessionNode]) -> bool;
     /// 生成 CodeGraph MCP 查询规格: 给定符号名返回查询串, 空名返回 None。
@@ -36,7 +36,7 @@ pub(crate) trait AgentDesktopClient: Send + Sync {
 
 /// 默认实现。
 #[derive(Default)]
-pub(crate) struct PiAgentDesktop;
+pub struct PiAgentDesktop;
 
 impl AgentDesktopClient for PiAgentDesktop {
     fn is_valid_tree(&self, nodes: &[SessionNode]) -> bool {
@@ -90,7 +90,7 @@ impl AgentDesktopClient for PiAgentDesktop {
 
 /// T1 SelfTest: 验证会话树校验与 CodeGraph 接口存在且生效。
 #[derive(Default)]
-pub(crate) struct PiAgentDesktopSelfTest;
+pub struct PiAgentDesktopSelfTest;
 
 impl SelfTest for PiAgentDesktopSelfTest {
     fn name(&self) -> &str {

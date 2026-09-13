@@ -86,7 +86,7 @@ pub use goal_contract::{
 pub use recipe::RecipeStage;
 
 // Internal helper shared across hyperagent sub-modules
-pub(crate) use hyperarchive::cosine_distance;
+pub use hyperarchive::cosine_distance;
 
 
 /// SEAL RL 训练循环的单元测试

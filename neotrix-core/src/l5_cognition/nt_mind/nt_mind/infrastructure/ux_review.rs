@@ -2,7 +2,7 @@ use crate::l5_cognition::nt_mind::nt_mind::core::CapabilityVector;
 use crate::l5_cognition::nt_mind::nt_mind::self_edit::MicroEdit;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum _UxSeverity {
+pub enum _UxSeverity {
     Critical,
     High,
     Medium,
@@ -11,7 +11,7 @@ pub(crate) enum _UxSeverity {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum _UxCategory {
+pub enum _UxCategory {
     Accessibility,
     VisualHierarchy,
     Consistency,
@@ -25,7 +25,7 @@ pub(crate) enum _UxCategory {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _UxIssue {
+pub struct _UxIssue {
     pub category: _UxCategory,
     pub severity: _UxSeverity,
     pub heuristic: String,
@@ -34,7 +34,7 @@ pub(crate) struct _UxIssue {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _UxReviewReport {
+pub struct _UxReviewReport {
     pub component: String,
     pub issues: Vec<_UxIssue>,
     pub accessibility_score: f64,

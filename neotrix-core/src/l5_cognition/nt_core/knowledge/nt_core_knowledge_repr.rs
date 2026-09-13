@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 知识表示引擎
-pub(crate) struct _KnowledgeRepresentationEngine {
+pub struct _KnowledgeRepresentationEngine {
     ontology: Ontology,
     knowledge_base: KnowledgeBase,
     reasoner: Reasoner,
@@ -21,7 +21,7 @@ pub(crate) struct _KnowledgeRepresentationEngine {
 
 /// KR 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KRConfig {
+pub struct _KRConfig {
     pub ontology_format: String,
     pub reasoning_depth: u32,
     pub enable_inference: bool,
@@ -52,7 +52,7 @@ pub struct Ontology {
 
 /// 本体类
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _OntologyClass {
+pub struct _OntologyClass {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
@@ -62,7 +62,7 @@ pub(crate) struct _OntologyClass {
 
 /// 本体属性
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _OntologyProperty {
+pub struct _OntologyProperty {
     pub id: String,
     pub name: String,
     pub property_type: _PropertyType,
@@ -73,7 +73,7 @@ pub(crate) struct _OntologyProperty {
 /// 属性类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _PropertyType {
+pub enum _PropertyType {
     Object,
     Data,
     Annotation,
@@ -81,7 +81,7 @@ pub(crate) enum _PropertyType {
 
 /// 本体个体
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _OntologyIndividual {
+pub struct _OntologyIndividual {
     pub id: String,
     pub name: String,
     pub class: String,
@@ -143,7 +143,7 @@ pub struct Reasoner {
 
 /// 推理规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _InferenceRule {
+pub struct _InferenceRule {
     pub id: String,
     pub name: String,
     pub preconditions: Vec<String>,
@@ -153,7 +153,7 @@ pub(crate) struct _InferenceRule {
 
 /// 推理结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _InferenceResult {
+pub struct _InferenceResult {
     pub inferred_facts: Vec<Fact>,
     pub reasoning_chain: Vec<String>,
     pub confidence: f64,
@@ -170,7 +170,7 @@ pub struct RetrievalResult {
 
 /// KR 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KRStats {
+pub struct _KRStats {
     pub entities_stored: u64,
     pub relations_stored: u64,
     pub facts_stored: u64,

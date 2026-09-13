@@ -8,7 +8,7 @@
 use crate::core::nt_core_self_test::SelfTest;
 
 /// BGM 推广器 trait — 把曲目信息映射为推广文案与标签集。
-pub(crate) trait BgmPromoter: Send + Sync {
+pub trait BgmPromoter: Send + Sync {
     /// 生成一条推广文案。
     fn compose_promo(&self, track: &str, mood: &str) -> String;
     /// 为曲目生成 hashtag 列表 (不含 # 前缀)。
@@ -17,7 +17,7 @@ pub(crate) trait BgmPromoter: Send + Sync {
 
 /// 默认实现: 模板化文案 + 基于 mood/track 的标签派生。
 #[derive(Default)]
-pub(crate) struct BgmPromoEngine;
+pub struct BgmPromoEngine;
 
 impl BgmPromoter for BgmPromoEngine {
     fn compose_promo(&self, track: &str, mood: &str) -> String {
@@ -33,7 +33,7 @@ impl BgmPromoter for BgmPromoEngine {
 
 /// T1 SelfTest: 验证推广引擎存在并能产出文案与标签。
 #[derive(Default)]
-pub(crate) struct PromoBgmSelfTest;
+pub struct PromoBgmSelfTest;
 
 impl SelfTest for PromoBgmSelfTest {
     fn name(&self) -> &str {

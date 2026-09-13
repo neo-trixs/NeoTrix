@@ -27,7 +27,7 @@ impl Hypothesis {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ABTestDesign {
+pub struct ABTestDesign {
     pub hypothesis_id: String,
     pub control_description: String,
     pub treatment_description: String,
@@ -59,7 +59,7 @@ pub struct ExperimentResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ExperimentRegistry {
+pub struct ExperimentRegistry {
     pub hypotheses: HashMap<String, Hypothesis>,
     pub designs: HashMap<String, ABTestDesign>,
     pub results: HashMap<String, ExperimentResult>,

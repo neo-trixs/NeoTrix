@@ -17,7 +17,7 @@ use super::nt_memory_sweep_20260815::FreshnessLedger;
 
 /// Summary produced by a single `run_cycle` invocation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ForgettingReport {
+pub struct ForgettingReport {
     /// Nodes marked in DB metadata by the ForgettingCurve.
     pub curve_marked: usize,
     /// Confidence entries decayed by ConfidenceStore::apply_decay.

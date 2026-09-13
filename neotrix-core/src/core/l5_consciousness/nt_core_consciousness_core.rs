@@ -3025,7 +3025,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         // ── Media asset registry (l2_perception::nt_world::media_asset_registry) ──
         "media_asset_registry" => {
             use crate::l2_perception::nt_world::media_asset_registry::_MediaAssetRegistry;
-            let reg = _MediaAssetRegistry::new();
+            let reg = _MediaAssetRegistry::new("/tmp/neotrix_media_assets");
             let stats = reg.statistics();
             let type_summary: Vec<String> = stats.assets_by_type.iter().map(|(k, v)| format!("{}:{}", k, v)).collect();
             (
@@ -3058,7 +3058,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── Image super resolution (neotrix::nt_file_ability::image_super_resolution) ──
         "image_super_resolution" => {
-            let resolver = crate::neotrix::nt_file_ability::image_super_resolution::ImageSuperResolver::new();
+            let resolver = crate::neotrix::nt_file_ability::ImageSuperResolver::new();
             let stats = resolver.statistics();
             (
                 true,

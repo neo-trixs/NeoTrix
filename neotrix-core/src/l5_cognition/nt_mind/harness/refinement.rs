@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 /// 快照（用于回滚）
 #[derive(Debug, Clone)]
-pub(crate) struct _HarnessSnapshot {
+pub struct _HarnessSnapshot {
     pub snapshot_id: String,
     pub timestamp: i64,
     pub state: HashMap<String, String>,
@@ -17,7 +17,7 @@ pub(crate) struct _HarnessSnapshot {
 
 /// 精炼更新
 #[derive(Debug, Clone)]
-pub(crate) struct _RefinementUpdate {
+pub struct _RefinementUpdate {
     pub update_id: String,
     pub target: String, // 要更新的配置/提示词/规则
     pub before: String,
@@ -28,7 +28,7 @@ pub(crate) struct _RefinementUpdate {
 
 /// 精炼结果
 #[derive(Debug, Clone)]
-pub(crate) struct _RefinementResult {
+pub struct _RefinementResult {
     pub snapshot_id: String,
     pub updates_applied: Vec<_RefinementUpdate>,
     pub updates_rejected: Vec<(_RefinementUpdate, String)>,

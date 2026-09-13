@@ -83,14 +83,14 @@ pub enum InteractionType {
 
 /// 评分规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ScoringRule {
+pub struct ScoringRule {
     pub field: String,
     pub condition: ScoringCondition,
     pub points: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum ScoringCondition {
+pub enum ScoringCondition {
     Exists,
     Equals(String),
     Contains(String),
@@ -100,7 +100,7 @@ pub(crate) enum ScoringCondition {
 
 /// 询盘更新参数
 #[derive(Debug, Clone, Default)]
-pub(crate) struct LeadUpdate {
+pub struct LeadUpdate {
     pub company_name: Option<String>,
     pub email: Option<String>,
     pub phone: Option<String>,
@@ -337,7 +337,7 @@ impl DataStore for LeadManager {
 // Registry + Router + Bridge
 // ════════════════════════════════════════════════════════════════
 
-pub(crate) struct LeadRegistry {
+pub struct LeadRegistry {
     managers: Vec<Box<dyn DataStore>>,
 }
 
@@ -360,7 +360,7 @@ impl LeadRegistry {
     }
 }
 
-pub(crate) struct LeadRouter { registry: LeadRegistry }
+pub struct LeadRouter { registry: LeadRegistry }
 
 impl LeadRouter {
     pub fn new(registry: LeadRegistry) -> Self { Self { registry } }
@@ -371,7 +371,7 @@ impl LeadRouter {
     }
 }
 
-pub(crate) struct LeadBridge { router: LeadRouter }
+pub struct LeadBridge { router: LeadRouter }
 
 impl LeadBridge {
     pub fn new(router: LeadRouter) -> Self { Self { router } }

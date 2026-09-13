@@ -24,7 +24,7 @@ use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
 /// 7 域 → 主属能力 (36 原子能力 Cycle 121)
-pub(crate) fn branch_capabilities() -> BTreeMap<&'static str, &'static [&'static str]> {
+pub fn branch_capabilities() -> BTreeMap<&'static str, &'static [&'static str]> {
     let mut m = BTreeMap::new();
     m.insert("NT-CORE", &["detect", "classify", "measure", "predict", "compare", "discover",
                           "plan", "decompose", "critique", "explain"][..]);
@@ -39,7 +39,7 @@ pub(crate) fn branch_capabilities() -> BTreeMap<&'static str, &'static [&'static
 }
 
 /// 5 道之本源 (Cycle 161i): 每节点溯源到一个本源 + 演化路径。
-pub(crate) fn source_cores() -> &'static [(&'static str, &'static str, &'static [&'static str], &'static str)] {
+pub fn source_cores() -> &'static [(&'static str, &'static str, &'static [&'static str], &'static str)] {
     use std::sync::OnceLock;
     static CORES: OnceLock<Vec<(&str, &str, &[&str], &str)>> = OnceLock::new();
     CORES.get_or_init(|| {

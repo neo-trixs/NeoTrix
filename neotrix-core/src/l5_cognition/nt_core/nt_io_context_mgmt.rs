@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 上下文管理器
-pub(crate) struct ContextManager {
+pub struct ContextManager {
     windows: HashMap<String, ContextWindow>,
     priority_queue: Vec<ContextItem>,
     #[allow(dead_code)]
@@ -28,7 +28,7 @@ pub(crate) struct ContextManager {
 /// For >256K tokens: use paged KV virtualization (GPU→Host→NVMe tiered).
 /// The threshold is configurable (default 256K tokens).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum ContextStrategy {
+pub enum ContextStrategy {
     /// Compaction mode: summarize + drop low-priority items when window full.
     /// Fast, low memory, suitable for short sessions (<256K tokens).
     Compaction,
@@ -48,7 +48,7 @@ impl Default for ContextStrategy {
 /// Manages GPU→Host→NVMe tiered KV storage with page-level granularity.
 /// GPU memory stays constant regardless of workspace size.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PagedKvState {
+pub struct PagedKvState {
     /// Current strategy (auto-switched based on token count).
     pub strategy: ContextStrategy,
     /// Token threshold for switching from compaction to paged KV.
@@ -95,7 +95,7 @@ impl Default for PagedKvState {
 /// Inter-step KL divergence is ~37× higher than intra-step (KVMem finding),
 /// so the working set updates once per step, not per token.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct WorkingSet {
+pub struct WorkingSet {
     /// Retained page indices (GPU-resident, no transfer needed).
     pub retained: Vec<usize>,
     /// Incoming page indices (must be transferred to GPU).
@@ -124,7 +124,7 @@ pub enum MemoryTier {
 
 /// 上下文配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ContextConfig {
+pub struct ContextConfig {
     pub max_window_size: usize,
     pub compression_ratio: f64,
     pub priority_levels: u32,
@@ -158,7 +158,7 @@ pub struct ContextWindow {
 
 /// 上下文项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ContextItem {
+pub struct ContextItem {
     pub id: String,
     pub item_type: ItemType,
     pub content: String,
@@ -171,7 +171,7 @@ pub(crate) struct ContextItem {
 /// 项类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ItemType {
+pub enum ItemType {
     UserMessage,
     AssistantMessage,
     SystemMessage,
@@ -183,14 +183,14 @@ pub(crate) enum ItemType {
 }
 
 /// 压缩引擎
-pub(crate) struct CompressionEngine {
+pub struct CompressionEngine {
     #[allow(dead_code)]
     compression_map: HashMap<String, String>,
 }
 
 /// 上下文统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ContextStats {
+pub struct ContextStats {
     pub total_windows: u64,
     pub total_items: u64,
     pub items_compressed: u64,
@@ -212,7 +212,7 @@ pub struct SessionState {
 
 /// 多文件协调结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct MultiFileCoordination {
+pub struct MultiFileCoordination {
     pub files: Vec<FileContext>,
     pub dependencies: Vec<FileDependency>,
     pub edit_plan: Vec<EditOperation>,
@@ -221,7 +221,7 @@ pub(crate) struct MultiFileCoordination {
 
 /// 文件上下文
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct FileContext {
+pub struct FileContext {
     pub path: String,
     pub content: String,
     pub language: String,
@@ -231,7 +231,7 @@ pub(crate) struct FileContext {
 
 /// 文件依赖
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct FileDependency {
+pub struct FileDependency {
     pub source: String,
     pub target: String,
     pub dependency_type: String,
@@ -239,7 +239,7 @@ pub(crate) struct FileDependency {
 
 /// 编辑操作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EditOperation {
+pub struct EditOperation {
     pub file_path: String,
     pub operation_type: String,
     pub start_line: u32,
@@ -249,7 +249,7 @@ pub(crate) struct EditOperation {
 
 /// 编辑冲突
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EditConflict {
+pub struct EditConflict {
     pub file_path: String,
     pub conflict_type: String,
     pub range: (u32, u32),

@@ -28,7 +28,7 @@ impl Severity {
 
 /// 单个设定问题
 #[derive(Debug, Clone)]
-pub(crate) struct SettingIssue {
+pub struct SettingIssue {
     pub severity: Severity,
     pub dimension: &'static str,
     pub node_id: String,
@@ -38,7 +38,7 @@ pub(crate) struct SettingIssue {
 
 /// 设定一致性检查报告
 #[derive(Debug, Clone, Default)]
-pub(crate) struct SettingConsistencyReport {
+pub struct SettingConsistencyReport {
     pub checked_at: u64,
     pub issues: Vec<SettingIssue>,
     pub scanned_nodes: usize,
@@ -188,7 +188,7 @@ fn check_drift(conn: &Connection, report: &mut SettingConsistencyReport) -> rusq
 }
 
 /// 便捷函数: 执行检查并打印人类可读报告（对标"每卷设定检查"）
-pub(crate) fn check_and_report(conn: &Connection, _path: &str) -> rusqlite::Result<SettingConsistencyReport> {
+pub fn check_and_report(conn: &Connection, _path: &str) -> rusqlite::Result<SettingConsistencyReport> {
     let report = check(conn)?;
     print!("{}", render_report(&report));
     Ok(report)

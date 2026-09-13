@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 /// 一致性修复策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _ConsistencyFixStrategy {
+pub enum _ConsistencyFixStrategy {
     /// ADetailer 自动修复
     ADetailer,
     /// FaceDetailer 自动修复
@@ -32,7 +32,7 @@ pub(crate) enum _ConsistencyFixStrategy {
 
 /// 视觉元素类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _VisualElementType {
+pub enum _VisualElementType {
     /// 角色
     Character,
     /// 物体
@@ -47,7 +47,7 @@ pub(crate) enum _VisualElementType {
 
 /// 一致性修复配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConsistencyFixConfig {
+pub struct _ConsistencyFixConfig {
     /// 修复策略
     pub strategy: _ConsistencyFixStrategy,
     /// 检测阈值 (0.0-1.0)
@@ -66,7 +66,7 @@ pub(crate) struct _ConsistencyFixConfig {
 
 /// 一致性修复结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConsistencyFixResult {
+pub struct _ConsistencyFixResult {
     /// 是否成功
     pub success: bool,
     /// 修复后的图片路径
@@ -106,7 +106,7 @@ pub struct RegionConfig {
 
 /// 分区控制配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RegionalControlConfig {
+pub struct _RegionalControlConfig {
     /// 是否启用
     pub enabled: bool,
     /// 分区模式
@@ -140,7 +140,7 @@ pub enum RegionalMode {
 
 /// 视觉一致性管理器
 /// 管理视觉元素跨帧/跨镜头的一致性
-pub(crate) struct _VisualConsistencyManager {
+pub struct _VisualConsistencyManager {
     /// 一致性修复配置
     #[allow(dead_code)]
     fix_config: _ConsistencyFixConfig,

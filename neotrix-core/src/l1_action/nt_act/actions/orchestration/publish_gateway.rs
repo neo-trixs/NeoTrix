@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 平台类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub(crate) enum PublishPlatform {
+pub enum PublishPlatform {
     /// YouTube
     YouTube,
     /// TikTok
@@ -31,7 +31,7 @@ pub(crate) enum PublishPlatform {
 
 /// 发布状态
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum PublishStatus {
+pub enum PublishStatus {
     /// 待发布
     Pending,
     /// 上传中
@@ -46,7 +46,7 @@ pub(crate) enum PublishStatus {
 
 /// 发布配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PublishConfig {
+pub struct PublishConfig {
     /// 平台
     pub platform: PublishPlatform,
     /// OAuth 令牌
@@ -63,7 +63,7 @@ pub(crate) struct PublishConfig {
 
 /// 视频元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct VideoMetadata {
+pub struct VideoMetadata {
     /// 标题
     pub title: String,
     /// 描述
@@ -82,7 +82,7 @@ pub(crate) struct VideoMetadata {
 
 /// 发布结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PublishResult {
+pub struct PublishResult {
     /// 是否成功
     pub success: bool,
     /// 发布URL
@@ -99,7 +99,7 @@ pub(crate) struct PublishResult {
 
 /// 发布任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PublishTask {
+pub struct PublishTask {
     /// 任务ID
     pub task_id: String,
     /// 视频文件路径
@@ -121,7 +121,7 @@ pub(crate) struct PublishTask {
 // ============================================================================
 
 /// 发布网关
-pub(crate) struct PublishGateway {
+pub struct PublishGateway {
     /// 平台配置
     configs: HashMap<PublishPlatform, PublishConfig>,
     /// 发布任务
@@ -323,7 +323,7 @@ impl PublishGateway {
 
 /// 发布统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PublishStats {
+pub struct PublishStats {
     /// 总任务数
     pub total_tasks: usize,
     /// 已发布任务数

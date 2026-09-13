@@ -127,7 +127,7 @@ pub struct StoryboardScript {
 
 /// 分镜拆解配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StoryboardConfig {
+pub struct _StoryboardConfig {
     /// 目标时长模式
     pub duration_mode: DurationMode,
     /// 默认镜头时长 (秒)

@@ -133,7 +133,7 @@ pub async fn brain_stats_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct AbsorbBody {
+pub struct AbsorbBody {
     source: String,
 }
 
@@ -201,7 +201,7 @@ pub async fn search_knowledge_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct ReasonBody {
+pub struct ReasonBody {
     prompt: String,
 }
 
@@ -243,7 +243,7 @@ pub async fn session_list_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct CreateSessionBody {
+pub struct CreateSessionBody {
     name: String,
 }
 
@@ -329,7 +329,7 @@ pub async fn session_export_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct ImportBody {
+pub struct ImportBody {
     json: String,
 }
 
@@ -403,7 +403,7 @@ pub async fn agent_status_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct AgentStartBody {
+pub struct AgentStartBody {
     prompt: String,
 }
 
@@ -439,7 +439,7 @@ pub async fn agent_stop_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct AgentReasonBody {
+pub struct AgentReasonBody {
     prompt: String,
 }
 
@@ -491,7 +491,7 @@ pub async fn agent_reason_stream_handler(
 // ─── Project / File Handlers ───────────────────────────────
 
 #[derive(Deserialize)]
-pub(crate) struct TreeQuery {
+pub struct TreeQuery {
     path: String,
     #[serde(default = "default_depth")]
     depth: u32,
@@ -546,7 +546,7 @@ pub async fn file_tree_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct FileQuery {
+pub struct FileQuery {
     path: String,
 }
 
@@ -558,7 +558,7 @@ pub async fn read_file_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct WriteFileBody {
+pub struct WriteFileBody {
     path: String,
     content: String,
 }
@@ -571,7 +571,7 @@ pub async fn write_file_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct DetectQuery {
+pub struct DetectQuery {
     path: String,
 }
 
@@ -620,7 +620,7 @@ pub async fn diff_unstaged_handler() -> Json<serde_json::Value> {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct DiffFileQuery {
+pub struct DiffFileQuery {
     path: String,
 }
 
@@ -646,7 +646,7 @@ pub async fn pending_permissions_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct PermissionRequestAction {
+pub struct PermissionRequestAction {
     pub action: String,
     pub target: String,
 }
@@ -747,7 +747,7 @@ pub async fn save_provider_handler(
 }
 
 #[derive(Deserialize)]
-pub(crate) struct CliCommandBody {
+pub struct CliCommandBody {
     command: String,
 }
 
@@ -778,13 +778,13 @@ pub async fn cli_command_handler(
 // ─── Session Share (通用能力: 从 server/http.rs 拆解融合) ──────────
 
 #[derive(Deserialize)]
-pub(crate) struct ShareCreateRequest {
+pub struct ShareCreateRequest {
     pub name: String,
     pub ttl_hours: Option<u64>,
 }
 
 #[derive(Serialize)]
-pub(crate) struct ShareCreateResponse {
+pub struct ShareCreateResponse {
     pub token: String,
     pub url: String,
     pub session_name: String,
@@ -793,7 +793,7 @@ pub(crate) struct ShareCreateResponse {
 }
 
 #[derive(Serialize)]
-pub(crate) struct ShareGetResponse {
+pub struct ShareGetResponse {
     pub session_name: String,
     pub session_json: serde_json::Value,
     pub created_at: String,
@@ -905,7 +905,7 @@ pub async fn h5_page() -> axum::response::Html<&'static str> {
 }
 
 /// CORS 中间件头
-pub(crate) fn cors_headers() -> axum::http::HeaderMap {
+pub fn cors_headers() -> axum::http::HeaderMap {
     let mut h = axum::http::HeaderMap::new();
     h.insert("Access-Control-Allow-Origin", axum::http::HeaderValue::from_static("*"));
     h.insert("Access-Control-Allow-Methods", axum::http::HeaderValue::from_static("GET,POST,OPTIONS"));
@@ -920,7 +920,7 @@ pub(crate) fn cors_headers() -> axum::http::HeaderMap {
 use uuid::Uuid;
 
 #[derive(Deserialize)]
-pub(crate) struct OpenAIChatCompletionRequest {
+pub struct OpenAIChatCompletionRequest {
     pub model: String,
     pub messages: Vec<OpenAIMessage>,
     #[serde(default)]
@@ -942,7 +942,7 @@ pub(crate) struct OpenAIChatCompletionRequest {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub(crate) struct OpenAIMessage {
+pub struct OpenAIMessage {
     pub role: String,
     pub content: String,
     #[serde(default)]
@@ -954,7 +954,7 @@ pub(crate) struct OpenAIMessage {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub(crate) struct OpenAIToolCall {
+pub struct OpenAIToolCall {
     pub id: String,
     #[serde(rename = "type")]
     pub call_type: String,
@@ -962,13 +962,13 @@ pub(crate) struct OpenAIToolCall {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub(crate) struct OpenAIToolCallFunction {
+pub struct OpenAIToolCallFunction {
     pub name: String,
     pub arguments: String,
 }
 
 #[derive(Serialize)]
-pub(crate) struct OpenAIChatCompletionResponse {
+pub struct OpenAIChatCompletionResponse {
     pub id: String,
     pub object: String,
     pub created: i64,
@@ -979,7 +979,7 @@ pub(crate) struct OpenAIChatCompletionResponse {
 }
 
 #[derive(Serialize)]
-pub(crate) struct OpenAIChoice {
+pub struct OpenAIChoice {
     pub index: u32,
     pub message: OpenAIMessage,
     pub finish_reason: Option<String>,
@@ -987,14 +987,14 @@ pub(crate) struct OpenAIChoice {
 }
 
 #[derive(Serialize)]
-pub(crate) struct OpenAIUsage {
+pub struct OpenAIUsage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
 }
 
 #[derive(Serialize)]
-pub(crate) struct OpenAIModel {
+pub struct OpenAIModel {
     pub id: String,
     pub object: String,
     pub created: i64,
@@ -1002,7 +1002,7 @@ pub(crate) struct OpenAIModel {
 }
 
 #[derive(Serialize)]
-pub(crate) struct OpenAIModelList {
+pub struct OpenAIModelList {
     pub object: String,
     pub data: Vec<OpenAIModel>,
 }

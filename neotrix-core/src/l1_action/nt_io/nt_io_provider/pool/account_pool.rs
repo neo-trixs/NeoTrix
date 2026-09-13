@@ -383,7 +383,7 @@ impl AccountPool {
 /// 用户已有 ChatGPT (Codex)/Claude/Grok (X Premium) 等订阅可直接作为 LLM provider 复用,
 /// 无需新建账户。每条订阅映射为一个可选择的账户, 汇入 AccountPool 健康/检疫/并发语义。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct ByokSubscription {
+pub struct ByokSubscription {
     /// 订阅名称, 如 "codex" / "claude-pro" / "grok-premium"。
     pub name: String,
     /// 订阅所属服务 (映射到 provider), 如 "openai" / "anthropic" / "xai"。
@@ -396,7 +396,7 @@ pub(crate) struct ByokSubscription {
 
 /// BYOK 订阅接入方式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum ByokKind {
+pub enum ByokKind {
     /// 借既有 harness/CLI 订阅 (Codex/Claude Code/Grok), 走本地凭证直连。
     HarnessSubscription,
     /// 自带 API 密钥, 但走订阅计费档位 (复用订阅配额而非独立计费)。
@@ -412,7 +412,7 @@ impl ByokSubscription {
 
 /// BYOK 订阅池 — 管理用户已有订阅的注册/查询/健康聚合。
 #[derive(Debug, Default)]
-pub(crate) struct ByokPool {
+pub struct ByokPool {
     subs: Arc<RwLock<HashMap<String, ByokSubscription>>>,
 }
 

@@ -35,7 +35,7 @@ impl Default for MetaObserverConfig {
 
 /// 单分支元观察项
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct _BranchObservation {
+pub struct _BranchObservation {
     pub branch: String,
     pub health: f64,
     pub fog: f64,

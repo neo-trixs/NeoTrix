@@ -122,7 +122,7 @@ pub struct MetaPattern {
 
 /// 迭代统计
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct _IterationStats {
+pub struct _IterationStats {
     /// 总周期数
     pub total_cycles: u32,
     /// 总漏洞发现数
@@ -141,7 +141,7 @@ pub(crate) struct _IterationStats {
 
 /// 迭代报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _IterationReport {
+pub struct _IterationReport {
     /// 统计
     pub stats: _IterationStats,
     /// 最终状态

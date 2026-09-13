@@ -8,7 +8,7 @@ use std::time::Instant;
 
 /// 质量维度
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum _QualityDimension {
+pub enum _QualityDimension {
     /// 时序一致性 (帧间稳定性)
     TemporalConsistency,
     /// 视觉保真度
@@ -27,7 +27,7 @@ pub(crate) enum _QualityDimension {
 
 /// 帧质量评估
 #[derive(Debug, Clone)]
-pub(crate) struct _FrameQuality {
+pub struct _FrameQuality {
     /// 帧索引
     pub index: u32,
     /// 时间戳 (毫秒)
@@ -42,7 +42,7 @@ pub(crate) struct _FrameQuality {
 
 /// 片段质量评估
 #[derive(Debug, Clone)]
-pub(crate) struct _SegmentQuality {
+pub struct _SegmentQuality {
     /// 片段 ID
     pub segment_id: String,
     /// 帧范围
@@ -57,7 +57,7 @@ pub(crate) struct _SegmentQuality {
 
 /// 整体质量报告
 #[derive(Debug, Clone)]
-pub(crate) struct _QualityReport {
+pub struct _QualityReport {
     /// 视频 ID
     pub video_id: String,
     /// 总帧数
@@ -76,7 +76,7 @@ pub(crate) struct _QualityReport {
 
 /// 质量等级
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum _QualityGrade {
+pub enum _QualityGrade {
     Excellent,
     Good,
     Fair,
@@ -126,7 +126,7 @@ pub enum IssueSeverity {
 }
 
 /// 视频质量评分器
-pub(crate) struct _VideoQualityScorer {
+pub struct _VideoQualityScorer {
     /// 帧质量历史
     frame_qualities: Vec<_FrameQuality>,
     /// 片段质量
@@ -137,7 +137,7 @@ pub(crate) struct _VideoQualityScorer {
 
 /// 评分器配置
 #[derive(Debug, Clone)]
-pub(crate) struct _ScorerConfig {
+pub struct _ScorerConfig {
     /// 最小帧分数阈值
     pub min_frame_score: f64,
     /// 时序一致性阈值
@@ -330,7 +330,7 @@ impl Default for _VideoQualityScorer {
 
 /// 评分统计
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _ScorerStats {
+pub struct _ScorerStats {
     pub total_frames: u32,
     pub total_segments: u32,
     pub avg_frame_score: f64,

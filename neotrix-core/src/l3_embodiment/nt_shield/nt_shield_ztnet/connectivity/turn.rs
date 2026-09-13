@@ -142,7 +142,7 @@ impl _TurnMessage {
 }
 
 /// 编码XOR地址
-pub(crate) fn encode_xor_address(addr: &SocketAddr, transaction_id: &[u8; 12]) -> Vec<u8> {
+pub fn encode_xor_address(addr: &SocketAddr, transaction_id: &[u8; 12]) -> Vec<u8> {
     let mut buf = Vec::with_capacity(8);
     buf.push(0);  // Reserved
 

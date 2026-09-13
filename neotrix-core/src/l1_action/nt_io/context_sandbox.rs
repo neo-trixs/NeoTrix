@@ -25,7 +25,7 @@ pub enum CompressionLevel {
 
 /// 沙箱化后的工具输出
 #[derive(Debug, Clone)]
-pub(crate) struct SandboxedOutput {
+pub struct SandboxedOutput {
     /// 工具名称
     pub tool_name: String,
     /// 原始输出
@@ -64,7 +64,7 @@ impl Default for SandboxConfig {
 }
 
 /// 上下文沙箱 — 在工具输出进入上下文前进行压缩
-pub(crate) struct ContextSandbox {
+pub struct ContextSandbox {
     config: SandboxConfig,
     history: Vec<SandboxedOutput>,
     /// 追加式存储 — 原始输出按 §id 引用

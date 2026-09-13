@@ -10,7 +10,7 @@ use super::NtxFile;
 
 /// 同步策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SyncStrategy {
+pub enum SyncStrategy {
     /// 双写: SQLite + NTX 同时写入
     DualWrite,
     /// 仅快照: SQLite 定期快照到 NTX
@@ -21,7 +21,7 @@ pub(crate) enum SyncStrategy {
 
 /// 同步统计
 #[derive(Debug, Clone, Default)]
-pub(crate) struct SyncStats {
+pub struct SyncStats {
     pub frames_synced: u64,
     pub nodes_synced: u64,
     pub edges_synced: u64,
@@ -53,7 +53,7 @@ impl Default for SyncConfig {
 }
 
 /// NTX 同步引擎
-pub(crate) struct NtxSync {
+pub struct NtxSync {
     ntx_path: PathBuf,
     config: SyncConfig,
     stats: SyncStats,
@@ -226,7 +226,7 @@ impl NtxSync {
 
 /// 导入结果
 #[derive(Debug, Clone)]
-pub(crate) struct ImportResult {
+pub struct ImportResult {
     pub frame_count: u64,
     pub node_count: u64,
     pub edge_count: u64,

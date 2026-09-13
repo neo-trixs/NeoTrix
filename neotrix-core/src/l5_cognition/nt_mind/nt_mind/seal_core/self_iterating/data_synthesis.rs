@@ -11,7 +11,7 @@ use std::collections::{HashMap, VecDeque};
 
 /// Role in the asymmetric co-evolution data synthesis pipeline
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum _SynthesisRole {
+pub enum _SynthesisRole {
     Proposer,
     Solver,
     Verifier,
@@ -29,7 +29,7 @@ impl _SynthesisRole {
 
 /// A piece of synthetic training data
 #[derive(Debug, Clone)]
-pub(crate) struct _TrainingDataRecord {
+pub struct _TrainingDataRecord {
     pub id: String,
     pub source_role: _SynthesisRole,
     pub task_type: DataTaskType,
@@ -69,7 +69,7 @@ impl DataTaskType {
 
 /// Configuration for the data synthesis pipeline
 #[derive(Debug, Clone)]
-pub(crate) struct _SynthesisConfig {
+pub struct _SynthesisConfig {
     pub max_records_per_cycle: usize,
     pub min_quality_threshold: f64,
     pub diversity_target: f64,
@@ -170,7 +170,7 @@ impl VerificationResult {
 
 /// Cycle statistics for the synthesis pipeline
 #[derive(Debug, Clone)]
-pub(crate) struct _SynthesisStats {
+pub struct _SynthesisStats {
     pub cycle: u64,
     pub proposed: usize,
     pub solved: usize,
@@ -356,7 +356,7 @@ impl AsymmetricSynthesisPipeline {
 
 /// SEAL pipeline stage wrapper for data synthesis
 #[derive(Debug, Clone)]
-pub(crate) struct _DataSynthesisStage {
+pub struct _DataSynthesisStage {
     pub pipeline: AsymmetricSynthesisPipeline,
     pub enabled: bool,
 }
@@ -382,7 +382,7 @@ impl _DataSynthesisStage {
 
 /// Gap detector — identifies knowledge gaps for data synthesis
 #[derive(Debug, Clone)]
-pub(crate) struct _GapDetector {
+pub struct _GapDetector {
     pub error_history: VecDeque<(String, f64, u64)>,
     pub max_history: usize,
     pub rarity_threshold: f64,
@@ -432,7 +432,7 @@ impl _GapDetector {
 
 /// Diversity tracker — ensures synthetic data covers a broad distribution
 #[derive(Debug, Clone)]
-pub(crate) struct _DiversityTracker {
+pub struct _DiversityTracker {
     pub type_counts: HashMap<DataTaskType, usize>,
     pub type_hashes: HashMap<DataTaskType, Vec<u64>>,
 }

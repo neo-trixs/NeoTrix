@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 场共振协调器
-pub(crate) struct _FieldResonanceCoordinator {
+pub struct _FieldResonanceCoordinator {
     _field_components: Vec<_FieldComponent>,
     _coupling_mechanisms: Vec<_CouplingMechanism>,
     coordination_states: Vec<_CoordinationState>,
@@ -19,7 +19,7 @@ pub(crate) struct _FieldResonanceCoordinator {
 
 /// 场协调配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FieldCoordinationConfig {
+pub struct _FieldCoordinationConfig {
     pub propagation_speed_km_s: f64,
     pub min_entrainment_threshold: f64,
     pub enable_cross_frequency_coupling: bool,
@@ -41,7 +41,7 @@ impl Default for _FieldCoordinationConfig {
 
 /// 场组件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FieldComponent {
+pub struct _FieldComponent {
     pub component_id: String,
     pub component_type: FieldType,
     pub spatial_extent: f64,
@@ -62,7 +62,7 @@ pub enum FieldType {
 
 /// 耦合机制
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CouplingMechanism {
+pub struct _CouplingMechanism {
     pub mechanism_id: String,
     pub coupling_type: _CouplingType,
     pub source_frequency: f64,
@@ -74,7 +74,7 @@ pub(crate) struct _CouplingMechanism {
 /// 耦合类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _CouplingType {
+pub enum _CouplingType {
     PhaseAmplitude,     // 相位-振幅耦合
     FrequencyFrequency, // 频率-频率耦合
     PhasePhase,         // 相位-相位耦合
@@ -83,7 +83,7 @@ pub(crate) enum _CouplingType {
 
 /// 协调状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CoordinationState {
+pub struct _CoordinationState {
     pub state_id: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub field_coherence: f64,
@@ -94,7 +94,7 @@ pub(crate) struct _CoordinationState {
 
 /// 场协调统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FieldCoordinationStats {
+pub struct _FieldCoordinationStats {
     pub total_components: u64,
     pub active_components: u64,
     pub total_couplings: u64,
@@ -105,7 +105,7 @@ pub(crate) struct _FieldCoordinationStats {
 
 /// 全脑整合结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _WholeBrainIntegration {
+pub struct _WholeBrainIntegration {
     pub integration_achieved: bool,
     pub integration_time_ms: f64,
     pub coherence_level: f64,

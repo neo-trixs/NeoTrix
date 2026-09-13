@@ -1,7 +1,7 @@
 type StudySectionTuple<'a> = (&'a str, &'a str, Vec<(String, f64)>);
 
 #[derive(Debug, Clone)]
-pub(crate) struct _CaseStudySection {
+pub struct _CaseStudySection {
     pub title: String,
     pub content: String,
     pub metrics: Vec<(String, f64)>,
@@ -65,7 +65,7 @@ impl CaseStudy {
     }
 }
 
-pub(crate) struct _CaseStudyWriter;
+pub struct _CaseStudyWriter;
 
 impl Default for _CaseStudyWriter {
     fn default() -> Self {

@@ -20,7 +20,7 @@ pub fn default_config_path() -> PathBuf {
 }
 
 /// 从 TOML 文件加载路由配置
-pub(crate) fn _load_router_config(path: Option<PathBuf>) -> RouterConfig {
+pub fn _load_router_config(path: Option<PathBuf>) -> RouterConfig {
     let path = path.unwrap_or_else(default_config_path);
     if path.exists() {
         let content = match std::fs::read_to_string(&path) {
@@ -43,7 +43,7 @@ pub(crate) fn _load_router_config(path: Option<PathBuf>) -> RouterConfig {
 }
 
 /// 保存路由配置到 TOML 文件
-pub(crate) fn _save_router_config(config: &RouterConfig, path: Option<PathBuf>) -> Result<(), String> {
+pub fn _save_router_config(config: &RouterConfig, path: Option<PathBuf>) -> Result<(), String> {
     let path = path.unwrap_or_else(default_config_path);
     let toml_str = toml::to_string_pretty(config).map_err(|e| format!("序列化失败: {}", e))?;
     if let Some(parent) = path.parent() {
@@ -94,7 +94,7 @@ impl ModelTier {
 
 /// 路由特征 — 用于分类 prompt 到合适的 tier
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RouterFeatures {
+pub struct _RouterFeatures {
     pub prompt_length: usize,
     pub language: _LanguageType,
     pub code_ratio: f64,
@@ -112,7 +112,7 @@ pub(crate) struct _RouterFeatures {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum _LanguageType {
+pub enum _LanguageType {
     Chinese,
     English,
     Mixed,
@@ -189,7 +189,7 @@ pub struct RouterConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TierThresholds {
+pub struct _TierThresholds {
     pub t0_max_tokens: usize,
     pub t1_max_tokens: usize,
     pub t2_max_tokens: usize,
@@ -199,7 +199,7 @@ pub(crate) struct _TierThresholds {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TierModelMapping {
+pub struct _TierModelMapping {
     pub tier: ModelTier,
     pub provider: String,
     pub model: String,
@@ -410,7 +410,7 @@ fn detect_language(s: &str) -> _LanguageType {
 
 /// 历史路由记录 — 用于自适应学习
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RouteHistoryEntry {
+pub struct _RouteHistoryEntry {
     pub features: _RouterFeatures,
     pub assigned_tier: ModelTier,
     pub used_fallback: bool,
@@ -420,7 +420,7 @@ pub(crate) struct _RouteHistoryEntry {
 
 /// 自适应学习参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AdaptiveParams {
+pub struct _AdaptiveParams {
     pub success_threshold: f64,
     pub upgrade_threshold: f64,
     pub downgrade_threshold: f64,

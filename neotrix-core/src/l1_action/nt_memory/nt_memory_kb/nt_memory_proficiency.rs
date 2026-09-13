@@ -226,7 +226,7 @@ impl MemoryProficiency {
 
 /// Stats for a single memory action.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct MemoryActionStats {
+pub struct MemoryActionStats {
     pub action: MemoryAction,
     pub total_attempts: u64,
     pub successes: u64,

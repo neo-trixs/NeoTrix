@@ -14,7 +14,7 @@ use crate::core::nt_core_kb_types::NodeType;
 // ============================================================
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum _KbSourceType {
+pub enum _KbSourceType {
     GitHub,
     ArXiv,
     Wikipedia,
@@ -56,7 +56,7 @@ pub struct SourceEntry {
 const SOURCE_MAP_LIMIT: usize = 2000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AbsorbState {
+pub struct _AbsorbState {
     pub source_map: HashMap<String, SourceEntry>,
     pub total_absorbed: usize,
     pub last_panorama_update: i64,
@@ -300,7 +300,7 @@ impl KnowledgeAbsorptionPipeline {
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AbsorptionReport {
+pub struct _AbsorptionReport {
     pub url: String,
     pub source_type: _KbSourceType,
     pub action: String,
@@ -317,7 +317,7 @@ pub struct PanoramaReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KbPipelineStats {
+pub struct _KbPipelineStats {
     pub total_sources: usize,
     pub total_absorbed: usize,
 }

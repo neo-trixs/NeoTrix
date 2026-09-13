@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 振动共振整合框架
-pub(crate) struct _VibrationalResonanceFramework {
+pub struct _VibrationalResonanceFramework {
     _processing_streams: Vec<_ProcessingStream>,
     _resonance_mechanisms: Vec<_ResonanceMechanism>,
     _sync_states: Vec<_SyncState>,
@@ -20,7 +20,7 @@ pub(crate) struct _VibrationalResonanceFramework {
 
 /// 振动配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _VibrationalConfig {
+pub struct _VibrationalConfig {
     pub gamma_range: (f64, f64),
     pub certs_frequency: f64,
     pub microtubule_frequency: f64,
@@ -42,7 +42,7 @@ impl Default for _VibrationalConfig {
 
 /// 处理流
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ProcessingStream {
+pub struct _ProcessingStream {
     pub stream_id: String,
     pub stream_type: _StreamType,
     pub frequency_hz: f64,
@@ -54,7 +54,7 @@ pub(crate) struct _ProcessingStream {
 /// 流类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _StreamType {
+pub enum _StreamType {
     Sensory,
     Cognitive,
     Emotional,
@@ -65,7 +65,7 @@ pub(crate) enum _StreamType {
 
 /// 共振机制
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResonanceMechanism {
+pub struct _ResonanceMechanism {
     pub mechanism_id: String,
     pub mechanism_type: _ResonanceType,
     pub frequency_alignment: f64,
@@ -77,7 +77,7 @@ pub(crate) struct _ResonanceMechanism {
 /// 共振类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _ResonanceType {
+pub enum _ResonanceType {
     FrequencyTuning,     // 频率调谐
     AmplitudeMatching,   // 振幅匹配
     TemporalSynchronization, // 时间同步
@@ -86,7 +86,7 @@ pub(crate) enum _ResonanceType {
 
 /// 同步状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SyncState {
+pub struct _SyncState {
     pub state_id: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub gamma_synchrony: f64,
@@ -97,7 +97,7 @@ pub(crate) struct _SyncState {
 
 /// 振动统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _VibrationalStats {
+pub struct _VibrationalStats {
     pub total_streams: u64,
     pub active_streams: u64,
     pub total_mechanisms: u64,
@@ -108,7 +108,7 @@ pub(crate) struct _VibrationalStats {
 
 /// 意识整合结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConsciousnessIntegrationResult {
+pub struct _ConsciousnessIntegrationResult {
     pub integrated: bool,
     pub integration_level: f64,
     pub gamma_sync: f64,

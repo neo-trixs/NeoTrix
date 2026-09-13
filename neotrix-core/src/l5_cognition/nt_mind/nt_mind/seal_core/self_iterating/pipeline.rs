@@ -447,7 +447,7 @@ impl BrainStage for SnapshotStage {
 }
 
 /// SSM update stage (used by recipe.rs)
-pub(crate) struct _SSMUpdateStage;
+pub struct _SSMUpdateStage;
 impl Default for _SSMUpdateStage {
     fn default() -> Self {
         Self
@@ -491,7 +491,7 @@ impl BrainStage for _SSMUpdateStage {
 /// findings and stop. Don't apply a fix until asked." Checks whether each
 /// pending edit/action was explicitly requested or is an unsolicited action.
 /// Unsolicited actions are flagged and prevented from executing.
-pub(crate) struct _BoundarySeparationStage {
+pub struct _BoundarySeparationStage {
     /// Whether to allow unrequested fixes (default: false = block them)
     pub allow_unrequested_fixes: bool,
     /// Threshold: actions matching this many keywords are "unrequested"
@@ -599,7 +599,7 @@ impl BrainStage for _BoundarySeparationStage {
 /// "Jointly optimizing the scaffold and the resulting solution, the model
 /// discovers better search trajectories and generates higher-quality solutions."
 #[derive(Debug, Clone)]
-pub(crate) struct _ScaffoldAwareRLStage {
+pub struct _ScaffoldAwareRLStage {
     pub scaffold_history: VecDeque<_ScaffoldRecord>,
     pub max_history: usize,
     pub staleness_threshold: u64,
@@ -607,7 +607,7 @@ pub(crate) struct _ScaffoldAwareRLStage {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _ScaffoldRecord {
+pub struct _ScaffoldRecord {
     pub iteration: u64,
     pub scaffold: String,
     pub solution_score: f64,
@@ -819,7 +819,7 @@ impl BrainStage for ReasoningBankStorageStage {
 }
 
 /// Hypercube optimize stage — prunes low-access entries via HyperCubeBridge.
-pub(crate) struct _HyperCubeOptimizeStage;
+pub struct _HyperCubeOptimizeStage;
 impl Default for _HyperCubeOptimizeStage {
     fn default() -> Self {
         Self
@@ -880,7 +880,7 @@ impl BrainStage for _HyperCubeOptimizeStage {
 }
 
 /// Distillation stage — extracts principles from pipeline trajectory into knowledge distiller
-pub(crate) struct _DistillationStage;
+pub struct _DistillationStage;
 impl Default for _DistillationStage {
     fn default() -> Self {
         Self
@@ -937,7 +937,7 @@ impl BrainStage for _DistillationStage {
 }
 
 /// Meta improvement stage (self-evolution planning)
-pub(crate) struct _MetaImprovementStage;
+pub struct _MetaImprovementStage;
 impl Default for _MetaImprovementStage {
     fn default() -> Self {
         Self
@@ -1057,7 +1057,7 @@ impl BrainStage for SleepStage {
 }
 
 /// Uncertainty quantification calibration stage
-pub(crate) struct _UQCalibrationStage;
+pub struct _UQCalibrationStage;
 impl Default for _UQCalibrationStage {
     fn default() -> Self {
         Self
@@ -1119,7 +1119,7 @@ impl BrainStage for _UQCalibrationStage {
 }
 
 /// Open-source compare stage
-pub(crate) struct _OpenSourceCompareStage;
+pub struct _OpenSourceCompareStage;
 impl Default for _OpenSourceCompareStage {
     fn default() -> Self {
         Self
@@ -1175,7 +1175,7 @@ impl BrainStage for _OpenSourceCompareStage {
 /// 监督微调：将能力增量作为监督信号，把当前最优 E8 模式推向目标质量。
 /// _SftWrapperStage — 监督微调 (smol-course 吸收: SFT → DPO 两阶段顺序)。
 /// 位于 DpoWrapperStage 之前，将能力增量构建为监督信号，为 DPO 提供 π_ref 基础。
-pub(crate) struct _SftWrapperStage;
+pub struct _SftWrapperStage;
 impl Default for _SftWrapperStage {
     fn default() -> Self {
         Self
@@ -1314,7 +1314,7 @@ impl BrainStage for ProcessWrapperStage {
 
 /// Wraps SearchSkillStage ::process() as a BrainStage.
 /// 搜索技能内化：从当前任务构造搜索演练，学习 query/evidence/synthesis 子技能。
-pub(crate) struct _SearchSkillWrapperStage;
+pub struct _SearchSkillWrapperStage;
 impl Default for _SearchSkillWrapperStage {
     fn default() -> Self {
         Self
@@ -1566,7 +1566,7 @@ impl BrainStage for SafetyWrapperStage {
 /// on the current task to produce structured task plans, execution traces, and
 /// self-reflective revisions. Frequency 5 — runs every 5 iterations to avoid
 /// overwhelming the pipeline with detailed planning on every tick.
-pub(crate) struct _AutonomyPerStage;
+pub struct _AutonomyPerStage;
 impl Default for _AutonomyPerStage {
     fn default() -> Self {
         Self
@@ -1640,7 +1640,7 @@ impl BrainStage for _AutonomyPerStage {
 }
 
 /// GWT absorption stage: routes insights into global workspace
-pub(crate) struct _GwtAbsorbStage;
+pub struct _GwtAbsorbStage;
 impl Default for _GwtAbsorbStage {
     fn default() -> Self {
         Self
@@ -1783,7 +1783,7 @@ impl BrainStage for HarnessAdaptStage {
 }
 
 /// Knowledge quality assessment stage — scores KB health metrics
-pub(crate) struct _KnowledgeQualityStage;
+pub struct _KnowledgeQualityStage;
 impl Default for _KnowledgeQualityStage {
     fn default() -> Self {
         Self
@@ -1915,7 +1915,7 @@ impl BrainStage for SecretScanStage {
 }
 
 /// Conversation distillation stage — stores trajectory insights to KB
-pub(crate) struct _ConversationDistillStage;
+pub struct _ConversationDistillStage;
 impl Default for _ConversationDistillStage {
     fn default() -> Self {
         Self
@@ -1995,7 +1995,7 @@ impl BrainStage for _ConversationDistillStage {
 
 /// EWHR Hypothesis Accuracy Stage: evaluates hypothesis predictions
 /// against actual outcomes and updates calibration. Runs every 5 iterations.
-pub(crate) struct _HypothesisAccuracyStage;
+pub struct _HypothesisAccuracyStage;
 impl Default for _HypothesisAccuracyStage {
     fn default() -> Self {
         Self
@@ -2038,7 +2038,7 @@ impl BrainStage for _HypothesisAccuracyStage {
 
 /// EWHR Pattern Extraction Stage: converts successful hypotheses
 /// into reusable procedural memory (skills). Runs every 10 iterations.
-pub(crate) struct _PatternExtractionStage;
+pub struct _PatternExtractionStage;
 impl Default for _PatternExtractionStage {
     fn default() -> Self {
         Self
@@ -2277,7 +2277,7 @@ impl BrainStage for ExternalKnowledgeAbsorbStage {
 //   Phase 1  digest_sample  → 有界激活冷节点进 live KB
 //   Phase 6  prune_external  → 反向修剪孤儿外置条目 (dry-run 安全, 不破坏冷存档)
 //   Skill    SkillEngine::maintain → 技能索引维护 (UCN Phase 1 写通)
-pub(crate) struct _ExternalBrainDigestStage;
+pub struct _ExternalBrainDigestStage;
 impl Default for _ExternalBrainDigestStage {
     fn default() -> Self {
         Self
@@ -2368,7 +2368,7 @@ impl BrainStage for _ExternalBrainDigestStage {
     }
 }
 
-pub(crate) struct _CreditAssignmentStage;
+pub struct _CreditAssignmentStage;
 impl Default for _CreditAssignmentStage {
     fn default() -> Self {
         Self
@@ -2544,7 +2544,7 @@ pub const DIVERGENCE_THRESHOLD: f64 = 1.0;
 
 /// 单步分歧发现
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _StepDivergence {
+pub struct _StepDivergence {
     pub step_idx: usize,
     /// unsung_hero = 低即时/高回传; lucky_start = 高即时/低或负回传
     pub label: &'static str,
@@ -2555,7 +2555,7 @@ pub(crate) struct _StepDivergence {
 
 /// 步级信用分歧审计报告
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _CreditAuditReport {
+pub struct _CreditAuditReport {
     pub steps_audited: usize,
     pub max_divergence: f64,
     pub divergent_steps: Vec<_StepDivergence>,
@@ -2620,7 +2620,7 @@ pub fn compute_credit_divergence(
 /// OracleGate stage: evaluates pipeline health to decide if external human
 /// oracle intervention is needed. Frequency 10 — low overhead gate that
 /// only triggers under critical conditions (high entropy, low reward).
-pub(crate) struct _OracleGateStage;
+pub struct _OracleGateStage;
 impl Default for _OracleGateStage {
     fn default() -> Self {
         Self
@@ -2678,7 +2678,7 @@ impl BrainStage for _OracleGateStage {
 
 /// ArchitectureOptimizer stage: runs self-architecture analysis every 15 iterations.
 /// Uses SelfArchitectureOptimizer to identify structural improvements.
-pub(crate) struct _ArchitectureOptimizerStage;
+pub struct _ArchitectureOptimizerStage;
 impl Default for _ArchitectureOptimizerStage {
     fn default() -> Self {
         Self
@@ -2732,7 +2732,7 @@ impl BrainStage for _ArchitectureOptimizerStage {
 
 /// _TrendAnalysisStage: runs evolution trend analysis every 15 iterations.
 /// Uses EvolutionTrendAnalyzer to detect capability trends over time.
-pub(crate) struct _TrendAnalysisStage;
+pub struct _TrendAnalysisStage;
 impl Default for _TrendAnalysisStage {
     fn default() -> Self {
         Self
@@ -2782,7 +2782,7 @@ impl BrainStage for _TrendAnalysisStage {
 }
 
 /// _MetaGoalStage: generates meta-goals every 12 iterations from trend report.
-pub(crate) struct _MetaGoalStage;
+pub struct _MetaGoalStage;
 impl Default for _MetaGoalStage {
     fn default() -> Self {
         Self
@@ -2979,7 +2979,7 @@ impl BrainStage for RewardCalculationStage {
 // ── _ConvergenceCheckStage ────────────────────────────────────
 // Architecture self-audit: every 50 iterations, scan for ghost modules + orphan files.
 
-pub(crate) struct _ConvergenceCheckStage;
+pub struct _ConvergenceCheckStage;
 
 impl Default for _ConvergenceCheckStage {
     fn default() -> Self {

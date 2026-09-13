@@ -13,21 +13,21 @@ use axum::{extract::Query, Json};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct TileParams {
+pub struct TileParams {
     pub bbox: String,
     pub limit: Option<usize>,
     pub source: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
-pub(crate) struct TileResponse {
+pub struct TileResponse {
     pub features: Vec<TileFeature>,
     pub count: usize,
     pub cold_hits: usize,
 }
 
 #[derive(Debug, serde::Serialize)]
-pub(crate) struct TileFeature {
+pub struct TileFeature {
     pub node_id: String,
     pub lon: f64,
     pub lat: f64,

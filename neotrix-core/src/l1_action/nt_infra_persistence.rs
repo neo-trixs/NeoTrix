@@ -79,28 +79,28 @@ lazy_static::lazy_static! {
         ));
 }
 
-pub(crate) fn persistence_save() -> Result<(), String> {
+pub fn persistence_save() -> Result<(), String> {
     GLOBAL_PERSISTENCE
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .save()
 }
 
-pub(crate) fn persistence_load() -> Result<(), String> {
+pub fn persistence_load() -> Result<(), String> {
     GLOBAL_PERSISTENCE
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .load()
 }
 
-pub(crate) fn persistence_upsert(entry: PersistedEntry) {
+pub fn persistence_upsert(entry: PersistedEntry) {
     GLOBAL_PERSISTENCE
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .upsert(entry);
 }
 
-pub(crate) fn persistence_count() -> usize {
+pub fn persistence_count() -> usize {
     GLOBAL_PERSISTENCE
         .lock()
         .unwrap_or_else(|e| e.into_inner())

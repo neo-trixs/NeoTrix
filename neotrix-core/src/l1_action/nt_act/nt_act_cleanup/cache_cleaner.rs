@@ -7,7 +7,7 @@
 use super::shared::*;
 use std::path::{Path, PathBuf};
 
-pub(crate) struct CacheCleaner {
+pub struct CacheCleaner {
     config: CleanupConfig,
 }
 

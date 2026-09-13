@@ -62,14 +62,14 @@ pub enum EdgeType {
 }
 
 /// 因果发现器 trait
-pub(crate) trait _CausalDiscoverer: Send + Sync {
+pub trait _CausalDiscoverer: Send + Sync {
     fn discover_causes(&self, effect: &str, context: &str) -> Vec<String>;
     fn name(&self) -> &str;
 }
 
 /// 因果记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CausalRecord {
+pub struct _CausalRecord {
     pub id: String,
     pub cycle: u32,
     pub cause: String,
@@ -131,7 +131,7 @@ impl CausalEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CausalStats {
+pub struct _CausalStats {
     pub total_nodes: usize,
     pub total_edges: usize,
     pub total_discoveries: usize,

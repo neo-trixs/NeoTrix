@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 
 /// Four training stages
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum _TrainingStage {
+pub enum _TrainingStage {
     /// Acquire external knowledge from papers, repos, docs, APIs
     Explore,
     /// Extract reusable patterns, compress, crystallize skills
@@ -29,7 +29,7 @@ pub(crate) enum _TrainingStage {
 }
 
 /// Canonical SEAL training stage type alias.
-pub(crate) type _SealTrainingStage = _TrainingStage;
+pub type _SealTrainingStage = _TrainingStage;
 
 impl _TrainingStage {
     /// Ordered stage sequence
@@ -86,7 +86,7 @@ pub struct StageResult {
 
 /// Knowledge items acquired during explore stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExploreOutput {
+pub struct _ExploreOutput {
     /// Sources scanned (papers, repos, docs)
     pub sources_scanned: u32,
     /// New discoveries (not in KB)
@@ -96,7 +96,7 @@ pub(crate) struct _ExploreOutput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DiscoveryItem {
+pub struct _DiscoveryItem {
     pub source_url: String,
     pub title: String,
     pub domain: String,
@@ -109,7 +109,7 @@ pub(crate) struct _DiscoveryItem {
 
 /// Patterns extracted during distill stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DistillOutput {
+pub struct _DistillOutput {
     /// Patterns extracted from explore discoveries
     pub patterns: Vec<ExtractedPattern>,
     /// Skills crystallized (production-ready templates)
@@ -133,7 +133,7 @@ pub struct ExtractedPattern {
 
 /// Validation results from test stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TestOutput {
+pub struct _TestOutput {
     /// SelfTest T1 results (existence checks)
     pub t1_existence: _TestTierResult,
     /// SelfTest T2 results (registration checks)
@@ -147,7 +147,7 @@ pub(crate) struct _TestOutput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TestTierResult {
+pub struct _TestTierResult {
     pub total: u32,
     pub passed: u32,
     pub failed: u32,
@@ -158,7 +158,7 @@ pub(crate) struct _TestTierResult {
 
 /// Integration results from absorb stage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AbsorbOutput {
+pub struct _AbsorbOutput {
     /// Patterns written to KB
     pub kb_writes: u32,
     /// Skills registered in skill registry

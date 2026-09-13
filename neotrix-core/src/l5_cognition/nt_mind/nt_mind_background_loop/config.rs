@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// 背景循环配置
 #[derive(Debug, Clone)]
-pub(crate) struct BackgroundConfig {
+pub struct BackgroundConfig {
     pub save_interval_secs: u64,
     pub consolidate_interval_secs: u64,
     pub evolve_interval_secs: u64,
@@ -111,7 +111,7 @@ impl Default for BackgroundConfig {
 }
 
 /// 轻量级遥测计数器
-pub(crate) struct TelemetryCollector {
+pub struct TelemetryCollector {
     pub seal_loop_count: AtomicU64,
     pub knowledge_mine_count: AtomicU64,
     pub absorb_count: AtomicU64,
@@ -148,7 +148,7 @@ impl TelemetryCollector {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct TelemetrySnapshot {
+pub struct TelemetrySnapshot {
     pub uptime_secs: u64,
     pub seal_loops: u64,
     pub knowledge_mines: u64,

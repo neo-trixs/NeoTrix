@@ -133,7 +133,7 @@ pub fn filter_visibility(
 }
 
 /// 便捷: 返回可见 (非 Drop) 的 ID 列表 (下游主消费视图)。
-pub(crate) fn visible_ids(verdicts: &[VisibilityVerdict]) -> Vec<String> {
+pub fn visible_ids(verdicts: &[VisibilityVerdict]) -> Vec<String> {
     verdicts
         .iter()
         .filter(|v| v.visibility != Visibility::Drop)
@@ -142,7 +142,7 @@ pub(crate) fn visible_ids(verdicts: &[VisibilityVerdict]) -> Vec<String> {
 }
 
 /// 便捷: 返回只含 Allow 的 ID 列表。
-pub(crate) fn allowed_ids(verdicts: &[VisibilityVerdict]) -> Vec<String> {
+pub fn allowed_ids(verdicts: &[VisibilityVerdict]) -> Vec<String> {
     verdicts
         .iter()
         .filter(|v| v.visibility == Visibility::Allow)

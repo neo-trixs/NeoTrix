@@ -71,7 +71,7 @@ impl Stage {
 
 /// 阶段机错误: 非法转移 (后退/越级/未定义)。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum _TransitionError {
+pub enum _TransitionError {
     IllegalBackward,
     IllegalJump,
     AlreadyTerminal,
@@ -81,7 +81,7 @@ pub(crate) enum _TransitionError {
 ///
 /// 状态转移严格单向: Proposed→Eval→Decision→Promoted→(新代际)Proposed。
 /// 每步 `transition` 即一次 `make_stage!` 阶段推进。
-pub(crate) struct _EvolutionMachine {
+pub struct _EvolutionMachine {
     stage: Stage,
     generation: u64,
     eval_passed: bool,

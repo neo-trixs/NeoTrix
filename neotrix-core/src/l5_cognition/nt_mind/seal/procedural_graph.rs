@@ -42,7 +42,7 @@ pub enum SkillType {
 /// 执行依赖边
 
 #[derive(Debug, Clone)]
-pub(crate) struct _ExecutionEdge {
+pub struct _ExecutionEdge {
     /// 源技能 ID
     pub from: String,
     /// 目标技能 ID
@@ -100,7 +100,7 @@ pub struct TraceStep {
 /// 图拓扑编辑操作
 
 #[derive(Debug, Clone)]
-pub(crate) enum _GraphEdit {
+pub enum _GraphEdit {
     /// 添加节点
     AddNode(SkillNode),
     /// 删除节点
@@ -128,7 +128,7 @@ pub struct RejectedEdit {
 /// 图统计信息
 
 #[derive(Debug, Clone)]
-pub(crate) struct _GraphStats {
+pub struct _GraphStats {
     /// 节点数
     pub node_count: usize,
     /// 边数

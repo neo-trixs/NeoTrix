@@ -13,7 +13,7 @@ use super::shared_utils::now;
 use super::nt_memory_cortex_sync::enrich_cortex_metadata;
 
 #[derive(Debug, Clone)]
-pub(crate) enum ResourceSource {
+pub enum ResourceSource {
     GitHub { owner: String, repo: String },
     ArXiv { id: String },
     Web { url: String },
@@ -169,7 +169,7 @@ impl ResourceDescriptor {
 }
 
 #[derive(Debug)]
-pub(crate) struct ResourceIngestResult {
+pub struct ResourceIngestResult {
     pub node_id: String,
     pub insight_ids: Vec<String>,
 }
@@ -378,7 +378,7 @@ fn find_node_by_title(conn: &Connection, title: &str) -> rusqlite::Result<Option
     }
 }
 
-pub(crate) fn ingest_session_resources(conn: &Connection) -> Result<String, String> {
+pub fn ingest_session_resources(conn: &Connection) -> Result<String, String> {
     let mut ingester = ResourceIngester::new(conn);
 
     ingest_github_resources(&mut ingester)?;
@@ -680,7 +680,7 @@ fn free_space_bytes(path: &std::path::Path) -> Result<u64, String> {
 /// 回收 `/private/tmp` 下过期的 `nt-target-*` 构建缓存 (孤儿 cargo target 目录), 释放系统盘。
 /// 保守策略: 仅删 `nt-target-` 前缀目录, 跳过 `*-check` (其他 loop/会话校验目录);
 /// 仅删 mtime 早于 `max_age_days` 天的目录。`dry_run=true` 只计数不删除, 供磁盘压力门禁安全调用。
-pub(crate) fn reclaim_nt_target_tmp(max_age_days: u64, dry_run: bool) -> Result<usize, String> {
+pub fn reclaim_nt_target_tmp(max_age_days: u64, dry_run: bool) -> Result<usize, String> {
     let tmp = std::path::Path::new("/private/tmp");
     if !tmp.is_dir() {
         return Ok(0);

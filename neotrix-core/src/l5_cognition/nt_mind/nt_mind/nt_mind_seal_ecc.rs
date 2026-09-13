@@ -22,7 +22,7 @@ pub fn register_ecc_dimensions(cv: &mut CapabilityVector) {
 }
 
 /// 读取某 ECC 维度当前值（扩展维度，不参与 base `index_from_name`）。
-pub(crate) fn _ecc_dimension_value(cv: &CapabilityVector, name: &str) -> Option<f64> {
+pub fn _ecc_dimension_value(cv: &CapabilityVector, name: &str) -> Option<f64> {
     let names = cv.extension_names();
     let values = cv.extension_values();
     for (n, v) in names.iter().zip(values.iter()) {
@@ -53,7 +53,7 @@ pub fn select_ecc_dimensions(task_type: &TaskType) -> Vec<String> {
     }
 }
 
-pub(crate) struct _SealEccSelfTest;
+pub struct _SealEccSelfTest;
 
 impl SelfTest for _SealEccSelfTest {
     fn name(&self) -> &str {

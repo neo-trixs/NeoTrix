@@ -244,7 +244,7 @@ impl Opportunity {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct FaucetInfo {
+pub struct FaucetInfo {
     pub name: String,
     pub url: String,
     pub chain: ChainType,
@@ -263,7 +263,7 @@ pub struct AirdropInfo {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ScannedOpportunity {
+pub struct ScannedOpportunity {
     pub opportunity: Opportunity,
     pub scanned_at: i64,
     pub executed: bool,

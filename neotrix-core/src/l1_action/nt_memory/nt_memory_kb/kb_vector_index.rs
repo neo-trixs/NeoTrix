@@ -9,7 +9,7 @@ use rusqlite::Connection;
 pub use crate::core::nt_core_vector_store::float_vec::{FloatVec, bytes_to_f32s};
 
 /// HNSW 向量索引
-pub(crate) struct KbVectorIndex {
+pub struct KbVectorIndex {
     hnsw: instant_distance::HnswMap<FloatVec, String>,
     dim: usize,
 }

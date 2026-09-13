@@ -13,7 +13,7 @@ use crate::core::nt_core_narrative_types::{SegmentData, SegmentType};
 
 /// 一致性检查配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CrossModuleConfig {
+pub struct _CrossModuleConfig {
     /// 动态等级与情绪一致性阈值
     pub dynamic_emotion_threshold: f32,
     /// 节奏与转场一致性检查
@@ -38,7 +38,7 @@ impl Default for _CrossModuleConfig {
 
 /// 一致性检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CrossModuleCheckResult {
+pub struct _CrossModuleCheckResult {
     /// 是否通过
     pub passed: bool,
     /// 检查详情
@@ -51,7 +51,7 @@ pub(crate) struct _CrossModuleCheckResult {
 
 /// 一致性检查详情
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CrossModuleDetail {
+pub struct _CrossModuleDetail {
     /// 检查维度
     pub dimension: String,
     /// 是否通过

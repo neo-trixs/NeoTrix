@@ -56,7 +56,7 @@ pub struct GrappleHookChain {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct HookConfig {
+pub struct HookConfig {
     point: _HookPoint,
     _name: String,
     _description: String,

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 // ═══════════════════════════════════════════════════════════════════
 
 /// Gateway Plugin trait — 所有网关插件必须实现此 trait
-pub(crate) trait GatewayPlugin: Send + Sync {
+pub trait GatewayPlugin: Send + Sync {
     /// 插件名称
     fn name(&self) -> &str;
     /// 插件版本
@@ -42,7 +42,7 @@ pub struct RequestContext {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ResponseContext {
+pub struct ResponseContext {
     pub provider: String,
     pub status: u16,
     pub headers: HashMap<String, String>,
@@ -59,7 +59,7 @@ pub struct ErrorContext {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum PluginError {
+pub enum PluginError {
     SkipRequest(String),
     OverrideResponse(Vec<u8>),
     Abort(String),
@@ -162,7 +162,7 @@ impl Default for PluginManager {
 // ═══════════════════════════════════════════════════════════════════
 
 /// 插件热重载管理器 — 运行时加载/卸载插件
-pub(crate) struct PluginHotReload {
+pub struct PluginHotReload {
     plugins: RwLock<HashMap<String, PluginEntry>>,
     event_log: RwLock<Vec<ReloadEvent>>,
 }
@@ -177,7 +177,7 @@ struct PluginEntry {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ReloadEvent {
+pub struct ReloadEvent {
     pub plugin: String,
     pub action: ReloadAction,
     pub timestamp: Instant,
@@ -186,7 +186,7 @@ pub(crate) struct ReloadEvent {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum ReloadAction {
+pub enum ReloadAction {
     Load,
     Unload,
     Reload,
@@ -299,14 +299,14 @@ impl Default for PluginHotReload {
 // ═══════════════════════════════════════════════════════════════════
 
 /// 模块化网关 — 组件化架构，支持热插拔中间件
-pub(crate) struct ModularGateway {
+pub struct ModularGateway {
     middlewares: RwLock<Vec<Box<dyn Middleware>>>,
     routes: RwLock<HashMap<String, Route>>,
     config: ModularConfig,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ModularConfig {
+pub struct ModularConfig {
     pub max_middlewares: usize,
     pub request_timeout_ms: u64,
 }
@@ -321,7 +321,7 @@ impl Default for ModularConfig {
 }
 
 /// 中间件 trait
-pub(crate) trait Middleware: Send + Sync {
+pub trait Middleware: Send + Sync {
     fn name(&self) -> &str;
     fn priority(&self) -> i32;
     fn before_request(&self, ctx: &mut RequestCtx) -> Result<(), MiddlewareError>;
@@ -329,7 +329,7 @@ pub(crate) trait Middleware: Send + Sync {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RequestCtx {
+pub struct RequestCtx {
     pub method: String,
     pub path: String,
     pub headers: HashMap<String, String>,
@@ -338,7 +338,7 @@ pub(crate) struct RequestCtx {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ResponseCtx {
+pub struct ResponseCtx {
     pub status: u16,
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
@@ -346,7 +346,7 @@ pub(crate) struct ResponseCtx {
 }
 
 #[derive(Debug)]
-pub(crate) enum MiddlewareError {
+pub enum MiddlewareError {
     Abort(String),
     Skip,
 }

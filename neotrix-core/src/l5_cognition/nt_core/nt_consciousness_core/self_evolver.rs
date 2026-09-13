@@ -26,7 +26,7 @@ pub struct SelfEvolver {
 
 /// 进化配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EvolverConfig {
+pub struct _EvolverConfig {
     /// 最大进化历史
     pub max_history: usize,
     /// 最小差距阈值
@@ -47,7 +47,7 @@ impl Default for _EvolverConfig {
 
 /// 能力评估
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct _CapabilityAssessment {
+pub struct _CapabilityAssessment {
     /// 能力维度评分
     pub dimension_scores: HashMap<String, f64>,
     /// 总体能力分数
@@ -79,7 +79,7 @@ pub struct CapabilityGap {
 
 /// 差距优先级
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub(crate) enum _GapPriority {
+pub enum _GapPriority {
     Low,
     Medium,
     High,
@@ -88,7 +88,7 @@ pub(crate) enum _GapPriority {
 
 /// 进化策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EvolutionStrategy {
+pub struct _EvolutionStrategy {
     /// 策略ID
     pub id: String,
     /// 策略名称
@@ -149,7 +149,7 @@ pub enum StepStatus {
 
 /// 策略状态
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum _StrategyStatus {
+pub enum _StrategyStatus {
     Planned,
     InProgress,
     Completed,
@@ -178,7 +178,7 @@ pub struct EvolutionRecord {
 
 /// 进化类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _EvolutionType {
+pub enum _EvolutionType {
     /// 能力增强
     CapabilityEnhancement,
     /// 知识获取
@@ -434,7 +434,7 @@ impl SelfEvolver {
 
 /// 进化统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EvolverStats {
+pub struct _EvolverStats {
     pub total_evolutions: usize,
     pub successful_evolutions: usize,
     pub success_rate: f64,

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// RAG 管线
-pub(crate) struct _RAGPipeline {
+pub struct _RAGPipeline {
     chunker: _DocumentChunker,
     retriever: _VectorRetriever,
     reranker: Reranker,
@@ -21,7 +21,7 @@ pub(crate) struct _RAGPipeline {
 
 /// RAG 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RAGConfig {
+pub struct _RAGConfig {
     pub chunk_size: usize,
     pub chunk_overlap: usize,
     pub top_k: usize,
@@ -46,14 +46,14 @@ impl Default for _RAGConfig {
 }
 
 /// 文档分块器
-pub(crate) struct _DocumentChunker {
+pub struct _DocumentChunker {
     chunk_size: usize,
     overlap: usize,
 }
 
 /// 文档块
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DocumentChunk {
+pub struct _DocumentChunk {
     pub id: String,
     pub document_id: String,
     pub content: String,
@@ -63,7 +63,7 @@ pub(crate) struct _DocumentChunk {
 
 /// 块元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ChunkMetadata {
+pub struct _ChunkMetadata {
     pub start_pos: usize,
     pub end_pos: usize,
     pub chunk_index: usize,
@@ -73,7 +73,7 @@ pub(crate) struct _ChunkMetadata {
 }
 
 /// 向量检索器
-pub(crate) struct _VectorRetriever {
+pub struct _VectorRetriever {
     index: HashMap<String, Vec<f32>>,
     chunks: HashMap<String, _DocumentChunk>,
 }
@@ -90,7 +90,7 @@ pub struct ContextCompressor {
 
 /// RAG 查询结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RAGResult {
+pub struct _RAGResult {
     pub query: String,
     pub chunks: Vec<_DocumentChunk>,
     pub context: String,

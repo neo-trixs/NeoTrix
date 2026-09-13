@@ -17,12 +17,12 @@ use std::time::Instant;
 
 use rand::Rng;
 
-pub(crate) const DEFAULT_ROTATION_INTERVAL_SECS: u64 = 9;
-pub(crate) const CONNECT_TIMEOUT_SECS: u64 = 5;
-pub(crate) const PROBE_INTERVAL_MS: u64 = 500;
-pub(crate) const QUICK_PROBE_TIMEOUT_MS: u64 = 500;
-pub(crate) const FAILOVER_THRESHOLD_SUCCESS_RATE: f64 = 0.3;
-pub(crate) const FAILOVER_LATENCY_THRESHOLD_MS: f64 = 3000.0;
+pub const DEFAULT_ROTATION_INTERVAL_SECS: u64 = 9;
+pub const CONNECT_TIMEOUT_SECS: u64 = 5;
+pub const PROBE_INTERVAL_MS: u64 = 500;
+pub const QUICK_PROBE_TIMEOUT_MS: u64 = 500;
+pub const FAILOVER_THRESHOLD_SUCCESS_RATE: f64 = 0.3;
+pub const FAILOVER_LATENCY_THRESHOLD_MS: f64 = 3000.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProxyProtocol {

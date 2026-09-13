@@ -98,7 +98,7 @@ pub struct AbsorptionRecord {
 
 /// 吸收请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AbsorptionRequest {
+pub struct _AbsorptionRequest {
     /// 请求ID
     pub id: String,
     /// 目标资源
@@ -113,7 +113,7 @@ pub(crate) struct _AbsorptionRequest {
 
 /// 查询类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _QueryType {
+pub enum _QueryType {
     /// 知识查询
     Knowledge,
     /// 代码查询
@@ -128,7 +128,7 @@ pub(crate) enum _QueryType {
 
 /// 吸收响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AbsorptionResponse {
+pub struct _AbsorptionResponse {
     /// 响应ID
     pub id: String,
     /// 内容
@@ -143,7 +143,7 @@ pub(crate) struct _AbsorptionResponse {
 
 /// 吸收状态
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum _AbsorptionStatus {
+pub enum _AbsorptionStatus {
     Pending,
     InProgress,
     Completed,
@@ -271,7 +271,7 @@ impl InformationAbsorber {
 
 /// 吸收统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AbsorberStats {
+pub struct _AbsorberStats {
     pub total_absorptions: usize,
     pub successful_absorptions: usize,
     pub success_rate: f64,

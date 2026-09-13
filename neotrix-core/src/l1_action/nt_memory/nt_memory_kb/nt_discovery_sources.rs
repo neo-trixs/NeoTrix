@@ -56,7 +56,7 @@ pub struct ExternalDiscoveryStats {
 // ======================================================================
 // 1. 古籍 / Classic Books — Project Gutenberg
 // ======================================================================
-pub(crate) fn discover_gutenberg(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_gutenberg(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -167,7 +167,7 @@ pub fn discover_semantic_scholar(conn: &Connection, query: &str, limit: usize) -
 /// ======================================================================
 /// 3. 古迹 / Historical Sites & 石碑 / Stone Inscriptions — Pleiades
 /// ======================================================================
-pub(crate) fn discover_historical_sites(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_historical_sites(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -221,7 +221,7 @@ pub(crate) fn discover_historical_sites(conn: &Connection, query: &str, limit: u
 /// ======================================================================
 /// 4. 博物馆藏品 / Museum Collections — Europeana
 /// ======================================================================
-pub(crate) fn discover_europeana(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_europeana(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -280,7 +280,7 @@ pub(crate) fn discover_europeana(conn: &Connection, query: &str, limit: usize) -
 /// ======================================================================
 /// 5. 铭刻 / Inscriptions — PHI (Packard Humanities Institute) via DMMapper
 /// ======================================================================
-pub(crate) fn discover_inscriptions(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_inscriptions(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -338,7 +338,7 @@ pub(crate) fn discover_inscriptions(conn: &Connection, query: &str, limit: usize
 /// ======================================================================
 /// 6. 古籍 / Chinese Ancient Texts — 国学大师 / Chinese Text Project
 /// ======================================================================
-pub(crate) fn discover_chinese_ancient(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_chinese_ancient(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -395,7 +395,7 @@ pub(crate) fn discover_chinese_ancient(conn: &Connection, query: &str, limit: us
 /// ======================================================================
 /// 7. Internet Archive / 互联网档案馆
 /// ======================================================================
-pub(crate) fn discover_internet_archive(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_internet_archive(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -451,7 +451,7 @@ pub(crate) fn discover_internet_archive(conn: &Connection, query: &str, limit: u
 /// ======================================================================
 /// 8. HathiTrust Digital Library / 数字图书馆
 /// ======================================================================
-pub(crate) fn discover_hathitrust(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_hathitrust(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -500,7 +500,7 @@ pub(crate) fn discover_hathitrust(conn: &Connection, query: &str, limit: usize) 
 /// ======================================================================
 /// 9. 考古 / Archaeology — Open Context
 /// ======================================================================
-pub(crate) fn discover_open_context(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_open_context(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -570,7 +570,7 @@ pub fn discover_technical_docs(conn: &Connection, topic: &str) -> Result<Externa
 /// ======================================================================
 /// 11. Gallica (Bibliothèque nationale de France) / 法国国家图书馆
 /// ======================================================================
-pub(crate) fn discover_gallica(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_gallica(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 

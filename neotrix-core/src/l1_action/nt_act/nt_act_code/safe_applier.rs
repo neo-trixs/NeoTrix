@@ -13,7 +13,7 @@ use super::semantic_entropy::SemanticEntropy;
 
 /// 应用结果
 #[derive(Debug)]
-pub(crate) struct ApplyResult {
+pub struct ApplyResult {
     pub file: String,
     pub success: bool,
     pub backup_path: Option<String>,

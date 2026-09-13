@@ -35,7 +35,7 @@ impl ReactRuleCategory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ReactRule {
+pub struct _ReactRule {
     pub id: &'static str,
     pub category: ReactRuleCategory,
     pub severity: RuleSeverity,
@@ -59,7 +59,7 @@ pub struct ReactDiagnostic {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CategoryBreakdown {
+pub struct _CategoryBreakdown {
     pub category: ReactRuleCategory,
     pub count: usize,
 }

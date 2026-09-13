@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// CUDA Agent RL优化器
-pub(crate) struct _CUDAAgentRLOptimizer {
+pub struct _CUDAAgentRLOptimizer {
     strategies: Vec<_RLStrategy>,
     curriculum: Vec<_CurriculumItem>,
     #[allow(dead_code)]
@@ -21,7 +21,7 @@ pub(crate) struct _CUDAAgentRLOptimizer {
 
 /// RL优化器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RLOptimizerConfig {
+pub struct _RLOptimizerConfig {
     pub max_strategies: usize,
     pub learning_rate: f64,
     pub exploration_rate: f64,
@@ -43,7 +43,7 @@ impl Default for _RLOptimizerConfig {
 
 /// RL策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RLStrategy {
+pub struct _RLStrategy {
     pub strategy_id: String,
     pub name: String,
     pub strategy_type: StrategyType,
@@ -65,7 +65,7 @@ pub enum StrategyType {
 
 /// 课程项
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CurriculumItem {
+pub struct _CurriculumItem {
     pub item_id: String,
     pub name: String,
     pub difficulty: f64,
@@ -86,7 +86,7 @@ pub struct OptimizationResult {
 
 /// RL优化器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RLOptimizerStats {
+pub struct _RLOptimizerStats {
     pub total_strategies: u64,
     pub total_optimizations: u64,
     pub avg_improvement: f64,

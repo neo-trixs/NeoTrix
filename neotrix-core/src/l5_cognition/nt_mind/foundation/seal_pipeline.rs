@@ -28,7 +28,7 @@ pub struct OracleRequest {
 ///
 /// This trait abstracts the L1 `OracleGate` that L5 needs.
 /// The actual implementation lives in L1 and is injected via DI.
-pub(crate) trait _OracleGateContract: Send + Sync {
+pub trait _OracleGateContract: Send + Sync {
     /// Evaluate failure and decide if oracle intervention is needed.
     fn evaluate_failure(&mut self, attempt_count: u32, dimension: &str) -> OracleDecision;
     
@@ -39,7 +39,7 @@ pub(crate) trait _OracleGateContract: Send + Sync {
 /// SemanticEntropyGate trait — L5 contract for semantic entropy operations.
 ///
 /// This trait abstracts the L1 `SemanticEntropyGate` that L5 needs.
-pub(crate) trait _SemanticEntropyGateContract: Send + Sync {
+pub trait _SemanticEntropyGateContract: Send + Sync {
     /// Compute entropy for a prompt.
     fn compute_entropy(prompt: &str, context: &[String]) -> f64 where Self: Sized;
     
@@ -58,7 +58,7 @@ pub(crate) trait _SemanticEntropyGateContract: Send + Sync {
 
 /// Entropy trend direction (L5层定义)
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum _EntropyTrend {
+pub enum _EntropyTrend {
     Increasing,
     Decreasing,
     Stable,
@@ -75,7 +75,7 @@ pub enum SandboxVerdict {
 /// ActionSandbox trait — L5 contract for action sandbox operations.
 ///
 /// This trait abstracts the L1 `ActionSandbox` that L5 needs.
-pub(crate) trait _ActionSandboxContract: Send + Sync {
+pub trait _ActionSandboxContract: Send + Sync {
     /// Evaluate an action against sandbox rules.
     fn evaluate(&mut self, action: &str) -> SandboxVerdict;
     

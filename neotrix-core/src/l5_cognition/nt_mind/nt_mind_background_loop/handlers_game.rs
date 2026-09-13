@@ -29,7 +29,7 @@ pub struct GameTickReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GameDaemonState {
+pub struct _GameDaemonState {
     pub constellation: u8,
     pub total_ticks: usize,
     pub total_episodes: usize,
@@ -192,7 +192,7 @@ fn rng_step(cells: &mut [u8], seed: u64, step: usize) {
 // Game Training Daemon
 // ═══════════════════════════════════════════════════════════════════
 
-pub(crate) struct _GameTrainingDaemon {
+pub struct _GameTrainingDaemon {
     pub state: _GameDaemonState,
     pub episodes_per_tick: usize,
     pub max_constellation: u8,

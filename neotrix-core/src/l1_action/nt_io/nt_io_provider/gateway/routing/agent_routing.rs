@@ -164,7 +164,7 @@ impl ModelTier {
 
 /// Provider kind for free-tier ordering
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum ProviderKind {
+pub enum ProviderKind {
     Groq,
     Gemini,
     Cerebras,
@@ -196,7 +196,7 @@ impl ProviderKind {
 
 /// Tier-aware failover strategy — HashCortX failover algorithm
 #[derive(Debug, Clone)]
-pub(crate) struct FailoverStrategy {
+pub struct FailoverStrategy {
     free_tier_providers: HashSet<ProviderKind>,
 }
 

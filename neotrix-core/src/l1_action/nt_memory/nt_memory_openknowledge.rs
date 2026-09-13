@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// Markdown IDE — OpenKnowledge 核心
-pub(crate) struct MarkdownIDE {
+pub struct MarkdownIDE {
     documents: HashMap<String, MarkdownDocument>,
     wiki_links: Vec<WikiLink>,
     sync_config: Option<SyncConfig>,
@@ -22,7 +22,7 @@ pub(crate) struct MarkdownIDE {
 
 /// Markdown 文档
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct MarkdownDocument {
+pub struct MarkdownDocument {
     pub id: String,
     pub path: String,
     pub content: String,
@@ -46,7 +46,7 @@ pub struct WikiLink {
 /// 链接类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum WikiLinkType {
+pub enum WikiLinkType {
     Internal,    // [[target]]
     Embed,       // ![[target]]
     Reference,   // [[target|text]]
@@ -64,7 +64,7 @@ pub struct SyncConfig {
 }
 
 /// LLM Wiki — 知识库系统
-pub(crate) struct LLMWiki {
+pub struct LLMWiki {
     documents: Vec<MarkdownDocument>,
     search_index: SearchIndex,
     knowledge_graph: KnowledgeGraph,
@@ -72,14 +72,14 @@ pub(crate) struct LLMWiki {
 
 /// 搜索索引
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SearchIndex {
+pub struct SearchIndex {
     pub entries: Vec<SearchEntry>,
     pub embeddings: bool,
 }
 
 /// 搜索条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SearchEntry {
+pub struct SearchEntry {
     pub doc_id: String,
     pub title: String,
     pub content: String,

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 知识管理引擎
-pub(crate) struct _KnowledgeManagementEngine {
+pub struct _KnowledgeManagementEngine {
     knowledge_graph: _EnhancedKnowledgeGraph,
     semantic_index: _SemanticIndex,
     reasoning_engine: ReasoningEngine,
@@ -21,7 +21,7 @@ pub(crate) struct _KnowledgeManagementEngine {
 
 /// 知识配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KnowledgeConfig {
+pub struct _KnowledgeConfig {
     pub max_entities: usize,
     pub embedding_dim: usize,
     pub similarity_threshold: f64,
@@ -43,7 +43,7 @@ impl Default for _KnowledgeConfig {
 
 /// 增强知识图谱
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EnhancedKnowledgeGraph {
+pub struct _EnhancedKnowledgeGraph {
     pub entities: HashMap<String, Entity>,
     pub relations: Vec<Relation>,
     pub embeddings: HashMap<String, Vec<f32>>,
@@ -83,7 +83,7 @@ pub struct Community {
 }
 
 /// 语义索引
-pub(crate) struct _SemanticIndex {
+pub struct _SemanticIndex {
     index: HashMap<String, Vec<f32>>,
     metadata: HashMap<String, HashMap<String, String>>,
 }
@@ -106,7 +106,7 @@ pub struct ReasoningRule {
 
 /// 知识查询结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KnowledgeQueryResult {
+pub struct _KnowledgeQueryResult {
     pub query: String,
     pub entities: Vec<Entity>,
     pub relations: Vec<Relation>,
@@ -116,7 +116,7 @@ pub(crate) struct _KnowledgeQueryResult {
 
 /// 推断事实
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _InferredFact {
+pub struct _InferredFact {
     pub fact: String,
     pub confidence: f64,
     pub reasoning_chain: Vec<String>,

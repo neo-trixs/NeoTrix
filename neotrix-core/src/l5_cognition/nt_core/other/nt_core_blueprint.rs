@@ -9,13 +9,13 @@ use std::collections::VecDeque;
 
 /// 蓝图中的单个执行步骤。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _BlueprintStep {
+pub struct _BlueprintStep {
     pub phase: usize,
     pub action: String,
 }
 
 /// 蓝图/规划 trait。
-pub(crate) trait _BlueprintPlanner {
+pub trait _BlueprintPlanner {
     /// 设定目标并规划 N 个阶段 (每个阶段一个步骤)。
     fn plan(&mut self, goal: &str, phases: usize);
     /// 按阶段序返回蓝图步骤, 空目标返回空。
@@ -28,7 +28,7 @@ pub(crate) trait _BlueprintPlanner {
 }
 
 /// blueprint 规划实现。
-pub(crate) struct _BlueprintPlannerImpl {
+pub struct _BlueprintPlannerImpl {
     goal: String,
     steps: VecDeque<_BlueprintStep>,
 }

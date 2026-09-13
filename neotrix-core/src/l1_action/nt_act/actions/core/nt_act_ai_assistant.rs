@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// AI 助手协调器
-pub(crate) struct AIAssistantCoordinator {
+pub struct AIAssistantCoordinator {
     tools: HashMap<String, Tool>,
     task_queue: Vec<Task>,
     context: AssistantContext,
@@ -23,7 +23,7 @@ pub(crate) struct AIAssistantCoordinator {
 
 /// 助手配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AssistantConfig {
+pub struct AssistantConfig {
     pub max_tools: usize,
     pub max_concurrent_tasks: usize,
     pub context_window: usize,
@@ -58,7 +58,7 @@ pub struct Tool {
 /// 工具类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ToolType {
+pub enum ToolType {
     Function,
     API,
     CLI,
@@ -69,7 +69,7 @@ pub(crate) enum ToolType {
 
 /// 工具参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ToolParameter {
+pub struct ToolParameter {
     pub name: String,
     pub param_type: String,
     pub description: String,
@@ -79,7 +79,7 @@ pub(crate) struct ToolParameter {
 
 /// 工具元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ToolMetadata {
+pub struct ToolMetadata {
     pub author: Option<String>,
     pub version: String,
     pub reliability: f64,
@@ -111,7 +111,7 @@ pub enum TaskStatus {
 
 /// 助手上下文
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AssistantContext {
+pub struct AssistantContext {
     pub conversation_history: Vec<Message>,
     pub active_tasks: Vec<String>,
     pub tool_results: HashMap<String, serde_json::Value>,
@@ -129,7 +129,7 @@ pub struct Message {
 
 /// 助手统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AssistantStats {
+pub struct AssistantStats {
     pub total_tasks: u64,
     pub completed_tasks: u64,
     pub failed_tasks: u64,
@@ -139,7 +139,7 @@ pub(crate) struct AssistantStats {
 
 /// 工具调用结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ToolCallResult {
+pub struct ToolCallResult {
     pub tool_id: String,
     pub success: bool,
     pub output: serde_json::Value,
@@ -149,7 +149,7 @@ pub(crate) struct ToolCallResult {
 
 /// 任务执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TaskExecutionResult {
+pub struct TaskExecutionResult {
     pub task_id: String,
     pub status: TaskStatus,
     pub tool_results: Vec<ToolCallResult>,

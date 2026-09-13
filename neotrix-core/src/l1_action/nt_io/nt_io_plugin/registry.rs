@@ -10,7 +10,7 @@ use crate::core::nt_core_context::revertible::{ClosureEffect, RevertibleContext}
 
 /// HMR 事务性热替换的结果分类 (§5.2.2 classify 不动点判定)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum HotReloadOutcome {
+pub enum HotReloadOutcome {
     /// 插件为全新安装 (此前未注册)。
     Installed,
     /// 同名插件已注册且版本不同 — 已事务性替换 (旧版被新版本接管)。

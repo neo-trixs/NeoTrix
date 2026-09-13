@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
 
 /// 验证维度
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _VerificationDimension {
+pub enum _VerificationDimension {
     /// 实体一致性
     EntityConsistency,
     /// 环境一致性
@@ -37,7 +37,7 @@ pub(crate) enum _VerificationDimension {
 
 /// 验证维度组
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DimensionGroup {
+pub struct _DimensionGroup {
     /// 组名
     pub name: String,
     /// 包含的维度
@@ -48,7 +48,7 @@ pub(crate) struct _DimensionGroup {
 
 /// 验证评分
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _VerificationScore {
+pub struct _VerificationScore {
     /// 维度
     pub dimension: _VerificationDimension,
     /// 分数 (1-10)
@@ -78,7 +78,7 @@ pub struct VerificationResult {
 
 /// 验证配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _VerifierConfig {
+pub struct _VerifierConfig {
     /// 维度组
     pub dimension_groups: Vec<_DimensionGroup>,
     /// 通过阈值 (0.0-1.0)
@@ -93,7 +93,7 @@ pub(crate) struct _VerifierConfig {
 
 /// 重生成请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RegenerationRequest {
+pub struct _RegenerationRequest {
     /// 原始提示词
     pub original_prompt: String,
     /// 验证结果
@@ -106,7 +106,7 @@ pub(crate) struct _RegenerationRequest {
 
 /// 重生成模式
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _RegenerationMode {
+pub enum _RegenerationMode {
     /// 重新生成（新种子）
     Regenerate,
     /// 编辑（保持主体）
@@ -121,7 +121,7 @@ pub(crate) enum _RegenerationMode {
 
 /// 验证器引导器
 /// 实现 VLM 验证 + 自动重生成循环
-pub(crate) struct _VerifierAgent {
+pub struct _VerifierAgent {
     /// 配置
     config: _VerifierConfig,
     /// 验证历史
@@ -289,7 +289,7 @@ impl _VerifierAgent {
 
 /// 验证统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _VerifierStats {
+pub struct _VerifierStats {
     /// 总验证次数
     pub total_verifications: usize,
     /// 通过次数

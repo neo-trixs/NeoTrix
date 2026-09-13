@@ -301,7 +301,7 @@ pub fn ingest_from_alphaxiv_feed(
 
 /// 填充 OpenLibrary 节点 (能力源自 `bin/kb_crawl_batch::crawl_openlibrary`, R-P95/R-P96 提炼并入)。
 /// 仅更新已有但 content 为空的 OpenLibrary URL 节点; 复用安全抓取原语 (guard + pin + retry)。
-pub(crate) fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
+pub fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
     let ts = now();
     let mut stmt = conn
         .prepare(
@@ -780,7 +780,7 @@ fn decode_html_entities(text: &str) -> String {
 
 /// 单一 HTML→链接 原语：抽取 href、仅保留 http/https、SSRF 过滤内网/回环、去重。
 /// 所有吸收器统一委托此处。
-pub(crate) fn extract_links(html: &str, _base_url: &str) -> Vec<String> {
+pub fn extract_links(html: &str, _base_url: &str) -> Vec<String> {
     let mut links = Vec::new();
     let mut pos = 0;
 

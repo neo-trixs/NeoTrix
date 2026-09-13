@@ -29,7 +29,7 @@ impl Default for HnswParams {
 
 /// HNSW 向量点 (用于 instant-distance)
 #[derive(Debug, Clone)]
-pub(crate) struct VecPoint {
+pub struct VecPoint {
     pub node_id: [u8; 36],
     pub vector: Vec<f32>,
 }

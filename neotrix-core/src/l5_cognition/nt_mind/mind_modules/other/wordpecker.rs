@@ -13,7 +13,7 @@ pub struct Entity {
 }
 
 /// 中英文 NLP 处理 trait。
-pub(crate) trait _NlpProcessor {
+pub trait _NlpProcessor {
     /// 分词 (中英文混合): 按空白 + 连续 ASCII 词 + 单汉字切分。
     fn tokenize(&self, text: &str) -> Vec<String>;
     /// 实体抽取 (stub: 抽取含大写的英文专有名词与 @中文 标记)。
@@ -21,7 +21,7 @@ pub(crate) trait _NlpProcessor {
 }
 
 /// WordPecker 中英文 NLP 处理实现。
-pub(crate) struct _WordPeckerNlp {
+pub struct _WordPeckerNlp {
     min_entity_len: usize,
 }
 

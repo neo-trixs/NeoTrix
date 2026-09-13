@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 一个被识别的设计模式实例。
 #[derive(Debug, Clone, PartialEq, Default)]
-pub(crate) struct _DesignPattern {
+pub struct _DesignPattern {
     pub name: String,
     /// 模式类别 (creational/structural/behavioral/idiom)。
     pub category: String,
@@ -54,7 +54,7 @@ pub struct CapabilityNode {
 }
 
 /// design-extract 核心接口: 模式提取 → 能力节点映射。
-pub(crate) trait _DesignPatternExtractor {
+pub trait _DesignPatternExtractor {
     /// 从源文本 (代码/图序列化) 抽取候选模式 (C0: 基于关键词启发式)。
     fn extract(&self, source: &str) -> Vec<_DesignPattern>;
 
@@ -67,7 +67,7 @@ pub(crate) trait _DesignPatternExtractor {
 
 /// C0 基础提取器 — 关键词启发式, 无需 AST 依赖即可编译运行。
 #[derive(Default)]
-pub(crate) struct _DesignExtractor {
+pub struct _DesignExtractor {
     /// 模式关键词 → 目标 NeoTrix 域 的查找表。
     rules: HashMap<String, String>,
 }
@@ -133,7 +133,7 @@ impl _DesignPatternExtractor for _DesignExtractor {
 
 /// T1 SelfTest: 提取与映射基础不变量在 C0 可用。
 #[derive(Default)]
-pub(crate) struct _DesignExtractSelfTest;
+pub struct _DesignExtractSelfTest;
 
 impl SelfTest for _DesignExtractSelfTest {
     fn name(&self) -> &str {

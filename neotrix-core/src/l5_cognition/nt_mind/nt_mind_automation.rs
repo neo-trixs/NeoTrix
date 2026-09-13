@@ -95,7 +95,7 @@ impl AutomationRule {
 
 /// Result of running an automation action
 #[derive(Debug, Clone)]
-pub(crate) struct AutomationResult {
+pub struct AutomationResult {
     pub rule_name: String,
     pub success: bool,
     pub message: String,

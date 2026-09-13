@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 共振复杂度引擎
-pub(crate) struct _ResonanceComplexityEngine {
+pub struct _ResonanceComplexityEngine {
     oscillators: Vec<_Oscillator>,
     interference_patterns: Vec<_InterferencePattern>,
     _attractors: Vec<_ResonanceAttractor>,
@@ -19,7 +19,7 @@ pub(crate) struct _ResonanceComplexityEngine {
 
 /// 共振配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResonanceConfig {
+pub struct _ResonanceConfig {
     pub min_complexity_index: f64,
     pub min_coherence: f64,
     pub min_gain: f64,
@@ -43,7 +43,7 @@ impl Default for _ResonanceConfig {
 
 /// 振荡器
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _Oscillator {
+pub struct _Oscillator {
     pub oscillator_id: String,
     pub frequency_hz: f64,
     pub amplitude: f64,
@@ -55,7 +55,7 @@ pub(crate) struct _Oscillator {
 /// 振荡器类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _OscillatorType {
+pub enum _OscillatorType {
     Delta,      // 0.5-4 Hz
     Theta,      // 4-8 Hz
     Alpha,      // 8-13 Hz
@@ -67,7 +67,7 @@ pub(crate) enum _OscillatorType {
 
 /// 干涉模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _InterferencePattern {
+pub struct _InterferencePattern {
     pub pattern_id: String,
     pub oscillators: Vec<String>,
     pub pattern_type: PatternType,
@@ -88,7 +88,7 @@ pub enum PatternType {
 
 /// 共振吸引子
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResonanceAttractor {
+pub struct _ResonanceAttractor {
     pub attractor_id: String,
     pub name: String,
     pub complexity_index: f64,
@@ -102,7 +102,7 @@ pub(crate) struct _ResonanceAttractor {
 
 /// 共振统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResonanceStats {
+pub struct _ResonanceStats {
     pub total_oscillators: u64,
     pub total_patterns: u64,
     pub total_attractors: u64,
@@ -114,7 +114,7 @@ pub(crate) struct _ResonanceStats {
 
 /// 复杂度指数 (CI)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ComplexityIndex {
+pub struct _ComplexityIndex {
     pub fractal_dimension: f64,
     pub spatial_coherence: f64,
     pub signal_gain: f64,

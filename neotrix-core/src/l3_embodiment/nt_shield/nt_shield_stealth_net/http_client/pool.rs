@@ -7,7 +7,7 @@ use crate::neotrix::nt_io_http_factory::TlsVariant;
 use super::StealthHttpClient;
 use super::config::{self, ProxyConfig, STEALTH_USER_AGENT, DEFAULT_TIMEOUT_SECS, MAX_REDIRECTS, STEALTH_CONNECT_TIMEOUT_SECS, STEALTH_POOL_MAX_IDLE, STEALTH_POOL_IDLE_TIMEOUT_SECS};
 
-pub(crate) struct ClientEntry {
+pub struct ClientEntry {
     pub(super) client: reqwest::Client,
     pub(super) proxy_url: String,
     pub(super) created_at: Instant,

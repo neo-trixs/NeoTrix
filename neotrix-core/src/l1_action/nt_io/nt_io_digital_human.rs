@@ -45,7 +45,7 @@ fn emotion_from_expression(expression: &str) -> Emotion {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct AsrConfig {
+pub struct AsrConfig {
     pub engine: String,
     pub language: String,
     pub sample_rate: u32,
@@ -66,7 +66,7 @@ impl Default for AsrConfig {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct AsrResult {
+pub struct AsrResult {
     pub text: String,
     pub confidence: f64,
     pub is_final: bool,
@@ -75,7 +75,7 @@ pub(crate) struct AsrResult {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct TtsConfig {
+pub struct TtsConfig {
     pub engine: String,
     pub voice: String,
     pub speed: f64,
@@ -135,7 +135,7 @@ impl Default for PersonaConfig {
 
 /// 外贸数字人 "小采" — 专注外贸全流程的数字人 persona
 /// 包含 200+ QA pairs，覆盖报价谈判、生产跟单、物流订舱、信用证审核、结汇退税等场景
-pub(crate) fn trade_persona_xiaocai() -> PersonaConfig {
+pub fn trade_persona_xiaocai() -> PersonaConfig {
     let mut qa = HashMap::new();
 
     // ════════════════════════════════════════════════════════════════
@@ -430,7 +430,7 @@ impl EmotionEngine {
     }
 }
 
-pub(crate) struct AvatarController {
+pub struct AvatarController {
     pub expression: Emotion,
     pub animation: String,
     pub lip_sync: bool,
@@ -480,7 +480,7 @@ impl AvatarController {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct AvatarState {
+pub struct AvatarState {
     pub expression: Emotion,
     pub animation: String,
     pub lip_sync: bool,
@@ -629,7 +629,7 @@ impl DigitalHumanPipeline {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct PipelineResponse {
+pub struct PipelineResponse {
     pub reply: String,
     pub emotion: Emotion,
     pub animation: String,
@@ -639,7 +639,7 @@ pub(crate) struct PipelineResponse {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SessionStats {
+pub struct SessionStats {
     pub active: bool,
     pub utterance_count: u64,
     pub duration: Duration,

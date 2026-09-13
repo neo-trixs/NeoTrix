@@ -13,7 +13,7 @@ use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEntry;
 
 /// 技能检索查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SkillQuery {
+pub struct _SkillQuery {
     pub text: String,
     pub category: Option<String>,
     pub top_k: usize,
@@ -31,7 +31,7 @@ pub struct RetrievalResult {
 
 /// 技能嵌入缓存
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SkillEmbedding {
+pub struct _SkillEmbedding {
     pub skill_name: String,
     pub embedding: Vec<f32>,
     pub category: String,
@@ -40,7 +40,7 @@ pub(crate) struct _SkillEmbedding {
 
 /// 质量分数 (SkillCorpus 3 维度)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct _QualityScores {
+pub struct _QualityScores {
     pub utility: f64,
     pub robustness: f64,
     pub safety: f64,
@@ -49,7 +49,7 @@ pub(crate) struct _QualityScores {
 
 /// 技能分类 (SkillCorpus 16 类别)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum _SkillCategory {
+pub enum _SkillCategory {
     CodeGeneration,
     CodeAnalysis,
     Testing,
@@ -113,7 +113,7 @@ impl _SkillCategory {
 }
 
 /// 技能检索引擎 (bi-encoder + reranker)
-pub(crate) struct _SkillRetriever {
+pub struct _SkillRetriever {
     bi_encoder: Arc<dyn _BiEncoder>,
     reranker: Arc<dyn Reranker>,
     embeddings: Arc<Mutex<HashMap<String, _SkillEmbedding>>>,
@@ -121,7 +121,7 @@ pub(crate) struct _SkillRetriever {
 }
 
 /// Bi-encoder trait (快速检索)
-pub(crate) trait _BiEncoder: Send + Sync {
+pub trait _BiEncoder: Send + Sync {
     fn encode(&self, text: &str) -> Result<Vec<f32>, String>;
     fn batch_encode(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String>;
     fn dim(&self) -> usize;
@@ -133,8 +133,8 @@ pub trait Reranker: Send + Sync {
 }
 
 /// 默认实现 (占位, 生产需接入 Qwen3-Embedding-0.6B / Qwen3-Reranker-0.6B)
-pub(crate) struct _PlaceholderBiEncoder;
-pub(crate) struct _PlaceholderReranker;
+pub struct _PlaceholderBiEncoder;
+pub struct _PlaceholderReranker;
 
 impl _BiEncoder for _PlaceholderBiEncoder {
     fn encode(&self, text: &str) -> Result<Vec<f32>, String> {

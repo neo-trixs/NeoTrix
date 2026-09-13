@@ -398,7 +398,7 @@ impl ProviderConfig {
 
 /// 网络隔离拒绝型 provider — 默认策略下非白名单端点返回此类, 所有调用立即失败。
 #[derive(Debug, Clone)]
-pub(crate) struct DeniedProvider {
+pub struct DeniedProvider {
     pub host: String,
 }
 
@@ -440,7 +440,7 @@ pub fn host_of(base_url: &str) -> String {
 }
 
 /// 是否为本地/内网回环端点 (Local 主体 provider 直连)。
-pub(crate) fn is_local_host(host: &str) -> bool {
+pub fn is_local_host(host: &str) -> bool {
     let h = host.trim().trim_start_matches('[').trim_end_matches(']').to_lowercase();
     matches!(h.as_str(), "localhost" | "127.0.0.1" | "::1" | "0.0.0.0")
         || h.starts_with("127.")
@@ -504,7 +504,7 @@ fn default_host(provider_type: LlmProviderType) -> Option<&'static str> {
 /// 4. 显式逃生门 NEOTRIX_NETWORK_UNBLOCK=1 → 放行 (告警)
 ///
 /// 阻断: 其余一律 DeniedProvider。shield 不可用时不静默放行 (安全默认)。
-pub(crate) fn network_access_allowed(provider_type: LlmProviderType, base_url: Option<&str>) -> bool {
+pub fn network_access_allowed(provider_type: LlmProviderType, base_url: Option<&str>) -> bool {
     let host = match base_url {
         Some(url) if !url.trim().is_empty() => host_of(url),
         _ => match default_host(provider_type) {

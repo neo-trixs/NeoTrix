@@ -36,7 +36,7 @@ pub enum DeliberationRole {
 
 /// 论证节点。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ArgumentNode {
+pub struct _ArgumentNode {
     pub id: String,
     pub author: DeliberationRole,
     pub claim: String,           // 主张
@@ -53,7 +53,7 @@ pub(crate) struct _ArgumentNode {
 
 /// 辩论轮次。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DeliberationRound {
+pub struct _DeliberationRound {
     pub round_num: usize,
     pub phase: DeliberationPhase,
     pub arguments: Vec<String>, // 节点 ID 列表
@@ -74,7 +74,7 @@ pub enum DeliberationPhase {
 
 /// 辩论图 — 论证的有向图。
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ArgumentGraph {
+pub struct _ArgumentGraph {
     pub nodes: HashMap<String, _ArgumentNode>,
     pub edges: HashMap<String, Vec<GraphEdge>>, // from -> edges
 }
@@ -122,7 +122,7 @@ pub enum SessionStatus {
 
 /// _DeliberationEngine 配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DeliberationConfig {
+pub struct _DeliberationConfig {
     pub max_rounds: usize,
     pub max_args_per_round: usize,
     pub min_participants: usize,
@@ -149,7 +149,7 @@ impl Default for _DeliberationConfig {
 }
 
 /// _DeliberationEngine 核心。
-pub(crate) struct _DeliberationEngine {
+pub struct _DeliberationEngine {
     config: _DeliberationConfig,
     active_sessions: Arc<RwLock<HashMap<String, DeliberationSession>>>,
     completed_sessions: Arc<RwLock<BTreeMap<String, DeliberationSession>>>,
@@ -458,7 +458,7 @@ impl _DeliberationEngine {
 
 /// 运行时包装。
 #[derive(Clone)]
-pub(crate) struct _DeliberationEngineRuntime {
+pub struct _DeliberationEngineRuntime {
     inner: Arc<_DeliberationEngine>,
 }
 
@@ -489,7 +489,7 @@ impl _DeliberationEngineRuntime {
 }
 
 /// 便捷函数：创建引擎并启动辩论。
-pub(crate) fn _start_deliberation(
+pub fn _start_deliberation(
     scenario: String,
     context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
     initial: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment>,

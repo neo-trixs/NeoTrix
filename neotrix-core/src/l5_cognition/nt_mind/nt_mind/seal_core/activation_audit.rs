@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// 单次 harness 进化的可量化观测样本。
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq)]
-pub(crate) struct _ActivationAuditSample {
+pub struct _ActivationAuditSample {
     /// 激活尝试次数（harness 被触发 / 加载的次数）。
     pub activation_attempts: u64,
     /// 激活成功次数。
@@ -49,7 +49,7 @@ fn rate(num: u64, den: u64) -> f64 {
 
 /// 激活/跟随/阶段依从三项比率。
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct _AuditRates {
+pub struct _AuditRates {
     /// Harness 激活成功率 (Success-rate of Loading/activation)。
     pub slr: f64,
     /// Harness 跟随率 (Harness Follow Rate)。
@@ -60,7 +60,7 @@ pub(crate) struct _AuditRates {
 
 /// 基于累计 SLR 的进化健康分级（论文阈值：弱模型 25.1% / 强模型 95.7%）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum _AuditHealth {
+pub enum _AuditHealth {
     /// SLR < 0.5 —— 激活严重失败（接近论文弱模型档）。
     Critical,
     /// 0.5 <= SLR < 0.8 —— 部分退化。
@@ -71,7 +71,7 @@ pub(crate) enum _AuditHealth {
 
 /// _ActivationAuditStage — 累计追踪每次 harness 进化的激活/跟随/阶段依从。
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _ActivationAuditStage {
+pub struct _ActivationAuditStage {
     samples: Vec<_ActivationAuditSample>,
     total: _ActivationAuditSample,
 }
@@ -132,7 +132,7 @@ impl _ActivationAuditStage {
 
 /// 可量化审计产出（供上报 / 持久化 / 对照论文阈值）。
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct _ActivationAuditReport {
+pub struct _ActivationAuditReport {
     pub _n_cycles: u64,
     pub slr: f64,
     pub hfr: f64,

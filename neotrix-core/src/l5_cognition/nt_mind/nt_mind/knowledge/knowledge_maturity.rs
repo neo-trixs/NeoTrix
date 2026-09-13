@@ -3,7 +3,7 @@ use crate::l5_cognition::nt_mind::nt_mind::core::MaturityLevel;
 
 /// Pairs a KnowledgeSource with its assessed maturity level.
 #[derive(Debug, Clone)]
-pub(crate) struct _MatureKnowledgeSource {
+pub struct _MatureKnowledgeSource {
     pub name: String,
     pub maturity: MaturityLevel,
 }
@@ -13,7 +13,7 @@ pub(crate) struct _MatureKnowledgeSource {
 /// Provides multi-fidelity filtering: consolidated queries only return
 /// sources that have reached at least `Validated`.
 #[derive(Debug, Clone)]
-pub(crate) struct _KnowledgeMaturityTracker {
+pub struct _KnowledgeMaturityTracker {
     levels: HashMap<String, MaturityLevel>,
 }
 

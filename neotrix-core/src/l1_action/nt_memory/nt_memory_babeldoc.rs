@@ -15,7 +15,7 @@ use uuid::Uuid;
 use super::shared_utils::now_ts;
 
 /// 文档翻译后端统一接口。
-pub(crate) trait DocumentTranslator: Send + Sync {
+pub trait DocumentTranslator: Send + Sync {
     /// 后端标识 (如 "babeldoc")。
     fn backend_id(&self) -> &str;
     /// 生成双语对照知识节点 key (原文 + 译文)。
@@ -34,7 +34,7 @@ pub(crate) trait DocumentTranslator: Send + Sync {
 }
 
 /// BabelDOC 后端实现 (stub)。
-pub(crate) struct BabelDocBackend {
+pub struct BabelDocBackend {
     pub endpoint: String,
 }
 

@@ -16,7 +16,7 @@ use crate::l5_cognition::l6_facade::ConsciousnessGoldStandard;
 
 /// 控制类型 (MERA 同款)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum _ControlType {
+pub enum _ControlType {
     /// 回溯: 发现错误/死胡同，退回到前一步骤
     Backtrack,
     /// 策略切换: 当前推理路径无效，切换分解法/第一性原理/验证模式
@@ -29,7 +29,7 @@ pub(crate) enum _ControlType {
 
 /// Takeover 点 (控制介入位置)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TakeoverPoint {
+pub struct _TakeoverPoint {
     pub step_idx: usize,           // 在 reasoning trace 中的步骤索引
     pub control_type: _ControlType,
     pub confidence: f64,           // 检测置信度 0~1
@@ -38,7 +38,7 @@ pub(crate) struct _TakeoverPoint {
 
 /// 控制指令 (生成的 meta-cognitive guidance)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ControlSignal {
+pub struct _ControlSignal {
     pub takeover_point: _TakeoverPoint,
     pub instruction: String,       // 自然语言控制指令
     pub target_effort_tier: Option<EffortTier>, // 建议的努力分层调整
@@ -47,7 +47,7 @@ pub(crate) struct _ControlSignal {
 
 /// 交替序列片段 (reason ↔ control 交替)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _AlternatingSegment {
+pub enum _AlternatingSegment {
     Reason { text: String, step_idx: usize },
     Control { signal: _ControlSignal },
 }
@@ -65,14 +65,14 @@ pub struct AlternatingSequence {
 
 /// 控制段奖励 (CSPO 核心)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ControlReward {
+pub struct _ControlReward {
     pub semantic_score: f64,       // 语义一致性 (vs 参考控制目标)
     pub format_score: f64,         // 格式规范性 (<think>...</think> 等)
     pub total: f64,                // semantic + format
 }
 
 /// Takeover 检测器
-pub(crate) struct _TakeoverDetector {
+pub struct _TakeoverDetector {
     // 启发式标记词 (MERA Table 1 扩展)
     backtrack_markers: Vec<&'static str>,
     strategy_switch_markers: Vec<&'static str>,
@@ -83,7 +83,7 @@ pub(crate) struct _TakeoverDetector {
 }
 
 #[async_trait::async_trait]
-pub(crate) trait _TakeoverVerifier: Send + Sync {
+pub trait _TakeoverVerifier: Send + Sync {
     async fn verify(&self, trace_segment: &str, candidate_type: _ControlType) -> Result<f64, String>;
 }
 
@@ -285,7 +285,7 @@ impl ControlDistiller {
 
 /// 控制信号生成器 (few-shot LLM)
 #[derive(Default)]
-pub(crate) struct _ControlSignalGenerator {
+pub struct _ControlSignalGenerator {
     // 模板: control_type -> (system_prompt, few_shot_examples)
     #[allow(dead_code)]
     templates: HashMap<_ControlType, (&'static str, Vec<(&'static str, &'static str)>)>,
@@ -532,7 +532,7 @@ pub struct CsppoReport {
 
 /// 蒸馏错误
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum _DistillError {
+pub enum _DistillError {
     #[error("Policy error: {0}")]
     PolicyError(String),
     #[error("PRM error: {0}")]

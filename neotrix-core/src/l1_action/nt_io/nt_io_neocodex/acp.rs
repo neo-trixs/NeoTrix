@@ -24,7 +24,7 @@ pub struct AcpResponse {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct AcpNotification {
+pub struct AcpNotification {
     pub method: String,
     pub params: serde_json::Value,
 }

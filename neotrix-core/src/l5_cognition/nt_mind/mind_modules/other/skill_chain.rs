@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 技能链管理器
-pub(crate) struct _SkillChainManager {
+pub struct _SkillChainManager {
     chains: HashMap<String, _SkillChain>,
     executors: HashMap<String, Box<dyn _SkillExecutor>>,
     #[allow(dead_code)]
@@ -58,7 +58,7 @@ impl Default for RetryPolicy {
 
 /// 技能链
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SkillChain {
+pub struct _SkillChain {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -69,7 +69,7 @@ pub(crate) struct _SkillChain {
 
 /// 链步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ChainStep {
+pub struct _ChainStep {
     pub id: String,
     pub skill_id: String,
     pub config: serde_json::Value,
@@ -80,7 +80,7 @@ pub(crate) struct _ChainStep {
 
 /// 链元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ChainMetadata {
+pub struct _ChainMetadata {
     pub author: Option<String>,
     pub version: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -89,7 +89,7 @@ pub(crate) struct _ChainMetadata {
 }
 
 /// 链执行器
-pub(crate) struct _ChainExecutor {
+pub struct _ChainExecutor {
     chain: _SkillChain,
     state: _ChainState,
     results: HashMap<String, StepResult>,
@@ -97,7 +97,7 @@ pub(crate) struct _ChainExecutor {
 
 /// 链状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ChainState {
+pub struct _ChainState {
     pub status: _ChainStatus,
     pub current_step: Option<String>,
     pub started_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -108,7 +108,7 @@ pub(crate) struct _ChainState {
 /// 链状态枚举
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _ChainStatus {
+pub enum _ChainStatus {
     Pending,
     Running,
     Completed,
@@ -139,7 +139,7 @@ pub enum StepStatus {
 }
 
 /// 技能执行器 trait
-pub(crate) trait _SkillExecutor: Send + Sync {
+pub trait _SkillExecutor: Send + Sync {
     fn execute(&self, config: &serde_json::Value, input: Option<&serde_json::Value>) -> Result<serde_json::Value, String>;
     fn rollback(&self, config: &serde_json::Value, output: &serde_json::Value) -> Result<(), String>;
     fn name(&self) -> &str;
@@ -147,7 +147,7 @@ pub(crate) trait _SkillExecutor: Send + Sync {
 
 /// 链统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ChainStats {
+pub struct _ChainStats {
     pub total_chains: u64,
     pub running_chains: u64,
     pub completed_chains: u64,
@@ -157,7 +157,7 @@ pub(crate) struct _ChainStats {
 
 /// 链执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ChainExecutionResult {
+pub struct _ChainExecutionResult {
     pub chain_id: String,
     pub status: _ChainStatus,
     pub results: HashMap<String, StepResult>,

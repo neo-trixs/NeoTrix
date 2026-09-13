@@ -16,7 +16,7 @@ pub struct ToolCall {
 /// 融合后的动作
 
 #[derive(Clone, Debug)]
-pub(crate) struct _FusedAction {
+pub struct _FusedAction {
     pub tools: Vec<String>,
     pub fused_input: String,
     pub fused_output: String,
@@ -28,7 +28,7 @@ pub(crate) struct _FusedAction {
 /// 观测包（压缩后的观测）
 
 #[derive(Clone, Debug)]
-pub(crate) struct _ObservationPack {
+pub struct _ObservationPack {
     pub tool_name: String,
     pub compressed_output: String,
     pub key_evidence: Vec<String>,
@@ -62,7 +62,7 @@ pub struct HarnessOptimizer {
 /// 优化记录
 
 #[derive(Clone, Debug)]
-pub(crate) struct _OptimizationRecord {
+pub struct _OptimizationRecord {
     pub timestamp: i64,
     pub action_count: usize,
     pub fused_count: usize,

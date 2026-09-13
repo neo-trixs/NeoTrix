@@ -25,7 +25,7 @@ pub struct Value {
 
 /// 价值类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _ValueType {
+pub enum _ValueType {
     Ethical,
     Practical,
     Aesthetic,
@@ -96,7 +96,7 @@ impl ValueJudge {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ValueStats {
+pub struct _ValueStats {
     pub total_values: usize,
     pub total_judgments: usize,
     pub avg_score: f64,

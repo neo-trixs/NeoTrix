@@ -7,7 +7,7 @@ use tracing::Span;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
-pub(crate) fn init_otel(service_name: &str) -> bool {
+pub fn init_otel(service_name: &str) -> bool {
     let endpoint = match std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
         Ok(v) if !v.is_empty() => v,
         _ => return false,
@@ -39,7 +39,7 @@ pub(crate) fn init_otel(service_name: &str) -> bool {
     true
 }
 
-pub(crate) fn agent_span(agent_id: &str, task: &str) -> Span {
+pub fn agent_span(agent_id: &str, task: &str) -> Span {
     tracing::info_span!(
         "agent",
         agent.id = %agent_id,

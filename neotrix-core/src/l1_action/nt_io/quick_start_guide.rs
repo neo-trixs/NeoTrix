@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 
 /// 快速入门步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct QuickStartStep {
+pub struct QuickStartStep {
     /// 步骤编号
     pub step_number: u32,
     /// 步骤标题
@@ -28,7 +28,7 @@ pub(crate) struct QuickStartStep {
 
 /// 快速入门指南
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct QuickStartGuide {
+pub struct QuickStartGuide {
     /// 指南标题
     pub title: String,
     /// 指南描述

@@ -53,7 +53,7 @@ const GAME_TRAINING_INTERVAL_SECS: u64 = 300; // 5min NT-PLAY 自主进化训练
 const CLUSTERING_INTERVAL_SECS: u64 = 3600; // 1h KB 域聚类巡检
 const SELF_IMPROVEMENT_INTERVAL_SECS: u64 = 3600; // 1h 自我改进循环 (L6 元认知)
 
-pub(crate) struct _ConsciousnessThresholds {
+pub struct _ConsciousnessThresholds {
     pub warn_quality: f64,
     pub critical_quality: f64,
     pub eventbus_critical: f64,
@@ -78,7 +78,7 @@ pub static CONSCIOUSNESS_THRESHOLDS: LazyLock<_ConsciousnessThresholds> =
 // 每层迭代推进 gap 关闭, 全部 gap 清空 + 外部验证通过后晋升下一层。
 // ────────────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _ConvergenceLayer {
+pub enum _ConvergenceLayer {
     Artifact,
     Task,
     Session,
@@ -111,7 +111,7 @@ impl _ConvergenceLayer {
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _ConvergenceGap {
+pub struct _ConvergenceGap {
     pub domain: String,
     pub description: String,
     pub severity: String,
@@ -254,7 +254,7 @@ use crate::core::nt_core_simulate_engine::SimulateEngine;
 // ============================================================
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum _AutonomyTier {
+pub enum _AutonomyTier {
     /// 仅监控与报告, 不自动修复
     L1 = 1,
     /// 自动修复, 不自主进化
@@ -275,7 +275,7 @@ impl _AutonomyTier {
 
 /// Loop Ready 评分 — 从循环健康信号计算 (0-100)
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct _LoopReadyScore {
+pub struct _LoopReadyScore {
     pub score: u8,
     pub handlers_ok: bool,
     pub kb_ok: bool,
@@ -332,7 +332,7 @@ impl _LoopReadyScore {
 // ============================================================
 
 #[derive(Debug, Clone)]
-pub(crate) struct _PathDenylist {
+pub struct _PathDenylist {
     patterns: Vec<String>,
 }
 

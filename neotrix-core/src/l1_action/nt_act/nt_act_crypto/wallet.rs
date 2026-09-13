@@ -4,7 +4,7 @@ use sha3::{Keccak256, Digest};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum WalletChain {
+pub enum WalletChain {
     Evm,
     Solana,
     Bitcoin,

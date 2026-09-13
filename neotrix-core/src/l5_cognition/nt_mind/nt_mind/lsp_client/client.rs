@@ -4,12 +4,12 @@ use std::io::{BufRead, BufReader, Read, Write};
 use serde_json::Value;
 use super::types::*;
 
-pub(crate) struct LspManager {
+pub struct LspManager {
     pub servers: HashMap<String, _LspSession>,
     configs: Vec<LspServerConfig>,
 }
 
-pub(crate) struct _LspSession {
+pub struct _LspSession {
     pub language_id: String,
     process: Option<Child>,
     seq_id: u64,

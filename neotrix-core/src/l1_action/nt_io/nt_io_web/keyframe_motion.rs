@@ -29,7 +29,7 @@ impl Keyframe {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct MotionClip {
+pub struct MotionClip {
     pub id: String,
     pub frames: Vec<Keyframe>,
     pub duration_ms: u64,
@@ -48,7 +48,7 @@ impl Default for MotionClip {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum Easing {
+pub enum Easing {
     Linear,
     EaseIn,
     EaseOut,
@@ -56,7 +56,7 @@ pub(crate) enum Easing {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct MotionAnimator {
+pub struct MotionAnimator {
     pub easing: Easing,
     pub samples_per_ms: u32,
 }

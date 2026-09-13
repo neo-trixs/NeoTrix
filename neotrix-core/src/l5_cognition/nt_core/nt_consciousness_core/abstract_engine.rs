@@ -26,7 +26,7 @@ pub struct Concept {
 
 /// 抽象层次
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _AbstractionLevel {
+pub enum _AbstractionLevel {
     Concrete,
     SubCategory,
     Category,
@@ -36,7 +36,7 @@ pub(crate) enum _AbstractionLevel {
 
 /// 概念关系
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConceptRelation {
+pub struct _ConceptRelation {
     pub relation_type: String,
     pub target_concept: String,
     pub strength: f64,
@@ -44,7 +44,7 @@ pub(crate) struct _ConceptRelation {
 
 /// 抽象记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AbstractRecord {
+pub struct _AbstractRecord {
     pub id: String,
     pub cycle: u32,
     pub input: String,
@@ -114,7 +114,7 @@ impl AbstractEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AbstractStats {
+pub struct _AbstractStats {
     pub total_concepts: usize,
     pub total_abstractions: usize,
 }

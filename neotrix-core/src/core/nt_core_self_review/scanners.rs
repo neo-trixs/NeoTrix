@@ -9,7 +9,7 @@ use syn;
 
 use super::*;
 
-pub(crate) fn collect_rs_files_recursive(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+pub fn collect_rs_files_recursive(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -30,7 +30,7 @@ pub(crate) fn collect_rs_files_recursive(dir: &Path, out: &mut Vec<std::path::Pa
 /// Nearly every check in `run_all` re-walks the whole source tree via `read_dir`
 /// (then stats each file through `read_source_cached`/`production_lines_cached`).
 /// Walking once and reusing the path list removes ~50 redundant tree traversals.
-pub(crate) fn cached_rs_files(root: &Path) -> Arc<Vec<PathBuf>> {
+pub fn cached_rs_files(root: &Path) -> Arc<Vec<PathBuf>> {
     static CACHE: OnceLock<Mutex<HashMap<PathBuf, (SystemTime, Arc<Vec<PathBuf>>)>>> =
         OnceLock::new();
     let mtime = std::fs::metadata(root)
@@ -59,7 +59,7 @@ pub(crate) fn cached_rs_files(root: &Path) -> Arc<Vec<PathBuf>> {
 /// and in `SelfReviewStage` (frequency 1) it runs on *every* seal-loop iteration.
 /// Memoizing contents by (mtime, len) collapses the audit to one disk read per
 /// file for the whole process lifetime.
-pub(crate) fn read_source_cached(path: &Path) -> std::io::Result<String> {
+pub fn read_source_cached(path: &Path) -> std::io::Result<String> {
     static CACHE: OnceLock<Mutex<HashMap<PathBuf, (SystemTime, u64, Arc<str>)>>> = OnceLock::new();
     let metadata = std::fs::metadata(path)?;
     let mtime = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
@@ -87,7 +87,7 @@ pub(crate) fn read_source_cached(path: &Path) -> std::io::Result<String> {
 /// cache each call re-runs the per-line test-context brace tracking over every
 /// file (344K lines in this repo). Stripping test contexts once per file turns
 /// the hot loop into a plain `line.matches(pattern)` scan over cached lines.
-pub(crate) fn production_lines_cached(path: &Path) -> Option<Arc<Vec<String>>> {
+pub fn production_lines_cached(path: &Path) -> Option<Arc<Vec<String>>> {
     static CACHE: OnceLock<Mutex<HashMap<PathBuf, (SystemTime, u64, Arc<Vec<String>>)>>> =
         OnceLock::new();
     let metadata = std::fs::metadata(path).ok()?;
@@ -144,7 +144,7 @@ pub(crate) fn production_lines_cached(path: &Path) -> Option<Arc<Vec<String>>> {
     Some(lines)
 }
 
-pub(crate) fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usize {
+pub fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Some(lines) = production_lines_cached(path) {
@@ -158,7 +158,7 @@ pub(crate) fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usi
 
 /// Simple heuristic: detect files where an import appears only in the import statement itself.
 /// Counts patterns like `use foo` when `foo` doesn't appear elsewhere.
-pub(crate) fn scan_for_unused_import_patterns(dir: &Path) -> usize {
+pub fn scan_for_unused_import_patterns(dir: &Path) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -184,7 +184,7 @@ pub(crate) fn scan_for_unused_import_patterns(dir: &Path) -> usize {
 }
 
 /// Helper: collect all .rs file stems recursively
-pub(crate) fn collect_rs_stems(dir: &Path, out: &mut Vec<String>) {
+pub fn collect_rs_stems(dir: &Path, out: &mut Vec<String>) {
     for path in cached_rs_files(dir).iter() {
         if let Some(stem) = path.file_stem() {
             out.push(stem.to_string_lossy().to_string());
@@ -194,7 +194,7 @@ pub(crate) fn collect_rs_stems(dir: &Path, out: &mut Vec<String>) {
 
 /// Scan a directory tree for .rs files without #[test].
 /// Appends uncovered file stems to `uncovered`.
-pub(crate) fn scan_file_test_coverage(dir: &Path, uncovered: &mut Vec<String>) {
+pub fn scan_file_test_coverage(dir: &Path, uncovered: &mut Vec<String>) {
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
             let line_count = content.lines().count();
@@ -210,7 +210,7 @@ pub(crate) fn scan_file_test_coverage(dir: &Path, uncovered: &mut Vec<String>) {
 }
 
 /// Scan for .unwrap() or .expect() within LazyLock initializer closures.
-pub(crate) fn scan_for_pattern_in_lazy_init(dir: &Path) -> usize {
+pub fn scan_for_pattern_in_lazy_init(dir: &Path) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -238,7 +238,7 @@ pub(crate) fn scan_for_pattern_in_lazy_init(dir: &Path) -> usize {
 
 /// Scan Python files for a simple pattern match.
 #[allow(dead_code)]
-pub(crate) fn scan_python_for_pattern(dir: &Path, pattern: &str) -> usize {
+pub fn scan_python_for_pattern(dir: &Path, pattern: &str) -> usize {
     let mut count = 0usize;
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -257,7 +257,7 @@ pub(crate) fn scan_python_for_pattern(dir: &Path, pattern: &str) -> usize {
 }
 
 /// Count bare `except:` clauses (not `except Exception:`, `except ValueError:`, etc.)
-pub(crate) fn scan_python_for_bare_except(dir: &Path) -> usize {
+pub fn scan_python_for_bare_except(dir: &Path) -> usize {
     let mut count = 0usize;
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -285,7 +285,7 @@ pub(crate) fn scan_python_for_bare_except(dir: &Path) -> usize {
 }
 
 /// Scan Python files for f-string patterns in SQL statements (like `f"SELECT ... {value}"`)
-pub(crate) fn scan_python_fstring_in_sql(dir: &Path) -> usize {
+pub fn scan_python_fstring_in_sql(dir: &Path) -> usize {
     let mut count = 0usize;
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -321,7 +321,7 @@ pub(crate) fn scan_python_fstring_in_sql(dir: &Path) -> usize {
 /// Scan for function declarations with single-uppercase-letter generic params
 /// (`fn foo<T>`) where the param name doesn't appear in the function body,
 /// suggesting they may be unused or over-abstracted.
-pub(crate) fn scan_for_unused_generic_params(dir: &Path) -> usize {
+pub fn scan_for_unused_generic_params(dir: &Path) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -369,7 +369,7 @@ pub(crate) fn scan_for_unused_generic_params(dir: &Path) -> usize {
 }
 
 /// Count lines with deep indentation (≥ `levels * 4` spaces, indicating >5 levels of nesting).
-pub(crate) fn count_deeply_nested_lines(dir: &Path, levels: usize) -> usize {
+pub fn count_deeply_nested_lines(dir: &Path, levels: usize) -> usize {
     let threshold = levels * 4;
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
@@ -387,7 +387,7 @@ pub(crate) fn count_deeply_nested_lines(dir: &Path, levels: usize) -> usize {
 
 /// Count functions that span more than `max_lines` lines.
 /// Uses simple brace-depth tracking to find matching closing braces.
-pub(crate) fn count_long_functions(dir: &Path, max_lines: usize) -> usize {
+pub fn count_long_functions(dir: &Path, max_lines: usize) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -397,7 +397,7 @@ pub(crate) fn count_long_functions(dir: &Path, max_lines: usize) -> usize {
     count
 }
 
-pub(crate) fn count_long_functions_in_content(content: &str, max_lines: usize) -> usize {
+pub fn count_long_functions_in_content(content: &str, max_lines: usize) -> usize {
     let lines: Vec<&str> = content.lines().collect();
     let mut count = 0usize;
     let mut i = 0;
@@ -457,7 +457,7 @@ pub(crate) fn count_long_functions_in_content(content: &str, max_lines: usize) -
 }
 
 /// Count traits that have only one implementation (over-abstracted pattern).
-pub(crate) fn count_single_impl_traits(dir: &Path) -> usize {
+pub fn count_single_impl_traits(dir: &Path) -> usize {
     let mut names: Vec<(String, String)> = Vec::new(); // (trait_name, file_path)
     let mut impl_counts: HashMap<String, usize> = HashMap::new();
     for path in cached_rs_files(dir).iter() {
@@ -501,7 +501,7 @@ pub(crate) fn count_single_impl_traits(dir: &Path) -> usize {
 }
 
 /// Count if-else chains longer than `max_chain` (consecutive `else if` / `else` lines).
-pub(crate) fn count_long_if_chains(dir: &Path, max_chain: usize) -> usize {
+pub fn count_long_if_chains(dir: &Path, max_chain: usize) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -528,7 +528,7 @@ pub(crate) fn count_long_if_chains(dir: &Path, max_chain: usize) -> usize {
 }
 
 /// Count match expressions with more than `max_arms` arms.
-pub(crate) fn count_excessive_match_arms(dir: &Path, max_arms: usize) -> usize {
+pub fn count_excessive_match_arms(dir: &Path, max_arms: usize) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -578,7 +578,7 @@ pub(crate) fn count_excessive_match_arms(dir: &Path, max_arms: usize) -> usize {
 }
 
 /// Count function declarations with more than `max_params` parameters.
-pub(crate) fn count_excessive_param_count(dir: &Path, max_params: usize) -> usize {
+pub fn count_excessive_param_count(dir: &Path, max_params: usize) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -610,7 +610,7 @@ pub(crate) fn count_excessive_param_count(dir: &Path, max_params: usize) -> usiz
 }
 
 /// Count `// TODO` / `// FIXME` comments that aren't in files with a `#[test]`.
-pub(crate) fn count_todos_without_nearby_test(dir: &Path) -> usize {
+pub fn count_todos_without_nearby_test(dir: &Path) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -627,7 +627,7 @@ pub(crate) fn count_todos_without_nearby_test(dir: &Path) -> usize {
 }
 
 /// Count `&mut self` methods that do not return `Result` (suggesting no error handling).
-pub(crate) fn count_state_mutation_no_result(dir: &Path) -> usize {
+pub fn count_state_mutation_no_result(dir: &Path) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -647,7 +647,7 @@ pub(crate) fn count_state_mutation_no_result(dir: &Path) -> usize {
 
 /// Count `pub fn` declarations without doc comments indicating success criteria
 /// (no "Returns", "Goal", "Purpose", or "Success" in the preceding doc block).
-pub(crate) fn count_pub_fn_without_goal_doc(dir: &Path) -> usize {
+pub fn count_pub_fn_without_goal_doc(dir: &Path) -> usize {
     let mut count = 0usize;
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
@@ -684,7 +684,7 @@ pub(crate) fn count_pub_fn_without_goal_doc(dir: &Path) -> usize {
 }
 
 /// Count files changed in the last commit (git diff --stat).
-pub(crate) fn count_files_in_last_commit(repo_dir: &Path) -> usize {
+pub fn count_files_in_last_commit(repo_dir: &Path) -> usize {
     let output = std::process::Command::new("git")
         .args(["diff", "--name-only", "HEAD~1..HEAD"])
         .current_dir(repo_dir)
@@ -699,7 +699,7 @@ pub(crate) fn count_files_in_last_commit(repo_dir: &Path) -> usize {
 }
 
 /// Count lines added in the last commit (git diff --shortstat).
-pub(crate) fn count_lines_in_last_commit(repo_dir: &Path) -> usize {
+pub fn count_lines_in_last_commit(repo_dir: &Path) -> usize {
     let output = std::process::Command::new("git")
         .args(["diff", "--shortstat", "HEAD~1..HEAD"])
         .current_dir(repo_dir)
@@ -721,7 +721,7 @@ pub(crate) fn count_lines_in_last_commit(repo_dir: &Path) -> usize {
     }
 }
 
-pub(crate) fn estimate_brace_depth(code: &str) -> usize {
+pub fn estimate_brace_depth(code: &str) -> usize {
     let mut depth = 0usize;
     let mut max_depth = 0usize;
     for c in code.chars() {
@@ -735,7 +735,7 @@ pub(crate) fn estimate_brace_depth(code: &str) -> usize {
     max_depth
 }
 
-pub(crate) fn syn_file_max_depth(file: &syn::File) -> usize {
+pub fn syn_file_max_depth(file: &syn::File) -> usize {
     file.items
         .iter()
         .map(|item| syn_item_max_depth(item, 0))
@@ -743,7 +743,7 @@ pub(crate) fn syn_file_max_depth(file: &syn::File) -> usize {
         .unwrap_or(0)
 }
 
-pub(crate) fn syn_item_max_depth(item: &syn::Item, depth: usize) -> usize {
+pub fn syn_item_max_depth(item: &syn::Item, depth: usize) -> usize {
     match item {
         syn::Item::Fn(f) => syn_block_max_depth(&f.block, depth),
         syn::Item::Impl(imp) => {
@@ -795,7 +795,7 @@ pub(crate) fn syn_item_max_depth(item: &syn::Item, depth: usize) -> usize {
     }
 }
 
-pub(crate) fn syn_impl_item_max_depth(item: &syn::ImplItem, depth: usize) -> usize {
+pub fn syn_impl_item_max_depth(item: &syn::ImplItem, depth: usize) -> usize {
     match item {
         syn::ImplItem::Fn(f) => syn_block_max_depth(&f.block, depth),
         syn::ImplItem::Const(c) => syn_expr_max_depth(&c.expr, depth),
@@ -803,7 +803,7 @@ pub(crate) fn syn_impl_item_max_depth(item: &syn::ImplItem, depth: usize) -> usi
     }
 }
 
-pub(crate) fn syn_trait_item_max_depth(item: &syn::TraitItem, depth: usize) -> usize {
+pub fn syn_trait_item_max_depth(item: &syn::TraitItem, depth: usize) -> usize {
     match item {
         syn::TraitItem::Fn(f) => f
             .default
@@ -819,16 +819,16 @@ pub(crate) fn syn_trait_item_max_depth(item: &syn::TraitItem, depth: usize) -> u
     }
 }
 
-pub(crate) fn syn_foreign_item_max_depth(_item: &syn::ForeignItem, depth: usize) -> usize {
+pub fn syn_foreign_item_max_depth(_item: &syn::ForeignItem, depth: usize) -> usize {
     depth
 }
 
-pub(crate) fn syn_block_max_depth(block: &syn::Block, depth: usize) -> usize {
+pub fn syn_block_max_depth(block: &syn::Block, depth: usize) -> usize {
     let d = depth + 1;
     d.max(syn_stmts_max_depth(&block.stmts, d))
 }
 
-pub(crate) fn syn_stmts_max_depth(stmts: &[syn::Stmt], depth: usize) -> usize {
+pub fn syn_stmts_max_depth(stmts: &[syn::Stmt], depth: usize) -> usize {
     stmts
         .iter()
         .map(|s| syn_stmt_max_depth(s, depth))
@@ -836,7 +836,7 @@ pub(crate) fn syn_stmts_max_depth(stmts: &[syn::Stmt], depth: usize) -> usize {
         .unwrap_or(depth)
 }
 
-pub(crate) fn syn_stmt_max_depth(stmt: &syn::Stmt, depth: usize) -> usize {
+pub fn syn_stmt_max_depth(stmt: &syn::Stmt, depth: usize) -> usize {
     match stmt {
         syn::Stmt::Item(item) => syn_item_max_depth(item, depth),
         syn::Stmt::Expr(expr, _) => syn_expr_max_depth(expr, depth),
@@ -849,7 +849,7 @@ pub(crate) fn syn_stmt_max_depth(stmt: &syn::Stmt, depth: usize) -> usize {
     }
 }
 
-pub(crate) fn syn_expr_max_depth(expr: &syn::Expr, depth: usize) -> usize {
+pub fn syn_expr_max_depth(expr: &syn::Expr, depth: usize) -> usize {
     match expr {
         syn::Expr::Block(eb) => syn_block_max_depth(&eb.block, depth),
         syn::Expr::If(ei) => {

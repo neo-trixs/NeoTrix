@@ -14,7 +14,7 @@ use crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::{EvolutionLo
 
 /// 单次管道执行结果
 #[derive(Debug)]
-pub(crate) struct PipelineResult {
+pub struct PipelineResult {
     pub total_detected: usize,
     pub auto_generated: usize,
     pub auto_applied: usize,

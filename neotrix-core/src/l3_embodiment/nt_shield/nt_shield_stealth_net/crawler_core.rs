@@ -5,30 +5,30 @@ use serde::{Deserialize, Serialize};
 
 // ── Constants ────────────────────────────────────────────────────────
 
-pub(crate) const MAX_CONCURRENCY: usize = 5;
-pub(crate) const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
-pub(crate) const CRAWL_DELAY: std::time::Duration = std::time::Duration::from_millis(1500);
-pub(crate) const MAX_PAGE_BYTES: usize = 2_097_152;
-pub(crate) const QUEUE_SAVE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(120);
-pub(crate) const INDEX_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(300);
-pub(crate) const MAX_QUEUE_SIZE: usize = 100_000;
-pub(crate) const MAX_VISITED: usize = 500_000;
-pub(crate) const SEARCH_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
+pub const MAX_CONCURRENCY: usize = 5;
+pub const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+pub const CRAWL_DELAY: std::time::Duration = std::time::Duration::from_millis(1500);
+pub const MAX_PAGE_BYTES: usize = 2_097_152;
+pub const QUEUE_SAVE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(120);
+pub const INDEX_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(300);
+pub const MAX_QUEUE_SIZE: usize = 100_000;
+pub const MAX_VISITED: usize = 500_000;
+pub const SEARCH_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
 
-pub(crate) const SEARCH_ENGINE_AHMIA: &str =
+pub const SEARCH_ENGINE_AHMIA: &str =
     "http://juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion";
-pub(crate) const SEARCH_ENGINE_TORCH: &str =
+pub const SEARCH_ENGINE_TORCH: &str =
     "http://xmh57jrknzkhv6y3ls3ubitzfqnkrwxhopf5aygthi7d6rplyvk3noyd.onion";
-pub(crate) const SEARCH_ENGINE_DUCKDUCKGO: &str =
+pub const SEARCH_ENGINE_DUCKDUCKGO: &str =
     "http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion";
-pub(crate) const SEARCH_ENGINE_TORLINKS: &str =
+pub const SEARCH_ENGINE_TORLINKS: &str =
     "http://torlinksge6enmcyyuxjpjkoouw4oorgdgeo7ftnq3zodj7g2zxi3kyd.onion";
-pub(crate) const SEARCH_ENGINE_DARKSEARCH: &str =
+pub const SEARCH_ENGINE_DARKSEARCH: &str =
     "http://darksearchivrio6kz5zqk6zl7qvbrtd4pwh3p3tr2da7ixy5z7j4z6yd.onion";
-pub(crate) const SEARCH_ENGINE_ONIONLAND: &str =
+pub const SEARCH_ENGINE_ONIONLAND: &str =
     "http://onionland3dg4f3k7k6hqzr7vz3z5kjk2zqkz5kjn7yzfjz7zq7p7ad.onion";
 
-pub(crate) const SEARCH_ENGINES: &[&str] = &[
+pub const SEARCH_ENGINES: &[&str] = &[
     SEARCH_ENGINE_AHMIA,
     SEARCH_ENGINE_TORCH,
     SEARCH_ENGINE_DUCKDUCKGO,
@@ -37,7 +37,7 @@ pub(crate) const SEARCH_ENGINES: &[&str] = &[
     SEARCH_ENGINE_ONIONLAND,
 ];
 
-pub(crate) const DEFAULT_SEEDS: &[&str] = &[
+pub const DEFAULT_SEEDS: &[&str] = &[
     "http://danielas3rtn54uwmofdo3qx2lvb3o37p3cskve4lw5l3k7ekpcid.onion/",
     "http://thehiddenwiki6ndgfkmh3zq5kq6zqk5zqk6zqk5zqk6zqk5zqk6zqkid.onion/",
 ];
@@ -119,7 +119,7 @@ pub enum ContentCategory {
     Unknown,
 }
 
-pub(crate) fn detect_category(title: &str, body: &str, url: &str) -> ContentCategory {
+pub fn detect_category(title: &str, body: &str, url: &str) -> ContentCategory {
     let combined = format!("{} {} {}", title, body, url).to_lowercase();
     if combined.contains("market") || combined.contains("shop") || combined.contains("buy")
         || combined.contains("escrow") || combined.contains("price") {
@@ -144,7 +144,7 @@ pub(crate) fn detect_category(title: &str, body: &str, url: &str) -> ContentCate
 
 // ── OnionIndex ────────────────────────────────────────────────────────
 
-pub(crate) struct OnionIndex {
+pub struct OnionIndex {
     entries: Vec<_OnionIndexEntry>,
     keyword_map: HashMap<String, Vec<usize>>,
     url_map: HashMap<String, usize>,

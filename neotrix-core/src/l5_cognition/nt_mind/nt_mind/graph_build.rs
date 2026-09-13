@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
-pub(crate) enum ParsedItem {
+pub enum ParsedItem {
     #[allow(dead_code)]
     UseStatement { target: String, line: usize },
     Function { name: String, line: usize, calls: Vec<String> },
@@ -15,7 +15,7 @@ pub(crate) enum ParsedItem {
     ModDecl { name: String, line: usize },
 }
 
-pub(crate) fn parse_rust_file(content: &str) -> Vec<ParsedItem> {
+pub fn parse_rust_file(content: &str) -> Vec<ParsedItem> {
     let syntax = match syn::parse_file(content) {
         Ok(s) => s,
         Err(_) => return Vec::new(),
@@ -93,18 +93,18 @@ pub(crate) fn parse_rust_file(content: &str) -> Vec<ParsedItem> {
     items
 }
 
-pub(crate) fn path_to_string(path: &syn::Path) -> String {
+pub fn path_to_string(path: &syn::Path) -> String {
     path.segments.iter().map(|s| s.ident.to_string()).collect::<Vec<_>>().join("::")
 }
 
-pub(crate) fn ty_to_string(ty: &syn::Type) -> String {
+pub fn ty_to_string(ty: &syn::Type) -> String {
     match ty {
         syn::Type::Path(type_path) => path_to_string(&type_path.path),
         _ => String::new(),
     }
 }
 
-pub(crate) fn fmt_use_tree(tree: &syn::UseTree) -> String {
+pub fn fmt_use_tree(tree: &syn::UseTree) -> String {
     match tree {
         syn::UseTree::Path(p) => format!("{}::{}", p.ident, fmt_use_tree(&p.tree)),
         syn::UseTree::Name(n) => n.ident.to_string(),
@@ -117,7 +117,7 @@ pub(crate) fn fmt_use_tree(tree: &syn::UseTree) -> String {
     }
 }
 
-pub(crate) fn extract_calls_from_block(block: &syn::Block) -> Vec<String> {
+pub fn extract_calls_from_block(block: &syn::Block) -> Vec<String> {
     let mut finder = CallFinder { calls: Vec::new() };
     syn::visit::visit_block(&mut finder, block);
     finder.calls
@@ -141,14 +141,14 @@ impl<'ast> syn::visit::Visit<'ast> for CallFinder {
     }
 }
 
-pub(crate) fn get_call_name(expr: &syn::Expr) -> Option<String> {
+pub fn get_call_name(expr: &syn::Expr) -> Option<String> {
     match expr {
         syn::Expr::Path(p) => p.path.segments.last().map(|s| s.ident.to_string()),
         _ => None,
     }
 }
 
-pub(crate) fn register_fn_defs(
+pub fn register_fn_defs(
     path: &std::path::Path,
     items: &[ParsedItem],
     fn_defs: &mut HashMap<String, Vec<(PathBuf, usize)>>,
@@ -160,7 +160,7 @@ pub(crate) fn register_fn_defs(
     }
 }
 
-pub(crate) fn resolve_import(file_path: &std::path::Path, use_target: &str) -> Option<PathBuf> {
+pub fn resolve_import(file_path: &std::path::Path, use_target: &str) -> Option<PathBuf> {
     let parts: Vec<&str> = use_target.split("::").collect();
     if parts.is_empty() { return None; }
 
@@ -197,7 +197,7 @@ pub(crate) fn resolve_import(file_path: &std::path::Path, use_target: &str) -> O
     candidates.into_iter().find(|c| c.exists())
 }
 
-pub(crate) fn find_crate_root(path: &std::path::Path) -> Option<PathBuf> {
+pub fn find_crate_root(path: &std::path::Path) -> Option<PathBuf> {
     let mut current = path.parent()?;
     loop {
         if current.join("Cargo.toml").exists() {

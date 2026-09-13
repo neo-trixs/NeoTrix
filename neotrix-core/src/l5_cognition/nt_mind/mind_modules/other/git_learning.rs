@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// Git 学习引擎
-pub(crate) struct _GitLearningEngine {
+pub struct _GitLearningEngine {
     commits: Vec<_CommitInfo>,
     patterns: Vec<_CommitPattern>,
     knowledge: Vec<_GitKnowledge>,
@@ -21,7 +21,7 @@ pub(crate) struct _GitLearningEngine {
 
 /// Git 学习配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GitLearningConfig {
+pub struct _GitLearningConfig {
     pub max_commits: usize,
     pub pattern_detection: bool,
     pub knowledge_extraction: bool,
@@ -41,7 +41,7 @@ impl Default for _GitLearningConfig {
 
 /// 提交信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CommitInfo {
+pub struct _CommitInfo {
     pub hash: String,
     pub author: String,
     pub date: chrono::DateTime<chrono::Utc>,
@@ -75,7 +75,7 @@ pub enum ChangeType {
 
 /// 提交模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CommitPattern {
+pub struct _CommitPattern {
     pub pattern_type: String,
     pub description: String,
     pub frequency: u32,
@@ -85,7 +85,7 @@ pub(crate) struct _CommitPattern {
 
 /// Git 知识
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GitKnowledge {
+pub struct _GitKnowledge {
     pub id: String,
     pub knowledge_type: String,
     pub content: serde_json::Value,
@@ -96,7 +96,7 @@ pub(crate) struct _GitKnowledge {
 
 /// Git 学习统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GitLearningStats {
+pub struct _GitLearningStats {
     pub commits_analyzed: u64,
     pub patterns_detected: u64,
     pub knowledge_extracted: u64,
@@ -116,7 +116,7 @@ pub struct EvolutionReport {
 
 /// 热点文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _Hotspot {
+pub struct _Hotspot {
     pub file_path: String,
     pub change_frequency: u32,
     pub complexity_trend: String,

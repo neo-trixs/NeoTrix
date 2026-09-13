@@ -453,7 +453,7 @@ impl CortexMemory {
 }
 
 /// 从 KnowledgeSource 来源自动注入 cortex
-pub(crate) fn _inject_from_web_miner(
+pub fn _inject_from_web_miner(
     cortex: &mut CortexMemory,
     source_url: &str,
     _source_name: &str,

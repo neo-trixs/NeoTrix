@@ -31,7 +31,7 @@ pub enum AuditEventType {
 
 /// 审计事件
 #[derive(Debug, Clone)]
-pub(crate) struct _AuditEvent {
+pub struct _AuditEvent {
     /// 事件 ID
     pub id: String,
     /// 事件类型
@@ -52,7 +52,7 @@ pub(crate) struct _AuditEvent {
 
 /// 溯源信息
 #[derive(Debug, Clone)]
-pub(crate) struct _ProvenanceInfo {
+pub struct _ProvenanceInfo {
     /// 内容 ID
     pub content_id: String,
     /// 创建者
@@ -75,7 +75,7 @@ pub(crate) struct _ProvenanceInfo {
 
 /// 审计日志配置
 #[derive(Debug, Clone)]
-pub(crate) struct _AuditConfig {
+pub struct _AuditConfig {
     /// 最大日志条目数
     pub max_entries: usize,
     /// 日志保留时间
@@ -98,7 +98,7 @@ impl Default for _AuditConfig {
 }
 
 /// 视频审计追踪
-pub(crate) struct _VideoAuditTrail {
+pub struct _VideoAuditTrail {
     /// 审计日志
     events: Vec<_AuditEvent>,
     /// 溯源信息
@@ -216,7 +216,7 @@ impl Default for _VideoAuditTrail {
 
 /// 审计统计
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _AuditStats {
+pub struct _AuditStats {
     pub total_events: u32,
     pub total_provenance: u32,
     pub total_c2pa_signed: u32,

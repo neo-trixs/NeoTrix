@@ -57,7 +57,7 @@ pub trait PatternMatcher: Send + Sync {
 
 /// 模式记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PatternRecord {
+pub struct _PatternRecord {
     pub id: String,
     pub cycle: u32,
     pub pattern: Pattern,
@@ -121,7 +121,7 @@ impl PatternEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PatternStats {
+pub struct _PatternStats {
     pub total_patterns: usize,
     pub total_discoveries: usize,
     pub patterns_by_type: HashMap<String, u32>,

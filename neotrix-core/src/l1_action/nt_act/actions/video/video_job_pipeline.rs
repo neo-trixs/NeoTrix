@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 /// 作业状态
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum JobStatus {
+pub enum JobStatus {
     /// 等待中
     Pending,
     /// 队列中
@@ -50,7 +50,7 @@ pub struct Checkpoint {
 
 /// 作业定义
 #[derive(Debug, Clone)]
-pub(crate) struct VideoJob {
+pub struct VideoJob {
     /// 作业 ID
     pub id: String,
     /// 作业名
@@ -109,7 +109,7 @@ impl Default for PipelineConfig {
 }
 
 /// 视频作业管线
-pub(crate) struct VideoJobPipeline {
+pub struct VideoJobPipeline {
     /// 作业存储
     jobs: HashMap<String, VideoJob>,
     /// 队列

@@ -66,13 +66,13 @@ pub enum MemoryType {
 }
 
 /// 短期记忆
-pub(crate) struct _ShortTermMemory {
+pub struct _ShortTermMemory {
     items: Vec<MemoryItem>,
     capacity: usize,
 }
 
 /// 长期记忆
-pub(crate) struct _LongTermMemory {
+pub struct _LongTermMemory {
     items: HashMap<String, MemoryItem>,
     categories: HashMap<String, Vec<String>>,
 }
@@ -89,7 +89,7 @@ pub struct ConsolidationResult {
 
 /// 整合统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConsolidationStats {
+pub struct _ConsolidationStats {
     pub total_consolidations: u64,
     pub total_items_consolidated: u64,
     pub total_items_forgotten: u64,

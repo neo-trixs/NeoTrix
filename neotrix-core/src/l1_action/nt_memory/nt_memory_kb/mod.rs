@@ -54,7 +54,7 @@ pub mod nt_memory_search;
 pub mod nt_memory_seed;
 // pub mod nt_memory_setting_consistency;
 pub mod nt_memory_store;
-pub(crate) mod shared_utils;
+pub mod shared_utils;
 pub mod nt_memory_svaf_gate;
 pub mod nt_memory_types;
 pub mod nt_memory_unify;

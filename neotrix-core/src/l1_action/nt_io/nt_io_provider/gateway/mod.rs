@@ -52,7 +52,7 @@ pub use stealth_middleware::*;
 
 /// 识别配额耗尽错误 — 与瞬时限速 (429) 区分 (freellmapi/aimux 模式)。
 /// 覆盖常见 provider 配额/信用耗尽措辞。命中后应熔断 provider 而非重试。
-pub(crate) fn is_quota_exhaustion(msg: &str) -> bool {
+pub fn is_quota_exhaustion(msg: &str) -> bool {
     let lowered = msg.to_lowercase();
     lowered.contains("quota exceeded")
         || lowered.contains("out of quota")

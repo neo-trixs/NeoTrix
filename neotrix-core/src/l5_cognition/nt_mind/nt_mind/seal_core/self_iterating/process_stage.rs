@@ -58,7 +58,7 @@ pub struct ProcessExample {
 
 /// 过程缓冲
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ProcessBuffer {
+pub struct _ProcessBuffer {
     pub traces: VecDeque<ReasoningTrace>,
     pub max_size: usize,
 }
@@ -82,7 +82,7 @@ impl _ProcessBuffer {
 
 /// 过程阶段统计报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ProcessReport {
+pub struct _ProcessReport {
     pub total_updates: u64,
     pub buffer_size: usize,
     pub avg_trace_length: f64,

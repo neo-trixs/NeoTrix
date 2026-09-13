@@ -12,12 +12,12 @@ pub struct MemoryIterationResult {
     pub expired_count: usize,
 }
 
-pub(crate) const K1: f64 = 1.5;
-pub(crate) const B: f64 = 0.75;
-pub(crate) const RRF_K: f64 = 60.0;
+pub const K1: f64 = 1.5;
+pub const B: f64 = 0.75;
+pub const RRF_K: f64 = 60.0;
 
 #[derive(Debug, Clone)]
-pub(crate) struct Bm25Document {
+pub struct Bm25Document {
     pub(crate) id: String,
     pub(crate) text: String,
 }
@@ -30,7 +30,7 @@ struct DocEntry {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Bm25Index {
+pub struct Bm25Index {
     df: HashMap<String, usize>,
     docs: Vec<DocEntry>,
     avg_doc_len: f64,
@@ -129,7 +129,7 @@ impl Bm25Index {
     }
 }
 
-pub(crate) fn tokenize(text: &str) -> Vec<String> {
+pub fn tokenize(text: &str) -> Vec<String> {
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
         .filter(|s| !s.is_empty() && s.len() >= 2)
@@ -137,7 +137,7 @@ pub(crate) fn tokenize(text: &str) -> Vec<String> {
         .collect()
 }
 
-pub(crate) fn rrf_fuse(results: &[Vec<(f64, String)>]) -> Vec<(f64, String)> {
+pub fn rrf_fuse(results: &[Vec<(f64, String)>]) -> Vec<(f64, String)> {
     if results.is_empty() {
         return Vec::new();
     }

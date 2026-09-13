@@ -631,7 +631,7 @@ thread_local! {
 ///
 /// 参考 Mask FPE 模式: 使用 HMAC 确定性 (此处简化为计数器, 因 Rust 无内建 HMAC-PE)
 /// 并保持格式可辨识 (方便调试和下游工具识别)。
-pub(crate) fn session_consistent_placeholder(plaintext: &str, pii_type: &str) -> String {
+pub fn session_consistent_placeholder(plaintext: &str, pii_type: &str) -> String {
     SESSION_PLACEHOLDER_MAP.with(|map| {
         let mut map = map.borrow_mut();
         if let Some(existing) = map.get(plaintext) {
@@ -652,7 +652,7 @@ pub(crate) fn session_consistent_placeholder(plaintext: &str, pii_type: &str) ->
 }
 
 /// 重置会话映射 — 每个独立会话/线程开始时调用。
-pub(crate) fn reset_session_placeholders() {
+pub fn reset_session_placeholders() {
     SESSION_PLACEHOLDER_MAP.with(|m| m.borrow_mut().clear());
     SESSION_REVERSE_MAP.with(|m| m.borrow_mut().clear());
     SESSION_COUNTER.with(|c| *c.borrow_mut() = 0);
@@ -660,7 +660,7 @@ pub(crate) fn reset_session_placeholders() {
 
 /// 从占位符反查明文 — 仅在本地工具执行时使用 (Tool Pre-Hook, JIT 解密)。
 /// 返回 None 表示非 Mask 生成的占位符 (安全: 不会误还原)。
-pub(crate) fn resolve_placeholder(masked: &str) -> Option<String> {
+pub fn resolve_placeholder(masked: &str) -> Option<String> {
     SESSION_REVERSE_MAP.with(|m| m.borrow().get(masked).cloned())
 }
 

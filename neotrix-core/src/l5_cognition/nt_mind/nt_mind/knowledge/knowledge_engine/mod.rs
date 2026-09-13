@@ -11,4 +11,4 @@ pub use graph::KnowledgeEngine;
 pub use search::LiteratureSearcher;
 
 #[cfg(test)]
-pub(crate) use types::strip_html;
+pub use types::strip_html;

@@ -72,7 +72,7 @@ pub enum EventType {
 /// 事件优先级
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum EventPriority {
+pub enum EventPriority {
     Low = 0,
     Normal = 1,
     High = 2,
@@ -81,7 +81,7 @@ pub(crate) enum EventPriority {
 
 /// 事件过滤器
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EventFilter {
+pub struct EventFilter {
     pub filter_type: FilterType,
     pub pattern: String,
     pub action: FilterAction,
@@ -101,7 +101,7 @@ pub enum FilterType {
 /// 过滤动作
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum FilterAction {
+pub enum FilterAction {
     Allow,
     Deny,
     Transform,
@@ -110,7 +110,7 @@ pub(crate) enum FilterAction {
 
 /// 事件总线统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EventBusStats {
+pub struct EventBusStats {
     pub total_events: u64,
     pub delivered_events: u64,
     pub dead_letters: u64,
@@ -119,7 +119,7 @@ pub(crate) struct EventBusStats {
 }
 
 /// 订阅句柄
-pub(crate) struct SubscriptionHandle {
+pub struct SubscriptionHandle {
     id: String,
     event_type: String,
     layer: String,

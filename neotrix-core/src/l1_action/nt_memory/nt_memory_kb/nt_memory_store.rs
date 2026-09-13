@@ -41,7 +41,7 @@ pub fn ensure_domain_cluster(conn: &Connection, domain: &str) -> rusqlite::Resul
 
 /// Assign a node to the cluster matching its domain field.
 /// If domain is None/empty, assigns to "unclustered" cluster.
-pub(crate) fn assign_cluster_to_node(conn: &Connection, node_id: &str, domain: Option<&str>) -> rusqlite::Result<()> {
+pub fn assign_cluster_to_node(conn: &Connection, node_id: &str, domain: Option<&str>) -> rusqlite::Result<()> {
     let cluster_domain = domain.unwrap_or("unclustered");
     let cluster_id = ensure_domain_cluster(conn, cluster_domain)?;
     conn.execute(
@@ -288,7 +288,7 @@ pub fn find_node_by_title_and_type(
         None => Ok(None),
     }
 }
-pub(crate) fn merge_duplicate_nodes(conn: &Connection, keep_id: &str, remove_id: &str) -> rusqlite::Result<()> {
+pub fn merge_duplicate_nodes(conn: &Connection, keep_id: &str, remove_id: &str) -> rusqlite::Result<()> {
     // 事务：边重映射 + 节点删除必须原子，否则残留指向已删节点的边
     let tx = conn.unchecked_transaction()?;
     // Remove edges from remove_id that already exist on keep_id (avoid UNIQUE conflict)
@@ -584,7 +584,7 @@ pub fn count_nodes_by_domain(conn: &Connection) -> rusqlite::Result<HashMap<Stri
     Ok(map)
 }
 
-pub(crate) fn count_edges_by_type(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
+pub fn count_edges_by_type(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
     let mut stmt = conn.prepare("SELECT relation_type, COUNT(*) FROM edges GROUP BY relation_type")?;
     let rows = stmt.query_map([], |row| {
         let rel_type: String = row.get(0)?;
@@ -599,7 +599,7 @@ pub(crate) fn count_edges_by_type(conn: &Connection) -> rusqlite::Result<HashMap
     Ok(map)
 }
 
-pub(crate) fn count_nodes_by_domain_and_type(conn: &Connection) -> rusqlite::Result<Vec<(String, String, usize)>> {
+pub fn count_nodes_by_domain_and_type(conn: &Connection) -> rusqlite::Result<Vec<(String, String, usize)>> {
     let mut stmt = conn.prepare(
         "SELECT COALESCE(domain,'unknown'), node_type, COUNT(*) FROM nodes GROUP BY domain, node_type ORDER BY domain"
     )?;
@@ -615,7 +615,7 @@ pub(crate) fn count_nodes_by_domain_and_type(conn: &Connection) -> rusqlite::Res
 
 // ─── Domain Clusters ────────────────────────────────────────────────────────
 
-pub(crate) fn insert_cluster(conn: &Connection, cluster: &KnowledgeCluster) -> rusqlite::Result<()> {
+pub fn insert_cluster(conn: &Connection, cluster: &KnowledgeCluster) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT OR REPLACE INTO domain_clusters (id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -632,7 +632,7 @@ pub(crate) fn insert_cluster(conn: &Connection, cluster: &KnowledgeCluster) -> r
     Ok(())
 }
 
-pub(crate) fn get_cluster(conn: &Connection, id: &str) -> rusqlite::Result<Option<KnowledgeCluster>> {
+pub fn get_cluster(conn: &Connection, id: &str) -> rusqlite::Result<Option<KnowledgeCluster>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
          FROM domain_clusters WHERE id=?1",
@@ -652,7 +652,7 @@ pub(crate) fn get_cluster(conn: &Connection, id: &str) -> rusqlite::Result<Optio
     }
 }
 
-pub(crate) fn get_cluster_by_name(conn: &Connection, name: &str) -> rusqlite::Result<Option<KnowledgeCluster>> {
+pub fn get_cluster_by_name(conn: &Connection, name: &str) -> rusqlite::Result<Option<KnowledgeCluster>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
          FROM domain_clusters WHERE name=?1",
@@ -707,12 +707,12 @@ pub fn update_cluster_stats(conn: &Connection, cluster_id: &str) -> rusqlite::Re
     Ok(())
 }
 
-pub(crate) fn delete_cluster(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
+pub fn delete_cluster(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
     let affected = conn.execute("DELETE FROM domain_clusters WHERE id=?1", params![id])?;
     Ok(affected > 0)
 }
 
-pub(crate) fn get_cluster_children(conn: &Connection, parent_id: &str) -> rusqlite::Result<Vec<KnowledgeCluster>> {
+pub fn get_cluster_children(conn: &Connection, parent_id: &str) -> rusqlite::Result<Vec<KnowledgeCluster>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
          FROM domain_clusters WHERE parent_cluster_id=?1 ORDER BY name",
@@ -735,7 +735,7 @@ pub(crate) fn get_cluster_children(conn: &Connection, parent_id: &str) -> rusqli
     Ok(clusters)
 }
 
-pub(crate) fn get_nodes_in_cluster(conn: &Connection, cluster_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+pub fn get_nodes_in_cluster(conn: &Connection, cluster_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
@@ -752,7 +752,7 @@ pub(crate) fn get_nodes_in_cluster(conn: &Connection, cluster_id: &str) -> rusql
     Ok(nodes)
 }
 
-pub(crate) fn get_node_children(conn: &Connection, parent_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+pub fn get_node_children(conn: &Connection, parent_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
@@ -769,7 +769,7 @@ pub(crate) fn get_node_children(conn: &Connection, parent_id: &str) -> rusqlite:
     Ok(nodes)
 }
 
-pub(crate) fn get_node_ancestors(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+pub fn get_node_ancestors(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut ancestors = Vec::new();
     let mut current_id = Some(node_id.to_string());
     // Walk up the hierarchy (max 32 levels to prevent infinite loops)
@@ -790,7 +790,7 @@ pub(crate) fn get_node_ancestors(conn: &Connection, node_id: &str) -> rusqlite::
     Ok(ancestors)
 }
 
-pub(crate) fn get_cluster_stats(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
+pub fn get_cluster_stats(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
     let mut stmt = conn.prepare(
         "SELECT COALESCE(cluster_id, 'unclustered'), COUNT(*) FROM nodes GROUP BY cluster_id"
     )?;
@@ -830,7 +830,7 @@ pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlit
     Ok(nodes)
 }
 
-pub(crate) fn get_edges_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<KnowledgeEdge>> {
+pub fn get_edges_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<KnowledgeEdge>> {
     let mut stmt = conn.prepare(
         "SELECT id, source_id, target_id, relation_type, weight, description, created_at, metadata FROM edges ORDER BY rowid LIMIT ?1 OFFSET ?2"
     )?;
@@ -915,7 +915,7 @@ pub fn store_procedural_memory(conn: &Connection, record: &ProceduralMemoryRecor
     Ok(())
 }
 
-pub(crate) fn get_procedural_memory(conn: &Connection, skill_id: &str) -> rusqlite::Result<Option<ProceduralMemoryRecord>> {
+pub fn get_procedural_memory(conn: &Connection, skill_id: &str) -> rusqlite::Result<Option<ProceduralMemoryRecord>> {
     let mut stmt = conn.prepare(
         "SELECT id, skill_id, name, description, e8_sequence, trigger_pattern,
                 success_rate, execution_count, avg_reward, created_at, updated_at, tags
@@ -970,7 +970,7 @@ pub fn list_procedural_memories(conn: &Connection, top_k: usize) -> rusqlite::Re
     Ok(records)
 }
 
-pub(crate) fn update_procedural_memory_success(conn: &Connection, skill_id: &str, reward: f64) -> rusqlite::Result<()> {
+pub fn update_procedural_memory_success(conn: &Connection, skill_id: &str, reward: f64) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE procedural_memory SET
             execution_count = execution_count + 1,
@@ -983,7 +983,7 @@ pub(crate) fn update_procedural_memory_success(conn: &Connection, skill_id: &str
     Ok(())
 }
 
-pub(crate) fn find_matching_skills(conn: &Connection, e8_state: u8) -> rusqlite::Result<Vec<ProceduralMemoryRecord>> {
+pub fn find_matching_skills(conn: &Connection, e8_state: u8) -> rusqlite::Result<Vec<ProceduralMemoryRecord>> {
     let pattern_str = format!("%{}%", e8_state);
     let mut stmt = conn.prepare(
         "SELECT id, skill_id, name, description, e8_sequence, trigger_pattern,

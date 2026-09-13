@@ -20,7 +20,7 @@ pub struct SentruxSensor {
 
 /// 规则引擎
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RulesEngine {
+pub struct _RulesEngine {
     pub constraints: Constraints,
     pub layers: Vec<_LayerRule>,
     pub boundaries: Vec<_BoundaryRule>,
@@ -37,7 +37,7 @@ pub struct Constraints {
 
 /// 层规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LayerRule {
+pub struct _LayerRule {
     pub name: String,
     pub paths: Vec<String>,
     pub order: u32,
@@ -45,7 +45,7 @@ pub(crate) struct _LayerRule {
 
 /// 边界规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _BoundaryRule {
+pub struct _BoundaryRule {
     pub from: String,
     pub to: String,
     pub reason: String,

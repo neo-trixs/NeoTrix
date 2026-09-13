@@ -146,7 +146,7 @@ impl SkillEntry {
 /// Agent Skills 标准校验 (吸收 `anthropics/skills`): 解析 SKILL.md frontmatter,
 /// 校验 Agent Skills 标准**必需**字段 (`name` + `description`)。缺则 `Err`(违规列表)。
 /// R-P42 强化现有 SkillEntry 解析路径, 不新建平行解析器 (复用同一 frontmatter 切片逻辑)。
-pub(crate) fn _validate_agent_skills_standard(content: &str) -> Result<(), Vec<String>> {
+pub fn _validate_agent_skills_standard(content: &str) -> Result<(), Vec<String>> {
     let stripped = content.trim_start();
     let mut violations = Vec::new();
     let (mut has_name, mut has_desc) = (false, false);
@@ -366,7 +366,7 @@ impl SkillQualityScorer {
 
 /// EVOMAL 毒化扫描: `Ok(true)`=干净可入库; `Ok(false)`=命中毒化模式;
 /// `Err`=扫描无法完成 (保守地视为不可入库, 由调用方阻断 promote)。
-pub(crate) fn _evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
+pub fn _evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
     let body = skill.body().to_lowercase();
 
     // 1) pipe-to-shell: 把下载/外部内容直接喂给 shell 执行 (经典投毒)。
@@ -866,7 +866,7 @@ pub struct BookInput {
 
 /// 章节→技能候选映射结果。
 #[derive(Debug, Clone)]
-pub(crate) struct _SkillCandidate {
+pub struct _SkillCandidate {
     pub name: String,
     pub source_chapters: Vec<usize>,
     pub priority: u8,
@@ -1024,7 +1024,7 @@ impl SkillAttribution {
 
 /// 技能树层级统计 (G6, AgentSkillOS 吸收): 巡检报告的数据载体。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct _SkillTreeStats {
+pub struct _SkillTreeStats {
     pub total_skills: usize,
     pub categories: HashMap<String, usize>,
     pub roots: usize,
@@ -1056,7 +1056,7 @@ fn parse_array_field(val: &str) -> Vec<String> {
 // ────────────────────────────────────────────────────────────────
 
 /// 逆操作闭包: 返回 Result 以便按 fiber 捕获失败而不中断其余逆操作 (L-Raise)。
-pub(crate) type _InverseOp = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
+pub type _InverseOp = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
 
 /// 可逆效应: 一次安装变换的前向标签 + 显式单侧逆。
 #[derive(Clone)]
@@ -1199,7 +1199,7 @@ impl FiberLifecycleState {
 
 /// 单次 fiber 失败记录: 失败时的状态 + 消息。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FiberFailure {
+pub struct _FiberFailure {
     pub at_state: FiberLifecycleState,
     pub message: String,
 }

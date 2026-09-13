@@ -101,7 +101,7 @@ async fn gate_write(
 // ─── Query Parameter Types ───
 
 #[derive(Deserialize)]
-pub(crate) struct SearchParams {
+pub struct SearchParams {
     q: String,
     limit: Option<usize>,
     /// 兼容字段：HTTP 公开面强制 Public clearance（C-2 加固），
@@ -111,17 +111,17 @@ pub(crate) struct SearchParams {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct PaginationParams {
+pub struct PaginationParams {
     limit: Option<usize>,
 }
 
 #[derive(Deserialize)]
-pub(crate) struct GraphParams {
+pub struct GraphParams {
     depth: Option<usize>,
 }
 
 #[derive(Deserialize)]
-pub(crate) struct AdvancedQueryBody {
+pub struct AdvancedQueryBody {
     pub text: Option<String>,
     pub node_type: Option<String>,
     pub domain: Option<String>,
@@ -131,7 +131,7 @@ pub(crate) struct AdvancedQueryBody {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct CreateNodeBody {
+pub struct CreateNodeBody {
     pub title: String,
     pub node_type: String,
     pub summary: Option<String>,
@@ -140,7 +140,7 @@ pub(crate) struct CreateNodeBody {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct CreateEdgeBody {
+pub struct CreateEdgeBody {
     pub source_id: String,
     pub target_id: String,
     pub relation_type: String,
@@ -151,7 +151,7 @@ pub(crate) struct CreateEdgeBody {
 /// POST /api/kb/diff 请求体 — base_path/other_path 至少提供一个文件路径;
 /// 缺省的一方使用当前实时库快照。
 #[derive(Deserialize)]
-pub(crate) struct DiffBody {
+pub struct DiffBody {
     pub base_path: Option<String>,
     pub other_path: Option<String>,
 }

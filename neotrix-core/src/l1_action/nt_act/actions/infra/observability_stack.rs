@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 /// 可观测性事件类型
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ObservabilityEvent {
+pub enum ObservabilityEvent {
     /// Trace 事件 (分布式追踪)
     TraceStart { span_id: String, parent_id: Option<String> },
     TraceEnd { span_id: String, duration: Duration },
@@ -36,7 +36,7 @@ pub enum LogLevel {
 
 /// 单条可观测性记录
 #[derive(Debug, Clone)]
-pub(crate) struct ObservabilityRecord {
+pub struct ObservabilityRecord {
     pub event: ObservabilityEvent,
     pub timestamp: Instant,
     pub service: String,
@@ -46,7 +46,7 @@ pub(crate) struct ObservabilityRecord {
 }
 
 /// 可观测性栈
-pub(crate) struct ObservabilityStack {
+pub struct ObservabilityStack {
     /// 事件历史
     records: Vec<ObservabilityRecord>,
     /// 最大记录数
@@ -216,7 +216,7 @@ impl Default for ObservabilityStack {
 
 /// 可观测性统计
 #[derive(Debug, Clone)]
-pub(crate) struct ObservabilityStats {
+pub struct ObservabilityStats {
     pub total_records: u32,
     pub traces: u32,
     pub metrics: u32,

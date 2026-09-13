@@ -73,7 +73,7 @@ impl AcpServer {
 }
 
 /// 创建默认 ACP 服务器
-pub(crate) fn create_default_acp_server() -> AcpServer {
+pub fn create_default_acp_server() -> AcpServer {
     let mut server = AcpServer::new();
 
     server.register_method("ping", |_params| Ok(serde_json::json!({"pong": true})));

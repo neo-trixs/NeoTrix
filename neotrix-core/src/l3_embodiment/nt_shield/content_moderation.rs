@@ -8,7 +8,7 @@ use std::time::Instant;
 
 /// 审核结果
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum _ModerationResult {
+pub enum _ModerationResult {
     /// 通过
     Passed,
     /// 被拒绝
@@ -59,7 +59,7 @@ pub enum RiskCategory {
 
 /// 审核规则
 #[derive(Debug, Clone)]
-pub(crate) struct _ModerationRule {
+pub struct _ModerationRule {
     /// 规则 ID
     pub id: String,
     /// 风险类别
@@ -74,7 +74,7 @@ pub(crate) struct _ModerationRule {
 
 /// 审核动作
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum _ModerationAction {
+pub enum _ModerationAction {
     /// 自动通过
     AutoApprove,
     /// 自动拒绝
@@ -87,7 +87,7 @@ pub(crate) enum _ModerationAction {
 
 /// 审核结果详情
 #[derive(Debug, Clone)]
-pub(crate) struct _ModerationOutcome {
+pub struct _ModerationOutcome {
     /// 内容 ID
     pub content_id: String,
     /// 内容类型
@@ -106,7 +106,7 @@ pub(crate) struct _ModerationOutcome {
 
 /// 人工审核任务
 #[derive(Debug, Clone)]
-pub(crate) struct _ReviewTask {
+pub struct _ReviewTask {
     /// 任务 ID
     pub id: String,
     /// 内容 ID
@@ -135,7 +135,7 @@ pub enum ReviewStatus {
 }
 
 /// 内容审核器
-pub(crate) struct _ContentModeration {
+pub struct _ContentModeration {
     /// 审核规则
     rules: Vec<_ModerationRule>,
     /// 人工审核队列
@@ -355,7 +355,7 @@ impl Default for _ContentModeration {
 
 /// 审核统计
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _ModerationStats {
+pub struct _ModerationStats {
     pub total_moderated: u32,
     pub total_passed: u32,
     pub total_rejected: u32,

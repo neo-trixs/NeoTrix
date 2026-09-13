@@ -60,7 +60,7 @@ pub enum LoadBalanceStrategy {
 
 /// 资源条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResourceEntry {
+pub struct _ResourceEntry {
     /// 资源ID
     pub id: String,
     /// 资源名称
@@ -102,7 +102,7 @@ pub enum ResourceType {
 
 /// 任务能力
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TaskCapability {
+pub struct _TaskCapability {
     /// 任务类型
     pub task_type: TaskType,
     /// 能力等级 (0.0 - 1.0)
@@ -132,7 +132,7 @@ pub enum TaskType {
 
 /// 成本模型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CostModel {
+pub struct _CostModel {
     /// 每1K token 成本
     pub cost_per_1k_tokens: f64,
     /// 每次请求基础成本

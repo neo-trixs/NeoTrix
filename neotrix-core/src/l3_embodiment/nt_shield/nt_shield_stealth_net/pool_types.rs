@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use crate::core::nt_core_resource_pool::PooledResource;
 
-pub(crate) const PROXY_STALE_SECS: u64 = 120;
+pub const PROXY_STALE_SECS: u64 = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SpeedTier {

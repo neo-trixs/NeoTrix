@@ -131,11 +131,11 @@ pub struct KnowledgeEngineStats {
     pub per_source: HashMap<String, usize>,
 }
 
-pub(crate) fn urlencoding(s: &str) -> String {
+pub fn urlencoding(s: &str) -> String {
     s.replace(' ', "+")
 }
 
-pub(crate) fn extract_xml(xml: &str, tag: &str) -> Option<String> {
+pub fn extract_xml(xml: &str, tag: &str) -> Option<String> {
     let open = format!("<{}>", tag);
     let close = format!("</{}>", tag);
     xml.find(&open).and_then(|start| {
@@ -146,7 +146,7 @@ pub(crate) fn extract_xml(xml: &str, tag: &str) -> Option<String> {
     })
 }
 
-pub(crate) fn extract_authors(xml: &str) -> Vec<String> {
+pub fn extract_authors(xml: &str) -> Vec<String> {
     let mut authors = Vec::new();
     let mut pos = 0;
     while let Some(s) = xml[pos..].find("<author>") {
@@ -162,7 +162,7 @@ pub(crate) fn extract_authors(xml: &str) -> Vec<String> {
     authors
 }
 
-pub(crate) fn extract_categories(xml: &str) -> Vec<String> {
+pub fn extract_categories(xml: &str) -> Vec<String> {
     let mut cats = Vec::new();
     let mut pos = 0;
     while let Some(s) = xml[pos..].find("term=\"") {
@@ -176,7 +176,7 @@ pub(crate) fn extract_categories(xml: &str) -> Vec<String> {
     cats
 }
 
-pub(crate) fn strip_html(s: &str) -> String {
+pub fn strip_html(s: &str) -> String {
     let mut result = String::new();
     let mut in_tag = false;
     for c in s.chars() {

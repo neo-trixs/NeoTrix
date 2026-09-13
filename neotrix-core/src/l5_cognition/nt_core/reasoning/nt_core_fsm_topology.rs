@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// FSM 行为拓扑引擎
-pub(crate) struct _FSMBehaviorTopologyEngine {
+pub struct _FSMBehaviorTopologyEngine {
     states: Vec<_FSMState>,
     transitions: Vec<_FSMTransition>,
     predictions: Vec<_BehaviorPrediction>,
@@ -21,7 +21,7 @@ pub(crate) struct _FSMBehaviorTopologyEngine {
 
 /// FSM 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FSMConfig {
+pub struct _FSMConfig {
     pub max_states: usize,
     pub max_transitions: usize,
     pub prediction_horizon: u32,
@@ -43,7 +43,7 @@ impl Default for _FSMConfig {
 
 /// FSM 状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FSMState {
+pub struct _FSMState {
     pub state_id: String,
     pub name: String,
     pub state_type: _StateType,
@@ -54,7 +54,7 @@ pub(crate) struct _FSMState {
 /// 状态类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _StateType {
+pub enum _StateType {
     Initial,
     Normal,
     Warning,
@@ -64,7 +64,7 @@ pub(crate) enum _StateType {
 
 /// 状态指标
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StateMetrics {
+pub struct _StateMetrics {
     pub visit_count: u64,
     pub avg_duration: f64,
     pub success_rate: f64,
@@ -73,7 +73,7 @@ pub(crate) struct _StateMetrics {
 
 /// FSM 转换
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FSMTransition {
+pub struct _FSMTransition {
     pub transition_id: String,
     pub from_state: String,
     pub to_state: String,
@@ -84,7 +84,7 @@ pub(crate) struct _FSMTransition {
 
 /// 行为预测
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _BehaviorPrediction {
+pub struct _BehaviorPrediction {
     pub prediction_id: String,
     pub current_state: String,
     pub predicted_states: Vec<String>,
@@ -96,7 +96,7 @@ pub(crate) struct _BehaviorPrediction {
 /// 预测类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _PredictionType {
+pub enum _PredictionType {
     NextState,
     Failure,
     Goal,
@@ -105,7 +105,7 @@ pub(crate) enum _PredictionType {
 
 /// FSM 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FSMStats {
+pub struct _FSMStats {
     pub total_states: u64,
     pub total_transitions: u64,
     pub total_predictions: u64,

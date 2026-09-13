@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 /// 缓存条目
 #[derive(Debug, Clone)]
-pub(crate) struct _PromptCacheEntry {
+pub struct _PromptCacheEntry {
     /// 提示词 ID
     pub id: String,
     /// 原始提示词
@@ -31,7 +31,7 @@ pub(crate) struct _PromptCacheEntry {
 
 /// 缓存配置
 #[derive(Debug, Clone)]
-pub(crate) struct _PromptCacheConfig {
+pub struct _PromptCacheConfig {
     /// 最大缓存条目数
     pub max_entries: usize,
     /// 缓存过期时间
@@ -57,7 +57,7 @@ impl Default for _PromptCacheConfig {
 }
 
 /// 视频提示词缓存
-pub(crate) struct _VideoPromptCache {
+pub struct _VideoPromptCache {
     /// 缓存存储
     entries: HashMap<String, _PromptCacheEntry>,
     /// 配置
@@ -247,7 +247,7 @@ impl Default for _VideoPromptCache {
 
 /// 缓存统计
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _PromptCacheStats {
+pub struct _PromptCacheStats {
     pub total_requests: u32,
     pub hits: u32,
     pub semantic_hits: u32,

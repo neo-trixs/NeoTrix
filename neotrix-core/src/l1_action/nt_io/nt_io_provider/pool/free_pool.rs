@@ -9,7 +9,7 @@ use std::sync::{OnceLock, RwLock};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct FreeTokenBudget {
+pub struct FreeTokenBudget {
     pub provider_name: String,
     pub monthly_token_cap: u64,
     pub tokens_used: u64,

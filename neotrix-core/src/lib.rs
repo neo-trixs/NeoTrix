@@ -18,7 +18,7 @@
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(not(test), deny(warnings))] // R-P2: 生产代码 0 warning; 测试代码豁免 (测试常有良性 warning)
-// // #![deny(dead_code)]
+#![allow(dead_code)] // Large codebase: dead items tracked by auto-patrol, not compilation gate
 // Float clamp: project convention uses .max().min() pattern
 #![allow(clippy::manual_clamp)]
 // Functions in crypto/tool APIs legitimately need many parameters

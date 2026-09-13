@@ -13,7 +13,7 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// GASP 运行时五大入仓维度。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _GaspVault {
+pub enum _GaspVault {
     /// 智能体身份 (唤醒即加载)。
     Identity,
     /// 技能集 (可入仓/出仓的 skill 单元)。
@@ -52,7 +52,7 @@ impl _GaspVault {
 
 /// GASP 四阶段演化循环 (patch→eval→decision→promote) 与 make_stage! 同构映射。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _GaspStage {
+pub enum _GaspStage {
     /// 提出修改 (patch.proposed)。
     PatchProposed,
     /// 评估完成 (eval.finished) — 对应 R-P42 验证门槛。
@@ -86,7 +86,7 @@ impl _GaspStage {
 }
 
 /// GASP 运行时架构映射 trait — 提供仓库/阶段同构校验。
-pub(crate) trait _GaspRuntimeMapper {
+pub trait _GaspRuntimeMapper {
     /// 五仓库是否全部命中 NeoTrix 对应模块 (非空映射)。
     fn all_vaults_mapped(&self) -> bool {
         _GaspVault::all().iter().all(|v| !v._maps_to_neotrix().is_empty())
@@ -100,7 +100,7 @@ pub(crate) trait _GaspRuntimeMapper {
 }
 
 /// yoyo-gasp 运行时参考映射器。
-pub(crate) struct _YoyoGaspRuntime;
+pub struct _YoyoGaspRuntime;
 
 impl _GaspRuntimeMapper for _YoyoGaspRuntime {}
 

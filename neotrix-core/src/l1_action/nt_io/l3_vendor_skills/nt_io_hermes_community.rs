@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 /// 社区插件元数据。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct CommunityPlugin {
+pub struct CommunityPlugin {
     pub name: String,
     pub tags: Vec<String>,
     pub enabled: bool,
@@ -29,7 +29,7 @@ pub trait PluginRegistry: Send + Sync {
 
 /// 默认实现: 基于名称索引的注册表。
 #[derive(Default)]
-pub(crate) struct HermesCommunityRegistry {
+pub struct HermesCommunityRegistry {
     plugins: HashMap<String, CommunityPlugin>,
 }
 
@@ -53,7 +53,7 @@ impl PluginRegistry for HermesCommunityRegistry {
 
 /// T1 SelfTest: 验证注册表存在并能查找/过滤启用插件。
 #[derive(Default)]
-pub(crate) struct HermesCommunitySelfTest;
+pub struct HermesCommunitySelfTest;
 
 impl SelfTest for HermesCommunitySelfTest {
     fn name(&self) -> &str {

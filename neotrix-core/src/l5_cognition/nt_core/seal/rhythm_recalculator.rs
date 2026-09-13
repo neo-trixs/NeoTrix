@@ -11,7 +11,7 @@ pub use crate::core::nt_core_narrative_types::{SegmentType, SegmentData};
 // 节段分配结果
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AllocatedSegment {
+pub struct _AllocatedSegment {
     pub r#type: SegmentType,
     pub allocated_length: f32,
     pub content_priority: f32,
@@ -41,7 +41,7 @@ pub const SERIES_10COL_RATIOS: [[f32; 4]; 10] = [
 // ============================================================================
 // 核心重算函数
 
-pub(crate) fn _recalculate_rhythm_segments(
+pub fn _recalculate_rhythm_segments(
     default_duration: f32,
     target_duration: f32,
     segments: &[SegmentData],
@@ -56,7 +56,7 @@ pub(crate) fn _recalculate_rhythm_segments(
     }).collect()
 }
 
-pub(crate) fn _generate_default_segments(default_duration: f32) -> Vec<SegmentData> {
+pub fn _generate_default_segments(default_duration: f32) -> Vec<SegmentData> {
     let ratios = DEFAULT_SEGMENT_RATIOS;
     let total_ratio: f32 = ratios.iter().sum();
     (0..ratios.len())
@@ -74,7 +74,7 @@ pub(crate) fn _generate_default_segments(default_duration: f32) -> Vec<SegmentDa
         .collect()
 }
 
-pub(crate) fn _generate_quick_segments(default_duration: f32) -> Vec<SegmentData> {
+pub fn _generate_quick_segments(default_duration: f32) -> Vec<SegmentData> {
     let ratios = QUICK_SEGMENT_RATIOS;
     let total_ratio: f32 = ratios.iter().sum();
     (0..ratios.len())
@@ -94,7 +94,7 @@ pub(crate) fn _generate_quick_segments(default_duration: f32) -> Vec<SegmentData
 // ============================================================================
 // 系列剧节奏布局
 
-pub(crate) fn _get_series_segment_raters(episode: usize) -> [f32; 4] {
+pub fn _get_series_segment_raters(episode: usize) -> [f32; 4] {
     if episode > 0 && episode <= 10 {
         SERIES_10COL_RATIOS[episode - 1]
     } else {
@@ -105,7 +105,7 @@ pub(crate) fn _get_series_segment_raters(episode: usize) -> [f32; 4] {
 // ============================================================================
 // 验证与工具
 
-pub(crate) fn _validate_segments(segments: &[SegmentData], total_duration: f32) -> bool {
+pub fn _validate_segments(segments: &[SegmentData], total_duration: f32) -> bool {
     let allocated_total: f32 = segments.iter().map(|s| s.base_length).sum();
     let tolerance = 0.1;
     let length_ok = (allocated_total - total_duration).abs() / total_duration < tolerance;
@@ -113,11 +113,11 @@ pub(crate) fn _validate_segments(segments: &[SegmentData], total_duration: f32) 
     length_ok && content_ok
 }
 
-pub(crate) fn _get_core_scuang_index(segments: &[SegmentData]) -> Option<usize> {
+pub fn _get_core_scuang_index(segments: &[SegmentData]) -> Option<usize> {
     segments.iter().position(|s| s.is_core_scuang)
 }
 
-pub(crate) fn _check_emotion_beat_interval(segments: &[SegmentData], _total_duration: f32) -> bool {
+pub fn _check_emotion_beat_interval(segments: &[SegmentData], _total_duration: f32) -> bool {
     let core_count = segments.iter().filter(|s| s.is_core_scuang).count();
     if core_count == 0 {
         return false;

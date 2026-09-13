@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 /// 搜索能力类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum SearchCapability {
+pub enum SearchCapability {
     MainSearch,
     DocsSearch,
     WebFetch,
@@ -27,7 +27,7 @@ impl SearchCapability {
 }
 
 /// Provider 注册槽
-pub(crate) struct ProviderSlot {
+pub struct ProviderSlot {
     name: String,
     capability: SearchCapability,
     #[allow(dead_code)]

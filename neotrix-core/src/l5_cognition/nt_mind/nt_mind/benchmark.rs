@@ -8,7 +8,7 @@ use crate::core::default_specialist_states;
 use crate::core::nt_core_self::SiliconSelfModel;
 
 #[derive(Debug, Clone)]
-pub(crate) struct _BenchPhase {
+pub struct _BenchPhase {
     pub label: String,
     pub durations: Vec<Duration>,
 }

@@ -39,7 +39,7 @@ pub struct AbsorbEntry {
 
 /// 附加关系声明 — 目标用 id 或 (title, node_type) 定位
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RelationSpec {
+pub struct RelationSpec {
     pub relation: String,
     pub target_id: Option<String>,
     pub target_title: Option<String>,
@@ -49,7 +49,7 @@ pub(crate) struct RelationSpec {
 
 /// 写端输出 — 吸收报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AbsorbReport {
+pub struct AbsorbReport {
     pub node_id: String,
     pub created: bool,
     pub hub_id: Option<String>,
@@ -63,7 +63,7 @@ pub(crate) struct AbsorbReport {
 
 /// 读端输出 — 一次完整服务结果 (意图 + 检索 + 图溯源)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ServeResult {
+pub struct ServeResult {
     pub query: String,
     pub channel: String,
     pub confidence: f64,

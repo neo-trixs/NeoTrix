@@ -5,7 +5,7 @@ use chrono::Utc;
 
 /// 空间特征（从 CSI 信号中提取）
 #[derive(Debug, Clone)]
-pub(crate) struct _SpatialFeatures {
+pub struct _SpatialFeatures {
     pub timestamp: i64,
     pub presence: Vec<_ZonePresence>,
     pub vital_signs: Option<_VitalSigns>,
@@ -14,7 +14,7 @@ pub(crate) struct _SpatialFeatures {
 
 /// 区域存在检测
 #[derive(Debug, Clone)]
-pub(crate) struct _ZonePresence {
+pub struct _ZonePresence {
     pub zone_id: String,
     pub probability: f64,
     pub person_count: usize,
@@ -23,7 +23,7 @@ pub(crate) struct _ZonePresence {
 
 /// 生命体征
 #[derive(Debug, Clone)]
-pub(crate) struct _VitalSigns {
+pub struct _VitalSigns {
     pub breathing_rate: f32,  // BPM
     pub heart_rate: f32,      // BPM
     pub confidence: f32,
@@ -31,7 +31,7 @@ pub(crate) struct _VitalSigns {
 
 /// 运动事件
 #[derive(Debug, Clone)]
-pub(crate) struct _MotionEvent {
+pub struct _MotionEvent {
     pub zone_id: String,
     pub motion_type: _MotionType,
     pub intensity: f32,      // 0.0-1.0
@@ -39,7 +39,7 @@ pub(crate) struct _MotionEvent {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum _MotionType {
+pub enum _MotionType {
     Enter, Exit, Walk, Gesture, Fall, Idle, Unknown,
 }
 
@@ -53,7 +53,7 @@ pub struct Zone {
 
 /// 空间模型：区域划分 + 人追踪
 #[derive(Debug, Clone)]
-pub(crate) struct _SpatialModel {
+pub struct _SpatialModel {
     zones: Vec<Zone>,
     occupants: HashMap<String, OccupantTrace>,
     history: VecDeque<_SpatialFeatures>,
@@ -111,13 +111,13 @@ impl _SpatialModel {
 }
 
 /// WiFi 感知引擎
-pub(crate) struct _WifiSensingEngine {
+pub struct _WifiSensingEngine {
     model: _SpatialModel,
     source: _SensingSource,
     enabled: bool,
 }
 
-pub(crate) enum _SensingSource {
+pub enum _SensingSource {
     /// 模拟模式（开发和测试）
     Simulation { interval_secs: u64, simulate_people: usize },
     /// RuView HTTP bridge

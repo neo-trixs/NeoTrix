@@ -21,7 +21,7 @@ pub struct SelfObserver {
 
 /// 观测配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ObserverConfig {
+pub struct _ObserverConfig {
     /// 最大观测历史
     pub max_observations: usize,
     /// 最大反思历史
@@ -61,7 +61,7 @@ pub struct Observation {
 
 /// 观测类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _ObservationType {
+pub enum _ObservationType {
     /// 状态观测
     StateObservation,
     /// 行为观测
@@ -95,7 +95,7 @@ pub struct Reflection {
 
 /// 反思类型 (MARS: 原则性反思 + 程序性反思)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum _ReflectionType {
+pub enum _ReflectionType {
     /// 原则性反思 (Principle Reflection)
     /// 关于"为什么"的反思
     PrincipleReflection,
@@ -141,7 +141,7 @@ pub struct ConsciousnessState {
 
 /// 情感状态
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct _EmotionalState {
+pub struct _EmotionalState {
     /// 好奇度 (驱动探索)
     pub curiosity: f64,
     /// 满足度 (驱动稳定)
@@ -334,7 +334,7 @@ impl SelfObserver {
 
 /// 状态数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StateData {
+pub struct _StateData {
     pub health_score: f64,
     pub learning_rate: f64,
     pub memory_usage: f64,
@@ -350,7 +350,7 @@ pub struct PerformanceMetrics {
 
 /// 观测统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ObserverStats {
+pub struct _ObserverStats {
     pub total_observations: usize,
     pub total_reflections: usize,
     pub observations_by_type: HashMap<String, u32>,

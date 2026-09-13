@@ -129,7 +129,7 @@ struct CaseIndices {
 
 /// CaseBase 配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CaseBaseConfig {
+pub struct _CaseBaseConfig {
     pub max_cases: usize,
     pub auto_index: bool,
     pub enable_vector_search: bool, // 未来：向量检索
@@ -507,7 +507,7 @@ impl CaseBase {
 
 /// 搜索过滤器。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct _SearchFilters {
+pub struct _SearchFilters {
     pub domain: Option<String>,
     pub conflict_type: Option<ConflictType>,
     pub min_severity: Option<Severity>,

@@ -18,7 +18,7 @@ pub struct TamperEngine {
 
 /// 篡改规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TamperRule {
+pub struct _TamperRule {
     /// 规则ID
     pub id: String,
     /// 正则表达式模式
@@ -33,7 +33,7 @@ pub(crate) struct _TamperRule {
 
 /// 篡改统计
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct _TamperStats {
+pub struct _TamperStats {
     /// 总触发次数
     pub total_triggers: u32,
     /// 按规则统计
@@ -145,7 +145,7 @@ impl TamperEngine {
 
 /// 篡改引擎统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TamperEngineStats {
+pub struct _TamperEngineStats {
     pub total_rules: usize,
     pub total_triggers: u32,
     pub top_rules: Vec<(String, u32)>,

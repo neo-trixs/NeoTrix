@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// 面部修复策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _FaceFixStrategy {
+pub enum _FaceFixStrategy {
     /// ADetailer 自动补脸 (SD WebUI)
     ADetailer,
     /// FaceDetailer 自动补脸 (ComfyUI Impact Pack)
@@ -25,7 +25,7 @@ pub(crate) enum _FaceFixStrategy {
 
 /// 面部修复配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FaceFixConfig {
+pub struct _FaceFixConfig {
     /// 修复策略
     pub strategy: _FaceFixStrategy,
     /// 检测阈值 (0.0-1.0)
@@ -44,7 +44,7 @@ pub(crate) struct _FaceFixConfig {
 
 /// 面部修复结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FaceFixResult {
+pub struct _FaceFixResult {
     /// 是否成功
     pub success: bool,
     /// 修复后的图片路径
@@ -84,7 +84,7 @@ pub struct RegionConfig {
 
 /// 多角色分区配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RegionalPromptingConfig {
+pub struct _RegionalPromptingConfig {
     /// 是否启用
     pub enabled: bool,
     /// 分区模式

@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// AI 安全对齐引擎
-pub(crate) struct _AISafetyAlignmentEngine {
+pub struct _AISafetyAlignmentEngine {
     values: Vec<Value>,
     constraints: Vec<_SafetyConstraint>,
     monitors: Vec<_BehaviorMonitor>,
@@ -20,7 +20,7 @@ pub(crate) struct _AISafetyAlignmentEngine {
 
 /// 安全配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SafetyConfig {
+pub struct _SafetyConfig {
     pub strict_mode: bool,
     pub monitoring_enabled: bool,
     pub auto_intervention: bool,
@@ -53,7 +53,7 @@ pub struct Value {
 
 /// 安全约束
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SafetyConstraint {
+pub struct _SafetyConstraint {
     pub id: String,
     pub name: String,
     pub constraint_type: ConstraintType,
@@ -77,7 +77,7 @@ pub enum ConstraintType {
 #[serde(rename_all = "snake_case")]
 
 /// 行为监控器
-pub(crate) struct _BehaviorMonitor {
+pub struct _BehaviorMonitor {
     monitor_id: String,
     monitor_type: String,
     threshold: f64,
@@ -87,7 +87,7 @@ pub(crate) struct _BehaviorMonitor {
 
 /// 行为监控结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MonitorResult {
+pub struct _MonitorResult {
     pub monitor_id: String,
     pub is_violation: bool,
     pub current_value: f64,
@@ -119,7 +119,7 @@ pub struct SafetyViolation {
 
 /// 安全警告
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SafetyWarning {
+pub struct _SafetyWarning {
     pub warning_type: String,
     pub message: String,
     pub risk_level: String,
@@ -128,7 +128,7 @@ pub(crate) struct _SafetyWarning {
 
 /// 伦理检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EthicsCheckResult {
+pub struct _EthicsCheckResult {
     pub is_ethical: bool,
     pub concerns: Vec<_EthicsConcern>,
     pub compliance_score: f64,
@@ -137,7 +137,7 @@ pub(crate) struct _EthicsCheckResult {
 
 /// 伦理关注
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EthicsConcern {
+pub struct _EthicsConcern {
     pub concern_type: String,
     pub description: String,
     pub severity: Severity,
@@ -146,7 +146,7 @@ pub(crate) struct _EthicsConcern {
 
 /// 风险评估结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RiskAssessmentResult {
+pub struct _RiskAssessmentResult {
     pub overall_risk: f64,
     pub risk_factors: Vec<_RiskFactor>,
     pub mitigation_strategies: Vec<String>,
@@ -155,7 +155,7 @@ pub(crate) struct _RiskAssessmentResult {
 
 /// 风险因素
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RiskFactor {
+pub struct _RiskFactor {
     pub factor_type: String,
     pub description: String,
     pub probability: f64,
@@ -165,7 +165,7 @@ pub(crate) struct _RiskFactor {
 
 /// 安全统计
 use neotrix_types::shared::Severity;
-pub(crate) struct _SafetyStats {
+pub struct _SafetyStats {
     pub checks_performed: u64,
     pub violations_detected: u64,
     pub interventions_triggered: u64,

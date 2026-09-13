@@ -44,7 +44,7 @@ pub const META_KEYWORDS: &[&str] = &[
 
 /// 策略序列模式: 如 [Research → Analyze → Implement → Verify]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StrategySequencePattern {
+pub struct _StrategySequencePattern {
     pub id: String,
     /// 策略序列 (字符串表示)
     pub sequence: Vec<String>,
@@ -60,7 +60,7 @@ pub(crate) struct _StrategySequencePattern {
 
 /// 自我发现的盲点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GapDiscovery {
+pub struct _GapDiscovery {
     pub id: String,
     pub description: String,
     /// 建议更新的能力维度 (维度名, 调整值)
@@ -83,7 +83,7 @@ pub struct ToolUsagePattern {
 
 /// 元认知洞察
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MetaCognitiveInsight {
+pub struct _MetaCognitiveInsight {
     pub id: String,
     pub insight: String,
     /// 影响的能力维度
@@ -95,7 +95,7 @@ pub(crate) struct _MetaCognitiveInsight {
 
 /// 完整元模式提取结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MetaPatternReport {
+pub struct _MetaPatternReport {
     pub strategy_patterns: Vec<_StrategySequencePattern>,
     pub gap_discoveries: Vec<_GapDiscovery>,
     pub tool_patterns: Vec<ToolUsagePattern>,

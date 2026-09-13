@@ -9,7 +9,7 @@ use super::model_router::ModelTier;
 /// Cascade 推理配置（来自 Wildfire SMoL 的多级联推理模式）
 /// 类比：450M 模型做 fast classify，置信度低才升级到 full reason
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CascadeConfig {
+pub struct _CascadeConfig {
     pub enabled: bool,
     pub fast_max_tokens: u32,
     pub fast_context_size: u32,
@@ -31,7 +31,7 @@ impl Default for _CascadeConfig {
 
 /// Cascade 推理结果
 #[derive(Debug, Clone)]
-pub(crate) struct _CascadeResult {
+pub struct _CascadeResult {
     pub fast_response: String,
     pub escalated: bool,
     pub deep_response: Option<String>,
@@ -192,7 +192,7 @@ impl ContextTier {
 
 /// Context-aware execution limits
 #[derive(Debug, Clone)]
-pub(crate) struct _ContextAwareLimits {
+pub struct _ContextAwareLimits {
     pub tier: ContextTier,
     pub context_window: usize,
     pub max_tool_calls: usize,

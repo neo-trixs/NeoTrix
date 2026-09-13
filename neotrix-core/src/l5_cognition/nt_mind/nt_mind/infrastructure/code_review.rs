@@ -17,7 +17,7 @@ use crate::l5_cognition::nt_mind::nt_mind::self_edit::MicroEdit;
 use crate::neotrix::nt_shield_audit::AuditMode;
 
 #[derive(Debug, Clone)]
-pub(crate) struct _ReviewIssue {
+pub struct _ReviewIssue {
     pub severity: IssueSeverity,
     pub category: _IssueCategory,
     pub message: String,
@@ -29,12 +29,12 @@ pub(crate) struct _ReviewIssue {
 pub enum IssueSeverity { Critical, High, Medium, Low, Info }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum _IssueCategory {
+pub enum _IssueCategory {
     Security, Performance, Architecture, Style, ErrorHandling, UnsafeCode, Testing
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _ReviewReport {
+pub struct _ReviewReport {
     pub file: String,
     pub issues: Vec<_ReviewIssue>,
     pub score: f64,
@@ -49,7 +49,7 @@ impl _ReviewReport {
 
 /// Audit report for L7-level code review
 #[derive(Debug, Clone)]
-pub(crate) struct _CodeAuditReport {
+pub struct _CodeAuditReport {
     pub name: String,
     pub path: String,
     pub file_count: usize,
@@ -59,7 +59,7 @@ pub(crate) struct _CodeAuditReport {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _AuditIssue {
+pub struct _AuditIssue {
     pub dimension: String,
     pub file: String,
     pub line: u32,
@@ -354,7 +354,7 @@ impl CodeReviewEngine {
 ///
 /// 对标 Octorus AI Rally: 双AI agent review-fix cycle
 /// 对标 roborev: continuous background review + auto-fix
-pub(crate) struct _CodeReviewLoop {
+pub struct _CodeReviewLoop {
     pub iteration: u64,
     pub max_iterations: usize,
     pub quality_target: f64,

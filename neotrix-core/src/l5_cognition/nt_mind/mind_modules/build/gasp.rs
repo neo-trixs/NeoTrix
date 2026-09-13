@@ -23,7 +23,7 @@ use std::collections::HashMap;
 
 /// GASP identity 维度 — 映射 `awakened` + `SystemIdentity`。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _GaspIdentity {
+pub struct _GaspIdentity {
     pub id: String,
     pub awakened: bool,
     pub species: String,
@@ -31,21 +31,21 @@ pub(crate) struct _GaspIdentity {
 
 /// GASP skills 维度 — 映射 `branches` / `atoms` (36 原子能力)。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _GaspSkill {
+pub struct _GaspSkill {
     pub name: String,
     pub promoted: bool,
 }
 
 /// GASP memory 维度 — 映射 `soil` (kb_node_count) + `kb` handle。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _GaspMemory {
+pub struct _GaspMemory {
     pub kb_node_count: u64,
     pub experience_cycles: u64,
 }
 
 /// GASP journal 维度 — **补强 ConsciousnessTree 原缺的显式审计轨迹**。
 #[derive(Debug, Clone, Default, PartialEq)]
-pub(crate) struct _GaspJournal {
+pub struct _GaspJournal {
     pub entries: Vec<String>,
 }
 
@@ -57,7 +57,7 @@ impl _GaspJournal {
 
 /// GASP lineage 维度 — 映射 `cycle` / `current_contract` 代际血缘。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _GaspLineage {
+pub struct _GaspLineage {
     pub parent_id: Option<String>,
     pub generation: u64,
     pub cycle: u64,
@@ -67,7 +67,7 @@ pub(crate) struct _GaspLineage {
 ///
 /// 直接对齐 ConsciousnessTree 字段 (见模块级对应表), 作为 NeoTrix 把 GASP 标准
 /// 收编为自进化 schema 的单一事实源节点 (R-P42: 强化现有节点, 禁止平行适配器)。
-pub(crate) struct _GaspRepo {
+pub struct _GaspRepo {
     pub identity: _GaspIdentity,
     pub skills: HashMap<String, _GaspSkill>,
     pub memory: _GaspMemory,

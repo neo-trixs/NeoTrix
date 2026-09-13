@@ -8,7 +8,7 @@ use std::collections::HashMap;
 /// 结晶状态
 
 #[derive(Clone, Debug)]
-pub(crate) enum _CrystallizationStatus {
+pub enum _CrystallizationStatus {
     /// 模板阶段（成功 < 3 次）
     Template { success_count: u32 },
     /// 候选阶段（成功 3+ 次，待审批）
@@ -21,7 +21,7 @@ pub(crate) enum _CrystallizationStatus {
 
 /// I/O 契约 — 定义技能的输入输出规范
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub(crate) struct _IoContract {
+pub struct _IoContract {
     /// 输入 JSON schema
     pub input_schema: String,
     /// 输出 JSON schema
@@ -36,7 +36,7 @@ pub(crate) struct _IoContract {
 
 /// 已结晶技能 — 从模板晋升为正式技能
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct _CrystallizedSkill {
+pub struct _CrystallizedSkill {
     /// 技能唯一标识
     pub id: String,
     /// 技能名称
@@ -58,7 +58,7 @@ pub(crate) struct _CrystallizedSkill {
 /// 结晶统计信息
 #[derive(Clone, Debug)]
 
-pub(crate) struct _CrystallizationStats {
+pub struct _CrystallizationStats {
     /// 候选模板数量
     pub candidates: usize,
     /// 已结晶技能数量

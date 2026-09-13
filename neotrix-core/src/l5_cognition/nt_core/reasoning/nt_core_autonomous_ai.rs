@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 自主AI框架
-pub(crate) struct _AutonomousAIFramework {
+pub struct _AutonomousAIFramework {
     goals: Vec<Goal>,
     capabilities: Vec<Capability>,
     learning_loop: _LearningLoop,
@@ -23,7 +23,7 @@ pub(crate) struct _AutonomousAIFramework {
 
 /// 自主配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AutonomousConfig {
+pub struct _AutonomousConfig {
     pub max_goals: usize,
     pub learning_rate: f64,
     pub exploration_rate: f64,
@@ -91,7 +91,7 @@ pub struct Capability {
 
 /// 改进记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ImprovementRecord {
+pub struct _ImprovementRecord {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub old_proficiency: f64,
     pub new_proficiency: f64,
@@ -99,7 +99,7 @@ pub(crate) struct _ImprovementRecord {
 }
 
 /// 学习循环
-pub(crate) struct _LearningLoop {
+pub struct _LearningLoop {
     experiences: Vec<Experience>,
     patterns: Vec<_LearningPattern>,
     adjustments: Vec<Adjustment>,
@@ -119,7 +119,7 @@ pub struct Experience {
 
 /// 学习模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LearningPattern {
+pub struct _LearningPattern {
     pub id: String,
     pub pattern_type: String,
     pub description: String,
@@ -139,7 +139,7 @@ pub struct Adjustment {
 
 /// 自主统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AutonomousStats {
+pub struct _AutonomousStats {
     pub goals_pursued: u64,
     pub goals_achieved: u64,
     pub capabilities_developed: u64,
@@ -149,7 +149,7 @@ pub(crate) struct _AutonomousStats {
 
 /// 决策结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _DecisionResult {
+pub struct _DecisionResult {
     pub action: String,
     pub target: String,
     pub confidence: f64,
@@ -159,7 +159,7 @@ pub(crate) struct _DecisionResult {
 
 /// 自我评估结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SelfEvaluationResult {
+pub struct _SelfEvaluationResult {
     pub overall_score: f64,
     pub strength_areas: Vec<String>,
     pub weakness_areas: Vec<String>,

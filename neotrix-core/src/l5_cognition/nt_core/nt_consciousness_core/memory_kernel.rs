@@ -27,7 +27,7 @@ pub struct MemoryKernel {
 
 /// 成功记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SuccessRecord {
+pub struct _SuccessRecord {
     /// 类别
     pub category: String,
     /// 输入

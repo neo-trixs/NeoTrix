@@ -22,7 +22,7 @@ pub struct MultiAgentCoordinator {
     engine: Option<Arc<Mutex<Box<dyn ReasoningProvider>>>>,
 }
 
-pub(crate) struct _AgentConfig {
+pub struct _AgentConfig {
     pub id: AgentId,
     pub capability: Vec<f64>,
     pub throughput: f64,
@@ -156,7 +156,7 @@ impl MultiAgentCoordinator {
 
 /// 共享上下文中的一个共享条目 — 跨阶段累积, 供后续阶段 agent 消费。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct _SharedContextItem {
+pub struct _SharedContextItem {
     /// 来源阶段名。
     pub stage: String,
     /// 来源 agent。
@@ -169,7 +169,7 @@ pub(crate) struct _SharedContextItem {
 
 /// 共享上下文窗口 — 累积各阶段产出, 受 token 预算硬约束。
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _SharedContextWindow {
+pub struct _SharedContextWindow {
     pub items: Vec<_SharedContextItem>,
     pub seq: u64,
     /// 硬 token 上限 (0 = 无上限)。
@@ -229,7 +229,7 @@ impl _SharedContextWindow {
 
 /// 一次阶段执行结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct _StageOutcome {
+pub struct _StageOutcome {
     pub stage: String,
     pub agents: usize,
     pub items_injected: usize,
@@ -244,7 +244,7 @@ pub(crate) struct _StageOutcome {
 /// - 共享窗口: 前阶段结论作为后阶段输入;
 /// - 预算门禁: context_budget 硬约束防止上下文无限膨胀。
 #[derive(Debug, Clone)]
-pub(crate) struct _StagedContextOrchestrator {
+pub struct _StagedContextOrchestrator {
     /// 阶段执行顺序。
     pub stages: Vec<String>,
     /// 共享窗口。

@@ -31,7 +31,7 @@ pub enum ModelType {
 
 /// 适配器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AdapterConfig {
+pub struct AdapterConfig {
     /// 适配器ID
     pub id: String,
     /// 适配器名称
@@ -50,7 +50,7 @@ pub(crate) struct AdapterConfig {
 
 /// 适配器应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AdapterApplication {
+pub struct AdapterApplication {
     /// 适配器ID
     pub adapter_id: String,
     /// 应用区域
@@ -65,7 +65,7 @@ pub(crate) struct AdapterApplication {
 
 /// 适配器结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AdapterResult {
+pub struct AdapterResult {
     /// 是否成功
     pub success: bool,
     /// 输出文件路径
@@ -82,7 +82,7 @@ pub(crate) struct AdapterResult {
 
 /// 适配器注册配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ModelAdapterConfig {
+pub struct ModelAdapterConfig {
     /// 默认适配器目录
     pub adapter_dir: String,
     /// 是否启用自动加载
@@ -100,7 +100,7 @@ pub(crate) struct ModelAdapterConfig {
 /// 模型适配器
 /// 统一管理 LoRA、IP-Adapter、ControlNet 等模型
 #[derive(Debug)]
-pub(crate) struct ModelAdapter {
+pub struct ModelAdapter {
     /// 配置
     #[allow(dead_code)]
     config: ModelAdapterConfig,
@@ -282,7 +282,7 @@ impl ModelAdapter {
 
 /// 适配器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AdapterStats {
+pub struct AdapterStats {
     /// 总适配器数
     pub total_adapters: usize,
     /// 按类型统计

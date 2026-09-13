@@ -6,7 +6,7 @@ use crate::l1_action::nt_io::nt_io_provider::common::factory::{LlmProviderType, 
 
 /// 模型来源
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum ModelSource {
+pub enum ModelSource {
     EnvVar,
     BuiltinFree,
     LocalEndpoint,
@@ -16,7 +16,7 @@ pub(crate) enum ModelSource {
 
 /// 发现的模型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DiscoveredModel {
+pub struct DiscoveredModel {
     pub provider_id: String,
     pub model_id: String,
     pub display_name: String,
@@ -36,7 +36,7 @@ impl DiscoveredModel {
 }
 
 /// 已知免费 API 端点
-pub(crate) const BUILTIN_FREE_PROVIDERS: &[(&str, &str, &str, LlmProviderType, &str)] = &[
+pub const BUILTIN_FREE_PROVIDERS: &[(&str, &str, &str, LlmProviderType, &str)] = &[
     ("llamacpp", "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL", "http://localhost:8080/v1", LlmProviderType::OpenAI, "t0-cheap"),
     ("llamacpp", "qwen3.5-9b-fable", "http://localhost:8080/v1", LlmProviderType::OpenAI, "t1-standard"),
     ("openai", "gpt-4o-mini", "https://api.openai.com/v1", LlmProviderType::OpenAI, "t1-standard"),
@@ -74,7 +74,7 @@ const ENV_VAR_MAP: &[(&str, &str, LlmProviderType, &str, bool)] = &[
 ];
 
 /// 模型发现器
-pub(crate) struct ModelDiscovery;
+pub struct ModelDiscovery;
 
 impl ModelDiscovery {
     pub fn discover_all() -> Vec<DiscoveredModel> {
@@ -452,7 +452,7 @@ impl Default for ModelRegistry {
 }
 
 /// 格式化显示模型列表
-pub(crate) fn format_model_list(models: &[&DiscoveredModel]) -> String {
+pub fn format_model_list(models: &[&DiscoveredModel]) -> String {
     let mut output = String::new();
     output.push_str(&format!("╭─ Models ({}) ─────────────────────────────╮\n", models.len()));
 

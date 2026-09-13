@@ -44,7 +44,7 @@ pub enum ProviderStatus {
 
 /// 迁移计划
 #[derive(Debug, Clone)]
-pub(crate) struct MigrationPlan {
+pub struct MigrationPlan {
     /// 源提供商
     pub source_provider: String,
     /// 目标提供商
@@ -61,7 +61,7 @@ pub(crate) struct MigrationPlan {
 
 /// 迁移原因
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum MigrationReason {
+pub enum MigrationReason {
     /// 成本优化
     CostOptimization,
     /// 性能提升
@@ -76,7 +76,7 @@ pub(crate) enum MigrationReason {
 
 /// 迁移影响
 #[derive(Debug, Clone)]
-pub(crate) struct MigrationImpact {
+pub struct MigrationImpact {
     /// 预计停机时间
     pub estimated_downtime: Duration,
     /// 预计成本变化
@@ -89,7 +89,7 @@ pub(crate) struct MigrationImpact {
 
 /// 迁移步骤
 #[derive(Debug, Clone)]
-pub(crate) struct MigrationStep {
+pub struct MigrationStep {
     /// 步骤名
     pub name: String,
     /// 步骤类型
@@ -129,7 +129,7 @@ pub enum StepStatus {
 
 /// 迁移状态
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum MigrationStatus {
+pub enum MigrationStatus {
     Planning,
     InProgress,
     Completed,
@@ -138,7 +138,7 @@ pub(crate) enum MigrationStatus {
 }
 
 /// 提供商迁移路由器
-pub(crate) struct ProviderMigrationRouter {
+pub struct ProviderMigrationRouter {
     /// 提供商列表
     providers: HashMap<String, ProviderInfo>,
     /// 迁移计划
@@ -166,7 +166,7 @@ pub struct RoutingConfig {
 
 /// 迁移策略
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum MigrationStrategy {
+pub enum MigrationStrategy {
     /// 成本优先
     CostFirst,
     /// 延迟优先
@@ -299,7 +299,7 @@ impl Default for ProviderMigrationRouter {
 
 /// 提供商需求
 #[derive(Debug, Clone)]
-pub(crate) struct ProviderRequirements {
+pub struct ProviderRequirements {
     /// 所需模态
     pub modalities: Vec<String>,
     /// 最大延迟 (ms)
@@ -312,7 +312,7 @@ pub(crate) struct ProviderRequirements {
 
 /// 迁移统计
 #[derive(Debug, Clone, Default)]
-pub(crate) struct MigrationStats {
+pub struct MigrationStats {
     pub total_providers: u32,
     pub total_migrations: u32,
     pub total_fallbacks: u32,

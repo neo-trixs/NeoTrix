@@ -23,7 +23,7 @@ pub const VERSION: u8 = 1;
 /// flags bit
 pub const FLAG_ZSTD: u16 = 0b0000_0000_0000_0001;
 pub const FLAG_DELTA: u16 = 0b0000_0000_0000_0010;
-pub(crate) const FLAG_TRUNCATE: u16 = 0b0000_0000_0000_0100;
+pub const FLAG_TRUNCATE: u16 = 0b0000_0000_0000_0100;
 /// 文件尾带 CRC32 校验 (C5 自愈基础, 损坏检测)
 pub const FLAG_CHECKSUM: u16 = 0b0000_0000_0000_1000;
 /// 分块模式 (v2, A5): 块表定位 → 随机访问单块解码; 见 nt_memory_pack_chunked
@@ -33,8 +33,8 @@ pub const FLAG_CHUNKED: u16 = 0b0000_0000_0001_0000;
 pub const COL_COORD_LAT: u8 = 0;
 pub const COL_COORD_LNG: u8 = 1;
 pub const COL_STRING_DICT: u8 = 2;
-pub(crate) const COL_U32: u8 = 3;
-pub(crate) const COL_F64: u8 = 4;
+pub const COL_U32: u8 = 3;
+pub const COL_F64: u8 = 4;
 /// node_id 专用列: 前缀入字典 + ident 原始字节流 (高基数 ID 不字典化, 省字典空间)
 pub const COL_NODE_ID: u8 = 5;
 
@@ -425,7 +425,7 @@ impl PackDecoder {
 // ---- 原语: varint / zigzag ----
 
 /// 编码 varint (LEB128 无符号)
-pub(crate) fn push_varint(out: &mut Vec<u8>, mut v: u64) {
+pub fn push_varint(out: &mut Vec<u8>, mut v: u64) {
     loop {
         let b = (v & 0x7F) as u8;
         v >>= 7;
@@ -438,7 +438,7 @@ pub(crate) fn push_varint(out: &mut Vec<u8>, mut v: u64) {
 }
 
 /// 解码 varint
-pub(crate) fn pop_varint(data: &[u8], mut pos: usize) -> Option<(u64, usize)> {
+pub fn pop_varint(data: &[u8], mut pos: usize) -> Option<(u64, usize)> {
     let mut result = 0u64;
     let mut shift = 0u32;
     loop {
@@ -465,11 +465,11 @@ fn unzigzag(v: u64) -> i64 {
     ((v >> 1) as i64) ^ (-((v & 1) as i64))
 }
 
-pub(crate) fn push_zigzag_varint(out: &mut Vec<u8>, v: i64) {
+pub fn push_zigzag_varint(out: &mut Vec<u8>, v: i64) {
     push_varint(out, zigzag(v));
 }
 
-pub(crate) fn pop_zigzag_varint(data: &[u8], pos: usize) -> Option<(i64, usize)> {
+pub fn pop_zigzag_varint(data: &[u8], pos: usize) -> Option<(i64, usize)> {
     let (v, p) = pop_varint(data, pos)?;
     Some((unzigzag(v), p))
 }

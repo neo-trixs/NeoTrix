@@ -71,7 +71,7 @@ pub enum DurationMode {
 
 /// 镜头单元
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ShotUnit {
+pub struct _ShotUnit {
     /// 镜头ID
     pub id: String,
     /// 镜头序号
@@ -114,7 +114,7 @@ pub(crate) struct _ShotUnit {
 
 /// 叙事脚本
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _NarrativeScript {
+pub struct _NarrativeScript {
     /// 内容ID
     pub content_id: String,
     /// 内容标题
@@ -131,7 +131,7 @@ pub(crate) struct _NarrativeScript {
 
 /// 叙事结构化配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _NarrativeConfig {
+pub struct _NarrativeConfig {
     /// 目标时长模式
     pub duration_mode: DurationMode,
     /// 默认镜头时长 (秒)
@@ -179,7 +179,7 @@ pub enum ContentType {
 
 /// 叙事结构化器
 /// 将文本转换为结构化叙事脚本
-pub(crate) struct _NarrativeStructuring {
+pub struct _NarrativeStructuring {
     /// 配置
     config: _NarrativeConfig,
     /// 结构化历史
@@ -396,7 +396,7 @@ impl _NarrativeStructuring {
 
 /// 结构化统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _NarrativeStats {
+pub struct _NarrativeStats {
     /// 总脚本数
     pub total_scripts: usize,
     /// 总镜头数

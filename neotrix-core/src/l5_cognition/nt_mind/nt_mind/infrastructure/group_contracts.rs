@@ -8,7 +8,7 @@ use regex::Regex;
 
 /// 合约类型
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum _ContractType {
+pub enum _ContractType {
     Function,
     Struct,
     Trait,
@@ -44,7 +44,7 @@ impl _ContractType {
 
 /// 单个 API 契约
 #[derive(Debug, Clone)]
-pub(crate) struct _ApiContract {
+pub struct _ApiContract {
     pub name: String,
     pub contract_type: _ContractType,
     /// 函数签名或类型的完整声明文本
@@ -59,7 +59,7 @@ pub(crate) struct _ApiContract {
 
 /// 仓库组 — 一组关联的仓库及其暴露的契约
 #[derive(Debug, Clone)]
-pub(crate) struct _RepositoryGroup {
+pub struct _RepositoryGroup {
     pub name: String,
     pub repos: Vec<String>,
     /// repo_name → 该仓库的契约列表
@@ -68,7 +68,7 @@ pub(crate) struct _RepositoryGroup {
 
 /// 匹配类型
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum _MatchType {
+pub enum _MatchType {
     Exact,
     Similar,
     Substring,
@@ -76,7 +76,7 @@ pub(crate) enum _MatchType {
 
 /// 跨仓库匹配结果
 #[derive(Debug, Clone)]
-pub(crate) struct _ContractMatchResult {
+pub struct _ContractMatchResult {
     pub matched_contract: _ApiContract,
     pub from_repo: String,
     pub to_repo: String,
@@ -379,7 +379,7 @@ pub struct User {
     pub name: String,
 }
 
-pub(crate) trait _Greeter {
+pub trait _Greeter {
     fn greet(&self) -> String;
 }
 

@@ -21,7 +21,7 @@ use std::fmt;
 
 /// 视觉分析器契约 — 骨架仅提供占位实现，真实后端 (本地视觉模型/多模态 API)
 /// 实现此 trait 后注入。
-pub(crate) trait VisionAnalyzer: Send + Sync {
+pub trait VisionAnalyzer: Send + Sync {
     /// 对单张图片产出纯文本分析。
     fn analyze(&self, image_id: usize, marker: &str) -> String;
     /// 意图感知分析 (吸收自 Anionex/agent-vision-toolkit): 把当前任务意图
@@ -37,7 +37,7 @@ pub(crate) trait VisionAnalyzer: Send + Sync {
 }
 
 /// 骨架占位分析器 — 用图片元数据生成占位文本，供管线联通测试。
-pub(crate) struct PlaceholderAnalyzer {
+pub struct PlaceholderAnalyzer {
     pub prefix: String,
 }
 
@@ -57,7 +57,7 @@ impl VisionAnalyzer for PlaceholderAnalyzer {
 
 /// 变换配置。
 #[derive(Debug, Clone)]
-pub(crate) struct TransformConfig {
+pub struct TransformConfig {
     pub enabled: bool,
     /// 目标模型列表 (空 = 全部模型均 text-only 处理)。
     pub target_models: Vec<String>,
@@ -80,7 +80,7 @@ impl Default for TransformConfig {
 
 /// 单条消息变换结果。
 #[derive(Debug, Clone)]
-pub(crate) struct Transformed {
+pub struct Transformed {
     pub text: String,
     /// 检出并替换的图片数。
     pub images_replaced: usize,
@@ -229,7 +229,7 @@ impl MultimodalTransform {
 /// 27 种视觉类型分类 (吸收自 pretty-mermaid-skills / diagram-design)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[repr(u8)]
-pub(crate) enum VisualType {
+pub enum VisualType {
     #[default]
     Flowchart,
     Sequence,
@@ -448,7 +448,7 @@ pub struct DiagramEdge {
 
 /// 语义图模型 — 与布局表现解耦。
 #[derive(Debug, Clone, Default)]
-pub(crate) struct DiagramModel {
+pub struct DiagramModel {
     pub title: Option<String>,
     pub vtype: VisualType,
     pub nodes: Vec<DiagramNode>,
@@ -490,7 +490,7 @@ impl DiagramModel {
 
 /// 渲染选项。
 #[derive(Debug, Clone)]
-pub(crate) struct RenderOptions {
+pub struct RenderOptions {
     /// 是否输出标题横幅。
     pub with_title: bool,
     /// 框线宽度 (字符数)。
@@ -512,7 +512,7 @@ impl Default for RenderOptions {
 ///   `<id>: <标签>`   → 节点 (Process)
 ///   `<id>:<kind>: <标签>` → 节点 (kind ∈ process|decision|terminator|data|subprocess)
 ///   `<from> -> <to>` 或 `<from> -> <to> [: <label>]` → 边
-pub(crate) fn parse_diagram(source: &str) -> DiagramModel {
+pub fn parse_diagram(source: &str) -> DiagramModel {
     let vtype = VisualType::classify(source);
     let mut model = DiagramModel::new(vtype);
     for line in source.lines() {
@@ -569,7 +569,7 @@ pub(crate) fn parse_diagram(source: &str) -> DiagramModel {
 }
 
 /// 渲染主入口: 解析 → ASCII 框线渲染。失败 (空图) 返回 None。
-pub(crate) fn render_diagram(source: &str) -> Option<String> {
+pub fn render_diagram(source: &str) -> Option<String> {
     let model = parse_diagram(source);
     if model.nodes.is_empty() && model.edges.is_empty() {
         return None;
@@ -578,7 +578,7 @@ pub(crate) fn render_diagram(source: &str) -> Option<String> {
 }
 
 /// Box-drawing ASCII 渲染 — 节点框 + 边 (带标签)。
-pub(crate) fn render_ascii(model: &DiagramModel, opts: &RenderOptions) -> String {
+pub fn render_ascii(model: &DiagramModel, opts: &RenderOptions) -> String {
     let mut out = String::new();
     if opts.with_title {
         if let Some(title) = &model.title {
@@ -626,7 +626,7 @@ pub(crate) fn render_ascii(model: &DiagramModel, opts: &RenderOptions) -> String
 }
 
 /// 从语义模型生成 Mermaid 文本 (flowchart)。
-pub(crate) fn to_mermaid(model: &DiagramModel) -> String {
+pub fn to_mermaid(model: &DiagramModel) -> String {
     let mut out = String::new();
     out.push_str("flowchart TD\n");
     for node in &model.nodes {
@@ -647,7 +647,7 @@ pub(crate) fn to_mermaid(model: &DiagramModel) -> String {
 }
 
 /// 渲染为 Mermaid 文本的便捷入口 (KB 落盘 / CLI 展示)。
-pub(crate) fn render_mermaid(source: &str) -> Option<String> {
+pub fn render_mermaid(source: &str) -> Option<String> {
     let model = parse_diagram(source);
     if model.nodes.is_empty() && model.edges.is_empty() {
         return None;
@@ -823,14 +823,14 @@ mod tests {
 
 /// 图像引用 — `hash` 由 id+size_bytes 经 djb2 确定性计算。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ImageRef {
+pub struct ImageRef {
     pub id: String,
     pub size_bytes: usize,
     pub hash: String,
 }
 
 /// djb2 确定性哈希 (id 字节 + size_bytes 小端字节) → 8 位 hex。
-pub(crate) fn djb2_hash(id: &str, size_bytes: usize) -> String {
+pub fn djb2_hash(id: &str, size_bytes: usize) -> String {
     let mut h: u32 = 5381;
     for b in id.bytes() {
         h = h.wrapping_mul(33).wrapping_add(u32::from(b));
@@ -851,14 +851,14 @@ impl ImageRef {
 
 /// 多图输入 — 同批图片 + 可选说明提示。
 #[derive(Debug, Clone)]
-pub(crate) struct VisionInput {
+pub struct VisionInput {
     pub images: Vec<ImageRef>,
     pub caption_hint: Option<String>,
 }
 
 /// 预处理输出文本。
 #[derive(Debug, Clone)]
-pub(crate) struct VisionText {
+pub struct VisionText {
     pub text: String,
     pub image_count: usize,
     pub cache_hit: bool,
@@ -874,7 +874,7 @@ fn hash_set_key(hashes: &[String]) -> String {
 
 /// 幂等缓存: hash 集 → 联合分析文本。同 hash 集不重复调用 analyze。
 #[derive(Debug, Clone, Default)]
-pub(crate) struct VisionCache {
+pub struct VisionCache {
     entries: HashMap<String, String>,
 }
 
@@ -1013,7 +1013,7 @@ impl crate::core::nt_core_self_test::SelfTest for VisionPreprocessor {
 
 /// 语音状态。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct VoiceState {
+pub struct VoiceState {
     pub name: String,
     pub model_path: String,
     pub sample_rate: u32,
@@ -1022,7 +1022,7 @@ pub(crate) struct VoiceState {
 
 /// TTS 错误。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum TtsError {
+pub enum TtsError {
     UnknownVoice(String),
     EmptyText,
 }
@@ -1084,7 +1084,7 @@ impl VoiceLoader {
 
 /// TTS 请求。
 #[derive(Debug, Clone)]
-pub(crate) struct TtsRequest {
+pub struct TtsRequest {
     pub text: String,
     pub voice: String,
     pub speed: f64,
@@ -1398,7 +1398,7 @@ mod multimodal_fusion_tests {
 
 /// 人脸分析四任务。
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum FaceTask {
+pub enum FaceTask {
     Detection,
     Recognition,
     Tracking,
@@ -1418,7 +1418,7 @@ impl FaceTask {
 
 /// 单张人脸框 (归一化坐标 [0,1] 内)。
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct FaceBox {
+pub struct FaceBox {
     pub x: f64,
     pub y: f64,
     pub w: f64,
@@ -1428,7 +1428,7 @@ pub(crate) struct FaceBox {
 
 /// 人脸分析结果 — 四任务共享统一返回。
 #[derive(Debug, Clone)]
-pub(crate) struct FaceResult {
+pub struct FaceResult {
     pub task: FaceTask,
     pub boxes: Vec<FaceBox>,
     pub identity: Option<String>,
@@ -1436,7 +1436,7 @@ pub(crate) struct FaceResult {
 }
 
 /// 人脸分析统一引擎 (确定性骨架)。
-pub(crate) struct UnifiedFace {
+pub struct UnifiedFace {
     pub max_detections: usize,
     pub min_confidence: f64,
 }

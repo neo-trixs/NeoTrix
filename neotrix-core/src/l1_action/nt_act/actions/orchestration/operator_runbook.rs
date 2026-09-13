@@ -42,7 +42,7 @@ pub enum StepType {
 
 /// 运行手册步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RunbookStep {
+pub struct RunbookStep {
     /// 步骤ID
     pub id: String,
     /// 步骤名称
@@ -73,7 +73,7 @@ pub(crate) struct RunbookStep {
 
 /// 决策节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DecisionNode {
+pub struct DecisionNode {
     /// 节点ID
     pub id: String,
     /// 条件描述
@@ -86,7 +86,7 @@ pub(crate) struct DecisionNode {
 
 /// 运行手册
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct OperatorRunbook {
+pub struct OperatorRunbook {
     /// 手册ID
     pub id: String,
     /// 手册名称
@@ -111,7 +111,7 @@ pub(crate) struct OperatorRunbook {
 
 /// 运行手册模板
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RunbookTemplate {
+pub struct RunbookTemplate {
     /// 模板ID
     pub id: String,
     /// 模板名称
@@ -128,7 +128,7 @@ pub(crate) struct RunbookTemplate {
 
 /// 运行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RunbookExecution {
+pub struct RunbookExecution {
     /// 执行ID
     pub execution_id: String,
     /// 手册ID
@@ -165,7 +165,7 @@ pub struct StepResult {
 // ============================================================================
 
 /// 运行手册管理器
-pub(crate) struct RunbookManager {
+pub struct RunbookManager {
     /// 手册存储
     runbooks: HashMap<String, OperatorRunbook>,
     /// 模板存储
@@ -291,7 +291,7 @@ impl RunbookManager {
 
 /// 运行手册统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RunbookStats {
+pub struct RunbookStats {
     /// 总手册数
     pub total_runbooks: usize,
     /// 总模板数

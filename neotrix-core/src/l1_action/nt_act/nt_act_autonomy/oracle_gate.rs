@@ -1,7 +1,7 @@
 use crate::l5_cognition::nt_core::awareness_monitor::{AwarenessReport, GapSeverity};
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum OracleReason {
+pub enum OracleReason {
     CriticalCapabilityGap { dimension: String, gap: f64 },
     UnknownTask { task_description: String },
     RepeatedFailure { attempt_count: u32, dimension: String },
@@ -18,7 +18,7 @@ pub struct OracleRequest {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum OracleUrgency {
+pub enum OracleUrgency {
     Immediate,
     High,
     Normal,

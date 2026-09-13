@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
 
 /// 风格特征
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _Style特征 {
+pub struct _Style特征 {
     /// 色彩分布
     pub color_distribution: Vec<f32>,
     /// 对比度
@@ -29,7 +29,7 @@ pub(crate) struct _Style特征 {
 
 /// 风格协调配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StyleHarmonizerConfig {
+pub struct _StyleHarmonizerConfig {
     /// 目标风格
     pub target_style: Option<String>,
     /// 参考图片路径
@@ -46,7 +46,7 @@ pub(crate) struct _StyleHarmonizerConfig {
 
 /// 风格协调结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StyleHarmonizationResult {
+pub struct _StyleHarmonizationResult {
     /// 是否成功
     pub success: bool,
     /// 输出文件路径
@@ -61,7 +61,7 @@ pub(crate) struct _StyleHarmonizationResult {
 
 /// 风格分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _StyleAnalysis {
+pub struct _StyleAnalysis {
     /// 风格特征
     pub features: _Style特征,
     /// 主要色彩
@@ -77,7 +77,7 @@ pub(crate) struct _StyleAnalysis {
 // ============================================================================
 
 /// 风格协调器
-pub(crate) struct _StyleHarmonizer {
+pub struct _StyleHarmonizer {
     /// 配置
     #[allow(dead_code)]
     config: _StyleHarmonizerConfig,
@@ -206,7 +206,7 @@ impl _StyleHarmonizer {
 
 /// 协调统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _HarmonizerStats {
+pub struct _HarmonizerStats {
     /// 总协调次数
     pub total_harmonized: usize,
     /// 成功次数

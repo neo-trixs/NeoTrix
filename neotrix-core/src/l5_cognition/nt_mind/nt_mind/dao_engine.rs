@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 
 /// 道的层级 — 从最抽象到最具体
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) enum DaoLevel {
+pub enum DaoLevel {
     /// 道: 本源规则 (最底层抽象)
     Dao,
     /// 一: 统一场 (信息/能量/物质三位一体)
@@ -26,7 +26,7 @@ pub(crate) enum DaoLevel {
 
 /// 本源规则 — 道的具体表达
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DaoRule {
+pub struct DaoRule {
     pub id: String,
     pub name: String,
     pub layer: DaoLevel,
@@ -37,7 +37,7 @@ pub(crate) struct DaoRule {
 }
 
 /// 道引擎 — 从规则逆推到具体现象 / 从现象追溯到规则
-pub(crate) struct DaoEngine {
+pub struct DaoEngine {
     pub rules: Vec<DaoRule>,
     pub domain_to_rules: HashMap<String, Vec<String>>, // 领域→对应规则
     pub phenomena_to_rules: HashMap<String, Vec<String>>, // 现象→对应规则

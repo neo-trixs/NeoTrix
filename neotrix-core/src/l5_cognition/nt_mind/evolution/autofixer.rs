@@ -6,7 +6,7 @@ use crate::core::nt_core_context::revertible::{ClosureEffect, RevertibleContext}
 use crate::core::l0_substrate::nt_core_error::parse::{self, CompilerDiagnostic, DiagnosticSeverity};
 
 /// 自愈快照 — 修复前记录文件原内容作为 ∂Γ inverse (写回原状)。
-pub(crate) struct _HealSnapshot {
+pub struct _HealSnapshot {
     pub path: PathBuf,
     pub original: Vec<u8>,
 }
@@ -24,7 +24,7 @@ impl _HealSnapshot {
 
 /// ∂Γ 事务性自愈批次 — heal 前快照, 批内任一步失败 recover 回滚全部已写文件。
 /// 语义: all-or-nothing (与 PluginRegistry::load_batch 同一回滚原语)。
-pub(crate) struct _RepairBatch {
+pub struct _RepairBatch {
     ctx: RevertibleContext<'static, ()>,
     snapshots: Vec<_HealSnapshot>,
 }
@@ -339,7 +339,7 @@ impl AutoFixer {
 
 /// GAUNTLET 门控阶段。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum _GauntletStage {
+pub enum _GauntletStage {
     /// SPEC: 变更前必须有明确规格 (spec-before 门禁)。
     Spec,
     /// RED: 先写失败测试。
@@ -385,7 +385,7 @@ impl _GauntletStage {
 
 /// GAUNTLET 门禁判定结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct _GauntletVerdict {
+pub struct _GauntletVerdict {
     pub stage: _GauntletStage,
     /// 是否通过该阶段门禁。
     pub pass: bool,
@@ -566,7 +566,7 @@ impl GauntletMachine {
 /// 失败后必须三选一, 禁止空白重试 ("a retry that does not carry the diagnosis
 /// is the same attempt again")。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _ResolveExit {
+pub enum _ResolveExit {
     /// 接受失败为已知事实, 不再重试 (范围重新界定)。
     Trust,
     /// 携带失败诊断重试 — 这是默认出口, 空白诊断被拒绝。
@@ -599,7 +599,7 @@ impl _ResolveExit {
 
 /// 单个 healer 巡检产出的修复建议。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct _HealSuggestion {
+pub struct _HealSuggestion {
     /// 健康维度 (如 "compile" / "todo" / "unused_import" / "unwraps")。
     pub dimension: String,
     /// 目标文件 (可空 = 全局维度)。

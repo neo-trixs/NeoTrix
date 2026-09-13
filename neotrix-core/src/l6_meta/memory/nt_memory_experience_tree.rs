@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 经验树管理器
-pub(crate) struct _ExperienceTreeManager {
+pub struct _ExperienceTreeManager {
     experiences: Vec<Experience>,
     #[allow(dead_code)]
     branches: Vec<_ExperienceBranch>,
@@ -20,7 +20,7 @@ pub(crate) struct _ExperienceTreeManager {
 
 /// 经验配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExperienceConfig {
+pub struct _ExperienceConfig {
     pub max_experiences: usize,
     pub enable_auto_distill: bool,
     pub retention_days: u32,
@@ -57,7 +57,7 @@ pub struct Experience {
 /// 经验类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _ExperienceType {
+pub enum _ExperienceType {
     Pattern,
     Rule,
     Defect,
@@ -79,7 +79,7 @@ impl std::fmt::Display for _ExperienceType {
 
 /// 经验反馈
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExperienceFeedback {
+pub struct _ExperienceFeedback {
     pub success: u32,
     pub failure: u32,
     pub reuse: u32,
@@ -87,7 +87,7 @@ pub(crate) struct _ExperienceFeedback {
 
 /// 经验分支
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExperienceBranch {
+pub struct _ExperienceBranch {
     pub branch_id: String,
     pub experience_id: String,
     pub branch_type: String,
@@ -97,7 +97,7 @@ pub(crate) struct _ExperienceBranch {
 
 /// 经验统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExperienceStats {
+pub struct _ExperienceStats {
     pub total_experiences: u64,
     pub by_domain: HashMap<String, u64>,
     pub by_type: HashMap<String, u64>,
@@ -108,7 +108,7 @@ pub(crate) struct _ExperienceStats {
 /// 吸收阶段
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _AbsorptionStage {
+pub enum _AbsorptionStage {
     Snapshot,    // 快照
     Distill,     // 蒸馏
     Classify,    // 分类

@@ -30,7 +30,7 @@ const LEVEL_DEBUG: u8 = 3;
 
 static LOG_LEVEL: AtomicU8 = AtomicU8::new(LEVEL_INFO);
 
-pub(crate) fn set_level(level: &str) {
+pub fn set_level(level: &str) {
     let lvl = match level.to_lowercase().as_str() {
         "error" => LEVEL_ERROR,
         "warn" | "warning" => LEVEL_WARN,

@@ -60,4 +60,4 @@ impl ReflectionReport {
     }
 }
 
-pub(crate) const MIN_EXPECTED_STEPS: usize = 3;
+pub const MIN_EXPECTED_STEPS: usize = 3;

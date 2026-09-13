@@ -12,7 +12,7 @@ use crate::core::nt_core_self_test::SelfTest;
 ///
 /// 每个变体对应书中一个反复出现的演化主题, 后续 C1+ 阶段可扩展为具体策略。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _SelfEvolutionLesson {
+pub enum _SelfEvolutionLesson {
     /// identity 先于 capability: 智能体须先确立"我是谁"再演化技能。
     IdentityBeforeCapability,
     /// skill 通过失败而非成功习得 (failure-driven crystallization)。
@@ -57,7 +57,7 @@ impl _SelfEvolutionLesson {
 /// 叙事 pattern 提取 trait — 从一段自进化叙事文本中抽取可复用 lesson。
 ///
 /// C0 占位: 结构化提取逻辑留待 C1 实现, 此处仅定义契约。
-pub(crate) trait _NarrativePatternExtractor {
+pub trait _NarrativePatternExtractor {
     /// 从叙事片段识别命中的 lesson 集合 (C0: 返回全部声明式 lesson)。
     fn extract_lessons(&self, _narrative: &str) -> Vec<_SelfEvolutionLesson> {
         _SelfEvolutionLesson::all().to_vec()
@@ -69,7 +69,7 @@ pub(crate) trait _NarrativePatternExtractor {
 }
 
 /// yoyobook 文献节点默认提取器。
-pub(crate) struct _YoyoBookExtractor;
+pub struct _YoyoBookExtractor;
 
 impl _NarrativePatternExtractor for _YoyoBookExtractor {}
 

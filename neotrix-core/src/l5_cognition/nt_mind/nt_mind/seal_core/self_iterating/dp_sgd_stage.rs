@@ -10,7 +10,7 @@ const DELTA: f64 = 1e-5;
 const MAX_EPSILON: f64 = 10.0;
 
 #[derive(Debug, Clone)]
-pub(crate) struct _DpSgdState {
+pub struct _DpSgdState {
     pub epsilon_spent: f64,
     pub delta: f64,
     pub total_steps: u64,

@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 
 /// 工具层 — 映射设计文档 L1/L2/L3。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum _BuildLayer {
+pub enum _BuildLayer {
     /// L1 快速确定性层 — check/clippy/fmt/test/tree/metadata
     Fast,
     /// L2 审计层 — audit/deny/outdated (安全 + 供应链)
@@ -51,7 +51,7 @@ const DENYLISTED_SUBCOMMANDS: &[&str] = &["publish", "install", "vendor", "clean
 
 /// 构建结果证据 — 结构化收集 (exit/计数/输出), 供调用方作为 R-P9/R-P16 双验证证据。
 #[derive(Debug, Clone)]
-pub(crate) struct _BuildEvidence {
+pub struct _BuildEvidence {
     pub layer: _BuildLayer,
     pub tool: String,
     pub args: Vec<String>,
@@ -89,7 +89,7 @@ impl _BuildEvidence {
 
 /// 统一 cargo 构建执行器。
 #[derive(Debug, Clone)]
-pub(crate) struct _BuildRunner {
+pub struct _BuildRunner {
     /// 默认超时秒数 (L1 短, L2/L3 长)。
     pub timeout_secs: u64,
     /// 工作目录 (None = 进程当前目录)。

@@ -43,7 +43,7 @@ pub struct CommitmentProof {
 /// A position-length binding that prevents chunk reordering attacks.
 /// Each chunk is cryptographically bound to its index and node ID.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PositionLengthBinding {
+pub struct PositionLengthBinding {
     pub node_id: String,
     pub chunk_count: u32,
     pub original_length: u32,

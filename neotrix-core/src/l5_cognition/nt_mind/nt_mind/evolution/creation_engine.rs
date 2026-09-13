@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 /// 覆盖: 材料→制造→能源→电子→工具→建筑→生命
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ManufacturableArtifact {
+pub struct _ManufacturableArtifact {
     pub id: String,
     pub name: String,
     pub category: _ArtifactCategory,
@@ -19,7 +19,7 @@ pub(crate) struct _ManufacturableArtifact {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum _ArtifactCategory {
+pub enum _ArtifactCategory {
     Tool,           // 工具
     Machine,        // 机器
     Structure,      // 建筑/结构
@@ -33,7 +33,7 @@ pub(crate) enum _ArtifactCategory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ProcessStep {
+pub struct _ProcessStep {
     pub step: u32,
     pub description: String,
     pub temperature_c: Option<f64>,
@@ -44,7 +44,7 @@ pub(crate) struct _ProcessStep {
 }
 
 /// 造物引擎 — 一切造物的知识链路
-pub(crate) struct _CreationEngine {
+pub struct _CreationEngine {
     pub artifacts: Vec<_ManufacturableArtifact>,
     pub material_properties: HashMap<String, _MaterialProperty>,
     pub energy_sources: Vec<_EnergySource>,
@@ -52,7 +52,7 @@ pub(crate) struct _CreationEngine {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MaterialProperty {
+pub struct _MaterialProperty {
     pub name: String,
     pub density_gcm3: f64,
     pub melting_point_c: f64,
@@ -63,7 +63,7 @@ pub(crate) struct _MaterialProperty {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _EnergySource {
+pub struct _EnergySource {
     pub name: String,
     pub energy_density: String,
     pub tech_level: u8,

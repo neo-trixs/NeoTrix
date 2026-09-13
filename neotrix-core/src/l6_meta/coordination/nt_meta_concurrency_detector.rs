@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 并发冲突检测器
-pub(crate) struct _ConcurrencyConflictDetector {
+pub struct _ConcurrencyConflictDetector {
     _monitored_files: Vec<_MonitoredFile>,
     conflicts: Vec<Conflict>,
     lock_states: HashMap<String, _LockState>,
@@ -21,7 +21,7 @@ pub(crate) struct _ConcurrencyConflictDetector {
 
 /// 冲突检测器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConflictDetectorConfig {
+pub struct _ConflictDetectorConfig {
     pub enable_file_locking: bool,
     pub lock_timeout_ms: u64,
     pub max_conflict_history: usize,
@@ -41,7 +41,7 @@ impl Default for _ConflictDetectorConfig {
 
 /// 监控文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MonitoredFile {
+pub struct _MonitoredFile {
     pub file_path: String,
     pub file_type: _FileType,
     pub last_modified: chrono::DateTime<chrono::Utc>,
@@ -52,7 +52,7 @@ pub(crate) struct _MonitoredFile {
 /// 文件类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _FileType {
+pub enum _FileType {
     SharedConfig,
     SharedState,
     PublicAPI,
@@ -84,14 +84,14 @@ pub enum ConflictType {
 /// 锁状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _LockState {
+pub enum _LockState {
     Unlocked,
     Locked { holder: String, since: chrono::DateTime<chrono::Utc> },
 }
 
 /// 冲突检测器统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ConflictDetectorStats {
+pub struct _ConflictDetectorStats {
     pub total_files_monitored: u64,
     pub total_conflicts: u64,
     pub resolved_conflicts: u64,

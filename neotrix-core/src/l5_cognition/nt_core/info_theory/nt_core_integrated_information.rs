@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 整合信息量化器
-pub(crate) struct _IntegratedInformationQuantifier {
+pub struct _IntegratedInformationQuantifier {
     mechanisms: Vec<Mechanism>,
     concepts: Vec<Concept>,
     causes: Vec<_CauseEffect>,
@@ -19,7 +19,7 @@ pub(crate) struct _IntegratedInformationQuantifier {
 
 /// Phi 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PhiConfig {
+pub struct _PhiConfig {
     pub phi_threshold: f64,
     pub max_partitions: usize,
     pub enable_exclusion: bool,
@@ -61,7 +61,7 @@ pub struct Concept {
 
 /// 因果关系
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CauseEffect {
+pub struct _CauseEffect {
     pub cause_effect_id: String,
     pub mechanism: String,
     pub cause_state: Vec<f64>,
@@ -73,7 +73,7 @@ pub(crate) struct _CauseEffect {
 
 /// Phi 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PhiStats {
+pub struct _PhiStats {
     pub total_mechanisms: u64,
     pub total_concepts: u64,
     pub total_causes: u64,
@@ -84,7 +84,7 @@ pub(crate) struct _PhiStats {
 
 /// Phi 计算结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PhiResult {
+pub struct _PhiResult {
     pub phi: f64,
     pub conceptual_structure: f64,
     pub cause_effect_power: f64,
@@ -95,7 +95,7 @@ pub(crate) struct _PhiResult {
 /// Phi 排名
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _PhiRank {
+pub enum _PhiRank {
     Zero,       // Φ = 0: 无意识
     Minimal,    // Φ > 0: 最小意识
     Moderate,   // Φ > 1: 中等意识
@@ -105,7 +105,7 @@ pub(crate) enum _PhiRank {
 
 /// 因果分割分析
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PartitionAnalysis {
+pub struct _PartitionAnalysis {
     pub partition_type: String,
     pub information_loss: f64,
     pub integrated: bool,

@@ -17,7 +17,7 @@ pub struct ToolResult {
 }
 
 /// MCP 工具注册表
-pub(crate) struct McpToolRegistry {
+pub struct McpToolRegistry {
     tools: Vec<McpTool>,
 }
 
@@ -48,7 +48,7 @@ impl McpToolRegistry {
 }
 
 /// 创建默认工具注册表
-pub(crate) fn create_default_registry() -> McpToolRegistry {
+pub fn create_default_registry() -> McpToolRegistry {
     let mut registry = McpToolRegistry::new();
 
     registry.register(McpTool {

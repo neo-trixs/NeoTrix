@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum _DependencySource {
+pub enum _DependencySource {
     CratesIo,
     Git(String),
     Path(PathBuf),
@@ -11,7 +11,7 @@ pub(crate) enum _DependencySource {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _DependencyInfo {
+pub struct _DependencyInfo {
     pub name: String,
     pub version_req: String,
     pub is_optional: bool,
@@ -19,7 +19,7 @@ pub(crate) struct _DependencyInfo {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _PackageInfo {
+pub struct _PackageInfo {
     pub name: String,
     pub version: String,
     pub path: PathBuf,
@@ -28,7 +28,7 @@ pub(crate) struct _PackageInfo {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _BuildContextStats {
+pub struct _BuildContextStats {
     pub total_packages: usize,
     pub total_dependencies: usize,
     pub external_count: usize,
@@ -36,7 +36,7 @@ pub(crate) struct _BuildContextStats {
     pub cycle_count: usize,
 }
 
-pub(crate) struct _BuildContext {
+pub struct _BuildContext {
     pub packages: Vec<_PackageInfo>,
     pub workspace_members: Vec<String>,
     pub package_index: HashMap<String, usize>,

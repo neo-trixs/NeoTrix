@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 /// SEAL 管线增强版
-pub(crate) struct _SEALPipelineEnhanced {
+pub struct _SEALPipelineEnhanced {
     stages: Vec<_SEALStage>,
     failure_library: _FailureLibrary,
     #[allow(dead_code)]
@@ -20,7 +20,7 @@ pub(crate) struct _SEALPipelineEnhanced {
 
 /// SEAL 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SEALConfig {
+pub struct _SEALConfig {
     pub exploration_budget: usize,
     pub distillation_threshold: f64,
     pub self_test_required: bool,
@@ -42,7 +42,7 @@ impl Default for _SEALConfig {
 
 /// SEAL 阶段
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SEALStage {
+pub struct _SEALStage {
     pub name: String,
     pub stage_type: _StageType,
     pub inputs: Vec<String>,
@@ -53,7 +53,7 @@ pub(crate) struct _SEALStage {
 /// 阶段类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _StageType {
+pub enum _StageType {
     Exploration,
     Distillation,
     SelfTest,
@@ -63,7 +63,7 @@ pub(crate) enum _StageType {
 
 /// 失败模式库
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FailureLibrary {
+pub struct _FailureLibrary {
     pub patterns: Vec<FailurePattern>,
     pub statistics: _FailureStats,
 }
@@ -82,7 +82,7 @@ pub struct FailurePattern {
 
 /// 失败统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FailureStats {
+pub struct _FailureStats {
     pub total_failures: u64,
     pub resolved_failures: u64,
     pub recurring_patterns: Vec<String>,
@@ -91,7 +91,7 @@ pub(crate) struct _FailureStats {
 
 /// 反馈回路
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FeedbackLoop {
+pub struct _FeedbackLoop {
     pub signals: Vec<FeedbackSignal>,
     pub adjustments: Vec<_LearningAdjustment>,
     pub effectiveness: f64,
@@ -108,7 +108,7 @@ pub struct FeedbackSignal {
 
 /// 学习调整
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _LearningAdjustment {
+pub struct _LearningAdjustment {
     pub parameter: String,
     pub old_value: f64,
     pub new_value: f64,
@@ -118,7 +118,7 @@ pub(crate) struct _LearningAdjustment {
 
 /// SEAL 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SEALStats {
+pub struct _SEALStats {
     pub total_cycles: u64,
     pub successful_absorptions: u64,
     pub failed_absorptions: u64,
@@ -128,7 +128,7 @@ pub(crate) struct _SEALStats {
 
 /// SEAL 执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SEALResult {
+pub struct _SEALResult {
     pub cycle_id: String,
     pub stages_completed: Vec<String>,
     pub extracted_knowledge: Vec<_ExtractedKnowledge>,
@@ -139,7 +139,7 @@ pub(crate) struct _SEALResult {
 
 /// 提取的知识
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ExtractedKnowledge {
+pub struct _ExtractedKnowledge {
     pub id: String,
     pub knowledge_type: String,
     pub content: serde_json::Value,

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::types::{DomElement, ElementFingerprint};
 
-pub(crate) fn fingerprint_from_dom_element(e: &DomElement) -> ElementFingerprint {
+pub fn fingerprint_from_dom_element(e: &DomElement) -> ElementFingerprint {
     let mut data_attrs = HashMap::new();
     for (k, v) in &e.attributes {
         if k.starts_with("data-") {
@@ -30,7 +30,7 @@ pub(crate) fn fingerprint_from_dom_element(e: &DomElement) -> ElementFingerprint
     }
 }
 
-pub(crate) fn build_selector(e: &DomElement) -> String {
+pub fn build_selector(e: &DomElement) -> String {
     let mut sel = e.tag.clone();
     if let Some(classes) = e.attributes.get("class") {
         for cls in classes.split_whitespace() {
@@ -45,7 +45,7 @@ pub(crate) fn build_selector(e: &DomElement) -> String {
     sel
 }
 
-pub(crate) fn jaccard_str(a: &[String], b: &[String]) -> f64 {
+pub fn jaccard_str(a: &[String], b: &[String]) -> f64 {
     let set_a: HashSet<&str> = a.iter().map(|s| s.as_str()).collect();
     let set_b: HashSet<&str> = b.iter().map(|s| s.as_str()).collect();
     let intersection = set_a.intersection(&set_b).count();
@@ -57,7 +57,7 @@ pub(crate) fn jaccard_str(a: &[String], b: &[String]) -> f64 {
     }
 }
 
-pub(crate) fn levenshtein_normalized(a: &str, b: &str) -> f64 {
+pub fn levenshtein_normalized(a: &str, b: &str) -> f64 {
     if a.is_empty() && b.is_empty() {
         return 1.0;
     }
@@ -71,7 +71,7 @@ pub(crate) fn levenshtein_normalized(a: &str, b: &str) -> f64 {
     1.0 - dist as f64 / max_len
 }
 
-pub(crate) fn levenshtein_distance(a: &str, b: &str) -> usize {
+pub fn levenshtein_distance(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
     let m = a_chars.len();

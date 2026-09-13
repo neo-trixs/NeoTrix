@@ -19,7 +19,7 @@ pub struct KnowledgeGraph {
 
 /// 图节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KGNode {
+pub struct _KGNode {
     pub id: String,
     pub node_type: String,
     pub properties: HashMap<String, serde_json::Value>,
@@ -28,7 +28,7 @@ pub(crate) struct _KGNode {
 
 /// 图边
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _KGEdge {
+pub struct _KGEdge {
     pub source: String,
     pub target: String,
     pub edge_type: String,
@@ -56,7 +56,7 @@ pub struct Community {
 
 /// 中心性指标
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _CentralityMetrics {
+pub struct _CentralityMetrics {
     pub node_id: String,
     pub _degree_centrality: f64,
     pub betweenness_centrality: f64,

@@ -8,13 +8,13 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 最佳实践评论反馈: critic 对某次生成的 critiques 与评分。
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _CriticFeedback {
+pub struct _CriticFeedback {
     pub critiques: Vec<String>,
     pub score: f64,
 }
 
 /// 最佳实践评论优化 trait (BPCO).
-pub(crate) trait _BestPracticeCritic {
+pub trait _BestPracticeCritic {
     /// 对生成文本给出评论反馈 (stub: 当前返回中性占位反馈)。
     fn critique(&self, _generated: &str) -> _CriticFeedback;
     /// 反馈是否通过质量标准 (stub: 默认通过)。
@@ -22,7 +22,7 @@ pub(crate) trait _BestPracticeCritic {
 }
 
 /// BPCO critic 实现 (C0 结构 stub).
-pub(crate) struct _BpcoCritic {
+pub struct _BpcoCritic {
     min_score: f64,
 }
 

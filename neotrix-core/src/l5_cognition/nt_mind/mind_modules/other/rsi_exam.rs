@@ -19,13 +19,13 @@ use std::collections::HashMap;
 
 /// 一次 RSI 改进的可见/隐藏评测集合标识。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub(crate) struct _DatasetSplit {
+pub struct _DatasetSplit {
     pub name: String,
 }
 
 /// 可运行工件: 智能体继承的起点 (代码 / 配置 / 技能权重等)。
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _InheritedArtifact {
+pub struct _InheritedArtifact {
     pub id: String,
     pub kind: String,
     pub payload_ref: String,
@@ -95,7 +95,7 @@ impl VersionHistory {
 
 /// RSI-Exam 评测结构: 聚合可见/隐藏集与版本历史。
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _RsiExam {
+pub struct _RsiExam {
     pub visible_set: _DatasetSplit,
     pub hidden_set: _DatasetSplit,
     pub history: VersionHistory,

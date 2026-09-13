@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum _Audience {
+pub enum _Audience {
     Executive,
     Board,
     Team,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct _StakeholderReport {
+pub struct _StakeholderReport {
     pub audience: _Audience,
     pub title: String,
     pub summary: String,
@@ -66,7 +66,7 @@ impl _StakeholderReport {
     }
 }
 
-pub(crate) struct _StakeholderCommunicator {
+pub struct _StakeholderCommunicator {
     pub tone_adjustments: HashMap<_Audience, f64>,
 }
 

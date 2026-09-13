@@ -17,7 +17,7 @@ pub enum Scope {
 }
 
 /// 三范围映射推理 trait。
-pub(crate) trait _ThreeScopeMap {
+pub trait _ThreeScopeMap {
     /// 将一项元素登记到指定范围。
     fn map(&mut self, scope: Scope, item: &str);
     /// 返回某范围登记的元素数。
@@ -32,7 +32,7 @@ pub(crate) trait _ThreeScopeMap {
 }
 
 /// three-scope-map 实现。
-pub(crate) struct _ThreeScopeMapImpl {
+pub struct _ThreeScopeMapImpl {
     scopes: HashMap<Scope, Vec<String>>,
 }
 

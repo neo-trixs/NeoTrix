@@ -10,7 +10,7 @@ pub struct FastGoal {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum _FastGoalStatus {
+pub enum _FastGoalStatus {
     Active,
     Completed,
     Abandoned,

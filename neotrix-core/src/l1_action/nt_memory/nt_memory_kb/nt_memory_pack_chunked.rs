@@ -37,14 +37,14 @@ use super::nt_memory_pack::{
 };
 
 /// v2 版本号
-pub(crate) const VERSION_CHUNKED: u8 = 2;
+pub const VERSION_CHUNKED: u8 = 2;
 /// 默认块大小 (记录数/块)。4096 ≈ 150KB/块 (geo_index 38.5B/记录), 平衡随机访问粒度与块表开销。
-pub(crate) const CHUNK_SIZE: usize = 4096;
+pub const CHUNK_SIZE: usize = 4096;
 
 /// 编码一组地理点为 v2 分块二进制。
 ///
 /// 全局共享 StringTable + LCP 前缀; 坐标 delta 每块独立; 每块独立 zstd。块数据 = v1 数据区格式。
-pub(crate) fn encode_chunked(points: &[GeoPoint], chunk_size: usize) -> Vec<u8> {
+pub fn encode_chunked(points: &[GeoPoint], chunk_size: usize) -> Vec<u8> {
     if points.is_empty() {
         // 空输入: 退化为合法 v1 空文件 (无块可建, 块表需后置参数的 v2 不适用)
         return super::nt_memory_pack::PackEncoder::default().encode(points);
@@ -239,7 +239,7 @@ pub(crate) fn encode_chunked(points: &[GeoPoint], chunk_size: usize) -> Vec<u8> 
 /// 解析 v2 文件头部 (明文区): 校验 + 列描述 + 字典 + 前缀 + 块表。
 /// 可重复调用一次后, 用 [`decode_one_chunk`] 按块随机访问。
 #[derive(Debug)]
-pub(crate) struct ChunkedMeta {
+pub struct ChunkedMeta {
     pub total: usize,
     pub nchunks: usize,
     pub dict: Vec<String>,
@@ -260,7 +260,7 @@ impl ChunkedMeta {
 }
 
 /// 校验 + 解析 v2 头部。非 v2 文件返回 Err("not a chunked ...")。
-pub(crate) fn parse_chunked_header(bytes: &[u8]) -> Result<ChunkedMeta, String> {
+pub fn parse_chunked_header(bytes: &[u8]) -> Result<ChunkedMeta, String> {
     if bytes.len() < 16 || &bytes[0..8] != MAGIC {
         return Err("invalid NT-Pack magic".into());
     }
@@ -340,7 +340,7 @@ pub(crate) fn parse_chunked_header(bytes: &[u8]) -> Result<ChunkedMeta, String> 
 
 /// 解码单个块 (随机访问)。只解压+解析目标块, 不碰其他块。
 /// `meta` 由 [`parse_chunked_header`] 得; 单块错误不影响其他块 (已返回目标块结果)。
-pub(crate) fn decode_one_chunk(bytes: &[u8], meta: &ChunkedMeta, idx: usize) -> Result<Vec<GeoPoint>, String> {
+pub fn decode_one_chunk(bytes: &[u8], meta: &ChunkedMeta, idx: usize) -> Result<Vec<GeoPoint>, String> {
     if idx >= meta.nchunks {
         return Err(format!("chunk index {} out of range {}", idx, meta.nchunks));
     }
@@ -466,7 +466,7 @@ pub fn decode_chunked(bytes: &[u8]) -> Result<Vec<GeoPoint>, String> {
 }
 
 /// 随机访问: 解码有序范围 [start..end) 的记录 (跨块)。适用于 bbox 过滤前置采样。
-pub(crate) fn decode_chunk_range(
+pub fn decode_chunk_range(
     bytes: &[u8],
     meta: &ChunkedMeta,
     start: usize,
@@ -494,7 +494,7 @@ pub(crate) fn decode_chunk_range(
 /// ⚠ 仍为 merge (O(n)), 与 A4 相同语义: 这是"追加正确性"基线。
 ///   真正 O(chunk) 的原地追加需"后置块表" (块表在文件末尾), 需 v3 格式, 标记 deferred
 ///   (见 docs/nt-pack-format.md A5 节)。v2 的价值 = 随机访问 + 每块独立解压。
-pub(crate) fn append_chunked(path: &str, new_points: &[GeoPoint], chunk_size: usize) -> Result<usize, String> {
+pub fn append_chunked(path: &str, new_points: &[GeoPoint], chunk_size: usize) -> Result<usize, String> {
     let data = std::fs::read(path).map_err(|e| format!("read {}: {}", path, e))?;
     let mut merged: HashMap<String, GeoPoint> = HashMap::new();
     let old_len = if data.is_empty() {

@@ -11,7 +11,7 @@ use crate::core::nt_core_self_test::SelfTest;
 use std::collections::HashMap;
 
 /// 配额治理器 trait — 对请求 key 做速率限制决策。
-pub(crate) trait QuotaGovernor: Send + Sync {
+pub trait QuotaGovernor: Send + Sync {
     /// 尝试消费一次额度; 成功返回 true, 超额返回 false。
     fn try_consume(&mut self, key: &str, cost: u32) -> bool;
     /// 查询某 key 的剩余额度。
@@ -20,7 +20,7 @@ pub(crate) trait QuotaGovernor: Send + Sync {
 
 /// 默认实现: 每 key 固定额度 + 重置窗口的滑动计数。
 #[derive(Default)]
-pub(crate) struct HermesQuotaGovernor {
+pub struct HermesQuotaGovernor {
     quota: u32,
     used: HashMap<String, u32>,
 }
@@ -50,7 +50,7 @@ impl QuotaGovernor for HermesQuotaGovernor {
 
 /// T1 SelfTest: 验证配额治理存在且超额拦截生效。
 #[derive(Default)]
-pub(crate) struct HermesQuotaSelfTest;
+pub struct HermesQuotaSelfTest;
 
 impl SelfTest for HermesQuotaSelfTest {
     fn name(&self) -> &str {

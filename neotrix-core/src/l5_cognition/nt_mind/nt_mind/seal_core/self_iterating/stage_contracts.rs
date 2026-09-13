@@ -4,7 +4,7 @@ use super::SelfIteratingBrain;
 
 /// Severity of a contract violation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _ContractSeverity {
+pub enum _ContractSeverity {
     /// Informational — logged but ignored
     Suggestion,
     /// Warning — logged, potentially blocks in strict mode
@@ -15,7 +15,7 @@ pub(crate) enum _ContractSeverity {
 
 /// A typed contract violation with diagnostic context.
 #[derive(Debug, Clone)]
-pub(crate) struct _ContractViolation {
+pub struct _ContractViolation {
     pub stage_name: String,
     pub severity: _ContractSeverity,
     pub message: String,
@@ -23,7 +23,7 @@ pub(crate) struct _ContractViolation {
 
 /// How the enforcer handles violations at each severity level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct _EnforcementPolicy {
+pub struct _EnforcementPolicy {
     pub suggestion: _ActionOnViolation,
     pub warning: _ActionOnViolation,
     pub error: _ActionOnViolation,
@@ -66,7 +66,7 @@ impl _EnforcementPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _ActionOnViolation {
+pub enum _ActionOnViolation {
     Ignore,
     Log,
     Block,
@@ -77,7 +77,7 @@ pub(crate) enum _ActionOnViolation {
 /// Contracts are checked before stage execution (pre), after (post),
 /// and continuously (invariant). A stage can implement one or more
 /// contracts to make its behavior predictable and verifiable.
-pub(crate) trait _StageContract: Send + Sync {
+pub trait _StageContract: Send + Sync {
     fn name(&self) -> &str;
     fn pre_check(&self, brain: &SelfIteratingBrain) -> Vec<_ContractViolation>;
     fn post_check(&self, brain: &SelfIteratingBrain, before: &StageCheckpoint) -> Vec<_ContractViolation>;
@@ -113,7 +113,7 @@ impl StageCheckpoint {
 // ============================================================
 
 /// Ensures the stage does not modify iteration or reward (read-only check).
-pub(crate) struct _ReadOnlyContract;
+pub struct _ReadOnlyContract;
 
 impl _StageContract for _ReadOnlyContract {
     fn name(&self) -> &str { "read_only" }
@@ -140,7 +140,7 @@ impl _StageContract for _ReadOnlyContract {
 }
 
 /// Ensures capability does not degrade significantly.
-pub(crate) struct _CapabilityStableContract {
+pub struct _CapabilityStableContract {
     pub max_degradation: f64,
 }
 
@@ -171,7 +171,7 @@ impl _StageContract for _CapabilityStableContract {
 }
 
 /// Ensures a stage stays within a resource budget.
-pub(crate) struct _ResourceBudgetContract {
+pub struct _ResourceBudgetContract {
     pub max_tool_calls_per_run: usize,
 }
 
@@ -198,7 +198,7 @@ impl _StageContract for _ResourceBudgetContract {
 }
 
 /// Ensures iteration number progresses monotonically (no rewinding).
-pub(crate) struct _MonotonicIterationContract;
+pub struct _MonotonicIterationContract;
 
 impl _StageContract for _MonotonicIterationContract {
     fn name(&self) -> &str { "monotonic_iteration" }
@@ -243,7 +243,7 @@ impl _StageContract for _MonotonicIterationContract {
 }
 
 /// A stage that must not add micro-edits (no-self-modification).
-pub(crate) struct _NoSelfEditContract;
+pub struct _NoSelfEditContract;
 
 impl _StageContract for _NoSelfEditContract {
     fn name(&self) -> &str { "no_self_edit" }
@@ -271,7 +271,7 @@ impl _StageContract for _NoSelfEditContract {
 /// 交付承诺类型 — 对应 OpenMontage `_PromiseType`。
 /// 阶段执行前声明"承诺交付什么"，执行后验证是否兑现，禁止静默降级。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum _PromiseType {
+pub enum _PromiseType {
     /// 承诺真实能力提升：champion_score 必须提升（对应 OpenMontage MOTION_LED：
     /// 只有真实运动算数，动画幻灯片不算）。reward 提升但 champion 未动 = 表面提升。
     CapabilityLed,
@@ -575,7 +575,7 @@ pub mod presets {
 }
 
 /// Convenience method to wrap a stage with a preset contract bundle.
-pub(crate) fn _with_contract_preset(stage: Box<dyn BrainStage>, preset: Vec<Box<dyn _StageContract>>) -> ContractAwareStage {
+pub fn _with_contract_preset(stage: Box<dyn BrainStage>, preset: Vec<Box<dyn _StageContract>>) -> ContractAwareStage {
     let mut wrapped = ContractAwareStage::new(stage);
     for c in preset {
         wrapped = wrapped.with_contract(c);

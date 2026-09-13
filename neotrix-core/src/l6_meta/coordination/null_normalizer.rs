@@ -5,7 +5,7 @@
 
 /// 空值模式
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum _NullPattern {
+pub enum _NullPattern {
     /// JSON null
     JsonNull,
     /// 空字符串
@@ -24,7 +24,7 @@ pub(crate) enum _NullPattern {
 
 /// 标准化策略
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum _NormalizeStrategy {
+pub enum _NormalizeStrategy {
     /// 替换为默认值
     ReplaceDefault,
     /// 移除该字段
@@ -37,7 +37,7 @@ pub(crate) enum _NormalizeStrategy {
 
 /// 标准化规则
 #[derive(Debug, Clone)]
-pub(crate) struct _NormalizeRule {
+pub struct _NormalizeRule {
     pub pattern: _NullPattern,
     pub strategy: _NormalizeStrategy,
     pub default_value: Option<String>,
@@ -45,7 +45,7 @@ pub(crate) struct _NormalizeRule {
 }
 
 /// 空值标准化器
-pub(crate) struct _NullNormalizer {
+pub struct _NullNormalizer {
     /// 规则集
     rules: Vec<_NormalizeRule>,
     /// 统计信息
@@ -155,7 +155,7 @@ impl Default for _NullNormalizer {
 
 /// 标准化统计
 #[derive(Debug, Clone, Default)]
-pub(crate) struct _NormalizeStats {
+pub struct _NormalizeStats {
     pub total_checks: u32,
     pub nulls_found: u32,
 }

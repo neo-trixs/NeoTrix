@@ -15,7 +15,7 @@ use crate::neotrix::nt_core_error::NeoTrixError;
 /// 从上次锚点恢复 iteration/reward/brain capability, 而非零冷启动。
 /// `BrainCheckpoint` 含 `Instant` 不可序列化, 故用此轻量 DTO 落盘。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _PersistedCheckpoint {
+pub struct _PersistedCheckpoint {
     pub iteration: u64,
     pub reward: f64,
     pub learning_rate: f64,

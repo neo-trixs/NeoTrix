@@ -11,7 +11,7 @@ use crate::core::nt_core_self_test::SelfTest;
 
 /// 一段 CAD 命令序列 (如 OpenCASCADE / BRep 操作历史) 的轻量表示。
 #[derive(Debug, Clone, PartialEq, Default)]
-pub(crate) struct _CadGeometry {
+pub struct _CadGeometry {
     /// 命令 token 流 (stub: 文本 token, 真实为数值化 command embedding)。
     pub commands: Vec<String>,
     /// 几何维度 (2D 草图 / 3D 实体)。
@@ -37,7 +37,7 @@ impl _CadGeometry {
 
 /// 渲染图像 (stub: 仅保留像素尺寸与通道, 真实为张量)。
 #[derive(Debug, Clone, PartialEq, Default)]
-pub(crate) struct _RenderedImage {
+pub struct _RenderedImage {
     pub width: u32,
     pub height: u32,
     pub channels: u8,
@@ -45,7 +45,7 @@ pub(crate) struct _RenderedImage {
 
 /// 对比检索索引中的一条记录 (几何向量 + 图像向量 对齐)。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _ContrastivePair {
+pub struct _ContrastivePair {
     pub geometry_id: String,
     pub geometry_vec: Vec<f32>,
     pub image_vec: Vec<f32>,
@@ -59,7 +59,7 @@ impl _ContrastivePair {
 }
 
 /// GenCAD 核心接口: CAD 几何 → 图像渲染 → 对比检索 KB。
-pub(crate) trait _GenCadRetrieval {
+pub trait _GenCadRetrieval {
     /// 将 CAD 几何渲染为图像 (C0: 仅生成占位尺寸, 真实走 rasterizer)。
     fn render(&self, geo: &_CadGeometry) -> _RenderedImage;
 
@@ -78,7 +78,7 @@ pub(crate) trait _GenCadRetrieval {
 
 /// C0 基础实现 — 全部逻辑本地可运行, 不依赖外部模型。
 #[derive(Default)]
-pub(crate) struct _GenCadCore {
+pub struct _GenCadCore {
     store: std::collections::VecDeque<_ContrastivePair>,
 }
 
@@ -177,7 +177,7 @@ fn cosine(a: &[f32], b: &[f32]) -> f32 {
 
 /// T1 SelfTest: 接口基础不变量在 C0 可用 (无外部模型依赖)。
 #[derive(Default)]
-pub(crate) struct _GenCadSelfTest;
+pub struct _GenCadSelfTest;
 
 impl SelfTest for _GenCadSelfTest {
     fn name(&self) -> &str {

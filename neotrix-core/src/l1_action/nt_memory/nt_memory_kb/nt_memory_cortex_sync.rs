@@ -97,7 +97,7 @@ pub fn enrich_cortex_metadata(
 
 /// `/cortex lineage` 报告: 每个 cortex_brain 节点的血缘快照 (G3 可观测性, Phase 1)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct LineageReport {
+pub struct LineageReport {
     pub url: String,
     pub kind: String,
     pub external_sha256: Option<String>,
@@ -140,7 +140,7 @@ pub fn report_lineage(conn: &Connection) -> Result<Vec<LineageReport>, String> {
 
 /// `export_delta` 结果 (G1 出向 + G2 版本门禁结果)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DeltaReport {
+pub struct DeltaReport {
     pub entries: usize,
     pub bytes: u64,
     pub since: i64,
@@ -325,7 +325,7 @@ fn latest_cycle_from_experience(conn: &Connection) -> Result<Option<String>, Str
 
 /// Phase 1 有界采样摄取报告: 从外置大脑 corpus (SQLite 超集快照) 取样的结果。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DigestReport {
+pub struct DigestReport {
     pub sampled: usize,
     pub activated: usize,
     pub already_live: usize,

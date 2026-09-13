@@ -46,7 +46,7 @@ struct Pattern {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SoftSignal {
+pub struct SoftSignal {
     _name: String,
     _weight: f64,
     _detect: fn(&str) -> bool,

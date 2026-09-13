@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 /// Temporal scope of an evidence claim
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) enum TemporalScope {
+pub enum TemporalScope {
     /// Specific point in time
     Point(i64),
     /// Time range (start, end)
@@ -275,7 +275,7 @@ pub struct TimelineReconstructor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TimelineEvent {
+pub struct TimelineEvent {
     pub id: String,
     pub description: String,
     pub timestamp: i64,

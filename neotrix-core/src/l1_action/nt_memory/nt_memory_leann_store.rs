@@ -25,7 +25,7 @@ pub struct GraphEdge {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum RecomputeStrategy {
+pub enum RecomputeStrategy {
     OnAccess,
     OnThreshold,
     Cached,
@@ -56,7 +56,7 @@ impl Default for LeannConfig {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct StorageComparison {
+pub struct StorageComparison {
     pub dense_embeddings_bytes: u64,
     pub graph_index_bytes: u64,
     pub leann_storage_bytes: u64,

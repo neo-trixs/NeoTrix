@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 黄金比例频率架构
-pub(crate) struct _GoldenRatioFrequencyArchitecture {
+pub struct _GoldenRatioFrequencyArchitecture {
     fundamental_frequency: f64,
     phi: f64,
     _frequency_bands: Vec<_GoldenBand>,
@@ -21,7 +21,7 @@ pub(crate) struct _GoldenRatioFrequencyArchitecture {
 
 /// 黄金比例配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GoldenRatioConfig {
+pub struct _GoldenRatioConfig {
     pub base_frequency_hz: f64,
     pub phi: f64,
     pub max_harmonics: usize,
@@ -43,7 +43,7 @@ impl Default for _GoldenRatioConfig {
 
 /// 黄金比例频带
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GoldenBand {
+pub struct _GoldenBand {
     pub band_id: String,
     pub n: i32,
     pub frequency_hz: f64,
@@ -56,7 +56,7 @@ pub(crate) struct _GoldenBand {
 /// 频带类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum _BandType {
+pub enum _BandType {
     UltraSlow,
     Delta,
     Theta,
@@ -68,7 +68,7 @@ pub(crate) enum _BandType {
 
 /// Fibonacci 耦合
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _FibonacciCoupling {
+pub struct _FibonacciCoupling {
     pub coupling_id: String,
     pub source_band: String,
     pub target_band: String,
@@ -79,7 +79,7 @@ pub(crate) struct _FibonacciCoupling {
 
 /// 黄金比例统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GoldenRatioStats {
+pub struct _GoldenRatioStats {
     pub total_bands: u64,
     pub noble_positions: u64,
     pub _fibonacci_couplings: u64,
@@ -90,7 +90,7 @@ pub(crate) struct _GoldenRatioStats {
 
 /// 共振对齐结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _ResonanceAlignment {
+pub struct _ResonanceAlignment {
     pub aligned: bool,
     pub alignment_score: f64,
     pub active_bands: Vec<String>,

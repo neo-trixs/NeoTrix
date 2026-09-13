@@ -14,7 +14,7 @@ pub struct Principle {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum PrincipleCategory {
+pub enum PrincipleCategory {
     Pattern,
     AntiPattern,
     Optimization,

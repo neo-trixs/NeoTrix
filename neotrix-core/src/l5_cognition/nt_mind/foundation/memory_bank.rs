@@ -67,7 +67,7 @@ pub struct DualTrackEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SymbolicTrack {
+pub struct _SymbolicTrack {
     pub ast_hash: String,
     pub file_hash: Option<String>,
     pub signatures: Vec<String>,
@@ -77,7 +77,7 @@ pub(crate) struct _SymbolicTrack {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _SemanticTrack {
+pub struct _SemanticTrack {
     pub intent: String,
     pub constraints: Vec<String>,
     pub preferences: Vec<String>,
@@ -106,7 +106,7 @@ pub trait MemoryStore: Send + Sync {
 /// | link | MemoryOrchestrator::promote | Connect / tier-promote memories |
 /// | observe | MemoryOrchestrator::drain_expired | Scan for stale / decayed entries |
 /// | validate | _OMPReconciler::reconcile | Verify consistency across dual tracks |
-pub(crate) struct _OMPReconciler;
+pub struct _OMPReconciler;
 
 impl _OMPReconciler {
     /// OMP `reconcile` — merge symbolic + semantic tracks into a unified entry.
@@ -607,7 +607,7 @@ mod tests {
 
 /// Admission score for a memory candidate before writing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _AdmissionScore {
+pub struct _AdmissionScore {
     pub utility: f64,
     pub confidence: f64,
     pub novelty: f64,

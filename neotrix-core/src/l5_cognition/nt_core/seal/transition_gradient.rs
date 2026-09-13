@@ -32,7 +32,7 @@ pub enum TransitionType {
 
 /// 转场适用场景
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _TransitionUseCase {
+pub struct _TransitionUseCase {
     /// 转场类型
     pub transition_type: TransitionType,
     /// 适用节奏
@@ -47,7 +47,7 @@ pub(crate) struct _TransitionUseCase {
 
 /// 节奏类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub(crate) enum _RhythmType {
+pub enum _RhythmType {
     /// 慢节奏 (铺垫/抒情)
     Slow,
     /// 中节奏 (过渡)
@@ -61,7 +61,7 @@ pub(crate) enum _RhythmType {
 // ============================================================================
 
 /// 转场梯度建议器
-pub(crate) struct _TransitionGradientAdvisor;
+pub struct _TransitionGradientAdvisor;
 
 impl _TransitionGradientAdvisor {
     /// 根据节奏类型推荐转场类型

@@ -24,7 +24,7 @@ use crate::core::nt_core_self_test::SelfTest;
 /// 智能体身份 — 映射 `nt_core_self::Self` / `SystemIdentity` (E8引导者身份锚)。
 /// GASP: clone 即唤醒的身份指纹, 决定智能体"是谁"。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _AgentIdentity {
+pub struct _AgentIdentity {
     pub id: String,
     pub awakened: bool,
     pub species: String,
@@ -62,7 +62,7 @@ pub struct AgentMemory {
 /// 演化日志 — 映射 `ConsciousnessTree` 6-stage loop / experience-tree 吸收日志。
 /// 可读审计轨迹, 每次 patch→eval→decision→promote 写入一条 journal entry。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _AgentJournal {
+pub struct _AgentJournal {
     pub entries: Vec<String>,
 }
 
@@ -78,7 +78,7 @@ impl _AgentJournal {
 /// 演化谱系 — 映射 `SEALPipelineImpl` 经 `make_stage!` 宏生成的阶段血缘链。
 /// 父子代际传承: parent_id → child_id, 记录 Promoted 代际。
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct _AgentLineage {
+pub struct _AgentLineage {
     pub parent_id: Option<String>,
     pub generation: u64,
 }
@@ -88,7 +88,7 @@ pub(crate) struct _AgentLineage {
 /// GASP→SEAL 映射语义内置: `awaken`=SEAL anchor, `crystallize_skill`=SEAL crystallize,
 /// `persist_memory`=SEAL distill, `log_stage`=SEAL self-test journal,
 /// `inherit`=SEAL lineage promote。
-pub(crate) trait _SelfEvolvingCodingAgent {
+pub trait _SelfEvolvingCodingAgent {
     fn identity(&self) -> &_AgentIdentity;
     fn awaken(&mut self);
     fn crystallize_skill(&mut self, name: &str) -> AgentSkill;
@@ -96,7 +96,7 @@ pub(crate) trait _SelfEvolvingCodingAgent {
 }
 
 /// yoyo-gasp 自进化编码智能体实现 (五要素全部入仓)。
-pub(crate) struct _YoyoGaspAgent {
+pub struct _YoyoGaspAgent {
     pub identity: _AgentIdentity,
     pub skills: Vec<AgentSkill>,
     pub memory: AgentMemory,
