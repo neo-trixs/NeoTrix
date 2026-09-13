@@ -233,7 +233,7 @@ export function discoverModels(force?: boolean): Promise<DiscoveryResult> {
 
 /** 批量探测所有已注册 provider 的网络可达性 */
 export function probeAllProviders(): Promise<ProbeResult[]> {
-  return invoke('probe_all_providers', {})
+  return domain.call<ProbeResult[]>('llamacpp', 'probe_all_providers')
 }
 
 /**
