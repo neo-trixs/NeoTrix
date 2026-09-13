@@ -63,13 +63,13 @@ pub fn publish_download_event(progress: &PipelineProgress) {
     };
     let status_str = match &progress.status {
         PipelineStatus::Resolving => "resolving".into(),
-        PipelineStatus::Downloading { downloaded, total, speed_bps } => {
+        PipelineStatus::Downloading { downloaded, total, speed_bps: _ } => {
             format!("downloading:{}:{:?}", downloaded, total)
         }
-        PipelineStatus::Playing { downloaded, total, speed_bps } => {
+        PipelineStatus::Playing { downloaded, total, speed_bps: _ } => {
             format!("playing:{}:{:?}", downloaded, total)
         }
-        PipelineStatus::Complete { total_bytes, elapsed } => {
+        PipelineStatus::Complete { total_bytes, elapsed: _ } => {
             format!("complete:{}", total_bytes)
         }
         PipelineStatus::Failed(e) => format!("failed:{}", e),
@@ -83,7 +83,7 @@ pub fn publish_download_event(progress: &PipelineProgress) {
         PipelineStatus::Complete { total_bytes, .. } => (*total_bytes, Some(*total_bytes), 0.0),
         _ => (0, None, 0.0),
     };
-    bus.emit(crate::core::nt_core_event::CoreEvent::DownloadProgress {
+    (**bus).emit(crate::core::nt_core_event::CoreEvent::DownloadProgress {
         url: progress.url.clone(),
         status: status_str,
         downloaded,
@@ -512,7 +512,7 @@ impl StreamingPipeline {
                         media_kind,
                         auth.as_ref(),
                         config.persistence.clone(),
-                        config.concurrency, media_kind,
+                        config.concurrency,
                         config.verify_sha256.as_deref(),
                         config.stall_timeout,
                         config.max_retries,
@@ -551,7 +551,8 @@ impl StreamingPipeline {
                         progress_tx.clone(),
                         auth_hls.as_ref(),
                         config.persistence.clone(),
-                        config.concurrency, media_kind,
+                        config.concurrency,
+                        media_kind,
                     )
                     .await
                 });
@@ -1864,7 +1865,7 @@ async fn stream_hls_download(
     progress_tx: mpsc::Sender<PipelineProgress>,
     auth: Option<&AuthConfig>,
     persistence: Option<Arc<super::persistence::DownloadStore>>,
-    concurrency: usize,
+    _concurrency: usize,
     media_kind: MediaKind,
 ) -> Result<(), PipelineError> {
     use super::hls;
@@ -1934,7 +1935,7 @@ async fn stream_hls_download(
                 hls::parse_m3u8(&variant_text).map_err(|e| PipelineError::Network(e.to_string()))?;
             hls::to_download_urls(&variant_manifest, &variant_url)
         }
-        hls::M3u8Manifest::Media(media) => hls::to_download_urls(&manifest, url),
+        hls::M3u8Manifest::Media(_media) => hls::to_download_urls(&manifest, url),
     };
 
     let total_segments = segment_urls.len() as u64;

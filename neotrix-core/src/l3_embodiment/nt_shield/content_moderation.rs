@@ -226,7 +226,7 @@ impl _ContentModeration {
     /// - All categories: multi-language + semantic equivalence detection
     fn evaluate_prompt_risk(&self, prompt: &str, _category: &RiskCategory) -> f64 {
         let prompt_lower = prompt.to_lowercase();
-        match category {
+        match _category {
             RiskCategory::Nsfw => {
                 // STUB: 仅检测最明显的关键词，真实实现需语义分析
                 if prompt_lower.contains("nude") || prompt_lower.contains("explicit") {

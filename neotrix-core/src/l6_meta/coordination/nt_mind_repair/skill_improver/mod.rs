@@ -405,7 +405,7 @@ rm -rf /dangerous
         
         // Should have detected safety issue and attempted fix
         assert!(result.unwrap().iterations > 0);
-        assert!(result.as_ref().unwrap().unwrap().scores.safety >= 0.0); // After fix
+        assert!(result.as_ref().unwrap().scores.safety >= 0.0); // After fix
         
         Ok(())
     }
