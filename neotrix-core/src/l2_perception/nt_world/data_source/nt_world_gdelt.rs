@@ -134,7 +134,7 @@ impl GdeltFetcher {
     /// 从给定 JSON 字符串解析并入库 (无网络，用于 fixture E2E)。
     pub fn ingest_from_json(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         json: &str,
         query: &str,
     ) -> Result<_GdeltIngestReport, String> {
@@ -145,7 +145,7 @@ impl GdeltFetcher {
     /// E2E 入库：fetch → 解析 → KB `insert_or_get_node` (Article, domain=gdelt)。
     pub fn ingest(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         query: &str,
         max_records: usize,
     ) -> Result<_GdeltIngestReport, String> {
@@ -155,7 +155,7 @@ impl GdeltFetcher {
 
     /// 将已解析的 articles 入库 — 可复用 (fetch/parse 解耦)。
     pub fn _ingest_articles(
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         articles: &[_GdeltArticle],
         query: &str,
     ) -> Result<_GdeltIngestReport, String> {

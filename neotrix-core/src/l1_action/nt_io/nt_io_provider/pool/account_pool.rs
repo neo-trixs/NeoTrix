@@ -425,31 +425,28 @@ impl ByokPool {
     }
 
     /// 注册一条订阅 (覆盖同名)。
-    pub fn register(&self, sub: ByokSubscription) {
+    pub fn register(&self, sub: ByokSubscription) -> Result<(), String> {
         match self.subs.write() {
-            Ok(mut m) => { m.insert(sub.name.clone(), sub); }
-            Err(e) => log::warn!("[byok_pool] subs lock poisoned, register '{}' failed: {}", sub.name, e),
+            Ok(mut m) => {
+                m.insert(sub.name.clone(), sub);
+                Ok(())
+            }
+            Err(e) => Err(format!("[byok_pool] subs lock poisoned, register '{}' failed: {}", sub.name, e)),
         }
     }
 
     /// 移除订阅。
-    pub fn unregister(&self, name: &str) -> bool {
+    pub fn unregister(&self, name: &str) -> Result<bool, String> {
         match self.subs.write() {
-            Ok(mut m) => m.remove(name).is_some(),
-            Err(e) => {
-                log::warn!("[byok_pool] subs lock poisoned, unregister '{}' failed: {}", name, e);
-                false
-            }
+            Ok(mut m) => Ok(m.remove(name).is_some()),
+            Err(e) => Err(format!("[byok_pool] subs lock poisoned, unregister '{}' failed: {}", name, e)),
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<ByokSubscription> {
+    pub fn get(&self, name: &str) -> Result<Option<ByokSubscription>, String> {
         match self.subs.read() {
-            Ok(m) => m.get(name).cloned(),
-            Err(e) => {
-                log::warn!("[byok_pool] subs read lock poisoned, get '{}' failed: {}", name, e);
-                None
-            }
+            Ok(m) => Ok(m.get(name).cloned()),
+            Err(e) => Err(format!("[byok_pool] subs read lock poisoned, get '{}' failed: {}", name, e)),
         }
     }
 
@@ -722,13 +719,13 @@ mod tests {
             provider: "openai".to_string(),
             kind: ByokKind::HarnessSubscription,
             max_concurrent: 2,
-        });
+        }).expect("register codex");
         byok.register(ByokSubscription {
             name: "grok-premium".to_string(),
             provider: "xai".to_string(),
             kind: ByokKind::KeyOnSubscriptionPlan,
             max_concurrent: 3,
-        });
+        }).expect("register grok-premium");
 
         assert_eq!(byok.len(), 2);
         assert_eq!(byok.for_provider("xai").len(), 1);
@@ -750,10 +747,10 @@ mod tests {
             provider: "anthropic".to_string(),
             kind: ByokKind::HarnessSubscription,
             max_concurrent: 1,
-        });
-        assert!(byok.get("claude-pro").is_some());
-        assert!(byok.unregister("claude-pro"));
-        assert!(byok.get("claude-pro").is_none());
+        }).expect("register claude-pro");
+        assert!(byok.get("claude-pro").expect("get claude-pro").is_some());
+        assert!(byok.unregister("claude-pro").expect("unregister claude-pro"));
+        assert!(byok.get("claude-pro").expect("get claude-pro after unregister").is_none());
         assert!(byok.is_empty());
     }
 }

@@ -148,16 +148,24 @@ impl QualityGate {
     
     /// AI initial review — aggregates caller-provided scores (no real AI analysis).
     ///
-    /// STUB: Scores are externally provided, not from VLM analysis.
-    /// Real implementation needs:
+    /// # Incomplete Implementation
+    /// Scores are externally provided, not from VLM analysis. The method aggregates
+    /// scores and applies threshold logic, but the scoring itself is not performed
+    /// by this method. This is honest — it does not fabricate AI analysis.
+    ///
+    /// # Required Wiring
     /// - Auto-call VLM (GPT-4V / Gemini Pro Vision) for multi-dimensional visual analysis
     /// - Image/video frame sampling for quality assessment
     /// - Confidence scoring with uncertainty estimation
     /// - Caching analysis results for repeated content
+    ///
+    /// # Impact
+    /// Without VLM integration, quality decisions are based on caller-provided scores
+    /// which may not reflect actual content quality. The `reviewer` field correctly
+    /// identifies this as "External (not AI-analyzed)".
     pub(crate) fn _ai_initial_review(&mut self, content_id: &str, scores: Vec<_DimensionScore>) -> ReviewResult {
         tracing::warn!(
-            "STUB _ai_initial_review called for content_id={}: \
-             scores are externally provided, no real AI analysis performed. \
+            "_ai_initial_review called for content_id={}: scores externally provided, no real AI analysis. \
              Wire VLM for multi-dimensional visual analysis.",
             content_id
         );
@@ -371,8 +379,12 @@ mod tests {
     fn test_quality_gate_passes_when_all_dimensions_pass() {
         // HONEST TEST: Verifies that _ai_initial_review aggregates caller-provided
         // scores correctly. This tests arithmetic plumbing (weighted average, pass
-        // threshold), NOT real content quality judgment. To test real judgment,
-        // wire a VLM and assert on actual analysis output.
+        // threshold), NOT real content quality judgment.
+        // FABRICATED INPUT: scores (0.9, 0.85, 0.8, 0.75) are synthetic, not from
+        // real VLM analysis. The test proves aggregation works, not that content is good.
+        // TODO(R-P79): To test real quality judgment, wire a VLM (GPT-4V / Gemini
+        // Pro Vision) to _ai_initial_review and assert that actual content analysis
+        // produces scores that reflect real quality differences.
         let mut gate = QualityGate::new();
 
         let scores = vec![
@@ -388,11 +400,8 @@ mod tests {
         // All dimensions passed → gate should pass (arithmetic check, not quality check)
         assert!(result.passed, "aggregation of all-passing scores should pass");
         assert!(result.total_score > 0.0,
-            "weighted average of high scores should be positive, got {}",
+            "weighted average of positive scores should be positive, got {}",
             result.total_score);
-        // TODO(R-P79): To test real quality judgment, wire a VLM (GPT-4V / Gemini
-        // Pro Vision) to _ai_initial_review and assert that actual content analysis
-        // produces scores that reflect real quality differences.
     }
     
     #[test]

@@ -172,6 +172,10 @@ impl _LayeredQA {
     /// Note: Real implementation needs — check items are hardcoded for video content.
     /// Consider: supporting configurable check sets per content type, loading check
     /// items from KB, and allowing runtime check addition/removal.
+    ///
+    /// Note: Real implementation needs — check items are hardcoded for video content.
+    /// Consider: supporting configurable check sets per content type, loading check
+    /// items from KB, and allowing runtime check addition/removal.
     pub fn new() -> Self {
         let mut stage_must_pass = HashMap::new();
         stage_must_pass.insert(_QAStage::Structural, true);
@@ -232,6 +236,10 @@ impl _LayeredQA {
     /// Note: Real implementation needs — configuration is stored but not validated.
     /// Consider: validating check item weights sum to 1.0, ensuring stage_must_pass
     /// covers all stages, and checking threshold ranges (0.0-1.0).
+    ///
+    /// Note: Real implementation needs — configuration is stored but not validated.
+    /// Consider: validating check item weights sum to 1.0, ensuring stage_must_pass
+    /// covers all stages, and checking threshold ranges (0.0-1.0).
     pub fn with_config(config: _LayeredQAConfig) -> Self {
         Self {
             config,
@@ -240,6 +248,10 @@ impl _LayeredQA {
     }
     
     /// Execute full QA pipeline: Structural → Deterministic → Semantic → PublishGate.
+    ///
+    /// Note: Real implementation needs — currently uses fail-fast on blocking failures.
+    /// Consider: configurable stage ordering, parallel stage execution for independent
+    /// checks, and caching of intermediate results for re-runs.
     ///
     /// Note: Real implementation needs — currently uses fail-fast on blocking failures.
     /// Consider: configurable stage ordering, parallel stage execution for independent
@@ -285,6 +297,10 @@ impl _LayeredQA {
     /// Note: Real implementation needs — checks are executed sequentially.
     /// Consider: parallel check execution, check dependency ordering, and
     /// early termination when blocking issues are found.
+    ///
+    /// Note: Real implementation needs — checks are executed sequentially.
+    /// Consider: parallel check execution, check dependency ordering, and
+    /// early termination when blocking issues are found.
     fn execute_stage(&self, stage: _QAStage, spec: &serde_json::Value, output: &serde_json::Value) -> _QAStageResult {
         let start = std::time::Instant::now();
         let mut check_results = vec![];
@@ -313,6 +329,10 @@ impl _LayeredQA {
     }
     
     /// 执行单个检查 — 基于检查类型和规范进行验证
+    ///
+    /// Note: Real implementation needs — currently only handles name-based matching.
+    /// Consider: implementing all check types (RequiredField, DurationMatch, etc.),
+    /// adding custom check functions, and parallel check execution.
     fn execute_check(&self, item: &_QACheckItem, spec: &serde_json::Value, output: &serde_json::Value) -> _QACheckResult {
         let start = std::time::Instant::now();
 
@@ -356,6 +376,11 @@ impl _LayeredQA {
     }
     
     /// Calculate overall QA score as average of stage pass rates.
+    ///
+    /// Note: Real implementation needs — stages are equally weighted.
+    /// Consider: weighted scoring (Semantic stage more critical than Structural),
+    /// severity-aware scoring (Blocking failures deduct more), and stage-specific
+    /// thresholds for pass/fail determination.
     ///
     /// Note: Real implementation needs — stages are equally weighted.
     /// Consider: weighted scoring (Semantic stage more critical than Structural),

@@ -154,7 +154,7 @@ impl UrlhausFetcher {
 
     pub fn ingest_from_json(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         json: &str,
     ) -> Result<_UrlhausIngestReport, String> {
         let events = Self::parse_json(json)?;
@@ -162,7 +162,7 @@ impl UrlhausFetcher {
     }
 
     pub fn ingest_events(
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         events: &[_UrlhausEvent],
     ) -> Result<_UrlhausIngestReport, String> {
         let mut report = _UrlhausIngestReport { events_fetched: events.len(), ..Default::default() };
@@ -233,7 +233,7 @@ impl CisaKevFetcher {
     }
 
     pub fn ingest_events(
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         events: &[_CisaKevEvent],
     ) -> Result<_CisaKevIngestReport, String> {
         let mut report = _CisaKevIngestReport { events_fetched: events.len(), ..Default::default() };

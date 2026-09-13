@@ -285,7 +285,7 @@ impl UnifiedCrawler {
                 });
                 let _ = kb.write_memory_entry(
                     &mapped.title,
-                    crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Source,
+                    super::super::l1_facade::NodeType::Source,
                     if content.is_empty() { None } else { Some(&content) },
                     Some(&mapped.url),
                     Some(&extract_domain(&mapped.url)),

@@ -209,19 +209,22 @@ impl _QualityControlPipeline {
     
     /// 执行 AI 自动审核 — 当前无真实 AI 内容分析能力, 始终返回 Rejected。
     ///
-    /// 返回 Rejected 而非伪造 Approved, 确保未审核内容不会被误判为通过。
-    /// `evaluate_check_item` 返回 0.0 (无真实分析), 加权汇总后总分必然为 0.0,
-    /// 触发 Rejected 状态。
+    /// # Honest Behavior
+    /// Returns Rejected (not fabricated Approved). `evaluate_check_item` returns 0.0
+    /// (no real analysis), so weighted sum is always 0.0, triggering Rejected status.
+    /// This prevents unreviewed content from being silently approved.
     ///
-    /// 真实实现需要: 调用多模态模型对 content_id 对应的媒体文件进行
-    /// 各维度评估, 返回基于实际内容的客观分数。
+    /// # Required Wiring
+    /// - VLM/LLM integration for multi-dimensional visual analysis of content_id's media
+    /// - Real scoring based on actual content (not hardcoded 0.0)
+    /// - Confidence scoring with uncertainty estimation
     ///
-    /// 注意: 此方法从 production 代码路径调用 (ReviewLevel::AI 分支),
-    /// 修改时需保持签名兼容。
+    /// # Note
+    /// Called from production code path (ReviewLevel::AI branch).
+    /// Maintain signature compatibility when modifying.
     pub(crate) fn _review_by_ai(&self, content_id: &str) -> ReviewResult {
         tracing::warn!(
-            "STUB _review_by_ai called for content_id={}: \
-             no real AI analysis available, returning Rejected. \
+            "_review_by_ai called for content_id={}: no real AI analysis, returning Rejected. \
              Wire VLM/LLM for actual content review.",
             content_id
         );

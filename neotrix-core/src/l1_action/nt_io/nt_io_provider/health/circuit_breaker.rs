@@ -133,16 +133,33 @@ impl ProviderBreaker {
 
     /// Check if cooldown has elapsed and transition Open → HalfOpen.
     ///
-    /// STUB: This method is the primary entry point for breaker state progression.
-    /// Real implementation needs — should be called periodically (e.g., by a background
-    /// health check loop) rather than on each request. Currently only transitions
-    /// Open → HalfOpen; does not handle HalfOpen → Closed (success) or
-    /// HalfOpen → Open (probe failure).
+    /// This method is the primary entry point for breaker state progression.
+    /// Should be called periodically (e.g., by a background health check loop)
+    /// rather than on each request.
+    ///
+    /// # State Transitions
+    /// - **Open → HalfOpen**: When cooldown period has elapsed since last state change
+    /// - **HalfOpen → Closed**: When probe succeeds (call `record_success()` after probe)
+    /// - **HalfOpen → Open**: When probe fails (call `record_failure()` after probe)
+    ///
+    /// # Incomplete Implementation
+    /// Currently only handles Open → HalfOpen transition. HalfOpen → Closed and
+    /// HalfOpen → Open transitions are handled by `record_success()` and `record_failure()`.
+    /// However, the probe mechanism (automatic probe after cooldown) is not implemented.
+    ///
+    /// # Required Wiring
+    /// - Background health check loop calling this method periodically
+    /// - Probe mechanism: after entering HalfOpen, allow one request through as probe
+    /// - Automatic transition on probe result (success → Closed, failure → Open)
     pub fn cooldown_reset(&mut self) {
         if self.inner.state == BreakerState::Open {
             if let Some(t) = self.inner.last_state_change {
                 let elapsed = t.elapsed();
                 if elapsed >= self.inner.cooldown {
+                    tracing::info!(
+                        "Circuit breaker Open → HalfOpen after {:?} cooldown",
+                        self.inner.cooldown
+                    );
                     self.inner.state = BreakerState::HalfOpen;
                     self.inner.last_state_change = Some(Instant::now());
                 }

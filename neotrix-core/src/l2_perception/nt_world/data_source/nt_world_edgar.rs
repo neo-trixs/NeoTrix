@@ -359,7 +359,7 @@ impl EdgarFetcher {
     /// 从给定 submissions JSON 解析并入库 (无网络，用于 fixture E2E)。
     pub fn _ingest_submissions_from_json(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         json: &str,
         cik: &str,
     ) -> Result<_EdgarIngestReport, String> {
@@ -371,7 +371,7 @@ impl EdgarFetcher {
     /// E2E 入库：fetch submissions → 解析 → KB `insert_or_get_node` (Filing, domain=edgar)。
     pub fn _ingest_submissions(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         cik: &str,
     ) -> Result<_EdgarIngestReport, String> {
         let sub = self._fetch_submissions(cik)?;
@@ -381,7 +381,7 @@ impl EdgarFetcher {
 
     /// 将已解析的 filings 入库 — 可复用 (fetch/parse 解耦)。
     pub fn _ingest_filings(
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         filings: &[_EdgarFiling],
         cik: &str,
     ) -> Result<_EdgarIngestReport, String> {

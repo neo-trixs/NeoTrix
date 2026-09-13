@@ -104,12 +104,18 @@ mod tests {
 
     #[test]
     fn test_lesson_statement_nonempty() {
-        // TODO(R-P79): Only checks non-empty strings — trivial assertion.
-        // Replace with test that validates extraction correctness against known inputs.
+        // TRIVIAL ASSERTION: Only checks that enum variants have non-empty strings.
+        // This proves the enum is well-formed, NOT that lesson statements are meaningful
+        // or correctly extracted from real content.
+        // TODO(R-P79): Replace with test that validates extraction correctness:
+        //   - Known input text → expected lesson statement output
+        //   - Empty/minimal input → appropriate error or fallback
+        //   - Extracted statements match what a human would identify as lessons
         let e = _YoyoBookExtractor;
         assert!(e.self_test().is_ok());
         for lesson in _SelfEvolutionLesson::all() {
-            assert!(!lesson.statement().is_empty());
+            assert!(!lesson.statement().is_empty(),
+                "lesson statement should not be empty");
         }
     }
 

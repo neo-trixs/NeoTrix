@@ -466,12 +466,27 @@ impl MLPRouter {
 
     /// Online fine-tuning — currently a no-op stub.
     ///
-    /// STUB: Requires backpropagation implementation. Real implementation needs:
-    /// - Gradient computation via chain rule
+    /// # Incomplete Implementation
+    /// This method is a no-op. The MLP weights are not updated after routing decisions.
+    /// This means the router does not learn from past performance and will not improve
+    /// over time.
+    ///
+    /// # Required Wiring
+    /// - Gradient computation via chain rule (backpropagation)
     /// - Learning rate scheduling (warmup + decay)
     /// - Experience replay buffer for stable training
+    /// - Weight persistence (save/load to disk)
+    ///
+    /// # Impact
+    /// Without this, the MLP router relies on random-initialized weights and Pareto
+    /// scoring only. Quality may degrade over time as cost/latency profiles change.
     fn update(&mut self, _features: &RouteFeatures, _chosen: &str, _reward: f32) {
-        // 在线微调: 可选, 需要反向传播实现
+        tracing::debug!(
+            "MLPRouter::update called (no-op): model={}, reward={}. \
+             Online fine-tuning not implemented — weights are static.",
+            _chosen,
+            _reward
+        );
     }
 
     fn name(&self) -> &str { "MLPRouter" }

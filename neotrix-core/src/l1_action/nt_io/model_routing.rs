@@ -50,7 +50,7 @@ pub enum ModelType {
 
 /// 模型配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelConfig {
+pub struct RoutingModelConfig {
     /// 模型ID
     pub id: String,
     /// 模型名称

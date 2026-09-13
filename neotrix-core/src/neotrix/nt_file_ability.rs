@@ -237,7 +237,7 @@ mod tests {
 
     fn office_sample() -> PathBuf {
         let dir = std::env::temp_dir().join("nt_file_ability_test");
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         let path = dir.join("sample.docx");
         if !path.exists() {
             create::create_from_markdown(
@@ -245,7 +245,7 @@ mod tests {
                 DocumentFormat::Docx,
                 &path,
             )
-            .unwrap();
+            .expect("create sample docx");
         }
         path
     }
@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn test_open_office_and_plain_text() {
         let path = office_sample();
-        let mut ab = FileAbility::open(&path).unwrap();
+        let mut ab = FileAbility::open(&path).expect("open office file");
         ab.register_consumer();
         assert!(matches!(ab.kind(), FileKind::Office(DocumentFormat::Docx)));
         assert!(ab.has_consumers());
@@ -266,9 +266,9 @@ mod tests {
     fn test_replace_placeholder_docx() {
         let path = office_sample();
         let copy = path.with_extension("replace.docx");
-        std::fs::copy(&path, &copy).unwrap();
-        let ab = FileAbility::open(&copy).unwrap();
-        let n = ab.replace_placeholder("{{name}}", "NeoTrix").unwrap();
+        std::fs::copy(&path, &copy).expect("copy file");
+        let ab = FileAbility::open(&copy).expect("open copy");
+        let n = ab.replace_placeholder("{{name}}", "NeoTrix").expect("replace placeholder");
         assert!(n > 0, "应至少替换一次占位符");
         std::fs::remove_file(&copy).ok();
     }
@@ -278,7 +278,7 @@ mod tests {
     /// 构造多 sheet 测试夹具: sheet1 = "修改版" (表头+数据+公式), sheet2 = "原始"
     fn xlsx_fixture() -> PathBuf {
         let dir = std::env::temp_dir().join("nt_file_ability_test");
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         let path = dir.join("prices.xlsx");
         if !path.exists() {
             use office_oxide::xlsx::write::{CellData, XlsxWriter};
@@ -295,7 +295,7 @@ mod tests {
             xw.sheet_set_cell(s1, 3, 1, CellData::Formula("B2+B3".into()));
             xw.sheet_set_cell(s2, 0, 0, CellData::String("备注".into()));
             xw.sheet_set_cell(s2, 1, 0, CellData::String("原始数据".into()));
-            xw.save(&path).unwrap();
+            xw.save(&path).expect("save xlsx fixture");
         }
         path
     }
@@ -304,13 +304,13 @@ mod tests {
     #[allow(deprecated)]
     fn test_xlsx_structured_read() {
         let path = xlsx_fixture();
-        let ab = FileAbility::open(&path).unwrap();
+        let ab = FileAbility::open(&path).expect("open xlsx");
         // sheet 名 + 数量
-        let names = ab.xlsx_sheet_names().unwrap();
+        let names = ab.xlsx_sheet_names().expect("get sheet names");
         assert_eq!(names, vec!["Sheet1", "Sheet2"]);
-        assert_eq!(ab.xlsx_sheet_count().unwrap(), 2);
+        assert_eq!(ab.xlsx_sheet_count().expect("sheet count"), 2);
         // 按名称读取 "修改版" 等价 sheet (Sheet1)
-        let s1 = ab.xlsx_sheet_by_name("Sheet1").unwrap();
+        let s1 = ab.xlsx_sheet_by_name("Sheet1").expect("get sheet by name");
         assert_eq!(s1.name, "Sheet1");
         assert_eq!(s1.rows.len(), 4);
         // 表头行
@@ -337,7 +337,7 @@ mod tests {
             vec![1, 2, 3, 4]
         );
         // sheet 2
-        let s2 = ab.xlsx_sheet(2).unwrap();
+        let s2 = ab.xlsx_sheet(2).expect("get sheet 2");
         assert_eq!(s2.name, "Sheet2");
         assert_eq!(s2.rows.len(), 2);
         assert_eq!(s2.rows[1].cells[0].text, "原始数据");
@@ -368,7 +368,7 @@ mod tests {
     #[allow(deprecated)]
     fn test_xlsx_structured_read_non_xlsx() {
         let path = office_sample(); // docx
-        let ab = FileAbility::open(&path).unwrap();
+        let ab = FileAbility::open(&path).expect("open docx for xlsx test");
         assert!(matches!(
             ab.xlsx_sheet_names(),
             Err(FileAbilityError::UnsupportedFormat { .. })
@@ -391,7 +391,7 @@ mod tests {
 
     fn test_dir() -> PathBuf {
         let d = std::env::temp_dir().join("nt_file_ability_d1d6");
-        std::fs::create_dir_all(&d).unwrap();
+        std::fs::create_dir_all(&d).expect("create test dir");
         d
     }
 

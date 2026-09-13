@@ -121,7 +121,7 @@ impl BgpviewFetcher {
 
     pub fn ingest_from_json(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         json: &str,
     ) -> Result<_BgpviewIngestReport, String> {
         let results = Self::parse_json(json)?;

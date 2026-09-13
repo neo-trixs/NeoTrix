@@ -776,11 +776,15 @@ mod tests {
 
     #[test]
     fn test_self_test_passes() {
-        // HONESTY: self_test() is a static method that always returns Ok — it
+        // ALWAYS-PASS: self_test() is a static method that always returns Ok — it
         // validates the type exists, not real validation behavior. This test
         // documents the SelfTest contract but does NOT test real validation.
         // TODO(R-P79): Replace with integration test that validates a real skill
-        // directory and checks that validation errors are produced for malformed input.
+        // directory and checks that validation errors are produced for malformed input:
+        //   - valid skill directory → passes validation
+        //   - missing SKILL.md → fails validation
+        //   - missing required fields (name/description) → fails validation
+        //   - oversized SKILL.md (>200 lines) → fails validation
         assert!(SkillValidator::self_test().is_ok());
     }
 }

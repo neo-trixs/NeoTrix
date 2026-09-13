@@ -110,7 +110,7 @@ impl PolymarketFetcher {
 
     pub fn ingest_from_json(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         json: &str,
     ) -> Result<_PolymarketIngestReport, String> {
         let events = Self::parse_json(json)?;
@@ -119,14 +119,14 @@ impl PolymarketFetcher {
 
     pub fn ingest(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
     ) -> Result<_PolymarketIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         events: &[_PolymarketMarket],
     ) -> Result<_PolymarketIngestReport, String> {
         let mut report = _PolymarketIngestReport { events_fetched: events.len(), ..Default::default() };

@@ -457,6 +457,30 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("置信度", "confidence_calibration", "NT-META", "MetaCognitionAnalyst"),
     ("校准置信", "confidence_calibration", "NT-META", "MetaCognitionAnalyst"),
     ("calibrate_confidence", "confidence_calibration", "NT-META", "MetaCognitionAnalyst"),
+    // analogical_transfer — 类比迁移引擎
+    ("analogical_transfer", "analogical_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    ("类比迁移", "analogical_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    ("类比推理", "analogical_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    ("迁移类比", "analogical_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    ("analogy", "analogical_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    // ethical_reasoning — 伦理推理框架
+    ("ethical_reasoning", "ethical_reasoning", "NT-CORE", "ReflectionEngine"),
+    ("伦理推理", "ethical_reasoning", "NT-CORE", "ReflectionEngine"),
+    ("伦理评估", "ethical_reasoning", "NT-CORE", "ReflectionEngine"),
+    ("道德判断", "ethical_reasoning", "NT-CORE", "ReflectionEngine"),
+    ("ethics", "ethical_reasoning", "NT-CORE", "ReflectionEngine"),
+    // wisdom_crystallization — 智慧结晶
+    ("wisdom_crystallization", "wisdom_crystallization", "NT-MIND", "KnowledgeIntegrator"),
+    ("智慧结晶", "wisdom_crystallization", "NT-MIND", "KnowledgeIntegrator"),
+    ("经验升华", "wisdom_crystallization", "NT-MIND", "KnowledgeIntegrator"),
+    ("智慧提炼", "wisdom_crystallization", "NT-MIND", "KnowledgeIntegrator"),
+    ("crystallize_wisdom", "wisdom_crystallization", "NT-MIND", "KnowledgeIntegrator"),
+    // cognitive_bias_detection — 认知偏差检测
+    ("cognitive_bias_detection", "cognitive_bias_detection", "NT-META", "MetaCognitionAnalyst"),
+    ("认知偏差", "cognitive_bias_detection", "NT-META", "MetaCognitionAnalyst"),
+    ("偏差检测", "cognitive_bias_detection", "NT-META", "MetaCognitionAnalyst"),
+    ("思维偏差", "cognitive_bias_detection", "NT-META", "MetaCognitionAnalyst"),
+    ("bias_detection", "cognitive_bias_detection", "NT-META", "MetaCognitionAnalyst"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -1900,6 +1924,122 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                     )
                 }
                 Err(e) => (false, format!("confidence_calibration 失败: KB 不可用 — {e}")),
+            }
+        }
+        "analogical_transfer" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("structural") || lower.contains("结构") { "structural" }
+                        else if lower.contains("relational") || lower.contains("关系") { "relational" }
+                        else if lower.contains("surface") || lower.contains("表面") { "surface" }
+                        else { "deep" };
+                    let transfers = kb.kv_get("experience", "analogical_transfer:total")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "analogical_transfer:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "analogical_transfer 类比迁移引擎: {} 模式 | 已迁移 {} 次 | 上次: {} | KB: {} nodes / {} kv",
+                            mode, transfers,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("analogical_transfer 失败: KB 不可用 — {e}")),
+            }
+        }
+        "ethical_reasoning" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let framework = if lower.contains("deontological") || lower.contains("义务") { "deontological" }
+                        else if lower.contains("consequential") || lower.contains("后果") { "consequential" }
+                        else if lower.contains("virtue") || lower.contains("美德") { "virtue" }
+                        else { "balanced" };
+                    let evaluations = kb.kv_get("experience", "ethical_reasoning:total_evaluations")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "ethical_reasoning:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "ethical_reasoning 伦理推理框架: {} 框架 | 已评估 {} 次 | 上次: {} | KB: {} nodes / {} kv",
+                            framework, evaluations,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("ethical_reasoning 失败: KB 不可用 — {e}")),
+            }
+        }
+        "wisdom_crystallization" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let strategy = if lower.contains("pattern") || lower.contains("模式") { "pattern_extract" }
+                        else if lower.contains("distill") || lower.contains("蒸馏") { "distill" }
+                        else if lower.contains("merge") || lower.contains("合并") { "merge" }
+                        else { "auto" };
+                    let crystallized = kb.kv_get("experience", "wisdom_crystallization:total")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "wisdom_crystallization:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "wisdom_crystallization 智慧结晶: {} 策略 | 已结晶 {} 条 | 上次: {} | KB: {} nodes / {} kv",
+                            strategy, crystallized,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("wisdom_crystallization 失败: KB 不可用 — {e}")),
+            }
+        }
+        "cognitive_bias_detection" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("scan") || lower.contains("扫描") { "scan" }
+                        else if lower.contains("audit") || lower.contains("审计") { "audit" }
+                        else if lower.contains("train") || lower.contains("训练") { "train" }
+                        else { "detect" };
+                    let detected = kb.kv_get("experience", "cognitive_bias:detection_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "cognitive_bias:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "cognitive_bias_detection 认知偏差检测: {} 模式 | 已检测 {} 次 | 上次: {} | KB: {} nodes / {} kv",
+                            mode, detected,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("cognitive_bias_detection 失败: KB 不可用 — {e}")),
             }
         }
         _ => (

@@ -179,7 +179,7 @@ impl FreePool {
         }
     }
 
-    pub fn record_usage(&self, provider_name: &str, tokens: u64) {
+    pub fn record_usage(&self, provider_name: &str, tokens: u64) -> Result<(), String> {
         match self.budgets.write() {
             Ok(mut budgets) => {
                 if let Some(budget) = budgets.get_mut(provider_name) {
@@ -187,12 +187,13 @@ impl FreePool {
                     budget.requests_used = budget.requests_used.saturating_add(1);
                 }
             }
-            Err(e) => log::warn!("[free_pool] budgets lock poisoned, usage for '{}' lost: {}", provider_name, e),
+            Err(e) => return Err(format!("[free_pool] budgets lock poisoned, usage for '{}' lost: {}", provider_name, e)),
         }
         match self.total_saved.write() {
             Ok(mut saved) => *saved += (tokens as f64 / 1000.0) * 0.01,
-            Err(e) => log::warn!("[free_pool] total_saved lock poisoned, savings update lost: {}", e),
+            Err(e) => return Err(format!("[free_pool] total_saved lock poisoned, savings update lost: {}", e)),
         }
+        Ok(())
     }
 
     pub fn get_budget(&self, provider_name: &str) -> Option<FreeTokenBudget> {

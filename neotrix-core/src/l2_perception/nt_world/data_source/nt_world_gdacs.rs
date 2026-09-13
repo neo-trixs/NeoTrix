@@ -140,7 +140,7 @@ impl GdacsFetcher {
 
     pub fn ingest_from_json(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         json: &str,
     ) -> Result<_GdacsIngestReport, String> {
         let events = Self::parse_json(json)?;
@@ -149,14 +149,14 @@ impl GdacsFetcher {
 
     pub fn ingest(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
     ) -> Result<_GdacsIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         events: &[_GdacsEvent],
     ) -> Result<_GdacsIngestReport, String> {
         let mut report = _GdacsIngestReport { events_fetched: events.len(), ..Default::default() };

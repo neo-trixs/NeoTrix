@@ -465,6 +465,11 @@ mod tests {
 
     #[test]
     fn test_self_test_passes() {
+        // ALWAYS-PASS: self_test() returns Ok because the type exists and compiles.
+        // This does NOT validate that SkillImprover can actually analyze or improve
+        // skill files. The test passes on every machine.
+        // TODO(R-P79): Replace with test that verifies self_test returns Err when
+        // the improvement pipeline is not wired to real skill file analysis.
         assert!(SkillImprover::self_test().is_ok());
     }
 }

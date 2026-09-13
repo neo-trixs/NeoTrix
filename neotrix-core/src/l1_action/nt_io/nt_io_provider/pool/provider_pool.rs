@@ -187,7 +187,10 @@ impl ProviderPool {
             );
             match gateway.account_pool.lock() {
                 Ok(pool) => pool.register_default(&entry.provider, &entry.label),
-                Err(e) => log::warn!("[provider-pool] account_pool mutex poisoned, register '{}' failed: {}", entry.label, e),
+                Err(e) => {
+                    log::error!("[provider-pool] account_pool mutex poisoned, register '{}' failed: {}", entry.label, e);
+                    return registered;
+                }
             }
             registered += 1;
             log::info!(

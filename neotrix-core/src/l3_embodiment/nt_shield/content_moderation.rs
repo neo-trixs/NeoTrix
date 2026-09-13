@@ -218,23 +218,25 @@ impl _ContentModeration {
 
     /// Evaluate risk of user-submitted prompt content.
     ///
-    /// **Not wired** — uses keyword-only substring matching, which is trivially
-    /// bypassed by synonyms, misspellings, or paraphrasing. Returns 0.1 (low risk)
-    /// for all categories except NSFW/Violence where explicit keywords are found.
+    /// # Incomplete Implementation
+    /// Uses keyword-only substring matching, which is trivially bypassed by
+    /// synonyms, misspellings, or paraphrasing. Returns 0.1 (low risk) for
+    /// all categories except NSFW/Violence where explicit keywords are found.
     ///
     /// # Risks
-    /// Keyword matching misses implicit hate, coded language, and non-English
-    /// harmful content. This function MUST NOT be the sole prompt safety gate.
+    /// - Keyword matching misses implicit hate, coded language, and non-English harmful content
+    /// - This function MUST NOT be the sole prompt safety gate in production
+    /// - Trivially bypassable: "nude" → "n υ d e" or "artistic figure" → passes
     ///
-    /// # Required wiring
+    /// # Required Wiring
     /// - NSFW/Violence: LLM-as-judge or dedicated classifier (Llama Guard / OpenAI Moderation)
     /// - Hate/Harassment: context-aware semantic analysis (keywords miss implicit hate)
     /// - Copyright: training data / character name / style fingerprint matching
     /// - All categories: multi-language + semantic equivalence detection
     fn evaluate_prompt_risk(&self, prompt: &str, _category: &RiskCategory) -> f64 {
         tracing::warn!(
-            "STUB evaluate_prompt_risk called: keyword-only matching, not real semantic analysis. \
-             TODO: integrate LLM-as-judge or dedicated classifier."
+            "evaluate_prompt_risk: keyword-only matching (trivially bypassable). \
+             Wire LLM-as-judge or dedicated classifier for production use."
         );
         let prompt_lower = prompt.to_lowercase();
         match _category {
@@ -258,18 +260,18 @@ impl _ContentModeration {
 
     /// Evaluate risk of generated output content.
     ///
-    /// **Not wired** — returns fixed baseline scores per content type without
-    /// analyzing the actual content. Only metadata fields `contains_pii` and
-    /// `contains_secret` provide real signal; all other risk categories
-    /// (NSFW, violence, hate, copyright, misinformation) return hardcoded
-    /// baselines that do NOT reflect actual content risk.
+    /// # Incomplete Implementation
+    /// Returns fixed baseline scores per content type without analyzing the actual
+    /// content. Only metadata fields `contains_pii` and `contains_secret` provide
+    /// real signal; all other risk categories (NSFW, violence, hate, copyright,
+    /// misinformation) return hardcoded baselines that do NOT reflect actual content risk.
     ///
     /// # Risks
-    /// Returning `0.05-0.25` for all content types regardless of actual content
-    /// means genuinely harmful content may pass moderation. This function MUST
-    /// NOT be used as the sole content safety gate in production.
+    /// - Returning `0.05-0.25` for all content types regardless of actual content means genuinely harmful content may pass moderation
+    /// - This function MUST NOT be used as the sole content safety gate in production
+    /// - Metadata signals are real but limited (only PII/secret detection)
     ///
-    /// # Required wiring
+    /// # Required Wiring
     /// - NSFW: CLIP-based NSFW detector or third-party API (e.g., OpenAI Moderation)
     /// - Violence/Hate: multimodal content safety model (Llama Guard / ShieldGemma)
     /// - Copyright: reverse image search + copyright database matching
@@ -277,9 +279,8 @@ impl _ContentModeration {
     /// - Privacy: PII detector (Presidio / custom NER)
     fn evaluate_output_risk(&self, content_type: ContentType, metadata: &HashMap<String, String>, _category: &RiskCategory) -> f64 {
         tracing::warn!(
-            "STUB evaluate_output_risk: returning fixed baseline for {:?}, \
-             NOT real content analysis. Harmful content may pass. \
-             Wire CLIP/Llama Guard/OpenAI Moderation for production use.",
+            "evaluate_output_risk: fixed baseline for {:?} (NOT real content analysis). \
+             Harmful content may pass. Wire CLIP/Llama Guard/OpenAI Moderation.",
             content_type
         );
         // FIXED BASELINE — does NOT analyze actual content.

@@ -1239,6 +1239,11 @@ pub struct PoolHealthReport {
 pub struct LlmPoolHealth;
 
 impl LlmPoolHealth {
+    /// Evaluate the health of the LLM provider pool.
+    ///
+    /// Note: Real implementation needs — returns a snapshot of pool metrics.
+    /// Consider: adding time-windowed health tracking, provider-specific
+    /// health scores, and trend analysis for pool degradation detection.
     pub fn evaluate(gw: &GatewayV2, min_free: usize) -> PoolHealthReport {
         let providers = gw.providers();
         let total = providers.len();
@@ -1260,6 +1265,10 @@ impl LlmPoolHealth {
         }
     }
 
+    /// Generate a human-readable summary of pool health.
+    ///
+    /// Note: Real implementation needs — simple format string. Consider:
+    /// structured logging integration and telemetry export.
     pub fn summarize(gw: &GatewayV2, min_free: usize) -> String {
         let r = Self::evaluate(gw, min_free);
         format!(
@@ -1274,35 +1283,63 @@ impl LlmPoolHealth {
 // ═══════════════════════════════════════════════════════════════════
 
 impl GatewayV2 {
+    /// Enable or disable the response cache.
+    ///
+    /// Note: Real implementation needs — simple toggle. Consider: adding
+    /// cache warming on enable, and cache flush on disable.
     pub fn enable_response_cache(&mut self, enabled: bool) {
         self.response_cache_enabled = enabled;
     }
 
+    /// Check if response cache is enabled.
+    ///
+    /// Note: Real implementation needs — returns current toggle state.
     pub fn response_cache_enabled(&self) -> bool {
         self.response_cache_enabled
     }
 
+    /// Get the total number of response cache hits.
+    ///
+    /// Note: Real implementation needs — returns counter from cache.
+    /// Consider: adding hit rate calculation and time-windowed stats.
     pub fn response_cache_hits(&self) -> u64 {
         self.response_cache.lock().map(|c| c.hit_count()).unwrap_or(0)
     }
 
+    /// Get the current number of entries in the response cache.
+    ///
+    /// Note: Real implementation needs — returns cache entry count.
     pub fn response_cache_len(&self) -> usize {
         self.response_cache.lock().map(|c| c.len()).unwrap_or(0)
     }
 
+    /// Get the total number of response cache prefetch operations.
+    ///
+    /// Note: Real implementation needs — returns atomic counter.
     pub fn response_cache_prefetches(&self) -> u64 {
         self.response_cache_prefetches
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    /// Enable or disable the response healer (malformed JSON repair).
+    ///
+    /// Note: Real implementation needs — simple toggle. Consider: adding
+    /// healer statistics reset on disable.
     pub fn set_response_healer(&mut self, enabled: bool) {
         self.response_healer_enabled = enabled;
     }
 
+    /// Check if response healer is enabled.
+    ///
+    /// Note: Real implementation needs — returns current toggle state.
     pub fn response_healer_enabled(&self) -> bool {
         self.response_healer_enabled
     }
 
+    /// Get the (healed, unrepairable) counters from the response healer.
+    ///
+    /// Note: Real implementation needs — returns tuple of heal counts.
+    /// Consider: adding per-provider breakdown and time-windowed stats.
     pub fn response_healer_counters(&self) -> (u64, u64) {
         match self.response_healer.lock() {
             Ok(h) => (h.heal_count(), h.unrepairable_count()),
@@ -1310,14 +1347,27 @@ impl GatewayV2 {
         }
     }
 
+    /// Enable or disable generation classification for analytics.
+    ///
+    /// Note: Real implementation needs — simple toggle. Consider: adding
+    /// classification model hot-swap and statistics reset on toggle.
     pub(crate) fn _set_generation_classification(&mut self, enabled: bool) {
         self.generation_classification_enabled = enabled;
     }
 
+    /// Check if generation classification is enabled.
+    ///
+    /// Note: Real implementation needs — returns current toggle state.
     pub fn generation_classification_enabled(&self) -> bool {
         self.generation_classification_enabled
     }
 
+    /// Classify and record a generation event for analytics.
+    ///
+    /// Note: Real implementation needs — classifies prompt+response into task type,
+    /// complexity, and domain. Records to GenerationAnalytics. Consider: adding
+    /// sampling rate control, async batch recording, and classification model
+    /// hot-swap without downtime.
     pub(crate) fn tag_generation(
         &self,
         request: &LlmRequest,
@@ -1364,6 +1414,10 @@ impl GatewayV2 {
         }
     }
 
+    /// Take a snapshot of generation analytics: total count and distributions.
+    ///
+    /// Note: Real implementation needs — returns (total, task_type_dist, complexity_dist, domain_dist).
+    /// Consider: adding time-windowed snapshots and per-provider breakdowns.
     pub(crate) fn _generation_analytics_snapshot(&self) -> (u64, HashMap<String, u64>, HashMap<String, u64>, HashMap<String, u64>) {
         match self.generation_analytics.lock() {
             Ok(a) => (
@@ -1376,6 +1430,11 @@ impl GatewayV2 {
         }
     }
 
+    /// Trigger market router re-evaluation if the re-evaluation interval has elapsed.
+    ///
+    /// Note: Real implementation needs — delegates to MarketRouter::re_evaluate.
+    /// Consider: adding event notification on weight changes and configurable
+    /// re-evaluation intervals.
     pub fn maybe_re_evaluate(&self) -> bool {
         let states = self.states.read().unwrap_or_else(|e| {
             log::warn!("[gateway] states RwLock poisoned: {}", e);
@@ -1391,6 +1450,11 @@ impl GatewayV2 {
         }
     }
 
+    /// Heal malformed JSON in response and cache the result.
+    ///
+    /// Note: Real implementation needs — applies ResponseHealer if enabled, then
+    /// caches in ResponseCache if enabled. Consider: adding response validation
+    /// after healing, cache key deduplication, and heal statistics reporting.
     pub(crate) fn heal_and_cache_response(&self, request: &LlmRequest, response: LlmResponse) -> LlmResponse {
         let mut response = response;
         if self.response_healer_enabled {
@@ -1417,6 +1481,11 @@ impl GatewayV2 {
         response
     }
 
+    /// Extract concatenated text content from all messages in a request.
+    ///
+    /// Note: Real implementation needs — joins all message content with newlines.
+    /// Consider: adding role-aware extraction, tool call content handling, and
+    /// content truncation for very long requests.
     pub(crate) fn prompt_text(&self, request: &LlmRequest) -> String {
         request
             .messages
@@ -1426,6 +1495,11 @@ impl GatewayV2 {
             .join("\n")
     }
 
+    /// Build a deterministic cache key from request parameters.
+    ///
+    /// Note: Real implementation needs — includes content, max_tokens, thinking_budget,
+    /// tools, structured_output, and cacheable_prefix_tokens. Consider: using a
+    /// content hash for shorter keys, and cache versioning for invalidation.
     pub(crate) fn prompt_cache_key(&self, request: &LlmRequest) -> String {
         let content = self.prompt_text(request);
         let mut tools: Vec<&str> = request
@@ -1436,7 +1510,10 @@ impl GatewayV2 {
         tools.sort_unstable();
         let tools_fp = tools.join(",");
         let structured_fp = match &request.structured_output {
-            Some(s) => serde_json::to_string(s).unwrap_or_default(),
+            Some(s) => serde_json::to_string(s).unwrap_or_else(|e| {
+                log::warn!("[gateway] structured_output serialization failed for cache key: {}", e);
+                String::new()
+            }),
             None => String::new(),
         };
         format!(

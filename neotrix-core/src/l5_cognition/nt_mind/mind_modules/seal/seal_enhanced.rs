@@ -150,6 +150,10 @@ pub struct _ExtractedKnowledge {
 
 impl _SEALPipelineEnhanced {
     /// 创建增强版 SEAL 管线
+    ///
+    /// Note: Real implementation needs — stages are hardcoded. Consider: loading
+    /// stage definitions from config, supporting custom stage plugins, and
+    /// validating stage dependency ordering.
     pub fn new(config: _SEALConfig) -> Self {
         Self {
             stages: vec![
@@ -401,6 +405,10 @@ impl _SEALPipelineEnhanced {
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory stats.
+    /// Consider: persisting stats to KB, adding time-windowed statistics,
+    /// and exposing via EventBus for telemetry integration.
     pub fn stats(&self) -> &_SEALStats {
         &self.stats
     }

@@ -24,3 +24,41 @@ pub use crate::l1_action::nt_io::nt_io_provider::common::egress_types::{
     SandboxEgressRule as EgressRule,
     SandboxEgressPolicy as EgressPolicy,
 };
+
+// ── KnowledgeStore trait — 打断 L2→L1 KnowledgeBase 直接依赖 ──────
+//
+// L2 数据源只需 KnowledgeBase 的读写子集，通过此 trait 解耦。
+// 实现留在 L1 facade，测试代码仍可直接用 KnowledgeBase concrete type。
+
+pub use crate::core::nt_core_kb_types::KnowledgeNode;
+
+/// L2 感知层对 KB 的最小读写接口 — 数据源入库只依赖此 trait，不依赖 KnowledgeBase concrete type。
+pub trait KnowledgeStore: Send + Sync {
+    /// 按 URL 查找节点 (去重用)。
+    fn find_node_by_url(&self, url: &str) -> Result<Option<KnowledgeNode>, String>;
+    /// 插入或复用节点 (幂等写入)。
+    fn insert_or_get_node(
+        &self,
+        title: &str,
+        node_type: NodeType,
+        summary: Option<&str>,
+        url: Option<&str>,
+        domain: Option<&str>,
+    ) -> Result<String, String>;
+}
+
+impl KnowledgeStore for KnowledgeBase {
+    fn find_node_by_url(&self, url: &str) -> Result<Option<KnowledgeNode>, String> {
+        KnowledgeBase::find_node_by_url(self, url)
+    }
+    fn insert_or_get_node(
+        &self,
+        title: &str,
+        node_type: NodeType,
+        summary: Option<&str>,
+        url: Option<&str>,
+        domain: Option<&str>,
+    ) -> Result<String, String> {
+        KnowledgeBase::insert_or_get_node(self, title, node_type, summary, url, domain)
+    }
+}

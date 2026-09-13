@@ -167,6 +167,12 @@ impl CapabilityCoordinator {
         }
     }
 
+    /// Coordinate an LLM request through the capability pipeline.
+    ///
+    /// Note: Real implementation needs — routes request to best provider for intent,
+    /// executes via `complete_for_profile_detailed`, and records success/failure for
+    /// provider swap decisions. Consider: adding request timeout enforcement,
+    /// response validation, and provider-specific header injection.
     pub async fn coordinate(&mut self, req: &CoordinationRequest) -> Result<CoordinationOutcome, LlmError> {
         self.ensure_default_sub_grids();
         let profile = req.intent.required_profile();
@@ -209,6 +215,11 @@ impl CapabilityCoordinator {
         }
     }
 
+    /// Find the first registered provider matching the given category.
+    ///
+    /// Note: Real implementation needs — linear scan of providers. Consider:
+    /// maintaining a category→provider index for O(1) lookup, and handling
+    /// providers with multiple category mappings.
     fn find_provider_by_category(&self, category: ProviderCategory) -> Option<String> {
         self.gateway.providers().into_iter().find(|name| {
             self.gateway.category_of(name).map(|c| c == category).unwrap_or(false)
@@ -417,6 +428,11 @@ impl GatewayV2 {
         result
     }
 
+    /// Execute a single LLM call to a named provider with full middleware stack.
+    ///
+    /// Note: Real implementation needs — this is a thin wrapper around `call_provider`.
+    /// Consider: adding request/response logging, timeout enforcement, and metrics
+    /// collection for single-provider calls (without fallback).
     pub async fn complete_single(&self, provider_name: &str, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         self.call_provider(provider_name, request).await
     }
@@ -460,6 +476,12 @@ impl GatewayV2 {
         result
     }
 
+    /// Complete a request with automatic provider selection and fallback chain.
+    ///
+    /// Note: Real implementation needs — this is the primary entry point for LLM calls.
+    /// It checks exact cache, semantic cache, response cache, then falls back to
+    /// provider selection with quota-aware fallback. Consider: adding request
+    /// deduplication for concurrent identical requests, and streaming support.
     pub async fn complete_with_selection(&self, request: &LlmRequest) -> Result<SelectionResult, LlmError> {
         self.ensure_pool_sufficient(3, 60).await;
         let prompt_key: String = self.prompt_cache_key(request);
@@ -546,7 +568,11 @@ impl GatewayV2 {
                     {
                         let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                         if let Some(state) = states.get(&name) {
-                            if state.is_free { global_free_pool().record_usage(&name, token_count as u64); }
+                            if state.is_free {
+                                if let Err(e) = global_free_pool().record_usage(&name, token_count as u64) {
+                                    log::warn!("[gateway] free pool usage recording failed: {}", e);
+                                }
+                            }
                         }
                     }
                     if let Ok(mut ct) = self.cost_tracker.write() {
@@ -681,7 +707,11 @@ impl GatewayV2 {
                     {
                         let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                         if let Some(state) = states.get(name) {
-                            if state.is_free { global_free_pool().record_usage(name, token_count as u64); }
+                            if state.is_free {
+                                if let Err(e) = global_free_pool().record_usage(name, token_count as u64) {
+                                    log::warn!("[gateway] free pool usage recording failed: {}", e);
+                                }
+                            }
                         }
                     }
                     let response = self.heal_and_cache_response(request, response);
@@ -789,6 +819,12 @@ impl GatewayV2 {
         provider.stream_complete(&req).await
     }
 
+    /// Describe an image using a vision-capable LLM provider.
+    ///
+    /// Note: Real implementation needs — selects first vision-capable provider,
+    /// falls back to best available. Consider: adding image preprocessing (resize,
+    /// format conversion), multi-provider voting for description quality, and
+    /// caching descriptions for identical images.
     pub async fn describe_image(&self, image_b64: &str, question: &str) -> Result<String, LlmError> {
         let mut used: Vec<String> = Vec::new();
         let vision_candidates: Vec<String> = {
@@ -833,6 +869,11 @@ impl GatewayV2 {
         Err(LlmError::Unknown("Aggressive streaming retry exhausted — all providers failed".to_string()))
     }
 
+    /// Record a call event to the observer for telemetry/logging.
+    ///
+    /// Note: Real implementation needs — fires to observer if registered. Consider:
+    /// adding structured event logging, EventBus integration, and batched event
+    /// flushing for high-throughput scenarios.
     fn fire_event(&self, provider_name: &str, success: bool, latency_ms: f64, tokens: u32, model: &str, phase: AttemptPhase) {
         if let Ok(guard) = self.observer.read() {
             if let Some(ref obs) = *guard {
@@ -860,6 +901,12 @@ impl GatewayV2 {
         vec!["opencode-zen/big-pickle".into(), "opencode-zen/mimo-v2.5-free".into(), "llm7/codestral-latest".into()]
     }
 
+    /// Execute a single provider call with retry-on-rate-limit and exponential backoff.
+    ///
+    /// Note: Real implementation needs — retries up to 5 times on rate limit errors,
+    /// parsing `retry_after` from error JSON. Consider: adding jitter to prevent
+    /// thundering herd, per-provider retry state, and distinguishing transient vs
+    /// permanent rate limits.
     pub(crate) async fn call_provider_backoff(&self, name: &str, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         const MAX_ATTEMPTS: u32 = 5;
         let mut attempt = 0u32;
@@ -897,6 +944,11 @@ impl GatewayV2 {
     }
 }
 
+/// Parse `retry_after` from an error message JSON response.
+///
+/// Note: Real implementation needs — only handles JSON error format. Consider:
+/// supporting HTTP header retry-after (seconds or HTTP-date), and handling
+/// non-JSON error formats from different providers.
 fn parse_retry_after(msg: &str) -> Option<f32> {
     let v: serde_json::Value = serde_json::from_str(msg).ok()?;
     v.get("error")?.get("retry_after")?.as_f64().map(|x| x as f32)
@@ -1140,7 +1192,7 @@ pub struct ModelCapabilities {
     pub cost_per_1k_tokens: f64,
 }
 
-pub struct ModelConfig {
+pub struct AdapterModelConfig {
     pub model_id: String,
     pub provider: String,
     pub capabilities: ModelCapabilities,
@@ -1181,8 +1233,8 @@ pub struct ToolCall2 {
 }
 
 pub trait FormatConverter {
-    fn to_provider_format(&self, request: &UnifiedRequest, model: &ModelConfig) -> String;
-    fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse>;
+    fn to_provider_format(&self, request: &UnifiedRequest, model: &AdapterModelConfig) -> String;
+    fn from_provider_response(&self, raw: &str, model: &AdapterModelConfig) -> Option<UnifiedResponse>;
 }
 
 pub struct OpenAiConverter;
@@ -1195,12 +1247,12 @@ fn role_to_str(role: &Role) -> &str {
     }
 }
 impl FormatConverter for OpenAiConverter {
-    fn to_provider_format(&self, request: &UnifiedRequest, model: &ModelConfig) -> String {
+    fn to_provider_format(&self, request: &UnifiedRequest, model: &AdapterModelConfig) -> String {
         let messages: Vec<String> = request.messages.iter().map(|m| format!("{{\"role\":\"{}\",\"content\":\"{}\"}}", escape_json(role_to_str(&m.role)), escape_json(&m.content))).collect();
         let tools: Vec<String> = request.tools.iter().map(|t| format!("{{\"type\":\"function\",\"function\":{{\"name\":\"{}\",\"description\":\"{}\",\"parameters\":{}}}}}", escape_json(&t.name), escape_json(&t.description), t.input_schema)).collect();
         format!("{{\"model\":\"{}\",\"messages\":[{}],\"tools\":[{}],\"temperature\":{},\"max_tokens\":{},\"stream\":{}}}", escape_json(&model.model_id), messages.join(","), tools.join(","), request.temperature, request.max_tokens, request.stream)
     }
-    fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> {
+    fn from_provider_response(&self, raw: &str, model: &AdapterModelConfig) -> Option<UnifiedResponse> {
         let content = extract_json_string(raw, "content").unwrap_or_default();
         let tokens_used = extract_json_number(raw, "total_tokens").unwrap_or(0.0) as u32;
         Some(UnifiedResponse { content, tool_calls: Vec::new(), tokens_used, model: model.model_id.clone() })
@@ -1209,12 +1261,12 @@ impl FormatConverter for OpenAiConverter {
 
 pub struct AnthropicConverter;
 impl FormatConverter for AnthropicConverter {
-    fn to_provider_format(&self, request: &UnifiedRequest, model: &ModelConfig) -> String {
+    fn to_provider_format(&self, request: &UnifiedRequest, model: &AdapterModelConfig) -> String {
         let messages: Vec<String> = request.messages.iter().filter(|m| m.role != Role::System).map(|m| format!("{{\"role\":\"{}\",\"content\":\"{}\"}}", escape_json(role_to_str(&m.role)), escape_json(&m.content))).collect();
         let system_msg = request.messages.iter().find(|m| m.role == Role::System).map(|m| format!(",\"system\":\"{}\"", escape_json(&m.content))).unwrap_or_default();
         format!("{{\"model\":\"{}\",\"messages\":[{}]{},\"max_tokens\":{}}}", escape_json(&model.model_id), messages.join(","), system_msg, request.max_tokens)
     }
-    fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> {
+    fn from_provider_response(&self, raw: &str, model: &AdapterModelConfig) -> Option<UnifiedResponse> {
         let content = extract_json_string(raw, "text").unwrap_or_default();
         let tokens_used = extract_json_number(raw, "input_tokens").zip(extract_json_number(raw, "output_tokens")).map(|(i, o)| (i + o) as u32).unwrap_or(0);
         Some(UnifiedResponse { content, tool_calls: Vec::new(), tokens_used, model: model.model_id.clone() })
@@ -1223,11 +1275,11 @@ impl FormatConverter for AnthropicConverter {
 
 pub struct GeminiConverter;
 impl FormatConverter for GeminiConverter {
-    fn to_provider_format(&self, request: &UnifiedRequest, _model: &ModelConfig) -> String {
+    fn to_provider_format(&self, request: &UnifiedRequest, _model: &AdapterModelConfig) -> String {
         let contents: Vec<String> = request.messages.iter().map(|m| format!("{{\"role\":\"{}\",\"parts\":[{{\"text\":\"{}\"}}]}}", if m.role == Role::Assistant { "model" } else { "user" }, escape_json(&m.content))).collect();
         format!("{{\"contents\":[{}],\"generationConfig\":{{\"temperature\":{},\"maxOutputTokens\":{}}}}}", contents.join(","), request.temperature, request.max_tokens)
     }
-    fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> {
+    fn from_provider_response(&self, raw: &str, model: &AdapterModelConfig) -> Option<UnifiedResponse> {
         let content = extract_json_string(raw, "text").unwrap_or_default();
         let tokens_used = extract_json_number(raw, "totalTokenCount").unwrap_or(0.0) as u32;
         Some(UnifiedResponse { content, tool_calls: Vec::new(), tokens_used, model: model.model_id.clone() })
@@ -1235,7 +1287,7 @@ impl FormatConverter for GeminiConverter {
 }
 
 pub struct UniversalAdapter {
-    models: Vec<ModelConfig>,
+    models: Vec<AdapterModelConfig>,
     active_model: Option<String>,
     converters: HashMap<String, Box<dyn FormatConverter>>,
 }
@@ -1248,22 +1300,22 @@ impl UniversalAdapter {
         converters.insert("gemini".to_string(), Box::new(GeminiConverter));
         Self { models: Vec::new(), active_model: None, converters }
     }
-    pub fn register_model(&mut self, config: ModelConfig) { self.models.push(config); }
+    pub fn register_model(&mut self, config: AdapterModelConfig) { self.models.push(config); }
     pub fn set_active(&mut self, model_id: &str) -> bool {
         if self.models.iter().any(|m| m.model_id == model_id) { self.active_model = Some(model_id.to_string()); true } else { false }
     }
-    pub fn active_model(&self) -> Option<&ModelConfig> { self.active_model.as_ref().and_then(|id| self.models.iter().find(|m| m.model_id == *id)) }
-    pub fn find_model(&self, model_id: &str) -> Option<&ModelConfig> { self.models.iter().find(|m| m.model_id == model_id) }
-    pub fn select_best(&self, needs_tools: bool, needs_streaming: bool, needs_images: bool, min_context_tokens: u32) -> Option<&ModelConfig> {
-        let mut candidates: Vec<&ModelConfig> = self.models.iter().filter(|m| (!needs_tools || m.capabilities.supports_tools) && (!needs_streaming || m.capabilities.supports_streaming) && (!needs_images || m.capabilities.supports_images) && m.capabilities.max_context_tokens >= min_context_tokens).collect();
+    pub fn active_model(&self) -> Option<&AdapterModelConfig> { self.active_model.as_ref().and_then(|id| self.models.iter().find(|m| m.model_id == *id)) }
+    pub fn find_model(&self, model_id: &str) -> Option<&AdapterModelConfig> { self.models.iter().find(|m| m.model_id == model_id) }
+    pub fn select_best(&self, needs_tools: bool, needs_streaming: bool, needs_images: bool, min_context_tokens: u32) -> Option<&AdapterModelConfig> {
+        let mut candidates: Vec<&AdapterModelConfig> = self.models.iter().filter(|m| (!needs_tools || m.capabilities.supports_tools) && (!needs_streaming || m.capabilities.supports_streaming) && (!needs_images || m.capabilities.supports_images) && m.capabilities.max_context_tokens >= min_context_tokens).collect();
         candidates.sort_by(|a, b| a.capabilities.cost_per_1k_tokens.partial_cmp(&b.capabilities.cost_per_1k_tokens).unwrap_or(std::cmp::Ordering::Equal));
         candidates.into_iter().next()
     }
-    pub fn models_by_provider(&self, provider: &str) -> Vec<&ModelConfig> { self.models.iter().filter(|m| m.provider == provider).collect() }
+    pub fn models_by_provider(&self, provider: &str) -> Vec<&AdapterModelConfig> { self.models.iter().filter(|m| m.provider == provider).collect() }
     pub fn converter(&self, provider: &str) -> Option<&dyn FormatConverter> { self.converters.get(provider).map(|c| c.as_ref()) }
-    pub fn to_provider_format(&self, request: &UnifiedRequest, model: &ModelConfig) -> Option<String> { self.converter(&model.provider).map(|c| c.to_provider_format(request, model)) }
-    pub fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> { self.converter(&model.provider).and_then(|c| c.from_provider_response(raw, model)) }
-    pub fn models(&self) -> &[ModelConfig] { &self.models }
+    pub fn to_provider_format(&self, request: &UnifiedRequest, model: &AdapterModelConfig) -> Option<String> { self.converter(&model.provider).map(|c| c.to_provider_format(request, model)) }
+    pub fn from_provider_response(&self, raw: &str, model: &AdapterModelConfig) -> Option<UnifiedResponse> { self.converter(&model.provider).and_then(|c| c.from_provider_response(raw, model)) }
+    pub fn models(&self) -> &[AdapterModelConfig] { &self.models }
     pub fn stats(&self) -> (usize, usize, usize) {
         let with_tools = self.models.iter().filter(|m| m.capabilities.supports_tools).count();
         let with_streaming = self.models.iter().filter(|m| m.capabilities.supports_streaming).count();

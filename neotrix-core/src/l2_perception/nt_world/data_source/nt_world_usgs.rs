@@ -281,7 +281,7 @@ impl UsgsFetcher {
 
     pub fn ingest_from_json(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         json: &str,
     ) -> Result<_UsgsIngestReport, String> {
         let events = Self::parse_geojson(json)?;
@@ -290,14 +290,14 @@ impl UsgsFetcher {
 
     pub fn ingest(
         &self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
     ) -> Result<_UsgsIngestReport, String> {
         let events = self.fetch()?;
         Self::ingest_events(kb, &events)
     }
 
     pub fn ingest_events(
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &dyn super::super::l1_facade::KnowledgeStore,
         events: &[_UsgsEvent],
     ) -> Result<_UsgsIngestReport, String> {
         let mut report = _UsgsIngestReport {

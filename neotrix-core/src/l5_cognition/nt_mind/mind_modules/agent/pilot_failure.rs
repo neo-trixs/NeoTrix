@@ -128,6 +128,10 @@ pub struct _SEALIntegrationResult {
 
 impl _PILOTFailureDetector {
     /// 创建新的 PILOT 失败模式检测器
+    ///
+    /// Note: Real implementation needs — detector starts empty.
+    /// Consider: loading failure patterns from KB, pre-registering known
+    /// failure modes, and integrating with EventBus for detection events.
     pub fn new() -> Self {
         Self {
             detectors: Vec::new(),
@@ -146,6 +150,10 @@ impl _PILOTFailureDetector {
     }
 
     /// 检测失败模式
+    ///
+    /// Note: Real implementation needs — matches input against registered patterns.
+    /// Consider: adding temporal pattern detection, context-aware scoring,
+    /// and false positive rate tracking per detector.
     pub fn detect(&mut self, input: &str) -> Vec<_FailureDetection> {
         let mut detections = Vec::new();
 
@@ -171,6 +179,10 @@ impl _PILOTFailureDetector {
     }
 
     /// 计算模式置信度
+    ///
+    /// Note: Real implementation needs — simple indicator matching ratio.
+    /// Consider: weighted indicator matching, fuzzy matching, and
+    /// context-dependent confidence scoring.
     fn calculate_pattern_confidence(&self, pattern: &FailurePattern, input: &str) -> f64 {
         // 简化版: 基于指标匹配计算置信度
         let matching_indicators = pattern.indicators.iter()
@@ -185,6 +197,11 @@ impl _PILOTFailureDetector {
     }
 
     /// 集成到 SEAL pipeline
+    ///
+    /// STUB: Returns hardcoded integration result. Real implementation needs:
+    /// - Actual SEAL pipeline hook registration
+    /// - Phase-specific failure detection configuration
+    /// - Impact scoring based on historical detection accuracy
     pub(crate) fn _integrate_seal(&self) -> _SEALIntegrationResult {
         _SEALIntegrationResult {
             integrated: self.config.enable_seal_integration,
@@ -199,16 +216,26 @@ impl _PILOTFailureDetector {
     }
 
     /// 获取所有检测器
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by status, type, and accuracy threshold.
     pub fn detectors(&self) -> &[_FailureDetector] {
         &self.detectors
     }
 
     /// 获取所有模式
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by severity, status, and effectiveness.
     pub fn patterns(&self) -> &[FailurePattern] {
         &self.patterns
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory stats.
+    /// Consider: persisting to KB, adding time-windowed statistics, and
+    /// exposing via EventBus for detection pipeline monitoring.
     pub fn stats(&self) -> &_PILOTStats {
         &self.stats
     }

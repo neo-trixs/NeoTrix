@@ -203,6 +203,10 @@ impl SelfImprovementLoop {
     /// Note: Real implementation needs — loop starts empty.
     /// Consider: loading initial metrics from KB, pre-populating trend baselines,
     /// and integrating with EventBus for metric collection.
+    ///
+    /// Note: Real implementation needs — loop starts empty.
+    /// Consider: loading initial metrics from KB, pre-populating trend baselines,
+    /// and integrating with EventBus for metric collection.
     pub fn new() -> Self {
         Self {
             metrics_history: Vec::new(),
@@ -221,6 +225,10 @@ impl SelfImprovementLoop {
     /// Note: Real implementation needs — capacity is stored but not validated.
     /// Consider: minimum capacity enforcement (e.g., >= 2 for trend detection),
     /// and capacity adjustment based on system resource availability.
+    ///
+    /// Note: Real implementation needs — capacity is stored but not validated.
+    /// Consider: minimum capacity enforcement (e.g., >= 2 for trend detection),
+    /// and capacity adjustment based on system resource availability.
     pub fn with_capacity(max_history: usize) -> Self {
         Self {
             max_history,
@@ -235,6 +243,10 @@ impl SelfImprovementLoop {
     /// Note: Real implementation needs — metrics are provided by caller.
     /// Consider: automatic metrics collection from EventBus, KB queries,
     /// and system health aggregators for unbiased metric collection.
+    ///
+    /// Note: Real implementation needs — metrics are provided by caller.
+    /// Consider: automatic metrics collection from EventBus, KB queries,
+    /// and system health aggregators for unbiased metric collection.
     pub fn collect_metrics(&mut self, metrics: SystemMetrics) {
         self.metrics_history.push(metrics);
         self.prune_history();
@@ -244,6 +256,10 @@ impl SelfImprovementLoop {
     // ── Stage 2: 诊断 ──
 
     /// 诊断系统瓶颈, 基于指标趋势分析
+    ///
+    /// Note: Real implementation needs — diagnosis is based on simple threshold comparisons.
+    /// Consider: statistical process control (SPC), anomaly detection algorithms,
+    /// and correlation analysis across multiple metrics.
     ///
     /// Note: Real implementation needs — diagnosis is based on simple threshold comparisons.
     /// Consider: statistical process control (SPC), anomaly detection algorithms,
@@ -374,6 +390,12 @@ impl SelfImprovementLoop {
     /// - Historical effectiveness tracking (which plans worked before)
     /// - Cost-benefit analysis for plan prioritization
     /// - Plan deduplication (avoid regenerating same plan each cycle)
+    ///
+    /// STUB: Plans are generated from hardcoded templates. Real implementation needs:
+    /// - LLM-based plan generation for novel issues
+    /// - Historical effectiveness tracking (which plans worked before)
+    /// - Cost-benefit analysis for plan prioritization
+    /// - Plan deduplication (avoid regenerating same plan each cycle)
     pub(crate) fn _generate_plans(&mut self, diagnosis: &DiagnosticResult) -> Vec<ImprovementPlan> {
         let mut plans = Vec::new();
 
@@ -409,6 +431,23 @@ impl SelfImprovementLoop {
     ///
     /// 真实实现需要: 对每个候选方案进行收益评估 (ROI estimation),
     /// 然后调用对应的参数调整逻辑 (如修改模型配置、调整权重、更新阈值)。
+    ///
+    /// # Incomplete Implementation
+    /// Current implementation marks `Generated` plans as `Skipped` without executing
+    /// any parameter adjustments. This is honest behavior — it does not fabricate
+    /// success — but it means the self-improvement loop cannot actually improve
+    /// the system.
+    ///
+    /// # Required Wiring
+    /// - ROI estimation for each candidate plan
+    /// - Parameter adjustment logic (model config, weights, thresholds)
+    /// - Execution rollback on failure
+    /// - Success verification (confirm parameters actually changed)
+    /// - Impact measurement (did the change improve metrics?)
+    ///
+    /// # Impact
+    /// Without this, `SelfImprovementLoop::run()` produces plans but never executes
+    /// them. The loop is mechanically functional but produces no real system changes.
     pub(crate) fn _evaluate_and_apply(&mut self, _max_applied: usize) -> Vec<ImprovementPlan> {
         tracing::warn!(
             "STUB _evaluate_and_apply: plans marked Skipped (not wired). \
@@ -437,6 +476,11 @@ impl SelfImprovementLoop {
     /// original parameter values. Consider: parameter snapshot storage at execution
     /// time, rollback execution logic, and rollback verification (confirm params
     /// actually reverted).
+    ///
+    /// Note: Real implementation needs — only updates status without restoring
+    /// original parameter values. Consider: parameter snapshot storage at execution
+    /// time, rollback execution logic, and rollback verification (confirm params
+    /// actually reverted).
     pub fn rollback(&mut self, plan_id: &str) -> bool {
         if let Some(plan) = self.executed.iter().find(|p| p.plan_id == plan_id) {
             let mut rolled = plan.clone();
@@ -454,6 +498,11 @@ impl SelfImprovementLoop {
     // ── Stage 5: 验证 ──
 
     /// Verify improvement effect — compare metrics before and after execution.
+    ///
+    /// Note: `_evaluate_and_apply` is STUB (plans marked Skipped), so `self.executed`
+    /// is always empty. Verification only compares metric trends, not specific plans.
+    /// Real implementation needs: link verification to specific executed plans,
+    /// and support A/B testing of improvement effects.
     ///
     /// Note: `_evaluate_and_apply` is STUB (plans marked Skipped), so `self.executed`
     /// is always empty. Verification only compares metric trends, not specific plans.
@@ -490,6 +539,10 @@ impl SelfImprovementLoop {
     /// Note: Real implementation needs — runs synchronously. Consider: async execution
     /// with cancellation support, progress reporting via EventBus, and configurable
     /// cycle intervals for background execution.
+    ///
+    /// Note: Real implementation needs — runs synchronously. Consider: async execution
+    /// with cancellation support, progress reporting via EventBus, and configurable
+    /// cycle intervals for background execution.
     pub fn run_cycle(&mut self) -> CycleResult {
         let start = timestamp_now();
 
@@ -522,6 +575,10 @@ impl SelfImprovementLoop {
     // ── 内部工具 ──
 
     /// Generate specific improvement actions for a given dimension.
+    ///
+    /// Note: Real implementation needs — actions are hardcoded templates.
+    /// Consider: LLM-based action generation, historical effectiveness tracking,
+    /// and integration with actual parameter adjustment logic.
     ///
     /// Note: Real implementation needs — actions are hardcoded templates.
     /// Consider: LLM-based action generation, historical effectiveness tracking,
@@ -596,11 +653,19 @@ impl SelfImprovementLoop {
     /// Note: Real implementation needs — linear mapping is simplistic.
     /// Consider: logarithmic scaling for high-severity issues, priority caps,
     /// and consideration of historical impact when prioritizing.
+    ///
+    /// Note: Real implementation needs — linear mapping is simplistic.
+    /// Consider: logarithmic scaling for high-severity issues, priority caps,
+    /// and consideration of historical impact when prioritizing.
     fn severity_to_priority(severity: f64) -> u8 {
         ((severity * 9.0) + 1.0).round() as u8
     }
 
     /// Prune metrics history to keep only the most recent entries.
+    ///
+    /// Note: Real implementation needs — simple drain from front.
+    /// Consider: time-based pruning (keep last 7 days), size-based pruning
+    /// with importance weighting, and persistence to KB before pruning.
     ///
     /// Note: Real implementation needs — simple drain from front.
     /// Consider: time-based pruning (keep last 7 days), size-based pruning
@@ -613,6 +678,10 @@ impl SelfImprovementLoop {
     }
 
     /// Update trend analysis based on metrics history.
+    ///
+    /// Note: Real implementation needs — trend detection uses simple delta comparison.
+    /// Consider: exponential moving averages, seasonality detection, and
+    /// multi-metric correlation analysis for trend identification.
     ///
     /// Note: Real implementation needs — trend detection uses simple delta comparison.
     /// Consider: exponential moving averages, seasonality detection, and
@@ -682,6 +751,10 @@ impl SelfImprovementLoop {
     /// Note: Real implementation needs — returns reference to in-memory vector.
     /// Consider: time-window filtering, metric type filtering, and persistence
     /// to KB for cross-session metric tracking.
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: time-window filtering, metric type filtering, and persistence
+    /// to KB for cross-session metric tracking.
     pub fn latest_metrics(&self) -> Option<&SystemMetrics> {
         self.metrics_history.last()
     }
@@ -690,11 +763,17 @@ impl SelfImprovementLoop {
     ///
     /// Note: Real implementation needs — returns reference to in-memory vector.
     /// Consider: filtering by trend direction, metric name, and streak length.
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by trend direction, metric name, and streak length.
     pub fn trends(&self) -> &[MetricTrend] {
         &self.trends
     }
 
     /// 获取待执行方案
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by priority, dimension, and time range.
     ///
     /// Note: Real implementation needs — returns reference to in-memory vector.
     /// Consider: filtering by priority, dimension, and time range.
@@ -709,11 +788,18 @@ impl SelfImprovementLoop {
     ///
     /// Note: Real implementation needs — returns reference to in-memory vector.
     /// Consider: filtering by execution status, time range, and success/failure.
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by execution status, time range, and success/failure.
     pub(crate) fn _executed_plans(&self) -> &[ImprovementPlan] {
         &self.executed
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     ///
     /// Note: Real implementation needs — stats are computed from in-memory state.
     /// For production: maintain running aggregates for O(1) access, and expose

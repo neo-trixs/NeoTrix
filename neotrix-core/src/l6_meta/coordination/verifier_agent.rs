@@ -252,6 +252,11 @@ impl _VerifierAgent {
     }
     
     /// 生成重生成请求
+    ///
+    /// Note: Real implementation needs — determines regeneration mode based on
+    /// score threshold (< 0.5 → Regenerate, else → Edit). Consider: adding
+    /// model-specific mode selection, cost-aware mode routing, and batch
+    /// regeneration support.
     pub(crate) fn _generate_regeneration_request(
         &self,
         original_prompt: &str,
@@ -279,13 +284,31 @@ impl _VerifierAgent {
     
     /// Auto-correct a prompt based on verification results.
     ///
-    /// STUB: Currently only appends suggested_corrections to the original prompt.
-    /// Real implementation needs: LLM-based prompt rewriting that combines the original
-    /// prompt, verification errors, and suggested corrections into a semantically
-    /// coherent corrected prompt. Simple concatenation does not produce high-quality
-    /// correction prompts.
+    /// # Incomplete Implementation
+    /// Currently only appends `suggested_corrections` to the original prompt via
+    /// simple string concatenation. This produces semantically incoherent prompts
+    /// that are unlikely to fix the underlying issues.
+    ///
+    /// # Required Wiring
+    /// - LLM-based prompt rewriting that combines:
+    ///   - Original prompt context
+    ///   - Verification errors (error_types)
+    ///   - Suggested corrections
+    ///   - Semantic coherence constraints
+    /// - Prompt template injection (avoid breaking existing structure)
+    /// - Iterative refinement (re-verify corrected prompt)
+    ///
+    /// # Example of Current Limitation
+    /// Input: "A cat sits on a mat"
+    /// Corrections: ["Use consistent lighting", "Add shadow details"]
+    /// Output: "A cat sits on a mat Use consistent lighting Add shadow details"
+    /// (incoherent — LLM rewrite needed)
     fn auto_correct_prompt(&self, prompt: &str, result: &VerificationResult) -> String {
-        // STUB: 仅追加修正建议, 无 LLM 重写能力
+        tracing::warn!(
+            "auto_correct_prompt: simple concatenation (no LLM rewrite). \
+             Corrections appended without semantic integration. \
+             Wire LLM-based prompt rewriting for production use."
+        );
         let mut corrected = prompt.to_string();
         
         for correction in &result.suggested_corrections {
@@ -295,7 +318,11 @@ impl _VerifierAgent {
         corrected
     }
     
-    /// Get aggregate verification statistics across all verification runs.
+    /// Calculate weighted total score from dimension scores across dimension groups.
+    ///
+    /// Note: Real implementation needs — dimensions not present in scores are skipped
+    /// (their weight doesn't contribute to total_weight normalization). Consider:
+    /// requiring all dimensions to be scored, or penalizing missing dimensions.
     ///
     /// Note: Real implementation needs — stats are computed from in-memory history.
     /// For production: persist to KB, add time-window filtering, and expose metrics
@@ -369,8 +396,9 @@ mod tests {
         // correct mode based on score thresholds. This tests threshold logic
         // (mode routing), NOT real VLM analysis quality.
         //
-        // TODO(R-P79): total_score is a hardcoded constant, not from real VLM
-        // analysis. To test real mode selection, wire a VLM and assert that actual
+        // FABRICATED INPUT: total_score (0.5, 0.3) are synthetic constants, NOT from
+        // real VLM analysis. The test proves mode routing works at threshold boundaries.
+        // TODO(R-P79): To test real mode selection, wire a VLM and assert that actual
         // analysis results drive the mode. Currently:
         //   - score >= 0.5 → Edit (minor corrections)
         //   - score < 0.5  → Regenerate (major issues)

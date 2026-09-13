@@ -157,11 +157,19 @@ impl SentruxSensor {
     /// Note: Real implementation needs — baseline is stored in-memory only.
     /// Consider: persistence to KB for cross-session baseline tracking,
     /// and baseline versioning for historical comparison.
+    ///
+    /// Note: Real implementation needs — baseline is stored in-memory only.
+    /// Consider: persistence to KB for cross-session baseline tracking,
+    /// and baseline versioning for historical comparison.
     pub(crate) fn _save_baseline(&mut self, snapshot: QualitySnapshot) {
         self.baseline = Some(snapshot);
     }
 
     /// 比较当前与 baseline
+    ///
+    /// Note: Real implementation needs — comparison is simple score delta.
+    /// Consider: per-metric comparison, trend analysis, and configurable
+    /// degradation thresholds for quality gate integration.
     ///
     /// Note: Real implementation needs — comparison is simple score delta.
     /// Consider: per-metric comparison, trend analysis, and configurable

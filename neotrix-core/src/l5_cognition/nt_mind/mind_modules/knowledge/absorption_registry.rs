@@ -162,12 +162,19 @@ pub fn _trigger_absorption(
     Ok(events)
 }
 
+/// List all registered absorber instances.
+///
+/// Note: Real implementation needs — returns snapshot of current registrations.
+/// Consider: adding pagination, filtering by capability, and staleness indicators.
 pub fn _list_absorbers() -> Vec<_AbsorberInstance> {
     REGISTRY.read()
         .map(|state| state.by_id.values().cloned().collect())
         .unwrap_or_default()
 }
 
+/// Get the total number of registered absorber instances.
+///
+/// Note: Real implementation needs — O(1) count from HashMap.
 pub fn _absorber_count() -> usize {
     REGISTRY.read().map(|state| state.by_id.len()).unwrap_or(0)
 }

@@ -167,6 +167,10 @@ pub struct _ResearchStats {
 
 impl _ResearchAutomationEngine {
     /// 创建新的科研自动化引擎
+    ///
+    /// Note: Real implementation needs — engine starts empty.
+    /// Consider: loading existing hypotheses/experiments from KB,
+    /// and integrating with EventBus for research event tracking.
     pub fn new(config: _ResearchConfig) -> Self {
         Self {
             hypotheses: Vec::new(),
@@ -185,6 +189,12 @@ impl _ResearchAutomationEngine {
     }
 
     /// 生成假设
+    ///
+    /// STUB: Returns hardcoded hypothesis structure. Real implementation needs:
+    /// - LLM-based hypothesis generation from topic and context
+    /// - Variable identification from research domain
+    /// - Confidence scoring based on literature support
+    /// - Hypothesis deduplication against existing hypotheses
     pub(crate) fn _generate_hypothesis(&mut self, topic: &str, context: &str) -> Hypothesis {
         let hypothesis = Hypothesis {
             id: uuid::Uuid::new_v4().to_string(),
@@ -215,6 +225,12 @@ impl _ResearchAutomationEngine {
     }
 
     /// 设计实验
+    ///
+    /// STUB: Returns hardcoded experiment design. Real implementation needs:
+    /// - LLM-based experimental design from hypothesis
+    /// - Sample size calculation based on effect size and power
+    /// - Control group selection and randomization strategy
+    /// - Material and procedure generation from domain knowledge
     pub(crate) fn _design_experiment(&mut self, hypothesis_id: &str) -> Option<Experiment> {
         let hypothesis = self.hypotheses.iter().find(|h| h.id == hypothesis_id)?;
 
@@ -265,6 +281,12 @@ impl _ResearchAutomationEngine {
     }
 
     /// 分析结果
+    ///
+    /// STUB: Returns hardcoded statistical analysis. Real implementation needs:
+    /// - Actual statistical tests (t-test, ANOVA, chi-square) based on data type
+    /// - Effect size calculation (Cohen's d, eta-squared)
+    /// - Confidence interval computation
+    /// - Multiple comparison correction (Bonferroni, FDR)
     pub fn analyze_results(&mut self, experiment_id: &str, data: HashMap<String, serde_json::Value>) -> Option<ExperimentResult> {
         let _experiment = self.experiments.iter().find(|e| e.id == experiment_id)?;
 
@@ -292,6 +314,12 @@ impl _ResearchAutomationEngine {
     }
 
     /// 生成论文草稿
+    ///
+    /// STUB: Returns hardcoded paper structure. Real implementation needs:
+    /// - LLM-based section generation from experiment results
+    /// - Citation management and reference formatting
+    /// - Figure/table generation from data
+    /// - LaTeX/Markdown export with proper formatting
     pub(crate) fn _generate_paper(&mut self, experiment_id: &str) -> Option<_PaperDraft> {
         if !self.config.auto_paper_generation {
             return None;
@@ -337,6 +365,10 @@ impl _ResearchAutomationEngine {
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory stats.
+    /// Consider: persisting to KB, adding time-windowed statistics, and
+    /// exposing via EventBus for research pipeline monitoring.
     pub fn stats(&self) -> &_ResearchStats {
         &self.stats
     }
