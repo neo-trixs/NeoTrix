@@ -242,7 +242,7 @@ pub const TRIGRAM_BITS: [u8; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
 
 /// A weight vector in the 8-dimensional weight space of E₈.
 /// Stored in half-units: coordinate value × 2 (so ½ is stored as 1, 1 as 2).
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Partialserde::Serialize, serde::Deserialize)]
 pub struct E8Weight {
     pub coords: [i8; 8],
 }

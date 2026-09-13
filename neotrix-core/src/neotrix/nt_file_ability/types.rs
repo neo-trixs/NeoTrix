@@ -203,7 +203,7 @@ pub enum SheetCellValueType {
 }
 
 /// XLSX 单元格结构化值 (列号/行号/引用 + 类型 + 显示文本 + 原始数值 + 公式)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialSerialize, Deserialize)]
 pub struct SheetCellData {
     /// 1-based 列号 (A=1, B=2, ...)
     pub col: u32,

@@ -1156,7 +1156,7 @@ pub fn verify_unified_batch(requests: &[UnifiedVerifyRequest]) -> (Vec<UnifiedVe
 // ────────────────────────────────────────────────────────────────
 
 /// 超参数敏感度观测点 (scale: 模型规模, 如参数量或训练 FLOPs)
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
 pub struct HyperparamSensitivity {
     pub scale: f64,
     pub loss_variance: f64,
@@ -1164,7 +1164,7 @@ pub struct HyperparamSensitivity {
 }
 
 /// 小规模实验警告: 规模低于前沿时结果被超参数敏感度混淆
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialSerialize, Deserialize)]
 pub struct SmallScaleWarning {
     pub model_scale: f64,
     pub sensitivity: f64,
@@ -1173,7 +1173,7 @@ pub struct SmallScaleWarning {
 }
 
 /// Small-Scale Method: 以超参数优先的 holistic 评测方法论
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
 pub struct SmallScaleMethod {
     pub sensitivity_decay_rate: f64, // loss_variance ∝ scale^(-rate)
     pub dimension_decay_rate: f64,   // effective dims ∝ scale^(-rate)

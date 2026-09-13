@@ -51,7 +51,7 @@ const TASK_AFFINITY: [[f64; NUM_GROUPS]; 6] = [
 ];
 
 /// One routing decision: which expert groups are active for a given step.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
 pub struct SparseRouting {
     /// Indices of the activated groups (length TOP_K, sorted ascending).
     pub active_groups: [usize; TOP_K],

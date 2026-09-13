@@ -9,7 +9,7 @@ pub struct AnalysisReport {
     pub layout_summary: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialSerialize, Deserialize)]
 pub struct Transcription {
     pub text: String,
     pub language: String,
@@ -31,7 +31,7 @@ pub enum ChangeType {
     Deleted,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialSerialize, Deserialize)]
 pub enum SensoryEventKind {
     Visual(AnalysisReport),
     Auditory(Transcription),
@@ -39,7 +39,7 @@ pub enum SensoryEventKind {
     Conversation(ConversationTurn),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialSerialize, Deserialize)]
 pub struct SensoryEvent {
     pub id: u64,
     pub timestamp_ms: u64,

@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 // P6: KvCacheMemory — KV 缓存即记忆 (KEEP)
 // ────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialSerialize, Deserialize)]
 pub struct CacheEntry {
     pub key: String,
     pub value: Vec<f64>,

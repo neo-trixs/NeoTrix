@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 const ADEQUACY_THRESHOLD: f64 = 0.75;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
 pub struct VoIConfig {
     pub hypotheses: usize,
     pub experiments: usize,
@@ -32,7 +32,7 @@ impl Default for VoIConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
 pub struct Hypothesis {
     pub id: usize,
     pub log_likelihood: f64,
@@ -57,14 +57,14 @@ impl Hypothesis {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
 pub struct Experiment {
     pub id: usize,
     pub outcome: f64,
     pub information_gain: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
 pub struct MOpenCheck {
     pub adequacy: f64,
     pub expand_hypothesis_space: bool,

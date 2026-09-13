@@ -1294,7 +1294,7 @@ fn take_until_tokens(text: &str, budget: usize, from_start: bool) -> String {
 /// W1.1 (batch3 2026-08-26, 源: arxiv 2608.22752 Compaction Cliff):
 /// 长会话压缩过猛 → 下游任务成功率断崖式衰减。本结构新增观测字段,
 /// 使调用方可在压缩事件发生时感知断崖风险 (retention_ratio / is_cliff)。
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct BudgetResult {
     pub original_tokens: usize,
     pub final_tokens: usize,

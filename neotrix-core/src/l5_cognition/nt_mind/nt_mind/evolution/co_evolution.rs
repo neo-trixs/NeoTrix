@@ -55,7 +55,7 @@ pub fn strategy_name(name: &str) -> &'static str {
 }
 
 /// 共进化循环配置 (P4) — epsilon 探索/利用、bounded curriculum 上限、bandit 冷启动证据门。
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Partialserde::Serialize, serde::Deserialize)]
 pub struct CoEvoConfig {
     /// bandit 探索概率: 足够证据后仍以 epsilon 概率尝试次优臂。
     pub epsilon: f64,

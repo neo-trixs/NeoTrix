@@ -98,7 +98,7 @@ impl Domain {
 }
 
 /// 一次生成的分类结果 — 三个维度 + 置信度
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialSerialize, Deserialize)]
 pub struct Classification {
     pub task_type: TaskType,
     pub complexity: Complexity,

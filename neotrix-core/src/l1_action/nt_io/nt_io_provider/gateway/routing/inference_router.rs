@@ -12,7 +12,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::l1_action::nt_io::nt_io_provider::gateway::execution::unified_inference::*;
+use crate::l1_action::nt_io::nt_io_provider::gateway::execution::unified_inference::{UnifiedInference, InferenceConfig};
 use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 use crate::l1_action::nt_io::nt_io_provider::common::types::*;
 
@@ -213,10 +213,10 @@ impl UnifiedInference for InferenceRouter {
             + (completion_tokens as f64 / 1000.0) * 0.002;
 
         CostEstimate {
-            prompt_tokens,
-            completion_tokens,
+            input_tokens: prompt_tokens,
+            output_tokens: completion_tokens,
             estimated_cost_usd: cost,
-            provider_name: request.model.clone().unwrap_or_default(),
+            model: request.model.clone().unwrap_or_default(),
         }
     }
 }

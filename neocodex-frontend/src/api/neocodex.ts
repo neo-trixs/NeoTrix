@@ -25,43 +25,43 @@ import type {
 
 /* ── 会话（domain plugin） ── */
 export function listSessions(projectPath?: string | null): Promise<NeoCodexSessionInfo[]> {
-  return sessionApi.listSessions() as Promise<NeoCodexSessionInfo[]>
+  return domain.session.list() as Promise<NeoCodexSessionInfo[]>
 }
 
 export function createSession(name?: string): Promise<NeoCodexSessionInfo> {
-  return sessionApi.createSession(name) as Promise<NeoCodexSessionInfo>
+  return domain.session.create(name) as Promise<NeoCodexSessionInfo>
 }
 
 export function deleteSession(sessionId: string): Promise<void> {
-  return sessionApi.deleteSession(sessionId)
+  return domain.session.delete(sessionId)
 }
 
 export function switchSession(sessionId: string): Promise<void> {
-  return sessionApi.switchSession(sessionId)
+  return domain.session.switch(sessionId)
 }
 
 export function renameSession(sessionId: string, name: string): Promise<NeoCodexSessionInfo> {
-  return sessionApi.renameSession(sessionId, name) as Promise<NeoCodexSessionInfo>
+  return domain.session.rename(sessionId, name) as Promise<NeoCodexSessionInfo>
 }
 
 export function tagSession(sessionId: string, tag: string): Promise<NeoCodexSessionInfo> {
-  return sessionApi.tagSession(sessionId, tag) as Promise<NeoCodexSessionInfo>
+  return domain.session.tag(sessionId, tag) as Promise<NeoCodexSessionInfo>
 }
 
 export function untagSession(sessionId: string, tag: string): Promise<NeoCodexSessionInfo> {
-  return sessionApi.untagSession(sessionId, tag) as Promise<NeoCodexSessionInfo>
+  return domain.session.untag(sessionId, tag) as Promise<NeoCodexSessionInfo>
 }
 
 export function archiveSession(sessionId: string): Promise<void> {
-  return sessionApi.archiveSession(sessionId)
+  return domain.session.archive(sessionId)
 }
 
 export function restoreSession(sessionId: string): Promise<void> {
-  return sessionApi.restoreSession(sessionId)
+  return domain.session.restore(sessionId)
 }
 
 export function listArchived(): Promise<NeoCodexSessionInfo[]> {
-  return sessionApi.listSessions() as Promise<NeoCodexSessionInfo[]>
+  return domain.session.listArchived() as Promise<NeoCodexSessionInfo[]>
 }
 
 export function searchSessions(query: string): Promise<NeoCodexSearchHit[]> {
@@ -460,7 +460,6 @@ export function canvasApplyEvolutionRoute(): Promise<{ matured: number; pruned: 
 }
 
 /* ── 画板 KV（domain plugin） ── */
-import * as domain from './domain'
 
 export function kbKvSet(namespace: string, key: string, value: string): Promise<void> {
   return domain.kb.kvSet(namespace, key, value)
@@ -470,45 +469,4 @@ export function kbKvGet(namespace: string, key: string): Promise<string | null> 
 }
 export function kbKvList(namespace: string): Promise<[string, string][]> {
   return domain.kb.kvList(namespace)
-}
-
-/* ── 代理池健康度 ── */
-export interface ProviderHealthStatus {
-  name: string
-  available: boolean
-  circuit_state: string
-  success_rate: string
-  total_calls: number
-  total_errors: number
-  is_free: boolean
-  composite_score: string
-  category: string
-  latency_p95_ms: string
-  latency_avg_ms: string
-  latency_samples: number
-  total_tokens: number
-  health_penalty: string
-  model_locked_count: number
-}
-
-export interface PoolSufficiencyReport {
-  total_providers: number
-  free_total: number
-  free_available: number
-  locked_models: number
-  sufficient: boolean
-}
-
-export interface ProbeResult {
-  name: string
-  reachable: boolean
-  status_code: number
-  latency_ms: number
-  error: string | null
-}
-
-export interface DiscoveryResult {
-  discovered_count: number
-  registered_total: number
-  models: { provider: string; model_id: string; base_url: string; is_free: boolean; tier: string }[]
 }

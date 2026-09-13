@@ -159,7 +159,7 @@ impl ChatPlugin {
         // Emit reasoning event
         if let Some(app) = APP_HANDLE.get() {
             if let Err(e) = app.emit("neocodex_stream_reasoning", serde_json::json!({
-                "content": format!("Starting reasoning for task: {}", content),
+                "text": format!("Starting reasoning for task: {}", content),
             })) {
                 log::warn!("Failed to emit reasoning event: {}", e);
             }
@@ -209,7 +209,7 @@ impl ChatPlugin {
         // Emit reasoning event for task decomposition
         if let Some(app) = APP_HANDLE.get() {
             if let Err(e) = app.emit("neocodex_stream_reasoning", serde_json::json!({
-                "content": format!("Task decomposed into {} subtasks", report.allocations.len()),
+                "text": format!("Task decomposed into {} subtasks", report.allocations.len()),
             })) {
                 log::warn!("Failed to emit reasoning event: {}", e);
             }
