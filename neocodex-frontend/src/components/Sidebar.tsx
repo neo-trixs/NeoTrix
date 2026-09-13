@@ -1,5 +1,5 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
-import { invoke } from '@tauri-apps/api/core'
+import * as domain from '../api/domain'
 import { Settings, Archive, RotateCcw, ChevronRight, GitFork } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
 import type { Session } from '../stores/chat'
@@ -144,7 +144,7 @@ export function Sidebar(props: SidebarProps) {
     setManualOrder(valid)
     persistOrder()
     // 接线工作树后端：真实持久化（running backend 无该命令时静默降级到本地序）
-    void invoke('cmd_reorder_sessions', { ids: valid }).catch(() => {})
+    void domain.session.reorder(valid).catch(() => {})
     dragSessionId = null
   }
   // 跨项目拖拽：前端本地覆盖会话所属项目（后端固化待并发会话释放）
@@ -160,7 +160,7 @@ export function Sidebar(props: SidebarProps) {
       return n
     })
     // 接线工作树后端：真实持久化（无命令时静默降级到本地覆盖）
-    void invoke('cmd_set_session_project', { id, project }).catch(() => {})
+    void domain.session.setProject(id, project).catch(() => {})
     dragSessionId = null
   }
   const pinnedSessions = () =>
@@ -271,7 +271,7 @@ export function Sidebar(props: SidebarProps) {
   const handleForkSession = async (e: Event, id: string) => {
     e.stopPropagation()
     try {
-      const newId = await invoke<string>('cmd_fork_session', { from_id: id })
+      const { id: newId } = await domain.session.fork(id)
       await chatStore.loadSessions()
       if (newId) await chatStore.switchSession(newId)
     } catch {

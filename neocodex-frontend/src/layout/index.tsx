@@ -1,5 +1,5 @@
 import { createSignal, onMount, onCleanup, For, Show } from 'solid-js'
-import { invoke } from '@tauri-apps/api/core'
+import { llamacpp } from '../api/domain'
 import Navbar from './components/navbar'
 
 interface Message {
@@ -58,12 +58,8 @@ export default function App() {
 
   const loadHealth = async () => {
     try {
-      const result = await invoke<{ ok: boolean; data: LlamacppHealth }>('domain_call', {
-        domain: 'llamacpp',
-        action: 'health',
-        args: {},
-      })
-      if (result.ok) setHealth(result.data)
+      const result = await llamacpp.health()
+      setHealth(result as unknown as LlamacppHealth)
     } catch (e) {
       console.error('Health check failed:', e)
     }
@@ -71,16 +67,10 @@ export default function App() {
 
   const loadModels = async () => {
     try {
-      const result = await invoke<{ ok: boolean; data: { models: LocalModel[] } }>('domain_call', {
-        domain: 'llamacpp',
-        action: 'models',
-        args: {},
-      })
-      if (result.ok) {
-        setModels(result.data.models)
-        if (result.data.models.length > 0 && !selectedModel()) {
-          setSelectedModel(result.data.models[0].name)
-        }
+      const result = await llamacpp.models()
+      setModels(result as unknown as LocalModel[])
+      if (result.length > 0 && !selectedModel()) {
+        setSelectedModel(result[0].name)
       }
     } catch (e) {
       console.error('Load models failed:', e)
@@ -90,11 +80,7 @@ export default function App() {
   const startServer = async () => {
     try {
       setLoading(true)
-      await invoke('domain_call', {
-        domain: 'llamacpp',
-        action: 'start',
-        args: {},
-      })
+      await llamacpp.start()
       await loadHealth()
     } catch (e) {
       console.error('Start server failed:', e)
@@ -105,11 +91,7 @@ export default function App() {
 
   const stopServer = async () => {
     try {
-      await invoke('domain_call', {
-        domain: 'llamacpp',
-        action: 'stop',
-        args: {},
-      })
+      await llamacpp.stop()
       await loadHealth()
     } catch (e) {
       console.error('Stop server failed:', e)
@@ -143,33 +125,26 @@ export default function App() {
         content: m.content,
       }))
 
-      const result = await invoke<{ ok: boolean; data: any }>('domain_call', {
-        domain: 'llamacpp',
-        action: 'send',
-        args: {
-          messages: apiMessages,
-          temperature: 0.7,
-          max_tokens: 2048,
-        },
+      const result = await llamacpp.send(apiMessages.map(m => m.content).join('\n'), {
+        temperature: 0.7,
+        max_tokens: 2048,
       })
 
-      if (result.ok) {
-        const content = result.data?.choices?.[0]?.message?.content || 'No response'
-        const assistantMsg: Message = {
-          role: 'assistant',
-          content,
-          timestamp: Date.now(),
-        }
-        setMessages(prev => [...prev, assistantMsg])
+      const content = result || 'No response'
+      const assistantMsg: Message = {
+        role: 'assistant',
+        content,
+        timestamp: Date.now(),
+      }
+      setMessages(prev => [...prev, assistantMsg])
 
-        // Save messages to conversation
-        if (currentId) {
-          setConversations(prev => prev.map(c => 
-            c.id === currentId 
-              ? { ...c, messages: [...c.messages, userMsg, assistantMsg] }
-              : c
-          ))
-        }
+      // Save messages to conversation
+      if (currentId) {
+        setConversations(prev => prev.map(c => 
+          c.id === currentId 
+            ? { ...c, messages: [...c.messages, userMsg, assistantMsg] }
+            : c
+        ))
       }
     } catch (e) {
       console.error('Send message failed:', e)

@@ -25,6 +25,7 @@ export interface Message {
     tokens?: number
     duration?: number
   }
+  reasoning?: string
 }
 
 export interface Session {
@@ -396,6 +397,18 @@ function createChatStore() {
     }))
   }
 
+  const appendMessageReasoning = (id: string, delta: string): void => {
+    setState('sessions', produce(s => {
+      const sess = s.find(sess => sess.id === state.currentSessionId)
+      if (sess) {
+        const msg = sess.messages.find(m => m.id === id)
+        if (msg) {
+          msg.reasoning = (msg.reasoning || '') + delta
+        }
+      }
+    }))
+  }
+
   const appendToolCall = (id: string, toolCall: ToolCallRecord): void => {
     setState('sessions', produce(s => {
       const sess = s.find(sess => sess.id === state.currentSessionId)
@@ -570,6 +583,7 @@ function createChatStore() {
     updateMessage,
     finishMessage,
     appendMessageContent,
+    appendMessageReasoning,
     messageContent,
     appendToolCall,
     deleteMessage,

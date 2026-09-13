@@ -4,29 +4,10 @@
    ════════════════════════════════════════════ */
 import { createSignal, For, Show, onMount, onCleanup } from 'solid-js'
 import { clsx } from 'clsx'
-import type { ProviderHealthStatus } from '../../api/neocodex'
+import { getProxyPoolStatus, type ProxyPoolStatus } from '../../api/proxy-pool'
+import { providerStatus, type ProviderHealthStatus } from '../../api/neocodex'
 
 /* ── 类型 ── */
-interface ProxyNode {
-  url: string
-  tag: string
-  latency_ms: number | null
-  success_count: number
-  fail_count: number
-  geo_tag: string | null
-  from_subscription: boolean
-  speed_tier: string
-}
-
-interface ProxyPoolStatus {
-  total: number
-  healthy: number
-  unhealthy: number
-  strategy: string
-  nodes: ProxyNode[]
-  subscriptions: string[]
-}
-
 interface SystemProxyStatus {
   enabled: boolean
   os: string
@@ -86,10 +67,9 @@ export function NetworkSection() {
     setLoading(true)
     setError(null)
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
       const [status, health] = await Promise.all([
-        invoke<ProxyPoolStatus>('proxy_pool_status').catch(() => null),
-        invoke<ProviderHealthStatus[]>('provider_status').catch(() => []),
+        getProxyPoolStatus().catch(() => null),
+        providerStatus().catch(() => []),
       ])
       setProxyStatus(status)
       setProviderHealth(health)
