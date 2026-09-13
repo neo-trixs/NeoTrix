@@ -13,14 +13,9 @@ pub struct HumanOversightSelfTest;
 
 impl SelfTest for HumanOversightSelfTest {
     fn name(&self) -> &str { "human_oversight_governance" }
-    fn category(&self) -> &str { "governance" }
-    fn evaluate(&self) -> SelfTestResult {
+    fn self_test(&self) -> Result<(), Vec<String>> {
         // 检查治理规则是否可访问
-        SelfTestResult {
-            passed: true,
-            message: "人类监督治理自测: 治理规则可访问".to_string(),
-            details: None,
-        }
+        Ok(())
     }
 }
 

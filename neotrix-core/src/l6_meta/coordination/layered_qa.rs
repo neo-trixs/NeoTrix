@@ -319,9 +319,15 @@ impl _LayeredQA {
             let has_visual = output.get("images").or_else(|| output.get("visual")).or_else(|| output.get("frames")).is_some();
             (has_visual, IssueSeverity::Warning, if has_visual { "视觉检查通过".into() } else { "缺少视觉输出".into() })
         } else {
-            // 默认检查：只要有输出就通过
-            let has_output = !output.as_object().map_or(true, |m| m.is_empty());
-            (has_output, IssueSeverity::Info, if has_output { format!("检查 {} 通过", item.name) } else { format!("检查 {} 无输出", item.name) })
+            // Default: check type not implemented — FAIL with clear warning.
+            // The QA gate must not silently pass unimplemented checks.
+            // Real implementation: match on item.check_type and validate.
+            let msg = format!(
+                "UNIMPLEMENTED check type {:?} for '{}' — QA gate cannot verify this item. \
+                 Implement execute_check branch or disable this check item in config.",
+                item.check_type, item.name
+            );
+            (false, IssueSeverity::Warning, msg)
         };
 
         _QACheckResult {
@@ -405,7 +411,7 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_layered_qa() {
+    fn test_layered_qa_unimplemented_checks_fail() {
         let mut qa = _LayeredQA::new();
         
         let spec = serde_json::json!({
@@ -420,9 +426,11 @@ mod tests {
         });
         
         let result = qa.execute(&spec, &output);
-        assert!(result.passed);
+        // With unimplemented checks, QA gate should NOT pass.
+        // This verifies that the gate doesn't silently approve unvalidated output.
+        assert!(!result.passed, "QA gate must not pass when checks are unimplemented");
         
         let decision = qa._generate_publish_decision(&result);
-        assert!(decision.publish);
+        assert!(!decision.publish, "Publish decision must be false for unimplemented checks");
     }
 }

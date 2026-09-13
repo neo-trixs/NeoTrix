@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::core::nt_core_hcube::{FhrrHyperCube, FhrrVector};
+use crate::core::nt_core_hcube::FhrrVector;
 
 /// Nuclei vulnerability scanner integration
 pub mod nt_shield_vuln_scanner;
@@ -128,13 +128,20 @@ impl ShieldCapability {
         // Phase 1: Reconnaissance via Nuclei
         let recon = self.scanner.reconnaissance(target).await;
         for finding in &recon.findings {
-            self.findings.entry(target.to_string()).or_default().push(finding.clone());
+            self.findings.entry(target.to_string()).or_default().push(
+                format!("[{}] {} on {}: {}", finding.severity, finding.template_id, finding.host, finding.description)
+            );
         }
         
-        // Phase 2: AI-driven vulnerability detection
-        if let Some(vulns) = self.pentest_agent.detect_vulnerabilities(target).await {
-            for vuln in vulns {
-                results.push(format!("{}: {}", target, vuln));
+        // Phase 2: AI-driven vulnerability detection (stub — returns Err until PentestGPT wired)
+        match self.pentest_agent.detect_vulnerabilities(target).await {
+            Ok(vulns) => {
+                for vuln in vulns {
+                    results.push(format!("{}: {:?}", target, vuln));
+                }
+            }
+            Err(e) => {
+                log::warn!("[pentest] AI vulnerability detection unavailable: {}", e);
             }
         }
         
@@ -151,7 +158,7 @@ impl ShieldCapability {
     }
     
     /// Extract VSA embedding from vulnerability findings
-    pub fn extract_finding_embedding(&self, finding: &str) -> FhrrVector {
+    pub fn extract_finding_embedding(&self, _finding: &str) -> FhrrVector {
         let vec = crate::core::l3_memory::nt_core_hcube::fhrr_vsa::FhrrVector::random_dim(1024, 0x42);
         // In production: encode finding text into VSA using word2vec/BERT
         vec

@@ -1041,7 +1041,12 @@ impl crate::core::nt_core_traits::SecurityCheckRegistry for CheckRegistry {
         let mut failed = Vec::new();
 
         for check in &self.checks {
-            let verdict = (check.check_fn)(&());
+            let ctx = ToolCallContext {
+                tool_name: check.name.clone(),
+                args: serde_json::Value::Null,
+                source: ToolSource::Consciousness,
+            };
+            let verdict = (check.check_fn)(&ctx);
             match verdict {
                 CheckVerdict::Pass => passed.push(check.name.clone()),
                 CheckVerdict::Fail(reason) => failed.push(format!("{}: {}", check.name, reason)),

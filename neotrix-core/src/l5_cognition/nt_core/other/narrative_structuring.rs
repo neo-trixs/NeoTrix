@@ -214,12 +214,20 @@ impl _NarrativeStructuring {
     }
     
     /// 从文本结构化叙事
+    ///
+    /// **Feature not wired**: This uses naive paragraph splitting with keyword heuristics.
+    /// Real implementation needs an LLM call to:
+    /// 1. Parse narrative structure (acts, scenes, beats)
+    /// 2. Assign shot sizes and camera movements based on dramatic context
+    /// 3. Extract emotional arcs and pacing
+    /// 4. Generate structured shot descriptions for video production
     pub(crate) fn _structure_from_text(
         &mut self,
         content_id: &str,
         text: &str,
     ) -> _NarrativeScript {
-        // TODO: 实际调用 LLM 进行叙事结构化
+        // Feature not wired: LLM-based narrative structuring not implemented.
+        // Falls back to keyword heuristics — produces rough approximations only.
         let shots = self.parse_text_to_shots(text);
         
         let total_duration = shots.iter().map(|s| s.duration_secs).sum();
@@ -287,7 +295,7 @@ impl _NarrativeStructuring {
                 scene: format!("场景_{}", (i / 3) + 1),
                 shot_size,
                 camera_movement,
-                duration_secs: duration,
+                duration_secs: duration as f32,
                 dialogue: None,
                 narration: None,
                 action: None,

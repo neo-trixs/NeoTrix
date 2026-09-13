@@ -165,22 +165,32 @@ impl FaceConsistencyManager {
     }
     
     /// 执行面部修复
+    ///
+    /// Real implementation needs:
+    /// - Face detection (InsightFace/RetinaFace/MTCNN)
+    /// - Face alignment and preprocessing
+    /// - ADetailer/FaceDetailer inpainting pipeline (SD WebUI or ComfyUI)
+    /// - Optionally apply LoRA weights for character consistency
+    /// - Compute actual consistency score via face embedding similarity (ArcFace/CosFace)
     pub(crate) fn _fix_faces(
         &mut self,
         image_path: &str,
         _character_id: Option<&str>,
     ) -> _FaceFixResult {
-        // TODO: 实际调用面部修复逻辑
         let result = _FaceFixResult {
-            success: true,
-            fixed_image_path: Some(format!("{}_fixed.png", image_path)),
-            detected_faces: 1,
-            fixed_faces: 1,
-            consistency_score: 0.95,
-            fix_time_ms: 2000,
-            error: None,
+            success: false,
+            fixed_image_path: None,
+            detected_faces: 0,
+            fixed_faces: 0,
+            consistency_score: 0.0,
+            fix_time_ms: 0,
+            error: Some(format!(
+                "Face fix not yet wired. Requires face detector (InsightFace) + \
+                 inpainting pipeline (ADetailer/FaceDetailer). Input: {}",
+                image_path
+            )),
         };
-        
+
         self.fix_history.push(result.clone());
         result
     }
@@ -270,15 +280,16 @@ mod tests {
         manager.set_reference("char_001", "/ref/char_001.png");
         assert!(manager.get_reference("char_001").is_some());
         
-        // 执行修复
+        // Face fix is not wired — expect explicit failure
         let result = manager._fix_faces("/input/test.png", Some("char_001"));
-        assert!(result.success);
-        assert!(result.consistency_score > 0.9);
+        assert!(!result.success);
+        assert!(result.error.is_some());
+        assert!(result.consistency_score == 0.0);
         
         // 检查统计
         let stats = manager.statistics();
         assert_eq!(stats.total_fixes, 1);
-        assert_eq!(stats.successful_fixes, 1);
+        assert_eq!(stats.successful_fixes, 0);
     }
     
     #[test]

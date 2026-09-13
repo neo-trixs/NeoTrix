@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 内部网络扫描器 — fscan 抽象 (旧名称 FscanModule 兼容)
+#[derive(Debug)]
 pub struct FscanModule {
     /// 发现的内部主机
     internal_hosts: Vec<_HostInfo>,
@@ -305,11 +306,13 @@ impl FscanModule {
                 id: host.ip.clone(),
                 node_type: "host".into(),
                 label: host.hostname.clone().unwrap_or_else(|| host.ip.clone()),
-                properties: serde_json::json!({
-                    "ip": host.ip,
-                    "os": host.os,
-                    "open_ports": host.open_ports,
-                }).as_object().unwrap().clone(),
+                properties: {
+                    let mut m = HashMap::new();
+                    m.insert("ip".to_string(), serde_json::Value::String(host.ip.clone()));
+                    m.insert("os".to_string(), serde_json::Value::String(host.os.clone().unwrap_or_default()));
+                    m.insert("open_ports".to_string(), serde_json::json!(host.open_ports));
+                    m
+                },
             });
         }
 
@@ -321,11 +324,13 @@ impl FscanModule {
                     id: service_node_id.clone(),
                     node_type: "service".into(),
                     label: format!("{} ({})", service.service, service.port),
-                    properties: serde_json::json!({
-                        "port": service.port,
-                        "service": service.service,
-                        "version": service.version,
-                    }).as_object().unwrap().clone(),
+                    properties: {
+                        let mut m = HashMap::new();
+                        m.insert("port".to_string(), serde_json::json!(service.port));
+                        m.insert("service".to_string(), serde_json::Value::String(service.service.clone()));
+                        m.insert("version".to_string(), serde_json::Value::String(service.version.clone().unwrap_or_default()));
+                        m
+                    },
                 });
 
                 edges.push(_AttackEdge {
@@ -346,10 +351,12 @@ impl FscanModule {
                     id: vuln_node_id.clone(),
                     node_type: "vulnerability".into(),
                     label: format!("{} ({})", vuln.vuln_type, vuln.severity),
-                    properties: serde_json::json!({
-                        "severity": vuln.severity,
-                        "confidence": vuln.confidence,
-                    }).as_object().unwrap().clone(),
+                    properties: {
+                        let mut m = HashMap::new();
+                        m.insert("severity".to_string(), serde_json::Value::String(vuln.severity.clone()));
+                        m.insert("confidence".to_string(), serde_json::json!(vuln.confidence));
+                        m
+                    },
                 });
 
                 edges.push(_AttackEdge {

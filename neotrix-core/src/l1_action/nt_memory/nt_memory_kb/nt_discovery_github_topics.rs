@@ -83,7 +83,6 @@ pub fn run_github_topics_discovery(
         Some("Auto-discovered GitHub topics and top repositories"),
         Some("https://github.com/topics"),
         Some("github.com"),
-        true,
     ).map_err(|e| format!("DB: {}", e))?;
 
     // Phase 1: Discover topics from popular repos (定向模式跳过 — 直接使用 target_topics)
@@ -125,7 +124,6 @@ pub fn run_github_topics_discovery(
                 Some(&format!("GitHub topic: {}", topic)),
                 None,
                 Some("github.com/topic"),
-                true,
             ).ok();
             if let Some(tid) = tid {
                 let _ = store::upsert_edge(
@@ -150,7 +148,6 @@ pub fn run_github_topics_discovery(
                 Some(&format!("GitHub topic: {}", t)),
                 None,
                 Some("github.com/topic"),
-                true,
             ).ok();
             if let Some(tid) = tid {
                 let _ = store::upsert_edge(
@@ -243,7 +240,6 @@ fn ingest_repo_from_search_item(conn: &Connection, item: &serde_json::Value) -> 
         Some(description),
         Some(repo_url),
         Some("github.com"),
-        true,
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
@@ -256,7 +252,6 @@ fn ingest_repo_from_search_item(conn: &Connection, item: &serde_json::Value) -> 
                 None,
                 Some(&format!("https://github.com/{}", owner_login)),
                 Some("github.com"),
-                true,
             )
             .map_err(|e| format!("DB error: {}", e))?;
             store::upsert_edge(
@@ -279,7 +274,6 @@ fn ingest_repo_from_search_item(conn: &Connection, item: &serde_json::Value) -> 
             None,
             None,
             Some("github.com"),
-            true,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         store::upsert_edge(

@@ -154,30 +154,45 @@ impl ModelAdapter {
     }
     
     /// 应用 LoRA
+    ///
+    /// Real implementation needs:
+    /// - Load `.safetensors` / `.pt` LoRA weights via `diffusers` or `peft`
+    /// - Apply to the target model's attention layers
+    /// - Run inference pipeline (txt2img/img2img) with the adapted model
+    /// - Return actual output path from inference pipeline
     pub fn apply_lora(
         &mut self,
         lora_id: &str,
         input_path: &str,
         _strength: f32,
     ) -> AdapterResult {
-        // TODO: 实际调用 LoRA 应用逻辑
         let adapter = self.adapters.get(lora_id);
         let adapter_name = adapter.map(|a| a.name.clone()).unwrap_or_default();
-        
+
         let result = AdapterResult {
-            success: true,
-            output_path: format!("{}_lora.png", input_path),
+            success: false,
+            output_path: String::new(),
             adapter_name,
-            application_time_ms: 1000,
-            similarity_score: 0.95,
-            error: None,
+            application_time_ms: 0,
+            similarity_score: 0.0,
+            error: Some(format!(
+                "LoRA application not yet wired. Requires inference backend (ComfyUI/SD WebUI) \
+                 for adapter '{}'. Input was: {}",
+                lora_id, input_path
+            )),
         };
-        
+
         self.history.push(result.clone());
         result
     }
     
     /// 应用 IP-Adapter
+    ///
+    /// Real implementation needs:
+    /// - Load IP-Adapter model (image encoder + cross-attention injection)
+    /// - Encode reference image into image embedding
+    /// - Inject embedding into UNet cross-attention layers
+    /// - Run diffusion pipeline with the adapted model
     pub(crate) fn _apply_ip_adapter(
         &mut self,
         adapter_id: &str,
@@ -185,24 +200,33 @@ impl ModelAdapter {
         _reference_path: &str,
         _strength: f32,
     ) -> AdapterResult {
-        // TODO: 实际调用 IP-Adapter 应用逻辑
         let adapter = self.adapters.get(adapter_id);
         let adapter_name = adapter.map(|a| a.name.clone()).unwrap_or_default();
-        
+
         let result = AdapterResult {
-            success: true,
-            output_path: format!("{}_ip_adapter.png", content_path),
+            success: false,
+            output_path: String::new(),
             adapter_name,
-            application_time_ms: 2000,
-            similarity_score: 0.88,
-            error: None,
+            application_time_ms: 0,
+            similarity_score: 0.0,
+            error: Some(format!(
+                "IP-Adapter application not yet wired. Requires image encoder + cross-attention \
+                 injection pipeline. Content: {}, Reference: {}",
+                content_path, _reference_path
+            )),
         };
-        
+
         self.history.push(result.clone());
         result
     }
     
     /// 应用 ControlNet
+    ///
+    /// Real implementation needs:
+    /// - Load ControlNet model (canny/depth/pose/openpose etc.)
+    /// - Preprocess control image to match ControlNet input type
+    /// - Inject control signal into UNet via zero convolution layers
+    /// - Run diffusion pipeline with guided generation
     pub(crate) fn _apply_controlnet(
         &mut self,
         adapter_id: &str,
@@ -210,19 +234,22 @@ impl ModelAdapter {
         control_image: &str,
         _strength: f32,
     ) -> AdapterResult {
-        // TODO: 实际调用 ControlNet 应用逻辑
         let adapter = self.adapters.get(adapter_id);
         let adapter_name = adapter.map(|a| a.name.clone()).unwrap_or_default();
-        
+
         let result = AdapterResult {
-            success: true,
-            output_path: format!("{}_controlnet.png", control_image),
+            success: false,
+            output_path: String::new(),
             adapter_name,
-            application_time_ms: 1500,
-            similarity_score: 0.85,
-            error: None,
+            application_time_ms: 0,
+            similarity_score: 0.0,
+            error: Some(format!(
+                "ControlNet application not yet wired. Requires ControlNet model loader + \
+                 preprocessor pipeline. Control image: {}",
+                control_image
+            )),
         };
-        
+
         self.history.push(result.clone());
         result
     }
@@ -296,7 +323,10 @@ mod tests {
         });
         
         let result = adapter.apply_lora("lora_001", "/input/test.png", 0.8);
-        assert!(result.success);
+        // LoRA is not wired — expect explicit failure, not fabricated success
+        assert!(!result.success);
+        assert!(result.error.is_some());
+        assert!(result.error.unwrap().contains("not yet wired"));
         
         let stats = adapter.statistics();
         assert_eq!(stats.total_adapters, 1);

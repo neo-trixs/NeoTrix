@@ -138,6 +138,10 @@ impl CliCommand for MediaStreamCmd {
                 chunk_size: 256 * 1024,
                 persistence: None,
                 auth: None,
+                concurrency: 4,
+                verify_sha256: None,
+                stall_timeout: Duration::from_secs(30),
+                max_retries: 6,
             };
 
             let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);

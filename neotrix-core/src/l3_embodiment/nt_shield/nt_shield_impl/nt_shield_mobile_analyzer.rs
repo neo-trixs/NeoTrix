@@ -3,6 +3,7 @@
 //! Absorbs Objection (⭐9K) for iOS/Android runtime exploration.
 //! Dynamic analysis of mobile applications.
 
+#[derive(Debug)]
 pub struct ObjectionAdapter {
     /// Objection installation path
     objection_path: std::path::PathBuf,

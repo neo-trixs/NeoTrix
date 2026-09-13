@@ -221,52 +221,83 @@ impl ReferenceBasedGeneration {
     }
     
     /// 执行视频生视频
+    ///
+    /// Real implementation needs:
+    /// - Load video frames from input_path
+    /// - Encode each frame (or keyframes) through VAE encoder
+    /// - Apply denoising with reference guidance (IP-Adapter/ControlNet)
+    /// - Decode through VAE decoder and reassemble to video
+    /// - Return actual output path from rendered video
     pub fn video_to_video(&mut self, input_path: &str) -> GenerationResult {
-        // TODO: 实际调用视频生成模型
+        let start = std::time::Instant::now();
         let result = GenerationResult {
-            success: true,
-            output_paths: vec![format!("{}_generated.mp4", input_path)],
-            generation_time_ms: 15000,
+            success: false,
+            output_paths: vec![],
+            generation_time_ms: start.elapsed().as_millis() as u64,
             model_used: self.config.model_name.clone(),
-            reference_similarity: 0.89,
-            quality_score: 0.86,
-            error: None,
+            reference_similarity: 0.0,
+            quality_score: 0.0,
+            error: Some(format!(
+                "Video-to-video generation not yet wired. Requires frame-level VAE encode/decode \
+                 pipeline + temporal consistency model. Input: {}",
+                input_path
+            )),
         };
-        
+
         self.history.push(result.clone());
         result
     }
     
     /// 执行图生视频
+    ///
+    /// Real implementation needs:
+    /// - Load reference image and encode through VAE
+    /// - Use as initial frame conditioning for video generation model
+    /// - Run temporal model (AnimateDiff/SVD/I2V) for frame interpolation
+    /// - Temporal stabilization and output encoding
     pub fn image_to_video(&mut self, input_path: &str) -> GenerationResult {
-        // TODO: 实际调用图生视频模型
+        let start = std::time::Instant::now();
         let result = GenerationResult {
-            success: true,
-            output_paths: vec![format!("{}_video.mp4", input_path)],
-            generation_time_ms: 20000,
+            success: false,
+            output_paths: vec![],
+            generation_time_ms: start.elapsed().as_millis() as u64,
             model_used: self.config.model_name.clone(),
-            reference_similarity: 0.85,
-            quality_score: 0.83,
-            error: None,
+            reference_similarity: 0.0,
+            quality_score: 0.0,
+            error: Some(format!(
+                "Image-to-video generation not yet wired. Requires temporal model \
+                 (AnimateDiff/SVD) + frame interpolation pipeline. Input: {}",
+                input_path
+            )),
         };
-        
+
         self.history.push(result.clone());
         result
     }
     
     /// 执行风格迁移
+    ///
+    /// Real implementation needs:
+    /// - Load content image and style reference
+    /// - Run style transfer model (NST/AdaIN/ControlNet+style)
+    /// - Preserve content structure while applying style aesthetics
+    /// - Output high-fidelity styled result
     pub fn style_transfer(&mut self, content_path: &str, _style_path: &str) -> GenerationResult {
-        // TODO: 实际调用风格迁移模型
+        let start = std::time::Instant::now();
         let result = GenerationResult {
-            success: true,
-            output_paths: vec![format!("{}_styled.png", content_path)],
-            generation_time_ms: 5000,
+            success: false,
+            output_paths: vec![],
+            generation_time_ms: start.elapsed().as_millis() as u64,
             model_used: self.config.model_name.clone(),
-            reference_similarity: 0.87,
-            quality_score: 0.90,
-            error: None,
+            reference_similarity: 0.0,
+            quality_score: 0.0,
+            error: Some(format!(
+                "Style transfer not yet wired. Requires NST/AdaIN model + content/style \
+                 embedding pipeline. Content: {}, Style: {}",
+                content_path, _style_path
+            )),
         };
-        
+
         self.history.push(result.clone());
         result
     }
@@ -419,9 +450,11 @@ mod tests {
             params: HashMap::new(),
         });
         
+        // image_to_image already returns explicit error for non-existent files
+        // and "not yet wired" for the inference pipeline
         let result = generator.image_to_image("/input/content.png");
-        assert!(result.success);
-        assert!(result.reference_similarity > 0.8);
+        assert!(!result.success);
+        assert!(result.error.is_some());
     }
     
     #[test]
@@ -446,7 +479,9 @@ mod tests {
             params: HashMap::new(),
         });
         
+        // Style transfer is not wired — expect explicit failure
         let result = generator.generate();
-        assert!(result.success);
+        assert!(!result.success);
+        assert!(result.error.is_some());
     }
 }

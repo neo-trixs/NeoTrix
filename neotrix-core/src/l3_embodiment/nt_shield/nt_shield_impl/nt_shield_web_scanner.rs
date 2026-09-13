@@ -3,6 +3,8 @@
 //! Absorbs w3af and Arachni for comprehensive web application testing.
 //! Crawler-based vulnerability detection.
 
+use std::collections::HashMap;
+
 pub struct W3afEngine {
     /// Discovered URL structure
     url_tree: Vec<_UrlNode>,

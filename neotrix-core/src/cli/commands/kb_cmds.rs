@@ -153,10 +153,8 @@ fn cmd_consistency(_args: &[String]) -> CommandOutput {
         Some(c) => c,
         None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
     };
-    let out = String::new();
-    // TODO: setting_consistency module not found; stub
-    // let _ = crate::l1_action::nt_memory::nt_memory_kb::setting_consistency::check_and_report_to_string(&conn, &mut out);
-    CommandOutput::ok(&out)
+    // setting_consistency 模块未接入 — 返回明确错误
+    CommandOutput::err("设定一致性检查未接入: 需要接入 setting_consistency 模块")
 }
 
 /// /kb axioms — 架构公理推演树 (公理→定律→模块约束)
@@ -1299,10 +1297,18 @@ fn cmd_central(args: &[String]) -> CommandOutput {
     CommandOutput::ok(&out)
 }
 
+/// /kb serve [--port 8337] — MCP 知识服务
+///
+/// **Feature not wired**: Returns a warning stub. Real implementation needs:
+/// 1. An HTTP/JSON-RPC server (e.g., axum or warp) exposing KB read/write endpoints
+/// 2. Authentication (API key or OAuth) for write operations
+/// 3. Rate limiting and connection pooling
+/// 4. MCP protocol compliance (tools/list, tools/call schemas)
 fn cmd_serve(_args: &[String]) -> CommandOutput {
     let port = parse_usize(_args, "--port", 8337);
-    CommandOutput::warn(&format!(
-        "MCP server stub on port {} — use Phase 3 OpenAPI for HTTP access",
+    CommandOutput::err(&format!(
+        "MCP server not implemented on port {}: feature not wired — needs axum/warp HTTP server \
+         with MCP protocol compliance, auth, and rate limiting. Use /kb query for local access.",
         port
     ))
 }

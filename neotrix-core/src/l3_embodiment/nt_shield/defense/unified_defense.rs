@@ -6,7 +6,17 @@ use std::collections::HashMap;
 use super::*;
 use crate::l3_embodiment::nt_shield::guard::input_gatekeeper;
 use crate::l3_embodiment::nt_shield::guard::output_sentinel;
+use crate::l3_embodiment::nt_shield::guard::prompt_guardian;
+use crate::l3_embodiment::nt_shield::guard::input_gatekeeper::InputGatekeeper;
+use crate::l3_embodiment::nt_shield::guard::output_sentinel::OutputSentinel;
+use crate::l3_embodiment::nt_shield::guard::prompt_guardian::PromptGuardian;
 use crate::l3_embodiment::nt_shield::dual_evidence;
+use crate::l3_embodiment::nt_shield::dual_evidence::DualEvidenceScanner;
+use crate::l3_embodiment::nt_shield::slang_norm::SlangNormEngine;
+use crate::l3_embodiment::nt_shield::evasion::grapple_hooks;
+use crate::l3_embodiment::nt_shield::evasion::grapple_hooks::GrappleHookChain;
+use crate::l3_embodiment::nt_shield::proxy_detection;
+use crate::l3_embodiment::nt_shield::proxy_detection::ProxyDetectionEngine;
 
 /// 统一防御结果
 #[derive(Debug, Clone)]

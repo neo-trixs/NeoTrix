@@ -25,8 +25,12 @@ pub use playback::{
     EnginePlaybackState, PlaybackController, PlaybackEngine, PlaybackHistory, PlaybackQueue,
     PlaybackRetry, PlaybackState, PlayMode, RepeatMode,
 };
+pub use persistence::{
+    ChunkState as SidecarChunkState, ChunkPersistenceConfig, DownloadStatus, ResumeValidation,
+    SidecarState,
+};
 pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use streaming::{
-    PipelineConfig, PipelineError, PipelineHandle, PipelineProgress, PipelineStatus,
-    StreamingPipeline,
+    ChunkStatus, PipelineConfig, PipelineError, PipelineHandle, PipelineProgress, PipelineStatus,
+    RetryPolicy, StallDetector, StreamingPipeline,
 };

@@ -158,29 +158,22 @@ impl SpeculativeDecoder {
     }
     
     /// Generate with speculative decoding
+    ///
+    /// 注意：投机解码需要接入 draft model + verification pipeline。
+    /// 当前未接入时返回明确错误。
     pub async fn generate(
         &self,
         _prompt: &str,
-        max_tokens: usize,
+        _max_tokens: usize,
     ) -> SpeculativeResult {
-        // TODO: Implement speculative decoding with draft verification
-        // Algorithm:
-        // 1. Draft model generates N candidate tokens
-        // 2. Target model verifies all N tokens in parallel
-        // 3. Accepted tokens emitted, rejected position triggers re-verification
-        // 4. Track acceptance rate per task type
-        
-        let draft_tokens = self.draft_model.num_draft_tokens;
-        let acceptance_rate = self.acceptance_stats.acceptance_rate.max(0.6);
-        let expected_accepted = (draft_tokens as f64 * acceptance_rate) as usize;
-        
+        // 投机解码未接入 — 返回零值 + 明确说明
         SpeculativeResult {
-            output_tokens: vec![], // Generated tokens
-            total_draft_tokens: draft_tokens,
-            accepted_count: expected_accepted,
-            rejection_count: draft_tokens - expected_accepted,
-            throughput_multiplier: 2.0 + (acceptance_rate * 2.0), // 2-4x
-            latency_savings_ms: (max_tokens as u64 / 2),
+            output_tokens: vec![],
+            total_draft_tokens: 0,
+            accepted_count: 0,
+            rejection_count: 0,
+            throughput_multiplier: 1.0, // 无加速
+            latency_savings_ms: 0,
         }
     }
     

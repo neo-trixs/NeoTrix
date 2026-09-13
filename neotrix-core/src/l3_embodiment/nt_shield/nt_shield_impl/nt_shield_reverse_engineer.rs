@@ -8,6 +8,7 @@
 //! - L4 Cognition: VSA embeddings of code patterns
 //! - E8: Decompilation output fed into reasoning engine
 
+#[derive(Debug)]
 pub struct GhidraAnalyzer {
     /// Ghidra installation path
     ghidra_path: std::path::PathBuf,

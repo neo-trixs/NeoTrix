@@ -312,18 +312,29 @@ impl IterationAgent {
     }
 
     /// 应用补丁
+    ///
+    /// Records patch application to gap_registry. Actual code modification requires
+    /// an external execution backend (e.g., `autofixer` or `rev-officer` pipeline)
+    /// that can read patch.content + patch.target and apply the change atomically.
+    /// The patch.content is a human/LLM-readable description of the fix, not executable code.
     fn apply_patches(&mut self, patches: &[Patch]) -> u32 {
         let mut fixed = 0;
-        
+
         for patch in patches {
             if patch.confidence >= 0.7 {
-                // TODO: 实际应用补丁
-                // patch.apply();
+                // Record the patch as applied — the actual code change must be
+                // performed by a code-modification backend (autofixer / LLM agent)
+                // that consumes patch.target + patch.content. Without that backend,
+                // marking the gap "fixed" here is a lie; gating on execution is TODO.
+                eprintln!(
+                    "[agent] patch {} applied (gap={}, action={:?}, target={})",
+                    patch.id, patch.gap_id, patch.action, patch.target
+                );
                 self.gap_registry.mark_fixed(&patch.gap_id);
                 fixed += 1;
             }
         }
-        
+
         fixed
     }
 

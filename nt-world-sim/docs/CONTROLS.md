@@ -1,43 +1,31 @@
-# Consciousness Valley — Controls Reference
+# Controls Quick Reference
 
-## Movement
+## Consciousness Valley
 | Key | Action |
 |-----|--------|
-| WASD | Move player |
-| Arrow Keys | Move player |
-| Shift (hold) | Sprint |
-| E | Interact with NPCs/objects |
+| WASD | Move |
+| Space | Use tool / Mine / Fish |
+| I | Inventory |
+| C | Crafting / Cooking |
+| M | Mute / Unmute |
+| E | Interact / Talk |
+| P | Perfection |
+| Q | Quests |
+| Esc | Pause |
+| 1-9 | Hotbar |
 
-## Tools
-| Key | Tool | Use |
-|-----|------|-----|
-| 1 | Hoe | Till soil for farming |
-| 2 | Watering Can | Water crops |
-| 3 | Pickaxe | Break rocks and mine minerals |
-| 4 | Axe | Chop trees for wood |
-| 5 | Fishing Rod | Fish at water edges |
-
-## Inventory & Crafting
+## Neural Arena
 | Key | Action |
 |-----|--------|
-| I | Toggle inventory |
-| C | Toggle crafting menu |
-| B | Toggle shipping bin |
-| F | Open shop (when near Pierre's Market) |
-| Tab | Switch between shop tabs |
+| WASD | Move |
+| Q/W/E/R | Abilities |
+| B | Shop |
+| Space | Attack |
+| Tab | Scoreboard |
 
-## Game Controls
+## Evolution Path
 | Key | Action |
 |-----|--------|
-| ESC | Pause menu |
-| F5 | Quick save |
-| F9 | Quick load |
-| H | Toggle controls overlay |
-| M | Enter/exit mines |
-| Space | Confirm/advance dialogue |
-
-## Combat
-| Input | Action |
-|-------|--------|
-| Click | Attack enemy (when in range) |
-| Shift + Click | Defend (50% damage reduction) |
+| WASD | Move |
+| 1/2/3/4 | Abilities |
+| Space | Interact |

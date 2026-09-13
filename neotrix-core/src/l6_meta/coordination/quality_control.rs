@@ -281,31 +281,36 @@ impl _QualityControlPipeline {
             let result = match level {
                 ReviewLevel::AI => self._review_by_ai(content_id),
                 ReviewLevel::Human => {
-                    // TODO: 实际调用人工审核接口
+                    // Feature not wired: Human review requires a UI or API endpoint
+                    // where reviewers can inspect content and submit verdicts.
+                    // Returns Pending status instead of hardcoded approval to prevent
+                    // silent pass-through of unreviewed content.
                     ReviewResult {
                         review_id: format!("review_{}_{}", content_id, 1),
                         content_id: content_id.to_string(),
                         level: ReviewLevel::Human,
-                        status: ReviewStatus::Approved,
-                        total_score: 0.90,
+                        status: ReviewStatus::Pending,
+                        total_score: 0.0,
                         check_scores: HashMap::new(),
-                        issues: vec![],
-                        comments: Some("人工审核通过".to_string()),
+                        issues: vec!["人工审核未接入: 需要接入审核 UI 或 API 端点".to_string()],
+                        comments: Some("等待人工审核 — 功能未接入".to_string()),
                         review_time: 0,
                         review_time_ms: 0,
                     }
                 }
                 ReviewLevel::Platform => {
-                    // TODO: 实际调用平台终审接口
+                    // Feature not wired: Platform review requires integration with
+                    // each target platform's content review API (e.g., Douyin/YouTube
+                    // content moderation endpoints). Returns Pending instead of fake approval.
                     ReviewResult {
                         review_id: format!("review_{}_{}", content_id, 2),
                         content_id: content_id.to_string(),
                         level: ReviewLevel::Platform,
-                        status: ReviewStatus::Approved,
-                        total_score: 0.88,
+                        status: ReviewStatus::Pending,
+                        total_score: 0.0,
                         check_scores: HashMap::new(),
-                        issues: vec![],
-                        comments: Some("平台终审通过".to_string()),
+                        issues: vec!["平台终审未接入: 需要接入平台内容审核 API".to_string()],
+                        comments: Some("等待平台终审 — 功能未接入".to_string()),
                         review_time: 0,
                         review_time_ms: 0,
                     }

@@ -173,45 +173,96 @@ impl PublishGateway {
     }
     
     /// 执行发布 — 实际调用平台 API
+    ///
+    /// **Feature not wired**: All platform branches return errors indicating
+    /// missing API configuration. Real implementation needs:
+    /// - YouTube: OAuth2 + YouTube Data API v3 (upload + metadata endpoints)
+    /// - Bilibili: Session cookie + Bilibili upload API
+    /// - TikTok/Douyin: OAuth2 + platform-specific upload APIs
+    /// - All: reqwest HTTP client, upload progress tracking, retry logic
     pub fn publish(&mut self, task_id: &str) -> PublishResult {
         if let Some(task) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
             task.status = PublishStatus::Uploading;
             task.updated_at = current_timestamp();
 
-            // 根据平台类型调用不同的 API
-            let result = match task.platform.as_str() {
-                "youtube" => {
-                    // YouTube API 调用（需要 API key）
-                    // 实际实现应使用 reqwest 调用 YouTube Data API v3
-                    PublishResult {
-                        success: false,
-                        publish_url: None,
-                        video_id: None,
-                        status: PublishStatus::Failed,
-                        published_at: None,
-                        error: Some("YouTube API not configured. Set YOUTUBE_API_KEY environment variable.".to_string()),
+            // Feature not wired: platform API calls are not implemented.
+            // Each platform needs OAuth + HTTP client + upload endpoint wiring.
+            let result = match task.config.platform {
+                PublishPlatform::YouTube => {
+                    let api_key = std::env::var("YOUTUBE_API_KEY").ok();
+                    let oauth_token = task.config.oauth_token.as_ref();
+                    if api_key.is_none() && oauth_token.is_none() {
+                        PublishResult {
+                            success: false,
+                            publish_url: None,
+                            video_id: None,
+                            status: PublishStatus::Failed,
+                            published_at: None,
+                            error: Some("YouTube API not configured. Set YOUTUBE_API_KEY or provide oauth_token in config.".to_string()),
+                        }
+                    } else {
+                        // TODO: Wire to YouTube Data API v3 resumable upload
+                        PublishResult {
+                            success: false,
+                            publish_url: None,
+                            video_id: None,
+                            status: PublishStatus::Failed,
+                            published_at: None,
+                            error: Some("YouTube upload not wired — needs reqwest + YouTube Data API v3 integration.".to_string()),
+                        }
                     }
                 }
-                "bilibili" => {
-                    // Bilibili API 调用
-                    PublishResult {
-                        success: false,
-                        publish_url: None,
-                        video_id: None,
-                        status: PublishStatus::Failed,
-                        published_at: None,
-                        error: Some("Bilibili API not configured. Set BILIBILI_SESSION cookie.".to_string()),
+                PublishPlatform::Bilibili => {
+                    let session = task.config.oauth_token.as_ref();
+                    if session.is_none() {
+                        PublishResult {
+                            success: false,
+                            publish_url: None,
+                            video_id: None,
+                            status: PublishStatus::Failed,
+                            published_at: None,
+                            error: Some("Bilibili API not configured. Set BILIBILI_SESSION cookie via oauth_token in config.".to_string()),
+                        }
+                    } else {
+                        // TODO: Wire to Bilibili upload API
+                        PublishResult {
+                            success: false,
+                            publish_url: None,
+                            video_id: None,
+                            status: PublishStatus::Failed,
+                            published_at: None,
+                            error: Some("Bilibili upload not wired — needs reqwest + Bilibili API integration.".to_string()),
+                        }
                     }
                 }
-                _ => {
-                    // 未知平台
+                PublishPlatform::TikTok | PublishPlatform::Douyin => {
                     PublishResult {
                         success: false,
                         publish_url: None,
                         video_id: None,
                         status: PublishStatus::Failed,
                         published_at: None,
-                        error: Some(format!("Unsupported platform: {}", task.platform)),
+                        error: Some(format!("{:?} upload not wired — needs OAuth2 + platform API integration.", task.config.platform)),
+                    }
+                }
+                PublishPlatform::Twitter | PublishPlatform::Instagram => {
+                    PublishResult {
+                        success: false,
+                        publish_url: None,
+                        video_id: None,
+                        status: PublishStatus::Failed,
+                        published_at: None,
+                        error: Some(format!("{:?} upload not wired — needs OAuth2 + platform API integration.", task.config.platform)),
+                    }
+                }
+                PublishPlatform::Custom => {
+                    PublishResult {
+                        success: false,
+                        publish_url: None,
+                        video_id: None,
+                        status: PublishStatus::Failed,
+                        published_at: None,
+                        error: Some("Custom platform upload not wired — needs webhook or custom API integration.".to_string()),
                     }
                 }
             };

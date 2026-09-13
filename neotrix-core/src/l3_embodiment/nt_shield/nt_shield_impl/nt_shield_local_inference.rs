@@ -186,7 +186,9 @@ impl LocalInferenceEngine {
             return profile;
         }
         
-        // Create new profile with defaults
+        // Create new profile with UNCALIBRATED defaults.
+        // These are conservative placeholders — no real benchmark has been run yet.
+        // E8 reasoning score is 0.0 (not calibrated), throughput is a floor estimate.
         let profile = _OptimizationProfile {
             model_name: model_name.to_string(),
             hardware: hardware.to_string(),
@@ -195,9 +197,9 @@ impl LocalInferenceEngine {
             kv_cache_type: "q4_0".to_string(),
             flash_attention: true,
             continuous_batching: false,
-            expected_throughput_tok_s: 9.06,
-            memory_requirements_gb: 8.0,
-            e8_reasoning_score: 0.85,
+            expected_throughput_tok_s: 0.0,  // UNCALIBRATED: run optimize_model() to populate
+            memory_requirements_gb: 0.0,     // UNCALIBRATED: run optimize_model() to populate
+            e8_reasoning_score: 0.0,         // UNCALIBRATED: no benchmark confidence yet
             gwt_attention_key: format!("infer_{}_{}", model_name, hardware),
         };
         

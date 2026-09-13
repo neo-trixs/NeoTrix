@@ -411,7 +411,6 @@ pub fn digest_sample(
             summary.as_deref(),
             Some(&url),
             domain.as_deref(),
-            false,
         )
         .map_err(|e| e.to_string())?;
         // 写入 lineage + 原始 content/metadata (G3)
@@ -468,7 +467,6 @@ pub fn ingest_causal_graph(
             Some(&node.description),
             Some(&url),
             Some("NT-CORE"),
-            false,
         )
         .map_err(|e| e.to_string())?;
         // 写 lineage (G3): 用既有 metadata 增量更新, 不平行造写入器
@@ -493,7 +491,6 @@ pub fn ingest_causal_graph(
         Some("外置大脑因果图蒸馏锚点"),
         Some("cortex_source://causal_graph"),
         Some("NT-CORE"),
-        false,
     )
     .map_err(|e| e.to_string())?;
     if let Ok(Some(existing)) = get_node(conn, &umbrella_id) {
@@ -799,7 +796,6 @@ mod tests {
             Some("s"),
             Some("cortex_source://causal_graph"),
             Some("example.com"),
-            false,
         )
         .map_err(|e| e.to_string())?;
         let cdir = tempfile::tempdir().expect("tmp");
@@ -903,7 +899,6 @@ mod tests {
         .map_err(|e| e.to_string())?;
         insert_or_get_node(
             &conn, "live", NodeType::from_str("article"), Some("s"), Some("zimid://live/2"), Some("d"),
-            false,
         )
         .map_err(|e| e.to_string())?;
         // dry-run 先计数

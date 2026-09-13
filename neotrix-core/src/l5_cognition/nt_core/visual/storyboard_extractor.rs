@@ -185,19 +185,27 @@ impl StoryboardExtractor {
     }
     
     /// 从剧本文本拆解分镜
+    ///
+    /// **Feature not wired**: This currently uses naive paragraph splitting.
+    /// Real implementation needs an LLM call (via `nt_io::LlmProvider`) to parse
+    /// the script into structured shots with proper shot sizes, camera movements,
+    /// dialogue extraction, and emotion tagging. The naive split produces empty
+    /// characters/scenes and uniform shot sizes — unsuitable for production use.
     pub(crate) fn _extract_from_script(
         &mut self,
         episode_id: &str,
         episode_number: u32,
         script_text: &str,
     ) -> StoryboardScript {
-        // TODO: 实际调用 LLM 进行分镜拆解
+        // Feature not wired: LLM-based storyboard extraction is not implemented.
+        // Returns naive paragraph-split results. For production, wire to LLM provider
+        // with a structured prompt that extracts shots, dialogue, camera, and emotion.
         let shots = self.parse_script_to_shots(script_text);
-        
+
         let total_duration = shots.iter().map(|s| s.duration_secs).sum();
         let characters = self.extract_characters(&shots);
         let scenes = self.extract_scenes(&shots);
-        
+
         let script = StoryboardScript {
             episode_id: episode_id.to_string(),
             episode_number,
@@ -207,17 +215,24 @@ impl StoryboardExtractor {
             characters,
             scenes,
         };
-        
+
         self.history.push(script.clone());
         script
     }
-    
-    /// 解析剧本为镜头
+
+    /// 解析剧本为镜头（朴素段落拆分 — 非 LLM 驱动）
+    ///
+    /// **Feature not wired**: Real implementation needs an LLM call to:
+    /// 1. Identify scene boundaries, dialogue, and action blocks
+    /// 2. Assign appropriate shot sizes and camera movements per narrative context
+    /// 3. Extract character names and emotions from dialogue/narration
+    /// 4. Generate positive/negative prompts for video generation
     fn parse_script_to_shots(&self, script_text: &str) -> Vec<Storyboard> {
-        // TODO: 实际调用 LLM 解析
-        // 简单模拟：按段落拆分
+        // Feature not wired: LLM-based parsing not implemented.
+        // Falls back to naive paragraph splitting — each paragraph becomes a shot
+        // with default values for all fields except description.
         let paragraphs: Vec<&str> = script_text.lines().filter(|l| !l.trim().is_empty()).collect();
-        
+
         paragraphs.iter().enumerate().map(|(i, p)| {
             Storyboard {
                 id: format!("shot_{}", i + 1),

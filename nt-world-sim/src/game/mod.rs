@@ -24,7 +24,9 @@ pub mod relationship;
 pub mod cooking;
 pub mod fishing;
 pub mod foraging;
+pub mod unified;
 
+pub use unified::{UnifiedGameWorld, GameMode, UnifiedPlayer, EvolutionStage, PlayerRole};
 pub use relationship::{Relationship, RelationshipStage, Child, RelationshipSystem};
 pub use cooking::{CookingSystem, CookingRecipe};
 pub use fishing::{FishingSystem, Fish, FishQuality};

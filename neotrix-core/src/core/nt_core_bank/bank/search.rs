@@ -205,12 +205,24 @@ impl ReasoningBank {
             .collect()
     }
 
+    /// Vector search by text query — embeds the query, computes cosine similarity.
+    ///
+    /// Returns empty if embeddings are unavailable (no fake scores).
     fn vector_search_by_text(
         &self,
-        _task: &str,
+        task: &str,
         task_type: Option<TaskType>,
         k: usize,
     ) -> Vec<(f64, String)> {
+        use crate::core::nt_core_embed::TextEmbedder;
+
+        let mut embedder = TextEmbedder::new();
+        let query_emb = embedder.embed(task);
+        if query_emb.is_empty() {
+            // Embedding unavailable — return empty, not fake scores
+            return Vec::new();
+        }
+
         let candidate_indices: Vec<usize> = if let Some(tt) = task_type {
             self.task_type_index.get(&tt).cloned().unwrap_or_default()
         } else {
@@ -221,12 +233,12 @@ impl ReasoningBank {
             .filter_map(|&idx| self.memories.get(idx))
             .filter_map(|m| {
                 m.embedding.as_ref().map(|emb| {
-                    let norm: f64 = emb.iter().map(|x| x * x).sum::<f64>().sqrt();
-                    (norm, m)
+                    let sim = crate::core::nt_core_math::cosine_similarity_f64(&query_emb, emb);
+                    (sim, m)
                 })
             })
             .filter(|(score, _)| *score > 0.0)
-            .map(|(norm, m)| {
+            .map(|(sim, m)| {
                 let type_bonus = if let Some(tt) = task_type {
                     if m.task_type == tt {
                         0.2
@@ -236,7 +248,7 @@ impl ReasoningBank {
                 } else {
                     0.0
                 };
-                (norm + type_bonus, m)
+                (sim + type_bonus, m)
             })
             .collect();
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -584,12 +596,12 @@ impl ReasoningBank {
             }
             if let Some(other_node) = graph.nodes.get(other_id) {
                 let mut strength = 0.0;
-                if let Some(ref _emb) = mem.embedding {
+                if let Some(ref emb) = mem.embedding {
                     if !other_node.embedding.is_empty() {
-                        // strength = crate::core::nt_core_graph::HyperGraph::cosine_similarity(
-                        //     emb,
-                        //     &other_node.embedding,
-                        // );
+                        strength = crate::core::nt_core_math::cosine_similarity_f64(
+                            emb,
+                            &other_node.embedding,
+                        );
                     }
                 }
                 if strength == 0.0 {
