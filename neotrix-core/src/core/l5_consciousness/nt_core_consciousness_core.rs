@@ -2182,11 +2182,12 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             let mut watchdog = crate::l6_meta::coordination::nt_meta_build_watchdog::BuildWatchdog::new(config);
             let status_result = watchdog.check_health();
             let stats = watchdog.stats();
+            let health_pct = (status_result.overall_health * 100.0) as u32;
             (
                 true,
                 format!(
-                    "构建健康检查:\n  状态: {} | 总检查: {} | 成功: {} | 失败: {}",
-                    if status_result.success { "健康" } else { "异常" },
+                    "构建健康检查:\n  健康度: {}% | 总检查: {} | 成功: {} | 失败: {}",
+                    health_pct,
                     stats.total_checks,
                     stats.successful_builds,
                     stats.failed_builds,
@@ -2202,12 +2203,16 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 Ok(mut shield) => {
                     let report = shield.security_audit(&input);
                     let signals_count = report.signals.len();
-                    let verdict = if report.has_critical { "存在风险" } else { "安全" };
+                    let verdict = match report.verdict {
+                        crate::cli::shield_enforcer::AuditVerdict::Clean => "安全",
+                        crate::cli::shield_enforcer::AuditVerdict::Warning => "警告",
+                        crate::cli::shield_enforcer::AuditVerdict::Critical => "存在风险",
+                    };
                     (
                         true,
                         format!(
-                            "安全审计完成 ({}):\n  判定: {} | 信号数: {} | 耗时: {}ms",
-                            input, verdict, signals_count, report.duration_ms
+                            "安全审计完成 ({}):\n  判定: {} | 信号数: {}",
+                            input, verdict, signals_count,
                         ),
                     )
                 }

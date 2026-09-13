@@ -11,16 +11,23 @@ pub enum TileType {
     Stone,
     Water,
     DeepWater,
+    Snow,
+    Swamp,
+    Ice,
+    Lava,
     // Farmable
     TilledSoil,
     WateredSoil,
     EnrichedSoil,
+    Farmland,
     // Objects
     Tree,
     Bush,
     Rock,
     Crystal,
     Mushroom,
+    TallGrass,
+    Flower,
     // Structures
     Path,
     Bridge,
@@ -43,9 +50,14 @@ impl TileType {
                 | TileType::Dirt
                 | TileType::Sand
                 | TileType::Stone
+                | TileType::Snow
+                | TileType::Ice
                 | TileType::TilledSoil
                 | TileType::WateredSoil
                 | TileType::EnrichedSoil
+                | TileType::Farmland
+                | TileType::TallGrass
+                | TileType::Flower
                 | TileType::Path
                 | TileType::Bridge
                 | TileType::Door
@@ -72,14 +84,21 @@ impl TileType {
             TileType::Stone => Color::rgb(0.5, 0.5, 0.5),
             TileType::Water => Color::rgb(0.2, 0.4, 0.8),
             TileType::DeepWater => Color::rgb(0.1, 0.2, 0.6),
+            TileType::Snow => Color::rgb(0.95, 0.95, 1.0),
+            TileType::Swamp => Color::rgb(0.3, 0.45, 0.25),
+            TileType::Ice => Color::rgb(0.7, 0.85, 0.95),
+            TileType::Lava => Color::rgb(0.9, 0.2, 0.0),
             TileType::TilledSoil => Color::rgb(0.35, 0.25, 0.15),
             TileType::WateredSoil => Color::rgb(0.25, 0.2, 0.12),
             TileType::EnrichedSoil => Color::rgb(0.45, 0.3, 0.15),
+            TileType::Farmland => Color::rgb(0.4, 0.35, 0.15),
             TileType::Tree => Color::rgb(0.2, 0.5, 0.1),
             TileType::Bush => Color::rgb(0.25, 0.55, 0.15),
             TileType::Rock => Color::rgb(0.45, 0.45, 0.45),
             TileType::Crystal => Color::rgb(0.6, 0.4, 0.9),
             TileType::Mushroom => Color::rgb(0.7, 0.3, 0.2),
+            TileType::TallGrass => Color::rgb(0.35, 0.65, 0.2),
+            TileType::Flower => Color::rgb(0.9, 0.4, 0.7),
             TileType::Path => Color::rgb(0.6, 0.5, 0.3),
             TileType::Bridge => Color::rgb(0.55, 0.4, 0.25),
             TileType::Fence => Color::rgb(0.5, 0.35, 0.2),
@@ -103,6 +122,31 @@ pub enum TileLayer {
     Effect,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Biome {
+    Plains,
+    Forest,
+    Mountain,
+    Desert,
+    Tundra,
+    Swamp,
+    Ocean,
+}
+
+impl Biome {
+    pub fn primary_tile(&self) -> TileType {
+        match self {
+            Biome::Plains => TileType::Grass,
+            Biome::Forest => TileType::Tree,
+            Biome::Mountain => TileType::Rock,
+            Biome::Desert => TileType::Sand,
+            Biome::Tundra => TileType::Snow,
+            Biome::Swamp => TileType::Swamp,
+            Biome::Ocean => TileType::Water,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Tile {
     pub tile_type: TileType,
@@ -110,6 +154,7 @@ pub struct Tile {
     pub interactable: bool,
     pub animated: bool,
     pub frame: u32,
+    pub biome: Option<Biome>,
     pub metadata: HashMap<String, String>,
 }
 
@@ -137,6 +182,7 @@ impl Tile {
             interactable,
             animated: false,
             frame: 0,
+            biome: None,
             metadata: HashMap::new(),
         }
     }
@@ -174,6 +220,14 @@ impl WorldMap {
     pub fn get_tile(&self, layer: usize, x: u32, y: u32) -> Option<&Tile> {
         if layer < self.layers.len() && x < self.width && y < self.height {
             Some(&self.layers[layer][(y * self.width + x) as usize])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_tile_mut(&mut self, layer: usize, x: u32, y: u32) -> Option<&mut Tile> {
+        if layer < self.layers.len() && x < self.width && y < self.height {
+            Some(&mut self.layers[layer][(y * self.width + x) as usize])
         } else {
             None
         }

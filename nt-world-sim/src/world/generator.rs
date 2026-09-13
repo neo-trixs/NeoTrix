@@ -1,4 +1,4 @@
-use super::tile::{Tile, TileType, WorldMap};
+use super::tile::{Biome, Tile, TileType, WorldMap};
 use super::zone::Zone;
 
 #[derive(Debug, Clone)]
@@ -46,6 +46,7 @@ impl WorldGenerator {
         Self::generate_paths(&mut map);
         Self::place_decorations(&mut map, config);
         Self::place_special_tiles(&mut map, config);
+        Self::assign_biomes(&mut map, config);
 
         map
     }
@@ -268,6 +269,40 @@ impl WorldGenerator {
             3 => BiomeType::Lake,
             4 => BiomeType::Beach,
             _ => BiomeType::Cave,
+        }
+    }
+
+    pub fn assign_biomes(map: &mut WorldMap, _config: &GeneratorConfig) {
+        let width = map.width;
+        let height = map.height;
+        for y in 0..height {
+            for x in 0..width {
+                if let Some(tile) = map.get_tile_mut(0, x, y) {
+                    let cx = (x as f32 - width as f32 / 2.0) / (width as f32 / 2.0);
+                    let cy = (y as f32 - height as f32 / 2.0) / (height as f32 / 2.0);
+                    let dist = (cx * cx + cy * cy).sqrt();
+
+                    let biome = if dist > 0.8 {
+                        Biome::Ocean
+                    } else if dist > 0.6 {
+                        match (x + y) % 3 {
+                            0 => Biome::Mountain,
+                            1 => Biome::Tundra,
+                            _ => Biome::Desert,
+                        }
+                    } else if dist > 0.3 {
+                        match (x * 3 + y * 7) % 5 {
+                            0 | 1 => Biome::Forest,
+                            2 => Biome::Swamp,
+                            _ => Biome::Plains,
+                        }
+                    } else {
+                        Biome::Plains
+                    };
+
+                    tile.biome = Some(biome);
+                }
+            }
         }
     }
 }

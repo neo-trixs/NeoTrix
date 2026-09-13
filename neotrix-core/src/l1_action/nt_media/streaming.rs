@@ -26,6 +26,7 @@
 
 use super::auth::AuthConfig;
 use super::detect::{self, MediaKind};
+use super::download_progress::DownloadProgress;
 use super::router::{self, TransportType};
 use crate::l1_action::nt_io::nt_io_http_factory;
 use futures::StreamExt;

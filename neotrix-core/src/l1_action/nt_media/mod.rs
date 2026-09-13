@@ -21,9 +21,7 @@ pub mod yt_extract;
 pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};
 pub use detect::MediaKind;
 pub use download_progress::{format_bytes, DownloadProgress, ProgressConfig};
-pub use persistence::{
-    ChunkDownloadStatus, ChunkState, ResumeValidation, SidecarState,
-};
+pub use persistence::{ChunkState, ResumeValidation, SidecarState};
 pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use streaming::{
     AggregateProgress, check_disk_space, compute_sha256, DownloadConfig, DownloadEngine,
