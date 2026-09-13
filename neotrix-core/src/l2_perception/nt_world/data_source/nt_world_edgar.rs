@@ -295,7 +295,10 @@ impl EdgarFetcher {
 
     /// 简单速率限制：确保请求间隔 ≥ 100ms (10 req/s)
     fn rate_limit(&self) {
-        let mut last = self.last_request.lock().unwrap();
+        let mut last = match self.last_request.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         let elapsed = last.elapsed();
         let min_interval = std::time::Duration::from_millis(100);
         if elapsed < min_interval {

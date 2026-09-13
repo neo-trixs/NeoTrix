@@ -103,8 +103,17 @@ impl PortScanner {
             let timeout = config.timeout_ms;
 
             handles.push(tokio::spawn(async move {
-                let _permit = sem.acquire().await.unwrap();
-                Self::scan_port(target, port, timeout).await
+                if let Some(_permit) = sem.acquire().await {
+                    Self::scan_port(target, port, timeout).await
+                } else {
+                    PortScanResult {
+                        port,
+                        is_open: false,
+                        banner: None,
+                        service: None,
+                        latency_ms: 0,
+                    }
+                }
             }));
         }
 

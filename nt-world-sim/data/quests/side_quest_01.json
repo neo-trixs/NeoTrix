@@ -1,16 +1,52 @@
 {
   "id": "side_01",
   "name": "收集草药",
-  "description": "商人需要10株草药来制作丹药。",
+  "description": "商人需要草药来制作丹药。帮他收集一些。",
   "type": "side",
   "level": 1,
+  "chapter": 1,
+  "prerequisites": [],
   "objectives": [
-    {"id": "collect_herbs", "type": "collect", "item": "herb", "count": 10, "text": "收集10株草药", "completed": false}
+    {
+      "id": "talk_merchant",
+      "type": "talk",
+      "target": "merchant",
+      "text": "与商人对话",
+      "completed": false,
+      "hint": "在村子里找到商人"
+    },
+    {
+      "id": "collect_herbs",
+      "type": "collect",
+      "item": "herb",
+      "count": 10,
+      "text": "收集10株草药",
+      "completed": false,
+      "hint": "在村子周围采集草药"
+    },
+    {
+      "id": "return_herbs",
+      "type": "deliver",
+      "item": "herb",
+      "target": "merchant",
+      "count": 10,
+      "text": "把草药交给商人",
+      "completed": false,
+      "hint": "回到村子里找商人"
+    }
   ],
   "rewards": {
     "exp": 50,
     "gold": 100,
-    "items": ["hp_potion_x5"]
+    "items": [
+      {"id": "hp_potion", "count": 5}
+    ],
+    "reputation": {"village": 5}
   },
-  "prerequisites": []
+  "dialogue_start": "merchant_herb_quest",
+  "dialogue_complete": "merchant_herb_complete",
+  "unlocks": [],
+  "timeLimit": null,
+  "repeatable": true,
+  "repeatCooldown": 3600
 }

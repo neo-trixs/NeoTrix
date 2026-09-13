@@ -22,7 +22,10 @@ pub fn record_mirror_speed(endpoint: &str, bytes_per_sec: f64) {
 
 /// Return mirrors sorted by speed (fastest first).
 pub fn ranked_mirrors() -> Vec<(String, f64)> {
-    let map = MIRROR_SPEED_MAP.lock().unwrap();
+    let map = match MIRROR_SPEED_MAP.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     let mut pairs: Vec<_> = map.iter().map(|(k, v)| (k.clone(), *v)).collect();
     pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     pairs

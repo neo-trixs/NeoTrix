@@ -423,7 +423,7 @@ mod tests {
     fn test_overlapping_tiles() {
         let map = make_test_tilemap();
         let aabb = AABB::new(Vec2::new(10.0, 10.0), Vec2::new(50.0, 50.0));
-        let tiles = CollisionSystem::overlapping_tiles(&map, &aabb);
+        let tiles = TileCollisionSystem::overlapping_tiles(&map, &aabb);
         assert!(!tiles.is_empty());
         // Should include tiles covering the range
         assert!(tiles.iter().any(|&(x, y)| x == 0 && y == 0));
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn test_entity_collision_detection() {
         let map = make_test_tilemap();
-        let system = TileTileCollisionSystem::new();
+        let system = TileCollisionSystem::new();
 
         // Entity near the wall at y=4 (world y=64..80)
         let entity = AABB::from_center_half(
@@ -473,7 +473,7 @@ mod tests {
     #[test]
     fn test_tile_aabb() {
         let map = make_test_tilemap();
-        let aabb = CollisionSystem::tile_aabb(&map, 3, 2);
+        let aabb = TileCollisionSystem::tile_aabb(&map, 3, 2);
         assert!((aabb.min.x - 48.0).abs() < 0.01);
         assert!((aabb.min.y - 32.0).abs() < 0.01);
         assert!((aabb.width() - 16.0).abs() < 0.01);

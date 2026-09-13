@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::renderer::Vec2;
-use super::skill::{Skill, SkillManager, SkillEffect};
+use super::skill::{SkillManager, SkillEffect};
 
 // ---------------------------------------------------------------------------
 // CombatEntity

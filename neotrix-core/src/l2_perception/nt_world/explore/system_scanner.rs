@@ -35,6 +35,12 @@ pub struct ScanResult {
     pub description: String,
 }
 
+/// Calculate file age in days from metadata.
+///
+/// Note: Uses modified time. Returns 0 if modification time is unavailable.
+/// Real implementation needs:
+/// - Configurable age source (created vs modified vs accessed)
+/// - Timezone-aware calculation
 pub fn calculate_age_days(metadata: &std::fs::Metadata) -> u32 {
     metadata.modified()
         .ok()
@@ -59,6 +65,11 @@ pub struct SystemScanner {
 }
 
 impl SystemScanner {
+    /// Create system scanner with default scan paths.
+    ///
+    /// Note: Default paths include Library/Caches, Library/Logs, /tmp,
+    /// /private/var/folders, Chrome cache, .cargo/registry, .npm, Homebrew cache.
+    /// Minimum age is 7 days, minimum size is 1MB.
     pub fn new() -> Self {
         let mut scanner = Self { scan_paths: Vec::new(), min_age_days: 7, min_size_bytes: 1024 * 1024 };
         scanner.init_default_paths();
@@ -82,13 +93,40 @@ impl SystemScanner {
         }
     }
 
+    /// Set minimum file age filter (in days).
+    ///
+    /// Note: Files older than this threshold are included in scan results.
+    /// Default is 7 days. Real implementation needs:
+    /// - Validation (days >= 0)
+    /// - Per-category age thresholds (logs vs caches)
     pub fn set_min_age(&mut self, days: u32) { self.min_age_days = days; }
+
+    /// Set minimum file size filter (in bytes).
+    ///
+    /// Note: Files larger than this threshold are included in scan results.
+    /// Default is 1MB. Real implementation needs:
+    /// - Validation (bytes > 0)
+    /// - Human-readable size parsing (e.g., "10MB" → 10485760)
     pub fn set_min_size(&mut self, bytes: u64) { self.min_size_bytes = bytes; }
 
+    /// Add a custom scan path.
+    ///
+    /// Note: Path is always added with recursive=true. Real implementation needs:
+    /// - Duplicate path detection
+    /// - Path existence validation
+    /// - Recursive flag parameter
     pub fn _add_scan_path(&mut self, path: PathBuf, category: ScanCategory, risk_level: ScanRiskLevel) {
         self.scan_paths.push(ScanPath { path, category, risk_level, recursive: true });
     }
 
+    /// Scan all configured paths for system垃圾.
+    ///
+    /// Note: Uses rayon parallel iterator over scan_paths. Filters by min_age_days
+    /// and min_size_bytes. Results sorted by size descending.
+    /// Real implementation needs:
+    /// - Progress callback for long scans
+    /// - Cancellation support
+    /// - Rate limiting for I/O-bound scans
     pub fn scan(&self) -> Vec<ScanResult> {
         use rayon::prelude::*;
         let results: Vec<ScanResult> = self.scan_paths.par_iter()

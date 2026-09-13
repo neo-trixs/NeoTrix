@@ -86,7 +86,10 @@ pub struct _StyleHarmonizer {
 }
 
 impl _StyleHarmonizer {
-    /// 创建协调器
+    /// Create style harmonizer with default config.
+    ///
+    /// Note: Default config uses 0.7 style_strength, preserves content,
+    /// and uses 0.8 color_match_strength. All model integration is stubbed.
     pub fn new() -> Self {
         Self {
             config: _StyleHarmonizerConfig {
@@ -101,7 +104,12 @@ impl _StyleHarmonizer {
         }
     }
     
-    /// 使用配置创建
+    /// Create style harmonizer with custom configuration.
+    ///
+    /// Note: Config validation should check:
+    /// - style_strength in [0.0, 1.0]
+    /// - color_match_strength in [0.0, 1.0]
+    /// - texture_match_strength in [0.0, 1.0]
     pub fn with_config(config: _StyleHarmonizerConfig) -> Self {
         Self {
             config,
@@ -165,7 +173,9 @@ impl _StyleHarmonizer {
         }
     }
     
-    /// 获取统计信息
+    /// Get harmonization statistics.
+    ///
+    /// Note: avg_style_similarity is mean of style_similarity across all results.
     pub fn statistics(&self) -> _HarmonizerStats {
         let total_harmonized = self.history.len();
         let successful = self.history.iter().filter(|r| r.success).count();

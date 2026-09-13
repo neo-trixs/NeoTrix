@@ -1,13 +1,445 @@
 {
   "name": "characters",
+  "version": "1.0.0",
   "tileSize": 32,
   "sprites": [
-    {"id": 200, "name": "player", "frames": {"down": [0,1,2,3], "left": [4,5,6,7], "right": [8,9,10,11], "up": [12,13,14,15]}},
-    {"id": 210, "name": "elder", "frames": {"down": [0,1]}},
-    {"id": 211, "name": "merchant", "frames": {"down": [0,1]}},
-    {"id": 212, "name": "guard", "frames": {"down": [0,1], "attack": [2,3]}},
-    {"id": 220, "name": "monster_wolf", "frames": {"down": [0,1], "attack": [2,3]}},
-    {"id": 221, "name": "monster_slime", "frames": {"down": [0,1]}},
-    {"id": 222, "name": "monster_ghost", "frames": {"down": [0,1], "fade": [2,3]}}
-  ]
+    {
+      "id": 200,
+      "name": "player",
+      "type": "player",
+      "description": "玩家角色",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "walk_down": {
+          "frames": [0, 1, 2, 3],
+          "speed": 0.15,
+          "loop": true
+        },
+        "walk_left": {
+          "frames": [4, 5, 6, 7],
+          "speed": 0.15,
+          "loop": true
+        },
+        "walk_right": {
+          "frames": [8, 9, 10, 11],
+          "speed": 0.15,
+          "loop": true
+        },
+        "walk_up": {
+          "frames": [12, 13, 14, 15],
+          "speed": 0.15,
+          "loop": true
+        },
+        "idle_down": {
+          "frames": [0],
+          "speed": 0,
+          "loop": false
+        },
+        "idle_left": {
+          "frames": [4],
+          "speed": 0,
+          "loop": false
+        },
+        "idle_right": {
+          "frames": [8],
+          "speed": 0,
+          "loop": false
+        },
+        "idle_up": {
+          "frames": [12],
+          "speed": 0,
+          "loop": false
+        },
+        "attack_down": {
+          "frames": [16, 17, 18, 19],
+          "speed": 0.1,
+          "loop": false
+        },
+        "attack_left": {
+          "frames": [20, 21, 22, 23],
+          "speed": 0.1,
+          "loop": false
+        },
+        "attack_right": {
+          "frames": [24, 25, 26, 27],
+          "speed": 0.1,
+          "loop": false
+        },
+        "attack_up": {
+          "frames": [28, 29, 30, 31],
+          "speed": 0.1,
+          "loop": false
+        },
+        "cast_down": {
+          "frames": [32, 33, 34, 35],
+          "speed": 0.12,
+          "loop": false
+        },
+        "cast_left": {
+          "frames": [36, 37, 38, 39],
+          "speed": 0.12,
+          "loop": false
+        },
+        "cast_right": {
+          "frames": [40, 41, 42, 43],
+          "speed": 0.12,
+          "loop": false
+        },
+        "cast_up": {
+          "frames": [44, 45, 46, 47],
+          "speed": 0.12,
+          "loop": false
+        },
+        "death": {
+          "frames": [48, 49, 50, 51],
+          "speed": 0.2,
+          "loop": false
+        },
+        "hurt": {
+          "frames": [52, 53],
+          "speed": 0.1,
+          "loop": false
+        }
+      },
+      "sound": {
+        "step": "footstep",
+        "attack": "slash",
+        "cast": "magic_cast",
+        "hurt": "player_hurt",
+        "death": "player_death"
+      }
+    },
+    {
+      "id": 210,
+      "name": "elder",
+      "type": "npc",
+      "description": "村长",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "idle_down": {"frames": [0], "speed": 0, "loop": false},
+        "talk": {"frames": [0, 1], "speed": 0.3, "loop": true}
+      },
+      "properties": {
+        "npcType": "elder",
+        "dialogue": "elder",
+        "portrait": "elder"
+      }
+    },
+    {
+      "id": 211,
+      "name": "merchant",
+      "type": "npc",
+      "description": "商人",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "idle_down": {"frames": [0], "speed": 0, "loop": false},
+        "talk": {"frames": [0, 1], "speed": 0.3, "loop": true}
+      },
+      "properties": {
+        "npcType": "merchant",
+        "dialogue": "merchant",
+        "portrait": "merchant",
+        "tradeEnabled": true
+      }
+    },
+    {
+      "id": 212,
+      "name": "guard",
+      "type": "npc",
+      "description": "守卫",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "idle_down": {"frames": [0], "speed": 0, "loop": false},
+        "walk_down": {"frames": [0, 1, 2, 3], "speed": 0.15, "loop": true},
+        "attack": {"frames": [4, 5, 6, 7], "speed": 0.1, "loop": false}
+      },
+      "properties": {
+        "npcType": "guard",
+        "dialogue": "guard",
+        "portrait": "guard",
+        "hostile": false,
+        "patrolPath": true
+      }
+    },
+    {
+      "id": 213,
+      "name": "blacksmith",
+      "type": "npc",
+      "description": "铁匠",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "idle_down": {"frames": [0], "speed": 0, "loop": false},
+        "talk": {"frames": [0, 1], "speed": 0.3, "loop": true},
+        "forge": {"frames": [2, 3], "speed": 0.2, "loop": true}
+      },
+      "properties": {
+        "npcType": "blacksmith",
+        "dialogue": "blacksmith",
+        "portrait": "blacksmith",
+        "tradeEnabled": true,
+        "craftEnabled": true
+      }
+    },
+    {
+      "id": 214,
+      "name": "healer",
+      "type": "npc",
+      "description": "治疗师",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "idle_down": {"frames": [0], "speed": 0, "loop": false},
+        "talk": {"frames": [0, 1], "speed": 0.3, "loop": true},
+        "heal": {"frames": [2, 3, 4], "speed": 0.15, "loop": false}
+      },
+      "properties": {
+        "npcType": "healer",
+        "dialogue": "healer",
+        "portrait": "healer",
+        "healEnabled": true
+      }
+    },
+    {
+      "id": 220,
+      "name": "wolf",
+      "type": "monster",
+      "description": "野狼",
+      "hitbox": {"x": 6, "y": 6, "width": 20, "height": 20},
+      "animations": {
+        "walk_down": {"frames": [0, 1, 2, 3], "speed": 0.12, "loop": true},
+        "walk_left": {"frames": [4, 5, 6, 7], "speed": 0.12, "loop": true},
+        "walk_right": {"frames": [8, 9, 10, 11], "speed": 0.12, "loop": true},
+        "walk_up": {"frames": [12, 13, 14, 15], "speed": 0.12, "loop": true},
+        "attack": {"frames": [16, 17, 18], "speed": 0.1, "loop": false},
+        "hurt": {"frames": [19, 20], "speed": 0.1, "loop": false},
+        "death": {"frames": [21, 22, 23], "speed": 0.2, "loop": false}
+      },
+      "properties": {
+        "aiType": "aggressive",
+        "detectionRange": 5,
+        "attackRange": 1.5,
+        "speed": 1.2
+      },
+      "sound": {
+        "growl": "wolf_growl",
+        "attack": "wolf_attack",
+        "hurt": "wolf_hurt",
+        "death": "wolf_death"
+      }
+    },
+    {
+      "id": 221,
+      "name": "slime",
+      "type": "monster",
+      "description": "史莱姆",
+      "hitbox": {"x": 6, "y": 6, "width": 20, "height": 20},
+      "animations": {
+        "idle": {"frames": [0, 1], "speed": 0.5, "loop": true},
+        "walk": {"frames": [0, 1, 2, 3], "speed": 0.3, "loop": true},
+        "attack": {"frames": [4, 5], "speed": 0.15, "loop": false},
+        "hurt": {"frames": [6], "speed": 0, "loop": false},
+        "death": {"frames": [7, 8, 9], "speed": 0.2, "loop": false}
+      },
+      "properties": {
+        "aiType": "passive",
+        "detectionRange": 3,
+        "attackRange": 1,
+        "speed": 0.5,
+        "splitOnDeath": true,
+        "splitCount": 2
+      }
+    },
+    {
+      "id": 222,
+      "name": "ghost",
+      "type": "monster",
+      "description": "幽灵",
+      "hitbox": {"x": 6, "y": 6, "width": 20, "height": 20},
+      "animations": {
+        "float": {"frames": [0, 1, 2, 3], "speed": 0.2, "loop": true},
+        "attack": {"frames": [4, 5, 6], "speed": 0.1, "loop": false},
+        "fade": {"frames": [7, 8, 9, 10], "speed": 0.15, "loop": true},
+        "death": {"frames": [11, 12, 13], "speed": 0.2, "loop": false}
+      },
+      "properties": {
+        "aiType": "wander",
+        "detectionRange": 6,
+        "attackRange": 2,
+        "speed": 0.8,
+        "phaseThrough": true,
+        "immuneToPhysical": false
+      }
+    },
+    {
+      "id": 223,
+      "name": "skeleton",
+      "type": "monster",
+      "description": "骷髅",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "walk_down": {"frames": [0, 1, 2, 3], "speed": 0.15, "loop": true},
+        "walk_left": {"frames": [4, 5, 6, 7], "speed": 0.15, "loop": true},
+        "walk_right": {"frames": [8, 9, 10, 11], "speed": 0.15, "loop": true},
+        "walk_up": {"frames": [12, 13, 14, 15], "speed": 0.15, "loop": true},
+        "attack": {"frames": [16, 17, 18], "speed": 0.1, "loop": false},
+        "hurt": {"frames": [19], "speed": 0, "loop": false},
+        "death": {"frames": [20, 21, 22], "speed": 0.2, "loop": false}
+      },
+      "properties": {
+        "aiType": "patrol",
+        "detectionRange": 5,
+        "attackRange": 1.5,
+        "speed": 0.8
+      }
+    },
+    {
+      "id": 224,
+      "name": "bandit",
+      "type": "monster",
+      "description": "强盗",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "walk_down": {"frames": [0, 1, 2, 3], "speed": 0.15, "loop": true},
+        "walk_left": {"frames": [4, 5, 6, 7], "speed": 0.15, "loop": true},
+        "walk_right": {"frames": [8, 9, 10, 11], "speed": 0.15, "loop": true},
+        "walk_up": {"frames": [12, 13, 14, 15], "speed": 0.15, "loop": true},
+        "attack": {"frames": [16, 17, 18, 19], "speed": 0.1, "loop": false},
+        "hurt": {"frames": [20], "speed": 0, "loop": false},
+        "death": {"frames": [21, 22, 23], "speed": 0.2, "loop": false}
+      },
+      "properties": {
+        "aiType": "aggressive",
+        "detectionRange": 6,
+        "attackRange": 1.5,
+        "speed": 1.0
+      }
+    },
+    {
+      "id": 225,
+      "name": "bear",
+      "type": "monster",
+      "description": "熊",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "walk_down": {"frames": [0, 1, 2, 3], "speed": 0.18, "loop": true},
+        "walk_left": {"frames": [4, 5, 6, 7], "speed": 0.18, "loop": true},
+        "walk_right": {"frames": [8, 9, 10, 11], "speed": 0.18, "loop": true},
+        "walk_up": {"frames": [12, 13, 14, 15], "speed": 0.18, "loop": true},
+        "attack": {"frames": [16, 17, 18], "speed": 0.12, "loop": false},
+        "hurt": {"frames": [19], "speed": 0, "loop": false},
+        "death": {"frames": [20, 21, 22], "speed": 0.25, "loop": false}
+      },
+      "properties": {
+        "aiType": "territorial",
+        "detectionRange": 4,
+        "attackRange": 2,
+        "speed": 0.9
+      }
+    },
+    {
+      "id": 226,
+      "name": "snake",
+      "type": "monster",
+      "description": "蛇",
+      "hitbox": {"x": 4, "y": 8, "width": 24, "height": 16},
+      "animations": {
+        "slither": {"frames": [0, 1, 2, 3], "speed": 0.1, "loop": true},
+        "attack": {"frames": [4, 5], "speed": 0.08, "loop": false},
+        "hurt": {"frames": [6], "speed": 0, "loop": false},
+        "death": {"frames": [7, 8], "speed": 0.15, "loop": false}
+      },
+      "properties": {
+        "aiType": "ambush",
+        "detectionRange": 4,
+        "attackRange": 1,
+        "speed": 1.1,
+        "poisonAttack": true,
+        "poisonDamage": 3,
+        "poisonDuration": 5
+      }
+    },
+    {
+      "id": 227,
+      "name": "spider",
+      "type": "monster",
+      "description": "蜘蛛",
+      "hitbox": {"x": 4, "y": 4, "width": 24, "height": 24},
+      "animations": {
+        "walk": {"frames": [0, 1, 2, 3], "speed": 0.12, "loop": true},
+        "attack": {"frames": [4, 5], "speed": 0.1, "loop": false},
+        "hurt": {"frames": [6], "speed": 0, "loop": false},
+        "death": {"frames": [7, 8], "speed": 0.2, "loop": false},
+        "web": {"frames": [9, 10, 11], "speed": 0.15, "loop": false}
+      },
+      "properties": {
+        "aiType": "aggressive",
+        "detectionRange": 5,
+        "attackRange": 1.5,
+        "speed": 0.9,
+        "webAttack": true,
+        "webSlowdown": 0.5,
+        "webDuration": 3
+      }
+    },
+    {
+      "id": 228,
+      "name": "demon",
+      "type": "monster",
+      "description": "恶魔",
+      "hitbox": {"x": 8, "y": 8, "width": 16, "height": 24},
+      "animations": {
+        "idle": {"frames": [0, 1], "speed": 0.3, "loop": true},
+        "walk": {"frames": [0, 1, 2, 3], "speed": 0.12, "loop": true},
+        "attack": {"frames": [4, 5, 6, 7], "speed": 0.1, "loop": false},
+        "cast": {"frames": [8, 9, 10, 11], "speed": 0.12, "loop": false},
+        "hurt": {"frames": [12], "speed": 0, "loop": false},
+        "death": {"frames": [13, 14, 15, 16], "speed": 0.2, "loop": false}
+      },
+      "properties": {
+        "aiType": "aggressive",
+        "detectionRange": 8,
+        "attackRange": 2,
+        "speed": 1.0,
+        "magicAttack": true,
+        "spellTypes": ["fireball", "dark_bolt"]
+      }
+    },
+    {
+      "id": 229,
+      "name": "dragon",
+      "type": "monster",
+      "description": "龙",
+      "hitbox": {"x": 16, "y": 16, "width": 32, "height": 32},
+      "animations": {
+        "idle": {"frames": [0, 1, 2, 3], "speed": 0.25, "loop": true},
+        "fly": {"frames": [4, 5, 6, 7], "speed": 0.15, "loop": true},
+        "fire_breath": {"frames": [8, 9, 10, 11, 12], "speed": 0.1, "loop": false},
+        "claw_attack": {"frames": [13, 14, 15], "speed": 0.1, "loop": false},
+        "hurt": {"frames": [16, 17], "speed": 0.1, "loop": false},
+        "death": {"frames": [18, 19, 20, 21, 22], "speed": 0.2, "loop": false}
+      },
+      "properties": {
+        "aiType": "aggressive",
+        "detectionRange": 10,
+        "attackRange": 3,
+        "speed": 1.5,
+        "flying": true,
+        "breathAttack": true,
+        "breathDamage": 20,
+        "breathRange": 5
+      },
+      "sound": {
+        "roar": "dragon_roar",
+        "breath": "dragon_fire",
+        "hurt": "dragon_hurt",
+        "death": "dragon_death"
+      }
+    }
+  ],
+  "animationDefaults": {
+    "walkSpeed": 0.15,
+    "attackSpeed": 0.1,
+    "castSpeed": 0.12,
+    "deathSpeed": 0.2,
+    "hurtDuration": 0.3
+  }
 }

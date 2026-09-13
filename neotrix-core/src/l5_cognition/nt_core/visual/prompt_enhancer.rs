@@ -89,7 +89,14 @@ pub struct _PromptEnhancer {
 }
 
 impl _PromptEnhancer {
-    /// 创建增强器
+    /// Create prompt enhancer with default config.
+    ///
+    /// Note: Default config includes "cinematic" and "anime" style presets,
+    /// 5 quality tags, 5 negative prompts, and 500 char max length.
+    /// Real implementation needs:
+    /// - More style presets (realistic, watercolor, pixel art, etc.)
+    /// - Platform-specific quality tags (SD WebUI vs ComfyUI)
+    /// - Dynamic max_prompt_length based on model tokenizer limits
     pub fn new() -> Self {
         Self {
             config: _EnhancerConfig {
@@ -133,7 +140,12 @@ impl _PromptEnhancer {
         }
     }
     
-    /// 使用配置创建
+    /// Create prompt enhancer with custom configuration.
+    ///
+    /// Note: Config validation should check:
+    /// - max_prompt_length > 0
+    /// - quality_tags and negative_prompts are non-empty for Combined strategy
+    /// - style_presets have valid IDs (no duplicates)
     pub fn with_config(config: _EnhancerConfig) -> Self {
         Self {
             config,
@@ -141,7 +153,15 @@ impl _PromptEnhancer {
         }
     }
     
-    /// 增强提示词
+    /// Enhance a prompt using the specified strategy.
+    ///
+    /// Note: Applies quality tags (prepended), style prefix (if style_id provided),
+    /// and auto-generates negative prompt. Truncates to max_prompt_length.
+    /// Real implementation needs:
+    /// - Token-aware truncation (not byte-level)
+    /// - Style-specific negative prompt generation
+    /// - Deduplication of quality tags already present in prompt
+    /// - Platform-specific formatting (ComfyUI node syntax vs SD WebUI syntax)
     pub fn enhance(
         &mut self,
         prompt: &str,
@@ -215,7 +235,9 @@ impl _PromptEnhancer {
         negative
     }
     
-    /// 获取统计信息
+    /// Get enhancement statistics.
+    ///
+    /// Note: avg_added_tags is mean number of tags added per enhancement.
     pub fn statistics(&self) -> _EnhancerStats {
         let total_enhanced = self.history.len();
         let avg_added_tags = if total_enhanced > 0 {

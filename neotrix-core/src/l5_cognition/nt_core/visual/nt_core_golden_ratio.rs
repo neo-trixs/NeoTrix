@@ -99,7 +99,11 @@ pub struct _ResonanceAlignment {
 }
 
 impl _GoldenRatioFrequencyArchitecture {
-    /// 创建新的黄金比例频率架构
+    /// Create new golden ratio frequency architecture.
+    ///
+    /// Note: Initializes with Schumann resonance base frequency (7.6 Hz),
+    /// generates max_harmonics bands at f(n) = f0 × φ^n frequencies.
+    /// Each band is classified into EEG-like categories.
     pub fn new() -> Self {
         let mut arch = Self {
             fundamental_frequency: 7.6,
@@ -262,17 +266,26 @@ impl _GoldenRatioFrequencyArchitecture {
         }
     }
 
-    /// 获取所有频带
+    /// Get all frequency bands.
+    ///
+    /// Note: Returns slice of _GoldenBand entries. Each band has frequency,
+    /// type, stability, and noble_position flag.
     pub(crate) fn _frequency_bands(&self) -> &[_GoldenBand] {
         &self._frequency_bands
     }
 
-    /// 获取所有 Fibonacci 耦合
+    /// Get all Fibonacci couplings.
+    ///
+    /// Note: Returns slice of _FibonacciCoupling entries. Each coupling
+    /// links two bands with a Fibonacci ratio and phase-locking flag.
     pub(crate) fn _fibonacci_couplings(&self) -> &[_FibonacciCoupling] {
         &self._fibonacci_couplings
     }
 
-    /// 获取统计信息
+    /// Get architecture statistics.
+    ///
+    /// Note: Returns reference to _GoldenRatioStats with band counts,
+    /// noble position count, average stability, and frequency coverage.
     pub fn stats(&self) -> &_GoldenRatioStats {
         &self.stats
     }

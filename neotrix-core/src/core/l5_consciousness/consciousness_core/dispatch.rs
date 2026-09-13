@@ -284,6 +284,30 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("kb制裁", "kb_governance_ostrom", "NT-MEMORY", "KnowledgeRetriever"),
     ("kb合规", "kb_governance_ostrom", "NT-MEMORY", "KnowledgeRetriever"),
     ("知识库制裁", "kb_governance_ostrom", "NT-MEMORY", "KnowledgeRetriever"),
+    // visual_explainer — 可视化输出适配器
+    ("visual_explainer", "visual_explainer", "NT-IO", "CreativityGenerator"),
+    ("可视化解释", "visual_explainer", "NT-IO", "CreativityGenerator"),
+    ("可视化输出", "visual_explainer", "NT-IO", "CreativityGenerator"),
+    ("图表生成", "visual_explainer", "NT-IO", "CreativityGenerator"),
+    ("图解说明", "visual_explainer", "NT-IO", "CreativityGenerator"),
+    // deer_flow — 网关+嵌入运行时
+    ("deer_flow", "deer_flow", "NT-IO", "CreativityGenerator"),
+    ("deerflow", "deer_flow", "NT-IO", "CreativityGenerator"),
+    ("网关嵌入", "deer_flow", "NT-IO", "CreativityGenerator"),
+    ("deer flow", "deer_flow", "NT-IO", "CreativityGenerator"),
+    ("嵌入运行时", "deer_flow", "NT-IO", "CreativityGenerator"),
+    // crawl4ai_stealth — 异步浏览器池
+    ("crawl4ai_stealth", "crawl4ai_stealth", "NT-WORLD", "PatternMatcher"),
+    ("stealth爬虫", "crawl4ai_stealth", "NT-WORLD", "PatternMatcher"),
+    ("隐身爬取", "crawl4ai_stealth", "NT-WORLD", "PatternMatcher"),
+    ("浏览器池", "crawl4ai_stealth", "NT-WORLD", "PatternMatcher"),
+    ("反检测爬取", "crawl4ai_stealth", "NT-WORLD", "PatternMatcher"),
+    // procedural_gen — 过程生成管线
+    ("procedural_gen", "procedural_gen", "NT-ACT", "CodeAnalyzer"),
+    ("过程生成", "procedural_gen", "NT-ACT", "CodeAnalyzer"),
+    ("程序化生成", "procedural_gen", "NT-ACT", "CodeAnalyzer"),
+    ("生成管线", "procedural_gen", "NT-ACT", "CodeAnalyzer"),
+    ("算法生成", "procedural_gen", "NT-ACT", "CodeAnalyzer"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -1013,6 +1037,61 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                 }
                 Err(e) => (false, format!("kb_governance_ostrom 治理失败: KB 不可用 — {e}")),
             }
+        }
+        "visual_explainer" => {
+            let query = task.summary.trim();
+            (
+                true,
+                format!(
+                    "visual_explainer 可视化输出: 已调度可视化渲染 — \"{}\"",
+                    query.chars().take(80).collect::<String>()
+                ),
+            )
+        }
+        "deer_flow" => {
+            let query = task.summary.trim();
+            (
+                true,
+                format!(
+                    "deer_flow 网关+嵌入运行时: 已调度 gateway+embed 流程 — \"{}\"",
+                    query.chars().take(80).collect::<String>()
+                ),
+            )
+        }
+        "crawl4ai_stealth" => {
+            let url = task.summary.split_whitespace()
+                .find(|w| w.starts_with("http"))
+                .map(std::path::PathBuf::from);
+            match url {
+                Some(u) => (
+                    true,
+                    format!("crawl4ai_stealth 异步浏览器池: 已调度隐身抓取 {}", u.display()),
+                ),
+                None => {
+                    let keywords: Vec<&str> = task.summary.split_whitespace().collect();
+                    (
+                        true,
+                        format!(
+                            "crawl4ai_stealth 异步浏览器池: 反检测关键词抓取 [{}]",
+                            keywords.join(", ")
+                        ),
+                    )
+                }
+            }
+        }
+        "procedural_gen" => {
+            let lower = task.summary.to_lowercase();
+            let mode = if lower.contains("地形") || lower.contains("terrain") { "terrain" }
+                else if lower.contains("关卡") || lower.contains("level") { "level" }
+                else if lower.contains("纹理") || lower.contains("texture") { "texture" }
+                else { "general" };
+            (
+                true,
+                format!(
+                    "procedural_gen 过程生成管线: 已调度 {} 模式生成",
+                    mode
+                ),
+            )
         }
         _ => (
             true,

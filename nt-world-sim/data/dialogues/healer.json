@@ -1,0 +1,93 @@
+{
+  "id": "healer_intro",
+  "speaker": "治疗师",
+  "portrait": "healer",
+  "nodes": [
+    {
+      "id": "start",
+      "text": "你好，年轻人。我是这里的治疗师。需要治疗吗？",
+      "choices": [
+        {"text": "治疗伤势", "next": "heal"},
+        {"text": "购买药品", "next": "shop"},
+        {"text": "解除诅咒", "next": "curse"},
+        {"text": "没事", "next": null}
+      ]
+    },
+    {
+      "id": "heal",
+      "text": "让我看看你的伤势。",
+      "choices": [
+        {"text": "治疗 (20金)", "next": "heal_full", "conditions": [{"type": "gold", "amount": 20}]},
+        {"text": "太贵了", "next": null}
+      ]
+    },
+    {
+      "id": "heal_full",
+      "text": "好了，你的伤已经全好了。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "heal", "amount": "full", "cost": 20}]}
+      ]
+    },
+    {
+      "id": "shop",
+      "text": "我这里有各种药品，你需要什么？",
+      "choices": [
+        {"text": "回血丹 (50金)", "next": "buy_hp", "conditions": [{"type": "gold", "amount": 50}]},
+        {"text": "回蓝丹 (80金)", "next": "buy_mp", "conditions": [{"type": "gold", "amount": 80}]},
+        {"text": "解毒丹 (120金)", "next": "buy_antidote", "conditions": [{"type": "gold", "amount": 120}]},
+        {"text": "复活丹 (500金)", "next": "buy_resurrect", "conditions": [{"type": "gold", "amount": 500}]},
+        {"text": "不需要了", "next": null}
+      ]
+    },
+    {
+      "id": "buy_hp",
+      "text": "好，回血丹一颗。受伤了吃一颗。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "hp_potion", "cost": 50}]}
+      ]
+    },
+    {
+      "id": "buy_mp",
+      "text": "好，回蓝丹一颗。蓝量不够时用。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "mp_potion", "cost": 80}]}
+      ]
+    },
+    {
+      "id": "buy_antidote",
+      "text": "好，解毒丹一颗。中毒了吃一颗。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "antidote", "cost": 120}]}
+      ]
+    },
+    {
+      "id": "buy_resurrect",
+      "text": "好，复活丹一颗。死了可以复活。但愿你用不上。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "resurrect_pill", "cost": 500}]}
+      ]
+    },
+    {
+      "id": "curse",
+      "text": "诅咒？让我看看。",
+      "choices": [
+        {"text": "解除诅咒 (100金)", "next": "remove_curse", "conditions": [{"type": "gold", "amount": 100}, {"type": "has_effect", "effect": "cursed"}]},
+        {"text": "我没被诅咒", "next": "no_curse"}
+      ]
+    },
+    {
+      "id": "remove_curse",
+      "text": "好了，诅咒已经解除了。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "remove_effect", "effect": "cursed", "cost": 100}]}
+      ]
+    },
+    {
+      "id": "no_curse",
+      "text": "那就好。祝你平安。",
+      "choices": [
+        {"text": "谢谢", "next": null}
+      ]
+    }
+  ]
+}

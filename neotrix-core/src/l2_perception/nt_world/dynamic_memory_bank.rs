@@ -166,7 +166,7 @@ impl _DynamicMemoryBank {
             }
         }
         
-        results.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap());
+        results.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(k);
         
         let avg_relevance = if results.is_empty() {
@@ -198,7 +198,7 @@ impl _DynamicMemoryBank {
             }
         }
         
-        results.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap());
+        results.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(k);
         
         let avg_relevance = if results.is_empty() {
@@ -311,7 +311,7 @@ pub struct _MemoryBankStats {
 fn current_timestamp() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_secs()
 }
 

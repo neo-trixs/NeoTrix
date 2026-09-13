@@ -57,6 +57,12 @@ pub struct _PromptCache {
 }
 
 impl _PromptCache {
+    /// Create prompt cache with custom configuration.
+    ///
+    /// Note: Config validation should check:
+    /// - max_entries > 0
+    /// - ttl > 0
+    /// - similarity_threshold in [0.0, 1.0]
     pub fn new(config: CacheConfig) -> Self {
         Self {
             entries: HashMap::new(),
@@ -80,7 +86,14 @@ impl _PromptCache {
         format!("{:x}", hasher.finish())
     }
 
-    /// 获取缓存
+    /// Get cached response for a prompt.
+    ///
+    /// Note: Checks exact hash match first. If TTL expired, removes entry.
+    /// Updates access_count and last_accessed on hit. Increments miss counter on miss.
+    /// Real implementation needs:
+    /// - Similarity-based lookup (not just exact hash)
+    /// - Batch get for multiple prompts
+    /// - Cache warming from persistent storage
     pub fn get(&mut self, prompt: &str) -> Option<String> {
         let hash = self.hash_prompt(prompt);
         self.stats.total_requests += 1;
@@ -100,7 +113,14 @@ impl _PromptCache {
         None
     }
 
-    /// 存入缓存
+    /// Store prompt-response pair in cache.
+    ///
+    /// Note: Generates hash key, checks capacity (evicts if full), inserts entry
+    /// with current timestamp. similarity is always 1.0 for exact matches.
+    /// Real implementation needs:
+    /// - Similarity-based deduplication (don't store near-duplicates)
+    /// - Response size tracking for size-aware eviction
+    /// - Compression for large responses
     pub fn set(&mut self, prompt: &str, response: &str) {
         let hash = self.hash_prompt(prompt);
 
@@ -156,7 +176,10 @@ impl _PromptCache {
         }
     }
 
-    /// 获取统计信息
+    /// Get cache statistics.
+    ///
+    /// Note: Returns current hit/miss counts and total entries.
+    /// Use hit_rate() on the returned CacheStats for hit ratio.
     pub fn stats(&self) -> CacheStats {
         self.stats.clone()
     }
@@ -178,6 +201,9 @@ pub struct CacheStats {
 }
 
 impl CacheStats {
+    /// Compute cache hit rate.
+    ///
+    /// Note: Returns hits / total_requests. Returns 0.0 if no requests yet.
     pub fn hit_rate(&self) -> f64 {
         if self.total_requests == 0 {
             return 0.0;

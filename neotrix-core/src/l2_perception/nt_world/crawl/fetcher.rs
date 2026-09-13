@@ -108,6 +108,14 @@ pub struct FetcherPool {
 }
 
 impl FetcherPool {
+    /// Create new fetcher pool.
+    ///
+    /// Note: Initializes with RequestScraper for HTTP, no browser client,
+    /// no session pool. Response cache is empty. Network check interval is 30s.
+    /// Real implementation needs:
+    /// - Configurable network_check_interval
+    /// - Response cache size limit
+    /// - Error history size limit
     pub fn new(config: &ScraperConfig, strategy: CrawlStrategy) -> Self {
         FetcherPool {
             http_nt_world_scrape: RequestScraper::new(config.clone()),
@@ -137,6 +145,15 @@ impl FetcherPool {
         self.session_pool.as_ref().map(|p| (p.active_count(), p.banned_count()))
     }
 
+    /// Fetch a URL with cache-first strategy.
+    ///
+    /// Note: Checks response cache first (exact URL match). On cache miss,
+    /// fetches via HTTP scraper. If HTTP fails and browser client available,
+    /// falls back to browser fetch. Updates cache on success.
+    /// Real implementation needs:
+    /// - Cache key normalization (strip trailing slash, normalize query params)
+    /// - Cache TTL configuration
+    /// - Cache size limit with LRU eviction
     pub fn fetch(&mut self, url: &str) -> FetchResult {
         // P1-18 cache-first (city-roads 模式): 命中缓存直接返回, 不重复抓取。
         if let Some((body, text)) = self.response_cache.get(url).cloned() {
@@ -262,6 +279,14 @@ impl FetcherPool {
         fetch_result
     }
 
+    /// Fetch URL with exponential backoff retry.
+    ///
+    /// Note: Retries on error status (>=400 or network error). Backoff is
+    /// 2^retries seconds, capped at 3600s. Updates retry count in FetchError.
+    /// Real implementation needs:
+    /// - Configurable backoff strategy (not just exponential)
+    /// - Retry on specific status codes only (not all errors)
+    /// - Jitter to prevent thundering herd
     pub fn fetch_with_retry(&mut self, url: &str, max_retries: u32) -> FetchResult {
         let mut result = self.fetch(url);
         let mut retries = 0;
@@ -279,6 +304,13 @@ impl FetcherPool {
         result
     }
 
+    /// Fetch URL with Tor-safe retry on block.
+    ///
+    /// Note: If first fetch is blocked (403/401), waits 5s and retries once.
+    /// Real implementation needs:
+    /// - Tor circuit rotation on block (not just delay)
+    /// - Configurable retry delay
+    /// - Block reason logging
     pub fn fetch_tor_safe(&mut self, url: &str) -> FetchResult {
         let mut result = self.fetch(url);
         if result.is_blocked() {
@@ -405,6 +437,10 @@ impl FetcherPool {
         fetch_result
     }
 
+    /// Compute error rate.
+    ///
+    /// Note: Returns (total_requests - total_success) / total_requests.
+    /// Returns 0.0 if no requests yet.
     pub fn error_rate(&self) -> f64 {
         if self.total_requests == 0 {
             return 0.0;
@@ -412,6 +448,10 @@ impl FetcherPool {
         (self.total_requests - self.total_success) as f64 / self.total_requests as f64
     }
 
+    /// Get fetcher summary statistics.
+    ///
+    /// Note: Returns aggregated counters and recent errors (last 10).
+    /// error_rate is computed from total_requests and total_success.
     pub fn summary(&self) -> FetcherSummary {
         FetcherSummary {
             total_requests: self.total_requests,
@@ -424,10 +464,23 @@ impl FetcherPool {
         }
     }
 
+    /// Clear error history.
+    ///
+    /// Note: Removes all FetchError entries. Call after healing cycle
+    /// to reset error state. Real implementation needs:
+    /// - Configurable error history retention
+    /// - Export errors to KB before clearing
     pub fn _clear_errors(&mut self) {
         self.errors.clear();
     }
 
+    /// Adjust crawl strategy.
+    ///
+    /// Note: Updates internal strategy (affects delay_ms and fallback behavior).
+    /// Real implementation needs:
+    /// - Strategy transition logging
+    /// - Cooldown between strategy changes
+    /// - EventBus notification of strategy change
     pub fn adjust_strategy(&mut self, new_strategy: CrawlStrategy) {
         self.strategy = new_strategy;
     }
@@ -460,6 +513,10 @@ impl FetcherPool {
         available
     }
 
+    /// Check if network is available (cached).
+    ///
+    /// Note: Returns last known network state. Use check_connectivity()
+    /// to force a fresh check. Network state is cached for 30s.
     pub fn _is_network_available(&self) -> bool {
         self.network_available
     }

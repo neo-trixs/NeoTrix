@@ -215,8 +215,11 @@ impl _NarrativeStructuring {
     
     /// 从文本结构化叙事
     ///
-    /// **Feature not wired**: This uses naive paragraph splitting with keyword heuristics.
-    /// Real implementation needs an LLM call to:
+    /// **Not wired**: This uses naive paragraph splitting with keyword heuristics
+    /// that produce rough approximations only. The output is a fabricated fallback —
+    /// callers must not treat shot assignments as drama-aware decisions.
+    ///
+    /// Real implementation requires an LLM call to:
     /// 1. Parse narrative structure (acts, scenes, beats)
     /// 2. Assign shot sizes and camera movements based on dramatic context
     /// 3. Extract emotional arcs and pacing

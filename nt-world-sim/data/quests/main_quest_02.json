@@ -1,0 +1,69 @@
+{
+  "id": "main_02",
+  "name": "青云试炼",
+  "description": "张长老要考验你的实力。完成试炼才能正式加入青云宗。",
+  "type": "main",
+  "level": 3,
+  "chapter": 2,
+  "prerequisites": ["main_01"],
+  "objectives": [
+    {
+      "id": "talk_zhang_start",
+      "type": "talk",
+      "target": "zhang",
+      "text": "与张长老对话，接受试炼",
+      "completed": false,
+      "hint": "回到大殿找张长老"
+    },
+    {
+      "id": "kill_slimes",
+      "type": "kill",
+      "target": "slime",
+      "count": 5,
+      "text": "消灭5只史莱姆",
+      "completed": false,
+      "hint": "史莱姆在山下的草地上"
+    },
+    {
+      "id": "collect_crystal",
+      "type": "collect",
+      "item": "spirit_crystal",
+      "count": 1,
+      "text": "收集1颗灵石",
+      "completed": false,
+      "hint": "灵石在水晶洞穴中"
+    },
+    {
+      "id": "defeat_guardian",
+      "type": "kill",
+      "target": "trial_guardian",
+      "count": 1,
+      "text": "击败试炼守卫",
+      "completed": false,
+      "hint": "守卫在试炼场中央"
+    },
+    {
+      "id": "return_zhang",
+      "type": "talk",
+      "target": "zhang",
+      "text": "回去找张长老",
+      "completed": false,
+      "hint": "回到大殿"
+    }
+  ],
+  "rewards": {
+    "exp": 300,
+    "gold": 100,
+    "items": [
+      {"id": "spirit_sword", "count": 1},
+      {"id": "mp_potion", "count": 5}
+    ],
+    "reputation": {"sect": 20},
+    "unlock": {"skill": "basic_slash"}
+  },
+  "dialogue_start": "zhang_trial_start",
+  "dialogue_complete": "zhang_trial_complete",
+  "unlocks": ["main_03", "side_02"],
+  "timeLimit": null,
+  "repeatable": false
+}

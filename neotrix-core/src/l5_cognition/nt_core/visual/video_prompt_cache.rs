@@ -67,6 +67,14 @@ pub struct _VideoPromptCache {
 }
 
 impl _VideoPromptCache {
+    /// Create video prompt cache with custom configuration.
+    ///
+    /// Note: Default config: 10000 entries, 7-day TTL, 0.9 similarity threshold,
+    /// semantic search enabled, versioning enabled.
+    /// Real implementation needs:
+    /// - Config validation (max_entries > 0, ttl > 0)
+    /// - Memory budget monitoring
+    /// - Persistent cache backend option
     pub fn new(config: _PromptCacheConfig) -> Self {
         Self {
             entries: HashMap::new(),
@@ -75,7 +83,15 @@ impl _VideoPromptCache {
         }
     }
 
-    /// 获取缓存
+    /// Get cached response for a prompt.
+    ///
+    /// Note: First checks exact match, then semantic similarity if enabled.
+    /// Updates access_count and last_accessed on hit. TTL-expired entries
+    /// are not returned but not proactively removed.
+    /// Real implementation needs:
+    /// - Proactive TTL cleanup (background thread)
+    /// - Batch get for multiple prompts
+    /// - Cache warming from persistent storage
     pub fn get(&mut self, prompt: &str) -> Option<String> {
         self.stats.total_requests += 1;
 
@@ -107,7 +123,15 @@ impl _VideoPromptCache {
         None
     }
 
-    /// 存入缓存
+    /// Store prompt-response pair in cache.
+    ///
+    /// Note: Generates UUID key, computes embedding, checks capacity (evicts if full).
+    /// If versioning enabled, increments version for same prompt. Tags are stored
+    /// for potential tag-based filtering.
+    /// Real implementation needs:
+    /// - Deduplication (don't store if similar prompt exists)
+    /// - Response size tracking
+    /// - Compression for large responses
     pub fn set(&mut self, prompt: &str, response: &str, tags: Vec<String>) {
         let id = format!("cache-{}", uuid::Uuid::new_v4());
         let embedding = self.embed_prompt(prompt);
@@ -226,7 +250,9 @@ impl _VideoPromptCache {
         }
     }
 
-    /// 获取统计信息
+    /// Get cache statistics.
+    ///
+    /// Note: Returns current hit/miss/semantic_hits counts and total entries.
     pub fn stats(&self) -> _PromptCacheStats {
         self.stats.clone()
     }
@@ -249,6 +275,10 @@ pub struct _PromptCacheStats {
 }
 
 impl _PromptCacheStats {
+    /// Compute cache hit rate.
+    ///
+    /// Note: Returns (hits + semantic_hits) / total_requests.
+    /// Returns 0.0 if no requests yet.
     pub fn hit_rate(&self) -> f64 {
         if self.total_requests == 0 {
             return 0.0;

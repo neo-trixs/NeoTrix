@@ -171,20 +171,21 @@ impl VideoObjectStorage {
     }
 
     /// 下载对象
-    pub fn download(&mut self, object_id: &str) -> Option<Vec<u8>> {
+    ///
+    /// **Not wired**: Returns `Err` for existing objects instead of silently
+    /// returning `None` — callers can distinguish "not found" from "not wired".
+    /// Real implementation requires object storage backend (S3/MinIO/R2).
+    pub fn download(&mut self, object_id: &str) -> Result<Vec<u8>, String> {
         if let Some(_object) = self.objects.get(object_id) {
             self.stats.total_downloads += 1;
-            // not wired: actual download logic not implemented.
-            // Returns None silently — callers cannot distinguish "not found"
-            // from "download not wired". Log for observability.
-            log::warn!(
+            // C1 stub: no real download logic — return honest error.
+            Err(format!(
                 "not wired: VideoObjectStorage::download — object '{}' exists but \
-                 actual download logic not implemented",
+                 download logic requires object storage backend (S3/MinIO/R2)",
                 object_id
-            );
-            None
+            ))
         } else {
-            None
+            Err(format!("object '{}' not found", object_id))
         }
     }
 

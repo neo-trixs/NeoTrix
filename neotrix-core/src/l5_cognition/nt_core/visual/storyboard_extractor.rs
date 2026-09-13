@@ -159,7 +159,14 @@ pub struct StoryboardExtractor {
 }
 
 impl StoryboardExtractor {
-    /// 创建拆解器
+    /// Create storyboard extractor with default config.
+    ///
+    /// Note: Default config uses Dynamic duration mode, 3.0s default shot
+    /// duration, anime art style, and 9:16 aspect ratio.
+    /// Real implementation needs:
+    /// - Configurable art_style presets (anime/realistic/cinematic)
+    /// - Platform-specific default aspect ratios (16:9 for YouTube, 9:16 for TikTok)
+    /// - Duration constraints per platform (short-form vs long-form)
     pub fn new() -> Self {
         Self {
             config: _StoryboardConfig {
@@ -176,7 +183,12 @@ impl StoryboardExtractor {
         }
     }
     
-    /// 使用配置创建
+    /// Create storyboard extractor with custom configuration.
+    ///
+    /// Note: Config validation should check:
+    /// - min_shot_duration < max_shot_duration
+    /// - default_shot_duration within [min, max] range
+    /// - aspect_ratio is valid format
     pub fn with_config(config: _StoryboardConfig) -> Self {
         Self {
             config,
@@ -314,7 +326,10 @@ impl StoryboardExtractor {
         }
     }
     
-    /// 获取拆解统计
+    /// Get extraction statistics.
+    ///
+    /// Note: Computes aggregates from history. avg_shots_per_script is
+    /// total_shots / total_scripts. avg_shot_duration is mean across all shots.
     pub fn statistics(&self) -> ExtractorStats {
         let total_scripts = self.history.len();
         let total_shots: usize = self.history.iter().map(|s| s.shots.len()).sum();

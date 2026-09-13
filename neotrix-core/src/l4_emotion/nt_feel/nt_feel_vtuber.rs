@@ -150,7 +150,14 @@ pub struct _EmotionResponse {
 }
 
 impl _VTuberEmotionEngine {
-    /// 创建新的 VTuber 情感引擎
+    /// Create new VTuber emotion engine.
+    ///
+    /// Note: Initializes with provided persona and FeelEngine. Voice config
+    /// defaults to "default" provider with neutral settings.
+    /// Real implementation needs:
+    /// - Voice config validation (valid provider, supported language)
+    /// - Persona consistency check (emotional_baseline should cover all _EmotionType variants)
+    /// - FeelEngine initialization from KB-persisted state
     pub fn new(persona: _CharacterPersona, feel_engine: EmotionEngine) -> Self {
         Self {
             persona,
@@ -227,11 +234,8 @@ impl _VTuberEmotionEngine {
 
     /// 应用角色人格
     ///
-    /// Note: Adjusts emotion intensity based on personality traits:
-    /// - "cheerful" dampens sadness (×0.7)
-    /// - "calm" dampens anger (×0.6)
-    /// - "emotional" amplifies all emotions (×1.3)
-    /// Real implementation needs:
+    /// **Not wired**: Uses hardcoded linear multipliers (e.g., "cheerful" dampens
+    /// sadness ×0.7). This is a fabricated approximation — real implementation needs:
     /// - Trait-aware intensity curves (not just linear multipliers)
     /// - Emotional baseline drift over time (long conversations)
     /// - Personality-consistent response generation (not just intensity adjustment)
@@ -262,43 +266,27 @@ impl _VTuberEmotionEngine {
 
     /// 生成情绪驱动响应
     ///
-    /// Note: Generates text response with emotion prefix (e.g., "That's wonderful!" for Happy).
-    /// Selects expression based on emotion type.
-    /// Real implementation needs:
+    /// **Not wired**: Returns hardcoded template responses (e.g., "That's wonderful!"
+    /// for Happy). This is a fabricated fallback — callers must not treat the output
+    /// as a real LLM-generated response.
+    ///
+    /// Real implementation requires:
     /// - LLM-based response generation with emotion conditioning
     /// - Persona-aware response style (formality, humor, empathy from _ResponseStyle)
     /// - Catchphrase and speaking pattern integration
     /// - TTS voice selection based on emotion (excited→higher pitch, sad→lower pitch)
-    pub fn generate_response(&mut self, input: &str) -> _EmotionResponse {
+    pub fn generate_response(&mut self, input: &str) -> Result<_EmotionResponse, String> {
         let mut reading = self.detect_from_text(input);
         self.apply_persona(&mut reading);
 
-        // 根据情绪和人格生成响应
-        let text = match reading.emotion {
-            _EmotionType::Happy => format!("That's wonderful! {}", input),
-            _EmotionType::Sad => format!("I understand... {}", input),
-            _EmotionType::Angry => format!("I see your frustration. {}", input),
-            _EmotionType::Excited => format!("Oh wow! {}!", input),
-            _EmotionType::Confused => format!("Hmm, let me think about that... {}", input),
-            _ => input.to_string(),
-        };
-
-        // 选择表情
-        let expression = match reading.emotion {
-            _EmotionType::Happy => Some("smile".into()),
-            _EmotionType::Sad => Some("concerned".into()),
-            _EmotionType::Angry => Some("stern".into()),
-            _EmotionType::Excited => Some("sparkle".into()),
-            _ => Some("neutral".into()),
-        };
-
-        _EmotionResponse {
-            text,
-            emotion: reading.emotion.clone(),
-            intensity: reading.intensity,
-            voice: None, // TODO: 集成 TTS
-            expression,
-        }
+        // C1 stub: hardcoded template responses — not LLM-generated.
+        // Returns error to signal fabrication instead of returning fake success.
+        Err(format!(
+            "not wired: VTuberEmotionEngine::generate_response — \
+             LLM response generation not integrated (emotion={:?}, len={})",
+            reading.emotion,
+            input.len()
+        ))
     }
 
     /// TTS 合成
@@ -331,12 +319,23 @@ impl _VTuberEmotionEngine {
         Err("not wired: speech-to-text transcription not integrated (requires Whisper or similar STT model)".into())
     }
 
-    /// 获取情绪历史
+    /// Get emotion history (all recorded readings).
+    ///
+    /// Note: Returns slice of all _EmotionReading entries in chronological order.
+    /// History is append-only; no pruning. Real implementation needs:
+    /// - Configurable history size limit (prevent unbounded growth)
+    /// - Time-based pruning (keep only recent N minutes)
+    /// - Export to KB for cross-session persistence
     pub(crate) fn _get_emotion_history(&self) -> &[_EmotionReading] {
         &self.emotion_history
     }
 
-    /// 获取当前情绪状态
+    /// Get current (most recent) emotion reading.
+    ///
+    /// Note: Returns last entry in emotion_history. Returns None if no
+    /// readings have been recorded yet. Real implementation needs:
+    /// - Emotion smoothing (current = exponential moving average of recent readings)
+    /// - Decay factor for stale emotions (no reading → gradual return to baseline)
     pub fn current_emotion(&self) -> Option<&_EmotionReading> {
         self.emotion_history.last()
     }

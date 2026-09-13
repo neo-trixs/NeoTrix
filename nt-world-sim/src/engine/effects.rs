@@ -1,4 +1,4 @@
-use crate::engine::renderer::{Color, Vec2, Rect, DrawCommand, Camera};
+use crate::engine::renderer::{Color, Vec2, DrawCommand, Camera};
 use crate::engine::particle::ParticlePool;
 
 // ---------------------------------------------------------------------------

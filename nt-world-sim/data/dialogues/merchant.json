@@ -5,56 +5,95 @@
   "nodes": [
     {
       "id": "start",
-      "text": "客官，想买点什么？我这里什么都有。",
+      "text": "客官，想买点什么？我这里什么都有，从草药到武器，应有尽有。",
       "choices": [
         {"text": "看看商品", "next": "shop"},
         {"text": "卖东西", "next": "sell"},
+        {"text": "有什么新货吗？", "next": "new_items"},
         {"text": "不用了", "next": null}
       ]
     },
     {
       "id": "shop",
-      "text": "这些是我最好的货物。",
+      "text": "这些是我最好的货物。质量保证，价格公道。",
       "choices": [
-        {"text": "购买回血丹 (50金)", "next": "buy_hp", "conditions": [{"type": "gold", "amount": 50}]},
-        {"text": "购买回蓝丹 (80金)", "next": "buy_mp", "conditions": [{"type": "gold", "amount": 80}]},
-        {"text": "购买铁剑 (200金)", "next": "buy_sword", "conditions": [{"type": "gold", "amount": 200}]},
+        {"text": "回血丹 (50金)", "next": "buy_hp", "conditions": [{"type": "gold", "amount": 50}]},
+        {"text": "回蓝丹 (80金)", "next": "buy_mp", "conditions": [{"type": "gold", "amount": 80}]},
+        {"text": "解毒丹 (120金)", "next": "buy_antidote", "conditions": [{"type": "gold", "amount": 120}]},
+        {"text": "铁剑 (200金)", "next": "buy_sword", "conditions": [{"type": "gold", "amount": 200}]},
+        {"text": "皮甲 (150金)", "next": "buy_armor", "conditions": [{"type": "gold", "amount": 150}]},
+        {"text": "火把 (20金)", "next": "buy_torch", "conditions": [{"type": "gold", "amount": 20}]},
         {"text": "下次再来", "next": null}
       ]
     },
     {
       "id": "buy_hp",
-      "text": "好嘞，回血丹一颗。",
+      "text": "好嘞，回血丹一颗。受伤了就吃一颗，立刻恢复体力。",
       "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "hp_potion", "cost": 50}]}]
     },
     {
       "id": "buy_mp",
-      "text": "好嘞，回蓝丹一颗。",
+      "text": "好嘞，回蓝丹一颗。施法后蓝量不够就用它。",
       "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "mp_potion", "cost": 80}]}]
     },
     {
+      "id": "buy_antidote",
+      "text": "好嘞，解毒丹一颗。沼泽里的蛇和蜘蛛都有毒，带着它保命。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "antidote", "cost": 120}]}]
+    },
+    {
       "id": "buy_sword",
-      "text": "好嘞，铁剑一把。",
+      "text": "好嘞，铁剑一把。这把剑虽然普通，但很结实。",
       "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "iron_sword", "cost": 200}]}]
     },
     {
+      "id": "buy_armor",
+      "text": "好嘞，皮甲一件。穿上它，能挡住不少攻击。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "leather_armor", "cost": 150}]}]
+    },
+    {
+      "id": "buy_torch",
+      "text": "好嘞，火把一根。黑暗的地方用得上。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_buy", "item": "torch", "cost": 20}]}]
+    },
+    {
       "id": "sell",
-      "text": "你想卖什么？",
+      "text": "你想卖什么？我出价公道。",
       "choices": [
         {"text": "卖草药 (10金)", "next": "sell_herb", "conditions": [{"type": "has_item", "item": "herb", "count": 1}]},
         {"text": "卖兽皮 (25金)", "next": "sell_fur", "conditions": [{"type": "has_item", "item": "wolf_fur", "count": 1}]},
+        {"text": "卖铁矿 (30金)", "next": "sell_ore", "conditions": [{"type": "has_item", "item": "iron_ore", "count": 1}]},
+        {"text": "卖宝石 (100金)", "next": "sell_gem", "conditions": [{"type": "has_item", "item": "rare_gem", "count": 1}]},
         {"text": "不卖了", "next": null}
       ]
     },
     {
       "id": "sell_herb",
-      "text": "好的，草药我收了。",
+      "text": "好的，草药我收了。品质不错。",
       "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_sell", "item": "herb", "gold": 10}]}]
     },
     {
       "id": "sell_fur",
-      "text": "不错的兽皮。",
+      "text": "不错的兽皮。狼皮可以做衣服。",
       "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_sell", "item": "wolf_fur", "gold": 25}]}]
+    },
+    {
+      "id": "sell_ore",
+      "text": "好矿石。铁匠会喜欢的。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_sell", "item": "iron_ore", "gold": 30}]}]
+    },
+    {
+      "id": "sell_gem",
+      "text": "好宝石！这东西值钱。",
+      "choices": [{"text": "谢谢", "next": null, "effects": [{"type": "item_sell", "item": "rare_gem", "gold": 100}]}]
+    },
+    {
+      "id": "new_items",
+      "text": "最近进了一批新货。你要看看吗？",
+      "choices": [
+        {"text": "看看新货", "next": "shop"},
+        {"text": "下次吧", "next": null}
+      ]
     }
   ]
 }

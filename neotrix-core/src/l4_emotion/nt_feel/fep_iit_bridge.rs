@@ -40,6 +40,10 @@ impl Default for FepIitBridge {
 
 impl FepIitBridge {
     /// Create a new FEP-IIT bridge with default calibration parameters.
+    ///
+    /// **Not wired**: Calibration parameters (alpha, phi_threshold, coherence_decay)
+    /// are hardcoded defaults — not learned from data. Real implementation requires
+    /// calibration against labeled consciousness datasets (e.g., reportability tasks).
     pub fn new() -> Self {
         Self::default()
     }

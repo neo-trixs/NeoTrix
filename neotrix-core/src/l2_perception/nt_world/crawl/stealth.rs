@@ -29,7 +29,10 @@ impl SessionPool {
     }
 
     pub fn get_session(&self) -> Fingerprint {
-        let mut sessions = self.sessions.lock().unwrap();
+        let mut sessions = match self.sessions.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         if let Some(session) = sessions.pop_front() {
             sessions.push_back(session.clone());
             session
@@ -39,7 +42,10 @@ impl SessionPool {
     }
 
     pub fn active_count(&self) -> usize {
-        self.sessions.lock().unwrap().len()
+        match self.sessions.lock() {
+            Ok(guard) => guard.len(),
+            Err(poisoned) => poisoned.into_inner().len(),
+        }
     }
 
     pub fn banned_count(&self) -> usize {

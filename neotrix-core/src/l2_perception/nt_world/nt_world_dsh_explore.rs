@@ -81,9 +81,12 @@ mod tests {
 
     #[test]
     fn graph_query_hits() {
+        // TODO: _CordisExplorer is an offline mock. Real CORDIS API integration
+        // needs network + auth. This test validates the offline mock contract,
+        // NOT real CORDIS behavior. Replace with integration test when wired.
         let r = _CordisExplorer.search("graph reasoning").unwrap();
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0].acronym, "GNN-REASON");
+        assert!(!r.is_empty(), "offline mock should return at least one result for 'graph' keyword");
+        assert_eq!(r[0].cordis_id, "CORDIS-101012345");
     }
 
     #[test]

@@ -57,6 +57,11 @@ impl _OdsParserAdapter for _OdsAdapter {
         }
     }
 
+    /// Parse content into document nodes.
+    ///
+    /// **Not wired**: Returns a single node wrapping the entire content for known
+    /// formats. Real implementation requires format-specific parsers (e.g., pulldown-cmark
+    /// for Markdown, org-parser for Org) that produce granular section/heading nodes.
     fn parse(&self, content: &str) -> Vec<_OdsNode> {
         match self.detect_format(content) {
             _OdsFormat::Unknown => Vec::new(),

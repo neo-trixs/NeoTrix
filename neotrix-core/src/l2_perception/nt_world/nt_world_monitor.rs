@@ -86,8 +86,11 @@ impl _SiteChangeMonitor for _WorldMonitor {
         }
     }
 
-    /// Returns `true` if the URL and content pass basic validation.
-    /// Does **not** persist to KB — use `index_fts5_to_kb` for actual writes.
+    /// Validates URL and content for indexability.
+    ///
+    /// **Not wired**: Returns `true` if inputs pass basic validation, but does NOT
+    /// persist to KB — callers must not assume the content was indexed.
+    /// Use `index_fts5_to_kb` for actual KB writes.
     fn index_fts5(&self, url: &str, content: &str) -> bool {
         !url.trim().is_empty() && !content.trim().is_empty()
     }

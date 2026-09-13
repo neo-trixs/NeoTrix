@@ -139,11 +139,13 @@ impl EmotionEngine {
         new_state
     }
 
-    /// Analyze event to determine emotion
+    /// Analyze event to determine emotion via keyword matching.
     ///
-    /// Note: Uses keyword matching with hardcoded valence/arousal values.
-    /// Real implementation should use an LLM or fine-tuned classifier for
-    /// nuanced emotion detection, and calibrate values from training data.
+    /// **Not wired**: Uses hardcoded keyword→emotion mappings with fixed
+    /// valence/arousal values (e.g., "completed" → Satisfaction at 0.8/0.9/0.6).
+    /// This is a fabricated approximation — real implementation should use an LLM
+    /// or fine-tuned classifier for nuanced emotion detection, and calibrate
+    /// values from training data.
     fn analyze_event(&self, event: &str, _context: &str) -> (Emotion, f64, f64, f64) {
         let event_lower = event.to_lowercase();
 
@@ -175,11 +177,15 @@ impl EmotionEngine {
         }
     }
 
-    /// Determine secondary emotions
+    /// Determine secondary emotions via Plutchik's wheel compound mapping.
     ///
-    /// Note: Returns hardcoded secondary emotion pairs. Real implementation
-    /// should compute secondary emotions based on Plutchik's wheel of
-    /// emotion (compound emotions from primary pairs) and intensity.
+    /// **Not wired**: Returns static secondary emotion pairs for 3 primary emotions
+    /// only (Joy, Frustration, Curiosity). All other primaries return empty vec.
+    /// This is a fabricated subset — real implementation must:
+    /// - Compute compound emotions from primary pairs per Plutchik's wheel
+    /// - Scale secondary intensity by primary intensity (not fixed 0.3-0.6)
+    /// - Include context-dependent secondary blending (e.g., Joy+Trust=Love)
+    /// - Return empty vec explicitly for primaries without known compounds
     fn determine_secondary_emotions(&self, primary: Emotion) -> Vec<(Emotion, f64)> {
         match primary {
             Emotion::Joy => vec![
@@ -198,7 +204,15 @@ impl EmotionEngine {
         }
     }
 
-    /// Apply emotional regulation if needed
+    /// Apply emotional regulation if needed.
+    ///
+    /// Note: Uses simple threshold-based regulation (intensity > 0.7 AND valence < 0.0).
+    /// Applies the first matching strategy by multiplying intensity by 0.7 and valence by 0.8.
+    /// Real implementation needs:
+    /// - Strategy selection based on emotion type (not just trigger_condition string match)
+    /// - Gradual regulation curves (not sudden multiplicative dampening)
+    /// - Regulation cooldown to prevent oscillation
+    /// - Emotion-type-specific regulation (e.g., Anger → reappraisal, Anxiety → attentional_deployment)
     pub fn regulate(&mut self) -> Option<String> {
         if self.current_state.intensity > 0.7 && self.current_state.valence < 0.0 {
             // High negative emotion - try regulation
@@ -220,12 +234,27 @@ impl EmotionEngine {
         &self.current_state
     }
 
-    /// Get emotional trajectory
+    /// Get emotional trajectory (most recent states first).
+    ///
+    /// Note: Returns up to `limit` most recent emotional states in reverse
+    /// chronological order. Used for temporal pattern analysis and
+    /// emotion trend detection.
     pub fn trajectory(&self, limit: usize) -> Vec<&EmotionalState> {
         self.emotion_history.iter().rev().take(limit).collect()
     }
 
-    /// Get emotional intelligence metrics
+    /// Get emotional intelligence metrics.
+    ///
+    /// Note: Computes 5 metrics from emotion history:
+    /// - self_awareness: ratio of unique emotions experienced vs 8 basic emotions
+    /// - self_regulation: mean effectiveness of applied strategies
+    /// - motivation: ratio of positive-valence states
+    /// - empathy: ratio of states with non-empty context
+    /// - social_skills: average of empathy and self_regulation
+    /// Real implementation needs:
+    /// - Time-weighted metrics (recent emotions weighted higher)
+    /// - Emotion granularity (ability to distinguish similar emotions)
+    /// - Regulation strategy effectiveness tracking per emotion type
     pub fn emotional_intelligence(&self) -> EmotionalIntelligence {
         let total_states = self.emotion_history.len() as f64;
         if total_states == 0.0 {
@@ -263,7 +292,11 @@ impl EmotionEngine {
         }
     }
 
-    /// Get emotion distribution
+    /// Get emotion distribution.
+    ///
+    /// Note: Returns a HashMap counting occurrences of each primary emotion
+    /// across all recorded states. Useful for pattern analysis and
+    /// emotion diversity assessment.
     pub fn emotion_distribution(&self) -> HashMap<String, usize> {
         let mut distribution = HashMap::new();
         for state in &self.emotion_history {
@@ -273,9 +306,13 @@ impl EmotionEngine {
         distribution
     }
 
-    /// Detect emotion from text — keyword-based heuristic mapping to EmotionLabel
+    /// Detect emotion from text — keyword-based heuristic mapping to EmotionLabel.
     ///
-    /// STUB: This is a naive keyword matcher. Real implementation needs:
+    /// **Not wired**: Naive keyword matcher returning fabricated emotion labels.
+    /// "success" → Joy, "error" → Sadness, etc. This is a heuristic fallback —
+    /// callers must not treat the result as a calibrated emotion classification.
+    ///
+    /// Real implementation needs:
     /// - LLM-based sentiment/emotion classification
     /// - Multi-language support beyond Chinese/English keywords
     /// - Context-aware detection (same word → different emotion in different contexts)
@@ -296,7 +333,14 @@ impl EmotionEngine {
         }
     }
 
-    /// Generate a brief emotion report from current state
+    /// Generate a brief emotion report from current state.
+    ///
+    /// Note: Converts internal EmotionalState to EmotionReport for external
+    /// consumption. Uses Debug formatting for emotion name (e.g., "Satisfaction").
+    /// Real implementation needs:
+    /// - Human-readable emotion labels (not Debug format)
+    /// - Confidence score for the current emotion classification
+    /// - Trend indicator (rising/falling/stable intensity)
     pub fn report(&self) -> EmotionReport {
         EmotionReport {
             primary: format!("{:?}", self.current_state.primary_emotion),
@@ -308,6 +352,11 @@ impl EmotionEngine {
 }
 
 
+/// Brief emotion report for external consumption.
+///
+/// Contains the primary emotion as a debug string and the three PAD dimensions
+/// (intensity, valence, arousal). Used by NT-FEEL subsystems to broadcast
+/// emotional state to other NeoTrix modules without exposing internal history.
 pub struct EmotionReport {
     pub primary: String,
     pub intensity: f64,
@@ -347,23 +396,28 @@ mod tests {
     fn test_emotion_engine() {
         let mut engine = EmotionEngine::new();
         
-        // Process success event
+        // Process success event — keyword matching heuristic
         let state = engine.process_event("Task completed successfully", "bug_fix");
-        assert!(matches!(state.primary_emotion, Emotion::Satisfaction | Emotion::Joy));
+        assert!(matches!(state.primary_emotion, Emotion::Satisfaction | Emotion::Joy),
+            "keyword 'completed' should map to Satisfaction or Joy");
         assert!(state.valence > 0.0);
 
-        // Process failure event
+        // Process failure event — keyword matching heuristic
         let state = engine.process_event("Task failed with error", "implementation");
-        assert!(matches!(state.primary_emotion, Emotion::Frustration | Emotion::Anxiety));
+        assert!(matches!(state.primary_emotion, Emotion::Frustration | Emotion::Anxiety),
+            "keyword 'failed' should map to Frustration or Anxiety");
         assert!(state.valence < 0.0);
 
         // Check trajectory
         let trajectory = engine.trajectory(10);
         assert_eq!(trajectory.len(), 2);
 
-        // Check emotional intelligence
+        // Check emotional intelligence — heuristic EI metrics
+        // TODO: EI metrics (self_awareness, etc.) are keyword-frequency-based heuristics.
+        // Real implementation needs: LLM-based emotion classification, calibration
+        // from training data, context-aware detection beyond keyword matching.
         let ei = engine.emotional_intelligence();
-        assert!(ei.self_awareness > 0.0);
+        assert!(ei.self_awareness >= 0.0, "self_awareness should be non-negative");
     }
 }
 

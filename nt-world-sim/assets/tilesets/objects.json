@@ -1,19 +1,570 @@
 {
   "name": "objects",
+  "version": "1.0.0",
   "tileSize": 32,
-  "tiles": [
-    {"id": 100, "name": "tree_pine", "blocking": true, "height": 64, "color": "#2d5a1e"},
-    {"id": 101, "name": "tree_bamboo", "blocking": true, "height": 48, "color": "#3a7a2a"},
-    {"id": 102, "name": "tree_cherry", "blocking": true, "height": 48, "color": "#ff69b4"},
-    {"id": 103, "name": "rock_large", "blocking": true, "height": 32, "color": "#555555"},
-    {"id": 104, "name": "rock_small", "blocking": false, "height": 16, "color": "#777777"},
-    {"id": 105, "name": "flower_red", "blocking": false, "height": 8, "color": "#ff4444"},
-    {"id": 106, "name": "flower_blue", "blocking": false, "height": 8, "color": "#4444ff"},
-    {"id": 107, "name": "bush", "blocking": false, "height": 24, "color": "#3a6a2a"},
-    {"id": 108, "name": "chest", "blocking": true, "height": 24, "color": "#8b4513", "interactable": true},
-    {"id": 109, "name": "sign", "blocking": true, "height": 32, "color": "#8b4513", "interactable": true},
-    {"id": 110, "name": "house", "blocking": true, "height": 96, "color": "#8b4513"},
-    {"id": 111, "name": "fence", "blocking": true, "height": 24, "color": "#8b4513"},
-    {"id": 112, "name": "bridge", "blocking": false, "height": 0, "color": "#8b4513"}
-  ]
+  "objects": [
+    {
+      "id": 100,
+      "name": "tree_pine",
+      "type": "nature",
+      "blocking": true,
+      "height": 64,
+      "color": "#2d5a1e",
+      "description": "高大的松树",
+      "properties": {
+        "harvestable": true,
+        "harvestTool": "axe",
+        "harvestTime": 2,
+        "hardness": 2,
+        "regrowth": true,
+        "regrowthTime": 60,
+        "hp": 10,
+        "destructible": true
+      },
+      "drops": [
+        {"item": "wood", "chance": 1.0, "count": 2},
+        {"item": "pine_cone", "chance": 0.3, "count": 1}
+      ],
+      "sound": {
+        "harvest": "chop_wood",
+        "break": "tree_fall",
+        "volume": 0.6
+      },
+      "shadow": {"offset": 0, "size": 1.0},
+      "animations": {
+        "idle": {"frames": 1, "speed": 0},
+        "harvest": {"frames": 3, "speed": 0.3}
+      }
+    },
+    {
+      "id": 101,
+      "name": "tree_bamboo",
+      "type": "nature",
+      "blocking": true,
+      "height": 48,
+      "color": "#3a7a2a",
+      "description": "翠绿的竹子",
+      "properties": {
+        "harvestable": true,
+        "harvestTool": "axe",
+        "harvestTime": 1,
+        "hardness": 1,
+        "regrowth": true,
+        "regrowthTime": 30,
+        "hp": 5,
+        "destructible": true
+      },
+      "drops": [
+        {"item": "bamboo", "chance": 1.0, "count": 3}
+      ],
+      "sound": {
+        "harvest": "chop_bamboo",
+        "volume": 0.5
+      }
+    },
+    {
+      "id": 102,
+      "name": "tree_cherry",
+      "type": "nature",
+      "blocking": true,
+      "height": 48,
+      "color": "#ff69b4",
+      "description": "美丽的樱花树",
+      "properties": {
+        "harvestable": true,
+        "harvestTool": "axe",
+        "harvestTime": 2,
+        "hardness": 2,
+        "regrowth": true,
+        "regrowthTime": 90,
+        "hp": 8,
+        "destructible": true,
+        "seasonal": true,
+        "season": "spring"
+      },
+      "drops": [
+        {"item": "wood", "chance": 1.0, "count": 1},
+        {"item": "cherry_blossom", "chance": 0.5, "count": 2}
+      ],
+      "visualEffects": {
+        "particle": "falling_petals",
+        "intensity": 0.4
+      }
+    },
+    {
+      "id": 103,
+      "name": "rock_large",
+      "type": "nature",
+      "blocking": true,
+      "height": 32,
+      "color": "#555555",
+      "description": "巨大的岩石",
+      "properties": {
+        "harvestable": true,
+        "harvestTool": "pickaxe",
+        "harvestTime": 3,
+        "hardness": 4,
+        "regrowth": false,
+        "hp": 20,
+        "destructible": true
+      },
+      "drops": [
+        {"item": "stone", "chance": 1.0, "count": 3},
+        {"item": "iron_ore", "chance": 0.2, "count": 1},
+        {"item": "rare_gem", "chance": 0.05, "count": 1}
+      ],
+      "sound": {
+        "harvest": "mine_stone",
+        "break": "rock_shatter",
+        "volume": 0.7
+      }
+    },
+    {
+      "id": 104,
+      "name": "rock_small",
+      "type": "nature",
+      "blocking": false,
+      "height": 16,
+      "color": "#777777",
+      "description": "小石头",
+      "properties": {
+        "harvestable": true,
+        "harvestTool": "pickaxe",
+        "harvestTime": 1,
+        "hardness": 2,
+        "regrowth": false,
+        "hp": 5,
+        "destructible": true
+      },
+      "drops": [
+        {"item": "stone_shard", "chance": 1.0, "count": 1}
+      ]
+    },
+    {
+      "id": 105,
+      "name": "flower_red",
+      "type": "nature",
+      "blocking": false,
+      "height": 8,
+      "color": "#ff4444",
+      "description": "红色的花朵",
+      "properties": {
+        "harvestable": true,
+        "harvestTool": "hand",
+        "harvestTime": 0.5,
+        "regrowth": true,
+        "regrowthTime": 20
+      },
+      "drops": [
+        {"item": "red_flower", "chance": 1.0, "count": 1}
+      ],
+      "visualEffects": {
+        "particle": "pollen",
+        "intensity": 0.2
+      }
+    },
+    {
+      "id": 106,
+      "name": "flower_blue",
+      "type": "nature",
+      "blocking": false,
+      "height": 8,
+      "color": "#4444ff",
+      "description": "蓝色的花朵",
+      "properties": {
+        "harvestable": true,
+        "harvestTool": "hand",
+        "harvestTime": 0.5,
+        "regrowth": true,
+        "regrowthTime": 20
+      },
+      "drops": [
+        {"item": "blue_flower", "chance": 1.0, "count": 1}
+      ]
+    },
+    {
+      "id": 107,
+      "name": "bush",
+      "type": "nature",
+      "blocking": false,
+      "height": 24,
+      "color": "#3a6a2a",
+      "description": "灌木丛",
+      "properties": {
+        "harvestable": true,
+        "harvestTool": "hand",
+        "harvestTime": 1,
+        "regrowth": true,
+        "regrowthTime": 15,
+        "hidingSpot": true,
+        "hidingChance": 0.3
+      },
+      "drops": [
+        {"item": "herb", "chance": 0.5, "count": 1},
+        {"item": "berry", "chance": 0.3, "count": 2}
+      ]
+    },
+    {
+      "id": 108,
+      "name": "chest",
+      "type": "container",
+      "blocking": true,
+      "height": 24,
+      "color": "#8b4513",
+      "description": "宝箱",
+      "interactable": true,
+      "properties": {
+        "lockable": true,
+        "locked": false,
+        "lockDifficulty": 0,
+        "trapChance": 0.1,
+        "trapDamage": 5,
+        "capacity": 20,
+        "respawn": true,
+        "respawnTime": 300,
+        "rarity": "common"
+      },
+      "drops": [
+        {"item": "gold", "chance": 1.0, "count": 10},
+        {"item": "hp_potion", "chance": 0.3, "count": 1},
+        {"item": "mp_potion", "chance": 0.2, "count": 1}
+      ],
+      "animations": {
+        "closed": {"frames": 1},
+        "open": {"frames": 2, "speed": 0.2}
+      },
+      "sound": {
+        "open": "chest_open",
+        "close": "chest_close",
+        "locked": "chest_locked",
+        "volume": 0.5
+      }
+    },
+    {
+      "id": 109,
+      "name": "sign",
+      "type": "interactive",
+      "blocking": true,
+      "height": 32,
+      "color": "#8b4513",
+      "description": "路牌",
+      "interactable": true,
+      "properties": {
+        "text": "欢迎来到青云村",
+        "readable": true,
+        "destroyable": false
+      },
+      "animations": {
+        "idle": {"frames": 1}
+      },
+      "sound": {
+        "interact": "wood_creak",
+        "volume": 0.3
+      }
+    },
+    {
+      "id": 110,
+      "name": "house",
+      "type": "building",
+      "blocking": true,
+      "height": 96,
+      "color": "#8b4513",
+      "description": "民居",
+      "properties": {
+        "enterable": true,
+        "doorPosition": {"x": 0, "y": 1},
+        "interiorMap": "house_interior",
+        "owner": "villager",
+        "lights": true,
+        "lightRadius": 3
+      },
+      "sound": {
+        "door_open": "door_wood_open",
+        "door_close": "door_wood_close",
+        "volume": 0.5
+      }
+    },
+    {
+      "id": 111,
+      "name": "fence",
+      "type": "structure",
+      "blocking": true,
+      "height": 24,
+      "color": "#8b4513",
+      "description": "木栅栏",
+      "properties": {
+        "destroyable": true,
+        "hp": 3,
+        "hardness": 1
+      },
+      "autoConnect": true,
+      "connectTypes": ["fence", "fence_gate"]
+    },
+    {
+      "id": 112,
+      "name": "bridge",
+      "type": "structure",
+      "blocking": false,
+      "height": 0,
+      "color": "#8b4513",
+      "description": "木桥",
+      "properties": {
+        "crossable": true,
+        "horseCrossable": true,
+        "cartCrossable": false,
+        "maxWeight": 500,
+        "repairable": true
+      },
+      "sound": {
+        "step": "footstep_wood",
+        "volume": 0.4
+      }
+    },
+    {
+      "id": 113,
+      "name": "well",
+      "type": "interactive",
+      "blocking": true,
+      "height": 40,
+      "color": "#666666",
+      "description": "水井",
+      "interactable": true,
+      "properties": {
+        "waterSource": true,
+        "healAmount": 10,
+        "cooldown": 10,
+        "destroyable": false
+      },
+      "sound": {
+        "interact": "water_splash",
+        "volume": 0.5
+      }
+    },
+    {
+      "id": 114,
+      "name": "campfire",
+      "type": "interactive",
+      "blocking": true,
+      "height": 20,
+      "color": "#ff6600",
+      "description": "篝火",
+      "interactable": true,
+      "properties": {
+        "lightRadius": 4,
+        "warmth": true,
+        "cookable": true,
+        "cooldown": 5
+      },
+      "animated": true,
+      "animation": {
+        "frames": 4,
+        "speed": 0.5,
+        "loop": true
+      },
+      "sound": {
+        "ambient": "fire_crackle",
+        "volume": 0.4
+      }
+    },
+    {
+      "id": 115,
+      "name": "torch",
+      "type": "decoration",
+      "blocking": false,
+      "height": 16,
+      "color": "#ff9900",
+      "description": "火把",
+      "properties": {
+        "lightRadius": 2,
+        "animated": true
+      },
+      "animation": {
+        "frames": 3,
+        "speed": 0.4,
+        "loop": true
+      }
+    },
+    {
+      "id": 116,
+      "name": "npc_elder",
+      "type": "npc",
+      "blocking": true,
+      "height": 48,
+      "color": "#8b4513",
+      "description": "村长",
+      "interactable": true,
+      "properties": {
+        "npcType": "elder",
+        "dialogue": "elder",
+        "portrait": "elder",
+        "tradeEnabled": false,
+        "questGiver": true
+      }
+    },
+    {
+      "id": 117,
+      "name": "npc_merchant",
+      "type": "npc",
+      "blocking": true,
+      "height": 48,
+      "color": "#8b4513",
+      "description": "商人",
+      "interactable": true,
+      "properties": {
+        "npcType": "merchant",
+        "dialogue": "merchant",
+        "portrait": "merchant",
+        "tradeEnabled": true,
+        "shopInventory": ["hp_potion", "mp_potion", "iron_sword"],
+        "buyMultiplier": 0.5,
+        "sellMultiplier": 1.5
+      }
+    },
+    {
+      "id": 118,
+      "name": "npc_guard",
+      "type": "npc",
+      "blocking": true,
+      "height": 48,
+      "color": "#666666",
+      "description": "守卫",
+      "interactable": true,
+      "properties": {
+        "npcType": "guard",
+        "dialogue": "guard",
+        "portrait": "guard",
+        "tradeEnabled": false,
+        "hostile": false,
+        "patrolPath": true
+      }
+    },
+    {
+      "id": 119,
+      "name": "npc_blacksmith",
+      "type": "npc",
+      "blocking": true,
+      "height": 48,
+      "color": "#333333",
+      "description": "铁匠",
+      "interactable": true,
+      "properties": {
+        "npcType": "blacksmith",
+        "dialogue": "blacksmith",
+        "portrait": "blacksmith",
+        "tradeEnabled": true,
+        "craftEnabled": true,
+        "upgradeEnabled": true,
+        "repairEnabled": true
+      }
+    },
+    {
+      "id": 120,
+      "name": "npc_healer",
+      "type": "npc",
+      "blocking": true,
+      "height": 48,
+      "color": "#ffffff",
+      "description": "治疗师",
+      "interactable": true,
+      "properties": {
+        "npcType": "healer",
+        "dialogue": "healer",
+        "portrait": "healer",
+        "tradeEnabled": true,
+        "healEnabled": true,
+        "healCost": 20,
+        "resurrectEnabled": true,
+        "resurrectCost": 100
+      }
+    },
+    {
+      "id": 121,
+      "name": "anvil",
+      "type": "crafting",
+      "blocking": true,
+      "height": 24,
+      "color": "#444444",
+      "description": "铁砧",
+      "interactable": true,
+      "properties": {
+        "craftType": "smithing",
+        "level": 1
+      }
+    },
+    {
+      "id": 122,
+      "name": "cauldron",
+      "type": "crafting",
+      "blocking": true,
+      "height": 32,
+      "color": "#222222",
+      "description": "炼丹炉",
+      "interactable": true,
+      "properties": {
+        "craftType": "alchemy",
+        "level": 1
+      }
+    },
+    {
+      "id": 123,
+      "name": "altar",
+      "type": "interactive",
+      "blocking": true,
+      "height": 32,
+      "color": "#996633",
+      "description": "祭坛",
+      "interactable": true,
+      "properties": {
+        "warpPoint": true,
+        "warpTarget": "spawn",
+        "healAmount": 50,
+        "cooldown": 60
+      },
+      "visualEffects": {
+        "particle": "holy_light",
+        "intensity": 0.6
+      }
+    },
+    {
+      "id": 124,
+      "name": "flowerpot",
+      "type": "decoration",
+      "blocking": false,
+      "height": 16,
+      "color": "#996633",
+      "description": "花盆",
+      "properties": {
+        "decorative": true
+      }
+    },
+    {
+      "id": 125,
+      "name": "barrel",
+      "type": "container",
+      "blocking": true,
+      "height": 24,
+      "color": "#8b4513",
+      "description": "木桶",
+      "interactable": true,
+      "properties": {
+        "lockable": false,
+        "locked": false,
+        "capacity": 10,
+        "respawn": true,
+        "respawnTime": 600
+      },
+      "drops": [
+        {"item": "food", "chance": 0.5, "count": 1},
+        {"item": "water", "chance": 0.3, "count": 1}
+      ]
+    }
+  ],
+  "objectGroups": {
+    "nature": [100, 101, 102, 103, 104, 105, 106, 107],
+    "buildings": [110, 111, 112, 113, 114, 115],
+    "npcs": [116, 117, 118, 119, 120],
+    "containers": [108, 125],
+    "crafting": [121, 122],
+    "interactive": [109, 113, 114, 123]
+  }
 }

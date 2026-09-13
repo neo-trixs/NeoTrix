@@ -133,9 +133,10 @@ impl _GenCadRetrieval for _GenCadCore {
         if pair.geometry_id.is_empty() {
             return Err("empty geometry_id".into());
         }
-        // NOTE(C0): 真实路径应写 KB FTS5; 此处仅挂接内存 store 占位。
-        // T3 接线留给 C2+ 集成阶段。
-        Ok(())
+        // C0 stub: no KB persistence implemented.
+        // Returns error instead of fabricated success — callers must not assume
+        // the pair was indexed. Real path requires KB FTS5 write (C2+ integration).
+        Err("not wired: GenCAD index_into_kb — KB FTS5 persistence not implemented (C0 stub)".into())
     }
 
     fn retrieve(&self, query: &_CadGeometry) -> Vec<_ContrastivePair> {
@@ -198,8 +199,10 @@ impl SelfTest for _GenCadSelfTest {
             image_vec: iv,
         };
         let mut errs = Vec::new();
-        if core.index_into_kb(pair.clone()).is_err() {
-            errs.push("gencad: index_into_kb rejected valid pair".into());
+        // C0 stub: index_into_kb always returns Err (not wired).
+        // Verify that input validation still works (rejects dim mismatch, empty id).
+        if core.index_into_kb(pair.clone()).is_ok() {
+            errs.push("gencad: C0 stub index_into_kb should not succeed".into());
         }
         if cosine(&gv, &gv) < 0.999 {
             errs.push("gencad: geometry self-cosine != 1.0".into());

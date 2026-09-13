@@ -1,0 +1,60 @@
+{
+  "id": "side_02",
+  "name": "剿灭狼群",
+  "description": "村子东边的森林里有狼群出没，威胁村民安全。去消灭它们。",
+  "type": "side",
+  "level": 2,
+  "chapter": 1,
+  "prerequisites": ["main_01"],
+  "objectives": [
+    {
+      "id": "talk_elder_wolf",
+      "type": "talk",
+      "target": "elder",
+      "text": "与村长对话，了解狼群情况",
+      "completed": false,
+      "hint": "村长会告诉你狼群的位置"
+    },
+    {
+      "id": "kill_wolves",
+      "type": "kill",
+      "target": "wolf",
+      "count": 8,
+      "text": "消灭8只狼",
+      "completed": false,
+      "hint": "狼群在村子东边的森林里"
+    },
+    {
+      "id": "kill_alpha",
+      "type": "kill",
+      "target": "wolf_alpha",
+      "count": 1,
+      "text": "击败狼王",
+      "completed": false,
+      "hint": "狼王在森林深处"
+    },
+    {
+      "id": "collect_furs",
+      "type": "collect",
+      "item": "wolf_fur",
+      "count": 5,
+      "text": "收集5张狼皮",
+      "completed": false,
+      "hint": "狼皮是狼的掉落物"
+    }
+  ],
+  "rewards": {
+    "exp": 200,
+    "gold": 150,
+    "items": [
+      {"id": "leather_armor", "count": 1},
+      {"id": "antidote", "count": 3}
+    ],
+    "reputation": {"village": 15}
+  },
+  "dialogue_start": "elder_wolf_quest",
+  "dialogue_complete": "elder_wolf_complete",
+  "unlocks": ["side_03"],
+  "timeLimit": null,
+  "repeatable": false
+}

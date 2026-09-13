@@ -9,6 +9,7 @@
       "choices": [
         {"text": "我想加入青云宗", "next": "join"},
         {"text": "我来找人", "next": "visit"},
+        {"text": "我来送信", "next": "deliver"},
         {"text": "没什么", "next": null}
       ]
     },
@@ -21,7 +22,7 @@
     },
     {
       "id": "test",
-      "text": "测试结果...你有灵根资质！可以进去找张长老。",
+      "text": "测试结果...你有灵根资质！可以进去找张长老。记住，宗门内不准私斗。",
       "choices": [
         {"text": "谢谢", "next": null, "effects": [{"type": "flag_set", "flag": "can_enter_sect"}]}
       ]
@@ -32,6 +33,7 @@
       "choices": [
         {"text": "找张长老", "next": "visit_zhang"},
         {"text": "找李师兄", "next": "visit_li"},
+        {"text": "找藏经阁", "next": "visit_library"},
         {"text": "算了", "next": null}
       ]
     },
@@ -45,6 +47,43 @@
     {
       "id": "visit_li",
       "text": "李师兄在练武场。你可以进去。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "flag_set", "flag": "can_enter_sect"}]}
+      ]
+    },
+    {
+      "id": "visit_library",
+      "text": "藏经阁在东边。里面有很多修炼秘籍，但需要贡献点才能借阅。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "flag_set", "flag": "can_enter_sect"}]}
+      ]
+    },
+    {
+      "id": "deliver",
+      "text": "送信？给谁的？",
+      "choices": [
+        {"text": "给张长老的", "next": "deliver_zhang"},
+        {"text": "给掌门的", "next": "deliver_leader"}
+      ]
+    },
+    {
+      "id": "deliver_zhang",
+      "text": "张长老的信？进去吧，他在山顶的大殿。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "flag_set", "flag": "can_enter_sect"}]}
+      ]
+    },
+    {
+      "id": "deliver_leader",
+      "text": "给掌门的信？你确定？掌门可不轻易见人。",
+      "choices": [
+        {"text": "确定", "next": "deliver_leader_check"},
+        {"text": "我搞错了", "next": null}
+      ]
+    },
+    {
+      "id": "deliver_leader_check",
+      "text": "好吧，你进去吧。但掌门不一定会见你。",
       "choices": [
         {"text": "谢谢", "next": null, "effects": [{"type": "flag_set", "flag": "can_enter_sect"}]}
       ]

@@ -1,0 +1,479 @@
+{
+  "name": "monsters",
+  "version": "1.0.0",
+  "monsters": [
+    {
+      "id": "slime",
+      "name": "史莱姆",
+      "level": 1,
+      "type": "normal",
+      "element": "none",
+      "description": "低级魔物，常见于草地",
+      "stats": {
+        "hp": 30,
+        "mp": 0,
+        "attack": 5,
+        "defense": 2,
+        "magicAttack": 0,
+        "magicDefense": 0,
+        "speed": 0.5,
+        "exp": 10,
+        "gold": 5
+      },
+      "skills": ["tackle"],
+      "loot": [
+        {"item": "slime_core", "chance": 0.5, "count": 1},
+        {"item": "herb", "chance": 0.2, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["grassland", "forest_edge"],
+        "minLevel": 1,
+        "maxLevel": 3,
+        "respawnTime": 30
+      },
+      "ai": {
+        "behavior": "passive",
+        "detectionRange": 3,
+        "attackRange": 1,
+        "fleeHpPercent": 0.2,
+        "packSize": 0
+      },
+      "resistances": {},
+      "weaknesses": {"fire": 1.5}
+    },
+    {
+      "id": "wolf",
+      "name": "野狼",
+      "level": 2,
+      "type": "normal",
+      "element": "none",
+      "description": "凶猛的野狼，成群出没",
+      "stats": {
+        "hp": 60,
+        "mp": 0,
+        "attack": 12,
+        "defense": 5,
+        "magicAttack": 0,
+        "magicDefense": 0,
+        "speed": 1.2,
+        "exp": 25,
+        "gold": 15
+      },
+      "skills": ["bite", "howl"],
+      "loot": [
+        {"item": "wolf_fur", "chance": 0.6, "count": 1},
+        {"item": "wolf_fang", "chance": 0.4, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["forest", "mountain"],
+        "minLevel": 2,
+        "maxLevel": 5,
+        "respawnTime": 45
+      },
+      "ai": {
+        "behavior": "aggressive",
+        "detectionRange": 5,
+        "attackRange": 1.5,
+        "fleeHpPercent": 0.15,
+        "packSize": 3,
+        "packAggro": true
+      },
+      "resistances": {},
+      "weaknesses": {"fire": 1.3}
+    },
+    {
+      "id": "wolf_alpha",
+      "name": "狼王",
+      "level": 5,
+      "type": "elite",
+      "element": "none",
+      "description": "狼群的首领，比普通狼更强壮",
+      "stats": {
+        "hp": 200,
+        "mp": 0,
+        "attack": 25,
+        "defense": 12,
+        "magicAttack": 0,
+        "magicDefense": 5,
+        "speed": 1.3,
+        "exp": 100,
+        "gold": 80
+      },
+      "skills": ["bite", "howl", "frenzy"],
+      "loot": [
+        {"item": "wolf_fur", "chance": 1.0, "count": 3},
+        {"item": "wolf_fang", "chance": 0.8, "count": 2},
+        {"item": "rare_gem", "chance": 0.1, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["forest_deep"],
+        "minLevel": 4,
+        "maxLevel": 6,
+        "respawnTime": 300
+      },
+      "ai": {
+        "behavior": "aggressive",
+        "detectionRange": 8,
+        "attackRange": 2,
+        "fleeHpPercent": 0.1,
+        "packSize": 0,
+        "summonOnAggro": "wolf",
+        "summonCount": 2
+      },
+      "resistances": {"physical": 0.2},
+      "weaknesses": {"fire": 1.5}
+    },
+    {
+      "id": "ghost",
+      "name": "幽灵",
+      "level": 4,
+      "type": "normal",
+      "element": "dark",
+      "description": "飘荡的幽灵，物理攻击无效",
+      "stats": {
+        "hp": 80,
+        "mp": 50,
+        "attack": 0,
+        "defense": 0,
+        "magicAttack": 18,
+        "magicDefense": 15,
+        "speed": 0.8,
+        "exp": 40,
+        "gold": 25
+      },
+      "skills": ["shadow_bolt", "fear"],
+      "loot": [
+        {"item": "spirit_crystal", "chance": 0.2, "count": 1},
+        {"item": "bone", "chance": 0.5, "count": 2}
+      ],
+      "spawn": {
+        "regions": ["cave", "ruins"],
+        "minLevel": 3,
+        "maxLevel": 6,
+        "respawnTime": 60
+      },
+      "ai": {
+        "behavior": "wander",
+        "detectionRange": 6,
+        "attackRange": 3,
+        "fleeHpPercent": 0.3,
+        "phaseThrough": true
+      },
+      "resistances": {"physical": 1.0, "fire": 0.5},
+      "weaknesses": {"thunder": 2.0, "holy": 3.0}
+    },
+    {
+      "id": "skeleton",
+      "name": "骷髅",
+      "level": 3,
+      "type": "normal",
+      "element": "dark",
+      "description": "复活的骷髅战士",
+      "stats": {
+        "hp": 50,
+        "mp": 0,
+        "attack": 15,
+        "defense": 10,
+        "magicAttack": 0,
+        "magicDefense": 5,
+        "speed": 0.8,
+        "exp": 30,
+        "gold": 20
+      },
+      "skills": ["slash", "bone_throw"],
+      "loot": [
+        {"item": "bone", "chance": 0.8, "count": 2},
+        {"item": "rusty_sword", "chance": 0.1, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["cave", "ruins", "graveyard"],
+        "minLevel": 2,
+        "maxLevel": 5,
+        "respawnTime": 45
+      },
+      "ai": {
+        "behavior": "patrol",
+        "detectionRange": 5,
+        "attackRange": 1.5,
+        "fleeHpPercent": 0
+      },
+      "resistances": {"physical": 0.3, "poison": 1.0},
+      "weaknesses": {"fire": 1.5, "holy": 2.0}
+    },
+    {
+      "id": "bandit",
+      "name": "强盗",
+      "level": 4,
+      "type": "normal",
+      "element": "none",
+      "description": "打劫路人的强盗",
+      "stats": {
+        "hp": 90,
+        "mp": 0,
+        "attack": 18,
+        "defense": 8,
+        "magicAttack": 0,
+        "magicDefense": 3,
+        "speed": 1.0,
+        "exp": 45,
+        "gold": 50
+      },
+      "skills": ["slash", "steal"],
+      "loot": [
+        {"item": "gold", "chance": 1.0, "count": 30},
+        {"item": "iron_sword", "chance": 0.05, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["road", "forest"],
+        "minLevel": 3,
+        "maxLevel": 6,
+        "respawnTime": 60
+      },
+      "ai": {
+        "behavior": "aggressive",
+        "detectionRange": 6,
+        "attackRange": 1.5,
+        "fleeHpPercent": 0.2
+      },
+      "resistances": {},
+      "weaknesses": {}
+    },
+    {
+      "id": "bear",
+      "name": "熊",
+      "level": 5,
+      "type": "normal",
+      "element": "earth",
+      "description": "巨大的熊，力量强大",
+      "stats": {
+        "hp": 150,
+        "mp": 0,
+        "attack": 28,
+        "defense": 15,
+        "magicAttack": 0,
+        "magicDefense": 5,
+        "speed": 0.7,
+        "exp": 70,
+        "gold": 40
+      },
+      "skills": ["claw_swipe", "roar"],
+      "loot": [
+        {"item": "bear_fur", "chance": 0.7, "count": 1},
+        {"item": "bear_claw", "chance": 0.3, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["forest_deep", "mountain"],
+        "minLevel": 4,
+        "maxLevel": 7,
+        "respawnTime": 120
+      },
+      "ai": {
+        "behavior": "territorial",
+        "detectionRange": 4,
+        "attackRange": 2,
+        "fleeHpPercent": 0.1
+      },
+      "resistances": {"earth": 0.5},
+      "weaknesses": {"water": 1.5}
+    },
+    {
+      "id": "snake",
+      "name": "毒蛇",
+      "level": 2,
+      "type": "normal",
+      "element": "poison",
+      "description": "潜伏在草丛中的毒蛇",
+      "stats": {
+        "hp": 40,
+        "mp": 0,
+        "attack": 10,
+        "defense": 3,
+        "magicAttack": 0,
+        "magicDefense": 2,
+        "speed": 1.1,
+        "exp": 20,
+        "gold": 10
+      },
+      "skills": ["bite", "poison_fang"],
+      "loot": [
+        {"item": "snake_fang", "chance": 0.5, "count": 1},
+        {"item": "herb", "chance": 0.3, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["swamp", "forest"],
+        "minLevel": 1,
+        "maxLevel": 4,
+        "respawnTime": 30
+      },
+      "ai": {
+        "behavior": "ambush",
+        "detectionRange": 4,
+        "attackRange": 1,
+        "fleeHpPercent": 0.2
+      },
+      "resistances": {"poison": 1.0},
+      "weaknesses": {"fire": 1.5}
+    },
+    {
+      "id": "spider",
+      "name": "蜘蛛",
+      "level": 3,
+      "type": "normal",
+      "element": "poison",
+      "description": "巨大的蜘蛛，会喷网",
+      "stats": {
+        "hp": 60,
+        "mp": 0,
+        "attack": 14,
+        "defense": 6,
+        "magicAttack": 0,
+        "magicDefense": 3,
+        "speed": 0.9,
+        "exp": 35,
+        "gold": 20
+      },
+      "skills": ["bite", "web_shot"],
+      "loot": [
+        {"item": "spider_silk", "chance": 0.6, "count": 2},
+        {"item": "spider_eye", "chance": 0.3, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["cave", "swamp"],
+        "minLevel": 2,
+        "maxLevel": 5,
+        "respawnTime": 45
+      },
+      "ai": {
+        "behavior": "aggressive",
+        "detectionRange": 5,
+        "attackRange": 1.5,
+        "fleeHpPercent": 0.15
+      },
+      "resistances": {"poison": 1.0},
+      "weaknesses": {"fire": 1.8}
+    },
+    {
+      "id": "demon",
+      "name": "恶魔",
+      "level": 8,
+      "type": "elite",
+      "element": "dark",
+      "description": "强大的恶魔，会使用魔法",
+      "stats": {
+        "hp": 300,
+        "mp": 100,
+        "attack": 35,
+        "defense": 20,
+        "magicAttack": 40,
+        "magicDefense": 25,
+        "speed": 1.0,
+        "exp": 200,
+        "gold": 150
+      },
+      "skills": ["fireball", "dark_bolt", "summon_demon"],
+      "loot": [
+        {"item": "demon_horn", "chance": 0.3, "count": 1},
+        {"item": "rare_gem", "chance": 0.2, "count": 1},
+        {"item": "dark_essence", "chance": 0.1, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["dungeon", "hell"],
+        "minLevel": 7,
+        "maxLevel": 10,
+        "respawnTime": 600
+      },
+      "ai": {
+        "behavior": "aggressive",
+        "detectionRange": 8,
+        "attackRange": 3,
+        "fleeHpPercent": 0.1,
+        "summonOnLowHp": true
+      },
+      "resistances": {"dark": 0.5, "fire": 0.3},
+      "weaknesses": {"holy": 2.5, "thunder": 1.5}
+    },
+    {
+      "id": "dragon",
+      "name": "龙",
+      "level": 15,
+      "type": "boss",
+      "element": "fire",
+      "description": "传说中的巨龙，拥有毁灭性的力量",
+      "stats": {
+        "hp": 1000,
+        "mp": 200,
+        "attack": 80,
+        "defense": 50,
+        "magicAttack": 100,
+        "magicDefense": 60,
+        "speed": 1.5,
+        "exp": 1000,
+        "gold": 500
+      },
+      "skills": ["fire_breath", "claw_swipe", "tail_whip", "dragon_roar", "inferno"],
+      "loot": [
+        {"item": "dragon_scale", "chance": 1.0, "count": 5},
+        {"item": "dragon_fang", "chance": 0.8, "count": 2},
+        {"item": "dragon_heart", "chance": 0.1, "count": 1},
+        {"item": "legendary_weapon", "chance": 0.05, "count": 1}
+      ],
+      "spawn": {
+        "regions": ["dragon_lair"],
+        "minLevel": 12,
+        "maxLevel": 18,
+        "respawnTime": 3600
+      },
+      "ai": {
+        "behavior": "aggressive",
+        "detectionRange": 10,
+        "attackRange": 4,
+        "fleeHpPercent": 0,
+        "phases": [
+          {"hpPercent": 100, "skills": ["fire_breath", "claw_swipe"]},
+          {"hpPercent": 50, "skills": ["fire_breath", "tail_whip", "dragon_roar"]},
+          {"hpPercent": 25, "skills": ["inferno", "fire_breath", "claw_swipe"]}
+        ]
+      },
+      "resistances": {"fire": 0.2, "earth": 0.5},
+      "weaknesses": {"water": 2.0, "ice": 2.5}
+    },
+    {
+      "id": "trial_guardian",
+      "name": "试炼守卫",
+      "level": 3,
+      "type": "boss",
+      "element": "none",
+      "description": "青云宗试炼场的守卫",
+      "stats": {
+        "hp": 200,
+        "mp": 0,
+        "attack": 20,
+        "defense": 15,
+        "magicAttack": 0,
+        "magicDefense": 10,
+        "speed": 0.9,
+        "exp": 150,
+        "gold": 100
+      },
+      "skills": ["slash", "shield_bash"],
+      "loot": [
+        {"item": "spirit_crystal", "chance": 1.0, "count": 1},
+        {"item": "iron_ore", "chance": 0.5, "count": 3}
+      ],
+      "spawn": {
+        "regions": ["trial_grounds"],
+        "minLevel": 3,
+        "maxLevel": 3,
+        "respawnTime": 0
+      },
+      "ai": {
+        "behavior": "aggressive",
+        "detectionRange": 10,
+        "attackRange": 1.5,
+        "fleeHpPercent": 0
+      },
+      "resistances": {},
+      "weaknesses": {}
+    }
+  ]
+}

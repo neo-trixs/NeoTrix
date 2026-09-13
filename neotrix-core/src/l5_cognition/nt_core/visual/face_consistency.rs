@@ -157,12 +157,23 @@ impl FaceConsistencyManager {
         }
     }
     
-    /// 设置角色参考图
+    /// Set character reference image.
+    ///
+    /// Note: Stores image path in memory cache keyed by character_id.
+    /// Real implementation needs:
+    /// - Reference image validation (exists, correct format, reasonable size)
+    /// - Reference embedding extraction (ArcFace/CosFace) for similarity comparison
+    /// - Persistent cache (not just in-memory) for cross-session consistency
     pub fn set_reference(&mut self, character_id: &str, image_path: &str) {
         self.reference_cache.insert(character_id.to_string(), image_path.to_string());
     }
     
-    /// 获取角色参考图
+    /// Get character reference image path.
+    ///
+    /// Note: Returns cached image path if exists. No validation performed.
+    /// Real implementation needs:
+    /// - TTL-based cache expiration (references may become stale)
+    /// - Fallback to KB-stored references if not in memory
     pub fn get_reference(&self, character_id: &str) -> Option<&String> {
         self.reference_cache.get(character_id)
     }
@@ -239,12 +250,22 @@ impl FaceConsistencyManager {
         prompt
     }
     
-    /// 设置区域配置
+    /// Set regional prompting configuration.
+    ///
+    /// Note: Replaces entire regional config. No validation of region bounds
+    /// (should be normalized 0.0-1.0). Real implementation needs:
+    /// - Bounds validation (x+w <= 1.0, y+h <= 1.0)
+    /// - Overlap detection between regions
+    /// - Platform-specific syntax validation (ComfyUI vs SD WebUI)
     pub fn set_regional_config(&mut self, config: _RegionalPromptingConfig) {
         self.regional_config = config;
     }
     
-    /// 获取修复统计
+    /// Get repair statistics.
+    ///
+    /// Note: Computes aggregates from fix_history. avg_consistency_score is
+    /// mean of all consistency_score values. reference_count is number of
+    /// cached reference images (not total characters).
     pub fn statistics(&self) -> ConsistencyStats {
         let total_fixes = self.fix_history.len();
         let successful_fixes = self.fix_history.iter().filter(|r| r.success).count();

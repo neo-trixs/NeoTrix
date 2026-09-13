@@ -34,6 +34,14 @@ impl Default for ContentClassifier {
 }
 
 impl ContentClassifier {
+    /// Create classifier with keyword-based heuristics.
+    ///
+    /// Note: Initializes topic_keywords for 12 CrawlTopic variants and
+    /// format_heuristics for 12 CrawlFormat variants. No LLM provider.
+    /// Real implementation needs:
+    /// - Configurable keyword lists per topic
+    /// - TF-IDF weighting (not just binary keyword match)
+    /// - Multi-language keyword support
     pub fn new() -> Self {
         let mut topic_keywords = HashMap::new();
 
@@ -157,6 +165,10 @@ impl ContentClassifier {
         }
     }
 
+    /// Create classifier with LLM provider for enhanced classification.
+    ///
+    /// Note: LLM provider is optional. When present, try_llm_classify() is used
+    /// before falling back to keyword classification.
     pub fn _with_provider(provider: Option<Arc<dyn LlmProvider>>) -> Self {
         let mut classifier = Self::new();
         classifier.provider = provider;
@@ -241,6 +253,15 @@ impl ContentClassifier {
         self.classify(url, text)
     }
 
+    /// Classify content using keyword-based heuristics.
+    ///
+    /// Note: Two-pass classification: URL pattern matching first, then keyword
+    /// scoring. Confidence is (matched_keywords / total_keywords) * 0.8 + 0.2,
+    /// capped at 0.95. Title extraction from <title> tag or # heading.
+    /// Real implementation needs:
+    /// - Content-aware classification (not just keyword counting)
+    /// - Language detection for multilingual content
+    /// - Confidence calibration (current formula is heuristic)
     pub fn classify(&mut self, url: &str, _text: &str) -> ClassifiedContent {
         self.classification_count += 1;
 
@@ -388,6 +409,9 @@ impl ContentClassifier {
         url.rsplit('/').next().unwrap_or(url).to_string()
     }
 
+    /// Get classifier summary statistics.
+    ///
+    /// Note: Returns total classified count and topic distribution.
     pub fn summary(&self) -> ClassifierSummary {
         ClassifierSummary {
             total_classified: self.classification_count,

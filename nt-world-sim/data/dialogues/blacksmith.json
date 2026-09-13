@@ -1,0 +1,94 @@
+{
+  "id": "blacksmith_intro",
+  "speaker": "铁匠",
+  "portrait": "blacksmith",
+  "nodes": [
+    {
+      "id": "start",
+      "text": "你好，年轻人。我是这里的铁匠。需要打造或修理什么吗？",
+      "choices": [
+        {"text": "打造武器", "next": "craft_weapon"},
+        {"text": "打造防具", "next": "craft_armor"},
+        {"text": "修理装备", "next": "repair"},
+        {"text": "只是看看", "next": null}
+      ]
+    },
+    {
+      "id": "craft_weapon",
+      "text": "想打造什么武器？我这里可以打造剑、刀、弓等。",
+      "choices": [
+        {"text": "铁剑 (50金 + 铁矿x3)", "next": "craft_iron_sword", "conditions": [{"type": "gold", "amount": 50}, {"type": "has_item", "item": "iron_ore", "count": 3}]},
+        {"text": "钢刀 (80金 + 钢锭x2)", "next": "craft_steel_blade", "conditions": [{"type": "gold", "amount": 80}, {"type": "has_item", "item": "steel_ingot", "count": 2}]},
+        {"text": "弓 (30金 + 木材x2)", "next": "craft_bow", "conditions": [{"type": "gold", "amount": 30}, {"type": "has_item", "item": "wood", "count": 2}]},
+        {"text": "材料不够", "next": null}
+      ]
+    },
+    {
+      "id": "craft_iron_sword",
+      "text": "好，铁剑一把。拿好了，这把剑很结实。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_craft", "item": "iron_sword", "materials": [{"item": "iron_ore", "count": 3}], "cost": 50}]}
+      ]
+    },
+    {
+      "id": "craft_steel_blade",
+      "text": "好，钢刀一把。这把刀比铁剑更锋利。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_craft", "item": "steel_blade", "materials": [{"item": "steel_ingot", "count": 2}], "cost": 80}]}
+      ]
+    },
+    {
+      "id": "craft_bow",
+      "text": "好，弓一把。适合远程攻击。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_craft", "item": "bow", "materials": [{"item": "wood", "count": 2}], "cost": 30}]}
+      ]
+    },
+    {
+      "id": "craft_armor",
+      "text": "想打造什么防具？",
+      "choices": [
+        {"text": "皮甲 (40金 + 兽皮x3)", "next": "craft_leather_armor", "conditions": [{"type": "gold", "amount": 40}, {"type": "has_item", "item": "wolf_fur", "count": 3}]},
+        {"text": "铁甲 (100金 + 铁矿x5)", "next": "craft_iron_armor", "conditions": [{"type": "gold", "amount": 100}, {"type": "has_item", "item": "iron_ore", "count": 5}]},
+        {"text": "材料不够", "next": null}
+      ]
+    },
+    {
+      "id": "craft_leather_armor",
+      "text": "好，皮甲一件。轻便灵活。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_craft", "item": "leather_armor", "materials": [{"item": "wolf_fur", "count": 3}], "cost": 40}]}
+      ]
+    },
+    {
+      "id": "craft_iron_armor",
+      "text": "好，铁甲一件。防护力很强，但有点重。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "item_craft", "item": "iron_armor", "materials": [{"item": "iron_ore", "count": 5}], "cost": 100}]}
+      ]
+    },
+    {
+      "id": "repair",
+      "text": "让我看看你要修理什么。",
+      "choices": [
+        {"text": "修理武器 (20金)", "next": "repair_weapon", "conditions": [{"type": "gold", "amount": 20}]},
+        {"text": "修理防具 (30金)", "next": "repair_armor", "conditions": [{"type": "gold", "amount": 30}]},
+        {"text": "不需要了", "next": null}
+      ]
+    },
+    {
+      "id": "repair_weapon",
+      "text": "修好了。下次小心点用。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "repair", "target": "weapon", "cost": 20}]}
+      ]
+    },
+    {
+      "id": "repair_armor",
+      "text": "修好了。下次小心点用。",
+      "choices": [
+        {"text": "谢谢", "next": null, "effects": [{"type": "repair", "target": "armor", "cost": 30}]}
+      ]
+    }
+  ]
+}

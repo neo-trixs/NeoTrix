@@ -187,12 +187,23 @@ impl _VisualConsistencyManager {
         }
     }
     
-    /// 设置参考图
+    /// Set visual element reference image.
+    ///
+    /// Note: Stores image path in memory cache keyed by element_id.
+    /// Real implementation needs:
+    /// - Reference embedding extraction (CLIP for objects, ArcFace for faces)
+    /// - Persistent cache with TTL
+    /// - Reference versioning (multiple references per element for variation)
     pub fn set_reference(&mut self, element_id: &str, image_path: &str) {
         self.reference_cache.insert(element_id.to_string(), image_path.to_string());
     }
     
-    /// 获取参考图
+    /// Get visual element reference image path.
+    ///
+    /// Note: Returns cached image path if exists. No validation performed.
+    /// Real implementation needs:
+    /// - TTL-based cache expiration
+    /// - Fallback to KB-stored references
     pub fn get_reference(&self, element_id: &str) -> Option<&String> {
         self.reference_cache.get(element_id)
     }
@@ -266,12 +277,22 @@ impl _VisualConsistencyManager {
         prompt
     }
     
-    /// 设置分区配置
+    /// Set regional control configuration.
+    ///
+    /// Note: Replaces entire config. No bounds validation on regions.
+    /// Real implementation needs:
+    /// - Region bounds validation (normalized 0.0-1.0)
+    /// - Overlap detection between regions
+    /// - Platform-specific syntax validation
     pub fn set_regional_config(&mut self, config: _RegionalControlConfig) {
         self.regional_config = config;
     }
     
-    /// 获取统计信息
+    /// Get consistency statistics.
+    ///
+    /// Note: Computes aggregates from fix_history. avg_consistency_score is
+    /// mean of all consistency_score values. reference_count is number of
+    /// cached reference images.
     pub fn statistics(&self) -> ConsistencyStats {
         let total_fixes = self.fix_history.len();
         let successful_fixes = self.fix_history.iter().filter(|r| r.success).count();
@@ -329,19 +350,20 @@ mod tests {
         manager.set_reference("element_001", "/ref/element_001.png");
         assert!(manager.get_reference("element_001").is_some());
         
-        // 执行修复
+        // Fix is not wired — expect explicit failure
         let result = manager._fix_consistency(
             "/input/test.png",
             Some("element_001"),
             _VisualElementType::Character,
         );
-        assert!(result.success);
-        assert!(result.consistency_score > 0.9);
+        assert!(!result.success);
+        assert!(result.error.is_some());
+        assert!(result.consistency_score == 0.0);
         
         // 检查统计
         let stats = manager.statistics();
         assert_eq!(stats.total_fixes, 1);
-        assert_eq!(stats.successful_fixes, 1);
+        assert_eq!(stats.successful_fixes, 0);
     }
     
     #[test]

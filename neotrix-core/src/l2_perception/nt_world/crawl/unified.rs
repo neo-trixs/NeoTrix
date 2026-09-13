@@ -141,7 +141,11 @@ impl UnifiedCrawler {
         self.transport
     }
 
-    /// prefetch 过滤后丢弃的链接数 (telemetry) — 从 filter_relevant 输入输出差计算。
+    /// Get count of links filtered by prefetch (telemetry).
+    ///
+    /// Note: Always returns 0 (stub). Real implementation needs:
+    /// - Track filtered count during _attach_prefetch filter_relevant calls
+    /// - Expose as metric for monitoring prefetch effectiveness
     pub fn _prefetch_filtered_count(&self) -> usize {
         0
     }
@@ -477,6 +481,10 @@ impl UnifiedCrawler {
         reports
     }
 
+    /// Get crawler summary statistics.
+    ///
+    /// Note: Aggregates counters from crawler state. error_rate comes from
+    /// FetcherPool summary. elapsed_secs is wall-clock time since creation.
     pub fn summary(&self) -> CrawlerSummary {
         let elapsed = self.start_time.elapsed().as_secs();
         let fetcher_summary = self.fetcher.summary();
@@ -494,6 +502,14 @@ impl UnifiedCrawler {
         }
     }
 
+    /// Print crawler status to stdout.
+    ///
+    /// Note: Outputs formatted string with cycle/fetched/classified/absorbed counts,
+    /// frontier size, error rate, elapsed time, and last heal action.
+    /// Real implementation needs:
+    /// - Structured logging (not println!)
+    /// - Configurable output format (JSON/text)
+    /// - Integration with EventBus for status broadcasting
     pub fn _print_status(&self) {
         let s = self.summary();
         let heal_count = self._heal_history.len();
@@ -511,14 +527,30 @@ impl UnifiedCrawler {
         );
     }
 
+    /// Get frontier statistics as formatted string.
+    ///
+    /// Note: Delegates to DualQueueFrontier::stats(). Returns string representation
+    /// of frontier state (pending counts, domain distribution).
     pub fn _frontier_stats(&self) -> String {
         format!("{}", self.frontier.stats())
     }
 
+    /// Get self-healing action history.
+    ///
+    /// Note: Returns slice of HealAction entries. Each entry records cycle number,
+    /// analysis, action taken, and whether it was applied. History is append-only.
     pub fn _heal_history(&self) -> &[HealAction] {
         &self._heal_history
     }
 
+    /// Add seed URLs to the crawler frontier.
+    ///
+    /// Note: Filters seeds by `enabled` flag, extracts domain, computes priority.
+    /// Seeds are added to DualQueueFrontier for priority-based crawling.
+    /// Real implementation needs:
+    /// - Deduplication of seeds against existing frontier
+    /// - Topic-based priority validation
+    /// - Seed freshness check (don't re-crawl recently crawled seeds)
     pub fn add_seeds(&mut self, seeds: Vec<SeedEntry>) {
         let entries: Vec<UrlEntry> = seeds.iter()
             .filter(|s| s.enabled)
@@ -533,6 +565,11 @@ impl UnifiedCrawler {
         self.frontier.push_seeds(entries);
     }
 
+    /// Get active fetch protocol.
+    ///
+    /// Note: Always returns Http (hardcoded). Real implementation needs:
+    /// - Return actual protocol from self.transport field
+    /// - Support protocol switching based on target domain
     pub fn _active_protocol(&self) -> FetcherProtocol {
         FetcherProtocol::Http
     }

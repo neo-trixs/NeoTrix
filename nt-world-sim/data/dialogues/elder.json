@@ -14,7 +14,7 @@
     },
     {
       "id": "explain",
-      "text": "青云村位于青云山脉脚下，是修仙者的聚集地。山上有一个名为青云宗的门派。",
+      "text": "青云村位于青云山脉脚下，是修仙者的聚集地。山上有一个名为青云宗的门派，是方圆百里最强的势力。",
       "choices": [
         {"text": "青云宗是什么？", "next": "sect"},
         {"text": "我该怎么做？", "next": "advice"},
@@ -23,7 +23,7 @@
     },
     {
       "id": "cultivation",
-      "text": "修仙之路漫长而艰辛。你需要找到一位师父，或者加入一个门派。",
+      "text": "修仙之路漫长而艰辛。你需要找到一位师父，或者加入一个门派。我年轻时也曾想修仙，可惜资质不足。",
       "choices": [
         {"text": "有推荐的门派吗？", "next": "sect"},
         {"text": "我自己修炼", "next": "solo"},
@@ -32,7 +32,7 @@
     },
     {
       "id": "sect",
-      "text": "青云宗是附近最大的门派，收徒条件是灵根资质。你可以去山上试试。",
+      "text": "青云宗是附近最大的门派，收徒条件是灵根资质。你可以去山上试试。宗门内有长老、弟子、还有各种修炼资源。",
       "choices": [
         {"text": "我这就去", "next": "accept_quest"},
         {"text": "还有其他选择吗？", "next": "other_sects"},
@@ -41,21 +41,21 @@
     },
     {
       "id": "advice",
-      "text": "先去村子周围看看，收集一些资源。等你准备好了，再去山上。",
+      "text": "先去村子周围看看，收集一些资源。等你准备好了，再去山上。记住，山上有妖兽出没，要小心。",
       "choices": [
         {"text": "好的", "next": null}
       ]
     },
     {
       "id": "solo",
-      "text": "独自修炼很危险，但也不是不可能。小心山上的妖兽。",
+      "text": "独自修炼很危险，但也不是不可能。小心山上的妖兽，尤其是狼群。它们最近变得更凶猛了。",
       "choices": [
         {"text": "我会小心的", "next": null}
       ]
     },
     {
       "id": "other_sects",
-      "text": "除了青云宗，还有天剑宗、万毒门、幽冥教等。但它们都在更远的地方。",
+      "text": "除了青云宗，还有天剑宗、万毒门、幽冥教等。但它们都在更远的地方，路途凶险。",
       "choices": [
         {"text": "我先去青云宗", "next": "accept_quest"},
         {"text": "谢谢", "next": null}
@@ -63,10 +63,39 @@
     },
     {
       "id": "accept_quest",
-      "text": "好，我这里有一个任务给你。去山上找到青云宗的张长老，把这封信交给他。",
+      "text": "好，我这里有一个任务给你。去山上找到青云宗的张长老，把这封信交给他。路上要小心。",
       "choices": [
-        {"text": "接受任务", "next": null, "effects": [{"type": "quest_accept", "quest": "main_01"}]},
+        {"text": "接受任务", "next": "quest_accepted", "effects": [{"type": "quest_accept", "quest": "main_01"}]},
         {"text": "我现在没空", "next": null}
+      ]
+    },
+    {
+      "id": "quest_accepted",
+      "text": "好，信已经给你了。张长老在山顶的大殿里。路上小心，遇到危险就跑。",
+      "choices": [
+        {"text": "我这就去", "next": null}
+      ]
+    },
+    {
+      "id": "quest_complete",
+      "text": "你已经见到张长老了？很好！看来你很有潜力。以后有什么需要可以来找我。",
+      "choices": [
+        {"text": "谢谢村长", "next": null}
+      ]
+    },
+    {
+      "id": "after_quest",
+      "text": "年轻人，你看起来越来越强了。最近村里不太平，狼群经常来骚扰。你能帮忙吗？",
+      "choices": [
+        {"text": "我愿意帮忙", "next": "wolf_quest", "effects": [{"type": "quest_accept", "quest": "side_02"}]},
+        {"text": "我现在很忙", "next": null}
+      ]
+    },
+    {
+      "id": "wolf_quest",
+      "text": "太好了！去村子东边的森林，消灭那些狼群。每杀一只狼，它们就不会再来了。",
+      "choices": [
+        {"text": "我这就去", "next": null}
       ]
     }
   ]

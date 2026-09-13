@@ -26,6 +26,9 @@ pub mod components;
 pub mod systems;
 pub mod ui;
 pub mod effects;
+pub mod save;
+pub mod perf;
+pub mod game;
 
 pub use renderer::{Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer};
 pub use renderer::{SpriteBatch, TextureAtlas, TilemapRenderer, ParticleSystem, DebugRenderer, ScreenEffects, GameRenderer};
@@ -94,3 +97,18 @@ pub use ui::InventorySlot as UiInventorySlot;
 
 // Effects
 pub use effects::{FloatingNumber, FloatingKind, FloatingNumberManager, SkillEffect as EffectSkillSkill, SkillEffectKind, SkillEffectManager, ScreenShake, EffectsRenderer};
+
+// Save/Load
+pub use save::{
+    SaveBackend, FileSaveBackend, MemorySaveBackend, AutoSaveManager, EngineSaveManager,
+    SaveGameState, SaveMetadata, PlayerSave, Vec2Save,
+};
+
+// Performance
+pub use perf::{
+    SpatialHashGrid, ViewportCuller, ObjectPool, FrameTimeMonitor, MemoryTracker,
+    PerfAggregator, PerfSnapshot,
+};
+
+// Game
+pub use game::{Game, GameConfig, GamePhase, GameCallbacks};

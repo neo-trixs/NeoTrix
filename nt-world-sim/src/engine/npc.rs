@@ -506,7 +506,7 @@ impl NPCManager {
         let npc_ids: Vec<String> = self.npcs.keys().cloned().collect();
         for id in &npc_ids {
             // Get NPC's alive status and current state before mutable borrow
-            let (is_alive, can_aggro, should_deaggro, has_no_target) = {
+            let (is_alive, can_aggro, should_deaggro, _has_no_target) = {
                 if let Some(npc) = self.npcs.get(id) {
                     let alive = npc.is_alive();
                     let agg = npc.should_aggro(player_pos);

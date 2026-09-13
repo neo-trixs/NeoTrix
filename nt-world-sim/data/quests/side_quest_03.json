@@ -1,0 +1,67 @@
+{
+  "id": "side_03",
+  "name": "寻找宝藏",
+  "description": "传说村子附近有一个古老的宝藏。去寻找它。",
+  "type": "side",
+  "level": 4,
+  "chapter": 2,
+  "prerequisites": ["side_02"],
+  "objectives": [
+    {
+      "id": "talk_scholar",
+      "type": "talk",
+      "target": "scholar",
+      "text": "与学者对话，了解宝藏线索",
+      "completed": false,
+      "hint": "学者在村子里的图书馆"
+    },
+    {
+      "id": "find_map",
+      "type": "collect",
+      "item": "treasure_map",
+      "count": 1,
+      "text": "找到藏宝图",
+      "completed": false,
+      "hint": "藏宝图在森林的宝箱里"
+    },
+    {
+      "id": "goto_cave",
+      "type": "goto",
+      "target": "hidden_cave",
+      "text": "前往隐藏洞穴",
+      "completed": false,
+      "hint": "洞穴在山脉的东侧"
+    },
+    {
+      "id": "defeat_guardians",
+      "type": "kill",
+      "target": "skeleton",
+      "count": 10,
+      "text": "击败洞穴中的骷髅守卫",
+      "completed": false,
+      "hint": "骷髅在洞穴深处"
+    },
+    {
+      "id": "open_chest",
+      "type": "interact",
+      "target": "treasure_chest",
+      "text": "打开宝藏箱",
+      "completed": false,
+      "hint": "宝藏箱在洞穴最深处"
+    }
+  ],
+  "rewards": {
+    "exp": 400,
+    "gold": 300,
+    "items": [
+      {"id": "rare_gem", "count": 2},
+      {"id": "ancient_scroll", "count": 1}
+    ],
+    "reputation": {"village": 20, "sect": 10}
+  },
+  "dialogue_start": "scholar_treasure_quest",
+  "dialogue_complete": "scholar_treasure_complete",
+  "unlocks": [],
+  "timeLimit": null,
+  "repeatable": false
+}

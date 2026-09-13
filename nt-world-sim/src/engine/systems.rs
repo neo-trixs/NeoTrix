@@ -582,7 +582,7 @@ mod tests {
         assert!(cam.position.x > 0.0);
 
         // Render commands were produced.
-        let cmds = world.get_resource::<RenderCommands>().unwrap();
+        let cmds = world.get_resource::<RenderCommandBuffer>().unwrap();
         assert!(!cmds.commands.is_empty());
     }
 }

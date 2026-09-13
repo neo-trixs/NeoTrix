@@ -59,6 +59,11 @@ pub trait _InternetReach: Send + Sync {
 pub struct _PublicScrapeReach;
 
 impl _InternetReach for _PublicScrapeReach {
+    /// Checks reachability of a target on the given platform.
+    ///
+    /// **Not wired**: This stub returns `accessible: false` for all targets.
+    /// Real implementation requires HTTP scraping with anti-detection (CamoFox),
+    /// platform-specific URL construction, and response validation.
     fn reach(&self, platform: _ReachPlatform, target: &str) -> _ReachResult {
         if target.trim().is_empty() {
             return _ReachResult {
@@ -68,11 +73,17 @@ impl _InternetReach for _PublicScrapeReach {
                 note: "empty target".into(),
             };
         }
+        // C1 stub: no real HTTP scraping implemented.
+        // Returns not-accessible instead of fabricated success.
         _ReachResult {
             platform,
             target: target.into(),
-            accessible: true,
-            note: format!("scrape public page (zero api fee): {}", platform.as_str()),
+            accessible: false,
+            note: format!(
+                "not wired: {} reach check for '{}' — requires HTTP scraping + anti-detection integration",
+                platform.as_str(),
+                target
+            ),
         }
     }
 }
@@ -88,8 +99,9 @@ impl SelfTest for _AgentReachSelfTest {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let r = _PublicScrapeReach;
         let res = r.reach(_ReachPlatform::GitHub, "rust-lang/rust");
-        if !res.accessible {
-            return Err(vec!["agent_reach: github target should be reachable".into()]);
+        // C1 stub: reach always returns accessible=false until real scraping is wired.
+        if res.accessible {
+            return Err(vec!["agent_reach: C1 stub should not report accessible=true".into()]);
         }
         let empty = r.reach(_ReachPlatform::Twitter, "");
         if empty.accessible {
@@ -117,9 +129,11 @@ mod tests {
     }
 
     #[test]
-    fn github_reachable() {
+    fn github_reachable_reports_not_wired() {
         let r = _PublicScrapeReach.reach(_ReachPlatform::GitHub, "neotrix");
-        assert!(r.accessible);
+        // C1 stub: not wired — returns accessible=false with explanation
+        assert!(!r.accessible);
+        assert!(r.note.contains("not wired"));
         assert_eq!(r.platform.as_str(), "github");
     }
 
