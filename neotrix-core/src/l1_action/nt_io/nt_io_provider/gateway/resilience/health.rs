@@ -126,7 +126,7 @@ impl GatewayV2 {
 
     /// 记录一次生成分类到 analytics (供 activity analytics 聚合)。
     /// 在成功响应完成路径调用 — 与 heal_and_cache_response 同位置。
-    pub(super) fn tag_generation(
+    pub(crate) fn tag_generation(
         &self,
         request: &LlmRequest,
         response: &LlmResponse,
@@ -205,7 +205,7 @@ impl GatewayV2 {
     }
 
     /// G: Response Healing + Caching — 成功响应后处理 (修复畸形 JSON, 回写 LRU 缓存)
-    pub(super) fn heal_and_cache_response(&self, request: &LlmRequest, response: LlmResponse) -> LlmResponse {
+    pub(crate) fn heal_and_cache_response(&self, request: &LlmRequest, response: LlmResponse) -> LlmResponse {
         let mut response = response;
         if self.response_healer_enabled {
             if let Ok(mut healer) = self.response_healer.lock() {
@@ -232,7 +232,7 @@ impl GatewayV2 {
     }
 
     /// 请求的纯文本提示 (消息内容拼接) — 用于 embedding 与 token 估算。
-    pub(super) fn prompt_text(&self, request: &LlmRequest) -> String {
+    pub(crate) fn prompt_text(&self, request: &LlmRequest) -> String {
         request
             .messages
             .iter()
@@ -243,7 +243,7 @@ impl GatewayV2 {
 
     /// 缓存 key 硬化: 除消息内容外, 纳入会影响响应语义的请求指纹
     /// (max_tokens / thinking_budget / tools / structured_output / prefix 标记)。
-    pub(super) fn prompt_cache_key(&self, request: &LlmRequest) -> String {
+    pub(crate) fn prompt_cache_key(&self, request: &LlmRequest) -> String {
         let content = self.prompt_text(request);
         let mut tools: Vec<&str> = request
             .tools

@@ -125,7 +125,7 @@ impl GatewayV2 {
 
     /// 与 complete_for_profile 相同, 但返回 (响应, 实际使用的画像, 实际 provider 名)。
     /// 供 CapabilityCoordinator 报告真实的降级状态 (修复 degraded 恒 false 失真)。
-    pub(super) async fn complete_for_profile_detailed(
+    pub(crate) async fn complete_for_profile_detailed(
         &self,
         required: CommunicationProfile,
         request: &LlmRequest,
@@ -181,7 +181,7 @@ impl GatewayV2 {
         match selected {
             Some(name) => {
                 log::debug!("[gateway] complete_for_profile({:?}) → {}", required, name);
-                let result = self.call_provider(&name, request).await;
+                let result: Result<LlmResponse, LlmError> = self.call_provider(&name, request).await;
                 let latency = start.elapsed().as_millis() as u64;
                 let success = result.is_ok();
                 self.record_sub_grid_call(required, success, latency);
@@ -216,7 +216,7 @@ impl GatewayV2 {
                 );
                 match self.select_best().await {
                     Some(name) => {
-                        let result = self.call_provider(&name, request).await;
+                        let result: Result<LlmResponse, LlmError> = self.call_provider(&name, request).await;
                         result.map(|r| (r, CommunicationProfile::Open, name))
                     }
                     None => Err(LlmError::Unknown("no provider available".into())),
@@ -275,7 +275,7 @@ impl GatewayV2 {
             let start = std::time::Instant::now();
             match self.select_best_for_profile(target).await {
                 Some(name) => {
-                    let result = self.call_provider(&name, request).await;
+                    let result: Result<LlmResponse, LlmError> = self.call_provider(&name, request).await;
                     let latency = start.elapsed().as_millis() as u64;
                     let success = result.is_ok();
                     self.record_sub_grid_call(target, success, latency);
