@@ -294,7 +294,7 @@ fn count_actual_unsafe(content: &str) -> usize {
 // 纯确定性可测。接线到 EvolutionLoop 作为"递归任务合成"进化输入源。
 
 /// RST 任务 — 递归合成的单元。
-#[derive(Debug, Clone, Partialserde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct _RstTask {
     /// 任务 id。
     pub id: String,

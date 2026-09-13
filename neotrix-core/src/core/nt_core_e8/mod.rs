@@ -166,7 +166,7 @@ pub fn verify_all_identities() -> Vec<(&'static str, bool)> {
 // ─── Hexagram System ─────────────────────────────────────────────────
 
 /// A single hexagram: 6-bit binary state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, Deserialize)]
 pub struct Hexagram {
     /// 6 bits, MSB = top line (yang=1, yin=0), per Shao Yong ordering.
     pub bits: u8,
@@ -242,7 +242,7 @@ pub const TRIGRAM_BITS: [u8; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
 
 /// A weight vector in the 8-dimensional weight space of E₈.
 /// Stored in half-units: coordinate value × 2 (so ½ is stored as 1, 1 as 2).
-#[derive(Debug, Clone, Partialserde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct E8Weight {
     pub coords: [i8; 8],
 }
@@ -357,7 +357,7 @@ pub fn trigram_to_su3_root(trigram: u8) -> (i8, i8) {
 // ─── Spin(11,3) 64-Fermion Decomposition ────────────────────────────
 
 /// A single fermion state in the Spin(11,3) 64-dimensional spinor.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, Deserialize)]
 pub struct FermionState {
     /// Spinor weight coordinates (8-dim weight space).
     pub weight: [i8; 8],
@@ -500,7 +500,7 @@ pub const WEN_SEQUENCE: [u8; 64] = [
 // ─── E₈ × 64 Model ──────────────────────────────────────────────────
 
 /// Complete E₈ × 64-hexagram model homology result.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, Deserialize)]
 #[serde(default)]
 pub struct E8HexagramHomology {
     /// E₈ dimension = 248.
@@ -1150,8 +1150,8 @@ impl serde::Serialize for SerdeCompat64 {
     }
 }
 
-impl<'de> serde::Deserialize<'de> for SerdeCompat64 {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+impl<'de> Deserialize<'de> for SerdeCompat64 {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let v = Vec::<u64>::deserialize(deserializer)?;
         if v.len() != 64 {
             return Err(serde::de::Error::custom("expected exactly 64 elements"));
@@ -1163,7 +1163,7 @@ impl<'de> serde::Deserialize<'de> for SerdeCompat64 {
 }
 
 /// Flat 64×64 matrix for serde compatibility.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 pub struct FlatCounts(pub Vec<u64>);
 
 impl FlatCounts {
@@ -1196,7 +1196,7 @@ pub enum EdgeSemantics {
 /// 64×64 transition probability matrix for E8 hexagram states.
 /// cell[i][j] = empirical probability of transitioning from hexagram i to j.
 /// Seeded from discovered Mythos trace patterns and updated continuously.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 pub struct E8TransitionMatrix {
     /// 64×64 transition count matrix (flat: index = i * 64 + j)
     pub counts: FlatCounts,
