@@ -9,7 +9,7 @@ pub struct AnalysisReport {
     pub layout_summary: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transcription {
     pub text: String,
     pub language: String,

@@ -131,6 +131,9 @@ pub struct FaceConsistencyManager {
 
 impl FaceConsistencyManager {
     /// 创建增强器
+    ///
+    /// STUB: Initializes with default FaceDetailer strategy and 0.5 detection threshold.
+    /// Real implementation needs configurable strategy per platform (SD WebUI vs ComfyUI).
     pub fn new() -> Self {
         Self {
             face_fix_config: _FaceFixConfig {
@@ -196,6 +199,12 @@ impl FaceConsistencyManager {
     }
     
     /// 批量修复面部
+    ///
+    /// STUB: Delegates each image to `_fix_faces` sequentially.
+    /// Real implementation needs:
+    /// - Parallel processing with configurable concurrency
+    /// - Batch face detection to amortize model load cost
+    /// - Cross-frame consistency enforcement (reference embedding matching)
     pub(crate) fn _batch_fix_faces(
         &mut self,
         image_paths: &[String],
@@ -207,6 +216,12 @@ impl FaceConsistencyManager {
     }
     
     /// 生成区域提示词
+    ///
+    /// Note: Concatenates region prompts in `[name: prompt (weight: w)]` syntax.
+    /// Real implementation needs platform-specific syntax adaptation:
+    /// - ComfyUI: RegionalPrompting node format
+    /// - SD WebUI: ADetailer regional prompt syntax
+    /// - Attention Couple: attention mask-based regions
     pub fn generate_regional_prompt(&self, base_prompt: &str) -> String {
         if !self.regional_config.enabled {
             return base_prompt.to_string();

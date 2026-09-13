@@ -26,7 +26,6 @@
 
 use super::auth::AuthConfig;
 use super::detect::{self, MediaKind};
-use super::download_progress::DownloadProgress;
 use super::router::{self, TransportType};
 use crate::l1_action::nt_io::nt_io_http_factory;
 use futures::StreamExt;
@@ -35,7 +34,7 @@ use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::Duration;
 use tokio::fs::{self, File};
@@ -822,37 +821,17 @@ impl ParallelDownloader {
                 return Ok(());
             }
 
-            let mut req = self
-                .client
-                .get(&self.url)
-                .header("Range", format!("bytes={}-{}", range_start, range_end))
-                .header("Accept-Encoding", "identity")
-                .timeout(Duration::from_secs(60));
-
-            if let Some(ref auth_cfg) = self.auth {
-                let domain = extract_domain(&self.url);
-                req = auth_cfg.apply(req, &domain).await;
-            }
-
-            match req.send().await {
-                Ok(resp) => {
-                    let status = resp.status().as_u16();
-                    if status != 206 && !resp.status().is_success() {
-                        if RetryPolicy::is_retryable_status(status) {
-                            attempt += 1;
-                            match self.retry_policy.delay_for(attempt) {
-                                Some(delay) => {
-                                    tokio::time::sleep(delay).await;
-                                    continue;
-                                }
-                                None => {
-                                    return Err(PipelineError::Http(status));
-                                }
-                            }
-                        }
-                        return Err(PipelineError::Http(status));
-                    }
-
+            match http_range_request(
+                &self.client,
+                &self.url,
+                range_start,
+                range_end,
+                self.auth.as_ref(),
+                Duration::from_secs(60),
+            )
+            .await
+            {
+                Ok((resp, _content_length)) => {
                     let mut stream = resp.bytes_stream();
                     stall.record_progress();
 
@@ -1576,6 +1555,49 @@ async fn probe_range_support(
 // HTTP chunk download (single-chunk, for temp-file merge path)
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Shared HTTP Range request helper. Sends a Range request and returns the response stream.
+/// Used by both `http_chunk_download` and `ParallelDownloader::download_chunk`.
+async fn http_range_request(
+    client: &reqwest::Client,
+    url: &str,
+    start: u64,
+    end: u64,
+    auth: Option<&AuthConfig>,
+    timeout: Duration,
+) -> Result<(reqwest::Response, u64), PipelineError> {
+    let mut req = client
+        .get(url)
+        .header("Accept-Encoding", "identity")
+        .timeout(timeout);
+
+    if end != 0 {
+        req = req.header("Range", format!("bytes={}-{}", start, end));
+    } else if start > 0 {
+        req = req.header("Range", format!("bytes={}-", start));
+    }
+
+    if let Some(auth_cfg) = auth {
+        let domain = extract_domain(url);
+        req = auth_cfg.apply(req, &domain).await;
+    }
+
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| PipelineError::Network(e.to_string()))?;
+
+    let status = resp.status().as_u16();
+    if status == 404 || status == 403 || status == 410 {
+        return Err(PipelineError::Http(status));
+    }
+    if !resp.status().is_success() && status != 206 {
+        return Err(PipelineError::Http(status));
+    }
+
+    let content_length = resp.content_length().unwrap_or(0);
+    Ok((resp, content_length))
+}
+
 async fn http_chunk_download(
     client: &reqwest::Client,
     url: &reqwest::Url,
@@ -1595,27 +1617,16 @@ async fn http_chunk_download(
         return Ok(already);
     }
 
-    let mut req = client
-        .get(url.clone())
-        .header("Accept-Encoding", "identity");
-    if end != 0 {
-        req = req.header("Range", format!("bytes={}-{}", actual_start, end));
-    } else if actual_start > 0 {
-        req = req.header("Range", format!("bytes={}-", actual_start));
-    }
-
-    let mut resp = tokio::time::timeout(Duration::from_secs(timeout_secs), req.send())
-        .await
-        .map_err(|_| "timeout".to_string())?
-        .map_err(|e| e.to_string())?;
-
-    let status = resp.status();
-    if status == 404 || status == 403 || status == 410 {
-        return Err(format!("permanent: HTTP {}", status));
-    }
-    if !status.is_success() && status != 206 {
-        return Err(format!("HTTP {}", status));
-    }
+    let (mut resp, _content_length) = http_range_request(
+        client,
+        url.as_str(),
+        actual_start,
+        end,
+        None,
+        Duration::from_secs(timeout_secs),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
     let file = if already > 0 {
         fs::OpenOptions::new()
@@ -1790,6 +1801,49 @@ async fn stream_magnet_download(
             }
             _ => {}
         }
+    }
+}
+
+/// Check if aria2c RPC daemon is running and responsive.
+/// Returns Ok(version_string) if healthy, Err(message) if not.
+pub async fn check_aria2c_health() -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let rpc_url = "http://127.0.0.1:6800/jsonrpc";
+
+    let rpc_body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": "nt-health-check",
+        "method": "aria2.getVersion",
+        "params": [],
+    });
+
+    match tokio::time::timeout(
+        Duration::from_secs(3),
+        client.post(rpc_url).json(&rpc_body).send(),
+    )
+    .await
+    {
+        Ok(Ok(resp)) => {
+            let body: serde_json::Value = resp
+                .json()
+                .await
+                .map_err(|e| format!("parse error: {}", e))?;
+            if let Some(error) = body.get("error") {
+                return Err(format!(
+                    "aria2c error: {}",
+                    error
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("unknown")
+                ));
+            }
+            let version = body["result"]["version"]
+                .as_str()
+                .unwrap_or("unknown");
+            Ok(format!("aria2c v{}", version))
+        }
+        Ok(Err(e)) => Err(format!("connection failed: {}", e)),
+        Err(_) => Err("timeout (3s)".into()),
     }
 }
 

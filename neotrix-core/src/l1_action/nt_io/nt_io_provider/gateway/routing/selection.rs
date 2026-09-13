@@ -2,6 +2,7 @@ use crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env;
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::l1_action::nt_io::nt_io_provider::LlmProvider;
 use crate::l1_action::nt_io::nt_io_provider::common::factory::{create_provider, ProviderConfig};
 use crate::l1_action::nt_io::nt_io_provider::catalog::free_catalog::{FreeModelCatalog, FreeModelEntry};
 use crate::l1_action::nt_io::nt_io_provider::health::rate_limiter::RateLimiter;

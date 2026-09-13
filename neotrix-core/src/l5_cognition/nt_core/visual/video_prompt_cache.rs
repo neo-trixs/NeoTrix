@@ -142,6 +142,12 @@ impl _VideoPromptCache {
     }
 
     /// 生成提示词嵌入
+    ///
+    /// STUB: Byte-frequency vector (128-dim) with L2 normalization — not semantically meaningful.
+    /// Real implementation needs:
+    /// - Text embedding model (e.g., sentence-transformers, OpenAI embeddings)
+    /// - Or domain-specific embedding trained on video prompt similarity
+    /// - Persistent embedding index (FAISS/HNSW) for sub-linear similarity search
     fn embed_prompt(&self, prompt: &str) -> Vec<f64> {
         // 简化的嵌入生成 (实际应使用模型)
         let mut embedding = vec![0.0; 128];
@@ -192,6 +198,12 @@ impl _VideoPromptCache {
     }
 
     /// 淘汰过期条目
+    ///
+    /// Note: Two-phase eviction: TTL-expired first, then lowest access_count.
+    /// Removes 1000 extra entries per cycle to amortize eviction cost.
+    /// Real implementation needs:
+    /// - LRU/LFU policy with bounded memory
+    /// - Version-aware eviction (keep latest version of same prompt)
     fn evict(&mut self) {
         let mut to_remove = Vec::new();
         for (id, entry) in &self.entries {

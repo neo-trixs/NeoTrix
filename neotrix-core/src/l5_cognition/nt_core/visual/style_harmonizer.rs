@@ -111,8 +111,13 @@ impl _StyleHarmonizer {
     
     /// 分析风格
     ///
-    /// 注意：需要接入风格分析模型（如 DINOv2/CLIP）。
-    /// 当前返回基础特征，不含真实图像分析。
+    /// STUB: Returns neutral/placeholder features — no actual image analysis.
+    /// Real implementation needs:
+    /// - DINOv2/CLIP feature extraction for style embedding
+    /// - Color histogram computation (HSV/LAB color space)
+    /// - Texture analysis via Gabor filters or learned features
+    /// - Style tag classification from a trained model
+    /// - Quality assessment (NIQUE/FID-based)
     pub(crate) fn _analyze_style(&self, _image_path: &str) -> _StyleAnalysis {
         // 基础特征 — 无法从图像提取时的降级值
         _StyleAnalysis {
@@ -132,7 +137,12 @@ impl _StyleHarmonizer {
     
     /// 协调风格
     ///
-    /// 注意：需要接入风格迁移模型。当前返回明确错误。
+    /// STUB: Returns explicit error — style transfer not wired.
+    /// Real implementation needs:
+    /// - CycleGAN / Neural Style Transfer model integration
+    /// - Content-style tradeoff control (style_strength parameter)
+    /// - Preservation of semantic content while applying target style
+    /// - GPU-accelerated inference pipeline
     pub(crate) fn _harmonize(
         &mut self,
         _input_path: &str,
@@ -151,7 +161,12 @@ impl _StyleHarmonizer {
     
     /// 匹配色彩
     ///
-    /// 注意：需要接入色彩匹配算法。当前返回明确错误。
+    /// STUB: Returns explicit error — color matching not wired.
+    /// Real implementation needs:
+    /// - Color histogram matching (Reinhard color transfer or similar)
+    /// - LAB color space transfer for perceptual uniformity
+    /// - Region-aware color matching (face/sky/object-specific)
+    /// - Temporal color consistency for video sequences
     pub(crate) fn _match_colors(
         &self,
         _source_path: &str,

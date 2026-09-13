@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
 use super::pool::account_pool::{AccountPool, AccountPoolConfig};
+use super::common::types::*;
 use super::common::generation_classifier::{GenerationAnalytics, GenerationClassifier};
 use super::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::health::rate_limiter::{AdaptivePacer, TieredSemaphore};
-use super::common::types::*;
 use crate::core::l0_substrate::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator};
 use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
@@ -42,6 +42,8 @@ pub use routing::free_providers;
 pub use resilience::*;
 // 执行
 pub use execution::*;
+// 可观测性
+pub use observability::*;
 // 类型 & 注册表
 pub use types::*;
 // Feature-gated

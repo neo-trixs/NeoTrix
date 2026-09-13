@@ -171,6 +171,14 @@ impl FscanModule {
     }
 
     /// 发现内部主机 (ARP ping / ICMP)
+    ///
+    /// STUB: Returns hardcoded mock hosts — no actual network scanning.
+    /// Real implementation needs:
+    /// - ARP ping sweep for local subnet discovery
+    /// - ICMP echo request with configurable timeout/retry
+    /// - TCP SYN scan for non-ICMP-responsive hosts
+    /// - Concurrent scanning with rate limiting
+    /// - Integration with fscan or system nmap binary
     pub async fn discover_hosts(&mut self) -> Result<Vec<_HostInfo>, String> {
         // TODO: 实际调用 fscan 或系统命令
         // 示例: fscan -t 192.168.0.0/16 -p all
@@ -208,6 +216,13 @@ impl FscanModule {
     }
 
     /// 枚举主机服务
+    ///
+    /// STUB: Returns hardcoded service data for known IPs — no actual port scanning.
+    /// Real implementation needs:
+    /// - nmap service version detection (-sV flag)
+    /// - Banner grabbing for custom services
+    /// - NSE script execution for detailed service fingerprinting
+    /// - Concurrent per-host scanning with timeout management
     pub async fn enumerate_services(&mut self, host: &str) -> Result<Vec<ServiceInfo>, String> {
         // TODO: 实际调用 nmap 或服务枚举工具
 
@@ -296,6 +311,14 @@ impl FscanModule {
     }
 
     /// 构建攻击图
+    ///
+    /// Note: Builds a graph with host→service→vulnerability nodes and edges.
+    /// Attack paths are computed via simplified Dijkstra (direct host→vuln edges only).
+    /// Real implementation needs:
+    /// - Multi-hop path discovery (vuln→lateral movement→new host)
+    /// - Edge cost based on CVSS exploitability + network distance
+    /// - Graph algorithms: shortest path, all-paths, critical node detection
+    /// - Integration with threat intelligence for exploit availability
     pub fn _build_attack_graph(&mut self) -> _AttackGraph {
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
@@ -382,6 +405,13 @@ impl FscanModule {
     }
 
     /// 查找攻击路径 — 简化版 Dijkstra
+    ///
+    /// Note: Currently finds direct host→vulnerability paths only (1-hop).
+    /// Real implementation needs:
+    /// - Multi-hop path finding (Dijkstra/A* with weighted edges)
+    /// - Lateral movement chain detection (vuln→compromise→new host→vuln)
+    /// - Path ranking by total exploitability score
+    /// - Attack graph pruning for actionable paths only
     fn find_attack_paths(&self) -> Vec<AttackPath> {
         let mut paths = Vec::new();
 

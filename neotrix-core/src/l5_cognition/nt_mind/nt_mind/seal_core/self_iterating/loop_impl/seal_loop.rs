@@ -702,8 +702,7 @@ impl SelfIteratingBrain {
             // Bench step is skipped — regression testing proceeds without JIT bench data.
             tracing::warn!(
                 "not wired: JIT bench backend not connected — \
-                 step '{}' skipped (no bench data available)",
-                step.id
+                 bench step skipped (no bench data available)"
             );
         }
 

@@ -197,6 +197,12 @@ impl _PromptEnhancer {
     }
     
     /// 增强负面提示词
+    ///
+    /// Note: Merges additional negative tags into base, deduplicating by substring match.
+    /// Real implementation needs:
+    /// - Semantic deduplication (not just substring) to avoid redundant tokens
+    /// - Platform-aware negative prompt length limits (SD WebUI ~75 tokens)
+    /// - Priority ordering (NSFW > violence > quality) for truncation
     pub(crate) fn _enhance_negative(&self, base_negative: &str, additional: &[String]) -> String {
         let mut negative = base_negative.to_string();
         

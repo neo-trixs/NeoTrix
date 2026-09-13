@@ -199,8 +199,13 @@ impl _VisualConsistencyManager {
     
     /// 执行一致性修复
     ///
-    /// 注意：需要接入视觉一致性修复模型（如 ADetailer/IP-Adapter）。
-    /// 当前未接入时返回明确错误。
+    /// STUB: Returns explicit error — no model integration.
+    /// Real implementation needs:
+    /// - Element detection (InsightFace for characters, YOLO for objects/props)
+    /// - Reference embedding extraction (ArcFace/CosFace for face, CLIP for objects)
+    /// - Consistency scoring via embedding cosine similarity
+    /// - Inpainting pipeline (ADetailer/IP-Adapter/InstantID) for fix application
+    /// - Cross-frame temporal consistency enforcement
     pub(crate) fn _fix_consistency(
         &mut self,
         _image_path: &str,
@@ -219,6 +224,13 @@ impl _VisualConsistencyManager {
     }
     
     /// 批量修复
+    ///
+    /// STUB: Delegates each image to `_fix_consistency` sequentially.
+    /// Real implementation needs:
+    /// - Batch element detection (single model pass for all frames)
+    /// - Cross-frame reference embedding propagation
+    /// - Parallel GPU inference with memory budget management
+    /// - Incremental fix: only re-fix frames where consistency dropped below threshold
     pub(crate) fn _batch_fix(
         &mut self,
         image_paths: &[String],
@@ -231,6 +243,12 @@ impl _VisualConsistencyManager {
     }
     
     /// 生成分区提示词
+    ///
+    /// Note: Appends `[region: prompt (weight: w)]` syntax for each enabled region.
+    /// Real implementation needs platform-specific formatting:
+    /// - ComfyUI: RegionalPrompting node with attention masks
+    /// - SD WebUI: ADetailer region syntax
+    /// - Attention Couple: per-region attention weight injection
     pub fn generate_regional_prompt(&self, base_prompt: &str) -> String {
         if !self.regional_config.enabled {
             return base_prompt.to_string();

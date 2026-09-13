@@ -141,7 +141,21 @@ impl SkillValidator {
             return;
         }
 
-        let content = std::fs::read_to_string(&plugin_json).unwrap_or_default();
+        let content = match std::fs::read_to_string(&plugin_json) {
+            Ok(c) => c,
+            Err(e) => {
+                report.add_finding(ValidationFinding {
+                    rule_id: "PLUGIN-READ".to_string(),
+                    category: RuleCategory::PluginMetadata,
+                    severity: Severity::Error,
+                    message: format!("Failed to read plugin.json: {}", e),
+                    file: Some(plugin_json.clone()),
+                    line: None,
+                    suggestion: Some("Check file permissions".to_string()),
+                });
+                return;
+            }
+        };
         let plugin: serde_json::Value = match serde_json::from_str(&content) {
             Ok(v) => v,
             Err(e) => {
@@ -211,7 +225,22 @@ impl SkillValidator {
             return; // Skills optional
         }
 
-        for entry in std::fs::read_dir(&skills_dir).into_iter().flatten().filter_map(|e| e.ok()) {
+        let skills_entries = match std::fs::read_dir(&skills_dir) {
+            Ok(entries) => entries,
+            Err(e) => {
+                report.add_finding(ValidationFinding {
+                    rule_id: "SKILL-READDIR".to_string(),
+                    category: RuleCategory::Structure,
+                    severity: Severity::Warning,
+                    message: format!("Failed to read skills directory: {}", e),
+                    file: Some(skills_dir.clone()),
+                    line: None,
+                    suggestion: Some("Check directory permissions".to_string()),
+                });
+                return;
+            }
+        };
+        for entry in skills_entries.filter_map(|e| e.ok()) {
             let skill_dir = entry.path();
             if !skill_dir.is_dir() { continue; }
             
@@ -236,7 +265,21 @@ impl SkillValidator {
     }
 
     fn validate_skill_frontmatter(&self, skill_md: &Path, report: &mut ValidationReport) {
-        let content = std::fs::read_to_string(skill_md).unwrap_or_default();
+        let content = match std::fs::read_to_string(skill_md) {
+            Ok(c) => c,
+            Err(e) => {
+                report.add_finding(ValidationFinding {
+                    rule_id: "SKILL-READ".to_string(),
+                    category: RuleCategory::SkillFrontmatter,
+                    severity: Severity::Error,
+                    message: format!("Failed to read {}: {}", skill_md.display(), e),
+                    file: Some(skill_md.to_path_buf()),
+                    line: None,
+                    suggestion: Some("Check file permissions".to_string()),
+                });
+                return;
+            }
+        };
         
         // Parse frontmatter
         let stripped = content.trim_start();
@@ -300,7 +343,21 @@ impl SkillValidator {
     }
 
     fn validate_skill_length(&self, skill_md: &Path, report: &mut ValidationReport) {
-        let content = std::fs::read_to_string(skill_md).unwrap_or_default();
+        let content = match std::fs::read_to_string(skill_md) {
+            Ok(c) => c,
+            Err(e) => {
+                report.add_finding(ValidationFinding {
+                    rule_id: "SKILL-LEN-READ".to_string(),
+                    category: RuleCategory::SkillFrontmatter,
+                    severity: Severity::Warning,
+                    message: format!("Failed to read {} for length check: {}", skill_md.display(), e),
+                    file: Some(skill_md.to_path_buf()),
+                    line: None,
+                    suggestion: Some("Check file permissions".to_string()),
+                });
+                return;
+            }
+        };
         let lines = content.lines().count();
         
         if lines > 500 {
@@ -320,11 +377,39 @@ impl SkillValidator {
         let refs_dir = skill_dir.join("references");
         if !refs_dir.exists() { return; }
         
-        for entry in std::fs::read_dir(&refs_dir).into_iter().flatten().filter_map(|e| e.ok()) {
+        let refs_entries = match std::fs::read_dir(&refs_dir) {
+            Ok(entries) => entries,
+            Err(e) => {
+                report.add_finding(ValidationFinding {
+                    rule_id: "SKILL-REFS-READDIR".to_string(),
+                    category: RuleCategory::Structure,
+                    severity: Severity::Warning,
+                    message: format!("Failed to read references directory: {}", e),
+                    file: Some(refs_dir.clone()),
+                    line: None,
+                    suggestion: Some("Check directory permissions".to_string()),
+                });
+                return;
+            }
+        };
+        for entry in refs_entries.filter_map(|e| e.ok()) {
             let path = entry.path();
             if path.extension().map_or(false, |e| e == "md") {
-                // Check for reference chains (file referencing another file in references/)
-                let content = std::fs::read_to_string(&path).unwrap_or_default();
+                let content = match std::fs::read_to_string(&path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        report.add_finding(ValidationFinding {
+                            rule_id: "SKILL-REFS-READ".to_string(),
+                            category: RuleCategory::SkillFrontmatter,
+                            severity: Severity::Warning,
+                            message: format!("Failed to read {}: {}", path.display(), e),
+                            file: Some(path),
+                            line: None,
+                            suggestion: Some("Check file permissions".to_string()),
+                        });
+                        continue;
+                    }
+                };
                 if content.contains("references/") {
                     report.add_finding(ValidationFinding {
                         rule_id: "SKILL-006".to_string(),
@@ -360,7 +445,22 @@ impl SkillValidator {
         // .claude-plugin only contains plugin.json
         let claude_plugin = self.plugin_root.join(".claude-plugin");
         if claude_plugin.exists() {
-            for entry in std::fs::read_dir(&claude_plugin).into_iter().flatten().filter_map(|e| e.ok()) {
+            let plugin_entries = match std::fs::read_dir(&claude_plugin) {
+                Ok(entries) => entries,
+                Err(e) => {
+                    report.add_finding(ValidationFinding {
+                        rule_id: "STRUCT-CLAUDE-READDIR".to_string(),
+                        category: RuleCategory::Structure,
+                        severity: Severity::Warning,
+                        message: format!("Failed to read .claude-plugin directory: {}", e),
+                        file: Some(claude_plugin.clone()),
+                        line: None,
+                        suggestion: Some("Check directory permissions".to_string()),
+                    });
+                    return;
+                }
+            };
+            for entry in plugin_entries.filter_map(|e| e.ok()) {
                 if entry.file_name() != "plugin.json" && entry.file_name() != "marketplace.json" {
                     report.add_finding(ValidationFinding {
                         rule_id: "STRUCT-CLAUDE-PLUGIN".to_string(),
@@ -380,11 +480,28 @@ impl SkillValidator {
         let commands_dir = self.plugin_root.join("commands");
         if !commands_dir.exists() { return; }
         
-        for entry in std::fs::read_dir(&commands_dir).into_iter().flatten().filter_map(|e| e.ok()) {
+        let cmd_entries = match std::fs::read_dir(&commands_dir) {
+            Ok(entries) => entries,
+            Err(e) => {
+                report.add_finding(ValidationFinding {
+                    rule_id: "CMD-READDIR".to_string(),
+                    category: RuleCategory::Commands,
+                    severity: Severity::Warning,
+                    message: format!("Failed to read commands directory: {}", e),
+                    file: Some(commands_dir.clone()),
+                    line: None,
+                    suggestion: Some("Check directory permissions".to_string()),
+                });
+                return;
+            }
+        };
+        for entry in cmd_entries.filter_map(|e| e.ok()) {
             let path = entry.path();
             if path.extension().map_or(false, |e| e == "md") {
-                // Check frontmatter has allowed-tools
-                let content = std::fs::read_to_string(&path).unwrap_or_default();
+                let content = match std::fs::read_to_string(&path) {
+                    Ok(c) => c,
+                    Err(_) => continue, // Can't read file, skip this command check
+                };
                 if !content.contains("allowed-tools:") {
                     report.add_finding(ValidationFinding {
                         rule_id: "CMD-001".to_string(),
@@ -405,22 +522,38 @@ impl SkillValidator {
         let patterns = ["/Users/", "/home/"];
         
         for ext in ["md", "py", "sh", "json", "yml", "toml"] {
-            if let Ok(files) = self.find_files(&self.plugin_root, ext) {
-                for file in files {
-                    let content = std::fs::read_to_string(&file).unwrap_or_default();
-                    for (i, line) in content.lines().enumerate() {
-                        for pattern in &patterns {
-                            if line.contains(pattern) && !line.contains("/path/to") && !line.contains("/home/vscode") {
-                                report.add_finding(ValidationFinding {
-                                    rule_id: "PATH-001".to_string(),
-                                    category: RuleCategory::Paths,
-                                    severity: Severity::Error,
-                                    message: format!("Hardcoded path '{}' found", pattern),
-                                    file: Some(file.clone()),
-                                    line: Some(i + 1),
-                                    suggestion: Some("Use {baseDir} or relative paths".to_string()),
-                                });
-                            }
+            let files = match self.find_files(&self.plugin_root, ext) {
+                Ok(f) => f,
+                Err(e) => {
+                    report.add_finding(ValidationFinding {
+                        rule_id: "PATH-FIND".to_string(),
+                        category: RuleCategory::Paths,
+                        severity: Severity::Warning,
+                        message: format!("Failed to find .{} files: {}", ext, e),
+                        file: None,
+                        line: None,
+                        suggestion: Some("Check directory permissions".to_string()),
+                    });
+                    continue;
+                }
+            };
+            for file in files {
+                let content = match std::fs::read_to_string(&file) {
+                    Ok(c) => c,
+                    Err(_) => continue,
+                };
+                for (i, line) in content.lines().enumerate() {
+                    for pattern in &patterns {
+                        if line.contains(pattern) && !line.contains("/path/to") && !line.contains("/home/vscode") {
+                            report.add_finding(ValidationFinding {
+                                rule_id: "PATH-001".to_string(),
+                                category: RuleCategory::Paths,
+                                severity: Severity::Error,
+                                message: format!("Hardcoded path '{}' found", pattern),
+                                file: Some(file.clone()),
+                                line: Some(i + 1),
+                                suggestion: Some("Use {baseDir} or relative paths".to_string()),
+                            });
                         }
                     }
                 }
@@ -433,27 +566,43 @@ impl SkillValidator {
         let forbidden = ["python ", "pip install", "python -m pip", "uv pip install"];
         
         for ext in ["md", "py", "sh"] {
-            if let Ok(files) = self.find_files(&self.plugin_root, ext) {
-                for file in files {
-                    let content = std::fs::read_to_string(&file).unwrap_or_default();
-                    for (i, line) in content.lines().enumerate() {
-                        for forbidden_cmd in &forbidden {
-                            if line.contains(forbidden_cmd) && 
-                               !line.contains("uv run --no-project") &&
-                               !line.contains("uv run --with") &&
-                               !line.contains("uv add") &&
-                               !line.contains("uv tool install") &&
-                               !line.contains("allow-legacy-python") {
-                                report.add_finding(ValidationFinding {
-                                    rule_id: "PY-001".to_string(),
-                                    category: RuleCategory::PythonCommands,
-                                    severity: Severity::Error,
-                                    message: format!("Forbidden python command: {}", forbidden_cmd),
-                                    file: Some(file.clone()),
-                                    line: Some(i + 1),
-                                    suggestion: Some("Use 'uv run --no-project <script>' or 'uv tool install'".to_string()),
-                                });
-                            }
+            let files = match self.find_files(&self.plugin_root, ext) {
+                Ok(f) => f,
+                Err(e) => {
+                    report.add_finding(ValidationFinding {
+                        rule_id: "PY-FIND".to_string(),
+                        category: RuleCategory::PythonCommands,
+                        severity: Severity::Warning,
+                        message: format!("Failed to find .{} files: {}", ext, e),
+                        file: None,
+                        line: None,
+                        suggestion: Some("Check directory permissions".to_string()),
+                    });
+                    continue;
+                }
+            };
+            for file in files {
+                let content = match std::fs::read_to_string(&file) {
+                    Ok(c) => c,
+                    Err(_) => continue,
+                };
+                for (i, line) in content.lines().enumerate() {
+                    for forbidden_cmd in &forbidden {
+                        if line.contains(forbidden_cmd) && 
+                           !line.contains("uv run --no-project") &&
+                           !line.contains("uv run --with") &&
+                           !line.contains("uv add") &&
+                           !line.contains("uv tool install") &&
+                           !line.contains("allow-legacy-python") {
+                            report.add_finding(ValidationFinding {
+                                rule_id: "PY-001".to_string(),
+                                category: RuleCategory::PythonCommands,
+                                severity: Severity::Error,
+                                message: format!("Forbidden python command: {}", forbidden_cmd),
+                                file: Some(file.clone()),
+                                line: Some(i + 1),
+                                suggestion: Some("Use 'uv run --no-project <script>' or 'uv tool install'".to_string()),
+                            });
                         }
                     }
                 }
@@ -482,7 +631,22 @@ impl SkillValidator {
         // Check plugins/*/.codex-plugin/
         let plugins_dir = self.plugin_root.join("plugins");
         if plugins_dir.exists() {
-            for entry in std::fs::read_dir(&plugins_dir).into_iter().flatten().filter_map(|e| e.ok()) {
+            let plugins_entries = match std::fs::read_dir(&plugins_dir) {
+                Ok(entries) => entries,
+                Err(e) => {
+                    report.add_finding(ValidationFinding {
+                        rule_id: "SIDECAR-PLUGINS-READDIR".to_string(),
+                        category: RuleCategory::Sidecars,
+                        severity: Severity::Warning,
+                        message: format!("Failed to read plugins directory: {}", e),
+                        file: Some(plugins_dir.clone()),
+                        line: None,
+                        suggestion: Some("Check directory permissions".to_string()),
+                    });
+                    return;
+                }
+            };
+            for entry in plugins_entries.filter_map(|e| e.ok()) {
                 let plugin_dir = entry.path();
                 let codex_plugin = plugin_dir.join(".codex-plugin");
                 if codex_plugin.exists() {
@@ -539,7 +703,11 @@ impl SkillValidator {
         let dependabot = self.plugin_root.join(".github").join("dependabot.yml");
         if dependabot.exists() {
             // Simplified: just check common locations
-            for entry in std::fs::read_dir(&self.plugin_root).into_iter().flatten().filter_map(|e| e.ok()) {
+            let root_entries = match std::fs::read_dir(&self.plugin_root) {
+                Ok(entries) => entries,
+                Err(_) => return dirs, // Can't read root, no uv dirs discoverable
+            };
+            for entry in root_entries.filter_map(|e| e.ok()) {
                 if entry.path().join("pyproject.toml").exists() || entry.path().join("uv.lock").exists() {
                     dirs.push(entry.path());
                 }

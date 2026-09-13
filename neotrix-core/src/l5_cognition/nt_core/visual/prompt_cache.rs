@@ -66,6 +66,11 @@ impl _PromptCache {
     }
 
     /// 生成提示词哈希
+    ///
+    /// Note: Uses DefaultHasher for fast hash. Not cryptographically secure.
+    /// Real implementation needs:
+    /// - Semantic hash (embedding-based) for fuzzy matching
+    /// - Or exact hash + similarity index for sub-linear lookup
     fn hash_prompt(&self, prompt: &str) -> String {
         // 简化的哈希实现
         use std::collections::hash_map::DefaultHasher;
@@ -118,6 +123,14 @@ impl _PromptCache {
     }
 
     /// 淘汰过期/低频条目
+    ///
+    /// Note: Two-phase eviction: first removes TTL-expired entries, then evicts
+    /// lowest access_count entries if still over capacity. Removes 100 extra entries
+    /// to avoid frequent eviction cycles.
+    /// Real implementation needs:
+    /// - LRU eviction instead of access_count (more memory-efficient)
+    /// - Size-aware eviction (some responses are much larger)
+    /// - Configurable eviction policy (LFU/LRU/FIFO)
     fn evict(&mut self) {
         let mut to_remove = Vec::new();
         for (hash, entry) in &self.entries {

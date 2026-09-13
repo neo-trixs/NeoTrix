@@ -222,11 +222,13 @@ impl StoryboardExtractor {
 
     /// 解析剧本为镜头（朴素段落拆分 — 非 LLM 驱动）
     ///
-    /// **Feature not wired**: Real implementation needs an LLM call to:
+    /// STUB: Splits by blank lines, assigns default shot size (Medium) and static camera.
+    /// Real implementation needs an LLM call to:
     /// 1. Identify scene boundaries, dialogue, and action blocks
     /// 2. Assign appropriate shot sizes and camera movements per narrative context
     /// 3. Extract character names and emotions from dialogue/narration
     /// 4. Generate positive/negative prompts for video generation
+    /// 5. Determine shot duration from dialogue length and action complexity
     fn parse_script_to_shots(&self, script_text: &str) -> Vec<Storyboard> {
         // Feature not wired: LLM-based parsing not implemented.
         // Falls back to naive paragraph splitting — each paragraph becomes a shot
@@ -259,6 +261,12 @@ impl StoryboardExtractor {
     }
     
     /// 提取角色列表
+    ///
+    /// Note: Collects unique character names from all shots into a HashSet.
+    /// Real implementation needs:
+    /// - Character name extraction from dialogue/narration (NER or LLM-based)
+    /// - Character alias resolution (e.g., "he"/"she" → named character)
+    /// - Character appearance tracking across shots for consistency
     fn extract_characters(&self, shots: &[Storyboard]) -> Vec<String> {
         let mut characters = std::collections::HashSet::new();
         for shot in shots {
@@ -270,6 +278,12 @@ impl StoryboardExtractor {
     }
     
     /// 提取场景列表
+    ///
+    /// Note: Collects unique scene names from all shots into a HashSet.
+    /// Real implementation needs:
+    /// - Scene boundary detection from script structure (acts/scenes)
+    /// - Location extraction from stage directions or LLM inference
+    /// - Scene metadata (time of day, weather, lighting) for prompt generation
     fn extract_scenes(&self, shots: &[Storyboard]) -> Vec<String> {
         let mut scenes = std::collections::HashSet::new();
         for shot in shots {
@@ -279,6 +293,14 @@ impl StoryboardExtractor {
     }
     
     /// 优化镜头时长
+    ///
+    /// Note: Adjusts duration based on dialogue length (0.15s/char) and action word count
+    /// (0.3s/word), clamped to [min_shot_duration, max_shot_duration].
+    /// Real implementation needs:
+    /// - Speech rate calibration per language/character
+    /// - Action complexity scoring (not just word count)
+    /// - Pacing model: tension/release arcs that override local duration
+    /// - Platform-specific duration constraints (TikTok 15s vs YouTube 60s)
     pub fn optimize_durations(&self, script: &mut StoryboardScript) {
         for shot in &mut script.shots {
             // 根据对白长度调整时长
@@ -301,6 +323,14 @@ impl StoryboardExtractor {
     }
     
     /// 生成镜头运动规划
+    ///
+    /// Note: Maps shot size to camera movement (e.g., ExtremeWide→Pan, Close→PushIn).
+    /// Only assigns movement when camera is currently Static.
+    /// Real implementation needs:
+    /// - Emotion-driven camera: sad→slow dolly, action→handheld shake
+    /// - Narrative arc integration: establishing→climax camera progression
+    /// - Transition-aware planning: camera movement at cut points
+    /// - Platform constraints: vertical video limits crane/dolly movements
     pub fn plan_camera_movements(&self, script: &mut StoryboardScript) {
         for (_i, shot) in script.shots.iter_mut().enumerate() {
             // 根据景别和情绪自动规划镜头运动

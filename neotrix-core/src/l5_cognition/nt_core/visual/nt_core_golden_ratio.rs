@@ -121,6 +121,12 @@ impl _GoldenRatioFrequencyArchitecture {
     }
 
     /// 初始化黄金比例频带
+    ///
+    /// Note: Generates `max_harmonics` bands at f(n) = f0 × φ^n frequencies.
+    /// Each band is classified into EEG-like categories (Delta/Theta/Alpha/Beta/Gamma)
+    /// based on frequency ranges. Noble positions (fractional ≈ 0.382 or 0.618) get
+    /// higher stability (0.9 vs 0.7) — these correspond to maximally irrational ratios
+    /// that resist phase-locking, enabling independent parallel processing.
     fn initialize_golden_bands(&mut self) {
         for n in 0..self.config.max_harmonics {
             let frequency = self.fundamental_frequency * self.phi.powi(n as i32);
@@ -158,6 +164,10 @@ impl _GoldenRatioFrequencyArchitecture {
     }
 
     /// 查找最接近的 Fibonacci 数
+    ///
+    /// Note: Returns the index of `n` in the Fibonacci sequence [1,1,2,3,5,8,13,21,34,55,89].
+    /// Returns `None` if `n` is not a Fibonacci number. Used to tag bands that align with
+    /// Fibonacci indices for cross-frequency coupling path selection.
     fn closest_fibonacci(n: usize) -> Option<usize> {
         let fibs = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
         fibs.iter().position(|&f| f == n)
@@ -170,6 +180,13 @@ impl _GoldenRatioFrequencyArchitecture {
     }
 
     /// 创建 Fibonacci 耦合
+    ///
+    /// Note: Creates a phase-locking coupling between two frequency bands.
+    /// The coupling strength (0.8) and phase_locking (true) are hardcoded defaults.
+    /// Real implementation needs:
+    /// - Adaptive coupling strength based on frequency ratio proximity to Fibonacci ratios
+    /// - Phase-locking value (PLV) computation from actual signal data
+    /// - Support for higher-order couplings (3+ band interactions)
     pub(crate) fn _create_fibonacci_coupling(&mut self, source_idx: usize, target_idx: usize) -> _FibonacciCoupling {
         let source = &self._frequency_bands[source_idx];
         let target = &self._frequency_bands[target_idx];
@@ -193,6 +210,11 @@ impl _GoldenRatioFrequencyArchitecture {
     }
 
     /// 查找最接近的 Fibonacci 比率
+    ///
+    /// Note: Returns the Fibonacci ratio closest to the input ratio.
+    /// The ratio table [1.0, 1.0, 2.0, 1.5, 1.667, ...] approximates F(n+1)/F(n)
+    /// converging to φ. Used for coupling classification — bands with Fibonacci ratios
+    /// have stronger cross-frequency coupling in neural models.
     fn find_closest_fibonacci_ratio(ratio: f64) -> f64 {
         let fib_ratios = [1.0, 1.0, 2.0, 1.5, 1.667, 1.6, 1.625, 1.615, 1.619, 1.618];
         fib_ratios.iter()
@@ -202,6 +224,13 @@ impl _GoldenRatioFrequencyArchitecture {
     }
 
     /// 评估共振对齐
+    ///
+    /// Note: Computes alignment_score as mean band stability, coupling_efficiency as
+    /// mean coupling strength. consciousness_potential is their average. The `aligned`
+    /// flag fires when alignment_score > 0.7. Real implementation needs:
+    /// - Weighted stability (noble-position bands weighted higher)
+    /// - Phase coherence metric (not just amplitude stability)
+    /// - Dynamic threshold based on system load
     pub(crate) fn _evaluate_alignment(&self) -> _ResonanceAlignment {
         let active_bands: Vec<String> = self._frequency_bands.iter()
             .filter(|b| b.stability > 0.7)

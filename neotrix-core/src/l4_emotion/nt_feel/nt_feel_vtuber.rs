@@ -204,6 +204,13 @@ impl _VTuberEmotionEngine {
     }
 
     /// 从语音检测情绪 (占位符 — 需要实际 ML 模型)
+    ///
+    /// STUB: Returns Neutral with 0.5 intensity — no actual voice analysis.
+    /// Real implementation needs:
+    /// - Speech emotion recognition model (e.g., wav2vec2-emotion, SER)
+    /// - Audio feature extraction (MFCCs, prosody, pitch contour)
+    /// - Multi-language support with language-specific models
+    /// - Real-time streaming emotion detection for conversational use
     pub fn detect_from_voice(&self, _audio: &[u8]) -> Result<_EmotionReading, String> {
         // TODO: 集成语音情绪识别模型
         Ok(_EmotionReading {
@@ -216,6 +223,13 @@ impl _VTuberEmotionEngine {
     }
 
     /// 从视觉检测情绪 (占位符 — 需要实际 CV 模型)
+    ///
+    /// STUB: Returns Neutral with 0.5 intensity — no actual image analysis.
+    /// Real implementation needs:
+    /// - Facial expression recognition (FER) model (e.g., Action Unit based)
+    /// - Body pose emotion inference
+    /// - Micro-expression detection for subtle emotional cues
+    /// - Multi-face emotion tracking in group scenes
     pub fn detect_from_visual(&self, _image: &[u8]) -> Result<_EmotionReading, String> {
         // TODO: 集成视觉情绪识别模型
         Ok(_EmotionReading {
@@ -228,6 +242,15 @@ impl _VTuberEmotionEngine {
     }
 
     /// 应用角色人格
+    ///
+    /// Note: Adjusts emotion intensity based on personality traits:
+    /// - "cheerful" dampens sadness (×0.7)
+    /// - "calm" dampens anger (×0.6)
+    /// - "emotional" amplifies all emotions (×1.3)
+    /// Real implementation needs:
+    /// - Trait-aware intensity curves (not just linear multipliers)
+    /// - Emotional baseline drift over time (long conversations)
+    /// - Personality-consistent response generation (not just intensity adjustment)
     pub fn apply_persona(&self, reading: &mut _EmotionReading) {
         // 根据人格特质调整情绪
         for trait_info in &self.persona.personality_traits {
@@ -254,6 +277,14 @@ impl _VTuberEmotionEngine {
     }
 
     /// 生成情绪驱动响应
+    ///
+    /// Note: Generates text response with emotion prefix (e.g., "That's wonderful!" for Happy).
+    /// Selects expression based on emotion type.
+    /// Real implementation needs:
+    /// - LLM-based response generation with emotion conditioning
+    /// - Persona-aware response style (formality, humor, empathy from _ResponseStyle)
+    /// - Catchphrase and speaking pattern integration
+    /// - TTS voice selection based on emotion (excited→higher pitch, sad→lower pitch)
     pub fn generate_response(&mut self, input: &str) -> _EmotionResponse {
         let mut reading = self.detect_from_text(input);
         self.apply_persona(&mut reading);
@@ -287,6 +318,13 @@ impl _VTuberEmotionEngine {
     }
 
     /// TTS 合成 (占位符)
+    ///
+    /// STUB: Returns empty audio bytes with estimated duration (50ms/char).
+    /// Real implementation needs:
+    /// - TTS provider integration (Edge-TTS, ElevenLabs, VITS, Bark)
+    /// - Emotion-conditioned prosody (pitch/speed/rhythm modulation)
+    /// - Voice cloning support via _VoiceConfig.voice_id
+    /// - Streaming audio output for real-time conversation
     pub fn synthesize_speech(
         &self,
         text: &str,
@@ -302,6 +340,13 @@ impl _VTuberEmotionEngine {
     }
 
     /// STT 转录 (占位符)
+    ///
+    /// STUB: Returns empty string — no speech-to-text.
+    /// Real implementation needs:
+    /// - STT provider integration (Whisper, VAD+Whisper, Deepgram)
+    /// - Language detection and multi-language support
+    /// - Streaming transcription for real-time input
+    /// - Speaker diarization for multi-speaker scenarios
     pub fn transcribe_speech(&self, _audio: &[u8]) -> Result<String, String> {
         // TODO: 集成实际 STT 引擎
         Ok("".into())

@@ -24,10 +24,15 @@ impl _ReconScanner {
         }
     }
 
-    /// TODO: 实现真实侦察行为 (NT-SHIELD 生产接线点)。
+    /// 执行侦察扫描 — 资产枚举/攻击面测绘。
     ///
-    /// 设计契约: 输入 = 目标范围; 输出 = 资产/攻击面清单;
-    /// fallback = 受限权限时回退至被动枚举。当前为桩, 返回未实现错误。
+    /// STUB: Returns "not yet implemented" error. No actual scanning.
+    /// Real implementation needs:
+    /// - Integration with existing nt_shield_* recon/audit paths
+    /// - Target scope validation and permission checks
+    /// - Passive enumeration fallback for restricted permissions
+    /// - Asset inventory output (hosts, services, open ports)
+    /// - Attack surface scoring and prioritization
     pub fn scan(&self, _target: &str) -> Result<String, String> {
         // TODO(T15): 接入 nt_shield_* 既有侦察/审计路径, 实现真实侦察行为。
         Err("nt_shield_recon::_ReconScanner::scan not yet implemented (fresh bud)".into())

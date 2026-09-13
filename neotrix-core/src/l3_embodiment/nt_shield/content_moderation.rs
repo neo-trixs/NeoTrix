@@ -218,15 +218,12 @@ impl _ContentModeration {
 
     /// 评估提示词风险
     ///
-    /// **当前为占位实现** — 仅做关键词子串匹配，极易被变体/同义词绕过。
-    ///
-    /// 真实实现需要：
-    /// - NSFW/Violence: 接入 LLM-as-judge 或专用分类器 (Llama Guard / OpenAI Moderation)
-    /// - Hate/Harassment: 上下文语义分析 (关键词无法捕获隐晦仇恨)
-    /// - Copyright: 训练数据/角色名/风格的版权指纹匹配
-    /// - 所有类别: 支持多语言 + 语义等价检测
-    ///
-    /// TODO: 接入真实分类器，替换关键词匹配
+    /// STUB: Keyword-only substring matching — easily bypassed by synonyms/variants.
+    /// Real implementation needs:
+    /// - NSFW/Violence: LLM-as-judge or dedicated classifier (Llama Guard / OpenAI Moderation)
+    /// - Hate/Harassment: context-aware semantic analysis (keywords miss implicit hate)
+    /// - Copyright: training data / character name / style fingerprint matching
+    /// - All categories: multi-language + semantic equivalence detection
     fn evaluate_prompt_risk(&self, prompt: &str, category: &RiskCategory) -> f64 {
         let prompt_lower = prompt.to_lowercase();
         match category {
@@ -254,17 +251,13 @@ impl _ContentModeration {
 
     /// 评估输出风险
     ///
-    /// **当前为占位实现** — 基于内容类型和元数据的启发式估算。
-    /// 返回固定基线分数而非真实内容分析结果。
-    ///
-    /// 真实实现需要：
-    /// - NSFW: 接入视觉分类器 (CLIP-based NSFW detector) 或第三方 API
-    /// - Violence/Hate: 接入多模态内容安全模型
-    /// - Copyright: 接入反向图像搜索 + 版权数据库匹配
-    /// - Misinformation: 接入事实核查 API + 知识图谱交叉验证
-    /// - Privacy: 接入 PII 检测器 (Presidio/自研 NER)
-    ///
-    /// TODO: 接入真实内容安全分类器，替换固定基线分数
+    /// STUB: Returns fixed baseline scores per content type — no actual content analysis.
+    /// Real implementation needs:
+    /// - NSFW: CLIP-based NSFW detector or third-party API
+    /// - Violence/Hate: multimodal content safety model
+    /// - Copyright: reverse image search + copyright database matching
+    /// - Misinformation: fact-check API + knowledge graph cross-validation
+    /// - Privacy: PII detector (Presidio / custom NER)
     fn evaluate_output_risk(&self, content_type: ContentType, metadata: &HashMap<String, String>, category: &RiskCategory) -> f64 {
         // STUB: 返回固定基线 — 不反映真实内容风险
         // 真实实现应分析实际内容而非依赖类型/类别常数

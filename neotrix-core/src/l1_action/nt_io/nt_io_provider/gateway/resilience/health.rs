@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
+use crate::core::nt_core_llm::{LlmRequest, LlmResponse};
 use crate::l1_action::nt_io::nt_io_provider::common::generation_classifier::{GenerationRecord, LlmPurpose, TaskType};
 use super::super::GatewayV2;
 use super::*;

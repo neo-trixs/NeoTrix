@@ -900,6 +900,18 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("经验桥接", "experience_bridge", "NT-MEMORY", "KnowledgeIntegrator"),
     ("经验知识", "experience_bridge", "NT-MEMORY", "KnowledgeIntegrator"),
     ("experience_bridge", "experience_bridge", "NT-MEMORY", "KnowledgeIntegrator"),
+    // ── Visual/narrative/style dispatch routes ──
+    ("视觉一致性", "visual_consistency", "NT-CORE", "ReflectionEngine"),
+    ("visual_consistency", "visual_consistency", "NT-CORE", "ReflectionEngine"),
+    ("风格分析", "style_harmonization", "NT-CORE", "ReflectionEngine"),
+    ("风格统一", "style_harmonization", "NT-CORE", "ReflectionEngine"),
+    ("style_harmonization", "style_harmonization", "NT-CORE", "ReflectionEngine"),
+    ("叙事结构", "narrative_structuring", "NT-CORE", "ReflectionEngine"),
+    ("分镜拆解", "narrative_structuring", "NT-CORE", "ReflectionEngine"),
+    ("narrative_structuring", "narrative_structuring", "NT-CORE", "ReflectionEngine"),
+    ("模型选择", "model_selection", "NT-CORE", "ReflectionEngine"),
+    ("选模型", "model_selection", "NT-CORE", "ReflectionEngine"),
+    ("model_selection", "model_selection", "NT-CORE", "ReflectionEngine"),
 ];
 
 /// 子任务 — 意识核心从人类语言拆解出的最小执行单元。
@@ -2251,7 +2263,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         "agentic_scan" => {
             use crate::l3_embodiment::nt_shield::nt_shield_agentic_scan::{AgenticScanner, ScanConfig};
             let config = ScanConfig::default();
-            let mut scanner = AgenticScanner::new(config);
+            let scanner = AgenticScanner::new(config);
             let target = first_path(&task.summary)
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| ".".to_string());
@@ -2288,12 +2300,12 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         "evidence_scan" => {
             use crate::l3_embodiment::nt_shield::nt_shield_agentic_scan::{AgenticScanner, ScanConfig};
             let config = ScanConfig::default();
-            let mut scanner = AgenticScanner::new(config);
+            let scanner = AgenticScanner::new(config);
             let target = first_path(&task.summary)
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| ".".to_string());
             let recon = scanner.recon_scan(&target);
-            let signals_count = recon.entry_points.len() + recon.frameworks.len();
+            let _signals_count = recon.entry_points.len() + recon.frameworks.len();
             let severity = if recon.estimated_complexity == "High" {
                 "高"
             } else if recon.estimated_complexity == "Medium" {
@@ -2356,6 +2368,80 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 }
                 Err(e) => (false, format!("经验-知识桥接失败 (KB 不可用): {e}")),
             }
+        }
+        // ── Visual consistency checking (nt_core::visual::visual_consistency) ──
+        "visual_consistency" => {
+            use crate::l5_cognition::nt_core::visual::visual_consistency::_VisualConsistencyManager;
+            let manager = _VisualConsistencyManager::new();
+            let stats = manager.statistics();
+            (
+                true,
+                format!(
+                    "视觉一致性管理:\n  总修复: {} | 成功: {} | 失败: {}\n  平均一致性分: {:.2}\n  输入: {}",
+                    stats.total_fixes,
+                    stats.successful_fixes,
+                    stats.failed_fixes,
+                    stats.avg_consistency_score,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Style harmonization (nt_core::visual::style_harmonizer) ──
+        "style_harmonization" => {
+            use crate::l5_cognition::nt_core::visual::style_harmonizer::_StyleHarmonizer;
+            let harmonizer = _StyleHarmonizer::new();
+            let stats = harmonizer.statistics();
+            (
+                true,
+                format!(
+                    "风格分析与统一:\n  总协调: {} | 成功: {} | 失败: {}\n  平均风格相似度: {:.2}\n  输入: {}",
+                    stats.total_harmonized,
+                    stats.successful,
+                    stats.failed,
+                    stats.avg_style_similarity,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Narrative structuring from text (nt_core::other::narrative_structuring) ──
+        "narrative_structuring" => {
+            use crate::l5_cognition::nt_core::other::narrative_structuring::_NarrativeStructuring;
+            let mut ns = _NarrativeStructuring::new();
+            let script = ns._structure_from_text(&task.id, &task.summary);
+            (
+                true,
+                format!(
+                    "叙事结构化:\n  内容: {} | 镜头: {} | 总时长: {:.1}s\n  场景: {:?}\n  输入: {}",
+                    script.content_title,
+                    script.shots.len(),
+                    script.total_duration_secs,
+                    script.scenes,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Model selection based on hardware ──
+        "model_selection" => {
+            // Hardware-aware model selection: detect GPU/CPU and recommend appropriate model
+            let gpu_available = std::process::Command::new("system_profiler")
+                .args(["SPDisplaysDataType"])
+                .output()
+                .map(|o| String::from_utf8_lossy(&o.stdout).contains("Metal"))
+                .unwrap_or(false);
+            let model = if gpu_available {
+                "RealESRGAN (GPU加速, 4x超分)"
+            } else {
+                "Bicubic/Lanczos (CPU降级, 2x插值)"
+            };
+            (
+                true,
+                format!(
+                    "模型选择 (硬件感知):\n  GPU/Metal: {}\n  推荐模型: {}\n  需求: {}",
+                    if gpu_available { "检测到" } else { "未检测到" },
+                    model,
+                    task.summary,
+                ),
+            )
         }
         _ => (
             true,
