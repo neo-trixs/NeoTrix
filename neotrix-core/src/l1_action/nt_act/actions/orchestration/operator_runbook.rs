@@ -259,13 +259,12 @@ impl RunbookManager {
     
     /// 执行单个步骤
     fn execute_step(&self, step: &RunbookStep) -> StepResult {
-        // TODO: 实际执行步骤逻辑
         StepResult {
             step_id: step.id.clone(),
-            status: StepStatus::Completed,
-            output: Some("步骤执行成功".to_string()),
-            duration_ms: 100,
-            error: None,
+            status: StepStatus::Failed,
+            output: None,
+            duration_ms: 0,
+            error: Some("not wired: step execution not implemented".to_string()),
         }
     }
     

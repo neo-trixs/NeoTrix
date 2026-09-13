@@ -222,10 +222,8 @@ impl ProductionOrchestrator {
     
     /// 保存检查点
     pub fn save_checkpoint(&self, workflow_id: &str) -> Result<(), String> {
-        if let Some(workflow) = self.workflows.get(workflow_id) {
-            // TODO: 实际保存检查点到持久化存储
-            let _ = workflow;
-            Ok(())
+        if let Some(_workflow) = self.workflows.get(workflow_id) {
+            Err("not wired: checkpoint persistence not implemented".to_string())
         } else {
             Err("工作流不存在".to_string())
         }
@@ -233,10 +231,8 @@ impl ProductionOrchestrator {
     
     /// 从检查点恢复
     pub fn restore_from_checkpoint(&mut self, workflow_id: &str) -> Result<(), String> {
-        // TODO: 实际从持久化存储恢复
-        if let Some(workflow) = self.workflows.get_mut(workflow_id) {
-            workflow.status = WorkflowStatus::Paused;
-            Ok(())
+        if let Some(_workflow) = self.workflows.get_mut(workflow_id) {
+            Err("not wired: checkpoint restore from persistence not implemented".to_string())
         } else {
             Err("工作流不存在".to_string())
         }

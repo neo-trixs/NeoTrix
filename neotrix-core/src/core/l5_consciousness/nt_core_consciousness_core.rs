@@ -852,6 +852,25 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("pdf图片统计", "pdf_image_stats", "NT-WORLD", "CodeAnalyzer"),
     ("pdf图像信息", "pdf_image_stats", "NT-WORLD", "CodeAnalyzer"),
     ("pdf提取图片", "pdf_extract_images", "NT-ACT", "CodeAnalyzer"),
+    // ── SEAL pipeline dispatch routes ──
+    ("进化", "seal_iterate", "NT-MIND", "KnowledgeIntegrator"),
+    ("迭代", "seal_iterate", "NT-MIND", "KnowledgeIntegrator"),
+    ("蒸馏", "seal_distill", "NT-MIND", "KnowledgeIntegrator"),
+    // ── Self model dispatch routes ──
+    ("自我评估", "self_model_tick", "NT-CORE", "ReflectionEngine"),
+    ("能力评估", "self_model_tick", "NT-CORE", "ReflectionEngine"),
+    ("认知健康", "metacog_evaluate", "NT-CORE", "ReflectionEngine"),
+    // ── Meta cognition dispatch routes ──
+    ("元观察", "meta_observe", "NT-META", "MetaCognitionAnalyst"),
+    ("质量扫描", "sentrux_scan", "NT-META", "MetaCognitionAnalyst"),
+    ("代码质量", "sentrux_scan", "NT-META", "MetaCognitionAnalyst"),
+    ("构建健康", "build_watchdog", "NT-META", "MetaCognitionAnalyst"),
+    ("构建检查", "build_watchdog", "NT-META", "MetaCognitionAnalyst"),
+    // ── Shield security dispatch routes ──
+    ("安全审计", "shield_audit", "NT-SHIELD", "RiskAssessor"),
+    ("攻击检测", "shield_audit", "NT-SHIELD", "RiskAssessor"),
+    ("漏洞扫描", "agentic_scan", "NT-SHIELD", "RiskAssessor"),
+    ("安全扫描", "agentic_scan", "NT-SHIELD", "RiskAssessor"),
 ];
 
 /// 子任务 — 意识核心从人类语言拆解出的最小执行单元。
@@ -2051,6 +2070,164 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 ),
                 Err(e) => (false, format!("PDF 图像提取失败: {e}")),
             }
+        }
+        // ── SEAL pipeline (nt_core_seal) ──
+        "seal_iterate" => {
+            match crate::l5_cognition::nt_mind::foundation::seal_pipeline::L1SealPipeline::new().run_cycle() {
+                Ok(status) => (
+                    true,
+                    format!("SEAL 进化迭代完成: cycle {}, 进度 {:.0}%", status.cycle_count, status.overall_progress * 100.0),
+                ),
+                Err(e) => (false, format!("SEAL 迭代失败: {e}")),
+            }
+        }
+        "seal_distill" => {
+            match crate::l5_cognition::nt_mind::foundation::seal_pipeline::L1SealPipeline::new().trigger_distillation() {
+                Ok(result) => (
+                    true,
+                    format!(
+                        "SEAL 蒸馏完成: 提取 {} 个模式, 压缩 {:.2} MB",
+                        result.patterns_extracted, result.knowledge_compressed_mb
+                    ),
+                ),
+                Err(e) => (false, format!("SEAL 蒸馏失败: {e}")),
+            }
+        }
+        // ── Self model (nt_core_self) ──
+        "self_model_tick" => {
+            let mut model = crate::core::nt_core_self::self_model::SelfModel::new();
+            // 从意识核心快照获取 workspace_signal (coherence), load_delta (weighted_fog_sum 归一化)
+            let snap = status();
+            let workspace_signal = snap.coherence.clamp(0.0, 1.0);
+            let load_delta = (snap.weighted_fog_sum / 11.0).clamp(0.0, 1.0);
+            let meta_alarm = snap.mars_system1_activations.min(10) as usize;
+            let state = model.tick(workspace_signal, load_delta, meta_alarm);
+            let reward = model.combined_intrinsic_reward();
+            (
+                true,
+                format!(
+                    "自我模型评估完成:\n  能力: {:.3} | 疲劳: {:.3} | 不确定性: {:.3}\n  自我误差: {:.4} | 内在奖励: {:.4}",
+                    state.capability, state.fatigue, state.uncertainty, state.self_error, reward
+                ),
+            )
+        }
+        "metacog_evaluate" => {
+            use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
+            use crate::core::nt_core_self::silicon_self_model::SiliconSelfModel;
+            let mut evaluator = CognitiveEvaluator::new();
+            let model = SiliconSelfModel::default();
+            let report = evaluator.evaluate(&model);
+            (
+                true,
+                format!(
+                    "认知健康评估:\n  注意力健康: {:.3} | 策略多样性: {:.3}\n  轨迹质量: {:.3} | 稳定性: {:.3}\n  标志: {} | 修复建议: {}",
+                    report.attention_health,
+                    report.strategy_diversity,
+                    report.trace_quality,
+                    report.stability_score,
+                    report.flags.len(),
+                    report.repair_suggestions.len(),
+                ),
+            )
+        }
+        // ── Meta cognition (nt_meta) ──
+        "meta_observe" => {
+            let config = crate::l6_meta::memory::meta_observer::MetaObserverConfig::default();
+            let observer = crate::l6_meta::memory::meta_observer::MetaObserver::new(config);
+            let snap = status();
+            let report = observer.observe(&snap);
+            let blindspots: usize = report.branches.iter().filter(|b| b.blindspot).count();
+            (
+                true,
+                format!(
+                    "元观察报告 (cycle {}):\n  Φ={:.3} 相干={:.3} | 元置信: {:.3}\n  观察失真: {} | 盲点: {}/{}",
+                    report.cycle,
+                    report.phi,
+                    report.coherence,
+                    report.meta_confidence,
+                    report.observation_distorted,
+                    blindspots,
+                    report.branches.len(),
+                ),
+            )
+        }
+        "sentrux_scan" => {
+            let sensor = crate::l6_meta::coordination::nt_meta_sentrux::SentruxSensor::new();
+            let path = first_path(&task.summary)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| ".".to_string());
+            match sensor.scan(&path) {
+                Ok(snapshot) => (
+                    true,
+                    format!(
+                        "质量扫描完成 ({}):\n  综合得分: {}/1000\n  模块性: {:.2} | 无环性: {:.2} | 深度: {:.2}",
+                        path,
+                        snapshot.score,
+                        snapshot.metrics.modularity,
+                        snapshot.metrics.acyclicity,
+                        snapshot.metrics.depth,
+                    ),
+                ),
+                Err(e) => (false, format!("质量扫描失败: {e}")),
+            }
+        }
+        "build_watchdog" => {
+            let config = crate::l6_meta::coordination::nt_meta_build_watchdog::WatchdogConfig::default();
+            let mut watchdog = crate::l6_meta::coordination::nt_meta_build_watchdog::BuildWatchdog::new(config);
+            let status_result = watchdog.check_health();
+            let stats = watchdog.stats();
+            (
+                true,
+                format!(
+                    "构建健康检查:\n  状态: {} | 总检查: {} | 成功: {} | 失败: {}",
+                    if status_result.success { "健康" } else { "异常" },
+                    stats.total_checks,
+                    stats.successful_builds,
+                    stats.failed_builds,
+                ),
+            )
+        }
+        // ── Shield security (nt_shield) ──
+        "shield_audit" => {
+            let input = first_path(&task.summary)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| task.summary.clone());
+            match crate::cli::shield_enforcer::global_shield().lock() {
+                Ok(mut shield) => {
+                    let report = shield.security_audit(&input);
+                    let signals_count = report.signals.len();
+                    let verdict = if report.has_critical { "存在风险" } else { "安全" };
+                    (
+                        true,
+                        format!(
+                            "安全审计完成 ({}):\n  判定: {} | 信号数: {} | 耗时: {}ms",
+                            input, verdict, signals_count, report.duration_ms
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("安全审计失败 (shield lock): {e}")),
+            }
+        }
+        "agentic_scan" => {
+            use crate::l3_embodiment::nt_shield::nt_shield_agentic_scan::{AgenticScanner, ScanConfig};
+            let config = ScanConfig::default();
+            let mut scanner = AgenticScanner::new(config);
+            let target = first_path(&task.summary)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| ".".to_string());
+            let recon = scanner.recon_scan(&target);
+            (
+                true,
+                format!(
+                    "主动安全扫描 ({}):\n  预估文件: {} | 语言: {} | 入口: {} | 框架: {} | 复杂度: {}",
+                    target,
+                    recon.estimated_files,
+                    recon.languages_detected.join(", "),
+                    recon.entry_points.join(", "),
+                    recon.frameworks.join(", "),
+                    recon.estimated_complexity,
+                ),
+            )
         }
         _ => (
             true,

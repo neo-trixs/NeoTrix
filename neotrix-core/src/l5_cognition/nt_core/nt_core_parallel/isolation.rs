@@ -23,7 +23,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 意图隔离结果
-#[derive(Debug, Clone, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IsolatedContext {
     /// 剥离核心目的后, 可安全暴露给外部 LLM / 子 agent 的最小上下文
     pub exposed_prompt: String,

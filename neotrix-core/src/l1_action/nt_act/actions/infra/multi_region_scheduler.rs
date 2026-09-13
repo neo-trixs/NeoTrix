@@ -188,13 +188,11 @@ impl MultiRegionScheduler {
     }
 
     /// 检查区域健康
-    pub(crate) fn _check_region_health(&mut self, region_id: &str) -> bool {
-        if let Some(region) = self.regions.get_mut(region_id) {
-            // TODO: 实际的健康检查逻辑
-            region.status = RegionStatus::Available;
-            true
+    pub(crate) fn _check_region_health(&mut self, region_id: &str) -> Result<bool, String> {
+        if let Some(_region) = self.regions.get(region_id) {
+            Err("not wired: region health check not implemented".to_string())
         } else {
-            false
+            Err(format!("region '{}' not found", region_id))
         }
     }
 

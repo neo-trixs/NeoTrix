@@ -270,13 +270,12 @@ impl ProviderMigrationRouter {
     }
 
     /// 执行迁移
-    pub(crate) fn _execute_migration(&mut self, plan_id: usize) -> bool {
+    pub(crate) fn _execute_migration(&mut self, plan_id: usize) -> Result<(), String> {
         if let Some(plan) = self.migration_plans.get_mut(plan_id) {
             plan.status = MigrationStatus::InProgress;
-            // TODO: 实际执行迁移逻辑
-            true
+            Err("not wired: migration execution not implemented".to_string())
         } else {
-            false
+            Err("plan not found".to_string())
         }
     }
 

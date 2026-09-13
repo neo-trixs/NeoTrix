@@ -237,13 +237,13 @@ impl PlatformGateway {
             }
         };
         
-        // TODO: 实际调用平台 API
+        // not wired: actual platform API call
         let response = PlatformResponse {
-            success: true,
-            task_id: Some(format!("task_{}", platform_id)),
-            output_path: Some(format!("{}_output.png", platform_id)),
-            processing_time_ms: 2000,
-            error: None,
+            success: false,
+            task_id: None,
+            output_path: None,
+            processing_time_ms: 0,
+            error: Some("not wired: platform API not implemented".to_string()),
             metadata: HashMap::new(),
         };
         

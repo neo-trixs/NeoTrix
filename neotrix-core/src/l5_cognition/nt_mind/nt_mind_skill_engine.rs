@@ -223,7 +223,7 @@ pub fn register_skill_standard_self_tests(registry: &mut crate::core::nt_core_se
 // ────────────────────────────────────────────────────────────────
 
 /// A5 五维技能质量评分 (SkillNet 语义, 归一化到 [0,1])。
-#[derive(Debug, Clone, Copy, PartialDefault, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct SkillQualityScores {
     /// 安全性: 无危险命令/脚本 (0..1)。
     pub safety: f64,

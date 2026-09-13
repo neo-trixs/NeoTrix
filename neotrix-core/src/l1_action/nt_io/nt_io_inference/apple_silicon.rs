@@ -412,12 +412,6 @@ pub struct _MLXConversion {
 impl _MLXConversion {
     /// Convert GGUF to MLX format
     pub fn _convert_gguf_to_mlx(_gguf_path: &str) -> Result<Self, String> {
-        // TODO: Run mlx_lm.convert_from_gguf or similar
-        Ok(Self {
-            source_format: "GGUF".to_string(),
-            target_format: "MLX".to_string(),
-            conversion_time_s: 120.0,
-            output_size_gb: 2.0,
-        })
+        Err("not wired: mlx_lm.convert_from_gguf not implemented".to_string())
     }
 }

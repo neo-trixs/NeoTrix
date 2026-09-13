@@ -1,7 +1,7 @@
 use crate::l2_perception::nt_world::nt_world_map::types::{GeoPoint, BoundingBox};
 use std::f64::consts::PI;
 
-#[derive(Debug, Clone, Copy, PartialDefault)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum Projection {
     #[default]
     WebMercator,

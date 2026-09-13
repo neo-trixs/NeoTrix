@@ -258,7 +258,7 @@ impl GenerativeReplay {
 }
 
 /// Result of a self-referential consistency check.
-#[derive(Debug, Clone, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SelfRefCheckResult {
     Stable,
     Destabilizing { metric: f64, threshold: f64 },

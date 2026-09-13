@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RecurrentLatentConfig {
     /// 潜状态维度
     pub dim: usize,
@@ -28,7 +28,7 @@ impl Default for RecurrentLatentConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Complex {
     pub re: f64,
     pub im: f64,

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Raw sensory/perception input — direct, unprocessed.
-#[derive(Debug, Clone, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PerceptionSource {
     UserInput,
     WebFetch,
@@ -25,7 +25,7 @@ impl PerceptionSource {
 }
 
 /// Metadata for the Raw(Perception) knowledge layer.
-#[derive(Debug, Clone, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerceptionMeta {
     pub source_type: PerceptionSource,
     pub raw_confidence: f64,
@@ -33,7 +33,7 @@ pub struct PerceptionMeta {
 }
 
 /// Metadata for the Structured(Context) knowledge layer.
-#[derive(Debug, Clone, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextMeta {
     pub source_ids: Vec<String>,
     pub processing_steps: Vec<String>,
@@ -41,7 +41,7 @@ pub struct ContextMeta {
 }
 
 /// Metadata for the Semantic(Meaning) knowledge layer.
-#[derive(Debug, Clone, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeaningMeta {
     pub abstraction_level: u8,
     pub supporting_facts: Vec<String>,

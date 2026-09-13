@@ -148,9 +148,8 @@ impl AudioOrchestrator {
     }
     
     /// 生成 TTS
-    pub(crate) fn _generate_tts(&self, text: &str, _config: &TTSConfig) -> String {
-        // TODO: 实际调用 TTS API
-        format!("/tmp/tts_{}.wav", &text[..10.min(text.len())])
+    pub(crate) fn _generate_tts(&self, text: &str, _config: &TTSConfig) -> Result<String, String> {
+        Err(format!("not wired: TTS API not implemented (text={})", &text[..10.min(text.len())]))
     }
     
     /// 生成 FFmpeg 混合命令
@@ -220,15 +219,8 @@ impl AudioOrchestrator {
     }
     
     /// 分析音频
-    pub(crate) fn _analyze_audio(&self, _audio_path: &str) -> AudioAnalysis {
-        // TODO: 实际调用音频分析
-        AudioAnalysis {
-            duration: 10.0,
-            sample_rate: 44100,
-            channels: 2,
-            loudness: -14.0,
-            peak_level: -1.0,
-        }
+    pub(crate) fn _analyze_audio(&self, _audio_path: &str) -> Result<AudioAnalysis, String> {
+        Err("not wired: audio analysis API not implemented".to_string())
     }
     
     /// 归一化响度

@@ -12,7 +12,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::l1_action::nt_io::nt_io_provider::gateway::execution::unified_inference::{UnifiedInference, InferenceConfig};
+use crate::l1_action::nt_io::nt_io_provider::gateway::execution::unified_inference::{UnifiedInference, InferenceConfig, InferenceRequest, InferenceResponse, InferenceError};
 use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 use crate::l1_action::nt_io::nt_io_provider::common::types::*;
 

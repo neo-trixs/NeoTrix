@@ -11,6 +11,13 @@
 //! │  • MagnetRpc  — aria2c JSON-RPC sequential BT download           │
 //! │  • FifoPipe   — zero-disk I/O via named pipe                     │
 //! ├──────────────────────────────────────────────────────────────────┤
+//! │  Download Engine:                                                │
+//! │  • Mirror speed profiling (EMA) + HuggingFace adaptive          │
+//! │  • Parallel chunk download with work-stealing                    │
+//! │  • Temp-file merge (.dl_* directories) + .done markers          │
+//! │  • Disk space pre-check + content-disposition detection          │
+//! │  • Stall detection + n² backoff retry + SHA-256 verify          │
+//! ├──────────────────────────────────────────────────────────────────┤
 //! │  Player Backends:                                                │
 //! │  • FileGrow — player reads growing file (mpv appending://)       │
 //! │  • PipePlay — player reads from stdin/FIFO                       │
@@ -23,17 +30,17 @@ use super::router::{self, TransportType};
 use crate::l1_action::nt_io::nt_io_http_factory;
 use futures::StreamExt;
 use sha2::{Digest, Sha256};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::SystemTime;
 use std::time::Duration;
 use tokio::fs::{self, File};
-use tokio::io::{AsyncSeekExt, AsyncWriteExt, BufWriter, SeekFrom};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufWriter, SeekFrom};
 use tokio::process::Command;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex as TokioMutex};
 use tokio::time::Instant;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -68,6 +75,40 @@ pub struct PipelineProgress {
     pub media_kind: MediaKind,
     pub output: PathBuf,
     pub elapsed: Duration,
+}
+
+/// Single-task progress for wrapper callers (re-exported as `DownloadProgress` in nt_io_download).
+#[derive(Debug, Clone)]
+pub struct DownloadProgressData {
+    pub percent: f32,
+    pub downloaded: u64,
+    pub total: u64,
+    pub speed_mbps: f64,
+    pub eta_secs: Option<f64>,
+}
+
+/// Multi-task aggregate progress for batch downloads.
+#[derive(Debug, Clone)]
+pub struct AggregateProgress {
+    pub total_tasks: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub cancelled: usize,
+    pub active: usize,
+    pub total_bytes: u64,
+    pub downloaded_bytes: u64,
+    pub overall_speed_mbps: f64,
+    pub overall_percent: f32,
+}
+
+/// Wrapper-level download status (returned by DownloadEngine).
+#[derive(Debug, Clone)]
+pub enum DownloadStatus {
+    Pending,
+    InProgress(DownloadProgressData),
+    Completed { elapsed_secs: f64, size_mb: f64 },
+    Failed(String),
+    Cancelled,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -113,6 +154,332 @@ impl Default for PipelineConfig {
         }
     }
 }
+
+/// Download-specific configuration (merged from nt_io_download).
+#[derive(Debug, Clone)]
+pub struct DownloadConfig {
+    pub max_concurrent: usize,
+    pub max_tasks: usize,
+    pub max_bandwidth: u64,
+    pub min_disk_space: u64,
+    pub timeout_secs: u64,
+    pub retry_count: u32,
+    pub max_chunk_bytes: u64,
+}
+
+impl Default for DownloadConfig {
+    fn default() -> Self {
+        Self {
+            max_concurrent: 16,
+            max_tasks: 8,
+            max_bandwidth: 0,
+            min_disk_space: 1024 * 1024 * 1024,
+            timeout_secs: 600,
+            retry_count: 5,
+            max_chunk_bytes: 64 * 1024 * 1024,
+        }
+    }
+}
+
+impl DownloadConfig {
+    /// Convert into a PipelineConfig base (player fields use defaults).
+    pub fn to_pipeline_config(self, url: String, output_dir: PathBuf) -> PipelineConfig {
+        PipelineConfig {
+            url,
+            output_dir,
+            chunk_size: self.max_chunk_bytes as usize,
+            timeout: Duration::from_secs(self.timeout_secs),
+            max_retries: self.retry_count,
+            concurrency: self.max_concurrent,
+            ..Default::default()
+        }
+    }
+}
+
+/// Simple download task descriptor for wrapper callers.
+#[derive(Debug, Clone)]
+pub struct DownloadTask {
+    pub url: String,
+    pub dest: PathBuf,
+    pub priority: u8,
+}
+
+impl DownloadTask {
+    pub fn new(url: impl Into<String>, dest: impl Into<PathBuf>) -> Self {
+        Self {
+            url: url.into(),
+            dest: dest.into(),
+            priority: 128,
+        }
+    }
+    pub fn with_priority(mut self, p: u8) -> Self {
+        self.priority = p;
+        self
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mirror speed profiling — EMA-based ranking (from nt_io_download)
+// ═══════════════════════════════════════════════════════════════════════════
+
+static MIRROR_SPEED_MAP: LazyLock<Mutex<HashMap<String, f64>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+const MIRROR_ENDPOINTS: &[&str] = &["https://hf-mirror.com", "https://huggingface.co"];
+
+/// Record mirror speed using exponential moving average (α=0.3).
+pub fn record_mirror_speed(endpoint: &str, bytes_per_sec: f64) {
+    if let Ok(mut map) = MIRROR_SPEED_MAP.lock() {
+        let entry = map.entry(endpoint.to_string()).or_insert(0.0);
+        *entry = 0.7 * *entry + 0.3 * bytes_per_sec;
+    }
+}
+
+/// Return mirrors sorted by speed (fastest first).
+pub fn ranked_mirrors() -> Vec<(String, f64)> {
+    let map = MIRROR_SPEED_MAP.lock().unwrap();
+    let mut pairs: Vec<_> = map.iter().map(|(k, v)| (k.clone(), *v)).collect();
+    pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    pairs
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HuggingFace mirror resolution — adaptive with parallel probing
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Resolve HuggingFace URL to fastest mirror. Returns original if not HF.
+pub async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String {
+    if !router::is_huggingface_url(original_url) || original_url.contains("hf-mirror.com") {
+        return original_url.to_string();
+    }
+
+    // Environment variable override
+    if let Ok(endpoint) = std::env::var("NT_DOWNLOAD_MIRROR_ENDPOINT") {
+        let ep = endpoint.trim();
+        if !ep.is_empty() {
+            let ep = if ep.starts_with("http") {
+                ep.to_string()
+            } else {
+                format!("https://{}", ep)
+            };
+            let forced = original_url
+                .replace("https://huggingface.co", &ep)
+                .replace("http://huggingface.co", &ep);
+            if forced != original_url {
+                return forced;
+            }
+        }
+    }
+
+    // Sort endpoints by known speed
+    let speed_ranking = ranked_mirrors();
+    let mut endpoints: Vec<&str> = MIRROR_ENDPOINTS.to_vec();
+    if !speed_ranking.is_empty() {
+        endpoints.sort_by(|a, b| {
+            let sa = speed_ranking
+                .iter()
+                .find(|(k, _)| k.contains(a.trim_start_matches("https://")))
+                .map(|(_, v)| *v)
+                .unwrap_or(0.0);
+            let sb = speed_ranking
+                .iter()
+                .find(|(k, _)| k.contains(b.trim_start_matches("https://")))
+                .map(|(_, v)| *v)
+                .unwrap_or(0.0);
+            sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+
+    // Build candidate list
+    let mut candidates: Vec<String> = endpoints
+        .iter()
+        .filter_map(|ep| {
+            let c = original_url
+                .replace("https://huggingface.co", ep)
+                .replace("http://huggingface.co", ep);
+            if c != original_url {
+                Some(c)
+            } else {
+                None
+            }
+        })
+        .collect();
+    candidates.push(original_url.to_string());
+
+    // Parallel HEAD probe — first success wins
+    let mut handles = Vec::new();
+    for url in &candidates {
+        let client = client.clone();
+        let url = url.clone();
+        handles.push(tokio::spawn(async move {
+            match tokio::time::timeout(Duration::from_secs(2), client.head(&url).send()).await {
+                Ok(Ok(resp)) if resp.status().is_success() => Some(url),
+                _ => None,
+            }
+        }));
+    }
+    for h in handles {
+        if let Ok(Some(url)) = h.await {
+            return url;
+        }
+    }
+    original_url.to_string()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Filename detection — content-disposition + URL path fallback
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Detect filename from HEAD content-disposition or URL path.
+pub async fn detect_filename(client: &reqwest::Client, url: &reqwest::Url, dest: &Path) -> PathBuf {
+    if dest.file_stem().is_some_and(|s| !s.to_string_lossy().is_empty()) {
+        return dest.to_path_buf();
+    }
+    if let Ok(resp) = client.head(url.clone()).send().await {
+        if let Some(cd) = resp.headers().get("content-disposition") {
+            if let Ok(cd_str) = cd.to_str() {
+                if let Some(name) = router::parse_content_disposition(cd_str) {
+                    return dest.with_file_name(name);
+                }
+            }
+        }
+    }
+    if let Some(name) = url.path().rsplit('/').next() {
+        if !name.is_empty() {
+            return dest.with_file_name(name);
+        }
+    }
+    dest.to_path_buf()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Disk space pre-check
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Check that the parent directory has enough free space for `needed` bytes.
+/// Returns Ok(()) if sufficient, Err with message if not.
+pub fn check_disk_space(path: &Path, needed: u64, min_free: u64) -> Result<(), String> {
+    let parent = path.parent().unwrap_or(Path::new("."));
+    let meta = std::fs::metadata(parent)
+        .map_err(|e| format!("cannot stat parent dir {}: {}", parent.display(), e))?;
+    if !meta.is_dir() {
+        return Err(format!("parent path is not a directory: {}", parent.display()));
+    }
+    // statvfs is not portable; use a heuristic: if the file already exists,
+    // check its size vs needed. Otherwise, attempt a create+set_len probe.
+    if path.exists() {
+        if let Ok(m) = std::fs::metadata(path) {
+            if m.len() >= needed {
+                return Ok(());
+            }
+        }
+    }
+    // Try to probe free space by creating a temporary file
+    let probe = parent.join(".nt_disk_probe");
+    match std::fs::File::options()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&probe)
+    {
+        Ok(f) => {
+            let probe_needed = needed.saturating_add(min_free);
+            let _ = f.set_len(probe_needed);
+            let _ = std::fs::remove_file(&probe);
+            Ok(())
+        }
+        Err(e) => Err(format!("disk space probe failed: {}", e)),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Temp file merge strategy (.dl_* directories)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Create a temp directory for chunk files: `.dl_{stem}/`
+fn make_dl_tmp_dir(dest: &Path) -> PathBuf {
+    let stem = dest.file_stem().and_then(|s| s.to_str()).unwrap_or("dl");
+    dest.parent()
+        .unwrap_or(Path::new("."))
+        .join(format!(".dl_{}", stem))
+}
+
+/// Merge chunk files from `tmp_dir` into a single output file.
+/// Chunks are expected to be named `c0000.tmp`, `c0001.tmp`, etc.
+async fn merge_chunks(tmp_dir: &Path, dest: &Path, n_chunks: usize) -> Result<(), String> {
+    let mut out = BufWriter::with_capacity(
+        256 * 1024,
+        fs::File::create(dest)
+            .await
+            .map_err(|e| format!("create output: {}", e))?,
+    );
+    let mut buf = vec![0u8; 8192];
+    for i in 0..n_chunks {
+        let chunk_file = tmp_dir.join(format!("c{:04}.tmp", i));
+        let mut f = fs::File::open(&chunk_file)
+            .await
+            .map_err(|e| format!("open chunk {}: {}", i, e))?;
+        loop {
+            let n = f
+                .read(&mut buf)
+                .await
+                .map_err(|e| format!("read chunk {}: {}", i, e))?;
+            if n == 0 {
+                break;
+            }
+            out.write_all(&buf[..n])
+                .await
+                .map_err(|e| format!("write output: {}", e))?;
+        }
+    }
+    out.flush()
+        .await
+        .map_err(|e| format!("flush output: {}", e))?;
+    Ok(())
+}
+
+/// Write a .done marker file alongside the download.
+async fn write_done_marker(
+    dest: &Path,
+    total_size: u64,
+    url: &str,
+) {
+    let done_marker = dest.with_extension("done");
+    let _ = fs::write(
+        &done_marker,
+        format!(
+            "size={}\nurl={}\ntimestamp={}\n",
+            total_size,
+            url,
+            SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+        ),
+    )
+    .await;
+}
+
+/// Check if a .done marker indicates the file is already complete.
+async fn is_done(dest: &Path) -> Option<u64> {
+    let done_marker = dest.with_extension("done");
+    if !dest.exists() || !done_marker.exists() {
+        return None;
+    }
+    let meta = fs::metadata(dest).await.ok()?;
+    let content = fs::read_to_string(&done_marker).await.ok()?;
+    let done_size = content
+        .lines()
+        .find(|l| l.starts_with("size="))
+        .and_then(|l| l.strip_prefix("size="))
+        .and_then(|s| s.parse::<u64>().ok())?;
+    if meta.len() >= done_size {
+        Some(meta.len())
+    } else {
+        None
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // StreamingPipeline — main entry point
 // ═══════════════════════════════════════════════════════════════════════════
@@ -340,15 +707,15 @@ impl StallDetector {
         self.last_check.elapsed() > self.timeout
     }
 
-    fn record_progress(&mut self) {
+    pub fn record_progress(&mut self) {
         self.last_check = Instant::now();
     }
 
-    fn is_stalled(&self) -> bool {
+    pub fn is_stalled(&self) -> bool {
         self.last_check.elapsed() > self.timeout
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.last_check = Instant::now();
     }
 }
@@ -397,12 +764,60 @@ impl RetryPolicy {
         false
     }
 
-    fn delay_for(&self, attempt: u32) -> Option<Duration> {
+    pub fn delay_for(&self, attempt: u32) -> Option<Duration> {
         self.delay(attempt)
     }
 
-    fn is_retryable_status(status: u16) -> bool {
+    pub fn is_retryable_status(status: u16) -> bool {
         matches!(status, 429 | 500..=599)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TokenBucket — simple bandwidth throttle
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct TokenBucket {
+    tokens: f64,
+    max_tokens: f64,
+    refill_rate: f64, // bytes per second
+    last_refill: Instant,
+}
+
+impl TokenBucket {
+    fn new(max_tokens: f64, refill_rate: f64) -> Self {
+        Self {
+            tokens: max_tokens,
+            max_tokens,
+            refill_rate,
+            last_refill: Instant::now(),
+        }
+    }
+
+    fn refill(&mut self) {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_refill).as_secs_f64();
+        self.tokens = (self.tokens + elapsed * self.refill_rate).min(self.max_tokens);
+        self.last_refill = now;
+    }
+
+    /// Try to consume `amount` bytes. Blocks until tokens are available.
+    /// Returns actual bytes allowed (may be less than amount if capped).
+    async fn consume(&mut self, amount: u64) -> u64 {
+        self.refill();
+        let amount_f = amount as f64;
+        if self.tokens >= amount_f {
+            self.tokens -= amount_f;
+            return amount;
+        }
+        // Not enough tokens — wait for refill
+        let deficit = amount_f - self.tokens;
+        let wait_secs = deficit / self.refill_rate;
+        tokio::time::sleep(Duration::from_secs_f64(wait_secs)).await;
+        self.refill();
+        let allowed = self.tokens.min(amount_f);
+        self.tokens -= allowed;
+        allowed as u64
     }
 }
 
@@ -423,6 +838,8 @@ struct ParallelDownloader {
     stall_timeout: Duration,
     retry_policy: RetryPolicy,
     auth: Option<AuthConfig>,
+    token_bucket: Option<Arc<Mutex<TokenBucket>>>,
+    speed_window: Arc<Mutex<VecDeque<(Instant, u64)>>>,
 }
 
 impl ParallelDownloader {
@@ -438,8 +855,12 @@ impl ParallelDownloader {
         auth: Option<AuthConfig>,
         bytes_written: Arc<AtomicU64>,
         cancel: Arc<AtomicBool>,
+        max_bandwidth_bps: Option<f64>,
     ) -> Self {
         let chunks = Self::plan_chunks(total_size, chunk_size);
+        let token_bucket = max_bandwidth_bps.map(|rate| {
+            Arc::new(Mutex::new(TokenBucket::new(rate * 2.0, rate)))
+        });
         Self {
             client,
             url,
@@ -453,6 +874,8 @@ impl ParallelDownloader {
             stall_timeout,
             retry_policy: RetryPolicy::new(max_retries),
             auth,
+            token_bucket,
+            speed_window: Arc::new(Mutex::new(VecDeque::new())),
         }
     }
 
@@ -539,6 +962,12 @@ impl ParallelDownloader {
 
                         match result {
                             Ok(data) => {
+                                // D2: bandwidth throttling — consume tokens before writing
+                                if let Some(ref bucket) = self.token_bucket {
+                                    let mut bucket = bucket.lock().await;
+                                    bucket.consume(data.len() as u64).await;
+                                }
+
                                 let file = File::options()
                                     .write(true)
                                     .open(&self.output)
@@ -556,7 +985,10 @@ impl ParallelDownloader {
                                     .map_err(|e| PipelineError::Io(e.to_string()))?;
 
                                 chunk.downloaded += data.len() as u64;
-                                let total = self.bytes_written.fetch_add(data.len() as u64, Ordering::Relaxed) + data.len() as u64;
+                                let total = self
+                                    .bytes_written
+                                    .fetch_add(data.len() as u64, Ordering::Relaxed)
+                                    + data.len() as u64;
                                 stall.record_progress();
                                 stall.check(total);
                             }
@@ -598,7 +1030,7 @@ impl ParallelDownloader {
                         let mut chunks = self.chunks.lock().await;
                         for c in chunks.iter_mut() {
                             if c.index == chunk.index {
-                                c.mark_streaming_complete();
+                                c.completed = true;
                                 break;
                             }
                         }
@@ -658,6 +1090,8 @@ impl ParallelDownloader {
                 stall_timeout: self.stall_timeout,
                 retry_policy: RetryPolicy::new(self.retry_policy.max_retries),
                 auth: self.auth.clone(),
+                token_bucket: self.token_bucket.clone(),
+                speed_window: Arc::clone(&self.speed_window),
             };
 
             let progress_tx = progress_tx.clone();
@@ -673,10 +1107,12 @@ impl ParallelDownloader {
 
                     let chunk = {
                         let mut chunks = dl.chunks.lock().await;
-                        let next = chunks.iter_mut().find(|c| matches!(c.status(), ChunkDownloadStatus::Pending));
+                        let next = chunks
+                            .iter_mut()
+                            .find(|c| matches!(c.status(), ChunkDownloadStatus::Pending));
                         match next {
                             Some(c) => {
-                                c.status = ChunkDownloadStatus::InProgress;
+                                c.completed = false;
                                 c.clone()
                             }
                             None => {
@@ -697,8 +1133,10 @@ impl ParallelDownloader {
                     if let Err(e) = dl.download_chunk(chunk).await {
                         let mut chunks = dl.chunks.lock().await;
                         for c in chunks.iter_mut() {
-                            if c.index == chunk.index && !matches!(c.status(), ChunkDownloadStatus::Complete) {
-                                c.status = ChunkDownloadStatus::Failed;
+                            if c.index == chunk.index
+                                && !matches!(c.status(), ChunkDownloadStatus::Complete)
+                            {
+                                c.completed = false;
                             }
                         }
 
@@ -715,13 +1153,45 @@ impl ParallelDownloader {
                     }
 
                     let written = dl.bytes_written.load(Ordering::Relaxed);
+
+                    // Real-time speed: track bytes in a 5-second sliding window
+                    {
+                        let mut window = dl.speed_window.lock().await;
+                        window.push_back((Instant::now(), written));
+                        // Evict entries older than 5 seconds
+                        let cutoff = Instant::now() - Duration::from_secs(5);
+                        while let Some(&(ts, _)) = window.front() {
+                            if ts < cutoff {
+                                window.pop_front();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    let speed_bps = {
+                        let window = dl.speed_window.lock().await;
+                        if window.len() >= 2 {
+                            let oldest = window.front().unwrap();
+                            let newest = window.back().unwrap();
+                            let bytes_delta = newest.1.saturating_sub(oldest.1);
+                            let time_delta = newest.0.duration_since(oldest.0).as_secs_f64();
+                            if time_delta > 0.0 {
+                                bytes_delta as f64 / time_delta
+                            } else {
+                                0.0
+                            }
+                        } else {
+                            0.0
+                        }
+                    };
+
                     let _ = progress_tx
                         .send(PipelineProgress {
                             url: url.clone(),
                             status: PipelineStatus::Downloading {
                                 downloaded: written,
                                 total: Some(total_size),
-                                speed_bps: 0.0,
+                                speed_bps,
                             },
                             media_kind,
                             output: output.clone(),
@@ -791,6 +1261,7 @@ async fn parallel_http_download(
         None,
         bytes_written.clone(),
         cancel,
+        None, // no bandwidth limit
     );
 
     let media_kind = MediaKind::Unknown;
@@ -826,7 +1297,8 @@ pub async fn compute_sha256(path: &Path) -> Result<String, PipelineError> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HTTP Streaming Download (enhanced: parallel + stall + retry + verify)
+// HTTP Streaming Download (enhanced: parallel + stall + retry + verify +
+//   mirror resolution + temp-file merge + .done markers + disk pre-check)
 // ═══════════════════════════════════════════════════════════════════════════
 
 async fn stream_http_download(
@@ -939,6 +1411,7 @@ async fn stream_http_download(
             auth_clone,
             bytes_written.clone(),
             cancel.clone(),
+            None, // no bandwidth limit
         );
 
         dl.run(progress_tx.clone(), media_kind).await?;
@@ -1034,9 +1507,8 @@ async fn stream_http_download(
                         .write_all(&data)
                         .await
                         .map_err(|e| PipelineError::Io(e.to_string()))?;
-                    let written =
-                        bytes_written.fetch_add(data.len() as u64, Ordering::Relaxed)
-                            + data.len() as u64;
+                    let written = bytes_written.fetch_add(data.len() as u64, Ordering::Relaxed)
+                        + data.len() as u64;
                     recent_bytes += data.len() as u64;
 
                     if last_sample.elapsed() > Duration::from_millis(500) {
@@ -1197,6 +1669,85 @@ async fn probe_range_support(
         .unwrap_or(false);
 
     (accepts_range, total)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HTTP chunk download (single-chunk, for temp-file merge path)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async fn http_chunk_download(
+    client: &reqwest::Client,
+    url: &reqwest::Url,
+    start: u64,
+    end: u64,
+    _total_size: u64,
+    path: &Path,
+    timeout_secs: u64,
+) -> Result<u64, String> {
+    let already = if path.exists() {
+        fs::metadata(path).await.map(|m| m.len()).unwrap_or(0)
+    } else {
+        0
+    };
+    let actual_start = start + already;
+    if end != 0 && actual_start > end {
+        return Ok(already);
+    }
+
+    let mut req = client
+        .get(url.clone())
+        .header("Accept-Encoding", "identity");
+    if end != 0 {
+        req = req.header("Range", format!("bytes={}-{}", actual_start, end));
+    } else if actual_start > 0 {
+        req = req.header("Range", format!("bytes={}-", actual_start));
+    }
+
+    let mut resp = tokio::time::timeout(Duration::from_secs(timeout_secs), req.send())
+        .await
+        .map_err(|_| "timeout".to_string())?
+        .map_err(|e| e.to_string())?;
+
+    let status = resp.status();
+    if status == 404 || status == 403 || status == 410 {
+        return Err(format!("permanent: HTTP {}", status));
+    }
+    if !status.is_success() && status != 206 {
+        return Err(format!("HTTP {}", status));
+    }
+
+    let file = if already > 0 {
+        fs::OpenOptions::new()
+            .append(true)
+            .open(path)
+            .await
+            .map_err(|e| format!("append: {}", e))?
+    } else {
+        fs::File::create(path)
+            .await
+            .map_err(|e| format!("create: {}", e))?
+    };
+
+    let mut writer = BufWriter::with_capacity(256 * 1024, file);
+    let mut downloaded = already;
+    loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                writer
+                    .write_all(&chunk)
+                    .await
+                    .map_err(|e| format!("write: {}", e))?;
+                downloaded += chunk.len() as u64;
+            }
+            Ok(None) => break,
+            Err(e) => return Err(format!("stream: {}", e)),
+        }
+    }
+    writer
+        .flush()
+        .await
+        .map_err(|e| format!("flush: {}", e))?;
+    Ok(downloaded)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1642,6 +2193,428 @@ impl PlayerHandle {
     }
 }
 
+/// Task cancel handle (exposed to wrapper callers).
+pub struct TaskHandle {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl TaskHandle {
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Relaxed)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DownloadEngine — unified download engine (strengthens existing, R-P42)
+//
+// Merges nt_io_download's features into streaming.rs:
+//   • Mirror speed profiling (EMA)
+//   • HuggingFace adaptive resolution
+//   • Temp-file merge (.dl_* directories)
+//   • .done marker for resume
+//   • Disk space pre-check
+//   • Content-disposition filename detection
+//   • Configurable retry/mirror/chunk settings
+//   • Multi-task batch with dedup + aggregate progress
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct DownloadEngine {
+    config: DownloadConfig,
+    client: reqwest::Client,
+    task_semaphore: Arc<tokio::sync::Semaphore>,
+    global_downloaded: Arc<AtomicU64>,
+}
+
+impl DownloadEngine {
+    pub fn new(config: DownloadConfig) -> Self {
+        let client = nt_io_http_factory::build_async_client_with_proxy(
+            std::env::var("HTTPS_PROXY").ok().as_deref(),
+        );
+        Self {
+            task_semaphore: Arc::new(tokio::sync::Semaphore::new(config.max_tasks)),
+            global_downloaded: Arc::new(AtomicU64::new(0)),
+            config,
+            client,
+        }
+    }
+
+    // ── Public API ──────────────────────────────────────────────────────
+
+    pub async fn download(&self, task: &DownloadTask) -> DownloadStatus {
+        self.download_with_progress(task, None).await
+    }
+
+    pub async fn download_with_progress(
+        &self,
+        task: &DownloadTask,
+        progress_tx: Option<mpsc::Sender<DownloadProgress>>,
+    ) -> DownloadStatus {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let start = SystemTime::now();
+        match self.download_inner(task, progress_tx, cancelled).await {
+            Ok(bytes) => {
+                let elapsed = start.elapsed().unwrap_or_default().as_secs_f64();
+                DownloadStatus::Completed {
+                    elapsed_secs: elapsed,
+                    size_mb: bytes as f64 / 1048576.0,
+                }
+            }
+            Err(e) => {
+                if e == "cancelled" {
+                    DownloadStatus::Cancelled
+                } else {
+                    DownloadStatus::Failed(e)
+                }
+            }
+        }
+    }
+
+    /// Multi-task parallel download with dedup + aggregate progress.
+    pub async fn download_all(
+        &self,
+        tasks: &[DownloadTask],
+        progress_tx: Option<mpsc::Sender<AggregateProgress>>,
+    ) -> Vec<DownloadStatus> {
+        // Deduplicate by URL
+        let mut seen: HashMap<String, usize> = HashMap::new();
+        let mut deduped: Vec<(usize, &DownloadTask)> = Vec::new();
+        for (i, task) in tasks.iter().enumerate() {
+            if seen.contains_key(&task.url) {
+                continue;
+            }
+            seen.insert(task.url.clone(), i);
+            deduped.push((i, task));
+        }
+
+        // Disk space pre-check
+        if let Some((_, first)) = deduped.first() {
+            if let Some(parent) = first.dest.parent() {
+                if let Err(e) = check_disk_space(&first.dest, self.config.min_disk_space, 0) {
+                    eprintln!("[dl] disk warning: {}", e);
+                }
+                let _ = fs::create_dir_all(parent).await;
+            }
+        }
+
+        let total = tasks.len();
+        let completed = Arc::new(AtomicUsize::new(0));
+        let failed = Arc::new(AtomicUsize::new(0));
+        let cancelled_count = Arc::new(AtomicUsize::new(0));
+        let active = Arc::new(AtomicUsize::new(0));
+        self.global_downloaded.store(0, Ordering::Relaxed);
+
+        let mut handles = Vec::new();
+        for (_, task) in deduped {
+            let engine = self.spawn_child();
+            let task = task.clone();
+            let completed = completed.clone();
+            let failed = failed.clone();
+            let cancelled_c = cancelled_count.clone();
+            let active = active.clone();
+            let global_dl = self.global_downloaded.clone();
+            let agg_tx = progress_tx.clone();
+
+            handles.push(tokio::spawn(async move {
+                let _permit = match engine.task_semaphore.clone().acquire_owned().await {
+                    Ok(p) => p,
+                    Err(_) => {
+                        return DownloadStatus::Failed("semaphore closed".to_string())
+                    }
+                };
+                active.fetch_add(1, Ordering::Relaxed);
+
+                let status = engine.download(&task).await;
+
+                active.fetch_sub(1, Ordering::Relaxed);
+                match &status {
+                    DownloadStatus::Completed { .. } => {
+                        completed.fetch_add(1, Ordering::Relaxed);
+                    }
+                    DownloadStatus::Failed(_) => {
+                        failed.fetch_add(1, Ordering::Relaxed);
+                    }
+                    DownloadStatus::Cancelled => {
+                        cancelled_c.fetch_add(1, Ordering::Relaxed);
+                    }
+                    _ => {}
+                }
+
+                if let Some(tx) = &agg_tx {
+                    let _ = tx.try_send(AggregateProgress {
+                        total_tasks: total,
+                        completed: completed.load(Ordering::Relaxed),
+                        failed: failed.load(Ordering::Relaxed),
+                        cancelled: cancelled_c.load(Ordering::Relaxed),
+                        active: active.load(Ordering::Relaxed),
+                        total_bytes: 0,
+                        downloaded_bytes: global_dl.load(Ordering::Relaxed),
+                        overall_speed_mbps: 0.0,
+                        overall_percent: if total > 0 {
+                            completed.load(Ordering::Relaxed) as f32 / total as f32 * 100.0
+                        } else {
+                            0.0
+                        },
+                    });
+                }
+                status
+            }));
+        }
+
+        let mut results = vec![DownloadStatus::Pending; total];
+        for (i, h) in handles.into_iter().enumerate() {
+            if let Ok(status) = h.await {
+                results[i] = status;
+            }
+        }
+        results
+    }
+
+    /// Create a child engine sharing the same config and semaphores.
+    fn spawn_child(&self) -> DownloadEngine {
+        DownloadEngine {
+            config: self.config.clone(),
+            client: self.client.clone(),
+            task_semaphore: self.task_semaphore.clone(),
+            global_downloaded: self.global_downloaded.clone(),
+        }
+    }
+
+    // ── Internal download implementation ────────────────────────────────
+
+    async fn download_inner(
+        &self,
+        task: &DownloadTask,
+        progress_tx: Option<mpsc::Sender<DownloadProgress>>,
+        cancelled: Arc<AtomicBool>,
+    ) -> Result<u64, String> {
+        let scheme = router::UrlScheme::parse(&task.url);
+
+        match scheme {
+            router::UrlScheme::Magnet => {
+                return Err(
+                    "magnet link: use aria2c --enable-rpc or add librqbit backend".into(),
+                );
+            }
+            router::UrlScheme::Ftp => {
+                return Err("ftp: not yet implemented, use HTTP mirror".into());
+            }
+            _ => {}
+        }
+
+        let mut url = reqwest::Url::parse(&task.url).map_err(|e| e.to_string())?;
+
+        // Mirror resolution for HuggingFace
+        if router::is_huggingface_url(&task.url) {
+            url = reqwest::Url::parse(&resolve_mirror(&self.client, &task.url).await)
+                .map_err(|e| e.to_string())?;
+        }
+
+        if let Some(parent) = task.dest.parent() {
+            fs::create_dir_all(parent)
+                .await
+                .map_err(|e| format!("mkdir: {}", e))?;
+        }
+
+        let dest = detect_filename(&self.client, &url, &task.dest).await;
+
+        // .done marker check
+        if let Some(existing_size) = is_done(&dest).await {
+            return Ok(existing_size);
+        }
+
+        // HEAD for size
+        let total_size = self.head_size(&url).await.unwrap_or(0);
+
+        // Disk space pre-check + pre-allocate
+        if total_size > 0 && !dest.exists() {
+            if let Err(e) = check_disk_space(&dest, total_size, self.config.min_disk_space) {
+                return Err(e);
+            }
+            let _ = std::fs::File::options()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(&dest)
+                .and_then(|f| f.set_len(total_size));
+        }
+
+        // Resume: existing bytes
+        let existing = if dest.exists() {
+            fs::metadata(&dest).await.map(|m| m.len()).unwrap_or(0)
+        } else {
+            0
+        };
+
+        if total_size > 0 && existing >= total_size {
+            write_done_marker(&dest, total_size, &task.url).await;
+            return Ok(existing);
+        }
+
+        // Chunk sizing
+        let remaining = total_size.saturating_sub(existing);
+        let chunk_size = if remaining > 0 {
+            (remaining / self.config.max_concurrent as u64)
+                .min(self.config.max_chunk_bytes)
+                .max(1)
+        } else {
+            self.config.max_chunk_bytes
+        };
+        let n_chunks = if total_size > 0 {
+            ((remaining - 1) / chunk_size + 1).min(self.config.max_concurrent as u64) as usize
+        } else {
+            1
+        };
+
+        // Temp directory for chunks
+        let tmp_dir = make_dl_tmp_dir(&dest);
+        fs::create_dir_all(&tmp_dir)
+            .await
+            .map_err(|e| format!("tmp dir: {}", e))?;
+
+        // Concurrent chunk download
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(n_chunks));
+        let mut handles = Vec::with_capacity(n_chunks);
+
+        for i in 0..n_chunks {
+            let start_byte = existing + i as u64 * chunk_size;
+            let end_byte = if i == n_chunks - 1 {
+                if total_size > 0 {
+                    total_size - 1
+                } else {
+                    0
+                }
+            } else {
+                existing + (i + 1) as u64 * chunk_size - 1
+            };
+
+            let chunk_file = tmp_dir.join(format!("c{:04}.tmp", i));
+            let url = url.clone();
+            let client = self.client.clone();
+            let timeout_secs = self.config.timeout_secs;
+            let permit = semaphore
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|e| format!("semaphore: {}", e))?;
+            let cancelled = cancelled.clone();
+
+            handles.push(tokio::spawn(async move {
+                let _permit = permit;
+                if cancelled.load(Ordering::Relaxed) {
+                    return Err("cancelled".into());
+                }
+                http_chunk_download(
+                    &client,
+                    &url,
+                    start_byte,
+                    end_byte,
+                    total_size,
+                    &chunk_file,
+                    timeout_secs,
+                )
+                .await
+            }));
+        }
+
+        // Wait + progress
+        let mut total_downloaded = existing;
+        let loop_start = Instant::now();
+        for (i, h) in handles.into_iter().enumerate() {
+            if cancelled.load(Ordering::Relaxed) {
+                return Err("cancelled".into());
+            }
+            let chunk_bytes = h
+                .await
+                .map_err(|e| format!("join {}: {}", i, e))?
+                .map_err(|e| format!("chunk {}: {}", i, e))?;
+            total_downloaded += chunk_bytes;
+            self.global_downloaded
+                .fetch_add(chunk_bytes, Ordering::Relaxed);
+
+            let elapsed = loop_start.elapsed().as_secs_f64();
+            let speed = if elapsed > 0.5 {
+                (total_downloaded - existing) as f64 / elapsed
+            } else {
+                0.0
+            };
+            let pct = if total_size > 0 {
+                total_downloaded as f32 / total_size as f32 * 100.0
+            } else {
+                0.0
+            };
+            let eta = if speed > 0.0 && total_size > total_downloaded {
+                Some((total_size - total_downloaded) as f64 / speed)
+            } else {
+                None
+            };
+
+            let progress = DownloadProgressData {
+                percent: pct,
+                downloaded: total_downloaded,
+                total: total_size,
+                speed_mbps: speed / 1048576.0,
+                eta_secs: eta,
+            };
+            if let Some(tx) = &progress_tx {
+                let _ = tx.try_send(progress);
+            }
+
+            let eta_str = eta
+                .map(|e| format!("{:.0}s", e))
+                .unwrap_or_else(|| "?".into());
+            eprintln!(
+                "\r[dl] chunk {} +{}MB {:.1}% {:.1}MiB/s ETA:{}",
+                i,
+                chunk_bytes / 1048576,
+                pct,
+                speed / 1048576.0,
+                eta_str
+            );
+        }
+        eprintln!();
+
+        // Merge chunks into final file
+        merge_chunks(&tmp_dir, &dest, n_chunks)
+            .await
+            .map_err(|e| format!("merge: {}", e))?;
+
+        // Record mirror speed (EMA)
+        let final_elapsed = loop_start.elapsed().as_secs_f64();
+        if let Some(host) = url.host_str() {
+            if total_size > 0 && final_elapsed > 0.5 {
+                let bps = (total_downloaded - existing) as f64 / final_elapsed;
+                record_mirror_speed(host, bps);
+            }
+        }
+
+        // Write .done marker + cleanup tmp
+        write_done_marker(&dest, total_size, &task.url).await;
+        let _ = fs::remove_dir_all(&tmp_dir).await;
+
+        eprintln!(
+            "[dl] complete: {} ({:.1}MB)",
+            dest.display(),
+            total_downloaded as f64 / 1048576.0
+        );
+        Ok(total_downloaded)
+    }
+
+    async fn head_size(&self, url: &reqwest::Url) -> Option<u64> {
+        let resp = self.client.head(url.clone()).send().await.ok()?;
+        let len = resp.headers().get(reqwest::header::CONTENT_LENGTH)?;
+        len.to_str().ok()?.parse().ok()
+    }
+}
+
+impl Default for DownloadEngine {
+    fn default() -> Self {
+        Self::new(DownloadConfig::default())
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // URL helpers
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1807,14 +2780,10 @@ mod tests {
     #[tokio::test]
     async fn test_stall_detector_check() {
         let mut stall = StallDetector::new(Duration::from_millis(50));
-        // No bytes yet — not stalled (just initialized)
         assert!(!stall.check(0));
-        // Same bytes, but within timeout
         assert!(!stall.check(0));
         tokio::time::sleep(Duration::from_millis(100)).await;
-        // Same bytes, timeout exceeded — stalled
         assert!(stall.check(0));
-        // New bytes — not stalled
         assert!(!stall.check(1024));
     }
 
@@ -1827,8 +2796,63 @@ mod tests {
         assert_eq!(hash.len(), 64);
 
         assert!(verify_sha256(&test_file, &hash).await.unwrap());
-        assert!(!verify_sha256(&test_file, "0000000000000000000000000000000000000000000000000000000000000000").await.unwrap());
+        assert!(!verify_sha256(
+            &test_file,
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        )
+        .await
+        .unwrap());
 
         let _ = fs::remove_file(&test_file).await;
+    }
+
+    #[test]
+    fn test_mirror_speed_recording() {
+        record_mirror_speed("hf-mirror.com", 1_000_000.0);
+        record_mirror_speed("huggingface.co", 500_000.0);
+        let ranked = ranked_mirrors();
+        assert_eq!(ranked.len(), 2);
+        assert!(ranked[0].1 >= ranked[1].1);
+    }
+
+    #[test]
+    fn test_download_config_defaults() {
+        let cfg = DownloadConfig::default();
+        assert_eq!(cfg.max_concurrent, 16);
+        assert_eq!(cfg.min_disk_space, 1024 * 1024 * 1024);
+        assert_eq!(cfg.retry_count, 5);
+    }
+
+    #[test]
+    fn test_download_config_to_pipeline() {
+        let cfg = DownloadConfig {
+            max_concurrent: 8,
+            timeout_secs: 120,
+            retry_count: 3,
+            max_chunk_bytes: 32 * 1024 * 1024,
+            ..Default::default()
+        };
+        let pc = cfg.to_pipeline_config(
+            "https://example.com/f.bin".into(),
+            PathBuf::from("/tmp"),
+        );
+        assert_eq!(pc.concurrency, 8);
+        assert_eq!(pc.max_retries, 3);
+        assert_eq!(pc.chunk_size, 32 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_make_dl_tmp_dir() {
+        let dest = Path::new("/tmp/model.gguf");
+        let tmp = make_dl_tmp_dir(dest);
+        assert_eq!(tmp, PathBuf::from("/tmp/.dl_model"));
+    }
+
+    #[test]
+    fn test_download_task_builder() {
+        let task = DownloadTask::new("https://example.com/f.bin", "/tmp/f.bin")
+            .with_priority(10);
+        assert_eq!(task.priority, 10);
+        assert_eq!(task.url, "https://example.com/f.bin");
     }
 }

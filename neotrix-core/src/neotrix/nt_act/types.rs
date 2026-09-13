@@ -158,7 +158,7 @@ pub struct SearchOptions {
 }
 
 /// Search Result
-#[derive(Debug, Clone, PartialSerialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
     pub title: String,
     pub url: String,

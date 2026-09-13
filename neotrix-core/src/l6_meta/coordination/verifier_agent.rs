@@ -409,6 +409,9 @@ mod tests {
     
     #[test]
     fn test_verifier_agent() {
+        // TODO: _verify_shot is a keyword-heuristic STUB, not real VLM verification.
+        // This test verifies the scoring plumbing works; it does NOT verify video quality.
+        // Replace with real VLM-backed tests once _verify_shot calls an actual vision model.
         let mut verifier = _VerifierAgent::new();
         
         let result = verifier._verify_shot(
@@ -418,8 +421,11 @@ mod tests {
             None,
         );
         
-        assert!(result.passed);
-        assert!(result.total_score > 0.7);
+        // The stub heuristic may or may not pass — do NOT assert fabricated success.
+        // Instead, verify the pipeline returned a valid result with scores.
+        assert!(result.total_score >= 0.0 && result.total_score <= 1.0,
+            "score must be in [0,1] range, got {}", result.total_score);
+        assert!(!result.scores.is_empty(), "stub should return at least one score");
         
         let stats = verifier.statistics();
         assert_eq!(stats.total_verifications, 1);

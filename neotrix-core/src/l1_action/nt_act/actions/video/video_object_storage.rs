@@ -174,8 +174,8 @@ impl VideoObjectStorage {
     pub fn download(&mut self, object_id: &str) -> Option<Vec<u8>> {
         if let Some(_object) = self.objects.get(object_id) {
             self.stats.total_downloads += 1;
-            // TODO: 实际的下载逻辑
-            Some(vec![])
+            // not wired: actual download logic not implemented
+            None
         } else {
             None
         }
