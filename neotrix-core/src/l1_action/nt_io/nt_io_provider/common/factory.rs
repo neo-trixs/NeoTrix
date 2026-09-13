@@ -376,7 +376,7 @@ impl ProviderConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(120),
-            proxy: super::super::nt_io_http_factory::proxy_from_env(),
+            proxy: crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env(),
         }
     }
 
@@ -972,7 +972,7 @@ pub async fn create_gateway_async() -> GatewayV2 {
     // ── 1b. Local: llama.cpp auto-start (实测最优本地推理) ──
     if !probe_llamacpp().await {
         // llama-server not running — auto-start with optimal config
-        let manager = super::llama_process::global_manager();
+        let manager = crate::l1_action::nt_io::nt_io_provider::llama::llama_process::global_manager();
         match manager.auto_start().await {
             Ok(()) => {
                 log::info!("[gateway] llama.cpp auto-started with optimal config");
@@ -1069,7 +1069,7 @@ pub async fn create_gateway_async() -> GatewayV2 {
     // 始终注册 keyless 免费提供者
     // 代理注入: 本机常为 fake-ip 分流网络 (如 198.18.0.x + 系统代理), 直连会全部超时,
     // 因此统一把 NEOTRIX_PROXY_URL / NEOTRIX_TOR_PROXY 注入每个 keyless provider 客户端。
-    let proxy = super::super::nt_io_http_factory::proxy_from_env();
+    let proxy = crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env();
     let keyless_provider = |ptype: LlmProviderType| {
         create_provider(ProviderConfig {
             provider_type: ptype,
@@ -1128,7 +1128,7 @@ pub async fn create_gateway_async() -> GatewayV2 {
     // ── 6. LLM 代理池: 注册持久化第三方 key 条目 (provider_pool.toml) ──
     // 每个条目按 label 注册进 gateway (统一路由/健康/配额) + AccountPool
     // (并发租约/检疫/自动恢复)。池为空时零开销跳过。
-    let pool = super::provider_pool::global_provider_pool();
+    let pool = super::super::pool::provider_pool::global_provider_pool();
     if let Ok(guard) = pool.lock() {
         if !guard.entries.is_empty() {
             let n = guard.register_into_gateway(&mut gateway);
