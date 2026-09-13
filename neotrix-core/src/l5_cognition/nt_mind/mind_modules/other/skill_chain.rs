@@ -223,7 +223,7 @@ impl _ChainExecutor {
         self.state.status = _ChainStatus::Running;
         self.state.started_at = Some(chrono::Utc::now());
 
-        let mut current_input = initial_input.cloned();
+        let _current_input = initial_input.cloned();
 
         // 拓扑排序步骤
         let sorted_steps = self.topological_sort();

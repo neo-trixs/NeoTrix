@@ -512,7 +512,7 @@ impl StreamingPipeline {
                         media_kind,
                         auth.as_ref(),
                         config.persistence.clone(),
-                        config.concurrency,
+                        config.concurrency, media_kind,
                         config.verify_sha256.as_deref(),
                         config.stall_timeout,
                         config.max_retries,
@@ -551,7 +551,7 @@ impl StreamingPipeline {
                         progress_tx.clone(),
                         auth_hls.as_ref(),
                         config.persistence.clone(),
-                        config.concurrency,
+                        config.concurrency, media_kind,
                     )
                     .await
                 });
@@ -1865,6 +1865,7 @@ async fn stream_hls_download(
     auth: Option<&AuthConfig>,
     persistence: Option<Arc<super::persistence::DownloadStore>>,
     concurrency: usize,
+    media_kind: MediaKind,
 ) -> Result<(), PipelineError> {
     use super::hls;
 

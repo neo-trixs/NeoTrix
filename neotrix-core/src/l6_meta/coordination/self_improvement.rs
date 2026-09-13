@@ -388,7 +388,7 @@ impl SelfImprovementLoop {
     ///
     /// # Panics
     /// 当前不 panic, 但返回的方案状态不反映真实执行。
-    pub(crate) fn _evaluate_and_apply(&mut self, max_applied: usize) -> Vec<ImprovementPlan> {
+    pub(crate) fn _evaluate_and_apply(&mut self, _max_applied: usize) -> Vec<ImprovementPlan> {
         todo!("STUB: _evaluate_and_apply 标记方案为 Executed 但未执行实际参数调整。需要: 1) 评估方案 ROI, 2) 调用参数调整逻辑。");
     }
 

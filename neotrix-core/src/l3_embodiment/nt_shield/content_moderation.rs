@@ -224,7 +224,7 @@ impl _ContentModeration {
     /// - Hate/Harassment: context-aware semantic analysis (keywords miss implicit hate)
     /// - Copyright: training data / character name / style fingerprint matching
     /// - All categories: multi-language + semantic equivalence detection
-    fn evaluate_prompt_risk(&self, prompt: &str, category: &RiskCategory) -> f64 {
+    fn evaluate_prompt_risk(&self, prompt: &str, _category: &RiskCategory) -> f64 {
         let prompt_lower = prompt.to_lowercase();
         match category {
             RiskCategory::Nsfw => {
@@ -258,7 +258,7 @@ impl _ContentModeration {
     /// - Copyright: reverse image search + copyright database matching
     /// - Misinformation: fact-check API + knowledge graph cross-validation
     /// - Privacy: PII detector (Presidio / custom NER)
-    fn evaluate_output_risk(&self, content_type: ContentType, metadata: &HashMap<String, String>, category: &RiskCategory) -> f64 {
+    fn evaluate_output_risk(&self, content_type: ContentType, metadata: &HashMap<String, String>, _category: &RiskCategory) -> f64 {
         // STUB: 返回固定基线 — 不反映真实内容风险
         // 真实实现应分析实际内容而非依赖类型/类别常数
         let baseline = match content_type {

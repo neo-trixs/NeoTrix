@@ -343,7 +343,7 @@ impl GatewayV2 {
                 Ok(_) => pacer.on_ok(),
                 Err(e) => {
                     let msg = e.to_string();
-                    if crate::is_quota_exhaustion(&msg) || msg.contains("rate limit") || msg.contains("429") {
+                    if crate::l1_action::nt_io::nt_io_provider::gateway::is_quota_exhaustion(&msg) || msg.contains("rate limit") || msg.contains("429") {
                         pacer.on_rate_limited();
                     } else {
                         pacer.on_ok();
@@ -495,7 +495,7 @@ impl GatewayV2 {
                 }
                 Err(err) => {
                     let error_msg = err.to_string();
-                    let is_quota_exhausted = crate::is_quota_exhaustion(&error_msg);
+                    let is_quota_exhausted = crate::l1_action::nt_io::nt_io_provider::gateway::is_quota_exhaustion(&error_msg);
                     {
                         let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                         if let Some(state) = states.get_mut(&name) {
@@ -1103,10 +1103,18 @@ pub trait FormatConverter {
 }
 
 pub struct OpenAiConverter;
+fn role_to_str(role: &Role) -> &str {
+    match role {
+        Role::System => "system",
+        Role::User => "user",
+        Role::Assistant => "assistant",
+        Role::Tool => "tool",
+    }
+}
 impl FormatConverter for OpenAiConverter {
     fn to_provider_format(&self, request: &UnifiedRequest, model: &ModelConfig) -> String {
-        let messages: Vec<String> = request.messages.iter().map(|m| format!("{{\"role\":\"{}\",\"content\":\"{}\"}}", escape_json(&m.role), escape_json(&m.content))).collect();
-        let tools: Vec<String> = request.tools.iter().map(|t| format!("{{\"type\":\"function\",\"function\":{{\"name\":\"{}\",\"description\":\"{}\",\"parameters\":{}}}}}", escape_json(&t.name), escape_json(&t.description), t.parameters)).collect();
+        let messages: Vec<String> = request.messages.iter().map(|m| format!("{{\"role\":\"{}\",\"content\":\"{}\"}}", escape_json(role_to_str(&m.role)), escape_json(&m.content))).collect();
+        let tools: Vec<String> = request.tools.iter().map(|t| format!("{{\"type\":\"function\",\"function\":{{\"name\":\"{}\",\"description\":\"{}\",\"parameters\":{}}}}}", escape_json(&t.name), escape_json(&t.description), t.input_schema)).collect();
         format!("{{\"model\":\"{}\",\"messages\":[{}],\"tools\":[{}],\"temperature\":{},\"max_tokens\":{},\"stream\":{}}}", escape_json(&model.model_id), messages.join(","), tools.join(","), request.temperature, request.max_tokens, request.stream)
     }
     fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> {
@@ -1119,8 +1127,8 @@ impl FormatConverter for OpenAiConverter {
 pub struct AnthropicConverter;
 impl FormatConverter for AnthropicConverter {
     fn to_provider_format(&self, request: &UnifiedRequest, model: &ModelConfig) -> String {
-        let messages: Vec<String> = request.messages.iter().filter(|m| m.role != "system").map(|m| format!("{{\"role\":\"{}\",\"content\":\"{}\"}}", escape_json(&m.role), escape_json(&m.content))).collect();
-        let system_msg = request.messages.iter().find(|m| m.role == "system").map(|m| format!(",\"system\":\"{}\"", escape_json(&m.content))).unwrap_or_default();
+        let messages: Vec<String> = request.messages.iter().filter(|m| m.role != Role::System).map(|m| format!("{{\"role\":\"{}\",\"content\":\"{}\"}}", escape_json(role_to_str(&m.role)), escape_json(&m.content))).collect();
+        let system_msg = request.messages.iter().find(|m| m.role == Role::System).map(|m| format!(",\"system\":\"{}\"", escape_json(&m.content))).unwrap_or_default();
         format!("{{\"model\":\"{}\",\"messages\":[{}]{},\"max_tokens\":{}}}", escape_json(&model.model_id), messages.join(","), system_msg, request.max_tokens)
     }
     fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> {
@@ -1133,7 +1141,7 @@ impl FormatConverter for AnthropicConverter {
 pub struct GeminiConverter;
 impl FormatConverter for GeminiConverter {
     fn to_provider_format(&self, request: &UnifiedRequest, _model: &ModelConfig) -> String {
-        let contents: Vec<String> = request.messages.iter().map(|m| format!("{{\"role\":\"{}\",\"parts\":[{{\"text\":\"{}\"}}]}}", if m.role == "assistant" { "model" } else { "user" }, escape_json(&m.content))).collect();
+        let contents: Vec<String> = request.messages.iter().map(|m| format!("{{\"role\":\"{}\",\"parts\":[{{\"text\":\"{}\"}}]}}", if m.role == Role::Assistant { "model" } else { "user" }, escape_json(&m.content))).collect();
         format!("{{\"contents\":[{}],\"generationConfig\":{{\"temperature\":{},\"maxOutputTokens\":{}}}}}", contents.join(","), request.temperature, request.max_tokens)
     }
     fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> {
