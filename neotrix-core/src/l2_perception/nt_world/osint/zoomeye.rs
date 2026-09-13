@@ -140,13 +140,13 @@ pub async fn investigate(
 pub struct _ZoomEyeInvestigator;
 
 pub const ZOOMEYE_API_HOST: &str = "api.zoomeye.org";
-pub fn _zoomeye_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(ZOOMEYE_API_HOST, "443")
-}
-pub fn _zoomeye_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![_zoomeye_egress_rule()], false)
+pub fn _zoomeye_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(ZOOMEYE_API_HOST, "443")
 }
 
+pub fn _zoomeye_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![_zoomeye_egress_rule()], false)
+}
 #[cfg(test)]
 mod tests {
     use super::*;

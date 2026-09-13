@@ -67,14 +67,16 @@ pub struct _RepairOption {
     pub description: String,
     pub target_files: Vec<String>,
     pub estimated_effort: _EffortLevel,
-    pub risk: RiskLevel,
+    pub risk: RepairRiskLevel,
     pub confidence: f32,           // 基于历史成功率 + 根因匹配度
     pub prerequisites: Vec<String>,
 }
 
-/// 风险等级
+/// 风险等级 — 用于修复计划风险评估
+/// 
+/// For the unified RiskLevel, see `neotrix_types::RiskLevel`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RiskLevel {
+pub enum RepairRiskLevel {
     None,
     Low,
     Medium,
@@ -114,7 +116,7 @@ pub struct _RepairStep {
 /// 风险评估
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiskAssessment {
-    pub level: RiskLevel,
+    pub level: RepairRiskLevel,
     pub impact: String,
     pub mitigations: Vec<String>,
     pub rollback_plan: String,
@@ -312,13 +314,13 @@ impl _RepairPlanner {
 
     fn assess_risk(&self, strategy: &_RepairStrategyType, _diagnosis: &Diagnosis) -> RiskAssessment {
         let (level, impact) = match strategy {
-            _RepairStrategyType::Rollback => (RiskLevel::Low, "仅回滚代码, 状态可恢复"),
-            _RepairStrategyType::Restart => (RiskLevel::Low, "暂态中断, 无数据风险"),
-            _RepairStrategyType::Reconfigure => (RiskLevel::Medium, "配置变更可能影响其他模块"),
-            _RepairStrategyType::CompileFix => (RiskLevel::Medium, "自动修正可能引入语义变更"),
-            _RepairStrategyType::Patch => (RiskLevel::High, "代码修改可能引入新缺陷"),
-            _RepairStrategyType::TestStub => (RiskLevel::Critical, "规避测试掩盖真实问题"),
-        }.into();
+            _RepairStrategyType::Rollback => (RepairRiskLevel::Low, "仅回滚代码, 状态可恢复"),
+            _RepairStrategyType::Restart => (RepairRiskLevel::Low, "暂态中断, 无数据风险"),
+            _RepairStrategyType::Reconfigure => (RepairRiskLevel::Medium, "配置变更可能影响其他模块"),
+            _RepairStrategyType::CompileFix => (RepairRiskLevel::Medium, "自动修正可能引入语义变更"),
+            _RepairStrategyType::Patch => (RepairRiskLevel::High, "代码修改可能引入新缺陷"),
+            _RepairStrategyType::TestStub => (RepairRiskLevel::Critical, "规避测试掩盖真实问题"),
+        };
 
         RiskAssessment {
             level,

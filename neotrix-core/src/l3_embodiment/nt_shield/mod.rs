@@ -2,29 +2,29 @@
 
 // Core modules (renamed from 'core' to avoid shadowing std::core)
 pub mod shield_core;
-pub mod content_moderation;
+// pub mod content_moderation; // DEAD: zero external references
 pub mod dual_evidence;
 pub mod proxy_detection;
 pub mod slang_norm;
 pub mod shield_capability;
 
 // Shield implementation modules
-pub mod nt_shield_adversarial;
+// pub mod nt_shield_adversarial; // DEAD: zero external references
 pub mod nt_shield_agentic_scan;
-pub mod nt_shield_approval;
+// pub mod nt_shield_approval; // DEAD: zero external references
 pub mod nt_shield_audit;
-pub mod nt_shield_audit_phases;
+// pub mod nt_shield_audit_phases; // DEAD: zero external references
 pub mod nt_shield_comm;
-pub mod nt_shield_cleanup;
+// pub mod nt_shield_cleanup; // DEAD: zero external references
 pub mod nt_shield_impl;
-pub mod nt_shield_osint;
+// pub mod nt_shield_osint; // DEAD: zero external references
 pub mod nt_shield_oversight;
 pub mod nt_shield_propagation_guard;
-pub mod nt_shield_recon;
+// pub mod nt_shield_recon; // DEAD: zero external references
 pub mod nt_shield_sandbox;
 pub mod nt_shield_sandbox_entry;
 pub mod nt_shield_sentry;
-pub mod nt_shield_threat_detection;
+// pub mod nt_shield_threat_detection; // DEAD: zero external references
 pub mod nt_shield_traffic;
 pub mod nt_shield_ztnet;
 
@@ -35,6 +35,7 @@ pub mod nt_shield_stealth_net;
 pub mod defense;
 pub mod guard;
 pub mod evasion;
+pub mod safety;
 
 // Re-exports from shield_core
 pub use shield_core::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};

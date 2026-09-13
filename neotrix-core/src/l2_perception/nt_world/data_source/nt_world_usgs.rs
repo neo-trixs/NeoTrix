@@ -335,13 +335,13 @@ impl UsgsFetcher {
 // ── Egress ───────────────────────────────────────────────────
 
 pub const USGS_HOST: &str = "earthquake.usgs.gov";
-pub fn usgs_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(USGS_HOST, "443")
-}
-pub fn usgs_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![usgs_egress_rule()], false)
+pub fn usgs_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(USGS_HOST, "443")
 }
 
+pub fn usgs_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![usgs_egress_rule()], false)
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _UsgsIngestReport {
     pub events_fetched: usize,

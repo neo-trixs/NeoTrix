@@ -13,4 +13,4 @@ pub use index::{
 };
 pub use store::{BruteForceVectorStore, IvfVectorStore, VectorStore};
 pub use store_hnsw::HnswVectorStore;
-pub use types::{DistanceMetric, IndexConfig, SearchResult, VectorRecord};
+pub use types::{DistanceMetric, IndexConfig, VectorSearchResult, VectorRecord};

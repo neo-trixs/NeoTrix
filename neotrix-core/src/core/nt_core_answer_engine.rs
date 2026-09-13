@@ -17,8 +17,11 @@ pub enum SourceType {
     Local,
 }
 
+/// Answer engine search result — specialized for answer engine context.
+/// 
+/// For the unified SearchResult, see `neotrix_types::search_backend::SearchResult`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct SearchResult {
+pub struct AnswerSearchResult {
     pub title: String,
     pub url: String,
     pub snippet: String,
@@ -104,7 +107,7 @@ pub struct AnswerSegment {
 #[derive(Debug, Clone)]
 pub struct AnswerResult {
     pub segments: Vec<AnswerSegment>,
-    pub sources_used: Vec<SearchResult>,
+    pub sources_used: Vec<AnswerSearchResult>,
     pub mode_used: AnswerMode,
     pub processing_time: Duration,
     pub token_count: usize,
@@ -265,7 +268,7 @@ impl AnswerEngine {
         }
     }
 
-    pub fn rank_results(&self, results: &[SearchResult]) -> Vec<SearchResult> {
+    pub fn rank_results(&self, results: &[AnswerSearchResult]) -> Vec<AnswerSearchResult> {
         let mut ranked = results.to_vec();
         ranked.sort_by(|a, b| {
             b.relevance
@@ -276,7 +279,7 @@ impl AnswerEngine {
         ranked
     }
 
-    pub fn build_answer(&self, query: &str, results: &[SearchResult]) -> AnswerResult {
+    pub fn build_answer(&self, query: &str, results: &[AnswerSearchResult]) -> AnswerResult {
         let start = Instant::now();
         let ranked = self.rank_results(results);
         let context = self.context.assemble();

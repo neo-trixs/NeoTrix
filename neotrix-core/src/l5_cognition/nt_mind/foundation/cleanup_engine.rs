@@ -634,9 +634,11 @@ impl Platform {
 }
 
 /// 风险分级 — 驱动 CLI 交互 (MacBroom/DeepPurge Safe·Moderate·Advanced 参照)
+/// 
+/// For the unified RiskLevel, see `neotrix_types::RiskLevel`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[derive(Default)]
-pub enum RiskLevel {
+pub enum CleanupRiskLevel {
     #[serde(rename = "low")]
     #[default]
     Low,
@@ -646,12 +648,12 @@ pub enum RiskLevel {
     High,
 }
 
-impl RiskLevel {
+impl CleanupRiskLevel {
     pub fn label(&self) -> &'static str {
         match self {
-            RiskLevel::Low => "低危",
-            RiskLevel::Medium => "中危",
-            RiskLevel::High => "高危",
+            CleanupRiskLevel::Low => "低危",
+            CleanupRiskLevel::Medium => "中危",
+            CleanupRiskLevel::High => "高危",
         }
     }
 }
@@ -669,7 +671,7 @@ pub struct CleanupPattern {
     #[serde(default = "platform_all")]
     pub platform: Platform,
     #[serde(default)]
-    pub risk: RiskLevel,
+    pub risk: CleanupRiskLevel,
     pub description: Option<&'static str>,
 }
 
@@ -679,7 +681,7 @@ fn platform_all() -> Platform {
 
 impl CleanupPattern {
     /// 当前平台生效的规则 (平台门控 + 风险阀)
-    pub(crate) fn _active_below(&self, max_risk: RiskLevel) -> bool {
+    pub(crate) fn _active_below(&self, max_risk: CleanupRiskLevel) -> bool {
         self.platform.matches(Platform::current()) && self.risk <= max_risk
     }
 
@@ -690,51 +692,51 @@ impl CleanupPattern {
         let all = Platform::All;
         vec![
             // ---- 项目构建产物 (跨平台, Mole 34 目标) ----
-            Self { name: "Rust build artifacts", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/target/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("target/ 为可重建构建产物") },
-            Self { name: "Node.js modules", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/node_modules/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("npm/yarn/pnpm install 重建") },
-            Self { name: "Python venv", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.venv/**", "**/venv/**", "**/.tox/**", "**/.nox/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "Build output", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/dist/**", "**/.build/**", "**/build/**", "**/out/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "Next.js cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.next/**", "**/.nuxt/**", "**/.output/**", "**/.svelte-kit/**", "**/.astro/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "Swift build", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.build/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Low, description: None },
-            Self { name: "Go test artifacts", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/*.test", "**/*.test.exe", "**/coverage.out", "**/coverage.html"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("go test 编译产物与覆盖率; vendor/ 为依赖源码不删") },
-            Self { name: "Turbo/Parcel cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.turbo/**", "**/.parcel-cache/**", "**/.angular/**", "**/.dart_tool/**", "**/.zig-cache/**", "**/zig-out/**"], max_age_days: Some(15), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "Test caches", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/coverage/**", "**/__pycache__/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Rust build artifacts", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/target/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: Some("target/ 为可重建构建产物") },
+            Self { name: "Node.js modules", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/node_modules/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: Some("npm/yarn/pnpm install 重建") },
+            Self { name: "Python venv", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.venv/**", "**/venv/**", "**/.tox/**", "**/.nox/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Build output", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/dist/**", "**/.build/**", "**/build/**", "**/out/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Next.js cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.next/**", "**/.nuxt/**", "**/.output/**", "**/.svelte-kit/**", "**/.astro/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Swift build", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.build/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Go test artifacts", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/*.test", "**/*.test.exe", "**/coverage.out", "**/coverage.html"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: Some("go test 编译产物与覆盖率; vendor/ 为依赖源码不删") },
+            Self { name: "Turbo/Parcel cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.turbo/**", "**/.parcel-cache/**", "**/.angular/**", "**/.dart_tool/**", "**/.zig-cache/**", "**/zig-out/**"], max_age_days: Some(15), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Test caches", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/coverage/**", "**/__pycache__/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
             // ---- 项目蜕皮: 旧躯壳目录 (legacy/old/backup 命名的旧版本, 归档到 _archive/) ----
-            Self { name: "Legacy shells", kind: CleanupKind::ProjectMolting, patterns: vec!["**/legacy/**", "**/*_legacy/**", "**/legacy_*/**", "**/old_*/**", "**/*_old/**", "**/*_v0/**", "**/*_v1/**", "**/*_backup*/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("旧躯壳目录 (旧版本代码), 蜕皮归档至 .cleanup/archive/ 而非删除") },
-            Self { name: "iOS derived data", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/DerivedData/**", "~/Library/Developer/CoreSimulator/Caches/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Medium, description: None },
+            Self { name: "Legacy shells", kind: CleanupKind::ProjectMolting, patterns: vec!["**/legacy/**", "**/*_legacy/**", "**/legacy_*/**", "**/old_*/**", "**/*_old/**", "**/*_v0/**", "**/*_v1/**", "**/*_backup*/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: Some("旧躯壳目录 (旧版本代码), 蜕皮归档至 .cleanup/archive/ 而非删除") },
+            Self { name: "iOS derived data", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/DerivedData/**", "~/Library/Developer/CoreSimulator/Caches/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: CleanupRiskLevel::Medium, description: None },
             // ---- 包管理缓存 ----
-            Self { name: "Cargo registry cache", kind: CleanupKind::Cache, patterns: vec!["~/.cargo/registry/cache/**", "~/.cargo/git/db/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "pip cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/pip/**", "%LOCALAPPDATA%/pip/cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "npm cache", kind: CleanupKind::Cache, patterns: vec!["~/.npm/_cacache/**", "%APPDATA%/npm-cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "pnpm store", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/pnpm/**", "~/.local/share/pnpm/store/**", "%LOCALAPPDATA%/pnpm-cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "yarn cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/yarn/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "bun cache", kind: CleanupKind::Cache, patterns: vec!["~/.bun/install/cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Medium, description: Some("仅 bun install 缓存; ~/.bun/bin(可执行)与全局包保留") },
-            Self { name: "uv pip cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/uv/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "go build cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/go-build/**", "~/.cache/go-build/**", "%LOCALAPPDATA%/go-build/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "conda pkgs", kind: CleanupKind::Cache, patterns: vec!["~/miniconda3/pkgs/**", "~/anaconda3/pkgs/**", "~/.conda/pkgs/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Medium, description: None },
+            Self { name: "Cargo registry cache", kind: CleanupKind::Cache, patterns: vec!["~/.cargo/registry/cache/**", "~/.cargo/git/db/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "pip cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/pip/**", "%LOCALAPPDATA%/pip/cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "npm cache", kind: CleanupKind::Cache, patterns: vec!["~/.npm/_cacache/**", "%APPDATA%/npm-cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "pnpm store", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/pnpm/**", "~/.local/share/pnpm/store/**", "%LOCALAPPDATA%/pnpm-cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "yarn cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/yarn/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "bun cache", kind: CleanupKind::Cache, patterns: vec!["~/.bun/install/cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Medium, description: Some("仅 bun install 缓存; ~/.bun/bin(可执行)与全局包保留") },
+            Self { name: "uv pip cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/uv/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "go build cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/go-build/**", "~/.cache/go-build/**", "%LOCALAPPDATA%/go-build/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "conda pkgs", kind: CleanupKind::Cache, patterns: vec!["~/miniconda3/pkgs/**", "~/anaconda3/pkgs/**", "~/.conda/pkgs/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Medium, description: None },
             // ---- 浏览器缓存 ----
-            Self { name: "Google Chrome cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/Google/Chrome/**", "%LOCALAPPDATA%/Google/Chrome/User Data/Default/Cache/**"], max_age_days: Some(15), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "Playwright browsers", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/ms-playwright/**", "~/Library/Caches/ms-playwright-go/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Low, description: Some("浏览器自动化引擎, 重装下载") },
+            Self { name: "Google Chrome cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/Google/Chrome/**", "%LOCALAPPDATA%/Google/Chrome/User Data/Default/Cache/**"], max_age_days: Some(15), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Playwright browsers", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/ms-playwright/**", "~/Library/Caches/ms-playwright-go/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: CleanupRiskLevel::Low, description: Some("浏览器自动化引擎, 重装下载") },
             // ---- AI 应用缓存 (PureMac AI Apps 吸收: Ollama/LM Studio 模型缓存) ----
-            Self { name: "Ollama model cache", kind: CleanupKind::Cache, patterns: vec!["~/.ollama/models/blobs/**"], max_age_days: Some(90), safe: false, recursive: true, platform: all, risk: RiskLevel::Medium, description: Some("Ollama 模型 blob 缓存, 可 ollama pull 重建; 谨慎, 仅清未引用 blob") },
-            Self { name: "LM Studio model cache", kind: CleanupKind::Cache, patterns: vec!["~/.lmstudio/models/**"], max_age_days: Some(90), safe: false, recursive: true, platform: all, risk: RiskLevel::Medium, description: Some("LM Studio 模型缓存, 可重新下载") },
-            Self { name: "MCP/Agent hub cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/claude/**", "~/.cache/opencode/**", "~/.cache/codex/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("AI agent 工具缓存 (工具响应/索引, 可重建)") },
-            Self { name: "Homebrew cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/Homebrew/**", "~/Library/Caches/Homebrew/downloads/**", "/opt/homebrew/Library/Homebrew/vendor/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Low, description: Some("brew 下载缓存与 vendor ruby; brew cleanup 等价, 重装即重建") },
+            Self { name: "Ollama model cache", kind: CleanupKind::Cache, patterns: vec!["~/.ollama/models/blobs/**"], max_age_days: Some(90), safe: false, recursive: true, platform: all, risk: CleanupRiskLevel::Medium, description: Some("Ollama 模型 blob 缓存, 可 ollama pull 重建; 谨慎, 仅清未引用 blob") },
+            Self { name: "LM Studio model cache", kind: CleanupKind::Cache, patterns: vec!["~/.lmstudio/models/**"], max_age_days: Some(90), safe: false, recursive: true, platform: all, risk: CleanupRiskLevel::Medium, description: Some("LM Studio 模型缓存, 可重新下载") },
+            Self { name: "MCP/Agent hub cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/claude/**", "~/.cache/opencode/**", "~/.cache/codex/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: Some("AI agent 工具缓存 (工具响应/索引, 可重建)") },
+            Self { name: "Homebrew cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/Homebrew/**", "~/Library/Caches/Homebrew/downloads/**", "/opt/homebrew/Library/Homebrew/vendor/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: CleanupRiskLevel::Low, description: Some("brew 下载缓存与 vendor ruby; brew cleanup 等价, 重装即重建") },
             // ---- Xcode 扩展 (mac-janitor: Archives/Simulators, 现仅 DerivedData) ----
-            Self { name: "Xcode Archives", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/Archives/**"], max_age_days: Some(90), safe: false, recursive: true, platform: mac, risk: RiskLevel::Medium, description: Some("已归档的 App 构建产物, 含 dSYM; 确认无需再上传后清理") },
-            Self { name: "Xcode Simulator runtimes", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/CoreSimulator/Images/**", "~/Library/Developer/CoreSimulator/Caches/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Medium, description: Some("模拟器运行时镜像缓存; 删除后按需重下") },
-            Self { name: "Xcode module caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/DerivedData/**/ModuleCache.noindex/**", "~/Library/Developer/Xcode/DerivedData/**/PrecompiledHeaders/**"], max_age_days: Some(7), safe: true, recursive: true, platform: mac, risk: RiskLevel::Medium, description: Some("Swift/ObjC 模块预编译缓存, 可重建") },
+            Self { name: "Xcode Archives", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/Archives/**"], max_age_days: Some(90), safe: false, recursive: true, platform: mac, risk: CleanupRiskLevel::Medium, description: Some("已归档的 App 构建产物, 含 dSYM; 确认无需再上传后清理") },
+            Self { name: "Xcode Simulator runtimes", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/CoreSimulator/Images/**", "~/Library/Developer/CoreSimulator/Caches/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: CleanupRiskLevel::Medium, description: Some("模拟器运行时镜像缓存; 删除后按需重下") },
+            Self { name: "Xcode module caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/DerivedData/**/ModuleCache.noindex/**", "~/Library/Developer/Xcode/DerivedData/**/PrecompiledHeaders/**"], max_age_days: Some(7), safe: true, recursive: true, platform: mac, risk: CleanupRiskLevel::Medium, description: Some("Swift/ObjC 模块预编译缓存, 可重建") },
             // ---- temp ----
-            Self { name: "System temp", kind: CleanupKind::TempFiles, patterns: vec!["/tmp/**", "/var/tmp/**", "%TEMP%/**", "%TMP%/**"], max_age_days: Some(1), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "Preload temp", kind: CleanupKind::TempFiles, patterns: vec!["%WINDIR%/Prefetch/**"], max_age_days: Some(1), safe: true, recursive: true, platform: win, risk: RiskLevel::Medium, description: None },
+            Self { name: "System temp", kind: CleanupKind::TempFiles, patterns: vec!["/tmp/**", "/var/tmp/**", "%TEMP%/**", "%TMP%/**"], max_age_days: Some(1), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Preload temp", kind: CleanupKind::TempFiles, patterns: vec!["%WINDIR%/Prefetch/**"], max_age_days: Some(1), safe: true, recursive: true, platform: win, risk: CleanupRiskLevel::Medium, description: None },
             // ---- IDE 缓存 ----
-            Self { name: "VS Code caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Application Support/Code/CachedData/**", "~/.vscode/extensions/.cache/**", "%APPDATA%/Code/CachedData/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "Cursor caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Application Support/Cursor/CachedData/**", "~/.cursor/cache/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "IntelliJ caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Caches/JetBrains/**", "~/.cache/JetBrains/**", "%LOCALAPPDATA%/JetBrains/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "Docker", kind: CleanupKind::Cache, patterns: vec!["~/Library/Containers/com.docker.docker/Data/vms/0/data/DockerDesktopRegular5/.cache/**"], max_age_days: Some(60), safe: true, recursive: true, platform: mac, risk: RiskLevel::Medium, description: None },
+            Self { name: "VS Code caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Application Support/Code/CachedData/**", "~/.vscode/extensions/.cache/**", "%APPDATA%/Code/CachedData/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Cursor caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Application Support/Cursor/CachedData/**", "~/.cursor/cache/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "IntelliJ caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Caches/JetBrains/**", "~/.cache/JetBrains/**", "%LOCALAPPDATA%/JetBrains/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: CleanupRiskLevel::Low, description: None },
+            Self { name: "Docker", kind: CleanupKind::Cache, patterns: vec!["~/Library/Containers/com.docker.docker/Data/vms/0/data/DockerDesktopRegular5/.cache/**"], max_age_days: Some(60), safe: true, recursive: true, platform: mac, risk: CleanupRiskLevel::Medium, description: None },
             // ---- Linux 系统缓存 ----
-            Self { name: "apt/dnf/pacman package cache", kind: CleanupKind::Cache, patterns: vec!["/var/cache/apt/archives/**", "/var/cache/dnf/**", "/var/cache/pacman/pkg/**", "/var/tmp/**"], max_age_days: Some(30), safe: true, recursive: true, platform: lin, risk: RiskLevel::Medium, description: None },
-            Self { name: "Linux user cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/**"], max_age_days: Some(30), safe: true, recursive: true, platform: lin, risk: RiskLevel::Low, description: None },
+            Self { name: "apt/dnf/pacman package cache", kind: CleanupKind::Cache, patterns: vec!["/var/cache/apt/archives/**", "/var/cache/dnf/**", "/var/cache/pacman/pkg/**", "/var/tmp/**"], max_age_days: Some(30), safe: true, recursive: true, platform: lin, risk: CleanupRiskLevel::Medium, description: None },
+            Self { name: "Linux user cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/**"], max_age_days: Some(30), safe: true, recursive: true, platform: lin, risk: CleanupRiskLevel::Low, description: None },
         ]
     }
 
@@ -875,7 +877,7 @@ pub struct CleanupEngine {
     pub dry_run_default: bool,
     pub archive_on_clean: bool, // true = 归档而非删除
     pub project_root: PathBuf,
-    pub risk_gate: RiskLevel, // 默认仅执行 <= 该风险级规则
+    pub risk_gate: CleanupRiskLevel, // 默认仅执行 <= 该风险级规则
     pub command_cleaner: Option<_CommandCleaner>, // 命令式清理 (SystemServices)
     max_history: usize,
 }
@@ -902,13 +904,13 @@ impl CleanupEngine {
             dry_run_default: true,
             archive_on_clean: true,
             project_root: PathBuf::from("."),
-            risk_gate: RiskLevel::Medium,
+            risk_gate: CleanupRiskLevel::Medium,
             command_cleaner: Some(_CommandCleaner::new()),
             max_history: 50,
         }
     }
 
-    pub fn _with_risk_gate(mut self, gate: RiskLevel) -> Self {
+    pub fn _with_risk_gate(mut self, gate: CleanupRiskLevel) -> Self {
         self.risk_gate = gate;
         self
     }
@@ -1343,7 +1345,7 @@ pub struct _CommandCleanup {
     /// 是否强制需用户确认 (拒绝无确认执行)
     pub requires_confirm: bool,
     pub platform: Platform,
-    pub risk: RiskLevel,
+    pub risk: CleanupRiskLevel,
     pub description: &'static str,
 }
 
@@ -1360,7 +1362,7 @@ impl _CommandCleanup {
                 dry_run_args: vec!["cleanup", "--dry-run"],
                 requires_confirm: false,
                 platform: Platform::MacOS,
-                risk: RiskLevel::Low,
+                risk: CleanupRiskLevel::Low,
                 description: "brew cleanup --prune=all: 清理旧版本与下载缓存",
             },
             // Docker 未使用资源 (PureMac: docker prune) — 中危, 需确认
@@ -1373,7 +1375,7 @@ impl _CommandCleanup {
                 dry_run_args: vec!["system", "df"],
                 requires_confirm: true,
                 platform: Platform::All,
-                risk: RiskLevel::Medium,
+                risk: CleanupRiskLevel::Medium,
                 description: "docker system prune -f: 移除停止容器/悬空镜像/未用网络与构建缓存",
             },
             // Time Machine 本地快照 (mac-janitor/GuacSweep) — 高危, 需确认
@@ -1386,14 +1388,14 @@ impl _CommandCleanup {
                 dry_run_args: vec!["listlocalsnapshots", "/"],
                 requires_confirm: true,
                 platform: Platform::MacOS,
-                risk: RiskLevel::High,
+                risk: CleanupRiskLevel::High,
                 description: "删除 Time Machine 本地快照 (需显式快照名, 执行前先列示)",
             },
         ]
     }
 
     /// 当前平台 + 风险阀过滤后的可用项
-    pub(crate) fn _active_on_current(&self, gate: RiskLevel) -> bool {
+    pub(crate) fn _active_on_current(&self, gate: CleanupRiskLevel) -> bool {
         self.platform.matches(Platform::current()) && self.risk <= gate
     }
 }
@@ -1412,7 +1414,7 @@ pub struct _CommandResult {
 pub struct _CommandCleaner {
     pub items: Vec<_CommandCleanup>,
     pub dry_run: bool,
-    pub risk_gate: RiskLevel,
+    pub risk_gate: CleanupRiskLevel,
 }
 
 impl Default for _CommandCleaner {
@@ -1426,7 +1428,7 @@ impl _CommandCleaner {
         Self {
             items: _CommandCleanup::all(),
             dry_run: true,
-            risk_gate: RiskLevel::Medium,
+            risk_gate: CleanupRiskLevel::Medium,
         }
     }
 
@@ -1434,7 +1436,7 @@ impl _CommandCleaner {
         self.dry_run = dry;
         self
     }
-    pub(crate) fn _with_risk_gate(mut self, gate: RiskLevel) -> Self {
+    pub(crate) fn _with_risk_gate(mut self, gate: CleanupRiskLevel) -> Self {
         self.risk_gate = gate;
         self
     }
@@ -1704,14 +1706,14 @@ mod tests {
 
     #[test]
     fn test_risk_gate_filters() {
-        let low = RiskLevel::Low;
-        let high = RiskLevel::High;
-        let engine = CleanupEngine::new()._with_risk_gate(RiskLevel::Low);
+        let low = CleanupRiskLevel::Low;
+        let high = CleanupRiskLevel::High;
+        let engine = CleanupEngine::new()._with_risk_gate(CleanupRiskLevel::Low);
         // 默认 gate 为 Medium 时, High 规则不应执行
         let default_engine = CleanupEngine::new();
         assert!(engine.risk_gate <= low || default_engine.risk_gate > low);
-        assert!(high > RiskLevel::Medium);
-        assert!(RiskLevel::Low < RiskLevel::High);
+        assert!(high > CleanupRiskLevel::Medium);
+        assert!(CleanupRiskLevel::Low < CleanupRiskLevel::High);
     }
 
     #[test]
@@ -1775,7 +1777,7 @@ mod tests {
     fn test_absorbed_pattern_risk_gating() {
         // AI 模型缓存默认 medium 风险 → 默认 gate (Medium) 下可用, 但 Low gate 下被过滤
         let engine = CleanupEngine::new();
-        assert_eq!(engine.risk_gate, RiskLevel::Medium);
+        assert_eq!(engine.risk_gate, CleanupRiskLevel::Medium);
         // SystemServices 类别枚举存在
         assert!(!CleanupKind::SystemServices.description().is_empty());
         // 命令清理项三件套 (brew/docker/tmutil)

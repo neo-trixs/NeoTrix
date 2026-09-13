@@ -78,6 +78,9 @@ pub mod reference_generation; // 基于参考的生成
 // 多模型路由
 pub mod model_routing;
 
+// Universal Model Interface — 模型无关的统一调用层
+pub mod universal_model;
+
 // Cache-Aware Compaction — 基于缓存命中率的智能压缩
 pub mod cache_compaction;
 

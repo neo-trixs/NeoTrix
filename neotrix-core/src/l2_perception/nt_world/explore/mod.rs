@@ -21,6 +21,6 @@ pub use geocode::{
     Geocoder, BuiltinGeocoder, CompositeGeocoder,
     GeocodingResult, ReverseGeocodingResult, format_coordinate,
 };
-pub use system_scanner::{ScanPath, SystemScanner, ScanCategory, RiskLevel, ScanResult, calculate_age_days};
+pub use system_scanner::{ScanPath, SystemScanner, ScanCategory, ScanRiskLevel, ScanResult, calculate_age_days};
 pub use cache_detector::{CacheDetector, CacheType, CacheInfo};
 pub use large_file_finder::LargeFileFinder;

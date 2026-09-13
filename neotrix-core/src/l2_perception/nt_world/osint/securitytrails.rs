@@ -222,13 +222,13 @@ async fn fetch_whois(
 pub struct _SecurityTrailsInvestigator;
 
 pub const SECURITYTRAILS_API_HOST: &str = "api.securitytrails.com";
-pub fn _securitytrails_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(SECURITYTRAILS_API_HOST, "443")
-}
-pub fn _securitytrails_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![_securitytrails_egress_rule()], false)
+pub fn _securitytrails_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(SECURITYTRAILS_API_HOST, "443")
 }
 
+pub fn _securitytrails_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![_securitytrails_egress_rule()], false)
+}
 #[cfg(test)]
 mod tests {
     use super::*;

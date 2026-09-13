@@ -5,5 +5,5 @@ pub mod consolidation;
 
 pub use episodic::{EpisodicMemory, EpisodicMemoryStore};
 pub use semantic::{SemanticMemory, SemanticMemoryStore, AbstractionLevel};
-pub use emotional::{EmotionalMemory, EmotionalMemoryStore, EmotionLabel};
+pub use emotional::{EmotionalMemory, EmotionalMemoryStore, PlutchikEmotion};
 pub use consolidation::{MemoryConsolidation, ConsolidationConfig, ConsolidationStatistics};

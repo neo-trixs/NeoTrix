@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub struct EmotionalMemory {
     pub id: String,
     pub event_id: String,
-    pub emotion: EmotionLabel,
+    pub emotion: PlutchikEmotion,
     pub intensity: f64,
     pub valence: f64,        // positive/negative
     pub arousal: f64,        // calm/excited
@@ -17,9 +17,12 @@ pub struct EmotionalMemory {
 }
 
 /// Plutchik's wheel adapted for AI
+/// 
+/// NOTE: This is an extended emotion set for emotional memory analysis.
+/// For the unified emotion label used across NeoTrix, see `nt_core_self::EmotionLabel`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EmotionLabel {
-    // Basic emotions
+pub enum PlutchikEmotion {
+    // Basic emotions (Plutchik's wheel)
     Joy,          // Satisfaction, completion
     Trust,        // Confidence, reliability
     Fear,         // Anxiety, uncertainty
@@ -56,7 +59,7 @@ pub struct EmotionalContext {
     pub complexity: f64,
     pub time_pressure: f64,
     pub social_context: Option<String>,
-    pub previous_emotions: Vec<EmotionLabel>,
+    pub previous_emotions: Vec<PlutchikEmotion>,
 }
 
 /// Attempt to regulate the emotion
@@ -120,7 +123,7 @@ impl EmotionalMemoryStore {
     }
 
     /// Recall memories by emotion
-    pub fn recall_by_emotion(&self, emotion: EmotionLabel, limit: usize) -> Vec<&EmotionalMemory> {
+    pub fn recall_by_emotion(&self, emotion: PlutchikEmotion, limit: usize) -> Vec<&EmotionalMemory> {
         let emotion_str = format!("{:?}", emotion);
         self.index_by_emotion
             .get(&emotion_str)

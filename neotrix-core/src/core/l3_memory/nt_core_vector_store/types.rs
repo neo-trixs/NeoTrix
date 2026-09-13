@@ -41,8 +41,11 @@ pub enum DistanceMetric {
     Euclidean,
 }
 
+/// Vector search result — specialized for vector similarity search.
+/// 
+/// For the unified SearchResult, see `neotrix_types::search_backend::SearchResult`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
+pub struct VectorSearchResult {
     pub id: String,
     pub distance: f64,
     pub metadata: HashMap<String, String>,

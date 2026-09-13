@@ -546,12 +546,12 @@ impl _FofaSyncClient {
 
 pub const FOFA_API_HOST: &str = "fofa.info";
 
-pub fn _fofa_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(FOFA_API_HOST, "443")
+pub fn _fofa_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(FOFA_API_HOST, "443")
 }
 
-pub fn _fofa_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(
+pub fn _fofa_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(
         vec![_fofa_egress_rule()],
         false,
     )

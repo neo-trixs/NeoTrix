@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use reqwest;
+use neotrix_types::search_backend::SearchResult;
 
 /// HTTP Request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,16 +156,6 @@ pub struct SearchOptions {
     pub language: Option<String>,
     pub region: Option<String>,
     pub time_range: Option<String>,
-}
-
-/// Search Result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
-    pub title: String,
-    pub url: String,
-    pub snippet: String,
-    pub score: f64,
-    pub engine: SearchEngine,
 }
 
 /// Tool Specification

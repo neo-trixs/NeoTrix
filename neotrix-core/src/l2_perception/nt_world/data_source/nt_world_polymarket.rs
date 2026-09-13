@@ -155,13 +155,13 @@ impl PolymarketFetcher {
 // ── Egress ───────────────────────────────────────────────────
 
 pub const POLYMARKET_HOST: &str = "gamma-api.polymarket.com";
-pub fn polymarket_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(POLYMARKET_HOST, "443")
-}
-pub fn polymarket_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![polymarket_egress_rule()], false)
+pub fn polymarket_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(POLYMARKET_HOST, "443")
 }
 
+pub fn polymarket_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![polymarket_egress_rule()], false)
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _PolymarketIngestReport {
     pub events_fetched: usize,

@@ -15,9 +15,11 @@ pub enum EdgeDirection {
     Bidirectional = 2,
 }
 
-/// 图谱边
+/// 图谱边 — NTX 专用二进制格式
+/// 
+/// For the unified GraphEdge, see `neotrix_core::core::nt_core_graph::GraphEdge`.
 #[derive(Debug, Clone)]
-pub struct GraphEdge {
+pub struct NtxGraphEdge {
     pub source: [u8; 36],
     pub target: [u8; 36],
     pub edge_type: u16,
@@ -25,9 +27,11 @@ pub struct GraphEdge {
     pub direction: EdgeDirection,
 }
 
-/// 图谱节点
+/// 图谱节点 — NTX 专用二进制格式
+/// 
+/// For the unified GraphNode, see `neotrix_core::core::nt_core_graph::GraphNode`.
 #[derive(Debug, Clone)]
-pub struct GraphNode {
+pub struct NtxGraphNode {
     pub node_id: [u8; 36],
     pub degree: u32,
     pub neighbors: Vec<GraphNeighbor>,
@@ -46,8 +50,8 @@ use std::collections::HashMap;
 
 /// 图谱段 (O(1) 邻居查询 via HashMap 索引)
 pub struct GraphSegment {
-    nodes: Vec<GraphNode>,
-    edges: Vec<GraphEdge>,
+    nodes: Vec<NtxGraphNode>,
+    edges: Vec<NtxGraphEdge>,
     node_index: HashMap<[u8; 36], usize>,  // node_id → nodes 索引
 }
 
@@ -57,14 +61,14 @@ impl GraphSegment {
     }
 
     /// 添加边
-    pub fn add_edge(&mut self, edge: GraphEdge) {
+    pub fn add_edge(&mut self, edge: NtxGraphEdge) {
         let edge_clone = edge.clone();
         self.edges.push(edge);
         self.update_adjacency(&edge_clone);
     }
 
     /// 更新邻接表 (O(1) via HashMap 索引)
-    fn update_adjacency(&mut self, edge: &GraphEdge) {
+    fn update_adjacency(&mut self, edge: &NtxGraphEdge) {
         // 源节点
         if let Some(&idx) = self.node_index.get(&edge.source) {
             let node = &mut self.nodes[idx];
@@ -77,7 +81,7 @@ impl GraphSegment {
             node.degree += 1;
         } else {
             let idx = self.nodes.len();
-            self.nodes.push(GraphNode {
+            self.nodes.push(NtxGraphNode {
                 node_id: edge.source,
                 degree: 1,
                 neighbors: vec![GraphNeighbor {
@@ -103,7 +107,7 @@ impl GraphSegment {
                 node.degree += 1;
             } else {
                 let idx = self.nodes.len();
-                self.nodes.push(GraphNode {
+                self.nodes.push(NtxGraphNode {
                     node_id: edge.target,
                     degree: 1,
                     neighbors: vec![GraphNeighbor {
@@ -154,12 +158,12 @@ impl GraphSegment {
     }
 
     /// 获取所有节点
-    pub fn nodes(&self) -> &[GraphNode] {
+    pub fn nodes(&self) -> &[NtxGraphNode] {
         &self.nodes
     }
 
     /// 获取所有边
-    pub fn edges(&self) -> &[GraphEdge] {
+    pub fn edges(&self) -> &[NtxGraphEdge] {
         &self.edges
     }
 

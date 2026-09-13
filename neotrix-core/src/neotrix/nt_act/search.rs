@@ -4,8 +4,9 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
+use neotrix_types::search_backend::SearchResult;
 
-use super::{SearchConfig, SearchEngine, SearchOptions, SearchResult};
+use super::{SearchConfig, SearchEngine, SearchOptions};
 
 /// Web Search Engine
 pub struct WebSearch {
@@ -150,13 +151,14 @@ impl WebSearch {
         for element in document.select(&selector).take(max_results) {
             let snippet = element.text().collect::<String>();
             if snippet.len() > 50 {
-                results.push(SearchResult {
-                    title: "DuckDuckGo Result".to_string(),
-                    url: "https://duckduckgo.com".to_string(),
-                    snippet: snippet.chars().take(200).collect(),
-                    score: 0.8,
-                    engine: SearchEngine::DuckDuckGo,
-                });
+                results.push(SearchResult::new(
+                    "duckduckgo-result",
+                    "DuckDuckGo Result",
+                    "https://duckduckgo.com",
+                )
+                .with_snippet(snippet.chars().take(200).collect::<String>())
+                .with_score(0.8)
+                .with_source_type("duckduckgo"));
             }
         }
         
@@ -197,13 +199,14 @@ impl WebSearch {
                 Ok(quick_xml::events::Event::End(ref e)) => {
                     if e.name().as_ref() == b"entry" {
                         if !current_title.is_empty() {
-                            results.push(SearchResult {
-                                title: current_title.clone(),
-                                url: current_id.clone(),
-                                snippet: current_summary.chars().take(300).collect(),
-                                score: 0.9,
-                                engine: SearchEngine::Arxiv,
-                            });
+                            results.push(SearchResult::new(
+                                &current_id,
+                                &current_title,
+                                &current_id,
+                            )
+                            .with_snippet(current_summary.chars().take(300).collect::<String>())
+                            .with_score(0.9)
+                            .with_source_type("arxiv"));
                         }
                         current_title.clear();
                         current_summary.clear();
@@ -241,13 +244,14 @@ impl WebSearch {
         if let Some(search) = json.get("query").and_then(|q| q.get("search")).and_then(|s| s.as_array()) {
             for item in search.iter().take(opts.max_results.unwrap_or(10)) {
                 if let (Some(title), Some(snippet)) = (item.get("title").and_then(|v| v.as_str()), item.get("snippet").and_then(|v| v.as_str())) {
-                    results.push(SearchResult {
-                        title: title.to_string(),
-                        url: format!("https://en.wikipedia.org/wiki/{}", urlencoding::encode(title)),
-                        snippet: snippet.to_string(),
-                        score: 0.85,
-                        engine: SearchEngine::Wikipedia,
-                    });
+                    results.push(SearchResult::new(
+                        title,
+                        title,
+                        format!("https://en.wikipedia.org/wiki/{}", urlencoding::encode(title)),
+                    )
+                    .with_snippet(snippet)
+                    .with_score(0.85)
+                    .with_source_type("wikipedia"));
                 }
             }
         }
@@ -276,13 +280,14 @@ impl WebSearch {
                     item.get("description").and_then(|v| v.as_str()),
                     item.get("html_url").and_then(|v| v.as_str()),
                 ) {
-                    results.push(SearchResult {
-                        title: name.to_string(),
-                        url: html_url.to_string(),
-                        snippet: desc.to_string(),
-                        score: 0.85,
-                        engine: SearchEngine::GitHub,
-                    });
+                    results.push(SearchResult::new(
+                        name,
+                        name,
+                        html_url,
+                    )
+                    .with_snippet(desc)
+                    .with_score(0.85)
+                    .with_source_type("github"));
                 }
             }
         }

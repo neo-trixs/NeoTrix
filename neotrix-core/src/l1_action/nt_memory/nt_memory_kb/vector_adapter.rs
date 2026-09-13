@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::core::nt_core_vector_store::store::VectorStore;
-use crate::core::nt_core_vector_store::types::{IndexConfig, SearchResult, VectorRecord};
+use crate::core::nt_core_vector_store::types::{IndexConfig, VectorSearchResult, VectorRecord};
 
 pub struct KbVectorAdapter {
     pub store: Box<dyn VectorStore>,

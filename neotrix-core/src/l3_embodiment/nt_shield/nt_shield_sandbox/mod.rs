@@ -69,78 +69,22 @@ pub enum CloudSessionStatus {
     TimedOut,
 }
 
-/// Per-sandbox egress network policy (OpenSandbox absorption, Cycle 232+).
-/// Controls which outbound hosts/ports a sandbox session may reach before the
-/// workload runs — the sandbox's outbound trust boundary (R-P32 双观独立性).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EgressRule {
-    /// Host pattern: exact host, `*.example.com`, or `*` (all).
-    pub host: String,
-    /// Port range as `"443"` or `"443-8443"`; empty = any port.
-    pub port: String,
-    /// allow (whitelist) or deny (blacklist). Deny takes precedence.
-    pub allow: bool,
-}
+// Re-export shared egress types from L1 to avoid L2→L3 upward dependencies.
+pub use crate::l1_action::nt_io::nt_io_provider::common::egress_types::{
+    SandboxEgressRule as EgressRule,
+    SandboxEgressPolicy as EgressPolicy,
+};
 
-impl EgressRule {
-    pub fn allow(host: &str, port: &str) -> Self {
-        Self { host: host.into(), port: port.into(), allow: true }
-    }
-
-    pub fn deny(host: &str, port: &str) -> Self {
-        Self { host: host.into(), port: port.into(), allow: false }
-    }
-
-    fn host_matches(&self, host: &str) -> bool {
-        if self.host == "*" {
-            return true;
-        }
-        if let Some(suffix) = self.host.strip_prefix("*.") {
-            // `*.example.com` matches subdomains only — not the bare apex,
-            // and never across a dot boundary (example.com.evil.net).
-            return host.ends_with(&format!(".{}", suffix));
-        }
-        host == self.host
-    }
-
-    fn port_matches(&self, port: u16) -> bool {
-        if self.port.is_empty() {
-            return true;
-        }
-        if let Some((lo, hi)) = self.port.split_once('-') {
-            let (lo, hi): (u16, u16) = match (lo.parse(), hi.parse()) {
-                (Ok(a), Ok(b)) => (a, b),
-                _ => return false,
-            };
-            port >= lo && port <= hi
-        } else {
-            self.port.parse::<u16>().map(|p| p == port).unwrap_or(false)
-        }
-    }
-}
-
-/// Compiled egress policy over a rule list. Deny wins over allow; unmatched
-/// hosts fall back to the policy default.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EgressPolicy {
-    pub rules: Vec<EgressRule>,
-    /// Default for hosts not matched by any rule.
-    pub default_allow: bool,
-}
-
+/// Extended EgressPolicy methods for L3-specific functionality.
 impl EgressPolicy {
-    pub fn new(rules: Vec<EgressRule>, default_allow: bool) -> Self {
-        Self { rules, default_allow }
-    }
-
     /// Everything out — matches legacy sandbox behaviour.
     pub fn permissive() -> Self {
-        Self { rules: vec![], default_allow: true }
+        Self { rules: vec![], deny_all: false }
     }
 
     /// Nothing out — the closed trust boundary default for agent sandboxes.
     pub fn deny_all() -> Self {
-        Self { rules: vec![], default_allow: false }
+        Self { rules: vec![], deny_all: true }
     }
 
     /// Evaluate one outbound connection. Deny rules shadow allow rules.

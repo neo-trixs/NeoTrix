@@ -271,13 +271,13 @@ fn urlencoding_safe(s: &str) -> String {
 // ── Egress ───────────────────────────────────────────────────
 
 pub const UCDP_HOST: &str = "ucdp.uu.se";
-pub fn ucdp_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(UCDP_HOST, "443")
-}
-pub fn ucdp_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![ucdp_egress_rule()], false)
+pub fn ucdp_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(UCDP_HOST, "443")
 }
 
+pub fn ucdp_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![ucdp_egress_rule()], false)
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _UcdpIngestReport {
     pub events_fetched: usize,

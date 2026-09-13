@@ -411,7 +411,7 @@ impl TorCrawler {
     }
 
     /// Search the local index for previously crawled content
-    pub async fn search_index(&self, query: &str, max: usize) -> Vec<SearchResult> {
+    pub async fn search_index(&self, query: &str, max: usize) -> Vec<CrawlerSearchResult> {
         let idx = self.index.read().await;
         idx.search(query, max)
     }

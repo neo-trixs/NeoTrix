@@ -14,9 +14,11 @@
 use regex::Regex;
 use serde::Serialize;
 
-/// 风险等级
+/// 风险等级 — 用于隐私脱敏分析
+/// 
+/// For the unified RiskLevel, see `neotrix_types::RiskLevel`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum RiskLevel {
+pub enum RedactionRiskLevel {
     Safe,
     Suspicious,
     Dangerous,
@@ -68,15 +70,15 @@ impl Redactor {
     }
 
     /// 分析文本风险等级 + 命中的规则描述
-    pub fn analyze(&self, text: &str) -> (RiskLevel, Vec<String>) {
+    pub fn analyze(&self, text: &str) -> (RedactionRiskLevel, Vec<String>) {
         for &(desc, ref re) in &self.secret_regexes {
             if re.is_match(text) {
-                return (RiskLevel::Dangerous, vec![desc.to_string()]);
+                return (RedactionRiskLevel::Dangerous, vec![desc.to_string()]);
             }
         }
         for &p in &self.secret_strs {
             if text.contains(p) {
-                return (RiskLevel::Dangerous, vec![p.to_string()]);
+                return (RedactionRiskLevel::Dangerous, vec![p.to_string()]);
             }
         }
         let mut matches = Vec::new();
@@ -86,14 +88,14 @@ impl Redactor {
             }
         }
         if !matches.is_empty() {
-            return (RiskLevel::Suspicious, matches);
+            return (RedactionRiskLevel::Suspicious, matches);
         }
-        (RiskLevel::Safe, matches)
+        (RedactionRiskLevel::Safe, matches)
     }
 
     /// 是否安全 (无可脱敏内容)
     pub fn is_safe(&self, text: &str) -> bool {
-        matches!(self.analyze(text).0, RiskLevel::Safe)
+        matches!(self.analyze(text).0, RedactionRiskLevel::Safe)
     }
 
     /// 将文本中的 secrets 替换为占位符 [REDACTED] (PII 也替换，默认严格脱敏)

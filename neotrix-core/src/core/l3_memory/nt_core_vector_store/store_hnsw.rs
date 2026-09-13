@@ -5,7 +5,7 @@ use instant_distance::{Builder, Search};
 
 use super::float_vec::{FloatVec, bytes_to_f32s};
 use super::store::VectorStore;
-use super::types::{DistanceMetric, IndexConfig, SearchResult, VectorRecord};
+use super::types::{DistanceMetric, IndexConfig, VectorSearchResult, VectorRecord};
 
 struct Inner {
     records: Vec<VectorRecord>,
@@ -62,7 +62,7 @@ impl VectorStore for HnswVectorStore {
         Ok(())
     }
 
-    fn search(&self, query: &[u8], k: usize) -> Vec<SearchResult> {
+    fn search(&self, query: &[u8], k: usize) -> Vec<VectorSearchResult> {
         let inner = self.inner.lock().unwrap_or_else(|e| {
             log::warn!("[hnsw_vector_store] mutex poisoned: {}", e);
             e.into_inner()
@@ -85,7 +85,7 @@ impl VectorStore for HnswVectorStore {
                     DistanceMetric::Cosine => item.distance as f64,
                     DistanceMetric::Euclidean => (item.distance as f64).powi(2) * query.len() as f64,
                 };
-                Some(SearchResult {
+                Some(VectorSearchResult {
                     id: record.id.clone(),
                     distance,
                     metadata: record.metadata.clone(),
@@ -119,7 +119,7 @@ impl VectorStore for HnswVectorStore {
         query: &[u8],
         k: usize,
         filter: &HashMap<String, String>,
-    ) -> Vec<SearchResult> {
+    ) -> Vec<VectorSearchResult> {
         let inner = self.inner.lock().unwrap_or_else(|e| {
             log::warn!("[hnsw_vector_store] mutex poisoned: {}", e);
             e.into_inner()
@@ -134,7 +134,7 @@ impl VectorStore for HnswVectorStore {
         let mut search = Search::default();
         let scan_limit = inner.records.len().max(k * 10);
 
-        let mut filtered: Vec<SearchResult> = hnsw
+        let mut filtered: Vec<VectorSearchResult> = hnsw
             .search(&query_f32, &mut search)
             .take(scan_limit)
             .filter_map(|item| {
@@ -150,7 +150,7 @@ impl VectorStore for HnswVectorStore {
                     DistanceMetric::Cosine => item.distance as f64,
                     DistanceMetric::Euclidean => (item.distance as f64).powi(2) * query.len() as f64,
                 };
-                Some(SearchResult {
+                Some(VectorSearchResult {
                     id: record.id.clone(),
                     distance,
                     metadata: record.metadata.clone(),

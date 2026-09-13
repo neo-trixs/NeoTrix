@@ -309,16 +309,20 @@ impl KnowledgeStorage {
 // 轻量图建模: 节点/边上下文切片 + 溯源链, 作为 KnowledgeStorage 之上的一层 (R-P42)。
 
 /// 图节点 — 上下文切片 (knowledge entry 的轻量投影)。
+/// 
+/// For the unified GraphNode, see `neotrix_core::core::nt_core_graph::GraphNode`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct GraphNode {
+pub struct ContextGraphNode {
     pub id: String,
     pub kind: String,
     pub content: String,
 }
 
 /// 图边 — 有向关系 + 权重 (权重钳制在 [0,1], R-P6)。
+/// 
+/// For the unified GraphEdge, see `neotrix_core::core::nt_core_graph::GraphEdge`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct GraphEdge {
+pub struct ContextGraphEdge {
     pub from: String,
     pub to: String,
     pub relation: String,
@@ -336,14 +340,14 @@ pub struct ProvenanceStep {
 /// 上下文图 — 节点/边/溯源链, 支撑因果推理与决策溯源。
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContextGraph {
-    pub nodes: Vec<GraphNode>,
-    pub edges: Vec<GraphEdge>,
+    pub nodes: Vec<ContextGraphNode>,
+    pub edges: Vec<ContextGraphEdge>,
     pub provenance: Vec<ProvenanceStep>,
 }
 
 impl ContextGraph {
     /// 添加节点; id 重复则替换旧节点。
-    pub fn add_node(&mut self, node: GraphNode) {
+    pub fn add_node(&mut self, node: ContextGraphNode) {
         if let Some(existing) = self.nodes.iter_mut().find(|n| n.id == node.id) {
             *existing = node;
         } else {
@@ -361,7 +365,7 @@ impl ContextGraph {
         if !has(to) {
             return Err(format!("missing node: {to}"));
         }
-        self.edges.push(GraphEdge {
+        self.edges.push(ContextGraphEdge {
             from: from.to_string(),
             to: to.to_string(),
             relation: relation.to_string(),
@@ -371,14 +375,14 @@ impl ContextGraph {
     }
 
     /// 广度优先收集 depth 层内的邻居节点 (不包含 focus 自身)。
-    pub fn neighborhood(&self, id: &str, depth: usize) -> Vec<&GraphNode> {
+    pub fn neighborhood(&self, id: &str, depth: usize) -> Vec<&ContextGraphNode> {
         if !self.nodes.iter().any(|n| n.id == id) || depth == 0 {
             return Vec::new();
         }
         let mut visited = std::collections::HashSet::new();
         visited.insert(id.to_string());
         let mut frontier: Vec<String> = vec![id.to_string()];
-        let mut result: Vec<&GraphNode> = Vec::new();
+        let mut result: Vec<&ContextGraphNode> = Vec::new();
 
         for _ in 0..depth {
             let mut next: Vec<String> = Vec::new();

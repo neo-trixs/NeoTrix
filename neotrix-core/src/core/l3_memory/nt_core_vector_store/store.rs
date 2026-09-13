@@ -8,7 +8,7 @@ use super::types::*;
 pub trait VectorStore: Send + Sync {
     fn name(&self) -> &str;
     fn insert(&mut self, record: VectorRecord) -> Result<(), String>;
-    fn search(&self, query: &[u8], k: usize) -> Vec<SearchResult>;
+    fn search(&self, query: &[u8], k: usize) -> Vec<VectorSearchResult>;
     fn remove(&mut self, id: &str) -> Result<(), String>;
     fn len(&self) -> usize;
     fn is_healthy(&self) -> bool;
@@ -17,7 +17,7 @@ pub trait VectorStore: Send + Sync {
         query: &[u8],
         k: usize,
         filter: &HashMap<String, String>,
-    ) -> Vec<SearchResult>;
+    ) -> Vec<VectorSearchResult>;
 }
 
 pub struct IvfVectorStore {
@@ -50,7 +50,7 @@ impl VectorStore for IvfVectorStore {
         Ok(())
     }
 
-    fn search(&self, query: &[u8], k: usize) -> Vec<SearchResult> {
+    fn search(&self, query: &[u8], k: usize) -> Vec<VectorSearchResult> {
         let index = self.index.lock().unwrap_or_else(|e| {
             log::warn!("[vector_store] mutex poisoned: {}", e);
             e.into_inner()
@@ -80,13 +80,13 @@ impl VectorStore for IvfVectorStore {
         query: &[u8],
         k: usize,
         filter: &HashMap<String, String>,
-    ) -> Vec<SearchResult> {
+    ) -> Vec<VectorSearchResult> {
         let index = self.index.lock().unwrap_or_else(|e| {
             log::warn!("[vector_store] mutex poisoned: {}", e);
             e.into_inner()
         });
         let all_results = index.search(query, index.len().max(k * 10));
-        let mut filtered: Vec<SearchResult> = all_results
+        let mut filtered: Vec<VectorSearchResult> = all_results
             .into_iter()
             .filter(|r| {
                 filter
@@ -128,8 +128,8 @@ impl VectorStore for BruteForceVectorStore {
         Ok(())
     }
 
-    fn search(&self, query: &[u8], k: usize) -> Vec<SearchResult> {
-        let mut results: Vec<SearchResult> = self
+    fn search(&self, query: &[u8], k: usize) -> Vec<VectorSearchResult> {
+        let mut results: Vec<VectorSearchResult> = self
             .records
             .iter()
             .map(|r| {
@@ -138,7 +138,7 @@ impl VectorStore for BruteForceVectorStore {
                     DistanceMetric::Cosine => 0.0,
                     DistanceMetric::Euclidean => index::euclidean_distance(query, &r.vector),
                 };
-                SearchResult {
+                VectorSearchResult {
                     id: r.id.clone(),
                     distance: d,
                     metadata: r.metadata.clone(),
@@ -177,8 +177,8 @@ impl VectorStore for BruteForceVectorStore {
         query: &[u8],
         k: usize,
         filter: &HashMap<String, String>,
-    ) -> Vec<SearchResult> {
-        let mut results: Vec<SearchResult> = self
+    ) -> Vec<VectorSearchResult> {
+        let mut results: Vec<VectorSearchResult> = self
             .records
             .iter()
             .filter(|r| {
@@ -192,7 +192,7 @@ impl VectorStore for BruteForceVectorStore {
                     DistanceMetric::Cosine => 0.0,
                     DistanceMetric::Euclidean => index::euclidean_distance(query, &r.vector),
                 };
-                SearchResult {
+                VectorSearchResult {
                     id: r.id.clone(),
                     distance: d,
                     metadata: r.metadata.clone(),

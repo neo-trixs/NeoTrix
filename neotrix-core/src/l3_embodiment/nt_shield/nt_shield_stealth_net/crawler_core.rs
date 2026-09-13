@@ -96,8 +96,11 @@ pub struct CrawlerStats {
     pub last_crawl: Option<String>,
 }
 
+/// Crawler search result — specialized for dark web crawling.
+/// 
+/// For the unified SearchResult, see `neotrix_types::search_backend::SearchResult`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
+pub struct CrawlerSearchResult {
     pub url: String,
     pub title: String,
     pub snippet: String,
@@ -174,7 +177,7 @@ impl OnionIndex {
         }
     }
 
-    pub(crate) fn search(&self, query: &str, max: usize) -> Vec<SearchResult> {
+    pub(crate) fn search(&self, query: &str, max: usize) -> Vec<CrawlerSearchResult> {
         let terms: Vec<String> = query.to_lowercase()
             .split_whitespace()
             .filter(|t| t.len() > 2)
@@ -200,7 +203,7 @@ impl OnionIndex {
 
         scores.into_iter().map(|(score, i)| {
             let e = &self.entries[i];
-            SearchResult {
+            CrawlerSearchResult {
                 url: e.url.clone(),
                 title: e.title.clone(),
                 snippet: e.snippet.clone(),

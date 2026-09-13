@@ -138,13 +138,13 @@ pub async fn investigate(
 pub struct _CensysInvestigator;
 
 pub const CENSYS_API_HOST: &str = "search.censys.io";
-pub fn _censys_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(CENSYS_API_HOST, "443")
-}
-pub fn _censys_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![_censys_egress_rule()], false)
+pub fn _censys_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(CENSYS_API_HOST, "443")
 }
 
+pub fn _censys_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![_censys_egress_rule()], false)
+}
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -8,7 +8,7 @@ pub mod l1_wrappers;
 pub mod knowledge_store;
 pub mod seal_pipeline;
 
-pub use repair::RiskLevel;
+pub use repair::RepairRiskLevel;
 pub use cleanup_engine::*;
 pub use guardian::*;
 pub use distiller::*;

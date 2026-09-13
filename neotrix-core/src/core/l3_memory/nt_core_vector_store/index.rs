@@ -158,7 +158,7 @@ impl IVFIndex {
         }
     }
 
-    pub fn search(&self, query: &[u8], k: usize) -> Vec<SearchResult> {
+    pub fn search(&self, query: &[u8], k: usize) -> Vec<VectorSearchResult> {
         if self.centroids.is_empty() || self.partitions.is_empty() {
             return Vec::new();
         }
@@ -174,11 +174,11 @@ impl IVFIndex {
             .collect();
         centroid_dists.sort_by(|a, b| a.1.total_cmp(&b.1));
 
-        let mut results: Vec<SearchResult> = Vec::new();
+        let mut results: Vec<VectorSearchResult> = Vec::new();
         for &(pidx, _) in centroid_dists.iter().take(nprobe) {
             for record in &self.partitions[pidx] {
                 let d = dist_fn.distance(query, &record.vector);
-                results.push(SearchResult {
+                results.push(VectorSearchResult {
                     id: record.id.clone(),
                     distance: d,
                     metadata: record.metadata.clone(),

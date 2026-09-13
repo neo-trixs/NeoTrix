@@ -431,12 +431,12 @@ impl EdgarFetcher {
 /// SEC EDGAR Egress 主机 — 单一事实源 (P2)。
 pub const EDGAR_HOST: &str = "data.sec.gov";
 /// SEC EDGAR Egress allow 规则 (deny-wins 体系中的 allow 分支)。
-pub fn edgar_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(EDGAR_HOST, "443")
+pub fn edgar_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(EDGAR_HOST, "443")
 }
 /// SEC EDGAR 专用 Egress Policy (deny_all 基线 + 单条 allow)。
-pub fn edgar_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![edgar_egress_rule()], false)
+pub fn edgar_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![edgar_egress_rule()], false)
 }
 
 // ── 入库报告 ───────────────────────────────────────────────────

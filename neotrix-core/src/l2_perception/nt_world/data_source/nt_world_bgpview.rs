@@ -148,13 +148,13 @@ impl BgpviewFetcher {
 // ── Egress ───────────────────────────────────────────────────
 
 pub const BGPVIEW_HOST: &str = "api.bgpview.io";
-pub fn bgpview_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(BGPVIEW_HOST, "443")
-}
-pub fn bgpview_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![bgpview_egress_rule()], false)
+pub fn bgpview_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(BGPVIEW_HOST, "443")
 }
 
+pub fn bgpview_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![bgpview_egress_rule()], false)
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _BgpviewIngestReport {
     pub results_fetched: usize,

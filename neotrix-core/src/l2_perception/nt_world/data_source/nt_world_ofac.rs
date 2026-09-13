@@ -177,13 +177,13 @@ impl OfacFetcher {
 // ── Egress ───────────────────────────────────────────────────
 
 pub const OFAC_HOST: &str = "www.treasury.gov";
-pub fn ofac_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(OFAC_HOST, "443")
-}
-pub fn ofac_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![ofac_egress_rule()], false)
+pub fn ofac_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(OFAC_HOST, "443")
 }
 
+pub fn ofac_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![ofac_egress_rule()], false)
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _OfacIngestReport {
     pub events_fetched: usize,

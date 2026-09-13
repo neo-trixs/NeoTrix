@@ -172,13 +172,13 @@ impl AdsbFetcher {
 // ── Egress ───────────────────────────────────────────────────
 
 pub const ADSB_HOST: &str = "api.adsb.lol";
-pub fn adsb_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(ADSB_HOST, "443")
-}
-pub fn adsb_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![adsb_egress_rule()], false)
+pub fn adsb_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(ADSB_HOST, "443")
 }
 
+pub fn adsb_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![adsb_egress_rule()], false)
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _AdsbIngestReport {
     pub events_fetched: usize,

@@ -266,13 +266,13 @@ fn self_default_fence() -> _Geofence {
 // ── Egress ───────────────────────────────────────────────────
 
 pub const AOI_HOST: &str = "earthquake.usgs.gov";
-pub fn aoi_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(AOI_HOST, "443")
-}
-pub fn aoi_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![aoi_egress_rule()], false)
+pub fn aoi_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(AOI_HOST, "443")
 }
 
+pub fn aoi_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![aoi_egress_rule()], false)
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _AoiIngestReport {
     pub events_fetched: usize,

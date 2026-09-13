@@ -15,8 +15,11 @@ pub enum ScanCategory {
     DeveloperCache,
 }
 
+/// System scan risk level — used for system scanner risk assessment.
+/// 
+/// For the unified RiskLevel, see `neotrix_types::RiskLevel`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RiskLevel {
+pub enum ScanRiskLevel {
     Safe,
     Moderate,
     High,
@@ -28,7 +31,7 @@ pub struct ScanResult {
     pub size_bytes: u64,
     pub age_days: u32,
     pub category: ScanCategory,
-    pub risk_level: RiskLevel,
+    pub risk_level: ScanRiskLevel,
     pub description: String,
 }
 
@@ -45,7 +48,7 @@ pub fn calculate_age_days(metadata: &std::fs::Metadata) -> u32 {
 pub struct ScanPath {
     pub path: PathBuf,
     pub category: ScanCategory,
-    pub risk_level: RiskLevel,
+    pub risk_level: ScanRiskLevel,
     pub recursive: bool,
 }
 
@@ -65,14 +68,14 @@ impl SystemScanner {
     fn init_default_paths(&mut self) {
         let home = dirs::home_dir().unwrap_or_default();
         let paths = vec![
-            (home.join("Library/Caches"), ScanCategory::SystemCache, RiskLevel::Safe),
-            (home.join("Library/Logs"), ScanCategory::SystemLog, RiskLevel::Safe),
-            (PathBuf::from("/tmp"), ScanCategory::TempFile, RiskLevel::Safe),
-            (PathBuf::from("/private/var/folders"), ScanCategory::TempFile, RiskLevel::Safe),
-            (home.join("Library/Caches/Google/Chrome"), ScanCategory::BrowserCache, RiskLevel::Safe),
-            (home.join(".cargo/registry"), ScanCategory::DeveloperCache, RiskLevel::Moderate),
-            (home.join(".npm"), ScanCategory::DeveloperCache, RiskLevel::Safe),
-            (home.join("Library/Caches/Homebrew"), ScanCategory::DeveloperCache, RiskLevel::Safe),
+            (home.join("Library/Caches"), ScanCategory::SystemCache, ScanRiskLevel::Safe),
+            (home.join("Library/Logs"), ScanCategory::SystemLog, ScanRiskLevel::Safe),
+            (PathBuf::from("/tmp"), ScanCategory::TempFile, ScanRiskLevel::Safe),
+            (PathBuf::from("/private/var/folders"), ScanCategory::TempFile, ScanRiskLevel::Safe),
+            (home.join("Library/Caches/Google/Chrome"), ScanCategory::BrowserCache, ScanRiskLevel::Safe),
+            (home.join(".cargo/registry"), ScanCategory::DeveloperCache, ScanRiskLevel::Moderate),
+            (home.join(".npm"), ScanCategory::DeveloperCache, ScanRiskLevel::Safe),
+            (home.join("Library/Caches/Homebrew"), ScanCategory::DeveloperCache, ScanRiskLevel::Safe),
         ];
         for (path, category, risk_level) in paths {
             self.scan_paths.push(ScanPath { path, category, risk_level, recursive: true });
@@ -82,7 +85,7 @@ impl SystemScanner {
     pub fn set_min_age(&mut self, days: u32) { self.min_age_days = days; }
     pub fn set_min_size(&mut self, bytes: u64) { self.min_size_bytes = bytes; }
 
-    pub fn _add_scan_path(&mut self, path: PathBuf, category: ScanCategory, risk_level: RiskLevel) {
+    pub fn _add_scan_path(&mut self, path: PathBuf, category: ScanCategory, risk_level: ScanRiskLevel) {
         self.scan_paths.push(ScanPath { path, category, risk_level, recursive: true });
     }
 
@@ -153,7 +156,7 @@ mod tests {
         s.scan_paths.clear();
         s.min_age_days = 0;
         s.min_size_bytes = 0;
-        s.scan_paths.push(ScanPath { path: temp.path().to_path_buf(), category: ScanCategory::TempFile, risk_level: RiskLevel::Safe, recursive: false });
+        s.scan_paths.push(ScanPath { path: temp.path().to_path_buf(), category: ScanCategory::TempFile, risk_level: ScanRiskLevel::Safe, recursive: false });
         assert!(s.scan().is_empty());
     }
 
@@ -165,7 +168,7 @@ mod tests {
         s.scan_paths.clear();
         s.min_age_days = 0;
         s.min_size_bytes = 0;
-        s.scan_paths.push(ScanPath { path: temp.path().to_path_buf(), category: ScanCategory::SystemLog, risk_level: RiskLevel::Safe, recursive: false });
+        s.scan_paths.push(ScanPath { path: temp.path().to_path_buf(), category: ScanCategory::SystemLog, risk_level: ScanRiskLevel::Safe, recursive: false });
         let r = s.scan();
         assert_eq!(r.len(), 1);
     }

@@ -170,11 +170,11 @@ pub async fn investigate(
 pub struct _ShodanInvestigator;
 
 pub const SHODAN_API_HOST: &str = "api.shodan.io";
-pub fn _shodan_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(SHODAN_API_HOST, "443")
+pub fn _shodan_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(SHODAN_API_HOST, "443")
 }
-pub fn _shodan_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![_shodan_egress_rule()], false)
+pub fn _shodan_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![_shodan_egress_rule()], false)
 }
 
 #[cfg(test)]

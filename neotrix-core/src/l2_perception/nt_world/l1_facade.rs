@@ -18,3 +18,9 @@ pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::run_blocking;
 
 // HTTP 工厂门面 — proxy_from_env
 pub use crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env;
+
+// 共享出口类型门面 — EgressRule/EgressPolicy (避免 L2→L3 向上依赖)
+pub use crate::l1_action::nt_io::nt_io_provider::common::egress_types::{
+    SandboxEgressRule as EgressRule,
+    SandboxEgressPolicy as EgressPolicy,
+};

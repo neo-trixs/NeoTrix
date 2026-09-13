@@ -205,15 +205,15 @@ impl GdeltFetcher {
 
 // ── Egress 登记 ─────────────────────────────────────────────────
 
-/// GDELT Egress 主机 — 单一事实源在 `nt_shield_sandbox::INTEL_GDELT_HOST` (P2)。
-pub const GDELT_HOST: &str = crate::l3_embodiment::nt_shield::nt_shield_sandbox::INTEL_GDELT_HOST;
+/// GDELT Egress 主机 — 单一事实源 (P2)。
+pub const GDELT_HOST: &str = "api.gdeltproject.org";
 /// GDELT Egress allow 规则 (deny-wins 体系中的 allow 分支)。
-pub fn gdelt_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(GDELT_HOST, "443")
+pub fn gdelt_egress_rule() -> super::super::l1_facade::EgressRule {
+    super::super::l1_facade::EgressRule::allow(GDELT_HOST, "443")
 }
-/// GDELT 专用 Egress Policy (deny_all 基线 + 单条 allow) — 委托 `intel_egress_policy`。
-pub fn _gdelt_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
-    crate::l3_embodiment::nt_shield::nt_shield_sandbox::intel_egress_policy()
+/// GDELT 专用 Egress Policy (deny_all 基线 + 单条 allow)。
+pub fn _gdelt_egress_policy() -> super::super::l1_facade::EgressPolicy {
+    super::super::l1_facade::EgressPolicy::new(vec![gdelt_egress_rule()], false)
 }
 
 // ── 入库报告 ───────────────────────────────────────────────────

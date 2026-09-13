@@ -57,13 +57,13 @@ pub mod nt_world_doc;
 pub mod nt_world_exploration_engine;
 pub mod nt_world_video_pipeline;
 pub mod nt_world_novel;
-pub mod nt_world_ods;
-pub mod nt_world_monitor;
-pub mod nt_world_osint_arsenal;
-pub mod nt_world_myip;
-pub mod nt_world_dsh_explore;
-pub mod nt_world_agent_reach;
-pub mod nt_world_semantic_extract;
+// pub mod nt_world_ods; // DEAD: zero external references
+// pub mod nt_world_monitor; // DEAD: zero external references
+// pub mod nt_world_osint_arsenal; // DEAD: zero external references
+// pub mod nt_world_myip; // DEAD: zero external references
+// pub mod nt_world_dsh_explore; // DEAD: zero external references
+// pub mod nt_world_agent_reach; // DEAD: zero external references
+// pub mod nt_world_semantic_extract; // DEAD: zero external references
 
 // 资产测绘系统
 pub mod asset_map;

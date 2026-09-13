@@ -8,7 +8,7 @@ use crate::core::nt_core_traits::{
     SecretScanner,
 };
 
-use super::redaction::{Redactor, RiskLevel};
+use super::redaction::{Redactor, RedactionRiskLevel};
 use crate::l3_embodiment::nt_shield::nt_shield_propagation_guard::PropagationGuard;
 use super::self_poison;
 use super::receipt::AgentReceipt;
@@ -19,9 +19,9 @@ impl SecretScanner for Redactor {
     fn analyze(&self, text: &str) -> (SecretRiskLevel, Vec<String>) {
         let (risk, hits) = Redactor::analyze(self, text);
         let risk = match risk {
-            RiskLevel::Safe => SecretRiskLevel::Safe,
-            RiskLevel::Suspicious => SecretRiskLevel::Suspicious,
-            RiskLevel::Dangerous => SecretRiskLevel::Dangerous,
+            RedactionRiskLevel::Safe => SecretRiskLevel::Safe,
+            RedactionRiskLevel::Suspicious => SecretRiskLevel::Suspicious,
+            RedactionRiskLevel::Dangerous => SecretRiskLevel::Dangerous,
         };
         (risk, hits)
     }

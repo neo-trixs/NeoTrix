@@ -8,7 +8,6 @@ pub use crate::core::l7_capability::*;
 pub mod reasoning;
 pub mod visual;
 pub mod info_theory;
-pub mod safety;
 pub mod cuda;
 pub mod other;
 
