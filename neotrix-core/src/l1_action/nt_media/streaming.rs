@@ -47,11 +47,11 @@ use tokio::time::Instant;
 // EventBus integration — R-P79: download progress → system-wide visibility
 // ═══════════════════════════════════════════════════════════════════════════
 
-static GLOBAL_EVENT_BUS: OnceLock<Arc<crate::core::nt_core_event_bus::EventBus>> = OnceLock::new();
+static GLOBAL_EVENT_BUS: OnceLock<Arc<crate::neotrix::nt_core_event_bus::EventBus>> = OnceLock::new();
 
 /// Register the global EventBus for download progress publishing.
 /// Call once at startup; silently no-ops if already set.
-pub fn set_download_event_bus(bus: Arc<crate::core::nt_core_event_bus::EventBus>) {
+pub fn set_download_event_bus(bus: Arc<crate::neotrix::nt_core_event_bus::EventBus>) {
     let _ = GLOBAL_EVENT_BUS.set(bus);
 }
 
@@ -1888,26 +1888,26 @@ async fn stream_hls_download(
     // Fetch and parse manifest
     let mut req = client.get(url).timeout(timeout);
     if let Some(a) = auth {
-        req = a.apply_to_request(req);
+        req = a.strategy.apply_to_request(req);
     }
     let resp = req
         .send()
         .await
-        .map_err(|e| PipelineError::Http(e.to_string()))?;
+        .map_err(|e| PipelineError::Network(e.to_string()))?;
     let manifest_text = resp
         .text()
         .await
-        .map_err(|e| PipelineError::Http(e.to_string()))?;
+        .map_err(|e| PipelineError::Network(e.to_string()))?;
 
     let manifest =
-        hls::parse_m3u8(&manifest_text).map_err(|e| PipelineError::Http(e.to_string()))?;
+        hls::parse_m3u8(&manifest_text).map_err(|e| PipelineError::Network(e.to_string()))?;
 
     // Resolve to segment URLs
     let segment_urls = match &manifest {
         hls::M3u8Manifest::Master(master) => {
             // Pick best quality variant (highest bandwidth)
             let variant = hls::select_variant(master, None)
-                .ok_or_else(|| PipelineError::Http("no variants in master playlist".into()))?;
+                .ok_or_else(|| PipelineError::Network("no variants in master playlist".to_string()))?;
             // Fetch the variant playlist
             let variant_url = hls::to_download_urls(
                 &hls::M3u8Manifest::Master(master.clone()),
@@ -1919,18 +1919,18 @@ async fn stream_hls_download(
 
             let mut req2 = client.get(&variant_url).timeout(timeout);
             if let Some(a) = auth {
-                req2 = a.apply_to_request(req2);
+                req2 = a.strategy.apply_to_request(req2);
             }
             let resp2 = req2
                 .send()
                 .await
-                .map_err(|e| PipelineError::Http(e.to_string()))?;
+                .map_err(|e| PipelineError::Network(e.to_string()))?;
             let variant_text = resp2
                 .text()
                 .await
-                .map_err(|e| PipelineError::Http(e.to_string()))?;
+                .map_err(|e| PipelineError::Network(e.to_string()))?;
             let variant_manifest =
-                hls::parse_m3u8(&variant_text).map_err(|e| PipelineError::Http(e.to_string()))?;
+                hls::parse_m3u8(&variant_text).map_err(|e| PipelineError::Network(e.to_string()))?;
             hls::to_download_urls(&variant_manifest, &variant_url)
         }
         hls::M3u8Manifest::Media(media) => hls::to_download_urls(&manifest, url),
@@ -1938,7 +1938,7 @@ async fn stream_hls_download(
 
     let total_segments = segment_urls.len() as u64;
     if total_segments == 0 {
-        return Err(PipelineError::Http("no segments in playlist".into()));
+        return Err(PipelineError::Network("no segments in playlist".to_string()));
     }
 
     let total_size_hint: Option<u64> = None;
@@ -2049,12 +2049,12 @@ async fn download_single_segment(
 ) -> Result<u64, PipelineError> {
     let mut req = client.get(url).timeout(timeout);
     if let Some(a) = auth {
-        req = a.apply_to_request(req);
+        req = a.strategy.apply_to_request(req);
     }
     let resp = req
         .send()
         .await
-        .map_err(|e| PipelineError::Http(e.to_string()))?;
+        .map_err(|e| PipelineError::Network(e.to_string()))?;
 
     let mut file = fs::File::create(dest)
         .await
@@ -2063,7 +2063,7 @@ async fn download_single_segment(
     let mut written: u64 = 0;
 
     while let Some(chunk) = stream.next().await {
-        let data = chunk.map_err(|e| PipelineError::Http(e.to_string()))?;
+        let data = chunk.map_err(|e| PipelineError::Network(e.to_string()))?;
         file.write_all(&data)
             .await
             .map_err(|e| PipelineError::Io(e.to_string()))?;
@@ -3018,6 +3018,8 @@ fn create_cancel_pair() -> (Arc<AtomicBool>, Arc<AtomicBool>) {
 
 #[derive(Debug, thiserror::Error)]
 pub enum PipelineError {
+    #[error("cancelled")]
+    Cancelled,
     #[error("network error: {0}")]
     Network(String),
     #[error("HTTP status {0}")]
