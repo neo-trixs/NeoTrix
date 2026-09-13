@@ -2005,7 +2005,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             let dir = first_path(&task.summary);
             match dir {
                 Some(p) if p.is_file() => {
-                    match crate::neotrix::pdf_image_stats(&p) {
+                    match crate::neotrix::nt_file_ability::pdf::pdf_image_extract::pdf_image_stats(&p) {
                         Ok(stats) => (
                             true,
                             format!(
@@ -2056,8 +2056,8 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     pdf_path.file_stem().unwrap_or_default().to_string_lossy()
                 ))
             });
-            let config = crate::neotrix::PdfImageExtractConfig::default();
-            match crate::neotrix::extract_pdf_images(pdf_path, &out_dir, &config) {
+            let config = crate::neotrix::nt_file_ability::pdf::pdf_image_extract::PdfImageExtractConfig::default();
+            match crate::neotrix::nt_file_ability::pdf::pdf_image_extract::extract_pdf_images(pdf_path, &out_dir, &config) {
                 Ok(result) => (
                     true,
                     format!(
@@ -2119,7 +2119,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         "metacog_evaluate" => {
             use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
-            use crate::core::nt_core_self::silicon_self_model::SiliconSelfModel;
+            use crate::core::nt_core_self::silicon_self::SiliconSelfModel;
             let mut evaluator = CognitiveEvaluator::new();
             let model = SiliconSelfModel::default();
             let report = evaluator.evaluate(&model);

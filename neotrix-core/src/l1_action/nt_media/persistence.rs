@@ -1142,30 +1142,3 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&dir).await;
     }
 }
-            offset,
-            size: end - offset,
-            completed: false,
-            checksum: None,
-        }
-    }
-
-    pub fn status(&self) -> ChunkDownloadStatus {
-        if self.completed {
-            ChunkDownloadStatus::Complete
-        } else {
-            ChunkDownloadStatus::Pending
-        }
-    }
-
-    pub fn downloaded(&self) -> bool {
-        self.completed
-    }
-
-    pub fn start(&self) -> u64 {
-        self.offset
-    }
-
-    pub fn end(&self) -> u64 {
-        self.offset + self.size
-    }
-}

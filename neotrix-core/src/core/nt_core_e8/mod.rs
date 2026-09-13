@@ -1138,6 +1138,7 @@ pub fn mythos_reasoning_to_e8(text: &str) -> Vec<u8> {
 // ─── E8 Transition Probability Matrix ───────────────────────────────
 //
 // Serde compatibility: fixed arrays >32 elements need custom serialization.
+use serde::{Deserialize, Deserializer};
 // We use FlatCounts (Vec<u64>) and SerdeCompat64 (newtype) wrappers.
 
 /// 64-element serde-compatible wrapper.

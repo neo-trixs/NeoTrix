@@ -833,14 +833,14 @@ struct ParallelDownloader {
     total_size: u64,
     chunk_size: usize,
     concurrency: usize,
-    chunks: Arc<Mutex<VecDeque<ChunkState>>>,
+    chunks: Arc<TokioMutex<VecDeque<ChunkState>>>,
     bytes_written: Arc<AtomicU64>,
     cancel: Arc<AtomicBool>,
     stall_timeout: Duration,
     retry_policy: RetryPolicy,
     auth: Option<AuthConfig>,
-    token_bucket: Option<Arc<Mutex<TokenBucket>>>,
-    speed_window: Arc<Mutex<VecDeque<(Instant, u64)>>>,
+    token_bucket: Option<Arc<TokioMutex<TokenBucket>>>,
+    speed_window: Arc<TokioMutex<VecDeque<(Instant, u64)>>>,
 }
 
 impl ParallelDownloader {
@@ -869,14 +869,14 @@ impl ParallelDownloader {
             total_size,
             chunk_size,
             concurrency,
-            chunks: Arc::new(Mutex::new(VecDeque::from(chunks))),
+            chunks: Arc::new(TokioMutex::new(VecDeque::from(chunks))),
             bytes_written,
             cancel,
             stall_timeout,
             retry_policy: RetryPolicy::new(max_retries),
             auth,
             token_bucket,
-            speed_window: Arc::new(Mutex::new(VecDeque::new())),
+            speed_window: Arc::new(TokioMutex::new(VecDeque::new())),
         }
     }
 
