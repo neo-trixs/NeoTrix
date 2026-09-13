@@ -93,7 +93,9 @@ impl SkillImprover {
                     if violation.message.contains("name") {
                         actions.push(ImprovementAction::AddFrontmatterField {
                             field: "name".to_string(),
-                            value: skill_path.file_stem().unwrap().to_string_lossy().to_string(),
+                            value: skill_path.file_stem()
+                                .map(|s| s.to_string_lossy().to_string())
+                                .unwrap_or_else(|| "unknown".to_string()),
                         });
                     }
                     if violation.message.contains("description") {
@@ -154,7 +156,9 @@ impl SkillImprover {
         }
         
         Ok(ImprovementPlan {
-            skill_name: skill_path.file_stem().unwrap().to_string_lossy().to_string(),
+            skill_name: skill_path.file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
             actions,
             estimated_iterations: 1,
         })
@@ -247,28 +251,31 @@ impl SkillImprover {
     }
 
     /// 迭代改进直到通过
-    pub fn improve_until_pass(&self, skill_path: &PathBuf) -> QualityGateResult {
+    pub fn improve_until_pass(&self, skill_path: &PathBuf) -> Result<QualityGateResult, String> {
         let mut iterations = 0;
         
         loop {
-            let content = std::fs::read_to_string(skill_path).unwrap_or_default();
+            let content = std::fs::read_to_string(skill_path).map_err(|e| e.to_string())?;
             let scores = self.evaluate(&content);
             let violations = self.detect_violations(&content, &scores);
             
             let passed = scores.overall >= self.min_overall_score && scores.safety >= self.min_safety_score && violations.is_empty();
             
             if passed || iterations >= self.max_iterations {
-                return QualityGateResult {
-                    skill_name: skill_path.file_stem().unwrap().to_string_lossy().to_string(),
+                let skill_name = skill_path.file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                return Ok(QualityGateResult {
+                    skill_name,
                     passed,
                     scores,
                     violations,
                     iterations,
-                };
+                });
             }
             
-            let plan = self.analyze(skill_path).unwrap();
-            self.apply(skill_path, &plan).unwrap();
+            let plan = self.analyze(skill_path)?;
+            self.apply(skill_path, &plan)?;
             iterations += 1;
         }
     }

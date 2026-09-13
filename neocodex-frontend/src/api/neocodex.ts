@@ -24,11 +24,11 @@ import type {
 
 /* ── 会话（domain plugin） ── */
 export function listSessions(projectPath?: string | null): Promise<NeoCodexSessionInfo[]> {
-  return domain.session.list() as Promise<NeoCodexSessionInfo[]>
+  return domain.session.list() as Promise<unknown> as Promise<NeoCodexSessionInfo[]>
 }
 
 export function createSession(name?: string): Promise<NeoCodexSessionInfo> {
-  return domain.session.create(name) as Promise<NeoCodexSessionInfo>
+  return domain.session.create(name) as Promise<unknown> as Promise<NeoCodexSessionInfo>
 }
 
 export function deleteSession(sessionId: string): Promise<void> {
@@ -40,15 +40,15 @@ export function switchSession(sessionId: string): Promise<void> {
 }
 
 export function renameSession(sessionId: string, name: string): Promise<NeoCodexSessionInfo> {
-  return domain.session.rename(sessionId, name) as Promise<NeoCodexSessionInfo>
+  return domain.session.rename(sessionId, name) as Promise<unknown> as Promise<NeoCodexSessionInfo>
 }
 
 export function tagSession(sessionId: string, tag: string): Promise<NeoCodexSessionInfo> {
-  return domain.session.tag(sessionId, tag) as Promise<NeoCodexSessionInfo>
+  return domain.session.tag(sessionId, tag) as Promise<unknown> as Promise<NeoCodexSessionInfo>
 }
 
 export function untagSession(sessionId: string, tag: string): Promise<NeoCodexSessionInfo> {
-  return domain.session.untag(sessionId, tag) as Promise<NeoCodexSessionInfo>
+  return domain.session.untag(sessionId, tag) as Promise<unknown> as Promise<NeoCodexSessionInfo>
 }
 
 export function archiveSession(sessionId: string): Promise<void> {
@@ -60,11 +60,11 @@ export function restoreSession(sessionId: string): Promise<void> {
 }
 
 export function listArchived(): Promise<NeoCodexSessionInfo[]> {
-  return domain.session.listArchived() as Promise<NeoCodexSessionInfo[]>
+  return domain.session.listArchived() as Promise<unknown> as Promise<NeoCodexSessionInfo[]>
 }
 
 export function searchSessions(query: string): Promise<NeoCodexSearchHit[]> {
-  return domain.session.search(query) as Promise<NeoCodexSearchHit[]>
+  return domain.session.search(query) as Promise<unknown> as Promise<NeoCodexSearchHit[]>
 }
 
 export function clearSession(sessionId: string): Promise<void> {
@@ -72,12 +72,12 @@ export function clearSession(sessionId: string): Promise<void> {
 }
 
 export function exportSession(sessionId: string, format?: string): Promise<string> {
-  return domain.chat.export(sessionId, format) as Promise<string>
+  return domain.chat.export(sessionId, format) as Promise<unknown> as Promise<string>
 }
 
 /* ── 消息 / 流式（domain plugin） ── */
 export function getSessionMessages(sessionId: string): Promise<NeoCodexMessageItem[]> {
-  return domain.chat.history(sessionId) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.history(sessionId) as Promise<unknown> as Promise<NeoCodexMessageItem[]>
 }
 
 export function sendMessageStream(params: {
@@ -88,7 +88,7 @@ export function sendMessageStream(params: {
   temperature?: number
   max_tokens?: number
 }): Promise<string> {
-  return domain.chat.send(params.content)
+  return domain.chat.send(params.content) as Promise<unknown> as Promise<string>
 }
 
 export function stopStream(): Promise<void> {
@@ -136,28 +136,28 @@ export async function subscribeStream(callbacks: {
 }
 
 export function editMessage(sessionId: string, index: number, content: string): Promise<NeoCodexMessageItem[]> {
-  return domain.chat.editMessage(sessionId, index, content) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.editMessage(sessionId, index, content) as Promise<unknown> as Promise<NeoCodexMessageItem[]>
 }
 
 export function deleteMessage(sessionId: string, index: number): Promise<NeoCodexMessageItem[]> {
-  return domain.chat.deleteMessage(sessionId, index) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.deleteMessage(sessionId, index) as Promise<unknown> as Promise<NeoCodexMessageItem[]>
 }
 
 export function regenerate(sessionId: string, index: number): Promise<NeoCodexMessageItem[]> {
-  return domain.chat.regenerate(sessionId, index) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.regenerate(sessionId, index) as Promise<unknown> as Promise<NeoCodexMessageItem[]>
 }
 
 export function compactSession(sessionId: string, keepMessages?: number): Promise<NeoCodexMessageItem[]> {
-  return domain.chat.compact(sessionId) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.compact(sessionId) as Promise<unknown> as Promise<NeoCodexMessageItem[]>
 }
 
 /* ── 侧聊（domain plugin） ── */
 export function getSideChat(sessionId: string): Promise<NeoCodexMessageItem[]> {
-  return domain.chat.sideChat.get(sessionId) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.sideChat.get(sessionId) as Promise<unknown> as Promise<NeoCodexMessageItem[]>
 }
 
 export function sendSideChat(sessionId: string, content: string): Promise<NeoCodexMessageItem[]> {
-  return domain.chat.sideChat.send(sessionId, content) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.sideChat.send(sessionId, content) as Promise<unknown> as Promise<NeoCodexMessageItem[]>
 }
 
 /* ── 提供商 / 模式 ── */

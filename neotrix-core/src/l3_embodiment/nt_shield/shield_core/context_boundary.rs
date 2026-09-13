@@ -1,6 +1,25 @@
 //! 上下文权限边界 — 防止 CPE 攻击
 //!
 //! 验证上下文来源，阻止权限提升。
+//!
+//! ## Privilege Separation (Absorbed: airgorah pattern)
+//!
+//! airgorah achieves privilege separation via polkit agent: the GTK4 GUI runs
+//! as a normal user while the Rust backend performs privileged operations
+//! through polkit-authenticated D-Bus calls. NeoTrix maps this to trust-level
+//! isolation:
+//!
+//! | airgorah Layer      | NeoTrix TrustLevel | Allowed Operations           |
+//! |---------------------|--------------------|------------------------------|
+//! | polkit agent (root) | `System`           | Everything (wildcard)        |
+//! | GTK4 GUI (user)     | `User`             | read/write/execute/search    |
+//! | D-Bus interface     | `Tool`             | read/search only             |
+//! | External input      | `External`         | read only                    |
+//! | Sandbox / untrusted | `Untrusted`        | nothing                      |
+//!
+//! Key principle: **the agent never escalates its own trust level**.
+//! Privilege escalation requires an external `ContextRequest` with a higher
+//! `TrustLevel` — the agent cannot forge this.
 
 use std::collections::HashMap;
 
@@ -116,6 +135,16 @@ impl ContextBoundary {
             }
         }
 
+        // Privilege escalation detection (airgorah pattern)
+        // Check if the request is attempting to act beyond its trust level
+        if let Some(escalation) = self.detect_privilege_escalation(request) {
+            let result = ValidationResult::Denied {
+                reason: escalation,
+            };
+            self.history.push((request.clone(), result.clone()));
+            return result;
+        }
+
         // 检查操作权限
         if let Some(allowed) = self.allowed_actions.get(&request.trust_level) {
             if allowed.contains(&"*".to_string()) {
@@ -141,6 +170,49 @@ impl ContextBoundary {
         let result = ValidationResult::Allowed;
         self.history.push((request.clone(), result.clone()));
         result
+    }
+
+    /// Detect privilege escalation attempts (airgorah polkit pattern).
+    ///
+    /// An agent running at TrustLevel::Tool cannot escalate to System by
+    /// requesting System-level actions. The request must originate from a
+    /// higher-trust source — the agent cannot forge its own trust level.
+    fn detect_privilege_escalation(&self, request: &ContextRequest) -> Option<String> {
+        // Untrusted sources can never request anything
+        if request.trust_level == TrustLevel::Untrusted && !request.requested_actions.is_empty() {
+            return Some(format!(
+                "Privilege escalation blocked: Untrusted source '{}' cannot request any actions",
+                request.source
+            ));
+        }
+
+        // External sources can only read — block any write/execute/delete
+        if request.trust_level == TrustLevel::External {
+            let mutating = ["write", "execute", "delete", "create", "update"];
+            for action in &request.requested_actions {
+                if mutating.contains(&action.as_str()) {
+                    return Some(format!(
+                        "Privilege escalation blocked: External source '{}' cannot perform mutating action '{}'",
+                        request.source, action
+                    ));
+                }
+            }
+        }
+
+        // Tool sources can only read/search — block write/execute/delete
+        if request.trust_level == TrustLevel::Tool {
+            let mutating = ["write", "execute", "delete", "create", "update"];
+            for action in &request.requested_actions {
+                if mutating.contains(&action.as_str()) {
+                    return Some(format!(
+                        "Privilege escalation blocked: Tool source '{}' cannot perform mutating action '{}'",
+                        request.source, action
+                    ));
+                }
+            }
+        }
+
+        None
     }
 
     /// 获取验证历史
@@ -229,5 +301,49 @@ mod tests {
         let (a, d, _) = cb.stats();
         assert_eq!(a, 1);
         assert_eq!(d, 1);
+    }
+
+    #[test]
+    fn test_tool_cannot_write_via_privilege_escalation() {
+        let mut cb = ContextBoundary::new();
+        let req = ContextRequest {
+            source: "mcp_tool".into(),
+            trust_level: TrustLevel::Tool,
+            content: "safe content".into(),
+            requested_actions: vec!["write".into()],
+        };
+        let result = cb.validate(&req);
+        match result {
+            ValidationResult::Denied { reason } => {
+                assert!(reason.contains("Privilege escalation blocked"));
+            }
+            _ => panic!("Tool requesting write should be denied via privilege escalation"),
+        }
+    }
+
+    #[test]
+    fn test_external_cannot_execute_via_privilege_escalation() {
+        let mut cb = ContextBoundary::new();
+        let req = ContextRequest {
+            source: "external_api".into(),
+            trust_level: TrustLevel::External,
+            content: "safe content".into(),
+            requested_actions: vec!["execute".into()],
+        };
+        let result = cb.validate(&req);
+        assert!(matches!(result, ValidationResult::Denied { .. }));
+    }
+
+    #[test]
+    fn test_untrusted_blocked_from_all_actions() {
+        let mut cb = ContextBoundary::new();
+        let req = ContextRequest {
+            source: "sandbox".into(),
+            trust_level: TrustLevel::Untrusted,
+            content: "hello".into(),
+            requested_actions: vec!["read".into()],
+        };
+        let result = cb.validate(&req);
+        assert!(matches!(result, ValidationResult::Denied { .. }));
     }
 }

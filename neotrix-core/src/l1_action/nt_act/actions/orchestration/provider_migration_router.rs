@@ -206,7 +206,7 @@ impl ProviderMigrationRouter {
             .min_by(|a, b| {
                 let score_a = self.calculate_provider_score(a, requirements);
                 let score_b = self.calculate_provider_score(b, requirements);
-                score_a.partial_cmp(&score_b).unwrap()
+                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
             })
     }
 

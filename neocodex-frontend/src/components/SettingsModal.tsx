@@ -425,6 +425,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   // 外部第三方模型 API 智能配置：乐观写入本地态，并尝试落盘后端
   const handleAddCustomProvider = async (req: CustomProviderReq) => {
     const meta: ProviderMeta = {
+      id: req.name,
       name: req.name,
       display_name: req.display_name,
       category: 'proxy',

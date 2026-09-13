@@ -21,7 +21,7 @@ export function McpServerPanel() {
     setError(null)
     try {
       const result = await tool.mcpList()
-      setServers(result.servers || [])
+      setServers(result || [])
     } catch (e) {
       setError(String(e))
     } finally {

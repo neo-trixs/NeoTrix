@@ -15,9 +15,9 @@ const baseCfg = (overrides: Partial<ProviderConfig> = {}): ProviderConfig => ({
   resolvable: true,
   active_model: 'local-model-a',
   providers: [
-    { name: 'Local', display_name: '本地引擎', category: 'local', is_free: true, base_url: '', model: 'local-model-a', models: ['local-model-a', 'local-model-b'], resolvable: true },
-    { name: 'Proxy', display_name: '中转代理', category: 'proxy', is_free: false, base_url: 'https://x', model: 'proxy-model-x', models: ['proxy-model-x'], resolvable: true },
-    { name: 'Broken', display_name: '不可用服务', category: 'cloud', is_free: false, base_url: '', model: 'dead-model', models: ['dead-model'], resolvable: false },
+    { id: 'local', name: 'Local', display_name: '本地引擎', category: 'local', is_free: true, base_url: '', model: 'local-model-a', models: ['local-model-a', 'local-model-b'], resolvable: true },
+    { id: 'proxy', name: 'Proxy', display_name: '中转代理', category: 'proxy', is_free: false, base_url: 'https://x', model: 'proxy-model-x', models: ['proxy-model-x'], resolvable: true },
+    { id: 'broken', name: 'Broken', display_name: '不可用服务', category: 'cloud', is_free: false, base_url: '', model: 'dead-model', models: ['dead-model'], resolvable: false },
   ],
   ...overrides,
 })
@@ -94,7 +94,7 @@ describe('ModelsSection', () => {
 
   it('连通测试: 无 endpoint 探测失败 → 不通 (fail-closed)', async () => {
     const cfg = baseCfg()
-    cfg.providers.push({ name: 'Abcd', display_name: '四字服务', category: 'cloud', is_free: false, base_url: '', model: 'm4', models: ['m4'], resolvable: true })
+    cfg.providers.push({ id: 'abcd', name: 'Abcd', display_name: '四字服务', category: 'cloud', is_free: false, base_url: '', model: 'm4', models: ['m4'], resolvable: true })
     mount(cfg)
     const btn = await screen.findByLabelText('测试 四字服务 连通')
     fireEvent.click(btn)

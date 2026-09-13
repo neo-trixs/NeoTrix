@@ -143,23 +143,23 @@ impl MultiRegionScheduler {
 
         match self.strategy {
             RegionalStrategy::LatencyFirst => {
-                candidates.sort_by(|a, b| a.latency_ms.partial_cmp(&b.latency_ms).unwrap());
+                candidates.sort_by(|a, b| a.latency_ms.partial_cmp(&b.latency_ms).unwrap_or(std::cmp::Ordering::Equal));
             }
             RegionalStrategy::CostFirst => {
                 candidates.sort_by(|a, b| a.cost_tier.cmp(&b.cost_tier));
             }
             RegionalStrategy::AvailabilityFirst => {
-                candidates.sort_by(|a, b| b.availability_percent.partial_cmp(&a.availability_percent).unwrap());
+                candidates.sort_by(|a, b| b.availability_percent.partial_cmp(&a.availability_percent).unwrap_or(std::cmp::Ordering::Equal));
             }
             RegionalStrategy::LoadBalanced => {
-                candidates.sort_by(|a, b| a.current_load.partial_cmp(&b.current_load).unwrap());
+                candidates.sort_by(|a, b| a.current_load.partial_cmp(&b.current_load).unwrap_or(std::cmp::Ordering::Equal));
             }
             RegionalStrategy::GeoProximity => {
                 // 按地理距离排序
                 candidates.sort_by(|a, b| {
                     let dist_a = self.calculate_distance(&requirements.origin, &a.location);
                     let dist_b = self.calculate_distance(&requirements.origin, &b.location);
-                    dist_a.partial_cmp(&dist_b).unwrap()
+                    dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
         }

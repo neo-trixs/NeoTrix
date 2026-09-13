@@ -96,7 +96,7 @@ impl NucleiEngine {
             .map(|f| {
                 // In production: use word2vec or BERT embedding
                 // For now: deterministic hash-based vector
-                let vec = FhrrHyperCube::random_vector(1024);
+                let vec = FhrrVector::random_dim(1024, 0x42);
                 vec
             })
             .collect()

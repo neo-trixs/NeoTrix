@@ -145,7 +145,7 @@ impl _ConcurrencyConflictDetector {
     pub fn try_lock(&mut self, file_path: &str, session_id: &str) -> bool {
         if let Some(state) = self.lock_states.get(file_path) {
             if *state == _LockState::Unlocked {
-                *self.lock_states.get_mut(file_path).unwrap() = _LockState::Locked {
+                *self.lock_states.get_mut(file_path).expect("file_path checked in get above") = _LockState::Locked {
                     holder: session_id.to_string(),
                     since: chrono::Utc::now(),
                 };

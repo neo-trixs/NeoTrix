@@ -1,7 +1,7 @@
 {
-  "productName": "Consciousness Valley",
-  "version": "0.1.0",
-  "identifier": "com.neotrix.consciousness-valley",
+  "productName": "Star Valley",
+  "version": "1.0.0",
+  "identifier": "com.neotrix.star-valley",
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "",
@@ -12,15 +12,17 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Consciousness Valley",
+        "title": "Star Valley - 星谷物语",
         "width": 960,
         "height": 640,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self'"
     }
   },
   "bundle": {

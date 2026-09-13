@@ -141,7 +141,7 @@ export function CapabilitiesSection() {
                       <div class="text-sm font-medium text-text-primary truncate">{d.name}</div>
                       <div class="text-[11px] text-text-secondary truncate">{d.description}</div>
                     </div>
-                    <span className="text-[10px] text-text-muted font-mono">{d.actions} actions</span>
+                    <span class="text-[10px] text-text-muted font-mono">{d.actions} actions</span>
                   </div>
                 )}
               </For>

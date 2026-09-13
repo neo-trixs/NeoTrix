@@ -163,8 +163,8 @@ impl VideoJobPipeline {
     pub(crate) fn _next_job(&mut self) -> Option<&mut VideoJob> {
         // 按优先级排序
         self.queue.sort_by(|a, b| {
-            let job_a = self.jobs.get(a).unwrap();
-            let job_b = self.jobs.get(b).unwrap();
+            let job_a = self.jobs.get(a).expect("job referenced by queue must exist in jobs map");
+            let job_b = self.jobs.get(b).expect("job referenced by queue must exist in jobs map");
             job_b.priority.cmp(&job_a.priority)
         });
 

@@ -856,21 +856,33 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("进化", "seal_iterate", "NT-MIND", "KnowledgeIntegrator"),
     ("迭代", "seal_iterate", "NT-MIND", "KnowledgeIntegrator"),
     ("蒸馏", "seal_distill", "NT-MIND", "KnowledgeIntegrator"),
+    ("seal_distill", "seal_distill", "NT-MIND", "KnowledgeIntegrator"),
+    ("seal_iterate", "seal_iterate", "NT-MIND", "KnowledgeIntegrator"),
+    ("pipeline", "seal_distill", "NT-MIND", "KnowledgeIntegrator"),
     // ── Self model dispatch routes ──
     ("自我评估", "self_model_tick", "NT-CORE", "ReflectionEngine"),
     ("能力评估", "self_model_tick", "NT-CORE", "ReflectionEngine"),
     ("认知健康", "metacog_evaluate", "NT-CORE", "ReflectionEngine"),
+    ("self_model_tick", "self_model_tick", "NT-CORE", "ReflectionEngine"),
+    ("self", "self_model_tick", "NT-CORE", "ReflectionEngine"),
+    ("model", "self_model_tick", "NT-CORE", "ReflectionEngine"),
     // ── Meta cognition dispatch routes ──
     ("元观察", "meta_observe", "NT-META", "MetaCognitionAnalyst"),
     ("质量扫描", "sentrux_scan", "NT-META", "MetaCognitionAnalyst"),
     ("代码质量", "sentrux_scan", "NT-META", "MetaCognitionAnalyst"),
     ("构建健康", "build_watchdog", "NT-META", "MetaCognitionAnalyst"),
     ("构建检查", "build_watchdog", "NT-META", "MetaCognitionAnalyst"),
+    ("meta_observe", "meta_observe", "NT-META", "MetaCognitionAnalyst"),
+    ("observe", "meta_observe", "NT-META", "MetaCognitionAnalyst"),
+    ("monitor", "meta_observe", "NT-META", "MetaCognitionAnalyst"),
     // ── Shield security dispatch routes ──
     ("安全审计", "shield_audit", "NT-SHIELD", "RiskAssessor"),
     ("攻击检测", "shield_audit", "NT-SHIELD", "RiskAssessor"),
     ("漏洞扫描", "agentic_scan", "NT-SHIELD", "RiskAssessor"),
     ("安全扫描", "agentic_scan", "NT-SHIELD", "RiskAssessor"),
+    ("shield_audit", "shield_audit", "NT-SHIELD", "RiskAssessor"),
+    ("shield", "shield_audit", "NT-SHIELD", "RiskAssessor"),
+    ("security", "shield_audit", "NT-SHIELD", "RiskAssessor"),
 ];
 
 /// 子任务 — 意识核心从人类语言拆解出的最小执行单元。

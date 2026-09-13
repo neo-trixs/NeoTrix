@@ -3,8 +3,8 @@ import { kb } from '../api/domain'
 
 interface KbNode {
   id: string
-  name: string
-  type: string
+  label: string
+  kind: string
 }
 
 interface KbEdge {
@@ -26,7 +26,7 @@ export function KbGraphVisualization() {
     try {
       const result = await kb.graph()
       setNodes(result.nodes || [])
-      setEdges(result.edges || [])
+      setEdges((result.edges as KbEdge[]) || [])
     } catch (e) {
       setError(String(e))
     } finally {
@@ -86,7 +86,7 @@ export function KbGraphVisualization() {
                   fill="white"
                   font-size="10"
                 >
-                  {node.name.substring(0, 5)}
+                  {node.label.substring(0, 5)}
                 </text>
               </g>
             )}
@@ -96,8 +96,8 @@ export function KbGraphVisualization() {
       
       <Show when={selectedNode()}>
         <div class="node-detail">
-          <h4>{selectedNode()!.name}</h4>
-          <p>类型: {selectedNode()!.type}</p>
+          <h4>{selectedNode()!.label}</h4>
+          <p>类型: {selectedNode()!.kind}</p>
           <p>ID: {selectedNode()!.id}</p>
         </div>
       </Show>

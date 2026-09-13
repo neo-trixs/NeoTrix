@@ -363,7 +363,7 @@ export const tool = {
     call<string>('tool', 'voice_synthesize', { text, voice }),
 }
 
-export interface McpServer { name: string; status: string }
+export interface McpServer { name: string; url: string; enabled: boolean }
 
 /**
  * 系统域操作

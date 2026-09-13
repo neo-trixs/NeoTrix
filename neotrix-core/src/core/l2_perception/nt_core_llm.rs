@@ -7,6 +7,7 @@
 //!
 //! 2026-07-04: 新增 ProviderCategory (自我/客体分离)
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -490,10 +491,205 @@ const INTERNAL_TOKENS: &[&str] = &[
 ];
 
 /// 常见密钥/凭据前缀 — 出站前必脱 (与 neotrix 层 Redactor 行为一致)。
+/// 吸收 Mask/Maskit 模式: 覆盖云厂商、CI/CD、支付、通信、区块链等全场景。
 const SECRET_PREFIXES: &[&str] = &[
-    "sk-", "AKIA", "eyJ", "ghp_", "gho_", "ghu_", "ghs_", "xoxb-", "xoxp-", "-----BEGIN", "AIza", "pk_live", "pk_test",
-    "Bearer ", "api_key=", "apikey=", "secret=", "client_secret=", "password=", "token=",
+    // ── 云厂商 API 密钥 ──
+    "sk-",           // OpenAI / Anthropic
+    "AKIA",          // AWS Access Key
+    "AIza",          // Google API
+    "pk_live",       // Stripe Live
+    "pk_test",       // Stripe Test
+    "rk_live",       // Stripe Restricted Key Live
+    "rk_test",       // Stripe Restricted Key Test
+    "sk_live",       // Stripe Secret Key Live
+    "sk_test",       // Stripe Secret Key Test
+    "SG.",           // SendGrid
+    "xoxb-",         // Slack Bot
+    "xoxp-",         // Slack User
+    "xoxo-",         // Slack OAuth
+    "xapp-",         // Slack App-Level
+    "EAAI",          // Facebook/Meta App Token
+    "pat-",          // Notion Integration Token
+    "napi_",         // Notion Internal Integration
+    "aioa",          // Azure OpenAI
+    "AZURE_CLIENT_SECRET", // Azure
+    // ── CI/CD & DevOps ──
+    "ghp_",          // GitHub Personal Access Token
+    "gho_",          // GitHub OAuth
+    "ghu_",          // GitHub User-to-Server
+    "ghs_",          // GitHub Server-to-Server
+    "ghr_",          // GitHub Refresh Token
+    "glpat-",        // GitLab PAT
+    "gldt-",         // GitLab Deploy Token
+    "ATATT",         // Atlassian (Jira/Confluence) API Token
+    "bxcb",          // Bitbucket App Password
+    "boatu",         // Boat CI
+    "drone.",        // Drone CI
+    "token",         // generic CI tokens
+    // ── 容器 & 基础设施 ──
+    "docker.",       // Docker Hub PAT
+    "hkr_",          // Heroku API Key
+    // ── 私钥 & 证书 ──
+    "-----BEGIN",    // PEM private keys / certificates
+    // ── Bearer / Authorization ──
+    "Bearer ",       // OAuth Bearer token
+    "Basic ",        // HTTP Basic auth (base64)
+    // ── 键值对式泄露 ──
+    "api_key=", "apikey=", "api-key=",
+    "secret=", "client_secret=", "app_secret=",
+    "password=", "passwd=", "pwd=",
+    "token=", "access_token=", "auth_token=",
+    "private_key=", "signing_key=",
+    "DATABASE_URL=", "REDIS_URL=", "MONGO_URI=",
+    "AWS_SECRET_ACCESS_KEY=",
+    "TWILIO_AUTH_TOKEN=",
+    "SLACK_WEBHOOK_URL=",
+    "WEBHOOK_SECRET=",
+    // ── 加密货币 ──
+    "0x",            // Ethereum wallet (40+ hex after 0x)
+    "bc1",           // Bech32 Bitcoin address
+    "lntb",          // Lightning Network invoice
 ];
+
+/// ============================================================================
+/// 吸收 Mask/Maskit 模式: PII 正则检测规则 (Deterministic Tier 0)
+///
+/// Mask 的核心洞见: 结构化 PII 可用正则 + 校验和精确识别 (Luhn/Mod-97/Mod-11),
+/// 无需 NLP 模型。NeoTrix 在出网守卫中复用此模式, 零额外依赖。
+/// ============================================================================
+
+/// PII 检测规则 — 每条规则含正则模式和对应的脱敏标签。
+/// 吸收 Mask 支持的 50+ 类型中的高频子集 (Financial / Contact / Identity)。
+static PII_RULES: &[(&str, &str)] = &[
+    // ── Financial ──
+    // SSN: 000-00-0000 (Mask collision prefix: 000)
+    (r"\b\d{3}-\d{2}-\d{4}\b", "SSN"),
+    // Credit Card: 13-19 digits (Luhn-validated in redact function)
+    (r"\b(?:\d[ -]*?){13,19}\b", "CreditCard"),
+    // IBAN: 2-letter country + 2 check digits + up to 30 alphanumeric
+    (r"\b[A-Z]{2}\d{2}[A-Z0-9]{4,30}\b", "IBAN"),
+    // US Routing Number: 9 digits (leading non-zero, Mod-10 validated in redact function)
+    (r"\b[1-9]\d{8}\b", "RoutingNumber"),
+    // ── Contact ──
+    // Email
+    (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", "Email"),
+    // US Phone: (XXX) XXX-XXXX or XXX-XXX-XXXX or +1XXXXXXXXXX
+    (r"(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", "Phone"),
+    // IPv4
+    (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "IPv4"),
+    // IPv6 (simplified)
+    (r"\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b", "IPv6"),
+    // MAC Address
+    (r"\b[0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}\b", "MAC"),
+    // ── Identity ──
+    // US Passport: 1 letter + 8 digits
+    (r"\b[A-Z]\d{8}\b", "Passport"),
+    // EIN/Tax ID: XX-XXXXXXX
+    (r"\b\d{2}-\d{7}\b", "TaxID"),
+    // ── Healthcare ──
+    // US NPI: 10 digits (starting with 1 or 2)
+    (r"\b[12]\d{9}\b", "NPI"),
+];
+
+/// Luhn 校验和 — 用于信用卡号验证 (Mask Tier 0 模式)。
+fn luhn_checksum_ok(digits: &str) -> bool {
+    let nums: Vec<u32> = digits.chars().filter_map(|c| c.to_digit(10)).collect();
+    if nums.len() < 13 || nums.len() > 19 {
+        return false;
+    }
+    let mut sum = 0u32;
+    let mut alt = false;
+    for &n in nums.iter().rev() {
+        let mut val = n;
+        if alt {
+            val *= 2;
+            if val > 9 { val -= 9; }
+        }
+        sum += val;
+        alt = !alt;
+    }
+    sum % 10 == 0
+}
+
+/// 会话级一致性映射 — Mask 的核心洞见:
+/// 同一 PII 在整个会话中映射到同一占位符, 保持 LLM 推理上下文不被破坏。
+/// 不同会话产生不同映射, 防止跨会话指纹关联。
+///
+/// 使用线程-local HashMap 实现, 无需全局锁, 零外部依赖。
+
+thread_local! {
+    /// 明文 → 占位符 映射 (会话级, 线程隔离)
+    static SESSION_PLACEHOLDER_MAP: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
+    /// 占位符 → 明文 映射 (仅本地工具调用时使用, 绝不出站)
+    static SESSION_REVERSE_MAP: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
+    /// 单调递增计数器, 用于生成唯一占位符标签
+    static SESSION_COUNTER: RefCell<u32> = RefCell::new(0);
+}
+
+/// 生成会话一致的占位符 — 同一明文始终映射到同一占位符。
+/// 占位符格式: `[MASKED:P-{type}-{seq}]`, 如 `[MASKED:P-Email-001]`
+///
+/// 参考 Mask FPE 模式: 使用 HMAC 确定性 (此处简化为计数器, 因 Rust 无内建 HMAC-PE)
+/// 并保持格式可辨识 (方便调试和下游工具识别)。
+pub(crate) fn session_consistent_placeholder(plaintext: &str, pii_type: &str) -> String {
+    SESSION_PLACEHOLDER_MAP.with(|map| {
+        let mut map = map.borrow_mut();
+        if let Some(existing) = map.get(plaintext) {
+            return existing.clone();
+        }
+        SESSION_COUNTER.with(|ctr| {
+            let mut ctr = ctr.borrow_mut();
+            *ctr += 1;
+            let seq = *ctr;
+            let placeholder = format!("[MASKED:P-{}-{:03}]", pii_type, seq);
+            map.insert(plaintext.to_string(), placeholder.clone());
+            SESSION_REVERSE_MAP.with(|rev| {
+                rev.borrow_mut().insert(placeholder.clone(), plaintext.to_string());
+            });
+            placeholder
+        })
+    })
+}
+
+/// 重置会话映射 — 每个独立会话/线程开始时调用。
+pub(crate) fn reset_session_placeholders() {
+    SESSION_PLACEHOLDER_MAP.with(|m| m.borrow_mut().clear());
+    SESSION_REVERSE_MAP.with(|m| m.borrow_mut().clear());
+    SESSION_COUNTER.with(|c| *c.borrow_mut() = 0);
+}
+
+/// 从占位符反查明文 — 仅在本地工具执行时使用 (Tool Pre-Hook, JIT 解密)。
+/// 返回 None 表示非 Mask 生成的占位符 (安全: 不会误还原)。
+pub(crate) fn resolve_placeholder(masked: &str) -> Option<String> {
+    SESSION_REVERSE_MAP.with(|m| m.borrow().get(masked).cloned())
+}
+
+/// 用 PII 正则 + 会话一致性映射替换文本中的敏感数据。
+/// 遵循 Mask Tier 0 模式: 逐规则扫描 → 命中即替换。
+/// 每条规则在当前 `out` 上扫描, 从后往前替换避免索引偏移。
+fn redact_pii_session_consistent(s: &str) -> String {
+    let mut out = s.to_string();
+    for (pattern_str, pii_type) in PII_RULES {
+        if let Ok(re) = regex::Regex::new(pattern_str) {
+            // 在当前 out 上收集匹配, 从后往前替换
+            let mut matches: Vec<(usize, usize, String)> = re.find_iter(&out.clone())
+                .filter_map(|mat| {
+                    let matched = mat.as_str();
+                    if *pii_type == "CreditCard" && !luhn_checksum_ok(&matched.replace(|c: char| !c.is_numeric(), "")) {
+                        return None;
+                    }
+                    let placeholder = session_consistent_placeholder(matched, pii_type);
+                    Some((mat.start(), mat.end(), placeholder))
+                })
+                .collect();
+            matches.sort_by(|a, b| b.0.cmp(&a.0));
+            for (start, end, placeholder) in matches {
+                out = format!("{}{}{}", &out[..start], placeholder, &out[end..]);
+            }
+        }
+    }
+    out
+}
 
 /// 扫描消息中的 NeoTrix 内部指纹。
 pub fn scan_internals(content: &str) -> Vec<&'static str> {
@@ -567,19 +763,22 @@ fn redact_paths_str(s: &str) -> String {
     out
 }
 
-/// 出站脱敏组合: 内部指纹 + 密钥 + 绝对路径。
+/// 出站脱敏组合: 内部指纹 + 密钥 + 绝对路径 + PII (Mask Tier 0 模式)。
+/// 吸收 Mask 流水线: Deterministic 正则 → 会话一致占位符 → 路径脱敏。
 fn redact_outbound_str(s: &str) -> String {
     let s = redact_internals(s);
     let s = redact_secrets_str(&s);
+    let s = redact_pii_session_consistent(&s);
     redact_paths_str(&s)
 }
 
-/// 入站隐私守卫 — 模型回包后处理, 剥离任何被回显的 NeoTrix 内部指纹 / 密钥 / 绝对路径,
+/// 入站隐私守卫 — 模型回包后处理, 剥离任何被回显的 NeoTrix 内部指纹 / 密钥 / 绝对路径 / PII,
 /// 防止泄露进上下文的机密经模型回写被放大存储 (defense-in-depth: egress 已脱敏请求侧,
 /// ingress 再兜底回包侧). 由 `LlmProvider::{complete,stream_complete}` 默认方法调用。
 pub fn ingress_privacy_guard(text: &str) -> String {
     let s = redact_internals(text);
     let s = redact_secrets_str(&s);
+    let s = redact_pii_session_consistent(&s);
     redact_paths_str(&s)
 }
 

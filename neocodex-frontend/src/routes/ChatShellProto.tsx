@@ -228,7 +228,8 @@ export function ChatShellProto() {
   const deriveTags = (title: string): string[] => TAG_RULES.filter(([re]) => re.test(title)).map(([, t]) => t)
   const [autoTagCount, setAutoTagCount] = createSignal(0)
   createEffect(() => {
-    try { localStorage.setItem('neotrix-proto-active', activeId()) } catch { /* ignore */ }
+    const id = activeId()
+    if (id) try { localStorage.setItem('neotrix-proto-active', id) } catch { /* ignore */ }
     if (!prefs().autoTag) return
     const all = sessions()
     let changed = false

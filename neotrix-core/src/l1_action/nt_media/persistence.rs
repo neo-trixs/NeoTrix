@@ -1142,3 +1142,9 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&dir).await;
     }
 }
+
+impl Default for ChunkDownloadStatus {
+    fn default() -> Self {
+        ChunkDownloadStatus::Pending
+    }
+}

@@ -29,6 +29,32 @@ pub struct SecurityFinding {
     pub fix: String,
 }
 
+/// Evidence Package — verifiable proof attached to every security finding.
+///
+/// Absorbs computer-repair-skill axiom: "Evidence-first."
+/// Each package makes a finding independently auditable outside the agent's
+/// trust boundary, mirroring SafetyKernel's signed-evidence pattern.
+#[derive(Debug, Clone)]
+pub struct EvidencePackage {
+    pub file_path: PathBuf,
+    /// SHA-256 hash of the scanned file content (integrity verification)
+    pub file_hash: String,
+    /// Exact line that triggered the rule (raw, not trimmed)
+    pub matched_line: String,
+    /// 1-indexed line number
+    pub line_number: usize,
+    /// Rule name that fired
+    pub rule_name: String,
+    /// Severity: critical / high / medium / low
+    pub severity: String,
+    /// Human-readable description from the rule
+    pub description: String,
+    /// OWASP tag (e.g. "A05:2025")
+    pub owasp_tag: String,
+    /// ISO-8601 timestamp of the scan
+    pub scan_timestamp: String,
+}
+
 /// 供应链漏洞 (cargo-audit 结果)
 #[derive(Debug, Clone)]
 pub struct _SupplyChainVuln {
@@ -327,6 +353,79 @@ impl SecurityAudit {
         }
 
         findings
+    }
+
+    /// Evidence-first scan — attaches verifiable proof to every finding.
+    ///
+    /// Absorbs computer-repair-skill (88lin) core axiom:
+    /// "Evidence-first, read-only-first, confirm before state changes."
+    ///
+    /// Each finding carries an `EvidencePackage` with:
+    /// - `file_hash`: SHA-256 of scanned file content (integrity)
+    /// - `matched_line`: exact line that triggered the rule
+    /// - `line_number`: precise location
+    /// - `rule_name`: which rule fired
+    /// - `scan_timestamp`: when the scan ran
+    /// - `severity`: calibrated severity
+    ///
+    /// This makes every finding independently verifiable outside the agent's
+    /// trust boundary — the same philosophy as SafetyKernel's signed evidence.
+    pub fn evidence_first_scan(&self, root: &str) -> Vec<EvidencePackage> {
+        let mut evidence_packages = Vec::new();
+        let root_path = Path::new(root);
+
+        if !root_path.exists() || !root_path.is_dir() {
+            return evidence_packages;
+        }
+
+        let timestamp = chrono::Utc::now().to_rfc3339();
+
+        if let Ok(entries) = std::fs::read_dir(root_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().is_some_and(|e| e == "rs" || e == "py" || e == "js" || e == "ts") {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let file_hash = Self::compute_file_hash(&content);
+                        for rule in &self.rules {
+                            let re = match regex::Regex::new(rule.pattern) {
+                                Ok(r) => r,
+                                Err(_) => continue,
+                            };
+                            for (i, line) in content.lines().enumerate() {
+                                let trimmed = line.trim();
+                                if trimmed.starts_with("//") || trimmed.starts_with("#[") {
+                                    continue;
+                                }
+                                if re.find(line).is_some() {
+                                    evidence_packages.push(EvidencePackage {
+                                        file_path: path.clone(),
+                                        file_hash: file_hash.clone(),
+                                        matched_line: line.to_string(),
+                                        line_number: i + 1,
+                                        rule_name: rule.name.to_string(),
+                                        severity: rule.severity.to_string(),
+                                        description: rule.description.to_string(),
+                                        owasp_tag: rule.owasp.unwrap_or("N/A").to_string(),
+                                        scan_timestamp: timestamp.clone(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        evidence_packages
+    }
+
+    /// Compute SHA-256 hash of file content for evidence integrity
+    fn compute_file_hash(content: &str) -> String {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(content.as_bytes());
+        let result = hasher.finalize();
+        hex::encode(result)
     }
 
     /// 扫描整个目录的安全风险
@@ -957,5 +1056,46 @@ unstable-dep = { git = "https://github.com/evil/repo" }
             assert!(names.contains(&expected), "默认规则库应含 {}", expected);
         }
         assert_eq!(names.len(), 28, "规则库应有 28 条 (24 原 + 4 LLM 红队)");
+    }
+
+    // ========== Evidence-first scan tests (computer-repair-skill absorption) ==========
+
+    #[test]
+    fn test_evidence_first_scan_populates_all_fields() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("neotrix_evidence_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let file_path = dir.join("evidence_test.rs");
+        let mut f = std::fs::File::create(&file_path).expect("create");
+        f.write_all(b"let secret = \"sk-test123\";\nfn main() {}\n").expect("write");
+        drop(f);
+
+        let audit = SecurityAudit::new();
+        let packages = audit.evidence_first_scan(dir.to_str().unwrap());
+        assert!(!packages.is_empty(), "evidence-first scan should find secrets-in-diff");
+
+        let pkg = &packages[0];
+        assert!(!pkg.file_hash.is_empty(), "file_hash must be populated");
+        assert!(!pkg.matched_line.is_empty(), "matched_line must be populated");
+        assert!(pkg.line_number > 0, "line_number must be 1-indexed");
+        assert_eq!(pkg.rule_name, "secrets-in-diff");
+        assert!(!pkg.scan_timestamp.is_empty(), "scan_timestamp must be ISO-8601");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_evidence_first_scan_empty_dir_returns_empty() {
+        let audit = SecurityAudit::new();
+        let packages = audit.evidence_first_scan("/nonexistent/path/for/evidence/test");
+        assert!(packages.is_empty());
+    }
+
+    #[test]
+    fn test_compute_file_hash_deterministic() {
+        let h1 = SecurityAudit::compute_file_hash("hello world");
+        let h2 = SecurityAudit::compute_file_hash("hello world");
+        assert_eq!(h1, h2, "same input must produce same hash");
+        assert_eq!(h1.len(), 64, "SHA-256 hex is 64 chars");
     }
 }

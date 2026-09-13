@@ -8,6 +8,7 @@
 //!   5. 384 lines = 64 × 6 = total degrees of freedom in E₈ root system
 //!   6. 50 (Dayan) - 1 (observer) = 49 (observable dof) ↔ 49 = 7² = 248-199
 
+use serde::{Deserialize, Deserializer};
 pub mod abduction;
 pub mod domain_transition;
 pub mod e8_abduction_bridge;
@@ -1138,7 +1139,6 @@ pub fn mythos_reasoning_to_e8(text: &str) -> Vec<u8> {
 // ─── E8 Transition Probability Matrix ───────────────────────────────
 //
 // Serde compatibility: fixed arrays >32 elements need custom serialization.
-use serde::{Deserialize, Deserializer};
 // We use FlatCounts (Vec<u64>) and SerdeCompat64 (newtype) wrappers.
 
 /// 64-element serde-compatible wrapper.

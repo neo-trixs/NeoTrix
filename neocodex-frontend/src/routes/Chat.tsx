@@ -1902,7 +1902,7 @@ export function Chat() {
               maxItems={4}
               onExpand={() => {
                 // 切换到右栏画板 tab
-                document.querySelector('[data-tab="canvas"]')?.click()
+                (document.querySelector('[data-tab="canvas"]') as HTMLElement | null)?.click()
               }}
             />
           </div>

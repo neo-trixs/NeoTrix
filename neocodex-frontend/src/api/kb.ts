@@ -23,11 +23,11 @@ export interface KbDocIngestResult {
 }
 
 export function kbDocIngest(title: string, text: string, library?: string): Promise<KbDocIngestResult> {
-  return domain.kb.docIngest(title, title, 'document', text, library) as Promise<KbDocIngestResult>
+  return domain.kb.docIngest(title, title, 'document', text, library) as unknown as Promise<KbDocIngestResult>
 }
 
 export function kbDocList(): Promise<KbDocSummary[]> {
-  return domain.kb.docList() as Promise<KbDocSummary[]>
+  return domain.kb.docList() as unknown as Promise<KbDocSummary[]>
 }
 
 export function kbDocDelete(docId: string): Promise<number> {

@@ -156,17 +156,17 @@ impl ModelRouter {
 
         match self.strategy {
             RoutingStrategy::CostOptimized => {
-                candidates.sort_by(|a, b| a.1.cost_per_1k_tokens.partial_cmp(&b.1.cost_per_1k_tokens).unwrap());
+                candidates.sort_by(|a, b| a.1.cost_per_1k_tokens.partial_cmp(&b.1.cost_per_1k_tokens).unwrap_or(std::cmp::Ordering::Equal));
             }
             RoutingStrategy::LatencyOptimized => {
-                candidates.sort_by(|a, b| a.1.latency_ms.partial_cmp(&b.1.latency_ms).unwrap());
+                candidates.sort_by(|a, b| a.1.latency_ms.partial_cmp(&b.1.latency_ms).unwrap_or(std::cmp::Ordering::Equal));
             }
             RoutingStrategy::QualityOptimized => {
                 // 质量优先: Ultra > Final > Preview > Draft
                 candidates.sort_by(|a, b| {
                     let score_a = self.quality_score(&a.1.quality_tiers);
                     let score_b = self.quality_score(&b.1.quality_tiers);
-                    score_b.partial_cmp(&score_a).unwrap()
+                    score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
             RoutingStrategy::LoadBalanced => {
@@ -174,7 +174,7 @@ impl ModelRouter {
                 candidates.sort_by(|a, b| {
                     let load_a = a.0.current_rpm as f64 / a.0.rate_limit_rpm as f64;
                     let load_b = b.0.current_rpm as f64 / b.0.rate_limit_rpm as f64;
-                    load_a.partial_cmp(&load_b).unwrap()
+                    load_a.partial_cmp(&load_b).unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
         }
@@ -213,7 +213,7 @@ impl ModelRouter {
             .filter(|(_, m)| modalities.iter().all(|modality| m.modalities.contains(modality)))
             .collect();
 
-        candidates.sort_by(|a, b| a.1.cost_per_1k_tokens.partial_cmp(&b.1.cost_per_1k_tokens).unwrap());
+        candidates.sort_by(|a, b| a.1.cost_per_1k_tokens.partial_cmp(&b.1.cost_per_1k_tokens).unwrap_or(std::cmp::Ordering::Equal));
 
         candidates.first().map(|(provider, model)| {
             RoutingDecision {

@@ -33,11 +33,11 @@ export interface MemoryTimelineEntry {
 }
 
 export function memoryStats(): Promise<MemoryStats> {
-  return domain.memory.stats() as Promise<MemoryStats>
+  return domain.memory.stats() as unknown as Promise<MemoryStats>
 }
 
 export function memoryExport(format?: string): Promise<string> {
-  return domain.memory.export(format) as Promise<string>
+  return domain.memory.export(format) as unknown as Promise<string>
 }
 
 export function memoryImport(content: string, format?: string): Promise<number> {
@@ -45,19 +45,19 @@ export function memoryImport(content: string, format?: string): Promise<number> 
 }
 
 export function memoryClear(kind?: string | null): Promise<number> {
-  return domain.memory.clear(kind) as Promise<number>
+  return domain.memory.clear(kind ?? undefined) as Promise<number>
 }
 
 export function memoryList(category?: string): Promise<MemoryEntry[]> {
-  return domain.memory.list(category) as Promise<MemoryEntry[]>
+  return domain.memory.list(category) as unknown as Promise<MemoryEntry[]>
 }
 
 export function memorySearch(query: string, kind?: string | null): Promise<MemoryEntry[]> {
-  return domain.memory.search(query) as Promise<MemoryEntry[]>
+  return domain.memory.search(query) as unknown as Promise<MemoryEntry[]>
 }
 
 export function memoryTimeline(days?: number): Promise<MemoryTimelineEntry[]> {
-  return domain.memory.timeline(days) as Promise<MemoryTimelineEntry[]>
+  return domain.memory.timeline(days) as unknown as Promise<MemoryTimelineEntry[]>
 }
 
 /* ── API Key（直接 invoke，非 domain plugin） ── */

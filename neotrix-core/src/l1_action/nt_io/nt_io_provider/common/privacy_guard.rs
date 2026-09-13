@@ -25,6 +25,7 @@ use std::sync::OnceLock;
 /// NeoTrix 内部指纹 — 命中即表明消息可能泄露 NeoTrix 自身源代码/KB/对话。
 /// 刻意**不含**项目通用名 "NeoTrix"(用户正常对话会提及, 误伤率高),
 /// 只取结构性代码信号, 保持低误报。
+/// 与 core::nt_core_llm::INTERNAL_TOKENS 保持同步 (单一事实源在 core, 此处为 neotrix 层镜像)。
 const INTERNAL_TOKENS: &[&str] = &[
     // 模块路径 / 源码树
     "neotrix-core/",
@@ -44,6 +45,7 @@ const INTERNAL_TOKENS: &[&str] = &[
     "nt_nexus_",
     "nt_repair_",
     "nt_governance_",
+    "nt_scout_",
     // 意识核心结构
     "ConsciousnessTree",
     "ConsciousnessCore",
@@ -53,13 +55,22 @@ const INTERNAL_TOKENS: &[&str] = &[
     "VSA HyperCube",
     "E8 Hexagram",
     "SEAL pipeline",
+    "SEAL Pipeline",
     "MARS System",
     "CoreSnapshot",
     "EvolutionFruit",
     "kv_store",
+    // 内部类型
+    "LlmProviderType",
+    "ProviderCategory",
+    "GatewayProvider",
+    "Redactor",
     // 内部配置文件
     "AGENTS.md",
     "CONTEXT.md",
+    "neotrix-experience",
+    "neotrix-tauri",
+    "experience.db",
 ];
 
 /// 模块级开关 — 默认开启 (safe-by-default), 经 env 或 config 可降级。
@@ -132,6 +143,23 @@ pub fn redact_internals(content: &str) -> String {
 ///
 /// 返回 `Err(reason)` 表示被阻断 (Untrusted + 命中内部指纹 + block 开启)。
 /// 返回 `Ok(())` 表示请求已就地脱敏, 可安全出站。
+///
+/// # Mask/Maskit 模式吸收
+///
+/// 吸收 Mask (maskaisolutions/mask) 的 Deterministic Tier 0 检测模式:
+/// - 结构化 PII (SSN/CC/Email/Phone) 用正则 + 校验和精确识别
+/// - 同一会话内同一 PII → 同一占位符 (session consistency)
+/// - 占位符格式 `[MASKED:P-{Type}-{Seq}]` 保留语义信息供调试
+///
+/// # Streaming 支持
+///
+/// 流式响应 (SSE/WebSocket) 的脱敏策略:
+/// - **Request 侧**: 每条出站 chunk 经 `egress_privacy_guard` 脱敏
+/// - **Response 侧**: 每条入站 chunk 经 `ingress_privacy_guard` 兜底
+/// - **Session 一致性**: 整个 streaming session 共享同一 `SESSION_PLACEHOLDER_MAP`,
+///   确保相同 PII 在所有 chunk 中映射到同一占位符
+/// - **延迟风险**: 流式 chunk 可能截断 PII 模式 (如邮箱跨 chunk), 建议在 chunk
+///   边界处维护 256 字节重叠缓冲区, 或在完整响应后二次扫描
 pub fn egress_privacy_guard(
     req: &mut LlmRequest,
     trust: DataTrust,

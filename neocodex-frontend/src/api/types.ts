@@ -59,6 +59,7 @@ export interface NeoCodexSearchHit {
 
 /* ── neocodex：提供商 ── */
 export interface ProviderMeta {
+  id: string
   name: string
   display_name: string
   category: string // local | proxy | cloud | unknown
@@ -67,6 +68,7 @@ export interface ProviderMeta {
   model: string
   models: string[]
   resolvable: boolean
+  api_key?: string
 }
 
 export interface ProviderConfig {

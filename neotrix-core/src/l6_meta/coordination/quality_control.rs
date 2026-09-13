@@ -321,7 +321,7 @@ impl _QualityControlPipeline {
             self.history.push(result);
             
             // 如果审核失败，停止后续流程
-            if results.last().unwrap().status == ReviewStatus::Rejected {
+            if results.last().map_or(false, |r| r.status == ReviewStatus::Rejected) {
                 break;
             }
         }

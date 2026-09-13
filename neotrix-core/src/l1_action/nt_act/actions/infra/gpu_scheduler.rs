@@ -191,7 +191,7 @@ impl GpuScheduler {
             .min_by(|a, b| {
                 let score_a = a.available_vram_gb - requirements.min_vram_gb;
                 let score_b = b.available_vram_gb - requirements.min_vram_gb;
-                score_a.partial_cmp(&score_b).unwrap()
+                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|d| ScheduleDecision {
                 gpu_id: d.id.clone(),

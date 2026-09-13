@@ -153,7 +153,7 @@ impl L1Capability for LinkedInProvider {
             healthy: !self.access_token.is_empty(),
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             message: None,
         }
     }
@@ -205,7 +205,7 @@ impl L1Capability for InstagramProvider {
             healthy: !self.access_token.is_empty(),
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             message: None,
         }
     }
@@ -403,11 +403,11 @@ impl ScheduleEngine {
             status: ScheduleStatus::Pending,
         };
         self.slots.push(slot);
-        Ok(self.slots.last().unwrap())
+        Ok(self.slots.last().expect("just pushed a slot"))
     }
 
     pub(crate) fn _auto_schedule(&mut self, post: Post, best_times: &[(u32, u32)]) -> Result<&ScheduleSlot, String> {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let tomorrow = now + 86400;
         let time = best_times.first().map_or(tomorrow + 3600, |&(h, _)| tomorrow + (h as u64 * 3600));
         self.schedule(post, time)

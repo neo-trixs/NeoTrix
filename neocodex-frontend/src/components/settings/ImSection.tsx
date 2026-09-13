@@ -7,6 +7,7 @@
 import { createSignal, For, Show, onMount } from 'solid-js'
 import { clsx } from 'clsx'
 import { im } from '../../api'
+import type { ChannelConfig } from '../../api/im'
 
 /** 渠道类型 */
 type ChannelType = 'wechat' | 'feishu' | 'dingtalk' | 'wecom' | 'qq' | 'slack' | 'telegram' | 'discord' | 'whatsapp'
@@ -27,7 +28,7 @@ const CHANNEL_META: Record<ChannelType, { name: string; icon: string; color: str
 const ALL_CHANNELS: ChannelType[] = ['wechat', 'feishu', 'dingtalk', 'wecom', 'qq', 'slack', 'telegram', 'discord', 'whatsapp']
 
 export function ImSection() {
-  const [channels, setChannels] = createSignal<im.ChannelConfig[]>([])
+  const [channels, setChannels] = createSignal<ChannelConfig[]>([])
   const [loading, setLoading] = createSignal(true)
   const [error, setError] = createSignal<string | null>(null)
 
@@ -55,7 +56,7 @@ export function ImSection() {
     }
   }
 
-  const getChannelStatus = (channel: ChannelType): im.ChannelConfig | undefined => {
+  const getChannelStatus = (channel: ChannelType): ChannelConfig | undefined => {
     return channels().find(c => c.channel === channel)
   }
 

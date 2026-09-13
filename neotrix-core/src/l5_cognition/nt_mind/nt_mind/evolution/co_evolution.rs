@@ -3,6 +3,7 @@
 //! MAGE 核心机制映射到 NeoTrix 派单/学习层:
 //!   1. **四子图共进化知识图谱 (EVOKG)**: 本模块把能力图 (capability)、任务图 (task)、
 //!      经验图 (experience)、环境图 (environment) 统一为一个 `CoEvoGraph`, 每次
+use serde::{Serialize, Deserialize};
 //!      派单 reward 同时更新四个子图 — 知识在图上共进化, 而非散落各处。
 //!   2. **双记忆索引**: 经验子图按成败建立双索引 — success index (自身正确轨迹)
 //!      与 failure index (失败校正)。`guidance` 从成功索引取指导, `failure_warnings`

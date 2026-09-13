@@ -12,6 +12,83 @@ use crate::core::nt_core_self_test::SelfTest;
 
 type HmacSha256 = Hmac<Sha256>;
 
+/// Destructive action categories that require explicit confirmation.
+///
+/// Absorbs computer-repair-skill axiom: "confirm before state changes."
+/// and airgorah pattern: polkit agent prompts before privileged operations.
+///
+/// When an action is classified as destructive, SafetyKernel refuses to
+/// auto-approve it — even if the risk score is below the threshold.
+/// The agent must receive an explicit human confirmation (or a signed
+/// SafetyKernel confirmation token) before proceeding.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum DestructiveAction {
+    /// File deletion (rm, trash, unlink)
+    FileDelete,
+    /// Directory deletion (rmdir, rm -rf)
+    DirectoryDelete,
+    /// Database modification (DROP, DELETE, TRUNCATE)
+    DatabaseModify,
+    /// System configuration change (chmod, chown, sysctl)
+    SystemConfigChange,
+    /// Network service restart (systemctl restart, service reload)
+    ServiceRestart,
+    /// User/account modification
+    AccountModify,
+    /// Package installation/removal (apt, brew, cargo install)
+    PackageModify,
+    /// Custom destructive action
+    Custom(String),
+}
+
+impl DestructiveAction {
+    /// Check if an ActionRequest is a destructive action
+    pub fn from_request(request: &ActionRequest) -> Option<DestructiveAction> {
+        match &request.action_type {
+            ActionType::FileDelete => Some(DestructiveAction::FileDelete),
+            ActionType::SubprocessExec => {
+                let cmd = request.args.values().find(|v| v.contains("rm ") || v.contains("rmdir"));
+                if cmd.is_some() {
+                    Some(DestructiveAction::DirectoryDelete)
+                } else if request.args.values().any(|v| v.contains("chmod") || v.contains("chown")) {
+                    Some(DestructiveAction::SystemConfigChange)
+                } else {
+                    None
+                }
+            }
+            ActionType::FileWrite => {
+                if request.target.contains("/etc/") || request.target.contains("/sys/") {
+                    Some(DestructiveAction::SystemConfigChange)
+                } else {
+                    None
+                }
+            }
+            ActionType::Custom(s) => {
+                if s.contains("delete") || s.contains("drop") || s.contains("remove") {
+                    Some(DestructiveAction::Custom(s.clone()))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Description for the confirmation prompt
+    pub fn confirmation_message(&self, request: &ActionRequest) -> String {
+        format!(
+            "DESTRUCTIVE ACTION CONFIRMATION REQUIRED\n\
+             Action: {:?}\n\
+             Target: {}\n\
+             Risk: {:.2}\n\
+             \n\
+             This action will permanently modify or delete data.\n\
+             Type 'CONFIRM' to proceed, or 'DENY' to abort.",
+            self, request.target, request.risk_score
+        )
+    }
+}
+
 /// Execution-Time Safety Decision
 #[derive(Debug, Clone, PartialEq)]
 pub enum SafetyDecision {
@@ -138,6 +215,24 @@ impl SafetyKernel {
             return self.sign(decision, timestamp);
         }
 
+        // Confirm-before-destructive gate (computer-repair-skill axiom)
+        // Destructive actions ALWAYS require approval, regardless of risk score
+        if let Some(destructive) = DestructiveAction::from_request(action) {
+            let decision = SafetyDecision::RequiresApproval {
+                reason: format!(
+                    "Destructive action '{}' of type {:?} requires explicit confirmation. \
+                     Target: {}. This is a state-changing operation — confirm before proceeding.",
+                    action.action_id, action.action_type, action.target
+                ),
+                escalation_path: format!(
+                    "destructive_confirm://{}\n{}",
+                    action.target,
+                    destructive.confirmation_message(action)
+                ),
+            };
+            return self.sign(decision, timestamp);
+        }
+
         let policy_action = action.action_type.to_policy_action();
         let policy_decision = self.policy.decide(policy_action);
 
@@ -181,6 +276,11 @@ impl SafetyKernel {
                 }
             }
         }
+    }
+
+    /// Convenience: check whether an action requires destructive confirmation
+    pub fn requires_destructive_confirmation(&self, action: &ActionRequest) -> bool {
+        DestructiveAction::from_request(action).is_some()
     }
 
     /// External verification — re-computes HMAC and compares
@@ -659,6 +759,85 @@ mod tests {
     }
 
     #[test]
+    fn test_confirm_before_destructive_file_delete() {
+        let kernel = SafetyKernel::new();
+        let request = create_request(ActionType::FileDelete, "/tmp/important.txt", 0.3);
+        let evidence = kernel.check(&request);
+        match &evidence.decision {
+            SafetyDecision::RequiresApproval { reason, escalation_path } => {
+                assert!(reason.contains("Destructive action"));
+                assert!(escalation_path.contains("destructive_confirm://"));
+            }
+            other => panic!("FileDelete should always require confirmation, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_confirm_before_destructive_subprocess_rm() {
+        let kernel = SafetyKernel::new();
+        let mut args = HashMap::new();
+        args.insert("command".into(), "rm -rf /tmp/data".into());
+        let request = ActionRequest {
+            action_id: "shell-rm".into(),
+            action_type: ActionType::SubprocessExec,
+            target: "/tmp/data".into(),
+            args,
+            context: HashMap::new(),
+            risk_score: 0.1, // low risk score doesn't matter for destructive
+        };
+        let evidence = kernel.check(&request);
+        match &evidence.decision {
+            SafetyDecision::RequiresApproval { reason, .. } => {
+                assert!(reason.contains("Destructive action"));
+            }
+            other => panic!("rm command should require destructive confirmation, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_confirm_before_destructive_system_config_write() {
+        let kernel = SafetyKernel::new();
+        let request = create_request(ActionType::FileWrite, "/etc/nginx.conf", 0.2);
+        let evidence = kernel.check(&request);
+        match &evidence.decision {
+            SafetyDecision::RequiresApproval { reason, .. } => {
+                assert!(reason.contains("Destructive action"));
+            }
+            other => panic!("Writing to /etc/ should require destructive confirmation, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_non_destructive_allows_low_risk() {
+        let kernel = SafetyKernel::new();
+        let request = create_request(ActionType::FileRead, "/tmp/safe.txt", 0.1);
+        let evidence = kernel.check(&request);
+        match &evidence.decision {
+            SafetyDecision::Allowed { .. } => {}
+            other => panic!("Safe read should be allowed, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_requires_destructive_confirmation_api() {
+        let kernel = SafetyKernel::new();
+        let delete_req = create_request(ActionType::FileDelete, "/tmp/x.txt", 0.1);
+        assert!(kernel.requires_destructive_confirmation(&delete_req));
+
+        let read_req = create_request(ActionType::FileRead, "/tmp/x.txt", 0.1);
+        assert!(!kernel.requires_destructive_confirmation(&read_req));
+    }
+
+    #[test]
+    fn test_destructive_action_detection_from_request() {
+        let req = create_request(ActionType::FileDelete, "/tmp/test.txt", 0.5);
+        assert!(DestructiveAction::from_request(&req).is_some());
+
+        let req2 = create_request(ActionType::FileRead, "/tmp/test.txt", 0.5);
+        assert!(DestructiveAction::from_request(&req2).is_none());
+    }
+
+    #[test]
     fn test_allow_confirmation_action() {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::FileWrite, "/tmp/output.txt", 0.2);
@@ -668,7 +847,7 @@ mod tests {
                 assert!(reason.contains("allowed"), "FileWrite (confirmation) with low risk should be allowed: {}", reason);
             }
             SafetyDecision::RequiresApproval { .. } => {
-                // Risk might be computed > 0.8 if target matches sensitive pattern, but /tmp/output.txt is safe
+                // 风险可能 > 0.8 如果目标匹配敏感模式, 但 /tmp/output.txt 是安全的
                 // FileWrite base 0.45 + target 0.0 + arg 0.0 = 0.45 < 0.8 => Allowed
             }
             other => panic!("FileWrite with low risk should not be denied, got: {:?}", other),
