@@ -10,7 +10,7 @@ use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
 use super::common::types::{LlmError, LlmProvider, LlmRequest, LlmResponse};
 
-// ── 子目录模块 ──────────────────────────────────────────────
+// ── 模块 (扁平化: 6层→3层) ─────────────────────────────────
 pub mod routing;
 pub mod resilience;
 pub mod execution;

@@ -2963,4 +2963,63 @@ mod tests {
         assert_eq!(task.priority, 10);
         assert_eq!(task.url, "https://example.com/f.bin");
     }
+
+    // ── Douyin fusion pattern tests ──────────────────────────────────
+
+    #[test]
+    fn test_retry_policy_delay_table() {
+        let table = vec![
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+            Duration::from_secs(5),
+        ];
+        let policy = RetryPolicy::with_delay_table(3, table);
+
+        assert_eq!(policy.delay(1), Some(Duration::from_secs(1)));
+        assert_eq!(policy.delay(2), Some(Duration::from_secs(2)));
+        assert_eq!(policy.delay(3), Some(Duration::from_secs(5)));
+        // Beyond max_retries — caps at last entry
+        assert_eq!(policy.delay(4), None);
+        assert_eq!(policy.delay(10), None);
+    }
+
+    #[test]
+    fn test_retry_policy_delay_table_capped() {
+        let table = vec![Duration::from_secs(1), Duration::from_secs(2)];
+        let policy = RetryPolicy::with_delay_table(5, table);
+
+        // Attempts beyond table length use last entry
+        assert_eq!(policy.delay(3), Some(Duration::from_secs(2)));
+        assert_eq!(policy.delay(5), Some(Duration::from_secs(2)));
+        assert_eq!(policy.delay(6), None);
+    }
+
+    #[test]
+    fn test_pipeline_config_atomic_write_default() {
+        let config = PipelineConfig::default();
+        assert!(!config.atomic_write);
+        assert!(config.mirror_fallback_enabled);
+        assert_eq!(config.min_disk_space, 1024 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_pipeline_config_atomic_write_enabled() {
+        let config = PipelineConfig {
+            atomic_write: true,
+            min_disk_space: 512 * 1024 * 1024,
+            ..Default::default()
+        };
+        assert!(config.atomic_write);
+        assert_eq!(config.min_disk_space, 512 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_download_config_to_pipeline_min_disk_space() {
+        let cfg = DownloadConfig {
+            min_disk_space: 256 * 1024 * 1024,
+            ..Default::default()
+        };
+        let pc = cfg.to_pipeline_config("https://example.com/f.bin".into(), PathBuf::from("/tmp"));
+        assert_eq!(pc.min_disk_space, 256 * 1024 * 1024);
+    }
 }

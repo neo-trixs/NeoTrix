@@ -1,3 +1,5 @@
+//! 可观测性 — 插件系统 + 模块化网关
+
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
@@ -293,7 +295,7 @@ impl Default for PluginHotReload {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Modular Gateway — 组件化架构，支持热插拔中间件 (merged from modular_gateway.rs)
+// Modular Gateway — 组件化架构，支持热插拔中间件
 // ═══════════════════════════════════════════════════════════════════
 
 /// 模块化网关 — 组件化架构，支持热插拔中间件
@@ -505,7 +507,7 @@ mod tests {
         assert_eq!(events.len(), 2);
     }
 
-    // ── ModularGateway tests (merged from modular_gateway.rs) ─────
+    // ── ModularGateway tests ─────
 
     struct LogMiddleware {
         name: String,
