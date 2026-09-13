@@ -431,7 +431,7 @@ mod tests {
         let tf_a = Transform::from_position(0.0, 0.0);
         let tf_b = Transform::from_position(100.0, 100.0);
 
-        assert!(a.overlaps(&tf_a, &tf_b, &tf_b).is_none());
+        assert!(a.overlaps(&tf_a, &b, &tf_b).is_none());
     }
 
     #[test]

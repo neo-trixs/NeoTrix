@@ -665,31 +665,26 @@ mod tests {
 
     #[test]
     fn test_system_priority_order() {
-        use std::cell::Cell;
-        use std::rc::Rc;
+        use std::sync::{Arc, Mutex};
 
-        let order = Rc::new(Cell::new(Vec::<i32>::new()));
+        let order = Arc::new(Mutex::new(Vec::<i32>::new()));
         let order_clone = order.clone();
 
-        struct HighPri { order: Rc<Cell<Vec<i32>>> }
+        struct HighPri { order: Arc<Mutex<Vec<i32>>> }
         impl System for HighPri {
             fn name(&self) -> &str { "High" }
             fn priority(&self) -> i32 { -10 }
             fn run(&mut self, _: &mut World, _: f32) {
-                let mut v = self.order.take();
-                v.push(1);
-                self.order.set(v);
+                self.order.lock().unwrap().push(1);
             }
         }
 
-        struct LowPri { order: Rc<Cell<Vec<i32>>> }
+        struct LowPri { order: Arc<Mutex<Vec<i32>>> }
         impl System for LowPri {
             fn name(&self) -> &str { "Low" }
             fn priority(&self) -> i32 { 10 }
             fn run(&mut self, _: &mut World, _: f32) {
-                let mut v = self.order.take();
-                v.push(2);
-                self.order.set(v);
+                self.order.lock().unwrap().push(2);
             }
         }
 
@@ -700,7 +695,7 @@ mod tests {
         let mut world = World::new();
         runner.run_all(&mut world, 1.0);
 
-        let v = order_clone.take();
-        assert_eq!(v, vec![1, 2]); // high priority first
+        let v = order_clone.lock().unwrap();
+        assert_eq!(*v, vec![1, 2]); // high priority first
     }
 }

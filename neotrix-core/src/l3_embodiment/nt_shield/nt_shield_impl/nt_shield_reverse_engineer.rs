@@ -36,61 +36,65 @@ impl GhidraAnalyzer {
         })
     }
     
-    /// Analyze binary for vulnerability patterns
+    /// Analyze binary for vulnerability patterns.
     ///
-    /// STUB: Returns hardcoded mock analysis — no real Ghidra execution.
-    /// Real implementation needs:
+    /// Returns `Err` — Ghidra headless subprocess not wired.
+    /// Requires Ghidra installed at `self.ghidra_path` with `analyzeHead` on PATH.
+    ///
+    /// When wired, this method will:
     /// - Launch Ghidra headless: `analyzeHead -import <binary> -postScript Export.java`
-    /// - Parse Ghidra program database (`.rep`) for function signatures
+    /// - Parse Ghidra program database for function signatures
     /// - Feed decompiled output into VSA HyperCube for pattern matching
     /// - Detect known vulnerability patterns (buffer overflow, use-after-free, format string)
-    /// - Cross-reference with CVE databases for known exploits
-    pub async fn analyze_binary(&mut self, _binary_path: &str) -> AnalysisResult {
-        // TODO: Launch Ghidra headless with Python API
-        // Architecture: L1 Body execution, results → VSA embedding
-        
-        let functions = vec![
-            _FunctionSignature {
-                name: "get_user_input".to_string(),
-                addr: "0x401000".to_string(),
-                returns: "char*".to_string(),
-                params: vec!["buffer".to_string(), "size".to_string()],
-                vulnerability: Some("Buffer overflow risk".to_string()),
-            },
-            _FunctionSignature {
-                name: "strcpy_safe".to_string(),
-                addr: "0x402000".to_string(),
-                returns: "int".to_string(),
-                params: vec!["dest".to_string(), "src".to_string()],
-                vulnerability: None,
-            },
-        ];
-        
-        self.functions = functions.clone();
-        
-        AnalysisResult {
-            functions,
-            vulnerabilities: vec![
-                "Potential stack-based buffer overflow in get_user_input".to_string(),
-            ],
+    pub async fn analyze_binary(&mut self, binary_path: &str) -> Result<AnalysisResult, String> {
+        if !self.ghidra_path.exists() {
+            return Err(format!(
+                "Ghidra installation not found at {:?}. \
+                 Install Ghidra and set the correct path.",
+                self.ghidra_path
+            ));
         }
+        tracing::warn!(
+            "GhidraAnalyzer.analyze_binary called for binary={}: \
+             Ghidra headless subprocess not wired. \
+             Requires `analyzeHead` in {:?}.",
+            binary_path,
+            self.ghidra_path
+        );
+        Err(format!(
+            "GhidraAnalyzer.analyze_binary not wired: requires Ghidra at {:?} \
+             with `analyzeHead` executable. Binary was: {}",
+            self.ghidra_path, binary_path
+        ))
     }
     
-    /// Extract control flow graph
+    /// Extract control flow graph from a binary.
     ///
-    /// STUB: Returns hardcoded graph metrics — no real CFG extraction.
-    /// Real implementation needs:
+    /// Returns `Err` — Ghidra decompiler output parsing not wired.
+    /// Requires a prior successful `analyze_binary` call and Ghidra CFG export scripts.
+    ///
+    /// When wired, this method will:
     /// - Parse Ghidra decompiled output for basic blocks and edges
     /// - Build CFG as adjacency list with loop/branch detection
     /// - Identify critical paths (function entry → sensitive operations)
     /// - Feed CFG into E8 Hexagram reasoning engine for vulnerability inference
-    pub fn _extract_cfg(&self) -> _ControlFlowGraph {
-        // TODO: Parse Ghidra decompiled output for CFG
-        _ControlFlowGraph {
-            nodes: 12,
-            edges: 18,
-            loops: 3,
+    pub fn extract_cfg(&self) -> Result<_ControlFlowGraph, String> {
+        if self.functions.is_empty() {
+            return Err(
+                "extract_cfg called before analyze_binary — no function data available. \
+                 Run analyze_binary first to populate function signatures."
+                    .into(),
+            );
         }
+        tracing::warn!(
+            "GhidraAnalyzer.extract_cfg called: Ghidra CFG export not wired. \
+             Requires Ghidra headless with CFG export script."
+        );
+        Err(
+            "extract_cfg not wired: requires Ghidra CFG export script. \
+             Run analyze_binary first, then export CFG via Ghidra postScript."
+                .into(),
+        )
     }
 }
 

@@ -169,7 +169,7 @@ impl _TemplateTagRegistry {
     /// 查找评分最高的模板
     pub(crate) fn _find_highest_rated_templates(&self, limit: usize) -> Vec<&SkillTemplate> {
         let mut templates: Vec<&SkillTemplate> = self.templates.values().collect();
-        templates.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal));
+        templates.sort_by(|a, b| b.rating.total_cmp(&a.rating));
         templates.into_iter().take(limit).collect()
     }
     

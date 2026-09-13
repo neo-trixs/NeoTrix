@@ -15,6 +15,11 @@ use rusqlite::Connection;
 
 /// 问题严重度（对标网文设定检查的"硬伤/软伤/提示"）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Severity {
+    Error,
+    Warning,
+    Info,
+}
 
 impl Severity {
     pub fn as_str(&self) -> &'static str {

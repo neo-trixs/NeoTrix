@@ -22,71 +22,47 @@ impl W3afEngine {
         }
     }
     
-    /// Crawl target and detect vulnerabilities
+    /// Crawl target and detect vulnerabilities.
     ///
-    /// STUB: Returns hardcoded mock vulnerability data — no real web crawling or scanning.
-    /// Real implementation needs:
-    /// - Spawn w3af subprocess: `w3af -b mechanize -u <target>`
-    /// - Parse spider output into `_UrlNode` tree with depth/child counts
+    /// Returns `Err` — w3af/Arachni subprocess not wired.
+    /// Requires w3af installed and on PATH: `w3af -b mechanize -u <target>`.
+    ///
+    /// When wired, this method will:
+    /// - Spawn w3af subprocess and parse spider output into `_UrlNode` tree
     /// - Run active audit plugins (SQLi, XSS, CSRF, path traversal)
     /// - Parse w3af JSON findings into `_WebVuln` structures
-    /// - Rate limiting + crawl depth limits for large targets
-    pub async fn scan(&mut self, target: &str) -> ScanResult {
-        // TODO: w3af -b mechanize -u target
-        // Architecture: L2 Perception (crawling) → L1 Body (exploitation tests)
-        
-        let url_tree = vec![
-            _UrlNode {
-                url: format!("{}/", target),
-                depth: 0,
-                child_count: 3,
-            },
-            _UrlNode {
-                url: format!("{}/api/users", target),
-                depth: 1,
-                child_count: 2,
-            },
-        ];
-        
-        self.url_tree = url_tree.clone();
-        
-        let vulnerabilities = vec![
-            _WebVuln {
-                id: "SQLi-001".to_string(),
-                url: format!("{}/search", target),
-                type_: "SQL Injection".to_string(),
-                severity: "high".to_string(),
-                payload: "' OR '1'='1".to_string(),
-            },
-            _WebVuln {
-                id: "XSS-002".to_string(),
-                url: format!("{}/profile", target),
-                type_: "Cross-site Scripting".to_string(),
-                severity: "medium".to_string(),
-                payload: "<script>alert(1)</script>".to_string(),
-            },
-        ];
-        
-        self.vulnerabilities = vulnerabilities.clone();
-        
-        ScanResult {
-            urls_scanned: url_tree.len(),
-            vulnerabilities,
-        }
+    /// - Apply rate limiting + crawl depth limits for large targets
+    pub async fn scan(&mut self, target: &str) -> Result<ScanResult, String> {
+        tracing::warn!(
+            "W3afEngine.scan called for target={}: w3af subprocess not wired. \
+             Install w3af and ensure it is on PATH.",
+            target
+        );
+        Err(format!(
+            "W3afEngine.scan not wired: requires w3af binary on PATH. \
+             Run `pip install w3af` and download plugins. Target was: {}",
+            target
+        ))
     }
     
-    /// Generate spider map of target
+    /// Generate spider map from prior scan results.
     ///
-    /// Note: Builds a summary of crawled URL structure from prior scan results.
+    /// Builds a summary of the crawled URL structure stored in `self.url_tree`.
+    /// Returns an empty map if no scan has been run yet (`self.url_tree` is empty).
+    ///
     /// Real implementation needs:
     /// - Aggregate `_UrlNode` tree into depth distribution histogram
     /// - Identify vulnerable URL clusters for prioritized re-testing
     /// - Export spider map for external consumption (NeoTrix UI / KB storage)
-    pub fn _generate_spider_map(&self) -> _SpiderMap {
+    pub fn spider_map(&self) -> _SpiderMap {
+        let mut depth_distribution: HashMap<usize, usize> = HashMap::new();
+        for node in &self.url_tree {
+            *depth_distribution.entry(node.depth).or_insert(0) += 1;
+        }
         _SpiderMap {
             total_urls: self.url_tree.len(),
             vulnerable_urls: self.vulnerabilities.len(),
-            depth_distribution: HashMap::new(),
+            depth_distribution,
         }
     }
 }

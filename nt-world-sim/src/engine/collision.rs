@@ -489,7 +489,7 @@ mod tests {
         let end = Vec2::new(32.0, 128.0);
         let hit = system.raycast_tilemap(&map, start, end);
         assert!(hit.is_some());
-        let (_, _, (tx, ty)) = hit.unwrap();
+        let (_, _, (_tx, _ty)) = hit.unwrap();
         assert_eq!(ty, 4);
     }
 

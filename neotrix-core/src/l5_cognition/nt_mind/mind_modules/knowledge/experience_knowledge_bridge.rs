@@ -378,35 +378,45 @@ impl ExperienceKnowledgeBridge {
         })
     }
 
+    /// Extract success pattern from a group of successful experiences.
+    ///
+    /// Current implementation: string concatenation of skill names and avg tokens.
+    /// Does NOT perform real pattern extraction — the output is a flat summary,
+    /// not a structured pattern.
+    ///
+    /// Real implementation needs:
+    /// - LLM summarization of success trajectories
+    /// - Identify common step sequences across successful experiences
+    /// - Extract decision points and their outcomes
     fn extract_success_pattern(&self, successes: &[&RawExperience]) -> String {
-        // STUB: String concatenation of skill names and avg tokens — no real pattern extraction.
-        // Real implementation needs:
-        // - LLM summarization of success trajectories
-        // - Identify common step sequences across successful experiences
-        // - Extract decision points and their outcomes
         let skills: Vec<&str> = successes
             .iter()
             .flat_map(|e| e.skills_used.iter().map(|s| s.as_str()))
             .collect();
         let avg_tokens = successes.iter().map(|e| e.tokens_used).sum::<u32>() / successes.len() as u32;
         format!(
-            "Success pattern: skill chain {:?}, avg tokens {}, success count {}",
+            "[stub] Success pattern: skill chain {:?}, avg tokens {}, success count {}",
             skills, avg_tokens, successes.len()
         )
     }
 
+    /// Extract failure pattern from a group of failed experiences.
+    ///
+    /// Current implementation: error string collection.
+    /// Does NOT perform real root cause analysis — the output is a flat list
+    /// of error messages, not a diagnostic pattern.
+    ///
+    /// Real implementation needs:
+    /// - LLM-based failure classification (timeout, auth, logic, data)
+    /// - Common failure mode identification across experiences
+    /// - Counterfactual analysis: "what would have succeeded?"
     fn extract_failure_pattern(&self, failures: &[&RawExperience]) -> String {
-        // STUB: Error string collection — no real failure root cause analysis.
-        // Real implementation needs:
-        // - LLM-based failure classification (timeout, auth, logic, data)
-        // - Common failure mode identification across experiences
-        // - Counterfactual analysis: "what would have succeeded?"
         let errors: Vec<&str> = failures
             .iter()
             .filter_map(|e| e.error.as_deref())
             .collect();
         format!(
-            "Failure anti-pattern: error signatures {:?}, failure count {}",
+            "[stub] Failure anti-pattern: error signatures {:?}, failure count {}",
             errors, failures.len()
         )
     }

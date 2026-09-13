@@ -322,7 +322,10 @@ pub struct GateStats {
 fn timestamp_now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
+        .unwrap_or_else(|e| {
+            tracing::warn!("SystemTime before UNIX_EPOCH, falling back to 0: {}", e);
+            std::time::Duration::ZERO
+        })
         .as_secs()
 }
 
@@ -335,7 +338,11 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_quality_gate() {
+    fn test_quality_gate_aggregates_provided_scores() {
+        // TODO: _ai_initial_review is a STUB — scores are externally provided, not
+        // produced by real VLM analysis. This test verifies the aggregation/plumbing
+        // only. Replace with real VLM-backed tests once the gate calls an actual
+        // vision model to score content.
         let mut gate = QualityGate::new();
         
         let scores = vec![
@@ -378,18 +385,24 @@ mod tests {
         ];
         
         let result = gate._ai_initial_review("content_001", scores);
-        assert!(result.passed);
-        assert!(result.total_score >= 0.7);
+        // Verify aggregation plumbing: high externally-provided scores produce a
+        // passing result. This does NOT validate real AI analysis — scores are
+        // caller-supplied. The reviewer field confirms the stub nature.
+        assert!(result.passed, "high externally-provided scores should aggregate to pass");
+        assert_eq!(result.reviewer, "External (not AI-analyzed)");
+        assert!(result.total_score >= 0.7, "weighted average of high scores should be >= 0.7, got {}", result.total_score);
     }
     
     #[test]
     fn test_quality_gate_reject() {
+        // Verifies threshold gating: a score below dimension threshold causes
+        // rejection. Input scores are caller-supplied (stub behavior).
         let mut gate = QualityGate::new();
         
         let scores = vec![
             _DimensionScore {
                 dimension: "角色一致性".to_string(),
-                score: 0.5,  // 低于阈值
+                score: 0.5,
                 passed: false,
                 notes: None,
             },
@@ -402,14 +415,13 @@ mod tests {
         ];
         
         let result = gate._ai_initial_review("content_002", scores);
-        assert!(!result.passed);
+        assert!(!result.passed, "low score on critical dimension should cause rejection");
     }
     
     #[test]
-    fn test_statistics() {
+    fn test_statistics_tracks_reviews() {
         let mut gate = QualityGate::new();
         
-        // 通过
         let scores1 = vec![
             _DimensionScore { dimension: "角色一致性".to_string(), score: 0.9, passed: true, notes: None },
             _DimensionScore { dimension: "画面质量".to_string(), score: 0.9, passed: true, notes: None },
@@ -420,15 +432,14 @@ mod tests {
         ];
         gate._ai_initial_review("c1", scores1);
         
-        // 拒绝
         let scores2 = vec![
             _DimensionScore { dimension: "角色一致性".to_string(), score: 0.5, passed: false, notes: None },
         ];
         gate._ai_initial_review("c2", scores2);
         
         let stats = gate.statistics();
-        assert_eq!(stats.total_reviews, 2);
-        assert_eq!(stats.approved, 1);
-        assert_eq!(stats.rejected, 1);
+        assert_eq!(stats.total_reviews, 2, "should count both reviews");
+        assert_eq!(stats.approved, 1, "only the high-score review should be approved");
+        assert_eq!(stats.rejected, 1, "the low-score review should be rejected");
     }
 }

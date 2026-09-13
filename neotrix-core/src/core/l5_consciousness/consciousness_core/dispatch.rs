@@ -308,6 +308,33 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("程序化生成", "procedural_gen", "NT-ACT", "CodeAnalyzer"),
     ("生成管线", "procedural_gen", "NT-ACT", "CodeAnalyzer"),
     ("算法生成", "procedural_gen", "NT-ACT", "CodeAnalyzer"),
+    // rogue_elements — GenStep 异常元素检测管线
+    ("rogue_elements", "rogue_elements", "NT-MIND", "KnowledgeIntegrator"),
+    ("异常元素", "rogue_elements", "NT-MIND", "KnowledgeIntegrator"),
+    ("rogue", "rogue_elements", "NT-MIND", "KnowledgeIntegrator"),
+    ("pipeline异常", "rogue_elements", "NT-MIND", "KnowledgeIntegrator"),
+    ("genstep异常", "rogue_elements", "NT-MIND", "KnowledgeIntegrator"),
+    // tile_pyramid — KB 瓦片金字塔可视化浏览器
+    ("tile_pyramid", "tile_pyramid", "NT-MEMORY", "KnowledgeRetriever"),
+    ("瓦片金字塔", "tile_pyramid", "NT-MEMORY", "KnowledgeRetriever"),
+    ("KB浏览", "tile_pyramid", "NT-MEMORY", "KnowledgeRetriever"),
+    ("知识库浏览", "tile_pyramid", "NT-MEMORY", "KnowledgeRetriever"),
+    ("KB可视化", "tile_pyramid", "NT-MEMORY", "KnowledgeRetriever"),
+    ("tile_pyramid", "tile_pyramid", "NT-MEMORY", "KnowledgeRetriever"),
+    // emotion_blending — 情感状态平滑过渡
+    ("emotion_blending", "emotion_blending", "NT-CORE", "ReflectionEngine"),
+    ("情绪混合", "emotion_blending", "NT-CORE", "ReflectionEngine"),
+    ("情感过渡", "emotion_blending", "NT-CORE", "ReflectionEngine"),
+    ("状态平滑", "emotion_blending", "NT-CORE", "ReflectionEngine"),
+    ("情绪融合", "emotion_blending", "NT-CORE", "ReflectionEngine"),
+    ("emotion_blend", "emotion_blending", "NT-CORE", "ReflectionEngine"),
+    // with_without_baseline — 技能效果对照基线度量
+    ("with_without_baseline", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
+    ("对照基线", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
+    ("技能效果对比", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
+    ("有无对比", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
+    ("baseline", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
+    ("效果度量", "with_without_baseline", "NT-META", "MetaCognitionAnalyst"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -1092,6 +1119,102 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                     mode
                 ),
             )
+        }
+        "rogue_elements" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let genstep_key = "genstep:last_pipeline_run";
+                    let last_run = kb.kv_get("experience", genstep_key)
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    let lower = task.summary.to_lowercase();
+                    let action = if lower.contains("scan") || lower.contains("扫描") { "scan" }
+                        else if lower.contains("fix") || lower.contains("修复") { "fix" }
+                        else { "inspect" };
+                    (
+                        true,
+                        format!(
+                            "rogue_elements GenStep 异常元素检测: {} 模式 | KB: {} nodes / {} kv | 上次 pipeline: {}",
+                            action, nodes, kv,
+                            last_run.chars().take(60).collect::<String>()
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("rogue_elements 管线失败: KB 不可用 — {e}")),
+            }
+        }
+        "tile_pyramid" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let edges = stats.get("edges").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let depth = if lower.contains("deep") || lower.contains("深层") { "deep" }
+                        else if lower.contains("shallow") || lower.contains("浅层") { "shallow" }
+                        else { "default" };
+                    (
+                        true,
+                        format!(
+                            "tile_pyramid KB 瓦片金字塔可视化: {} 深度 | KB: {} nodes / {} edges / {} kv entries",
+                            depth, nodes, edges, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("tile_pyramid 浏览器失败: KB 不可用 — {e}")),
+            }
+        }
+        "emotion_blending" => {
+            let lower = task.summary.to_lowercase();
+            let from_emotion = if lower.contains("joy") || lower.contains("快乐") { "Joy" }
+                else if lower.contains("sad") || lower.contains("悲伤") { "Sadness" }
+                else if lower.contains("anger") || lower.contains("愤怒") { "Anger" }
+                else if lower.contains("fear") || lower.contains("恐惧") { "Fear" }
+                else { "Neutral" };
+            let to_emotion = if lower.contains("→") || lower.contains("to") || lower.contains("到") {
+                if lower.contains("trust") || lower.contains("信任") { "Trust" }
+                else if lower.contains("surprise") || lower.contains("惊讶") { "Surprise" }
+                else { "Neutral" }
+            } else { "Neutral" };
+            (
+                true,
+                format!(
+                    "emotion_blending 情感状态平滑过渡: {} → {} | 11-variant EmotionLabel 渐变插值",
+                    from_emotion, to_emotion
+                ),
+            )
+        }
+        "with_without_baseline" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let skill_name = task.summary.split_whitespace()
+                        .find(|w| !w.starts_with("with") && !w.starts_with("without")
+                            && !w.starts_with("有") && !w.starts_with("无")
+                            && !w.starts_with("对照") && !w.starts_with("基线"))
+                        .unwrap_or("unknown");
+                    let with_count = kb.kv_get("experience", &format!("baseline:with:{}", skill_name))
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let without_count = kb.kv_get("experience", &format!("baseline:without:{}", skill_name))
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    (
+                        true,
+                        format!(
+                            "with_without_baseline 技能效果度量 [{}]: 有技能={} 无技能={} | KB: {} nodes / {} kv",
+                            skill_name, with_count, without_count, nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("with_without_baseline 度量失败: KB 不可用 — {e}")),
+            }
         }
         _ => (
             true,

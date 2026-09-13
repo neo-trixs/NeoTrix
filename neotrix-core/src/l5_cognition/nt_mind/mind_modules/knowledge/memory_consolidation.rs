@@ -293,21 +293,24 @@ impl MemoryConsolidation {
         }
     }
 
-    /// 压缩内容
+    /// Compress content for long-term storage.
     ///
-    /// STUB: Simple truncation with "[compressed]" marker — no real summarization.
+    /// Current implementation: simple truncation with "[compressed]" marker.
+    /// Does NOT perform real summarization — key facts may be lost.
+    ///
     /// Real implementation needs:
     /// - LLM-based abstractive summarization (e.g., use local Ollama model)
     /// - Extractive summarization with sentence importance scoring
     /// - Preserve key facts (entity names, dates, technical terms)
     /// - Adaptive compression ratio based on content complexity
     fn compress_content(&self, content: &str) -> String {
-        // 简化版: 截断并添加摘要标记
         let max_length = (content.len() as f64 * self.config.compression_ratio) as usize;
         if content.len() <= max_length {
             content.to_string()
         } else {
-            format!("{}... [compressed]", &content[..max_length])
+            // Truncation only — real summarization not yet wired.
+            // Key facts beyond max_length are lost.
+            format!("{}... [truncated, real summarization not wired]", &content[..max_length])
         }
     }
 

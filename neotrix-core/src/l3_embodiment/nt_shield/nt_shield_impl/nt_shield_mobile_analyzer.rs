@@ -20,59 +20,60 @@ impl ObjectionAdapter {
         }
     }
     
-    /// Explore iOS/Android app via Objection
+    /// Explore iOS/Android app via Objection.
     ///
-    /// STUB: Returns hardcoded mock components — no real device interaction.
-    /// Real implementation needs:
+    /// Returns `Err` — Objection/Frida subprocess not wired.
+    /// Requires Objection installed at `self.objection_path` and a connected device.
+    ///
+    /// When wired, this method will:
     /// - Spawn Objection: `objection -g <app_id> explore --express`
     /// - Hook into Frida runtime for dynamic analysis
     /// - Enumerate Activities/Services/BroadcastReceivers via reflection
     /// - Detect hardcoded secrets in SharedPreferences/plist files
     /// - Map app component interactions for attack surface analysis
-    pub async fn explore_app(&mut self, _app_id: &str) -> _ExploreResult {
-        // TODO: objection explore -a app_id --express
-        // Architecture: L1 Body (device interaction) → L2 Perception (app model)
-        
-        let components = vec![
-            _AppComponent {
-                type_: "Activity".to_string(),
-                name: "LoginActivity".to_string(),
-                signature: "com.example.app.LoginActivity".to_string(),
-                vulnerabilities: vec![
-                    "Hardcoded API key in preferences".to_string(),
-                ],
-            },
-            _AppComponent {
-                type_: "Service".to_string(),
-                name: "DataSyncService".to_string(),
-                signature: "com.example.app.DataSyncService".to_string(),
-                vulnerabilities: vec![],
-            },
-        ];
-        
-        self.components = components.clone();
-        
-        _ExploreResult { components }
+    pub async fn explore_app(&mut self, app_id: &str) -> Result<_ExploreResult, String> {
+        if !self.objection_path.exists() {
+            return Err(format!(
+                "Objection installation not found at {:?}. \
+                 Install Objection and Frida first.",
+                self.objection_path
+            ));
+        }
+        tracing::warn!(
+            "ObjectionAdapter.explore_app called for app_id={}: \
+             Objection/Frida subprocess not wired. \
+             Requires objection binary at {:?} and a connected device.",
+            app_id,
+            self.objection_path
+        );
+        Err(format!(
+            "ObjectionAdapter.explore_app not wired: requires Objection at {:?} \
+             with Frida runtime. App ID was: {}",
+            self.objection_path, app_id
+        ))
     }
     
-    /// Check for root/jailbreak detection evasion
+    /// Check for root/jailbreak detection evasion.
     ///
-    /// STUB: Returns hardcoded non-rooted/non-jailbroken result — no real device check.
-    /// Real implementation needs:
+    /// Returns `Err` — Objection/Frida runtime not connected to a device.
+    /// Requires a running Objection session with Frida attached to the target app.
+    ///
+    /// When wired, this method will:
     /// - Objection `ios jailbreak disable` / `android root disable` commands
     /// - Check for su binary, Magisk, Cydia detection methods
     /// - Test filesystem access patterns (/data/data, /Applications)
     /// - Hook Frida into detection functions to bypass checks
-    pub async fn check_evasion(&self) -> _EvasionReport {
-        _EvasionReport {
-            is_rooted: false,
-            is_jailbroken: false,
-            detection_methods: vec![
-                "checksu".to_string(),
-                "which zsh".to_string(),
-                "ls /Applications".to_string(),
-            ],
-        }
+    pub async fn check_evasion(&self) -> Result<_EvasionReport, String> {
+        tracing::warn!(
+            "ObjectionAdapter.check_evasion called: \
+             Objection/Frida runtime not connected. \
+             Requires a running Objection session with device attachment."
+        );
+        Err(
+            "check_evasion not wired: requires Objection + Frida runtime connected to a device. \
+             Start an Objection session first."
+                .into(),
+        )
     }
 }
 

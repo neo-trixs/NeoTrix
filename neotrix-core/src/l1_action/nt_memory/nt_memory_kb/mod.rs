@@ -24,7 +24,7 @@ pub mod nt_memory_community;
 pub mod nt_memory_confidence;
 pub mod nt_memory_crawl;
 pub mod nt_memory_pack;
-// pub mod nt_memory_pack_chunked; // DEAD: cleanup
+pub mod nt_memory_pack_chunked;
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_cortex_sync;
@@ -32,7 +32,7 @@ pub mod nt_memory_embed;
 // pub mod kb_cognition; // DEAD: cleanup
 // pub mod kb_vector_index; // DEAD: cleanup
 pub mod nt_memory_distill;
-// pub mod nt_memory_graph; // DEAD: cleanup
+pub mod nt_memory_graph;
 pub mod nt_memory_pipeline;
 pub mod nt_memory_geo;
 pub mod nt_memory_hierarchical;

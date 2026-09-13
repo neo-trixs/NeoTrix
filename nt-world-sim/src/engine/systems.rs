@@ -359,7 +359,7 @@ impl System for MonsterAiSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::components::{Collider, GameCamera, GameSprite, Health, MonsterMarker, NpcMarker, PlayerMarker, RenderCommandBuffer, TimeState, Transform, Velocity};
+    use super::super::components::{Collider, GameCamera, GameSprite, Health, MonsterMarker, PlayerMarker, RenderCommandBuffer, TimeState, Transform, Velocity};
 
     fn setup_world() -> World {
         let mut world = World::new();

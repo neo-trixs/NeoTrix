@@ -272,7 +272,10 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_cross_module_audit() {
+    fn test_cross_module_audit_valid_input_passes() {
+        // Tests the happy path: well-formed input with consistent dynamic params,
+        // segments, and ratings. The check function performs real validation of
+        // dynamic-emotion consistency, rhythm-segment consistency, and param bounds.
         let checker = CrossModuleAudit::default_checker();
         
         let dynamic_params = vec![
@@ -303,7 +306,8 @@ mod tests {
         let dynamic_ratings = vec![ScalingRating::Micro];
         
         let result = checker.check(&dynamic_params, &segments, &dynamic_ratings);
-        assert!(result.passed);
-        assert!(result.consistency_score >= 80);
+        assert!(result.passed, "consistent input should pass cross-module audit");
+        assert!(result.consistency_score >= 80,
+            "consistent input should score >= 80, got {}", result.consistency_score);
     }
 }

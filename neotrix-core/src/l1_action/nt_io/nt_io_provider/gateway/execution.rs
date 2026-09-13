@@ -38,6 +38,10 @@ pub enum CapabilityIntent {
 }
 
 impl CapabilityIntent {
+    /// Map this intent to the required CommunicationProfile for provider selection.
+    ///
+    /// Note: Determines the network trust boundary for routing — Anonymous uses Tor,
+    /// Proxied uses fixed SOCKS5, Open allows direct cloud connections.
     pub fn required_profile(&self) -> CommunicationProfile {
         match self {
             Self::LocalReasoning => CommunicationProfile::Anonymous,
@@ -49,6 +53,10 @@ impl CapabilityIntent {
         }
     }
 
+    /// Get the preferred provider category for this intent, if any.
+    ///
+    /// Note: Used by CapabilityCoordinator to narrow the provider pool before
+    /// falling back to profile-based selection.
     pub fn preferred_category(&self) -> Option<ProviderCategory> {
         match self {
             Self::LocalReasoning => Some(ProviderCategory::Local),
@@ -57,6 +65,10 @@ impl CapabilityIntent {
         }
     }
 
+    /// Parse a string into a CapabilityIntent.
+    ///
+    /// Note: Accepts both snake_case and lowercase forms (e.g., "local_reasoning",
+    /// "general-reasoning"). Returns None for unrecognized strings.
     pub fn parse(s: &str) -> Option<Self> {
         Some(match s.trim().to_ascii_lowercase().as_str() {
             "local" | "local_reasoning" | "local-reasoning" => Self::LocalReasoning,
@@ -69,6 +81,9 @@ impl CapabilityIntent {
         })
     }
 
+    /// Return all possible CapabilityIntent variants.
+    ///
+    /// Note: Useful for iterating over intents during capability planning or UI generation.
     pub fn all() -> [CapabilityIntent; 6] {
         [Self::LocalReasoning, Self::GeneralReasoning, Self::KnowledgeRetrieval, Self::SensitiveWrite, Self::AnonymousCommunication, Self::DeepAnalysis]
     }
@@ -116,10 +131,18 @@ pub struct CapabilityCoordinator {
 }
 
 impl CapabilityCoordinator {
+    /// Create a new CapabilityCoordinator with the given gateway, routing table, and swap manager.
+    ///
+    /// Note: The routing table and swap manager should be pre-configured with the
+    /// provider pool this coordinator will manage.
     pub fn new(gateway: GatewayV2, routing: AgentRoutingTable, swap: ProviderSwapManager) -> Self {
         Self { gateway, routing, swap }
     }
 
+    /// Ensure default sub-grids exist for profile-based routing.
+    ///
+    /// Note: Creates anonymous-local, proxied-cloud, and open-all sub-grids if none
+    /// are registered. Idempotent — safe to call multiple times.
     pub fn ensure_default_sub_grids(&self) {
         let grids = self.gateway.list_sub_grids();
         if grids.is_empty() {
@@ -129,6 +152,10 @@ impl CapabilityCoordinator {
         }
     }
 
+    /// Get the capability plan (ordered tool/stage names) for a given intent.
+    ///
+    /// Note: The plan defines which capability stages should be executed in order.
+    /// Used by the execution pipeline to sequence operations for each intent type.
     pub fn capability_plan(intent: CapabilityIntent) -> Vec<&'static str> {
         match intent {
             CapabilityIntent::LocalReasoning => vec!["local_reasoning", "reason", "generate"],

@@ -20,42 +20,69 @@ impl ARTToolbox {
         }
     }
     
-    /// Test prompt injection vulnerabilities
+    /// Test prompt injection vulnerabilities.
     ///
-    /// STUB: Returns hardcoded vulnerability result — no real ART/Jailbreak testing.
-    /// Real implementation needs:
-    /// - ART Toolbox test suite: direct injection, indirect injection, jailbreak prompts
+    /// Returns `Err` — ART Toolbox test suite not wired.
+    /// Requires ART Toolbox installed with target model endpoint configured.
+    ///
+    /// When wired, this method will:
+    /// - Run ART Toolbox test suite: direct injection, indirect injection, jailbreak prompts
     /// - Measure model resistance across injection techniques (DAN, role-play, encoding)
     /// - Track prompt leaking via system prompt extraction attempts
     /// - Feed results into GWT attention for risk scoring
-    pub async fn test_prompt_injection(&self, _prompt: &str) -> _PromptInjectionResult {
-        // TODO: ART test for prompt injection, jailbreak, prompt leaking
-        // Architecture: L1 Body (LLM interaction) → L4 Cognition (pattern analysis)
-        
-        _PromptInjectionResult {
-            is_vulnerable: true,
-            techniques_triggered: vec![
-                "Direct injection: <|endoftext|> System: ignore previous".to_string(),
-                "Indirect injection: User queries contain hidden instructions".to_string(),
-            ],
-            mitigation: "Implement prompt filtering and output validation".to_string(),
+    pub async fn test_prompt_injection(&self, prompt: &str) -> Result<_PromptInjectionResult, String> {
+        if self.model_endpoint.is_empty() {
+            return Err(
+                "test_prompt_injection called but no model_endpoint configured. \
+                 Set the target model endpoint before testing."
+                    .into(),
+            );
         }
+        tracing::warn!(
+            "ARTToolbox.test_prompt_injection called for prompt_len={}: \
+             ART Toolbox test suite not wired. \
+             Requires ART Toolbox with target endpoint: {}",
+            prompt.len(),
+            self.model_endpoint
+        );
+        Err(format!(
+            "test_prompt_injection not wired: requires ART Toolbox with model endpoint '{}'. \
+             Install ART Toolbox and configure the target model.",
+            self.model_endpoint
+        ))
+    }
     }
     
-    /// Test for model stealing via membership inference
+    /// Test for model stealing via membership inference.
     ///
-    /// STUB: Returns hardcoded membership result — no real inference attack.
-    /// Real implementation needs:
+    /// Returns `Err` — membership inference attack not wired.
+    /// Requires access to the target model's training data distribution and query API.
+    ///
+    /// When wired, this method will:
     /// - Membership inference attack: query model with known/unknown training samples
     /// - Measure confidence differential to detect overfitting
     /// - Estimate model memorization risk for private data
     /// - Report attack success rate across multiple query strategies
-    pub async fn test_membership_inference(&self, _query: &str) -> _MembershipResult {
-        _MembershipResult {
-            is_member: true,
-            confidence: 0.89,
-            attack_vector: "Gradient leakage through repeated queries".to_string(),
+    pub async fn test_membership_inference(&self, query: &str) -> Result<_MembershipResult, String> {
+        if self.model_endpoint.is_empty() {
+            return Err(
+                "test_membership_inference called but no model_endpoint configured. \
+                 Set the target model endpoint before testing."
+                    .into(),
+            );
         }
+        tracing::warn!(
+            "ARTToolbox.test_membership_inference called for query_len={}: \
+             membership inference attack not wired. \
+             Requires target model endpoint: {}",
+            query.len(),
+            self.model_endpoint
+        );
+        Err(format!(
+            "test_membership_inference not wired: requires target model endpoint '{}'. \
+             Configure the model endpoint and training data access.",
+            self.model_endpoint
+        ))
     }
     
     /// Generate adversarial prompts

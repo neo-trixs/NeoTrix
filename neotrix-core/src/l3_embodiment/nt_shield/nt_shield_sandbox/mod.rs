@@ -120,7 +120,7 @@ impl EgressPolicy {
                 .cmp(&(b.host.as_str(), b.port.as_str(), b.allow))
         });
         rules.dedup_by(|a, b| a.host == b.host && a.port == b.port && a.allow == b.allow);
-        EgressPolicy { rules, default_allow: self.default_allow }
+        EgressPolicy { rules, deny_all: !self.default_allow }
     }
 
     /// 是否已处于规范化 (幂等后) 状态。

@@ -146,7 +146,7 @@ impl _GenCadRetrieval for _GenCadCore {
             .iter()
             .map(|p| (cosine(&q, &p.geometry_vec), p.clone()))
             .collect();
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| b.0.total_cmp(&a.0));
         scored.into_iter().map(|(_, p)| p).collect()
     }
 }

@@ -6,10 +6,16 @@ use std::sync::Arc;
 // ---------------------------------------------------------------------------
 
 /// A lightweight, reference-counted handle to a loaded resource.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ResourceHandle<T: 'static> {
     key: String,
     _marker: std::marker::PhantomData<T>,
+}
+
+impl<T: 'static> Clone for ResourceHandle<T> {
+    fn clone(&self) -> Self {
+        Self { key: self.key.clone(), _marker: std::marker::PhantomData }
+    }
 }
 
 impl<T: 'static> ResourceHandle<T> {
