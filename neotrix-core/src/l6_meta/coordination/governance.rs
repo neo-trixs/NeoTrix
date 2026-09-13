@@ -104,7 +104,7 @@ pub struct _ComplianceCheckResult {
 }
 
 impl _GovernanceComplianceChecker {
-    /// 创建新的治理合规检查器
+    /// Create a new governance compliance checker with default rules.
     ///
     /// Note: Real implementation needs — rules are hardcoded in register_default_rules().
     /// Consider: loading rules from config file, dynamic rule registration via EventBus,

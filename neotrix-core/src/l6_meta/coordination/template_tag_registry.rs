@@ -105,7 +105,11 @@ pub struct _TemplateTagRegistry {
 }
 
 impl _TemplateTagRegistry {
-    /// 创建空注册中心
+    /// Create an empty template tag registry.
+    ///
+    /// Note: Real implementation needs — registry starts empty.
+    /// Consider: loading default tags/templates from config file,
+    /// and supporting preset tag categories for common use cases.
     pub fn new() -> Self {
         Self {
             tags: HashMap::new(),
@@ -218,6 +222,11 @@ impl _TemplateTagRegistry {
         chain
     }
     
+    /// Recursive helper for tag reuse chain traversal.
+    ///
+    /// Note: Real implementation needs — cycle detection via visited set is implemented.
+    /// Consider: maximum depth enforcement (currently depends on caller), and caching
+    /// of reuse chains for performance.
     fn _get_tag_reuse_chain_recursive(&self, tag_id: &str, depth: usize, chain: &mut Vec<String>, visited: &mut std::collections::HashSet<String>) {
         if depth == 0 || visited.contains(tag_id) {
             return;
@@ -246,6 +255,11 @@ impl _TemplateTagRegistry {
         chain
     }
     
+    /// Recursive helper for template reuse chain traversal.
+    ///
+    /// Note: Real implementation needs — cycle detection via visited set is implemented.
+    /// Consider: maximum depth enforcement (currently depends on caller), and caching
+    /// of reuse chains for performance.
     fn _get_template_reuse_chain_recursive(&self, template_id: &str, depth: usize, chain: &mut Vec<String>, visited: &mut std::collections::HashSet<String>) {
         if depth == 0 || visited.contains(template_id) {
             return;
@@ -283,6 +297,11 @@ impl _TemplateTagRegistry {
         }
     }
     
+    /// Find the most frequently used tags.
+    ///
+    /// Note: Real implementation needs — sorts all tags by usage count.
+    /// Consider: maintaining a sorted index for O(1) access, and time-window
+    /// filtering for recent usage patterns.
     fn find_most_used_tags(&self, limit: usize) -> Vec<(String, u32)> {
         let mut tags: Vec<&_TemplateTag> = self.tags.values().collect();
         tags.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
@@ -320,6 +339,9 @@ mod tests {
     
     #[test]
     fn test_template_tag_registry() {
+        // TODO(R-P79): Basic CRUD only — no behavioral assertions on tag-matching logic.
+        // Replace with test that validates template discovery, weighted matching, and
+        // cross-module consistency checking against real template/tag data.
         let mut registry = _TemplateTagRegistry::new();
         
         // 添加标签

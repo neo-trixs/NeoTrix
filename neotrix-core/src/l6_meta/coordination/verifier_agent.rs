@@ -131,7 +131,11 @@ pub struct _VerifierAgent {
 }
 
 impl _VerifierAgent {
-    /// 创建验证器
+    /// Create a verifier agent with default configuration.
+    ///
+    /// Note: Real implementation needs — dimension groups are hardcoded for video content.
+    /// Consider: supporting configurable dimension sets per content type (video/image/text),
+    /// loading dimensions from KB, and allowing runtime dimension addition/removal.
     pub fn new() -> Self {
         Self {
             config: _VerifierConfig {
@@ -173,7 +177,11 @@ impl _VerifierAgent {
         }
     }
     
-    /// 使用配置创建
+    /// Create a verifier agent with custom configuration.
+    ///
+    /// Note: Real implementation needs — configuration is stored but not validated.
+    /// Consider: validating dimension group weights sum to 1.0, checking threshold
+    /// ranges (0.0-1.0), and ensuring at least one dimension group is defined.
     pub fn with_config(config: _VerifierConfig) -> Self {
         Self {
             config,
@@ -269,11 +277,13 @@ impl _VerifierAgent {
         }
     }
     
-    /// 自动修正提示词 — 当前仅追加 suggested_corrections 到原始 prompt 末尾。
+    /// Auto-correct a prompt based on verification results.
     ///
-    /// 这是占位实现: 简单拼接不会产生高质量修正 prompt。
-    /// 真实实现需要: 调用 LLM 将原始 prompt + verification errors + suggested_corrections
-    /// 重写为语义连贯的修正后 prompt, 而非机械追加。
+    /// STUB: Currently only appends suggested_corrections to the original prompt.
+    /// Real implementation needs: LLM-based prompt rewriting that combines the original
+    /// prompt, verification errors, and suggested corrections into a semantically
+    /// coherent corrected prompt. Simple concatenation does not produce high-quality
+    /// correction prompts.
     fn auto_correct_prompt(&self, prompt: &str, result: &VerificationResult) -> String {
         // STUB: 仅追加修正建议, 无 LLM 重写能力
         let mut corrected = prompt.to_string();

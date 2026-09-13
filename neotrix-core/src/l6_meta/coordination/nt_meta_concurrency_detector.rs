@@ -109,7 +109,11 @@ pub struct ConflictResolution {
 }
 
 impl _ConcurrencyConflictDetector {
-    /// 创建新的并发冲突检测器
+    /// Create a new concurrency conflict detector with default configuration.
+    ///
+    /// Note: Real implementation needs — detector starts empty.
+    /// Consider: loading monitored files from config, pre-registering
+    /// critical shared files, and integrating with EventBus for conflict notifications.
     pub fn new() -> Self {
         Self {
             _monitored_files: Vec::new(),

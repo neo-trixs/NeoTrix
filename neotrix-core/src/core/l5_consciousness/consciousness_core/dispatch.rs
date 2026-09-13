@@ -433,6 +433,30 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("情绪调节", "emotional_regulation", "NT-FEEL", "ReflectionEngine"),
     ("情感管控", "emotional_regulation", "NT-FEEL", "ReflectionEngine"),
     ("regulate_emotion", "emotional_regulation", "NT-FEEL", "ReflectionEngine"),
+    // memory_pruning — 记忆剪枝与衰减
+    ("memory_pruning", "memory_pruning", "NT-MEMORY", "KnowledgeRetriever"),
+    ("记忆剪枝", "memory_pruning", "NT-MEMORY", "KnowledgeRetriever"),
+    ("记忆衰减", "memory_pruning", "NT-MEMORY", "KnowledgeRetriever"),
+    ("衰减清理", "memory_pruning", "NT-MEMORY", "KnowledgeRetriever"),
+    ("prune_memory", "memory_pruning", "NT-MEMORY", "KnowledgeRetriever"),
+    // skill_versioning — 技能版本控制
+    ("skill_versioning", "skill_versioning", "NT-MIND", "KnowledgeIntegrator"),
+    ("技能版本", "skill_versioning", "NT-MIND", "KnowledgeIntegrator"),
+    ("技能控制", "skill_versioning", "NT-MIND", "KnowledgeIntegrator"),
+    ("版本控制", "skill_versioning", "NT-MIND", "KnowledgeIntegrator"),
+    ("version_skill", "skill_versioning", "NT-MIND", "KnowledgeIntegrator"),
+    // emotional_memory — 情感记忆标签
+    ("emotional_memory", "emotional_memory", "NT-FEEL", "ReflectionEngine"),
+    ("情感记忆", "emotional_memory", "NT-FEEL", "ReflectionEngine"),
+    ("情绪记忆", "emotional_memory", "NT-FEEL", "ReflectionEngine"),
+    ("记忆标签", "emotional_memory", "NT-FEEL", "ReflectionEngine"),
+    ("emotion_memory", "emotional_memory", "NT-FEEL", "ReflectionEngine"),
+    // confidence_calibration — 置信度校准
+    ("confidence_calibration", "confidence_calibration", "NT-META", "MetaCognitionAnalyst"),
+    ("置信度校准", "confidence_calibration", "NT-META", "MetaCognitionAnalyst"),
+    ("置信度", "confidence_calibration", "NT-META", "MetaCognitionAnalyst"),
+    ("校准置信", "confidence_calibration", "NT-META", "MetaCognitionAnalyst"),
+    ("calibrate_confidence", "confidence_calibration", "NT-META", "MetaCognitionAnalyst"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -1757,6 +1781,126 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                     strategy, target_emotion
                 ),
             )
+        }
+        "memory_pruning" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let strategy = if lower.contains("decay") || lower.contains("衰减") { "decay" }
+                        else if lower.contains("lru") || lower.contains("最近最少") { "lru" }
+                        else if lower.contains("threshold") || lower.contains("阈值") { "threshold" }
+                        else { "auto" };
+                    let pruned = kb.kv_get("experience", "memory_pruning:pruned_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "memory_pruning:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "memory_pruning 记忆剪枝与衰减: {} 策略 | 已剪枝 {} 条 | 上次: {} | KB: {} nodes / {} kv",
+                            strategy, pruned,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("memory_pruning 失败: KB 不可用 — {e}")),
+            }
+        }
+        "skill_versioning" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let action = if lower.contains("diff") || lower.contains("差异") { "diff" }
+                        else if lower.contains("rollback") || lower.contains("回滚") { "rollback" }
+                        else if lower.contains("tag") || lower.contains("标签") { "tag" }
+                        else { "status" };
+                    let versions = kb.kv_get("experience", "skill_versioning:total_versions")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "skill_versioning:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "skill_versioning 技能版本控制: {} 操作 | 已注册 {} 版本 | 上次: {} | KB: {} nodes / {} kv",
+                            action, versions,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("skill_versioning 失败: KB 不可用 — {e}")),
+            }
+        }
+        "emotional_memory" => {
+            let lower = task.summary.to_lowercase();
+            let emotion = if lower.contains("joy") || lower.contains("快乐") { "Joy" }
+                else if lower.contains("sad") || lower.contains("悲伤") { "Sadness" }
+                else if lower.contains("anger") || lower.contains("愤怒") { "Anger" }
+                else if lower.contains("fear") || lower.contains("恐惧") { "Fear" }
+                else if lower.contains("trust") || lower.contains("信任") { "Trust" }
+                else if lower.contains("surprise") || lower.contains("惊讶") { "Surprise" }
+                else { "Neutral" };
+            let mode = if lower.contains("query") || lower.contains("查询") { "query" }
+                else if lower.contains("tag") || lower.contains("标记") { "tag" }
+                else if lower.contains("decay") || lower.contains("衰减") { "decay" }
+                else { "tag" };
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let tagged = kb.kv_get("experience", "emotional_memory:tagged_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    (
+                        true,
+                        format!(
+                            "emotional_memory 情感记忆标签: {} 模式 | 情感 {} | 已标记 {} 条",
+                            mode, emotion, tagged
+                        ),
+                    )
+                }
+                Err(_) => (
+                    true,
+                    format!(
+                        "emotional_memory 情感记忆标签: {} 模式 | 情感 {}",
+                        mode, emotion
+                    ),
+                ),
+            }
+        }
+        "confidence_calibration" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("ece") || lower.contains("误差") { "ece" }
+                        else if lower.contains("brier") || lower.contains("布里尔") { "brier" }
+                        else if lower.contains("recalibrate") || lower.contains("重校") { "recalibrate" }
+                        else { "status" };
+                    let calibration_score = kb.kv_get("experience", "confidence_calibration:last_score")
+                        .unwrap_or_else(|| "未校准".to_string());
+                    let calibrations = kb.kv_get("experience", "confidence_calibration:total_runs")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    (
+                        true,
+                        format!(
+                            "confidence_calibration 置信度校准: {} 模式 | 上次得分 {} | 已校准 {} 次 | KB: {} nodes / {} kv",
+                            mode, calibration_score, calibrations, nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("confidence_calibration 失败: KB 不可用 — {e}")),
+            }
         }
         _ => (
             true,

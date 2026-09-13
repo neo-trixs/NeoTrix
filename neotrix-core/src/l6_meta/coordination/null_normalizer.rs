@@ -53,6 +53,11 @@ pub struct _NullNormalizer {
 }
 
 impl _NullNormalizer {
+    /// Create a new null normalizer with no rules.
+    ///
+    /// Note: Real implementation needs — default normalizer has no rules.
+    /// Consider: loading default rules from config, supporting rule presets
+    /// for common null patterns (JSON/API/text), and rule versioning.
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
@@ -60,7 +65,11 @@ impl _NullNormalizer {
         }
     }
 
-    /// 添加规则
+    /// Add a normalization rule.
+    ///
+    /// Note: Real implementation needs — rules are appended without duplicate checking.
+    /// Consider: rule deduplication, rule priority ordering, and validation of
+    /// rule combinations to prevent conflicts.
     pub fn add_rule(&mut self, rule: _NormalizeRule) {
         self.rules.push(rule);
     }

@@ -337,7 +337,7 @@ impl _NoiseHandshake {
         hkdf_blake2s(label, &self.hash, b"", 32)
             .expect("32 bytes always valid")
             .try_into()
-            .unwrap()
+            .expect("32-byte HKDF output")
     }
 }
 

@@ -64,11 +64,11 @@ fn main() {
 
     // 解码
     timed("decode E5 (no zstd)", iters, || {
-        let (_, out) = PackDecoder::decode(&pack_e5).unwrap();
+        let (_, out) = PackDecoder::decode(&pack_e5).expect("decode");
         std::hint::black_box(out.len());
     });
     timed("decode E5+zstd", iters, || {
-        let (_, out) = PackDecoder::decode(&pack_e5z).unwrap();
+        let (_, out) = PackDecoder::decode(&pack_e5z).expect("decode");
         std::hint::black_box(out.len());
     });
 

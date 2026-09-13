@@ -98,7 +98,8 @@ fn set_proxy(&mut self, proxy_url: &str) {
             .map_err(|e| LlmError::Network(format!("{}", e)))?;
 
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
+        let text = resp.text().await
+            .map_err(|e| LlmError::Network(format!("failed to read response body: {}", e)))?;
 
         match status.as_u16() {
             200 => self.parse_response(&text),
@@ -149,7 +150,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                 Ok(response) => {
                     let status = response.status();
                     if !status.is_success() {
-                        let text = response.text().await.unwrap_or_default();
+                        let text = response.text().await.unwrap_or_else(|e| format!("failed to read error body: {}", e));
                         let err = match status.as_u16() {
                             401 => LlmError::Authentication(text),
                             429 => LlmError::RateLimit(text),
@@ -160,7 +161,13 @@ fn set_proxy(&mut self, proxy_url: &str) {
                         return;
                     }
 
-                    let full_text = response.text().await.unwrap_or_default();
+                    let full_text = match response.text().await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            let _ = tx.send(Err(LlmError::Network(format!("failed to read response body: {}", e)))).await;
+                            return;
+                        }
+                    };
                     for line in full_text.lines() {
                         let line = line.trim();
                         if line.is_empty() || line == "data: [DONE]" { continue; }
@@ -249,7 +256,8 @@ fn set_proxy(&mut self, proxy_url: &str) {
             .map_err(|e| LlmError::Network(format!("{}", e)))?;
 
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
+        let text = resp.text().await
+            .map_err(|e| LlmError::Network(format!("failed to read response body: {}", e)))?;
 
         match status.as_u16() {
             200 => {
@@ -315,7 +323,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                 Ok(response) => {
                     let status = response.status();
                     if !status.is_success() {
-                        let text = response.text().await.unwrap_or_default();
+                        let text = response.text().await.unwrap_or_else(|e| format!("failed to read error body: {}", e));
                         let _ = tx.send(Err(match status.as_u16() {
                             401 => LlmError::Authentication(text),
                             429 => LlmError::RateLimit(text),
@@ -323,7 +331,13 @@ fn set_proxy(&mut self, proxy_url: &str) {
                         })).await;
                         return;
                     }
-                    let full_text = response.text().await.unwrap_or_default();
+                    let full_text = match response.text().await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            let _ = tx.send(Err(LlmError::Network(format!("failed to read response body: {}", e)))).await;
+                            return;
+                        }
+                    };
                     for line in full_text.lines() {
                         let line = line.trim();
                         if line.is_empty() || line == "data: [DONE]" { continue; }
@@ -414,7 +428,8 @@ impl LlmProvider for PollinationsProvider {
             .map_err(|e| LlmError::Network(format!("{}", e)))?;
 
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
+        let text = resp.text().await
+            .map_err(|e| LlmError::Network(format!("failed to read response body: {}", e)))?;
 
         match status.as_u16() {
             200 => {
@@ -478,7 +493,7 @@ impl LlmProvider for PollinationsProvider {
             // 非 200 时上报明确错误 (此前静默丢弃导致调用方看到空内容)
             let status = response.status();
             if !status.is_success() {
-                let text = response.text().await.unwrap_or_default();
+                let text = response.text().await.unwrap_or_else(|e| format!("failed to read error body: {}", e));
                 let err = match status.as_u16() {
                     429 => LlmError::RateLimit(text),
                     401..=403 => LlmError::Authentication(text),
@@ -488,7 +503,13 @@ impl LlmProvider for PollinationsProvider {
                 let _ = tx.send(Err(err)).await;
                 return;
             }
-            let full_text = response.text().await.unwrap_or_default();
+            let full_text = match response.text().await {
+                Ok(t) => t,
+                Err(e) => {
+                    let _ = tx.send(Err(LlmError::Network(format!("failed to read response body: {}", e)))).await;
+                    return;
+                }
+            };
             // SSE 逐行解析 (pollinations 返回 OpenAI 兼容 data: {...} 流),
             // 对齐 openai.rs 的解析模式 — 此前整段 text 当单 chunk 发出含 data: 前缀。
             for line in full_text.lines() {
@@ -562,7 +583,8 @@ fn set_proxy(&mut self, proxy_url: &str) {
             .map_err(|e| LlmError::Network(format!("{}", e)))?;
 
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
+        let text = resp.text().await
+            .map_err(|e| LlmError::Network(format!("failed to read response body: {}", e)))?;
 
         match status.as_u16() {
             200 => {
@@ -620,7 +642,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                 Ok(response) => {
                     let status = response.status();
                     if !status.is_success() {
-                        let text = response.text().await.unwrap_or_default();
+                        let text = response.text().await.unwrap_or_else(|e| format!("failed to read error body: {}", e));
                         let err = match status.as_u16() {
                             401 => LlmError::Authentication(text),
                             429 => LlmError::RateLimit(text),
@@ -631,7 +653,13 @@ fn set_proxy(&mut self, proxy_url: &str) {
                         return;
                     }
 
-                    let full_text = response.text().await.unwrap_or_default();
+                    let full_text = match response.text().await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            let _ = tx.send(Err(LlmError::Network(format!("failed to read response body: {}", e)))).await;
+                            return;
+                        }
+                    };
                     for line in full_text.lines() {
                         let line = line.trim();
                         if line.is_empty() || line == "data: [DONE]" { continue; }

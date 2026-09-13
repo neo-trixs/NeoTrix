@@ -167,7 +167,11 @@ pub struct _LayeredQA {
 }
 
 impl _LayeredQA {
-    /// 创建检查器
+    /// Create a layered QA checker with default configuration.
+    ///
+    /// Note: Real implementation needs — check items are hardcoded for video content.
+    /// Consider: supporting configurable check sets per content type, loading check
+    /// items from KB, and allowing runtime check addition/removal.
     pub fn new() -> Self {
         let mut stage_must_pass = HashMap::new();
         stage_must_pass.insert(_QAStage::Structural, true);
@@ -223,7 +227,11 @@ impl _LayeredQA {
         }
     }
     
-    /// 使用配置创建
+    /// Create a layered QA checker with custom configuration.
+    ///
+    /// Note: Real implementation needs — configuration is stored but not validated.
+    /// Consider: validating check item weights sum to 1.0, ensuring stage_must_pass
+    /// covers all stages, and checking threshold ranges (0.0-1.0).
     pub fn with_config(config: _LayeredQAConfig) -> Self {
         Self {
             config,

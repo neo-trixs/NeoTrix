@@ -102,6 +102,8 @@ mod tests {
 
     #[test]
     fn test_selftest_pass() {
+        // TODO(R-P79): self_test() is a C0 stub that always returns Ok. Replace with
+        // integration test that validates real critique behavior on actual skill content.
         let c = _BpcoCritic::new();
         assert!(c.self_test().is_ok());
     }

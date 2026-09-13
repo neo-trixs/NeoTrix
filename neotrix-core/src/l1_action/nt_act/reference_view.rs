@@ -97,6 +97,6 @@ impl ReferenceManager {
 fn now_ts() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("system time after UNIX epoch")
         .as_secs() as i64
 }

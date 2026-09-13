@@ -414,7 +414,7 @@ impl ProceduralGraph {
                         .edges
                         .iter()
                         .position(|e| &e.from == from && &e.to == old_to)
-                        .unwrap();
+                        .expect("edge exists");
                     let old_edge = self.edges[idx].clone();
                     self.edges[idx].to = new_to.clone();
                     let cycle = self.has_cycle();

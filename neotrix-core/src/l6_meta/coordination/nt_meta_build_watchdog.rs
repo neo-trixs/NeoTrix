@@ -142,7 +142,11 @@ pub struct FixAction {
 }
 
 impl BuildWatchdog {
-    /// 创建新的构建看门狗
+    /// Create a new build watchdog with custom configuration.
+    ///
+    /// Note: Real implementation needs — monitors are hardcoded for compilation/test/cache.
+    /// Consider: configurable monitor types, loading monitors from config file,
+    /// and dynamic monitor registration via EventBus.
     pub fn new(config: WatchdogConfig) -> Self {
         Self {
             monitors: vec![

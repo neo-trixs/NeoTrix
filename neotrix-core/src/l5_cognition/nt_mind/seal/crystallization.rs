@@ -135,7 +135,7 @@ impl CrystallizationEngine {
                         .crystallized
                         .iter()
                         .find(|s| s.source_templates.contains(&template_id.to_string()))
-                        .unwrap()
+                        .expect("checked with any()")
                         .id
                         .clone();
                     _CrystallizationStatus::Crystallized { skill_id }
@@ -144,7 +144,7 @@ impl CrystallizationEngine {
                         .rejected
                         .iter()
                         .find(|(id, _)| id == template_id)
-                        .unwrap()
+                        .expect("checked with any()")
                         .1
                         .clone();
                     _CrystallizationStatus::Rejected { reason }
@@ -491,7 +491,7 @@ impl SkillEvolutionTracker {
 fn chrono_now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("system time after UNIX epoch")
         .as_secs() as i64
 }
 

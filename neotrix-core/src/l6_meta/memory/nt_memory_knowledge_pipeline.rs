@@ -42,9 +42,6 @@ impl Default for KnowledgePipelineConfig {
     }
 }
 
-/// Backward-compatible alias
-pub type PipelineConfig = KnowledgePipelineConfig;
-
 /// 知识管线
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _KnowledgePipeline {

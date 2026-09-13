@@ -15,7 +15,7 @@ pub mod nt_memory_gwt_router;
 pub mod nt_memory_e8_agent;
 pub mod nt_memory_vsa_expand;
 pub mod nt_memory_decompose;
-pub mod nt_memory_domain_adapter;
+// pub mod nt_memory_domain_adapter; // DEAD wave2: zero external refs, zero KB method usage
 pub mod nt_memory_agent_driven;
 pub mod nt_memory_agent_session;
 pub mod nt_memory_api;
@@ -76,7 +76,7 @@ pub mod knowledge_storage;
 pub mod nt_absorb_mapper;
 pub mod nt_memory_write_guard;
 pub mod nt_memory_snapshot;
-pub mod nt_memory_zim_absorber;
+// pub mod nt_memory_zim_absorber; // DEAD wave2: zero external refs, zero KB method usage
 pub mod nt_memory_brain;
 pub mod nt_memory_lifecycle;
 pub mod nt_memory_shanhai;
@@ -122,7 +122,7 @@ pub use nt_memory_snapshot::{
     diff_snapshots, snapshot_from_file, snapshot_kb, snapshot_to_file, DiffEdge, DiffNode, KbDiff,
     KbSnapshot, SNAPSHOT_FORMAT, SNAPSHOT_VERSION,
 };
-pub use nt_memory_zim_absorber::{ZimAbsorbConfig, ZimAbsorbStats};
+// pub use nt_memory_zim_absorber::{ZimAbsorbConfig, ZimAbsorbStats}; // DEAD wave2
 pub use nt_memory_search::{
     MaterializedNeighborCache, build_materialized_neighbors,
 };

@@ -187,6 +187,9 @@ mod tests {
 
     #[test]
     fn test_agent_five_elements_incarnation() {
+        // TODO(R-P79): Only checks identity.awakened flag — trivial assertion.
+        // Replace with test that validates real incarnation behavior (memory grounding,
+        // skill crystallization, lineage tracking) against actual system state.
         let mut a = _YoyoGaspAgent::new("agent-001", None, 0);
         a.memory.kb_nodes = 10;
         a.awaken();

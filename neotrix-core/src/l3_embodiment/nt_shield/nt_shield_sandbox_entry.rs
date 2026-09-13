@@ -70,18 +70,21 @@ impl Sandbox {
         }
     }
 
-    /// Run a full agent loop inside the sandbox
+    /// Run a full agent loop inside the sandbox.
+    ///
+    /// Returns `Err` because no real agent loop is wired.
+    /// The previous implementation returned fabricated success ("sandbox_agent_ready")
+    /// by running a trivial echo command — that was dishonest.
+    /// Requires: task decomposition, tool dispatch, and iterative execution within sandbox.
     pub fn _run_agent(&self, task: &str) -> L1Result<String> {
-        let result = self.execute("echo sandbox_agent_ready");
-        if result.exit_code == 0 {
-            Ok(result.stdout)
-        } else {
-            Err(L1Error::Command {
-                cmd: task.to_string(),
-                exit_code: Some(result.exit_code),
-                stderr: result.stderr,
-            })
-        }
+        Err(L1Error::Command {
+            cmd: task.to_string(),
+            exit_code: None,
+            stderr: "Sandbox agent loop not wired: cannot execute agent task '{}' \
+                     inside sandbox. Requires task decomposition + tool dispatch + \
+                     iterative execution backend."
+                .replace("{}", task),
+        })
     }
 
     fn exec_local(&self, cmd: &str) -> _SandboxResult {

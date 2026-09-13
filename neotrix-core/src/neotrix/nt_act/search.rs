@@ -146,7 +146,7 @@ impl WebSearch {
         // Simplified HTML parsing - in production use a proper HTML parser
         let mut results = Vec::new();
         let document = scraper::Html::parse_document(html);
-        let selector = scraper::Selector::parse(".result__snippet").unwrap();
+        let selector = scraper::Selector::parse(".result__snippet").expect("valid CSS selector");
         
         for element in document.select(&selector).take(max_results) {
             let snippet = element.text().collect::<String>();

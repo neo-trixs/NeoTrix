@@ -112,6 +112,8 @@ mod tests {
 
     #[test]
     fn test_selftest_pass() {
+        // TODO(R-P79): self_test() is a C0 stub that always returns Ok. Replace with
+        // integration test that validates real NLP behavior on actual text input.
         let p = _WordPeckerNlp::new();
         assert!(p.self_test().is_ok());
     }

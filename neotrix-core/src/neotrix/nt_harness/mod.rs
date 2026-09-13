@@ -220,7 +220,7 @@ impl HarnessGateway {
             .and_then(|t| self.lookup_by_tag(t))
             .cloned()
             .or_else(|| self.resolve_instruction(&req.instruction))
-            .unwrap_or_else(|| self.lookup_by_tag("orchestration").unwrap().clone());
+            .unwrap_or_else(|| self.lookup_by_tag("orchestration").expect("orchestration tag exists").clone());
         HarnessExecuteResponse {
             instruction: req.instruction.clone(),
             capability_tag: entry.capability_tag.clone(),
@@ -247,7 +247,7 @@ impl HarnessGateway {
             .and_then(|t| self.lookup_by_tag(t))
             .cloned()
             .or_else(|| self.resolve_instruction(&req.instruction))
-            .unwrap_or_else(|| self.lookup_by_tag("orchestration").unwrap().clone());
+            .unwrap_or_else(|| self.lookup_by_tag("orchestration").expect("orchestration tag exists").clone());
         let allocations: Vec<String> = report
             .allocations
             .iter()

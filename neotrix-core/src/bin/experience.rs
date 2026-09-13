@@ -815,7 +815,7 @@ fn refresh_hub_metrics(conn: &Connection, hub: &mut Value) {
         let cmeta = cycles
             .entry(cycle.to_string())
             .or_insert_with(|| json!({"count": 0, "types": [], "domains": []}));
-        let cmeta = cmeta.as_object_mut().unwrap();
+        let cmeta = cmeta.as_object_mut().expect("JSON object");
         let count = cmeta.get("count").and_then(|c| c.as_i64()).unwrap_or(0);
         cmeta.insert("count".to_string(), json!(count + 1));
         let types = cmeta.entry("types".to_string()).or_insert_with(|| json!([]));
@@ -1220,11 +1220,11 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
         // Hebb 共现突触: 同分支概念两两强化关联 (fire together, wire together)
         hebb_cooccurrence(conn, &chs);
         // 更新 hub cycle 索引
-        let cycles = hub["hub"]["cycles"].as_object_mut().unwrap();
+        let cycles = hub["hub"]["cycles"].as_object_mut().expect("JSON object");
         let cmeta = cycles
             .entry(cycle.clone())
             .or_insert_with(|| json!({"count": 0, "types": [], "domains": []}));
-        let cmeta = cmeta.as_object_mut().unwrap();
+        let cmeta = cmeta.as_object_mut().expect("JSON object");
         let count = cmeta.get("count").and_then(|c| c.as_i64()).unwrap_or(0);
         cmeta.insert("count".to_string(), json!(count + 1));
         let types = cmeta.entry("types".to_string()).or_insert_with(|| json!([]));
@@ -1385,9 +1385,9 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
             let obs_key = format!("obs_{}_{}_{}", cycle, chunk_idx, uuid_hex(6));
             kv_stage(conn, NS, &obs_key, &obs_entry.to_string());
             // 更新 hub
-            let cycles = hub["hub"]["cycles"].as_object_mut().unwrap();
+            let cycles = hub["hub"]["cycles"].as_object_mut().expect("JSON object");
             let cmeta = cycles.entry(cycle.clone()).or_insert_with(|| json!({"count": 0, "types": [], "domains": []}));
-            let cmeta = cmeta.as_object_mut().unwrap();
+            let cmeta = cmeta.as_object_mut().expect("JSON object");
             let count = cmeta.get("count").and_then(|c| c.as_i64()).unwrap_or(0);
             cmeta.insert("count".to_string(), json!(count + 1));
             let types = cmeta.entry("types".to_string()).or_insert_with(|| json!([]));
@@ -2488,7 +2488,7 @@ fn cmd_neuron(conn: &Connection, term: &str, exact: bool) {
         }
         c = Some(cands.remove(0));
     }
-    let c = c.unwrap();
+    let c = c.expect("concept found");
     let term_disp = c.get("term").and_then(|t| t.as_str()).unwrap_or("");
     let id = c.get("id").and_then(|i| i.as_str()).unwrap_or("");
     let branches = c.get("branches").and_then(|b| b.as_array()).cloned().unwrap_or_default();

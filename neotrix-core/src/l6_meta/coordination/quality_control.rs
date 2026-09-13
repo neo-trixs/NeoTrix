@@ -147,7 +147,11 @@ pub struct _QualityControlPipeline {
 }
 
 impl _QualityControlPipeline {
-    /// 创建流水线
+    /// Create a quality control pipeline with default configuration.
+    ///
+    /// Note: Real implementation needs — check items are hardcoded for video content.
+    /// Consider: supporting configurable check sets per content type, loading check
+    /// items from KB, and allowing runtime check addition/removal.
     pub fn new() -> Self {
         Self {
             config: _QualityControlConfig {
@@ -191,7 +195,11 @@ impl _QualityControlPipeline {
         }
     }
     
-    /// 使用配置创建
+    /// Create a quality control pipeline with custom configuration.
+    ///
+    /// Note: Real implementation needs — configuration is stored but not validated.
+    /// Consider: validating check item weights sum to 1.0, ensuring threshold ranges
+    /// (0.0-1.0), and checking review_flow contains at least one level.
     pub fn with_config(config: _QualityControlConfig) -> Self {
         Self {
             config,

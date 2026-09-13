@@ -269,48 +269,29 @@ impl LocalInferenceEngine {
             .unwrap_or_default()
     }
     
-    /// Optimize a model for local inference
+    /// Optimize a model for local inference.
+    ///
+    /// Returns `Err` because the E8 reasoning strategy is not wired.
+    /// The previous implementation fabricated a success profile by formatting a
+    /// strategy string and accessing `strategy.confidence` (which doesn't exist on String).
+    /// Requires: real E8 hexagram reasoning for optimization strategy selection,
+    /// actual benchmark profiling for throughput measurement, and memory profiling
+    /// for accurate memory_requirements_gb.
     pub async fn optimize_model(
         &mut self,
         model_name: &str,
         hardware: &str,
         target_throughput: f64,
-    ) -> _OptimizationProfile {
-        // Phase 1: E8 reasoning for optimization strategy (placeholder)
-        let strategy = format!("optimize {} on {} for {} tok/s", model_name, hardware, target_throughput);
-        
-        // Phase 2: Select quantization based on strategy
-        let quant_config = self.quantization.select_best_quantization(
-            model_name, hardware, &strategy,
-        );
-        
-        // Phase 3: Configure KV cache
-        let kv_config = self.kv_cache.select_best_cache(
-            hardware, &quant_config,
-        );
-        
-        // Phase 4: Build optimization profile
-        let profile = _OptimizationProfile {
-            model_name: model_name.to_string(),
-            hardware: hardware.to_string(),
-            quantization_format: quant_config.format,
-            quant_level: quant_config.level,
-            kv_cache_type: kv_config.cache_type,
-            flash_attention: true,
-            continuous_batching: true,
-            expected_throughput_tok_s: target_throughput,
-            memory_requirements_gb: self.estimate_memory(model_name, &quant_config),
-            e8_reasoning_score: strategy.confidence,
-            gwt_attention_key: format!("infer_{}_{}", model_name, hardware),
-        };
-        
-        // Persist to KB
-        self.profiles.insert(
-            format!("{}_{}", model_name, hardware),
-            profile.clone(),
-        );
-        
-        profile
+    ) -> Result<_OptimizationProfile, String> {
+        // E8 reasoning for optimization strategy — NOT WIRED.
+        // Previous stub fabricated: let strategy = format!("optimize {} on {} for {} tok/s", ...);
+        // and then accessed strategy.confidence (String has no confidence field).
+        Err(format!(
+            "optimize_model not wired: cannot optimize '{}' on '{}' for {} tok/s. \
+             Requires E8 hexagram reasoning for strategy selection, actual benchmark \
+             profiling for throughput measurement, and memory profiling for accurate estimates.",
+            model_name, hardware, target_throughput
+        ))
     }
     
     fn estimate_memory(&self, model_name: &str, quant: &QuantizationConfig) -> f64 {

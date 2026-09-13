@@ -154,6 +154,8 @@ mod tests {
 
     #[test]
     fn test_gasp_repo_five_dimensions_complete() {
+        // TODO(R-P79): Sets fields then checks is_complete() — trivial plumbing test.
+        // Replace with test that validates completeness logic against real repo state.
         let mut r = _GaspRepo::new("gasp-1", None, 1, 0);
         r.awaken();
         r.memory.kb_node_count = 42;

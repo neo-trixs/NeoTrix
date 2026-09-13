@@ -533,7 +533,7 @@ impl Tool for JsonProcessingTool {
         
         // Parse input JSON
         let value: serde_json::Value = if json.is_string() {
-            serde_json::from_str(json.as_str().unwrap()).map_err(|e| e.to_string())?
+            serde_json::from_str(json.as_str().expect("checked is_string")).map_err(|e| e.to_string())?
         } else {
             json.clone()
         };

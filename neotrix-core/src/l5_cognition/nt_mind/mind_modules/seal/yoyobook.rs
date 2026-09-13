@@ -58,9 +58,15 @@ impl _SelfEvolutionLesson {
 ///
 /// C0 占位: 结构化提取逻辑留待 C1 实现, 此处仅定义契约。
 pub trait _NarrativePatternExtractor {
-    /// 从叙事片段识别命中的 lesson 集合 (C0: 返回全部声明式 lesson)。
-    fn extract_lessons(&self, _narrative: &str) -> Vec<_SelfEvolutionLesson> {
-        _SelfEvolutionLesson::all().to_vec()
+    /// 从叙事片段识别命中的 lesson 集合。
+    ///
+    /// Returns `Err` because no real NLP extraction is wired.
+    /// The C0 stub previously returned ALL lessons regardless of input —
+    /// that was fabricated extraction. Now returns an honest error.
+    fn extract_lessons(&self, _narrative: &str) -> Result<Vec<_SelfEvolutionLesson>, String> {
+        Err("extract_lessons not wired: no real NLP/keyword extraction connected. \
+             Requires semantic analysis to match narrative text against lesson patterns."
+            .into())
     }
     /// 已收录的 lesson 总数。
     fn lesson_count(&self) -> usize {
@@ -98,6 +104,8 @@ mod tests {
 
     #[test]
     fn test_lesson_statement_nonempty() {
+        // TODO(R-P79): Only checks non-empty strings — trivial assertion.
+        // Replace with test that validates extraction correctness against known inputs.
         let e = _YoyoBookExtractor;
         assert!(e.self_test().is_ok());
         for lesson in _SelfEvolutionLesson::all() {
@@ -106,11 +114,12 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_returns_all_declared_lessons() {
+    fn test_extract_lessons_returns_not_wired_error() {
         let e = _YoyoBookExtractor;
-        let got = e.extract_lessons("a self-evolving agent story");
-        assert_eq!(got.len(), 5);
-        assert!(got.contains(&_SelfEvolutionLesson::ClosedLoopNonNull));
+        let result = e.extract_lessons("a self-evolving agent story");
+        assert!(result.is_err(), "C0 stub must return Err (not wired)");
+        assert!(result.unwrap_err().contains("not wired"),
+            "error should explain the stub is unwired");
     }
 
     #[test]

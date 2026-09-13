@@ -109,7 +109,11 @@ pub struct McpToolResult {
 }
 
 impl SentruxSensor {
-    /// 创建新的传感器
+    /// Create a new Sentrux sensor with default rules.
+    ///
+    /// Note: Real implementation needs — rules are hardcoded.
+    /// Consider: loading rules from config file, dynamic rule registration via EventBus,
+    /// and rule versioning for backward compatibility.
     pub fn new() -> Self {
         Self {
             rules: _RulesEngine {

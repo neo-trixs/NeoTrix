@@ -93,7 +93,11 @@ pub struct ConcurrencyStats {
 }
 
 impl ConcurrencyIsolationTester {
-    /// 创建新的并发隔离测试器
+    /// Create a new concurrency isolation tester with default configuration.
+    ///
+    /// Note: Real implementation needs — tester starts empty.
+    /// Consider: loading configuration from KB, pre-registering known race condition
+    /// patterns, and integrating with EventBus for test result notifications.
     pub fn new() -> Self {
         Self {
             test_sessions: Vec::new(),

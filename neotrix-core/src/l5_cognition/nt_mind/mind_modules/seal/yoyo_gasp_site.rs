@@ -127,6 +127,8 @@ mod tests {
 
     #[test]
     fn test_vault_maps_to_neotrix_module() {
+        // TODO(R-P79): Only checks hardcoded string constants — trivial assertion.
+        // Replace with test that validates actual module resolution against real vault paths.
         let m = _YoyoGaspRuntime;
         assert!(m.all_vaults_mapped());
         assert_eq!(_GaspVault::Skills._maps_to_neotrix(),

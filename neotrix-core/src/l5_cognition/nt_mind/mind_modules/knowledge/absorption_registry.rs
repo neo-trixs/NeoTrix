@@ -244,6 +244,9 @@ mod tests {
 
     #[test]
     fn test_stats_tracking() {
+        // TODO(R-P79): Tests counter increment — trivial assertion. Replace with test
+        // that validates absorption quality (confidence propagation, event deduplication,
+        // error recovery) against real absorber implementations.
         let _ = _register_absorber("stat_test", &["s"], Arc::new(TestAbsorber));
         let _ = _trigger_absorption("stat_test", "s", "ctx");
         let _ = _trigger_absorption("stat_test", "s", "ctx2");

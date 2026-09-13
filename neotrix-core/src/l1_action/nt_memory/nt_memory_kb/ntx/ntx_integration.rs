@@ -50,7 +50,7 @@ impl NtxIndexManager {
     /// 从 SQLite 全量同步到 NTX (增量由 sync 模块处理)
     pub fn full_sync(&self, conn: &Connection, dimension: usize) -> std::io::Result<NtxStats> {
         let mut cache = self.get_or_open(false)?;
-        let ntx = cache.as_mut().unwrap();
+        let ntx = cache.as_mut().expect("cache opened");
 
         // 1. 同步节点帧
         let mut stmt = conn.prepare(

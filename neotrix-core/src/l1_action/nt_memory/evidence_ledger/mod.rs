@@ -84,7 +84,7 @@ impl SessionLedger {
             id: id.clone(),
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .expect("system time after UNIX epoch")
                 .as_secs(),
             evidence_type,
             content: content.to_string(),

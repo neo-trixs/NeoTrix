@@ -351,7 +351,10 @@ impl GatewayV2 {
                 provider: name.to_string(),
                 model: req.model.clone(),
                 headers: std::collections::HashMap::new(),
-                body: serde_json::to_vec(&req).unwrap_or_default(),
+                body: serde_json::to_vec(&req).unwrap_or_else(|e| {
+                    log::warn!("[gateway] failed to serialize request for plugin hook: {}", e);
+                    Vec::new()
+                }),
                 timestamp: std::time::Instant::now(),
             };
             if let Err(e) = plugins._run_pre_request(&mut ctx) {
@@ -366,7 +369,10 @@ impl GatewayV2 {
                         provider: name.to_string(),
                         status: 200,
                         headers: std::collections::HashMap::new(),
-                        body: serde_json::to_vec(response).unwrap_or_default(),
+                        body: serde_json::to_vec(response).unwrap_or_else(|e| {
+                            log::warn!("[gateway] failed to serialize response for plugin hook: {}", e);
+                            Vec::new()
+                        }),
                         latency: std::time::Duration::from_millis(0),
                     };
                     if let Err(e) = plugins._run_post_response(&mut ctx) {
@@ -771,7 +777,11 @@ impl GatewayV2 {
         let mut req = request.clone();
         if req.model == name {
             req.model = crate::l1_action::nt_io::nt_io_provider::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
-                .map(|info| info.default_model.to_string()).unwrap_or_default();
+                .map(|info| info.default_model.to_string())
+                .unwrap_or_else(|| {
+                    log::warn!("[gateway] provider catalog lookup failed for '{}', using raw name", name);
+                    name.to_string()
+                });
         } else if let Some(m) = stripped { req.model = m; }
         if let Err(reason) = egress_privacy_guard(&mut req, trust_from_name(name), name) {
             return Err(LlmError::InvalidRequest(reason));

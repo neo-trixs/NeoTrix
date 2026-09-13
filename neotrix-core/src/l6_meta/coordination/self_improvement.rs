@@ -198,7 +198,11 @@ pub struct SelfImprovementLoop {
 }
 
 impl SelfImprovementLoop {
-    /// 创建新的自我改进循环
+    /// Create a new self-improvement loop with default capacity.
+    ///
+    /// Note: Real implementation needs — loop starts empty.
+    /// Consider: loading initial metrics from KB, pre-populating trend baselines,
+    /// and integrating with EventBus for metric collection.
     pub fn new() -> Self {
         Self {
             metrics_history: Vec::new(),
@@ -212,7 +216,11 @@ impl SelfImprovementLoop {
         }
     }
 
-    /// 创建指定历史容量的实例
+    /// Create a self-improvement loop with custom history capacity.
+    ///
+    /// Note: Real implementation needs — capacity is stored but not validated.
+    /// Consider: minimum capacity enforcement (e.g., >= 2 for trend detection),
+    /// and capacity adjustment based on system resource availability.
     pub fn with_capacity(max_history: usize) -> Self {
         Self {
             max_history,

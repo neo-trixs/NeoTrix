@@ -290,7 +290,7 @@ impl HotReloadCapability {
     pub fn current_version(&self) -> String {
         self.manager
             .lock()
-            .unwrap()
+            .expect("mutex poisoned")
             .get_loaded(&self.capability_id)
             .map(|c| c.version.clone())
             .unwrap_or_default()

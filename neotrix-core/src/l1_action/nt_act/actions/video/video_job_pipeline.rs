@@ -108,9 +108,6 @@ impl Default for VideoJobPipelineConfig {
     }
 }
 
-/// Backward-compatible alias
-pub type PipelineConfig = VideoJobPipelineConfig;
-
 /// 视频作业管线
 pub struct VideoJobPipeline {
     /// 作业存储

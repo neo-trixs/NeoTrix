@@ -180,7 +180,7 @@ impl CliCommand for FileCmd {
                             if let Err(e) = std::fs::create_dir_all(&dir) {
                                 return CommandOutput::err(&format!("创建 schema 目录失败: {e}"));
                             }
-                            match std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()) {
+                            match std::fs::write(&path, serde_json::to_string_pretty(&json).expect("JSON serialization")) {
                                 Ok(_) => out.push_str(&format!("\n已固化 schema '{name}' → {}\n用 `/file consolidate <目录> --schema {name}` 复用", path.display())),
                                 Err(e) => return CommandOutput::err(&format!("schema 写入失败: {e}")),
                             }

@@ -130,7 +130,11 @@ pub enum ViolationSeverity {
 }
 
 impl IntegrationPatternLibrary {
-    /// 创建新的集成模式库
+    /// Create a new integration pattern library with default patterns.
+    ///
+    /// Note: Real implementation needs — patterns are hardcoded in register_default_patterns().
+    /// Consider: loading patterns from config file, pattern versioning,
+    /// and dynamic pattern registration via EventBus.
     pub fn new() -> Self {
         let mut lib = Self {
             patterns: Vec::new(),
