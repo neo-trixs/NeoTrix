@@ -232,9 +232,72 @@ impl ModelSelector {
     }
     
     /// Auto-detect best model for hardware
+    ///
+    /// 检测 GPU/VRAM/Apple Silicon 并填充硬件配置。
     pub fn auto_detect(&mut self) -> Result<(), String> {
-        // Detect hardware and populate profiles
-        // TODO: Query system for GPU/CPU/memory info
+        // 检测 Apple Silicon (macOS)
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(output) = std::process::Command::new("sysctl").arg("-n").arg("machdep.cpu.brand_string").output() {
+                let cpu = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if cpu.contains("Apple") {
+                    // Apple Silicon — 统一内存
+                    let ram_gb = sys_info::mem_info().map(|m| m.total as f64 / 1024.0 / 1024.0).unwrap_or(16.0);
+                    self.profiles.insert("local".to_string(), HardwareCapabilities {
+                        gpu_arch: "Apple Silicon".to_string(),
+                        vram_gb: ram_gb * 0.7, // 70% 可用于模型
+                        supports_metal: true,
+                        memory_bandwidth_gbps: 200.0,
+                        system_ram_gb: ram_gb,
+                        compute_tflops: 0.0,
+                        supports_fp8: false,
+                        supports_nvfp4: false,
+                        supports_flash_attention: true,
+                    });
+                    return Ok(());
+                }
+            }
+        }
+        
+        // 检测 NVIDIA GPU (Linux/macOS)
+        if let Ok(output) = std::process::Command::new("nvidia-smi").arg("--query-gpu=name,memory.total").arg("--format=csv,noheader").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.split(',').collect();
+                if parts.len() >= 2 {
+                    let name = parts[0].trim().to_string();
+                    let vram_str = parts[1].trim().replace(" MiB", "").replace("MB", "");
+                    if let Ok(vram_mb) = vram_str.parse::<f64>() {
+                        self.profiles.insert("local".to_string(), HardwareCapabilities {
+                            gpu_arch: name,
+                            vram_gb: vram_mb / 1024.0,
+                            supports_metal: false,
+                            memory_bandwidth_gbps: 80.0,
+                            system_ram_gb: vram_mb / 1024.0,
+                            compute_tflops: 0.0,
+                            supports_fp8: false,
+                            supports_nvfp4: false,
+                            supports_flash_attention: true,
+                        });
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        
+        // 无 GPU — CPU only
+        self.profiles.insert("local".to_string(), HardwareCapabilities {
+            gpu_arch: "CPU".to_string(),
+            vram_gb: 0.0,
+            supports_metal: false,
+            memory_bandwidth_gbps: 20.0,
+            system_ram_gb: sys_info::mem_info().map(|m| m.total as f64 / 1024.0 / 1024.0).unwrap_or(8.0),
+            compute_tflops: 0.0,
+            supports_fp8: false,
+            supports_nvfp4: false,
+            supports_flash_attention: false,
+        });
+        
         Ok(())
     }
     

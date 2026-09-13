@@ -279,18 +279,35 @@ impl ResourceBudgetManager {
         self.history.push(usage);
     }
     
-    /// 获取成本估算
+    /// 获取成本估算 (2026年定价)
+    ///
+    /// 注意：价格为近似值，实际价格可能变化。
+    /// 输入/输出 token 价格不同时，使用 input_price 作为默认估算。
     pub fn estimate_cost(
         &self,
         token_count: u64,
         model: &str,
     ) -> f64 {
-        // TODO: 实际调用成本计算
+        // 2026年模型定价 ($/1K tokens)
         let cost_per_1k = match model {
-            "gpt-4" => 0.03,
-            "gpt-3.5-turbo" => 0.002,
-            "claude-3" => 0.015,
-            _ => 0.001,
+            // OpenAI
+            "gpt-4o" => 0.0025,           // input
+            "gpt-4o-mini" => 0.00015,      // input
+            "gpt-4-turbo" => 0.01,         // input
+            "gpt-4" => 0.03,               // input (legacy)
+            "gpt-3.5-turbo" => 0.0005,     // input
+            // Anthropic
+            "claude-sonnet-4-20250514" => 0.003,  // input
+            "claude-3-5-sonnet-20241022" => 0.003, // input
+            "claude-3-haiku-20240307" => 0.00025,  // input
+            "claude-3-opus-20240229" => 0.015,     // input
+            // Google
+            "gemini-2.0-flash" => 0.0001,  // input
+            "gemini-1.5-pro" => 0.00125,   // input
+            "gemini-1.5-flash" => 0.000075,// input
+            // 本地/免费模型
+            "ollama" | "local" => 0.0,
+            _ => 0.001, // 未知模型使用保守估计
         };
         
         (token_count as f64 / 1000.0) * cost_per_1k

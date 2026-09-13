@@ -59,6 +59,11 @@ impl TextureAtlas {
 pub struct SpriteBatchExt {
     pub batches: HashMap<String, Vec<BatchEntry>>,
     pub max_batch_size: usize,
+    /// Optional texture atlas — sprites referencing atlas sub-textures are
+    /// remapped to the atlas texture and their src coords are adjusted.
+    pub atlas: Option<TextureAtlas>,
+    /// Tracks total draw calls generated (for perf metrics)
+    pub draw_calls: u64,
 }
 
 #[derive(Clone)]
@@ -80,10 +85,33 @@ impl SpriteBatchExt {
         Self {
             batches: HashMap::new(),
             max_batch_size,
+            atlas: None,
+            draw_calls: 0,
         }
     }
 
+    /// Attach a texture atlas. Sprites added via `add()` will be automatically
+    /// remapped to the atlas texture if their name matches an atlas region.
+    pub fn set_atlas(&mut self, atlas: TextureAtlas) {
+        self.atlas = Some(atlas);
+    }
+
     pub fn add(&mut self, texture: &str, entry: BatchEntry) {
+        // If an atlas is set and contains this texture, remap to atlas texture
+        if let Some(ref atlas) = self.atlas {
+            if let Some(region) = atlas.get_region(texture) {
+                let key = atlas.atlas_texture.clone();
+                let remapped = BatchEntry {
+                    src_x: region.x,
+                    src_y: region.y,
+                    src_w: region.width,
+                    src_h: region.height,
+                    ..entry
+                };
+                self.batches.entry(key).or_default().push(remapped);
+                return;
+            }
+        }
         self.batches
             .entry(texture.to_string())
             .or_default()
@@ -92,20 +120,27 @@ impl SpriteBatchExt {
 
     pub fn clear(&mut self) {
         self.batches.clear();
+        self.draw_calls = 0;
     }
 
-    pub fn to_draw_commands(&self) -> Vec<DrawCommand> {
+    /// Convert batches to draw commands. Sprites sharing the same texture
+    /// are grouped into a single batch → single draw call.
+    pub fn to_draw_commands(&mut self) -> Vec<DrawCommand> {
         let mut cmds = Vec::new();
         for (texture, entries) in &self.batches {
             let mut sorted = entries.clone();
             sorted.sort_by_key(|e| e.z_order);
-            for entry in sorted {
-                cmds.push(DrawCommand::DrawSprite {
-                    texture: texture.clone(),
-                    dest: Rect::new(entry.x, entry.y, entry.width, entry.height),
-                    color: entry.color,
-                    z_index: entry.z_order,
-                });
+            // Split into sub-batches if exceeding max_batch_size
+            for chunk in sorted.chunks(self.max_batch_size) {
+                self.draw_calls += 1;
+                for entry in chunk {
+                    cmds.push(DrawCommand::DrawSprite {
+                        texture: texture.clone(),
+                        dest: Rect::new(entry.x, entry.y, entry.width, entry.height),
+                        color: entry.color,
+                        z_index: entry.z_order,
+                    });
+                }
             }
         }
         cmds
@@ -137,6 +172,11 @@ impl SpriteBatchExt {
 
     pub fn total_vertices(&self) -> usize {
         self.entry_count() * 4
+    }
+
+    /// How many unique textures are being batched (lower = fewer draw calls)
+    pub fn unique_texture_count(&self) -> usize {
+        self.batches.len()
     }
 }
 
@@ -207,5 +247,50 @@ mod tests {
         assert!(batch.remove_texture("a.png"));
         assert!(!batch.remove_texture("a.png"));
         assert_eq!(batch.entry_count(), 0);
+    }
+
+    #[test]
+    fn test_texture_atlas_remapping() {
+        let mut atlas = TextureAtlas::new("atlas_main.png", 512.0, 512.0);
+        atlas.add_region("hero.png", AtlasRegion { x: 0.0, y: 0.0, width: 32.0, height: 32.0 });
+        atlas.add_region("enemy.png", AtlasRegion { x: 32.0, y: 0.0, width: 32.0, height: 32.0 });
+
+        let mut batch = SpriteBatchExt::new(64);
+        batch.set_atlas(atlas);
+
+        batch.add("hero.png", make_entry(0.0, 0));
+        batch.add("enemy.png", make_entry(64.0, 0));
+        batch.add("hero.png", make_entry(128.0, 1));
+
+        // All sprites remapped to single atlas texture → 1 batch
+        assert_eq!(batch.batch_count(), 1);
+        assert_eq!(batch.entry_count(), 3);
+        // Check that the batch key is the atlas texture
+        assert!(batch.batches.contains_key("atlas_main.png"));
+    }
+
+    #[test]
+    fn test_atlas_non_atlas_texture_unchanged() {
+        let mut atlas = TextureAtlas::new("atlas.png", 256.0, 256.0);
+        atlas.add_region("hero.png", AtlasRegion { x: 0.0, y: 0.0, width: 16.0, height: 16.0 });
+
+        let mut batch = SpriteBatchExt::new(64);
+        batch.set_atlas(atlas);
+
+        batch.add("hero.png", make_entry(0.0, 0));
+        batch.add("background.png", make_entry(64.0, 0)); // not in atlas
+
+        assert_eq!(batch.batch_count(), 2); // atlas batch + separate batch
+    }
+
+    #[test]
+    fn test_max_batch_size_chunking() {
+        let mut batch = SpriteBatchExt::new(2); // max 2 per batch
+        for i in 0..5 {
+            batch.add("t.png", make_entry(i as f32, 0));
+        }
+        let cmds = batch.to_draw_commands();
+        assert_eq!(cmds.len(), 5);
+        assert_eq!(batch.draw_calls, 3); // ceil(5/2) = 3 draw calls
     }
 }

@@ -547,6 +547,9 @@ pub struct GameRenderer {
     pub debug_renderer: DebugRenderer,
     pub effects: ScreenEffects,
     pub camera: Camera,
+    pub frame_timer: FrameTimer,
+    pub draw_call_batcher: DrawCallBatcher,
+    pub metrics: PerformanceMetrics,
 }
 
 impl GameRenderer {
@@ -558,6 +561,9 @@ impl GameRenderer {
             debug_renderer: DebugRenderer::new(),
             effects: ScreenEffects::new(),
             camera: Camera::new(width, height),
+            frame_timer: FrameTimer::new(),
+            draw_call_batcher: DrawCallBatcher::new(256),
+            metrics: PerformanceMetrics::new(),
         }
     }
 
@@ -582,6 +588,7 @@ impl GameRenderer {
     }
 
     pub fn end_frame(&mut self, dt: f32) -> Vec<DrawCommand> {
+        self.frame_timer.tick();
         self.particle_system.update(dt);
         self.effects.update(dt);
         self.debug_renderer.record_frame_time(dt);
@@ -608,6 +615,16 @@ impl GameRenderer {
         // Screen effects on top
         cmds.extend(self.effects.render());
 
+        // Update performance metrics
+        self.metrics.fps = self.frame_timer.fps();
+        self.metrics.entities_rendered = self.sprite_batch.total_sprites() as u64;
+        self.metrics.draw_calls = self.draw_call_batcher.draw_calls;
+        self.metrics.avg_frame_time_ms = if self.frame_timer.fps > 0.0 {
+            1000.0 / self.frame_timer.fps
+        } else {
+            0.0
+        };
+
         cmds
     }
 }
@@ -625,4 +642,128 @@ fn rand_f32_range(min: f32, max: f32) -> f32 {
     let nanos = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().subsec_nanos();
     let t = (nanos % 10000) as f32 / 10000.0;
     min + (max - min) * t
+}
+
+// ---------------------------------------------------------------------------
+// FrameTimer — measures real FPS by wall-clock intervals
+// ---------------------------------------------------------------------------
+
+pub struct FrameTimer {
+    pub frame_count: u64,
+    pub last_report: std::time::Instant,
+    pub fps: f64,
+}
+
+impl FrameTimer {
+    pub fn new() -> Self {
+        Self {
+            frame_count: 0,
+            last_report: std::time::Instant::now(),
+            fps: 0.0,
+        }
+    }
+
+    /// Call once per frame. After 1 s of wall time, recomputes FPS and resets.
+    pub fn tick(&mut self) {
+        self.frame_count += 1;
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(self.last_report).as_secs_f64();
+        if elapsed >= 1.0 {
+            self.fps = self.frame_count as f64 / elapsed;
+            self.frame_count = 0;
+            self.last_report = now;
+        }
+    }
+
+    pub fn fps(&self) -> f64 {
+        self.fps
+    }
+}
+
+impl Default for FrameTimer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DrawCallBatcher — accumulates DrawCommands and flushes in fixed-size batches
+// ---------------------------------------------------------------------------
+
+pub struct DrawCallBatcher {
+    pub max_batch_size: usize,
+    pub current_batch: Vec<DrawCommand>,
+    pub draw_calls: u64,
+}
+
+impl DrawCallBatcher {
+    pub fn new(max_batch_size: usize) -> Self {
+        Self {
+            max_batch_size,
+            current_batch: Vec::new(),
+            draw_calls: 0,
+        }
+    }
+
+    /// Push a command. Returns `true` if the batch was flushed (full).
+    pub fn add(&mut self, cmd: DrawCommand) -> bool {
+        self.current_batch.push(cmd);
+        if self.current_batch.len() >= self.max_batch_size {
+            self.flush();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Flush the current batch (counts as one draw call).
+    pub fn flush(&mut self) {
+        if !self.current_batch.is_empty() {
+            self.draw_calls += 1;
+            self.current_batch.clear();
+        }
+    }
+
+    pub fn pending(&self) -> usize {
+        self.current_batch.len()
+    }
+
+    pub fn reset_stats(&mut self) {
+        self.draw_calls = 0;
+        self.current_batch.clear();
+    }
+}
+
+impl Default for DrawCallBatcher {
+    fn default() -> Self {
+        Self::new(256)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PerformanceMetrics — snapshot of per-frame rendering stats
+// ---------------------------------------------------------------------------
+
+pub struct PerformanceMetrics {
+    pub fps: f64,
+    pub entities_rendered: u64,
+    pub draw_calls: u64,
+    pub avg_frame_time_ms: f64,
+}
+
+impl PerformanceMetrics {
+    pub fn new() -> Self {
+        Self {
+            fps: 0.0,
+            entities_rendered: 0,
+            draw_calls: 0,
+            avg_frame_time_ms: 0.0,
+        }
+    }
+}
+
+impl Default for PerformanceMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
 }

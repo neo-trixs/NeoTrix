@@ -13,6 +13,7 @@ pub mod debug_overlay;
 
 pub use renderer::{Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer};
 pub use renderer::{SpriteBatch, TilemapRenderer, ParticleSystem, DebugRenderer, ScreenEffects, GameRenderer};
+pub use renderer::{FrameTimer, DrawCallBatcher, PerformanceMetrics};
 pub use physics::{PhysicsEntity, BodyType, RigidBody, Collider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld};
 pub use input::{KeyCode, MouseButton, GamepadAxis, GamepadButton, InputState, InputProvider, SimpleInputProvider};
 pub use camera::{Camera2D, CameraBounds};

@@ -247,12 +247,14 @@ impl _DynamicMemoryBank {
     }
     
     /// 计算语义相似度
+    ///
+    /// 注意：此为嵌入模型未接入时的降级方案。使用关键词重叠度估算相似度。
+    /// 接入 DINOv2/CLIP 后应替换为向量余弦相似度。
     fn calculate_semantic_similarity(&self, query: &str, description: &str) -> f32 {
-        // TODO: 实际调用语义相似度计算 (如 DINOv2)
-        // 简化实现：基于关键词匹配
         let query_words: Vec<&str> = query.split_whitespace().collect();
         let desc_words: Vec<&str> = description.split_whitespace().collect();
         
+        // 关键词重叠度 + 长度惩罚
         let mut matches = 0;
         for qw in &query_words {
             if desc_words.iter().any(|dw| dw.contains(qw) || qw.contains(dw)) {
@@ -260,11 +262,15 @@ impl _DynamicMemoryBank {
             }
         }
         
-        if query_words.is_empty() {
+        let base_score = if query_words.is_empty() {
             0.0
         } else {
             matches as f32 / query_words.len() as f32
-        }
+        };
+        
+        // 关键词重叠度上限为 0.6 — 表示这只是近似匹配
+        // 真实语义相似度应通过向量嵌入计算
+        (base_score * 0.6).min(0.6)
     }
     
     /// 获取记忆库统计
