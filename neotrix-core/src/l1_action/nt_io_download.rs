@@ -5,12 +5,12 @@
 //! public API surface for callers that were using `nt_io_download` directly.
 
 pub use crate::l1_action::nt_media::streaming::{
-    AggregateProgress, DownloadConfig, DownloadEngine, DownloadProgressData, DownloadStatus,
+    AggregateProgress, DownloadConfig, DownloadEngine, DownloadProgressSnapshot, DownloadStatus,
     DownloadTask, TaskHandle,
 };
 
 /// Alias for callers that expect `DownloadProgress` name.
-pub type DownloadProgress = DownloadProgressData;
+pub type DownloadProgress = DownloadProgressSnapshot;
 
 // Re-export sub-modules that callers may reference.
 pub use crate::l1_action::nt_media::router::{is_huggingface_url, UrlScheme};

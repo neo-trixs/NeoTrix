@@ -25,7 +25,7 @@ pub use persistence::{ChunkState, ResumeValidation, SidecarState};
 pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use streaming::{
     AggregateProgress, check_disk_space, compute_sha256, DownloadConfig, DownloadEngine,
-    DownloadProgressData, DownloadStatus, DownloadTask, detect_filename, PipelineConfig,
+    DownloadProgressSnapshot, DownloadStatus, DownloadTask, detect_filename, PipelineConfig,
     PipelineError, PipelineHandle, PipelineProgress, PipelineStatus, record_mirror_speed,
     ranked_mirrors, resolve_mirror, RetryPolicy, StallDetector, StreamingPipeline, TaskHandle,
     verify_sha256,

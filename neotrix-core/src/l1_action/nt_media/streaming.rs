@@ -78,9 +78,9 @@ pub struct PipelineProgress {
     pub elapsed: Duration,
 }
 
-/// Single-task progress for wrapper callers (re-exported as `DownloadProgress` in nt_io_download).
+/// Single-task progress for wrapper callers (re-exported as `DownloadProgressSnapshot` in nt_io_download).
 #[derive(Debug, Clone)]
-pub struct DownloadProgressData {
+pub struct DownloadProgressSnapshot {
     pub percent: f32,
     pub downloaded: u64,
     pub total: u64,
@@ -106,7 +106,7 @@ pub struct AggregateProgress {
 #[derive(Debug, Clone)]
 pub enum DownloadStatus {
     Pending,
-    InProgress(DownloadProgressData),
+    InProgress(DownloadProgressSnapshot),
     Completed { elapsed_secs: f64, size_mb: f64 },
     Failed(String),
     Cancelled,
@@ -220,112 +220,12 @@ impl DownloadTask {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Mirror speed profiling — EMA-based ranking (from nt_io_download)
+// Mirror speed profiling — delegated to NT-WORLD (L2 Perception)
 // ═══════════════════════════════════════════════════════════════════════════
 
-static MIRROR_SPEED_MAP: LazyLock<Mutex<HashMap<String, f64>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-const MIRROR_ENDPOINTS: &[&str] = &["https://hf-mirror.com", "https://huggingface.co"];
-
-/// Record mirror speed using exponential moving average (α=0.3).
-pub fn record_mirror_speed(endpoint: &str, bytes_per_sec: f64) {
-    if let Ok(mut map) = MIRROR_SPEED_MAP.lock() {
-        let entry = map.entry(endpoint.to_string()).or_insert(0.0);
-        *entry = 0.7 * *entry + 0.3 * bytes_per_sec;
-    }
-}
-
-/// Return mirrors sorted by speed (fastest first).
-pub fn ranked_mirrors() -> Vec<(String, f64)> {
-    let map = MIRROR_SPEED_MAP.lock().unwrap();
-    let mut pairs: Vec<_> = map.iter().map(|(k, v)| (k.clone(), *v)).collect();
-    pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    pairs
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// HuggingFace mirror resolution — adaptive with parallel probing
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// Resolve HuggingFace URL to fastest mirror. Returns original if not HF.
-pub async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String {
-    if !router::is_huggingface_url(original_url) || original_url.contains("hf-mirror.com") {
-        return original_url.to_string();
-    }
-
-    // Environment variable override
-    if let Ok(endpoint) = std::env::var("NT_DOWNLOAD_MIRROR_ENDPOINT") {
-        let ep = endpoint.trim();
-        if !ep.is_empty() {
-            let ep = if ep.starts_with("http") {
-                ep.to_string()
-            } else {
-                format!("https://{}", ep)
-            };
-            let forced = original_url
-                .replace("https://huggingface.co", &ep)
-                .replace("http://huggingface.co", &ep);
-            if forced != original_url {
-                return forced;
-            }
-        }
-    }
-
-    // Sort endpoints by known speed
-    let speed_ranking = ranked_mirrors();
-    let mut endpoints: Vec<&str> = MIRROR_ENDPOINTS.to_vec();
-    if !speed_ranking.is_empty() {
-        endpoints.sort_by(|a, b| {
-            let sa = speed_ranking
-                .iter()
-                .find(|(k, _)| k.contains(a.trim_start_matches("https://")))
-                .map(|(_, v)| *v)
-                .unwrap_or(0.0);
-            let sb = speed_ranking
-                .iter()
-                .find(|(k, _)| k.contains(b.trim_start_matches("https://")))
-                .map(|(_, v)| *v)
-                .unwrap_or(0.0);
-            sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
-        });
-    }
-
-    // Build candidate list
-    let mut candidates: Vec<String> = endpoints
-        .iter()
-        .filter_map(|ep| {
-            let c = original_url
-                .replace("https://huggingface.co", ep)
-                .replace("http://huggingface.co", ep);
-            if c != original_url {
-                Some(c)
-            } else {
-                None
-            }
-        })
-        .collect();
-    candidates.push(original_url.to_string());
-
-    // Parallel HEAD probe — first success wins
-    let mut handles = Vec::new();
-    for url in &candidates {
-        let client = client.clone();
-        let url = url.clone();
-        handles.push(tokio::spawn(async move {
-            match tokio::time::timeout(Duration::from_secs(2), client.head(&url).send()).await {
-                Ok(Ok(resp)) if resp.status().is_success() => Some(url),
-                _ => None,
-            }
-        }));
-    }
-    for h in handles {
-        if let Ok(Some(url)) = h.await {
-            return url;
-        }
-    }
-    original_url.to_string()
-}
+pub use crate::l2_perception::nt_world::nt_world_mirror::{
+    ranked_mirrors, record_mirror_speed, resolve_mirror,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Filename detection — content-disposition + URL path fallback
@@ -1131,7 +1031,7 @@ impl ParallelDownloader {
                         }
                     };
 
-                    if let Err(e) = dl.download_chunk(chunk).await {
+                    if let Err(e) = dl.download_chunk(chunk.clone()).await {
                         let mut chunks = dl.chunks.lock().await;
                         for c in chunks.iter_mut() {
                             if c.index == chunk.index
@@ -1336,7 +1236,7 @@ async fn stream_http_download(
     };
 
     // Probe Range support via HEAD
-    let (total_size, supports_range) = probe_range_support(client, url, auth).await;
+    let (supports_range, total_size) = probe_range_support(client, url, auth).await;
 
     let use_parallel = supports_range
         && total_size
@@ -2552,7 +2452,7 @@ impl DownloadEngine {
                 None
             };
 
-            let progress = DownloadProgressData {
+            let progress = DownloadProgressSnapshot {
                 percent: pct,
                 downloaded: total_downloaded,
                 total: total_size,
