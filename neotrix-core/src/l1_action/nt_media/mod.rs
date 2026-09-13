@@ -21,16 +21,12 @@ pub mod yt_extract;
 pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};
 pub use detect::MediaKind;
 pub use download_progress::{format_bytes, DownloadProgress, ProgressConfig};
-pub use playback::{
-    EnginePlaybackState, PlaybackController, PlaybackEngine, PlaybackHistory, PlaybackQueue,
-    PlaybackRetry, PlaybackState, PlayMode, RepeatMode,
-};
 pub use persistence::{
-    ChunkState as SidecarChunkState, ChunkPersistenceConfig, DownloadStatus, ResumeValidation,
-    SidecarState,
+    check_disk_space, ChunkDownloadStatus, ChunkState, compute_sha256_streaming, DownloadStatus,
+    ResumeValidation, SidecarState,
 };
 pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use streaming::{
-    ChunkStatus, PipelineConfig, PipelineError, PipelineHandle, PipelineProgress, PipelineStatus,
-    RetryPolicy, StallDetector, StreamingPipeline,
+    PipelineConfig, PipelineError, PipelineHandle, PipelineProgress, PipelineStatus, RetryPolicy,
+    StallDetector, StreamingPipeline,
 };

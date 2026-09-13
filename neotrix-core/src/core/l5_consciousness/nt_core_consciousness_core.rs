@@ -839,6 +839,19 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
         "NT-MEMORY",
         "KnowledgeIntegrator",
     ),
+    // ── file-ability dispatch routes (R-P110: internal dispatch, not CLI) ──
+    ("智能合并", "collection_merge", "NT-ACT", "CodeAnalyzer"),
+    ("混合合并", "collection_merge", "NT-ACT", "CodeAnalyzer"),
+    ("编辑表格", "xlsx_edit", "NT-ACT", "CodeAnalyzer"),
+    ("单元格", "xlsx_edit", "NT-ACT", "CodeAnalyzer"),
+    ("读取结构", "structured_read", "NT-WORLD", "CodeAnalyzer"),
+    ("读取json", "structured_read", "NT-WORLD", "CodeAnalyzer"),
+    ("读取yaml", "structured_read", "NT-WORLD", "CodeAnalyzer"),
+    ("写入json", "json_write", "NT-ACT", "CodeAnalyzer"),
+    ("保存json", "json_write", "NT-ACT", "CodeAnalyzer"),
+    ("pdf图片统计", "pdf_image_stats", "NT-WORLD", "CodeAnalyzer"),
+    ("pdf图像信息", "pdf_image_stats", "NT-WORLD", "CodeAnalyzer"),
+    ("pdf提取图片", "pdf_extract_images", "NT-ACT", "CodeAnalyzer"),
 ];
 
 /// 子任务 — 意识核心从人类语言拆解出的最小执行单元。
@@ -1768,6 +1781,275 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     ),
                 ),
                 Err(e) => (false, format!("PDF 增强失败: {e}")),
+            }
+        }
+        // 智能合并 (R-P110): 按输入格式自动路由到 PDF/XLSX/DOCX/PPTX/混合合并
+        "collection_merge" | "smart_merge" => {
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.len() < 2 {
+                return (
+                    false,
+                    format!(
+                        "子任务 '{}' 缺少 输入+输出 路径, 无法智能合并",
+                        task.summary
+                    ),
+                );
+            }
+            let out = paths[0].clone();
+            let inputs = paths[1..].to_vec();
+            let req = crate::neotrix::CollectionMergeRequest {
+                inputs,
+                strategy: crate::neotrix::MergeStrategy::All,
+                schema: None,
+                output: out.clone(),
+                dry_run: false,
+            };
+            match crate::neotrix::collection_merge(&req) {
+                Ok(outcome) => {
+                    let desc = match &outcome {
+                        crate::neotrix::MergeOutcome::Text { items, note } => {
+                            format!("文本级合并 {items} 个文件: {note}")
+                        }
+                        crate::neotrix::MergeOutcome::Docx { items, parts } => {
+                            format!("DOCX 结构合并 {items} 个文件, {parts} 个 part")
+                        }
+                        crate::neotrix::MergeOutcome::Pptx { slides } => {
+                            format!("PPTX 结构合并, {slides} 张幻灯片")
+                        }
+                        crate::neotrix::MergeOutcome::Pdf { pages } => {
+                            format!("PDF 结构合并, {pages} 页")
+                        }
+                        crate::neotrix::MergeOutcome::Xlsx { rows, note } => {
+                            format!("XLSX 表格合并 {rows} 行: {note}")
+                        }
+                    };
+                    (
+                        true,
+                        format!("智能合并完成 ({})\n输出: {}", desc, out.display()),
+                    )
+                }
+                Err(e) => (false, format!("智能合并失败: {e}")),
+            }
+        }
+        // XLSX 单元格级编辑 (R-P110): SetCell/InsertRow/RemoveRow
+        "xlsx_edit" | "table_edit" => {
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.is_empty() {
+                return (
+                    false,
+                    format!("子任务 '{}' 缺少 XLSX 路径, 无法编辑", task.summary),
+                );
+            }
+            let path = &paths[0];
+            if !path.exists() {
+                return (false, format!("XLSX 文件不存在: {}", path.display()));
+            }
+            let mut edits: Vec<crate::neotrix::TableEdit> = Vec::new();
+            for (i, w) in words.iter().enumerate() {
+                if *w == "--set" && i + 1 < words.len() {
+                    if let Some((rc, val)) = words[i + 1].split_once('=') {
+                        let parts: Vec<usize> = rc
+                            .split(',')
+                            .filter_map(|s| s.parse().ok())
+                            .collect();
+                        if parts.len() == 2 {
+                            edits.push(crate::neotrix::TableEdit::SetCell {
+                                sheet: 0,
+                                row: parts[0],
+                                col: parts[1],
+                                value: val.to_string(),
+                            });
+                        }
+                    }
+                }
+                if *w == "--insert" && i + 1 < words.len() {
+                    if let Ok(row) = words[i + 1].parse::<usize>() {
+                        edits.push(crate::neotrix::TableEdit::InsertRow { sheet: 0, row });
+                    }
+                }
+                if *w == "--remove" && i + 1 < words.len() {
+                    if let Ok(row) = words[i + 1].parse::<usize>() {
+                        edits.push(crate::neotrix::TableEdit::RemoveRow { sheet: 0, row });
+                    }
+                }
+            }
+            if edits.is_empty() {
+                return (
+                    false,
+                    format!(
+                        "子任务 '{}' 未解析出编辑指令 (--set/--insert/--remove)",
+                        task.summary
+                    ),
+                );
+            }
+            match crate::neotrix::edit_xlsx_table(path, &edits) {
+                Ok(tables) => {
+                    let total_rows: usize = tables.iter().map(|t| t.rows.len()).sum();
+                    (
+                        true,
+                        format!(
+                            "XLSX 编辑完成: {} 条编辑, {} 行数据\n文件: {}",
+                            edits.len(),
+                            total_rows,
+                            path.display()
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("XLSX 编辑失败: {e}")),
+            }
+        }
+        // 结构化数据读取 (R-P110): JSON/YAML/TOML → StructuredData
+        "structured_read" | "json_read" => {
+            let dir = first_path(&task.summary);
+            match dir {
+                Some(p) if p.is_file() => {
+                    match crate::neotrix::read_structured(&p) {
+                        Ok(data) => (
+                            true,
+                            format!(
+                                "结构化读取完成 ({} 格式):\n{}",
+                                data.format,
+                                serde_json::to_string_pretty(&data.value)
+                                    .unwrap_or_else(|_| "<序列化失败>".into())
+                                    .chars()
+                                    .take(500)
+                                    .collect::<String>()
+                            ),
+                        ),
+                        Err(e) => (false, format!("结构化读取失败: {e}")),
+                    }
+                }
+                Some(p) => (
+                    false,
+                    format!("路径 '{}' 不是文件, 无法结构化读取", p.display()),
+                ),
+                None => (
+                    false,
+                    format!(
+                        "子任务 '{}' 未提供有效文件路径, 无法结构化读取",
+                        task.summary
+                    ),
+                ),
+            }
+        }
+        // JSON 写入 (R-P110): <path.json> <json_content>
+        "json_write" | "structured_write" => {
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.is_empty() {
+                return (
+                    false,
+                    format!("子任务 '{}' 缺少 JSON 输出路径", task.summary),
+                );
+            }
+            let out = &paths[0];
+            let json_str = words
+                .iter()
+                .skip_while(|w| {
+                    let w = w.trim_matches('"').trim_matches('，').trim_matches(',');
+                    !(w.contains('/') || w.contains('\\'))
+                })
+                .skip(1)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ");
+            match serde_json::from_str::<serde_json::Value>(&json_str) {
+                Ok(v) => match crate::neotrix::write_json(out, &v, true) {
+                    Ok(()) => (
+                        true,
+                        format!("JSON 写入完成: {}\n内容: {} 字节", out.display(), json_str.len()),
+                    ),
+                    Err(e) => (false, format!("JSON 写入失败: {e}")),
+                },
+                Err(e) => (false, format!("JSON 内容解析失败: {e}\n输入: {json_str}")),
+            }
+        }
+        // PDF 图像统计 (R-P110): 分析 PDF 中嵌入图像的数量和大小
+        "pdf_image_stats" | "pdf_images_info" => {
+            let dir = first_path(&task.summary);
+            match dir {
+                Some(p) if p.is_file() => {
+                    match crate::neotrix::pdf_image_stats(&p) {
+                        Ok(stats) => (
+                            true,
+                            format!(
+                                "PDF 图像统计:\n  文件: {}\n  嵌入图像: {} 张 ({} 页)\n  格式: {}\n  平均尺寸: {}×{}",
+                                p.display(),
+                                stats.total_images,
+                                stats.total_pages,
+                                if stats.formats.is_empty() { "未知".to_string() } else { stats.formats.join(", ") },
+                                stats.avg_image_size.0,
+                                stats.avg_image_size.1
+                            ),
+                        ),
+                        Err(e) => (false, format!("PDF 图像统计失败: {e}")),
+                    }
+                }
+                Some(p) => (
+                    false,
+                    format!("路径 '{}' 不是 PDF 文件", p.display()),
+                ),
+                None => (
+                    false,
+                    format!(
+                        "子任务 '{}' 未提供 PDF 路径, 无法统计图像",
+                        task.summary
+                    ),
+                ),
+            }
+        }
+        // PDF 图像提取 (R-P110): 从 PDF 中提取嵌入图像到指定目录
+        "pdf_extract_images" => {
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.is_empty() {
+                return (
+                    false,
+                    format!("子任务 '{}' 缺少 PDF 路径, 无法提取图像", task.summary),
+                );
+            }
+            let pdf_path = &paths[0];
+            let out_dir = paths.get(1).cloned().unwrap_or_else(|| {
+                pdf_path.with_file_name(format!(
+                    "{}_images",
+                    pdf_path.file_stem().unwrap_or_default().to_string_lossy()
+                ))
+            });
+            let config = crate::neotrix::PdfImageExtractConfig::default();
+            match crate::neotrix::extract_pdf_images(pdf_path, &out_dir, &config) {
+                Ok(result) => (
+                    true,
+                    format!(
+                        "PDF 图像提取完成:\n  输入: {}\n  输出目录: {}\n  提取: {} 张\n  耗时: {}ms",
+                        pdf_path.display(),
+                        out_dir.display(),
+                        result.images.len(),
+                        result.processing_time_ms
+                    ),
+                ),
+                Err(e) => (false, format!("PDF 图像提取失败: {e}")),
             }
         }
         _ => (

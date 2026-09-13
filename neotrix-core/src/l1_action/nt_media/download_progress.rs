@@ -5,7 +5,10 @@
 //! - Speed display (B/s, KB/s, MB/s)
 //! - ETA calculation
 //! - File size tracking
+//!
+//! Accepts `PipelineStatus` directly for unified progress display.
 
+use super::streaming::PipelineStatus;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
@@ -50,6 +53,56 @@ impl DownloadProgress {
             last_bytes: 0,
             speed_bytes_per_sec: 0.0,
             config,
+        }
+    }
+
+    /// Create a DownloadProgress directly from a PipelineStatus variant.
+    ///
+    /// Extracts `downloaded`, `total`, and `speed_bps` from the status.
+    /// Returns None for non-downloading statuses (Resolving, Complete, Failed, Cancelled).
+    pub fn from_pipeline_status(status: &PipelineStatus, config: ProgressConfig) -> Option<Self> {
+        match status {
+            PipelineStatus::Downloading {
+                downloaded,
+                total,
+                speed_bps,
+            }
+            | PipelineStatus::Playing {
+                downloaded,
+                total,
+                speed_bps,
+            } => {
+                let total_bytes = total.unwrap_or(0);
+                let mut progress = Self::new(total_bytes, config);
+                progress.downloaded_bytes = *downloaded;
+                progress.speed_bytes_per_sec = *speed_bps;
+                Some(progress)
+            }
+            _ => None,
+        }
+    }
+
+    /// Update progress from a PipelineStatus, returning whether display should refresh.
+    pub fn update_from_pipeline_status(&mut self, status: &PipelineStatus) -> bool {
+        match status {
+            PipelineStatus::Downloading {
+                downloaded,
+                total,
+                speed_bps,
+            }
+            | PipelineStatus::Playing {
+                downloaded,
+                total,
+                speed_bps,
+            } => {
+                self.downloaded_bytes = *downloaded;
+                if let Some(t) = total {
+                    self.total_bytes = *t;
+                }
+                self.speed_bytes_per_sec = *speed_bps;
+                true
+            }
+            _ => false,
         }
     }
 
@@ -165,5 +218,42 @@ mod tests {
         progress.update(500_000_000);
         // Just verify it doesn't panic
         progress.display();
+    }
+
+    #[test]
+    fn test_from_pipeline_status_downloading() {
+        let status = PipelineStatus::Downloading {
+            downloaded: 512,
+            total: Some(1024),
+            speed_bps: 256.0,
+        };
+        let progress = DownloadProgress::from_pipeline_status(&status, ProgressConfig::default());
+        assert!(progress.is_some());
+        let p = progress.unwrap();
+        assert_eq!(p.downloaded_bytes, 512);
+        assert_eq!(p.total_bytes, 1024);
+        assert_eq!(p.speed_bytes_per_sec, 256.0);
+    }
+
+    #[test]
+    fn test_from_pipeline_status_non_downloading() {
+        let status = PipelineStatus::Resolving;
+        let progress = DownloadProgress::from_pipeline_status(&status, ProgressConfig::default());
+        assert!(progress.is_none());
+    }
+
+    #[test]
+    fn test_update_from_pipeline_status() {
+        let status = PipelineStatus::Downloading {
+            downloaded: 256,
+            total: Some(512),
+            speed_bps: 128.0,
+        };
+        let mut progress = DownloadProgress::new(0, ProgressConfig::default());
+        let updated = progress.update_from_pipeline_status(&status);
+        assert!(updated);
+        assert_eq!(progress.downloaded_bytes, 256);
+        assert_eq!(progress.total_bytes, 512);
+        assert_eq!(progress.speed_bytes_per_sec, 128.0);
     }
 }

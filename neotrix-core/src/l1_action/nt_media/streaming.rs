@@ -306,25 +306,10 @@ impl StreamingPipeline {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ChunkState / ChunkStatus — per-chunk state for parallel download
+// Re-export unified ChunkState / ChunkDownloadStatus from persistence
 // ═══════════════════════════════════════════════════════════════════════════
 
-#[derive(Debug, Clone)]
-pub struct ChunkState {
-    pub index: usize,
-    pub start: u64,
-    pub end: u64,
-    pub downloaded: u64,
-    pub status: ChunkStatus,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ChunkStatus {
-    Pending,
-    InProgress,
-    Complete,
-    Failed,
-}
+pub use super::persistence::{ChunkDownloadStatus, ChunkState};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // StallDetector — monitors per-chunk download progress
@@ -477,16 +462,10 @@ impl ParallelDownloader {
         }
         let mut chunks = Vec::new();
         let mut offset = 0u64;
-        let mut index = 0;
+        let mut index = 0u32;
         while offset < total_size {
             let end = (offset + chunk_size as u64 - 1).min(total_size - 1);
-            chunks.push(ChunkState {
-                index,
-                start: offset,
-                end,
-                downloaded: 0,
-                status: ChunkStatus::Pending,
-            });
+            chunks.push(ChunkState::streaming(index, offset, end));
             offset = end + 1;
             index += 1;
         }
@@ -496,7 +475,7 @@ impl ParallelDownloader {
     fn steal_next(&self) -> Option<ChunkState> {
         let chunks = self.chunks.blocking_lock();
         for chunk in chunks.iter() {
-            if matches!(chunk.status, ChunkStatus::Pending) {
+            if matches!(chunk.status(), ChunkDownloadStatus::Pending) {
                 return Some(chunk.clone());
             }
         }
@@ -619,8 +598,7 @@ impl ParallelDownloader {
                         let mut chunks = self.chunks.lock().await;
                         for c in chunks.iter_mut() {
                             if c.index == chunk.index {
-                                c.status = ChunkStatus::Complete;
-                                c.downloaded = chunk.downloaded;
+                                c.mark_streaming_complete();
                                 break;
                             }
                         }
@@ -695,16 +673,16 @@ impl ParallelDownloader {
 
                     let chunk = {
                         let mut chunks = dl.chunks.lock().await;
-                        let next = chunks.iter_mut().find(|c| matches!(c.status, ChunkStatus::Pending));
+                        let next = chunks.iter_mut().find(|c| matches!(c.status(), ChunkDownloadStatus::Pending));
                         match next {
                             Some(c) => {
-                                c.status = ChunkStatus::InProgress;
+                                c.status = ChunkDownloadStatus::InProgress;
                                 c.clone()
                             }
                             None => {
                                 let all_done = chunks.iter().all(|c| {
-                                    matches!(c.status, ChunkStatus::Complete)
-                                        || matches!(c.status, ChunkStatus::Failed)
+                                    matches!(c.status(), ChunkDownloadStatus::Complete)
+                                        || matches!(c.status(), ChunkDownloadStatus::Failed)
                                 });
                                 if all_done {
                                     return Ok(());
@@ -719,8 +697,8 @@ impl ParallelDownloader {
                     if let Err(e) = dl.download_chunk(chunk).await {
                         let mut chunks = dl.chunks.lock().await;
                         for c in chunks.iter_mut() {
-                            if c.index == chunk.index && !matches!(c.status, ChunkStatus::Complete) {
-                                c.status = ChunkStatus::Failed;
+                            if c.index == chunk.index && !matches!(c.status(), ChunkDownloadStatus::Complete) {
+                                c.status = ChunkDownloadStatus::Failed;
                             }
                         }
 
