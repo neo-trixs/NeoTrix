@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { isTauriRuntime } from '../lib/env'
 
 /* ════════════════════════════════════════════
    api/client.ts — Tauri invoke 统一封装
@@ -60,6 +61,9 @@ export function toApiError(e: unknown): ApiError {
 
 /** 类型化调用。args 键名保持 snake_case（对齐 Rust 参数名） */
 export async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauriRuntime()) {
+    throw new ApiError('此功能仅在桌面宿主可用')
+  }
   try {
     return await invoke<T>(cmd, args)
   } catch (e) {
@@ -69,6 +73,9 @@ export async function call<T>(cmd: string, args?: Record<string, unknown>): Prom
 
 /** 静默调用：失败返回 fallback（非关键路径用，避免 try/catch 噪音） */
 export async function callOr<T>(cmd: string, args: Record<string, unknown> | undefined, fallback: T): Promise<T> {
+  if (!isTauriRuntime()) {
+    return fallback
+  }
   try {
     return await invoke<T>(cmd, args)
   } catch {

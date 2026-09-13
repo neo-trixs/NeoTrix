@@ -6,6 +6,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import { isTauriRuntime } from '../lib/env'
 
 // ========== Types ==========
 
@@ -59,6 +60,9 @@ export async function call<T = unknown>(
   action: string,
   args: Record<string, unknown> = {}
 ): Promise<T> {
+  if (!isTauriRuntime()) {
+    throw new DomainError('NOT_AVAILABLE', '此功能仅在桌面宿主可用', false)
+  }
   const response = await invoke<DomainResponse<T>>('domain_call', {
     domain,
     action,
