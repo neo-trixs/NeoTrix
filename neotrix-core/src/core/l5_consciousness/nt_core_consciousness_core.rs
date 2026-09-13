@@ -2073,25 +2073,31 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── SEAL pipeline (nt_core_seal) ──
         "seal_iterate" => {
-            match crate::l5_cognition::nt_mind::foundation::seal_pipeline::L1SealPipeline::new().run_cycle() {
-                Ok(status) => (
-                    true,
-                    format!("SEAL 进化迭代完成: cycle {}, 进度 {:.0}%", status.cycle_count, status.overall_progress * 100.0),
+            let mut evo = crate::l5_cognition::nt_mind::evolution::EvolutionLoop::new();
+            let report = evo.run_cycle(None, None);
+            (
+                true,
+                format!(
+                    "SEAL 进化迭代完成 (cycle {}): 问题 {} 个, 修复 {} 个, 健康分 {:.1}, 自动修复 {}",
+                    report.cycle,
+                    report.issues_found.len(),
+                    report.issues_fixed,
+                    report.evolution_score,
+                    report.auto_fixes,
                 ),
-                Err(e) => (false, format!("SEAL 迭代失败: {e}")),
-            }
+            )
         }
         "seal_distill" => {
-            match crate::l5_cognition::nt_mind::foundation::seal_pipeline::L1SealPipeline::new().trigger_distillation() {
-                Ok(result) => (
-                    true,
-                    format!(
-                        "SEAL 蒸馏完成: 提取 {} 个模式, 压缩 {:.2} MB",
-                        result.patterns_extracted, result.knowledge_compressed_mb
-                    ),
+            let mut evo = crate::l5_cognition::nt_mind::evolution::EvolutionLoop::new();
+            let report = evo.run_cycle(None, None);
+            (
+                true,
+                format!(
+                    "SEAL 蒸馏完成: 新模式 {} 个, 建议 {} 个",
+                    report.new_patterns.len(),
+                    report.suggestions.len(),
                 ),
-                Err(e) => (false, format!("SEAL 蒸馏失败: {e}")),
-            }
+            )
         }
         // ── Self model (nt_core_self) ──
         "self_model_tick" => {
