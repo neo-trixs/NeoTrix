@@ -133,7 +133,7 @@ impl _NoiseHandshake {
             return Err(_NoiseError::MessageTooShort);
         }
 
-        let ephemeral_pub = PublicKey::from_bytes(msg[..32].try_into().unwrap());
+        let ephemeral_pub = PublicKey::from_bytes(msg[..32].try_into().expect("correct size"));
         self.remote_ephemeral = Some(ephemeral_pub.clone());
         self.hash_concat(msg);
         self.state = _HandshakeState::Message1Received;
@@ -187,7 +187,7 @@ impl _NoiseHandshake {
             return Err(_NoiseError::MessageTooShort);
         }
 
-        let e_pub = PublicKey::from_bytes(msg[..32].try_into().unwrap());
+        let e_pub = PublicKey::from_bytes(msg[..32].try_into().expect("correct size"));
         self.remote_ephemeral = Some(e_pub.clone());
 
         let eph_priv = self.ephemeral_private.as_ref().ok_or(_NoiseError::InvalidState)?;

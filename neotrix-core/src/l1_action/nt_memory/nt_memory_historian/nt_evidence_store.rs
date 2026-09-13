@@ -587,13 +587,9 @@ mod tests {
         super::EvidenceStore::new(kb)
     }
 
-    // TODO: Replace with real evidence store tests — current placeholder tests nothing meaningful
     #[test]
-    #[ignore = "TODO: instantiation-only test — replace with real store/get/delete roundtrip"]
     fn test_evidence_store_instantiation() {
-        // Baseline: EvidenceStore can be created with a valid KB
         let store = new_store();
-        // Verify store is operational by attempting a get on non-existent key
         let result = store.get_evidence("nonexistent-id-000");
         assert!(result.is_ok(), "get_evidence on empty store should not error");
     }

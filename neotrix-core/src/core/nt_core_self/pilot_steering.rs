@@ -204,7 +204,7 @@ impl PilotSupervisor {
                     pattern_id: pattern_id.clone(),
                     description: error,
                     frequency,
-                    last_seen: points.last().unwrap().timestamp,
+                    last_seen: points.last().expect("non-empty").timestamp,
                     suggested_fix: None,
                     related_skills: Vec::new(),
                 };

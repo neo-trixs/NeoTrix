@@ -254,7 +254,7 @@ impl ContextAssembler {
 
         // 按相关性降序排序，贪心选择
         let mut sorted_fragments = fragments;
-        sorted_fragments.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap());
+        sorted_fragments.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap_or(std::cmp::Ordering::Equal));
 
         // 跟踪已分配的预算
         let alloc_map: HashMap<&ContextSource, usize> = allocations

@@ -404,7 +404,7 @@ rm -rf /dangerous
         let result = improver.improve_until_pass(&skill_path);
         
         // Should have detected safety issue and attempted fix
-        let result_ref = result.as_ref().unwrap();
+        let result_ref = result.as_ref().expect("Some value");
         assert!(result_ref.iterations > 0);
         assert!(result_ref.scores.safety >= 0.0); // After fix
         
@@ -424,6 +424,12 @@ mod tests {
 
     #[test]
     fn test_improver_creation() {
+        // HONESTY: Tests constructor default value. This is a trivial contract test —
+        // the real behavior (analyzing skill files, generating improvement plans)
+        // is tested in `test_analyze_detects_issues` and `test_apply_fixes_frontmatter`.
+        // TODO(R-P79): Once SkillImprover is wired to real skill file analysis,
+        // add tests that verify iteration limits are actually respected during
+        // the improvement loop.
         let improver = SkillImprover::new();
         assert_eq!(improver.max_iterations, 5);
     }

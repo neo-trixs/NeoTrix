@@ -57,7 +57,7 @@ impl Default for WebSearchTool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
+pub struct WebSearchResult {
     pub title: String,
     pub url: String,
     pub snippet: String,
@@ -65,6 +65,8 @@ pub struct SearchResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<_EvidenceScore>,
 }
+
+pub type SearchResult = WebSearchResult;
 
 /// 证据可信度分解 (argo evidence 管线移植)。
 #[derive(Debug, Clone, Serialize, Deserialize)]

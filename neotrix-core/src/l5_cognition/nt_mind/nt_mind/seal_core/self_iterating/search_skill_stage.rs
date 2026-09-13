@@ -65,13 +65,15 @@ pub struct SearchExercise {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
+pub struct SkillSearchResult {
     pub url: String,
     pub title: String,
     pub snippet: String,
     pub source_type: String,              // "web" | "academic" | "code" | "doc"
     pub credibility: f64,                 // 来源可信度 (0-1)
 }
+
+pub type SearchResult = SkillSearchResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Evidence {

@@ -409,6 +409,30 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("知识管线", "knowledge_compilation", "NT-MIND", "KnowledgeIntegrator"),
     ("compile_knowledge", "knowledge_compilation", "NT-MIND", "KnowledgeIntegrator"),
     ("编译知识", "knowledge_compilation", "NT-MIND", "KnowledgeIntegrator"),
+    // knowledge_distillation — 知识蒸馏管线
+    ("knowledge_distillation", "knowledge_distillation", "NT-MIND", "KnowledgeIntegrator"),
+    ("知识蒸馏", "knowledge_distillation", "NT-MIND", "KnowledgeIntegrator"),
+    ("蒸馏管线", "knowledge_distillation", "NT-MIND", "KnowledgeIntegrator"),
+    ("模型蒸馏", "knowledge_distillation", "NT-MIND", "KnowledgeIntegrator"),
+    ("teacher_student", "knowledge_distillation", "NT-MIND", "KnowledgeIntegrator"),
+    // experience_crystallization — 经验结晶
+    ("experience_crystallization", "experience_crystallization", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("经验结晶", "experience_crystallization", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("结晶经验", "experience_crystallization", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("经验固化", "experience_crystallization", "NT-MEMORY", "KnowledgeIntegrator"),
+    ("crystallize", "experience_crystallization", "NT-MEMORY", "KnowledgeIntegrator"),
+    // skill_transfer — 跨模型技能迁移
+    ("skill_transfer", "skill_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    ("技能迁移", "skill_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    ("跨模型迁移", "skill_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    ("技能转移", "skill_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    ("transfer_skill", "skill_transfer", "NT-MIND", "KnowledgeIntegrator"),
+    // emotional_regulation — 情感调节
+    ("emotional_regulation", "emotional_regulation", "NT-FEEL", "ReflectionEngine"),
+    ("情感调节", "emotional_regulation", "NT-FEEL", "ReflectionEngine"),
+    ("情绪调节", "emotional_regulation", "NT-FEEL", "ReflectionEngine"),
+    ("情感管控", "emotional_regulation", "NT-FEEL", "ReflectionEngine"),
+    ("regulate_emotion", "emotional_regulation", "NT-FEEL", "ReflectionEngine"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -1627,6 +1651,112 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                 }
                 Err(e) => (false, format!("knowledge_compilation 失败: KB 不可用 — {e}")),
             }
+        }
+        "knowledge_distillation" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("teacher") || lower.contains("教师") { "teacher_student" }
+                        else if lower.contains("self") || lower.contains("自蒸馏") { "self_distill" }
+                        else if lower.contains("feature") || lower.contains("特征") { "feature_transfer" }
+                        else { "standard" };
+                    let distilled = kb.kv_get("experience", "knowledge_distillation:distilled_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "knowledge_distillation:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "knowledge_distillation 知识蒸馏管线: {} 模式 | 已蒸馏 {} 条 | 上次: {} | KB: {} nodes / {} kv",
+                            mode, distilled,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("knowledge_distillation 失败: KB 不可用 — {e}")),
+            }
+        }
+        "experience_crystallization" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let strategy = if lower.contains("pattern") || lower.contains("模式") { "pattern_extract" }
+                        else if lower.contains("merge") || lower.contains("合并") { "merge_consolidate" }
+                        else if lower.contains("prune") || lower.contains("剪枝") { "prune_decay" }
+                        else { "auto" };
+                    let crystallized = kb.kv_get("experience", "crystallization:total")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "crystallization:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "experience_crystallization 经验结晶: {} 策略 | 已结晶 {} 条 | 上次: {} | KB: {} nodes / {} kv",
+                            strategy, crystallized,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("experience_crystallization 失败: KB 不可用 — {e}")),
+            }
+        }
+        "skill_transfer" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let direction = if lower.contains("export") || lower.contains("导出") { "export" }
+                        else if lower.contains("import") || lower.contains("导入") { "import" }
+                        else if lower.contains("clone") || lower.contains("克隆") { "clone" }
+                        else { "bidirectional" };
+                    let transferred = kb.kv_get("experience", "skill_transfer:transferred_count")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "skill_transfer:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "skill_transfer 跨模型技能迁移: {} 方向 | 已迁移 {} 条 | 上次: {} | KB: {} nodes / {} kv",
+                            direction, transferred,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("skill_transfer 失败: KB 不可用 — {e}")),
+            }
+        }
+        "emotional_regulation" => {
+            let lower = task.summary.to_lowercase();
+            let target_emotion = if lower.contains("calm") || lower.contains("平静") { "Neutral" }
+                else if lower.contains("focus") || lower.contains("专注") { "Thinking" }
+                else if lower.contains("trust") || lower.contains("信任") { "Trust" }
+                else if lower.contains("anticipate") || lower.contains("期待") { "Anticipation" }
+                else { "Neutral" };
+            let strategy = if lower.contains("suppress") || lower.contains("抑制") { "suppress" }
+                else if lower.contains("reappraise") || lower.contains("重评") { "reappraise" }
+                else if lower.contains("blend") || lower.contains("混合") { "blend" }
+                else { "adaptive" };
+            (
+                true,
+                format!(
+                    "emotional_regulation 情感调节: {} 策略 → {} 目标 | EmotionLabel 11-variant 调控",
+                    strategy, target_emotion
+                ),
+            )
         }
         _ => (
             true,

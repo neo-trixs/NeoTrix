@@ -1351,6 +1351,12 @@ mod tests {
 
     #[test]
     fn test_empero_provider_type_wiring() {
+        // HONESTY: Tests hardcoded provider properties. These assertions verify the
+        // Empero provider is wired correctly (free, keyless, cloud category), but
+        // the values are compile-time constants — this tests configuration, NOT that
+        // the provider actually works in production.
+        // TODO(R-P79): Add integration test that actually connects to Empero and
+        // verifies the provider responds (network smoke test).
         assert_eq!(LlmProviderType::from_name("empero"), Some(LlmProviderType::Empero));
         assert!(LlmProviderType::Empero.is_free());
         assert!(!LlmProviderType::Empero.needs_api_key());

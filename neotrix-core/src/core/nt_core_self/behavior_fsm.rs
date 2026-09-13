@@ -328,7 +328,7 @@ impl NextStepPredictor {
         self.fsm
             .transitions_from(current_state)
             .into_iter()
-            .max_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap())
+            .max_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap_or(std::cmp::Ordering::Equal))
     }
 
     /// 预测 Top-K 下一步
@@ -339,7 +339,7 @@ impl NextStepPredictor {
         };
 
         let mut transitions: Vec<_> = self.fsm.transitions_from(current_state);
-        transitions.sort_by(|a, b| b.probability.partial_cmp(&a.probability).unwrap());
+        transitions.sort_by(|a, b| b.probability.partial_cmp(&a.probability).unwrap_or(std::cmp::Ordering::Equal));
         transitions.into_iter().take(k).collect()
     }
 }

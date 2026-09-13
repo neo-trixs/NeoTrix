@@ -88,7 +88,7 @@ impl ReasoningProtectionEngine {
 
     /// 注入诱饵
     fn inject_decoy(&self, reasoning: &str) -> String {
-        let decoy = self.decoy_patterns.first().unwrap();
+        let decoy = self.decoy_patterns.first().expect("non-empty");
         format!("{}\n\n{}", reasoning, decoy)
     }
 

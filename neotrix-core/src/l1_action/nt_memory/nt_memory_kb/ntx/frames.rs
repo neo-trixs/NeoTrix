@@ -128,7 +128,7 @@ impl KnowledgeFrame {
         }
         let mut pos = 0;
 
-        let frame_id = u64::from_le_bytes(data[pos..pos+8].try_into().unwrap());
+        let frame_id = u64::from_le_bytes(data[pos..pos+8].try_into().expect("8-byte frame_id"));
         pos += 8;
 
         let mut node_id = [0u8; 36];
@@ -152,7 +152,7 @@ impl KnowledgeFrame {
         };
         pos += 1;
 
-        let payload_len = u32::from_le_bytes(data[pos..pos+4].try_into().unwrap()) as usize;
+        let payload_len = u32::from_le_bytes(data[pos..pos+4].try_into().expect("4-byte payload_len")) as usize;
         pos += 4;
 
         if data.len() < pos + payload_len + 16 {
@@ -162,16 +162,16 @@ impl KnowledgeFrame {
         let payload = data[pos..pos+payload_len].to_vec();
         pos += payload_len;
 
-        let uncompressed_len = u32::from_le_bytes(data[pos..pos+4].try_into().unwrap());
+        let uncompressed_len = u32::from_le_bytes(data[pos..pos+4].try_into().expect("4-byte uncompressed_len"));
         pos += 4;
 
-        let checksum = u32::from_le_bytes(data[pos..pos+4].try_into().unwrap());
+        let checksum = u32::from_le_bytes(data[pos..pos+4].try_into().expect("4-byte checksum"));
         pos += 4;
 
-        let timestamp = u64::from_le_bytes(data[pos..pos+8].try_into().unwrap());
+        let timestamp = u64::from_le_bytes(data[pos..pos+8].try_into().expect("8-byte timestamp"));
         pos += 8;
 
-        let tags_len = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap()) as usize;
+        let tags_len = u16::from_le_bytes(data[pos..pos+2].try_into().expect("2-byte tags_len")) as usize;
         pos += 2;
 
         let tags = if tags_len > 0 {

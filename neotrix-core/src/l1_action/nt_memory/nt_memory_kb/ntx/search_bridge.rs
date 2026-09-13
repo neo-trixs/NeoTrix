@@ -136,7 +136,7 @@ impl NtxSearchBridge {
     pub(crate) fn _get_node_vector(&self, node_id: &[u8; 36]) -> Option<Vec<f32>> {
         self.vec_segment.as_ref()?
             .find_by_id(node_id)
-            .map(|idx| self.vec_segment.as_ref().unwrap().entries()[idx].vector.clone())
+            .map(|idx| self.vec_segment.as_ref().expect("Some value").entries()[idx].vector.clone())
     }
 
     pub fn has_vec_index(&self) -> bool { self.vec_segment.is_some() }

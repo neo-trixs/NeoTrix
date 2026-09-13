@@ -761,14 +761,14 @@ impl KnowledgeGapDetector {
              WHERE n.node_type = 'concept'
              GROUP BY n.id
              HAVING degree < ?"
-        ).unwrap();
+        ).expect("SQL prepare");
 
         let rows = stmt.query_map([self.min_connectivity_threshold as usize], |row| {
             let id: String = row.get(0)?;
             let title: String = row.get(1)?;
             let degree: usize = row.get(2)?;
             Ok((id, title, degree))
-        }).unwrap();
+        }).expect("SQL query");
 
         for row in rows.flatten() {
             let (nid, title, degree) = row;
@@ -811,15 +811,15 @@ impl KnowledgeGapDetector {
              FROM nodes n
              JOIN node_dimensions nd ON n.id = nd.node_id
              WHERE nd.updated_at < ? AND n.node_type IN ('article', 'concept', 'insight')
-             LIMIT 50"
-        ).unwrap();
+              LIMIT 50"
+        ).expect("SQL prepare");
 
         let rows = stmt.query_map([cutoff], |row| {
             let id: String = row.get(0)?;
             let title: String = row.get(1)?;
             let updated: i64 = row.get(2)?;
             Ok((id, title, updated))
-        }).unwrap();
+        }).expect("SQL query");
 
         for row in rows.flatten() {
             let (nid, title, updated) = row;
@@ -830,7 +830,7 @@ impl KnowledgeGapDetector {
                 category: GapCategory::StaleKnowledge,
                 description: format!(
                     "Node '{}' not updated for {} days (last: {})",
-                    title, age_days, chrono::DateTime::from_timestamp(updated, 0).unwrap().format("%Y-%m-%d")
+                    title, age_days, chrono::DateTime::from_timestamp(updated, 0).expect("valid timestamp").format("%Y-%m-%d")
                 ),
                 affected_modules: vec!["knowledge_freshness".to_string()],
                 severity: 0.6,
@@ -861,13 +861,13 @@ impl KnowledgeGapDetector {
              FROM node_dimensions
              WHERE abstraction IS NOT NULL
              GROUP BY abstraction"
-        ).unwrap();
+        ).expect("SQL operation");
 
         let rows = stmt.query_map([], |row| {
             let abstraction: String = row.get(0)?;
             let count: usize = row.get(1)?;
             Ok((abstraction, count))
-        }).unwrap();
+        }).expect("SQL query");
 
         for row in rows.flatten() {
             coverage.insert(row.0, row.1);
@@ -890,7 +890,7 @@ impl KnowledgeGapDetector {
                  LEFT JOIN edges e ON e.source_id = n.id OR e.target_id = n.id
                  GROUP BY n.id
              )"
-        ).unwrap();
+        ).expect("SQL prepare");
 
         let stats = stmt.query_row([], |row| {
             Ok(ConnectivityStats {
@@ -933,7 +933,7 @@ impl KnowledgeGapDetector {
                     serde_json::to_string(&gap.kb_node_ids).unwrap_or_default(),
                     now,
                 ]
-            ).unwrap();
+            ).expect("SQL insert");
 
             report_ids.push(report_id);
         }

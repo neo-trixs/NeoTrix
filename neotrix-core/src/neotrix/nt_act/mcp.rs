@@ -95,7 +95,7 @@ impl McpClient {
     }
 
     async fn spawn_reader(&mut self) {
-        let stdout = self.stdout.clone().unwrap();
+        let stdout = self.stdout.clone().expect("Some value");
         let pending = self.pending.clone();
         
         tokio::spawn(async move {

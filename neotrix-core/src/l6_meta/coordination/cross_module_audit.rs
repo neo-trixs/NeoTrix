@@ -179,10 +179,14 @@ impl CrossModuleAudit {
             }
         }
         
-        // TODO(R-P79): consistency_score is not computed in sub-checks — the main
-        // check() function computes it from aggregated details. Sub-check return
-        // values use 0 as a placeholder. Wire real per-dimension scoring here.
-        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
+        // Compute per-dimension score from details (passed/total * 100).
+        let score = if details.is_empty() {
+            100
+        } else {
+            let passed_count = details.iter().filter(|d| d.passed).count();
+            (passed_count as f32 / details.len() as f32 * 100.0) as u32
+        };
+        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: score }
     }
     
     /// Check rhythm consistency: no more than 2 consecutive segments of same type,
@@ -239,8 +243,14 @@ impl CrossModuleAudit {
             }
         }
         
-        // TODO(R-P79): consistency_score placeholder — see check_dynamic_emotion_consistency.
-        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
+        // Compute per-dimension score from details (passed/total * 100).
+        let score = if details.is_empty() {
+            100
+        } else {
+            let passed_count = details.iter().filter(|d| d.passed).count();
+            (passed_count as f32 / details.len() as f32 * 100.0) as u32
+        };
+        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: score }
     }
     
     /// Validate that all dynamic parameters are within physical bounds.
@@ -270,8 +280,14 @@ impl CrossModuleAudit {
             }
         }
         
-        // TODO(R-P79): consistency_score placeholder — see check_dynamic_emotion_consistency.
-        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: 0 }
+        // Compute per-dimension score from details (passed/total * 100).
+        let score = if details.is_empty() {
+            100
+        } else {
+            let passed_count = details.iter().filter(|d| d.passed).count();
+            (passed_count as f32 / details.len() as f32 * 100.0) as u32
+        };
+        _CrossModuleCheckResult { passed, details, suggestions, consistency_score: score }
     }
     
     /// Calculate overall consistency score (0-100) from check details.

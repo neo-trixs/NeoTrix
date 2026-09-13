@@ -5,6 +5,60 @@ use std::path::Path;
 
 static SKIP_DIRS: &[&str] = &["target", ".git", "node_modules", ".fingerprint", "build"];
 
+/// Count only genuine `unsafe` blocks/fns/traits/impls in Rust source.
+/// Skips comments, doc-comments, `#![forbid(unsafe_code)]` attributes, and
+/// string-literal occurrences (e.g. test input containing "unsafe { }").
+fn count_real_unsafe_blocks(content: &str) -> usize {
+    let mut count = 0usize;
+    for line in content.lines() {
+        let t = line.trim();
+        // Skip comments and doc-comments
+        if t.starts_with("//") || t.starts_with("/*") || t.starts_with('*') {
+            continue;
+        }
+        // Skip crate-level forbid/deny/allow unsafe attributes
+        if t.contains("#![forbid(unsafe_code)]")
+            || t.contains("#![deny(unsafe_code)]")
+            || t.contains("#![allow(unsafe")
+        {
+            continue;
+        }
+        // Skip lines that are purely string-matching checks (scanner internals)
+        if t.contains("matches(\"unsafe\"") || t.contains("contains(\"unsafe\"") {
+            continue;
+        }
+        // Only count actual unsafe code patterns
+        if t.contains("unsafe {")
+            || t.contains("unsafe fn")
+            || t.contains("unsafe trait")
+            || t.contains("unsafe impl")
+        {
+            count += 1;
+        }
+    }
+    count
+}
+
+/// Check if a file contains any genuine `unsafe` usage (not in comments/strings/attributes).
+fn file_has_real_unsafe(content: &str) -> bool {
+    for line in content.lines() {
+        let t = line.trim();
+        if t.starts_with("//") || t.starts_with("/*") || t.starts_with('*') {
+            continue;
+        }
+        if t.contains("#![forbid(unsafe_code)]")
+            || t.contains("#![deny(unsafe_code)]")
+            || t.contains("#![allow(unsafe")
+        {
+            continue;
+        }
+        if t.contains("unsafe {") || t.contains("unsafe fn") || t.contains("unsafe trait") || t.contains("unsafe impl") {
+            return true;
+        }
+    }
+    false
+}
+
 #[derive(Debug, Clone)]
 pub struct CodeScanner {
     pub project_root: String,
@@ -113,7 +167,7 @@ impl CodeScanner {
                     if let Ok(content) = std::fs::read_to_string(&fpath) {
                         let line_count = content.lines().count();
                         total_lines += line_count;
-                        unsafe_count += content.matches("unsafe").count();
+                        unsafe_count += count_real_unsafe_blocks(&content);
                         unwrap_count += content.matches(".unwrap()").count();
                         todo_count +=
                             content.matches("TODO").count() + content.matches("todo!").count();
@@ -203,7 +257,7 @@ impl CodeScanner {
                             lines: content.lines().count(),
                             is_test_file: path_str.ends_with("_test.rs")
                                 || path_str.ends_with("tests.rs"),
-                            has_unsafe: content.contains("unsafe"),
+                            has_unsafe: file_has_real_unsafe(&content),
                             has_todos: content.contains("TODO") || content.contains("todo!"),
                             pub_fns: content.matches("pub fn").count(),
                             last_modified: chrono::Utc::now(),

@@ -69,7 +69,7 @@ impl SkillMemory {
                         "%Y-%m-%d"
                     ) {
                         records.push(ExperienceRecord {
-                            timestamp: date.and_hms_opt(0, 0, 0).unwrap().and_utc(),
+                            timestamp: date.and_hms_opt(0, 0, 0).expect("valid time").and_utc(),
                             event: event.to_string(),
                             conclusion: conclusion.to_string(),
                             skill_name: String::new(),
@@ -104,7 +104,7 @@ impl SkillMemory {
     }
 
     fn append_to_file(&self, record: &ExperienceRecord) -> Result<(), std::io::Error> {
-        std::fs::create_dir_all(self.file_path.parent().unwrap())?;
+        std::fs::create_dir_all(self.file_path.parent().expect("has parent"))?;
         
         let line = format!(
             "{{{}}}: {} → {}\n",

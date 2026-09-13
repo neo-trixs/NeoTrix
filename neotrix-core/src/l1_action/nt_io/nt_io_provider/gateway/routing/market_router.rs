@@ -18,6 +18,11 @@ impl MarketRouter {
     /// 默认重估间隔: 5 分钟
     pub const DEFAULT_INTERVAL: Duration = Duration::from_secs(300);
 
+    /// Create a MarketRouter with default 5-minute re-evaluation interval.
+    ///
+    /// Note: Real implementation needs — initial weights are empty until first
+    /// `re_evaluate()` call. Consider: seeding weights from cached provider stats
+    /// on startup to avoid cold-start routing bias.
     pub fn new() -> Self {
         Self::with_interval(Self::DEFAULT_INTERVAL)
     }
@@ -70,10 +75,18 @@ impl MarketRouter {
         best.map(|(i, _)| i)
     }
 
+    /// Return current market weights for all providers (parallel to provider registration order).
+    ///
+    /// Note: Real implementation needs — weights may be stale if `re_evaluate()` hasn't
+    /// been called recently. Consider returning weights with a staleness indicator.
     pub fn weights(&self) -> &[f64] {
         &self.weights
     }
 
+    /// Return the number of re-evaluations performed since construction.
+    ///
+    /// Note: Real implementation needs — useful for telemetry but not used for routing.
+    /// Consider adding a timestamp of last evaluation for staleness checks.
     pub fn eval_count(&self) -> u64 {
         self.eval_count
     }
@@ -85,7 +98,11 @@ impl Default for MarketRouter {
     }
 }
 
-/// 单 provider 的市场权重: success_rate + composite_score + avg_latency 加权混合
+/// Compute a single provider's market weight from success rate, composite score, and latency.
+///
+/// Note: Real implementation needs — the weighting coefficients (0.4/0.4/0.2) are
+/// hardcoded. Consider: making weights configurable per use case, adding cost as a
+/// fourth factor, and using time-decayed success rate instead of raw EMA.
 fn market_weight(s: &ProviderState) -> f64 {
     if !s.is_available() {
         return 0.0;

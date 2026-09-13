@@ -443,12 +443,3 @@ fn archive_centroid(archive: &HyperAgentArchive, dim: usize) -> Vec<f64> {
 }
 
 
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
-}

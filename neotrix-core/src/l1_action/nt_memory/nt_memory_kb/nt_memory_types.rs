@@ -80,12 +80,14 @@ pub struct SearchQuery {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
+pub struct KbSearchResult {
     pub node: KnowledgeNode,
     pub score: f64,
     pub matched_on: Vec<SearchMatchType>,
     pub signals: Option<[f64; 4]>,
 }
+
+pub type SearchResult = KbSearchResult;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SearchMatchType {
@@ -229,12 +231,6 @@ pub struct CrawlQueueItem {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
 
     #[test]
     fn test_node_type_pascal_cases() {

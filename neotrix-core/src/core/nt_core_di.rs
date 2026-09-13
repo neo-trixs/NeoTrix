@@ -94,7 +94,7 @@ pub fn global_container() -> Container {
     if write.is_none() {
         *write = Some(Container::new());
     }
-    write.as_ref().unwrap().clone()
+    write.as_ref().expect("Some value").clone()
 }
 
 /// 向全局容器注册服务

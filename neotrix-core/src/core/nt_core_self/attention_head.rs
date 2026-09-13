@@ -586,7 +586,7 @@ impl AttentionManager {
         }
 
         // 将历史域序列转换为 FSM 状态 ID
-        let state_id = format!("domain_{}", history.last().unwrap().label());
+        let state_id = format!("domain_{}", history.last().expect("non-empty").label());
 
         // 从 FSM 获取可能的下一个状态
         let transitions = fsm.transitions_from(&state_id);

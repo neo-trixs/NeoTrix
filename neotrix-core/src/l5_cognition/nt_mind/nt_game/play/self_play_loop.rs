@@ -166,7 +166,7 @@ impl SelfPlayLoop {
                     }
                 } else {
                     // Simple policy: pick the first legal action
-                    legal.into_iter().next().unwrap()
+                    legal.into_iter().next().expect("non-empty")
                 };
 
                 let step_result = env.step(&action);

@@ -90,7 +90,7 @@ impl Trie {
             if let Some(child) = node.children.get(&char) {
                 node = child;
                 if node.is_end {
-                    last_match = Some((node.professional.clone().unwrap(), node.domain.unwrap()));
+                    last_match = Some((node.professional.clone().expect("Some value"), node.domain.expect("has domain")));
                 }
             } else {
                 break;

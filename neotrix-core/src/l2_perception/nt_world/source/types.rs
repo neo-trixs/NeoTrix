@@ -83,12 +83,14 @@ pub struct MediaItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
+pub struct MediaSearchResult {
     pub data: Vec<MediaItem>,
     pub total: usize,
     pub source: String,
     pub page: u32,
 }
+
+pub type SearchResult = MediaSearchResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ViewSource {

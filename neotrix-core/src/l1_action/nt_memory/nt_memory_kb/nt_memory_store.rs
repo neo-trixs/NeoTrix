@@ -1020,12 +1020,6 @@ mod tests {
     
 
     #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
-
-    #[test]
     fn test_normalize_title_collapses_punctuation() {
         assert_eq!(normalize_title("Attention Is All You Need!"), "attention is all you need");
         assert_eq!(normalize_title("  Transformer-Attention  "), "transformer attention");

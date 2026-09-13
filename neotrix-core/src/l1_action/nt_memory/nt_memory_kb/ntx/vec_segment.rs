@@ -157,7 +157,7 @@ impl VecSegment {
         }
 
         // 排序并截断
-        results.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+        results.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(k);
         results
     }
@@ -302,10 +302,12 @@ impl VecSegment {
 
 /// 搜索结果
 #[derive(Debug, Clone)]
-pub struct SearchResult {
+pub struct VecSearchResult {
     pub node_id: [u8; 36],
     pub distance: f32,
 }
+
+pub type SearchResult = VecSearchResult;
 
 /// 余弦距离 (1 - cosine_similarity)
 pub use crate::core::nt_core_math::cosine_distance_f32 as cosine_distance;

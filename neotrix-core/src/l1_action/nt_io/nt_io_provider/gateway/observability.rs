@@ -72,6 +72,10 @@ pub struct PluginManager {
 }
 
 impl PluginManager {
+    /// Create an empty PluginManager with no registered plugins.
+    ///
+    /// Note: Real implementation needs — consider loading plugins from a config
+    /// file or plugin directory on construction.
     pub fn new() -> Self {
         Self {
             plugins: Vec::new(),
@@ -79,6 +83,10 @@ impl PluginManager {
         }
     }
 
+    /// Register a gateway plugin and sort by priority.
+    ///
+    /// Note: Real implementation needs — does not check for duplicate plugin names.
+    /// Consider: rejecting duplicate registrations and supporting plugin replacement.
     pub fn register(&mut self, plugin: Box<dyn GatewayPlugin>) {
         let name = plugin.name().to_string();
         self.enabled
@@ -122,18 +130,30 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Enable a plugin by name.
+    ///
+    /// Note: Real implementation needed — no-op for unknown plugin names.
+    /// Consider: returning a Result to indicate whether the plugin was found.
     pub fn enable(&self, name: &str) {
         if let Some(v) = self.enabled.write().unwrap_or_else(|e| e.into_inner()).get_mut(name) {
             *v = true;
         }
     }
 
+    /// Disable a plugin by name.
+    ///
+    /// Note: Real implementation needed — no-op for unknown plugin names.
+    /// Consider: returning a Result and supporting temporary disable with TTL.
     pub fn disable(&self, name: &str) {
         if let Some(v) = self.enabled.write().unwrap_or_else(|e| e.into_inner()).get_mut(name) {
             *v = false;
         }
     }
 
+    /// List all registered plugins with their enabled status.
+    ///
+    /// Note: Real implementation needed — returns (name, enabled) pairs in
+    /// registration order. Consider: adding plugin version and priority info.
     pub fn list_plugins(&self) -> Vec<(&str, bool)> {
         self.plugins
             .iter()

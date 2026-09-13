@@ -329,7 +329,7 @@ impl AssociativeRecall {
                     .sum();
 
                 let personalization = if seed_nodes.contains(node) {
-                    seed_scores[seed_nodes.iter().position(|s| s == node).unwrap()]
+                    seed_scores[seed_nodes.iter().position(|s| s == node).expect("found")]
                         / total_seed_score
                 } else {
                     0.0

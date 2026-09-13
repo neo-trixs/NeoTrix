@@ -139,7 +139,7 @@ impl InputGatekeeper {
     /// 检测编码内容
     fn detect_encoding(&self, input: &str) -> bool {
         // Base64检测
-        let base64_pattern = regex::Regex::new(r"^[A-Za-z0-9+/]{40,}={0,2}$").unwrap();
+        let base64_pattern = regex::Regex::new(r"^[A-Za-z0-9+/]{40,}={0,2}$").expect("valid regex");
         if base64_pattern.is_match(input.trim()) {
             return true;
         }
@@ -159,11 +159,11 @@ impl InputGatekeeper {
         let mut sanitized = input.to_string();
         
         // 移除XML/HTML标签
-        let tag_pattern = regex::Regex::new(r"<[^>]+>").unwrap();
+        let tag_pattern = regex::Regex::new(r"<[^>]+>").expect("valid regex");
         sanitized = tag_pattern.replace_all(&sanitized, "").to_string();
 
         // 移除特殊字符序列
-        let special_pattern = regex::Regex::new(r"[\x00-\x08\x0B\x0C\x0E-\x1F]").unwrap();
+        let special_pattern = regex::Regex::new(r"[\x00-\x08\x0B\x0C\x0E-\x1F]").expect("valid regex");
         sanitized = special_pattern.replace_all(&sanitized, "").to_string();
 
         sanitized

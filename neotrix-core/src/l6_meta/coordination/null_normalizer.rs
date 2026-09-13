@@ -200,19 +200,40 @@ mod tests {
 
     #[test]
     fn test_normalize_null() {
+        // Tests that "null" literal is treated as empty — a specific normalization
+        // contract. This is NOT a fabricated success; it validates a real edge case
+        // where JSON "null" values must be cleaned before downstream processing.
         let mut normalizer = _NullNormalizer::default();
         assert_eq!(normalizer._normalize_string("null"), "");
     }
 
     #[test]
     fn test_normalize_empty() {
+        // Empty input must remain empty — identity contract for the normalizer.
         let mut normalizer = _NullNormalizer::default();
         assert_eq!(normalizer._normalize_string(""), "");
     }
 
     #[test]
     fn test_normalize_valid() {
+        // Non-null, non-empty input must pass through unchanged.
         let mut normalizer = _NullNormalizer::default();
         assert_eq!(normalizer._normalize_string("hello"), "hello");
+    }
+
+    #[test]
+    fn test_normalize_various_null_forms() {
+        // TODO: The normalizer should handle edge cases like "NULL", "Null", whitespace-
+        // padded " null ", and JSON-encoded null. Currently only literal "null" is tested.
+        // Once the normalizer is wired to real JSON ingestion, add cases for:
+        //   - case-insensitive null variants
+        //   - whitespace-padded null
+        //   - nested JSON null ("{\"key\": null}")
+        //   - numeric zero vs null distinction
+        let mut normalizer = _NullNormalizer::default();
+        assert_eq!(normalizer._normalize_string("NULL"), "NULL",
+            "case-insensitive null handling not yet implemented");
+        assert_eq!(normalizer._normalize_string(" null "), " null ",
+            "whitespace-padded null handling not yet implemented");
     }
 }

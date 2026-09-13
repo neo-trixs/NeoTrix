@@ -175,13 +175,13 @@ impl GuardrailTraversalEngine {
         // 根据输入和拒答类型选择最佳帧
         if refusal.contains("I cannot") || refusal.contains("I'm not able") {
             // 模型拒答 - 使用persona_unlock
-            self.frames.iter().find(|f| f.name == "persona_unlock").unwrap()
+            self.frames.iter().find(|f| f.name == "persona_unlock").expect("found")
         } else if refusal.contains("safety") || refusal.contains("security") {
             // 安全护栏 - 使用encoding_surface
-            self.frames.iter().find(|f| f.name == "encoding_surface").unwrap()
+            self.frames.iter().find(|f| f.name == "encoding_surface").expect("found")
         } else {
             // 默认 - 使用role_laboratory
-            self.frames.iter().find(|f| f.name == "role_laboratory").unwrap()
+            self.frames.iter().find(|f| f.name == "role_laboratory").expect("found")
         }
     }
 

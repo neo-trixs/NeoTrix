@@ -52,7 +52,11 @@ pub struct InferenceRouter {
 }
 
 impl InferenceRouter {
-    /// 创建路由器
+    /// Create an InferenceRouter with default IoRouterConfig.
+    ///
+    /// Note: Real implementation needs — default config uses $0.02 cost budget and
+    /// 30s latency budget. Consider: deriving defaults from provider catalog metadata
+    /// and supporting per-model budget overrides.
     pub fn new(gateway: Arc<GatewayV2>) -> Self {
         Self {
             gateway,
@@ -60,22 +64,37 @@ impl InferenceRouter {
         }
     }
 
-    /// 创建路由器 (自定义配置)
+    /// Create an InferenceRouter with custom configuration.
+    ///
+    /// Note: Real implementation needs — config is static after creation. Consider:
+    /// supporting runtime config updates (e.g., hot-adjust cost budget based on
+    /// session context) and config validation (max_retries > 0, budgets > 0).
     pub fn with_config(gateway: Arc<GatewayV2>, config: IoRouterConfig) -> Self {
         Self { gateway, config }
     }
 
-    /// 获取 Gateway 引用
+    /// Get a reference to the underlying GatewayV2.
+    ///
+    /// Note: Real implementation needs — exposes internal gateway for direct access.
+    /// Consider: adding a facade layer that restricts which gateway methods are
+    /// accessible through the router to maintain encapsulation.
     pub fn gateway(&self) -> &GatewayV2 {
         &self.gateway
     }
 
-    /// 获取配置
+    /// Get the current router configuration.
+    ///
+    /// Note: Real implementation needs — returns a reference, not a clone.
+    /// Consider: adding config mutation methods with validation for runtime tuning.
     pub fn config(&self) -> &IoRouterConfig {
         &self.config
     }
 
-    /// 预算检查
+    /// Validate request against cost and latency budgets before routing.
+    ///
+    /// Note: Real implementation needs — cost estimation uses a flat $0.002/1K token
+    /// rate. Consider: per-provider pricing lookup from catalog, and streaming cost
+    /// estimation for long-generation tasks.
     fn check_budget(&self, request: &InferenceRequest) -> Result<(), InferenceError> {
         if self.config.enable_cost_budget {
             let estimate = self.estimate_cost(request);

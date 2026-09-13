@@ -317,7 +317,7 @@ impl ProceduralGraph {
             neighbors.sort();
 
             for neighbor in neighbors {
-                let degree = in_degree.get_mut(neighbor).unwrap();
+                let degree = in_degree.get_mut(neighbor).expect("key exists");
                 *degree -= 1;
                 if *degree == 0 {
                     queue.push(neighbor);

@@ -83,7 +83,7 @@ impl VersionHistory {
         if kept.is_empty() {
             return 0.0;
         }
-        let num: f64 = kept.iter().map(|r| r.hidden_score.unwrap()).sum();
+        let num: f64 = kept.iter().map(|r| r.hidden_score.expect("has score")).sum();
         let den: f64 = kept.iter().map(|r| r.visible_score).sum();
         if den == 0.0 {
             0.0

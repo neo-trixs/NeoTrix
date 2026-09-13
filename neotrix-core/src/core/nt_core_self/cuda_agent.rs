@@ -231,7 +231,7 @@ impl StrategyManager {
             .max_by(|a, b| {
                 let a_score = a.expected_improvement * a.success_rate;
                 let b_score = b.expected_improvement * b.success_rate;
-                a_score.partial_cmp(&b_score).unwrap()
+                a_score.partial_cmp(&b_score).unwrap_or(std::cmp::Ordering::Equal)
             })
     }
 
@@ -246,7 +246,7 @@ impl StrategyManager {
         let mut ranked: Vec<_> = self.effectiveness.iter()
             .map(|(k, v)| (k.as_str(), *v))
             .collect();
-        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         ranked
     }
 }

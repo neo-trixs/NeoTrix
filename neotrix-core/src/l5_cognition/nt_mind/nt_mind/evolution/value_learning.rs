@@ -199,7 +199,7 @@ impl ValueLearningEngine {
         let mut groups: HashMap<String, Vec<Observation>> = HashMap::new();
         for obs in observations {
             let key = obs.value_signals.iter()
-                .max_by(|a, b| a.intensity.partial_cmp(&b.intensity).unwrap())
+                .max_by(|a, b| a.intensity.partial_cmp(&b.intensity).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|s| s.value_id.clone())
                 .unwrap_or_else(|| "unknown".into());
             groups.entry(key).or_default().push(obs.clone());

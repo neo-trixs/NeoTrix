@@ -325,9 +325,9 @@ impl OrderedBackendRouter {
         
         // Test 4: Disable/enable
         router.disable_backend(BackendType::BrowserAct);
-        assert!(!router.backends.iter().find(|b| b.backend == BackendType::BrowserAct).unwrap().enabled);
+        assert!(!router.backends.iter().find(|b| b.backend == BackendType::BrowserAct).expect("found").enabled);
         router.enable_backend(BackendType::BrowserAct);
-        assert!(router.backends.iter().find(|b| b.backend == BackendType::BrowserAct).unwrap().enabled);
+        assert!(router.backends.iter().find(|b| b.backend == BackendType::BrowserAct).expect("found").enabled);
 
         Ok(())
     }

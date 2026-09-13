@@ -209,7 +209,7 @@ impl DistillationEngine {
             }
         }
 
-        diffs.sort_by(|a, b| b.divergence_score.partial_cmp(&a.divergence_score).unwrap());
+        diffs.sort_by(|a, b| b.divergence_score.partial_cmp(&a.divergence_score).unwrap_or(std::cmp::Ordering::Equal));
         diffs
     }
 

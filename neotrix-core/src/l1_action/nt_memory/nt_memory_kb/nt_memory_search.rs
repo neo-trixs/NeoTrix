@@ -1435,12 +1435,6 @@ pub fn build_materialized_neighbors(conn: &Connection, k: usize) -> rusqlite::Re
 mod tests {
 
     #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
-
-    #[test]
     fn test_fts5_config_defaults() {
         let cfg = super::Fts5OptimizerConfig::default();
         assert_eq!(cfg.cache_size, -256000);

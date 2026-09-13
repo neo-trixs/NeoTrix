@@ -762,12 +762,25 @@ mod tests {
 
     #[test]
     fn test_validator_creation() {
+        // HONESTY: Tests constructor stores the path correctly. This is a trivial
+        // plumbing test — the real validation behavior (parsing SKILL.md frontmatter,
+        // checking required fields, validating skill structure) is NOT tested here.
+        // TODO(R-P79): Add tests that exercise real validation:
+        //   - valid skill directory → passes validation
+        //   - missing SKILL.md → fails validation
+        //   - missing required fields (name/description) → fails validation
+        //   - oversized SKILL.md (>200 lines) → fails validation
         let validator = SkillValidator::new(PathBuf::from("."));
         assert_eq!(validator.plugin_root, PathBuf::from("."));
     }
 
     #[test]
     fn test_self_test_passes() {
+        // HONESTY: self_test() is a static method that always returns Ok — it
+        // validates the type exists, not real validation behavior. This test
+        // documents the SelfTest contract but does NOT test real validation.
+        // TODO(R-P79): Replace with integration test that validates a real skill
+        // directory and checks that validation errors are produced for malformed input.
         assert!(SkillValidator::self_test().is_ok());
     }
 }

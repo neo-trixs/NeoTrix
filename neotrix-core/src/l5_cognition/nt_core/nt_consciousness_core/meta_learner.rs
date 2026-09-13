@@ -109,7 +109,7 @@ impl MetaLearner {
     pub fn select_strategy(&self, task_type: &str) -> Option<&_LearningStrategy> {
         self.strategies.iter()
             .filter(|s| s.applicable_tasks.contains(&task_type.to_string()))
-            .max_by(|a, b| a.effectiveness.partial_cmp(&b.effectiveness).unwrap())
+            .max_by(|a, b| a.effectiveness.partial_cmp(&b.effectiveness).unwrap_or(std::cmp::Ordering::Equal))
     }
 
     /// 获取统计

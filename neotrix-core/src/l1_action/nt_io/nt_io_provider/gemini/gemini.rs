@@ -2,6 +2,20 @@ use async_trait::async_trait;
 
 use crate::l1_action::nt_io::nt_io_provider::common::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, ToolCallFunction, ToolCallInfo, Usage, Role};
 
+/// Parse Gemini `usageMetadata` from response JSON.
+/// Returns `Usage::default()` if the field is missing (non-fatal).
+fn parse_usage(resp: &serde_json::Value) -> Usage {
+    let meta = match resp.get("usageMetadata") {
+        Some(m) => m,
+        None => return Usage::default(),
+    };
+    Usage {
+        prompt_tokens: meta.get("promptTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        completion_tokens: meta.get("candidatesTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        total_tokens: meta.get("totalTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+    }
+}
+
 pub struct GeminiProvider {
     api_key: String,
     base_url: String,
@@ -116,7 +130,9 @@ fn set_proxy(&mut self, proxy_url: &str) {
                     FinishReason::Stop
                 };
 
-                Ok(LlmResponse { content, model: request.model.clone(), usage: Usage::default(), finish_reason, tool_calls, reasoning: None })
+                let usage = parse_usage(&resp);
+
+                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason, tool_calls, reasoning: None })
             }
             400 => {
                 let msg = serde_json::from_str::<serde_json::Value>(&text)
@@ -172,13 +188,17 @@ fn set_proxy(&mut self, proxy_url: &str) {
                     }
                     let full = match response.text().await {
                         Ok(t) => t,
-                        Err(_) => return,
+                        Err(e) => {
+                            let _ = tx.send(Err(LlmError::Network(format!("Failed to read streaming response body: {}", e)))).await;
+                            return;
+                        }
                     };
                     for line in full.lines() {
                         let line = line.trim();
                         if line.is_empty() || line == "[DONE]" { continue; }
                         if let Some(data) = line.strip_prefix("data: ") {
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
+                                let parsed_usage = parse_usage(&v);
                                 let parts = v.get("candidates")
                                     .and_then(|c| c.as_array())
                                     .and_then(|c| c.first())
@@ -214,7 +234,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                     let _ = tx.send(Ok(LlmResponse {
                                         content,
                                         model: model_name.clone(),
-                                        usage: Usage::default(),
+                                        usage: parsed_usage,
                                         finish_reason,
                                         tool_calls,
                                         reasoning: None,

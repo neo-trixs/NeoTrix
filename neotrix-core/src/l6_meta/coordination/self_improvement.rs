@@ -865,8 +865,22 @@ mod tests {
 
     #[test]
     fn test_severity_to_priority() {
+        // HONESTY: Tests boundary values of severity→priority mapping. This verifies
+        // the clamping contract (0→1, 1→10) but does NOT test that the priority
+        // ordering is correct for real improvement scenarios.
+        // TODO(R-P79): Add tests that verify priority ordering matches real urgency:
+        //   - critical system failure (severity=1.0) should map to highest priority
+        //   - minor degradation (severity=0.2) should map to low priority
+        //   - medium severity should produce proportionally ordered priorities
         assert_eq!(SelfImprovementLoop::new().severe_to_priority_helper(0.0), 1);
+        assert_eq!(SelfImprovementLoop::new().severe_to_priority_helper(0.5), 5);
         assert_eq!(SelfImprovementLoop::new().severe_to_priority_helper(1.0), 10);
+        // Verify ordering: higher severity → higher priority
+        let low = SelfImprovementLoop::new().severe_to_priority_helper(0.1);
+        let high = SelfImprovementLoop::new().severe_to_priority_helper(0.9);
+        assert!(high > low,
+            "higher severity should produce higher priority: low={} high={}",
+            low, high);
     }
 
     #[test]

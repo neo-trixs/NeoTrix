@@ -120,7 +120,7 @@ impl _CUDAAgentRLOptimizer {
 
     /// 选择最佳策略
     pub(crate) fn _select_best_strategy(&self) -> Option<&_RLStrategy> {
-        self.strategies.iter().max_by(|a, b| a.performance.partial_cmp(&b.performance).unwrap())
+        self.strategies.iter().max_by(|a, b| a.performance.partial_cmp(&b.performance).unwrap_or(std::cmp::Ordering::Equal))
     }
 
     /// 探索新策略

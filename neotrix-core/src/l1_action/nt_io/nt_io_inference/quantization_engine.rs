@@ -451,7 +451,7 @@ impl QuantizationEngine {
             qlevel.fits_in_memory = fits;
             
             if fits && level.quality_score >= min_quality {
-                if selected.is_none() || level.quality_score > selected.as_ref().unwrap().quality_score {
+                if selected.is_none() || level.quality_score > selected.as_ref().expect("Some value").quality_score {
                     selected = Some(qlevel.clone());
                 }
             }

@@ -71,4 +71,3 @@ pub use path_metadata::{extract_order_metadata, OrderMetadata};
 pub use template_detector::{build_column_map, detect_template, ContractTemplate, TemplateColumnMap};
 
 // ── contract_parser: 合同 Excel 解析器 ──────────────────────
-// TODO: contract_parser module was removed — re-add when ready

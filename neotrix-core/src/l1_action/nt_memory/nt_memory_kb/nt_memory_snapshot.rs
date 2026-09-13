@@ -142,16 +142,16 @@ pub fn diff_snapshots(base: &KbSnapshot, other: &KbSnapshot) -> KbDiff {
     let other_ids: HashSet<&str> = other_nodes.keys().copied().collect();
 
     for id in other_ids.difference(&base_ids) {
-        let n = other_nodes.get(*id).copied().unwrap();
+        let n = other_nodes.get(*id).copied().expect("key from set");
         diff.nodes_added.push(diff_node(n, vec!["(new)".into()]));
     }
     for id in base_ids.difference(&other_ids) {
-        let n = base_nodes.get(*id).copied().unwrap();
+        let n = base_nodes.get(*id).copied().expect("key from set");
         diff.nodes_removed.push(diff_node(n, vec!["(removed)".into()]));
     }
     for id in base_ids.intersection(&other_ids) {
-        let b = base_nodes.get(*id).copied().unwrap();
-        let o = other_nodes.get(*id).copied().unwrap();
+        let b = base_nodes.get(*id).copied().expect("key from set");
+        let o = other_nodes.get(*id).copied().expect("key from set");
         let changed = changed_node_fields(b, o);
         if !changed.is_empty() {
             diff.nodes_changed.push(diff_node(o, changed));
@@ -167,10 +167,10 @@ pub fn diff_snapshots(base: &KbSnapshot, other: &KbSnapshot) -> KbDiff {
     let other_edge_ids: HashSet<&str> = other_edges.keys().copied().collect();
 
     for id in other_edge_ids.difference(&base_edge_ids) {
-        diff.edges_added.push(diff_edge(other_edges.get(*id).copied().unwrap()));
+        diff.edges_added.push(diff_edge(other_edges.get(*id).copied().expect("key from set")));
     }
     for id in base_edge_ids.difference(&other_edge_ids) {
-        diff.edges_removed.push(diff_edge(base_edges.get(*id).copied().unwrap()));
+        diff.edges_removed.push(diff_edge(base_edges.get(*id).copied().expect("key from set")));
     }
 
     diff

@@ -275,7 +275,7 @@ impl KnowledgeDistiller {
         if self.knowledge_graph.nodes.len() > self.config.max_knowledge_nodes {
             // 按重要性排序，移除最不重要的
             let mut nodes: Vec<_> = self.knowledge_graph.nodes.iter().collect();
-            nodes.sort_by(|a, b| a.1.importance.partial_cmp(&b.1.importance).unwrap());
+            nodes.sort_by(|a, b| a.1.importance.partial_cmp(&b.1.importance).unwrap_or(std::cmp::Ordering::Equal));
             
             let to_remove: Vec<String> = nodes.iter()
                 .take(nodes.len() - self.config.max_knowledge_nodes)

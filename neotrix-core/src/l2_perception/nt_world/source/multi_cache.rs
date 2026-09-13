@@ -31,7 +31,7 @@ pub struct MultiLevelCache {
 impl MultiLevelCache {
     pub fn new() -> Self {
         Self {
-            l1: LruCache::new(NonZeroUsize::new(DEFAULT_L1_CAPACITY).unwrap()),
+            l1: LruCache::new(NonZeroUsize::new(DEFAULT_L1_CAPACITY).expect("non-zero")),
             ttl: Duration::from_secs(DEFAULT_TTL_SECS),
             hit_count: 0,
             miss_count: 0,

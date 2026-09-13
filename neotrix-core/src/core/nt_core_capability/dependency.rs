@@ -151,7 +151,7 @@ impl DependencyGraph {
 
             if let Some(dependencies) = self.edges.get(&node) {
                 for dep in dependencies {
-                    let degree = in_degree.get_mut(&dep.capability_id).unwrap();
+                    let degree = in_degree.get_mut(&dep.capability_id).expect("key exists");
                     *degree -= 1;
                     if *degree == 0 {
                         queue.push_back(dep.capability_id.clone());

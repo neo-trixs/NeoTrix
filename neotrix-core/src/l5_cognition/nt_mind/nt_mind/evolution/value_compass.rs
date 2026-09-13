@@ -211,8 +211,8 @@ impl ValueCompass {
             let has_v2 = triggered.iter().any(|v| v.id == *v2_id);
             if has_v1 && has_v2 {
                 // 核心价值冲突 → 否决
-                let v1 = self.values.get(v1_id).unwrap();
-                let v2 = self.values.get(v2_id).unwrap();
+                let v1 = self.values.get(v1_id).expect("key exists");
+                let v2 = self.values.get(v2_id).expect("key exists");
                 return ArbitrationResult::Veto {
                     reason: format!("核心价值冲突：{} vs {}", v1.name, v2.name),
                     vetoing_value: if v1.weight >= v2.weight { v1.id.clone() } else { v2.id.clone() },
@@ -302,7 +302,7 @@ impl ValueCompass {
         self.hierarchy.sort_by(|a, b| {
             let wa = self.values.get(a).map(|v| v.weight).unwrap_or(0.0);
             let wb = self.values.get(b).map(|v| v.weight).unwrap_or(0.0);
-            wb.partial_cmp(&wa).unwrap()
+            wb.partial_cmp(&wa).unwrap_or(std::cmp::Ordering::Equal)
         });
         Ok(())
     }

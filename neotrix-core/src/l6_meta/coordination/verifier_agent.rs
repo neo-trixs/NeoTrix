@@ -334,18 +334,9 @@ mod tests {
     use super::*;
     
     #[test]
-    #[should_panic(expected = "STUB")]
-    fn test_verifier_agent() {
-        // TODO: _verify_shot is a keyword-heuristic STUB, not real VLM verification.
-        // It scores based on text description keywords (character/action/lighting),
-        // NOT actual video frame analysis. This test validates the scoring plumbing
-        // only. Replace with real VLM-backed tests once _verify_shot calls an
-        // actual vision model (GPT-4V / Gemini Pro Vision).
-        //
-        // Anti-honesty check: the stub returns scores 5-9 regardless of video
-        // content. Once real VLM is wired, expect LOWER scores for bad inputs.
-        // Do NOT assert fabricated success — the stub may pass or fail depending
-        // on text heuristics, not video quality.
+    fn test_verifier_agent_returns_error_when_vlm_not_wired() {
+        // _verify_shot returns Err when VLM is not configured.
+        // This is the honest behavior: no VLM endpoint means no verification possible.
         let mut verifier = _VerifierAgent::new();
         
         let result = verifier._verify_shot(
@@ -355,29 +346,11 @@ mod tests {
             None,
         );
         
-        // Pipeline plumbing: result is well-formed
-        assert!(result.total_score >= 0.0 && result.total_score <= 1.0,
-            "score must be in [0,1] range, got {}", result.total_score);
-        assert!(!result.scores.is_empty(), "stub should return at least one score");
-        
-        // Verify stub scores are NOT fabricated high — the keyword heuristic
-        // should produce DIFFERENT scores for different inputs.
-        let mut verifier2 = _VerifierAgent::new();
-        let short_result = verifier2._verify_shot(
-            "shot_002",
-            "/output/shot_002.mp4",
-            "x",
-            None,
-        );
-        // TODO: The keyword heuristic produces similar scores for different inputs
-        // (length-based instruction_score is the only differentiator). Once real
-        // VLM is wired, different inputs should produce meaningfully different
-        // quality scores. Assert that the stub does NOT always produce identical
-        // scores — at minimum, the instruction_score component should differ.
-        assert!(short_result.scores.len() > 0, "stub must return scores");
-
-        let stats = verifier.statistics();
-        assert_eq!(stats.total_verifications, 1);
+        // Honest error: VLM not wired
+        assert!(result.is_err(), "_verify_shot must return Err when VLM is not wired");
+        let err = result.unwrap_err();
+        assert!(err.contains("not wired"), "error should explain VLM is not wired, got: {}", err);
+        assert!(err.contains("VLM"), "error should mention VLM, got: {}", err);
     }
     
     #[test]

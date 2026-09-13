@@ -778,12 +778,6 @@ impl super::super::brain_impl::SelfIteration for SelfIteratingBrain {
  mod tests {
 
     #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
-
-    #[test]
     fn test_brain_hosts_element_registry() {
         let mut brain = super::SelfIteratingBrain::new();
         assert_eq!(brain.element_registry.state(), crate::l5_cognition::nt_mind::nt_mind::element::registry::RegistryState::Started);

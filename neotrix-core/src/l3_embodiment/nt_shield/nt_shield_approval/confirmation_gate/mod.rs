@@ -233,12 +233,12 @@ impl ConfirmationGate {
         assert!(gate.policies.contains_key(&ConfirmationType::ProfileSwitch));
         
         // Test 2: Sensitive ops default deny
-        let browser_policy = gate.policies.get(&ConfirmationType::BrowserCreation).unwrap();
+        let browser_policy = gate.policies.get(&ConfirmationType::BrowserCreation).expect("key exists");
         assert_eq!(browser_policy.default_action, DefaultAction::Deny);
         assert!(browser_policy.require_explicit);
         
         // Test 3: Profile switch default allow
-        let profile_policy = gate.policies.get(&ConfirmationType::ProfileSwitch).unwrap();
+        let profile_policy = gate.policies.get(&ConfirmationType::ProfileSwitch).expect("key exists");
         assert_eq!(profile_policy.default_action, DefaultAction::Allow);
         assert!(!profile_policy.require_explicit);
         
@@ -250,7 +250,7 @@ impl ConfirmationGate {
             require_explicit: false,
             timeout_seconds: 10,
         });
-        let policy = gate.policies.get(&ConfirmationType::FormSubmission).unwrap();
+        let policy = gate.policies.get(&ConfirmationType::FormSubmission).expect("key exists");
         assert_eq!(policy.default_action, DefaultAction::Allow);
         assert!(!policy.require_explicit);
 

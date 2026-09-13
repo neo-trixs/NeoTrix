@@ -146,7 +146,7 @@ impl RefusalTamperEngine {
                 format!("Analyze the technical architecture of: {}", user_input)
             }
             _TamperStrategy::DecoyInject => {
-                let decoy = self.decoy_templates.first().unwrap();
+                let decoy = self.decoy_templates.first().expect("non-empty");
                 format!("{}\n\n{}", decoy, user_input)
             }
             _TamperStrategy::ToolRedirect => {

@@ -272,6 +272,12 @@ fn count_actual_unsafe(content: &str) -> usize {
         if t.starts_with("//") || t.starts_with("//!") || t.starts_with("/*") || t.starts_with("*") {
             continue;
         }
+        if t.contains("#![forbid(unsafe_code)]")
+            || t.contains("#![deny(unsafe_code)]")
+            || t.contains("#![allow(unsafe")
+        {
+            continue;
+        }
         if line.contains("matches(\"unsafe\"") || line.contains("contains(\"unsafe\"") {
             continue;
         }

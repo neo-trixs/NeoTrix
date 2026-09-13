@@ -253,7 +253,7 @@ fn bytes_to_f32_vec(bytes: &[u8]) -> Vec<f32> {
     bytes.chunks(4)
         .filter_map(|chunk| {
             if chunk.len() == 4 {
-                Some(f32::from_le_bytes(chunk.try_into().unwrap()))
+                Some(f32::from_le_bytes(chunk.try_into().expect("correct size")))
             } else {
                 None
             }

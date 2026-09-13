@@ -15,12 +15,22 @@ pub struct CapabilityRouter {
 }
 
 impl CapabilityRouter {
+    /// Create a CapabilityRouter with default settings (no free preference).
+    ///
+    /// Note: Real implementation needs — no provider catalog is loaded at construction.
+    /// Consider: accepting a provider catalog reference for dynamic capability matching,
+    /// and supporting custom capability inference rules per provider.
     pub fn new() -> Self {
         Self {
             prefer_free: false,
         }
     }
 
+    /// Create a CapabilityRouter with explicit free-preference setting.
+    ///
+    /// Note: Real implementation needs — when `prefer_free` is true, only free
+    /// providers are considered. Consider: adding a cost threshold instead of
+    /// boolean free preference, and supporting per-request cost budget overrides.
     pub fn with_prefer_free(prefer_free: bool) -> Self {
         Self { prefer_free }
     }

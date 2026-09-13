@@ -1,11 +1,5 @@
 
     #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
-
-    #[test]
     fn test_save_load_tui_session_roundtrip() {
         // 用隔离 base 目录验证 save/load 闭环（不污染真实 ~/.neotrix KB）。
         

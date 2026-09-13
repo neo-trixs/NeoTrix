@@ -129,7 +129,7 @@ impl ValidatePhase {
         let mut deduplicated = Vec::new();
         for (_, mut group) in groups {
             if group.len() == 1 {
-                deduplicated.push(group.into_iter().next().unwrap());
+                deduplicated.push(group.into_iter().next().expect("non-empty"));
             } else {
                 // 合并: 保留证据最强的，合并证据
                 group.sort_by(|a, b| b.evidence.len().cmp(&a.evidence.len()));

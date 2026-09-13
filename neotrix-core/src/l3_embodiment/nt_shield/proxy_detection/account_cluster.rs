@@ -421,8 +421,8 @@ impl AccountClusterEngine {
             return 0.0;
         }
 
-        let min_time = *times.iter().min().unwrap();
-        let max_time = *times.iter().max().unwrap();
+        let min_time = *times.iter().min().expect("non-empty times");
+        let max_time = *times.iter().max().expect("non-empty times");
         let window = max_time.saturating_sub(min_time);
 
         // Score: narrow window → high score
@@ -452,8 +452,8 @@ impl AccountClusterEngine {
             return 0;
         }
 
-        let min_time = *times.iter().min().unwrap();
-        let max_time = *times.iter().max().unwrap();
+        let min_time = *times.iter().min().expect("non-empty times");
+        let max_time = *times.iter().max().expect("non-empty times");
         max_time.saturating_sub(min_time)
     }
 

@@ -29,6 +29,10 @@ pub struct LatencyPrediction {
 }
 
 impl MLPredictor {
+    /// Create an empty MLPredictor with no historical data.
+    ///
+    /// Note: Real implementation needs — consider loading historical provider stats
+    /// from KB on construction to avoid cold-start prediction bias.
     pub fn new() -> Self {
         Self {
             data: RwLock::new(HashMap::new()),
@@ -108,6 +112,11 @@ impl MLPredictor {
         }
     }
 
+    /// Return names of all providers with recorded observations.
+    ///
+    /// Note: Real implementation needs — returns all providers ever recorded, including
+    /// those with stale data. Consider: filtering by last_update timestamp to return
+    /// only recently active providers.
     pub fn get_providers(&self) -> Vec<String> {
         self.data.read().unwrap_or_else(|e| e.into_inner()).keys().cloned().collect()
     }
@@ -160,6 +169,10 @@ pub struct RouteDecision {
 }
 
 impl IntelligentRouter {
+    /// Create an empty IntelligentRouter with no registered providers.
+    ///
+    /// Note: Real implementation needs — `route()` returns None until providers are
+    /// registered. Consider: auto-registering from provider catalog on construction.
     pub fn new() -> Self {
         Self {
             weights: RwLock::new(HashMap::new()),
@@ -168,6 +181,11 @@ impl IntelligentRouter {
         }
     }
 
+    /// Register a provider with its routing weight profile.
+    ///
+    /// Note: Real implementation needs — overwrites existing registration without
+    /// merging historical data. Consider: preserving historical latency/error stats
+    /// when re-registering a provider.
     pub fn register_provider(&self, weight: ProviderWeight) {
         self.weights
             .write()
@@ -233,6 +251,11 @@ impl IntelligentRouter {
         best.map(|(name, _)| name.to_string())
     }
 
+    /// Record a routing decision outcome for historical analysis.
+    ///
+    /// Note: Real implementation needs — history is capped at 1000 entries (FIFO eviction).
+    /// Consider: importance-weighted eviction (keep high-impact decisions), and temporal
+    /// decay for older decisions in route() scoring.
     pub fn record_decision(&self, decision: RouteDecision) {
         let mut history = self.history.write().unwrap_or_else(|e| e.into_inner());
         if history.len() >= self.max_history {

@@ -161,7 +161,7 @@ impl ApprovalManager {
 
         // 如果批准或拒绝，移动到完成列表
         if decision.decision == ApprovalStatus::Approved || decision.decision == ApprovalStatus::Rejected {
-            let completed = self.pending_requests.remove(&decision.request_id).unwrap();
+            let completed = self.pending_requests.remove(&decision.request_id).expect("key exists");
             self.completed_requests.push(completed);
         }
 

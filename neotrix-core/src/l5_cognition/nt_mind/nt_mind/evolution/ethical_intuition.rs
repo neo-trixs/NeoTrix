@@ -241,7 +241,7 @@ impl EthicalIntuition {
 
         let total_weight: f64 = scores.values().sum();
         let (verdict, _score) = scores.into_iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((JudgmentVerdict::Uncertain, 0.3));
 
         let confidence = (total_weight / 5.0).min(1.0);

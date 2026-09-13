@@ -1,12 +1,6 @@
     use super::KnowledgeBase;
 
     #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
-
-    #[test]
     fn test_nodes_by_asset_kind() {
         use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
         use crate::core::nt_core_memory_asset::MemoryAssetKind;

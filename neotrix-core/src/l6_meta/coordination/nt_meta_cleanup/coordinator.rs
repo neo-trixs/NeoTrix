@@ -135,9 +135,19 @@ mod tests {
 
     #[test]
     fn test_calculate_priority() {
+        // HONESTY: Priority calculation uses a formula (size + age weighting).
+        // This tests that priority is positive and ordered by input magnitude —
+        // NOT that the priority formula is correct for real cleanup decisions.
+        // TODO(R-P79): Wire real cleanup urgency signals (disk pressure, age
+        // thresholds) and assert priority ordering matches actual cleanup needs.
         let c = _CleanupCoordinator::new();
-        let p = c.calculate_priority("system", 1024 * 1024 * 1024, 30);
-        assert!(p > 0.0);
+        let p_large = c.calculate_priority("system", 1024 * 1024 * 1024, 30);
+        let p_small = c.calculate_priority("system", 1024, 1);
+        assert!(p_large > 0.0, "priority should be positive for large files");
+        assert!(p_small > 0.0, "priority should be positive for small files");
+        assert!(p_large > p_small,
+            "larger/older files should get higher priority: large={} small={}",
+            p_large, p_small);
     }
 
     #[test]

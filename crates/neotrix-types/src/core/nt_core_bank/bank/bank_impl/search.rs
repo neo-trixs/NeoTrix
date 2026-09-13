@@ -8,10 +8,12 @@ use crate::core::nt_core_bank::iteration::{Bm25Document, Bm25Index, rrf_fuse};
 use crate::core::nt_core_bank::{ReasoningMemory, T3ViewType};
 
 #[derive(Debug, Clone)]
-pub struct SearchResult {
+pub struct BankSearchResult {
     pub mem: ReasoningMemory,
     pub score: f64,
 }
+
+pub type SearchResult = BankSearchResult;
 
 pub fn apply_freshness_ranking(
     results: &mut [SearchResult],

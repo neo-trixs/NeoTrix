@@ -1671,12 +1671,6 @@ pub fn ingest_geo_boundaries(
 mod tests {
     use super::is_safe_fetch_url;
 
-    #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
-
     // arXiv export API 返回 feed, 首个 <title> 是 feed 级 "arXiv Query: ...",
     // 论文 title/summary/author 在 <entry> 内。此测试锁定 entry 截取逻辑,
     // 防止回归到 feed 级 title (R-P16 持久化验证 + R-P80 吸收纪律)。

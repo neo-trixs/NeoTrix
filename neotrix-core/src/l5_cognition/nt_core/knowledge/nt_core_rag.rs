@@ -214,13 +214,13 @@ impl _VectorRetriever {
             .map(|(id, embedding)| {
                 let score = cosine_similarity(query_embedding, embedding);
                 RetrievalResult {
-                    chunk: self.chunks.get(id).unwrap().clone(),
+                    chunk: self.chunks.get(id).expect("key exists").clone(),
                     score,
                 }
             })
             .collect();
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         results.into_iter().take(top_k).collect()
     }
 }
@@ -249,7 +249,7 @@ impl Reranker {
             })
             .collect();
 
-        reranked.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        reranked.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         reranked
     }
 }

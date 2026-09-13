@@ -296,13 +296,4 @@ impl WebSearch {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[tokio::test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    async fn test_search_creation() {
-        panic!("test_search_creation is a placeholder; implement real assertion or remove");
-    }
-}

@@ -372,13 +372,4 @@ impl SkillCmd {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_placeholder() {
-        panic!("test_placeholder is a placeholder; implement real assertion or remove");
-    }
-}

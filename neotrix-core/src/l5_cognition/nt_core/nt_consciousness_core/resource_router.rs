@@ -275,7 +275,7 @@ impl ResourceRouter {
             };
         }
 
-        scored_resources.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        scored_resources.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let (idx, score) = scored_resources[0];
         let selected = self.resource_pool[idx].clone();
 

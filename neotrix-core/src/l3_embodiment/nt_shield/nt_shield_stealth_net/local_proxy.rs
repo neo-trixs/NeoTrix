@@ -518,12 +518,6 @@ pub fn tor_connect(_target: &str, _port: u16) -> Result<String, String> {
 mod tests {
     use super::connect_via_socks5;
 
-    #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
-
     #[tokio::test]
     async fn test_socks5_overlong_host_rejected_before_network() {
         // Regression: host.len() as u8 truncated SOCKS5 ATYP=0x03 domain

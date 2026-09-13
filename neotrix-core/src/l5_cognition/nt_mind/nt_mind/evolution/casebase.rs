@@ -217,7 +217,7 @@ impl CaseBase {
             })
             .collect();
 
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap()
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| a.1.id.cmp(&b.1.id)));
         if scored.is_empty() {
             // 回退：字面不重叠时按严重度降序给出候选 (类比推理仍可用)
@@ -226,7 +226,7 @@ impl CaseBase {
                 .map(|c| (severity_rank(&c.severity) as f64 * 0.1 + c.version as f64 * 0.01, c.clone()))
                 .collect();
             fallback.sort_by(|a, b| {
-                b.0.partial_cmp(&a.0).unwrap()
+                b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
                     .then_with(|| classic_first(&a.1).cmp(&classic_first(&b.1)))
                     .then_with(|| a.1.id.cmp(&b.1.id))
             });
@@ -518,11 +518,13 @@ pub struct _SearchFilters {
 
 /// 搜索结果。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
+pub struct CaseSearchResult {
     pub case: EthicalCase,
     pub score: f64,
     pub matched_keywords: Vec<String>,
 }
+
+pub type SearchResult = CaseSearchResult;
 
 /// 类比推理结果。
 pub struct AnalogicalResult {

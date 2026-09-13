@@ -158,7 +158,7 @@ fn table_to_markdown(table: &Table) -> String {
     
     let mut md = String::new();
     
-    let header = grid.first().unwrap();
+    let header = grid.first().expect("non-empty");
     md.push_str("| ");
     for cell in header {
         md.push_str(&cell_text(cell));

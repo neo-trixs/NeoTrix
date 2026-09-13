@@ -136,7 +136,7 @@ impl WalEntry {
         if data.len() < 22 {
             return Err(FrameError::Truncated);
         }
-        let sequence = u64::from_le_bytes(data[0..8].try_into().unwrap());
+        let sequence = u64::from_le_bytes(data[0..8].try_into().expect("8-byte sequence"));
         let entry_type = match data[8] {
             0x01 => WalEntryType::Append,
             0x02 => WalEntryType::Update,
@@ -144,16 +144,16 @@ impl WalEntry {
             0x04 => WalEntryType::Checkpoint,
             _ => return Err(FrameError::InvalidFrameType),
         };
-        let payload_len = u32::from_le_bytes(data[9..13].try_into().unwrap()) as usize;
+        let payload_len = u32::from_le_bytes(data[9..13].try_into().expect("4-byte payload_len")) as usize;
         let compression = CompressionType::from_u8(data[13])
             .ok_or(FrameError::InvalidCompression)?;
-        let uncompressed_size = u32::from_le_bytes(data[14..18].try_into().unwrap());
+        let uncompressed_size = u32::from_le_bytes(data[14..18].try_into().expect("4-byte uncompressed_size"));
         
         if data.len() < 18 + payload_len + 4 {
             return Err(FrameError::Truncated);
         }
         let payload = data[18..18+payload_len].to_vec();
-        let checksum = u32::from_le_bytes(data[18+payload_len..22+payload_len].try_into().unwrap());
+        let checksum = u32::from_le_bytes(data[18+payload_len..22+payload_len].try_into().expect("4-byte checksum"));
         Ok(Self {
             sequence,
             entry_type,

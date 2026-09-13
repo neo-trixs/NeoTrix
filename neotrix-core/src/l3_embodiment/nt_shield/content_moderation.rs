@@ -216,10 +216,17 @@ impl _ContentModeration {
         }
     }
 
-    /// 评估提示词风险
+    /// Evaluate risk of user-submitted prompt content.
     ///
-    /// STUB: Keyword-only substring matching — easily bypassed by synonyms/variants.
-    /// Real implementation needs:
+    /// **Not wired** — uses keyword-only substring matching, which is trivially
+    /// bypassed by synonyms, misspellings, or paraphrasing. Returns 0.1 (low risk)
+    /// for all categories except NSFW/Violence where explicit keywords are found.
+    ///
+    /// # Risks
+    /// Keyword matching misses implicit hate, coded language, and non-English
+    /// harmful content. This function MUST NOT be the sole prompt safety gate.
+    ///
+    /// # Required wiring
     /// - NSFW/Violence: LLM-as-judge or dedicated classifier (Llama Guard / OpenAI Moderation)
     /// - Hate/Harassment: context-aware semantic analysis (keywords miss implicit hate)
     /// - Copyright: training data / character name / style fingerprint matching
@@ -249,22 +256,34 @@ impl _ContentModeration {
         }
     }
 
-    /// 评估输出风险
+    /// Evaluate risk of generated output content.
     ///
-    /// STUB: Returns fixed baseline scores per content type — no actual content analysis.
-    /// Real implementation needs:
-    /// - NSFW: CLIP-based NSFW detector or third-party API
-    /// - Violence/Hate: multimodal content safety model
+    /// **Not wired** — returns fixed baseline scores per content type without
+    /// analyzing the actual content. Only metadata fields `contains_pii` and
+    /// `contains_secret` provide real signal; all other risk categories
+    /// (NSFW, violence, hate, copyright, misinformation) return hardcoded
+    /// baselines that do NOT reflect actual content risk.
+    ///
+    /// # Risks
+    /// Returning `0.05-0.25` for all content types regardless of actual content
+    /// means genuinely harmful content may pass moderation. This function MUST
+    /// NOT be used as the sole content safety gate in production.
+    ///
+    /// # Required wiring
+    /// - NSFW: CLIP-based NSFW detector or third-party API (e.g., OpenAI Moderation)
+    /// - Violence/Hate: multimodal content safety model (Llama Guard / ShieldGemma)
     /// - Copyright: reverse image search + copyright database matching
     /// - Misinformation: fact-check API + knowledge graph cross-validation
     /// - Privacy: PII detector (Presidio / custom NER)
     fn evaluate_output_risk(&self, content_type: ContentType, metadata: &HashMap<String, String>, _category: &RiskCategory) -> f64 {
         tracing::warn!(
-            "STUB evaluate_output_risk called: returning fixed baseline, not real content analysis. \
-             TODO: integrate CLIP/multimodal content safety model."
+            "STUB evaluate_output_risk: returning fixed baseline for {:?}, \
+             NOT real content analysis. Harmful content may pass. \
+             Wire CLIP/Llama Guard/OpenAI Moderation for production use.",
+            content_type
         );
-        // STUB: 返回固定基线 — 不反映真实内容风险
-        // 真实实现应分析实际内容而非依赖类型/类别常数
+        // FIXED BASELINE — does NOT analyze actual content.
+        // Only metadata signals (contains_pii, contains_secret) provide real input.
         let baseline = match content_type {
             ContentType::Prompt => 0.05,
             ContentType::GeneratedImage => 0.2,
@@ -273,7 +292,7 @@ impl _ContentModeration {
             ContentType::Text => 0.05,
         };
 
-        // 元数据信号 (唯一真实的输入源)
+        // Metadata signal: only real input source
         let mut risk: f64 = baseline;
         if metadata.get("contains_pii").map_or(false, |v| v == "true") {
             risk += 0.2;
@@ -282,8 +301,6 @@ impl _ContentModeration {
             risk += 0.3;
         }
 
-        // STUB: 风险类别调整为占位常数 — 真实实现需分类器输出
-        // 当前返回值仅用于管道不中断，不代表真实风险判断
         risk.clamp(0.0, 1.0)
     }
 

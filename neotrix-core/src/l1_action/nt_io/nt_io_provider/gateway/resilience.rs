@@ -41,6 +41,11 @@ pub struct CircuitBreaker {
 }
 
 impl CircuitBreaker {
+    /// Create a CircuitBreaker with the given failure threshold and recovery timeout.
+    ///
+    /// Note: Real implementation needs — default half-open max calls is 1. Consider:
+    /// making threshold configurable per error type (rate limit vs server error),
+    /// and adding a jitter to recovery timeout to prevent thundering herd.
     pub fn new(threshold: u32, recovery_timeout: Duration) -> Self {
         Self {
             state: Arc::new(AtomicBool::new(false)),
@@ -54,6 +59,11 @@ impl CircuitBreaker {
         }
     }
 
+    /// Set the maximum number of concurrent half-open probe requests.
+    ///
+    /// Note: Real implementation needs — higher values speed up recovery detection
+    /// but increase load on a potentially unhealthy provider. Consider: adaptive
+    /// probe count based on provider historical reliability.
     pub fn with_half_open_max(mut self, max: u32) -> Self {
         self.half_open_max_calls = max;
         self
@@ -86,6 +96,11 @@ impl CircuitBreaker {
         }
     }
 
+    /// Check if the circuit breaker is currently in the Open state.
+    ///
+    /// Note: Real implementation needs — auto-transitions to Closed if recovery
+    /// timeout has elapsed. Consider: adding a callback for state transitions
+    /// to notify monitoring systems.
     pub fn is_open(&self) -> bool {
         if self.state.load(Ordering::Relaxed) {
             if let Some(last) = self.last_failure.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
@@ -115,6 +130,11 @@ impl CircuitBreaker {
         }
     }
 
+    /// Record a failure while allowing state transitions (used during half-open probes).
+    ///
+    /// Note: Real implementation needs — in Open state, resets cooldown without
+    /// incrementing failure count. Consider: tracking probe-specific failure reasons
+    /// to differentiate between transient and permanent failures.
     pub fn record_failure_allow_transition(&self) {
         if self.state.load(Ordering::Relaxed) {
             // Open 状态下的 failure — 保持 open 并重置冷却
@@ -145,6 +165,11 @@ impl CircuitBreaker {
         }
     }
 
+    /// Return the current circuit breaker state as a CircuitState enum.
+    ///
+    /// Note: Real implementation needs — the HalfOpen state is determined by
+    /// `failure_count > 0` while not Open, which may be inaccurate after a
+    /// successful half-open probe. Consider: tracking explicit half-open state.
     pub fn state(&self) -> CircuitState {
         if self.is_open() {
             CircuitState::Open
@@ -261,6 +286,10 @@ pub struct AnomalyAlert {
 }
 
 impl AnomalyDetector {
+    /// Create an AnomalyDetector with custom configuration.
+    ///
+    /// Note: Real implementation needs — z-score threshold is static. Consider:
+    /// adaptive thresholds based on provider volatility and metric type.
     pub fn new(config: AnomalyConfig) -> Self {
         Self {
             windows: RwLock::new(HashMap::new()),
@@ -269,6 +298,10 @@ impl AnomalyDetector {
         }
     }
 
+    /// Record a latency observation and check for anomaly.
+    ///
+    /// Note: Real implementation needs — delegates to `record_metric` with "latency" key.
+    /// Consider: adding unit validation (ms vs seconds) and outlier pre-filtering.
     pub fn record_latency(&self, provider: &str, latency_ms: f64) -> Option<AnomalyAlert> {
         self.record_metric(provider, "latency", latency_ms)
     }
@@ -314,6 +347,10 @@ impl AnomalyDetector {
         None
     }
 
+    /// Check if a metric value is anomalous without recording it.
+    ///
+    /// Note: Real implementation needs — returns false for providers with insufficient
+    /// samples. Consider: returning a confidence score alongside the boolean result.
     pub fn is_anomalous(&self, provider: &str, metric: &str, value: f64) -> bool {
         let key = format!("{}:{}", provider, metric);
         let windows = self.windows.read().unwrap_or_else(|e| e.into_inner());
@@ -399,6 +436,11 @@ pub struct AutoRecovery {
 }
 
 impl AutoRecovery {
+    /// Create an AutoRecovery manager with the given configuration.
+    ///
+    /// Note: Real implementation needs — recovery state is in-memory only. Consider:
+    /// persisting recovery state to survive process restarts and enabling cross-instance
+    /// recovery coordination.
     pub fn new(config: AutoRecoveryConfig) -> Self {
         Self {
             config,
@@ -407,6 +449,10 @@ impl AutoRecovery {
         }
     }
 
+    /// Record a failure for a provider, updating its health state.
+    ///
+    /// Note: Real implementation needs — state transitions are threshold-based only.
+    /// Consider: time-windowed failure counting and error-type-aware state transitions.
     pub fn record_failure(&self, provider: &str) {
         let mut trackers = self.trackers.write().unwrap_or_else(|e| e.into_inner());
         let tracker = trackers.entry(provider.to_string()).or_insert_with(|| RecoveryTracker {
@@ -426,6 +472,10 @@ impl AutoRecovery {
         }
     }
 
+    /// Record a success for a provider, resetting failure counters.
+    ///
+    /// Note: Real implementation needs — immediate reset to Healthy state. Consider:
+    /// requiring N consecutive successes before transitioning from Recovering to Healthy.
     pub fn record_success(&self, provider: &str) {
         let mut trackers = self.trackers.write().unwrap_or_else(|e| e.into_inner());
         if let Some(tracker) = trackers.get_mut(provider) {
@@ -435,6 +485,11 @@ impl AutoRecovery {
         }
     }
 
+    /// Check if a provider should be skipped (circuit open).
+    ///
+    /// Note: Real implementation needs — returns false for unknown providers.
+    /// Consider: returning a Result with the provider's health state for richer
+    /// skip-reason information.
     pub fn should_skip(&self, provider: &str) -> bool {
         let trackers = self.trackers.read().unwrap_or_else(|e| e.into_inner());
         match trackers.get(provider) {
@@ -443,6 +498,11 @@ impl AutoRecovery {
         }
     }
 
+    /// Get the current health state of a provider.
+    ///
+    /// Note: Real implementation needs — returns Healthy for unknown providers.
+    /// Consider: adding a provider registration check and returning an explicit
+    /// "Unknown" state for unregistered providers.
     pub fn get_state(&self, provider: &str) -> HealthState {
         let trackers = self.trackers.read().unwrap_or_else(|e| e.into_inner());
         trackers
@@ -451,6 +511,11 @@ impl AutoRecovery {
             .unwrap_or(HealthState::Healthy)
     }
 
+    /// Calculate exponential backoff delay for a provider's next recovery attempt.
+    ///
+    /// Note: Real implementation needs — uses base_delay * backoff_factor^attempts.
+    /// Consider: adding jitter to prevent synchronized recovery probes, and
+    /// capping at provider-specific max delay based on error type.
     pub fn calculate_backoff(&self, provider: &str) -> Duration {
         let trackers = self.trackers.read().unwrap_or_else(|e| e.into_inner());
         match trackers.get(provider) {
@@ -464,6 +529,11 @@ impl AutoRecovery {
         }
     }
 
+    /// Attempt to transition a provider from CircuitOpen to Recovering state.
+    ///
+    /// Note: Real implementation needs — returns true if transition occurred.
+    /// Consider: adding a cooldown between recovery attempts and limiting
+    /// concurrent recovery probes per provider.
     pub fn try_recover(&self, provider: &str) -> bool {
         let mut trackers = self.trackers.write().unwrap_or_else(|e| e.into_inner());
         if let Some(tracker) = trackers.get_mut(provider) {
@@ -476,6 +546,11 @@ impl AutoRecovery {
         false
     }
 
+    /// Get health states for all tracked providers.
+    ///
+    /// Note: Real implementation needed — returns only providers that have been
+    /// recorded. Consider: including providers with default Healthy state for
+    /// complete visibility.
     pub fn get_all_states(&self) -> HashMap<String, HealthState> {
         let trackers = self.trackers.read().unwrap_or_else(|e| e.into_inner());
         trackers
@@ -528,6 +603,10 @@ pub struct DriftDetector {
 }
 
 impl DriftDetector {
+    /// Create a DriftDetector with the given window size and thresholds.
+    ///
+    /// Note: Real implementation needs — internal buffer is 10x window_size. Consider:
+    /// using a circular buffer for memory efficiency and supporting per-metric thresholds.
     pub fn new(window_size: usize, drift_threshold: f64, severe_threshold: f64) -> Self {
         Self {
             windows: VecDeque::with_capacity(window_size * 10),
@@ -537,6 +616,11 @@ impl DriftDetector {
         }
     }
 
+    /// Record a provider metric observation for drift detection.
+    ///
+    /// Note: Real implementation needs — prunes oldest entries when buffer exceeds
+    /// 10x window_size. Consider: pruning by provider (not globally) to maintain
+    /// per-provider sample depth.
     pub fn record(&mut self, metric: ProviderMetric) {
         self.windows.push_back(metric);
         while self.windows.len() > self.window_size * 10 {
@@ -622,6 +706,10 @@ impl DriftDetector {
         }
     }
 
+    /// Generate a health summary for all observed providers.
+    ///
+    /// Note: Real implementation needed — returns (provider_id, avg_quality, avg_latency).
+    /// Consider: adding success rate and observation count per provider.
     pub fn health_summary(&self) -> Vec<(String, f64, f64)> {
         let mut summaries: Vec<(String, f64, f64)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
@@ -644,12 +732,20 @@ impl DriftDetector {
         summaries
     }
 
+    /// Prune oldest metric observations to cap total entries.
+    ///
+    /// Note: Real implementation needed — FIFO eviction. Consider: per-provider
+    /// pruning to maintain minimum sample depth per provider.
     pub fn prune(&mut self, max_entries: usize) {
         while self.windows.len() > max_entries {
             self.windows.pop_front();
         }
     }
 
+    /// Count recorded observations for a specific provider.
+    ///
+    /// Note: Real implementation needed — O(n) scan. Consider: maintaining per-provider
+    /// counts for O(1) lookup.
     pub fn provider_count(&self, provider_id: &str) -> usize {
         self.windows
             .iter()
@@ -657,6 +753,10 @@ impl DriftDetector {
             .count()
     }
 
+    /// Return total number of metric observations across all providers.
+    ///
+    /// Note: Real implementation needed — useful for capacity planning and
+    /// determining if drift detection has sufficient data.
     pub fn total_records(&self) -> usize {
         self.windows.len()
     }
@@ -681,6 +781,11 @@ impl ResponseCache {
     pub const DEFAULT_CAPACITY: usize = 256;
     pub const MAX_PINNED: usize = 32;
 
+    /// Create a ResponseCache with the given capacity.
+    ///
+    /// Note: Real implementation needs — hash-based keying uses DefaultHasher which
+    /// is not cryptographically stable across platforms. Consider: using a stable
+    /// hash (e.g., xxHash) for cross-session cache persistence.
     pub fn new(capacity: usize) -> Self {
         Self {
             entries: HashMap::with_capacity(capacity),
@@ -693,6 +798,10 @@ impl ResponseCache {
         }
     }
 
+    /// Build a cache key from model ID and message content.
+    ///
+    /// Note: Real implementation needs — concatenates all message content which may
+    /// produce long keys. Consider: using a content hash for shorter, fixed-size keys.
     pub fn key_for(model_id: &str, messages: &[Message]) -> String {
         let body = messages
             .iter()
@@ -702,6 +811,10 @@ impl ResponseCache {
         format!("{}|{}", model_id, body)
     }
 
+    /// Build a cache key from model ID and a pre-computed fingerprint.
+    ///
+    /// Note: Real implementation needs — fingerprint should be deterministic for
+    /// the same request. Consider: adding cache versioning to invalidate stale entries.
     pub fn key_for_request(model_id: &str, fingerprint: &str) -> String {
         format!("{}|fp={}", model_id, fingerprint)
     }
@@ -712,6 +825,10 @@ impl ResponseCache {
         hasher.finish()
     }
 
+    /// Look up a cached response by key, updating LRU timestamp on hit.
+    ///
+    /// Note: Real implementation needs — O(1) HashMap lookup. Consider: TTL-based
+    /// expiration for time-sensitive responses and size-based eviction pressure.
     pub fn cache(&mut self, key: &str) -> Option<String> {
         let hash = Self::hash_key(key);
         if let Some((resp, last_used)) = self.entries.get_mut(&hash) {
@@ -724,6 +841,11 @@ impl ResponseCache {
         None
     }
 
+    /// Insert a response into the cache, evicting LRU entry if at capacity.
+    ///
+    /// Note: Real implementation needed — pinned entries are never evicted.
+    /// Consider: adding compression for large responses and tracking per-key
+    /// access patterns for smarter eviction.
     pub fn insert(&mut self, key: &str, response: String) {
         let hash = Self::hash_key(key);
         self.tick += 1;
@@ -745,6 +867,10 @@ impl ResponseCache {
         self.entries.insert(hash, (response, self.tick));
     }
 
+    /// Pin a cache entry to prevent eviction. Returns false if at MAX_PINNED limit.
+    ///
+    /// Note: Real implementation needed — pinned entries consume capacity but are
+    /// never evicted. Consider: adding TTL to pins and auto-unpin on staleness.
     pub fn pin(&mut self, key: &str) -> bool {
         if self.pinned.len() >= Self::MAX_PINNED {
             return false;
@@ -752,14 +878,26 @@ impl ResponseCache {
         self.pinned.insert(Self::hash_key(key))
     }
 
+    /// Unpin a previously pinned cache entry, making it eligible for eviction.
+    ///
+    /// Note: Real implementation needed — no-op if key is not pinned. Consider:
+    /// logging unpin events for cache behavior analysis.
     pub fn unpin(&mut self, key: &str) {
         self.pinned.remove(&Self::hash_key(key));
     }
 
+    /// Return the number of currently pinned cache entries.
+    ///
+    /// Note: Real implementation needed — useful for cache health monitoring.
+    /// Consider: adding pinned percentage as a cache health metric.
     pub fn pinned_count(&self) -> usize {
         self.pinned.len()
     }
 
+    /// Prefetch a cache entry, updating its LRU timestamp without returning it.
+    ///
+    /// Note: Real implementation needed — useful for warming cache before expected
+    /// access. Consider: batch prefetch with parallel lookup for multi-key warming.
     pub fn prefetch(&mut self, key: &str) -> Option<String> {
         let hash = Self::hash_key(key);
         let exists = self.entries.contains_key(&hash);
@@ -778,6 +916,10 @@ impl ResponseCache {
         self.prefetch_hits
     }
 
+    /// Batch prefetch: look up multiple hint keys, returning hit count and missing keys.
+    ///
+    /// Note: Real implementation needed — sequential lookup. Consider: parallel lookup
+    /// for large hint sets and selective prefetch based on access pattern prediction.
     pub fn prefetch_lookahead(&mut self, hints: &[String]) -> (usize, Vec<String>) {
         let mut hits = 0;
         let mut missing = Vec::new();
@@ -797,6 +939,11 @@ impl ResponseCache {
         (hits, missing)
     }
 
+    /// Generate lookahead hint keys based on a base cache key.
+    ///
+    /// Note: Real implementation needed — generates fixed pattern hints
+    /// (`fp=lookahead:1`, `fp=lookahead:2`). Consider: learning actual access
+    /// patterns from history to generate smarter hints.
     pub fn lookahead_hints(&self, key: &str) -> Vec<String> {
         let mut hints = Vec::new();
         if let Some((model, _)) = key.split_once('|') {

@@ -239,13 +239,13 @@ fn fuse(events: &[Value]) -> Vec<Value> {
             m
         });
 
-        let disc_list = entry["disciplines"].as_array_mut().unwrap();
+        let disc_list = entry["disciplines"].as_array_mut().expect("disciplines is array");
         if !disc_list.iter().any(|d| d.as_str() == Some(discipline.as_str())) {
             disc_list.push(json!(discipline));
         }
         let cur = entry["confidence"].as_f64().unwrap_or(0.0);
         entry.insert("confidence".into(), json!(1.0 - (1.0 - cur) * (1.0 - e["confidence"].as_f64().unwrap_or(0.0))));
-        let ev = entry["evidence"].as_array_mut().unwrap();
+        let ev = entry["evidence"].as_array_mut().expect("evidence is array");
         ev.push(json!(format!("{}:{}", discipline, e["source"].as_str().unwrap_or(""))));
         let cls = e.get("classification").and_then(|c| c.as_str()).unwrap_or("unclassified");
         if cls != "unclassified" {
@@ -571,8 +571,8 @@ fn run(scenario: &Value, verbose: bool) -> String {
     let fused = fuse(&events);
     let analysis = analyze(&fused, scenario["region"].as_str().unwrap_or(""));
     let warning = warn(
-        scenario["indicators"].as_object().unwrap(),
-        scenario["weights"].as_object().unwrap(),
+        scenario["indicators"].as_object().expect("indicators is object"),
+        scenario["weights"].as_object().expect("weights is object"),
     );
     let gates = decide(&warning, &fused);
     render(&obs, &events, &fused, &analysis, &warning, &gates, verbose)

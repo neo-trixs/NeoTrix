@@ -236,12 +236,14 @@ pub struct QueryResult {
 // ── 搜索类型 ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
+pub struct ActionSearchResult {
     pub id: String,
     pub score: f64,
     pub title: String,
     pub snippet: String,
 }
+
+pub type SearchResult = ActionSearchResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Document {

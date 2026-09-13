@@ -159,7 +159,7 @@ impl _FSMBehaviorTopologyEngine {
         // 选择概率最高的转换
         let best_transition = possible_transitions
             .iter()
-            .max_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap())?;
+            .max_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap_or(std::cmp::Ordering::Equal))?;
 
         let prediction = _BehaviorPrediction {
             prediction_id: uuid::Uuid::new_v4().to_string(),

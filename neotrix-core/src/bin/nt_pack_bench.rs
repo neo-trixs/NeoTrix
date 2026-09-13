@@ -77,7 +77,7 @@ fn main() {
     println!("  压缩率 (B/记录):");
     println!("    E5 无压缩: {:.1} B/记录", pack_e5.len() as f64 / n as f64);
     println!("    E5+zstd:   {:.1} B/记录", pack_e5z.len() as f64 / n as f64);
-    let json_bytes = serde_json::to_string(&pts).unwrap().len();
+    let json_bytes = serde_json::to_string(&pts).expect("JSON serialization").len();
     println!("    JSON:      {:.1} B/记录", json_bytes as f64 / n as f64);
     println!("    zstd vs JSON: {:.1}x", json_bytes as f64 / pack_e5z.len() as f64);
 }

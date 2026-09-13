@@ -389,7 +389,7 @@ fn seed_from_str(s: &str) -> u64 {
     let mut h = Sha1::new();
     h.update(s.as_bytes());
     let d = h.finalize();
-    u64::from_be_bytes(d[..8].try_into().unwrap())
+    u64::from_be_bytes(d[..8].try_into().expect("SHA1 digest >= 8 bytes"))
 }
 
 /// CJK 2-gram / ASCII 空白分词的 token 列表 (VSA 词袋)。
@@ -463,8 +463,8 @@ fn extract_concepts(content: &str) -> BTreeSet<String> {
     if content.is_empty() {
         return found;
     }
-    let en_re = regex::Regex::new(r"[A-Za-z][A-Za-z0-9_/\-]{3,}").unwrap();
-    let cn_re = regex::Regex::new(r"[\u{4e00}-\u{9fff}]{3,12}").unwrap();
+    let en_re = regex::Regex::new(r"[A-Za-z][A-Za-z0-9_/\-]{3,}").expect("valid regex");
+    let cn_re = regex::Regex::new(r"[\u{4e00}-\u{9fff}]{3,12}").expect("valid regex");
     for m in en_re.find_iter(content) {
         let tok = m.as_str().trim();
         if tok.is_empty() {
@@ -629,7 +629,7 @@ fn concept_from_branch(conn: &Connection, term: &str, branch_key: &str, domain: 
             "ts": now_ts(),
         });
     }
-    let branches = c.get_mut("branches").unwrap().as_array_mut().unwrap();
+    let Some(branches) = c.get_mut("branches").and_then(|v| v.as_array_mut()) else { return; };
     if !branches.iter().any(|b| b.as_str() == Some(branch_key)) {
         branches.push(json!(branch_key));
     }
@@ -693,7 +693,7 @@ fn co_bump(conn: &Connection, a: &str, b: &str) {
     } else {
         co.push(json!(b));
     }
-    let obj = ca.as_object_mut().unwrap();
+    let Some(obj) = ca.as_object_mut() else { return; };
     if co.is_empty() {
         obj.remove("co");
     } else {
@@ -720,41 +720,28 @@ fn hebb_cooccurrence(conn: &Connection, hashes: &[String]) {
 /// 内存版 co_bump (cmd_hebb 全量重建用, 避免逐对 commit 的 O(n) DB 往返)。
 fn co_bump_in_mem(concepts: &mut HashMap<String, Value>, x: &str, y: &str) {
     let Some(c) = concepts.get_mut(x) else { return };
-    let obj = c.as_object_mut().unwrap();
+    let Some(obj) = c.as_object_mut() else { return };
     let in_cow = obj.get("co_w").and_then(|m| m.get(y)).cloned();
     if let Some(w) = in_cow {
-        obj.get_mut("co_w")
-            .unwrap()
-            .as_object_mut()
-            .unwrap()
-            .insert(y.to_string(), json!(w.as_i64().unwrap_or(1) + 1));
+        if let Some(cow) = obj.get_mut("co_w").and_then(|v| v.as_object_mut()) {
+            cow.insert(y.to_string(), json!(w.as_i64().unwrap_or(1) + 1));
+        }
         return;
     }
     let in_co = obj
         .get("co")
-        .map(|v| {
-            v.as_array()
-                .map(|a| a.iter().any(|v| v.as_str() == Some(y)))
-                .unwrap_or(false)
-        })
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().any(|v| v.as_str() == Some(y)))
         .unwrap_or(false);
     if in_co {
-        obj.get_mut("co")
-            .unwrap()
-            .as_array_mut()
-            .unwrap()
-            .retain(|v| v.as_str() != Some(y));
-        obj.get_mut("co_w")
-            .unwrap()
-            .as_object_mut()
-            .unwrap()
-            .insert(y.to_string(), json!(2));
-    } else {
-        obj.get_mut("co")
-            .unwrap()
-            .as_array_mut()
-            .unwrap()
-            .push(json!(y));
+        if let Some(arr) = obj.get_mut("co").and_then(|v| v.as_array_mut()) {
+            arr.retain(|v| v.as_str() != Some(y));
+        }
+        if let Some(cow) = obj.get_mut("co_w").and_then(|v| v.as_object_mut()) {
+            cow.insert(y.to_string(), json!(2));
+        }
+    } else if let Some(arr) = obj.get_mut("co").and_then(|v| v.as_array_mut()) {
+        arr.push(json!(y));
     }
 }
 
@@ -832,24 +819,22 @@ fn refresh_hub_metrics(conn: &Connection, hub: &mut Value) {
         let count = cmeta.get("count").and_then(|c| c.as_i64()).unwrap_or(0);
         cmeta.insert("count".to_string(), json!(count + 1));
         let types = cmeta.entry("types".to_string()).or_insert_with(|| json!([]));
-        if !types
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|x| x.as_str() == Some(t))
-        {
-            types.as_array_mut().unwrap().push(json!(t));
+        if let Some(arr) = types.as_array() {
+            if !arr.iter().any(|x| x.as_str() == Some(t)) {
+                if let Some(arr) = types.as_array_mut() {
+                    arr.push(json!(t));
+                }
+            }
         }
         let domains = cmeta
             .entry("domains".to_string())
             .or_insert_with(|| json!([]));
-        if !domains
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|x| x.as_str() == Some(d))
-        {
-            domains.as_array_mut().unwrap().push(json!(d));
+        if let Some(arr) = domains.as_array() {
+            if !arr.iter().any(|x| x.as_str() == Some(d)) {
+                if let Some(arr) = domains.as_array_mut() {
+                    arr.push(json!(d));
+                }
+            }
         }
     }
     hub["hub"]["cycles"] = json!(cycles);
@@ -1244,8 +1229,12 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
         cmeta.insert("count".to_string(), json!(count + 1));
         let types = cmeta.entry("types".to_string()).or_insert_with(|| json!([]));
         let ty = e.get("type").cloned().unwrap_or_else(|| json!("insight"));
-        if !types.as_array().unwrap().contains(&ty) {
-            types.as_array_mut().unwrap().push(ty);
+        if let Some(arr) = types.as_array() {
+            if !arr.contains(&ty) {
+                if let Some(arr) = types.as_array_mut() {
+                    arr.push(ty);
+                }
+            }
         }
         let domains = cmeta
             .entry("domains".to_string())
@@ -1254,8 +1243,12 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
             .get("domain")
             .cloned()
             .unwrap_or_else(|| json!("unknown"));
-        if !domains.as_array().unwrap().contains(&dom) {
-            domains.as_array_mut().unwrap().push(dom);
+        if let Some(arr) = domains.as_array() {
+            if !arr.contains(&dom) {
+                if let Some(arr) = domains.as_array_mut() {
+                    arr.push(dom);
+                }
+            }
         }
         written += 1;
         if e.get("importance").and_then(|x| x.as_f64()).unwrap_or(0.0) >= 0.6 {
@@ -1398,12 +1391,20 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
             let count = cmeta.get("count").and_then(|c| c.as_i64()).unwrap_or(0);
             cmeta.insert("count".to_string(), json!(count + 1));
             let types = cmeta.entry("types".to_string()).or_insert_with(|| json!([]));
-            if !types.as_array().unwrap().contains(&json!("observation")) {
-                types.as_array_mut().unwrap().push(json!("observation"));
+            if let Some(arr) = types.as_array() {
+                if !arr.contains(&json!("observation")) {
+                    if let Some(arr) = types.as_array_mut() {
+                        arr.push(json!("observation"));
+                    }
+                }
             }
             let doms = cmeta.entry("domains".to_string()).or_insert_with(|| json!([]));
-            if !doms.as_array().unwrap().contains(&json!("NT-MEMORY")) {
-                doms.as_array_mut().unwrap().push(json!("NT-MEMORY"));
+            if let Some(arr) = doms.as_array() {
+                if !arr.contains(&json!("NT-MEMORY")) {
+                    if let Some(arr) = doms.as_array_mut() {
+                        arr.push(json!("NT-MEMORY"));
+                    }
+                }
             }
             println!("[absorb] observation chunk {} written: {} tokens, {} sources, extracted={}", chunk_idx, total_tokens, chunk.len(), extracted.as_object().map(|o| o.len()).unwrap_or(0));
         }
@@ -2360,7 +2361,7 @@ fn cmd_hub(conn: &Connection) {
     let mut hub = ensure_hub(conn);
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
-    println!("{}", serde_json::to_string_pretty(&hub).unwrap());
+    println!("{}", serde_json::to_string_pretty(&hub).expect("hub JSON serialization"));
 }
 
 fn cmd_route(conn: &Connection, kw: &str, branch: &str) {
@@ -4036,7 +4037,7 @@ fn cmd_rune(conn: &Connection, action: &str, color: Option<&str>, module: Option
             let val = json!({ "color": color_str, "module": module_str, "set_at": now_ts() });
             conn.execute(
                 "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
-                params![NS, key, serde_json::to_string(&val).unwrap(), now_ts()],
+                params![NS, key, serde_json::to_string(&val).expect("JSON serialization"), now_ts()],
             )
             .expect("failed to set rune");
             println!("rune set: module={}, color={}", module_str, color_str);

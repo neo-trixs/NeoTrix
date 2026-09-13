@@ -219,7 +219,7 @@ impl LeadManager {
         };
         self.leads.insert(id.clone(), lead);
         self.rescore(&id);
-        self.leads.get(&id).unwrap()
+        self.leads.get(&id).expect("key exists")
     }
 
     pub(crate) fn _update_lead(&mut self, id: &str, updates: LeadUpdate) -> Result<&Lead, String> {

@@ -150,22 +150,6 @@ impl NeoCodexAgent {
         }
     }
 
-    /// P2-5: attach the shared MCP registry so the agent can call MCP tools.
-    // pub fn with_mcp(
-    //     mut self,
-    //     mcp: crate::l1_action::nt_io::nt_io_mcp_registry::McpRegistry,  // TODO: restore when McpRegistry type is available
-    // ) -> Self {
-    //     self.mcp = Some(mcp);
-    //     self
-    // }
-
-    // pub fn set_mcp(
-    //     &mut self,
-    //     mcp: Option<crate::l1_action::nt_io::nt_io_mcp_registry::McpRegistry>,
-    // ) {
-    //     self.mcp = mcp;
-    // }
-
     /// Set budget limit (from Claude Code max_budget_usd)
     pub fn with_budget(mut self, max_budget: f64) -> Self {
         self.cost.max_budget = max_budget;

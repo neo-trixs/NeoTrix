@@ -290,7 +290,7 @@ impl _OSINTReconEngine {
         self.collected_data.push(_OSINTData {
             id: uuid::Uuid::new_v4().to_string(),
             data_type: _DataType::Domain,
-            content: serde_json::to_value(&intel).unwrap(),
+            content: serde_json::to_value(&intel).expect("JSON conversion"),
             source_id: "whois".into(),
             confidence: 0.9,
             timestamp: chrono::Utc::now(),
@@ -341,7 +341,7 @@ impl _OSINTReconEngine {
         self.collected_data.push(_OSINTData {
             id: uuid::Uuid::new_v4().to_string(),
             data_type: _DataType::IP,
-            content: serde_json::to_value(&intel).unwrap(),
+            content: serde_json::to_value(&intel).expect("JSON conversion"),
             source_id: "shodan".into(),
             confidence: 0.85,
             timestamp: chrono::Utc::now(),

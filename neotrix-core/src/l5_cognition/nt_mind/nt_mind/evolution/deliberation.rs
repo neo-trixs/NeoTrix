@@ -289,7 +289,7 @@ impl _DeliberationEngine {
         let mut sessions = self.active_sessions.write().unwrap_or_else(|e| e.into_inner());
         let session = sessions.get_mut(session_id).ok_or("会话不存在")?;
         
-        let current = session.rounds.last_mut().unwrap();
+        let current = session.rounds.last_mut().expect("non-empty");
         current.end_time = Some(now());
         
         let next_phase = match current.phase {
@@ -324,7 +324,7 @@ impl _DeliberationEngine {
             });
         }
 
-        session.rounds.last_mut().unwrap().phase = next_phase.clone();
+        session.rounds.last_mut().expect("non-empty").phase = next_phase.clone();
 
         if matches!(next_phase, DeliberationPhase::Verdict) {
             self.finalize_verdict(session)?;

@@ -22,11 +22,13 @@ use std::collections::{HashMap, HashSet};
 
 /// 语义搜索结果
 #[derive(Debug, Clone)]
-pub struct SearchResult {
+pub struct SemanticSearchResult {
     pub node_id: String,
     pub title: String,
     pub similarity: f64,
 }
+
+pub type SearchResult = SemanticSearchResult;
 
 /// 图遍历路径
 #[derive(Debug, Clone)]

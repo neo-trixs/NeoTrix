@@ -247,7 +247,7 @@ impl ModelRoutingLayer {
                 candidates.sort_by(|a, b| b.priority.cmp(&a.priority));
             }
             RoutingStrategy::LowestCost => {
-                candidates.sort_by(|a, b| a.price_per_second.partial_cmp(&b.price_per_second).unwrap());
+                candidates.sort_by(|a, b| a.price_per_second.partial_cmp(&b.price_per_second).unwrap_or(std::cmp::Ordering::Equal));
             }
             RoutingStrategy::HighestQuality => {
                 // 基于质量分数排序：优先选择 rate_limit 高、价格适中的模型
@@ -272,7 +272,7 @@ impl ModelRoutingLayer {
                     let b_load = self.states.get(&b.id).map_or(0.0, |s| {
                         s.current_concurrent as f32 / b.max_concurrent as f32
                     });
-                    a_load.partial_cmp(&b_load).unwrap()
+                    a_load.partial_cmp(&b_load).unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
         }

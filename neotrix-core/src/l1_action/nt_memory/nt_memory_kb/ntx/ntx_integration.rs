@@ -201,7 +201,7 @@ use super::format::{uuid_to_bytes, bytes_to_uuid};
 fn blob_to_vector(blob: &[u8]) -> Vec<f32> {
     blob.chunks(4)
         .filter_map(|c| {
-            if c.len() == 4 { Some(f32::from_le_bytes(c.try_into().unwrap())) }
+            if c.len() == 4 { Some(f32::from_le_bytes(c.try_into().expect("correct size"))) }
             else { None }
         })
         .collect()
