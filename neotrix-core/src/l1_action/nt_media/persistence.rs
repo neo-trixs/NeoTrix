@@ -1142,22 +1142,6 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&dir).await;
     }
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// ChunkDownloadStatus — download lifecycle for streaming.rs
-// ═══════════════════════════════════════════════════════════════════
-#[derive(Debug, Clone, PartialEq)]
-pub enum ChunkDownloadStatus {
-    Pending,
-    InProgress,
-    Complete,
-    Failed,
-}
-
-impl ChunkState {
-    pub fn streaming(index: u32, offset: u64, end: u64) -> Self {
-        Self {
-            index,
             offset,
             size: end - offset,
             completed: false,
