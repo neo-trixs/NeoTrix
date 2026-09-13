@@ -29,109 +29,12 @@ impl FreePool {
         let mut budgets = HashMap::new();
 
         budgets.insert(
-            "pollinations".to_string(),
+            "openrouter".to_string(),
             FreeTokenBudget {
-                provider_name: "pollinations".into(),
-                monthly_token_cap: 0,
+                provider_name: "openrouter".into(),
+                monthly_token_cap: 200_000,
                 tokens_used: 0,
-                daily_request_cap: 0,
-                requests_used: 0,
-                is_keyless: true,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "empero".to_string(),
-            FreeTokenBudget {
-                provider_name: "empero".into(),
-                monthly_token_cap: 0,
-                tokens_used: 0,
-                daily_request_cap: 0,
-                requests_used: 0,
-                is_keyless: true,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "llm7".to_string(),
-            FreeTokenBudget {
-                provider_name: "llm7".into(),
-                monthly_token_cap: 0,
-                tokens_used: 0,
-                daily_request_cap: 0,
-                requests_used: 0,
-                is_keyless: true,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "kilo".to_string(),
-            FreeTokenBudget {
-                provider_name: "kilo".into(),
-                monthly_token_cap: 0,
-                tokens_used: 0,
-                daily_request_cap: 0,
-                requests_used: 0,
-                is_keyless: true,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "opencode-zen".to_string(),
-            FreeTokenBudget {
-                provider_name: "opencode-zen".into(),
-                monthly_token_cap: 0,
-                tokens_used: 0,
-                daily_request_cap: 0,
-                requests_used: 0,
-                is_keyless: true,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "ovh".to_string(),
-            FreeTokenBudget {
-                provider_name: "ovh".into(),
-                monthly_token_cap: 0,
-                tokens_used: 0,
-                daily_request_cap: 0,
-                requests_used: 0,
-                is_keyless: true,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "freetheai".to_string(),
-            FreeTokenBudget {
-                provider_name: "freetheai".into(),
-                monthly_token_cap: 0,
-                tokens_used: 0,
-                daily_request_cap: 0,
-                requests_used: 0,
-                is_keyless: true,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "modelscope".to_string(),
-            FreeTokenBudget {
-                provider_name: "modelscope".into(),
-                monthly_token_cap: 0,
-                tokens_used: 0,
-                daily_request_cap: 0,
-                requests_used: 0,
-                is_keyless: true,
-                is_active: true,
-            },
-        );
-
-        budgets.insert(
-            "gemini".to_string(),
-            FreeTokenBudget {
-                provider_name: "gemini".into(),
-                monthly_token_cap: 1_000_000,
-                tokens_used: 0,
-                daily_request_cap: 1500,
+                daily_request_cap: 100,
                 requests_used: 0,
                 is_keyless: false,
                 is_active: true,
@@ -141,30 +44,6 @@ impl FreePool {
             "groq".to_string(),
             FreeTokenBudget {
                 provider_name: "groq".into(),
-                monthly_token_cap: 500_000,
-                tokens_used: 0,
-                daily_request_cap: 100,
-                requests_used: 0,
-                is_keyless: false,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "cerebras".to_string(),
-            FreeTokenBudget {
-                provider_name: "cerebras".into(),
-                monthly_token_cap: 1_000_000,
-                tokens_used: 0,
-                daily_request_cap: 100,
-                requests_used: 0,
-                is_keyless: false,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "sambanova".to_string(),
-            FreeTokenBudget {
-                provider_name: "sambanova".into(),
                 monthly_token_cap: 500_000,
                 tokens_used: 0,
                 daily_request_cap: 100,
@@ -222,6 +101,42 @@ impl FreePool {
             },
         );
         budgets.insert(
+            "llm7".to_string(),
+            FreeTokenBudget {
+                provider_name: "llm7".into(),
+                monthly_token_cap: 1_000_000,
+                tokens_used: 0,
+                daily_request_cap: 0,
+                requests_used: 0,
+                is_keyless: true,
+                is_active: true,
+            },
+        );
+        budgets.insert(
+            "opencode-zen".to_string(),
+            FreeTokenBudget {
+                provider_name: "opencode-zen".into(),
+                monthly_token_cap: 2_000_000,
+                tokens_used: 0,
+                daily_request_cap: 0,
+                requests_used: 0,
+                is_keyless: true,
+                is_active: true,
+            },
+        );
+        budgets.insert(
+            "together-free".to_string(),
+            FreeTokenBudget {
+                provider_name: "together-free".into(),
+                monthly_token_cap: 500_000,
+                tokens_used: 0,
+                daily_request_cap: 100,
+                requests_used: 0,
+                is_keyless: false,
+                is_active: true,
+            },
+        );
+        budgets.insert(
             "siliconflow".to_string(),
             FreeTokenBudget {
                 provider_name: "siliconflow".into(),
@@ -246,26 +161,14 @@ impl FreePool {
             },
         );
         budgets.insert(
-            "deepseek-free".to_string(),
+            "api-airforce".to_string(),
             FreeTokenBudget {
-                provider_name: "deepseek-free".into(),
-                monthly_token_cap: 500_000,
+                provider_name: "api-airforce".into(),
+                monthly_token_cap: 1_000_000,
                 tokens_used: 0,
-                daily_request_cap: 100,
+                daily_request_cap: 0,
                 requests_used: 0,
-                is_keyless: false,
-                is_active: true,
-            },
-        );
-        budgets.insert(
-            "openrouter".to_string(),
-            FreeTokenBudget {
-                provider_name: "openrouter".into(),
-                monthly_token_cap: 200_000,
-                tokens_used: 0,
-                daily_request_cap: 100,
-                requests_used: 0,
-                is_keyless: false,
+                is_keyless: true,
                 is_active: true,
             },
         );
@@ -344,15 +247,15 @@ mod tests {
     fn test_free_pool_initializes_all_budgets() {
         let pool = FreePool::new();
         let budgets = pool.all_budgets();
-        assert!(budgets.len() >= 18, "should have at least 18 free provider budgets, got {}", budgets.len());
+        assert_eq!(budgets.len(), 12, "should have 12 free provider budgets (matching FreeModelCatalog), got {}", budgets.len());
     }
 
     #[test]
     fn test_record_usage_updates_tokens() {
         let pool = FreePool::new();
-        pool.record_usage("gemini", 1000);
-        pool.record_usage("gemini", 500);
-        let budget = pool.get_budget("gemini").expect("gemini budget exists");
+        pool.record_usage("groq", 1000);
+        pool.record_usage("groq", 500);
+        let budget = pool.get_budget("groq").expect("groq budget exists");
         assert_eq!(budget.tokens_used, 1500);
         assert_eq!(budget.requests_used, 2);
     }
@@ -369,7 +272,7 @@ mod tests {
     fn test_total_free_tokens_remaining() {
         let pool = FreePool::new();
         let total = pool.total_free_tokens_remaining();
-        // Should sum all provider caps (gemini=1M, groq=500K, etc) - at least 5M
+        // Sum of caps: groq=500K + cloudflare=10M + nvidia=1M + github=500K + huggingface=200K + together=500K + siliconflow=2M + zai=1M + openrouter=200K = ~15.9M
         assert!(
             total >= 5_000_000,
             "total free tokens should be >= 5M, got {}",
@@ -381,7 +284,7 @@ mod tests {
     fn test_total_free_tokens_decreases_after_usage() {
         let pool = FreePool::new();
         let before = pool.total_free_tokens_remaining();
-        pool.record_usage("gemini", 250_000);
+        pool.record_usage("cloudflare", 250_000);
         let after = pool.total_free_tokens_remaining();
         assert_eq!(before - after, 250_000);
     }
@@ -390,22 +293,19 @@ mod tests {
     fn test_total_savings_increases() {
         let pool = FreePool::new();
         assert_eq!(pool.total_savings(), 0.0);
-        pool.record_usage("gemini", 1000);
+        pool.record_usage("groq", 1000);
         let savings = pool.total_savings();
         assert!(savings > 0.0, "savings should be positive after usage, got {}", savings);
     }
 
     #[test]
-    fn test_keyless_providers_have_unlimited_budget() {
+    fn test_keyless_providers_have_budget_caps() {
         let pool = FreePool::new();
-        // 预算层契约 (与 gateway 注册解耦): 预算存在 ≠ 端点当前可用。
-        // 2026-08-06 走代理实测: pollinations(匿名层关)/llm7(可用)/kilo(端点死)/
-        // opencode-zen(需key)/ovh+freetheai+modelscope(DNS不可达)。
-        // 保留 budget 使端点恢复时预算就绪; 可用性由 gateway 注册/探测决定。
-        for name in &["pollinations", "llm7", "kilo", "opencode-zen", "ovh", "freetheai", "modelscope"] {
+        let expected_caps = [("llm7", 1_000_000), ("opencode-zen", 2_000_000), ("api-airforce", 1_000_000)];
+        for (name, expected_cap) in &expected_caps {
             let budget = pool.get_budget(name).unwrap_or_else(|| panic!("{} should have a budget", name));
             assert!(budget.is_keyless, "{} should be keyless", name);
-            assert_eq!(budget.monthly_token_cap, 0, "{} should have unlimited cap", name);
+            assert_eq!(budget.monthly_token_cap, *expected_cap, "{} should have cap {}", name, expected_cap);
         }
     }
 }

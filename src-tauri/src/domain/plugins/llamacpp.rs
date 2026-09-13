@@ -871,17 +871,23 @@ fn scan_models(dir: &PathBuf) -> Vec<serde_json::Value> {
                 .filter(|e| {
                     e.path()
                         .extension()
-                        .map(|ext| ext == "gguf")
+                        .map(|ext| ext == "gguf" || ext == "onnx")
                         .unwrap_or(false)
                 })
                 .filter_map(|e| {
                     let path = e.path();
                     let meta = e.metadata().ok()?;
                     let name = path.file_stem()?.to_string_lossy().to_string();
+                    let format = path.extension()
+                        .map(|ext| ext.to_string_lossy().to_uppercase())
+                        .unwrap_or_default();
+                    let backend = if format == "ONNX" { "onnxruntime" } else { "llamacpp" };
                     Some(serde_json::json!({
                         "name": name,
                         "path": path.to_string_lossy(),
                         "size_bytes": meta.len(),
+                        "format": format,
+                        "backend": backend,
                         "quantization": extract_quant(&name),
                     }))
                 })
@@ -894,16 +900,20 @@ fn find_model(dir: &PathBuf) -> Option<PathBuf> {
     if !dir.exists() {
         return None;
     }
+    const MIN_MAIN_MODEL_BYTES: u64 = 1024 * 1024 * 1024; // 1 GB
     std::fs::read_dir(dir)
         .ok()?
         .filter_map(|e| e.ok())
         .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_lowercase();
             e.path()
                 .extension()
-                .map(|ext| ext == "gguf")
+                .map(|ext| ext == "gguf" || ext == "onnx")
                 .unwrap_or(false)
+                && !name.contains("mmproj")
         })
-        .min_by_key(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
+        .filter(|e| e.metadata().map(|m| m.len()).unwrap_or(0) >= MIN_MAIN_MODEL_BYTES)
+        .max_by_key(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
         .map(|e| e.path())
 }
 
