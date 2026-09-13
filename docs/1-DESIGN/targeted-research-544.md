@@ -56,10 +56,19 @@ Expanded `dispatch_internal_capability` in `nt_core_consciousness_core.rs` with 
 
 ## Module Coverage
 
-| Module | Before | After |
-|--------|--------|-------|
-| nt_core_seal | 0 routes | 3 routes (进化/迭代/蒸馏) |
-| nt_core_self | 0 routes | 3 routes (自我评估/能力评估/认知健康) |
-| nt_meta | 0 routes | 5 routes (元观察/质量扫描/代码质量/构建健康/构建检查) |
-| nt_shield | 2 routes (审查/审计) | 6 routes (+安全审计/攻击检测/漏洞扫描/安全扫描) |
-| **Total** | **43 routes** | **59 routes** |
+| Module | Routes Added | Keywords |
+|--------|-------------|----------|
+| nt_core_seal | 3 | 进化, 迭代, 蒸馏 |
+| nt_core_self | 3 | 自我评估, 能力评估, 认知健康 |
+| nt_meta | 5 | 元观察, 质量扫描, 代码质量, 构建健康, 构建检查 |
+| nt_shield | 4 | 安全审计, 攻击检测, 漏洞扫描, 安全扫描 |
+| **Total new** | **15** | |
+
+**Total CAPABILITY_ROUTES:** 72 entries | **Total dispatch match arms:** 26 (including `_` catch-all)
+
+## Import Path Fixes (this session)
+
+3 broken import paths were corrected in the existing dispatch arms:
+- `pdf_image_stats`: `crate::neotrix::pdf_image_stats` → `crate::neotrix::nt_file_ability::pdf::pdf_image_extract::pdf_image_stats`
+- `PdfImageExtractConfig`/`extract_pdf_images`: same module path correction
+- `SiliconSelfModel`: `silicon_self_model` → `silicon_self`
