@@ -177,7 +177,7 @@ pub struct ModelRoutingLayer {
     /// 路由配置
     config: RoutingConfig,
     /// 模型配置
-    models: HashMap<String, ModelConfig>,
+    models: HashMap<String, RoutingModelConfig>,
     /// 模型状态
     states: HashMap<String, ModelState>,
     /// 轮询索引
@@ -217,7 +217,7 @@ impl ModelRoutingLayer {
     }
     
     /// 注册模型
-    pub fn register_model(&mut self, model: ModelConfig) {
+    pub fn register_model(&mut self, model: RoutingModelConfig) {
         let id = model.id.clone();
         self.states.insert(id.clone(), ModelState {
             current_concurrent: 0,
@@ -232,8 +232,8 @@ impl ModelRoutingLayer {
     }
     
     /// 选择模型
-    pub fn select_model(&self, request: &RoutingRequest) -> Option<&ModelConfig> {
-        let mut candidates: Vec<&ModelConfig> = self.models.values()
+    pub fn select_model(&self, request: &RoutingRequest) -> Option<&RoutingModelConfig> {
+        let mut candidates: Vec<&RoutingModelConfig> = self.models.values()
             .filter(|m| {
                 m.enabled
                     && m.model_type == request.task_type
@@ -384,7 +384,7 @@ mod tests {
     fn test_model_routing() {
         let mut router = ModelRoutingLayer::new();
         
-        router.register_model(ModelConfig {
+        router.register_model(RoutingModelConfig {
             id: "kling_001".to_string(),
             name: "Kling 2.6".to_string(),
             provider: ModelProvider::Kling,

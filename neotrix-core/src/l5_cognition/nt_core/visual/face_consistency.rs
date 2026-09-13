@@ -132,8 +132,9 @@ pub struct FaceConsistencyManager {
 impl FaceConsistencyManager {
     /// 创建增强器
     ///
-    /// STUB: Initializes with default FaceDetailer strategy and 0.5 detection threshold.
-    /// Real implementation needs configurable strategy per platform (SD WebUI vs ComfyUI).
+    /// Initializes with default FaceDetailer strategy. No per-platform
+    /// configuration is wired — real implementation needs configurable
+    /// strategy for SD WebUI vs ComfyUI vs other backends.
     pub fn new() -> Self {
         Self {
             face_fix_config: _FaceFixConfig {
@@ -211,11 +212,9 @@ impl FaceConsistencyManager {
     
     /// 批量修复面部
     ///
-    /// STUB: Delegates each image to `_fix_faces` sequentially.
-    /// Real implementation needs:
-    /// - Parallel processing with configurable concurrency
-    /// - Batch face detection to amortize model load cost
-    /// - Cross-frame consistency enforcement (reference embedding matching)
+    /// Delegates each image to `_fix_faces` sequentially. No parallel processing
+    /// or batch detection is wired — real implementation needs concurrent GPU
+    /// inference and cross-frame consistency enforcement.
     pub(crate) fn _batch_fix_faces(
         &mut self,
         image_paths: &[String],

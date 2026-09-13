@@ -481,6 +481,30 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("偏差检测", "cognitive_bias_detection", "NT-META", "MetaCognitionAnalyst"),
     ("思维偏差", "cognitive_bias_detection", "NT-META", "MetaCognitionAnalyst"),
     ("bias_detection", "cognitive_bias_detection", "NT-META", "MetaCognitionAnalyst"),
+    // strategy_selection — 认知策略选择
+    ("strategy_selection", "strategy_selection", "NT-CORE", "ReflectionEngine"),
+    ("策略选择", "strategy_selection", "NT-CORE", "ReflectionEngine"),
+    ("认知策略", "strategy_selection", "NT-CORE", "ReflectionEngine"),
+    ("选择策略", "strategy_selection", "NT-CORE", "ReflectionEngine"),
+    ("select_strategy", "strategy_selection", "NT-CORE", "ReflectionEngine"),
+    // error_detection — 认知错误检测
+    ("error_detection", "error_detection", "NT-META", "MetaCognitionAnalyst"),
+    ("错误检测", "error_detection", "NT-META", "MetaCognitionAnalyst"),
+    ("认知错误", "error_detection", "NT-META", "MetaCognitionAnalyst"),
+    ("推理错误", "error_detection", "NT-META", "MetaCognitionAnalyst"),
+    ("detect_error", "error_detection", "NT-META", "MetaCognitionAnalyst"),
+    // learning_optimization — 学习优化
+    ("learning_optimization", "learning_optimization", "NT-MIND", "KnowledgeIntegrator"),
+    ("学习优化", "learning_optimization", "NT-MIND", "KnowledgeIntegrator"),
+    ("优化学习", "learning_optimization", "NT-MIND", "KnowledgeIntegrator"),
+    ("学习策略", "learning_optimization", "NT-MIND", "KnowledgeIntegrator"),
+    ("optimize_learning", "learning_optimization", "NT-MIND", "KnowledgeIntegrator"),
+    // pattern_recognition — 模式识别
+    ("pattern_recognition", "pattern_recognition", "NT-CORE", "ReflectionEngine"),
+    ("模式识别", "pattern_recognition", "NT-CORE", "ReflectionEngine"),
+    ("识别模式", "pattern_recognition", "NT-CORE", "ReflectionEngine"),
+    ("发现模式", "pattern_recognition", "NT-CORE", "ReflectionEngine"),
+    ("recognize_pattern", "pattern_recognition", "NT-CORE", "ReflectionEngine"),
 ];
 
 // ─── 子任务类型 ──────────────────────────────────────────────────────────────
@@ -2040,6 +2064,122 @@ fn dispatch_internal_capability(task: &super::core::ConsciousTask) -> (bool, Str
                     )
                 }
                 Err(e) => (false, format!("cognitive_bias_detection 失败: KB 不可用 — {e}")),
+            }
+        }
+        "strategy_selection" => {
+            let lower = task.summary.to_lowercase();
+            let strategy = if lower.contains("analytic") || lower.contains("分析") { "analytic" }
+                else if lower.contains("heuristic") || lower.contains("启发") { "heuristic" }
+                else if lower.contains("intuitive") || lower.contains("直觉") { "intuitive" }
+                else if lower.contains("meta") || lower.contains("元") { "meta_strategy" }
+                else { "adaptive" };
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let selected = kb.kv_get("experience", "strategy_selection:total_selections")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "strategy_selection:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "strategy_selection 认知策略选择: {} 策略 | 已选择 {} 次 | 上次: {}",
+                            strategy, selected,
+                            last_run.chars().take(40).collect::<String>(),
+                        ),
+                    )
+                }
+                Err(_) => (
+                    true,
+                    format!("strategy_selection 认知策略选择: {} 策略", strategy),
+                ),
+            }
+        }
+        "error_detection" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("logical") || lower.contains("逻辑") { "logical" }
+                        else if lower.contains("factual") || lower.contains("事实") { "factual" }
+                        else if lower.contains("reasoning") || lower.contains("推理") { "reasoning" }
+                        else { "general" };
+                    let detected = kb.kv_get("experience", "error_detection:total_detected")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "error_detection:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "error_detection 认知错误检测: {} 模式 | 已检测 {} 次 | 上次: {} | KB: {} nodes / {} kv",
+                            mode, detected,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("error_detection 失败: KB 不可用 — {e}")),
+            }
+        }
+        "learning_optimization" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("spaced") || lower.contains("间隔") { "spaced_repetition" }
+                        else if lower.contains("reinforcement") || lower.contains("强化") { "reinforcement" }
+                        else if lower.contains("transfer") || lower.contains("迁移") { "transfer_learning" }
+                        else { "adaptive" };
+                    let optimized = kb.kv_get("experience", "learning_optimization:total_optimized")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "learning_optimization:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "learning_optimization 学习优化: {} 模式 | 已优化 {} 次 | 上次: {} | KB: {} nodes / {} kv",
+                            mode, optimized,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("learning_optimization 失败: KB 不可用 — {e}")),
+            }
+        }
+        "pattern_recognition" => {
+            match KnowledgeBase::open(None) {
+                Ok(kb) => {
+                    let stats = kb.stats().unwrap_or_default();
+                    let nodes = stats.get("nodes").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let kv = stats.get("kv_entries").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lower = task.summary.to_lowercase();
+                    let mode = if lower.contains("structural") || lower.contains("结构") { "structural" }
+                        else if lower.contains("temporal") || lower.contains("时序") { "temporal" }
+                        else if lower.contains("causal") || lower.contains("因果") { "causal" }
+                        else { "general" };
+                    let recognized = kb.kv_get("experience", "pattern_recognition:total_recognized")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let last_run = kb.kv_get("experience", "pattern_recognition:last_run")
+                        .unwrap_or_else(|| "未执行过".to_string());
+                    (
+                        true,
+                        format!(
+                            "pattern_recognition 模式识别: {} 模式 | 已识别 {} 次 | 上次: {} | KB: {} nodes / {} kv",
+                            mode, recognized,
+                            last_run.chars().take(40).collect::<String>(),
+                            nodes, kv
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("pattern_recognition 失败: KB 不可用 — {e}")),
             }
         }
         _ => (

@@ -213,12 +213,11 @@ impl _SEALPipelineEnhanced {
 
     /// Execute a complete SEAL cycle: explore → distill → self-test → absorb.
     ///
-    /// STUB: All four stages return `Err("not wired")` — no real backends connected.
-    /// Real implementation needs:
-    /// - Exploration: LLM/research API to generate exploration candidates
-    /// - Distillation: LLM to extract verified knowledge from candidates
-    /// - Absorption: KB write path to persist verified knowledge
-    /// - Failure pattern deduplication (currently creates duplicate entries)
+    /// Execute a complete SEAL cycle: explore → distill → self-test → absorb.
+    ///
+    /// Each stage records honest failure patterns when backends are not wired.
+    /// No fabricated success — callers can inspect `failures` to determine
+    /// which stages actually produced results.
     pub(crate) fn _execute_cycle(&mut self, task: &str, context: &serde_json::Value) -> _SEALResult {
         let cycle_id = uuid::Uuid::new_v4().to_string();
         let mut stages_completed = Vec::new();

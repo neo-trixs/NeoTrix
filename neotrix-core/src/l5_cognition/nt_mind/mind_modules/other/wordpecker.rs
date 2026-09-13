@@ -112,13 +112,13 @@ mod tests {
 
     #[test]
     fn test_selftest_pass() {
-        // ALWAYS-PASS: self_test() is a C0 stub that always returns Ok. This test
-        // documents the SelfTest contract (type exists, constructor works) but does
-        // NOT validate real NLP behavior. The test passes on every machine.
+        // ALWAYS-PASS: self_test() is a C0 stub that always returns Ok — it
+        // validates the type exists, not real NLP behavior. This test documents
+        // the SelfTest contract but does NOT validate real NLP quality.
         // TODO(R-P79): Replace with integration test that validates real NLP behavior:
         //   - tokenize() handles edge cases (empty string, unicode, emoji)
         //   - extract_entities() finds real proper nouns in mixed-language text
-        //   - self_test() returns Err when NLP pipeline is not wired
+        //   - self_test() returns Err when NLP pipeline is not wired to real models
         let p = _WordPeckerNlp::new();
         assert!(p.self_test().is_ok());
     }

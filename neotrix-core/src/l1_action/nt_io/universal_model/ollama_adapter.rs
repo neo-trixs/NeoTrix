@@ -95,10 +95,20 @@ impl UniversalModel for OllamaUniversal {
         self.inner.complete(request).await
     }
 
-    /// STUB: Returns default health. Real implementation should call `ollama ps`
-    /// to check running models and track local inference latency.
+    /// Returns health status for the Ollama adapter.
+    ///
+    /// Currently returns an unavailable state since no live probe is wired.
+    /// Real implementation should call `ollama ps` to check running models
+    /// and track local inference latency.
     fn health(&self) -> ModelHealth {
-        ModelHealth::default()
+        ModelHealth {
+            available: false,
+            latency_ms: None,
+            error_rate: 1.0,
+            last_success: None,
+            circuit_breaker_open: true,
+            message: Some("Health probe not wired — requires `ollama ps` integration".into()),
+        }
     }
 
     fn capabilities(&self) -> ModelCapabilities {

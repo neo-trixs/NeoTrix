@@ -190,32 +190,30 @@ impl _ResearchAutomationEngine {
 
     /// 生成假设
     ///
-    /// STUB: Returns hardcoded hypothesis structure. Real implementation needs:
-    /// - LLM-based hypothesis generation from topic and context
-    /// - Variable identification from research domain
-    /// - Confidence scoring based on literature support
-    /// - Hypothesis deduplication against existing hypotheses
+    /// Returns a placeholder hypothesis — LLM-based generation is not wired.
+    /// Callers should not treat the returned hypothesis as substantiated by
+    /// literature or domain analysis.
     pub(crate) fn _generate_hypothesis(&mut self, topic: &str, context: &str) -> Hypothesis {
         let hypothesis = Hypothesis {
             id: uuid::Uuid::new_v4().to_string(),
-            statement: format!("Hypothesis about: {}", topic),
-            rationale: format!("Based on context: {}", context),
+            statement: format!("Hypothesis about: {} (not wired — requires LLM generation)", topic),
+            rationale: format!("Based on context: {} (placeholder — no real analysis)", context),
             variables: vec![
                 Variable {
                     name: "independent_variable".into(),
                     var_type: "continuous".into(),
-                    description: "The variable being manipulated".into(),
-                    measurement_unit: Some("units".into()),
+                    description: "Placeholder — requires LLM-based variable identification".into(),
+                    measurement_unit: None,
                 },
                 Variable {
                     name: "dependent_variable".into(),
                     var_type: "continuous".into(),
-                    description: "The variable being measured".into(),
-                    measurement_unit: Some("units".into()),
+                    description: "Placeholder — requires LLM-based variable identification".into(),
+                    measurement_unit: None,
                 },
             ],
-            predicted_outcome: "Positive correlation expected".into(),
-            confidence: 0.7,
+            predicted_outcome: "Not wired — requires LLM-based prediction".into(),
+            confidence: 0.0,
             status: HypothesisStatus::Proposed,
         };
 
@@ -226,11 +224,9 @@ impl _ResearchAutomationEngine {
 
     /// 设计实验
     ///
-    /// STUB: Returns hardcoded experiment design. Real implementation needs:
-    /// - LLM-based experimental design from hypothesis
-    /// - Sample size calculation based on effect size and power
-    /// - Control group selection and randomization strategy
-    /// - Material and procedure generation from domain knowledge
+    /// Returns a placeholder experiment design — LLM-based design is not wired.
+    /// Callers should not treat the returned design as scientifically valid or
+    /// suitable for real experimentation.
     pub(crate) fn _design_experiment(&mut self, hypothesis_id: &str) -> Option<Experiment> {
         let hypothesis = self.hypotheses.iter().find(|h| h.id == hypothesis_id)?;
 
@@ -238,39 +234,14 @@ impl _ResearchAutomationEngine {
             id: uuid::Uuid::new_v4().to_string(),
             hypothesis_id: hypothesis_id.to_string(),
             design: ExperimentDesign {
-                design_type: "randomized_controlled".into(),
-                sample_size: 100,
-                control_group: true,
-                randomization: true,
-                blinding: Some("single-blind".into()),
+                design_type: "placeholder".into(),
+                sample_size: 0,
+                control_group: false,
+                randomization: false,
+                blinding: None,
                 variables: hypothesis.variables.clone(),
             },
-            procedure: vec![
-                _ProcedureStep {
-                    step_number: 1,
-                    description: "Prepare materials and setup".into(),
-                    duration: Some("30 minutes".into()),
-                    materials: vec!["Equipment A".into(), "Software B".into()],
-                },
-                _ProcedureStep {
-                    step_number: 2,
-                    description: "Collect baseline measurements".into(),
-                    duration: Some("1 hour".into()),
-                    materials: vec!["Measurement tool".into()],
-                },
-                _ProcedureStep {
-                    step_number: 3,
-                    description: "Apply treatment".into(),
-                    duration: Some("2 hours".into()),
-                    materials: vec!["Treatment material".into()],
-                },
-                _ProcedureStep {
-                    step_number: 4,
-                    description: "Collect post-treatment measurements".into(),
-                    duration: Some("1 hour".into()),
-                    materials: vec!["Measurement tool".into()],
-                },
-            ],
+            procedure: vec![],
             status: _ExperimentStatus::Designed,
             start_date: None,
             end_date: None,
@@ -282,30 +253,27 @@ impl _ResearchAutomationEngine {
 
     /// 分析结果
     ///
-    /// STUB: Returns hardcoded statistical analysis. Real implementation needs:
-    /// - Actual statistical tests (t-test, ANOVA, chi-square) based on data type
-    /// - Effect size calculation (Cohen's d, eta-squared)
-    /// - Confidence interval computation
-    /// - Multiple comparison correction (Bonferroni, FDR)
+    /// Returns a placeholder analysis — no real statistical tests are wired.
+    /// Callers should not treat p_value, effect_size, or confidence as
+    /// computed from actual data.
     pub fn analyze_results(&mut self, experiment_id: &str, data: HashMap<String, serde_json::Value>) -> Option<ExperimentResult> {
         let _experiment = self.experiments.iter().find(|e| e.id == experiment_id)?;
 
-        // 简化版: 模拟统计分析
         let statistical_analysis = Some(_StatisticalAnalysis {
-            test_type: "t-test".into(),
-            p_value: 0.03,
-            effect_size: Some(0.5),
-            confidence_interval: Some((0.1, 0.9)),
-            significance: true,
+            test_type: "placeholder".into(),
+            p_value: 1.0,
+            effect_size: None,
+            confidence_interval: None,
+            significance: false,
         });
 
         let result = ExperimentResult {
             experiment_id: experiment_id.to_string(),
             data,
             statistical_analysis,
-            conclusion: "Results support the hypothesis".into(),
-            supports_hypothesis: true,
-            confidence: 0.85,
+            conclusion: "Not wired — requires real statistical analysis (t-test/ANOVA/chi-square)".into(),
+            supports_hypothesis: false,
+            confidence: 0.0,
         };
 
         self.results.push(result.clone());
@@ -315,11 +283,8 @@ impl _ResearchAutomationEngine {
 
     /// 生成论文草稿
     ///
-    /// STUB: Returns hardcoded paper structure. Real implementation needs:
-    /// - LLM-based section generation from experiment results
-    /// - Citation management and reference formatting
-    /// - Figure/table generation from data
-    /// - LaTeX/Markdown export with proper formatting
+    /// Returns a placeholder paper draft — LLM-based section generation is not wired.
+    /// Callers should not treat the returned content as scientifically valid writing.
     pub(crate) fn _generate_paper(&mut self, experiment_id: &str) -> Option<_PaperDraft> {
         if !self.config.auto_paper_generation {
             return None;

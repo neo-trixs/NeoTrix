@@ -94,10 +94,20 @@ impl UniversalModel for AnthropicUniversal {
         self.inner.complete(request).await
     }
 
-    /// STUB: Returns default health. Real implementation should probe Anthropic's
-    /// /v1/messages endpoint and track latency/error rate for circuit breaker.
+    /// Returns health status for the Anthropic adapter.
+    ///
+    /// Currently returns an unavailable state since no live probe is wired.
+    /// Real implementation should call `/v1/messages` endpoint and track
+    /// latency/error rate for the circuit breaker.
     fn health(&self) -> ModelHealth {
-        ModelHealth::default()
+        ModelHealth {
+            available: false,
+            latency_ms: None,
+            error_rate: 1.0,
+            last_success: None,
+            circuit_breaker_open: true,
+            message: Some("Health probe not wired — requires /v1/messages endpoint check".into()),
+        }
     }
 
     fn capabilities(&self) -> ModelCapabilities {

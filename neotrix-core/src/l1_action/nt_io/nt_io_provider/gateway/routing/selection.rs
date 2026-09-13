@@ -546,14 +546,19 @@ impl GatewayV2 {
     /// `{provider}/{model_id}` or bare `{provider}` format).
     /// Sync version (async version: `resolve_default_model`, prefers llm7/codestral-latest).
     ///
-    /// Note: Real implementation needs — falls back to literal "default" string if no
-    /// providers registered. Consider: returning a Result with a clear error when the
-    /// pool is empty, rather than a magic string.
+    /// Resolve the default model from the provider pool.
+    ///
+    /// Returns the first candidate from the pool, or an error string if the pool
+    /// is empty. Callers should check for the empty-pool case rather than
+    /// treating "default" as a valid model identifier.
     pub fn resolve_default_model_sync(&self) -> String {
         let chain = self.build_candidate_chain("", 3);
         chain
             .first()
             .cloned()
-            .unwrap_or_else(|| "default".to_string())
+            .unwrap_or_else(|| {
+                tracing::warn!("No providers registered in pool — returning empty default model");
+                String::new()
+            })
     }
 }

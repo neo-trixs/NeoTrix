@@ -232,8 +232,16 @@ pub mod team {
         pub fn add_agent(&mut self, _role: AgentRole) {
             self.agents.push(_role.name);
         }
+        /// Execute a task across all agents in the team.
+        ///
+        /// Returns an error result per agent — no real execution is wired yet.
+        /// Callers should not treat `success: true` as evidence of task completion.
         pub fn execute(&self, _task: &str) -> Vec<AgentResult> {
-            vec![AgentResult { agent_name: "stub".into(), success: true, output: String::new() }]
+            self.agents.iter().map(|name| AgentResult {
+                agent_name: name.clone(),
+                success: false,
+                output: format!("Agent '{}' execution not wired — requires agent runtime integration", name),
+            }).collect()
         }
     }
 

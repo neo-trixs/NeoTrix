@@ -747,6 +747,12 @@ impl GatewayV2 {
         Err(LlmError::Unknown("Aggressive retry exhausted — all providers failed".to_string()))
     }
 
+    /// Execute a streaming LLM call with automatic provider selection and fallback.
+    ///
+    /// Note: Real implementation needs — similar to `complete_with_selection` but returns
+    /// a channel receiver for streaming responses. Consider: adding timeout per chunk,
+    /// stream error recovery (reconnect on dropped chunks), and backpressure handling
+    /// when the receiver is slow to consume.
     pub async fn stream_complete_with_selection(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         self.ensure_pool_sufficient(3, 60).await;
         if self.cost_budget_per_query > 0.0 {
@@ -798,6 +804,12 @@ impl GatewayV2 {
         self.attempt_aggressive_retry_stream(request).await
     }
 
+    /// Execute a single streaming LLM call to a named provider.
+    ///
+    /// Note: Real implementation needs — strips provider prefix from model name,
+    /// applies egress privacy guard, then delegates to provider's `stream_complete`.
+    /// Consider: adding streaming-specific middleware hooks, chunk-level telemetry,
+    /// and stream cancellation support.
     async fn call_provider_stream(&self, name: &str, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let provider = self.providers.read().unwrap_or_else(|e| e.into_inner()).get(name).cloned()
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;

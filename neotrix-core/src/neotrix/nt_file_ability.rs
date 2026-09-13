@@ -347,7 +347,7 @@ mod tests {
     #[allow(deprecated)]
     fn test_xlsx_sheet_index_boundaries() {
         let path = xlsx_fixture();
-        let ab = FileAbility::open(&path).unwrap();
+        let ab = FileAbility::open(&path).expect("open xlsx boundary test");
         // 0-based / 越界索引报错
         assert!(matches!(
             ab.xlsx_sheet(0),
@@ -378,10 +378,10 @@ mod tests {
     #[test]
     fn test_open_text_file() {
         let dir = std::env::temp_dir().join("nt_file_ability_test");
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         let path = dir.join("hello.rs");
-        std::fs::write(&path, "fn main() { println!(\"hi\"); }").unwrap();
-        let ab = FileAbility::open(&path).unwrap();
+        std::fs::write(&path, "fn main() { println!(\"hi\"); }").expect("write test file");
+        let ab = FileAbility::open(&path).expect("open text file");
         assert_eq!(ab.kind(), FileKind::Text);
         assert!(ab.plain_text().contains("main"));
         std::fs::remove_file(&path).ok();
@@ -407,9 +407,9 @@ mod tests {
                 vec!["闸阀".to_string(), "128".to_string(), "12.5kg".to_string()],
             ],
         };
-        write_xlsx_table(&path, &t).unwrap();
+        write_xlsx_table(&path, &t).expect("write xlsx");
         // 回读校验
-        let back = read_xlsx_table(&path).unwrap();
+        let back = read_xlsx_table(&path).expect("read xlsx");
         assert_eq!(back.headers, vec!["品名", "单价", "单重(Kg)"]);
         assert_eq!(back.row_count(), 2);
         assert_eq!(back.cell(0, "品名"), Some("蝶阀"));
@@ -429,8 +429,8 @@ mod tests {
                 vec!["闸阀,带逗号".to_string(), "128".to_string()],
             ],
         };
-        write_csv(&path, &t, ',', true).unwrap();
-        let back = read_csv(&path).unwrap();
+        write_csv(&path, &t, ',', true).expect("write csv");
+        let back = read_csv(&path).expect("read csv");
         assert_eq!(back.headers, vec!["品名", "单价"]);
         assert_eq!(back.row_count(), 2);
         // 引号包裹字段正确还原
@@ -444,7 +444,7 @@ mod tests {
         // calamine 多 sheet 全遍历 (E13): 每 sheet 独立表头 = 首个非空行。
         // 锁定 read_xlsx_sheets_all 契约: sheet 数 / 表头 / 数据行。
         let path = xlsx_fixture();
-        let tables = read_xlsx_sheets_all(&path).unwrap();
+        let tables = read_xlsx_sheets_all(&path).expect("read xlsx sheets");
         assert_eq!(tables.len(), 2, "应读出全部 2 个 sheet");
         let s1 = &tables[0];
         assert_eq!(s1.name, "Sheet1");
@@ -494,7 +494,7 @@ mod tests {
         // 只保留首行, 第二 sheet 重复行计入 dedup_rows。
         let dir = test_dir();
         let src = dir.join("dedup_src");
-        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&src).expect("create merge test dir");
         use office_oxide::xlsx::write::{CellData, XlsxWriter};
         let mut xw = XlsxWriter::new();
         let s1 = xw.add_sheet_get_index("Sheet1");
@@ -505,7 +505,7 @@ mod tests {
             xw.sheet_set_cell(s, 1, 0, CellData::String("蝶阀".into()));
             xw.sheet_set_cell(s, 1, 1, CellData::Number(100.0));
         }
-        xw.save(src.join("供应商甲.xlsx")).unwrap();
+        xw.save(src.join("供应商甲.xlsx")).expect("save xlsx");
 
         let schema = MergeSchema {
             name: "去重测试",
@@ -523,14 +523,14 @@ mod tests {
         column_types: &[],
         };
         let out = dir.join("dedup_out.xlsx");
-        let report = merge_tables_with(&schema, &src, &out).unwrap();
+        let report = merge_tables_with(&schema, &src, &out).expect("merge tables");
         // 两 sheet 各 1 数据行, 去重键相同 → 只保留 1 行
         assert_eq!(report.total_rows, 1);
         assert_eq!(report.usd_rows, 1);
         assert_eq!(report.dedup_rows.as_ref().map(|v| v.len()), Some(1));
         assert!(report.dedup_rows.unwrap()[0].contains("Sheet2"));
         // 输出回读验证行数
-        let back = read_xlsx_table(&out).unwrap();
+        let back = read_xlsx_table(&out).expect("read merged xlsx");
         assert_eq!(back.row_count(), 1);
         assert_eq!(back.cell(0, "品名"), Some("蝶阀"));
         std::fs::remove_dir_all(&src).ok();
@@ -563,7 +563,7 @@ mod tests {
     fn test_p3_suggest_schema_deterministic_and_llm() {
         // 临时目录: 一个 xlsx, 表头混合命中/未命中标准列
         let dir = std::env::temp_dir().join(format!("nt_suggest_schema_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         let table = TableData {
             name: "Sheet1".to_string(),
             headers: vec![
@@ -579,10 +579,10 @@ mod tests {
                 "?".to_string(),
             ]],
         };
-        write_xlsx_table(dir.join("甲价格表.xlsx"), &table).unwrap();
+        write_xlsx_table(dir.join("甲价格表.xlsx"), &table).expect("write xlsx");
 
         // 确定性路径 (无 LLM): 命中 3 标准列, 未命中 1
-        let s = suggest_schema(&dir, None).unwrap();
+        let s = suggest_schema(&dir, None).expect("suggest schema");
         assert!(s.matched.contains_key("产品型号"));
         assert!(s.matched.contains_key("阀体材质"));
         assert!(s.matched.contains_key("单重(Kg)"));
@@ -594,7 +594,7 @@ mod tests {
         let s = suggest_schema(&dir, Some(&|_prompt: &str| {
             Some("完全未知列A → 产品大类\n完全未知列A → 不存在的列\n".to_string())
         }))
-        .unwrap();
+        .expect("suggest schema with LLM");
         assert!(s.llm_enhanced);
         assert_eq!(s.suggested_variants.get("产品大类").map(|v| v.len()), Some(1));
         // 非法目标被过滤
@@ -644,7 +644,7 @@ mod tests {
     #[test]
     fn test_d4_schema_validate() {
         // 合法 schema 通过
-        PRICE_TABLE_SCHEMA.validate().unwrap();
+        PRICE_TABLE_SCHEMA.validate().expect("valid schema");
         // value_columns 必须是标准列
         let bad = MergeSchema {
             name: "bad",
@@ -703,14 +703,14 @@ mod tests {
         // 通用引擎零领域知识验证: 自定义 schema + 变体列
         let dir = test_dir();
         let src = dir.join("merge_generic_src");
-        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&src).expect("create merge test dir");
         // 源表1: 使用变体列名 + 无供应商列 (由文件名推导)
         let t1 = TableData {
             name: "s1".into(),
             headers: vec!["品名".to_string(), "价格".to_string(), "重量".to_string()],
             rows: vec![vec!["A阀".to_string(), "100".to_string(), "2.5".to_string()]],
         };
-        write_xlsx_table(src.join("1、华北阀门_目录-第一版.xlsx"), &t1).unwrap();
+        write_xlsx_table(src.join("1、华北阀门_目录-第一版.xlsx"), &t1).expect("write xlsx t1");
         // 源表2: 使用标准列名 + 显式供应商
         let t2 = TableData {
             name: "s2".into(),
@@ -727,7 +727,7 @@ mod tests {
                 "华南阀门".to_string(),
             ]],
         };
-        write_xlsx_table(src.join("2、华东阀门_目录.xlsx"), &t2).unwrap();
+        write_xlsx_table(src.join("2、华东阀门_目录.xlsx"), &t2).expect("write xlsx t2");
 
         let schema = MergeSchema {
             name: "测试目录",
@@ -753,7 +753,7 @@ mod tests {
         column_types: &[],
         };
         let out = dir.join("merge_generic_out.xlsx");
-        let report = merge_tables_with(&schema, &src, &out).unwrap();
+        let report = merge_tables_with(&schema, &src, &out).expect("merge tables");
         assert_eq!(report.files_processed, 2);
         assert_eq!(report.total_rows, 2);
         assert_eq!(report.usd_rows, 2); // 两行都有单价
@@ -781,7 +781,7 @@ mod tests {
         // 多 sheet 全遍历 (E13) + 同文件内跨 sheet 去重 (E14), 跨文件不去重
         let dir = test_dir();
         let src = dir.join("merge_multisheet_src");
-        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&src).expect("create merge test dir");
         // 单文件双 sheet: sheet1 有 2 行, sheet2 有 1 行独立 + 1 行与 sheet1 重复
         // 需用 XlsxWriter 写双 sheet
         {
@@ -840,7 +840,7 @@ mod tests {
             column_types: &[],
         };
         let out = dir.join("merge_multisheet_out.xlsx");
-        let report = merge_tables_with(&schema, &src, &out).unwrap();
+        let report = merge_tables_with(&schema, &src, &out).expect("merge tables");
         // 全遍历 4 行, 同文件去重 1 行 (副表 B阀/DN65), 剩 3 行;
         // 文件2 D阀 同 key [DN65,200] 跨文件不去重 → 总计 4 行
         assert_eq!(report.files_processed, 2);
@@ -850,8 +850,8 @@ mod tests {
         assert!(dedup[0].contains("多sheet厂_目录.xlsx::副表"), "去重行来源应为副表: {dedup:?}");
         assert_eq!(report.usd_rows, 4);
 
-        let merged = read_xlsx_sheets_all(&out).unwrap();
-        let m = merged.first().unwrap();
+        let merged = read_xlsx_sheets_all(&out).expect("read merged xlsx sheets");
+        let m = merged.first().expect("first sheet");
         assert_eq!(m.rows.len(), 4);
         // 主表两行 + 副表独立 C阀 + 异厂 D阀 (同 key 跨文件保留)
         let lines: Vec<String> = m.rows.iter().map(|r| r[..3].join("|")).collect();
@@ -872,7 +872,7 @@ mod tests {
         // 输出数据校验: Numeric 列非数值值 → validation_warnings; 千分位/单位后缀可解析
         let dir = test_dir();
         let src = dir.join("merge_validate_src");
-        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&src).expect("create merge test dir");
         let t1 = TableData {
             name: "Sheet1".into(),
             headers: vec![
@@ -906,7 +906,7 @@ mod tests {
             ],
         };
         let out = dir.join("merge_validate_out.xlsx");
-        let report = merge_tables_with(&schema, &src, &out).unwrap();
+        let report = merge_tables_with(&schema, &src, &out).expect("merge tables");
         assert_eq!(report.total_rows, 3);
         // 非数值: B阀单价 "N/A", C阀单重 "abc" → 2 条警告; "1,200" 与 "2.5kg" 可解析不告警
         assert_eq!(report.validation_warnings.len(), 2, "{:?}", report.validation_warnings);
@@ -980,7 +980,7 @@ mod tests {
     fn test_d4_consolidate_tables() {
         let dir = test_dir();
         let src = dir.join("consolidate_src");
-        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&src).expect("create merge test dir");
         // 两个 CSV 供应商文件, 列名变体不同
         let t1 = TableData {
             name: "a".to_string(),
@@ -1007,7 +1007,7 @@ mod tests {
         assert!(report.usd_rows >= 1, "应检测到 USD 报价行");
         assert!(out.exists());
         // 回读验证归一化 + 供应商名 + 单重单位
-        let back = read_xlsx_table(&out).unwrap();
+        let back = read_xlsx_table(&out).expect("read merged xlsx");
         assert!(back.headers.iter().any(|h| h == "阀体材质"), "列名应归一化为标准列");
         assert!(back.headers.iter().any(|h| h == "供应商名称"));
         let suppliers: Vec<String> = (0..back.row_count())
@@ -1091,7 +1091,7 @@ mod tests {
         assert!(report.files_processed >= 20, "应合并多数供应商文件");
         assert!(report.total_rows > 1000);
         assert!(out.exists());
-        let back = read_xlsx_table(&out).unwrap();
+        let back = read_xlsx_table(&out).expect("read merged xlsx");
         assert!(back.headers.iter().any(|h| h == "阀体材质"), "材质列应归一化");
         let usd_rates = (0..back.row_count())
             .map(|i| back.cell(i, "美元报价(USD)").unwrap_or(""))
@@ -1115,7 +1115,7 @@ mod tests {
     #[test]
     fn test_open_image_metadata() {
         let dir = std::env::temp_dir().join("nt_file_ability_test");
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         let path = dir.join("pixel.png");
         let img = image::RgbaImage::from_pixel(2, 3, image::Rgba([255, 0, 0, 255]));
         img.save(&path).unwrap();
@@ -1134,7 +1134,7 @@ mod tests {
     fn test_convert_image_formats() {
         // 横向推广: FileKind::Image 写缺口 — png→jpg, jpg→png, 重编码
         let dir = std::env::temp_dir().join("nt_file_ability_test");
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         let src = dir.join("src_pixel.png");
         let img = image::RgbaImage::from_pixel(4, 5, image::Rgba([10, 20, 30, 255]));
         img.save(&src).unwrap();
@@ -1182,7 +1182,7 @@ mod tests {
         // 横向推广: 目录级统一提取 (FileKind×读 统一入口)
         let dir = std::env::temp_dir().join("nt_extract_dir_test");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         // xlsx
         let t = TableData {
             name: "s".into(),
@@ -1291,7 +1291,7 @@ mod tests {
     #[test]
     fn test_audio_duration_wav_real_parse() {
         let dir = std::env::temp_dir().join("nt_file_ability_test");
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         let path = dir.join("tone.wav");
         // 构造 1 秒 8kHz 单声道 WAV: 字节率 8000, data 8000 字节
         // 构造 1 秒 8kHz 单声道 WAV: 字节率 8000, data 8000 字节
@@ -1416,7 +1416,7 @@ mod tests {
     #[test]
     fn test_ocr_trait_wiring() {
         let dir = std::env::temp_dir().join("nt_file_ability_test");
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).expect("create test dir");
         let path = dir.join("scan_document.png");
         let img = image::RgbaImage::from_pixel(4, 4, image::Rgba([255, 255, 255, 255]));
         img.save(&path).unwrap();

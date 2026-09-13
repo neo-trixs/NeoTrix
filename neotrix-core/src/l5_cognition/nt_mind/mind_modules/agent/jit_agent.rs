@@ -143,7 +143,11 @@ impl _JITAgentProtocolOrchestrator {
         self.stats.total_protocols += 1;
     }
 
-    /// 执行协议
+    /// Execute a protocol for a given task.
+    ///
+    /// Note: Real implementation needs — executes synchronously without actual module
+    /// invocation. Consider: async execution with timeout, module result aggregation,
+    /// and session state management for long-running protocols.
     pub(crate) fn _execute_protocol(&mut self, protocol_id: &str, task: &str) -> _ProtocolExecutionResult {
         let session_id = uuid::Uuid::new_v4().to_string();
 

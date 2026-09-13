@@ -385,17 +385,9 @@ impl SelfImprovementLoop {
 
     /// Generate improvement plans based on diagnostic results.
     ///
-    /// STUB: Plans are generated from hardcoded templates. Real implementation needs:
-    /// - LLM-based plan generation for novel issues
-    /// - Historical effectiveness tracking (which plans worked before)
-    /// - Cost-benefit analysis for plan prioritization
-    /// - Plan deduplication (avoid regenerating same plan each cycle)
-    ///
-    /// STUB: Plans are generated from hardcoded templates. Real implementation needs:
-    /// - LLM-based plan generation for novel issues
-    /// - Historical effectiveness tracking (which plans worked before)
-    /// - Cost-benefit analysis for plan prioritization
-    /// - Plan deduplication (avoid regenerating same plan each cycle)
+    /// Generates plans from diagnostic issues using template-based action mapping.
+    /// No LLM-based plan generation is wired — callers should not treat plans
+    /// as optimized for cost-benefit or deduplicated against historical plans.
     pub(crate) fn _generate_plans(&mut self, diagnosis: &DiagnosticResult) -> Vec<ImprovementPlan> {
         let mut plans = Vec::new();
 

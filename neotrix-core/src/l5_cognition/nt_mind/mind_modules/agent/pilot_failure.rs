@@ -198,19 +198,18 @@ impl _PILOTFailureDetector {
 
     /// 集成到 SEAL pipeline
     ///
-    /// STUB: Returns hardcoded integration result. Real implementation needs:
-    /// - Actual SEAL pipeline hook registration
-    /// - Phase-specific failure detection configuration
-    /// - Impact scoring based on historical detection accuracy
+    /// Returns an integration descriptor indicating that SEAL wiring is not yet
+    /// connected. Callers should not treat `integrated: true` as evidence of
+    /// live pipeline integration.
     pub(crate) fn _integrate_seal(&self) -> _SEALIntegrationResult {
         _SEALIntegrationResult {
-            integrated: self.config.enable_seal_integration,
+            integrated: false,
             phase: "Phase-0".into(),
-            impact_score: 0.8,
+            impact_score: 0.0,
             recommendations: vec![
-                "将失败模式检测集成到 SEAL pipeline 的 Phase-0 阶段".into(),
-                "在 consciousness tick 中调用失败检测".into(),
-                "在 goal loop 中集成失败预测".into(),
+                "SEAL pipeline integration not wired — requires hook registration".into(),
+                "Wire failure detection to consciousness tick cycle".into(),
+                "Wire failure prediction to goal loop".into(),
             ],
         }
     }

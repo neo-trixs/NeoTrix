@@ -102,8 +102,13 @@ mod tests {
 
     #[test]
     fn test_selftest_pass() {
-        // TODO(R-P79): self_test() is a C0 stub that always returns Ok. Replace with
-        // integration test that validates real critique behavior on actual skill content.
+        // ALWAYS-PASS: self_test() is a C0 stub that always returns Ok — it
+        // validates the type exists, not real critique behavior. This test
+        // documents the SelfTest contract but does NOT test real quality judgment.
+        // TODO(R-P79): Replace with integration test that validates real critique
+        // behavior: _BpcoCritic::critique() should return meaningful scores for
+        // actual skill content, and self_test() should return Err when the critique
+        // pipeline is not wired to real analysis.
         let c = _BpcoCritic::new();
         assert!(c.self_test().is_ok());
     }

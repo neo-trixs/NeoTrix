@@ -236,12 +236,9 @@ impl _VisualConsistencyManager {
     
     /// 批量修复
     ///
-    /// STUB: Delegates each image to `_fix_consistency` sequentially.
-    /// Real implementation needs:
-    /// - Batch element detection (single model pass for all frames)
-    /// - Cross-frame reference embedding propagation
-    /// - Parallel GPU inference with memory budget management
-    /// - Incremental fix: only re-fix frames where consistency dropped below threshold
+    /// Delegates each image to `_fix_consistency` sequentially. No parallel processing
+    /// or batch detection is wired — real implementation needs concurrent GPU
+    /// inference and cross-frame reference embedding propagation.
     pub(crate) fn _batch_fix(
         &mut self,
         image_paths: &[String],
