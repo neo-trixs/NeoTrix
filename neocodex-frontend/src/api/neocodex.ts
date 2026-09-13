@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import * as domain from './domain'
 import type {
@@ -163,16 +162,16 @@ export function sendSideChat(sessionId: string, content: string): Promise<NeoCod
 
 /* ── 提供商 / 模式 ── */
 export function providerConfig(): Promise<ProviderConfig> {
-  return invoke('neocodex_provider_config', {})
+  return domain.call<ProviderConfig>('llamacpp', 'provider_config')
 }
 
 export function setProvider(name: string): Promise<void> {
-  return invoke('neocodex_set_provider', { name })
+  return domain.call<void>('llamacpp', 'set_provider', { name })
 }
 
-/** 连接测试：验证指定提供商是否可达（需后端 neocodex_test_provider 命令）。 */
+/** 连接测试：验证指定提供商是否可达 */
 export function testProvider(name: string): Promise<boolean> {
-  return invoke('neocodex_test_provider', { name })
+  return domain.call<boolean>('llamacpp', 'test_provider', { name })
 }
 
 /* ── 代理池健康度 ── */
@@ -244,8 +243,8 @@ export function probeAllProviders(): Promise<ProbeResult[]> {
 export async function providerTest(baseUrl: string): Promise<{ ok: boolean; status_code: number; latency_ms: number; latencyMs?: number }> {
   const t0 = Date.now()
   try {
-    // 尝试后端真实探测（Rust 侧若未注册该命令会抛错，自动回退到前端探测）
-    const r = await invoke<{ ok: boolean; status_code: number; latency_ms: number }>('neocodex_provider_test', { base_url: baseUrl }).catch(() => null)
+    // 尝试通过 llamacpp 域插件探测
+    const r = await domain.call<{ ok: boolean; status_code: number; latency_ms: number }>('llamacpp', 'provider_test', { base_url: baseUrl }).catch(() => null)
     if (r) return { ...r, latencyMs: r.latency_ms }
   } catch { /* 回退 */ }
   // 前端回退：GET {baseUrl}/models 计时
@@ -262,16 +261,16 @@ export async function providerTest(baseUrl: string): Promise<{ ok: boolean; stat
 
 /** 外部第三方模型 API 智能配置：新增一个自定义提供商（OpenAI 兼容 / 自定义网关）。 */
 export function addCustomProvider(req: CustomProviderReq): Promise<void> {
-  return invoke('neocodex_add_custom_provider', { req })
+  return domain.call<void>('llamacpp', 'add_custom_provider', { req })
 }
 
 /**
  * 智能检测：从 base_url 拉取可用模型列表（GET {base_url}/models，Bearer 鉴权）。
- * 桌面端走 Tauri 命令；浏览器预览无 Tauri 时直连 /models 作为回退（受 CORS 限制）。
+ * 桌面端走域插件；浏览器预览无 Tauri 时直连 /models 作为回退（受 CORS 限制）。
  */
 export async function fetchProviderModels(baseUrl: string, apiKey: string): Promise<string[]> {
   try {
-    return await invoke<string[]>('neocodex_fetch_provider_models', { base_url: baseUrl, api_key: apiKey })
+    return await domain.call<string[]>('llamacpp', 'fetch_provider_models', { base_url: baseUrl, api_key: apiKey })
   } catch {
     try {
       const url = baseUrl.trim().replace(/\/+$/, '') + '/models'
@@ -286,49 +285,49 @@ export async function fetchProviderModels(baseUrl: string, apiKey: string): Prom
 }
 
 export function setMode(mode: string): Promise<void> {
-  return invoke('neocodex_set_mode', { mode })
+  return domain.call<void>('llamacpp', 'set_mode', { mode })
 }
 
 /* ── 项目 / 文件 ── */
 export function setProject(path: string): Promise<void> {
-  return invoke('neocodex_set_project', { path })
+  return domain.call<void>('session', 'set_project', { path })
 }
 
 export function getProject(): Promise<string | null> {
-  return invoke('neocodex_get_project', {})
+  return domain.call<string | null>('session', 'get_project')
 }
 
 export function initProject(sessionId: string): Promise<void> {
-  return invoke('neocodex_init_project', { session_id: sessionId })
+  return domain.call<void>('session', 'init_project', { session_id: sessionId })
 }
 
 export function searchFiles(query: string): Promise<string[]> {
-  return invoke('neocodex_search_files', { query })
+  return domain.call<string[]>('llamacpp', 'search_files', { query })
 }
 
 export function projectTree(): Promise<ProjectView> {
-  return invoke('neocodex_project_tree', {})
+  return domain.call<ProjectView>('file', 'project_tree')
 }
 
 export function openFile(path: string): Promise<void> {
-  return invoke('neocodex_open_file', { path })
+  return domain.call<void>('file', 'open_file', { path })
 }
 
 export function openExternal(path: string): Promise<void> {
-  return invoke('neocodex_open_external', { path })
+  return domain.call<void>('file', 'open_external', { path })
 }
 
 export function fileOperation(op: string, path: string, newName?: string): Promise<void> {
-  return invoke('neocodex_file_operation', { op, path, new_name: newName ?? null })
+  return domain.call<void>('file', 'file_operation', { op, path, new_name: newName ?? null })
 }
 
 /* ── Git ── */
 export function gitStatus(): Promise<GitStatus | null> {
-  return invoke('neocodex_git_status', {})
+  return domain.call<GitStatus | null>('file', 'git_status')
 }
 
 export function getDiff(): Promise<GitDiffResponse> {
-  return invoke('neocodex_get_diff', {})
+  return domain.call<GitDiffResponse>('file', 'get_diff')
 }
 
 export interface GitDiffFile {
@@ -341,89 +340,89 @@ export interface GitDiffResponse {
 }
 
 export function applyDiff(path: string, action: string): Promise<void> {
-  return invoke('neocodex_apply_diff', { path, action })
+  return domain.call<void>('file', 'apply_diff', { path, action })
 }
 
 /** 提交已暂存内容（对应面板 accept = git add 后的 commit）。 */
 export function gitCommit(message: string): Promise<void> {
-  return invoke('neocodex_git_commit', { message })
+  return domain.call<void>('file', 'git_commit', { message })
 }
 
 /** 推送当前分支到远程，返回远程输出摘要（无上游时错误内含提示）。 */
 export function gitPush(): Promise<string> {
-  return invoke('neocodex_git_push', {})
+  return domain.call<string>('file', 'git_push')
 }
 
 /** 列出本地分支（short ref names，如 main）。 */
 export function listBranches(): Promise<string[]> {
-  return invoke('neocodex_git_branch', {})
+  return domain.call<string[]>('file', 'git_branch')
 }
 
 /** 返回当前已暂存文件列表（git diff --cached --name-only）。 */
 export function gitStagedFiles(): Promise<string[]> {
-  return invoke('neocodex_git_staged_files', {})
+  return domain.call<string[]>('file', 'git_staged_files')
 }
 
 /** 切换分支（git checkout），返回切换后的分支名。 */
 export function gitCheckout(branch: string): Promise<string> {
-  return invoke('neocodex_git_checkout', { branch })
+  return domain.call<string>('file', 'git_checkout', { branch })
 }
 
 /* ── 检查点 ── */
 export function checkpointList(sessionId: string): Promise<Checkpoint[]> {
-  return invoke('neocodex_checkpoint_list', { session_id: sessionId })
+  return domain.call<Checkpoint[]>('session', 'checkpoint_list', { session_id: sessionId })
 }
 
 export function checkpointRestore(sessionId: string, checkpointId: string): Promise<NeoCodexMessageItem[]> {
-  return invoke('neocodex_checkpoint_restore', { session_id: sessionId, checkpoint_id: checkpointId })
+  return domain.call<NeoCodexMessageItem[]>('session', 'checkpoint_restore', { session_id: sessionId, checkpoint_id: checkpointId })
 }
 
 /* ── 健康 / 状态 / 版本 ── */
 export function healthReport(): Promise<HealthReport> {
-  return invoke('neocodex_health_report', {})
+  return domain.call<HealthReport>('llamacpp', 'health_report')
 }
 
 export function agentStatus(): Promise<AgentStatus> {
-  return invoke('neocodex_agent_status', {})
+  return domain.call<AgentStatus>('agent', 'status')
 }
 
 export function appVersion(): Promise<string> {
-  return invoke('neocodex_app_version', {})
+  return domain.call<string>('llamacpp', 'app_version')
 }
 
 /* ── 更新（热更新；进度经 Tauri event 推送，见 api/system.ts listenUpdateEvents） ── */
 export function checkUpdate(): Promise<UpdateCheckResult> {
-  return invoke('neocodex_check_update', {})
+  return domain.call<UpdateCheckResult>('llamacpp', 'check_update')
 }
 
 export function downloadUpdate(): Promise<void> {
-  return invoke('neocodex_download_update', {})
+  return domain.call<void>('llamacpp', 'download_update')
 }
 
 export function restartApp(): Promise<void> {
-  return invoke('neocodex_restart_app', {})
+  return domain.call<void>('llamacpp', 'restart_app')
 }
 
 /* ── MCP ── */
 export function mcpList(): Promise<McpServerInfo[]> {
-  return invoke('neocodex_mcp_list', {})
+  return domain.call<McpServerInfo[]>('llamacpp', 'mcp_list')
 }
 
 export function mcpTools(): Promise<McpToolInfo[]> {
-  return invoke('neocodex_mcp_tools', {})
+  return domain.call<McpToolInfo[]>('llamacpp', 'mcp_tools')
 }
 
 /** 注册本地 stdio MCP 服务器（name/command/args），返回注册后的服务器列表。 */
 export function mcpRegister(name: string, command: string, args?: string[]): Promise<McpServerInfo[]> {
-  return invoke('neocodex_mcp_register', { name, command, args: args ?? null })
+  return domain.call<McpServerInfo[]>('llamacpp', 'mcp_register', { name, command, args: args ?? null })
 }
 
 /* ── 反馈 ── */
 export function feedback(sessionId: string, text: string): Promise<void> {
-  return invoke('neocodex_feedback', { session_id: sessionId, text })
+  return domain.call<void>('session', 'feedback', { session_id: sessionId, text })
 }
 
-/* ── 画板能力网 → NeoTrix 能力树（直接 invoke，非 domain plugin） ── */
+/* ── 画板能力网 → NeoTrix 能力树（domain plugin） ── */
 export interface CanvasCapabilityInput {
   kind: string
   label: string
@@ -441,22 +440,22 @@ export interface CanvasCapabilitySyncResult {
 }
 /** 把画板能力网快照并入 NeoTrix 能力树 (KB kv_store capability_tree)，执行 Budding/Strengthen/Dark-Forest 回收。 */
 export function canvasSyncCapabilities(caps: CanvasCapabilityInput[]): Promise<CanvasCapabilitySyncResult> {
-  return invoke('canvas_sync_capabilities', { caps })
+  return domain.call<CanvasCapabilitySyncResult>('canvas', 'sync_capabilities', { caps })
 }
 
 /** 画板覆盖层手动触发 Dark Forest 回收：把 canvas::<kind> 标记废弃 (画板 → 树 写回)。 */
 export function canvasPruneCapability(kind: string): Promise<{ kind: string; pruned: boolean; constellation: string }> {
-  return invoke('canvas_prune_capability', { kind })
+  return domain.call<{ kind: string; pruned: boolean; constellation: string }>('canvas', 'prune_capability', { kind })
 }
 
 /** 画板覆盖层把「期望成熟度」推回能力树：写入/清除 canvas::<kind> 的 canvas_desired 元数据。 */
 export function canvasSetDesired(kind: string, stage: number | null): Promise<{ kind: string; pruned: boolean; constellation: string }> {
-  return invoke('canvas_set_desired', { kind, stage })
+  return domain.call<{ kind: string; pruned: boolean; constellation: string }>('canvas', 'set_desired', { kind, stage })
 }
 
 /** 画板按自身能力树 SEAL 进化路线自动进化：执行所有作用于 canvas::* 的计划 (Mature/Prune)。 */
 export function canvasApplyEvolutionRoute(): Promise<{ matured: number; pruned: number; applied: string[] }> {
-  return invoke('canvas_apply_evolution_route', {})
+  return domain.call<{ matured: number; pruned: number; applied: string[] }>('canvas', 'apply_evolution_route')
 }
 
 /* ── 画板 KV（domain plugin） ── */
