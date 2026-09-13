@@ -115,7 +115,9 @@ impl SelfModel {
                 .filter(|kw| action_lower.contains(*kw))
                 .count();
             if keywords.is_empty() {
-                0.5 // 未知维度给中性分
+                // 未知维度: 无信号 → 返回 0.0 (诚实无知) 而非 0.5 (伪装中性)
+                // 真实实现应通过 VSA HyperCube 语义投影替代关键词匹配
+                0.0
             } else {
                 (matches as f64) / (keywords.len() as f64)
             }
@@ -137,16 +139,29 @@ impl SelfModel {
 
     /// SEAL 钩子：候选行为变更产出后更新自我模型。
     ///
-    /// 当前仅递增 `revision` 并记录目标占位；真实实现应据候选回写
-    /// 价值权重 / 长期偏好（受 `nt_core_self_constitution` 治理约束）。
+    /// **当前为占位实现** — 仅递增 `revision`，不修改价值权重。
+    ///
+    /// 真实实现需要：
+    /// 1. 解析 candidate 中的行为变更语义（需对接 nt_mind SEAL 候选格式）
+    /// 2. 对比候选行为与当前 goals 的一致性
+    /// 3. 按 FEP 自由能最小化或 IIT Φ 一致性调整 value_weights
+    /// 4. 受 nt_core_self_constitution 治理约束（权重变更不超过阈值）
+    ///
+    /// TODO: 接入 SEAL 候选解析器 + FEP/IIT 价值更新规则
     pub fn update(&mut self, candidate: &str) -> NeoTrixResult<()> {
         if candidate.is_empty() {
             return Err(NeoTrixError::InvalidInput(
                 "self_model.update: empty candidate".to_string(),
             ));
         }
+        // STUB: 真实实现需根据 candidate 语义更新 value_weights
+        // 当前仅记录修订号，不修改权重 — 调用方不应依赖此方法产生权重变化
         self.revision += 1;
-        Ok(())
+        Err(NeoTrixError::InvalidInput(format!(
+            "self_model.update: stub implementation — candidate '{}' not applied to value_weights. \
+             Real implementation requires SEAL candidate parser + FEP/IIT weight update rules.",
+            candidate
+        )))
     }
 }
 
@@ -165,10 +180,13 @@ mod tests {
     }
 
     #[test]
-    fn self_model_update_increments_revision() {
+    fn self_model_update_returns_stub_error() {
         let mut m = SelfModel::new();
         let before = m.revision;
-        m.update("candidate edit").unwrap();
+        // update() is a stub — returns error indicating real impl not wired
+        let err = m.update("candidate edit");
+        assert!(err.is_err(), "stub update should return error");
+        // revision still increments (audit trail) but weight update is not applied
         assert_eq!(m.revision, before + 1);
         assert!(m.update("").is_err());
     }

@@ -131,11 +131,16 @@ impl TemporalContinuityChecker {
     }
     
     /// 检查首尾帧连续性
+    ///
+    /// NOTE: `calculate_frame_diff` currently compares file path strings, not pixel data.
+    /// For production use, frames should be loaded as image buffers and compared via
+    /// SSIM, LPIPS, or histogram distance. The string-level diff is a placeholder that
+    /// will produce meaningless results on real image data.
     pub fn check_first_last_frame(
         &self,
         frames: &[String],
     ) -> ContinuityCheckResult {
-        // TODO: 实际调用帧比较逻辑
+        let start = std::time::Instant::now();
         let mut issues = vec![];
         
         for i in 0..frames.len().saturating_sub(1) {
@@ -171,7 +176,7 @@ impl TemporalContinuityChecker {
             issue_count: issues.len() as u32,
             pass_rate,
             issues,
-            check_time_ms: 100,
+            check_time_ms: start.elapsed().as_millis() as u64,
             error: None,
         }
     }
@@ -215,49 +220,65 @@ impl TemporalContinuityChecker {
     }
     
     /// 检查场景转场
+    ///
+    /// STUB: Not yet implemented. Always returns an error indicating
+    /// missing scene-change detection (e.g. perceptual hashing, DNN-based
+    /// scene segmentation). Callers must not trust "passed" from this method
+    /// until a real implementation is wired in.
     pub fn check_scene_transition(
         &self,
         frames: &[String],
         _transition_type: &str,
     ) -> ContinuityCheckResult {
-        // TODO: 实际调用场景转场检查逻辑
         let checked_frames = frames.len() as u32;
         
         ContinuityCheckResult {
-            passed: true,
+            passed: false,
             checked_frames,
             issue_count: 0,
-            pass_rate: 1.0,
+            pass_rate: 0.0,
             issues: vec![],
-            check_time_ms: 50,
-            error: None,
+            check_time_ms: 0,
+            error: Some(
+                "check_scene_transition is not implemented — requires perceptual \
+                 hashing or DNN scene-change detection on actual image data"
+                    .to_string(),
+            ),
         }
     }
     
     /// 检查元素位置连续性
+    ///
+    /// STUB: Not yet implemented. Always returns an error indicating
+    /// missing object tracking (e.g. ByteTrack, optical flow).
     pub fn check_element_position(
         &self,
         frames: &[String],
         _element_id: &str,
     ) -> ContinuityCheckResult {
-        // TODO: 实际调用元素位置跟踪逻辑
         let checked_frames = frames.len() as u32;
         
         ContinuityCheckResult {
-            passed: true,
+            passed: false,
             checked_frames,
             issue_count: 0,
-            pass_rate: 1.0,
+            pass_rate: 0.0,
             issues: vec![],
-            check_time_ms: 80,
-            error: None,
+            check_time_ms: 0,
+            error: Some(
+                "check_element_position is not implemented — requires object tracking \
+                 (ByteTrack / optical flow) on actual image data"
+                    .to_string(),
+            ),
         }
     }
     
     /// 执行完整检查
     pub fn check_all(&self, frames: &[String]) -> ContinuityCheckResult {
+        let start = std::time::Instant::now();
         let mut all_issues = vec![];
         let mut total_checked = 0;
+        let mut errors = vec![];
         
         for check_type in &self.config.check_types {
             let result = match check_type {
@@ -270,22 +291,26 @@ impl TemporalContinuityChecker {
                 ContinuityCheckType::ElementPosition => {
                     self.check_element_position(frames, "element_001")
                 }
-                _ => ContinuityCheckResult {
-                    passed: true,
-                    checked_frames: frames.len() as u32,
+                other => ContinuityCheckResult {
+                    passed: false,
+                    checked_frames: 0,
                     issue_count: 0,
-                    pass_rate: 1.0,
+                    pass_rate: 0.0,
                     issues: vec![],
                     check_time_ms: 0,
-                    error: None,
+                    error: Some(format!("check type {:?} is not implemented", other)),
                 },
             };
             
+            if let Some(err) = &result.error {
+                errors.push(err.clone());
+            }
             all_issues.extend(result.issues);
             total_checked += result.checked_frames;
         }
         
-        let passed = all_issues.iter().all(|i| i.severity < self.config.severity_threshold);
+        let passed = all_issues.iter().all(|i| i.severity < self.config.severity_threshold)
+            && errors.is_empty();
         let pass_rate = if total_checked > 0 {
             (total_checked - all_issues.len() as u32) as f32 / total_checked as f32
         } else {
@@ -298,8 +323,8 @@ impl TemporalContinuityChecker {
             issue_count: all_issues.len() as u32,
             pass_rate,
             issues: all_issues,
-            check_time_ms: 200,
-            error: None,
+            check_time_ms: start.elapsed().as_millis() as u64,
+            error: if errors.is_empty() { None } else { Some(errors.join("; ")) },
         }
     }
     

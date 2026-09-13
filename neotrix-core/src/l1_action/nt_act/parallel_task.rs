@@ -257,31 +257,39 @@ impl ParallelTaskManager {
     
     /// 完成任务
     pub fn complete_task(&mut self, task_id: &str, result: TaskResult) {
-        // 释放 GPU 显存
-        if let Some(task) = self.running_tasks.remove(task_id) {
-            if let Some(device) = self.devices.iter_mut().find(|d| {
-                d.used_memory_mb >= task.gpu_memory_mb
-            }) {
-                device.used_memory_mb = device.used_memory_mb.saturating_sub(task.gpu_memory_mb);
+        // Remove the task from running_tasks exactly once.
+        let task = match self.running_tasks.remove(task_id) {
+            Some(t) => t,
+            None => {
+                tracing::warn!(
+                    "complete_task called for unknown or already-completed task: {}",
+                    task_id
+                );
+                return;
             }
+        };
+
+        // Release GPU memory on the device that was running this task.
+        if let Some(device) = self.devices.iter_mut().find(|d| {
+            d.used_memory_mb >= task.gpu_memory_mb
+        }) {
+            device.used_memory_mb = device.used_memory_mb.saturating_sub(task.gpu_memory_mb);
         }
-        
-        // 失败重试
+
+        // Retry logic: re-queue failed task if retries remain.
         if !result.success {
-            if let Some(mut task) = self.running_tasks.remove(task_id) {
-                task.current_retries += 1;
-                if task.current_retries < task.max_retries {
-                    task.status = TaskStatus::Pending;
-                    // 指数退避重试
-                    let delay_secs = self.config.retry_interval_base_secs
-                        * (2u32.pow(task.current_retries).min(self.config.retry_max_multiplier));
-                    // 设置下次执行时间（避免立即重试）
-                    task.next_retry_at = Some(std::time::Instant::now() + std::time::Duration::from_secs(delay_secs as u64));
-                    self.task_queue.push(task);
-                } else {
-                    self.completed_tasks.push(result);
-                    return;
-                }
+            let mut task = task;
+            task.current_retries += 1;
+            if task.current_retries < task.max_retries {
+                task.status = TaskStatus::Pending;
+                let delay_secs = self.config.retry_interval_base_secs
+                    * (2u32.pow(task.current_retries).min(self.config.retry_max_multiplier));
+                task.next_retry_at = Some(
+                    std::time::Instant::now() + std::time::Duration::from_secs(delay_secs as u64),
+                );
+                self.task_queue.push(task);
+            } else {
+                self.completed_tasks.push(result);
             }
         } else {
             self.completed_tasks.push(result);

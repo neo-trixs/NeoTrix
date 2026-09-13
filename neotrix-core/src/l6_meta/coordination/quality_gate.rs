@@ -142,7 +142,11 @@ impl QualityGate {
         }
     }
     
-    /// AI 初检
+    /// AI 初检 — **STUB: 当前仅接收外部传入的 scores, 无真实 AI 检查能力。**
+    ///
+    /// 调用方自行计算各维度分数后传入, 本方法只负责加权汇总和阈值判定。
+    /// 真实实现需要: 自动调用多模态模型 (VLM + LLM) 对 `content_id` 对应的
+    /// 视频/图片进行各维度评分, 而非依赖调用方手动提供。
     pub(crate) fn _ai_initial_review(&mut self, content_id: &str, scores: Vec<_DimensionScore>) -> ReviewResult {
         let total_score = self.calculate_total_score(&scores);
         let passed = self.check_passed(&scores, total_score);

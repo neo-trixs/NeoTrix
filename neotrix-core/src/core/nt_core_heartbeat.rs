@@ -120,13 +120,19 @@ impl SystemHealthSnapshot {
     ///
     /// 返回 (专家名, 权重调整量) 列表。
     /// 正值 = 增加注意力，负值 = 减少注意力。
+    ///
+    /// **当前映射局限**: 7 个 NT-* 域只有 5 个健康维度，部分域共享同一分数。
+    /// nt_act/nt_world/nt_shield 共用 modules 分数 — 真实实现需为每个域
+    /// 维护独立健康信号（如 nt_act 需要工具调用成功率，nt_world 需要爬取成功率）。
     pub fn to_gwt_weights(&self) -> Vec<(String, f64)> {
         vec![
-            ("nt_act".into(), self.modules - 0.5),      // 偏离中性点
-            ("nt_io".into(), self.eventbus - 0.5),
-            ("nt_memory".into(), self.kb_health - 0.5),
             ("nt_core".into(), self.compilation - 0.5),
             ("nt_mind".into(), self.testing - 0.5),
+            ("nt_memory".into(), self.kb_health - 0.5),
+            ("nt_io".into(), self.eventbus - 0.5),
+            // STUB: 以下三域共享 modules 分数 — 不反映各自独立健康状态
+            // 真实实现需每域独立信号源 (nt_act: 工具调用率, nt_world: 爬取成功率, nt_shield: 安全事件率)
+            ("nt_act".into(), self.modules - 0.5),
             ("nt_world".into(), self.modules - 0.5),
             ("nt_shield".into(), self.modules - 0.5),
         ]

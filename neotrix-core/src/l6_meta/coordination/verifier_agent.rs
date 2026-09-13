@@ -182,7 +182,14 @@ impl _VerifierAgent {
         }
     }
     
-    /// 验证视频片段
+    /// 验证视频片段 — **STUB: 当前使用关键词启发式评分, 非真实 VLM 验证。**
+    ///
+    /// 返回的分数基于文本描述中的关键词匹配, 不涉及实际视频帧分析。
+    /// 真实实现需要: 调用 VLM (如 GPT-4V / Gemini Pro Vision) 对视频帧进行
+    /// 多维度视觉评估, 并将评估结果映射到 `VerificationScore`。
+    ///
+    /// # Panics
+    /// 当前不会 panic, 但分数不反映真实视频质量。
     pub(crate) fn _verify_shot(
         &mut self,
         _shot_id: &str,
@@ -192,7 +199,7 @@ impl _VerifierAgent {
     ) -> VerificationResult {
         let start = std::time::Instant::now();
         
-        // TODO: 实际调用 VLM 进行验证
+        // STUB: 用关键词启发式代替真实 VLM — 返回不代表视频质量的分数
         let scores = self.simulate_verification(spec_description, memory_context);
         
         // 计算总分
@@ -216,9 +223,18 @@ impl _VerifierAgent {
         result
     }
     
-    /// 模拟验证 — 基于描述和上下文计算验证分数
+    /// STUB: 模拟验证 — 基于描述和上下文的关键词启发式评分。
     ///
-    /// 使用关键词匹配和启发式规则评估各维度。
+    /// **这不是真实验证。** 返回的分数仅反映文本描述中是否包含特定关键词
+    /// (如 "character"、"action"、"lighting"), 不涉及实际视频帧分析。
+    /// 分数不代表视频质量, 只代表描述文本的丰富程度。
+    ///
+    /// 真实实现需要:
+    /// 1. 从 `_video_path` 提取关键帧
+    /// 2. 将帧 + `spec_description` 送入 VLM 进行多维度评估
+    /// 3. 将 VLM 输出结构化为 `_VerificationScore`
+    ///
+    /// 当前实现仅供占位: 让 `calculate_total_score` 的权重逻辑可测试。
     fn simulate_verification(&self, description: &str, context: Option<&str>) -> Vec<_VerificationScore> {
         let desc_lower = description.to_lowercase();
         let ctx_lower = context.map(|c| c.to_lowercase()).unwrap_or_default();
@@ -332,9 +348,12 @@ impl _VerifierAgent {
         }
     }
     
-    /// 自动修正提示词
+    /// STUB: 自动修正提示词 — 当前仅追加 suggested_corrections, 无 LLM 重写。
+    ///
+    /// 真实实现需要: 调用 LLM 将原始 prompt + verification errors 重写为
+    /// 修正后的 prompt, 而非简单追加。
     fn auto_correct_prompt(&self, prompt: &str, result: &VerificationResult) -> String {
-        // TODO: 实际调用 LLM 修正提示词
+        // STUB: 仅追加修正建议, 无 LLM 重写能力
         let mut corrected = prompt.to_string();
         
         for correction in &result.suggested_corrections {

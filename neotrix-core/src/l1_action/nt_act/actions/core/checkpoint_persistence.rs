@@ -144,7 +144,7 @@ impl CheckpointPersistence {
             status: CheckpointStatus::Saved,
             created_at: current_timestamp(),
             expires_at: Some(current_timestamp() + self.config.expiration_secs),
-            file_size: 0, // TODO: 计算实际大小
+            file_size: 0, // 初始值; 实际大小在写入后由 save_result 回填 (line meta_with_size)
             description: None,
         };
         
@@ -342,11 +342,14 @@ pub struct CheckpointStats {
 }
 
 /// 获取当前时间戳
+///
+/// Returns 0 if system clock is before UNIX epoch (should never happen in practice).
+/// Avoids panic from `unwrap()` on edge-case systems.
 fn current_timestamp() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 // ============================================================================

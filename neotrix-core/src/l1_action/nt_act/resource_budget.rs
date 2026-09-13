@@ -279,38 +279,52 @@ impl ResourceBudgetManager {
         self.history.push(usage);
     }
     
-    /// 获取成本估算 (2026年定价)
+    /// 获取成本估算
     ///
-    /// 注意：价格为近似值，实际价格可能变化。
-    /// 输入/输出 token 价格不同时，使用 input_price 作为默认估算。
+    /// Uses `external_prices` when provided (model → $/1K tokens).
+    /// Falls back to a **stale** built-in table that must be refreshed
+    /// manually or replaced by a live pricing API call.
+    ///
+    /// Returns `None` if the model is unknown and no fallback exists.
     pub fn estimate_cost(
         &self,
         token_count: u64,
         model: &str,
-    ) -> f64 {
-        // 2026年模型定价 ($/1K tokens)
-        let cost_per_1k = match model {
-            // OpenAI
-            "gpt-4o" => 0.0025,           // input
-            "gpt-4o-mini" => 0.00015,      // input
-            "gpt-4-turbo" => 0.01,         // input
-            "gpt-4" => 0.03,               // input (legacy)
-            "gpt-3.5-turbo" => 0.0005,     // input
-            // Anthropic
-            "claude-sonnet-4-20250514" => 0.003,  // input
-            "claude-3-5-sonnet-20241022" => 0.003, // input
-            "claude-3-haiku-20240307" => 0.00025,  // input
-            "claude-3-opus-20240229" => 0.015,     // input
-            // Google
-            "gemini-2.0-flash" => 0.0001,  // input
-            "gemini-1.5-pro" => 0.00125,   // input
-            "gemini-1.5-flash" => 0.000075,// input
-            // 本地/免费模型
+        external_prices: Option<&HashMap<String, f64>>,
+    ) -> Option<f64> {
+        // 1. Check caller-supplied price map first (always fresh).
+        if let Some(prices) = external_prices {
+            if let Some(&cost_per_1k) = prices.get(model) {
+                return Some((token_count as f64 / 1000.0) * cost_per_1k);
+            }
+        }
+
+        // 2. Built-in fallback — STALE, will drift from real pricing.
+        //    Refresh this table or provide `external_prices` to keep estimates accurate.
+        #[allow(clippy::uninlined_format_args)]
+        let cost_per_1k: f64 = match model {
+            // OpenAI  (approximate, verify at https://openai.com/pricing)
+            "gpt-4o" => 0.0025,
+            "gpt-4o-mini" => 0.00015,
+            "gpt-4-turbo" => 0.01,
+            "gpt-4" => 0.03,
+            "gpt-3.5-turbo" => 0.0005,
+            // Anthropic (approximate)
+            "claude-sonnet-4-20250514" => 0.003,
+            "claude-3-5-sonnet-20241022" => 0.003,
+            "claude-3-haiku-20240307" => 0.00025,
+            "claude-3-opus-20240229" => 0.015,
+            // Google (approximate)
+            "gemini-2.0-flash" => 0.0001,
+            "gemini-1.5-pro" => 0.00125,
+            "gemini-1.5-flash" => 0.000075,
+            // Local / free
             "ollama" | "local" => 0.0,
-            _ => 0.001, // 未知模型使用保守估计
+            // Unknown model — return None instead of a fake estimate.
+            _ => return None,
         };
-        
-        (token_count as f64 / 1000.0) * cost_per_1k
+
+        Some((token_count as f64 / 1000.0) * cost_per_1k)
     }
     
     /// 获取使用统计
@@ -409,7 +423,20 @@ mod tests {
     fn test_cost_estimation() {
         let manager = ResourceBudgetManager::new();
         
-        let cost = manager.estimate_cost(1000, "gpt-4");
-        assert!(cost > 0.0);
+        // Known model — returns a price from built-in table.
+        let cost = manager.estimate_cost(1000, "gpt-4", None);
+        assert!(cost.is_some());
+        assert!(cost.unwrap() > 0.0);
+        
+        // Unknown model with no external map — returns None (no fake estimate).
+        let cost = manager.estimate_cost(1000, "unknown-model", None);
+        assert!(cost.is_none());
+        
+        // External price map overrides built-in.
+        let mut prices = std::collections::HashMap::new();
+        prices.insert("gpt-4".to_string(), 0.10);
+        let cost = manager.estimate_cost(1000, "gpt-4", Some(&prices));
+        assert!(cost.is_some());
+        assert!((cost.unwrap() - 0.10).abs() < 0.001);
     }
 }

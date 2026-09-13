@@ -217,11 +217,21 @@ impl _ContentModeration {
     }
 
     /// 评估提示词风险
+    ///
+    /// **当前为占位实现** — 仅做关键词子串匹配，极易被变体/同义词绕过。
+    ///
+    /// 真实实现需要：
+    /// - NSFW/Violence: 接入 LLM-as-judge 或专用分类器 (Llama Guard / OpenAI Moderation)
+    /// - Hate/Harassment: 上下文语义分析 (关键词无法捕获隐晦仇恨)
+    /// - Copyright: 训练数据/角色名/风格的版权指纹匹配
+    /// - 所有类别: 支持多语言 + 语义等价检测
+    ///
+    /// TODO: 接入真实分类器，替换关键词匹配
     fn evaluate_prompt_risk(&self, prompt: &str, category: &RiskCategory) -> f64 {
-        // 简化的风险评估
         let prompt_lower = prompt.to_lowercase();
         match category {
             RiskCategory::Nsfw => {
+                // STUB: 仅检测最明显的关键词，真实实现需语义分析
                 if prompt_lower.contains("nude") || prompt_lower.contains("explicit") {
                     0.9
                 } else {
@@ -229,22 +239,36 @@ impl _ContentModeration {
                 }
             }
             RiskCategory::Violence => {
+                // STUB: 仅检测最明显的关键词
                 if prompt_lower.contains("violence") || prompt_lower.contains("blood") {
                     0.8
                 } else {
                     0.1
                 }
             }
+            // STUB: 所有其他类别返回基线 0.1 — 不代表真实风险
+            // 真实实现需为每个类别配置独立分类器
             _ => 0.1,
         }
     }
 
     /// 评估输出风险
+    ///
+    /// **当前为占位实现** — 基于内容类型和元数据的启发式估算。
+    /// 返回固定基线分数而非真实内容分析结果。
+    ///
+    /// 真实实现需要：
+    /// - NSFW: 接入视觉分类器 (CLIP-based NSFW detector) 或第三方 API
+    /// - Violence/Hate: 接入多模态内容安全模型
+    /// - Copyright: 接入反向图像搜索 + 版权数据库匹配
+    /// - Misinformation: 接入事实核查 API + 知识图谱交叉验证
+    /// - Privacy: 接入 PII 检测器 (Presidio/自研 NER)
+    ///
+    /// TODO: 接入真实内容安全分类器，替换固定基线分数
     fn evaluate_output_risk(&self, content_type: ContentType, metadata: &HashMap<String, String>, category: &RiskCategory) -> f64 {
-        let mut risk: f64 = 0.0;
-
-        // 基于内容类型的基础风险
-        risk += match content_type {
+        // STUB: 返回固定基线 — 不反映真实内容风险
+        // 真实实现应分析实际内容而非依赖类型/类别常数
+        let baseline = match content_type {
             ContentType::Prompt => 0.05,
             ContentType::GeneratedImage => 0.2,
             ContentType::GeneratedVideo => 0.25,
@@ -252,31 +276,17 @@ impl _ContentModeration {
             ContentType::Text => 0.05,
         };
 
-        // 基于风险类别的调整
-        risk += match category {
-            RiskCategory::Nsfw => 0.3,
-            RiskCategory::Violence => 0.25,
-            RiskCategory::Hate => 0.2,
-            RiskCategory::Harassment => 0.2,
-            RiskCategory::SelfHarm => 0.3,
-            RiskCategory::Copyright => 0.15,
-            RiskCategory::BrandSafety => 0.1,
-            RiskCategory::Misinformation => 0.15,
-            RiskCategory::PrivacyViolation => 0.25,
-        };
-
-        // 检查元数据中的风险信号
-        if let Some(contains_pii) = metadata.get("contains_pii") {
-            if contains_pii == "true" {
-                risk += 0.2; // 包含个人身份信息
-            }
+        // 元数据信号 (唯一真实的输入源)
+        let mut risk = baseline;
+        if metadata.get("contains_pii").map_or(false, |v| v == "true") {
+            risk += 0.2;
         }
-        if let Some(contains_secret) = metadata.get("contains_secret") {
-            if contains_secret == "true" {
-                risk += 0.3; // 包含密钥/密码
-            }
+        if metadata.get("contains_secret").map_or(false, |v| v == "true") {
+            risk += 0.3;
         }
 
+        // STUB: 风险类别调整为占位常数 — 真实实现需分类器输出
+        // 当前返回值仅用于管道不中断，不代表真实风险判断
         risk.clamp(0.0, 1.0)
     }
 

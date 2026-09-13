@@ -94,16 +94,34 @@ pub struct SourceCredibility {
     pub cross_validation_count: u32,
 }
 
+/// Default source credibility — **all scalar fields use 0.5 (unknown/midpoint).**
+///
+/// This is an **explicit sentinel**, not a calibrated estimate. Callers MUST
+/// override these defaults with real values when the source metadata is available.
+/// Using `Default::default()` without field-level overrides produces an
+/// "everything is average" score that masks missing data.
 impl Default for SourceCredibility {
     fn default() -> Self {
         Self {
             source_tier: SourceTier::Secondary,
             review_status: ReviewStatus::Unreviewed,
+            // STUB: 0.5 = unknown midpoint, NOT a calibrated reputation estimate.
+            // Real impl: query academic APIs (OpenAlex/Semantic Scholar) for author h-index,
+            // or use institutional affiliation data from the source metadata.
             author_reputation: 0.5,
+            // STUB: 0.5 = unknown midpoint.
+            // Real impl: check if source has institutional DOI, university affiliation,
+            // or government/NGO backing.
             institutional_backing: 0.5,
             citation_count: 0,
+            // STUB: 0.5 = unknown midpoint.
+            // Real impl: compute recency decay from source publication date vs now,
+            // using exponential decay with half-life appropriate to domain.
             temporal_proximity: 0.5,
             custody_chain: None,
+            // STUB: 0.5 = unknown midpoint.
+            // Real impl: assess whether evidence was independently gathered vs
+            // derived from a single source chain.
             independence_score: 0.5,
             cross_validation_count: 0,
         }

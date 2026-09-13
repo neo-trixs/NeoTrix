@@ -264,36 +264,40 @@ impl VideoStitcher {
     }
     
     /// 添加转场
+    ///
+    /// Returns an FFmpeg xfade filter string for the given transition type.
+    /// Returns `Err` for unsupported transition types instead of silently
+    /// falling back to CrossDissolve.
     pub fn add_transition(
         &self,
         clip_a: &VideoClip,
         _clip_b: &VideoClip,
         transition: TransitionType,
         duration: f32,
-    ) -> String {
-        match transition {
+    ) -> Result<String, String> {
+        let offset = clip_a.timeline_start + clip_a.duration_secs - duration;
+        let filter = match transition {
+            TransitionType::Cut => {
+                // Cut needs no xfade filter — clips are simply concatenated.
+                return Ok(String::new());
+            }
             TransitionType::CrossDissolve => {
-                format!(
-                    "xfade=transition=fade:duration={}:offset={}",
-                    duration,
-                    clip_a.timeline_start + clip_a.duration_secs - duration
-                )
+                format!("xfade=transition=fade:duration={}:offset={}", duration, offset)
             }
             TransitionType::Dissolve => {
-                format!(
-                    "xfade=transition=dissolve:duration={}:offset={}",
-                    duration,
-                    clip_a.timeline_start + clip_a.duration_secs - duration
-                )
+                format!("xfade=transition=dissolve:duration={}:offset={}", duration, offset)
             }
-            _ => {
-                format!(
-                    "xfade=transition=fade:duration={}:offset={}",
-                    duration,
-                    clip_a.timeline_start + clip_a.duration_secs - duration
-                )
+            TransitionType::Wipe => {
+                format!("xfade=transition=wipeleft:duration={}:offset={}", duration, offset)
             }
-        }
+            TransitionType::Push => {
+                format!("xfade=transition=smoothleft:duration={}:offset={}", duration, offset)
+            }
+            TransitionType::Zoom => {
+                format!("xfade=transition=circlecrop:duration={}:offset={}", duration, offset)
+            }
+        };
+        Ok(filter)
     }
     
     /// 生成字幕滤镜
