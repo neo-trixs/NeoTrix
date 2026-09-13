@@ -7,12 +7,12 @@ pub mod bm25;
 pub mod spill_storage;
 // pub mod nt_memory_blocks; // DEAD: cleanup
 pub mod nt_discovery_github_topics;
-// pub mod nt_discovery_orchestrator; // DEAD: cleanup
+pub mod nt_discovery_orchestrator;
 // pub mod nt_discovery_sources; // DEAD: cleanup
 pub mod nt_memory_adaptive_rag;
 pub mod nt_memory_feedback;
 pub mod nt_memory_gwt_router;
-// pub mod nt_memory_e8_agent; // DEAD: cleanup
+pub mod nt_memory_e8_agent;
 pub mod nt_memory_vsa_expand;
 // pub mod nt_memory_decompose; // DEAD: cleanup
 // pub mod nt_memory_domain_adapter; // DEAD: cleanup
@@ -69,15 +69,15 @@ pub mod nt_memory_graph_cache;
 pub mod nt_memory_galaxy_hygiene;
 // pub mod nt_memory_weave; // DEAD: cleanup
 pub mod privacy;
-// pub mod user_memory; // DEAD: cleanup
+pub mod user_memory;
 // pub mod vector_adapter; // DEAD: cleanup
-// pub mod nt_normalizer; // DEAD: cleanup
+pub mod nt_normalizer;
 // pub mod knowledge_storage; // DEAD: cleanup
 // pub mod nt_absorb_mapper; // DEAD: cleanup
 pub mod nt_memory_write_guard;
 // pub mod nt_memory_snapshot; // DEAD: cleanup
 // pub mod nt_memory_zim_absorber; // DEAD: cleanup
-// pub mod nt_memory_brain; // DEAD: cleanup
+pub mod nt_memory_brain;
 pub mod nt_memory_lifecycle;
 pub mod nt_memory_shanhai;
 
@@ -3089,7 +3089,7 @@ impl neotrix_types::knowledge_access::KnowledgeAccess for KnowledgeBase {
 #[cfg(test)]
 mod tests;
 // 2026-08-15 sweep absorption (P6/P15/P16/P17): 记忆层四能力注入
-// pub mod nt_memory_sweep_20260815; // DEAD: cleanup
+pub mod nt_memory_sweep_20260815;
 pub use nt_memory_sweep_20260815::*;
 
 

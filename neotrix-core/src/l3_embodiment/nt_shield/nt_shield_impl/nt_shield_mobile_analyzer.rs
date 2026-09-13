@@ -21,6 +21,14 @@ impl ObjectionAdapter {
     }
     
     /// Explore iOS/Android app via Objection
+    ///
+    /// STUB: Returns hardcoded mock components — no real device interaction.
+    /// Real implementation needs:
+    /// - Spawn Objection: `objection -g <app_id> explore --express`
+    /// - Hook into Frida runtime for dynamic analysis
+    /// - Enumerate Activities/Services/BroadcastReceivers via reflection
+    /// - Detect hardcoded secrets in SharedPreferences/plist files
+    /// - Map app component interactions for attack surface analysis
     pub async fn explore_app(&mut self, _app_id: &str) -> _ExploreResult {
         // TODO: objection explore -a app_id --express
         // Architecture: L1 Body (device interaction) → L2 Perception (app model)
@@ -48,6 +56,13 @@ impl ObjectionAdapter {
     }
     
     /// Check for root/jailbreak detection evasion
+    ///
+    /// STUB: Returns hardcoded non-rooted/non-jailbroken result — no real device check.
+    /// Real implementation needs:
+    /// - Objection `ios jailbreak disable` / `android root disable` commands
+    /// - Check for su binary, Magisk, Cydia detection methods
+    /// - Test filesystem access patterns (/data/data, /Applications)
+    /// - Hook Frida into detection functions to bypass checks
     pub async fn check_evasion(&self) -> _EvasionReport {
         _EvasionReport {
             is_rooted: false,

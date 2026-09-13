@@ -199,10 +199,11 @@ impl _QualityControlPipeline {
         }
     }
     
-    /// 执行 AI 自动审核 — **STUB: 使用硬编码基础分数, 非真实 AI 内容分析。**
+    /// 执行 AI 自动审核 — 当前无真实 AI 内容分析能力, 始终返回 Rejected。
     ///
-    /// `evaluate_check_item` 返回的分数基于检查类型复杂度的启发式规则,
-    /// 不涉及对 `content_id` 对应内容的实际分析。
+    /// 返回 Rejected 而非伪造 Approved, 确保未审核内容不会被误判为通过。
+    /// `evaluate_check_item` 返回 0.0 (无真实分析), 加权汇总后总分必然为 0.0,
+    /// 触发 Rejected 状态。
     ///
     /// 真实实现需要: 调用多模态模型对 content_id 对应的媒体文件进行
     /// 各维度评估, 返回基于实际内容的客观分数。
@@ -212,8 +213,8 @@ impl _QualityControlPipeline {
     pub(crate) fn _review_by_ai(&self, content_id: &str) -> ReviewResult {
         tracing::warn!(
             "STUB _review_by_ai called for content_id={}: \
-             scores are heuristic-based, no real AI content analysis. \
-             TODO: call VLM/LLM for actual content review.",
+             no real AI analysis available, returning Rejected. \
+             Wire VLM/LLM for actual content review.",
             content_id
         );
         let mut check_scores = HashMap::new();
@@ -235,6 +236,8 @@ impl _QualityControlPipeline {
             total_score /= total_weight;
         }
         
+        // No real AI analysis → always Reject. Threshold logic preserved
+        // for when real VLM is wired (score 0.0 < any threshold → Rejected).
         let status = if total_score >= self.config.pass_threshold {
             ReviewStatus::Approved
         } else if total_score >= self.config.warning_threshold {
@@ -250,8 +253,14 @@ impl _QualityControlPipeline {
             status,
             total_score,
             check_scores,
-            issues: vec![],
-            comments: Some("STUB: heuristic-based scores, not real AI analysis".to_string()),
+            issues: vec![QualityIssue {
+                check_type: _QualityCheckType::Technical,
+                severity: IssueSeverity::Critical,
+                description: "AI 审核未接入: evaluate_check_item 无真实分析能力, 返回 0.0".to_string(),
+                location: None,
+                fix_suggestion: Some("接入 VLM/LLM 对 content_id 对应媒体文件进行多维度评估".to_string()),
+            }],
+            comments: Some("STUB: no real AI analysis — all scores are 0.0 (reject). Wire VLM for actual review.".to_string()),
             review_time: 0,
             review_time_ms: 500,
         }
@@ -259,25 +268,19 @@ impl _QualityControlPipeline {
     
     /// 评估检查项 — 需要真实 AI 分析
     ///
-    /// STUB: 当前实现返回硬编码基础分数, 不反映真实内容质量。
+    /// 当前无真实 AI 内容分析能力, 返回 0.0 (拒绝) 以防止
+    /// 未审核内容被误判为通过。返回 0.0 而非伪造高分, 确保
+    /// 任何依赖此方法的审核流程在真实 VLM/LLM 接入前都会拒绝。
+    ///
     /// 真实实现需要: 调用多模态模型对 content_id 对应的媒体文件进行
     /// 各维度评估, 返回基于实际内容的客观分数。
     fn evaluate_check_item(&self, check_type: &_QualityCheckType) -> f32 {
         tracing::warn!(
-            "STUB evaluate_check_item called for {:?}: returning hardcoded score, not real AI analysis. \
-             TODO: call VLM/LLM for actual content review.",
+            "evaluate_check_item called for {:?}: no real AI analysis available, \
+             returning 0.0 (reject). Wire VLM/LLM for actual content review.",
             check_type
         );
-        // STUB: 返回固定基线 — 不反映真实内容风险
-        // 真实实现应分析实际内容而非依赖类型/类别常数
-        match check_type {
-            _QualityCheckType::Technical => 0.85,
-            _QualityCheckType::Compliance => 0.90,
-            _QualityCheckType::VisualConsistency => 0.75,
-            _QualityCheckType::NarrativeCoherence => 0.80,
-            _QualityCheckType::AudioVisualSync => 0.70,
-            _QualityCheckType::Performance => 0.88,
-        }
+        0.0
     }
     
     /// 执行完整审核流程
@@ -405,9 +408,8 @@ mod tests {
     
     #[test]
     fn test_quality_pipeline() {
-        // TODO: Human and Platform reviews are NOT wired — they return Pending.
-        // Only AI review returns Approved (based on hardcoded base scores).
-        // Replace with real review integrations once wired.
+        // Human and Platform reviews return Pending (not wired).
+        // AI review returns Rejected (no real analysis — scores are 0.0).
         let mut pipeline = _QualityControlPipeline::new();
         
         let results = pipeline._execute_review_flow("content_001");
@@ -415,25 +417,23 @@ mod tests {
         
         let stats = pipeline.statistics();
         assert_eq!(stats.total_reviews, 3);
-        // Only AI review is Approved; Human and Platform are Pending (not wired)
-        assert_eq!(stats.approved, 1,
-            "only AI review should be Approved; Human/Platform return Pending");
+        // AI review is Rejected (no real analysis); Human/Platform are Pending
+        assert_eq!(stats.rejected, 1,
+            "AI review should be Rejected (no real analysis capability)");
     }
     
     #[test]
-    fn test_ai_review() {
-        // NOTE: _review_by_ai uses hardcoded base scores from evaluate_check_item,
-        // not real content analysis. This test verifies scoring plumbing, not quality.
+    fn test_ai_review_returns_rejected() {
+        // AI review always returns Rejected because evaluate_check_item
+        // returns 0.0 (no real analysis). This prevents fabricated approval.
         let pipeline = _QualityControlPipeline::new();
         
         let result = pipeline._review_by_ai("content_001");
-        // Score is from hardcoded base values (0.85/0.90/0.75/0.80), not real eval
-        assert!(result.total_score >= 0.0 && result.total_score <= 1.0,
-            "score must be in [0,1] range, got {}", result.total_score);
-        // Status depends on hardcoded thresholds — not a real quality assertion
-        assert!(result.status == ReviewStatus::Approved
-            || result.status == ReviewStatus::RevisionNeeded
-            || result.status == ReviewStatus::Rejected,
-            "status must be a valid review variant");
+        assert_eq!(result.status, ReviewStatus::Rejected,
+            "AI review must Reject when no real analysis capability is wired");
+        assert_eq!(result.total_score, 0.0,
+            "score must be 0.0 (no real analysis)");
+        assert!(!result.issues.is_empty(),
+            "must include issue explaining AI analysis is not wired");
     }
 }

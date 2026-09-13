@@ -93,12 +93,13 @@ impl _VideoPromptCache {
         if self.config.semantic_search {
             let prompt_embedding = self.embed_prompt(prompt);
             if let Some(id) = self.find_similar_id(&prompt_embedding) {
-                let entry = self.entries.get_mut(&id).unwrap();
-                entry.last_accessed = Instant::now();
-                entry.access_count += 1;
-                let resp = entry.response.clone();
-                self.stats.semantic_hits += 1;
-                return Some(resp);
+                if let Some(entry) = self.entries.get_mut(&id) {
+                    entry.last_accessed = Instant::now();
+                    entry.access_count += 1;
+                    let resp = entry.response.clone();
+                    self.stats.semantic_hits += 1;
+                    return Some(resp);
+                }
             }
         }
 

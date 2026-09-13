@@ -726,7 +726,9 @@ impl AutoSave {
                 }
                 _ = shutdown.changed() => {
                     if *shutdown.borrow() {
-                        let _ = self.store.save().await;
+                        if let Err(e) = self.store.save().await {
+                            eprintln!("[persistence] shutdown save failed: {}", e);
+                        }
                         break;
                     }
                 }

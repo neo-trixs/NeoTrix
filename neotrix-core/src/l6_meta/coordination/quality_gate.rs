@@ -142,22 +142,19 @@ impl QualityGate {
         }
     }
     
-    /// AI 初检 — **STUB: 仅接收外部传入的 scores, 无真实 AI 检查能力。**
+    /// AI 初检 — 当前无真实 AI 分析能力, 仅聚合调用方提供的 scores。
     ///
     /// 调用方自行计算各维度分数后传入, 本方法只负责加权汇总和阈值判定。
+    /// 返回的 `reviewer` 标注为 "External (not AI-analyzed)" — 调用方
+    /// 不应将此结果视为真实 AI 审核。
+    ///
     /// 真实实现需要: 自动调用多模态模型 (VLM + LLM) 对 `content_id` 对应的
     /// 视频/图片进行各维度评分, 而非依赖调用方手动提供。
-    ///
-    /// TODO(NT-META): 实现真实 AI 评分 — 调用 VLM 对 content_id 对应的媒体文件
-    /// 进行多维度分析, 返回客观评分而非依赖外部传入。
-    ///
-    /// 返回的 `reviewer` 字段标注为 "AI" 但实际无 AI 参与 — 调用方
-    /// 不应将此结果视为真实 AI 审核。
     pub(crate) fn _ai_initial_review(&mut self, content_id: &str, scores: Vec<_DimensionScore>) -> ReviewResult {
         tracing::warn!(
             "STUB _ai_initial_review called for content_id={}: \
              scores are externally provided, no real AI analysis performed. \
-             TODO: call VLM for multi-dimensional visual analysis.",
+             Wire VLM for multi-dimensional visual analysis.",
             content_id
         );
         let total_score = self.calculate_total_score(&scores);
@@ -171,12 +168,12 @@ impl QualityGate {
             total_score,
             passed,
             comments: if passed {
-                vec!["AI 初检通过 (STUB — 分数由调用方提供, 非真实 AI 分析)".to_string()]
+                vec!["通过 — 但分数由调用方提供, 非真实 AI 分析 (reviewer: External, not AI)".to_string()]
             } else {
-                vec!["AI 初检未通过 (STUB — 分数由调用方提供, 非真实 AI 分析)".to_string()]
+                vec!["未通过 — 分数由调用方提供, 非真实 AI 分析 (reviewer: External, not AI)".to_string()]
             },
             reviewed_at: timestamp_now(),
-            reviewer: "AI (STUB)".to_string(),
+            reviewer: "External (not AI-analyzed)".to_string(),
         };
         
         self.history.push(result.clone());

@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use super::components::{
-    Collider, GameCamera, GameSprite, Health, MonsterMarker, NpcMarker, Overlap,
-    PlayerMarker, RenderCmd, RenderCommands, TimeState, Transform, Velocity,
+    Collider, GameCamera, GameSprite, Health, MonsterMarker, NpcMarker,
+    PlayerMarker, RenderCommandBuffer, Transform, Velocity,
 };
 use super::ecs::{CollisionEvent, Entity, System, World};
-use super::renderer::{Color, Rect, Vec2};
+use super::renderer::{Color, DrawCommand, Rect, Vec2};
 
 // ---------------------------------------------------------------------------
 // MovementSystem — integrate velocity into position
@@ -41,13 +41,13 @@ impl System for MovementSystem {
 
 /// Tests all collider pairs for overlap. Non-sensor collisions produce
 /// events; sensors are flagged separately.
-pub struct CollisionSystem {
+pub struct EcsCollisionSystem {
     /// Only check pairs where at least one entity has this set of marker
     /// types. Empty = check all collidable entities.
     pub filter: HashSet<Entity>,
 }
 
-impl CollisionSystem {
+impl EcsCollisionSystem {
     pub fn new() -> Self {
         Self { filter: HashSet::new() }
     }
@@ -63,15 +63,15 @@ impl CollisionSystem {
     }
 }
 
-impl Default for CollisionSystem {
+impl Default for EcsCollisionSystem {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl System for CollisionSystem {
+impl System for EcsCollisionSystem {
     fn name(&self) -> &str {
-        "CollisionSystem"
+        "EcsCollisionSystem"
     }
 
     fn priority(&self) -> i32 {
@@ -131,8 +131,8 @@ impl System for CameraSystem {
 
     fn run(&mut self, world: &mut World, dt: f32) {
         // Clone target to avoid borrow issues.
-        let target = match world.get_resource::<GameCamera>() {
-            Some(cam) => cam.target,
+        let (target, speed, dead) = match world.get_resource::<GameCamera>() {
+            Some(cam) => (cam.target, cam.follow_speed, cam.dead_zone),
             None => return,
         };
 
@@ -146,13 +146,7 @@ impl System for CameraSystem {
             None => return,
         };
 
-        let cam = world.get_resource::<GameCamera>().unwrap();
-        let speed = cam.follow_speed;
-        let dead = cam.dead_zone;
-        let current = cam.position;
-        let view_w = cam.viewport_width;
-        let view_h = cam.viewport_height;
-        drop(cam);
+        let current = world.get_resource::<GameCamera>().unwrap().position;
 
         // Calculate desired camera center with dead zone.
         let dx = target_pos.x - current.x;
@@ -213,9 +207,9 @@ impl System for HealthSystem {
 // RenderSystem — build render command buffer from sprites
 // ---------------------------------------------------------------------------
 
-/// Iterates all (Transform, GameSprite) entities, produces RenderCmds
+/// Iterates all (Transform, GameSprite) entities, produces DrawCommands
 /// sorted by z_index (ascending). Commands are pushed into the
-/// `RenderCommands` resource for the backend to consume.
+/// `RenderCommandBuffer` resource for the backend to consume.
 pub struct RenderSystem;
 
 impl System for RenderSystem {
@@ -228,30 +222,23 @@ impl System for RenderSystem {
     }
 
     fn run(&mut self, world: &mut World, _dt: f32) {
-        // Build camera for world-to-screen transform.
-        let cam = world.get_resource::<GameCamera>()
-            .cloned()
-            .unwrap_or_else(|| GameCamera::new(800.0, 600.0));
-
+        // Collect all sprite data first to avoid borrow conflicts.
         let entities = world.query2::<Transform, GameSprite>();
-        let mut entries: Vec<(Entity, i32)> = entities.into_iter()
-            .map(|e| {
-                let z = world.get::<GameSprite>(e).map_or(0, |s| s.z_index);
-                (e, z)
+        let mut entries: Vec<(Entity, Transform, GameSprite)> = entities.into_iter()
+            .filter_map(|e| {
+                let tf = *world.get::<Transform>(e)?;
+                let sprite = world.get::<GameSprite>(e)?.clone();
+                Some((e, tf, sprite))
             })
             .collect();
-        entries.sort_by_key(|(_, z)| *z);
+        entries.sort_by_key(|(_, _, s)| s.z_index);
 
-        // Clear previous frame commands.
-        if let Some(cmds) = world.get_resource_mut::<RenderCommands>() {
+        // Now write to the command buffer (no outstanding borrows).
+        if let Some(cmds) = world.get_resource_mut::<RenderCommandBuffer>() {
             cmds.clear();
-            cmds.push(RenderCmd::Clear { color: Color::rgb(0.1, 0.1, 0.15) });
+            cmds.push(DrawCommand::Clear { color: Color::rgb(0.1, 0.1, 0.15) });
 
-            for (e, _z) in &entries {
-                let tf = world.get::<Transform>(*e).unwrap();
-                let sprite = world.get::<GameSprite>(*e).unwrap();
-
-                // World-space dest rect centered on transform.
+            for (_e, tf, sprite) in &entries {
                 let w = sprite.source.width;
                 let h = sprite.source.height;
                 let dest = Rect::new(
@@ -261,18 +248,20 @@ impl System for RenderSystem {
                     h,
                 );
 
-                cmds.push(RenderCmd::DrawSprite {
-                    entity: *e,
+                cmds.push(DrawCommand::DrawSprite {
                     texture: sprite.texture.clone(),
                     dest,
+                    src_rect: None,
                     color: sprite.color,
+                    alpha: sprite.color.a,
                     flip_x: sprite.flip_x,
                     flip_y: sprite.flip_y,
+                    rotation: tf.rotation,
                     z_index: sprite.z_index,
                 });
             }
 
-            cmds.push(RenderCmd::Present);
+            cmds.push(DrawCommand::Present);
         }
     }
 }
@@ -370,12 +359,12 @@ impl System for MonsterAiSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::components::{Collider, GameCamera, GameSprite, Health, MonsterMarker, NpcMarker, PlayerMarker, RenderCommands, TimeState, Transform, Velocity};
+    use super::super::components::{Collider, GameCamera, GameSprite, Health, MonsterMarker, NpcMarker, PlayerMarker, RenderCommandBuffer, TimeState, Transform, Velocity};
 
     fn setup_world() -> World {
         let mut world = World::new();
         world.insert_resource(GameCamera::new(800.0, 600.0));
-        world.insert_resource(RenderCommands::new());
+        world.insert_resource(RenderCommandBuffer::new());
         world.insert_resource(TimeState::default());
         world
     }
@@ -420,7 +409,7 @@ mod tests {
         world.insert(b, Transform::from_position(20.0, 0.0));
         world.insert(b, Collider::aabb(32.0, 32.0));
 
-        CollisionSystem::new().run(&mut world, 1.0 / 60.0);
+        EcsCollisionSystem::new().run(&mut world, 1.0 / 60.0);
 
         let events = world.drain_collisions();
         assert_eq!(events.len(), 1);
@@ -440,7 +429,7 @@ mod tests {
         world.insert(b, Transform::from_position(100.0, 100.0));
         world.insert(b, Collider::aabb(16.0, 16.0));
 
-        CollisionSystem::new().run(&mut world, 1.0 / 60.0);
+        EcsCollisionSystem::new().run(&mut world, 1.0 / 60.0);
 
         assert!(world.drain_collisions().is_empty());
     }
@@ -461,7 +450,7 @@ mod tests {
         world.insert(c, Collider::aabb(32.0, 32.0));
 
         // Filter: only check pairs involving 'a'.
-        let mut sys = CollisionSystem::new();
+        let mut sys = EcsCollisionSystem::new();
         sys.track(a);
         sys.run(&mut world, 1.0 / 60.0);
 
@@ -525,13 +514,13 @@ mod tests {
 
         RenderSystem.run(&mut world, 1.0 / 60.0);
 
-        let cmds = world.get_resource::<RenderCommands>().unwrap();
+        let cmds = world.get_resource::<RenderCommandBuffer>().unwrap();
         // Clear + 2 sprites + Present
         assert!(cmds.commands.len() >= 4);
 
         // First draw should be the low-z-index sprite.
         match &cmds.commands[1] {
-            RenderCmd::DrawSprite { texture, z_index, .. } => {
+            DrawCommand::DrawSprite { texture, z_index, .. } => {
                 assert_eq!(texture, "bg.png");
                 assert_eq!(*z_index, 0);
             }
@@ -562,12 +551,12 @@ mod tests {
         world.insert(m, Health::new(50.0));
 
         world.insert_resource(GameCamera::new(800.0, 600.0));
-        world.insert_resource(RenderCommands::new());
+        world.insert_resource(RenderCommandBuffer::new());
         world.insert_resource(TimeState::default());
 
         let mut runner = super::super::ecs::SystemRunner::new();
         runner.add_system(Box::new(MovementSystem));
-        runner.add_system(Box::new(CollisionSystem::new()));
+        runner.add_system(Box::new(EcsCollisionSystem::new()));
         runner.add_system(Box::new(CameraSystem));
         runner.add_system(Box::new(HealthSystem));
         runner.add_system(Box::new(RenderSystem));

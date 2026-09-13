@@ -233,6 +233,16 @@ impl MemoryConsolidation {
     }
 
     /// 执行整合
+    ///
+    /// Note: Consolidation pipeline: (1) select short-term items exceeding importance threshold,
+    /// (2) compress content, (3) promote to long-term memory with boosted importance,
+    /// (4) remove consolidated items from short-term, (5) apply forgetting curve to long-term.
+    ///
+    /// Real implementation needs:
+    /// - Semantic deduplication before promotion (avoid duplicate long-term entries)
+    /// - Ebbinghaus forgetting curve with spaced repetition scheduling
+    /// - Cross-memory association building (episodic ↔ semantic links)
+    /// - Integration with KB for persistent storage beyond in-memory
     pub fn consolidate(&mut self) -> ConsolidationResult {
         let mut items_consolidated = 0;
         let items_forgotten = 0;
@@ -284,6 +294,13 @@ impl MemoryConsolidation {
     }
 
     /// 压缩内容
+    ///
+    /// STUB: Simple truncation with "[compressed]" marker — no real summarization.
+    /// Real implementation needs:
+    /// - LLM-based abstractive summarization (e.g., use local Ollama model)
+    /// - Extractive summarization with sentence importance scoring
+    /// - Preserve key facts (entity names, dates, technical terms)
+    /// - Adaptive compression ratio based on content complexity
     fn compress_content(&self, content: &str) -> String {
         // 简化版: 截断并添加摘要标记
         let max_length = (content.len() as f64 * self.config.compression_ratio) as usize;

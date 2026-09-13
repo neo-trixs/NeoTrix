@@ -89,7 +89,7 @@ impl TextureAtlas {
     }
 
     pub fn auto_grid(&mut self) {
-        let rows = (self.total_frames + self.columns - 1) / self.columns;
+        let _rows = (self.total_frames + self.columns - 1) / self.columns;
         for i in 0..self.total_frames {
             let col = i % self.columns;
             let row = i / self.columns;
@@ -360,9 +360,12 @@ impl SpriteBatch {
 
     /// Add a sprite from the atlas by frame index.
     pub fn add_sprite_frame(&mut self, frame: u32, dest: Rect, color: Color, alpha: f32, z_index: i32) {
-        if let Some(atlas) = &self.atlas {
-            let src = atlas.get_frame_region(frame).map(|r| Rect::new(r.x, r.y, r.width, r.height));
-            self.push_instance(&atlas.texture_path, SpriteInstance {
+        let key = self.atlas.as_ref().map(|a| {
+            let src = a.get_frame_region(frame).map(|r| Rect::new(r.x, r.y, r.width, r.height));
+            (a.texture_path.clone(), src)
+        });
+        if let Some((key, src)) = key {
+            self.push_instance(&key, SpriteInstance {
                 dest, src_rect: src, color, alpha,
                 flip_x: false, flip_y: false, rotation: 0.0, z_index,
             });

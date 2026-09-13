@@ -178,6 +178,16 @@ impl ExperienceKnowledgeBridge {
     }
 
     /// Layer 1->2: 蒸馏原始经验为知识
+    ///
+    /// Note: Groups raw experiences by skill used, then extracts success/failure patterns
+    /// when the group exceeds the distillation threshold. Produces KnowledgeEntry records
+    /// of type Pattern (from successes) and AntiPattern (from failures).
+    ///
+    /// Real implementation needs:
+    /// - Semantic clustering (not just skill name matching) for diverse experience grouping
+    /// - LLM-based pattern extraction instead of string concatenation
+    /// - Temporal weighting (recent experiences weighted higher)
+    /// - Confidence calibration based on experience count and variance
     pub fn distill(&mut self) -> Vec<KnowledgeEntry> {
         let mut new_knowledge = Vec::new();
 
@@ -369,6 +379,11 @@ impl ExperienceKnowledgeBridge {
     }
 
     fn extract_success_pattern(&self, successes: &[&RawExperience]) -> String {
+        // STUB: String concatenation of skill names and avg tokens — no real pattern extraction.
+        // Real implementation needs:
+        // - LLM summarization of success trajectories
+        // - Identify common step sequences across successful experiences
+        // - Extract decision points and their outcomes
         let skills: Vec<&str> = successes
             .iter()
             .flat_map(|e| e.skills_used.iter().map(|s| s.as_str()))
@@ -381,6 +396,11 @@ impl ExperienceKnowledgeBridge {
     }
 
     fn extract_failure_pattern(&self, failures: &[&RawExperience]) -> String {
+        // STUB: Error string collection — no real failure root cause analysis.
+        // Real implementation needs:
+        // - LLM-based failure classification (timeout, auth, logic, data)
+        // - Common failure mode identification across experiences
+        // - Counterfactual analysis: "what would have succeeded?"
         let errors: Vec<&str> = failures
             .iter()
             .filter_map(|e| e.error.as_deref())

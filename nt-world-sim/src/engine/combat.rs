@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use super::npc::NPC;
 use super::renderer::Vec2;
 use super::skill::{Skill, SkillManager, SkillEffect};
 
@@ -105,14 +104,14 @@ impl CombatEntity {
         for (i, effect) in self.status_effects.iter_mut().enumerate() {
             match effect {
                 StatusEffect::Poison { damage_per_sec, remaining, .. } => {
-                    let tick_dmg = damage_per_sec * dt;
+                    let tick_dmg = *damage_per_sec * dt;
                     self.hp = (self.hp - tick_dmg).max(0.0);
                     *remaining -= dt;
                     if *remaining <= 0.0 { to_remove.push(i); events.push(StatusEvent::PoisonExpired(self.name.clone())); }
                     else { events.push(StatusEvent::PoisonTick(self.name.clone(), tick_dmg)); }
                 }
                 StatusEffect::Regen { heal_per_sec, remaining, .. } => {
-                    let tick_heal = heal_per_sec * dt;
+                    let tick_heal = *heal_per_sec * dt;
                     self.hp = (self.hp + tick_heal).min(self.max_hp);
                     *remaining -= dt;
                     if *remaining <= 0.0 { to_remove.push(i); }
@@ -166,8 +165,8 @@ impl CombatEntity {
         let mut atk = self.attack;
         for effect in &self.status_effects {
             match effect {
-                StatusEffect::Buff { stat, amount, remaining } if *remaining > 0.0 && stat == "attack" => atk += amount,
-                StatusEffect::Debuff { stat, amount, remaining } if *remaining > 0.0 && stat == "attack" => atk -= amount,
+                StatusEffect::Buff { stat, amount, remaining, .. } if *remaining > 0.0 && stat == "attack" => atk += amount,
+                StatusEffect::Debuff { stat, amount, remaining, .. } if *remaining > 0.0 && stat == "attack" => atk -= amount,
                 _ => {}
             }
         }
@@ -179,8 +178,8 @@ impl CombatEntity {
         let mut def = self.defense;
         for effect in &self.status_effects {
             match effect {
-                StatusEffect::Shield { amount, remaining } if *remaining > 0.0 => def += amount,
-                StatusEffect::Debuff { stat, amount, remaining } if *remaining > 0.0 && stat == "defense" => def -= amount,
+                StatusEffect::Shield { amount, remaining, .. } if *remaining > 0.0 => def += amount,
+                StatusEffect::Debuff { stat, amount, remaining, .. } if *remaining > 0.0 && stat == "defense" => def -= amount,
                 _ => {}
             }
         }
@@ -527,8 +526,9 @@ impl CombatManager {
 
         let result = calc_combat_damage(&attacker, &defender, attacker.effective_attack());
 
-        let defender_mut = self.entities.get_mut(defender_id)?;
-        defender_mut.take_damage(result.clone());
+        if let Some(d) = self.entities.get_mut(defender_id) {
+            d.take_damage(result.clone());
+        }
 
         let msg = format!(
             "{} attacks {} for {:.0} damage{}!",
@@ -551,86 +551,119 @@ impl CombatManager {
 
     /// Execute a skill between two entities.
     pub fn execute_skill(&mut self, attacker_id: &str, defender_id: &str, skill_id: &str) -> Option<DamageResult> {
-        let attacker = self.entities.get(attacker_id)?.clone();
+        // Clone attacker to avoid borrow conflicts
+        let mut attacker = self.entities.get(attacker_id)?.clone();
         let defender = self.entities.get(defender_id)?.clone();
 
         if !attacker.is_alive() || !defender.is_alive() { return None; }
         if attacker.is_stunned() { return None; }
 
+        // Check if skill can be used and get cost
         let skill = attacker.skills.get(skill_id)?.clone();
         let cost = attacker.skills.use_skill(skill_id, attacker.mp as u32)?;
 
-        let attacker_mut = self.entities.get_mut(attacker_id)?;
-        attacker_mut.consume_mp(cost);
+        // Apply MP cost
+        if let Some(a) = self.entities.get_mut(attacker_id) {
+            a.consume_mp(cost);
+        }
 
         let result = calc_combat_damage(&attacker, &defender, skill.effective_damage());
 
-        let defender_mut = self.entities.get_mut(defender_id)?;
-        defender_mut.take_damage(result.clone());
+        // Apply damage
+        if let Some(d) = self.entities.get_mut(defender_id) {
+            d.take_damage(result.clone());
+        }
 
         // Apply skill effects
-        for effect in &skill.effects {
+        let attacker_name = attacker.name.clone();
+        let defender_name = defender.name.clone();
+        let skill_name = skill.name.clone();
+        let skill_effects = skill.effects.clone();
+
+        for effect in &skill_effects {
             match effect {
                 SkillEffect::Stun { duration } => {
-                    defender_mut.apply_status(StatusEffect::Stun { remaining: *duration });
+                    if let Some(d) = self.entities.get_mut(defender_id) {
+                        d.apply_status(StatusEffect::Stun { remaining: *duration });
+                    }
                 }
                 SkillEffect::Slow { amount, duration } => {
-                    defender_mut.apply_status(StatusEffect::Slow { amount: *amount, remaining: *duration });
+                    if let Some(d) = self.entities.get_mut(defender_id) {
+                        d.apply_status(StatusEffect::Slow { amount: *amount, remaining: *duration });
+                    }
                 }
                 SkillEffect::Poison { damage_per_sec, duration } => {
-                    defender_mut.apply_status(StatusEffect::Poison {
-                        damage_per_sec: *damage_per_sec,
-                        remaining: *duration,
-                        source: attacker.name.clone(),
-                    });
+                    if let Some(d) = self.entities.get_mut(defender_id) {
+                        d.apply_status(StatusEffect::Poison {
+                            damage_per_sec: *damage_per_sec,
+                            remaining: *duration,
+                            source: attacker_name.clone(),
+                        });
+                    }
                 }
                 SkillEffect::Heal(amount) => {
-                    attacker_mut.heal(*amount);
+                    if let Some(a) = self.entities.get_mut(attacker_id) {
+                        a.heal(*amount);
+                    }
                 }
                 SkillEffect::Shield { amount, duration } => {
-                    attacker_mut.apply_status(StatusEffect::Shield { amount: *amount, remaining: *duration });
+                    if let Some(a) = self.entities.get_mut(attacker_id) {
+                        a.apply_status(StatusEffect::Shield { amount: *amount, remaining: *duration });
+                    }
                 }
                 SkillEffect::Buff { stat, amount, duration } => {
-                    attacker_mut.apply_status(StatusEffect::Buff {
-                        stat: stat.clone(),
-                        amount: *amount,
-                        remaining: *duration,
-                        source: attacker.name.clone(),
-                    });
+                    if let Some(a) = self.entities.get_mut(attacker_id) {
+                        a.apply_status(StatusEffect::Buff {
+                            stat: stat.clone(),
+                            amount: *amount,
+                            remaining: *duration,
+                            source: attacker_name.clone(),
+                        });
+                    }
                 }
                 SkillEffect::Debuff { stat, amount, duration } => {
-                    defender_mut.apply_status(StatusEffect::Debuff {
-                        stat: stat.clone(),
-                        amount: *amount,
-                        remaining: *duration,
-                        source: attacker.name.clone(),
-                    });
+                    if let Some(d) = self.entities.get_mut(defender_id) {
+                        d.apply_status(StatusEffect::Debuff {
+                            stat: stat.clone(),
+                            amount: *amount,
+                            remaining: *duration,
+                            source: attacker_name.clone(),
+                        });
+                    }
                 }
                 SkillEffect::Lifesteal(pct) => {
                     let heal = result.final_damage * pct;
-                    attacker_mut.heal(heal);
+                    if let Some(a) = self.entities.get_mut(attacker_id) {
+                        a.heal(heal);
+                    }
                 }
                 SkillEffect::Knockback(force) => {
-                    let dx = defender_mut.position.x - attacker_mut.position.x;
-                    let dy = defender_mut.position.y - attacker_mut.position.y;
-                    let len = (dx * dx + dy * dy).sqrt().max(1.0);
-                    defender_mut.position.x += dx / len * force;
-                    defender_mut.position.y += dy / len * force;
+                    let attacker_pos = self.entities.get(attacker_id).map(|a| a.position);
+                    if let (Some(d), Some(a_pos)) = (
+                        self.entities.get_mut(defender_id),
+                        attacker_pos
+                    ) {
+                        let dx = d.position.x - a_pos.x;
+                        let dy = d.position.y - a_pos.y;
+                        let len = (dx * dx + dy * dy).sqrt().max(1.0);
+                        d.position.x += dx / len * force;
+                        d.position.y += dy / len * force;
+                    }
                 }
             }
         }
 
         let msg = format!(
             "{} uses {} on {} for {:.0} damage{}!",
-            attacker.name, skill.name, defender.name, result.final_damage,
+            attacker_name, skill_name, defender_name, result.final_damage,
             if result.is_crit { " (CRIT)" } else { "" }
         );
         self.event_log.push(msg.clone());
         self.state.log(CombatLogEntry {
             turn: self.state.turn_count,
-            attacker: attacker.name.clone(),
-            defender: defender.name.clone(),
-            skill: skill.name.clone(),
+            attacker: attacker_name,
+            defender: defender_name,
+            skill: skill_name,
             damage: result.final_damage,
             is_crit: result.is_crit,
             message: msg,

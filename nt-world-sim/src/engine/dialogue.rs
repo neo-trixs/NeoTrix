@@ -452,10 +452,12 @@ impl DialogueRunner {
             self.current_node = Some(choice.next_node.clone());
             // Fire enter events of next node
             if let Some(next_node) = self.tree.get_node(&choice.next_node) {
-                for event in &next_node.on_enter {
+                let enter_events = next_node.on_enter.clone();
+                let node_effects = next_node.effects.clone();
+                for event in &enter_events {
                     self.event_log.push(event.clone());
                 }
-                for effect in &next_node.effects {
+                for effect in &node_effects {
                     self.apply_effect(effect);
                     effects.push(effect.clone());
                 }

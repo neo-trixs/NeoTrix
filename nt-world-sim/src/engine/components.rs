@@ -1,7 +1,5 @@
-use std::fmt;
-
 use super::ecs::{Component, Entity};
-use super::renderer::{Color, Rect, Vec2};
+use super::renderer::{Color, DrawCommand, Rect, Vec2};
 
 // ---------------------------------------------------------------------------
 // Transform — position, rotation, scale
@@ -336,86 +334,34 @@ impl Default for TimeState {
     }
 }
 
-/// Render command buffer — systems append commands, the renderer consumes them.
+/// Render command buffer — systems append `DrawCommand`s, the renderer consumes them.
 #[derive(Debug, Clone)]
-pub struct RenderCommands {
-    pub commands: Vec<RenderCmd>,
+pub struct RenderCommandBuffer {
+    pub commands: Vec<DrawCommand>,
 }
 
-impl RenderCommands {
+impl RenderCommandBuffer {
     pub fn new() -> Self {
         Self { commands: Vec::new() }
     }
 
-    pub fn push(&mut self, cmd: RenderCmd) {
+    pub fn push(&mut self, cmd: DrawCommand) {
         self.commands.push(cmd);
     }
 
     pub fn clear(&mut self) {
         self.commands.clear();
     }
-}
 
-impl Default for RenderCommands {
-    fn default() -> Self {
-        Self::new()
+    pub fn drain(&mut self) -> Vec<DrawCommand> {
+        std::mem::take(&mut self.commands)
     }
 }
 
-/// A single render command to be consumed by the backend renderer.
-#[derive(Debug, Clone)]
-pub enum RenderCmd {
-    DrawSprite {
-        entity: Entity,
-        texture: String,
-        dest: Rect,
-        color: Color,
-        flip_x: bool,
-        flip_y: bool,
-        z_index: i32,
-    },
-    DrawRect {
-        dest: Rect,
-        color: Color,
-        z_index: i32,
-    },
-    DrawText {
-        text: String,
-        position: Vec2,
-        color: Color,
-        size: f32,
-    },
-    DrawCircle {
-        center: Vec2,
-        radius: f32,
-        color: Color,
-    },
-    DrawLine {
-        start: Vec2,
-        end: Vec2,
-        color: Color,
-        width: f32,
-    },
-    DebugAabb {
-        rect: Rect,
-        color: Color,
-    },
-    Clear {
-        color: Color,
-    },
-    Present,
-}
-
-// ---------------------------------------------------------------------------
-// CollisionResult — summary of a collision test for the CollisionSystem
-// ---------------------------------------------------------------------------
-
-/// Information about a detected collision between two entities.
-#[derive(Debug, Clone)]
-pub struct CollisionResult {
-    pub entity_a: Entity,
-    pub entity_b: Entity,
-    pub overlap: Overlap,
+impl Default for RenderCommandBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ---------------------------------------------------------------------------

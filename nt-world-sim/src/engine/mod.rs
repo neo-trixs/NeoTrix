@@ -11,53 +11,86 @@ pub mod particle;
 pub mod input_map;
 pub mod debug_overlay;
 pub mod ecs;
-pub mod components;
-pub mod systems;
 pub mod map;
+pub mod collision;
+pub mod mapgen;
 pub mod dialogue;
 pub mod quest;
 pub mod npc;
 pub mod resources;
+pub mod inventory;
+pub mod combat;
+pub mod skill;
 pub mod physics;
+pub mod components;
+pub mod systems;
+pub mod ui;
+pub mod effects;
 
 pub use renderer::{Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer};
-pub use renderer::{SpriteBatch, TilemapRenderer, ParticleSystem, DebugRenderer, ScreenEffects, GameRenderer};
+pub use renderer::{SpriteBatch, TextureAtlas, TilemapRenderer, ParticleSystem, DebugRenderer, ScreenEffects, GameRenderer};
 pub use renderer::{FrameTimer, DrawCallBatcher, PerformanceMetrics};
 pub use physics::{PhysicsEntity, BodyType, RigidBody, Collider as PhysicsCollider, CollisionInfo, PhysicsWorld, SimplePhysicsWorld};
 pub use input::{KeyCode, MouseButton, GamepadAxis, GamepadButton, InputState, InputProvider, SimpleInputProvider};
 pub use camera::{Camera2D, CameraBounds};
 pub use asset::{AssetServer, AssetHandle, TextureData, SoundData, FontData, GlyphData};
 
-// Core game loop
 pub use core::{GameState, StateStack, StackEntry, CoreEvent, CoreEventBus, LoopConfig, LoopTimer, GameEngine, GameLoopCallbacks};
-
-// ECS
 pub use ecs::{Entity, Component, World, System, SystemRunner, CollisionEvent};
 
-// Components
+// ECS components (game-level)
 pub use components::{
     Transform as EcsTransform, Velocity, GameSprite, Health, Collider,
     PlayerMarker, NpcMarker, MonsterMarker,
-    GameCamera, TimeState, RenderCommands, RenderCmd,
+    GameCamera, TimeState, RenderCommandBuffer,
 };
 
-// Systems
+// ECS systems
 pub use systems::{
-    MovementSystem, CollisionSystem, CameraSystem, HealthSystem,
+    MovementSystem, EcsCollisionSystem, CameraSystem, HealthSystem,
     RenderSystem, PlayerInfoSystem, NpcAiSystem, MonsterAiSystem,
 };
+pub use map::{Tile, TileProperty, CollisionType, MapLayer, TileMap as GameTileMap, AutoTileSystem, AutoTileFlags, FogOfWar, FogState, MinimapRenderer};
+pub use collision::{AABB, TileCollisionSystem, TileCollisionResult};
+pub use mapgen::{ValueNoise, Biome, RegionTemplate, MapGenConfig, MapGenerator, GeneratedMap};
 
-// Map
-pub use map::{Tile, TileProperty, MapLayer, TileMap as GameTileMap, AutoTileSystem, AutoTileFlags, FogOfWar, FogState, MinimapRenderer};
+pub use dialogue::{
+    DialogueNode, DialogueChoice, DialogueCondition, DialogueEffect, DialoguePortrait,
+    DialogueTree, DialogueRunner, DialogueNodeDisplay, ChoiceDisplay,
+    GameStateContext, QuestConditionState, PortraitPosition,
+};
 
-// Dialogue
-pub use dialogue::{DialogueNode, DialogueChoice, DialogueCondition, DialogueTree, DialogueRunner, DialogueNodeDisplay, ChoiceDisplay};
+pub use quest::{
+    Quest, QuestState, Objective, ObjectiveType, Reward, QuestManager, JournalEntry,
+};
 
-// Quest
-pub use quest::{Quest, QuestState, Objective, ObjectiveType, Reward, QuestManager, JournalEntry};
+pub use npc::{
+    NPC, NPCState, NPCBehavior, NPCSchedule, ScheduleEntry,
+    NPCRelationship, RelationTier, NPCManager, BehaviorTransition, NPCEvent,
+};
 
-// NPC
-pub use npc::{NPC, NPCState, NPCBehavior, NPCSchedule, ScheduleEntry, NPCRelationship, RelationTier, NPCManager};
+pub use inventory::{
+    Item, ItemType, EquipSlot, Rarity, ItemUseEffect,
+    InventorySlot, Inventory,
+};
 
-// Resources
+pub use combat::{
+    CombatEntity, CombatState, CombatManager, AutoCombatAI,
+    StatusEffect, DamageInput, DamageResult,
+    SkillCast, CombatLogEntry, AIDecision, LootTable, LootEntry, LootDrop,
+    StatusEvent, calculate_damage, calc_combat_damage,
+};
+
+pub use skill::{
+    Skill, SkillType, SkillTarget, SkillAffix, AffixType, AffixBonus,
+    SkillEffect, SkillCooldowns, SkillManager,
+};
+
 pub use resources::{ResourceHandle, ResourceManager, TypedResourceManager, ResourceLoader};
+
+// UI
+pub use ui::{UiTheme, Panel, Button, ButtonState, TextLabel, Bar, BarKind, InventoryGrid, UiMinimap, UIRenderer};
+pub use ui::InventorySlot as UiInventorySlot;
+
+// Effects
+pub use effects::{FloatingNumber, FloatingKind, FloatingNumberManager, SkillEffect as EffectSkillSkill, SkillEffectKind, SkillEffectManager, ScreenShake, EffectsRenderer};

@@ -110,6 +110,10 @@ impl LlmProviderType {
         }
     }
 
+    /// Whether this provider offers free-tier access (no paid API key required for basic usage).
+    ///
+    /// Note: Free providers may have rate limits, lower quality models, or data collection policies.
+    /// Used by gateway routing to prioritize free providers for cost-sensitive workloads.
     pub fn is_free(self) -> bool {
         matches!(self,
             Self::Gemini | Self::Groq | Self::OpenRouter | Self::Cerebras |
@@ -122,6 +126,11 @@ impl LlmProviderType {
         )
     }
 
+    /// Whether this provider requires an API key for authentication.
+    ///
+    /// Note: Keyless providers (Ollama, LLM7, ApiAirforce, etc.) can be used without
+    /// explicit credentials. Key-required providers return an error if no key is found
+    /// in config or environment variables.
     pub fn needs_api_key(self) -> bool {
         matches!(self,
             Self::OpenAI | Self::Anthropic | Self::Gemini | Self::Groq |
@@ -133,6 +142,11 @@ impl LlmProviderType {
         )
     }
 
+    /// Classify this provider into Local / Proxy / Cloud category.
+    ///
+    /// Note: Category drives network isolation policy — Local providers bypass egress
+    /// restrictions, Cloud providers are subject to allowlist checks, Proxy providers
+    /// are treated as Untrusted for privacy guard purposes.
     pub fn category(self) -> ProviderCategory {
         match self {
             Self::Ollama | Self::Vllm | Self::Sglang => ProviderCategory::Local,
@@ -904,6 +918,10 @@ pub fn create_provider(config: ProviderConfig) -> Arc<dyn LlmProvider> {
     Arc::from(provider)
 }
 
+/// Convenience wrapper: create a provider from type + optional API key with default config.
+///
+/// Note: Delegates to `create_provider(ProviderConfig { ... })` with default timeout/proxy.
+/// Prefer this over manual ProviderConfig construction for simple cases.
 pub fn create_provider_from_type(provider_type: LlmProviderType, api_key: Option<String>) -> Arc<dyn LlmProvider> {
     create_provider(ProviderConfig {
         provider_type,

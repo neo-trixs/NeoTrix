@@ -2670,7 +2670,9 @@ impl DownloadEngine {
                 if let Err(e) = check_disk_space(&first.dest, self.config.min_disk_space, 0) {
                     eprintln!("[dl] disk warning: {}", e);
                 }
-                let _ = fs::create_dir_all(parent).await;
+                if let Err(e) = fs::create_dir_all(parent).await {
+                    eprintln!("[dl] failed to create parent dir {}: {}", parent.display(), e);
+                }
             }
         }
 

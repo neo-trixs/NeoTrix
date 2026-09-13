@@ -145,7 +145,7 @@ impl Button {
 
     /// Check if screen position is inside the button.
     pub fn hit_test(&self, pos: Vec2) -> bool {
-        self.visible && self.enabled && self.rect.contains(pos)
+        self.visible && self.enabled && self.rect.contains(&pos)
     }
 
     pub fn set_state(&mut self, state: ButtonState) { self.state = state; }
@@ -333,7 +333,7 @@ impl InventoryGrid {
     }
 
     pub fn slot_at(&self, pos: Vec2) -> Option<(usize, usize)> {
-        if !self.rect.contains(pos) { return None; }
+        if !self.rect.contains(&pos) { return None; }
         let local_x = pos.x - self.rect.x;
         let local_y = pos.y - self.rect.y;
         let col = (local_x / (self.slot_size + self.gap)) as usize;

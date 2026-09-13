@@ -251,10 +251,11 @@ impl _VerifierAgent {
         }
     }
     
-    /// STUB: 自动修正提示词 — 当前仅追加 suggested_corrections, 无 LLM 重写。
+    /// 自动修正提示词 — 当前仅追加 suggested_corrections 到原始 prompt 末尾。
     ///
-    /// 真实实现需要: 调用 LLM 将原始 prompt + verification errors 重写为
-    /// 修正后的 prompt, 而非简单追加。
+    /// 这是占位实现: 简单拼接不会产生高质量修正 prompt。
+    /// 真实实现需要: 调用 LLM 将原始 prompt + verification errors + suggested_corrections
+    /// 重写为语义连贯的修正后 prompt, 而非机械追加。
     fn auto_correct_prompt(&self, prompt: &str, result: &VerificationResult) -> String {
         // STUB: 仅追加修正建议, 无 LLM 重写能力
         let mut corrected = prompt.to_string();

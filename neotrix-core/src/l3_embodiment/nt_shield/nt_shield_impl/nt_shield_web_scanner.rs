@@ -23,6 +23,14 @@ impl W3afEngine {
     }
     
     /// Crawl target and detect vulnerabilities
+    ///
+    /// STUB: Returns hardcoded mock vulnerability data — no real web crawling or scanning.
+    /// Real implementation needs:
+    /// - Spawn w3af subprocess: `w3af -b mechanize -u <target>`
+    /// - Parse spider output into `_UrlNode` tree with depth/child counts
+    /// - Run active audit plugins (SQLi, XSS, CSRF, path traversal)
+    /// - Parse w3af JSON findings into `_WebVuln` structures
+    /// - Rate limiting + crawl depth limits for large targets
     pub async fn scan(&mut self, target: &str) -> ScanResult {
         // TODO: w3af -b mechanize -u target
         // Architecture: L2 Perception (crawling) → L1 Body (exploitation tests)
@@ -68,6 +76,12 @@ impl W3afEngine {
     }
     
     /// Generate spider map of target
+    ///
+    /// Note: Builds a summary of crawled URL structure from prior scan results.
+    /// Real implementation needs:
+    /// - Aggregate `_UrlNode` tree into depth distribution histogram
+    /// - Identify vulnerable URL clusters for prioritized re-testing
+    /// - Export spider map for external consumption (NeoTrix UI / KB storage)
     pub fn _generate_spider_map(&self) -> _SpiderMap {
         _SpiderMap {
             total_urls: self.url_tree.len(),

@@ -401,17 +401,16 @@ impl Inventory {
                 }
                 if let Some(v) = entry["value"].as_u64() { item.value = v; }
                 if let Some(stack) = entry["max_stack"].as_u64() { item.max_stack = stack as u32; }
-                if let Some(slot) = item_type == ItemType::Equipment
-                    .then(|| entry["equip_slot"].as_str())
-                    .flatten()
-                {
-                    item.equip_slot = Some(match slot {
-                        "weapon" => EquipSlot::Weapon,
-                        "armor" => EquipSlot::Armor,
-                        "helmet" => EquipSlot::Helmet,
-                        "boots" => EquipSlot::Boots,
-                        _ => EquipSlot::Accessory,
-                    });
+                if item_type == ItemType::Equipment {
+                    if let Some(slot) = entry["equip_slot"].as_str() {
+                        item.equip_slot = Some(match slot {
+                            "weapon" => EquipSlot::Weapon,
+                            "armor" => EquipSlot::Armor,
+                            "helmet" => EquipSlot::Helmet,
+                            "boots" => EquipSlot::Boots,
+                            _ => EquipSlot::Accessory,
+                        });
+                    }
                 }
                 self.register_item(item);
             }

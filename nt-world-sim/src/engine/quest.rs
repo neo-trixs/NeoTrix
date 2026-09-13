@@ -365,45 +365,58 @@ impl QuestManager {
 
     pub fn accept_quest(&mut self, quest_id: &str) -> bool {
         if !self.check_prerequisites(quest_id) { return false; }
-        if let Some(quest) = self.quests.get_mut(quest_id) {
-            if quest.activate() {
-                self.add_journal(quest_id, &format!("Quest accepted: {}", quest.name));
-                self.event_log.push(format!("quest_accepted:{}", quest_id));
-                true
-            } else { false }
+        let result = self.quests.get_mut(quest_id).and_then(|q| {
+            if q.activate() {
+                let name = q.name.clone();
+                Some(name)
+            } else { None }
+        });
+        if let Some(name) = result {
+            self.add_journal(quest_id, &format!("Quest accepted: {}", name));
+            self.event_log.push(format!("quest_accepted:{}", quest_id));
+            true
         } else { false }
     }
 
     pub fn complete_quest(&mut self, quest_id: &str) -> bool {
-        if let Some(quest) = self.quests.get_mut(quest_id) {
-            if quest.complete() {
-                self.completed_quests.push(quest_id.to_string());
-                self.add_journal(quest_id, &format!("Quest completed: {}", quest.name));
-                self.event_log.push(format!("quest_completed:{}", quest_id));
-                true
-            } else { false }
+        let result = self.quests.get_mut(quest_id).and_then(|q| {
+            if q.complete() {
+                let name = q.name.clone();
+                Some(name)
+            } else { None }
+        });
+        if let Some(name) = result {
+            self.completed_quests.push(quest_id.to_string());
+            self.add_journal(quest_id, &format!("Quest completed: {}", name));
+            self.event_log.push(format!("quest_completed:{}", quest_id));
+            true
         } else { false }
     }
 
     pub fn fail_quest(&mut self, quest_id: &str) -> bool {
-        if let Some(quest) = self.quests.get_mut(quest_id) {
-            if quest.fail() {
-                self.add_journal(quest_id, &format!("Quest failed: {}", quest.name));
-                self.event_log.push(format!("quest_failed:{}", quest_id));
-                true
-            } else { false }
+        let result = self.quests.get_mut(quest_id).and_then(|q| {
+            if q.fail() {
+                let name = q.name.clone();
+                Some(name)
+            } else { None }
+        });
+        if let Some(name) = result {
+            self.add_journal(quest_id, &format!("Quest failed: {}", name));
+            self.event_log.push(format!("quest_failed:{}", quest_id));
+            true
         } else { false }
     }
 
     pub fn complete_objective(&mut self, quest_id: &str, objective_id: &str) -> bool {
-        if let Some(quest) = self.quests.get_mut(quest_id) {
-            if quest.state != QuestState::Active { return false; }
-            let completed = quest.complete_objective_by_id(objective_id, 1);
-            if completed {
-                self.add_journal(quest_id, &format!("Objective completed: {}", objective_id));
-                self.event_log.push(format!("objective_completed:{}:{}", quest_id, objective_id));
-            }
-            completed
+        let result = self.quests.get_mut(quest_id).and_then(|q| {
+            if q.state != QuestState::Active { return None; }
+            let completed = q.complete_objective_by_id(objective_id, 1);
+            if completed { Some(()) } else { None }
+        });
+        if result.is_some() {
+            self.add_journal(quest_id, &format!("Objective completed: {}", objective_id));
+            self.event_log.push(format!("objective_completed:{}:{}", quest_id, objective_id));
+            true
         } else { false }
     }
 
@@ -424,7 +437,7 @@ impl QuestManager {
     }
 
     pub fn is_completed(&self, quest_id: &str) -> bool {
-        self.completed_quests.contains(&quest_id)
+        self.completed_quests.contains(&quest_id.to_string())
     }
 
     pub fn quest_journal(&self, quest_id: &str) -> Vec<&JournalEntry> {
@@ -438,15 +451,19 @@ impl QuestManager {
         let mut completed = Vec::new();
         let quest_ids: Vec<String> = self.quests.keys().cloned().collect();
         for id in quest_ids {
-            if let Some(quest) = self.quests.get_mut(&id) {
-                if quest.state == QuestState::Active && quest.all_objectives_complete() {
-                    quest.state = QuestState::Complete;
-                    quest.repeat_count += 1;
-                    self.completed_quests.push(id.clone());
-                    self.add_journal(&id, &format!("Quest completed: {}", quest.name));
-                    self.event_log.push(format!("quest_completed:{}", id));
-                    completed.push(id);
-                }
+            let result = self.quests.get_mut(&id).and_then(|q| {
+                if q.state == QuestState::Active && q.all_objectives_complete() {
+                    q.state = QuestState::Complete;
+                    q.repeat_count += 1;
+                    let name = q.name.clone();
+                    Some(name)
+                } else { None }
+            });
+            if let Some(name) = result {
+                self.completed_quests.push(id.clone());
+                self.add_journal(&id, &format!("Quest completed: {}", name));
+                self.event_log.push(format!("quest_completed:{}", id));
+                completed.push(id);
             }
         }
         completed
@@ -457,13 +474,17 @@ impl QuestManager {
         let mut timed_out = Vec::new();
         let quest_ids: Vec<String> = self.quests.keys().cloned().collect();
         for id in quest_ids {
-            if let Some(quest) = self.quests.get_mut(&id) {
-                if quest.state == QuestState::Active && quest.is_timed_out() {
-                    quest.state = QuestState::Failed;
-                    self.add_journal(&id, &format!("Quest timed out: {}", quest.name));
-                    self.event_log.push(format!("quest_timed_out:{}", id));
-                    timed_out.push(id);
-                }
+            let result = self.quests.get_mut(&id).and_then(|q| {
+                if q.state == QuestState::Active && q.is_timed_out() {
+                    q.state = QuestState::Failed;
+                    let name = q.name.clone();
+                    Some(name)
+                } else { None }
+            });
+            if let Some(name) = result {
+                self.add_journal(&id, &format!("Quest timed out: {}", name));
+                self.event_log.push(format!("quest_timed_out:{}", id));
+                timed_out.push(id);
             }
         }
         timed_out

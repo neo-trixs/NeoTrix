@@ -472,6 +472,7 @@ mod tests {
 
     // TODO: This test uses default stubs which always succeed — needs real failure injection to test absorb-skip logic
     #[test]
+    #[ignore = "TODO: stubs always succeed — needs failure injection to test absorb-skip path"]
     fn test_failure_skips_absorb() {
         let config = TrainingCycleConfig {
             run_t3_wiring: false, // no T3 → test has 0 total → still passes

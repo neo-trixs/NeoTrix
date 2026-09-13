@@ -111,6 +111,11 @@ fn ensure_configured() {
     let _ = CONFIGURED.set(());
 }
 
+/// Check if the egress privacy guard is enabled.
+///
+/// Note: Returns the current runtime state of the global privacy guard switch.
+/// After first call, subsequent reads are zero-cost atomic loads.
+/// Useful for callers to short-circuit expensive scanning when guard is disabled.
 pub fn privacy_guard_enabled() -> bool {
     ensure_configured();
     PRIVACY_ENABLED.load(Ordering::Relaxed)

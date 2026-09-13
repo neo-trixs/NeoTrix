@@ -72,8 +72,16 @@ mod inner {
                 .format_reader
                 .tracks()
                 .iter()
-                .find(|t| t.id == self.track_id)
-                .expect("track must exist");
+                .find(|t| t.id == self.track_id);
+
+            let Some(track) = track else {
+                return AudioInfo {
+                    channels: 0,
+                    sample_rate: 0,
+                    duration_secs: None,
+                    codec: "unknown".into(),
+                };
+            };
 
             let params = &track.codec_params;
             let channels = params.channels.map(|c| c.count() as u16).unwrap_or(0);

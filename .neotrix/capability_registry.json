@@ -290,6 +290,22 @@
       "rationale": "经验 '[蒸馏-NT-CORE] 聚合 4 条经验的模式: 构建前把源码锁 444 可阻断 churn 在编译中途改写文件导致编译错误; 编译完成后 chmod 644 恢复可编辑。配合 'pkill -9 cargo/rustc' + CARGO_TARGET_DIR=/tmp/nt-target-absorb + NEOTRIX_NETWORK_UNBLOCK=1 可稳定复现干净构建。 [关键词: cargo, pkill, target, cargo构建锁竞争, lock, lock导致build挂起, rustc, 大crate编译时间长]' 命中能力标签 'failure_recovery' 于域 Core, 应强化对应能力节点",
       "signal": 0.76,
       "promoted_at": 1789271506
+    },
+    {
+      "domain": "NT-IO",
+      "capability": "architecture_decision",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-IO] 聚合 4 条经验的模式: UnifiedModelPool 统一模型池架构: ModelSource trait 作为插件接口, 统一本地 GGUF + 云端免费 API + 本地运行端点。两套旧系统 (FreeModelCatalog + llama_process::scan_models) 仅作为 ModelSource 插件实现, GatewayV2 通过 register_ [关键词: api, gguf, modelsource, unifiedmodelpool, 云端免费, free, freemodelcatalog, gateway]' 命中能力标签 'architecture_decision' 于域 Io, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1789296553
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76,
+      "promoted_at": 1789296553
     }
   ]
 }

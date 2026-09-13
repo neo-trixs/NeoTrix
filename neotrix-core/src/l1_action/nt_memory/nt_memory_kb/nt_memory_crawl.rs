@@ -1672,8 +1672,9 @@ mod tests {
     use super::is_safe_fetch_url;
 
     #[test]
+    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
     fn test_basic() {
-        assert!(true);
+        panic!("test_basic is a placeholder; implement real assertion or remove");
     }
 
     // arXiv export API 返回 feed, 首个 <title> 是 feed 级 "arXiv Query: ...",

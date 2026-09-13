@@ -37,6 +37,14 @@ impl GhidraAnalyzer {
     }
     
     /// Analyze binary for vulnerability patterns
+    ///
+    /// STUB: Returns hardcoded mock analysis — no real Ghidra execution.
+    /// Real implementation needs:
+    /// - Launch Ghidra headless: `analyzeHead -import <binary> -postScript Export.java`
+    /// - Parse Ghidra program database (`.rep`) for function signatures
+    /// - Feed decompiled output into VSA HyperCube for pattern matching
+    /// - Detect known vulnerability patterns (buffer overflow, use-after-free, format string)
+    /// - Cross-reference with CVE databases for known exploits
     pub async fn analyze_binary(&mut self, _binary_path: &str) -> AnalysisResult {
         // TODO: Launch Ghidra headless with Python API
         // Architecture: L1 Body execution, results → VSA embedding
@@ -69,6 +77,13 @@ impl GhidraAnalyzer {
     }
     
     /// Extract control flow graph
+    ///
+    /// STUB: Returns hardcoded graph metrics — no real CFG extraction.
+    /// Real implementation needs:
+    /// - Parse Ghidra decompiled output for basic blocks and edges
+    /// - Build CFG as adjacency list with loop/branch detection
+    /// - Identify critical paths (function entry → sensitive operations)
+    /// - Feed CFG into E8 Hexagram reasoning engine for vulnerability inference
     pub fn _extract_cfg(&self) -> _ControlFlowGraph {
         // TODO: Parse Ghidra decompiled output for CFG
         _ControlFlowGraph {

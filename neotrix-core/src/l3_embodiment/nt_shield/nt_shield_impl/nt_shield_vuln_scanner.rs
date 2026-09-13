@@ -74,6 +74,13 @@ impl NucleiEngine {
     }
     
     /// Convert nuclei template to GWT attack pattern
+    ///
+    /// Note: Maps a nuclei template ID to a GWT attention key for pattern-based routing.
+    /// Real implementation needs:
+    /// - Parse nuclei YAML template metadata (severity, tags, classification)
+    /// - Generate semantic attention key from template description + tags
+    /// - Map to E8 Hexagram reasoning state for vulnerability classification
+    /// - Store in HyperCube for associative retrieval during audit planning
     pub fn _template_to_gwt_pattern(&self, template_id: &str) -> _GWTAttackPattern {
         _GWTAttackPattern {
             template_id: template_id.to_string(),
@@ -83,6 +90,14 @@ impl NucleiEngine {
     }
     
     /// Extract VSA embedding from findings
+    ///
+    /// Note: Converts nuclei findings into VSA HyperCube vectors for associative recall.
+    /// Current implementation uses deterministic random vectors (placeholder).
+    /// Real implementation needs:
+    /// - Embed finding text (description + evidence) via word2vec/BERT
+    /// - Combine with severity-weighted encoding for salience scoring
+    /// - Store in KB VSA index for cross-audit pattern matching
+    /// - Enable analogical reasoning between similar vulnerability classes
     pub fn _findings_to_vsa(&self, findings: &[_NucleiFinding]) -> Vec<FhrrVector> {
         findings.iter()
             .map(|_f| {

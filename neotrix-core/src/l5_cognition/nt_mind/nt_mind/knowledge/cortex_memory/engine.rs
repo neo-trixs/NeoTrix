@@ -487,7 +487,8 @@ pub fn _inject_from_web_miner(
 #[cfg(test)]
 mod tests {
     #[test]
+    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
     fn test_placeholder() {
-        assert!(true);
+        panic!("test_placeholder is a placeholder; implement real assertion or remove");
     }
 }

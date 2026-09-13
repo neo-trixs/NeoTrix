@@ -137,7 +137,12 @@ impl SpriteBatchExt {
                     cmds.push(DrawCommand::DrawSprite {
                         texture: texture.clone(),
                         dest: Rect::new(entry.x, entry.y, entry.width, entry.height),
+                        src_rect: Some(Rect::new(entry.src_x, entry.src_y, entry.src_w, entry.src_h)),
                         color: entry.color,
+                        alpha: 1.0,
+                        flip_x: false,
+                        flip_y: false,
+                        rotation: 0.0,
                         z_index: entry.z_order,
                     });
                 }

@@ -1,4 +1,4 @@
-use crate::engine::renderer::{Color, Vec2, Camera, ParticleDrawVertex, DrawCommand, Rect};
+use crate::engine::renderer::{Color, Vec2, Camera, ParticleDrawVertex};
 
 #[derive(Debug, Clone)]
 pub struct ParticleAdvanced {

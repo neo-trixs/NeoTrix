@@ -20,7 +20,7 @@ pub enum SkillType {
 pub enum SkillTarget {
     SingleEnemy,
     AllEnemies,
-    Self,
+    Caster,
     Ally,
     AllAllies,
     Area,
@@ -291,6 +291,25 @@ pub struct SkillManager {
     skills: HashMap<String, Skill>,
     cooldowns: SkillCooldowns,
     skill_points: u32,
+}
+
+impl Clone for SkillManager {
+    fn clone(&self) -> Self {
+        Self {
+            skills: self.skills.clone(),
+            cooldowns: SkillCooldowns::new(), // Reset cooldowns on clone
+            skill_points: self.skill_points,
+        }
+    }
+}
+
+impl std::fmt::Debug for SkillManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SkillManager")
+            .field("skills", &self.skills)
+            .field("skill_points", &self.skill_points)
+            .finish()
+    }
 }
 
 impl SkillManager {

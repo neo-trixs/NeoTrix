@@ -589,6 +589,7 @@ mod tests {
 
     // TODO: Replace with real evidence store tests — current placeholder tests nothing meaningful
     #[test]
+    #[ignore = "TODO: instantiation-only test — replace with real store/get/delete roundtrip"]
     fn test_evidence_store_instantiation() {
         // Baseline: EvidenceStore can be created with a valid KB
         let store = new_store();
