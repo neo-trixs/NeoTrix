@@ -105,6 +105,10 @@ pub struct _ComplianceCheckResult {
 
 impl _GovernanceComplianceChecker {
     /// 创建新的治理合规检查器
+    ///
+    /// Note: Real implementation needs — rules are hardcoded in register_default_rules().
+    /// Consider: loading rules from config file, dynamic rule registration via EventBus,
+    /// and rule versioning for backward compatibility.
     pub fn new() -> Self {
         let mut checker = Self {
             rules: Vec::new(),
@@ -244,9 +248,14 @@ impl _GovernanceComplianceChecker {
 
     /// Evaluate a single governance rule against the check_type.
     ///
-    /// Note: STUB: Current implementation uses simple string contains() checks.
-    /// Real implementation needs: proper command AST parsing, git diff analysis,
-    /// and integration with actual build system for compile-time checks.
+    /// Build gate rules (`check_pre_commit_build`, `check_pre_push_build`) expect
+    /// the caller to provide build evidence in `check_type` (e.g., "cargo_check_passed").
+    /// If no build evidence is present, the rule fails — it does not fabricate a pass.
+    ///
+    /// Note: The actual `cargo check` / `cargo test` execution is NOT performed here.
+    /// This checker only validates that the caller has declared build status.
+    /// Real implementation needs: integration with build system for compile-time checks,
+    /// or structured check contexts (git diff, command AST).
     fn check_rule(&self, rule: &_GovernanceRule, check_type: &str) -> bool {
         match rule.check_fn.as_str() {
             "check_no_remote_push" => {
@@ -258,12 +267,12 @@ impl _GovernanceComplianceChecker {
                 !check_type.contains("kill")
             }
             "check_pre_commit_build" => {
-                // 检查编译状态
-                true // 简化版
+                // 需要调用方提供编译通过的证据
+                check_type.contains("cargo_check_passed") || check_type.contains("build_ok")
             }
             "check_pre_push_build" => {
-                // 检查编译状态
-                true // 简化版
+                // 需要调用方提供编译通过的证据
+                check_type.contains("cargo_check_passed") || check_type.contains("build_ok")
             }
             "check_no_unsafe" => {
                 // 检查 unsafe 代码
@@ -278,6 +287,10 @@ impl _GovernanceComplianceChecker {
     }
 
     /// 解决违规
+    ///
+    /// Note: Real implementation needs — resolution is tracked but not persisted.
+    /// Consider: resolution reason logging, audit trail, and integration with
+    /// compliance reporting for governance dashboards.
     pub(crate) fn _resolve_violation(&mut self, violation_id: &str) -> bool {
         if let Some(violation) = self.violations.iter_mut().find(|v| v.violation_id == violation_id) {
             violation.resolved = true;
@@ -289,11 +302,19 @@ impl _GovernanceComplianceChecker {
     }
 
     /// 获取所有规则
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by category/severity, rule versioning, and persistence
+    /// to KB for cross-session rule tracking.
     pub fn rules(&self) -> &[_GovernanceRule] {
         &self.rules
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn stats(&self) -> &_ComplianceStats {
         &self.stats
     }

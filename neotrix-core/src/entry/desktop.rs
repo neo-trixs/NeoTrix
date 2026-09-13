@@ -4,6 +4,7 @@ use tokio::sync::RwLock;
 
 use neotrix::neotrix::nt_io_neocodex::{NeoCodexUI, NeoCodexMode, NeoCodexAgent};
 use neotrix::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::core::nt_core_traits::BrainHandle;
 
 use neotrix::cli::commands::registry::default_registry;
 
@@ -16,8 +17,9 @@ pub(crate) async fn step_evolution(agent: &mut NeoCodexAgent) {
 
 
 pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: bool) {
+    let brain_handle: Arc<RwLock<dyn BrainHandle>> = agent.clone();
     let mut agent_ui = NeoCodexUI::new("neotrix-session");
-    agent_ui.agent.lock().await.set_brain(agent.clone());
+    agent_ui.agent.lock().await.set_brain(brain_handle);
 
     // Cycle 159b fix: ensure a real (non-stub) provider is selected at startup
     // so the ReAct loop is production-reachable instead of always falling back

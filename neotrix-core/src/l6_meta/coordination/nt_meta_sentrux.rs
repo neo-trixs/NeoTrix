@@ -128,6 +128,10 @@ impl SentruxSensor {
     }
 
     /// 扫描项目质量
+    ///
+    /// STUB: Currently returns hardcoded metric values (modularity=0.85, acyclicity=0.92, etc.)
+    /// without actual code analysis. Real implementation needs: AST parsing, dependency
+    /// graph analysis, and actual metric computation from source code.
     pub fn scan(&self, path: &str) -> Result<QualitySnapshot, String> {
         // 简化版: 计算基础指标
         let metrics = QualityMetrics {
@@ -155,6 +159,10 @@ impl SentruxSensor {
     }
 
     /// 检查规则
+    ///
+    /// STUB: Currently always reports a cycle violation regardless of actual dependency graph.
+    /// Real implementation needs: actual dependency graph analysis, cycle detection algorithms,
+    /// and rule evaluation against real code structure.
     pub(crate) fn _check_rules(&self, _path: &str) -> Result<Vec<QualityViolation>, String> {
         let mut violations = Vec::new();
 
@@ -174,11 +182,19 @@ impl SentruxSensor {
     }
 
     /// 保存 baseline
+    ///
+    /// Note: Real implementation needs — baseline is stored in-memory only.
+    /// Consider: persistence to KB for cross-session baseline tracking,
+    /// and baseline versioning for historical comparison.
     pub(crate) fn _save_baseline(&mut self, snapshot: QualitySnapshot) {
         self.baseline = Some(snapshot);
     }
 
     /// 比较当前与 baseline
+    ///
+    /// Note: Real implementation needs — comparison is simple score delta.
+    /// Consider: per-metric comparison, trend analysis, and configurable
+    /// degradation thresholds for quality gate integration.
     pub(crate) fn _compare_with_baseline(&self, current: &QualitySnapshot) -> Option<SessionComparison> {
         self.baseline.as_ref().map(|baseline| {
             let delta = current.score as i64 - baseline.score as i64;
@@ -199,6 +215,9 @@ impl SentruxSensor {
     }
 
     /// MCP 工具: scan
+    ///
+    /// Note: Real implementation needs — delegates to self.scan() which returns hardcoded values.
+    /// Consider: integrating with actual code analysis tools and returning real metrics.
     pub(crate) fn _mcp_scan(&self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(snapshot) => McpToolResult {
@@ -219,6 +238,9 @@ impl SentruxSensor {
     }
 
     /// MCP 工具: session_start
+    ///
+    /// Note: Real implementation needs — delegates to self.scan() which returns hardcoded values.
+    /// Consider: integrating with actual code analysis tools and returning real baseline metrics.
     pub(crate) fn _mcp_session_start(&mut self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(snapshot) => {
@@ -241,6 +263,9 @@ impl SentruxSensor {
     }
 
     /// MCP 工具: session_end
+    ///
+    /// Note: Real implementation needs — delegates to self.scan() which returns hardcoded values.
+    /// Consider: integrating with actual code analysis tools and returning real comparison results.
     pub(crate) fn _mcp_session_end(&self, path: &str) -> McpToolResult {
         match self.scan(path) {
             Ok(current) => {
@@ -265,6 +290,10 @@ impl SentruxSensor {
     }
 
     /// MCP 工具: _check_rules
+    ///
+    /// Note: Real implementation needs — delegates to self._check_rules() which always
+    /// reports cycle violations. Consider: actual dependency graph analysis and rule
+    /// evaluation against real code structure.
     pub(crate) fn _mcp_check_rules(&self, path: &str) -> McpToolResult {
         match self._check_rules(path) {
             Ok(violations) => {

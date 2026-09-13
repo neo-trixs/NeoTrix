@@ -663,10 +663,8 @@ fn set_proxy(&mut self, proxy_url: &str) {
 
 #[cfg(test)]
 mod tests {
-
-    #[test]
-    #[ignore = "TODO: replace with real test — current placeholder asserts nothing"]
-    fn test_basic() {
-        panic!("test_basic is a placeholder; implement real assertion or remove");
-    }
+    // TODO: No real tests implemented. This module needs tests for:
+    // - FreeProviderRegistry: registration, lookup, tier filtering
+    // - Free model quota tracking and rotation
+    // - Provider health-based demotion
 }

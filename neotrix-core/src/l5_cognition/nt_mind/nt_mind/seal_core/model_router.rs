@@ -20,30 +20,30 @@ pub fn default_config_path() -> PathBuf {
 }
 
 /// 从 TOML 文件加载路由配置
-pub fn _load_router_config(path: Option<PathBuf>) -> RouterConfig {
+pub fn _load_router_config(path: Option<PathBuf>) -> MindRouterConfig {
     let path = path.unwrap_or_else(default_config_path);
     if path.exists() {
         let content = match std::fs::read_to_string(&path) {
             Ok(c) => c,
             Err(e) => {
                 log::warn!("[router] read config: {}", e);
-                return RouterConfig::default();
+                return MindRouterConfig::default();
             }
         };
         match toml::from_str(&content) {
             Ok(config) => config,
             Err(e) => {
                 log::warn!("[router] parse config: {}", e);
-                RouterConfig::default()
+                MindRouterConfig::default()
             }
         }
     } else {
-        RouterConfig::default()
+        MindRouterConfig::default()
     }
 }
 
 /// 保存路由配置到 TOML 文件
-pub fn _save_router_config(config: &RouterConfig, path: Option<PathBuf>) -> Result<(), String> {
+pub fn _save_router_config(config: &MindRouterConfig, path: Option<PathBuf>) -> Result<(), String> {
     let path = path.unwrap_or_else(default_config_path);
     let toml_str = toml::to_string_pretty(config).map_err(|e| format!("序列化失败: {}", e))?;
     if let Some(parent) = path.parent() {
@@ -177,9 +177,9 @@ impl _RouterFeatures {
     }
 }
 
-/// 模型路由配置
+/// 模型路由配置 (NT-MIND model tier routing)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouterConfig {
+pub struct MindRouterConfig {
     pub enabled: bool,
     pub tier_thresholds: _TierThresholds,
     pub model_map: Vec<_TierModelMapping>,
@@ -207,7 +207,7 @@ pub struct _TierModelMapping {
     pub fallback_models: Vec<String>,
 }
 
-impl Default for RouterConfig {
+impl Default for MindRouterConfig {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -439,7 +439,7 @@ impl Default for _AdaptiveParams {
 }
 
 pub struct ModelRouter {
-    pub config: RouterConfig,
+    pub config: MindRouterConfig,
     pub history: Vec<_RouteHistoryEntry>,
     pub adaptive_params: _AdaptiveParams,
     config_path: Option<std::path::PathBuf>,
@@ -545,7 +545,7 @@ impl Default for ModelRouter {
 impl ModelRouter {
     pub fn new() -> Self {
         Self {
-            config: RouterConfig::default(),
+            config: MindRouterConfig::default(),
             history: Vec::new(),
             adaptive_params: _AdaptiveParams::default(),
             config_path: None,

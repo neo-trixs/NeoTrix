@@ -107,7 +107,7 @@ pub struct NeoCodexAgent {
     pub consciousness: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     pub event_bus: Option<crate::neotrix::nt_core_event_bus::EventBus>,
     pub brain: Option<
-        Arc<tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain>>,
+        Arc<tokio::sync::RwLock<dyn crate::core::nt_core_traits::BrainHandle>>,
     >,
     // Cycle 112b additions
     pub hooks: LifecycleHookRegistry,
@@ -230,7 +230,7 @@ impl NeoCodexAgent {
     pub fn set_brain(
         &mut self,
         brain: Arc<
-            tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain>,
+            tokio::sync::RwLock<dyn crate::core::nt_core_traits::BrainHandle>,
         >,
     ) {
         self.brain = Some(brain);

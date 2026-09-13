@@ -300,12 +300,16 @@ mod tests {
 
     #[test]
     fn test_keyless_providers_have_budget_caps() {
+        // HONESTY: Monthly token caps are hardcoded from provider documentation.
+        // Provider limits may change. TODO: Replace with dynamic quota discovery
+        // or config-driven caps once a rate-limit introspection mechanism exists.
         let pool = FreePool::new();
         let expected_caps = [("llm7", 1_000_000), ("opencode-zen", 2_000_000), ("api-airforce", 1_000_000)];
         for (name, expected_cap) in &expected_caps {
             let budget = pool.get_budget(name).unwrap_or_else(|| panic!("{} should have a budget", name));
             assert!(budget.is_keyless, "{} should be keyless", name);
-            assert_eq!(budget.monthly_token_cap, *expected_cap, "{} should have cap {}", name, expected_cap);
+            assert_eq!(budget.monthly_token_cap, *expected_cap,
+                "{} cap mismatch — provider limit may have changed", name);
         }
     }
 }

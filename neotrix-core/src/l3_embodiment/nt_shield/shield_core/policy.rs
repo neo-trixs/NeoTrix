@@ -210,6 +210,16 @@ impl Default for ActionPolicy {
     }
 }
 
+impl crate::core::nt_core_traits::NetworkPolicy for ActionPolicy {
+    fn check_network_access(&self, domain: &str) -> crate::core::nt_core_traits::NetworkPolicyResult {
+        match self.evaluate_network(domain) {
+            PolicyDecision::Allow => crate::core::nt_core_traits::NetworkPolicyResult::Allow,
+            PolicyDecision::RequireConfirmation => crate::core::nt_core_traits::NetworkPolicyResult::RequireConfirmation,
+            PolicyDecision::Deny => crate::core::nt_core_traits::NetworkPolicyResult::Deny,
+        }
+    }
+}
+
 impl SelfTest for ActionPolicy {
     fn name(&self) -> &str { "action_policy" }
     fn self_test(&self) -> Result<(), Vec<String>> {

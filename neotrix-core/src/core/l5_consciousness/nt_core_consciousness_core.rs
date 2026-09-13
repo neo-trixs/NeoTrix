@@ -2356,19 +2356,23 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         "build_watchdog" => {
             let config = crate::l6_meta::coordination::nt_meta_build_watchdog::WatchdogConfig::default();
             let mut watchdog = crate::l6_meta::coordination::nt_meta_build_watchdog::BuildWatchdog::new(config);
-            let status_result = watchdog.check_health();
-            let stats = watchdog.stats();
-            let health_pct = (status_result.overall_health * 100.0) as u32;
-            (
-                true,
-                format!(
-                    "构建健康检查:\n  健康度: {}% | 总检查: {} | 成功: {} | 失败: {}",
-                    health_pct,
-                    stats.total_checks,
-                    stats.successful_builds,
-                    stats.failed_builds,
-                ),
-            )
+            match watchdog.check_health() {
+                Ok(status_result) => {
+                    let stats = watchdog.stats();
+                    let health_pct = (status_result.overall_health * 100.0) as u32;
+                    (
+                        true,
+                        format!(
+                            "构建健康检查:\n  健康度: {}% | 总检查: {} | 成功: {} | 失败: {}",
+                            health_pct,
+                            stats.total_checks,
+                            stats.successful_builds,
+                            stats.failed_builds,
+                        ),
+                    )
+                }
+                Err(e) => (false, format!("构建健康检查失败: {e}")),
+            }
         }
         // ── Shield security (nt_shield) ──
         "shield_audit" => {

@@ -314,7 +314,7 @@ impl MonitoredCapability {
         let duration = start.elapsed().as_millis() as u64;
 
         // 记录日志
-        let mut collector = self.collector.lock().unwrap();
+        let mut collector = self.collector.lock().unwrap_or_else(|e| e.into_inner());
         collector.log(LogEntry {
             timestamp: start,
             level: if result.is_ok() {

@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 use crate::core::l2_perception::nt_core_llm::{LlmRequest, LlmResponse};
 
 use super::traits::{
-    ModelError, ModelHealth, ModelIdentifier, TaskType, UniversalModel,
+    ModelError, ModelHealth, TaskType, UniversalModel,
 };
 
 /// Fallback 链配置
@@ -175,7 +175,7 @@ impl FallbackRouter {
         let eligible = self.eligible_models(task_type).await;
         let mut last_error = None;
 
-        for (attempt, (idx, model)) in eligible.iter().enumerate() {
+        for (attempt, (_idx, model)) in eligible.iter().enumerate() {
             if attempt >= self.config.max_attempts {
                 break;
             }

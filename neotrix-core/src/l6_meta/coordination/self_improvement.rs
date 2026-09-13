@@ -82,6 +82,8 @@ pub enum PlanStatus {
     Adopted,
     /// 已执行
     Executed,
+    /// 已跳过 (执行引擎未接线, 不伪造成功)
+    Skipped,
     /// 已回滚
     RolledBack,
     /// 已拒绝
@@ -221,6 +223,10 @@ impl SelfImprovementLoop {
     // ── Stage 1: 采集指标 ──
 
     /// 采集系统指标快照
+    ///
+    /// Note: Real implementation needs — metrics are provided by caller.
+    /// Consider: automatic metrics collection from EventBus, KB queries,
+    /// and system health aggregators for unbiased metric collection.
     pub fn collect_metrics(&mut self, metrics: SystemMetrics) {
         self.metrics_history.push(metrics);
         self.prune_history();
@@ -230,6 +236,10 @@ impl SelfImprovementLoop {
     // ── Stage 2: 诊断 ──
 
     /// 诊断系统瓶颈, 基于指标趋势分析
+    ///
+    /// Note: Real implementation needs — diagnosis is based on simple threshold comparisons.
+    /// Consider: statistical process control (SPC), anomaly detection algorithms,
+    /// and correlation analysis across multiple metrics.
     pub fn diagnose(&self) -> DiagnosticResult {
         let mut issues = Vec::new();
 
@@ -350,6 +360,10 @@ impl SelfImprovementLoop {
     // ── Stage 3: 生成改进方案 ──
 
     /// 基于诊断结果生成改进方案
+    ///
+    /// Note: Real implementation needs — plans are generated from hardcoded templates.
+    /// Consider: LLM-based plan generation, historical effectiveness tracking,
+    /// and cost-benefit analysis for plan prioritization.
     pub(crate) fn _generate_plans(&mut self, diagnosis: &DiagnosticResult) -> Vec<ImprovementPlan> {
         let mut plans = Vec::new();
 
@@ -378,16 +392,16 @@ impl SelfImprovementLoop {
 
     // ── Stage 4: 评估并执行 ──
 
-    /// 评估方案收益, 采纳最优方案 (最多 3 个) — **STUB: 标记为 Executed 但未执行实际参数调整。**
+    /// 评估方案收益, 采纳最优方案 (最多 3 个) — 标记为 `Skipped` 而非伪造执行成功。
     ///
-    /// 当前实现将 `Generated` 状态的方案直接标记为 `Executed`,
-    /// 不执行任何实际的参数调整或系统修改。
+    /// 当前实现将 `Generated` 状态的方案标记为 `Skipped`,
+    /// 不执行任何实际的参数调整或系统修改, 因为执行引擎尚未接线。
     ///
     /// 真实实现需要: 对每个候选方案进行收益评估 (ROI estimation),
     /// 然后调用对应的参数调整逻辑 (如修改模型配置、调整权重、更新阈值)。
     pub(crate) fn _evaluate_and_apply(&mut self, _max_applied: usize) -> Vec<ImprovementPlan> {
         tracing::warn!(
-            "STUB _evaluate_and_apply: marking plans as Executed without actual parameter adjustment. \
+            "STUB _evaluate_and_apply: plans marked Skipped (not wired). \
              Wire ROI estimation + parameter adjustment logic."
         );
         let pending: Vec<_> = self
@@ -400,15 +414,18 @@ impl SelfImprovementLoop {
 
         for plan in &pending {
             if let Some(p) = self.plans.iter_mut().find(|p| p.plan_id == plan.plan_id) {
-                p.status = PlanStatus::Executed;
+                p.status = PlanStatus::Skipped;
             }
         }
 
-        self.executed.extend(pending.clone());
         pending
     }
 
     /// 回滚已执行的方案
+    ///
+    /// Note: Real implementation needs — rollback only updates status without
+    /// restoring original parameter values. Consider: parameter snapshot storage,
+    /// rollback execution logic, and rollback verification.
     pub fn rollback(&mut self, plan_id: &str) -> bool {
         if let Some(plan) = self.executed.iter().find(|p| p.plan_id == plan_id) {
             let mut rolled = plan.clone();
@@ -426,8 +443,13 @@ impl SelfImprovementLoop {
     // ── Stage 5: 验证 ──
 
     /// 验证改进效果 — 对比执行前后的指标
+    ///
+    /// Note: 执行引擎未接线 (`_evaluate_and_apply` 标记 Skipped),
+    /// `self.executed` 为空, 验证仅对比指标趋势变化, 不关联具体方案。
+    /// 真实实现需要在 `_evaluate_and_apply` 实际执行参数调整后,
+    /// 对比调整前后的系统指标变化。
     pub fn verify(&self) -> Option<VerificationResult> {
-        if self.metrics_history.len() < 2 || self.executed.is_empty() {
+        if self.metrics_history.len() < 2 {
             return None;
         }
 
@@ -445,7 +467,7 @@ impl SelfImprovementLoop {
             token_delta,
             skill_delta,
             overall_improved: improved,
-            _executed_plans: self.executed.len(),
+            _executed_plans: 0, // 执行引擎未接线, 无已执行方案
             timestamp: timestamp_now(),
         })
     }
@@ -453,6 +475,10 @@ impl SelfImprovementLoop {
     // ── 完整循环 ──
 
     /// 运行一次完整的自改进循环
+    ///
+    /// Note: Real implementation needs — cycle runs synchronously.
+    /// Consider: async execution with cancellation support, progress reporting
+    /// via EventBus, and configurable cycle intervals for background execution.
     pub fn run_cycle(&mut self) -> CycleResult {
         let start = timestamp_now();
 
@@ -485,6 +511,10 @@ impl SelfImprovementLoop {
     // ── 内部工具 ──
 
     /// 根据维度生成具体改进操作
+    ///
+    /// Note: Real implementation needs — actions are hardcoded templates.
+    /// Consider: LLM-based action generation, historical effectiveness tracking,
+    /// and integration with actual parameter adjustment logic.
     fn actions_for_dimension(
         &self,
         dimension: &ImprovementDimension,
@@ -551,11 +581,19 @@ impl SelfImprovementLoop {
     }
 
     /// 严重程度 → 优先级 (severity 0.0-1.0 → priority 1-10)
+    ///
+    /// Note: Real implementation needs — linear mapping is simplistic.
+    /// Consider: logarithmic scaling for high-severity issues, priority caps,
+    /// and consideration of historical impact when prioritizing.
     fn severity_to_priority(severity: f64) -> u8 {
         ((severity * 9.0) + 1.0).round() as u8
     }
 
     /// 保留最近 N 条历史
+    ///
+    /// Note: Real implementation needs — simple drain from front.
+    /// Consider: time-based pruning (keep last 7 days), size-based pruning
+    /// with importance weighting, and persistence to KB before pruning.
     fn prune_history(&mut self) {
         let len = self.metrics_history.len();
         if len > self.max_history {
@@ -564,6 +602,10 @@ impl SelfImprovementLoop {
     }
 
     /// 基于指标历史更新趋势
+    ///
+    /// Note: Real implementation needs — trend detection uses simple delta comparison.
+    /// Consider: exponential moving averages, seasonality detection, and
+    /// multi-metric correlation analysis for trend identification.
     fn update_trends(&mut self) {
         if self.metrics_history.len() < 2 {
             return;
@@ -625,16 +667,26 @@ impl SelfImprovementLoop {
     // ── 查询接口 ──
 
     /// 获取最近指标
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: time-window filtering, metric type filtering, and persistence
+    /// to KB for cross-session metric tracking.
     pub fn latest_metrics(&self) -> Option<&SystemMetrics> {
         self.metrics_history.last()
     }
 
     /// 获取当前趋势
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by trend direction, metric name, and streak length.
     pub fn trends(&self) -> &[MetricTrend] {
         &self.trends
     }
 
     /// 获取待执行方案
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by priority, dimension, and time range.
     pub(crate) fn _pending_plans(&self) -> Vec<&ImprovementPlan> {
         self.plans
             .iter()
@@ -643,11 +695,18 @@ impl SelfImprovementLoop {
     }
 
     /// 获取已执行方案
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by execution status, time range, and success/failure.
     pub(crate) fn _executed_plans(&self) -> &[ImprovementPlan] {
         &self.executed
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn stats(&self) -> LoopStats {
         LoopStats {
             cycle_count: self.cycle_count,
@@ -715,19 +774,19 @@ fn timestamp_now() -> i64 {
 mod tests {
     use super::*;
 
-    // TODO: sample_metrics fabricates all metric values — avg_tokens, skill_hit_rate,
-    // crystallization_rate, knowledge_retention, error_recovery_rate are hardcoded constants,
-    // NOT derived from real system observation. Tests below verify loop mechanics
-    // (collect/diagnose/trend/plan) against fabricated inputs. Replace with real
-    // metrics collection from EventBus or KB once self-observation wiring exists.
+    // TODO(R-P79): sample_metrics fabricates all metric values. Tests below verify
+    // loop mechanics (collect/diagnose/trend/plan) against fabricated inputs.
+    // Replace with real metrics from EventBus or KB once self-observation wiring exists.
+    // HONESTY: These tests prove the loop engine works mechanically, NOT that it
+    // produces meaningful improvements for the real system.
     fn sample_metrics(success_rate: f64) -> SystemMetrics {
         SystemMetrics {
             success_rate,
-            avg_tokens: 1000.0,       // FABRICATED — not from real token accounting
-            skill_hit_rate: 0.4,      // FABRICATED — not from real skill命中率
-            crystallization_rate: 0.2, // FABRICATED — not from real crystallization
-            knowledge_retention: 0.8,  // FABRICATED — not from real KB retention
-            error_recovery_rate: 0.6,  // FABRICATED — not from real error recovery
+            avg_tokens: 1000.0,
+            skill_hit_rate: 0.4,
+            crystallization_rate: 0.2,
+            knowledge_retention: 0.8,
+            error_recovery_rate: 0.6,
             timestamp: timestamp_now(),
         }
     }
@@ -742,10 +801,10 @@ mod tests {
 
     #[test]
     fn test_collect_metrics_and_diagnose() {
-        // TODO: All inputs are fabricated via sample_metrics(). This test verifies
-        // that the diagnose() function reacts to declining success_rate values,
-        // but the declining values are manually chosen constants, not real observations.
-        // Once real metrics wiring exists, replace with assertions on actual system behavior.
+        // Verifies diagnose() reacts to declining success_rate values.
+        // HONESTY: The declining values are manually chosen constants, not real
+        // observations. Once real metrics wiring exists, replace with assertions
+        // on actual system behavior.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.7));
@@ -763,9 +822,8 @@ mod tests {
 
     #[test]
     fn test_generate_plans() {
-        // TODO: Inputs fabricated. This only verifies plan generation produces
-        // non-empty output when given a declining metrics pattern. Plan quality
-        // and relevance to real system state are NOT validated.
+        // Verifies plan generation produces non-empty output for declining metrics.
+        // HONESTY: Plan quality and relevance to real system state are NOT validated.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.6));
@@ -778,9 +836,9 @@ mod tests {
 
     #[test]
     fn test_run_full_cycle() {
-        // TODO: Fabricated inputs. Verifies cycle executes without panic and
-        // produces non-zero counts. Does NOT verify plans address real issues
-        // or that applied plans have real effect.
+        // Verifies cycle executes without panic and produces non-zero counts.
+        // HONESTY: Does NOT verify plans address real issues or that applied
+        // plans have real effect.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.65));
@@ -799,8 +857,8 @@ mod tests {
 
     #[test]
     fn test_trends_update() {
-        // TODO: Fabricated declining sequence (0.9→0.8→0.7). Verifies trend
-        // detection math, but does NOT validate against real system degradation.
+        // Verifies trend detection math against a fabricated declining sequence.
+        // HONESTY: Does NOT validate against real system degradation.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.8));
@@ -816,8 +874,8 @@ mod tests {
 
     #[test]
     fn test_rollback() {
-        // TODO: Fabricated inputs. Verifies rollback removes a plan from executed
-        // list, but the plan was generated from fabricated metrics, not real issues.
+        // Verifies rollback removes a plan from executed list.
+        // HONESTY: The plan was generated from fabricated metrics, not real issues.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.6));

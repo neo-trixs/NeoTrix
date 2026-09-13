@@ -14,14 +14,14 @@ pub struct ResourceRouter {
     /// 路由历史
     pub routing_history: Vec<RoutingRecord>,
     /// 路由配置
-    pub config: RouterConfig,
+    pub config: CoreRouterConfig,
     /// 资源使用统计
     pub usage_stats: HashMap<String, ResourceUsage>,
 }
 
-/// 路由配置
+/// 路由配置 (NT-CORE resource routing)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouterConfig {
+pub struct CoreRouterConfig {
     /// 最大历史记录
     pub max_history: usize,
     /// 最大重试次数
@@ -32,7 +32,7 @@ pub struct RouterConfig {
     pub cost_optimization: bool,
 }
 
-impl Default for RouterConfig {
+impl Default for CoreRouterConfig {
     fn default() -> Self {
         Self {
             max_history: 1000,
@@ -222,7 +222,7 @@ pub struct ResourceUsage {
 
 impl ResourceRouter {
     /// 创建新的资源路由器
-    pub fn new(config: RouterConfig) -> Self {
+    pub fn new(config: CoreRouterConfig) -> Self {
         Self {
             resource_pool: Vec::new(),
             routing_history: Vec::new(),
@@ -416,14 +416,14 @@ mod tests {
 
     #[test]
     fn test_router_creation() {
-        let router = ResourceRouter::new(RouterConfig::default());
+        let router = ResourceRouter::new(CoreRouterConfig::default());
         assert_eq!(router.resource_pool.len(), 0);
         assert_eq!(router.routing_history.len(), 0);
     }
 
     #[test]
     fn test_route_task() {
-        let mut router = ResourceRouter::new(RouterConfig::default());
+        let mut router = ResourceRouter::new(CoreRouterConfig::default());
         let request = RoutingRequest {
             id: "req_1".to_string(),
             task_type: TaskType::SimpleQA,

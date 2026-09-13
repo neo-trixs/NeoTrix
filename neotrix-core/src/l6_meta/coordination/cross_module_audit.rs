@@ -83,6 +83,10 @@ impl CrossModuleAudit {
     }
     
     /// 执行跨模块一致性检查
+    ///
+    /// Note: Real implementation needs — checks are executed sequentially.
+    /// Consider: parallel check execution, weighted scoring across dimensions,
+    /// and configurable severity thresholds for each check type.
     pub fn check(
         &self,
         dynamic_params: &[DynamicParams],

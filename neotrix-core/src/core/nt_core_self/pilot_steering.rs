@@ -147,7 +147,7 @@ impl PilotSupervisor {
                 }
 
                 // 分析轨迹中的失败模式
-                let traces = self.traces.lock().unwrap();
+                let traces = self.traces.lock().unwrap_or_else(|e| e.into_inner());
                 let recent_failures: Vec<_> = traces
                     .iter()
                     .rev()
@@ -181,8 +181,8 @@ impl PilotSupervisor {
 
     /// 提取失败模式并记录到共享内存
     pub fn extract_failure_patterns(&self) -> Vec<FailurePattern> {
-        let traces = self.traces.lock().unwrap();
-        let mut patterns = self.failure_patterns.lock().unwrap();
+        let traces = self.traces.lock().unwrap_or_else(|e| e.into_inner());
+        let mut patterns = self.failure_patterns.lock().unwrap_or_else(|e| e.into_inner());
         let mut new_patterns = Vec::new();
 
         // 按错误类型聚合失败
@@ -218,17 +218,17 @@ impl PilotSupervisor {
 
     /// 获取所有已知失败模式
     pub fn get_failure_patterns(&self) -> Vec<FailurePattern> {
-        self.failure_patterns.lock().unwrap().values().cloned().collect()
+        self.failure_patterns.lock().unwrap_or_else(|e| e.into_inner()).values().cloned().collect()
     }
 
     /// 获取当前 worker 状态
     pub fn get_worker_state(&self) -> WorkerState {
-        self.worker_state.lock().unwrap().clone()
+        self.worker_state.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// 获取执行轨迹
     pub fn get_traces(&self) -> Vec<TracePoint> {
-        self.traces.lock().unwrap().clone()
+        self.traces.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 }
 
@@ -357,7 +357,7 @@ impl PilotSystem {
                     worker.accept_task(new_task.clone());
                 }
                 // 记录重定向
-                let mut state = self.supervisor.worker_state.lock().unwrap();
+                let mut state = self.supervisor.worker_state.lock().unwrap_or_else(|e| e.into_inner());
                 if let WorkerState::Running { task_id, .. } = &*state {
                     let from = task_id.clone();
                     *state = WorkerState::Redirected {

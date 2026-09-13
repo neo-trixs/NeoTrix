@@ -133,12 +133,20 @@ impl IntegrationPointManager {
     }
 
     /// 添加集成点
+    ///
+    /// Note: Real implementation needs — integration point insertion without validation.
+    /// Consider: duplicate detection, compliance status calculation, and EventBus
+    /// notification when new integration points are added.
     pub(crate) fn _add_integration_point(&mut self, point: IntegrationPoint) {
         self._integration_points.push(point);
         self.stats.total_points += 1;
     }
 
     /// 审计模块集成
+    ///
+    /// Note: Real implementation needs — audit checks minimum point count only.
+    /// Consider: integration type coverage analysis, dependency graph validation,
+    /// and compliance status persistence to KB for tracking.
     pub(crate) fn _audit_module(&self, module_name: &str) -> IntegrationAuditResult {
         let module_points: Vec<&IntegrationPoint> = self._integration_points
             .iter()
@@ -198,11 +206,19 @@ impl IntegrationPointManager {
     }
 
     /// 获取所有集成点
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by module name, integration type, and status,
+    /// and pagination for large result sets.
     pub(crate) fn _integration_points(&self) -> &[IntegrationPoint] {
         &self._integration_points
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn stats(&self) -> &IntegrationPointStats {
         &self.stats
     }

@@ -142,6 +142,10 @@ impl IntegrationPatternLibrary {
     }
 
     /// 注册默认模式
+    ///
+    /// Note: Real implementation needs — patterns are hardcoded templates.
+    /// Consider: loading patterns from config file, pattern versioning,
+    /// and dynamic pattern registration via EventBus.
     fn register_default_patterns(&mut self) {
         // 模式1: 委托模式 (R-P42)
         self.patterns.push(IntegrationPattern {
@@ -211,6 +215,10 @@ impl IntegrationPatternLibrary {
     }
 
     /// 推荐集成模式
+    ///
+    /// Note: Real implementation needs — recommendation is based on module name prefix only.
+    /// Consider: analyzing module interfaces, dependency patterns, and historical
+    /// integration success rates for more accurate recommendations.
     pub(crate) fn _recommend_pattern(&self, source: &str, target: &str) -> Option<&IntegrationPattern> {
         // 根据模块类型推荐模式
         if source.starts_with("nt_") && target.starts_with("nt_") {
@@ -223,6 +231,10 @@ impl IntegrationPatternLibrary {
     }
 
     /// 创建集成计划
+    ///
+    /// Note: Real implementation needs — step dependencies are sequential only.
+    /// Consider: dependency graph analysis, parallel step execution planning,
+    /// and resource allocation for multi-step integrations.
     pub fn create_plan(&self, source: &str, target: &str, pattern_id: &str) -> Option<IntegrationPlan> {
         let pattern = self.patterns.iter().find(|p| p.pattern_id == pattern_id)?;
 
@@ -247,6 +259,10 @@ impl IntegrationPatternLibrary {
     }
 
     /// 检查集成是否符合规则
+    ///
+    /// Note: Real implementation needs — rule checks are simple pattern matching.
+    /// Consider: AST-based analysis, dependency graph validation, and
+    /// integration with actual build system for compile-time checks.
     pub(crate) fn _check_integration(&self, source: &str, target: &str, pattern_id: &str) -> IntegrationCheck {
         let mut violations = Vec::new();
 
@@ -281,11 +297,18 @@ impl IntegrationPatternLibrary {
     }
 
     /// 获取所有模式
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by category, pattern versioning, and persistence
+    /// to KB for cross-session pattern tracking.
     pub fn patterns(&self) -> &[IntegrationPattern] {
         &self.patterns
     }
 
     /// 获取活跃集成
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by status, module name, and time range.
     pub(crate) fn _active_integrations(&self) -> &[ActiveIntegration] {
         &self._active_integrations
     }

@@ -20,9 +20,9 @@ struct CacheEntry {
     access_count: u64,
 }
 
-/// 缓存配置
+/// 缓存配置 (NT-CORE capability cache)
 #[derive(Debug, Clone)]
-pub struct CacheConfig {
+pub struct CapabilityCacheConfig {
     /// 最大容量
     pub max_capacity: usize,
     /// 默认过期时间
@@ -31,7 +31,7 @@ pub struct CacheConfig {
     pub enable_stats: bool,
 }
 
-impl Default for CacheConfig {
+impl Default for CapabilityCacheConfig {
     fn default() -> Self {
         Self {
             max_capacity: 1000,
@@ -59,14 +59,14 @@ pub struct CapabilityCache {
     /// 缓存存储
     entries: HashMap<String, CacheEntry>,
     /// 配置
-    config: CacheConfig,
+    config: CapabilityCacheConfig,
     /// 统计
     stats: CacheStats,
 }
 
 impl CapabilityCache {
     /// 创建新的缓存
-    pub fn new(config: CacheConfig) -> Self {
+    pub fn new(config: CapabilityCacheConfig) -> Self {
         Self {
             entries: HashMap::with_capacity(config.max_capacity),
             config,
@@ -173,7 +173,7 @@ pub struct CachedCapability {
 
 impl CachedCapability {
     /// 创建缓存包装器
-    pub fn new(capability: Arc<dyn UnifiedCapability>, config: CacheConfig) -> Self {
+    pub fn new(capability: Arc<dyn UnifiedCapability>, config: CapabilityCacheConfig) -> Self {
         Self {
             capability,
             cache: std::sync::Mutex::new(CapabilityCache::new(config)),
@@ -189,7 +189,7 @@ impl CachedCapability {
 
         // 检查缓存
         {
-            let mut cache = self.cache.lock().unwrap();
+            let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(output) = cache.get(&key) {
                 return Ok(output);
             }
@@ -200,7 +200,7 @@ impl CachedCapability {
 
         // 存入缓存
         {
-            let mut cache = self.cache.lock().unwrap();
+            let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
             cache.set(key, output.clone(), None);
         }
 
@@ -209,7 +209,7 @@ impl CachedCapability {
 
     /// 获取缓存统计
     pub fn cache_stats(&self) -> CacheStats {
-        self.cache.lock().unwrap().stats().clone()
+        self.cache.lock().unwrap_or_else(|e| e.into_inner()).stats().clone()
     }
 }
 
@@ -239,13 +239,13 @@ mod tests {
 
     #[test]
     fn cache_creation() {
-        let cache = CapabilityCache::new(CacheConfig::default());
+        let cache = CapabilityCache::new(CapabilityCacheConfig::default());
         assert_eq!(cache.len(), 0);
     }
 
     #[test]
     fn cache_set_get() {
-        let mut cache = CapabilityCache::new(CacheConfig::default());
+        let mut cache = CapabilityCache::new(CapabilityCacheConfig::default());
         let key = "test".to_string();
         let value = CapabilityOutput::Text("hello".into());
 
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn cache_eviction() {
-        let config = CacheConfig {
+        let config = CapabilityCacheConfig {
             max_capacity: 2,
             default_ttl: Duration::from_secs(300),
             enable_stats: true,
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn cached_capability() {
         let cap = crate::l2_perception::nt_world::nt_nlp_capability::create_nlp_capability();
-        let cached = CachedCapability::new(cap, CacheConfig::default());
+        let cached = CachedCapability::new(cap, CapabilityCacheConfig::default());
 
         let input = CapabilityInput::Nlp(NlpInput {
             task: NlpTask::Tokenize,

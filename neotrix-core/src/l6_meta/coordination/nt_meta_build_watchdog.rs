@@ -186,13 +186,17 @@ impl BuildWatchdog {
     }
 
     /// 执行健康检查
-    pub fn check_health(&mut self) -> BuildStatus {
+    ///
+    /// 返回 `Err` — 编译/测试/缓存检查均未接线, 不伪造健康状态。
+    /// 真实实现需要: 执行 `cargo check`/`cargo test`, 解析输出,
+    /// 并集成构建系统进行实时监控。
+    pub fn check_health(&mut self) -> Result<BuildStatus, String> {
         self.stats.total_checks += 1;
 
-        let lib_compilation = self.check_compilation("lib");
-        let test_compilation = self.check_compilation("tests");
-        let test_execution = self.check_tests();
-        let cache_status = self.check_cache();
+        let lib_compilation = self.check_compilation("lib")?;
+        let test_compilation = self.check_compilation("tests")?;
+        let test_execution = self.check_tests()?;
+        let cache_status = self.check_cache()?;
 
         // 计算整体健康度
         let mut health_score: f32 = 1.0;
@@ -251,45 +255,53 @@ impl BuildWatchdog {
             self.stats.failed_builds += 1;
         }
 
-        status
+        Ok(status)
     }
 
     /// 检查编译
-    fn check_compilation(&self, _target: &str) -> CompilationResult {
-        // 简化版: 模拟编译检查
-        CompilationResult {
-            success: true,
-            errors: 0,
-            warnings: 0,
-            duration_ms: 5000,
-            error_messages: Vec::new(),
-        }
+    ///
+    /// 返回 `Err` — 未接线实际 `cargo check` 执行。
+    /// 真实实现需要: 执行 `cargo check --lib` 或 `cargo check --tests`,
+    /// 解析编译输出, 测量编译时长。
+    fn check_compilation(&self, target: &str) -> Result<CompilationResult, String> {
+        Err(format!(
+            "check_compilation({}) is a stub — requires actual cargo check execution, \
+             output parsing, and duration measurement",
+            target
+        ))
     }
 
     /// 检查测试
-    fn check_tests(&self) -> TestResult {
-        // 简化版: 模拟测试检查
-        TestResult {
-            total: 100,
-            passed: 98,
-            failed: 2,
-            ignored: 0,
-            duration_ms: 30000,
-        }
+    ///
+    /// 返回 `Err` — 未接线实际 `cargo test` 执行。
+    /// 真实实现需要: 执行 `cargo test`, 解析测试输出,
+    /// 聚合测试结果用于健康监控。
+    fn check_tests(&self) -> Result<TestResult, String> {
+        Err(
+            "check_tests is a stub — requires actual cargo test execution, \
+             output parsing, and test result aggregation"
+                .to_string(),
+        )
     }
 
     /// 检查缓存
-    fn check_cache(&self) -> CacheStatus {
-        // 简化版: 模拟缓存检查
-        CacheStatus {
-            valid: true,
-            size_mb: 500.0,
-            last_invalidated: None,
-            invalidation_count: 0,
-        }
+    ///
+    /// 返回 `Err` — 未接线实际缓存目录检查。
+    /// 真实实现需要: 检查 `target/` 目录大小, 检测缓存失效,
+    /// 用于缓存健康监控。
+    fn check_cache(&self) -> Result<CacheStatus, String> {
+        Err(
+            "check_cache is a stub — requires actual cache directory inspection, \
+             size calculation, and invalidation detection"
+                .to_string(),
+        )
     }
 
     /// 生成告警
+    ///
+    /// Note: Real implementation needs — alerts are stored in-memory only.
+    /// Consider: alert deduplication, escalation policies, and integration
+    /// with notification systems (email/Slack/EventBus).
     fn generate_alert(&mut self, alert_type: &str, severity: AlertSeverity, message: &str) {
         let alert = BuildAlert {
             id: uuid::Uuid::new_v4().to_string(),
@@ -305,6 +317,10 @@ impl BuildWatchdog {
     }
 
     /// 自动修复
+    ///
+    /// 标记修复动作为 `success: false` — 未接线实际缓存清理或重编译。
+    /// 真实实现需要: 执行 `cargo clean`、触发重新编译,
+    /// 以及失败时的回滚逻辑。
     pub(crate) fn _auto_fix(&mut self) -> Vec<FixAction> {
         let mut fixes = Vec::new();
 
@@ -314,22 +330,20 @@ impl BuildWatchdog {
                 if !last_status.cache_status.valid {
                     fixes.push(FixAction {
                         action_type: "cache_cleanup".into(),
-                        description: "Cleaned build cache".into(),
-                        success: true,
+                        description: "cache_cleanup not wired — requires cargo clean or manual cache invalidation".into(),
+                        success: false,
                         timestamp: chrono::Utc::now(),
                     });
-                    self.stats.auto_fixes_applied += 1;
                 }
 
                 // 检查编译错误
                 if !last_status.lib_compilation.success {
                     fixes.push(FixAction {
                         action_type: "recompile".into(),
-                        description: "Triggered recompilation".into(),
-                        success: true,
+                        description: "recompile not wired — requires cargo check execution and error-driven retry".into(),
+                        success: false,
                         timestamp: chrono::Utc::now(),
                     });
-                    self.stats.auto_fixes_applied += 1;
                 }
             }
         }
@@ -338,11 +352,19 @@ impl BuildWatchdog {
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn stats(&self) -> &WatchdogStats {
         &self.stats
     }
 
     /// 获取历史
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: time-range filtering, health threshold filtering, and persistence
+    /// to KB for cross-session history tracking.
     pub fn history(&self) -> &[BuildStatus] {
         &self.history
     }

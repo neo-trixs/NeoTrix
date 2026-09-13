@@ -258,7 +258,7 @@ impl HotReloadCapability {
         capability: Arc<std::sync::Mutex<dyn UnifiedCapability>>,
         manager: Arc<std::sync::Mutex<HotReloadManager>>,
     ) -> Self {
-        let capability_id = capability.lock().unwrap().meta().id.clone();
+        let capability_id = capability.lock().unwrap_or_else(|e| e.into_inner()).meta().id.clone();
         Self {
             capability,
             manager,
@@ -272,14 +272,14 @@ impl HotReloadCapability {
         input: CapabilityInput,
     ) -> Result<CapabilityOutput, CapabilityError> {
         // 尝试执行
-        let result = self.capability.lock().unwrap().execute(input.clone());
+        let result = self.capability.lock().unwrap_or_else(|e| e.into_inner()).execute(input.clone());
 
         // 如果失败，尝试重载
         if result.is_err() {
-            let mut manager = self.manager.lock().unwrap();
+            let mut manager = self.manager.lock().unwrap_or_else(|e| e.into_inner());
             if manager.reload(&self.capability_id).is_ok() {
                 // 重载成功，重试执行
-                return self.capability.lock().unwrap().execute(input);
+                return self.capability.lock().unwrap_or_else(|e| e.into_inner()).execute(input);
             }
         }
 
@@ -299,11 +299,11 @@ impl HotReloadCapability {
 
 impl UnifiedCapability for HotReloadCapability {
     fn meta(&self) -> CapabilityMeta {
-        self.capability.lock().unwrap().meta()
+        self.capability.lock().unwrap_or_else(|e| e.into_inner()).meta()
     }
 
     fn health(&self) -> CapabilityHealth {
-        self.capability.lock().unwrap().health()
+        self.capability.lock().unwrap_or_else(|e| e.into_inner()).health()
     }
 
     fn execute(&self, input: CapabilityInput) -> Result<CapabilityOutput, CapabilityError> {
@@ -311,7 +311,7 @@ impl UnifiedCapability for HotReloadCapability {
     }
 
     fn supports(&self, input: &CapabilityInput) -> bool {
-        self.capability.lock().unwrap().supports(input)
+        self.capability.lock().unwrap_or_else(|e| e.into_inner()).supports(input)
     }
 }
 

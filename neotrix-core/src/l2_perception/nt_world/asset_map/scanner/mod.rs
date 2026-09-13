@@ -103,7 +103,7 @@ impl PortScanner {
             let timeout = config.timeout_ms;
 
             handles.push(tokio::spawn(async move {
-                if let Some(_permit) = sem.acquire().await {
+                if let Ok(_permit) = sem.acquire().await {
                     Self::scan_port(target, port, timeout).await
                 } else {
                     PortScanResult {

@@ -750,7 +750,7 @@ impl KnowledgeGapDetector {
 
     /// Scan for weak connectivity in KB graph
     fn scan_connectivity_gaps(&self, kb: &KnowledgeBase, id: &mut usize) -> Vec<KnowledgeGap> {
-        let conn = kb.conn.lock().unwrap();
+        let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut gaps = Vec::new();
 
         // Find concepts with degree < threshold
@@ -802,7 +802,7 @@ impl KnowledgeGapDetector {
 
     /// Scan for stale knowledge (nodes not updated in max_temporal_age_days)
     fn scan_stale_knowledge(&self, kb: &KnowledgeBase, id: &mut usize) -> Vec<KnowledgeGap> {
-        let conn = kb.conn.lock().unwrap();
+        let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut gaps = Vec::new();
 
         let cutoff = chrono::Utc::now().timestamp() - (self.max_temporal_age_days * 86400);
@@ -853,7 +853,7 @@ impl KnowledgeGapDetector {
 
     /// Compute abstraction level coverage per domain
     fn compute_abstraction_coverage(&self, kb: &KnowledgeBase) -> HashMap<String, usize> {
-        let conn = kb.conn.lock().unwrap();
+        let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut coverage = HashMap::new();
 
         let mut stmt = conn.prepare(
@@ -878,7 +878,7 @@ impl KnowledgeGapDetector {
 
     /// Compute connectivity statistics from KB graph
     fn compute_connectivity_stats(&self, kb: &KnowledgeBase) -> ConnectivityStats {
-        let conn = kb.conn.lock().unwrap();
+        let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
 
         let mut stmt = conn.prepare(
             "SELECT AVG(degree) as avg_deg,
@@ -906,7 +906,7 @@ impl KnowledgeGapDetector {
 
     /// Write new gap reports to KB knowledge_gap_reports table
     fn write_gap_reports_to_kb(&self, kb: &KnowledgeBase, gaps: &[KnowledgeGap]) -> Vec<String> {
-        let conn = kb.conn.lock().unwrap();
+        let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut report_ids = Vec::new();
         let now = chrono::Utc::now().timestamp();
 

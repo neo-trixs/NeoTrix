@@ -127,6 +127,10 @@ impl _ConcurrencyConflictDetector {
     }
 
     /// 监控文件
+    ///
+    /// Note: Real implementation needs — currently only tracks file metadata.
+    /// Consider: filesystem watcher integration (notify crate), hash-based change
+    /// detection, and EventBus notifications when monitored files change.
     pub fn monitor_file(&mut self, file_path: &str, file_type: _FileType) {
         let file = _MonitoredFile {
             file_path: file_path.to_string(),
@@ -142,6 +146,10 @@ impl _ConcurrencyConflictDetector {
     }
 
     /// 尝试获取锁
+    ///
+    /// STUB: Currently uses in-memory lock states without timeout enforcement.
+    /// Real implementation needs: distributed lock coordination, timeout handling
+    /// with automatic release, and integration with session lifecycle for cleanup.
     pub fn try_lock(&mut self, file_path: &str, session_id: &str) -> bool {
         if let Some(state) = self.lock_states.get(file_path) {
             if *state == _LockState::Unlocked {
@@ -159,6 +167,10 @@ impl _ConcurrencyConflictDetector {
     }
 
     /// 释放锁
+    ///
+    /// Note: Real implementation needs — lock release is not validated against holder identity.
+    /// Consider: adding session_id validation, lock timeout cleanup, and audit logging
+    /// for lock acquisition/release events.
     pub(crate) fn _release_lock(&mut self, file_path: &str) -> bool {
         if let Some(state) = self.lock_states.get_mut(file_path) {
             if *state != _LockState::Unlocked {
@@ -171,6 +183,10 @@ impl _ConcurrencyConflictDetector {
     }
 
     /// 检测冲突
+    ///
+    /// Note: Real implementation needs — currently only detects lock-based conflicts.
+    /// Consider: version mismatch detection (git diff-based), read-write conflict
+    /// detection for concurrent readers, and conflict resolution strategies.
     pub(crate) fn _detect_conflict(&mut self, file_path: &str, session_a: &str, session_b: &str) -> Option<Conflict> {
         // 检查是否有锁冲突
         if let Some(state) = self.lock_states.get(file_path) {
@@ -197,16 +213,27 @@ impl _ConcurrencyConflictDetector {
     }
 
     /// 获取所有监控文件
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: pagination for large file sets, filtering by file type/status,
+    /// and persistence to KB for cross-session tracking.
     pub(crate) fn _monitored_files(&self) -> &[_MonitoredFile] {
         &self._monitored_files
     }
 
     /// 获取所有冲突
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by resolution status, time range, and file path patterns.
     pub fn conflicts(&self) -> &[Conflict] {
         &self.conflicts
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn stats(&self) -> &_ConflictDetectorStats {
         &self.stats
     }

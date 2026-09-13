@@ -144,6 +144,8 @@ pub struct SelfIteratingBrain {
     pub element_registry: ElementRegistry,
 }
 
+impl crate::core::nt_core_traits::BrainHandle for SelfIteratingBrain {}
+
 impl SelfIteratingBrain {
     pub fn new() -> Self {
         let (init_kb, init_adapter): (Option<KnowledgeBase>, HarnessAdapter) = {

@@ -15,9 +15,9 @@ use std::time::Instant;
 use crate::l1_action::nt_io::nt_io_provider::gateway::execution::{UnifiedInference, InferenceRequest, InferenceResponse, InferenceError, CostEstimate, StreamHandle, RouterHealth, InferenceCapabilities, ResponseMetadata};
 use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 
-/// 路由器配置
+/// 路由器配置 (NT-IO cost/latency routing)
 #[derive(Debug, Clone)]
-pub struct RouterConfig {
+pub struct IoRouterConfig {
     /// 最大重试次数
     pub max_retries: u32,
     /// 最大故障转移链长度
@@ -32,7 +32,7 @@ pub struct RouterConfig {
     pub default_latency_budget: u64,
 }
 
-impl Default for RouterConfig {
+impl Default for IoRouterConfig {
     fn default() -> Self {
         Self {
             max_retries: 3,
@@ -48,7 +48,7 @@ impl Default for RouterConfig {
 /// 推理路由器 — 统一 LLM 调用入口
 pub struct InferenceRouter {
     gateway: Arc<GatewayV2>,
-    config: RouterConfig,
+    config: IoRouterConfig,
 }
 
 impl InferenceRouter {
@@ -56,12 +56,12 @@ impl InferenceRouter {
     pub fn new(gateway: Arc<GatewayV2>) -> Self {
         Self {
             gateway,
-            config: RouterConfig::default(),
+            config: IoRouterConfig::default(),
         }
     }
 
     /// 创建路由器 (自定义配置)
-    pub fn with_config(gateway: Arc<GatewayV2>, config: RouterConfig) -> Self {
+    pub fn with_config(gateway: Arc<GatewayV2>, config: IoRouterConfig) -> Self {
         Self { gateway, config }
     }
 
@@ -71,7 +71,7 @@ impl InferenceRouter {
     }
 
     /// 获取配置
-    pub fn config(&self) -> &RouterConfig {
+    pub fn config(&self) -> &IoRouterConfig {
         &self.config
     }
 

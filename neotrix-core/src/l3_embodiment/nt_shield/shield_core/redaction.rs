@@ -154,7 +154,7 @@ pub fn redact_secrets(text: &str) -> String {
 }
 
 /// 便捷函数: 风险分析
-pub fn analyze(text: &str) -> (RiskLevel, Vec<String>) {
+pub fn analyze(text: &str) -> (RedactionRiskLevel, Vec<String>) {
     Redactor::new().analyze(text)
 }
 
@@ -220,7 +220,7 @@ mod tests {
     fn test_analyze_dangerous_on_secret() {
         let r = Redactor::new();
         let (level, matched) = r.analyze(&format!("token ghp_{}", "A".repeat(36)));
-        assert_eq!(level, RiskLevel::Dangerous);
+        assert_eq!(level, RedactionRiskLevel::Dangerous);
         assert!(!matched.is_empty());
     }
 
@@ -228,7 +228,7 @@ mod tests {
     fn test_analyze_suspicious_on_email() {
         let r = Redactor::new();
         let (level, matched) = r.analyze("contact me at user@example.com");
-        assert_eq!(level, RiskLevel::Suspicious);
+        assert_eq!(level, RedactionRiskLevel::Suspicious);
         assert!(matched.contains(&"email".to_string()));
     }
 

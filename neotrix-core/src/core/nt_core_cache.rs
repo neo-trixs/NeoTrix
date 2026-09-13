@@ -10,13 +10,16 @@ pub enum EvictionPolicy {
 }
 
 #[derive(Debug, Clone)]
-pub struct CacheConfig {
+pub struct CoreCacheConfig {
     pub capacity: usize,
     pub ttl_secs: u64,
     pub eviction_policy: EvictionPolicy,
 }
 
-impl Default for CacheConfig {
+/// Backward-compatible alias
+pub type CacheConfig = CoreCacheConfig;
+
+impl Default for CoreCacheConfig {
     fn default() -> Self {
         Self {
             capacity: 1000,
@@ -109,7 +112,7 @@ impl std::fmt::Debug for SemanticCache {
 }
 
 impl SemanticCache {
-    pub fn new(config: CacheConfig) -> Self {
+    pub fn new(config: CoreCacheConfig) -> Self {
         Self {
             entries: HashMap::with_capacity(config.capacity),
             embedding_entries: HashMap::with_capacity(config.capacity / 2),
@@ -356,7 +359,7 @@ mod tests {
 
     #[test]
     fn test_cache_basic() {
-        let mut cache = SemanticCache::new(CacheConfig::default());
+        let mut cache = SemanticCache::new(CoreCacheConfig::default());
         cache.set_exact("test", "key1", "value1".into());
         let got = cache.get_exact("test", "key1");
         assert_eq!(got, Some("value1".into()));
@@ -364,14 +367,14 @@ mod tests {
 
     #[test]
     fn test_cache_miss() {
-        let cache = SemanticCache::new(CacheConfig::default());
+        let cache = SemanticCache::new(CoreCacheConfig::default());
         let got = cache.get_exact("test", "nonexistent");
         assert_eq!(got, None);
     }
 
     #[test]
     fn test_cache_eviction_exact() {
-        let mut cache = SemanticCache::new(CacheConfig {
+        let mut cache = SemanticCache::new(CoreCacheConfig {
             capacity: 2,
             ttl_secs: 300,
             ..Default::default()
@@ -384,7 +387,7 @@ mod tests {
 
     #[test]
     fn test_semantic_hit() {
-        let mut cache = SemanticCache::new(CacheConfig::default());
+        let mut cache = SemanticCache::new(CoreCacheConfig::default());
         let emb = make_embedding(1.0, 16);
         cache.set_with_embedding("test", "key1", "hello semantic".into(), emb.clone());
         let result = cache.get_semantic(&emb);
@@ -393,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_semantic_miss_different_embedding() {
-        let mut cache = SemanticCache::new(CacheConfig::default());
+        let mut cache = SemanticCache::new(CoreCacheConfig::default());
         let emb_a = make_embedding(1.0, 16);
         let emb_b = make_embedding(999.0, 16);
         cache.set_with_embedding("test", "a", "value_a".into(), emb_a);
@@ -403,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_semantic_similar_above_threshold() {
-        let mut cache = SemanticCache::new(CacheConfig::default());
+        let mut cache = SemanticCache::new(CoreCacheConfig::default());
         cache.set_semantic_threshold(0.80);
         let emb = make_embedding(1.0, 16);
         cache.set_with_embedding("test", "ref", "reference".into(), emb.clone());
@@ -415,7 +418,7 @@ mod tests {
 
     #[test]
     fn test_semantic_lfu_eviction() {
-        let mut cache = SemanticCache::new(CacheConfig {
+        let mut cache = SemanticCache::new(CoreCacheConfig {
             capacity: 4,
             ttl_secs: 300,
             eviction_policy: EvictionPolicy::Lfu,
@@ -437,7 +440,7 @@ mod tests {
 
     #[test]
     fn test_semantic_hit_increments_count() {
-        let mut cache = SemanticCache::new(CacheConfig::default());
+        let mut cache = SemanticCache::new(CoreCacheConfig::default());
         let emb = make_embedding(1.0, 16);
         cache.set_with_embedding("test", "key1", "value".into(), emb.clone());
         // First hit
@@ -454,7 +457,7 @@ mod tests {
     #[test]
     fn test_semantic_lru_vs_lfu_policy() {
         // LRU should not crash — just verify it picks a victim
-        let mut cache = SemanticCache::new(CacheConfig {
+        let mut cache = SemanticCache::new(CoreCacheConfig {
             capacity: 1,
             ttl_secs: 300,
             eviction_policy: EvictionPolicy::Lru,
@@ -484,14 +487,14 @@ mod tests {
 
     #[test]
     fn test_semantic_empty_cache_returns_none() {
-        let mut cache = SemanticCache::new(CacheConfig::default());
+        let mut cache = SemanticCache::new(CoreCacheConfig::default());
         let emb = make_embedding(1.0, 8);
         assert_eq!(cache.get_semantic(&emb), None);
     }
 
     #[test]
     fn test_eviction_policy_default() {
-        let config = CacheConfig::default();
+        let config = CoreCacheConfig::default();
         assert_eq!(config.eviction_policy, EvictionPolicy::Lfu);
     }
 
@@ -519,7 +522,7 @@ mod tests {
 
     #[test]
     fn test_set_eviction_policy() {
-        let mut cache = SemanticCache::new(CacheConfig::default());
+        let mut cache = SemanticCache::new(CoreCacheConfig::default());
         cache.set_eviction_policy(EvictionPolicy::Lru);
     }
 }
@@ -536,7 +539,7 @@ impl SelfTest for CacheSelfTest {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
-        let mut cache = SemanticCache::new(CacheConfig::default());
+        let mut cache = SemanticCache::new(CoreCacheConfig::default());
         cache.set_exact("selftest", "k", "v".to_string());
         match cache.get_exact("selftest", "k") {
             Some(v) if v == "v" => {}

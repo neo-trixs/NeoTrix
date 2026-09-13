@@ -309,15 +309,21 @@ impl Inventory {
         let old = self.equipment.insert(equip_slot, taken);
 
         // Return old equipment to inventory if not empty
-        if let Some(ref old_slot) = old {
+        let had_previous = if let Some(ref old_slot) = old {
             if !old_slot.is_empty() {
                 if let Some(old_id) = &old_slot.item_id {
                     self.add_item(old_id, old_slot.count);
                 }
+                true
+            } else {
+                false
             }
-        }
+        } else {
+            false
+        };
 
-        old
+        // Return Some only if something was actually unequipped
+        if had_previous { old } else { None }
     }
 
     /// Unequip item from equipment slot. Returns true if successful.

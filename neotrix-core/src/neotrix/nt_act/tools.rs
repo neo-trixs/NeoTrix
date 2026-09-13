@@ -63,11 +63,11 @@ impl ToolRegistry {
         let name = spec.name.clone();
         
         // Check for conflicts
-        if self.builtin_tools.lock().unwrap().contains_key(&name) {
+        if self.builtin_tools.lock().unwrap_or_else(|e| e.into_inner()).contains_key(&name) {
             eprintln!("Warning: Tool '{}' already registered, overwriting", name);
         }
         
-        self.builtin_tools.lock().unwrap().insert(name, tool);
+        self.builtin_tools.lock().unwrap_or_else(|e| e.into_inner()).insert(name, tool);
     }
 
 pub fn register_custom(&mut self, tool: Arc<dyn Tool>) {
@@ -75,22 +75,22 @@ pub fn register_custom(&mut self, tool: Arc<dyn Tool>) {
     }
 
     pub fn unregister(&mut self, name: &str) -> bool {
-        self.builtin_tools.lock().unwrap().remove(name).is_some()
+        self.builtin_tools.lock().unwrap_or_else(|e| e.into_inner()).remove(name).is_some()
     }
 
     pub fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
-        self.builtin_tools.lock().unwrap()
+        self.builtin_tools.lock().unwrap_or_else(|e| e.into_inner())
             .get(name)
             .map(|t| Arc::clone(t) as Arc<dyn Tool>)
     }
 
     pub fn list_tools(&self) -> Vec<String> {
-        self.builtin_tools.lock().unwrap().keys().cloned().collect()
+        self.builtin_tools.lock().unwrap_or_else(|e| e.into_inner()).keys().cloned().collect()
     }
 
     pub async fn execute(&self, name: &str, args: serde_json::Value) -> Result<ToolResult, String> {
         let tool = {
-            let tools = self.builtin_tools.lock().unwrap();
+            let tools = self.builtin_tools.lock().unwrap_or_else(|e| e.into_inner());
             tools.get(name).cloned()
         }.ok_or_else(|| format!("Tool '{}' not found", name))?;
 

@@ -146,46 +146,64 @@ impl LlmProvider for OllamaProvider {
             if let Ok(response) = client.post(format!("{}/api/chat", base_url))
                 .json(&body)
                 .send().await {
-                if !response.status().is_success() { return; }
+                let status = response.status();
+                if !status.is_success() {
+                    let text = response.text().await.unwrap_or_else(|_| status.canonical_reason().unwrap_or("unknown error").to_string());
+                    let err = match status.as_u16() {
+                        400 => LlmError::InvalidRequest(text),
+                        500..=599 => LlmError::Server(text),
+                        _ => LlmError::Unknown(text),
+                    };
+                    let _ = tx.send(Err(err)).await;
+                    return;
+                }
                 let full = match response.text().await {
                     Ok(t) => t,
-                    Err(_) => return,
+                    Err(e) => {
+                        let _ = tx.send(Err(LlmError::Network(format!("Failed to read streaming response: {}", e)))).await;
+                        return;
+                    }
                 };
                 for line in full.lines() {
                     let line = line.trim();
                     if line.is_empty() { continue; }
-                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
-                        let content = v["message"]["content"].as_str().unwrap_or("").to_string();
-                        let tool_calls = v.get("message")
-                            .and_then(|m| m.get("tool_calls"))
-                            .and_then(|tc| serde_json::from_value::<Vec<super::types::ToolCallInfo>>(tc.clone()).ok())
-                            .filter(|v| !v.is_empty());
+                    match serde_json::from_str::<serde_json::Value>(line) {
+                        Ok(v) => {
+                            let content = v["message"]["content"].as_str().unwrap_or("").to_string();
+                            let tool_calls = v.get("message")
+                                .and_then(|m| m.get("tool_calls"))
+                                .and_then(|tc| serde_json::from_value::<Vec<super::types::ToolCallInfo>>(tc.clone()).ok())
+                                .filter(|v| !v.is_empty());
 
-                        if !content.is_empty() || tool_calls.is_some() {
-                            let finish_reason = if tool_calls.is_some() {
-                                FinishReason::Tool
-                            } else {
-                                FinishReason::Unknown
-                            };
-                            let _ = tx.send(Ok(LlmResponse {
-                                content,
-                                model: model.clone(),
-                                usage: Usage::default(),
-                                finish_reason,
-                                tool_calls,
-                                reasoning: None,
-                            })).await;
+                            if !content.is_empty() || tool_calls.is_some() {
+                                let finish_reason = if tool_calls.is_some() {
+                                    FinishReason::Tool
+                                } else {
+                                    FinishReason::Unknown
+                                };
+                                let _ = tx.send(Ok(LlmResponse {
+                                    content,
+                                    model: model.clone(),
+                                    usage: Usage::default(),
+                                    finish_reason,
+                                    tool_calls,
+                                    reasoning: None,
+                                })).await;
+                            }
+
+                            if v.get("done").and_then(|d| d.as_bool()).unwrap_or(false) {
+                                let _ = tx.send(Ok(LlmResponse {
+                                    content: String::new(),
+                                    model: model.clone(),
+                                    usage: Usage::default(),
+                                    finish_reason: FinishReason::Stop,
+                                    tool_calls: None,
+                                    reasoning: None,
+                                })).await;
+                            }
                         }
-
-                        if v.get("done").and_then(|d| d.as_bool()).unwrap_or(false) {
-                            let _ = tx.send(Ok(LlmResponse {
-                                content: String::new(),
-                                model: model.clone(),
-                                usage: Usage::default(),
-                                finish_reason: FinishReason::Stop,
-                                tool_calls: None,
-                                reasoning: None,
-                            })).await;
+                        Err(e) => {
+                            log::warn!("[ollama] failed to parse streaming line: {} (data: {:.80})", e, line);
                         }
                     }
                 }

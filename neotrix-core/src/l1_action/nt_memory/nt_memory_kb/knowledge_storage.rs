@@ -486,12 +486,12 @@ impl crate::core::nt_core_self_test::SelfTest for ContextGraphSelfTest {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut graph = ContextGraph::default();
-        graph.add_node(GraphNode {
+        graph.add_node(ContextGraphNode {
             id: "n1".into(),
             kind: "fact".into(),
             content: "alpha".into(),
         });
-        graph.add_node(GraphNode {
+        graph.add_node(ContextGraphNode {
             id: "n2".into(),
             kind: "fact".into(),
             content: "beta".into(),

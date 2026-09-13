@@ -284,6 +284,10 @@ impl _QualityControlPipeline {
     }
     
     /// 执行完整审核流程
+    ///
+    /// STUB: AI review returns Rejected (no real analysis). Human/Platform reviews
+    /// return Pending (not wired). Real implementation needs: VLM/LLM integration
+    /// for AI review, review UI/API for human review, and platform API integration.
     pub(crate) fn _execute_review_flow(&mut self, content_id: &str) -> Vec<ReviewResult> {
         let mut results = vec![];
         
@@ -352,6 +356,10 @@ impl _QualityControlPipeline {
     }
     
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory history.
+    /// For production: maintain running aggregates for O(1) access, add time-window
+    /// filtering, and expose metrics via EventBus for telemetry integration.
     pub fn statistics(&self) -> _QualityStats {
         let total_reviews = self.history.len();
         let approved = self.history.iter().filter(|r| r.status == ReviewStatus::Approved).count();

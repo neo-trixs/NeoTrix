@@ -111,6 +111,10 @@ impl AsyncSafetyWrapper {
     }
 
     /// 设置门禁状态
+    ///
+    /// Note: Real implementation needs — gate state is stored in-memory only.
+    /// Consider: persistence to KB for cross-session gate tracking,
+    /// and EventBus notification when gate state changes.
     pub(crate) fn _set_gate(&mut self, key: &str, state: bool) {
         self.gate_states.insert(key.to_string(), state);
         if state {
@@ -119,11 +123,19 @@ impl AsyncSafetyWrapper {
     }
 
     /// 检查门禁状态
+    ///
+    /// Note: Real implementation needs — returns default state if key not found.
+    /// Consider: gate state persistence, timeout-based automatic gate opening,
+    /// and audit logging for gate state queries.
     pub(crate) fn _check_gate(&self, key: &str) -> bool {
         self.gate_states.get(key).copied().unwrap_or(self.config.default_gate_state)
     }
 
     /// 检查异步安全
+    ///
+    /// Note: Real implementation needs — safety checks are string-based pattern matching.
+    /// Consider: AST-based analysis, integration with clippy lints, and
+    /// configurable safety rules for different async runtimes.
     pub fn check_safety(&self, operation: &str) -> SafetyCheckResult {
         let mut violations = Vec::new();
         let mut recommendations = Vec::new();
@@ -156,11 +168,18 @@ impl AsyncSafetyWrapper {
     }
 
     /// 获取所有包装器
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by wrapper type, gate status, and async capability.
     pub fn wrappers(&self) -> &[BlockingWrapper] {
         &self.blocking_wrappers
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn stats(&self) -> &AsyncSafetyStats {
         &self.stats
     }

@@ -81,9 +81,9 @@ pub struct VideoJob {
     pub error_message: Option<String>,
 }
 
-/// 作业管线配置
+/// 作业管线配置 (NT-ACT video job pipeline)
 #[derive(Debug, Clone)]
-pub struct PipelineConfig {
+pub struct VideoJobPipelineConfig {
     /// 最大并发作业数
     pub max_concurrent_jobs: usize,
     /// 队列大小
@@ -96,7 +96,7 @@ pub struct PipelineConfig {
     pub max_retries: u32,
 }
 
-impl Default for PipelineConfig {
+impl Default for VideoJobPipelineConfig {
     fn default() -> Self {
         Self {
             max_concurrent_jobs: 10,
@@ -108,6 +108,9 @@ impl Default for PipelineConfig {
     }
 }
 
+/// Backward-compatible alias
+pub type PipelineConfig = VideoJobPipelineConfig;
+
 /// 视频作业管线
 pub struct VideoJobPipeline {
     /// 作业存储
@@ -115,13 +118,13 @@ pub struct VideoJobPipeline {
     /// 队列
     queue: Vec<String>,
     /// 配置
-    config: PipelineConfig,
+    config: VideoJobPipelineConfig,
     /// 统计信息
     stats: PipelineStats,
 }
 
 impl VideoJobPipeline {
-    pub fn new(config: PipelineConfig) -> Self {
+    pub fn new(config: VideoJobPipelineConfig) -> Self {
         Self {
             jobs: HashMap::new(),
             queue: Vec::new(),
@@ -248,7 +251,7 @@ impl VideoJobPipeline {
 
 impl Default for VideoJobPipeline {
     fn default() -> Self {
-        Self::new(PipelineConfig::default())
+        Self::new(VideoJobPipelineConfig::default())
     }
 }
 

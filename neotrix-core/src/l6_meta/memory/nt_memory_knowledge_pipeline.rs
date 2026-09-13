@@ -16,13 +16,13 @@ pub struct _KnowledgePipelineEnhanced {
     concepts: Vec<_ConceptNode>,
     route_table: HashMap<String, String>,
     #[allow(dead_code)]
-    config: PipelineConfig,
+    config: KnowledgePipelineConfig,
     stats: PipelineStats,
 }
 
-/// 管线配置
+/// 管线配置 (NT-MEMORY knowledge pipeline)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PipelineConfig {
+pub struct KnowledgePipelineConfig {
     pub max_pipelines: usize,
     pub enable_concept_routing: bool,
     pub enable_cross_session: bool,
@@ -30,7 +30,7 @@ pub struct PipelineConfig {
     pub retention_days: u32,
 }
 
-impl Default for PipelineConfig {
+impl Default for KnowledgePipelineConfig {
     fn default() -> Self {
         Self {
             max_pipelines: 10,
@@ -41,6 +41,9 @@ impl Default for PipelineConfig {
         }
     }
 }
+
+/// Backward-compatible alias
+pub type PipelineConfig = KnowledgePipelineConfig;
 
 /// 知识管线
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,7 +124,7 @@ impl _KnowledgePipelineEnhanced {
             pipelines: Vec::new(),
             concepts: Vec::new(),
             route_table: HashMap::new(),
-            config: PipelineConfig::default(),
+            config: KnowledgePipelineConfig::default(),
             stats: PipelineStats {
                 total_pipelines: 0,
                 running_pipelines: 0,

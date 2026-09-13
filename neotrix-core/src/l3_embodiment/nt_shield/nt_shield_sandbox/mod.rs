@@ -91,14 +91,14 @@ impl EgressPolicy {
     pub fn check(&self, host: &str, port: u16) -> bool {
         let mut matched_allow = false;
         for rule in &self.rules {
-            if rule.host_matches(host) && rule.port_matches(port) {
+            if rule.host_matches(host) && rule.port_matches(&port.to_string()) {
                 if !rule.allow {
                     return false; // explicit deny wins
                 }
                 matched_allow = true;
             }
         }
-        matched_allow || self.default_allow
+        matched_allow || !self.deny_all
     }
 
     /// Sanity validation: deny-all + a localhost allow must pass only the allow.
@@ -120,7 +120,7 @@ impl EgressPolicy {
                 .cmp(&(b.host.as_str(), b.port.as_str(), b.allow))
         });
         rules.dedup_by(|a, b| a.host == b.host && a.port == b.port && a.allow == b.allow);
-        EgressPolicy { rules, deny_all: !self.default_allow }
+        EgressPolicy { rules, deny_all: self.deny_all }
     }
 
     /// 是否已处于规范化 (幂等后) 状态。

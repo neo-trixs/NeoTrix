@@ -271,6 +271,33 @@ pub trait ReceiptEmitter: Send + Sync {
     fn emit_receipt(&self, run_id: &str, input: &str, output: &str) -> String;
 }
 
+// ════════════════════════════════════════════════════════════════
+// NetworkPolicy — L1 网络隔离判定抽象 (避免 L1→L3 直接依赖)
+// ════════════════════════════════════════════════════════════════
+
+/// NetworkPolicyResult — 网络访问判定结果 (core 层枚举, 不依赖 L3 PolicyDecision)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetworkPolicyResult {
+    Allow,
+    RequireConfirmation,
+    Deny,
+}
+
+/// NetworkPolicy — 网络访问策略抽象
+/// L1 模块通过此 trait 判定网络访问权限，而非直接依赖 L3 PolicyDecision。
+pub trait NetworkPolicy: Send + Sync {
+    /// 评估指定域名的网络访问策略
+    fn check_network_access(&self, domain: &str) -> NetworkPolicyResult;
+}
+
+// ════════════════════════════════════════════════════════════════
+// BrainHandle — L5 推理大脑抽象 (避免 L1→L5 直接依赖)
+// ════════════════════════════════════════════════════════════════
+
+/// BrainHandle — 推理大脑轻量句柄 trait
+/// L1 模块通过此 trait 持有大脑引用，而非直接依赖 L5 SelfIteratingBrain 具体类型。
+pub trait BrainHandle: Send + Sync {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

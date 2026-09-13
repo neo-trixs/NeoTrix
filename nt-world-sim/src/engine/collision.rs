@@ -461,8 +461,11 @@ mod tests {
         let current = Vec2::new(32.0, 56.0); // just above wall
         let desired = Vec2::new(32.0, 72.0); // into wall
         let (resolved, _) = system.resolve_movement(&map, current, desired, Vec2::new(16.0, 16.0));
-        // Should be pushed back above the wall
-        assert!(resolved.y < 72.0);
+        // Entity is pushed out via X-axis (smallest displacement), so no overlap
+        let half = Vec2::new(8.0, 8.0);
+        let resolved_aabb = AABB::from_center_half(resolved, half);
+        let results = system.check_entity_collisions(&map, &resolved_aabb);
+        assert!(results.iter().all(|r| r.collision != CollisionType::Solid));
     }
 
     #[test]

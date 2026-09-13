@@ -123,19 +123,19 @@ lazy_static::lazy_static! {
 }
 
 pub fn learner_record_call(provider_id: &str, success: bool, latency_ms: f64) {
-    GLOBAL_LEARNER.lock().unwrap().record_call(provider_id, success, latency_ms);
+    GLOBAL_LEARNER.lock().unwrap_or_else(|e| e.into_inner()).record_call(provider_id, success, latency_ms);
 }
 
 pub fn learner_record_feedback(provider_id: &str, score: f64) {
-    GLOBAL_LEARNER.lock().unwrap().record_feedback(provider_id, score);
+    GLOBAL_LEARNER.lock().unwrap_or_else(|e| e.into_inner()).record_feedback(provider_id, score);
 }
 
 pub fn learner_best_provider() -> Option<String> {
-    GLOBAL_LEARNER.lock().unwrap().best_provider().map(String::from)
+    GLOBAL_LEARNER.lock().unwrap_or_else(|e| e.into_inner()).best_provider().map(String::from)
 }
 
 pub fn learner_weights() -> HashMap<String, f64> {
-    GLOBAL_LEARNER.lock().unwrap().weights()
+    GLOBAL_LEARNER.lock().unwrap_or_else(|e| e.into_inner()).weights()
 }
 
 #[cfg(test)]

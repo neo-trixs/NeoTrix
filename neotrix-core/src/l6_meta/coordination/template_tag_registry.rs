@@ -116,16 +116,28 @@ impl _TemplateTagRegistry {
     }
     
     /// 添加标签
+    ///
+    /// Note: Real implementation needs — tag insertion without duplicate checking.
+    /// Consider: tag deduplication, tag versioning, and EventBus notification
+    /// when new tags are added for cross-module consistency.
     pub(crate) fn _add_tag(&mut self, tag: _TemplateTag) {
         self.tags.insert(tag.id.clone(), tag);
     }
     
     /// 添加模板
+    ///
+    /// Note: Real implementation needs — template insertion without duplicate checking.
+    /// Consider: template deduplication, version control, and EventBus notification
+    /// when new templates are added for cross-module consistency.
     pub(crate) fn _add_template(&mut self, template: SkillTemplate) {
         self.templates.insert(template.id.clone(), template);
     }
     
     /// 添加标签复用关系
+    ///
+    /// Note: Real implementation needs — reuse relationship without cycle detection.
+    /// Consider: circular dependency detection, bidirectional relationship support,
+    /// and persistence to KB for cross-session reuse tracking.
     pub(crate) fn _add_tag_reuse(&mut self, source_tag_id: &str, target_tag_id: &str) {
         if self.tags.contains_key(source_tag_id) && self.tags.contains_key(target_tag_id) {
             self.tag_reuse
@@ -136,6 +148,10 @@ impl _TemplateTagRegistry {
     }
     
     /// 添加模板复用关系
+    ///
+    /// Note: Real implementation needs — reuse relationship without cycle detection.
+    /// Consider: circular dependency detection, bidirectional relationship support,
+    /// and persistence to KB for cross-session reuse tracking.
     pub(crate) fn _add_template_reuse(&mut self, source_template_id: &str, target_template_id: &str) {
         if self.templates.contains_key(source_template_id) && self.templates.contains_key(target_template_id) {
             self.template_reuse
@@ -146,6 +162,10 @@ impl _TemplateTagRegistry {
     }
     
     /// 根据标签查找模板
+    ///
+    /// Note: Real implementation needs — linear scan of all templates.
+    /// Consider: inverted index for O(1) lookup, tag-based caching,
+    /// and pagination for large result sets.
     pub(crate) fn _find_templates_by_tag(&self, tag_id: &str) -> Vec<&SkillTemplate> {
         self.templates.values()
             .filter(|t| t.tags.contains(&tag_id.to_string()))
@@ -153,6 +173,10 @@ impl _TemplateTagRegistry {
     }
     
     /// 根据分类查找标签
+    ///
+    /// Note: Real implementation needs — linear scan of all tags.
+    /// Consider: inverted index for O(1) lookup, category-based caching,
+    /// and pagination for large result sets.
     pub(crate) fn _find_tags_by_category(&self, category: _TagCategory) -> Vec<&_TemplateTag> {
         self.tags.values()
             .filter(|t| t.category == category)
@@ -160,6 +184,10 @@ impl _TemplateTagRegistry {
     }
     
     /// 查找最常用的模板
+    ///
+    /// Note: Real implementation needs — sorts all templates by usage count.
+    /// Consider: maintaining a sorted index for O(1) access, and time-window
+    /// filtering for recent usage patterns.
     pub(crate) fn _find_most_used_templates(&self, limit: usize) -> Vec<&SkillTemplate> {
         let mut templates: Vec<&SkillTemplate> = self.templates.values().collect();
         templates.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
@@ -167,6 +195,10 @@ impl _TemplateTagRegistry {
     }
     
     /// 查找评分最高的模板
+    ///
+    /// Note: Real implementation needs — sorts all templates by rating.
+    /// Consider: maintaining a sorted index for O(1) access, and minimum
+    /// usage threshold for rating validity.
     pub(crate) fn _find_highest_rated_templates(&self, limit: usize) -> Vec<&SkillTemplate> {
         let mut templates: Vec<&SkillTemplate> = self.templates.values().collect();
         templates.sort_by(|a, b| b.rating.total_cmp(&a.rating));
@@ -174,6 +206,10 @@ impl _TemplateTagRegistry {
     }
     
     /// 获取标签的复用链
+    ///
+    /// Note: Real implementation needs — recursive traversal without cycle detection.
+    /// Consider: cycle detection with visited set, maximum depth enforcement,
+    /// and caching of reuse chains for performance.
     pub(crate) fn _get_tag_reuse_chain(&self, tag_id: &str, depth: usize) -> Vec<String> {
         let mut chain = Vec::new();
         let mut visited = std::collections::HashSet::new();
@@ -198,6 +234,10 @@ impl _TemplateTagRegistry {
     }
     
     /// 获取模板的复用链
+    ///
+    /// Note: Real implementation needs — recursive traversal without cycle detection.
+    /// Consider: cycle detection with visited set, maximum depth enforcement,
+    /// and caching of reuse chains for performance.
     pub(crate) fn _get_template_reuse_chain(&self, template_id: &str, depth: usize) -> Vec<String> {
         let mut chain = Vec::new();
         let mut visited = std::collections::HashSet::new();
@@ -222,6 +262,10 @@ impl _TemplateTagRegistry {
     }
     
     /// 统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn statistics(&self) -> _RegistryStatistics {
         let mut category_counts: HashMap<String, usize> = HashMap::new();
         for tag in self.tags.values() {

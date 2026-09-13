@@ -358,14 +358,14 @@ impl Orchestrator for SwarmOrchestrator {
 // ── Pipeline ────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
-pub struct PipelineConfig {
+pub struct OrchestratorPipelineConfig {
     pub stages: Vec<String>,
     pub fail_fast: bool,
 }
 
-impl Default for PipelineConfig {
+impl Default for OrchestratorPipelineConfig {
     fn default() -> Self {
-        PipelineConfig {
+        OrchestratorPipelineConfig {
             stages: Vec::new(),
             fail_fast: true,
         }
@@ -374,12 +374,12 @@ impl Default for PipelineConfig {
 
 pub struct PipelineOrchestrator {
     agents: HashMap<String, Box<dyn AgentUnit>>,
-    config: PipelineConfig,
+    config: OrchestratorPipelineConfig,
     stats: Mutex<OrchestratorStats>,
 }
 
 impl PipelineOrchestrator {
-    pub fn new(config: PipelineConfig) -> Self {
+    pub fn new(config: OrchestratorPipelineConfig) -> Self {
         PipelineOrchestrator {
             agents: HashMap::new(),
             config,
@@ -467,7 +467,7 @@ impl Orchestrator for PipelineOrchestrator {
 pub enum OrchestrationPattern {
     Supervisor(SupervisorConfig),
     Swarm(SwarmConfig),
-    Pipeline(PipelineConfig),
+    Pipeline(OrchestratorPipelineConfig),
 }
 
 pub fn create_orchestrator(
@@ -703,7 +703,7 @@ mod tests {
         let a2 = Box::new(MockAgent::new("stage2", "analyzer", "analyzed"));
         let a3 = Box::new(MockAgent::new("stage3", "formatter", "formatted"));
 
-        let config = PipelineConfig {
+        let config = OrchestratorPipelineConfig {
             stages: vec!["stage1".into(), "stage2".into(), "stage3".into()],
             fail_fast: true,
         };
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_agent_not_found() {
-        let config = PipelineConfig {
+        let config = OrchestratorPipelineConfig {
             stages: vec!["missing".into()],
             fail_fast: true,
         };
@@ -730,7 +730,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_no_stages() {
-        let orch = PipelineOrchestrator::new(PipelineConfig::default());
+        let orch = PipelineOrchestrator::new(OrchestratorPipelineConfig::default());
         let result = orch.execute("task");
         assert!(matches!(result, Err(AgentError::InvalidConfig(_))));
     }
@@ -775,7 +775,7 @@ mod tests {
             Box::new(MockAgent::new("s1", "stage", "out1")),
             Box::new(MockAgent::new("s2", "stage", "out2")),
         ];
-        let config = PipelineConfig {
+        let config = OrchestratorPipelineConfig {
             stages: vec!["s1".into(), "s2".into()],
             fail_fast: true,
         };
@@ -807,7 +807,7 @@ mod tests {
     #[test]
     fn test_factory_pipeline_no_stages() {
         let result = create_orchestrator(
-            OrchestrationPattern::Pipeline(PipelineConfig::default()),
+            OrchestrationPattern::Pipeline(OrchestratorPipelineConfig::default()),
             Vec::new(),
         );
         assert!(matches!(result, Err(AgentError::InvalidConfig(_))));
@@ -834,7 +834,7 @@ mod tests {
     #[test]
     fn test_pipeline_single_stage() {
         let a1 = Box::new(MockAgent::new("only", "stage", "result"));
-        let config = PipelineConfig {
+        let config = OrchestratorPipelineConfig {
             stages: vec!["only".into()],
             fail_fast: true,
         };

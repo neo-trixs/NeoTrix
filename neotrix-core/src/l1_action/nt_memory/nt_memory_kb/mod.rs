@@ -24,7 +24,7 @@ pub mod nt_memory_community;
 pub mod nt_memory_confidence;
 pub mod nt_memory_crawl;
 pub mod nt_memory_pack;
-pub mod nt_memory_pack_chunked;
+// pub mod nt_memory_pack_chunked; // DEAD: zero external references
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_cortex_sync;
@@ -37,7 +37,7 @@ pub mod nt_memory_pipeline;
 pub mod nt_memory_geo;
 pub mod nt_memory_hierarchical;
 pub mod nt_memory_graphrag;
-pub mod nt_memory_gwtq;
+// pub mod nt_memory_gwtq; // DEAD: zero external references
 pub mod nt_memory_diversity;
 pub mod nt_memory_curation;
 pub mod nt_memory_visibility;
@@ -45,21 +45,21 @@ pub mod nt_memory_provenance;
 pub mod nt_temporal_audit;
 pub mod nt_memory_skill_cost;
 pub mod nt_memory_dual_brain;
-pub mod nt_memory_ingest;
+// pub mod nt_memory_ingest; // DEAD: zero external references
 pub mod nt_memory_proficiency;
 pub mod nt_memory_primitives;
 pub mod nt_memory_integration;
 pub mod nt_memory_schema;
 pub mod nt_memory_search;
 pub mod nt_memory_seed;
-pub mod nt_memory_setting_consistency;
+// pub mod nt_memory_setting_consistency; // DEAD: zero external references
 pub mod nt_memory_store;
 pub mod shared_utils;
 pub mod nt_memory_svaf_gate;
 pub mod nt_memory_types;
 pub mod nt_memory_unify;
 pub mod nt_field_ledger;
-pub mod nt_memory_panorama;
+// pub mod nt_memory_panorama; // DEAD: zero external references
 pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
 pub mod nt_memory_knowledge_assets;
@@ -77,7 +77,7 @@ pub mod nt_absorb_mapper;
 pub mod nt_memory_write_guard;
 pub mod nt_memory_snapshot;
 pub mod nt_memory_zim_absorber;
-pub mod nt_memory_brain;
+// pub mod nt_memory_brain; // DEAD: zero external references
 pub mod nt_memory_lifecycle;
 pub mod nt_memory_shanhai;
 
@@ -693,7 +693,7 @@ impl KnowledgeBase {
         Ok(())
     }
 
-    pub fn search_similar(&self, query_vector: &[u8], k: usize) -> Result<Vec<crate::core::nt_core_vector_store::types::VectorSearchResult>, String> {
+    pub fn search_similar(&self, query_vector: &[u8], k: usize) -> Result<Vec<crate::core::l3_memory::nt_core_vector_store::types::VectorSearchResult>, String> {
         let va = self.vector_adapter.read().map_err(|e| format!("Lock: {}", e))?;
         match va.as_ref() {
             Some(adapter) => Ok(adapter.search_similar_nodes(query_vector, k)),

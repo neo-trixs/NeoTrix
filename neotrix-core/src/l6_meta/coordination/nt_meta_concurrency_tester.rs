@@ -112,6 +112,10 @@ impl ConcurrencyIsolationTester {
     }
 
     /// 创建隔离测试会话
+    ///
+    /// Note: Real implementation needs — worktree paths are placeholder paths.
+    /// Consider: actual git worktree creation (git worktree add), cleanup on session
+    /// end, and CARGO_TARGET_DIR isolation for parallel test execution.
     pub fn create_session(&mut self, use_worktree: bool) -> TestSession {
         let session_id = uuid::Uuid::new_v4().to_string();
 
@@ -142,6 +146,10 @@ impl ConcurrencyIsolationTester {
     }
 
     /// 分析测试失败
+    ///
+    /// STUB: Currently uses keyword-based heuristic to classify failures as race conditions
+    /// vs real bugs. Real implementation needs: stack trace analysis, git diff inspection,
+    /// and statistical analysis of failure patterns across multiple runs.
     pub fn analyze_failure(&mut self, session_id: &str, test_name: &str, error: &str) -> TestResult {
         // 简化版: 基于错误信息判断是否为竞态条件
         let is_race_condition = error.contains("conflict") || 
@@ -176,6 +184,10 @@ impl ConcurrencyIsolationTester {
     }
 
     /// 获取干净基线
+    ///
+    /// STUB: Currently returns hardcoded command and expected output.
+    /// Real implementation needs: actual cargo test execution, output parsing,
+    /// and baseline comparison logic for detecting race conditions.
     pub(crate) fn _get_clean_baseline(&self) -> HashMap<String, String> {
         let mut baseline = HashMap::new();
         baseline.insert("command".into(), "CARGO_TARGET_DIR=/tmp/nt-target-clean cargo test -p neotrix --lib".into());
@@ -184,11 +196,19 @@ impl ConcurrencyIsolationTester {
     }
 
     /// 获取所有会话
+    ///
+    /// Note: Real implementation needs — returns reference to in-memory vector.
+    /// Consider: filtering by session status, time range, and persistence to KB
+    /// for cross-session tracking.
     pub fn sessions(&self) -> &[TestSession] {
         &self.test_sessions
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn stats(&self) -> &ConcurrencyStats {
         &self.stats
     }

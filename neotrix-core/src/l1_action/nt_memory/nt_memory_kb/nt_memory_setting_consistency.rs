@@ -208,7 +208,6 @@ pub fn check_and_report_to_string(conn: &Connection, out: &mut String) -> rusqli
 
 /// 渲染人类可读报告
 fn render_report(report: &SettingConsistencyReport) -> String {
-use neotrix_types::shared::Severity;
     let mut out = String::new();
     out.push_str("=== KB 设定一致性检查 (每卷设定检查) ===\n");
     out.push_str(&format!("  检查时间: {}\n", report.checked_at));

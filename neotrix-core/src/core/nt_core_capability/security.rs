@@ -298,7 +298,7 @@ impl SecureCapability {
         token_id: &str,
         ip_address: &str,
     ) -> Result<CapabilityOutput, CapabilityError> {
-        let mut manager = self.security_manager.lock().unwrap();
+        let mut manager = self.security_manager.lock().unwrap_or_else(|e| e.into_inner());
 
         // 验证令牌
         if manager.policy.enable_authentication {

@@ -66,6 +66,10 @@ impl _NullNormalizer {
     }
 
     /// 标准化字符串值
+    ///
+    /// Note: Real implementation needs — rules are applied in order, first match wins.
+    /// Consider: rule priority ordering, regex pattern support, and statistics
+    /// tracking for normalization effectiveness.
     pub(crate) fn _normalize_string(&mut self, value: &str) -> String {
         self.stats.total_checks += 1;
 
@@ -80,6 +84,10 @@ impl _NullNormalizer {
     }
 
     /// 标准化 JSON 值
+    ///
+    /// STUB: Currently only replaces `: null` with `: ""` using string replacement.
+    /// Real implementation needs: proper JSON parsing, nested null handling,
+    /// and configurable replacement strategies per JSON path.
     pub(crate) fn _normalize_json(&mut self, json: &str) -> String {
         // 简化的 JSON 空值处理
         let mut result = json.to_string();
@@ -92,6 +100,10 @@ impl _NullNormalizer {
     }
 
     /// 匹配模式
+    ///
+    /// Note: Real implementation needs — pattern matching is simple equality/contains.
+    /// Consider: regex pattern support, case-insensitive matching options,
+    /// and configurable pattern matching strategies.
     fn matches_pattern(&self, value: &str, pattern: &_NullPattern) -> bool {
         match pattern {
             _NullPattern::JsonNull => value == "null",
@@ -105,6 +117,10 @@ impl _NullNormalizer {
     }
 
     /// 应用策略
+    ///
+    /// Note: Real implementation needs — strategy application is simple replacement.
+    /// Consider: recursive normalization for nested structures, template-based
+    /// replacement with variable interpolation, and statistics tracking.
     fn apply_strategy(&self, value: &str, strategy: &_NormalizeStrategy, default_value: &Option<String>, template: &Option<String>) -> String {
         match strategy {
             _NormalizeStrategy::ReplaceDefault => {
@@ -123,6 +139,10 @@ impl _NullNormalizer {
     }
 
     /// 获取统计信息
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory state.
+    /// For production: maintain running aggregates for O(1) access, and expose
+    /// metrics via EventBus for telemetry integration.
     pub fn stats(&self) -> _NormalizeStats {
         self.stats.clone()
     }
@@ -161,6 +181,11 @@ pub struct _NormalizeStats {
 }
 
 impl _NormalizeStats {
+    /// 计算空值比率
+    ///
+    /// Note: Real implementation needs — simple division of nulls_found/total_checks.
+    /// Consider: time-windowed calculation, trend analysis, and configurable
+    /// threshold for anomaly detection.
     pub(crate) fn _null_rate(&self) -> f64 {
         if self.total_checks == 0 {
             return 0.0;

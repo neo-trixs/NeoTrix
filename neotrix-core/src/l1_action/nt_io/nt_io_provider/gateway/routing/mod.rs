@@ -24,7 +24,7 @@ pub mod agent_routing;
 pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
 
 mod inference_router;
-pub use inference_router::{InferenceRouter, RouterConfig};
+pub use inference_router::{InferenceRouter, IoRouterConfig as RouterConfig};
 
 // ── 搜索 & 免费 provider ─────────────────────────────────
 pub mod search_router;

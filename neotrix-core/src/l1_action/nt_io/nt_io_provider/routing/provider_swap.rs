@@ -387,7 +387,7 @@ mod tests {
 
     #[test]
     fn test_global_swap_manager() {
-        let manager = GLOBAL_SWAP_MANAGER.lock().unwrap();
+        let manager = GLOBAL_SWAP_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
         assert_eq!(manager.fallback_chain.len(), 6);
     }
 }

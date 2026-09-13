@@ -29,13 +29,13 @@ impl InferenceProvider {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouterConfig {
+pub struct HarnessRouterConfig {
     pub default_provider: InferenceProvider,
     pub fallback_order: Vec<InferenceProvider>,
     pub auto_routing: bool,
 }
 
-impl Default for RouterConfig {
+impl Default for HarnessRouterConfig {
     fn default() -> Self {
         Self {
             default_provider: InferenceProvider::Cursor,
@@ -47,12 +47,12 @@ impl Default for RouterConfig {
 
 #[derive(Debug, Clone, Default)]
 pub struct InferenceRouter {
-    pub config: RouterConfig,
+    pub config: HarnessRouterConfig,
     usage: std::collections::HashMap<String, u64>,
 }
 
 impl InferenceRouter {
-    pub fn with_config(config: RouterConfig) -> Self {
+    pub fn with_config(config: HarnessRouterConfig) -> Self {
         Self { config, usage: std::collections::HashMap::new() }
     }
     pub fn select(&self, hint: Option<InferenceProvider>) -> InferenceProvider {

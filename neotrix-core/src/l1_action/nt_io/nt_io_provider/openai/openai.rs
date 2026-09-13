@@ -218,21 +218,29 @@ fn set_proxy(&mut self, proxy_url: &str) {
                     }
                     let full = match response.text().await {
                         Ok(t) => t,
-                        Err(_) => return,
+                        Err(e) => {
+                            let _ = tx.send(Err(LlmError::Network(format!("Failed to read streaming response: {}", e)))).await;
+                            return;
+                        }
                     };
                     for line in full.lines() {
                         let line = line.trim();
                         if line.is_empty() || line == "data: [DONE]" { continue; }
                         if let Some(data) = line.strip_prefix("data: ") {
-                            if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
-                                if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
-                                    let _ = tx.send(Ok(LlmResponse {
-                                        content: delta.to_string(),
-                                        model: v["model"].as_str().unwrap_or("").to_string(),
-                                        usage: Usage::default(),
-                                        finish_reason: FinishReason::Unknown,
-                                    tool_calls: None,
-                                     reasoning: None,})).await;
+                            match serde_json::from_str::<serde_json::Value>(data) {
+                                Ok(v) => {
+                                    if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
+                                        let _ = tx.send(Ok(LlmResponse {
+                                            content: delta.to_string(),
+                                            model: v["model"].as_str().unwrap_or("").to_string(),
+                                            usage: Usage::default(),
+                                            finish_reason: FinishReason::Unknown,
+                                        tool_calls: None,
+                                         reasoning: None,})).await;
+                                    }
+                                }
+                                Err(e) => {
+                                    log::warn!("[openai] failed to parse streaming SSE line: {} (data: {:.80})", e, data);
                                 }
                             }
                         }

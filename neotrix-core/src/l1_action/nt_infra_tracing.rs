@@ -130,19 +130,19 @@ lazy_static::lazy_static! {
 
 /// 便捷函数
 pub fn trace_start(capability_id: &str, action: &str) -> String {
-    GLOBAL_COLLECTOR.lock().unwrap().start_span(capability_id, action)
+    GLOBAL_COLLECTOR.lock().unwrap_or_else(|e| e.into_inner()).start_span(capability_id, action)
 }
 
 pub fn trace_end(span_id: &str, success: bool, error: Option<String>) {
-    GLOBAL_COLLECTOR.lock().unwrap().end_span(span_id, success, error);
+    GLOBAL_COLLECTOR.lock().unwrap_or_else(|e| e.into_inner()).end_span(span_id, success, error);
 }
 
 pub fn trace_aggregate(capability_id: &str) -> Option<CapabilityAggregate> {
-    GLOBAL_COLLECTOR.lock().unwrap().aggregate(capability_id).cloned()
+    GLOBAL_COLLECTOR.lock().unwrap_or_else(|e| e.into_inner()).aggregate(capability_id).cloned()
 }
 
 pub fn trace_all_aggregates() -> HashMap<String, CapabilityAggregate> {
-    GLOBAL_COLLECTOR.lock().unwrap().all_aggregates().clone()
+    GLOBAL_COLLECTOR.lock().unwrap_or_else(|e| e.into_inner()).all_aggregates().clone()
 }
 
 #[cfg(test)]

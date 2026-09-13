@@ -31,7 +31,7 @@ pub mod router;
 pub mod sandbox;
 
 pub use app_server::{ApprovalRequest, ApprovalState, HarnessThread, HarnessTurn, ThreadStore};
-pub use router::{InferenceProvider, InferenceRouter, RouterConfig};
+pub use router::{InferenceProvider, InferenceRouter, HarnessRouterConfig as RouterConfig};
 pub use sandbox::{LocalSandbox, SandboxConfig, SandboxState};
 
 // ── 11 统一工具（对标 harness/mcp-server registry dispatch） ───────────

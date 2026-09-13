@@ -112,9 +112,9 @@ pub struct PoolStatus {
     pub total_count: usize,
 }
 
-/// 缓存配置
+/// 缓存配置 (NT-CORE capability performance LRU cache)
 #[derive(Debug, Clone)]
-pub struct CacheConfig {
+pub struct PerformanceCacheConfig {
     /// 最大缓存大小
     pub max_size: usize,
     /// 缓存过期时间
@@ -125,7 +125,7 @@ pub struct CacheConfig {
     pub warmup: bool,
 }
 
-impl Default for CacheConfig {
+impl Default for PerformanceCacheConfig {
     fn default() -> Self {
         Self {
             max_size: 1000,
@@ -148,12 +148,12 @@ struct CacheEntry<V> {
 /// LRU缓存
 pub struct LruCache<K, V> {
     entries: std::collections::HashMap<K, CacheEntry<V>>,
-    config: CacheConfig,
+    config: PerformanceCacheConfig,
 }
 
 impl<K: Eq + std::hash::Hash + Clone, V: Clone> LruCache<K, V> {
     /// 创建新的LRU缓存
-    pub fn new(config: CacheConfig) -> Self {
+    pub fn new(config: PerformanceCacheConfig) -> Self {
         Self {
             entries: std::collections::HashMap::with_capacity(config.max_size),
             config,
@@ -273,7 +273,7 @@ pub struct PerformanceOptimizer {
     /// 连接池配置
     pool_config: PoolConfig,
     /// 缓存配置
-    cache_config: CacheConfig,
+    cache_config: PerformanceCacheConfig,
     /// 预热器
     warmer: Warmer,
     /// 性能统计
@@ -293,7 +293,7 @@ pub struct PerformanceStats {
 
 impl PerformanceOptimizer {
     /// 创建新的性能优化器
-    pub fn new(pool_config: PoolConfig, cache_config: CacheConfig) -> Self {
+    pub fn new(pool_config: PoolConfig, cache_config: PerformanceCacheConfig) -> Self {
         Self {
             pool_config,
             cache_config,
@@ -394,7 +394,7 @@ impl OptimizedCapability {
         let duration = start.elapsed().as_millis() as u64;
 
         // 记录性能
-        let mut optimizer = self.optimizer.lock().unwrap();
+        let mut optimizer = self.optimizer.lock().unwrap_or_else(|e| e.into_inner());
         optimizer.record_request(false, duration);
 
         result
@@ -425,7 +425,7 @@ mod tests {
 
     #[test]
     fn lru_cache() {
-        let config = CacheConfig {
+        let config = PerformanceCacheConfig {
             max_size: 3,
             ttl: Duration::from_secs(60),
             enable_lru: true,
@@ -449,7 +449,7 @@ mod tests {
     #[test]
     fn performance_optimizer() {
         let pool_config = PoolConfig::default();
-        let cache_config = CacheConfig::default();
+        let cache_config = PerformanceCacheConfig::default();
         let mut optimizer = PerformanceOptimizer::new(pool_config, cache_config);
 
         optimizer.record_request(true, 100);

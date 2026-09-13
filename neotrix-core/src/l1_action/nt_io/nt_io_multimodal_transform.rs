@@ -717,7 +717,7 @@ mod tests {
                 format!("base:{}", marker)
             }
             fn analyze_with_intent(&self, id: usize, marker: &str, intent: &str) -> String {
-                self.received.lock().unwrap().push(intent.to_string());
+                self.received.lock().unwrap_or_else(|e| e.into_inner()).push(intent.to_string());
                 format!("intent[{}]:{}:{}", id, marker, intent)
             }
         }
@@ -728,7 +728,7 @@ mod tests {
         );
         let r = t.transform_with_intent("![图](url) 看这个", "提取登录按钮坐标");
         assert_eq!(r.images_replaced, 1);
-        let got = received.lock().unwrap();
+        let got = received.lock().unwrap_or_else(|e| e.into_inner());
         assert_eq!(got[0], "提取登录按钮坐标");
         assert!(r.text.contains("intent[1]"));
     }

@@ -231,7 +231,11 @@ impl _LayeredQA {
         }
     }
     
-    /// 执行完整 QA 流程
+    /// Execute full QA pipeline: Structural → Deterministic → Semantic → PublishGate.
+    ///
+    /// Note: Real implementation needs — currently uses fail-fast on blocking failures.
+    /// Consider: configurable stage ordering, parallel stage execution for independent
+    /// checks, and caching of intermediate results for re-runs.
     pub fn execute(&mut self, spec: &serde_json::Value, output: &serde_json::Value) -> _LayeredQAResult {
         let start = std::time::Instant::now();
         let mut stage_results = vec![];
@@ -268,7 +272,11 @@ impl _LayeredQA {
         result
     }
     
-    /// 执行单阶段检查
+    /// Execute all enabled checks for a single QA stage.
+    ///
+    /// Note: Real implementation needs — checks are executed sequentially.
+    /// Consider: parallel check execution, check dependency ordering, and
+    /// early termination when blocking issues are found.
     fn execute_stage(&self, stage: _QAStage, spec: &serde_json::Value, output: &serde_json::Value) -> _QAStageResult {
         let start = std::time::Instant::now();
         let mut check_results = vec![];
@@ -339,7 +347,12 @@ impl _LayeredQA {
         }
     }
     
-    /// 计算总分
+    /// Calculate overall QA score as average of stage pass rates.
+    ///
+    /// Note: Real implementation needs — stages are equally weighted.
+    /// Consider: weighted scoring (Semantic stage more critical than Structural),
+    /// severity-aware scoring (Blocking failures deduct more), and stage-specific
+    /// thresholds for pass/fail determination.
     fn calculate_total_score(&self, stage_results: &[_QAStageResult]) -> f32 {
         if stage_results.is_empty() {
             return 0.0;
@@ -349,7 +362,11 @@ impl _LayeredQA {
         total_pass_rate / stage_results.len() as f32
     }
     
-    /// 生成发布决策
+    /// Generate publish decision based on QA results.
+    ///
+    /// STUB: Currently returns binary publish/no-publish based on `qa_result.passed`.
+    /// Real implementation needs: configurable approval workflows, human-in-the-loop
+    /// escalation for borderline cases, and platform-specific publish criteria.
     pub(crate) fn _generate_publish_decision(&self, qa_result: &_LayeredQAResult) -> _PublishDecision {
         if qa_result.passed {
             _PublishDecision {
@@ -370,7 +387,11 @@ impl _LayeredQA {
         }
     }
     
-    /// 获取检查统计
+    /// Get aggregate QA statistics across all pipeline runs.
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory history.
+    /// For production: maintain running aggregates for O(1) access, add time-window
+    /// filtering, and expose metrics via EventBus for telemetry integration.
     pub fn statistics(&self) -> _QAStats {
         let total_runs = self.history.len();
         let passed = self.history.iter().filter(|r| r.passed).count();

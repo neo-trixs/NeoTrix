@@ -25,9 +25,9 @@ pub struct CacheEntry {
     pub similarity: f64,
 }
 
-/// 缓存配置
+/// 缓存配置 (NT-CORE visual prompt cache)
 #[derive(Debug, Clone)]
-pub struct CacheConfig {
+pub struct VisualPromptCacheConfig {
     /// 最大缓存条目数
     pub max_entries: usize,
     /// 缓存过期时间
@@ -36,7 +36,7 @@ pub struct CacheConfig {
     pub similarity_threshold: f64,
 }
 
-impl Default for CacheConfig {
+impl Default for VisualPromptCacheConfig {
     fn default() -> Self {
         Self {
             max_entries: 1000,
@@ -51,7 +51,7 @@ pub struct _PromptCache {
     /// 缓存存储
     entries: HashMap<String, CacheEntry>,
     /// 配置
-    config: CacheConfig,
+    config: VisualPromptCacheConfig,
     /// 统计信息
     stats: CacheStats,
 }
@@ -63,7 +63,7 @@ impl _PromptCache {
     /// - max_entries > 0
     /// - ttl > 0
     /// - similarity_threshold in [0.0, 1.0]
-    pub fn new(config: CacheConfig) -> Self {
+    pub fn new(config: VisualPromptCacheConfig) -> Self {
         Self {
             entries: HashMap::new(),
             config,
@@ -187,7 +187,7 @@ impl _PromptCache {
 
 impl Default for _PromptCache {
     fn default() -> Self {
-        Self::new(CacheConfig::default())
+        Self::new(VisualPromptCacheConfig::default())
     }
 }
 

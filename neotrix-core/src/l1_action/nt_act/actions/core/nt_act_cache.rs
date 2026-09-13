@@ -18,12 +18,12 @@ pub struct CacheLayer {
     l1_cache: LRUCache<String, CacheEntry>,
     l2_cache: Option<DiskCache>,
     stats: CacheStats,
-    config: CacheConfig,
+    config: ActCacheConfig,
 }
 
-/// 缓存配置
+/// 缓存配置 (NT-ACT multi-level cache)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheConfig {
+pub struct ActCacheConfig {
     pub l1_max_entries: usize,
     pub l1_ttl: Duration,
     pub l2_enabled: bool,
@@ -33,7 +33,7 @@ pub struct CacheConfig {
     pub warmup_enabled: bool,
 }
 
-impl Default for CacheConfig {
+impl Default for ActCacheConfig {
     fn default() -> Self {
         Self {
             l1_max_entries: 1000,
@@ -147,7 +147,7 @@ impl<K: Eq + std::hash::Hash + Clone, V: Clone> LRUCache<K, V> {
 
 impl CacheLayer {
     /// 创建新的缓存层
-    pub fn new(config: CacheConfig) -> Self {
+    pub fn new(config: ActCacheConfig) -> Self {
         let l2_cache = if config.l2_enabled {
             config.l2_path.as_ref().map(|path| DiskCache {
                 path: path.clone(),

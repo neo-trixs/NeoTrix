@@ -149,19 +149,19 @@ lazy_static::lazy_static! {
 }
 
 pub fn agent_card_register(card: AgentCard) {
-    GLOBAL_CARDS.lock().unwrap().register(card);
+    GLOBAL_CARDS.lock().unwrap_or_else(|e| e.into_inner()).register(card);
 }
 
 pub fn agent_card_get(id: &str) -> Option<AgentCard> {
-    GLOBAL_CARDS.lock().unwrap().get(id).cloned()
+    GLOBAL_CARDS.lock().unwrap_or_else(|e| e.into_inner()).get(id).cloned()
 }
 
 pub fn agent_card_find_by_capability(cap: &str) -> Vec<AgentCard> {
-    GLOBAL_CARDS.lock().unwrap().find_by_capability(cap).into_iter().cloned().collect()
+    GLOBAL_CARDS.lock().unwrap_or_else(|e| e.into_inner()).find_by_capability(cap).into_iter().cloned().collect()
 }
 
 pub fn agent_card_alive() -> Vec<AgentCard> {
-    GLOBAL_CARDS.lock().unwrap().alive_agents().into_iter().cloned().collect()
+    GLOBAL_CARDS.lock().unwrap_or_else(|e| e.into_inner()).alive_agents().into_iter().cloned().collect()
 }
 
 #[cfg(test)]

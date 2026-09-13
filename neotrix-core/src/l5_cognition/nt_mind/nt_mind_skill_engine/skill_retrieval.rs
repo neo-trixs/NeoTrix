@@ -204,8 +204,8 @@ impl _SkillRetriever {
             quality_scores: _QualityScores::default(),
         };
 
-        self.embeddings.lock().unwrap().insert(skill.name.clone(), embedding);
-        self.category_index.lock().unwrap()
+        self.embeddings.lock().unwrap_or_else(|e| e.into_inner()).insert(skill.name.clone(), embedding);
+        self.category_index.lock().unwrap_or_else(|e| e.into_inner())
             .entry(category_str)
             .or_default()
             .push(skill.name.clone());
@@ -226,7 +226,7 @@ impl _SkillRetriever {
 
     /// 检索技能 (bi-encoder 召回 + reranker 重排)
     pub fn retrieve(&self, query: &_SkillQuery) -> Result<Vec<RetrievalResult>, String> {
-        let embeddings = self.embeddings.lock().unwrap();
+        let embeddings = self.embeddings.lock().unwrap_or_else(|e| e.into_inner());
         if embeddings.is_empty() {
             return Ok(Vec::new());
         }
@@ -235,7 +235,7 @@ impl _SkillRetriever {
         let query_emb = self.bi_encoder.encode(&query.text)?;
 
         // 2. 向量相似度召回 (余弦相似度)
-        let embeddings_guard = self.embeddings.lock().unwrap();
+        let embeddings_guard = self.embeddings.lock().unwrap_or_else(|e| e.into_inner());
         let mut candidates: Vec<(String, f32)> = embeddings_guard.iter()
             .map(|(name, emb)| {
                 let sim = cosine_similarity(&query_emb, &emb.embedding);
@@ -249,7 +249,7 @@ impl _SkillRetriever {
         // 应用类别过滤
         if query.category.is_some() {
             candidates.retain(|(name, _)| {
-                self.category_index.lock().unwrap()
+                self.category_index.lock().unwrap_or_else(|e| e.into_inner())
                     .get(&query.category.clone().unwrap_or_default())
                     .map(|v| v.contains(name))
                     .unwrap_or(true)
@@ -275,7 +275,7 @@ impl _SkillRetriever {
         for ((name, bi_score), rerank_score) in top_candidates.into_iter().zip(rerank_scores.into_iter()) {
             let combined = (0.7 * bi_score + 0.3 * rerank_score) as f64;
             if combined >= query.min_score {
-                let emb = self.embeddings.lock().unwrap().get(&name).cloned();
+                let emb = self.embeddings.lock().unwrap_or_else(|e| e.into_inner()).get(&name).cloned();
                 let (category, snippet) = emb
                     .map(|e| (e.category, e.skill_name))
                     .unwrap_or_default();
@@ -294,12 +294,12 @@ impl _SkillRetriever {
     /// 按类别检索
     pub(crate) fn _retrieve_by_category(&self, category: _SkillCategory, top_k: usize) -> Vec<RetrievalResult> {
         let cat_str = format!("{:?}", category);
-        let index = self.category_index.lock().unwrap();
+        let index = self.category_index.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(names) = index.get(&cat_str) {
             names.iter()
                 .take(top_k)
                 .filter_map(|name| {
-                    self.embeddings.lock().unwrap().get(name).map(|emb| RetrievalResult {
+                    self.embeddings.lock().unwrap_or_else(|e| e.into_inner()).get(name).map(|emb| RetrievalResult {
                         skill_name: name.clone(),
                         score: emb.quality_scores.overall,
                         category: format!("{:?}", category),
@@ -314,7 +314,7 @@ impl _SkillRetriever {
 
     /// 更新质量分数
     pub fn update_quality(&self, skill_name: &str, scores: _QualityScores) {
-        if let Some(emb) = self.embeddings.lock().unwrap().get_mut(skill_name) {
+        if let Some(emb) = self.embeddings.lock().unwrap_or_else(|e| e.into_inner()).get_mut(skill_name) {
             emb.quality_scores = scores;
         }
     }

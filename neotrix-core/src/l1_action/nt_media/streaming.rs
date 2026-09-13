@@ -162,10 +162,10 @@ pub enum DownloadStatus {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PipelineConfig — session configuration
+// StreamingPipelineConfig — session configuration
 // ═══════════════════════════════════════════════════════════════════════════
 
-pub struct PipelineConfig {
+pub struct StreamingPipelineConfig {
     pub url: String,
     pub output_dir: PathBuf,
     pub prefer_streaming: bool,
@@ -183,7 +183,7 @@ pub struct PipelineConfig {
     pub max_retries: u32,
 }
 
-impl Default for PipelineConfig {
+impl Default for StreamingPipelineConfig {
     fn default() -> Self {
         Self {
             url: String::new(),
@@ -204,6 +204,9 @@ impl Default for PipelineConfig {
         }
     }
 }
+
+/// Backward-compatible alias
+pub type PipelineConfig = StreamingPipelineConfig;
 
 /// Download-specific configuration (merged from nt_io_download).
 #[derive(Debug, Clone)]
@@ -232,9 +235,9 @@ impl Default for DownloadConfig {
 }
 
 impl DownloadConfig {
-    /// Convert into a PipelineConfig base (player fields use defaults).
-    pub fn to_pipeline_config(self, url: String, output_dir: PathBuf) -> PipelineConfig {
-        PipelineConfig {
+    /// Convert into a StreamingPipelineConfig base (player fields use defaults).
+    pub fn to_pipeline_config(self, url: String, output_dir: PathBuf) -> StreamingPipelineConfig {
+        StreamingPipelineConfig {
             url,
             output_dir,
             chunk_size: self.max_chunk_bytes as usize,
@@ -465,11 +468,11 @@ async fn is_done(dest: &Path) -> Option<u64> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 pub struct StreamingPipeline {
-    config: PipelineConfig,
+    config: StreamingPipelineConfig,
 }
 
 impl StreamingPipeline {
-    pub fn new(config: PipelineConfig) -> Self {
+    pub fn new(config: StreamingPipelineConfig) -> Self {
         Self { config }
     }
 
@@ -3053,7 +3056,7 @@ mod tests {
     #[tokio::test]
     async fn test_pipeline_http_streaming() {
         let (tx, mut rx) = mpsc::channel(100);
-        let pipeline = StreamingPipeline::new(PipelineConfig {
+        let pipeline = StreamingPipeline::new(StreamingPipelineConfig {
             url: "https://httpbin.org/bytes/4096".into(),
             output_dir: std::env::temp_dir(),
             prefer_streaming: true,
@@ -3082,7 +3085,7 @@ mod tests {
         let test_file = std::env::temp_dir().join("nt_test_file_copy.txt");
         fs::write(&test_file, b"hello").await.unwrap();
 
-        let pipeline = StreamingPipeline::new(PipelineConfig {
+        let pipeline = StreamingPipeline::new(StreamingPipelineConfig {
             url: format!("file://{}", test_file.to_string_lossy()),
             output_dir: std::env::temp_dir(),
             ..Default::default()
@@ -3267,7 +3270,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_config_atomic_write_default() {
-        let config = PipelineConfig::default();
+        let config = StreamingPipelineConfig::default();
         assert!(!config.atomic_write);
         assert!(config.mirror_fallback_enabled);
         assert_eq!(config.min_disk_space, 1024 * 1024 * 1024);
@@ -3275,7 +3278,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_config_atomic_write_enabled() {
-        let config = PipelineConfig {
+        let config = StreamingPipelineConfig {
             atomic_write: true,
             min_disk_space: 512 * 1024 * 1024,
             ..Default::default()

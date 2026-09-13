@@ -162,20 +162,20 @@ lazy_static::lazy_static! {
 }
 
 pub fn enhanced_register(card: super::nt_infra_agent_card::AgentCard) {
-    ENHANCED_REGISTRY.lock().unwrap().register(card);
+    ENHANCED_REGISTRY.lock().unwrap_or_else(|e| e.into_inner()).register(card);
 }
 
 pub fn enhanced_is_available(id: &str) -> bool {
-    ENHANCED_REGISTRY.lock().unwrap().is_available(id)
+    ENHANCED_REGISTRY.lock().unwrap_or_else(|e| e.into_inner()).is_available(id)
 }
 
 pub fn enhanced_route(query: &str, intent: Option<&str>) -> Option<String> {
-    ENHANCED_ROUTER.lock().unwrap().route(query, intent)
+    ENHANCED_ROUTER.lock().unwrap_or_else(|e| e.into_inner()).route(query, intent)
 }
 
 pub fn enhanced_record(provider_id: &str, success: bool, latency_ms: f64) {
-    ENHANCED_REGISTRY.lock().unwrap().record_result(provider_id, success);
-    ENHANCED_ROUTER.lock().unwrap().record_result(provider_id, success, latency_ms);
+    ENHANCED_REGISTRY.lock().unwrap_or_else(|e| e.into_inner()).record_result(provider_id, success);
+    ENHANCED_ROUTER.lock().unwrap_or_else(|e| e.into_inner()).record_result(provider_id, success, latency_ms);
 }
 
 #[cfg(test)]

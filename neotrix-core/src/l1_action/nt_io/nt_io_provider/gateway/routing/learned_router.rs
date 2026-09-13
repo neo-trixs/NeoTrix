@@ -454,6 +454,20 @@ impl MLPRouter {
     fn name(&self) -> &str { "MLPRouter" }
 }
 
+impl LearnedRouter for MLPRouter {
+    fn route(&self, features: &RouteFeatures, candidates: &[CandidateModel]) -> RouteDecision {
+        MLPRouter::route(self, features, candidates)
+    }
+
+    fn update(&mut self, features: &RouteFeatures, chosen: &str, reward: f32) {
+        MLPRouter::update(self, features, chosen, reward);
+    }
+
+    fn name(&self) -> &str {
+        MLPRouter::name(self)
+    }
+}
+
 /// Hybrid Router — KNN + MLP 融合, 置信度加权
 pub struct HybridRouter {
     knn: KNNRouter,

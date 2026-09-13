@@ -214,7 +214,11 @@ impl _VerifierAgent {
         )
     }
     
-    /// 计算总分
+    /// Calculate weighted total score from dimension scores across dimension groups.
+    ///
+    /// Note: Real implementation needs — dimensions not present in scores are skipped
+    /// (their weight doesn't contribute to total_weight normalization). Consider:
+    /// requiring all dimensions to be scored, or penalizing missing dimensions.
     fn calculate_total_score(&self, scores: &[_VerificationScore]) -> f32 {
         let mut weighted_sum = 0.0;
         let mut total_weight = 0.0;
@@ -281,7 +285,11 @@ impl _VerifierAgent {
         corrected
     }
     
-    /// 获取验证统计
+    /// Get aggregate verification statistics across all verification runs.
+    ///
+    /// Note: Real implementation needs — stats are computed from in-memory history.
+    /// For production: persist to KB, add time-window filtering, and expose metrics
+    /// via EventBus for telemetry integration.
     pub fn statistics(&self) -> _VerifierStats {
         let total_verifications = self.history.len();
         let passed = self.history.iter().filter(|r| r.passed).count();
@@ -374,19 +382,18 @@ mod tests {
     
     #[test]
     fn test_regeneration_request() {
-        // FABRICATED DATA: total_score, error_types, and suggested_corrections are
-        // all hardcoded constants. This test verifies mode-selection threshold logic
-        // (score < 0.5 → Regenerate, score >= 0.5 → Edit) against fabricated inputs.
-        // When real VLM verification is wired, mode selection should depend on
-        // actual analysis results, not just score heuristics.
+        // TODO(R-P79): total_score, error_types, and suggested_corrections are
+        // hardcoded constants, not from real VLM analysis. This verifies
+        // mode-selection threshold logic only. To test real mode selection,
+        // wire a VLM and assert that actual analysis results drive the mode.
         let verifier = _VerifierAgent::new();
 
         let result = VerificationResult {
             passed: false,
-            total_score: 0.5,  // FABRICATED — not from real VLM analysis
+            total_score: 0.5,
             scores: vec![],
-            error_types: vec!["实体漂移".to_string()],  // FABRICATED error type
-            suggested_corrections: vec!["保持角色外观一致".to_string()],  // FABRICATED
+            error_types: vec!["实体漂移".to_string()],
+            suggested_corrections: vec!["保持角色外观一致".to_string()],
             needs_regeneration: true,
             verification_time_ms: 100,
         };
@@ -396,15 +403,15 @@ mod tests {
             &result,
         );
 
-        // Tautological: we set total_score=0.5 (>= 0.5), so mode is Edit.
+        // TAUTOLOGICAL: We set total_score=0.5 (>= 0.5), so mode is Edit.
         assert_eq!(request.regeneration_mode, _RegenerationMode::Edit,
-            "tautological: fabricated score=0.5 should trigger Edit mode");
+            "score >= 0.5 threshold should trigger Edit mode");
         assert!(request.corrected_prompt.contains("保持角色外观一致"),
-            "auto-correct should append fabricated corrections, got: {}", request.corrected_prompt);
+            "auto-correct should append corrections, got: {}", request.corrected_prompt);
 
-        // Verify low score triggers Regenerate mode — also tautological
+        // Verify low score triggers Regenerate mode
         let low_result = VerificationResult {
-            total_score: 0.3,  // FABRICATED
+            total_score: 0.3,
             ..result
         };
         let low_request = verifier._generate_regeneration_request(
@@ -412,7 +419,7 @@ mod tests {
             &low_result,
         );
         assert_eq!(low_request.regeneration_mode, _RegenerationMode::Regenerate,
-            "tautological: fabricated score=0.3 should trigger Regenerate, got {:?}",
+            "score < 0.5 threshold should trigger Regenerate, got {:?}",
             low_request.regeneration_mode);
     }
 }

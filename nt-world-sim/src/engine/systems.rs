@@ -553,6 +553,9 @@ mod tests {
         world.insert(m, Health::new(50.0));
 
         world.insert_resource(GameCamera::new(800.0, 600.0));
+        if let Some(cam) = world.get_resource_mut::<GameCamera>() {
+            cam.target = Some(p);
+        }
         world.insert_resource(RenderCommandBuffer::new());
         world.insert_resource(TimeState::default());
 
