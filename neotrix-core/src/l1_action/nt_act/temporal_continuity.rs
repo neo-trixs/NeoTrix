@@ -378,31 +378,82 @@ pub type ShotContinuityChecker = TemporalContinuityChecker;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
+    /// Strings with zero common prefix at max_len positions → diff = 1.0 (max).
+    /// This verifies the checker actually flags high-diff frames.
     #[test]
-    fn test_continuity_checker() {
+    fn test_detects_high_diff_frames() {
         let checker = TemporalContinuityChecker::new();
-        
+        let frames = vec![
+            "aaaa".to_string(),
+            "bbbb".to_string(),
+        ];
+        let result = checker.check_first_last_frame(&frames);
+        // 4 chars, 0 matches → diff = 1.0, exceeds max_diff (0.15) → issues
+        assert_eq!(result.issue_count, 1);
+        assert!(!result.passed || result.issues.iter().any(|i| i.severity >= ContinuitySeverity::Warning));
+    }
+
+    /// Identical strings → diff = 0.0, should pass cleanly.
+    #[test]
+    fn test_identical_frames_pass() {
+        let checker = TemporalContinuityChecker::new();
         let frames = vec![
             "frame_001.png".to_string(),
-            "frame_002.png".to_string(),
-            "frame_003.png".to_string(),
+            "frame_001.png".to_string(),
         ];
-        
         let result = checker.check_first_last_frame(&frames);
         assert!(result.passed);
+        assert_eq!(result.issue_count, 0);
     }
-    
+
+    /// Empty frame list → no issues, pass_rate = 1.0, passed = true.
     #[test]
-    fn test_check_all() {
+    fn test_empty_frames_returns_pass() {
         let checker = TemporalContinuityChecker::new();
-        
-        let frames = vec![
-            "frame_001.png".to_string(),
-            "frame_002.png".to_string(),
-        ];
-        
-        let result = checker.check_all(&frames);
+        let frames: Vec<String> = vec![];
+        let result = checker.check_first_last_frame(&frames);
         assert!(result.passed);
+        assert_eq!(result.checked_frames, 0);
+    }
+
+    /// check_scene_transition is a stub → must report error, not fabricated success.
+    #[test]
+    fn test_scene_transition_stub_returns_error() {
+        let checker = TemporalContinuityChecker::new();
+        let frames = vec!["frame_001.png".to_string()];
+        let result = checker.check_scene_transition(&frames, "cut");
+        assert!(!result.passed);
+        assert!(result.error.is_some());
+    }
+
+    /// check_element_position is a stub → must report error, not fabricated success.
+    #[test]
+    fn test_element_position_stub_returns_error() {
+        let checker = TemporalContinuityChecker::new();
+        let frames = vec!["frame_001.png".to_string()];
+        let result = checker.check_element_position(&frames, "elem_1");
+        assert!(!result.passed);
+        assert!(result.error.is_some());
+    }
+
+    /// check_all aggregates stub errors → must not pass when stubs are active.
+    #[test]
+    fn test_check_all_fails_when_stubs_active() {
+        let config = ContinuityCheckConfig {
+            check_types: vec![
+                ContinuityCheckType::FirstLastFrame,
+                ContinuityCheckType::SceneTransition,
+            ],
+            match_threshold: 0.85,
+            max_diff: 0.15,
+            auto_suggest_fix: false,
+            severity_threshold: ContinuitySeverity::Warning,
+        };
+        let checker = TemporalContinuityChecker::with_config(config);
+        let frames = vec!["frame_001.png".to_string(), "frame_001.png".to_string()];
+        let result = checker.check_all(&frames);
+        assert!(!result.passed);
+        assert!(result.error.is_some());
     }
 }

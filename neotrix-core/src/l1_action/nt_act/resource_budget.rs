@@ -391,52 +391,185 @@ pub type CostManager = ResourceBudgetManager;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
-    fn test_budget_check() {
+    fn test_budget_within_limit_returns_continue() {
         let manager = ResourceBudgetManager::new();
-        
-        let result = manager.check_budget(ResourceType::Token, 100000.0);
+        // Default token quota: 1M limit, 0 used → 100K request is within budget
+        let result = manager.check_budget(ResourceType::Token, 100_000.0);
         assert!(result.within_budget);
         assert_eq!(result.recommendation, BudgetRecommendation::Continue);
     }
-    
+
     #[test]
-    fn test_record_usage() {
+    fn test_budget_exceeded_returns_delay() {
+        let config = BudgetConfig {
+            quotas: vec![ResourceQuota {
+                resource_type: ResourceType::Token,
+                period: BudgetPeriod::Daily,
+                limit: 1000.0,
+                used: 800.0,  // 80% used
+                reserved: 0.0,
+            }],
+            alert_threshold: 0.9,
+            hard_limit_threshold: 0.95,
+            allow_overdraft: false,
+            overdraft_penalty: 1.5,
+            cost_optimization: CostOptimization {
+                enable_batch_optimization: false,
+                enable_cache_reuse: false,
+                enable_degradation: false,
+                max_degradation_level: 0,
+            },
+        };
+        let manager = ResourceBudgetManager::with_config(config);
+
+        // 300 more tokens would exceed 1000 limit (800 + 300 = 1100 > 1000)
+        let result = manager.check_budget(ResourceType::Token, 300.0);
+        assert!(!result.within_budget);
+        assert_eq!(result.recommendation, BudgetRecommendation::Delay);
+    }
+
+    #[test]
+    fn test_alert_threshold_triggers_degraded() {
+        let config = BudgetConfig {
+            quotas: vec![ResourceQuota {
+                resource_type: ResourceType::Token,
+                period: BudgetPeriod::Daily,
+                limit: 1000.0,
+                used: 900.0,  // 90% used = alert_threshold
+                reserved: 0.0,
+            }],
+            alert_threshold: 0.9,
+            hard_limit_threshold: 0.95,
+            allow_overdraft: false,
+            overdraft_penalty: 1.5,
+            cost_optimization: CostOptimization {
+                enable_batch_optimization: false,
+                enable_cache_reuse: false,
+                enable_degradation: false,
+                max_degradation_level: 0,
+            },
+        };
+        let manager = ResourceBudgetManager::with_config(config);
+
+        let result = manager.check_budget(ResourceType::Token, 1.0);
+        assert!(result.within_budget);  // 99 remaining >= 1
+        assert!(result.alert_triggered);
+        assert_eq!(result.recommendation, BudgetRecommendation::Degraded);
+    }
+
+    #[test]
+    fn test_hard_limit_triggers_reject() {
+        let config = BudgetConfig {
+            quotas: vec![ResourceQuota {
+                resource_type: ResourceType::Token,
+                period: BudgetPeriod::Daily,
+                limit: 1000.0,
+                used: 960.0,  // 96% used = hard_limit_threshold
+                reserved: 0.0,
+            }],
+            alert_threshold: 0.8,
+            hard_limit_threshold: 0.95,
+            allow_overdraft: false,
+            overdraft_penalty: 1.5,
+            cost_optimization: CostOptimization {
+                enable_batch_optimization: false,
+                enable_cache_reuse: false,
+                enable_degradation: false,
+                max_degradation_level: 0,
+            },
+        };
+        let manager = ResourceBudgetManager::with_config(config);
+
+        let result = manager.check_budget(ResourceType::Token, 1.0);
+        assert!(result.hard_limit_triggered);
+        assert_eq!(result.recommendation, BudgetRecommendation::Reject);
+    }
+
+    #[test]
+    fn test_usage_accumulation_affects_subsequent_checks() {
         let mut manager = ResourceBudgetManager::new();
-        
+
+        // First check: within budget
+        let r1 = manager.check_budget(ResourceType::Token, 100_000.0);
+        assert!(r1.within_budget);
+
+        // Record heavy usage
         manager.record_usage(ResourceUsage {
-            task_id: "task_001".to_string(),
+            task_id: "heavy".into(),
             resource_type: ResourceType::Token,
-            amount: 50000.0,
+            amount: 950_000.0,
+            cost: 0.0,
+            timestamp: 0,
+            tags: vec![],
+        });
+
+        // Second check: now 950K used out of 1M → alert territory
+        let r2 = manager.check_budget(ResourceType::Token, 100_000.0);
+        assert!(r2.alert_triggered);
+        assert_eq!(r2.recommendation, BudgetRecommendation::Degraded);
+    }
+
+    #[test]
+    fn test_unknown_resource_type_returns_unlimited() {
+        let manager = ResourceBudgetManager::new();
+        // Network has no quota defined → should appear unlimited
+        let result = manager.check_budget(ResourceType::Network, f64::MAX);
+        assert!(result.within_budget);
+        assert_eq!(result.remaining, f64::MAX);
+        assert_eq!(result.recommendation, BudgetRecommendation::Continue);
+    }
+
+    #[test]
+    fn test_record_usage_updates_statistics() {
+        let mut manager = ResourceBudgetManager::new();
+
+        manager.record_usage(ResourceUsage {
+            task_id: "t1".into(),
+            resource_type: ResourceType::Token,
+            amount: 50_000.0,
             cost: 1.5,
             timestamp: 0,
             tags: vec![],
         });
-        
+        manager.record_usage(ResourceUsage {
+            task_id: "t2".into(),
+            resource_type: ResourceType::Token,
+            amount: 30_000.0,
+            cost: 0.9,
+            timestamp: 0,
+            tags: vec![],
+        });
+
         let stats = manager.statistics();
-        assert_eq!(stats.total_tokens, 50000);
-        assert_eq!(stats.total_tasks, 1);
+        assert_eq!(stats.total_tokens, 80_000);
+        assert_eq!(stats.total_tasks, 2);
+        assert!((stats.total_cost_usd - 2.4).abs() < 0.001);
     }
-    
+
     #[test]
-    fn test_cost_estimation() {
+    fn test_cost_estimation_known_model() {
         let manager = ResourceBudgetManager::new();
-        
-        // Known model — returns a price from built-in table.
         let cost = manager.estimate_cost(1000, "gpt-4", None);
         assert!(cost.is_some());
         assert!(cost.unwrap() > 0.0);
-        
-        // Unknown model with no external map — returns None (no fake estimate).
+    }
+
+    #[test]
+    fn test_cost_estimation_unknown_model_returns_none() {
+        let manager = ResourceBudgetManager::new();
         let cost = manager.estimate_cost(1000, "unknown-model", None);
         assert!(cost.is_none());
-        
-        // External price map overrides built-in.
+    }
+
+    #[test]
+    fn test_cost_estimation_external_price_overrides_builtin() {
+        let manager = ResourceBudgetManager::new();
         let mut prices = std::collections::HashMap::new();
         prices.insert("gpt-4".to_string(), 0.10);
-        let cost = manager.estimate_cost(1000, "gpt-4", Some(&prices));
-        assert!(cost.is_some());
-        assert!((cost.unwrap() - 0.10).abs() < 0.001);
+        let cost = manager.estimate_cost(1000, "gpt-4", Some(&prices)).unwrap();
+        // 1000 tokens * $0.10/1K = $0.10
+        assert!((cost - 0.10).abs() < 0.001);
     }
 }

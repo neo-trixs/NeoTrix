@@ -359,32 +359,142 @@ fn current_timestamp() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
+    fn temp_dir() -> String {
+        let dir = std::env::temp_dir().join(format!("nt_checkpoint_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir.to_string_lossy().to_string()
+    }
+
+    fn cleanup(dir: &str) {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     #[test]
-    fn test_checkpoint_persistence() {
-        let mut persistence = CheckpointPersistence::new("/tmp/checkpoints");
-        
-        // 保存检查点
+    fn test_save_load_roundtrip_preserves_state() {
+        let dir = temp_dir();
+        let mut persistence = CheckpointPersistence::new(&dir);
+
         let mut state = HashMap::new();
         state.insert("step".to_string(), serde_json::json!("planning"));
-        
+        state.insert("progress".to_string(), serde_json::json!(0.5));
+
         let result = persistence.save_checkpoint(
-            "workflow_001",
+            "wf_001",
             "planning",
-            state,
+            state.clone(),
             vec!["/output/plan.json".to_string()],
         );
-        
         assert!(result.success);
-        assert!(result.checkpoint_id.is_some());
-        
-        // 加载检查点
-        let checkpoint_id = result.checkpoint_id.unwrap();
-        let load_result = persistence.load_checkpoint(&checkpoint_id);
-        assert!(load_result.success);
-        
-        // 列出检查点
-        let checkpoints = persistence.list_checkpoints("workflow_001");
-        assert_eq!(checkpoints.len(), 1);
+        let cp_id = result.checkpoint_id.unwrap();
+
+        // Verify metadata is indexed
+        let listed = persistence.list_checkpoints("wf_001");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, cp_id);
+        assert_eq!(listed[0].workflow_id, "wf_001");
+        assert_eq!(listed[0].stage_name, "planning");
+        assert_eq!(listed[0].status, CheckpointStatus::Saved);
+        assert!(listed[0].file_size > 0);
+
+        // Load and verify state is restored
+        let load = persistence.load_checkpoint(&cp_id);
+        assert!(load.success);
+        let loaded = persistence.current().unwrap();
+        assert_eq!(loaded.stage_state.get("step").unwrap(), &serde_json::json!("planning"));
+        assert_eq!(loaded.stage_state.get("progress").unwrap(), &serde_json::json!(0.5));
+        assert_eq!(loaded.output_files, vec!["/output/plan.json"]);
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_load_nonexistent_checkpoint_fails() {
+        let dir = temp_dir();
+        let mut persistence = CheckpointPersistence::new(&dir);
+
+        let result = persistence.load_checkpoint("no_such_id");
+        assert!(!result.success);
+        assert!(result.error.is_some());
+        assert!(persistence.current().is_none());
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_delete_checkpoint_removes_index_and_file() {
+        let dir = temp_dir();
+        let mut persistence = CheckpointPersistence::new(&dir);
+
+        let save = persistence.save_checkpoint(
+            "wf_del", "stage_a", HashMap::new(), vec![],
+        );
+        assert!(save.success);
+        let cp_id = save.checkpoint_id.unwrap();
+
+        let del = persistence.delete_checkpoint(&cp_id);
+        assert!(del.success);
+        assert!(del.checkpoint_id.is_some());
+
+        // File on disk should be gone
+        let file_path = std::path::Path::new(&dir).join(format!("{}.json", cp_id));
+        assert!(!file_path.exists());
+
+        // Index should be gone
+        assert!(persistence.list_checkpoints("wf_del").is_empty());
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_delete_nonexistent_checkpoint_fails() {
+        let dir = temp_dir();
+        let mut persistence = CheckpointPersistence::new(&dir);
+
+        let result = persistence.delete_checkpoint("ghost_id");
+        assert!(!result.success);
+        assert!(result.error.is_some());
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_statistics_reflect_actual_state() {
+        let dir = temp_dir();
+        let mut persistence = CheckpointPersistence::new(&dir);
+
+        // Empty stats
+        let stats = persistence.statistics();
+        assert_eq!(stats.total_checkpoints, 0);
+        assert_eq!(stats.total_size_bytes, 0);
+        assert_eq!(stats.unique_workflows, 0);
+
+        // After saving checkpoints across workflows
+        persistence.save_checkpoint("wf_1", "s1", HashMap::new(), vec![]);
+        persistence.save_checkpoint("wf_1", "s2", HashMap::new(), vec![]);
+        persistence.save_checkpoint("wf_2", "s1", HashMap::new(), vec![]);
+
+        let stats = persistence.statistics();
+        assert_eq!(stats.total_checkpoints, 3);
+        assert!(stats.total_size_bytes > 0);
+        assert_eq!(stats.unique_workflows, 2);
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn test_list_checkpoints_filters_by_workflow() {
+        let dir = temp_dir();
+        let mut persistence = CheckpointPersistence::new(&dir);
+
+        persistence.save_checkpoint("wf_a", "s1", HashMap::new(), vec![]);
+        persistence.save_checkpoint("wf_a", "s2", HashMap::new(), vec![]);
+        persistence.save_checkpoint("wf_b", "s1", HashMap::new(), vec![]);
+
+        assert_eq!(persistence.list_checkpoints("wf_a").len(), 2);
+        assert_eq!(persistence.list_checkpoints("wf_b").len(), 1);
+        assert_eq!(persistence.list_checkpoints("wf_c").len(), 0);
+
+        cleanup(&dir);
     }
 }

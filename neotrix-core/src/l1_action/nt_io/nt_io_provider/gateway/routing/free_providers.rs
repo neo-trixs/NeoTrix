@@ -1,4 +1,5 @@
 use crate::l1_action::nt_io::nt_io_provider::common::types::*;
+use crate::core::nt_core_llm::{LlmRequest, LlmResponse, LlmError};
 use crate::l1_action::nt_io::nt_io_http_factory::global_client;
 
 const GROQ_BASE: &str = "https://api.groq.com/openai/v1";

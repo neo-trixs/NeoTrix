@@ -912,6 +912,30 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("模型选择", "model_selection", "NT-CORE", "ReflectionEngine"),
     ("选模型", "model_selection", "NT-CORE", "ReflectionEngine"),
     ("model_selection", "model_selection", "NT-CORE", "ReflectionEngine"),
+    // ── Video/temporal dispatch routes ──
+    ("时序连续", "temporal_continuity", "NT-ACT", "CodeAnalyzer"),
+    ("帧间连续", "temporal_continuity", "NT-ACT", "CodeAnalyzer"),
+    ("镜头衔接", "temporal_continuity", "NT-ACT", "CodeAnalyzer"),
+    ("temporal_continuity", "temporal_continuity", "NT-ACT", "CodeAnalyzer"),
+    ("shot_continuity", "temporal_continuity", "NT-ACT", "CodeAnalyzer"),
+    // ── Resource budget dispatch routes ──
+    ("资源预算", "resource_budget", "NT-ACT", "CodeAnalyzer"),
+    ("成本控制", "resource_budget", "NT-ACT", "CodeAnalyzer"),
+    ("token预算", "resource_budget", "NT-ACT", "CodeAnalyzer"),
+    ("resource_budget", "resource_budget", "NT-ACT", "CodeAnalyzer"),
+    ("cost_manager", "resource_budget", "NT-ACT", "CodeAnalyzer"),
+    // ── Parallel task dispatch routes ──
+    ("并行任务", "parallel_task", "NT-ACT", "CodeAnalyzer"),
+    ("任务调度", "parallel_task", "NT-ACT", "CodeAnalyzer"),
+    ("gpu调度", "parallel_task", "NT-ACT", "CodeAnalyzer"),
+    ("parallel_task", "parallel_task", "NT-ACT", "CodeAnalyzer"),
+    ("task_scheduler", "parallel_task", "NT-ACT", "CodeAnalyzer"),
+    // ── Checkpoint persistence dispatch routes ──
+    ("检查点", "checkpoint_persistence", "NT-ACT", "CodeAnalyzer"),
+    ("断点续传", "checkpoint_persistence", "NT-ACT", "CodeAnalyzer"),
+    ("状态快照", "checkpoint_persistence", "NT-ACT", "CodeAnalyzer"),
+    ("checkpoint_persistence", "checkpoint_persistence", "NT-ACT", "CodeAnalyzer"),
+    ("checkpoint", "checkpoint_persistence", "NT-ACT", "CodeAnalyzer"),
 ];
 
 /// 子任务 — 意识核心从人类语言拆解出的最小执行单元。
@@ -2439,6 +2463,90 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     "模型选择 (硬件感知):\n  GPU/Metal: {}\n  推荐模型: {}\n  需求: {}",
                     if gpu_available { "检测到" } else { "未检测到" },
                     model,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Video temporal continuity (nt_act::temporal_continuity) ──
+        "temporal_continuity" | "shot_continuity" => {
+            use crate::l1_action::nt_act::temporal_continuity::TemporalContinuityChecker;
+            let checker = TemporalContinuityChecker::new();
+            let stats = checker.statistics();
+            (
+                true,
+                format!(
+                    "时序连续性检查:\n  总检查: {} | 通过: {} | 失败: {}\n  总问题: {} | 平均通过率: {:.2}\n  输入: {}",
+                    stats.total_checks,
+                    stats.passed,
+                    stats.failed,
+                    stats.total_issues,
+                    stats.avg_pass_rate,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Resource budget management (nt_act::resource_budget) ──
+        "resource_budget" | "cost_manager" => {
+            use crate::l1_action::nt_act::resource_budget::ResourceBudgetManager;
+            let manager = ResourceBudgetManager::new();
+            let stats = manager.statistics();
+            (
+                true,
+                format!(
+                    "资源预算管理:\n  总成本: ${:.2} | 总 Token: {} | 总任务: {}\n  平均成本/任务: ${:.4} | 平均 Token/任务: {}\n  输入: {}",
+                    stats.total_cost_usd,
+                    stats.total_tokens,
+                    stats.total_tasks,
+                    stats.avg_cost_per_task,
+                    stats.avg_tokens_per_task,
+                    task.summary,
+                ),
+            )
+        }
+        // ── Parallel task scheduling (nt_act::parallel_task) ──
+        "parallel_task" | "task_scheduler" => {
+            use crate::l1_action::nt_act::parallel_task::ParallelTaskManager;
+            let mut manager = ParallelTaskManager::new();
+            // 注册默认 GPU 设备供调度参考
+            manager.register_device(crate::l1_action::nt_act::parallel_task::GPUDevice {
+                device_id: 0,
+                name: "default".to_string(),
+                total_memory_mb: 8192,
+                used_memory_mb: 0,
+                utilization: 0.0,
+                temperature: 0.0,
+                available: true,
+            });
+            let stats = manager.statistics();
+            (
+                true,
+                format!(
+                    "并行任务调度:\n  排队: {} | 运行: {} | 完成: {} | 失败: {}\n  GPU 显存: {}MB / {}MB ({:.0}%)\n  退避基数: {}s | 最大倍率: {}x\n  输入: {}",
+                    stats.queued_tasks,
+                    stats.running_tasks,
+                    stats.completed_tasks,
+                    stats.failed_tasks,
+                    stats.used_gpu_memory_mb,
+                    stats.total_gpu_memory_mb,
+                    stats.gpu_utilization * 100.0,
+                    manager.calculate_backoff_delay(0),
+                    manager.calculate_backoff_delay(3),
+                    task.summary,
+                ),
+            )
+        }
+        // ── Checkpoint persistence (nt_act::actions::core::checkpoint_persistence) ──
+        "checkpoint_persistence" | "checkpoint" => {
+            use crate::l1_action::nt_act::actions::core::checkpoint_persistence::CheckpointPersistence;
+            let persistence = CheckpointPersistence::new("/tmp/neotrix_checkpoints");
+            let stats = persistence.statistics();
+            (
+                true,
+                format!(
+                    "检查点持久化:\n  总检查点: {} | 总大小: {} bytes | 唯一工作流: {}\n  存储路径: /tmp/neotrix_checkpoints\n  输入: {}",
+                    stats.total_checkpoints,
+                    stats.total_size_bytes,
+                    stats.unique_workflows,
                     task.summary,
                 ),
             )

@@ -158,6 +158,17 @@ pub enum CoreEvent {
         retry_count: u32,
     },
 
+    // ── NT-ACT / NT-MEDIA (下载进度) ────────────────────────────────────
+    #[serde(rename = "download_progress")]
+    DownloadProgress {
+        url: String,
+        status: String,
+        downloaded: u64,
+        total: Option<u64>,
+        speed_bps: f64,
+        output: String,
+    },
+
     // ── NT-SHIELD (影卫) ──────────────────────────────────────────────
     #[serde(rename = "shield_intrusion_detected")]
     ShieldIntrusionDetected {
@@ -420,7 +431,7 @@ impl CoreEvent {
             Self::MindSealIteration { .. } | Self::MindDistillation { .. } => "nt_mind",
             Self::MemoryKbWrite { .. } | Self::MemoryKbQuery { .. } => "nt_memory",
             Self::WorldCrawlCompleted { .. } | Self::WorldFetchError { .. } => "nt_world",
-            Self::ActToolInvocation { .. } | Self::ActGoalProgress { .. } => "nt_act",
+            Self::ActToolInvocation { .. } | Self::ActGoalProgress { .. } | Self::DownloadProgress { .. } => "nt_act",
             Self::IoProviderSwitch { .. } | Self::IoRequestError { .. } => "nt_io",
             Self::ShieldIntrusionDetected { .. } | Self::ShieldAuditCompleted { .. } => "nt_shield",
             Self::TaskSubmitted { .. } | Self::AgentFeedback { .. } | Self::AgentTeam { .. } => "nt_act",

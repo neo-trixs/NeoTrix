@@ -6,6 +6,7 @@
 //! - 错误分类: is_retryable() / should_fallback() 方法
 //! - 成本感知: per-provider 定价 + 预算检查
 
+use crate::core::nt_core_llm::{LlmRequest, LlmResponse, LlmError};
 use async_trait::async_trait;
 use std::collections::HashMap;
 

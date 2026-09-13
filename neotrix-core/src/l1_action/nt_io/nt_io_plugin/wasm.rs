@@ -42,6 +42,11 @@ impl WasmPluginWrapper {
         Ok(Self { name, version, wasm_bytes })
     }
 
+    /// Call a WASM export function and return its result.
+    ///
+    /// **Not wired** — reads result pointer but does not extract the actual
+    /// return value from WASM memory. Returns a placeholder string indicating
+    /// the call succeeded, but callers cannot rely on the content.
     fn call_export(&self, func_name: &str, arg: &str) -> Result<String, String> {
         let engine = global_wasm_engine();
         let module = wasmtime::Module::new(engine, &self.wasm_bytes)
@@ -67,7 +72,13 @@ impl WasmPluginWrapper {
         let _result_ptr = func.call(&mut store, (ptr, input_len))
             .map_err(|e| format!("Call error: {}", e))?;
 
-        Ok(format!("wasm:{}({}):ok", func_name, arg))
+        // TODO: Read actual return string from WASM memory at _result_ptr
+        // Currently returns placeholder — callers cannot trust the content.
+        Err(format!(
+            "not wired: WASM result extraction not implemented (func={}, arglen={})",
+            func_name,
+            arg.len()
+        ))
     }
 }
 

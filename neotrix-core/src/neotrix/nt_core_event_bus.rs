@@ -270,6 +270,7 @@ fn filter_event_for_layer(event: &CoreEvent, layer: LayerId) -> bool {
         (CoreEvent::ActGoalProgress { .. }, LayerId::L1Body) => true,
         (CoreEvent::IoProviderSwitch { .. }, LayerId::L1Body) => true,
         (CoreEvent::IoRequestError { .. }, LayerId::L1Body) => true,
+        (CoreEvent::DownloadProgress { .. }, LayerId::L1Body) => true,
         // L2 (World): external rewards, NT-WORLD crawl/fetch events
         (CoreEvent::ExternalReward { .. }, LayerId::L2World) => true,
         (CoreEvent::WorldCrawlCompleted { .. }, LayerId::L2World) => true,

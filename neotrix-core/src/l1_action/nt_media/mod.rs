@@ -24,9 +24,9 @@ pub use download_progress::{format_bytes, DownloadProgress, ProgressConfig};
 pub use persistence::{ChunkState, ResumeValidation, SidecarState};
 pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use streaming::{
-    AggregateProgress, check_aria2c_health, check_disk_space, compute_sha256, DownloadConfig,
-    DownloadEngine, DownloadProgressSnapshot, DownloadStatus, DownloadTask, detect_filename,
-    PipelineConfig, PipelineError, PipelineHandle, PipelineProgress, PipelineStatus,
-    record_mirror_speed, ranked_mirrors, resolve_mirror, RetryPolicy, StallDetector,
-    StreamingPipeline, TaskHandle, verify_sha256,
+    AggregateProgress, check_aria2c_health, check_disk_space, cleanup_stale_temps, compute_sha256,
+    DownloadConfig, DownloadEngine, DownloadProgressSnapshot, DownloadStatus, DownloadTask,
+    detect_filename, PipelineConfig, PipelineError, PipelineHandle, PipelineProgress,
+    PipelineStatus, record_mirror_speed, ranked_mirrors, resolve_mirror, RetryPolicy,
+    StallDetector, StreamingPipeline, TaskHandle, verify_sha256,
 };

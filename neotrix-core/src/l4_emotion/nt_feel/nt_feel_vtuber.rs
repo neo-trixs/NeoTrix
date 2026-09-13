@@ -203,42 +203,26 @@ impl _VTuberEmotionEngine {
         }
     }
 
-    /// 从语音检测情绪 (占位符 — 需要实际 ML 模型)
+    /// 从语音检测情绪
     ///
-    /// STUB: Returns Neutral with 0.5 intensity — no actual voice analysis.
-    /// Real implementation needs:
+    /// **Not wired** — speech emotion recognition requires:
     /// - Speech emotion recognition model (e.g., wav2vec2-emotion, SER)
     /// - Audio feature extraction (MFCCs, prosody, pitch contour)
     /// - Multi-language support with language-specific models
     /// - Real-time streaming emotion detection for conversational use
     pub fn detect_from_voice(&self, _audio: &[u8]) -> Result<_EmotionReading, String> {
-        // TODO: 集成语音情绪识别模型
-        Ok(_EmotionReading {
-            emotion: _EmotionType::Neutral,
-            intensity: 0.5,
-            source: _EmotionSource::Voice,
-            raw_data: None,
-            timestamp: chrono::Utc::now(),
-        })
+        Err("not wired: speech emotion recognition model not integrated (requires wav2vec2-emotion or similar SER model)".into())
     }
 
-    /// 从视觉检测情绪 (占位符 — 需要实际 CV 模型)
+    /// 从视觉检测情绪
     ///
-    /// STUB: Returns Neutral with 0.5 intensity — no actual image analysis.
-    /// Real implementation needs:
+    /// **Not wired** — facial expression recognition requires:
     /// - Facial expression recognition (FER) model (e.g., Action Unit based)
     /// - Body pose emotion inference
     /// - Micro-expression detection for subtle emotional cues
     /// - Multi-face emotion tracking in group scenes
     pub fn detect_from_visual(&self, _image: &[u8]) -> Result<_EmotionReading, String> {
-        // TODO: 集成视觉情绪识别模型
-        Ok(_EmotionReading {
-            emotion: _EmotionType::Neutral,
-            intensity: 0.5,
-            source: _EmotionSource::Visual,
-            raw_data: None,
-            timestamp: chrono::Utc::now(),
-        })
+        Err("not wired: visual emotion recognition model not integrated (requires FER model or similar CV pipeline)".into())
     }
 
     /// 应用角色人格
@@ -317,10 +301,9 @@ impl _VTuberEmotionEngine {
         }
     }
 
-    /// TTS 合成 (占位符)
+    /// TTS 合成
     ///
-    /// STUB: Returns empty audio bytes with estimated duration (50ms/char).
-    /// Real implementation needs:
+    /// **Not wired** — text-to-speech synthesis requires:
     /// - TTS provider integration (Edge-TTS, ElevenLabs, VITS, Bark)
     /// - Emotion-conditioned prosody (pitch/speed/rhythm modulation)
     /// - Voice cloning support via _VoiceConfig.voice_id
@@ -330,26 +313,22 @@ impl _VTuberEmotionEngine {
         text: &str,
         emotion: &_EmotionType,
     ) -> Result<_VoiceOutput, String> {
-        // TODO: 集成实际 TTS 引擎
-        Ok(_VoiceOutput {
-            audio: vec![], // 占位符
-            text: text.to_string(),
-            emotion: emotion.clone(),
-            duration_ms: (text.len() as u64 * 50), // 估算
-        })
+        Err(format!(
+            "not wired: TTS synthesis not integrated (textlen={}, emotion={:?})",
+            text.len(),
+            emotion
+        ))
     }
 
-    /// STT 转录 (占位符)
+    /// STT 转录
     ///
-    /// STUB: Returns empty string — no speech-to-text.
-    /// Real implementation needs:
+    /// **Not wired** — speech-to-text transcription requires:
     /// - STT provider integration (Whisper, VAD+Whisper, Deepgram)
     /// - Language detection and multi-language support
     /// - Streaming transcription for real-time input
     /// - Speaker diarization for multi-speaker scenarios
     pub fn transcribe_speech(&self, _audio: &[u8]) -> Result<String, String> {
-        // TODO: 集成实际 STT 引擎
-        Ok("".into())
+        Err("not wired: speech-to-text transcription not integrated (requires Whisper or similar STT model)".into())
     }
 
     /// 获取情绪历史

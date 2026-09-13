@@ -34,7 +34,7 @@ use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::SystemTime;
 use std::time::Duration;
 use tokio::fs::{self, File};
@@ -42,6 +42,56 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufWriter, SeekFrom};
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot, Mutex as TokioMutex};
 use tokio::time::Instant;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EventBus integration — R-P79: download progress → system-wide visibility
+// ═══════════════════════════════════════════════════════════════════════════
+
+static GLOBAL_EVENT_BUS: OnceLock<Arc<crate::core::nt_core_event_bus::EventBus>> = OnceLock::new();
+
+/// Register the global EventBus for download progress publishing.
+/// Call once at startup; silently no-ops if already set.
+pub fn set_download_event_bus(bus: Arc<crate::core::nt_core_event_bus::EventBus>) {
+    let _ = GLOBAL_EVENT_BUS.set(bus);
+}
+
+/// Publish a PipelineProgress event to the global EventBus for system-wide visibility.
+/// Silently drops if EventBus is not available or channel is full (non-blocking).
+pub fn publish_download_event(progress: &PipelineProgress) {
+    let Some(bus) = GLOBAL_EVENT_BUS.get() else {
+        return;
+    };
+    let status_str = match &progress.status {
+        PipelineStatus::Resolving => "resolving".into(),
+        PipelineStatus::Downloading { downloaded, total, speed_bps } => {
+            format!("downloading:{}:{:?}", downloaded, total)
+        }
+        PipelineStatus::Playing { downloaded, total, speed_bps } => {
+            format!("playing:{}:{:?}", downloaded, total)
+        }
+        PipelineStatus::Complete { total_bytes, elapsed } => {
+            format!("complete:{}", total_bytes)
+        }
+        PipelineStatus::Failed(e) => format!("failed:{}", e),
+        PipelineStatus::Cancelled => "cancelled".into(),
+    };
+    let (downloaded, total, speed_bps) = match &progress.status {
+        PipelineStatus::Downloading { downloaded, total, speed_bps }
+        | PipelineStatus::Playing { downloaded, total, speed_bps } => {
+            (*downloaded, *total, *speed_bps)
+        }
+        PipelineStatus::Complete { total_bytes, .. } => (*total_bytes, Some(*total_bytes), 0.0),
+        _ => (0, None, 0.0),
+    };
+    bus.emit(crate::core::nt_core_event::CoreEvent::DownloadProgress {
+        url: progress.url.clone(),
+        status: status_str,
+        downloaded,
+        total,
+        speed_bps,
+        output: progress.output.to_string_lossy().into_owned(),
+    });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Shared progress types — single source of truth
@@ -302,6 +352,36 @@ fn make_dl_tmp_dir(dest: &Path) -> PathBuf {
     dest.parent()
         .unwrap_or(Path::new("."))
         .join(format!(".dl_{}", stem))
+}
+
+/// Clean up stale `.dl_*` temp directories older than `max_age_secs`.
+/// Returns the number of directories removed.
+pub async fn cleanup_stale_temps(output_dir: &Path, max_age_secs: u64) -> usize {
+    let mut removed = 0;
+    let Ok(mut entries) = fs::read_dir(output_dir).await else {
+        return 0;
+    };
+    let cutoff = SystemTime::now()
+        .checked_sub(Duration::from_secs(max_age_secs))
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if !name_str.starts_with(".dl_") {
+            continue;
+        }
+        let meta = match entry.metadata().await {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let modified = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+        if modified < cutoff {
+            let _ = fs::remove_dir_all(entry.path()).await;
+            removed += 1;
+        }
+    }
+    removed
 }
 
 /// Merge chunk files from `tmp_dir` into a single output file.
@@ -953,6 +1033,13 @@ impl ParallelDownloader {
                 elapsed: Duration::ZERO,
             })
             .await;
+        publish_download_event(&PipelineProgress {
+            url: self.url.clone(),
+            status: PipelineStatus::Resolving,
+            media_kind,
+            output: self.output.clone(),
+            elapsed: Duration::ZERO,
+        });
 
         let mut handles = Vec::with_capacity(self.concurrency);
 
@@ -1029,6 +1116,13 @@ impl ParallelDownloader {
                                 elapsed: started.elapsed(),
                             })
                             .await;
+                        publish_download_event(&PipelineProgress {
+                            url: url.clone(),
+                            status: PipelineStatus::Failed(e.to_string()),
+                            media_kind,
+                            output: output.clone(),
+                            elapsed: started.elapsed(),
+                        });
                         return Err(e);
                     }
 
@@ -1078,6 +1172,17 @@ impl ParallelDownloader {
                             elapsed: started.elapsed(),
                         })
                         .await;
+                    publish_download_event(&PipelineProgress {
+                        url: url.clone(),
+                        status: PipelineStatus::Downloading {
+                            downloaded: written,
+                            total: Some(total_size),
+                            speed_bps,
+                        },
+                        media_kind,
+                        output: output.clone(),
+                        elapsed: started.elapsed(),
+                    });
                 }
             });
 
@@ -1258,6 +1363,16 @@ async fn stream_http_download(
                     elapsed: started.elapsed(),
                 })
                 .await;
+            publish_download_event(&PipelineProgress {
+                url: url.to_string(),
+                status: PipelineStatus::Complete {
+                    total_bytes: final_bytes,
+                    elapsed: started.elapsed(),
+                },
+                media_kind,
+                output: output.to_path_buf(),
+                elapsed: started.elapsed(),
+            });
             return Ok(());
         }
 
@@ -1356,6 +1471,13 @@ async fn stream_http_download(
                 elapsed: Duration::ZERO,
             })
             .await;
+        publish_download_event(&PipelineProgress {
+            url: url.to_string(),
+            status: PipelineStatus::Resolving,
+            media_kind,
+            output: output.to_path_buf(),
+            elapsed: Duration::ZERO,
+        });
 
         while let Some(chunk) = stream.next().await {
             if cancel.load(Ordering::Relaxed) {
@@ -1377,6 +1499,13 @@ async fn stream_http_download(
                         elapsed: started.elapsed(),
                     })
                     .await;
+                publish_download_event(&PipelineProgress {
+                    url: url.to_string(),
+                    status: PipelineStatus::Cancelled,
+                    media_kind,
+                    output: output.to_path_buf(),
+                    elapsed: started.elapsed(),
+                });
                 writer.flush().await.ok();
                 return Ok(());
             }
@@ -1416,15 +1545,15 @@ async fn stream_http_download(
                             }
                         };
 
-                        let _ = progress_tx
-                            .send(PipelineProgress {
-                                url: url.to_string(),
-                                status,
-                                media_kind,
-                                output: output.to_path_buf(),
-                                elapsed: started.elapsed(),
-                            })
-                            .await;
+                        let progress = PipelineProgress {
+                            url: url.to_string(),
+                            status,
+                            media_kind,
+                            output: output.to_path_buf(),
+                            elapsed: started.elapsed(),
+                        };
+                        publish_download_event(&progress);
+                        let _ = progress_tx.send(progress).await;
 
                         if let (Some(ref store), Some(ref id)) = (&persistence, &record_id) {
                             if last_persist.elapsed() > Duration::from_secs(5) {
@@ -1458,6 +1587,13 @@ async fn stream_http_download(
                             elapsed: started.elapsed(),
                         })
                         .await;
+                    publish_download_event(&PipelineProgress {
+                        url: url.to_string(),
+                        status: PipelineStatus::Failed(e.to_string()),
+                        media_kind,
+                        output: output.to_path_buf(),
+                        elapsed: started.elapsed(),
+                    });
                     return Err(PipelineError::Network(e.to_string()));
                 }
             }
@@ -1491,6 +1627,13 @@ async fn stream_http_download(
                     elapsed: started.elapsed(),
                 })
                 .await;
+            publish_download_event(&PipelineProgress {
+                url: url.to_string(),
+                status: PipelineStatus::Failed("SHA-256 integrity check failed".into()),
+                media_kind,
+                output: output.to_path_buf(),
+                elapsed: started.elapsed(),
+            });
             return Err(PipelineError::Io("SHA-256 integrity check failed".into()));
         }
     }
@@ -1516,6 +1659,16 @@ async fn stream_http_download(
             elapsed: started.elapsed(),
         })
         .await;
+    publish_download_event(&PipelineProgress {
+        url: url.to_string(),
+        status: PipelineStatus::Complete {
+            total_bytes: final_bytes,
+            elapsed: started.elapsed(),
+        },
+        media_kind,
+        output: output.to_path_buf(),
+        elapsed: started.elapsed(),
+    });
 
     Ok(())
 }

@@ -360,64 +360,264 @@ pub type TaskScheduler = ParallelTaskManager;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    #[test]
-    fn test_task_scheduler() {
-        let mut scheduler = ParallelTaskManager::new();
-        
-        // 注册 GPU
-        scheduler.register_device(GPUDevice {
-            device_id: 0,
-            name: "RTX 4090".to_string(),
-            total_memory_mb: 24000,
-            used_memory_mb: 0,
-            utilization: 0.0,
-            temperature: 35.0,
-            available: true,
-        });
-        
-        // 提交任务
-        scheduler.submit_task(Task {
-            id: "task_001".to_string(),
-            name: "测试任务".to_string(),
+
+    fn make_task(id: &str, priority: TaskPriority, gpu_mb: u64) -> Task {
+        Task {
+            id: id.to_string(),
+            name: format!("task_{}", id),
             task_type: "inference".to_string(),
-            priority: TaskPriority::High,
+            priority,
             status: TaskStatus::Pending,
-            gpu_memory_mb: 4000,
+            gpu_memory_mb: gpu_mb,
             estimated_duration_secs: 60,
             dependencies: vec![],
             params: HashMap::new(),
             max_retries: 3,
             current_retries: 0,
             timeout_secs: 300,
-        });
-        
-        // 调度
-        let task_id = scheduler.schedule_next();
-        assert!(task_id.is_some());
-        
-        // 完成任务
-        scheduler.complete_task(&task_id.unwrap(), TaskResult {
-            task_id: "task_001".to_string(),
-            success: true,
-            output: None,
-            execution_time_ms: 50000,
-            peak_gpu_memory_mb: 3500,
-            retries: 0,
-            error: None,
-        });
-        
-        let stats = scheduler.statistics();
-        assert_eq!(stats.completed_tasks, 1);
+        }
     }
-    
+
+    fn make_device(id: u32, total_mb: u64) -> GPUDevice {
+        GPUDevice {
+            device_id: id,
+            name: format!("GPU_{}", id),
+            total_memory_mb: total_mb,
+            used_memory_mb: 0,
+            utilization: 0.0,
+            temperature: 35.0,
+            available: true,
+        }
+    }
+
+    fn make_result(task_id: &str, success: bool) -> TaskResult {
+        TaskResult {
+            task_id: task_id.to_string(),
+            success,
+            output: None,
+            execution_time_ms: 5000,
+            peak_gpu_memory_mb: 0,
+            retries: 0,
+            error: if success { None } else { Some("simulated failure".into()) },
+        }
+    }
+
+    /// Priority scheduling: high-priority task scheduled before low-priority.
+    #[test]
+    fn test_priority_ordering() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(make_device(0, 24000));
+
+        scheduler.submit_task(make_task("low", TaskPriority::Low, 1000));
+        scheduler.submit_task(make_task("high", TaskPriority::High, 1000));
+        scheduler.submit_task(make_task("med", TaskPriority::Medium, 1000));
+
+        let scheduled = scheduler.schedule_next();
+        assert_eq!(scheduled.as_deref(), Some("high"));
+    }
+
+    /// No GPU available → schedule_next returns None.
+    #[test]
+    fn test_no_gpu_blocks_scheduling() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(GPUDevice {
+            device_id: 0,
+            name: "small".into(),
+            total_memory_mb: 500,
+            used_memory_mb: 0,
+            utilization: 0.0,
+            temperature: 30.0,
+            available: true,
+        });
+        scheduler.submit_task(make_task("big", TaskPriority::High, 8000));
+
+        assert!(scheduler.schedule_next().is_none());
+    }
+
+    /// Max parallel limit: after reaching limit, schedule_next returns None.
+    #[test]
+    fn test_max_parallel_limit() {
+        let config = SchedulerConfig {
+            max_parallel_tasks: 2,
+            max_gpu_utilization: 0.9,
+            retry_interval_base_secs: 5,
+            retry_max_multiplier: 10,
+            enable_load_balancing: false,
+            enable_preemptive_scheduling: false,
+            scheduling_algorithm: SchedulingAlgorithm::Priority,
+        };
+        let mut scheduler = ParallelTaskManager::with_config(config);
+        scheduler.register_device(make_device(0, 24000));
+
+        scheduler.submit_task(make_task("a", TaskPriority::High, 1000));
+        scheduler.submit_task(make_task("b", TaskPriority::High, 1000));
+        scheduler.submit_task(make_task("c", TaskPriority::High, 1000));
+
+        assert!(scheduler.schedule_next().is_some()); // a running
+        assert!(scheduler.schedule_next().is_some()); // b running
+        assert!(scheduler.schedule_next().is_none()); // c blocked by max_parallel
+    }
+
+    /// Unmet dependency blocks scheduling; met dependency allows it.
+    #[test]
+    fn test_dependency_blocking() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(make_device(0, 24000));
+
+        let mut dep_task = make_task("dep", TaskPriority::High, 1000);
+        let mut dependent = make_task("main", TaskPriority::High, 1000);
+        dependent.dependencies = vec!["dep".to_string()];
+
+        scheduler.submit_task(dep_task.clone());
+        scheduler.submit_task(dependent);
+
+        // dep scheduled first
+        let dep_id = scheduler.schedule_next().unwrap();
+        assert_eq!(dep_id, "dep");
+
+        // dependent blocked — dep not yet completed
+        assert!(scheduler.schedule_next().is_none());
+
+        // complete dep successfully
+        scheduler.complete_task(&dep_id, make_result("dep", true));
+
+        // now dependent can be scheduled
+        let main_id = scheduler.schedule_next();
+        assert_eq!(main_id.as_deref(), Some("main"));
+    }
+
+    /// Failed dependency prevents downstream scheduling.
+    #[test]
+    fn test_failed_dependency_blocks() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(make_device(0, 24000));
+
+        let mut dependent = make_task("main", TaskPriority::High, 1000);
+        dependent.dependencies = vec!["dep".to_string()];
+        scheduler.submit_task(make_task("dep", TaskPriority::High, 1000));
+        scheduler.submit_task(dependendent);
+
+        let dep_id = scheduler.schedule_next().unwrap();
+        scheduler.complete_task(&dep_id, make_result("dep", false)); // failed
+
+        assert!(scheduler.schedule_next().is_none());
+    }
+
+    /// Failed task with retries left is re-queued, not completed.
+    #[test]
+    fn test_retry_requeues_failed_task() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(make_device(0, 24000));
+
+        let mut task = make_task("retry_me", TaskPriority::High, 1000);
+        task.max_retries = 3;
+        scheduler.submit_task(task);
+
+        let task_id = scheduler.schedule_next().unwrap();
+        scheduler.complete_task(&task_id, make_result("retry_me", false));
+
+        // Task should be re-queued (pending), not completed
+        let stats = scheduler.statistics();
+        assert_eq!(stats.completed_tasks, 0);
+        assert_eq!(stats.failed_tasks, 0);
+        // The task is back in the queue with current_retries = 1
+        assert_eq!(scheduler.task_queue.len(), 1);
+        assert_eq!(scheduler.task_queue[0].current_retries, 1);
+        assert_eq!(scheduler.task_queue[0].status, TaskStatus::Pending);
+    }
+
+    /// Exhausted retries → task is marked as failed in completed_tasks.
+    #[test]
+    fn test_exhausted_retries_marks_failure() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(make_device(0, 24000));
+
+        let mut task = make_task("fail_me", TaskPriority::High, 1000);
+        task.max_retries = 1;
+        scheduler.submit_task(task);
+
+        let task_id = scheduler.schedule_next().unwrap();
+        scheduler.complete_task(&task_id, make_result("fail_me", false));
+
+        let stats = scheduler.statistics();
+        assert_eq!(stats.failed_tasks, 1);
+        assert_eq!(stats.completed_tasks, 0);
+    }
+
+    /// GPU memory is released after task completion.
+    #[test]
+    fn test_gpu_memory_release() {
+        let mut scheduler = ParallelTaskManager::new();
+        let mut device = make_device(0, 8000);
+        scheduler.register_device(device);
+
+        scheduler.submit_task(make_task("mem_task", TaskPriority::High, 4000));
+        let task_id = scheduler.schedule_next().unwrap();
+
+        // Memory allocated
+        assert_eq!(scheduler.devices[0].used_memory_mb, 4000);
+
+        scheduler.complete_task(&task_id, make_result("mem_task", true));
+
+        // Memory released
+        assert_eq!(scheduler.devices[0].used_memory_mb, 0);
+    }
+
+    /// GPU memory is released even when task fails.
+    #[test]
+    fn test_gpu_memory_release_on_failure() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(make_device(0, 8000));
+
+        scheduler.submit_task(make_task("fail_mem", TaskPriority::High, 4000));
+        let task_id = scheduler.schedule_next().unwrap();
+        assert_eq!(scheduler.devices[0].used_memory_mb, 4000);
+
+        scheduler.complete_task(&task_id, make_result("fail_mem", false));
+        assert_eq!(scheduler.devices[0].used_memory_mb, 0);
+    }
+
+    /// complete_task on unknown task_id is a no-op (no panic, no side effects).
+    #[test]
+    fn test_complete_unknown_task_is_noop() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(make_device(0, 8000));
+        scheduler.complete_task("nonexistent", make_result("nonexistent", true));
+        let stats = scheduler.statistics();
+        assert_eq!(stats.completed_tasks, 0);
+    }
+
+    /// Statistics reflect actual scheduler state.
+    #[test]
+    fn test_statistics_accuracy() {
+        let mut scheduler = ParallelTaskManager::new();
+        scheduler.register_device(make_device(0, 8000));
+
+        scheduler.submit_task(make_task("t1", TaskPriority::High, 1000));
+        scheduler.submit_task(make_task("t2", TaskPriority::High, 1000));
+
+        let t1 = scheduler.schedule_next().unwrap();
+        let stats_before = scheduler.statistics();
+        assert_eq!(stats_before.queued_tasks, 1);
+        assert_eq!(stats_before.running_tasks, 1);
+
+        scheduler.complete_task(&t1, make_result("t1", true));
+        let stats_after = scheduler.statistics();
+        assert_eq!(stats_after.completed_tasks, 1);
+        assert_eq!(stats_after.running_tasks, 0);
+        assert_eq!(stats_after.queued_tasks, 1);
+    }
+
+    /// Backoff delay follows exponential formula: base * 2^retry.
     #[test]
     fn test_backoff_delay() {
         let scheduler = ParallelTaskManager::new();
-        
+
         assert_eq!(scheduler.calculate_backoff_delay(0), 5);
         assert_eq!(scheduler.calculate_backoff_delay(1), 10);
         assert_eq!(scheduler.calculate_backoff_delay(2), 20);
         assert_eq!(scheduler.calculate_backoff_delay(3), 40);
+        // Capped by retry_max_multiplier (10): 5 * min(2^10, 10) = 5 * 10 = 50
+        assert_eq!(scheduler.calculate_backoff_delay(10), 50);
     }
 }

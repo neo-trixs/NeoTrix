@@ -188,18 +188,34 @@ impl L1Capability for WhatsAppProvider {
 }
 
 impl MessagingProvider for WhatsAppProvider {
+    /// **Not wired** — WhatsApp Business API send requires:
+    /// - HTTP POST to `{api_url}/{phone_number_id}/messages`
+    /// - OAuth2 token validation
+    /// - Message format compliance with WhatsApp Business API spec
+    /// - Rate limiting and retry logic
     fn send(&self, _msg: &Message) -> Result<String, CapabilityError> {
-        let msg_id = format!("wa_{}", uuid::Uuid::new_v4());
-        // 实际实现: POST {api_url}/{phone_number_id}/messages
-        Ok(msg_id)
+        Err(CapabilityError::NotAvailable(
+            "not wired: WhatsApp Business API send not implemented (requires HTTP client + API credentials)".into()
+        ))
     }
 
+    /// **Not wired** — WhatsApp message retrieval requires:
+    /// - Webhook setup for real-time message receiving
+    /// - Pagination API for historical messages
+    /// - Message decryption for end-to-end encrypted messages
     fn receive(&self, _since: Option<u64>) -> Result<Vec<Message>, CapabilityError> {
-        Ok(Vec::new())
+        Err(CapabilityError::NotAvailable(
+            "not wired: WhatsApp Business API receive not implemented (requires webhook configuration)".into()
+        ))
     }
 
+    /// **Not wired** — WhatsApp message status requires:
+    /// - Status API endpoint calls
+    /// - Delivery/read receipt tracking
     fn get_status(&self, _id: &str) -> Result<MessageStatus, CapabilityError> {
-        Ok(MessageStatus::Sent)
+        Err(CapabilityError::NotAvailable(
+            "not wired: WhatsApp Business API status check not implemented".into()
+        ))
     }
 }
 
@@ -250,18 +266,34 @@ impl L1Capability for EmailProvider {
 }
 
 impl MessagingProvider for EmailProvider {
+    /// **Not wired** — SMTP email send requires:
+    /// - SMTP connection with TLS/STARTTLS
+    /// - Authentication (username/password or OAuth2)
+    /// - MIME message construction
+    /// - Attachment handling
     fn send(&self, _msg: &Message) -> Result<String, CapabilityError> {
-        let msg_id = format!("email_{}", uuid::Uuid::new_v4());
-        // 实际实现: SMTP send
-        Ok(msg_id)
+        Err(CapabilityError::NotAvailable(
+            "not wired: SMTP email send not implemented (requires SMTP client + credentials)".into()
+        ))
     }
 
+    /// **Not wired** — Email retrieval requires:
+    /// - IMAP/POP3 client connection
+    /// - Mailbox polling or IDLE mode
+    /// - MIME parsing for received messages
     fn receive(&self, _since: Option<u64>) -> Result<Vec<Message>, CapabilityError> {
-        Ok(Vec::new())
+        Err(CapabilityError::NotAvailable(
+            "not wired: SMTP email receive not implemented (requires IMAP/POP3 client)".into()
+        ))
     }
 
+    /// **Not wired** — Email status tracking requires:
+    /// - Delivery receipt parsing
+    /// - Read receipt tracking
     fn get_status(&self, _id: &str) -> Result<MessageStatus, CapabilityError> {
-        Ok(MessageStatus::Sent)
+        Err(CapabilityError::NotAvailable(
+            "not wired: SMTP email status check not implemented".into()
+        ))
     }
 }
 
