@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use crate::neotrix::nt_io_provider::context_budget::estimate_tokens;
+use crate::l1_action::nt_io::nt_io_provider::context_budget::estimate_tokens;
 
 /// Precise token counter. **单一事实源 (P0-7)**: 委托 `context_budget::estimate_tokens`,
 /// 即 tiktoken cl100k_base 精确计数优先, tiktoken 不可用 (如离线首跑) 时回退

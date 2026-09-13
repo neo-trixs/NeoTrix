@@ -213,11 +213,13 @@ pub struct ClassifiedRootCause {
     pub evidence: Vec<String>,
 }
 
+#[derive(Debug)]
 pub struct ErrorRateTracker {
     pub(crate) window: VecDeque<bool>,
     pub(crate) capacity: usize,
 }
 
+#[derive(Debug)]
 pub struct MonitoredEndpoint {
     pub name: &'static str,
     pub ttfb_ewma: super::protocol::EwmaDetector,
@@ -235,6 +237,7 @@ pub struct MonitoredEndpoint {
     pub prediction_confidence: f64,
 }
 
+#[derive(Debug)]
 pub struct PredictiveNetworkMonitor {
     pub endpoints: HashMap<String, MonitoredEndpoint>,
     pub environment: NetworkEnvironment,

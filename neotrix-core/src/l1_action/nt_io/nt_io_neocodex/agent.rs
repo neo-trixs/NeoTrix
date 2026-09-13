@@ -6,8 +6,8 @@ use std::time::Instant;
 
 use base64::Engine as _;
 use crate::l1_action::nt_io::nt_io_provider::context_budget::apply_context_budget;
-use crate::neotrix::nt_io_provider::context_budget::estimate_messages_tokens;
-use crate::neotrix::nt_io_provider::types::{LlmRequest, Message, Role, Tool};
+use crate::l1_action::nt_io::nt_io_provider::context_budget::estimate_messages_tokens;
+use crate::l1_action::nt_io::nt_io_provider::types::{LlmRequest, Message, Role, Tool};
 
 use super::context::ContextPipeline;
 use super::cost::CostTracker;
@@ -760,10 +760,10 @@ impl NeoCodexAgent {
                     });
                     messages.push(Message::assistant_with_calls(
                         &response.content,
-                        vec![crate::neotrix::nt_io_provider::types::ToolCallInfo {
+                        vec![crate::l1_action::nt_io::nt_io_provider::types::ToolCallInfo {
                             id: format!("call-{}", step),
                             call_type: "function".into(),
-                            function: crate::neotrix::nt_io_provider::types::ToolCallFunction {
+                            function: crate::l1_action::nt_io::nt_io_provider::types::ToolCallFunction {
                                 name: name.clone(),
                                 arguments: args.clone(),
                             },
@@ -954,10 +954,10 @@ impl NeoCodexAgent {
                     }
                     messages.push(Message::assistant_with_calls(
                         &response_content,
-                        vec![crate::neotrix::nt_io_provider::types::ToolCallInfo {
+                        vec![crate::l1_action::nt_io::nt_io_provider::types::ToolCallInfo {
                             id: format!("call-{}", step),
                             call_type: "function".into(),
-                            function: crate::neotrix::nt_io_provider::types::ToolCallFunction {
+                            function: crate::l1_action::nt_io::nt_io_provider::types::ToolCallFunction {
                                 name: name.clone(),
                                 arguments: args.clone(),
                             },

@@ -78,7 +78,7 @@ pub static REMEDIATION_PLAYBOOK: &[RemediationAction] = &[
     },
 ];
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RemediationEngine {
     pub stage: PlaybookStage,
     pub current_action: Option<&'static RemediationAction>,

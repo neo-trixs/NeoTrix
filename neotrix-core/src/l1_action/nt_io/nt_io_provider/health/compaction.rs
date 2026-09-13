@@ -43,7 +43,7 @@ pub(crate) fn sanitize_history(messages: &mut Vec<Message>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_io_provider::types::{ToolCallInfo, ToolCallFunction};
+    use crate::l1_action::nt_io::nt_io_provider::types::{ToolCallInfo, ToolCallFunction};
 
     fn tool_msg(content: &str, call_id: &str) -> Message {
         Message {

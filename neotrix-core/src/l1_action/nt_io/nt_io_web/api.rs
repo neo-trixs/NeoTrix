@@ -43,22 +43,22 @@ fn read_provider_config() -> Result<serde_json::Value, String> {
     serde_json::from_str(&content).map_err(|e| format!("Parse error: {}", e))
 }
 
-fn payload_to_provider_config(payload: &ProviderConfigPayload) -> crate::neotrix::nt_io_provider::ProviderConfig {
+fn payload_to_provider_config(payload: &ProviderConfigPayload) -> crate::l1_action::nt_io::nt_io_provider::ProviderConfig {
     let provider_type = match payload.id.to_lowercase().as_str() {
-        "openai" => crate::neotrix::nt_io_provider::LlmProviderType::OpenAI,
-        "anthropic" => crate::neotrix::nt_io_provider::LlmProviderType::Anthropic,
-        "gemini" => crate::neotrix::nt_io_provider::LlmProviderType::Gemini,
-        "ollama" => crate::neotrix::nt_io_provider::LlmProviderType::Ollama,
-        "groq" => crate::neotrix::nt_io_provider::LlmProviderType::Groq,
-        "openrouter" => crate::neotrix::nt_io_provider::LlmProviderType::OpenRouter,
-        "cerebras" => crate::neotrix::nt_io_provider::LlmProviderType::Cerebras,
-        "pollinations" => crate::neotrix::nt_io_provider::LlmProviderType::Pollinations,
-        "freeapi" | "free" => crate::neotrix::nt_io_provider::LlmProviderType::FreeApi,
-        "vllm" => crate::neotrix::nt_io_provider::LlmProviderType::Vllm,
-        "sglang" => crate::neotrix::nt_io_provider::LlmProviderType::Sglang,
-        _ => crate::neotrix::nt_io_provider::LlmProviderType::OpenAI,
+        "openai" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::OpenAI,
+        "anthropic" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Anthropic,
+        "gemini" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Gemini,
+        "ollama" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Ollama,
+        "groq" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Groq,
+        "openrouter" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::OpenRouter,
+        "cerebras" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Cerebras,
+        "pollinations" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Pollinations,
+        "freeapi" | "free" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::FreeApi,
+        "vllm" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Vllm,
+        "sglang" => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Sglang,
+        _ => crate::l1_action::nt_io::nt_io_provider::LlmProviderType::OpenAI,
     };
-    crate::neotrix::nt_io_provider::ProviderConfig {
+    crate::l1_action::nt_io::nt_io_provider::ProviderConfig {
         provider_type,
         api_key: Some(payload.api_key.clone()),
         base_url: payload.base_url.clone(),
@@ -221,7 +221,7 @@ pub async fn reason_handler(
         })),
     };
     let provider_config = payload_to_provider_config(&payload);
-    let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
+    let provider = crate::l1_action::nt_io::nt_io_provider::create_provider(provider_config);
     let request = crate::core::nt_core_llm::LlmRequest::new(&payload.model, &body.prompt);
     match provider.complete(&request).await {
         Ok(response) => json_ok(serde_json::json!({
@@ -467,7 +467,7 @@ pub async fn agent_reason_stream_handler(
         };
 
         let provider_config = payload_to_provider_config(&payload);
-        let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
+        let provider = crate::l1_action::nt_io::nt_io_provider::create_provider(provider_config);
         let request = crate::core::nt_core_llm::LlmRequest::new(&payload.model, &body.prompt);
 
         match provider.complete(&request).await {
@@ -719,7 +719,7 @@ pub async fn test_provider_handler(
         }));
     }
     let provider_config = payload_to_provider_config(&body);
-    let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
+    let provider = crate::l1_action::nt_io::nt_io_provider::create_provider(provider_config);
     let request = crate::core::nt_core_llm::LlmRequest::new(&body.model, "Hello");
     match provider.complete(&request).await {
         Ok(_) => json_ok(serde_json::json!({"success": true, "message": "ok"})),
@@ -1052,7 +1052,7 @@ pub async fn openai_chat_completions(
     }
 
     // 转换消息格式
-    let messages: Vec<crate::neotrix::nt_io_provider::Message> = req.messages.into_iter().map(|m| {
+    let messages: Vec<crate::l1_action::nt_io::nt_io_provider::Message> = req.messages.into_iter().map(|m| {
         let role = match m.role.as_str() {
             "system" => crate::core::nt_core_llm::Role::System,
             "user" => crate::core::nt_core_llm::Role::User,
@@ -1060,7 +1060,7 @@ pub async fn openai_chat_completions(
             "tool" => crate::core::nt_core_llm::Role::Tool,
             _ => crate::core::nt_core_llm::Role::User,
         };
-        crate::neotrix::nt_io_provider::Message::new(role, m.content.as_str())
+        crate::l1_action::nt_io::nt_io_provider::Message::new(role, m.content.as_str())
     }).collect();
 
     // 构建请求
@@ -1160,7 +1160,7 @@ pub async fn openai_chat_completions(
                             role: "assistant".to_string(),
                             content: resp.content.clone(),
                             name: None,
-                            tool_calls: resp.tool_calls.map(|calls: Vec<crate::neotrix::nt_io_provider::ToolCallInfo>| calls.into_iter().map(|tc| OpenAIToolCall {
+                            tool_calls: resp.tool_calls.map(|calls: Vec<crate::l1_action::nt_io::nt_io_provider::ToolCallInfo>| calls.into_iter().map(|tc| OpenAIToolCall {
                                 id: tc.id,
                                 call_type: tc.call_type,
                                 function: OpenAIToolCallFunction {
@@ -1171,10 +1171,10 @@ pub async fn openai_chat_completions(
                             tool_call_id: None,
                         },
                         finish_reason: Some(match resp.finish_reason {
-                            crate::neotrix::nt_io_provider::FinishReason::Stop => "stop",
-                            crate::neotrix::nt_io_provider::FinishReason::Length => "length",
-                            crate::neotrix::nt_io_provider::FinishReason::Tool => "tool_calls",
-                            crate::neotrix::nt_io_provider::FinishReason::ContentFilter => "content_filter",
+                            crate::l1_action::nt_io::nt_io_provider::FinishReason::Stop => "stop",
+                            crate::l1_action::nt_io::nt_io_provider::FinishReason::Length => "length",
+                            crate::l1_action::nt_io::nt_io_provider::FinishReason::Tool => "tool_calls",
+                            crate::l1_action::nt_io::nt_io_provider::FinishReason::ContentFilter => "content_filter",
                             _ => "stop",
                         }.to_string()),
                         logprobs: None,

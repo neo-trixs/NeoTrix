@@ -58,7 +58,7 @@ impl HardwareProfile {
 // ═══════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub(crate) struct GgufModel {
+pub struct GgufModel {
     pub path: PathBuf,
     pub name: String,
     pub size_gb: f64,
@@ -91,7 +91,7 @@ impl GgufModel {
 }
 
 /// 扫描所有 GGUF 模型, 按大小降序
-pub(crate) fn scan_models() -> Vec<GgufModel> {
+pub fn scan_models() -> Vec<GgufModel> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/Users/neo".into());
     let search_dirs = [
         // 本地项目 models/ (Neo's current model)
@@ -127,7 +127,7 @@ pub(crate) fn scan_models() -> Vec<GgufModel> {
 }
 
 /// 自动选择最优模型
-pub(crate) fn select_best_model() -> Option<GgufModel> {
+pub fn select_best_model() -> Option<GgufModel> {
     scan_models().into_iter().next()
 }
 
@@ -136,7 +136,7 @@ pub(crate) fn select_best_model() -> Option<GgufModel> {
 // ═══════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub(crate) struct LlamaServerConfig {
+pub struct LlamaServerConfig {
     pub executable: PathBuf,
     pub model_path: PathBuf,
     pub host: String,
@@ -222,7 +222,7 @@ impl LlamaServerConfig {
 }
 
 /// 基于硬件 + 模型计算最优参数 — 使用 M5 16GB 实测基准
-pub(crate) fn compute_optimal_config(model_path: &Path, hw: &HardwareProfile) -> LlamaServerConfig {
+pub fn compute_optimal_config(model_path: &Path, hw: &HardwareProfile) -> LlamaServerConfig {
     let model_size_gb = std::fs::metadata(model_path)
         .map(|m| m.len() as f64 / 1024.0 / 1024.0 / 1024.0)
         .unwrap_or(7.0);
@@ -283,7 +283,7 @@ pub fn global_manager() -> &'static Arc<LlamaProcessManager> {
     })
 }
 
-pub(crate) struct LlamaProcessManager {
+pub struct LlamaProcessManager {
     config: Mutex<LlamaServerConfig>,
     child: Arc<Mutex<Option<Child>>>,
 }
@@ -459,7 +459,7 @@ impl Drop for LlamaProcessManager {
 // 查找可执行文件
 // ═══════════════════════════════════════════════════════════
 
-pub(crate) fn find_executable() -> Option<PathBuf> {
+pub fn find_executable() -> Option<PathBuf> {
     let candidates = [
         PathBuf::from("/opt/homebrew/bin/llama-server"),
         PathBuf::from("/usr/local/bin/llama-server"),

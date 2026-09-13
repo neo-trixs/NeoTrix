@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use crate::core::l0_substrate::nt_core_error::recovery::{ErrorContext, ErrorType, RecoveryAction};
 use crate::core::nt_core_cache::text_to_embedding;
+use crate::core::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
 use crate::core::nt_core_span::{SpanKind, Tracer};
 
 use crate::l1_action::nt_io::nt_io_provider::pool::account_pool::AccountPoolError;

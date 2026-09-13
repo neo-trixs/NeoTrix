@@ -31,6 +31,7 @@ pub enum ThreatLevel {
 }
 
 /// 双证据扫描器
+#[derive(Debug)]
 pub struct DualEvidenceScanner {
     action_patterns: Vec<Pattern>,
     target_patterns: Vec<Pattern>,

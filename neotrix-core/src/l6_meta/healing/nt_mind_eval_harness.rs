@@ -8,7 +8,7 @@ use crate::core::nt_core_ttc::EffortTier;
 use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::{
     derive_level, ConsciousnessGoldStandard, ConsciousnessLevel, GoldStandardReport,
 };
-use crate::neotrix::nt_io_provider::{
+use crate::l1_action::nt_io::nt_io_provider::{
     create_provider_from_type, LlmError, LlmProvider, LlmProviderType, LlmRequest,
 };
 use serde::{Deserialize, Serialize};
@@ -1589,7 +1589,7 @@ impl crate::core::nt_core_self_test::SelfTest for OracleLadderHealer {
 mod tests {
     use super::*;
     use crate::core::nt_core_self_test::SelfTest;
-    use crate::neotrix::nt_io_provider::LlmResponse;
+    use crate::l1_action::nt_io::nt_io_provider::LlmResponse;
 
     #[test]
     fn test_interpolate_quality() {

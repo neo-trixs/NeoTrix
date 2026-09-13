@@ -35,6 +35,10 @@ pub use anthropic::AnthropicProvider;
 pub use gemini::GeminiProvider;
 pub use ollama::OllamaProvider;
 pub use openai::OpenAiProvider;
+pub use llama::{
+    global_manager, find_executable, scan_models, select_best_model, compute_optimal_config,
+    GgufModel, HardwareProfile, LlamaProcessManager, LlamaServerConfig,
+};
 
 // ── 网关核心 ────────────────────────────────────────────────
 pub use gateway::{

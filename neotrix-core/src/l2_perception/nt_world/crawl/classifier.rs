@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use super::config::{CrawlTopic, CrawlFormat};
 use super::discover::DiscoveryExtractor;
-use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest};
+use crate::l1_action::nt_io::nt_io_provider::{LlmProvider, LlmRequest};
 
 #[derive(Debug, Clone)]
 pub struct ClassifiedContent {
@@ -487,17 +487,17 @@ mod tests {
         crate::core::nt_core_llm::DataTrust::Trusted
     }
 
-        async fn complete_raw(&self, _request: &LlmRequest) -> Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError> {
-            Ok(crate::neotrix::nt_io_provider::LlmResponse {
+        async fn complete_raw(&self, _request: &LlmRequest) -> Result<crate::l1_action::nt_io::nt_io_provider::LlmResponse, crate::l1_action::nt_io::nt_io_provider::LlmError> {
+            Ok(crate::l1_action::nt_io::nt_io_provider::LlmResponse {
                 content: r#"{"topic":"science_and_technology","format":"academic_paper","confidence":0.92}"#.into(),
                 model: "mock".into(),
-                usage: crate::neotrix::nt_io_provider::Usage::default(),
-                finish_reason: crate::neotrix::nt_io_provider::FinishReason::Stop,
+                usage: crate::l1_action::nt_io::nt_io_provider::Usage::default(),
+                finish_reason: crate::l1_action::nt_io::nt_io_provider::FinishReason::Stop,
                 tool_calls: None,
              reasoning: None,})
         }
 
-        async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError>>, crate::neotrix::nt_io_provider::LlmError> {
+        async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::l1_action::nt_io::nt_io_provider::LlmResponse, crate::l1_action::nt_io::nt_io_provider::LlmError>>, crate::l1_action::nt_io::nt_io_provider::LlmError> {
             let (_, rx) = tokio::sync::mpsc::channel(1);
             Ok(rx)
         }

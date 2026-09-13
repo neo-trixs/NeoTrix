@@ -51,19 +51,48 @@ impl ComponentStorage {
     }
 }
 
-/// SoA storage
+/// SoA storage — Vec-based for cache-friendly iteration (typical: 1-5 TypeIds per archetype)
 #[derive(Debug)]
 pub struct SoAStorage {
-    pub arrays: HashMap<TypeId, Vec<u8>>,
+    pub arrays: Vec<(TypeId, Vec<u8>)>,
     pub stride: usize,
 }
 
 impl SoAStorage {
     pub fn new(stride: usize) -> Self {
         Self {
-            arrays: HashMap::new(),
+            arrays: Vec::new(),
             stride,
         }
+    }
+
+    /// Lookup by TypeId — linear scan is faster than HashMap for small N (≤6 components)
+    #[inline]
+    pub fn get_array(&self, type_id: TypeId) -> Option<&Vec<u8>> {
+        self.arrays.iter()
+            .find(|(tid, _)| *tid == type_id)
+            .map(|(_, data)| data)
+    }
+
+    #[inline]
+    pub fn get_array_mut(&mut self, type_id: TypeId) -> Option<&mut Vec<u8>> {
+        self.arrays.iter_mut()
+            .find(|(tid, _)| *tid == type_id)
+            .map(|(_, data)| data)
+    }
+
+    #[inline]
+    pub fn insert_array(&mut self, type_id: TypeId, data: Vec<u8>) {
+        if let Some(existing) = self.arrays.iter_mut().find(|(tid, _)| *tid == type_id) {
+            existing.1 = data;
+        } else {
+            self.arrays.push((type_id, data));
+        }
+    }
+
+    #[inline]
+    pub fn has_array(&self, type_id: TypeId) -> bool {
+        self.arrays.iter().any(|(tid, _)| *tid == type_id)
     }
 }
 

@@ -257,6 +257,16 @@ impl ProxyPool {
     }
 }
 
+impl std::fmt::Debug for ProxyHeartbeatEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProxyHeartbeatEngine")
+            .field("heartbeat_interval", &self.heartbeat_interval)
+            .field("rotation_count", &self.rotation_count.load(std::sync::atomic::Ordering::Relaxed))
+            .field("max_history", &self.max_history)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

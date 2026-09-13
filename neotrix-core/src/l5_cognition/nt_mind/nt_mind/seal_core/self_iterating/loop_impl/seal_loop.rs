@@ -18,7 +18,7 @@ use super::super::super::stagnation::StagnationSignal;
 use super::super::pipeline::kernel_iterate_pipeline;
 use super::super::recursive_depth_reward::RecursiveDepthReward;
 use crate::neotrix::nt_world_model::{TaskType, Context};
-use crate::neotrix::nt_io_provider::create_gateway;
+use crate::l1_action::nt_io::nt_io_provider::create_gateway;
 use crate::core::nt_core_sae_bridge::SAEBridge;
 use crate::core::SparseAutoencoder;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};

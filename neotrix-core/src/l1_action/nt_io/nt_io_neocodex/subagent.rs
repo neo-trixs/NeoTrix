@@ -5,7 +5,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use crate::l1_action::nt_io::nt_io_provider::factory::create_gateway;
-use crate::neotrix::nt_io_provider::types::{LlmProvider, LlmRequest, Message, Role};
+use crate::l1_action::nt_io::nt_io_provider::types::{LlmProvider, LlmRequest, Message, Role};
 
 use super::context::ContextTurn;
 
@@ -152,7 +152,7 @@ impl SubagentDispatch {
             .await
             .unwrap_or_else(|e| {
                 log::warn!("[subagent] gateway build task failed: {e}; using empty gateway");
-                crate::neotrix::nt_io_provider::gateway::GatewayV2::new()
+                crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2::new()
             });
         let gateway = Arc::new(gateway);
         // R-P79: 注册参与 Auto Exacto 周期重估 — 后台循环 5min cadence 统一 tick。
@@ -262,7 +262,7 @@ impl SubagentDispatch {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_io_provider::types::{FinishReason, LlmError, LlmResponse, Usage};
+    use crate::l1_action::nt_io::nt_io_provider::types::{FinishReason, LlmError, LlmResponse, Usage};
 
     use super::super::context::ContextPipeline;
 

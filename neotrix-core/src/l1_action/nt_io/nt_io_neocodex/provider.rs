@@ -85,7 +85,7 @@ impl ProviderCatalog {
 
     /// Populate catalog from the real nt_io_provider layer
     pub fn sync_from_real(&mut self) {
-        use crate::neotrix::nt_io_provider::provider_catalog;
+        use crate::l1_action::nt_io::nt_io_provider::provider_catalog;
         self.providers.clear();
         for entry in provider_catalog::PROVIDER_CATALOG.iter() {
             let is_code = entry
@@ -128,34 +128,34 @@ impl ProviderCatalog {
     }
 
     /// Map a provider name to a real LlmProviderType (shared by selection helpers).
-    fn provider_type_of(name: &str) -> Option<crate::neotrix::nt_io_provider::LlmProviderType> {
+    fn provider_type_of(name: &str) -> Option<crate::l1_action::nt_io::nt_io_provider::LlmProviderType> {
         match name {
-            "openai" | "gpt" => Some(crate::neotrix::nt_io_provider::LlmProviderType::OpenAI),
+            "openai" | "gpt" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::OpenAI),
             "anthropic" | "claude" => {
-                Some(crate::neotrix::nt_io_provider::LlmProviderType::Anthropic)
+                Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Anthropic)
             }
-            "gemini" | "google" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Gemini),
-            "ollama" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Ollama),
-            "openrouter" => Some(crate::neotrix::nt_io_provider::LlmProviderType::OpenRouter),
-            "groq" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Groq),
-            "cerebras" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Cerebras),
-            "sambanova" => Some(crate::neotrix::nt_io_provider::LlmProviderType::SambaNova),
-            "pollinations" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Pollinations),
-            "bazaarlink" => Some(crate::neotrix::nt_io_provider::LlmProviderType::BazaarLink),
-            "nvidia" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Nvidia),
+            "gemini" | "google" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Gemini),
+            "ollama" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Ollama),
+            "openrouter" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::OpenRouter),
+            "groq" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Groq),
+            "cerebras" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Cerebras),
+            "sambanova" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::SambaNova),
+            "pollinations" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Pollinations),
+            "bazaarlink" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::BazaarLink),
+            "nvidia" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Nvidia),
             "github-models" | "github_models" => {
-                Some(crate::neotrix::nt_io_provider::LlmProviderType::GitHubModels)
+                Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::GitHubModels)
             }
             "huggingface" | "hf" => {
-                Some(crate::neotrix::nt_io_provider::LlmProviderType::HuggingFace)
+                Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::HuggingFace)
             }
-            "cohere" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Cohere),
-            "siliconflow" => Some(crate::neotrix::nt_io_provider::LlmProviderType::SiliconFlow),
+            "cohere" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Cohere),
+            "siliconflow" => Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::SiliconFlow),
             "deepseek-free" | "deepseek_free" => {
-                Some(crate::neotrix::nt_io_provider::LlmProviderType::DeepSeekFree)
+                Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::DeepSeekFree)
             }
             "lm-studio" | "llamacpp" | "local" => {
-                Some(crate::neotrix::nt_io_provider::LlmProviderType::Ollama)
+                Some(crate::l1_action::nt_io::nt_io_provider::LlmProviderType::Ollama)
             }
             _ => None,
         }
@@ -260,10 +260,10 @@ impl ProviderCatalog {
     }
 
     /// Create a LlmProvider from real layer (if matching provider type)
-    pub fn to_llm_provider(&self) -> Option<Arc<dyn crate::neotrix::nt_io_provider::LlmProvider>> {
+    pub fn to_llm_provider(&self) -> Option<Arc<dyn crate::l1_action::nt_io::nt_io_provider::LlmProvider>> {
         let info = self.providers.get(self.active)?;
         let provider_type = Self::provider_type_of(&info.name)?;
-        let mut config = crate::neotrix::nt_io_provider::ProviderConfig::from_env();
+        let mut config = crate::l1_action::nt_io::nt_io_provider::ProviderConfig::from_env();
         config.provider_type = provider_type;
         config.model = Some(info.model.clone());
         if info.name == "anthropic" || info.name == "claude" {
@@ -271,7 +271,7 @@ impl ProviderCatalog {
                 .ok()
                 .or_else(|| std::env::var("NEOTRIX_API_KEY").ok());
         }
-        Some(crate::neotrix::nt_io_provider::create_provider(config))
+        Some(crate::l1_action::nt_io::nt_io_provider::create_provider(config))
     }
 }
 

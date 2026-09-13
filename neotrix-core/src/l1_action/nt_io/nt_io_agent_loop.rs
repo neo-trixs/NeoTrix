@@ -1099,7 +1099,7 @@ impl AgentLoop {
 mod tests {
     use super::*;
     use crate::core::nt_core_traits::ToolDef;
-    use crate::neotrix::nt_io_provider::LlmResponse;
+    use crate::l1_action::nt_io::nt_io_provider::LlmResponse;
     use async_trait::async_trait;
     use std::sync::{Arc, Mutex};
 

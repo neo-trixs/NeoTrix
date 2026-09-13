@@ -254,6 +254,7 @@ impl RuleSnapshot {
     }
 }
 
+#[derive(Debug)]
 pub struct RuleEngine {
     rules: Vec<OutboundRule>,
     default_action: OutboundAction,

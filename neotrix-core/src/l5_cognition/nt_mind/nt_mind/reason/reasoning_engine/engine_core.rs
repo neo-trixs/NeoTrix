@@ -38,7 +38,7 @@ use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{ControlDistill
 use crate::l5_cognition::kb_facade::{KnowledgeBase, SearchResult};
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
 // use crate::l5_cognition::nt_mind::context_artifacts::indexer::ArtifactIndexer;
-use crate::neotrix::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
+use crate::l1_action::nt_io::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
 use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 use crate::l5_cognition::l6_facade::ConsciousnessGoldStandard;
 use super::CognitiveEye;

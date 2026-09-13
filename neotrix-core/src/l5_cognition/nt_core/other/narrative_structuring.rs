@@ -240,20 +240,54 @@ impl _NarrativeStructuring {
     }
     
     /// 解析文本为镜头
+    ///
+    /// 注意：此为 LLM 未接入时的降级方案。按段落分割并启发式分配镜头类型。
     fn parse_text_to_shots(&self, text: &str) -> Vec<_ShotUnit> {
-        // TODO: 实际调用 LLM 解析
         let paragraphs: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
         
         paragraphs.iter().enumerate().map(|(i, p)| {
+            let p_lower = p.to_lowercase();
+            
+            // 启发式：根据内容判断镜头类型
+            let (shot_size, duration_multiplier) = if p_lower.contains("特写") || p_lower.contains("close") || p_lower.contains("脸") {
+                (ShotSize::ExtremeClose, 0.7)
+            } else if p_lower.contains("全景") || p_lower.contains("wide") || p_lower.contains("场景") {
+                (ShotSize::Wide, 1.3)
+            } else if p_lower.contains("中景") || p_lower.contains("medium") {
+                (ShotSize::Medium, 1.0)
+            } else if p_lower.contains("远景") || p_lower.contains("extreme") {
+                (ShotSize::ExtremeWide, 1.5)
+            } else {
+                (ShotSize::Medium, 1.0)
+            };
+            
+            let camera_movement = if p_lower.contains("跟拍") || p_lower.contains("follow") || p_lower.contains("追踪") {
+                CameraMovement::Follow
+            } else if p_lower.contains("推") || p_lower.contains("zoom") || p_lower.contains("拉近") {
+                CameraMovement::PushIn
+            } else if p_lower.contains("摇") || p_lower.contains("pan") || p_lower.contains("扫") {
+                CameraMovement::Pan
+            } else if p_lower.contains("旋转") || p_lower.contains("rotate") {
+                CameraMovement::Rotate
+            } else if p_lower.contains("手持") || p_lower.contains("handheld") {
+                CameraMovement::Handheld
+            } else if p_lower.contains("航拍") || p_lower.contains("aerial") {
+                CameraMovement::Aerial
+            } else {
+                CameraMovement::Static
+            };
+            
+            let duration = (self.config.default_shot_duration as f64 * duration_multiplier) as f64;
+            
             _ShotUnit {
                 id: format!("shot_{}", i + 1),
                 shot_number: (i + 1) as u32,
                 description: p.to_string(),
                 elements: vec![],
-                scene: "默认场景".to_string(),
-                shot_size: ShotSize::Medium,
-                camera_movement: CameraMovement::Static,
-                duration_secs: self.config.default_shot_duration,
+                scene: format!("场景_{}", (i / 3) + 1),
+                shot_size,
+                camera_movement,
+                duration_secs: duration,
                 dialogue: None,
                 narration: None,
                 action: None,

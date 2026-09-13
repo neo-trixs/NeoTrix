@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
-use crate::neotrix::nt_io_provider::provider_catalog::{
+use crate::l1_action::nt_io::nt_io_provider::provider_catalog::{
     ProviderCategory, lookup_provider, providers_by_category,
 };
 use crate::core::nt_core_llm::LlmRequest;
@@ -125,7 +125,7 @@ impl ProviderCmd {
         if name.is_empty() {
             return CommandOutput::err("Usage: /provider challenge <name> [task]\ntask: arithmetic | extraction | boolean (默认 arithmetic)");
         }
-        let gateway = crate::neotrix::nt_io_provider::create_gateway();
+        let gateway = crate::l1_action::nt_io::nt_io_provider::create_gateway();
         let available = gateway.providers();
         let registered = available.iter().any(|p| p == name)
             || (name.contains('/')
@@ -161,7 +161,7 @@ impl ProviderCmd {
                 "Usage: /provider free <prompt>\n调用匿名免费模型 (无需 API key), 自动跨候选路由 + 429 退避重试。",
             );
         }
-        let gateway = crate::neotrix::nt_io_provider::create_gateway();
+        let gateway = crate::l1_action::nt_io::nt_io_provider::create_gateway();
         let request = LlmRequest::new("", &prompt);
         let rt = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
@@ -181,12 +181,12 @@ impl ProviderCmd {
         let sub = args.first().map(|s| s.as_str()).unwrap_or("list");
         match sub {
             "list" | "ls" => {
-                let pool = crate::neotrix::nt_io_provider::global_provider_pool();
+                let pool = crate::l1_action::nt_io::nt_io_provider::global_provider_pool();
                 let guard = pool.lock().unwrap_or_else(|e| e.into_inner());
                 CommandOutput::ok(&format!(
                     "{}\n\n保存于: {}",
                     guard.describe(),
-                    crate::neotrix::nt_io_provider::provider_pool::ProviderPool::path().display()
+                    crate::l1_action::nt_io::nt_io_provider::provider_pool::ProviderPool::path().display()
                 ))
             }
             "add" => self.cmd_pool_add(&args[1..]),
@@ -195,7 +195,7 @@ impl ProviderCmd {
                 if label.is_empty() {
                     return CommandOutput::err("Usage: /provider pool remove <label>");
                 }
-                let pool = crate::neotrix::nt_io_provider::global_provider_pool();
+                let pool = crate::l1_action::nt_io::nt_io_provider::global_provider_pool();
                 let mut guard = pool.lock().unwrap_or_else(|e| e.into_inner());
                 if guard.remove(label) {
                     CommandOutput::ok(&format!("已移除池条目: {}", label))
@@ -204,8 +204,8 @@ impl ProviderCmd {
                 }
             }
             "reload" => {
-                let mut gateway = crate::neotrix::nt_io_provider::create_gateway();
-                let pool = crate::neotrix::nt_io_provider::global_provider_pool();
+                let mut gateway = crate::l1_action::nt_io::nt_io_provider::create_gateway();
+                let pool = crate::l1_action::nt_io::nt_io_provider::global_provider_pool();
                 let guard = pool.lock().unwrap_or_else(|e| e.into_inner());
                 let n = guard.register_into_gateway(&mut gateway);
                 CommandOutput::ok(&format!(
@@ -247,7 +247,7 @@ impl ProviderCmd {
         if provider.is_empty() {
             return CommandOutput::err("缺少 --provider (如 openai / opencode-zen / anthropic)");
         }
-        if crate::neotrix::nt_io_provider::LlmProviderType::from_name(&provider).is_none() {
+        if crate::l1_action::nt_io::nt_io_provider::LlmProviderType::from_name(&provider).is_none() {
             let known = [
                 "openai", "anthropic", "gemini", "ollama", "groq", "openrouter",
                 "cerebras", "sambanova", "opencode-zen", "deepseek-free",
@@ -268,7 +268,7 @@ impl ProviderCmd {
         let base_url = ProviderCmd::parse_kv(args, "--base-url");
         let tags = ProviderCmd::parse_multi(args, "--tag");
 
-        let entry = crate::neotrix::nt_io_provider::PoolEntry {
+        let entry = crate::l1_action::nt_io::nt_io_provider::PoolEntry {
             label: label.to_string(),
             provider: provider.clone(),
             api_key: key,
@@ -280,7 +280,7 @@ impl ProviderCmd {
                 .map(|d| d.as_secs())
                 .unwrap_or(0),
         };
-        let pool = crate::neotrix::nt_io_provider::global_provider_pool();
+        let pool = crate::l1_action::nt_io::nt_io_provider::global_provider_pool();
         let mut guard = pool.lock().unwrap_or_else(|e| e.into_inner());
         match guard.upsert(entry) {
             Ok(()) => CommandOutput::ok(&format!(

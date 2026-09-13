@@ -1304,8 +1304,8 @@ mod tests {
     fn test_pool_entry_registers_into_gateway() {
         // 直接验证 ProviderPool::register_into_gateway 接线:
         // 池条目按 label 注册为 gateway provider (可被 providers() 发现)。
-        let mut pool = crate::neotrix::nt_io_provider::provider_pool::ProviderPool::default();
-        pool.entries.push(crate::neotrix::nt_io_provider::provider_pool::PoolEntry {
+        let mut pool = crate::l1_action::nt_io::nt_io_provider::provider_pool::ProviderPool::default();
+        pool.entries.push(crate::l1_action::nt_io::nt_io_provider::provider_pool::PoolEntry {
             label: "t-pool-gw".to_string(),
             provider: "openai".to_string(),
             api_key: "sk-test-pool".to_string(),

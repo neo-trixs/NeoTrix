@@ -1,6 +1,61 @@
 use crate::engine::renderer::{Color, Rect, DrawCommand};
 use std::collections::HashMap;
 
+// ---------------------------------------------------------------------------
+// Texture Atlas — maps sub-textures to regions within a single atlas texture
+// ---------------------------------------------------------------------------
+
+/// A region within an atlas texture (UV-like coordinates in pixels)
+#[derive(Debug, Clone, Copy)]
+pub struct AtlasRegion {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// Texture atlas: packs multiple small textures into one large texture to
+/// reduce draw calls. Sprites referencing atlas sub-textures are batched
+/// together under the atlas texture name.
+#[derive(Debug, Clone)]
+pub struct TextureAtlas {
+    /// Atlas texture name (the single GPU texture)
+    pub atlas_texture: String,
+    /// Maps sub-texture names to their region within the atlas
+    pub regions: HashMap<String, AtlasRegion>,
+    /// Atlas dimensions (for validation)
+    pub atlas_width: f32,
+    pub atlas_height: f32,
+}
+
+impl TextureAtlas {
+    pub fn new(atlas_texture: &str, width: f32, height: f32) -> Self {
+        Self {
+            atlas_texture: atlas_texture.to_string(),
+            regions: HashMap::new(),
+            atlas_width: width,
+            atlas_height: height,
+        }
+    }
+
+    /// Register a sub-texture region within the atlas
+    pub fn add_region(&mut self, name: &str, region: AtlasRegion) {
+        self.regions.insert(name.to_string(), region);
+    }
+
+    /// Look up the atlas region for a texture name
+    #[inline]
+    pub fn get_region(&self, texture_name: &str) -> Option<&AtlasRegion> {
+        self.regions.get(texture_name)
+    }
+
+    /// Check if a texture name belongs to this atlas
+    #[inline]
+    pub fn contains(&self, texture_name: &str) -> bool {
+        self.regions.contains_key(texture_name)
+    }
+}
+
 pub struct SpriteBatchExt {
     pub batches: HashMap<String, Vec<BatchEntry>>,
     pub max_batch_size: usize,

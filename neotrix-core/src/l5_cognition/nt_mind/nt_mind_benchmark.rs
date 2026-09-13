@@ -9,7 +9,7 @@ use crate::l5_cognition::nt_mind::nt_mind::memory::ReasoningBank;
 use crate::l5_cognition::nt_mind::nt_mind::ReasoningBrain;
 use crate::core::nt_core_knowledge::KnowledgeSource;
 use crate::core::nt_core_bank::ReasoningMemory;
-use crate::neotrix::nt_io_provider::{LlmError, LlmProvider, LlmRequest, LlmResponse};
+use crate::l1_action::nt_io::nt_io_provider::{LlmError, LlmProvider, LlmRequest, LlmResponse};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchmarkResult {
