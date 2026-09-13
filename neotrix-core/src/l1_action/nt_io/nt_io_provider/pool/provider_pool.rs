@@ -62,7 +62,7 @@ impl PoolEntry {
             base_url: self.base_url.clone(),
             model: Some(self.model.clone()),
             timeout_secs: 120,
-            proxy: super::super::nt_io_http_factory::proxy_from_env(),
+            proxy: crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env(),
         })
     }
 }
