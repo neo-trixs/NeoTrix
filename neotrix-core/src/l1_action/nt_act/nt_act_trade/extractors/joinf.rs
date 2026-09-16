@@ -867,11 +867,11 @@ impl ExternalPlatformExtractor for JoinfExtractor {
             }
         }
 
-        let has_more = (all_customers.len() as u32) < _total;
+        let has_more = (all_customers.len() as u32) < total;
 
         Ok(ExtractionResult {
             data: all_customers,
-            total: _total,
+            total,
             has_more,
         })
     }
@@ -937,11 +937,11 @@ impl ExternalPlatformExtractor for JoinfExtractor {
             }
         }
 
-        let has_more = (all_emails.len() as u32) < _total;
+        let has_more = (all_emails.len() as u32) < total;
 
         Ok(ExtractionResult {
             data: all_emails,
-            total: _total,
+            total,
             has_more,
         })
     }

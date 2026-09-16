@@ -7,6 +7,7 @@
 
 pub mod core;
 pub mod knowledge_access;
+pub mod llm_types;
 pub mod search_backend;
 pub mod write_guard_types;
 pub use core::self_measure;
@@ -39,7 +40,7 @@ pub use core::nt_core_traits as traits;
 pub use core::nt_core_self_org::{AgentMetadata, AgentStatus, DeadEndRecord, DeadEndRegistry, Heartbeat, SharedState, SelfOrgProtocol};
 
 pub use core::{
-    SkillTier, SkillDefinition, SkillRegistry,
+    SkillTier, SkillDefinition,
     ToolRisk, ToolClassification,
     AbsorbValidator, Accessor, AccessionReport, SourceType, UrlAccessor,
     CapabilityVector,

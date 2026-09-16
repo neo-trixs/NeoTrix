@@ -1,7 +1,10 @@
 pub mod capabilities;
+pub mod capability_registry;
 pub mod contract_parser;
+pub mod error;
 pub mod extractors;
 pub mod data_model;
+pub mod engine_traits;
 pub mod event_bus;
 pub mod finance_compliance;
 pub mod knowledge_base;
@@ -25,23 +28,34 @@ pub mod quote_negotiation;
 pub mod sqlite_knowledge_base;
 pub mod template_detector;
 pub mod trade_core;
+pub mod trade_knowledge;
 pub mod data_pipeline;
 pub mod router;
 pub mod unified_types;  // 新增：统一类型系统
 pub mod workers;
+// 从 L1 Action 层复用限流/熔断基础设施
+pub use crate::l1_action::nt_act::actions::core::nt_act_rate_limiter::{RateLimiter, RateLimiterConfig};
+pub use crate::l1_action::nt_act::actions::core::nt_act_circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitState};
 
 #[cfg(test)]
 pub mod tests;
+
+// ── error: 统一错误类型 ──────────────────────────────────
+pub use error::TradeError;
 
 // ── unified_types: 统一类型系统 (Single Source of Truth) ──
 pub use unified_types::{
     stable_id, Grade, Channel, ProductKind, Currency, FlowStep, OrderNode,
     ProductCategory, DriveType, ConnectionType, TradeTerms,
     OrderStatus, QuoteStatus, InquiryStatus,
-    MaterialSpec, PressureRating, SizeSpec, PriceInfo, ContactInfo,
-    PerformanceMetrics, InquiryMetadata,
+    MaterialSpec, PressureRating, SizeSpec, PriceInfo,
+    PerformanceMetrics, InquiryMetadata, TradeContactInfo,
     Product, Supplier, Customer, InquiryItem, Inquiry,
     QuoteItem, Quote, Order,
+    // 通用通信能力 (从 nt_act::communication 重新导出)
+    CommunicationChannel, ContactInfo, ContactMethod, InteractionDirection,
+    InteractionRecord, InteractionType,
+    SocialMediaPlatform,
 };
 
 // ── data_model: 统一数据模型 ─────────────────────────────
@@ -55,7 +69,7 @@ pub use event_bus::{
 
 // ── knowledge_base: 外贸知识库接口 ──────────────────────
 pub use knowledge_base::{
-    KnowledgeBase, KnowledgeBaseError, KnowledgeResult, KnowledgeUpdateResult,
+    CustomerRecord, KnowledgeBase, KnowledgeBaseError, KnowledgeResult, KnowledgeUpdateResult,
     PriceQuery, PriceResult, ProductFilters, ProductMatchEntry, ProductMatchResult,
     ProductQueryResult, ProductRecord, SupplierFilters, SupplierMatchEntry,
     SupplierMatchResult, SupplierQueryResult, SupplierRecord,
@@ -128,15 +142,24 @@ pub use orchestrator_v2::{
     TradeRouter as OrchestratorV2Router,
     TradeTask as OrchestratorV2Task,
     WorkerPool as OrchestratorV2WorkerPool,
-    WorkerResult as OrchestratorV2WorkerResult,
-    WorkerType as OrchestratorV2WorkerType,
+    DomainWorkerResult as OrchestratorV2WorkerResult,
+    DomainWorkerType as OrchestratorV2WorkerType,
 };
 
 // ── process_engine: 流程引擎 ────────────────────────────
 pub use process_engine::{
-    EventHandler, EventBus, NoOpHandler, ProcessDefinition, ProcessEngine, ProcessEvent,
+    EventHandler, NoOpHandler, ProcessDefinition, ProcessEngine, ProcessEvent,
     ProcessInstance, ProcessStatus, ProcessStep, StepCondition, StepHandler, StepResult,
     StepStatus,
+};
+
+// ── capability_registry: 统一能力注册表 ──────────────────
+pub use capability_registry::{
+    CapabilityInfo, PriceCalculatorCapability, ProductMatcherCapability,
+    RiskAssessorCapability, StepHandlerCapability, SupplierMatcherCapability,
+    TradeCapability, TradeCapabilityError, TradeCapabilityInput, TradeCapabilityOutput,
+    TradeCapabilityRegistry, TradeCapabilityType,
+    create_default_registry, create_empty_registry,
 };
 
 // ── path_metadata: 路径元数据提取 ────────────────────────
@@ -151,7 +174,8 @@ pub use contract_parser::{ContractParser, ContractType, ParsedContract, ParsedCo
 // ── nt_trade_crm: 客户关系管理 ─────────────────────────────
 pub use nt_trade_crm::{
     Contact, Company, CustomerProfile, CustomerGrade, CustomerSource, CustomerStatus,
-    CustomerFilters, CustomerQueryResult, CrmSummary, InteractionRecord, InteractionType,
+    CustomerFilters, CustomerQueryResult, CrmSummary,
+    InteractionRecord as CrmInteractionRecord, InteractionType as CrmInteractionType,
     TradeCrmEngine,
 };
 
@@ -207,8 +231,16 @@ pub use extractors::{ChromeDecryptor, LoginEntry};
 // ── workers: 异步工作池 ──────────────────────────────────────
 pub use workers::{
     AnalyzeWorker, ExtractWorker, SendWorker, TrackWorker, WorkerPool, WorkerResult, WorkerTask,
-    WorkerType, WriteWorker,
+    TaskWorkerType, WriteWorker,
 };
+
+// ── engine_traits: 统一 Engine 契约层 ──────────────────────
+pub use engine_traits::{
+    EngineInfo, EngineMetrics, EngineStatus, EngineType, TradeEngine, TradeEngineRegistry,
+};
+
+// ── trade_knowledge: 外贸知识库查询接口 ──────────────────────
+pub use trade_knowledge::{CustomerQueryResult as TradeCustomerQueryResult, CustomerStats, TradeKnowledgeQuery};
 
 // ── message: 多 Agent 通信协议 ──────────────────────────────
 pub use message::{
@@ -216,3 +248,5 @@ pub use message::{
     ExtractCustomers, GenerateReport, MessageHeader, MessagePriority, ReportFormat, SyncCompleted,
     SyncStarted, TaskError, TaskProgress, TaskRequest, TaskResponse, TaskStatus, TradeMessage,
 };
+
+

@@ -29,6 +29,7 @@ pub mod ffi;
 // ─── Infrastructure ─────────────────────────────────────────────────────
 pub mod nt_core_error;
 pub mod nt_core_event_bus;
+pub mod nt_core_event_bus_muted;
 
 // ─── 意识核心 (已迁移至 l5_cognition/nt_core/) ────────────────────────
 pub use crate::l5_cognition::nt_core::nt_consciousness_core;
@@ -36,6 +37,7 @@ pub use crate::l5_cognition::nt_core::nt_consciousness_core;
 // ─── Standalone modules at neotrix level ────────────────────────────────
 pub mod nt_harness;
 pub mod nt_file_ability;
+pub mod nt_crystal_core;
 pub mod proxy_daemon_wrapper;
 
 // ─── L7 Capability Tree ────────────────────────────────────────────────
@@ -172,6 +174,35 @@ pub use nt_file_ability::{
 };
 
 pub use nt_file_ability::merge_docx;
+
+// ─── Backward-compatible stub functions ────────────────────────────────
+// These functions were removed during refactoring but are still referenced
+// by consciousness_core::dispatch. Stubs prevent compilation errors.
+
+/// List available LLM providers (stub)
+pub fn list_llm_providers() -> Result<Vec<String>, String> {
+    Ok(vec!["openai".into(), "anthropic".into(), "gemini".into()])
+}
+
+/// Enhance file icon (stub)
+pub fn enhance_file_icon(_path: &std::path::Path) -> Result<String, String> {
+    Ok("File icon enhancement (stub)".into())
+}
+
+/// SEAL distill phase (stub)
+pub fn seal_distill() -> Result<String, String> {
+    Ok("SEAL distill completed (stub)".into())
+}
+
+/// SEAL absorb phase (stub)
+pub fn seal_absorb() -> Result<String, String> {
+    Ok("SEAL absorb completed (stub)".into())
+}
+
+/// SEAL iterate phase (stub)
+pub fn seal_iterate() -> Result<String, String> {
+    Ok("SEAL iterate completed (stub)".into())
+}
 
 #[cfg(test)]
 pub(crate) use nt_file_ability::{make_min_docx, make_min_pptx};

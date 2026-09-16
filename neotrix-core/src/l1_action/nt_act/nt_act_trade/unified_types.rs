@@ -2,11 +2,20 @@
 //!
 //! 合并 NeoTrix 通用类型 + WSD 外贸业务类型
 //! 所有 trade 子模块共用的领域数据结构统一在此定义。
+//!
+//! 通信相关类型已提取到 `nt_act::communication` 模块，此处仅保留外贸特有类型。
 
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+// 重新导出通用通信能力 (外贸模块使用 communication 模块的版本)
+pub use crate::l1_action::nt_act::communication::{
+    CommunicationChannel, ContactInfo, ContactMethod, InteractionDirection,
+    InteractionRecord, InteractionType,
+    SocialMediaPlatform,
+};
 
 // ============================================================
 // 1. ID 策略 (从 WSD 迁移)
@@ -128,6 +137,41 @@ impl Channel {
             "海关数据" | "CustomsData" => Some(Self::CustomsData),
             _ => Some(Self::Other(s.to_string())),
         }
+    }
+
+    /// 转换为通用通信渠道
+    pub fn to_communication_channel(&self) -> CommunicationChannel {
+        match self {
+            Self::Email => CommunicationChannel::Email,
+            Self::WhatsApp | Self::WeChat | Self::LinkedIn => CommunicationChannel::InstantMessage,
+            Self::WebsiteForm => CommunicationChannel::WebsiteForm,
+            Self::WebsiteChat => CommunicationChannel::WebsiteChat,
+            Self::SEOOrganic => CommunicationChannel::Other("SEO".into()),
+            _ => CommunicationChannel::Other(self.to_string()),
+        }
+    }
+
+    /// 是否为通信渠道 (可直接与客户沟通)
+    pub fn is_communication(&self) -> bool {
+        matches!(
+            self,
+            Self::Email | Self::WhatsApp | Self::WeChat | Self::LinkedIn | Self::WebsiteChat | Self::ColdCall
+        )
+    }
+
+    /// 是否为广告渠道
+    pub fn is_advertising(&self) -> bool {
+        matches!(self, Self::GoogleAds | Self::FacebookAds | Self::LinkedInAds)
+    }
+
+    /// 是否为贸易平台
+    pub fn is_trade_platform(&self) -> bool {
+        matches!(self, Self::Alibaba | Self::MadeInChina | Self::GlobalSources)
+    }
+
+    /// 是否为SEO/内容渠道
+    pub fn is_seo_content(&self) -> bool {
+        matches!(self, Self::SEOOrganic | Self::WebsiteForm | Self::WebsiteChat)
     }
 }
 
@@ -471,9 +515,9 @@ pub struct PriceInfo {
     pub tax_included: bool,
 }
 
-/// 联系信息
+/// 联系信息 (外贸专用简化版)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ContactInfo {
+pub struct TradeContactInfo {
     pub name: String,
     pub phone: String,
     pub email: String,
@@ -548,7 +592,7 @@ impl Default for Product {
 pub struct Supplier {
     pub id: String,
     pub name: String,
-    pub contact: ContactInfo,
+    pub contact: TradeContactInfo,
     pub performance: PerformanceMetrics,
     pub products: Vec<String>,
     pub location: String,
@@ -559,7 +603,7 @@ pub struct Supplier {
 pub struct Customer {
     pub id: String,
     pub name: String,
-    pub contact: ContactInfo,
+    pub contact: TradeContactInfo,
     pub grade: Grade,
     pub channel: Channel,
     pub country: String,

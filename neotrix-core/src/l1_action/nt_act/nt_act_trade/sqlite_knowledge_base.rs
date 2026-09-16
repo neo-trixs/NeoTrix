@@ -13,7 +13,7 @@ use rusqlite::{params, Connection};
 use serde_json;
 
 use super::knowledge_base::{
-    KnowledgeBase, KnowledgeBaseError, KnowledgeOperation, KnowledgeResult, KnowledgeUpdateResult,
+    CustomerRecord, KnowledgeBase, KnowledgeBaseError, KnowledgeOperation, KnowledgeResult, KnowledgeUpdateResult,
     PriceQuery, PriceResult, ProductFilters, ProductMatchEntry, ProductMatchResult, ProductQueryResult,
     ProductRecord, SupplierFilters, SupplierMatchEntry, SupplierMatchResult, SupplierQueryResult,
     SupplierRecord,
@@ -121,6 +121,37 @@ impl SqliteKnowledgeBase {
 
             CREATE UNIQUE INDEX IF NOT EXISTS idx_config_product_key
                 ON product_configs(product_id, key);
+
+            -- 客户表 (富通天下 CRM 数据)
+            CREATE TABLE IF NOT EXISTS customers (
+                customer_id TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                code        TEXT NOT NULL DEFAULT '',
+                grade       TEXT NOT NULL DEFAULT 'D',
+                channel     TEXT NOT NULL DEFAULT '',
+                country     TEXT NOT NULL DEFAULT '',
+                region      TEXT NOT NULL DEFAULT '',
+                contact_name TEXT NOT NULL DEFAULT '',
+                contact_id  TEXT NOT NULL DEFAULT '',
+                owner       TEXT NOT NULL DEFAULT '',
+                owner_id    INTEGER NOT NULL DEFAULT 0,
+                description TEXT NOT NULL DEFAULT '',
+                business_type TEXT NOT NULL DEFAULT '',
+                tags        TEXT NOT NULL DEFAULT '[]',
+                status      INTEGER NOT NULL DEFAULT 0,
+                public_status INTEGER NOT NULL DEFAULT 0,
+                created_at  INTEGER NOT NULL DEFAULT 0,
+                updated_at  INTEGER NOT NULL DEFAULT 0,
+                last_follow_at INTEGER NOT NULL DEFAULT 0,
+                last_activity TEXT NOT NULL DEFAULT '',
+                activity_type TEXT NOT NULL DEFAULT '',
+                metadata    TEXT NOT NULL DEFAULT '{}'
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+            CREATE INDEX IF NOT EXISTS idx_customers_grade ON customers(grade);
+            CREATE INDEX IF NOT EXISTS idx_customers_country ON customers(country);
+            CREATE INDEX IF NOT EXISTS idx_customers_owner ON customers(owner);
             ",
         )?;
 
@@ -194,6 +225,52 @@ impl SqliteKnowledgeBase {
         Ok(count)
     }
 
+    /// 批量导入客户数据 (富通天下 CRM)
+    pub fn import_customers(&self, customers: &[CustomerRecord]) -> KnowledgeResult<u32> {
+        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
+            reason: e.to_string(),
+        })?;
+        let mut count = 0u32;
+        for c in customers {
+            let tags_json = serde_json::to_string(&c.tags)?;
+            let metadata_json = serde_json::to_string(&c.metadata)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO customers
+                 (customer_id, name, code, grade, channel, country, region,
+                  contact_name, contact_id, owner, owner_id, description,
+                  business_type, tags, status, public_status, created_at, updated_at,
+                  last_follow_at, last_activity, activity_type, metadata)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+                params![
+                    c.customer_id,
+                    c.name,
+                    c.code,
+                    c.grade,
+                    c.channel,
+                    c.country,
+                    c.region,
+                    c.contact_name,
+                    c.contact_id,
+                    c.owner,
+                    c.owner_id as i64,
+                    c.description,
+                    c.business_type,
+                    tags_json,
+                    c.status as i32,
+                    c.public_status as i32,
+                    c.created_at as i64,
+                    c.updated_at as i64,
+                    c.last_follow_at as i64,
+                    c.last_activity,
+                    c.activity_type,
+                    metadata_json,
+                ],
+            )?;
+            count += 1;
+        }
+        Ok(count)
+    }
+
     /// 插入产品配置键值对
     pub fn upsert_product_config(
         &self,
@@ -250,6 +327,15 @@ impl SqliteKnowledgeBase {
             reason: e.to_string(),
         })?;
         let count: i64 = conn.query_row("SELECT COUNT(*) FROM suppliers", [], |r| r.get(0))?;
+        Ok(count as u64)
+    }
+
+    /// 获取客户总数
+    pub fn customer_count(&self) -> KnowledgeResult<u64> {
+        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
+            reason: e.to_string(),
+        })?;
+        let count: i64 = conn.query_row("SELECT COUNT(*) FROM customers", [], |r| r.get(0))?;
         Ok(count as u64)
     }
 

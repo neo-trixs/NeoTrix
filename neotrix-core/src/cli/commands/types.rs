@@ -10,8 +10,8 @@ use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::cli::approval::ApprovalEngine;
 use crate::cli::sandbox::SandboxEnforcer;
 use crate::cli::shield_enforcer::ShieldEnforcer;
-use crate::core::nt_core_conn::ConnectorManager;
-use crate::core::nt_core_router::SmartRouter;
+use crate::cli::nt_conn::ConnectorManager;
+use crate::cli::nt_router::SmartRouter;
 use crate::core::nt_core_ws::WorkSpaceManager;
 
 /// Centralized dependency container for CLI command execution.
@@ -84,6 +84,11 @@ impl CommandOutput {
 
     pub fn err(msg: &str) -> Self {
         Self { success: false, message: msg.to_string(), exit_code: ExitCode::InvalidInput, json: None }
+    }
+
+    /// Backward-compatible: create output from text
+    pub fn text(msg: impl Into<String>) -> Self {
+        Self { success: true, message: msg.into(), exit_code: ExitCode::Success, json: None }
     }
 
     pub fn not_found(msg: &str) -> Self {
