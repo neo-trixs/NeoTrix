@@ -13,6 +13,8 @@ use crate::l1_action::traits::{
 use super::nt_act_orch_patterns::{
     Orchestrator as L7Orchestrator, AgentError,
 };
+#[cfg(test)]
+use super::nt_act_orch_patterns::{AgentOutput, OrchestratorStats};
 
 // ════════════════════════════════════════════════════════════════
 // 适配器: L7 Orchestrator → L1 Orchestrator

@@ -7,7 +7,7 @@ mod tests {
 
     #[test]
     fn test_bm25_basic_search() {
-        use crate::l5_cognition::nt_mind::bm25::{Bm25Index, Bm25Document};
+        use crate::l5_cognition::kb_facade::bm25::{Bm25Index, Bm25Document};
         let docs = vec![
             Bm25Document { id: "1".into(), text: "Rust memory safety ownership borrowing lifetimes".into() },
             Bm25Document { id: "2".into(), text: "async await tokio async runtime concurrency".into() },
@@ -21,7 +21,7 @@ mod tests {
 
     #[test]
     fn test_bm25_empty_index() {
-        use crate::l5_cognition::nt_mind::bm25::Bm25Index;
+        use crate::l5_cognition::kb_facade::bm25::Bm25Index;
         let index = Bm25Index::empty();
         let results = index.search("anything", 5);
         assert!(results.is_empty());
@@ -29,7 +29,7 @@ mod tests {
 
     #[test]
     fn test_rrf_fusion() {
-        use crate::l5_cognition::nt_mind::bm25::rrf_fuse;
+        use crate::l5_cognition::kb_facade::bm25::rrf_fuse;
         let v1: Vec<(f64, String)> = vec![(0.9, "a".into()), (0.8, "b".into()), (0.7, "c".into())];
         let v2: Vec<(f64, String)> = vec![(0.95, "b".into()), (0.85, "a".into()), (0.6, "d".into())];
         let fused = rrf_fuse(&[v1, v2]);

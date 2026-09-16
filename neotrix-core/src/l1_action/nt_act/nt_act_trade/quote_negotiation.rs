@@ -10,15 +10,8 @@ use nt_core_capability_tree::{
 };
 use serde::{Deserialize, Serialize};
 
-/// Negotiation Strategy Types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum NegotiationStrategy {
-    Collaborative,
-    Competitive,
-    Compromise,
-    Accommodating,
-    Avoiding,
-}
+// ── SSOT imports: 所有底层类型统一从 trade_core 引用 ──
+use super::trade_core::{CostBreakdown, Concession, NegotiationEngine, NegotiationStrategy};
 
 /// Customer Objection Categories
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,18 +64,6 @@ pub struct QuoteGenerator {
     pub cost_breakdown: CostBreakdown,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CostBreakdown {
-    pub material: f64,
-    pub labor: f64,
-    pub overhead: f64,
-    pub packaging: f64,
-    pub logistics: f64,
-    pub certification: f64,
-    pub contingency: f64,
-    pub total: f64,
-}
-
 impl QuoteGenerator {
     pub fn generate(&self) -> QuoteSheet {
         let unit_price = self.base_cost * (1.0 + self.margin_target);
@@ -124,46 +105,8 @@ pub struct QuoteSheet {
     pub risk_flag: Option<String>,
 }
 
-/// Negotiation Engine (FT04)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NegotiationEngine {
-    pub strategy: NegotiationStrategy,
-    pub bottom_line: f64,
-    pub current_quote: f64,
-    pub round: u32,
-    pub concessions_made: Vec<Concession>,
-    pub competitor_data: Option<CompetitorData>,
-}
-
-impl Default for NegotiationEngine {
-    fn default() -> Self {
-        Self {
-            strategy: NegotiationStrategy::Collaborative,
-            bottom_line: 0.0,
-            current_quote: 0.0,
-            round: 0,
-            concessions_made: Vec::new(),
-            competitor_data: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Concession {
-    pub round: u32,
-    pub item: String,
-    pub original: f64,
-    pub conceded: f64,
-    pub reason: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompetitorData {
-    pub competitor_name: String,
-    pub quoted_price: f64,
-    pub quoted_terms: String,
-    pub source: String,
-}
+// ── NegotiationEngine / Concession / CompetitorData 统一从 trade_core 引用 ──
+// 本模块仅定义外贸特有的异议处理逻辑 (handle_objection / generate_response)
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NegotiationRecord {
@@ -289,6 +232,8 @@ pub fn execute_quote_negotiation(
         current_quote: initial_quote.unit_price,
         round: 1,
         concessions_made: Vec::new(),
+        max_rounds: 3,
+        concession_rate: 0.05,
         competitor_data: None,
     };
 
@@ -364,6 +309,8 @@ pub fn register_quote_negotiation_capability(registry: &mut CapabilityRegistry) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::trade_core::CompetitorData;
+    use std::collections::HashMap;
 
     #[test]
     fn test_quote_generation() {
@@ -399,6 +346,8 @@ mod tests {
             current_quote: 120.0,
             round: 1,
             concessions_made: Vec::new(),
+            max_rounds: 3,
+            concession_rate: 0.3,
             competitor_data: None,
         };
 
@@ -422,6 +371,8 @@ mod tests {
             current_quote: 112.0, // Very close to bottom line
             round: 1,
             concessions_made: Vec::new(),
+            max_rounds: 3,
+            concession_rate: 0.3,
             competitor_data: None,
         };
 
@@ -508,6 +459,8 @@ mod tests {
             current_quote: 150.0,
             round: 1,
             concessions_made: Vec::new(),
+            max_rounds: 3,
+            concession_rate: 0.3,
             competitor_data: Some(CompetitorData {
                 competitor_name: "Competitor X".into(),
                 quoted_price: 120.0,
@@ -558,6 +511,8 @@ mod tests {
             current_quote: 130.0,
             round: 1,
             concessions_made: Vec::new(),
+            max_rounds: 3,
+            concession_rate: 0.3,
             competitor_data: None,
         };
 
@@ -603,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_execute_quote_negotiation_integration() {
-        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec, MarketEnvironment, IntentLevel};
+        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec, MarketEnvironment};
 
         let req = RequirementConfirmation {
             confirmed: true,

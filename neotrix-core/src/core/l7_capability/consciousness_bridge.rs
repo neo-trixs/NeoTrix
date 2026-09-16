@@ -189,7 +189,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_bridge_value_check() {
+    fn test_bridge_value_check() -> Result<(), String> {
         let b = bridge();
         b.sync_value_weights(HashMap::from([
             ("autonomy".into(), 0.95),
@@ -197,8 +197,9 @@ mod tests {
         ]));
         match b.pre_tick_check(1) {
             QuickVerdict::Warn(msg) => assert!(msg.contains("test_low")),
-            _ => panic!("低权重应告警"),
+            _ => return Err("低权重应告警".to_string()),
         }
+        Ok(())
     }
 
     #[test]

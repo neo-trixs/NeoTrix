@@ -2010,7 +2010,7 @@ mod tests {
             .expect("hub node");
         assert_eq!(
             hub.node_type,
-            crate::l1_action::nt_memory::nt_memory_kb::types::NodeType::Concept
+            crate::l1_action::nt_memory::nt_memory_kb::NodeType::Concept
         );
         // 至少一个数据集节点存在且为 Dataset 类型
         let ds = kb
@@ -2019,7 +2019,7 @@ mod tests {
             .expect("first dataset node");
         assert_eq!(
             ds.node_type,
-            crate::l1_action::nt_memory::nt_memory_kb::types::NodeType::Dataset
+            crate::l1_action::nt_memory::nt_memory_kb::NodeType::Dataset
         );
         // 幂等: 再次落盘不重复
         let n2 = ingester.persist_to_kb_store(&kb).expect("persist again");

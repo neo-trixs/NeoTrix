@@ -58,14 +58,15 @@ pub use crate::l1_action::nt_io::nt_io_provider::types::{
 pub use crate::l1_action::nt_io::{
     nt_io_agents_md, nt_io_avatar_channel, nt_io_digital_human, nt_io_hotreload,
     nt_io_http_factory, nt_io_logging, nt_io_mention, nt_io_neocodex, nt_io_notify, nt_io_plugin,
-    nt_io_provider, nt_io_proxy_server, nt_io_session_recovery, nt_io_user_avatar, nt_io_web,
+    nt_io_provider, nt_io_proxy_server, nt_io_session_recovery, nt_io_standalone,
+    nt_io_user_avatar, nt_io_web,
 };
 #[cfg(feature = "telemetry")]
 pub use crate::l1_action::nt_io::nt_io_telemetry;
 
 // L1 Action — nt_act re-exports
 pub use crate::l1_action::nt_act::{
-    nt_act_autonomy, nt_act_code, nt_act_crypto, nt_act_goal, nt_act_orchestrator, nt_act_sandbox,
+    nt_act_autonomy, nt_act_code, nt_act_crypto, nt_act_orchestrator, nt_act_sandbox,
     nt_act_voice,
 };
 pub use crate::l5_cognition::nt_mind::nt_mind_automation::{
@@ -106,6 +107,9 @@ pub use crate::l5_cognition::nt_mind::{
 };
 pub use crate::l5_cognition::nt_mind::evolution;
 pub use crate::l5_cognition::nt_mind::foundation;
+
+// L5 Cognition — nt_goal re-export (migrated from L1 nt_act_goal)
+pub use crate::l5_cognition::nt_goal;
 
 // L6 Meta — re-exports
 pub use crate::l5_cognition::nt_core::nt_core_intra_reflection;

@@ -3,6 +3,7 @@
 // Core modules (renamed from 'core' to avoid shadowing std::core)
 pub mod shield_core;
 // pub mod content_moderation; // DEAD: zero external references
+pub mod circuit_breaker;
 pub mod dual_evidence;
 pub mod proxy_detection;
 pub mod slang_norm;
@@ -15,9 +16,11 @@ pub mod nt_shield_agentic_scan;
 pub mod nt_shield_audit;
 // pub mod nt_shield_audit_phases; // DEAD: zero external references
 pub mod nt_shield_comm;
+pub mod nt_shield_internal_scan;
 // pub mod nt_shield_cleanup; // DEAD: zero external references
 pub mod nt_shield_impl;
-// pub mod nt_shield_osint; // DEAD: zero external references
+pub mod http_intercept;
+pub mod osint;
 pub mod nt_shield_oversight;
 pub mod nt_shield_propagation_guard;
 // pub mod nt_shield_recon; // DEAD: zero external references
@@ -27,9 +30,15 @@ pub mod nt_shield_sentry;
 // pub mod nt_shield_threat_detection; // DEAD: zero external references
 pub mod nt_shield_traffic;
 pub mod nt_shield_ztnet;
+pub mod binary_analyzer;
 
 #[cfg(feature = "stealth-net")]
 pub mod nt_shield_stealth_net;
+
+// Security analysis modules
+pub mod mitigation_auditor;
+pub mod sink_analyzer;
+pub mod vulnerability_pipeline;
 
 // Defense subdirectories
 pub mod defense;
@@ -53,3 +62,4 @@ pub use guard::prompt_guardian::PromptGuardian;
 pub use evasion::grapple_hooks::GrappleHookChain;
 pub use evasion::fullbreak::FullbreakEngine;
 pub use evasion::cloud_evade::CloudEvadeEngine;
+pub use binary_analyzer::BinaryAnalyzer;

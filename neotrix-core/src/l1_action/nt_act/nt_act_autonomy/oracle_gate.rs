@@ -1,4 +1,4 @@
-use crate::l5_cognition::nt_core::awareness_monitor::{AwarenessReport, GapSeverity};
+use super::types::{AwarenessReport, GapSeverity};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OracleReason {
@@ -214,7 +214,7 @@ impl crate::core::nt_core_self_test::SelfTest for OracleGate {
         if gate.oracle_call_count != 0 {
             failures.push("oracle_call_count should start at 0".into());
         }
-        let report = crate::l5_cognition::nt_core::awareness_monitor::AwarenessReport {
+        let report = super::types::AwarenessReport {
             gaps: vec![],
             total_gap: 0.0,
             critical_count: 0,
@@ -233,7 +233,7 @@ impl crate::core::nt_core_self_test::SelfTest for OracleGate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_act_autonomy::awareness_monitor::{AwarenessReport, CapabilityGap, GapSeverity};
+    use super::super::types::{AwarenessReport, CapabilityGap, GapSeverity};
 
     fn make_report(critical_count: u32) -> AwarenessReport {
         let gaps = if critical_count > 0 {

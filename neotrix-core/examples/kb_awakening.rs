@@ -5,8 +5,9 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_embed;
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+use neotrix::core::nt_core_math::cosine_similarity_f32;
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_embed;
+use neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let t0 = Instant::now();
@@ -101,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             
             let vb = &vec_map[nids[j]];
-            let sim = nt_memory_embed::cosine_similarity(va, vb);
+            let sim = cosine_similarity_f32(va, vb);
             if sim <= 0.25 { continue; }
             
             let rel = if sim > 0.35 { "supports" } else { "related_to" };
@@ -109,7 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 uuid::Uuid::new_v4().to_string(),
                 nids[i].clone(), nids[j].clone(),
                 rel.to_string(),
-                ((0.4 + sim as f64 * 0.5).min(0.95)),
+                ((0.4 + sim * 0.5_f64).min(0.95)),
                 format!("emb-sim:{:.3}", sim),
                 now_ts,
             ));

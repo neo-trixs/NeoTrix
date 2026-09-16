@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use crate::core::nt_core_knowledge::AffectiveFeedback;
@@ -6,43 +6,9 @@ use crate::core::nt_core_self::affective_interface::{
     AffectiveInterface, AffectiveReadout, GuideMode, ResponseIntent,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Emotion {
-    Neutral,
-    Happy,
-    Sad,
-    Angry,
-    Surprised,
-    Confused,
-    Thinking,
-}
-
-impl Emotion {
-    pub fn animation_key(&self) -> &'static str {
-        match self {
-            Emotion::Neutral => "idle",
-            Emotion::Happy => "smile",
-            Emotion::Sad => "frown",
-            Emotion::Angry => "fury",
-            Emotion::Surprised => "shock",
-            Emotion::Confused => "tilt",
-            Emotion::Thinking => "look_up",
-        }
-    }
-}
-
-/// 情绪微表情键 → 数字人 Emotion 枚举 (桥接 affective 表情键与动画枚举)。
-fn emotion_from_expression(expression: &str) -> Emotion {
-    match expression {
-        "smile" => Emotion::Happy,
-        "frown" => Emotion::Sad,
-        "fury" => Emotion::Angry,
-        "shock" => Emotion::Surprised,
-        "tilt" => Emotion::Confused,
-        "look_up" => Emotion::Thinking,
-        _ => Emotion::Neutral,
-    }
-}
+pub use crate::l4_emotion::nt_feel::digital_human::{
+    Emotion, EmotionEngine, emotion_from_expression,
+};
 
 #[derive(Debug, Clone)]
 pub struct AsrConfig {
@@ -369,64 +335,6 @@ pub fn trade_persona_xiaocai() -> PersonaConfig {
             "trade assistant".into(),
         ],
         interrupt_enabled: true,
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct EmotionEngine {
-    current: Emotion,
-    intensity: f64,
-    history: VecDeque<(Emotion, Instant)>,
-}
-
-impl Default for EmotionEngine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EmotionEngine {
-    pub fn new() -> Self {
-        Self {
-            current: Emotion::Neutral,
-            intensity: 0.5,
-            history: VecDeque::new(),
-        }
-    }
-
-    pub fn detect_from_text(&mut self, text: &str) -> Emotion {
-        let lower = text.to_lowercase();
-        let emotion = if lower.contains("happy") || lower.contains("great") || lower.contains("thank") {
-            Emotion::Happy
-        } else if lower.contains("sad") || lower.contains("sorry") || lower.contains("bad") {
-            Emotion::Sad
-        } else if lower.contains("angry") || lower.contains("mad") || lower.contains("furious") {
-            Emotion::Angry
-        } else if lower.contains("wow") || lower.contains("amazing") || lower.contains("unexpected") {
-            Emotion::Surprised
-        } else if lower.contains("hmm") || lower.contains("maybe") || lower.chars().any(|c| c == '?') {
-            Emotion::Confused
-        } else {
-            Emotion::Neutral
-        };
-        self.current = emotion;
-        self.history.push_back((emotion, Instant::now()));
-        if self.history.len() > 100 {
-            self.history.pop_front();
-        }
-        emotion
-    }
-
-    pub fn set_intensity(&mut self, intensity: f64) {
-        self.intensity = intensity.max(0.0).min(1.0);
-    }
-
-    pub fn current_emotion(&self) -> Emotion {
-        self.current
-    }
-
-    pub fn intensity(&self) -> f64 {
-        self.intensity
     }
 }
 

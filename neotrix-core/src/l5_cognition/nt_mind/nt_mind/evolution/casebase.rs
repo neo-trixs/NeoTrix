@@ -18,12 +18,22 @@ pub const NS_CASEBASE: &str = "casebase";
 
 /// 严重度序数辅助 (Low=0..Critical=3)。
 fn severity_rank(s: &Severity) -> u8 {
-    match s { Severity::Low => 0, Severity::Medium => 1, Severity::High => 2, Severity::Critical => 3, _ => 0 }
+    match s {
+        Severity::Low => 0,
+        Severity::Medium => 1,
+        Severity::High => 2,
+        Severity::Critical => 3,
+        _ => 0,
+    }
 }
 
 /// 经典判例优先 (fallback 排序 tie-break)。
 fn classic_first(c: &EthicalCase) -> u8 {
-    if c.source == "classic" { 0 } else { 1 }
+    if c.source == "classic" {
+        0
+    } else {
+        1
+    }
 }
 
 /// 中英混合关键词提取: 拉丁按词, CJK 按二元组 (无分词器的最小可用方案)。
@@ -31,7 +41,9 @@ fn extract_keywords_mixed(text: &str) -> HashSet<String> {
     let lower = text.to_lowercase();
     let mut out = HashSet::new();
     for tok in lower.split(|c: char| !c.is_alphanumeric()) {
-        if tok.is_empty() { continue; }
+        if tok.is_empty() {
+            continue;
+        }
         let is_cjk = tok.chars().any(|c| ('\u{4E00}'..='\u{9FFF}').contains(&c));
         if is_cjk {
             let chars: Vec<char> = tok.chars().collect();
@@ -54,21 +66,21 @@ fn extract_keywords_mixed(text: &str) -> HashSet<String> {
 pub struct EthicalCase {
     pub id: String,
     pub title: String,
-    pub description: String,           // 完整场景描述
-    pub domain: String,                // 领域：medical, ai, business, legal, social, etc.
-    pub conflict_type: ConflictType,   // 冲突类型
-    pub severity: Severity,            // 严重度
-    pub stakeholders: Vec<Stakeholder>, // 利益相关者
+    pub description: String,             // 完整场景描述
+    pub domain: String,                  // 领域：medical, ai, business, legal, social, etc.
+    pub conflict_type: ConflictType,     // 冲突类型
+    pub severity: Severity,              // 严重度
+    pub stakeholders: Vec<Stakeholder>,  // 利益相关者
     pub values_in_conflict: Vec<String>, // 冲突的价值观
-    pub recommended_action: String,    // 推荐行动/判例
-    pub reasoning: String,             // 推理过程
-    pub tags: Vec<String>,             // 标签
-    pub source: String,                // 来源：classic, modern, ai_specific, community
-    pub jurisdiction: Option<String>,  // 适用法域（可选）
+    pub recommended_action: String,      // 推荐行动/判例
+    pub reasoning: String,               // 推理过程
+    pub tags: Vec<String>,               // 标签
+    pub source: String,                  // 来源：classic, modern, ai_specific, community
+    pub jurisdiction: Option<String>,    // 适用法域（可选）
     pub created_at: i64,
     pub updated_at: i64,
     pub version: u32,
-    pub annotations: Vec<Annotation>,  // 社区标注（未来）
+    pub annotations: Vec<Annotation>, // 社区标注（未来）
 }
 
 /// 冲突类型分类。
@@ -177,7 +189,10 @@ impl CaseBase {
 
     fn add_case_internal(&self, case: EthicalCase) {
         let id = case.id.clone();
-        self.cases.write().unwrap_or_else(|e| e.into_inner()).insert(id.clone(), case.clone());
+        self.cases
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(id.clone(), case.clone());
     }
 
     /// 添加案例（自动索引 + 持久化）。
@@ -213,38 +228,70 @@ impl CaseBase {
             .filter(|c| self.passes_filters(c, &filters))
             .filter_map(|c| {
                 let score = self.compute_relevance(c, &keywords);
-                if score > 0.1 { Some((score, c.clone())) } else { None }
+                if score > 0.1 {
+                    Some((score, c.clone()))
+                } else {
+                    None
+                }
             })
             .collect();
 
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.1.id.cmp(&b.1.id)));
+        scored.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.1.id.cmp(&b.1.id))
+        });
         if scored.is_empty() {
             // 回退：字面不重叠时按严重度降序给出候选 (类比推理仍可用)
-            let mut fallback: Vec<(f64, EthicalCase)> = cases.values()
+            let mut fallback: Vec<(f64, EthicalCase)> = cases
+                .values()
                 .filter(|c| self.passes_filters(c, &filters))
-                .map(|c| (severity_rank(&c.severity) as f64 * 0.1 + c.version as f64 * 0.01, c.clone()))
+                .map(|c| {
+                    (
+                        severity_rank(&c.severity) as f64 * 0.1 + c.version as f64 * 0.01,
+                        c.clone(),
+                    )
+                })
                 .collect();
             fallback.sort_by(|a, b| {
-                b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
+                b.0.partial_cmp(&a.0)
+                    .unwrap_or(std::cmp::Ordering::Equal)
                     .then_with(|| classic_first(&a.1).cmp(&classic_first(&b.1)))
                     .then_with(|| a.1.id.cmp(&b.1.id))
             });
-            return fallback.into_iter()
+            return fallback
+                .into_iter()
                 .take(limit)
-                .map(|(score, case)| SearchResult { case, score, matched_keywords: vec![] })
+                .map(|(score, case)| SearchResult {
+                    case,
+                    score,
+                    matched_keywords: vec![],
+                })
                 .collect();
         }
-        scored.into_iter()
+        scored
+            .into_iter()
             .take(limit)
-            .map(|(score, case)| { let mk = self.matched_keywords(&case, &keywords); SearchResult { case, score, matched_keywords: mk } })
+            .map(|(score, case)| {
+                let mk = self.matched_keywords(&case, &keywords);
+                SearchResult {
+                    case,
+                    score,
+                    matched_keywords: mk,
+                }
+            })
             .collect()
     }
 
     /// 结构化查询：按字段精确/范围过滤。
-    pub(crate) fn _query_structured(&self, filters: _SearchFilters, limit: usize) -> Vec<EthicalCase> {
+    pub(crate) fn _query_structured(
+        &self,
+        filters: _SearchFilters,
+        limit: usize,
+    ) -> Vec<EthicalCase> {
         let cases = self.cases.read().unwrap_or_else(|e| e.into_inner());
-        cases.values()
+        cases
+            .values()
             .filter(|c| self.passes_filters(c, &filters))
             .take(limit)
             .cloned()
@@ -255,10 +302,18 @@ impl CaseBase {
     pub fn analogical_reasoning(&self, scenario: &str, limit: usize) -> Vec<AnalogicalResult> {
         // 简化：复用搜索 + 额外映射分析
         let results = self.search(scenario, limit * 2, _SearchFilters::default());
-        results.into_iter().take(limit).map(|r| {
-            let mapping = self.analyze_mapping(scenario, &r.case);
-            AnalogicalResult { case: r.case, similarity: r.score, mapping }
-        }).collect()
+        results
+            .into_iter()
+            .take(limit)
+            .map(|r| {
+                let mapping = self.analyze_mapping(scenario, &r.case);
+                AnalogicalResult {
+                    case: r.case,
+                    similarity: r.score,
+                    mapping,
+                }
+            })
+            .collect()
     }
 
     // 内部方法
@@ -266,13 +321,20 @@ impl CaseBase {
         // 启发式：基于关键词匹配
         let text = format!("{} {}", case.title, case.description).to_lowercase();
         if text.contains("autonomy") || text.contains("consent") || text.contains("choice") {
-            if text.contains("harm") || text.contains("hurt") { return ConflictType::AutonomyVsNonMaleficence; }
-            if text.contains("benefit") || text.contains("help") { return ConflictType::AutonomyVsBeneficence; }
+            if text.contains("harm") || text.contains("hurt") {
+                return ConflictType::AutonomyVsNonMaleficence;
+            }
+            if text.contains("benefit") || text.contains("help") {
+                return ConflictType::AutonomyVsBeneficence;
+            }
         }
-        if text.contains("privacy") && (text.contains("security") || text.contains("surveillance")) {
+        if text.contains("privacy") && (text.contains("security") || text.contains("surveillance"))
+        {
             return ConflictType::PrivacyVsSecurity;
         }
-        if text.contains("fair") && text.contains("efficient") { return ConflictType::FairnessVsEfficiency; }
+        if text.contains("fair") && text.contains("efficient") {
+            return ConflictType::FairnessVsEfficiency;
+        }
         if text.contains("ai") || text.contains("algorithm") || text.contains("model") {
             return ConflictType::HumanVsAIAgency;
         }
@@ -312,13 +374,21 @@ impl CaseBase {
         let mut score = 0.0;
         let text = format!("{} {} {}", case.title, case.description, case.reasoning).to_lowercase();
         for kw in keywords {
-            if text.contains(kw) { score += 1.0; }
+            if text.contains(kw) {
+                score += 1.0;
+            }
         }
         // 价值观/冲突类型匹配加权
         for v in &case.values_in_conflict {
-            if keywords.contains(v) { score += 2.0; }
+            if keywords.contains(v) {
+                score += 2.0;
+            }
         }
-        if format!("{:?}", case.conflict_type).to_lowercase().split(|c: char| !c.is_alphanumeric()).any(|w| keywords.contains(w)) {
+        if format!("{:?}", case.conflict_type)
+            .to_lowercase()
+            .split(|c: char| !c.is_alphanumeric())
+            .any(|w| keywords.contains(w))
+        {
             score += 1.5;
         }
         score * (1.0 + severity_rank(&case.severity) as f64 * 0.2)
@@ -326,49 +396,125 @@ impl CaseBase {
 
     fn matched_keywords(&self, case: &EthicalCase, keywords: &HashSet<String>) -> Vec<String> {
         let text = format!("{} {} {}", case.title, case.description, case.reasoning).to_lowercase();
-        keywords.iter().filter(|kw| text.contains(*kw)).cloned().collect()
+        keywords
+            .iter()
+            .filter(|kw| text.contains(*kw))
+            .cloned()
+            .collect()
     }
 
     fn passes_filters(&self, case: &EthicalCase, filters: &_SearchFilters) -> bool {
-        if let Some(ref d) = filters.domain { if case.domain != *d { return false; } }
-        if let Some(ref ct) = filters.conflict_type { if case.conflict_type != *ct { return false; } }
-        if let Some(ref s) = filters.min_severity { if case.severity < *s { return false; } }
-        if let Some(ref src) = filters.source { if case.source != *src { return false; } }
-        if let Some(ref roles) = filters.stakeholder_roles { if !case.stakeholders.iter().any(|st| roles.contains(&st.role)) { return false; } }
-        if let Some(ref values) = filters.required_values { if !values.iter().all(|v| case.values_in_conflict.contains(v)) { return false; } }
+        if let Some(ref d) = filters.domain {
+            if case.domain != *d {
+                return false;
+            }
+        }
+        if let Some(ref ct) = filters.conflict_type {
+            if case.conflict_type != *ct {
+                return false;
+            }
+        }
+        if let Some(ref s) = filters.min_severity {
+            if case.severity < *s {
+                return false;
+            }
+        }
+        if let Some(ref src) = filters.source {
+            if case.source != *src {
+                return false;
+            }
+        }
+        if let Some(ref roles) = filters.stakeholder_roles {
+            if !case.stakeholders.iter().any(|st| roles.contains(&st.role)) {
+                return false;
+            }
+        }
+        if let Some(ref values) = filters.required_values {
+            if !values.iter().all(|v| case.values_in_conflict.contains(v)) {
+                return false;
+            }
+        }
         true
     }
 
     fn analyze_mapping(&self, _scenario: &str, case: &EthicalCase) -> String {
-        format!("场景与案例 '{}' 相似度高。共同价值观冲突：{:?}。建议参考该案例的推理：{}", case.title, case.values_in_conflict, case.reasoning)
+        format!(
+            "场景与案例 '{}' 相似度高。共同价值观冲突：{:?}。建议参考该案例的推理：{}",
+            case.title, case.values_in_conflict, case.reasoning
+        )
     }
 
     fn rebuild_indices(&self) {
         let mut indices = self.indices.write().unwrap_or_else(|e| e.into_inner());
         *indices = CaseIndices::default();
-        for case in self.cases.read().unwrap_or_else(|e| e.into_inner()).values() {
+        for case in self
+            .cases
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+        {
             self.index_case(&mut indices, case);
         }
     }
 
     fn index_case(&self, indices: &mut CaseIndices, case: &EthicalCase) {
-        indices.by_domain.entry(case.domain.clone()).or_default().insert(case.id.clone());
-        indices.by_conflict_type.entry(case.conflict_type.clone()).or_default().insert(case.id.clone());
-        indices.by_severity.entry(case.severity.clone()).or_default().insert(case.id.clone());
-        for v in &case.values_in_conflict { indices.by_value.entry(v.clone()).or_default().insert(case.id.clone()); }
-        for s in &case.stakeholders { indices.by_stakeholder_role.entry(s.role.clone()).or_default().insert(case.id.clone()); }
-        for t in &case.tags { indices.by_tag.entry(t.clone()).or_default().insert(case.id.clone()); }
-        indices.by_source.entry(case.source.clone()).or_default().insert(case.id.clone());
+        indices
+            .by_domain
+            .entry(case.domain.clone())
+            .or_default()
+            .insert(case.id.clone());
+        indices
+            .by_conflict_type
+            .entry(case.conflict_type.clone())
+            .or_default()
+            .insert(case.id.clone());
+        indices
+            .by_severity
+            .entry(case.severity.clone())
+            .or_default()
+            .insert(case.id.clone());
+        for v in &case.values_in_conflict {
+            indices
+                .by_value
+                .entry(v.clone())
+                .or_default()
+                .insert(case.id.clone());
+        }
+        for s in &case.stakeholders {
+            indices
+                .by_stakeholder_role
+                .entry(s.role.clone())
+                .or_default()
+                .insert(case.id.clone());
+        }
+        for t in &case.tags {
+            indices
+                .by_tag
+                .entry(t.clone())
+                .or_default()
+                .insert(case.id.clone());
+        }
+        indices
+            .by_source
+            .entry(case.source.clone())
+            .or_default()
+            .insert(case.id.clone());
     }
 
     fn update_indices(&self, case: &EthicalCase) {
-        self.index_case(&mut self.indices.write().unwrap_or_else(|e| e.into_inner()), case);
+        self.index_case(
+            &mut self.indices.write().unwrap_or_else(|e| e.into_inner()),
+            case,
+        );
     }
 
     fn persist_case(&self, conn: &Connection, case: &EthicalCase) -> Result<(), String> {
         let json = serde_json::to_string(case).map_err(|e| e.to_string())?;
         let key = format!("case:{}", case.id);
-        { use crate::core::nt_core_kb_primitives::kv_set; kv_set(conn, NS_CASEBASE, &key, &json) }
+        {
+            use crate::core::nt_core_kb_primitives::kv_set;
+            kv_set(conn, NS_CASEBASE, &key, &json)
+        }
     }
 
     /// 注入种子案例（启动时自动运行）。
@@ -548,30 +694,50 @@ mod tests {
     #[test]
     fn test_casebase_seed_and_search() {
         let conn = mem_conn();
-        let cb = CaseBase::new(_CaseBaseConfig { seed_on_init: true, ..Default::default() });
+        let cb = CaseBase::new(_CaseBaseConfig {
+            seed_on_init: true,
+            ..Default::default()
+        });
         cb.load_from_kb(&conn).unwrap();
 
         let results = cb.search("电车 难题", 5, _SearchFilters::default());
         assert!(!results.is_empty());
-        assert!(results[0].case.id.contains("trolley"), "首条应为电车类案例, got {}", results[0].case.id);
+        assert!(
+            results[0].case.id.contains("trolley"),
+            "首条应为电车类案例, got {}",
+            results[0].case.id
+        );
         assert_eq!(results[0].case.severity, Severity::Critical);
     }
 
     #[test]
     fn test_analogical_reasoning() {
         let conn = mem_conn();
-        let cb = CaseBase::new(_CaseBaseConfig { seed_on_init: true, ..Default::default() });
+        let cb = CaseBase::new(_CaseBaseConfig {
+            seed_on_init: true,
+            ..Default::default()
+        });
         cb.load_from_kb(&conn).unwrap();
 
-        let results = cb.analogical_reasoning("医生是否应该杀死一位健康的路人，摘取其器官救治五位濒死病人", 3);
+        let results = cb.analogical_reasoning(
+            "医生是否应该杀死一位健康的路人，摘取其器官救治五位濒死病人",
+            3,
+        );
         assert!(!results.is_empty(), "类比推理必须有候选");
-        assert_eq!(results[0].case.severity, Severity::Critical, "首条应为最高严重度案例");
+        assert_eq!(
+            results[0].case.severity,
+            Severity::Critical,
+            "首条应为最高严重度案例"
+        );
     }
 
     #[test]
     fn test_structured_query() {
         let conn = mem_conn();
-        let cb = CaseBase::new(_CaseBaseConfig { seed_on_init: true, ..Default::default() });
+        let cb = CaseBase::new(_CaseBaseConfig {
+            seed_on_init: true,
+            ..Default::default()
+        });
         cb.load_from_kb(&conn).unwrap();
 
         let filters = _SearchFilters {
@@ -588,7 +754,10 @@ mod tests {
     #[test]
     fn test_case_persistence() {
         let conn = mem_conn();
-        let cb = CaseBase::new(_CaseBaseConfig { seed_on_init: false, ..Default::default() });
+        let cb = CaseBase::new(_CaseBaseConfig {
+            seed_on_init: false,
+            ..Default::default()
+        });
         let case = EthicalCase {
             id: "test_case".into(),
             title: "测试案例".into(),

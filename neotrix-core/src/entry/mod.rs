@@ -2091,7 +2091,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
         // 意识核心能力面: 命令面 (file/git/session/memory/crypto/...) 全部桥接为
         // NativeTool, LLM 意识核心智能调度; 人类只接触基础控制命令。
         let mut tools = mcp_registry.as_native_tools();
-        tools.extend(neotrix::l1_action::nt_io::nt_io_awareness_core::awareness_core_tools());
+        tools.extend(neotrix::l5_cognition::nt_core::nt_io_awareness_core::awareness_core_tools());
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
@@ -2197,7 +2197,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
         // 意识核心能力面: 命令面 (file/git/session/memory/crypto/...) 全部桥接为
         // NativeTool, LLM 意识核心智能调度; 人类只接触基础控制命令。
         let mut tools = mcp_registry.as_native_tools();
-        tools.extend(neotrix::l1_action::nt_io::nt_io_awareness_core::awareness_core_tools());
+        tools.extend(neotrix::l5_cognition::nt_core::nt_io_awareness_core::awareness_core_tools());
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {

@@ -10,3 +10,4 @@ pub mod neotrix_cli;
 pub mod proxy_pool;
 pub mod pty;
 pub mod unified;
+pub mod universal_commands;

@@ -300,7 +300,7 @@ mod tests {
             .map(|i| {
                 let q = make_vec(dim, i as u64 + 10);
                 let d = make_vec(dim, i as u64 + 100);
-//                 let teacher = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::cosine_similarity(&q, &d);
+                let teacher: f64 = q.iter().zip(d.iter()).map(|(a, b)| (*a as f64) * (*b as f64)).sum();
                 (q, d, teacher)
             })
             .collect();

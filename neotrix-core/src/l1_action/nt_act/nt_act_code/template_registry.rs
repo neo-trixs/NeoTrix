@@ -72,11 +72,18 @@ impl CodeTemplateRegistry {
 
     /// 获取某一分类的所有模板
     pub fn by_category(&self, category: TemplateCategory) -> Vec<&CodeTemplate> {
-        self.templates.iter().filter(|t| t.category == category).collect()
+        self.templates
+            .iter()
+            .filter(|t| t.category == category)
+            .collect()
     }
 
     /// 查找适用于某文件的模板
-    pub fn applicable_to(&self, file: &str, category: Option<TemplateCategory>) -> Vec<&CodeTemplate> {
+    pub fn applicable_to(
+        &self,
+        file: &str,
+        category: Option<TemplateCategory>,
+    ) -> Vec<&CodeTemplate> {
         let ext = file.rsplit('.').next().unwrap_or("");
         self.templates
             .iter()
@@ -180,7 +187,9 @@ mod tests {
         let reg = CodeTemplateRegistry::new();
         let apps = reg.applicable_to("foo.rs", None);
         assert!(!apps.is_empty());
-        assert!(apps.iter().all(|t| t.applicability.contains(&"rs".to_string())));
+        assert!(apps
+            .iter()
+            .all(|t| t.applicability.contains(&"rs".to_string())));
     }
 
     #[test]
@@ -196,7 +205,10 @@ mod tests {
             confidence: 0.5,
         };
         reg.register(t);
-        assert_eq!(reg.by_category(TemplateCategory::ImportOrganization).len(), 1);
+        assert_eq!(
+            reg.by_category(TemplateCategory::ImportOrganization).len(),
+            1
+        );
     }
 
     #[test]
@@ -213,7 +225,10 @@ mod tests {
         };
         reg.register(t1);
         assert_eq!(reg.by_category(TemplateCategory::TestStub).len(), 0);
-        assert_eq!(reg.by_category(TemplateCategory::ImportOrganization).len(), 1);
+        assert_eq!(
+            reg.by_category(TemplateCategory::ImportOrganization).len(),
+            1
+        );
     }
 
     #[test]

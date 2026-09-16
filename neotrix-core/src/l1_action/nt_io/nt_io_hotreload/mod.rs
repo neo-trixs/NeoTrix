@@ -229,7 +229,7 @@ impl HotReloadWatcher {
 #[cfg(feature = "stealth-net")]
 pub fn default_watcher(
     neotrix_dir: PathBuf,
-    rule_engine: Option<std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_shield_stealth_net::rules::RuleEngine>>>,
+    rule_engine: Option<Arc<tokio::sync::RwLock<crate::neotrix::nt_shield_stealth_net::rules::RuleEngine>>>,
     proxy_pool: Option<std::sync::Arc<crate::neotrix::nt_shield_stealth_net::proxy_pool::ProxyPool>>,
 ) -> std::io::Result<HotReloadWatcher> {
     let mut watcher = HotReloadWatcher::new(neotrix_dir.clone())?;

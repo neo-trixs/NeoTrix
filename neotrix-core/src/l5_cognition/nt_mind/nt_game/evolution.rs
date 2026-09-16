@@ -102,14 +102,24 @@ struct AutoTicTacToe {
 
 impl AutoTicTacToe {
     fn new() -> Self {
-        Self { board: [0; 9], turn: 0, terminal: false, winner: None }
+        Self {
+            board: [0; 9],
+            turn: 0,
+            terminal: false,
+            winner: None,
+        }
     }
 
     fn check(&mut self) {
         let lines = [
-            [0,1,2],[3,4,5],[6,7,8],
-            [0,3,6],[1,4,7],[2,5,8],
-            [0,4,8],[2,4,6],
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            [0, 4, 8],
+            [2, 4, 6],
         ];
         for line in lines {
             let a = self.board[line[0]];
@@ -134,7 +144,11 @@ impl AutoGame for AutoTicTacToe {
     }
 
     fn step(&mut self, action: &Action) -> StepResult {
-        let target = action.params.get("pos").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let target = action
+            .params
+            .get("pos")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
         if target < 9 && self.board[target] == 0 {
             self.board[target] = if self.turn % 2 == 0 { 1 } else { 2 };
             self.turn += 1;
@@ -164,8 +178,12 @@ impl AutoGame for AutoTicTacToe {
     }
 
     fn legal_actions(&self, player: u32) -> Vec<Action> {
-        if self.terminal { return vec![]; }
-        self.board.iter().enumerate()
+        if self.terminal {
+            return vec![];
+        }
+        self.board
+            .iter()
+            .enumerate()
             .filter(|(_, &v)| v == 0)
             .map(|(i, _)| Action {
                 kind: "Place".into(),
@@ -175,7 +193,9 @@ impl AutoGame for AutoTicTacToe {
             .collect()
     }
 
-    fn is_terminal(&self) -> bool { self.terminal }
+    fn is_terminal(&self) -> bool {
+        self.terminal
+    }
 
     fn reward(&self, player: u32) -> f64 {
         match self.winner {
@@ -190,7 +210,9 @@ impl AutoGame for AutoTicTacToe {
         filled / 9.0
     }
 
-    fn name(&self) -> &str { "HexTicTacToe" }
+    fn name(&self) -> &str {
+        "HexTicTacToe"
+    }
 
     fn board_hexagrams(&self) -> Vec<u8> {
         self.board.iter().map(|&v| v as u8 * 10).collect()
@@ -208,16 +230,25 @@ struct Auto2048 {
 
 impl Auto2048 {
     fn new() -> Self {
-        let mut g = Self { board: [[0; 4]; 4], score: 0, terminal: false, rng: 0 };
+        let mut g = Self {
+            board: [[0; 4]; 4],
+            score: 0,
+            terminal: false,
+            rng: 0,
+        };
         g.spawn();
         g.spawn();
         g
     }
 
     fn spawn(&mut self) {
-        let empty: Vec<(usize, usize)> = (0..4).flat_map(|r| (0..4).map(move |c| (r, c)))
-            .filter(|&(r, c)| self.board[r][c] == 0).collect();
-        if empty.is_empty() { return; }
+        let empty: Vec<(usize, usize)> = (0..4)
+            .flat_map(|r| (0..4).map(move |c| (r, c)))
+            .filter(|&(r, c)| self.board[r][c] == 0)
+            .collect();
+        if empty.is_empty() {
+            return;
+        }
         self.rng = self.rng.wrapping_mul(6364136223846793005).wrapping_add(1);
         let idx = (self.rng >> 33) as usize % empty.len();
         let (r, c) = empty[idx];
@@ -229,20 +260,32 @@ impl Auto2048 {
         v.resize(4, 0);
         let mut score = 0u32;
         for i in 0..3 {
-            if v[i] == v[i + 1] && v[i] != 0 { v[i] *= 2; score += v[i]; v[i + 1] = 0; }
+            if v[i] == v[i + 1] && v[i] != 0 {
+                v[i] *= 2;
+                score += v[i];
+                v[i + 1] = 0;
+            }
         }
         let mut r: Vec<u32> = v.into_iter().filter(|&x| x != 0).collect();
         r.resize(4, 0);
-        for (i, &val) in r.iter().enumerate() { row[i] = val; }
+        for (i, &val) in r.iter().enumerate() {
+            row[i] = val;
+        }
         score
     }
 
     fn can_move(&self) -> bool {
         for r in 0..4 {
             for c in 0..4 {
-                if self.board[r][c] == 0 { return true; }
-                if c + 1 < 4 && self.board[r][c] == self.board[r][c + 1] { return true; }
-                if r + 1 < 4 && self.board[r][c] == self.board[r + 1][c] { return true; }
+                if self.board[r][c] == 0 {
+                    return true;
+                }
+                if c + 1 < 4 && self.board[r][c] == self.board[r][c + 1] {
+                    return true;
+                }
+                if r + 1 < 4 && self.board[r][c] == self.board[r + 1][c] {
+                    return true;
+                }
             }
         }
         false
@@ -250,14 +293,24 @@ impl Auto2048 {
 
     fn rotate(&mut self) {
         let b = self.board;
-        for r in 0..4 { for c in 0..4 { self.board[c][3 - r] = b[r][c]; } }
+        for r in 0..4 {
+            for c in 0..4 {
+                self.board[c][3 - r] = b[r][c];
+            }
+        }
     }
 
     fn move_dir(&mut self, dir: u8) -> u32 {
         let mut score = 0u32;
-        for _ in 0..dir { self.rotate(); }
-        for r in 0..4 { score += Self::slide(&mut self.board[r]); }
-        for _ in 0..(4 - dir) % 4 { self.rotate(); }
+        for _ in 0..dir {
+            self.rotate();
+        }
+        for r in 0..4 {
+            score += Self::slide(&mut self.board[r]);
+        }
+        for _ in 0..(4 - dir) % 4 {
+            self.rotate();
+        }
         score
     }
 }
@@ -274,23 +327,42 @@ impl AutoGame for Auto2048 {
 
     fn step(&mut self, action: &Action) -> StepResult {
         let dir = match action.kind.as_str() {
-            "Left" => 0, "Up" => 1, "Right" => 2, "Down" => 3, _ => 0,
+            "Left" => 0,
+            "Up" => 1,
+            "Right" => 2,
+            "Down" => 3,
+            _ => 0,
         };
         let old = self.board;
         let gain = self.move_dir(dir);
         if self.board == old {
             return StepResult {
-                observation: Observation { text: "no change".into(), legal_actions: vec![], hexagram: None, phi: None },
-                reward: 0.0, done: false, info: serde_json::json!({}),
+                observation: Observation {
+                    text: "no change".into(),
+                    legal_actions: vec![],
+                    hexagram: None,
+                    phi: None,
+                },
+                reward: 0.0,
+                done: false,
+                info: serde_json::json!({}),
             };
         }
         self.score += gain;
         self.spawn();
-        if !self.can_move() { self.terminal = true; }
+        if !self.can_move() {
+            self.terminal = true;
+        }
         StepResult {
             observation: Observation {
-                text: format!("2048 score={} max={}", self.score, self.board.iter().flatten().max().unwrap_or(&0)),
-                legal_actions: vec![], hexagram: Some((self.score as u8).min(63)), phi: None,
+                text: format!(
+                    "2048 score={} max={}",
+                    self.score,
+                    self.board.iter().flatten().max().unwrap_or(&0)
+                ),
+                legal_actions: vec![],
+                hexagram: Some((self.score as u8).min(63)),
+                phi: None,
             },
             reward: gain as f64 / 2048.0,
             done: self.terminal,
@@ -299,21 +371,38 @@ impl AutoGame for Auto2048 {
     }
 
     fn legal_actions(&self, player: u32) -> Vec<Action> {
-        if self.terminal { return vec![]; }
-        ["Left","Up","Right","Down"].iter().map(|d| Action {
-            kind: d.to_string(), params: serde_json::json!({}), actor_id: player,
-        }).collect()
+        if self.terminal {
+            return vec![];
+        }
+        ["Left", "Up", "Right", "Down"]
+            .iter()
+            .map(|d| Action {
+                kind: d.to_string(),
+                params: serde_json::json!({}),
+                actor_id: player,
+            })
+            .collect()
     }
 
-    fn is_terminal(&self) -> bool { self.terminal }
-    fn reward(&self, _player: u32) -> f64 { self.score as f64 / 10000.0 }
+    fn is_terminal(&self) -> bool {
+        self.terminal
+    }
+    fn reward(&self, _player: u32) -> f64 {
+        self.score as f64 / 10000.0
+    }
     fn phi(&self) -> f64 {
         let max = *self.board.iter().flatten().max().unwrap_or(&1) as f64;
         (max.log2() / 12.0).min(1.0)
     }
-    fn name(&self) -> &str { "2048" }
+    fn name(&self) -> &str {
+        "2048"
+    }
     fn board_hexagrams(&self) -> Vec<u8> {
-        self.board.iter().flatten().map(|&v| (v as u8).min(63)).collect()
+        self.board
+            .iter()
+            .flatten()
+            .map(|&v| (v as u8).min(63))
+            .collect()
     }
 }
 
@@ -350,9 +439,9 @@ impl AutoHexCrucible {
         let c = idx % self.grid;
         let mut out = Vec::new();
         let offsets = if r % 2 == 0 {
-            [(-1,-1),(-1,0),(0,-1),(0,1),(1,-1),(1,0)]
+            [(-1, -1), (-1, 0), (0, -1), (0, 1), (1, -1), (1, 0)]
         } else {
-            [(-1,0),(-1,1),(0,-1),(0,1),(1,0),(1,1)]
+            [(-1, 0), (-1, 1), (0, -1), (0, 1), (1, 0), (1, 1)]
         };
         for (dr, dc) in offsets {
             let nr = r as isize + dr;
@@ -364,18 +453,26 @@ impl AutoHexCrucible {
         out
     }
 
-    fn hamming(a: u8, b: u8) -> u32 { (a ^ b).count_ones() }
+    fn hamming(a: u8, b: u8) -> u32 {
+        (a ^ b).count_ones()
+    }
 
     fn compute_phi(&self) -> f64 {
         let mut total = 0u32;
         let n = self.grid * self.grid;
         for i in 0..n {
             for &j in &self.neighbors(i) {
-                if j > i { total += 6 - Self::hamming(self.cells[i], self.cells[j]); }
+                if j > i {
+                    total += 6 - Self::hamming(self.cells[i], self.cells[j]);
+                }
             }
         }
         let max = (n as u32) * 6;
-        if max == 0 { 0.0 } else { total as f64 / max as f64 }
+        if max == 0 {
+            0.0
+        } else {
+            total as f64 / max as f64
+        }
     }
 }
 
@@ -402,7 +499,11 @@ impl AutoGame for AutoHexCrucible {
 
     fn step(&mut self, action: &Action) -> StepResult {
         let player = self.turn % 2;
-        let target = action.params.get("target").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let target = action
+            .params
+            .get("target")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
         let n = self.grid * self.grid;
 
         match action.kind.as_str() {
@@ -413,8 +514,14 @@ impl AutoGame for AutoHexCrucible {
             }
             "Transform" if self.energy[player] >= 2.0 && target < n => {
                 self.energy[player] -= 2.0;
-                let line = action.params.get("line").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                if line < 6 { self.cells[target] ^= 1 << line; }
+                let line = action
+                    .params
+                    .get("line")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
+                if line < 6 {
+                    self.cells[target] ^= 1 << line;
+                }
             }
             "Pass" => {
                 self.energy[player] = (self.energy[player] + 1.0).min(10.0);
@@ -424,7 +531,9 @@ impl AutoGame for AutoHexCrucible {
 
         self.turn += 1;
         let max_turns = self.grid * self.grid * 2;
-        if self.turn >= max_turns { self.terminal = true; }
+        if self.turn >= max_turns {
+            self.terminal = true;
+        }
 
         let phi = self.compute_phi();
         StepResult {
@@ -441,28 +550,44 @@ impl AutoGame for AutoHexCrucible {
     }
 
     fn legal_actions(&self, player: u32) -> Vec<Action> {
-        if self.terminal { return vec![]; }
+        if self.terminal {
+            return vec![];
+        }
         let mut actions = Vec::new();
         let n = self.grid * self.grid;
-        actions.push(Action { kind: "Pass".into(), params: serde_json::json!({}), actor_id: player });
+        actions.push(Action {
+            kind: "Pass".into(),
+            params: serde_json::json!({}),
+            actor_id: player,
+        });
         if self.energy[player as usize] >= 1.0 {
             for i in 0..n {
                 if self.owners[i] == -1 {
-                    actions.push(Action { kind: "Claim".into(), params: serde_json::json!({"target": i}), actor_id: player });
+                    actions.push(Action {
+                        kind: "Claim".into(),
+                        params: serde_json::json!({"target": i}),
+                        actor_id: player,
+                    });
                 }
             }
         }
         if self.energy[player as usize] >= 2.0 {
             for i in 0..n {
                 for line in 0..6 {
-                    actions.push(Action { kind: "Transform".into(), params: serde_json::json!({"target": i, "line": line}), actor_id: player });
+                    actions.push(Action {
+                        kind: "Transform".into(),
+                        params: serde_json::json!({"target": i, "line": line}),
+                        actor_id: player,
+                    });
                 }
             }
         }
         actions
     }
 
-    fn is_terminal(&self) -> bool { self.terminal }
+    fn is_terminal(&self) -> bool {
+        self.terminal
+    }
 
     fn reward(&self, player: u32) -> f64 {
         let p = player as usize;
@@ -472,9 +597,15 @@ impl AutoGame for AutoHexCrucible {
         (territory_diff / max).clamp(-1.0, 1.0)
     }
 
-    fn phi(&self) -> f64 { self.compute_phi() }
-    fn name(&self) -> &str { "HexCrucible" }
-    fn board_hexagrams(&self) -> Vec<u8> { self.cells.clone() }
+    fn phi(&self) -> f64 {
+        self.compute_phi()
+    }
+    fn name(&self) -> &str {
+        "HexCrucible"
+    }
+    fn board_hexagrams(&self) -> Vec<u8> {
+        self.cells.clone()
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -542,46 +673,89 @@ impl GameEvolutionLoop {
             while !game.is_terminal() && steps < self.config.max_turns {
                 let player = (steps % 2) as u32;
                 let actions = game.legal_actions(player);
-                if actions.is_empty() { break; }
+                if actions.is_empty() {
+                    break;
+                }
 
                 // Simple policy: pick action based on seed (simulating a policy network)
                 let idx = ((ep_seed.wrapping_add(steps as u64)) % actions.len() as u64) as usize;
                 let result = game.step(&actions[idx]);
                 total_reward += result.reward;
-                total_phi += result.info.get("phi").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                total_phi += result
+                    .info
+                    .get("phi")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
                 steps += 1;
             }
 
             total_turns += steps as f64;
             let reward = game.reward(0);
-            if reward > 0.0 { wins += 1; }
-            else if reward < 0.0 { losses += 1; }
-            else { draws += 1; }
+            if reward > 0.0 {
+                wins += 1;
+            } else if reward < 0.0 {
+                losses += 1;
+            } else {
+                draws += 1;
+            }
 
             self.state.total_episodes += 1;
             self.state.total_steps += steps;
             self.difficulty_adjuster.record_episode(reward > 0.0);
         }
 
-        let win_rate = if episodes > 0 { wins as f64 / episodes as f64 } else { 0.0 };
-        let avg_reward = if episodes > 0 { total_reward / episodes as f64 } else { 0.0 };
-        let avg_turns = if episodes > 0 { total_turns / episodes as f64 } else { 0.0 };
-        let phi_avg = if episodes > 0 { total_phi / (episodes as f64 * avg_turns.max(1.0)) } else { 0.0 };
+        let win_rate = if episodes > 0 {
+            wins as f64 / episodes as f64
+        } else {
+            0.0
+        };
+        let avg_reward = if episodes > 0 {
+            total_reward / episodes as f64
+        } else {
+            0.0
+        };
+        let avg_turns = if episodes > 0 {
+            total_turns / episodes as f64
+        } else {
+            0.0
+        };
+        let phi_avg = if episodes > 0 {
+            total_phi / (episodes as f64 * avg_turns.max(1.0))
+        } else {
+            0.0
+        };
 
         self.phi_history.push(phi_avg);
-        if self.phi_history.len() > 100 { self.phi_history.remove(0); }
-        let phi_avg_stable: f64 = if self.phi_history.is_empty() { 0.0 }
-            else { self.phi_history.iter().sum::<f64>() / self.phi_history.len() as f64 };
+        if self.phi_history.len() > 100 {
+            self.phi_history.remove(0);
+        }
+        let phi_avg_stable: f64 = if self.phi_history.is_empty() {
+            0.0
+        } else {
+            self.phi_history.iter().sum::<f64>() / self.phi_history.len() as f64
+        };
 
         // Health: composite of win_rate + phi
         let health = (win_rate * 0.6 + phi_avg_stable * 0.4).clamp(0.0, 1.0);
         self.health_history.push(health);
-        if self.health_history.len() > 100 { self.health_history.remove(0); }
+        if self.health_history.len() > 100 {
+            self.health_history.remove(0);
+        }
 
         // Update scores
-        let best = self.state.constellation_scores.entry(constellation).or_insert(0.0);
-        if avg_reward > *best { *best = avg_reward; }
-        let ep_count = self.state.constellation_episodes.entry(constellation).or_insert(0);
+        let best = self
+            .state
+            .constellation_scores
+            .entry(constellation)
+            .or_insert(0.0);
+        if avg_reward > *best {
+            *best = avg_reward;
+        }
+        let ep_count = self
+            .state
+            .constellation_episodes
+            .entry(constellation)
+            .or_insert(0);
         *ep_count += episodes;
 
         // Check constellation advance
@@ -601,7 +775,9 @@ impl GameEvolutionLoop {
             constellation,
             game_name: Self::game_name(constellation).to_string(),
             episodes_played: episodes,
-            wins, losses, draws,
+            wins,
+            losses,
+            draws,
             avg_reward,
             avg_turns,
             win_rate,
@@ -613,9 +789,18 @@ impl GameEvolutionLoop {
     }
 
     pub fn should_advance(&self) -> bool {
-        if !self.config.auto_advance { return false; }
-        if self.state.current_constellation >= self.config.max_constellation { return false; }
-        let ep = self.state.constellation_episodes.get(&self.state.current_constellation).copied().unwrap_or(0);
+        if !self.config.auto_advance {
+            return false;
+        }
+        if self.state.current_constellation >= self.config.max_constellation {
+            return false;
+        }
+        let ep = self
+            .state
+            .constellation_episodes
+            .get(&self.state.current_constellation)
+            .copied()
+            .unwrap_or(0);
         ep >= self.config.min_episodes_before_advance
     }
 
@@ -631,10 +816,16 @@ impl GameEvolutionLoop {
 }
 
 fn timestamp() -> String {
-    let secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-    format!("{}-{:02}-{:02}T00:00:00Z", 1970 + (secs / 31_536_000) as u32,
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    format!(
+        "{}-{:02}-{:02}T00:00:00Z",
+        1970 + (secs / 31_536_000) as u32,
         ((secs % 31_536_000) / 2_592_000) as u32 + 1,
-        ((secs % 2_592_000) / 86_400) as u32 + 1)
+        ((secs % 2_592_000) / 86_400) as u32 + 1
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -654,7 +845,10 @@ mod tests {
 
     #[test]
     fn test_tick_runs() {
-        let mut evo = GameEvolutionLoop::new(GameEvolutionConfig { episodes_per_round: 3, ..Default::default() });
+        let mut evo = GameEvolutionLoop::new(GameEvolutionConfig {
+            episodes_per_round: 3,
+            ..Default::default()
+        });
         let report = evo.tick();
         assert_eq!(report.episodes_played, 3);
         assert!(report.avg_turns > 0.0);

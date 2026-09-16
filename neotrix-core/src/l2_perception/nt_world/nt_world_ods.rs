@@ -26,23 +26,12 @@ pub struct _OdsNode {
     pub body: String,
 }
 
-/// 开放文档系统解析器适配契约 (ODS 抽象)
-pub trait _OdsParserAdapter {
-    /// 探测输入内容的格式
-    fn detect_format(&self, content: &str) -> _OdsFormat;
-    /// 将内容解析为节点树
-    fn parse(&self, content: &str) -> Vec<_OdsNode>;
-    /// C2 接线: 将解析出的节点树写入 KB (Article 节点) 并触发 FTS5 索引。
-    /// 返回成功写入的节点 id 列表。
-    fn ingest_nodes(&self, kb: &dyn KnowledgeSink, content: &str) -> Result<Vec<String>, String>;
-}
-
 /// 默认 stub 实现
 #[derive(Default)]
 pub struct _OdsAdapter;
 
-impl _OdsParserAdapter for _OdsAdapter {
-    fn detect_format(&self, content: &str) -> _OdsFormat {
+impl _OdsAdapter {
+    pub fn detect_format(&self, content: &str) -> _OdsFormat {
         let head = content.lines().next().unwrap_or("").trim();
         if head.starts_with("# ") {
             _OdsFormat::Markdown
@@ -57,12 +46,7 @@ impl _OdsParserAdapter for _OdsAdapter {
         }
     }
 
-    /// Parse content into document nodes.
-    ///
-    /// **Not wired**: Returns a single node wrapping the entire content for known
-    /// formats. Real implementation requires format-specific parsers (e.g., pulldown-cmark
-    /// for Markdown, org-parser for Org) that produce granular section/heading nodes.
-    fn parse(&self, content: &str) -> Vec<_OdsNode> {
+    pub fn parse(&self, content: &str) -> Vec<_OdsNode> {
         match self.detect_format(content) {
             _OdsFormat::Unknown => Vec::new(),
             fmt => vec![_OdsNode {
@@ -73,7 +57,7 @@ impl _OdsParserAdapter for _OdsAdapter {
         }
     }
 
-    fn ingest_nodes(&self, kb: &dyn KnowledgeSink, content: &str) -> Result<Vec<String>, String> {
+    pub fn ingest_nodes(&self, kb: &dyn KnowledgeSink, content: &str) -> Result<Vec<String>, String> {
         let nodes = self.parse(content);
         let mut ids = Vec::with_capacity(nodes.len());
         for n in &nodes {
@@ -90,7 +74,6 @@ impl _OdsParserAdapter for _OdsAdapter {
         Ok(ids)
     }
 }
-
 /// SelfTest (T1): 格式探测 + 解析存在性
 pub struct _OdsSelfTest;
 

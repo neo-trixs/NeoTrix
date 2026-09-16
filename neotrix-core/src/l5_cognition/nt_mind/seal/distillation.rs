@@ -431,7 +431,7 @@ mod tests {
         let f = vec!["b", "c", "d"];
 
         let score =
-            compute_pattern_divergence(&s.iter().copied().collect(), &f.iter().copied().collect());
+            compute_pattern_divergence(&s, &f);
 
         assert!(score > 0.0);
         assert!(score < 1.0);

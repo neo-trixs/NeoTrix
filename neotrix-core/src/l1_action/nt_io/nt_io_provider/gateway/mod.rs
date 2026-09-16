@@ -18,8 +18,6 @@ pub mod observability;
 pub mod types;
 
 #[cfg(test)]
-use routing::AgentRoutingTable;
-#[cfg(test)]
 use super::routing::provider_swap::ProviderSwapManager;
 
 // ── Feature-gated ────────────────────────────────────────────
@@ -46,8 +44,9 @@ pub use execution::*;
 pub use observability::*;
 // 类型 & 注册表
 pub use types::*;
-// Feature-gated
+// Feature-gated — stub module, re-export kept for API compat
 #[cfg(feature = "stealth-net")]
+#[allow(unused_imports)]
 pub use stealth_middleware::*;
 
 /// 识别配额耗尽错误 — 与瞬时限速 (429) 区分 (freellmapi/aimux 模式)。
@@ -209,6 +208,7 @@ impl LlmProvider for GatewayV2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::l2_perception::nt_core_llm::{Usage, FinishReason, Message, Role};
 
     #[tokio::test]
     async fn test_gateway_selects_free_provider() {
@@ -1322,6 +1322,8 @@ mod tests {
 #[cfg(test)]
 mod provider_reliability_tests {
     use super::*;
+    use crate::core::l2_perception::nt_core_llm::{Usage, FinishReason, Message, Role};
+    use std::time::Duration;
 
     // ── ResponseCache (G: Response Caching) ─────────────────────────
 

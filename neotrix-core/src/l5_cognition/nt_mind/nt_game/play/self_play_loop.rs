@@ -3,14 +3,14 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::advantage::{AdvantageConfig, GameAdvantageEstimator};
-use super::buffer::GameTrajectoryBuffer;
-use super::grpo_adapter::GameGrpoAdapter;
-use super::scaling::{ScalingConfig, ScalingScheduler};
 use super::super::env::NtGameEnv;
 use super::super::framework::{
     Action, Actor, Arena, ArenaConfig, Episode, Rubric, Trajectory, TrajectoryStep, WinLossReward,
 };
+use super::advantage::{AdvantageConfig, GameAdvantageEstimator};
+use super::buffer::GameTrajectoryBuffer;
+use super::grpo_adapter::GameGrpoAdapter;
+use super::scaling::{ScalingConfig, ScalingScheduler};
 
 // ═══════════════════════════════════════════════════════════════════
 // Config
@@ -294,6 +294,7 @@ impl SelfPlayLoop {
 mod tests {
     use super::*;
     use crate::l5_cognition::nt_mind::nt_game::env::{Difficulty, GameMeta, GameState, RenderMode};
+    use crate::l5_cognition::nt_mind::nt_game::{Observation, StepResult};
     use std::collections::HashMap;
 
     /// A trivial environment that always returns a win for the first player
@@ -464,9 +465,7 @@ mod tests {
         };
         let mut loop_ = SelfPlayLoop::new(config);
 
-        let factory = |seed: u64| -> Box<dyn NtGameEnv> {
-            Box::new(DummyEnv::new(2))
-        };
+        let factory = |seed: u64| -> Box<dyn NtGameEnv> { Box::new(DummyEnv::new(2)) };
 
         let report = loop_.run(&factory, 3);
         assert_eq!(report.metrics_history.len(), 3);

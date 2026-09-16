@@ -12,8 +12,7 @@ pub mod nt_act_orchestrator;
 // Code-related actions
 pub mod nt_act_code;
 
-// Goal management
-pub mod nt_act_goal;
+// Goal management — migrated to l5_cognition/nt_goal/ (cognitive/RL modules)
 
 // Autonomy and self-evolution
 pub mod nt_act_autonomy;
@@ -23,9 +22,14 @@ pub mod nt_act_crypto;
 
 // Types module
 pub mod nt_act_types;
+pub mod acp_protocol;
+pub mod async_tool_executor;
 
 // Voice commands
 pub mod nt_act_voice;
+
+// Tool contracts
+pub mod tool_contract;
 
 // ============================================================================
 // Backward-compat re-exports
@@ -36,6 +40,9 @@ pub use actions::security::disk_guard as nt_act_disk_guard;
 pub use actions::media::media as nt_act_media;
 pub use actions::security::sandbox as nt_act_sandbox;
 pub use actions::security::security as nt_act_security;
+
+pub mod deferred_loader;
+pub use deferred_loader::DeferredLoader;
 
 pub mod resource_budget;
 pub mod temporal_continuity;
@@ -60,3 +67,5 @@ pub mod video_audit_trail;
 
 // Re-exports for cross-module integration
 pub use reference_view::ReferenceManager;
+pub use acp_protocol::AcpProtocol;
+pub use async_tool_executor::AsyncToolExecutor;

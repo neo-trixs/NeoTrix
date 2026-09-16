@@ -58,24 +58,6 @@ impl _ContrastivePair {
     }
 }
 
-/// GenCAD 核心接口: CAD 几何 → 图像渲染 → 对比检索 KB。
-pub trait _GenCadRetrieval {
-    /// 将 CAD 几何渲染为图像 (C0: 仅生成占位尺寸, 真实走 rasterizer)。
-    fn render(&self, geo: &_CadGeometry) -> _RenderedImage;
-
-    /// 将几何编码为向量 (C0: 基于命令 token 哈希的统计向量)。
-    fn encode_geometry(&self, geo: &_CadGeometry) -> Vec<f32>;
-
-    /// 将图像编码为向量 (C0: 基于尺寸/通道的统计向量)。
-    fn encode_image(&self, img: &_RenderedImage) -> Vec<f32>;
-
-    /// 将一对 (几何, 图像) 写入 KB FTS5 对比索引。
-    fn index_into_kb(&self, pair: _ContrastivePair) -> Result<(), String>;
-
-    /// 给定查询几何, 在 KB 中检索最相似的图像向量对 (返回 alignment 降序)。
-    fn retrieve(&self, query: &_CadGeometry) -> Vec<_ContrastivePair>;
-}
-
 /// C0 基础实现 — 全部逻辑本地可运行, 不依赖外部模型。
 #[derive(Default)]
 pub struct _GenCadCore {
@@ -94,11 +76,8 @@ impl _GenCadCore {
     pub fn is_empty(&self) -> bool {
         self.store.is_empty()
     }
-}
 
-impl _GenCadRetrieval for _GenCadCore {
-    fn render(&self, geo: &_CadGeometry) -> _RenderedImage {
-        // C0 stub: 尺寸由维度推导, 真实应走几何栅格化。
+    pub fn render(&self, geo: &_CadGeometry) -> _RenderedImage {
         let (w, h) = if geo.dim == 2 { (256, 256) } else { (512, 512) };
         _RenderedImage {
             width: w,
@@ -107,7 +86,7 @@ impl _GenCadRetrieval for _GenCadCore {
         }
     }
 
-    fn encode_geometry(&self, geo: &_CadGeometry) -> Vec<f32> {
+    pub fn encode_geometry(&self, geo: &_CadGeometry) -> Vec<f32> {
         let mut v = vec![0.0f32; 8];
         for c in geo.commands.iter() {
             let h = simple_hash(c) as usize % 8;
@@ -118,7 +97,7 @@ impl _GenCadRetrieval for _GenCadCore {
         v
     }
 
-    fn encode_image(&self, img: &_RenderedImage) -> Vec<f32> {
+    pub fn encode_image(&self, img: &_RenderedImage) -> Vec<f32> {
         let mut v = vec![0.0f32; 8];
         v[0] = img.width as f32 / 512.0;
         v[1] = img.height as f32 / 512.0;
@@ -126,20 +105,17 @@ impl _GenCadRetrieval for _GenCadCore {
         v
     }
 
-    fn index_into_kb(&self, pair: _ContrastivePair) -> Result<(), String> {
+    pub fn index_into_kb(&self, pair: _ContrastivePair) -> Result<(), String> {
         if pair.geometry_vec.len() != pair.image_vec.len() {
             return Err("geometry/image vector dim mismatch".into());
         }
         if pair.geometry_id.is_empty() {
             return Err("empty geometry_id".into());
         }
-        // C0 stub: no KB persistence implemented.
-        // Returns error instead of fabricated success — callers must not assume
-        // the pair was indexed. Real path requires KB FTS5 write (C2+ integration).
         Err("not wired: GenCAD index_into_kb — KB FTS5 persistence not implemented (C0 stub)".into())
     }
 
-    fn retrieve(&self, query: &_CadGeometry) -> Vec<_ContrastivePair> {
+    pub fn retrieve(&self, query: &_CadGeometry) -> Vec<_ContrastivePair> {
         let q = self.encode_geometry(query);
         let mut scored: Vec<(f32, _ContrastivePair)> = self
             .store

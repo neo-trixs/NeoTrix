@@ -113,6 +113,20 @@ pub struct SystemMetrics {
     pub timestamp: i64,
 }
 
+impl crate::l5_cognition::traits::SystemMetricsApi for SystemMetrics {
+    fn new_system_metrics(
+        success_rate: f64,
+        avg_tokens: f64,
+        skill_hit_rate: f64,
+        crystallization_rate: f64,
+        knowledge_retention: f64,
+        error_recovery_rate: f64,
+        timestamp: i64,
+    ) -> Self {
+        SystemMetrics { success_rate, avg_tokens, skill_hit_rate, crystallization_rate, knowledge_retention, error_recovery_rate, timestamp }
+    }
+}
+
 /// 指标趋势
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricTrend {

@@ -1,5 +1,5 @@
 use crate::l5_cognition::nt_mind::trend_analyzer::{TrendDirection, TrendReport};
-use crate::neotrix::nt_act_goal::goal_generator::{EvolutionGoal, GoalCategory, GoalPriority};
+use crate::l5_cognition::nt_goal::goal_generator::{EvolutionGoal, GoalCategory, GoalPriority};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MetaGoalCategory {
@@ -187,7 +187,7 @@ impl Default for MetaGoalGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_act_autonomy::trend_analyzer::Trend;
+    use crate::l5_cognition::nt_mind::trend_analyzer::Trend;
 
     fn declining_report() -> TrendReport {
         TrendReport {

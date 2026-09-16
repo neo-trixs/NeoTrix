@@ -556,7 +556,7 @@ mod tests {
             plan: RepairPlan {
                 strategy: "Patch".into(),
                 steps: vec![],
-                risk: RiskAssessment { level: RiskLevel::Medium, impact: "".into(), mitigations: vec![], rollback_plan: "".into() },
+                risk: RiskAssessment { level: RepairRiskLevel::Medium, impact: "".into(), mitigations: vec![], rollback_plan: "".into() },
                 rollback_point: None,
                 confidence: 0.8,
                 source_pattern: None,
@@ -584,7 +584,7 @@ mod tests {
             plan: RepairPlan {
                 strategy: "Patch".into(),
                 steps: vec![],
-                risk: RiskAssessment { level: RiskLevel::Medium, impact: "".into(), mitigations: vec![], rollback_plan: "".into() },
+                risk: RiskAssessment { level: RepairRiskLevel::Medium, impact: "".into(), mitigations: vec![], rollback_plan: "".into() },
                 rollback_point: None,
                 confidence: 0.6,
                 source_pattern: None,

@@ -26,7 +26,9 @@ pub struct CognitiveEye {
 
 impl CognitiveEye {
     pub fn new() -> Self {
-        Self { blind_spots: Vec::new() }
+        Self {
+            blind_spots: Vec::new(),
+        }
     }
 }
 

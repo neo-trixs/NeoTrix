@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use crate::core::nt_core_cap::CapabilityVector;
 use crate::core::nt_core_bank::ReasoningMemory;
+use crate::core::nt_core_cap::CapabilityVector;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 
@@ -34,10 +34,10 @@ impl HebbianUpdater {
         }
     }
 
-//     pub(crate) fn _compute_forget_gate(&self, memory: &ReasoningMemory, state: &SelectiveState) -> f64 {
-//         let sim = self._memory_state_similarity(memory, state);
-//         (sim + self.forget_gate_bias).clamp(0.1, 0.99)
-//     }
+    //     pub(crate) fn _compute_forget_gate(&self, memory: &ReasoningMemory, state: &SelectiveState) -> f64 {
+    //         let sim = self._memory_state_similarity(memory, state);
+    //         (sim + self.forget_gate_bias).clamp(0.1, 0.99)
+    //     }
 
     pub(crate) fn _compute_input_gate(&self, memory: &ReasoningMemory) -> f64 {
         let reward_gate = (memory.reward + self.input_gate_bias).clamp(0.01, 0.99);
@@ -45,25 +45,22 @@ impl HebbianUpdater {
         (reward_gate * success_boost).clamp(0.01, 0.99)
     }
 
-//     pub(crate) fn _memory_state_similarity(&self, memory: &ReasoningMemory, _state: &SelectiveState) -> f64 {
-//         if let Some(ref emb) = memory.embedding {
-//             let avg = emb.iter().take(self.dim.min(emb.len())).map(|x| x.abs()).sum::<f64>()
-//                 / self.dim.min(emb.len()) as f64;
-//             avg.clamp(0.0, 1.0)
-//         } else {
-//             0.3
-//         }
-//     }
+    //     pub(crate) fn _memory_state_similarity(&self, memory: &ReasoningMemory, _state: &SelectiveState) -> f64 {
+    //         if let Some(ref emb) = memory.embedding {
+    //             let avg = emb.iter().take(self.dim.min(emb.len())).map(|x| x.abs()).sum::<f64>()
+    //                 / self.dim.min(emb.len()) as f64;
+    //             avg.clamp(0.0, 1.0)
+    //         } else {
+    //             0.3
+    //         }
+    //     }
 
     /// Compute Hebbian consolidation delta for a reasoning memory.
     ///
     /// Returns 0.0 as a conservative no-op: without SelectiveState integration,
     /// we cannot compute meaningful weight updates. Real implementation would
     /// use input gate to modulate reward signal into capability vectors.
-    pub fn hebbian_step(
-        &self,
-        memory: &ReasoningMemory,
-    ) -> f64 {
+    pub fn hebbian_step(&self, memory: &ReasoningMemory) -> f64 {
         // Without SelectiveState, we can only compute the input gate contribution.
         // This gives a non-zero signal based on memory reward, but no full Hebbian update.
         let gate = self._compute_input_gate(memory);
@@ -79,8 +76,12 @@ impl HebbianUpdater {
             (Self::pad_or_truncate(k, n), Self::pad_or_truncate(v, n))
         } else {
             let base = memory.reward;
-            let k: Vec<f64> = (0..n).map(|i| base * (0.5 + (i as f64 / n as f64) * 0.5)).collect();
-            let v: Vec<f64> = (0..n).map(|i| base * (1.0 - (i as f64 / n as f64) * 0.5)).collect();
+            let k: Vec<f64> = (0..n)
+                .map(|i| base * (0.5 + (i as f64 / n as f64) * 0.5))
+                .collect();
+            let v: Vec<f64> = (0..n)
+                .map(|i| base * (1.0 - (i as f64 / n as f64) * 0.5))
+                .collect();
             (k, v)
         }
     }
@@ -100,26 +101,23 @@ impl HebbianUpdater {
     /// Returns 0.0 as a conservative no-op: without SelectiveState, we cannot
     /// compute meaningful capability deltas. Real implementation would project
     /// memory embeddings into capability space and update weights.
-    pub fn consolidate_to_capability(
-        &self,
-        capability: &mut CapabilityVector,
-    ) -> f64 {
+    pub fn consolidate_to_capability(&self, capability: &mut CapabilityVector) -> f64 {
         // Without SelectiveState, we cannot compute meaningful consolidation.
         // Return 0.0 to indicate no change was applied.
         let _ = capability;
         0.0
     }
 
-//     pub(crate) fn _add_transition_noise(&self, state: &mut SelectiveState, noise_level: f64) {
-//         if noise_level <= 0.0 {
-//             return;
-//         }
-//         for (i, h) in state.hidden.iter_mut().enumerate() {
-//             let pseudo = ((i * 2654435761) ^ (i << 13) ^ (i >> 7)) as f64 / usize::MAX as f64;
-//             let noise = (pseudo - 0.5) * 2.0 * noise_level;
-//             *h += noise;
-//         }
-//     }
+    //     pub(crate) fn _add_transition_noise(&self, state: &mut SelectiveState, noise_level: f64) {
+    //         if noise_level <= 0.0 {
+    //             return;
+    //         }
+    //         for (i, h) in state.hidden.iter_mut().enumerate() {
+    //             let pseudo = ((i * 2654435761) ^ (i << 13) ^ (i >> 7)) as f64 / usize::MAX as f64;
+    //             let noise = (pseudo - 0.5) * 2.0 * noise_level;
+    //             *h += noise;
+    //         }
+    //     }
 }
 
 #[cfg(test)]
@@ -167,7 +165,10 @@ mod tests {
         let updater = HebbianUpdater::new(23, 64);
         let low = updater._compute_input_gate(&dummy_memory(0.1, false, "low"));
         let high = updater._compute_input_gate(&dummy_memory(0.9, true, "high"));
-        assert!(high > low, "high-reward memory should have higher input gate");
+        assert!(
+            high > low,
+            "high-reward memory should have higher input gate"
+        );
     }
 
     #[test]

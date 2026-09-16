@@ -259,7 +259,7 @@ impl StealthHttpClient {
         pool.clear();
     }
 
-    pub(super) async fn auto_rotate_fingerprint(&self) {
+    pub(crate) async fn auto_rotate_fingerprint(&self) {
         if let Some(ref coord) = *self.coordinator.read().await {
             if coord.should_rotate(RotationDomain::HttpHeaders).await {
                 self.rotate_fingerprint().await;

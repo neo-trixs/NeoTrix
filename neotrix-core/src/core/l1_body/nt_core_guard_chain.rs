@@ -142,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deny_dominates_and_short_circuits() {
+    fn test_deny_dominates_and_short_circuits() -> Result<(), String> {
         let mut chain = GuardChain::new();
         chain.allow("first");
         chain.add("destructive", |tool, a| {
@@ -154,13 +154,19 @@ mod tests {
             }
             GuardVerdict::Allow
         });
-        // 第三个守卫标记为不可达 (应被短路) — 用 panic 验证短路
-        chain.add("should_be_skipped", |_, _| panic!("must not run"));
+        let skipped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let skipped2 = skipped.clone();
+        chain.add("should_be_skipped", move |_, _| {
+            skipped2.store(true, std::sync::atomic::Ordering::SeqCst);
+            GuardVerdict::Deny
+        });
         let (verdict, reasons) = chain.evaluate("execute_command", &args("rm -rf /"));
+        assert!(!skipped.load(std::sync::atomic::Ordering::SeqCst), "third guard should not run");
         assert_eq!(verdict, GuardVerdict::Deny);
         assert!(!verdict.is_allowed());
         assert_eq!(reasons.len(), 1);
         assert!(reasons[0].contains("destructive"));
+        Ok(())
     }
 
     #[test]

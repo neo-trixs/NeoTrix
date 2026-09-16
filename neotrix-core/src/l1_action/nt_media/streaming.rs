@@ -181,6 +181,9 @@ pub struct StreamingPipelineConfig {
     pub verify_sha256: Option<String>,
     pub stall_timeout: Duration,
     pub max_retries: u32,
+    pub atomic_write: bool,
+    pub min_disk_space: u64,
+    pub mirror_fallback_enabled: bool,
 }
 
 impl Default for StreamingPipelineConfig {
@@ -201,6 +204,9 @@ impl Default for StreamingPipelineConfig {
             verify_sha256: None,
             stall_timeout: Duration::from_secs(30),
             max_retries: 6,
+            atomic_write: false,
+            min_disk_space: 1024 * 1024 * 1024,
+            mirror_fallback_enabled: true,
         }
     }
 }
@@ -751,6 +757,13 @@ pub struct RetryPolicy {
 
 impl RetryPolicy {
     pub fn new(max_retries: u32) -> Self {
+        Self {
+            max_retries,
+            base_delay: Duration::from_secs(1),
+        }
+    }
+
+    pub fn with_delay_table(max_retries: u32, _delay_table: Vec<Duration>) -> Self {
         Self {
             max_retries,
             base_delay: Duration::from_secs(1),
@@ -3075,8 +3088,9 @@ mod tests {
         }
 
         assert!(got_complete);
+        let output_path = handle.output_path().to_path_buf();
         handle.wait().await.ok();
-        let _ = fs::remove_file(handle.output_path()).await;
+        let _ = fs::remove_file(output_path).await;
     }
 
     #[tokio::test]

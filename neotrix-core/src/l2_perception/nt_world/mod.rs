@@ -71,14 +71,29 @@ pub mod asset_map;
 // NLP能力模块
 pub mod nt_nlp_capability;
 
+// OCR 能力模块
+pub mod ocr;
+
 // HuggingFace mirror speed profiling & adaptive resolution
 pub mod nt_world_mirror;
+
+// 社交平台访问层
+pub mod social_access;
 
 // 通用能力模块
 pub mod media_asset_registry;
 
 // 动态记忆库
 pub mod dynamic_memory_bank;
+
+// 代码库映射
+pub mod nt_world_repomap;
+
+// 函数恢复与反汇编
+pub mod function_recovery;
+
+// 控制流图构建
+pub mod cfg_builder;
 
 // 向后兼容别名
 pub use media_asset_registry::AssetRegistry;

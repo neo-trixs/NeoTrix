@@ -61,7 +61,12 @@ impl EditHistoryTracker {
                     .flatten()
             })
             .unwrap_or_default();
-        Self { path, entries, session_id, use_kb: true }
+        Self {
+            path,
+            entries,
+            session_id,
+            use_kb: true,
+        }
     }
 
     pub fn load_from_path(path: PathBuf) -> Self {
@@ -74,7 +79,12 @@ impl EditHistoryTracker {
         } else {
             Vec::new()
         };
-        Self { path, entries, session_id, use_kb: false }
+        Self {
+            path,
+            entries,
+            session_id,
+            use_kb: false,
+        }
     }
 
     /// 记录一次代码变更
@@ -112,7 +122,10 @@ impl EditHistoryTracker {
 
     /// 获取某一类型的所有编辑记录
     pub fn get_history_for_issue_type(&self, issue_type: &str) -> Vec<&EditEntry> {
-        self.entries.iter().filter(|e| e.issue_type == issue_type).collect()
+        self.entries
+            .iter()
+            .filter(|e| e.issue_type == issue_type)
+            .collect()
     }
 
     /// 获取最近的 N 条记录
@@ -244,7 +257,8 @@ mod tests {
     use std::path::PathBuf;
 
     fn tmp_tracker(name: &str) -> (EditHistoryTracker, PathBuf) {
-        let path = std::env::temp_dir().join(format!("neotrix_edit_{}_{}.json", name, std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("neotrix_edit_{}_{}.json", name, std::process::id()));
         (EditHistoryTracker::load_from_path(path.clone()), path)
     }
 
@@ -258,7 +272,9 @@ mod tests {
     #[test]
     fn test_record_change() {
         let (mut tracker, path) = tmp_tracker("change");
-        tracker.record_change("test.rs", "MissingTests", "old", "new", true).unwrap();
+        tracker
+            .record_change("test.rs", "MissingTests", "old", "new", true)
+            .unwrap();
         assert_eq!(tracker.len(), 1);
         let entry = &tracker.all_entries()[0];
         assert_eq!(entry.file, "test.rs");
@@ -270,7 +286,9 @@ mod tests {
     #[test]
     fn test_record_failure() {
         let (mut tracker, path) = tmp_tracker("fail");
-        tracker.record_change("test.rs", "CompileWarning", "old", "new_but_failed", false).unwrap();
+        tracker
+            .record_change("test.rs", "CompileWarning", "old", "new_but_failed", false)
+            .unwrap();
         let stats = tracker.file_stats();
         let f = stats.iter().find(|s| s.file == "test.rs").unwrap();
         assert_eq!(f.total_edits, 1);
@@ -293,19 +311,32 @@ mod tests {
     #[test]
     fn test_get_history_for_issue_type() {
         let (mut tracker, path) = tmp_tracker("hist_type");
-        tracker.record_change("a.rs", "MissingTests", "1", "2", true).unwrap();
-        tracker.record_change("b.rs", "CompileWarning", "1", "2", true).unwrap();
+        tracker
+            .record_change("a.rs", "MissingTests", "1", "2", true)
+            .unwrap();
+        tracker
+            .record_change("b.rs", "CompileWarning", "1", "2", true)
+            .unwrap();
         assert_eq!(tracker.get_history_for_issue_type("MissingTests").len(), 1);
-        assert_eq!(tracker.get_history_for_issue_type("CompileWarning").len(), 1);
+        assert_eq!(
+            tracker.get_history_for_issue_type("CompileWarning").len(),
+            1
+        );
         std::fs::remove_file(&path).ok();
     }
 
     #[test]
     fn test_file_stats_ordering() {
         let (mut tracker, path) = tmp_tracker("stats");
-        tracker.record_change("hot.rs", "A", "1", "2", true).unwrap();
-        tracker.record_change("hot.rs", "A", "2", "3", true).unwrap();
-        tracker.record_change("cold.rs", "B", "1", "2", true).unwrap();
+        tracker
+            .record_change("hot.rs", "A", "1", "2", true)
+            .unwrap();
+        tracker
+            .record_change("hot.rs", "A", "2", "3", true)
+            .unwrap();
+        tracker
+            .record_change("cold.rs", "B", "1", "2", true)
+            .unwrap();
         let stats = tracker.file_stats();
         assert!(stats[0].total_edits >= stats[1].total_edits);
         std::fs::remove_file(&path).ok();
@@ -314,10 +345,14 @@ mod tests {
     #[test]
     fn test_record_after_clear() {
         let (mut tracker, path) = tmp_tracker("clear");
-        tracker.record_change("test.rs", "A", "1", "2", true).unwrap();
+        tracker
+            .record_change("test.rs", "A", "1", "2", true)
+            .unwrap();
         tracker.clear().unwrap();
         assert!(tracker.is_empty());
-        tracker.record_change("test.rs", "A", "1", "2", true).unwrap();
+        tracker
+            .record_change("test.rs", "A", "1", "2", true)
+            .unwrap();
         assert_eq!(tracker.len(), 1);
         std::fs::remove_file(&path).ok();
     }

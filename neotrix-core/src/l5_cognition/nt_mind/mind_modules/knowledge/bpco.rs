@@ -13,14 +13,6 @@ pub struct _CriticFeedback {
     pub score: f64,
 }
 
-/// 最佳实践评论优化 trait (BPCO).
-pub trait _BestPracticeCritic {
-    /// 对生成文本给出评论反馈 (stub: 当前返回中性占位反馈)。
-    fn critique(&self, _generated: &str) -> _CriticFeedback;
-    /// 反馈是否通过质量标准 (stub: 默认通过)。
-    fn passes(&self, fb: &_CriticFeedback) -> bool;
-}
-
 /// BPCO critic 实现 (C0 结构 stub).
 pub struct _BpcoCritic {
     min_score: f64,
@@ -30,18 +22,8 @@ impl _BpcoCritic {
     pub fn new() -> Self {
         Self { min_score: 0.5 }
     }
-}
 
-impl Default for _BpcoCritic {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl _BestPracticeCritic for _BpcoCritic {
-    fn critique(&self, _generated: &str) -> _CriticFeedback {
-        // not wired: C0 structural stub — no real critic model connected.
-        // Returns explicit rejection signal instead of silent neutral placeholder.
+    pub fn critique(&self, _generated: &str) -> _CriticFeedback {
         _CriticFeedback {
             critiques: vec!["not wired: BPCO critic has no real model behind it — \
              cannot evaluate best-practice compliance"
@@ -50,8 +32,14 @@ impl _BestPracticeCritic for _BpcoCritic {
         }
     }
 
-    fn passes(&self, fb: &_CriticFeedback) -> bool {
+    pub fn passes(&self, fb: &_CriticFeedback) -> bool {
         fb.score >= self.min_score
+    }
+}
+
+impl Default for _BpcoCritic {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

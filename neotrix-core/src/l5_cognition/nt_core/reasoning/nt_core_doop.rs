@@ -15,21 +15,6 @@ pub struct _AnalysisPoint {
     pub points_to: Vec<String>,
 }
 
-/// 声明式指针/静态分析 trait。
-pub trait _PointerAnalysis {
-    /// 声明一个分析点并登记其初始指针集。
-    fn declare(&mut self, var: &str, points_to: &[&str]);
-    /// 查询某变量的声明式 points-to set, 无登记则空。
-    fn query_points_to(&self, var: &str) -> Vec<String>;
-    /// 合并两个变量的指针集 (传播/别名推导), 返回新增的别名数。
-    fn merge_alias(&mut self, a: &str, b: &str) -> usize;
-    /// 已登记变量数。
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
 /// doop 声明式指针分析实现。
 pub struct _DoopPointerAnalysis {
     points: HashMap<String, Vec<String>>,
@@ -41,16 +26,8 @@ impl _DoopPointerAnalysis {
             points: HashMap::new(),
         }
     }
-}
 
-impl Default for _DoopPointerAnalysis {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl _PointerAnalysis for _DoopPointerAnalysis {
-    fn declare(&mut self, var: &str, points_to: &[&str]) {
+    pub fn declare(&mut self, var: &str, points_to: &[&str]) {
         let entry = self
             .points
             .entry(var.to_string())
@@ -62,11 +39,11 @@ impl _PointerAnalysis for _DoopPointerAnalysis {
         }
     }
 
-    fn query_points_to(&self, var: &str) -> Vec<String> {
+    pub fn query_points_to(&self, var: &str) -> Vec<String> {
         self.points.get(var).cloned().unwrap_or_default()
     }
 
-    fn merge_alias(&mut self, a: &str, b: &str) -> usize {
+    pub fn merge_alias(&mut self, a: &str, b: &str) -> usize {
         let bset = self.points.get(b).cloned().unwrap_or_default();
         let entry = self.points.entry(a.to_string()).or_default();
         let before = entry.len();
@@ -78,8 +55,18 @@ impl _PointerAnalysis for _DoopPointerAnalysis {
         entry.len() - before
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.points.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl Default for _DoopPointerAnalysis {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

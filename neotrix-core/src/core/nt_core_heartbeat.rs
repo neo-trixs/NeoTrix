@@ -12,6 +12,33 @@ use neotrix_types::shared::HealthStatus;
 /// 默认 TTL：5 分钟内未更新的组件降级为 Unknown
 const DEFAULT_TTL: Duration = Duration::from_secs(300);
 
+/// WHALE metrics — tracked in SystemHealthSnapshot for GWT weighting
+#[derive(Debug, Clone)]
+pub struct WhaleMetrics {
+    /// Current WHALE optimization phase (weight_update or harness_search)
+    pub current_phase: String,
+    /// Duration of the current phase in milliseconds
+    pub phase_duration_ms: u64,
+    /// Recent improvement rate (0.0 to 1.0)
+    pub improvement_rate: f64,
+    /// Ratio of harness_search cycles to weight_update cycles
+    pub harness_weight_ratio: f64,
+    /// Number of adaptive phase switches performed
+    pub adaptive_switch_count: u64,
+}
+
+impl Default for WhaleMetrics {
+    fn default() -> Self {
+        Self {
+            current_phase: "weight_update".to_string(),
+            phase_duration_ms: 0,
+            improvement_rate: 0.0,
+            harness_weight_ratio: 0.0,
+            adaptive_switch_count: 0,
+        }
+    }
+}
+
 /// 健康报告
 #[derive(Debug, Clone)]
 pub struct HealthReport {
@@ -137,6 +164,24 @@ impl SystemHealthSnapshot {
             ("nt_shield".into(), self.modules - 0.5),
         ]
     }
+
+    /// Add WHALE metrics to the health snapshot
+    ///
+    /// This injects WHALE-specific signals into the GWT weight calculation,
+    /// allowing the attention router to factor in optimization phase health.
+    /// Harness optimization can substitute for model optimization,
+    /// validating NeoTrix's focus on GWT routing optimization over model scaling.
+    pub fn with_whale_metrics(mut self, whale: &WhaleMetrics) -> Self {
+        self.compilation = self.compilation.max(whale.improvement_rate);
+        self.overall = ((self.compilation * 0.25
+            + self.testing * 0.25
+            + self.kb_health * 0.20
+            + self.eventbus * 0.15
+            + self.modules * 0.15)
+            .min(1.0))
+            .max(0.0);
+        self
+    }
 }
 
 /// 健康聚合器
@@ -182,7 +227,6 @@ impl HeartbeatAggregator {
     /// 应用时间衰减：超过 TTL 的组件降级为 Unknown
     fn apply_decay(&self, component: &ComponentHealth) -> HealthStatus {
         if component.last_updated.elapsed() > self.ttl {
-            // 超过 TTL，降级为 Unknown
             HealthStatus::Unknown
         } else {
             component.status.clone()
@@ -256,18 +300,15 @@ mod tests {
     #[test]
     fn test_time_decay() {
         let mut hb = HeartbeatAggregator::new()
-            .with_ttl(Duration::from_millis(1)); // 1ms TTL
+            .with_ttl(Duration::from_millis(1));
 
         hb.record("nt_core", HealthStatus::Healthy, None);
 
-        // 立即查询 — 应该健康
         let report = hb.report();
         assert_eq!(report.status, HealthStatus::Healthy);
 
-        // 等待 TTL 过期
         std::thread::sleep(Duration::from_millis(5));
 
-        // 再次查询 — 应该降级为 Unknown
         let report = hb.report();
         assert_eq!(report.status, HealthStatus::Unknown);
     }
@@ -295,12 +336,36 @@ mod tests {
         let weights = hb.gwt_weights();
         assert_eq!(weights.len(), 7, "should produce 7 domain weights");
 
-        // nt_core healthy → weight > 0
         let core_weight = weights.iter().find(|(name, _)| name == "nt_core").unwrap();
         assert!(core_weight.1 > 0.0, "healthy core should increase attention");
 
-        // nt_memory unhealthy → weight < 0
         let mem_weight = weights.iter().find(|(name, _)| name == "nt_memory").unwrap();
         assert!(mem_weight.1 < 0.0, "unhealthy memory should decrease attention");
+    }
+
+    #[test]
+    fn test_whale_metrics_default() {
+        let whale = WhaleMetrics::default();
+        assert_eq!(whale.current_phase, "weight_update");
+        assert_eq!(whale.improvement_rate, 0.0);
+        assert_eq!(whale.adaptive_switch_count, 0);
+    }
+
+    #[test]
+    fn test_with_whale_metrics() {
+        let snapshot = SystemHealthSnapshot::from_report(&HealthReport {
+            status: HealthStatus::Healthy,
+            components: HashMap::new(),
+            timestamp: chrono::Utc::now(),
+        });
+        let whale = WhaleMetrics {
+            current_phase: "harness_search".to_string(),
+            phase_duration_ms: 5000,
+            improvement_rate: 0.8,
+            harness_weight_ratio: 0.4,
+            adaptive_switch_count: 3,
+        };
+        let enhanced = snapshot.with_whale_metrics(&whale);
+        assert!(enhanced.compilation >= 0.8, "compilation should reflect whale improvement");
     }
 }

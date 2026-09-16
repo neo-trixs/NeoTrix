@@ -5,12 +5,12 @@
 //!
 //! 零 LLM 依赖: 所有决策基于规则 + 历史模式 + 确定性模板
 
-use crate::neotrix::nt_act_code::code_writer::{CodeGenRequest, SelfCodeWriter, ActionPlan};
+use crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::{
+    DiagnoseActionPlan, EvolutionLoopProvider,
+};
+use crate::neotrix::nt_act_code::code_writer::{ActionPlan, CodeGenRequest, SelfCodeWriter};
 use crate::neotrix::nt_act_code::edit_history::EditHistoryTracker;
 use crate::neotrix::nt_act_code::safe_applier::SafeCodeApplier;
-use crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::{EvolutionLoopProvider, DiagnoseActionPlan};
-
-
 
 /// 单次管道执行结果
 #[derive(Debug)]
@@ -61,7 +61,10 @@ impl PipelineAutoFixer {
 
         // 2. 对高分项尝试代码生成
         for item in pq.as_slice() {
-            if matches!(item.plan, DiagnoseActionPlan::HumanDecision { .. } | DiagnoseActionPlan::NoAction { .. }) {
+            if matches!(
+                item.plan,
+                DiagnoseActionPlan::HumanDecision { .. } | DiagnoseActionPlan::NoAction { .. }
+            ) {
                 result.human_needed += 1;
                 continue;
             }
@@ -77,16 +80,32 @@ impl PipelineAutoFixer {
 
             let req = CodeGenRequest {
                 plan: match &item.plan {
-                    DiagnoseActionPlan::AddTestStub { file } => ActionPlan::AddTestStub { file: file.clone() },
+                    DiagnoseActionPlan::AddTestStub { file } => {
+                        ActionPlan::AddTestStub { file: file.clone() }
+                    }
                     DiagnoseActionPlan::RunCargoFix => ActionPlan::RunCargoFix,
-                    DiagnoseActionPlan::RemoveTodo { file } => ActionPlan::RemoveTodo { file: file.clone() },
-                    DiagnoseActionPlan::SplitLargeFile { file } => ActionPlan::SplitLargeFile { file: file.clone() },
-                    DiagnoseActionPlan::ReviewUnsafe { file } => ActionPlan::ReviewUnsafe { file: file.clone() },
-                    DiagnoseActionPlan::ReplaceUnwrap { file } => ActionPlan::ReplaceUnwrap { file: file.clone() },
-                    DiagnoseActionPlan::HumanDecision { reason, .. } => ActionPlan::HumanDecision { reason: reason.clone() },
-                    DiagnoseActionPlan::NoAction { reason } => ActionPlan::NoAction { reason: reason.clone() },
+                    DiagnoseActionPlan::RemoveTodo { file } => {
+                        ActionPlan::RemoveTodo { file: file.clone() }
+                    }
+                    DiagnoseActionPlan::SplitLargeFile { file } => {
+                        ActionPlan::SplitLargeFile { file: file.clone() }
+                    }
+                    DiagnoseActionPlan::ReviewUnsafe { file } => {
+                        ActionPlan::ReviewUnsafe { file: file.clone() }
+                    }
+                    DiagnoseActionPlan::ReplaceUnwrap { file } => {
+                        ActionPlan::ReplaceUnwrap { file: file.clone() }
+                    }
+                    DiagnoseActionPlan::HumanDecision { reason, .. } => ActionPlan::HumanDecision {
+                        reason: reason.clone(),
+                    },
+                    DiagnoseActionPlan::NoAction { reason } => ActionPlan::NoAction {
+                        reason: reason.clone(),
+                    },
                     DiagnoseActionPlan::AutoFix(s) => ActionPlan::NoAction { reason: s.clone() },
-                    DiagnoseActionPlan::ManualReview(s) => ActionPlan::HumanDecision { reason: s.clone() },
+                    DiagnoseActionPlan::ManualReview(s) => {
+                        ActionPlan::HumanDecision { reason: s.clone() }
+                    }
                     DiagnoseActionPlan::Skip(s) => ActionPlan::NoAction { reason: s.clone() },
                 },
                 file: file.to_string(),
@@ -105,19 +124,25 @@ impl PipelineAutoFixer {
 
             // 4. 安全应用
             let issue_type_str = format!("{:?}", item.issue.issue_type);
-            let apply_result = self.applier.safe_write(
-                &gen_result.file,
-                &gen_result.new_content,
-                &issue_type_str,
-            );
+            let apply_result =
+                self.applier
+                    .safe_write(&gen_result.file, &gen_result.new_content, &issue_type_str);
 
             if apply_result.success {
                 result.auto_applied += 1;
-                result.details.push(format!("✅ {}: 已{}", gen_result.file, gen_result.template_used.as_deref().unwrap_or("自动修复")));
+                result.details.push(format!(
+                    "✅ {}: 已{}",
+                    gen_result.file,
+                    gen_result.template_used.as_deref().unwrap_or("自动修复")
+                ));
                 el.on_fix_applied();
             } else {
                 result.auto_failed += 1;
-                result.details.push(format!("❌ {}: {}", gen_result.file, apply_result.error.unwrap_or_default()));
+                result.details.push(format!(
+                    "❌ {}: {}",
+                    gen_result.file,
+                    apply_result.error.unwrap_or_default()
+                ));
             }
         }
 
@@ -151,13 +176,19 @@ impl Default for PipelineAutoFixer {
 #[cfg(test)]
 mod tests {
     use super::*;
-//     use crate::l1_action::nt_act::nt_l1_shared_types::PrioritizedIssue;
+    use crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::{
+        PrioritizedIssue, ProjectSnapshotLite,
+    };
 
     struct MockEvolutionLoop {
         call_count: usize,
     }
 
     impl EvolutionLoopProvider for MockEvolutionLoop {
+        fn get_snapshot(&self) -> ProjectSnapshotLite {
+            ProjectSnapshotLite::default()
+        }
+
         fn self_diagnose(&mut self) -> (Vec<String>, Vec<PrioritizedIssue>) {
             self.call_count += 1;
             (vec![], vec![])

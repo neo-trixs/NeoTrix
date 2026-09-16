@@ -3,13 +3,14 @@
 mod tests {
     use crate::core::nt_core_knowledge::TaskType;
     use crate::core::nt_core_bank::{ReasoningBank, ReasoningMemory};
+    use crate::core::l1_body::nt_core_edit::SelfEdit;
     use crate::l5_cognition::nt_mind::nt_mind::self_edit::MicroEdit;
     use crate::l5_cognition::nt_mind::nt_mind::memory::MemoryTier;
 
     #[test]
     fn test_reasoning_bank_store_with_embedding() {
         let mut bank = ReasoningBank::new(10);
-        let _edit = crate::l5_cognition::nt_mind::SelfEdit {
+        let _edit = crate::core::l1_body::nt_core_edit::SelfEdit {
             task_type: TaskType::UIDesign,
             target_dimensions: vec!["typography".to_string()],
             adjustment_magnitude: 0.1,
@@ -59,7 +60,7 @@ mod tests {
     fn test_reasoning_bank_retrieve_fallback() {
         let mut bank = ReasoningBank::new(10);
 
-        let _edit = crate::l5_cognition::nt_mind::SelfEdit {
+        let _edit = crate::core::l1_body::nt_core_edit::SelfEdit {
             task_type: TaskType::UIDesign,
             target_dimensions: vec!["typography".to_string()],
             adjustment_magnitude: 0.1,
@@ -79,7 +80,7 @@ mod tests {
     #[test]
     fn test_reasoning_bank_store() {
         let mut bank = ReasoningBank::new(10);
-        let _edit = crate::l5_cognition::nt_mind::SelfEdit {
+        let _edit = crate::core::l1_body::nt_core_edit::SelfEdit {
             task_type: TaskType::UIDesign,
             target_dimensions: vec!["typography".to_string()],
             adjustment_magnitude: 0.1,
@@ -98,7 +99,7 @@ mod tests {
     #[test]
     fn test_reasoning_bank_capacity() {
         let mut bank = ReasoningBank::new(3);
-        let _edit = crate::l5_cognition::nt_mind::SelfEdit {
+        let _edit = crate::core::l1_body::nt_core_edit::SelfEdit {
             task_type: TaskType::UIDesign,
             target_dimensions: vec!["typography".to_string()],
             adjustment_magnitude: 0.1,
@@ -122,7 +123,7 @@ mod tests {
     #[test]
     fn test_reasoning_bank_get_successes() {
         let mut bank = ReasoningBank::new(10);
-        let _edit = crate::l5_cognition::nt_mind::SelfEdit {
+        let _edit = crate::core::l1_body::nt_core_edit::SelfEdit {
             task_type: TaskType::UIDesign,
             target_dimensions: vec!["typography".to_string()],
             adjustment_magnitude: 0.1,
@@ -144,7 +145,7 @@ mod tests {
     #[test]
     fn test_reasoning_bank_stats() {
         let mut bank = ReasoningBank::new(10);
-        let _edit = crate::l5_cognition::nt_mind::SelfEdit {
+        let _edit = crate::core::l1_body::nt_core_edit::SelfEdit {
             task_type: TaskType::UIDesign,
             target_dimensions: vec!["typography".to_string()],
             adjustment_magnitude: 0.1,
@@ -175,7 +176,7 @@ mod tests {
     #[test]
     fn test_reasoning_bank_retrieve_by_embedding_no_match() {
         let mut bank = ReasoningBank::new(10);
-        let _edit = crate::l5_cognition::nt_mind::SelfEdit {
+        let _edit = crate::core::l1_body::nt_core_edit::SelfEdit {
             task_type: TaskType::UIDesign,
             target_dimensions: vec!["typography".to_string()],
             adjustment_magnitude: 0.1,

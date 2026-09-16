@@ -928,7 +928,7 @@ impl BackgroundLoop {
 /// Lightweight inner state for concurrent handler access.
 pub struct BackgroundLoopHandle {
     brain: Arc<RwLock<SelfIteratingBrain>>,
-    bbrain: Option<std::sync::Arc<tokio::sync::RwLock<BMonitor>>>,
+    bbrain: Option<Arc<RwLock<BMonitor>>>,
     cleanup_engine: Option<CleanupEngine>,
     config: BackgroundConfig,
     goal_loop: GoalLoop,

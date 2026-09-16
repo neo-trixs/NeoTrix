@@ -311,13 +311,13 @@ mod tests {
             }
         }));
          let _ = bus.register(closure_capability(
-             "fs.write",
-             "写文件",
-             "{}",
-             "{}",
-             false,
-             |_| panic!("守卫拦截后不应执行"),
-         ));
+              "fs.write",
+              "写文件",
+              "{}",
+              "{}",
+              false,
+              |_| Err("守卫拦截后不应执行".to_string()),
+          ));
         let err = bus.dispatch("fs.write", "t", json!(null)).unwrap_err();
         assert!(err.contains("守卫[no_writes]"), "got: {err}");
     }

@@ -118,10 +118,10 @@ impl FingerprintManager {
             (Platform::IOS, Browser::Safari),
             (Platform::IOS, Browser::Chrome),
         ];
-        combos.into_iter().map(|(platform, nt_world_browse)| {
+        combos.into_iter().map(|(platform, stealth_browser)| {
             let cfg = SystemFingerprintConfig {
                 platform: Some(platform),
-                nt_world_browse: Some(nt_world_browse),
+                stealth_browser: Some(stealth_browser),
                 timezone: None,
                 locale: None,
                 h2_profile: None,
@@ -204,7 +204,7 @@ impl FingerprintManager {
         let safari_ver = format!("{}.2", 17 + (days_since_epoch / 90) as u32);
         let os = fp.platform.user_agent_os();
         let mobile = fp.platform.is_mobile();
-        match (fp.nt_world_browse, mobile) {
+        match (fp.stealth_browser, mobile) {
             (Browser::Chrome, false) => format!(
                 "Mozilla/5.0 ({}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{} Safari/537.36",
                 os, chrome_ver
@@ -264,15 +264,15 @@ impl FingerprintManager {
     pub fn _spawn_variant(&mut self) {
         let mut rng = rand::thread_rng();
         let platforms = Platform::all();
-        let nt_world_browses = Browser::all();
+        let stealth_browsers = Browser::all();
         let platform = platforms[rng.gen_range(0..platforms.len())];
-        let compat_nt_world_browses: Vec<&Browser> = nt_world_browses.iter()
+        let compat_stealth_browsers: Vec<&Browser> = stealth_browsers.iter()
             .filter(|b| b.compatible_platforms().contains(&platform))
             .collect();
-        let nt_world_browse = *compat_nt_world_browses[rng.gen_range(0..compat_nt_world_browses.len())];
+        let stealth_browser = *compat_stealth_browsers[rng.gen_range(0..compat_stealth_browsers.len())];
         let config = SystemFingerprintConfig {
             platform: Some(platform),
-            nt_world_browse: Some(nt_world_browse),
+            stealth_browser: Some(stealth_browser),
             timezone: None,
             locale: None,
             h2_profile: None,

@@ -34,6 +34,7 @@ use crate::cli::commands::skill_cmds::SkillCmd;
 use crate::cli::commands::provider_cmds::ProviderCmd;
 use crate::cli::commands::free_cmds::FreeCmd;
 use crate::cli::commands::kb_cmds::KbCmd;
+use crate::cli::commands::social_cmds::SocialCmd;
 use crate::cli::commands::wiki_cmds::WikiCmd;
 use crate::cli::commands::chain_cmds::ChainCmd;
 use crate::cli::commands::explore_cmds::ExploreCmd;
@@ -50,6 +51,7 @@ pub fn default_registry() -> CommandRegistry {
         std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
 
     // System
+    reg.register(Box::new(SocialCmd));
     reg.register(Box::new(HelpCmd));
     reg.register(Box::new(StatsCmd));
     reg.register(Box::new(ExitCmd));

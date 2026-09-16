@@ -53,18 +53,6 @@ pub struct CapabilityNode {
     pub weight: f32,
 }
 
-/// design-extract 核心接口: 模式提取 → 能力节点映射。
-pub trait _DesignPatternExtractor {
-    /// 从源文本 (代码/图序列化) 抽取候选模式 (C0: 基于关键词启发式)。
-    fn extract(&self, source: &str) -> Vec<_DesignPattern>;
-
-    /// 将一个模式映射为能力节点 (写入 KB 前的结构化表示)。
-    fn map_to_capability(&self, pattern: &_DesignPattern) -> CapabilityNode;
-
-    /// 批量映射并去重合并 (同名模式取最高置信度)。
-    fn build_mapping(&self, patterns: &[_DesignPattern]) -> Vec<CapabilityNode>;
-}
-
 /// C0 基础提取器 — 关键词启发式, 无需 AST 依赖即可编译运行。
 #[derive(Default)]
 pub struct _DesignExtractor {
@@ -82,10 +70,8 @@ impl _DesignExtractor {
         rules.insert("strategy".into(), "nt_core_kernel".into());
         Self { rules }
     }
-}
 
-impl _DesignPatternExtractor for _DesignExtractor {
-    fn extract(&self, source: &str) -> Vec<_DesignPattern> {
+    pub fn extract(&self, source: &str) -> Vec<_DesignPattern> {
         let lower = source.to_lowercase();
         let mut out = Vec::new();
         for kw in ["factory", "builder", "observer", "adapter", "strategy"] {
@@ -102,7 +88,7 @@ impl _DesignPatternExtractor for _DesignExtractor {
         out
     }
 
-    fn map_to_capability(&self, pattern: &_DesignPattern) -> CapabilityNode {
+    pub fn map_to_capability(&self, pattern: &_DesignPattern) -> CapabilityNode {
         let domain = self
             .rules
             .get(&pattern.name)
@@ -116,7 +102,7 @@ impl _DesignPatternExtractor for _DesignExtractor {
         }
     }
 
-    fn build_mapping(&self, patterns: &[_DesignPattern]) -> Vec<CapabilityNode> {
+    pub fn build_mapping(&self, patterns: &[_DesignPattern]) -> Vec<CapabilityNode> {
         let mut best: HashMap<String, _DesignPattern> = HashMap::new();
         for p in patterns {
             best.entry(p.name.clone())

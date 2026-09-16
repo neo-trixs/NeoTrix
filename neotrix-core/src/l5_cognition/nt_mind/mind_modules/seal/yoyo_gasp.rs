@@ -83,18 +83,6 @@ pub struct _AgentLineage {
     pub generation: u64,
 }
 
-/// 自进化编码智能体 — 五要素聚合 trait。
-///
-/// GASP→SEAL 映射语义内置: `awaken`=SEAL anchor, `crystallize_skill`=SEAL crystallize,
-/// `persist_memory`=SEAL distill, `log_stage`=SEAL self-test journal,
-/// `inherit`=SEAL lineage promote。
-pub trait _SelfEvolvingCodingAgent {
-    fn identity(&self) -> &_AgentIdentity;
-    fn awaken(&mut self);
-    fn crystallize_skill(&mut self, name: &str) -> AgentSkill;
-    fn inherit(&mut self, parent_id: &str) -> _AgentLineage;
-}
-
 /// yoyo-gasp 自进化编码智能体实现 (五要素全部入仓)。
 pub struct _YoyoGaspAgent {
     pub identity: _AgentIdentity,
@@ -128,17 +116,17 @@ impl _YoyoGaspAgent {
             && self.memory.kb_nodes > 0
             && !self.journal.entries.is_empty()
     }
-}
 
-impl _SelfEvolvingCodingAgent for _YoyoGaspAgent {
-    fn identity(&self) -> &_AgentIdentity {
+    pub fn identity(&self) -> &_AgentIdentity {
         &self.identity
     }
-    fn awaken(&mut self) {
+
+    pub fn awaken(&mut self) {
         self.identity.awaken();
         self.journal.append("awaken", "SEAL anchor — identity loaded");
     }
-    fn crystallize_skill(&mut self, name: &str) -> AgentSkill {
+
+    pub fn crystallize_skill(&mut self, name: &str) -> AgentSkill {
         let skill = AgentSkill {
             name: name.to_string(),
             promoted: true,
@@ -148,7 +136,8 @@ impl _SelfEvolvingCodingAgent for _YoyoGaspAgent {
             .append("crystallize", &format!("skill promoted: {}", name));
         skill
     }
-    fn inherit(&mut self, parent_id: &str) -> _AgentLineage {
+
+    pub fn inherit(&mut self, parent_id: &str) -> _AgentLineage {
         self.lineage = _AgentLineage {
             parent_id: Some(parent_id.to_string()),
             generation: self.lineage.generation + 1,

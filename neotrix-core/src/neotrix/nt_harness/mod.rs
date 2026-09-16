@@ -421,6 +421,7 @@ mod tests {
         };
         let report = TaskLoopReport {
             instruction: "合并价格表".into(),
+            routed_skill: "default".into(),
             allocations: vec![TaskAllocation {
                 task,
                 provider: AllocationProvider::Internal { node_id: "n1".into(), path: vec![], cost: 0.0 },

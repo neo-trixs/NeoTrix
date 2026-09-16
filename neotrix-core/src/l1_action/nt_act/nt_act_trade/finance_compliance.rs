@@ -10,6 +10,9 @@ use nt_core_capability_tree::{
 };
 use serde::{Deserialize, Serialize};
 
+// ── SSOT imports: RiskLevel 统一从 trade_core 引用 ──
+use super::trade_core::RiskLevel;
+
 /// Contract Review Result (FT05)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractReview {
@@ -110,13 +113,7 @@ pub struct RiskFlag {
     pub level: RiskLevel,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RiskLevel {
-    Low,
-    Medium,
-    High,
-    Critical,
-}
+// ── RiskLevel 已从 trade_core 导入 ──
 
 /// Letter of Credit Review
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -590,6 +587,7 @@ pub fn register_finance_compliance_capability(registry: &mut CapabilityRegistry)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_contract_review_approved() {
@@ -603,11 +601,13 @@ mod tests {
                 product: "Widget".into(),
                 qty: 1000,
                 unit_price: 50.0,
+                ..Default::default()
             }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "T/T 30% deposit, 70% against BL copy".into(),
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let policy = CompanyPolicy {
@@ -638,11 +638,13 @@ mod tests {
                 product: "Widget".into(),
                 qty: 1000,
                 unit_price: 50.0,
+                ..Default::default()
             }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "T/T 10% deposit, 90% against BL copy".into(), // Below 30%
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let policy = CompanyPolicy {
@@ -691,11 +693,13 @@ mod tests {
                 product: "Widget".into(),
                 qty: 1000,
                 unit_price: 50.0,
+                ..Default::default()
             }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "LC at sight".into(),
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let lc_text = r#"
@@ -733,7 +737,7 @@ mod tests {
 
     #[test]
     fn test_settlement_calculation() {
-        use super::super::full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
+        use super::super::full_cycle::{Contract, ContractItem};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -743,11 +747,13 @@ mod tests {
                 product: "Widget".into(),
                 qty: 1000,
                 unit_price: 50.0,
+                ..Default::default()
             }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "T/T 30% deposit, 70% against BL copy".into(),
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let collection = CollectionRecord {
@@ -779,11 +785,12 @@ mod tests {
             contract_id: "CONTRACT-1".into(),
             pi_number: "PI-1".into(),
             parties: ("Seller".into(), "Buyer".into()),
-            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0 }],
+            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0, ..Default::default() }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "LC at sight".into(),
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let lc_text = "LC Number: LC202612345\nAmount: USD 50,000.00\nIrrevocable LC at sight.\nDocuments: Commercial Invoice, Packing List, Bill of Lading.";
@@ -859,11 +866,12 @@ mod tests {
             contract_id: "CONTRACT-1".into(),
             pi_number: "PI-1".into(),
             parties: ("Seller".into(), "Buyer".into()),
-            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0 }],
+            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0, ..Default::default() }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "T/T 30% deposit".into(),
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let policy = CompanyPolicy {
@@ -915,11 +923,12 @@ mod tests {
             contract_id: "CONTRACT-1".into(),
             pi_number: "PI-1".into(),
             parties: ("Seller".into(), "Buyer".into()),
-            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0 }],
+            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0, ..Default::default() }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "LC at sight".into(),
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let collection = CollectionRecord {

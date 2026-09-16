@@ -71,27 +71,20 @@ fn is_ipv6(s: &str) -> bool {
     well_formed && groups_ok
 }
 
-/// IP/网络探测接口 (stub — 真实采集由 C2 接线实现).
-pub trait _IpProbeProvider: Send + Sync {
-    /// 探测本机/出口 IP.
-    fn probe_self(&self) -> Result<_IpProbe, String>;
-    /// 探测指定目标 IP 的 ASN/地理信息.
-    fn probe_target(&self, ip: &str) -> Result<_IpProbe, String>;
-}
 
-/// 离线探测 stub — 返回 fixture, 不发起网络请求 (C1 阶段).
-pub struct _OfflineIpProbe;
 
-impl _IpProbeProvider for _OfflineIpProbe {
-    fn probe_self(&self) -> Result<_IpProbe, String> {
+impl _OfflineIpProbe {
+    pub fn probe_self(&self) -> Result<_IpProbe, String> {
         Ok(_IpProbe::new("127.0.0.1"))
     }
-    fn probe_target(&self, ip: &str) -> Result<_IpProbe, String> {
+    pub fn probe_target(&self, ip: &str) -> Result<_IpProbe, String> {
         let mut p = _IpProbe::new(ip);
         p.asn = Some("AS0".to_string());
         Ok(p)
     }
 }
+
+pub struct _OfflineIpProbe;
 
 pub struct _MyIpSelfTest;
 impl SelfTest for _MyIpSelfTest {

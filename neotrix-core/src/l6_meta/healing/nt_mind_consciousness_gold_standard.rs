@@ -226,7 +226,11 @@ impl Default for ConsciousnessGoldStandard {
 }
 
 // L5 trait abstraction: GoldStandardApi (marker trait)
-impl crate::l5_cognition::traits::GoldStandardApi for ConsciousnessGoldStandard {}
+impl crate::l5_cognition::traits::GoldStandardApi for ConsciousnessGoldStandard {
+    fn new_gold_standard() -> Self {
+        ConsciousnessGoldStandard::new()
+    }
+}
 
 // ─── Internal helpers ───
 

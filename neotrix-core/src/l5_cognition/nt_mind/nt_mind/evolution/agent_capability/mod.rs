@@ -11,17 +11,15 @@
 //! 约束: 核心确定性管线 (nt_core_meta) 保持同步无运行时依赖, 外壳只在
 //! `nt_mind` 层做路由 — 不引入平行适配器模块 (R-P42)。
 
-use crate::core::nt_core_meta::{MetaCognitiveLoop, MetaCycleResult};
-use crate::core::nt_core_self::attention_head::{
-    AttentionDomain, AttentionManager,
-};
-use crate::l5_cognition::kb_facade::KnowledgeBase;
-use crate::core::nt_core_kb_types::NodeType;
-use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator;
-use crate::l5_cognition::l2_facade::{SearchResult, UnifiedSearch};
-use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
-use crate::core::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
 use super::co_evolution::{CoEvoConfig, CoEvolutionLoop};
+use crate::core::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
+use crate::core::nt_core_kb_types::NodeType;
+use crate::core::nt_core_meta::{MetaCognitiveLoop, MetaCycleResult};
+use crate::core::nt_core_self::attention_head::{AttentionDomain, AttentionManager};
+use crate::l5_cognition::kb_facade::KnowledgeBase;
+use crate::l5_cognition::l2_facade::{SearchResult, UnifiedSearch};
+use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 /// 记忆大脑能力类型 — agent 可按任务路由到具体能力。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -86,11 +84,7 @@ pub trait MemoryAgentCapability {
     ) -> Result<CapabilityOutcome, String>;
 
     /// 决策式检索 — adaptive 管线分类/打分/路由后按权限过滤。
-    fn capability_retrieve(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<CapabilityOutcome, String>;
+    fn capability_retrieve(&self, query: &str, limit: usize) -> Result<CapabilityOutcome, String>;
 
     /// 记忆巩固报告 — 当前库规模 + 结构信号。
     fn capability_consolidate(&self) -> Result<CapabilityOutcome, String>;
@@ -122,11 +116,7 @@ impl MemoryAgentCapability for MemoryAgent {
         Ok(CapabilityOutcome::Text(format!("node={}", id)))
     }
 
-    fn capability_retrieve(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<CapabilityOutcome, String> {
+    fn capability_retrieve(&self, query: &str, limit: usize) -> Result<CapabilityOutcome, String> {
         let nodes = self.kb.search_permission_aware(
             query,
             limit,
@@ -181,7 +171,10 @@ impl Default for RouteLearnerConfig {
 #[derive(Debug, Clone)]
 pub struct RouteLearner {
     /// domain → (agent → (success, attempts))
-    outcomes: std::collections::HashMap<AttentionDomain, std::collections::HashMap<&'static str, (u32, u32)>>,
+    outcomes: std::collections::HashMap<
+        AttentionDomain,
+        std::collections::HashMap<&'static str, (u32, u32)>,
+    >,
     /// 学习策略配置 (min_evidence 可调, 不再硬编码 3)
     pub config: RouteLearnerConfig,
 }
@@ -218,8 +211,12 @@ impl RouteLearner {
 
     /// 是否有足够证据覆盖静态映射 (该域某档案试过 ≥ min_evidence 次)。
     pub fn has_enough_evidence(&self, domain: AttentionDomain) -> bool {
-        self.outcomes.get(&domain)
-            .map(|m| m.values().any(|(_, attempts)| *attempts >= self.config.min_evidence))
+        self.outcomes
+            .get(&domain)
+            .map(|m| {
+                m.values()
+                    .any(|(_, attempts)| *attempts >= self.config.min_evidence)
+            })
             .unwrap_or(false)
     }
 
@@ -244,10 +241,7 @@ impl RouteLearner {
             .map(|(agent, (_, attempts))| (*agent, *attempts))
             .collect();
         if !under_evidence.is_empty() {
-            if let Some((least, _)) = under_evidence
-                .iter()
-                .min_by_key(|(_, attempts)| *attempts)
-            {
+            if let Some((least, _)) = under_evidence.iter().min_by_key(|(_, attempts)| *attempts) {
                 return least;
             }
         }
@@ -255,7 +249,9 @@ impl RouteLearner {
         map.iter()
             .filter(|(_, (_, attempts))| *attempts >= self.config.min_evidence)
             .max_by(|(_, (sa, ta)), (_, (sb, tb))| {
-                rate(sa, ta).partial_cmp(&rate(sb, tb)).unwrap_or(std::cmp::Ordering::Equal)
+                rate(sa, ta)
+                    .partial_cmp(&rate(sb, tb))
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(agent, _)| *agent)
             .unwrap_or(static_agent)
@@ -263,8 +259,13 @@ impl RouteLearner {
 
     /// 该域当前各档案成功率一览 (诊断/审计用)。
     pub fn rates(&self, domain: AttentionDomain) -> Vec<(&'static str, f64, u32)> {
-        self.outcomes.get(&domain)
-            .map(|m| m.iter().map(|(a, (s, t))| (*a, *s as f64 / (*t).max(1) as f64, *t)).collect())
+        self.outcomes
+            .get(&domain)
+            .map(|m| {
+                m.iter()
+                    .map(|(a, (s, t))| (*a, *s as f64 / (*t).max(1) as f64, *t))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -300,8 +301,8 @@ impl RouteLearner {
         let Some(json) = kb.load_route_learner()? else {
             return Ok(());
         };
-        let parsed: serde_json::Value = serde_json::from_str(&json)
-            .map_err(|e| format!("route_learner deserialize: {}", e))?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json).map_err(|e| format!("route_learner deserialize: {}", e))?;
         self.config = parsed
             .get("config")
             .and_then(|c| serde_json::from_value(c.clone()).ok())
@@ -504,7 +505,9 @@ impl DispatchTopology {
             let best_alt = rates
                 .iter()
                 .filter(|(a, _, t)| *a != *current && *t >= learner.config.min_evidence)
-                .max_by(|(_, ra, _), (_, rb, _)| ra.partial_cmp(rb).unwrap_or(std::cmp::Ordering::Equal));
+                .max_by(|(_, ra, _), (_, rb, _)| {
+                    ra.partial_cmp(rb).unwrap_or(std::cmp::Ordering::Equal)
+                });
             if let Some((candidate, candidate_rate, candidate_attempts)) = best_alt {
                 if *candidate_rate > current_rate + 0.15 {
                     repairs.push(TopologyRepair {
@@ -538,7 +541,14 @@ impl DispatchTopology {
         if failed.is_empty() {
             return repairs;
         }
-        let candidates = ["researcher", "explorer", "planner", "generalist", "verifier", "watcher"];
+        let candidates = [
+            "researcher",
+            "explorer",
+            "planner",
+            "generalist",
+            "verifier",
+            "watcher",
+        ];
         for (domain, current) in &self.edges {
             let current_failures = failed.iter().filter(|m| m.agent == *current).count();
             if current_failures == 0 {
@@ -601,8 +611,8 @@ impl DispatchTopology {
             "edges": edges,
             "revision": self.revision,
         });
-        let json = serde_json::to_string(&payload)
-            .map_err(|e| format!("topology serialize: {}", e))?;
+        let json =
+            serde_json::to_string(&payload).map_err(|e| format!("topology serialize: {}", e))?;
         kb.save_dispatch_topology(&json)
     }
 
@@ -611,8 +621,8 @@ impl DispatchTopology {
         let Some(json) = kb.load_dispatch_topology()? else {
             return Ok(());
         };
-        let parsed: serde_json::Value = serde_json::from_str(&json)
-            .map_err(|e| format!("topology deserialize: {}", e))?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json).map_err(|e| format!("topology deserialize: {}", e))?;
         self.revision = parsed.get("revision").and_then(|r| r.as_u64()).unwrap_or(0);
         if let Some(edges) = parsed.get("edges").and_then(|e| e.as_object()) {
             for (domain_key, agent) in edges {
@@ -709,36 +719,32 @@ impl AgentExecutor for ProductionAgentExecutor {
     fn execute(&self, agent: &str, task: &str) -> AgentExecutionOutcome {
         match agent {
             "researcher" => match self.search.search(task, 5) {
-                Ok(results) if !results.is_empty() => {
-                    AgentExecutionOutcome::Success(format!(
-                        "searched {} results (backend={})",
-                        results.len(),
-                        self.search.active_backend(),
-                    ))
-                }
+                Ok(results) if !results.is_empty() => AgentExecutionOutcome::Success(format!(
+                    "searched {} results (backend={})",
+                    results.len(),
+                    self.search.active_backend(),
+                )),
                 Ok(_) => AgentExecutionOutcome::NoOp("search returned no results".into()),
                 Err(e) => AgentExecutionOutcome::Failure(format!("search: {}", e)),
             },
             "explorer" => match self.memory.capability_retrieve(task, 5) {
-                Ok(CapabilityOutcome::Hits(n, first)) if n > 0 => {
-                    AgentExecutionOutcome::Success(format!("retrieved {} hits (first: {})", n, first))
-                }
+                Ok(CapabilityOutcome::Hits(n, first)) if n > 0 => AgentExecutionOutcome::Success(
+                    format!("retrieved {} hits (first: {})", n, first),
+                ),
                 Ok(_) => AgentExecutionOutcome::NoOp("no KB hits".into()),
                 Err(e) => AgentExecutionOutcome::Failure(format!("retrieve: {}", e)),
             },
             "verifier" => match self.memory.capability_evidence() {
-                Ok(CapabilityOutcome::Count(n)) => AgentExecutionOutcome::Success(format!(
-                    "evidence audit: {} sources traced",
-                    n
-                )),
+                Ok(CapabilityOutcome::Count(n)) => {
+                    AgentExecutionOutcome::Success(format!("evidence audit: {} sources traced", n))
+                }
                 Ok(_) => AgentExecutionOutcome::NoOp("evidence count unavailable".into()),
                 Err(e) => AgentExecutionOutcome::Failure(format!("evidence: {}", e)),
             },
             "watcher" => match self.memory.capability_consolidate() {
-                Ok(CapabilityOutcome::Count(n)) => AgentExecutionOutcome::Success(format!(
-                    "health probe: {} KB nodes",
-                    n
-                )),
+                Ok(CapabilityOutcome::Count(n)) => {
+                    AgentExecutionOutcome::Success(format!("health probe: {} KB nodes", n))
+                }
                 Ok(_) => AgentExecutionOutcome::NoOp("consolidate signal unavailable".into()),
                 Err(e) => AgentExecutionOutcome::Failure(format!("consolidate: {}", e)),
             },
@@ -750,7 +756,10 @@ impl AgentExecutor for ProductionAgentExecutor {
                 let e = self.memory.capability_evidence();
                 match (r, e) {
                     (Ok(CapabilityOutcome::Hits(n, _)), Ok(CapabilityOutcome::Count(m))) => {
-                        AgentExecutionOutcome::Success(format!("combined {} hits, {} evidence", n, m))
+                        AgentExecutionOutcome::Success(format!(
+                            "combined {} hits, {} evidence",
+                            n, m
+                        ))
                     }
                     (Err(err), _) => AgentExecutionOutcome::Failure(format!("retrieve: {}", err)),
                     _ => AgentExecutionOutcome::NoOp("no combined signal".into()),
@@ -769,23 +778,27 @@ impl AgentExecutor for ProductionAgentExecutor {
         task: &str,
         strategy: &str,
     ) -> AgentExecutionOutcome {
-        use crate::l5_cognition::nt_mind::nt_mind::evolution::co_evolution::{parse_strategy, strategy_name};
+        use crate::l5_cognition::nt_mind::nt_mind::evolution::co_evolution::{
+            parse_strategy, strategy_name,
+        };
         let strategy = strategy_name(strategy);
         match (agent, strategy) {
             ("explorer", "balanced") => self.execute(agent, task),
-            ("explorer", parsed) => match self
-                .memory
-                .kb
-                .search_with_confidence(task, parse_strategy(parsed), 5)
-            {
-                Ok(results) if !results.is_empty() => AgentExecutionOutcome::Success(format!(
-                    "retrieved {} hits (strategy={})",
-                    results.len(),
-                    parsed
-                )),
-                Ok(_) => AgentExecutionOutcome::NoOp("no KB hits".into()),
-                Err(e) => AgentExecutionOutcome::Failure(format!("retrieve: {}", e)),
-            },
+            ("explorer", parsed) => {
+                match self
+                    .memory
+                    .kb
+                    .search_with_confidence(task, parse_strategy(parsed), 5)
+                {
+                    Ok(results) if !results.is_empty() => AgentExecutionOutcome::Success(format!(
+                        "retrieved {} hits (strategy={})",
+                        results.len(),
+                        parsed
+                    )),
+                    Ok(_) => AgentExecutionOutcome::NoOp("no KB hits".into()),
+                    Err(e) => AgentExecutionOutcome::Failure(format!("retrieve: {}", e)),
+                }
+            }
             _ => self.execute(agent, task),
         }
     }
@@ -899,7 +912,8 @@ impl MetaAgentShell {
     pub fn route_with_hint(&self, task_hint: &str) -> Option<&'static str> {
         let dominant = self.attention.dominant_domain()?;
         if dominant == AttentionDomain::PatternMatch && !task_hint.trim().is_empty() {
-            let profile = crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::route(task_hint);
+            let profile =
+                crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::route(task_hint);
             // 仅接受 PatternMatch 语义内的细分 (researcher/explorer); 关键词
             // 路由若越界到其他域档案则退回注意力静态映射, 避免语义漂移。
             if profile.name == "researcher" || profile.name == "explorer" {
@@ -929,7 +943,8 @@ impl MetaAgentShell {
         // System1 直通单轮。行为差异即路由落地 (R-P79)。
         let alloc = self.attention.allocate_for_task(&self.task_type);
         let mut result = self.metacog.run_cycle();
-        if alloc.mode == crate::core::nt_core_self::attention_head::ThinkingMode::System2Deliberate {
+        if alloc.mode == crate::core::nt_core_self::attention_head::ThinkingMode::System2Deliberate
+        {
             result = self.metacog.run_cycle();
         }
         self.iterations_run += 1;
@@ -986,7 +1001,9 @@ impl MetaAgentShell {
     /// 行为 trace, 发现"当前组织不足"时改派单拓扑的边 (域→档案), 让组织自进化。
     /// 返回实际应用的修复列表 (空 = 当前组织仍足够)。
     pub fn audit_and_repair_topology(&mut self) -> Vec<TopologyRepair> {
-        let repairs = self.topology.audit_with_experience(&self.learner, &self.coevo, &self.task_type);
+        let repairs =
+            self.topology
+                .audit_with_experience(&self.learner, &self.coevo, &self.task_type);
         let mut applied = Vec::new();
         for repair in repairs {
             if self.topology.apply_repair(&repair) {
@@ -1036,22 +1053,49 @@ pub fn domains_for_goal(goal: &str) -> Vec<(AttentionDomain, f64)> {
         return vec![(AttentionDomain::SelfReflection, 0.2)];
     }
     let mut domains = Vec::new();
-    if has(&["research", "search", "研究", "搜索", "分析", "find", "aggregate"]) {
+    if has(&[
+        "research",
+        "search",
+        "研究",
+        "搜索",
+        "分析",
+        "find",
+        "aggregate",
+    ]) {
         domains.push((AttentionDomain::PatternMatch, 0.8));
         domains.push((AttentionDomain::SelfReflection, 0.4));
     }
-    if has(&["code", "implement", "fix", "refactor", "编码", "实现", "修复", "重构"]) {
+    if has(&[
+        "code",
+        "implement",
+        "fix",
+        "refactor",
+        "编码",
+        "实现",
+        "修复",
+        "重构",
+    ]) {
         domains.push((AttentionDomain::Code, 0.8));
         domains.push((AttentionDomain::ToolUse, 0.6));
     }
-    if has(&["design", "architecture", "plan", "方案", "架构", "设计", "规划"]) {
+    if has(&[
+        "design",
+        "architecture",
+        "plan",
+        "方案",
+        "架构",
+        "设计",
+        "规划",
+    ]) {
         domains.push((AttentionDomain::Planning, 0.8));
         domains.push((AttentionDomain::Creativity, 0.4));
     }
     if has(&["monitor", "watch", "health", "监控", "心跳", "巩固"]) {
         domains.push((AttentionDomain::Semantic, 0.7));
     }
-    if has(&["review", "verify", "audit", "rollback", "审查", "校验", "回滚"]) {
+    if has(&[
+        "review", "verify", "audit", "rollback", "审查", "校验", "回滚",
+    ]) {
         domains.push((AttentionDomain::RiskAssessment, 0.7));
         domains.push((AttentionDomain::SelfReflection, 0.5));
     }
@@ -1107,16 +1151,25 @@ pub fn branch_weakness(branch: &CapabilityBranch) -> f64 {
 /// 分支 → 注意力域映射 (P2 控制面) — 每个星系分支薄弱时应刺激哪些域。
 pub fn branch_attention_domains(kind: &BranchKind) -> Vec<AttentionDomain> {
     match kind {
-        BranchKind::Core => vec![AttentionDomain::SelfReflection, AttentionDomain::RiskAssessment],
+        BranchKind::Core => vec![
+            AttentionDomain::SelfReflection,
+            AttentionDomain::RiskAssessment,
+        ],
         BranchKind::Mind => vec![AttentionDomain::Creativity, AttentionDomain::Planning],
         BranchKind::Memory => vec![AttentionDomain::Semantic],
         BranchKind::World => vec![AttentionDomain::PatternMatch],
         BranchKind::Act => vec![AttentionDomain::GoalAlignment, AttentionDomain::ToolUse],
         BranchKind::Io => vec![AttentionDomain::Code, AttentionDomain::ToolUse],
-        BranchKind::Shield => vec![AttentionDomain::RiskAssessment, AttentionDomain::SelfReflection],
+        BranchKind::Shield => vec![
+            AttentionDomain::RiskAssessment,
+            AttentionDomain::SelfReflection,
+        ],
         BranchKind::Meta => vec![AttentionDomain::SelfReflection, AttentionDomain::Planning],
         BranchKind::Repair => vec![AttentionDomain::RiskAssessment, AttentionDomain::ToolUse],
-        BranchKind::Governance => vec![AttentionDomain::RiskAssessment, AttentionDomain::GoalAlignment],
+        BranchKind::Governance => vec![
+            AttentionDomain::RiskAssessment,
+            AttentionDomain::GoalAlignment,
+        ],
         BranchKind::Nexus => vec![AttentionDomain::Semantic, AttentionDomain::SelfReflection],
         BranchKind::Game => vec![AttentionDomain::Creativity, AttentionDomain::GoalAlignment],
     }
@@ -1244,9 +1297,7 @@ impl DialogueAbsorbBridge {
         };
         let mut experiences: Vec<DialogueExperience> = nodes
             .into_iter()
-            .filter(|n| {
-                n.node_type == NodeType::Session || n.title.starts_with("session-")
-            })
+            .filter(|n| n.node_type == NodeType::Session || n.title.starts_with("session-"))
             .filter(|n| n.importance >= self.min_importance)
             .map(|n| {
                 let content = n
@@ -1261,7 +1312,11 @@ impl DialogueAbsorbBridge {
                 }
             })
             .collect();
-        experiences.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal));
+        experiences.sort_by(|a, b| {
+            b.importance
+                .partial_cmp(&a.importance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         experiences.truncate(self.max_entries);
         experiences
     }
@@ -1274,21 +1329,40 @@ impl DialogueAbsorbBridge {
         let text = content.to_lowercase();
         let mut cv = crate::core::CapabilityVector::default();
         let keyword_dims: &[(&[&str], &str)] = &[
-            (&["test", "verify", "assert", "check", "unit"], "verification"),
-            (&["memory", "kb", "storage", "recall", "retriev"], "semantic_layer"),
-            (&["plan", "goal", "strategy", "schedule"], "compound_composition"),
+            (
+                &["test", "verify", "assert", "check", "unit"],
+                "verification",
+            ),
+            (
+                &["memory", "kb", "storage", "recall", "retriev"],
+                "semantic_layer",
+            ),
+            (
+                &["plan", "goal", "strategy", "schedule"],
+                "compound_composition",
+            ),
             (&["analy", "trace", "debug", "root cause"], "analysis"),
             (&["synthes", "summar", "distill", "abstract"], "synthesis"),
-            (&["seal", "iterate", "self-improve", "evolve", "absorb"], "experimental"),
-            (&["attention", "focus", "route", "domain"], "ai_native_states"),
+            (
+                &["seal", "iterate", "self-improve", "evolve", "absorb"],
+                "experimental",
+            ),
+            (
+                &["attention", "focus", "route", "domain"],
+                "ai_native_states",
+            ),
             (&["creative", "novel", "design", "style"], "creativity"),
             (&["document", "comment", "explain", "doc"], "accessibility"),
-            (&["conversation", "dialogue", "user", "prompt"], "inference_depth"),
+            (
+                &["conversation", "dialogue", "user", "prompt"],
+                "inference_depth",
+            ),
         ];
         for (kws, dim) in keyword_dims {
             let hits = kws.iter().filter(|k| text.contains(**k)).count();
             if hits > 0 {
-                let boost = (self.config.boost_base + self.config.boost_per_hit * hits as f64).min(self.config.boost_cap);
+                let boost = (self.config.boost_base + self.config.boost_per_hit * hits as f64)
+                    .min(self.config.boost_cap);
                 let _ = cv.set_field_by_name(dim, boost);
             }
         }
@@ -1330,9 +1404,9 @@ impl DialogueAbsorbBridge {
         let has_batch_signal = batch.arr().iter().any(|&v| v > 0.0);
         if !has_batch_signal {
             return DialogueAbsorbOutcome::empty();
-}
+        }
 
-// 实测能力差: 吸收前按 PerformanceEvaluator 打分 (D1/D2 行为化指标)。
+        // 实测能力差: 吸收前按 PerformanceEvaluator 打分 (D1/D2 行为化指标)。
         let before_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
             &brain.brain.capability,
@@ -1341,22 +1415,31 @@ impl DialogueAbsorbBridge {
         // ── 实例级: 每条经验内容感知吸收 ──
         let mut absorbed = 0usize;
         for (i, exp) in experiences.iter().enumerate() {
-            let custom_name = format!("dialogue:{}:{}", i, exp.title.chars().take(32).collect::<String>());
+            let custom_name = format!(
+                "dialogue:{}:{}",
+                i,
+                exp.title.chars().take(32).collect::<String>()
+            );
             let vector = self.derive_vector(&exp.content);
             let has_signal = vector.arr().iter().any(|&v| v > 0.0);
-            brain.brain.register_knowledge_source(&custom_name, vector.clone());
+            brain
+                .brain
+                .register_knowledge_source(&custom_name, vector.clone());
             if has_signal && brain.brain.absorb_from_custom(&custom_name) {
                 absorbed += 1;
             }
         }
 
         // ── 批次级: 原则级共振向量经 DialogueExperience 源吸收 ──
-        brain.brain.register_knowledge_source("dialogue:batch", batch.clone());
+        brain
+            .brain
+            .register_knowledge_source("dialogue:batch", batch.clone());
         let _ = brain.brain.absorb_from_custom("dialogue:batch");
 
         // ── Verify (EDV): 吸收前后性能对比, 能力下降则回滚 ──
         // 批评器返回是否接受 (未回滚); 不再丢弃 — 它是行为化成败的真信号。
-        let critic_accepted = brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
+        let critic_accepted =
+            brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
 
         // 实测后分: 批评器若回滚, after == before, 无增益。
         let after_score = PerformanceEvaluator::evaluate(
@@ -1411,9 +1494,9 @@ impl DialogueAbsorbBridge {
             // 无能力信号 → 标记已尝试, 无增益返回 (避免每次扫描同批死数据)。
             coevo.commit_absorb();
             return DialogueAbsorbOutcome::empty();
-}
+        }
 
-// 实测能力差: 吸收前打分 (D1/D2 行为化指标)。
+        // 实测能力差: 吸收前打分 (D1/D2 行为化指标)。
         let before_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
             &brain.brain.capability,
@@ -1425,18 +1508,23 @@ impl DialogueAbsorbBridge {
             let custom_name = format!("dispatch:{}:{}", m.id, m.agent);
             let vector = self.derive_dispatch_vector(&m.summary);
             let has_signal = vector.arr().iter().any(|&v| v > 0.0);
-            brain.brain.register_knowledge_source(&custom_name, vector.clone());
+            brain
+                .brain
+                .register_knowledge_source(&custom_name, vector.clone());
             if has_signal && brain.brain.absorb_from_custom(&custom_name) {
                 absorbed += 1;
             }
         }
 
         // ── 批次级: 原则级共振向量经 batch 源吸收 ──
-        brain.brain.register_knowledge_source("dispatch:batch", batch.clone());
+        brain
+            .brain
+            .register_knowledge_source("dispatch:batch", batch.clone());
         let _ = brain.brain.absorb_from_custom("dispatch:batch");
 
         // ── Verify (EDV): 吸收前后性能对比, 能力下降则回滚 ──
-        let critic_accepted = brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
+        let critic_accepted =
+            brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
 
         let after_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
@@ -1465,21 +1553,46 @@ impl DialogueAbsorbBridge {
         let text = content.to_lowercase();
         let mut cv = crate::core::CapabilityVector::default();
         let dispatch_dims: &[(&[&str], &str)] = &[
-            (&["route", "agent", "dispatch", "catalog"], "ai_native_states"),
-            (&["topology", "edge", "repair", "revision"], "compound_composition"),
-            (&["strategy", "bandit", "explor", "exploit", "epsilon"], "analysis"),
-            (&["retriev", "recall", "hit", "search", "kb", "searched"], "semantic_layer"),
+            (
+                &["route", "agent", "dispatch", "catalog"],
+                "ai_native_states",
+            ),
+            (
+                &["topology", "edge", "repair", "revision"],
+                "compound_composition",
+            ),
+            (
+                &["strategy", "bandit", "explor", "exploit", "epsilon"],
+                "analysis",
+            ),
+            (
+                &["retriev", "recall", "hit", "search", "kb", "searched"],
+                "semantic_layer",
+            ),
             (&["success", "found", "pass", "returned"], "verification"),
-            (&["fail", "error", "empty", "miss", "unavailable"], "quality_gates"),
-            (&["evolv", "co-evol", "memory", "graph", "absorb"], "experimental"),
+            (
+                &["fail", "error", "empty", "miss", "unavailable"],
+                "quality_gates",
+            ),
+            (
+                &["evolv", "co-evol", "memory", "graph", "absorb"],
+                "experimental",
+            ),
             (&["research", "study", "paper"], "inference_depth"),
-            (&["plan", "goal", "task", "strategy"], "compound_composition"),
-            (&["test", "assert", "verify", "audit", "evidence"], "verification"),
+            (
+                &["plan", "goal", "task", "strategy"],
+                "compound_composition",
+            ),
+            (
+                &["test", "assert", "verify", "audit", "evidence"],
+                "verification",
+            ),
         ];
         for (kws, dim) in dispatch_dims {
             let hits = kws.iter().filter(|k| text.contains(**k)).count();
             if hits > 0 {
-                let boost = (self.config.boost_base + self.config.boost_per_hit * hits as f64).min(self.config.boost_cap);
+                let boost = (self.config.boost_base + self.config.boost_per_hit * hits as f64)
+                    .min(self.config.boost_cap);
                 let _ = cv.set_field_by_name(dim, boost);
             }
         }
@@ -1495,21 +1608,52 @@ impl DialogueAbsorbBridge {
         let text = content.to_lowercase();
         let mut cv = crate::core::CapabilityVector::default();
         let research_dims: &[(&[&str], &str)] = &[
-            (&["search", "web", "online", "url", "http"], "semantic_layer"),
-            (&["paper", "arxiv", "research", "study", "report"], "inference_depth"),
-            (&["method", "approach", "technique", "algorithm"], "analysis"),
-            (&["synthes", "aggregate", "summary", "distill", "conclusion"], "synthesis"),
-            (&["evidence", "source", "cite", "reference", "verify"], "verification"),
-            (&["benchmark", "metric", "evaluate", "compare", "result"], "quality_gates"),
-            (&["finding", "insight", "discover", "trend", "pattern"], "ai_native_states"),
-            (&["domain", "field", "industry", "topic", "expert"], "domain_specificity"),
-            (&["collect", "gather", "mine", "scrape", "harvest"], "compound_composition"),
-            (&["open", "share", "collaborate", "community", "doc"], "accessibility"),
+            (
+                &["search", "web", "online", "url", "http"],
+                "semantic_layer",
+            ),
+            (
+                &["paper", "arxiv", "research", "study", "report"],
+                "inference_depth",
+            ),
+            (
+                &["method", "approach", "technique", "algorithm"],
+                "analysis",
+            ),
+            (
+                &["synthes", "aggregate", "summary", "distill", "conclusion"],
+                "synthesis",
+            ),
+            (
+                &["evidence", "source", "cite", "reference", "verify"],
+                "verification",
+            ),
+            (
+                &["benchmark", "metric", "evaluate", "compare", "result"],
+                "quality_gates",
+            ),
+            (
+                &["finding", "insight", "discover", "trend", "pattern"],
+                "ai_native_states",
+            ),
+            (
+                &["domain", "field", "industry", "topic", "expert"],
+                "domain_specificity",
+            ),
+            (
+                &["collect", "gather", "mine", "scrape", "harvest"],
+                "compound_composition",
+            ),
+            (
+                &["open", "share", "collaborate", "community", "doc"],
+                "accessibility",
+            ),
         ];
         for (kws, dim) in research_dims {
             let hits = kws.iter().filter(|k| text.contains(**k)).count();
             if hits > 0 {
-                let boost = (self.config.boost_base + self.config.boost_per_hit * hits as f64).min(self.config.boost_cap);
+                let boost = (self.config.boost_base + self.config.boost_per_hit * hits as f64)
+                    .min(self.config.boost_cap);
                 let _ = cv.set_field_by_name(dim, boost);
             }
         }
@@ -1565,7 +1709,11 @@ impl DialogueAbsorbBridge {
 
         // ── 蒸馏向量 (研究域内容感知) → custom source 吸收 ──
         let vector = self.derive_research_vector(distilled.trim());
-        let custom_name = format!("research:{}:{}", query.chars().take(24).collect::<String>(), absorbed);
+        let custom_name = format!(
+            "research:{}:{}",
+            query.chars().take(24).collect::<String>(),
+            absorbed
+        );
         brain.brain.register_knowledge_source(&custom_name, vector);
         let has_signal = brain.brain.absorb_from_custom(&custom_name);
 
@@ -1586,7 +1734,11 @@ impl DialogueAbsorbBridge {
             critic_accepted,
             score_before: before_score,
             score_after: after_score,
-            score_delta: if has_signal { after_score - before_score } else { 0.0 },
+            score_delta: if has_signal {
+                after_score - before_score
+            } else {
+                0.0
+            },
         }
     }
 
@@ -1626,7 +1778,9 @@ impl Default for MemoryAgent {
         match Self::try_new() {
             Ok(agent) => agent,
             Err(e) => {
-                tracing::warn!("MemoryAgent default fallback: KB open failed ({e}), returning empty agent");
+                tracing::warn!(
+                    "MemoryAgent default fallback: KB open failed ({e}), returning empty agent"
+                );
                 Self {
                     kb: std::sync::Arc::new(
                         KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))

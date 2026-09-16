@@ -17,14 +17,29 @@ pub enum DiagnoseActionPlan {
     AutoFix(String),
     ManualReview(String),
     Skip(String),
-    AddTestStub { file: String },
-    NoAction { reason: String },
+    AddTestStub {
+        file: String,
+    },
+    NoAction {
+        reason: String,
+    },
     RunCargoFix,
-    SplitLargeFile { file: String },
-    ReviewUnsafe { file: String },
-    ReplaceUnwrap { file: String },
-    RemoveTodo { file: String },
-    HumanDecision { reason: String, options: Vec<String> },
+    SplitLargeFile {
+        file: String,
+    },
+    ReviewUnsafe {
+        file: String,
+    },
+    ReplaceUnwrap {
+        file: String,
+    },
+    RemoveTodo {
+        file: String,
+    },
+    HumanDecision {
+        reason: String,
+        options: Vec<String>,
+    },
 }
 
 /// A prioritized diagnostic issue with score and action plan.

@@ -112,7 +112,11 @@ mod tests {
             d.observe(false, false, 2, 0.0, false, false);
         }
         let sig = d.observe(false, false, 2, 0.0, false, false);
-        assert!(matches!(sig, StagnationSignal::Pause(_, _)), "expected Pause, got {:?}", sig);
+        assert!(
+            matches!(sig, StagnationSignal::Pause(_, _)),
+            "expected Pause, got {:?}",
+            sig
+        );
     }
 
     /// 端到端集成测试: StagnationDetector → SelfIteratingBrain 全链路
@@ -132,11 +136,19 @@ mod tests {
         // 2. 用短任务跑几次 — 模拟无信息循环
         for i in 0..2 {
             let r = brain.run_seal_loop(&format!("task_{}", i), None, None);
-            assert!(r.is_ok(), "stagnation gate should return Ok, not Err at iter {}", i);
+            assert!(
+                r.is_ok(),
+                "stagnation gate should return Ok, not Err at iter {}",
+                i
+            );
         }
 
         // 3. 验证 iteration 正常增长
-        assert!(brain.iteration >= 2, "brain should have iterated >=2 times, got {}", brain.iteration);
+        assert!(
+            brain.iteration >= 2,
+            "brain should have iterated >=2 times, got {}",
+            brain.iteration
+        );
     }
 
     #[test]
@@ -153,12 +165,18 @@ mod tests {
         // absorb 事件应重置 stagnation
         d.observe(true, true, 0, 0.5, true, false);
         let stats = d.stats();
-        assert_eq!(stats.consecutive_no_absorb, 0,
-            "absorb should reset no-absorb counter");
-        assert_eq!(stats.consecutive_zero_reward, 0,
-            "absorb should reset zero-reward counter");
-        assert_eq!(stats.consecutive_minor_errors, 0,
-            "absorb should reset minor-errors counter");
+        assert_eq!(
+            stats.consecutive_no_absorb, 0,
+            "absorb should reset no-absorb counter"
+        );
+        assert_eq!(
+            stats.consecutive_zero_reward, 0,
+            "absorb should reset zero-reward counter"
+        );
+        assert_eq!(
+            stats.consecutive_minor_errors, 0,
+            "absorb should reset minor-errors counter"
+        );
     }
 
     /// 验证 evolve 级别的停滞场景: 所有维度=纯错误, 最终触发 Stop
@@ -176,11 +194,19 @@ mod tests {
         for i in 0..10 {
             let sig = d.observe(false, false, 0, 0.0, false, false);
             if let StagnationSignal::Stop(_) = sig {
-                assert!(i >= 4, "should stop after {}+ cycles, stopped at {}", d.stop_threshold, i);
+                assert!(
+                    i >= 4,
+                    "should stop after {}+ cycles, stopped at {}",
+                    d.stop_threshold,
+                    i
+                );
                 return;
             }
         }
-        panic!("should have stopped after {} no-absorb cycles", d.stop_threshold);
+        panic!(
+            "should have stopped after {} no-absorb cycles",
+            d.stop_threshold
+        );
     }
 
     // ═══ step-budget 吸收测试 (L1/L2/L4/L3) ═══
@@ -204,10 +230,17 @@ mod tests {
     fn test_observe_stage_dead_end() {
         let mut d = StagnationDetector::new();
         // A→B→C 三轮, 全程零产出 → DeadEnd
-        for (i, name) in ["A", "B", "C", "A", "B", "C", "A", "B", "C"].iter().enumerate() {
+        for (i, name) in ["A", "B", "C", "A", "B", "C", "A", "B", "C"]
+            .iter()
+            .enumerate()
+        {
             let insight = d.observe_stage(name, false); // 全程零产出
             if matches!(insight, StageInsight::DeadEnd(_)) {
-                assert!(i >= 8, "dead-end should fire at the repeated cycle, fired at {}", i);
+                assert!(
+                    i >= 8,
+                    "dead-end should fire at the repeated cycle, fired at {}",
+                    i
+                );
                 return;
             }
         }
@@ -240,8 +273,16 @@ mod tests {
             d.observe_stage("s", true);
         }
         let (rem_high, trend_high) = d.remaining_estimate(30.0);
-        assert!(trend_high >= 1.0, "all-produce trend should be >=1, got {}", trend_high);
-        assert!(rem_high >= 30, "all-produce remaining should be >= base, got {}", rem_high);
+        assert!(
+            trend_high >= 1.0,
+            "all-produce trend should be >=1, got {}",
+            trend_high
+        );
+        assert!(
+            rem_high >= 30,
+            "all-produce remaining should be >= base, got {}",
+            rem_high
+        );
 
         // 零产出 → trend ≈ 0, 剩余 ≈ 0
         let mut d2 = StagnationDetector::new();
@@ -249,8 +290,16 @@ mod tests {
             d2.observe_stage("s", false);
         }
         let (rem_low, trend_low) = d2.remaining_estimate(30.0);
-        assert!(trend_low < 0.1, "zero-produce trend should be ~0, got {}", trend_low);
-        assert!(rem_low <= 1, "zero-produce remaining should be ~0, got {}", rem_low);
+        assert!(
+            trend_low < 0.1,
+            "zero-produce trend should be ~0, got {}",
+            trend_low
+        );
+        assert!(
+            rem_low <= 1,
+            "zero-produce remaining should be ~0, got {}",
+            rem_low
+        );
     }
 
     /// 正常推进不误报: 全产出无重复 → 始终 None
@@ -259,7 +308,12 @@ mod tests {
         let mut d = StagnationDetector::new();
         for name in ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] {
             let insight = d.observe_stage(name, true);
-            assert_eq!(insight, StageInsight::None, "clean progress should be None, got {:?}", insight);
+            assert_eq!(
+                insight,
+                StageInsight::None,
+                "clean progress should be None, got {:?}",
+                insight
+            );
         }
     }
 
@@ -286,13 +340,21 @@ mod tests {
         for _ in 0..10 {
             d.observe_stage("s", true);
         }
-        assert!(d.validity() > 0.9, "all-produce validity should be high, got {}", d.validity());
+        assert!(
+            d.validity() > 0.9,
+            "all-produce validity should be high, got {}",
+            d.validity()
+        );
 
         let mut d2 = StagnationDetector::new();
         for _ in 0..10 {
             d2.observe_stage("s", false);
         }
-        assert!(d2.validity() < 0.1, "zero-produce validity should be low, got {}", d2.validity());
+        assert!(
+            d2.validity() < 0.1,
+            "zero-produce validity should be low, got {}",
+            d2.validity()
+        );
     }
 
     /// TIDE Loop Ratio: 循环/停滞阶段占比
@@ -307,8 +369,16 @@ mod tests {
             d.observe_stage(&format!("prod_{}", i), true);
         }
         let lr = d.loop_ratio();
-        assert!(lr > 0.0 && lr < 1.0, "loop ratio should be in (0,1), got {}", lr);
-        assert!(lr <= 0.5, "5 loop stages / 10 total should be <= 0.5, got {}", lr);
+        assert!(
+            lr > 0.0 && lr < 1.0,
+            "loop ratio should be in (0,1), got {}",
+            lr
+        );
+        assert!(
+            lr <= 0.5,
+            "5 loop stages / 10 total should be <= 0.5, got {}",
+            lr
+        );
     }
 
     /// agent-loop-guard 四级升级: 连续命中升级
@@ -322,8 +392,16 @@ mod tests {
             }
         }
         let (streak, level) = d.escalation_level();
-        assert!(streak >= 6, "escalation streak should be >= 6, got {}", streak);
-        assert_eq!(level, "ESCALATE", "6+ hits should be ESCALATE, got {}", level);
+        assert!(
+            streak >= 6,
+            "escalation streak should be >= 6, got {}",
+            streak
+        );
+        assert_eq!(
+            level, "ESCALATE",
+            "6+ hits should be ESCALATE, got {}",
+            level
+        );
     }
 
     /// VRR-Stop 有界停止 (缺陷③): ESCALATE + 持续无产出 (信念<0.3) → abort;
@@ -340,7 +418,11 @@ mod tests {
         let (streak, lvl) = d.escalation_level();
         assert!(streak >= 6, "streak={} 应达 ESCALATE", streak);
         assert_eq!(lvl, "ESCALATE");
-        assert!(d.validity() < 0.3, "validity={:.3} 应低于 0.3", d.validity());
+        assert!(
+            d.validity() < 0.3,
+            "validity={:.3} 应低于 0.3",
+            d.validity()
+        );
         assert!(d.should_abort(), "ESCALATE+低信念应触发有界停止");
 
         // 对照: ESCALATE 但产出正常 (信念高) → 不 abort
@@ -386,11 +468,11 @@ pub struct StagnationDetector {
     progress_events: u64,           // 有产出的阶段总数 (L3 目标距离用)
 
     // ── ReflexGrad 双进程路由 + VRR-Stop 信念过滤 (外部调研吸收) ──
-    low_score_streak: u64,          // 连续低产出阶段数 (慢进程触发条件 m)
-    escalation_streak: u64,         // 连续升级命中数 (agent-loop-guard 四级升级)
-    committed_validity: f64,        // VRR-Stop 信念过滤: 验证投票的信念估计 (0..1)
-    total_stages: u64,              // 总阶段数 (TIDE Loop Ratio 分母)
-    loop_stages: u64,               // 循环/停滞阶段数 (TIDE Loop Ratio 分子)
+    low_score_streak: u64,   // 连续低产出阶段数 (慢进程触发条件 m)
+    escalation_streak: u64,  // 连续升级命中数 (agent-loop-guard 四级升级)
+    committed_validity: f64, // VRR-Stop 信念过滤: 验证投票的信念估计 (0..1)
+    total_stages: u64,       // 总阶段数 (TIDE Loop Ratio 分母)
+    loop_stages: u64,        // 循环/停滞阶段数 (TIDE Loop Ratio 分子)
 }
 
 impl Default for StagnationDetector {
@@ -687,11 +769,27 @@ impl StagnationDetector {
             return (base_allowance as u64, 1.0);
         }
         let split = n / 3;
-        let recent: Vec<bool> = self.stage_produced.iter().skip(n - split).copied().collect();
-        let early: Vec<bool> = self.stage_produced.iter().take(n - split).copied().collect();
+        let recent: Vec<bool> = self
+            .stage_produced
+            .iter()
+            .skip(n - split)
+            .copied()
+            .collect();
+        let early: Vec<bool> = self
+            .stage_produced
+            .iter()
+            .take(n - split)
+            .copied()
+            .collect();
         let r1 = recent.iter().filter(|&&p| p).count() as f64 / recent.len().max(1) as f64;
         let r0 = early.iter().filter(|&&p| p).count() as f64 / early.len().max(1) as f64;
-        let trend = if r0 > 0.0 { r1 / r0 } else if r1 > 0.0 { 1.5 } else { 0.0 };
+        let trend = if r0 > 0.0 {
+            r1 / r0
+        } else if r1 > 0.0 {
+            1.5
+        } else {
+            0.0
+        };
         let remaining = (base_allowance * trend.min(1.5)).round() as u64;
         (remaining, (trend * 100.0).round() / 100.0)
     }

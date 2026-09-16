@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeoTrix Sound Editor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#1a0f0a;--bg2:#231510;--bg3:#2d1c14;--border:#d4a050;
+--text:#f0d080;--text2:#c0a060;--accent:#e0c080;--accent2:#b08040;
+--danger:#c04040;--success:#40c060;
+}
+html,body{height:100%;overflow:hidden;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg);color:var(--text)}
+#app{display:grid;grid-template-rows:auto 1fr auto auto;height:100vh;gap:0}
+.toolbar{display:flex;align-items:center;gap:4px;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.toolbar .sep{width:1px;height:24px;background:var(--border);opacity:.4;margin:0 4px}
+.toolbar button{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:3px;cursor:pointer;font-size:12px;white-space:nowrap}
+.toolbar button:hover{background:var(--accent2);color:#000}
+.toolbar button.active{background:var(--accent);color:#000}
+.toolbar label{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px}
+.toolbar input[type=range]{width:80px;accent-color:var(--border)}
+.toolbar .dur-val{font-size:11px;min-width:30px;text-align:center;color:var(--accent)}
+.main{display:grid;grid-template-columns:1fr 260px;gap:0;overflow:hidden;min-height:0}
+.canvas-wrap{position:relative;overflow:hidden;background:var(--bg);border-right:1px solid var(--border)}
+.canvas-wrap canvas{display:block;width:100%;height:100%}
+.panel{overflow-y:auto;background:var(--bg2);padding:10px;font-size:12px}
+.panel h3{color:var(--accent);font-size:13px;margin:12px 0 6px;border-bottom:1px solid var(--border);padding-bottom:3px}
+.panel h3:first-child{margin-top:0}
+.param-row{display:flex;align-items:center;gap:6px;margin:4px 0}
+.param-row label{min-width:60px;color:var(--text2);font-size:11px}
+.param-row input[type=range]{flex:1;accent-color:var(--border)}
+.param-row input[type=number]{width:55px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:2px 4px;border-radius:2px;font-size:11px;text-align:right}
+.param-row select{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:2px;border-radius:2px;font-size:11px}
+.param-row .val{min-width:40px;text-align:right;font-size:11px;color:var(--accent)}
+.timeline{background:var(--bg2);border-top:1px solid var(--border);padding:6px 10px;display:flex;flex-direction:column;gap:4px}
+.timeline-header{display:flex;align-items:center;gap:8px}
+.timeline-header span{font-size:12px;color:var(--accent)}
+.timeline-header button{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:2px 8px;border-radius:2px;cursor:pointer;font-size:11px}
+.timeline-header button:hover{background:var(--accent2);color:#000}
+.layer-row{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(212,160,80,.15)}
+.layer-row .name{min-width:80px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.layer-row .btns{display:flex;gap:3px}
+.layer-row button{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:1px 6px;border-radius:2px;cursor:pointer;font-size:10px}
+.layer-row button:hover{background:var(--accent2);color:#000}
+.layer-row button.muted{background:var(--danger);color:#fff}
+.layer-row button.solo-active{background:var(--success);color:#fff}
+.presets{background:var(--bg3);border-top:1px solid var(--border);padding:8px 10px}
+.presets span{font-size:12px;color:var(--accent);margin-right:8px}
+.preset-grid{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.preset-grid button{background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px}
+.preset-grid button:hover{background:var(--accent);color:#000}
+#statusbar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:2px 10px;font-size:10px;color:var(--text2);display:flex;justify-content:space-between;z-index:100}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:200}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:20px;min-width:300px;max-width:500px}
+.modal h3{color:var(--accent);margin-bottom:10px}
+.modal textarea{width:100%;height:150px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:3px;font-family:monospace;font-size:11px;resize:vertical}
+.modal .btn-row{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
+.modal .btn-row button{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 16px;border-radius:3px;cursor:pointer}
+.modal .btn-row button:hover{background:var(--accent);color:#000}
+</style>
+</head>
+<body>
+<div id="app">
+<!-- TOOLBAR -->
+<div class="toolbar" id="toolbar">
+<button onclick="newSound()" title="New Sound">New</button>
+<button onclick="importAudio()" title="Import Audio File">Import</button>
+<button onclick="exportWAV()" title="Export WAV">WAV</button>
+<button onclick="exportJSON()" title="Export JSON">JSON</button>
+<button onclick="exportBase64()" title="Export Base64">B64</button>
+<div class="sep"></div>
+<button id="btnPlay" onclick="togglePlay()" title="Play/Stop">&#9654; Play</button>
+<button id="btnLoop" onclick="toggleLoop()" title="Toggle Loop">Loop</button>
+<div class="sep"></div>
+<label>Vol <input type="range" id="masterVol" min="0" max="100" value="80" oninput="setVolume(this.value)"><span id="volVal" class="dur-val">80%</span></label>
+<div class="sep"></div>
+<button onclick="doUndo()" title="Undo">Undo</button>
+<button onclick="doRedo()" title="Redo">Redo</button>
+<div class="sep"></div>
+<label>Duration <input type="range" id="durSlider" min="100" max="5000" value="500" step="50" oninput="setDuration(this.value)"><span id="durVal" class="dur-val">0.5s</span></label>
+</div>
+<!-- MAIN -->
+<div class="main">
+<div class="canvas-wrap" id="canvasWrap">
+<canvas id="waveCanvas"></canvas>
+</div>
+<div class="panel" id="panel">
+<h3>Oscillator</h3>
+<div class="param-row"><label>Type</label><select id="oscType" onchange="paramChange()"><option value="sine">Sine</option><option value="square">Square</option><option value="sawtooth">Sawtooth</option><option value="triangle">Triangle</option><option value="noise">Noise</option></select></div>
+<div class="param-row"><label>Freq</label><input type="range" id="oscFreq" min="20" max="2000" value="440" oninput="paramChange()"><input type="number" id="oscFreqN" min="20" max="2000" value="440" oninput="syncFreq(this.value)"><span class="val" id="freqVal">440Hz</span></div>
+<div class="param-row"><label>Detune</label><input type="range" id="oscDetune" min="-100" max="100" value="0" oninput="paramChange()"><span class="val" id="detuneVal">0</span></div>
+<h3>Envelope (ADSR)</h3>
+<div class="param-row"><label>Attack</label><input type="range" id="envA" min="10" max="2000" value="10" step="10" oninput="paramChange()"><span class="val" id="aVal">0.01s</span></div>
+<div class="param-row"><label>Decay</label><input type="range" id="envD" min="10" max="2000" value="50" step="10" oninput="paramChange()"><span class="val" id="dVal">0.05s</span></div>
+<div class="param-row"><label>Sustain</label><input type="range" id="envS" min="0" max="100" value="70" oninput="paramChange()"><span class="val" id="sVal">70%</span></div>
+<div class="param-row"><label>Release</label><input type="range" id="envR" min="10" max="2000" value="100" step="10" oninput="paramChange()"><span class="val" id="rVal">0.10s</span></div>
+<h3>Effects</h3>
+<div class="param-row"><label>Reverb</label><input type="range" id="fxReverb" min="0" max="100" value="0" oninput="paramChange()"><span class="val" id="revVal">0%</span></div>
+<div class="param-row"><label>Delay</label><input type="range" id="fxDelay" min="0" max="1000" value="0" step="10" oninput="paramChange()"><span class="val" id="delVal">0ms</span></div>
+<div class="param-row"><label>Distort</label><input type="range" id="fxDist" min="0" max="100" value="0" oninput="paramChange()"><span class="val" id="distVal">0%</span></div>
+<div class="param-row"><label>Filter</label><select id="fxFilterType" onchange="paramChange()"><option value="none">None</option><option value="lowpass">Lowpass</option><option value="highpass">Highpass</option><option value="bandpass">Bandpass</option></select></div>
+<div class="param-row"><label>FiltFreq</label><input type="range" id="fxFilterFreq" min="20" max="20000" value="1000" step="10" oninput="paramChange()"><span class="val" id="filtVal">1000Hz</span></div>
+<h3>Processing</h3>
+<div class="param-row"><button onclick="fadeIn()" style="flex:1;padding:6px">Fade In</button><button onclick="fadeOut()" style="flex:1;padding:6px">Fade Out</button></div>
+<div class="param-row"><button onclick="reverseSound()" style="flex:1;padding:6px">Reverse</button><button onclick="normalizeSound()" style="flex:1;padding:6px">Normalize</button></div>
+<div class="param-row"><button onclick="pitchShift(1.2)" style="flex:1;padding:6px">Pitch +</button><button onclick="pitchShift(0.8)" style="flex:1;padding:6px">Pitch -</button></div>
+</div>
+</div>
+<!-- TIMELINE -->
+<div class="timeline">
+<div class="timeline-header"><span>Layers</span><button onclick="addLayer()">+ Add</button><button onclick="removeLayer()">- Remove</button></div>
+<div id="layerList"></div>
+</div>
+<!-- PRESETS -->
+<div class="presets">
+<span>Presets:</span>
+<div class="preset-grid" id="presetGrid"></div>
+</div>
+</div>
+<div id="statusbar"><span id="sbLeft">Ready</span><span id="sbRight">44100Hz</span></div>
+<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="importModal">
+<div class="modal">
+<h3>Import Audio</h3>
+<p style="font-size:11px;color:var(--text2);margin-bottom:8px">Paste Base64 WAV or use file picker:</p>
+<textarea id="importB64" placeholder="Paste base64 encoded audio here..."></textarea>
+<div style="margin:8px 0;font-size:11px;color:var(--text2)">-- OR --</div>
+<input type="file" id="importFile" accept="audio/*" style="font-size:11px;color:var(--text2)">
+<div class="btn-row"><button onclick="closeModal('importModal')">Cancel</button><button onclick="doImport()">Import</button></div>
+</div>
+</div>
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="exportModal">
+<div class="modal">
+<h3 id="exportTitle">Export</h3>
+<textarea id="exportContent" readonly></textarea>
+<div class="btn-row"><button onclick="closeModal('exportModal')">Close</button><button onclick="copyExport()">Copy</button></div>
+</div>
+</div>
+
+<script>
+const PRESETS=[
+{name:'Sword Swing',type:'noise',freq:800,dur:0.2,attack:0.01,release:0.1},
+{name:'Magic Cast',type:'sine',freq:440,dur:0.5,attack:0.1,release:0.3},
+{name:'Hit Impact',type:'square',freq:200,dur:0.1,attack:0.01,release:0.05},
+{name:'Healing',type:'sine',freq:660,dur:1.0,attack:0.3,release:0.5},
+{name:'Level Up',type:'sine',freq:880,dur:0.8,attack:0.1,release:0.5},
+{name:'Death',type:'sawtooth',freq:100,dur:1.5,attack:0.5,release:1.0},
+{name:'Button Click',type:'square',freq:1000,dur:0.05,attack:0.01,release:0.02},
+{name:'Alert',type:'square',freq:800,dur:0.3,attack:0.01,release:0.1},
+{name:'Coin Drop',type:'sine',freq:1200,dur:0.15,attack:0.01,release:0.1},
+{name:'Door Close',type:'square',freq:150,dur:0.1,attack:0.01,release:0.05},
+{name:'Footstep',type:'noise',freq:300,dur:0.08,attack:0.01,release:0.04},
+{name:'Water Drop',type:'sine',freq:1500,dur:0.1,attack:0.005,release:0.08},
+];
+
+let actx=null;
+let masterGain=null;
+let isPlaying=false;
+let isLooping=false;
+let duration=0.5;
+let undoStack=[];
+let redoStack=[];
+let wavePoints=[];
+let layers=[{name:'Layer 1',muted:false,solo:false}];
+let activeLayer=0;
+let zoomX=1;
+let zoomY=1;
+let dragPoint=-1;
+let rafId=null;
+let audioBuffer=null;
+
+function ensureCtx(){
+if(!actx){actx=new(window.AudioContext||window.webkitAudioContext)();masterGain=actx.createGain();masterGain.connect(actx.destination);masterGain.gain.value=0.8;}
+if(actx.state==='suspended')actx.resume();
+}
+
+function getParams(){
+return{
+type:document.getElementById('oscType').value,
+freq:parseInt(document.getElementById('oscFreq').value),
+detune:parseInt(document.getElementById('oscDetune').value),
+attack:parseInt(document.getElementById('envA').value)/1000,
+decay:parseInt(document.getElementById('envD').value)/1000,
+sustain:parseInt(document.getElementById('envS').value)/100,
+release:parseInt(document.getElementById('envR').value)/1000,
+reverb:parseInt(document.getElementById('fxReverb').value)/100,
+delay:parseInt(document.getElementById('fxDelay').value)/1000,
+distortion:parseInt(document.getElementById('fxDist').value)/100,
+filterType:document.getElementById('fxFilterType').value,
+filterFreq:parseInt(document.getElementById('fxFilterFreq').value),
+duration:duration
+};
+}
+
+function setParams(p){
+if(p.type!=null)document.getElementById('oscType').value=p.type;
+if(p.freq!=null){document.getElementById('oscFreq').value=p.freq;document.getElementById('oscFreqN').value=p.freq;}
+if(p.detune!=null)document.getElementById('oscDetune').value=p.detune;
+if(p.attack!=null)document.getElementById('envA').value=Math.round(p.attack*1000);
+if(p.decay!=null)document.getElementById('envD').value=Math.round(p.decay*1000);
+if(p.sustain!=null)document.getElementById('envS').value=Math.round(p.sustain*100);
+if(p.release!=null)document.getElementById('envR').value=Math.round(p.release*1000);
+if(p.reverb!=null)document.getElementById('fxReverb').value=Math.round(p.reverb*100);
+if(p.delay!=null)document.getElementById('fxDelay').value=Math.round(p.delay*1000);
+if(p.distortion!=null)document.getElementById('fxDist').value=Math.round(p.distortion*100);
+if(p.filterType!=null)document.getElementById('fxFilterType').value=p.filterType;
+if(p.filterFreq!=null)document.getElementById('fxFilterFreq').value=p.filterFreq;
+if(p.dur!=null){duration=p.dur;document.getElementById('durSlider').value=Math.round(duration*1000);document.getElementById('durVal').textContent=duration.toFixed(1)+'s';}
+paramChange();
+}
+
+function paramChange(){
+const p=getParams();
+document.getElementById('freqVal').textContent=p.freq+'Hz';
+document.getElementById('detuneVal').textContent=p.detune;
+document.getElementById('aVal').textContent=p.attack.toFixed(2)+'s';
+document.getElementById('dVal').textContent=p.decay.toFixed(2)+'s';
+document.getElementById('sVal').textContent=Math.round(p.sustain*100)+'%';
+document.getElementById('rVal').textContent=p.release.toFixed(2)+'s';
+document.getElementById('revVal').textContent=Math.round(p.reverb*100)+'%';
+document.getElementById('delVal').textContent=Math.round(p.delay*1000)+'ms';
+document.getElementById('distVal').textContent=Math.round(p.distortion*100)+'%';
+document.getElementById('filtVal').textContent=p.filterFreq+'Hz';
+drawWaveform();
+}
+
+function syncFreq(v){
+const n=parseInt(v)||440;
+document.getElementById('oscFreq').value=n;
+paramChange();
+}
+
+function setVolume(v){
+document.getElementById('volVal').textContent=v+'%';
+if(masterGain)masterGain.gain.value=v/100;
+}
+
+function setDuration(v){
+duration=parseInt(v)/1000;
+document.getElementById('durVal').textContent=duration.toFixed(1)+'s';
+drawWaveform();
+}
+
+function saveUndo(){
+undoStack.push(JSON.stringify({points:[...wavePoints],params:getParams(),layers:JSON.parse(JSON.stringify(layers))}));
+if(undoStack.length>50)undoStack.shift();
+redoStack=[];
+}
+
+function doUndo(){
+if(!undoStack.length)return;
+redoStack.push(JSON.stringify({points:[...wavePoints],params:getParams(),layers:JSON.parse(JSON.stringify(layers))}));
+const s=JSON.parse(undoStack.pop());
+wavePoints=s.points;
+setParams(s.params);
+layers=s.layers;
+renderLayers();
+drawWaveform();
+}
+
+function doRedo(){
+if(!redoStack.length)return;
+undoStack.push(JSON.stringify({points:[...wavePoints],params:getParams(),layers:JSON.parse(JSON.stringify(layers))}));
+const s=JSON.parse(redoStack.pop());
+wavePoints=s.points;
+setParams(s.params);
+layers=s.layers;
+renderLayers();
+drawWaveform();
+}
+
+// Waveform Canvas
+const canvas=document.getElementById('waveCanvas');
+const ctx=canvas.getContext('2d');
+
+function resizeCanvas(){
+const wrap=document.getElementById('canvasWrap');
+canvas.width=wrap.clientWidth;
+canvas.height=wrap.clientHeight;
+drawWaveform();
+}
+window.addEventListener('resize',resizeCanvas);
+
+function drawWaveform(){
+const W=canvas.width,H=canvas.height;
+ctx.fillStyle='#1a0f0a';
+ctx.fillRect(0,0,W,H);
+// Grid
+ctx.strokeStyle='rgba(212,160,80,0.1)';
+ctx.lineWidth=1;
+for(let i=0;i<=10;i++){
+const x=W*i/10;
+ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+}
+for(let i=0;i<=8;i++){
+const y=H*i/8;
+ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+}
+// Center line
+ctx.strokeStyle='rgba(212,160,80,0.3)';
+ctx.beginPath();ctx.moveTo(0,H/2);ctx.lineTo(W,H/2);ctx.stroke();
+// Waveform points
+if(wavePoints.length>1){
+ctx.strokeStyle='#e0c080';
+ctx.lineWidth=2;
+ctx.beginPath();
+for(let i=0;i<wavePoints.length;i++){
+const x=(i/(wavePoints.length-1))*W*zoomX;
+const y=H/2-wavePoints[i]*(H/2)*0.9*zoomY;
+if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+}
+ctx.stroke();
+// Fill
+ctx.fillStyle='rgba(224,192,128,0.08)';
+ctx.lineTo(W*zoomX,H/2);
+ctx.lineTo(0,H/2);
+ctx.closePath();
+ctx.fill();
+// Points
+ctx.fillStyle='#d4a050';
+for(let i=0;i<wavePoints.length;i++){
+const x=(i/(wavePoints.length-1))*W*zoomX;
+const y=H/2-wavePoints[i]*(H/2)*0.9*zoomY;
+ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();
+}
+}
+// Time markers
+ctx.fillStyle='rgba(240,208,128,0.5)';
+ctx.font='10px monospace';
+for(let i=0;i<=10;i++){
+const t=(duration*i/10).toFixed(2);
+ctx.fillText(t+'s',W*i/10+2,H-4);
+}
+}
+
+// Canvas interactions
+let isDragging=false;
+canvas.addEventListener('mousedown',e=>{
+const rect=canvas.getBoundingClientRect();
+const mx=(e.clientX-rect.left);
+const my=(e.clientY-rect.top);
+const W=canvas.width,H=canvas.height;
+// Check existing points
+for(let i=0;i<wavePoints.length;i++){
+const x=(i/(wavePoints.length-1))*W*zoomX;
+const y=H/2-wavePoints[i]*(H/2)*0.9*zoomY;
+if(Math.hypot(mx-x,my-y)<8){dragPoint=i;isDragging=true;saveUndo();return;}
+}
+// Add new point
+const t=mx/(W*zoomX);
+const val=-(my-H/2)/((H/2)*0.9*zoomY);
+const idx=Math.round(t*(wavePoints.length-1));
+saveUndo();
+wavePoints.splice(idx,0,Math.max(-1,Math.min(1,val)));
+drawWaveform();
+});
+
+canvas.addEventListener('mousemove',e=>{
+if(!isDragging||dragPoint<0)return;
+const rect=canvas.getBoundingClientRect();
+const my=e.clientY-rect.top;
+const H=canvas.height;
+const val=-(my-H/2)/((H/2)*0.9*zoomY);
+wavePoints[dragPoint]=Math.max(-1,Math.min(1,val));
+drawWaveform();
+});
+
+canvas.addEventListener('mouseup',()=>{isDragging=false;dragPoint=-1;});
+canvas.addEventListener('mouseleave',()=>{isDragging=false;dragPoint=-1;});
+
+canvas.addEventListener('wheel',e=>{
+e.preventDefault();
+if(e.shiftKey){zoomY=Math.max(0.2,Math.min(5,zoomY+(e.deltaY>0?-0.1:0.1)));}
+else{zoomX=Math.max(0.5,Math.min(10,zoomX+(e.deltaY>0?-0.1:0.1)));}
+drawWaveform();
+},{passive:false});
+
+// Audio synthesis
+function generateBuffer(){
+ensureCtx();
+const sr=actx.sampleRate;
+const len=Math.round(duration*sr);
+const buf=actx.createBuffer(1,len,sr);
+const data=buf.getChannelData(0);
+const p=getParams();
+const attackS=Math.round(p.attack*sr);
+const decayS=Math.round(p.decay*sr);
+const releaseS=Math.round(p.release*sr);
+const sustainStart=attackS+decayS;
+const releaseStart=Math.max(sustainStart,len-releaseS);
+
+for(let i=0;i<len;i++){
+let sample=0;
+if(p.type==='noise'){
+sample=(Math.random()*2-1);
+}else{
+const phase=(p.freq+i*p.detune/100*0.01)/sr;
+const t=i/sr;
+const angle=2*Math.PI*p.freq*t+p.detune*Math.PI/2/100;
+switch(p.type){
+case'sine':sample=Math.sin(angle);break;
+case'square':sample=Math.sin(angle)>0?1:-1;break;
+case'sawtooth':sample=2*((p.freq*t)%1)-1;break;
+case'triangle':sample=4*Math.abs((p.freq*t)%1-0.5)-1;break;
+}
+}
+// ADSR
+let env=0;
+if(i<attackS){env=i/attackS;}
+else if(i<sustainStart){env=1-(1-p.sustain)*((i-attackS)/decayS);}
+else if(i<releaseStart){env=p.sustain;}
+else{env=p.sustain*(1-(i-releaseStart)/releaseS);}
+env=Math.max(0,env);
+sample*=env;
+data[i]=sample;
+}
+return buf;
+}
+
+function togglePlay(){
+ensureCtx();
+if(isPlaying){stopSound();return;}
+isPlaying=true;
+document.getElementById('btnPlay').innerHTML='&#9632; Stop';
+document.getElementById('btnPlay').classList.add('active');
+playSound();
+}
+
+function playSound(){
+ensureCtx();
+stopSound(false);
+const buf=generateBuffer();
+const src=actx.createBufferSource();
+src.buffer=buf;
+src.loop=isLooping;
+// Effects chain
+let lastNode=src;
+const p=getParams();
+// Filter
+if(p.filterType!=='none'){
+const filt=actx.createBiquadFilter();
+filt.type=p.filterType;
+filt.frequency.value=p.filterFreq;
+lastNode.connect(filt);
+lastNode=filt;
+}
+// Distortion
+if(p.distortion>0){
+const ws=actx.createWaveShaper();
+const amt=p.distortion*400;
+const curve=new Float32Array(256);
+for(let i=0;i<256;i++){
+const x=(i/128)-1;
+curve[i]=(3+amt)*x*20*(Math.PI/180)/(Math.PI+amt*Math.abs(x));
+}
+ws.curve=curve;
+lastNode.connect(ws);
+lastNode=ws;
+}
+// Delay
+if(p.delay>0){
+const delayNode=actx.createDelay(2);
+delayNode.delayTime.value=p.delay;
+const fb=actx.createGain();
+fb.gain.value=0.3;
+const wet=actx.createGain();
+wet.gain.value=0.4;
+lastNode.connect(delayNode);
+delayNode.connect(fb);
+fb.connect(delayNode);
+delayNode.connect(wet);
+lastNode.connect(masterGain);
+wet.connect(masterGain);
+lastNode=null;
+}
+// Reverb
+if(p.reverb>0){
+const conv=actx.createConvolver();
+const rLen=actx.sampleRate*2;
+const rBuf=actx.createBuffer(2,rLen,actx.sampleRate);
+for(let ch=0;ch<2;ch++){
+const d=rBuf.getChannelData(ch);
+for(let i=0;i<rLen;i++){d[i]=(Math.random()*2-1)*Math.pow(1-i/rLen,2);}
+}
+conv.buffer=rBuf;
+const wet=actx.createGain();
+wet.gain.value=p.reverb;
+lastNode.connect(conv);
+conv.connect(wet);
+wet.connect(masterGain);
+lastNode.connect(masterGain);
+lastNode=null;
+}
+if(lastNode)lastNode.connect(masterGain);
+src.start(0);
+window._activeSrc=src;
+src.onended=()=>{if(isPlaying&&!isLooping)stopSound();};
+}
+
+function stopSound(resetBtn=true){
+if(window._activeSrc){try{window._activeSrc.stop();}catch(e){}window._activeSrc=null;}
+isPlaying=false;
+if(resetBtn){
+document.getElementById('btnPlay').innerHTML='&#9654; Play';
+document.getElementById('btnPlay').classList.remove('active');
+}
+}
+
+function toggleLoop(){
+isLooping=!isLooping;
+document.getElementById('btnLoop').classList.toggle('active',isLooping);
+if(window._activeSrc)window._activeSrc.loop=isLooping;
+}
+
+// Presets
+function initPresets(){
+const g=document.getElementById('presetGrid');
+PRESETS.forEach((p,i)=>{
+const b=document.createElement('button');
+b.textContent=p.name;
+b.onclick=()=>applyPreset(i);
+g.appendChild(b);
+});
+}
+
+function applyPreset(i){
+saveUndo();
+const p=PRESETS[i];
+wavePoints=[];
+const n=Math.round(p.dur*200);
+for(let j=0;j<n;j++){
+const t=j/n;
+let v=0;
+if(p.type==='noise'){v=(Math.random()*2-1);}
+else{v=Math.sin(t*Math.PI*p.freq/200);}
+// Simple envelope
+let env=1;
+if(t<p.attack/p.dur)env=t/(p.attack/p.dur);
+else if(t>(1-p.release/p.dur))env=(1-t)/(p.release/p.dur);
+v*=env;
+wavePoints.push(Math.max(-1,Math.min(1,v)));
+}
+setParams({type:p.type==='noise'?'sine':p.type,freq:p.freq,dur:p.dur,attack:p.attack,release:p.release});
+drawWaveform();
+document.getElementById('sbLeft').textContent='Loaded: '+p.name;
+}
+
+// Layers
+function renderLayers(){
+const el=document.getElementById('layerList');
+el.innerHTML='';
+layers.forEach((l,i)=>{
+const row=document.createElement('div');
+row.className='layer-row';
+row.innerHTML=`<span class="name" style="cursor:pointer;${i===activeLayer?'color:var(--accent);font-weight:bold':''}">${l.name}</span>
+<div class="btns">
+<button class="${l.muted?'muted':''}" onclick="toggleMute(${i})">M</button>
+<button class="${l.solo?'solo-active':''}" onclick="toggleSolo(${i})">S</button>
+<button onclick="renameLayer(${i})">R</button>
+</div>`;
+row.querySelector('.name').onclick=()=>{activeLayer=i;renderLayers();};
+el.appendChild(row);
+});
+}
+
+function addLayer(){
+saveUndo();
+layers.push({name:'Layer '+(layers.length+1),muted:false,solo:false});
+activeLayer=layers.length-1;
+renderLayers();
+}
+
+function removeLayer(){
+if(layers.length<=1)return;
+saveUndo();
+layers.splice(activeLayer,1);
+activeLayer=Math.min(activeLayer,layers.length-1);
+renderLayers();
+}
+
+function toggleMute(i){layers[i].muted=!layers[i].muted;renderLayers();}
+function toggleSolo(i){layers[i].solo=!layers[i].solo;renderLayers();}
+function renameLayer(i){
+const n=prompt('Layer name:',layers[i].name);
+if(n){layers[i].name=n;renderLayers();}
+}
+
+// Processing
+function fadeIn(){
+saveUndo();
+const n=wavePoints.length;
+for(let i=0;i<n;i++)wavePoints[i]*=(i/n);
+drawWaveform();
+}
+function fadeOut(){
+saveUndo();
+const n=wavePoints.length;
+for(let i=0;i<n;i++)wavePoints[i]*=(1-i/n);
+drawWaveform();
+}
+function reverseSound(){
+saveUndo();
+wavePoints.reverse();
+drawWaveform();
+}
+function normalizeSound(){
+saveUndo();
+let mx=0;
+for(const v of wavePoints)mx=Math.max(mx,Math.abs(v));
+if(mx>0)for(let i=0;i<wavePoints.length;i++)wavePoints[i]/=mx;
+drawWaveform();
+}
+function pitchShift(factor){
+saveUndo();
+const newPts=[];
+const n=wavePoints.length;
+for(let i=0;i<n;i++){
+const srcIdx=i*factor;
+const idx=Math.floor(srcIdx);
+const frac=srcIdx-idx;
+if(idx+1<n){newPts.push(wavePoints[idx]*(1-frac)+wavePoints[idx+1]*frac);}
+else if(idx<n){newPts.push(wavePoints[idx]);}
+else{newPts.push(0);}
+}
+wavePoints=newPts;
+drawWaveform();
+}
+
+// New
+function newSound(){
+saveUndo();
+wavePoints=[];
+for(let i=0;i<100;i++)wavePoints.push(0);
+drawWaveform();
+document.getElementById('sbLeft').textContent='New sound created';
+}
+
+// Import
+function importAudio(){document.getElementById('importModal').classList.add('show');}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+
+function doImport(){
+const b64=document.getElementById('importB64').value.trim();
+const fileInput=document.getElementById('importFile');
+if(fileInput.files.length>0){
+const reader=new FileReader();
+reader.onload=async(e)=>{
+ensureCtx();
+try{
+const buf=await actx.decodeAudioData(e.target.result);
+audioBuffer=buf;
+duration=buf.duration;
+document.getElementById('durSlider').value=Math.round(duration*1000);
+document.getElementById('durVal').textContent=duration.toFixed(1)+'s';
+// Extract waveform
+const raw=buf.getChannelData(0);
+const samples=Math.min(500,raw.length);
+wavePoints=[];
+const step=Math.floor(raw.length/samples);
+for(let i=0;i<samples;i++){wavePoints.push(raw[i*step]||0);}
+drawWaveform();
+document.getElementById('sbLeft').textContent='Imported: '+fileInput.files[0].name;
+closeModal('importModal');
+}catch(err){alert('Decode error: '+err.message);}
+};
+reader.readAsArrayBuffer(fileInput.files[0]);
+return;
+}
+if(b64){
+ensureCtx();
+try{
+const bin=atob(b64);
+const arr=new Uint8Array(bin.length);
+for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+actx.decodeAudioData(arr.buffer).then(buf=>{
+audioBuffer=buf;duration=buf.duration;
+document.getElementById('durSlider').value=Math.round(duration*1000);
+document.getElementById('durVal').textContent=duration.toFixed(1)+'s';
+const raw=buf.getChannelData(0);
+const samples=Math.min(500,raw.length);
+wavePoints=[];
+const step=Math.floor(raw.length/samples);
+for(let i=0;i<samples;i++)wavePoints.push(raw[i*step]||0);
+drawWaveform();
+document.getElementById('sbLeft').textContent='Imported from base64';
+closeModal('importModal');
+}).catch(err=>alert('Decode error: '+err.message));
+}catch(e){alert('Invalid base64');}
+}
+}
+
+// Export
+function exportWAV(){
+ensureCtx();
+const buf=generateBuffer();
+const wav=encodeWAV(buf);
+const blob=new Blob([wav],{type:'audio/wav'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;a.download='sound.wav';a.click();
+URL.revokeObjectURL(url);
+document.getElementById('sbLeft').textContent='Exported WAV';
+}
+
+function encodeWAV(buffer){
+const numCh=buffer.numberOfChannels;
+const sr=buffer.sampleRate;
+const len=buffer.length;
+const bitsPerSample=16;
+const byteRate=sr*numCh*bitsPerSample/8;
+const blockAlign=numCh*bitsPerSample/8;
+const dataSize=len*blockAlign;
+const headerSize=44;
+const total=headerSize+dataSize;
+const ab=new ArrayBuffer(total);
+const view=new DataView(ab);
+function w(off,val){view.setUint16(off,val,true);}
+function dw(off,val){view.setUint32(off,val,true);}
+dw(0,0x46464952);dw(4,total-8);dw(8,0x45564157);
+dw(12,0x20746d66);dw(16,16);w(20,1);w(22,numCh);
+dw(24,sr);dw(28,byteRate);w(32,blockAlign);w(34,bitsPerSample);
+dw(36,0x61746164);dw(40,dataSize);
+const channels=[];
+for(let ch=0;ch<numCh;ch++)channels.push(buffer.getChannelData(ch));
+let off=44;
+for(let i=0;i<len;i++){
+for(let ch=0;ch<numCh;ch++){
+const s=Math.max(-1,Math.min(1,channels[ch][i]));
+view.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);
+off+=2;
+}
+}
+return ab;
+}
+
+function exportJSON(){
+const p=getParams();
+const data={
+sound:{
+name:'custom_sound',
+type:p.type,
+frequency:p.freq,
+detune:p.detune,
+duration:p.duration,
+envelope:{attack:p.attack,decay:p.decay,sustain:p.sustain,release:p.release},
+effects:{reverb:p.reverb,delay:p.delay,distortion:p.distortion,filter:{type:p.filterType,frequency:p.filterFreq}},
+layers:layers.map(l=>({name:l.name,muted:l.muted}))
+},
+presets:{}
+};
+PRESETS.forEach(p=>{data.presets[p.name.toLowerCase().replace(/ /g,'_')]={type:p.type,freq:p.freq,dur:p.dur};});
+document.getElementById('exportTitle').textContent='Export JSON';
+document.getElementById('exportContent').value=JSON.stringify(data,null,2);
+document.getElementById('exportModal').classList.add('show');
+}
+
+function exportBase64(){
+ensureCtx();
+const buf=generateBuffer();
+const wav=encodeWAV(buf);
+let binary='';
+const bytes=new Uint8Array(wav);
+for(let i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+const b64=btoa(binary);
+document.getElementById('exportTitle').textContent='Export Base64';
+document.getElementById('exportContent').value=b64;
+document.getElementById('exportModal').classList.add('show');
+}
+
+function copyExport(){
+const ta=document.getElementById('exportContent');
+ta.select();
+document.execCommand('copy');
+document.getElementById('sbLeft').textContent='Copied to clipboard';
+}
+
+// Init
+function init(){
+resizeCanvas();
+newSound();
+initPresets();
+renderLayers();
+document.getElementById('sbRight').textContent=(navigator.hardwareConcurrency||4)+' cores | WebAudio';
+}
+init();
+</script>
+</body>
+</html>

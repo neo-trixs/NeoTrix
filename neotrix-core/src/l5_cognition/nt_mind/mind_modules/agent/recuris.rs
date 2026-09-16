@@ -15,19 +15,6 @@ pub struct Experience {
     pub depth: usize,
 }
 
-/// 递归经验工作记忆 trait。
-pub trait _WorkingMemory {
-    /// 写入一条经验, 返回其递归深度 (当前缓存长度)。
-    fn remember(&mut self, input: &str, output: &str) -> usize;
-    /// 按递归深度重访最近经验 (0 = 最新), 无则 None。
-    fn recall(&self, depth: usize) -> Option<&Experience>;
-    /// 缓存容量。
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
 /// Recuris 递归经验工作记忆实现。
 pub struct _RecurisWorkingMemory {
     buffer: VecDeque<Experience>,
@@ -45,10 +32,8 @@ impl _RecurisWorkingMemory {
     pub fn capacity(&self) -> usize {
         self.capacity
     }
-}
 
-impl _WorkingMemory for _RecurisWorkingMemory {
-    fn remember(&mut self, input: &str, output: &str) -> usize {
+    pub fn remember(&mut self, input: &str, output: &str) -> usize {
         let depth = self.buffer.len();
         self.buffer.push_back(Experience {
             input: input.to_string(),
@@ -61,12 +46,12 @@ impl _WorkingMemory for _RecurisWorkingMemory {
         depth
     }
 
-    fn recall(&self, depth: usize) -> Option<&Experience> {
+    pub fn recall(&self, depth: usize) -> Option<&Experience> {
         let idx = self.buffer.len().checked_sub(1).and_then(|last| last.checked_sub(depth));
         idx.and_then(|i| self.buffer.get(i))
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.buffer.len()
     }
 }

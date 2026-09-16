@@ -6,6 +6,7 @@
 
 pub mod attention_router;
 pub mod cognitive_map;
+pub mod mid_turn_steering;
 pub mod reasoning_engine;
 pub mod reasoning_types;
 pub mod sleep;

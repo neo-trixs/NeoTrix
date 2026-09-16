@@ -34,20 +34,6 @@ pub enum _ChangeKind {
     Unchanged,
 }
 
-/// 网站变更检测 + FTS5 索引契约 (worldmonitor 抽象)
-pub trait _SiteChangeMonitor {
-    /// 计算内容 hash 快照
-    fn snapshot(&self, url: &str, content: &str) -> Snapshot;
-    /// 比对前后快照，返回变更类型
-    fn detect(&self, previous: &Snapshot, current: &Snapshot) -> _ChangeKind;
-    /// 无 KB 句柄的轻量入口 (兼容旧调用方) — 仅校验可索引性。
-    /// TODO(C2): 真实写入统一经 `index_fts5_to_kb`, 本方法保留为可用性探针。
-    fn index_fts5(&self, url: &str, content: &str) -> bool;
-    /// C2 接线: 将抓取内容作为 `Source` 节点写入 KB 并触发 FTS5 索引。
-    /// 返回新节点 id。
-    fn index_fts5_to_kb(&self, kb: &dyn KnowledgeSink, url: &str, content: &str) -> Result<String, String>;
-}
-
 /// 默认 stub 实现
 #[derive(Default)]
 pub struct _WorldMonitor;
@@ -68,15 +54,15 @@ fn md5_like(content: &str) -> u64 {
     h
 }
 
-impl _SiteChangeMonitor for _WorldMonitor {
-    fn snapshot(&self, url: &str, content: &str) -> Snapshot {
+impl _WorldMonitor {
+    pub fn snapshot(&self, url: &str, content: &str) -> Snapshot {
         Snapshot {
             url: url.to_string(),
             content_hash: simple_hash(content),
         }
     }
 
-    fn detect(&self, previous: &Snapshot, current: &Snapshot) -> _ChangeKind {
+    pub fn detect(&self, previous: &Snapshot, current: &Snapshot) -> _ChangeKind {
         if previous.content_hash == current.content_hash {
             _ChangeKind::Unchanged
         } else if previous.content_hash.is_empty() {
@@ -86,16 +72,11 @@ impl _SiteChangeMonitor for _WorldMonitor {
         }
     }
 
-    /// Validates URL and content for indexability.
-    ///
-    /// **Not wired**: Returns `true` if inputs pass basic validation, but does NOT
-    /// persist to KB — callers must not assume the content was indexed.
-    /// Use `index_fts5_to_kb` for actual KB writes.
-    fn index_fts5(&self, url: &str, content: &str) -> bool {
+    pub fn index_fts5(&self, url: &str, content: &str) -> bool {
         !url.trim().is_empty() && !content.trim().is_empty()
     }
 
-    fn index_fts5_to_kb(&self, kb: &dyn KnowledgeSink, url: &str, _content: &str) -> Result<String, String> {
+    pub fn index_fts5_to_kb(&self, kb: &dyn KnowledgeSink, url: &str, _content: &str) -> Result<String, String> {
         if url.trim().is_empty() {
             return Err("url must not be empty".to_string());
         }
@@ -114,7 +95,6 @@ impl _SiteChangeMonitor for _WorldMonitor {
         )
     }
 }
-
 /// SelfTest (T1): 变更检测 + hash 比对存在性
 pub struct _WorldMonitorSelfTest;
 

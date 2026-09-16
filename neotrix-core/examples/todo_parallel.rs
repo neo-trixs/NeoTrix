@@ -1,8 +1,8 @@
 //! 示例：多子agent同步执行 TODO 任务
 //! 展示 ParallelExecutor 的并发执行能力
 
-use neotrix::neotrix::nt_core_parallel::executor::{ParallelExecutor, ExecMode};
-use neotrix::neotrix::nt_core_parallel::types::TodoTask;
+use neotrix::l5_cognition::nt_core::nt_core_parallel::executor::{ParallelExecutor, ExecMode};
+use neotrix::l5_cognition::nt_core::nt_core_parallel::types::TodoTask;
 
 #[tokio::main]
 async fn main() {

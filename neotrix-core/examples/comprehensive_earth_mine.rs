@@ -126,7 +126,7 @@ fn main() {
     println!("║  arXiv 论文:     {:>3} / 3                        ║", total_arxiv);
     println!("║  公开知识库:     完成                              ║");
     println!("╠════════════════════════════════════════════════════╣");
-    println!("║  知识来源总数:    {:>3}                             ║", brain.brain.list_sources().len());
+    println!("║  知识来源总数:    {:>3}                             ║", brain.brain.custom_sources.len());
     println!("║  Bank 记忆数:    {:>3}                             ║", brain.reasoning_bank.memories().len());
     println!("║  能力向量和:     {:.3}                            ║", brain.brain.get_statistics().capability_sum);
     println!("╚════════════════════════════════════════════════════╝");
@@ -147,7 +147,7 @@ fn main() {
 
     // 列出所有知识来源
     println!("\n已注册知识来源:");
-    for s in brain.brain.list_sources() {
+    for s in brain.brain.custom_sources.keys() {
         println!("  • {}", s);
     }
 }

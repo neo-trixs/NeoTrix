@@ -12,15 +12,7 @@ pub struct Entity {
     pub kind: String,
 }
 
-/// 中英文 NLP 处理 trait。
-pub trait _NlpProcessor {
-    /// 分词 (中英文混合): 按空白 + 连续 ASCII 词 + 单汉字切分。
-    fn tokenize(&self, text: &str) -> Vec<String>;
-    /// 实体抽取 (stub: 抽取含大写的英文专有名词与 @中文 标记)。
-    fn extract_entities(&self, text: &str) -> Vec<Entity>;
-}
-
-/// WordPecker 中英文 NLP 处理实现。
+/// 中英文 NLP 处理实现。
 pub struct _WordPeckerNlp {
     min_entity_len: usize,
 }
@@ -29,19 +21,10 @@ impl _WordPeckerNlp {
     pub fn new() -> Self {
         Self { min_entity_len: 2 }
     }
-}
 
-impl Default for _WordPeckerNlp {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl _NlpProcessor for _WordPeckerNlp {
-    fn tokenize(&self, text: &str) -> Vec<String> {
+    pub fn tokenize(&self, text: &str) -> Vec<String> {
         let mut tokens = Vec::new();
         for raw in text.split_whitespace() {
-            // 连续 ASCII 视为一个 token, 其余按单字符切 (中文逐字)。
             if raw.chars().all(|c| c.is_ascii_alphanumeric()) {
                 tokens.push(raw.to_string());
             } else {
@@ -55,10 +38,9 @@ impl _NlpProcessor for _WordPeckerNlp {
         tokens
     }
 
-    fn extract_entities(&self, text: &str) -> Vec<Entity> {
+    pub fn extract_entities(&self, text: &str) -> Vec<Entity> {
         let mut entities = Vec::new();
         for tok in self.tokenize(text) {
-            // 英文专有名词: 首字母大写且长度达标。
             if tok.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
                 && tok.len() >= self.min_entity_len
             {
@@ -69,6 +51,12 @@ impl _NlpProcessor for _WordPeckerNlp {
             }
         }
         entities
+    }
+}
+
+impl Default for _WordPeckerNlp {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

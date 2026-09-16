@@ -265,6 +265,7 @@ impl EventStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_capability::factory::init_global_registry;
 
     #[test]
     fn dashboard_creation() {

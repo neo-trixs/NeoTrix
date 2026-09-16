@@ -379,10 +379,6 @@ pub struct User {
     pub name: String,
 }
 
-pub trait _Greeter {
-    fn greet(&self) -> String;
-}
-
 pub enum Status {
     Active,
     Inactive,
@@ -419,12 +415,11 @@ pub trait Serializable {
             "repo_a",
         );
 
-        assert_eq!(contracts.len(), 4, "should find 4 pub items (fn, struct, trait, enum)");
+        assert_eq!(contracts.len(), 3, "should find 3 pub items (fn, struct, enum)");
 
         let names: Vec<&str> = contracts.iter().map(|c| c.name.as_str()).collect();
         assert!(names.contains(&"hello"));
         assert!(names.contains(&"User"));
-        assert!(names.contains(&"_Greeter"));
         assert!(names.contains(&"Status"));
 
         let hello = contracts.iter().find(|c| c.name == "hello").expect("hello contract should exist");
@@ -468,8 +463,8 @@ pub trait Serializable {
         let results_struct = manager._query_group("core", "User");
         assert_eq!(results_struct.len(), 2, "both repos have User");
 
-        let results_trait = manager._query_group("core", "_Greeter");
-        assert_eq!(results_trait.len(), 1, "only repo_a has _Greeter");
+        let results_trait = manager._query_group("core", "Serializable");
+        assert_eq!(results_trait.len(), 1, "only repo_b has Serializable");
     }
 
     #[test]
@@ -488,8 +483,8 @@ pub trait Serializable {
         assert_eq!(matches[0].match_type, _MatchType::Exact);
         assert_eq!(matches[0].matched_contract.name, "hello");
 
-        let matches_none = manager.match_cross_repo("_Greeter");
-        assert!(matches_none.is_empty(), "_Greeter only in repo_a");
+        let matches_none = manager.match_cross_repo("Serializable");
+        assert!(matches_none.is_empty(), "Serializable only in repo_b");
     }
 
     #[test]

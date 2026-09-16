@@ -13,10 +13,12 @@
 
 #[allow(unused_imports)]
 #[allow(unused_imports)]
+use super::deliberation::{
+    DeliberationPhase, DeliberationRole, DeliberationSession, SessionStatus,
+};
+#[allow(unused_imports)]
+#[allow(unused_imports)]
 use super::value_compass::{ValueCompass, ValueCompassStore};
-#[allow(unused_imports)]
-#[allow(unused_imports)]
-use super::deliberation::{DeliberationRole, DeliberationPhase, DeliberationSession, SessionStatus};
 #[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
@@ -55,7 +57,7 @@ pub struct FederationMessage {
 
 /// 计算守卫哈希：msg_type + payload 摘要。
 fn compute_guard_hash(msg: &FederationMessage) -> u64 {
-#[allow(unused_imports)]
+    #[allow(unused_imports)]
     use blake2::Digest;
     let canonical = format!(
         "{}:{}:{}",
@@ -108,8 +110,14 @@ fn now_secs() -> i64 {
 
 /// 种子价值观 ID 集合 — 这些值不可降级（与单体规则一致）。
 const SEED_VALUES: [&str; 8] = [
-    "autonomy", "harm_prevention", "truth_seeking", "fairness",
-    "privacy", "responsibility", "benevolence", "growth",
+    "autonomy",
+    "harm_prevention",
+    "truth_seeking",
+    "fairness",
+    "privacy",
+    "responsibility",
+    "benevolence",
+    "growth",
 ];
 
 /// 价值观同步摘要 — 只交换权重差分，不传原始数据。
@@ -136,10 +144,7 @@ pub struct MergeResult {
 /// - 种子值: 取 max(local, remote)，不可低于 0.5
 /// - 非种子值: 加权平均 (各 50%)
 /// - 仅单侧存在的值: 直接采纳存在的那个
-pub fn merge_value_weights(
-    local: &ValueSyncPayload,
-    remote: &ValueSyncPayload,
-) -> MergeResult {
+pub fn merge_value_weights(local: &ValueSyncPayload, remote: &ValueSyncPayload) -> MergeResult {
     let mut merged = BTreeMap::new();
     let mut changed = Vec::new();
     let mut conflicts = 0usize;
@@ -177,8 +182,13 @@ pub fn merge_value_weights(
                     merged.insert(id.clone(), new_w);
                 }
             }
-            (Some(l), None) => { merged.insert(id.clone(), l); }
-            (None, Some(r)) => { merged.insert(id.clone(), r); changed.push(id.clone()); }
+            (Some(l), None) => {
+                merged.insert(id.clone(), l);
+            }
+            (None, Some(r)) => {
+                merged.insert(id.clone(), r);
+                changed.push(id.clone());
+            }
             (None, None) => {} // 不可能
         }
     }
@@ -198,11 +208,17 @@ pub fn value_sync_from_compass(compass: &ValueCompass) -> ValueSyncPayload {
         .iter()
         .map(|(id, v)| (id.clone(), v.weight))
         .collect();
-    ValueSyncPayload { weights, version: compass.version }
+    ValueSyncPayload {
+        weights,
+        version: compass.version,
+    }
 }
 
 /// 将合并结果应用回 ValueCompass（仅更新非种子值的权重下限）。
-pub fn apply_merge_to_compass(compass: &mut ValueCompass, result: &MergeResult) -> Result<usize, String> {
+pub fn apply_merge_to_compass(
+    compass: &mut ValueCompass,
+    result: &MergeResult,
+) -> Result<usize, String> {
     let mut applied = 0;
     for id in &result.changed_values {
         if let Some(w) = result.merged_weights.get(id) {
@@ -237,7 +253,9 @@ pub struct InsightCollector {
 }
 
 impl InsightCollector {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// 接收外部洞察（去重）。
     pub fn receive(&mut self, insight: SharedInsight) -> bool {
@@ -334,22 +352,33 @@ impl CollectiveVerdictManager {
             return Err("无可用 peer".into());
         }
         let sid = format!("cv_{}", now_secs());
-        self.sessions.insert(sid.clone(), CollectiveVerdictSession {
-            session_id: sid.clone(),
-            scenario: scenario.to_string(),
-            votes: Vec::new(),
-            required_peers: expected_peers,
-            is_critical,
-            status: CollectiveVerdictStatus::CollectingVotes,
-            final_verdict: None,
-            started_at: now_secs(),
-        });
+        self.sessions.insert(
+            sid.clone(),
+            CollectiveVerdictSession {
+                session_id: sid.clone(),
+                scenario: scenario.to_string(),
+                votes: Vec::new(),
+                required_peers: expected_peers,
+                is_critical,
+                status: CollectiveVerdictStatus::CollectingVotes,
+                final_verdict: None,
+                started_at: now_secs(),
+            },
+        );
         Ok(sid)
     }
 
     /// 提交一个 peer 的投票。
-    pub fn submit_vote(&mut self, session_id: &str, peer_id: &str, vote: Vote, confidence: f64) -> Result<(), String> {
-        let session = self.sessions.get_mut(session_id)
+    pub fn submit_vote(
+        &mut self,
+        session_id: &str,
+        peer_id: &str,
+        vote: Vote,
+        confidence: f64,
+    ) -> Result<(), String> {
+        let session = self
+            .sessions
+            .get_mut(session_id)
             .ok_or_else(|| "会话不存在".to_string())?;
         if session.status != CollectiveVerdictStatus::CollectingVotes {
             return Err("会话已关闭".into());
@@ -365,9 +394,21 @@ impl CollectiveVerdictManager {
 
         // Inline convergence check (avoids borrow conflict with self.sessions)
         if session.votes.len() >= session.required_peers {
-            let permissible = session.votes.iter().filter(|v| v.vote == Vote::Permissible).count();
-            let impermissible = session.votes.iter().filter(|v| v.vote == Vote::Impermissible).count();
-            let abstain = session.votes.iter().filter(|v| v.vote == Vote::Abstain).count();
+            let permissible = session
+                .votes
+                .iter()
+                .filter(|v| v.vote == Vote::Permissible)
+                .count();
+            let impermissible = session
+                .votes
+                .iter()
+                .filter(|v| v.vote == Vote::Impermissible)
+                .count();
+            let abstain = session
+                .votes
+                .iter()
+                .filter(|v| v.vote == Vote::Abstain)
+                .count();
 
             if session.is_critical && self.require_unanimity_for_critical {
                 if abstain > 0 || (impermissible > 0 && permissible > 0) {
@@ -377,16 +418,20 @@ impl CollectiveVerdictManager {
                 }
             }
 
-            let verdict = if permissible > impermissible && permissible > abstain { Vote::Permissible }
-                else if impermissible > permissible && impermissible > abstain { Vote::Impermissible }
-                else if impermissible > 0 { Vote::Impermissible }
-                else { Vote::Abstain };
+            let verdict = if permissible > impermissible && permissible > abstain {
+                Vote::Permissible
+            } else if impermissible > permissible && impermissible > abstain {
+                Vote::Impermissible
+            } else if impermissible > 0 {
+                Vote::Impermissible
+            } else {
+                Vote::Abstain
+            };
             session.final_verdict = Some(verdict);
             session.status = CollectiveVerdictStatus::Converged;
         }
         Ok(())
     }
-
 
     /// 检查超时并降级。
     pub fn check_timeouts(&mut self) -> Vec<String> {
@@ -408,12 +453,17 @@ impl CollectiveVerdictManager {
     /// 获取裁决结果。
     pub fn get_result(&self, session_id: &str) -> Option<(Vote, CollectiveVerdictStatus)> {
         self.sessions.get(session_id).and_then(|s| {
-            s.final_verdict.as_ref().map(|v| (v.clone(), s.status.clone()))
+            s.final_verdict
+                .as_ref()
+                .map(|v| (v.clone(), s.status.clone()))
         })
     }
 
     pub fn active_sessions(&self) -> usize {
-        self.sessions.values().filter(|s| s.status == CollectiveVerdictStatus::CollectingVotes).count()
+        self.sessions
+            .values()
+            .filter(|s| s.status == CollectiveVerdictStatus::CollectingVotes)
+            .count()
     }
 }
 
@@ -439,7 +489,9 @@ pub struct SharedDreamingSync {
 }
 
 impl SharedDreamingSync {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// 接收来自 peer 的梦境摘要。
     pub fn receive_dream(&mut self, dream: DreamSummary) -> bool {
@@ -460,7 +512,8 @@ impl SharedDreamingSync {
                 *theme_counts.entry(t.clone()).or_insert(0) += 1;
             }
         }
-        let mut themes: Vec<_> = theme_counts.into_iter()
+        let mut themes: Vec<_> = theme_counts
+            .into_iter()
             .filter(|(_, c)| *c >= min_frequency)
             .collect();
         themes.sort_by(|a, b| b.1.cmp(&a.1));
@@ -529,10 +582,17 @@ impl FederationProtocol {
                 let payload = msg.payload.clone();
                 let vote: PeerVote = serde_json::from_value(payload.clone())
                     .map_err(|e| format!("解析投票失败: {e}"))?;
-                let session_id = payload.get("session_id")
+                let session_id = payload
+                    .get("session_id")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("").to_string();
-                self.verdict_manager.submit_vote(&session_id, &vote.peer_id, vote.vote.clone(), vote.confidence)
+                    .unwrap_or("")
+                    .to_string();
+                self.verdict_manager.submit_vote(
+                    &session_id,
+                    &vote.peer_id,
+                    vote.vote.clone(),
+                    vote.confidence,
+                )
             }
             FederationMessageType::DreamSync => {
                 let dream: DreamSummary = serde_json::from_value(msg.payload)
@@ -551,31 +611,31 @@ impl FederationProtocol {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-#[allow(unused_imports)]
+    #[allow(unused_imports)]
     use crate::core::nt_core_paradigm::{Anomaly, ParadigmShiftDetector};
+    use serde_json::json;
 
     // ── FP1 ValueSync ──
 
     #[test]
     fn test_value_sync_seed_protection() {
         let local = ValueSyncPayload {
-            weights: BTreeMap::from([
-                ("autonomy".into(), 0.95),
-                ("custom_val".into(), 0.8),
-            ]),
+            weights: BTreeMap::from([("autonomy".into(), 0.95), ("custom_val".into(), 0.8)]),
             version: 1,
         };
         let remote = ValueSyncPayload {
             weights: BTreeMap::from([
-                ("autonomy".into(), 0.6), // 远端较低 → 种子保护取 max=0.95
+                ("autonomy".into(), 0.6),   // 远端较低 → 种子保护取 max=0.95
                 ("custom_val".into(), 0.9), // 非种子值 → 取平均 (0.8+0.9)/2=0.85
             ]),
             version: 1,
         };
         let result = merge_value_weights(&local, &remote);
         assert_eq!(result.merged_weights["autonomy"], 0.95, "种子值取 max");
-        assert!((result.merged_weights["custom_val"] - 0.85).abs() < 0.001, "non-seed average");
+        assert!(
+            (result.merged_weights["custom_val"] - 0.85).abs() < 0.001,
+            "non-seed average"
+        );
         assert!(result.conflicts_resolved >= 1);
     }
 
@@ -590,12 +650,19 @@ mod tests {
             version: 1,
         };
         let result = merge_value_weights(&local, &remote);
-        assert_eq!(result.merged_weights["custom_value"], 0.7, "仅本地有 → 保留");
+        assert_eq!(
+            result.merged_weights["custom_value"], 0.7,
+            "仅本地有 → 保留"
+        );
     }
 
     #[test]
     fn test_federation_message_integrity() {
-        let msg = build_message("peer_a", FederationMessageType::InsightShare, json!({"data": 1}));
+        let msg = build_message(
+            "peer_a",
+            FederationMessageType::InsightShare,
+            json!({"data": 1}),
+        );
         assert!(verify_message(&msg));
         // 篡改 payload
         let mut tampered = msg.clone();
@@ -630,7 +697,8 @@ mod tests {
 
         mgr.submit_vote(&sid, "p1", Vote::Permissible, 0.9).unwrap();
         mgr.submit_vote(&sid, "p2", Vote::Permissible, 0.8).unwrap();
-        mgr.submit_vote(&sid, "p3", Vote::Impermissible, 0.7).unwrap();
+        mgr.submit_vote(&sid, "p3", Vote::Impermissible, 0.7)
+            .unwrap();
 
         let (verdict, status) = mgr.get_result(&sid).unwrap();
         assert_eq!(verdict, Vote::Permissible, "2:1 多数派");
@@ -643,7 +711,8 @@ mod tests {
         let sid = mgr.start_collective_verdict("生死决策", 3, true).unwrap();
 
         mgr.submit_vote(&sid, "p1", Vote::Permissible, 0.9).unwrap();
-        mgr.submit_vote(&sid, "p2", Vote::Impermissible, 0.8).unwrap();
+        mgr.submit_vote(&sid, "p2", Vote::Impermissible, 0.8)
+            .unwrap();
         mgr.submit_vote(&sid, "p3", Vote::Permissible, 0.7).unwrap();
 
         let (verdict, status) = mgr.get_result(&sid).unwrap();
@@ -656,7 +725,11 @@ mod tests {
         let mut mgr = CollectiveVerdictManager::new(false, 60);
         let sid = mgr.start_collective_verdict("测试", 2, false).unwrap();
         mgr.submit_vote(&sid, "p1", Vote::Permissible, 0.9).unwrap();
-        assert!(mgr.submit_vote(&sid, "p1", Vote::Impermissible, 0.8).is_err(), "重复投票拒绝");
+        assert!(
+            mgr.submit_vote(&sid, "p1", Vote::Impermissible, 0.8)
+                .is_err(),
+            "重复投票拒绝"
+        );
     }
 
     // ── FP4 SharedDreaming ──
@@ -665,12 +738,18 @@ mod tests {
     fn test_shared_dreaming_common_themes() {
         let mut sync = SharedDreamingSync::new();
         sync.receive_dream(DreamSummary {
-            peer_id: "a".into(), chapter_title: "Rust 学习".into(),
-            themes: vec!["学习".into(), "成长".into()], arc_type: "Growth".into(), timestamp: 1,
+            peer_id: "a".into(),
+            chapter_title: "Rust 学习".into(),
+            themes: vec!["学习".into(), "成长".into()],
+            arc_type: "Growth".into(),
+            timestamp: 1,
         });
         sync.receive_dream(DreamSummary {
-            peer_id: "b".into(), chapter_title: "Rust 进阶".into(),
-            themes: vec!["学习".into(), "挑战".into()], arc_type: "Challenge".into(), timestamp: 2,
+            peer_id: "b".into(),
+            chapter_title: "Rust 进阶".into(),
+            themes: vec!["学习".into(), "挑战".into()],
+            arc_type: "Challenge".into(),
+            timestamp: 2,
         });
         let themes = sync.common_themes(2);
         assert!(themes.contains(&("学习".into(), 2)), "'学习' 应出现 2 次");
@@ -687,7 +766,11 @@ mod tests {
             "insight_id": "i1", "description": "test",
             "cross_domain": true, "novelty": 0.8, "source_peer": "peer_b", "timestamp": 1
         });
-        let msg = build_message("peer_b", FederationMessageType::InsightShare, insight_payload);
+        let msg = build_message(
+            "peer_b",
+            FederationMessageType::InsightShare,
+            insight_payload,
+        );
         assert!(fed.handle_inbound(msg).is_ok());
         assert_eq!(fed.insight_collector.count(), 1);
         assert!(fed.known_peers.contains("peer_b"), "peer 自动注册");

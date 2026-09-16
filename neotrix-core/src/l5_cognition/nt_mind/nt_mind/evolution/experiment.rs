@@ -36,7 +36,13 @@ pub struct ABTestDesign {
 }
 
 impl ABTestDesign {
-    pub fn new(hypothesis_id: &str, control: &str, treatment: &str, sample_size: u64, days: u64) -> Self {
+    pub fn new(
+        hypothesis_id: &str,
+        control: &str,
+        treatment: &str,
+        sample_size: u64,
+        days: u64,
+    ) -> Self {
         Self {
             hypothesis_id: hypothesis_id.to_string(),
             control_description: control.to_string(),
@@ -107,7 +113,11 @@ pub struct ExperimentDesigner;
 
 impl ExperimentDesigner {
     pub fn design_ab_test(hypothesis: &Hypothesis) -> ABTestDesign {
-        let sample_size = Self::estimate_sample_size(hypothesis.expected_effect, hypothesis.confidence_level, hypothesis.power);
+        let sample_size = Self::estimate_sample_size(
+            hypothesis.expected_effect,
+            hypothesis.confidence_level,
+            hypothesis.power,
+        );
         ABTestDesign {
             hypothesis_id: hypothesis.id.clone(),
             control_description: "Current state (no change)".to_string(),
@@ -138,7 +148,11 @@ impl ExperimentDesigner {
         (n.ceil() as u64).max(30)
     }
 
-    pub fn analyze_results(control: &[f64], treatment: &[f64], hypothesis_id: &str) -> ExperimentResult {
+    pub fn analyze_results(
+        control: &[f64],
+        treatment: &[f64],
+        hypothesis_id: &str,
+    ) -> ExperimentResult {
         let n_control = control.len() as f64;
         let n_treatment = treatment.len() as f64;
         let total_n = (n_control + n_treatment) as u64;
@@ -158,8 +172,10 @@ impl ExperimentDesigner {
         let mean_c = control.iter().sum::<f64>() / n_control;
         let mean_t = treatment.iter().sum::<f64>() / n_treatment;
 
-        let var_c = control.iter().map(|v| (v - mean_c).powi(2)).sum::<f64>() / (n_control - 1.0).max(1.0);
-        let var_t = treatment.iter().map(|v| (v - mean_t).powi(2)).sum::<f64>() / (n_treatment - 1.0).max(1.0);
+        let var_c =
+            control.iter().map(|v| (v - mean_c).powi(2)).sum::<f64>() / (n_control - 1.0).max(1.0);
+        let var_t = treatment.iter().map(|v| (v - mean_t).powi(2)).sum::<f64>()
+            / (n_treatment - 1.0).max(1.0);
         let pooled_se = ((var_c / n_control) + (var_t / n_treatment)).sqrt();
 
         let effect_size = (mean_t - mean_c) / ((var_c + var_t) / 2.0).sqrt().max(0.001);
@@ -193,8 +209,15 @@ mod tests {
 
     #[test]
     fn test_hypothesis_creation() {
-        let h = Hypothesis::new("H-001", "Adding search will increase user engagement",
-            vec!["daily_active_users".to_string(), "search_per_session".to_string()], 0.3);
+        let h = Hypothesis::new(
+            "H-001",
+            "Adding search will increase user engagement",
+            vec![
+                "daily_active_users".to_string(),
+                "search_per_session".to_string(),
+            ],
+            0.3,
+        );
         assert_eq!(h.id, "H-001");
         assert!((h.confidence_level - 0.95).abs() < 0.01);
         assert!((h.power - 0.80).abs() < 0.01);
@@ -236,10 +259,14 @@ mod tests {
 
     #[test]
     fn test_analyze_results_significant() {
-        let control = vec![1.0, 1.5, 1.2, 1.3, 1.1, 1.4, 1.0, 1.2, 1.3, 1.1,
-                           1.2, 1.0, 1.3, 1.1, 1.4, 1.2, 1.0, 1.3, 1.2, 1.1];
-        let treatment = vec![5.0, 5.5, 5.2, 5.3, 5.1, 5.4, 5.0, 5.2, 5.3, 5.1,
-                             5.2, 5.0, 5.3, 5.1, 5.4, 5.2, 5.0, 5.3, 5.2, 5.1];
+        let control = vec![
+            1.0, 1.5, 1.2, 1.3, 1.1, 1.4, 1.0, 1.2, 1.3, 1.1, 1.2, 1.0, 1.3, 1.1, 1.4, 1.2, 1.0,
+            1.3, 1.2, 1.1,
+        ];
+        let treatment = vec![
+            5.0, 5.5, 5.2, 5.3, 5.1, 5.4, 5.0, 5.2, 5.3, 5.1, 5.2, 5.0, 5.3, 5.1, 5.4, 5.2, 5.0,
+            5.3, 5.2, 5.1,
+        ];
         let result = ExperimentDesigner::analyze_results(&control, &treatment, "H-003");
         assert!(result.significant);
         assert!(result.p_value <= 0.05);

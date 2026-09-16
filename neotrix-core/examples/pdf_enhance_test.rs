@@ -3,7 +3,7 @@
 //! 测试流程: PDF → 提取图像 → 超分增强 → 输出结果
 
 use std::path::Path;
-use neotrix::nt_file_ability::{
+use neotrix::neotrix::nt_file_ability::{
     extract_pdf_images, enhance_pdf_icons_with_config,
     PdfImageExtractConfig, PdfIconEnhanceConfig,
     SuperResolutionConfig, SuperResolutionModel,
@@ -67,7 +67,7 @@ fn main() {
         ..Default::default()
     };
     
-    let mut resolver = neotrix::nt_file_ability::ImageSuperResolver::with_config(sr_config);
+    let mut resolver = neotrix::neotrix::nt_file_ability::ImageSuperResolver::with_config(sr_config);
     
     // 测试单张图像超分
     let test_image = output_dir.read_dir()

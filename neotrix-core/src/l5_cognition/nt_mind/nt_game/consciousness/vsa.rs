@@ -19,7 +19,12 @@ pub struct Trajectory {
 }
 
 impl Trajectory {
-    pub fn new(total_reward: f64, length: usize, hexagrams: Vec<u8>, resonance_count: usize) -> Self {
+    pub fn new(
+        total_reward: f64,
+        length: usize,
+        hexagrams: Vec<u8>,
+        resonance_count: usize,
+    ) -> Self {
         Self {
             total_reward,
             length,
@@ -73,7 +78,13 @@ impl GameVsaEncoder {
             trajectory.hexagrams.iter().copied().collect();
         let diversity = distinct.len() as f64 / 64.0;
 
-        let features = vec![reward_norm, length_norm, avg_hex, resonance_density, diversity];
+        let features = vec![
+            reward_norm,
+            length_norm,
+            avg_hex,
+            resonance_density,
+            diversity,
+        ];
 
         // Unit-normalize
         let norm: f64 = features.iter().map(|&f| f * f).sum::<f64>().sqrt();
@@ -112,7 +123,12 @@ pub struct StrategySignature {
 }
 
 impl StrategySignature {
-    pub fn from_features(reward_norm: f64, length_norm: f64, diversity: f64, resonance: f64) -> Self {
+    pub fn from_features(
+        reward_norm: f64,
+        length_norm: f64,
+        diversity: f64,
+        resonance: f64,
+    ) -> Self {
         Self {
             aggressive: reward_norm > 0.3,
             efficient: length_norm < 0.3,

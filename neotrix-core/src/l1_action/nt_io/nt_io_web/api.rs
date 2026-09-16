@@ -7,6 +7,7 @@ use axum::{
     },
 };
 use futures::stream::{self, Stream};
+use tokio_stream::wrappers::ReceiverStream;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -1142,7 +1143,7 @@ pub async fn openai_chat_completions(
             let _ = tx.send(Ok(Event::default().data("[DONE]"))).await;
         });
         
-        Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
+        Sse::new(ReceiverStream::new(rx))
             .keep_alive(KeepAlive::new())
             .into_response()
     } else {

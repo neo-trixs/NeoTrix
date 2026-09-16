@@ -400,7 +400,6 @@ mod tests {
             None,
             Some("https://github.com/topics"),
             Some("github.com"),
-            true,
         ).unwrap();
         for t in &cfg.target_topics {
             let tid = store::insert_or_get_node(
@@ -410,7 +409,6 @@ mod tests {
                 None,
                 None,
                 Some("github.com/topic"),
-                true,
             ).unwrap();
             let _ = store::upsert_edge(&conn, &tid, &topic_node_id, RelationType::InstanceOf, 0.8, None);
         }

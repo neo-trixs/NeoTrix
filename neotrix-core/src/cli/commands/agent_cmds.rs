@@ -17,13 +17,21 @@ pub struct AgentInfo { pub id: String, pub config: SubagentConfig, pub status: A
 pub enum AgentStatus { Idle, Running { progress: f64 }, Completed { result: String }, Failed { error: String }, Paused, Stale }
 impl SubagentManager {
     pub fn new() -> Self { Self { agents: Vec::new() } }
-    pub fn send_message(&mut self, _src: &str, _id: &str, _msg: &str, _mt: MessageType) -> Result<(), String> {
+    pub fn send_message(&mut self, _src: &str, id: &str, _msg: &str, _mt: MessageType) -> Result<(), String> {
+        if self.agents.iter().find(|a| a.id == id).is_none() {
+            return Err(format!("Subagent '{}' not found.", id));
+        }
         tracing::warn!("STUB SubagentManager::send_message called: no-op, not real message delivery.");
         Ok(())
     }
-    pub fn kill(&mut self, _id: &str) -> Result<(), String> {
-        tracing::warn!("STUB SubagentManager::kill called: no-op, not real agent termination.");
-        Ok(())
+    pub fn kill(&mut self, id: &str) -> Result<(), String> {
+        if let Some(pos) = self.agents.iter().position(|a| a.id == id) {
+            self.agents.remove(pos);
+            tracing::warn!("STUB SubagentManager::kill called: removed agent from list.");
+            Ok(())
+        } else {
+            Err(format!("Subagent '{}' not found.", id))
+        }
     }
     pub fn spawn_from_profile(&mut self, name: &str) -> Result<String, String> {
         let id = format!("agent_{}", self.agents.len());
@@ -57,34 +65,40 @@ impl SubagentManager {
 pub enum MessageType { Task }
 #[derive(Debug, Clone)]
 pub struct McpToolInfo { pub name: String, pub description: String, pub server_name: String }
-pub struct McpRegistry;
+pub struct McpRegistry { tools: Vec<McpToolInfo> }
+
+impl Clone for McpRegistry {
+    fn clone(&self) -> Self {
+        Self { tools: self.tools.clone() }
+    }
+}
 impl McpRegistry {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self { Self { tools: Vec::new() } }
     pub fn gateway(&self) -> Option<String> {
         tracing::warn!("STUB McpRegistry::gateway called: returning None, not real gateway lookup.");
         None
     }
     pub fn list_tools(&self) -> Vec<McpToolInfo> {
-        tracing::warn!("STUB McpRegistry::list_tools called: returning empty, not real tool listing.");
-        Vec::new()
+        self.tools.clone()
     }
-    pub fn search(&self, _query: &str) -> Vec<McpToolInfo> {
-        tracing::warn!("STUB McpRegistry::search called: returning empty, not real tool search.");
-        Vec::new()
+    pub fn search(&self, query: &str) -> Vec<McpToolInfo> {
+        self.tools.iter().filter(|t| t.name.contains(query) || t.description.contains(query)).cloned().collect()
     }
-    pub fn publish(&mut self, _name: &str, _command: &str, _args: &[String], _desc: &str) -> usize {
-        tracing::warn!("STUB McpRegistry::publish called: returning 0, not real tool publish.");
-        0
+    pub fn has_tool(&self, name: &str) -> bool {
+        self.tools.iter().any(|t| t.name == name || name.starts_with(&format!("{}_", t.name)))
+    }
+    pub fn publish(&mut self, name: &str, _command: &str, _args: &[String], desc: &str) -> usize {
+        self.tools.push(McpToolInfo { name: name.to_string(), description: desc.to_string(), server_name: name.to_string() });
+        self.tools.len()
     }
     pub fn as_native_tools(&self) -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> {
         tracing::warn!("STUB McpRegistry::as_native_tools called: returning empty, not real tool conversion.");
         Vec::new()
     }
-    pub fn tool_count(&self) -> usize { 0 }
-    pub fn server_count(&self) -> usize { 0 }
+    pub fn tool_count(&self) -> usize { self.tools.len() }
+    pub fn server_count(&self) -> usize { self.tools.len() }
     pub fn list_servers(&self) -> Vec<String> {
-        tracing::warn!("STUB McpRegistry::list_servers called: returning empty, not real server listing.");
-        Vec::new()
+        self.tools.iter().map(|t| t.server_name.clone()).collect()
     }
     pub fn register_stdio(&mut self, _server: &str, _cmd: &str, _args: &[&str], _tools: Vec<crate::agent::tool::mcp::McpToolDef>) {
         tracing::warn!("STUB McpRegistry::register_stdio called: no-op, not real server registration.");
@@ -100,15 +114,23 @@ impl McpDiscovery {
 }
 pub struct McpEntry { pub name: String, pub path: std::path::PathBuf, pub status: String, pub version: String }
 pub struct ProgrammaticCall { pub tool: String, pub args: serde_json::Value, pub group: usize }
-pub struct ProgrammaticPlanner;
+pub struct ProgrammaticPlanner { registry: std::sync::Arc<tokio::sync::RwLock<McpRegistry>> }
 impl ProgrammaticPlanner {
-    pub fn new(_registry: &McpRegistry) -> Self { Self }
-    pub fn plan(&self, _calls: Vec<ProgrammaticCall>) -> Result<Plan, String> {
-        Err("ProgrammaticPlanner::plan not yet implemented".to_string())
+    pub fn new(registry: &std::sync::Arc<tokio::sync::RwLock<McpRegistry>>) -> Self {
+        Self { registry: registry.clone() }
+    }
+    pub fn plan(&self, calls: Vec<ProgrammaticCall>) -> Result<Plan, String> {
+        let reg = self.registry.blocking_read();
+        for call in &calls {
+            if !reg.has_tool(&call.tool) {
+                return Err(format!("unknown tool: {}", call.tool));
+            }
+        }
+        Ok(Plan { stage_count: calls.len() })
     }
 }
-pub struct Plan;
-impl Plan { pub fn stages(&self) -> usize { 0 } }
+pub struct Plan { stage_count: usize }
+impl Plan { pub fn stages(&self) -> usize { self.stage_count } }
 #[derive(Debug, Clone)]
 pub struct SubagentConfig { pub name: String, pub description: String, pub e8_mode: u8, pub goal: String, pub capabilities: Vec<String>, pub max_context: usize, pub autostart: bool }
 
@@ -475,8 +497,6 @@ impl CliCommand for McpCmd {
                 if raw.is_empty() {
                     return CommandOutput::err("用法: /mcp exec <tool>|<json> [...] [--parallel] [--json]");
                 }
-                let registry = get_mcp_registry();
-                let registry = registry.blocking_read();
                 let mut calls: Vec<ProgrammaticCall> = Vec::new();
                 for item in &raw {
                     let (tool, json) = match item.split_once('|') {
@@ -494,7 +514,7 @@ impl CliCommand for McpCmd {
                     });
                 }
                 // 经 plan() 校验 (未知工具拒绝 = 校验门), 再走 governed 执行路径
-                let planner = ProgrammaticPlanner::new(&registry);
+                let planner = ProgrammaticPlanner::new(&get_mcp_registry());
                 let plan = match planner.plan(calls) {
                     Ok(p) => p,
                     Err(e) => return CommandOutput::err(&format!("[exec] 校验失败: {}", e)),

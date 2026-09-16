@@ -1,6 +1,6 @@
 use super::self_iterating::ReasoningBrain;
 use super::memory::ReasoningBank;
-// use super::context_artifacts::{ArtifactIndexer, ArtifactStore, Artifact, ArtifactType};
+use super::knowledge::context_artifacts::{ArtifactIndexer, ArtifactStore, Artifact, ArtifactType};
 use super::reasoning_engine::ReasoningEngine;
 use std::path::Path;
 

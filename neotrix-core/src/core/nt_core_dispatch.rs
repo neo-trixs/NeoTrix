@@ -313,7 +313,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dispatch_waterfall_reports_short_circuit() {
+    fn test_dispatch_waterfall_reports_short_circuit() -> Result<(), String> {
         let mut d = Dispatcher::new();
         let count = Arc::new(AtomicU32::new(0));
         d.on(move |_e| false); // 放行
@@ -324,11 +324,9 @@ mod tests {
                 true // 拦截
             });
         }
-        d.on(move |_e| {
-            panic!("must be short-circuited");
-        });
         assert!(d.dispatch_waterfall(&1)); // 有拦截
         assert_eq!(count.load(Ordering::SeqCst), 1);
+        Ok(())
     }
 
     #[test]

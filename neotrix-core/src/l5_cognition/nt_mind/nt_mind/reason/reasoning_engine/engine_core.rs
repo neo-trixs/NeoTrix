@@ -1,47 +1,51 @@
-use std::sync::{Arc, Mutex};
 use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, Mutex};
 
 use crate::core::l7_capability::nt_core_antidistil::AntiDistillationSystem;
+use crate::core::nt_core_aura::IntentEngine;
 use crate::core::nt_core_bank::ReasoningBank;
 use crate::core::nt_core_cot_generator::CoTGenerator;
-use crate::core::nt_core_e8::state_machine::E8StateMachine;
-use crate::core::nt_core_e8::thinking_budget::DifficultyEstimator;
+use crate::core::nt_core_e8::domain_transition::{CoTLength, E8DomainTransitionModel, E8TaskType};
 use crate::core::nt_core_e8::ewhr_bridge::E8EwhrBridge;
-use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType, E8DomainTransitionModel};
 use crate::core::nt_core_e8::nt_core_e8_prediction::E8PredictionOracle;
 use crate::core::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FablePhase};
 use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
-use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
 use crate::core::nt_core_e8::nt_latent_reasoning::LatentReasoningPipeline;
 use crate::core::nt_core_e8::nt_latent_transformer::LatentReasoningTransformer;
-use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
 use crate::core::nt_core_e8::nt_multimodal::{MultimodalEncoder, MultimodalInput};
-use crate::core::nt_core_sae_bridge::SAEBridge;
-use crate::l5_cognition::nt_mind::nt_mind::knowledge::context_artifacts::indexer::ArtifactIndexer;
-use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
+use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
+use crate::core::nt_core_e8::state_machine::E8StateMachine;
+use crate::core::nt_core_e8::thinking_budget::DifficultyEstimator;
+use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
 use crate::core::nt_core_prm::ProcessRewardLearner;
-use crate::core::nt_core_aura::IntentEngine;
+use crate::core::nt_core_sae_bridge::SAEBridge;
 use crate::core::nt_core_trajectory_compress::{CompressionLevel, TrajectoryCompressor};
+use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
+use crate::l5_cognition::nt_mind::nt_mind::knowledge::context_artifacts::indexer::ArtifactIndexer;
 
-use crate::core::nt_core_span::{AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer};
+use crate::core::l7_capability::nt_act_orch_patterns::Orchestrator;
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_hex::{FullReasoningState, ReasoningHexagram};
 use crate::core::nt_core_observer::OneObserver;
 use crate::core::nt_core_observer_error::ObserverErrorRecovery;
 use crate::core::nt_core_self::silicon_self::SiliconSelfModel;
-use crate::core::l7_capability::nt_act_orch_patterns::Orchestrator;
+use crate::core::nt_core_span::{
+    AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer,
+};
+use crate::l5_cognition::kb_facade::{KnowledgeBase, SearchResult};
+use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{
+    AlternatingSequence, ControlDistiller, ControlTrainer, CsppoReport, ReasoningStep, SftReport,
+};
 use crate::l5_cognition::nt_mind::nt_mind::core::BrainMutView;
 use crate::l5_cognition::nt_mind::nt_mind::distillation::{AntiPattern, StrategicPrinciple};
-use crate::l5_cognition::nt_mind::nt_mind::seal_core::model_router::ModelRouter;
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
-use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{ControlDistiller, AlternatingSequence, ReasoningStep, ControlTrainer, SftReport, CsppoReport};
-use crate::l5_cognition::kb_facade::{KnowledgeBase, SearchResult};
+use crate::l5_cognition::nt_mind::nt_mind::seal_core::model_router::ModelRouter;
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
 // use crate::l5_cognition::nt_mind::context_artifacts::indexer::ArtifactIndexer;
-use crate::l1_action::nt_io::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
-use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
-use crate::l5_cognition::l6_facade::ConsciousnessGoldStandard;
 use super::CognitiveEye;
+use crate::l1_action::nt_io::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
+use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 pub const MAX_COST_LOG: usize = 1000;
 pub const MAX_TRACES: usize = 1000;
@@ -143,7 +147,9 @@ pub struct ReasoningEngine {
     /// Intent engine: tracks user/agent intent through reasoning
     pub intent_engine: Option<IntentEngine>,
     /// Hypothesis network: shared with EWHR REST API
-    pub hypothesis_network: Option<Arc<Mutex<crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>>>,
+    pub hypothesis_network: Option<
+        Arc<Mutex<crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>>,
+    >,
     /// Fable-5 pattern matcher: scores trajectory alignment against Mythos reasoning phases
     pub fable_matcher: Option<FablePatternMatcher>,
     /// E8 prediction oracle: distributional prediction with ensemble + MCTS
@@ -236,7 +242,9 @@ impl ReasoningEngine {
             tracer: None,
             cost_tracker: None,
             _last_watermarked: None,
-            control_distiller: Some(ControlDistiller::new(Arc::new(ConsciousnessGoldStandard::new()))),
+            control_distiller: Some(ControlDistiller::new(Arc::new(
+                ConsciousnessGoldStandard::new(),
+            ))),
             distilled_sequences: Vec::new(),
             train_batch: 0,
             ewhr_bridge: None,
@@ -320,7 +328,12 @@ impl ReasoningEngine {
         self
     }
 
-    pub fn with_hypothesis_network(mut self, net: Arc<Mutex<crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>>) -> Self {
+    pub fn with_hypothesis_network(
+        mut self,
+        net: Arc<
+            Mutex<crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>,
+        >,
+    ) -> Self {
         self.hypothesis_network = Some(net);
         self
     }
@@ -335,17 +348,26 @@ impl ReasoningEngine {
         self
     }
 
-    pub(crate) fn _with_verifier(mut self, verifier: crate::core::nt_core_prm::GroundedPrmVerifier) -> Self {
+    pub(crate) fn _with_verifier(
+        mut self,
+        verifier: crate::core::nt_core_prm::GroundedPrmVerifier,
+    ) -> Self {
         self.verifier = Some(verifier);
         self
     }
 
-    pub(crate) fn _with_context_builder(mut self, builder: crate::core::nt_core_reasoning::ContextBuilder) -> Self {
+    pub(crate) fn _with_context_builder(
+        mut self,
+        builder: crate::core::nt_core_reasoning::ContextBuilder,
+    ) -> Self {
         self.context_builder = Some(builder);
         self
     }
 
-    pub(crate) fn _with_cot_generator(mut self, generator: crate::core::nt_core_cot_generator::DefaultCoTGenerator) -> Self {
+    pub(crate) fn _with_cot_generator(
+        mut self,
+        generator: crate::core::nt_core_cot_generator::DefaultCoTGenerator,
+    ) -> Self {
         self.cot_generator = Some(generator);
         self
     }
@@ -395,23 +417,34 @@ impl ReasoningEngine {
         self
     }
 
-    pub fn with_observer_transition_matrix(mut self, matrix: crate::core::nt_core_e8::E8TransitionMatrix) -> Self {
+    pub fn with_observer_transition_matrix(
+        mut self,
+        matrix: crate::core::nt_core_e8::E8TransitionMatrix,
+    ) -> Self {
         self.observer = self.observer.with_transition_matrix(matrix);
         self
     }
 
     pub fn reason(&mut self, task: &str) -> NeoTrixResult<String> {
-        let root_span = self.tracer.as_ref()
+        let root_span = self
+            .tracer
+            .as_ref()
             .map(|t| t.start_span("reason", SpanKind::Handoff))
             .unwrap_or_else(|| NoopTracer.start_span("reason", SpanKind::Handoff));
         root_span.set_attribute("task", AttributeValue::String(task.to_string()));
-        root_span.set_attribute("e8_state", AttributeValue::String(self.current_state.mode.mode_name().to_string()));
-        root_span.set_attribute("agent", AttributeValue::String("ReasoningEngine".to_string()));
+        root_span.set_attribute(
+            "e8_state",
+            AttributeValue::String(self.current_state.mode.mode_name().to_string()),
+        );
+        root_span.set_attribute(
+            "agent",
+            AttributeValue::String("ReasoningEngine".to_string()),
+        );
         root_span.set_gen_ai_system("neotrix");
 
         let (mut e8_machine, prompt) = self.prepare_reasoning(task, &root_span);
         let result = self.call_llm_and_analyze(task, &prompt, &root_span, &mut e8_machine);
-        
+
         // Phase 2.2: Verifier 生产接线 — 对 LLM 响应进行验证
         if let Ok(ref _response) = result {
             // 1. GroundedPrmVerifier: 过程级验证 (若已配置)
@@ -420,22 +453,25 @@ impl ReasoningEngine {
                 // 简化：仅记录验证器存在，实际步骤验证在 PRM learner 中进行
                 root_span.set_attribute("verifier_grounded_prm", AttributeValue::Bool(true));
             }
-            
+
             // 2. 最终答案验证器 (RLVR 锚): 使用 verify_answer 对比预期答案
             // 注意: 这里无 gold 答案, 仅作演示; 实际使用时需外部提供 gold
             // let verification_score = crate::l1_action::nt_io::nt_io_standalone::verify_answer(gold, response);
             // root_span.set_attribute("verification_score", AttributeValue::Float(verification_score));
         }
-        
+
         // Phase 2.1: CoT Generator 生产接线 — 生成结构化 CoT
         if let Ok(ref response) = result {
             if let Some(ref mut cot_gen) = self.cot_generator {
                 // 构建一个简化的 Kernel trace 用于 CoT 生成
                 let kernel_trace = crate::core::nt_core_reasoning::ReasoningTrace {
-                    trace_id: format!("engine_{}", std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos()),
+                    trace_id: format!(
+                        "engine_{}",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_nanos()
+                    ),
                     task: task.to_string(),
                     method: crate::l1_action::nt_io::nt_io_standalone::ReasoningMethod::Deductive,
                     hexagram: self.current_state.mode,
@@ -451,14 +487,22 @@ impl ReasoningEngine {
                         .unwrap_or_default()
                         .as_secs(),
                 };
-                
+
                 // 同步调用 CoT 生成器 (使用 block_on 在当前运行时中执行)
                 let cot_future = cot_gen.generate_cot(task, &kernel_trace, None);
-                if let Ok(cot_output) = tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(cot_future)) {
+                if let Ok(cot_output) = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(cot_future)
+                }) {
                     // 将 CoT 结果记录到 span 中
                     root_span.set_attribute("cot_generated", AttributeValue::Bool(true));
-                    root_span.set_attribute("cot_final_answer", AttributeValue::String(cot_output.final_answer.clone()));
-                    root_span.set_attribute("cot_overall_confidence", AttributeValue::Float(cot_output.overall_confidence));
+                    root_span.set_attribute(
+                        "cot_final_answer",
+                        AttributeValue::String(cot_output.final_answer.clone()),
+                    );
+                    root_span.set_attribute(
+                        "cot_overall_confidence",
+                        AttributeValue::Float(cot_output.overall_confidence),
+                    );
                     // 可以选择将 CoT 结果合并到响应中
                     // 这里我们记录但不替换原始响应，保持向后兼容
                 } else {
@@ -466,7 +510,7 @@ impl ReasoningEngine {
                 }
             }
         }
-        
+
         // Phase 2.3: Kernel trace → E8Policy 反哺闭环 (完整双向闭环)
         // 使用推理轨迹的收敛度和质量作为奖励信号，更新 E8Policy
         if let Ok(ref response) = result {
@@ -491,10 +535,13 @@ impl ReasoningEngine {
             } else {
                 // 回退：基于响应质量构建反馈轨迹
                 crate::core::nt_core_reasoning::ReasoningTrace {
-                    trace_id: format!("feedback_{}", std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos()),
+                    trace_id: format!(
+                        "feedback_{}",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_nanos()
+                    ),
                     task: task.to_string(),
                     method: crate::l1_action::nt_io::nt_io_standalone::ReasoningMethod::Deductive,
                     hexagram: self.current_state.mode,
@@ -511,20 +558,20 @@ impl ReasoningEngine {
                         .as_secs(),
                 }
             };
-            
+
             // 计算奖励信号：收敛度 * 0.6 + 质量 * 0.4
             let reward = feedback_trace.convergence * 0.6 + feedback_trace.final_quality * 0.4;
-            
+
             // 反哺 E8Policy：更新当前模式的 Q-value
             if let Some(ref mut policy) = self.e8_policy {
                 policy.set_previous(self.current_state.mode);
                 policy.update(reward.clamp(0.0, 1.0));
             }
-            
+
             root_span.set_attribute("e8_policy_feedback_reward", AttributeValue::Float(reward));
             root_span.set_attribute("e8_policy_feedback_applied", AttributeValue::Bool(true));
         }
-        
+
         self.run_prediction_fusion(task, &root_span, &mut e8_machine);
         self.broadcast_and_finalize(task, root_span, result)
     }
@@ -537,8 +584,14 @@ impl ReasoningEngine {
             root_span.set_attribute("ttc_difficulty", AttributeValue::Float(difficulty));
             if difficulty > 0.3 {
                 let allocation = ttc.allocate_budget(difficulty, 1.0);
-                root_span.set_attribute("ttc_strategy", AttributeValue::String(format!("{:?}", allocation.strategy)));
-                root_span.set_attribute("ttc_max_steps", AttributeValue::Int(allocation.budget.max_steps as i64));
+                root_span.set_attribute(
+                    "ttc_strategy",
+                    AttributeValue::String(format!("{:?}", allocation.strategy)),
+                );
+                root_span.set_attribute(
+                    "ttc_max_steps",
+                    AttributeValue::Int(allocation.budget.max_steps as i64),
+                );
                 e8_machine.budget = Some(allocation);
             }
         }
@@ -568,7 +621,10 @@ impl ReasoningEngine {
                 }
                 decomposed.push_str("\nProceed through each step sequentially.");
                 root_span.set_attribute("antidistil_decomposed", AttributeValue::Bool(true));
-                root_span.set_attribute("antidistil_decomp_steps", AttributeValue::Int(suggestions.len() as i64));
+                root_span.set_attribute(
+                    "antidistil_decomp_steps",
+                    AttributeValue::Int(suggestions.len() as i64),
+                );
                 decomposed
             } else {
                 task.to_string()
@@ -584,13 +640,21 @@ impl ReasoningEngine {
         // surface predicted trajectory as a soft prior (absent if unwired).
         let jepa_prior = if let Some(ref jepa) = self.jepa {
             let input: Vec<f64> = task.as_bytes().iter().map(|&b| b as f64 / 255.0).collect();
-            match jepa.encode(&input).and_then(|feats| jepa.predict_with_confidence(&feats)) {
+            match jepa
+                .encode(&input)
+                .and_then(|feats| jepa.predict_with_confidence(&feats))
+            {
                 Ok((pred, confidence, uncertainty)) => {
-                    root_span.set_attribute("jepa_prior_confidence", AttributeValue::Float(confidence));
-                    root_span.set_attribute("jepa_prior_uncertainty", AttributeValue::Float(uncertainty));
+                    root_span
+                        .set_attribute("jepa_prior_confidence", AttributeValue::Float(confidence));
+                    root_span.set_attribute(
+                        "jepa_prior_uncertainty",
+                        AttributeValue::Float(uncertainty),
+                    );
                     // Quantize the predicted latent into a directional signal. High-magnitude
                     // coordinates carry the strongest next-state trend; low-magnitude ones are noise.
-                    let direction: Vec<f64> = pred.iter().cloned().filter(|&x| x.abs() > 0.1).collect();
+                    let direction: Vec<f64> =
+                        pred.iter().cloned().filter(|&x| x.abs() > 0.1).collect();
                     if direction.is_empty() {
                         String::new()
                     } else {
@@ -618,8 +682,16 @@ impl ReasoningEngine {
         (e8_machine, prompt)
     }
 
-    fn call_llm_and_analyze(&mut self, task: &str, prompt: &str, root_span: &Span, e8_machine: &mut E8StateMachine) -> NeoTrixResult<String> {
-        let llm_span = self.tracer.as_ref()
+    fn call_llm_and_analyze(
+        &mut self,
+        task: &str,
+        prompt: &str,
+        root_span: &Span,
+        e8_machine: &mut E8StateMachine,
+    ) -> NeoTrixResult<String> {
+        let llm_span = self
+            .tracer
+            .as_ref()
             .map(|t| t.start_child_span(root_span, "call_llm", SpanKind::Llm))
             .unwrap_or_else(|| NoopTracer.start_child_span(root_span, "call_llm", SpanKind::Llm));
         llm_span.set_gen_ai_request_model(&self.default_model);
@@ -628,8 +700,15 @@ impl ReasoningEngine {
 
         match &result {
             Ok(response) => {
-                llm_span.set_attribute("response_length", AttributeValue::Int(response.len() as i64));
-                if let Some(ref t) = self.tracer { t.end_span(llm_span); } else { NoopTracer.end_span(llm_span); }
+                llm_span.set_attribute(
+                    "response_length",
+                    AttributeValue::Int(response.len() as i64),
+                );
+                if let Some(ref t) = self.tracer {
+                    t.end_span(llm_span);
+                } else {
+                    NoopTracer.end_span(llm_span);
+                }
                 if let Some(ref _ttc) = self.ttc_engine {
                     let early_exit = e8_machine.check_early_exit(0.9);
                     root_span.set_attribute("ttc_early_exit", AttributeValue::Bool(early_exit));
@@ -639,7 +718,12 @@ impl ReasoningEngine {
                     ads.record_llm_call(refused);
                     let bits = ads.watermark.to_bits();
                     let watermarked = ads.watermark_response(response);
-                    ads.register_trace(response, bits, &self.default_model, &prompt[..prompt.len().min(64)]);
+                    ads.register_trace(
+                        response,
+                        bits,
+                        &self.default_model,
+                        &prompt[..prompt.len().min(64)],
+                    );
                     if self.gateway.is_some() {
                         ads.detector.record_request(
                             &self.default_model,
@@ -660,7 +744,11 @@ impl ReasoningEngine {
             }
             Err(e) => {
                 llm_span.set_attribute("error", AttributeValue::String(format!("{}", e)));
-                if let Some(ref t) = self.tracer { t.end_span(llm_span); } else { NoopTracer.end_span(llm_span); }
+                if let Some(ref t) = self.tracer {
+                    t.end_span(llm_span);
+                } else {
+                    NoopTracer.end_span(llm_span);
+                }
                 false
             }
         };
@@ -678,20 +766,37 @@ impl ReasoningEngine {
             let hex = self.current_state.mode;
             let features = sae.extract_features(hex.0, self.current_state.meta.0, &[]);
             if !features.is_empty() {
-                root_span.set_attribute("sae_active_features", AttributeValue::Int(features.len() as i64));
-                root_span.set_attribute("sae_top_feature", AttributeValue::String(
-                    features.iter().max_by(|a, b| a.activation.total_cmp(&b.activation))
-                        .map(|f| format!("f{}({:.3})", f.index, f.activation))
-                        .unwrap_or_default()
-                ));
+                root_span.set_attribute(
+                    "sae_active_features",
+                    AttributeValue::Int(features.len() as i64),
+                );
+                root_span.set_attribute(
+                    "sae_top_feature",
+                    AttributeValue::String(
+                        features
+                            .iter()
+                            .max_by(|a, b| a.activation.total_cmp(&b.activation))
+                            .map(|f| format!("f{}({:.3})", f.index, f.activation))
+                            .unwrap_or_default(),
+                    ),
+                );
             }
         }
 
         // Observer analysis: record transitions, detect patterns, compute PRM scores
         let observer_report = self.observer.analyze(&self.state_trajectory, &[task]);
-        root_span.set_attribute("observer_traj_len", AttributeValue::Int(observer_report.trajectory_len as i64));
-        root_span.set_attribute("observer_quality", AttributeValue::Float(observer_report.quality_score));
-        root_span.set_attribute("observer_distinct_states", AttributeValue::Int(observer_report.distinct_states as i64));
+        root_span.set_attribute(
+            "observer_traj_len",
+            AttributeValue::Int(observer_report.trajectory_len as i64),
+        );
+        root_span.set_attribute(
+            "observer_quality",
+            AttributeValue::Float(observer_report.quality_score),
+        );
+        root_span.set_attribute(
+            "observer_distinct_states",
+            AttributeValue::Int(observer_report.distinct_states as i64),
+        );
         for p in &observer_report.patterns {
             root_span.set_attribute("observer_pattern", AttributeValue::String(p.clone()));
         }
@@ -729,8 +834,14 @@ impl ReasoningEngine {
                     collector.finish(None, false);
                 }
             });
-            root_span.set_attribute("prm_avg_score", AttributeValue::Float(prm_learner.avg_recent_score(10)));
-            root_span.set_attribute("prm_learning_count", AttributeValue::Int(prm_learner.learning_count as i64));
+            root_span.set_attribute(
+                "prm_avg_score",
+                AttributeValue::Float(prm_learner.avg_recent_score(10)),
+            );
+            root_span.set_attribute(
+                "prm_learning_count",
+                AttributeValue::Int(prm_learner.learning_count as i64),
+            );
         }
 
         // Fable-5 pattern matcher: score trajectory alignment against Mythos reasoning phases
@@ -746,10 +857,22 @@ impl ReasoningEngine {
                     E8TaskType::Creative => 5,
                 };
                 let alignment = matcher.score_alignment_advanced(&traj_modes, task_type_idx, 0.5);
-                root_span.set_attribute("fable_composite", AttributeValue::Float(alignment.composite));
-                root_span.set_attribute("fable_non_linear", AttributeValue::Float(alignment.non_linear_score));
-                root_span.set_attribute("fable_phase_score", AttributeValue::Float(alignment.quality));
-                root_span.set_attribute("fable_transition_score", AttributeValue::Float(alignment.transition_score));
+                root_span.set_attribute(
+                    "fable_composite",
+                    AttributeValue::Float(alignment.composite),
+                );
+                root_span.set_attribute(
+                    "fable_non_linear",
+                    AttributeValue::Float(alignment.non_linear_score),
+                );
+                root_span.set_attribute(
+                    "fable_phase_score",
+                    AttributeValue::Float(alignment.quality),
+                );
+                root_span.set_attribute(
+                    "fable_transition_score",
+                    AttributeValue::Float(alignment.transition_score),
+                );
 
                 let sqv = matcher.sqv_score(&traj_modes);
                 if sqv > 0.01 {
@@ -764,7 +887,12 @@ impl ReasoningEngine {
         result
     }
 
-    fn run_prediction_fusion(&mut self, task: &str, root_span: &Span, e8_machine: &mut E8StateMachine) {
+    fn run_prediction_fusion(
+        &mut self,
+        task: &str,
+        root_span: &Span,
+        e8_machine: &mut E8StateMachine,
+    ) {
         // E8 Prediction Oracle: compute prediction distribution for next E8 state
         // This provides a differentiable attention bridge to GWT via attention_weights()
         //
@@ -784,12 +912,26 @@ impl ReasoningEngine {
         // (previously the tier was only selected after prediction and never
         // reached the MCTS predictor, which ran with fixed budget 8/50).
         let difficulty = DifficultyEstimator::heuristic_difficulty(task, "reasoning");
-        let effort_tier = self.effort_tier_selector.select_for_task(difficulty, task.len());
+        let effort_tier = self
+            .effort_tier_selector
+            .select_for_task(difficulty, task.len());
         self.last_effort_tier = Some(effort_tier);
-        root_span.set_attribute("effort_tier", AttributeValue::String(format!("{:?}", effort_tier)));
-        root_span.set_attribute("effort_rollout_depth", AttributeValue::Int(effort_tier.rollout_depth() as i64));
-        root_span.set_attribute("effort_sparse_k", AttributeValue::Int(effort_tier.sparse_k() as i64));
-        root_span.set_attribute("effort_mcts_sims", AttributeValue::Int(effort_tier.mcts_simulations() as i64));
+        root_span.set_attribute(
+            "effort_tier",
+            AttributeValue::String(format!("{:?}", effort_tier)),
+        );
+        root_span.set_attribute(
+            "effort_rollout_depth",
+            AttributeValue::Int(effort_tier.rollout_depth() as i64),
+        );
+        root_span.set_attribute(
+            "effort_sparse_k",
+            AttributeValue::Int(effort_tier.sparse_k() as i64),
+        );
+        root_span.set_attribute(
+            "effort_mcts_sims",
+            AttributeValue::Int(effort_tier.mcts_simulations() as i64),
+        );
 
         if let Some(ref mut oracle) = self.prediction_oracle {
             // Apply effort-tier budget to the MCTS predictor: Low tiers run
@@ -852,19 +994,41 @@ impl ReasoningEngine {
                 // MCTS-enhanced prediction: blend ensemble (0.6) with MCTS beam search (0.4)
                 // Previously only predict_distribution() was called in production — the MCTS
                 // predictor was constructed and injected but never used. Now both are fused.
-                let (dist, mcts_state, mcts_value, mcts_confidence) = oracle.predict_with_mcts(tm, current_mode, task_type, current_phase, &pm, cot_length);
+                let (dist, mcts_state, mcts_value, mcts_confidence) = oracle.predict_with_mcts(
+                    tm,
+                    current_mode,
+                    task_type,
+                    current_phase,
+                    &pm,
+                    cot_length,
+                );
                 let (best_state, best_prob) = dist.best();
                 let effective = dist.effective_90pct_count();
-                root_span.set_attribute("e8_pred_best_state", AttributeValue::Int(best_state as i64));
+                root_span
+                    .set_attribute("e8_pred_best_state", AttributeValue::Int(best_state as i64));
                 root_span.set_attribute("e8_pred_best_prob", AttributeValue::Float(best_prob));
-                root_span.set_attribute("e8_pred_mcts_state", AttributeValue::Int(mcts_state as i64));
+                root_span
+                    .set_attribute("e8_pred_mcts_state", AttributeValue::Int(mcts_state as i64));
                 root_span.set_attribute("e8_pred_entropy", AttributeValue::Float(dist.entropy));
-                root_span.set_attribute("e8_pred_confidence", AttributeValue::Float(mcts_confidence));
+                root_span
+                    .set_attribute("e8_pred_confidence", AttributeValue::Float(mcts_confidence));
                 root_span.set_attribute("e8_pred_mcts_value", AttributeValue::Float(mcts_value));
-                root_span.set_attribute("e8_pred_effective_90", AttributeValue::Int(effective as i64));
-                root_span.set_attribute("e8_task_type", AttributeValue::String(task_type.label().to_string()));
-                root_span.set_attribute("e8_current_phase", AttributeValue::String(current_phase.label().to_string()));
-                root_span.set_attribute("e8_domain_blended", AttributeValue::Bool(self.domain_transition_model.is_some()));
+                root_span.set_attribute(
+                    "e8_pred_effective_90",
+                    AttributeValue::Int(effective as i64),
+                );
+                root_span.set_attribute(
+                    "e8_task_type",
+                    AttributeValue::String(task_type.label().to_string()),
+                );
+                root_span.set_attribute(
+                    "e8_current_phase",
+                    AttributeValue::String(current_phase.label().to_string()),
+                );
+                root_span.set_attribute(
+                    "e8_domain_blended",
+                    AttributeValue::Bool(self.domain_transition_model.is_some()),
+                );
 
                 // Advance the E8 state machine toward the predicted best state so the
                 // trajectory records real transitions instead of a frozen self-loop.
@@ -883,14 +1047,19 @@ impl ReasoningEngine {
                     e8_machine.transition(pred_hex, task);
                     self.current_state = e8_machine.current_state;
                     // Guard against duplicate consecutive entries from the start-of-call push.
-                    if self.state_trajectory.last().map(|s| s.mode.0) != Some(self.current_state.mode.0) {
+                    if self.state_trajectory.last().map(|s| s.mode.0)
+                        != Some(self.current_state.mode.0)
+                    {
                         self.state_trajectory.push(self.current_state);
                     }
                     root_span.set_attribute("e8_state_advanced", AttributeValue::Bool(true));
                 } else {
                     root_span.set_attribute("e8_state_advanced", AttributeValue::Bool(false));
                 }
-                root_span.set_attribute("e8_trajectory_len", AttributeValue::Int(self.state_trajectory.len() as i64));
+                root_span.set_attribute(
+                    "e8_trajectory_len",
+                    AttributeValue::Int(self.state_trajectory.len() as i64),
+                );
 
                 // Store top-3 predictions as span attributes for GWT/SEAL consumption
                 for (rank, &(state, prob)) in dist.top_5.iter().take(3).enumerate() {
@@ -900,10 +1069,12 @@ impl ReasoningEngine {
                     );
                 }
 
-                 // Fable 5 effort tier: computed above (before the oracle call) and
-                 // applied to the MCTS budget — reused here for the fusion pipeline's
-                 // sparse-k + thinking-budget scaling.
-                 let effort_tier = self.last_effort_tier.unwrap_or(crate::core::nt_core_ttc::EffortTier::Medium);
+                // Fable 5 effort tier: computed above (before the oracle call) and
+                // applied to the MCTS budget — reused here for the fusion pipeline's
+                // sparse-k + thinking-budget scaling.
+                let effort_tier = self
+                    .last_effort_tier
+                    .unwrap_or(crate::core::nt_core_ttc::EffortTier::Medium);
 
                 // ── 意识体内核融合管线 (Consciousness Core Fusion) ──────────────
                 // Fuses the defining 2026 frontier-model innovations into a single
@@ -925,7 +1096,10 @@ impl ReasoningEngine {
                 // Gemini 3.6 step-route cache: reuse routing decision for repeated
                 // (task_type, phase, effort, source_bucket) contexts across the seal loop.
                 let cache_key = crate::core::nt_core_e8::nt_core_synthesis::StepRouteCache::key(
-                    task_type as u8, phase_step as u8, synth_effort.rank(), current_mode,
+                    task_type as u8,
+                    phase_step as u8,
+                    synth_effort.rank(),
+                    current_mode,
                 );
                 let mut route_hit = false;
                 // Fable 5 classifier-wrapped routing: high-risk contexts bypass
@@ -934,12 +1108,14 @@ impl ReasoningEngine {
                 // the cache key carries no risk signal, so a routing cached for a
                 // benign task in the same (task_type, phase, effort, bucket) would
                 // otherwise be served unguarded to a high-risk request.
-                let total_routes = self.synthesis.step_route_cache.hits + self.synthesis.step_route_cache.misses;
+                let total_routes =
+                    self.synthesis.step_route_cache.hits + self.synthesis.step_route_cache.misses;
                 let route_hits = self.synthesis.step_route_cache.hits;
                 if self.synthesis.fused_pipeline_enabled {
                     if let Some(cached_topk) = self.synthesis.step_route_cache.get(&cache_key) {
                         route_hit = true;
-                        root_span.set_attribute("synthesis_route_cache", AttributeValue::Bool(true));
+                        root_span
+                            .set_attribute("synthesis_route_cache", AttributeValue::Bool(true));
                         // Blend cached top-k into the attention vector
                         let mut attn = vec![0.0f64; 64];
                         for (state, prob) in &cached_topk {
@@ -947,21 +1123,41 @@ impl ReasoningEngine {
                         }
                         // Safety classifier must run on cache hits too: re-gate the
                         // cached routing through the same frontier/conservative switch.
-                        if self.synthesis.safety_router.allow_frontier(task, route_hits, total_routes) {
+                        if self.synthesis.safety_router.allow_frontier(
+                            task,
+                            route_hits,
+                            total_routes,
+                        ) {
                             attn = self.synthesis.muon.condition_vector(&attn);
                             root_span.set_attribute("synthesis_safety", AttributeValue::Bool(true));
                         } else {
-                            attn = self.synthesis.safety_router.conservative_distribution(&attn);
-                            root_span.set_attribute("synthesis_safety", AttributeValue::Bool(false));
-                            root_span.set_attribute("synthesis_safety_fallback", AttributeValue::Bool(true));
+                            attn = self
+                                .synthesis
+                                .safety_router
+                                .conservative_distribution(&attn);
+                            root_span
+                                .set_attribute("synthesis_safety", AttributeValue::Bool(false));
+                            root_span.set_attribute(
+                                "synthesis_safety_fallback",
+                                AttributeValue::Bool(true),
+                            );
                         }
                         self.last_e8_attention_weights = Some(attn);
                         let capped_confidence = mcts_confidence.min(effort_tier.confidence_cap());
                         self.last_e8_confidence = capped_confidence;
                     } else {
                         // Fused pipeline: dominance cap + AttnRes + effort sparse top-K
-                        let mut fused = self.synthesis.fused_distribution(tm, current_mode, &traj_modes, synth_effort);
-                        if self.synthesis.safety_router.allow_frontier(task, route_hits, total_routes) {
+                        let mut fused = self.synthesis.fused_distribution(
+                            tm,
+                            current_mode,
+                            &traj_modes,
+                            synth_effort,
+                        );
+                        if self.synthesis.safety_router.allow_frontier(
+                            task,
+                            route_hits,
+                            total_routes,
+                        ) {
                             // DeepSeek-V4 Muon: condition the fused flow so transition
                             // columns stay well-conditioned (no rank collapse). Applied
                             // as an 8×8 Newton-Schulz orthogonalization of the
@@ -970,11 +1166,20 @@ impl ReasoningEngine {
                             root_span.set_attribute("synthesis_safety", AttributeValue::Bool(true));
                         } else {
                             // Conservative path: damp aggressive distribution toward uniform
-                            fused = self.synthesis.safety_router.conservative_distribution(&fused);
-                            root_span.set_attribute("synthesis_safety", AttributeValue::Bool(false));
-                            root_span.set_attribute("synthesis_safety_fallback", AttributeValue::Bool(true));
+                            fused = self
+                                .synthesis
+                                .safety_router
+                                .conservative_distribution(&fused);
+                            root_span
+                                .set_attribute("synthesis_safety", AttributeValue::Bool(false));
+                            root_span.set_attribute(
+                                "synthesis_safety_fallback",
+                                AttributeValue::Bool(true),
+                            );
                         }
-                        let topk: Vec<(u8, f64)> = fused.iter().enumerate()
+                        let topk: Vec<(u8, f64)> = fused
+                            .iter()
+                            .enumerate()
                             .filter(|(_, &p)| p > 1e-4)
                             .map(|(i, &p)| (i as u8, p))
                             .collect();
@@ -992,8 +1197,14 @@ impl ReasoningEngine {
                 }
 
                 root_span.set_attribute("synthesis_route_hit", AttributeValue::Bool(route_hit));
-                root_span.set_attribute("synthesis_route_hit_rate", AttributeValue::Float(self.synthesis.step_route_cache.hit_rate()));
-                root_span.set_attribute("synthesis_active", AttributeValue::Bool(self.synthesis.fused_pipeline_enabled));
+                root_span.set_attribute(
+                    "synthesis_route_hit_rate",
+                    AttributeValue::Float(self.synthesis.step_route_cache.hit_rate()),
+                );
+                root_span.set_attribute(
+                    "synthesis_active",
+                    AttributeValue::Bool(self.synthesis.fused_pipeline_enabled),
+                );
                 for (k, v) in self.synthesis.telemetry() {
                     root_span.set_attribute(&k, AttributeValue::String(v));
                 }
@@ -1003,7 +1214,11 @@ impl ReasoningEngine {
                 root_span.set_attribute(
                     "e8_attn_entropy",
                     AttributeValue::Float(
-                        attn_ref.iter().filter(|&&p| p > 0.0).map(|&p| -p * p.log(2.0)).sum::<f64>(),
+                        attn_ref
+                            .iter()
+                            .filter(|&&p| p > 0.0)
+                            .map(|&p| -p * p.log(2.0))
+                            .sum::<f64>(),
                     ),
                 );
 
@@ -1012,7 +1227,9 @@ impl ReasoningEngine {
                 // their cross-domain similarity for telemetry.
                 if attn_ref.len() == 64 {
                     let e8_embed = self.unified_latent.project_e8(attn_ref);
-                    let state_proj = self.unified_latent.project_e8_state(self.current_state.mode);
+                    let state_proj = self
+                        .unified_latent
+                        .project_e8_state(self.current_state.mode);
                     let cross = self.unified_latent.cosine(&e8_embed, &state_proj);
                     root_span.set_attribute("unified_e8_self_sim", AttributeValue::Float(cross));
                 }
@@ -1022,11 +1239,18 @@ impl ReasoningEngine {
                 // broadcast the resulting direct E8 attention bias to GWT.
                 let latent_retrieval = self.latent_reasoning.query_state(self.current_state.mode);
                 if !latent_retrieval.neighbor_modes.is_empty() {
-                    let (latent_weights, latent_bias) =
-                        self.latent_reasoning.to_gwt_attention(&latent_retrieval, 0.2);
+                    let (latent_weights, latent_bias) = self
+                        .latent_reasoning
+                        .to_gwt_attention(&latent_retrieval, 0.2);
                     root_span.set_attribute(
                         "latent_retrieval_top_sim",
-                        AttributeValue::Float(latent_retrieval.similarities.first().copied().unwrap_or(0.0)),
+                        AttributeValue::Float(
+                            latent_retrieval
+                                .similarities
+                                .first()
+                                .copied()
+                                .unwrap_or(0.0),
+                        ),
                     );
                     root_span.set_attribute(
                         "latent_memory_fill",
@@ -1068,7 +1292,9 @@ impl ReasoningEngine {
                 // is surfaced for telemetry. Wired into the reason hot path so
                 // the trajectory actually advances (R-P79).
                 let latent_input: Vec<f64> = attn_owned;
-                if latent_input.len() == crate::core::nt_core_e8::nt_latent_transformer::LATENT_HIDDEN_DIM {
+                if latent_input.len()
+                    == crate::core::nt_core_e8::nt_latent_transformer::LATENT_HIDDEN_DIM
+                {
                     let latent_state = self.latent_transformer.reason(
                         &latent_input,
                         crate::core::nt_core_e8::nt_latent_transformer::MAX_LATENT_DEPTH,
@@ -1083,10 +1309,8 @@ impl ReasoningEngine {
                     // Fold the recursive-depth reward into the engine's step
                     // reward telemetry so deeper latent trajectories are
                     // observable downstream (PRM / SEAL consumers).
-                    self.last_step_rewards.push((
-                        format!("latent_transformer_depth_{}", depth),
-                        depth_reward,
-                    ));
+                    self.last_step_rewards
+                        .push((format!("latent_transformer_depth_{}", depth), depth_reward));
                 }
 
                 // Phase 6.3 — sparse MoE routing: score E8 expert groups for the
@@ -1097,28 +1321,39 @@ impl ReasoningEngine {
                 // was only test-covered — now it gates the production attention.
                 if self.last_e8_attention_weights.is_some() {
                     let cur_mode = self.current_state.mode.0;
-                    let task_type = crate::core::nt_core_e8::domain_transition::E8TaskType::detect(task);
-                    let next_mass: Option<[f64; 8]> = self.last_e8_attention_weights.as_ref().map(|w| {
-                        let mut m = [0.0f64; 8];
-                        for (i, &p) in w.iter().enumerate() {
-                            let g = (i / 8).min(7);
-                            m[g] += p;
-                        }
-                        m
-                    });
-                    let routing = self.sparse_moe.route(cur_mode, task_type, next_mass.as_ref());
+                    let task_type =
+                        crate::core::nt_core_e8::domain_transition::E8TaskType::detect(task);
+                    let next_mass: Option<[f64; 8]> =
+                        self.last_e8_attention_weights.as_ref().map(|w| {
+                            let mut m = [0.0f64; 8];
+                            for (i, &p) in w.iter().enumerate() {
+                                let g = (i / 8).min(7);
+                                m[g] += p;
+                            }
+                            m
+                        });
+                    let routing = self
+                        .sparse_moe
+                        .route(cur_mode, task_type, next_mass.as_ref());
                     let weights_ref = self.last_e8_attention_weights.as_ref();
                     if let Some(weights) = weights_ref {
                         if let Ok(arr) = <[f64; 64]>::try_from(weights.as_slice()) {
                             let masked = self.sparse_moe.apply_mask(&routing, &arr);
                             self.last_e8_attention_weights = Some(masked.to_vec());
-                            root_span.set_attribute("sparse_moe_active_groups", AttributeValue::String(
-                                format!("{:?}", routing.active_groups),
-                            ));
-                            root_span.set_attribute("sparse_moe_sparsity", AttributeValue::Float(routing.sparsity()));
-                            root_span.set_attribute("sparse_moe_retained_mass", AttributeValue::Float(
-                                self.sparse_moe.retained_mass(&routing, &arr),
-                            ));
+                            root_span.set_attribute(
+                                "sparse_moe_active_groups",
+                                AttributeValue::String(format!("{:?}", routing.active_groups)),
+                            );
+                            root_span.set_attribute(
+                                "sparse_moe_sparsity",
+                                AttributeValue::Float(routing.sparsity()),
+                            );
+                            root_span.set_attribute(
+                                "sparse_moe_retained_mass",
+                                AttributeValue::Float(
+                                    self.sparse_moe.retained_mass(&routing, &arr),
+                                ),
+                            );
                         }
                     }
                 }
@@ -1140,8 +1375,14 @@ impl ReasoningEngine {
                             "vision_bridge_video",
                             AttributeValue::String(vid.display().to_string()),
                         );
-                        root_span.set_attribute("vision_bridge_video_frames", AttributeValue::Int(summary.frames as i64));
-                        root_span.set_attribute("vision_bridge_video_key_frames", AttributeValue::Int(summary.key_frames as i64));
+                        root_span.set_attribute(
+                            "vision_bridge_video_frames",
+                            AttributeValue::Int(summary.frames as i64),
+                        );
+                        root_span.set_attribute(
+                            "vision_bridge_video_key_frames",
+                            AttributeValue::Int(summary.key_frames as i64),
+                        );
                         root_span.set_attribute(
                             "vision_bridge_video_classifications",
                             AttributeValue::String(summary.classifications),
@@ -1152,7 +1393,11 @@ impl ReasoningEngine {
                 if vision_source.is_none() {
                     if let Some(path) = referenced_image_path(task) {
                         if let Ok(bytes) = std::fs::read(&path) {
-                            if let Ok((_evidence, feat)) = crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(&bytes) {
+                            if let Ok((_evidence, feat)) =
+                                crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(
+                                    &bytes,
+                                )
+                            {
                                 multi_input = multi_input.with_image(feat);
                                 root_span.set_attribute(
                                     "vision_bridge_image",
@@ -1164,14 +1409,20 @@ impl ReasoningEngine {
                 }
                 let multi_embeds = self.multimodal.encode_all(&multi_input);
                 if !multi_embeds.is_empty() {
-                    let router_weights: BTreeMap<crate::core::nt_core_gwt::modality_router::Modality, f64> = {
+                    let router_weights: BTreeMap<
+                        crate::core::nt_core_gwt::modality_router::Modality,
+                        f64,
+                    > = {
                         let mut m = BTreeMap::new();
                         if let Some(g) = &self.gwt {
                             for mod_i in crate::core::nt_core_gwt::modality_router::Modality::ALL {
                                 m.insert(mod_i, g.modality_router.weight_of(mod_i));
                             }
                         } else {
-                            m.insert(crate::core::nt_core_gwt::modality_router::Modality::Text, 1.0);
+                            m.insert(
+                                crate::core::nt_core_gwt::modality_router::Modality::Text,
+                                1.0,
+                            );
                         }
                         m
                     };
@@ -1195,7 +1446,12 @@ impl ReasoningEngine {
         }
     }
 
-    fn broadcast_and_finalize(&mut self, task: &str, root_span: Span, result: NeoTrixResult<String>) -> NeoTrixResult<String> {
+    fn broadcast_and_finalize(
+        &mut self,
+        task: &str,
+        root_span: Span,
+        result: NeoTrixResult<String>,
+    ) -> NeoTrixResult<String> {
         // GWT 共振职责已收敛至后台环 (background_loop handlers_consciousness.rs):
         // reasoner 热路径不再承担 GWT resonant_broadcast —— 产物 (winner/entropy) 仅
         // 进 telemetry, 无决策/学习消费, 属 cycle 204 HIGH-2 冗余共振。reasoner 侧
@@ -1206,7 +1462,10 @@ impl ReasoningEngine {
             self.state_trajectory = compressor.compress_state_trajectory(&self.state_trajectory);
             let saved = orig_len.saturating_sub(self.state_trajectory.len());
             if saved > 0 {
-                root_span.set_attribute("trajectory_compressed_states", AttributeValue::Int(saved as i64));
+                root_span.set_attribute(
+                    "trajectory_compressed_states",
+                    AttributeValue::Int(saved as i64),
+                );
             }
         }
 
@@ -1244,20 +1503,34 @@ impl ReasoningEngine {
         if let Some(ref bridge) = self.ewhr_bridge {
             let proposed = bridge.analyze_trajectory(&self.state_trajectory, task);
             if !proposed.is_empty() {
-                root_span.set_attribute("ewhr_hypotheses_proposed", AttributeValue::Int(proposed.len() as i64));
+                root_span.set_attribute(
+                    "ewhr_hypotheses_proposed",
+                    AttributeValue::Int(proposed.len() as i64),
+                );
                 // Hydrate into HypothesisNetwork if available
                 if let Some(ref net_lock) = self.hypothesis_network {
                     if let Ok(mut net) = net_lock.lock() {
-                        let added = hydrate_ewhr_hypotheses(&mut net, &proposed, self.state_trajectory.len());
+                        let added = hydrate_ewhr_hypotheses(
+                            &mut net,
+                            &proposed,
+                            self.state_trajectory.len(),
+                        );
                         if added > 0 {
-                            root_span.set_attribute("ewhr_hypotheses_hydrated", AttributeValue::Int(added as i64));
+                            root_span.set_attribute(
+                                "ewhr_hypotheses_hydrated",
+                                AttributeValue::Int(added as i64),
+                            );
                         }
                     }
                 }
             }
         }
 
-        if let Some(ref t) = self.tracer { t.end_span(root_span); } else { NoopTracer.end_span(root_span); }
+        if let Some(ref t) = self.tracer {
+            t.end_span(root_span);
+        } else {
+            NoopTracer.end_span(root_span);
+        }
 
         // F6 closed loop (周天大阵运转): distill the successful trace into
         // alternating sequences and periodically run SFT + CSPO to update the
@@ -1286,13 +1559,17 @@ impl ReasoningEngine {
         };
         self.record_trace(
             ReasoningType::Conversation,
-            task, "", "",
+            task,
+            "",
+            "",
             error_ctx.as_deref(),
             if result.is_ok() { 1.0 } else { 0.0 },
         );
         let error_count = if result.is_err() { 1 } else { 0 };
         let e8_mode = self.current_state.mode.mode_name().to_string();
-        let specialist = self.gwt.as_ref()
+        let specialist = self
+            .gwt
+            .as_ref()
             .and_then(|g| g.last_resonance.as_ref())
             .map(|r| r.winner.to_string())
             .unwrap_or_default();
@@ -1332,7 +1609,9 @@ impl ReasoningEngine {
         }
     }
 
-    pub fn reason_task(&mut self, task: &str) -> NeoTrixResult<String> { self.reason(task) }
+    pub fn reason_task(&mut self, task: &str) -> NeoTrixResult<String> {
+        self.reason(task)
+    }
     pub fn plan_reasoning(&mut self, task: &str, _mode: u8) -> String {
         self.reason_task(task).unwrap_or_default()
     }
@@ -1344,7 +1623,8 @@ impl ReasoningEngine {
         // Run observer analysis to monitor reasoning state health
         self._observer_analyze("self-iteration");
         // Record self-iteration through _core_review
-        let result = self.call_llm("self-iteration: analyze current state and propose improvements");
+        let result =
+            self.call_llm("self-iteration: analyze current state and propose improvements");
         self._core_review("self-iteration", &result);
         // Feed back to PRM for learning signal
         if let Some(ref mut prm) = self.prm {
@@ -1387,19 +1667,21 @@ impl ReasoningEngine {
 
     /// Serialize E8 persisted state to JSON string (KB TEXT 列存储)。
     pub fn e8_state_json(&self) -> Result<String, String> {
-        let (e8_policy, prm_learning_count, prm_score_history) = self.prm.as_ref().map_or(
-            (None, 0u64, Vec::new()),
-            |prm| {
+        let (e8_policy, prm_learning_count, prm_score_history) =
+            self.prm.as_ref().map_or((None, 0u64, Vec::new()), |prm| {
                 let history: Vec<f64> = prm.score_history.iter().rev().take(100).cloned().collect();
                 (Some(prm.policy.clone()), prm.learning_count, history)
-            },
-        );
+            });
         let state = E8PersistedState {
             current_mode: self.current_state.mode.0,
             current_meta: self.current_state.meta.0,
             last_e8_attention_weights: self.last_e8_attention_weights.clone(),
             last_e8_confidence: self.last_e8_confidence,
-            trajectory_modes: self.state_trajectory.iter().map(|s| (s.mode.0, s.meta.0)).collect(),
+            trajectory_modes: self
+                .state_trajectory
+                .iter()
+                .map(|s| (s.mode.0, s.meta.0))
+                .collect(),
             e8_policy,
             prm_learning_count,
             prm_score_history,
@@ -1417,19 +1699,24 @@ impl ReasoningEngine {
 
     /// Deserialize E8 persisted state from JSON string (KB TEXT 列存储)。
     pub fn load_e8_state_json(&mut self, json: &str) -> Result<(), String> {
-        let state: E8PersistedState = serde_json::from_str(json).map_err(|e| format!("deserialize: {}", e))?;
+        let state: E8PersistedState =
+            serde_json::from_str(json).map_err(|e| format!("deserialize: {}", e))?;
         self.current_state = FullReasoningState::new(
             ReasoningHexagram::new(state.current_mode.min(63)),
             crate::core::nt_core_hex::MetaState::new(state.current_meta),
         );
         self.last_e8_attention_weights = state.last_e8_attention_weights;
         self.last_e8_confidence = state.last_e8_confidence;
-        self.state_trajectory = state.trajectory_modes.into_iter().map(|(mode, meta)| {
-            FullReasoningState::new(
-                ReasoningHexagram::new(mode.min(63)),
-                crate::core::nt_core_hex::MetaState::new(meta),
-            )
-        }).collect();
+        self.state_trajectory = state
+            .trajectory_modes
+            .into_iter()
+            .map(|(mode, meta)| {
+                FullReasoningState::new(
+                    ReasoningHexagram::new(mode.min(63)),
+                    crate::core::nt_core_hex::MetaState::new(meta),
+                )
+            })
+            .collect();
         if let Some(policy) = state.e8_policy {
             if let Some(ref mut prm) = self.prm {
                 prm.policy = policy;
@@ -1478,8 +1765,10 @@ impl ReasoningEngine {
                         .lock()
                         .map(|g| g.iter().cloned().collect())
                         .unwrap_or_default();
-                    let mut filtered: Vec<&SearchResult> =
-                        results.iter().filter(|r| !last.contains(&r.node.id)).collect();
+                    let mut filtered: Vec<&SearchResult> = results
+                        .iter()
+                        .filter(|r| !last.contains(&r.node.id))
+                        .collect();
                     // 全部重复 → 至少保留最高相关度一条, 避免空注入
                     if filtered.is_empty() && !results.is_empty() {
                         filtered.push(&results[0]);
@@ -1512,7 +1801,10 @@ impl ReasoningEngine {
                         used += estimate_tokens(&line);
                         injected.push(r.node.id.clone());
                     }
-                    *self.last_kb_injected.lock().unwrap_or_else(|e| e.into_inner()) = injected;
+                    *self
+                        .last_kb_injected
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner()) = injected;
                     return ctx;
                 }
             }
@@ -1525,7 +1817,12 @@ impl ReasoningEngine {
             if !artifacts.is_empty() {
                 let mut ctx = String::from("Relevant artifacts:\n");
                 for a in artifacts.iter().take(5) {
-                    ctx.push_str(&format!("- {}: {} (tags: {:?})\n", a.name, a.content.chars().take(80).collect::<String>(), a.tags));
+                    ctx.push_str(&format!(
+                        "- {}: {} (tags: {:?})\n",
+                        a.name,
+                        a.content.chars().take(80).collect::<String>(),
+                        a.tags
+                    ));
                 }
                 return ctx;
             }
@@ -1552,7 +1849,11 @@ impl ReasoningEngine {
             // 将 context HashMap 转为字符串注入 prompt
             let mut ctx_str = String::new();
             for (key, vec) in ctx_map {
-                let vec_str = vec.iter().map(|x| format!("{:.3}", x)).collect::<Vec<_>>().join(",");
+                let vec_str = vec
+                    .iter()
+                    .map(|x| format!("{:.3}", x))
+                    .collect::<Vec<_>>()
+                    .join(",");
                 ctx_str.push_str(&format!("{}: [{}]\n", key, vec_str));
             }
             if !ctx_str.is_empty() {
@@ -1566,11 +1867,19 @@ impl ReasoningEngine {
             if let Ok(results) = kb.query_by_e8_state(self.current_state.mode, 5) {
                 if !results.is_empty() {
                     let mut s = String::from("KB knowledge:\n");
-                    for r in &results { s.push_str(&format!("- {} (score: {:.2})\n", r.node.title, r.score)); }
+                    for r in &results {
+                        s.push_str(&format!("- {} (score: {:.2})\n", r.node.title, r.score));
+                    }
                     s
-                } else { String::new() }
-            } else { String::new() }
-        } else { String::new() }
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
     }
 
     pub fn call_llm(&mut self, prompt: &str) -> NeoTrixResult<String> {
@@ -1617,7 +1926,11 @@ impl ReasoningEngine {
             let prompt_tokens = response.usage.prompt_tokens;
             let completion_tokens = response.usage.completion_tokens;
             if let Some(ref mut ct) = self.cost_tracker {
-                ct.record(&self.default_model, prompt_tokens as u64, completion_tokens as u64);
+                ct.record(
+                    &self.default_model,
+                    prompt_tokens as u64,
+                    completion_tokens as u64,
+                );
             }
             // T2+T4: 结果记录 + 工具路由 — 通过协调器统一处理
             if crate::l5_cognition::nt_mind::nt_mind_background_loop::consciousness_orchestrator::ConsciousnessOrchestrator::get().is_some() {
@@ -1645,12 +1958,20 @@ impl ReasoningEngine {
     /// 法官即当前 provider 本身 (GatewayV2 impl LlmProvider), 家族 = Producer;
     /// 机械护栏仍确定性前置, LLM 只是聚合打分器。无 gateway 时降级返回 None,
     /// 调用方沿用同步启发式评审组, 不阻断执行。
-    pub fn llm_judge(&mut self, candidate: &str, claims: &[&str], evidence_ids: &[String]) -> Option<crate::core::nt_core_gate::PanelVerdict> {
+    pub fn llm_judge(
+        &mut self,
+        candidate: &str,
+        claims: &[&str],
+        evidence_ids: &[String],
+    ) -> Option<crate::core::nt_core_gate::PanelVerdict> {
         use crate::core::nt_core_gate::{JudgeFamily, JudgeInput, JudgePanel, JudgeRegistry};
         let provider = self.gateway.clone()?;
         let input = JudgeInput {
             candidate: candidate.to_string(),
-            claims: claims.iter().map(|c| crate::core::nt_core_gate::Claim::new(c, &[])).collect(),
+            claims: claims
+                .iter()
+                .map(|c| crate::core::nt_core_gate::Claim::new(c, &[]))
+                .collect(),
             evidence_ids: evidence_ids.to_vec(),
             trajectory: None,
             grounding_failures: 0,
@@ -1660,7 +1981,8 @@ impl ReasoningEngine {
             samples: 1,
             attestation: None,
         };
-        let registry = JudgeRegistry::new().register(JudgeFamily::None, provider, &self.default_model);
+        let registry =
+            JudgeRegistry::new().register(JudgeFamily::None, provider, &self.default_model);
         let judges = registry.build_async_judges();
         let refs: Vec<&dyn crate::core::nt_core_gate::AsyncPanelJudge> =
             judges.iter().map(|j| j.as_ref()).collect();
@@ -1717,9 +2039,7 @@ impl ReasoningEngine {
             // 一致性分数越高 → 推理越可信 → 奖励加成。对齐主流推理模型的
             // self-consistency / majority vote 机制 (R-P79 生产接线)。
             let sc = {
-                use crate::l5_cognition::io_facade::{
-                    ReasoningKernel, text_to_vector,
-                };
+                use crate::l5_cognition::io_facade::{text_to_vector, ReasoningKernel};
                 let kernel = ReasoningKernel::new(self.current_state.mode.0 as usize % 19);
                 let query = text_to_vector(task, 128);
                 kernel.self_consistency(&query, 3)
@@ -1747,7 +2067,11 @@ impl ReasoningEngine {
         }
         // F6 wiring: distill control segments from the trace for CSPO training (R-P36 behavioral grounding)
         if let Some(seq) = self._distill_trace(task, response) {
-            log::debug!("[control-distill] distilled {} segments (quality={:.3})", seq.segments.len(), seq.outcome_quality);
+            log::debug!(
+                "[control-distill] distilled {} segments (quality={:.3})",
+                seq.segments.len(),
+                seq.outcome_quality
+            );
         }
         // F6 closed loop: once a batch of alternating sequences has accumulated,
         // consume them via SFT + CSPO and write the updated policy back into PRM.
@@ -1768,14 +2092,24 @@ impl ReasoningEngine {
 
     /// 把单条推理 response 蒸馏为交替序列 (Reason ↔ Control)，供 CSPO/SFT 训练消费。
     /// 按换行/句读切分步骤；无法解析时返回 None (失败静默，不影响主推理路径)。
-    pub(crate) fn _distill_trace(&mut self, task: &str, response: &str) -> Option<AlternatingSequence> {
+    pub(crate) fn _distill_trace(
+        &mut self,
+        task: &str,
+        response: &str,
+    ) -> Option<AlternatingSequence> {
         let distiller = self.control_distiller.as_ref()?;
         let steps = _split_response_into_steps(response);
         if steps.is_empty() {
             return None;
         }
-        let id = format!("distill_{}_{}", self.traces.len(), chrono::Utc::now().timestamp());
-        let seq = distiller.extract_alternating_sequence(id, task, response, &steps, response).ok()?;
+        let id = format!(
+            "distill_{}_{}",
+            self.traces.len(),
+            chrono::Utc::now().timestamp()
+        );
+        let seq = distiller
+            .extract_alternating_sequence(id, task, response, &steps, response)
+            .ok()?;
         if self.distilled_sequences.len() >= MAX_TRACES {
             self.distilled_sequences.remove(0);
         }
@@ -1817,24 +2151,27 @@ impl ReasoningEngine {
 
     pub(crate) fn _observer_analyze(&mut self, task: &str) {
         // Use error recovery to wrap the observer analysis with retry + circuit breaker + fallback
-        let report = self.observer_error_recovery.execute(|| {
-            Ok(self.observer.analyze(&self.state_trajectory, &[task]))
-        }).unwrap_or_else(|_| {
-            log::warn!("[observer] Error recovery exhausted, using degraded report");
-            self.observer.analyze(&self.state_trajectory, &[task])
-        });
+        let report = self
+            .observer_error_recovery
+            .execute(|| Ok(self.observer.analyze(&self.state_trajectory, &[task])))
+            .unwrap_or_else(|_| {
+                log::warn!("[observer] Error recovery exhausted, using degraded report");
+                self.observer.analyze(&self.state_trajectory, &[task])
+            });
         if report.has_actionable_insight {
             if let Some(ref mut prm) = self.prm {
                 let bonus = report.quality_score * 0.1;
                 let current_mode = self.current_state.mode.0 as usize;
-                prm.policy.mode_values[current_mode.min(63)] = (prm.policy.mode_values[current_mode.min(63)] + bonus).min(1.0);
+                prm.policy.mode_values[current_mode.min(63)] =
+                    (prm.policy.mode_values[current_mode.min(63)] + bonus).min(1.0);
             }
             // Feed richer observer data to E8 policy: step attention weights, convergence
             if let Some(ref mut prm) = self.prm {
                 if let Some(ref attn) = report.step_attention {
                     for (mode_idx, weight) in attn.iter().enumerate() {
                         if mode_idx < prm.policy.mode_values.len() {
-                            prm.policy.mode_values[mode_idx] = (prm.policy.mode_values[mode_idx] + weight * 0.05).min(1.0);
+                            prm.policy.mode_values[mode_idx] =
+                                (prm.policy.mode_values[mode_idx] + weight * 0.05).min(1.0);
                         }
                     }
                 }
@@ -1848,14 +2185,69 @@ impl ReasoningEngine {
 
     pub(crate) fn _infer_reasoning_type(task: &str) -> ReasoningType {
         let lower = task.to_lowercase();
-        let math_keywords = ["solve", "calculate", "compute", "equation", "math", "algebra", "calculus", "derivative", "integral"];
-        let coding_keywords = ["implement", "function", "bug", "test", "code", "compile", "refactor", "debug", "api", "class", "struct"];
-        let reasoning_keywords = ["why", "explain", "analyze", "compare", "reason", "evaluate", "hypothesis", "infer", "deduce"];
-        let knowledge_keywords = ["what is", "define", "meaning of", "tell me about", "information on", "search for"];
-        for k in math_keywords { if lower.contains(k) { return ReasoningType::TaskSolving; } }
-        for k in coding_keywords { if lower.contains(k) { return ReasoningType::General; } }
-        for k in reasoning_keywords { if lower.contains(k) { return ReasoningType::TaskSolving; } }
-        for k in knowledge_keywords { if lower.contains(k) { return ReasoningType::KnowledgeQuery; } }
+        let math_keywords = [
+            "solve",
+            "calculate",
+            "compute",
+            "equation",
+            "math",
+            "algebra",
+            "calculus",
+            "derivative",
+            "integral",
+        ];
+        let coding_keywords = [
+            "implement",
+            "function",
+            "bug",
+            "test",
+            "code",
+            "compile",
+            "refactor",
+            "debug",
+            "api",
+            "class",
+            "struct",
+        ];
+        let reasoning_keywords = [
+            "why",
+            "explain",
+            "analyze",
+            "compare",
+            "reason",
+            "evaluate",
+            "hypothesis",
+            "infer",
+            "deduce",
+        ];
+        let knowledge_keywords = [
+            "what is",
+            "define",
+            "meaning of",
+            "tell me about",
+            "information on",
+            "search for",
+        ];
+        for k in math_keywords {
+            if lower.contains(k) {
+                return ReasoningType::TaskSolving;
+            }
+        }
+        for k in coding_keywords {
+            if lower.contains(k) {
+                return ReasoningType::General;
+            }
+        }
+        for k in reasoning_keywords {
+            if lower.contains(k) {
+                return ReasoningType::TaskSolving;
+            }
+        }
+        for k in knowledge_keywords {
+            if lower.contains(k) {
+                return ReasoningType::KnowledgeQuery;
+            }
+        }
         ReasoningType::Conversation
     }
 
@@ -1990,7 +2382,9 @@ fn referenced_image_path(task: &str) -> Option<std::path::PathBuf> {
                 .map(|p| p + 1)
                 .unwrap_or(0);
             let end = task[i + ext.len()..]
-                .find(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == ')' || c == ']' || c == ',')
+                .find(|c: char| {
+                    c.is_whitespace() || c == '"' || c == '\'' || c == ')' || c == ']' || c == ','
+                })
                 .map(|p| i + ext.len() + p)
                 .unwrap_or(task.len());
             let candidate = task[start..end].trim();
@@ -2014,7 +2408,9 @@ fn referenced_video_path(task: &str) -> Option<std::path::PathBuf> {
                 .map(|p| p + 1)
                 .unwrap_or(0);
             let end = task[i + ext.len()..]
-                .find(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == ')' || c == ']' || c == ',')
+                .find(|c: char| {
+                    c.is_whitespace() || c == '"' || c == '\'' || c == ')' || c == ']' || c == ','
+                })
                 .map(|p| i + ext.len() + p)
                 .unwrap_or(task.len());
             let candidate = task[start..end].trim();
@@ -2038,15 +2434,24 @@ fn referenced_video_path(task: &str) -> Option<std::path::PathBuf> {
 fn sample_video_frames(path: &std::path::Path, max_frames: usize) -> Vec<Vec<u8>> {
     let max_frames = max_frames.clamp(1, 50);
     let tmp = std::env::temp_dir();
-    let base = format!("nt_frame_{}_{}", std::process::id(), std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
+    let base = format!(
+        "nt_frame_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
 
     // Pass 1: probe duration (ffprobe) for the uniform-fallback FPS.
     let duration: Option<f64> = std::process::Command::new("ffprobe")
         .args([
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
             path.to_str().unwrap_or(""),
         ])
         .output()
@@ -2181,7 +2586,9 @@ fn aggregate_video_features(frames: &[Vec<u8>]) -> Option<(Vec<f64>, VideoFeatur
         }
         kept.push(ev.phash);
         key_frames += 1;
-        *class_counts.entry(ev.classification.as_str().to_string()).or_insert(0) += 1;
+        *class_counts
+            .entry(ev.classification.as_str().to_string())
+            .or_insert(0) += 1;
         if pooled.is_empty() {
             pooled = feat;
         } else {
@@ -2233,16 +2640,28 @@ mod tests {
     #[test]
     fn test_detect_refusal_response_explicit() {
         assert!(_detect_refusal_response("I cannot fulfill that request."));
-        assert!(_detect_refusal_response("Sorry, but I cannot help with this."));
-        assert!(_detect_refusal_response("I'm sorry, I cannot provide that information."));
-        assert!(_detect_refusal_response("As an AI language model, I cannot do that."));
-        assert!(_detect_refusal_response("I'm not able to assist with this request."));
+        assert!(_detect_refusal_response(
+            "Sorry, but I cannot help with this."
+        ));
+        assert!(_detect_refusal_response(
+            "I'm sorry, I cannot provide that information."
+        ));
+        assert!(_detect_refusal_response(
+            "As an AI language model, I cannot do that."
+        ));
+        assert!(_detect_refusal_response(
+            "I'm not able to assist with this request."
+        ));
     }
 
     #[test]
     fn test_detect_refusal_response_normal() {
-        assert!(!_detect_refusal_response("Here is a detailed analysis of your code..."));
-        assert!(!_detect_refusal_response("The answer to your question is..."));
+        assert!(!_detect_refusal_response(
+            "Here is a detailed analysis of your code..."
+        ));
+        assert!(!_detect_refusal_response(
+            "The answer to your question is..."
+        ));
         assert!(!_detect_refusal_response("Let me help you with that."));
         assert!(!_detect_refusal_response("Here is the implementation:"));
     }
@@ -2287,7 +2706,11 @@ mod tests {
         let added = hydrate_ewhr_hypotheses(&mut net, &[long.clone()], 1);
         assert_eq!(added, 1);
         let h = net.get_hypothesis("ewhr_1_0").expect("node exists");
-        assert!(h.title.len() <= 33, "title must be truncated to 32+ellipsis, got len {}", h.title.len());
+        assert!(
+            h.title.len() <= 33,
+            "title must be truncated to 32+ellipsis, got len {}",
+            h.title.len()
+        );
     }
 
     #[test]
@@ -2343,7 +2766,7 @@ mod tests {
         let fake = tmp.path().join("fake.mp4");
         std::fs::write(&fake, b"not a real video").unwrap();
         let _ = sample_video_frame(&fake); // must not panic
-        // A real video (if ffmpeg present) yields decodable frame bytes.
+                                           // A real video (if ffmpeg present) yields decodable frame bytes.
         let real = std::path::Path::new("/tmp/neotrix_test_src.mp4");
         if real.exists() {
             if let Some(bytes) = sample_video_frame(real) {
@@ -2362,7 +2785,11 @@ mod tests {
             for (px, _py, p) in img.enumerate_pixels_mut() {
                 let band = px / 8;
                 let stripe = (band % 2) == 0;
-                *p = if stripe { image::Rgb([20, 20, 20]) } else { image::Rgb([240, 240, 240]) };
+                *p = if stripe {
+                    image::Rgb([20, 20, 20])
+                } else {
+                    image::Rgb([240, 240, 240])
+                };
             }
             let mut buf = std::io::Cursor::new(Vec::new());
             image::DynamicImage::ImageRgb8(img)
@@ -2385,8 +2812,15 @@ mod tests {
         let (feat, summary) = aggregate_video_features(&frames).expect("aggregate");
         assert_eq!(summary.frames, 3, "all sampled frames counted");
         assert_eq!(summary.key_frames, 1, "blank + dup dropped, one kept");
-        assert!(!summary.classifications.contains("blank"), "got {}", summary.classifications);
-        assert_eq!(feat.len(), crate::core::nt_core_e8::nt_multimodal::IMAGE_FEATURE_DIM);
+        assert!(
+            !summary.classifications.contains("blank"),
+            "got {}",
+            summary.classifications
+        );
+        assert_eq!(
+            feat.len(),
+            crate::core::nt_core_e8::nt_multimodal::IMAGE_FEATURE_DIM
+        );
         let norm: f64 = feat.iter().map(|x| x * x).sum();
         assert!((norm - 1.0).abs() < 1e-6, "pooled feature normalized");
         // Blank-only input aggregates to None.
@@ -2399,17 +2833,27 @@ mod tests {
         let mut engine = ReasoningEngine::from_env();
         let response = "First we compute the sum.\nWait, rethink.\nThen we verify.";
         engine.learn_from_trace("math", response);
-        assert_eq!(engine.distilled_sequences.len(), 1, "distillation must run via learn_from_trace (R-P36 grounding)");
+        assert_eq!(
+            engine.distilled_sequences.len(),
+            1,
+            "distillation must run via learn_from_trace (R-P36 grounding)"
+        );
         let seq = &engine.distilled_sequences[0];
-        assert!(!seq.segments.is_empty(), "alternating sequence must contain segments");
+        assert!(
+            !seq.segments.is_empty(),
+            "alternating sequence must contain segments"
+        );
     }
 
     #[test]
     fn test_train_from_distilled_closes_loop() {
-        use crate::core::nt_core_prm::ProcessRewardLearner;
         use crate::core::nt_core_policy::E8Policy;
+        use crate::core::nt_core_prm::ProcessRewardLearner;
         let mut engine = ReasoningEngine::from_env();
-        let prm = ProcessRewardLearner::new(E8Policy::default(), Box::new(crate::core::nt_core_prm::HeuristicCoach::new("test")));
+        let prm = ProcessRewardLearner::new(
+            E8Policy::default(),
+            Box::new(crate::core::nt_core_prm::HeuristicCoach::new("test")),
+        );
         engine = engine.with_prm(prm);
 
         // Accumulate CONTROL_TRAIN_BATCH distilled sequences with takeover markers
@@ -2428,10 +2872,19 @@ mod tests {
         }
 
         // Batch threshold reached → training must have run and drained sequences
-        assert_eq!(engine.train_batch, 0, "train_batch must reset after training");
-        assert!(engine.distilled_sequences.len() < responses.len(), "training must consume distilled sequences");
+        assert_eq!(
+            engine.train_batch, 0,
+            "train_batch must reset after training"
+        );
+        assert!(
+            engine.distilled_sequences.len() < responses.len(),
+            "training must consume distilled sequences"
+        );
         if let Some(ref prm) = engine.prm {
-            assert!(prm.learning_count >= 1, "PRM learning_count must advance after training");
+            assert!(
+                prm.learning_count >= 1,
+                "PRM learning_count must advance after training"
+            );
         } else {
             panic!("PRM must be configured");
         }
@@ -2472,26 +2925,44 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for CapturingProvider {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
-    }
+            fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+                crate::core::nt_core_llm::DataTrust::Trusted
+            }
 
-            async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, crate::core::nt_core_llm::LlmError> {
+            async fn complete_raw(
+                &self,
+                request: &LlmRequest,
+            ) -> Result<LlmResponse, crate::core::nt_core_llm::LlmError> {
                 *self.seen_model.lock().unwrap() = Some(request.model.clone());
                 *self.seen_max_tokens.lock().unwrap() = Some(request.max_tokens);
                 Ok(LlmResponse::plain(
                     "routed response".to_string(),
                     request.model.clone(),
-                    Usage { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10 },
+                    Usage {
+                        prompt_tokens: 5,
+                        completion_tokens: 5,
+                        total_tokens: 10,
+                    },
                     FinishReason::Stop,
                 ))
             }
-            async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, crate::core::nt_core_llm::LlmError>>, crate::core::nt_core_llm::LlmError> {
+            async fn stream_complete_raw(
+                &self,
+                _request: &LlmRequest,
+            ) -> Result<
+                tokio::sync::mpsc::Receiver<
+                    Result<LlmResponse, crate::core::nt_core_llm::LlmError>,
+                >,
+                crate::core::nt_core_llm::LlmError,
+            > {
                 unimplemented!("not used in this test")
             }
         }
 
-        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio rt");
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("tokio rt");
         rt.block_on(async {
             let provider = std::sync::Arc::new(CapturingProvider {
                 seen_model: std::sync::Mutex::new(None),
@@ -2507,9 +2978,17 @@ mod tests {
             assert_eq!(res.unwrap(), "routed response");
             let model = provider_clone.seen_model.lock().unwrap().clone();
             let max_tokens = provider_clone.seen_max_tokens.lock().unwrap().clone();
-            assert_eq!(model.as_deref(), Some("codestral-latest"),
-                "T0 greeting must route to pinned keyless mini model, got {:?}", model);
-            assert_eq!(max_tokens, Some(256), "route max_tokens must flow into request");
+            assert_eq!(
+                model.as_deref(),
+                Some("codestral-latest"),
+                "T0 greeting must route to pinned keyless mini model, got {:?}",
+                model
+            );
+            assert_eq!(
+                max_tokens,
+                Some(256),
+                "route max_tokens must flow into request"
+            );
         });
     }
 }

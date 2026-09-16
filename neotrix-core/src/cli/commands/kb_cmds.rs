@@ -1494,7 +1494,7 @@ mod tests {
     fn seed_node(conn: &Connection, id: &str, ntype: &str, title: &str, url: &str) {
         let now = 1750000000i64;
         conn.execute(
-            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier) VALUES(?1,?2,?3,'s','c',?4,'github.com','en',1.0,0.7,?5,?6,0,'{}','cache',NULL,NULL,NULL,'warm')",
+            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier,transaction_time) VALUES(?1,?2,?3,'s','c',?4,'github.com','en',1.0,0.7,?5,?6,0,'{}','cache',NULL,NULL,NULL,'warm',?5)",
             rusqlite::params![id, ntype, title, url, now, now],
         )
         .unwrap();

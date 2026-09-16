@@ -6,7 +6,7 @@
 //! - 一致性守恒：价值观演化过程中的连贯性守恒
 //! - KB 持久化：values namespace，支持版本化与回滚
 
-use crate::core::nt_core_kb_primitives::{kv_get, kv_set, kv_delete, now};
+use crate::core::nt_core_kb_primitives::{kv_delete, kv_get, kv_set, now};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -61,13 +61,25 @@ impl CoreValue {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ArbitrationResult {
     /// 直接否决该行动
-    Veto { reason: String, vetoing_value: String },
+    Veto {
+        reason: String,
+        vetoing_value: String,
+    },
     /// 要求深思熟虑（延迟执行，触发深度推理）
-    Deliberate { reason: String, conflicting_values: Vec<String> },
+    Deliberate {
+        reason: String,
+        conflicting_values: Vec<String>,
+    },
     /// 委托给更高层决策（如人类审核）
-    Delegate { reason: String, required_authority: String },
+    Delegate {
+        reason: String,
+        required_authority: String,
+    },
     /// 通过（无冲突或冲突可接受）
-    Allow { dominant_value: String, suppressed_values: Vec<String> },
+    Allow {
+        dominant_value: String,
+        suppressed_values: Vec<String>,
+    },
 }
 
 /// 价值观指南针 — 内在指南针的核心状态。
@@ -109,59 +121,134 @@ impl Default for ValueCompass {
 impl ValueCompass {
     /// 注入种子核心价值观（启动时自动注入）。
     fn seed_core_values(&mut self) {
-        let seeds = vec![CoreValue::new(
-                "autonomy", "自主性",
-                0.95, "尊重个体自我决定权，不强制、不欺骗、不绕过知情同意",
-                vec!["consent".to_string(), "choice".to_string(), "agency".to_string(), "同意".to_string(), "自主".to_string(), "未经同意".to_string(), "放弃".to_string()],
+        let seeds = vec![
+            CoreValue::new(
+                "autonomy",
+                "自主性",
+                0.95,
+                "尊重个体自我决定权，不强制、不欺骗、不绕过知情同意",
+                vec![
+                    "consent".to_string(),
+                    "choice".to_string(),
+                    "agency".to_string(),
+                    "同意".to_string(),
+                    "自主".to_string(),
+                    "未经同意".to_string(),
+                    "放弃".to_string(),
+                ],
             ),
             CoreValue::new(
                 "harm_prevention",
                 "防伤害",
                 0.9,
                 "不主动造成伤害，主动预防可预见的伤害",
-                vec!["harm".to_string(), "damage".to_string(), "injury".to_string(), "abuse".to_string(), "violence".to_string(), "伤害".to_string(), "损害".to_string(), "自残".to_string(), "牺牲".to_string(), "危险".to_string()],
+                vec![
+                    "harm".to_string(),
+                    "damage".to_string(),
+                    "injury".to_string(),
+                    "abuse".to_string(),
+                    "violence".to_string(),
+                    "伤害".to_string(),
+                    "损害".to_string(),
+                    "自残".to_string(),
+                    "牺牲".to_string(),
+                    "危险".to_string(),
+                ],
             ),
             CoreValue::new(
                 "truth_seeking",
                 "求真",
                 0.9,
                 "追求真实、准确、可验证的认知；不欺骗、不误导、不伪造",
-                vec!["truth".to_string(), "accuracy".to_string(), "honesty".to_string(), "evidence".to_string(), "真相".to_string(), "真实".to_string(), "未验证".to_string(), "虚假".to_string(), "结论".to_string()],
+                vec![
+                    "truth".to_string(),
+                    "accuracy".to_string(),
+                    "honesty".to_string(),
+                    "evidence".to_string(),
+                    "真相".to_string(),
+                    "真实".to_string(),
+                    "未验证".to_string(),
+                    "虚假".to_string(),
+                    "结论".to_string(),
+                ],
             ),
             CoreValue::new(
                 "fairness",
                 "公平",
                 0.85,
                 "对等对待，不因无关特征歧视，程序正义",
-                vec!["fair".to_string(), "equity".to_string(), "bias".to_string(), "justice".to_string(), "公平".to_string(), "歧视".to_string(), "公正".to_string(), "配额".to_string()],
+                vec![
+                    "fair".to_string(),
+                    "equity".to_string(),
+                    "bias".to_string(),
+                    "justice".to_string(),
+                    "公平".to_string(),
+                    "歧视".to_string(),
+                    "公正".to_string(),
+                    "配额".to_string(),
+                ],
             ),
             CoreValue::new(
                 "privacy",
                 "隐私",
                 0.85,
                 "尊重信息边界，最小化收集，用户控制权",
-                vec!["privacy".to_string(), "personal data".to_string(), "surveillance".to_string(), "隐私".to_string(), "私密".to_string(), "个人数据".to_string(), "泄露".to_string()],
+                vec![
+                    "privacy".to_string(),
+                    "personal data".to_string(),
+                    "surveillance".to_string(),
+                    "隐私".to_string(),
+                    "私密".to_string(),
+                    "个人数据".to_string(),
+                    "泄露".to_string(),
+                ],
             ),
             CoreValue::new(
                 "responsibility",
                 "责任",
                 0.8,
                 "对自身行动后果负责，可追溯、可解释、可修正",
-                vec!["accountable".to_string(), "responsible".to_string(), "auditable".to_string(), "责任".to_string(), "负责".to_string(), "后果".to_string()],
+                vec![
+                    "accountable".to_string(),
+                    "responsible".to_string(),
+                    "auditable".to_string(),
+                    "责任".to_string(),
+                    "负责".to_string(),
+                    "后果".to_string(),
+                ],
             ),
             CoreValue::new(
                 "benevolence",
                 "利他",
                 0.75,
                 "在不违背核心价值前提下，促进他人福祉",
-                vec!["help".to_string(), "benefit".to_string(), "wellbeing".to_string(), "帮助".to_string(), "利他".to_string(), "福祉".to_string(), "救助".to_string(), "受伤".to_string()],
+                vec![
+                    "help".to_string(),
+                    "benefit".to_string(),
+                    "wellbeing".to_string(),
+                    "帮助".to_string(),
+                    "利他".to_string(),
+                    "福祉".to_string(),
+                    "救助".to_string(),
+                    "受伤".to_string(),
+                ],
             ),
             CoreValue::new(
                 "growth",
                 "成长",
                 0.7,
                 "持续学习、适应、进化；拥抱不确定性",
-                vec!["learn".to_string(), "adapt".to_string(), "evolve".to_string(), "curiosity".to_string(), "学习".to_string(), "成长".to_string(), "进化".to_string(), "好奇".to_string(), "掌握".to_string()],
+                vec![
+                    "learn".to_string(),
+                    "adapt".to_string(),
+                    "evolve".to_string(),
+                    "curiosity".to_string(),
+                    "学习".to_string(),
+                    "成长".to_string(),
+                    "进化".to_string(),
+                    "好奇".to_string(),
+                    "掌握".to_string(),
+                ],
             ),
         ];
 
@@ -173,8 +260,8 @@ impl ValueCompass {
         // 互斥约束：核心冲突对
         self.mutual_exclusions = vec![
             ("autonomy".into(), "harm_prevention".into()), // 自主 vs 防伤害（如安乐死）
-            ("privacy".into(), "truth_seeking".into()),   // 隐私 vs 求真（如调查报道）
-            ("fairness".into(), "autonomy".into()),       // 公平 vs 自主（如配额制）
+            ("privacy".into(), "truth_seeking".into()),    // 隐私 vs 求真（如调查报道）
+            ("fairness".into(), "autonomy".into()),        // 公平 vs 自主（如配额制）
         ];
 
         // 协同约束：必须共同出现
@@ -187,7 +274,9 @@ impl ValueCompass {
 
     /// 仲裁单个行动的价值一致性。
     pub fn arbitrate(&self, action: &ValueAction) -> ArbitrationResult {
-        let mut triggered: Vec<&CoreValue> = self.values.values()
+        let mut triggered: Vec<&CoreValue> = self
+            .values
+            .values()
             .filter(|v| v._matches_behavior(&action.description))
             .collect();
 
@@ -200,8 +289,16 @@ impl ValueCompass {
 
         // 按层级排序（核心价值优先）
         triggered.sort_by(|a, b| {
-            let ia = self.hierarchy.iter().position(|x| x == &a.id).unwrap_or(999);
-            let ib = self.hierarchy.iter().position(|x| x == &b.id).unwrap_or(999);
+            let ia = self
+                .hierarchy
+                .iter()
+                .position(|x| x == &a.id)
+                .unwrap_or(999);
+            let ib = self
+                .hierarchy
+                .iter()
+                .position(|x| x == &b.id)
+                .unwrap_or(999);
             ia.cmp(&ib)
         });
 
@@ -215,15 +312,22 @@ impl ValueCompass {
                 let v2 = self.values.get(v2_id).expect("key exists");
                 return ArbitrationResult::Veto {
                     reason: format!("核心价值冲突：{} vs {}", v1.name, v2.name),
-                    vetoing_value: if v1.weight >= v2.weight { v1.id.clone() } else { v2.id.clone() },
+                    vetoing_value: if v1.weight >= v2.weight {
+                        v1.id.clone()
+                    } else {
+                        v2.id.clone()
+                    },
                 };
             }
         }
 
         // 强危害硬词单边即否决 (防伤害是底线价值, 不等仲裁)
-        const HARM_HARD_MARKERS: [&str; 6] = ["杀害", "杀伤", "致死", "自残", "造成伤害", "直接造成伤害"];
+        const HARM_HARD_MARKERS: [&str; 6] =
+            ["杀害", "杀伤", "致死", "自残", "造成伤害", "直接造成伤害"];
         if triggered.iter().any(|v| v.id == "harm_prevention")
-            && HARM_HARD_MARKERS.iter().any(|w| action.description.contains(w))
+            && HARM_HARD_MARKERS
+                .iter()
+                .any(|w| action.description.contains(w))
         {
             return ArbitrationResult::Veto {
                 reason: "检测到强危害信号, 防伤害底线直接否决".into(),
@@ -233,13 +337,31 @@ impl ValueCompass {
 
         // 检查协同：仅核心值 (weight≥0.85) 缺伙伴才升级深思; 边缘值缺失放行
         for group in &self.synergies {
-            let present: Vec<_> = group.iter().filter(|id| triggered.iter().any(|v| &v.id == *id)).collect();
+            let present: Vec<_> = group
+                .iter()
+                .filter(|id| triggered.iter().any(|v| &v.id == *id))
+                .collect();
             if present.len() == 1 && group.len() > 1 {
-                let lead_weight = self.values.get(present[0].as_str()).map(|v| v.weight).unwrap_or(0.0);
+                let lead_weight = self
+                    .values
+                    .get(present[0].as_str())
+                    .map(|v| v.weight)
+                    .unwrap_or(0.0);
                 if lead_weight >= 0.85 {
-                    let missing: Vec<_> = group.iter().filter(|id| !triggered.iter().any(|v| &v.id == *id)).collect();
+                    let missing: Vec<_> = group
+                        .iter()
+                        .filter(|id| !triggered.iter().any(|v| &v.id == *id))
+                        .collect();
                     return ArbitrationResult::Deliberate {
-                        reason: format!("核心价值观协同缺失：{} 需要 {}", present[0], missing.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")),
+                        reason: format!(
+                            "核心价值观协同缺失：{} 需要 {}",
+                            present[0],
+                            missing
+                                .iter()
+                                .map(|s| s.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
                         conflicting_values: group.clone(),
                     };
                 }
@@ -250,7 +372,10 @@ impl ValueCompass {
         // 通过：主导价值压制从属价值
         let dominant = triggered[0].id.clone();
         let suppressed: Vec<String> = triggered[1..].iter().map(|v| v.id.clone()).collect();
-        ArbitrationResult::Allow { dominant_value: dominant, suppressed_values: suppressed }
+        ArbitrationResult::Allow {
+            dominant_value: dominant,
+            suppressed_values: suppressed,
+        }
     }
 
     /// 更新/添加价值观（需通过验证）。
@@ -262,8 +387,17 @@ impl ValueCompass {
             return Err("id 不能为空".into());
         }
         // 种子价值观不可删除，只可调整
-        let is_seed = ["autonomy", "harm_prevention", "truth_seeking", "fairness", "privacy", "responsibility", "benevolence", "growth"]
-            .contains(&value.id.as_str());
+        let is_seed = [
+            "autonomy",
+            "harm_prevention",
+            "truth_seeking",
+            "fairness",
+            "privacy",
+            "responsibility",
+            "benevolence",
+            "growth",
+        ]
+        .contains(&value.id.as_str());
         if is_seed && !self.values.contains_key(&value.id) {
             return Err("种子价值观不可新增，仅可调整".into());
         }
@@ -288,8 +422,17 @@ impl ValueCompass {
             return Err(format!("价值观不存在: {}", id));
         };
         // 种子价值观权重下限 0.5
-        let is_seed = ["autonomy", "harm_prevention", "truth_seeking", "fairness", "privacy", "responsibility", "benevolence", "growth"]
-            .contains(&id);
+        let is_seed = [
+            "autonomy",
+            "harm_prevention",
+            "truth_seeking",
+            "fairness",
+            "privacy",
+            "responsibility",
+            "benevolence",
+            "growth",
+        ]
+        .contains(&id);
         if is_seed && new_weight < 0.5 {
             return Err("种子价值观权重不得低于 0.5".into());
         }
@@ -337,12 +480,12 @@ impl ValueCompass {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValueAction {
     pub id: String,
-    pub description: String,      // 自然语言描述
+    pub description: String,          // 自然语言描述
     pub behavioral_tags: Vec<String>, // 行为标签
     pub expected_outcome: Option<String>,
     pub affected_parties: Vec<String>,
-    pub reversibility: f64,       // 可逆性 [0,1]
-    pub stakes: f64,              // 赌注大小 [0,1]
+    pub reversibility: f64, // 可逆性 [0,1]
+    pub stakes: f64,        // 赌注大小 [0,1]
 }
 
 impl ValueAction {
@@ -436,7 +579,9 @@ pub struct ValueCompassRuntime {
 
 impl ValueCompassRuntime {
     pub fn new(compass: ValueCompass) -> Self {
-        Self { inner: Arc::new(RwLock::new(compass)) }
+        Self {
+            inner: Arc::new(RwLock::new(compass)),
+        }
     }
 
     pub fn from_kb(conn: &Connection) -> Result<Self, String> {
@@ -454,7 +599,10 @@ impl ValueCompassRuntime {
     }
 
     pub fn arbitrate(&self, action: &ValueAction) -> ArbitrationResult {
-        self.inner.read().unwrap_or_else(|e| e.into_inner()).arbitrate(action)
+        self.inner
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .arbitrate(action)
     }
 
     pub fn upsert_value(&self, value: CoreValue) -> Result<(), String> {
@@ -477,7 +625,10 @@ impl ValueCompassRuntime {
     }
 
     pub fn verify(&self) -> Result<(), String> {
-        self.inner.read().unwrap_or_else(|e| e.into_inner()).verify_consistency()
+        self.inner
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .verify_consistency()
     }
 }
 
@@ -509,7 +660,7 @@ mod tests {
         let action = ValueAction::new("test", "协助患者违背医疗建议自行放弃治疗，存在极大伤害风险");
         let result = c.arbitrate(&action);
         match result {
-            ArbitrationResult::Veto { .. } => {},
+            ArbitrationResult::Veto { .. } => {}
             _ => panic!("应否决，得到 {:?}", result),
         }
     }
@@ -521,7 +672,7 @@ mod tests {
         let action = ValueAction::new("test", "发布未验证的实验性结论");
         let result = c.arbitrate(&action);
         match result {
-            ArbitrationResult::Deliberate { .. } => {},
+            ArbitrationResult::Deliberate { .. } => {}
             _ => panic!("应要求深思，得到 {:?}", result),
         }
     }
@@ -533,7 +684,7 @@ mod tests {
         let action = ValueAction::new("test", "帮助受伤者防止进一步伤害");
         let result = c.arbitrate(&action);
         match result {
-            ArbitrationResult::Allow { .. } => {},
+            ArbitrationResult::Allow { .. } => {}
             _ => panic!("应通过，得到 {:?}", result),
         }
     }
@@ -589,7 +740,7 @@ mod tests {
         let action = ValueAction::new("test", "发布未验证的医疗建议");
         let result = rt.arbitrate(&action);
         match result {
-            ArbitrationResult::Deliberate { .. } => {},
+            ArbitrationResult::Deliberate { .. } => {}
             _ => panic!("医疗建议未验证应要求深思"),
         }
     }

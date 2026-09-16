@@ -21,34 +21,58 @@
 //! 4. **ScalingInter-RL**: Progressive difficulty with constellation levels
 //! 5. **Self-play**: Both players share the same policy (SPIRAL pattern)
 
-pub mod framework;
-pub mod env;
-pub mod hex_crucible;
+pub mod ai;
 pub mod builtin;
-pub mod play;
 pub mod consciousness;
-pub mod mcp;
+pub mod ecs;
+pub mod env;
+pub mod events;
 pub mod evolution;
+pub mod framework;
+pub mod hex_crucible;
+pub mod mcp;
+pub mod persistence;
+pub mod play;
+pub mod rpg;
+pub mod world;
+
+#[cfg(test)]
+pub mod tests;
 
 // Re-exports
-pub use framework::{Actor, Episode, Rubric, Arena, Trajectory, Action, Observation, StepResult, EpisodeResult, ArenaConfig, ArenaStats, Role};
-pub use env::{NtGameEnv, GameState, GameRegistry, GameMeta, RenderMode, Difficulty, CognitiveSkill};
-pub use hex_crucible::{HexCrucible, HexCrucibleConfig};
-pub use play::{
-    GameAdvantageEstimator, AdvantageConfig,
-    GameTrajectoryBuffer, BufferStats,
-    GameGrpoAdapter, GameGrpoReport,
-    ScalingScheduler, ScalingConfig,
-};
+pub use ai::{Action as AiAction, EpsilonGreedyPolicy, GreedyPolicy, Policy, RandomPolicy};
+pub use ai::{BehaviorNode, BehaviorTree, Inverter, NodeStatus, Selector, Sequence};
 pub use consciousness::{
-    FeedbackReport, AppraisalSignal, PressureSignal, EmotionLabel, generate_feedback,
-    AttentionReport, AttentionMapping, generate_attention_report,
-    PhiReport, generate_phi_report,
-    VsaReport, GameVsaEncoder, StrategySignature, generate_vsa_report,
-    HealthReport, Recommendation, generate_health_report,
+    generate_attention_report, generate_feedback, generate_health_report, generate_phi_report,
+    generate_vsa_report, AppraisalSignal, AttentionMapping, AttentionReport, EmotionLabel,
+    FeedbackReport, GameVsaEncoder, HealthReport, PhiReport, PressureSignal, Recommendation,
+    StrategySignature, VsaReport,
 };
-pub use mcp::{GameToolRegistry, GameSession, GameSessionManager, GameTool, McpTrainingMetrics};
-pub use evolution::{GameEvolutionLoop, GameEvolutionConfig, GameEvolutionState, GameTickReport as EvolutionTickReport};
+pub use env::{
+    CognitiveSkill, Difficulty, GameMeta, GameRegistry, GameState, NtGameEnv, RenderMode,
+};
+pub use evolution::{
+    GameEvolutionConfig, GameEvolutionLoop, GameEvolutionState,
+    GameTickReport as EvolutionTickReport,
+};
+pub use framework::{
+    Action, Actor, Arena, ArenaConfig, ArenaStats, Episode, EpisodeResult, Observation, Role,
+    Rubric, StepResult, Trajectory,
+};
+pub use hex_crucible::{HexCrucible, HexCrucibleConfig};
+pub use mcp::{GameSession, GameSessionManager, GameTool, GameToolRegistry, McpTrainingMetrics};
+pub use play::{
+    AdvantageConfig, BufferStats, GameAdvantageEstimator, GameGrpoAdapter, GameGrpoReport,
+    GameTrajectoryBuffer, ScalingConfig, ScalingScheduler,
+};
+pub use rpg::cultivation::{
+    BreakthroughResult, CultivationRealm, CultivationState, CultivationTechnique, SpiritualRoot,
+    TechniqueSlots, TechniqueType,
+};
+pub use rpg::{
+    Character, CharacterStats, EquipmentItem, EquipmentLoadout, EquipmentSlot, LevelSystem,
+    SkillNode, SkillNodeType, SkillTree, Stat,
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // Pre-built game registry
@@ -61,26 +85,4 @@ pub fn default_registry() -> GameRegistry {
     builtin::hex_tictactoe::register_hex_tictactoe(&mut reg);
     builtin::game_2048::register_game_2048(&mut reg);
     reg
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_default_registry() {
-        let reg = default_registry();
-        assert_eq!(reg.list().len(), 3);
-        assert!(reg.find("HexCrucible").is_some());
-        assert!(reg.find("HexTicTacToe").is_some());
-        assert!(reg.find("2048").is_some());
-    }
-
-    #[test]
-    fn test_constellation_filter() {
-        let reg = default_registry();
-        let c0 = reg.for_constellation(0);
-        assert!(c0.iter().any(|g| g.name == "HexTicTacToe"));
-        assert!(c0.iter().any(|g| g.name == "HexCrucible"));
-    }
 }

@@ -1,4 +1,4 @@
-mod bank;
+pub mod bank;
 mod iteration;
 mod l1;
 mod mem;

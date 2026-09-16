@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::types::{GoalState, GoalConfig, GoalIterationRecord, GoalPriority};
+use super::types::{GoalConfig, GoalIterationRecord, GoalPriority, GoalState};
 
 const CONTINUATION_PROMPT: &str = r#"
 ## Goal Continuation Check
@@ -74,7 +74,9 @@ impl GoalTracker {
             }
         };
         let now = chrono::Utc::now();
-        start.map(|s| (now - s.with_timezone(&chrono::Utc)).num_seconds()).unwrap_or(0)
+        start
+            .map(|s| (now - s.with_timezone(&chrono::Utc)).num_seconds())
+            .unwrap_or(0)
     }
 
     pub fn budget_exhausted(&self) -> Option<GoalState> {

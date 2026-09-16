@@ -50,43 +50,7 @@ pub struct _ReachResult {
     pub note: String,
 }
 
-/// 零 API 费互联网访问契约 (Agent-Reach 抽象)
-pub trait _InternetReach: Send + Sync {
-    fn reach(&self, platform: _ReachPlatform, target: &str) -> _ReachResult;
-}
 
-/// 公开页抓取访问器 (零 API 费: 拒绝付费 endpoint)
-pub struct _PublicScrapeReach;
-
-impl _InternetReach for _PublicScrapeReach {
-    /// Checks reachability of a target on the given platform.
-    ///
-    /// **Not wired**: This stub returns `accessible: false` for all targets.
-    /// Real implementation requires HTTP scraping with anti-detection (CamoFox),
-    /// platform-specific URL construction, and response validation.
-    fn reach(&self, platform: _ReachPlatform, target: &str) -> _ReachResult {
-        if target.trim().is_empty() {
-            return _ReachResult {
-                platform,
-                target: target.into(),
-                accessible: false,
-                note: "empty target".into(),
-            };
-        }
-        // C1 stub: no real HTTP scraping implemented.
-        // Returns not-accessible instead of fabricated success.
-        _ReachResult {
-            platform,
-            target: target.into(),
-            accessible: false,
-            note: format!(
-                "not wired: {} reach check for '{}' — requires HTTP scraping + anti-detection integration",
-                platform.as_str(),
-                target
-            ),
-        }
-    }
-}
 
 /// SelfTest (T1)
 pub struct _AgentReachSelfTest;
@@ -97,16 +61,6 @@ impl SelfTest for _AgentReachSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let r = _PublicScrapeReach;
-        let res = r.reach(_ReachPlatform::GitHub, "rust-lang/rust");
-        // C1 stub: reach always returns accessible=false until real scraping is wired.
-        if res.accessible {
-            return Err(vec!["agent_reach: C1 stub should not report accessible=true".into()]);
-        }
-        let empty = r.reach(_ReachPlatform::Twitter, "");
-        if empty.accessible {
-            return Err(vec!["agent_reach: empty target must be inaccessible".into()]);
-        }
         if _ReachPlatform::all().len() != 6 {
             return Err(vec!["agent_reach: expected 6 platforms".into()]);
         }

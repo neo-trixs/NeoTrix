@@ -9,9 +9,9 @@
 // 对比历史 (cargo bench --bench capability_c3)。
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_provenance::{self, ProvenanceRecord, ProvActivity};
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::{KnowledgeNode, NodeType, SearchResult, SearchMatchType};
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_visibility::{filter_visibility, VisibilityConfig};
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_provenance::{self, ProvenanceRecord, ProvActivity};
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_types::{KnowledgeNode, NodeType, SearchResult, SearchMatchType};
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_visibility::{filter_visibility, VisibilityConfig};
 use neotrix::core::nt_core_context::revertible::{RevertibleContext, add_effect};
 
 /// 构造 n 条候选 SearchResult (混合风险/相关度, 覆盖三种裁定路径)。
@@ -37,6 +37,9 @@ fn make_results(n: usize) -> Vec<SearchResult> {
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             };
             // i%10==0 → 高风险 (risk>0.8), i%3==0 → 低相关, 其余 Allow
             let risk = if i % 10 == 0 { 0.95 } else { 0.1 };
@@ -275,13 +278,13 @@ fn bench_table_write(c: &mut Criterion) {
 }
 
 // ─────────────────── 能力树 8 芽 C3 基准证据 (7 基准组) ───────────────────
-use neotrix::neotrix::nt_shield_sentry::{fence_untrusted, cleanse_untagged};
+use neotrix::l3_embodiment::nt_shield::nt_shield_sentry::{_fence_untrusted as fence_untrusted, _cleanse_untagged as cleanse_untagged};
 use neotrix::neotrix::nt_act_orchestrator::task_state_dag::TaskStateDag;
 use neotrix::core::nt_core_scheduler::event_driven_claim::EventDrivenClaimPool;
 use neotrix::neotrix::nt_io_provider::account_pool::{AccountPool, AccountPoolConfig};
 use neotrix::neotrix::nt_memory_kb::spill_storage::{SpillStorage, SpillConfig};
 use neotrix::neotrix::nt_mind_skill_engine::{FiberLifecycle, FiberLifecycleState};
-use neotrix::neotrix::l9_transcendent_impl::nt_mind_eval_harness::{
+use neotrix::l6_meta::healing::nt_mind_eval_harness::{
     OracleLadder, OracleRung, RungResult,
 };
 

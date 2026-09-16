@@ -11,6 +11,7 @@ use super::types::{
 // EWMA — Exponentially Weighted Moving Average anomaly detector
 // ═══════════════════════════════════════════════════════════════
 
+#[derive(Debug)]
 pub struct EwmaDetector {
     alpha: f64,
     mean: f64,
@@ -49,6 +50,7 @@ impl EwmaDetector {
 // CUSUM — Cumulative Sum change point detector
 // ═══════════════════════════════════════════════════════════════
 
+#[derive(Debug)]
 pub struct CusumDetector {
     target: f64,
     k: f64,           // allowance — typically 0.5
@@ -91,6 +93,7 @@ impl CusumDetector {
 // Holt-Winters triple exponential smoothing (periodic latency prediction)
 // ═══════════════════════════════════════════════════════════════
 
+#[derive(Debug)]
 pub struct HoltWinters {
     alpha: f64,
     beta: f64,

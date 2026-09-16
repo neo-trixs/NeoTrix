@@ -78,11 +78,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = "0.1"
+fs2 = "0.4"
 chrono = { workspace = true }
 uuid = { workspace = true }
 tempfile = "3"
 dirs = { workspace = true }
-ureq = { workspace = true, optional = true }
+ureq = { version = "2", optional = true }
+inventory = "0.3"
 log = "0.4"
 hmac = "0.12"
 sha2 = "0.10"
@@ -92,10 +94,12 @@ aes = "0.8"
 cbc = "0.1"
 ecb = "0.1"
 cipher = "0.4"
+pbkdf2 = "0.12"
 ring = "0.17"
 bitflags = { version = "2", features = ["serde"] }
 bincode = "1"
 lz4_flex = "0.11"
+oauth2 = "4"
 num-bigint = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "socks", "rustls-tls", "stream"] }
 url = "2"
@@ -192,6 +196,7 @@ tempfile = "3"
 criterion = { version = "0.5", features = ["html_reports"] }
 assert_cmd = "2"
 predicates = "3"
+tokio = { version = "1", features = ["macros", "rt"] }
 
 [build-dependencies]
 uniffi = { version = "0.28", features = ["build"] }
@@ -239,7 +244,7 @@ harness = false
 [features]
 # keyring 纳入 default：API key 加密默认走 OS keychain（macOS Keychain/Linux Secret Service），
 # 避免静默降级到可推导的机器派生密钥（C-3 安全加固）。
-default = ["keyring", "anydoc"]
+default = ["keyring", "anydoc", "stealth-net"]
 # pmtiles feature removed - now a regular dependency
 stealth-net = ["dep:chromiumoxide"]
 sandbox = ["dep:wasmtime", "dep:agent-sandbox"]

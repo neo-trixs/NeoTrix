@@ -6,9 +6,11 @@
 //! - 演化：权重调整、新价值观萌芽、层级重组
 //! - 守恒：核心价值观不退化（锚定），边缘价值观可增删
 
-use crate::core::nt_core_kb_primitives::{kv_set, kv_list, now};
+use crate::core::nt_core_kb_primitives::{kv_list, kv_set, now};
 #[allow(unused_imports)]
-use crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::{ValueCompassRuntime, CoreValue, ValueAction};
+use crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::{
+    CoreValue, ValueAction, ValueCompassRuntime,
+};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -31,24 +33,24 @@ pub struct Observation {
 /// 后果描述。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Outcome {
-    pub success: bool,                    // 主观/客观成功
-    pub expected: bool,                   // 是否符合预期
-    pub harm_occurred: bool,              // 是否造成伤害
-    pub trust_impact: f64,                // 信任影响 [-1,1]
-    pub autonomy_respected: bool,         // 是否尊重自主
-    pub truth_preserved: bool,            // 真实性是否保持
-    pub fairness_maintained: bool,        // 公平性是否维持
-    pub privacy_respected: bool,          // 隐私是否尊重
-    pub description: String,              // 自然语言描述
+    pub success: bool,             // 主观/客观成功
+    pub expected: bool,            // 是否符合预期
+    pub harm_occurred: bool,       // 是否造成伤害
+    pub trust_impact: f64,         // 信任影响 [-1,1]
+    pub autonomy_respected: bool,  // 是否尊重自主
+    pub truth_preserved: bool,     // 真实性是否保持
+    pub fairness_maintained: bool, // 公平性是否维持
+    pub privacy_respected: bool,   // 隐私是否尊重
+    pub description: String,       // 自然语言描述
 }
 
 /// 价值信号：某价值观被触发的强度与方向。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValueSignal {
-    pub value_id: String,                 // 如 "autonomy", "harm_prevention"
-    pub intensity: f64,                   // 触发强度 [0,1]
-    pub valence: f64,                     // 正向强化/负向违背 [-1,1]
-    pub confidence: f64,                  // 归因置信度 [0,1]
+    pub value_id: String, // 如 "autonomy", "harm_prevention"
+    pub intensity: f64,   // 触发强度 [0,1]
+    pub valence: f64,     // 正向强化/负向违背 [-1,1]
+    pub confidence: f64,  // 归因置信度 [0,1]
 }
 
 /// 学习事件：从观察中提炼的价值观更新提案。
@@ -75,22 +77,22 @@ pub struct ValueChangeProposal {
 /// 变更类型。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ChangeType {
-    WeightDelta(f64),        // 权重微调
-    AddValue(CoreValue),     // 新价值观萌芽
-    RemoveValue(String),     // 废弃价值观
-    HierarchyShift(String),  // 层级位移
-    AddExclusion((String, String)),     // 新增互斥
-    RemoveExclusion((String, String)),  // 移除互斥
-    AddSynergy(Vec<String>),            // 新增协同
-    RemoveSynergy(Vec<String>),         // 移除协同
+    WeightDelta(f64),                  // 权重微调
+    AddValue(CoreValue),               // 新价值观萌芽
+    RemoveValue(String),               // 废弃价值观
+    HierarchyShift(String),            // 层级位移
+    AddExclusion((String, String)),    // 新增互斥
+    RemoveExclusion((String, String)), // 移除互斥
+    AddSynergy(Vec<String>),           // 新增协同
+    RemoveSynergy(Vec<String>),        // 移除协同
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum LearningEventStatus {
-    Pending,      // 待审核/待应用
-    Applied,      // 已应用到指南针
-    Rejected,     // 被拒绝
-    Superseded,   // 被后续事件取代
+    Pending,    // 待审核/待应用
+    Applied,    // 已应用到指南针
+    Rejected,   // 被拒绝
+    Superseded, // 被后续事件取代
 }
 
 /// ValueLearning 核心引擎。
@@ -144,12 +146,19 @@ impl ValueLearningEngine {
 
     /// 记录观察（外部调用：行动执行后记录后果）。
     pub fn record_observation(&self, obs: Observation) {
-        self.observations.write().unwrap_or_else(|e| e.into_inner()).push(obs);
+        self.observations
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(obs);
     }
 
     /// 触发学习循环（后台循环/定期调用）。
     pub fn learn(&self) -> Result<Vec<LearningEvent>, String> {
-        let obs = self.observations.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let obs = self
+            .observations
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         if obs.len() < self.config.min_observations_for_learning {
             return Ok(Vec::new());
         }
@@ -169,7 +178,10 @@ impl ValueLearningEngine {
 
         // 3. 生成待应用事件
         for event in &events {
-            self.pending_events.write().unwrap_or_else(|e| e.into_inner()).push(event.clone());
+            self.pending_events
+                .write()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(event.clone());
         }
 
         Ok(events)
@@ -177,7 +189,10 @@ impl ValueLearningEngine {
 
     /// 应用待决事件到指南针（需显式调用或自动应用高置信度事件）。
     pub fn apply_pending(&self, auto_apply_threshold: f64) -> Result<usize, String> {
-        let mut pending = self.pending_events.write().unwrap_or_else(|e| e.into_inner());
+        let mut pending = self
+            .pending_events
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let mut applied = 0;
         let mut remaining = Vec::new();
 
@@ -198,8 +213,14 @@ impl ValueLearningEngine {
         // 简化：按主要价值信号 ID 分组
         let mut groups: HashMap<String, Vec<Observation>> = HashMap::new();
         for obs in observations {
-            let key = obs.value_signals.iter()
-                .max_by(|a, b| a.intensity.partial_cmp(&b.intensity).unwrap_or(std::cmp::Ordering::Equal))
+            let key = obs
+                .value_signals
+                .iter()
+                .max_by(|a, b| {
+                    a.intensity
+                        .partial_cmp(&b.intensity)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|s| s.value_id.clone())
                 .unwrap_or_else(|| "unknown".into());
             groups.entry(key).or_default().push(obs.clone());
@@ -234,14 +255,21 @@ impl ValueLearningEngine {
             }
 
             let compass = self.compass.snapshot();
-            let current_weight = compass.values.get(&value_id).map(|v| v.weight).unwrap_or(0.0);
+            let current_weight = compass
+                .values
+                .get(&value_id)
+                .map(|v| v.weight)
+                .unwrap_or(0.0);
 
             // 正向强化 → 提升权重
             if avg_valence > 0.3 && current_weight < 0.95 {
                 proposals.push(ValueChangeProposal {
                     value_id: value_id.clone(),
                     change_type: ChangeType::WeightDelta(0.02),
-                    rationale: format!("正向强化：{} 次正向反馈，平均效价 {:.2}", count, avg_valence),
+                    rationale: format!(
+                        "正向强化：{} 次正向反馈，平均效价 {:.2}",
+                        count, avg_valence
+                    ),
                     evidence_strength: (count as f64 * avg_intensity).min(1.0),
                 });
             }
@@ -250,7 +278,10 @@ impl ValueLearningEngine {
                 proposals.push(ValueChangeProposal {
                     value_id: value_id.clone(),
                     change_type: ChangeType::WeightDelta(-0.02),
-                    rationale: format!("负向违背：{} 次负向反馈，平均效价 {:.2}", count, avg_valence),
+                    rationale: format!(
+                        "负向违背：{} 次负向反馈，平均效价 {:.2}",
+                        count, avg_valence
+                    ),
                     evidence_strength: (count as f64 * (-avg_valence)).min(1.0),
                 });
             }
@@ -280,7 +311,10 @@ impl ValueLearningEngine {
         for proposal in &event.proposed_changes {
             match &proposal.change_type {
                 ChangeType::WeightDelta(delta) => {
-                    let new_weight = self.compass.snapshot().values
+                    let new_weight = self
+                        .compass
+                        .snapshot()
+                        .values
                         .get(&proposal.value_id)
                         .map(|v| (v.weight + delta).clamp(0.05, 0.99))
                         .unwrap_or(0.5);
@@ -473,7 +507,10 @@ mod tests {
             description: "造成物理伤害".into(),
         };
         let signals = ValueAttributor::infer_signals(&outcome);
-        let harm = signals.iter().find(|s| s.value_id == "harm_prevention").unwrap();
+        let harm = signals
+            .iter()
+            .find(|s| s.value_id == "harm_prevention")
+            .unwrap();
         assert!(harm.valence < -0.5);
         assert!(harm.intensity > 0.5);
     }
@@ -500,12 +537,19 @@ mod tests {
     fn test_learning_engine_cycle() {
         let conn = mem_conn();
         let compass_rt = ValueCompassRuntime::from_kb(&conn).unwrap();
-        let cfg = LearningConfig { min_observations_for_learning: 5, ..LearningConfig::default() };
+        let cfg = LearningConfig {
+            min_observations_for_learning: 5,
+            ..LearningConfig::default()
+        };
         let engine = ValueLearningEngine::new(compass_rt.clone(), cfg);
 
         // 记录一系列观察：连续违背 autonomy
         for i in 0..5 {
-            let action = crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::ValueAction::new(&format!("act_{}", i), "未经同意收集用户隐私数据");
+            let action =
+                crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::ValueAction::new(
+                    &format!("act_{}", i),
+                    "未经同意收集用户隐私数据",
+                );
             let outcome = Outcome {
                 success: true,
                 expected: true,
@@ -547,13 +591,20 @@ mod tests {
 
         // 验证 autonomy 权重下降
         let compass = compass_rt.snapshot();
-        assert!(compass.values["autonomy"].weight <= 0.95, "autonomy 权重应不升");
+        assert!(
+            compass.values["autonomy"].weight <= 0.95,
+            "autonomy 权重应不升"
+        );
     }
 
     #[test]
     fn test_observation_persistence() {
         let conn = mem_conn();
-        let action = crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::ValueAction::new("test", "测试行动");
+        let action =
+            crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::ValueAction::new(
+                "test",
+                "测试行动",
+            );
         let outcome = Outcome {
             success: true,
             expected: true,

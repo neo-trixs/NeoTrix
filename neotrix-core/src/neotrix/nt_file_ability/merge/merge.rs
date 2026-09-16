@@ -828,7 +828,7 @@ fn select_preferred_sheets(tables: Vec<TableData>, mode: SheetMode) -> Vec<Table
 
 /// 从文件名推导来源名 (通用: 剥离序号/后缀, 后缀来自 schema.filename_suffixes)。
 /// 例: "4、玉鹏价格_报价模板-修改版" → "玉鹏"
-pub(super) fn derive_source_name(path: &Path, schema: &MergeSchema) -> String {
+pub(crate) fn derive_source_name(path: &Path, schema: &MergeSchema) -> String {
     let stem = path
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())

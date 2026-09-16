@@ -15,73 +15,7 @@ pub enum _TunError {
     UnsupportedPlatform,
 }
 
-/// TUN设备 trait
-pub trait _TunDevice: Send + Sync {
-    /// 读取数据包
-    fn read_packet(&mut self, buf: &mut [u8]) -> Result<usize, _TunError>;
 
-    /// 写入数据包
-    fn write_packet(&mut self, data: &[u8]) -> Result<usize, _TunError>;
-
-    /// 获取设备名称
-    fn name(&self) -> &str;
-
-    /// 关闭设备
-    fn close(&mut self) -> Result<(), _TunError>;
-}
-
-/// 模拟TUN设备 (用于测试)
-pub struct _MockTunDevice {
-    name: String,
-    rx_queue: std::collections::VecDeque<Vec<u8>>,
-    tx_queue: std::collections::VecDeque<Vec<u8>>,
-}
-
-impl _MockTunDevice {
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            rx_queue: std::collections::VecDeque::new(),
-            tx_queue: std::collections::VecDeque::new(),
-        }
-    }
-
-    /// 注入待读取的数据包
-    pub fn _inject_rx(&mut self, data: Vec<u8>) {
-        self.rx_queue.push_back(data);
-    }
-
-    /// 获取已写入的数据包
-    pub fn _take_tx(&mut self) -> Option<Vec<u8>> {
-        self.tx_queue.pop_front()
-    }
-}
-
-impl _TunDevice for _MockTunDevice {
-    fn read_packet(&mut self, buf: &mut [u8]) -> Result<usize, _TunError> {
-        match self.rx_queue.pop_front() {
-            Some(data) => {
-                let len = std::cmp::min(data.len(), buf.len());
-                buf[..len].copy_from_slice(&data[..len]);
-                Ok(len)
-            }
-            None => Ok(0), // 无数据
-        }
-    }
-
-    fn write_packet(&mut self, data: &[u8]) -> Result<usize, _TunError> {
-        self.tx_queue.push_back(data.to_vec());
-        Ok(data.len())
-    }
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn close(&mut self) -> Result<(), _TunError> {
-        Ok(())
-    }
-}
 
 #[cfg(test)]
 mod tests {

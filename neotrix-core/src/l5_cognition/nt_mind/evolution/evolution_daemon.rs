@@ -3,15 +3,15 @@
 //! 零 LLM 依赖的持续自修复引擎, 由 BackgroundLoop 驱动。
 //! 集成 SelfDiagnose + AutoFixer + _PersistentIssueTracker。
 //!
-//! 真实实现来自 L1 nt_act_goal 与 L2 nt_world_infer，替代原本的本地存根。
+//! 真实实现来自 L5 nt_goal 与 L2 nt_world_infer，替代原本的本地存根。
 
 use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
 use crate::l5_cognition::nt_mind::evolution::evolution_loop::EvolutionLoop;
-use crate::neotrix::nt_act_goal::{
+use crate::l5_cognition::nt_goal::{
     BehavioralVerifier, CoverageAnalyzer, AutoGoalGenerator, RLFeedbackLoop,
     EvolutionGoal, GoalCategory,
 };
-use crate::neotrix::nt_act_goal::behavioral_verifier::VerificationLevel;
+use crate::l5_cognition::nt_goal::behavioral_verifier::VerificationLevel;
 use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
 use crate::core::nt_core_iit_phi::IITPhiCalculator;
 use crate::core::nt_core_absorb::spec_driven::{

@@ -9,10 +9,10 @@
 // 对比历史 (cargo bench --bench shield_c3)。
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use neotrix::neotrix::l1_body_impl::nt_shield_audit::{
+use neotrix::l3_embodiment::nt_shield::nt_shield_audit::{
     ReasoningTraceGuard, SecurityAuditor, TraceGuardMode,
 };
-use neotrix::neotrix::l1_body_impl::nt_shield_comm::strip_internal;
+use neotrix::l3_embodiment::nt_shield::nt_shield_comm::strip_internal;
 
 /// 构造 n 条含推理块/指纹/内部头的混合审计文本 (模拟真实请求行)。
 fn make_trace_text(n: usize) -> String {

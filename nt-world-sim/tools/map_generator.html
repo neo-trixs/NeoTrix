@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="ASCII">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeoTrix Terrain Generator</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#1a0f0a;--panel:#221810;--border:#d4a050;--text:#f0d080;--accent:#e0c080;--dim:#a08060;--hover:#3a2818;--input:#2a1c10;--canvas-bg:#100a06}
+body{font-family:'Courier New',monospace;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0}
+header h1{font-size:14px;letter-spacing:2px;color:var(--accent)}
+header .info{font-size:10px;color:var(--dim)}
+#main{display:flex;flex:1;overflow:hidden}
+#controls{width:260px;min-width:260px;background:var(--panel);border-right:1px solid var(--border);padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.ctrl-section{border:1px solid var(--border);border-radius:4px;padding:8px;margin-bottom:4px}
+.ctrl-section h3{font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase}
+.ctrl-row{margin-bottom:5px}
+.ctrl-row label{display:block;font-size:10px;color:var(--dim);margin-bottom:2px}
+.ctrl-row input[type="range"]{width:100%;accent-color:var(--border);height:4px}
+.ctrl-row select,.ctrl-row input[type="number"],.ctrl-row input[type="text"]{
+  width:100%;background:var(--input);color:var(--text);border:1px solid var(--border);
+  border-radius:3px;padding:4px 6px;font-size:11px;font-family:inherit}
+.ctrl-row select:focus,.ctrl-row input:focus{outline:none;border-color:var(--accent)}
+.ctrl-row .val{float:right;font-size:10px;color:var(--accent)}
+.btn{width:100%;padding:8px;border:1px solid var(--border);background:var(--input);color:var(--text);
+  font-family:inherit;font-size:11px;cursor:pointer;border-radius:3px;letter-spacing:1px;transition:all 0.15s}
+.btn:hover{background:var(--hover);border-color:var(--accent)}
+.btn-primary{background:var(--border);color:var(--bg);font-weight:bold}
+.btn-primary:hover{background:var(--accent)}
+.btn-row{display:flex;gap:4px}
+.btn-row .btn{flex:1}
+#canvas-panel{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--canvas-bg);position:relative}
+#canvas-toolbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0}
+#canvas-toolbar label{font-size:10px;color:var(--dim);display:flex;align-items:center;gap:4px;cursor:pointer}
+#canvas-toolbar input[type="checkbox"]{accent-color:var(--border)}
+#zoom-info{font-size:10px;color:var(--dim);margin-left:auto}
+#canvas-wrap{flex:1;overflow:hidden;position:relative;cursor:crosshair}
+canvas{position:absolute;top:0;left:0}
+#data-panel{width:300px;min-width:300px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+#data-panel h3{font-size:10px;color:var(--accent);letter-spacing:1px;padding:8px 10px;border-bottom:1px solid var(--border);text-transform:uppercase;flex-shrink:0}
+#json-output{flex:1;overflow:auto;padding:8px;font-size:9px;line-height:1.4;color:var(--dim);white-space:pre-wrap;word-break:break-all}
+#stats{padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0}
+#stats h4{font-size:10px;color:var(--accent);margin-bottom:4px}
+.stat-row{display:flex;justify-content:space-between;font-size:10px;padding:1px 0}
+.stat-row .count{color:var(--accent)}
+#copy-btn{margin-top:6px}
+#legend{display:flex;flex-wrap:wrap;gap:4px;padding:6px 10px;border-top:1px solid var(--border);flex-shrink:0}
+.legend-item{display:flex;align-items:center;gap:3px;font-size:9px;color:var(--dim)}
+.legend-color{width:10px;height:10px;border-radius:2px;border:1px solid var(--border)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <h1>NEOTRIX TERRAIN GENERATOR</h1>
+  <span class="info" id="status">Ready</span>
+</header>
+<div id="main">
+<div id="controls">
+  <div class="ctrl-section">
+    <h3>Region</h3>
+    <div class="ctrl-row">
+      <label>Region Type</label>
+      <select id="region-type">
+        <option value="forest">Forest</option>
+        <option value="desert">Desert</option>
+        <option value="mountain">Mountain</option>
+        <option value="swamp">Swamp</option>
+        <option value="plains">Plains</option>
+        <option value="island">Island</option>
+        <option value="tundra">Tundra</option>
+        <option value="volcano">Volcano</option>
+      </select>
+    </div>
+    <div class="ctrl-row">
+      <label>Biome Blend <span class="val" id="blend-val">50</span>%</label>
+      <input type="range" id="biome-blend" min="0" max="100" value="50">
+    </div>
+  </div>
+  <div class="ctrl-section">
+    <h3>Map Settings</h3>
+    <div class="ctrl-row">
+      <label>Map Size</label>
+      <select id="map-size">
+        <option value="32">32x32</option>
+        <option value="64">64x64</option>
+        <option value="80" selected>80x80</option>
+        <option value="128">128x128</option>
+      </select>
+    </div>
+    <div class="ctrl-row">
+      <label>Random Seed</label>
+      <div style="display:flex;gap:4px">
+        <input type="number" id="seed" value="42" style="flex:1">
+        <button class="btn" onclick="randomizeSeed()" style="width:auto;padding:4px 8px">Random</button>
+      </div>
+    </div>
+  </div>
+  <div class="ctrl-section">
+    <h3>Density</h3>
+    <div class="ctrl-row">
+      <label>Terrain Density <span class="val" id="td-val">40</span>%</label>
+      <input type="range" id="terrain-density" min="0" max="100" value="40">
+    </div>
+    <div class="ctrl-row">
+      <label>Tree Density <span class="val" id="tree-val">30</span>%</label>
+      <input type="range" id="tree-density" min="0" max="100" value="30">
+    </div>
+    <div class="ctrl-row">
+      <label>Ruin Density <span class="val" id="ruin-val">10</span>%</label>
+      <input type="range" id="ruin-density" min="0" max="100" value="10">
+    </div>
+  </div>
+  <div class="ctrl-section">
+    <h3>Spawn Point</h3>
+    <div style="display:flex;gap:4px">
+      <div class="ctrl-row" style="flex:1"><label>X</label><input type="number" id="spawn-x" value="40" min="0"></div>
+      <div class="ctrl-row" style="flex:1"><label>Y</label><input type="number" id="spawn-y" value="40" min="0"></div>
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="generateMap()">GENERATE MAP</button>
+  <div class="btn-row">
+    <button class="btn" onclick="exportJSON()">EXPORT JSON</button>
+    <button class="btn" onclick="exportPNG()">EXPORT PNG</button>
+  </div>
+</div>
+<div id="canvas-panel">
+  <div id="canvas-toolbar">
+    <label><input type="checkbox" id="show-grid" checked> Grid</label>
+    <label><input type="checkbox" id="show-objects" checked> Objects</label>
+    <label><input type="checkbox" id="show-spawn" checked> Spawn</label>
+    <span id="zoom-info">Zoom: 100% | Click to set spawn</span>
+  </div>
+  <div id="canvas-wrap"><canvas id="map-canvas"></canvas></div>
+</div>
+<div id="data-panel">
+  <h3>Data Output</h3>
+  <div id="json-output">Click "Generate Map" to start.</div>
+  <div id="legend"></div>
+  <div id="stats">
+    <h4>Terrain Statistics</h4>
+    <div id="stat-list"></div>
+    <button class="btn" id="copy-btn" onclick="copyJSON()">COPY TO CLIPBOARD</button>
+  </div>
+</div>
+</div>
+</div>
+<script>
+var TERRAIN = {
+  GRASS:  {id:0, color:'#4a7a3a', name:'Grassland'},
+  FOREST: {id:1, color:'#2a5a2a', name:'Forest'},
+  WATER:  {id:2, color:'#2a6090', name:'Water'},
+  SAND:   {id:3, color:'#c8a860', name:'Desert'},
+  SNOW:   {id:4, color:'#d8d8e0', name:'Snow Mountain'},
+  ROCK:   {id:5, color:'#7a6a5a', name:'Rocky Terrain'},
+  LAVA:   {id:6, color:'#c04020', name:'Lava Zone'},
+  SWAMP:  {id:7, color:'#4a6a3a', name:'Swamp'}
+};
+var TERRAIN_LIST = [TERRAIN.GRASS, TERRAIN.FOREST, TERRAIN.WATER, TERRAIN.SAND, TERRAIN.SNOW, TERRAIN.ROCK, TERRAIN.LAVA, TERRAIN.SWAMP];
+var TERRAIN_BY_ID = {};
+TERRAIN_LIST.forEach(function(t){ TERRAIN_BY_ID[t.id] = t; });
+
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+var SimplexNoise = (function(){
+  var F2 = 0.5 * (Math.sqrt(3) - 1);
+  var G2 = (3 - Math.sqrt(3)) / 6;
+  var G3 = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+
+  function SimplexNoise(seed){
+    var rng = mulberry32(seed);
+    this.perm = new Uint8Array(512);
+    this.perm12 = new Uint8Array(512);
+    var p = new Uint8Array(256);
+    for(var i=0;i<256;i++) p[i]=i;
+    for(var i=255;i>0;i--){
+      var j=Math.floor(rng()*(i+1));
+      var tmp=p[i]; p[i]=p[j]; p[j]=tmp;
+    }
+    for(var i=0;i<512;i++){
+      this.perm[i]=p[i&255];
+      this.perm12[i]=this.perm[i]%12;
+    }
+  }
+
+  SimplexNoise.prototype.noise2D = function(xin,yin){
+    var n0,n1,n2;
+    var s=(xin+yin)*F2;
+    var i=Math.floor(xin+s);
+    var j=Math.floor(yin+s);
+    var t=(i+j)*G2;
+    var X0=i-t;
+    var Y0=j-t;
+    var x0=xin-X0;
+    var y0=yin-Y0;
+    var i1,j1;
+    if(x0>y0){i1=1;j1=0;}else{i1=0;j1=1;}
+    var x1=x0-i1+G2;
+    var y1=y0-j1+G2;
+    var x2=x0-1+2*G2;
+    var y2=y0-1+2*G2;
+    var ii=i&255;
+    var jj=j&255;
+    var gi0=this.perm12[ii+this.perm[jj]];
+    var gi1=this.perm12[ii+i1+this.perm[jj+j1]];
+    var gi2=this.perm12[ii+1+this.perm[jj+1]];
+    var t0=0.5-x0*x0-y0*y0;
+    if(t0<0)n0=0;else{t0*=t0;n0=t0*t0*(G3[gi0][0]*x0+G3[gi0][1]*y0);}
+    var t1=0.5-x1*x1-y1*y1;
+    if(t1<0)n1=0;else{t1*=t1;n1=t1*t1*(G3[gi1][0]*x1+G3[gi1][1]*y1);}
+    var t2=0.5-x2*x2-y2*y2;
+    if(t2<0)n2=0;else{t2*=t2;n2=t2*t2*(G3[gi2][0]*x2+G3[gi2][1]*y2);}
+    return 70*(n0+n1+n2);
+  };
+
+  return SimplexNoise;
+})();
+
+var mapData = null;
+var zoom = 1;
+var offsetX = 0, offsetY = 0;
+var isDragging = false, dragStartX, dragStartY, dragOffsetX, dragOffsetY;
+
+function getParams(){
+  return {
+    regionType: document.getElementById('region-type').value,
+    biomeBlend: +document.getElementById('biome-blend').value,
+    mapSize: +document.getElementById('map-size').value,
+    terrainDensity: +document.getElementById('terrain-density').value,
+    treeDensity: +document.getElementById('tree-density').value,
+    ruinDensity: +document.getElementById('ruin-density').value,
+    seed: +document.getElementById('seed').value,
+    spawnX: +document.getElementById('spawn-x').value,
+    spawnY: +document.getElementById('spawn-y').value
+  };
+}
+
+function generateMap(){
+  var p = getParams();
+  var size = p.mapSize;
+  var rng = mulberry32(p.seed);
+  var noise = new SimplexNoise(p.seed);
+  var noise2 = new SimplexNoise(p.seed + 1337);
+  var terrain = [];
+  var objects = [];
+  var regions = [];
+  var regionBias = {
+    forest:   {FOREST:0.4,GRASS:0.3,WATER:0.05,SAND:0,SNOW:0,ROCK:0.15,LAVA:0,SWAMP:0.1},
+    desert:   {FOREST:0,GRASS:0.1,WATER:0.02,SAND:0.6,SNOW:0,ROCK:0.18,LAVA:0,SWAMP:0},
+    mountain: {FOREST:0.05,GRASS:0.1,WATER:0.05,SAND:0,SNOW:0.25,ROCK:0.45,LAVA:0.05,SWAMP:0},
+    swamp:    {FOREST:0.1,GRASS:0.1,WATER:0.15,SAND:0,SNOW:0,ROCK:0.05,LAVA:0,SWAMP:0.6},
+    plains:   {FOREST:0.1,GRASS:0.55,WATER:0.1,SAND:0.05,SNOW:0,ROCK:0.1,LAVA:0,SWAMP:0.1},
+    island:   {FOREST:0.15,GRASS:0.25,WATER:0.35,SAND:0.15,SNOW:0,ROCK:0.05,LAVA:0,SWAMP:0.05},
+    tundra:   {FOREST:0.05,GRASS:0.1,WATER:0.1,SAND:0,SNOW:0.45,ROCK:0.25,LAVA:0,SWAMP:0.05},
+    volcano:  {FOREST:0,GRASS:0.05,WATER:0,SAND:0.05,SNOW:0,ROCK:0.3,LAVA:0.5,SWAMP:0.1}
+  };
+  var bias = regionBias[p.regionType] || regionBias.forest;
+  var terrainIds = [];
+  var cumWeights = [];
+  var cum = 0;
+  TERRAIN_LIST.forEach(function(t){
+    cum += (bias[t.name] || 0.125);
+    terrainIds.push(t.id);
+    cumWeights.push(cum);
+  });
+  if(cum>0){for(var i=0;i<cumWeights.length;i++) cumWeights[i]/=cum;}
+  var blend = p.biomeBlend / 100;
+  var waterThreshold = p.terrainDensity / 100;
+  var treeChance = p.treeDensity / 100;
+  var ruinChance = p.ruinDensity / 100;
+  for(var y=0;y<size;y++){
+    terrain[y]=[];
+    for(var x=0;x<size;x++){
+      var nx=x/size;
+      var ny=y/size;
+      var e=0;
+      e+=noise.noise2D(nx*4,ny*4)*0.5;
+      e+=noise.noise2D(nx*8,ny*8)*0.25;
+      e+=noise.noise2D(nx*16,ny*16)*0.125;
+      e+=noise2.noise2D(nx*6,ny*6)*0.125;
+      e=(e+1)/2;
+      e=Math.max(0,Math.min(1,e));
+      var cx=(nx-0.5)*2;
+      var cy=(ny-0.5)*2;
+      var edgeDist=1-Math.sqrt(cx*cx+cy*cy);
+      edgeDist=Math.max(0,Math.min(1,edgeDist+0.3));
+      var baseId;
+      if(e<waterThreshold*0.5) baseId=2;
+      else if(e<waterThreshold) baseId=(Math.floor(rng()*2)===0)?2:3;
+      else if(e<0.55) baseId=0;
+      else if(e<0.7) baseId=1;
+      else if(e<0.85) baseId=5;
+      else baseId=4;
+      if(blend>0 && rng()<blend*0.6){
+        var r=rng();
+        for(var k=0;k<cumWeights.length;k++){
+          if(r<cumWeights[k]){baseId=terrainIds[k];break;}
+        }
+      }
+      if((p.regionType==='island'||p.regionType==='tundra') && edgeDist<0.2) baseId=2;
+      terrain[y][x]=baseId;
+    }
+  }
+  for(var y=0;y<size;y++){
+    for(var x=0;x<size;x++){
+      var tid=terrain[y][x];
+      if((tid===0||tid===1||tid===7) && rng()<treeChance*0.15){
+        objects.push({type:'tree',x:x,y:y,variant:Math.floor(rng()*4)});
+      }
+    }
+  }
+  var ruinCount=Math.floor(size*size*ruinChance*0.003);
+  var ruinNames=['Village','Temple','Tower','Fortress','Shrine','Camp','Ruins','Dungeon'];
+  for(var i=0;i<ruinCount;i++){
+    var rx=Math.floor(rng()*size);
+    var ry=Math.floor(rng()*size);
+    var rtid=terrain[ry][rx];
+    if(rtid!==2 && rtid!==6){
+      objects.push({type:'building',x:rx,y:ry,name:ruinNames[Math.floor(rng()*ruinNames.length)]});
+    }
+  }
+  var regionNames={forest:'Forest Region',desert:'Desert Region',mountain:'Mountain Region',swamp:'Swamp Region',plains:'Plains Region',island:'Island Region',tundra:'Tundra Region',volcano:'Volcanic Region'};
+  regions.push({name:regionNames[p.regionType]||'Unknown',x:0,y:0,w:size,h:size});
+  var sx=Math.max(0,Math.min(size-1,p.spawnX));
+  var sy=Math.max(0,Math.min(size-1,p.spawnY));
+  mapData={version:'1.0',size:{w:size,h:size},tileSize:32,spawn:{x:sx,y:sy},terrain:terrain,objects:objects,regions:regions};
+  document.getElementById('spawn-x').value=sx;
+  document.getElementById('spawn-y').value=sy;
+  updateStats();
+  renderJSON();
+  renderMap();
+  document.getElementById('status').textContent='Generated: '+size+'x'+size+' | '+objects.length+' objects';
+}
+
+var canvas, ctx;
+function initCanvas(){
+  canvas=document.getElementById('map-canvas');
+  ctx=canvas.getContext('2d');
+  var wrap=document.getElementById('canvas-wrap');
+  canvas.width=wrap.clientWidth;
+  canvas.height=wrap.clientHeight;
+  window.addEventListener('resize',function(){
+    canvas.width=wrap.clientWidth;
+    canvas.height=wrap.clientHeight;
+    if(mapData)renderMap();
+  });
+  canvas.addEventListener('wheel',function(e){
+    e.preventDefault();
+    var oldZoom=zoom;
+    if(e.deltaY<0)zoom=Math.min(8,zoom*1.15);
+    else zoom=Math.max(0.25,zoom/1.15);
+    var rect=canvas.getBoundingClientRect();
+    var mx=e.clientX-rect.left;
+    var my=e.clientY-rect.top;
+    offsetX=mx-(mx-offsetX)*(zoom/oldZoom);
+    offsetY=my-(my-offsetY)*(zoom/oldZoom);
+    updateZoomInfo();
+    renderMap();
+  },{passive:false});
+  canvas.addEventListener('mousedown',function(e){
+    if(e.button===1||e.shiftKey){
+      isDragging=true;
+      dragStartX=e.clientX;dragStartY=e.clientY;
+      dragOffsetX=offsetX;dragOffsetY=offsetY;
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('mousemove',function(e){
+    if(isDragging){
+      offsetX=dragOffsetX+(e.clientX-dragStartX);
+      offsetY=dragOffsetY+(e.clientY-dragStartY);
+      renderMap();
+    }
+  });
+  window.addEventListener('mouseup',function(){isDragging=false;});
+  canvas.addEventListener('click',function(e){
+    if(!mapData)return;
+    var rect=canvas.getBoundingClientRect();
+    var mx=(e.clientX-rect.left-offsetX)/zoom;
+    var my=(e.clientY-rect.top-offsetY)/zoom;
+    var tileX=Math.floor(mx/mapData.tileSize);
+    var tileY=Math.floor(my/mapData.tileSize);
+    if(tileX>=0&&tileX<mapData.size.w&&tileY>=0&&tileY<mapData.size.h){
+      mapData.spawn.x=tileX;
+      mapData.spawn.y=tileY;
+      document.getElementById('spawn-x').value=tileX;
+      document.getElementById('spawn-y').value=tileY;
+      renderMap();
+      renderJSON();
+    }
+  });
+}
+
+function updateZoomInfo(){
+  document.getElementById('zoom-info').textContent='Zoom: '+Math.round(zoom*100)+'% | Click to set spawn';
+}
+
+function renderMap(){
+  if(!mapData||!ctx)return;
+  var size=mapData.size.w;
+  var ts=mapData.tileSize;
+  var totalPx=size*ts;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.translate(offsetX,offsetY);
+  ctx.scale(zoom,zoom);
+  for(var y=0;y<size;y++){
+    for(var x=0;x<size;x++){
+      var tid=mapData.terrain[y][x];
+      var t=TERRAIN_BY_ID[tid];
+      ctx.fillStyle=t?t.color:'#ff00ff';
+      ctx.fillRect(x*ts,y*ts,ts,ts);
+    }
+  }
+  if(document.getElementById('show-grid').checked && zoom>0.5){
+    ctx.strokeStyle='rgba(212,160,80,0.15)';
+    ctx.lineWidth=0.5/zoom;
+    ctx.beginPath();
+    for(var i=0;i<=size;i++){
+      ctx.moveTo(i*ts,0);ctx.lineTo(i*ts,totalPx);
+      ctx.moveTo(0,i*ts);ctx.lineTo(totalPx,i*ts);
+    }
+    ctx.stroke();
+  }
+  if(document.getElementById('show-objects').checked){
+    mapData.objects.forEach(function(obj){
+      if(obj.type==='tree'){
+        ctx.fillStyle='#1a4a1a';
+        ctx.beginPath();
+        ctx.arc(obj.x*ts+ts/2,obj.y*ts+ts/2,ts*0.35,0,Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle='#2a6a2a';
+        ctx.beginPath();
+        ctx.arc(obj.x*ts+ts/2,obj.y*ts+ts/3,ts*0.25,0,Math.PI*2);
+        ctx.fill();
+      }else if(obj.type==='building'){
+        ctx.fillStyle='#a08060';
+        ctx.fillRect(obj.x*ts+ts*0.15,obj.y*ts+ts*0.15,ts*0.7,ts*0.7);
+        ctx.fillStyle='#604020';
+        ctx.fillRect(obj.x*ts+ts*0.25,obj.y*ts+ts*0.25,ts*0.5,ts*0.5);
+        ctx.fillStyle='#c04020';
+        ctx.beginPath();
+        ctx.moveTo(obj.x*ts+ts*0.1,obj.y*ts+ts*0.2);
+        ctx.lineTo(obj.x*ts+ts*0.5,obj.y*ts-ts*0.1);
+        ctx.lineTo(obj.x*ts+ts*0.9,obj.y*ts+ts*0.2);
+        ctx.fill();
+      }
+    });
+  }
+  if(document.getElementById('show-spawn').checked){
+    var sx=mapData.spawn.x*ts+ts/2;
+    var sy=mapData.spawn.y*ts+ts/2;
+    var r=ts*0.4;
+    ctx.shadowColor='#ff4040';
+    ctx.shadowBlur=12;
+    ctx.fillStyle='#ff4040';
+    ctx.beginPath();
+    ctx.arc(sx,sy,r,0,Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#ff8080';
+    ctx.beginPath();
+    ctx.arc(sx,sy,r*0.5,0,Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle='#fff';
+    ctx.lineWidth=1.5/zoom;
+    ctx.beginPath();
+    ctx.moveTo(sx-r,sy);ctx.lineTo(sx+r,sy);
+    ctx.moveTo(sx,sy-r);ctx.lineTo(sx,sy+r);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function renderJSON(){
+  if(!mapData)return;
+  document.getElementById('json-output').textContent=JSON.stringify(mapData,null,2);
+}
+
+function updateStats(){
+  if(!mapData)return;
+  var counts={};
+  TERRAIN_LIST.forEach(function(t){counts[t.id]=0;});
+  for(var y=0;y<mapData.size.h;y++){
+    for(var x=0;x<mapData.size.w;x++){
+      var tid=mapData.terrain[y][x];
+      counts[tid]=(counts[tid]||0)+1;
+    }
+  }
+  var total=mapData.size.w*mapData.size.h;
+  var html='';
+  TERRAIN_LIST.forEach(function(t){
+    var c=counts[t.id]||0;
+    var pct=((c/total)*100).toFixed(1);
+    html+='<div class="stat-row"><span><span class="legend-color" style="display:inline-block;width:8px;height:8px;background:'+t.color+';border-radius:2px;vertical-align:middle;margin-right:4px"></span>'+t.name+'</span><span class="count">'+c+' ('+pct+'%)</span></div>';
+  });
+  html+='<div class="stat-row" style="border-top:1px solid var(--border);padding-top:3px;margin-top:3px"><span>Objects</span><span class="count">'+mapData.objects.length+'</span></div>';
+  document.getElementById('stat-list').innerHTML=html;
+  var legendHtml='';
+  TERRAIN_LIST.forEach(function(t){
+    legendHtml+='<span class="legend-item"><span class="legend-color" style="background:'+t.color+'"></span>'+t.name+'</span>';
+  });
+  document.getElementById('legend').innerHTML=legendHtml;
+}
+
+function exportJSON(){
+  if(!mapData)return;
+  var blob=new Blob([JSON.stringify(mapData,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='terrain_'+mapData.size.w+'x'+mapData.size.h+'_seed'+document.getElementById('seed').value+'.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  document.getElementById('status').textContent='JSON exported';
+}
+
+function exportPNG(){
+  if(!mapData)return;
+  var size=mapData.size.w;
+  var ts=mapData.tileSize;
+  var c=document.createElement('canvas');
+  c.width=size*ts;
+  c.height=size*ts;
+  var x=c.getContext('2d');
+  for(var y=0;y<size;y++){
+    for(var i=0;i<size;i++){
+      var tid=mapData.terrain[y][i];
+      var t=TERRAIN_BY_ID[tid];
+      x.fillStyle=t?t.color:'#ff00ff';
+      x.fillRect(i*ts,y*ts,ts,ts);
+    }
+  }
+  mapData.objects.forEach(function(obj){
+    if(obj.type==='tree'){
+      x.fillStyle='#1a4a1a';
+      x.beginPath();
+      x.arc(obj.x*ts+ts/2,obj.y*ts+ts/2,ts*0.35,0,Math.PI*2);
+      x.fill();
+      x.fillStyle='#2a6a2a';
+      x.beginPath();
+      x.arc(obj.x*ts+ts/2,obj.y*ts+ts/3,ts*0.25,0,Math.PI*2);
+      x.fill();
+    }else if(obj.type==='building'){
+      x.fillStyle='#a08060';
+      x.fillRect(obj.x*ts+ts*0.15,obj.y*ts+ts*0.15,ts*0.7,ts*0.7);
+    }
+  });
+  x.fillStyle='#ff4040';
+  x.beginPath();
+  x.arc(mapData.spawn.x*ts+ts/2,mapData.spawn.y*ts+ts/2,ts*0.4,0,Math.PI*2);
+  x.fill();
+  var a=document.createElement('a');
+  a.href=c.toDataURL('image/png');
+  a.download='terrain_'+mapData.size.w+'x'+mapData.size.h+'_seed'+document.getElementById('seed').value+'.png';
+  a.click();
+  document.getElementById('status').textContent='PNG exported';
+}
+
+function copyJSON(){
+  if(!mapData)return;
+  navigator.clipboard.writeText(JSON.stringify(mapData,null,2)).then(function(){
+    document.getElementById('status').textContent='JSON copied to clipboard';
+  }).catch(function(){
+    document.getElementById('status').textContent='Copy failed - check permissions';
+  });
+}
+
+function randomizeSeed(){
+  document.getElementById('seed').value=Math.floor(Math.random()*999999);
+}
+
+['biome-blend','terrain-density','tree-density','ruin-density'].forEach(function(id){
+  var el=document.getElementById(id);
+  var valId=id.replace('biome-blend','blend-val').replace('terrain-density','td-val').replace('tree-density','tree-val').replace('ruin-density','ruin-val');
+  el.addEventListener('input',function(){document.getElementById(valId).textContent=el.value;});
+});
+
+['show-grid','show-objects','show-spawn'].forEach(function(id){
+  document.getElementById(id).addEventListener('change',function(){renderMap();});
+});
+
+initCanvas();
+generateMap();
+</script>
+</body>
+</html>

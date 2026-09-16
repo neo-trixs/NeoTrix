@@ -375,6 +375,7 @@ mod tests {
             max_retries: 3,
             current_retries: 0,
             timeout_secs: 300,
+            next_retry_at: None,
         }
     }
 
@@ -495,7 +496,7 @@ mod tests {
         let mut dependent = make_task("main", TaskPriority::High, 1000);
         dependent.dependencies = vec!["dep".to_string()];
         scheduler.submit_task(make_task("dep", TaskPriority::High, 1000));
-        scheduler.submit_task(dependendent);
+        scheduler.submit_task(dependent);
 
         let dep_id = scheduler.schedule_next().unwrap();
         scheduler.complete_task(&dep_id, make_result("dep", false)); // failed

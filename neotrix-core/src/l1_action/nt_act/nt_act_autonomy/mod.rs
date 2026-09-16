@@ -1,5 +1,6 @@
 pub mod oracle_gate;
 pub mod per_agent;
+pub mod types;
 
 pub use oracle_gate::OracleGate;
 pub use per_agent::{
@@ -7,3 +8,4 @@ pub use per_agent::{
     PerConfig, PlanExecuteReflectLoop, PlanRevision, PlanStep, Planner, PlannerAgent,
     Reflector, ReflectorAgent, StepStatus, TaskPlan, ModifiedStep,
 };
+pub use types::{AwarenessReport, CapabilityGap, GapSeverity};

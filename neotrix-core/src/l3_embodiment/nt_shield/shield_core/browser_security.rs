@@ -802,7 +802,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nt_world_browse_vuln_type_label() {
+    fn test_stealth_browser_vuln_type_label() {
         assert_eq!(_BrowserVulnType::XssReflected.label(), "Reflected XSS");
         assert_eq!(_BrowserVulnType::Csrf.label(), "CSRF");
         assert_eq!(_BrowserVulnType::CorsMisconfiguration.label(), "CORS Misconfiguration");

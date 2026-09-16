@@ -2,7 +2,7 @@ use super::core::SelfIteratingBrain;
 use super::super::brain_impl::EvaluationRecord;
 use super::super::benchmark_gate::{BenchmarkGateDecision, BenchmarkSuite};
 use crate::core::nt_core_consciousness::inner_critic::CritiqueResult;
-use crate::l5_cognition::l6_facade::EvalHarness;
+use crate::l5_cognition::traits::EvalHarnessApi;
 use super::super::super::core::{CapabilityVector, RewardSource};
 use super::super::super::self_edit::MicroEdit;
 use super::super::super::memory::{ReasoningMemory, ReasoningBank};
@@ -629,7 +629,7 @@ impl SelfIteratingBrain {
                 // 由外部 (其他意识维度 agent) 注入 EvalHarness 或 BenchmarkSuite 触发真实回归闸门。
                 {
                     let cand = self._current_task.clone();
-                    if let Ok(false) = self._close_iteration_loop(&cand, None, None) {
+                    if let Ok(false) = self.close_iteration_loop(&cand, None, None) {
                         // 回归失败: E3 钩子内部已发 CritiqueResult 信号并回滚候选。
                         log::warn!("[seal][E3] 候选未通过回归闸门 (默认透传不应触发)");
                     }
@@ -659,10 +659,10 @@ impl SelfIteratingBrain {
     /// - `bench_suite`: 可选 scope 内 `BenchmarkSuite` 回归基准 (benchmark_gate.rs)。
     ///
     /// 返回 `Ok(true)` = 候选可持久化; `Ok(false)` = 回归失败, 候选已拒并回滚。
-    pub(crate) fn _close_iteration_loop(
+    pub fn close_iteration_loop(
         &mut self,
         candidate: &str,
-        harness: Option<&EvalHarness>,
+        harness: Option<&dyn EvalHarnessApi>,
         bench_suite: Option<&BenchmarkSuite>,
     ) -> NeoTrixResult<bool> {
         let mut regression_failed = false;

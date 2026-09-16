@@ -229,16 +229,17 @@ mod tests {
     }
 
     #[test]
-    fn test_shared_ordered_key_requires_order() {
+    fn test_shared_ordered_key_requires_order() -> Result<(), String> {
         let a = EffectSpec::commutative("a", &["accum"]);
         let b = EffectSpec::with_ordered("b", &[("accum", KeyCommutativity::Ordered)]);
         // middleware 链共享累积器 → 非交换, 须外部强加次序
         match independent(&a, &b) {
-            IndependenceVerdict::Independent => panic!("should require order"),
+            IndependenceVerdict::Independent => return Err("should require order".to_string()),
             IndependenceVerdict::OrderedRequired { conflicts } => {
                 assert_eq!(conflicts, vec![("a".to_string(), "b".to_string())]);
             }
         }
+        Ok(())
     }
 
     #[test]

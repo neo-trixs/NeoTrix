@@ -30,11 +30,11 @@ impl TorCrawler {
         let path = store_path.join("tor_crawl");
         for sub in &["pages", "queue", "index"] {
             if let Err(e) = std::fs::create_dir_all(path.join(sub)) {
-                log::warn!("[tor-nt_world_crawl] create dir {:?}: {}", path.join(sub), e);
+                log::warn!("[tor-scanner] create dir {:?}: {}", path.join(sub), e);
             }
         }
 
-        let nt_world_crawl = Self {
+        let tor_scanner = Self {
             queue: RwLock::new(VecDeque::new()),
             visited: RwLock::new(HashSet::new()),
             index: RwLock::new(OnionIndex::new()),
@@ -54,8 +54,8 @@ impl TorCrawler {
             search_count: AtomicU64::new(0),
         };
 
-        nt_world_crawl.load_state();
-        nt_world_crawl
+        tor_scanner.load_state();
+        tor_scanner
     }
 
     pub fn _socks5_addr(&self) -> &str { &self._socks5_addr }
@@ -149,10 +149,10 @@ impl TorCrawler {
                 stats.search_engines_queried += 1;
             }
             Ok(resp) => {
-                log::debug!("[tor-nt_world_crawl] search engine {} returned HTTP {}", engine_url, resp.status());
+                log::debug!("[tor-scanner] search engine {} returned HTTP {}", engine_url, resp.status());
             }
             Err(e) => {
-                log::debug!("[tor-nt_world_crawl] search engine {} error: {}", engine_url, e);
+                log::debug!("[tor-scanner] search engine {} error: {}", engine_url, e);
             }
         }
 
@@ -165,7 +165,7 @@ impl TorCrawler {
         let client = match self.socks_client().await {
             Ok(c) => c,
             Err(e) => {
-                log::warn!("[tor-nt_world_crawl] search failed to create client: {}", e);
+                log::warn!("[tor-scanner] search failed to create client: {}", e);
                 return vec![];
             }
         };
@@ -312,7 +312,7 @@ impl TorCrawler {
         let sem = Arc::new(Semaphore::new(self.concurrency));
 
         // Seed search engines with high-value queries for discovery
-        let nt_world_crawl_clone = self.clone();
+        let tor_scanner_clone = self.clone();
         tokio::spawn(async move {
             sleep(Duration::from_secs(30)).await;
             let discovery_queries = [
@@ -320,8 +320,8 @@ impl TorCrawler {
                 "dark web index", "onion search",
             ];
             for q in &discovery_queries {
-                let results = nt_world_crawl_clone.search(q).await;
-                log::info!("[tor-nt_world_crawl] discovery query '{}' found {} .onion URLs", q, results.len());
+                let results = tor_scanner_clone.search(q).await;
+                log::info!("[tor-scanner] discovery query '{}' found {} .onion URLs", q, results.len());
                 sleep(Duration::from_secs(60)).await;
             }
         });
@@ -339,28 +339,28 @@ impl TorCrawler {
                     continue;
                 }
                 Some(job) => {
-                    let nt_world_crawl = self.clone();
+                    let tor_scanner = self.clone();
                     let sem_clone = sem.clone();
 
                     tokio::spawn(async move {
                         let _permit = sem_clone.acquire_owned().await;
-                        let client = match nt_world_crawl.socks_client().await {
+                        let client = match tor_scanner.socks_client().await {
                             Ok(c) => c,
                             Err(e) => {
-                                let mut s = nt_world_crawl.stats.write().await;
+                                let mut s = tor_scanner.stats.write().await;
                                 s.errors += 1;
-                                log::warn!("[tor-nt_world_crawl] client error: {}", e);
+                                log::warn!("[tor-scanner] client error: {}", e);
                                 return;
                             }
                         };
 
-                        match nt_world_crawl.crawl_page(&client, &job).await {
+                        match tor_scanner.crawl_page(&client, &job).await {
                             Ok(page) => {
                                 let links = page.links.clone();
-                                if let Err(e) = nt_world_crawl.store_page(&page) {
-                                    log::warn!("[tor-nt_world_crawl] store failed: {}", e);
+                                if let Err(e) = tor_scanner.store_page(&page) {
+                                    log::warn!("[tor-scanner] store failed: {}", e);
                                 }
-                                nt_world_crawl.index_page(&page);
+                                tor_scanner.index_page(&page);
 
                                 // Enqueue discovered links
                                 let next_priority = match job.priority {
@@ -371,24 +371,24 @@ impl TorCrawler {
                                 };
                                 let next_depth = job.depth + 1;
                                 for link in &links {
-                                    nt_world_crawl.enqueue(link, next_depth, next_priority).await;
+                                    tor_scanner.enqueue(link, next_depth, next_priority).await;
                                 }
 
-                                let mut s = nt_world_crawl.stats.write().await;
+                                let mut s = tor_scanner.stats.write().await;
                                 s.visited += 1;
                                 s.stored += 1;
-                                s.indexed = nt_world_crawl.index.try_read().map(|i| i.len()).unwrap_or(0);
+                                s.indexed = tor_scanner.index.try_read().map(|i| i.len()).unwrap_or(0);
                                 s.last_crawl = Some(page.url.clone());
                                 if s.visited % 10 == 0 {
-                                    log::info!("[tor-nt_world_crawl] crawled {} pages, idx {}, queue {}",
-                                        s.visited, s.indexed, nt_world_crawl.queue_len());
+                                    log::info!("[tor-scanner] crawled {} pages, idx {}, queue {}",
+                                        s.visited, s.indexed, tor_scanner.queue_len());
                                 }
                             }
                             Err(e) => {
-                                let mut s = nt_world_crawl.stats.write().await;
+                                let mut s = tor_scanner.stats.write().await;
                                 s.errors += 1;
                                 if s.errors % 10 == 0 {
-                                    log::warn!("[tor-nt_world_crawl] {} errors (last: {}): {}", s.errors, job.url, e);
+                                    log::warn!("[tor-scanner] {} errors (last: {}): {}", s.errors, job.url, e);
                                 }
                             }
                         }

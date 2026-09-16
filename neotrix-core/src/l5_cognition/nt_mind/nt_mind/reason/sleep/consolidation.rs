@@ -1,10 +1,10 @@
-use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_bank::ReasoningBank;
+use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_cap::CapabilityVector;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
-use chrono::Utc;
 use super::hebbian::HebbianUpdater;
+use chrono::Utc;
 
 #[derive(Debug, Clone)]
 pub struct ConsolidationConfig {
@@ -46,7 +46,8 @@ impl MemoryConsolidation {
 
     pub(crate) fn _select_memories_for_sleep(&self, bank: &ReasoningBank) -> Vec<ReasoningMemory> {
         let all_mems = bank.memories();
-        let mut scored: Vec<(f64, &ReasoningMemory)> = all_mems.iter()
+        let mut scored: Vec<(f64, &ReasoningMemory)> = all_mems
+            .iter()
             .filter(|m| m.reward >= self.config.min_reward)
             .map(|m| {
                 let age = (Utc::now().timestamp() - m.timestamp).max(0) as f64;
@@ -69,8 +70,8 @@ impl MemoryConsolidation {
         &self,
         bank: &mut ReasoningBank,
         brain: &mut CapabilityVector,
-//         state: &mut SelectiveState,
-//         operator: &SelectableOperator,
+        //         state: &mut SelectiveState,
+        //         operator: &SelectableOperator,
         updater: &HebbianUpdater,
     ) -> ConsolidationResult {
         let memories = self._select_memories_for_sleep(bank);
@@ -116,10 +117,10 @@ impl MemoryConsolidation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
-    use crate::core::nt_core_bank::{MemoryTier, MemoryLifecycle, T3Views};
-    use crate::core::{RewardSource, TaskType};
+    use crate::core::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
     use crate::core::nt_core_cap::CapabilityVector;
+    use crate::core::{RewardSource, TaskType};
+    use chrono::Utc;
 
     fn make_memory(reward: f64, success: bool, id: &str, ts: i64) -> ReasoningMemory {
         ReasoningMemory {
@@ -162,7 +163,10 @@ mod tests {
         let bank = build_test_bank(mems);
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
         let selected = mc._select_memories_for_sleep(&bank);
-        assert!(selected.iter().any(|m| m.id == "high"), "high-reward memory should be selected");
+        assert!(
+            selected.iter().any(|m| m.id == "high"),
+            "high-reward memory should be selected"
+        );
     }
 
     #[test]
@@ -170,16 +174,22 @@ mod tests {
         let bank = ReasoningBank::new(10);
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
         let selected = mc._select_memories_for_sleep(&bank);
-        assert!(selected.is_empty(), "empty bank should return empty selection");
+        assert!(
+            selected.is_empty(),
+            "empty bank should return empty selection"
+        );
     }
 
     #[test]
     fn test_select_memories_respects_max() {
-        let mems: Vec<_> = (0..20).map(|i| {
-            make_memory(0.5 + (i as f64) * 0.02, true, &format!("m{}", i), i as i64)
-        }).collect();
+        let mems: Vec<_> = (0..20)
+            .map(|i| make_memory(0.5 + (i as f64) * 0.02, true, &format!("m{}", i), i as i64))
+            .collect();
         let bank = build_test_bank(mems);
-        let mc = MemoryConsolidation::new(ConsolidationConfig { max_memories_per_pass: 5, ..Default::default() });
+        let mc = MemoryConsolidation::new(ConsolidationConfig {
+            max_memories_per_pass: 5,
+            ..Default::default()
+        });
         let selected = mc._select_memories_for_sleep(&bank);
         assert!(selected.len() <= 5, "should limit to max_memories_per_pass");
     }
@@ -196,7 +206,10 @@ mod tests {
         let selected = mc._select_memories_for_sleep(&bank);
         let recent = selected.iter().position(|m| m.id == "recent");
         let old = selected.iter().position(|m| m.id == "old");
-        assert!(recent < Some(old.unwrap_or(usize::MAX)), "recent memory should rank higher");
+        assert!(
+            recent < Some(old.unwrap_or(usize::MAX)),
+            "recent memory should rank higher"
+        );
     }
 
     #[test]
@@ -206,8 +219,12 @@ mod tests {
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
 
         let mut bank = bank;
-        let result = mc.run_consolidation_pass(&mut bank, &mut cap);
-        assert_eq!(result.memories_processed, 0, "empty bank should process 0 memories");
+        let updater = HebbianUpdater::default();
+        let result = mc.run_consolidation_pass(&mut bank, &mut cap, &updater);
+        assert_eq!(
+            result.memories_processed, 0,
+            "empty bank should process 0 memories"
+        );
     }
 
     #[test]

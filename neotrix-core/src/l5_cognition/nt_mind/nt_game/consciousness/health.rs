@@ -67,7 +67,8 @@ pub fn compute_health(stats: &BufferStats, phi_avg: f64) -> f64 {
     let consistency_score = (1.0 - stats.reward_variance).clamp(0.0, 1.0);
 
     // Weighted combination
-    let health = 0.40 * wr_score + 0.25 * reward_score + 0.20 * phi_score + 0.15 * consistency_score;
+    let health =
+        0.40 * wr_score + 0.25 * reward_score + 0.20 * phi_score + 0.15 * consistency_score;
 
     health.clamp(0.0, 1.0)
 }
@@ -255,10 +256,19 @@ mod tests {
 
     #[test]
     fn test_recommendation_as_str() {
-        assert_eq!(Recommendation::IncreaseDifficulty.as_str(), "increase_difficulty");
+        assert_eq!(
+            Recommendation::IncreaseDifficulty.as_str(),
+            "increase_difficulty"
+        );
         assert_eq!(Recommendation::Maintain.as_str(), "maintain");
-        assert_eq!(Recommendation::DecreaseDifficulty.as_str(), "decrease_difficulty");
+        assert_eq!(
+            Recommendation::DecreaseDifficulty.as_str(),
+            "decrease_difficulty"
+        );
         assert_eq!(Recommendation::IncreasePhi.as_str(), "increase_phi");
-        assert_eq!(Recommendation::ImproveConsistency.as_str(), "improve_consistency");
+        assert_eq!(
+            Recommendation::ImproveConsistency.as_str(),
+            "improve_consistency"
+        );
     }
 }

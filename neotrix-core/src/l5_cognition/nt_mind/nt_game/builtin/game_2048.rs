@@ -46,7 +46,10 @@ impl Game2048 {
     }
 
     fn next_random(&mut self) -> u32 {
-        self.rng_state = self.rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        self.rng_state = self
+            .rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1);
         (self.rng_state >> 33) as u32
     }
 
@@ -122,7 +125,10 @@ impl Game2048 {
 
     fn text_state(&self) -> String {
         let mut s = String::new();
-        s.push_str(&format!("=== 2048 (Score: {}, Best: {}) ===\n\n", self.score, self.best));
+        s.push_str(&format!(
+            "=== 2048 (Score: {}, Best: {}) ===\n\n",
+            self.score, self.best
+        ));
         for r in 0..GRID {
             for c in 0..GRID {
                 let v = self.board[r][c];
@@ -145,7 +151,10 @@ impl NtGameEnv for Game2048 {
             description: "Classic 2048 resource merging puzzle".into(),
             min_constellation: 1,
             max_constellation: 2,
-            target_skills: vec![CognitiveSkill::Optimization, CognitiveSkill::PatternRecognition],
+            target_skills: vec![
+                CognitiveSkill::Optimization,
+                CognitiveSkill::PatternRecognition,
+            ],
             is_builtin: true,
         }
     }
@@ -241,7 +250,12 @@ impl NtGameEnv for Game2048 {
             is_terminal: self.is_terminal,
             scores,
             energy: HashMap::new(),
-            hexagram_states: self.board.iter().flatten().map(|&v| (v as u8).min(63)).collect(),
+            hexagram_states: self
+                .board
+                .iter()
+                .flatten()
+                .map(|&v| (v as u8).min(63))
+                .collect(),
             board_size: (GRID, GRID),
             difficulty: Difficulty::Apprentice,
             custom: serde_json::json!({
@@ -257,10 +271,26 @@ impl NtGameEnv for Game2048 {
             return vec![];
         }
         vec![
-            Action { kind: "Left".into(), params: serde_json::json!({}), actor_id: 0 },
-            Action { kind: "Up".into(), params: serde_json::json!({}), actor_id: 0 },
-            Action { kind: "Right".into(), params: serde_json::json!({}), actor_id: 0 },
-            Action { kind: "Down".into(), params: serde_json::json!({}), actor_id: 0 },
+            Action {
+                kind: "Left".into(),
+                params: serde_json::json!({}),
+                actor_id: 0,
+            },
+            Action {
+                kind: "Up".into(),
+                params: serde_json::json!({}),
+                actor_id: 0,
+            },
+            Action {
+                kind: "Right".into(),
+                params: serde_json::json!({}),
+                actor_id: 0,
+            },
+            Action {
+                kind: "Down".into(),
+                params: serde_json::json!({}),
+                actor_id: 0,
+            },
         ]
     }
 
@@ -285,7 +315,8 @@ impl NtGameEnv for Game2048 {
 
 Slide tiles in 4 directions. Same-value tiles merge.
 Goal: reach 2048 or maximize score before the board fills.
-"#.into()
+"#
+        .into()
     }
 
     fn constellation_level(&self) -> u8 {
@@ -318,7 +349,10 @@ pub fn register_game_2048(registry: &mut GameRegistry) {
         description: "Classic 2048 resource merging puzzle".into(),
         min_constellation: 1,
         max_constellation: 2,
-        target_skills: vec![CognitiveSkill::Optimization, CognitiveSkill::PatternRecognition],
+        target_skills: vec![
+            CognitiveSkill::Optimization,
+            CognitiveSkill::PatternRecognition,
+        ],
         is_builtin: true,
     });
 }

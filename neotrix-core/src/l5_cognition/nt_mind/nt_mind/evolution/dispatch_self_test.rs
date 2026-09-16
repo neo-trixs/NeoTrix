@@ -165,7 +165,13 @@ impl SelfTest for DispatchControlPlaneSelfTest {
                 report.strategies_seen
             ));
         }
-        if (shell.coevo.mastery(AttentionDomain::PatternMatch, "explorer") - 1.0).abs() > 1e-9 {
+        if (shell
+            .coevo
+            .mastery(AttentionDomain::PatternMatch, "explorer")
+            - 1.0)
+            .abs()
+            > 1e-9
+        {
             failures.push("coevo capability mastery for explorer should be 1.0".into());
         }
 
@@ -204,7 +210,11 @@ impl SelfTest for DispatchControlPlaneSelfTest {
                 if restored.coevo.evolution_revision != report.coevo_rewards {
                     failures.push("restored coevo evolution revision lost".into());
                 }
-                if restored.learner.rates(AttentionDomain::PatternMatch).is_empty() {
+                if restored
+                    .learner
+                    .rates(AttentionDomain::PatternMatch)
+                    .is_empty()
+                {
                     failures.push("restored learner evidence lost".into());
                 }
             }
@@ -222,7 +232,11 @@ impl SelfTest for DispatchControlPlaneSelfTest {
 ///
 /// 每轮: 刺激 PatternMatch → 交替 research/explore 提示 → 真实 dispatch_and_execute
 /// → MANTA audit+repair (镜像生产 handlers_core 派单后的审计块)。
-pub fn run_mission(shell: &mut MetaAgentShell, executor: &ScriptedExecutor, rounds: usize) -> MissionReport {
+pub fn run_mission(
+    shell: &mut MetaAgentShell,
+    executor: &ScriptedExecutor,
+    rounds: usize,
+) -> MissionReport {
     let mut repairs = 0usize;
     for i in 0..rounds {
         shell.stimulate(AttentionDomain::PatternMatch, 0.9);
@@ -242,11 +256,7 @@ pub fn run_mission(shell: &mut MetaAgentShell, executor: &ScriptedExecutor, roun
             .map(|(_, r, _)| *r)
             .unwrap_or(0.0)
     };
-    let strategies_seen = shell
-        .coevo
-        .bandit()
-        .stats("research_study")
-        .len();
+    let strategies_seen = shell.coevo.bandit().stats("research_study").len();
     MissionReport {
         rounds,
         repairs,
@@ -308,13 +318,30 @@ mod tests {
         assert_eq!(report.effective_agent, "explorer");
         // MANTA 拓扑修复。
         assert!(report.repairs >= 1);
-        assert_eq!(shell.topology.agent_for(AttentionDomain::PatternMatch), "explorer");
+        assert_eq!(
+            shell.topology.agent_for(AttentionDomain::PatternMatch),
+            "explorer"
+        );
         // MAGE 共进化: 同一 reward 流同步累积。
         assert_eq!(report.coevo_rewards, 8);
         assert_eq!(report.memories, 8);
-        assert!(report.strategies_seen >= 3, "bandit should cover multiple arms, got {}", report.strategies_seen);
-        assert_eq!(shell.coevo.mastery(AttentionDomain::PatternMatch, "explorer"), 1.0);
-        assert_eq!(shell.coevo.mastery(AttentionDomain::PatternMatch, "researcher"), 0.0);
+        assert!(
+            report.strategies_seen >= 3,
+            "bandit should cover multiple arms, got {}",
+            report.strategies_seen
+        );
+        assert_eq!(
+            shell
+                .coevo
+                .mastery(AttentionDomain::PatternMatch, "explorer"),
+            1.0
+        );
+        assert_eq!(
+            shell
+                .coevo
+                .mastery(AttentionDomain::PatternMatch, "researcher"),
+            0.0
+        );
     }
 
     #[test]
@@ -324,6 +351,9 @@ mod tests {
 
     #[test]
     fn selftest_name_unique() {
-        assert_eq!(DispatchControlPlaneSelfTest::default().name(), "dispatch_control_plane");
+        assert_eq!(
+            DispatchControlPlaneSelfTest::default().name(),
+            "dispatch_control_plane"
+        );
     }
 }

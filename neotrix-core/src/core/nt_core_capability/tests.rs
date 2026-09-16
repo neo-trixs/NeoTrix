@@ -3,6 +3,14 @@
 #[cfg(test)]
 mod capability_tests {
     use crate::core::nt_core_capability::*;
+    use crate::core::nt_core_capability::cache::{CapabilityCacheConfig, CapabilityCache};
+    use crate::core::nt_core_capability::composer::CapabilityComposer;
+    use crate::core::nt_core_capability::monitor::{MonitorDashboard, MonitorEvent, EventType};
+    use crate::core::nt_core_capability::discovery::{DiscoveryConfig, DistributedDiscovery};
+    use crate::core::nt_core_capability::versioning::{SemanticVersion, VersionManager};
+    use crate::core::nt_core_capability::orchestrator::OrchestrationEngine;
+    use crate::core::nt_core_capability::loadbalancer::{LoadBalancer, LoadBalanceStrategy, CapabilityInstance, InstanceStatus};
+    use crate::core::nt_core_capability::factory::{init_global_registry, CapabilityFactory};
     use std::sync::Arc;
 
     #[test]
@@ -103,7 +111,7 @@ mod capability_tests {
 
     #[test]
     fn test_cache() {
-        let config = CacheConfig::default();
+        let config = CapabilityCacheConfig::default();
         let mut cache = CapabilityCache::new(config);
         let key = "test".to_string();
         let value = CapabilityOutput::Text("hello".into());
@@ -115,7 +123,7 @@ mod capability_tests {
 
     #[test]
     fn test_cache_eviction() {
-        let config = CacheConfig {
+        let config = CapabilityCacheConfig {
             max_capacity: 2,
             default_ttl: std::time::Duration::from_secs(300),
             enable_stats: true,

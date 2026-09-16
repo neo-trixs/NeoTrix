@@ -5,8 +5,8 @@
 
 use std::collections::HashMap;
 
-use super::semantic_entropy::SemanticEntropyGate;
 use super::semantic_entropy::SemanticEntropy;
+use super::semantic_entropy::SemanticEntropyGate;
 use super::template_registry::{CodeTemplateRegistry, TemplateCategory};
 
 // use crate::l1_action::nt_act::nt_l1_shared_types::ActionPlan;
@@ -70,7 +70,10 @@ impl CodeContentEntropy {
         if tokens.len() < self.ngram_size {
             return Vec::new();
         }
-        tokens.windows(self.ngram_size).map(|w| w.join(" ")).collect()
+        tokens
+            .windows(self.ngram_size)
+            .map(|w| w.join(" "))
+            .collect()
     }
 
     /// Compute Shannon entropy from n-gram frequency distribution
@@ -98,7 +101,7 @@ impl Default for CodeContentEntropy {
 pub struct CodeGenRequest {
     pub plan: ActionPlan,
     pub file: String,
-    pub context: String,  // 文件内容快照
+    pub context: String, // 文件内容快照
 }
 
 /// 代码生成结果
@@ -144,8 +147,12 @@ impl SelfCodeWriter {
     pub fn generate(&self, req: &CodeGenRequest) -> Result<CodeGenResult, String> {
         match &req.plan {
             ActionPlan::AddTestStub { .. } => self.gen_test_stub(req),
-            ActionPlan::RunCargoFix => Err("SelfCodeWriter: RunCargoFix 请使用 AutoFixer::cargo_fix".into()),
-            ActionPlan::RemoveTodo { .. } => Err("SelfCodeWriter: RemoveTodo 请使用 ActionExecutor".into()),
+            ActionPlan::RunCargoFix => {
+                Err("SelfCodeWriter: RunCargoFix 请使用 AutoFixer::cargo_fix".into())
+            }
+            ActionPlan::RemoveTodo { .. } => {
+                Err("SelfCodeWriter: RemoveTodo 请使用 ActionExecutor".into())
+            }
             ActionPlan::SplitLargeFile { .. } => self.gen_file_split(req),
             ActionPlan::ReviewUnsafe { .. } => self.gen_unsafe_review(req),
             ActionPlan::ReplaceUnwrap { .. } => self.gen_unwrap_replacement(req),
@@ -179,7 +186,10 @@ impl SelfCodeWriter {
         let context = vec![req.context.clone()];
         if gate.should_defer(&plan_desc, &context) {
             let entropy = SemanticEntropyGate::compute_entropy(&plan_desc, &context);
-            return Err(format!("DeferredToLLM: entropy={:.4} > threshold={:.4}", entropy, gate.entropy_threshold));
+            return Err(format!(
+                "DeferredToLLM: entropy={:.4} > threshold={:.4}",
+                entropy, gate.entropy_threshold
+            ));
         }
         self.generate(req)
     }
@@ -203,15 +213,17 @@ impl SelfCodeWriter {
         use super::semantic_entropy::EntropyAction;
 
         // Re-borrow to compute entropy (immutable)
-        let entropy = self.entropy_detector.as_ref()
+        let entropy = self
+            .entropy_detector
+            .as_ref()
             .map(|d| d.estimate_entropy(&candidates))
             .unwrap_or(0.0);
 
         let should_defer = entropy > threshold;
 
         let edit_hash = {
-            use std::hash::{Hash, Hasher};
             use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
             let mut h = DefaultHasher::new();
             result.new_content.hash(&mut h);
             format!("{:x}", h.finish())
@@ -223,7 +235,9 @@ impl SelfCodeWriter {
             }
             return Err(format!(
                 "DeferredToLLM: pairwise entropy={:.4} > threshold={:.4}, {} candidates",
-                entropy, threshold, candidates.len()
+                entropy,
+                threshold,
+                candidates.len()
             ));
         }
 
@@ -252,7 +266,8 @@ impl SelfCodeWriter {
 
         for i in 0..(n - 1).min(templates.len()) {
             let mut vars = HashMap::new();
-            let struct_name = Self::extract_struct_name(&req.context).unwrap_or_else(|| "Default".to_string());
+            let struct_name =
+                Self::extract_struct_name(&req.context).unwrap_or_else(|| "Default".to_string());
             vars.insert("name".into(), format!("variant_{}", i));
             vars.insert("struct".into(), struct_name.clone());
             let variant = CodeTemplateRegistry::instantiate(templates[i], &vars);
@@ -306,11 +321,14 @@ impl SelfCodeWriter {
             return Err("已有测试模块".into());
         }
 
-        let templates = self.template_registry.applicable_to(&req.file, Some(TemplateCategory::TestStub));
+        let templates = self
+            .template_registry
+            .applicable_to(&req.file, Some(TemplateCategory::TestStub));
         let template = templates.first().ok_or("没有可用的测试模板")?;
 
         // 尝试从文件内容提取 struct 名
-        let struct_name = Self::extract_struct_name(&req.context).unwrap_or_else(|| "Default".to_string());
+        let struct_name =
+            Self::extract_struct_name(&req.context).unwrap_or_else(|| "Default".to_string());
 
         let mut vars = HashMap::new();
         vars.insert("name".into(), "placeholder".into());
@@ -333,15 +351,15 @@ impl SelfCodeWriter {
         let lines: Vec<&str> = req.context.lines().collect();
         let suggestions: Vec<String> = Vec::new();
 
-// // 找 mod / impl / pub fn 作为拆分候选
+        // // 找 mod / impl / pub fn 作为拆分候选
         for line in lines.iter() {
             let t = line.trim();
             if t.starts_with("pub fn ") || t.starts_with("fn ") {
                 let _name = t.split_whitespace().nth(1).unwrap_or("unknown");
-//                suggestions.push(format!("  Line {}: {} — 可提取为独立函数", i + 1, name));
+                //                suggestions.push(format!("  Line {}: {} — 可提取为独立函数", i + 1, name));
             }
             if t.starts_with("impl ") {
-//                suggestions.push(format!("  Line {}: {} — 可提取为独立文件", i + 1, t));
+                //                suggestions.push(format!("  Line {}: {} — 可提取为独立文件", i + 1, t));
             }
         }
 
@@ -368,7 +386,10 @@ impl SelfCodeWriter {
 
         for line in req.context.lines() {
             if line.contains("unsafe {") || line.contains("unsafe fn") {
-                new_content.push_str(&format!("// SAFETY-REVIEW: 需要人工审计此 unsafe 块\n{}\n", line));
+                new_content.push_str(&format!(
+                    "// SAFETY-REVIEW: 需要人工审计此 unsafe 块\n{}\n",
+                    line
+                ));
                 found += 1;
             } else {
                 new_content.push_str(line);
@@ -423,8 +444,14 @@ impl SelfCodeWriter {
         for line in content.lines() {
             let t = line.trim();
             if t.starts_with("pub struct ") || t.starts_with("struct ") {
-                let name = t.split_whitespace().nth(2).or_else(|| t.split_whitespace().nth(1))?;
-                return Some(name.trim_end_matches(|c: char| c == ';' || c == '{' || c.is_whitespace()).to_string());
+                let name = t
+                    .split_whitespace()
+                    .nth(2)
+                    .or_else(|| t.split_whitespace().nth(1))?;
+                return Some(
+                    name.trim_end_matches(|c: char| c == ';' || c == '{' || c.is_whitespace())
+                        .to_string(),
+                );
             }
         }
         None
@@ -451,7 +478,9 @@ mod tests {
     fn test_generate_test_stub_simple() {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::AddTestStub { file: "test.rs".into() },
+            plan: ActionPlan::AddTestStub {
+                file: "test.rs".into(),
+            },
             file: "test.rs".into(),
             context: "fn main() {}".into(),
         };
@@ -466,7 +495,9 @@ mod tests {
     fn test_generate_test_stub_already_exists() {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::AddTestStub { file: "test.rs".into() },
+            plan: ActionPlan::AddTestStub {
+                file: "test.rs".into(),
+            },
             file: "test.rs".into(),
             context: "#[cfg(test)]\nfn main() {}".into(),
         };
@@ -479,8 +510,6 @@ mod tests {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
             plan: ActionPlan::HumanDecision {
-//                 issue_type: crate::l1_action::nt_act::nt_l1_shared_types::IssueType::TodoLeftovers,
-                file: None,
                 reason: "test".into(),
             },
             file: "test.rs".into(),
@@ -495,7 +524,9 @@ mod tests {
         let w = SelfCodeWriter::new();
         let content = "pub fn foo() {}\nimpl Bar {}\npub fn baz() {}";
         let req = CodeGenRequest {
-            plan: ActionPlan::SplitLargeFile { file: "big.rs".into() },
+            plan: ActionPlan::SplitLargeFile {
+                file: "big.rs".into(),
+            },
             file: "big.rs".into(),
             context: content.into(),
         };
@@ -510,7 +541,9 @@ mod tests {
     fn test_generate_unsafe_review() {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::ReviewUnsafe { file: "unsafe.rs".into() },
+            plan: ActionPlan::ReviewUnsafe {
+                file: "unsafe.rs".into(),
+            },
             file: "unsafe.rs".into(),
             context: "fn safe() {}\nunsafe { *p = 1; }\nfn also_safe() {}".into(),
         };
@@ -523,7 +556,9 @@ mod tests {
     fn test_generate_unsafe_review_none_found() {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::ReviewUnsafe { file: "safe.rs".into() },
+            plan: ActionPlan::ReviewUnsafe {
+                file: "safe.rs".into(),
+            },
             file: "safe.rs".into(),
             context: "fn all_safe() {}".into(),
         };
@@ -535,7 +570,9 @@ mod tests {
     fn test_generate_unwrap_replacement() {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::ReplaceUnwrap { file: "unwrap.rs".into() },
+            plan: ActionPlan::ReplaceUnwrap {
+                file: "unwrap.rs".into(),
+            },
             file: "unwrap.rs".into(),
             context: "let x = foo().unwrap();".into(),
         };
@@ -546,8 +583,14 @@ mod tests {
 
     #[test]
     fn test_extract_struct_name() {
-        assert_eq!(SelfCodeWriter::extract_struct_name("pub struct Foo {").as_deref(), Some("Foo"));
-        assert_eq!(SelfCodeWriter::extract_struct_name("struct Bar;"), Some("Bar".to_string()));
+        assert_eq!(
+            SelfCodeWriter::extract_struct_name("pub struct Foo {").as_deref(),
+            Some("Foo")
+        );
+        assert_eq!(
+            SelfCodeWriter::extract_struct_name("struct Bar;"),
+            Some("Bar".to_string())
+        );
         assert_eq!(SelfCodeWriter::extract_struct_name("fn main() {}"), None);
     }
 
@@ -555,7 +598,9 @@ mod tests {
     fn test_no_action_returns_err() {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::NoAction { reason: "nothing".into() },
+            plan: ActionPlan::NoAction {
+                reason: "nothing".into(),
+            },
             file: "x.rs".into(),
             context: "".into(),
         };
@@ -603,17 +648,29 @@ mod tests {
     fn test_entropy_threshold_gating() {
         let mut writer = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::AddTestStub { file: "test.rs".into() },
+            plan: ActionPlan::AddTestStub {
+                file: "test.rs".into(),
+            },
             file: "test.rs".into(),
             context: "fn main() {}".into(),
         };
         // Generated test stub has moderate entropy (~4.2). Use high threshold to verify gate passes.
-        let mut se_high = CodeContentEntropy { max_entropy_threshold: 10.0, ..CodeContentEntropy::new() };
+        let mut se_high = CodeContentEntropy {
+            max_entropy_threshold: 10.0,
+            ..CodeContentEntropy::new()
+        };
         let result = writer.generate_with_entropy_gate(&req, &mut se_high);
-        assert!(result.is_ok(), "gate should pass with high threshold: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "gate should pass with high threshold: {:?}",
+            result
+        );
 
         // Use low threshold to verify gate blocks
-        let mut se_low = CodeContentEntropy { max_entropy_threshold: 0.1, ..CodeContentEntropy::new() };
+        let mut se_low = CodeContentEntropy {
+            max_entropy_threshold: 0.1,
+            ..CodeContentEntropy::new()
+        };
         let result = writer.generate_with_entropy_gate(&req, &mut se_low);
         assert!(result.is_err(), "gate should block with low threshold");
         assert!(result.unwrap_err().contains("LLM required"));
@@ -633,7 +690,9 @@ mod tests {
     fn test_generate_with_pairwise_entropy_no_detector() {
         let mut writer = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::AddTestStub { file: "test.rs".into() },
+            plan: ActionPlan::AddTestStub {
+                file: "test.rs".into(),
+            },
             file: "test.rs".into(),
             context: "fn main() {}".into(),
         };
@@ -647,7 +706,9 @@ mod tests {
         let detector = crate::neotrix::nt_act_code::semantic_entropy::SemanticEntropy::new(3, 0.01);
         let mut writer = SelfCodeWriter::new().with_entropy_detector(detector);
         let req = CodeGenRequest {
-            plan: ActionPlan::AddTestStub { file: "test.rs".into() },
+            plan: ActionPlan::AddTestStub {
+                file: "test.rs".into(),
+            },
             file: "test.rs".into(),
             context: "fn main() {}".into(),
         };
@@ -674,7 +735,9 @@ mod tests {
     fn test_generate_variants() {
         let writer = SelfCodeWriter::new();
         let req = CodeGenRequest {
-            plan: ActionPlan::AddTestStub { file: "test.rs".into() },
+            plan: ActionPlan::AddTestStub {
+                file: "test.rs".into(),
+            },
             file: "test.rs".into(),
             context: "fn main() {}".into(),
         };

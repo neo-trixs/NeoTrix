@@ -3,7 +3,7 @@ fn main() {
         KnowledgeSource, FIELD_NAMES,
     };
     use neotrix::neotrix::nt_mind::self_iterating::ReasoningBrain;
-    use neotrix::neotrix::nt_mind::attention_router::AttentionRouter;
+    use neotrix::l5_cognition::nt_mind::nt_mind::reason::attention_router::AttentionRouter;
     use neotrix::core::ReasoningBank;
 
     const N: usize = 200;
@@ -70,7 +70,7 @@ fn main() {
             println!("       winner: {}  |  activated: {}",
                 routed.winning_topic,
                 routed.active_specialists.iter()
-                    .map(|s| s.short_name()).collect::<Vec<_>>().join(","));
+                    .map(|s| format!("{:?}", s)).collect::<Vec<_>>().join(","));
             if !routed.knowledge_lines.is_empty() {
                 let snippet: Vec<&str> = routed.knowledge_lines.iter()
                     .map(|s| s.as_str()).collect();

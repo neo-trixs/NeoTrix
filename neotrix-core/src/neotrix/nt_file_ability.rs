@@ -231,8 +231,8 @@ mod tests {
     use office_oxide::{create, DocumentFormat};
 
     // 跨子模块私有项访问 (拆分后保留原单文件测试语义)
-    use super::visual::grounding::{compact_numeric_text, is_critical_numeric_token, normalize_numeric_token};
-    use super::merge::merge::derive_source_name;
+    use super::visual::{compact_numeric_text, is_critical_numeric_token, normalize_numeric_token};
+    use super::merge::derive_source_name;
     use super::excel::tables::data_to_text;
 
     fn office_sample() -> PathBuf {
@@ -1345,9 +1345,9 @@ mod tests {
         let a = embed_text("NeoTrix 自我进化知识表示", &engine);
         let b = embed_text("NeoTrix 自我进化知识表示", &engine);
         let c = embed_text("完全无关的另一段内容", &engine);
-        let sim_self = engine.similarity(&a, &b);
-        let sim_diff = engine.similarity(&a, &c);
-        assert!(a.len() == engine.dimensions());
+        let sim_self = crate::core::l3_memory::nt_core_hcube::vsa::VsaBackend::similarity(&engine, &a, &b);
+        let sim_diff = crate::core::l3_memory::nt_core_hcube::vsa::VsaBackend::similarity(&engine, &a, &c);
+        assert!(a.len() == crate::core::l3_memory::nt_core_hcube::vsa::VsaBackend::dimensions(&engine));
         assert!(sim_self > 0.99, "相同文本相似度应高, 实际 {sim_self}");
         assert!(sim_diff < 0.3, "无关文本相似度应低, 实际 {sim_diff}");
     }
@@ -1379,7 +1379,7 @@ mod tests {
             "单步转移应单调逼近目标"
         );
         // 到达目标后停在目标
-        ab.e8_state = target_hex;
+        ab.e8_state = target_bits;
         let stay = ab.transition(FileOperation::Transform);
         assert_eq!(stay, target_bits, "已达目标时转移应保持");
         // 路径: 从当前到目标, 首尾正确
@@ -1682,7 +1682,7 @@ mod tests {
     #[test]
     fn test_edit_pdf_free_function_wiring() {
         // R-P79 生产接线验证: edit_pdf 自由函数 → FileParser::edit_pdf_text 端到端。
-        use super::pdf::pdfedit::{edit_pdf, PdfEdit};
+        use super::pdf::{edit_pdf, PdfEdit};
 
         // 构造最小 PDF (未压缩内容流)
         let mut doc = lopdf::Document::with_version("1.4");

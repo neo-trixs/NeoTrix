@@ -36,7 +36,7 @@ impl Default for AdaptiveDifficultyConfig {
 // ═══════════════════════════════════════════════════════════════════
 
 /// The difficulty adjustment recommended by the adjuster.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum DifficultyAdjustment {
     /// Increase difficulty by the given magnitude.
     Increase(f64),

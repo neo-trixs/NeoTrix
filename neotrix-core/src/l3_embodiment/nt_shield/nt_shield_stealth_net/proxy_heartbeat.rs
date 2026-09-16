@@ -36,7 +36,7 @@ pub struct HeartbeatSummary {
 ///
 /// On each tick:
 /// 1. Selects a different proxy node (preferring a different geographic region)
-/// 2. Rotates the nt_world_browse fingerprint (atomic_rotate → fingerprint + TLS + timing)
+/// 2. Rotates the stealth_browser fingerprint (atomic_rotate → fingerprint + TLS + timing)
 /// 3. Flushes OS DNS cache for clean resolution through the new egress
 /// 4. Records telemetry for monitoring
 pub struct ProxyHeartbeatEngine {
@@ -152,7 +152,7 @@ impl ProxyHeartbeatEngine {
         (String::new(), None, 0.0)
     }
 
-    /// Rotate the nt_world_browse fingerprint via atomic_rotate.
+    /// Rotate the stealth_browser fingerprint via atomic_rotate.
     async fn rotate_fingerprint(&self) -> usize {
         let mut fm = self.fingerprint_manager.write().await;
         fm.atomic_rotate();

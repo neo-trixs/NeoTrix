@@ -53,7 +53,7 @@ async fn rag_generate(
     let model = provider.split('/').next_back().unwrap_or(provider);
     let model = if model == provider {
         // 裸注册名 (无 `/`) → 查 catalog 默认模型
-        neotrix::neotrix::l1_body_impl::nt_io_provider::provider_catalog::lookup_provider(provider)
+        neotrix::l1_action::nt_io::nt_io_provider::provider_catalog::lookup_provider(provider)
             .map(|info| info.default_model.to_string())
             .unwrap_or_else(|| model.to_string())
     } else {

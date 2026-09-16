@@ -60,7 +60,6 @@ pub use l3_memory::nt_core_vector_store;
 // ═══════════════════════════════════════════════════════════════════
 // L4 — 认知层 (Cognition)
 // ═══════════════════════════════════════════════════════════════════
-pub mod l4_cognition;
 pub mod nt_core_rule_memory;
 pub mod nt_core_meaning;
 pub mod nt_core_paradigm;
@@ -88,6 +87,7 @@ pub mod nt_core_task_dispatcher;
 pub mod nt_core_td;
 pub mod nt_core_trajectory_compress;
 pub mod nt_core_ttc;
+pub mod nt_core_tlc_correction;
 pub mod nt_core_narrative_types;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -137,7 +137,6 @@ pub mod nt_core_scheduler;
 // ═══════════════════════════════════════════════════════════════════
 // L9 — 超验层 (Transcendent)
 // ═══════════════════════════════════════════════════════════════════
-pub mod l9_transcendent;
 pub mod nt_core_meta;
 pub mod nt_core_observer;
 pub mod nt_core_observer_error;
@@ -153,6 +152,9 @@ pub mod nt_core_conn;
 pub mod nt_core_event;
 pub use nt_core_event::{CoreEvent};
 pub use crate::neotrix::nt_core_event_bus::{EventBus};
+
+/// Event Sourcing Core — append-only event log as single source of truth
+pub mod nt_core_event_bus;
 pub mod nt_core_retrieval;
 pub mod nt_core_router;
 pub mod nt_core_self_review;

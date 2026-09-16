@@ -285,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn test_json_roundtrip() {
+    fn test_json_roundtrip() -> Result<(), String> {
         let e = CoreEvent::GoalCompleted {
             goal_id: "g1".into(),
             goal: "test".into(),
@@ -304,8 +304,9 @@ mod tests {
                 assert_eq!(goal_id, "g1");
                 assert_eq!(iterations, 5);
             }
-            _ => panic!("wrong variant"),
+            _ => return Err("wrong variant".to_string()),
         }
+        Ok(())
     }
 }
 

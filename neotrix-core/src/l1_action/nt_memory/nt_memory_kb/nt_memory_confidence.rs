@@ -1121,6 +1121,7 @@ mod tests {
         let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase {
             conn: std::sync::Mutex::new(conn),
             db_path: std::path::PathBuf::from(":memory:"),
+            db_file: None,
             bm25: std::sync::RwLock::new(None),
             bm25_dirty: std::sync::RwLock::new(false),
             embedding_config: std::sync::RwLock::new(None),
@@ -1196,6 +1197,8 @@ mod tests {
             lifecycle: std::sync::RwLock::new(
                 crate::l1_action::nt_memory::nt_memory_kb::nt_memory_lifecycle::MemoryLifecycle::default(),
             ),
+            absorb_scanner: std::sync::RwLock::new(None),
+            receipt_emitter: std::sync::RwLock::new(None),
         };
 
         let high_conf_id = Uuid::new_v4();

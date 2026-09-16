@@ -3,6 +3,7 @@ mod capability;
 mod knowledge_source;
 mod evaluator;
 mod access;
+pub mod verified_pivoting;
 pub use brain_mut_view::*;
 pub use capability::*;
 pub use knowledge_source::*;

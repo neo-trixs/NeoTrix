@@ -71,7 +71,7 @@ impl Default for _RecoveryVerifyService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::repair::{FixResult, RepairPlan, RiskAssessment, RiskLevel};
+    use super::super::repair::{FixResult, RepairPlan, RiskAssessment, RepairRiskLevel, HealthReport, VerifyVerdict};
 
     #[test]
     fn test_recovery_verify_service() {
@@ -96,7 +96,7 @@ mod tests {
             plan: RepairPlan {
                 strategy: "CompileFix".into(),
                 steps: vec![],
-                risk: RiskAssessment { level: RiskLevel::Low, impact: "".into(), mitigations: vec![], rollback_plan: "".into() },
+                risk: RiskAssessment { level: RepairRiskLevel::Low, impact: "".into(), mitigations: vec![], rollback_plan: "".into() },
                 rollback_point: None,
                 confidence: 0.9,
                 source_pattern: None,
@@ -108,14 +108,14 @@ mod tests {
         };
         let verify = VerificationInput {
             tests_pass: true,
-            health: super::super::repair::HealthReport {
+            health: HealthReport {
                 healthy: true, dimensions: std::collections::HashMap::new(), alerts: vec![],
             },
         };
         let history = RepairHistory { same_pattern_count: 0, total_attempts: 1 };
 
         let result = svc._verify_recovery(&fix, &verify, &history);
-        assert_eq!(result.verdict, super::super::repair::VerifyVerdict::Recovered);
+        assert_eq!(result.verdict, VerifyVerdict::Recovered);
         assert!(pattern_received.load(Ordering::SeqCst), "pattern callback should be called");
         assert!(!trap_received.load(Ordering::SeqCst), "trap callback should NOT be called for success");
     }

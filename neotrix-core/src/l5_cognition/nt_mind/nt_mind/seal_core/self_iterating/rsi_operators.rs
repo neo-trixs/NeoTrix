@@ -350,7 +350,7 @@ mod tests {
         };
         let data = vec!["hello".into()];
         let result = op._execute_data_rsi(&data);
-        assert_eq!(result, vec!["hello".into()]);
+        assert_eq!(result, vec!["hello".to_string()]);
     }
 
     #[test]

@@ -531,7 +531,7 @@ impl UnifiedCrawler {
     ///
     /// Note: Delegates to DualQueueFrontier::stats(). Returns string representation
     /// of frontier state (pending counts, domain distribution).
-    pub fn _frontier_stats(&self) -> String {
+    pub fn frontier_stats(&self) -> String {
         format!("{}", self.frontier.stats())
     }
 
@@ -539,7 +539,7 @@ impl UnifiedCrawler {
     ///
     /// Note: Returns slice of HealAction entries. Each entry records cycle number,
     /// analysis, action taken, and whether it was applied. History is append-only.
-    pub fn _heal_history(&self) -> &[HealAction] {
+    pub fn heal_history(&self) -> &[HealAction] {
         &self._heal_history
     }
 

@@ -97,7 +97,7 @@ impl ActionPolicy {
         rules.insert("git_force_push".to_string(), PolicyDecision::Deny);
         rules.insert("delete_file".to_string(), PolicyDecision::RequireConfirmation);
         rules.insert("modify_dependency".to_string(), PolicyDecision::RequireConfirmation);
-        rules.insert("access_nt_world_browse_auto".to_string(), PolicyDecision::RequireConfirmation);
+        rules.insert("access_stealth_browser_auto".to_string(), PolicyDecision::RequireConfirmation);
         rules.insert("access_tor_network".to_string(), PolicyDecision::RequireConfirmation);
 
         Self {

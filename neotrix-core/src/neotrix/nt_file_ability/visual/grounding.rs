@@ -20,7 +20,7 @@ const NUMERIC_TOKEN_RE: &str =
 const VERSION_TOKEN_RE: &str = r"[0-9]+\.[0-9]+(?:\.[0-9]+)+";
 
 /// 数字 token 判定: ≥3 位数字, 或含小数/百分号/货币符号
-pub(super) fn is_critical_numeric_token(value: &str) -> bool {
+pub(crate) fn is_critical_numeric_token(value: &str) -> bool {
     let trimmed = value.trim().trim_matches(|c| c == '(' || c == ')');
     let digits = trimmed.chars().filter(|c| c.is_ascii_digit()).count();
     digits >= 3
@@ -30,7 +30,7 @@ pub(super) fn is_critical_numeric_token(value: &str) -> bool {
 }
 
 /// 数值 token 归一化: 空格/unicode 减号/括号归一, 便于跨来源比对
-pub(super) fn normalize_numeric_token(value: &str) -> String {
+pub(crate) fn normalize_numeric_token(value: &str) -> String {
     let mut v = value.trim().trim_end_matches(',').to_string();
     v = v
         .replace(['−', '－'], "-")
@@ -46,7 +46,7 @@ pub(super) fn normalize_numeric_token(value: &str) -> String {
 }
 
 /// 紧凑化文本: 去除空白/Markdown 标记/unicode 减号, 用于存在性比对
-pub(super) fn compact_numeric_text(value: &str) -> String {
+pub(crate) fn compact_numeric_text(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
         match ch {

@@ -150,7 +150,7 @@ mod tests {
         let tmp = std::env::temp_dir().join("nt_offline_test");
         let _ = tokio::fs::create_dir_all(&tmp).await;
 
-        let dl = OfflineDownloader::new(tmp.clone());
+        let mut dl = OfflineDownloader::new(tmp.clone());
         let result = dl
             .download(&format!(
                 "file://{}/test_offline.bin",

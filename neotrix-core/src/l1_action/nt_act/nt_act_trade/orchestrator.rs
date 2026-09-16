@@ -421,7 +421,7 @@ impl TradeOrchestrator {
                 incoterms: "FOB".into(),
                 currency: "USD".into(),
                 validity_days: 30,
-                cost_breakdown: crate::l1_action::nt_act::nt_act_trade::quote_negotiation::CostBreakdown {
+                cost_breakdown: super::trade_core::CostBreakdown {
                     material: 0.0,
                     labor: 0.0,
                     overhead: 0.0,
@@ -1125,6 +1125,7 @@ impl TradeOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::l1_action::nt_act::nt_act_trade::production_logistics::{BookingStatus, MaterialStatus, PackingItem};
 
     #[test]
     fn test_trade_phases_count() {
@@ -1356,7 +1357,7 @@ mod tests {
             status: MaterialStatus::Pending,
         }];
         let order = orch.create_production_order(&order_id, &materials).unwrap();
-        assert!(!order.order_id.is_empty());
+        assert!(!order.production_order_id.is_empty());
 
         let ctx = orch.active_trades.get(&order_id).unwrap();
         assert_eq!(
@@ -1443,9 +1444,10 @@ mod tests {
                     description: "Widget A x 10".into(),
                     qty: 10,
                     ctns: 1,
-                    cbm: 0.25,
-                    gross_kg: 50.0,
-                    net_kg: 45.0,
+                    cbm_per_ctn: 0.25,
+                    gross_kg_per_ctn: 50.0,
+                    net_kg_per_ctn: 45.0,
+                    marks: vec![],
                 }],
                 total_ctns: 1,
                 total_cbm: 0.25,
@@ -1454,7 +1456,7 @@ mod tests {
             },
             status: BookingStatus::Confirmed,
         };
-        orch.book_and_pack(&order_id, &booking).unwrap();
+        orch.book_and_pack(&order_id, &booking, &booking.packing_list).unwrap();
 
         let ctx = orch.active_trades.get(&order_id).unwrap();
         assert_eq!(

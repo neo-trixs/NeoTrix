@@ -1,12 +1,12 @@
-use super::super::types::{GoalState, GoalIterationRecord};
-use super::super::tracker::GoalTracker;
 use super::super::super::memory::ReasoningMemory;
 use super::super::super::self_iterating::SelfIteratingBrain;
+use super::super::tracker::GoalTracker;
+use super::super::types::{GoalIterationRecord, GoalState};
 // use crate::l5_cognition::nt_mind::KnowledgeSource;
+use super::core::truncate;
+use super::core::GoalLoop;
 use crate::core::nt_core_knowledge::TaskType;
 use crate::neotrix::nt_world_model::TaskType as WorldTaskType;
-use super::core::GoalLoop;
-use super::core::truncate;
 
 /// 单次迭代的估算成本 (USD)。模拟环境无真实 LLM token 计量,
 /// 故以固定估算值 + 实际吸收工作量加权, 避免纯魔法数字。
@@ -25,16 +25,26 @@ impl GoalLoop {
             let cap_sum: f64 = brain.brain.capability.arr().iter().sum();
             let mem_count = brain.reasoning_bank.memories().len();
 
-            candidates.push(format!("explore new knowledge domains to expand capability beyond {:.2}", cap_sum));
+            candidates.push(format!(
+                "explore new knowledge domains to expand capability beyond {:.2}",
+                cap_sum
+            ));
 
             if mem_count > 20 {
-                candidates.push(format!("consolidate {} memories into reusable principles", mem_count));
+                candidates.push(format!(
+                    "consolidate {} memories into reusable principles",
+                    mem_count
+                ));
             } else {
-                candidates.push("gather new experiences and store as reasoning memories".to_string());
+                candidates
+                    .push("gather new experiences and store as reasoning memories".to_string());
             }
 
             if count > 3 && brain.iteration > 100 {
-                candidates.push(format!("optimize self-iteration loop at iteration #{}", brain.iteration));
+                candidates.push(format!(
+                    "optimize self-iteration loop at iteration #{}",
+                    brain.iteration
+                ));
             }
         }
         candidates
@@ -125,9 +135,16 @@ impl GoalLoop {
         });
 
         if tracker.iterations_completed > 0 && tracker.history.len() <= 10 {
-            let last = tracker.history.last().expect("history has entries after pushing");
+            let last = tracker
+                .history
+                .last()
+                .expect("history has entries after pushing");
             let memory = ReasoningMemory::new(
-                &format!("goal_iter: {} (#{})", tracker.description.chars().take(50).collect::<String>(), last.iteration),
+                &format!(
+                    "goal_iter: {} (#{})",
+                    tracker.description.chars().take(50).collect::<String>(),
+                    last.iteration
+                ),
                 TaskType::General,
                 &[],
                 last.reward,
@@ -135,11 +152,14 @@ impl GoalLoop {
             brain.reasoning_bank.store(memory);
         }
 
-        if improved && reward >= tracker.config.improvement_threshold
-            && tracker.stalled_count == 0 && tracker.iterations_completed >= 2 {
-                tracker.state = GoalState::Achieved;
-                return false;
-            }
+        if improved
+            && reward >= tracker.config.improvement_threshold
+            && tracker.stalled_count == 0
+            && tracker.iterations_completed >= 2
+        {
+            tracker.state = GoalState::Achieved;
+            return false;
+        }
 
         if tracker.stalled_count >= tracker.config.stall_threshold {
             tracker.state = GoalState::Unmet;
@@ -169,7 +189,11 @@ impl GoalLoop {
                     let continue_loop = self.pursue_iteration(brain);
                     logs.push(format!("  [{}/{}] reward={:.4}", i + 1, max_loops, reward));
                     if !continue_loop {
-                        let final_state = self.active_goal.as_ref().map(|g| g.state.label()).unwrap_or("unknown");
+                        let final_state = self
+                            .active_goal
+                            .as_ref()
+                            .map(|g| g.state.label())
+                            .unwrap_or("unknown");
                         logs.push(format!("  → Goal state: {}", final_state));
                         break;
                     }
@@ -185,7 +209,10 @@ impl GoalLoop {
             if goal.config.e8_priority_enabled {
                 if let Some(ref engine) = brain.reasoning_engine {
                     self.apply_e8_priority(engine.current_state.mode);
-                    logs.push(format!("  🜁 E8 priority adjusted (state={})", engine.current_state.mode.mode_name()));
+                    logs.push(format!(
+                        "  🜁 E8 priority adjusted (state={})",
+                        engine.current_state.mode.mode_name()
+                    ));
                 }
             }
         }
@@ -202,7 +229,10 @@ impl GoalLoop {
         if cap_sum < 10.0 {
             format!("improve general capability from {:.2} to 12.0+", cap_sum)
         } else if mem_count > 50 {
-            format!("consolidate and distill {} memories into principles", mem_count)
+            format!(
+                "consolidate and distill {} memories into principles",
+                mem_count
+            )
         } else if lr < 0.01 {
             "optimize learning parameters for faster adaptation".to_string()
         } else if iter % 50 < 25 {
@@ -216,18 +246,26 @@ impl GoalLoop {
 
     pub fn pursue_auto_iteration(&mut self, brain: &mut SelfIteratingBrain) -> bool {
         if self.circuit_breaker.is_open() {
-            let elapsed = self.circuit_breaker
+            let elapsed = self
+                .circuit_breaker
                 .last_failure
                 .map(|t| std::time::Instant::now().duration_since(t).as_secs())
                 .unwrap_or(0);
             if self.circuit_breaker.last_stall_reason.is_none() {
                 self.circuit_breaker.last_stall_reason = Some(self._analyze_stall(brain));
             }
-            let reason = self.circuit_breaker.last_stall_reason.as_deref().unwrap_or("unknown");
+            let reason = self
+                .circuit_breaker
+                .last_stall_reason
+                .as_deref()
+                .unwrap_or("unknown");
             if reason != "unknown" {
                 println!("[bg-goal] ⚠ stall analysis: {}", reason);
             }
-            println!("[bg-goal] ⚠ circuit breaker open ({}/{} cooldown secs), skipping", elapsed, self.circuit_breaker.cooldown_secs);
+            println!(
+                "[bg-goal] ⚠ circuit breaker open ({}/{} cooldown secs), skipping",
+                elapsed, self.circuit_breaker.cooldown_secs
+            );
             return false;
         }
 
@@ -242,55 +280,84 @@ impl GoalLoop {
             }
         }
 
-                if self.active_goal.as_ref().is_some_and(|g| g.state.is_terminal()) {
-                    let _ = brain.brain.save();
-                    let finished = self.active_goal.take().expect("confirmed terminal above");
-                    let reward = match finished.state {
-                        GoalState::Achieved => 0.9,
-                        GoalState::Unmet => 0.2,
-                        GoalState::BudgetLimited => 0.5,
-                        _ => 0.5,
-                    };
-                    let memory = ReasoningMemory::new(
-                        &format!("goal {}: score={:.3} ({})", finished.description.chars().take(30).collect::<String>(), finished.score_current, finished.state.label()),
-                        TaskType::General,
-                        &[],
-                        reward,
-                    );
-                    brain.reasoning_bank.store(memory);
-                    println!("[bg-goal] goal '{}' → {}", truncate(&finished.description, 40), finished.state.label());
-                    self.completed_goals.push(finished);
-                    self.completed_goals.truncate(100);
+        if self
+            .active_goal
+            .as_ref()
+            .is_some_and(|g| g.state.is_terminal())
+        {
+            let _ = brain.brain.save();
+            let finished = self.active_goal.take().expect("confirmed terminal above");
+            let reward = match finished.state {
+                GoalState::Achieved => 0.9,
+                GoalState::Unmet => 0.2,
+                GoalState::BudgetLimited => 0.5,
+                _ => 0.5,
+            };
+            let memory = ReasoningMemory::new(
+                &format!(
+                    "goal {}: score={:.3} ({})",
+                    finished.description.chars().take(30).collect::<String>(),
+                    finished.score_current,
+                    finished.state.label()
+                ),
+                TaskType::General,
+                &[],
+                reward,
+            );
+            brain.reasoning_bank.store(memory);
+            println!(
+                "[bg-goal] goal '{}' → {}",
+                truncate(&finished.description, 40),
+                finished.state.label()
+            );
+            self.completed_goals.push(finished);
+            self.completed_goals.truncate(100);
 
-                    if !self.goal_queue.is_empty() {
-                        if let Some(next) = self.dequeue_next() {
-                            let desc = next.description.clone();
-                            self.active_goal = Some(next);
-                            println!("[bg-goal] dequeued next goal: {}", truncate(&desc, 40));
-                        }
-                    }
+            if !self.goal_queue.is_empty() {
+                if let Some(next) = self.dequeue_next() {
+                    let desc = next.description.clone();
+                    self.active_goal = Some(next);
+                    println!("[bg-goal] dequeued next goal: {}", truncate(&desc, 40));
                 }
+            }
+        }
 
         if self.active_goal.is_none() {
             let base_desc = Self::auto_goal_generate(brain);
             let desc = if let Some(ref mot) = self.motivation_hint {
                 if mot.should_explore && !base_desc.contains("explore") {
-                    format!("explore new cognitive strategies and knowledge sources (R_int={:.3})", mot.intrinsic_reward)
+                    format!(
+                        "explore new cognitive strategies and knowledge sources (R_int={:.3})",
+                        mot.intrinsic_reward
+                    )
                 } else if mot.error_rate > 0.3 {
-                    format!("investigate and debug recent poor reflection traces (error={:.0}%)", mot.error_rate * 100.0)
+                    format!(
+                        "investigate and debug recent poor reflection traces (error={:.0}%)",
+                        mot.error_rate * 100.0
+                    )
                 } else if mot.confidence < 0.4 {
-                    format!("run validation and reinforce weak capabilities (conf={:.0}%)", mot.confidence * 100.0)
+                    format!(
+                        "run validation and reinforce weak capabilities (conf={:.0}%)",
+                        mot.confidence * 100.0
+                    )
                 } else {
                     base_desc
                 }
             } else {
                 base_desc
             };
-            let cap = brain.brain.evaluate_capability(crate::neotrix::nt_world_model::TaskType::General);
+            let cap = brain
+                .brain
+                .evaluate_capability(crate::neotrix::nt_world_model::TaskType::General);
             self.start_goal(brain, &desc, Some(Self::auto_goal_config()));
             self.prioritize_from_motivation();
             if let Some(ref g) = self.active_goal {
-                println!("[bg-goal] 🎯 auto: {} (cap={:.3}, priority={})", truncate(&g.description, 50), cap, g.priority.label());
+                println!(
+                    "[bg-goal] 🎯 auto: {} (cap={:.3}, priority={})",
+                    truncate(&g.description, 50),
+                    cap,
+                    g.priority.label()
+                );
             }
 
             if self.goal_queue.len() < self.max_queue {
@@ -299,7 +366,12 @@ impl GoalLoop {
                     if self.goal_queue.iter().any(|g| g.description == desc) {
                         continue;
                     }
-                    if self.active_goal.as_ref().map(|g| g.description == desc).unwrap_or(false) {
+                    if self
+                        .active_goal
+                        .as_ref()
+                        .map(|g| g.description == desc)
+                        .unwrap_or(false)
+                    {
                         continue;
                     }
                     let tracker = GoalTracker::new(
@@ -309,7 +381,8 @@ impl GoalLoop {
                     );
                     self.goal_queue.push(tracker);
                 }
-                self.goal_queue.sort_by_key(|b| std::cmp::Reverse(b.priority));
+                self.goal_queue
+                    .sort_by_key(|b| std::cmp::Reverse(b.priority));
             }
 
             if desc.contains("distill session") || desc.contains("distill past") {
@@ -317,13 +390,19 @@ impl GoalLoop {
                 if !suggestions.is_empty() {
                     let _suggestion_text = suggestions.join("\n");
                     let memory = ReasoningMemory::new(
-                        &format!("session_distillation: {}", desc.chars().take(40).collect::<String>()),
+                        &format!(
+                            "session_distillation: {}",
+                            desc.chars().take(40).collect::<String>()
+                        ),
                         TaskType::General,
                         &[],
                         0.85,
                     );
                     brain.reasoning_bank.store(memory);
-                    println!("[bg-goal] 📝 distilled {} suggestions into ReasoningBank", suggestions.len());
+                    println!(
+                        "[bg-goal] 📝 distilled {} suggestions into ReasoningBank",
+                        suggestions.len()
+                    );
                 }
             }
         }
@@ -331,5 +410,3 @@ impl GoalLoop {
         self.pursue_iteration(brain)
     }
 }
-
-

@@ -24,14 +24,14 @@ pub const NS_DELIBERATION: &str = "deliberation";
 /// 辩论角色。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum DeliberationRole {
-    Proponent,      // 支持方
-    Opponent,       // 反方
-    Mediator,       // 调解者
-    DevilAdvocate,  // 反方代言人
-    Expert(String), // 专家（领域）
+    Proponent,           // 支持方
+    Opponent,            // 反方
+    Mediator,            // 调解者
+    DevilAdvocate,       // 反方代言人
+    Expert(String),      // 专家（领域）
     Stakeholder(String), // 利益相关者
-    Ethicist(String), // 伦理学家（流派）
-    Auditor,        // 审计员
+    Ethicist(String),    // 伦理学家（流派）
+    Auditor,             // 审计员
 }
 
 /// 论证节点。
@@ -39,14 +39,14 @@ pub enum DeliberationRole {
 pub struct _ArgumentNode {
     pub id: String,
     pub author: DeliberationRole,
-    pub claim: String,           // 主张
-    pub premises: Vec<String>,   // 前提
-    pub reasoning: String,       // 推理链
-    pub evidence: Vec<String>,   // 证据/引用
-    pub confidence: f64,         // 自信度 [0,1]
-    pub targets: Vec<String>,    // 回应的节点 ID
-    pub rebuts: Vec<String>,     // 反驳的节点 ID
-    pub supports: Vec<String>,   // 支持的节点 ID
+    pub claim: String,         // 主张
+    pub premises: Vec<String>, // 前提
+    pub reasoning: String,     // 推理链
+    pub evidence: Vec<String>, // 证据/引用
+    pub confidence: f64,       // 自信度 [0,1]
+    pub targets: Vec<String>,  // 回应的节点 ID
+    pub rebuts: Vec<String>,   // 反驳的节点 ID
+    pub supports: Vec<String>, // 支持的节点 ID
     pub timestamp: i64,
     pub round: usize,
 }
@@ -88,11 +88,11 @@ pub struct GraphEdge {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum EdgeType {
-    Supports,    // 支持
-    Rebuts,      // 反驳
-    Questions,   // 质疑
-    Clarifies,   // 澄清
-    Extends,     // 延伸
+    Supports,  // 支持
+    Rebuts,    // 反驳
+    Questions, // 质疑
+    Clarifies, // 澄清
+    Extends,   // 延伸
 }
 
 /// 辩论会话。
@@ -100,11 +100,14 @@ pub enum EdgeType {
 pub struct DeliberationSession {
     pub id: String,
     pub scenario: String,
-    pub context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
+    pub context:
+        crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
     pub participants: Vec<DeliberationRole>,
     pub rounds: Vec<_DeliberationRound>,
     pub graph: _ArgumentGraph,
-    pub final_verdict: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict>,
+    pub final_verdict: Option<
+        crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict,
+    >,
     pub consensus_score: f64,
     pub started_at: i64,
     pub ended_at: Option<i64>,
@@ -169,13 +172,15 @@ impl _DeliberationEngine {
         &self,
         scenario: String,
         context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
-        _initial_verdict: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment>,
+        _initial_verdict: Option<
+            crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment,
+        >,
     ) -> Result<String, String> {
         let session_id = format!("delib_{}", now());
-        
+
         // 确定参与者
         let mut participants = self.select_participants(&context);
-        
+
         // 自动分配反方代言人
         if self.config.auto_assign_devil_advocate {
             participants.push(DeliberationRole::DevilAdvocate);
@@ -227,9 +232,12 @@ impl _DeliberationEngine {
         rebuts: Vec<String>,
         supports: Vec<String>,
     ) -> Result<String, String> {
-        let mut sessions = self.active_sessions.write().map_err(|e| format!("Lock poisoned: {}", e))?;
+        let mut sessions = self
+            .active_sessions
+            .write()
+            .map_err(|e| format!("Lock poisoned: {}", e))?;
         let session = sessions.get_mut(session_id).ok_or("会话不存在")?;
-        
+
         if session.status != SessionStatus::InProgress {
             return Err("会话未进行中".into());
         }
@@ -286,12 +294,15 @@ impl _DeliberationEngine {
 
     /// 推进到下一阶段/轮次。
     pub fn advance_phase(&self, session_id: &str) -> Result<DeliberationPhase, String> {
-        let mut sessions = self.active_sessions.write().unwrap_or_else(|e| e.into_inner());
+        let mut sessions = self
+            .active_sessions
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let session = sessions.get_mut(session_id).ok_or("会话不存在")?;
-        
+
         let current = session.rounds.last_mut().expect("non-empty");
         current.end_time = Some(now());
-        
+
         let next_phase = match current.phase {
             DeliberationPhase::Opening => DeliberationPhase::Examination,
             DeliberationPhase::Examination => DeliberationPhase::Rebuttal,
@@ -351,16 +362,21 @@ impl _DeliberationEngine {
     /// 会话归档 (调用方必须已释放 active_sessions 写锁, 否则 RwLock 重入死锁)。
     fn archive_session(&self, session: DeliberationSession) {
         let id = session.id.clone();
-        self.completed_sessions.write().unwrap_or_else(|e| e.into_inner()).insert(id, session);
+        self.completed_sessions
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(id, session);
     }
 
     /// 计算共识度。
     fn compute_consensus(&self, graph: &_ArgumentGraph) -> f64 {
-        if graph.nodes.is_empty() { return 0.0; }
-        
+        if graph.nodes.is_empty() {
+            return 0.0;
+        }
+
         let mut support = 0.0;
         let mut conflict = 0.0;
-        
+
         for (_, edges) in &graph.edges {
             for edge in edges {
                 match edge.edge_type {
@@ -370,33 +386,47 @@ impl _DeliberationEngine {
                 }
             }
         }
-        
+
         let total = support + conflict;
-        if total == 0.0 { return 0.5; }
+        if total == 0.0 {
+            return 0.5;
+        }
         support / total
     }
 
     /// 基于图结构推导裁决。
-    fn derive_verdict(&self, graph: &_ArgumentGraph, context: &crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext) -> crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict {
+    fn derive_verdict(
+        &self,
+        graph: &_ArgumentGraph,
+        context: &crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
+    ) -> crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict {
         // 简化：统计支持/反对的角色权重
         let mut pro_weight = 0.0;
         let mut con_weight = 0.0;
-        
+
         for (_, node) in &graph.nodes {
             let weight = self.role_weight(&node.author);
-            if node.claim.contains("支持") || node.claim.contains("允许") || node.claim.contains("许可") {
+            if node.claim.contains("支持")
+                || node.claim.contains("允许")
+                || node.claim.contains("许可")
+            {
                 pro_weight += weight * node.confidence;
-            } else if node.claim.contains("反对") || node.claim.contains("禁止") || node.claim.contains("拒绝") {
+            } else if node.claim.contains("反对")
+                || node.claim.contains("禁止")
+                || node.claim.contains("拒绝")
+            {
                 con_weight += weight * node.confidence;
             }
         }
-        
-        if context.severity == crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::Severity::Critical 
-            && self.config.require_unanimity_for_critical 
-            && con_weight > 0.0 {
+
+        if context.severity
+            == crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::Severity::Critical
+            && self.config.require_unanimity_for_critical
+            && con_weight > 0.0
+        {
             return crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict::Impermissible;
         }
-        
+
         if pro_weight > con_weight * 1.5 {
             crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentVerdict::Permissible
         } else if con_weight > pro_weight * 1.5 {
@@ -419,38 +449,65 @@ impl _DeliberationEngine {
         }
     }
 
-    fn select_participants(&self, context: &crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext) -> Vec<DeliberationRole> {
+    fn select_participants(
+        &self,
+        context: &crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
+    ) -> Vec<DeliberationRole> {
         let mut participants = vec![
             DeliberationRole::Proponent,
             DeliberationRole::Opponent,
             DeliberationRole::Mediator,
         ];
-        
+
         if !context.domain.is_empty() {
             participants.push(DeliberationRole::Expert(context.domain.clone()));
         }
         if !context.stakeholders.is_empty() {
             participants.push(DeliberationRole::Stakeholder("primary".into()));
         }
-        if context.severity == crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::Severity::Critical {
+        if context.severity
+            == crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::Severity::Critical
+        {
             participants.push(DeliberationRole::Ethicist("deontological".into()));
             participants.push(DeliberationRole::Ethicist("consequentialist".into()));
         }
-        
+
         participants.truncate(self.config.max_participants);
         participants
     }
 
     /// 获取会话状态。
     pub fn get_session(&self, session_id: &str) -> Option<DeliberationSession> {
-        self.active_sessions.read().unwrap_or_else(|e| e.into_inner()).get(session_id).cloned()
-            .or_else(|| self.completed_sessions.read().unwrap_or_else(|e| e.into_inner()).get(session_id).cloned())
+        self.active_sessions
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(session_id)
+            .cloned()
+            .or_else(|| {
+                self.completed_sessions
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get(session_id)
+                    .cloned()
+            })
     }
 
     /// 列出所有会话。
     pub fn list_sessions(&self) -> Vec<DeliberationSession> {
-        let mut sessions = self.active_sessions.read().unwrap_or_else(|e| e.into_inner()).values().cloned().collect::<Vec<_>>();
-        sessions.extend(self.completed_sessions.read().unwrap_or_else(|e| e.into_inner()).values().cloned());
+        let mut sessions = self
+            .active_sessions
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        sessions.extend(
+            self.completed_sessions
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .values()
+                .cloned(),
+        );
         sessions.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         sessions
     }
@@ -464,15 +521,37 @@ pub struct _DeliberationEngineRuntime {
 
 impl _DeliberationEngineRuntime {
     pub fn new(config: _DeliberationConfig) -> Self {
-        Self { inner: Arc::new(_DeliberationEngine::new(config)) }
+        Self {
+            inner: Arc::new(_DeliberationEngine::new(config)),
+        }
     }
 
-    pub fn start(&self, scenario: String, context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext, initial: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment>) -> Result<String, String> {
+    pub fn start(
+        &self,
+        scenario: String,
+        context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
+        initial: Option<
+            crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment,
+        >,
+    ) -> Result<String, String> {
         self.inner._start_deliberation(scenario, context, initial)
     }
 
-    pub fn submit(&self, session_id: &str, author: DeliberationRole, claim: String, premises: Vec<String>, reasoning: String, evidence: Vec<String>, targets: Vec<String>, rebuts: Vec<String>, supports: Vec<String>) -> Result<String, String> {
-        self.inner._submit_argument(session_id, author, claim, premises, reasoning, evidence, targets, rebuts, supports)
+    pub fn submit(
+        &self,
+        session_id: &str,
+        author: DeliberationRole,
+        claim: String,
+        premises: Vec<String>,
+        reasoning: String,
+        evidence: Vec<String>,
+        targets: Vec<String>,
+        rebuts: Vec<String>,
+        supports: Vec<String>,
+    ) -> Result<String, String> {
+        self.inner._submit_argument(
+            session_id, author, claim, premises, reasoning, evidence, targets, rebuts, supports,
+        )
     }
 
     pub fn advance(&self, session_id: &str) -> Result<DeliberationPhase, String> {
@@ -492,7 +571,9 @@ impl _DeliberationEngineRuntime {
 pub fn _start_deliberation(
     scenario: String,
     context: crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::JudgmentContext,
-    initial: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment>,
+    initial: Option<
+        crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment,
+    >,
 ) -> Result<String, String> {
     let engine = _DeliberationEngineRuntime::new(_DeliberationConfig::default());
     engine.start(scenario, context, initial)
@@ -500,19 +581,19 @@ pub fn _start_deliberation(
 
 #[cfg(test)]
 mod tests {
-#[allow(unused_imports)]
+    #[allow(unused_imports)]
     use super::*;
-#[allow(unused_imports)]
-    use crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::{EthicalCase, ConflictType};
-#[allow(unused_imports)]
-    use crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment;
-#[allow(unused_imports)]
-    use std::collections::HashSet;
-#[allow(unused_imports)]
+    #[allow(unused_imports)]
     use crate::core::nt_core_kb_primitives::schema_initialize;
+    #[allow(unused_imports)]
+    use crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::{ConflictType, EthicalCase};
+    #[allow(unused_imports)]
+    use crate::l5_cognition::nt_mind::nt_mind::evolution::ethical_intuition::IntuitionJudgment;
     use rusqlite::Connection;
+    #[allow(unused_imports)]
+    use std::collections::HashSet;
 
-     fn mem_conn() -> Connection {
+    fn mem_conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         schema_initialize(&conn).unwrap();
         conn
@@ -533,14 +614,28 @@ mod tests {
         ).unwrap();
 
         // Opening: 双方立陈
-        let _ = engine.submit(&session_id, DeliberationRole::Proponent,
+        let _ = engine.submit(
+            &session_id,
+            DeliberationRole::Proponent,
             "数据去标识化后可用于训练，促进医疗进步".into(),
             vec!["去标识化技术成熟".to_string()],
-            "功利主义视角".into(), vec![], vec![], vec![], vec![]);
-        let _ = engine.submit(&session_id, DeliberationRole::Opponent,
+            "功利主义视角".into(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        let _ = engine.submit(
+            &session_id,
+            DeliberationRole::Opponent,
             "未经明确同意使用隐私数据侵犯自主权".into(),
             vec!["知情同意是基石".to_string()],
-            "义务论视角".into(), vec![], vec![], vec![], vec![]);
+            "义务论视角".into(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
 
         // 逐步推进 O→E→R→C→D→V, 每步校验相位单调
         let expect = [
@@ -555,7 +650,11 @@ mod tests {
             assert_eq!(got, want, "相位推进错序");
         }
 
-        let session = engine.list().into_iter().find(|s| s.id == session_id).unwrap();
+        let session = engine
+            .list()
+            .into_iter()
+            .find(|s| s.id == session_id)
+            .unwrap();
         assert_eq!(session.status, SessionStatus::Completed);
         assert!(session.final_verdict.is_some());
         assert!(session.consensus_score >= 0.0);

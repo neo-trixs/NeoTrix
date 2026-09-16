@@ -1,0 +1,57 @@
+[
+  {
+    "schema_version": 1,
+    "type": "pattern",
+    "session_id": "sess_game_engine_20260915",
+    "cycle": "771",
+    "ts": 1694793600,
+    "domain": "NT-MIND",
+    "content": "Multi-agent parallel execution pattern for game engine development: 5 agents simultaneously implementing ECS/Tilemap/Events/Persistence/WorldSystems. Optimal concurrency = 5 agents. More triggers connection errors. Each agent creates files independently, parent agent wires mod.rs integration. Pattern: parallel creation → sequential wiring → single verification pass.",
+    "evidence": "neotrix-core/src/l5_cognition/nt_mind/nt_game/ (28 new files)",
+    "source": "dialogue"
+  },
+  {
+    "schema_version": 1,
+    "type": "pattern",
+    "session_id": "sess_game_engine_20260915",
+    "cycle": "771",
+    "ts": 1694793600,
+    "domain": "NT-MIND",
+    "content": "Game engine capability absorption from external sources (Godot/EnTT/RogueElements/StardewValley): Scene tree → ECS registry, Signal → EventBus, Chunk loading → ChunkManager, Seasonal cycles → SeasonState, NPC relationships → RelationshipLevel with trust modifiers, Loot tables → weighted drop system with guaranteed drops. Each pattern maps to a concrete Rust module.",
+    "evidence": "neotrix-core/src/l5_cognition/nt_mind/nt_game/world/",
+    "source": "research"
+  },
+  {
+    "schema_version": 1,
+    "type": "defect",
+    "session_id": "sess_game_engine_20260915",
+    "cycle": "771",
+    "ts": 1694793600,
+    "domain": "NT-MIND",
+    "content": "Pre-existing compilation errors dropped from 926 to 25 via targeted fixes: (1) lock_mutex returns MutexGuard not Result → removed if-let-Ok wrapper, (2) StepCondition missing Default → added derive(Default), (3) tokio_stream unresolved → replaced with tokio built-in Receiver::into_stream(), (4) ureq workspace dependency blocking cargo → changed to direct version dependency. Root cause: partial refactors leaving orphaned imports and type mismatches.",
+    "evidence": "neotrix-core/src/neotrix/nt_core_event_bus.rs:100,118,435",
+    "source": "dialogue"
+  },
+  {
+    "schema_version": 1,
+    "type": "insight",
+    "session_id": "sess_game_engine_20260915",
+    "cycle": "771",
+    "ts": 1694793600,
+    "domain": "NT-MIND",
+    "content": "RPG cultivation system design: 7 realms (Qi Refining → Foundation → Core Formation → Nascent Soul → Spirit Severing → Dao Seeking → Immortal Ascension). Breakthrough mechanic: qi accumulation threshold + stability check with failure risk. Spiritual root types (metal/wood/water/fire/earth/mixed) affect cultivation speed per element. Technique slots limit active abilities.",
+    "evidence": "neotrix-core/src/l5_cognition/nt_mind/nt_game/rpg/cultivation.rs",
+    "source": "dialogue"
+  },
+  {
+    "schema_version": 1,
+    "type": "rule",
+    "session_id": "sess_game_engine_20260915",
+    "cycle": "771",
+    "ts": 1694793600,
+    "domain": "NT-MIND",
+    "content": "Borrow checker pattern for trade modules: When self.method_a() needs immutable borrow but self.field_b needs mutable borrow, extract immutable data to local variable BEFORE mutable borrow. Pattern: let ts = self.current_timestamp(); let deals = &mut self.deals; ... use ts ... This avoids E0502 which accounts for 68% of remaining errors.",
+    "evidence": "neotrix-core/src/l1_action/nt_act/nt_act_trade/",
+    "source": "dialogue"
+  }
+]

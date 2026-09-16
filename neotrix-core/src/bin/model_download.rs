@@ -1,7 +1,7 @@
 /// model-download — NeoTrix 自研下载引擎 CLI
 /// 下载 HuggingFace GGUF 模型到本地，支持断点续传、分片并发、进度显示
 
-use neotrix_core::l1_action::nt_io_download::{DownloadEngine, DownloadConfig, DownloadTask};
+use neotrix::l1_action::nt_io_download::{DownloadEngine, DownloadConfig, DownloadTask};
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -62,20 +62,21 @@ async fn main() {
     let task = DownloadTask {
         url,
         dest: target,
+        priority: 128,
     };
 
     let start = SystemTime::now();
     let status = engine.download(&task).await;
 
     match status {
-        neotrix_core::l1_action::nt_io_download::DownloadStatus::Completed { elapsed_secs, size_mb } => {
+        neotrix::l1_action::nt_io_download::DownloadStatus::Completed { elapsed_secs, size_mb } => {
             eprintln!();
             eprintln!("✓ download complete");
             eprintln!("  size:  {:.1} MB", size_mb);
             eprintln!("  time:  {:.1}s", elapsed_secs);
             eprintln!("  speed: {:.1} MB/s", if elapsed_secs > 0.0 { size_mb / elapsed_secs } else { 0.0 });
         }
-        neotrix_core::l1_action::nt_io_download::DownloadStatus::Failed(e) => {
+        neotrix::l1_action::nt_io_download::DownloadStatus::Failed(e) => {
             eprintln!("✗ download failed: {}", e);
             std::process::exit(1);
         }

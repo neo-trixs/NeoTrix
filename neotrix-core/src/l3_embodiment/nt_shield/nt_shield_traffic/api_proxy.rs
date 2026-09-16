@@ -12,7 +12,7 @@ use axum::routing::{get, post};
 use axum::Router;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use tokio_stream::wrappers::ReceiverStream as RxStream;
+use tokio_stream::wrappers::ReceiverStream;
 
 use super::analyzer::TrafficAnalyzer;
 use crate::l3_embodiment::l1_facade::{
@@ -400,7 +400,7 @@ async fn handle_stream(
                 }
             });
 
-            let stream = Sse::new(RxStream::new(rx_out))
+            let stream = Sse::new(ReceiverStream::new(rx_out))
                 .keep_alive(
                     axum::response::sse::KeepAlive::new()
                         .interval(Duration::from_secs(15)),
@@ -420,6 +420,7 @@ async fn handle_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::l2_perception::nt_core_llm::Usage;
 
     #[test]
     fn test_to_internal_role() {

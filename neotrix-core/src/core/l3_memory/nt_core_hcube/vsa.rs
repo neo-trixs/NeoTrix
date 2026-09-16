@@ -81,6 +81,41 @@ impl VsaBackend for VSAEngine {
     }
 }
 
+impl crate::neotrix::VsaEmbedding for VSAEngine {
+    fn embed_tokens(&self, tokens: &[&str]) -> Vec<f64> {
+        if tokens.is_empty() {
+            return vec![0.0; self.dim];
+        }
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut result = vec![0.0f64; self.dim];
+        for token in tokens {
+            let mut hasher = DefaultHasher::new();
+            token.hash(&mut hasher);
+            let h = hasher.finish();
+            for i in 0..self.dim {
+                let bit = (h >> (i % 64)) & 1;
+                result[i] += if bit == 1 { 1.0 } else { -1.0 };
+            }
+        }
+        let norm: f64 = result.iter().map(|x| x * x).sum::<f64>().sqrt();
+        if norm > 1e-12 {
+            for r in &mut result {
+                *r /= norm;
+            }
+        }
+        result
+    }
+
+    fn similarity(&self, a: &[f64], b: &[f64]) -> f64 {
+        VsaBackend::similarity(self, a, b)
+    }
+
+    fn dimensions(&self) -> usize {
+        VsaBackend::dimensions(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

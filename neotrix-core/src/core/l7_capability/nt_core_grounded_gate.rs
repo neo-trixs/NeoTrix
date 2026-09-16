@@ -316,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gate_revise_with_feedback_when_retries_left() {
+    fn test_gate_revise_with_feedback_when_retries_left() -> Result<(), String> {
         let gate = GroundedGate::new(
             "unit",
             vec![GroundedCheck::Compile {
@@ -331,12 +331,13 @@ mod tests {
                 assert_eq!(feedback.len(), 1);
                 assert!(feedback[0].contains("E0308"));
             }
-            other => panic!("expected Revise, got {:?}", other),
+            other => return Err(format!("expected Revise, got {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_gate_fail_when_no_retries_left() {
+    fn test_gate_fail_when_no_retries_left() -> Result<(), String> {
         let gate = GroundedGate::new(
             "unit",
             vec![GroundedCheck::Compile {
@@ -348,12 +349,13 @@ mod tests {
         let decision = gate.evaluate(|_| Err("boom".into()));
         match decision {
             GroundedDecision::Fail { reason } => assert!(reason.contains("unit")),
-            other => panic!("expected Fail, got {:?}", other),
+            other => return Err(format!("expected Fail, got {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_gate_partial_fail_collects_all_feedback() {
+    fn test_gate_partial_fail_collects_all_feedback() -> Result<(), String> {
         let gate = GroundedGate::new(
             "multi",
             vec![
@@ -378,8 +380,9 @@ mod tests {
         });
         match decision {
             GroundedDecision::Revise { feedback } => assert_eq!(feedback.len(), 1),
-            other => panic!("expected Revise, got {:?}", other),
+            other => return Err(format!("expected Revise, got {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
@@ -419,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gate_run_loop_exhausts_retries_then_fail() {
+    fn test_gate_run_loop_exhausts_retries_then_fail() -> Result<(), String> {
         let gate = GroundedGate::new(
             "loop",
             vec![GroundedCheck::ToolOutput {
@@ -443,8 +446,9 @@ mod tests {
         );
         match decision {
             GroundedDecision::Fail { reason } => assert!(reason.contains("exhausted")),
-            other => panic!("expected Fail, got {:?}", other),
+            other => return Err(format!("expected Fail, got {:?}", other)),
         }
+        Ok(())
     }
 
     // ── AgentContract 契约校验 ──

@@ -1508,7 +1508,7 @@ mod tests {
     }
 
     #[test]
-    fn test_register_for_task_heartbeat_release() {
+    fn test_register_for_task_heartbeat_release() -> Result<(), String> {
         let mut mgr = SubagentManager::new();
         let id = mgr.register_for_task("S-TASK-9", "cycle-201");
         assert!(id.starts_with("ses_"));
@@ -1518,8 +1518,9 @@ mod tests {
         assert!(mgr.release(&id, "done well"));
         match mgr.get(&id).unwrap().status {
             SubagentStatus::Completed { ref result } => assert_eq!(result, "done well"),
-            _ => panic!("expected Completed after release"),
+            _ => return Err("expected Completed after release".to_string()),
         }
+        Ok(())
     }
 
     #[test]

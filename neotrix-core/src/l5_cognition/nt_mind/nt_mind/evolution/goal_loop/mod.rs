@@ -1,20 +1,25 @@
-pub mod types;
-pub mod tracker;
-pub mod priority;
 pub mod fast_goal;
 pub mod loop_impl;
+pub mod priority;
+pub mod tracker;
+pub mod types;
 
-pub use types::{RateLimiter, CircuitState, CircuitBreaker, GoalState, GoalConfig, GoalIterationRecord, GoalPriority, GoalScheduleStrategy, PlanLevel, PlanTemplate};
-pub use tracker::GoalTracker;
-pub use priority::{PriorityEngine, RICEScore, ICEScore, MoscowClass, PriorityFramework, PriorityDecision};
 pub use fast_goal::FastGoal;
 pub use loop_impl::GoalLoop;
+pub use priority::{
+    ICEScore, MoscowClass, PriorityDecision, PriorityEngine, PriorityFramework, RICEScore,
+};
+pub use tracker::GoalTracker;
+pub use types::{
+    CircuitBreaker, CircuitState, GoalConfig, GoalIterationRecord, GoalPriority,
+    GoalScheduleStrategy, GoalState, PlanLevel, PlanTemplate, RateLimiter,
+};
 // pub(crate) use loop_impl::truncate;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::self_iterating::SelfIteratingBrain;
+    use super::*;
 
     #[test]
     fn test_goal_lifecycle() {
@@ -22,13 +27,31 @@ mod tests {
         let mut brain = SelfIteratingBrain::new();
 
         gl.start_goal(&mut brain, "Test autonomous goal", None);
-        assert_eq!(gl.active_goal.as_ref().expect("active_goal after start_goal").state, GoalState::Pursuing);
+        assert_eq!(
+            gl.active_goal
+                .as_ref()
+                .expect("active_goal after start_goal")
+                .state,
+            GoalState::Pursuing
+        );
 
         gl.pause_goal();
-        assert_eq!(gl.active_goal.as_ref().expect("active_goal after pause_goal").state, GoalState::Paused);
+        assert_eq!(
+            gl.active_goal
+                .as_ref()
+                .expect("active_goal after pause_goal")
+                .state,
+            GoalState::Paused
+        );
 
         gl.resume_goal();
-        assert_eq!(gl.active_goal.as_ref().expect("active_goal after resume_goal").state, GoalState::Pursuing);
+        assert_eq!(
+            gl.active_goal
+                .as_ref()
+                .expect("active_goal after resume_goal")
+                .state,
+            GoalState::Pursuing
+        );
 
         gl.clear_goal();
         assert!(gl.active_goal.is_none());
@@ -58,7 +81,12 @@ mod tests {
         let mut gl2 = GoalLoop::with_path(tmp.clone());
         gl2.load();
         assert!(gl2.active_goal.is_some());
-        assert_eq!(gl2.active_goal.expect("active_goal must be Some after load").description, "persist test");
+        assert_eq!(
+            gl2.active_goal
+                .expect("active_goal must be Some after load")
+                .description,
+            "persist test"
+        );
 
         let _ = std::fs::remove_file(&tmp);
     }
@@ -70,7 +98,13 @@ mod tests {
 
         gl.start_goal(&mut brain, "test", None);
         let _continued = gl.pursue_iteration(&mut brain);
-        assert!(gl.active_goal.as_ref().expect("active_goal after pursue_iteration").iterations_completed > 0);
+        assert!(
+            gl.active_goal
+                .as_ref()
+                .expect("active_goal after pursue_iteration")
+                .iterations_completed
+                > 0
+        );
     }
 
     #[test]
@@ -98,7 +132,8 @@ mod tests {
 
     #[test]
     fn test_budget_prompt_generation() {
-        let mut tracker = GoalTracker::new("t2".into(), "refactor module".into(), GoalConfig::default());
+        let mut tracker =
+            GoalTracker::new("t2".into(), "refactor module".into(), GoalConfig::default());
         tracker.iterations_completed = 5;
         tracker.total_cost_estimate = 0.25;
         tracker.tokens_consumed = 50000;
@@ -154,7 +189,13 @@ mod tests {
 
         gl.start_goal(&mut brain, "test rate limit", None);
         let _first = gl.pursue_iteration(&mut brain);
-        assert!(gl.active_goal.as_ref().expect("active_goal after pursue_iteration in integration test").iterations_completed > 0);
+        assert!(
+            gl.active_goal
+                .as_ref()
+                .expect("active_goal after pursue_iteration in integration test")
+                .iterations_completed
+                > 0
+        );
         assert!(!gl.circuit_breaker.is_open());
         assert_eq!(gl.rate_limiter.call_timestamps.len(), 1);
     }
@@ -176,7 +217,13 @@ mod tests {
         gl.start_goal(&mut brain, "complex analysis task", None);
         let result = gl.pursue_iteration(&mut brain);
         assert!(result);
-        assert!(gl.active_goal.as_ref().expect("active_goal after pursue_iteration in complex task").iterations_completed > 0);
+        assert!(
+            gl.active_goal
+                .as_ref()
+                .expect("active_goal after pursue_iteration in complex task")
+                .iterations_completed
+                > 0
+        );
     }
 
     #[test]
@@ -205,10 +252,18 @@ mod tests {
         let mut brain = SelfIteratingBrain::new();
 
         gl.enqueue_goal(&mut brain, "low priority goal", None);
-        gl.goal_queue.iter_mut().find(|g| g.description == "low priority goal").expect("low priority goal in queue").priority = GoalPriority::Low;
+        gl.goal_queue
+            .iter_mut()
+            .find(|g| g.description == "low priority goal")
+            .expect("low priority goal in queue")
+            .priority = GoalPriority::Low;
 
         gl.enqueue_goal(&mut brain, "high priority goal", None);
-        gl.goal_queue.iter_mut().find(|g| g.description == "high priority goal").expect("high priority goal in queue").priority = GoalPriority::High;
+        gl.goal_queue
+            .iter_mut()
+            .find(|g| g.description == "high priority goal")
+            .expect("high priority goal in queue")
+            .priority = GoalPriority::High;
 
         let dequeued = gl.dequeue_next().expect("dequeue_next with enqueued goals");
         assert_eq!(dequeued.description, "high priority goal");
@@ -222,7 +277,9 @@ mod tests {
 
         gl.enqueue_goal(&mut brain, "explore new knowledge", None);
         gl.enqueue_goal(&mut brain, "fix bug in parser", None);
-        gl.goal_queue.iter_mut().for_each(|g| g.priority = GoalPriority::Medium);
+        gl.goal_queue
+            .iter_mut()
+            .for_each(|g| g.priority = GoalPriority::Medium);
 
         gl.set_motivation(crate::core::nt_core_self::MotivationState {
             intrinsic_reward: 0.8,
@@ -235,9 +292,15 @@ mod tests {
         });
         gl.rebalance_from_motivation();
 
-        let explore_goal = gl.goal_queue.iter().find(|g| g.description.contains("explore"));
+        let explore_goal = gl
+            .goal_queue
+            .iter()
+            .find(|g| g.description.contains("explore"));
         assert!(explore_goal.is_some());
-        assert_eq!(explore_goal.expect("explore_goal after rebalance").priority, GoalPriority::High);
+        assert_eq!(
+            explore_goal.expect("explore_goal after rebalance").priority,
+            GoalPriority::High
+        );
     }
 
     #[test]
@@ -247,7 +310,9 @@ mod tests {
 
         gl.enqueue_goal(&mut brain, "investigate reflection failure", None);
         gl.enqueue_goal(&mut brain, "add unit tests", None);
-        gl.goal_queue.iter_mut().for_each(|g| g.priority = GoalPriority::Medium);
+        gl.goal_queue
+            .iter_mut()
+            .for_each(|g| g.priority = GoalPriority::Medium);
 
         gl.set_motivation(crate::core::nt_core_self::MotivationState {
             intrinsic_reward: 0.2,
@@ -260,9 +325,15 @@ mod tests {
         });
         gl.rebalance_from_motivation();
 
-        let debug_goal = gl.goal_queue.iter().find(|g| g.description.contains("investigate"));
+        let debug_goal = gl
+            .goal_queue
+            .iter()
+            .find(|g| g.description.contains("investigate"));
         assert!(debug_goal.is_some());
-        assert_eq!(debug_goal.expect("debug_goal after rebalance").priority, GoalPriority::Critical);
+        assert_eq!(
+            debug_goal.expect("debug_goal after rebalance").priority,
+            GoalPriority::Critical
+        );
     }
 
     #[test]
@@ -288,8 +359,13 @@ mod tests {
         assert!(!candidates[1].is_empty());
         assert!(!candidates[2].is_empty());
         // Verify diversity: at least two different descriptions
-        let unique: std::collections::HashSet<&str> = candidates.iter().map(|s| s.as_str()).collect();
-        assert!(unique.len() >= 2, "candidates should be diverse: {:?}", candidates);
+        let unique: std::collections::HashSet<&str> =
+            candidates.iter().map(|s| s.as_str()).collect();
+        assert!(
+            unique.len() >= 2,
+            "candidates should be diverse: {:?}",
+            candidates
+        );
     }
 
     // === Hierarchical Plan Tests ===
@@ -318,7 +394,10 @@ mod tests {
 
         let meso_level = gl.drill_down();
         assert!(meso_level.is_some());
-        assert_eq!(meso_level.expect("meso_level after drill_down").level, PlanLevel::Meso);
+        assert_eq!(
+            meso_level.expect("meso_level after drill_down").level,
+            PlanLevel::Meso
+        );
         assert_eq!(gl.plan_stack.len(), 1);
         assert_eq!(gl.plan_stack[0].level, PlanLevel::Macro);
     }
@@ -387,7 +466,10 @@ mod tests {
         assert!(summary.contains("macro"), "summary should contain 'macro'");
         assert!(summary.contains("meso"), "summary should contain 'meso'");
         assert!(summary.contains("micro"), "summary should contain 'micro'");
-        assert!(summary.contains("cycles est."), "summary should show cycles estimate");
+        assert!(
+            summary.contains("cycles est."),
+            "summary should show cycles estimate"
+        );
     }
 
     #[test]
@@ -397,6 +479,12 @@ mod tests {
         assert!(gl.active_plan.is_none());
         gl.auto_plan(&brain);
         assert!(gl.active_plan.is_some());
-        assert_eq!(gl.active_plan.as_ref().expect("active_plan after auto_plan").level, PlanLevel::Macro);
+        assert_eq!(
+            gl.active_plan
+                .as_ref()
+                .expect("active_plan after auto_plan")
+                .level,
+            PlanLevel::Macro
+        );
     }
 }

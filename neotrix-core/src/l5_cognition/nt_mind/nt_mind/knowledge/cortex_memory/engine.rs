@@ -118,7 +118,7 @@ impl CortexMemory {
     }
 
     /// 强制所有短期 → 长期
-    pub(crate) fn _consolidate_all(&mut self) -> usize {
+    pub fn consolidate_all(&mut self) -> usize {
         let count = self.nt_world_sense_buffer.len();
         while let Some(trace) = self.nt_world_sense_buffer.pop_front() {
             if self.long_term.len() >= self.long_term_capacity {
@@ -453,7 +453,7 @@ impl CortexMemory {
 }
 
 /// 从 KnowledgeSource 来源自动注入 cortex
-pub fn _inject_from_web_miner(
+pub fn inject_from_web_miner(
     cortex: &mut CortexMemory,
     source_url: &str,
     _source_name: &str,

@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use neotrix::CapabilityVector;
 use neotrix::core::{VSAEngine, VsaBackend};
-use neotrix::neotrix::nt_world_jepa::{JepaEncoder, JepaPredictor, JepaWorldModel};
-use neotrix::neotrix::nt_mind_evolution_loop::EvolutionLoop;
+use neotrix::l2_perception::nt_world::sense::{JepaEncoder, JepaPredictor, JepaWorldModel};
+use neotrix::l5_cognition::nt_mind::evolution::evolution_loop::EvolutionLoop;
 
 // ============================================================
 // Helpers
@@ -48,7 +48,7 @@ fn bench_jepa_predict_next_latent(c: &mut Criterion) {
         let latent = random_latent(dim);
         group.throughput(Throughput::Elements(dim as u64));
         group.bench_with_input(format!("dim_{}", dim), &(model, latent), |b, (m, z)| {
-            b.iter(|| m.predict_next_latent(black_box(z)))
+            b.iter(|| m._predict_next_latent(black_box(z)))
         });
     }
     group.finish();

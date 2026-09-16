@@ -407,7 +407,7 @@ mod tests {
     fn test_answer_engine_rank() {
         let engine = AnswerEngine::with_mode(AnswerMode::Balanced);
         let results = vec![
-            SearchResult {
+            AnswerSearchResult {
                 title: "a".into(),
                 url: "http://a.com".into(),
                 snippet: "".into(),
@@ -415,7 +415,7 @@ mod tests {
                 relevance: 0.5,
                 cached: false,
             },
-            SearchResult {
+            AnswerSearchResult {
                 title: "b".into(),
                 url: "http://b.com".into(),
                 snippet: "".into(),
@@ -431,7 +431,7 @@ mod tests {
     #[test]
     fn test_build_answer() {
         let engine = AnswerEngine::with_mode(AnswerMode::Speed);
-        let results = vec![SearchResult {
+        let results = vec![AnswerSearchResult {
             title: "test".into(),
             url: "http://test.com".into(),
             snippet: "content".into(),

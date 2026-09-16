@@ -109,8 +109,7 @@ async fn main() {
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.ok();
         r.store(false, Ordering::SeqCst);
-        println!("\n[proxy-daemon] shutting down...");
-        std::process::exit(0);
+        println!("\n[proxy-daemon] shutting down gracefully...");
     });
 
     let mut net_monitor = neotrix::nt_shield_stealth_net::NetworkMonitor::default();

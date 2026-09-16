@@ -83,11 +83,23 @@ impl AstCodeSearcher {
 
         supported_languages.insert("rust".into(), vec!["rs".into()]);
         supported_languages.insert("python".into(), vec!["py".into()]);
-        supported_languages.insert("javascript".into(), vec!["js".into(), "mjs".into(), "cjs".into()]);
+        supported_languages.insert(
+            "javascript".into(),
+            vec!["js".into(), "mjs".into(), "cjs".into()],
+        );
         supported_languages.insert("typescript".into(), vec!["ts".into(), "tsx".into()]);
         supported_languages.insert("go".into(), vec!["go".into()]);
         supported_languages.insert("java".into(), vec!["java".into()]);
-        supported_languages.insert("cpp".into(), vec!["cpp".into(), "cc".into(), "cxx".into(), "hpp".into(), "hxx".into()]);
+        supported_languages.insert(
+            "cpp".into(),
+            vec![
+                "cpp".into(),
+                "cc".into(),
+                "cxx".into(),
+                "hpp".into(),
+                "hxx".into(),
+            ],
+        );
         supported_languages.insert("c".into(), vec!["c".into(), "h".into()]);
         supported_languages.insert("csharp".into(), vec!["cs".into()]);
         supported_languages.insert("ruby".into(), vec!["rb".into()]);
@@ -108,14 +120,17 @@ impl AstCodeSearcher {
         let mut files: Vec<std::path::PathBuf> = Vec::new();
         Self::collect_files(dir, recursive, &mut files)?;
 
-        let exts: Vec<String> = self.supported_extensions().iter()
+        let exts: Vec<String> = self
+            .supported_extensions()
+            .iter()
             .map(|e| e.to_string())
             .collect();
         let ext_set: std::collections::HashSet<String> = exts.into_iter().collect();
 
         let mut indexed = 0usize;
         for path in &files {
-            let ext = path.extension()
+            let ext = path
+                .extension()
                 .and_then(|s| s.to_str())
                 .map(|s| s.to_lowercase())
                 .unwrap_or_default();
@@ -169,7 +184,10 @@ impl AstCodeSearcher {
 
             // Path glob filter
             if !query.path_globs.is_empty() {
-                let matched = query.path_globs.iter().any(|g| path_matches_glob(file_path, g));
+                let matched = query
+                    .path_globs
+                    .iter()
+                    .any(|g| path_matches_glob(file_path, g));
                 if !matched {
                     continue;
                 }
@@ -212,7 +230,9 @@ impl AstCodeSearcher {
     ///
     /// Walks `dir` and checks all supported files for structural matches.
     pub fn search_files(&self, query: &AstQuery, dir: &Path) -> Vec<CodeMatch> {
-        let exts: Vec<String> = self.supported_extensions().iter()
+        let exts: Vec<String> = self
+            .supported_extensions()
+            .iter()
             .map(|e| e.to_string())
             .collect();
         let ext_set: std::collections::HashSet<String> = exts.into_iter().collect();
@@ -231,7 +251,8 @@ impl AstCodeSearcher {
                 break;
             }
 
-            let ext = path.extension()
+            let ext = path
+                .extension()
                 .and_then(|s| s.to_str())
                 .map(|s| s.to_lowercase())
                 .unwrap_or_default();
@@ -250,7 +271,10 @@ impl AstCodeSearcher {
 
             // Filter by path globs
             if !query.path_globs.is_empty() {
-                let matched = query.path_globs.iter().any(|g| path_matches_glob(&path_str, g));
+                let matched = query
+                    .path_globs
+                    .iter()
+                    .any(|g| path_matches_glob(&path_str, g));
                 if !matched {
                     continue;
                 }
@@ -333,16 +357,14 @@ impl AstCodeSearcher {
                         } else if chars[i] == ')' {
                             depth -= 1;
                         }
-                    if depth > 0 || (depth == 0 && chars[i] == ')') {
-                        metavar.push(chars[i]);
+                        if depth > 0 || (depth == 0 && chars[i] == ')') {
+                            metavar.push(chars[i]);
+                        }
+                        i += 1;
                     }
-                    i += 1;
-                }
                 } else {
                     // \NAME — read alphanumeric + underscore
-                    while i < chars.len()
-                        && (chars[i].is_alphanumeric() || chars[i] == '_')
-                    {
+                    while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
                         metavar.push(chars[i]);
                         i += 1;
                     }
@@ -357,9 +379,7 @@ impl AstCodeSearcher {
                 let mut word = String::new();
                 word.push(ch);
                 i += 1;
-                while i < chars.len()
-                    && (chars[i].is_alphanumeric() || chars[i] == '_')
-                {
+                while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
                     word.push(chars[i]);
                     i += 1;
                 }
@@ -428,7 +448,11 @@ impl AstCodeSearcher {
     }
 
     /// Collect all files under `dir` (recursively if `recursive`).
-    fn collect_files(dir: &Path, recursive: bool, files: &mut Vec<std::path::PathBuf>) -> Result<(), String> {
+    fn collect_files(
+        dir: &Path,
+        recursive: bool,
+        files: &mut Vec<std::path::PathBuf>,
+    ) -> Result<(), String> {
         let entries = fs::read_dir(dir).map_err(|e| format!("Cannot read dir {:?}: {}", dir, e))?;
         for entry in entries {
             let entry = entry.map_err(|e| format!("Entry error: {}", e))?;
@@ -604,25 +628,36 @@ fn is_def_keyword(line: &str) -> bool {
     }
 
     // All definition-starting keywords across supported languages
-    line.starts_with("fn ") || line.starts_with("pub fn ")
-        || line.starts_with("pub(crate) fn ") || line.starts_with("unsafe fn ")
+    line.starts_with("fn ")
+        || line.starts_with("pub fn ")
+        || line.starts_with("pub(crate) fn ")
+        || line.starts_with("unsafe fn ")
         || line.starts_with("pub unsafe fn ")
-        || line.starts_with("def ") || line.starts_with("async def ")
+        || line.starts_with("def ")
+        || line.starts_with("async def ")
         || line.starts_with("class ")
         || line.starts_with("struct ")
         || line.starts_with("enum ")
-        || line.starts_with("trait ") || line.starts_with("pub trait ")
-        || line.starts_with("impl") || line.starts_with("pub impl")
+        || line.starts_with("trait ")
+        || line.starts_with("pub trait ")
+        || line.starts_with("impl")
+        || line.starts_with("pub impl")
         || line.starts_with("interface ")
-        || line.starts_with("func ") || line.starts_with("function ")
+        || line.starts_with("func ")
+        || line.starts_with("function ")
         || line.starts_with("async function ")
-        || line.starts_with("fun ") || line.starts_with("data class ")
-        || line.starts_with("protocol ") || line.starts_with("extension ")
-        || line.starts_with("module ") || line.starts_with("type ")
+        || line.starts_with("fun ")
+        || line.starts_with("data class ")
+        || line.starts_with("protocol ")
+        || line.starts_with("extension ")
+        || line.starts_with("module ")
+        || line.starts_with("type ")
         || line.starts_with("macro_rules!")
         || line.starts_with("object ")
-        || line.starts_with("export function") || line.starts_with("export class")
-        || line.starts_with("export interface") || line.starts_with("export type")
+        || line.starts_with("export function")
+        || line.starts_with("export class")
+        || line.starts_with("export interface")
+        || line.starts_with("export type")
 }
 
 /// Check if a token is an identifier (alphanumeric + underscore, starts with letter or `_`).
@@ -643,8 +678,10 @@ fn path_matches_glob(path: &str, glob: &str) -> bool {
         let rest = &glob[3..];
         if rest.contains("**") {
             // `**/dir/**` — check it contains `/dir/`
-            let inner = rest.trim_start_matches('*').trim_end_matches('*')
-                        .trim_matches('/');
+            let inner = rest
+                .trim_start_matches('*')
+                .trim_end_matches('*')
+                .trim_matches('/');
             if !inner.is_empty() {
                 let needle = format!("/{}/", inner);
                 return path.contains(&needle) || path.starts_with(needle.trim_start_matches('/'));
@@ -719,16 +756,34 @@ mod tests {
 
     #[test]
     fn test_structural_match_simple() {
-        assert!(AstCodeSearcher::structural_match("fn foo() {}", "fn foo() {}"));
-        assert!(AstCodeSearcher::structural_match("fn  foo ( )  { }", "fn foo() {}"));
-        assert!(AstCodeSearcher::structural_match("let x = 42;", "let x = 42;"));
+        assert!(AstCodeSearcher::structural_match(
+            "fn foo() {}",
+            "fn foo() {}"
+        ));
+        assert!(AstCodeSearcher::structural_match(
+            "fn  foo ( )  { }",
+            "fn foo() {}"
+        ));
+        assert!(AstCodeSearcher::structural_match(
+            "let x = 42;",
+            "let x = 42;"
+        ));
     }
 
     #[test]
     fn test_structural_match_with_name_metavar() {
-        assert!(AstCodeSearcher::structural_match("fn foo() {}", "fn \\NAME() {}"));
-        assert!(AstCodeSearcher::structural_match("let bar = 1;", "let \\NAME = 1;"));
-        assert!(AstCodeSearcher::structural_match("let bar_baz = 1;", "let \\NAME = 1;"));
+        assert!(AstCodeSearcher::structural_match(
+            "fn foo() {}",
+            "fn \\NAME() {}"
+        ));
+        assert!(AstCodeSearcher::structural_match(
+            "let bar = 1;",
+            "let \\NAME = 1;"
+        ));
+        assert!(AstCodeSearcher::structural_match(
+            "let bar_baz = 1;",
+            "let \\NAME = 1;"
+        ));
     }
 
     #[test]
@@ -749,16 +804,31 @@ mod tests {
 
     #[test]
     fn test_structural_match_no_match() {
-        assert!(!AstCodeSearcher::structural_match("fn foo() {}", "fn bar() {}"));
-        assert!(!AstCodeSearcher::structural_match("let x = 1;", "fn \\NAME() {}"));
-        assert!(!AstCodeSearcher::structural_match("class Foo {}", "struct Foo {}"));
+        assert!(!AstCodeSearcher::structural_match(
+            "fn foo() {}",
+            "fn bar() {}"
+        ));
+        assert!(!AstCodeSearcher::structural_match(
+            "let x = 1;",
+            "fn \\NAME() {}"
+        ));
+        assert!(!AstCodeSearcher::structural_match(
+            "class Foo {}",
+            "struct Foo {}"
+        ));
     }
 
     #[test]
     fn test_structural_match_case_sensitive() {
         // Must be case-sensitive
-        assert!(!AstCodeSearcher::structural_match("fn FOO() {}", "fn foo() {}"));
-        assert!(AstCodeSearcher::structural_match("fn FOO() {}", "fn FOO() {}"));
+        assert!(!AstCodeSearcher::structural_match(
+            "fn FOO() {}",
+            "fn foo() {}"
+        ));
+        assert!(AstCodeSearcher::structural_match(
+            "fn FOO() {}",
+            "fn FOO() {}"
+        ));
     }
 
     #[test]
@@ -784,7 +854,10 @@ mod tests {
             ..Default::default()
         };
         let results = s.search(&query);
-        assert!(results.is_empty(), "empty index should return empty results");
+        assert!(
+            results.is_empty(),
+            "empty index should return empty results"
+        );
     }
 
     #[test]
@@ -810,7 +883,8 @@ mod tests {
             "fn bar() {",
             "    let y = 2;",
             "}",
-        ].join("\n");
+        ]
+        .join("\n");
         fs::write(dir.join("test.rs"), &code).unwrap();
 
         let mut s = AstCodeSearcher::new();
@@ -819,7 +893,11 @@ mod tests {
 
         let (num_files, num_chunks) = s.index_stats();
         assert_eq!(num_files, 1);
-        assert!(num_chunks >= 2, "should have at least 2 chunks for 2 functions, got {}", num_chunks);
+        assert!(
+            num_chunks >= 2,
+            "should have at least 2 chunks for 2 functions, got {}",
+            num_chunks
+        );
 
         let query = AstQuery {
             pattern: "fn bar() {}".into(),
@@ -856,16 +934,20 @@ mod tests {
         };
         let results = s.search_files(&query, &dir);
         assert!(!results.is_empty(), "should find structural matches");
-        assert!(results.iter().any(|r| r.file_path.ends_with("main.rs")),
-            "should match Rust file");
+        assert!(
+            results.iter().any(|r| r.file_path.ends_with("main.rs")),
+            "should match Rust file"
+        );
 
         let query_py = AstQuery {
             pattern: "def \\NAME\\(ARGS*)".into(),
             ..Default::default()
         };
         let results_py = s.search_files(&query_py, &dir);
-        assert!(results_py.iter().any(|r| r.file_path.ends_with("lib.py")),
-            "should match Python file");
+        assert!(
+            results_py.iter().any(|r| r.file_path.ends_with("lib.py")),
+            "should match Python file"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
@@ -873,15 +955,20 @@ mod tests {
     #[test]
     fn test_index_and_search_rust_code() {
         let dir = tmp_dir("rust_search");
-        fs::write(dir.join("math.rs"), [
-            "fn add(a: i32, b: i32) -> i32 {",
-            "    a + b",
-            "}",
-            "",
-            "fn sub(a: i32, b: i32) -> i32 {",
-            "    a - b",
-            "}",
-        ].join("\n")).unwrap();
+        fs::write(
+            dir.join("math.rs"),
+            [
+                "fn add(a: i32, b: i32) -> i32 {",
+                "    a + b",
+                "}",
+                "",
+                "fn sub(a: i32, b: i32) -> i32 {",
+                "    a - b",
+                "}",
+            ]
+            .join("\n"),
+        )
+        .unwrap();
 
         let mut s = AstCodeSearcher::new();
         s.index_directory(&dir, true).unwrap();
@@ -988,10 +1075,7 @@ mod tests {
             AstCodeSearcher::language_for_ext("py", &lang_map),
             Some("python".into())
         );
-        assert_eq!(
-            AstCodeSearcher::language_for_ext("js", &lang_map),
-            None
-        );
+        assert_eq!(AstCodeSearcher::language_for_ext("js", &lang_map), None);
     }
 
     #[test]

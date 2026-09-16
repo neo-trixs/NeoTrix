@@ -159,7 +159,10 @@ impl Trajectory {
 
     /// Get all steps for a specific actor.
     pub fn for_actor(&self, actor_id: ActorId) -> Vec<&TrajectoryStep> {
-        self.steps.iter().filter(|s| s.actor_id == actor_id).collect()
+        self.steps
+            .iter()
+            .filter(|s| s.actor_id == actor_id)
+            .collect()
     }
 }
 

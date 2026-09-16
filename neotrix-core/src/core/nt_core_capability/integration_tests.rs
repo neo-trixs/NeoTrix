@@ -3,6 +3,16 @@
 #[cfg(test)]
 mod integration_tests {
     use crate::core::nt_core_capability::*;
+    use crate::core::nt_core_capability::cache::{CachedCapability, CapabilityCacheConfig};
+    use crate::core::nt_core_capability::composer::CapabilityComposer;
+    use crate::core::nt_core_capability::discovery::{DiscoveryConfig, DistributedDiscovery};
+    use crate::core::nt_core_capability::factory::init_global_registry;
+    use crate::core::nt_core_capability::loadbalancer::{LoadBalancer, LoadBalanceStrategy, InstanceStatus, CapabilityInstance};
+    use crate::core::nt_core_capability::monitoring::{MonitoringConfig, MonitoringCollector, MonitoredCapability};
+    use crate::core::nt_core_capability::orchestrator::{OrchestrationEngine, OrchestrationMode, OrchestrationFlow, OrchestrationStep};
+    use crate::core::nt_core_capability::performance::{PoolConfig, PerformanceOptimizer, OptimizedCapability, PerformanceCacheConfig};
+    use crate::core::nt_core_capability::security::{SecurityPolicy, SecurityManager, SecureCapability, AccessToken};
+    use crate::core::nt_core_capability::versioning::{SemanticVersion, VersionManager, UpgradeType};
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -44,7 +54,7 @@ mod integration_tests {
         let cap = crate::l2_perception::nt_world::nt_nlp_capability::create_nlp_capability();
 
         // 2. 创建缓存包装器
-        let config = CacheConfig {
+        let config = CapabilityCacheConfig {
             max_capacity: 100,
             default_ttl: Duration::from_secs(60),
             enable_stats: true,
@@ -173,7 +183,8 @@ mod integration_tests {
 
         // 4. 更新统计
         if let Some(inst) = selected {
-            lb.update_instance_stats(&inst.id, 100, true);
+            let id = inst.id.clone();
+            lb.update_instance_stats(&id, 100, true);
         }
 
         assert_eq!(lb.stats().total_requests, 1);
@@ -259,7 +270,7 @@ mod integration_tests {
     fn test_performance_integration() {
         // 1. 创建性能优化器
         let pool_config = PoolConfig::default();
-        let cache_config = CacheConfig::default();
+        let cache_config = PerformanceCacheConfig::default();
         let optimizer = Arc::new(std::sync::Mutex::new(PerformanceOptimizer::new(
             pool_config,
             cache_config,

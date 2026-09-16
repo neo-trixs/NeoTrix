@@ -162,10 +162,10 @@ pub struct RegressionResult {
 
 /// L6 ConsciousnessGoldStandard 意识金标接口 — L5 控制蒸馏消费
 ///
-/// Marker trait: L5 仅持有 `Arc<dyn GoldStandardApi>` 引用,
-/// 不直接依赖 L6 `ConsciousnessGoldStandard` 具体类型。
-/// 构造在 L6 侧完成 (L6 impl 提供 `new_gold_standard()`)。
-pub trait GoldStandardApi: Send + Sync {}
+/// L5 通过此 trait 访问 L6 `ConsciousnessGoldStandard`, 不直接依赖具体类型。
+pub trait GoldStandardApi: Send + Sync {
+    fn new_gold_standard() -> Self where Self: Sized;
+}
 
 /// L6 ConsciousnessMonitor 意识监控接口 — L5 后台循环消费
 pub trait ConsciousnessMonitorApi {
@@ -215,4 +215,17 @@ pub struct RegistrySuggestion {
     pub node_id: String,
     pub resonance: f64,
     pub suggestion: String,
+}
+
+/// L6 SystemMetrics 系统指标接口 — L5 后台循环自改进消费
+pub trait SystemMetricsApi {
+    fn new_system_metrics(
+        success_rate: f64,
+        avg_tokens: f64,
+        skill_hit_rate: f64,
+        crystallization_rate: f64,
+        knowledge_retention: f64,
+        error_recovery_rate: f64,
+        timestamp: i64,
+    ) -> Self where Self: Sized;
 }

@@ -1160,10 +1160,13 @@ mod tests {
         assert_eq!(mcp_tools.len(), 6, "should produce 6 MCP tool definitions");
 
         for tool in &mcp_tools {
-            assert!(tool.name.starts_with("security_"), "MCP tool name should start with security_");
-            assert_eq!(tool.server_name, "nt_shield");
-            assert!(tool.input_schema.get("properties").is_some(), "should have input schema with properties");
-            assert_eq!(tool.schema_version.as_deref(), Some("v1"));
+            let name = tool.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            assert!(name.starts_with("security_"), "MCP tool name should start with security_");
+            let server_name = tool.get("server_name").and_then(|v| v.as_str()).unwrap_or("");
+            assert_eq!(server_name, "nt_shield");
+            assert!(tool.get("input_schema").and_then(|v| v.get("properties")).is_some(), "should have input schema with properties");
+            let schema_version = tool.get("schema_version").and_then(|v| v.as_str());
+            assert_eq!(schema_version, Some("v1"));
         }
     }
 

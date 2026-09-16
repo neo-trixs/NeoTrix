@@ -159,13 +159,14 @@ mod tests {
     }
 
     #[test]
-    fn test_error_from_io() {
+    fn test_error_from_io() -> Result<(), String> {
         let io = std::io::Error::new(std::io::ErrorKind::Other, "io error");
         let e: NeoTrixError = io.into();
         match e {
             NeoTrixError::Io(_) => {}
-            _ => panic!("expected Io variant"),
+            _ => return Err("expected Io variant".to_string()),
         }
+        Ok(())
     }
 
     #[test]

@@ -81,11 +81,18 @@ pub mod model_routing;
 // Universal Model Interface — 模型无关的统一调用层
 pub mod universal_model;
 
+// Universal Browser — 统一浏览器能力骨架 (融合 stealth_browser + auth browser login)
+pub mod universal_browser;
+
 // Cache-Aware Compaction — 基于缓存命中率的智能压缩
 pub mod cache_compaction;
 
 // 推理运行时（从 nt_shield_local_inference 迁移）
 pub mod nt_io_inference;
+
+// Media processing and GPU inference engines
+pub mod nt_io_media;
+
 pub use cache_compaction::{CacheCompactor, CompactionStrategy, CacheEntry, CompactionResult};
 
 // 向后兼容别名

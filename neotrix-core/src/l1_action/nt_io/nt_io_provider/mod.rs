@@ -26,6 +26,7 @@ pub mod gateway;
 // 基础设施
 pub mod catalog;
 pub mod common;
+pub mod config;
 pub mod health;
 pub mod pool;
 pub mod routing;

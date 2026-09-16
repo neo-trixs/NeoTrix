@@ -10,6 +10,9 @@ use nt_core_capability_tree::{
 };
 use serde::{Deserialize, Serialize};
 
+// ── SSOT imports: 底层类型统一从 trade_core 引用 ──
+use super::trade_core::{MilestoneStatus, ScheduleDeviation};
+
 /// Production Order (FT07)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductionOrder {
@@ -105,14 +108,7 @@ pub struct ProductionMilestone {
     pub dependencies: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MilestoneStatus {
-    Pending,
-    InProgress,
-    Completed,
-    Delayed,
-    Blocked,
-}
+// ── MilestoneStatus / ScheduleDeviation / MilestoneDelay 统一从 trade_core 引用 ──
 
 /// Production Progress Report (FT08)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,19 +135,7 @@ pub struct DailyProgress {
     pub issues: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScheduleDeviation {
-    pub critical_path_delay_days: i32,
-    pub milestone_delays: Vec<MilestoneDelay>,
-    pub recovery_plan: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MilestoneDelay {
-    pub milestone: String,
-    pub delay_days: i32,
-    pub cause: String,
-}
+// ── ScheduleDeviation / MilestoneDelay 已从 trade_core 导入 ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductionAlert {
@@ -723,7 +707,7 @@ mod tests {
 
     #[test]
     fn test_progress_report() {
-        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
+        use super::super::full_cycle::{ProductSpec, PackagingSpec};
 
         let spec = ProductSpec {
             spec_id: "test".into(),
@@ -814,11 +798,13 @@ mod tests {
                 product: "Widget".into(),
                 qty: 1000,
                 unit_price: 50.0,
+                ..Default::default()
             }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "T/T 30% deposit, 70% against BL copy".into(),
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let spec = ProductSpec {
@@ -873,11 +859,12 @@ mod tests {
             contract_id: "CONTRACT-1".into(),
             pi_number: "PI-1".into(),
             parties: ("Seller".into(), "Buyer".into()),
-            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0 }],
+            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0, ..Default::default() }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "T/T 30% deposit, 70% against BL copy".into(),
             delivery_date: "2026-03-01".into(),
+            ..Default::default()
         };
 
         let spec = ProductSpec {

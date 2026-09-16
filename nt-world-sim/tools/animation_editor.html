@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animation Editor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#1a0f0a;--bg2:#231610;--bg3:#2c1e14;--bg4:#352618;
+  --border:#d4a050;--border2:#8a6830;--border3:#5a4420;
+  --text:#f0d080;--text2:#c0a060;--text3:#806040;
+  --accent:#e0c080;--accent2:#d4a050;--accent3:#b08030;
+  --red:#c04020;--green:#4a7a3a;--blue:#2a6090;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Courier New',monospace;font-size:12px;}
+#app{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:1fr 220px;height:100vh;}
+#toolbar{grid-column:1/-1;display:flex;align-items:center;gap:4px;padding:4px 6px;background:var(--bg2);border-bottom:1px solid var(--border3);flex-wrap:wrap;min-height:32px;}
+.tb{background:var(--bg3);color:var(--text);border:1px solid var(--border3);padding:2px 8px;cursor:pointer;font-size:11px;font-family:inherit;white-space:nowrap;}
+.tb:hover{background:var(--bg4);border-color:var(--border2);}
+.tb.active{background:var(--accent3);color:var(--bg);border-color:var(--accent);}
+.tb-sep{width:1px;height:18px;background:var(--border3);margin:0 2px;}
+select.tb{appearance:none;-webkit-appearance:none;padding-right:16px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4'%3E%3Cpath d='M0 0l4 4 4-4' fill='%23f0d080'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center;}
+#middle{display:flex;overflow:hidden;}
+#canvas-area{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;}
+#canvas-wrap{flex:1;overflow:auto;position:relative;background:var(--bg);display:flex;align-items:center;justify-content:center;}
+canvas#mainCanvas{cursor:crosshair;image-rendering:pixelated;border:1px solid var(--border3);}
+#tools-row{display:flex;align-items:center;gap:4px;padding:4px 6px;background:var(--bg2);border-top:1px solid var(--border3);border-bottom:1px solid var(--border3);}
+#tools-row .tb{padding:2px 6px;font-size:10px;}
+#color-palette{display:flex;flex-wrap:wrap;gap:2px;padding:4px 6px;background:var(--bg2);border-top:1px solid var(--border3);}
+.color-swatch{width:20px;height:20px;border:1px solid var(--border3);cursor:pointer;}
+.color-swatch:hover{border-color:var(--accent);}
+.color-swatch.active{border:2px solid var(--accent);box-shadow:0 0 4px var(--accent);}
+#current-color{width:32px;height:20px;border:1px solid var(--accent);margin-right:6px;}
+#right-panel{width:220px;background:var(--bg2);border-left:1px solid var(--border3);display:flex;flex-direction:column;overflow-y:auto;}
+.panel-section{padding:8px;border-bottom:1px solid var(--border3);}
+.panel-section h3{color:var(--accent);font-size:11px;margin-bottom:6px;font-weight:normal;text-transform:uppercase;letter-spacing:1px;}
+.prop-row{display:flex;align-items:center;margin-bottom:5px;gap:6px;}
+.prop-row label{color:var(--text2);font-size:10px;width:70px;flex-shrink:0;text-align:right;}
+.prop-row input[type="text"],.prop-row input[type="number"]{flex:1;background:var(--bg);border:1px solid var(--border3);color:var(--text);padding:2px 4px;font-family:inherit;font-size:11px;}
+.prop-row input[type="text"]:focus,.prop-row input[type="number"]:focus{border-color:var(--accent);}
+.prop-row input[type="checkbox"]{accent-color:var(--accent2);}
+#bottom-area{grid-column:1/-1;display:flex;flex-direction:column;}
+#timeline-wrap{background:var(--bg2);border-top:1px solid var(--border3);padding:6px;display:flex;gap:4px;align-items:flex-start;min-height:100px;overflow-x:auto;}
+#timeline-wrap::-webkit-scrollbar{height:8px;}
+#timeline-wrap::-webkit-scrollbar-track{background:var(--bg2);}
+#timeline-wrap::-webkit-scrollbar-thumb{background:var(--border3);}
+.frame-thumb{flex-shrink:0;width:64px;cursor:pointer;text-align:center;border:2px solid var(--border3);background:var(--bg3);padding:2px;}
+.frame-thumb:hover{border-color:var(--border2);}
+.frame-thumb.selected{border-color:var(--accent);background:var(--bg4);}
+.frame-thumb canvas{display:block;margin:0 auto 2px;border:1px solid var(--border3);image-rendering:pixelated;}
+.frame-thumb .fnum{font-size:9px;color:var(--text3);}
+.frame-thumb .fdur{font-size:8px;color:var(--text3);}
+#frame-actions{display:flex;gap:4px;padding:4px 6px;background:var(--bg2);border-top:1px solid var(--border3);flex-shrink:0;}
+#frame-actions .tb{font-size:10px;padding:2px 6px;}
+#preview-area{display:flex;gap:8px;padding:6px;background:var(--bg2);border-top:1px solid var(--border3);align-items:center;flex-shrink:0;}
+#preview-canvas-wrap{border:1px solid var(--border3);background:#000;position:relative;}
+canvas#previewCanvas{image-rendering:pixelated;display:block;}
+#preview-controls{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text2);}
+#preview-controls .tb{font-size:10px;padding:2px 6px;}
+#statusbar{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:2px 8px;background:var(--bg2);border-top:1px solid var(--border3);font-size:10px;color:var(--text3);min-height:20px;}
+#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:var(--bg4);color:var(--accent);border:1px solid var(--border2);padding:6px 16px;font-size:11px;font-family:inherit;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;}
+#toast.show{opacity:1;}
+input[type="range"]{accent-color:var(--accent2);height:4px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <button class="tb" onclick="newAnimation()">New</button>
+    <button class="tb" onclick="importSpriteSheet()">Import Sheet</button>
+    <button class="tb" onclick="exportJSON()">Export JSON</button>
+    <button class="tb" onclick="exportGIF()">Export GIF</button>
+    <div class="tb-sep"></div>
+    <button class="tb" id="btnPlay" onclick="togglePlay()">Play</button>
+    <button class="tb" onclick="stopPlay()">Stop</button>
+    <button class="tb" id="btnLoop" onclick="toggleLoop()">Loop</button>
+    <button class="tb" id="btnPingPong" onclick="togglePingPong()">PingPong</button>
+    <div class="tb-sep"></div>
+    <label style="color:var(--text2);font-size:10px;">FPS:</label>
+    <input type="range" id="fpsSlider" min="1" max="60" value="8" style="width:60px;" oninput="setFPS(this.value)">
+    <span id="fpsVal" style="color:var(--text);font-size:10px;width:24px;">8</span>
+    <div class="tb-sep"></div>
+    <button class="tb" id="btnOnion" onclick="toggleOnion()">Onion</button>
+    <button class="tb" id="btnGrid" onclick="toggleGrid()">Grid</button>
+    <div class="tb-sep"></div>
+    <button class="tb" onclick="undo()">Undo</button>
+    <button class="tb" onclick="redo()">Redo</button>
+    <div class="tb-sep"></div>
+    <button class="tb" onclick="setZoom('fit')">Fit</button>
+    <button class="tb" onclick="setZoom(1)">1x</button>
+    <button class="tb" onclick="setZoom(2)">2x</button>
+    <button class="tb" onclick="setZoom(4)">4x</button>
+  </div>
+
+  <div id="middle">
+    <div id="canvas-area">
+      <div id="tools-row">
+        <button class="tb active" id="toolPen" onclick="setTool('pen')" title="Pen (P)">Pen</button>
+        <button class="tb" id="toolEraser" onclick="setTool('eraser')" title="Eraser (E)">Eraser</button>
+        <button class="tb" id="toolFill" onclick="setTool('fill')" title="Fill (F)">Fill</button>
+        <button class="tb" id="toolLine" onclick="setTool('line')" title="Line (L)">Line</button>
+        <button class="tb" id="toolRect" onclick="setTool('rect')" title="Rect (R)">Rect</button>
+        <button class="tb" id="toolCircle" onclick="setTool('circle')" title="Circle (C)">Circle</button>
+        <div class="tb-sep"></div>
+        <button class="tb" onclick="flipH()" title="Flip H">FlipH</button>
+        <button class="tb" onclick="flipV()" title="Flip V">FlipV</button>
+        <button class="tb" onclick="rotate90()" title="Rotate 90">Rot90</button>
+        <div class="tb-sep"></div>
+        <button class="tb" onclick="copyFrame()" title="Copy Frame">Copy</button>
+        <button class="tb" onclick="pasteFrame()" title="Paste Frame">Paste</button>
+      </div>
+      <div id="canvas-wrap">
+        <canvas id="mainCanvas"></canvas>
+      </div>
+      <div id="color-palette"></div>
+    </div>
+
+    <div id="right-panel">
+      <div class="panel-section">
+        <h3>Animation</h3>
+        <div class="prop-row">
+          <label>Name</label>
+          <input type="text" id="propName" value="untitled" onchange="setState('name',this.value)">
+        </div>
+        <div class="prop-row">
+          <label>Frames</label>
+          <span id="propFrameCount" style="color:var(--text);font-size:11px;">0</span>
+        </div>
+        <div class="prop-row">
+          <label>FPS</label>
+          <input type="number" id="propFPS" min="1" max="60" value="8" onchange="setFPS(+this.value)">
+        </div>
+        <div class="prop-row">
+          <label>Loop</label>
+          <input type="checkbox" id="propLoop" checked onchange="setState('loop',this.checked)">
+        </div>
+        <div class="prop-row">
+          <label>PingPong</label>
+          <input type="checkbox" id="propPingPong" onchange="setState('pingPong',this.checked)">
+        </div>
+        <div class="prop-row">
+          <label>Duration</label>
+          <span id="propDuration" style="color:var(--text);font-size:11px;">0ms</span>
+        </div>
+      </div>
+      <div class="panel-section">
+        <h3>Canvas Size</h3>
+        <div class="prop-row">
+          <label>Size</label>
+          <select class="tb" id="selCanvasSize" onchange="resizeCanvas(+this.value)">
+            <option value="16">16x16</option>
+            <option value="32" selected>32x32</option>
+            <option value="48">48x48</option>
+            <option value="64">64x64</option>
+            <option value="0">Custom</option>
+          </select>
+        </div>
+        <div class="prop-row" id="customSizeRow" style="display:none;">
+          <label>W x H</label>
+          <input type="number" id="customW" value="32" min="1" max="256" style="width:45px;" onchange="resizeCanvasCustom()">
+          <span style="color:var(--text3);">x</span>
+          <input type="number" id="customH" value="32" min="1" max="256" style="width:45px;" onchange="resizeCanvasCustom()">
+        </div>
+      </div>
+      <div class="panel-section">
+        <h3>Frame Duration</h3>
+        <div class="prop-row">
+          <label>Override</label>
+          <input type="number" id="propFrameDur" min="0" value="0" style="width:50px;" onchange="setFrameDuration(+this.value)">
+          <span style="color:var(--text3);font-size:9px;">0=auto</span>
+        </div>
+      </div>
+      <div class="panel-section">
+        <h3>Preview</h3>
+        <div style="display:flex;gap:4px;margin-bottom:6px;">
+          <button class="tb" onclick="togglePreviewBg()" id="btnPreviewBg">Black</button>
+        </div>
+        <div id="preview-canvas-wrap">
+          <canvas id="previewCanvas" width="64" height="64"></canvas>
+        </div>
+      </div>
+      <div class="panel-section">
+        <h3>Animations</h3>
+        <select id="selAnim" style="width:100%;background:var(--bg);border:1px solid var(--border3);color:var(--text);padding:2px;font-family:inherit;font-size:11px;margin-bottom:4px;" onchange="switchAnimation(this.value)"></select>
+        <div style="display:flex;gap:4px;">
+          <button class="tb" onclick="addAnimation()" style="font-size:10px;">+ Add</button>
+          <button class="tb" onclick="deleteAnimation()" style="font-size:10px;">- Del</button>
+          <button class="tb" onclick="duplicateAnimation()" style="font-size:10px;">Dup</button>
+        </div>
+      </div>
+      <div class="panel-section">
+        <h3>Load Default</h3>
+        <select id="selDefault" style="width:100%;background:var(--bg);border:1px solid var(--border3);color:var(--text);padding:2px;font-family:inherit;font-size:11px;">
+          <option value="">-- select --</option>
+          <option value="0">player_idle</option>
+          <option value="1">player_walk</option>
+          <option value="2">player_attack</option>
+          <option value="3">enemy_death</option>
+        </select>
+        <button class="tb" onclick="loadDefault()" style="font-size:10px;margin-top:4px;width:100%;">Load</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom-area">
+    <div id="frame-actions">
+      <button class="tb" onclick="addFrame()">+ Frame</button>
+      <button class="tb" onclick="dupFrame()">Dup</button>
+      <button class="tb" onclick="delFrame()">Del</button>
+      <div class="tb-sep"></div>
+      <button class="tb" onclick="moveFrame(-1)">&lt;</button>
+      <button class="tb" onclick="moveFrame(1)">&gt;</button>
+    </div>
+    <div id="timeline-wrap"></div>
+    <div id="preview-area">
+      <span style="color:var(--text2);font-size:10px;">Preview:</span>
+      <button class="tb" id="btnPrevPlay" onclick="togglePreviewPlay()" style="font-size:10px;">Play</button>
+      <label style="color:var(--text2);font-size:10px;">Speed:</label>
+      <input type="range" id="previewSpeed" min="1" max="60" value="8" style="width:50px;" oninput="setPreviewSpeed(this.value)">
+      <span id="previewSpeedVal" style="color:var(--text);font-size:10px;">8</span>
+    </div>
+  </div>
+
+  <div id="statusbar">
+    <span id="statSize">32x32</span>
+    <span id="statFrame">Frame 1/1</span>
+    <span id="statTool">Pen</span>
+    <span id="statZoom">4x</span>
+    <span id="statPos"></span>
+  </div>
+</div>
+<div id="toast"></div>
+<input type="file" id="fileInput" accept="image/*" style="display:none;">
+<input type="file" id="fileInputSheet" accept="image/*" style="display:none;">
+
+<script>
+// --- State ---
+let S = {
+  animations: [],
+  currentAnim: 0,
+  currentFrame: 0,
+  canvasW: 32, canvasH: 32,
+  zoom: 4,
+  tool: 'pen',
+  color: '#000000',
+  showGrid: false,
+  showOnion: false,
+  loop: true,
+  pingPong: false,
+  playing: false,
+  previewPlaying: false,
+  previewBg: 'black',
+  fps: 8,
+  undoStack: [],
+  redoStack: [],
+  clipboard: null,
+  drawing: false,
+  lastPx: null,
+  shapeStart: null,
+  previewAnimIdx: 0,
+  previewFrameIdx: 0,
+  previewDir: 1,
+};
+
+const PALETTE = [
+  '#000000','#ffffff','#ff0000','#00ff00','#0000ff','#ffff00',
+  '#ff00ff','#00ffff','#800000','#008000','#000080','#808000',
+  '#c0c0c0','#808080','#ff8000','#8000ff','#0080ff','#ff0080'
+];
+
+const DEFAULT_ANIMATIONS = [
+  {
+    name: "player_idle", fps: 4, loop: true,
+    frames: (function(){
+      let f=[];
+      for(let i=0;i<4;i++){
+        let p=[];
+        // body
+        for(let y=10;y<22;y++) for(let x=12;x<20;x++) p.push([x,y,50,120,200,255]);
+        // head
+        for(let y=4;y<10;y++) for(let x=13;x<19;x++) p.push([x,y,220,180,140,255]);
+        // eyes
+        p.push([14,6,0,0,0,255]);p.push([17,6,0,0,0,255]);
+        // mouth
+        p.push([15,8,180,60,60,255]);p.push([16,8,180,60,60,255]);
+        // breathing offset
+        let dy = Math.sin(i*Math.PI/2)*1;
+        p = p.map(([x,y,r,g,b,a])=>[x,y+Math.round(dy),r,g,b,a]);
+        // legs
+        for(let y=22;y<26;y++) for(let x=13;x<19;x++) p.push([x,y,40,80,160,255]);
+        // arms
+        for(let y=12;y<18;y++){p.push([10,y,50,120,200,255]);p.push([21,y,50,120,200,255]);}
+        f.push({pixels:p,duration:250});
+      }
+      return f;
+    })()
+  },
+  {
+    name: "player_walk", fps: 8, loop: true,
+    frames: (function(){
+      let f=[];
+      for(let i=0;i<8;i++){
+        let p=[];
+        let legOff = Math.sin(i*Math.PI/4)*2;
+        let armOff = Math.sin(i*Math.PI/4)*2;
+        // body
+        for(let y=10;y<22;y++) for(let x=12;x<20;x++) p.push([x,y,50,120,200,255]);
+        // head
+        for(let y=4;y<10;y++) for(let x=13;x<19;x++) p.push([x,y,220,180,140,255]);
+        p.push([14,6,0,0,0,255]);p.push([17,6,0,0,0,255]);
+        p.push([15,8,180,60,60,255]);p.push([16,8,180,60,60,255]);
+        // legs with walk offset
+        for(let y=22;y<26;y++){
+          for(let x=13;x<16;x++) p.push([x,y+Math.round(legOff),40,80,160,255]);
+          for(let x=17;x<19;x++) p.push([x,y-Math.round(legOff),40,80,160,255]);
+        }
+        // arms
+        for(let y=12;y<18;y++){
+          p.push([10,y+Math.round(armOff),50,120,200,255]);
+          p.push([21,y-Math.round(armOff),50,120,200,255]);
+        }
+        f.push({pixels:p,duration:125});
+      }
+      return f;
+    })()
+  },
+  {
+    name: "player_attack", fps: 12, loop: false,
+    frames: (function(){
+      let f=[];
+      for(let i=0;i<6;i++){
+        let p=[];
+        // body
+        for(let y=10;y<22;y++) for(let x=12;x<20;x++) p.push([x,y,50,120,200,255]);
+        // head
+        for(let y=4;y<10;y++) for(let x=13;x<19;x++) p.push([x,y,220,180,140,255]);
+        p.push([14,6,0,0,0,255]);p.push([17,6,0,0,0,255]);
+        // sword swing arc
+        let angle = -Math.PI/2 + i*(Math.PI/5);
+        let sx = Math.round(20 + Math.cos(angle)*6);
+        let sy = Math.round(8 + Math.sin(angle)*6);
+        // sword blade
+        for(let j=0;j<5;j++){
+          let bx = Math.round(20 + Math.cos(angle)*(6+j));
+          let by = Math.round(8 + Math.sin(angle)*(6+j));
+          if(bx>=0&&bx<32&&by>=0&&by<32) p.push([bx,by,200,200,220,255]);
+        }
+        if(sx>=0&&sx<32&&sy>=0&&sy<32){
+          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+            let nx=sx+dx,ny=sy+dy;
+            if(nx>=0&&nx<32&&ny>=0&&ny<32) p.push([nx,ny,220,180,80,255]);
+          }
+        }
+        // sword handle
+        p.push([20,10,120,80,40,255]);
+        // legs
+        for(let y=22;y<26;y++) for(let x=13;x<19;x++) p.push([x,y,40,80,160,255]);
+        // left arm static
+        for(let y=12;y<18;y++) p.push([10,y,50,120,200,255]);
+        // right arm follows sword
+        for(let y=8;y<12;y++) p.push([21,y,50,120,200,255]);
+        f.push({pixels:p,duration:83});
+      }
+      return f;
+    })()
+  },
+  {
+    name: "enemy_death", fps: 10, loop: false,
+    frames: (function(){
+      let f=[];
+      for(let i=0;i<5;i++){
+        let p=[];
+        let spread = i*3;
+        // exploding body
+        let baseColor = [180,40,40];
+        for(let y=8;y<24;y++) for(let x=10;x<22;x++){
+          let dx=x-16,dy=y-16;
+          let dist=Math.sqrt(dx*dx+dy*dy);
+          let maxR=5+i*2;
+          if(dist<maxR+Math.random()*3){
+            let r=baseColor[0]+Math.round(Math.random()*40-20);
+            let g=baseColor[1]+Math.round(Math.random()*30-15);
+            let b=baseColor[2]+Math.round(Math.random()*20-10);
+            let ox=Math.round(dx*spread/5+Math.random()*2-1);
+            let oy=Math.round(dy*spread/5+Math.random()*2-1);
+            let nx=x+ox,ny=y+oy;
+            if(nx>=0&&nx<32&&ny>=0&&ny<32) p.push([nx,ny,Math.max(0,Math.min(255,r)),Math.max(0,Math.min(255,g)),Math.max(0,Math.min(255,b)),255]);
+          }
+        }
+        // fire particles
+        if(i<3){
+          for(let j=0;j<8;j++){
+            let px=Math.round(16+Math.random()*10-5+spread*(Math.random()-0.5));
+            let py=Math.round(16+Math.random()*10-5+spread*(Math.random()-0.5));
+            if(px>=0&&px<32&&py>=0&&py<32) p.push([px,py,255,200,50,255]);
+          }
+        }
+        // last frame: just dust
+        if(i===4){
+          for(let j=0;j<12;j++){
+            let px=Math.round(16+Math.random()*16-8);
+            let py=Math.round(20+Math.random()*8-4);
+            if(px>=0&&px<32&&py>=0&&py<32) p.push([px,py,120,100,80,200]);
+          }
+        }
+        f.push({pixels:p,duration:100});
+      }
+      return f;
+    })()
+  }
+];
+
+// --- Canvas refs ---
+const mainCanvas = document.getElementById('mainCanvas');
+const mainCtx = mainCanvas.getContext('2d');
+const previewCanvas = document.getElementById('previewCanvas');
+const previewCtx = previewCanvas.getContext('2d');
+
+// --- Init ---
+function init() {
+  buildPalette();
+  loadFromStorage() || loadDefaults();
+  refreshAll();
+  setupCanvasEvents();
+  setupKeyboard();
+  updateAnimSelect();
+}
+
+function loadDefaults() {
+  S.animations = DEFAULT_ANIMATIONS.map(a => ({
+    name: a.name, fps: a.fps, loop: a.loop, pingPong: false,
+    frames: a.frames.map(fr => ({
+      pixels: fr.pixels.map(p => [...p]),
+      duration: fr.duration || 0
+    }))
+  }));
+  S.currentAnim = 0;
+  S.currentFrame = 0;
+}
+
+function buildPalette() {
+  const el = document.getElementById('color-palette');
+  el.innerHTML = '';
+  const cur = document.createElement('div');
+  cur.id = 'current-color';
+  cur.style.background = S.color;
+  el.appendChild(cur);
+  PALETTE.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'color-swatch' + (c === S.color ? ' active' : '');
+    d.style.background = c;
+    d.onclick = () => pickColor(c);
+    el.appendChild(d);
+  });
+}
+
+function pickColor(c) {
+  S.color = c;
+  document.getElementById('current-color').style.background = c;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('active', s.style.background === c || rgbToHex(s.style.background) === c));
+}
+
+function rgbToHex(rgb) {
+  if (rgb.startsWith('#')) return rgb;
+  let m = rgb.match(/\d+/g);
+  if (!m) return rgb;
+  return '#' + m.slice(0,3).map(x => (+x).toString(16).padStart(2,'0')).join('');
+}
+
+// --- Anim State ---
+function getAnim() { return S.animations[S.currentAnim]; }
+function getFrame() { let a=getAnim(); return a?a.frames[S.currentFrame]:null; }
+
+function setState(key, val) {
+  if (key === 'name') getAnim().name = val;
+  else if (key === 'loop') { getAnim().loop = val; S.loop = val; }
+  else if (key === 'pingPong') { getAnim().pingPong = val; S.pingPong = val; }
+  updateAnimSelect();
+  autoSave();
+}
+
+function setFPS(v) {
+  v = Math.max(1, Math.min(60, +v));
+  S.fps = v;
+  getAnim().fps = v;
+  document.getElementById('fpsSlider').value = v;
+  document.getElementById('fpsVal').textContent = v;
+  document.getElementById('propFPS').value = v;
+  updateDuration();
+  autoSave();
+}
+
+function setFrameDuration(v) {
+  let fr = getFrame();
+  if (fr) { fr.duration = Math.max(0, v); updateTimeline(); updateDuration(); autoSave(); }
+}
+
+// --- Canvas ---
+function resizeCanvas(size) {
+  if (size === 0) {
+    document.getElementById('customSizeRow').style.display = '';
+    return;
+  }
+  document.getElementById('customSizeRow').style.display = 'none';
+  S.canvasW = S.canvasH = size;
+  S.canvasH = size;
+  mainCanvas.width = size;
+  mainCanvas.height = size;
+  updateStatSize();
+  renderMain();
+  autoSave();
+}
+
+function resizeCanvasCustom() {
+  let w = Math.max(1, Math.min(256, +document.getElementById('customW').value || 32));
+  let h = Math.max(1, Math.min(256, +document.getElementById('customH').value || 32));
+  S.canvasW = w; S.canvasH = h;
+  mainCanvas.width = w; mainCanvas.height = h;
+  updateStatSize();
+  renderMain();
+  autoSave();
+}
+
+function setZoom(z) {
+  if (z === 'fit') {
+    let wrap = document.getElementById('canvas-wrap');
+    let maxW = wrap.clientWidth - 20;
+    let maxH = wrap.clientHeight - 20;
+    z = Math.max(1, Math.min(Math.floor(maxW / S.canvasW), Math.floor(maxH / S.canvasH), 16));
+  }
+  S.zoom = z;
+  mainCanvas.style.width = (S.canvasW * z) + 'px';
+  mainCanvas.style.height = (S.canvasH * z) + 'px';
+  document.getElementById('statZoom').textContent = z + 'x';
+}
+
+// --- Rendering ---
+function renderMain() {
+  let fr = getFrame();
+  let w = S.canvasW, h = S.canvasH;
+  mainCanvas.width = w; mainCanvas.height = h;
+  mainCtx.clearRect(0, 0, w, h);
+
+  // onion skin prev
+  if (S.showOnion && S.currentFrame > 0) {
+    let prev = getAnim().frames[S.currentFrame - 1];
+    renderPixels(mainCtx, prev, 0.25);
+  }
+
+  // onion skin next
+  if (S.showOnion && S.currentFrame < getAnim().frames.length - 1) {
+    let next = getAnim().frames[S.currentFrame + 1];
+    renderPixels(mainCtx, next, 0.25);
+  }
+
+  // current frame
+  if (fr) renderPixels(mainCtx, fr, 1.0);
+
+  // grid
+  if (S.showGrid) drawGrid(mainCtx, w, h);
+
+  // shape preview
+  if (S.shapeStart && S.shapeEnd) drawShapePreview();
+}
+
+function renderPixels(ctx, fr, alpha) {
+  if (!fr || !fr.pixels) return;
+  fr.pixels.forEach(([x,y,r,g,b,a]) => {
+    if (x >= 0 && x < S.canvasW && y >= 0 && y < S.canvasH) {
+      ctx.fillStyle = `rgba(${r},${g},${b},${(a/255)*alpha})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  });
+}
+
+function drawGrid(ctx, w, h) {
+  ctx.strokeStyle = 'rgba(212,160,80,0.15)';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x <= w; x++) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  for (let y = 0; y <= h; y++) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+}
+
+function drawShapePreview() {
+  let fr = getFrame();
+  if (!fr) return;
+  renderPixels(mainCtx, fr, 1.0);
+  let s = S.shapeStart, e = S.shapeEnd;
+  mainCtx.strokeStyle = S.color;
+  mainCtx.lineWidth = 1;
+  if (S.tool === 'line') {
+    mainCtx.beginPath();
+    mainCtx.moveTo(s[0]+0.5, s[1]+0.5);
+    mainCtx.lineTo(e[0]+0.5, e[1]+0.5);
+    mainCtx.stroke();
+  } else if (S.tool === 'rect') {
+    let x0=Math.min(s[0],e[0]),y0=Math.min(s[1],e[1]);
+    let x1=Math.max(s[0],e[0]),y1=Math.max(s[1],e[1]);
+    mainCtx.strokeRect(x0+0.5,y0+0.5,x1-x0+1,y1-y1+1);
+    // draw pixel outline
+    for(let x=x0;x<=x1;x++){plotTempPixel(x,y0);plotTempPixel(x,y1);}
+    for(let y=y0;y<=y1;y++){plotTempPixel(x0,y);plotTempPixel(x1,y);}
+  } else if (S.tool === 'circle') {
+    let cx=Math.round((s[0]+e[0])/2), cy=Math.round((s[1]+e[1])/2);
+    let rx=Math.abs(e[0]-s[0])/2, ry=Math.abs(e[1]-s[1])/2;
+    let r = Math.round(Math.max(rx, ry));
+    // midpoint circle
+    let x=r,y=0,d=1-r;
+    while(x>=y){
+      plotTempPixel(cx+x,cy+y);plotTempPixel(cx-x,cy+y);
+      plotTempPixel(cx+x,cy-y);plotTempPixel(cx-x,cy-y);
+      plotTempPixel(cx+y,cy+x);plotTempPixel(cx-y,cy+x);
+      plotTempPixel(cx+y,cy-x);plotTempPixel(cx-y,cy-x);
+      y++;
+      if(d<0){d+=2*y+1;}else{x--;d+=2*(y-x)+1;}
+    }
+  }
+}
+
+function plotTempPixel(x,y) {
+  if(x<0||x>=S.canvasW||y<0||y>=S.canvasH) return;
+  let c = hexToRgb(S.color);
+  mainCtx.fillStyle = S.color;
+  mainCtx.fillRect(x,y,1,1);
+}
+
+function hexToRgb(hex) {
+  let r=0,g=0,b=0;
+  if(hex.length===7){r=parseInt(hex.slice(1,3),16);g=parseInt(hex.slice(3,5),16);b=parseInt(hex.slice(5,7),16);}
+  return [r,g,b];
+}
+
+// --- Tools ---
+function setTool(t) {
+  S.tool = t;
+  document.querySelectorAll('#tools-row .tb').forEach(b => b.classList.remove('active'));
+  let el = document.getElementById('tool' + t.charAt(0).toUpperCase() + t.slice(1));
+  if (el) el.classList.add('active');
+  document.getElementById('statTool').textContent = t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function toggleGrid() {
+  S.showGrid = !S.showGrid;
+  document.getElementById('btnGrid').classList.toggle('active', S.showGrid);
+  renderMain();
+}
+
+function toggleOnion() {
+  S.showOnion = !S.showOnion;
+  document.getElementById('btnOnion').classList.toggle('active', S.showOnion);
+  renderMain();
+}
+
+function toggleLoop() {
+  S.loop = !S.loop;
+  getAnim().loop = S.loop;
+  document.getElementById('btnLoop').classList.toggle('active', S.loop);
+  document.getElementById('propLoop').checked = S.loop;
+  autoSave();
+}
+
+function togglePingPong() {
+  S.pingPong = !S.pingPong;
+  getAnim().pingPong = S.pingPong;
+  document.getElementById('btnPingPong').classList.toggle('active', S.pingPong);
+  document.getElementById('propPingPong').checked = S.pingPong;
+  autoSave();
+}
+
+// --- Canvas Events ---
+function setupCanvasEvents() {
+  mainCanvas.addEventListener('mousedown', onCanvasDown);
+  mainCanvas.addEventListener('mousemove', onCanvasMove);
+  mainCanvas.addEventListener('mouseup', onCanvasUp);
+  mainCanvas.addEventListener('mouseleave', onCanvasUp);
+  mainCanvas.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+function getPixelCoord(e) {
+  let rect = mainCanvas.getBoundingClientRect();
+  let scaleX = S.canvasW / rect.width;
+  let scaleY = S.canvasH / rect.height;
+  let x = Math.floor((e.clientX - rect.left) * scaleX);
+  let y = Math.floor((e.clientY - rect.top) * scaleY);
+  return [x, y];
+}
+
+function onCanvasDown(e) {
+  let [x,y] = getPixelCoord(e);
+  if (x < 0 || x >= S.canvasW || y < 0 || y >= S.canvasH) return;
+
+  if (e.button === 2) {
+    // right click = erase
+    erasePixel(x, y);
+    S.drawing = true;
+    S.lastPx = [x,y];
+    return;
+  }
+
+  S.drawing = true;
+  S.lastPx = [x,y];
+
+  if (S.tool === 'pen') {
+    pushUndo();
+    plotPixel(x, y, S.color);
+    renderMain();
+  } else if (S.tool === 'eraser') {
+    pushUndo();
+    erasePixel(x, y);
+    renderMain();
+  } else if (S.tool === 'fill') {
+    pushUndo();
+    floodFill(x, y, S.color);
+    renderMain();
+  } else if (S.tool === 'line' || S.tool === 'rect' || S.tool === 'circle') {
+    S.shapeStart = [x, y];
+    S.shapeEnd = [x, y];
+  }
+}
+
+function onCanvasMove(e) {
+  let [x,y] = getPixelCoord(e);
+  document.getElementById('statPos').textContent = x+','+y;
+
+  if (!S.drawing) return;
+  if (x < 0 || x >= S.canvasW || y < 0 || y >= S.canvasH) return;
+
+  if (e.buttons === 2 || S.tool === 'eraser') {
+    erasePixel(x, y);
+    S.lastPx = [x,y];
+    renderMain();
+    return;
+  }
+
+  if (S.tool === 'pen') {
+    if (S.lastPx) bresenham(S.lastPx[0], S.lastPx[1], x, y, (px,py) => plotPixel(px, py, S.color));
+    else plotPixel(x, y, S.color);
+    S.lastPx = [x,y];
+    renderMain();
+  } else if (S.tool === 'line' || S.tool === 'rect' || S.tool === 'circle') {
+    S.shapeEnd = [x, y];
+    renderMain();
+  }
+}
+
+function onCanvasUp(e) {
+  if (!S.drawing) return;
+  S.drawing = false;
+
+  if ((S.tool === 'line' || S.tool === 'rect' || S.tool === 'circle') && S.shapeStart && S.shapeEnd) {
+    pushUndo();
+    applyShape();
+    renderMain();
+    S.shapeStart = null;
+    S.shapeEnd = null;
+    autoSave();
+  } else {
+    autoSave();
+  }
+  S.lastPx = null;
+}
+
+function plotPixel(x, y, color) {
+  let fr = getFrame();
+  if (!fr) return;
+  let [r,g,b] = hexToRgb(color);
+  // remove existing pixel at x,y
+  fr.pixels = fr.pixels.filter(p => !(p[0]===x && p[1]===y));
+  fr.pixels.push([x, y, r, g, b, 255]);
+}
+
+function erasePixel(x, y) {
+  let fr = getFrame();
+  if (!fr) return;
+  fr.pixels = fr.pixels.filter(p => !(p[0]===x && p[1]===y));
+}
+
+function floodFill(startX, startY, color) {
+  let fr = getFrame();
+  if (!fr) return;
+  let w = S.canvasW, h = S.canvasH;
+  let [r,g,b] = hexToRgb(color);
+
+  // get pixel color at position
+  function getAt(x,y) {
+    let found = fr.pixels.find(p => p[0]===x && p[1]===y);
+    return found ? found.slice(2,6) : null;
+  }
+
+  let target = getAt(startX, startY);
+  if (target && target[0]===r && target[1]===g && target[2]===b) return;
+
+  let stack = [[startX, startY]];
+  let visited = new Set();
+
+  while (stack.length > 0) {
+    let [x,y] = stack.pop();
+    if (x<0||x>=w||y<0||y>=h) continue;
+    let key = y*w+x;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    let cur = getAt(x,y);
+    let match = (!target && !cur) || (target && cur && cur[0]===target[0] && cur[1]===target[1] && cur[2]===target[2] && cur[3]===target[3]);
+    if (!match) continue;
+
+    fr.pixels = fr.pixels.filter(p => !(p[0]===x && p[1]===y));
+    fr.pixels.push([x, y, r, g, b, 255]);
+
+    stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+  }
+}
+
+function bresenham(x0,y0,x1,y1,fn) {
+  let dx=Math.abs(x1-x0), dy=Math.abs(y1-y0);
+  let sx=x0<x1?1:-1, sy=y0<y1?1:-1;
+  let err=dx-dy;
+  while(true){
+    fn(x0,y0);
+    if(x0===x1&&y0===y1) break;
+    let e2=2*err;
+    if(e2>-dy){err-=dy;x0+=sx;}
+    if(e2<dx){err+=dx;y0+=sy;}
+  }
+}
+
+function applyShape() {
+  let s = S.shapeStart, e = S.shapeEnd;
+  if (S.tool === 'line') {
+    bresenham(s[0],s[1],e[0],e[1],(x,y)=>plotPixel(x,y,S.color));
+  } else if (S.tool === 'rect') {
+    let x0=Math.min(s[0],e[0]),y0=Math.min(s[1],e[1]);
+    let x1=Math.max(s[0],e[0]),y1=Math.max(s[1],e[1]);
+    for(let x=x0;x<=x1;x++){plotPixel(x,y0,S.color);plotPixel(x,y1,S.color);}
+    for(let y=y0;y<=y1;y++){plotPixel(x0,y,S.color);plotPixel(x1,y,S.color);}
+  } else if (S.tool === 'circle') {
+    let cx=Math.round((s[0]+e[0])/2),cy=Math.round((s[1]+e[1])/2);
+    let rx=Math.abs(e[0]-s[0])/2,ry=Math.abs(e[1]-s[1])/2;
+    let r=Math.round(Math.max(rx,ry));
+    let x=r,y=0,d=1-r;
+    while(x>=y){
+      plotPixel(cx+x,cy+y,S.color);plotPixel(cx-x,cy+y,S.color);
+      plotPixel(cx+x,cy-y,S.color);plotPixel(cx-x,cy-y,S.color);
+      plotPixel(cx+y,cy+x,S.color);plotPixel(cx-y,cy+x,S.color);
+      plotPixel(cx+y,cy-x,S.color);plotPixel(cx-y,cy-x,S.color);
+      y++;
+      if(d<0){d+=2*y+1;}else{x--;d+=2*(y-x)+1;}
+    }
+  }
+}
+
+// --- Undo/Redo ---
+function pushUndo() {
+  let fr = getFrame();
+  if (!fr) return;
+  S.undoStack.push(JSON.parse(JSON.stringify(fr.pixels)));
+  if (S.undoStack.length > 100) S.undoStack.shift();
+  S.redoStack = [];
+}
+
+function undo() {
+  if (S.undoStack.length === 0) return;
+  let fr = getFrame();
+  S.redoStack.push(JSON.parse(JSON.stringify(fr.pixels)));
+  fr.pixels = S.undoStack.pop();
+  renderMain();
+  updateTimeline();
+  autoSave();
+}
+
+function redo() {
+  if (S.redoStack.length === 0) return;
+  let fr = getFrame();
+  S.undoStack.push(JSON.parse(JSON.stringify(fr.pixels)));
+  fr.pixels = S.redoStack.pop();
+  renderMain();
+  updateTimeline();
+  autoSave();
+}
+
+// --- Frame Operations ---
+function addFrame() {
+  let a = getAnim();
+  a.frames.splice(S.currentFrame + 1, 0, { pixels: [], duration: 0 });
+  S.currentFrame++;
+  refreshAll();
+  autoSave();
+}
+
+function dupFrame() {
+  let a = getAnim();
+  let src = a.frames[S.currentFrame];
+  let dup = { pixels: src.pixels.map(p => [...p]), duration: src.duration };
+  a.frames.splice(S.currentFrame + 1, 0, dup);
+  S.currentFrame++;
+  refreshAll();
+  autoSave();
+}
+
+function delFrame() {
+  let a = getAnim();
+  if (a.frames.length <= 1) return;
+  a.frames.splice(S.currentFrame, 1);
+  if (S.currentFrame >= a.frames.length) S.currentFrame = a.frames.length - 1;
+  refreshAll();
+  autoSave();
+}
+
+function moveFrame(dir) {
+  let a = getAnim();
+  let ni = S.currentFrame + dir;
+  if (ni < 0 || ni >= a.frames.length) return;
+  [a.frames[S.currentFrame], a.frames[ni]] = [a.frames[ni], a.frames[S.currentFrame]];
+  S.currentFrame = ni;
+  refreshAll();
+  autoSave();
+}
+
+function copyFrame() {
+  let fr = getFrame();
+  if (fr) S.clipboard = JSON.parse(JSON.stringify(fr.pixels));
+  toast('Frame copied');
+}
+
+function pasteFrame() {
+  if (!S.clipboard) return;
+  let fr = getFrame();
+  pushUndo();
+  fr.pixels = S.clipboard.map(p => [...p]);
+  renderMain();
+  updateTimeline();
+  toast('Frame pasted');
+  autoSave();
+}
+
+function flipH() {
+  pushUndo();
+  let fr = getFrame();
+  fr.pixels = fr.pixels.map(([x,y,r,g,b,a]) => [S.canvasW-1-x, y, r, g, b, a]);
+  renderMain(); updateTimeline(); autoSave();
+}
+
+function flipV() {
+  pushUndo();
+  let fr = getFrame();
+  fr.pixels = fr.pixels.map(([x,y,r,g,b,a]) => [x, S.canvasH-1-y, r, g, b, a]);
+  renderMain(); updateTimeline(); autoSave();
+}
+
+function rotate90() {
+  pushUndo();
+  let fr = getFrame();
+  fr.pixels = fr.pixels.map(([x,y,r,g,b,a]) => [S.canvasH-1-y, x, r, g, b, a]);
+  [S.canvasW, S.canvasH] = [S.canvasH, S.canvasW];
+  mainCanvas.width = S.canvasW;
+  mainCanvas.height = S.canvasH;
+  updateStatSize();
+  renderMain(); updateTimeline(); autoSave();
+}
+
+// --- Animation Management ---
+function addAnimation() {
+  S.animations.push({
+    name: 'anim_' + S.animations.length,
+    fps: 8, loop: true, pingPong: false,
+    frames: [{ pixels: [], duration: 0 }]
+  });
+  S.currentAnim = S.animations.length - 1;
+  S.currentFrame = 0;
+  refreshAll();
+  autoSave();
+}
+
+function deleteAnimation() {
+  if (S.animations.length <= 1) return;
+  S.animations.splice(S.currentAnim, 1);
+  S.currentAnim = Math.min(S.currentAnim, S.animations.length - 1);
+  S.currentFrame = 0;
+  refreshAll();
+  autoSave();
+}
+
+function duplicateAnimation() {
+  let src = S.animations[S.currentAnim];
+  let dup = {
+    name: src.name + '_copy',
+    fps: src.fps, loop: src.loop, pingPong: src.pingPong,
+    frames: src.frames.map(f => ({ pixels: f.pixels.map(p=>[...p]), duration: f.duration }))
+  };
+  S.animations.splice(S.currentAnim + 1, 0, dup);
+  S.currentAnim++;
+  S.currentFrame = 0;
+  refreshAll();
+  autoSave();
+}
+
+function switchAnimation(idx) {
+  S.currentAnim = +idx;
+  S.currentFrame = 0;
+  let a = getAnim();
+  S.fps = a.fps;
+  S.loop = a.loop;
+  S.pingPong = a.pingPong;
+  document.getElementById('fpsSlider').value = a.fps;
+  document.getElementById('fpsVal').textContent = a.fps;
+  document.getElementById('propFPS').value = a.fps;
+  document.getElementById('propLoop').checked = a.loop;
+  document.getElementById('propPingPong').checked = a.pingPong;
+  document.getElementById('propName').value = a.name;
+  document.getElementById('btnLoop').classList.toggle('active', a.loop);
+  document.getElementById('btnPingPong').classList.toggle('active', a.pingPong);
+  refreshAll();
+  autoSave();
+}
+
+function updateAnimSelect() {
+  let sel = document.getElementById('selAnim');
+  sel.innerHTML = '';
+  S.animations.forEach((a, i) => {
+    let opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = a.name;
+    opt.selected = i === S.currentAnim;
+    sel.appendChild(opt);
+  });
+}
+
+// --- Timeline ---
+function updateTimeline() {
+  let wrap = document.getElementById('timeline-wrap');
+  wrap.innerHTML = '';
+  let a = getAnim();
+  a.frames.forEach((fr, i) => {
+    let d = document.createElement('div');
+    d.className = 'frame-thumb' + (i === S.currentFrame ? ' selected' : '');
+    d.onclick = () => { S.currentFrame = i; refreshAll(); };
+    d.draggable = true;
+    d.ondragstart = (e) => e.dataTransfer.setData('text/plain', i);
+    d.ondragover = (e) => e.preventDefault();
+    d.ondrop = (e) => {
+      e.preventDefault();
+      let from = +e.dataTransfer.getData('text/plain');
+      let to = i;
+      if (from === to) return;
+      [a.frames[from], a.frames[to]] = [a.frames[to], a.frames[from]];
+      S.currentFrame = to;
+      refreshAll();
+      autoSave();
+    };
+
+    let tc = document.createElement('canvas');
+    tc.width = S.canvasW; tc.height = S.canvasH;
+    let tctx = tc.getContext('2d');
+    renderPixels(tctx, fr, 1.0);
+    tc.style.width = '56px';
+    tc.style.height = '56px';
+    d.appendChild(tc);
+
+    let num = document.createElement('div');
+    num.className = 'fnum';
+    num.textContent = '#' + (i + 1);
+    d.appendChild(num);
+
+    if (fr.duration > 0) {
+      let dur = document.createElement('div');
+      dur.className = 'fdur';
+      dur.textContent = fr.duration + 'ms';
+      d.appendChild(dur);
+    }
+
+    wrap.appendChild(d);
+  });
+
+  document.getElementById('propFrameCount').textContent = a.frames.length;
+  document.getElementById('statFrame').textContent = 'Frame ' + (S.currentFrame+1) + '/' + a.frames.length;
+  document.getElementById('propFrameDur').value = getFrame()?.duration || 0;
+  updateDuration();
+}
+
+function updateDuration() {
+  let a = getAnim();
+  let total = 0;
+  a.frames.forEach(fr => {
+    total += fr.duration > 0 ? fr.duration : Math.round(1000 / a.fps);
+  });
+  document.getElementById('propDuration').textContent = total + 'ms';
+}
+
+// --- Playback ---
+function togglePlay() {
+  S.playing = !S.playing;
+  document.getElementById('btnPlay').classList.toggle('active', S.playing);
+  if (S.playing) playLoop();
+}
+
+function stopPlay() {
+  S.playing = false;
+  document.getElementById('btnPlay').classList.remove('active');
+}
+
+let playTimer = null;
+function playLoop() {
+  if (!S.playing) return;
+  let a = getAnim();
+  let fr = a.frames[S.currentFrame];
+  let dur = fr.duration > 0 ? fr.duration : Math.round(1000 / a.fps);
+
+  playTimer = setTimeout(() => {
+    if (a.pingPong) {
+      S.currentFrame += S.previewDir;
+      if (S.currentFrame >= a.frames.length - 1) { S.previewDir = -1; S.currentFrame = a.frames.length - 1; }
+      if (S.currentFrame <= 0) { S.previewDir = 1; S.currentFrame = 0; }
+      if (!a.loop && S.currentFrame === 0) { stopPlay(); return; }
+    } else {
+      S.currentFrame++;
+      if (S.currentFrame >= a.frames.length) {
+        if (a.loop) S.currentFrame = 0;
+        else { S.currentFrame = a.frames.length - 1; stopPlay(); return; }
+      }
+    }
+    renderMain();
+    updateTimeline();
+    playLoop();
+  }, dur);
+}
+
+// --- Preview Panel ---
+function togglePreviewPlay() {
+  S.previewPlaying = !S.previewPlaying;
+  document.getElementById('btnPrevPlay').classList.toggle('active', S.previewPlaying);
+  if (S.previewPlaying) previewLoop();
+}
+
+function setPreviewSpeed(v) {
+  document.getElementById('previewSpeedVal').textContent = v;
+}
+
+function previewLoop() {
+  if (!S.previewPlaying) return;
+  let a = getAnim();
+  let spd = +document.getElementById('previewSpeed').value;
+  let dur = Math.round(1000 / spd);
+
+  // draw preview
+  let size = S.canvasW;
+  previewCanvas.width = size; previewCanvas.height = size;
+  let pw = Math.min(192, size * 6);
+  previewCanvas.style.width = pw + 'px';
+  previewCanvas.style.height = pw + 'px';
+
+  if (S.previewBg === 'black') previewCtx.fillStyle = '#000';
+  else if (S.previewBg === 'white') previewCtx.fillStyle = '#fff';
+  else {
+    // checker
+    let cs = Math.max(2, Math.floor(size/8));
+    for(let y=0;y<size;y+=cs) for(let x=0;x<size;x+=cs){
+      previewCtx.fillStyle = ((x/cs+y/cs)%2===0)?'#ccc':'#999';
+      previewCtx.fillRect(x,y,cs,cs);
+    }
+  }
+  if (S.previewBg !== 'checker') previewCtx.fillRect(0,0,size,size);
+
+  let fr = a.frames[S.previewFrameIdx];
+  renderPixels(previewCtx, fr, 1.0);
+
+  setTimeout(() => {
+    if (a.pingPong) {
+      S.previewFrameIdx += S.previewDir;
+      if (S.previewFrameIdx >= a.frames.length - 1) { S.previewDir = -1; }
+      if (S.previewFrameIdx <= 0) { S.previewDir = 1; }
+    } else {
+      S.previewFrameIdx++;
+      if (S.previewFrameIdx >= a.frames.length) {
+        if (a.loop) S.previewFrameIdx = 0;
+        else { S.previewFrameIdx = a.frames.length - 1; S.previewPlaying = false; document.getElementById('btnPrevPlay').classList.remove('active'); return; }
+      }
+    }
+    previewLoop();
+  }, dur);
+}
+
+function togglePreviewBg() {
+  let bgs = ['black','white','checker'];
+  let i = bgs.indexOf(S.previewBg);
+  S.previewBg = bgs[(i+1)%3];
+  document.getElementById('btnPreviewBg').textContent = S.previewBg.charAt(0).toUpperCase() + S.previewBg.slice(1);
+  // redraw static
+  let a = getAnim();
+  let size = S.canvasW;
+  previewCanvas.width = size; previewCanvas.height = size;
+  let pw = Math.min(192, size * 6);
+  previewCanvas.style.width = pw + 'px';
+  previewCanvas.style.height = pw + 'px';
+  if (S.previewBg === 'black') { previewCtx.fillStyle = '#000'; previewCtx.fillRect(0,0,size,size); }
+  else if (S.previewBg === 'white') { previewCtx.fillStyle = '#fff'; previewCtx.fillRect(0,0,size,size); }
+  else {
+    let cs = Math.max(2, Math.floor(size/8));
+    for(let y=0;y<size;y+=cs) for(let x=0;x<size;x+=cs){
+      previewCtx.fillStyle = ((x/cs+y/cs)%2===0)?'#ccc':'#999';
+      previewCtx.fillRect(x,y,cs,cs);
+    }
+  }
+  renderPixels(previewCtx, a.frames[S.currentFrame], 1.0);
+}
+
+// --- Import/Export ---
+function newAnimation() {
+  if (!confirm('Create new animation? Unsaved changes will be lost.')) return;
+  S.animations = [{ name: 'untitled', fps: 8, loop: true, pingPong: false, frames: [{ pixels: [], duration: 0 }] }];
+  S.currentAnim = 0; S.currentFrame = 0;
+  S.undoStack = []; S.redoStack = [];
+  refreshAll();
+  autoSave();
+  toast('New animation created');
+}
+
+function importSpriteSheet() {
+  document.getElementById('fileInputSheet').click();
+}
+
+document.getElementById('fileInputSheet').onchange = function(e) {
+  let file = e.target.files[0];
+  if (!file) return;
+  let img = new Image();
+  img.onload = function() {
+    let cols = Math.floor(img.width / S.canvasW);
+    let rows = Math.floor(img.height / S.canvasH);
+    let a = getAnim();
+    a.frames = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let tc = document.createElement('canvas');
+        tc.width = S.canvasW; tc.height = S.canvasH;
+        let tctx = tc.getContext('2d');
+        tctx.drawImage(img, c*S.canvasW, r*S.canvasH, S.canvasW, S.canvasH, 0, 0, S.canvasW, S.canvasH);
+        let data = tctx.getImageData(0, 0, S.canvasW, S.canvasH).data;
+        let pixels = [];
+        for (let y = 0; y < S.canvasH; y++) {
+          for (let x = 0; x < S.canvasW; x++) {
+            let idx = (y * S.canvasW + x) * 4;
+            if (data[idx+3] > 128) {
+              pixels.push([x, y, data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+            }
+          }
+        }
+        a.frames.push({ pixels, duration: 0 });
+      }
+    }
+    S.currentFrame = 0;
+    refreshAll();
+    toast('Imported ' + a.frames.length + ' frames from sprite sheet');
+    autoSave();
+  };
+  img.src = URL.createObjectURL(file);
+  e.target.value = '';
+};
+
+function exportJSON() {
+  let data = {
+    name: getAnim().name,
+    fps: getAnim().fps,
+    loop: getAnim().loop,
+    pingPong: getAnim().pingPong,
+    frameWidth: S.canvasW,
+    frameHeight: S.canvasH,
+    frames: getAnim().frames.map(fr => ({
+      pixels: fr.pixels,
+      duration: fr.duration > 0 ? fr.duration : Math.round(1000 / getAnim().fps)
+    }))
+  };
+  let blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  let a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (getAnim().name || 'animation') + '.json';
+  a.click();
+  toast('JSON exported');
+}
+
+function exportGIF() {
+  // Simple animated PNG via canvas frames
+  let a = getAnim();
+  toast('GIF export: use "Export JSON" and convert with external tool (GIF requires encoding library)');
+}
+
+// --- Keyboard ---
+function setupKeyboard() {
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    if (e.key === 'p') setTool('pen');
+    else if (e.key === 'e') setTool('eraser');
+    else if (e.key === 'f') setTool('fill');
+    else if (e.key === 'l') setTool('line');
+    else if (e.key === 'r') setTool('rect');
+    else if (e.key === 'c' && !e.metaKey && !e.ctrlKey) setTool('circle');
+    else if (e.key === 'z' && (e.metaKey || e.ctrlKey) && e.shiftKey) { e.preventDefault(); redo(); }
+    else if (e.key === 'z' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); undo(); }
+    else if (e.key === 'ArrowRight') { S.currentFrame = Math.min(S.currentFrame+1, getAnim().frames.length-1); refreshAll(); }
+    else if (e.key === 'ArrowLeft') { S.currentFrame = Math.max(S.currentFrame-1, 0); refreshAll(); }
+    else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+    else if (e.key === 'Delete') { delFrame(); }
+    else if (e.key === 'g') toggleGrid();
+    else if (e.key === 'o') toggleOnion();
+  });
+}
+
+// --- Storage ---
+function autoSave() {
+  try {
+    let data = {
+      animations: S.animations,
+      currentAnim: S.currentAnim,
+      canvasW: S.canvasW, canvasH: S.canvasH,
+      fps: S.fps, loop: S.loop, pingPong: S.pingPong
+    };
+    localStorage.setItem('neotrix_anim_editor', JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    let raw = localStorage.getItem('neotrix_anim_editor');
+    if (!raw) return false;
+    let data = JSON.parse(raw);
+    if (!data.animations || !data.animations.length) return false;
+    S.animations = data.animations;
+    S.currentAnim = data.currentAnim || 0;
+    S.canvasW = data.canvasW || 32;
+    S.canvasH = data.canvasH || 32;
+    S.fps = data.fps || 8;
+    S.loop = data.loop !== undefined ? data.loop : true;
+    S.pingPong = data.pingPong || false;
+    mainCanvas.width = S.canvasW;
+    mainCanvas.height = S.canvasH;
+    document.getElementById('selCanvasSize').value = S.canvasW;
+    document.getElementById('fpsSlider').value = S.fps;
+    document.getElementById('fpsVal').textContent = S.fps;
+    document.getElementById('propFPS').value = S.fps;
+    document.getElementById('propLoop').checked = S.loop;
+    document.getElementById('propPingPong').checked = S.pingPong;
+    document.getElementById('propName').value = getAnim().name;
+    document.getElementById('btnLoop').classList.toggle('active', S.loop);
+    document.getElementById('btnPingPong').classList.toggle('active', S.pingPong);
+    return true;
+  } catch(e) { return false; }
+}
+
+// --- Load Default ---
+function loadDefault() {
+  let idx = document.getElementById('selDefault').value;
+  if (idx === '') return;
+  let def = DEFAULT_ANIMATIONS[+idx];
+  let dup = {
+    name: def.name, fps: def.fps, loop: def.loop, pingPong: false,
+    frames: def.frames.map(f => ({ pixels: f.pixels.map(p=>[...p]), duration: f.duration }))
+  };
+  S.animations.splice(S.currentAnim + 1, 0, dup);
+  S.currentAnim++;
+  S.currentFrame = 0;
+  refreshAll();
+  autoSave();
+  toast('Loaded: ' + def.name);
+}
+
+// --- Refresh ---
+function refreshAll() {
+  let a = getAnim();
+  S.fps = a.fps;
+  S.loop = a.loop;
+  S.pingPong = a.pingPong;
+  document.getElementById('fpsSlider').value = a.fps;
+  document.getElementById('fpsVal').textContent = a.fps;
+  document.getElementById('propFPS').value = a.fps;
+  document.getElementById('propLoop').checked = a.loop;
+  document.getElementById('propPingPong').checked = a.pingPong;
+  document.getElementById('propName').value = a.name;
+  document.getElementById('btnLoop').classList.toggle('active', a.loop);
+  document.getElementById('btnPingPong').classList.toggle('active', a.pingPong);
+  document.getElementById('statSize').textContent = S.canvasW + 'x' + S.canvasH;
+  updateAnimSelect();
+  renderMain();
+  updateTimeline();
+  togglePreviewBg();
+}
+
+function updateStatSize() {
+  document.getElementById('statSize').textContent = S.canvasW + 'x' + S.canvasH;
+}
+
+// --- Toast ---
+function toast(msg) {
+  let el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// --- Start ---
+init();
+setZoom('fit');
+</script>
+</body>
+</html>

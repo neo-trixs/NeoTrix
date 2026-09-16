@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
+use std::sync::RwLock;
 
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::l5_cognition::kb_facade::{ProceduralMemoryRecord, skill_upsert, SkillRecord, KnowledgeBase};
@@ -366,7 +366,7 @@ impl SkillQualityScorer {
 
 /// EVOMAL 毒化扫描: `Ok(true)`=干净可入库; `Ok(false)`=命中毒化模式;
 /// `Err`=扫描无法完成 (保守地视为不可入库, 由调用方阻断 promote)。
-pub fn _evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
+pub fn evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
     let body = skill.body().to_lowercase();
 
     // 1) pipe-to-shell: 把下载/外部内容直接喂给 shell 执行 (经典投毒)。
@@ -1559,7 +1559,7 @@ impl SkillEngine {
                             let trust_rejected = !matches!(trust_verdict, crate::l3_embodiment::nt_shield::shield_core::tool_inspection_stack::InspectionResult::Allow);
                             // E6 防护层硬化 (src9 EVOMAL 毒化扫描): 折入 R-P108
                             // 五维门 — 命中毒化模式即拒收, 阻断 promote。Err 保守视为拒收。
-                            let poison_ok = _evomal_poison_scan(&skill).unwrap_or(false);
+                            let poison_ok = evomal_poison_scan(&skill).unwrap_or(false);
                             // A5 安全门 (SkillNet absorb, R-P79): 含危险命令
                             // (rm -rf 等) 的技能拒收, 不进入生产检索索引。
                             if scores.safety >= 0.8 && !trust_rejected && poison_ok {
@@ -1591,7 +1591,7 @@ impl SkillEngine {
                         let trust_rejected = !matches!(trust_verdict, crate::l3_embodiment::nt_shield::shield_core::tool_inspection_stack::InspectionResult::Allow);
                         // E6 防护层硬化 (src9 EVOMAL 毒化扫描): 折入 R-P108
                         // 五维门 — 命中毒化模式即拒收, 阻断 promote。Err 保守视为拒收。
-                        let poison_ok = _evomal_poison_scan(&skill).unwrap_or(false);
+                        let poison_ok = evomal_poison_scan(&skill).unwrap_or(false);
                         if scores.safety >= 0.8 && !trust_rejected && poison_ok {
                             self.quality_stats.insert(skill.name.clone(), scores);
                             loaded.push(skill);

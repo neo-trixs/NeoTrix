@@ -532,7 +532,7 @@ mod tests {
     }
 
     #[test]
-    fn test_backoff_respects_retry_after() {
+    fn test_backoff_respects_retry_after() -> Result<(), String> {
         let s = ExponentialBackoffStrategy::new(1000, 60000, 0.1);
         let ctx = make_ctx(
             ErrorType::RateLimit {
@@ -544,8 +544,9 @@ mod tests {
         if let Some(RecoveryAction::Retry { delay_ms, .. }) = s.recover(&ctx) {
             assert_eq!(delay_ms, 5000);
         } else {
-            panic!("expected retry with retry_after");
+            return Err("expected retry with retry_after".to_string());
         }
+        Ok(())
     }
 
     #[test]

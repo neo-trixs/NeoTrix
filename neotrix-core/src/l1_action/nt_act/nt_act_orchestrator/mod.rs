@@ -6,6 +6,7 @@ pub mod state_graph;
 pub mod task_state_dag;
 pub mod pm_workflow;
 pub mod harness_scaffold;
+pub mod mcp_adapter;
 #[cfg(test)]
 pub mod group_integration_test;
 

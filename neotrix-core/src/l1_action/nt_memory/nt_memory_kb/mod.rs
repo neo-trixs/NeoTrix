@@ -3,7 +3,6 @@
 use log::{warn, error};
 
 pub mod bm25;
-// pub mod ntx; // DEAD: cleanup
 pub mod spill_storage;
 pub mod nt_memory_blocks;
 pub mod nt_discovery_github_topics;
@@ -15,7 +14,6 @@ pub mod nt_memory_gwt_router;
 pub mod nt_memory_e8_agent;
 pub mod nt_memory_vsa_expand;
 pub mod nt_memory_decompose;
-// pub mod nt_memory_domain_adapter; // DEAD wave2: zero external refs, zero KB method usage
 pub mod nt_memory_agent_driven;
 pub mod nt_memory_agent_session;
 pub mod nt_memory_api;
@@ -29,8 +27,6 @@ pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_cortex_sync;
 pub mod nt_memory_embed;
-// pub mod kb_cognition; // DEAD: cleanup
-// pub mod kb_vector_index; // DEAD: cleanup
 pub mod nt_memory_distill;
 pub mod nt_memory_graph;
 pub mod nt_memory_pipeline;
@@ -42,24 +38,19 @@ pub mod nt_memory_diversity;
 pub mod nt_memory_curation;
 pub mod nt_memory_visibility;
 pub mod nt_memory_provenance;
-// pub mod nt_temporal_audit; // DEAD: zero external references
 pub mod nt_memory_skill_cost;
 pub mod nt_memory_dual_brain;
-// pub mod nt_memory_ingest; // DEAD: zero external references
 pub mod nt_memory_proficiency;
-// pub mod nt_memory_primitives; // DEAD: zero external references
 pub mod nt_memory_integration;
 pub mod nt_memory_schema;
 pub mod nt_memory_search;
 pub mod nt_memory_seed;
-// pub mod nt_memory_setting_consistency; // DEAD: zero external references
 pub mod nt_memory_store;
 pub mod shared_utils;
 pub mod nt_memory_svaf_gate;
 pub mod nt_memory_types;
 pub mod nt_memory_unify;
 pub mod nt_field_ledger;
-// pub mod nt_memory_panorama; // DEAD: zero external references
 pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
 pub mod nt_memory_knowledge_assets;
@@ -76,10 +67,17 @@ pub mod knowledge_storage;
 pub mod nt_absorb_mapper;
 pub mod nt_memory_write_guard;
 pub mod nt_memory_snapshot;
-// pub mod nt_memory_zim_absorber; // DEAD wave2: zero external refs, zero KB method usage
 pub mod nt_memory_brain;
 pub mod nt_memory_lifecycle;
 pub mod nt_memory_shanhai;
+pub mod vector_index;
+pub mod bloom_filter;
+pub mod memory_palace;
+pub mod skill_glows;
+pub mod file_centric_state;
+pub mod memory_orchestrator;
+pub mod retrieval_fusion;
+pub mod cognitive_graph;
 
 pub use nt_discovery_github_topics::{DiscoveryPipelineConfig, GithubDiscoveryStats};
 pub use nt_discovery_orchestrator::{DiscoveryCycleConfig, DiscoveryCycleReport};
@@ -128,7 +126,9 @@ pub use nt_memory_search::{
 };
 
 use rusqlite::Connection;
+use fs2::FileExt;
 use std::collections::{HashMap, HashSet};
+use std::fs::{File, OpenOptions};
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -145,6 +145,7 @@ use crate::l1_action::nt_memory::nt_memory_historian::{TemporalFact, TemporalFac
 pub struct KnowledgeBase {
     pub(crate) conn: Mutex<Connection>,
     pub db_path: PathBuf,
+    db_file: Option<File>,
     pub bm25: RwLock<Option<Bm25Index>>,
     pub bm25_dirty: RwLock<bool>,
     pub embedding_config: RwLock<Option<EmbeddingConfig>>,
@@ -195,7 +196,7 @@ impl std::fmt::Debug for KnowledgeBase {
 
 impl KnowledgeBase {
     /// Shared field initialization for `open()` and `_from_conn()`.
-    fn init_fields(conn: Connection, db_path: PathBuf, bm25_dirty: bool) -> Self {
+    fn init_fields(conn: Connection, db_path: PathBuf, db_file: Option<File>, bm25_dirty: bool) -> Self {
         let commitment_store = EmbeddingCommitmentStore::new(10000, None);
         let confidence_store = ConfidenceStore::new(DecayConfig::default());
         let community_search = CommunityAwareSearch::new(CommunityDetector::default());
@@ -211,6 +212,7 @@ impl KnowledgeBase {
         Self {
             conn: Mutex::new(conn),
             db_path,
+            db_file,
             bm25: RwLock::new(None),
             bm25_dirty: RwLock::new(bm25_dirty),
             embedding_config: RwLock::new(None),
@@ -247,7 +249,15 @@ impl KnowledgeBase {
         });
         let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open KB: {}", e))?;
         nt_memory_schema::initialize(&conn).map_err(|e| format!("Failed to initialize KB: {}", e))?;
-        let kb = Self::init_fields(conn, db_path.clone(), true);
+        let db_file = OpenOptions::new().read(true).write(true).open(&db_path).ok();
+        if let Some(ref f) = db_file {
+            if let Err(e) = f.lock_exclusive() {
+                log::warn!("[KB] file lock failed: {}", e);
+            } else {
+                log::info!("[KB] acquired exclusive file lock on knowledge.db");
+            }
+        }
+        let kb = Self::init_fields(conn, db_path.clone(), db_file, true);
         let db_path_str = db_path.display().to_string();
         log::info!("[KB] opened at {db_path_str} — graph_cache lazy (rebuilt by background loop on demand); BM25/tech-reserve lazy");
 
@@ -270,7 +280,7 @@ impl KnowledgeBase {
 
     /// Build minimal KB from an existing Connection (for fallback paths).
     fn _from_conn(conn: Connection, db_path: PathBuf) -> Self {
-        Self::init_fields(conn, db_path, false)
+        Self::init_fields(conn, db_path, None, false)
     }
 
     pub fn rebuild_skills_library(&self) -> Result<usize, String> {
@@ -581,6 +591,33 @@ impl KnowledgeBase {
         // Connection is dropped; nothing else to do
         Ok(())
     }
+}
+
+impl Drop for KnowledgeBase {
+    fn drop(&mut self) {
+        if let Some(ref f) = self.db_file {
+            let _ = f.unlock();
+            log::info!("[KB] released file lock on knowledge.db");
+        }
+    }
+}
+
+impl KnowledgeBase {
+    /// Acquire an exclusive file lock before a write operation.
+    fn lock_before_write(&self) -> std::io::Result<()> {
+        if let Some(ref f) = self.db_file {
+            f.lock_exclusive()?;
+        }
+        Ok(())
+    }
+
+    /// Release the file lock after a write operation.
+    fn unlock_after_write(&self) -> std::io::Result<()> {
+        if let Some(ref f) = self.db_file {
+            f.unlock()?;
+        }
+        Ok(())
+    }
 
     // ── Embedding Commitment ──
 
@@ -712,6 +749,7 @@ impl KnowledgeBase {
     // ── Store: basic CRUD ──
 
     pub fn insert_node(&self, node: &KnowledgeNode) -> Result<(), String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let r = nt_memory_store::insert_node(&conn, node).map_err(|e| format!("insert_node: {}", e));
         if r.is_ok() {
@@ -721,12 +759,12 @@ impl KnowledgeBase {
         drop(conn);
         if r.is_ok() {
             self.record_node_fact(node);
-            // A1 时效账本 (recall absorb, R-P79): 写入即刷新时刻, 避免新数据被误判陈旧。
             if let Ok(mut lc) = self.lifecycle.write() {
                 let now = lc.tick();
                 lc.note_updated(&node.id, now);
             }
         }
+        let _ = self.unlock_after_write();
         r
     }
 
@@ -781,27 +819,33 @@ impl KnowledgeBase {
     }
 
     pub fn insert_edge(&self, edge: &KnowledgeEdge) -> Result<(), String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_store::insert_edge(&conn, edge).map_err(|e| format!("insert_edge: {}", e))
+        let r = nt_memory_store::insert_edge(&conn, edge).map_err(|e| format!("insert_edge: {}", e));
+        let _ = self.unlock_after_write();
+        r
     }
 
     pub fn delete_node(&self, id: &str) -> Result<bool, String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let r = nt_memory_store::delete_node(&conn, id).map_err(|e| format!("delete_node: {}", e));
         if r.as_ref().ok().copied().unwrap_or(false) {
             self.mark_bm25_dirty();
-            // A1 时效账本 (recall absorb, R-P79): 删除即标记应遗忘, 使仍残留在
-            // 内存索引/缓存里的该 id 不再被检索返回。
             if let Ok(mut lc) = self.lifecycle.write() {
                 lc.mark_should_forget(id);
             }
         }
+        let _ = self.unlock_after_write();
         r
     }
 
     pub fn delete_edge(&self, id: &str) -> Result<bool, String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_store::delete_edge(&conn, id).map_err(|e| format!("delete_edge: {}", e))
+        let r = nt_memory_store::delete_edge(&conn, id).map_err(|e| format!("delete_edge: {}", e));
+        let _ = self.unlock_after_write();
+        r
     }
 
     pub fn insert_or_get_node(
@@ -812,9 +856,12 @@ impl KnowledgeBase {
         url: Option<&str>,
         domain: Option<&str>,
     ) -> Result<String, String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_store::insert_or_get_node(&conn, title, node_type, summary, url, domain)
-            .map_err(|e| format!("insert_or_get_node: {}", e))
+        let r = nt_memory_store::insert_or_get_node(&conn, title, node_type, summary, url, domain)
+            .map_err(|e| format!("insert_or_get_node: {}", e));
+        let _ = self.unlock_after_write();
+        r
     }
 
     pub fn upsert_edge(
@@ -825,9 +872,12 @@ impl KnowledgeBase {
         weight: f64,
         description: Option<&str>,
     ) -> Result<(), String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_store::upsert_edge(&conn, source_id, target_id, relation_type, weight, description)
-            .map_err(|e| format!("upsert_edge: {}", e))
+        let r = nt_memory_store::upsert_edge(&conn, source_id, target_id, relation_type, weight, description)
+            .map_err(|e| format!("upsert_edge: {}", e));
+        let _ = self.unlock_after_write();
+        r
     }
 
     /// 边是否已存在 (同 source/target/relation)。供幂等写入计数。
@@ -871,21 +921,23 @@ impl KnowledgeBase {
     }
 
     pub fn update_node(&self, node: &KnowledgeNode) -> Result<(), String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let r = nt_memory_store::update_node(&conn, node)
             .map_err(|e| format!("update_node: {}", e));
         if r.is_ok() {
             self.mark_bm25_dirty();
-            // A1 时效账本 (recall absorb, R-P79): 更新即刷新时刻 + 撤销遗忘标记。
             if let Ok(mut lc) = self.lifecycle.write() {
                 let now = lc.tick();
                 lc.note_updated(&node.id, now);
             }
         }
+        let _ = self.unlock_after_write();
         r
     }
 
     pub fn update_node_content(&self, id: &str, content: &str) -> Result<(), String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let mut node = nt_memory_store::get_node(&conn, id)
             .map_err(|e| format!("get_node: {}", e))?
@@ -900,13 +952,17 @@ impl KnowledgeBase {
         if r.is_ok() {
             self.mark_bm25_dirty();
         }
+        let _ = self.unlock_after_write();
         r
     }
 
     pub fn update_node_metadata(&self, id: &str, metadata: &serde_json::Value) -> Result<(), String> {
+        self.lock_before_write().map_err(|e| format!("File lock: {}", e))?;
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        nt_memory_store::update_node_metadata(&conn, id, metadata)
-            .map_err(|e| format!("update_node_metadata: {}", e))
+        let r = nt_memory_store::update_node_metadata(&conn, id, metadata)
+            .map_err(|e| format!("update_node_metadata: {}", e));
+        let _ = self.unlock_after_write();
+        r
     }
 
     /// 子方法: 主库写入 — 插入或复用节点 + 时序事实记账。

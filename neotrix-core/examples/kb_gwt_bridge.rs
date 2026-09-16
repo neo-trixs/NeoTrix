@@ -7,7 +7,7 @@ use neotrix::core::nt_core_gwt::cognitive_hub::CognitiveHub;
 use neotrix::core::nt_core_gwt::cognitive_type::CognitiveType;
 use std::collections::HashMap;
 use neotrix::core::nt_core_traits::SpecialistType;
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+use neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let t0 = std::time::Instant::now();

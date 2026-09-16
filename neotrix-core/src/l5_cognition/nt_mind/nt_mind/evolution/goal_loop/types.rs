@@ -1,6 +1,6 @@
+use crate::core::CrtTimeScale;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use crate::core::CrtTimeScale;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GoalScheduleStrategy {
@@ -178,7 +178,10 @@ pub enum GoalState {
 
 impl GoalState {
     pub fn is_terminal(&self) -> bool {
-        matches!(self, GoalState::Achieved | GoalState::Unmet | GoalState::BudgetLimited)
+        matches!(
+            self,
+            GoalState::Achieved | GoalState::Unmet | GoalState::BudgetLimited
+        )
     }
 
     pub fn label(&self) -> &str {
@@ -328,5 +331,3 @@ pub struct PlanTemplate {
     pub expected_duration_cycles: usize,
     pub completion_criteria: Option<String>,
 }
-
-

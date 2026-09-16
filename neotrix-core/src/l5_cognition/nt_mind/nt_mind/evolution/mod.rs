@@ -4,21 +4,30 @@
 // replacing the earlier empty re-export shell.
 //
 
-pub mod causal_inventor;
 pub mod agent_capability;
+pub mod casebase;
+pub mod causal_inventor;
 pub mod co_evolution;
 pub mod creation_engine;
 pub mod dao_engine;
+pub mod deferred_loader;
+pub mod deliberation;
 pub mod dispatch_self_test;
 pub mod distillation;
+pub mod ethical_intuition;
 pub mod experiment;
 pub mod federation;
 pub mod goal_loop;
+pub mod meta_skill_evolve;
+pub mod multi_branch;
+pub mod process_skill_memory;
+pub mod q_evolution;
+pub mod recuris_memory;
+pub mod rise_reflector;
+pub mod scaffold_self_modify;
 pub mod self_evolver;
+pub mod skill_glow_process;
 pub mod value_compass;
-pub mod deliberation;
-pub mod ethical_intuition;
-pub mod casebase;
 pub mod value_gate;
 pub mod value_learning;
 

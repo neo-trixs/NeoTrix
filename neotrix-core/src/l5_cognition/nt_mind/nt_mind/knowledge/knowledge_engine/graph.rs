@@ -259,7 +259,7 @@ impl KnowledgeEngine {
         r
     }
 
-    pub(crate) fn _export_graph(&self) -> serde_json::Value {
+    pub fn export_graph(&self) -> serde_json::Value {
         let nodes: Vec<serde_json::Value> = self.entries.values().map(|e| {
             serde_json::json!({
                 "id": e.id, "title": e.title, "source": e.source.name(),

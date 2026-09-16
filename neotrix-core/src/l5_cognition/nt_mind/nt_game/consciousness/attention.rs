@@ -169,10 +169,7 @@ pub struct AttentionReport {
 }
 
 /// Generate attention report from trajectory and game meta.
-pub fn generate_attention_report(
-    trajectory: &Trajectory,
-    meta: &GameMeta,
-) -> AttentionReport {
+pub fn generate_attention_report(trajectory: &Trajectory, meta: &GameMeta) -> AttentionReport {
     let domain_scores = compute_domain_scores(trajectory, meta);
     let intensity = compute_intensity(&meta.difficulty).to_string();
 

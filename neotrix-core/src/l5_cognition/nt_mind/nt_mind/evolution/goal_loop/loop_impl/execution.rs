@@ -1,24 +1,28 @@
-use super::super::types::{PlanTemplate, PlanLevel};
 use super::super::super::self_iterating::SelfIteratingBrain;
 use super::super::super::stats::IterationResult;
+use super::super::types::{PlanLevel, PlanTemplate};
 // use crate::l5_cognition::nt_mind::KnowledgeSource;
-use crate::neotrix::nt_world_model::TaskType;
 use super::core::GoalLoop;
+use crate::neotrix::nt_world_model::TaskType;
 
 impl GoalLoop {
     pub(crate) fn _is_complex_goal(&self, description: &str) -> bool {
-        let keywords = ["design", "analyze", "compare", "research", "multiple", "both",
-                        "架构", "设计", "分析", "对比", "研究", "多个"];
+        let keywords = [
+            "design", "analyze", "compare", "research", "multiple", "both", "架构", "设计", "分析",
+            "对比", "研究", "多个",
+        ];
         let lower = description.to_lowercase();
         keywords.iter().any(|k| lower.contains(k))
     }
 
     fn _decompose_goal(&self, description: &str) -> Vec<String> {
-
         let lower = description.to_lowercase();
-        let has_compare = lower.contains(" vs ") || lower.contains(" versus ")
-            || lower.starts_with("compare ") || lower.starts_with("对比")
-            || lower.contains("x vs ") || lower.contains(" 与 ");
+        let has_compare = lower.contains(" vs ")
+            || lower.contains(" versus ")
+            || lower.starts_with("compare ")
+            || lower.starts_with("对比")
+            || lower.contains("x vs ")
+            || lower.contains(" 与 ");
 
         if has_compare {
             let separators = [" and ", " then ", " also "];
@@ -33,7 +37,9 @@ impl GoalLoop {
                             sub_goals.push(trimmed.to_string());
                         }
                     }
-                    if !sub_goals.is_empty() { return sub_goals; }
+                    if !sub_goals.is_empty() {
+                        return sub_goals;
+                    }
                 }
             }
             return vec![description.to_string()];
@@ -43,11 +49,14 @@ impl GoalLoop {
         for sep in &separators {
             if description.contains(sep) {
                 let parts: Vec<&str> = description.split(sep).collect();
-                let sub_goals: Vec<String> = parts.iter()
+                let sub_goals: Vec<String> = parts
+                    .iter()
                     .map(|p| p.trim().to_string())
                     .filter(|p| !p.is_empty() && p.len() > 5)
                     .collect();
-                if !sub_goals.is_empty() { return sub_goals; }
+                if !sub_goals.is_empty() {
+                    return sub_goals;
+                }
             }
         }
 
@@ -91,7 +100,10 @@ impl GoalLoop {
                     };
                 }
                 Err(e) => {
-                    println!("[goal-loop] orchestrator failed ({}), falling back to agent team", e);
+                    println!(
+                        "[goal-loop] orchestrator failed ({}), falling back to agent team",
+                        e
+                    );
                 }
             }
         }
@@ -104,11 +116,21 @@ impl GoalLoop {
                     let results = t.execute(task);
                     let successes = results.iter().filter(|r| r.success).count();
                     let total = results.len();
-                    println!("[goal-loop] agent team '{}': {}/{} successful", t.name, successes, total);
-                    let delta = if successes > 0 { 0.02 * successes as f64 } else { 0.0 };
+                    println!(
+                        "[goal-loop] agent team '{}': {}/{} successful",
+                        t.name, successes, total
+                    );
+                    let delta = if successes > 0 {
+                        0.02 * successes as f64
+                    } else {
+                        0.0
+                    };
                     if delta > 0.0 {
                         let current = brain.brain.capability.quality_gates();
-                        brain.brain.capability.set_quality_gates((current + delta).min(1.0));
+                        brain
+                            .brain
+                            .capability
+                            .set_quality_gates((current + delta).min(1.0));
                         brain.brain.total_absorb_count += 1;
                     }
                 }
@@ -129,7 +151,11 @@ impl GoalLoop {
         }
     }
 
-    pub(crate) fn _execute_complex_iteration(&mut self, brain: &mut SelfIteratingBrain, task: &str) -> IterationResult {
+    pub(crate) fn _execute_complex_iteration(
+        &mut self,
+        brain: &mut SelfIteratingBrain,
+        task: &str,
+    ) -> IterationResult {
         let sub_goals = self._decompose_goal(task);
         if sub_goals.len() > 1 {
             let n = sub_goals.len();
@@ -166,7 +192,10 @@ impl GoalLoop {
             PlanTemplate {
                 level: PlanLevel::Meso,
                 name: "assess".into(),
-                description: format!("assess current capability ({:.2}) and memory ({})", cap_sum, mem_count),
+                description: format!(
+                    "assess current capability ({:.2}) and memory ({})",
+                    cap_sum, mem_count
+                ),
                 sub_plans: vec![
                     PlanTemplate {
                         level: PlanLevel::Micro,
@@ -183,7 +212,10 @@ impl GoalLoop {
                         name: "memory review".into(),
                         description: "review recent reasoning memories for patterns".into(),
                         sub_plans: vec![],
-                        skip_condition: Some(format!("memory < {}", (mem_count as f64 * 0.5).max(5.0) as usize)),
+                        skip_condition: Some(format!(
+                            "memory < {}",
+                            (mem_count as f64 * 0.5).max(5.0) as usize
+                        )),
                         reflection_trigger: None,
                         expected_duration_cycles: 2,
                         completion_criteria: Some("patterns extracted".into()),
@@ -246,7 +278,12 @@ impl GoalLoop {
         }
         let current = self.active_plan.take()?;
         self.plan_stack.push(current);
-        self.active_plan = Some(sub_plans.into_iter().next().expect("sub_plans non-empty checked above"));
+        self.active_plan = Some(
+            sub_plans
+                .into_iter()
+                .next()
+                .expect("sub_plans non-empty checked above"),
+        );
         self.active_plan.as_ref()
     }
 
@@ -261,7 +298,10 @@ impl GoalLoop {
         };
 
         if cond.starts_with("capability > ") {
-            let threshold: f64 = cond.trim_start_matches("capability > ").parse().unwrap_or(f64::MAX);
+            let threshold: f64 = cond
+                .trim_start_matches("capability > ")
+                .parse()
+                .unwrap_or(f64::MAX);
             let cap_sum: f64 = brain.brain.capability.arr().iter().sum();
             return cap_sum > threshold;
         }
@@ -271,7 +311,10 @@ impl GoalLoop {
             return mem_count < threshold;
         }
         if cond.starts_with("iteration > ") {
-            let threshold: u64 = cond.trim_start_matches("iteration > ").parse().unwrap_or(u64::MAX);
+            let threshold: u64 = cond
+                .trim_start_matches("iteration > ")
+                .parse()
+                .unwrap_or(u64::MAX);
             return brain.iteration > threshold;
         }
         false
@@ -306,18 +349,46 @@ impl GoalLoop {
         };
 
         let mut lines = Vec::new();
-        lines.push(format!("📋 {}: {} ({})", plan.level.label(), plan.name, plan.description));
+        lines.push(format!(
+            "📋 {}: {} ({})",
+            plan.level.label(),
+            plan.name,
+            plan.description
+        ));
         for meso in &plan.sub_plans {
             let skip = meso.skip_condition.as_ref().map(|_| " ⏭").unwrap_or("");
-            let refl = meso.reflection_trigger.as_ref().map(|_| " 🔍").unwrap_or("");
-            lines.push(format!("  ├─ {} {}{}{}", meso.level.label(), meso.name, skip, refl));
+            let refl = meso
+                .reflection_trigger
+                .as_ref()
+                .map(|_| " 🔍")
+                .unwrap_or("");
+            lines.push(format!(
+                "  ├─ {} {}{}{}",
+                meso.level.label(),
+                meso.name,
+                skip,
+                refl
+            ));
             for micro in &meso.sub_plans {
                 let mskip = micro.skip_condition.as_ref().map(|_| " ⏭").unwrap_or("");
-                let mrefl = micro.reflection_trigger.as_ref().map(|_| " 🔍").unwrap_or("");
-                lines.push(format!("  │  └─ {} {}{}{}", micro.level.label(), micro.name, mskip, mrefl));
+                let mrefl = micro
+                    .reflection_trigger
+                    .as_ref()
+                    .map(|_| " 🔍")
+                    .unwrap_or("");
+                lines.push(format!(
+                    "  │  └─ {} {}{}{}",
+                    micro.level.label(),
+                    micro.name,
+                    mskip,
+                    mrefl
+                ));
             }
         }
-        lines.push(format!("  └─ {} cycles est.", plan.expected_duration_cycles));
+        lines.push(format!(
+            "  └─ {} cycles est.",
+            plan.expected_duration_cycles
+        ));
         lines.join("\n")
     }
 
@@ -335,7 +406,11 @@ impl GoalLoop {
                 if !plan.sub_plans.is_empty() {
                     let sub = plan.sub_plans.clone();
                     self.plan_stack.pop();
-                    self.active_plan = Some(sub.into_iter().next().expect("sub_plans non-empty checked above"));
+                    self.active_plan = Some(
+                        sub.into_iter()
+                            .next()
+                            .expect("sub_plans non-empty checked above"),
+                    );
                     if let Some(ref p) = self.active_plan {
                         println!("[bg-plan] ⏭ skipping to next sub-plan '{}'", p.name);
                     }
@@ -344,5 +419,3 @@ impl GoalLoop {
         }
     }
 }
-
-

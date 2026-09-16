@@ -1,0 +1,35 @@
+[
+  {
+    "schema_version": 1,
+    "type": "pattern",
+    "session_id": "sess_game_engine_fix_20260915",
+    "cycle": "772",
+    "ts": 1694793600,
+    "domain": "NT-MIND",
+    "content": "Cargo check vs cargo test error count divergence: cargo check --lib passes 0 errors but cargo test --lib reveals 15 additional errors in test-only code (cfg(test) blocks, test modules). Pattern: always run BOTH check and test to get true error count. Test-mode errors are typically: missing imports in test modules, type resolution differences, closure borrow issues.",
+    "evidence": "neotrix-core/src/l5_cognition/nt_mind/nt_game/tests/mod.rs",
+    "source": "dialogue"
+  },
+  {
+    "schema_version": 1,
+    "type": "defect",
+    "session_id": "sess_game_engine_fix_20260915",
+    "cycle": "772",
+    "ts": 1694793600,
+    "domain": "NT-MIND",
+    "content": "CompetitorData unused import in quote_negotiation.rs: imported at top-level but only used inside #[cfg(test)] module. Fix: remove from top-level import, add to test module's use statements. Lesson: when a type is only used in tests, import it in the test module, not at file level.",
+    "evidence": "neotrix-core/src/l1_action/nt_act/nt_act_trade/quote_negotiation.rs:14",
+    "source": "dialogue"
+  },
+  {
+    "schema_version": 1,
+    "type": "insight",
+    "session_id": "sess_game_engine_fix_20260915",
+    "cycle": "772",
+    "ts": 1694793600,
+    "domain": "NT-MIND",
+    "content": "Game engine module count: 19 modules, 33+ files, 132 tests. Compilation: 926→0 errors on cargo check --lib. This represents a complete game engine skeleton with ECS, tilemap, events, persistence, time/season/weather, NPC, AI, combat, inventory, quests, loot, RPG, cultivation, worldgen, equipment, audio, input, particles, minimap, notifications. All absorbed from Godot/EnTT/RogueElements/StardewValley patterns.",
+    "evidence": "neotrix-core/src/l5_cognition/nt_mind/nt_game/",
+    "source": "dialogue"
+  }
+]

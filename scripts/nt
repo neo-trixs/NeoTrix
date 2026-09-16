@@ -1,0 +1,156 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────
+#  nt — NeoTrix CLI launcher
+#
+#  Usage:
+#    nt                  → launch opencode in NeoTrix project
+#    nt "do something"   → single-shot task via opencode
+#    nt --status         → show consciousness status
+#    nt --evolve [N]     → run N growth cycles
+#    nt --review         → run full review
+#    nt --mcp            → start MCP server only
+#    nt --help           → show this help
+# ─────────────────────────────────────────────────────────────
+set -e
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+OPENCODE="${OPENCODE:-opencode}"
+STABLE="$HOME/.local/share/neotrix/neotrix-mcp"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+banner() {
+    printf "${CYAN}╔══════════════════════════════════════╗${NC}\n"
+    printf "${CYAN}║${NC}  ${BOLD}NeoTrix${NC} — AI-Native Dev Toolkit   ${CYAN}║${NC}\n"
+    printf "${CYAN}╚══════════════════════════════════════╝${NC}\n"
+}
+
+# ── Ensure MCP binary exists ──────────────────────────────
+ensure_mcp() {
+    if [ -x "$STABLE" ]; then
+        return 0
+    fi
+    if [ -x "$ROOT/target/debug/neotrix" ]; then
+        mkdir -p "$(dirname -- "$STABLE")"
+        cp "$ROOT/target/debug/neotrix" "$STABLE"
+        return 0
+    fi
+    printf "${CYAN}[nt]${NC} Building neotrix MCP server...\n"
+    cargo build -q -p neotrix --bin neotrix --manifest-path "$ROOT/Cargo.toml" || {
+        printf "${RED}[nt]${NC} Build failed. Run: cargo build -p neotrix\n"
+        exit 1
+    }
+    mkdir -p "$(dirname -- "$STABLE")"
+    cp "$ROOT/target/debug/neotrix" "$STABLE"
+}
+
+# ── Consciousness status ──────────────────────────────────
+cmd_status() {
+    ensure_mcp
+    "$STABLE" consciousness-status 2>/dev/null || {
+        printf "${RED}[nt]${NC} Could not read consciousness status.\n"
+        printf "  Make sure neotrix is built: cargo build -p neotrix\n"
+        exit 1
+    }
+}
+
+# ── Growth cycles ─────────────────────────────────────────
+cmd_evolve() {
+    ensure_mcp
+    cycles="${1:-1}"
+    printf "${CYAN}[nt]${NC} Running ${BOLD}${cycles}${NC} growth cycle(s)...\n"
+    "$STABLE" consciousness-tick --cycles "$cycles" 2>/dev/null || {
+        printf "${RED}[nt]${NC} Growth cycle failed.\n"
+        exit 1
+    }
+}
+
+# ── Full review ───────────────────────────────────────────
+cmd_review() {
+    ensure_mcp
+    printf "${CYAN}[nt]${NC} Launching review agent...\n"
+    cd "$ROOT"
+    exec "$OPENCODE" --agent nt-review
+}
+
+# ── MCP server mode ───────────────────────────────────────
+cmd_mcp() {
+    ensure_mcp
+    exec "$STABLE" mcp-server
+}
+
+# ── Launch opencode in NeoTrix project ────────────────────
+cmd_launch() {
+    ensure_mcp
+    cd "$ROOT"
+
+    # Print status briefly
+    if [ -z "$*" ]; then
+        banner
+        printf "  Project  : %s\n" "$ROOT"
+        printf "  Model    : %s\n" "$(cat opencode.json 2>/dev/null | grep -A1 '"model"' | tail -1 | tr -d ' ",' || echo 'local/llamacpp')"
+        printf "  MCP      : nt-core (consciousness_status, consciousness_tick)\n"
+        printf "\n"
+        printf "  ${BOLD}Commands:${NC}\n"
+        printf "    /help        — show available skills\n"
+        printf "    /skill       — load a specific skill\n"
+        printf "    /quit        — exit\n"
+        printf "\n"
+    fi
+
+    if [ $# -eq 0 ]; then
+        exec "$OPENCODE"
+    else
+        # Single-shot: pass the task to opencode
+        exec "$OPENCODE" --quiet "$@"
+    fi
+}
+
+# ── Help ──────────────────────────────────────────────────
+cmd_help() {
+    banner
+    printf "${BOLD}Usage:${NC}\n"
+    printf "  nt                  Launch opencode interactive shell\n"
+    printf "  nt \"task\"           Single-shot task\n"
+    printf "  nt --status         Show consciousness health\n"
+    printf "  nt --evolve [N]     Run N growth cycles (default: 1)\n"
+    printf "  nt --review         Launch review agent\n"
+    printf "  nt --mcp            Start MCP server (stdio)\n"
+    printf "  nt --help           Show this help\n"
+    printf "\n"
+    printf "${BOLD}Examples:${NC}\n"
+    printf "  nt                              # interactive mode\n"
+    printf "  nt \"fix the build error\"        # single task\n"
+    printf "  nt --status                     # check system health\n"
+    printf "  nt --evolve 3                   # run 3 growth cycles\n"
+    printf "\n"
+}
+
+# ── Main dispatch ─────────────────────────────────────────
+case "${1:-}" in
+    --status|-s)
+        cmd_status
+        ;;
+    --evolve|-e)
+        shift
+        cmd_evolve "$@"
+        ;;
+    --review|-r)
+        cmd_review
+        ;;
+    --mcp)
+        cmd_mcp
+        ;;
+    --help|-h)
+        cmd_help
+        ;;
+    *)
+        shift 2>/dev/null || true
+        cmd_launch "$@"
+        ;;
+esac

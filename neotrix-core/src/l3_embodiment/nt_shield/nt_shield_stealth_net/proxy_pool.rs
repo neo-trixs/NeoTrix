@@ -19,6 +19,9 @@ pub use super::pool_types::{NodeSelectionStrategy, SpeedTier, ProxyNode};
 pub use super::pool_strategies::StrategyLearner;
 pub use super::pool_health::{base64_decode, FREE_PROXY_SCRAPERS, DEFAULT_SUBSCRIPTIONS};
 
+/// Stub trait — KbProvider was removed; kept for API compatibility.
+pub trait KbProvider: Send + Sync + 'static {}
+
 const MAX_POOL_SIZE: usize = 200;
 const HEALTH_CHECK_CONCURRENCY: usize = 100;
 const HEALTH_CHECK_TIMEOUT_SECS: u64 = 3;
@@ -69,7 +72,6 @@ pub struct ProxyPool {
     strategy: RwLock<NodeSelectionStrategy>,
     rr_idx: RwLock<usize>,
     learner: RwLock<StrategyLearner>,
-    kb: Option<Arc<dyn KbProvider>>,
 }
 
 impl Default for ProxyPool {
@@ -93,12 +95,7 @@ impl ProxyPool {
             strategy: RwLock::new(NodeSelectionStrategy::from_name(&c.pool.selection_strategy)),
             rr_idx: RwLock::new(0),
             learner: RwLock::new(StrategyLearner::load(&q_path)),
-            kb: None,
         }
-    }
-
-    pub fn with_kb(self, kb: Option<Arc<dyn KbProvider>>) -> Self {
-        Self { kb, ..self }
     }
 
     pub fn _with_min_nodes(mut self, n: u32) -> Self {
@@ -115,17 +112,6 @@ impl ProxyPool {
     }
 
     pub async fn load_subscriptions(&self) -> usize {
-        if let Some(ref kb) = self.kb {
-            if let Ok(Some(json)) = kb.kv_get("proxy_pool", "subscriptions") {
-                if let Ok(subs) = serde_json::from_str::<Vec<String>>(&json) {
-                    if !subs.is_empty() {
-                        let count = subs.len();
-                        *self.subscriptions.write().await = subs;
-                        return count;
-                    }
-                }
-            }
-        }
         self._ensure_subs_file();
         let content = match std::fs::read_to_string(&self.subs_file) {
             Ok(s) => s,
@@ -133,11 +119,6 @@ impl ProxyPool {
         };
         let subs: Vec<String> = serde_json::from_str(&content).unwrap_or_default();
         let count = subs.len();
-        if let Some(ref kb) = self.kb {
-            if let Ok(json) = serde_json::to_string(&subs) {
-                let _ = kb.kv_set("proxy_pool", "subscriptions", &json);
-            }
-        }
         *self.subscriptions.write().await = subs;
         count
     }
@@ -168,11 +149,6 @@ impl ProxyPool {
 
     async fn persist_subscriptions(&self) {
         let subs = self.subscriptions.read().await.clone();
-        if let Some(ref kb) = self.kb {
-            if let Ok(json) = serde_json::to_string(&subs) {
-                let _ = kb.kv_set("proxy_pool", "subscriptions", &json);
-            }
-        }
         let json = serde_json::to_string_pretty(&subs).unwrap_or_else(|e| { eprintln!("[proxy-pool] serialize subs: {e}"); String::new() });
         let _ = std::fs::write(&self.subs_file, json);
     }
@@ -223,10 +199,7 @@ impl ProxyPool {
     }
 
     async fn persist_nodes(&self) {
-        if let Some(ref kb) = self.kb {
-            let count = self.nodes.read().await.len();
-            let _ = kb.kv_set("proxy_pool", "node_count", &count.to_string());
-        }
+        // No-op: nodes are in-memory only; reloaded from subscriptions on restart
     }
 
     pub async fn ready(&self, n: usize) -> Vec<ProxyNode> {

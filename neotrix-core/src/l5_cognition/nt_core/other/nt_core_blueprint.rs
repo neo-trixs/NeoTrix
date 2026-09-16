@@ -14,19 +14,6 @@ pub struct _BlueprintStep {
     pub action: String,
 }
 
-/// 蓝图/规划 trait。
-pub trait _BlueprintPlanner {
-    /// 设定目标并规划 N 个阶段 (每个阶段一个步骤)。
-    fn plan(&mut self, goal: &str, phases: usize);
-    /// 按阶段序返回蓝图步骤, 空目标返回空。
-    fn steps(&self) -> Vec<_BlueprintStep>;
-    /// 蓝图阶段数。
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
 /// blueprint 规划实现。
 pub struct _BlueprintPlannerImpl {
     goal: String,
@@ -44,19 +31,10 @@ impl _BlueprintPlannerImpl {
     pub fn goal(&self) -> &str {
         &self.goal
     }
-}
 
-impl Default for _BlueprintPlannerImpl {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl _BlueprintPlanner for _BlueprintPlannerImpl {
-    fn plan(&mut self, goal: &str, phases: usize) {
+    pub fn plan(&mut self, goal: &str, phases: usize) {
         self.goal = goal.to_string();
         self.steps.clear();
-        // 空目标无法展开蓝图 — 不产生任何阶段步骤。
         if goal.is_empty() {
             return;
         }
@@ -68,12 +46,22 @@ impl _BlueprintPlanner for _BlueprintPlannerImpl {
         }
     }
 
-    fn steps(&self) -> Vec<_BlueprintStep> {
+    pub fn steps(&self) -> Vec<_BlueprintStep> {
         self.steps.iter().cloned().collect()
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.steps.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl Default for _BlueprintPlannerImpl {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

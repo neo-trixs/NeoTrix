@@ -99,10 +99,7 @@ impl RecipeRefactor {
 
     /// 按名取 recipe。
     pub fn get(&self, name: &str) -> Option<Recipe> {
-        self.registry
-            .read()
-            .ok()
-            .and_then(|m| m.get(name).cloned())
+        self.registry.read().ok().and_then(|m| m.get(name).cloned())
     }
 
     pub fn list(&self) -> Vec<String> {
@@ -141,7 +138,10 @@ impl RecipeRefactor {
                     StepResult { hits }
                 }
                 RecipeStep::DeleteLines { containing } => {
-                    let hits = buf.lines().filter(|l| l.contains(containing.as_str())).count() as u64;
+                    let hits = buf
+                        .lines()
+                        .filter(|l| l.contains(containing.as_str()))
+                        .count() as u64;
                     buf = buf
                         .lines()
                         .filter(|l| !l.contains(containing.as_str()))
@@ -235,7 +235,10 @@ impl crate::core::nt_core_self_test::SelfTest for RecipeRefactorSelfTest {
             failures.push("dry-run failed".into());
         }
         if engine.applied_count() != 2 {
-            failures.push(format!("applied_count = {}, want 2", engine.applied_count()));
+            failures.push(format!(
+                "applied_count = {}, want 2",
+                engine.applied_count()
+            ));
         }
 
         if failures.is_empty() {
@@ -284,7 +287,9 @@ mod tests {
             }],
         };
         let src = "a\neprintln!(\"x\");\nb\neprintln!(\"y\");";
-        let res = RecipeRefactor::new().apply(&recipe, src, false).expect("applies");
+        let res = RecipeRefactor::new()
+            .apply(&recipe, src, false)
+            .expect("applies");
         assert_eq!(res.step_results[0].hits, 2);
         assert!(!res.output().contains("eprintln!"));
     }

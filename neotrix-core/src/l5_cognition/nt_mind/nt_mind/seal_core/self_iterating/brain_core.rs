@@ -165,7 +165,7 @@ impl ReasoningBrain {
         self.learning_rate_budget
     }
 
-    pub(crate) fn _list_sources(&self) -> Vec<String> {
+    pub fn list_sources(&self) -> Vec<String> {
         let mut sources: Vec<String> = vec![
             KnowledgeSource::HeroUI.name().to_string(),
             KnowledgeSource::BaseUI.name().to_string(),

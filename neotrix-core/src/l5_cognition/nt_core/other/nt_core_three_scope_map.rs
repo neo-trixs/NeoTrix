@@ -16,21 +16,6 @@ pub enum Scope {
     Macro,
 }
 
-/// 三范围映射推理 trait。
-pub trait _ThreeScopeMap {
-    /// 将一项元素登记到指定范围。
-    fn map(&mut self, scope: Scope, item: &str);
-    /// 返回某范围登记的元素数。
-    fn count(&self, scope: Scope) -> usize;
-    /// 跨范围提升: 将 micro 元素提升为 macro 归并键, 返回提升数。
-    fn elevate(&mut self, from: Scope, to: Scope, item: &str) -> usize;
-    /// 总登记数。
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
 /// three-scope-map 实现。
 pub struct _ThreeScopeMapImpl {
     scopes: HashMap<Scope, Vec<String>>,
@@ -46,27 +31,19 @@ impl _ThreeScopeMapImpl {
     pub fn scopes(&self) -> Vec<Scope> {
         self.scopes.keys().copied().collect()
     }
-}
 
-impl Default for _ThreeScopeMapImpl {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl _ThreeScopeMap for _ThreeScopeMapImpl {
-    fn map(&mut self, scope: Scope, item: &str) {
+    pub fn map(&mut self, scope: Scope, item: &str) {
         self.scopes
             .entry(scope)
             .or_default()
             .push(item.to_string());
     }
 
-    fn count(&self, scope: Scope) -> usize {
+    pub fn count(&self, scope: Scope) -> usize {
         self.scopes.get(&scope).map(|v| v.len()).unwrap_or(0)
     }
 
-    fn elevate(&mut self, from: Scope, to: Scope, item: &str) -> usize {
+    pub fn elevate(&mut self, from: Scope, to: Scope, item: &str) -> usize {
         let removed = self
             .scopes
             .get_mut(&from)
@@ -85,8 +62,18 @@ impl _ThreeScopeMap for _ThreeScopeMapImpl {
         removed
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.scopes.values().map(|v| v.len()).sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl Default for _ThreeScopeMapImpl {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

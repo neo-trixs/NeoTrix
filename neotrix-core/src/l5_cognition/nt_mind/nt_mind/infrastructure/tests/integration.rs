@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn test_intrinsic_motivation_drives_goal_priority() {
         use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
-        use crate::l5_cognition::nt_mind::GoalLoop;
+        use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
 
         let mut bridge = ThinkingBridge::new("/tmp");
         let mut goal_loop = GoalLoop::new();

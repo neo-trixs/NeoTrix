@@ -288,7 +288,7 @@ pub fn read_xlsx_sheets_all(path: impl AsRef<Path>) -> Result<Vec<TableData>> {
 }
 
 /// calamine Data → 显示文本 (与 office_oxide 显示文本语义对齐)
-pub(super) fn data_to_text(d: &calamine::Data) -> String {
+pub(crate) fn data_to_text(d: &calamine::Data) -> String {
     match d {
         calamine::Data::Int(i) => i.to_string(),
         calamine::Data::Float(f) => {

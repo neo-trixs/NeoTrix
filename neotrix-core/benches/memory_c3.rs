@@ -10,13 +10,14 @@
 // 对比历史 (cargo bench --bench memory_c3)。
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_embed::{
-    cosine_similarity, local_embed_texts,
+use neotrix::core::nt_core_math::cosine_similarity_f32;
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::{
+    local_embed_texts,
 };
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_graph_cache::{
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_graph_cache::{
     weighted_shortest_path, GraphCache,
 };
-use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::{KnowledgeEdge, RelationType};
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_types::{KnowledgeEdge, RelationType};
 
 fn bench_cosine(c: &mut Criterion) {
     let mut group = c.benchmark_group("memory_cosine");
@@ -24,7 +25,7 @@ fn bench_cosine(c: &mut Criterion) {
         let va: Vec<f32> = (0..dim).map(|i| (i as f32) / dim as f32).collect();
         let vb: Vec<f32> = (0..dim).map(|i| 1.0 - (i as f32) / dim as f32).collect();
         group.bench_function(format!("cosine_dim{dim}"), |b| {
-            b.iter(|| black_box(cosine_similarity(&va, &vb)));
+            b.iter(|| black_box(cosine_similarity_f32(&va, &vb)));
         });
     }
     group.finish();

@@ -17,3 +17,9 @@ pub mod nt_meta;
 pub use coordination as nt_governance;
 pub use healing as nt_repair;
 pub mod nt_nexus;
+
+pub mod runtime_monitor;
+pub use runtime_monitor::RuntimeMonitor;
+
+pub mod evolving_evaluator;
+pub use evolving_evaluator::EvolvingEvaluator;

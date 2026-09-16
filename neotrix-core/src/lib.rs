@@ -99,3 +99,21 @@ pub use core::{
     ThinkingTrace, ThinkingStep, ReflectionGrade,
 };
 pub use neotrix::nt_act_orchestrator::Orchestrator;
+
+// Re-export modules used by binary targets via `neotrix::module_name` paths
+pub use neotrix::nt_io_mention;
+pub use neotrix::nt_world_crawl;
+pub use neotrix::nt_world_search;
+pub use neotrix::nt_io_session_recovery;
+pub use neotrix::nt_io_agents_md;
+pub use neotrix::nt_io_standalone;
+pub use neotrix::nt_shield;
+pub use neotrix::nt_shield_sentry;
+pub use neotrix::nt_io_logging;
+pub use neotrix::nt_io;
+pub use neotrix::ReasoningKernel;
+
+// Re-export feature-gated modules for binary/example targets
+#[cfg(feature = "stealth-net")]
+pub use neotrix::nt_shield_stealth_net;
+pub use neotrix::nt_shield_traffic;

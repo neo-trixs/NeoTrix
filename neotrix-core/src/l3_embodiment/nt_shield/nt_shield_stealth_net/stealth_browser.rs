@@ -25,7 +25,7 @@ const CHROMIUM_ARGS: &[&str] = &[
     "--disable-translate",
     "--hide-scrollbars",
     "--mute-audio",
-    "--no-default-nt_world_browse-check",
+    "--no-default-browser-check",
     "--no-first-run",
     "--disable-background-networking",
     "--disable-background-timer-throttling",
@@ -47,7 +47,7 @@ const CHROMIUM_ARGS: &[&str] = &[
 ];
 
 pub struct _StealthBrowser {
-    nt_world_browse: Arc<Mutex<Option<Browser>>>,
+    stealth_browser: Arc<Mutex<Option<Browser>>>,
     proxy: Option<String>,
     current_fp: Arc<RwLock<Option<BrowserFingerprintProfile>>>,
 }
@@ -61,7 +61,7 @@ impl Default for _StealthBrowser {
 impl _StealthBrowser {
     pub fn new() -> Self {
         Self {
-            nt_world_browse: Arc::new(Mutex::new(None)),
+            stealth_browser: Arc::new(Mutex::new(None)),
             proxy: None,
             current_fp: Arc::new(RwLock::new(None)),
         }
@@ -104,21 +104,21 @@ impl _StealthBrowser {
             cfg_builder = cfg_builder.arg(format!("--proxy-server={}", proxy));
         }
 
-        let (nt_world_browse, mut handler) = Browser::launch(
+        let (stealth_browser, mut handler) = Browser::launch(
             cfg_builder.build().map_err(|e| format!("Browser config: {}", e))?
         )
         .await
-        .map_err(|e| format!("Launch nt_world_browse: {}", e))?;
+        .map_err(|e| format!("Launch stealth_browser: {}", e))?;
 
         tokio::spawn(async move {
             while let Some(event) = handler.next().await {
                 if let Err(e) = event {
-                    log::error!("[stealth-nt_world_browse] CDP handler error: {:?}", e);
+                    log::error!("[stealth-browser] CDP handler error: {:?}", e);
                 }
             }
         });
 
-        let page = nt_world_browse.new_page("about:blank")
+        let page = stealth_browser.new_page("about:blank")
             .await
             .map_err(|e| format!("Create page: {}", e))?;
         page.enable_stealth_mode()
@@ -127,15 +127,15 @@ impl _StealthBrowser {
         self.inject_fingerprint_js(&page).await?;
         let _ = page.close().await;
 
-        *self.nt_world_browse.lock().await = Some(nt_world_browse);
+        *self.stealth_browser.lock().await = Some(stealth_browser);
         Ok(())
     }
 
     /// 创建新页面并启用 stealth
     async fn new_page(&self) -> Result<Page, String> {
-        let mut guard = self.nt_world_browse.lock().await;
-        let nt_world_browse = guard.as_mut().ok_or("Browser not launched")?;
-        let page = nt_world_browse.new_page("about:blank")
+        let mut guard = self.stealth_browser.lock().await;
+        let stealth_browser = guard.as_mut().ok_or("Browser not launched")?;
+        let page = stealth_browser.new_page("about:blank")
             .await
             .map_err(|e| format!("New page: {}", e))?;
         page.enable_stealth_mode()
@@ -179,9 +179,9 @@ impl _StealthBrowser {
 
     /// 关闭浏览器
     pub async fn close(&self) {
-        let mut guard = self.nt_world_browse.lock().await;
-        if let Some(mut nt_world_browse) = guard.take() {
-            let _ = nt_world_browse.close().await;
+        let mut guard = self.stealth_browser.lock().await;
+        if let Some(mut stealth_browser) = guard.take() {
+            let _ = stealth_browser.close().await;
         }
     }
 }
@@ -191,23 +191,23 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "integration_tests")]
-    #[ignore = "requires headless nt_world_browse binary (chromiumoxide)"]
+    #[ignore = "requires headless stealth_browser binary (chromiumoxide)"]
     #[tokio::test]
-    async fn test_nt_world_browse_launch_and_close() {
-        let nt_world_browse = _StealthBrowser::new();
-        assert!(nt_world_browse.launch().await.is_ok());
-        nt_world_browse.close().await;
+    async fn test_stealth_browser_launch_and_close() {
+        let stealth_browser = _StealthBrowser::new();
+        assert!(stealth_browser.launch().await.is_ok());
+        stealth_browser.close().await;
     }
 
     #[cfg(feature = "integration_tests")]
-    #[ignore = "requires headless nt_world_browse and network access"]
+    #[ignore = "requires headless stealth_browser and network access"]
     #[tokio::test]
-    async fn test_nt_world_browse_fetch_title() {
-        let nt_world_browse = _StealthBrowser::new();
-        nt_world_browse.launch().await.expect("await should be ok in test");
-        let title = nt_world_browse.title("https://example.com").await.expect("await should be ok in test");
+    async fn test_stealth_browser_fetch_title() {
+        let stealth_browser = _StealthBrowser::new();
+        stealth_browser.launch().await.expect("await should be ok in test");
+        let title = stealth_browser.title("https://example.com").await.expect("await should be ok in test");
         assert!(title.contains("Example") || title.contains("example"));
-        nt_world_browse.close().await;
+        stealth_browser.close().await;
     }
 
     #[test]

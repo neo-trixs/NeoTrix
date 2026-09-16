@@ -16,6 +16,7 @@ pub mod ast_searcher;
 pub mod code_writer;
 pub mod edit_history;
 pub mod evolution_loop_provider;
+pub mod git_integration;
 pub mod pattern_extractor;
 pub mod pipeline_autofixer;
 pub mod recipe_refactor;
@@ -25,41 +26,57 @@ pub mod template_registry;
 pub mod yagni_ladder;
 
 pub use ast_searcher::{AstCodeSearcher, AstQuery, CodeMatch};
-pub use code_writer::{CodeGenRequest, CodeGenResult, CodeContentEntropy, SelfCodeWriter};
+pub use code_writer::{CodeContentEntropy, CodeGenRequest, CodeGenResult, SelfCodeWriter};
 pub use edit_history::EditHistoryTracker;
 pub use pattern_extractor::PatternExtractor;
 pub use pipeline_autofixer::PipelineAutoFixer;
-pub use recipe_refactor::{Recipe, RecipeError, RecipeRefactor, RecipeResult, RecipeStep, StepResult};
+pub use recipe_refactor::{
+    Recipe, RecipeError, RecipeRefactor, RecipeResult, RecipeStep, StepResult,
+};
 pub use safe_applier::SafeCodeApplier;
-pub use semantic_entropy::{SemanticEntropy, SemanticEntropyGate, EntropyAction, EntropyRecord, EditContext, TrendDirection};
+pub use semantic_entropy::{
+    EditContext, EntropyAction, EntropyRecord, SemanticEntropy, SemanticEntropyGate, TrendDirection,
+};
 pub use template_registry::{CodeTemplate, CodeTemplateRegistry, TemplateCategory};
 
 // ════════════════════════════════════════════════════════════════
 // Unified Architecture: L1Capability + ToolExecutor trait
 // ════════════════════════════════════════════════════════════════
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use crate::l1_action::traits::{
-    L1Capability, ToolExecutor as ToolExecutorTrait, CapabilityCategory, ConstellationLevel,
-    CapabilityHealth, CapabilityStats, CapabilityError,
-    ToolInput, ToolOutput, ToolDef,
+    CapabilityCategory, CapabilityError, CapabilityHealth, CapabilityStats, ConstellationLevel,
+    L1Capability, ToolDef, ToolExecutor as ToolExecutorTrait, ToolInput, ToolOutput,
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 
 impl L1Capability for SelfCodeWriter {
-    fn capability_id(&self) -> &str { "act.code_writer" }
-    fn category(&self) -> CapabilityCategory { CapabilityCategory::Execution }
-    fn constellation(&self) -> ConstellationLevel { ConstellationLevel::C1UnitTest }
+    fn capability_id(&self) -> &str {
+        "act.code_writer"
+    }
+    fn category(&self) -> CapabilityCategory {
+        CapabilityCategory::Execution
+    }
+    fn constellation(&self) -> ConstellationLevel {
+        ConstellationLevel::C1UnitTest
+    }
     fn health_check(&self) -> CapabilityHealth {
         CapabilityHealth {
             healthy: true,
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+            last_check: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
             message: None,
         }
     }
-    fn description(&self) -> &str { "Template-based code generation with edit history" }
-    fn stats(&self) -> CapabilityStats { CapabilityStats::default() }
+    fn description(&self) -> &str {
+        "Template-based code generation with edit history"
+    }
+    fn stats(&self) -> CapabilityStats {
+        CapabilityStats::default()
+    }
 }
 
 impl ToolExecutorTrait for SelfCodeWriter {
@@ -73,21 +90,30 @@ impl ToolExecutorTrait for SelfCodeWriter {
                     metadata: Default::default(),
                 })
             }
-            "list_templates" => {
-                Ok(ToolOutput {
-                    success: true,
-                    result: serde_json::json!({"templates": []}),
-                    metadata: Default::default(),
-                })
-            }
-            _ => Err(CapabilityError::InvalidInput(format!("Unknown tool: {}", tool))),
+            "list_templates" => Ok(ToolOutput {
+                success: true,
+                result: serde_json::json!({"templates": []}),
+                metadata: Default::default(),
+            }),
+            _ => Err(CapabilityError::InvalidInput(format!(
+                "Unknown tool: {}",
+                tool
+            ))),
         }
     }
 
     fn list_tools(&self) -> Vec<ToolDef> {
         vec![
-            ToolDef { name: "generate".into(), description: "Generate code from template".into(), input_schema: serde_json::json!({}) },
-            ToolDef { name: "list_templates".into(), description: "List available templates".into(), input_schema: serde_json::json!({}) },
+            ToolDef {
+                name: "generate".into(),
+                description: "Generate code from template".into(),
+                input_schema: serde_json::json!({}),
+            },
+            ToolDef {
+                name: "list_templates".into(),
+                description: "List available templates".into(),
+                input_schema: serde_json::json!({}),
+            },
         ]
     }
 }
@@ -102,20 +128,35 @@ pub struct CodeRegistry {
 }
 
 impl Default for CodeRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CodeRegistry {
-    pub fn new() -> Self { Self { executors: Vec::new() } }
-    pub fn register(&mut self, executor: Box<dyn ToolExecutorTrait>) { self.executors.push(executor); }
+    pub fn new() -> Self {
+        Self {
+            executors: Vec::new(),
+        }
+    }
+    pub fn register(&mut self, executor: Box<dyn ToolExecutorTrait>) {
+        self.executors.push(executor);
+    }
     pub fn get(&self, id: &str) -> Option<&dyn ToolExecutorTrait> {
-        self.executors.iter().find(|e| e.capability_id() == id).map(|e| e.as_ref())
+        self.executors
+            .iter()
+            .find(|e| e.capability_id() == id)
+            .map(|e| e.as_ref())
     }
     pub fn health_check_all(&self) -> Vec<(String, CapabilityHealth)> {
-        self.executors.iter().map(|e| (e.capability_id().to_string(), e.health_check())).collect()
+        self.executors
+            .iter()
+            .map(|e| (e.capability_id().to_string(), e.health_check()))
+            .collect()
     }
     pub fn optimal(&self) -> Option<&dyn ToolExecutorTrait> {
-        self.executors.iter()
+        self.executors
+            .iter()
             .filter(|e| e.health_check().healthy)
             .max_by(|a, b| {
                 let a_s = 1.0 - a.health_check().error_rate;
@@ -132,10 +173,15 @@ pub struct CodeRouter {
 }
 
 impl CodeRouter {
-    pub fn new(registry: CodeRegistry) -> Self { Self { registry } }
-    pub fn route(&self, _tool: &str) -> Option<&dyn ToolExecutorTrait> { self.registry.optimal() }
-    pub fn execute(&self, tool: &str, input: &ToolInput) -> Result<ToolOutput, CapabilityError> {
+    pub fn new(registry: CodeRegistry) -> Self {
+        Self { registry }
+    }
+    pub fn route(&self, _tool: &str) -> Option<&dyn ToolExecutorTrait> {
         self.registry.optimal()
+    }
+    pub fn execute(&self, tool: &str, input: &ToolInput) -> Result<ToolOutput, CapabilityError> {
+        self.registry
+            .optimal()
             .ok_or_else(|| CapabilityError::NotAvailable("No code executor".into()))?
             .execute(tool, input)
     }
@@ -147,7 +193,9 @@ pub struct CodeBridge {
 }
 
 impl CodeBridge {
-    pub fn new(router: CodeRouter) -> Self { Self { router } }
+    pub fn new(router: CodeRouter) -> Self {
+        Self { router }
+    }
     pub fn execute(&self, tool: &str, input: &ToolInput) -> Result<ToolOutput, CapabilityError> {
         self.router.execute(tool, input)
     }

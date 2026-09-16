@@ -5,8 +5,8 @@
 //!   - 可复用的代码变换 (如"加测试 stub")
 //!   - 失败模式 (哪些修改容易出错)
 
-use std::cmp::Reverse;
 use super::edit_history::{EditEntry, EditHistoryTracker};
+use std::cmp::Reverse;
 
 /// 提取出的可复用模式
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ pub struct ExtractedPattern {
 #[derive(Debug, Clone)]
 pub struct EditCluster {
     pub name: String,
-    pub entries: Vec<usize>,  // indices into history
+    pub entries: Vec<usize>, // indices into history
     pub common_issue_types: Vec<String>,
     pub files: Vec<String>,
 }
@@ -75,7 +75,10 @@ impl PatternExtractor {
                 issue_types: vec![it.clone()],
                 frequency: entries.len(),
                 success_rate: success as f64 / entries.len() as f64,
-                avg_diff_size: entries.iter().map(|e| e.diff_summary.len() as f64).sum::<f64>()
+                avg_diff_size: entries
+                    .iter()
+                    .map(|e| e.diff_summary.len() as f64)
+                    .sum::<f64>()
                     / entries.len() as f64,
                 template_source: None,
                 template_target: None,
@@ -105,7 +108,9 @@ impl PatternExtractor {
             assigned[i] = true;
 
             for j in i + 1..entries.len() {
-                if assigned[j] { continue; }
+                if assigned[j] {
+                    continue;
+                }
                 // 相同文件 + 相同问题类型 → 同一集群
                 if entries[j].file == entries[i].file
                     && entries[j].issue_type == entries[i].issue_type
@@ -136,7 +141,9 @@ impl PatternExtractor {
                 continue;
             }
 
-            let entries: Vec<&EditEntry> = cluster.entries.iter()
+            let entries: Vec<&EditEntry> = cluster
+                .entries
+                .iter()
                 .map(|&i| &history.all_entries()[i])
                 .collect();
 
@@ -146,14 +153,20 @@ impl PatternExtractor {
                 continue;
             }
 
-                let file_name = cluster.files.first()
-                    .and_then(|f| f.rsplit('/').next())
-                    .unwrap_or("unknown");
-                let name = format!(
-                    "auto_{}_{}",
-                    cluster.common_issue_types.first().map(|s| s.to_lowercase()).unwrap_or_else(|| "unknown".to_string()),
-                    file_name,
-                );
+            let file_name = cluster
+                .files
+                .first()
+                .and_then(|f| f.rsplit('/').next())
+                .unwrap_or("unknown");
+            let name = format!(
+                "auto_{}_{}",
+                cluster
+                    .common_issue_types
+                    .first()
+                    .map(|s| s.to_lowercase())
+                    .unwrap_or_else(|| "unknown".to_string()),
+                file_name,
+            );
 
             templates.push(super::template_registry::CodeTemplate {
                 name,
@@ -172,7 +185,8 @@ impl PatternExtractor {
     // ─── 内部 ───
 
     fn collect_issue_types(history: &EditHistoryTracker, file: &str) -> Vec<String> {
-        let mut types: Vec<String> = history.get_history_for_file(file)
+        let mut types: Vec<String> = history
+            .get_history_for_file(file)
             .iter()
             .map(|e| e.issue_type.clone())
             .collect();
@@ -182,7 +196,8 @@ impl PatternExtractor {
     }
 
     fn collect_all_issue_types(history: &EditHistoryTracker) -> Vec<String> {
-        let mut types: Vec<String> = history.all_entries()
+        let mut types: Vec<String> = history
+            .all_entries()
             .iter()
             .map(|e| e.issue_type.clone())
             .collect();
@@ -196,7 +211,11 @@ impl PatternExtractor {
         if entries.is_empty() {
             return 0.0;
         }
-        entries.iter().map(|e| e.diff_summary.len() as f64).sum::<f64>() / entries.len() as f64
+        entries
+            .iter()
+            .map(|e| e.diff_summary.len() as f64)
+            .sum::<f64>()
+            / entries.len() as f64
     }
 }
 
@@ -207,19 +226,29 @@ mod tests {
     use std::path::PathBuf;
 
     fn setup_history() -> EditHistoryTracker {
-        let path = std::env::temp_dir().join(format!("neotrix_pattern_test_{}.json", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("neotrix_pattern_test_{}.json", std::process::id()));
         let mut h = EditHistoryTracker::load_from_path(path);
-        h.record_change("src/a.rs", "MissingTests", "old", "new", true).unwrap();
-        h.record_change("src/a.rs", "MissingTests", "old", "new2", true).unwrap();
-        h.record_change("src/a.rs", "MissingTests", "old", "new3", true).unwrap();
-        h.record_change("src/b.rs", "CompileWarning", "old", "new", false).unwrap();
-        h.record_change("src/b.rs", "CompileWarning", "old", "new2", true).unwrap();
-        h.record_change("src/b.rs", "CompileWarning", "old", "new3", true).unwrap();
+        h.record_change("src/a.rs", "MissingTests", "old", "new", true)
+            .unwrap();
+        h.record_change("src/a.rs", "MissingTests", "old", "new2", true)
+            .unwrap();
+        h.record_change("src/a.rs", "MissingTests", "old", "new3", true)
+            .unwrap();
+        h.record_change("src/b.rs", "CompileWarning", "old", "new", false)
+            .unwrap();
+        h.record_change("src/b.rs", "CompileWarning", "old", "new2", true)
+            .unwrap();
+        h.record_change("src/b.rs", "CompileWarning", "old", "new3", true)
+            .unwrap();
         h
     }
 
     fn tmp_tracker() -> (EditHistoryTracker, PathBuf) {
-        let path = std::env::temp_dir().join(format!("neotrix_pattern_extract_test_{}.json", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "neotrix_pattern_extract_test_{}.json",
+            std::process::id()
+        ));
         (EditHistoryTracker::load_from_path(path.clone()), path)
     }
 

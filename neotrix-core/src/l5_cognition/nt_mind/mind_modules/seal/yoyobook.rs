@@ -54,30 +54,20 @@ impl _SelfEvolutionLesson {
     }
 }
 
-/// 叙事 pattern 提取 trait — 从一段自进化叙事文本中抽取可复用 lesson。
-///
-/// C0 占位: 结构化提取逻辑留待 C1 实现, 此处仅定义契约。
-pub trait _NarrativePatternExtractor {
-    /// 从叙事片段识别命中的 lesson 集合。
-    ///
-    /// Returns `Err` because no real NLP extraction is wired.
-    /// The C0 stub previously returned ALL lessons regardless of input —
-    /// that was fabricated extraction. Now returns an honest error.
-    fn extract_lessons(&self, _narrative: &str) -> Result<Vec<_SelfEvolutionLesson>, String> {
+/// yoyobook 文献节点默认提取器。
+pub struct _YoyoBookExtractor;
+
+impl _YoyoBookExtractor {
+    pub fn extract_lessons(&self, _narrative: &str) -> Result<Vec<_SelfEvolutionLesson>, String> {
         Err("extract_lessons not wired: no real NLP/keyword extraction connected. \
              Requires semantic analysis to match narrative text against lesson patterns."
             .into())
     }
-    /// 已收录的 lesson 总数。
-    fn lesson_count(&self) -> usize {
+
+    pub fn lesson_count(&self) -> usize {
         _SelfEvolutionLesson::all().len()
     }
 }
-
-/// yoyobook 文献节点默认提取器。
-pub struct _YoyoBookExtractor;
-
-impl _NarrativePatternExtractor for _YoyoBookExtractor {}
 
 impl SelfTest for _YoyoBookExtractor {
     fn name(&self) -> &'static str {

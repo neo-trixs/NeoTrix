@@ -7,10 +7,12 @@
 //! - 熔断：连续拦截触发熔断，防止死循环
 
 use crate::core::nt_core_kb_primitives::{kv_list, kv_set, now};
-use rusqlite::Connection;
 #[allow(unused_imports)]
-use crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::{ValueAction as Action, ArbitrationResult, ValueCompassRuntime, ValueCompassStore, CoreValue};
+use crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::{
+    ArbitrationResult, CoreValue, ValueAction as Action, ValueCompassRuntime, ValueCompassStore,
+};
 use crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::ValueLearningEngine;
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
@@ -126,7 +128,10 @@ impl ValueGate {
 
         // 4. 根据仲裁结果返回
         match arbitration {
-            ArbitrationResult::Veto { reason, vetoing_value } => {
+            ArbitrationResult::Veto {
+                reason,
+                vetoing_value,
+            } => {
                 self.increment_interceptions();
                 GateResult::Veto {
                     reason,
@@ -134,7 +139,10 @@ impl ValueGate {
                     suggested_alternatives: self.suggest_alternatives(action),
                 }
             }
-            ArbitrationResult::Deliberate { reason, conflicting_values } => {
+            ArbitrationResult::Deliberate {
+                reason,
+                conflicting_values,
+            } => {
                 self.increment_interceptions();
                 let approach = self.suggest_deliberation_approach(&conflicting_values);
                 GateResult::Deliberate {
@@ -144,7 +152,10 @@ impl ValueGate {
                     suggested_approach: approach,
                 }
             }
-            ArbitrationResult::Delegate { reason, required_authority } => {
+            ArbitrationResult::Delegate {
+                reason,
+                required_authority,
+            } => {
                 if self.config.enable_delegation {
                     GateResult::Delegate {
                         reason,
@@ -159,7 +170,10 @@ impl ValueGate {
                     }
                 }
             }
-            ArbitrationResult::Allow { dominant_value, suppressed_values } => {
+            ArbitrationResult::Allow {
+                dominant_value,
+                suppressed_values,
+            } => {
                 self.reset_interceptions();
                 GateResult::Allow {
                     dominant_value,
@@ -176,17 +190,23 @@ impl ValueGate {
     }
 
     /// 记录观察到学习引擎（行动执行后调用）。
-    pub fn record_outcome(&self, action: &Action, outcome: crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::Outcome, session_id: &str) {
+    pub fn record_outcome(
+        &self,
+        action: &Action,
+        outcome: crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::Outcome,
+        session_id: &str,
+    ) {
         if let Some(learning) = &self.learning {
             let signals = crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::ValueAttributor::infer_signals(&outcome);
-            let obs = crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::Observation {
-                id: format!("obs_{}", now()),
-                action: action.clone(),
-                outcome,
-                value_signals: signals,
-                timestamp: now(),
-                session_id: session_id.into(),
-            };
+            let obs =
+                crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::Observation {
+                    id: format!("obs_{}", now()),
+                    action: action.clone(),
+                    outcome,
+                    value_signals: signals,
+                    timestamp: now(),
+                    session_id: session_id.into(),
+                };
             learning.record_observation(obs);
         }
     }
@@ -204,14 +224,32 @@ impl ValueGate {
 
     /// 获取拦截统计。
     pub fn stats(&self) -> GateStats {
-        let log = self.interception_log.read().unwrap_or_else(|e| e.into_inner());
+        let log = self
+            .interception_log
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         let total = log.len();
-        let vetoed = log.iter().filter(|r| matches!(r.arbitration, ArbitrationResult::Veto { .. })).count();
-        let deliberated = log.iter().filter(|r| matches!(r.arbitration, ArbitrationResult::Deliberate { .. })).count();
-        let delegated = log.iter().filter(|r| matches!(r.arbitration, ArbitrationResult::Delegate { .. })).count();
-        let allowed = log.iter().filter(|r| matches!(r.arbitration, ArbitrationResult::Allow { .. })).count();
+        let vetoed = log
+            .iter()
+            .filter(|r| matches!(r.arbitration, ArbitrationResult::Veto { .. }))
+            .count();
+        let deliberated = log
+            .iter()
+            .filter(|r| matches!(r.arbitration, ArbitrationResult::Deliberate { .. }))
+            .count();
+        let delegated = log
+            .iter()
+            .filter(|r| matches!(r.arbitration, ArbitrationResult::Delegate { .. }))
+            .count();
+        let allowed = log
+            .iter()
+            .filter(|r| matches!(r.arbitration, ArbitrationResult::Allow { .. }))
+            .count();
 
-        let cb = self.circuit_breaker.read().unwrap_or_else(|e| e.into_inner());
+        let cb = self
+            .circuit_breaker
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         GateStats {
             total_checks: total,
             vetoed,
@@ -229,7 +267,10 @@ impl ValueGate {
         if !self.config.audit_all && matches!(record.arbitration, ArbitrationResult::Allow { .. }) {
             return; // 仅记录拦截
         }
-        let mut log = self.interception_log.write().unwrap_or_else(|e| e.into_inner());
+        let mut log = self
+            .interception_log
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         log.push_back(record);
         if log.len() > self.max_log_size {
             log.pop_front();
@@ -237,7 +278,10 @@ impl ValueGate {
     }
 
     fn is_circuit_open(&self) -> bool {
-        let cb = self.circuit_breaker.read().unwrap_or_else(|e| e.into_inner());
+        let cb = self
+            .circuit_breaker
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         if cb.is_open {
             if let Some(trip) = cb.last_trip_time {
                 if now() - trip > self.config.circuit_breaker_cooldown_secs as i64 {
@@ -251,7 +295,10 @@ impl ValueGate {
     }
 
     fn update_circuit_breaker(&self, arbitration: &ArbitrationResult) {
-        let mut cb = self.circuit_breaker.write().unwrap_or_else(|e| e.into_inner());
+        let mut cb = self
+            .circuit_breaker
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         match arbitration {
             ArbitrationResult::Veto { .. } | ArbitrationResult::Deliberate { .. } => {
                 cb.consecutive_interceptions += 1;
@@ -271,12 +318,18 @@ impl ValueGate {
     }
 
     fn increment_interceptions(&self) {
-        let mut cb = self.circuit_breaker.write().unwrap_or_else(|e| e.into_inner());
+        let mut cb = self
+            .circuit_breaker
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         cb.consecutive_interceptions += 1;
     }
 
     fn reset_interceptions(&self) {
-        let mut cb = self.circuit_breaker.write().unwrap_or_else(|e| e.into_inner());
+        let mut cb = self
+            .circuit_breaker
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         cb.consecutive_interceptions = 0;
     }
 
@@ -290,7 +343,11 @@ impl ValueGate {
     }
 
     fn suggest_deliberation_approach(&self, conflicting: &[String]) -> String {
-        format!("建议采用多视角辩论：{} 视角 vs {} 视角，寻找第三条路径", conflicting[0], conflicting.get(1).unwrap_or(&"other".into()))
+        format!(
+            "建议采用多视角辩论：{} 视角 vs {} 视角，寻找第三条路径",
+            conflicting[0],
+            conflicting.get(1).unwrap_or(&"other".into())
+        )
     }
 
     fn suggest_fallback(&self, _action: &Action) -> Vec<String> {
@@ -309,7 +366,11 @@ impl ValueGate {
     }
 
     /// 查询拦截历史。
-    pub fn query_log(conn: &Connection, limit: usize, filter: Option<&str>) -> Result<Vec<InterceptionRecord>, String> {
+    pub fn query_log(
+        conn: &Connection,
+        limit: usize,
+        filter: Option<&str>,
+    ) -> Result<Vec<InterceptionRecord>, String> {
         let rows = kv_list(conn, NS_VALUE_GATE)?;
         let mut logs = Vec::new();
         for (_k, v) in rows {
@@ -394,7 +455,9 @@ pub struct ValueGateRuntime {
 
 impl ValueGateRuntime {
     pub fn new(gate: ValueGate) -> Self {
-        Self { inner: Arc::new(gate) }
+        Self {
+            inner: Arc::new(gate),
+        }
     }
 
     pub fn check(&self, action: &Action, session_id: &str) -> GateResult {
@@ -405,7 +468,12 @@ impl ValueGateRuntime {
         self.inner.quick_check(action)
     }
 
-    pub fn record_outcome(&self, action: &Action, outcome: crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::Outcome, session_id: &str) {
+    pub fn record_outcome(
+        &self,
+        action: &Action,
+        outcome: crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::Outcome,
+        session_id: &str,
+    ) {
         self.inner.record_outcome(action, outcome, session_id)
     }
 
@@ -417,7 +485,11 @@ impl ValueGateRuntime {
         self.inner.stats()
     }
 
-    pub fn persist_log(&self, conn: &Connection, record: &InterceptionRecord) -> Result<(), String> {
+    pub fn persist_log(
+        &self,
+        conn: &Connection,
+        record: &InterceptionRecord,
+    ) -> Result<(), String> {
         ValueGate::persist_log(conn, record)
     }
 }
@@ -472,8 +544,13 @@ mod tests {
         let action = Action::new("test", "发布未经验证的实验性医疗结论");
         let result = gate.check(&action, "test_session");
         match result {
-            GateResult::Deliberate { conflicting_values, .. } => {
-                assert!(conflicting_values.contains(&"truth_seeking".into()) || conflicting_values.contains(&"responsibility".into()));
+            GateResult::Deliberate {
+                conflicting_values, ..
+            } => {
+                assert!(
+                    conflicting_values.contains(&"truth_seeking".into())
+                        || conflicting_values.contains(&"responsibility".into())
+                );
             }
             _ => panic!("应要求深思，得到 {:?}", result),
         }

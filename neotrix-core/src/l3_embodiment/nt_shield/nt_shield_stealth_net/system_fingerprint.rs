@@ -3,7 +3,7 @@
 //! 对标开源项目:
 //! - **BrowserForge**: 真实世界浏览器指纹分布
 //! - **curl-impersonate**: TLS 指纹伪造 (JA3)
-//! - **undetectable-fingerprint-nt_world_browse**: Canvas/WebGL/Platform 隐匿
+//! - **undetectable-fingerprint-stealth_browser**: Canvas/WebGL/Platform 隐匿
 //!
 //! 覆盖维度:
 //! - 浏览器品牌 (Chrome/Firefox/Safari/Edge) 独立 UA + Sec-CH-UA
@@ -201,7 +201,7 @@ pub struct TlsFingerprintHint {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SystemFingerprint {
     pub platform: Platform,
-    pub nt_world_browse: Browser,
+    pub stealth_browser: Browser,
     pub timezone: String,
     pub locale: String,
     pub accept_language: String,
@@ -213,7 +213,7 @@ pub struct SystemFingerprint {
     pub dns_leak_protection: bool,
     pub tls_fingerprint_hint: TlsFingerprintHint,
     pub tls_variant: TlsVariant,
-    pub nt_world_browse_fp: BrowserFingerprintProfile,
+    pub stealth_browser_fp: BrowserFingerprintProfile,
 }
 
 impl Default for TlsFingerprintHint {
@@ -402,7 +402,7 @@ Object.defineProperty(screen, 'colorDepth', {{ get: () => {} }});
 #[derive(Debug, Clone)]
 pub struct SystemFingerprintConfig {
     pub platform: Option<Platform>,
-    pub nt_world_browse: Option<Browser>,
+    pub stealth_browser: Option<Browser>,
     pub h2_profile: Option<H2SettingsProfile>,
     pub timezone: Option<String>,
     pub locale: Option<String>,
@@ -413,7 +413,7 @@ impl Default for SystemFingerprintConfig {
     fn default() -> Self {
         Self {
             platform: None,
-            nt_world_browse: None,
+            stealth_browser: None,
             h2_profile: None,
             timezone: None,
             locale: None,
@@ -454,7 +454,7 @@ impl SystemFingerprintGenerator {
             else { Platform::IOS }
         });
 
-        let nt_world_browse = config.nt_world_browse.unwrap_or_else(|| {
+        let stealth_browser = config.stealth_browser.unwrap_or_else(|| {
             let compat = Browser::all().iter()
                 .filter(|b| b.compatible_platforms().contains(&platform))
                 .copied()
@@ -472,8 +472,8 @@ impl SystemFingerprintGenerator {
             compat[0]
         });
 
-        let h2 = config.h2_profile.unwrap_or_else(|| nt_world_browse._preferred_h2_profile());
-        let tls_variant = nt_world_browse._preferred_tls_variant();
+        let h2 = config.h2_profile.unwrap_or_else(|| stealth_browser._preferred_h2_profile());
+        let tls_variant = stealth_browser._preferred_tls_variant();
 
         let timezone = config.timezone.clone()
             .unwrap_or_else(|| platform._default_timezone().to_string());
@@ -502,10 +502,10 @@ impl SystemFingerprintGenerator {
         let _ff_base = 121u32 + (days_since_epoch / 90) as u32;
         let _safari_base = 17u32 + (days_since_epoch / 90) as u32;
 
-        let (sec_ch_ua, sec_ch_ua_mobile, sec_ch_ua_platform) = match nt_world_browse {
+        let (sec_ch_ua, sec_ch_ua_mobile, sec_ch_ua_platform) = match stealth_browser {
             Browser::Chrome | Browser::Edge => {
                 let major_version = chrome_base.to_string();
-                let brand_str = nt_world_browse._sec_ch_ua_brand(&major_version);
+                let brand_str = stealth_browser._sec_ch_ua_brand(&major_version);
                 (brand_str, if platform.is_mobile() { "?1".into() } else { "?0".into() }, platform.sec_ch_ua_platform().to_string())
             }
             Browser::Firefox | Browser::Safari => {
@@ -513,7 +513,7 @@ impl SystemFingerprintGenerator {
             }
         };
 
-        let tls_fingerprint_hint = match nt_world_browse {
+        let tls_fingerprint_hint = match stealth_browser {
             Browser::Chrome | Browser::Edge => TlsFingerprintHint {
                 alpn: vec!["h2".into(), "http/1.1".into()],
                 cipher_order: vec![
@@ -548,7 +548,7 @@ impl SystemFingerprintGenerator {
 
         SystemFingerprint {
             platform,
-            nt_world_browse,
+            stealth_browser,
             timezone,
             locale,
             accept_language,
@@ -560,7 +560,7 @@ impl SystemFingerprintGenerator {
             dns_leak_protection: true,
             tls_fingerprint_hint,
             tls_variant,
-            nt_world_browse_fp: BrowserFingerprintProfile::_from_platform_and_h2(platform, h2),
+            stealth_browser_fp: BrowserFingerprintProfile::_from_platform_and_h2(platform, h2),
         }
     }
 
@@ -603,7 +603,7 @@ impl SystemFingerprintGenerator {
             headers.insert("Sec-CH-UA-Model".into(), "".into());
         }
         headers.insert("DNT".into(), "1".into());
-        for (k, v) in fp.nt_world_browse_fp.to_headers() {
+        for (k, v) in fp.stealth_browser_fp.to_headers() {
             headers.insert(k.to_string(), v);
         }
         headers
@@ -613,10 +613,10 @@ impl SystemFingerprintGenerator {
     pub fn validate_consistency(fp: &SystemFingerprint) -> Vec<String> {
         let mut issues = Vec::new();
 
-        if !fp.nt_world_browse.compatible_platforms().contains(&fp.platform) {
+        if !fp.stealth_browser.compatible_platforms().contains(&fp.platform) {
             issues.push(format!(
                 "Browser {:?} not compatible with platform {:?}",
-                fp.nt_world_browse, fp.platform
+                fp.stealth_browser, fp.platform
             ));
         }
 
@@ -646,11 +646,11 @@ impl SystemFingerprintGenerator {
             Platform::ChromeOS => "Google Inc. (Intel)",
             Platform::Android | Platform::IOS => "",
         };
-        if !fp.nt_world_browse_fp.webgl_vendor.starts_with(expected_webgl_prefix)
-            && !fp.nt_world_browse_fp.webgl_vendor.contains("Apple Inc") && !fp.platform.is_mobile() {
+        if !fp.stealth_browser_fp.webgl_vendor.starts_with(expected_webgl_prefix)
+            && !fp.stealth_browser_fp.webgl_vendor.contains("Apple Inc") && !fp.platform.is_mobile() {
                 issues.push(format!(
                     "WebGL vendor '{}' doesn't match platform {:?} (expected '{}')",
-                    fp.nt_world_browse_fp.webgl_vendor, fp.platform, expected_webgl_prefix
+                    fp.stealth_browser_fp.webgl_vendor, fp.platform, expected_webgl_prefix
                 ));
             }
 
@@ -659,10 +659,10 @@ impl SystemFingerprintGenerator {
             Platform::Android | Platform::IOS => 700,
             _ => 720,
         };
-        if fp.nt_world_browse_fp.screen_height < expected_min_height {
+        if fp.stealth_browser_fp.screen_height < expected_min_height {
             issues.push(format!(
                 "Screen height {} too low for {:?}",
-                fp.nt_world_browse_fp.screen_height, fp.platform
+                fp.stealth_browser_fp.screen_height, fp.platform
             ));
         }
 
@@ -706,7 +706,7 @@ mod tests {
         assert!(headers.contains_key("Accept-Language"));
         assert!(headers.contains_key("DNT"));
         // Sec-CH-UA only present for Chrome/Edge
-        if matches!(fp.nt_world_browse, Browser::Chrome | Browser::Edge) {
+        if matches!(fp.stealth_browser, Browser::Chrome | Browser::Edge) {
             assert!(headers.contains_key("Sec-CH-UA"));
             assert!(headers.contains_key("Sec-CH-UA-Platform"));
         }

@@ -105,10 +105,7 @@ pub struct PhiReport {
 }
 
 /// Generate phi report from hexagram states and history.
-pub fn generate_phi_report(
-    hexagram_states: &[u8],
-    phi_history: &[f64],
-) -> PhiReport {
+pub fn generate_phi_report(hexagram_states: &[u8], phi_history: &[f64]) -> PhiReport {
     let current_phi = compute_board_phi(hexagram_states);
     let phi_delta = track_phi_delta(phi_history);
 
@@ -167,7 +164,7 @@ mod tests {
     }
 
     #[test]
-   fn test_track_phi_delta_decreasing() {
+    fn test_track_phi_delta_decreasing() {
         let history = vec![0.5, 0.4, 0.3, 0.2, 0.1];
         let delta = track_phi_delta(&history);
         assert!(delta < 0.0);

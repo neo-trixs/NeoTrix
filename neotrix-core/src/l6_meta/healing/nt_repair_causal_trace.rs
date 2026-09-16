@@ -145,7 +145,7 @@ pub enum SourceVerdict {
 }
 
 impl SourceVerdict {
-    pub(crate) fn _is_identified(&self) -> bool {
+    pub fn is_identified(&self) -> bool {
         matches!(self, Self::Identified { .. })
     }
 }
@@ -184,7 +184,7 @@ impl SourceAdjudicator {
     }
 
     /// 裁决: 返回恰好一个主源。全部未命中 → `SourceUnknown`。
-    pub(crate) fn _adjudicate(&self, chain: &[CausalNode]) -> SourceVerdict {
+    pub fn adjudicate(&self, chain: &[CausalNode]) -> SourceVerdict {
         for detector in &self.detectors {
             if let Some(evidence) = (detector.detect)(chain) {
                 return SourceVerdict::Identified {
@@ -302,7 +302,7 @@ impl EvidenceGate {
         Self { rules }
     }
 
-    pub(crate) fn _with_default_rules() -> Self {
+    pub fn with_default_rules() -> Self {
         Self::new(vec![
             EvidenceRule {
                 name: "root_owned",
@@ -385,7 +385,7 @@ impl CausalTrace {
                 warnings: Vec::new(),
             };
         }
-        let verdict = adjudicator._adjudicate(&chain);
+        let verdict = adjudicator.adjudicate(&chain);
         let warnings = gate.evaluate(&chain);
         CausalTrace {
             chain,
@@ -469,19 +469,19 @@ impl SelfTest for CausalTraceSelfTest {
             CausalNode::new("2", "pm2")._with_parent("1"),
             CausalNode::new("3", "node")._with_parent("2"),
         ];
-        let verdict = adj._adjudicate(&chain2);
+        let verdict = adj.adjudicate(&chain2);
         if !matches!(&verdict, SourceVerdict::Identified { source, .. } if source == "systemd/launchd")
         {
             failures.push(format!("expected systemd winner, got {:?}", verdict));
         }
         // 无证据链 → Unknown (显式不确定)
         let empty_chain: Vec<CausalNode> = Vec::new();
-        if !matches!(adj._adjudicate(&empty_chain), SourceVerdict::Unknown) {
+        if !matches!(adj.adjudicate(&empty_chain), SourceVerdict::Unknown) {
             failures.push("empty chain should be Unknown".into());
         }
 
         // C3: 证据门控 — 根身份 + 公网绑定命中
-        let gate = EvidenceGate::_with_default_rules();
+        let gate = EvidenceGate::with_default_rules();
         let chain3 = vec![
             CausalNode::new("1", "root@systemd").with_evidence("0.0.0.0:80"),
             CausalNode::new("2", "web_server")._with_parent("1"),
@@ -575,19 +575,19 @@ mod tests {
             CausalNode::new("2", "pm2")._with_parent("1"),
             CausalNode::new("3", "node")._with_parent("2"),
         ];
-        assert!(adj._adjudicate(&chain)._is_identified());
+        assert!(adj.adjudicate(&chain).is_identified());
     }
 
     #[test]
     fn test_adjudicator_unknown_explicit() {
         let adj = default_adjudicator();
         let chain = vec![CausalNode::new("1", "orphan_proc")];
-        assert_eq!(adj._adjudicate(&chain), SourceVerdict::Unknown);
+        assert_eq!(adj.adjudicate(&chain), SourceVerdict::Unknown);
     }
 
     #[test]
     fn test_evidence_gate_warnings() {
-        let gate = EvidenceGate::_with_default_rules();
+        let gate = EvidenceGate::with_default_rules();
         let chain = vec![CausalNode::new("1", "root@systemd").with_evidence("0.0.0.0:443")];
         let warnings = gate.evaluate(&chain);
         let names: Vec<&str> = warnings.iter().map(|w| w.name).collect();
@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_evidence_gate_clean() {
-        let gate = EvidenceGate::_with_default_rules();
+        let gate = EvidenceGate::with_default_rules();
         let chain = vec![CausalNode::new("1", "user@systemd").with_evidence("127.0.0.1:8080")];
         assert!(gate.is_clean(&chain));
     }
@@ -616,7 +616,7 @@ mod tests {
     fn test_narrative_output() {
         let walker = CausalChainWalker::default();
         let adj = default_adjudicator();
-        let gate = EvidenceGate::_with_default_rules();
+        let gate = EvidenceGate::with_default_rules();
         let mut resolve = |id: &str| -> Option<CausalNode> {
             match id {
                 "srv" => Some(CausalNode::new("pm2", "pm2")._with_parent("sys")),

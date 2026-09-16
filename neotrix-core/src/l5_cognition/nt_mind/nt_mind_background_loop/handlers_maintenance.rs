@@ -948,7 +948,7 @@ impl BackgroundLoopHandle {
     /// L6 自我改进循环 — 采集系统指标 → 诊断瓶颈 → 生成改进方案 → 执行 → 验证。
     /// 与 SEAL pipeline 互补: SEAL 聚焦技能模板提取, 本模块聚焦系统层面参数调优。
     pub(crate) async fn handle_self_improvement(&mut self) {
-        use crate::l5_cognition::l6_facade::SystemMetrics;
+        use crate::l6_meta::coordination::self_improvement::SystemMetrics;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
@@ -1034,7 +1034,7 @@ impl BackgroundLoopHandle {
 //     use crate::l5_cognition::nt_mind_background_loop::BackgroundLoop;
 //     use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
 //     use std::sync::Arc;
-//     use tokio::sync::RwLock;
+//     use std::sync::RwLock;
 //
 //     /// Test that system health heal handler exists and can be called
 //     #[tokio::test]

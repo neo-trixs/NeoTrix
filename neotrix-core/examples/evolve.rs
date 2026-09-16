@@ -10,7 +10,7 @@ use std::time::Instant;
 use neotrix::neotrix::nt_world_crawl::{
     CrawlerConfig, CrawlStrategy, CrawlTopic, SeedEntry, UnifiedCrawler,
 };
-use neotrix::neotrix::nt_mind::attention_router::AttentionRouter;
+use neotrix::nt_mind::nt_mind::reason::attention_router::AttentionRouter;
 use neotrix::{ReasoningBrain, ReasoningBank};
 
 fn main() {

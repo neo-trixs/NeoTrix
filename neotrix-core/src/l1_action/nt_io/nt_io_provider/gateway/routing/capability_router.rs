@@ -100,6 +100,7 @@ impl Default for CapabilityRouter {
 mod tests {
     use super::*;
     use crate::core::nt_core_llm::{Message, Role, Tool};
+    use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::PROVIDER_CATALOG;
 
     fn user_msg(content: &str) -> Message {
         Message::new(Role::User, content)
@@ -143,7 +144,7 @@ mod tests {
         let req = LlmRequest::new("test", "use tools").with_tools(vec![Tool {
             name: "search".into(),
             description: "search the web".into(),
-            parameters: "{}".into(),
+            input_schema: "{}".into(),
         }]);
         let cap = CapabilityRouter::infer_capabilities(&req);
         assert!(cap.function_calling);
@@ -188,7 +189,7 @@ mod tests {
         let req = LlmRequest::new("test", "use tools").with_tools(vec![Tool {
             name: "search".into(),
             description: "search".into(),
-            parameters: "{}".into(),
+            input_schema: "{}".into(),
         }]);
         let name = router.route(&req).unwrap();
         let info = PROVIDER_CATALOG.iter().find(|p| p.name == name).unwrap();

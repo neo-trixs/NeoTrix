@@ -286,7 +286,7 @@ pub fn _language_for_region(region: &str) -> String {
 // ============================================================================
 
 /// 剥离内部 NeoTrix 指纹 (port of _strip_internal_headers / INTERNAL_PATTERNS)。
-pub fn _strip_internal(value: &str) -> String {
+pub fn strip_internal(value: &str) -> String {
     let mut v = value.to_string();
     // "nt_" 独立成词才替换 (词边界, 避免命中 "client_" 尾部), 先于 "neotrix"
     let nt_re = regex::Regex::new(r"(?i)\bnt_").expect("static literal regex");
@@ -378,7 +378,7 @@ pub fn build_headers(
     // strip internal
     let cleaned: Vec<(String, String)> = headers
         .into_iter()
-        .map(|(k, v)| (_strip_internal(&k), _strip_internal(&v)))
+        .map(|(k, v)| (strip_internal(&k), strip_internal(&v)))
         .collect();
 
     // apply header_order
@@ -730,13 +730,13 @@ mod tests {
 
     #[test]
     fn test_strip_internal_patterns() {
-        assert_eq!(_strip_internal("NeoTrixBot/1.0"), "clientBot/1.0");
-        assert_eq!(_strip_internal("x-neotrix-session: abc"), "x-client-session: abc");
-        assert_eq!(_strip_internal("x-nt-key: secret"), "x-client-key: secret");
-        assert_eq!(_strip_internal("NEOTRIX_TOKEN"), "CLIENT_TOKEN");
-        assert_eq!(_strip_internal("/Users/alice/data"), "/home/user/data");
-        assert_eq!(_strip_internal("id 550e8400-e29b-41d4-a716-446655440000 end"), "id 00000000-0000-0000-0000-000000000000 end");
-        assert_eq!(_strip_internal("nt_foo_bar"), "sys_foo_bar");
+        assert_eq!(strip_internal("NeoTrixBot/1.0"), "clientBot/1.0");
+        assert_eq!(strip_internal("x-neotrix-session: abc"), "x-client-session: abc");
+        assert_eq!(strip_internal("x-nt-key: secret"), "x-client-key: secret");
+        assert_eq!(strip_internal("NEOTRIX_TOKEN"), "CLIENT_TOKEN");
+        assert_eq!(strip_internal("/Users/alice/data"), "/home/user/data");
+        assert_eq!(strip_internal("id 550e8400-e29b-41d4-a716-446655440000 end"), "id 00000000-0000-0000-0000-000000000000 end");
+        assert_eq!(strip_internal("nt_foo_bar"), "sys_foo_bar");
     }
 
     #[test]

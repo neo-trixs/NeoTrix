@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn test_enhanced_registry() {
         let mut reg = EnhancedRegistry::new();
-        let card = super::nt_infra_agent_card::AgentCard::new("test", "Test", "Test agent");
+        let card = crate::l1_action::nt_infra_agent_card::AgentCard::new("test", "Test", "Test agent");
         reg.register(card);
         assert!(reg.is_available("test"));
         assert_eq!(reg.available().len(), 1);
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn test_enhanced_router() {
         let mut router = EnhancedRouter::new();
-        router.semantic.add_rule(super::nt_infra_semantic_router::RouteRule {
+        router.semantic.add_rule(crate::l1_action::nt_infra_semantic_router::RouteRule {
             id: "r1".into(),
             intent: "search".into(),
             keywords: vec!["search".into()],

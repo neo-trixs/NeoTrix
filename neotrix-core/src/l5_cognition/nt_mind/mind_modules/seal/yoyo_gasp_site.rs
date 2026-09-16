@@ -85,24 +85,20 @@ impl _GaspStage {
     }
 }
 
-/// GASP 运行时架构映射 trait — 提供仓库/阶段同构校验。
-pub trait _GaspRuntimeMapper {
-    /// 五仓库是否全部命中 NeoTrix 对应模块 (非空映射)。
-    fn all_vaults_mapped(&self) -> bool {
+/// yoyo-gasp 运行时参考映射器。
+pub struct _YoyoGaspRuntime;
+
+impl _YoyoGaspRuntime {
+    pub fn all_vaults_mapped(&self) -> bool {
         _GaspVault::all().iter().all(|v| !v._maps_to_neotrix().is_empty())
     }
-    /// 四阶段是否全部命中 SEAL stage (非空映射)。
-    fn all_stages_mapped(&self) -> bool {
+
+    pub fn all_stages_mapped(&self) -> bool {
         _GaspStage::lifecycle()
             .iter()
             .all(|s| !s._maps_to_seal_stage().is_empty())
     }
 }
-
-/// yoyo-gasp 运行时参考映射器。
-pub struct _YoyoGaspRuntime;
-
-impl _GaspRuntimeMapper for _YoyoGaspRuntime {}
 
 impl SelfTest for _YoyoGaspRuntime {
     fn name(&self) -> &'static str {

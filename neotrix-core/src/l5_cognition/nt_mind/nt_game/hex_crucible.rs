@@ -32,12 +32,8 @@
 
 use std::collections::HashMap;
 
-use super::env::{
-    CognitiveSkill, Difficulty, GameMeta, GameRegistry, NtGameEnv, RenderMode,
-};
-use super::framework::{
-    Action, Actor, ActorId, Observation, Role, StepResult, TurnIndex,
-};
+use super::env::{CognitiveSkill, Difficulty, GameMeta, GameRegistry, NtGameEnv, RenderMode};
+use super::framework::{Action, Actor, ActorId, Observation, Role, StepResult, TurnIndex};
 
 // ═══════════════════════════════════════════════════════════════════
 // Constants
@@ -330,8 +326,7 @@ impl HexCrucible {
             return Err("Not your turn".into());
         }
 
-        let token_pos = self.find_token(player_idx)
-            .ok_or("No token found")?;
+        let token_pos = self.find_token(player_idx).ok_or("No token found")?;
 
         let neighbors = self.neighbors(token_pos);
         if !neighbors.contains(&target) {
@@ -470,8 +465,7 @@ impl HexCrucible {
             return Err("Not your turn".into());
         }
 
-        self.state.energy[player_idx] =
-            (self.state.energy[player_idx] + PASS_GAIN).min(MAX_ENERGY);
+        self.state.energy[player_idx] = (self.state.energy[player_idx] + PASS_GAIN).min(MAX_ENERGY);
         self.advance_turn();
 
         Ok(StepResult {
@@ -590,15 +584,24 @@ impl HexCrucible {
     fn text_state(&self, agent_id: ActorId) -> String {
         let mut s = String::new();
         let n = self.state.grid_size;
-        let pid = if agent_id == self.state.player_ids[0] { 0 } else { 1 };
+        let pid = if agent_id == self.state.player_ids[0] {
+            0
+        } else {
+            1
+        };
 
         s.push_str(&format!(
             "=== HexCrucible (Turn {}/{}) ===\n",
             self.state.turn, self.state.max_turns
         ));
-        s.push_str(&format!("You: {} | Energy: {:.0}\n", agent_id, self.state.energy[pid]));
-        s.push_str(&format!("Territory: {} | Resonance pairs: {}\n",
-            self.state.territory[0], self.state.total_resonance_pairs));
+        s.push_str(&format!(
+            "You: {} | Energy: {:.0}\n",
+            agent_id, self.state.energy[pid]
+        ));
+        s.push_str(&format!(
+            "Territory: {} | Resonance pairs: {}\n",
+            self.state.territory[0], self.state.total_resonance_pairs
+        ));
         s.push_str(&format!("Phi: {:.3}\n\n", self.compute_phi()));
 
         // Board
@@ -631,7 +634,9 @@ impl NtGameEnv for HexCrucible {
     fn meta(&self) -> GameMeta {
         GameMeta {
             name: "HexCrucible".into(),
-            description: "E8 hexagram strategy game — two-player territory control with resonance mechanics".into(),
+            description:
+                "E8 hexagram strategy game — two-player territory control with resonance mechanics"
+                    .into(),
             min_constellation: 0,
             max_constellation: 5,
             target_skills: vec![
@@ -671,7 +676,9 @@ impl NtGameEnv for HexCrucible {
         let pid = self.state.current_player;
         match action.kind.as_str() {
             "Move" => {
-                let target = action.params.get("target")
+                let target = action
+                    .params
+                    .get("target")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as usize;
                 self.try_move(pid, target).unwrap_or_else(|e| StepResult {
@@ -682,7 +689,9 @@ impl NtGameEnv for HexCrucible {
                 })
             }
             "Claim" => {
-                let target = action.params.get("target")
+                let target = action
+                    .params
+                    .get("target")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as usize;
                 self.try_claim(pid, target).unwrap_or_else(|e| StepResult {
@@ -693,18 +702,23 @@ impl NtGameEnv for HexCrucible {
                 })
             }
             "Transform" => {
-                let target = action.params.get("target")
+                let target = action
+                    .params
+                    .get("target")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as usize;
-                let line = action.params.get("line")
+                let line = action
+                    .params
+                    .get("line")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as usize;
-                self.try_transform(pid, target, line).unwrap_or_else(|e| StepResult {
-                    observation: self.make_observation(),
-                    reward: -0.1,
-                    done: false,
-                    info: serde_json::json!({"error": e}),
-                })
+                self.try_transform(pid, target, line)
+                    .unwrap_or_else(|e| StepResult {
+                        observation: self.make_observation(),
+                        reward: -0.1,
+                        done: false,
+                        info: serde_json::json!({"error": e}),
+                    })
             }
             "Pass" | _ => self.try_pass(pid).unwrap_or_else(|e| StepResult {
                 observation: self.make_observation(),
@@ -777,7 +791,8 @@ Scoring:
 
 Winning:
 - Highest score after max_turns wins
-"#.into()
+"#
+        .into()
     }
 
     fn to_hexagram(&self) -> Option<u8> {
@@ -813,7 +828,8 @@ Winning:
                     "energy": self.state.energy,
                     "territory": self.state.territory,
                     "phi": self.compute_phi(),
-                }).to_string()
+                })
+                .to_string()
             }
         }
     }
@@ -827,7 +843,9 @@ Winning:
 pub fn register_hex_crucible(registry: &mut GameRegistry) {
     registry.register(GameMeta {
         name: "HexCrucible".into(),
-        description: "E8 hexagram strategy game — two-player territory control with resonance mechanics".into(),
+        description:
+            "E8 hexagram strategy game — two-player territory control with resonance mechanics"
+                .into(),
         min_constellation: 0,
         max_constellation: 5,
         target_skills: vec![
@@ -927,7 +945,12 @@ mod tests {
     fn test_claim_action() {
         let mut game = make_game();
         // Find an unclaimed cell
-        let target = game.state.cells.iter().position(|c| c.owner.is_none()).unwrap();
+        let target = game
+            .state
+            .cells
+            .iter()
+            .position(|c| c.owner.is_none())
+            .unwrap();
         let result = game.try_claim(0, target);
         assert!(result.is_ok());
         assert!(game.state.energy[0] < STARTING_ENERGY);

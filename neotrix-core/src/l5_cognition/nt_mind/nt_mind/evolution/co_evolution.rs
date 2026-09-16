@@ -18,7 +18,7 @@
 // 经 `ProductionAgentExecutor::execute_with_strategy` 走既有的 `search_with_confidence`
 // 检索缝 — 不新建平行检索路径。
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -29,12 +29,19 @@ use crate::core::nt_core_self::attention_head::AttentionDomain;
 use crate::l5_cognition::kb_facade::{KnowledgeBase, RetrievalStrategy};
 
 /// 可选的检索策略集 — 任务级搜索 bandit 的臂 (arm)。
-pub const COEVO_STRATEGIES: &[&str] = &["balanced", "conservative", "exploratory", "confidence_weighted"];
+pub const COEVO_STRATEGIES: &[&str] = &[
+    "balanced",
+    "conservative",
+    "exploratory",
+    "confidence_weighted",
+];
 
 /// 策略名 → `RetrievalStrategy` (注入既有 confidence 检索缝)。
 pub fn parse_strategy(name: &str) -> RetrievalStrategy {
     match name {
-        "conservative" => RetrievalStrategy::Conservative { min_confidence: 0.6 },
+        "conservative" => RetrievalStrategy::Conservative {
+            min_confidence: 0.6,
+        },
         "exploratory" => RetrievalStrategy::Exploratory,
         "confidence_weighted" => RetrievalStrategy::ConfidenceWeighted {
             source_weight: 0.4,
@@ -169,10 +176,14 @@ impl TaskSearchBandit {
                 .map(|s| s.strategy.clone())
                 .unwrap_or_else(|| "balanced".to_string());
         }
-        let explore = self.config.epsilon > 0.0
-            && rand::thread_rng().gen::<f64>() < self.config.epsilon;
+        let explore =
+            self.config.epsilon > 0.0 && rand::thread_rng().gen::<f64>() < self.config.epsilon;
         if explore {
-            let pool = if stats.len() > 1 { stats.as_slice() } else { &[stats[0].clone()][..] };
+            let pool = if stats.len() > 1 {
+                stats.as_slice()
+            } else {
+                &[stats[0].clone()][..]
+            };
             let i = rand::thread_rng().gen_range(0..pool.len());
             return pool[i].strategy.clone();
         }
@@ -301,7 +312,11 @@ impl CoEvolutionLoop {
         }
 
         // environment 子图: 任务级总体成败。
-        let env = self.graph.environment.entry(task_type.to_string()).or_insert((0, 0));
+        let env = self
+            .graph
+            .environment
+            .entry(task_type.to_string())
+            .or_insert((0, 0));
         env.0 += success as u32;
         env.1 += 1;
 
@@ -404,8 +419,7 @@ impl CoEvolutionLoop {
 
     /// 持久化到 KB kv_store (namespace "coevolution") — 四子图与 bandit 跨会话存活。
     pub fn persist(&self, kb: &KnowledgeBase) -> Result<(), String> {
-        let json = serde_json::to_string(self)
-            .map_err(|e| format!("coevo serialize: {}", e))?;
+        let json = serde_json::to_string(self).map_err(|e| format!("coevo serialize: {}", e))?;
         kb.save_coevo(&json)
     }
 
@@ -414,8 +428,8 @@ impl CoEvolutionLoop {
         let Some(json) = kb.load_coevo()? else {
             return Ok(());
         };
-        let loaded: CoEvolutionLoop = serde_json::from_str(&json)
-            .map_err(|e| format!("coevo deserialize: {}", e))?;
+        let loaded: CoEvolutionLoop =
+            serde_json::from_str(&json).map_err(|e| format!("coevo deserialize: {}", e))?;
         self.config = loaded.config;
         self.graph = loaded.graph;
         self.next_memory_id = loaded.next_memory_id;
@@ -489,18 +503,32 @@ mod tests {
             );
         }
         // 5 轮内覆盖 ≥ 3 种不同策略 (balanced/conservative/exploratory/confidence_weighted)。
-        assert!(seen.len() >= 3, "cold-start should cover multiple arms, got {:?}", seen);
+        assert!(
+            seen.len() >= 3,
+            "cold-start should cover multiple arms, got {:?}",
+            seen
+        );
     }
 
     #[test]
     fn record_reward_evolves_all_four_subgraphs() {
         let mut loop_ = CoEvolutionLoop::with_config(cfg_deterministic());
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "explorer", "balanced", true, "searched 5");
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "balanced",
+            true,
+            "searched 5",
+        );
         assert_eq!(loop_.evolution_revision, 1);
         assert_eq!(loop_.task_rewards("research"), 1);
         assert_eq!(loop_.graph.memories.len(), 1);
         // capability 子图
-        assert_eq!(loop_.mastery(AttentionDomain::PatternMatch, "explorer"), 1.0);
+        assert_eq!(
+            loop_.mastery(AttentionDomain::PatternMatch, "explorer"),
+            1.0
+        );
         // task 子图 bandit 观测
         let stats = loop_.bandit().stats("research");
         assert_eq!(stats.len(), 1);
@@ -514,12 +542,43 @@ mod tests {
     fn bandit_exploits_highest_rate_after_evidence() {
         let mut loop_ = CoEvolutionLoop::with_config(cfg_deterministic());
         // balanced 2 尝试 2 成功; exploratory 2 尝试 0 成功 → 利用 balanced。
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "e", "balanced", true, "a");
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "e", "balanced", true, "b");
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "e", "exploratory", false, "c");
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "e", "exploratory", false, "d");
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "e",
+            "balanced",
+            true,
+            "a",
+        );
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "e",
+            "balanced",
+            true,
+            "b",
+        );
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "e",
+            "exploratory",
+            false,
+            "c",
+        );
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "e",
+            "exploratory",
+            false,
+            "d",
+        );
         assert_eq!(loop_.select_strategy("research"), "balanced");
-        assert_eq!(loop_.bandit().best_strategy("research").unwrap(), "balanced");
+        assert_eq!(
+            loop_.bandit().best_strategy("research").unwrap(),
+            "balanced"
+        );
     }
 
     #[test]
@@ -538,10 +597,38 @@ mod tests {
     #[test]
     fn dual_memory_guidance_and_failure_warnings() {
         let mut loop_ = CoEvolutionLoop::with_config(cfg_deterministic());
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "explorer", "balanced", true, "good1");
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "explorer", "balanced", false, "bad1");
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "explorer", "balanced", true, "good2");
-        loop_.record_reward("coding", AttentionDomain::Code, "generalist", "balanced", true, "unrelated");
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "balanced",
+            true,
+            "good1",
+        );
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "balanced",
+            false,
+            "bad1",
+        );
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "balanced",
+            true,
+            "good2",
+        );
+        loop_.record_reward(
+            "coding",
+            AttentionDomain::Code,
+            "generalist",
+            "balanced",
+            true,
+            "unrelated",
+        );
         let g: Vec<&ExperienceMemory> = loop_.guidance("research", 10);
         assert_eq!(g.len(), 2);
         assert!(g.iter().all(|m| m.is_success()));
@@ -563,8 +650,22 @@ mod tests {
     #[test]
     fn absorb_watermark_dedups_consumed_memories() {
         let mut loop_ = CoEvolutionLoop::with_config(cfg_deterministic());
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "explorer", "balanced", true, "hit 5");
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "explorer", "conservative", false, "empty");
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "balanced",
+            true,
+            "hit 5",
+        );
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "conservative",
+            false,
+            "empty",
+        );
         // 水位之上 = 全部未吸收经验。
         assert_eq!(loop_.new_memories_since_watermark().len(), 2);
         loop_.commit_absorb();
@@ -572,7 +673,14 @@ mod tests {
         assert!(loop_.new_memories_since_watermark().is_empty());
         assert_eq!(loop_.absorbed_watermark, 2);
         // 新 reward 落在水位之后 → 可被下一次吸收。
-        loop_.record_reward("research", AttentionDomain::PatternMatch, "explorer", "exploratory", true, "deep dive");
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "exploratory",
+            true,
+            "deep dive",
+        );
         let new = loop_.new_memories_since_watermark();
         assert_eq!(new.len(), 1);
         assert_eq!(new[0].id, 2);
@@ -585,7 +693,8 @@ mod tests {
                 .unwrap_or_default()
                 .as_nanos()
         ));
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp.into())).expect("open kb");
+        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp.into()))
+            .expect("open kb");
         loop_.persist(&kb).expect("persist");
         let mut restored = CoEvolutionLoop::new();
         restored.load(&kb).expect("load");

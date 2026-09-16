@@ -11,7 +11,7 @@ use super::knowledge_engine::{KnowledgeEngine, KnowledgeEntry, SourceType};
 
 /// 统一来源类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum _UnifiedSourceType {
+pub enum UnifiedSourceType {
     Wikipedia,
     ArXiv,
     GitHub,
@@ -20,17 +20,17 @@ pub enum _UnifiedSourceType {
     SeedDomain,
 }
 
-impl _UnifiedSourceType {
+impl UnifiedSourceType {
     pub fn detect(url: &str) -> Self {
         let lower = url.to_lowercase();
         if lower.contains("wikipedia.org") || lower.contains("wikidata.org") {
-            _UnifiedSourceType::Wikipedia
+            UnifiedSourceType::Wikipedia
         } else if lower.contains("arxiv.org") || lower.contains("semanticscholar.org") {
-            _UnifiedSourceType::ArXiv
+            UnifiedSourceType::ArXiv
         } else if lower.contains("github.com") {
-            _UnifiedSourceType::GitHub
+            UnifiedSourceType::GitHub
         } else {
-            _UnifiedSourceType::GenericWeb
+            UnifiedSourceType::GenericWeb
         }
     }
 }
@@ -71,7 +71,7 @@ impl ExploreDomain {
 pub use super::exploration_seeds::seed_urls_by_domain;
 
 #[derive(Debug, Clone)]
-pub struct _ExploreRoundResult {
+pub struct ExploreRoundResult {
     pub domains_processed: Vec<ExploreDomain>,
     pub total_mined: usize,
     pub total_absorbed: usize,
@@ -137,11 +137,11 @@ impl ExplorationPipeline {
     /// 统一入口：接受任意 URL/来源，分类并入队
     pub fn ingest(&mut self, url: &str, domain: Option<ExploreDomain>) {
         let effective_domain = domain.unwrap_or_else(|| {
-            let src = _UnifiedSourceType::detect(url);
+            let src = UnifiedSourceType::detect(url);
             match src {
-                _UnifiedSourceType::GitHub => ExploreDomain::GitHub,
-                _UnifiedSourceType::ArXiv => ExploreDomain::Papers,
-                _UnifiedSourceType::Wikipedia => ExploreDomain::Wiki,
+                UnifiedSourceType::GitHub => ExploreDomain::GitHub,
+                UnifiedSourceType::ArXiv => ExploreDomain::Papers,
+                UnifiedSourceType::Wikipedia => ExploreDomain::Wiki,
                 _ => ExploreDomain::General,
             }
         });
@@ -316,8 +316,8 @@ impl ExplorationPipeline {
         let mut web_urls: Vec<String> = Vec::new();
         let mut gh_urls: Vec<String> = Vec::new();
         for url in &domain_urls {
-            match _UnifiedSourceType::detect(url) {
-                _UnifiedSourceType::GitHub => { gh_urls.push(url.clone()); }
+            match UnifiedSourceType::detect(url) {
+                UnifiedSourceType::GitHub => { gh_urls.push(url.clone()); }
                 _ => { web_urls.push(url.clone()); }
             }
         }
@@ -402,11 +402,11 @@ impl ExplorationPipeline {
     }
 
     /// 单轮完整处理：检查所有域 -> 抓取 -> 自动发现 -> 目标构建
-    pub(crate) fn _run_round(
+    pub fn run_round(
         &mut self,
         brain: &mut ReasoningBrain,
         bank: &mut ReasoningBank,
-    ) -> _ExploreRoundResult {
+    ) -> ExploreRoundResult {
         self.round_count += 1;
         let mut details = Vec::new();
         let mut total_mined = 0usize;
@@ -464,10 +464,10 @@ impl ExplorationPipeline {
             let last_attempt = self.processed.contains(url);
             if last_attempt && *retries < self.max_retries && now as u64 > cooldown {
                 self.processed.remove(url);
-                let domain = match _UnifiedSourceType::detect(url) {
-                    _UnifiedSourceType::GitHub => ExploreDomain::GitHub,
-                    _UnifiedSourceType::ArXiv => ExploreDomain::Papers,
-                    _UnifiedSourceType::Wikipedia => ExploreDomain::Wiki,
+                let domain = match UnifiedSourceType::detect(url) {
+                    UnifiedSourceType::GitHub => ExploreDomain::GitHub,
+                    UnifiedSourceType::ArXiv => ExploreDomain::Papers,
+                    UnifiedSourceType::Wikipedia => ExploreDomain::Wiki,
                     _ => ExploreDomain::General,
                 };
                 self.seed_queue.push_back((domain, vec![url.clone()]));
@@ -485,7 +485,7 @@ impl ExplorationPipeline {
             details.push("all domains up-to-date, sleeping until next cycle".into());
         }
 
-        _ExploreRoundResult {
+        ExploreRoundResult {
             domains_processed,
             total_mined,
             total_absorbed: total_mined,
@@ -540,60 +540,60 @@ mod tests {
     #[test]
     fn test_unified_source_type_detect_wikipedia() {
         assert_eq!(
-            _UnifiedSourceType::detect("https://en.wikipedia.org/wiki/Rust"),
-            _UnifiedSourceType::Wikipedia
+            UnifiedSourceType::detect("https://en.wikipedia.org/wiki/Rust"),
+            UnifiedSourceType::Wikipedia
         );
         assert_eq!(
-            _UnifiedSourceType::detect("https://wikidata.org/wiki/Q123"),
-            _UnifiedSourceType::Wikipedia
+            UnifiedSourceType::detect("https://wikidata.org/wiki/Q123"),
+            UnifiedSourceType::Wikipedia
         );
     }
 
     #[test]
     fn test_unified_source_type_detect_arxiv() {
         assert_eq!(
-            _UnifiedSourceType::detect("https://arxiv.org/abs/2303.08774"),
-            _UnifiedSourceType::ArXiv
+            UnifiedSourceType::detect("https://arxiv.org/abs/2303.08774"),
+            UnifiedSourceType::ArXiv
         );
         assert_eq!(
-            _UnifiedSourceType::detect("https://semanticscholar.org/paper/123"),
-            _UnifiedSourceType::ArXiv
+            UnifiedSourceType::detect("https://semanticscholar.org/paper/123"),
+            UnifiedSourceType::ArXiv
         );
     }
 
     #[test]
     fn test_unified_source_type_detect_github() {
         assert_eq!(
-            _UnifiedSourceType::detect("https://github.com/rust-lang/rust"),
-            _UnifiedSourceType::GitHub
+            UnifiedSourceType::detect("https://github.com/rust-lang/rust"),
+            UnifiedSourceType::GitHub
         );
         assert_eq!(
-            _UnifiedSourceType::detect("https://github.com/serde-rs/serde"),
-            _UnifiedSourceType::GitHub
+            UnifiedSourceType::detect("https://github.com/serde-rs/serde"),
+            UnifiedSourceType::GitHub
         );
     }
 
     #[test]
     fn test_unified_source_type_detect_generic() {
         assert_eq!(
-            _UnifiedSourceType::detect("https://example.com"),
-            _UnifiedSourceType::GenericWeb
+            UnifiedSourceType::detect("https://example.com"),
+            UnifiedSourceType::GenericWeb
         );
         assert_eq!(
-            _UnifiedSourceType::detect("https://some-other-site.org/page"),
-            _UnifiedSourceType::GenericWeb
+            UnifiedSourceType::detect("https://some-other-site.org/page"),
+            UnifiedSourceType::GenericWeb
         );
     }
 
     #[test]
     fn test_unified_source_type_detect_unknown() {
         assert_eq!(
-            _UnifiedSourceType::detect(""),
-            _UnifiedSourceType::GenericWeb
+            UnifiedSourceType::detect(""),
+            UnifiedSourceType::GenericWeb
         );
         assert_eq!(
-            _UnifiedSourceType::detect("not-a-url"),
-            _UnifiedSourceType::GenericWeb
+            UnifiedSourceType::detect("not-a-url"),
+            UnifiedSourceType::GenericWeb
         );
     }
 

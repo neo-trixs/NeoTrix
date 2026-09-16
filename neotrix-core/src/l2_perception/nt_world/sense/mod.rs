@@ -63,11 +63,12 @@ mod tests;
 #[cfg(test)]
 mod model_tests {
     use super::*;
+    use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
 
     #[test]
     fn test_latent_state_similarity() {
-        let s1 = LatentState::new();
-        let s2 = LatentState::new();
+        let s1 = LatentState::zeros(64);
+        let s2 = LatentState::zeros(64);
         let sim = s1.similarity(&s2);
         assert!(sim > 0.9);
     }

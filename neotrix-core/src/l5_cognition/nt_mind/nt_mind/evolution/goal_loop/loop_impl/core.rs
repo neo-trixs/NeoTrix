@@ -1,16 +1,21 @@
 use std::path::PathBuf;
 
-use super::super::types::{RateLimiter, CircuitBreaker, GoalState, GoalConfig, GoalPriority, GoalScheduleStrategy, PlanTemplate};
-use super::super::tracker::GoalTracker;
 use super::super::super::self_iterating::SelfIteratingBrain;
-use crate::core::{CrtTimeScale, ReasoningHexagram, optimal_starting_mode};
-use crate::neotrix::nt_world_model::TaskType;
-use crate::neotrix::nt_act_orchestrator::Orchestrator;
+use super::super::tracker::GoalTracker;
+use super::super::types::{
+    CircuitBreaker, GoalConfig, GoalPriority, GoalScheduleStrategy, GoalState, PlanTemplate,
+    RateLimiter,
+};
 use crate::agent::AgentTeam;
-use crate::core::nt_core_self::MotivationState;
 use crate::core::nt_core_gwt::resonance::OscillatorNetwork;
-use crate::l5_cognition::nt_mind::foundation::distiller::{CommandDistiller, DistilledOutput, SessionDistiller};
-use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
+use crate::core::nt_core_self::MotivationState;
+use crate::core::{optimal_starting_mode, CrtTimeScale, ReasoningHexagram};
+use crate::l5_cognition::nt_mind::foundation::distiller::{
+    CommandDistiller, DistilledOutput, SessionDistiller,
+};
+use crate::neotrix::nt_act_orchestrator::Orchestrator;
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::neotrix::nt_world_model::TaskType;
 
 fn state_icon(state: &GoalState) -> &str {
     match state {
@@ -26,7 +31,10 @@ pub fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max {
         format!("{:width$}", s, width = max)
     } else {
-        format!("{}...", s.chars().take(max.saturating_sub(3)).collect::<String>())
+        format!(
+            "{}...",
+            s.chars().take(max.saturating_sub(3)).collect::<String>()
+        )
     }
 }
 
@@ -115,10 +123,9 @@ impl GoalLoop {
                 if mot.error_rate > 0.3 && !goal.description.contains("debug") {
                     goal.priority = GoalPriority::High;
                 }
-                if mot.should_explore
-                    && !goal.description.contains("explore") {
-                        goal.priority = GoalPriority::High;
-                    }
+                if mot.should_explore && !goal.description.contains("explore") {
+                    goal.priority = GoalPriority::High;
+                }
                 if mot.confidence < 0.4 && mot.error_rate > 0.2 {
                     goal.priority = GoalPriority::Critical;
                 }
@@ -126,14 +133,24 @@ impl GoalLoop {
         }
     }
 
-    pub fn enqueue_goal(&mut self, brain: &mut SelfIteratingBrain, description: &str, config: Option<GoalConfig>) -> usize {
+    pub fn enqueue_goal(
+        &mut self,
+        brain: &mut SelfIteratingBrain,
+        description: &str,
+        config: Option<GoalConfig>,
+    ) -> usize {
         if self.goal_queue.len() >= self.max_queue {
             return self.goal_queue.len();
         }
         if self.goal_queue.iter().any(|g| g.description == description) {
             return self.goal_queue.len();
         }
-        if self.active_goal.as_ref().map(|g| g.description == description).unwrap_or(false) {
+        if self
+            .active_goal
+            .as_ref()
+            .map(|g| g.description == description)
+            .unwrap_or(false)
+        {
             return self.goal_queue.len();
         }
         let id = uuid::Uuid::new_v4().to_string();
@@ -142,7 +159,8 @@ impl GoalLoop {
         tracker.score_before = brain.brain.evaluate_capability(TaskType::General);
         tracker.score_current = tracker.score_before;
         self.goal_queue.push(tracker);
-        self.goal_queue.sort_by_key(|b| std::cmp::Reverse(b.priority));
+        self.goal_queue
+            .sort_by_key(|b| std::cmp::Reverse(b.priority));
         self.goal_queue.len()
     }
 
@@ -150,7 +168,8 @@ impl GoalLoop {
         if self.goal_queue.is_empty() {
             return None;
         }
-        self.goal_queue.sort_by_key(|b| std::cmp::Reverse(b.priority));
+        self.goal_queue
+            .sort_by_key(|b| std::cmp::Reverse(b.priority));
         Some(self.goal_queue.remove(0))
     }
 
@@ -165,20 +184,25 @@ impl GoalLoop {
             }
             if mot.error_rate > 0.3 {
                 for goal in &mut self.goal_queue {
-                    if goal.description.contains("debug") || goal.description.contains("investigate") {
+                    if goal.description.contains("debug")
+                        || goal.description.contains("investigate")
+                    {
                         goal.priority = GoalPriority::Critical;
                     }
                 }
             }
             if mot.confidence < 0.4 && mot.error_rate > 0.2 {
                 for goal in &mut self.goal_queue {
-                    if goal.description.contains("validate") || goal.description.contains("reinforce") {
+                    if goal.description.contains("validate")
+                        || goal.description.contains("reinforce")
+                    {
                         goal.priority = GoalPriority::Critical;
                     }
                 }
             }
         }
-        self.goal_queue.sort_by_key(|b| std::cmp::Reverse(b.priority));
+        self.goal_queue
+            .sort_by_key(|b| std::cmp::Reverse(b.priority));
     }
 
     pub fn apply_e8_priority(&mut self, hexagram: ReasoningHexagram) {
@@ -192,10 +216,16 @@ impl GoalLoop {
             let dist = hexagram.hamming_dist(&ideal) as u8;
             goal.priority = goal.config.e8_adjusted_priority(goal.priority, dist);
         }
-        self.goal_queue.sort_by_key(|b| std::cmp::Reverse(b.priority));
+        self.goal_queue
+            .sort_by_key(|b| std::cmp::Reverse(b.priority));
     }
 
-    pub fn start_goal(&mut self, brain: &mut SelfIteratingBrain, description: &str, config: Option<GoalConfig>) -> &GoalTracker {
+    pub fn start_goal(
+        &mut self,
+        brain: &mut SelfIteratingBrain,
+        description: &str,
+        config: Option<GoalConfig>,
+    ) -> &GoalTracker {
         let id = uuid::Uuid::new_v4().to_string();
         let cfg = config.unwrap_or_default();
         let score_before = brain.brain.evaluate_capability(TaskType::General);
@@ -250,7 +280,11 @@ impl GoalLoop {
                 } else if g.elapsed_secs() < 3600 {
                     format!("{}m {}s", g.elapsed_secs() / 60, g.elapsed_secs() % 60)
                 } else {
-                    format!("{}h {}m", g.elapsed_secs() / 3600, (g.elapsed_secs() % 3600) / 60)
+                    format!(
+                        "{}h {}m",
+                        g.elapsed_secs() / 3600,
+                        (g.elapsed_secs() % 3600) / 60
+                    )
                 };
                 format!(
                     "╭─ /goal status ─────────────────────────────╮\n\
@@ -263,12 +297,22 @@ impl GoalLoop {
                      │ Stalled:    {}x                            │\n\
                      ╰─────────────────────────────────────────────╯",
                     truncate(&g.description, 28),
-                    state_icon(&g.state), g.state.label(),
-                    g.iterations_completed, g.config.max_iterations,
-                    if g.config.max_iterations > 0 { (g.iterations_completed as f64 / g.config.max_iterations as f64) * 100.0 } else { 0.0 },
-                    g.total_cost_estimate, g.config.max_cost_usd,
-                    elapsed_human, g.config.max_duration_secs,
-                    g.score_before, g.score_current, g.score_current - g.score_before,
+                    state_icon(&g.state),
+                    g.state.label(),
+                    g.iterations_completed,
+                    g.config.max_iterations,
+                    if g.config.max_iterations > 0 {
+                        (g.iterations_completed as f64 / g.config.max_iterations as f64) * 100.0
+                    } else {
+                        0.0
+                    },
+                    g.total_cost_estimate,
+                    g.config.max_cost_usd,
+                    elapsed_human,
+                    g.config.max_duration_secs,
+                    g.score_before,
+                    g.score_current,
+                    g.score_current - g.score_before,
                     g.stalled_count,
                 )
             }
@@ -281,9 +325,18 @@ impl GoalLoop {
         if self.goal_queue.is_empty() {
             return String::new();
         }
-        let mut lines = vec![format!("\nQueue: {} goals (max {})", self.goal_queue.len(), self.max_queue)];
+        let mut lines = vec![format!(
+            "\nQueue: {} goals (max {})",
+            self.goal_queue.len(),
+            self.max_queue
+        )];
         for (i, g) in self.goal_queue.iter().enumerate().take(3) {
-            lines.push(format!("  {}. [{}] {}", i + 1, g.priority.label(), truncate(&g.description, 40)));
+            lines.push(format!(
+                "  {}. [{}] {}",
+                i + 1,
+                g.priority.label(),
+                truncate(&g.description, 40)
+            ));
         }
         if self.goal_queue.len() > 3 {
             lines.push(format!("  ... and {} more", self.goal_queue.len() - 3));
@@ -298,8 +351,13 @@ impl GoalLoop {
         let mut lines = vec!["╭─ Goal History ────────────────────────────╮".to_string()];
         for (i, g) in self.completed_goals.iter().rev().enumerate().take(10) {
             let icon = state_icon(&g.state);
-            lines.push(format!("│ {}. {} {} {:25} │",
-                i + 1, icon, truncate(&g.description, 28), g.state.label()));
+            lines.push(format!(
+                "│ {}. {} {} {:25} │",
+                i + 1,
+                icon,
+                truncate(&g.description, 28),
+                g.state.label()
+            ));
         }
         lines.push("╰─────────────────────────────────────────────╯".to_string());
         lines.join("\n")
@@ -344,7 +402,11 @@ impl GoalLoop {
         let mut distiller = SessionDistiller::with_paths(session_logs_dir, agents_path);
         let report = distiller.generate_distillation_report();
         if !report.suggestions.is_empty() {
-            println!("[goal] 🧠 distilled {} patterns from {} sessions", report.patterns.len(), report.session_count);
+            println!(
+                "[goal] 🧠 distilled {} patterns from {} sessions",
+                report.patterns.len(),
+                report.session_count
+            );
             for s in &report.suggestions {
                 println!("[goal]   → {}", s);
             }
@@ -365,7 +427,11 @@ impl GoalLoop {
                         name, out.total_chars, out.kept_chars, out.ratio * 100.0, out.error_lines, out.artifact_path
                     );
                     // 保留 error_lines 最多的输出 — 生产路径后续 expand 优先还原问题最多的会话。
-                    if stored.as_ref().map(|s| out.error_lines > s.error_lines).unwrap_or(true) {
+                    if stored
+                        .as_ref()
+                        .map(|s| out.error_lines > s.error_lines)
+                        .unwrap_or(true)
+                    {
                         stored = Some(out);
                     }
                 }
@@ -381,8 +447,14 @@ impl GoalLoop {
 
     /// 生产路径 expand — 还原最近一次可逆蒸馏的原始会话日志内容。
     pub(crate) fn _expand_last_distillation(&self) -> Result<String, String> {
-        let out = self.last_distilled_output.as_ref().ok_or_else(|| "no distillation stored yet".to_string())?;
-        let dir = self.last_distill_dir.clone().unwrap_or_else(|| CommandDistiller::new().artifact_dir);
+        let out = self
+            .last_distilled_output
+            .as_ref()
+            .ok_or_else(|| "no distillation stored yet".to_string())?;
+        let dir = self
+            .last_distill_dir
+            .clone()
+            .unwrap_or_else(|| CommandDistiller::new().artifact_dir);
         CommandDistiller::with_dir(dir).expand(&out.id)
     }
 
@@ -392,37 +464,52 @@ impl GoalLoop {
             "completed_goals": self.completed_goals,
             "goal_queue": self.goal_queue,
         });
-        let json = serde_json::to_string_pretty(&data)
-            .map_err(|e| NeoTrixError::Serde(e.to_string()))?;
-        crate::core::nt_core_state::save("goals", &json)
-            .map_err(NeoTrixError::Io)
+        let json =
+            serde_json::to_string_pretty(&data).map_err(|e| NeoTrixError::Serde(e.to_string()))?;
+        crate::core::nt_core_state::save("goals", &json).map_err(NeoTrixError::Io)
     }
 
     pub fn load(&mut self) {
         if let Some(json) = crate::core::nt_core_state::load("goals") {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(&json) {
-                self.active_goal = data["active_goal"]
-                    .as_object()
-                    .and_then(|_| serde_json::from_value(data["active_goal"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse active_goal: {}", e)).ok());
+                self.active_goal = data["active_goal"].as_object().and_then(|_| {
+                    serde_json::from_value(data["active_goal"].clone())
+                        .inspect_err(|e| log::warn!("[goal-loop] parse active_goal: {}", e))
+                        .ok()
+                });
                 self.completed_goals = data["completed_goals"]
                     .as_array()
-                    .and_then(|_| serde_json::from_value(data["completed_goals"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse completed_goals: {}", e)).ok())
+                    .and_then(|_| {
+                        serde_json::from_value(data["completed_goals"].clone())
+                            .inspect_err(|e| log::warn!("[goal-loop] parse completed_goals: {}", e))
+                            .ok()
+                    })
                     .unwrap_or_default();
                 self.goal_queue = data["goal_queue"]
                     .as_array()
-                    .and_then(|_| serde_json::from_value(data["goal_queue"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse goal_queue: {}", e)).ok())
+                    .and_then(|_| {
+                        serde_json::from_value(data["goal_queue"].clone())
+                            .inspect_err(|e| log::warn!("[goal-loop] parse goal_queue: {}", e))
+                            .ok()
+                    })
                     .unwrap_or_default();
                 let restored = self.completed_goals.len();
                 let queued = self.goal_queue.len();
                 if restored > 0 {
-                    println!("[bg-goal] restored {} completed goals from persistence", restored);
+                    println!(
+                        "[bg-goal] restored {} completed goals from persistence",
+                        restored
+                    );
                 }
                 if queued > 0 {
                     println!("[bg-goal] restored {} queued goals", queued);
                 }
                 if let Some(ref g) = self.active_goal {
                     if g.state == GoalState::Pursuing {
-                        println!("[bg-goal] restored pursuing goal: {}", truncate(&g.description, 40));
+                        println!(
+                            "[bg-goal] restored pursuing goal: {}",
+                            truncate(&g.description, 40)
+                        );
                     }
                 }
             }
@@ -437,17 +524,17 @@ impl GoalLoop {
     /// Compute resonance coherence — how well current goals synchronize.
     /// Returns a value in [0.0, 1.0], or 0.5 if no oscillator network is initialized.
     pub fn resonance_coherence(&self) -> f64 {
-        self.oscillator_network.as_ref()
+        self.oscillator_network
+            .as_ref()
             .map(|osc| osc.phase_coherence())
             .unwrap_or(0.5)
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::GoalLoop;
     use super::truncate;
+    use super::GoalLoop;
     use crate::core::nt_core_self::MotivationState;
 
     #[test]
@@ -455,7 +542,10 @@ mod tests {
         let gl = GoalLoop::new();
         let coherence = gl.resonance_coherence();
         assert!(coherence >= 0.0 && coherence <= 1.0);
-        assert!((coherence - 0.5).abs() < 1e-6, "no oscillator network should yield 0.5");
+        assert!(
+            (coherence - 0.5).abs() < 1e-6,
+            "no oscillator network should yield 0.5"
+        );
     }
 
     #[test]
@@ -463,8 +553,11 @@ mod tests {
         let mut gl = GoalLoop::new();
         gl.init_oscillators(5);
         let coherence = gl.resonance_coherence();
-        assert!(coherence >= 0.0 && coherence <= 1.0,
-            "coherence should be in [0,1], got {}", coherence);
+        assert!(
+            coherence >= 0.0 && coherence <= 1.0,
+            "coherence should be in [0,1], got {}",
+            coherence
+        );
     }
 
     #[test]
@@ -551,23 +644,44 @@ mod tests {
             PathBuf::from("AGENTS.md"),
             artifact_dir.clone(),
         );
-        assert!(suggestions.is_empty(), "no session patterns expected, got {:?}", suggestions);
+        assert!(
+            suggestions.is_empty(),
+            "no session patterns expected, got {:?}",
+            suggestions
+        );
 
-        let out = gl.last_distilled_output
+        let out = gl
+            .last_distilled_output
             .as_ref()
             .expect("run_distillation must store DistilledOutput for later expand");
-        assert!(out.error_lines >= 1, "error lines from session log must be retained, got {}", out.error_lines);
-        assert!(out.artifact_path.contains("distill-artifacts"), "artifact must land in configured dir: {}", out.artifact_path);
+        assert!(
+            out.error_lines >= 1,
+            "error lines from session log must be retained, got {}",
+            out.error_lines
+        );
+        assert!(
+            out.artifact_path.contains("distill-artifacts"),
+            "artifact must land in configured dir: {}",
+            out.artifact_path
+        );
 
-        let expanded = gl._expand_last_distillation()
+        let expanded = gl
+            ._expand_last_distillation()
             .expect("_expand_last_distillation must restore original");
-        assert!(expanded.contains("E0277"), "expand must restore error lines: {}", expanded);
+        assert!(
+            expanded.contains("E0277"),
+            "expand must restore error lines: {}",
+            expanded
+        );
         assert!(expanded.contains("cargo check"));
     }
 
     #[test]
     fn test_expand_last_distillation_without_distill_errors() {
         let gl = GoalLoop::new();
-        assert!(gl._expand_last_distillation().is_err(), "no distillation stored yet → Err");
+        assert!(
+            gl._expand_last_distillation().is_err(),
+            "no distillation stored yet → Err"
+        );
     }
 }

@@ -37,7 +37,11 @@ impl crate::core::nt_core_self_test::SelfTest for SemanticEntropyGate {
         if !(0.0..=1.0).contains(&entropy) {
             failures.push("entropy out of [0,1] range".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -212,7 +216,11 @@ impl SemanticEntropy {
 
     /// Record an entropy measurement for later inspection / trending.
     pub fn record(&mut self, edit_hash: String, entropy: f32, action: EntropyAction) {
-        self.history.push(EntropyRecord { edit_hash, entropy, action });
+        self.history.push(EntropyRecord {
+            edit_hash,
+            entropy,
+            action,
+        });
     }
 }
 
@@ -268,9 +276,9 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
         curr_row[0] = i + 1;
         for (j, sc) in short.iter().enumerate() {
             let cost = if lc == sc { 0 } else { 1 };
-            curr_row[j + 1] = (curr_row[j] + 1)          // insertion
-                .min(prev_row[j + 1] + 1)                // deletion
-                .min(prev_row[j] + cost);                // substitution
+            curr_row[j + 1] = (curr_row[j] + 1) // insertion
+                .min(prev_row[j + 1] + 1) // deletion
+                .min(prev_row[j] + cost); // substitution
         }
         std::mem::swap(&mut prev_row, &mut curr_row);
     }
@@ -370,9 +378,17 @@ mod tests {
     #[test]
     fn test_identical_candidates_zero_entropy() {
         let se = SemanticEntropy::default();
-        let candidates = vec!["fn main() {}".into(), "fn main() {}".into(), "fn main() {}".into()];
+        let candidates = vec![
+            "fn main() {}".into(),
+            "fn main() {}".into(),
+            "fn main() {}".into(),
+        ];
         let entropy = se.estimate_entropy(&candidates);
-        assert!(entropy < 0.01, "identical candidates should yield ~0 entropy, got {}", entropy);
+        assert!(
+            entropy < 0.01,
+            "identical candidates should yield ~0 entropy, got {}",
+            entropy
+        );
     }
 
     /// 2. All different candidates → entropy ≈ 1
@@ -382,7 +398,11 @@ mod tests {
         let candidates = vec!["aaaa".into(), "bbbb".into(), "cccc".into()];
         let entropy = se.estimate_entropy(&candidates);
         // Each pair has 0 similarity (no overlapping chars), so entropy ≈ 1
-        assert!(entropy > 0.9, "all-different candidates should yield ~1 entropy, got {}", entropy);
+        assert!(
+            entropy > 0.9,
+            "all-different candidates should yield ~1 entropy, got {}",
+            entropy
+        );
     }
 
     /// 3. n_samples = 0 → 0 entropy (always apply)
@@ -477,10 +497,7 @@ mod tests {
         se.record("low".into(), entropy1, EntropyAction::AutoApplied);
 
         // High-entropy candidates → SHOULD defer
-        let high_entropy_candidates = vec![
-            "aaaa".into(),
-            "bbbb".into(),
-        ];
+        let high_entropy_candidates = vec!["aaaa".into(), "bbbb".into()];
         let entropy2 = se.estimate_entropy(&high_entropy_candidates);
         assert!(se.should_defer(entropy2));
         se.record("high".into(), entropy2, EntropyAction::DeferredToLLM);

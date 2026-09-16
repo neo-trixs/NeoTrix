@@ -1,11 +1,11 @@
-use crate::core::nt_core_cap::CapabilityVector;
 use crate::core::nt_core_bank::ReasoningBank;
+use crate::core::nt_core_cap::CapabilityVector;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 use crate::neotrix::nt_core_error::NeoTrixResult;
 
+use super::consolidation::{ConsolidationConfig, MemoryConsolidation};
 use super::hebbian::HebbianUpdater;
-use super::consolidation::{MemoryConsolidation, ConsolidationConfig};
 
 #[derive(Debug, Clone)]
 pub struct SleepStats {
@@ -37,15 +37,28 @@ impl Default for SleepConfig {
 
 impl SleepConfig {
     pub fn with_passes(passes: usize) -> Self {
-        Self { passes, ..Default::default() }
+        Self {
+            passes,
+            ..Default::default()
+        }
     }
 
     pub(crate) fn _light_sleep() -> Self {
-        Self { passes: 1, consolidation_rate: 0.02, transition_noise: 0.005, ..Default::default() }
+        Self {
+            passes: 1,
+            consolidation_rate: 0.02,
+            transition_noise: 0.005,
+            ..Default::default()
+        }
     }
 
     pub(crate) fn _deep_sleep() -> Self {
-        Self { passes: 6, consolidation_rate: 0.08, transition_noise: 0.02, ..Default::default() }
+        Self {
+            passes: 6,
+            consolidation_rate: 0.08,
+            transition_noise: 0.02,
+            ..Default::default()
+        }
     }
 }
 
@@ -68,7 +81,11 @@ impl SleepEngine {
             ..Default::default()
         };
         let _consolidator = MemoryConsolidation::new(config.consolidation.clone());
-        Self { config, updater, _consolidator }
+        Self {
+            config,
+            updater,
+            _consolidator,
+        }
     }
 
     pub fn with_passes(passes: usize) -> Self {
@@ -79,8 +96,8 @@ impl SleepEngine {
         &mut self,
         brain: &mut CapabilityVector,
         bank: &mut ReasoningBank,
-//         operator: &SelectableOperator,
-//         state: &mut SelectiveState,
+        //         operator: &SelectableOperator,
+        //         state: &mut SelectiveState,
     ) -> NeoTrixResult<SleepResult> {
         let passes = self.config.passes;
         if passes == 0 {
@@ -102,16 +119,20 @@ impl SleepEngine {
         let mut total_sim = 0.0;
 
         for _pass_idx in 0..passes {
-            let result = self._consolidator.run_consolidation_pass(
-                bank, brain, &self.updater,
-            );
+            let result = self
+                ._consolidator
+                .run_consolidation_pass(bank, brain, &self.updater);
             total_delta += result.total_delta;
             delta_per_pass.push(result.total_delta);
             total_memories += result.memories_processed;
             total_sim += result.avg_similarity * result.memories_processed as f64;
         }
 
-        let avg_sim = if total_memories > 0 { total_sim / total_memories as f64 } else { 0.0 };
+        let avg_sim = if total_memories > 0 {
+            total_sim / total_memories as f64
+        } else {
+            0.0
+        };
 
         Ok(SleepResult {
             stats: SleepStats {
@@ -127,7 +148,8 @@ impl SleepEngine {
 
     pub(crate) fn _should_sleep(&self, bank: &ReasoningBank) -> bool {
         let mems = bank.memories();
-        let recent_count = mems.iter()
+        let recent_count = mems
+            .iter()
             .filter(|m| m.reward >= self.config.consolidation.min_reward)
             .count();
         recent_count >= 3
@@ -145,7 +167,7 @@ impl SleepEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_bank::{ReasoningMemory, MemoryTier, MemoryLifecycle, T3Views};
+    use crate::core::nt_core_bank::{MemoryLifecycle, MemoryTier, ReasoningMemory, T3Views};
     use crate::core::{RewardSource, TaskType};
 
     fn make_memory(reward: f64, success: bool, id: &str) -> ReasoningMemory {
@@ -178,7 +200,11 @@ mod tests {
         let bank = {
             let mut b = ReasoningBank::new(100);
             for i in 0..5 {
-                b.store(make_memory(0.5 + (i as f64 * 0.1), true, &format!("m{}", i)));
+                b.store(make_memory(
+                    0.5 + (i as f64 * 0.1),
+                    true,
+                    &format!("m{}", i),
+                ));
             }
             b
         };
@@ -188,7 +214,9 @@ mod tests {
     #[test]
     fn test_sleep_returns_result() {
         let (mut engine, mut brain, mut bank) = setup_engine_and_bank();
-        let result = engine.sleep(&mut brain, &mut bank).expect("value should be ok in test");
+        let result = engine
+            .sleep(&mut brain, &mut bank)
+            .expect("value should be ok in test");
         assert_eq!(result.stats.passes_done, 3, "should execute 3 passes");
         assert!(result.stats.total_memories > 0, "should process memories");
     }
@@ -196,19 +224,31 @@ mod tests {
     #[test]
     fn test_sleep_all_passes_produce_delta() {
         let (mut engine, mut brain, mut bank) = setup_engine_and_bank();
-        let result = engine.sleep(&mut brain, &mut bank).expect("value should be ok in test");
+        let result = engine
+            .sleep(&mut brain, &mut bank)
+            .expect("value should be ok in test");
         assert_eq!(result.stats.delta_per_pass.len(), 3, "should have 3 deltas");
-        assert!(result.stats.delta_per_pass.iter().all(|d| *d >= 0.0),
-            "all pass deltas should be non-negative");
+        assert!(
+            result.stats.delta_per_pass.iter().all(|d| *d >= 0.0),
+            "all pass deltas should be non-negative"
+        );
     }
 
     #[test]
     fn test_sleep_zero_passes() {
-        let mut engine = SleepEngine::new(SleepConfig { passes: 0, ..Default::default() });
+        let mut engine = SleepEngine::new(SleepConfig {
+            passes: 0,
+            ..Default::default()
+        });
         let mut brain = CapabilityVector::default();
         let mut bank = ReasoningBank::new(10);
-        let result = engine.sleep(&mut brain, &mut bank).expect("value should be ok in test");
-        assert_eq!(result.stats.passes_done, 0, "zero passes returns immediately");
+        let result = engine
+            .sleep(&mut brain, &mut bank)
+            .expect("value should be ok in test");
+        assert_eq!(
+            result.stats.passes_done, 0,
+            "zero passes returns immediately"
+        );
     }
 
     #[test]
@@ -221,14 +261,20 @@ mod tests {
             }
             b
         };
-        assert!(engine._should_sleep(&bank), "should sleep with 5 qualifying memories");
+        assert!(
+            engine._should_sleep(&bank),
+            "should sleep with 5 qualifying memories"
+        );
     }
 
     #[test]
     fn test_should_sleep_with_few_memories() {
         let engine = SleepEngine::with_passes(3);
         let bank = ReasoningBank::new(100);
-        assert!(!engine._should_sleep(&bank), "should not sleep with empty bank");
+        assert!(
+            !engine._should_sleep(&bank),
+            "should not sleep with empty bank"
+        );
     }
 
     #[test]
@@ -242,15 +288,24 @@ mod tests {
     fn test_deep_sleep_config() {
         let config = SleepConfig::_deep_sleep();
         assert_eq!(config.passes, 6, "deep sleep has 6 passes");
-        assert!(config.consolidation_rate > 0.05, "deep sleep has higher consolidation rate");
+        assert!(
+            config.consolidation_rate > 0.05,
+            "deep sleep has higher consolidation rate"
+        );
     }
 
     #[test]
     fn test_capability_changes_after_sleep() {
         let (mut engine, mut brain, mut bank) = setup_engine_and_bank();
         let before = brain.arr.clone();
-        engine.sleep(&mut brain, &mut bank).expect("value should be ok in test");
-        let changed = brain.arr.iter().zip(before.iter()).any(|(a, b)| (a - b).abs() > 1e-6);
+        engine
+            .sleep(&mut brain, &mut bank)
+            .expect("value should be ok in test");
+        let changed = brain
+            .arr
+            .iter()
+            .zip(before.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
         assert!(changed, "capability should change after sleep");
     }
 }

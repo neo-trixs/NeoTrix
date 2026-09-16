@@ -787,17 +787,11 @@ impl KanbanBoard {
             .filter_map(|i| i.assignee.clone())
             .collect();
         for item in self.items.iter_mut() {
-            let _subagent_running = item.assignee.as_ref().map(|a| running.contains(a)).unwrap_or(false);
-            let _subagent_completed = false; // completed tracked via phase
-//             item.efficiency_score = crate::l5_cognition::nt_core::nt_core_parallel::OptimalTaskAllocator::new(
-//                 crate::l5_cognition::nt_core::nt_core_parallel::AllocationStrategy::Hybrid
-//             ).score_todo(
-//                 item.priority,
-//                 item.created_at,
-//                 item.dependencies.len(),
-//                 subagent_running,
-//                 subagent_completed,
-//             );
+            let subagent_running = item.assignee.as_ref().map(|a| running.contains(a)).unwrap_or(false);
+            let priority_score = (item.priority as f64) / 3.0;
+            let dep_penalty = (item.dependencies.len() as f64) * 0.05;
+            let running_bonus = if subagent_running { 0.1 } else { 0.0 };
+            item.efficiency_score = (priority_score + running_bonus - dep_penalty).clamp(0.0, 1.0);
         }
     }
 

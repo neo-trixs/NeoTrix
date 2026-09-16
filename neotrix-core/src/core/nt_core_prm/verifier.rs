@@ -884,6 +884,7 @@ mod grounded_prm_tests {
 #[cfg(test)]
 mod ws_grpo_tests {
     use super::*;
+    use super::super::ws_grpo::{WsPreferenceModel, WsGrpoLearner};
 
     #[test]
     fn test_ws_preference_model_record_and_score() {

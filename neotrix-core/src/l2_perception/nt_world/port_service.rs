@@ -67,7 +67,7 @@ mod tests {
         assert_eq!(guess_service_by_port(3306), Some("mysql"));
         assert_eq!(guess_service_by_port(5432), Some("postgresql"));
         assert_eq!(guess_service_by_port(6379), Some("redis"));
-        assert_eq!(guess_service_by_port(99999), None);
+        assert_eq!(guess_service_by_port(9999), None);
     }
 
     #[test]
@@ -84,7 +84,7 @@ mod tests {
         assert_eq!(guess_service(12345, Some("SSH-2.0-OpenSSH")), Some("ssh".into()));
         // Fallback to port
         assert_eq!(guess_service(22, None), Some("ssh".into()));
-        assert_eq!(guess_service(99999, None), None);
+        assert_eq!(guess_service(9999, None), None);
     }
 
     #[test]

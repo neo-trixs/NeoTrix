@@ -329,6 +329,7 @@ pub struct _KbPipelineStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content;
 
     #[test]
     fn test_pipeline_new() {

@@ -1,5 +1,5 @@
 use crate::core::nt_core_cap::CapabilityVector;
-use crate::neotrix::nt_act_goal::rl_feedback::RLFeedbackLoop;
+use crate::l5_cognition::nt_goal::rl_feedback::RLFeedbackLoop;
 use crate::core::ReasoningHexagram;
 
 #[derive(Debug, Clone)]

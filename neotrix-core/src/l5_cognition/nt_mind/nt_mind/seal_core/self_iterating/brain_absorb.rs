@@ -217,7 +217,7 @@ impl ReasoningBrain {
         applied_indices
     }
 
-    pub(crate) fn _apply_self_edit(&mut self, edit: &SelfEdit, reward: Option<f64>) -> bool {
+    pub fn apply_self_edit(&mut self, edit: &SelfEdit, reward: Option<f64>) -> bool {
         let snapshot = self.capability.clone();
         let snapshot_lr = self.learning_rate;
 
@@ -276,7 +276,7 @@ impl ReasoningBrain {
         score
     }
 
-    pub(crate) fn _update_task_affinity(&mut self, task_type: TaskType, performance: f64) {
+    pub fn update_task_affinity(&mut self, task_type: TaskType, performance: f64) {
         let entry = self.task_affinity.entry(task_type).or_insert(0.5);
         *entry = *entry * 0.7 + performance * 0.3;
     }

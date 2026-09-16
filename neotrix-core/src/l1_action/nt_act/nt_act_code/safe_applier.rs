@@ -6,8 +6,8 @@
 //!   3. git stash 保护: 若 git 工作区干净, 修改后可回退
 //!   4. 若 cargo check 失败 → 自动回滚
 
-use std::path::PathBuf;
 use super::edit_history::EditHistoryTracker;
+use std::path::PathBuf;
 
 use super::semantic_entropy::SemanticEntropy;
 
@@ -52,39 +52,40 @@ impl SafeCodeApplier {
     }
 
     /// 安全的文件写入: 备份 → 写入 → 验证 → 记录
-    pub fn safe_write(
-        &mut self,
-        file: &str,
-        new_content: &str,
-        issue_type: &str,
-    ) -> ApplyResult {
+    pub fn safe_write(&mut self, file: &str, new_content: &str, issue_type: &str) -> ApplyResult {
         // 1. 读取旧内容
         let old_content = match std::fs::read_to_string(file) {
             Ok(c) => c,
-            Err(e) => return ApplyResult {
-                file: file.to_string(),
-                success: false,
-                backup_path: None,
-                error: Some(format!("读取失败: {}", e)),
-                deferred: None,
-            },
+            Err(e) => {
+                return ApplyResult {
+                    file: file.to_string(),
+                    success: false,
+                    backup_path: None,
+                    error: Some(format!("读取失败: {}", e)),
+                    deferred: None,
+                }
+            }
         };
 
         // 2. 备份
         let backup_path = match self.backup(file, &old_content) {
             Ok(p) => p,
-            Err(e) => return ApplyResult {
-                file: file.to_string(),
-                success: false,
-                backup_path: None,
-                error: Some(format!("备份失败: {}", e)),
-                deferred: None,
-            },
+            Err(e) => {
+                return ApplyResult {
+                    file: file.to_string(),
+                    success: false,
+                    backup_path: None,
+                    error: Some(format!("备份失败: {}", e)),
+                    deferred: None,
+                }
+            }
         };
 
         // 3. 写入
         if let Err(e) = std::fs::write(file, new_content) {
-            self.tracker.record_change(file, issue_type, &old_content, new_content, false).ok();
+            self.tracker
+                .record_change(file, issue_type, &old_content, new_content, false)
+                .ok();
             return ApplyResult {
                 file: file.to_string(),
                 success: false,
@@ -99,7 +100,9 @@ impl SafeCodeApplier {
         if !check_ok {
             // 回滚
             let _ = std::fs::write(file, &old_content);
-            self.tracker.record_change(file, issue_type, &old_content, new_content, false).ok();
+            self.tracker
+                .record_change(file, issue_type, &old_content, new_content, false)
+                .ok();
             return ApplyResult {
                 file: file.to_string(),
                 success: false,
@@ -110,7 +113,9 @@ impl SafeCodeApplier {
         }
 
         // 5. 记录成功
-        self.tracker.record_change(file, issue_type, &old_content, new_content, true).ok();
+        self.tracker
+            .record_change(file, issue_type, &old_content, new_content, true)
+            .ok();
         ApplyResult {
             file: file.to_string(),
             success: true,
@@ -149,16 +154,15 @@ impl SafeCodeApplier {
 
     /// 从备份恢复文件
     pub fn restore_from_backup(&self, file: &str) -> Result<(), String> {
-        let backup = self.backup_dir.join(
-            file.replace(std::path::is_separator, "__")
-        );
+        let backup = self
+            .backup_dir
+            .join(file.replace(std::path::is_separator, "__"));
         if !backup.exists() {
             return Err("备份不存在".into());
         }
-        let content = std::fs::read_to_string(&backup)
-            .map_err(|e| format!("读取备份失败: {}", e))?;
-        std::fs::write(file, &content)
-            .map_err(|e| format!("恢复失败: {}", e))?;
+        let content =
+            std::fs::read_to_string(&backup).map_err(|e| format!("读取备份失败: {}", e))?;
+        std::fs::write(file, &content).map_err(|e| format!("恢复失败: {}", e))?;
         Ok(())
     }
 
@@ -177,8 +181,7 @@ impl SafeCodeApplier {
             .map_err(|e| format!("创建备份目录失败: {}", e))?;
         let backup_name = file.replace(std::path::is_separator, "__");
         let backup_path = self.backup_dir.join(&backup_name);
-        std::fs::write(&backup_path, content)
-            .map_err(|e| format!("写入备份失败: {}", e))?;
+        std::fs::write(&backup_path, content).map_err(|e| format!("写入备份失败: {}", e))?;
         Ok(backup_path.to_string_lossy().to_string())
     }
 
@@ -221,7 +224,14 @@ mod tests {
     #[test]
     fn test_new_creates_backup_dir() {
         let applier = SafeCodeApplier::new();
-        assert!(applier.backup_dir.exists() || applier.backup_dir.parent().map(|p| p.exists()).unwrap_or(false));
+        assert!(
+            applier.backup_dir.exists()
+                || applier
+                    .backup_dir
+                    .parent()
+                    .map(|p| p.exists())
+                    .unwrap_or(false)
+        );
     }
 
     #[test]

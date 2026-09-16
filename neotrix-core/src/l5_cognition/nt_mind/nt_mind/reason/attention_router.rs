@@ -1,15 +1,15 @@
 use crate::core::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::core::nt_core_harness::HarnessAdapter;
 use crate::core::nt_core_hcube::axis::DimensionAxis;
 use crate::core::nt_core_hcube::coord::HyperCoord;
 use crate::core::nt_core_hcube::cube::CubeEntry;
-use crate::core::nt_core_harness::HarnessAdapter;
 
 use super::hypercube_bridge::HyperCubeBridge;
 
+use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_world_crawl::config::{CrawlTopic, SeedEntry};
 use crate::neotrix::nt_world_crawl::unified::UnifiedCrawler;
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 /// 路由结果 — GWT 竞争 + 知识检索的产出
 pub struct _RoutedContext {
@@ -93,8 +93,7 @@ impl AttentionRouter {
         for st in &active {
             let entries = self.retrieve_for_specialist(*st, context);
             for e in entries {
-                knowledge_lines
-                    .push(format!("[{}] {} ({})", st._short_name(), e.label, e.source));
+                knowledge_lines.push(format!("[{}] {} ({})", st._short_name(), e.label, e.source));
             }
         }
         // 真实 KB 知识补充 — KnowledgeRetriever 的实际数据源
@@ -117,56 +116,113 @@ impl AttentionRouter {
                 SpecialistType::PatternMatcher,
                 0.7,
                 &[
-                    "pattern", "repeat", "template", "structure", "trend",
-                    "similar", "common", "regular", "cycle", "algorithm",
+                    "pattern",
+                    "repeat",
+                    "template",
+                    "structure",
+                    "trend",
+                    "similar",
+                    "common",
+                    "regular",
+                    "cycle",
+                    "algorithm",
                 ][..],
             ),
             (
                 SpecialistType::AnomalyDetector,
                 0.7,
                 &[
-                    "error", "bug", "crash", "fail", "unusual", "exception",
-                    "unexpected", "wrong", "broken", "issue", "problem",
+                    "error",
+                    "bug",
+                    "crash",
+                    "fail",
+                    "unusual",
+                    "exception",
+                    "unexpected",
+                    "wrong",
+                    "broken",
+                    "issue",
+                    "problem",
                 ][..],
             ),
             (
                 SpecialistType::KnowledgeIntegrator,
                 0.6,
                 &[
-                    "knowledge", "learn", "understand", "combine", "integrate",
-                    "synthesize", "connect", "relate", "overview", "survey",
+                    "knowledge",
+                    "learn",
+                    "understand",
+                    "combine",
+                    "integrate",
+                    "synthesize",
+                    "connect",
+                    "relate",
+                    "overview",
+                    "survey",
                 ][..],
             ),
             (
                 SpecialistType::GoalPrioritizer,
                 0.7,
                 &[
-                    "goal", "plan", "priority", "objective", "milestone",
-                    "strategy", "roadmap", "next", "schedule", "deadline",
+                    "goal",
+                    "plan",
+                    "priority",
+                    "objective",
+                    "milestone",
+                    "strategy",
+                    "roadmap",
+                    "next",
+                    "schedule",
+                    "deadline",
                 ][..],
             ),
             (
                 SpecialistType::RiskAssessor,
                 0.7,
                 &[
-                    "risk", "nt_shield", "danger", "warn", "vulnerability",
-                    "threat", "safe", "protect", "audit", "breach",
+                    "risk",
+                    "nt_shield",
+                    "danger",
+                    "warn",
+                    "vulnerability",
+                    "threat",
+                    "safe",
+                    "protect",
+                    "audit",
+                    "breach",
                 ][..],
             ),
             (
                 SpecialistType::CreativityGenerator,
                 0.6,
                 &[
-                    "creative", "novel", "innovate", "design", "imagine",
-                    "invent", "explore", "possibility", "brainstorm", "idea",
+                    "creative",
+                    "novel",
+                    "innovate",
+                    "design",
+                    "imagine",
+                    "invent",
+                    "explore",
+                    "possibility",
+                    "brainstorm",
+                    "idea",
                 ][..],
             ),
             (
                 SpecialistType::ReflectionEngine,
                 0.6,
                 &[
-                    "reflect", "review", "improve", "optimize", "evolve",
-                    "retrospect", "lesson", "growth", "iterate", "meta",
+                    "reflect",
+                    "review",
+                    "improve",
+                    "optimize",
+                    "evolve",
+                    "retrospect",
+                    "lesson",
+                    "growth",
+                    "iterate",
+                    "meta",
                 ][..],
             ),
         ];
@@ -190,11 +246,7 @@ impl AttentionRouter {
     }
 
     /// 为特定 Specialist 从超立方体检索相关知识
-    fn retrieve_for_specialist(
-        &self,
-        st: SpecialistType,
-        context: &str,
-    ) -> Vec<CubeEntry> {
+    fn retrieve_for_specialist(&self, st: SpecialistType, context: &str) -> Vec<CubeEntry> {
         let query = specialist_query_coord(st, context);
         self.bridge.query(&query, 4)
     }
@@ -212,7 +264,8 @@ impl AttentionRouter {
             None => return Vec::new(),
         };
         match kb.search(context, limit) {
-            Ok(results) => results.into_iter()
+            Ok(results) => results
+                .into_iter()
                 .map(|r| r.node.title)
                 .filter(|t| !t.is_empty())
                 .collect(),
@@ -237,14 +290,14 @@ impl AttentionRouter {
         let mut topics = Vec::new();
         // Map 8 dim indices to CrawlTopic (aligns with analyze_gaps dim 0..8)
         const DIM_TOPIC: [CrawlTopic; 8] = [
-            CrawlTopic::LawAndGovernance,      // 0
-            CrawlTopic::ScienceAndTechnology,  // 1
-            CrawlTopic::PhilosophyAndEthics,   // 2
-            CrawlTopic::HumanitiesAndCulture,  // 3
-            CrawlTopic::HistoryAndArcheology,  // 4
-            CrawlTopic::NewsAndMedia,          // 5
-            CrawlTopic::PolicyAndRegulation,   // 6
-            CrawlTopic::ArtsAndLiterature,     // 7
+            CrawlTopic::LawAndGovernance,     // 0
+            CrawlTopic::ScienceAndTechnology, // 1
+            CrawlTopic::PhilosophyAndEthics,  // 2
+            CrawlTopic::HumanitiesAndCulture, // 3
+            CrawlTopic::HistoryAndArcheology, // 4
+            CrawlTopic::NewsAndMedia,         // 5
+            CrawlTopic::PolicyAndRegulation,  // 6
+            CrawlTopic::ArtsAndLiterature,    // 7
         ];
         for report in &gap_reports {
             if report.sparsity_score > 0.7 && report.dim_index < 8 {
@@ -270,12 +323,7 @@ impl AttentionRouter {
     }
 
     /// 吸收推理结果到超立方体
-    pub(crate) fn _absorb_reasoning_result(
-        &mut self,
-        topic: &str,
-        _result: &str,
-        source: &str,
-    ) {
+    pub(crate) fn _absorb_reasoning_result(&mut self, topic: &str, _result: &str, source: &str) {
         let coord = HyperCoord::with(DimensionAxis::Abstraction, 0.7);
         self.bridge.hypercube.insert(&coord, source, topic);
     }
@@ -287,8 +335,14 @@ impl AttentionRouter {
 
     /// Register a harness profile for the current environment.
     /// Returns true if the profile was registered and specialists got activation boosts.
-    pub(crate) fn _register_harness_profile(&mut self, env: &str, profile: &crate::l5_cognition::nt_mind::nt_mind::self_iterating::harness_adapter::HarnessProfile) -> bool {
-        self.workspace.harness_adapter.register_profile(env, profile.clone());
+    pub(crate) fn _register_harness_profile(
+        &mut self,
+        env: &str,
+        profile: &crate::l5_cognition::nt_mind::nt_mind::self_iterating::harness_adapter::HarnessProfile,
+    ) -> bool {
+        self.workspace
+            .harness_adapter
+            .register_profile(env, profile.clone());
         let activated = self.workspace.harness_adapter.activate(env).is_some();
         if activated {
             for (_, m) in self.workspace.specialists.iter_mut() {
@@ -310,36 +364,56 @@ impl AttentionRouter {
     pub fn seed_knowledge(&mut self) {
         // All coords spaced by >= 0.1 per axis to avoid float-precision merge (< 0.05)
         let seeds: Vec<(&str, &str, HyperCoord)> = vec![
-            ("deductive-reasoning",
-             "Infer specific conclusions from general principles using syllogisms",
-             HyperCoord::with(DimensionAxis::Abstraction, 0.95)),
-            ("inductive-reasoning",
-             "Generalize patterns from specific observations",
-             HyperCoord::with(DimensionAxis::Abstraction, 0.75)),
-            ("abductive-reasoning",
-             "Infer best explanation from observed evidence",
-             HyperCoord::with(DimensionAxis::Abstraction, 0.55)),
-            ("analogical-reasoning",
-             "Transfer knowledge from familiar domains via structural alignment",
-             HyperCoord::with(DimensionAxis::Abstraction, 0.35)),
-            ("causal-reasoning",
-             "Identify cause-effect through counterfactual analysis",
-             HyperCoord::with(DimensionAxis::Abstraction, 0.65)),
-            ("system-1-intuition",
-             "Fast automatic associative pattern matching",
-             HyperCoord::with(DimensionAxis::Abstraction, 0.15)),
-            ("system-2-analysis",
-             "Slow deliberate analytical step-by-step verification",
-             HyperCoord::with(DimensionAxis::Certainty, 0.85)),
-            ("error-detection",
-             "Identify discrepancies between expected and observed states",
-             HyperCoord::with(DimensionAxis::Certainty, 0.95)),
-            ("goal-decomposition",
-             "Break high-level objectives into executable sub-tasks",
-             HyperCoord::with(DimensionAxis::Agency, 0.85)),
-            ("risk-assessment",
-             "Evaluate probability and impact of adverse outcomes",
-             HyperCoord::with(DimensionAxis::Agency, 0.65)),
+            (
+                "deductive-reasoning",
+                "Infer specific conclusions from general principles using syllogisms",
+                HyperCoord::with(DimensionAxis::Abstraction, 0.95),
+            ),
+            (
+                "inductive-reasoning",
+                "Generalize patterns from specific observations",
+                HyperCoord::with(DimensionAxis::Abstraction, 0.75),
+            ),
+            (
+                "abductive-reasoning",
+                "Infer best explanation from observed evidence",
+                HyperCoord::with(DimensionAxis::Abstraction, 0.55),
+            ),
+            (
+                "analogical-reasoning",
+                "Transfer knowledge from familiar domains via structural alignment",
+                HyperCoord::with(DimensionAxis::Abstraction, 0.35),
+            ),
+            (
+                "causal-reasoning",
+                "Identify cause-effect through counterfactual analysis",
+                HyperCoord::with(DimensionAxis::Abstraction, 0.65),
+            ),
+            (
+                "system-1-intuition",
+                "Fast automatic associative pattern matching",
+                HyperCoord::with(DimensionAxis::Abstraction, 0.15),
+            ),
+            (
+                "system-2-analysis",
+                "Slow deliberate analytical step-by-step verification",
+                HyperCoord::with(DimensionAxis::Certainty, 0.85),
+            ),
+            (
+                "error-detection",
+                "Identify discrepancies between expected and observed states",
+                HyperCoord::with(DimensionAxis::Certainty, 0.95),
+            ),
+            (
+                "goal-decomposition",
+                "Break high-level objectives into executable sub-tasks",
+                HyperCoord::with(DimensionAxis::Agency, 0.85),
+            ),
+            (
+                "risk-assessment",
+                "Evaluate probability and impact of adverse outcomes",
+                HyperCoord::with(DimensionAxis::Agency, 0.65),
+            ),
         ];
         for (label, summary, coord) in seeds {
             self.bridge.hypercube.insert(&coord, label, summary);
@@ -538,7 +612,9 @@ mod tests {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
         let result = router.route("critical bug in production, nt_shield vulnerability detected");
-        assert!(result.active_specialists.contains(&SpecialistType::AnomalyDetector));
+        assert!(result
+            .active_specialists
+            .contains(&SpecialistType::AnomalyDetector));
     }
 
     #[test]
@@ -546,7 +622,9 @@ mod tests {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
         let result = router.route("plan next sprint goals and set milestones");
-        assert!(result.active_specialists.contains(&SpecialistType::GoalPrioritizer));
+        assert!(result
+            .active_specialists
+            .contains(&SpecialistType::GoalPrioritizer));
     }
 
     #[test]
@@ -554,7 +632,9 @@ mod tests {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
         let result = router.route("brainstorm novel design ideas for the new interface");
-        assert!(result.active_specialists.contains(&SpecialistType::CreativityGenerator));
+        assert!(result
+            .active_specialists
+            .contains(&SpecialistType::CreativityGenerator));
     }
 
     #[test]
@@ -587,11 +667,18 @@ mod tests {
     fn test_compute_salience_ranks_anomaly_highest_for_error_context() {
         let router = AttentionRouter::new();
         let scores = router.compute_salience("error crash bug exception");
-        let anomaly = scores.iter().find(|(st, _)| *st == SpecialistType::AnomalyDetector);
-        let pattern = scores.iter().find(|(st, _)| *st == SpecialistType::PatternMatcher);
+        let anomaly = scores
+            .iter()
+            .find(|(st, _)| *st == SpecialistType::AnomalyDetector);
+        let pattern = scores
+            .iter()
+            .find(|(st, _)| *st == SpecialistType::PatternMatcher);
         assert!(anomaly.is_some());
         assert!(pattern.is_some());
-        assert!(anomaly.expect("anomaly should be ok in test").1 > pattern.expect("anomaly should be ok in test").1);
+        assert!(
+            anomaly.expect("anomaly should be ok in test").1
+                > pattern.expect("anomaly should be ok in test").1
+        );
     }
 
     #[test]
@@ -604,9 +691,19 @@ mod tests {
     #[test]
     fn test_decay_happens_after_route() {
         let mut router = AttentionRouter::new();
-        let _before: Vec<f64> = router.workspace.specialists.values().map(|s| s.activation).collect();
+        let _before: Vec<f64> = router
+            .workspace
+            .specialists
+            .values()
+            .map(|s| s.activation)
+            .collect();
         router.route("test");
-        let after: Vec<f64> = router.workspace.specialists.values().map(|s| s.activation).collect();
+        let after: Vec<f64> = router
+            .workspace
+            .specialists
+            .values()
+            .map(|s| s.activation)
+            .collect();
         assert!(after.iter().all(|&a| a <= 0.8));
     }
 
@@ -648,9 +745,10 @@ mod tests {
     fn test_attach_kb_enables_kb_retrieval() {
         // B1 测试隔离: 用内存 KB 而非 open(None) (生产路径会被并行锁+污染)
         let kb = std::sync::Arc::new(
-            crate::neotrix::nt_memory_kb::KnowledgeBase::open(
-                Some(std::path::PathBuf::from(":memory:")),
-            ).expect("open memory kb"),
+            crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(std::path::PathBuf::from(
+                ":memory:",
+            )))
+            .expect("open memory kb"),
         );
         let _ = kb.insert_or_get_node(
             "KB-Wire-Test-Topic",
@@ -678,6 +776,9 @@ mod tests {
         router._append_kb_knowledge_lines("test", &mut lines);
         assert!(lines.is_empty());
         let result = router.route("test context");
-        assert!(result.knowledge_lines.iter().all(|l| !l.starts_with("[KB]")));
+        assert!(result
+            .knowledge_lines
+            .iter()
+            .all(|l| !l.starts_with("[KB]")));
     }
 }

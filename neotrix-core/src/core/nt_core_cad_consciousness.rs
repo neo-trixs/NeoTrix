@@ -320,6 +320,7 @@ pub fn register_cad_consciousness_self_tests(registry: &mut SelfTestRegistry) {
 #[cfg(test)]
 mod verification {
     use crate::core::nt_core_self_test::SelfTestRegistry;
+    use crate::core::nt_core_self_test::SelfTestResult;
     use crate::core::nt_core_self_test_integration::register_absorbed_modules;
     use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
     use crate::core::nt_core_gwt::cad_route::register_cad_gwt;

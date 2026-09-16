@@ -151,11 +151,16 @@ impl CognitiveMap {
     }
 
     pub fn resolve(&self, llm_concept: &str) -> Option<&MappingEntry> {
-        self.llm_to_neotrix.iter().find(|e| e.llm_concept.to_lowercase() == llm_concept.to_lowercase())
+        self.llm_to_neotrix
+            .iter()
+            .find(|e| e.llm_concept.to_lowercase() == llm_concept.to_lowercase())
     }
 
     pub fn by_module(&self, module: &str) -> Vec<&MappingEntry> {
-        self.llm_to_neotrix.iter().filter(|e| e.module_path.contains(module)).collect()
+        self.llm_to_neotrix
+            .iter()
+            .filter(|e| e.module_path.contains(module))
+            .collect()
     }
 
     pub fn count(&self) -> usize {
@@ -176,7 +181,9 @@ mod tests {
     #[test]
     fn test_resolve_concept() {
         let map = CognitiveMap::new();
-        let entry = map.resolve("Attention Head").expect("value should be ok in test");
+        let entry = map
+            .resolve("Attention Head")
+            .expect("value should be ok in test");
         assert_eq!(entry.llm_concept, "Attention Head");
         assert!(entry.neotrix_abstraction.contains("SpecialistModule"));
     }
@@ -199,24 +206,44 @@ mod tests {
     fn test_all_entries_have_modules() {
         let map = CognitiveMap::new();
         for entry in &map.llm_to_neotrix {
-            assert!(!entry.module_path.is_empty(), "Module path missing for {}", entry.llm_concept);
-            assert!(!entry.neotrix_abstraction.is_empty(), "NeoTrix mapping missing for {}", entry.llm_concept);
+            assert!(
+                !entry.module_path.is_empty(),
+                "Module path missing for {}",
+                entry.llm_concept
+            );
+            assert!(
+                !entry.neotrix_abstraction.is_empty(),
+                "NeoTrix mapping missing for {}",
+                entry.llm_concept
+            );
         }
     }
 
     #[test]
     fn test_resolve_nonexistent_returns_none() {
         let map = CognitiveMap::new();
-        assert!(map.resolve("nonexistent concept that doesn't exist").is_none());
+        assert!(map
+            .resolve("nonexistent concept that doesn't exist")
+            .is_none());
     }
 
     #[test]
     fn test_covers_major_llm_concepts() {
         let map = CognitiveMap::new();
-        let required = vec!["Attention", "Context", "Memory", "Goal", "Knowledge", "Reasoning"];
+        let required = vec![
+            "Attention",
+            "Context",
+            "Memory",
+            "Goal",
+            "Knowledge",
+            "Reasoning",
+        ];
         for concept in required {
-            let found = map.llm_to_neotrix.iter().any(|e|
-                e.llm_concept.to_lowercase().contains(&concept.to_lowercase()));
+            let found = map.llm_to_neotrix.iter().any(|e| {
+                e.llm_concept
+                    .to_lowercase()
+                    .contains(&concept.to_lowercase())
+            });
             assert!(found, "Missing mapping for concept: {}", concept);
         }
     }

@@ -158,7 +158,10 @@ impl ExperienceDistiller {
         anti_patterns
     }
 
-    fn describe_pattern(pattern: &HashMap<String, f64>, task_type: &crate::core::TaskType) -> String {
+    fn describe_pattern(
+        pattern: &HashMap<String, f64>,
+        task_type: &crate::core::TaskType,
+    ) -> String {
         let dims: Vec<&String> = pattern.keys().collect();
         format!(
             "Distilled strategy for {:?}: adjust {} dimensions ({:.2?})",
@@ -393,6 +396,7 @@ impl MetaCognitionBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::l3_memory::nt_core_knowledge::TaskType;
 
     /// 最小确定性扫描夹具 — 消除全量并行下整仓库递归扫描的 IO 时序抖动。
     /// 生成 >800 行含 unwrap/TODO 的模块触发 LARGE_FILE 弱点。

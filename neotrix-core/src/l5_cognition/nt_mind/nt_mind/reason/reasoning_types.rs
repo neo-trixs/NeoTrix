@@ -3,8 +3,8 @@
 //! 包含: _CascadeConfig, _CascadeResult, ReasoningType, ReasoningMethod,
 //!       PerspectiveLens, ReasoningTrace, ReasoningStats
 
-use serde::{Deserialize, Serialize};
 use super::model_router::ModelTier;
+use serde::{Deserialize, Serialize};
 
 /// Cascade 推理配置（来自 Wildfire SMoL 的多级联推理模式）
 /// 类比：450M 模型做 fast classify，置信度低才升级到 full reason
@@ -66,9 +66,14 @@ pub enum ReasoningMethod {
 impl ReasoningMethod {
     pub fn all() -> Vec<Self> {
         vec![
-            Self::Direct, Self::FirstPrinciples, Self::Adversarial,
-            Self::EdgeCaseFocus, Self::ConstraintPropagation,
-            Self::ReverseEngineering, Self::HistoricalEmpirical, Self::Analogical,
+            Self::Direct,
+            Self::FirstPrinciples,
+            Self::Adversarial,
+            Self::EdgeCaseFocus,
+            Self::ConstraintPropagation,
+            Self::ReverseEngineering,
+            Self::HistoricalEmpirical,
+            Self::Analogical,
         ]
     }
 
@@ -102,8 +107,14 @@ pub enum PerspectiveLens {
 impl PerspectiveLens {
     pub fn all() -> Vec<Self> {
         vec![
-            Self::Builder, Self::Architect, Self::Skeptic, Self::User,
-            Self::Economist, Self::Historian, Self::Contrarian, Self::Ethicist,
+            Self::Builder,
+            Self::Architect,
+            Self::Skeptic,
+            Self::User,
+            Self::Economist,
+            Self::Historian,
+            Self::Contrarian,
+            Self::Ethicist,
         ]
     }
 
@@ -186,7 +197,12 @@ impl ContextTier {
     }
 
     pub fn name(&self) -> &'static str {
-        match self { Self::Small => "small", Self::Medium => "medium", Self::Large => "large", Self::Massive => "massive" }
+        match self {
+            Self::Small => "small",
+            Self::Medium => "medium",
+            Self::Large => "large",
+            Self::Massive => "massive",
+        }
     }
 }
 

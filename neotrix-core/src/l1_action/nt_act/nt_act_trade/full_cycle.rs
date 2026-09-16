@@ -181,8 +181,24 @@ pub struct ProductSpec {
     pub tax_refund_rate: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+impl Default for ProductSpec {
+    fn default() -> Self {
+        Self {
+            spec_id: String::new(),
+            product_type: ProductType::Machinery,
+            bom: Vec::new(),
+            routing: Vec::new(),
+            packaging: PackagingSpec::default(),
+            certifications: Vec::new(),
+            hs_code: String::new(),
+            tax_refund_rate: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ProductType {
+    #[default]
     Machinery,
     Textile,
     Food,
@@ -209,7 +225,7 @@ pub struct RoutingStep {
     pub duration_hours: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PackagingSpec {
     pub package_type: String,
     pub dimensions_cm: (f64, f64, f64),
@@ -327,6 +343,57 @@ pub struct ContractItem {
     pub unit_weight: Option<f64>,         // 单重kg
     pub total_weight: Option<f64>,        // 总重kg
     pub config: Option<ProductConfig>,    // 解析后的配置
+}
+
+impl Default for ContractItem {
+    fn default() -> Self {
+        Self {
+            product: String::new(),
+            qty: 0,
+            unit_price: 0.0,
+            serial: None,
+            model: None,
+            diameter: None,
+            config_raw: None,
+            unit: None,
+            total_price: None,
+            unit_weight: None,
+            total_weight: None,
+            config: None,
+        }
+    }
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self {
+            contract_id: String::new(),
+            pi_number: String::new(),
+            parties: (String::new(), String::new()),
+            items: Vec::new(),
+            price: 0.0,
+            incoterms: String::new(),
+            payment_terms: String::new(),
+            delivery_date: String::new(),
+            salesperson: None,
+            country: None,
+            customer: None,
+            order_folder: None,
+            order_no: None,
+            contract_date: None,
+            seller_name: None,
+            buyer_name: None,
+            shipping: None,
+            has_packing: None,
+            has_shipping: None,
+            has_tax: None,
+            exec_std: None,
+            packing_req: None,
+            other_req: None,
+            remarks: None,
+            template_type: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -60,6 +60,9 @@ pub struct BackgroundConfig {
     pub efe_epistemic_scale: f64,
     /// Continual Harness Refinement 周期 — 审查轨迹，应用有证据支持的状态更新
     pub refinement_interval_secs: u64,
+    /// WHALE 循环间隔 (秒), 默认 120s
+    /// 每间隔运行一次 WHALE phase detection → optimize → evaluate → decide next phase
+    pub whale_interval_secs: u64,
 }
 
 impl Default for BackgroundConfig {
@@ -106,6 +109,7 @@ impl Default for BackgroundConfig {
             consciousness_interval_secs: 600,
             efe_epistemic_scale: 0.0,
             refinement_interval_secs: 3600,
+            whale_interval_secs: 120,
         }
     }
 }

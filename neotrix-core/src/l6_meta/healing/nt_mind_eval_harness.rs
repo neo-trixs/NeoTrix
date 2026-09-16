@@ -1477,7 +1477,7 @@ impl OracleLadder {
     }
 
     /// 为某个 rung 注册可执行 oracle。
-    pub(crate) fn _with_oracle(
+    pub fn with_oracle(
         mut self,
         rung: OracleRung,
         oracle: impl Fn() -> RungResult + Send + Sync + 'static,
@@ -1532,7 +1532,7 @@ impl OracleLadder {
 
     /// 重置阶梯到 T0 (C5 自愈): 清空全部 oracle 回到基准状态 (构建检查基态,
     /// 无空洞), 返回重置动作描述。
-    pub(crate) fn _reset_to_t0(&mut self) -> Vec<String> {
+    pub fn reset_to_t0(&mut self) -> Vec<String> {
         let mut actions = Vec::new();
         for rung in OracleRung::LADDER {
             if self.oracles.remove(&rung).is_some() {
@@ -1545,7 +1545,7 @@ impl OracleLadder {
 }
 
 /// C5 自愈检测件 (MIND-eval, oracle_ladder): 构造含空洞 rung 的阶梯,
-/// _reset_to_t0 重置后断言 is_valid。
+/// reset_to_t0 重置后断言 is_valid。
 pub struct OracleLadderHealer;
 
 impl crate::core::nt_core_self_test::SelfTest for OracleLadderHealer {
@@ -1557,21 +1557,21 @@ impl crate::core::nt_core_self_test::SelfTest for OracleLadderHealer {
         let mut failures = Vec::new();
 
         let healthy = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            ._with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"));
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"));
         if !healthy.is_valid() {
             failures.push("healthy contiguous ladder reported invalid".into());
         }
 
         let mut holed = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
         if holed.is_valid() {
             failures.push("ladder with hole (T2 without T1) reported valid".into());
         }
-        let actions = holed._reset_to_t0();
+        let actions = holed.reset_to_t0();
         if actions.is_empty() {
-            failures.push("_reset_to_t0 returned no actions".into());
+            failures.push("reset_to_t0 returned no actions".into());
         }
         if !holed.is_valid() {
             failures.push("ladder still invalid after reset".into());
@@ -2054,9 +2054,9 @@ mod tests {
     #[test]
     fn test_ladder_stops_at_first_failing_rung() {
         let ladder = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            ._with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc still crashes"))
-            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc still crashes"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
         let report = ladder.run();
         assert!(!report.promoted);
         assert_eq!(report.highest_passed, Some(OracleRung::T0BuildCheck));
@@ -2066,10 +2066,10 @@ mod tests {
     #[test]
     fn test_all_oracles_pass_promotes_to_t3() {
         let ladder = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            ._with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc no longer crashes"))
-            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "suite passes"))
-            ._with_oracle(OracleRung::T3Reattack, || RungResult::pass(OracleRung::T3Reattack, "survives re-attack"));
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc no longer crashes"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "suite passes"))
+            .with_oracle(OracleRung::T3Reattack, || RungResult::pass(OracleRung::T3Reattack, "survives re-attack"));
         let report = ladder.run();
         assert!(report.promoted, "全部 oracle 通过 → 提升到 T3");
         assert_eq!(report.highest_passed, Some(OracleRung::T3Reattack));
@@ -2079,8 +2079,8 @@ mod tests {
     #[test]
     fn test_per_rung_result_recorded() {
         let ladder = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "exit 0"))
-            ._with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "AddressSanitizer: heap-buffer-overflow"));
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "exit 0"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "AddressSanitizer: heap-buffer-overflow"));
         let report = ladder.run();
         let t0 = report._rung_result(OracleRung::T0BuildCheck).unwrap();
         assert!(t0.passed && t0.evidence == "exit 0");
@@ -2095,9 +2095,9 @@ mod tests {
         let t2_ran = Arc::new(AtomicBool::new(false));
         let t2_flag = t2_ran.clone();
         let ladder = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            ._with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc crashes"))
-            ._with_oracle(OracleRung::T2Regression, move || {
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc crashes"))
+            .with_oracle(OracleRung::T2Regression, move || {
                 t2_flag.store(true, Ordering::SeqCst);
                 RungResult::pass(OracleRung::T2Regression, "should not run")
             });
@@ -2110,8 +2110,8 @@ mod tests {
     #[test]
     fn test_ladder_missing_rung_does_not_promote() {
         let ladder = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            ._with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc clean"));
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc clean"));
         // T2/T3 未注册 → 不提升
         let report = ladder.run();
         assert!(!report.promoted);
@@ -2122,19 +2122,19 @@ mod tests {
     #[test]
     fn test_ladder_valid_when_contiguous() {
         let ladder = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            ._with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"))
-            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
         assert!(ladder.is_valid(), "T0→T2 连续前缀必须有效");
     }
 
     #[test]
-    fn test_ladder_hole_reset_to_t0() {
+    fn test_ladder_holereset_to_t0() {
         let mut ladder = OracleLadder::new()
-            ._with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
-            ._with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
         assert!(!ladder.is_valid(), "T2 注册而 T1 缺失 → 空洞阶梯");
-        let actions = ladder._reset_to_t0();
+        let actions = ladder.reset_to_t0();
         assert!(!actions.is_empty());
         assert!(ladder.is_valid(), "重置后必须回到有效基态");
         assert!(!ladder.has(OracleRung::T0BuildCheck), "重置后不应残留任何 oracle");

@@ -31,7 +31,7 @@ pub struct StealthNetConfig {
     pub tor: _TorConfigSection,
     pub pool: PoolConfig,
     pub bandit: _BanditConfig,
-    pub nt_world_browse: BrowserConfig,
+    pub stealth_browser: BrowserConfig,
     #[serde(default)]
     pub firewall: _FirewallConfigSection,
     #[serde(default)]
@@ -167,7 +167,7 @@ impl Default for StealthNetConfig {
             bandit: _BanditConfig {
                 persistence_path: "~/.neotrix/bandit.json".into(),
             },
-            nt_world_browse: BrowserConfig {
+            stealth_browser: BrowserConfig {
                 headless: true,
                 window_width: 1920,
                 window_height: 1080,
@@ -211,7 +211,7 @@ selection_strategy = "auto"
 [bandit]
 persistence_path = "~/.neotrix/bandit.json"
 
-[nt_world_browse]
+[stealth_browser]
 headless = true
 window_width = 1920
 window_height = 1080
@@ -311,7 +311,7 @@ mod tests {
         assert_eq!(cfg.proxy.local_port, 11080);
         assert_eq!(cfg.rotation.gaussian_mean_secs, 7.5);
         assert_eq!(cfg.pool.min_nodes, 5);
-        assert!(cfg.nt_world_browse.headless);
+        assert!(cfg.stealth_browser.headless);
     }
 
     #[test]

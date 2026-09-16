@@ -26,6 +26,7 @@ pub mod registry;
 pub mod evidence_cmds;
 pub mod hypothesis_cmds;
 pub mod skill_cmds;
+pub mod social_cmds;
 pub mod explore_cmds;
 pub mod kanban_cmds;
 pub mod plan_cmds;

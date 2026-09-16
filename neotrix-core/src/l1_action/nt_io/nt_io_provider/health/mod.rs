@@ -4,6 +4,7 @@ pub mod rate_limiter;
 pub mod rate_profiles;
 pub mod compaction;
 pub mod context_budget;
+pub mod otel_integration;
 pub use circuit_breaker::*;
 pub use rate_limiter::*;
 pub use rate_profiles::*;

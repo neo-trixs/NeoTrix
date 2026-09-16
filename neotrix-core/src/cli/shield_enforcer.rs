@@ -600,10 +600,10 @@ mod tests {
 
     #[test]
     fn test_guardrail_blocks_long_input() {
-        let mut config = crate::l3_embodiment::nt_shield::guardrails::GuardrailConfig::default();
+        let mut config = crate::l3_embodiment::nt_shield::shield_core::guardrails::GuardrailConfig::default();
         config.max_input_length = 5;
         let mut s = ShieldEnforcer {
-            guardrails: crate::l3_embodiment::nt_shield::guardrails::GuardrailSystem::new(config),
+            guardrails: crate::l3_embodiment::nt_shield::shield_core::guardrails::GuardrailSystem::new(config),
             ..ShieldEnforcer::new()
         };
         // Use file_read — SecurityGuard auto-allows within project root

@@ -12,7 +12,8 @@ use neotrix::agent::{
 };
 use neotrix::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
 use neotrix::agent::skills::SkillsEngine;
-use neotrix::agent::tool::mcp::{McpRegistry, McpTransport, McpToolDef};
+use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
+use neotrix::cli::commands::agent_cmds::McpRegistry;
 
 fn main() {
     println!("╭──────────────────────────────────────╮");
@@ -89,7 +90,7 @@ fn main() {
     println!("   注册服务: {} 个, 工具: {} 个",
         mcp.server_count(), mcp.tool_count());
     println!("   推荐工具 'search': {:?}",
-        mcp.recommend_tools("search the web", 3));
+        mcp.recommend_tools("search the web"));
 
     // 5. 启动方式
     println!("\n► 5. 启动方式");

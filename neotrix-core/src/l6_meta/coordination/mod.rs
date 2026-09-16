@@ -16,6 +16,7 @@ pub mod verifier_agent;
 pub mod layered_qa;
 pub mod null_normalizer;
 pub mod self_improvement;
+pub mod nt_task_orchestrator;
 
 pub use governance::*;
 pub use nt_governance::*;
@@ -49,3 +50,4 @@ pub use self_improvement::{
     SystemMetrics, MetricTrend, TrendDirection, DiagnosticResult, DiagnosticIssue,
     VerificationResult, LoopStats, CycleResult,
 };
+pub use nt_task_orchestrator::{RecursiveController, TaskNode};

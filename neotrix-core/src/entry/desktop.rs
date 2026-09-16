@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use neotrix::neotrix::nt_io_neocodex::{NeoCodexUI, NeoCodexMode, NeoCodexAgent};
-use neotrix::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use neotrix::core::nt_core_traits::BrainHandle;
 
 use neotrix::cli::commands::registry::default_registry;

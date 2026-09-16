@@ -41,7 +41,8 @@ impl YagniLadder {
             YagniLevel {
                 level: 1,
                 name: "Minimal Viable",
-                question: "Does the system fail without it? Is it required by an existing contract?",
+                question:
+                    "Does the system fail without it? Is it required by an existing contract?",
             },
             YagniLevel {
                 level: 2,
@@ -71,7 +72,8 @@ impl YagniLadder {
             YagniLevel {
                 level: 7,
                 name: "Rewrite",
-                question: "Would you be better off deleting and rewriting it than adding this feature?",
+                question:
+                    "Would you be better off deleting and rewriting it than adding this feature?",
             },
         ]
     }
@@ -144,9 +146,16 @@ impl crate::core::nt_core_self_test::SelfTest for YagniLadder {
 /// 投机性措辞检测 — 确定性小写子串扫描
 fn is_speculative(candidate: &str) -> bool {
     let lower = candidate.to_lowercase();
-    ["eventually", "might", "someday", "future", "probably", "potentially"]
-        .iter()
-        .any(|w| lower.contains(w))
+    [
+        "eventually",
+        "might",
+        "someday",
+        "future",
+        "probably",
+        "potentially",
+    ]
+    .iter()
+    .any(|w| lower.contains(w))
 }
 
 #[cfg(test)]
@@ -173,7 +182,11 @@ mod tests {
         for (i, l) in levels.iter().enumerate() {
             assert_eq!(l.level, (i + 1) as u8);
             assert_eq!(l.name, expected[i]);
-            assert!(!l.question.is_empty(), "level {} must have a question", l.level);
+            assert!(
+                !l.question.is_empty(),
+                "level {} must have a question",
+                l.level
+            );
         }
     }
 
@@ -186,17 +199,38 @@ mod tests {
 
     #[test]
     fn medium_usage_reconsider() {
-        assert_eq!(ladder().evaluate("mid feature", 2, 1), YagniVerdict::Reconsider);
-        assert_eq!(ladder().evaluate("mid feature", 1, 2), YagniVerdict::Reconsider);
-        assert_eq!(ladder().evaluate("mid feature", 2, 2), YagniVerdict::Reconsider);
-        assert_eq!(ladder().evaluate("mid feature", 4, 1), YagniVerdict::Reconsider);
-        assert_eq!(ladder().evaluate("mid feature", 5, 0), YagniVerdict::Reconsider);
+        assert_eq!(
+            ladder().evaluate("mid feature", 2, 1),
+            YagniVerdict::Reconsider
+        );
+        assert_eq!(
+            ladder().evaluate("mid feature", 1, 2),
+            YagniVerdict::Reconsider
+        );
+        assert_eq!(
+            ladder().evaluate("mid feature", 2, 2),
+            YagniVerdict::Reconsider
+        );
+        assert_eq!(
+            ladder().evaluate("mid feature", 4, 1),
+            YagniVerdict::Reconsider
+        );
+        assert_eq!(
+            ladder().evaluate("mid feature", 5, 0),
+            YagniVerdict::Reconsider
+        );
     }
 
     #[test]
     fn high_usage_keep() {
-        assert_eq!(ladder().evaluate("core endpoint", 10, 5), YagniVerdict::Keep);
-        assert_eq!(ladder().evaluate("core endpoint", 100, 1), YagniVerdict::Keep);
+        assert_eq!(
+            ladder().evaluate("core endpoint", 10, 5),
+            YagniVerdict::Keep
+        );
+        assert_eq!(
+            ladder().evaluate("core endpoint", 100, 1),
+            YagniVerdict::Keep
+        );
         assert_eq!(ladder().evaluate("core endpoint", 6, 0), YagniVerdict::Keep);
     }
 
@@ -205,10 +239,10 @@ mod tests {
         // score 5 → Cut, score 6 → Reconsider
         assert_eq!(ladder().evaluate("x", 1, 1), YagniVerdict::Cut); // 2+3=5
         assert_eq!(ladder().evaluate("x", 2, 0), YagniVerdict::Cut); // 4+0=4
-        // score 6 → Reconsider (6 is not < 6)
+                                                                     // score 6 → Reconsider (6 is not < 6)
         assert_eq!(ladder().evaluate("x", 3, 0), YagniVerdict::Reconsider); // 6+0=6
         assert_eq!(ladder().evaluate("x", 2, 1), YagniVerdict::Reconsider); // 4+3=7
-        // score 11 → Reconsider, score 12 → Keep
+                                                                            // score 11 → Reconsider, score 12 → Keep
         assert_eq!(ladder().evaluate("x", 4, 1), YagniVerdict::Reconsider); // 8+3=11
         assert_eq!(ladder().evaluate("x", 3, 2), YagniVerdict::Keep); // 6+6=12
         assert_eq!(ladder().evaluate("x", 2, 3), YagniVerdict::Keep); // 4+9=13
@@ -217,20 +251,41 @@ mod tests {
     #[test]
     fn speculative_language_penalty() {
         // 3*2 + 0*3 = 6 → Reconsider, 但投机措辞 → 5 → Cut
-        assert_eq!(ladder().evaluate("we might need it someday", 3, 0), YagniVerdict::Cut);
+        assert_eq!(
+            ladder().evaluate("we might need it someday", 3, 0),
+            YagniVerdict::Cut
+        );
         // 没有投机措辞 → Reconsider
-        assert_eq!(ladder().evaluate("we need it now", 3, 0), YagniVerdict::Reconsider);
+        assert_eq!(
+            ladder().evaluate("we need it now", 3, 0),
+            YagniVerdict::Reconsider
+        );
         // 高 usage 不受投机措辞影响降级太多: 100*2=200 → Keep
-        assert_eq!(ladder().evaluate("future-proofing helper", 100, 0), YagniVerdict::Keep);
+        assert_eq!(
+            ladder().evaluate("future-proofing helper", 100, 0),
+            YagniVerdict::Keep
+        );
     }
 
     #[test]
     fn reached_level_progression() {
         let l = ladder();
-        assert!(!l.reached_level("toy", 0, 0, 1), "Cut feature reaches nothing");
-        assert!(l.reached_level("mid", 2, 2, 4), "Reconsider reaches up to level 4");
-        assert!(!l.reached_level("mid", 2, 2, 5), "Reconsider does not reach level 5");
-        assert!(l.reached_level("keep", 10, 5, 7), "Keep reaches all 7 levels");
+        assert!(
+            !l.reached_level("toy", 0, 0, 1),
+            "Cut feature reaches nothing"
+        );
+        assert!(
+            l.reached_level("mid", 2, 2, 4),
+            "Reconsider reaches up to level 4"
+        );
+        assert!(
+            !l.reached_level("mid", 2, 2, 5),
+            "Reconsider does not reach level 5"
+        );
+        assert!(
+            l.reached_level("keep", 10, 5, 7),
+            "Keep reaches all 7 levels"
+        );
     }
 
     #[test]

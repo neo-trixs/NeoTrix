@@ -7,8 +7,10 @@ pub mod health;
 pub mod phi;
 pub mod vsa;
 
-pub use attention::{AttentionReport, AttentionMapping, generate_attention_report};
-pub use feedback::{FeedbackReport, AppraisalSignal, PressureSignal, EmotionLabel, generate_feedback};
-pub use health::{HealthReport, Recommendation, generate_health_report};
-pub use phi::{PhiReport, generate_phi_report};
-pub use vsa::{VsaReport, GameVsaEncoder, StrategySignature, generate_vsa_report};
+pub use attention::{generate_attention_report, AttentionMapping, AttentionReport};
+pub use feedback::{
+    generate_feedback, AppraisalSignal, EmotionLabel, FeedbackReport, PressureSignal,
+};
+pub use health::{generate_health_report, HealthReport, Recommendation};
+pub use phi::{generate_phi_report, PhiReport};
+pub use vsa::{generate_vsa_report, GameVsaEncoder, StrategySignature, VsaReport};

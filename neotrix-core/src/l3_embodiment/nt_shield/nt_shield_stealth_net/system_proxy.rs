@@ -105,7 +105,7 @@ impl SystemProxyManager {
         }
     }
 
-    /// 注册 SIGTERM/SIGINT 处理 — 进程退出时自动恢复系统代理
+    /// Register SIGTERM/SIGINT handling — graceful shutdown via signal.
     pub async fn install_shutdown_handler(self: Arc<Self>) {
         #[cfg(unix)]
         {
@@ -120,12 +120,12 @@ impl SystemProxyManager {
             let proxy = self.clone();
             tokio::spawn(async move {
                 tokio::select! {
-                    _ = term.recv() => {}
-                    _ = int.recv() => {}
+                    _ = term.recv() => {},
+                    _ = int.recv() => {},
                 }
-                log::info!("[system-proxy] signal received, restoring proxy settings...");
+                log::info!("[system-proxy] signal received, initiating graceful shutdown...");
                 let _ = proxy.disable().await;
-                std::process::exit(0);
+                log::info!("[system-proxy] graceful shutdown complete");
             });
         }
     }

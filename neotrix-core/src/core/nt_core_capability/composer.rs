@@ -11,6 +11,12 @@ pub struct CapabilityComposer {
     registry: Arc<CapabilityRegistry>,
 }
 
+impl CapabilityComposer {
+    pub fn registry(&self) -> &CapabilityRegistry {
+        &self.registry
+    }
+}
+
 /// 组合步骤
 #[derive(Debug, Clone)]
 pub struct CompositionStep {
@@ -203,6 +209,7 @@ impl CapabilityComposer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_capability::factory::init_global_registry;
 
     #[test]
     fn composer_creation() {

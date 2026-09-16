@@ -29,18 +29,8 @@ static GEO_CACHE: LazyLock<std::sync::Mutex<HashMap<String, (bool, Instant)>>> =
 });
 
 /// DI-aware 缓存访问 — 优先从容器解析，回退到静态缓存
-fn get_geo_cache() -> std::sync::Mutex<HashMap<String, (bool, Instant)>> {
-    use crate::core::nt_core_di;
-    if let Some(cached) = nt_core_di::resolve_global::<std::sync::Mutex<HashMap<String, (bool, Instant)>>>() {
-        return cached;
-    }
-    match GEO_CACHE.lock() {
-        Ok(m) => return std::sync::Mutex::new(m.clone()),
-        Err(e) => {
-            log::warn!("[geo] cache lock: {}", e);
-        }
-    }
-    std::sync::Mutex::new(HashMap::new())
+fn get_geo_cache() -> &'static std::sync::Mutex<HashMap<String, (bool, Instant)>> {
+    &GEO_CACHE
 }
 
 fn geo_cache_get(domain: &str) -> Option<bool> {

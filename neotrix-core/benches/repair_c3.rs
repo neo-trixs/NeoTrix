@@ -9,7 +9,7 @@
 // 对比历史 (cargo bench --bench repair_c3)。
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use neotrix::neotrix::l8_autonomic_impl::nt_repair_causal_trace::{
+use neotrix::l6_meta::healing::nt_repair_causal_trace::{
     default_adjudicator, CausalChainWalker, CausalNode, EvidenceGate,
 };
 

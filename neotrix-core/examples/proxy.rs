@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg(feature = "stealth-net")]
-use neotrix::neotrix::nt_shield_stealth_net::config::load as cfg;
+use neotrix::nt_shield_stealth_net::config::load as cfg;
 
 #[cfg(not(feature = "stealth-net"))]
 fn main() {
@@ -44,10 +44,9 @@ async fn main() {
     sys_proxy.clone().install_shutdown_handler().await;
 
     // 3. 启动本地 HTTP CONNECT 代理
-    let mut engine = neotrix::neotrix::nt_shield_stealth_net::rules::RuleEngine::new();
-    engine.load_rules(neotrix::neotrix::nt_shield_stealth_net::rules::china_bypass_rules());
+    let engine = neotrix::neotrix::nt_shield_stealth_net::rules::RuleEngine::new();
     let proxy = neotrix::neotrix::nt_shield_stealth_net::local_proxy::LocalProxy::new()
-        .with_rule_engine(Arc::new(engine));
+        .with_rule_engine(Arc::new(tokio::sync::RwLock::new(engine)));
     let proxy = Arc::new(proxy);
     let p = proxy.clone();
     tokio::spawn(async move {
@@ -71,7 +70,7 @@ async fn main() {
         for _ in 0..3 {
             if neotrix::neotrix::nt_shield_stealth_net::local_proxy::TorManager::socks5_reachable().await {
                 // 通过 Google 预热 Tor 电路
-                let _ = neotrix::neotrix::nt_shield_stealth_net::local_proxy::tor_connect("www.google.com", 443).await;
+                let _ = neotrix::neotrix::nt_shield_stealth_net::local_proxy::tor_connect("www.google.com", 443);
                 break;
             }
             tokio::time::sleep(Duration::from_secs(5)).await;
@@ -81,7 +80,7 @@ async fn main() {
     // 5. 状态摘要
     println!();
     println!("╭──────────────────────────────────────────────╮");
-    println!("│  ✅ 本地代理 : {}                  │", proxy.proxy_url());
+    println!("│  ✅ 本地代理 : http://127.0.0.1:{}        │", c.proxy.local_port);
     println!("│                                                │");
     println!("│  浏览器访问 http://127.0.0.1:11080 查看状态     │");
     println!("│  直连已就绪 · Tor/Arti 后台安装中...           │");

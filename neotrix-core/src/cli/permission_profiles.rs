@@ -79,7 +79,7 @@ impl ProfileStore {
         nt_shield.rules.insert("git_force_push".into(), ProfileDecision::Deny);
         nt_shield.rules.insert("compile_check".into(), ProfileDecision::Allow);
         nt_shield.rules.insert("modify_dependency".into(), ProfileDecision::Ask);
-        nt_shield.rules.insert("access_nt_world_browse_auto".into(), ProfileDecision::Ask);
+        nt_shield.rules.insert("access_stealth_browser_auto".into(), ProfileDecision::Ask);
         nt_shield.rules.insert("access_tor_network".into(), ProfileDecision::Ask);
         profiles.insert("nt_shield".into(), nt_shield);
 
@@ -107,7 +107,7 @@ impl ProfileStore {
         developer.parent = Some("general".into());
         developer.rules.insert("delete_file".into(), ProfileDecision::Allow);
         developer.rules.insert("git_push".into(), ProfileDecision::Allow);
-        developer.rules.insert("access_nt_world_browse_auto".into(), ProfileDecision::Allow);
+        developer.rules.insert("access_stealth_browser_auto".into(), ProfileDecision::Allow);
         developer.rules.insert("access_tor_network".into(), ProfileDecision::Deny);
         developer.approval_mode_override = Some("auto-edit".into());
         profiles.insert("developer".into(), developer);

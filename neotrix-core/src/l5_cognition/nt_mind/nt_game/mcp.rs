@@ -221,10 +221,7 @@ impl GameTool for GameStepTool {
             .as_str()
             .ok_or("missing action_kind")?
             .to_string();
-        let params = args
-            .get("params")
-            .cloned()
-            .unwrap_or(serde_json::json!({}));
+        let params = args.get("params").cloned().unwrap_or(serde_json::json!({}));
 
         // The session is accessed via GameSessionManager; this tool
         // receives the session reference externally. For standalone use,
@@ -517,12 +514,7 @@ impl GameSessionManager {
     }
 
     /// Step the game in the given session.
-    pub fn step(
-        &mut self,
-        id: &str,
-        action_kind: &str,
-        params: Value,
-    ) -> Result<Value, String> {
+    pub fn step(&mut self, id: &str, action_kind: &str, params: Value) -> Result<Value, String> {
         let session = self
             .sessions
             .get_mut(id)
@@ -654,10 +646,7 @@ mod tests {
         let out = reg.execute("game_list", serde_json::json!({})).unwrap();
         let games: Vec<Value> = serde_json::from_value(out).unwrap();
         assert!(games.len() >= 3);
-        let names: Vec<&str> = games
-            .iter()
-            .map(|g| g["name"].as_str().unwrap())
-            .collect();
+        let names: Vec<&str> = games.iter().map(|g| g["name"].as_str().unwrap()).collect();
         assert!(names.contains(&"HexCrucible"));
         assert!(names.contains(&"HexTicTacToe"));
         assert!(names.contains(&"2048"));

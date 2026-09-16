@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// 因果发明引擎 — 跨域知识融合生成超越现有技术的发明
 pub struct CausalInventor {
@@ -47,10 +47,16 @@ impl CausalInventor {
     }
 
     /// 加载知识引擎数据
-    pub fn load_from_engine(&mut self, entries: &[crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_engine::KnowledgeEntry]) {
+    pub fn load_from_engine(
+        &mut self,
+        entries: &[crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_engine::KnowledgeEntry],
+    ) {
         for entry in entries {
             for tag in &entry.tags {
-                self.domain_index.entry(tag.clone()).or_default().push(entry.title.clone());
+                self.domain_index
+                    .entry(tag.clone())
+                    .or_default()
+                    .push(entry.title.clone());
             }
         }
         self.build_analogies();
@@ -60,54 +66,88 @@ impl CausalInventor {
     fn build_analogies(&mut self) {
         let analogies = vec![
             CrossDomainMapping {
-                source_domain: "生物学: 菌丝网络".into(), target_domain: "计算: 分布式系统".into(),
-                principle: "菌丝的自适应生长模式可作为分布式计算的拓扑优化算法,比传统Paxos/Raft更高效".into(),
-                novelty_score: 0.92, description: "菌丝网络(Fungal Network)的分布式自适应拓扑优化".into(),
+                source_domain: "生物学: 菌丝网络".into(),
+                target_domain: "计算: 分布式系统".into(),
+                principle:
+                    "菌丝的自适应生长模式可作为分布式计算的拓扑优化算法,比传统Paxos/Raft更高效"
+                        .into(),
+                novelty_score: 0.92,
+                description: "菌丝网络(Fungal Network)的分布式自适应拓扑优化".into(),
             },
             CrossDomainMapping {
-                source_domain: "量子力学: 纠缠".into(), target_domain: "通信: 安全协议".into(),
-                principle: "量子纠缠+区块链=无法篡改的量子共识机制,比当前加密签名安全一个维度".into(),
-                novelty_score: 0.95, description: "量子纠缠共识协议(Quantum Entanglement Consensus)".into(),
+                source_domain: "量子力学: 纠缠".into(),
+                target_domain: "通信: 安全协议".into(),
+                principle: "量子纠缠+区块链=无法篡改的量子共识机制,比当前加密签名安全一个维度"
+                    .into(),
+                novelty_score: 0.95,
+                description: "量子纠缠共识协议(Quantum Entanglement Consensus)".into(),
             },
             CrossDomainMapping {
-                source_domain: "中医: 经络系统".into(), target_domain: "网络: 路由算法".into(),
+                source_domain: "中医: 经络系统".into(),
+                target_domain: "网络: 路由算法".into(),
                 principle: "经络的气血流注时间规律可用作动态路由算法,比OSPF/BGP更高效".into(),
-                novelty_score: 0.88, description: "子午流注路由协议(Meridian Flow Routing Protocol)".into(),
+                novelty_score: 0.88,
+                description: "子午流注路由协议(Meridian Flow Routing Protocol)".into(),
             },
             CrossDomainMapping {
-                source_domain: "内丹: 三丹田".into(), target_domain: "AI: 认知架构".into(),
-                principle: "上丹田(感知)+中丹田(处理)+下丹田(存储)=三层认知架构,解决当前AI的灾难性遗忘".into(),
-                novelty_score: 0.93, description: "三丹田认知架构(Elixir Architecture): 感知层+处理层+存储层的强化学习框架".into(),
+                source_domain: "内丹: 三丹田".into(),
+                target_domain: "AI: 认知架构".into(),
+                principle:
+                    "上丹田(感知)+中丹田(处理)+下丹田(存储)=三层认知架构,解决当前AI的灾难性遗忘"
+                        .into(),
+                novelty_score: 0.93,
+                description:
+                    "三丹田认知架构(Elixir Architecture): 感知层+处理层+存储层的强化学习框架".into(),
             },
             CrossDomainMapping {
-                source_domain: "易学: 64卦可变系统".into(), target_domain: "编程: 类型系统".into(),
-                principle: "64卦的二进制排列+变爻规则=完备的错误处理类型系统,比Rust的Result更全面".into(),
-                novelty_score: 0.90, description: "卦象类型系统(Hexagram Type System): 64种状态完备覆盖所有异常路径".into(),
+                source_domain: "易学: 64卦可变系统".into(),
+                target_domain: "编程: 类型系统".into(),
+                principle: "64卦的二进制排列+变爻规则=完备的错误处理类型系统,比Rust的Result更全面"
+                    .into(),
+                novelty_score: 0.90,
+                description: "卦象类型系统(Hexagram Type System): 64种状态完备覆盖所有异常路径"
+                    .into(),
             },
             CrossDomainMapping {
-                source_domain: "禅宗: 顿悟".into(), target_domain: "AI: 推理加速".into(),
-                principle: "不立文字直指本心的顿悟机制 ≈ 跳过中间推理步骤的直觉推理,可加速LLM推理3-10倍".into(),
-                novelty_score: 0.91, description: "顿悟推理引擎(Insight Engine): 跳过中间步骤的端到端直觉推理".into(),
+                source_domain: "禅宗: 顿悟".into(),
+                target_domain: "AI: 推理加速".into(),
+                principle:
+                    "不立文字直指本心的顿悟机制 ≈ 跳过中间推理步骤的直觉推理,可加速LLM推理3-10倍"
+                        .into(),
+                novelty_score: 0.91,
+                description: "顿悟推理引擎(Insight Engine): 跳过中间步骤的端到端直觉推理".into(),
             },
             CrossDomainMapping {
-                source_domain: "生物: DNA存储".into(), target_domain: "数据: 归档存储".into(),
-                principle: "DNA的4碱基编码+CRISPR写入=比当前蓝光存储密度高百万倍的数据归档系统".into(),
-                novelty_score: 0.94, description: "DNA归档存储系统: 1克DNA=215PB,千年保存".into(),
+                source_domain: "生物: DNA存储".into(),
+                target_domain: "数据: 归档存储".into(),
+                principle: "DNA的4碱基编码+CRISPR写入=比当前蓝光存储密度高百万倍的数据归档系统"
+                    .into(),
+                novelty_score: 0.94,
+                description: "DNA归档存储系统: 1克DNA=215PB,千年保存".into(),
             },
             CrossDomainMapping {
-                source_domain: "金字塔: 结构工程".into(), target_domain: "建筑: 抗灾结构".into(),
+                source_domain: "金字塔: 结构工程".into(),
+                target_domain: "建筑: 抗灾结构".into(),
                 principle: "金字塔的自稳定斜面+巨石互锁=零地震损坏的超长期建筑,寿命可达万年".into(),
-                novelty_score: 0.82, description: "金字塔抗震建筑: 自稳定斜面+互锁结构+应力分散".into(),
+                novelty_score: 0.82,
+                description: "金字塔抗震建筑: 自稳定斜面+互锁结构+应力分散".into(),
             },
             CrossDomainMapping {
-                source_domain: "兵法: 奇正相生".into(), target_domain: "算法: 搜索优化".into(),
-                principle: "正合奇胜=深度优先(正)+蒙特卡洛(奇)的混合搜索,比AlphaZero的MCTS更高效".into(),
-                novelty_score: 0.89, description: "奇正搜索算法(Surprise-Search Algorithm): 正兵当敌+奇兵制胜的混合搜索".into(),
+                source_domain: "兵法: 奇正相生".into(),
+                target_domain: "算法: 搜索优化".into(),
+                principle: "正合奇胜=深度优先(正)+蒙特卡洛(奇)的混合搜索,比AlphaZero的MCTS更高效"
+                    .into(),
+                novelty_score: 0.89,
+                description: "奇正搜索算法(Surprise-Search Algorithm): 正兵当敌+奇兵制胜的混合搜索"
+                    .into(),
             },
             CrossDomainMapping {
-                source_domain: "针灸: 子午流注".into(), target_domain: "能源: 电网调度".into(),
-                principle: "人体气血的昼夜节律优化模型≈智能电网的实时负载调度,比线性规划节能15-30%".into(),
-                novelty_score: 0.87, description: "经络电网调度(Meridian Grid Dispatch): 生物节律启发的智能电网".into(),
+                source_domain: "针灸: 子午流注".into(),
+                target_domain: "能源: 电网调度".into(),
+                principle: "人体气血的昼夜节律优化模型≈智能电网的实时负载调度,比线性规划节能15-30%"
+                    .into(),
+                novelty_score: 0.87,
+                description: "经络电网调度(Meridian Grid Dispatch): 生物节律启发的智能电网".into(),
             },
         ];
         self.analogies = analogies;
@@ -122,15 +162,19 @@ impl CausalInventor {
                 Some(d) => analogy.source_domain.contains(d) || analogy.target_domain.contains(d),
                 None => true,
             };
-            if !matches { continue; }
+            if !matches {
+                continue;
+            }
 
             let novelty = analogy.novelty_score;
             let feasibility = 0.5 + (novelty - 0.5) * 0.6; // 越高越难
             let impact = 0.6 + novelty * 0.35;
 
-            let name = format!("{}→{} 跨域创新系统", 
+            let name = format!(
+                "{}→{} 跨域创新系统",
                 analogy.source_domain.split(':').next().unwrap_or("?"),
-                analogy.target_domain.split(':').next().unwrap_or("?"));
+                analogy.target_domain.split(':').next().unwrap_or("?")
+            );
 
             inventions.push(Invention {
                 id: uuid::Uuid::new_v4().to_string(),
@@ -160,7 +204,9 @@ impl CausalInventor {
             "基于{}的{}原理, 结合{}的领域知识.\n\
              关键技术指标: 创新度{:.0}%, 可行性{:.0}%, 预期影响{:.0}%.\n\
              所需资源: 跨学科团队(2-3个领域专家), 12-18个月研发周期.",
-            mapping.source_domain, mapping.principle, mapping.target_domain,
+            mapping.source_domain,
+            mapping.principle,
+            mapping.target_domain,
             mapping.novelty_score * 100.0,
             (0.5 + (mapping.novelty_score - 0.5) * 0.6) * 100.0,
             (0.6 + mapping.novelty_score * 0.35) * 100.0,
@@ -180,8 +226,11 @@ impl CausalInventor {
     pub fn knowledge_coverage(&self) -> String {
         let mut report = String::new();
         report.push_str("知识覆盖分析:\n");
-        let mut count: Vec<(String, usize)> = self.domain_index.iter()
-            .map(|(k, v)| (k.clone(), v.len())).collect();
+        let mut count: Vec<(String, usize)> = self
+            .domain_index
+            .iter()
+            .map(|(k, v)| (k.clone(), v.len()))
+            .collect();
         count.sort_by_key(|b| std::cmp::Reverse(b.1));
         for (domain, c) in count.iter().take(15) {
             report.push_str(&format!("  {}: {} 条目\n", domain, c));

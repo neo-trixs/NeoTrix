@@ -29,3 +29,6 @@ pub use awareness_monitor::SelfAwarenessMonitor;
 // 从 L1 nt_io 迁移过来的模块
 pub mod nt_io_awareness_core;
 pub mod nt_io_context_mgmt;
+
+// JSON-first declarative agent configuration (crewAI pattern)
+pub mod nt_core_agent_config;

@@ -3,7 +3,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use neotrix::core::CapabilityVector;
-use neotrix::neotrix::nt_core_signal::ops;
 
 /// 生成随机向量（指定维度）
 fn random_vector(dim: usize) -> Vec<f64> {
@@ -100,11 +99,11 @@ fn benchmark_capability_vector_ops(c: &mut Criterion) {
             })
         });
 
-        // 余弦相似度 (使用 signal::ops)
+        // 余弦相似度 (使用 nt_core_math)
         let vec1 = random_vector(dim);
         let vec2 = random_vector(dim);
         group.bench_function(&format!("cosine_similarity_{}d", dim), |b| {
-            b.iter(|| black_box(ops::cosine_similarity(&vec1, &vec2)))
+            b.iter(|| black_box(neotrix::core::nt_core_math::cosine_similarity_f64(&vec1, &vec2)))
         });
     }
 

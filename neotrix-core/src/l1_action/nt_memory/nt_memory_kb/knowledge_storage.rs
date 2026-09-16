@@ -8,6 +8,7 @@
 //!   3. 懒惰 compact — 仅当碎片率 >30% 或调用 compact()
 //!   4. 零拷贝读取 — 读取避免 json 全量解析
 
+use fs2::FileExt;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
@@ -291,10 +292,12 @@ impl KnowledgeStorage {
             .create(true)
             .append(true)
             .open(&self.journal_path)?;
+        f.lock_exclusive()?;
         for e in entries {
             let line = serde_json::to_string(e)?;
             writeln!(f, "{line}")?;
         }
+        f.unlock()?;
         Ok(())
     }
 
@@ -310,7 +313,7 @@ impl KnowledgeStorage {
 
 /// 图节点 — 上下文切片 (knowledge entry 的轻量投影)。
 /// 
-/// For the unified GraphNode, see `neotrix_core::core::nt_core_graph::GraphNode`.
+/// For the unified ContextGraphNode, see `neotrix_core::core::nt_core_graph::ContextGraphNode`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContextGraphNode {
     pub id: String,
@@ -655,10 +658,10 @@ mod tests {
 
     fn sample_graph() -> ContextGraph {
         let mut g = ContextGraph::default();
-        g.add_node(GraphNode { id: "a".into(), kind: "fact".into(), content: "alpha".into() });
-        g.add_node(GraphNode { id: "b".into(), kind: "fact".into(), content: "beta".into() });
-        g.add_node(GraphNode { id: "c".into(), kind: "fact".into(), content: "gamma".into() });
-        g.add_node(GraphNode { id: "d".into(), kind: "fact".into(), content: "delta".into() });
+        g.add_node(ContextGraphNode { id: "a".into(), kind: "fact".into(), content: "alpha".into() });
+        g.add_node(ContextGraphNode { id: "b".into(), kind: "fact".into(), content: "beta".into() });
+        g.add_node(ContextGraphNode { id: "c".into(), kind: "fact".into(), content: "gamma".into() });
+        g.add_node(ContextGraphNode { id: "d".into(), kind: "fact".into(), content: "delta".into() });
         g.connect("a", "b", "relates", 0.8).unwrap();
         g.connect("b", "c", "relates", 0.7).unwrap();
         g.connect("c", "d", "relates", 0.6).unwrap();
@@ -668,8 +671,8 @@ mod tests {
     #[test]
     fn test_graph_add_node_replaces_duplicate_id() {
         let mut g = ContextGraph::default();
-        g.add_node(GraphNode { id: "a".into(), kind: "fact".into(), content: "old".into() });
-        g.add_node(GraphNode { id: "a".into(), kind: "fact".into(), content: "new".into() });
+        g.add_node(ContextGraphNode { id: "a".into(), kind: "fact".into(), content: "old".into() });
+        g.add_node(ContextGraphNode { id: "a".into(), kind: "fact".into(), content: "new".into() });
         assert_eq!(g.nodes.len(), 1, "重复 id 应替换而非追加");
         assert_eq!(g.nodes[0].content, "new");
     }
@@ -708,9 +711,9 @@ mod tests {
     #[test]
     fn test_graph_decision_context_truncates_content() {
         let mut g = ContextGraph::default();
-        g.add_node(GraphNode { id: "focus".into(), kind: "fact".into(), content: "focus body".into() });
+        g.add_node(ContextGraphNode { id: "focus".into(), kind: "fact".into(), content: "focus body".into() });
         let long = "x".repeat(120);
-        g.add_node(GraphNode { id: "nbr".into(), kind: "fact".into(), content: long.clone() });
+        g.add_node(ContextGraphNode { id: "nbr".into(), kind: "fact".into(), content: long.clone() });
         g.connect("focus", "nbr", "relates", 0.5).unwrap();
         let ctx = g.decision_context("focus");
         assert_eq!(ctx.len(), 1, "应返回 1 跳邻接内容切片");
@@ -722,8 +725,8 @@ mod tests {
     #[test]
     fn test_graph_provenance_chain_filters() {
         let mut g = ContextGraph::default();
-        g.add_node(GraphNode { id: "a".into(), kind: "fact".into(), content: "alpha".into() });
-        g.add_node(GraphNode { id: "b".into(), kind: "fact".into(), content: "beta".into() });
+        g.add_node(ContextGraphNode { id: "a".into(), kind: "fact".into(), content: "alpha".into() });
+        g.add_node(ContextGraphNode { id: "b".into(), kind: "fact".into(), content: "beta".into() });
         g.trace("a", "created", 1);
         g.trace("a", "decided", 2);
         g.trace("b", "created", 3);

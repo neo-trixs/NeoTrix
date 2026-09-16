@@ -3,7 +3,7 @@
 mod cognitive_observer;
 pub mod engine_core;
 
+pub use cognitive_observer::{BlindSpotKind, CognitiveBlindSpot, CognitiveEye, CognitiveSnapshot};
 pub use engine_core::{
     CostRecord, EngineMetrics, ReasoningEngine, ReasoningStats, MAX_COST_LOG, MAX_TRACES,
 };
-pub use cognitive_observer::{BlindSpotKind, CognitiveBlindSpot, CognitiveEye, CognitiveSnapshot};

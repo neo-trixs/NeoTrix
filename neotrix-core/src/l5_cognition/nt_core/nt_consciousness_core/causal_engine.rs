@@ -9,8 +9,6 @@ use serde::{Deserialize, Serialize};
 pub struct CausalEngine {
     /// 因果图
     pub causal_graph: CausalGraph,
-    /// 因果发现器
-    pub discoverers: Vec<Box<dyn _CausalDiscoverer>>,
     /// 因果历史
     pub history: Vec<_CausalRecord>,
 }
@@ -61,12 +59,6 @@ pub enum EdgeType {
     Bidirectional,
 }
 
-/// 因果发现器 trait
-pub trait _CausalDiscoverer: Send + Sync {
-    fn discover_causes(&self, effect: &str, context: &str) -> Vec<String>;
-    fn name(&self) -> &str;
-}
-
 /// 因果记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _CausalRecord {
@@ -82,19 +74,13 @@ impl CausalEngine {
     pub fn new() -> Self {
         Self {
             causal_graph: CausalGraph::default(),
-            discoverers: Vec::new(),
             history: Vec::new(),
         }
     }
 
     /// 发现因果关系
     pub fn discover(&mut self, cycle: u32, effect: &str, context: &str) -> Vec<String> {
-        let mut causes = Vec::new();
-        
-        for discoverer in &self.discoverers {
-            let discovered = discoverer.discover_causes(effect, context);
-            causes.extend(discovered);
-        }
+        let causes: Vec<String> = Vec::new();
         
         // 记录
         for cause in &causes {

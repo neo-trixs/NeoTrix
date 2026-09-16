@@ -548,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fail_closed_when_inactive() {
+    fn test_fail_closed_when_inactive() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         kernel.set_active(false);
         assert!(!kernel.is_active());
@@ -559,12 +559,13 @@ mod tests {
             SafetyDecision::Denied { reason, .. } => {
                 assert!(reason.contains("inactive"), "Denial should mention inactive: {}", reason);
             }
-            _ => panic!("Should be denied when kernel is inactive (fail-closed)"),
+            _ => return Err("Should be denied when kernel is inactive (fail-closed)".to_string()),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_allow_low_risk_action() {
+    fn test_allow_low_risk_action() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::FileRead, "/tmp/test.txt", 0.1);
         let evidence = kernel.check(&request);
@@ -572,12 +573,13 @@ mod tests {
             SafetyDecision::Allowed { reason, .. } => {
                 assert!(reason.contains("allowed"), "Should be allowed: {}", reason);
             }
-            other => panic!("Low-risk FileRead should be allowed, got: {:?}", other),
+            other => return Err(format!("Low-risk FileRead should be allowed, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_deny_blocked_action() {
+    fn test_deny_blocked_action() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::NetworkRequest, "evil.example.com", 0.3);
         let evidence = kernel.check(&request);
@@ -585,12 +587,13 @@ mod tests {
             SafetyDecision::Denied { reason, .. } => {
                 assert!(reason.contains("denied"), "Denial should mention denied: {}", reason);
             }
-            other => panic!("NetworkRequest to unknown domain should be denied, got: {:?}", other),
+            other => return Err(format!("NetworkRequest to unknown domain should be denied, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_require_approval_high_risk() {
+    fn test_require_approval_high_risk() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::FileDelete, "/etc/secrets/password.db", 0.0);
         let evidence = kernel.check(&request);
@@ -601,8 +604,9 @@ mod tests {
                     "Should mention high risk/approval: {}", reason
                 );
             }
-            other => panic!("High-risk FileDelete should require approval, got: {:?}", other),
+            other => return Err(format!("High-risk FileDelete should require approval, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
@@ -635,7 +639,7 @@ mod tests {
     }
 
     #[test]
-    fn test_kernel_rejects_missing_action() {
+    fn test_kernel_rejects_missing_action() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = ActionRequest {
             action_id: String::new(),
@@ -650,12 +654,13 @@ mod tests {
             SafetyDecision::Denied { reason, .. } => {
                 assert!(reason.contains("empty"), "Should mention empty: {}", reason);
             }
-            other => panic!("Empty action ID should be denied, got: {:?}", other),
+            other => return Err(format!("Empty action ID should be denied, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_kernel_rejects_empty_args() {
+    fn test_kernel_rejects_empty_args() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = ActionRequest {
             action_id: "test-action".to_string(),
@@ -670,13 +675,14 @@ mod tests {
             SafetyDecision::Allowed { .. } => {}
             SafetyDecision::RequiresApproval { .. } => {}
             SafetyDecision::Denied { .. } => {
-                panic!("Empty args should not cause denial for allowed action type");
+                return Err("Empty args should not cause denial for allowed action type".to_string());
             }
         }
+        Ok(())
     }
 
     #[test]
-    fn test_kernel_requires_approval_for_unknown_high_risk() {
+    fn test_kernel_requires_approval_for_unknown_high_risk() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = ActionRequest {
             action_id: "dangerous-code-eval".to_string(),
@@ -689,8 +695,9 @@ mod tests {
         let evidence = kernel.check(&request);
         match evidence.decision {
             SafetyDecision::RequiresApproval { .. } => {}
-            other => panic!("High-risk CodeEval should require approval, got: {:?}", other),
+            other => return Err(format!("High-risk CodeEval should require approval, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
@@ -759,7 +766,7 @@ mod tests {
     }
 
     #[test]
-    fn test_confirm_before_destructive_file_delete() {
+    fn test_confirm_before_destructive_file_delete() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::FileDelete, "/tmp/important.txt", 0.3);
         let evidence = kernel.check(&request);
@@ -768,12 +775,13 @@ mod tests {
                 assert!(reason.contains("Destructive action"));
                 assert!(escalation_path.contains("destructive_confirm://"));
             }
-            other => panic!("FileDelete should always require confirmation, got: {:?}", other),
+            other => return Err(format!("FileDelete should always require confirmation, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_confirm_before_destructive_subprocess_rm() {
+    fn test_confirm_before_destructive_subprocess_rm() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let mut args = HashMap::new();
         args.insert("command".into(), "rm -rf /tmp/data".into());
@@ -783,19 +791,20 @@ mod tests {
             target: "/tmp/data".into(),
             args,
             context: HashMap::new(),
-            risk_score: 0.1, // low risk score doesn't matter for destructive
+            risk_score: 0.1,
         };
         let evidence = kernel.check(&request);
         match &evidence.decision {
             SafetyDecision::RequiresApproval { reason, .. } => {
                 assert!(reason.contains("Destructive action"));
             }
-            other => panic!("rm command should require destructive confirmation, got: {:?}", other),
+            other => return Err(format!("rm command should require destructive confirmation, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_confirm_before_destructive_system_config_write() {
+    fn test_confirm_before_destructive_system_config_write() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::FileWrite, "/etc/nginx.conf", 0.2);
         let evidence = kernel.check(&request);
@@ -803,19 +812,21 @@ mod tests {
             SafetyDecision::RequiresApproval { reason, .. } => {
                 assert!(reason.contains("Destructive action"));
             }
-            other => panic!("Writing to /etc/ should require destructive confirmation, got: {:?}", other),
+            other => return Err(format!("Writing to /etc/ should require destructive confirmation, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_non_destructive_allows_low_risk() {
+    fn test_non_destructive_allows_low_risk() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::FileRead, "/tmp/safe.txt", 0.1);
         let evidence = kernel.check(&request);
         match &evidence.decision {
             SafetyDecision::Allowed { .. } => {}
-            other => panic!("Safe read should be allowed, got: {:?}", other),
+            other => return Err(format!("Safe read should be allowed, got: {:?}", other)),
         }
+        Ok(())
     }
 
     #[test]
@@ -838,7 +849,7 @@ mod tests {
     }
 
     #[test]
-    fn test_allow_confirmation_action() {
+    fn test_allow_confirmation_action() -> Result<(), String> {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::FileWrite, "/tmp/output.txt", 0.2);
         let evidence = kernel.check(&request);
@@ -850,7 +861,8 @@ mod tests {
                 // 风险可能 > 0.8 如果目标匹配敏感模式, 但 /tmp/output.txt 是安全的
                 // FileWrite base 0.45 + target 0.0 + arg 0.0 = 0.45 < 0.8 => Allowed
             }
-            other => panic!("FileWrite with low risk should not be denied, got: {:?}", other),
+            other => return Err(format!("FileWrite with low risk should not be denied, got: {:?}", other)),
         }
+        Ok(())
     }
 }

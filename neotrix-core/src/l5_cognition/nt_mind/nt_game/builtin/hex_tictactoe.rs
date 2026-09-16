@@ -112,7 +112,10 @@ impl HexTicTacToe {
     fn text_state(&self) -> String {
         let mut s = String::new();
         s.push_str(&format!("=== HexTicTacToe (Turn {}) ===\n", self.turn));
-        s.push_str(&format!("Player: {} | Opponent: {}\n\n", self.player_ids[0], self.player_ids[1]));
+        s.push_str(&format!(
+            "Player: {} | Opponent: {}\n\n",
+            self.player_ids[0], self.player_ids[1]
+        ));
 
         for r in 0..GRID {
             for c in 0..GRID {
@@ -179,7 +182,11 @@ impl NtGameEnv for HexTicTacToe {
             };
         }
 
-        let target = action.params.get("target").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let target = action
+            .params
+            .get("target")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
         let row = target / GRID;
         let col = target % GRID;
 
@@ -192,7 +199,11 @@ impl NtGameEnv for HexTicTacToe {
             };
         }
 
-        self.board[row][col] = if self.current_player == 0 { Cell::X } else { Cell::O };
+        self.board[row][col] = if self.current_player == 0 {
+            Cell::X
+        } else {
+            Cell::O
+        };
         self.turn += 1;
 
         if let Some(winner) = self.check_winner() {
@@ -283,7 +294,8 @@ impl NtGameEnv for HexTicTacToe {
         r#"HexTicTacToe — Simple E8 Tic-Tac-Toe
 3×3 grid. Take turns placing X or O.
 First to get 3 in a row wins.
-"#.into()
+"#
+        .into()
     }
 
     fn constellation_level(&self) -> u8 {

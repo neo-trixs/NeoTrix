@@ -3,6 +3,7 @@ use std::time::Instant;
 
 pub mod registry;
 pub mod builtin;
+pub mod plugin_system;
 #[cfg(feature = "sandbox")]
 pub mod wasm;
 
