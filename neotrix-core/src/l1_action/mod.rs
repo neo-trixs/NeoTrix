@@ -5,6 +5,19 @@ pub mod nt_media; // 统一媒体能力 (detect/router/streaming)
 pub mod nt_io_download; // 下载引擎 (自研，无外部依赖)
 pub mod nt_memory;
 pub mod nt_memory_spatial; // moved from L2 (no L2 deps, spatial storage belongs in L1)
+pub mod nt_action_facade; // L1 行动层唯一门面 (sole facade)
+
+// 从 core/ 迁移的 L1 模块
+pub mod nt_core_bank;
+pub mod nt_core_graph;
+pub mod nt_core_memory_budget;
+pub mod nt_core_resource_pool;
+pub mod nt_core_edit;
+pub mod nt_core_embed;
+pub mod nt_core_llm;
+pub mod nt_core_task_dispatcher;
+pub mod nt_core_harness;
+pub mod nt_core_simulate_engine;
 
 // L1 基础设施层
 pub mod nt_infra_tracing;

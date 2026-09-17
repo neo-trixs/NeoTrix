@@ -44,100 +44,100 @@ pub use crate::l2_perception;
 pub use crate::l3_embodiment as l1_body;
 
 // ═══════════════════════════════════════════════════════════════
-// L0 基质层 — 底层错误处理与热数据
+// L0 基质层 — 底层错误处理与热数据 (已迁移到 l0_substrate)
 // ═══════════════════════════════════════════════════════════════
-pub mod nt_core_error;
-pub mod nt_core_hot_data;
+pub use crate::l0_substrate::nt_core_error;
+pub use crate::l0_substrate::nt_core_hot_data;
 
 // ═══════════════════════════════════════════════════════════════
-// L1 行动层 — 工具/IO/记忆/任务调度
+// L1 行动层 — 工具/IO/记忆/任务调度 (已迁移到 l1_action)
 // ═══════════════════════════════════════════════════════════════
-pub mod nt_core_bank;           // 推理银行
-pub mod nt_core_graph;          // 图结构
-pub mod nt_core_memory_budget;  // 内存预算
-pub mod nt_core_resource_pool;  // 资源池
-pub mod nt_core_edit;           // 编辑操作
-pub mod nt_core_embed;          // 嵌入
-pub mod nt_core_llm;            // LLM 接口
-pub mod nt_core_task_dispatcher; // 任务分发
-pub mod nt_core_harness;        // 运行时外壳
-pub mod nt_core_simulate_engine; // 模拟引擎
+pub use crate::l1_action::nt_core_bank;           // 推理银行
+pub use crate::l1_action::nt_core_graph;          // 图结构
+pub use crate::l1_action::nt_core_memory_budget;  // 内存预算
+pub use crate::l1_action::nt_core_resource_pool;  // 资源池
+pub use crate::l1_action::nt_core_edit;           // 编辑操作
+pub use crate::l1_action::nt_core_embed;          // 嵌入
+pub use crate::l1_action::nt_core_llm;            // LLM 接口
+pub use crate::l1_action::nt_core_task_dispatcher; // 任务分发
+pub use crate::l1_action::nt_core_harness;        // 运行时外壳
+pub use crate::l1_action::nt_core_simulate_engine; // 模拟引擎
 
 // ═══════════════════════════════════════════════════════════════
-// L2 感知层 — 世界模型/知识/向量/E8/超几何
+// L2 感知层 — 世界模型/知识/向量/E8/超几何 (已迁移到 l2_perception)
 // ═══════════════════════════════════════════════════════════════
-pub mod nt_core_e8;             // E8 超几何
-pub mod nt_core_e8_predictor;   // E8 预测器
-pub mod nt_core_e8_vsa;         // E8-VSA 融合
-pub mod nt_core_hcube;          // HyperCube 向量符号
-pub mod nt_core_sense;          // 感官处理
-pub mod nt_core_knowledge;      // 知识系统
-pub mod nt_core_vector_store;   // 向量存储
-pub mod nt_core_code_search;    // 代码搜索
+pub use crate::l2_perception::nt_core_e8;             // E8 超几何
+pub use crate::l2_perception::nt_core_e8_predictor;   // E8 预测器
+pub use crate::l2_perception::nt_core_e8_vsa;         // E8-VSA 融合
+pub use crate::l2_perception::nt_core_hcube;          // HyperCube 向量符号
+pub use crate::l2_perception::nt_core_sense;          // 感官处理
+pub use crate::l2_perception::nt_core_knowledge;      // 知识系统
+pub use crate::l2_perception::nt_core_vector_store;   // 向量存储
+pub use crate::l2_perception::nt_core_code_search;    // 代码搜索
 
 // ═══════════════════════════════════════════════════════════════
-// L3 具身层 — 安全/保护
+// L3 具身层 — 安全/保护 (已迁移到 l3_embodiment)
 // ═══════════════════════════════════════════════════════════════
-pub mod nt_core_guard_chain;    // 守护链
+pub use crate::l3_embodiment::nt_core_guard_chain;    // 守护链
 
 // ═══════════════════════════════════════════════════════════════
-// L5 认知层 — 推理/意识/数学/策略
+// L5 认知层 — 推理/意识/数学/策略 (已迁移到 l5_cognition)
 // ═══════════════════════════════════════════════════════════════
-pub mod nt_core_consciousness;  // 意识系统
-pub mod nt_core_context;        // 上下文组装
-pub mod nt_core_dispatch;       // 任务调度
-pub mod nt_core_gwt;            // 全局工作空间理论
-pub mod nt_core_echo_terminal;  // 回声终端
-pub mod nt_core_reasoning;      // 推理引擎
-pub mod nt_core_math;           // 数学工具
-pub mod nt_core_hex;            // 推理六十四卦
-pub mod nt_core_gate;           // 门控系统
-pub mod nt_core_policy;         // E8 策略
-pub mod nt_core_prm;            // PRM 推理
-pub mod nt_core_cot_generator;  // CoT 生成器
-pub mod nt_core_credit;         // 信用系统
-pub mod nt_core_rule_memory;    // 规则记忆
-pub mod nt_core_meaning;        // 语义系统
-pub mod nt_core_paradigm;       // 范式系统
-pub mod nt_core_aura;           // 氛围场
-pub mod nt_core_walsh;          // Walsh 变换
-pub mod nt_core_kron;           // Kronecker 积
-pub mod nt_core_plan;           // 规划引擎
-pub mod nt_core_kernel_types;   // 内核类型
-pub mod nt_core_sae;            // 稀疏自编码器
-pub mod nt_core_sae_bridge;     // SAE 桥接
-pub mod nt_core_state;          // 状态系统
-pub mod nt_core_narrative_types; // 叙事类型
-pub mod nt_core_td;             // 时差学习
-pub mod nt_core_trajectory_compress; // 轨迹压缩
-pub mod nt_core_ttc;            // TTC 指标
-pub mod nt_core_quantum_fusion; // 量子融合
-pub mod nt_core_panic_recovery; // panic 恢复
-pub mod nt_core_scoring_substrate; // 评分子基
-pub mod nt_core_second_brain;   // 第二大脑
-pub mod nt_core_orchestration_failure_taxonomy; // 编排故障分类
-pub mod nt_core_cad_consciousness; // CAD 意识
-pub mod nt_core_arch_diagram;   // 架构图
-pub mod nt_core_arch_fitness;   // 架构适应度
-pub mod nt_core_model_skills;   // 模型技能
-pub mod nt_core_shared_types;   // 共享类型
+pub use crate::l5_cognition::nt_core_consciousness;  // 意识系统
+pub use crate::l5_cognition::nt_core_context;        // 上下文组装
+pub use crate::l5_cognition::nt_core_dispatch;       // 任务调度
+pub use crate::l5_cognition::nt_core_gwt;            // 全局工作空间理论
+pub use crate::l5_cognition::nt_core_echo_terminal;  // 回声终端
+pub use crate::l5_cognition::nt_core_reasoning;      // 推理引擎
+pub use crate::l5_cognition::nt_core_math;           // 数学工具
+pub use crate::l5_cognition::nt_core_hex;            // 推理六十四卦
+pub use crate::l5_cognition::nt_core_gate;           // 门控系统
+pub use crate::l5_cognition::nt_core_policy;         // E8 策略
+pub use crate::l5_cognition::nt_core_prm;            // PRM 推理
+pub use crate::l5_cognition::nt_core_cot_generator;  // CoT 生成器
+pub use crate::l5_cognition::nt_core_credit;         // 信用系统
+pub use crate::l5_cognition::nt_core_rule_memory;    // 规则记忆
+pub use crate::l5_cognition::nt_core_meaning;        // 语义系统
+pub use crate::l5_cognition::nt_core_paradigm;       // 范式系统
+pub use crate::l5_cognition::nt_core_aura;           // 氛围场
+pub use crate::l5_cognition::nt_core_walsh;          // Walsh 变换
+pub use crate::l5_cognition::nt_core_kron;           // Kronecker 积
+pub use crate::l5_cognition::nt_core_plan;           // 规划引擎
+pub use crate::l5_cognition::nt_core_kernel_types;   // 内核类型
+pub use crate::l5_cognition::nt_core_sae;            // 稀疏自编码器
+pub use crate::l5_cognition::nt_core_sae_bridge;     // SAE 桥接
+pub use crate::l5_cognition::nt_core_state;          // 状态系统
+pub use crate::l5_cognition::nt_core_narrative_types; // 叙事类型
+pub use crate::l5_cognition::nt_core_td;             // 时差学习
+pub use crate::l5_cognition::nt_core_trajectory_compress; // 轨迹压缩
+pub use crate::l5_cognition::nt_core_ttc;            // TTC 指标
+pub use crate::l5_cognition::nt_core_quantum_fusion; // 量子融合
+pub use crate::l5_cognition::nt_core_panic_recovery; // panic 恢复
+pub use crate::l5_cognition::nt_core_scoring_substrate; // 评分子基
+pub use crate::l5_cognition::nt_core_second_brain;   // 第二大脑
+pub use crate::l5_cognition::nt_core_orchestration_failure_taxonomy; // 编排故障分类
+pub use crate::l5_cognition::nt_core_cad_consciousness; // CAD 意识
+pub use crate::l5_cognition::nt_core_arch_diagram;   // 架构图
+pub use crate::l5_cognition::nt_core_arch_fitness;   // 架构适应度
+pub use crate::l5_cognition::nt_core_model_skills;   // 模型技能
+pub use crate::l5_cognition::nt_core_shared_types;   // 共享类型
 
 // ═══════════════════════════════════════════════════════════════
-// L6 元认知层 — 自我/观察/吸收/调度
+// L6 元认知层 — 自我/观察/吸收/调度 (已迁移到 l6_meta)
 // ═══════════════════════════════════════════════════════════════
-pub mod nt_core_self;           // 自我模型
-pub mod nt_core_self_constitution; // 自我宪法
-pub mod nt_core_aware;          // 意识感知
-pub mod nt_core_observer;       // 观察者
-pub mod nt_core_observer_error; // 观察者错误
-pub mod nt_core_kb_primitives;  // KB 原语
-pub mod nt_core_kb_types;       // KB 类型
-pub mod nt_core_memory_asset;   // 记忆资产
-pub mod nt_core_absorb;         // 吸收系统
-pub mod nt_core_iter;           // 迭代器
-pub mod nt_core_scheduler;      // 调度器
-pub mod nt_core_self_review;    // 自我审查
-pub mod nt_core_capability;     // 能力系统
+pub use crate::l6_meta::nt_core_self;           // 自我模型
+pub use crate::l6_meta::nt_core_self_constitution; // 自我宪法
+pub use crate::l6_meta::nt_core_aware;          // 意识感知
+pub use crate::l6_meta::nt_core_observer;       // 观察者
+pub use crate::l6_meta::nt_core_observer_error; // 观察者错误
+pub use crate::l6_meta::nt_core_kb_primitives;  // KB 原语
+pub use crate::l6_meta::nt_core_kb_types;       // KB 类型
+pub use crate::l6_meta::nt_core_memory_asset;   // 记忆资产
+pub use crate::l6_meta::nt_core_absorb;         // 吸收系统
+pub use crate::l6_meta::nt_core_iter;           // 迭代器
+pub use crate::l6_meta::nt_core_scheduler;      // 调度器
+pub use crate::l6_meta::nt_core_self_review;    // 自我审查
+pub use crate::l6_meta::nt_core_capability;     // 能力系统
 
 // ═══════════════════════════════════════════════════════════════
 // 基础设施 — 跨层通用组件

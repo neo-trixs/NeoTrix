@@ -1,0 +1,201 @@
+//! E8 → VSA 超向量嵌入层
+//!
+//! Bridges the discrete E8 hexagram state space (6-bit → 64 states)
+//! with continuous VSA hypervectors for gradient-friendly GWT integration.
+//!
+//! Architecture:
+//!   E8 state (u8) → base hypervector (R^D) ⊕ meta-state → VSA bound with task context
+//!
+//! Uses MAP-BSC (Multiply-Add-Permute) VSA operations via VSAEngine.
+
+pub use crate::core::nt_core_shared_types::{E8VsaEmbedding, E8_VSA_DIM, E8_VSA_SEED};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_embed_returns_bipolar_vector() {
+        let emb = E8VsaEmbedding::new(128);
+        let hv = emb.embed(0);
+        assert_eq!(hv.len(), 128);
+        for &v in hv {
+            assert!((v.abs() - 1.0).abs() < 1e-9, "bipolar values should be ±1");
+        }
+    }
+
+    #[test]
+    fn test_deterministic_mapping() {
+        let emb1 = E8VsaEmbedding::new(256);
+        let emb2 = E8VsaEmbedding::new(256);
+        let hv1 = emb1.embed(42).to_vec();
+        let hv2 = emb2.embed(42);
+        assert_eq!(
+            hv1, hv2,
+            "deterministic seed should produce identical vectors"
+        );
+    }
+
+    #[test]
+    fn test_different_states_different_vectors() {
+        let emb = E8VsaEmbedding::new(128);
+        let hv0 = emb.embed(0);
+        let hv1 = emb.embed(1);
+        let sim = emb.similarity(hv0, hv1);
+        assert!(
+            sim.abs() < 0.5,
+            "different states should have low similarity, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_self_similarity_is_one() {
+        let emb = E8VsaEmbedding::new(64);
+        let hv = emb.embed(31);
+        let sim = emb.similarity(hv, hv);
+        assert!((sim - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_bind_produces_dissimilar_vector() {
+        let emb = E8VsaEmbedding::new(256);
+        let a = emb.embed(5);
+        let b = emb.embed(10);
+        let bound = emb.bind(a, b);
+        let sim_to_a = emb.similarity(&bound, a);
+        let sim_to_b = emb.similarity(&bound, b);
+        assert!(
+            sim_to_a.abs() < 0.3,
+            "bound vector should be dissimilar to inputs"
+        );
+        assert!(sim_to_b.abs() < 0.3);
+    }
+
+    #[test]
+    fn test_bundle_is_similar_to_components() {
+        let emb = E8VsaEmbedding::new(256);
+        let a = emb.embed(7);
+        let b = emb.embed(21);
+        let bundle = emb.bundle(a, b);
+        let sim_a = emb.similarity(&bundle, a);
+        let sim_b = emb.similarity(&bundle, b);
+        assert!(sim_a > 0.3, "bundle should be similar to component a");
+        assert!(sim_b > 0.3, "bundle should be similar to component b");
+    }
+
+    #[test]
+    fn test_permute_is_reversible() {
+        let emb = E8VsaEmbedding::new(128);
+        let v = emb.embed(15);
+        let shifted = emb.permute(v, 10);
+        let unshifted = emb.permute(&shifted, 128 - 10);
+        let sim = emb.similarity(v, &unshifted);
+        assert!((sim - 1.0).abs() < 1e-9, "permute should be reversible");
+    }
+
+    #[test]
+    fn test_nearest_e8_state_finds_self() {
+        let emb = E8VsaEmbedding::new(128);
+        let hv = emb.embed(33);
+        let (idx, sim) = emb.nearest_e8_state(hv);
+        assert_eq!(idx, 33);
+        assert!((sim - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_embed_with_meta_modifies_vector() {
+        let emb = E8VsaEmbedding::new(256);
+        let with_meta_0 = emb.embed_with_meta(10, 0);
+        let with_meta_1 = emb.embed_with_meta(10, 1);
+        let sim = emb.similarity(&with_meta_0, &with_meta_1);
+        // Different meta bits should produce different bundled vectors
+        assert!(
+            sim < 0.8,
+            "different meta should give different vectors, sim={}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_transition_similarity_matrix_shape() {
+        let emb = E8VsaEmbedding::new(64);
+        let mat = emb.transition_similarity_matrix();
+        assert_eq!(mat.len(), 64);
+        assert_eq!(mat[0].len(), 64);
+        // Diagonal should have high similarity
+        for i in 0..64 {
+            assert!(mat[i][i] > 0.5, "diagonal similarity should be high");
+        }
+    }
+
+    #[test]
+    fn test_all_64_states_accessible() {
+        let emb = E8VsaEmbedding::new(128);
+        for state in 0u8..64 {
+            let hv = emb.embed(state);
+            assert_eq!(hv.len(), 128);
+            let (decoded, _) = emb.nearest_e8_state(hv);
+            assert_eq!(decoded, state, "roundtrip should recover state {}", state);
+        }
+    }
+}
+
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
+
+/// NT-CORE VSA/HyperCube 核心自测: 卦象嵌入自相似 ~1 + 异卦分离 + bind 自相似 (卫生层 P0)。
+pub struct E8VsaSelfTest;
+
+impl SelfTest for E8VsaSelfTest {
+    fn name(&self) -> &str {
+        "e8_vsa_core"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let emb = E8VsaEmbedding::new(256);
+        let a = emb.embed(0).to_vec();
+        let a2 = emb.embed(0).to_vec();
+        let b = emb.embed(63).to_vec();
+        let sim_aa = emb.similarity(&a, &a2);
+        if !sim_aa.is_finite() || sim_aa < 0.99 {
+            failures.push(format!("e8_vsa_core: 同态自相似过低/NaN {sim_aa}"));
+        }
+        let sim_ab = emb.similarity(&a, &b);
+        if sim_ab >= sim_aa {
+            failures.push(format!(
+                "e8_vsa_core: 不同卦象相似度未低于同态 ({sim_ab} >= {sim_aa})"
+            ));
+        }
+        let bound = emb.bind(&a, &b);
+        let sim_bb = emb.similarity(&bound, &bound);
+        if !sim_bb.is_finite() || sim_bb < 0.99 {
+            failures.push(format!("e8_vsa_core: bind 自相似过低/NaN {sim_bb}"));
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+/// 注册 VSA 核心 SelfTest 到全局注册表 (T2)。
+pub fn register_e8_vsa_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(E8VsaSelfTest));
+}
+
+#[cfg(test)]
+mod selftest_tests {
+    use super::*;
+
+    #[test]
+    fn test_e8_vsa_self_test_passes() {
+        let t = super::E8VsaSelfTest;
+        assert!(
+            t.self_test().is_ok(),
+            "E8VsaSelfTest failed: {:?}",
+            t.self_test().err()
+        );
+    }
+}
