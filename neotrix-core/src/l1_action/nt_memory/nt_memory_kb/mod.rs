@@ -131,6 +131,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::sync::RwLock;
 
@@ -146,6 +147,8 @@ pub struct KnowledgeBase {
     pub(crate) conn: Mutex<Connection>,
     pub db_path: PathBuf,
     db_file: Option<File>,
+    /// 跟踪文件锁状态，避免 macOS flock() 不可重入死锁
+    file_lock_held: AtomicBool,
     pub bm25: RwLock<Option<Bm25Index>>,
     pub bm25_dirty: RwLock<bool>,
     pub embedding_config: RwLock<Option<EmbeddingConfig>>,
@@ -213,6 +216,7 @@ impl KnowledgeBase {
             conn: Mutex::new(conn),
             db_path,
             db_file,
+            file_lock_held: AtomicBool::new(false),
             bm25: RwLock::new(None),
             bm25_dirty: RwLock::new(bm25_dirty),
             embedding_config: RwLock::new(None),
@@ -258,6 +262,10 @@ impl KnowledgeBase {
             }
         }
         let kb = Self::init_fields(conn, db_path.clone(), db_file, true);
+        // 标记文件锁已持有 (open 时获取)
+        if kb.db_file.is_some() {
+            kb.file_lock_held.store(true, Ordering::Relaxed);
+        }
         let db_path_str = db_path.display().to_string();
         log::info!("[KB] opened at {db_path_str} — graph_cache lazy (rebuilt by background loop on demand); BM25/tech-reserve lazy");
 
@@ -604,17 +612,27 @@ impl Drop for KnowledgeBase {
 
 impl KnowledgeBase {
     /// Acquire an exclusive file lock before a write operation.
+    /// 使用 AtomicBool 跟踪锁状态，避免 macOS flock() 不可重入死锁。
     fn lock_before_write(&self) -> std::io::Result<()> {
+        if self.file_lock_held.load(Ordering::Relaxed) {
+            // 锁已持有，跳过 (flock 不可重入)
+            return Ok(());
+        }
         if let Some(ref f) = self.db_file {
             f.lock_exclusive()?;
+            self.file_lock_held.store(true, Ordering::Relaxed);
         }
         Ok(())
     }
 
     /// Release the file lock after a write operation.
     fn unlock_after_write(&self) -> std::io::Result<()> {
+        if !self.file_lock_held.load(Ordering::Relaxed) {
+            return Ok(());
+        }
         if let Some(ref f) = self.db_file {
             f.unlock()?;
+            self.file_lock_held.store(false, Ordering::Relaxed);
         }
         Ok(())
     }
@@ -730,7 +748,7 @@ impl KnowledgeBase {
         Ok(())
     }
 
-    pub fn search_similar(&self, query_vector: &[u8], k: usize) -> Result<Vec<crate::core::l3_memory::nt_core_vector_store::types::VectorSearchResult>, String> {
+    pub fn search_similar(&self, query_vector: &[u8], k: usize) -> Result<Vec<crate::core::nt_core_vector_store::types::VectorSearchResult>, String> {
         let va = self.vector_adapter.read().map_err(|e| format!("Lock: {}", e))?;
         match va.as_ref() {
             Some(adapter) => Ok(adapter.search_similar_nodes(query_vector, k)),
@@ -2957,6 +2975,18 @@ impl KnowledgeBase {
     }
 }
 
+/// 实现 core::nt_core_kb_primitives::KvStore — 让 L6 元认知层通过 trait 访问 KV 存储,
+/// 而非直接依赖 `KnowledgeBase` 具体类型。
+impl crate::core::nt_core_kb_primitives::KvStore for KnowledgeBase {
+    fn kv_set(&self, namespace: &str, key: &str, value: &str) -> Result<(), String> {
+        KnowledgeBase::kv_set(self, namespace, key, value)
+    }
+
+    fn kv_get(&self, namespace: &str, key: &str) -> Result<Option<String>, String> {
+        KnowledgeBase::kv_get(self, namespace, key)
+    }
+}
+
 /// 打通 core/nt_core_traits::MemoryProvider 死抽象 — KnowledgeBase 是记忆存储/检索的
 /// 事实提供者。此前 trait 定义但从未实现，任何 `dyn MemoryProvider` 都无法接线。
 impl crate::core::nt_core_traits::MemoryProvider for KnowledgeBase {
@@ -3097,7 +3127,7 @@ impl crate::core::nt_core_traits::KnowledgeSink for KnowledgeBase {
     }
 }
 
-impl crate::core::l7_capability::nt_core_antidistil::AntiDistilStore for KnowledgeBase {
+impl crate::l5_cognition::nt_core::capability::nt_core_antidistil::AntiDistilStore for KnowledgeBase {
     fn store_trace_data(&self, data: &serde_json::Value) -> Result<(), String> {
         KnowledgeBase::store_trace_data(self, data)
     }
