@@ -6,7 +6,7 @@
 
 pub mod skill_validator;
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// 人类监督治理自测
 pub struct HumanOversightSelfTest;

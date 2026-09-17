@@ -5,3 +5,4 @@
 
 pub mod approval_workflow;
 pub mod confirmation_gate;
+pub mod human_approval;

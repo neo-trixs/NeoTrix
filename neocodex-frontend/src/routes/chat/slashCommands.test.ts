@@ -1,8 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const invokeMock = vi.fn()
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: (...args: unknown[]) => invokeMock(...args),
+const mockProviderConfig = vi.fn()
+const mockAgentStatus = vi.fn()
+const mockExportSession = vi.fn(() => Promise.resolve(''))
+const mockClearSession = vi.fn(() => Promise.resolve())
+
+vi.mock('../../api', () => ({
+  neocodex: {
+    get providerConfig() { return mockProviderConfig },
+    get agentStatus() { return mockAgentStatus },
+    get exportSession() { return mockExportSession },
+    get clearSession() { return mockClearSession },
+  },
 }))
 
 import { runSlashModel, runSlashStatus, runSlashCost, runSlashExport, runSlashDispatch } from './slashCommands'
@@ -28,18 +37,19 @@ function cmd(id: string): SlashCommandDef {
 
 describe('routes/chat/slashCommands — 斜杠命令逻辑', () => {
   beforeEach(() => {
-    invokeMock.mockReset()
+    mockProviderConfig.mockReset()
+    mockAgentStatus.mockReset()
   })
 
   it('/model 显示当前激活模型（providerConfig）', async () => {
-    invokeMock.mockResolvedValue({ provider_count: 2, resolvable: true, active_model: 'gpt-x', providers: [] })
+    mockProviderConfig.mockResolvedValue({ provider_count: 2, resolvable: true, active_model: 'gpt-x', providers: [] })
     const ctx = makeCtx()
     await runSlashModel(ctx)
     expect(ctx.showInfo).toHaveBeenCalledWith(expect.stringContaining('gpt-x'), 5000)
   })
 
   it('/status 显示运行状态（agentStatus）', async () => {
-    invokeMock.mockResolvedValue({
+    mockAgentStatus.mockResolvedValue({
       provider_model: 'm1', context_usage: 0.42, tokens_used: 1234,
       cost_spent: 500, cost_budget: 10000, running: true, current_task: null,
       uptime_secs: 1, turn_count: 1, evolution_iterations: 1,
@@ -50,7 +60,7 @@ describe('routes/chat/slashCommands — 斜杠命令逻辑', () => {
   })
 
   it('/cost 显示用量与成本占比', async () => {
-    invokeMock.mockResolvedValue({
+    mockAgentStatus.mockResolvedValue({
       cost_spent: 5000, cost_budget: 10000, tokens_used: 1000, running: true, current_task: null,
       uptime_secs: 1, turn_count: 1, context_usage: 0, provider_model: '', evolution_iterations: 1,
     })
@@ -62,7 +72,7 @@ describe('routes/chat/slashCommands — 斜杠命令逻辑', () => {
   it('/export 无会话时提示，不调 exportSession', async () => {
     const ctx = makeCtx({ currentSessionId: () => '' })
     await runSlashExport(ctx)
-    expect(invokeMock).not.toHaveBeenCalled()
+    expect(mockExportSession).not.toHaveBeenCalled()
     expect(ctx.showInfo).toHaveBeenCalledWith('当前没有激活会话，无法导出', 3000)
   })
 
@@ -79,7 +89,7 @@ describe('routes/chat/slashCommands — 斜杠命令逻辑', () => {
   })
 
   it('/model 经 dispatch 派发到 runSlashModel', async () => {
-    invokeMock.mockResolvedValue({ provider_count: 0, resolvable: true, active_model: 'x', providers: [] })
+    mockProviderConfig.mockResolvedValue({ provider_count: 0, resolvable: true, active_model: 'x', providers: [] })
     const ctx = makeCtx()
     runSlashDispatch(ctx, cmd('model'))
     await Promise.resolve()

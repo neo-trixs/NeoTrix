@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+
 
 /// Dynamic task routing with rule-based, load-balanced, priority-based, and fallback strategies.
 pub struct TradeRouter {

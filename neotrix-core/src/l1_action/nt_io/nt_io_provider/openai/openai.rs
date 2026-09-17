@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::l1_action::nt_io::nt_io_provider::common::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, StructuredOutputConfig, ToolCallInfo, Usage};
+use crate::l1_action::nt_io::nt_io_provider::common::types::{DataTrust, FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, StructuredOutputConfig, ToolCallInfo, Usage};
 
 pub struct OpenAiProvider {
     api_key: String,
@@ -97,9 +97,14 @@ impl OpenAiProvider {
 
 #[async_trait]
 impl LlmProvider for OpenAiProvider {
-fn set_proxy(&mut self, proxy_url: &str) {
+    fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
+
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
+    }
+
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let url = format!("{}/chat/completions", self.base_url);
         let body = self.build_body(request, false);
@@ -161,11 +166,10 @@ fn set_proxy(&mut self, proxy_url: &str) {
                         arr.iter().map(|tc| {
                             ToolCallInfo {
                                 id: tc["id"].as_str().unwrap_or("").to_string(),
-                                call_type: tc["type"].as_str().unwrap_or("function").to_string(),
-                                function: super::types::ToolCallFunction {
-                                    name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
-                                    arguments: tc["function"]["arguments"].as_str().unwrap_or("{}").to_string(),
-                                },
+                                name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
+                                arguments: tc["function"]["arguments"].as_str().unwrap_or("{}").to_string(),
+                                function: None,
+                                call_type: tc["type"].as_str().map(|s| s.to_string()),
                             }
                         }).collect()
                     });
@@ -272,12 +276,13 @@ fn serialize_message(m: &Message) -> serde_json::Value {
     });
     if let Some(calls) = &m.tool_calls {
         let calls: Vec<serde_json::Value> = calls.iter().map(|tc| {
+            let (fn_name, fn_args) = tc.function.as_ref().map(|f| (f.name.clone(), f.arguments.clone())).unwrap_or_default();
             serde_json::json!({
                 "id": tc.id,
                 "type": tc.call_type,
                 "function": {
-                    "name": tc.function.name,
-                    "arguments": tc.function.arguments,
+                    "name": fn_name,
+                    "arguments": fn_args,
                 }
             })
         }).collect();

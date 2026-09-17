@@ -8,7 +8,7 @@
 //! 插入钩子。
 
 use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use uuid::Uuid;
 

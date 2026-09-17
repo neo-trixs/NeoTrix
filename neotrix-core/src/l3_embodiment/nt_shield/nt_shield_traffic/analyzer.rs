@@ -2,7 +2,7 @@ use std::collections::HashMap;
 pub use neotrix_types::shared::Severity;
 use std::time::{Duration, Instant};
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 const RING_CAPACITY: usize = 1000;
 

@@ -48,11 +48,11 @@ impl CliCommand for ConnectorCmd {
                     );
                 }
                 let mut msg = format!("Connectors ({}):\n", connectors.len());
-                for c in &connectors {
+                for c in connectors {
                     let status = if c.enabled { "enabled" } else { "disabled" };
                     let last = c
                         .last_event
-                        .map(|t| t.to_rfc3339())
+                        .map(|t: chrono::DateTime<chrono::Utc>| t.to_rfc3339())
                         .unwrap_or_else(|| "never".to_string());
                     msg.push_str(&format!(
                         "  {} {:?}/{} [{}] events:{} last:{}\n",

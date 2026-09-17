@@ -535,7 +535,7 @@ impl OriEvalSuite {
                 .tool_calls
                 .unwrap_or_default()
                 .iter()
-                .map(|tc| tc.function.name.clone())
+                .map(|tc| tc.function.as_ref().map(|f| f.name.clone()).unwrap_or_default())
                 .collect();
             case_scores.push(Self::_grade_case(case, &response.content, &calls));
         }

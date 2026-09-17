@@ -421,6 +421,10 @@ impl LlmProvider for DeniedProvider {
         crate::core::nt_core_llm::DataTrust::Untrusted
     }
 
+    fn set_proxy(&mut self, _proxy_url: &str) {
+        // DeniedProvider always rejects; proxy is irrelevant.
+    }
+
     async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         Err(LlmError::InvalidRequest(format!(
             "network access to '{}' is blocked by default isolation policy; \

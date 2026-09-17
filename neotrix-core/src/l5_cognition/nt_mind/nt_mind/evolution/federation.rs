@@ -97,12 +97,7 @@ pub fn build_message(
     msg
 }
 
-fn now_secs() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
-}
+use crate::l0_substrate::nt_core_time::now_secs_i64 as now_secs;
 
 // ══════════════════════════════════════════════════════════════
 // FP1: ValueSync — 价值观权重 CRDT 合并器

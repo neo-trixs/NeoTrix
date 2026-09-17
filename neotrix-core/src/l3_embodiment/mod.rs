@@ -3,3 +3,5 @@ pub mod nt_shield;
 pub mod l1_facade;
 // 从 core/ 迁移
 pub mod nt_core_guard_chain;
+/// P3: Computer first-class abstraction (absorbed from cumora)
+pub mod nt_computer;

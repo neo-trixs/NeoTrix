@@ -24,8 +24,10 @@ pub use runtime_monitor::RuntimeMonitor;
 pub mod evolving_evaluator;
 pub use evolving_evaluator::EvolvingEvaluator;
 
-/// Self-model
+/// Self-model (价值函数模型)
 pub mod nt_core_self_model;
+/// 统一自我模型 facade — 合并三个 SelfModel 变体
+pub mod self_model_unified;
 
 // 从 core/ 迁移的 L6 模块
 pub mod nt_core_self;
@@ -41,3 +43,7 @@ pub mod nt_core_iter;
 pub mod nt_core_scheduler;
 pub mod nt_core_self_review;
 pub mod nt_core_capability;
+/// Agent Identity System — Agent 一等公民身份管理 (absorbed from cumora + munder-difflin)
+pub mod nt_agent_identity;
+/// Agent Gallery — 浏览/安装预设 agent 角色 (absorbed from munder-difflin)
+pub mod nt_agent_gallery;

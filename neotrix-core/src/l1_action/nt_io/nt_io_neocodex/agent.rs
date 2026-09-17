@@ -746,11 +746,13 @@ impl NeoCodexAgent {
                         &response.content,
                         vec![crate::l1_action::nt_io::nt_io_provider::types::ToolCallInfo {
                             id: format!("call-{}", step),
-                            call_type: "function".into(),
-                            function: crate::l1_action::nt_io::nt_io_provider::types::ToolCallFunction {
+                            name: name.clone(),
+                            arguments: args.clone(),
+                            call_type: Some("function".into()),
+                            function: Some(crate::l1_action::nt_io::nt_io_provider::types::ToolCallFunction {
                                 name: name.clone(),
                                 arguments: args.clone(),
-                            },
+                            }),
                         }],
                     ));
                     messages.push(Message::tool(&result, &format!("call-{}", step)));
@@ -940,11 +942,13 @@ impl NeoCodexAgent {
                         &response_content,
                         vec![crate::l1_action::nt_io::nt_io_provider::types::ToolCallInfo {
                             id: format!("call-{}", step),
-                            call_type: "function".into(),
-                            function: crate::l1_action::nt_io::nt_io_provider::types::ToolCallFunction {
+                            name: name.clone(),
+                            arguments: args.clone(),
+                            call_type: Some("function".into()),
+                            function: Some(crate::l1_action::nt_io::nt_io_provider::types::ToolCallFunction {
                                 name: name.clone(),
                                 arguments: args.clone(),
-                            },
+                            }),
                         }],
                     ));
                     messages.push(Message::tool(&result, &format!("call-{}", step)));
@@ -1016,7 +1020,7 @@ impl NeoCodexAgent {
     /// current-user request are never evicted. Tool-result truncation is disabled
     /// here (0) — ContextPipeline Layer-3 already caps tool turns.
     fn budget_react_messages(messages: &mut Vec<Message>, max_tokens: usize) {
-        apply_context_budget(messages, max_tokens, 0);
+        apply_context_budget(messages, max_tokens);
     }
     /// Build an LlmRequest from the current catalog's active provider.
     fn build_request(&self, messages: Vec<Message>) -> Option<LlmRequest> {
@@ -1127,7 +1131,7 @@ impl NeoCodexAgent {
         };
         if req.image_data.is_some() && active_has_vision {
             if let Some(raw) = req.image_data.clone() {
-                req = req.with_image_b64(&raw);
+                req = req.with_image_b64(raw);
             }
         }
         Some(req)

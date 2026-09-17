@@ -8,8 +8,7 @@
 /// 5. 自动聚合子任务结果，生成最终答案
 /// 6. 对用户完全隐藏意识核心内部实现细节（E8、CRT、GWT 等）
 ///
-/// 受控边界: 反向引用 `crate::neotrix::...::engine_core::ReasoningEngine`
-/// 属架构允许的 ReasoningEngine 注入边界, 禁止扩展此边界。
+/// L1 不直接依赖 L5 — 通过 `ReasoningEngineProvider` trait 抽象推理能力。
 use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
     DecomposeSuggestion, TaskDecomposer,
 };
@@ -21,11 +20,21 @@ use crate::core::nt_core_kernel_types::{KERNEL_DIM, ReasoningKernel, Vector};
 use crate::core::nt_core_llm::{
     estimate_tokens, truncate_preserving, LlmProvider, LlmRequest, Message, Role,
 };
-use crate::l5_cognition::nt_mind::reason::reasoning_engine::engine_core::ReasoningEngine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// 推理引擎抽象 trait — L1 通过此 trait 使用 L5 推理能力，不直接依赖具体类型。
+///
+/// L5 实现方需为 `ReasoningEngine` 实现此 trait:
+/// ```ignore
+/// impl ReasoningEngineProvider for ReasoningEngine { ... }
+/// ```
+pub trait ReasoningEngineProvider: Send + Sync {
+    /// 执行推理任务，返回推理结果文本。
+    fn reason(&mut self, prompt: &str) -> Result<String, String>;
+}
 
 /// 子任务定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,8 +92,8 @@ pub struct TaskDecomposerDispatcher {
     provider: Arc<dyn LlmProvider>,
     /// CoT Generator
     cot_generator: Option<DefaultCoTGenerator>,
-    /// Reasoning Engine
-    reasoning_engine: Option<ReasoningEngine>,
+    /// Reasoning Engine (trait object — L1 不直接依赖 L5 具体类型)
+    reasoning_engine: Option<Box<dyn ReasoningEngineProvider>>,
     /// Kernel
     kernel: Option<ReasoningKernel>,
     /// E8 Policy
@@ -192,8 +201,8 @@ impl TaskDecomposerDispatcher {
         }
     }
 
-    /// 设置 Reasoning Engine
-    pub fn with_reasoning_engine(mut self, engine: ReasoningEngine) -> Self {
+    /// 设置 Reasoning Engine (trait object)
+    pub fn with_reasoning_engine(mut self, engine: Box<dyn ReasoningEngineProvider>) -> Self {
         self.reasoning_engine = Some(engine);
         self
     }
@@ -783,7 +792,7 @@ Output your result for this subtask only."#,
         Ok(cot_output.final_answer)
     }
 
-    /// 使用 Reasoning Engine 执行
+    /// 使用 Reasoning Engine 执行 (通过 trait 抽象)
     async fn execute_with_reasoning_engine(
         &mut self,
         sub_task: &SubTask,
@@ -799,7 +808,7 @@ Output your result for this subtask only."#,
             ))?;
         engine
             .reason(&full_prompt)
-            .map_err(|e| TaskDispatchError::ReasoningError(e.to_string()))
+            .map_err(|e| TaskDispatchError::ReasoningError(e))
     }
 
     /// 使用 Kernel 执行

@@ -84,9 +84,10 @@ pub fn knowledge_to_world_task_type(t: &crate::core::nt_core_knowledge::TaskType
         K::Design | K::UIDesign => W::Design,
         K::CodeAnalysis => W::CodeAnalysis,
         K::CodeGeneration => W::CodeGeneration,
-        K::CodeReview | K::Debugging => W::CodeAnalysis,
+        K::CodeReview => W::CodeAnalysis,
         K::Security => W::Security,
         K::Planning | K::Reflection | K::Research | K::Learning => W::General,
+        K::MetaCognition => W::MetaCognition,
     }
 }
 
@@ -104,7 +105,6 @@ pub fn world_to_knowledge_task_type(t: &crate::neotrix::nt_world_model::TaskType
         W::Planning => K::Planning,
         W::CodeReview => K::CodeReview,
         W::Learning => K::Learning,
-        W::Debugging => K::Debugging,
         _ => K::General,
     }
 }

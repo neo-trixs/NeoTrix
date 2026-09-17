@@ -656,7 +656,7 @@ impl BackgroundLoopHandle {
     /// ① 消费 novel_queue(外部起点采集器入队) → ingest_qidian_book;
     /// ② 离线为既有 Book 节点补世界观分类。
     pub(crate) async fn handle_novel_ingest(&mut self) {
-        use crate::l5_cognition::l2_facade::{drain_novel_queue, classify_unanalyzed_books};
+        use crate::l5_cognition::layer_aliases::{drain_novel_queue, classify_unanalyzed_books};
         let kb = match self.kb_pipeline.kb.as_ref() {
             Some(kb) => kb,
             None => { log::warn!("[bg] novel_ingest: kb not attached"); return; }
@@ -683,7 +683,7 @@ impl BackgroundLoopHandle {
     ///
     /// 聚类结果供 GWT 注意力路由和知识检索使用 (域感知检索)。
     pub(crate) async fn handle_clustering(&mut self) {
-        use crate::l5_cognition::kb_facade::{
+        use crate::l5_cognition::layer_aliases::{
             CommunityDetector, CommunityAwareSearch,
             ensure_domain_cluster, get_all_edges, get_all_nodes, update_cluster_stats,
         };

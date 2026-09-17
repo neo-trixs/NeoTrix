@@ -196,7 +196,7 @@ mod tests {
         // 私有锁串行 cipher 内部; 共享 TEST_ENV_LOCK 与 kb_cmds/consciousness_core
         // 的 HOME 隔离互斥 (Rust set_var 进程级全局, 并行窗口竞争 → flaky)。
         let _g = HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let _ge = crate::core::nt_core_self_test::TEST_ENV_LOCK
+        let _ge = crate::l6_meta::healing::nt_core_self_test::TEST_ENV_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let old = std::env::var("HOME").ok();

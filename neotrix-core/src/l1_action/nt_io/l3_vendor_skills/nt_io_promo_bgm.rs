@@ -5,7 +5,7 @@
 //!
 //! 核心能力: 将音乐曲目元数据转换为跨平台推广文案与标签组合, 提升曝光分发效率。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// BGM 推广器 trait — 把曲目信息映射为推广文案与标签集。
 pub trait BgmPromoter: Send + Sync {

@@ -837,6 +837,7 @@ impl ExternalPlatformExtractor for JoinfExtractor {
         let base_url = format!("{}/rapi/d/customers", self.base_url);
         let mut all_customers = Vec::new();
         let mut page = 1;
+        #[allow(unused_assignments)]
         let mut total: u32 = 0;
 
         loop {
@@ -908,6 +909,7 @@ impl ExternalPlatformExtractor for JoinfExtractor {
     {
         let mut all_emails = Vec::new();
         let mut page = 1;
+        #[allow(unused_assignments)]
         let mut total: u32 = 0;
 
         loop {

@@ -26,7 +26,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rand::Rng;
 
 use crate::core::nt_core_self::attention_head::AttentionDomain;
-use crate::l5_cognition::kb_facade::{KnowledgeBase, RetrievalStrategy};
+use crate::l5_cognition::layer_aliases::{KnowledgeBase, RetrievalStrategy};
 
 /// 可选的检索策略集 — 任务级搜索 bandit 的臂 (arm)。
 pub const COEVO_STRATEGIES: &[&str] = &[

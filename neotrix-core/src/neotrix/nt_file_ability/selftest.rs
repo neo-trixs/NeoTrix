@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 
-// ─── 本地 SelfTest trait — 消除对 crate::core::nt_core_self_test 的硬耦合 ───
+// ─── 本地 SelfTest trait — 消除对 crate::l6_meta::healing::nt_core_self_test 的硬耦合 ───
 
 /// 跨模块共享的自检 trait (与 NT-CORE SelfTest 接口一致，L1→L5 依赖倒置)
 pub trait SelfTest: Send + Sync {
@@ -327,44 +327,44 @@ impl SelfTest for FileAbilitySelfTest {
 // ─── 核心 trait 桥接包装器 (跨层注册用) ──────────────────────────────────
 
 struct CorePdfIconEnhanceBridge;
-impl crate::core::nt_core_self_test::SelfTest for CorePdfIconEnhanceBridge {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CorePdfIconEnhanceBridge {
     fn name(&self) -> &str { "nt_file_ability::pdf_icon_enhance" }
     fn self_test(&self) -> Result<(), Vec<String>> { PdfIconEnhanceSelfTest.self_test() }
 }
 
 struct CoreImageSRBridge;
-impl crate::core::nt_core_self_test::SelfTest for CoreImageSRBridge {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CoreImageSRBridge {
     fn name(&self) -> &str { "nt_file_ability::image_super_resolution" }
     fn self_test(&self) -> Result<(), Vec<String>> { ImageSuperResolutionSelfTest.self_test() }
 }
 
 struct CorePdfImageExtractBridge;
-impl crate::core::nt_core_self_test::SelfTest for CorePdfImageExtractBridge {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CorePdfImageExtractBridge {
     fn name(&self) -> &str { "nt_file_ability::pdf_image_extract" }
     fn self_test(&self) -> Result<(), Vec<String>> { PdfImageExtractSelfTest.self_test() }
 }
 
 struct CorePdfEditBridge;
-impl crate::core::nt_core_self_test::SelfTest for CorePdfEditBridge {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CorePdfEditBridge {
     fn name(&self) -> &str { "nt_file_ability::pdf_edit" }
     fn self_test(&self) -> Result<(), Vec<String>> { PdfEditSelfTest.self_test() }
 }
 
 struct CoreDocParseBridge;
-impl crate::core::nt_core_self_test::SelfTest for CoreDocParseBridge {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CoreDocParseBridge {
     fn name(&self) -> &str { "nt_file_ability::doc_parse" }
     fn self_test(&self) -> Result<(), Vec<String>> { DocParseSelfTest.self_test() }
 }
 
 /// 双 trait 实现: 使 FileAbilitySelfTest 可被 NT-MIND 意识树 SelfTestRegistry 注册。
-impl crate::core::nt_core_self_test::SelfTest for FileAbilitySelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for FileAbilitySelfTest {
     fn name(&self) -> &str { "nt_file_ability" }
     fn self_test(&self) -> Result<(), Vec<String>> { Ok(()) }
 }
 
 /// 注册 PDF/SR/doc_parse SelfTest 到核心 registry
 /// 接受核心 SelfTestRegistry (跨层调用契约)
-pub fn register_pdf_sr_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
+pub fn register_pdf_sr_self_tests(registry: &mut crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry) {
     registry.register(Box::new(CorePdfIconEnhanceBridge));
     registry.register(Box::new(CoreImageSRBridge));
     registry.register(Box::new(CorePdfImageExtractBridge));

@@ -12,7 +12,7 @@ pub mod shield_capability;
 // Shield implementation modules
 // pub mod nt_shield_adversarial; // DEAD: zero external references
 pub mod nt_shield_agentic_scan;
-// pub mod nt_shield_approval; // DEAD: zero external references
+pub mod nt_shield_approval;
 pub mod nt_shield_audit;
 // pub mod nt_shield_audit_phases; // DEAD: zero external references
 pub mod nt_shield_comm;

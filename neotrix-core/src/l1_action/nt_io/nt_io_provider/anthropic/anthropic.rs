@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::l1_action::nt_io::nt_io_provider::health::context_budget::estimate_tokens;
-use crate::l1_action::nt_io::nt_io_provider::common::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, StructuredOutputConfig, Usage, Role};
+use crate::l1_action::nt_io::nt_io_provider::common::types::{DataTrust, FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, StructuredOutputConfig, Usage, Role};
 
 pub struct AnthropicProvider {
     api_key: String,
@@ -69,8 +69,12 @@ fn serialize_system(s: &str, cache: bool) -> serde_json::Value {
 
 #[async_trait]
 impl LlmProvider for AnthropicProvider {
-fn set_proxy(&mut self, proxy_url: &str) {
+    fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
+
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -177,11 +181,10 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                 if block["type"].as_str() == Some("tool_use") {
                                     Some(super::types::ToolCallInfo {
                                         id: block["id"].as_str().unwrap_or("").to_string(),
-                                        call_type: "function".to_string(),
-                                        function: super::types::ToolCallFunction {
-                                            name: block["name"].as_str().unwrap_or("").to_string(),
-                                            arguments: block["input"].to_string(),
-                                        },
+                                        name: block["name"].as_str().unwrap_or("").to_string(),
+                                        arguments: block["input"].to_string(),
+                                        function: None,
+                                        call_type: Some("function".to_string()),
                                     })
                                 } else {
                                     None
@@ -318,11 +321,10 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                                 // Use a placeholder that will be updated
                                                 tool_calls.push(super::types::ToolCallInfo {
                                                     id,
-                                                    call_type: "function".to_string(),
-                                                    function: super::types::ToolCallFunction {
-                                                        name,
-                                                        arguments: String::new(),
-                                                    },
+                                                    name,
+                                                    arguments: String::new(),
+                                                    function: None,
+                                                    call_type: Some("function".to_string()),
                                                 });
                                             }
                                         }
@@ -346,7 +348,9 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                             if in_tool_block {
                                                 // Finalize the current tool call with accumulated input
                                                 if let Some(last) = tool_calls.last_mut() {
-                                                    last.function.arguments = current_tool_input.clone();
+                                                    if let Some(ref mut f) = last.function {
+                                                        f.arguments = current_tool_input.clone();
+                                                    }
                                                 }
                                                 in_tool_block = false;
                                                 current_tool_input.clear();

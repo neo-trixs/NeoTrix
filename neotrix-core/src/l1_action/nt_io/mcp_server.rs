@@ -51,6 +51,7 @@ impl McpToolRegistry {
 pub fn create_default_registry() -> McpToolRegistry {
     let mut registry = McpToolRegistry::new();
 
+    // ── 基础工具 ──────────────────────────────────────────────────
     registry.register(McpTool {
         name: "kb_search".to_string(),
         description: "搜索知识库 — 在 KB 中检索相关信息".to_string(),
@@ -75,6 +76,49 @@ pub fn create_default_registry() -> McpToolRegistry {
         input_schema: r#"{"type":"object","properties":{"action":{"type":"string","enum":["compress","expand","summarize"]}},"required":["action"]}"#.to_string(),
     });
 
+    // ── 晶体意识核心工具 (Crystal Consciousness Core) ─────────────
+    registry.register(McpTool {
+        name: "crystal_status".to_string(),
+        description: "晶体核心状态 — 显示四层架构 (L1身份/L2知识/L3经验/L4进化) 状态".to_string(),
+        input_schema: r#"{"type":"object","properties":{}}"#.to_string(),
+    });
+
+    registry.register(McpTool {
+        name: "crystal_init".to_string(),
+        description: "初始化晶体核心 — 创建或重置晶体意识核心".to_string(),
+        input_schema: r#"{"type":"object","properties":{"name":{"type":"string","description":"核心名称 (默认 NeoTrix)"}}}"#.to_string(),
+    });
+
+    registry.register(McpTool {
+        name: "crystal_absorb".to_string(),
+        description: "吸收信息 — 将新信息存入晶体核心经验层".to_string(),
+        input_schema: r#"{"type":"object","properties":{"content":{"type":"string","description":"要吸收的内容"},"domain":{"type":"string","description":"领域 (默认 general)"},"memory_type":{"type":"string","enum":["fact","pattern","causal","contradiction","counterfactual","experience","lesson","solution"],"description":"记忆类型 (默认 fact)"}},"required":["content"]}"#.to_string(),
+    });
+
+    registry.register(McpTool {
+        name: "crystal_fuse".to_string(),
+        description: "熔炼 — 从经验中提取模式，更新知识层".to_string(),
+        input_schema: r#"{"type":"object","properties":{}}"#.to_string(),
+    });
+
+    registry.register(McpTool {
+        name: "crystal_evolve".to_string(),
+        description: "进化 — 评估能力，识别差距，生成改进目标".to_string(),
+        input_schema: r#"{"type":"object","properties":{}}"#.to_string(),
+    });
+
+    registry.register(McpTool {
+        name: "crystal_output".to_string(),
+        description: "输出上下文 — 生成任务相关的响应上下文".to_string(),
+        input_schema: r#"{"type":"object","properties":{"domain":{"type":"string","description":"任务领域 (默认 general)"}}}"#.to_string(),
+    });
+
+    registry.register(McpTool {
+        name: "crystal_memory".to_string(),
+        description: "查询记忆 — 按领域和类型检索晶体核心记忆".to_string(),
+        input_schema: r#"{"type":"object","properties":{"domain":{"type":"string","description":"领域 (默认 general)"},"memory_type":{"type":"string","enum":["fact","pattern","causal","contradiction","counterfactual","experience","lesson","solution"],"description":"记忆类型 (可选)"},"limit":{"type":"integer","description":"返回数量 (默认 10)"}}}"#.to_string(),
+    });
+
     registry
 }
 
@@ -85,13 +129,16 @@ mod tests {
     #[test]
     fn test_registry_creation() {
         let registry = create_default_registry();
-        assert_eq!(registry.tool_count(), 4);
+        // 4 基础工具 + 7 晶体核心工具 = 11
+        assert_eq!(registry.tool_count(), 11);
     }
 
     #[test]
     fn test_find_tool() {
         let registry = create_default_registry();
         assert!(registry.find_tool("kb_search").is_some());
+        assert!(registry.find_tool("crystal_status").is_some());
+        assert!(registry.find_tool("crystal_absorb").is_some());
         assert!(registry.find_tool("nonexistent").is_none());
     }
 
@@ -99,7 +146,9 @@ mod tests {
     fn test_list_tools() {
         let registry = create_default_registry();
         let tools = registry.list_tools();
-        assert_eq!(tools.len(), 4);
+        assert_eq!(tools.len(), 11);
         assert!(tools.iter().any(|(n, _)| *n == "kb_search"));
+        assert!(tools.iter().any(|(n, _)| *n == "crystal_status"));
+        assert!(tools.iter().any(|(n, _)| *n == "crystal_absorb"));
     }
 }

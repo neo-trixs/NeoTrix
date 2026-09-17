@@ -17,6 +17,11 @@ pub mod nt_io_hotreload;
 // ============================================================================
 
 pub mod nt_io_agent_loop;
+/// HiveAgentLoop — AgentLoop wrapper with Hive coordination (inbox/outbox/blackboard)
+pub mod nt_io_hive_agent_loop;
+
+/// MCP Bridge — Model Context Protocol 桥接
+pub mod nt_io_mcp_bridge;
 
 pub mod nt_io_agents_md;
 
@@ -89,6 +94,12 @@ pub mod cache_compaction;
 
 // 推理运行时（从 nt_shield_local_inference 迁移）
 pub mod nt_io_inference;
+
+// Unified LLM Module — simplified trait + registry
+pub mod nt_io_llm;
+
+// Typed I/O contracts (NVIDIA NOOA pattern)
+pub mod nt_io_contract;
 
 // Media processing and GPU inference engines
 pub mod nt_io_media;

@@ -6,13 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::three_tier::MemoryItem;
 
-fn now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
+use crate::l0_substrate::nt_core_time::now_secs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FamiliarityWeightedRetrieval {

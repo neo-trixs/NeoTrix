@@ -7,7 +7,7 @@
 //! 本模块提供 trait: 从代码/图提取模式 → 产出能力节点映射。C0 (编译通过 + 基础
 //! 逻辑 + SelfTest T1)。真实 AST/图解析留待 C2+。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use std::collections::HashMap;
 
 /// 一个被识别的设计模式实例。

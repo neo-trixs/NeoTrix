@@ -49,6 +49,24 @@ export interface ChatState {
   isLoadingMessages: boolean
 }
 
+// ─── P0: Hold-Token + Verbatim-Dup 防重复发送 ───
+
+/** Hold token: 防止同一会话并发发送 */
+interface HoldToken {
+  token: string
+  expiresAt: number
+}
+
+/** 内容指纹 (SHA-256 前 16 hex) — 用于 verbatim-dup 检测 */
+async function contentFingerprint(content: string): Promise<string> {
+  const normalized = content.trim().toLowerCase().replace(/\s+/g, ' ')
+  const data = new TextEncoder().encode(normalized)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hash).slice(0, 8))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 }
@@ -99,6 +117,43 @@ function createChatStore() {
     isLoadingSessions: false,
     isLoadingMessages: false,
   })
+
+  // ─── P0: Hold-Token 状态 (session_id → hold) ───
+  const holdTokens = new Map<string, HoldToken>()
+  const HOLD_TTL_MS = 30_000 // 30s hold 有效期
+
+  /** 获取 hold token: 同一会话 30s 内不允许并发发送 */
+  const acquireHold = (sessionId: string): boolean => {
+    const existing = holdTokens.get(sessionId)
+    if (existing && Date.now() < existing.expiresAt) return false // 被 hold
+    const token = `${sessionId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    holdTokens.set(sessionId, { token, expiresAt: Date.now() + HOLD_TTL_MS })
+    return true
+  }
+
+  /** 消费 hold token (发送成功后调用) */
+  const releaseHold = (sessionId: string): void => {
+    holdTokens.delete(sessionId)
+  }
+
+  /** 检查会话是否被 hold */
+  const isHeld = (sessionId: string): boolean => {
+    const existing = holdTokens.get(sessionId)
+    if (!existing) return false
+    if (Date.now() >= existing.expiresAt) {
+      holdTokens.delete(sessionId)
+      return false
+    }
+    return true
+  }
+
+  /** 清理过期 hold tokens */
+  const gcHolds = (): void => {
+    const now = Date.now()
+    for (const [k, v] of holdTokens) {
+      if (now >= v.expiresAt) holdTokens.delete(k)
+    }
+  }
 
   const currentSession = () => 
     state.sessions.find(s => s.id === state.currentSessionId) || null
@@ -597,6 +652,12 @@ function createChatStore() {
     tagSession,
     untagSession,
     hydrateSessionTags,
+    // P0: hold-token + verbatim-dup
+    acquireHold,
+    releaseHold,
+    isHeld,
+    gcHolds,
+    contentFingerprint,
   }
 }
 

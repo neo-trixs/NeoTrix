@@ -175,6 +175,18 @@ pub fn parse_write_evidence(key: &str, raw: &str) -> Option<WriteGuardEvidence> 
     })
 }
 
+/// 创建 Hold 裁决 — 从 Reject/RequiresApproval 转换, 附带 scope。
+/// scope 由 action + content fingerprint 计算, 用于 hold token 门控。
+pub fn hold_verdict_from(
+    original: &WriteGuardVerdict,
+    action: &str,
+    payload: &serde_json::Value,
+) -> WriteGuardVerdict {
+    let reasons = original.reasons();
+    let scope = neotrix_types::write_guard_types::compute_scope(action, payload);
+    WriteGuardVerdict::Hold { reasons, scope }
+}
+
 /// 扫描 `write_guard` 证据命名空间, 聚合守卫拦截统计 + 异常检测。
 ///
 /// 异常 (anomaly): 裁决为 Reject / RequiresApproval 的写操作仍标记
@@ -203,6 +215,12 @@ pub fn scan_write_guard_evidence(kb: &super::KnowledgeBase) -> WriteGuardStats {
                     stats.anomalies.push(format!("action={} 需审批仍执行", ev.action));
                 }
             }
+            WriteGuardVerdict::Hold { .. } => {
+                stats.requires_approval += 1; // Hold 归入 requires_approval 统计
+                if ev.executed {
+                    stats.anomalies.push(format!("action={} 被 hold 仍执行", ev.action));
+                }
+            }
             WriteGuardVerdict::Reject(_) => {
                 stats.rejected += 1;
                 *stats.rejected_actions.entry(ev.action.clone()).or_insert(0) += 1;
@@ -226,7 +244,7 @@ pub fn scan_write_guard_evidence(kb: &super::KnowledgeBase) -> WriteGuardStats {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct WriteGuardAudit;
 
-impl crate::core::nt_core_self_test::SelfTest for WriteGuardAudit {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for WriteGuardAudit {
     fn name(&self) -> &str {
         "nt_memory_write_guard_audit"
     }
@@ -539,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_write_guard_audit_selftest_passes() {
-        use crate::core::nt_core_self_test::SelfTest;
+        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
         let audit = WriteGuardAudit::default();
         assert_eq!(audit.name(), "nt_memory_write_guard_audit");
         assert!(audit.self_test().is_ok());

@@ -526,8 +526,8 @@ impl AgentLoop {
                         .push(Message::assistant_with_calls("", assistant_calls));
                     for call in &response_tool_calls {
                         let args: Value =
-                            serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
-                        let result = self.call_tool(&call.function.name, &args);
+                            serde_json::from_str(&call.arguments).unwrap_or(Value::Null);
+                        let result = self.call_tool(&call.name, &args);
                         if let Ok(output) = &result {
                             on_tool(call, output);
                         }
@@ -542,8 +542,8 @@ impl AgentLoop {
                             Err(e) => format!("TOOL_ERROR: {}", e),
                         };
                         self.tool_log.push(ToolInvocation {
-                            name: call.function.name.clone(),
-                            arguments: call.function.arguments.clone(),
+                            name: call.name.clone(),
+                            arguments: call.arguments.clone(),
                             success: result.is_ok(),
                             output: content.clone(),
                         });
@@ -659,9 +659,9 @@ impl AgentLoop {
                         .push(Message::assistant_with_calls("", assistant_calls));
                     for call in &response_tool_calls {
                         let args: Value =
-                            serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
-                        let name = call.function.name.clone();
-                        let args_str = call.function.arguments.clone();
+                            serde_json::from_str(&call.arguments).unwrap_or(Value::Null);
+                        let name = call.name.clone();
+                        let args_str = call.arguments.clone();
 
                         // P0 审批门槛：需审批且被拒绝 → 跳过工具，模型收到明确错误。
                         if let Err(approval_err) =
@@ -758,7 +758,7 @@ impl AgentLoop {
         // 压缩至保留率 <35% — 下游任务成功率坍缩前兆, 生产路径告警留痕。
         let mut messages = self.messages.clone();
         let budget_result =
-            apply_context_budget(&mut messages, self.context_token_budget, self.max_tool_output_tokens);
+            apply_context_budget(&mut messages, self.context_token_budget);
         if budget_result.is_cliff {
             log::warn!(
                 "compaction cliff: retention={:.1}% evicted={} truncated={} \
@@ -828,8 +828,8 @@ impl AgentLoop {
 
         // 2. 逐个执行。
         for call in calls {
-            let args: Value = serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
-            let result = self.call_tool(&call.function.name, &args);
+            let args: Value = serde_json::from_str(&call.arguments).unwrap_or(Value::Null);
+            let result = self.call_tool(&call.name, &args);
             let content = match &result {
                 Ok(ToolOutput { success, content }) => {
                     if *success {
@@ -843,8 +843,8 @@ impl AgentLoop {
             // 完整输出进 tool_log 供审计, 回填历史经 trim_tool_output 截断。
             let history_content = self.trim_tool_output(&content);
             self.tool_log.push(ToolInvocation {
-                name: call.function.name.clone(),
-                arguments: call.function.arguments.clone(),
+                name: call.name.clone(),
+                arguments: call.arguments.clone(),
                 success: result.is_ok(),
                 output: content.clone(),
             });

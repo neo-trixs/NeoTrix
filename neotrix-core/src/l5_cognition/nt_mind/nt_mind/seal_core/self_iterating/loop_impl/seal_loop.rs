@@ -30,7 +30,7 @@ use crate::cli::shield_enforcer::global_shield;
 use crate::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
 use crate::core::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
 use crate::core::nt_core_reasoning::ContextBuilder;
-use crate::l5_cognition::io_facade::ReasoningKernel;
+use crate::l5_cognition::layer_aliases::ReasoningKernel;
 use crate::l5_cognition::nt_core::nt_core_parallel::isolation::{IntentIsolator, AtomicDecomposer};
 use crate::l5_cognition::nt_mind::nt_mind::infrastructure::code_review::CodeReviewEngine;
 
@@ -671,10 +671,10 @@ impl SelfIteratingBrain {
         // ── NT-CORE 自我模型钩子 (T6): 候选行为变更产出后, 若 SelfModel 可用,
         //    评估其价值并回写自我状态。默认 feature 关闭 → 编译掉, 不影响既有逻辑;
         //    开启 `self_model` feature 后自动接线 (无需修改 brain 结构字段)。
-        //    真实启发式见 `nt_core_self_model::SelfModel::value_function` TODO(T6)。
+        //    真实启发式见 `l6_meta::nt_core_self_model::SelfModel::value_function` TODO(T6)。
         #[cfg(feature = "self_model")]
         {
-            let mut model = crate::core::nt_core_self_model::SelfModel::new();
+            let mut model = crate::l6_meta::nt_core_self_model::SelfModel::new();
             let v = model.value_function(candidate);
             log::debug!("[seal][self-model] candidate value={:.4}", v);
             if let Err(e) = model.update(candidate) {

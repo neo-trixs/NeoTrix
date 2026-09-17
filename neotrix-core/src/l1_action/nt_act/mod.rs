@@ -65,6 +65,12 @@ pub mod reference_view;
 pub mod video_quality_scorer;
 pub mod video_audit_trail;
 
+// Agent coordination protocol (sagent-inspired multi-agent)
+pub mod agent_protocol;
+
+// Cross-domain communication primitives
+pub mod communication;
+
 // Re-exports for cross-module integration
 pub use reference_view::ReferenceManager;
 pub use acp_protocol::AcpProtocol;

@@ -1,0 +1,662 @@
+/* ═══ AgentActivityBar — OS 活动透明度层（2026 Agent UX: 可观测性 anti black-box） ═══ */
+.agent-activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.6);
+  color: #475569;
+  white-space: nowrap;
+}
+.agent-activity__dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #94a3b8; flex-shrink: 0;
+}
+.agent-activity__domain {
+  padding: 0 6px; border-radius: 999px;
+  background: var(--nt-color-io-500, #3b82f6); color: #fff; font-size: 10px;
+}
+.agent-activity__tools { color: #64748b; font-variant-numeric: tabular-nums; }
+/* 思考/生成/工具调用：持续呼吸脉冲，体现 OS 在动 */
+.agent-activity--thinking .agent-activity__dot,
+.agent-activity--generating .agent-activity__dot,
+.agent-activity--tooling .agent-activity__dot {
+  background: var(--nt-color-gold-500, #f0913a);
+  animation: agent-pulse 1.1s ease-in-out infinite;
+}
+.agent-activity--thinking,
+.agent-activity--generating { color: var(--nt-color-gold-700, #c96823); border-color: rgba(240,145,58,0.25); }
+.agent-activity--tooling { color: var(--nt-color-io-600, #2563eb); border-color: rgba(37,99,235,0.25); }
+.agent-activity--tooling .agent-activity__dot { background: var(--nt-color-io-500, #3b82f6); }
+.agent-activity--error { color: #dc2626; border-color: rgba(220,38,38,0.25); background: rgba(254,242,242,0.7); }
+.agent-activity--error .agent-activity__dot { background: #dc2626; animation: none; }
+.agent-activity--done { color: #16a34a; border-color: rgba(22,163,74,0.25); background: rgba(240,253,244,0.7); }
+.agent-activity--done .agent-activity__dot { background: #16a34a; animation: none; }
+
+@keyframes agent-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.55); opacity: 0.45; }
+}
+
+/* ===== App Bot 打磨：活动日志审计层（对标 2026 agent UI 独立活动面板） ===== */
+.agent-log-toggle {
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 9999px;
+  color: var(--nt-color-text-muted, #6b7280);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--nt-color-border-primary, rgba(15, 23, 42, 0.12));
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.agent-log-toggle:hover {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--nt-color-text-primary, #1f2937);
+}
+
+.agent-log-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: 320px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--nt-color-border-primary, rgba(15, 23, 42, 0.14));
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+.agent-log-pop__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nt-color-text-muted, #6b7280);
+  padding: 2px 2px 6px;
+  border-bottom: 1px solid var(--nt-color-border-primary, rgba(15, 23, 42, 0.1));
+  margin-bottom: 6px;
+}
+.agent-log-pop__close {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--nt-color-text-muted, #6b7280);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.agent-log-pop__close:hover { color: var(--nt-color-text-primary, #1f2937); }
+
+.agent-log { display: flex; flex-direction: column; gap: 2px; }
+.agent-log__empty { font-size: 11px; color: var(--nt-color-text-muted, #9ca3af); padding: 4px 2px; }
+.agent-log__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 3px 4px;
+  border-radius: 6px;
+}
+.agent-log__row:hover { background: rgba(15, 23, 42, 0.04); }
+.agent-log__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background: var(--nt-color-text-muted, #9ca3af);
+}
+.agent-log__dot--phase { background: var(--nt-color-gold-600, #f0913a); }
+.agent-log__dot--reasoning { background: #8b5cf6; }
+.agent-log__dot--tool { background: var(--nt-color-io-500, #3b82f6); }
+.agent-log__dot--error { background: #dc2626; }
+.agent-log__dot--done { background: #16a34a; }
+.agent-log__label {
+  color: var(--nt-color-text-primary, #1f2937);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-log__domain {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  color: var(--nt-color-io-600, #2563eb);
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  flex-shrink: 0;
+}
+.agent-log__detail { color: var(--nt-color-text-muted, #6b7280); flex-shrink: 0; }
+.agent-log__time { margin-left: auto; color: var(--nt-color-text-muted, #9ca3af); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* 结构化错误：WHAT / WHY / NEXT 三段式 */
+.agent-err-steps { font-size: 11.5px; line-height: 1.5; color: #b91c1c; }
+.agent-err-k {
+  display: inline-block;
+  min-width: 38px;
+  margin-right: 6px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #dc2626;
+}
+.agent-err-raw {
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+/* ===== App Bot 打磨：工具执行实时进度条 ===== */
+.tool-progress {
+  height: 2px;
+  margin: 4px 2px 0;
+  background: rgba(37, 99, 235, 0.12);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.tool-progress__bar {
+  height: 100%;
+  width: 40%;
+  border-radius: 9999px;
+  background: var(--nt-color-io-500, #3b82f6);
+  animation: tool-progress-slide 1.1s ease-in-out infinite;
+}
+@keyframes tool-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+
+/* ===== App Bot 打磨：左栏可拖拽宽度手柄 ===== */
+.sb-resize {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  margin-left: -2px;
+}
+.sb-resize:hover,
+.sb-resize:active {
+  background: var(--nt-color-io-500, #3b82f6);
+}
+
+/* ===== CommandPalette：分组标题（最近使用 / 全部命令） ===== */
+.cmd-palette-section {
+  padding: 6px 12px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(4px);
+}
+
+/* ===== GenUIView：工具结果富渲染（JSON / 表格 / 代码 / 文本） ===== */
+.gen-ui {
+  font-size: 11px;
+  line-height: 1.5;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  overflow: auto;
+  max-height: 320px;
+}
+.gen-ui__json,
+.gen-ui__text {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #334155;
+}
+.gen-ui__code {
+  background: rgba(15, 23, 42, 0.04);
+}
+.gen-ui__table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11px;
+}
+.gen-ui__table th,
+.gen-ui__table td {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 4px 8px;
+  text-align: left;
+}
+.gen-ui__table th {
+  background: rgba(59, 130, 246, 0.08);
+  font-weight: 600;
+}
+/* JSON 语法高亮（对标 2026 可读性） */
+.json-key { color: #7c3aed; }
+.json-str { color: #16a34a; }
+.json-num { color: #ea580c; }
+.json-bool { color: #0891b2; }
+.json-null { color: #9ca3af; }
+
+/* ===== AutonomyMeter：渐进授权可视层 ===== */
+.autonomy-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  font-size: 11px;
+  color: #1e40af;
+}
+.autonomy-meter__label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.autonomy-meter__bars {
+  display: inline-flex;
+  gap: 2px;
+}
+.autonomy-meter__seg {
+  width: 10px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(30, 64, 175, 0.18);
+}
+.autonomy-meter__seg--on {
+  background: #3b82f6;
+}
+.autonomy-meter__rate {
+  font-variant-numeric: tabular-nums;
+  color: #1e40af;
+}
+
+/* ===== 无障碍：尊重系统「减弱动画」偏好 ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===== 主题切换：浅金 / 浅紫 / 浅青（均为浅色主题，仅主色相切换） =====
+   所有 UI 的金色身份走 var(--nt-color-gold-*)（含页面底色 gold-50），
+   故在 [data-theme] 下重定义该组变量即可整体换肤。
+   浅色画布/面板变量仅在具体主题选择器内覆盖 main.css :root 深色。 */
+ :root {
+  /* Surface tokens — single source of truth for all backgrounds */
+  --color-canvas: #ffffff;
+  --color-panel: #f9fafb;
+  --color-panel-2: #f5f6f7;
+  --color-panel-hover: #f1f3f5;
+  --color-line: rgba(0, 0, 0, 0.08);
+  --color-line-strong: rgba(0, 0, 0, 0.14);
+  --color-ink: #0f1115;
+  --color-muted: #81858c;
+  --color-btn-fill: #f9fafb;
+  --color-btn-fill-hover: #ebeef2;
+  --color-btn-ink: #0f1115;
+  --color-btn-border: rgba(0, 0, 0, 0.08);
+  --color-btn-hover: rgba(0, 0, 0, 0.04);
+  --color-btn-active: rgba(0, 0, 0, 0.08);
+  --color-nav-hover: rgba(0, 0, 0, 0.04);
+  --color-nav-active: rgba(0, 0, 0, 0.08);
+  --color-scroll-thumb: rgba(212, 212, 212, 0.8);
+  --color-scroll-thumb-strong: rgba(229, 229, 229, 0.9);
+  --color-accent: #d9a441;
+  --color-accent-2: #c96823;
+  --color-danger: #ec1313;
+  --color-ok: #22c55e;
+  /* Legacy gold palette — consumed by nt-color-gold-* tokens */
+  --nt-color-gold-50: #fef7ee;
+  --nt-color-gold-100: #fdf0dd;
+  --nt-color-gold-200: #fbe6c8;
+  --nt-color-gold-300: #f6d9a8;
+  --nt-color-gold-500: #f0913a;
+  --nt-color-gold-600: #d9a441;
+  --nt-color-gold-700: #c96823;
+  --nt-color-gold-800: #a3501c;
+  --nt-glow-1: rgba(255, 179, 102, 0.07);
+  --nt-glow-2: rgba(255, 168, 86, 0.055);
+  /* a11y：浅色主题文本对比度（≥4.5:1 WCAG AA） */
+  --text-primary: #1f2937;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  /* Tailwind 语义色 — dark mode 由 :root[data-theme-mode="dark"] 组件覆盖处理 */
+}
+[data-theme='gold'],
+[data-theme='lilac'],
+[data-theme='mint'] {
+  /* Surface tokens are inherited from :root — themes only override accents */
+}
+[data-theme='gold'] {
+  --color-accent: #d9a441;
+  --color-accent-2: #c96823;
+  --color-danger: #ec1313;
+  --color-ok: #22c55e;
+}
+[data-theme='lilac'] {
+  --nt-color-gold-50: #f7f5ff;
+  --nt-color-gold-100: #efedff;
+  --nt-color-gold-200: #e4e0ff;
+  --nt-color-gold-300: #d6cfff;
+  --nt-color-gold-500: #8b6cf0;
+  --nt-color-gold-600: #7c5ce0;
+  --nt-color-gold-700: #6b4cc9;
+  --nt-color-gold-800: #553a9e;
+  --nt-glow-1: rgba(139, 108, 240, 0.07);
+  --nt-glow-2: rgba(124, 92, 224, 0.055);
+  --color-accent: #7c5ce0;
+  --color-accent-2: #6b4cc9;
+}
+[data-theme='mint'] {
+  --nt-color-gold-50: #f0fbf7;
+  --nt-color-gold-100: #e3f8f1;
+  --nt-color-gold-200: #c9f1e3;
+  --nt-color-gold-300: #a7e8d2;
+  --nt-color-gold-500: #14b8a6;
+  --nt-color-gold-600: #0d9488;
+  --nt-color-gold-700: #0f766e;
+  --nt-color-gold-800: #115e59;
+  --nt-glow-1: rgba(20, 184, 166, 0.07);
+  --nt-glow-2: rgba(13, 148, 136, 0.055);
+  --color-accent: #0d9488;
+  --color-accent-2: #0f766e;
+}
+
+/* 主题切换按钮（头部） */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  color: var(--nt-color-gold-800);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+.theme-toggle.on {
+  background: var(--nt-color-gold-500, #f0913a);
+  color: #fff;
+  border-color: transparent;
+}
+.theme-toggle__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--nt-color-gold-500);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+.theme-toggle__swatch-inline {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nt-color-gold-500);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.5);
+}
+
+/* ===== 快捷键帮助面板 ===== */
+.shortcut-help-card {
+  width: min(420px, 92vw);
+}
+.shortcut-help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nt-color-gold-800);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.shortcut-help-close {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted, #6b7280);
+  cursor: pointer;
+}
+.shortcut-help-list {
+  padding: 6px 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.shortcut-help-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+.shortcut-help-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+.shortcut-help-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #475569);
+}
+.shortcut-help-kbd {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: var(--nt-color-gold-800);
+}
+
+/* ===== 深色模式 =====
+   data-theme-mode="dark" 由 stores/theme.ts 管理。
+   覆盖 :root 的 surface tokens + accent palette，
+   同时覆盖 Tailwind 语义色（bg-primary 等）以保持 @apply 一致性。 */
+:root[data-theme-mode="dark"] {
+  /* Surface tokens — dark palette */
+  --color-canvas: #111113;
+  --color-panel: #1a1a1e;
+  --color-panel-2: #222226;
+  --color-panel-hover: #2a2a2e;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.14);
+  --color-ink: #e8e8ec;
+  --color-muted: #7a7a82;
+  --color-btn-fill: #222226;
+  --color-btn-fill-hover: #2a2a2e;
+  --color-btn-ink: #e8e8ec;
+  --color-btn-border: rgba(255, 255, 255, 0.08);
+  --color-btn-hover: rgba(255, 255, 255, 0.04);
+  --color-btn-active: rgba(255, 255, 255, 0.08);
+  --color-nav-hover: rgba(255, 255, 255, 0.04);
+  --color-nav-active: rgba(255, 255, 255, 0.08);
+  --color-scroll-thumb: rgba(255, 255, 255, 0.12);
+  --color-scroll-thumb-strong: rgba(255, 255, 255, 0.2);
+  /* Accent colors — slightly muted for dark bg */
+  --color-accent: #e0a030;
+  --color-accent-2: #c96823;
+  --color-danger: #ef4444;
+  --color-ok: #34d399;
+  /* Legacy gold palette — dark variants */
+  --nt-color-gold-50: #1c1a14;
+  --nt-color-gold-100: #242018;
+  --nt-color-gold-200: #302a1c;
+  --nt-color-gold-300: #4a3f28;
+  --nt-color-gold-500: #f0913a;
+  --nt-color-gold-600: #e0a030;
+  --nt-color-gold-700: #c96823;
+  --nt-color-gold-800: #a3501c;
+  --nt-glow-1: rgba(255, 179, 102, 0.06);
+  --nt-glow-2: rgba(255, 168, 86, 0.04);
+  /* a11y：深色主题文本对比度 */
+  --text-primary: #e8e8ec;
+  --text-secondary: #b0b0b8;
+  --text-muted: #7a7a82;
+}
+
+/* 深色模式 Tailwind 语义色覆盖 — @apply 指令在 build 时解析，无法通过 CSS 变量覆盖。
+   深色模式下的 Tailwind 类由 JSX 中的 dark: 前缀 + 此处 CSS 覆盖处理。 */
+
+/* 深色模式 glass 效果调整 */
+:root[data-theme-mode="dark"] .glass-modal {
+  background-image: linear-gradient(180deg, rgba(30, 30, 34, 0.92) 0%, rgba(22, 22, 26, 0.85) 100%);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* 深色模式主题切换按钮 */
+:root[data-theme-mode="dark"] .theme-toggle {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--nt-color-gold-200);
+}
+:root[data-theme-mode="dark"] .theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ===== 深色模式组件覆盖（覆盖 @apply 中的 Tailwind 语义色） ===== */
+:root[data-theme-mode="dark"] * {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme-mode="dark"] body {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] ::selection {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+:root[data-theme-mode="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 顶部工具栏按钮 */
+:root[data-theme-mode="dark"] .tb-btn {
+  color: #7a7a82;
+}
+:root[data-theme-mode="dark"] .tb-btn:hover {
+  color: #e8e8ec;
+  background: rgba(255, 255, 255, 0.06);
+}
+:root[data-theme-mode="dark"] .tb-btn.on {
+  background: rgba(240, 145, 58, 0.12);
+  color: #e0a030;
+}
+
+/* 按钮 */
+:root[data-theme-mode="dark"] .btn-primary {
+  color: #111113;
+}
+:root[data-theme-mode="dark"] .btn-secondary {
+  background: #222226;
+  color: #e8e8ec;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme-mode="dark"] .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+:root[data-theme-mode="dark"] .btn-ghost {
+  color: #b0b0b8;
+}
+:root[data-theme-mode="dark"] .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e8ec;
+}
+
+/* 输入框 */
+:root[data-theme-mode="dark"] .input {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] .input::placeholder {
+  color: #7a7a82;
+}
+
+/* 侧栏项 */
+:root[data-theme-mode="dark"] .sidebar-item {
+  color: #b0b0b8;
+}
+:root[data-theme-mode="dark"] .sidebar-item:hover {
+  color: #e8e8ec;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* 消息气泡 */
+:root[data-theme-mode="dark"] .message-user {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] .message-assistant {
+  background: #222226;
+  color: #e8e8ec;
+}
+
+/* 面板 */
+:root[data-theme-mode="dark"] .panel-head {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme-mode="dark"] .panel-title {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] .panel-sub {
+  color: #7a7a82;
+}
+:root[data-theme-mode="dark"] .panel-close {
+  color: #7a7a82;
+}
+:root[data-theme-mode="dark"] .panel-close:hover {
+  color: #e8e8ec;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* 代码块 */
+:root[data-theme-mode="dark"] .code-block-header {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 设置面板 */
+:root[data-theme-mode="dark"] .ss-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+:root[data-theme-mode="dark"] .ss-card-header {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] .ss-row-label,
+:root[data-theme-mode="dark"] .ss-row-desc {
+  color: #b0b0b8;
+}
+
+/* glass 效果深色模式 */
+:root[data-theme-mode="dark"] .glass-pop {
+  background-image: linear-gradient(180deg, rgba(30, 30, 34, 0.9) 0%, rgba(26, 26, 30, 0.8) 100%);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 16px 40px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+:root[data-theme-mode="dark"] .glass-side {
+  background: var(--color-panel);
+  border-color: rgba(255, 255, 255, 0.06);
+}

@@ -7,7 +7,7 @@ pub fn recall_similar(query: &str, memories: &[crate::l5_cognition::nt_mind::nt_
         return Vec::new();
     }
 
-    let mut embedder = TextEmbedder::new();
+    let embedder = TextEmbedder::new();
 
     let qv = embedder.embed(query);
 

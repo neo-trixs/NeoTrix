@@ -196,7 +196,7 @@ impl Drop for CrossSessionMemory {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CrossSessionMemorySelfTest;
 
-impl crate::core::nt_core_self_test::SelfTest for CrossSessionMemorySelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CrossSessionMemorySelfTest {
     fn name(&self) -> &str {
         "nt_nexus_cross_session_memory"
     }

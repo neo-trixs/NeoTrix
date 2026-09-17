@@ -185,10 +185,9 @@ impl CliCommand for AgentCmd {
         match args[0].as_str() {
             "catalog" => {
                 if args.len() > 1 && args[1] == "file" {
-                    // 文件驱动 agent 目录（~/.neotrix/agents/ + 项目 .neotrix/agents/）
-                    return CommandOutput::ok(&crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::catalog_full_text());
+                    return CommandOutput::ok("Agent catalog (file-driven) not available — module removed");
                 }
-                CommandOutput::ok(&crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::catalog_text())
+                CommandOutput::ok("Agent catalog not available — module removed")
             }
             "spawn" => {
                 if args.len() < 3 {
@@ -201,8 +200,7 @@ impl CliCommand for AgentCmd {
                 use crate::core::nt_core_subagent::SubAgentRegistry;
                 let mut file_reg = SubAgentRegistry::new();
                 file_reg.scan_all();
-                let is_known_agent = file_reg.get(name).is_some()
-                    || crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::by_name(name).is_some();
+                let is_known_agent = file_reg.get(name).is_some();
                 if is_known_agent {
                     // 先去掉挡在前面阻塞写锁的临时借用再 spawn
                     return match mgr.spawn_from_profile(name) {

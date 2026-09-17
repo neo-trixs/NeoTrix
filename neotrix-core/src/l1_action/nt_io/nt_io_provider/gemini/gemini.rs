@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::l1_action::nt_io::nt_io_provider::common::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, ToolCallFunction, ToolCallInfo, Usage, Role};
+use crate::l1_action::nt_io::nt_io_provider::common::types::{DataTrust, FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, ToolCallInfo, Usage, Role};
 
 /// Parse Gemini `usageMetadata` from response JSON.
 /// Returns `Usage::default()` if the field is missing (non-fatal).
@@ -39,8 +39,12 @@ impl GeminiProvider {
 
 #[async_trait]
 impl LlmProvider for GeminiProvider {
-fn set_proxy(&mut self, proxy_url: &str) {
+    fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
+
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -114,8 +118,10 @@ fn set_proxy(&mut self, proxy_url: &str) {
                             let args = fc.get("args").map(|a| a.to_string()).unwrap_or_else(|| "{}".to_string());
                             calls.push(ToolCallInfo {
                                 id: format!("call_{}", uuid::Uuid::new_v4()),
-                                call_type: "function".to_string(),
-                                function: ToolCallFunction { name, arguments: args },
+                                name,
+                                arguments: args,
+                                function: None,
+                                call_type: Some("function".to_string()),
                             });
                         }
                     }
@@ -219,8 +225,10 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                             let args = fc.get("args").map(|a| a.to_string()).unwrap_or_else(|| "{}".to_string());
                                             tool_calls.get_or_insert_with(Vec::new).push(ToolCallInfo {
                                                 id: format!("call_{}", uuid::Uuid::new_v4()),
-                                                call_type: "function".to_string(),
-                                                function: ToolCallFunction { name, arguments: args },
+                                                name,
+                                                arguments: args,
+                                                function: None,
+                                                call_type: Some("function".to_string()),
                                             });
                                         }
                                     }

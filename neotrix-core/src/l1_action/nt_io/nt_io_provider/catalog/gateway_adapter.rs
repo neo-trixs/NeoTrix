@@ -41,6 +41,10 @@ impl LlmProvider for GatewayV2Adapter {
         crate::core::nt_core_llm::DataTrust::Trusted
     }
 
+    fn set_proxy(&mut self, _proxy_url: &str) {
+        // GatewayV2Adapter delegates to inner GatewayV2; proxy is set per-provider.
+    }
+
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         self.gateway.complete_with_selection(request).await.map(|s| s.response)
     }

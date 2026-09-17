@@ -1,5 +1,5 @@
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
     fn sample_skill_content() -> &'static str {
         r#"---
@@ -594,7 +594,7 @@ low"#;
 
     #[test]
     fn test_sync_to_kb_index_write_through_and_dedup() {
-        use crate::l5_cognition::kb_facade::skill_list_all;
+        use crate::l5_cognition::layer_aliases::skill_list_all;
 
         let dir = setup_temp_dir();
         let skills_dir = dir.path().join("skills");
@@ -633,8 +633,8 @@ low"#;
 
     #[test]
     fn test_load_all_auto_syncs_to_kb() {
-        use crate::l5_cognition::kb_facade::skill_list_all;
-        use crate::l5_cognition::kb_facade::KnowledgeBase;
+        use crate::l5_cognition::layer_aliases::skill_list_all;
+        use crate::l5_cognition::layer_aliases::KnowledgeBase;
 
         let dir = setup_temp_dir();
         let skills_dir = dir.path().join("skills");
@@ -1330,7 +1330,7 @@ category: general
 
     #[test]
     fn test_book_to_skill_selftest() {
-        use crate::core::nt_core_self_test::SelfTest;
+        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
         let bts = BookToSkill::default();
         assert_eq!(bts.name(), "nt_mind_book_to_skill");
         assert!(bts.self_test().is_ok());
@@ -1458,7 +1458,7 @@ category: general
 
     #[test]
     fn test_revertible_effects_healer() {
-        use crate::core::nt_core_self_test::SelfTest;
+        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
         let healer = RevertibleEffectsHealer;
         assert_eq!(healer.name(), "nt_mind_skill_engine::revertible_effects_healer");
         assert!(healer.self_test().is_ok());
@@ -1466,7 +1466,7 @@ category: general
 
     #[test]
     fn test_fiber_lifecycle_healer() {
-        use crate::core::nt_core_self_test::SelfTest;
+        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
         let healer = FiberLifecycleHealer;
         assert_eq!(healer.name(), "nt_mind_skill_engine::fiber_lifecycle_healer");
         assert!(healer.self_test().is_ok());

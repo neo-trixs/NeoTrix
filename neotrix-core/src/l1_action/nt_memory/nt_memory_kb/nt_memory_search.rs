@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 #[cfg(feature = "full")]
 use log::debug;
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 

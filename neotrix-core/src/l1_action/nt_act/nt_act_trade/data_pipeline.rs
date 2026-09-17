@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::unified_types::{ContactInfo, Customer, Grade};
+use super::unified_types::{Customer, Grade, TradeContactInfo};
 
 // ============================================================
 // 1. 配置类型
@@ -182,7 +182,7 @@ impl DataNormalizer {
     }
 
     /// 归一化联系信息
-    pub fn normalize_contact(&self, mut contact: ContactInfo) -> ContactInfo {
+    pub fn normalize_contact(&self, mut contact: TradeContactInfo) -> TradeContactInfo {
         contact.name = contact.name.trim().to_string();
         contact.email = contact.email.trim().to_lowercase();
         contact.phone = contact.phone.trim().to_string();
@@ -421,7 +421,7 @@ mod tests {
             Ok(vec![Customer {
                 id: "c1".into(),
                 name: "Test Customer".into(),
-                contact: ContactInfo::default(),
+                contact: TradeContactInfo::default(),
                 grade: Grade::B,
                 channel: Channel::Email,
                 country: "CN".into(),
@@ -495,7 +495,7 @@ mod tests {
         let customer = Customer {
             id: "c1".into(),
             name: "  Acme Corp  ".into(),
-            contact: ContactInfo {
+            contact: TradeContactInfo {
                 name: "  John  ".into(),
                 email: "  JOHN@EXAMPLE.COM  ".into(),
                 phone: "  +86 138 0000 0000  ".into(),

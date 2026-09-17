@@ -6,7 +6,7 @@
 //! 核心能力: 把电影级产品视频编排为 shot card 驱动的 Remotion 渲染管线。
 //! 本 stub 负责 shot card 选取校验与 Remotion 渲染规格生成。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// Shot card: 一个镜头卡片 (来自 152 卡库), 含时长与序号。
 #[derive(Debug, Clone, PartialEq)]

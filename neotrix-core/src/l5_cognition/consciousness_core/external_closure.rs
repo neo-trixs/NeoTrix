@@ -82,7 +82,7 @@ impl ExternalClosureEngine {
 
 /// 关闭外部缺口 (stub)
 pub fn close_external_gap(
-    _kb: &crate::l5_cognition::kb_facade::KnowledgeBase,
+    _kb: &crate::l5_cognition::layer_aliases::KnowledgeBase,
     task: &ConsciousTask,
     _executor: &dyn SolutionExecutor,
     _config: &ExternalClosureConfig,

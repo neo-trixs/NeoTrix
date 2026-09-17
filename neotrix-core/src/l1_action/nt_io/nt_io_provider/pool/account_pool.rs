@@ -504,7 +504,7 @@ impl Default for AccountPool {
 /// evict_unhealthy 驱逐后断言 is_healthy。
 pub struct AccountPoolHealer;
 
-impl crate::core::nt_core_self_test::SelfTest for AccountPoolHealer {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for AccountPoolHealer {
     fn name(&self) -> &str {
         "nt_io_provider::account_pool_healer"
     }

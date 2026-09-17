@@ -3,6 +3,8 @@ pub mod nt_core;
 pub mod nt_mind;
 /// L5 Cognition Facade — 唯一对外门面 (Qingjian 模式)
 pub mod nt_cognition_facade;
+/// Consolidated layer aliases (replaces 5 stub facades)
+pub mod layer_aliases;
 /// Goal management
 pub mod nt_goal;
 /// Consciousness modules
@@ -23,6 +25,12 @@ pub mod nt_core_agents_md;
 pub mod nt_core_hybrid_search;
 /// L1 Facade
 pub mod l1_facade;
+pub mod act_facade;
+pub mod io_facade;
+pub mod kb_facade;
+pub mod l2_facade;
+pub mod l3_facade;
+pub mod io_skills_facade;
 
 // 从 core/ 迁移的 L5 模块
 pub mod nt_core_consciousness;
@@ -63,3 +71,13 @@ pub mod nt_core_arch_diagram;
 pub mod nt_core_arch_fitness;
 pub mod nt_core_model_skills;
 pub mod nt_core_shared_types;
+/// Hive Coordination Protocol — inbox/outbox/blackboard (absorbed from munder-difflin)
+pub mod nt_core_hive;
+/// BYOA — Bring Your Own Agent (absorbed from cumora)
+pub mod nt_core_byoa;
+/// Agent Circuit Breaker — steer→constrain→stop 三级行为控制 (moved from L3 shield)
+pub mod nt_core_agent_circuit_breaker;
+/// Model Gateway — 统一模型网关 (cost-aware routing + fallback chain)
+pub mod nt_core_model_gateway;
+/// Semantic Router — 语义路由 (confidence-based dispatch)
+pub mod nt_core_semantic_router;

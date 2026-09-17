@@ -262,6 +262,14 @@ fn main() {
                     autostart::autostart_enable,
                     autostart::autostart_disable,
                     autostart::autostart_toggle,
+                    // ===== Onboarding (首次运行引导) =====
+                    crate::commands::onboarding::onboarding_check_prereqs,
+                    crate::commands::onboarding::onboarding_get_tips,
+                    crate::commands::onboarding::onboarding_complete,
+                    crate::commands::onboarding::onboarding_is_completed,
+                    // ===== Hive (Office Floor 可视化) =====
+                    crate::commands::hive::hive_get_floor_state,
+                    crate::commands::hive::hive_send_message,
                 ])
                 .setup(move |app| {
                     // 初始化通知管理器

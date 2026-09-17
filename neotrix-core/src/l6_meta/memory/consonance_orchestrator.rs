@@ -12,7 +12,7 @@
 
 use super::CapabilityNode;
 use crate::core::nt_core_consciousness_core::CoreSnapshot;
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::core::nt_core_traits::RuneSocket;
 use std::collections::HashMap;
 

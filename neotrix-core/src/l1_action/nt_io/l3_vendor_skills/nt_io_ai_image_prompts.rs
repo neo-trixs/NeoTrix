@@ -10,7 +10,7 @@
 //! 端点: 优先 `NEOTRIX_IMAGE_ENDPOINT` 环境变量，回退 `NeoTrixConfig.custom_endpoint`。
 
 use crate::config::NeoTrixConfig;
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// 图像提示生成器 trait — 将语义意图映射为可投递给图像模型的 prompt 字符串。
 pub trait AiImagePromptGenerator: Send + Sync {

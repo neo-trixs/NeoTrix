@@ -234,7 +234,7 @@ impl crate::l5_cognition::traits::EvolutionHarnessApi for EvolutionHarness {
 
     fn harness_persist_suggestions(
         &mut self,
-        kb: &crate::l5_cognition::kb_facade::KnowledgeBase,
+        kb: &crate::l5_cognition::layer_aliases::KnowledgeBase,
         report: &serde_json::Value,
     ) -> usize {
         let l6_report: LoopReport = match serde_json::from_value(report.clone()) {
@@ -266,7 +266,7 @@ impl crate::l5_cognition::traits::EvolutionHarnessApi for EvolutionHarness {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for EvolutionHarness {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for EvolutionHarness {
     fn name(&self) -> &str {
         "nt_mind_transcendent_evolution_harness"
     }
@@ -289,7 +289,7 @@ impl crate::core::nt_core_self_test::SelfTest for EvolutionHarness {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_harness_self_test() {

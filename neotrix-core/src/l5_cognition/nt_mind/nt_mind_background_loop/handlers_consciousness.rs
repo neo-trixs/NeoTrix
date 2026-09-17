@@ -2,7 +2,7 @@ use super::*;
 use crate::nt_mind::infrastructure::ConsciousnessBridge;
 use crate::l5_cognition::nt_mind::nt_mind::evolution::dispatch_self_test::DispatchControlPlaneSelfTest;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest;
-use crate::l5_cognition::act_facade::recipe_refactor;
+use crate::l5_cognition::layer_aliases::recipe_refactor;
 
 use log::info;
 
@@ -1278,7 +1278,7 @@ impl BackgroundLoopHandle {
         use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
         use crate::core::nt_core_self::self_audit::{converge_check, ConvergeCheckFn};
         use crate::core::nt_core_self_review::SelfReviewGate;
-        use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+        use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
         // GAP-2 (T3): MetaAuditor 生产消费端 — 从持久字段克隆, 周期审计发现写回。
         let mut meta_auditor = self.meta_auditor.clone();
@@ -1502,10 +1502,10 @@ impl BackgroundLoopHandle {
         // 异常 (被拒/需审批仍 executed = 守卫被绕过) 汇入 MetaAuditor +
         // 落盘 KB `consciousness` 命名空间 (行为接地, 与 converge_check 同模式)。
         if let Some(ref kb) = self.kb {
-            use crate::l5_cognition::l3_facade::{
+            use crate::l5_cognition::layer_aliases::{
                 write_guard_check_result, CheckStatus,
             };
-            use crate::l5_cognition::kb_facade::{
+            use crate::l5_cognition::layer_aliases::{
                 scan_write_guard_evidence,
             };
             let stats = scan_write_guard_evidence(kb);
@@ -1546,7 +1546,7 @@ impl BackgroundLoopHandle {
         let meta_cog_loop = MetaCognitiveLoop::new(model);
 
         let mut self_tests = SelfTestRegistry::new();
-        self_tests.register(Box::new(crate::core::nt_core_self_test::ExternalVerifier));
+        self_tests.register(Box::new(crate::l6_meta::healing::nt_core_self_test::ExternalVerifier));
         self_tests.register(Box::new(watchdog));
         self_tests.register(Box::new(ConvergeCheckFn));
         self_tests.register(Box::new(scanner));
@@ -1651,7 +1651,7 @@ impl BackgroundLoopHandle {
         // data source exists.
 
         // ── Absorbed module SelfTests (Cycle 113) ──
-        crate::core::nt_core_self_test_integration::register_absorbed_modules(&mut self_tests);
+        crate::l6_meta::healing::nt_core_self_test_integration::register_absorbed_modules(&mut self_tests);
 
         // ── Substrate + Engine SelfTests (Cycle 119 architecture refactor) ──
         self_tests.register(Box::new(
@@ -1921,38 +1921,38 @@ impl BackgroundLoopHandle {
     /// 与 handle_architecture_audit 的完整 registry (3600s) 分层: 此方法用高频轻量集,
     /// 保证 `consciousness/core` 快照分支健康保持实时非 0 — 驱动迷雾下降与 MCP status 真实读数。
     fn feed_persistent_branch_health(&mut self) {
-        use crate::core::nt_core_self_test::SelfTest;
-        let mut results: Vec<crate::core::nt_core_self_test::SelfTestResult> = Vec::new();
+        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        let mut results: Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> = Vec::new();
 
         // NT-CORE: 意识核心检测件
         // self_test not available on Arc<RwLock<BMonitor>>
         // if let Some(b) = self.bbrain.as_ref() {
         //     match b.self_test() {
-        //         Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass(
+        //         Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
         //             "nt_core_bbrain_monitor",
         //         )),
-        //         Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail(
+        //         Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
         //             "nt_core_bbrain_monitor",
         //             f,
         //         )),
         //     }
         // }
-        results.push(crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_bbrain_monitor"));
+        results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_core_bbrain_monitor"));
         match self.cog_eval.self_test() {
-            Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass(
+            Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
                 "nt_core_cognitive_evaluator",
             )),
-            Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail(
+            Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                 "nt_core_cognitive_evaluator",
                 f,
             )),
         }
         if let Some(ref m) = self.awareness {
             match m.self_test() {
-                Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass(
+                Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
                     "nt_core_consciousness_monitor",
                 )),
-                Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail(
+                Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                     "nt_core_consciousness_monitor",
                     f,
                 )),
@@ -1961,19 +1961,19 @@ impl BackgroundLoopHandle {
         // NT-MEMORY: 叙事一致性 / 知识缺口
         let narrative_ok = crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new().self_test().is_ok();
         results.push(if narrative_ok {
-            crate::core::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency")
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency")
         } else {
-            crate::core::nt_core_self_test::SelfTestResult::fail(
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                 "nt_memory_narrative_consistency",
                 vec!["narrative consistency check failed".into()],
             )
         });
         if let Some(ref g) = self.gap_detector {
             match g.self_test() {
-                Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass(
+                Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
                     "nt_memory_knowledge_gap",
                 )),
-                Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail(
+                Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                     "nt_memory_knowledge_gap",
                     f,
                 )),
@@ -1982,10 +1982,10 @@ impl BackgroundLoopHandle {
         // NT-MIND: 认知负载 / FEPIIT 桥
         if let Some(ref clm) = self.cognitive_load {
             match clm.self_test() {
-                Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass(
+                Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
                     "nt_mind_cognitive_load",
                 )),
-                Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail(
+                Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                     "nt_mind_cognitive_load",
                     f,
                 )),
@@ -2002,9 +2002,9 @@ impl BackgroundLoopHandle {
                 .self_test()
                 .is_ok();
         results.push(if shield_ok {
-            crate::core::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry")
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry")
         } else {
-            crate::core::nt_core_self_test::SelfTestResult::fail(
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                 "nt_shield_check_registry",
                 vec!["check registry selftest failed".into()],
             )
@@ -2019,9 +2019,9 @@ impl BackgroundLoopHandle {
         //         .self_test()
         //         .is_ok();
         // results.push(if repair_ok {
-        //     crate::core::nt_core_self_test::SelfTestResult::pass("nt_repair_causal_trace")
+        //     crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_repair_causal_trace")
         // } else {
-        //     crate::core::nt_core_self_test::SelfTestResult::fail(
+        //     crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
         //         "nt_repair_causal_trace",
         //         vec!["causal trace selftest failed".into()],
         //     )
@@ -2031,11 +2031,11 @@ impl BackgroundLoopHandle {
                 .self_test()
                 .is_ok();
         results.push(if meta_ok {
-            crate::core::nt_core_self_test::SelfTestResult::pass(
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
                 "nt_meta_transcendent_observer",
             )
         } else {
-            crate::core::nt_core_self_test::SelfTestResult::fail(
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                 "nt_meta_transcendent_observer",
                 vec!["meta observer selftest failed".into()],
             )
@@ -2044,11 +2044,11 @@ impl BackgroundLoopHandle {
             .self_test()
             .is_ok();
         results.push(if gov_ok {
-            crate::core::nt_core_self_test::SelfTestResult::pass(
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
                 "nt_governance_constitution",
             )
         } else {
-            crate::core::nt_core_self_test::SelfTestResult::fail(
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                 "nt_governance_constitution",
                 vec!["constitution governance selftest failed".into()],
             )
@@ -2058,11 +2058,11 @@ impl BackgroundLoopHandle {
                 .self_test()
                 .is_ok();
         results.push(if nexus_ok {
-            crate::core::nt_core_self_test::SelfTestResult::pass(
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
                 "nt_nexus_cross_session_memory",
             )
         } else {
-            crate::core::nt_core_self_test::SelfTestResult::fail(
+            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
                 "nt_nexus_cross_session_memory",
                 vec!["cross-session memory selftest failed".into()],
             )

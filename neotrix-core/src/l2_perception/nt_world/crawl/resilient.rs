@@ -238,7 +238,7 @@ impl ResilientCrawler {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ResilientCrawler {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ResilientCrawler {
     fn name(&self) -> &str {
         "nt_world_crawl_async_resilient"
     }
@@ -457,8 +457,8 @@ mod tests {
     #[test]
     fn test_async_resilient_self_test_name() {
         let c = ResilientCrawler::new(ThrottlePolicy::default());
-        let name = crate::core::nt_core_self_test::SelfTest::name(&c);
+        let name = crate::l6_meta::healing::nt_core_self_test::SelfTest::name(&c);
         assert_eq!(name, "nt_world_crawl_async_resilient");
-        assert!(crate::core::nt_core_self_test::SelfTest::self_test(&c).is_ok());
+        assert!(crate::l6_meta::healing::nt_core_self_test::SelfTest::self_test(&c).is_ok());
     }
 }

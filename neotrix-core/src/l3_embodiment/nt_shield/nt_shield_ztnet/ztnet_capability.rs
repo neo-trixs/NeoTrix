@@ -86,7 +86,7 @@ impl Default for _ZtNetCapabilityManager {
 }
 
 /// ZTNet UnifiedCapability wrapper
-struct ZtNetUnifiedCapability {
+pub struct ZtNetUnifiedCapability {
     meta: CapabilityMeta,
     health: CapabilityHealth,
 }

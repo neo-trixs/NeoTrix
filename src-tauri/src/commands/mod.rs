@@ -4,9 +4,11 @@
 
 pub mod domain_cmd;
 pub mod file_drop;
+pub mod hive;
 pub mod im;
 pub mod model_pool;
 pub mod neotrix_cli;
+pub mod onboarding;
 pub mod proxy_pool;
 pub mod pty;
 pub mod unified;

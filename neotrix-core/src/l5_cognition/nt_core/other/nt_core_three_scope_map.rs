@@ -5,7 +5,7 @@
 //! 本模块实现 `_ThreeScopeMap` trait (C1: trait 存在 + 基础逻辑 + SelfTest T1
 //! + 3 测试), 建模范围划分与跨范围映射。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use std::collections::HashMap;
 
 /// 三个范围层的标识。

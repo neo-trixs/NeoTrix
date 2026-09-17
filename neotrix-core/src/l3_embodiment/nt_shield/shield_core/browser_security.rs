@@ -448,7 +448,7 @@ impl BrowserSecurityScanner {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for BrowserSecurityScanner {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BrowserSecurityScanner {
     fn name(&self) -> &str {
         "BrowserSecurityScanner"
     }
@@ -826,7 +826,7 @@ mod tests {
 }
 
 /// 创建 BrowserSecurityScanner 的 SelfTest 实例 (供 L5 注册，避免 L5 直接依赖 L3 类型)
-pub fn create_browser_security_self_test() -> Box<dyn crate::core::nt_core_self_test::SelfTest> {
+pub fn create_browser_security_self_test() -> Box<dyn crate::l6_meta::healing::nt_core_self_test::SelfTest> {
     Box::new(BrowserSecurityScanner::new(BrowserSecurityConfig::default()))
 }
 

@@ -17,7 +17,7 @@
 //! 真实信号 (time/override/evidence-seeking 速率, canary tripped) 由 NT-ACT 运行期
 //! 采集。SelfTest 验证桩逻辑健康 (Dark Forest: 接入即验证)。
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// 监督退化 canary — 注入不可由 agent 静默绕过的高价值陷阱动作, 检测 agent 是否
 /// 在未提审批的情况下执行 (向上欺骗 / 监督盲区)。

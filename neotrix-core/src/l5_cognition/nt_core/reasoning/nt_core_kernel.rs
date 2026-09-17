@@ -9,7 +9,7 @@
 //! 真实推理能力（多步状态演化 + 方法选择 + self-consistency + 验证器）
 //! 由 L1 实现提供，L8 生产路径已接线消费。
 
-pub use crate::l5_cognition::io_facade::{
+pub use crate::l5_cognition::layer_aliases::{
     EVOLUTION, KERNEL_DIM, ReasoningKernel, ReasoningMethod, ReasoningOutput,
     StageInfo, KernelStats, SelfConsistencyResult, verify_answer,
     text_to_vector, format_kernel_output,

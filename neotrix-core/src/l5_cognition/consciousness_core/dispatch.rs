@@ -1,13 +1,11 @@
 //! 意识核心任务环 — 拆解/分配/内置调度/反思补齐
 
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use super::core::ConsciousnessCoreHandle;
 use super::external_closure::{ExternalClosureConfig, SolutionExecutor, ExternalClosureReport};
-use crate::l5_cognition::kb_facade::AbsorbEntry;
-use crate::l5_cognition::kb_facade::KnowledgeBase;
+use crate::l5_cognition::layer_aliases::AbsorbEntry;
+use crate::l5_cognition::layer_aliases::KnowledgeBase;
 
 // ─── 能力路由表 ──────────────────────────────────────────────────────────────
 
@@ -1363,7 +1361,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     let stats = kb.stats().unwrap_or_default();
                     let nodes = stats.total_nodes as u64;
                     let kv = 0;
-                    let lower = task.summary.to_lowercase();
+                    let _lower = task.summary.to_lowercase();
                     let skill_name = task.summary.split_whitespace()
                         .find(|w| !w.starts_with("with") && !w.starts_with("without")
                             && !w.starts_with("有") && !w.starts_with("无")

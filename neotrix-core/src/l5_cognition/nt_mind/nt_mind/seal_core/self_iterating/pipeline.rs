@@ -3062,7 +3062,7 @@ impl BrainStage for SelfTestStage {
         use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
         use crate::core::nt_core_self::self_audit::ConvergeCheckFn;
         use crate::core::nt_core_self_review::SelfReviewGate;
-        use crate::core::nt_core_self_test::SelfTestRegistry;
+        use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
         let mut registry = SelfTestRegistry::new();
         registry.register(Box::new(SchemaWatchdog::new()));
         registry.register(Box::new(ConvergeCheckFn));

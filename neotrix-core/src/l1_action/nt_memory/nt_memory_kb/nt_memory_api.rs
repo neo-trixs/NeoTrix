@@ -94,6 +94,7 @@ async fn gate_write(
             }
             return Err(json_err(&format!("{} 拒绝: {}", action, reasons.join("; "))));
         }
+        WriteGuardVerdict::Hold { .. } => {}
     }
     Ok(verdict)
 }

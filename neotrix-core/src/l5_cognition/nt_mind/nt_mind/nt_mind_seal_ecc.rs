@@ -7,7 +7,7 @@
 
 use crate::core::nt_core_cap::CapabilityVector;
 use crate::core::nt_core_knowledge::TaskType;
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// affaan-m/ECC 吸收的 SEAL 进化维度。
 pub const SEAL_ECC_DIMENSIONS: &[&str] = &[

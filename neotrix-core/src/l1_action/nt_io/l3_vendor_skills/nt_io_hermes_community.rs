@@ -6,7 +6,7 @@
 //! 核心能力: 维护社区插件的注册表, 支持按名称/标签查找与启用状态跟踪。
 //! 注: 与 nt_io_hermes_quota.rs 同属 Hermes 生态, 共享 nt_io_hermes 前缀。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use std::collections::HashMap;
 
 /// 社区插件元数据。

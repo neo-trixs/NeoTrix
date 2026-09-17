@@ -7,7 +7,7 @@
 //! 会话树 (session tree)、双轨分支 (dual-track branch)、CodeGraph MCP 接口。
 //! 本 stub 负责会话/分支模型校验与 CodeGraph 查询规格生成。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// 会话节点: 一棵会话树中的一次对话/任务单元。
 #[derive(Debug, Clone, PartialEq)]

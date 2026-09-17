@@ -16,7 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::time::{SystemTime, UNIX_EPOCH};
+
 
 use super::KnowledgeBase;
 
@@ -176,13 +176,7 @@ fn fnv1a_hex(bytes: &[u8]) -> String {
     format!("{hash:016x}")
 }
 
-/// Current unix-epoch seconds (saturating).
-fn now_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
+use crate::l0_substrate::nt_core_time::now_secs;
 
 #[cfg(test)]
 mod tests {

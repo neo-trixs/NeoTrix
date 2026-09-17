@@ -66,6 +66,7 @@ pub mod nt_normalizer;
 pub mod knowledge_storage;
 pub mod nt_absorb_mapper;
 pub mod nt_memory_write_guard;
+pub mod nt_memory_write_guard_fallback;
 pub mod nt_memory_snapshot;
 pub mod nt_memory_brain;
 pub mod nt_memory_lifecycle;
@@ -116,6 +117,11 @@ pub use nt_normalizer::{normalize_text, strip_markdown, normalize_lang, content_
 pub use knowledge_storage::{KnowledgeStorage, migrate_from_json};
 pub use nt_absorb_mapper::{map_all_nodes, map_batch_nodes, map_nodes, apply_mappings, map_node, map_source_core, CapabilityMapping, MappingReport};
 pub use nt_memory_write_guard::{kb_write_guard, record_write_evidence, WriteGuardVerdict, WRITE_GUARD_NS};
+pub use nt_memory_write_guard_fallback::{
+    check_verbatim_dup, verbatim_content_fingerprint,
+    deterministic_fallback, has_hold_conflict, normalize_content as normalize_for_dedup,
+    ContentFingerprint, DeterministicVerdict, VerbatimDupResult,
+};
 pub use nt_memory_snapshot::{
     diff_snapshots, snapshot_from_file, snapshot_kb, snapshot_to_file, DiffEdge, DiffNode, KbDiff,
     KbSnapshot, SNAPSHOT_FORMAT, SNAPSHOT_VERSION,

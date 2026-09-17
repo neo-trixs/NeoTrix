@@ -392,7 +392,7 @@ impl BMonitor {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for BMonitor {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BMonitor {
     fn name(&self) -> &str {
         "bmonitor"
     }
@@ -495,7 +495,7 @@ mod tests {
         // D16 回归门禁: self_test 曾将 green>yellow 判为非法 (极性倒置),
         // 但默认配置 green=70>yellow=40 且分级语义要求 green 为最高档 →
         // 默认配置恒 Fail, 拖低 NT-CORE 分支健康至 0.667。
-        use crate::core::nt_core_self_test::SelfTest;
+        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
         let bm = BMonitor::new();
         let r = bm.self_test();
         assert!(r.is_ok(), "default config must pass self_test: {:?}", r);

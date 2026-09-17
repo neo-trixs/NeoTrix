@@ -129,7 +129,7 @@ impl _OracleGateContract for L1OracleGate {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for L1OracleGate {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for L1OracleGate {
     fn name(&self) -> &str {
         "l1_oracle_gate"
     }
@@ -181,7 +181,7 @@ impl _SemanticEntropyGateContract for L1SemanticEntropyGate {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for L1SemanticEntropyGate {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for L1SemanticEntropyGate {
     fn name(&self) -> &str {
         "l1_semantic_entropy_gate"
     }
@@ -237,7 +237,7 @@ impl _ActionSandboxContract for L1ActionSandbox {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for L1ActionSandbox {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for L1ActionSandbox {
     fn name(&self) -> &str {
         "l1_action_sandbox"
     }

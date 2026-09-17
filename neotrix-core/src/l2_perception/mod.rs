@@ -1,4 +1,5 @@
 pub mod nt_world;
+pub use crate::l1_action::nt_core_llm;
 
 // 从 core/ 迁移的 L2 模块
 pub mod nt_core_e8;

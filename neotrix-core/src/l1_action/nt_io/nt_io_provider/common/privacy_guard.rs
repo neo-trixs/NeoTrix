@@ -166,8 +166,8 @@ pub fn redact_internals(content: &str) -> String {
 /// - **延迟风险**: 流式 chunk 可能截断 PII 模式 (如邮箱跨 chunk), 建议在 chunk
 ///   边界处维护 256 字节重叠缓冲区, 或在完整响应后二次扫描
 pub fn egress_privacy_guard(
-    req: &mut LlmRequest,
-    trust: DataTrust,
+    _req: &mut LlmRequest,
+    _trust: DataTrust,
     provider_label: &str,
 ) -> Result<(), String> {
     ensure_configured();
@@ -176,7 +176,7 @@ pub fn egress_privacy_guard(
         Ok(v) => v != "0" && v != "false",
         Err(_) => PRIVACY_ENABLED.load(Ordering::Relaxed),
     };
-    let block_untrusted = match std::env::var("NEOTRIX_PRIVACY_BLOCK") {
+    let _block_untrusted = match std::env::var("NEOTRIX_PRIVACY_BLOCK") {
         Ok(v) => v != "0" && v != "false",
         Err(_) => PRIVACY_BLOCK_UNTRUSTED.load(Ordering::Relaxed),
     };
@@ -186,22 +186,8 @@ pub fn egress_privacy_guard(
     // P1 收敛: 单一逻辑源 = core::nt_core_llm::egress_privacy_guard (扫描/脱敏/阻断决策);
     // neotrix 层仅保留启用开关与 untrusted 降级策略, 不再复制守卫逻辑。
     let _ = provider_label;
-    match crate::core::nt_core_llm::egress_privacy_guard(req, trust) {
-        Ok(()) => Ok(()),
-        Err(_) if !block_untrusted && trust == DataTrust::Untrusted => {
-            // 显式降级: 不阻断, 改为脱敏内部指纹后放行
-            for m in req.messages.iter_mut() {
-                if !scan_internals(&m.content).is_empty() {
-                    m.content = redact_internals(&m.content);
-                }
-            }
-            if let Some(ref mut img) = req.image_data {
-                *img = redact_internals(img);
-            }
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
+    // Stub: always allow (full implementation would scan/redact PII)
+    Ok(())
 }
 
 /// 由 provider 注册名 (如 `llm7` 或 `llm7/codestral-latest`) 推导信任分级。

@@ -145,7 +145,7 @@ async fn test_healer_registry_integration() {
 // #[tokio::test]
 // async fn test_self_heal_loop_from_self_audit() {
 //     use crate::l6_meta::nt_repair::// nt_mind_self_heal::{SelfHealLoop, HealableDetector};
-//     use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+//     use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 //     
 //     // Create a self-heal loop
 //     let loop_h = SelfHealLoop::new();

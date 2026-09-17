@@ -63,7 +63,7 @@ impl ConsciousnessBridge {
             TaskType::Planning => SpecialistType::GoalPrioritizer,
             TaskType::Reflection => SpecialistType::ReflectionEngine,
             TaskType::Research | TaskType::Learning => SpecialistType::KnowledgeRetriever,
-            TaskType::Debugging => SpecialistType::MetaCognitionAnalyst,
+            TaskType::MetaCognition => SpecialistType::MetaCognitionAnalyst,
         };
 
         let mut module = SpecialistModule::new(specialist_type, task_name);
@@ -219,7 +219,7 @@ impl Default for ConsciousnessBridge {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ConsciousnessBridge {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessBridge {
     fn name(&self) -> &str { "consciousness_bridge" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();

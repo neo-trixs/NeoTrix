@@ -57,6 +57,7 @@ pub mod config;
 pub mod unified_cmd;
 
 // 六层架构 (Consciousness-Embodiment-Capability)
+pub mod l0_substrate;
 pub mod l1_action;
 pub mod l2_perception;
 pub mod l3_embodiment;
@@ -80,24 +81,6 @@ pub use neotrix::nt_mind::nt_mind::{
     ReasoningBrain, SelfIteratingBrain, SelfEvolver,
 };
 
-pub use core::{
-    CapabilityVector, KnowledgeSource, SelfEdit, MicroEdit,
-    ReasoningBank, ReasoningMemory,
-
-    AbsorbValidator, SelfIteration,
-    KnowledgeProvider, MemoryProvider, AgentExecutor, ToolProvider, ToolDef, ToolOutput, SessionProvider,
-    SelfModel, ModuleInfo, FileInfo, DepGraph, TechDebtInventory, TechDebtItem, TechDebtKind, DebtSeverity,
-    EvolutionEvent, EventKind, ComponentMap, ComponentNode,
-    CodeScanner, MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend,
-    WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary,
-    EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel,
-    MetaCognitiveLoop, MetaCycleResult,
-    SiliconSelfModel, SiliconSelfState, ContextWindow, CognitiveUnit, CognitiveUnitKind,
-    AttentionHead, AttentionDomain, AttentionProfile, AttentionManager,
-    SystemIdentity, CognitiveCapability, ValueConstraint,
-    ReasoningStrategy, ReasoningStrategyRegistry, StrategyKind,
-    ThinkingTrace, ThinkingStep, ReflectionGrade,
-};
 pub use neotrix::nt_act_orchestrator::Orchestrator;
 
 // Re-export modules used by binary targets via `neotrix::module_name` paths

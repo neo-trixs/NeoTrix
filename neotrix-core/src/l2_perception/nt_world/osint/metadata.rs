@@ -5,7 +5,7 @@
 //! (PushLocal / PullRemote / Merge / NoOp)。零网络、零 I/O, 完全确定性 —
 //! 相同输入恒得相同输出 (含并列决胜采用字典序)。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// 单个元数据 provider 的静态描述。
 #[derive(Debug, Clone, Copy, PartialEq)]

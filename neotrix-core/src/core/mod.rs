@@ -46,6 +46,7 @@ pub use crate::l3_embodiment as l1_body;
 // ═══════════════════════════════════════════════════════════════
 // L0 基质层 — 底层错误处理与热数据 (已迁移到 l0_substrate)
 // ═══════════════════════════════════════════════════════════════
+pub use crate::l0_substrate;
 pub use crate::l0_substrate::nt_core_error;
 pub use crate::l0_substrate::nt_core_hot_data;
 
@@ -138,6 +139,7 @@ pub use crate::l6_meta::nt_core_iter;           // 迭代器
 pub use crate::l6_meta::nt_core_scheduler;      // 调度器
 pub use crate::l6_meta::nt_core_self_review;    // 自我审查
 pub use crate::l6_meta::nt_core_capability;     // 能力系统
+pub use crate::l6_meta::healing::nt_core_self_test;
 
 // ═══════════════════════════════════════════════════════════════
 // 基础设施 — 跨层通用组件

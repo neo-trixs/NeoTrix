@@ -182,7 +182,7 @@ impl StepResult {
 /// 注册于 BackgroundLoop 后台循环, 结果喂入分支健康治理。
 pub struct RecipeRefactorSelfTest;
 
-impl crate::core::nt_core_self_test::SelfTest for RecipeRefactorSelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for RecipeRefactorSelfTest {
     fn name(&self) -> &str {
         "nt_act_code::recipe_refactor"
     }

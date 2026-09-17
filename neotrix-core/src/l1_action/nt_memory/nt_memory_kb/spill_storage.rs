@@ -212,7 +212,7 @@ impl SpillStorage {
 /// rebuild_index 修复后断言 is_consistent。
 pub struct SpillStorageHealer;
 
-impl crate::core::nt_core_self_test::SelfTest for SpillStorageHealer {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SpillStorageHealer {
     fn name(&self) -> &str {
         "nt_memory_kb::spill_storage_healer"
     }

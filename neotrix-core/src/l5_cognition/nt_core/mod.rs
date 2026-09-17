@@ -2,7 +2,12 @@
 //!
 //! 能力注册、调度、成熟度进化、星脉通信协议。
 
-pub use crate::core::l7_capability::*;
+pub mod capability;
+pub mod nt_crt;
+pub mod nt_iit_phi;
+pub mod nt_meta;
+pub mod nt_forecast;
+pub mod nt_state_substrate;
 
 // 子目录模块
 pub mod reasoning;

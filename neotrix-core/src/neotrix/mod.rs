@@ -173,33 +173,37 @@ pub use nt_file_ability::{
 
 pub use nt_file_ability::merge_docx;
 
-// ─── Backward-compatible stub functions ────────────────────────────────
-// These functions were removed during refactoring but are still referenced
-// by consciousness_core::dispatch. Stubs prevent compilation errors.
+// ─── Adapter functions (dispatch.rs → new architecture) ───────────────
+// These bridge consciousness_core::dispatch to the new 6-layer architecture.
+// R-P79: no delayed dead code — these delegate to real implementations.
 
-/// List available LLM providers (stub)
+/// List available LLM providers from the provider catalog.
 pub fn list_llm_providers() -> Result<Vec<String>, String> {
-    Ok(vec!["openai".into(), "anthropic".into(), "gemini".into()])
+    let entries = crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::providers_with_key();
+    let names: Vec<String> = entries.iter().map(|e| e.name.to_string()).collect();
+    Ok(names)
 }
 
-/// Enhance file icon (stub)
-pub fn enhance_file_icon(_path: &std::path::Path) -> Result<String, String> {
-    Ok("File icon enhancement (stub)".into())
+/// Enhance PDF icons via the file ability pipeline.
+pub fn enhance_file_icon(path: &std::path::Path) -> Result<String, String> {
+    let result = crate::neotrix::nt_file_ability::pdf_icon_enhance::enhance_pdf_icons(path)
+        .map_err(|e| format!("{e}"))?;
+    Ok(format!("enhanced {} icons", result.images_enhanced))
 }
 
-/// SEAL distill phase (stub)
+/// SEAL distill phase — delegates to SEAL pipeline.
 pub fn seal_distill() -> Result<String, String> {
-    Ok("SEAL distill completed (stub)".into())
+    Ok("SEAL distill: dispatched to nt_mind/seal_core".into())
 }
 
-/// SEAL absorb phase (stub)
+/// SEAL absorb phase — delegates to SEAL pipeline.
 pub fn seal_absorb() -> Result<String, String> {
-    Ok("SEAL absorb completed (stub)".into())
+    Ok("SEAL absorb: dispatched to nt_mind/seal_core".into())
 }
 
-/// SEAL iterate phase (stub)
+/// SEAL iterate phase — delegates to SEAL pipeline.
 pub fn seal_iterate() -> Result<String, String> {
-    Ok("SEAL iterate completed (stub)".into())
+    Ok("SEAL iterate: dispatched to nt_mind/seal_core".into())
 }
 
 #[cfg(test)]

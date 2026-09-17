@@ -81,7 +81,11 @@ impl GroqProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for GroqProvider {
-fn set_proxy(&mut self, proxy_url: &str) {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Untrusted
+    }
+
+    fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
@@ -219,7 +223,11 @@ impl OpenRouterProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for OpenRouterProvider {
-fn set_proxy(&mut self, proxy_url: &str) {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Untrusted
+    }
+
+    fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
@@ -551,7 +559,11 @@ impl CerebrasProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for CerebrasProvider {
-fn set_proxy(&mut self, proxy_url: &str) {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Untrusted
+    }
+
+    fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 

@@ -361,7 +361,7 @@ impl TaskStateDag {
 /// repair_consistency 修复后断言 is_consistent。
 pub struct TaskStateDagHealer;
 
-impl crate::core::nt_core_self_test::SelfTest for TaskStateDagHealer {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for TaskStateDagHealer {
     fn name(&self) -> &str {
         "nt_act_orchestrator::task_state_dag"
     }

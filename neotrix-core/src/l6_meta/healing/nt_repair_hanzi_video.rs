@@ -27,7 +27,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 // ────────────────────────────────────────────────────────────────
 // 汉字组件 — 拆字结果的基本单元

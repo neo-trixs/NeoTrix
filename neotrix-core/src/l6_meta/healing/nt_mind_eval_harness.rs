@@ -596,10 +596,9 @@ impl EvalHarness {
 
         // 思考预算与输出预算解耦: 此前 with_thinking(budget) 使思考可花掉全部输出预算,
         // 总生成 token 最高达 2×budget (纯浪费)。思考分配 25%, 输出保底 budget。
-        let thinking = if budget > 0 { (budget / 4).max(1) } else { 0 };
+        let _thinking = if budget > 0 { (budget / 4).max(1) } else { 0 };
         let request = LlmRequest::new(&model_name, &full_prompt)
-            .with_max_tokens(budget.max(512))
-            .with_thinking(thinking);
+            .with_max_tokens(budget.max(512));
 
         let response = provider
             .complete(&request)
@@ -1241,7 +1240,7 @@ impl SmallScaleMethod {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for SmallScaleMethod {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SmallScaleMethod {
     fn name(&self) -> &str {
         "nt_mind_eval_harness_small_scale"
     }
@@ -1290,7 +1289,7 @@ impl crate::l5_cognition::traits::EvalHarnessApi for EvalHarness {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for EvalHarness {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for EvalHarness {
     fn name(&self) -> &str {
         "nt_mind_eval_harness_self_verifiable"
     }
@@ -1336,7 +1335,7 @@ impl crate::core::nt_core_self_test::SelfTest for EvalHarness {
 #[derive(Default)]
 pub struct HdaAttributionSelfTest;
 
-impl crate::core::nt_core_self_test::SelfTest for HdaAttributionSelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for HdaAttributionSelfTest {
     fn name(&self) -> &str {
         "nt_mind_eval_harness_hda_attribution"
     }
@@ -1358,7 +1357,7 @@ impl crate::core::nt_core_self_test::SelfTest for HdaAttributionSelfTest {
 #[derive(Default)]
 pub struct SelfVerifiableRewardSelfTest;
 
-impl crate::core::nt_core_self_test::SelfTest for SelfVerifiableRewardSelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SelfVerifiableRewardSelfTest {
     fn name(&self) -> &str {
         "nt_mind_eval_harness_self_verifiable_reward"
     }
@@ -1548,7 +1547,7 @@ impl OracleLadder {
 /// reset_to_t0 重置后断言 is_valid。
 pub struct OracleLadderHealer;
 
-impl crate::core::nt_core_self_test::SelfTest for OracleLadderHealer {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for OracleLadderHealer {
     fn name(&self) -> &str {
         "nt_mind_eval_harness::oracle_ladder_healer"
     }
@@ -1588,7 +1587,7 @@ impl crate::core::nt_core_self_test::SelfTest for OracleLadderHealer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
     use crate::l1_action::nt_io::nt_io_provider::LlmResponse;
 
     #[test]

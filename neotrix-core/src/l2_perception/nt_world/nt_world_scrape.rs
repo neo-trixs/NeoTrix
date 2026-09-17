@@ -1018,7 +1018,7 @@ impl FitExtractor {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for FitExtractor {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for FitExtractor {
     fn name(&self) -> &str {
         "nt_world_scrape_fit_extraction"
     }
@@ -1167,8 +1167,8 @@ mod fit_extraction_tests {
     #[test]
     fn test_fit_extraction_self_test_name() {
         let e = FitExtractor::default();
-        let name = crate::core::nt_core_self_test::SelfTest::name(&e);
+        let name = crate::l6_meta::healing::nt_core_self_test::SelfTest::name(&e);
         assert_eq!(name, "nt_world_scrape_fit_extraction");
-        assert!(crate::core::nt_core_self_test::SelfTest::self_test(&e).is_ok());
+        assert!(crate::l6_meta::healing::nt_core_self_test::SelfTest::self_test(&e).is_ok());
     }
 }

@@ -552,3 +552,33 @@ mod tests {
         assert_eq!(entries[0].product.product_id, "P-001");
     }
 }
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct CustomerRecord {
+    pub customer_id: String,
+    pub name: String,
+    pub email: Option<String>,
+    pub company: Option<String>,
+    pub tags: Vec<String>,
+    pub metadata: serde_json::Value,
+    pub code: Option<String>,
+    pub grade: Option<String>,
+    pub channel: Option<String>,
+    pub country: Option<String>,
+    pub region: Option<String>,
+    pub status: Option<String>,
+    pub public_status: Option<String>,
+    pub owner_id: Option<String>,
+    pub owner: Option<String>,
+    pub last_follow_at: Option<String>,
+    pub last_activity: Option<String>,
+    pub description: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub contact_name: Option<String>,
+    pub contact_id: Option<String>,
+    pub business_type: Option<String>,
+    pub activity_type: Option<String>,
+    pub hs_code: Option<String>,
+    pub product_type: Option<String>,
+}

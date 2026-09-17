@@ -32,7 +32,7 @@ use crate::core::nt_core_self::silicon_self::SiliconSelfModel;
 use crate::core::nt_core_span::{
     AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer,
 };
-use crate::l5_cognition::kb_facade::{KnowledgeBase, SearchResult};
+use crate::l5_cognition::layer_aliases::{KnowledgeBase, SearchResult};
 use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{
     AlternatingSequence, ControlDistiller, ControlTrainer, CsppoReport, ReasoningStep, SftReport,
 };
@@ -1574,7 +1574,7 @@ impl ReasoningEngine {
             .map(|r| r.winner.to_string())
             .unwrap_or_default();
         if let Some(ref kb) = self.kb {
-            use crate::l5_cognition::kb_facade::ConversationRecord;
+            use crate::l5_cognition::layer_aliases::ConversationRecord;
             let record = ConversationRecord {
                 id: format!("conv-{}", self.llm_call_count),
                 session_id: String::new(),
@@ -2039,7 +2039,7 @@ impl ReasoningEngine {
             // 一致性分数越高 → 推理越可信 → 奖励加成。对齐主流推理模型的
             // self-consistency / majority vote 机制 (R-P79 生产接线)。
             let sc = {
-                use crate::l5_cognition::io_facade::{text_to_vector, ReasoningKernel};
+                use crate::l5_cognition::layer_aliases::{text_to_vector, ReasoningKernel};
                 let kernel = ReasoningKernel::new(self.current_state.mode.0 as usize % 19);
                 let query = text_to_vector(task, 128);
                 kernel.self_consistency(&query, 3)
@@ -2990,5 +2990,15 @@ mod tests {
                 "route max_tokens must flow into request"
             );
         });
+    }
+}
+
+// ── L1 trait bridge: ReasoningEngineProvider ──────────────────────────
+// 允许 l1_action::nt_core_task_dispatcher 通过 trait 抽象使用 ReasoningEngine,
+// 不在 L1 层直接引入 L5 具体类型。
+
+impl crate::l1_action::nt_core_task_dispatcher::ReasoningEngineProvider for ReasoningEngine {
+    fn reason(&mut self, prompt: &str) -> Result<String, String> {
+        ReasoningEngine::reason(self, prompt).map_err(|e| e.to_string())
     }
 }

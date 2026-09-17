@@ -24,7 +24,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// 可被置于"损坏"态、亦可被"自愈"恢复的检测器。

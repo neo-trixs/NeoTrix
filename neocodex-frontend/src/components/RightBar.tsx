@@ -6,6 +6,10 @@ import { GlobeView } from './GlobeView'
 import { ProjectView as ProjectViewPanel } from './ProjectView'
 import { SmartCanvas, startCanvasBridge, initCanvasEvolution } from '../canvas'
 import { canvasStore, initCanvasPersistence } from '../stores/canvas'
+import { KanbanAgentBoard } from './KanbanAgentBoard'
+import { OfficeFloor } from './OfficeFloor'
+import type { AgentInfo } from './NeoTrixCore'
+import type { FloorAgent, FloorMessage } from './OfficeFloor'
 
 /* ════════════════════════════════════════════
    RightBar — 右栏（设计 v2，已接线后端）
@@ -15,9 +19,9 @@ import { canvasStore, initCanvasPersistence } from '../stores/canvas'
    交互：auto-hide（hover/右侧边缘展开）或 collapsed 固定
    ════════════════════════════════════════════ */
 
-type RbTab = 'files' | 'map' | 'project' | 'canvas'
+type RbTab = 'files' | 'map' | 'project' | 'canvas' | 'agents'
 
-const RB_TABS: RbTab[] = ['files', 'map', 'project', 'canvas']
+const RB_TABS: RbTab[] = ['files', 'map', 'project', 'canvas', 'agents']
 
 interface FileNode {
   name: string
@@ -188,6 +192,7 @@ export function RightBar() {
   const [treeError, setTreeError] = createSignal<string | null>(null)
   const [copied, setCopied] = createSignal(false)
   const [activePath, setActivePath] = createSignal<string | null>(null)
+  const [agentView, setAgentView] = createSignal<'kanban' | 'floor'>('kanban')
 
   /* ── 展开状态保持：收集当前展开目录 → 新树重新应用 ── */
   const collectOpenPaths = (nodes: FileNode[], acc: Set<string> = new Set()): Set<string> => {
@@ -436,9 +441,23 @@ export function RightBar() {
                <rect x="1.5" y="8" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1" fill="none" />
                <rect x="8" y="8" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1" fill="none" />
              </svg>
-             画板
-           </button>
-         </div>
+              画板
+            </button>
+            <button
+              class={clsx('rb-tab', rbTab() === 'agents' && 'on')}
+              onClick={() => setRbTab('agents')}
+              role="tab"
+              aria-selected={rbTab() === 'agents'}
+              tabIndex={rbTab() === 'agents' ? 0 : -1}
+              onKeyDown={tabKeyDown}
+            >
+              <svg viewBox="0 0 14 14" class="rb-tab-ic">
+                <circle cx="7" cy="4" r="2.5" stroke="currentColor" stroke-width="1.1" fill="none" />
+                <path d="M2.5 12.5c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" />
+              </svg>
+              协调
+            </button>
+          </div>
 
         {/* ── 地图视图：shanhai 3D 地球 ── */}
         <Show when={rbTab() === 'map'}>
@@ -462,6 +481,52 @@ export function RightBar() {
               spawn={(n) => canvasStore.spawn(n)}
               setCollapsed={(id, v) => canvasStore.setCollapsed(id, v)}
             />
+          </div>
+        </Show>
+
+        {/* ── 协调视图：多 agent 协调状态可视化 (Kanban + Office Floor) ── */}
+        <Show when={rbTab() === 'agents'}>
+          <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {/* View toggle */}
+            <div class="flex items-center gap-1 px-3 pt-2 pb-1">
+              <button
+                class={clsx('text-[10px] px-2 py-0.5 rounded-md transition-colors', agentView() === 'kanban' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60')}
+                onClick={() => setAgentView('kanban')}
+              >看板</button>
+              <button
+                class={clsx('text-[10px] px-2 py-0.5 rounded-md transition-colors', agentView() === 'floor' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60')}
+                onClick={() => setAgentView('floor')}
+              >地图</button>
+            </div>
+            <Show when={agentView() === 'kanban'}>
+              <div class="flex-1 min-h-0 overflow-hidden">
+                <KanbanAgentBoard
+                  agents={() => [
+                    { id: 'god-agent', name: 'GOD Agent', status: 'running', domain: 'orchestration', mode: 'chat', model: 'claude-sonnet-4-20250514', filesChanged: 0, toolCalls: 3, startedAt: new Date(), phi: 0.85 },
+                    { id: 'coder-1', name: '编码员', status: 'idle', domain: 'code_generation', mode: 'code', model: 'gpt-4o', filesChanged: 0, toolCalls: 0, startedAt: new Date() },
+                    { id: 'reviewer-1', name: '审查员', status: 'idle', domain: 'code_review', mode: 'work', model: 'claude-sonnet-4-20250514', filesChanged: 0, toolCalls: 0, startedAt: new Date() },
+                  ]}
+                  onSelectAgent={(id) => console.log('select agent:', id)}
+                  onPauseAgent={(id) => console.log('pause agent:', id)}
+                  onStopAgent={(id) => console.log('stop agent:', id)}
+                  onMoveAgent={(id, target) => console.log('move agent:', id, target)}
+                />
+              </div>
+            </Show>
+            <Show when={agentView() === 'floor'}>
+              <div class="flex-1 min-h-0 p-2">
+                <OfficeFloor
+                  agents={() => [
+                    { id: 'god-agent', name: 'GOD Agent', avatar: '🧠', status: 'running', specialty: 'orchestration', x: 0.5, y: 0.3 },
+                    { id: 'coder-1', name: '编码员', avatar: '💻', status: 'idle', specialty: 'code_generation', x: 0.2, y: 0.6 },
+                    { id: 'reviewer-1', name: '审查员', avatar: '🔍', status: 'idle', specialty: 'code_review', x: 0.8, y: 0.6 },
+                  ]}
+                  messages={() => []}
+                  onSelectAgent={(id) => console.log('select agent:', id)}
+                  useRealData={true}
+                />
+              </div>
+            </Show>
           </div>
         </Show>
 

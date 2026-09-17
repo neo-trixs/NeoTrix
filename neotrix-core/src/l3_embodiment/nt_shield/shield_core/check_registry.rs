@@ -762,7 +762,7 @@ impl ToolInspector for CheckRegistry {
 
 // ── SelfTest ──────────────────────────────────────────────
 
-impl crate::core::nt_core_self_test::SelfTest for CheckRegistry {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CheckRegistry {
     fn name(&self) -> &str {
         "CheckRegistry"
     }
@@ -789,7 +789,7 @@ impl crate::core::nt_core_self_test::SelfTest for CheckRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
     use serde_json::json;
 
     fn fresh_registry() -> CheckRegistry {
@@ -1019,7 +1019,7 @@ tool_patterns = ["webfetch", "websearch"]
 }
 
 /// 创建 CheckRegistry 的 SelfTest 实例 (供 L5 注册，避免 L5 直接依赖 L3 类型)
-pub fn create_check_registry_self_test() -> Box<dyn crate::core::nt_core_self_test::SelfTest> {
+pub fn create_check_registry_self_test() -> Box<dyn crate::l6_meta::healing::nt_core_self_test::SelfTest> {
     Box::new(CheckRegistry::new())
 }
 

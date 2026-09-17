@@ -28,11 +28,11 @@ mod helpers;
 mod selftest;
 mod event_types;
 mod structured;
-mod types;
+pub mod types;
 mod doc_parse;
 mod format_route;
-mod image_super_resolution;
-mod capability;
+pub mod image_super_resolution;
+pub mod capability;
 mod template_engine;
 mod config_parser;
 mod path_metadata;
@@ -225,7 +225,7 @@ mod tests {
 
     use crate::core::nt_core_hcube::vsa::{VSAEngine, VsaBackend};
     use crate::core::nt_core_hex::ReasoningHexagram;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
     use crate::neotrix::nt_file_ability::types::SpecialistType;
     use nt_core_capability_tree::ConstellationLevel;
     use office_oxide::{create, DocumentFormat};

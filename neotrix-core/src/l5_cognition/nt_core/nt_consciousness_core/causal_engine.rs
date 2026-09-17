@@ -79,7 +79,7 @@ impl CausalEngine {
     }
 
     /// 发现因果关系
-    pub fn discover(&mut self, cycle: u32, effect: &str, context: &str) -> Vec<String> {
+    pub fn discover(&mut self, cycle: u32, effect: &str, _context: &str) -> Vec<String> {
         let causes: Vec<String> = Vec::new();
         
         // 记录

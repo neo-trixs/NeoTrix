@@ -482,7 +482,7 @@ impl ContextGraph {
 /// SelfTest (T1): ContextGraph 能力自检。
 pub struct ContextGraphSelfTest;
 
-impl crate::core::nt_core_self_test::SelfTest for ContextGraphSelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ContextGraphSelfTest {
     fn name(&self) -> &str {
         "nt_memory_kb_context_graph"
     }
@@ -739,7 +739,7 @@ mod tests {
 
     #[test]
     fn test_graph_selftest_runs() {
-        use crate::core::nt_core_self_test::SelfTest;
+        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
         let t = ContextGraphSelfTest;
         assert!(t.self_test().is_ok());
     }

@@ -279,7 +279,7 @@ impl CliCommand for RouterCmd {
                     } else {
                         crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
                     };
-                    router.set_rule(complexity, provider, model, cost_in, cost_out);
+                    router.set_rule(complexity.clone(), provider, model, cost_in, cost_out);
                     let _ = router.save();
                 }
                 let msg = format!("🔀 路由规则已设置: {} → {} / {} (${:.4} in, ${:.4} out)",

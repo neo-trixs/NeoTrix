@@ -195,7 +195,7 @@ impl ConvergencePulse {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ConvergencePulse {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConvergencePulse {
     fn name(&self) -> &str {
         "convergence_pulse"
     }
@@ -451,7 +451,7 @@ impl BackgroundLoop {
         // 语义: set 走 effect 可回滚 (coeffect operations are effects), 前置条件
         // k∉dom(σ) 防重复提供; 消费方 NT-MEMORY/CLI 插件注入时读取该表。
         if let Some(ref kb_ref) = kb {
-            use crate::l5_cognition::kb_facade::{
+            use crate::l5_cognition::layer_aliases::{
                 persist_bindings, CoeffectBinding, CoeffectRegistry, CoeffectTx,
             };
             if let Ok(conn) = kb_ref.raw_conn() {
@@ -1210,7 +1210,7 @@ mod tests {
     use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
     use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
     use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-    use crate::l5_cognition::l2_facade::WorldModelV2;
+    use crate::l5_cognition::layer_aliases::WorldModelV2;
 
     #[test]
     fn test_panorama_pipeline_new() {
@@ -1228,7 +1228,7 @@ mod tests {
 
     use super::ConvergencePulse;
     use super::{_AutonomyTier, _LoopReadyScore, _PathDenylist};
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_convergence_pulse_advance_no_gaps() {

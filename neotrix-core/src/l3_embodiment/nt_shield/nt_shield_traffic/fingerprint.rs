@@ -136,7 +136,7 @@ impl FingerprintStore {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for FingerprintStore {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for FingerprintStore {
     fn name(&self) -> &str {
         "nt_shield_tls_fingerprint"
     }
@@ -162,7 +162,7 @@ impl crate::core::nt_core_self_test::SelfTest for FingerprintStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_store_has_all_presets() {

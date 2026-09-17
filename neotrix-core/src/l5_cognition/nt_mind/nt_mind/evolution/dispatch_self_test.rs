@@ -14,8 +14,8 @@
 use std::sync::Arc;
 
 use crate::core::nt_core_self::attention_head::AttentionDomain;
-use crate::core::nt_core_self_test::SelfTest;
-use crate::l5_cognition::kb_facade::KnowledgeBase;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l5_cognition::layer_aliases::KnowledgeBase;
 use crate::l5_cognition::nt_mind::nt_mind::{
     AgentExecutionOutcome, AgentExecutor, CoEvoConfig, MetaAgentShell,
 };

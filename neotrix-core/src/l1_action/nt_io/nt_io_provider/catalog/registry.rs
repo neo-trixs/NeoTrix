@@ -39,7 +39,7 @@ impl ProviderRegistry {
         let mut candidates: Vec<_> = self.providers.iter()
             .filter(|(name, _)| {
                 health.get(*name)
-                    .map(|h| matches!(h, HealthStatus::Healthy))
+                    .map(|h| h.healthy)
                     .unwrap_or(true)
             })
             .filter(|(_, provider)| {
@@ -111,9 +111,9 @@ impl ProviderRegistry {
             let name = state.get("name").and_then(|v| v.as_str()).unwrap_or("");
             if let Some(available) = state.get("available") {
                 let h = if available.as_bool().unwrap_or(false) {
-                    HealthStatus::Healthy
+                    HealthStatus::healthy()
                 } else {
-                    HealthStatus::Unavailable { reason: "marked unavailable by gateway".into() }
+                    HealthStatus { healthy: false, message: "marked unavailable by gateway".into() }
                 };
                 health.insert(name.to_string(), h);
             }

@@ -8,7 +8,7 @@ use sha2::Sha256;
 
 use super::policy::{ActionPolicy, PolicyDecision};
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 type HmacSha256 = Hmac<Sha256>;
 

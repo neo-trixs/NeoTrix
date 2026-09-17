@@ -124,42 +124,6 @@ impl From<crate::l1_action::nt_act::agent_protocol::AgentProtocolError> for NeoT
     }
 }
 
-impl From<crate::l1_action::nt_act::nt_act_scheduler::SchedulerError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_scheduler::SchedulerError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_dual_executor::ExecutionError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_dual_executor::ExecutionError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_automation_engine::AutomationError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_automation_engine::AutomationError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_record_replay::RecordReplayError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_record_replay::RecordReplayError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_long_running_agent::AgentError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_long_running_agent::AgentError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_workspace_isolator::WorkspaceError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_workspace_isolator::WorkspaceError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
 impl From<crate::l1_action::nt_act::nt_act_voice::VoiceError> for NeoTrixError {
     fn from(e: crate::l1_action::nt_act::nt_act_voice::VoiceError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
@@ -208,12 +172,6 @@ impl From<crate::l1_action::nt_act::acp_protocol::ProtocolError> for NeoTrixErro
     }
 }
 
-impl From<crate::l1_action::nt_act::agent_loop::AgentLoopError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::agent_loop::AgentLoopError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
 impl From<crate::l1_action::nt_action_facade::FacadeError> for NeoTrixError {
     fn from(e: crate::l1_action::nt_action_facade::FacadeError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
@@ -232,18 +190,6 @@ impl From<crate::l1_action::nt_io::nt_l1_error::L1Error> for NeoTrixError {
     }
 }
 
-impl From<crate::l1_action::nt_io::nt_io_browser_engine::BrowserError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_browser_engine::BrowserError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_io::nt_io_computer_history::HistoryError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_computer_history::HistoryError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
 #[cfg(feature = "desktop")]
 impl From<crate::l1_action::nt_io::nt_io_desktop::updater_signing::SigningError> for NeoTrixError {
     fn from(e: crate::l1_action::nt_io::nt_io_desktop::updater_signing::SigningError) -> Self {
@@ -253,12 +199,6 @@ impl From<crate::l1_action::nt_io::nt_io_desktop::updater_signing::SigningError>
 
 impl From<crate::l1_action::nt_io::nt_io_multimodal_transform::TtsError> for NeoTrixError {
     fn from(e: crate::l1_action::nt_io::nt_io_multimodal_transform::TtsError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_io::nt_io_protocol_bridge::ProtocolError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_protocol_bridge::ProtocolError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
@@ -335,12 +275,6 @@ impl From<crate::l2_perception::nt_world::source::offline_download::OfflineError
 }
 
 // L3 Embodiment 层错误
-impl From<crate::l3_embodiment::nt_shield::adversarial_pipeline::DefenseError> for NeoTrixError {
-    fn from(e: crate::l3_embodiment::nt_shield::adversarial_pipeline::DefenseError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
 impl From<crate::l3_embodiment::nt_shield::binary_analyzer::BinaryError> for NeoTrixError {
     fn from(e: crate::l3_embodiment::nt_shield::binary_analyzer::BinaryError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())

@@ -856,7 +856,7 @@ impl GatewayV2 {
                 None => return Err(LlmError::Unknown("no provider available for image description".into())),
             },
         };
-        let request = LlmRequest::new(&name, question).with_image_b64(image_b64).with_max_tokens(1024).with_temperature(Some(0.2));
+        let request = LlmRequest::new(&name, question).with_image_b64(image_b64.to_string()).with_max_tokens(1024).with_temperature(Some(0.2));
         let response = self.call_provider(&name, &request).await?;
         Ok(response.content)
     }
@@ -1144,6 +1144,8 @@ impl From<LlmError> for InferenceError {
             LlmError::InvalidRequest(s) => InferenceError::ValidationError(s),
             LlmError::Server(s) => InferenceError::ProviderError { provider: String::new(), message: s },
             LlmError::Unknown(s) => InferenceError::ProviderError { provider: String::new(), message: s },
+            LlmError::UnsupportedOperation(s) => InferenceError::ProviderError { provider: String::new(), message: s },
+            LlmError::ProviderNotFound(s) => InferenceError::ProviderError { provider: String::new(), message: s },
         }
     }
 }

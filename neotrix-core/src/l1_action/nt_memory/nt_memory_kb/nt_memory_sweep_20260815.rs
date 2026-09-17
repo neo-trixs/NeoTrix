@@ -741,12 +741,7 @@ impl SingleFileMemory {
     }
 }
 
-fn now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
+use crate::l0_substrate::nt_core_time::now_secs;
 
 // ────────────────────────────────────────────────────────────────
 // SelfTest 聚合 (T1): 单一 SelfTest 覆盖四能力
@@ -754,7 +749,7 @@ fn now_secs() -> u64 {
 
 pub struct SweepMemoryCapabilitiesSelfTest;
 
-impl crate::core::nt_core_self_test::SelfTest for SweepMemoryCapabilitiesSelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SweepMemoryCapabilitiesSelfTest {
     fn name(&self) -> &str {
         "nt_memory_kb_sweep_capabilities"
     }
@@ -792,7 +787,7 @@ impl crate::core::nt_core_self_test::SelfTest for SweepMemoryCapabilitiesSelfTes
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
     // ── P6 ──
     #[test]

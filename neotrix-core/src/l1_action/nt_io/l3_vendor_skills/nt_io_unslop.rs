@@ -6,7 +6,7 @@
 //! 核心能力: 检测并清理 AI 生成文本中的"slop"模式
 //! (套话/空洞修饰/重复结构), 本 stub 负责基于规则的模式剔除与密度评估。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// 已知 slop 短语 (套话/空洞修饰)。
 const SLOP_PHRASES: &[&str] = &[

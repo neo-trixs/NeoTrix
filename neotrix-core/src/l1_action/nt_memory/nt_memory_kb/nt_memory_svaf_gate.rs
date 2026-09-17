@@ -165,7 +165,7 @@ impl SvafGate {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for SvafGate {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SvafGate {
     fn name(&self) -> &str {
         "svaf_gate"
     }

@@ -117,8 +117,8 @@ impl ActionFacade {
             if let Some(ref bm25) = *bm25_guard {
                 for hit in bm25.search(query, 10) {
                     results.push(SearchResult {
-                        title: hit.id.clone(),
-                        score: hit.score,
+                        title: hit.1.clone(),
+                        score: hit.0,
                         snippet: String::new(),
                     });
                 }
@@ -166,7 +166,7 @@ impl ActionFacade {
         let kb = self.kb.as_ref().ok_or(FacadeError::NotInitialized)?;
 
         let node_id = kb
-            .insert_or_get_node(title, node_type, Some(summary), None, None)
+            .insert_or_get_node(title, crate::core::nt_core_kb_types::NodeType::from_str(node_type), Some(summary), None, None)
             .map_err(|e| FacadeError::StoreFailed(format!("{e}")))?;
 
         Ok(node_id)

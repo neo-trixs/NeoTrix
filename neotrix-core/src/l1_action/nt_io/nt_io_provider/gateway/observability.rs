@@ -65,6 +65,16 @@ pub enum PluginError {
     Abort(String),
 }
 
+impl std::fmt::Display for PluginError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PluginError::SkipRequest(s) => write!(f, "SkipRequest: {}", s),
+            PluginError::OverrideResponse(_) => write!(f, "OverrideResponse"),
+            PluginError::Abort(s) => write!(f, "Abort: {}", s),
+        }
+    }
+}
+
 /// 插件管理器 — 管理插件生命周期和执行顺序
 pub struct PluginManager {
     plugins: Vec<Box<dyn GatewayPlugin>>,
@@ -369,6 +379,15 @@ pub struct ResponseCtx {
 pub enum MiddlewareError {
     Abort(String),
     Skip,
+}
+
+impl std::fmt::Display for MiddlewareError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MiddlewareError::Abort(s) => write!(f, "Abort: {}", s),
+            MiddlewareError::Skip => write!(f, "Skip"),
+        }
+    }
 }
 
 /// 路由定义

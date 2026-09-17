@@ -909,6 +909,7 @@ fn cmd_write(args: &[String]) -> CommandOutput {
                 reasons.join("; ")
             ));
         }
+        WriteGuardVerdict::Hold { .. } => {}
     }
 
     let result: Result<String, String> = (|| {
@@ -1473,7 +1474,7 @@ mod tests {
         // 双重持锁: 私有锁串行 kb_cmds 内部; 共享 TEST_ENV_LOCK 与其它模块
         // (consciousness_core::isolate_home_once / cipher) 互斥, 防 HOME 窗口竞争。
         let _g = HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let _ge = crate::core::nt_core_self_test::TEST_ENV_LOCK
+        let _ge = crate::l6_meta::healing::nt_core_self_test::TEST_ENV_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let old = std::env::var("HOME").ok();

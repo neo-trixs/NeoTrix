@@ -1163,10 +1163,10 @@ pub async fn openai_chat_completions(
                             name: None,
                             tool_calls: resp.tool_calls.map(|calls: Vec<crate::l1_action::nt_io::nt_io_provider::ToolCallInfo>| calls.into_iter().map(|tc| OpenAIToolCall {
                                 id: tc.id,
-                                call_type: tc.call_type,
+                                call_type: tc.call_type.unwrap_or_default(),
                                 function: OpenAIToolCallFunction {
-                                    name: tc.function.name,
-                                    arguments: tc.function.arguments,
+                                    name: tc.name,
+                                    arguments: tc.arguments,
                                 },
                             }).collect()),
                             tool_call_id: None,

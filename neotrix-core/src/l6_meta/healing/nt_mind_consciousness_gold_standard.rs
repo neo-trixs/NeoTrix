@@ -292,7 +292,7 @@ fn linear_slope(data: &[f64]) -> f64 {
     (n * sum_xy - sum_x * sum_y) / denom
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ConsciousnessGoldStandard {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessGoldStandard {
     fn name(&self) -> &str { "consciousness_gold_standard" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();

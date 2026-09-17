@@ -377,13 +377,15 @@ impl WorkerPool {
             if !self.workers.contains_key(&wtype) {
                 self.register_callback_worker(wtype.clone(), move |task| {
                     let wtype = wtype.clone();
+                    let task_id = task.id;
+                    let task_type = task.task_type.clone();
                     Box::pin(async move {
                         Ok(WorkerResult {
                             worker_type: wtype,
                             output: serde_json::json!({
                                 "status": "completed",
-                                "task_id": task.id.to_string(),
-                                "task_type": task.task_type,
+                                "task_id": task_id.to_string(),
+                                "task_type": task_type,
                             }),
                             success: true,
                             error: None,
@@ -569,7 +571,7 @@ impl TradeOrchestrator {
                 self.stats.total_duration_ms.fetch_add(duration, Ordering::Relaxed);
 
                 let aggregated = if self.config.enable_aggregation {
-                    Some(self.aggregate_results(vec![result.clone()]))
+                    Some(serde_json::to_value(self.aggregate_results(vec![result.clone()])).unwrap_or_default())
                 } else {
                     None
                 };

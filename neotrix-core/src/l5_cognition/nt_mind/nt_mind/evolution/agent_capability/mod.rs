@@ -16,8 +16,8 @@ use crate::core::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, Cons
 use crate::core::nt_core_kb_types::NodeType;
 use crate::core::nt_core_meta::{MetaCognitiveLoop, MetaCycleResult};
 use crate::core::nt_core_self::attention_head::{AttentionDomain, AttentionManager};
-use crate::l5_cognition::kb_facade::KnowledgeBase;
-use crate::l5_cognition::l2_facade::{SearchResult, UnifiedSearch};
+use crate::l5_cognition::layer_aliases::KnowledgeBase;
+use crate::l5_cognition::layer_aliases::{UnifiedSearch, WorldSearchResult};
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator;
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
@@ -912,13 +912,7 @@ impl MetaAgentShell {
     pub fn route_with_hint(&self, task_hint: &str) -> Option<&'static str> {
         let dominant = self.attention.dominant_domain()?;
         if dominant == AttentionDomain::PatternMatch && !task_hint.trim().is_empty() {
-            let profile =
-                crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::route(task_hint);
-            // 仅接受 PatternMatch 语义内的细分 (researcher/explorer); 关键词
-            // 路由若越界到其他域档案则退回注意力静态映射, 避免语义漂移。
-            if profile.name == "researcher" || profile.name == "explorer" {
-                return Some(self.learner.route(dominant, profile.name));
-            }
+            // AgentCatalog removed — fall through to static mapping
         }
         self.route_to_catalog()
     }
@@ -1672,7 +1666,7 @@ impl DialogueAbsorbBridge {
         &self,
         brain: &mut SelfIteratingBrain,
         query: &str,
-        results: &[SearchResult],
+        results: &[WorldSearchResult],
     ) -> DialogueAbsorbOutcome {
         if results.is_empty() {
             return DialogueAbsorbOutcome::empty();

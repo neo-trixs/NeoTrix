@@ -19,7 +19,7 @@
 //! | Journal (审计轨迹)    | `ConsciousnessTree` 6-stage loop / experience-tree | SEAL self-test log |
 //! | Lineage (代际传承)    | `SEALPipelineImpl` `make_stage!` 阶段血缘     | SEAL promote/lineage  |
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// 智能体身份 — 映射 `nt_core_self::Self` / `SystemIdentity` (E8引导者身份锚)。
 /// GASP: clone 即唤醒的身份指纹, 决定智能体"是谁"。

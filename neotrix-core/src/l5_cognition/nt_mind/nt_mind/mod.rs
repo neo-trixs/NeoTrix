@@ -17,7 +17,7 @@ pub use seal_core::self_iterating;
 pub use seal_core::stats;
 pub use seal_core::model_router;
 pub use seal_core::multi_brain;
-pub use crate::l5_cognition::kb_facade::bm25;
+pub use crate::l5_cognition::layer_aliases::bm25;
 pub use seal_core::embedding;
 
 // ============================================================================
@@ -193,7 +193,7 @@ pub mod skill_tree;
 // ============================================================================
 // Domain 8: 外贸全流程 (Foreign Trade Full Cycle) — re-export via ACT facade
 // ============================================================================
-pub use crate::l5_cognition::act_facade::{
+pub use crate::l5_cognition::layer_aliases::{
     TradeStateMachine, TradeCapabilitySpec, TradeResult,
     InquiryDetail, IntentLevel, ProductSpec, ProductType,
     BomItem, RoutingStep, PackagingSpec, CompanyPolicy, RiskControl,

@@ -147,6 +147,18 @@ export function Chat() {
   const [logOpen, setLogOpen] = createSignal(false)
   // 结构化错误三段式（what/why/next）：后端可选填充，前端缺失时推导
   const [streamErrorDetail, setStreamErrorDetail] = createSignal<{ what: string; why: string; next: string } | null>(null)
+  // P1: 自动重试状态
+  const [retryCountdown, setRetryCountdown] = createSignal(0)
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
+  let retryAttempt = 0
+  const MAX_RETRY_ATTEMPTS = 2
+  // P1: 记录最后一次发送的内容 (用于自动重试)
+  let lastSentContent = ''
+  // P0: Verbatim-Dup 用户可见提示
+  const [dupWarning, setDupWarning] = createSignal(false)
+  // P1: Hold 倒计时 (用于状态栏显示)
+  const [holdCountdown, setHoldCountdown] = createSignal(0)
+  let holdCountdownTimer: ReturnType<typeof setInterval> | undefined
   const pushLog = (step: Omit<ActivityStep, 'ts'>) => {
     setAgentLog((prev) => {
       const next = [...prev, { ...step, ts: Date.now() }]
@@ -593,6 +605,12 @@ export function Chat() {
 
         chatStore.setGenerating(false)
         setCurrentAssistantMsgId(null)
+        // P0: 流式完成，释放 hold token
+        const sid = chatStore.state.currentSessionId
+        if (sid) chatStore.releaseHold(sid)
+        // P1: 清除 hold 倒计时
+        if (holdCountdownTimer) { clearInterval(holdCountdownTimer); holdCountdownTimer = undefined }
+        setHoldCountdown(0)
         // OS 活动：完成阶段，1.5s 后回落空闲（短暂可见成功态）
         setAgentPhase('done')
         pushLog({ kind: wasCancelled ? 'error' : 'done', label: wasCancelled ? '生成已停止' : '完成' })
@@ -653,6 +671,16 @@ export function Chat() {
         // 作废旧代次：错误后迟到的 token/done 一律丢弃
         generation++
         if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
+        // P0: 流式错误，释放 hold token
+        const errSid = chatStore.state.currentSessionId
+        if (errSid) chatStore.releaseHold(errSid)
+        // P1: 清除 hold 倒计时
+        if (holdCountdownTimer) { clearInterval(holdCountdownTimer); holdCountdownTimer = undefined }
+        setHoldCountdown(0)
+        // P1: 可重试错误 → 自动重试
+        if (rc.retryAfterMs && lastSentContent) {
+          scheduleRetry(rc.retryAfterMs, lastSentContent)
+        }
       },
       onReasoning: (payload) => {
         // OS 推理流（后端可选 emit）：把意识核心推理步骤实时透出，对抗 black-box
@@ -764,6 +792,10 @@ export function Chat() {
     if (globalKeydownHandler) {
       window.removeEventListener('keydown', globalKeydownHandler)
     }
+    // P1: 清理重试定时器
+    cancelRetry()
+    // P1: 清理 hold 倒计时
+    if (holdCountdownTimer) { clearInterval(holdCountdownTimer); holdCountdownTimer = undefined }
     // F5: 流式进行中卸载（路由切换 / → /chat 或 /globe）时复位 store——
     // 否则重挂后 isGenerating 恒 true 锁死发送守卫，且流式消息红色光标永久残留
     if (isGenerating()) {
@@ -975,6 +1007,58 @@ export function Chat() {
   const sendMessage = async (content: string, opts?: { userMessageAdded?: boolean; regenerate?: boolean }) => {
     if (!content || isGenerating()) return
 
+    // ─── P0: Hold-Token 检查 — 同一会话 30s 内不允许并发发送 ───
+    const sessionId = chatStore.state.currentSessionId
+    if (sessionId && chatStore.isHeld(sessionId)) {
+      console.warn('[Chat] Send blocked: session is held (concurrent send prevention)')
+      setStreamError('消息正在处理中，请稍后重试')
+      setTimeout(() => setStreamError(null), 3000)
+      return
+    }
+
+    // ─── P0: Verbatim-Dup 检查 — 同一会话内重复消息提示 ───
+    if (!opts?.regenerate) {
+      const msgs = chatStore.currentMessages
+      const lastUserMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null
+      if (lastUserMsg && lastUserMsg.role === 'user') {
+        const newFp = await chatStore.contentFingerprint(content)
+        const lastFp = await chatStore.contentFingerprint(lastUserMsg.content)
+        if (newFp === lastFp) {
+          // P0: 用户可见的重复提示
+          console.warn('[Chat] Verbatim-dup detected: identical to last user message')
+          setDupWarning(true)
+          // 5s 自动消失
+          setTimeout(() => setDupWarning(false), 5000)
+        } else {
+          setDupWarning(false)
+        }
+      } else {
+        setDupWarning(false)
+      }
+    }
+
+    // 获取 hold token
+    if (sessionId) chatStore.acquireHold(sessionId)
+
+    // P1: Hold 倒计时 (30s TTL, 每秒更新)
+    if (holdCountdownTimer) clearInterval(holdCountdownTimer)
+    setHoldCountdown(30)
+    holdCountdownTimer = setInterval(() => {
+      const remaining = holdCountdown() - 1
+      if (remaining <= 0) {
+        clearInterval(holdCountdownTimer)
+        holdCountdownTimer = undefined
+        setHoldCountdown(0)
+      } else {
+        setHoldCountdown(remaining)
+      }
+    }, 1000)
+
+    // P1: 记录发送内容 (用于自动重试)
+    lastSentContent = content
+    // 重置重试计数
+    cancelRetry()
+
     if (!currentSession()) {
       await chatStore.addSession()
     }
@@ -1018,6 +1102,12 @@ export function Chat() {
       chatStore.setGenerating(false)
       setCurrentAssistantMsgId(null)
       generation++
+      // P0: 看门狗超时，释放 hold token
+      const wdSid = chatStore.state.currentSessionId
+      if (wdSid) chatStore.releaseHold(wdSid)
+      // P1: 清除 hold 倒计时
+      if (holdCountdownTimer) { clearInterval(holdCountdownTimer); holdCountdownTimer = undefined }
+      setHoldCountdown(0)
     }, 600_000)
 
     try {
@@ -1048,6 +1138,12 @@ export function Chat() {
       generation++
       setCurrentAssistantMsgId(null)
       if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
+      // P0: 失败时释放 hold token
+      const sid = chatStore.state.currentSessionId
+      if (sid) chatStore.releaseHold(sid)
+      // P1: 清除 hold 倒计时
+      if (holdCountdownTimer) { clearInterval(holdCountdownTimer); holdCountdownTimer = undefined }
+      setHoldCountdown(0)
     }
   }
 
@@ -1186,6 +1282,40 @@ export function Chat() {
     }
   }
 
+  // ─── P1: 自动重试机制 ───
+  /** 触发自动重试 (429/503/timeout 场景) */
+  const scheduleRetry = (retryAfterMs: number, lastContent: string) => {
+    if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
+      setStreamError('重试次数已用尽，请手动重试')
+      setTimeout(() => setStreamError(null), 3000)
+      retryAttempt = 0
+      return
+    }
+    retryAttempt++
+    const seconds = Math.ceil(retryAfterMs / 1000)
+    setRetryCountdown(seconds)
+    if (retryTimer) clearInterval(retryTimer)
+    retryTimer = setInterval(() => {
+      const remaining = retryCountdown() - 1
+      if (remaining <= 0) {
+        clearInterval(retryTimer)
+        retryTimer = undefined
+        setRetryCountdown(0)
+        // 自动重发
+        sendMessage(lastContent, { regenerate: true })
+      } else {
+        setRetryCountdown(remaining)
+      }
+    }, 1000)
+  }
+
+  /** 取消自动重试 */
+  const cancelRetry = () => {
+    if (retryTimer) { clearInterval(retryTimer); retryTimer = undefined }
+    setRetryCountdown(0)
+    retryAttempt = 0
+  }
+
   const handleStop = async () => {
     // 立即作废旧代次：停止后迟到的事件（token/done/tool）一律丢弃，防止污染下一轮
     generation++
@@ -1202,6 +1332,12 @@ export function Chat() {
     }
     setCurrentAssistantMsgId(null)
     if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
+    // P0: 停止时释放 hold token
+    const sid = chatStore.state.currentSessionId
+    if (sid) chatStore.releaseHold(sid)
+    // P1: 清除 hold 倒计时
+    if (holdCountdownTimer) { clearInterval(holdCountdownTimer); holdCountdownTimer = undefined }
+    setHoldCountdown(0)
   }
 
   const handleRegenerate = (message: Message) => {
@@ -1663,6 +1799,14 @@ export function Chat() {
                       <Show when={showDaySep()}>
                         <div class="msg-date-sep"><span class="msg-date-pill">{dayLabel(message.timestamp)}</span></div>
                       </Show>
+                      {/* P2: 消息阶段分隔线 — 工具调用后插入阶段标记 */}
+                      <Show when={i() > 0 && prevMsg()?.toolCalls && prevMsg()!.toolCalls!.length > 0 && !isUser}>
+                        <div class="flex items-center gap-2 my-1 px-4">
+                          <div class="flex-1 h-px bg-border-primary/30" />
+                          <span class="text-[10px] text-text-muted/50 font-medium">── 工具调用完成 ──</span>
+                          <div class="flex-1 h-px bg-border-primary/30" />
+                        </div>
+                      </Show>
                     <div
                       ref={(el) => { if (el) messageEls.set(message.id, el) }}
                       class={clsx('group msg', isUser ? 'r' : 'l', msgSearch() && !message.content.toLowerCase().includes(msgSearch().toLowerCase()) && 'msg-dim')}
@@ -1914,6 +2058,11 @@ export function Chat() {
             <AlertCircle class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div class="min-w-0 flex-1">
               <span class="text-sm text-red-700">{streamError()}</span>
+              <Show when={retryCountdown() > 0}>
+                <span class="ml-2 text-xs text-amber-600 font-medium">
+                  {retryCountdown()}s 后自动重试…
+                </span>
+              </Show>
               <Show when={streamErrorDetail()}>
                 {(d) => (
                   <div class="agent-err-steps mt-2 space-y-1">
@@ -1924,6 +2073,15 @@ export function Chat() {
                 )}
               </Show>
             </div>
+            <Show when={retryCountdown() > 0}>
+              <button
+                class="ml-2 p-1 text-[11px] text-amber-600 hover:text-amber-800 flex-shrink-0 underline underline-offset-2"
+                onClick={cancelRetry}
+                aria-label="取消自动重试"
+              >
+                取消
+              </button>
+            </Show>
             <button
               class="ml-2 p-1 text-[11px] text-red-600/80 hover:text-red-800 flex-shrink-0 underline underline-offset-2"
               onClick={() => setShowErrRaw((v) => !v)}
@@ -2167,10 +2325,34 @@ export function Chat() {
               </div>
 
               <div class="cic">
+                {/* P0: Verbatim-Dup 黄色提示条 */}
+                <Show when={dupWarning()}>
+                  <div class="mx-3 mb-1 px-3 py-1.5 bg-amber-50 border border-amber-200/60 rounded-lg text-xs text-amber-700 flex items-center gap-2 animate-in">
+                    <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>与上条消息内容相同</span>
+                    <button class="ml-auto text-amber-600 underline underline-offset-2 hover:text-amber-800" onClick={() => setDupWarning(false)}>忽略</button>
+                  </div>
+                </Show>
+                {/* P1: Hold 倒计时横条 */}
+                <Show when={holdCountdown() > 0}>
+                  <div class="mx-3 mb-1 flex items-center gap-2 text-[10px] text-amber-600">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span>处理中 · {holdCountdown()}s</span>
+                    <div class="flex-1 h-0.5 bg-amber-100 rounded-full overflow-hidden">
+                      <div class="h-full bg-amber-400 rounded-full transition-all duration-1000" style={{ width: `${(holdCountdown() / 30) * 100}%` }} />
+                    </div>
+                  </div>
+                </Show>
                 <textarea
                   ref={setTextareaRef}
                   class="flex-1 bg-transparent border-none resize-none min-h-[52px] max-h-[240px] py-2 text-[14px] leading-relaxed text-text-primary placeholder-text-muted/70 focus:outline-none focus:ring-0 focus:border-none"
-                  placeholder={isGenerating() ? '生成中仍可输入，下一条稍后发送…' : '输入消息… (Enter 发送, Shift+Enter 换行)'}
+                  placeholder={
+                    holdCountdown() > 0
+                      ? '消息处理中…'
+                      : isGenerating()
+                        ? '生成中仍可输入，下一条稍后发送…'
+                        : '输入消息… (Enter 发送, Shift+Enter 换行)'
+                  }
                   value={inputValue()}
                   onInput={handleInput}
                   onKeyDown={handleKeyDown}
@@ -2194,15 +2376,21 @@ export function Chat() {
                         <Show when={pendingAttachments().length > 0}> · {pendingAttachments().length} 附件</Show>
                       </span>
                     </Show>
-                    <button
-                      class="vc-btn vc-send"
-                      disabled={!inputValue().trim() && pendingAttachments().length === 0 && !annotationHint() && !isGenerating()}
-                      onClick={isGenerating() ? handleStop : handleSend}
-                      aria-label={isGenerating() ? '停止生成' : '发送消息'}
-                      title={isGenerating() ? '停止生成' : '发送消息'}
-                    >
-                      {isGenerating() ? <Square class="w-4 h-4" /> : <NeoSend class="w-4 h-4" />}
-                    </button>
+                    {/* P0: Hold 状态发送按钮 */}
+                    <div class="relative">
+                      <Show when={holdCountdown() > 0}>
+                        <span class="absolute inset-0 rounded-xl border-2 border-amber-400/60 animate-pulse pointer-events-none" />
+                      </Show>
+                      <button
+                        class="vc-btn vc-send"
+                        disabled={holdCountdown() > 0 || (!inputValue().trim() && pendingAttachments().length === 0 && !annotationHint() && !isGenerating())}
+                        onClick={isGenerating() ? handleStop : handleSend}
+                        aria-label={isGenerating() ? '停止生成' : holdCountdown() > 0 ? '处理中' : '发送消息'}
+                        title={isGenerating() ? '停止生成' : holdCountdown() > 0 ? `处理中 ${holdCountdown()}s` : '发送消息'}
+                      >
+                        {isGenerating() ? <Square class="w-4 h-4" /> : <NeoSend class="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2234,6 +2422,60 @@ export function Chat() {
                       title={`上下文占用 ${Math.round(contextPct() ?? 0)}%${(contextPct() ?? 0) >= 80 ? '，点击压缩' : ''}`}
                       aria-label={`上下文占用 ${Math.round(contextPct() ?? 0)}%`}
                     >
+                      <span>{Math.round(contextPct() ?? 0)}%</span>
+                    </button>
+                  </Show>
+                  <Show when={activeModel()}>
+                    <span class="font-mono text-nt-io-700">{activeModel()}</span>
+                  </Show>
+                  <Show when={isGenerating()}>
+                    <span class="font-mono text-nt-io-700">≈{liveGenTokens()} tok</span>
+                  </Show>
+                </div>
+                <div class="flex items-center gap-2 text-10px text-text-muted/80">
+                  {/* P1: 统一 OS 状态 badge */}
+                  <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-white/30 bg-white/40">
+                    <span class={clsx(
+                      'w-1.5 h-1.5 rounded-full',
+                      holdCountdown() > 0 ? 'bg-amber-500 animate-pulse' :
+                      agentPhase() === 'thinking' || agentPhase() === 'tooling' ? 'bg-nt-io-500 animate-pulse' :
+                      agentPhase() === 'done' ? 'bg-emerald-500' :
+                      agentPhase() === 'error' ? 'bg-red-500' : 'bg-text-muted/40'
+                    )} />
+                    <span class="font-medium">
+                      {holdCountdown() > 0
+                        ? `Hold · ${holdCountdown()}s`
+                        : isGenerating()
+                          ? `${agentPhase() === 'thinking' ? '思考' : agentPhase() === 'tooling' ? '工具' : '生成'}中`
+                          : '空闲'
+                      }
+                    </span>
+                    <Show when={harnessRoute()}>
+                      <span class="text-nt-io-600">· {harnessRoute()!.domain}</span>
+                    </Show>
+                  </div>
+                  {/* P3: 上下文预算条 */}
+                  <Show when={contextPct() !== null}>
+                    <button
+                      class={clsx(
+                        'flex items-center gap-1 px-2 py-0.5 rounded-md border transition-colors font-mono',
+                        (contextPct() ?? 0) >= 80
+                          ? 'border-red-400/40 bg-red-50/60 text-red-600 hover:bg-red-50'
+                          : 'border-white/30 bg-white/40 hover:bg-white/60 text-text-primary',
+                      )}
+                      onClick={runCompact}
+                      title={`上下文占用 ${Math.round(contextPct() ?? 0)}%${(contextPct() ?? 0) >= 80 ? '，点击压缩' : ''}`}
+                      aria-label={`上下文占用 ${Math.round(contextPct() ?? 0)}%`}
+                    >
+                      <div class="w-8 h-1 bg-neutral-200 rounded-full overflow-hidden">
+                        <div
+                          class={clsx(
+                            'h-full rounded-full transition-all',
+                            (contextPct() ?? 0) >= 80 ? 'bg-red-500' : 'bg-nt-io-500'
+                          )}
+                          style={{ width: `${Math.min(contextPct() ?? 0, 100)}%` }}
+                        />
+                      </div>
                       <span>{Math.round(contextPct() ?? 0)}%</span>
                     </button>
                   </Show>

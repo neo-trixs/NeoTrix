@@ -758,7 +758,7 @@ impl ReasoningTraceGuard {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ReasoningTraceGuard {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ReasoningTraceGuard {
     fn name(&self) -> &str {
         "nt_shield_reasoning_trace_guard"
     }
@@ -864,7 +864,7 @@ impl CohGuard {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for CohGuard {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CohGuard {
     fn name(&self) -> &str {
         "nt_shield_coh_guard"
     }
@@ -1126,7 +1126,7 @@ impl _ApiScanner {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for _ApiScanner {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for _ApiScanner {
     fn name(&self) -> &str {
         "nt_shield_api_attack_surface"
     }
@@ -1152,7 +1152,7 @@ impl crate::core::nt_core_self_test::SelfTest for _ApiScanner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_checklist_count() {

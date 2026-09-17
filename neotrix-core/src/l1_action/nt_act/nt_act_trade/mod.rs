@@ -142,8 +142,8 @@ pub use orchestrator_v2::{
     TradeRouter as OrchestratorV2Router,
     TradeTask as OrchestratorV2Task,
     WorkerPool as OrchestratorV2WorkerPool,
-    DomainWorkerResult as OrchestratorV2WorkerResult,
-    DomainWorkerType as OrchestratorV2WorkerType,
+    WorkerResult as OrchestratorV2WorkerResult,
+    WorkerType as OrchestratorV2WorkerType,
 };
 
 // ── process_engine: 流程引擎 ────────────────────────────
@@ -231,7 +231,7 @@ pub use extractors::{ChromeDecryptor, LoginEntry};
 // ── workers: 异步工作池 ──────────────────────────────────────
 pub use workers::{
     AnalyzeWorker, ExtractWorker, SendWorker, TrackWorker, WorkerPool, WorkerResult, WorkerTask,
-    TaskWorkerType, WriteWorker,
+    WorkerType as TaskWorkerType, WriteWorker,
 };
 
 // ── engine_traits: 统一 Engine 契约层 ──────────────────────

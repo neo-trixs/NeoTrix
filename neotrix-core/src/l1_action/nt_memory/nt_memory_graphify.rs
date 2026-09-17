@@ -10,7 +10,7 @@
 //! shortest_path / subgraph / community_detection)。
 
 use crate::core::nt_core_kb_types::{KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use uuid::Uuid;
 

@@ -701,6 +701,10 @@ export function Sidebar(props: SidebarProps) {
                                     )}>
                                       {session.title}
                                     </span>
+                                    {/* P2: 协调状态指示 — 被 hold 的会话显示 amber 圆点 */}
+                                    <Show when={active && chatStore.isHeld(session.id)}>
+                                      <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0" title="会话正在处理中" />
+                                    </Show>
                                   </button>
                                   <div class="absolute right-0 top-0 bottom-0 flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity bg-gradient-to-l from-white/80 via-white/60 to-transparent pointer-events-none group-hover:pointer-events-auto">
                                     <button

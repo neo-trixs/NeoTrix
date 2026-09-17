@@ -7,7 +7,7 @@
 //! check-and-consume, 超额时拒绝并报告剩余额度。
 //! 注: 与 nt_io_hermes_community.rs 同属 Hermes 生态, 共享 nt_io_hermes 前缀。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use std::collections::HashMap;
 
 /// 配额治理器 trait — 对请求 key 做速率限制决策。

@@ -5,3 +5,5 @@ pub mod nt_repair_causal_trace;
 pub mod nt_repair_facade;
 pub mod nt_repair_hanzi_video;
 pub mod nt_repair_self_heal;
+pub mod nt_core_self_test;
+pub mod nt_core_self_test_integration;

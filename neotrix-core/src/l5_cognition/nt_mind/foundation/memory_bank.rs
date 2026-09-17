@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_self_test;
+use crate::l6_meta::healing::nt_core_self_test;
 
 /// Memory tier — 4 levels from ephemeral to permanent
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

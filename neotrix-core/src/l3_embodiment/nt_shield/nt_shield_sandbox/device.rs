@@ -142,7 +142,7 @@ impl DeviceSandbox {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for DeviceSandbox {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for DeviceSandbox {
     fn name(&self) -> &str {
         "nt_shield_device_sandbox"
     }
@@ -163,7 +163,7 @@ impl crate::core::nt_core_self_test::SelfTest for DeviceSandbox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_provision_ready() {
