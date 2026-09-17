@@ -59,14 +59,12 @@ pub mod nt_core_task_dispatcher;
 pub mod nt_core_td;
 pub mod nt_core_trajectory_compress;
 pub mod nt_core_ttc;
-pub mod nt_core_tlc_correction;
 pub mod nt_core_narrative_types;
 
 // L5 — Consciousness
 pub mod nt_core_context;
 pub mod nt_core_dispatch;
 pub mod nt_core_gwt;
-pub mod nt_core_heartbeat;
 pub mod nt_core_consciousness;
 pub mod nt_core_echo_terminal;
 
@@ -103,8 +101,6 @@ pub use crate::cli::nt_conn as nt_core_conn;
 pub mod nt_core_event;
 pub use nt_core_event::CoreEvent;
 pub use crate::neotrix::nt_core_event_bus::EventBus;
-pub mod nt_core_event_bus;
-pub mod nt_core_retrieval;
 pub use crate::cli::nt_router as nt_core_router;
 pub mod nt_core_self_review;
 pub mod nt_core_traits;
@@ -136,8 +132,6 @@ pub mod nt_core_harness;
 pub use crate::l5_cognition::nt_core::nt_state_substrate as nt_core_state_substrate;
 pub use crate::cli::nt_subagent as nt_core_subagent;
 pub mod nt_core_telemetry;
-#[cfg(test)]
-pub mod kani_proofs;
 
 // ════════════════════════════════════════════════════════════════
 // 向后兼容重导出 — 旧路径迁移后保留 import 兼容性
@@ -158,12 +152,13 @@ pub use nt_core_sense::{Sensor, SensorSample};
 
 // 从 nt_core_knowledge 重导出共享类型
 pub use nt_core_knowledge::types::{KnowledgeSource, RewardSource, TaskType};
+pub use nt_core_knowledge::SourceAccessTracker;
 
 // 从 nt_core_sae 重导出 SAE 类型
 pub use nt_core_sae::{SaeFeature, SparseAutoencoder, SAE_INPUT_DIM};
 
 // 从 nt_core_hex 重导出推理状态类型
-pub use nt_core_hex::{FullReasoningState, MetaState};
+pub use nt_core_hex::{FullReasoningState, MetaState, strategy_matrix};
 
 // 从 l5_cognition capability 重导出 CapabilityVector
 pub use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
@@ -180,6 +175,7 @@ pub use nt_core_bank::bank::ReasoningBank;
 // 从 nt_core_hex 重导出
 pub use nt_core_hex::ReasoningHexagram;
 pub use nt_core_hex::optimal_starting_mode;
+pub use nt_core_gwt::resonance::default_specialist_states;
 
 // 从 nt_core_policy 重导出
 pub use nt_core_policy::E8Policy;

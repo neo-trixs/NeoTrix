@@ -29,13 +29,11 @@ pub mod ffi;
 // ─── Infrastructure ─────────────────────────────────────────────────────
 pub mod nt_core_error;
 pub mod nt_core_event_bus;
-pub mod nt_core_event_bus_muted;
 
 // ─── 意识核心 (已迁移至 l5_cognition/nt_core/) ────────────────────────
 pub use crate::l5_cognition::nt_core::nt_consciousness_core;
 
 // ─── Standalone modules at neotrix level ────────────────────────────────
-pub mod nt_harness;
 pub mod nt_file_ability;
 pub mod nt_crystal_core;
 pub mod proxy_daemon_wrapper;
