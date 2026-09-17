@@ -6,7 +6,7 @@
 
 use crate::core::nt_core_reasoning::ReasoningTrace;
 use crate::core::nt_core_llm::{LlmError, LlmProvider, LlmRequest, Message, Role};
-use crate::core::l0_substrate::nt_core_error::NeoTrixError;
+use crate::core::nt_core_error::NeoTrixError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -153,7 +153,7 @@ pub enum CoTError {
 impl From<CoTError> for NeoTrixError {
     fn from(e: CoTError) -> Self {
         match e {
-            CoTError::Provider(s) => NeoTrixError::from(s),
+            CoTError::Provider(s) => NeoTrixError::Network(s.to_string()),
             CoTError::JsonParse(s) => NeoTrixError::Serde(s.to_string()),
             CoTError::InvalidFormat(s) => NeoTrixError::InvalidInput(s),
             CoTError::EmptyResponse => NeoTrixError::InvalidState("CoT empty response".into()),

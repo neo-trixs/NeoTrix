@@ -1,4 +1,4 @@
-use crate::core::nt_core_e8_vsa::E8VsaEmbedding;
+use crate::core::nt_core_shared_types::E8VsaEmbedding;
 use serde::{Deserialize, Serialize};
 
 /// VSA-aware content scorer for GWT.

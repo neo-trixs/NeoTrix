@@ -182,6 +182,14 @@ pub enum CoreEvent {
         findings: u32,
         score: f64,
     },
+
+    /// 领域事件 (trade/process 等)
+    #[serde(rename = "domain_event")]
+    DomainEvent {
+        domain: String,
+        event_type: String,
+        payload: serde_json::Value,
+    },
 }
 
 // ── Backward-compatible type aliases ──────────────────────────────────────
@@ -444,6 +452,20 @@ impl CoreEvent {
             | Self::GameEpisodeCompleted { .. }
             | Self::GameTrainingUpdate { .. }
             | Self::GameConsciousnessFeedback { .. } => "nt_mind",
+            Self::DomainEvent { domain, .. } => domain,
+        }
+    }
+
+    pub fn domain_field(&self) -> &str {
+        match self {
+            Self::DomainEvent { domain, .. } => domain,
+            _ => "",
+        }
+    }
+    pub fn event_type_field(&self) -> &str {
+        match self {
+            Self::DomainEvent { event_type, .. } => event_type,
+            _ => "",
         }
     }
 }

@@ -18,7 +18,7 @@
 //!     SelfTestStage::process (生产接线, T3)
 //!   - 守卫是"机制", 不追求一次通过 — 报警即暴露, 驱动修复
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use regex::Regex;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

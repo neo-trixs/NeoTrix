@@ -161,7 +161,7 @@ impl GRPOLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::EditType;
+    use crate::core::nt_core_self::seal::self_edit_gen::EditType as GrpoEditType;
 
     #[test]
     fn test_config_default() {
@@ -247,7 +247,7 @@ mod tests {
         let loop_ = GRPOLoop::new(cfg, 10);
         let edit = SelfEdit {
             id: 0,
-            edit_type: EditType::Fix,
+            edit_type: GrpoEditType::Fix,
             target_location: "x".into(),
             original_text: "a".into(),
             proposed_text: "b".into(),
@@ -264,7 +264,7 @@ mod tests {
         let loop_ = GRPOLoop::new(cfg, 10);
         let low = SelfEdit {
             id: 0,
-            edit_type: EditType::Fix,
+            edit_type: GrpoEditType::Fix,
             target_location: "x".into(),
             original_text: "a".into(),
             proposed_text: "b".into(),
@@ -273,7 +273,7 @@ mod tests {
         };
         let high = SelfEdit {
             id: 1,
-            edit_type: EditType::Fix,
+            edit_type: GrpoEditType::Fix,
             target_location: "x".into(),
             original_text: "a".into(),
             proposed_text: "b".into(),

@@ -10,7 +10,7 @@
 ///
 /// 受控边界: 反向引用 `crate::neotrix::...::engine_core::ReasoningEngine`
 /// 属架构允许的 ReasoningEngine 注入边界, 禁止扩展此边界。
-use crate::core::l7_capability::nt_core_antidistil::decompose::{
+use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
     DecomposeSuggestion, TaskDecomposer,
 };
 use crate::core::nt_core_cot_generator::{CoTConfig, CoTGenerator, DefaultCoTGenerator};
@@ -914,7 +914,7 @@ Output your result for this subtask only."#,
         const MAX_AGGREGATION_RESULTS_TOKENS: usize = 4096;
         let result_count = results.len().max(1);
         let per_result_budget = (MAX_AGGREGATION_RESULTS_TOKENS / result_count).max(256);
-        let field_signals = truncate_preserving(&field_signals, 1024, 0.6);
+        let field_signals = truncate_preserving(&field_signals, 1024);
 
         // 使用 LLM 聚合结果（模型只做推理综合, 不再承担清洗/去重）
         let aggregation_prompt = format!(
@@ -942,7 +942,7 @@ Output ONLY the final synthesized answer."#,
                         "{}. {}: {}",
                         i + 1,
                         if r.success { "SUCCESS" } else { "FAILED" },
-                        truncate_preserving(&r.output, per_result_budget, 0.6)
+                        truncate_preserving(&r.output, per_result_budget)
                     )
                 })
                 .collect::<Vec<_>>()

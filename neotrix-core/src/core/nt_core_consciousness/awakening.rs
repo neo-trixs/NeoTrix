@@ -107,7 +107,7 @@ impl ConsciousnessAwakening {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ConsciousnessAwakening {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessAwakening {
     fn name(&self) -> &str {
         "consciousness_awakening"
     }

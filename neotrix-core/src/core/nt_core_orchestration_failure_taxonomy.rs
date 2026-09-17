@@ -8,7 +8,7 @@
 //! `OrchestrationFailureTaxonomyTest` 逐条验证锚点在源码中真实存在 —
 //! 删除守卫代码会导致本测试失败, 形成"检测的检测"闭环。
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestResult};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestResult};
 
 /// 失败类定义
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -215,7 +215,7 @@ mod tests {
 #[cfg(test)]
 mod registry_integration {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTestRegistry;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
 
     /// T2 验证: 与 register_absorbed_modules 相同路径注册后 run_one 可执行
     #[test]

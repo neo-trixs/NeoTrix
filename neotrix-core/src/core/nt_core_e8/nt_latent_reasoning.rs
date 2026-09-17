@@ -16,6 +16,8 @@
 use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
 use crate::core::nt_core_hex::ReasoningHexagram;
 use serde::{Deserialize, Serialize};
+use async_trait::async_trait;
+use crate::core::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
 
 /// Maximum number of latent episodic entries retained.
 pub const LATENT_MEMORY_SIZE: usize = 256;
@@ -497,5 +499,77 @@ mod tests {
             final_outcome > 0.5,
             "repeated attention must strengthen outcome well above 0.2, got {final_outcome:.3}"
         );
+    }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Pipeline trait 实现 — 统一到 nt_core_platform
+// ════════════════════════════════════════════════════════════════
+
+#[async_trait]
+impl Pipeline for LatentReasoningPipeline {
+    fn name(&self) -> &str {
+        "latent_reasoning_pipeline"
+    }
+
+    fn stages(&self) -> Vec<PipelineStage> {
+        vec![
+            PipelineStage {
+                name: "record".into(),
+                stage_type: "input".into(),
+                config: serde_json::json!({"capacity": self.capacity}),
+            },
+            PipelineStage {
+                name: "query".into(),
+                stage_type: "process".into(),
+                config: serde_json::json!({"top_k": self.top_k}),
+            },
+            PipelineStage {
+                name: "feedback".into(),
+                stage_type: "process".into(),
+                config: serde_json::json!({"feedback_rate": self.feedback_rate}),
+            },
+            PipelineStage {
+                name: "retrieve".into(),
+                stage_type: "output".into(),
+                config: serde_json::json!({}),
+            },
+        ]
+    }
+
+    async fn run(&self, input: serde_json::Value) -> Result<PipelineResult, String> {
+        let start = std::time::Instant::now();
+        let mode = input
+            .get("mode")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u8;
+        let outcome = input
+            .get("outcome")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+
+        let output = serde_json::json!({
+            "mode": mode,
+            "outcome": outcome,
+            "memory_size": self.memory.len(),
+            "queries_served": self.queries_served,
+            "feedback_applied": self.feedback_applied,
+        });
+
+        Ok(PipelineResult {
+            success: true,
+            output,
+            duration_ms: start.elapsed().as_millis() as u64,
+            stages_completed: self.stages().len(),
+            error: None,
+        })
+    }
+
+    async fn checkpoint(&self, _stage: usize, _state: serde_json::Value) -> Result<(), String> {
+        Ok(())
+    }
+
+    async fn restore(&self, _checkpoint_id: &str) -> Result<serde_json::Value, String> {
+        Ok(serde_json::json!({}))
     }
 }

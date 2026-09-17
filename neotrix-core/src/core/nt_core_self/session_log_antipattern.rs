@@ -286,7 +286,7 @@ fn suggestion_for(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
     fn lines(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| s.to_string()).collect()
@@ -381,7 +381,7 @@ mod tests {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for SessionLogScanner {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SessionLogScanner {
     fn name(&self) -> &str {
         "nt_core_self_session_log_antipattern"
     }

@@ -156,9 +156,6 @@ pub mod nt_core_platform;       // 平台初始化
 pub mod nt_core_telemetry;      // 遥测
 pub mod nt_core_schema_watchdog; // Schema 看门狗
 
-// 向后兼容: l8_autonomic → l6_meta/healing
-pub mod l8_autonomic;
-
 // ═══════════════════════════════════════════════════════════════
 // 类型重导出 — 供外部模块快速引用
 // ═══════════════════════════════════════════════════════════════

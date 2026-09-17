@@ -264,7 +264,7 @@ impl SchemaWatchdog {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for SchemaWatchdog {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SchemaWatchdog {
     fn name(&self) -> &str {
         "schema_watchdog"
     }

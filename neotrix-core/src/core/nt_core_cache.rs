@@ -527,7 +527,7 @@ mod tests {
     }
 }
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// NT-CORE 缓存核心自测: 精确层写入/读取往返 + 容量计数 (卫生层 P0: 核心必须可自测)。
 pub struct CacheSelfTest;

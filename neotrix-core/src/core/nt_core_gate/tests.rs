@@ -14,6 +14,7 @@
 
     #[async_trait::async_trait]
     impl LlmProvider for MockJudgeProvider {
+    fn set_proxy(&mut self, _proxy_url: &str) {}
     fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
         crate::core::nt_core_llm::DataTrust::Trusted
     }
@@ -632,6 +633,7 @@
 
     #[async_trait::async_trait]
     impl LlmProvider for MockRubricProvider {
+    fn set_proxy(&mut self, _proxy_url: &str) {}
     fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
         crate::core::nt_core_llm::DataTrust::Trusted
     }

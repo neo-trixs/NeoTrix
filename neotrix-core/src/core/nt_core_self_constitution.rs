@@ -716,7 +716,7 @@ pub fn global_constitution() -> &'static Constitution {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GovernanceConstitutionSelfTest;
 
-impl crate::core::nt_core_self_test::SelfTest for GovernanceConstitutionSelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for GovernanceConstitutionSelfTest {
     fn name(&self) -> &str {
         "nt_governance_constitution"
     }
@@ -761,7 +761,7 @@ pub fn reload_constitution(path: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self_test::SelfTest;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
     use std::path::Path;
 
     #[test]

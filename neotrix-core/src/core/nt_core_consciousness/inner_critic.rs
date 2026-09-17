@@ -201,7 +201,7 @@ impl InnerCritic {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for InnerCritic {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for InnerCritic {
     fn name(&self) -> &str {
         "inner_critic"
     }

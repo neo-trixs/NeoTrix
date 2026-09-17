@@ -167,8 +167,8 @@ impl ReasoningBank {
     ) -> Vec<ReasoningMemory> {
         use crate::core::nt_core_embed::TextEmbedder;
 
-        let mut embedder = TextEmbedder::new();
-        let query_emb = embedder.embed(task);
+        let _embedder = TextEmbedder::new();
+        let query_emb = _embedder.embed(task);
         if query_emb.len() != kronecker.dim() {
             return Vec::new();
         }
@@ -216,8 +216,8 @@ impl ReasoningBank {
     ) -> Vec<(f64, String)> {
         use crate::core::nt_core_embed::TextEmbedder;
 
-        let mut embedder = TextEmbedder::new();
-        let query_emb = embedder.embed(task);
+        let _embedder = TextEmbedder::new();
+        let query_emb = _embedder.embed(task);
         if query_emb.is_empty() {
             // Embedding unavailable — return empty, not fake scores
             return Vec::new();

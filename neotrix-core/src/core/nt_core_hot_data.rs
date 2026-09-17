@@ -45,6 +45,17 @@ pub enum HotDataError {
     KeyNotFound,
 }
 
+impl std::fmt::Display for HotDataError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HotDataError::CapacityExceeded => write!(f, "Hot data capacity exceeded"),
+            HotDataError::KeyNotFound => write!(f, "Key not found in hot data"),
+        }
+    }
+}
+
+impl std::error::Error for HotDataError {}
+
 // ---------------------------------------------------------------------------
 // BatchLookup trait
 // ---------------------------------------------------------------------------

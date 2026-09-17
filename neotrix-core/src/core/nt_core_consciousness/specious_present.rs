@@ -117,7 +117,7 @@ impl SpeciousPresent {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for SpeciousPresent {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SpeciousPresent {
     fn name(&self) -> &str {
         "SpeciousPresent"
     }

@@ -10,7 +10,7 @@ use super::specious_present::SpeciousPresent;
 use super::stream_buffer::ConsciousnessStream;
 use super::volition::{ActionCandidate, VolitionEngine};
 use super::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
-use crate::core::nt_core_self::affective_interface::{
+use crate::l4_emotion::nt_feel::affective_interface::{
     AffectiveInterface, UserAffectSnapshot, UserEmotion,
 };
 use crate::core::nt_core_self::emotion_state::{EmotionDimension, EmotionEngine, EmotionReport};
@@ -447,7 +447,7 @@ impl ConsciousnessRuntime {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ConsciousnessRuntime {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessRuntime {
     fn name(&self) -> &str {
         "consciousness_runtime"
     }
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_observe_user_affect_maps_to_engine() {
-        use crate::core::nt_core_self::affective_interface::UserAffectModel;
+        use crate::l4_emotion::nt_feel::affective_interface::UserAffectModel;
         let mut cr = ConsciousnessRuntime::new();
         let mut model = UserAffectModel::default();
         let snap = model.detect_from_text("我很难过", None);

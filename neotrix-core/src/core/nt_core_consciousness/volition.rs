@@ -141,7 +141,7 @@ impl VolitionEngine {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for VolitionEngine {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for VolitionEngine {
     fn name(&self) -> &str {
         "VolitionEngine"
     }

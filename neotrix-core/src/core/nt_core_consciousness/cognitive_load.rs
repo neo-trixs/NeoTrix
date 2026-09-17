@@ -228,7 +228,7 @@ mod tests {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for CognitiveLoadMonitor {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CognitiveLoadMonitor {
     fn name(&self) -> &str {
         "cognitive_load"
     }

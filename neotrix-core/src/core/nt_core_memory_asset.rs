@@ -5,7 +5,7 @@
 //! node_type 启发式。为 KB 提供团队级记忆中枢的资产视图, 支撑跨会话持久与技能结晶。
 
 use crate::core::nt_core_kb_types::KnowledgeNode;
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use serde::{Deserialize, Serialize};
 
 /// 记忆资产四态 — 团队级记忆中枢的可复用资产类别。

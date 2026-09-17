@@ -892,7 +892,7 @@ pub fn global_provider_usage_ledger() -> &'static ProviderUsageLedger {
     &GLOBAL_PROVIDER_USAGE_LEDGER
 }
 
-impl crate::core::nt_core_self_test::SelfTest for TelemetryStore {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for TelemetryStore {
     fn name(&self) -> &str {
         "TelemetryStore"
     }
@@ -912,7 +912,7 @@ impl crate::core::nt_core_self_test::SelfTest for TelemetryStore {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for AnomalyDetector {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for AnomalyDetector {
     fn name(&self) -> &str {
         "AnomalyDetector"
     }
@@ -953,7 +953,7 @@ impl crate::core::nt_core_self_test::SelfTest for AnomalyDetector {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for PolicyDriftMonitor {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for PolicyDriftMonitor {
     fn name(&self) -> &str {
         "PolicyDriftMonitor"
     }

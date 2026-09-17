@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 pub use neotrix_types::core::nt_core_traits::{NativeTool, ToolDef, ToolOutput, ToolProvider};
 
-pub use crate::core::nt_core_self_test::SelfTest;
+pub use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// Rune Socket — 每模块 5 色符文槽位配置 (数据/变换/缓存/错误恢复/监控)。
 /// 定义在 `nt_core_capability_tree` (node.rs), 此处 re-export 供 core 层引用。

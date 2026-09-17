@@ -1,14 +1,11 @@
-pub mod affective_interface;
 pub mod archive;
 pub mod attention_head;
 pub mod behavior_fsm;
 pub mod context_window;
 pub mod cuda_agent;
-pub mod io_contract;
 pub mod dynamic_params;
 pub mod emotion_state;
 pub mod evolution_analysis;
-pub mod human_approval;
 pub mod hyperframes;
 pub mod intrinsic_motivation;
 pub mod metacognitive_evaluator;
@@ -26,7 +23,7 @@ pub mod thinking_trace;
 pub mod trace_evaluation;
 pub mod wiki_skill;
 
-pub use affective_interface::{
+pub use crate::l4_emotion::nt_feel::affective_interface::{
     au_to_emotion, AffectiveInterface, AffectiveReadout, EmpathyConfig, EmpathyStrategy, GuideMode,
     RelationshipConfig, RelationshipStage, RelationshipState, ResponseIntent, RhythmProfile,
     UserAffectConfig, UserAffectModel, UserAffectSnapshot, UserEmotion, VisualAffect,
@@ -52,7 +49,7 @@ pub use evolution_analysis::{
     analyze_kb_health, print_report, record_meta_cognition_defect, store_report_to_kb, KbDefect,
     KbHealthReport,
 };
-pub use human_approval::{
+pub use crate::l3_embodiment::nt_shield::nt_shield_approval::human_approval::{
     ApprovalDecision, ApprovalManager, ApprovalPolicy, ApprovalRequest, ApprovalRequestBuilder,
     ApprovalStats, ApprovalStatus, RiskLevel,
 };
@@ -87,5 +84,5 @@ pub use wiki_skill::{
     LinkType, RawExperience, SkillOutput, SkillParameter, WikiSkillConfig, WikiSkillKB,
 };
 
-// Re-exports for io_contract
-pub use io_contract::{ContractRegistry, ToolIoContract, ParamDef, ParamType};
+// Re-exports for io_contract (moved to l1_action/nt_io)
+pub use crate::l1_action::nt_io::nt_io_contract::{ContractRegistry, ToolIoContract, ParamDef, ParamType};

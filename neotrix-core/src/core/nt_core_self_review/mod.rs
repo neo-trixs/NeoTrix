@@ -231,7 +231,7 @@ impl Default for SelfReviewGate {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for SelfReviewGate {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SelfReviewGate {
     fn name(&self) -> &str {
         "self_review_gate"
     }

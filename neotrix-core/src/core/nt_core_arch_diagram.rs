@@ -2,7 +2,7 @@
 //! 从节点/边生成 self-contained SVG, 标签清晰、确定性可校验。R-P42 强化现有架构表示,
 //! 不新建平行渲染器 — 仅提供架构图原语供 Seed Graph / 意识树消费。
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// 架构图节点: 标签 + 所属层 (0..=9, NeoTrix 9 层架构)。
 #[derive(Debug, Clone)]

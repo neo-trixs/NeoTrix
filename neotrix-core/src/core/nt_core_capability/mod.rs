@@ -56,6 +56,7 @@ pub enum Domain {
     NtPhysical,
     NtFeel,
     NtFileAbility,
+    Trade,
 }
 
 /// 能力元数据
@@ -891,7 +892,7 @@ mod inline_tests {
             Domain::NtFileAbility,
         ];
         assert_eq!(layers.len(), 6);
-        assert_eq!(domains.len(), 10);
+        assert_eq!(domains.len(), 11);
     }
 
     #[test]

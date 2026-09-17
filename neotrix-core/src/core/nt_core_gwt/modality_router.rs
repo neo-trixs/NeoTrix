@@ -1,40 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Modalities that can carry workspace content for attention routing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum Modality {
-    /// Text / natural language
-    Text,
-    /// Image / visual
-    Image,
-    /// Audio / speech
-    Audio,
-    /// Structured code / data
-    Code,
-    /// Vector/latent knowledge
-    Latent,
-}
-
-impl Modality {
-    pub const ALL: [Modality; 5] = [
-        Modality::Text,
-        Modality::Image,
-        Modality::Audio,
-        Modality::Code,
-        Modality::Latent,
-    ];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Modality::Text => "text",
-            Modality::Image => "image",
-            Modality::Audio => "audio",
-            Modality::Code => "code",
-            Modality::Latent => "vector",
-        }
-    }
-}
+pub use crate::core::nt_core_shared_types::Modality;
 
 /// Top-Down Modality Attention Router.
 ///

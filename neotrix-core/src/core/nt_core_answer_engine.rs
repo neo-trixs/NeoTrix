@@ -1,5 +1,5 @@
 use std::time::{Duration, Instant};
-use crate::core::l0_substrate::nt_core_error::NeoTrixError;
+use crate::core::nt_core_error::NeoTrixError;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AnswerMode {

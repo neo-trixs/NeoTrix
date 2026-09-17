@@ -499,7 +499,7 @@ mod tests {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for CognitiveEvaluator {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CognitiveEvaluator {
     fn name(&self) -> &str {
         "cognitive_evaluator"
     }

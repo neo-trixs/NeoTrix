@@ -12,6 +12,17 @@
 
 use rusqlite::Connection;
 
+
+// ─── KvStore Trait ──────────────────────────────────────────────────────────
+/// KV 存储抽象 — L6 元认知层通过此 trait 访问持久化 KV 存储,
+/// 避免直接依赖 L1 的 `KnowledgeBase` 具体类型。
+///
+/// 实现者: `KnowledgeBase` (L1), 以及任何提供 namespace/key/value 三元组存储的对象。
+pub trait KvStore: Send + Sync {
+    fn kv_set(&self, namespace: &str, key: &str, value: &str) -> Result<(), String>;
+    fn kv_get(&self, namespace: &str, key: &str) -> Result<Option<String>, String>;
+}
+
 pub const NONCE_LEN: usize = 12;
 
 /// kv_store value 透明压缩魔数 (neotrix-experience 的 _VALUE_MAGIC, 与旧 Python 版兼容)。

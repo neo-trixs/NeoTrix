@@ -555,7 +555,7 @@ impl ToolGroundingMonitor {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ToolGroundingMonitor {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ToolGroundingMonitor {
     fn name(&self) -> &str {
         "tool_grounding"
     }
@@ -580,7 +580,7 @@ impl crate::core::nt_core_self_test::SelfTest for ToolGroundingMonitor {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for ConvergeCheckFn {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConvergeCheckFn {
     fn name(&self) -> &str {
         "self_audit"
     }
@@ -727,7 +727,7 @@ impl MultiSignalEval {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for MultiSignalEval {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for MultiSignalEval {
     fn name(&self) -> &str {
         "nt_core_multi_signal_eval"
     }

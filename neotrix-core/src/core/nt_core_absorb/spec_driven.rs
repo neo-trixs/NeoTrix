@@ -1,6 +1,9 @@
 #![forbid(unsafe_code)]
 
 use std::collections::VecDeque;
+use async_trait::async_trait;
+use serde::Serialize;
+use crate::core::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpecStatus {
@@ -102,7 +105,7 @@ impl Default for SpecPipelineConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SpecPipelineStats {
     pub total: u32,
     pub active: u32,
@@ -400,5 +403,78 @@ mod tests {
         let mut pipeline = SpecDrivenPipeline::default();
         let spec = EvolutionSpec::new("", "x", "desc", "m");
         assert!(pipeline.submit_spec_incremental(spec).is_err());
+    }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Pipeline trait 实现 — 统一到 nt_core_platform
+// ════════════════════════════════════════════════════════════════
+
+#[async_trait]
+impl Pipeline for SpecDrivenPipeline {
+    fn name(&self) -> &str {
+        "spec_driven_pipeline"
+    }
+
+    fn stages(&self) -> Vec<PipelineStage> {
+        vec![
+            PipelineStage {
+                name: "submit".into(),
+                stage_type: "input".into(),
+                config: serde_json::json!({"max_active": self.config.max_active_specs}),
+            },
+            PipelineStage {
+                name: "verify".into(),
+                stage_type: "process".into(),
+                config: serde_json::json!({"min_confidence": self.config.min_confidence}),
+            },
+            PipelineStage {
+                name: "evolve".into(),
+                stage_type: "process".into(),
+                config: serde_json::json!({"auto_evolve": self.config.auto_evolve}),
+            },
+            PipelineStage {
+                name: "archive".into(),
+                stage_type: "output".into(),
+                config: serde_json::json!({}),
+            },
+        ]
+    }
+
+    async fn run(&self, input: serde_json::Value) -> Result<PipelineResult, String> {
+        let start = std::time::Instant::now();
+        let spec_id = input
+            .get("spec_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let total_specs = self.specs.len() as usize;
+        let active_specs = self
+            .specs
+            .iter()
+            .filter(|s| s.status == SpecStatus::Active)
+            .count();
+
+        let output = serde_json::json!({
+            "spec_id": spec_id,
+            "total_specs": total_specs,
+            "active_specs": active_specs,
+            "stats": self.stats(),
+        });
+
+        Ok(PipelineResult {
+            success: true,
+            output,
+            duration_ms: start.elapsed().as_millis() as u64,
+            stages_completed: self.stages().len(),
+            error: None,
+        })
+    }
+
+    async fn checkpoint(&self, _stage: usize, _state: serde_json::Value) -> Result<(), String> {
+        Ok(())
+    }
+
+    async fn restore(&self, _checkpoint_id: &str) -> Result<serde_json::Value, String> {
+        Ok(serde_json::json!({}))
     }
 }

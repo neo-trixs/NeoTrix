@@ -440,7 +440,7 @@ impl EventDrivenClaimPool {
 /// heal 修复后断言 is_consistent。
 pub struct ClaimPoolHealer;
 
-impl crate::core::nt_core_self_test::SelfTest for ClaimPoolHealer {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ClaimPoolHealer {
     fn name(&self) -> &str {
         "nt_core_scheduler::event_driven_claim_healer"
     }

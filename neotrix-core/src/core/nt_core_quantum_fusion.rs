@@ -17,7 +17,7 @@
 //!
 //! 层归属: L4 认知层 (Cognition)。接线: SelfTest 检测族 (T3)。
 
-use crate::core::nt_core_self_test::SelfTest;
+use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 // ---------------------------------------------------------------------------
 // 叠加态

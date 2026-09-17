@@ -184,7 +184,7 @@ pub async fn catch_async<T, F>(
 ) -> Result<T, PanicError>
 where
     T: Send + 'static,
-    F: FnOnce() -> T + Send + 'static,
+    F: FnOnce() -> T + Send + panic::UnwindSafe + 'static,
 {
     let ctx = context.to_string();
     let result = tokio::task::spawn_blocking(move || {
@@ -225,7 +225,7 @@ where
 /// and races it against the deadline.
 pub fn boundary_call<T>(
     name: &str,
-    f: impl FnOnce() -> T + Send + 'static,
+    f: impl FnOnce() -> T + Send + panic::UnwindSafe + 'static,
     timeout: Option<Duration>,
 ) -> Result<T, BoundaryError>
 where
@@ -234,7 +234,7 @@ where
     match timeout {
         None => catch_panic(name, f).map_err(BoundaryError::Panic),
         Some(duration) => {
-            let ctx = name.to_string();
+            let _ctx = name.to_string();
             let result = std::thread::scope(|s| {
                 let handle = s.spawn(|| catch_panic(name, f));
 
@@ -248,7 +248,7 @@ where
                                 timestamp: 0,
                                 backtrace: None,
                             })
-                        });
+                        }).map_err(BoundaryError::Panic);
                     }
                     if std::time::Instant::now() >= deadline {
                         return Err(BoundaryError::Timeout {
@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn catch_panic_catches_non_string_panic() {
         let result = catch_panic("integer panic", || {
-            panic!(42);
+            panic!("{}", 42);
         });
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -386,7 +386,9 @@ mod tests {
     #[test]
     fn macro_catches_panic() {
         let result = panic_boundary!("div" => {
-            let _ = 1 / 0;
+            let a: i32 = std::hint::black_box(1);
+            let b: i32 = std::hint::black_box(0);
+            let _ = a / b;
         });
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().context, "div");
@@ -510,7 +512,7 @@ mod tests {
         #[derive(Debug)]
         struct CustomError(i32);
         let result = catch_panic("custom", || {
-            panic!(CustomError(42));
+            panic!("{:?}", CustomError(42));
         });
         let err = result.unwrap_err();
         assert!(err.message.contains("42"));

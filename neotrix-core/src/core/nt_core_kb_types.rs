@@ -8,7 +8,7 @@ pub use neotrix_types::knowledge_access::{
     KnowledgeEdge, KnowledgeNode, NodeType, RelationType, TemporalValidity,
 };
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// NT-CORE KB 类型核心自测: NodeType 枚举 as_str<->from_str 全变体往返 (卫生层 P0: 核心必须可自测)。
 pub struct KbTypesSelfTest;

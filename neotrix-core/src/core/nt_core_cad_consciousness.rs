@@ -12,7 +12,7 @@
 //! 原语 (csr/ccip/cdp/decoder/检索/合成/B-rep/自愈); 本模块提供意识级编排
 //! (SEAL 路由 / Rune 演化 / 接线验证 / 经验吸收), 契合指针守恒与 Dark Forest。
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use crate::core::nt_core_traits::RuneSocket;
 
 // ════════════════════════════════════════════════════════════════════════
@@ -319,9 +319,9 @@ pub fn register_cad_consciousness_self_tests(registry: &mut SelfTestRegistry) {
 
 #[cfg(test)]
 mod verification {
-    use crate::core::nt_core_self_test::SelfTestRegistry;
-    use crate::core::nt_core_self_test::SelfTestResult;
-    use crate::core::nt_core_self_test_integration::register_absorbed_modules;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
+    use crate::l6_meta::healing::nt_core_self_test::SelfTestResult;
+    use crate::l6_meta::healing::nt_core_self_test_integration::register_absorbed_modules;
     use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
     use crate::core::nt_core_gwt::cad_route::register_cad_gwt;
     use crate::core::nt_core_knowledge::cad_absorb::absorb_cad_experience;

@@ -169,7 +169,7 @@ impl EntropyMonitor {
     }
 }
 
-impl crate::core::nt_core_self_test::SelfTest for EntropyMonitor {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for EntropyMonitor {
     fn name(&self) -> &str {
         "entropy_monitor"
     }

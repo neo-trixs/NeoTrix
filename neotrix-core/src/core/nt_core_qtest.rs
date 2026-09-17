@@ -409,7 +409,7 @@ impl QTestIndex {
 /// 此时量子坍缩会静默退化到全量 — 需显式报告。
 pub struct QTestEngineSelfTest;
 
-impl crate::core::nt_core_self_test::SelfTest for QTestEngineSelfTest {
+impl crate::l6_meta::healing::nt_core_self_test::SelfTest for QTestEngineSelfTest {
     fn name(&self) -> &str {
         "nt_core_qtest_engine"
     }
