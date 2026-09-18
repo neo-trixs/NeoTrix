@@ -8,7 +8,7 @@ use super::super::super::attention_router::AttentionRouter;
 use super::super::super::knowledge::cortex_memory::CortexMemory;
 use super::super::super::change_archive::ChangeArchive;
 use super::super::super::sleep::{SleepEngine, SleepStats};
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
 use crate::l5_cognition::layer_aliases::CryptoAgent;
@@ -23,14 +23,14 @@ use super::super::harness_adapter::{HarnessAdapter, HarnessKbExt};
 use super::super::dpo_stage::DpoStage;
 use super::super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::super::safety_stage::SafetyCheckStage;
-use crate::core::{E8TransitionLearner, ReasoningHexagram, strategy_matrix};
+use crate::l5_cognition::nt_core_policy::E8TransitionLearner; use crate::l5_cognition::nt_core_hex::{ReasoningHexagram, strategy_matrix};
 use crate::l5_cognition::nt_core_consciousness::{
     awakening::ConsciousnessAwakening,
     specious_present::SpeciousPresent,
     FirstPersonRef, ConsciousnessStream, CognitiveLoadMonitor,
 };
-use crate::neotrix::nt_world_jepa::JepaWorldModel;
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l2_perception::nt_world::nt_world_jepa::JepaWorldModel;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l5_cognition::nt_mind::knowledge_distiller::KnowledgeDistiller;
 use crate::l5_cognition::nt_mind::foundation::memory_bank::{MemoryOrchestrator, MemoryTier};
 use crate::l5_cognition::nt_mind::nt_mind::element::registry::ElementRegistry;
@@ -86,7 +86,7 @@ pub struct SelfIteratingBrain {
     pub(crate) _harness_adapter: HarnessAdapter,
     pub(crate) _stage_results: Vec<StageResult>,
     pub(crate) _transition_learner: E8TransitionLearner,
-    pub(crate) _e8_policy: crate::core::E8Policy,
+    pub(crate) _e8_policy: crate::l5_cognition::nt_core_policy::E8Policy,
     pub(crate) _knowledge_distiller: KnowledgeDistiller,
     pub _nt_memory_kb: Option<KnowledgeBase>,
     // Phase 2: Task Dispatcher & CoT Generator integration
@@ -121,8 +121,8 @@ pub struct SelfIteratingBrain {
     pub(crate) _last_anchor_decision: Option<super::super::checkpoint::AnchorDecision>,
     pub echo_bridge: crate::l5_cognition::nt_core_echo_terminal::EchoPrmBridge,
     pub(crate) _memory_orch: MemoryOrchestrator,
-    pub(crate) _per_loop: Option<crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop>,
-    pub(crate) _oracle_gate: Option<crate::neotrix::nt_act_autonomy::OracleGate>,
+    pub(crate) _per_loop: Option<crate::l1_action::nt_act::nt_act_autonomy::PlanExecuteReflectLoop>,
+    pub(crate) _oracle_gate: Option<crate::l1_action::nt_act::nt_act_autonomy::OracleGate>,
     pub(crate) _cross_session_memory: Option<crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemory>,
 
     /// Last consciousness quality score from InnerCritic (0.0–1.0)
@@ -135,11 +135,11 @@ pub struct SelfIteratingBrain {
     pub(crate) _consciousness_critique_count: u64,
     /// G5 S 门控 (灵境 L4 自指闭环): 意识质量门控 SEAL 自编辑应用。
     /// 裁决点: BoundedEditStage + code_review_iterate; 计数供 SelfTest 断言。
-    pub(crate) _constitution_gate: crate::core::nt_core_self::seal::ConstitutionGate,
+    pub(crate) _constitution_gate: crate::l6_meta::nt_core_self::seal::ConstitutionGate,
     /// Phase 9.2 — dynamic self-model: continuous estimate of capability,
     /// uncertainty, and fatigue; its prediction error is the intrinsic
     /// self-reward blended into transition learning.
-    pub self_model: crate::core::nt_core_self::SelfModel,
+    pub self_model: crate::l6_meta::nt_core_self::SelfModel,
     /// Plugin Element registry (Phase 1): lifecycle-managed capability/memory/skill elements.
     pub element_registry: ElementRegistry,
 }
@@ -210,7 +210,7 @@ impl SelfIteratingBrain {
             _rejected_buffer: RejectedEditBuffer::default(),
             _aging_monitor: AgingMonitor::default(),
             _transition_learner: E8TransitionLearner::default(),
-            _e8_policy: crate::core::E8Policy::default(),
+            _e8_policy: crate::l5_cognition::nt_core_policy::E8Policy::default(),
             _knowledge_distiller: KnowledgeDistiller::new(),
             _nt_memory_kb: init_kb,
             _harness_adapter: init_adapter,
@@ -242,10 +242,10 @@ impl SelfIteratingBrain {
             _last_anchor_decision: None,
             echo_bridge: crate::l5_cognition::nt_core_echo_terminal::EchoPrmBridge::new(),
             _memory_orch: MemoryOrchestrator::new(),
-            _per_loop: Some(crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop::new(
-                crate::neotrix::nt_act_autonomy::PerConfig::default(),
+            _per_loop: Some(crate::l1_action::nt_act::nt_act_autonomy::PlanExecuteReflectLoop::new(
+                crate::l1_action::nt_act::nt_act_autonomy::PerConfig::default(),
             )),
-            _oracle_gate: Some(crate::neotrix::nt_act_autonomy::OracleGate::new()),
+            _oracle_gate: Some(crate::l1_action::nt_act::nt_act_autonomy::OracleGate::new()),
             _cross_session_memory: Some(crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemory::new(
                 dirs::home_dir()
                     .unwrap_or_default()
@@ -256,8 +256,8 @@ impl SelfIteratingBrain {
             _last_consciousness_quality: 0.0,
             _consciousness_fruits: Vec::new(),
             _consciousness_critique_count: 0,
-            _constitution_gate: crate::core::nt_core_self::seal::ConstitutionGate::new(),
-            self_model: crate::core::nt_core_self::SelfModel::new(),
+            _constitution_gate: crate::l6_meta::nt_core_self::seal::ConstitutionGate::new(),
+            self_model: crate::l6_meta::nt_core_self::SelfModel::new(),
             element_registry: Self::build_element_registry(),
         };
         // ScienceFlow re-anchor 接线 (absorbed 2026-08-19, P3, R-P79):
@@ -432,7 +432,7 @@ impl SelfIteratingBrain {
     pub(crate) fn _set_aging_monitor(&mut self, m: AgingMonitor) { self._aging_monitor = m; }
 
     /// G5 S 门控只读访问 (SelfTest 断言否决/放行计数用)。
-    pub fn edit_constitution_gate(&self) -> &crate::core::nt_core_self::seal::ConstitutionGate {
+    pub fn edit_constitution_gate(&self) -> &crate::l6_meta::nt_core_self::seal::ConstitutionGate {
         &self._constitution_gate
     }
 
@@ -752,11 +752,11 @@ impl super::super::brain_impl::SelfIteration for SelfIteratingBrain {
     type Evaluation = f64;
 
     fn iterate(&mut self) -> Self::IterationResult {
-        self.iterate(crate::neotrix::nt_world_model::TaskType::General)
+        self.iterate(crate::l2_perception::nt_world::nt_world_model::TaskType::General)
     }
 
     fn evaluate(&self) -> Self::Evaluation {
-        self.brain.evaluate_capability(crate::neotrix::nt_world_model::TaskType::General)
+        self.brain.evaluate_capability(crate::l2_perception::nt_world::nt_world_model::TaskType::General)
     }
 
     fn absorb_feedback(&mut self, feedback: f64) {
@@ -766,7 +766,7 @@ impl super::super::brain_impl::SelfIteration for SelfIteratingBrain {
     }
 
     fn should_continue(&self, threshold: f64) -> bool {
-        let base_score = self.brain.evaluate_capability(crate::neotrix::nt_world_model::TaskType::General);
+        let base_score = self.brain.evaluate_capability(crate::l2_perception::nt_world::nt_world_model::TaskType::General);
         let aging_penalty = self._aging_monitor.overall_aging() * 0.2;
         let adjusted_threshold = threshold * (1.0 - aging_penalty);
         base_score < adjusted_threshold

@@ -8,9 +8,9 @@
 use crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::{
     DiagnoseActionPlan, EvolutionLoopProvider,
 };
-use crate::neotrix::nt_act_code::code_writer::{ActionPlan, CodeGenRequest, SelfCodeWriter};
-use crate::neotrix::nt_act_code::edit_history::EditHistoryTracker;
-use crate::neotrix::nt_act_code::safe_applier::SafeCodeApplier;
+use crate::l1_action::nt_act::nt_act_code::code_writer::{ActionPlan, CodeGenRequest, SelfCodeWriter};
+use crate::l1_action::nt_act::nt_act_code::edit_history::EditHistoryTracker;
+use crate::l1_action::nt_act::nt_act_code::safe_applier::SafeCodeApplier;
 
 /// 单次管道执行结果
 #[derive(Debug)]

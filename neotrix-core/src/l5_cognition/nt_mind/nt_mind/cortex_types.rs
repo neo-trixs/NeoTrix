@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
-use crate::neotrix::nt_world_jepa::JepaPredictor;
-use crate::neotrix::nt_world_e8::E8WorldModel;
-use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
+use crate::l2_perception::nt_world::nt_world_jepa::JepaPredictor;
+use crate::l2_perception::nt_world::nt_world_e8::E8WorldModel;
+use crate::l2_perception::nt_world::nt_world_infer::ActiveInferenceEngine;
 use crate::l1_action::nt_core_edit::MicroEdit;
 
 pub const DEFAULT_HORIZON: usize = 5;

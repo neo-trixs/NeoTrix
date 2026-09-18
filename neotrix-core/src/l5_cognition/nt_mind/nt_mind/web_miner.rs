@@ -8,8 +8,8 @@ use super::self_edit::MicroEdit;
 use super::self_iterating::ReasoningBrain;
 use super::memory::{ReasoningBank, ReasoningMemory};
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 /// 网络来源类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

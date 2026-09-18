@@ -8,11 +8,11 @@ use super::stealth::SessionPool;
 use super::classifier::ContentClassifier;
 use super::mapper::KnowledgeMapper;
 
-use crate::core::CapabilityVector;
+use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use crate::l1_action::nt_core_bank::ReasoningBank;
 use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
 use crate::l2_perception::nt_core_hcube::gap::GapReport;
-use crate::neotrix::nt_world_scrape::ScraperConfig;
+use crate::l2_perception::nt_world::nt_world_scrape::ScraperConfig;
 
 pub struct UnifiedCrawler {
     pub config: CrawlerConfig,
@@ -35,7 +35,7 @@ pub struct UnifiedCrawler {
     pub cube: KnowledgeHyperCube,
     /// 可选 SQLite KB 引用 — 挂接后爬取结果落 KB（修复对外信息获取断点:
     /// 此前只写内存 hypercube, 与 SQLite KB 脱节, 爬取数据无法被 BM25/embedding 检索）。
-    kb: Option<crate::neotrix::nt_memory_kb::KnowledgeBase>,
+    kb: Option<crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase>,
     /// 可选两阶段抓取器 (nt_world_prefetch 接线) — 挂接后链接发现先过 BM25 过滤,
     /// 只保留主题相关链接入 frontier, 降噪并减少无效抓取 (D11/D15 缺陷网修复)。
     prefetch: Option<crate::l2_perception::nt_world::nt_world_prefetch::TwoPhaseCrawler>,
@@ -122,7 +122,7 @@ impl UnifiedCrawler {
     }
 
     /// 挂接 SQLite KB — 之后每次 run_cycle 的爬取结果都会落 KB（可检索）。
-    pub fn attach_kb(&mut self, kb: crate::neotrix::nt_memory_kb::KnowledgeBase) {
+    pub fn attach_kb(&mut self, kb: crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) {
         self.kb = Some(kb);
     }
 
@@ -613,7 +613,7 @@ fn priority_for_topic(topic: &CrawlTopic) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::CapabilityVector;
+    use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 
     fn test_nt_world_crawl() -> UnifiedCrawler {
         let config = CrawlerConfig {
@@ -746,7 +746,7 @@ mod tests {
                 .unwrap_or_default()
                 .as_nanos()
         ));
-        let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(tmp))
+        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp))
             .expect("open temp KB");
 
         // 直接构造 crawler 并挂接 KB（不跑真实网络）

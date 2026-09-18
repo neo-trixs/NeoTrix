@@ -7,9 +7,9 @@ use crate::l2_perception::nt_core_hcube::cube::CubeEntry;
 
 use super::hypercube_bridge::HyperCubeBridge;
 
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
-use crate::neotrix::nt_world_crawl::config::{CrawlTopic, SeedEntry};
-use crate::neotrix::nt_world_crawl::unified::UnifiedCrawler;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l2_perception::nt_world::nt_world_crawl::config::{CrawlTopic, SeedEntry};
+use crate::l2_perception::nt_world::nt_world_crawl::unified::UnifiedCrawler;
 
 /// 路由结果 — GWT 竞争 + 知识检索的产出
 pub struct _RoutedContext {
@@ -745,7 +745,7 @@ mod tests {
     fn test_attach_kb_enables_kb_retrieval() {
         // B1 测试隔离: 用内存 KB 而非 open(None) (生产路径会被并行锁+污染)
         let kb = std::sync::Arc::new(
-            crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(std::path::PathBuf::from(
+            crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(std::path::PathBuf::from(
                 ":memory:",
             )))
             .expect("open memory kb"),

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::pipeline::{AutonomyLevel, BrainSnapshot, BrainStage, PermissionLevel, StageDecision};
 use super::SelfIteratingBrain;
-use crate::core::CapabilityVector;
+use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use crate::make_stage;
 use crate::neotrix::nt_core_error::NeoTrixError;
 
@@ -201,8 +201,8 @@ impl CheckpointManager {
         let json = serde_json::to_string_pretty(&persisted)
             .map_err(|e| NeoTrixError::Serde(format!("checkpoint 序列化失败: {e}")))?;
         match conn {
-            Some(c) => crate::core::nt_core_state::save_with(c, "seal_checkpoint", &json),
-            None => crate::core::nt_core_state::save("seal_checkpoint", &json),
+            Some(c) => crate::l5_cognition::nt_core_state::save_with(c, "seal_checkpoint", &json),
+            None => crate::l5_cognition::nt_core_state::save("seal_checkpoint", &json),
         }
         .map_err(NeoTrixError::Io)
     }
@@ -215,8 +215,8 @@ impl CheckpointManager {
     /// 注入连接变体。
     pub(crate) fn _load_from_conn(conn: Option<&rusqlite::Connection>) -> Option<_PersistedCheckpoint> {
         let json = match conn {
-            Some(c) => crate::core::nt_core_state::load_with(c, "seal_checkpoint"),
-            None => crate::core::nt_core_state::load("seal_checkpoint"),
+            Some(c) => crate::l5_cognition::nt_core_state::load_with(c, "seal_checkpoint"),
+            None => crate::l5_cognition::nt_core_state::load("seal_checkpoint"),
         }?;
         serde_json::from_str(&json).ok()
     }
@@ -229,8 +229,8 @@ impl CheckpointManager {
     /// 注入连接变体。
     pub(crate) fn _clear_conn(conn: Option<&rusqlite::Connection>) -> Result<bool, String> {
         match conn {
-            Some(c) => crate::core::nt_core_state::delete_with(c, "seal_checkpoint"),
-            None => crate::core::nt_core_state::delete("seal_checkpoint"),
+            Some(c) => crate::l5_cognition::nt_core_state::delete_with(c, "seal_checkpoint"),
+            None => crate::l5_cognition::nt_core_state::delete("seal_checkpoint"),
         }
     }
 }

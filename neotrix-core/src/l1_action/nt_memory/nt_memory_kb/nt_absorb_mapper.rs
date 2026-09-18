@@ -673,7 +673,7 @@ pub fn map_nodes(
 
 /// 写库: 合并 `absorbed_capability` + `knowledge_source` 进 metadata (read-modify-write)。
 pub fn apply_mappings(conn: &Connection, mappings: &[(String, CapabilityMapping)]) -> rusqlite::Result<usize> {
-    use crate::neotrix::nt_memory_kb::nt_memory_store;
+    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store;
     let now = unix_now();
     for (nid, m) in mappings {
         let meta = read_metadata(conn, nid)?;
@@ -747,7 +747,7 @@ fn read_metadata(conn: &Connection, nid: &str) -> rusqlite::Result<Map<String, V
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
-    use crate::neotrix::nt_memory_kb::nt_memory_schema;
+    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema;
     use std::collections::BTreeSet;
 
     fn test_db() -> Connection {

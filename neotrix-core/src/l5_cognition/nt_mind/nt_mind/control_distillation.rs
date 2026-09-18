@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::l5_cognition::nt_core_prm::{StepGrpoConfig, ProcessScore, AgentTrajectory, TrajectoryStep};
 use crate::l5_cognition::nt_core_policy::E8Policy;
 use crate::l5_cognition::nt_core_ttc::EffortTier;
-use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_traits::SpecialistType;
 use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 

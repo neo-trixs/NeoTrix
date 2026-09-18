@@ -1,7 +1,7 @@
 use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
 use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
 use crate::l2_perception::nt_core_hcube::cube::{KnowledgeHyperCube, CubeEntry};
-use crate::core::nt_core_self::attention_head::{AttentionDomain, AttentionManager};
+use crate::l6_meta::nt_core_self::attention_head::{AttentionDomain, AttentionManager};
 
 #[derive(Debug, Clone)]
 pub struct AttentionRecallItem {

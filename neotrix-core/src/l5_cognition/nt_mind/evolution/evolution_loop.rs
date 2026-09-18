@@ -11,16 +11,16 @@
 //! 融合 AGENTS.md 元认知自检 + MetaCognitive Self-Check 协议
 
 use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
-use crate::neotrix::nt_act_code::PipelineAutoFixer;
+use crate::l1_action::nt_act::nt_act_code::PipelineAutoFixer;
 use crate::l5_cognition::nt_mind::evolution::self_diagnose::{
     ActionExecutor, ActionPlan, CodeUnderlyingIssue, DiagnosticItem, EvolutionLoopProvider,
     PriorityQueue, PrioritizedIssue, RepairCircuitBreaker, SelfDiagnose,
 };
 use crate::l5_cognition::nt_core::nt_iit_phi::IITPhiCalculator;
-use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
+use crate::l2_perception::nt_world::nt_world_infer::ActiveInferenceEngine;
 // pub use crate::l1_action::nt_act::nt_l1_shared_types::IssueType;
 use serde::{Deserialize, Serialize};
-use crate::neotrix::evolution::evolution_daemon::IssueType;
+use crate::l5_cognition::nt_mind::evolution::evolution_daemon::IssueType;
 
 // ============================================================
 // 常量

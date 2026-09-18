@@ -16,7 +16,7 @@ struct PlanManager {
 
 impl PlanManager {
     fn load() -> Self {
-        if let Some(data) = crate::core::nt_core_state::load("plans") {
+        if let Some(data) = crate::l5_cognition::nt_core_state::load("plans") {
             if let Ok(plans) = serde_json::from_str::<Vec<E8Plan>>(&data) {
                 let active_id = plans.last().map(|p| p.id.clone());
                 return Self { plans, active_id };
@@ -27,7 +27,7 @@ impl PlanManager {
 
     fn save(&self) {
         if let Ok(data) = serde_json::to_string_pretty(&self.plans) {
-            let _ = crate::core::nt_core_state::save("plans", &data);
+            let _ = crate::l5_cognition::nt_core_state::save("plans", &data);
         }
     }
 

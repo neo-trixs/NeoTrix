@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::bm25;
 use super::nt_memory_embed::load_all_embeddings;
-use crate::l5_cognition::nt_core_math::cosine_similarity_f32;
+use crate::l0_substrate::nt_core_math::cosine_similarity_f32;
 use super::nt_memory_types::*;
 
 pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
@@ -571,7 +571,7 @@ fn build_walsh_ranklist(
     scored
 }
 
-use crate::l5_cognition::nt_core_math::cosine_similarity_f64;
+use crate::l0_substrate::nt_core_math::cosine_similarity_f64;
 
 /// Build a proxy query embedding by averaging stored embeddings of nodes
 /// whose title or content matches query words.

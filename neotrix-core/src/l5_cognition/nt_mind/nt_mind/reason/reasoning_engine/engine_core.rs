@@ -25,13 +25,14 @@ use crate::l5_cognition::nt_mind::nt_mind::knowledge::context_artifacts::indexer
 
 use crate::l5_cognition::nt_core::capability::nt_act_orch_patterns::Orchestrator;
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::l5_cognition::nt_core_hex::{FullReasoningState, ReasoningHexagram};
-use crate::core::nt_core_observer::OneObserver;
+use crate::l0_substrate::nt_core_hex::{FullReasoningState, ReasoningHexagram};
+use crate::l6_meta::nt_core_observer::OneObserver;
 use crate::l6_meta::nt_core_observer_error::ObserverErrorRecovery;
-use crate::core::nt_core_self::silicon_self::SiliconSelfModel;
+use crate::l6_meta::nt_core_self::silicon_self::SiliconSelfModel;
 use crate::core::nt_core_span::{
     AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer,
 };
+use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use crate::l5_cognition::layer_aliases::{KnowledgeBase, SearchResult};
 use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{
     AlternatingSequence, ControlDistiller, ControlTrainer, CsppoReport, ReasoningStep, SftReport,
@@ -40,11 +41,10 @@ use crate::l5_cognition::nt_mind::nt_mind::core::BrainMutView;
 use crate::l5_cognition::nt_mind::nt_mind::distillation::{AntiPattern, StrategicPrinciple};
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::model_router::ModelRouter;
-use crate::neotrix::nt_world_jepa::JepaWorldModel;
+use crate::l2_perception::nt_world::nt_world_jepa::JepaWorldModel;
 // use crate::l5_cognition::nt_mind::context_artifacts::indexer::ArtifactIndexer;
 use super::CognitiveEye;
 use crate::l1_action::nt_io::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
-use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 pub const MAX_COST_LOG: usize = 1000;
@@ -148,7 +148,7 @@ pub struct ReasoningEngine {
     pub intent_engine: Option<IntentEngine>,
     /// Hypothesis network: shared with EWHR REST API
     pub hypothesis_network: Option<
-        Arc<Mutex<crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>>,
+        Arc<Mutex<crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>>,
     >,
     /// Fable-5 pattern matcher: scores trajectory alignment against Mythos reasoning phases
     pub fable_matcher: Option<FablePatternMatcher>,
@@ -331,7 +331,7 @@ impl ReasoningEngine {
     pub fn with_hypothesis_network(
         mut self,
         net: Arc<
-            Mutex<crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>,
+            Mutex<crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>,
         >,
     ) -> Self {
         self.hypothesis_network = Some(net);
@@ -2279,7 +2279,7 @@ impl ReasoningEngine {
 /// HypothesisNetwork 节点。幂等: 同一 (trajectory_len, index) 的 id 已存在则跳过,
 /// 避免每轮重复落点。返回实际新增数量。
 fn hydrate_ewhr_hypotheses(
-    net: &mut crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork,
+    net: &mut crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork,
     proposed: &[String],
     tick: usize,
 ) -> usize {
@@ -2668,7 +2668,7 @@ mod tests {
 
     #[test]
     fn test_hydrate_ewhr_hypotheses_adds_nodes() {
-        use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        use crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
         let mut net = HypothesisNetwork::new();
         let proposed = vec![
             "agent should adopt Direct strategy when context is high".to_string(),
@@ -2683,7 +2683,7 @@ mod tests {
 
     #[test]
     fn test_hydrate_ewhr_hypotheses_idempotent() {
-        use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        use crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
         let mut net = HypothesisNetwork::new();
         let proposed = vec!["same proposal repeated".to_string()];
         // 同一 tick 两次调用 → 第二次不重复落点
@@ -2700,7 +2700,7 @@ mod tests {
 
     #[test]
     fn test_hydrate_ewhr_hypotheses_long_title_truncated() {
-        use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        use crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
         let mut net = HypothesisNetwork::new();
         let long = "a very long hypothesis description that definitely exceeds the thirty two character title limit for display purposes".to_string();
         let added = hydrate_ewhr_hypotheses(&mut net, &[long.clone()], 1);
@@ -2925,6 +2925,7 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for CapturingProvider {
+    fn set_proxy(&mut self, _proxy_url: &str) {}
             fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
                 crate::l1_action::nt_core_llm::DataTrust::Trusted
             }
@@ -2935,16 +2936,18 @@ mod tests {
             ) -> Result<LlmResponse, crate::l1_action::nt_core_llm::LlmError> {
                 *self.seen_model.lock().unwrap() = Some(request.model.clone());
                 *self.seen_max_tokens.lock().unwrap() = Some(request.max_tokens);
-                Ok(LlmResponse::plain(
-                    "routed response".to_string(),
-                    request.model.clone(),
-                    Usage {
+                Ok(LlmResponse {
+                    content: "routed response".to_string(),
+                    model: request.model.clone(),
+                    usage: Usage {
                         prompt_tokens: 5,
                         completion_tokens: 5,
                         total_tokens: 10,
                     },
-                    FinishReason::Stop,
-                ))
+                    finish_reason: FinishReason::Stop,
+                    tool_calls: None,
+                    reasoning: None,
+                })
             }
             async fn stream_complete_raw(
                 &self,

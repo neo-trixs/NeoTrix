@@ -644,7 +644,7 @@ mod tests {
         let mut brain = dummy_brain();
         brain.champion = {
             let mut snap = crate::l5_cognition::nt_mind::nt_mind::self_iterating::BrainSnapshot::new(
-                &brain.brain, &crate::neotrix::nt_world_model::TaskType::General
+                &brain.brain, &crate::l2_perception::nt_world::nt_world_model::TaskType::General
             );
             snap.score = 1.0;
             Some(snap)
@@ -803,7 +803,7 @@ mod tests {
         let mut brain = dummy_brain();
         brain.champion = {
             let mut snap = crate::l5_cognition::nt_mind::nt_mind::self_iterating::BrainSnapshot::new(
-                &brain.brain, &crate::neotrix::nt_world_model::TaskType::General
+                &brain.brain, &crate::l2_perception::nt_world::nt_world_model::TaskType::General
             );
             snap.score = 1.0;
             Some(snap)
@@ -822,7 +822,7 @@ mod tests {
         let mut brain = dummy_brain();
         brain.champion = {
             let mut snap = crate::l5_cognition::nt_mind::nt_mind::self_iterating::BrainSnapshot::new(
-                &brain.brain, &crate::neotrix::nt_world_model::TaskType::General
+                &brain.brain, &crate::l2_perception::nt_world::nt_world_model::TaskType::General
             );
             snap.score = 1.0;
             Some(snap)
@@ -841,7 +841,7 @@ mod tests {
         let mut brain = dummy_brain();
         brain.champion = {
             let mut snap = crate::l5_cognition::nt_mind::nt_mind::self_iterating::BrainSnapshot::new(
-                &brain.brain, &crate::neotrix::nt_world_model::TaskType::General
+                &brain.brain, &crate::l2_perception::nt_world::nt_world_model::TaskType::General
             );
             snap.score = 1.0;
             Some(snap)

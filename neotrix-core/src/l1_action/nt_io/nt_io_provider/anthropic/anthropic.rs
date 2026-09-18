@@ -14,7 +14,7 @@ impl AnthropicProvider {
         Self {
             api_key,
             base_url: "https://api.anthropic.com".to_string(),
-            client: crate::neotrix::nt_io_http_factory::global_client().clone(),
+            client: crate::l1_action::nt_io::nt_io_http_factory::global_client().clone(),
         }
     }
 }
@@ -70,7 +70,7 @@ fn serialize_system(s: &str, cache: bool) -> serde_json::Value {
 #[async_trait]
 impl LlmProvider for AnthropicProvider {
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
     fn data_trust(&self) -> DataTrust {
@@ -273,7 +273,7 @@ impl LlmProvider for AnthropicProvider {
         let (tx, rx) = tokio::sync::mpsc::channel(64);
 
         tokio::spawn(async move {
-            let client = crate::neotrix::nt_io_http_factory::global_client().clone();
+            let client = crate::l1_action::nt_io::nt_io_http_factory::global_client().clone();
             match client.post(&url)
                 .header("x-api-key", &api_key)
                 .header("anthropic-version", "2023-06-01")

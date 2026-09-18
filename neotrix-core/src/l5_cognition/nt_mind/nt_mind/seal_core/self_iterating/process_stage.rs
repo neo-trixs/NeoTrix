@@ -254,7 +254,7 @@ impl ProcessStage {
     }
 
     /// 将过程能力写入 CapabilityVector.extension
-    pub fn sync_to_capability_vector(&self, cv: &mut crate::core::CapabilityVector) {
+    pub fn sync_to_capability_vector(&self, cv: &mut crate::l5_cognition::nt_core::capability::types::CapabilityVector) {
         cv.add_extension_dim("nt_cap:reasoning_depth", self.reasoning_depth);
         cv.add_extension_dim("nt_cap:cot_quality", self.cot_quality);
         cv.add_extension_dim("nt_cap:tool_use_fluency", self.tool_use_fluency);
@@ -264,7 +264,7 @@ impl ProcessStage {
     }
 
     /// 从 CapabilityVector 读取过程能力
-    pub fn load_from_capability_vector(cv: &crate::core::CapabilityVector) -> Self {
+    pub fn load_from_capability_vector(cv: &crate::l5_cognition::nt_core::capability::types::CapabilityVector) -> Self {
         let mut stage = Self::new();
         for (name, val) in cv.extension() {
             match name.as_str() {
@@ -356,14 +356,14 @@ mod tests {
     fn test_sync_to_capability_vector() {
         let mut stage = ProcessStage::new();
         stage.reasoning_depth = 0.7; stage.cot_quality = 0.8;
-        let mut cv = crate::core::CapabilityVector::default();
+        let mut cv = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         stage.sync_to_capability_vector(&mut cv);
         assert!((cv.extension().iter().find(|(n,_)| n=="nt_cap:reasoning_depth").unwrap().1 - 0.7).abs() < 1e-9);
     }
 
     #[test]
     fn test_load_from_capability_vector() {
-        let mut cv = crate::core::CapabilityVector::default();
+        let mut cv = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         cv.add_extension_dim("nt_cap:tool_use_fluency", 0.6);
         cv.add_extension_dim("nt_cap:decomposition_skill", 0.4);
         let stage = ProcessStage::load_from_capability_vector(&cv);

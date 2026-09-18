@@ -9,7 +9,7 @@
 //! - Unicast:   starpulse.<layer>.<module>.<sender>.<target> (发送给指定模块实例)
 //! - Anycast:   starpulse.anycast.<role>.<sender>            (任意一个具有该角色的模块处理)
 
-use crate::core::nt_core_self::emotion_state::EmotionReport;
+use crate::l6_meta::nt_core_self::emotion_state::EmotionReport;
 use std::collections::HashMap;
 
 /// Unique module/agent identifier in the layer topology

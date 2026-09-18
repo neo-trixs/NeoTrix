@@ -3,14 +3,14 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use neotrix::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-use neotrix::nt_mind::nt_mind::KnowledgeSource as V1KnowledgeSource;
-use neotrix::nt_mind::nt_mind::goal_loop::{GoalLoop, GoalState};
-use neotrix::agent::skills::SkillsEngine;
-use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-use neotrix::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
-use neotrix::cli::commands::agent_cmds::McpRegistry;
-use neotrix::core::nt_core_cap::FIELD_NAMES;
+use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::KnowledgeSource as V1KnowledgeSource;
+use crate::l5_cognition::nt_mind::nt_mind::goal_loop::{GoalLoop, GoalState};
+use crate::agent::skills::SkillsEngine;
+use crate::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
+use crate::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
+use crate::cli::commands::agent_cmds::McpRegistry;
+use crate::core::nt_core_cap::FIELD_NAMES;
 
 use super::print_brain_stats;
 
@@ -124,7 +124,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("  <text>         - Reason with current task");
         }
         "/status" => {
-            let mut bridge = neotrix::neotrix::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
+            let mut bridge = neotrix::neotrix::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
             bridge.run_reflection_cycle();
             let mot = bridge.compute_motivation();
             bridge.evaluate_cognitive_health();
@@ -149,7 +149,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("╰──────────────────────────────────────────────────────╯");
         }
         "/evo" => {
-            let mut bridge = neotrix::neotrix::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
+            let mut bridge = neotrix::neotrix::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
             let evo = bridge.run_full_evolution_cycle();
             println!("{}", evo);
             let health = bridge.evolution_summary();
@@ -161,7 +161,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             }
         }
         "/think" => {
-            let mut bridge = neotrix::neotrix::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
+            let mut bridge = neotrix::neotrix::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
             let result = bridge.run_reflection_cycle();
             let grade_label = result.trace.as_ref().map(|t| t.grade.label()).unwrap_or("?");
             let profile = bridge.attention_profile_summary();
@@ -255,7 +255,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                     let mode_str = parts.get(2).copied();
                     #[cfg(feature = "stealth-net")]
                     {
-                        use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{ProxyClient, DaemonMode};
+                        use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::{ProxyClient, DaemonMode};
                         let client = ProxyClient::new();
                         if let Some(m) = mode_str {
                             if let Some(mode) = DaemonMode::from_str(m) {
@@ -283,8 +283,8 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 Some("status") | None => {
                     #[cfg(feature = "stealth-net")]
                     {
-                        use neotrix::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient;
-                        use neotrix::neotrix::nt_shield_stealth_net::local_proxy::TorManager;
+                        use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::ProxyClient;
+                        use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::local_proxy::TorManager;
                         println!("\n╭─ NeoTrix 代理状态 ───────────────────────────────╮");
                         let tor = TorManager::socks5_reachable().await;
                         println!("│ Tor SOCKS5 :9050 :  {}                     │",

@@ -86,7 +86,7 @@ impl LlmProvider for GroqProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -228,7 +228,7 @@ impl LlmProvider for OpenRouterProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -401,7 +401,7 @@ impl LlmProvider for PollinationsProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -564,7 +564,7 @@ impl LlmProvider for CerebrasProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {

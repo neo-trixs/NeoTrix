@@ -14,7 +14,7 @@ use std::path::Path;
 
 use crate::l5_cognition::nt_mind::nt_mind::core::CapabilityVector;
 use crate::l5_cognition::nt_mind::nt_mind::self_edit::MicroEdit;
-use crate::neotrix::nt_shield_audit::AuditMode;
+use crate::l3_embodiment::nt_shield::nt_shield_audit::AuditMode;
 
 #[derive(Debug, Clone)]
 pub struct _ReviewIssue {

@@ -17,7 +17,7 @@ use super::meta_observer::{MetaObservationReport, MetaObserver, MetaObserverConf
 use super::CapabilityNode;
 use crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot;
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
-use crate::neotrix::RuneSocket;
+use nt_core_capability_tree::RuneSocket;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -49,7 +49,7 @@ impl EditHistoryTracker {
             .join(".neotrix")
             .join("edit_history.json");
         let session_id = Self::generate_session_id();
-        let entries = crate::core::nt_core_state::load("edit_history")
+        let entries = crate::l5_cognition::nt_core_state::load("edit_history")
             .and_then(|s| serde_json::from_str(&s).ok())
             .or_else(|| {
                 path.exists()
@@ -203,7 +203,7 @@ impl EditHistoryTracker {
         let json = serde_json::to_string_pretty(&self.entries)
             .map_err(|e| format!("序列化失败: {}", e))?;
         if self.use_kb {
-            crate::core::nt_core_state::save("edit_history", &json)
+            crate::l5_cognition::nt_core_state::save("edit_history", &json)
                 .map_err(|e| format!("KB写入失败: {}", e))?;
         }
         if !self.use_kb {

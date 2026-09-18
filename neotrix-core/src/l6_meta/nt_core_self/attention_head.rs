@@ -579,7 +579,7 @@ impl AttentionManager {
     pub fn fsm_assisted_route(
         &self,
         history: &[AttentionDomain],
-        fsm: &crate::core::nt_core_self::behavior_fsm::FsmModel,
+        fsm: &crate::l6_meta::nt_core_self::behavior_fsm::FsmModel,
     ) -> Option<AttentionDomain> {
         if history.is_empty() {
             return None;
@@ -611,7 +611,7 @@ impl AttentionManager {
     pub fn fsm_failure_aware_route(
         &self,
         current_domain: &AttentionDomain,
-        fsm: &crate::core::nt_core_self::behavior_fsm::FsmModel,
+        fsm: &crate::l6_meta::nt_core_self::behavior_fsm::FsmModel,
         failure_threshold: f64,
     ) -> AttentionDomain {
         let state_id = format!("domain_{}", current_domain.label());
@@ -638,7 +638,7 @@ impl AttentionManager {
     pub fn cuda_assisted_route(
         &self,
         current_domain: &AttentionDomain,
-        cuda_env: &crate::core::nt_core_self::cuda_agent::CudaAgentEnvironment,
+        cuda_env: &crate::l6_meta::nt_core_self::cuda_agent::CudaAgentEnvironment,
         reward_threshold: f64,
     ) -> AttentionDomain {
         // 从 CUDA Agent 的性能分析器获取优化历史
@@ -1054,7 +1054,7 @@ mod tests {
     fn test_cuda_assisted_route_no_history_keeps_domain() {
         let mgr = AttentionManager::new(0.3);
 
-        let cuda_env = crate::core::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
+        let cuda_env = crate::l6_meta::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
         let result = mgr.cuda_assisted_route(&AttentionDomain::Planning, &cuda_env, 0.0);
         assert_eq!(result, AttentionDomain::Planning);
     }
@@ -1062,10 +1062,10 @@ mod tests {
     #[test]
     fn test_cuda_assisted_route_low_reward_switches() {
         let mgr = AttentionManager::new(0.3);
-        let mut cuda_env = crate::core::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
+        let mut cuda_env = crate::l6_meta::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
 
         // 注入低奖励历史: 手动提交任务并优化 (RewardCalculator 默认权重, 零改进 = 奖励 0)
-        let task = crate::core::nt_core_self::cuda_agent::OptimizationTask {
+        let task = crate::l6_meta::nt_core_self::cuda_agent::OptimizationTask {
             id: "t1".into(),
             name: "low_reward_task".into(),
             description: "test".into(),
@@ -1073,7 +1073,7 @@ mod tests {
             language: "python".into(),
             metrics: std::collections::HashMap::new(),
             constraints: vec![],
-            status: crate::core::nt_core_self::cuda_agent::TaskStatus::Pending,
+            status: crate::l6_meta::nt_core_self::cuda_agent::TaskStatus::Pending,
         };
         cuda_env.submit_task(task);
         cuda_env.optimize("t1");
@@ -1086,10 +1086,10 @@ mod tests {
     #[test]
     fn test_cuda_assisted_route_high_reward_keeps_domain() {
         let mgr = AttentionManager::new(0.3);
-        let mut cuda_env = crate::core::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
+        let mut cuda_env = crate::l6_meta::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
 
         // 注入高奖励历史: 提交任务并优化 (有策略时模拟 10% 改进)
-        let task = crate::core::nt_core_self::cuda_agent::OptimizationTask {
+        let task = crate::l6_meta::nt_core_self::cuda_agent::OptimizationTask {
             id: "t1".into(),
             name: "high_reward_task".into(),
             description: "test".into(),
@@ -1097,7 +1097,7 @@ mod tests {
             language: "python".into(),
             metrics: std::collections::HashMap::new(),
             constraints: vec![],
-            status: crate::core::nt_core_self::cuda_agent::TaskStatus::Pending,
+            status: crate::l6_meta::nt_core_self::cuda_agent::TaskStatus::Pending,
         };
         cuda_env.submit_task(task);
         cuda_env.optimize("t1");

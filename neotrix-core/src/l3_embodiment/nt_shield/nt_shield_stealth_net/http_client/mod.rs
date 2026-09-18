@@ -26,7 +26,7 @@ use super::proxy_chain::DynamicProxyChain;
 use super::rules::RuleEngine;
 use super::lan_router::LanRouter;
 use super::ip_privacy::IpPrivacyManager;
-use crate::neotrix::nt_io_http_factory::build_async_client;
+use crate::l1_action::nt_io::nt_io_http_factory::build_async_client;
 
 mod config;
 mod pool;

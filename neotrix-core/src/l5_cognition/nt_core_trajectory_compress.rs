@@ -1,4 +1,4 @@
-use crate::l5_cognition::nt_core_hex::FullReasoningState;
+use crate::l0_substrate::nt_core_hex::FullReasoningState;
 use crate::l5_cognition::nt_core_prm::{AgentTrajectory, TrajectoryStep};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -158,7 +158,7 @@ impl TrajectoryCompressor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+    use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
     use crate::core::nt_core_traits::SpecialistType;
 
     fn mk_step(

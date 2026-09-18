@@ -1281,7 +1281,7 @@ mod tests {
             "uniform high-health tree must yield non-zero coherence, got {coh_after}"
         );
         // 情绪报告只作 ±0.2 调制, 不把真实相干性抹成 0
-        let report = crate::core::nt_core_self::emotion_state::EmotionReport {
+        let report = crate::l6_meta::nt_core_self::emotion_state::EmotionReport {
             frustration: 0.0,
             confidence: 0.5,
             joy: 0.5,
@@ -1292,12 +1292,12 @@ mod tests {
             valence: 0.0,
             confidence_score: 0.5,
             dominant: (
-                crate::core::nt_core_self::emotion_state::EmotionDimension::Joy,
+                crate::l6_meta::nt_core_self::emotion_state::EmotionDimension::Joy,
                 0.5,
             ),
             observation_count: 0,
             dominance: 0.5,
-            emotion_label: crate::core::nt_core_self::emotion_state::EmotionLabel::Neutral,
+            emotion_label: crate::l6_meta::nt_core_self::emotion_state::EmotionLabel::Neutral,
         };
         grown.apply_emotion_report(report);
         assert!(

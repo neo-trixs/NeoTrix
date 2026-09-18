@@ -703,7 +703,7 @@ mod tests {
 
     #[test]
     fn test_generate_with_pairwise_entropy_low_threshold_defers() {
-        let detector = crate::neotrix::nt_act_code::semantic_entropy::SemanticEntropy::new(3, 0.01);
+        let detector = crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropy::new(3, 0.01);
         let mut writer = SelfCodeWriter::new().with_entropy_detector(detector);
         let req = CodeGenRequest {
             plan: ActionPlan::AddTestStub {
@@ -726,7 +726,7 @@ mod tests {
 
     #[test]
     fn test_with_entropy_detector_some() {
-        let detector = crate::neotrix::nt_act_code::semantic_entropy::SemanticEntropy::default();
+        let detector = crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropy::default();
         let writer = SelfCodeWriter::new().with_entropy_detector(detector);
         assert!(writer.entropy_detector.is_some());
     }

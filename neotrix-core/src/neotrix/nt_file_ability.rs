@@ -224,7 +224,7 @@ mod tests {
     use image::GenericImageView;
 
     use crate::l2_perception::nt_core_hcube::vsa::{VSAEngine, VsaBackend};
-    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+    use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
     use crate::l6_meta::healing::nt_core_self_test::SelfTest;
     use crate::neotrix::nt_file_ability::types::SpecialistType;
     use nt_core_capability_tree::ConstellationLevel;
@@ -1345,9 +1345,9 @@ mod tests {
         let a = embed_text("NeoTrix 自我进化知识表示", &engine);
         let b = embed_text("NeoTrix 自我进化知识表示", &engine);
         let c = embed_text("完全无关的另一段内容", &engine);
-        let sim_self = crate::core::l3_memory::nt_core_hcube::vsa::VsaBackend::similarity(&engine, &a, &b);
-        let sim_diff = crate::core::l3_memory::nt_core_hcube::vsa::VsaBackend::similarity(&engine, &a, &c);
-        assert!(a.len() == crate::core::l3_memory::nt_core_hcube::vsa::VsaBackend::dimensions(&engine));
+        let sim_self = crate::l2_perception::nt_core_hcube::vsa::VsaBackend::similarity(&engine, &a, &b);
+        let sim_diff = crate::l2_perception::nt_core_hcube::vsa::VsaBackend::similarity(&engine, &a, &c);
+        assert!(a.len() == crate::l2_perception::nt_core_hcube::vsa::VsaBackend::dimensions(&engine));
         assert!(sim_self > 0.99, "相同文本相似度应高, 实际 {sim_self}");
         assert!(sim_diff < 0.3, "无关文本相似度应低, 实际 {sim_diff}");
     }

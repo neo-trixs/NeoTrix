@@ -258,4 +258,4 @@ impl _KnowledgeManagementEngine {
     }
 }
 
-use crate::l5_cognition::nt_core_math::cosine_similarity_f32 as cosine_similarity;
+use crate::l0_substrate::nt_core_math::cosine_similarity_f32 as cosine_similarity;

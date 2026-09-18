@@ -760,7 +760,7 @@ mod tests {
 // ════════════════════════════════════════════════════════════════
 
 use crate::core::nt_core_platform::{Agent, AgentError as PlatformAgentError,  AgentMetrics, AgentStatus};
-use crate::l6_meta::nt_core_capability::{Layer, Domain, UnifiedCapability, CapabilityMeta, CapabilityHealth, CapabilityState, CapabilityInput, CapabilityOutput, CapabilityError, CapabilityStatus, CapabilityMetrics};
+use crate::l0_substrate::nt_core_capability_types::{Layer, Domain, UnifiedCapability, CapabilityMeta, CapabilityHealth, CapabilityState, CapabilityInput, CapabilityOutput, CapabilityError, CapabilityStatus, CapabilityMetrics};
 
 impl UnifiedCapability for RecoveryOrchestrator {
     fn meta(&self) -> CapabilityMeta {

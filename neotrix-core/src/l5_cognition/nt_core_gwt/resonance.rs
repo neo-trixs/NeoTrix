@@ -12,7 +12,7 @@ use std::collections::VecDeque;
 use super::moe_router::MoERouter;
 use super::physics_attention::AdaptiveSlicer;
 use super::vsa_scorer::VsaContentScorer;
-use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 
 /// Compute Shannon entropy of a probability distribution.
 /// Returns normalized entropy (0..1) where 0 = certain, 1 = uniform.

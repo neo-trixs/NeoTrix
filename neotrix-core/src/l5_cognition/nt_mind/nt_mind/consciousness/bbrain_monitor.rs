@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use crate::core::nt_core_self::{
+use crate::l6_meta::nt_core_self::{
     CognitiveEvaluator,
     IntrinsicMotivation,
     SelfReferentialMonitor,
@@ -201,7 +201,7 @@ impl BMonitor {
         };
         let raw = report.stability_score * 100.0;
         let penalty = report.flags.iter().filter(|f| {
-            matches!(f.severity, crate::core::nt_core_self::FlagSeverity::Critical)
+            matches!(f.severity, crate::l6_meta::nt_core_self::FlagSeverity::Critical)
         }).count() as f64 * self.config.critical_flag_penalty;
         (raw - penalty).clamp(0.0, 100.0)
     }
@@ -417,7 +417,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BMonitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self::{
+    use crate::l6_meta::nt_core_self::{
         SiliconSelfModel, SiliconArchive, CrystalRegistry, SelfReferentialMonitor,
         CognitiveEvaluator, IntrinsicMotivation,
         StrategyKind, AttentionDomain,
@@ -469,7 +469,7 @@ mod tests {
         let mut reg = CrystalRegistry::new();
         for i in 0..n {
             reg.crystals.push(
-                crate::core::nt_core_self::SkillCrystal::new(
+                crate::l6_meta::nt_core_self::SkillCrystal::new(
                     i, &format!("skill_{}", i), "test",
                     StrategyKind::Direct, AttentionDomain::Code, 1,
                 )

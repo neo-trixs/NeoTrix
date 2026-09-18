@@ -118,7 +118,7 @@ pub struct NeoCodexAgent {
     pub evolution: EvolutionLoop,
     pub audit: NeoCodexSelfAudit,
     // Cycle 160e: tool grounding monitor (D25 production-wired, R-P49~R-P53)
-    pub tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
+    pub tool_grounding: crate::l6_meta::nt_core_self::self_audit::ToolGroundingMonitor,
     // P2-5: MCP tool registry (Codex/Claude MCP parity). When registered, the
     // agent gains a `mcp_call` tool proxying to the registry; previously the
     // MCP host existed only for CLI/headless and the NeoCodex agent could not
@@ -145,7 +145,7 @@ impl NeoCodexAgent {
             subagent_results: Vec::new(),
             evolution: EvolutionLoop::new(),
             audit: NeoCodexSelfAudit::new(),
-            tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
+            tool_grounding: crate::l6_meta::nt_core_self::self_audit::ToolGroundingMonitor::new(),
             mcp: None,
         }
     }

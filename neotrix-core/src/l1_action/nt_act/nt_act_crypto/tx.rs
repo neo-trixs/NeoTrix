@@ -362,8 +362,8 @@ fn u256_padded(bytes: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_act_crypto::wallet::CryptoWallet;
-    use crate::neotrix::nt_act_crypto::chain::ChainType;
+    use crate::l1_action::nt_act::nt_act_crypto::wallet::CryptoWallet;
+    use crate::l1_action::nt_act::nt_act_crypto::chain::ChainType;
 
     fn test_wallet() -> CryptoWallet {
         CryptoWallet::generate_evm("test_tx")

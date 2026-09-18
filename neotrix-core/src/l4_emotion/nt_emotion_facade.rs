@@ -85,14 +85,14 @@ impl EmotionFacade {
 
     fn tone_from_report(report: &EmotionReport) -> WritingTone {
         match report.emotion_label {
-            crate::core::nt_core_self::emotion_state::EmotionLabel::Joy => WritingTone::Energetic,
-            crate::core::nt_core_self::emotion_state::EmotionLabel::Sadness => {
+            crate::l6_meta::nt_core_self::emotion_state::EmotionLabel::Joy => WritingTone::Energetic,
+            crate::l6_meta::nt_core_self::emotion_state::EmotionLabel::Sadness => {
                 WritingTone::Empathetic
             }
-            crate::core::nt_core_self::emotion_state::EmotionLabel::Neutral => WritingTone::Neutral,
-            crate::core::nt_core_self::emotion_state::EmotionLabel::Trust => WritingTone::Formal,
-            crate::core::nt_core_self::emotion_state::EmotionLabel::Confused
-            | crate::core::nt_core_self::emotion_state::EmotionLabel::Thinking => {
+            crate::l6_meta::nt_core_self::emotion_state::EmotionLabel::Neutral => WritingTone::Neutral,
+            crate::l6_meta::nt_core_self::emotion_state::EmotionLabel::Trust => WritingTone::Formal,
+            crate::l6_meta::nt_core_self::emotion_state::EmotionLabel::Confused
+            | crate::l6_meta::nt_core_self::emotion_state::EmotionLabel::Thinking => {
                 WritingTone::Casual
             }
             _ => WritingTone::Neutral,

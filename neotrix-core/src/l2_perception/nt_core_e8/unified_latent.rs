@@ -22,7 +22,7 @@
 //! Cross-domain similarity then works: `cosine(e8_embed, vsa_proj)`.
 
 use crate::l2_perception::nt_core_e8::nt_latent_thought::LatentThoughtVector;
-use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 use serde::{Deserialize, Serialize};
 
 /// Dimension of the shared latent space (≥ the largest native embed).

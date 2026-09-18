@@ -76,9 +76,9 @@ pub fn _generate_tool_calls(task_type: &TaskType, _task: &str) -> Vec<ToolCall> 
 }
 
 /// Convert `core::nt_core_knowledge::TaskType` to `nt_world_model::TaskType`
-pub fn knowledge_to_world_task_type(t: &crate::l2_perception::nt_core_knowledge::TaskType) -> crate::neotrix::nt_world_model::TaskType {
+pub fn knowledge_to_world_task_type(t: &crate::l2_perception::nt_core_knowledge::TaskType) -> crate::l2_perception::nt_world::nt_world_model::TaskType {
     use crate::l2_perception::nt_core_knowledge::TaskType as K;
-    use crate::neotrix::nt_world_model::TaskType as W;
+    use crate::l2_perception::nt_world::nt_world_model::TaskType as W;
     match t {
         K::General => W::General,
         K::Design | K::UIDesign => W::Design,
@@ -88,13 +88,27 @@ pub fn knowledge_to_world_task_type(t: &crate::l2_perception::nt_core_knowledge:
         K::Security => W::Security,
         K::Planning | K::Reflection | K::Research | K::Learning => W::General,
         K::MetaCognition => W::MetaCognition,
+        // New TaskType variants: map to closest existing world model type
+        K::Chat | K::SimpleQA => W::General,
+        K::Math | K::ComplexReasoning | K::DataAnalysis | K::DataProcessing => W::General,
+        K::Creative | K::CreativeWriting => W::Design,
+        K::Multimodal => W::General,
+        K::KnowledgeRetrieval => W::General,
+        K::Extraction | K::Summarization => W::General,
+        K::ToolUse | K::Completion | K::Embedding | K::Reranking => W::General,
+        K::ImageGeneration | K::AudioGeneration | K::VideoGeneration => W::Design,
+        K::Debugging => W::CodeAnalysis,
+        K::Architecture => W::Planning,
+        K::Documentation | K::Testing | K::SystemAdmin | K::FileOperations => W::General,
+        K::AgentTask => W::General,
+        K::Custom => W::General,
     }
 }
 
 /// Convert `nt_world_model::TaskType` to `core::nt_core_knowledge::TaskType`
-pub fn world_to_knowledge_task_type(t: &crate::neotrix::nt_world_model::TaskType) -> crate::l2_perception::nt_core_knowledge::TaskType {
+pub fn world_to_knowledge_task_type(t: &crate::l2_perception::nt_world::nt_world_model::TaskType) -> crate::l2_perception::nt_core_knowledge::TaskType {
     use crate::l2_perception::nt_core_knowledge::TaskType as K;
-    use crate::neotrix::nt_world_model::TaskType as W;
+    use crate::l2_perception::nt_world::nt_world_model::TaskType as W;
     match t {
         W::General => K::General,
         W::Design => K::Design,

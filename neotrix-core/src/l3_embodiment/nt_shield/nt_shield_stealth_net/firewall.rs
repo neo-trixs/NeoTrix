@@ -296,7 +296,7 @@ impl Default for FirewallManager { fn default() -> Self { Self::new() } }
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_shield_stealth_net::rules::{OutboundRule, OutboundAction, RuleCondition};
+    use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::rules::{OutboundRule, OutboundAction, RuleCondition};
 
     #[test]
     fn test_firewall_type_debug_clone() {

@@ -2,11 +2,8 @@
  * src/index.ts — FSD 架构中心枢纽
  * 导入所有 FSD 切片，确保每个切片至少被引用一次
  */
-// Entities
-import './entities/agent'
-import './entities/domain'
+// Entities（agent/domain/session 为空壳骨架，暂不导入）
 import './entities/message'
-import './entities/session'
 import './entities/tool'
 
 // Features

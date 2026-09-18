@@ -5,7 +5,7 @@ use super::pipeline::{BrainStage, StageDecision};
 use crate::l5_cognition::nt_core_policy::E8Outcome;
 use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
 use crate::neotrix::nt_core_error::NeoTrixError;
-use crate::neotrix::nt_memory_kb::ProceduralMemoryRecord;
+use crate::l1_action::nt_memory::nt_memory_kb::ProceduralMemoryRecord;
 
 pub struct ProceduralMemoryStage;
 impl Default for ProceduralMemoryStage { fn default() -> Self { Self } }

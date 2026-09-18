@@ -76,27 +76,27 @@ macro_rules! make_stage {
     };
 }
 
-pub use neotrix::nt_mind;
-pub use neotrix::nt_mind::nt_mind::{
+pub use l5_cognition::nt_mind;
+pub use l5_cognition::nt_mind::nt_mind::{
     ReasoningBrain, SelfIteratingBrain, SelfEvolver,
 };
 
-pub use neotrix::nt_act_orchestrator::Orchestrator;
+pub use l1_action::nt_act::nt_act_orchestrator::Orchestrator;
 
-// Re-export modules used by binary targets via `neotrix::module_name` paths
-pub use neotrix::nt_io_mention;
-pub use neotrix::nt_world_crawl;
-pub use neotrix::nt_world_search;
-pub use neotrix::nt_io_session_recovery;
-pub use neotrix::nt_io_agents_md;
-pub use neotrix::nt_io_standalone;
-pub use neotrix::nt_shield;
-pub use neotrix::nt_shield_sentry;
-pub use neotrix::nt_io_logging;
-pub use neotrix::nt_io;
-pub use neotrix::ReasoningKernel;
+// Re-export modules used by binary targets via direct layer paths
+pub use l1_action::nt_io::nt_io_mention;
+pub use l2_perception::nt_world::nt_world_crawl;
+pub use l2_perception::nt_world::nt_world_search;
+pub use l1_action::nt_io::nt_io_session_recovery;
+pub use l1_action::nt_io::nt_io_agents_md;
+pub use l1_action::nt_io::nt_io_standalone;
+pub use l3_embodiment::nt_shield;
+pub use l3_embodiment::nt_shield::nt_shield_sentry;
+pub use l1_action::nt_io::nt_io_logging;
+pub use l1_action::nt_io;
+pub use l1_action::nt_io::nt_io_standalone::ReasoningKernel;
 
 // Re-export feature-gated modules for binary/example targets
 #[cfg(feature = "stealth-net")]
-pub use neotrix::nt_shield_stealth_net;
-pub use neotrix::nt_shield_traffic;
+pub use l3_embodiment::nt_shield::nt_shield_stealth_net;
+pub use l3_embodiment::nt_shield::nt_shield_traffic;

@@ -4,8 +4,8 @@ use super::reasoning_engine::ReasoningEngine;
 use super::self_iterating::ReasoningBrain;
 use super::memory::ReasoningBank;
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::core::default_specialist_states;
-use crate::core::nt_core_self::SiliconSelfModel;
+use crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states;
+use crate::l6_meta::nt_core_self::SiliconSelfModel;
 
 #[derive(Debug, Clone)]
 pub struct _BenchPhase {

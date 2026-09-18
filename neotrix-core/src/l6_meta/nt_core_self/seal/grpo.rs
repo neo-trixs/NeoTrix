@@ -161,7 +161,7 @@ impl GRPOLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self::seal::self_edit_gen::EditType as GrpoEditType;
+    use crate::l6_meta::nt_core_self::seal::self_edit_gen::EditType as GrpoEditType;
 
     #[test]
     fn test_config_default() {

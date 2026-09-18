@@ -5,7 +5,7 @@ use std::ops::Range;
 use rand::Rng;
 use serde::{Serialize, Deserialize};
 
-use crate::neotrix::nt_io_http_factory::TlsVariant;
+use crate::l1_action::nt_io::nt_io_http_factory::TlsVariant;
 
 use super::StealthHttpClient;
 use super::system_fingerprint::{SystemFingerprint, SystemFingerprintGenerator, SystemFingerprintConfig, Platform, Browser};
@@ -58,7 +58,7 @@ impl FingerprintManager {
             .unwrap_or_else(|| PathBuf::from("fingerprints.json"));
 
         let gen = SystemFingerprintGenerator::new();
-        let fingerprints = crate::core::nt_core_state::load("fingerprints")
+        let fingerprints = crate::l5_cognition::nt_core_state::load("fingerprints")
             .and_then(|json| serde_json::from_str::<FingerprintStore>(&json).ok())
             .filter(|store| !store.fingerprints.is_empty())
             .map(|store| store.fingerprints)
@@ -140,7 +140,7 @@ impl FingerprintManager {
         };
         if let Ok(json) = serde_json::to_string_pretty(&store) {
             if self.use_kb {
-                if let Err(e) = crate::core::nt_core_state::save("fingerprints", &json) {
+                if let Err(e) = crate::l5_cognition::nt_core_state::save("fingerprints", &json) {
                     log::warn!("[fingerprint] kb write: {}", e);
                 }
             }

@@ -5,9 +5,9 @@ pub use crate::l5_cognition::nt_mind::nt_mind::cortex_types::*;
 impl PredictiveCortex {
     pub fn new(latent_dim: usize, hidden_dim: usize) -> Self {
         Self {
-            jepa: crate::neotrix::nt_world_jepa::JepaPredictor::new(latent_dim, hidden_dim),
-            e8: crate::neotrix::nt_world_e8::E8WorldModel::new(),
-            ai: crate::neotrix::nt_world_infer::ActiveInferenceEngine::new(),
+            jepa: crate::l2_perception::nt_world::nt_world_jepa::JepaPredictor::new(latent_dim, hidden_dim),
+            e8: crate::l2_perception::nt_world::nt_world_e8::E8WorldModel::new(),
+            ai: crate::l2_perception::nt_world::nt_world_infer::ActiveInferenceEngine::new(),
             horizon: crate::l5_cognition::nt_mind::nt_mind::cortex_types::DEFAULT_HORIZON,
             n_samples: crate::l5_cognition::nt_mind::nt_mind::cortex_types::DEFAULT_N_SAMPLES,
             action_dim: crate::l5_cognition::nt_mind::nt_mind::cortex_types::DEFAULT_ACTION_DIM,

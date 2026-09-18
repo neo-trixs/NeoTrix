@@ -9,7 +9,7 @@
 use std::sync::{Arc, RwLock};
 
 use crate::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::core::{SaeFeature, SparseAutoencoder, SAE_INPUT_DIM};
+use crate::l5_cognition::nt_core_sae::{SaeFeature, SparseAutoencoder, SAE_INPUT_DIM};
 
 /// Bridge connecting SAE feature extraction to the E8 reasoning path.
 ///

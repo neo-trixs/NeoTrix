@@ -230,7 +230,7 @@ mod tests {
     fn test_with_orchestrator_does_not_panic() {
         let mut gl = GoalLoop::new();
         let mut brain = SelfIteratingBrain::new();
-        let orch = crate::neotrix::nt_act_orchestrator::Orchestrator::new();
+        let orch = crate::l1_action::nt_act::nt_act_orchestrator::Orchestrator::new();
         gl = gl.with_orchestrator(orch);
         gl.start_goal(&mut brain, "design a login page", None);
         let _ = gl.pursue_iteration(&mut brain);
@@ -281,7 +281,7 @@ mod tests {
             .iter_mut()
             .for_each(|g| g.priority = GoalPriority::Medium);
 
-        gl.set_motivation(crate::core::nt_core_self::MotivationState {
+        gl.set_motivation(crate::l6_meta::nt_core_self::MotivationState {
             intrinsic_reward: 0.8,
             confidence: 0.9,
             error_rate: 0.1,
@@ -314,7 +314,7 @@ mod tests {
             .iter_mut()
             .for_each(|g| g.priority = GoalPriority::Medium);
 
-        gl.set_motivation(crate::core::nt_core_self::MotivationState {
+        gl.set_motivation(crate::l6_meta::nt_core_self::MotivationState {
             intrinsic_reward: 0.2,
             confidence: 0.3,
             error_rate: 0.5,

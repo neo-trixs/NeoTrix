@@ -8,14 +8,14 @@ use super::super::types::{
 };
 use crate::agent::AgentTeam;
 use crate::l5_cognition::nt_core_gwt::resonance::OscillatorNetwork;
-use crate::core::nt_core_self::MotivationState;
-use crate::core::{optimal_starting_mode, CrtTimeScale, ReasoningHexagram};
+use crate::l6_meta::nt_core_self::MotivationState;
+use crate::l5_cognition::nt_core_hex::optimal_starting_mode; use crate::l5_cognition::nt_core::nt_crt::CrtTimeScale; use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 use crate::l5_cognition::nt_mind::foundation::distiller::{
     CommandDistiller, DistilledOutput, SessionDistiller,
 };
-use crate::neotrix::nt_act_orchestrator::Orchestrator;
+use crate::l1_action::nt_act::nt_act_orchestrator::Orchestrator;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 fn state_icon(state: &GoalState) -> &str {
     match state {
@@ -466,11 +466,11 @@ impl GoalLoop {
         });
         let json =
             serde_json::to_string_pretty(&data).map_err(|e| NeoTrixError::Serde(e.to_string()))?;
-        crate::core::nt_core_state::save("goals", &json).map_err(NeoTrixError::Io)
+        crate::l5_cognition::nt_core_state::save("goals", &json).map_err(NeoTrixError::Io)
     }
 
     pub fn load(&mut self) {
-        if let Some(json) = crate::core::nt_core_state::load("goals") {
+        if let Some(json) = crate::l5_cognition::nt_core_state::load("goals") {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(&json) {
                 self.active_goal = data["active_goal"].as_object().and_then(|_| {
                     serde_json::from_value(data["active_goal"].clone())
@@ -535,7 +535,7 @@ impl GoalLoop {
 mod tests {
     use super::truncate;
     use super::GoalLoop;
-    use crate::core::nt_core_self::MotivationState;
+    use crate::l6_meta::nt_core_self::MotivationState;
 
     #[test]
     fn test_resonance_coherence_default() {

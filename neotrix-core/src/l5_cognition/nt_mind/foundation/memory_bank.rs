@@ -226,7 +226,7 @@ impl MemoryOrchestrator {
 
     /// Persist a dual-track entry to AgentSessionManager via KnowledgeBase.
     /// Returns the KB entry ID on success.
-    pub fn persist_entry(kb: &crate::neotrix::nt_memory_kb::KnowledgeBase, entry: &DualTrackEntry) -> Result<String, String> {
+    pub fn persist_entry(kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase, entry: &DualTrackEntry) -> Result<String, String> {
         let content = serde_json::to_string(entry).map_err(|e| format!("serialize: {}", e))?;
         let tier_str = match entry.tier {
             MemoryTier::Working => "working",

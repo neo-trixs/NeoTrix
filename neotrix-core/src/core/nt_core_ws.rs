@@ -108,12 +108,12 @@ impl WorkSpaceManager {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        crate::core::nt_core_state::save("workspaces", &self.to_json()?)
+        crate::l5_cognition::nt_core_state::save("workspaces", &self.to_json()?)
     }
 
     /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
     pub fn save_with(&self, conn: &rusqlite::Connection) -> Result<(), String> {
-        crate::core::nt_core_state::save_with(conn, "workspaces", &self.to_json()?)
+        crate::l5_cognition::nt_core_state::save_with(conn, "workspaces", &self.to_json()?)
     }
 
     fn to_json(&self) -> Result<String, String> {
@@ -121,14 +121,14 @@ impl WorkSpaceManager {
     }
 
     pub fn load() -> Self {
-        crate::core::nt_core_state::load("workspaces")
+        crate::l5_cognition::nt_core_state::load("workspaces")
             .and_then(|content| serde_json::from_str(&content).ok())
             .unwrap_or_default()
     }
 
     /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
     pub fn load_with(conn: &rusqlite::Connection) -> Self {
-        crate::core::nt_core_state::load_with(conn, "workspaces")
+        crate::l5_cognition::nt_core_state::load_with(conn, "workspaces")
             .and_then(|content| serde_json::from_str(&content).ok())
             .unwrap_or_default()
     }

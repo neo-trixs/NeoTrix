@@ -3,7 +3,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
-use crate::neotrix::nt_world_search::UnifiedSearch;
+use crate::l2_perception::nt_world::nt_world_search::UnifiedSearch;
 
 pub struct SearchCmd;
 

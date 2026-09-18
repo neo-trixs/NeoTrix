@@ -21,15 +21,24 @@ export function StreamingText(props: StreamingTextProps) {
   const [done, setDone] = createSignal(false)
 
   let index = 0
-  let timer: ReturnType<typeof setTimeout> | undefined
+  let rafId: number | undefined
+  let lastUpdateTime = 0
+  let pendingIndex = 0
 
-  const tick = () => {
+  const tick = (timestamp: number) => {
     if (index < props.text.length) {
-      // 每次追加 1-3 个字符，模拟自然打字节奏
-      const chunk = Math.random() > 0.7 ? 2 : 1
-      index = Math.min(index + chunk, props.text.length)
-      setDisplayed(props.text.slice(0, index))
-      timer = setTimeout(tick, props.speed ?? 15)
+      const elapsed = timestamp - lastUpdateTime
+      const interval = props.speed ?? 15
+
+      if (elapsed >= interval) {
+        const charsPerFrame = Math.max(1, Math.floor(elapsed / interval))
+        const chunk = Math.min(charsPerFrame, props.text.length - index)
+        index = Math.min(index + chunk, props.text.length)
+        lastUpdateTime = timestamp
+        setDisplayed(props.text.slice(0, index))
+      }
+
+      rafId = requestAnimationFrame(tick)
     } else {
       setDone(true)
       props.onComplete?.()
@@ -40,11 +49,13 @@ export function StreamingText(props: StreamingTextProps) {
     // 文本变化时重新开始
     const text = props.text
     index = 0
+    lastUpdateTime = 0
+    pendingIndex = 0
     setDisplayed('')
     setDone(false)
 
     if (props.streaming !== false && text) {
-      tick()
+      rafId = requestAnimationFrame(tick)
     } else {
       setDisplayed(text)
       setDone(true)
@@ -52,7 +63,7 @@ export function StreamingText(props: StreamingTextProps) {
   })
 
   onCleanup(() => {
-    if (timer) clearTimeout(timer)
+    if (rafId) cancelAnimationFrame(rafId)
   })
 
   return (

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 type Vector = Vec<f64>;
 
-use crate::l5_cognition::nt_core_math::cosine_similarity_f64;
+use crate::l0_substrate::nt_core_math::cosine_similarity_f64;
 use super::types::{
     JEPA_VAR_WEIGHT, JEPA_INV_WEIGHT, JEPA_COV_WEIGHT,
     JEPA_VARIANCE_TARGET, JEPA_LATENT_DIM,

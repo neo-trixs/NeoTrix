@@ -17,10 +17,10 @@ use log::{error, warn};
 use super::super::super::stagnation::StagnationSignal;
 use super::super::pipeline::kernel_iterate_pipeline;
 use super::super::recursive_depth_reward::RecursiveDepthReward;
-use crate::neotrix::nt_world_model::{TaskType, Context};
+use crate::l2_perception::nt_world::nt_world_model::{TaskType, Context};
 use crate::l1_action::nt_io::nt_io_provider::create_gateway;
 use crate::l5_cognition::nt_core_sae_bridge::SAEBridge;
-use crate::core::SparseAutoencoder;
+use crate::l5_cognition::nt_core_sae::SparseAutoencoder;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 // // use crate::core::// nt_core_signal::SelectiveState;
@@ -578,7 +578,7 @@ impl SelfIteratingBrain {
             let compilable = self.tool_traces.iter().any(|(tool, _, success)| *success && tool.contains("cargo"));
             if compilable {
                 self._reward += 0.05;
-                self._reward_source = crate::core::RewardSource::External;
+                self._reward_source = crate::l2_perception::nt_core_knowledge::types::RewardSource::External;
             }
         }
 
@@ -841,7 +841,7 @@ impl SelfIteratingBrain {
         let json = self.cortex.export_json();
         let data = serde_json::to_string_pretty(&json)
             .map_err(|e| NeoTrixError::Serde(format!("cortex序列化失败: {}", e)))?;
-        crate::core::nt_core_state::save("cortex", &data).map_err(NeoTrixError::Io)
+        crate::l5_cognition::nt_core_state::save("cortex", &data).map_err(NeoTrixError::Io)
     }
 
     /// 缺陷④: 证据持久化 (每 5 轮跨阶段证据 → KB kv_store state.seal_evidence)。
@@ -858,18 +858,18 @@ impl SelfIteratingBrain {
         });
         let data = serde_json::to_string_pretty(&evidence)
             .map_err(|e| NeoTrixError::Serde(format!("证据序列化失败: {}", e)))?;
-        crate::core::nt_core_state::save("seal_evidence", &data).map_err(NeoTrixError::Io)
+        crate::l5_cognition::nt_core_state::save("seal_evidence", &data).map_err(NeoTrixError::Io)
     }
 
     /// 缺陷④: 读取证据 — 重规划/steer 时慢进程可见此前各轮留下的证据历史。
     pub(crate) fn _load_evidence(&self) -> serde_json::Value {
-        crate::core::nt_core_state::load("seal_evidence")
+        crate::l5_cognition::nt_core_state::load("seal_evidence")
             .and_then(|d| serde_json::from_str(&d).ok())
             .unwrap_or_else(|| serde_json::json!({}))
     }
 
     pub fn load_cortex(&mut self) {
-        let Some(data) = crate::core::nt_core_state::load("cortex") else {
+        let Some(data) = crate::l5_cognition::nt_core_state::load("cortex") else {
             return;
         };
         let json: serde_json::Value = match serde_json::from_str(&data) {
@@ -933,8 +933,8 @@ impl SelfIteratingBrain {
             engine = engine.with_jepa((*jepa).clone());
         }
         if !self.skip_kb_io {
-            if let Ok(mut kb) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
-            let emb_cfg = crate::neotrix::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
+            if let Ok(mut kb) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+            let emb_cfg = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
             if !emb_cfg.api_key.is_empty() {
                 kb = kb.with_embedding(emb_cfg);
                 // Note: ensure_embeddings uses reqwest::blocking which panics
@@ -988,7 +988,7 @@ impl SelfIteratingBrain {
         }
         engine = engine.with_ewhr_bridge(E8EwhrBridge::new());
         let hyp_net = Arc::new(Mutex::new(
-            crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork::new()
+            crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork::new()
         ));
         engine = engine.with_hypothesis_network(hyp_net);
 
@@ -1020,7 +1020,7 @@ impl SelfIteratingBrain {
         // L6 Self: 注入剩余的元认知/监控/压缩/蒸馏子系统
         use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
         use crate::l5_cognition::nt_core_gwt::vsa_scorer::VsaContentScorer;
-        use crate::core::nt_core_self::silicon_self::SiliconSelfModel;
+        use crate::l6_meta::nt_core_self::silicon_self::SiliconSelfModel;
         use crate::l5_cognition::nt_core_ttc::{TtcEngine, TtcConfig};
         use crate::l5_cognition::nt_core_trajectory_compress::CompressionLevel;
         use crate::l5_cognition::nt_core::capability::nt_core_antidistil::AntiDistillationSystem;
@@ -1089,7 +1089,7 @@ impl SelfIteratingBrain {
     pub fn save_e8(&self) {
         if let Some(ref engine) = self.reasoning_engine {
             if let Ok(json) = engine.e8_state_json() {
-                if let Err(e) = crate::core::nt_core_state::save("e8_state", &json) {
+                if let Err(e) = crate::l5_cognition::nt_core_state::save("e8_state", &json) {
                     warn!("[warn] 保存 E8 状态到 KB 失败: {}", e);
                 }
             }
@@ -1122,7 +1122,7 @@ impl SelfIteratingBrain {
 
     pub(crate) fn _load_e8(&mut self) {
         if let Some(ref mut engine) = self.reasoning_engine {
-            if let Some(json) = crate::core::nt_core_state::load("e8_state") {
+            if let Some(json) = crate::l5_cognition::nt_core_state::load("e8_state") {
                 if let Err(e) = engine.load_e8_state_json(&json) {
                     warn!("[warn] 加载 E8 状态失败: {}", e);
                 }
@@ -1162,7 +1162,7 @@ impl SelfIteratingBrain {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
         // 接通真实知识库：超立方体检索 + analyze_gaps/sparse_topics 落到实际知识
-        if let Ok(kb) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
+        if let Ok(kb) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
             // 基础 + 前沿模型知识一次性种入 (insert_or_get 幂等, 多次启动安全)
             if let Err(e) = kb.seed_foundational() {
                 log::warn!("[KB] foundational seed failed: {e}");
@@ -1192,7 +1192,7 @@ mod tests {
     use crate::nt_mind::infrastructure::KnowledgeSource;
     use crate::SelfIteratingBrain;
     use crate::l5_cognition::nt_mind::nt_mind::element::registry::RegistryState;
-    use crate::neotrix::nt_world_model::TaskType;
+    use crate::l2_perception::nt_world::nt_world_model::TaskType;
     use crate::neotrix::nt_core_error::NeoTrixResult;
 
     // 1. 构造：核心字段在构建后被正确初始化。
@@ -1395,7 +1395,7 @@ mod tests {
             brain.cortex.store(trace);
             brain.save_cortex()?;
 
-            let persisted = crate::core::nt_core_state::load("cortex");
+            let persisted = crate::l5_cognition::nt_core_state::load("cortex");
             assert!(persisted.is_some(), "cortex 应已写入 KB");
 
             // 全新 brain 从已持久化文件读回同一条 trace。

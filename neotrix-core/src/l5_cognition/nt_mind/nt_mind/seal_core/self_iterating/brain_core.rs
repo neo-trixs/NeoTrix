@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use chrono::Utc;
 use serde::{Serialize, Deserialize};
 
-use crate::core::SourceAccessTracker;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_core_knowledge::SourceAccessTracker;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 use super::super::core::{CapabilityVector, KnowledgeSource, AbsorptionRecord, PerformanceEvaluator};
 use super::super::memory::ReasoningBank;
 use super::brain_seal::{SealEditStrategy, DefaultSealStrategy};

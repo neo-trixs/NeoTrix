@@ -222,7 +222,7 @@ impl PatternExtractor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_act_code::edit_history::EditHistoryTracker;
+    use crate::l1_action::nt_act::nt_act_code::edit_history::EditHistoryTracker;
     use std::path::PathBuf;
 
     fn setup_history() -> EditHistoryTracker {

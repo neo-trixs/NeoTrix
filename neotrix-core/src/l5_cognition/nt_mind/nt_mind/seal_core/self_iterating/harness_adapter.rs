@@ -3,7 +3,7 @@
 
 pub use crate::l1_action::nt_core_harness::{HarnessAdapter, HarnessProfile};
 
-use crate::neotrix::nt_memory_kb::{KnowledgeBase, KnowledgeNode, NodeType};
+use crate::l1_action::nt_memory::nt_memory_kb::{KnowledgeBase, KnowledgeNode, NodeType};
 use std::collections::HashMap;
 
 /// HarnessAdapter 的 KB 持久化扩展。

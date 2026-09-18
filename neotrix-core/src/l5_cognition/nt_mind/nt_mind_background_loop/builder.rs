@@ -56,15 +56,15 @@ impl BackgroundLoop {
     }
 
     #[cfg(feature = "stealth-net")]
-    pub(crate) fn _with_tor_crawler(mut self, tor_crawler: std::sync::Arc<crate::neotrix::nt_shield_stealth_net::tor_crawler::TorCrawler>) -> Self {
+    pub(crate) fn _with_tor_crawler(mut self, tor_crawler: std::sync::Arc<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::tor_crawler::TorCrawler>) -> Self {
         self.tor_crawler = Some(tor_crawler);
         self
     }
 
     #[cfg(feature = "stealth-net")]
     pub(crate) fn _with_proxy_heartbeat(mut self, interval_secs: u64) -> Self {
-        use crate::neotrix::nt_shield_stealth_net::{ProxyHeartbeatEngine, FingerprintManager};
-        use crate::neotrix::nt_shield_stealth_net::proxy_pool::global_pool;
+        use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::{ProxyHeartbeatEngine, FingerprintManager};
+        use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::global_pool;
 
         let fm = FingerprintManager::new();
         let engine = ProxyHeartbeatEngine::new(global_pool(), fm, interval_secs);
@@ -77,8 +77,8 @@ impl BackgroundLoop {
         let reg = self.plugin_registry.clone();
         let rt = tokio::runtime::Handle::current();
         rt.block_on(async {
-            let logging: Box<dyn crate::neotrix::nt_io_plugin::Plugin> =
-                Box::new(crate::neotrix::nt_io_plugin::builtin::logging::LoggingPlugin);
+            let logging: Box<dyn crate::l1_action::nt_io::nt_io_plugin::Plugin> =
+                Box::new(crate::l1_action::nt_io::nt_io_plugin::builtin::logging::LoggingPlugin);
             if let Err(e) = reg.register(logging).await {
                 log::error!("[plugin] register logging: {}", e);
             }
@@ -115,13 +115,13 @@ impl BackgroundLoop {
 
     #[cfg(feature = "stealth-net")]
     pub(crate) fn _with_proxy_client(mut self) -> Self {
-        self.proxy_client = Some(crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient::new());
+        self.proxy_client = Some(crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::ProxyClient::new());
         self
     }
 
     #[cfg(feature = "stealth-net")]
     pub fn with_world_consciousness(mut self) -> Self {
-        use crate::neotrix::nt_world_sense::WorldConsciousness;
+        use crate::l2_perception::nt_world::nt_world_sense::WorldConsciousness;
         let mut wc = WorldConsciousness::new();
         wc.nt_world_sense.active = true;
         wc.nt_world_sense.visual.activate();

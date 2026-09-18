@@ -11,7 +11,7 @@ impl OllamaProvider {
     pub fn new() -> Self {
         Self {
             base_url: "http://localhost:11434".to_string(),
-            client: crate::neotrix::nt_io_http_factory::global_client().clone(),
+            client: crate::l1_action::nt_io::nt_io_http_factory::global_client().clone(),
         }
     }
 
@@ -56,7 +56,7 @@ impl LlmProvider for OllamaProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -149,7 +149,7 @@ impl LlmProvider for OllamaProvider {
         let (tx, rx) = tokio::sync::mpsc::channel(64);
 
         tokio::spawn(async move {
-            let client = crate::neotrix::nt_io_http_factory::global_client().clone();
+            let client = crate::l1_action::nt_io::nt_io_http_factory::global_client().clone();
             if let Ok(response) = client.post(format!("{}/api/chat", base_url))
                 .json(&body)
                 .send().await {

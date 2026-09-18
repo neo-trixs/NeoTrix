@@ -1,6 +1,6 @@
 use crate::core::nt_core_cap::CapabilityVector;
 use crate::l5_cognition::nt_goal::rl_feedback::RLFeedbackLoop;
-use crate::core::ReasoningHexagram;
+use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 
 #[derive(Debug, Clone)]
 pub struct Principle {

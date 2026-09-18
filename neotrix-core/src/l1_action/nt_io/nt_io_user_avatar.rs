@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
-use crate::neotrix::nt_io_avatar_channel::{AvatarIdentity, AvatarChain, MessageDirection};
+use crate::l1_action::nt_io::nt_io_avatar_channel::{AvatarIdentity, AvatarChain, MessageDirection};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserAvatar {
     pub identity_name: String,

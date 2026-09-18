@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-pub use crate::l5_cognition::nt_core_math::cosine_similarity_f64 as cosine_similarity;
+pub use crate::l0_substrate::nt_core_math::cosine_similarity_f64 as cosine_similarity;
 
 pub type Vector = Vec<f64>;
 pub type Matrix = Vec<Vec<f64>>;

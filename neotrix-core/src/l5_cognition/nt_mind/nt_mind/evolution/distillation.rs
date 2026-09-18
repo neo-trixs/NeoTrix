@@ -6,7 +6,7 @@
 use super::core::CapabilityVector;
 use super::memory::ReasoningMemory;
 use super::self_edit::MicroEdit;
-use crate::core::nt_core_meta::{
+use crate::l6_meta::nt_meta::{
     CodeScanner, MetaCognitiveLoop, MetaCycleResult, SelfModel, WeaknessAnalyzer,
 };
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use std::collections::HashMap;
 pub struct StrategicPrinciple {
     pub id: String,
     pub description: String,
-    pub task_type: crate::core::TaskType,
+    pub task_type: crate::l2_perception::nt_core_knowledge::types::TaskType,
     /// 抽象后的维度调整模式（维度名 → 调整幅度）
     pub adjustment_pattern: HashMap<String, f64>,
     /// 该原则的历史平均奖励
@@ -31,7 +31,7 @@ pub struct StrategicPrinciple {
 pub struct AntiPattern {
     pub id: String,
     pub description: String,
-    pub task_type: crate::core::TaskType,
+    pub task_type: crate::l2_perception::nt_core_knowledge::types::TaskType,
     /// 导致失败的维度调整模式
     pub harmful_pattern: HashMap<String, f64>,
     /// 观察到的失败次数
@@ -47,7 +47,7 @@ impl ExperienceDistiller {
     /// 2. 对每组，提取 MicroEdit 的公共模式
     /// 3. 加权平均维度调整值（以 reward 为权重）
     pub fn distill(memories: &[ReasoningMemory]) -> Vec<StrategicPrinciple> {
-        let mut grouped: HashMap<crate::core::TaskType, Vec<&ReasoningMemory>> = HashMap::new();
+        let mut grouped: HashMap<crate::l2_perception::nt_core_knowledge::types::TaskType, Vec<&ReasoningMemory>> = HashMap::new();
         for m in memories {
             grouped.entry(m.task_type).or_default().push(m);
         }
@@ -160,7 +160,7 @@ impl ExperienceDistiller {
 
     fn describe_pattern(
         pattern: &HashMap<String, f64>,
-        task_type: &crate::core::TaskType,
+        task_type: &crate::l2_perception::nt_core_knowledge::types::TaskType,
     ) -> String {
         let dims: Vec<&String> = pattern.keys().collect();
         format!(
@@ -288,7 +288,7 @@ impl MetaCognitionBridge {
         }
     }
 
-    pub fn quick_scan(&self) -> crate::core::nt_core_meta::WeaknessReport {
+    pub fn quick_scan(&self) -> crate::l6_meta::nt_meta::WeaknessReport {
         let scanner = CodeScanner::new(&self.project_root);
         let model = scanner.scan();
         self.weak_analyzer.analyze(&model)
@@ -330,10 +330,10 @@ impl MetaCognitionBridge {
                 .iter()
                 .map(|p| {
                     let sev = match p.weakness.severity {
-                        crate::core::nt_core_meta::DebtSeverity::Critical => "CRIT",
-                        crate::core::nt_core_meta::DebtSeverity::Major => "MAJ",
-                        crate::core::nt_core_meta::DebtSeverity::Minor => "MIN",
-                        crate::core::nt_core_meta::DebtSeverity::Cosmetic => "COS",
+                        crate::l6_meta::nt_meta::DebtSeverity::Critical => "CRIT",
+                        crate::l6_meta::nt_meta::DebtSeverity::Major => "MAJ",
+                        crate::l6_meta::nt_meta::DebtSeverity::Minor => "MIN",
+                        crate::l6_meta::nt_meta::DebtSeverity::Cosmetic => "COS",
                     };
                     format!("[{}] {}: {}", sev, p.weakness.pattern_id, p.action)
                 })
@@ -384,7 +384,7 @@ impl MetaCognitionBridge {
             .tech_debt
             .items
             .iter()
-            .filter(|i| i.severity == crate::core::nt_core_meta::DebtSeverity::Critical)
+            .filter(|i| i.severity == crate::l6_meta::nt_meta::DebtSeverity::Critical)
             .count()
     }
 
@@ -396,7 +396,7 @@ impl MetaCognitionBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::l3_memory::nt_core_knowledge::TaskType;
+    use crate::l2_perception::nt_core_knowledge::TaskType;
 
     /// 最小确定性扫描夹具 — 消除全量并行下整仓库递归扫描的 IO 时序抖动。
     /// 生成 >800 行含 unwrap/TODO 的模块触发 LARGE_FILE 弱点。

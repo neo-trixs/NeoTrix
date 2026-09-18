@@ -14,7 +14,7 @@ impl OpenAiProvider {
         Self {
             api_key,
             base_url: "https://api.openai.com/v1".to_string(),
-            client: crate::neotrix::nt_io_http_factory::global_client().clone(),
+            client: crate::l1_action::nt_io::nt_io_http_factory::global_client().clone(),
             zen_anonymous: false,
         }
     }
@@ -98,7 +98,7 @@ impl OpenAiProvider {
 #[async_trait]
 impl LlmProvider for OpenAiProvider {
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
     fn data_trust(&self) -> DataTrust {
@@ -191,7 +191,7 @@ impl LlmProvider for OpenAiProvider {
         let (tx, rx) = tokio::sync::mpsc::channel(64);
 
         tokio::spawn(async move {
-            let client = crate::neotrix::nt_io_http_factory::global_client().clone();
+            let client = crate::l1_action::nt_io::nt_io_http_factory::global_client().clone();
             let mut req = client.post(&url).json(&body);
             // keyless provider（api.airforce 等）：无 key 时发送占位 token，
             // 空 header 反而被服务端拒为 Missing Authorization

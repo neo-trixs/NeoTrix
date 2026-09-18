@@ -3,7 +3,7 @@ use super::super::super::stats::IterationResult;
 use super::super::types::{PlanLevel, PlanTemplate};
 // use crate::l5_cognition::nt_mind::KnowledgeSource;
 use super::core::GoalLoop;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 impl GoalLoop {
     pub(crate) fn _is_complex_goal(&self, description: &str) -> bool {

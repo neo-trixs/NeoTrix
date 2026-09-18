@@ -8,8 +8,8 @@ pub mod self_edit_gen;
 use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 
-use crate::core::nt_core_self::self_audit::{converge_check, AuditReport};
-use crate::core::nt_core_self::pilot_steering::{PilotSupervisor, SupervisorConfig, SupervisorDecision, TracePoint, TraceResult};
+use crate::l6_meta::nt_core_self::self_audit::{converge_check, AuditReport};
+use crate::l6_meta::nt_core_self::pilot_steering::{PilotSupervisor, SupervisorConfig, SupervisorDecision, TracePoint, TraceResult};
 use crate::core::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
 
 pub use self::constitution_gate::{ConstitutionGate, SELF_EDIT_MIN_CONSCIOUSNESS};
@@ -141,8 +141,8 @@ impl SealPipeline {
     /// 参考: arXiv:2602.24286 "CUDA-Agent: Skill-Augmented..."
     /// 整合强化学习策略选择器, 根据历史效果选择最佳优化策略。
     pub fn select_optimization_strategy(&self, _task: &str, language: &str) -> Option<String> {
-        use crate::core::nt_core_self::cuda_agent::StrategyManager;
-        use crate::core::nt_core_self::cuda_agent::OptimizationStrategy;
+        use crate::l6_meta::nt_core_self::cuda_agent::StrategyManager;
+        use crate::l6_meta::nt_core_self::cuda_agent::OptimizationStrategy;
 
         let mut manager = StrategyManager::new();
 
@@ -203,7 +203,7 @@ impl SealPipeline {
     }
 
     /// 获取 PILOT 失败模式
-    pub fn get_failure_patterns(&self) -> Vec<crate::core::nt_core_self::pilot_steering::FailurePattern> {
+    pub fn get_failure_patterns(&self) -> Vec<crate::l6_meta::nt_core_self::pilot_steering::FailurePattern> {
         self.supervisor.get_failure_patterns()
     }
 

@@ -1,5 +1,6 @@
 
 use super::*;
+use crate::l1_action::nt_memory::vector_index::SearchResult;
 
 fn mem_agent() -> MemoryAgent {
     let tmp = std::env::temp_dir().join(format!(
@@ -420,7 +421,7 @@ fn dialogue_bridge_absorb_pending_moves_capability() {
         .brain
         .absorption_history
         .iter()
-        .any(|rec| rec.source == crate::core::KnowledgeSource::DialogueExperience);
+        .any(|rec| rec.source == crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::DialogueExperience);
     assert!(
         has_dialogue,
         "DialogueExperience should be in absorption history"
@@ -653,7 +654,7 @@ fn research_bridge_findings_absorb_moves_capability() {
         .brain
         .absorption_history
         .iter()
-        .any(|rec| rec.source == crate::core::KnowledgeSource::ResearchFindings);
+        .any(|rec| rec.source == crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::ResearchFindings);
     assert!(
         has_research,
         "ResearchFindings should be in absorption history"
@@ -689,10 +690,10 @@ fn research_bridge_empty_results_noop() {
 #[test]
 fn research_source_registered_in_catalog() {
     // KnowledgeSource::ResearchFindings 完整登记: name / all / source_weight / 向量。
-    let s = crate::core::KnowledgeSource::ResearchFindings;
+    let s = crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::ResearchFindings;
     assert_eq!(s.name(), "neotrix-research-findings");
     assert!((s.source_weight() - 0.84).abs() < 1e-9);
-    assert!(crate::core::KnowledgeSource::all().contains(&s));
+    assert!(crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::all().contains(&s));
     let cv = s.capability_vector();
     assert!(
         cv.verification() > 0.0,

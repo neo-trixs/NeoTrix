@@ -14,8 +14,8 @@
 use super::co_evolution::{CoEvoConfig, CoEvolutionLoop};
 use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
 use crate::l6_meta::nt_core_kb_types::NodeType;
-use crate::core::nt_core_meta::{MetaCognitiveLoop, MetaCycleResult};
-use crate::core::nt_core_self::attention_head::{AttentionDomain, AttentionManager};
+use crate::l6_meta::nt_meta::{MetaCognitiveLoop, MetaCycleResult};
+use crate::l6_meta::nt_core_self::attention_head::{AttentionDomain, AttentionManager};
 use crate::l5_cognition::layer_aliases::KnowledgeBase;
 use crate::l5_cognition::layer_aliases::{UnifiedSearch, WorldSearchResult};
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator;
@@ -835,7 +835,7 @@ impl MetaAgentShell {
     pub fn new(task_type: &str) -> Self {
         // 按任务类型选择强度 + Weapon Set (Ascendancy 双专精路由)
         let attention = AttentionManager::from_task_type(0.3, task_type);
-        let metacog = MetaCognitiveLoop::new(crate::core::nt_core_meta::SelfModel::new());
+        let metacog = MetaCognitiveLoop::new(crate::l6_meta::nt_meta::SelfModel::new());
         Self {
             attention,
             metacog,
@@ -851,7 +851,7 @@ impl MetaAgentShell {
     /// 以自定义路由学习配置构造 (P1: min_evidence 等经 config 注入)。
     pub fn with_learner_config(task_type: &str, learner_config: RouteLearnerConfig) -> Self {
         let attention = AttentionManager::from_task_type(0.3, task_type);
-        let metacog = MetaCognitiveLoop::new(crate::core::nt_core_meta::SelfModel::new());
+        let metacog = MetaCognitiveLoop::new(crate::l6_meta::nt_meta::SelfModel::new());
         Self {
             attention,
             metacog,
@@ -867,7 +867,7 @@ impl MetaAgentShell {
     /// 以自定义共进化配置构造 (P4: epsilon/max_memories/min_evidence 注入)。
     pub fn with_coevo_config(task_type: &str, coevo_config: CoEvoConfig) -> Self {
         let attention = AttentionManager::from_task_type(0.3, task_type);
-        let metacog = MetaCognitiveLoop::new(crate::core::nt_core_meta::SelfModel::new());
+        let metacog = MetaCognitiveLoop::new(crate::l6_meta::nt_meta::SelfModel::new());
         Self {
             attention,
             metacog,
@@ -937,7 +937,7 @@ impl MetaAgentShell {
         // System1 直通单轮。行为差异即路由落地 (R-P79)。
         let alloc = self.attention.allocate_for_task(&self.task_type);
         let mut result = self.metacog.run_cycle();
-        if alloc.mode == crate::core::nt_core_self::attention_head::ThinkingMode::System2Deliberate
+        if alloc.mode == crate::l6_meta::nt_core_self::attention_head::ThinkingMode::System2Deliberate
         {
             result = self.metacog.run_cycle();
         }
@@ -1319,9 +1319,9 @@ impl DialogueAbsorbBridge {
     ///
     /// 吸收模式: 这是 content-aware 的源头向量, 经 `register_knowledge_source`
     /// 登记后由 `absorb_from_custom` 以对话特有强度反哺能力面。
-    pub fn derive_vector(&self, content: &str) -> crate::core::CapabilityVector {
+    pub fn derive_vector(&self, content: &str) -> crate::l5_cognition::nt_core::capability::types::CapabilityVector {
         let text = content.to_lowercase();
-        let mut cv = crate::core::CapabilityVector::default();
+        let mut cv = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         let keyword_dims: &[(&[&str], &str)] = &[
             (
                 &["test", "verify", "assert", "check", "unit"],
@@ -1382,7 +1382,7 @@ impl DialogueAbsorbBridge {
             return DialogueAbsorbOutcome::empty();
         }
         // ── 批次级共振向量 (分量取 max, 反映跨会话主题强度) ──
-        let mut batch = crate::core::CapabilityVector::default();
+        let mut batch = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         let mut seen = std::collections::HashSet::new();
         for exp in &experiences {
             if !seen.insert(exp.title.clone()) {
@@ -1402,7 +1402,7 @@ impl DialogueAbsorbBridge {
 
         // 实测能力差: 吸收前按 PerformanceEvaluator 打分 (D1/D2 行为化指标)。
         let before_score = PerformanceEvaluator::evaluate(
-            &crate::neotrix::nt_world_model::TaskType::General,
+            &crate::l2_perception::nt_world::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
 
@@ -1433,11 +1433,11 @@ impl DialogueAbsorbBridge {
         // ── Verify (EDV): 吸收前后性能对比, 能力下降则回滚 ──
         // 批评器返回是否接受 (未回滚); 不再丢弃 — 它是行为化成败的真信号。
         let critic_accepted =
-            brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
+            brain.absorb_with_critic(crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::DialogueExperience);
 
         // 实测后分: 批评器若回滚, after == before, 无增益。
         let after_score = PerformanceEvaluator::evaluate(
-            &crate::neotrix::nt_world_model::TaskType::General,
+            &crate::l2_perception::nt_world::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
 
@@ -1474,7 +1474,7 @@ impl DialogueAbsorbBridge {
             return DialogueAbsorbOutcome::empty();
         }
         // ── 批次级共振向量 (分量取 max, 反映派单控制面主题强度) ──
-        let mut batch = crate::core::CapabilityVector::default();
+        let mut batch = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         for m in &memories {
             let v = self.derive_dispatch_vector(&m.summary);
             for (i, val) in v.arr().iter().enumerate() {
@@ -1492,7 +1492,7 @@ impl DialogueAbsorbBridge {
 
         // 实测能力差: 吸收前打分 (D1/D2 行为化指标)。
         let before_score = PerformanceEvaluator::evaluate(
-            &crate::neotrix::nt_world_model::TaskType::General,
+            &crate::l2_perception::nt_world::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
 
@@ -1518,10 +1518,10 @@ impl DialogueAbsorbBridge {
 
         // ── Verify (EDV): 吸收前后性能对比, 能力下降则回滚 ──
         let critic_accepted =
-            brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
+            brain.absorb_with_critic(crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::DialogueExperience);
 
         let after_score = PerformanceEvaluator::evaluate(
-            &crate::neotrix::nt_world_model::TaskType::General,
+            &crate::l2_perception::nt_world::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
 
@@ -1543,9 +1543,9 @@ impl DialogueAbsorbBridge {
     /// 派单域映射: 关键词侧重路由/拓扑/策略/检索成败/进化信号, 反映
     /// "派单控制面学到的经验"被吸收进脑能力的信号面。复用同一
     /// `DialogueAbsorbConfig` boost 系数 (D5 单一调参入口)。
-    pub fn derive_dispatch_vector(&self, content: &str) -> crate::core::CapabilityVector {
+    pub fn derive_dispatch_vector(&self, content: &str) -> crate::l5_cognition::nt_core::capability::types::CapabilityVector {
         let text = content.to_lowercase();
-        let mut cv = crate::core::CapabilityVector::default();
+        let mut cv = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         let dispatch_dims: &[(&[&str], &str)] = &[
             (
                 &["route", "agent", "dispatch", "catalog"],
@@ -1598,9 +1598,9 @@ impl DialogueAbsorbBridge {
     /// 与 `derive_vector` (对话域) 平行的研究域映射: 关键词侧重证据/来源/
     /// 方法/聚合/分析, 反映"外部世界知识被吸收"的信号面。复用同一
     /// `DialogueAbsorbConfig` boost 系数 (D5 单一调参入口)。
-    pub fn derive_research_vector(&self, content: &str) -> crate::core::CapabilityVector {
+    pub fn derive_research_vector(&self, content: &str) -> crate::l5_cognition::nt_core::capability::types::CapabilityVector {
         let text = content.to_lowercase();
-        let mut cv = crate::core::CapabilityVector::default();
+        let mut cv = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         let research_dims: &[(&[&str], &str)] = &[
             (
                 &["search", "web", "online", "url", "http"],
@@ -1713,13 +1713,13 @@ impl DialogueAbsorbBridge {
 
         // ── Verify (EDV): 以 ResearchFindings 身份受校验吸收, 能力下降则回滚 ──
         let before_score = PerformanceEvaluator::evaluate(
-            &crate::neotrix::nt_world_model::TaskType::General,
+            &crate::l2_perception::nt_world::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
         let critic_accepted =
-            brain.absorb_with_critic(crate::core::KnowledgeSource::ResearchFindings);
+            brain.absorb_with_critic(crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::ResearchFindings);
         let after_score = PerformanceEvaluator::evaluate(
-            &crate::neotrix::nt_world_model::TaskType::General,
+            &crate::l2_perception::nt_world::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
 

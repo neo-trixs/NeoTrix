@@ -1,4 +1,4 @@
-use crate::core::CapabilityVector;
+use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use serde::{Deserialize, Serialize};
 
 /// Maturity level of a KnowledgeSource, per TENSA multi-fidelity epistemology.

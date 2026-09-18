@@ -17,8 +17,8 @@
 use rand::Rng;
 use std::collections::HashMap;
 
-use crate::neotrix::nt_io_http_factory::H2SettingsProfile;
-use crate::neotrix::nt_io_http_factory::TlsVariant;
+use crate::l1_action::nt_io::nt_io_http_factory::H2SettingsProfile;
+use crate::l1_action::nt_io::nt_io_http_factory::TlsVariant;
 
 /// 浏览器品牌 — 独立影响 User-Agent + Sec-CH-UA + TLS 参数
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

@@ -89,7 +89,7 @@ pub fn run_doctor() -> CommandOutput {
     }
 
     // 5. Brain state
-    if crate::core::nt_core_state::load("brain_metadata").is_some() {
+    if crate::l5_cognition::nt_core_state::load("brain_metadata").is_some() {
         report.push_str("**Brain**: ✅ saved in KB kv_store (state.brain)\n\n");
     } else {
         report.push_str("**Brain**: ⚠️ not found in KB\n\n");

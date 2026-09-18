@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::Connection;
 
 use crate::l5_cognition::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
-use crate::neotrix::nt_memory_kb::nt_memory_unify::{kv_delete, kv_get, kv_set};
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::{kv_delete, kv_get, kv_set};
 
 /// coeffect 依赖表的持久化 namespace。
 pub const COEFFECT_NS: &str = "coeffect_deps";
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn test_persist_and_load_roundtrip() {
         let conn = Connection::open_in_memory().unwrap();
-        let _ = crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn);
+        let _ = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn);
         let _reg = CoeffectRegistry::new();
         let bindings = vec![CoeffectBinding::new("db", "knowledge", "{\"path\":\"kb.db\"}")];
         assert_eq!(persist_bindings(&conn, &bindings).unwrap(), 1);

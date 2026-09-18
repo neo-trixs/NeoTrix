@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::core::nt_core_self::attention_head::{AttentionDomain, AttentionManager, WeaponSet};
+use crate::l6_meta::nt_core_self::attention_head::{AttentionDomain, AttentionManager, WeaponSet};
 
 /// 双专精 — 每 session 两个 Weapon Set
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -212,7 +212,7 @@ impl WeaponSetKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-     use crate::core::nt_core_self::attention_head::AttentionDomain;
+     use crate::l6_meta::nt_core_self::attention_head::AttentionDomain;
 
     #[test]
     fn test_ascendancy_router_new() {

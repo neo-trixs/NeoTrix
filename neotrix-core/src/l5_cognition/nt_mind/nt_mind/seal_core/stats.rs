@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 use super::core::KnowledgeSource;
 use super::model_router::ModelTier;
 

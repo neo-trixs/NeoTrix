@@ -13,7 +13,7 @@ use super::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
 use crate::l4_emotion::nt_feel::affective_interface::{
     AffectiveInterface, UserAffectSnapshot, UserEmotion,
 };
-use crate::core::nt_core_self::emotion_state::{EmotionDimension, EmotionEngine, EmotionReport};
+use crate::l6_meta::nt_core_self::emotion_state::{EmotionDimension, EmotionEngine, EmotionReport};
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 /// 每次 tick 最多注入的 KB 知识条目数，防止无界流入意识流。

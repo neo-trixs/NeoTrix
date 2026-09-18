@@ -1,6 +1,6 @@
 #![deny(clippy::unwrap_used)]
 
-use crate::l5_cognition::nt_core_hex::FullReasoningState;
+use crate::l0_substrate::nt_core_hex::FullReasoningState;
 use crate::l5_cognition::nt_core_policy::E8Policy;
 use serde::{Deserialize, Serialize};
 

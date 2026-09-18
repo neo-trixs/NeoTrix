@@ -44,16 +44,16 @@ use clap::{Parser, Subcommand};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use neotrix::neotrix::nt_memory_kb::nt_field_ledger;
-use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
-use neotrix::neotrix::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
-use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
-use neotrix::neotrix::foundation::guardian::{MapeGate, MapeGateConfig, MetricEval};
-use neotrix::core::nt_core_hcube::ghrr_vsa::{
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_field_ledger;
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_schema;
+use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
+use neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use neotrix::crate::foundation::guardian::{MapeGate, MapeGateConfig, MetricEval};
+use neotrix::l2_perception::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
 };
-use neotrix::core::nt_core_hcube::{PersistentHomology, PointCloud};
-use neotrix::core::nt_core_math::normalize_url;
+use neotrix::l2_perception::nt_core_hcube::{PersistentHomology, PointCloud};
+use neotrix::l5_cognition::nt_core_math::normalize_url;
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
@@ -136,7 +136,7 @@ fn cn_stop() -> &'static HashSet<char> {
 // ─── value 透明压缩层 (方案 D) ─────────────────────────────────────
 const VALUE_MAGIC: &[u8] = b"NTZ1";
 
-// normalize_url 已统一到 neotrix::core::nt_core_math::normalize_url
+// normalize_url 已统一到 neotrix::l5_cognition::nt_core_math::normalize_url
 
 fn now_ts() -> i64 {
     SystemTime::now()

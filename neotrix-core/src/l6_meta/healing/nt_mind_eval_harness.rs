@@ -5,7 +5,7 @@
 //! 预算执行: prompt 注入 "use at most K tokens" (Lee et al. 2025)
 
 use crate::l5_cognition::nt_core_ttc::EffortTier;
-use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::{
+use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::{
     derive_level, ConsciousnessGoldStandard, ConsciousnessLevel, GoldStandardReport,
 };
 use crate::l1_action::nt_io::nt_io_provider::{
@@ -1639,6 +1639,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for DummyProvider {
+    fn set_proxy(&mut self, _proxy_url: &str) {}
     fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
         crate::l1_action::nt_core_llm::DataTrust::Trusted
     }

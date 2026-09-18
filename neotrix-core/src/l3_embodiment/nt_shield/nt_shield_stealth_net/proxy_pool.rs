@@ -12,8 +12,8 @@ use tokio::sync::{RwLock, Semaphore};
 
 use crate::l1_action::nt_core_resource_pool::{AnyPool, DiscoveredResource, PoolHealthReport, PoolSnapshot, PoolSelectionStrategy, PoolSupervisor, ResourcePool};
 
-use crate::neotrix::nt_shield_stealth_net::config::load as cfg;
-use crate::neotrix::nt_shield_stealth_net::ip_geo::IpGeoLocator;
+use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::config::load as cfg;
+use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::ip_geo::IpGeoLocator;
 
 pub use super::pool_types::{NodeSelectionStrategy, SpeedTier, ProxyNode};
 pub use super::pool_strategies::StrategyLearner;

@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque, HashSet};
 use crate::l5_cognition::nt_mind::nt_mind::embedding::TextEmbedder;
 use super::types::*;
 
-use crate::l5_cognition::nt_core_math::cosine_similarity_f64 as cosine_similarity;
+use crate::l0_substrate::nt_core_math::cosine_similarity_f64 as cosine_similarity;
 
 // CortexMemory — 类人脑多维度存储系统
 // ============================================================

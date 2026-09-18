@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::core::nt_core_self::{CrystalRegistry, ThinkingTrace, StrategyKind, AttentionDomain};
+use crate::l6_meta::nt_core_self::{CrystalRegistry, ThinkingTrace, StrategyKind, AttentionDomain};
 use super::bus::ElementBus;
 use super::{Element, ElementError, ElementType, CapabilityAccess, CapabilityOp};
 
@@ -40,14 +40,14 @@ impl SkillElement {
 
     /// Project capability magnitude into the skill registry so the plugin layer
     /// can recommend strategies without duplicating the brain's capability state.
-    pub fn sync_from_capability(&mut self, capability: &crate::core::CapabilityVector) {
+    pub fn sync_from_capability(&mut self, capability: &crate::l5_cognition::nt_core::capability::types::CapabilityVector) {
         let magnitude: f64 = capability.arr.iter().sum();
         if magnitude > 0.0 && self.registry.crystals.is_empty() {
-            let mut trace = crate::core::nt_core_self::ThinkingTrace::new(0, "capability sync");
-            trace.grade = crate::core::nt_core_self::ReflectionGrade::Good;
+            let mut trace = crate::l6_meta::nt_core_self::ThinkingTrace::new(0, "capability sync");
+            trace.grade = crate::l6_meta::nt_core_self::ReflectionGrade::Good;
             trace.steps.push(
-                crate::core::nt_core_self::ThinkingStep::new(1, "synthesize", crate::core::nt_core_self::StrategyKind::Reflection)
-                    .with_domain(crate::core::nt_core_self::AttentionDomain::Code),
+                crate::l6_meta::nt_core_self::ThinkingStep::new(1, "synthesize", crate::l6_meta::nt_core_self::StrategyKind::Reflection)
+                    .with_domain(crate::l6_meta::nt_core_self::AttentionDomain::Code),
             );
             let _ = self.extract(&trace, 1);
         }
@@ -107,7 +107,7 @@ impl Element for SkillElement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self::{ThinkingTrace, ThinkingStep, ReflectionGrade};
+    use crate::l6_meta::nt_core_self::{ThinkingTrace, ThinkingStep, ReflectionGrade};
 
     fn make_good_trace() -> ThinkingTrace {
         let mut trace = ThinkingTrace::new(0, "refactor module");

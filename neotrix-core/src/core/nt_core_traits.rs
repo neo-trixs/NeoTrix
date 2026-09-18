@@ -96,7 +96,7 @@ pub trait SessionProvider {
 }
 
 /// KnowledgeProvider re-export (defined in knowledge.rs)
-pub use super::nt_core_knowledge::KnowledgeProvider;
+pub use crate::l2_perception::nt_core_knowledge::types::KnowledgeProvider;
 
 /// KnowledgeSink — 知识写入抽象 (L2 感知层对 L1 知识层的写入接口)
 ///

@@ -124,8 +124,8 @@ impl CalibratedCurriculumGenerator {
         available_tasks: &[(String, f64, Vec<String>)],
         language: &str,
     ) -> Option<(String, f64, Vec<String>)> {
-        use crate::core::nt_core_self::cuda_agent::StrategyManager;
-        use crate::core::nt_core_self::cuda_agent::OptimizationStrategy;
+        use crate::l6_meta::nt_core_self::cuda_agent::StrategyManager;
+        use crate::l6_meta::nt_core_self::cuda_agent::OptimizationStrategy;
 
         // 首先使用标准难度过滤
         let candidates: Vec<_> = available_tasks.iter()

@@ -1,23 +1,30 @@
 /**
- * widgets/chat-panel/model/useChatState.ts — Chat 状态管理
+ * widgets/chat-panel/model/useChatState.ts — Chat 状态管理 (组合层)
  *
  * 从 Chat.tsx 提取所有状态声明（signals, effects）
  * Chat.tsx 从 2311 行 → ~800 行（渲染 + 薄胶水）
+ *
+ * v2: 按领域拆分为子 Hook（hooks/），本文件为组合层，保持 ChatStateReturn 接口不变。
  */
 import { createSignal, createEffect, onMount, onCleanup } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { chatStore, type Message, type NeoCodexAttachmentDto } from '../../../stores/chat'
 import { tagsStore } from '../../../stores/tags'
-import { PERMISSION_MODES, type PermissionMode } from '../../../components/PermissionModeSelector'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../../../api/events'
-import type { HarnessApproval, HarnessStep, HarnessRunResponse } from '../../../api/harness'
-import type { ActivityStep } from '../../../components/AgentActivityLog'
-import type { AgentPhase } from '../../../components/AgentActivityBar'
 import { neocodex, harness, unified, errText } from '../../../api'
-import { usePolling } from '../../../lib/usePolling'
-import { query } from '../../../api/query'
 import type { AgentStatus } from '../../../api/types'
 import { rootCause } from '../../../lib/errorRootCause'
+
+// ── 子 Hook 导入 ──
+import { useInputState } from './hooks/useInputState'
+import { useSidebarState } from './hooks/useSidebarState'
+import { useAgentActivity } from './hooks/useAgentActivity'
+import { useStreamError } from './hooks/useStreamError'
+import { useHarnessState } from './hooks/useHarnessState'
+import { useMsgSearch } from './hooks/useMsgSearch'
+import { useThemeState } from './hooks/useThemeState'
+import { useContextState } from './hooks/useContextState'
+import { usePermissionState } from './hooks/usePermissionState'
 
 export interface ChatStateReturn {
   // Input
@@ -55,16 +62,16 @@ export interface ChatStateReturn {
   setShowErrRaw: (v: boolean) => void
 
   // Agent activity
-  agentPhase: () => AgentPhase
-  setAgentPhase: (p: AgentPhase) => void
+  agentPhase: () => any
+  setAgentPhase: (p: any) => void
   agentDomain: () => string | null
   setAgentDomain: (d: string | null) => void
   agentToolCount: () => number
   setAgentToolCount: (fn: (n: number) => number) => void
   agentLastActivity: () => string | null
   setAgentLastActivity: (a: string | null) => void
-  agentLog: () => ActivityStep[]
-  pushLog: (step: Omit<ActivityStep, 'ts'>) => void
+  agentLog: () => any[]
+  pushLog: (step: Omit<any, 'ts'>) => void
   logOpen: () => boolean
   setLogOpen: (v: boolean | ((prev: boolean) => boolean)) => void
 
@@ -77,16 +84,16 @@ export interface ChatStateReturn {
   // Harness
   harnessRoute: () => { tag: string; domain: string; specialist: string } | null
   setHarnessRoute: (r: { tag: string; domain: string; specialist: string } | null) => void
-  harnessReport: () => HarnessRunResponse | null
-  setHarnessReport: (r: HarnessRunResponse | null) => void
+  harnessReport: () => any | null
+  setHarnessReport: (r: any | null) => void
   harnessRunning: () => boolean
   setHarnessRunning: (v: boolean) => void
-  harnessSteps: () => HarnessStep[]
-  setHarnessSteps: (fn: (prev: HarnessStep[]) => HarnessStep[]) => void
+  harnessSteps: () => any[]
+  setHarnessSteps: (fn: (prev: any[]) => any[]) => void
 
   // Approvals
-  approvals: () => HarnessApproval[]
-  setApprovals: (a: HarnessApproval[]) => void
+  approvals: () => any[]
+  setApprovals: (a: any[]) => void
   refreshApprovals: () => void
 
   // File editor
@@ -98,8 +105,8 @@ export interface ChatStateReturn {
   setCopiedId: (id: string | null) => void
 
   // Permission
-  permissionMode: () => PermissionMode
-  setPermissionMode: (m: PermissionMode) => void
+  permissionMode: () => any
+  setPermissionMode: (m: any) => void
   cyclePermissionMode: () => void
 
   // Annotation
@@ -238,139 +245,36 @@ export interface ChatStateReturn {
 export function useChatState(): ChatStateReturn {
   const navigate = useNavigate()
 
-  // ── Input ──
-  const [inputValue, setInputValue] = createSignal('')
-  const DRAFT_KEY = 'nt_session_drafts'
-  const readDrafts = (): Record<string, string> => {
-    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') } catch { return {} }
+  // ── 组合子 Hook ──
+  const input = useInputState()
+  const sidebar = useSidebarState()
+  const agent = useAgentActivity()
+  const streamErr = useStreamError()
+  const harnessState = useHarnessState()
+  const search = useMsgSearch()
+  const themeState = useThemeState()
+
+  // ── 独立 signals (轻量，不值得单独提取) ──
+  const [settingsOpen, setSettingsOpen] = createSignal(false)
+  const [showFileEditor, setShowFileEditor] = createSignal(false)
+  const [copiedId, setCopiedId] = createSignal<string | null>(null)
+  const [annotationHint, setAnnotationHint] = createSignal<string | null>(null)
+  const [planPending, setPlanPending] = createSignal<{ msgId: string } | null>(null)
+  const [activeModel, setActiveModel] = createSignal<string | null>(null)
+  const [appVersion, setAppVersion] = createSignal<string | null>(null)
+  const [exportMenuOpen, setExportMenuOpen] = createSignal(false)
+  const [activePanel, setActivePanel] = createSignal<string | null>(null)
+  const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
+  const [activeTags, setActiveTags] = createSignal<string[]>([])
+  const toggleTag = (name: string) => {
+    setActiveTags((prev) => prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name])
   }
-  const saveDraft = (id: string, text: string) => {
-    const d = readDrafts()
-    if (text) d[id] = text
-    else delete d[id]
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* 忽略 */ }
-  }
-  createEffect(() => {
-    const id = chatStore.state.currentSessionId
-    setInputValue(id ? (readDrafts()[id] ?? '') : '')
-  })
-  createEffect(() => {
-    const id = chatStore.state.currentSessionId
-    if (id) saveDraft(id, inputValue())
-  })
-  const [textareaRef, setTextareaRef] = createSignal<HTMLTextAreaElement | null>(null)
-  const adjustTextarea = () => {
-    const textarea = textareaRef()
-    if (textarea) {
-      textarea.style.height = 'auto'
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
-    }
-  }
+  const clearTags = () => setActiveTags([])
 
   // ── Edit ──
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null)
   const [editContent, setEditContent] = createSignal('')
   const [showEditOrig, setShowEditOrig] = createSignal(false)
-
-  // ── Sidebar ──
-  const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false)
-  const [sidebarWidth, setSidebarWidth] = createSignal(280)
-  let sbResizing = false
-  const onSidebarResizeDown = (e: MouseEvent) => {
-    e.preventDefault()
-    sbResizing = true
-    const onMove = (ev: MouseEvent) => {
-      if (!sbResizing) return
-      setSidebarWidth(Math.min(460, Math.max(200, ev.clientX)))
-    }
-    const onUp = () => {
-      sbResizing = false
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }
-
-  // ── Settings ──
-  const [settingsOpen, setSettingsOpen] = createSignal(false)
-
-  // ── Stream ──
-  const [streamError, setStreamError] = createSignal<string | null>(null)
-  const [showErrRaw, setShowErrRaw] = createSignal(false)
-  const [streamErrorDetail, setStreamErrorDetail] = createSignal<{ what: string; why: string; next: string } | null>(null)
-
-  // ── Agent activity ──
-  const [agentPhase, setAgentPhase] = createSignal<AgentPhase>('idle')
-  const [agentDomain, setAgentDomain] = createSignal<string | null>(null)
-  const [agentToolCount, setAgentToolCount] = createSignal(0)
-  const [agentLastActivity, setAgentLastActivity] = createSignal<string | null>(null)
-  const [agentLog, setAgentLog] = createSignal<ActivityStep[]>([])
-  const [logOpen, setLogOpen] = createSignal(false)
-  const pushLog = (step: Omit<ActivityStep, 'ts'>) => {
-    setAgentLog((prev) => {
-      const next = [...prev, { ...step, ts: Date.now() }]
-      return next.length > 24 ? next.slice(next.length - 24) : next
-    })
-  }
-
-  // ── Info notice ──
-  const [infoNotice, setInfoNotice] = createSignal<string | null>(null)
-  let infoNoticeTimer: ReturnType<typeof setTimeout> | undefined
-  const showInfo = (msg: string, ms = 3000) => {
-    if (infoNoticeTimer) clearTimeout(infoNoticeTimer)
-    setInfoNotice(msg)
-    infoNoticeTimer = setTimeout(() => setInfoNotice(null), ms)
-  }
-  const showError = (msg: string) => {
-    setStreamError(msg)
-    setTimeout(() => setStreamError(null), 3000)
-  }
-
-  // ── Harness ──
-  const [harnessRoute, setHarnessRoute] = createSignal<{ tag: string; domain: string; specialist: string } | null>(null)
-  const [harnessReport, setHarnessReport] = createSignal<HarnessRunResponse | null>(null)
-  const [harnessRunning, setHarnessRunning] = createSignal(false)
-  const [harnessSteps, setHarnessSteps] = createSignal<HarnessStep[]>([])
-
-  // ── Approvals ──
-  const [approvals, setApprovals] = createSignal<HarnessApproval[]>([])
-  const refreshApprovals = () => {
-    harness.harnessApprovalList().then(setApprovals).catch(() => setApprovals([]))
-  }
-  onMount(() => { refreshApprovals() })
-
-  // ── File editor ──
-  const [showFileEditor, setShowFileEditor] = createSignal(false)
-
-  // ── Copied ──
-  const [copiedId, setCopiedId] = createSignal<string | null>(null)
-
-  // ── Permission ──
-  const [permissionMode, setPermissionMode] = createSignal<PermissionMode>(
-    (typeof localStorage !== 'undefined' && (localStorage.getItem('nt_perm_mode') as PermissionMode)) || 'auto',
-  )
-  const persistPermissionMode = (m: PermissionMode) => {
-    try { localStorage.setItem('nt_perm_mode', m) } catch { /* 隐私模式忽略 */ }
-  }
-  const cyclePermissionMode = () => {
-    if (isGenerating()) return
-    const idx = PERMISSION_MODES.findIndex((m) => m.value === permissionMode())
-    const next = PERMISSION_MODES[(idx + 1) % PERMISSION_MODES.length]
-    setPermissionMode(next.value)
-    persistPermissionMode(next.value)
-    showInfo(`权限模式：${next.label}`, 2500)
-  }
-
-  // ── Annotation ──
-  const [annotationHint, setAnnotationHint] = createSignal<string | null>(null)
-
-  // ── Plan ──
-  const [planPending, setPlanPending] = createSignal<{ msgId: string } | null>(null)
-
-  // ── Model/Version ──
-  const [activeModel, setActiveModel] = createSignal<string | null>(null)
-  const [appVersion, setAppVersion] = createSignal<string | null>(null)
 
   // ── Palette ──
   const [paletteOpen, setPaletteOpen] = createSignal(false)
@@ -378,95 +282,6 @@ export function useChatState(): ChatStateReturn {
   const [recentPaletteIds, setRecentPaletteIds] = createSignal<string[]>([])
   const pushRecentCmd = (id: string) =>
     setRecentPaletteIds((ids) => [id, ...ids.filter((x) => x !== id)].slice(0, 5))
-
-  // ── Search ──
-  const [msgSearch, setMsgSearch] = createSignal('')
-  const [msgSearchOpen, setMsgSearchOpen] = createSignal(false)
-  const [msgSearchInput, setMsgSearchInput] = createSignal<HTMLInputElement | null>(null)
-  const matchCount = () => {
-    const q = msgSearch().trim().toLowerCase()
-    if (!q) return 0
-    return messages().filter((m) => m.content.toLowerCase().includes(q)).length
-  }
-  const [matchCursor, setMatchCursor] = createSignal(0)
-  const matchedIds = () => {
-    const q = msgSearch().trim().toLowerCase()
-    if (!q) return []
-    return messages().filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.id)
-  }
-  const messageEls = new Map<string, HTMLElement>()
-  const jumpMatch = (dir: 1 | -1) => {
-    const ids = matchedIds()
-    if (!ids.length) return
-    const i = (matchCursor() + dir + ids.length) % ids.length
-    setMatchCursor(i)
-    messageEls.get(ids[i])?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }
-
-  // ── Theme ──
-  const THEMES = ['gold', 'lilac', 'mint'] as const
-  type Theme = (typeof THEMES)[number]
-  const THEME_LABEL: Record<Theme, string> = { gold: '浅金', lilac: '浅紫', mint: '浅青' }
-  const [theme, setTheme] = createSignal<Theme>(
-    (typeof localStorage !== 'undefined' && (localStorage.getItem('nt-theme') as Theme)) ||
-      (typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: light)').matches ? 'lilac' : 'gold'),
-  )
-  createEffect(() => {
-    document.documentElement.dataset.theme = theme()
-    try { localStorage.setItem('nt-theme', theme()) } catch { /* 隐私模式忽略 */ }
-  })
-  const cycleTheme = () => setTheme((t) => THEMES[(THEMES.indexOf(t) + 1) % THEMES.length])
-
-  // ── Export ──
-  const [exportMenuOpen, setExportMenuOpen] = createSignal(false)
-
-  // ── Panel ──
-  const [activePanel, setActivePanel] = createSignal<string | null>(null)
-  const togglePanel = (id: string) => setActivePanel(activePanel() === id ? null : id)
-
-  // ── View ──
-  const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
-
-  // ── Tags ──
-  const [activeTags, setActiveTags] = createSignal<string[]>([])
-  const toggleTag = (name: string) => {
-    setActiveTags((prev) => prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name])
-  }
-  const clearTags = () => setActiveTags([])
-
-  // ── Context ──
-  const [contextPct, setContextPct] = createSignal<number | null>(null)
-  const [compactHintDismissed, setCompactHintDismissed] = createSignal(false)
-  const compactHintVisible = () => {
-    const p = contextPct()
-    if (p === null || p < 80) return false
-    return !compactHintDismissed()
-  }
-  const [compacting, setCompacting] = createSignal(false)
-  const runCompact = async () => {
-    if (compacting() || isGenerating()) return
-    const sessionId = currentSession()?.id ?? ''
-    if (!sessionId) { setStreamError('当前没有激活会话，无法压缩'); setTimeout(() => setStreamError(null), 3000); return }
-    setCompacting(true)
-    try {
-      await neocodex.compactSession(sessionId, 8)
-      await chatStore.loadSessionMessages(sessionId)
-      setCompactHintDismissed(true)
-      showInfo('上下文已压缩，更早的对话被截断', 3000)
-    } catch (error) {
-      console.error('[Chat] Compact session failed:', error)
-      setStreamError(errText(error) || '压缩会话失败，请重试')
-      setTimeout(() => setStreamError(null), 3000)
-    } finally { setCompacting(false) }
-  }
-
-  // ── Attachments ──
-  const [pendingAttachments, setPendingAttachments] = createSignal<NeoCodexAttachmentDto[]>([])
-  const removeAttachment = (idx: number) => setPendingAttachments(p => p.filter((_, i) => i !== idx))
-
-  // ── Mentions ──
-  const [mentionRefs, setMentionRefs] = createSignal<{ path: string; lines: number; tokens: number }[]>([])
-  const removeMentionRef = (path: string) => setMentionRefs(prev => prev.filter(r => r.path !== path))
 
   // ── Expanded ──
   const [expandedMsgIds, setExpandedMsgIds] = createSignal<Record<string, boolean>>({})
@@ -490,33 +305,17 @@ export function useChatState(): ChatStateReturn {
     setStickToBottom(true)
   }
 
-  // ── Approval counts ──
-  const [approvalAccepted, setApprovalAccepted] = createSignal(0)
-  const [approvalRejected, setApprovalRejected] = createSignal(0)
-  const autonomyLevel = () => {
-    const total = approvalAccepted() + approvalRejected()
-    if (total === 0) return '待校准' as const
-    const rate = approvalAccepted() / total
-    if (rate >= 0.8) return '高信任' as const
-    if (rate >= 0.5) return '协作' as const
-    return '审慎' as const
-  }
-  const autonomyRate = () => {
-    const total = approvalAccepted() + approvalRejected()
-    return total === 0 ? 0 : approvalAccepted() / total
-  }
-  const autonomyLevelNum = () => {
-    const m = permissionMode()
-    if (m === 'manual') return 0
-    if (m === 'plan') return 1
-    if (m === 'auto') return 2
-    if (m === 'accept_edits') return 3
-    return 1
-  }
+  // ── Attachments ──
+  const [pendingAttachments, setPendingAttachments] = createSignal<NeoCodexAttachmentDto[]>([])
+  const removeAttachment = (idx: number) => setPendingAttachments(p => p.filter((_, i) => i !== idx))
+
+  // ── Mentions ──
+  const [mentionRefs, setMentionRefs] = createSignal<{ path: string; lines: number; tokens: number }[]>([])
+  const removeMentionRef = (path: string) => setMentionRefs(prev => prev.filter(r => r.path !== path))
 
   // ── Live tokens ──
   const liveGenTokens = () => {
-    const ms = messages()
+    const ms = chatStore.currentMessages
     const last = ms[ms.length - 1]
     return last && last.role === 'assistant' ? Math.ceil(last.content.length / 4) : 0
   }
@@ -537,75 +336,174 @@ export function useChatState(): ChatStateReturn {
   const isGenerating = () => chatStore.isGenerating
   const currentSession = () => chatStore.currentSession
 
+  // ── Info notice ──
+  const [infoNotice, setInfoNotice] = createSignal<string | null>(null)
+  let infoNoticeTimer: ReturnType<typeof setTimeout> | undefined
+  const showInfo = (msg: string, ms = 3000) => {
+    if (infoNoticeTimer) clearTimeout(infoNoticeTimer)
+    setInfoNotice(msg)
+    infoNoticeTimer = setTimeout(() => setInfoNotice(null), ms)
+  }
+  const showError = (msg: string) => {
+    streamErr.setStreamError(msg)
+    setTimeout(() => streamErr.setStreamError(null), 3000)
+  }
+
+  // ── 需要跨 Hook 依赖的子 Hook ──
+  const context = useContextState({
+    isGenerating,
+    showInfo,
+    setStreamError: streamErr.setStreamError,
+  })
+  const permission = usePermissionState({ isGenerating, showInfo })
+
   // ── Event cleanup ──
   const [unlistenStream, setUnlistenStream] = createSignal<UnlistenFn | null>(null)
   const [unlistenMenu, setUnlistenMenu] = createSignal<UnlistenFn | null>(null)
 
-  // ── Context polling ──
-  usePolling({
-    intervalMs: 15000,
-    immediate: true,
-    run: async () => {
-      try {
-        const s = await query<AgentStatus>('agent_status', () => neocodex.agentStatus(), { ttlMs: 3000 })
-        if (s && typeof s.context_usage === 'number') setContextPct(s.context_usage * 100)
-      } catch { /* 只读轮询，失败静默 */ }
-    },
-  })
+  // ── Effects ──
   createEffect(() => {
-    const p = contextPct()
-    if (p !== null && p < 80) setCompactHintDismissed(false)
+    const r = harnessState.harnessRoute()
+    agent.setAgentDomain(r?.domain ?? null)
   })
-  createEffect(() => {
-    const r = harnessRoute()
-    setAgentDomain(r?.domain ?? null)
-  })
-
-  // ── Panel cost redirect ──
   createEffect(() => {
     if (activePanel() === 'cost') { setActivePanel(null); navigate('/insights') }
   })
 
   return {
-    inputValue, setInputValue, textareaRef, setTextareaRef, adjustTextarea,
+    // Input (from sub-hook)
+    inputValue: input.inputValue, setInputValue: input.setInputValue,
+    textareaRef: input.textareaRef, setTextareaRef: input.setTextareaRef,
+    adjustTextarea: input.adjustTextarea,
+
+    // Edit
     editingMessageId, setEditingMessageId, editContent, setEditContent, showEditOrig, setShowEditOrig,
-    sidebarCollapsed, setSidebarCollapsed, sidebarWidth, setSidebarWidth, onSidebarResizeDown,
+
+    // Sidebar (from sub-hook)
+    sidebarCollapsed: sidebar.sidebarCollapsed, setSidebarCollapsed: sidebar.setSidebarCollapsed,
+    sidebarWidth: sidebar.sidebarWidth, setSidebarWidth: sidebar.setSidebarWidth,
+    onSidebarResizeDown: sidebar.onSidebarResizeDown,
+
+    // Settings
     settingsOpen, setSettingsOpen,
-    streamError, setStreamError, streamErrorDetail, setStreamErrorDetail, showErrRaw, setShowErrRaw,
-    agentPhase, setAgentPhase, agentDomain, setAgentDomain, agentToolCount, setAgentToolCount,
-    agentLastActivity, setAgentLastActivity, agentLog, pushLog, logOpen, setLogOpen,
+
+    // Stream error (from sub-hook)
+    streamError: streamErr.streamError, setStreamError: streamErr.setStreamError,
+    streamErrorDetail: streamErr.streamErrorDetail, setStreamErrorDetail: streamErr.setStreamErrorDetail,
+    showErrRaw: streamErr.showErrRaw, setShowErrRaw: streamErr.setShowErrRaw,
+
+    // Agent activity (from sub-hook)
+    agentPhase: agent.agentPhase, setAgentPhase: agent.setAgentPhase,
+    agentDomain: agent.agentDomain, setAgentDomain: agent.setAgentDomain,
+    agentToolCount: agent.agentToolCount, setAgentToolCount: agent.setAgentToolCount,
+    agentLastActivity: agent.agentLastActivity, setAgentLastActivity: agent.setAgentLastActivity,
+    agentLog: agent.agentLog, pushLog: agent.pushLog,
+    logOpen: agent.logOpen, setLogOpen: agent.setLogOpen,
+
+    // Info notice
     infoNotice, setInfoNotice, showInfo, showError,
-    harnessRoute, setHarnessRoute, harnessReport, setHarnessReport, harnessRunning, setHarnessRunning,
-    harnessSteps, setHarnessSteps,
-    approvals, setApprovals, refreshApprovals,
+
+    // Harness (from sub-hook)
+    harnessRoute: harnessState.harnessRoute, setHarnessRoute: harnessState.setHarnessRoute,
+    harnessReport: harnessState.harnessReport, setHarnessReport: harnessState.setHarnessReport,
+    harnessRunning: harnessState.harnessRunning, setHarnessRunning: harnessState.setHarnessRunning,
+    harnessSteps: harnessState.harnessSteps, setHarnessSteps: harnessState.setHarnessSteps,
+    approvals: harnessState.approvals, setApprovals: harnessState.setApprovals,
+    refreshApprovals: harnessState.refreshApprovals,
+
+    // File editor
     showFileEditor, setShowFileEditor,
+
+    // Copied
     copiedId, setCopiedId,
-    permissionMode, setPermissionMode, cyclePermissionMode,
+
+    // Permission (from sub-hook)
+    permissionMode: permission.permissionMode, setPermissionMode: permission.setPermissionMode,
+    cyclePermissionMode: permission.cyclePermissionMode,
+
+    // Annotation
     annotationHint, setAnnotationHint,
+
+    // Plan
     planPending, setPlanPending,
+
+    // Model/Version
     activeModel, setActiveModel, appVersion, setAppVersion,
+
+    // Palette
     paletteOpen, setPaletteOpen, shortcutHelpOpen, setShortcutHelpOpen,
     recentPaletteIds, pushRecentCmd,
-    msgSearch, setMsgSearch, msgSearchOpen, setMsgSearchOpen, msgSearchInput, setMsgSearchInput,
-    matchCount, matchCursor, setMatchCursor, matchedIds, jumpMatch,
-    theme, cycleTheme,
+
+    // Search (from sub-hook)
+    msgSearch: search.msgSearch, setMsgSearch: search.setMsgSearch,
+    msgSearchOpen: search.msgSearchOpen, setMsgSearchOpen: search.setMsgSearchOpen,
+    msgSearchInput: search.msgSearchInput, setMsgSearchInput: search.setMsgSearchInput,
+    matchCount: search.matchCount, matchCursor: search.matchCursor,
+    setMatchCursor: search.setMatchCursor, matchedIds: search.matchedIds,
+    jumpMatch: search.jumpMatch,
+
+    // Theme (from sub-hook)
+    theme: themeState.theme, cycleTheme: themeState.cycleTheme,
+
+    // Export
     exportMenuOpen, setExportMenuOpen,
-    activePanel, setActivePanel, togglePanel,
+
+    // Panel
+    activePanel, setActivePanel,
+    togglePanel: (id: string) => setActivePanel(activePanel() === id ? null : id),
+
+    // View
     activeView, setActiveView,
+
+    // Tags
     activeTags, toggleTag, clearTags,
-    contextPct, compactHintDismissed, setCompactHintDismissed, compactHintVisible, compacting, runCompact,
+
+    // Context (from sub-hook)
+    contextPct: context.contextPct,
+    compactHintDismissed: context.compactHintDismissed,
+    setCompactHintDismissed: context.setCompactHintDismissed,
+    compactHintVisible: context.compactHintVisible,
+    compacting: context.compacting,
+    runCompact: context.runCompact,
+
+    // Attachments
     pendingAttachments, setPendingAttachments, removeAttachment,
+
+    // Mentions
     mentionRefs, setMentionRefs, removeMentionRef,
+
+    // Expanded
     expandedMsgIds, setExpandedMsgIds,
+
+    // Slash
     slashIdx, setSlashIdx, slashDismissed, setSlashDismissed,
+
+    // Streaming
     currentAssistantMsgId, setCurrentAssistantMsgId, generation, activeGen,
-    scrollRef: undefined as HTMLDivElement | undefined, setScrollRef, stickToBottom, setStickToBottom, scrollToBottom,
-    approvalAccepted, setApprovalAccepted, approvalRejected, setApprovalRejected,
-    autonomyLevel, autonomyRate, autonomyLevelNum,
+
+    // Scroll
+    scrollRef: undefined as HTMLDivElement | undefined, setScrollRef,
+    stickToBottom, setStickToBottom, scrollToBottom,
+
+    // Approval counts (from sub-hook)
+    approvalAccepted: permission.approvalAccepted, setApprovalAccepted: permission.setApprovalAccepted,
+    approvalRejected: permission.approvalRejected, setApprovalRejected: permission.setApprovalRejected,
+    autonomyLevel: permission.autonomyLevel, autonomyRate: permission.autonomyRate,
+    autonomyLevelNum: permission.autonomyLevelNum,
+
+    // Live tokens
     liveGenTokens, streamWatchdogTimer,
+
+    // CLI
     unifiedCliCmds, setUnifiedCliCmds, harnessCaps, loadHarnessCaps,
+
+    // Messages
     messages, isGenerating, currentSession,
+
+    // Event cleanup
     unlistenStream, setUnlistenStream, unlistenMenu, setUnlistenMenu,
-    messageEls,
+
+    // Search element refs (from sub-hook)
+    messageEls: search.messageEls,
   } as any
 }

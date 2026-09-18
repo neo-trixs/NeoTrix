@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 use std::time::{Duration, Instant};
 
-use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
+use neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 fn main() {
     println!("╔═══════════════════════════════════════════════════╗");

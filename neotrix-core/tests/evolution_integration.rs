@@ -21,8 +21,8 @@ use neotrix::l3_embodiment::nt_shield::nt_shield_sandbox::{storm_breaker_tcp_pro
 use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_dual_brain::{
     DualBrainWorkingMemory, ExperienceAnchor,
 };
-use neotrix::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-use neotrix::nt_mind::nt_mind_skill_engine::{evomal_poison_scan, SkillEntry};
+use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::l5_cognition::nt_mind::nt_mind_skill_engine::{evomal_poison_scan, SkillEntry};
 use neotrix::neotrix::nt_core_event_bus::EventBus;
 
 /// (1) FEP/IIT output → EventBus.

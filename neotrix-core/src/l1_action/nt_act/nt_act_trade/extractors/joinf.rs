@@ -1081,15 +1081,14 @@ mod tests {
     fn test_activity_log_mapping() {
         let extractor = JoinfExtractor::new("https://www.joinf.com", 1, 1);
 
-        let log = JoinfCustomerLog {
-            log_id: 100,
+        let log = ActivityLog {
+            id: 100,
             customer_id: 42,
-            log_type: "whatsapp".into(),
-            content: "Sent product catalog".into(),
-            create_time: 1700000000,
-            operator_name: "Alice".into(),
-            whatsapp_info: Some("{}".into()),
-            email_info: None,
+            interaction_type: "whatsapp".into(),
+            summary: "Sent product catalog".into(),
+            detail: String::new(),
+            timestamp: 1700000000,
+            operator: Some("Alice".into()),
         };
 
         let interaction = extractor.map_interaction(&log);

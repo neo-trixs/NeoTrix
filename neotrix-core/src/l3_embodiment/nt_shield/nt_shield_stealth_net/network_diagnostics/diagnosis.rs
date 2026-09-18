@@ -3,7 +3,7 @@
 mod tests {
     use std::time::Duration;
     use super::super::*;
-    use crate::neotrix::nt_shield_stealth_net::network_diagnostics::types::ConnectionFailureRootCause;
+    use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::network_diagnostics::types::ConnectionFailureRootCause;
 
     #[test]
     fn test_deterministic_classifier_fake_ip() {

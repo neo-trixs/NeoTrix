@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub use crate::l5_cognition::nt_core_shared_types::Modality;
+pub use crate::l0_substrate::nt_core_shared_types::Modality;
 
 /// Top-Down Modality Attention Router.
 ///

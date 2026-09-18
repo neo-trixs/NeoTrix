@@ -507,6 +507,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for MockLlmProvider {
+    fn set_proxy(&mut self, _proxy_url: &str) {}
     fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
         crate::l1_action::nt_core_llm::DataTrust::Trusted
     }

@@ -458,7 +458,7 @@ impl GroundedPrmVerifier {
 #[cfg(test)]
 mod grounded_prm_tests {
     use super::*;
-    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+    use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 
     fn make_step(idx: usize, mode: u8, success: bool) -> TrajectoryStep {
         TrajectoryStep {

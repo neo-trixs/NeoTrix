@@ -9,45 +9,12 @@ import type {
   ToolCallRecord,
 } from '../api/types'
 
+// ── 统一类型：单一事实源来自 entities/message/model/types.ts ──
+import type { Message, Session, ChatState } from '../entities/message/model/types'
+export type { Message, Session, ChatState }
+
 // 兼容再导出：旧导入点（routes/Chat, ToolCallCard, FilePreview）逐步迁移到 api/types
 export type { NeoCodexAttachmentDto, NeoCodexMessageItem, NeoCodexSessionInfo, ToolCallRecord } from '../api/types'
-
-export interface Message {
-  id: string
-  role: 'user' | 'assistant' | 'system' | 'tool'
-  content: string
-  timestamp: Date
-  isStreaming?: boolean
-  toolCalls?: ToolCallRecord[]
-  attachments?: NeoCodexAttachmentDto[]
-  metadata?: {
-    model?: string
-    tokens?: number
-    duration?: number
-  }
-  reasoning?: string
-}
-
-export interface Session {
-  id: string
-  title: string
-  messages: Message[]
-  createdAt: Date
-  updatedAt: Date
-  checkpointId?: string
-  /** 项目名（从会话 wire_path 提取，对标 Claude 项目分组） */
-  project?: string
-  /** 会话标签（本地持久化，对标 Obsidian tag） */
-  tags: string[]
-}
-
-export interface ChatState {
-  sessions: Session[]
-  currentSessionId: string | null
-  isGenerating: boolean
-  isLoadingSessions: boolean
-  isLoadingMessages: boolean
-}
 
 // ─── P0: Hold-Token + Verbatim-Dup 防重复发送 ───
 

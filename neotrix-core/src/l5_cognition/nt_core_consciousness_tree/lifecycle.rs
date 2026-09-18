@@ -505,7 +505,7 @@ impl ConsciousnessTree {
     /// Uses confidence to boost coil health and frustration/urgency to indicate stress.
     pub fn apply_emotion_report(
         &mut self,
-        report: crate::core::nt_core_self::emotion_state::EmotionReport,
+        report: crate::l6_meta::nt_core_self::emotion_state::EmotionReport,
     ) {
         // 情绪作为主观调制叠加在真实计算相干性之上 (D4): 不再全量覆盖。
         // 真实 coherence 来自 compute_coherence (分支一致性/谐振/合规/迷雾);

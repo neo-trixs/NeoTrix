@@ -123,7 +123,7 @@ pub fn compute_pressure(turns_played: usize, max_turns: usize) -> PressureSignal
 // ═══════════════════════════════════════════════════════════════════
 
 /// 统一 EmotionLabel 事实源: core::nt_core_self::emotion_state::EmotionLabel
-pub use crate::core::nt_core_self::emotion_state::EmotionLabel;
+pub use crate::l6_meta::nt_core_self::emotion_state::EmotionLabel;
 
 /// Map appraisal to dominant emotion label.
 fn appraisal_to_emotion(appraisal: &AppraisalSignal) -> EmotionLabel {

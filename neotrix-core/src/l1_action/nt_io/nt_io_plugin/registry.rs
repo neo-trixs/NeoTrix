@@ -278,7 +278,7 @@ impl PluginRegistry {
             let fname = entry.file_name().to_string_lossy().to_string();
             if fname.ends_with(".wasm") {
                 let full_path = entry.path();
-                match crate::neotrix::nt_io_plugin::wasm::WasmPluginWrapper::new(&full_path) {
+                match crate::l1_action::nt_io::nt_io_plugin::wasm::WasmPluginWrapper::new(&full_path) {
                     Ok(wrapper) => batch.push(Box::new(wrapper)),
                     Err(e) => log::warn!("[plugin] hot-reload invalid wasm '{}': {}", fname, e),
                 }
@@ -327,7 +327,7 @@ impl PluginRegistry {
             let fname = entry.file_name().to_string_lossy().to_string();
             if fname.ends_with(".wasm") {
                 let full_path = entry.path();
-                match crate::neotrix::nt_io_plugin::wasm::WasmPluginWrapper::new(&full_path) {
+                match crate::l1_action::nt_io::nt_io_plugin::wasm::WasmPluginWrapper::new(&full_path) {
                     Ok(wrapper) => batch.push(Box::new(wrapper)),
                     Err(e) => log::warn!("[plugin] invalid wasm plugin '{}': {}", fname, e),
                 }

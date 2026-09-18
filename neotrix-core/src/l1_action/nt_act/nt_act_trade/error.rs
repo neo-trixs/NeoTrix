@@ -92,9 +92,9 @@ impl From<&str> for TradeError {
     }
 }
 
-impl From<crate::core::NeoTrixError> for TradeError {
-    fn from(err: crate::core::NeoTrixError) -> Self {
-        use crate::core::NeoTrixError;
+impl From<crate::l0_substrate::nt_core_error::NeoTrixError> for TradeError {
+    fn from(err: crate::l0_substrate::nt_core_error::NeoTrixError) -> Self {
+        use crate::l0_substrate::nt_core_error::NeoTrixError;
         match err {
             NeoTrixError::Io(msg) => TradeError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,

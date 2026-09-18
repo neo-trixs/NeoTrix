@@ -1,32 +1,5 @@
 use neotrix_types::core::CapabilityVector;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TaskType {
-    General = 0,
-    Design = 1,
-    CodeAnalysis = 2,
-    CodeGeneration = 3,
-    CodeReview = 4,
-    Security = 5,
-    Planning = 6,
-    UIDesign = 8,
-}
-
-impl From<crate::core::TaskType> for TaskType {
-    fn from(tt: crate::core::TaskType) -> Self {
-        match tt {
-            crate::core::TaskType::General => TaskType::General,
-            crate::core::TaskType::Design => TaskType::Design,
-            crate::core::TaskType::UIDesign => TaskType::UIDesign,
-            crate::core::TaskType::CodeAnalysis => TaskType::CodeAnalysis,
-            crate::core::TaskType::CodeGeneration => TaskType::CodeGeneration,
-            crate::core::TaskType::CodeReview => TaskType::CodeReview,
-            crate::core::TaskType::Security => TaskType::Security,
-            crate::core::TaskType::Planning => TaskType::Planning,
-            _ => TaskType::General,
-        }
-    }
-}
+pub use neotrix_types::core::TaskType;
 
 /// Simple access context with trust score
 #[derive(Debug, Clone)]

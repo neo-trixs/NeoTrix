@@ -139,7 +139,7 @@ impl CognitiveEvaluator {
     /// 将轨迹评估结果转换为质量监控系统可消费的指标格式。
     pub fn trace_to_quality_metrics(
         &self,
-        trace_report: &crate::core::nt_core_self::trace_evaluation::EvaluationReport,
+        trace_report: &crate::l6_meta::nt_core_self::trace_evaluation::EvaluationReport,
     ) -> QualityMetrics {
         let mut metrics = std::collections::HashMap::new();
 
@@ -156,11 +156,11 @@ impl CognitiveEvaluator {
         metrics.insert(
             "grade_numeric".to_string(),
             match trace_report.grade {
-                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Excellent => 1.0,
-                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Good => 0.8,
-                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Adequate => 0.6,
-                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Poor => 0.4,
-                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Failed => 0.2,
+                crate::l6_meta::nt_core_self::trace_evaluation::EvaluationGrade::Excellent => 1.0,
+                crate::l6_meta::nt_core_self::trace_evaluation::EvaluationGrade::Good => 0.8,
+                crate::l6_meta::nt_core_self::trace_evaluation::EvaluationGrade::Adequate => 0.6,
+                crate::l6_meta::nt_core_self::trace_evaluation::EvaluationGrade::Poor => 0.4,
+                crate::l6_meta::nt_core_self::trace_evaluation::EvaluationGrade::Failed => 0.2,
             },
         );
 

@@ -293,7 +293,7 @@ impl Default for MultiEvmClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_act_crypto::chain::ChainConfig;
+    use crate::l1_action::nt_act::nt_act_crypto::chain::ChainConfig;
 
     #[test]
     fn test_format_balance_call() {

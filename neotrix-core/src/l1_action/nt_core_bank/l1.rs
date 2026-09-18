@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn test_l1_prompt_contains_memories() {
         use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
-        use crate::core::{RewardSource, TaskType};
+        use crate::l2_perception::nt_core_knowledge::{RewardSource, TaskType};
         let mem = ReasoningMemory {
             id: "mem-1".into(),
             task_description: "test task".into(),

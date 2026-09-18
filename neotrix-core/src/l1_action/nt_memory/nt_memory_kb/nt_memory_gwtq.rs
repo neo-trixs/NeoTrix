@@ -1,5 +1,5 @@
 use crate::l5_cognition::nt_core_gwt::module_def::SpecialistType;
-use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 
 use super::nt_memory_search as search;
 use super::nt_memory_store as store;

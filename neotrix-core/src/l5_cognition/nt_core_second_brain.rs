@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_self::emotion_state::EmotionEngine;
+use crate::l6_meta::nt_core_self::emotion_state::EmotionEngine;
 // [豁免] core 层 second_brain 持久化需落 KB 单一事实源 (attach_kb/kv_set 生产路径, 非测试注入)
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
@@ -612,27 +612,27 @@ mod tests {
 
     #[test]
     fn test_save_emotion_raw_no_kb() {
-        let engine = crate::core::nt_core_self::emotion_state::EmotionEngine::default();
+        let engine = crate::l6_meta::nt_core_self::emotion_state::EmotionEngine::default();
         let brain = SecondBrain::new();
         brain.save_emotion_raw(&engine); // should not panic
     }
 
     #[test]
     fn test_emotion_engine_serde_roundtrip() {
-        let mut engine = crate::core::nt_core_self::emotion_state::EmotionEngine::default();
+        let mut engine = crate::l6_meta::nt_core_self::emotion_state::EmotionEngine::default();
         engine.observe(
-            crate::core::nt_core_self::emotion_state::EmotionDimension::Confidence,
+            crate::l6_meta::nt_core_self::emotion_state::EmotionDimension::Confidence,
             0.8,
             "test",
         );
         engine.observe(
-            crate::core::nt_core_self::emotion_state::EmotionDimension::Curiosity,
+            crate::l6_meta::nt_core_self::emotion_state::EmotionDimension::Curiosity,
             0.6,
             "explore",
         );
         engine.tick();
         let json = engine.to_json().expect("to_json");
-        let deser = crate::core::nt_core_self::emotion_state::EmotionEngine::from_json(&json)
+        let deser = crate::l6_meta::nt_core_self::emotion_state::EmotionEngine::from_json(&json)
             .expect("from_json");
         let r1 = engine.report();
         let r2 = deser.report();

@@ -14,8 +14,8 @@ use rusqlite::Connection;
 use serde_json::Value;
 
 use super::kb::safe_insert_edge;
-use crate::neotrix::nt_memory_kb::nt_memory_types::{KnowledgeEdge, RelationType};
-use crate::neotrix::nt_memory_kb::shared_utils::now;
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::{KnowledgeEdge, RelationType};
+use crate::l1_action::nt_memory::nt_memory_kb::shared_utils::now;
 
 /// 查询所有 shanhai 节点 (id, node_type, title, metadata)。
 fn load_shanhai_nodes(conn: &Connection) -> rusqlite::Result<Vec<(String, String, String, Option<String>)>> {
@@ -184,7 +184,7 @@ pub fn shanhai_edge_count(conn: &Connection) -> rusqlite::Result<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_memory_kb::nt_memory_schema;
+    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema;
     use rusqlite::Connection;
 
     fn test_db() -> Connection {

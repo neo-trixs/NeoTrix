@@ -302,7 +302,7 @@ impl AlwaysOnEngine {
         }
 
         // Check for incomplete work
-        if let Some(content) = crate::core::nt_core_state::load("goals") {
+        if let Some(content) = crate::l5_cognition::nt_core_state::load("goals") {
             if let Ok(goals) = serde_json::from_str::<serde_json::Value>(&content) {
                 if let Some(items) = goals.get("items").and_then(|v| v.as_array()) {
                     for item in items {
@@ -592,11 +592,11 @@ impl AlwaysOnEngine {
             "idle_cooldown_secs": self.idle_cooldown_secs,
         });
         let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
-        crate::core::nt_core_state::save("always_on", &json)
+        crate::l5_cognition::nt_core_state::save("always_on", &json)
     }
 
     pub fn load() -> Self {
-        let Some(content) = crate::core::nt_core_state::load("always_on") else {
+        let Some(content) = crate::l5_cognition::nt_core_state::load("always_on") else {
             return Self::new();
         };
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&content) {

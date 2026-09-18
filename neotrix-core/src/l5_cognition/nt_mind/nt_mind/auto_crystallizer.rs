@@ -1,11 +1,11 @@
 use super::self_edit::MicroEdit;
 use super::self_iterating::ReasoningBrain;
 use super::memory::{ReasoningBank, ReasoningMemory};
-use crate::core::nt_core_self::skill_crystal::{
+use crate::l6_meta::nt_core_self::skill_crystal::{
     SkillCrystal, CrystalRegistry, VerificationContract,
 };
-use crate::core::nt_core_self::reasoning_strategy::StrategyKind;
-use crate::core::nt_core_self::attention_head::AttentionDomain;
+use crate::l6_meta::nt_core_self::reasoning_strategy::StrategyKind;
+use crate::l6_meta::nt_core_self::attention_head::AttentionDomain;
 use crate::l2_perception::nt_core_knowledge::TaskType;
 
 pub struct AutoCrystallizer {
@@ -385,7 +385,7 @@ impl Default for AutoCrystallizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_self::skill_crystal::VerificationStatus;
+    use crate::l6_meta::nt_core_self::skill_crystal::VerificationStatus;
 
     #[test]
     fn test_new_crystallizer() {

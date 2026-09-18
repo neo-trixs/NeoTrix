@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use crate::l5_cognition::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::core::nt_core_self::AttentionDomain;
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l6_meta::nt_core_self::AttentionDomain;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 use super::self_iterating::SelfIteratingBrain;
 
 const SEAL_POLL_INTERVAL: u64 = 5;
@@ -64,6 +64,20 @@ impl ConsciousnessBridge {
             TaskType::Reflection => SpecialistType::ReflectionEngine,
             TaskType::Research | TaskType::Learning => SpecialistType::KnowledgeRetriever,
             TaskType::MetaCognition => SpecialistType::MetaCognitionAnalyst,
+            // New TaskType variants: map to closest specialist
+            TaskType::Chat | TaskType::SimpleQA => SpecialistType::KnowledgeIntegrator,
+            TaskType::Math | TaskType::ComplexReasoning | TaskType::DataAnalysis | TaskType::DataProcessing => SpecialistType::KnowledgeIntegrator,
+            TaskType::Creative | TaskType::CreativeWriting => SpecialistType::CreativityGenerator,
+            TaskType::Multimodal => SpecialistType::KnowledgeIntegrator,
+            TaskType::KnowledgeRetrieval => SpecialistType::KnowledgeRetriever,
+            TaskType::Extraction | TaskType::Summarization => SpecialistType::KnowledgeIntegrator,
+            TaskType::ToolUse | TaskType::Completion | TaskType::Embedding | TaskType::Reranking => SpecialistType::KnowledgeIntegrator,
+            TaskType::ImageGeneration | TaskType::AudioGeneration | TaskType::VideoGeneration => SpecialistType::CreativityGenerator,
+            TaskType::Debugging => SpecialistType::CodeAnalyzer,
+            TaskType::Architecture => SpecialistType::GoalPrioritizer,
+            TaskType::Documentation | TaskType::Testing | TaskType::SystemAdmin | TaskType::FileOperations => SpecialistType::KnowledgeIntegrator,
+            TaskType::AgentTask => SpecialistType::KnowledgeIntegrator,
+            TaskType::Custom => SpecialistType::KnowledgeIntegrator,
         };
 
         let mut module = SpecialistModule::new(specialist_type, task_name);

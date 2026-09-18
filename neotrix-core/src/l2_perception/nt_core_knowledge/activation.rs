@@ -1,5 +1,5 @@
 use super::{KnowledgeSource, SourceAccessTracker, TaskType};
-use crate::core::CapabilityVector;
+use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq)]

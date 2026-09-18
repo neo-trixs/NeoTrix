@@ -4,7 +4,7 @@
 //! 确保所有模块之间的协同工作
 
 use serde::{Serialize, Deserialize};
-use crate::core::nt_core_self::dynamic_params::{DynamicParams, ScalingRating};
+use crate::l6_meta::nt_core_self::dynamic_params::{DynamicParams, ScalingRating};
 use crate::l5_cognition::nt_core_narrative_types::{SegmentData, SegmentType};
 
 // ============================================================================
@@ -342,7 +342,7 @@ mod tests {
                 speed: 0.5,
                 amplitude: 5.0,
                 frequency: 1.0,
-                unit: crate::core::nt_core_self::dynamic_params::ParamUnit::Degrees,
+                unit: crate::l6_meta::nt_core_self::dynamic_params::ParamUnit::Degrees,
                 valid: true,
             },
         ];

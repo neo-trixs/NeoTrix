@@ -217,7 +217,7 @@ export function registerPanelRenderers(): void {
             <span class="sc-panel-title">{data.alt ?? '图像'}</span>
           </div>
           {data.url ? (
-            <img src={data.url} alt={data.alt ?? ''} class="sc-image" style={{ 'max-height': '240px', 'object-fit': 'contain' }} />
+            <img src={data.url} alt={data.alt ?? ''} loading="lazy" class="sc-image" style={{ 'max-height': '240px', 'object-fit': 'contain' }} />
           ) : (
             <div class="sc-chart-placeholder">图像占位</div>
           )}

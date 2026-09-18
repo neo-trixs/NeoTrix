@@ -1,6 +1,6 @@
 use super::core::CapabilityVector;
 use super::self_edit::MicroEdit;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 pub struct BenchmarkReport {
     pub project_name: String,

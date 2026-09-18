@@ -1,4 +1,4 @@
-use crate::core::CrtTimeScale;
+use crate::l5_cognition::nt_core::nt_crt::CrtTimeScale;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -256,8 +256,8 @@ impl GoalConfig {
     }
 
     /// Build a CrtPlan from this config.
-    pub(crate) fn _to_crt_plan(&self) -> crate::core::CrtPlan {
-        crate::core::CrtPlan::new(self.crt_scale, self.max_duration_secs as f64)
+    pub(crate) fn _to_crt_plan(&self) -> crate::l5_cognition::nt_core::nt_crt::CrtPlan {
+        crate::l5_cognition::nt_core::nt_crt::CrtPlan::new(self.crt_scale, self.max_duration_secs as f64)
     }
 
     pub(crate) fn _crt_scale_label(&self) -> &str {

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::*;
 
 pub fn sync_directory(kb: &KnowledgeBase, dir: &Path, prefix: &str) -> Result<WikiSyncReport, String> {
@@ -116,7 +116,7 @@ pub fn build_graph(kb: &KnowledgeBase) -> Result<WikiGraph, String> {
             Ok(c) => c,
             Err(e) => return Err(format!("Lock: {}", e)),
         };
-        if let Ok(edge_list) = crate::neotrix::nt_memory_kb::nt_memory_store::get_edges_for_node(&conn, &n.id) {
+        if let Ok(edge_list) = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::get_edges_for_node(&conn, &n.id) {
             for e in &edge_list {
                 if e.relation_type == RelationType::WikiLink {
                     graph.edges.push(WikiEdge {

@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use super::core::CapabilityVector;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 /// ImpactMatrix: 能力维度 → 任务类型的影响权重矩阵
 /// 借鉴 MemOS MemCube 的可扩展思想：支持动态添加任务类型
@@ -198,7 +198,7 @@ impl ImpactMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_world_model::TaskType;
+    use crate::l2_perception::nt_world::nt_world_model::TaskType;
     
     #[test]
     fn test_new() {

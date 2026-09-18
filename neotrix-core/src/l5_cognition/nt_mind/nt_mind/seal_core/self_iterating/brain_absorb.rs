@@ -1,6 +1,6 @@
 use chrono::Utc;
 
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 use super::brain_core::ReasoningBrain;
 use super::super::core::{CapabilityVector, KnowledgeSource, AbsorptionRecord, PerformanceEvaluator};
 use super::super::self_edit::{SelfEdit, MicroEdit, infer_task_type};

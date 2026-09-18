@@ -26,10 +26,10 @@ impl ExecutionFeedback {
 }
 
 impl PerformanceEvaluator {
-    pub fn evaluate(task_type: &crate::neotrix::nt_world_model::TaskType, capability: &CapabilityVector) -> f64 {
+    pub fn evaluate(task_type: &crate::l2_perception::nt_world::nt_world_model::TaskType, capability: &CapabilityVector) -> f64 {
         let raw_score = match task_type {
-            crate::neotrix::nt_world_model::TaskType::Design |
-            crate::neotrix::nt_world_model::TaskType::UIDesign => {
+            crate::l2_perception::nt_world::nt_world_model::TaskType::Design |
+            crate::l2_perception::nt_world::nt_world_model::TaskType::UIDesign => {
                 
                 (capability.accessibility() * 0.2
                     + capability.compound_composition() * 0.2
@@ -39,21 +39,21 @@ impl PerformanceEvaluator {
                     + capability.ai_native_states() * 0.1
                     + capability.semantic_layer() * 0.1).min(1.0)
             }
-            crate::neotrix::nt_world_model::TaskType::CodeAnalysis |
-            crate::neotrix::nt_world_model::TaskType::CodeGeneration |
-            crate::neotrix::nt_world_model::TaskType::CodeReview => {
+            crate::l2_perception::nt_world::nt_world_model::TaskType::CodeAnalysis |
+            crate::l2_perception::nt_world::nt_world_model::TaskType::CodeGeneration |
+            crate::l2_perception::nt_world::nt_world_model::TaskType::CodeReview => {
                 
                 (capability.analysis() * 0.3
                     + capability.synthesis() * 0.3
                     + capability.inference_depth() * 0.2
                     + capability.creativity() * 0.2).min(1.0)
             }
-            crate::neotrix::nt_world_model::TaskType::Security => {
+            crate::l2_perception::nt_world::nt_world_model::TaskType::Security => {
                 (capability.analysis() * 0.4
                     + capability.verification() * 0.3
                     + capability.quality_gates() * 0.3).min(1.0)
             }
-            crate::neotrix::nt_world_model::TaskType::Planning => {
+            crate::l2_perception::nt_world::nt_world_model::TaskType::Planning => {
                 (capability.inference_depth() * 0.4
                     + capability.synthesis() * 0.3
                     + capability.analysis() * 0.3).min(1.0)
@@ -176,7 +176,7 @@ impl PerformanceEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_world_model::TaskType;
+    use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
     fn design_capability() -> CapabilityVector {
         CapabilityVector::from_values(

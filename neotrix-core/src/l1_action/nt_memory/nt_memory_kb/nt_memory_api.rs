@@ -549,11 +549,11 @@ mod tests {
         // 写入一个节点后, 快照应包含该节点。
         {
             let kb = state.kb.lock().unwrap();
-            kb.insert_or_get_node("G5 snap", crate::neotrix::nt_memory_kb::NodeType::Concept, None, None, None).unwrap();
+            kb.insert_or_get_node("G5 snap", crate::l1_action::nt_memory::nt_memory_kb::NodeType::Concept, None, None, None).unwrap();
         }
         let body = futures_block_on(snapshot_handler(State(state))).expect("snapshot ok");
         let v = body.0;
-        assert_eq!(v["format"], crate::neotrix::nt_memory_kb::SNAPSHOT_FORMAT);
+        assert_eq!(v["format"], crate::l1_action::nt_memory::nt_memory_kb::SNAPSHOT_FORMAT);
         assert_eq!(v["nodes"].as_array().map(|a| a.len()).unwrap_or(0), 1);
         assert_eq!(v["edges"].as_array().map(|a| a.len()).unwrap_or(0), 0);
     }
@@ -572,7 +572,7 @@ mod tests {
         // 空库 → 快照文件 (含 1 节点) → 删除后 diff 应报告 removed 1。
         let node_id = {
             let kb = state.kb.lock().unwrap();
-            kb.insert_or_get_node("G5 file", crate::neotrix::nt_memory_kb::NodeType::Concept, None, None, None)
+            kb.insert_or_get_node("G5 file", crate::l1_action::nt_memory::nt_memory_kb::NodeType::Concept, None, None, None)
                 .unwrap()
         };
         let snap = {
@@ -582,7 +582,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("nt_kb_api_snap_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
         let path = dir.join("snap.json");
-        crate::neotrix::nt_memory_kb::snapshot_to_file(&snap, &path).unwrap();
+        crate::l1_action::nt_memory::nt_memory_kb::snapshot_to_file(&snap, &path).unwrap();
         // 删除节点 → 库变空, 与文件快照对比应报告 removed 1。
         {
             let kb = state.kb.lock().unwrap();

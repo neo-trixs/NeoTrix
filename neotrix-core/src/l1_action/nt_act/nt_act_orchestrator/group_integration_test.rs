@@ -1,4 +1,4 @@
-use crate::neotrix::nt_act_orchestrator::planner::PlannerNode;
+use crate::l1_action::nt_act::nt_act_orchestrator::planner::PlannerNode;
 
 #[test]
 fn test_planner_no_group_manager() {

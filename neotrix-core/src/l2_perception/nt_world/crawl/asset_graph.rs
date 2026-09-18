@@ -17,8 +17,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::l5_cognition::nt_core_math::normalize_url;
-use crate::neotrix::nt_memory_kb::{KnowledgeBase, NodeType, RelationType};
+use crate::l0_substrate::nt_core_math::normalize_url;
+use crate::l1_action::nt_memory::nt_memory_kb::{KnowledgeBase, NodeType, RelationType};
 
 /// 资产层级: 从 URL 解析出 root_domain / subdomain / service / endpoint。
 #[derive(Debug, Clone, PartialEq, Eq)]

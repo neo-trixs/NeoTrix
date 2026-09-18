@@ -4,9 +4,9 @@ use super::super::core::CapabilityVector;
 use super::recipe::RecipeStage;
 use super::SelfIteratingBrain;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus;
-use crate::neotrix::nt_memory_kb::GraphRagConfig;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus;
+use crate::l1_action::nt_memory::nt_memory_kb::GraphRagConfig;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 // P0-2 接线 (OpenMontage delivery_promise 吸收): 用 ContractAwareStage 包装
 // 蒸馏阶段, 附加 DeliveryPromiseContract 防静默降级。
 use super::stage_contracts::{ContractAwareStage, DeliveryPromise, DeliveryPromiseContract};
@@ -73,7 +73,7 @@ use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::{PerformanceEvaluato
 use crate::l5_cognition::nt_mind::foundation::seal_pipeline::{L1OracleGate, L1SemanticEntropyGate, L1ActionSandbox};
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::consciousness_bridge::ConsciousnessBridge;
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
-use crate::neotrix::nt_memory_kb::ProceduralMemoryRecord;
+use crate::l1_action::nt_memory::nt_memory_kb::ProceduralMemoryRecord;
 
 fn compute_capability_deltas(brain: &SelfIteratingBrain) -> Vec<(String, f64)> {
     let current = brain.brain.capability.arr().to_vec();
@@ -1585,7 +1585,7 @@ impl BrainStage for _AutonomyPerStage {
         5
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop;
+        use crate::l1_action::nt_act::nt_act_autonomy::PlanExecuteReflectLoop;
 
         let task = if brain._current_task.is_empty() {
             log::trace!("[autonomy_per] no current task, skipping");
@@ -1598,7 +1598,7 @@ impl BrainStage for _AutonomyPerStage {
         let outcome = if let Some(ref mut per) = brain._per_loop {
             per.run(&task)
         } else {
-            let mut per = PlanExecuteReflectLoop::new(crate::neotrix::nt_act_autonomy::PerConfig {
+            let mut per = PlanExecuteReflectLoop::new(crate::l1_action::nt_act::nt_act_autonomy::PerConfig {
                 max_iterations: 3,
                 min_score_to_converge: 0.7,
                 require_all_steps: false,
@@ -2018,8 +2018,8 @@ impl BrainStage for _HypothesisAccuracyStage {
             if let Some(ref net_lock) = engine.hypothesis_network {
                 if let Ok(net) = net_lock.lock() {
                     let total = net.hypotheses.len();
-                    let supported = net.hypotheses.iter().filter(|h| matches!(h.status, crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Supported)).count();
-                    let refuted = net.hypotheses.iter().filter(|h| matches!(h.status, crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Refuted)).count();
+                    let supported = net.hypotheses.iter().filter(|h| matches!(h.status, crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Supported)).count();
+                    let refuted = net.hypotheses.iter().filter(|h| matches!(h.status, crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Refuted)).count();
                     if total > 0 {
                         log::info!(
                             "[EWHR] Hypothesis accuracy: {}/{} supported, {}/{} refuted",
@@ -2243,7 +2243,7 @@ impl BrainStage for ExternalKnowledgeAbsorbStage {
         // Open a temporary KB connection for the explorer instead of consuming
         // the pipeline's KB connection (which would lose pending transactions,
         // LRU cache state, and uncommitted embedding data).
-        let explorer_kb = match crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
+        let explorer_kb = match crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
             Ok(kb) => kb,
             Err(e) => {
                 log::warn!(
@@ -2639,7 +2639,7 @@ impl BrainStage for _OracleGateStage {
         10
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let gate = brain._oracle_gate.get_or_insert_with(crate::neotrix::nt_act_autonomy::OracleGate::new);
+        let gate = brain._oracle_gate.get_or_insert_with(crate::l1_action::nt_act::nt_act_autonomy::OracleGate::new);
 
         let entropy = brain.entropy_crisis_level;
         let reward = brain._reward;
@@ -2959,7 +2959,7 @@ impl BrainStage for RewardCalculationStage {
             } else {
                 ext
             };
-            (blended, crate::core::RewardSource::External)
+            (blended, crate::l2_perception::nt_core_knowledge::types::RewardSource::External)
         } else {
             let task_type = brain._current_task_type();
             let score_before = brain._snapshot_score();
@@ -2968,7 +2968,7 @@ impl BrainStage for RewardCalculationStage {
             let raw = (score_after - score_before) + regularization;
             let health = brain.evo_stats().health_score;
             let calibrated = raw * (0.5 + health * 0.5);
-            (calibrated, crate::core::RewardSource::Internal)
+            (calibrated, crate::l2_perception::nt_core_knowledge::types::RewardSource::Internal)
         };
         brain._set_reward(reward);
         brain._set_reward_source(source);
@@ -3004,7 +3004,7 @@ impl BrainStage for _ConvergenceCheckStage {
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let _ = brain; // unused: the audit runs on the source tree, not brain state
-        use crate::core::nt_core_self::self_audit::converge_check;
+        use crate::l6_meta::nt_core_self::self_audit::converge_check;
         let report = converge_check(".");
         if !report.findings.is_empty() {
             log::warn!(
@@ -3051,16 +3051,16 @@ impl BrainStage for SelfTestStage {
         use crate::l5_cognition::nt_core_consciousness::inner_critic::InnerCritic;
         use crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree;
         use crate::l5_cognition::nt_core_gwt::monitor::EntropyMonitor;
-        use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
-        use crate::core::nt_core_meta::metacognition_loop::MetaCognitiveLoop;
-        use crate::core::nt_core_meta::monitor::MetaMonitor;
-        use crate::core::nt_core_meta::nt_core_arch_lint::ArchLint;
-        use crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor;
-        use crate::core::nt_core_meta::scanner::CodeScanner;
-        use crate::core::nt_core_meta::self_model::SelfModel;
+        use crate::l6_meta::nt_meta::knowledge_gap_detector::KnowledgeGapDetector;
+        use crate::l6_meta::nt_meta::metacognition_loop::MetaCognitiveLoop;
+        use crate::l6_meta::nt_meta::monitor::MetaMonitor;
+        use crate::l6_meta::nt_meta::nt_core_arch_lint::ArchLint;
+        use crate::l6_meta::nt_meta::nt_core_meta_auditor::MetaAuditor;
+        use crate::l6_meta::nt_meta::scanner::CodeScanner;
+        use crate::l6_meta::nt_meta::self_model::SelfModel;
         use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
-        use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
-        use crate::core::nt_core_self::self_audit::ConvergeCheckFn;
+        use crate::l6_meta::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
+        use crate::l6_meta::nt_core_self::self_audit::ConvergeCheckFn;
         use crate::l6_meta::nt_core_self_review::SelfReviewGate;
         use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
         let mut registry = SelfTestRegistry::new();
@@ -3113,7 +3113,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(
             crate::core::nt_core_telemetry::TelemetryStore::new(100),
         ));
-        registry.register(Box::new(crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
+        registry.register(Box::new(crate::l1_action::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
         registry.register(Box::new(
             crate::l5_cognition::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5),
         ));

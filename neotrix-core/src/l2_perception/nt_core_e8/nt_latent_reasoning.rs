@@ -14,7 +14,7 @@
 //! broadcast is driven by latent continuity rather than text.
 
 use crate::l2_perception::nt_core_e8::unified_latent::UnifiedLatentSpace;
-use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 use crate::core::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};

@@ -787,7 +787,7 @@ impl BackgroundLoopHandle {
     /// - restart_module: 重启故障模块 (通过 EventBus 发送重启信号)
     /// - alert: 经 EventBus 广播告警, 注入意识监控
     pub(crate) async fn handle_system_health_heal(&mut self) {
-        use crate::core::nt_core_self::self_audit::scan_system_health;
+        use crate::l6_meta::nt_core_self::self_audit::scan_system_health;
         use crate::core::nt_core_event::CoreEvent;
 
         let findings = scan_system_health(".");
@@ -828,9 +828,9 @@ impl BackgroundLoopHandle {
                 component: "nt_repair".into(),
                 error: f.message.clone(),
                 severity: match f.severity {
-                    crate::core::nt_core_self::self_audit::AuditSeverity::Error => "error",
-                    crate::core::nt_core_self::self_audit::AuditSeverity::Warning => "warning",
-                    crate::core::nt_core_self::self_audit::AuditSeverity::Info => "info",
+                    crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Error => "error",
+                    crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Warning => "warning",
+                    crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Info => "info",
                 }.into(),
             });
         }
@@ -887,7 +887,7 @@ impl BackgroundLoopHandle {
     }
 
     /// 发送告警 (注入意识监控, 供治理层/NT-SHIELD 处置)
-    async fn emit_alert(&mut self, alert_type: &str, findings: &[crate::core::nt_core_self::self_audit::AuditFinding]) {
+    async fn emit_alert(&mut self, alert_type: &str, findings: &[crate::l6_meta::nt_core_self::self_audit::AuditFinding]) {
         let msg = findings.iter()
             .filter(|f| f.category == alert_type)
             .map(|f| f.message.clone())
@@ -902,7 +902,7 @@ impl BackgroundLoopHandle {
     }
 
     /// 自愈动作落地 → 经验分支 (单一事实源闭环)
-    async fn report_heal_experience(&mut self, findings: &[crate::core::nt_core_self::self_audit::AuditFinding]) {
+    async fn report_heal_experience(&mut self, findings: &[crate::l6_meta::nt_core_self::self_audit::AuditFinding]) {
         let kb = match self.kb.as_ref() {
             Some(kb) => kb,
             None => {
@@ -1067,7 +1067,7 @@ impl BackgroundLoopHandle {
 //     /// Test alert emission
 //     #[tokio::test]
 //     async fn test_emit_alert() {
-//         use crate::core::nt_core_self::self_audit::{AuditFinding, AuditSeverity};
+//         use crate::l6_meta::nt_core_self::self_audit::{AuditFinding, AuditSeverity};
 //         let brain = Arc::new(RwLock::new(SelfIteratingBrain::new()));
 //         let mut bg = BackgroundLoop::new(brain);
 //         let findings = vec![

@@ -7,6 +7,33 @@ export default {
   darkMode: ['selector', '[data-theme-mode="dark"]'],
   theme: {
     extend: {
+      spacing: {
+        '1': 'var(--space-1)',
+        '2': 'var(--space-2)',
+        '3': 'var(--space-3)',
+        '4': 'var(--space-4)',
+        '5': 'var(--space-5)',
+        '6': 'var(--space-6)',
+        '8': 'var(--space-8)',
+        '10': 'var(--space-10)',
+        '12': 'var(--space-12)',
+      },
+      borderRadius: {
+        'sm': 'var(--radius-sm)',
+        'md': 'var(--radius-md)',
+        'lg': 'var(--radius-lg)',
+        'xl': 'var(--radius-xl)',
+        'full': 'var(--radius-full)',
+      },
+      boxShadow: {
+        'sm': 'var(--shadow-sm)',
+        'md': 'var(--shadow-md)',
+        'lg': 'var(--shadow-lg)',
+        'xl': 'var(--shadow-xl)',
+        'glass-inset': 'inset 0 1px 0 0 rgba(255,255,255,0.45), inset 0 0 0 0.5px rgba(255,255,255,0.25)',
+        'glass-pop': '0 24px 64px rgba(40,30,20,0.18), 0 4px 16px rgba(40,30,20,0.08)',
+        'hover-surface': 'inset 0 0 0 1px rgba(0,0,0,0.04)',
+      },
       colors: {
         // NeoTrix Faction Color Palette
         'nt-core': {
@@ -132,11 +159,7 @@ export default {
         '13.5px': ['13.5px', '17px'],
         '14.5px': ['14.5px', '18px'],
       },
-      boxShadow: {
-        'glass-inset': 'inset 0 1px 0 0 rgba(255,255,255,0.45), inset 0 0 0 0.5px rgba(255,255,255,0.25)',
-        'glass-pop': '0 24px 64px rgba(40,30,20,0.18), 0 4px 16px rgba(40,30,20,0.08)',
-        'hover-surface': 'inset 0 0 0 1px rgba(0,0,0,0.04)',
-      },
+      /* original boxShadow entries merged above */
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
         'slide-in': 'slideIn 0.3s ease-out',

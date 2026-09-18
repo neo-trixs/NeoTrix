@@ -2277,7 +2277,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── Self model (nt_core_self) ──
         "self_model_tick" => {
-            let mut model = crate::core::nt_core_self::self_model::SelfModel::new();
+            let mut model = crate::l6_meta::nt_core_self::self_model::SelfModel::new();
             // 从意识核心快照获取 workspace_signal (coherence), load_delta (weighted_fog_sum 归一化)
             let snap = status();
             let workspace_signal = snap.coherence.clamp(0.0, 1.0);
@@ -2294,8 +2294,8 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             )
         }
         "metacog_evaluate" => {
-            use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
-            use crate::core::nt_core_self::silicon_self::SiliconSelfModel;
+            use crate::l6_meta::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
+            use crate::l6_meta::nt_core_self::silicon_self::SiliconSelfModel;
             let mut evaluator = CognitiveEvaluator::new();
             let model = SiliconSelfModel::default();
             let report = evaluator.evaluate(&model);

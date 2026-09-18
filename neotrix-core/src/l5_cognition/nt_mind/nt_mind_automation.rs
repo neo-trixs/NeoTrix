@@ -136,14 +136,14 @@ impl AutomationEngine {
 
     pub fn save_to_file(&self) {
         if let Ok(data) = serde_json::to_string_pretty(&self.rules) {
-            if let Err(e) = crate::core::nt_core_state::save("automation", &data) {
+            if let Err(e) = crate::l5_cognition::nt_core_state::save("automation", &data) {
                 log::warn!("[automation] failed to save rules: {}", e);
             }
         }
     }
 
     pub fn load_from_file(&mut self) {
-        if let Some(data) = crate::core::nt_core_state::load("automation") {
+        if let Some(data) = crate::l5_cognition::nt_core_state::load("automation") {
             if let Ok(rules) = serde_json::from_str::<Vec<AutomationRule>>(&data) {
                 self.rules = rules;
             }

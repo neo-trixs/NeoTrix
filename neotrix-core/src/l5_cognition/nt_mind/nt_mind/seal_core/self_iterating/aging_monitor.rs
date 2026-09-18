@@ -41,7 +41,7 @@ impl AgingMonitor {
         }
     }
 
-    pub fn record_snapshot(&mut self, iteration: u64, capability: &crate::core::CapabilityVector) {
+    pub fn record_snapshot(&mut self, iteration: u64, capability: &crate::l5_cognition::nt_core::capability::types::CapabilityVector) {
         if self.capability_history.len() >= self.max_history {
             self.capability_history.pop_front();
         }

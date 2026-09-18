@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn test_recall_similar_basic() {
         use crate::l5_cognition::nt_mind::nt_mind::memory::ReasoningMemory;
-        use crate::neotrix::nt_world_model::TaskType;
+        use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
         let mems = vec![
             ReasoningMemory::new("fix database connection pool", TaskType::CodeReview, &[], 0.8),

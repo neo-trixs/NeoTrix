@@ -1159,6 +1159,7 @@ mod tests {
 
     #[async_trait]
     impl LlmProvider for ScriptedLlm {
+    fn set_proxy(&mut self, _proxy_url: &str) {}
     fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
         crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
@@ -1170,12 +1171,14 @@ mod tests {
                 .push(request.tools.len());
             let mut script = self.script.lock().unwrap_or_else(|e| e.into_inner());
             if script.is_empty() {
-                return Ok(LlmResponse::plain(
-                    "done".into(),
-                    "mock".into(),
-                    Default::default(),
-                    FinishReason::Stop,
-                ));
+                return Ok(LlmResponse {
+                    content: "done".into(),
+                    model: "mock".into(),
+                    usage: Default::default(),
+                    finish_reason: FinishReason::Stop,
+                    tool_calls: None,
+                    reasoning: None,
+                });
             }
             let (content, fr, calls) = script.remove(0);
             Ok(LlmResponse {
@@ -1199,12 +1202,14 @@ mod tests {
             let mut script = self.script.lock().unwrap_or_else(|e| e.into_inner());
             let (tx, rx) = mpsc::channel(16);
             if script.is_empty() {
-                let _ = tx.try_send(Ok(LlmResponse::plain(
-                    "done".into(),
-                    "mock".into(),
-                    Default::default(),
-                    FinishReason::Stop,
-                )));
+                let _ = tx.try_send(Ok(LlmResponse {
+                    content: "done".into(),
+                    model: "mock".into(),
+                    usage: Default::default(),
+                    finish_reason: FinishReason::Stop,
+                    tool_calls: None,
+                    reasoning: None,
+                }));
                 return Ok(rx);
             }
             let (content, fr, calls) = script.remove(0);
@@ -1236,11 +1241,13 @@ mod tests {
     fn tool_call(name: &str, id: &str, args: &str) -> ToolCallInfo {
         ToolCallInfo {
             id: id.to_string(),
-            call_type: "function".to_string(),
-            function: super::super::nt_io_provider::types::ToolCallFunction {
+            name: name.to_string(),
+            arguments: args.to_string(),
+            call_type: Some("function".to_string()),
+            function: Some(super::super::nt_io_provider::types::ToolCallFunction {
                 name: name.to_string(),
                 arguments: args.to_string(),
-            },
+            }),
         }
     }
 
@@ -1482,7 +1489,7 @@ mod tests {
             .turn_stream(
                 "compute",
                 |_| true,
-                |call, output| tool_seen.push((call.function.name.clone(), output.content.clone())),
+                |call, output| tool_seen.push((call.name.clone(), output.content.clone())),
             )
             .await
             .expect("turn_stream ok");

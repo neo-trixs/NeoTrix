@@ -102,7 +102,7 @@ impl CrossSessionMemory {
     pub fn save(&self) -> Result<(), String> {
         let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize error: {}", e))?;
         if self.use_kb {
-            crate::core::nt_core_state::save("cross_session_memory", &json)
+            crate::l5_cognition::nt_core_state::save("cross_session_memory", &json)
                 .map_err(|e| format!("kb write error: {}", e))?;
         }
         if !self.use_kb {
@@ -113,7 +113,7 @@ impl CrossSessionMemory {
 
     pub fn load(&mut self) -> Result<(), String> {
         let data = if self.use_kb {
-            match crate::core::nt_core_state::load("cross_session_memory") {
+            match crate::l5_cognition::nt_core_state::load("cross_session_memory") {
                 Some(d) => Some(d),
                 None => self.storage_path
                     .exists()

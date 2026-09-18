@@ -263,7 +263,7 @@ fn meta_key(meta: Option<String>, key: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_memory_kb::nt_memory_schema;
+    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema;
     use rusqlite::Connection;
 
     fn test_db() -> Connection {

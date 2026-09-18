@@ -1,4 +1,4 @@
-use crate::core::CapabilityVector;
+use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use crate::l1_action::nt_core_bank::ReasoningBank;
 
 /// Local benchmark types (replaces L8 BenchmarkSuite dependency)
@@ -37,7 +37,7 @@ impl ServerProxy {
     fn kb_stats() -> (u64, i64, i64) {
         let db_path = dirs::home_dir().unwrap_or_default().join(".neotrix/knowledge.db");
         let bytes = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
-        let (nodes, edges) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None)
+        let (nodes, edges) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None)
             .ok()
             .and_then(|kb| {
                 kb.stats().ok().map(|s| {
@@ -97,7 +97,7 @@ impl ServerProxy {
     }
 
     fn load_brain() -> CapabilityVector {
-        crate::core::nt_core_state::load("brain")
+        crate::l5_cognition::nt_core_state::load("brain")
             .and_then(|content| serde_json::from_str::<CapabilityVector>(&content).ok())
             .unwrap_or_else(|| {
                 log::warn!("[server-proxy] brain state missing or unparseable");

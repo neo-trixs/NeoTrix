@@ -6,18 +6,18 @@ use std::io::{self, Write};
 
 use colored::Colorize;
 
-use neotrix::nt_mind::nt_mind_background_loop::BackgroundLoop;
+use crate::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
 use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-use neotrix::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
-use neotrix::nt_mind::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
-use neotrix::core::nt_core_bank::bank::ReasoningBank;
-use neotrix::nt_io_mention::resolve_mentions;
-use neotrix::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
-use neotrix::ReasoningKernel;
-use neotrix::core::nt_core_policy::E8Policy;
+use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
+use crate::l5_cognition::nt_mind::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
+use crate::l1_action::nt_core_bank::bank::ReasoningBank;
+use crate::l1_action::nt_io::nt_io_mention::resolve_mentions;
+use crate::l1_action::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
+use crate::l1_action::nt_io::nt_io_standalone::ReasoningKernel;
+use crate::l5_cognition::nt_core_policy::E8Policy;
 
-use neotrix::config::NeoTrixConfig;
-use neotrix::cli::tui::output::StreamingMarkdownRenderer;
+use crate::config::NeoTrixConfig;
+use crate::cli::tui::output::StreamingMarkdownRenderer;
 
 mod proxy_cmd;
 mod standalone;
@@ -336,7 +336,7 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
         agent.reasoning_bank = bank;
         let bg_agent = Arc::new(tokio::sync::RwLock::new(agent));
         let mut bg = BackgroundLoop::new(bg_agent.clone());
-        bg.goal_loop = neotrix::nt_mind::nt_mind::GoalLoop::new();
+        bg.goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
         bg.nt_world_model = Some(WorldModelV2::new(8, 64));
         let mut panorama = PanoramaPipeline::new();
         if let Ok(kb) = neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
@@ -404,7 +404,7 @@ pub(crate) fn spawn_sighup_reload() -> tokio::task::JoinHandle<()> {
                     sig.recv().await;
                     #[cfg(feature = "stealth-net")]
                     {
-                        match neotrix::nt_shield_stealth_net::config::reload() {
+                        match neotrix::l3_embodiment::nt_shield::nt_shield_stealth_net::config::reload() {
                             Ok(_) => log::info!("[hotreload] SIGHUP: stealth-net config reloaded"),
                             Err(e) => log::warn!("[hotreload] SIGHUP reload failed: {}", e),
                         }
@@ -457,7 +457,7 @@ pub fn resolve_prompt(prompt: Option<&str>, file: Option<&str>, pipe: bool) -> S
 pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64) {
     if prompt.is_empty() {
         if json_output {
-            use neotrix::cli::jsonl_stream::JsonlWriter;
+            use crate::cli::jsonl_stream::JsonlWriter;
             let mut writer = JsonlWriter::new();
             writer.emit_error("Empty prompt", Some("EMPTY_PROMPT"), false);
             writer.emit_finish("", 0, 0, 1);
@@ -475,7 +475,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
         if reg.find(cmd_name).is_some() {
             let out = reg.execute(trimmed, None);
             if json_output {
-                use neotrix::cli::jsonl_stream::JsonlWriter;
+                use crate::cli::jsonl_stream::JsonlWriter;
                 let mut writer = JsonlWriter::new();
                 if out.success {
                     writer.emit_message("command", &out.message, None);
@@ -498,7 +498,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     let rt = tokio_runtime();
 
     if json_output {
-        use neotrix::cli::jsonl_stream::JsonlWriter;
+        use crate::cli::jsonl_stream::JsonlWriter;
         let mut writer = JsonlWriter::new();
         writer.emit_start(&prompt, None, None, None);
 
@@ -831,7 +831,7 @@ pub fn generate_completions(shell: &str, cmd: &mut clap::Command) {
 }
 
 pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize) {
-    use neotrix::core::nt_core_consciousness_core as consciousness_core;
+    use crate::l5_cognition::nt_core_consciousness_core as consciousness_core;
 
     let sub = sub.unwrap_or("status");
 
@@ -1005,7 +1005,7 @@ pub fn run_project_evolve(
     want_json: bool,
     max_rounds: usize,
 ) -> Result<(), String> {
-    use neotrix::nt_mind::evolution::{EvolutionLoop, REPAIR_MAX_ROUNDS};
+    use crate::l5_cognition::nt_mind::evolution::{EvolutionLoop, REPAIR_MAX_ROUNDS};
 
     let target_dir = target.unwrap_or(".").to_string();
     let target_path = std::path::Path::new(&target_dir);
@@ -1080,7 +1080,7 @@ pub fn run_mcp_server() {
     server.register_all_tools();
     // 单调授权守卫: 阻断破坏性 shell 命令 (NT-SHIELD GuardChain 生产接线)
     {
-        use neotrix::core::nt_core_guard_chain::GuardVerdict;
+        use crate::l3_embodiment::nt_core_guard_chain::GuardVerdict;
         server.add_guard("destructive_shell", |tool, args| {
             if tool != "execute_command" {
                 return GuardVerdict::Allow;
@@ -1105,7 +1105,7 @@ pub fn run_mcp_server() {
     // Allow → 放行; RequiresApproval → Ask (人工审批); Reject → Deny。
     // 读工具 (kb_get/kb_stats/kb_query) 恒 Allow。
     {
-        use neotrix::core::nt_core_guard_chain::GuardVerdict;
+        use crate::l3_embodiment::nt_core_guard_chain::GuardVerdict;
         use neotrix::l1_action::nt_memory::nt_memory_kb::{
             kb_write_guard, WriteGuardVerdict,
         };
@@ -1148,8 +1148,8 @@ pub fn run_mcp_server() {
 }
 
 pub fn run_benchmark(category: Option<&str>) {
-    use neotrix::nt_mind::benchmark::{BenchmarkSuite, BenchmarkReport};
-    use neotrix::CapabilityVector;
+    use crate::l5_cognition::nt_mind::benchmark::{BenchmarkSuite, BenchmarkReport};
+    use crate::core::nt_core_cap::CapabilityVector;
 
     let cap: CapabilityVector = neotrix::core::nt_core_state::load("brain")
         .and_then(|json| serde_json::from_str(&json).ok())
@@ -1194,7 +1194,7 @@ pub fn run_benchmark(category: Option<&str>) {
 }
 
 pub fn run_browse(url: &str) {
-    use neotrix::nt_world_crawl::BrowserCircuit;
+    use crate::l2_perception::nt_world::nt_world_crawl::BrowserCircuit;
     println!("{}", info("╭─ NeoTrix Browser ──────────────────────────╮"));
     println!("│ {} {}", info("Fetching:"), url);
     println!("{}", info("╰────────────────────────────────────────────────╯"));
@@ -1216,7 +1216,7 @@ pub fn run_browse(url: &str) {
 }
 
 pub fn run_search(query: &str, count: usize) {
-    use neotrix::nt_world_search::UnifiedSearch;
+    use crate::l2_perception::nt_world::nt_world_search::UnifiedSearch;
 
     let engine = UnifiedSearch::new();
     println!("{} Searching for: {}", info("🔍"), query);
@@ -1245,7 +1245,7 @@ pub fn run_search(query: &str, count: usize) {
 }
 
 pub fn run_login(url: &str) {
-    use neotrix::nt_world_crawl::BrowserCircuit;
+    use crate::l2_perception::nt_world::nt_world_crawl::BrowserCircuit;
     println!("{}", info("╭─ NeoTrix Login ────────────────────────────╮"));
     println!("│ {}: {}", info("URL"), url);
     println!("│ {}", info("A Chrome window will open. Log in, then"));
@@ -1324,7 +1324,7 @@ pub fn run_daemon(profile: &str) {
         agent.reasoning_bank = bank;
         let bg_agent = Arc::new(tokio::sync::RwLock::new(agent));
         let mut bg = BackgroundLoop::new(bg_agent.clone());
-        bg.goal_loop = neotrix::nt_mind::nt_mind::GoalLoop::new();
+        bg.goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
         bg.nt_world_model = Some(WorldModelV2::new(8, 64));
         #[cfg(feature = "stealth-net")]
         {
@@ -1351,7 +1351,7 @@ pub fn run_daemon_evolution(profile: &str) {
         agent.reasoning_bank = bank;
         let bg_agent = Arc::new(tokio::sync::RwLock::new(agent));
         let mut bg = BackgroundLoop::new(bg_agent.clone());
-        bg.goal_loop = neotrix::nt_mind::nt_mind::GoalLoop::new();
+        bg.goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
         bg.nt_world_model = Some(WorldModelV2::new(8, 64));
         #[cfg(feature = "stealth-net")]
         {
@@ -1394,15 +1394,15 @@ pub fn run_standalone_mode(stage: usize) {
 }
 
 pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
-    use neotrix::nt_mind::nt_mind_background_loop::BackgroundLoop;
+    use crate::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
     use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-    use neotrix::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+    use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
     
-    use neotrix::agent::skills::SkillsEngine;
-    use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-    use neotrix::cli::commands::agent_cmds::McpRegistry;
-    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
-    use neotrix::agent::{AgentTeam, ProcessType};
+    use crate::agent::skills::SkillsEngine;
+    use crate::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
+    use crate::cli::commands::agent_cmds::McpRegistry;
+    use crate::agent::tool::mcp::{McpTransport, McpToolDef};
+    use crate::agent::{AgentTeam, ProcessType};
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
 
@@ -1477,7 +1477,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         let skills_engine = Arc::new(RwLock::new(skills_engine));
         let hook_registry = Arc::new(RwLock::new(hook_registry));
 
-        let mut bg_goal_loop = neotrix::nt_mind::nt_mind::GoalLoop::new();
+        let mut bg_goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
         bg_goal_loop.load();
         let agent_team = Arc::new(Mutex::new(AgentTeam::new("default", ProcessType::Sequential)));
         bg_goal_loop = bg_goal_loop.with_agent_team(agent_team);
@@ -1504,7 +1504,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
 
         // Session Recovery
         {
-            use neotrix::nt_io_session_recovery::SessionRecoveryManager;
+            use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
             let recovery_mgr = SessionRecoveryManager::new("default")
                 .with_auto_recover(true);
             if let Some(snapshot) = recovery_mgr.load_latest_snapshot() {
@@ -1519,7 +1519,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
 
         // AGENTS.md
         {
-            use neotrix::nt_io_agents_md::AgentsMdReader;
+            use crate::l1_action::nt_io::nt_io_agents_md::AgentsMdReader;
             let agents_reader = AgentsMdReader::new();
             if let Ok(rules) = agents_reader.load_project_rules(std::path::Path::new(".")) {
                 if !rules.is_empty() {
@@ -1550,16 +1550,16 @@ pub fn run_interactive(cfg: &NeoTrixConfig, profile: &str) {
 }
 
 pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, ephemeral: bool) {
-    use neotrix::nt_mind::nt_mind_background_loop::BackgroundLoop;
+    use crate::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
     use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-use neotrix::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
-    use neotrix::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
+    use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
     
-    use neotrix::agent::skills::SkillsEngine;
-    use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-    use neotrix::cli::commands::agent_cmds::McpRegistry;
-    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
-    use neotrix::agent::{AgentTeam, AgentRole, ProcessType};
+    use crate::agent::skills::SkillsEngine;
+    use crate::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
+    use crate::cli::commands::agent_cmds::McpRegistry;
+    use crate::agent::tool::mcp::{McpTransport, McpToolDef};
+    use crate::agent::{AgentTeam, AgentRole, ProcessType};
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
 
@@ -1637,7 +1637,7 @@ use neotrix::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
         let _skills_engine = Arc::new(RwLock::new(skills_engine));
         let hook_registry: Arc<RwLock<EccHookRegistry>> = Arc::new(RwLock::new(hook_registry));
 
-        let mut bg_goal_loop = neotrix::nt_mind::nt_mind::GoalLoop::new();
+        let mut bg_goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
         bg_goal_loop.load();
         if bg_goal_loop.active_goal.is_some() {
             println!("{} {}", info("[bg]"), info("Restored background goal from ~/.neotrix/goals.json"));
@@ -1695,7 +1695,7 @@ use neotrix::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 
         // Session Recovery — 加载上次会话快照
         {
-            use neotrix::nt_io_session_recovery::SessionRecoveryManager;
+            use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
             let recovery_mgr = SessionRecoveryManager::new("default")
                 .with_auto_recover(true);
             if let Some(snapshot) = recovery_mgr.load_latest_snapshot() {
@@ -1710,7 +1710,7 @@ use neotrix::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 
         // AGENTS.md — 扫描项目规则文件
         {
-            use neotrix::nt_io_agents_md::AgentsMdReader;
+            use crate::l1_action::nt_io::nt_io_agents_md::AgentsMdReader;
             let agents_reader = AgentsMdReader::new();
             if let Ok(rules) = agents_reader.load_project_rules(std::path::Path::new(".")) {
                 if !rules.is_empty() {
@@ -1829,7 +1829,7 @@ pub fn run_features_list() {
 // ── Config commands ──
 
 pub fn run_config_encrypt_keys() {
-    use neotrix::nt_shield::shield_core::key_encryption;
+    use crate::l3_embodiment::nt_shield::shield_core::key_encryption;
     let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
@@ -1894,7 +1894,7 @@ pub fn run_config_encrypt_keys() {
 }
 
 pub fn run_config_decrypt_keys() {
-    use neotrix::nt_shield::shield_core::key_encryption;
+    use crate::l3_embodiment::nt_shield::shield_core::key_encryption;
     let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
@@ -2057,8 +2057,8 @@ pub fn run_wallet_export(label: &str) {
 ///   2. 装配 MCP 原生工具（ToolOrchestrator → AgentLoop 工具集）
 ///   3. 启动交互 REPL：每轮 `loop_.turn(input)` 驱动 用户→LLM→工具→回答
 pub fn run_agent_mode(profile: &str) {
-    use neotrix::cli::commands::agent_cmds::McpRegistry;
-    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
+    use crate::cli::commands::agent_cmds::McpRegistry;
+    use crate::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
     use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
     use std::io::{self, Write};
@@ -2154,12 +2154,12 @@ You have tools available; call them when they help. Be concise and evidence-firs
 ///   - 工具调用行内状态、token 计数、tokens/sec、会话切换
 ///   - 流式 markdown 增量渲染（`streaming_text` → `commit_stream`）
 pub fn run_agent_tui(profile: &str) {
-    use neotrix::cli::commands::agent_cmds::McpRegistry;
-    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
+    use crate::cli::commands::agent_cmds::McpRegistry;
+    use crate::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
     use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
-    use neotrix::cli::tui::TuiApp;
-    use neotrix::cli::tui::app::KeyAction;
+    use crate::cli::tui::TuiApp;
+    use crate::cli::tui::app::KeyAction;
     use crossterm::event::{self, Event};
     use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
     use crossterm::execute;
@@ -2280,7 +2280,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
             let theme = neotrix::cli::tui::theme_by_name(&app.theme_name);
             let _ = terminal.draw(|frame| {
                 let area = frame.area();
-                use neotrix::cli::tui::layout::{
+                use crate::cli::tui::layout::{
                     compute_layout, render_approval_bar, render_chat_panel, render_diff_panel,
                     render_input_panel, render_session_list, render_session_picker,
                     render_status_bar, render_streaming_tools,
@@ -2398,7 +2398,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
                                 .and_then(|p| p.entries.get(idx))
                                 .map(|e| e.name.clone());
                             if let Some(name) = name {
-                                use neotrix::cli::tui::session_store::SessionStore;
+                                use crate::cli::tui::session_store::SessionStore;
                                 let mut store = SessionStore::new();
                                 match store.delete_session(&name) {
                                     Ok(()) => {
@@ -3013,8 +3013,8 @@ fn handle_slash_tui(
 
 /// 打开会话恢复 picker：从 SessionStore 拉取已保存会话列表填充到 TuiApp。
 fn open_session_picker(app: &mut neotrix::cli::tui::TuiApp) {
-    use neotrix::cli::tui::session_store::SessionStore;
-    use neotrix::cli::tui::app::types::{SessionEntry, SessionPicker};
+    use crate::cli::tui::session_store::SessionStore;
+    use crate::cli::tui::app::types::{SessionEntry, SessionPicker};
     let store = SessionStore::new();
     let mut entries: Vec<SessionEntry> = Vec::new();
     for data in store.list_sessions() {
@@ -3034,7 +3034,7 @@ fn open_session_picker(app: &mut neotrix::cli::tui::TuiApp) {
 
 /// 把 TuiApp 当前会话持久化到 SessionStore（KB + session-logs 双落盘）。
 fn save_tui_session(app: &neotrix::cli::tui::TuiApp, name: &str) -> Result<(), String> {
-    use neotrix::cli::tui::session_store::{SessionData, SessionStore};
+    use crate::cli::tui::session_store::{SessionData, SessionStore};
     let session = &app.sessions[app.active_session];
     let now = chrono::Utc::now().to_rfc3339();
     let messages: Vec<String> = session.messages.iter()
@@ -3053,7 +3053,7 @@ fn save_tui_session(app: &neotrix::cli::tui::TuiApp, name: &str) -> Result<(), S
 
 /// 从 SessionStore 加载会话到 TuiApp。
 fn load_tui_session(app: &mut neotrix::cli::tui::TuiApp, name: &str) -> Result<usize, String> {
-    use neotrix::cli::tui::session_store::SessionStore;
+    use crate::cli::tui::session_store::SessionStore;
     let store = SessionStore::new();
     let data = store.load_session(name)?;
     app.clear_session();

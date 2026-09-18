@@ -26,7 +26,7 @@ pub enum RLAlgorithm {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationRecord {
     pub iteration: u64,
-    pub task_type: crate::neotrix::nt_world_model::TaskType,
+    pub task_type: crate::l2_perception::nt_world::nt_world_model::TaskType,
     pub score_before: f64,
     pub score_after: f64,
     pub improved: bool,

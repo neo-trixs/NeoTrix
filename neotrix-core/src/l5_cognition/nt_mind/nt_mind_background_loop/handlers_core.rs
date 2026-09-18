@@ -268,8 +268,8 @@ impl BackgroundLoopHandle {
             }
         }
         if let Some(ref mut gd) = self.gap_detector {
-            use crate::core::nt_core_meta::scanner::CodeScanner;
-            use crate::core::nt_core_meta::weakness::WeaknessAnalyzer;
+            use crate::l6_meta::nt_meta::scanner::CodeScanner;
+            use crate::l6_meta::nt_meta::weakness::WeaknessAnalyzer;
             let m = CodeScanner::new(".").scan();
             let w = WeaknessAnalyzer::new().analyze(&m);
             let r = gd.detect_gaps(&m, &w.weaknesses);
@@ -321,7 +321,7 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_plugin_tick(&mut self) {
-        use crate::neotrix::nt_io_plugin::PluginEvent;
+        use crate::l1_action::nt_io::nt_io_plugin::PluginEvent;
         self.plugin_registry.dispatch(&PluginEvent::BrainTick).await;
     }
 

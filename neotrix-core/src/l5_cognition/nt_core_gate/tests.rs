@@ -1,5 +1,5 @@
     use super::*;
-    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+    use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
     use crate::l5_cognition::nt_core_prm::TrajectoryStep;
     use crate::core::nt_core_traits::SpecialistType;
     use crate::l1_action::nt_io::nt_io_provider::{

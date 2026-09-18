@@ -270,7 +270,7 @@ impl std::fmt::Debug for ProxyHeartbeatEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_shield_stealth_net::proxy_pool::ProxyPool;
+    use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::ProxyPool;
 
     #[tokio::test]
     async fn test_heartbeat_empty_pool() {

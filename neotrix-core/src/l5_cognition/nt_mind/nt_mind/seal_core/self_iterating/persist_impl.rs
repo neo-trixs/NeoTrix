@@ -42,9 +42,9 @@ impl ReasoningBrain {
                 Ok(())
             }
             None => {
-                crate::core::nt_core_state::save("brain", &brain_data)
+                crate::l5_cognition::nt_core_state::save("brain", &brain_data)
                     .map_err(NeoTrixError::Io)?;
-                crate::core::nt_core_state::save("brain_metadata", &metadata_json)
+                crate::l5_cognition::nt_core_state::save("brain_metadata", &metadata_json)
                     .map_err(NeoTrixError::Io)?;
                 Ok(())
             }
@@ -68,7 +68,7 @@ impl ReasoningBrain {
                     Err(e) => return Err(NeoTrixError::Io(e.to_string())),
                 }
             }
-            None => match crate::core::nt_core_state::load("brain_metadata") {
+            None => match crate::l5_cognition::nt_core_state::load("brain_metadata") {
                 Some(json) => json,
                 None => return Err(NeoTrixError::Memory("未找到保存的brain状态".to_string())),
             },
@@ -98,6 +98,6 @@ impl ReasoningBrain {
 
     /// 检查是否存在已保存的状态
     pub fn has_saved_state() -> bool {
-        crate::core::nt_core_state::load("brain_metadata").is_some()
+        crate::l5_cognition::nt_core_state::load("brain_metadata").is_some()
     }
 }

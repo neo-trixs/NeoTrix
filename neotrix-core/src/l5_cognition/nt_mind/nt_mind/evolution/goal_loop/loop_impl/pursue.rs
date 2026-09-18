@@ -6,7 +6,7 @@ use super::super::types::{GoalIterationRecord, GoalState};
 use super::core::truncate;
 use super::core::GoalLoop;
 use crate::l2_perception::nt_core_knowledge::TaskType;
-use crate::neotrix::nt_world_model::TaskType as WorldTaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType as WorldTaskType;
 
 /// 单次迭代的估算成本 (USD)。模拟环境无真实 LLM token 计量,
 /// 故以固定估算值 + 实际吸收工作量加权, 避免纯魔法数字。
@@ -348,7 +348,7 @@ impl GoalLoop {
             };
             let cap = brain
                 .brain
-                .evaluate_capability(crate::neotrix::nt_world_model::TaskType::General);
+                .evaluate_capability(crate::l2_perception::nt_world::nt_world_model::TaskType::General);
             self.start_goal(brain, &desc, Some(Self::auto_goal_config()));
             self.prioritize_from_motivation();
             if let Some(ref g) = self.active_goal {

@@ -405,7 +405,7 @@ impl CryptoAgent {
 
         // Build and sign the transaction for the best opportunity
         let to_address = best.contract_address.clone().unwrap_or_else(|| wallet_address.clone());
-        let tx = crate::neotrix::nt_act_crypto::tx::Tx1559 {
+        let tx = crate::l1_action::nt_act::nt_act_crypto::tx::Tx1559 {
             chain_id: client.chain.chain_id(),
             nonce,
             max_priority_fee: ((gas_price * 0.1 * 1e9) as u128).max(1_000_000_000),
@@ -418,14 +418,14 @@ impl CryptoAgent {
 
         let wallet = self.wallet_manager.active_wallet()
             .ok_or_else(|| String::from("no active wallet"))?;
-        let signed = crate::neotrix::nt_act_crypto::tx::TxBuilder::sign_1559(wallet, &tx)
+        let signed = crate::l1_action::nt_act::nt_act_crypto::tx::TxBuilder::sign_1559(wallet, &tx)
             .map_err(|e| format!("sign: {}", e))?;
 
         let tx_hash = client.send_raw_transaction(&signed.raw)
             .map_err(|e| format!("send: {}", e))?;
 
         self.scanner.learn_from_execution(true, &best.opportunity_type, best.estimated_value_usd, best.execution_gas_cost);
-        self.self_evolver.backtest(best.opportunity_type.name(), &crate::neotrix::nt_act_crypto::opportunity::StrategyStats {
+        self.self_evolver.backtest(best.opportunity_type.name(), &crate::l1_action::nt_act::nt_act_crypto::opportunity::StrategyStats {
             opportunity_type: best.opportunity_type.clone(),
             attempts: 1,
             successes: 1,

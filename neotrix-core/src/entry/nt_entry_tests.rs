@@ -3,7 +3,7 @@
     fn test_save_load_tui_session_roundtrip() {
         // 用隔离 base 目录验证 save/load 闭环（不污染真实 ~/.neotrix KB）。
         
-        use neotrix::cli::tui::session_store::SessionStore;
+        use crate::cli::tui::session_store::SessionStore;
 
         let tmp = std::env::temp_dir().join(format!("nt-tui-session-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
@@ -66,7 +66,7 @@
 
     #[test]
     fn test_slash_command_dispatch() {
-        use neotrix::cli::tui::TuiApp;
+        use crate::cli::tui::TuiApp;
         let mut app = TuiApp::new(true);
         use super::SlashResult;
         // /clear
@@ -85,7 +85,7 @@
     #[test]
     fn test_slash_compact_undo_redo_handled() {
         use super::SlashResult;
-        use neotrix::cli::tui::TuiApp;
+        use crate::cli::tui::TuiApp;
         let mut app = TuiApp::new(true);
         // 无 agent 时 /model 无参仅显示提示（Handled）。
         assert!(matches!(super::handle_slash_tui(&mut app, "/model", None), SlashResult::Handled));
@@ -113,7 +113,7 @@
 
     #[test]
     fn test_diff_slash_with_literal_text_opens_viewer() {
-        use neotrix::cli::tui::TuiApp;
+        use crate::cli::tui::TuiApp;
         let mut app = TuiApp::new(true);
         // 含换行的参数 → 视为命令行直接传入的 diff 文本（不触发 git 调用）。
         let diff_text = "diff --git a/x.rs b/x.rs\n@@ -1,2 +1,3 @@\n-old\n+new\n";
@@ -132,7 +132,7 @@
 
     #[test]
     fn test_diff_slash_empty_reports_no_content() {
-        use neotrix::cli::tui::TuiApp;
+        use crate::cli::tui::TuiApp;
         let mut app = TuiApp::new(true);
         // 空 diff 文本 → 不进入查看模式，状态栏提示无内容。
         assert!(matches!(

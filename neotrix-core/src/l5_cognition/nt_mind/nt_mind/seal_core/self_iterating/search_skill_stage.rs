@@ -170,7 +170,7 @@ impl SearchSkillStage {
         &self,
         task_type: SearchTaskType,
         query: String,
-        crawl_results: Vec<crate::neotrix::nt_world_crawl::fetcher::FetchResult>,
+        crawl_results: Vec<crate::l2_perception::nt_world::nt_world_crawl::fetcher::FetchResult>,
         synthesized_answer: String,
         grounding_score: f64,
     ) -> SearchExercise {
@@ -334,7 +334,7 @@ impl SearchSkillStage {
     }
 
     /// 将搜索技能写入 CapabilityVector.extension
-    pub fn sync_to_capability_vector(&self, cv: &mut crate::core::CapabilityVector) {
+    pub fn sync_to_capability_vector(&self, cv: &mut crate::l5_cognition::nt_core::capability::types::CapabilityVector) {
         cv.add_extension_dim("nt_cap:search_query_generation", self.query_generation);
         cv.add_extension_dim("nt_cap:search_result_filtering", self.result_filtering);
         cv.add_extension_dim("nt_cap:search_evidence_synthesis", self.evidence_synthesis);
@@ -343,7 +343,7 @@ impl SearchSkillStage {
     }
 
     /// 从 CapabilityVector 读取搜索技能
-    pub fn load_from_capability_vector(cv: &crate::core::CapabilityVector) -> Self {
+    pub fn load_from_capability_vector(cv: &crate::l5_cognition::nt_core::capability::types::CapabilityVector) -> Self {
         let mut stage = Self::new();
         for (name, val) in cv.extension() {
             match name.as_str() {
@@ -425,14 +425,14 @@ mod tests {
     fn test_sync_to_capability_vector() {
         let mut stage = SearchSkillStage::new();
         stage.query_generation = 0.8; stage.grounding_quality = 0.9;
-        let mut cv = crate::core::CapabilityVector::default();
+        let mut cv = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         stage.sync_to_capability_vector(&mut cv);
         assert!((cv.extension().iter().find(|(n,_)| n=="nt_cap:search_query_generation").unwrap().1 - 0.8).abs() < 1e-9);
     }
 
     #[test]
     fn test_load_from_capability_vector() {
-        let mut cv = crate::core::CapabilityVector::default();
+        let mut cv = crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
         cv.add_extension_dim("nt_cap:search_result_filtering", 0.7);
         cv.add_extension_dim("nt_cap:search_evidence_synthesis", 0.6);
         let stage = SearchSkillStage::load_from_capability_vector(&cv);

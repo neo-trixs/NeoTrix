@@ -124,8 +124,8 @@ impl HebbianUpdater {
 mod tests {
     use super::*;
     use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
-    use crate::core::RewardSource;
-    use crate::core::TaskType;
+    use crate::l2_perception::nt_core_knowledge::types::RewardSource;
+    use crate::l2_perception::nt_core_knowledge::types::TaskType;
 
     fn dummy_memory(reward: f64, success: bool, id: &str) -> ReasoningMemory {
         ReasoningMemory {

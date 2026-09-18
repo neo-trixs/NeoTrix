@@ -391,7 +391,7 @@ pub fn download_to_file_with_retry(
 
 #[cfg(feature = "stealth-net")]
 fn pool_select_blocking() -> Option<String> {
-    crate::neotrix::nt_shield_stealth_net::proxy_pool::global_pool()
+    crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::global_pool()
         .select_node_blocking()
         .map(|n| n.url.clone())
 }
@@ -399,7 +399,7 @@ fn pool_select_blocking() -> Option<String> {
 #[cfg(feature = "stealth-net")]
 fn pool_record_result(host: Option<&str>, success: bool) {
     if let Some(host) = host {
-        crate::neotrix::nt_shield_stealth_net::proxy_pool::global_pool()
+        crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::global_pool()
             .record_strategy_result_blocking(host, success);
     }
 }

@@ -6,7 +6,7 @@
 //! 受控边界: 反向引用 `crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase`
 //! 属架构允许的 KB 注入边界 (core 逻辑核心消费 neotrix 层基础设施), 禁止扩展此边界。
 
-use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 pub use crate::l5_cognition::nt_core_kernel_types::{EVOLUTION, KERNEL_DIM, ReasoningMethod, Vector};
 use serde::{Deserialize, Serialize};

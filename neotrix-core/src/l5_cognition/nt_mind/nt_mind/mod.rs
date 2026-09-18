@@ -90,7 +90,6 @@ pub use infrastructure::react_doctor;            // ReactDoctor: React 代码健
 pub use evolution::goal_loop;               // Goal Loop — 24/7 自主目标追求引擎 (Codex /goal + Ralph loop)
 pub use infrastructure::build_context;
 pub use infrastructure::case_study;              // Case Study Writer (Problem→Process→Result)
-pub use infrastructure::stakeholder_comm;        // Stakeholder Communicator (3 audience types)
 pub use infrastructure::group_contracts;         // 多仓库 Group / Contract 系统
 pub use infrastructure::kronecker_cleanup;       // L-02: Kronecker-structured O(N log N) cleanup
 pub use infrastructure::open_source_benchmark;

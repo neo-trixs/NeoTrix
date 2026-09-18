@@ -1122,6 +1122,7 @@ mod tests {
             conn: std::sync::Mutex::new(conn),
             db_path: std::path::PathBuf::from(":memory:"),
             db_file: None,
+            file_lock_held: std::sync::atomic::AtomicBool::new(false),
             bm25: std::sync::RwLock::new(None),
             bm25_dirty: std::sync::RwLock::new(false),
             embedding_config: std::sync::RwLock::new(None),

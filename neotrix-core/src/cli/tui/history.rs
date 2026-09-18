@@ -121,14 +121,14 @@ impl CommandHistory {
 
     pub fn save(&self) {
         if let Ok(json) = serde_json::to_string(&self.entries) {
-            if let Err(e) = crate::core::nt_core_state::save("history", &json) {
+            if let Err(e) = crate::l5_cognition::nt_core_state::save("history", &json) {
                 log::warn!("[history] write to KB: {}", e);
             }
         }
     }
 
     fn load(&mut self) {
-        if let Some(json) = crate::core::nt_core_state::load("history") {
+        if let Some(json) = crate::l5_cognition::nt_core_state::load("history") {
             if let Ok(entries) = serde_json::from_str::<Vec<String>>(&json) {
                 self.entries = entries;
                 if self.entries.len() > self.max_entries {

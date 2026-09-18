@@ -127,16 +127,7 @@ impl Default for ModelCapabilities {
 }
 
 /// 任务类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TaskType {
-    Chat,
-    Completion,
-    Embedding,
-    Reranking,
-    ImageGeneration,
-    AudioGeneration,
-    VideoGeneration,
-}
+pub use neotrix_types::core::TaskType;
 
 // ════════════════════════════════════════════════════════════════
 // 健康状态

@@ -8,7 +8,7 @@
 //!
 //! Uses MAP-BSC (Multiply-Add-Permute) VSA operations via VSAEngine.
 
-pub use crate::l5_cognition::nt_core_shared_types::{E8VsaEmbedding, E8_VSA_DIM, E8_VSA_SEED};
+pub use crate::l0_substrate::nt_core_shared_types::{E8VsaEmbedding, E8_VSA_DIM, E8_VSA_SEED};
 
 #[cfg(test)]
 mod tests {

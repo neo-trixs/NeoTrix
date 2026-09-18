@@ -2,7 +2,7 @@ mod general;
 mod specialized;
 
 use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
-use crate::core::CapabilityVector;
+use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 
 pub(super) fn capability_vector_group_b(s: &KnowledgeSource) -> CapabilityVector {
     match s {

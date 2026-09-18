@@ -8,7 +8,7 @@ mod tests {
         use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
         use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
         use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
-        use crate::core::nt_core_self::AttentionDomain;
+        use crate::l6_meta::nt_core_self::AttentionDomain;
         use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
 
         let mut bridge = ThinkingBridge::new("/tmp");
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_metacognition_weakness_patterns() {
-        use crate::core::nt_core_meta::{SelfModel, ModuleInfo, WeaknessAnalyzer};
+        use crate::l6_meta::nt_meta::{SelfModel, ModuleInfo, WeaknessAnalyzer};
         let analyzer = WeaknessAnalyzer::new();
         let mut model = SelfModel::new();
         model.modules.push(ModuleInfo {
@@ -169,18 +169,18 @@ mod tests {
 
     #[test]
     fn test_metacognition_planner_prioritization() {
-        use crate::core::nt_core_meta::EvolutionPlanner;
-        use crate::core::nt_core_meta::weakness::Weakness;
+        use crate::l6_meta::nt_meta::EvolutionPlanner;
+        use crate::l6_meta::nt_meta::weakness::Weakness;
         let mut planner = EvolutionPlanner::new();
         let weaknesses = vec![
             Weakness {
                 pattern_id: "MISSING_TESTS".into(), target_module: None, file: None, line: None,
-                severity: crate::core::nt_core_meta::DebtSeverity::Critical,
+                severity: crate::l6_meta::nt_meta::DebtSeverity::Critical,
                 description: "no tests".into(), impact: "risk".into(), suggestion: "add tests".into(),
             },
             Weakness {
                 pattern_id: "LARGE_FILE".into(), target_module: None, file: None, line: None,
-                severity: crate::core::nt_core_meta::DebtSeverity::Minor,
+                severity: crate::l6_meta::nt_meta::DebtSeverity::Minor,
                 description: "big file".into(), impact: "hard to maintain".into(), suggestion: "split".into(),
             },
         ];

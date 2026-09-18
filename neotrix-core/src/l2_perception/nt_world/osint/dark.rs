@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{OsintConfig, OsintTarget};
 
-use crate::neotrix::nt_io_http_factory as http_factory;
+use crate::l1_action::nt_io::nt_io_http_factory as http_factory;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _DarkWebResult {

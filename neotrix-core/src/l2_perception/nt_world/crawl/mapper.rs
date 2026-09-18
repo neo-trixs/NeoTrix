@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::core::CapabilityVector;
+use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use crate::l1_action::nt_core_edit::MicroEdit;
 use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
 use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
@@ -250,7 +250,7 @@ pub struct MapperSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_world_crawl::classifier::ContentClassifier;
+    use crate::l2_perception::nt_world::nt_world_crawl::classifier::ContentClassifier;
 
     #[test]
     fn test_map_legal_content() {

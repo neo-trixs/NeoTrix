@@ -8,15 +8,16 @@ use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
 use crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_chain::KnowledgeChain;
 use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
+use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use self::always_on::AlwaysOnEngine;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngine;
-use crate::neotrix::nt_io_plugin::registry::PluginRegistry;
+use crate::l1_action::nt_io::nt_io_plugin::registry::PluginRegistry;
 use crate::l5_cognition::layer_aliases::WorldModelV2;
 use crate::l5_cognition::nt_mind::evolution::evolution_daemon::{EvolutionDaemon, EvolutionConfig};
 use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExplorationPipeline;
-use crate::neotrix::nt_act_voice::VoiceInput;
+use crate::l1_action::nt_act::nt_act_voice::VoiceInput;
 use crate::l5_cognition::nt_mind::foundation::l1_wrappers::DistillationEngineWrapper;
 use crate::l5_cognition::nt_mind::nt_mind::self_evolver::SelfEvolver;
 use crate::l6_meta::nt_core_scheduler::SchedulerEngine;
@@ -24,13 +25,12 @@ use crate::l5_cognition::nt_mind::nt_mind::curiosity_drive::CuriosityDrive;
 use crate::l5_cognition::nt_mind::nt_mind::knowledge_aging::KnowledgeAging;
 use crate::l5_cognition::nt_mind::nt_mind::auto_crystallizer::AutoCrystallizer;
 use crate::l5_cognition::nt_mind::foundation::l1_wrappers::SessionRecoveryWrapper;
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 // AgentDiscovery not defined — field removed from BackgroundLoop
 
 use crate::l5_cognition::nt_core_second_brain::SecondBrain;
-use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
-use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
+use crate::l6_meta::nt_meta::knowledge_gap_detector::KnowledgeGapDetector;
 use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
 use crate::l5_cognition::nt_core_consciousness::CognitiveLoadMonitor;
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
@@ -82,15 +82,15 @@ pub bbrain: Option<BMonitor>,
     pub awareness: Option<ConsciousnessMonitor>,
     pub gold_standard: Option<ConsciousnessGoldStandard>,
     #[cfg(feature = "stealth-net")]
-    pub nt_shield_manager: Option<crate::neotrix::nt_shield_stealth_net::nt_shield_manager::StealthManager>,
+    pub nt_shield_manager: Option<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::nt_shield_manager::StealthManager>,
     #[cfg(feature = "stealth-net")]
-    pub tor_crawler: Option<std::sync::Arc<crate::neotrix::nt_shield_stealth_net::tor_crawler::TorCrawler>>,
+    pub tor_crawler: Option<std::sync::Arc<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::tor_crawler::TorCrawler>>,
     #[cfg(feature = "stealth-net")]
-    pub heartbeat_engine: Option<crate::neotrix::nt_shield_stealth_net::ProxyHeartbeatEngine>,
+    pub heartbeat_engine: Option<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::ProxyHeartbeatEngine>,
     #[cfg(feature = "stealth-net")]
-    pub world_consciousness: Option<crate::neotrix::nt_world_sense::WorldConsciousness>,
+    pub world_consciousness: Option<crate::l2_perception::nt_world::nt_world_sense::WorldConsciousness>,
     #[cfg(feature = "stealth-net")]
-    pub proxy_client: Option<crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient>,
+    pub proxy_client: Option<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::ProxyClient>,
     pub nt_act_voice_input: Option<VoiceInput>,
     pub avatar_engine: Option<DistillationEngineWrapper>,
     pub scheduler: Option<SchedulerEngine>,
@@ -155,7 +155,7 @@ impl BackgroundLoop {
             awareness: Some(ConsciousnessMonitor::new()),
             gold_standard: Some(ConsciousnessGoldStandard::new()),
             #[cfg(feature = "stealth-net")]
-            nt_shield_manager: Some(crate::neotrix::nt_shield_stealth_net::nt_shield_manager::StealthManager::new(5)),
+            nt_shield_manager: Some(crate::l3_embodiment::nt_shield::nt_shield_stealth_net::nt_shield_manager::StealthManager::new(5)),
             #[cfg(feature = "stealth-net")]
             tor_crawler: None,
             #[cfg(feature = "stealth-net")]
@@ -234,7 +234,8 @@ mod tests {
         // tree.trunk.coherence 应非零 (ConsciousnessMonitor compute_coherence 起步 0.1),
         // 且 GWT resonance 激活逻辑在 handle_consciousness_tick 生效。
         // 直接验证链路源头: observe() 产生非零 coherence, 注入 tree 后非零。
-        use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
+use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
         use crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree;
         let mut monitor = ConsciousnessMonitor::new();
         monitor.observe();

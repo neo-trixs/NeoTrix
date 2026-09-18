@@ -15,7 +15,7 @@ static FETCHER_DEFAULT_HEADERS: LazyLock<reqwest::header::HeaderMap> = LazyLock:
     headers
 });
 
-use crate::neotrix::nt_world_scrape::{RequestScraper, ScraperConfig};
+use crate::l2_perception::nt_world::nt_world_scrape::{RequestScraper, ScraperConfig};
 
 use super::config::CrawlStrategy;
 use super::stealth::SessionPool;
@@ -546,7 +546,7 @@ impl std::fmt::Display for FetcherSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_world_scrape::ScraperConfig;
+    use crate::l2_perception::nt_world::nt_world_scrape::ScraperConfig;
 
     fn test_config() -> ScraperConfig {
         ScraperConfig {

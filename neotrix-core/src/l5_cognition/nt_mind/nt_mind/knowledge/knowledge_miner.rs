@@ -9,7 +9,7 @@ use super::self_edit::MicroEdit;
 use super::self_iterating::ReasoningBrain;
 use super::memory::{ReasoningBank, ReasoningMemory};
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::neotrix::nt_world_model::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 /// 知识挖掘结果
 #[derive(Debug, Clone, Serialize, Deserialize)]

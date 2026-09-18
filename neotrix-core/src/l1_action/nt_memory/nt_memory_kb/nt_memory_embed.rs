@@ -235,7 +235,7 @@ pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<
     }
 }
 
-use crate::l5_cognition::nt_core_math::cosine_similarity_f32;
+use crate::l0_substrate::nt_core_math::cosine_similarity_f32;
 
 /// Serialize a Vec<f32> to a byte blob for SQLite storage (little-endian f32).
 fn vector_to_blob(v: &[f32]) -> Vec<u8> {
@@ -636,7 +636,7 @@ pub fn train_pq_codebook(
             }
         }
     }
-    let now = crate::neotrix::nt_memory_kb::nt_memory_embed::unix_now();
+    let now = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::unix_now();
     conn.execute(
         "INSERT INTO pq_codebook (m, ks, sub_dim, codewords, dimension, model, trained_at, num_vectors) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
         params![m as i64, ks as i64, sub_dim as i64, codeword_blob, dimension as i64, "all-MiniLM-L6-v2", now, n as i64],

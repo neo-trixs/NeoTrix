@@ -12,7 +12,7 @@ pub use schools::all_schools;
 pub use mountains::known_peaks;
 pub use mappings::all_mappings;
 pub use kb::{safe_insert_node, safe_insert_edge};
-pub use crate::neotrix::nt_memory_kb::shared_utils::now;
+pub use crate::l1_action::nt_memory::nt_memory_kb::shared_utils::now;
 pub use query::{
     shanhai_stats, shanhai_peaks, shanhai_mappings, shanhai_evidence, shanhai_schools,
     export_geojson, MappingRecord,

@@ -69,11 +69,13 @@ mod tests {
             content: String::new(),
             tool_calls: Some(ids.iter().map(|id| ToolCallInfo {
                 id: id.to_string(),
-                call_type: "function".to_string(),
-                function: ToolCallFunction {
+                name: "test".to_string(),
+                arguments: "{}".to_string(),
+                call_type: Some("function".to_string()),
+                function: Some(ToolCallFunction {
                     name: "test".to_string(),
                     arguments: "{}".to_string(),
-                },
+                }),
             }).collect()),
             tool_call_id: None,
         }

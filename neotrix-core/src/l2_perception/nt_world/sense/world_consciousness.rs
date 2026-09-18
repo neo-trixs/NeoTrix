@@ -1,6 +1,6 @@
 use crate::l2_perception::nt_core_sense::*;
-use crate::neotrix::nt_world_sense::nt_world_sense_hub::SensoryIntegrationHub;
-use crate::neotrix::nt_world_sense::omniscient_view::OmniscientView;
+use crate::l2_perception::nt_world::nt_world_sense::nt_world_sense_hub::SensoryIntegrationHub;
+use crate::l2_perception::nt_world::nt_world_sense::omniscient_view::OmniscientView;
 
 pub struct WorldConsciousness {
     pub nt_world_sense: SensoryIntegrationHub,

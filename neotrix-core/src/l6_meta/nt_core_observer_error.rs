@@ -9,7 +9,7 @@ use std::time::Duration;
 
 pub use neotrix_types::shared::{BreakerState, CircuitBreaker};
 
-use crate::core::nt_core_observer::ObserverReport;
+use crate::l6_meta::nt_core_observer::ObserverReport;
 
 /// Three-layer error recovery for the +1 observer.
 #[derive(Debug, Clone)]

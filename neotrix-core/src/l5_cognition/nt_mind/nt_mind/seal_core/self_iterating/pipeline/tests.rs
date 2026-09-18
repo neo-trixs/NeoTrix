@@ -3,7 +3,7 @@
     #[test]
     fn test_placeholder() {
         let brain = crate::l5_cognition::nt_mind::nt_mind::self_iterating::brain_core::ReasoningBrain::new();
-        let task_type = crate::neotrix::nt_world_model::TaskType::General;
+        let task_type = crate::l2_perception::nt_world::nt_world_model::TaskType::General;
         let snapshot = BrainSnapshot::new(&brain, &task_type);
         assert!(snapshot.learning_rate >= 0.0);
     }
@@ -102,7 +102,7 @@
         stage.process(&mut brain).expect("reward calc ok");
         let boosted = brain._reward();
         assert!(boosted > 0.5, "affective 引导应抬高, got {boosted}");
-        assert_eq!(brain._reward_source(), crate::core::RewardSource::External);
+        assert_eq!(brain._reward_source(), crate::l2_perception::nt_core_knowledge::types::RewardSource::External);
         assert!(take_affective_observation().is_none(), "情感观测被消费即取走");
     }
 
@@ -114,7 +114,7 @@
         let stage = RewardCalculationStage::new();
         stage.process(&mut brain).expect("reward calc ok");
         assert!((brain._reward() + 0.3).abs() < 1e-9, "负奖励应保留, got {}", brain._reward());
-        assert_eq!(brain._reward_source(), crate::core::RewardSource::External);
+        assert_eq!(brain._reward_source(), crate::l2_perception::nt_core_knowledge::types::RewardSource::External);
     }
 
     #[test]

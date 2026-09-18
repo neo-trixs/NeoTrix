@@ -648,7 +648,7 @@ impl BackgroundLoop {
             cognitive_load: self.cognitive_load.take(),
             volition: self.volition.take(),
             // bbrain already set above (line 571)
-            cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
+            cog_eval: crate::l6_meta::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
             second_brain: {
                 let mut sb = SecondBrain::new();
         if let Some(ref kb_ref) = self.kb {
@@ -704,8 +704,8 @@ impl BackgroundLoop {
             state: StateSubstrate::new(),
             simulate: SimulateEngine::new(),
             convergence_pulse: ConvergencePulse::default(),
-            tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
-            meta_auditor: crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor::new(),
+            tool_grounding: crate::l6_meta::nt_core_self::self_audit::ToolGroundingMonitor::new(),
+            meta_auditor: crate::l6_meta::nt_meta::nt_core_meta_auditor::MetaAuditor::new(),
             // 门控注册表 — 默认只读工具, 运行时可扩展。
             gate_registry: Some(ToolRegistry::from_read_only(&["get", "query", "read", "search"])),
             kb_guard: crate::l5_cognition::nt_mind::foundation::guardian::KbGuard::default(),
@@ -845,7 +845,7 @@ impl BackgroundLoop {
                 let affective_json = h.kb.as_ref()
                     .and_then(|kb| kb.kv_get("emotion", "affective_interface").ok().flatten());
                 if let Some(json) = engine_json {
-                    if let Ok(engine) = crate::core::nt_core_self::emotion_state::EmotionEngine::from_json(&json) {
+                    if let Ok(engine) = crate::l6_meta::nt_core_self::emotion_state::EmotionEngine::from_json(&json) {
                         if let Some(ref mut cr) = h.consciousness_runtime {
                             cr.set_emotion_engine(engine);
                             log::info!("[bg] emotion state restored from KB");
@@ -853,7 +853,7 @@ impl BackgroundLoop {
                     }
                 }
                 if let Some(json) = affective_json {
-                    if let Ok(iface) = crate::core::nt_core_self::affective_interface::AffectiveInterface::from_json(&json) {
+                    if let Ok(iface) = crate::l6_meta::nt_core_self::affective_interface::AffectiveInterface::from_json(&json) {
                         if let Some(ref mut cr) = h.consciousness_runtime {
                             // 恢复人类情感交互界面 (关系阶段 + 用户情感历史)。
                             // 恢复后把持久化的用户情感吸收进意识 (意识影响闭环)。
@@ -960,11 +960,11 @@ pub struct BackgroundLoopHandle {
     session_recovery: Option<SessionRecoveryWrapper>,
     event_bus: Option<EventBus>,
     metacognition: Option<MetaCognitionBridge>,
-    world_consciousness: Option<crate::neotrix::nt_world_sense::WorldConsciousness>,
+    world_consciousness: Option<crate::l2_perception::nt_world::nt_world_sense::WorldConsciousness>,
     #[cfg(feature = "stealth-net")]
-    heartbeat_engine: Option<crate::neotrix::nt_shield_stealth_net::ProxyHeartbeatEngine>,
+    heartbeat_engine: Option<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::ProxyHeartbeatEngine>,
     #[cfg(feature = "stealth-net")]
-    proxy_client: Option<crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient>,
+    proxy_client: Option<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::ProxyClient>,
     consciousness_runtime: Option<crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     consciousness_tree: Option<crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree>,
     fep_iit_bridge: Option<crate::l4_emotion::nt_feel::fep_iit_bridge::FepIitBridge>,
@@ -993,17 +993,17 @@ pub struct BackgroundLoopHandle {
     /// pending-absorb 自动吸收重入标志 (handlers_absorption.rs)。
     absorption_in_progress: std::sync::atomic::AtomicBool,
 //     bbrain: crate::l5_cognition::nt_mind::bbrain_monitor::BMonitor,
-    cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator,
+    cog_eval: crate::l6_meta::nt_core_self::metacognitive_evaluator::CognitiveEvaluator,
     /// 0=Balanced, 1=Deep, 2=Fast — updated by consciousness tick, consumed by batch loops.
     cognitive_mode: u8,
     state: StateSubstrate,
     simulate: SimulateEngine,
     convergence_pulse: ConvergencePulse,
-    tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
+    tool_grounding: crate::l6_meta::nt_core_self::self_audit::ToolGroundingMonitor,
     /// 元审计器 — 架构审计真实消费端 (GAP-2 修复): handle_architecture_audit 把
     /// converge_check 幽灵/孤儿/失效 + SelfTest 失败统一汇入 record_finding,
     /// 使其从"仅测试调用"变 T3 生产接线 (R-P79), 累计准确性驱动审计质量。
-    meta_auditor: crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor,
+    meta_auditor: crate::l6_meta::nt_meta::nt_core_meta_auditor::MetaAuditor,
     /// 门控注册表 — 背景循环工具执行前置检查用。
     gate_registry: Option<ToolRegistry>,
     /// KB 守卫 + 工作区守卫 (Rust 化自 sh 守护脚本)

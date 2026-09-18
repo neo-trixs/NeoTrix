@@ -2,8 +2,8 @@
 #[cfg(test)]
 mod tests {
     use crate::ReasoningBrain;
-    use crate::KnowledgeSource;
-    use crate::CapabilityVector;
+    use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
+    use crate::l5_cognition::nt_core::capability::CapabilityVector;
 
     #[test]
     fn test_nt_mind_creation() {

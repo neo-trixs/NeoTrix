@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_infer_image_data_sets_vision() {
-        let req = LlmRequest::new("test", "describe").with_image_b64("iVBORw0KGgo=");
+        let req = LlmRequest::new("test", "describe").with_image_b64("iVBORw0KGgo=".to_string());
         let cap = CapabilityRouter::infer_capabilities(&req);
         assert!(cap.vision);
     }
@@ -141,11 +141,12 @@ mod tests {
 
     #[test]
     fn test_infer_tools_sets_function_calling() {
-        let req = LlmRequest::new("test", "use tools").with_tools(vec![Tool {
+        let mut req = LlmRequest::new("test", "use tools");
+        req.tools = vec![Tool {
             name: "search".into(),
             description: "search the web".into(),
             input_schema: "{}".into(),
-        }]);
+        }];
         let cap = CapabilityRouter::infer_capabilities(&req);
         assert!(cap.function_calling);
     }
@@ -174,7 +175,7 @@ mod tests {
     #[test]
     fn test_route_vision_prefers_vision_capable() {
         let router = CapabilityRouter::new();
-        let req = LlmRequest::new("test", "describe").with_image_b64("iVBORw0KGgo=");
+        let req = LlmRequest::new("test", "describe").with_image_b64("iVBORw0KGgo=".to_string());
         let name = router.route(&req).unwrap();
         let info = PROVIDER_CATALOG.iter().find(|p| p.name == name).unwrap();
         assert!(
@@ -186,11 +187,12 @@ mod tests {
     #[test]
     fn test_route_tool_calling_prefers_capable() {
         let router = CapabilityRouter::new();
-        let req = LlmRequest::new("test", "use tools").with_tools(vec![Tool {
+        let mut req = LlmRequest::new("test", "use tools");
+        req.tools = vec![Tool {
             name: "search".into(),
             description: "search".into(),
             input_schema: "{}".into(),
-        }]);
+        }];
         let name = router.route(&req).unwrap();
         let info = PROVIDER_CATALOG.iter().find(|p| p.name == name).unwrap();
         assert!(

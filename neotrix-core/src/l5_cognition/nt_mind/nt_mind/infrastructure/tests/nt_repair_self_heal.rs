@@ -1,7 +1,7 @@
 //! NT-REPAIR Self-Heal Integration Tests (Track 3: D22/D26/D27/D28)
 //! Verifies the self-healing loop: monitoring → diagnosis → heal → retest
 
-use crate::core::nt_core_self::self_audit::{scan_system_health, scan_disk_pressure, scan_memory_pressure, scan_build_status, scan_test_flakiness, AuditSeverity};
+use crate::l6_meta::nt_core_self::self_audit::{scan_system_health, scan_disk_pressure, scan_memory_pressure, scan_build_status, scan_test_flakiness, AuditSeverity};
 use crate::l5_cognition::nt_mind::evolution::autofixer::HealerRegistry;
 use std::fs;
 use std::env;
@@ -98,7 +98,7 @@ async fn test_test_flakiness_monitoring() {
 //     bg.emit_restart_signal("test_module").await;
 //     
 //     // Test alert emission
-//     use crate::core::nt_core_self::self_audit::AuditFinding;
+//     use crate::l6_meta::nt_core_self::self_audit::AuditFinding;
 //     let findings = vec![
 //         AuditFinding {
 //             category: "test-flake".to_string(),

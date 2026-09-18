@@ -21,7 +21,7 @@ impl CliCommand for PluginCmd {
                     Ok(rt) => rt,
                     Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
                 };
-                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
+                let registry = crate::l1_action::nt_io::nt_io_plugin::registry::global_registry();
                 let plugins = rt.block_on(registry.list());
                 if plugins.is_empty() {
                     return CommandOutput::ok("No plugins registered. Use /plugin load <path> to load from a directory.");
@@ -42,7 +42,7 @@ impl CliCommand for PluginCmd {
                     Ok(rt) => rt,
                     Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
                 };
-                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
+                let registry = crate::l1_action::nt_io::nt_io_plugin::registry::global_registry();
                 match rt.block_on(registry.load_from_dir(&dir)) {
                     Ok(loaded) => {
                         let count: usize = loaded.len();
@@ -60,7 +60,7 @@ impl CliCommand for PluginCmd {
                     Ok(rt) => rt,
                     Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
                 };
-                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
+                let registry = crate::l1_action::nt_io::nt_io_plugin::registry::global_registry();
                 match rt.block_on(registry.unregister(name)) {
                     Ok(()) => CommandOutput::ok(&format!("Plugin '{}' unregistered.", name)),
                     Err(e) => CommandOutput::err(&format!("Failed to unregister '{}': {}", name, e)),
@@ -75,7 +75,7 @@ impl CliCommand for PluginCmd {
                     Ok(rt) => rt,
                     Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
                 };
-                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
+                let registry = crate::l1_action::nt_io::nt_io_plugin::registry::global_registry();
                 let plugins = rt.block_on(registry.list());
                 match plugins.iter().find(|p| p.name == name) {
                     Some(p) => {
@@ -93,7 +93,7 @@ impl CliCommand for PluginCmd {
                     return CommandOutput::err("Usage: /plugin watch <dir>");
                 }
                 let dir = PathBuf::from(path);
-                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
+                let registry = crate::l1_action::nt_io::nt_io_plugin::registry::global_registry();
                 match registry.watch_dir(dir.clone()) {
                     Ok(_handle) => CommandOutput::ok(&format!("Hot-plug watching: {} (新增插件自动 load, 删除自动 unregister)", dir.display())),
                     Err(e) => CommandOutput::err(&format!("Failed to watch {}: {}", path, e)),

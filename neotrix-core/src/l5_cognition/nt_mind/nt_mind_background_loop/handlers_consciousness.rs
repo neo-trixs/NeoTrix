@@ -455,7 +455,7 @@ impl BackgroundLoopHandle {
             // (Dark Forest), 且每 tick 沉淀一条训练样本 (The Spice Must Flow)。
             {
                 use crate::l2_perception::nt_core_e8_predictor::{load as predictor_load, persist as predictor_persist};
-                use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+                use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
                 let mut predictor = predictor_load();
                 // 六阶段 → 6 位卦象 (每阶段 2 位: 阶段主域 + 状态位), 形成 64 态子空间映射
                 let stage_code = |phase: u8, state_bit: u8| -> u8 {
@@ -1270,13 +1270,13 @@ impl BackgroundLoopHandle {
     pub(crate) async fn handle_architecture_audit(&mut self) {
         use crate::l5_cognition::nt_core_consciousness::inner_critic::InnerCritic;
         use crate::l5_cognition::nt_core_gwt::monitor::EntropyMonitor;
-        use crate::core::nt_core_meta::metacognition_loop::MetaCognitiveLoop;
-        use crate::core::nt_core_meta::monitor::MetaMonitor;
-        use crate::core::nt_core_meta::nt_core_arch_lint::ArchLint;
-        use crate::core::nt_core_meta::scanner::CodeScanner;
-        use crate::core::nt_core_meta::self_model::SelfModel;
+        use crate::l6_meta::nt_meta::metacognition_loop::MetaCognitiveLoop;
+        use crate::l6_meta::nt_meta::monitor::MetaMonitor;
+        use crate::l6_meta::nt_meta::nt_core_arch_lint::ArchLint;
+        use crate::l6_meta::nt_meta::scanner::CodeScanner;
+        use crate::l6_meta::nt_meta::self_model::SelfModel;
         use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
-        use crate::core::nt_core_self::self_audit::{converge_check, ConvergeCheckFn};
+        use crate::l6_meta::nt_core_self::self_audit::{converge_check, ConvergeCheckFn};
         use crate::l6_meta::nt_core_self_review::SelfReviewGate;
         use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
@@ -1366,11 +1366,11 @@ impl BackgroundLoopHandle {
         // GAP-2 (T3): converge_check 发现统一汇入 MetaAuditor — 使审计器成为真实消费端,
         // 不再是仅测试调用的空转检测件 (R-P79 生产接线)。
         for f in &report.findings {
-            use crate::core::nt_core_meta::nt_core_meta_auditor::AuditorFinding;
+            use crate::l6_meta::nt_meta::nt_core_meta_auditor::AuditorFinding;
             let severity = match f.severity {
-                crate::core::nt_core_self::self_audit::AuditSeverity::Error => 0.9,
-                crate::core::nt_core_self::self_audit::AuditSeverity::Warning => 0.6,
-                crate::core::nt_core_self::self_audit::AuditSeverity::Info => 0.3,
+                crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Error => 0.9,
+                crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Warning => 0.6,
+                crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Info => 0.3,
             };
             meta_auditor.record_finding(AuditorFinding {
                 file: f.file.clone(),
@@ -1384,7 +1384,7 @@ impl BackgroundLoopHandle {
         // converge_check 是 code-only; 本块把其输出作为"产出物证据信号"输入
         // MultiSignalEval, 综合判定架构健康度并写入 KB (R-P36 行为接地)。
         {
-            use crate::core::nt_core_self::self_audit::MultiSignalEval;
+            use crate::l6_meta::nt_core_self::self_audit::MultiSignalEval;
             let eval = MultiSignalEval::new(0.7);
             let mut signals = Vec::new();
             signals.push(eval.signal_syntax_ok(
@@ -1519,7 +1519,7 @@ impl BackgroundLoopHandle {
                 let _ = kb.kv_set("consciousness", "write_guard_audit", evidence);
             }
             if matches!(check.status, CheckStatus::Failed) {
-                use crate::core::nt_core_meta::nt_core_meta_auditor::AuditorFinding;
+                use crate::l6_meta::nt_meta::nt_core_meta_auditor::AuditorFinding;
                 meta_auditor.record_finding(AuditorFinding {
                     file: "nt_memory_write_guard".into(),
                     category: "write_guard_anomaly".into(),
@@ -1611,7 +1611,7 @@ impl BackgroundLoopHandle {
         // ── P0 多信号产出物级验证 (DSAgentBench, T2 注册) ──
         // T3 接线: converge_check 输出补强为产出物级验证 (下方 handle_architecture_audit)。
         self_tests.register(Box::new(
-            crate::core::nt_core_self::self_audit::MultiSignalEval::new(1.0),
+            crate::l6_meta::nt_core_self::self_audit::MultiSignalEval::new(1.0),
         ));
         self_tests.register(Box::new(
             crate::core::nt_core_telemetry::TelemetryStore::new(100),
@@ -1689,7 +1689,7 @@ impl BackgroundLoopHandle {
             }
         } else {
             self_tests.register(Box::new(
-                crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector::new(),
+                crate::l6_meta::nt_meta::knowledge_gap_detector::KnowledgeGapDetector::new(),
             ));
         }
 
@@ -1808,7 +1808,7 @@ impl BackgroundLoopHandle {
 
         // ── L1 Shield + IO SelfTest registrations ──
         // (disabled: these types don't implement SelfTest yet)
-        self_tests.register(Box::new(crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
+        self_tests.register(Box::new(crate::l1_action::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
 
         // ── Run registry self-tests for remaining modules ──
         let results = self_tests.run_all();
@@ -1820,7 +1820,7 @@ impl BackgroundLoopHandle {
                 log::warn!("{}", r.summary());
                 failure_count += 1;
                 // GAP-2 (T3): SelfTest 失败同样汇入 MetaAuditor (R-P79 生产消费)。
-                use crate::core::nt_core_meta::nt_core_meta_auditor::AuditorFinding;
+                use crate::l6_meta::nt_meta::nt_core_meta_auditor::AuditorFinding;
                 meta_auditor.record_finding(AuditorFinding {
                     file: r.name.clone(),
                     category: "selftest_failure".to_string(),
@@ -1959,7 +1959,7 @@ impl BackgroundLoopHandle {
             }
         }
         // NT-MEMORY: 叙事一致性 / 知识缺口
-        let narrative_ok = crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new().self_test().is_ok();
+        let narrative_ok = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new().self_test().is_ok();
         results.push(if narrative_ok {
             crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency")
         } else {

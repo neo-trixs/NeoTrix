@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use super::emotion_engine::EmotionEngine;
-use crate::core::nt_core_self::emotion_state::EmotionLabel;
+use crate::l6_meta::nt_core_self::emotion_state::EmotionLabel;
 
 /// VTuber 情感引擎 — Open-LLM-VTuber 核心
 /// 委托文本情绪检测给 FeelEngine，自身负责角色人格与表达

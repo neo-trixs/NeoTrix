@@ -1,17 +1,6 @@
 use super::GroupManager;
 use super::types::Task;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TaskType {
-    General = 0,
-    Design = 1,
-    CodeAnalysis = 2,
-    CodeGeneration = 3,
-    CodeReview = 4,
-    Security = 5,
-    Planning = 6,
-    UIDesign = 8,
-}
+pub use neotrix_types::core::TaskType;
 
 #[derive(Debug, Clone)]
 pub struct Context {

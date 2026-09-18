@@ -10,7 +10,7 @@ pub const GEO_REGIONS: &[&str] = &["", "US", "EU", "ASIA", "OTHER"];
 use rand::Rng;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::neotrix::nt_io_http_factory::{TlsVariant, H2SettingsProfile};
+use crate::l1_action::nt_io::nt_io_http_factory::{TlsVariant, H2SettingsProfile};
 use super::system_fingerprint::Platform;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -65,7 +65,7 @@ impl FingerprintBandit {
     /// 加载持久化的 bandit（如果存在），否则新建
     pub fn load() -> Self {
         let bandit = Self::new();
-        if let Some(content) = crate::core::nt_core_state::load("bandit") {
+        if let Some(content) = crate::l5_cognition::nt_core_state::load("bandit") {
             if let Ok(loaded) = serde_json::from_str::<Vec<(ComboArm, u64, u64)>>(&content) {
                 for (arm, success, fail) in loaded {
                     for (a, stats) in &bandit.arms {
@@ -94,7 +94,7 @@ impl FingerprintBandit {
             (a.clone(), s.success.load(Ordering::Relaxed), s.fail.load(Ordering::Relaxed))
         }).collect();
         if let Ok(json) = serde_json::to_string_pretty(&data) {
-            if let Err(e) = crate::core::nt_core_state::save("bandit", &json) {
+            if let Err(e) = crate::l5_cognition::nt_core_state::save("bandit", &json) {
                 log::warn!("[bandit] save to KB: {}", e);
             }
         }
@@ -244,8 +244,8 @@ fn sample_gamma(rng: &mut impl Rng, shape: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_io_http_factory::{TlsVariant, H2SettingsProfile};
-    use crate::neotrix::nt_shield_stealth_net::system_fingerprint::Platform;
+    use crate::l1_action::nt_io::nt_io_http_factory::{TlsVariant, H2SettingsProfile};
+    use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::system_fingerprint::Platform;
 
     fn test_arm(tls: TlsVariant, platform: Platform) -> ComboArm {
         ComboArm { tls, platform, h2_profile: H2SettingsProfile::ChromeDefault, geo_tag: String::new() }
@@ -290,7 +290,7 @@ mod tests {
         let bandit = FingerprintBandit::new();
         let best = test_arm(TlsVariant::LegacyHttp11, Platform::MacOS);
         let worst = test_arm(TlsVariant::ModernH2, Platform::Windows);
-        use crate::neotrix::nt_io_http_factory::H2SettingsProfile;
+        use crate::l1_action::nt_io::nt_io_http_factory::H2SettingsProfile;
         // Train all 4 h2 variants of the best/worst pattern so they dominate
         let mut train_arms = Vec::new();
         for h2 in H2SettingsProfile::all() {
@@ -300,8 +300,8 @@ mod tests {
             train_arms.push(w);
         }
         // Also train all TLS/platform combos to push them down
-        for tls in crate::neotrix::nt_io_http_factory::TlsVariant::all() {
-            for plat in crate::neotrix::nt_shield_stealth_net::system_fingerprint::Platform::all().iter().take(3) {
+        for tls in crate::l1_action::nt_io::nt_io_http_factory::TlsVariant::all() {
+            for plat in crate::l3_embodiment::nt_shield::nt_shield_stealth_net::system_fingerprint::Platform::all().iter().take(3) {
                 for h2 in H2SettingsProfile::all() {
                     let cnt = if *tls == TlsVariant::LegacyHttp11 { train_arms.iter().filter(|a| a.tls == *tls).count() as u64 } else { 0 };
                     if cnt == 0 {

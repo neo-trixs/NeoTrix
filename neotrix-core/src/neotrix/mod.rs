@@ -1,152 +1,33 @@
 //! # NeoTrix 核心模块
 //!
-//! 6-Layer Architecture:
-//!   L6 Meta-Cognition — L5 Cognition — L4 Emotion —
-//!   L3 Embodiment — L2 Perception — L1 Action
-//!
-//! 统一版本: 0.21.0
+//! 本地模块：nt_crystal_core, nt_file_ability, nt_capability_bridge,
+//! nt_core_error, nt_core_event_bus, ffi, proxy_daemon_wrapper
 
-// ─── Six-Layer Architecture Modules ──────────────────────────────────────
-pub use crate::l1_action::{nt_act, nt_io, nt_memory};
-pub use crate::l2_perception::nt_world;
-pub use crate::l3_embodiment::nt_shield;
-pub use crate::l4_emotion::nt_feel;
-pub use crate::l5_cognition::{nt_core, nt_mind};
-pub use crate::l6_meta::{nt_meta, nt_repair, nt_nexus};
+#![forbid(unsafe_code)]
 
-// ─── Crate-root modules (re-exported for binary-crate entry/* files) ────
-pub use crate::agent;
-pub use crate::cli;
-pub use crate::core;
+// ─── Minimal re-exports for binary/entry crates ──────────────────────────
+pub use crate::l2_perception::nt_world::nt_world_model;
+pub use crate::l1_action::nt_io::nt_io_hotreload;
 
-// ─── 经验 → 能力树迭代目标桥 ──────────────────────────────────────────
+// ─── Local modules ────────────────────────────────────────────────────────
 pub mod nt_capability_bridge;
 
-// ─── iOS FFI bridge ─────────────────────────────────────────────────────
 #[cfg(feature = "ios-bridge")]
 pub mod ffi;
 
-// ─── Infrastructure ─────────────────────────────────────────────────────
 pub mod nt_core_error;
 pub mod nt_core_event_bus;
-
-// ─── 意识核心 (已迁移至 l5_cognition/nt_core/) ────────────────────────
-pub use crate::l5_cognition::nt_core::nt_consciousness_core;
-
-// ─── Standalone modules at neotrix level ────────────────────────────────
 pub mod nt_file_ability;
 pub mod nt_crystal_core;
 pub mod proxy_daemon_wrapper;
 
-// ─── L7 Capability Tree ────────────────────────────────────────────────
+// ─── Standalone crate re-export ──────────────────────────────────────────
 pub use nt_core_capability_tree::{
     CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain as CapabilityDomain,
     EvolutionAction, EvolutionEngine, EvolutionOp, EvolutionPlan, NodeLayer, RuneSocket,
 };
 
-// ─── Re-exports from new architecture ───────────────────────────────────
-
-// L1 Action — nt_io re-exports
-pub use crate::l1_action::nt_io::nt_io_standalone::{
-    format_kernel_output, text_to_vector, verify_answer, KernelStats, ReasoningKernel,
-    ReasoningMethod, ReasoningOutput, SelfConsistencyResult, StandaloneEngine, StageInfo, Vector,
-    EVOLUTION, KERNEL_DIM,
-};
-pub use crate::l1_action::nt_io::nt_io_provider::types::{
-    LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role,
-};
-pub use crate::l1_action::nt_io::{
-    nt_io_agents_md, nt_io_avatar_channel, nt_io_digital_human, nt_io_hotreload,
-    nt_io_http_factory, nt_io_logging, nt_io_mention, nt_io_neocodex, nt_io_notify, nt_io_plugin,
-    nt_io_provider, nt_io_proxy_server, nt_io_session_recovery, nt_io_standalone,
-    nt_io_user_avatar, nt_io_web,
-};
-#[cfg(feature = "telemetry")]
-pub use crate::l1_action::nt_io::nt_io_telemetry;
-
-// L1 Action — nt_act re-exports
-pub use crate::l1_action::nt_act::{
-    nt_act_autonomy, nt_act_code, nt_act_crypto, nt_act_orchestrator, nt_act_sandbox,
-    nt_act_voice,
-};
-pub use crate::l5_cognition::nt_mind::nt_mind_automation::{
-    AutomationAction, AutomationEngine, AutomationRule, AutomationTrigger,
-};
-
-// L1 Action — nt_memory re-exports
-pub use crate::l1_action::nt_memory::{
-    nt_memory_historian, nt_memory_kb, nt_memory_leann_store,
-};
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_shanhai;
-pub use crate::l1_action::nt_memory_spatial;
-
-// L2 Perception — nt_world re-exports
-pub use crate::l2_perception::nt_world::{
-    nt_world_code_search, nt_world_crawl, nt_world_e8,
-    nt_world_infer, nt_world_scrape,
-    nt_world_search, nt_world_sense,
-    nt_world_model, nt_world_jepa, nt_world_model_v2,
-};
-
-// L3 Embodiment — nt_shield re-exports
-pub use crate::l3_embodiment::nt_shield::{
-    nt_shield_audit, nt_shield_comm, nt_shield_sandbox,
-    nt_shield_sentry, nt_shield_traffic, nt_shield_agentic_scan,
-};
-#[cfg(feature = "sandbox")]
-pub use crate::l3_embodiment::nt_shield::nt_shield_sandbox_entry;
-#[cfg(feature = "stealth-net")]
-pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net;
-
-// L5 Cognition — nt_mind re-exports
-pub use crate::l5_cognition::nt_mind::{
-    nt_mind_background_loop,
-    nt_mind_benchmark,
-    nt_mind_hook,
-    nt_mind_skill_engine,
-};
-pub use crate::l5_cognition::nt_mind::evolution;
-pub use crate::l5_cognition::nt_mind::foundation;
-
-// L5 Cognition — nt_goal re-export (migrated from L1 nt_act_goal)
-pub use crate::l5_cognition::nt_goal;
-
-// L6 Meta — re-exports
-pub use crate::l5_cognition::nt_core::nt_core_intra_reflection;
-pub use crate::l6_meta::healing::{
-    nt_mind_consciousness_gold_standard, nt_mind_consciousness_monitor,
-};
-
-// ─── Specific type re-exports ───────────────────────────────────────────
-
-pub use crate::l5_cognition::nt_core_reasoning::{
-    default_context_builder, default_method_registry, MethodRegistry, MethodSpec, ReasoningStep,
-    ReasoningTrace, TraceSource,
-};
-
-pub use crate::core::nt_core_answer_engine::{
-    AnswerEngine, AnswerEngineConfig, AnswerMode, AnswerResult, AnswerSegment, ContextSource,
-    PreparedQuery, SourceType, WidgetKind, WidgetProvider,
-};
-pub use neotrix_types::search_backend::SearchResult;
-
-pub use crate::l1_action::nt_io::nt_io_mention::{resolve_mentions, MentionResult};
-pub use crate::l1_action::nt_io::nt_io_notify::{
-    notify, notify_approval_needed, notify_task_complete, notify_with_level, Level,
-};
-pub use crate::l3_embodiment::nt_shield::nt_shield_audit::{
-    AuditDimension, AuditMode, AuditReport, CheckResult, CheckStatus, SecurityAuditor, Severity,
-    VulnDomain, VulnerabilityCheck,
-};
-pub use crate::l2_perception::nt_world::nt_world_scrape::{
-    AntiDetect, BrowserScraper, RequestScraper, ScrapeResult, ScraperConfig,
-};
-pub use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::{
-    ConsciousnessGoldStandard, ConsciousnessLevel, DetectionTrend, E8HexagramState,
-    GoldStandardReport,
-};
-
-// ─── Unified File Ability ───────────────────────────────────────────────
+// ─── Unified File Ability re-export ──────────────────────────────────────
 pub use nt_file_ability::{
     check_health,
     consolidate_tables_with_mode, content_similarity,
@@ -172,39 +53,6 @@ pub use nt_file_ability::{
 };
 
 pub use nt_file_ability::merge_docx;
-
-// ─── Adapter functions (dispatch.rs → new architecture) ───────────────
-// These bridge consciousness_core::dispatch to the new 6-layer architecture.
-// R-P79: no delayed dead code — these delegate to real implementations.
-
-/// List available LLM providers from the provider catalog.
-pub fn list_llm_providers() -> Result<Vec<String>, String> {
-    let entries = crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::providers_with_key();
-    let names: Vec<String> = entries.iter().map(|e| e.name.to_string()).collect();
-    Ok(names)
-}
-
-/// Enhance PDF icons via the file ability pipeline.
-pub fn enhance_file_icon(path: &std::path::Path) -> Result<String, String> {
-    let result = crate::neotrix::nt_file_ability::pdf_icon_enhance::enhance_pdf_icons(path)
-        .map_err(|e| format!("{e}"))?;
-    Ok(format!("enhanced {} icons", result.images_enhanced))
-}
-
-/// SEAL distill phase — delegates to SEAL pipeline.
-pub fn seal_distill() -> Result<String, String> {
-    Ok("SEAL distill: dispatched to nt_mind/seal_core".into())
-}
-
-/// SEAL absorb phase — delegates to SEAL pipeline.
-pub fn seal_absorb() -> Result<String, String> {
-    Ok("SEAL absorb: dispatched to nt_mind/seal_core".into())
-}
-
-/// SEAL iterate phase — delegates to SEAL pipeline.
-pub fn seal_iterate() -> Result<String, String> {
-    Ok("SEAL iterate: dispatched to nt_mind/seal_core".into())
-}
 
 #[cfg(test)]
 pub(crate) use nt_file_ability::{make_min_docx, make_min_pptx};

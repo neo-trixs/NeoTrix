@@ -12,12 +12,12 @@ use crate::l5_cognition::nt_goal::{
     EvolutionGoal, GoalCategory,
 };
 use crate::l5_cognition::nt_goal::behavioral_verifier::VerificationLevel;
-use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
+use crate::l2_perception::nt_world::nt_world_infer::ActiveInferenceEngine;
 use crate::l5_cognition::nt_core::nt_iit_phi::IITPhiCalculator;
 use crate::l6_meta::nt_core_absorb::spec_driven::{
     SpecDrivenPipeline, SpecPipelineConfig, EvolutionSpec, SpecDiff, SpecStatus,
 };
-use crate::neotrix::nt_world_code_search::CodeSearchEngine;
+use crate::l2_perception::nt_world::nt_world_code_search::CodeSearchEngine;
 use std::path::PathBuf;
 
 // ============================================================

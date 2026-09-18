@@ -274,6 +274,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for FakeProvider {
+    fn set_proxy(&mut self, _proxy_url: &str) {}
     fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
         crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
@@ -294,12 +295,14 @@ mod tests {
 
     fn fake_ok() -> Arc<FakeProvider> {
         Arc::new(FakeProvider {
-            result: Ok(LlmResponse::plain(
-                "fake-ok".into(),
-                "fake-model".into(),
-                Usage::default(),
-                FinishReason::Stop,
-            )),
+            result: Ok(LlmResponse {
+                content: "fake-ok".into(),
+                model: "fake-model".into(),
+                usage: Usage::default(),
+                finish_reason: FinishReason::Stop,
+                tool_calls: None,
+                reasoning: None,
+            }),
         })
     }
 

@@ -119,7 +119,7 @@ mod tests {
     use super::*;
     use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
     use crate::core::nt_core_cap::CapabilityVector;
-    use crate::core::{RewardSource, TaskType};
+    use crate::l2_perception::nt_core_knowledge::{RewardSource, TaskType};
     use chrono::Utc;
 
     fn make_memory(reward: f64, success: bool, id: &str, ts: i64) -> ReasoningMemory {

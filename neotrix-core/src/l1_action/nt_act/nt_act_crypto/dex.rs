@@ -324,7 +324,7 @@ mod tests {
     #[test]
     fn test_get_reserves_error_on_bad_rpc() {
         let chain = ChainType::Ethereum;
-        let config = crate::neotrix::nt_act_crypto::chain::ChainConfig::new(
+        let config = crate::l1_action::nt_act::nt_act_crypto::chain::ChainConfig::new(
             chain,
             "https://invalid-rpc.example.com",
         );

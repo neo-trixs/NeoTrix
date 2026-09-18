@@ -13,9 +13,9 @@ use super::{api, AgentStatus, SessionInfo, AppState};
 
 const FRONTEND_HTML: &str = include_str!("frontend.html");
 
-/// OpenAPI 3.0 规范 — 单一事实源在 docs/6-REFERENCE/openapi.yaml (R-P83),
+/// OpenAPI 3.0 规范 — 单一事实源在 docs/7-REFERENCE/openapi.yaml (R-P83),
 /// 构建期嵌入, 服务端 /openapi.yaml 直接提供 (不再只有静态文档)。
-const OPENAPI_YAML: &str = include_str!("../../../../../docs/6-REFERENCE/openapi.yaml");
+const OPENAPI_YAML: &str = include_str!("../../../../../docs/7-REFERENCE/openapi.yaml");
 
 pub async fn handle_frontend() -> impl IntoResponse {
     Html(FRONTEND_HTML)
@@ -253,7 +253,7 @@ fn handle_ws_text(
 pub async fn start_server_with(
     port: u16,
     brain: Box<dyn crate::core::nt_core_traits::BrainProvider>,
-    bank: crate::core::ReasoningBank,
+    bank: crate::l1_action::nt_core_bank::bank::ReasoningBank,
 ) {
 
     // Read api_token from config.toml
@@ -318,14 +318,14 @@ pub async fn start_server_with(
     let mut app = build_router(state.clone());
 
     // Merge KB API routes if KnowledgeBase can be opened
-    if let Some(kb_state) = crate::neotrix::nt_memory_kb::nt_memory_api::KbApiState::try_open_default() {
-        let kb_router = crate::neotrix::nt_memory_kb::nt_memory_api::build_kb_router(kb_state);
+    if let Some(kb_state) = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_api::KbApiState::try_open_default() {
+        let kb_router = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_api::build_kb_router(kb_state);
         app = app.merge(kb_router);
     }
 
     // Merge EWHR API routes if KB can be opened
-    if let Some(ewhr_state) = crate::neotrix::nt_memory_historian::EvidenceApiState::try_open_default() {
-        let ewhr_router = crate::neotrix::nt_memory_historian::build_ewhr_router(ewhr_state);
+    if let Some(ewhr_state) = crate::l1_action::nt_memory::nt_memory_historian::EvidenceApiState::try_open_default() {
+        let ewhr_router = crate::l1_action::nt_memory::nt_memory_historian::build_ewhr_router(ewhr_state);
         app = app.merge(ewhr_router);
     }
 

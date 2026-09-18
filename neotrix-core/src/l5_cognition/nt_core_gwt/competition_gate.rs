@@ -154,7 +154,7 @@ impl CompetitionGate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::default_specialist_states;
+    use crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states;
 
     #[test]
     fn test_hard_wta_selects_highest() {

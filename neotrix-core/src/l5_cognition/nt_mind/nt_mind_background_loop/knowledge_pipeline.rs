@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::l5_cognition::nt_mind::foundation::knowledge_store::{KnowledgeStore, L1KnowledgeStore};
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l6_meta::nt_core_kb_types::NodeType;
 
 // ============================================================

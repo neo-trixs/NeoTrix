@@ -8,7 +8,7 @@
 //!   - SelfTestWriter: 解析函数签名, 生成针对性的测试用例
 
 use std::collections::HashMap;
-use crate::neotrix::nt_act_code::{CodeGenResult, CodeTemplateRegistry, TemplateCategory};
+use crate::l1_action::nt_act::nt_act_code::{CodeGenResult, CodeTemplateRegistry, TemplateCategory};
 
 /// 测试写入器
 pub struct SelfTestWriter {

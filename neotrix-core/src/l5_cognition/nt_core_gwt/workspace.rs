@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 
 use crate::l1_action::nt_core_harness::HarnessAdapter;
-use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 
 /// 按 SpecialistType 声明序取 module 索引（与 default_specialist_states / hexagram_states 同序）。
 /// BTreeMap<String, _> 的 values() 是 name-sort 序，与声明序不一致，绝不能按位置互用。
@@ -1094,7 +1094,7 @@ pub enum AttentionState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::default_specialist_states;
+    use crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states;
 
     fn make_workspace() -> GlobalWorkspace {
         let mut ws = GlobalWorkspace::new(0.3);
