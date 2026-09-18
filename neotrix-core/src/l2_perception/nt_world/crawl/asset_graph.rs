@@ -17,7 +17,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::core::nt_core_math::normalize_url;
+use crate::l5_cognition::nt_core_math::normalize_url;
 use crate::neotrix::nt_memory_kb::{KnowledgeBase, NodeType, RelationType};
 
 /// 资产层级: 从 URL 解析出 root_domain / subdomain / service / endpoint。
@@ -183,7 +183,7 @@ impl ScopeFrontier {
     }
 }
 
-// normalize_url 已统一到 crate::core::nt_core_math::normalize_url
+// normalize_url 已统一到 crate::l5_cognition::nt_core_math::normalize_url
 
 /// 多 scope 探索图管理器: scope → ScopeFrontier。
 #[derive(Default)]

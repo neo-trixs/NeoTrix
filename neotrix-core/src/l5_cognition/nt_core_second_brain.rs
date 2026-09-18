@@ -145,7 +145,7 @@ impl SecondBrain {
         let title = format!("session_note_{}", ts);
         let _ = kb.insert_or_get_node(
             &title,
-            crate::core::nt_core_kb_types::NodeType::Idea,
+            crate::l6_meta::nt_core_kb_types::NodeType::Idea,
             Some(note),
             None,
             Some("second_brain"),
@@ -162,7 +162,7 @@ impl SecondBrain {
         let title = format!("session_note_{}", ts);
         let _ = kb.insert_or_get_node(
             &title,
-            crate::core::nt_core_kb_types::NodeType::Idea,
+            crate::l6_meta::nt_core_kb_types::NodeType::Idea,
             Some(note),
             None,
             Some("second_brain"),
@@ -182,7 +182,7 @@ impl SecondBrain {
         kb.upsert_edge(
             source_id,
             target_id,
-            crate::core::nt_core_kb_types::RelationType::Related,
+            crate::l6_meta::nt_core_kb_types::RelationType::Related,
             weight,
             Some(relation.as_str()),
         )?;
@@ -192,11 +192,11 @@ impl SecondBrain {
     pub fn build_wiki_graph(&self) -> Result<BrainWikiGraph, String> {
         let kb = self.kb.as_ref().ok_or("KB not attached")?;
         let nodes = kb.search_by_type(
-            &crate::core::nt_core_kb_types::NodeType::WikiPage,
+            &crate::l6_meta::nt_core_kb_types::NodeType::WikiPage,
             10000,
         )?;
         let all_emotion_nodes = kb.search_by_type(
-            &crate::core::nt_core_kb_types::NodeType::Idea,
+            &crate::l6_meta::nt_core_kb_types::NodeType::Idea,
             1000,
         )?;
 
@@ -282,13 +282,13 @@ impl SecondBrain {
         let session_notes = kb.kv_list("session_notes").unwrap_or_default();
         let conn = kb.conn.lock().map_err(|e| e.to_string())?;
         let node_count =
-            crate::core::nt_core_kb_primitives::count_nodes(&conn)
+            crate::l6_meta::nt_core_kb_primitives::count_nodes(&conn)
                 .map_err(|e| e.to_string())?;
         let edge_count =
-            crate::core::nt_core_kb_primitives::count_edges(&conn)
+            crate::l6_meta::nt_core_kb_primitives::count_edges(&conn)
                 .map_err(|e| e.to_string())?;
         let wiki_pages = kb.search_by_type(
-            &crate::core::nt_core_kb_types::NodeType::WikiPage,
+            &crate::l6_meta::nt_core_kb_types::NodeType::WikiPage,
             10000,
         )?;
 

@@ -1,6 +1,6 @@
 use super::axis::DimensionAxis;
 use super::coord::HyperCoord;
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -265,8 +265,8 @@ fn cosine_16d(a: &[f64; 16], b: &[f64; 16]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hcube::axis::DimensionAxis;
-    use crate::core::nt_core_hcube::coord::HyperCoord;
+    use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
+    use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
 
     fn test_coord(x: f64) -> HyperCoord {
         let mut c = HyperCoord::new();

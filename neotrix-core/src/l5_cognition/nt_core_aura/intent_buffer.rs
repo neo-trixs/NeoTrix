@@ -56,7 +56,7 @@ impl IntentBuffer {
             Some(v) => v,
             None => return 0.0,
         };
-        1.0 - crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA::similarity(current, previous)
+        1.0 - crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA::similarity(current, previous)
     }
 
     pub fn most_common_intent(&self) -> Option<String> {
@@ -97,12 +97,12 @@ mod tests {
             inferred_intent: Some(intent.to_string()),
             confidence: 0.9,
             intent_vector: Some(vector),
-            phase: crate::core::nt_core_aura::intent_frame::IntentPhase::Resolved,
+            phase: crate::l5_cognition::nt_core_aura::intent_frame::IntentPhase::Resolved,
         }
     }
 
     fn fake_vector(value: u8) -> Vec<u8> {
-        vec![value; crate::core::nt_core_hcube::vsa_quantized::VSA_DIM]
+        vec![value; crate::l2_perception::nt_core_hcube::vsa_quantized::VSA_DIM]
     }
 
     #[test]

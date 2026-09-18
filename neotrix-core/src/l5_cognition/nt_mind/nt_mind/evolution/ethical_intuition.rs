@@ -7,7 +7,7 @@
 //! - 直觉校准：从反馈中持续校准直觉权重
 //! - 可解释性：输出判断依据的案例映射链
 
-use crate::core::nt_core_kb_primitives::now;
+use crate::l6_meta::nt_core_kb_primitives::now;
 use crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::{
     AnalogicalResult, CaseBase, ConflictType, EthicalCase, Severity,
 };
@@ -478,7 +478,7 @@ impl EthicalIntuitionRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_kb_primitives::schema_initialize;
+    use crate::l6_meta::nt_core_kb_primitives::schema_initialize;
     use rusqlite::Connection;
 
     fn mem_conn() -> Connection {

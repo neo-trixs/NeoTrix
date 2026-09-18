@@ -208,7 +208,7 @@ impl CortexCmd {
         if !causal.exists() {
             return CommandOutput::warn(&format!("外置大脑未挂载或 causal_graph.json 缺失: {CORTEX_CAUSAL}"));
         }
-        match crate::core::nt_core_e8::abduction::causal_graph::CausalGraph::from_cortex_json(causal) {
+        match crate::l2_perception::nt_core_e8::abduction::causal_graph::CausalGraph::from_cortex_json(causal) {
             Ok(g) => {
                 let summary = format!(
                     "E8 因果图: {} 节点 / {} 链路\n挂载源: {CORTEX_CAUSAL}",
@@ -343,7 +343,7 @@ impl CortexCmd {
             Ok(c) => c,
             Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
         };
-        match crate::core::nt_core_e8::abduction::causal_graph::CausalGraph::from_cortex_json(&causal) {
+        match crate::l2_perception::nt_core_e8::abduction::causal_graph::CausalGraph::from_cortex_json(&causal) {
             Ok(g) => match ingest_causal_graph(&conn, &g, Some(&causal)) {
                 Ok(n) => CommandOutput::ok(&format!(
                     "causal-ingest: 从 {} 蒸馏 {} 个高信号节点进 live KB (共 {} 节点/{} 边)",

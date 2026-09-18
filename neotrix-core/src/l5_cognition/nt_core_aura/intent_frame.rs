@@ -1,6 +1,6 @@
 use super::patterns::{match_patterns, IntentPattern};
-use crate::core::nt_core_hcube::cross_modal::CrossModalAligner;
-use crate::core::nt_core_hcube::vsa_quantized::VSA_DIM;
+use crate::l2_perception::nt_core_hcube::cross_modal::CrossModalAligner;
+use crate::l2_perception::nt_core_hcube::vsa_quantized::VSA_DIM;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IntentPhase {

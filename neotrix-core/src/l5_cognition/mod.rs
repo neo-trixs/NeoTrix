@@ -10,7 +10,6 @@ pub mod nt_goal;
 /// Consciousness modules
 pub mod nt_core_consciousness_core;
 pub mod nt_core_consciousness_tree;
-pub mod consciousness_core;
 /// Real-time Model Router
 pub mod nt_core_model_router;
 /// Skill Registry

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::types::*;
 
-pub use crate::core::nt_core_math::{hamming_distance, cosine_similarity_bytes as cosine_similarity};
+pub use crate::l5_cognition::nt_core_math::{hamming_distance, cosine_similarity_bytes as cosine_similarity};
 
 pub fn euclidean_distance(a: &[u8], b: &[u8]) -> f64 {
     let hd = hamming_distance(a, b);

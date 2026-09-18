@@ -1,7 +1,7 @@
 //! 叙事/节奏共享类型
 //!
 //! L4 认知层定义的基础数据类型，供 L5 (SEAL pipeline) 和 L6 (跨模块审计) 共用。
-//! 消除 L6→L5 直接依赖，所有层通过 `crate::core::nt_core_narrative_types` 引用。
+//! 消除 L6→L5 直接依赖，所有层通过 `crate::l5_cognition::nt_core_narrative_types` 引用。
 
 use serde::{Serialize, Deserialize};
 

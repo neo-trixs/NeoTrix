@@ -2,7 +2,7 @@
 //!
 //! core 层 (second_brain 等) 需要知识图谱节点/边类型枚举。
 //! 这些是纯 serde 枚举 (无状态、无 l3 依赖)，由 neotrix-types 提供单一定义，
-//! 此处 re-export 保持 `crate::core::nt_core_kb_types::*` 路径不变。
+//! 此处 re-export 保持 `crate::l6_meta::nt_core_kb_types::*` 路径不变。
 
 pub use neotrix_types::knowledge_access::{
     KnowledgeEdge, KnowledgeNode, NodeType, RelationType, TemporalValidity,

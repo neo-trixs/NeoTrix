@@ -4,12 +4,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 
 use super::iteration::Bm25Index;
-use crate::core::nt_core_bank::{
+use crate::l1_action::nt_core_bank::{
     MemoryDetailedStats, MemoryTier, ReasoningBankStats, ReasoningMemory,
 };
-use crate::core::nt_core_knowledge::TaskType;
-use crate::core::nt_core_kron::KroneckerCleanup;
-use crate::core::nt_core_walsh::WalshMemoryIndex;
+use crate::l2_perception::nt_core_knowledge::TaskType;
+use crate::l5_cognition::nt_core_kron::KroneckerCleanup;
+use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
 
 pub mod ext;
 pub mod maintenance;
@@ -23,7 +23,7 @@ pub struct ReasoningBank {
     task_type_index: HashMap<TaskType, Vec<usize>>,
     bm25: RwLock<Bm25Index>,
     bm25_dirty: AtomicBool,
-    hypergraph: Option<crate::core::nt_core_graph::HyperGraph>,
+    hypergraph: Option<crate::l1_action::nt_core_graph::HyperGraph>,
     wh_index: Option<WalshMemoryIndex>,
     pub(crate) kronecker: Option<KroneckerCleanup>,
 }

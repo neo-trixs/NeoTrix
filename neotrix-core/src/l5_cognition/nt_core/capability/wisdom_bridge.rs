@@ -7,8 +7,8 @@
 //! - `wisdom.paradigm_detect`:  {} → [hypotheses]
 
 use super::native_bus::{closure_capability, NativeBus};
-use crate::core::nt_core_meaning::{MeaningConstructor, MeaningContext};
-use crate::core::nt_core_paradigm::{Anomaly, ParadigmShiftDetector};
+use crate::l5_cognition::nt_core_meaning::{MeaningConstructor, MeaningContext};
+use crate::l5_cognition::nt_core_paradigm::{Anomaly, ParadigmShiftDetector};
 use serde_json::json;
 use std::sync::{Arc, RwLock};
 

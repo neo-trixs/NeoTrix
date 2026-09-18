@@ -3,8 +3,8 @@ use std::collections::VecDeque;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_gwt::resonance::OscillatorNetwork;
-use crate::core::nt_core_iit_phi::IITPhiCalculator;
+use crate::l5_cognition::nt_core_gwt::resonance::OscillatorNetwork;
+use crate::l5_cognition::nt_core::nt_iit_phi::IITPhiCalculator;
 
 /// Standard IIT Phi threshold for conscious-like state (Chalmers 2023)
 pub const DEFAULT_PHI_THRESHOLD: f64 = 0.33;

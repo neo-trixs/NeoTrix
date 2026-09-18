@@ -12,7 +12,7 @@
 //! of discrete modes becomes an aggregated continuous "thought" that can be
 //! compared, interpolated, and decoded back to the nearest mode.
 
-use crate::core::nt_core_hex::ReasoningHexagram;
+use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 use serde::{Deserialize, Serialize};
 
 /// Default latent dimension = number of E₈ hexagram states (64).

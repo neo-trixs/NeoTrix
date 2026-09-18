@@ -148,7 +148,7 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
         std::fs::create_dir_all(parent).map_err(|e| format!("KB dir: {}", e))?;
     }
     let conn = rusqlite::Connection::open(&path).map_err(|e| format!("KB open: {}", e))?;
-    crate::core::nt_core_kb_primitives::schema_initialize(&conn)
+    crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
         .map_err(|e| format!("KB init: {}", e))?;
     Ok(conn)
 }
@@ -156,7 +156,7 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
 /// 从持久化存储加载 E8 预测器实例
 ///
 /// 对应 `handlers_consciousness.rs` 线 356-358 的调用：
-/// `use crate::core::nt_core_e8_predictor::{load as predictor_load, persist as predictor_persist};`
+/// `use crate::l2_perception::nt_core_e8_predictor::{load as predictor_load, persist as predictor_persist};`
 /// `let mut predictor = predictor_load();`
 ///
 /// 行为：尝试从 KB kv_store (namespace=`e8_predictor`) 读取先前状态；
@@ -167,7 +167,7 @@ pub fn load() -> E8Predictor {
         Ok(c) => c,
         Err(_) => return E8Predictor::new(),
     };
-    let raw = match crate::core::nt_core_kb_primitives::kv_get(
+    let raw = match crate::l6_meta::nt_core_kb_primitives::kv_get(
         &conn,
         KB_NAMESPACE,
         KB_KEY,
@@ -195,7 +195,7 @@ pub fn persist(predictor: &E8Predictor) {
         Ok(j) => j,
         Err(_) => return,
     };
-    let _ = crate::core::nt_core_kb_primitives::kv_set(
+    let _ = crate::l6_meta::nt_core_kb_primitives::kv_set(
         &conn,
         KB_NAMESPACE,
         KB_KEY,

@@ -157,7 +157,7 @@ impl OfacFetcher {
             let summary = format!("{} | type={} | programs={}", evt.name, evt.sdn_type, evt.programs.join(","));
             let existing = kb.find_node_by_url(&evt.url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.name, crate::core::nt_core_kb_types::NodeType::Organization, Some(&summary), Some(&evt.url), Some("ofac"))
+            let _id = kb.insert_or_get_node(&evt.name, crate::l6_meta::nt_core_kb_types::NodeType::Organization, Some(&summary), Some(&evt.url), Some("ofac"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.id, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }

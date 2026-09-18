@@ -15,7 +15,7 @@ use super::consonance_orchestrator::{
 };
 use super::meta_observer::{MetaObservationReport, MetaObserver, MetaObserverConfig};
 use super::CapabilityNode;
-use crate::core::nt_core_consciousness_core::CoreSnapshot;
+use crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot;
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::neotrix::RuneSocket;
 use std::collections::HashMap;

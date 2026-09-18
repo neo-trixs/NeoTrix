@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use crate::core::CapabilityVector;
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 use crate::neotrix::nt_world_model::TaskType as WorldTaskType;
 use crate::l5_cognition::nt_mind::nt_mind::memory::ReasoningBank;
 use crate::l5_cognition::nt_mind::nt_mind::ReasoningBrain;
-use crate::core::nt_core_knowledge::KnowledgeSource;
-use crate::core::nt_core_bank::ReasoningMemory;
+use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
+use crate::l1_action::nt_core_bank::ReasoningMemory;
 use crate::l1_action::nt_io::nt_io_provider::{LlmError, LlmProvider, LlmRequest, LlmResponse};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

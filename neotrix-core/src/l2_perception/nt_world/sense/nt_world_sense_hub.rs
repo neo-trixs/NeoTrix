@@ -1,4 +1,4 @@
-use crate::core::nt_core_sense::*;
+use crate::l2_perception::nt_core_sense::*;
 use crate::neotrix::nt_world_sense::visual_cortex::VisualCortex;
 use crate::neotrix::nt_world_sense::auditory_cortex::AuditoryCortex;
 use crate::neotrix::nt_world_sense::real_sensors::screen::ScreenCapture;

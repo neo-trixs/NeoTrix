@@ -1,6 +1,6 @@
 use super::ReasoningBank;
-use crate::core::nt_core_bank::ReasoningMemory;
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l1_action::nt_core_bank::ReasoningMemory;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 
 impl ReasoningBank {
     pub fn initialize_all_knowledge_sources(&mut self) -> usize {

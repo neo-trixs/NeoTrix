@@ -8,7 +8,7 @@
 use super::nt_core_hex::strategy_matrix;
 use super::nt_core_hex::{evolve_strategy_entry, ReasoningHexagram};
 use super::nt_core_prm::{AgentTrajectory, ProcessScore};
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 use rand::Rng;
 
 /// Number of factorized energy dimensions per mode.

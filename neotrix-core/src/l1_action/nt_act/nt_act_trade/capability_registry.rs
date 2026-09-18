@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_capability::{
+use crate::l6_meta::nt_core_capability::{
     CapabilityError, CapabilityHealth, CapabilityInput as CoreCapabilityInput, CapabilityMeta,
     CapabilityOutput as CoreCapabilityOutput, CapabilityState, CapabilityStatus,
     CapabilityMetrics, Domain, Layer, UnifiedCapability,
@@ -168,7 +168,7 @@ pub struct CapabilityInfo {
 // 5. TradeCapabilityRegistry — 桥接全局 CapabilityRegistry
 // ============================================================
 
-use crate::core::nt_core_capability::CapabilityRegistry as GlobalCapabilityRegistry;
+use crate::l6_meta::nt_core_capability::CapabilityRegistry as GlobalCapabilityRegistry;
 
 /// 能力注册表 — 管理所有可注册的 Trade 能力
 ///

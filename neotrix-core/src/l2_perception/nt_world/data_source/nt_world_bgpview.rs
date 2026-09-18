@@ -133,7 +133,7 @@ impl BgpviewFetcher {
             let url = format!("https://bgpview.io/search?query={}", key);
             let existing = kb.find_node_by_url(&url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&key, crate::core::nt_core_kb_types::NodeType::External, Some(&summary), Some(&url), Some("bgpview"))
+            let _id = kb.insert_or_get_node(&key, crate::l6_meta::nt_core_kb_types::NodeType::External, Some(&summary), Some(&url), Some("bgpview"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", key, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }

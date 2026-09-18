@@ -1,7 +1,7 @@
 #![deny(clippy::unwrap_used)]
 
-use crate::core::nt_core_hex::FullReasoningState;
-use crate::core::nt_core_policy::E8Policy;
+use crate::l5_cognition::nt_core_hex::FullReasoningState;
+use crate::l5_cognition::nt_core_policy::E8Policy;
 use serde::{Deserialize, Serialize};
 
 /// E8 Plan Mode — 将推理轨迹编码为结构化计划，每个步骤是对应 E8 卦象状态

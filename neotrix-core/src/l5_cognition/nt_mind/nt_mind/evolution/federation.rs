@@ -607,7 +607,7 @@ impl FederationProtocol {
 mod tests {
     use super::*;
     #[allow(unused_imports)]
-    use crate::core::nt_core_paradigm::{Anomaly, ParadigmShiftDetector};
+    use crate::l5_cognition::nt_core_paradigm::{Anomaly, ParadigmShiftDetector};
     use serde_json::json;
 
     // ── FP1 ValueSync ──

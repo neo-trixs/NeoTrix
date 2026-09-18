@@ -19,10 +19,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType};
-use crate::core::nt_core_e8::e8_abduction_bridge::E8AbductionBridge;
+use crate::l2_perception::nt_core_e8::domain_transition::{CoTLength, E8TaskType};
+use crate::l2_perception::nt_core_e8::e8_abduction_bridge::E8AbductionBridge;
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
-use crate::core::nt_core_llm::{LlmError, LlmRequest};
+use crate::l1_action::nt_core_llm::{LlmError, LlmRequest};
 
 // ─────────────────────────────────────────────────────────────
 // ① 结构化事件（Ding 2015: Actor-Action-Object + 时效衰减）
@@ -345,7 +345,7 @@ pub struct LlmNarrator {
 
 /// Gateway 句柄 — 持有池子实例，`complete` 时自动 block_on。
 mod gateway_handle {
-    use crate::core::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
+    use crate::l1_action::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
     use crate::l1_action::nt_io::nt_io_provider::factory;
     use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
     /// 持有 GatewayV2 并封装同步调用（池子内部自动选择 provider）。
@@ -569,7 +569,7 @@ impl LlmNarrator {
     /// CJK 感知 token 估算 — 委托 `nt_core_llm::estimate_tokens`
     /// (中文含全角标点按字符 1 token, 其余按 4 字符 1 token, 保守上界最小 1)。
     pub fn estimate_tokens(text: &str) -> usize {
-        crate::core::nt_core_llm::estimate_tokens(text)
+        crate::l1_action::nt_core_llm::estimate_tokens(text)
     }
 
     /// 按预算截断上下文: 保留开头, 超预算部分截断并附标记。

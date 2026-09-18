@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
+use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
 use super::nt_world_model_predict::{LatentTransition, ExpertPredictor};
 use super::nt_world_model_types::{
     Vector, Matrix, LATENT_DIM, Context,
@@ -20,7 +20,7 @@ use super::types::LatentState;
 // JepaWorldModel — JEPA 世界模型
 // ═══════════════════════════════════════════════════════════
 
-use crate::core::nt_core_td::{TemporalDifferenceFlows, TDFlowsConfig};
+use crate::l5_cognition::nt_core_td::{TemporalDifferenceFlows, TDFlowsConfig};
 use super::types::{
     JEPA_LATENT_DIM, JEPA_HIDDEN_DIM, JEPA_LEARNING_RATE, JEPA_EMA_MOMENTUM,
     JEPA_GAUSS_WEIGHT, JEPA_GAUSS_STD_TARGET,

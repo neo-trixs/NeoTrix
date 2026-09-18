@@ -2,7 +2,7 @@
 
 use super::{LlmError, LlmProviderType, LlmRequest, LlmResponse, UnifiedLlm};
 use crate::l1_action::nt_io::nt_io_provider::anthropic::AnthropicProvider;
-use crate::core::nt_core_llm::LlmProvider;
+use crate::l1_action::nt_core_llm::LlmProvider;
 
 /// Adapter wrapping `AnthropicProvider` to implement `UnifiedLlm`
 pub struct AnthropicUnifiedAdapter {

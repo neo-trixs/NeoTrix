@@ -17,13 +17,13 @@ pub const NONCE_LEN: usize = 12;
 
 // D3 架构倒置: kv 原语下沉至 core (nt_core_kb_primitives), 此处 re-export
 // 保持 `nt_memory_unify::kv_*` 调用方路径不变。实现单一事实源在 core。
-pub use crate::core::nt_core_kb_primitives::{
+pub use crate::l6_meta::nt_core_kb_primitives::{
     VALUE_COMPRESSED_MAGIC, is_compressed_value, kv_delete, kv_exists, kv_get, kv_list,
     kv_list_namespaces, kv_purge_namespace, kv_set,
 };
 
 pub fn now() -> i64 {
-    crate::core::nt_core_kb_primitives::now()
+    crate::l6_meta::nt_core_kb_primitives::now()
 }
 
 // ─── Config Entries ─────────────────────────────────────────────────────────

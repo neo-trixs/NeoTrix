@@ -2,7 +2,7 @@
 
 use super::{LlmError, LlmProviderType, LlmRequest, LlmResponse, UnifiedLlm};
 use crate::l1_action::nt_io::nt_io_provider::openai::OpenAiProvider;
-use crate::core::nt_core_llm::LlmProvider;
+use crate::l1_action::nt_core_llm::LlmProvider;
 
 // ════════════════════════════════════════════════════════════════
 // Groq

@@ -3,7 +3,7 @@
 //! 零信任网络、安全扫描、威胁检测能力
 
 use std::sync::Arc;
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 
 /// 零信任网络能力
 pub struct _ZeroTrustCapability;

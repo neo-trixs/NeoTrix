@@ -178,7 +178,7 @@ impl GdeltFetcher {
             let existing = kb.find_node_by_url(&art.url).ok().flatten();
             let is_new = existing.is_none();
             let _id = kb
-                .insert_or_get_node(&art.title, crate::core::nt_core_kb_types::NodeType::Article, Some(&summary), Some(&art.url), Some("gdelt"))
+                .insert_or_get_node(&art.title, crate::l6_meta::nt_core_kb_types::NodeType::Article, Some(&summary), Some(&art.url), Some("gdelt"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", art.url, e))?;
             if is_new {
                 report.nodes_created += 1;

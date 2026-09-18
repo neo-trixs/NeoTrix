@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_capability::{
+use crate::l6_meta::nt_core_capability::{
     CapabilityError, CapabilityInput, CapabilityMeta, CapabilityOutput, CapabilityState,
     UnifiedCapability,
 };
@@ -320,7 +320,7 @@ pub fn create_ocr_engine(#[allow(unused_variables)] config: OcrConfig) -> Arc<dy
 /// 可注册到 CapabilityRegistry 进行统一调度
 pub struct OcrCapability {
     meta: CapabilityMeta,
-    health: crate::core::nt_core_capability::CapabilityHealth,
+    health: crate::l6_meta::nt_core_capability::CapabilityHealth,
     engine: Arc<dyn OcrEngine>,
 }
 
@@ -332,17 +332,17 @@ impl OcrCapability {
             meta: CapabilityMeta {
                 id: "nt-world-ocr".into(),
                 name: "NT-WORLD OCR".into(),
-                layer: crate::core::nt_core_capability::Layer::L2Perception,
-                domain: crate::core::nt_core_capability::Domain::NtWorld,
+                layer: crate::l6_meta::nt_core_capability::Layer::L2Perception,
+                domain: crate::l6_meta::nt_core_capability::Domain::NtWorld,
                 version: "0.1.0".into(),
                 description: "基于 ONNX Runtime 的 OCR 文字识别能力".into(),
                 tags: vec!["ocr".into(), "paddleocr".into(), "onnx".into()],
-                status: crate::core::nt_core_capability::CapabilityStatus::Healthy,
-                metrics: crate::core::nt_core_capability::CapabilityMetrics::default(),
+                status: crate::l6_meta::nt_core_capability::CapabilityStatus::Healthy,
+                metrics: crate::l6_meta::nt_core_capability::CapabilityMetrics::default(),
                 cost_weight: 0.3,
                 priority: 1.0,
             },
-            health: crate::core::nt_core_capability::CapabilityHealth {
+            health: crate::l6_meta::nt_core_capability::CapabilityHealth {
                 state: CapabilityState::Ready,
                 success_rate: 1.0,
                 avg_latency_ms: 0.0,
@@ -359,7 +359,7 @@ impl UnifiedCapability for OcrCapability {
         self.meta.clone()
     }
 
-    fn health(&self) -> crate::core::nt_core_capability::CapabilityHealth {
+    fn health(&self) -> crate::l6_meta::nt_core_capability::CapabilityHealth {
         self.health.clone()
     }
 
@@ -393,13 +393,13 @@ impl Drop for OcrCapability {
 }
 
 /// 创建 OCR 能力实例 — 返回核心 trait 对象供 NT-CORE 能力工厂消费
-pub fn create_ocr_capability() -> Arc<dyn crate::core::nt_core_capability::UnifiedCapability> {
+pub fn create_ocr_capability() -> Arc<dyn crate::l6_meta::nt_core_capability::UnifiedCapability> {
     let engine = create_ocr_engine(OcrConfig::default());
     Arc::new(OcrCapability::new(engine))
 }
 
 /// 注册 OCR 能力到本地注册中心
-pub fn register_ocr_capability(registry: &mut crate::core::nt_core_capability::CapabilityRegistry) {
+pub fn register_ocr_capability(registry: &mut crate::l6_meta::nt_core_capability::CapabilityRegistry) {
     registry.register(Arc::new(OcrCapability::new(create_ocr_engine(OcrConfig::default()))) as Arc<dyn UnifiedCapability>);
 }
 
@@ -473,8 +473,8 @@ mod tests {
         let engine = create_ocr_engine(OcrConfig::default());
         let cap = OcrCapability::new(engine);
         assert_eq!(cap.meta().id, "nt-world-ocr");
-        assert_eq!(cap.meta().domain, crate::core::nt_core_capability::Domain::NtWorld);
-        assert_eq!(cap.meta().layer, crate::core::nt_core_capability::Layer::L2Perception);
+        assert_eq!(cap.meta().domain, crate::l6_meta::nt_core_capability::Domain::NtWorld);
+        assert_eq!(cap.meta().layer, crate::l6_meta::nt_core_capability::Layer::L2Perception);
     }
 
     #[test]
@@ -482,10 +482,10 @@ mod tests {
         let engine = create_ocr_engine(OcrConfig::default());
         let cap = OcrCapability::new(engine);
         let input = CapabilityInput::FileEnhance(
-            crate::core::nt_core_capability::FileEnhanceInput {
+            crate::l6_meta::nt_core_capability::FileEnhanceInput {
                 input_path: "test.pdf".to_string(),
                 output_path: None,
-                mode: crate::core::nt_core_capability::FileEnhanceMode::PdfIconEnhance,
+                mode: crate::l6_meta::nt_core_capability::FileEnhanceMode::PdfIconEnhance,
             }
         );
         assert!(cap.supports(&input));

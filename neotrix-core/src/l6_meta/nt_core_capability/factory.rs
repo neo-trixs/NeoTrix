@@ -2,7 +2,7 @@
 //!
 //! 自动注册所有内置能力到能力注册中心
 
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 use std::sync::Arc;
 
 /// 内置能力工厂

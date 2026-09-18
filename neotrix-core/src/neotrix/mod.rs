@@ -119,7 +119,7 @@ pub use crate::l6_meta::healing::{
 
 // ─── Specific type re-exports ───────────────────────────────────────────
 
-pub use crate::core::nt_core_reasoning::{
+pub use crate::l5_cognition::nt_core_reasoning::{
     default_context_builder, default_method_registry, MethodRegistry, MethodSpec, ReasoningStep,
     ReasoningTrace, TraceSource,
 };

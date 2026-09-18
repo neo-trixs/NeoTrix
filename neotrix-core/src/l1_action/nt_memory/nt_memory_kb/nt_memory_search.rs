@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::bm25;
 use super::nt_memory_embed::load_all_embeddings;
-use crate::core::nt_core_math::cosine_similarity_f32;
+use crate::l5_cognition::nt_core_math::cosine_similarity_f32;
 use super::nt_memory_types::*;
 
 pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
@@ -546,7 +546,7 @@ fn build_walsh_ranklist(
     fts_results: &[SearchResult],
     limit: usize,
 ) -> Vec<(f64, String)> {
-    use crate::core::nt_core_walsh::WalshMemoryIndex;
+    use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
 
     if fts_results.is_empty() {
         return Vec::new();
@@ -571,7 +571,7 @@ fn build_walsh_ranklist(
     scored
 }
 
-use crate::core::nt_core_math::cosine_similarity_f64;
+use crate::l5_cognition::nt_core_math::cosine_similarity_f64;
 
 /// Build a proxy query embedding by averaging stored embeddings of nodes
 /// whose title or content matches query words.
@@ -1474,7 +1474,7 @@ mod tests {
 
     #[test]
     fn test_walsh_ranklist_ranks_similar_higher() {
-        use crate::core::nt_core_walsh::WalshMemoryIndex;
+        use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
         let walsh = WalshMemoryIndex::new();
         // 语义相似文档应比不相关文档得分更高
         let q = walsh.encode("neural network training");

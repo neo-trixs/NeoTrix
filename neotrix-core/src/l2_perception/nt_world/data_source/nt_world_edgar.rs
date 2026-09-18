@@ -404,7 +404,7 @@ impl EdgarFetcher {
             let existing = kb.find_node_by_url(&url).ok().flatten();
             let is_new = existing.is_none();
             let _id = kb
-                .insert_or_get_node(&format!("{} ({})", f.form, f.accession_number), crate::core::nt_core_kb_types::NodeType::Filing, Some(&summary), Some(&url), Some("edgar"))
+                .insert_or_get_node(&format!("{} ({})", f.form, f.accession_number), crate::l6_meta::nt_core_kb_types::NodeType::Filing, Some(&summary), Some(&url), Some("edgar"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", f.accession_number, e))?;
             if is_new {
                 report.nodes_created += 1;

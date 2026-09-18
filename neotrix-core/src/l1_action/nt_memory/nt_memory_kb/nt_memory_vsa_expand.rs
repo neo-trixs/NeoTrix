@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use crate::core::nt_core_hcube::vsa::{VsaBackend, VSAEngine};
+use crate::l2_perception::nt_core_hcube::vsa::{VsaBackend, VSAEngine};
 
 /// VSA 联想扩召器
 pub struct VsaAssociativeExpander {

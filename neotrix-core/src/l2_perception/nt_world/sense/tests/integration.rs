@@ -5,7 +5,7 @@ mod perception_bridge_integration {
     use crate::neotrix::nt_world_sense::perception_bridge::PerceptionBridge;
     use crate::neotrix::nt_world_sense::nt_world_sense_hub::SensoryIntegrationHub;
 // //     use crate::core::// nt_core_signal::core::SelectiveState;
-    use crate::core::nt_core_sense::{SensoryEvent, SensoryEventKind, AnalysisReport};
+    use crate::l2_perception::nt_core_sense::{SensoryEvent, SensoryEventKind, AnalysisReport};
 
     fn make_test_event(priority: u8, confidence: f64) -> SensoryEvent {
         SensoryEvent {

@@ -1,5 +1,5 @@
 use crate::core::CapabilityVector;
-use crate::core::nt_core_bank::ReasoningBank;
+use crate::l1_action::nt_core_bank::ReasoningBank;
 
 /// Local benchmark types (replaces L8 BenchmarkSuite dependency)
 #[derive(Debug, Clone)]

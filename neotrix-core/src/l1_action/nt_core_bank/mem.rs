@@ -1,5 +1,5 @@
-use crate::core::nt_core_bank::{MemoryLifecycle, MemoryTier};
-use crate::core::nt_core_edit::{MicroEdit, SelfEdit};
+use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier};
+use crate::l1_action::nt_core_edit::{MicroEdit, SelfEdit};
 use crate::core::{RewardSource, TaskType};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

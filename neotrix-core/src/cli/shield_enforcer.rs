@@ -369,19 +369,19 @@ impl ShieldEnforcer {
 
 /// 写操作单向事实源 — 由 ToolRegistry/ToolSpec 声明 (reversibility != ReadOnly → 写)。
 /// 与 nt_core_gate 风险分级共用同一规约, 不再维护第二份字符串清单。
-fn write_action_registry() -> &'static crate::core::nt_core_gate::ToolRegistry {
-    static REG: LazyLock<crate::core::nt_core_gate::ToolRegistry> = LazyLock::new(|| {
-        crate::core::nt_core_gate::ToolRegistry::new()
-            .register(crate::core::nt_core_gate::ToolSpec::reversible("write_file", "undo_file"))
-            .register(crate::core::nt_core_gate::ToolSpec::reversible("file_write", "undo_file"))
-            .register(crate::core::nt_core_gate::ToolSpec::irreversible("delete_file"))
-            .register(crate::core::nt_core_gate::ToolSpec::irreversible("file_delete"))
-            .register(crate::core::nt_core_gate::ToolSpec::irreversible("git_push"))
-            .register(crate::core::nt_core_gate::ToolSpec::irreversible("git_force_push"))
-            .register(crate::core::nt_core_gate::ToolSpec::reversible("execute_command", "undo_command"))
-            .register(crate::core::nt_core_gate::ToolSpec::reversible("command_exec", "undo_command"))
-            .register(crate::core::nt_core_gate::ToolSpec::irreversible("modify_dependency"))
-            .register(crate::core::nt_core_gate::ToolSpec::irreversible("seal_iterate"))
+fn write_action_registry() -> &'static crate::l5_cognition::nt_core_gate::ToolRegistry {
+    static REG: LazyLock<crate::l5_cognition::nt_core_gate::ToolRegistry> = LazyLock::new(|| {
+        crate::l5_cognition::nt_core_gate::ToolRegistry::new()
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::reversible("write_file", "undo_file"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::reversible("file_write", "undo_file"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("delete_file"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("file_delete"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("git_push"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("git_force_push"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::reversible("execute_command", "undo_command"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::reversible("command_exec", "undo_command"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("modify_dependency"))
+            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("seal_iterate"))
     });
     &REG
 }
@@ -392,7 +392,7 @@ fn is_write_action(action: &str) -> bool {
     match write_action_registry().get(action) {
         Some(spec) => {
             spec.authority_modifying
-                || spec.reversibility != crate::core::nt_core_gate::ToolReversibility::ReadOnly
+                || spec.reversibility != crate::l5_cognition::nt_core_gate::ToolReversibility::ReadOnly
         }
         None => false,
     }

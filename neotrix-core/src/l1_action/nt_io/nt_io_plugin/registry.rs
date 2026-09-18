@@ -6,7 +6,7 @@ use std::time::Instant;
 use tokio::sync::RwLock;
 
 use super::{Plugin, PluginEvent, PluginInfo, PluginSource, PluginStatus};
-use crate::core::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
+use crate::l5_cognition::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
 
 /// HMR 事务性热替换的结果分类 (§5.2.2 classify 不动点判定)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

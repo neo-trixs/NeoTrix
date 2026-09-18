@@ -1,6 +1,6 @@
 use super::*;
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_policy::E8Policy;
+use crate::l5_cognition::nt_core_policy::E8Policy;
 
 /// Lightweight online learner that wraps Coach + Policy + TrajectoryCollector.
 ///
@@ -148,7 +148,7 @@ impl ProcessRewardLearner {
 
             for step in &traj.steps {
                 if let Some(ext_r) = step.external_reward {
-                    let _outcome = crate::core::nt_core_policy::E8Outcome {
+                    let _outcome = crate::l5_cognition::nt_core_policy::E8Outcome {
                         task: traj.task.clone(),
                         mode: step.e8_mode,
                         reward: ext_r,
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_process_reward_learner_end_to_end() {
-        let policy = crate::core::nt_core_policy::E8Policy::new(0.0, 1.0, 0.0, 0.5, 0.0);
+        let policy = crate::l5_cognition::nt_core_policy::E8Policy::new(0.0, 1.0, 0.0, 0.5, 0.0);
         let coach: Box<dyn Coach> = Box::new(HeuristicCoach::default());
         let mut learner = ProcessRewardLearner::new(policy, coach);
 

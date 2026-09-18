@@ -2,15 +2,15 @@
 
 #[cfg(test)]
 mod capability_tests {
-    use crate::core::nt_core_capability::*;
-    use crate::core::nt_core_capability::cache::{CapabilityCacheConfig, CapabilityCache};
-    use crate::core::nt_core_capability::composer::CapabilityComposer;
-    use crate::core::nt_core_capability::monitor::{MonitorDashboard, MonitorEvent, EventType};
-    use crate::core::nt_core_capability::discovery::{DiscoveryConfig, DistributedDiscovery};
-    use crate::core::nt_core_capability::versioning::{SemanticVersion, VersionManager};
-    use crate::core::nt_core_capability::orchestrator::OrchestrationEngine;
-    use crate::core::nt_core_capability::loadbalancer::{LoadBalancer, LoadBalanceStrategy, CapabilityInstance, InstanceStatus};
-    use crate::core::nt_core_capability::factory::{init_global_registry, CapabilityFactory};
+    use crate::l6_meta::nt_core_capability::*;
+    use crate::l6_meta::nt_core_capability::cache::{CapabilityCacheConfig, CapabilityCache};
+    use crate::l6_meta::nt_core_capability::composer::CapabilityComposer;
+    use crate::l6_meta::nt_core_capability::monitor::{MonitorDashboard, MonitorEvent, EventType};
+    use crate::l6_meta::nt_core_capability::discovery::{DiscoveryConfig, DistributedDiscovery};
+    use crate::l6_meta::nt_core_capability::versioning::{SemanticVersion, VersionManager};
+    use crate::l6_meta::nt_core_capability::orchestrator::OrchestrationEngine;
+    use crate::l6_meta::nt_core_capability::loadbalancer::{LoadBalancer, LoadBalanceStrategy, CapabilityInstance, InstanceStatus};
+    use crate::l6_meta::nt_core_capability::factory::{init_global_registry, CapabilityFactory};
     use std::sync::Arc;
 
     #[test]

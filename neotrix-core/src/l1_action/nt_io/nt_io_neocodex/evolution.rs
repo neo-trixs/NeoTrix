@@ -30,7 +30,7 @@ pub struct NeoCodexHealthReport {
     pub tool_grounding_degraded: bool,
     /// Skill Node Evolution — per-domain 节点状态 (NodeTier/Constellation/Rune)
     /// 使 7 域健康网格反映真实 per-domain 遥测, 而非布尔投影。
-    pub node_snapshots: Vec<crate::core::nt_core_consciousness_tree::NodeSnapshot>,
+    pub node_snapshots: Vec<crate::l5_cognition::nt_core_consciousness_tree::NodeSnapshot>,
 }
 
 impl NeoCodexHealthReport {

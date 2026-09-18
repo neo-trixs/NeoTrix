@@ -287,7 +287,7 @@ fn compute_phi_from_branches(branches: &HashMap<String, BranchState>) -> f32 {
         };
         state.push(v);
     }
-    crate::core::nt_core_iit_phi::IITPhiCalculator::new()
+    crate::l5_cognition::nt_core::nt_iit_phi::IITPhiCalculator::new()
         .compute_phi(&state)
         .phi as f32
 }
@@ -317,8 +317,8 @@ fn apply_metacognitive_calibration(health: f32, metrics: &HashMap<String, f32>) 
 /// 施加 `apply_metacognitive_calibration`, 并产出 D 维能力画像向量 = [成功率, ECE, Brier]。
 /// 无样本 → 无证据, 健康与画像归零 (防 D15 健康虚高)。
 pub fn calibrate_branch_health(samples: &[(f32, bool)]) -> (f32, Vec<f32>) {
-    let ece = crate::core::nt_core_consciousness_tree::metacalib::expected_calibration_error(samples, 10);
-    let brier = crate::core::nt_core_consciousness_tree::metacalib::brier_score(samples);
+    let ece = crate::l5_cognition::nt_core_consciousness_tree::metacalib::expected_calibration_error(samples, 10);
+    let brier = crate::l5_cognition::nt_core_consciousness_tree::metacalib::brier_score(samples);
     let success_rate = if samples.is_empty() {
         0.0f32
     } else {

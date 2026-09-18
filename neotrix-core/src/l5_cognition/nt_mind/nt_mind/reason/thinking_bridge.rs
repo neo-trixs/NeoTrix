@@ -1,8 +1,8 @@
 use super::consciousness_bridge::attention_to_specialist;
 use super::hypercube_attention_bridge::{AttentionHypercubeBridge, AttentionRecallItem};
-use crate::core::nt_core_gwt::module_def::SpecialistModule;
-use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
+use crate::l5_cognition::nt_core_gwt::module_def::SpecialistModule;
+use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
 use crate::core::nt_core_self::{
     AttentionDomain, CognitiveEvaluator, CognitiveHealthReport, CrystalRegistry,
     IntrinsicMotivation, MotivationState, ReflectionGrade, SelfReferentialMonitor, SiliconArchive,
@@ -373,7 +373,7 @@ pub struct _ThinkingCycleResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
+    use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 
     #[test]
     fn test_bridge_new() {

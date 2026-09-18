@@ -2,7 +2,7 @@
 //!
 //! 提供能力调用的安全控制和访问管理
 
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 

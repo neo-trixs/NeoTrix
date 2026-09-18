@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::core::nt_core_kb_types::{KnowledgeNode, KnowledgeEdge, NodeType, RelationType};
+use crate::l6_meta::nt_core_kb_types::{KnowledgeNode, KnowledgeEdge, NodeType, RelationType};
 use super::nt_memory_community::{CommunityAwareSearch, CommunityDetector};
 
 static ID_COUNTER: AtomicU64 = AtomicU64::new(1);

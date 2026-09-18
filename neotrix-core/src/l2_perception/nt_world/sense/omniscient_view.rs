@@ -1,4 +1,4 @@
-use crate::core::nt_core_sense::*;
+use crate::l2_perception::nt_core_sense::*;
 
 #[derive(Debug, Clone)]
 pub struct OmniscientView {

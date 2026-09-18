@@ -9,7 +9,7 @@
 //! 抽取 → 图存储钩子, 复用 NeoTrix 现有 KB 图结构 (nt_memory_graph.rs 的
 //! shortest_path / subgraph / community_detection)。
 
-use crate::core::nt_core_kb_types::{KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
+use crate::l6_meta::nt_core_kb_types::{KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use uuid::Uuid;

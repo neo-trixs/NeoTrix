@@ -16,7 +16,7 @@
 //!     s(g) = α·proximity(g, current) + β·affinity(task, g) + γ·transition(g)
 //! with softmax over groups. Top-2 selected deterministically.
 
-use crate::core::nt_core_e8::domain_transition::E8TaskType;
+use crate::l2_perception::nt_core_e8::domain_transition::E8TaskType;
 use serde::{Deserialize, Serialize};
 
 /// Number of expert groups partitioning the 64 E₈ states.

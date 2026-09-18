@@ -10,7 +10,7 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use tokio::sync::{RwLock, Semaphore};
 
-use crate::core::nt_core_resource_pool::{AnyPool, DiscoveredResource, PoolHealthReport, PoolSnapshot, PoolSelectionStrategy, PoolSupervisor, ResourcePool};
+use crate::l1_action::nt_core_resource_pool::{AnyPool, DiscoveredResource, PoolHealthReport, PoolSnapshot, PoolSelectionStrategy, PoolSupervisor, ResourcePool};
 
 use crate::neotrix::nt_shield_stealth_net::config::load as cfg;
 use crate::neotrix::nt_shield_stealth_net::ip_geo::IpGeoLocator;

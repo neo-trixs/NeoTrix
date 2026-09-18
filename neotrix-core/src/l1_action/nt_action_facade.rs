@@ -166,7 +166,7 @@ impl ActionFacade {
         let kb = self.kb.as_ref().ok_or(FacadeError::NotInitialized)?;
 
         let node_id = kb
-            .insert_or_get_node(title, crate::core::nt_core_kb_types::NodeType::from_str(node_type), Some(summary), None, None)
+            .insert_or_get_node(title, crate::l6_meta::nt_core_kb_types::NodeType::from_str(node_type), Some(summary), None, None)
             .map_err(|e| FacadeError::StoreFailed(format!("{e}")))?;
 
         Ok(node_id)

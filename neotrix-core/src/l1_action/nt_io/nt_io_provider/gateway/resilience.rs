@@ -10,9 +10,9 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::core::nt_core_llm::{LlmRequest, LlmResponse};
+use crate::l1_action::nt_core_llm::{LlmRequest, LlmResponse};
 use crate::l1_action::nt_io::nt_io_provider::common::generation_classifier::{GenerationRecord, LlmPurpose, TaskType};
-use crate::core::nt_core_llm::Message;
+use crate::l1_action::nt_core_llm::Message;
 use super::types::ProviderState;
 use super::GatewayV2;
 

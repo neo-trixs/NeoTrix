@@ -1,5 +1,5 @@
 use super::brain_impl::{ReasoningBrain, BrainMetadata, DefaultSealStrategy};
-use crate::core::nt_core_knowledge::SourceAccessTracker;
+use crate::l2_perception::nt_core_knowledge::SourceAccessTracker;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 impl ReasoningBrain {

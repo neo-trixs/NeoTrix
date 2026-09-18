@@ -2,7 +2,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CliContext, CommandOutput};
-use crate::core::nt_core_conn::{ConnectorConfig, ConnectorKind};
+use crate::cli::nt_conn::{ConnectorConfig, ConnectorKind};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 pub struct ConnectorCmd;
@@ -39,7 +39,7 @@ impl CliCommand for ConnectorCmd {
                 let mgr = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.connectors)
                 } else {
-                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 let connectors = mgr.list_connectors();
                 if connectors.is_empty() {
@@ -72,7 +72,7 @@ impl CliCommand for ConnectorCmd {
                 let mut mgr = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.connectors)
                 } else {
-                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 let id = match kind_str.as_str() {
                     "github" => {
@@ -141,7 +141,7 @@ impl CliCommand for ConnectorCmd {
                 let mut mgr = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.connectors)
                 } else {
-                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 match mgr.remove_connector(id) {
                     Ok(()) => {
@@ -161,7 +161,7 @@ impl CliCommand for ConnectorCmd {
                 let mut mgr = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.connectors)
                 } else {
-                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 match mgr.enable_connector(id) {
                     Ok(()) => {
@@ -181,7 +181,7 @@ impl CliCommand for ConnectorCmd {
                 let mut mgr = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.connectors)
                 } else {
-                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 match mgr.disable_connector(id) {
                     Ok(()) => {
@@ -198,7 +198,7 @@ impl CliCommand for ConnectorCmd {
                 let mut mgr = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.connectors)
                 } else {
-                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 match action {
                     "start" => match mgr.start_server() {

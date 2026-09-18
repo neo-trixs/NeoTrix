@@ -1,8 +1,8 @@
-use crate::core::nt_core_arch_fitness::arch_fitness_tests;
+use crate::l5_cognition::nt_core_arch_fitness::arch_fitness_tests;
 use crate::core::nt_core_qtest::QTestEngineSelfTest;
 use crate::l6_meta::healing::nt_core_self_test::{ConstitutionComplianceTest, SelfTest, SelfTestRegistry};
 // use crate::l2_perception::nt_world::cad_selftest;
-use crate::core::nt_core_cad_consciousness;
+use crate::l5_cognition::nt_core_cad_consciousness;
 use crate::l2_perception::nt_world::osint::{UnifiedAbsorber, AbsorberConfig};
 
 pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
@@ -32,17 +32,17 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // CAD 真实生成管线 (GenCAD 四步: CSR→CCIP→CDP→Decoder) — 替换架构占位
     // crate::l2_perception::nt_world::cad_generator::register_cad_generator_self_tests(&mut registry);
     // LLM 核心 (NT-CORE): 统一错误域接入 + token 预算引擎自测 (卫生层 P0)
-    // crate::core::nt_core_llm::register_llm_self_tests(&mut registry); // stub returns empty Vec
+    // crate::l1_action::nt_core_llm::register_llm_self_tests(&mut registry); // stub returns empty Vec
     // 缓存核心 (NT-CORE): 精确层往返 + 容量计数自测
     crate::core::nt_core_cache::register_cache_self_tests(&mut registry);
     // VSA/HyperCube 核心 (NT-CORE): 卦象嵌入自相似 + 异卦分离 + bind 自相似
-    crate::core::nt_core_e8_vsa::register_e8_vsa_self_tests(&mut registry);
+    crate::l2_perception::nt_core_e8_vsa::register_e8_vsa_self_tests(&mut registry);
     // KB 类型核心 (NT-CORE): NodeType 枚举全变体往返
-    crate::core::nt_core_kb_types::register_kb_types_self_tests(&mut registry);
+    crate::l6_meta::nt_core_kb_types::register_kb_types_self_tests(&mut registry);
     // NT-MEMORY 四态记忆资产 (吸收 TencentDB-Agent-Memory): ChatMemory/Skill/LlmWiki/CodeGraph 分类
-    crate::core::nt_core_memory_asset::register_memory_asset_self_tests(&mut registry);
+    crate::l6_meta::nt_core_memory_asset::register_memory_asset_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (archify/diagram-design): NT-CORE 可验证架构图原语
-    crate::core::nt_core_arch_diagram::register_arch_diagram_self_tests(&mut registry);
+    crate::l5_cognition::nt_core_arch_diagram::register_arch_diagram_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (firecrawl/anydoc): NT-WORLD 文档格式路由
     crate::neotrix::nt_file_ability::register_format_route_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (reverse-skill): NT-SHIELD 安全技能路由
@@ -50,9 +50,9 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // 2026-08-29 外部吸收 (affaan-m/ECC): NT-MIND SEAL 进化维度 instincts/security
     crate::l5_cognition::nt_mind::nt_mind::nt_mind_seal_ecc::register_seal_ecc_self_tests(&mut registry);
     // 意识核心本体 (NT-CORE): 跨会话 CoreSnapshot 持久化往返
-    crate::core::nt_core_consciousness_core::register_consciousness_core_self_tests(&mut registry);
+    crate::l5_cognition::nt_core_consciousness_core::register_consciousness_core_self_tests(&mut registry);
     // 意识度量 IIT Φ (NT-CORE): 同步可约→phi=0 + 变化状态 phi∈[0,1] + 共振矩阵维度
-    crate::core::nt_core_iit_phi::register_iit_phi_self_tests(&mut registry);
+    crate::l5_cognition::nt_core::nt_iit_phi::register_iit_phi_self_tests(&mut registry);
     registry.register(Box::new(
         crate::l3_embodiment::nt_shield::nt_shield_traffic::FingerprintStore::new(),
     ));
@@ -66,7 +66,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
         crate::l3_embodiment::nt_shield::nt_shield_sandbox::stateful_bench::StatefulEgressBench,
     ));
     registry.register(Box::new(
-        crate::core::nt_core_orchestration_failure_taxonomy::OrchestrationFailureTaxonomyTest,
+        crate::l5_cognition::nt_core_orchestration_failure_taxonomy::OrchestrationFailureTaxonomyTest,
     ));
     // 2026-08-15 sweep absorption batch (Phase B): HDA 归因 / 自验证奖励 / 元 harness 优化 / 提示词库
     registry.register(Box::new(
@@ -91,8 +91,8 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-16 T2 补齐: 贝叶斯实验设计 (SelfTest 存在但漏注册, C1→C2)
     registry.register(Box::new(
-        crate::core::nt_core_hcube::bayesian_experiment::BayesianExperimentDesign::new(
-            crate::core::nt_core_hcube::bayesian_experiment::VoIConfig::default(),
+        crate::l2_perception::nt_core_hcube::bayesian_experiment::BayesianExperimentDesign::new(
+            crate::l2_perception::nt_core_hcube::bayesian_experiment::VoIConfig::default(),
             Vec::new(),
         ),
     ));
@@ -106,11 +106,11 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-15 sweep absorption batch (Phase C): 模式路由 / 潜循环 / 记忆四能力
     registry.register(Box::new(
-        crate::core::nt_core_gwt::mode_router::ModeRouter::new(),
+        crate::l5_cognition::nt_core_gwt::mode_router::ModeRouter::new(),
     ));
     registry.register(Box::new(
-        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
-            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
+        crate::l2_perception::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
+            crate::l2_perception::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
         ),
     ));
     registry.register(Box::new(
@@ -164,7 +164,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-16 Replica absorb: 量子态最优融合检测 (quantum_fusion) T3 接线
     registry.register(Box::new(
-        crate::core::nt_core_quantum_fusion::QuantumFusionSelfTest,
+        crate::l5_cognition::nt_core_quantum_fusion::QuantumFusionSelfTest,
     ));
     // 2026-08-19 write_guard 证据审计闭环 (dbx G4): T1→T2 注册 (run.rs 架构审计侧)
     registry.register(Box::new(
@@ -217,7 +217,7 @@ pub fn register_c5_healers(registry: &mut SelfTestRegistry) {
     // ));
     // 2026-08-17 C5 自愈回路扩展: CORE scheduler 认领池一致性 + IO 账户池健康度
     // registry.register(Box::new(
-    //     crate::core::nt_core_scheduler::event_driven_claim::ClaimPoolHealer,
+    //     crate::l6_meta::nt_core_scheduler::event_driven_claim::ClaimPoolHealer,
     // ));
     // registry.register(Box::new(
     //     crate::l1_action::nt_io::nt_io_provider::account_pool::AccountPoolHealer,
@@ -256,21 +256,21 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AnswerEngineSelfTest));
     registry.register(Box::new(AffectiveInterfaceSelfTest));
     registry.register(Box::new(
-        crate::core::nt_core_gwt::mode_router::ModeRouter::new(),
+        crate::l5_cognition::nt_core_gwt::mode_router::ModeRouter::new(),
     ));
     registry.register(Box::new(
-        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
-            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
+        crate::l2_perception::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
+            crate::l2_perception::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
         ),
     ));
     registry.register(Box::new(
-        crate::core::nt_core_quantum_fusion::QuantumFusionSelfTest,
+        crate::l5_cognition::nt_core_quantum_fusion::QuantumFusionSelfTest,
     ));
     registry.register(Box::new(ConstitutionComplianceTest));
     // 2026-08-16 T2 补齐 (lightweight): 贝叶斯实验设计
     registry.register(Box::new(
-        crate::core::nt_core_hcube::bayesian_experiment::BayesianExperimentDesign::new(
-            crate::core::nt_core_hcube::bayesian_experiment::VoIConfig::default(),
+        crate::l2_perception::nt_core_hcube::bayesian_experiment::BayesianExperimentDesign::new(
+            crate::l2_perception::nt_core_hcube::bayesian_experiment::VoIConfig::default(),
             Vec::new(),
         ),
     ));
@@ -287,7 +287,7 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     ));
     // NT-MEMORY 四态资产 (吸收 TencentDB-Agent-Memory): 纯内存分类自测, 轻量注册
     registry.register(Box::new(
-        crate::core::nt_core_memory_asset::MemoryAssetSelfTest,
+        crate::l6_meta::nt_core_memory_asset::MemoryAssetSelfTest,
     ));
     registry.register(Box::new(
         crate::l1_action::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::default(),
@@ -326,7 +326,7 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
         crate::l6_meta::memory::meta_observer::MetaObserverSelfTest,
     ));
     registry.register(Box::new(
-        crate::core::nt_core_self_constitution::GovernanceConstitutionSelfTest,
+        crate::l6_meta::nt_core_self_constitution::GovernanceConstitutionSelfTest,
     ));
     registry.register(Box::new(
         crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemorySelfTest,
@@ -384,7 +384,7 @@ pub fn run_lightweight_self_tests() -> Vec<crate::l6_meta::healing::nt_core_self
 fn fuse_self_test_results(
     results: &[crate::l6_meta::healing::nt_core_self_test::SelfTestResult],
 ) -> Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> {
-    use crate::core::nt_core_quantum_fusion::{QuantumSignal, QuantumSuperposition};
+    use crate::l5_cognition::nt_core_quantum_fusion::{QuantumSignal, QuantumSuperposition};
     use crate::l6_meta::healing::nt_core_self_test::SelfTestResult;
 
     if results.is_empty() {

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::core::nt_core_sense::{Sensor, SensorSample, SensoryEvent, SensoryEventKind, AnalysisReport};
+use crate::l2_perception::nt_core_sense::{Sensor, SensorSample, SensoryEvent, SensoryEventKind, AnalysisReport};
 
 /// macOS screen capture using `screencapture` CLI.
 /// Falls back to file metadata analysis on non-macOS.

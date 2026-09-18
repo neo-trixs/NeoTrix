@@ -6,7 +6,7 @@
 //! 读写/演化 API，使 SEAL 自进化循环可定向调优这些维度而不产生死代码。
 
 use crate::core::nt_core_cap::CapabilityVector;
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// affaan-m/ECC 吸收的 SEAL 进化维度。

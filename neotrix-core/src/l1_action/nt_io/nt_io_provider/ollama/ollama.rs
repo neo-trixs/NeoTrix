@@ -51,8 +51,8 @@ impl Default for OllamaProvider {
 
 #[async_trait]
 impl LlmProvider for OllamaProvider {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {

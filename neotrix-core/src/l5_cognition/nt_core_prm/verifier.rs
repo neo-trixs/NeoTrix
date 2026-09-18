@@ -458,7 +458,7 @@ impl GroundedPrmVerifier {
 #[cfg(test)]
 mod grounded_prm_tests {
     use super::*;
-    use crate::core::nt_core_hex::ReasoningHexagram;
+    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 
     fn make_step(idx: usize, mode: u8, success: bool) -> TrajectoryStep {
         TrajectoryStep {
@@ -934,7 +934,7 @@ mod ws_grpo_tests {
 
     #[test]
     fn test_ws_grpo_learner_learn_step() {
-        let policy = crate::core::nt_core_policy::E8Policy::new(0.0, 1.0, 0.0, 0.5, 0.0);
+        let policy = crate::l5_cognition::nt_core_policy::E8Policy::new(0.0, 1.0, 0.0, 0.5, 0.0);
         let coach: Box<dyn Coach> = Box::new(HeuristicCoach::default());
         let mut learner = WsGrpoLearner::new(policy, coach, 0.1, 100);
 

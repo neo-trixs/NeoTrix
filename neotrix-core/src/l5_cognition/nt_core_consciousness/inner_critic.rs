@@ -1,4 +1,4 @@
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 use super::vsa_tag::VsaTagged;
 
@@ -251,11 +251,11 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for InnerCritic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_consciousness::vsa_tag::{
+    use crate::l5_cognition::nt_core_consciousness::vsa_tag::{
         VsaOrigin, VsaSelfCategory, VsaWorldCategory,
     };
-    use crate::core::nt_core_consciousness::SpeciousPresent;
-    use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+    use crate::l5_cognition::nt_core_consciousness::SpeciousPresent;
+    use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
     #[test]
     fn test_new_critic_has_perfect_pass_rate() {

@@ -1,5 +1,5 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::core::nt_core_memory_asset::MemoryAssetKind;
+use crate::l6_meta::nt_core_memory_asset::MemoryAssetKind;
 use crate::l1_action::nt_memory::nt_memory_kb::{
     diff_snapshots, kb_write_guard, record_write_evidence, snapshot_from_file, snapshot_kb,
     snapshot_to_file, KnowledgeBase, KnowledgeNode, NodeType, RelationType, WriteGuardVerdict,

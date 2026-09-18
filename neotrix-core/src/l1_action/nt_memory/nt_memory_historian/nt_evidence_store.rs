@@ -7,7 +7,7 @@ use super::nt_evidence_types::{
 };
 use super::nt_evidence_hypothesis::HypothesisNetwork;
 use crate::l1_action::nt_memory::nt_memory_kb::{KnowledgeBase, KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
-use crate::core::nt_core_consciousness_tree::EvidenceChain;
+use crate::l5_cognition::nt_core_consciousness_tree::EvidenceChain;
 use crate::l1_action::nt_memory::shared_utils::now_ts;
 
 const EWHR_DOMAIN: &str = "nt_memory_historian";
@@ -597,7 +597,7 @@ mod tests {
     #[test]
     fn test_store_chain_evidence_roundtrip() {
         // P1-1: EvidenceChain (WARC/sha256/run_id) 桥接为考古证据记录并落库
-        use crate::core::nt_core_consciousness_tree::EvidenceChain;
+        use crate::l5_cognition::nt_core_consciousness_tree::EvidenceChain;
         let store = new_store();
         let chain = EvidenceChain {
             warc_path: Some("/tmp/chain.warc.gz".into()),

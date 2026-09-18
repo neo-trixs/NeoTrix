@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 use serde::{Serialize, Deserialize};
 use rand::Rng;
-use crate::core::nt_core_hcube::vsa::VsaBackend;
+use crate::l2_perception::nt_core_hcube::vsa::VsaBackend;
 use super::HyperAgentArchive;
 use super::HyperAgentRecord;
 use super::SelfModificationProposal;
@@ -77,7 +77,7 @@ impl DGMMetaAgent {
     }
 
     pub fn generate_edit(&self, archive: &HyperAgentArchive) -> LatentEdit {
-        let engine = crate::core::nt_core_hcube::vsa::VSAEngine::new(self.vsa_dim);
+        let engine = crate::l2_perception::nt_core_hcube::vsa::VSAEngine::new(self.vsa_dim);
         let mut rng = rand::thread_rng();
 
         let parents = self._select_top_k(archive);

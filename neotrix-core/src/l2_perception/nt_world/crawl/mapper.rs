@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use crate::core::CapabilityVector;
-use crate::core::nt_core_edit::MicroEdit;
-use crate::core::nt_core_hcube::axis::DimensionAxis;
-use crate::core::nt_core_hcube::coord::HyperCoord;
-use crate::core::nt_core_knowledge::{TaskType, RewardSource};
-use crate::core::nt_core_bank::{ReasoningMemory, T3Views, MemoryTier, MemoryLifecycle};
-use crate::core::nt_core_bank::ReasoningBank;
+use crate::l1_action::nt_core_edit::MicroEdit;
+use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
+use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
+use crate::l2_perception::nt_core_knowledge::{TaskType, RewardSource};
+use crate::l1_action::nt_core_bank::{ReasoningMemory, T3Views, MemoryTier, MemoryLifecycle};
+use crate::l1_action::nt_core_bank::ReasoningBank;
 
 use super::classifier::ClassifiedContent;
 use super::config::{CrawlFormat, CrawlTopic};

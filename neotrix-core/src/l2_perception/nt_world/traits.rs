@@ -4,7 +4,7 @@
 //! 打断 L2→L1 concrete type 直接依赖。
 //! 实现留在 L1，此处仅定义 trait contract。
 
-pub use crate::core::nt_core_kb_types::KnowledgeNode;
+pub use crate::l6_meta::nt_core_kb_types::KnowledgeNode;
 pub use crate::l1_action::nt_memory::nt_memory_kb::NodeType;
 
 /// L2 感知层对 KB 的最小读写接口 — 数据源入库只依赖此 trait，不依赖 KnowledgeBase concrete type。

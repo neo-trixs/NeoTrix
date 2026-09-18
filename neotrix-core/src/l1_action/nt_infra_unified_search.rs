@@ -112,12 +112,12 @@ pub trait KnowledgeSearchBackend: Send + Sync {
 // Adapters — wrap existing search engines into backend traits
 // ════════════════════════════════════════════════════════════════
 
-/// Adapter: wraps `crate::core::nt_core_code_search::CodeSearchEngine`.
+/// Adapter: wraps `crate::l2_perception::nt_core_code_search::CodeSearchEngine`.
 pub struct CodeSearchAdapter;
 
 impl CodeSearchBackend for CodeSearchAdapter {
     fn search(&self, query: &str, path: &Path, max_results: usize) -> Vec<UnifiedSearchResult> {
-        crate::core::nt_core_code_search::CodeSearchEngine::search(query, path)
+        crate::l2_perception::nt_core_code_search::CodeSearchEngine::search(query, path)
             .into_iter()
             .take(max_results)
             .enumerate()

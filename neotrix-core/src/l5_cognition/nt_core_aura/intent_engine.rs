@@ -106,7 +106,7 @@ impl Default for IntentEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hcube::vsa_quantized::VSA_DIM;
+    use crate::l2_perception::nt_core_hcube::vsa_quantized::VSA_DIM;
 
     #[test]
     fn test_process_input_resolves_direct_command() {

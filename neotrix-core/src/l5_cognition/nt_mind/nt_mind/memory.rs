@@ -1,13 +1,13 @@
 //! Reverse bridge: V1 → core/
 //! Core types re-exported, plus V1-only custom methods.
 
-pub use crate::core::nt_core_bank::{
+pub use crate::l1_action::nt_core_bank::{
     ReasoningMemory, ReasoningBank, MemoryTier, TemporalContext, MemoryLifecycle,
     ReasoningBankStats, MemoryDetailedStats, MemoryIterationResult,
 };
 pub use super::reasoning_types::ReasoningTrace;
 
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 use super::kronecker_cleanup::KroneckerCleanup;
 
 impl ReasoningBank {

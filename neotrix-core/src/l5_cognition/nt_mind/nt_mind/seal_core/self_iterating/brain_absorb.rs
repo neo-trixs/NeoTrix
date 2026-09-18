@@ -296,7 +296,7 @@ impl ReasoningBrain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_knowledge::KnowledgeSource;
+    use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
 
     /// P0-2 三步循环: 极端源向量应触发 Adaptation (位移超阈值 → 回退 + 学习率缩放)。
     #[test]

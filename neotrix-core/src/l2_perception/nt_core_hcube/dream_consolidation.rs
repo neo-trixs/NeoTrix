@@ -1,4 +1,4 @@
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 const SIMILARITY_THRESHOLD: f64 = 0.5;
 const PATTERN_MATCH_THRESHOLD: f64 = 0.8;
@@ -306,7 +306,7 @@ impl DreamConsolidation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hcube::vsa_quantized::VSA_DIM;
+    use crate::l2_perception::nt_core_hcube::vsa_quantized::VSA_DIM;
 
     fn make_test_events(dc: &mut DreamConsolidation, count: usize) {
         let mut v0 = vec![0u8; VSA_DIM];

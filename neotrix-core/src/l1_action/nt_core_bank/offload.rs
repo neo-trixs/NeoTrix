@@ -1,4 +1,4 @@
-use crate::core::nt_core_bank::{L1Memory, Persona, PipelineConfig, ReasoningMemory, SceneBlock};
+use crate::l1_action::nt_core_bank::{L1Memory, Persona, PipelineConfig, ReasoningMemory, SceneBlock};
 
 pub struct OffloadManager {
     pub base_path: std::path::PathBuf,

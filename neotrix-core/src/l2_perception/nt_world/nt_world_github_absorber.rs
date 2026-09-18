@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_kb_types::{NodeType, RelationType};
+use crate::l6_meta::nt_core_kb_types::{NodeType, RelationType};
 use super::l1_facade::KnowledgeBase;
 use super::l1_facade::{DownloadOptions, download_to_file, shared_blocking_client, run_blocking, proxy_from_env};
 

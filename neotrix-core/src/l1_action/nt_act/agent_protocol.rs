@@ -333,11 +333,11 @@ impl Default for AgentOrchestrator {
 impl crate::core::nt_core_platform::Agent for AgentOrchestrator {
     fn agent_id(&self) -> &str { "act.agent_orchestrator" }
     fn agent_name(&self) -> &str { "AgentOrchestrator" }
-    fn agent_layer(&self) -> crate::core::nt_core_capability::Layer {
-        crate::core::nt_core_capability::Layer::L1Action
+    fn agent_layer(&self) -> crate::l6_meta::nt_core_capability::Layer {
+        crate::l6_meta::nt_core_capability::Layer::L1Action
     }
-    fn agent_domain(&self) -> crate::core::nt_core_capability::Domain {
-        crate::core::nt_core_capability::Domain::NtAct
+    fn agent_domain(&self) -> crate::l6_meta::nt_core_capability::Domain {
+        crate::l6_meta::nt_core_capability::Domain::NtAct
     }
 
     async fn initialize(&mut self) -> Result<(), crate::core::nt_core_platform::AgentError> {
@@ -361,26 +361,26 @@ impl crate::core::nt_core_platform::Agent for AgentOrchestrator {
 // UnifiedCapability — nt_core_capability unified capability interface
 // ════════════════════════════════════════════════════════════════
 
-impl crate::core::nt_core_capability::UnifiedCapability for AgentOrchestrator {
-    fn meta(&self) -> crate::core::nt_core_capability::CapabilityMeta {
-        crate::core::nt_core_capability::CapabilityMeta {
+impl crate::l6_meta::nt_core_capability::UnifiedCapability for AgentOrchestrator {
+    fn meta(&self) -> crate::l6_meta::nt_core_capability::CapabilityMeta {
+        crate::l6_meta::nt_core_capability::CapabilityMeta {
             id: "act.agent_orchestrator".into(),
             name: "AgentOrchestrator".into(),
-            layer: crate::core::nt_core_capability::Layer::L1Action,
-            domain: crate::core::nt_core_capability::Domain::NtAct,
+            layer: crate::l6_meta::nt_core_capability::Layer::L1Action,
+            domain: crate::l6_meta::nt_core_capability::Domain::NtAct,
             version: env!("CARGO_PKG_VERSION").into(),
             description: "Multi-agent coordination orchestrator with spawn/send/mutate primitives".into(),
             tags: vec!["agent".into(), "orchestrator".into(), "l1".into()],
-            status: crate::core::nt_core_capability::CapabilityStatus::Healthy,
-            metrics: crate::core::nt_core_capability::CapabilityMetrics::default(),
+            status: crate::l6_meta::nt_core_capability::CapabilityStatus::Healthy,
+            metrics: crate::l6_meta::nt_core_capability::CapabilityMetrics::default(),
             cost_weight: 0.2,
             priority: 1.0,
         }
     }
 
-    fn health(&self) -> crate::core::nt_core_capability::CapabilityHealth {
-        crate::core::nt_core_capability::CapabilityHealth {
-            state: crate::core::nt_core_capability::CapabilityState::Healthy,
+    fn health(&self) -> crate::l6_meta::nt_core_capability::CapabilityHealth {
+        crate::l6_meta::nt_core_capability::CapabilityHealth {
+            state: crate::l6_meta::nt_core_capability::CapabilityState::Healthy,
             success_rate: 1.0,
             avg_latency_ms: 0.0,
             last_called: None,
@@ -390,14 +390,14 @@ impl crate::core::nt_core_capability::UnifiedCapability for AgentOrchestrator {
 
     fn execute(
         &self,
-        _input: crate::core::nt_core_capability::CapabilityInput,
-    ) -> Result<crate::core::nt_core_capability::CapabilityOutput, crate::core::nt_core_capability::CapabilityError> {
-        Ok(crate::core::nt_core_capability::CapabilityOutput::Text(
+        _input: crate::l6_meta::nt_core_capability::CapabilityInput,
+    ) -> Result<crate::l6_meta::nt_core_capability::CapabilityOutput, crate::l6_meta::nt_core_capability::CapabilityError> {
+        Ok(crate::l6_meta::nt_core_capability::CapabilityOutput::Text(
             format!("AgentOrchestrator: {} agents registered", self.agents.len()),
         ))
     }
 
-    fn supports(&self, _input: &crate::core::nt_core_capability::CapabilityInput) -> bool {
+    fn supports(&self, _input: &crate::l6_meta::nt_core_capability::CapabilityInput) -> bool {
         true
     }
 }

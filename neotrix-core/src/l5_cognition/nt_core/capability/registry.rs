@@ -527,7 +527,7 @@ impl CapabilityRegistry {
     /// 把模型能力 (vision/context_window/provider) 注册为 Cognitive 类 capability,
     /// 使能力网可感知模型选择能力 (模型能力查询桥接, 消除 model_skills 死代码)。
     pub fn register_model_skills(&mut self) -> usize {
-        use crate::core::nt_core_model_skills::REGISTRY;
+        use crate::l5_cognition::nt_core_model_skills::REGISTRY;
         let mut registered = 0;
         for cap in REGISTRY.list_models() {
             let id = capability_id_from_name(&format!("model_{}", cap.model_name));

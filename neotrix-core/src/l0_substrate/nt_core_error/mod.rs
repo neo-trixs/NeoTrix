@@ -370,22 +370,22 @@ impl From<crate::core::nt_core_platform::AgentError> for NeoTrixError {
     }
 }
 
-impl From<crate::core::nt_core_task_dispatcher::TaskDispatchError> for NeoTrixError {
-    fn from(e: crate::core::nt_core_task_dispatcher::TaskDispatchError) -> Self {
+impl From<crate::l1_action::nt_core_task_dispatcher::TaskDispatchError> for NeoTrixError {
+    fn from(e: crate::l1_action::nt_core_task_dispatcher::TaskDispatchError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
 
-impl From<crate::core::nt_core_panic_recovery::BoundaryError> for NeoTrixError {
-    fn from(e: crate::core::nt_core_panic_recovery::BoundaryError) -> Self {
+impl From<crate::l5_cognition::nt_core_panic_recovery::BoundaryError> for NeoTrixError {
+    fn from(e: crate::l5_cognition::nt_core_panic_recovery::BoundaryError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
 
 
 
-impl From<crate::core::nt_core_observer_error::ErrorRecoveryError> for NeoTrixError {
-    fn from(e: crate::core::nt_core_observer_error::ErrorRecoveryError) -> Self {
+impl From<crate::l6_meta::nt_core_observer_error::ErrorRecoveryError> for NeoTrixError {
+    fn from(e: crate::l6_meta::nt_core_observer_error::ErrorRecoveryError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
@@ -416,14 +416,14 @@ impl From<nt_core_capability_tree::registry::RegistryError> for NeoTrixError {
 }
 
 // Core 层补充错误
-impl From<crate::core::nt_core_capability::CapabilityError> for NeoTrixError {
-    fn from(e: crate::core::nt_core_capability::CapabilityError) -> Self {
+impl From<crate::l6_meta::nt_core_capability::CapabilityError> for NeoTrixError {
+    fn from(e: crate::l6_meta::nt_core_capability::CapabilityError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
 
-impl From<crate::core::nt_core_hot_data::HotDataError> for NeoTrixError {
-    fn from(e: crate::core::nt_core_hot_data::HotDataError) -> Self {
+impl From<crate::l0_substrate::nt_core_hot_data::HotDataError> for NeoTrixError {
+    fn from(e: crate::l0_substrate::nt_core_hot_data::HotDataError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }

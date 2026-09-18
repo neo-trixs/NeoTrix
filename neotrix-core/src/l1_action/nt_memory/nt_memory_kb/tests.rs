@@ -2,8 +2,8 @@
 
     #[test]
     fn test_nodes_by_asset_kind() {
-        use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
-        use crate::core::nt_core_memory_asset::MemoryAssetKind;
+        use crate::l6_meta::nt_core_kb_types::{KnowledgeNode, NodeType};
+        use crate::l6_meta::nt_core_memory_asset::MemoryAssetKind;
 
         let dir = std::env::temp_dir().join(format!("nt_kb_asset_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
@@ -133,7 +133,7 @@
 
     #[test]
     fn test_consciousness_runtime_attaches_kb() {
-        use crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
+        use crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
         let dir = std::env::temp_dir().join(format!("nt_kb_cr_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
         let db_path = dir.join("test_cr_kb.db");

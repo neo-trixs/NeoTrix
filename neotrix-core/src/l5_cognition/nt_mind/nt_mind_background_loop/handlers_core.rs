@@ -32,8 +32,8 @@ impl BackgroundLoopHandle {
         // 用主库近期节点内容构造 VSA 事件 (seeded_random 确定性向量),
         // 跑 run_consolidation_cycle + prune_low_coherence。这是记忆大脑的
         // 夜间整理 — 此前 dream_consolidation 零生产调用。
-        use crate::core::nt_core_hcube::vsa_quantized::{QuantizedVSA, VSA_DIM};
-        use crate::core::nt_core_hcube::dream_consolidation::{DreamConfig};
+        use crate::l2_perception::nt_core_hcube::vsa_quantized::{QuantizedVSA, VSA_DIM};
+        use crate::l2_perception::nt_core_hcube::dream_consolidation::{DreamConfig};
         let dream_inputs: Vec<(String, f64)> = {
             if let Some(ref kb) = self.kb {
                 if let Ok(nodes) = kb.all_nodes() {
@@ -76,19 +76,19 @@ impl BackgroundLoopHandle {
     pub(crate) async fn handle_goal(&mut self) {
         // ── 门控前置检查: 爆炸半径分级 × 护栏 × 评审组 ──
         if let Some(ref registry) = self.gate_registry {
-            let input = crate::core::nt_core_gate::JudgeInput {
+            let input = crate::l5_cognition::nt_core_gate::JudgeInput {
                 candidate: "autonomous goal pursuit".to_string(),
-                claims: vec![crate::core::nt_core_gate::Claim::new("pursue next goal", &["internal:goal_loop"])],
+                claims: vec![crate::l5_cognition::nt_core_gate::Claim::new("pursue next goal", &["internal:goal_loop"])],
                 evidence_ids: vec!["internal:goal_loop".to_string()],
                 trajectory: None,
                 grounding_failures: self.tool_grounding.grounding_failures,
                 schema_failures: vec![],
-                producer_family: crate::core::nt_core_gate::JudgeFamily::None,
+                producer_family: crate::l5_cognition::nt_core_gate::JudgeFamily::None,
                 rubric: None,
                 samples: 1,
                 attestation: None,
             };
-            let panel = crate::core::nt_core_gate::JudgePanel::default_panel();
+            let panel = crate::l5_cognition::nt_core_gate::JudgePanel::default_panel();
             let decision = GateDecision::check_path(&registry.cloned_specs(), &input, &panel);
             if !decision.allows_autonomous() {
                 log::warn!("[bg] gate blocked goal pursuit: level={:?} action={:?} verdict={:?} reason={}",

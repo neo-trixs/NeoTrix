@@ -163,7 +163,7 @@ impl KnowledgeMiner {
                     let memory = ReasoningMemory {
                         id: uuid::Uuid::new_v4().to_string(),
                         task_description: format!("KnowledgeMined: {} ({})", knowledge.source_name, knowledge.domain),
-                        task_type: crate::core::nt_core_knowledge::TaskType::General,
+                        task_type: crate::l2_perception::nt_core_knowledge::TaskType::General,
                         micro_edits: knowledge.micro_edits.clone(),
                         reward: knowledge.confidence * 0.85,
                         reward_source: crate::l5_cognition::nt_mind::nt_mind::core::RewardSource::External,
@@ -172,7 +172,7 @@ impl KnowledgeMiner {
                         embedding: None,
                         tier: crate::l5_cognition::nt_mind::nt_mind::memory::MemoryTier::Semantic,
                         lifecycle: crate::l5_cognition::nt_mind::nt_mind::memory::MemoryLifecycle::new(knowledge.confidence * 0.85),
-                        t3_views: crate::core::nt_core_bank::T3Views::new(),
+                        t3_views: crate::l1_action::nt_core_bank::T3Views::new(),
                     };
                     bank.store(memory);
 

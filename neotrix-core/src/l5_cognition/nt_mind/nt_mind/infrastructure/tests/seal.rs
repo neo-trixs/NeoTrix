@@ -1,9 +1,9 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::core::nt_core_knowledge::TaskType;
+    use crate::l2_perception::nt_core_knowledge::TaskType;
     use crate::SelfIteratingBrain;
-    use crate::core::nt_core_bank::ReasoningMemory;
+    use crate::l1_action::nt_core_bank::ReasoningMemory;
 
     #[test]
     fn test_self_iteration() {
@@ -152,8 +152,8 @@ mod tests {
 
         // 显式写入一条记忆验证检索路径 (ReasoningBankStorageStage 按 freq=2 触发,
         // 单次循环可能 0 次迭代命中, 不依赖时序)。
-        use crate::core::nt_core_bank::ReasoningMemory;
-        use crate::core::nt_core_knowledge::TaskType;
+        use crate::l1_action::nt_core_bank::ReasoningMemory;
+        use crate::l2_perception::nt_core_knowledge::TaskType;
         system
             .reasoning_bank
             .store(ReasoningMemory::new("improve UI accessibility", TaskType::UIDesign, &[], 0.8));

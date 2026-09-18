@@ -107,7 +107,7 @@ impl EvolutionHarness {
     /// 高共振阈值: suggestion == "strengthen"。
     pub fn run_cycle(
         &mut self,
-        snapshot: &crate::core::nt_core_consciousness_core::CoreSnapshot,
+        snapshot: &crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot,
         infos: &[CapabilityNodeInfo],
     ) -> LoopReport {
         self.loop_.run(snapshot, infos)
@@ -219,7 +219,7 @@ impl crate::l5_cognition::traits::EvolutionHarnessApi for EvolutionHarness {
         snapshot_json: &serde_json::Value,
         infos: &[crate::l5_cognition::traits::RegistryNodeInfo],
     ) -> serde_json::Value {
-        let snapshot: crate::core::nt_core_consciousness_core::CoreSnapshot =
+        let snapshot: crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot =
             serde_json::from_value(snapshot_json.clone()).unwrap_or_default();
         let l6_infos: Vec<CapabilityNodeInfo> = infos.iter().map(|i| CapabilityNodeInfo {
             node_id: i.node_id.clone(),
@@ -272,7 +272,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for EvolutionHarness {
     }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut harness = EvolutionHarness::new(LoopConfig::default());
-        let snapshot = crate::core::nt_core_consciousness_core::CoreSnapshot::default();
+        let snapshot = crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot::default();
         let infos = EvolutionHarness::_infos_from_registry_export(
             r#"{"nodes":[{"id":"nt-core::gwt","domain":"NT-CORE","layer":"L4","constellation":"C0","metadata":{"strength":0.3}}]}"#,
         );
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_suggestions_skip_inactive_and_low_maturity_nodes() {
-        let snapshot = crate::core::nt_core_consciousness_core::CoreSnapshot {
+        let snapshot = crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot {
             phi: 0.9,
             coherence: 0.9,
             ..Default::default()

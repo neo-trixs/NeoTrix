@@ -14,8 +14,8 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::collections::VecDeque;
 
-use crate::core::nt_core_harness::HarnessAdapter;
-use crate::core::nt_core_hex::ReasoningHexagram;
+use crate::l1_action::nt_core_harness::HarnessAdapter;
+use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 
 /// 按 SpecialistType 声明序取 module 索引（与 default_specialist_states / hexagram_states 同序）。
 /// BTreeMap<String, _> 的 values() 是 name-sort 序，与声明序不一致，绝不能按位置互用。
@@ -661,7 +661,7 @@ impl GlobalWorkspace {
         // Step 5b: Competition Gate — WTA ignition override if enabled
         if let Some(ref gate) = self.competition_gate {
             let resonance_matrix =
-                crate::core::nt_core_gwt::resonance::ResonanceMatrix::from_states(hexagram_states);
+                crate::l5_cognition::nt_core_gwt::resonance::ResonanceMatrix::from_states(hexagram_states);
             let competition_result = gate.compete(&raw, &resonance_matrix);
             if competition_result.ignition {
                 // Override winner and effective saliences with competition result
@@ -1590,7 +1590,7 @@ mod tests {
         // Dominant type should be Logical (CodeAnalyzer dominates)
         assert_eq!(
             profile.dominant,
-            crate::core::nt_core_gwt::cognitive_type::CognitiveType::Logical
+            crate::l5_cognition::nt_core_gwt::cognitive_type::CognitiveType::Logical
         );
         // Entropy is a valid Shannon entropy
         assert!(profile.entropy >= 0.0);

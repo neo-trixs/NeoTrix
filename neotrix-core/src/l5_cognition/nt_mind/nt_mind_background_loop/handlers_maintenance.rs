@@ -594,7 +594,7 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_constitution_reload(&mut self) {
-        use crate::core::nt_core_self_constitution::ConstitutionLoader;
+        use crate::l6_meta::nt_core_self_constitution::ConstitutionLoader;
         let path = std::path::Path::new("AGENTS.md");
         if path.exists() {
             match ConstitutionLoader::load_from_file(path) {

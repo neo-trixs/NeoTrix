@@ -1,15 +1,15 @@
-use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
-use crate::core::nt_core_hcube::coord::HyperCoord;
-use crate::core::nt_core_hcube::axis::DimensionAxis;
-use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::core::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
-use crate::core::nt_core_bank::ReasoningMemory;
-use crate::core::nt_core_edit::MicroEdit;
+use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
+use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
+use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
+use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::l5_cognition::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
+use crate::l1_action::nt_core_bank::ReasoningMemory;
+use crate::l1_action::nt_core_edit::MicroEdit;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::l5_cognition::layer_aliases::WorldModelV2;
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 use crate::neotrix::nt_world_infer::FreeEnergyReport;
-use crate::core::nt_core_iit_phi::PhiReport;
+use crate::l5_cognition::nt_core::nt_iit_phi::PhiReport;
 use super::cortex_memory::{CortexMemory, MemoryTrace, DimensionTag, Modality};
 use super::consciousness_bridge::ConsciousnessBridge;
 use super::self_iterating::SelfIteratingBrain;
@@ -175,7 +175,7 @@ impl PanoramaPipeline {
         // cycle 205 收敛"共振至后台环"后 background_loop 从未调用 resonant_broadcast,
         // 导致 GWT 共振引擎(competition/oscillator/entropy 全景)零执行, 恒为伪收敛。
         // 此处以预测特征为内容驱动一轮全景共振。
-        let hexagram_states = crate::core::nt_core_gwt::resonance::default_specialist_states();
+        let hexagram_states = crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states();
         self.gwt.resonant_broadcast(
             &format!(
                 "[panorama] cycle={} prediction_energy={:.3} phi={:.3} fe={:.3}",

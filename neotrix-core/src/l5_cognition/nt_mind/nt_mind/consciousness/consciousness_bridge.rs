@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use crate::core::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
-use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::l5_cognition::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
+use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_self::AttentionDomain;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_world_model::TaskType;

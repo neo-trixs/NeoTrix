@@ -16,7 +16,7 @@ use crate::l5_cognition::nt_mind::evolution::self_diagnose::{
     ActionExecutor, ActionPlan, CodeUnderlyingIssue, DiagnosticItem, EvolutionLoopProvider,
     PriorityQueue, PrioritizedIssue, RepairCircuitBreaker, SelfDiagnose,
 };
-use crate::core::nt_core_iit_phi::IITPhiCalculator;
+use crate::l5_cognition::nt_core::nt_iit_phi::IITPhiCalculator;
 use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
 // pub use crate::l1_action::nt_act::nt_l1_shared_types::IssueType;
 use serde::{Deserialize, Serialize};

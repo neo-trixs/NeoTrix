@@ -5,7 +5,7 @@
 use serde::{Serialize, Deserialize};
 
 // 叙事类型定义在 core 层，此处 re-export 保持 L5 内部向后兼容
-pub use crate::core::nt_core_narrative_types::{SegmentType, SegmentData};
+pub use crate::l5_cognition::nt_core_narrative_types::{SegmentType, SegmentData};
 
 // ============================================================================
 // 节段分配结果

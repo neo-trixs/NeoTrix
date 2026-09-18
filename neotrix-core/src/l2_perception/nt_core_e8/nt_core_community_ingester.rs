@@ -24,8 +24,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_e8::domain_transition::{E8DomainTransitionModel, E8TaskType};
-use crate::core::nt_core_e8::E8TransitionMatrix;
+use crate::l2_perception::nt_core_e8::domain_transition::{E8DomainTransitionModel, E8TaskType};
+use crate::l2_perception::nt_core_e8::E8TransitionMatrix;
 
 /// 20-hex md5 of a string, used to derive deterministic node/edge ids.
 /// Mirrors the retired prototype `scripts/deep-absorb-fable5.py:ndig`. md5 here is used only for
@@ -317,7 +317,7 @@ impl CommunityDataIngester {
         &self,
         kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
     ) -> Result<usize, String> {
-        use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType, RelationType};
+        use crate::l6_meta::nt_core_kb_types::{KnowledgeNode, NodeType, RelationType};
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)

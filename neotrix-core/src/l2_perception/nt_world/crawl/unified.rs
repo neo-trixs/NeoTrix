@@ -9,9 +9,9 @@ use super::classifier::ContentClassifier;
 use super::mapper::KnowledgeMapper;
 
 use crate::core::CapabilityVector;
-use crate::core::nt_core_bank::ReasoningBank;
-use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
-use crate::core::nt_core_hcube::gap::GapReport;
+use crate::l1_action::nt_core_bank::ReasoningBank;
+use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
+use crate::l2_perception::nt_core_hcube::gap::GapReport;
 use crate::neotrix::nt_world_scrape::ScraperConfig;
 
 pub struct UnifiedCrawler {

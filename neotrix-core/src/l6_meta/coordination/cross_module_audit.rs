@@ -5,7 +5,7 @@
 
 use serde::{Serialize, Deserialize};
 use crate::core::nt_core_self::dynamic_params::{DynamicParams, ScalingRating};
-use crate::core::nt_core_narrative_types::{SegmentData, SegmentType};
+use crate::l5_cognition::nt_core_narrative_types::{SegmentData, SegmentType};
 
 // ============================================================================
 // 一致性检查配置

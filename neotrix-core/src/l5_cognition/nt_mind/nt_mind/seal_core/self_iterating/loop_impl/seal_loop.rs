@@ -1,7 +1,7 @@
 use super::core::SelfIteratingBrain;
 use super::super::brain_impl::EvaluationRecord;
 use super::super::benchmark_gate::{BenchmarkGateDecision, BenchmarkSuite};
-use crate::core::nt_core_consciousness::inner_critic::CritiqueResult;
+use crate::l5_cognition::nt_core_consciousness::inner_critic::CritiqueResult;
 use crate::l5_cognition::traits::EvalHarnessApi;
 use super::super::super::core::{CapabilityVector, RewardSource};
 use super::super::super::self_edit::MicroEdit;
@@ -19,17 +19,17 @@ use super::super::pipeline::kernel_iterate_pipeline;
 use super::super::recursive_depth_reward::RecursiveDepthReward;
 use crate::neotrix::nt_world_model::{TaskType, Context};
 use crate::l1_action::nt_io::nt_io_provider::create_gateway;
-use crate::core::nt_core_sae_bridge::SAEBridge;
+use crate::l5_cognition::nt_core_sae_bridge::SAEBridge;
 use crate::core::SparseAutoencoder;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 // // use crate::core::// nt_core_signal::SelectiveState;
-use crate::core::nt_core_e8::ewhr_bridge::E8EwhrBridge;
+use crate::l2_perception::nt_core_e8::ewhr_bridge::E8EwhrBridge;
 use std::sync::{Arc, Mutex};
 use crate::cli::shield_enforcer::global_shield;
-use crate::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
-use crate::core::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
-use crate::core::nt_core_reasoning::ContextBuilder;
+use crate::l1_action::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
+use crate::l5_cognition::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
+use crate::l5_cognition::nt_core_reasoning::ContextBuilder;
 use crate::l5_cognition::layer_aliases::ReasoningKernel;
 use crate::l5_cognition::nt_core::nt_core_parallel::isolation::{IntentIsolator, AtomicDecomposer};
 use crate::l5_cognition::nt_mind::nt_mind::infrastructure::code_review::CodeReviewEngine;
@@ -947,34 +947,34 @@ impl SelfIteratingBrain {
             // distilled reasoning patterns — not just local observations.
             let mut load_tm = match kb.kv_get("e8_tm", "transition_matrix") {
                 Ok(Some(json)) => {
-                    match crate::core::nt_core_e8::E8TransitionMatrix::from_json_str(&json) {
+                    match crate::l2_perception::nt_core_e8::E8TransitionMatrix::from_json_str(&json) {
                         Some(matrix) => {
                             log::info!("[E8-TM] loaded transition matrix from KB ({} total visits)",
                                 matrix.visit_counts.0.iter().sum::<u64>());
                             matrix
                         }
                         None => {
-                            let mut tm = crate::core::nt_core_e8::E8TransitionMatrix::new();
+                            let mut tm = crate::l2_perception::nt_core_e8::E8TransitionMatrix::new();
                             tm.init_from_trace_patterns();
                             tm
                         }
                     }
                 }
                 _ => {
-                    let mut tm = crate::core::nt_core_e8::E8TransitionMatrix::new();
+                    let mut tm = crate::l2_perception::nt_core_e8::E8TransitionMatrix::new();
                     tm.init_from_trace_patterns();
                     tm
                 }
             };
             // Seed loaded TM with community dataset priors
-            crate::core::nt_core_e8::nt_core_community_ingester::seed_transition_matrix_with_community(&mut load_tm);
+            crate::l2_perception::nt_core_e8::nt_core_community_ingester::seed_transition_matrix_with_community(&mut load_tm);
             engine = engine.with_observer_transition_matrix(load_tm);
             log::info!("[E8-TM] community-seeded transition matrix active");
             // 意识核心进化闭环 (数据→KB): 把 200G 级社区推理数据集落盘 KB,
             // 使 ConsciousnessTree soil 能观测真实节点/边数, 而非仅内部模拟。
             // 此前 persist_to_kb_store 无生产调用者, 社区数据只种子化 E8 TM,
             // 从不进入知识库 (KB 全表 0 行)。
-            let ingester = crate::core::nt_core_e8::nt_core_community_ingester::CommunityDataIngester::default();
+            let ingester = crate::l2_perception::nt_core_e8::nt_core_community_ingester::CommunityDataIngester::default();
             match ingester.persist_to_kb_store(&kb) {
                 Ok(n) => log::info!("[KB] community datasets persisted: {} nodes", n),
                 Err(e) => log::warn!("[KB] community datasets persist failed: {}", e),
@@ -1018,17 +1018,17 @@ impl SelfIteratingBrain {
         engine = engine.with_sae_bridge(SAEBridge::new(sae));
 
         // L6 Self: 注入剩余的元认知/监控/压缩/蒸馏子系统
-        use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-        use crate::core::nt_core_gwt::vsa_scorer::VsaContentScorer;
+        use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
+        use crate::l5_cognition::nt_core_gwt::vsa_scorer::VsaContentScorer;
         use crate::core::nt_core_self::silicon_self::SiliconSelfModel;
-        use crate::core::nt_core_ttc::{TtcEngine, TtcConfig};
-        use crate::core::nt_core_trajectory_compress::CompressionLevel;
-        use crate::core::l7_capability::nt_core_antidistil::AntiDistillationSystem;
+        use crate::l5_cognition::nt_core_ttc::{TtcEngine, TtcConfig};
+        use crate::l5_cognition::nt_core_trajectory_compress::CompressionLevel;
+        use crate::l5_cognition::nt_core::capability::nt_core_antidistil::AntiDistillationSystem;
         use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
-        use crate::core::nt_core_prm::{ProcessRewardLearner, HeuristicCoach};
-        use crate::core::nt_core_policy::E8Policy;
-        use crate::core::nt_core_e8::nt_core_fable_pattern::FablePatternMatcher;
-        use crate::core::nt_core_e8::nt_core_e8_prediction::{
+        use crate::l5_cognition::nt_core_prm::{ProcessRewardLearner, HeuristicCoach};
+        use crate::l5_cognition::nt_core_policy::E8Policy;
+        use crate::l2_perception::nt_core_e8::nt_core_fable_pattern::FablePatternMatcher;
+        use crate::l2_perception::nt_core_e8::nt_core_e8_prediction::{
             E8PredictionOracle, E8PredictionEnsemble, E8MctsPredictor,
         };
 
@@ -1049,7 +1049,7 @@ impl SelfIteratingBrain {
             .with_cost_tracker(CostTracker::new())
             .with_prm(ProcessRewardLearner::new(E8Policy::default(), Box::new(HeuristicCoach::new("prm"))))
             .with_fable_matcher(FablePatternMatcher::default())
-            .with_domain_transition(crate::core::nt_core_e8::domain_transition::E8DomainTransitionModel::new(0.3))
+            .with_domain_transition(crate::l2_perception::nt_core_e8::domain_transition::E8DomainTransitionModel::new(0.3))
             .with_prediction_oracle(E8PredictionOracle::new(
                 E8PredictionEnsemble::default(),
                 E8MctsPredictor::new(8, 50, 2.0, 0.9),
@@ -1133,7 +1133,7 @@ impl SelfIteratingBrain {
         if let Some(ref mut engine) = self.reasoning_engine {
             if let Some(ref kb) = engine.kb {
                 if let Ok(Some(json)) = kb.kv_get("e8_tm", "transition_matrix") {
-                    if let Some(tm) = crate::core::nt_core_e8::E8TransitionMatrix::from_json_str(&json) {
+                    if let Some(tm) = crate::l2_perception::nt_core_e8::E8TransitionMatrix::from_json_str(&json) {
                         engine.observer = std::mem::take(&mut engine.observer).with_transition_matrix(tm);
                         log::info!("[E8-TM] loaded transition matrix from KB on restart");
                     }
@@ -1144,7 +1144,7 @@ impl SelfIteratingBrain {
                 // canonical chain seeds in init_reasoning_engine() then REPLACED here with the
                 // persisted version containing all runtime transitions.
                 if let Ok(Some(dtm_json)) = kb.kv_get("e8_tm", "domain_model") {
-                    if let Ok(dtm) = serde_json::from_str::<crate::core::nt_core_e8::domain_transition::E8DomainTransitionModel>(&dtm_json) {
+                    if let Ok(dtm) = serde_json::from_str::<crate::l2_perception::nt_core_e8::domain_transition::E8DomainTransitionModel>(&dtm_json) {
                         engine.domain_transition_model = Some(dtm);
                         log::info!("[E8-DTM] loaded domain transition model from KB on restart");
                     }

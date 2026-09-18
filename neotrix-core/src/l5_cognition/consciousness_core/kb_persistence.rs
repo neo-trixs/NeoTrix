@@ -31,7 +31,7 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
     conn.busy_timeout(std::time::Duration::from_secs(5))
         .map_err(|e| format!("KB busy_timeout: {}", e))?;
     let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
-    crate::core::nt_core_kb_primitives::schema_initialize(&conn)
+    crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
         .map_err(|e| format!("KB init: {}", e))?;
     Ok(conn)
 }
@@ -44,7 +44,7 @@ pub(crate) fn load_snapshot() -> Option<CoreSnapshot> {
 /// 连接注入版快照读取
 fn load_snapshot_from_conn(conn: &rusqlite::Connection) -> Option<CoreSnapshot> {
     let raw =
-        crate::core::nt_core_kb_primitives::kv_get(conn, NAMESPACE, KEY).ok()??;
+        crate::l6_meta::nt_core_kb_primitives::kv_get(conn, NAMESPACE, KEY).ok()??;
     serde_json::from_str(&raw).ok()
 }
 
@@ -69,7 +69,7 @@ pub(crate) fn persist_snapshot_to_conn(
     out.coherence_trend =
         merge_trend_sample(prev_coh_hist, prev_cycle, snap.cycle, snap.coherence);
     let json = serde_json::to_string(&out).map_err(|e| format!("snapshot serialize: {}", e))?;
-    crate::core::nt_core_kb_primitives::kv_set(conn, NAMESPACE, KEY, &json)?;
+    crate::l6_meta::nt_core_kb_primitives::kv_set(conn, NAMESPACE, KEY, &json)?;
     refresh_gold_standard(conn, &out);
     Ok(out)
 }
@@ -111,7 +111,7 @@ fn refresh_gold_standard(conn: &rusqlite::Connection, snap: &CoreSnapshot) {
         "cycle": snap.cycle,
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
-    let _ = crate::core::nt_core_kb_primitives::kv_set(
+    let _ = crate::l6_meta::nt_core_kb_primitives::kv_set(
         conn,
         NAMESPACE,
         GOLD_STANDARD_KEY,
@@ -120,9 +120,9 @@ fn refresh_gold_standard(conn: &rusqlite::Connection, snap: &CoreSnapshot) {
 }
 
 /// 从 KB 读取快照并重建树
-pub(crate) fn load_or_new() -> crate::core::nt_core_consciousness_tree::ConsciousnessTree {
+pub(crate) fn load_or_new() -> crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree {
     use super::core::tree_from_snapshot;
-    let tree = crate::core::nt_core_consciousness_tree::ConsciousnessTree::new();
+    let tree = crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree::new();
     match load_snapshot() {
         Some(snap) => tree_from_snapshot(&snap),
         None => tree,

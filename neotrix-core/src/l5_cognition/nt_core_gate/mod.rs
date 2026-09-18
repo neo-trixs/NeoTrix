@@ -26,8 +26,8 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_prm::{AgentTrajectory, ScoredCriterion};
-use crate::core::nt_core_llm::{LlmProvider, LlmRequest};
+use crate::l5_cognition::nt_core_prm::{AgentTrajectory, ScoredCriterion};
+use crate::l1_action::nt_core_llm::{LlmProvider, LlmRequest};
 
 // ───────────────────────────── 基础类型 ─────────────────────────────
 
@@ -857,7 +857,7 @@ impl LLMJudgeAdapter {
         let request = LlmRequest::new(&self.model, &self.prompt(input))
             .with_temperature(Some(0.2))
             .with_max_tokens(max_tokens)
-            .with_structured_output(crate::core::nt_core_llm::StructuredOutputConfig::JsonObject);
+            .with_structured_output(crate::l1_action::nt_core_llm::StructuredOutputConfig::JsonObject);
         let response = self.provider.complete(&request).await;
         match response {
             Ok(resp) => {
@@ -2024,10 +2024,10 @@ impl CalibrationSet {
                 TrajectoryLabel::Clean
             };
             let mut traj = AgentTrajectory::new(id, content.to_string());
-            traj.push(crate::core::nt_core_prm::TrajectoryStep {
+            traj.push(crate::l5_cognition::nt_core_prm::TrajectoryStep {
                 step_idx: 0,
                 specialist: crate::core::nt_core_traits::SpecialistType::RiskAssessor,
-                e8_mode: crate::core::nt_core_hex::ReasoningHexagram::new(0b001010),
+                e8_mode: crate::l5_cognition::nt_core_hex::ReasoningHexagram::new(0b001010),
                 action: "absorb".to_string(),
                 input: evidence.to_string(),
                 output: content.to_string(),

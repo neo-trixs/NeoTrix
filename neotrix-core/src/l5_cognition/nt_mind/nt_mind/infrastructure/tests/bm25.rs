@@ -1,8 +1,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::core::nt_core_knowledge::TaskType;
-    use crate::core::nt_core_bank::{ReasoningBank, ReasoningMemory};
+    use crate::l2_perception::nt_core_knowledge::TaskType;
+    use crate::l1_action::nt_core_bank::{ReasoningBank, ReasoningMemory};
     use crate::l5_cognition::nt_mind::nt_mind::self_edit::MicroEdit;
 
     #[test]

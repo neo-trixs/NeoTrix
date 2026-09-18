@@ -239,7 +239,7 @@ impl UcdpFetcher {
             let url = format!("https://ucdp.uu.se/#/event/{}/{}", evt.year, evt.id);
             let existing = kb.find_node_by_url(&url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.id, crate::core::nt_core_kb_types::NodeType::Event, Some(&summary), Some(&url), Some("ucdp"))
+            let _id = kb.insert_or_get_node(&evt.id, crate::l6_meta::nt_core_kb_types::NodeType::Event, Some(&summary), Some(&url), Some("ucdp"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.id, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }

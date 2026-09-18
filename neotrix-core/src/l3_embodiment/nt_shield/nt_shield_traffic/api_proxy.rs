@@ -420,7 +420,7 @@ async fn handle_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::l2_perception::nt_core_llm::Usage;
+    use crate::l2_perception::nt_core_llm::Usage;
 
     #[test]
     fn test_to_internal_role() {

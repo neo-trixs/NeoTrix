@@ -1,7 +1,7 @@
 //! HarnessAdapter 适配器 — 类型定义在 core/nt_core_harness 中（防 L5→L8 反向依赖），
 //! KB 持久化方法通过 HarnessKbExt trait 扩展至此层。
 
-pub use crate::core::nt_core_harness::{HarnessAdapter, HarnessProfile};
+pub use crate::l1_action::nt_core_harness::{HarnessAdapter, HarnessProfile};
 
 use crate::neotrix::nt_memory_kb::{KnowledgeBase, KnowledgeNode, NodeType};
 use std::collections::HashMap;

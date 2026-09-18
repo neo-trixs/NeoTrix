@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use url::Url;
 
-use crate::core::nt_core_llm::DataTrust;
+use crate::l1_action::nt_core_llm::DataTrust;
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 
 /// HTTP/HTTPS interception proxy for request/response inspection.

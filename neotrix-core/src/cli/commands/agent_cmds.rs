@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 // use crate::l1_action::nt_io::nt_agent_mcp_gateway::{ProgrammaticCall, ProgrammaticPlanner};
-// use crate::core::l7_capability::nt_core_orch_agent::{SubagentConfig, SubagentManager, MessageType};
+// use crate::l5_cognition::nt_core::capability::nt_core_orch_agent::{SubagentConfig, SubagentManager, MessageType};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 // use crate::agent::tool::mcp::{McpRegistry, McpDiscovery};
 
@@ -197,7 +197,7 @@ impl CliCommand for AgentCmd {
                 let name = &args[1];
                 // 档案命中判定：文件驱动定义（~/.neotrix/agents）优先，其次内置静态档案。
                 // 命中则套用档案的工具权限矩阵与分级，而非裸 E8 模式。
-                use crate::core::nt_core_subagent::SubAgentRegistry;
+                use crate::cli::nt_subagent::SubAgentRegistry;
                 let mut file_reg = SubAgentRegistry::new();
                 file_reg.scan_all();
                 let is_known_agent = file_reg.get(name).is_some();

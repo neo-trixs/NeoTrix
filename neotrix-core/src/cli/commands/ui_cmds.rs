@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CliContext, CommandOutput};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
-use crate::core::nt_core_router::{TaskComplexity, TaskContext};
+use crate::cli::nt_router::{TaskComplexity, TaskContext};
 use crate::l5_cognition::nt_mind::nt_mind_background_loop::always_on::ALWAYS_ON_ENGINE;
 
 // ====== /side ======
@@ -215,7 +215,7 @@ impl CliCommand for RouterCmd {
                 let router = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.router)
                 } else {
-                    crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 let msg = router.savings_report();
                 let out = CommandOutput::ok(&msg);
@@ -233,7 +233,7 @@ impl CliCommand for RouterCmd {
                 let mut router = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.router)
                 } else {
-                    crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 router.set_enabled(true);
                 let _ = router.save();
@@ -244,7 +244,7 @@ impl CliCommand for RouterCmd {
                 let mut router = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.router)
                 } else {
-                    crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 router.set_enabled(false);
                 let _ = router.save();
@@ -255,7 +255,7 @@ impl CliCommand for RouterCmd {
                 let mut router = if let Some(ctx) = ctx {
                     CliContext::lock(&ctx.router)
                 } else {
-                    crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                    crate::cli::nt_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
                 };
                 router.reset_stats();
                 let out = CommandOutput::ok("🔀 路由统计已重置");
@@ -277,7 +277,7 @@ impl CliCommand for RouterCmd {
                     let mut router = if let Some(ctx) = ctx {
                         CliContext::lock(&ctx.router)
                     } else {
-                        crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                        crate::cli::nt_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
                     };
                     router.set_rule(complexity.clone(), provider, model, cost_in, cost_out);
                     let _ = router.save();

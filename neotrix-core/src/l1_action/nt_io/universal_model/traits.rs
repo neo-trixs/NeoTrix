@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::core::l2_perception::nt_core_llm::{
+use crate::l2_perception::nt_core_llm::{
     DataTrust, LlmError, LlmRequest, LlmResponse, Usage,
 };
 

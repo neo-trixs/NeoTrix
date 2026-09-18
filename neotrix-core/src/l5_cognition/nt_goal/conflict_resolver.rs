@@ -231,7 +231,7 @@ impl GoalConflictResolver {
             expected_impact: (a.expected_impact + b.expected_impact) / 2.0,
             effort_estimate: a.effort_estimate + b.effort_estimate,
             dependencies: merged_deps,
-            time_scale: crate::core::nt_core_crt::CrtTimeScale::Huntian,
+            time_scale: crate::l5_cognition::nt_core::nt_crt::CrtTimeScale::Huntian,
         }
     }
 }
@@ -259,7 +259,7 @@ mod tests {
             expected_impact: 0.5,
             effort_estimate: 0.3,
             dependencies: vec![],
-            time_scale: crate::core::nt_core_crt::CrtTimeScale::Huntian,
+            time_scale: crate::l5_cognition::nt_core::nt_crt::CrtTimeScale::Huntian,
         }
     }
 
@@ -325,7 +325,7 @@ mod tests {
             expected_impact: 0.8,
             effort_estimate: 0.5,
             dependencies: vec![],
-            time_scale: crate::core::nt_core_crt::CrtTimeScale::Gaitian,
+            time_scale: crate::l5_cognition::nt_core::nt_crt::CrtTimeScale::Gaitian,
         };
         let b = EvolutionGoal {
             id: "B1".into(),
@@ -336,7 +336,7 @@ mod tests {
             expected_impact: 0.3,
             effort_estimate: 0.2,
             dependencies: vec![],
-            time_scale: crate::core::nt_core_crt::CrtTimeScale::Gaitian,
+            time_scale: crate::l5_cognition::nt_core::nt_crt::CrtTimeScale::Gaitian,
         };
         let merged = GoalConflictResolver::merge_goals(&a, &b);
         assert_eq!(merged.priority, GoalPriority::Critical);

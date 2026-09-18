@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use super::*;
-use crate::core::nt_core_gate::{GateDecision, ToolRegistry};
+use crate::l5_cognition::nt_core_gate::{GateDecision, ToolRegistry};
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -236,7 +236,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConvergencePulse {
     }
 }
 
-use crate::core::nt_core_self_constitution::ConstitutionLoader;
+use crate::l6_meta::nt_core_self_constitution::ConstitutionLoader;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::{CleanupEngine, CleanupKind, BackupEngine};
 use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, LogHook};
@@ -245,8 +245,8 @@ use crate::l5_cognition::nt_mind::foundation::l1_wrappers::SessionRecoveryWrappe
 use crate::neotrix::nt_core_event_bus::{EventBus, flood_guard, subscribe_all_layers_sync};
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
 use crate::core::nt_core_event::CoreEvent;
-use crate::core::nt_core_state_substrate::StateSubstrate;
-use crate::core::nt_core_simulate_engine::SimulateEngine;
+use crate::l5_cognition::nt_core::nt_state_substrate::StateSubstrate;
+use crate::l1_action::nt_core_simulate_engine::SimulateEngine;
 
 // ============================================================
 // L1-L3 自治梯度 (G9 — loop-engineering 吸收)
@@ -656,8 +656,8 @@ impl BackgroundLoop {
                 }
                 Some(sb)
             },
-            dream: crate::core::nt_core_hcube::dream_consolidation::DreamConsolidation::new(
-                crate::core::nt_core_hcube::dream_consolidation::DreamConfig::default(),
+            dream: crate::l2_perception::nt_core_hcube::dream_consolidation::DreamConsolidation::new(
+                crate::l2_perception::nt_core_hcube::dream_consolidation::DreamConfig::default(),
             ),
             meta_agent: self.kb.clone().map(|kb_ref| {
                 crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::MemoryAgent { kb: kb_ref }
@@ -948,7 +948,7 @@ pub struct BackgroundLoopHandle {
 //     agent_discovery: Option<crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery>,
     panorama: Option<PanoramaPipeline>,
     nt_world_model: Option<WorldModelV2>,
-    scheduler: Option<crate::core::nt_core_scheduler::SchedulerEngine>,
+    scheduler: Option<crate::l6_meta::nt_core_scheduler::SchedulerEngine>,
     daemon: Option<EvolutionDaemon>,
     skill_engine: SkillEngine,
     /// G28 自维护巡检 healers (topics/code-health 吸收) — 多维度代码健康巡检。
@@ -965,16 +965,16 @@ pub struct BackgroundLoopHandle {
     heartbeat_engine: Option<crate::neotrix::nt_shield_stealth_net::ProxyHeartbeatEngine>,
     #[cfg(feature = "stealth-net")]
     proxy_client: Option<crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient>,
-    consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
-    consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
+    consciousness_runtime: Option<crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
+    consciousness_tree: Option<crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree>,
     fep_iit_bridge: Option<crate::l4_emotion::nt_feel::fep_iit_bridge::FepIitBridge>,
-    cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
+    cognitive_load: Option<crate::l5_cognition::nt_core_consciousness::CognitiveLoadMonitor>,
     /// 意图引擎 (F2 接线): EFE 域探索提案必须经 select_by_goal_alignment 放行。
-    volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
+    volition: Option<crate::l5_cognition::nt_core_consciousness::VolitionEngine>,
     second_brain: Option<SecondBrain>,
     /// 梦境巩固器 — VSA 记忆重组/提纯/巩固 (skales Dreaming 模式, P0-3 接线)。
     /// 低负载周期触发 run_consolidation_cycle + prune_low_coherence。
-    dream: crate::core::nt_core_hcube::dream_consolidation::DreamConsolidation,
+    dream: crate::l2_perception::nt_core_hcube::dream_consolidation::DreamConsolidation,
     /// 记忆大脑 agent 外壳 — MemoryAgentCapability 统一能力面 (R-P42 接线)。
     /// handle_goal 按事件路由写/检索/巩固/证据能力。
     meta_agent: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::MemoryAgent>,

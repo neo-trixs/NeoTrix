@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::core::nt_core_policy::E8Policy;
-use crate::core::nt_core_reasoning::{ReasoningTrace, TraceSource};
+use crate::l5_cognition::nt_core_policy::E8Policy;
+use crate::l5_cognition::nt_core_reasoning::{ReasoningTrace, TraceSource};
 
-pub use crate::core::nt_core_kernel_types::{
+pub use crate::l5_cognition::nt_core_kernel_types::{
     EVOLUTION, KERNEL_DIM, KernelStats, ReasoningKernel, ReasoningMethod, ReasoningOutput,
     SelfConsistencyResult, StageInfo, Vector,
 };
@@ -71,7 +71,7 @@ impl ReasoningKernel {
                 .as_nanos()),
             task: "standalone_kernel_reasoning".to_string(),
             method,
-            hexagram: crate::core::nt_core_hex::ReasoningHexagram::new(self.stage as u8 % 64),
+            hexagram: crate::l5_cognition::nt_core_hex::ReasoningHexagram::new(self.stage as u8 % 64),
             stage: self.stage,
             steps: Vec::new(), // 简化：不记录详细步骤文本
             intermediate_states: intermediates,

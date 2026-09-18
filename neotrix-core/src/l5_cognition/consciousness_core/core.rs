@@ -7,7 +7,7 @@ use std::sync::{LazyLock, RwLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
+use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
 
 
 /// KB 最短路径管道 — 意识体读写端直达 (R-P42: 强化现有节点, 禁止平行适配器)
@@ -393,14 +393,14 @@ pub(crate) fn tree_from_snapshot(snap: &CoreSnapshot) -> ConsciousnessTree {
     apply_branch_maturity(&mut tree, &snap.branch_maturity);
     for fr in &snap.fruits {
         tree.fruits
-            .push(crate::core::nt_core_consciousness_tree::EvolutionFruit {
+            .push(crate::l5_cognition::nt_core_consciousness_tree::EvolutionFruit {
                 name: fr.name.clone(),
                 source_branch: branch_kind_from_str(&fr.source_branch),
                 description: fr.description.clone(),
                 produced_at_cycle: fr.produced_at_cycle,
                 quality: fr.quality,
                 claim: fr.claim.clone(),
-                evidence: crate::core::nt_core_consciousness_tree::EvidenceChain {
+                evidence: crate::l5_cognition::nt_core_consciousness_tree::EvidenceChain {
                     run_id: fr.run_id.clone(),
                     ..Default::default()
                 },

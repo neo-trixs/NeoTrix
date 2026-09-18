@@ -1,6 +1,6 @@
 // // use crate::core::// nt_core_signal::ops::cosine_similarity;
 
-pub use crate::core::nt_core_embed::TextEmbedder;
+pub use crate::l1_action::nt_core_embed::TextEmbedder;
 
 pub fn recall_similar(query: &str, memories: &[crate::l5_cognition::nt_mind::nt_mind::memory::ReasoningMemory], top_k: usize) -> Vec<(usize, f64)> {
     if memories.is_empty() {
@@ -35,7 +35,7 @@ pub fn recall_similar(query: &str, memories: &[crate::l5_cognition::nt_mind::nt_
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_embed::EMBEDDING_DIM;
+    use crate::l1_action::nt_core_embed::EMBEDDING_DIM;
 
     #[test]
     fn test_embedding_creation() {

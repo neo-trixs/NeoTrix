@@ -8,7 +8,7 @@
 //! 机制: `YopediaBackend` 实现 `AgentWikiRef` trait, 预留条目化知识节点
 //! 插入钩子, 与 NeoTrix 现有 `KnowledgeBase` (l3_memory_impl/nt_memory_kb) 对应。
 
-use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
+use crate::l6_meta::nt_core_kb_types::{KnowledgeNode, NodeType};
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use uuid::Uuid;

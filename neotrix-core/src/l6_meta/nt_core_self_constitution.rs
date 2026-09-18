@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::LazyLock;
 
-use crate::core::nt_core_hcube::fhrr_vsa::{similarity, FhrrVector};
-use crate::core::nt_core_guard_chain::{GuardChain, GuardVerdict};
+use crate::l2_perception::nt_core_hcube::fhrr_vsa::{similarity, FhrrVector};
+use crate::l3_embodiment::nt_core_guard_chain::{GuardChain, GuardVerdict};
 
 /// Rule categories for semantic indexing and retrieval
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

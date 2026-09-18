@@ -4,9 +4,9 @@
 //! 通过 NT-IO LLM Provider 调用外部模型生成，支持 thinking_budget 扩展思考。
 //! 这是 Kernel 与 LLM 解耦的关键桥梁：Kernel 做"推理骨架"，CoTGenerator 做"语言肉"。
 
-use crate::core::nt_core_reasoning::ReasoningTrace;
-use crate::core::nt_core_llm::{LlmError, LlmProvider, LlmRequest, Message, Role};
-use crate::core::nt_core_error::NeoTrixError;
+use crate::l5_cognition::nt_core_reasoning::ReasoningTrace;
+use crate::l1_action::nt_core_llm::{LlmError, LlmProvider, LlmRequest, Message, Role};
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -283,7 +283,7 @@ impl CoTGenerator for DefaultCoTGenerator {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: if self.config.structured_output {
-                Some(crate::core::nt_core_llm::StructuredOutputConfig::JsonObject)
+                Some(crate::l1_action::nt_core_llm::StructuredOutputConfig::JsonObject)
             } else {
                 None
             },

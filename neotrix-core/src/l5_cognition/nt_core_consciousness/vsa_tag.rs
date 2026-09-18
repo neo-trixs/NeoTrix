@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_with_provenance_attaches_chain() {
-        use crate::core::nt_core_consciousness::source_hierarchy::{
+        use crate::l5_cognition::nt_core_consciousness::source_hierarchy::{
             KnowledgeLayer, PerceptionMeta, PerceptionSource, ProvenanceChain,
         };
         let raw = KnowledgeLayer::Raw(PerceptionMeta {
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn test_knowledge_layer_returns_topmost() {
-        use crate::core::nt_core_consciousness::source_hierarchy::{
+        use crate::l5_cognition::nt_core_consciousness::source_hierarchy::{
             ContextMeta, KnowledgeLayer, PerceptionMeta, PerceptionSource, ProvenanceChain,
         };
         let raw = KnowledgeLayer::Raw(PerceptionMeta {
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_retention_score_with_provenance_factors_in_confidence() {
-        use crate::core::nt_core_consciousness::source_hierarchy::{
+        use crate::l5_cognition::nt_core_consciousness::source_hierarchy::{
             ContextMeta, KnowledgeLayer, PerceptionMeta, PerceptionSource, ProvenanceChain,
         };
         let raw = KnowledgeLayer::Raw(PerceptionMeta {

@@ -6,7 +6,7 @@
 //! - 一致性守恒：价值观演化过程中的连贯性守恒
 //! - KB 持久化：values namespace，支持版本化与回滚
 
-use crate::core::nt_core_kb_primitives::{kv_delete, kv_get, kv_set, now};
+use crate::l6_meta::nt_core_kb_primitives::{kv_delete, kv_get, kv_set, now};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -635,7 +635,7 @@ impl ValueCompassRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_kb_primitives::schema_initialize;
+    use crate::l6_meta::nt_core_kb_primitives::schema_initialize;
     use rusqlite::Connection;
 
     fn mem_conn() -> Connection {

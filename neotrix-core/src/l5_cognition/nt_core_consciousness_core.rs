@@ -37,7 +37,7 @@ use std::sync::{LazyLock, RwLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
+use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
 
 /// KB 最短路径管道 — 意识体读写端直达 (R-P42: 强化现有节点, 禁止平行适配器)
 use crate::l5_cognition::l1_facade::AbsorbEntry;
@@ -528,14 +528,14 @@ fn tree_from_snapshot(snap: &CoreSnapshot) -> ConsciousnessTree {
     // 不重建二进制证据; 进化产物引用保留, 供审计/追踪)。
     for fr in &snap.fruits {
         tree.fruits
-            .push(crate::core::nt_core_consciousness_tree::EvolutionFruit {
+            .push(crate::l5_cognition::nt_core_consciousness_tree::EvolutionFruit {
                 name: fr.name.clone(),
                 source_branch: branch_kind_from_str(&fr.source_branch),
                 description: fr.description.clone(),
                 produced_at_cycle: fr.produced_at_cycle,
                 quality: fr.quality,
                 claim: fr.claim.clone(),
-                evidence: crate::core::nt_core_consciousness_tree::EvidenceChain {
+                evidence: crate::l5_cognition::nt_core_consciousness_tree::EvidenceChain {
                     run_id: fr.run_id.clone(),
                     ..Default::default()
                 },
@@ -624,7 +624,7 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
     conn.busy_timeout(std::time::Duration::from_secs(5))
         .map_err(|e| format!("KB busy_timeout: {}", e))?;
     let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
-    crate::core::nt_core_kb_primitives::schema_initialize(&conn)
+    crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
         .map_err(|e| format!("KB init: {}", e))?;
     Ok(conn)
 }
@@ -636,7 +636,7 @@ fn load_snapshot() -> Option<CoreSnapshot> {
 /// 连接注入版快照读取 — 供 persist 合并与测试复用 (同一连接, 单一事实源)。
 fn load_snapshot_from_conn(conn: &rusqlite::Connection) -> Option<CoreSnapshot> {
     let raw =
-        crate::core::nt_core_kb_primitives::kv_get(conn, NAMESPACE, KEY).ok()??;
+        crate::l6_meta::nt_core_kb_primitives::kv_get(conn, NAMESPACE, KEY).ok()??;
     serde_json::from_str(&raw).ok()
 }
 
@@ -666,7 +666,7 @@ fn persist_snapshot_to_conn(
     out.coherence_trend =
         merge_trend_sample(prev_coh_hist, prev_cycle, snap.cycle, snap.coherence);
     let json = serde_json::to_string(&out).map_err(|e| format!("snapshot serialize: {}", e))?;
-    crate::core::nt_core_kb_primitives::kv_set(conn, NAMESPACE, KEY, &json)?;
+    crate::l6_meta::nt_core_kb_primitives::kv_set(conn, NAMESPACE, KEY, &json)?;
     // D3: 金标键接到真实度量流 (尽力而为, 失败不阻断快照落盘)
     refresh_gold_standard(conn, &out);
     Ok(out)
@@ -719,7 +719,7 @@ fn refresh_gold_standard(conn: &rusqlite::Connection, snap: &CoreSnapshot) {
         "cycle": snap.cycle,
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
-    let _ = crate::core::nt_core_kb_primitives::kv_set(
+    let _ = crate::l6_meta::nt_core_kb_primitives::kv_set(
         conn,
         NAMESPACE,
         GOLD_STANDARD_KEY,
@@ -2425,7 +2425,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             let input = first_path(&task.summary)
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| task.summary.clone());
-            let redacted = crate::core::nt_core_llm::redact_internals(&input);
+            let redacted = crate::l1_action::nt_core_llm::redact_internals(&input);
             (
                 true,
                 format!(
@@ -3513,14 +3513,14 @@ mod tests {
         // 果实可完整序列化 (含 run_id 证据投影), 跨会话可恢复
         let mut tree = ConsciousnessTree::new();
         tree.fruits
-            .push(crate::core::nt_core_consciousness_tree::EvolutionFruit {
+            .push(crate::l5_cognition::nt_core_consciousness_tree::EvolutionFruit {
                 name: "test-fruit".into(),
                 source_branch: BranchKind::Mind,
                 description: "Test evolution fruit".into(),
                 produced_at_cycle: 1,
                 quality: 0.9,
                 claim: "Claims X".into(),
-                evidence: crate::core::nt_core_consciousness_tree::EvidenceChain {
+                evidence: crate::l5_cognition::nt_core_consciousness_tree::EvidenceChain {
                     run_id: Some("run-123".into()),
                     sha256: Some("deadbeef".into()),
                     ..Default::default()
@@ -3555,8 +3555,8 @@ mod tests {
                 ),
                 crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry"),
             ];
-            crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
-            let snap = crate::core::nt_core_consciousness_core::status();
+            crate::l5_cognition::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+            let snap = crate::l5_cognition::nt_core_consciousness_core::status();
             assert!(
                 snap.branch_health.values().any(|h| *h > 0.0),
                 "apply_branch_health_from_self_tests 后至少一个分支健康应非 0, got {:?}",
@@ -3775,7 +3775,7 @@ mod tests {
             };
             persist_snapshot(&s).expect("persist");
             let conn = open_kb().expect("open kb");
-            let raw = crate::core::nt_core_kb_primitives::kv_get(
+            let raw = crate::l6_meta::nt_core_kb_primitives::kv_get(
                 &conn,
                 NAMESPACE,
                 GOLD_STANDARD_KEY,

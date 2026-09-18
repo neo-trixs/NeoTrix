@@ -1,4 +1,4 @@
-use crate::core::nt_core_reasoning::ReasoningTrace;
+use crate::l5_cognition::nt_core_reasoning::ReasoningTrace;
 use serde::{Deserialize, Serialize};
 
 pub type Vector = Vec<f64>;

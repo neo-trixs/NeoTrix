@@ -1,4 +1,4 @@
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 use super::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
 
@@ -104,7 +104,7 @@ mod tests {
         let world_tagged = VsaTagged::new(
             QuantizedVSA::random_binary(),
             VsaOrigin::World(
-                crate::core::nt_core_consciousness::vsa_tag::VsaWorldCategory::UserInput,
+                crate::l5_cognition::nt_core_consciousness::vsa_tag::VsaWorldCategory::UserInput,
             ),
         );
         assert!(!fpr.is_self_coherent(&world_tagged));

@@ -1,6 +1,6 @@
 use super::*;
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_hex::ReasoningHexagram;
+use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_traits::SpecialistType;
 /// Collects raw reasoning steps into AgentTrajectories for coaching.
 /// Manual impls for Debug, Clone, Serialize, Deserialize (dyn = unsafe)

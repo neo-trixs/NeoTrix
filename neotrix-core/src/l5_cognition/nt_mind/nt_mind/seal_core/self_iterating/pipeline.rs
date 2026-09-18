@@ -66,7 +66,7 @@ use super::safety_stage::SafetyCheckStage;
 use super::search_skill_stage::{Evidence, SearchExercise, SearchResult, SearchTaskType};
 use super::secret_scanner::SecretScanner;
 use super::sft_stage::SupervisedExample;
-use crate::core::nt_core_self_review::SelfReviewGate;
+use crate::l6_meta::nt_core_self_review::SelfReviewGate;
 use crate::make_stage;
 use crate::l5_cognition::nt_mind::foundation::memory_bank::MemoryTier;
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::{PerformanceEvaluator, ExecutionFeedback};
@@ -801,7 +801,7 @@ impl BrainStage for ReasoningBankStorageStage {
         if !task.is_empty() {
             let task_type = super::super::self_edit::world_to_knowledge_task_type(&brain._current_task_type);
             let edits = brain._micro_edits.clone();
-            let memory = crate::core::nt_core_bank::ReasoningMemory::new(
+            let memory = crate::l1_action::nt_core_bank::ReasoningMemory::new(
                 &task,
                 task_type,
                 &edits,
@@ -1703,7 +1703,7 @@ impl BrainStage for _GwtAbsorbStage {
             // 升级: 从 no-op broadcast (仅 push history) 改为 resonant_broadcast —
             // 真正进入 E8 注意力偏置 + Kuramoto 同步 + 共振竞争, 让 SEAL 状态
             // 参与 GWT 注意力路由 (修复信息流转对内断点 #2)。
-            let states = crate::core::nt_core_gwt::resonance::default_specialist_states();
+            let states = crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states();
             let _report = router.wm().resonant_broadcast(&content, &states);
             log::debug!("[gwt_absorb] resonant broadcast to GWT: {}", content);
             if let Some(ref kb) = brain._nt_memory_kb {
@@ -2157,7 +2157,7 @@ impl BrainStage for SelfReviewStage {
         // 单元测试不打全树 self-review 扫描 (run_all ~50 次全树扫描, 单次 ~6s)。
         // 测试验证循环机制; 真实审查留待集成测试/生产路径 (与 cfg!(test) 隔离纪律一致)。
         let report = if cfg!(test) {
-            crate::core::nt_core_self_review::SelfReviewReport {
+            crate::l6_meta::nt_core_self_review::SelfReviewReport {
                 findings: Vec::new(),
                 passed: 1,
                 failed: 0,
@@ -2388,8 +2388,8 @@ impl BrainStage for _CreditAssignmentStage {
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         // Build credit graph from PRM step rewards + E8 transitions
-        let mut graph = crate::core::nt_core_credit::CreditGraph::new();
-        let policy = crate::core::nt_core_credit::E8CreditPolicy::default();
+        let mut graph = crate::l5_cognition::nt_core_credit::CreditGraph::new();
+        let policy = crate::l5_cognition::nt_core_credit::E8CreditPolicy::default();
         let mut visit_counts: std::collections::HashMap<u8, u64> = std::collections::HashMap::new();
 
         for (step, reward) in &brain._prm_step_rewards {
@@ -2398,7 +2398,7 @@ impl BrainStage for _CreditAssignmentStage {
             *visit += 1;
             let attribution = policy
                 .compute_attribution(brain._prm_step_rewards.len().saturating_sub(*step), *visit);
-            graph.add_event(crate::core::nt_core_credit::CreditEvent {
+            graph.add_event(crate::l5_cognition::nt_core_credit::CreditEvent {
                 id: format!("prm_step_{}", step),
                 parent_id: if *step > 0 {
                     Some(format!("prm_step_{}", step - 1))
@@ -2406,9 +2406,9 @@ impl BrainStage for _CreditAssignmentStage {
                     None
                 },
                 role: if *reward > 0.5 {
-                    crate::core::nt_core_credit::CreditRole::Outcome
+                    crate::l5_cognition::nt_core_credit::CreditRole::Outcome
                 } else {
-                    crate::core::nt_core_credit::CreditRole::Actor
+                    crate::l5_cognition::nt_core_credit::CreditRole::Actor
                 },
                 label: format!("step_{}_reward_{:.2}", step, reward),
                 e8_state,
@@ -2420,7 +2420,7 @@ impl BrainStage for _CreditAssignmentStage {
                 metadata: std::collections::HashMap::new(),
             });
             if *step > 0 {
-                graph.add_edge(crate::core::nt_core_credit::CreditEdge {
+                graph.add_edge(crate::l5_cognition::nt_core_credit::CreditEdge {
                     from: format!("prm_step_{}", step - 1),
                     to: format!("prm_step_{}", step),
                     attribution,
@@ -2946,7 +2946,7 @@ impl BrainStage for RewardCalculationStage {
             // combine_reward_with_affective 融合进外部奖励 (经 RewardSource::External)。
             // 负外部奖励**原样保留** (触发 snapshot restore rewind 语义, 不夹取到 0)。
             let blended = if ext >= 0.0 {
-                let affective = crate::core::nt_core_knowledge::take_affective_observation();
+                let affective = crate::l2_perception::nt_core_knowledge::take_affective_observation();
                 match affective {
                 Some(a) => PerformanceEvaluator::combine_reward_with_affective(
                     brain._snapshot_score(),
@@ -3046,11 +3046,11 @@ impl BrainStage for SelfTestStage {
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let _ = brain;
-        use crate::core::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor;
-        use crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
-        use crate::core::nt_core_consciousness::inner_critic::InnerCritic;
-        use crate::core::nt_core_consciousness_tree::ConsciousnessTree;
-        use crate::core::nt_core_gwt::monitor::EntropyMonitor;
+        use crate::l5_cognition::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor;
+        use crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
+        use crate::l5_cognition::nt_core_consciousness::inner_critic::InnerCritic;
+        use crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree;
+        use crate::l5_cognition::nt_core_gwt::monitor::EntropyMonitor;
         use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
         use crate::core::nt_core_meta::metacognition_loop::MetaCognitiveLoop;
         use crate::core::nt_core_meta::monitor::MetaMonitor;
@@ -3061,7 +3061,7 @@ impl BrainStage for SelfTestStage {
         use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
         use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
         use crate::core::nt_core_self::self_audit::ConvergeCheckFn;
-        use crate::core::nt_core_self_review::SelfReviewGate;
+        use crate::l6_meta::nt_core_self_review::SelfReviewGate;
         use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
         let mut registry = SelfTestRegistry::new();
         registry.register(Box::new(SchemaWatchdog::new()));
@@ -3072,7 +3072,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(BMonitor::default()));
         registry.register(Box::new(InnerCritic::new()));
         registry.register(Box::new(ConsciousnessRuntime::new()));
-        registry.register(Box::new(crate::core::nt_core_consciousness::ConsciousnessAwakening));
+        registry.register(Box::new(crate::l5_cognition::nt_core_consciousness::ConsciousnessAwakening));
         registry.register(Box::new(SelfReviewGate::new(false)));
         registry.register(Box::new(ConsciousnessTree::new()));
         registry.register(Box::new(MetaAuditor::new()));
@@ -3094,13 +3094,13 @@ impl BrainStage for SelfTestStage {
             crate::l1_action::nt_memory::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),
         ));
         registry.register(Box::new(
-            crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new(),
+            crate::l5_cognition::nt_core::capability::nt_core_antidistil::DistillationDetector::new(),
         ));
         registry.register(Box::new(L1OracleGate::new()));
         registry.register(Box::new(L1SemanticEntropyGate::new()));
         registry.register(Box::new(L1ActionSandbox::new()));
         registry.register(Box::new(
-            crate::core::nt_core_consciousness_tree::review::ConsciousnessReview::new(),
+            crate::l5_cognition::nt_core_consciousness_tree::review::ConsciousnessReview::new(),
         ));
         // nt_core_fep_iit module not found - removed
         // registry.register(Box::new(
@@ -3115,16 +3115,16 @@ impl BrainStage for SelfTestStage {
         ));
         registry.register(Box::new(crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
         registry.register(Box::new(
-            crate::core::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5),
+            crate::l5_cognition::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5),
         ));
         registry.register(Box::new(
-            crate::core::nt_core_state_substrate::StateSubstrate::new(),
+            crate::l5_cognition::nt_core::nt_state_substrate::StateSubstrate::new(),
         ));
         registry.register(Box::new(
-            crate::core::nt_core_simulate_engine::SimulateEngine::new(),
+            crate::l1_action::nt_core_simulate_engine::SimulateEngine::new(),
         ));
         registry.register(Box::new(
-            crate::core::nt_core_second_brain::SecondBrain::new(),
+            crate::l5_cognition::nt_core_second_brain::SecondBrain::new(),
         ));
         registry.register(Box::new(
             crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest,
@@ -3138,7 +3138,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(
             crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
         ));
-        for t in crate::core::nt_core_arch_fitness::arch_fitness_tests() {
+        for t in crate::l5_cognition::nt_core_arch_fitness::arch_fitness_tests() {
             registry.register(t);
         }
         let results = registry.run_all();

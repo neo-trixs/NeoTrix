@@ -19,7 +19,7 @@ use super::nt_memory_store::{get_node, insert_or_get_node, update_node_metadata}
 use super::nt_memory_types::NodeType;
 use super::nt_normalizer::validate_node_type;
 use super::shared_utils::now;
-use crate::core::nt_core_e8::abduction::causal_graph::CausalGraph;
+use crate::l2_perception::nt_core_e8::abduction::causal_graph::CausalGraph;
 
 const SCHEMA_VERSION: u32 = 1;
 /// 超过该体积的文件不计算 sha256 (避免 68GB corpus 卡死); 仅小文件 (因果图) 取指纹。
@@ -822,7 +822,7 @@ mod tests {
 
     #[test]
     fn ingest_causal_graph_distills_high_signal_only() -> Result<(), String> {
-        use crate::core::nt_core_e8::abduction::causal_graph::CausalGraph;
+        use crate::l2_perception::nt_core_e8::abduction::causal_graph::CausalGraph;
         let conn = Connection::open_in_memory().expect("mem");
         crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn)
             .map_err(|e| e.to_string())?;

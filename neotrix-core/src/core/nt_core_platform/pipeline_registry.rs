@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 
 use super::error::{PlatformError, PlatformResult};
 use super::pipeline::{Pipeline, PipelineResult};
-use crate::core::nt_core_capability::{Domain, Layer};
+use crate::l6_meta::nt_core_capability::{Domain, Layer};
 
 // ============================================================
 // 1. PipelineEntry — 注册表条目

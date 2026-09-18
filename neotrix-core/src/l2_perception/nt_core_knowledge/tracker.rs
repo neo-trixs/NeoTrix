@@ -1,4 +1,4 @@
-use crate::core::nt_core_knowledge::KnowledgeSource;
+use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
@@ -83,7 +83,7 @@ impl SourceAccessTracker {
 
 #[cfg(test)]
 mod lifecycle_tests {
-    use crate::core::nt_core_knowledge::*;
+    use crate::l2_perception::nt_core_knowledge::*;
 
     #[test]
     fn test_record_access_increments_count() {

@@ -24,7 +24,7 @@
 //! | DeepSeek-V4 | Muon optimizer (Newton-Schulz + Nesterov) | `MuonOptimizer` |
 //! | All | Token efficiency | `effective_90pct_count` focus measure |
 
-use crate::core::nt_core_e8::E8TransitionMatrix;
+use crate::l2_perception::nt_core_e8::E8TransitionMatrix;
 use serde::{Deserialize, Serialize};
 
 /// Attention Residuals (AttnRes) — Kimi K3.

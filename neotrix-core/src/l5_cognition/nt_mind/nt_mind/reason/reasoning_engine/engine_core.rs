@@ -1,33 +1,33 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
-use crate::core::l7_capability::nt_core_antidistil::AntiDistillationSystem;
-use crate::core::nt_core_aura::IntentEngine;
-use crate::core::nt_core_bank::ReasoningBank;
-use crate::core::nt_core_cot_generator::CoTGenerator;
-use crate::core::nt_core_e8::domain_transition::{CoTLength, E8DomainTransitionModel, E8TaskType};
-use crate::core::nt_core_e8::ewhr_bridge::E8EwhrBridge;
-use crate::core::nt_core_e8::nt_core_e8_prediction::E8PredictionOracle;
-use crate::core::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FablePhase};
-use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
-use crate::core::nt_core_e8::nt_latent_reasoning::LatentReasoningPipeline;
-use crate::core::nt_core_e8::nt_latent_transformer::LatentReasoningTransformer;
-use crate::core::nt_core_e8::nt_multimodal::{MultimodalEncoder, MultimodalInput};
-use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
-use crate::core::nt_core_e8::state_machine::E8StateMachine;
-use crate::core::nt_core_e8::thinking_budget::DifficultyEstimator;
-use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
-use crate::core::nt_core_prm::ProcessRewardLearner;
-use crate::core::nt_core_sae_bridge::SAEBridge;
-use crate::core::nt_core_trajectory_compress::{CompressionLevel, TrajectoryCompressor};
-use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
+use crate::l5_cognition::nt_core::capability::nt_core_antidistil::AntiDistillationSystem;
+use crate::l5_cognition::nt_core_aura::IntentEngine;
+use crate::l1_action::nt_core_bank::ReasoningBank;
+use crate::l5_cognition::nt_core_cot_generator::CoTGenerator;
+use crate::l2_perception::nt_core_e8::domain_transition::{CoTLength, E8DomainTransitionModel, E8TaskType};
+use crate::l2_perception::nt_core_e8::ewhr_bridge::E8EwhrBridge;
+use crate::l2_perception::nt_core_e8::nt_core_e8_prediction::E8PredictionOracle;
+use crate::l2_perception::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FablePhase};
+use crate::l2_perception::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
+use crate::l2_perception::nt_core_e8::nt_latent_reasoning::LatentReasoningPipeline;
+use crate::l2_perception::nt_core_e8::nt_latent_transformer::LatentReasoningTransformer;
+use crate::l2_perception::nt_core_e8::nt_multimodal::{MultimodalEncoder, MultimodalInput};
+use crate::l2_perception::nt_core_e8::sparse_moe::SparseMoERouter;
+use crate::l2_perception::nt_core_e8::state_machine::E8StateMachine;
+use crate::l2_perception::nt_core_e8::thinking_budget::DifficultyEstimator;
+use crate::l2_perception::nt_core_e8::unified_latent::UnifiedLatentSpace;
+use crate::l5_cognition::nt_core_prm::ProcessRewardLearner;
+use crate::l5_cognition::nt_core_sae_bridge::SAEBridge;
+use crate::l5_cognition::nt_core_trajectory_compress::{CompressionLevel, TrajectoryCompressor};
+use crate::l5_cognition::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
 use crate::l5_cognition::nt_mind::nt_mind::knowledge::context_artifacts::indexer::ArtifactIndexer;
 
-use crate::core::l7_capability::nt_act_orch_patterns::Orchestrator;
-use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::core::nt_core_hex::{FullReasoningState, ReasoningHexagram};
+use crate::l5_cognition::nt_core::capability::nt_act_orch_patterns::Orchestrator;
+use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::l5_cognition::nt_core_hex::{FullReasoningState, ReasoningHexagram};
 use crate::core::nt_core_observer::OneObserver;
-use crate::core::nt_core_observer_error::ObserverErrorRecovery;
+use crate::l6_meta::nt_core_observer_error::ObserverErrorRecovery;
 use crate::core::nt_core_self::silicon_self::SiliconSelfModel;
 use crate::core::nt_core_span::{
     AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer,
@@ -75,7 +75,7 @@ struct E8PersistedState {
     trajectory_modes: Vec<(u8, u8)>,
     /// Serialized E8Policy RL state (mode_values, mode_counts, factor_energies, factor_control)
     #[serde(default)]
-    e8_policy: Option<crate::core::nt_core_policy::E8Policy>,
+    e8_policy: Option<crate::l5_cognition::nt_core_policy::E8Policy>,
     /// PRM learning count
     #[serde(default)]
     prm_learning_count: u64,
@@ -137,13 +137,13 @@ pub struct ReasoningEngine {
     /// PRM: process reward model scoring E8 reasoning steps
     pub prm: Option<ProcessRewardLearner>,
     /// Verifier: grounded PRM verifier for step-level verification (Phase 2.2)
-    pub verifier: Option<crate::core::nt_core_prm::GroundedPrmVerifier>,
+    pub verifier: Option<crate::l5_cognition::nt_core_prm::GroundedPrmVerifier>,
     /// ContextBuilder: KB/经验 → Kernel context 自动注入 (Phase 1.3)
-    pub context_builder: Option<crate::core::nt_core_reasoning::ContextBuilder>,
+    pub context_builder: Option<crate::l5_cognition::nt_core_reasoning::ContextBuilder>,
     /// CoT Generator: Kernel 结构化推理 → 自然语言 CoT (Phase 2.1)
-    pub cot_generator: Option<crate::core::nt_core_cot_generator::DefaultCoTGenerator>,
+    pub cot_generator: Option<crate::l5_cognition::nt_core_cot_generator::DefaultCoTGenerator>,
     /// E8Policy: RL policy for reasoning mode selection (Phase 2.3)
-    pub e8_policy: Option<crate::core::nt_core_policy::E8Policy>,
+    pub e8_policy: Option<crate::l5_cognition::nt_core_policy::E8Policy>,
     /// Intent engine: tracks user/agent intent through reasoning
     pub intent_engine: Option<IntentEngine>,
     /// Hypothesis network: shared with EWHR REST API
@@ -207,7 +207,7 @@ impl ReasoningEngine {
         Self {
             current_state: FullReasoningState::new(
                 ReasoningHexagram::new(0),
-                crate::core::nt_core_hex::MetaState::new(0),
+                crate::l5_cognition::nt_core_hex::MetaState::new(0),
             ),
             state_trajectory: Vec::new(),
             strategy_matrix: [[ReasoningHexagram::new(0); 8]; 8],
@@ -350,7 +350,7 @@ impl ReasoningEngine {
 
     pub(crate) fn _with_verifier(
         mut self,
-        verifier: crate::core::nt_core_prm::GroundedPrmVerifier,
+        verifier: crate::l5_cognition::nt_core_prm::GroundedPrmVerifier,
     ) -> Self {
         self.verifier = Some(verifier);
         self
@@ -358,7 +358,7 @@ impl ReasoningEngine {
 
     pub(crate) fn _with_context_builder(
         mut self,
-        builder: crate::core::nt_core_reasoning::ContextBuilder,
+        builder: crate::l5_cognition::nt_core_reasoning::ContextBuilder,
     ) -> Self {
         self.context_builder = Some(builder);
         self
@@ -366,13 +366,13 @@ impl ReasoningEngine {
 
     pub(crate) fn _with_cot_generator(
         mut self,
-        generator: crate::core::nt_core_cot_generator::DefaultCoTGenerator,
+        generator: crate::l5_cognition::nt_core_cot_generator::DefaultCoTGenerator,
     ) -> Self {
         self.cot_generator = Some(generator);
         self
     }
 
-    pub fn with_e8_policy(mut self, policy: crate::core::nt_core_policy::E8Policy) -> Self {
+    pub fn with_e8_policy(mut self, policy: crate::l5_cognition::nt_core_policy::E8Policy) -> Self {
         self.e8_policy = Some(policy);
         self
     }
@@ -419,7 +419,7 @@ impl ReasoningEngine {
 
     pub fn with_observer_transition_matrix(
         mut self,
-        matrix: crate::core::nt_core_e8::E8TransitionMatrix,
+        matrix: crate::l2_perception::nt_core_e8::E8TransitionMatrix,
     ) -> Self {
         self.observer = self.observer.with_transition_matrix(matrix);
         self
@@ -464,7 +464,7 @@ impl ReasoningEngine {
         if let Ok(ref response) = result {
             if let Some(ref mut cot_gen) = self.cot_generator {
                 // 构建一个简化的 Kernel trace 用于 CoT 生成
-                let kernel_trace = crate::core::nt_core_reasoning::ReasoningTrace {
+                let kernel_trace = crate::l5_cognition::nt_core_reasoning::ReasoningTrace {
                     trace_id: format!(
                         "engine_{}",
                         std::time::SystemTime::now()
@@ -481,7 +481,7 @@ impl ReasoningEngine {
                     convergence: 0.5,
                     final_quality: 0.5,
                     llm_response: Some(response.clone()),
-                    source: crate::core::nt_core_reasoning::TraceSource::LLMDriven,
+                    source: crate::l5_cognition::nt_core_reasoning::TraceSource::LLMDriven,
                     timestamp: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -518,7 +518,7 @@ impl ReasoningEngine {
             // 注: self.traces 元素为 reasoning_types::ReasoningTrace, 需转换为
             // nt_core_reasoning::ReasoningTrace (E8Policy 反哺所需字段)。
             let feedback_trace = if let Some(last_trace) = self.traces.last() {
-                crate::core::nt_core_reasoning::ReasoningTrace {
+                crate::l5_cognition::nt_core_reasoning::ReasoningTrace {
                     trace_id: last_trace.id.clone(),
                     task: last_trace.task.clone(),
                     method: crate::l1_action::nt_io::nt_io_standalone::ReasoningMethod::Deductive,
@@ -529,12 +529,12 @@ impl ReasoningEngine {
                     convergence: last_trace.outcome_score.clamp(0.0, 1.0),
                     final_quality: if last_trace.success { 0.8 } else { 0.5 },
                     llm_response: Some(last_trace.llm_response.clone()),
-                    source: crate::core::nt_core_reasoning::TraceSource::LLMDriven,
+                    source: crate::l5_cognition::nt_core_reasoning::TraceSource::LLMDriven,
                     timestamp: last_trace.timestamp as u64,
                 }
             } else {
                 // 回退：基于响应质量构建反馈轨迹
-                crate::core::nt_core_reasoning::ReasoningTrace {
+                crate::l5_cognition::nt_core_reasoning::ReasoningTrace {
                     trace_id: format!(
                         "feedback_{}",
                         std::time::SystemTime::now()
@@ -551,7 +551,7 @@ impl ReasoningEngine {
                     convergence: 0.7, // 基于响应质量估算
                     final_quality: if response.len() > 100 { 0.8 } else { 0.5 },
                     llm_response: Some(response.clone()),
-                    source: crate::core::nt_core_reasoning::TraceSource::LLMDriven,
+                    source: crate::l5_cognition::nt_core_reasoning::TraceSource::LLMDriven,
                     timestamp: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -1074,7 +1074,7 @@ impl ReasoningEngine {
                 // sparse-k + thinking-budget scaling.
                 let effort_tier = self
                     .last_effort_tier
-                    .unwrap_or(crate::core::nt_core_ttc::EffortTier::Medium);
+                    .unwrap_or(crate::l5_cognition::nt_core_ttc::EffortTier::Medium);
 
                 // ── 意识体内核融合管线 (Consciousness Core Fusion) ──────────────
                 // Fuses the defining 2026 frontier-model innovations into a single
@@ -1087,15 +1087,15 @@ impl ReasoningEngine {
                 //   6. Qwen3/Fable 5 → effort tier (thinking budget) scales sparsity
                 let traj_modes: Vec<u8> = self.state_trajectory.iter().map(|s| s.mode.0).collect();
                 let synth_effort = match effort_tier {
-                    crate::core::nt_core_ttc::EffortTier::Low => SynthesisEffortTier::Low,
-                    crate::core::nt_core_ttc::EffortTier::Medium => SynthesisEffortTier::Medium,
-                    crate::core::nt_core_ttc::EffortTier::High => SynthesisEffortTier::High,
-                    crate::core::nt_core_ttc::EffortTier::XHigh => SynthesisEffortTier::XHigh,
-                    crate::core::nt_core_ttc::EffortTier::Max => SynthesisEffortTier::Max,
+                    crate::l5_cognition::nt_core_ttc::EffortTier::Low => SynthesisEffortTier::Low,
+                    crate::l5_cognition::nt_core_ttc::EffortTier::Medium => SynthesisEffortTier::Medium,
+                    crate::l5_cognition::nt_core_ttc::EffortTier::High => SynthesisEffortTier::High,
+                    crate::l5_cognition::nt_core_ttc::EffortTier::XHigh => SynthesisEffortTier::XHigh,
+                    crate::l5_cognition::nt_core_ttc::EffortTier::Max => SynthesisEffortTier::Max,
                 };
                 // Gemini 3.6 step-route cache: reuse routing decision for repeated
                 // (task_type, phase, effort, source_bucket) contexts across the seal loop.
-                let cache_key = crate::core::nt_core_e8::nt_core_synthesis::StepRouteCache::key(
+                let cache_key = crate::l2_perception::nt_core_e8::nt_core_synthesis::StepRouteCache::key(
                     task_type as u8,
                     phase_step as u8,
                     synth_effort.rank(),
@@ -1293,11 +1293,11 @@ impl ReasoningEngine {
                 // the trajectory actually advances (R-P79).
                 let latent_input: Vec<f64> = attn_owned;
                 if latent_input.len()
-                    == crate::core::nt_core_e8::nt_latent_transformer::LATENT_HIDDEN_DIM
+                    == crate::l2_perception::nt_core_e8::nt_latent_transformer::LATENT_HIDDEN_DIM
                 {
                     let latent_state = self.latent_transformer.reason(
                         &latent_input,
-                        crate::core::nt_core_e8::nt_latent_transformer::MAX_LATENT_DEPTH,
+                        crate::l2_perception::nt_core_e8::nt_latent_transformer::MAX_LATENT_DEPTH,
                     );
                     let depth = self.latent_transformer.current_depth();
                     let mag = self.latent_transformer.step_magnitude(&latent_state);
@@ -1322,7 +1322,7 @@ impl ReasoningEngine {
                 if self.last_e8_attention_weights.is_some() {
                     let cur_mode = self.current_state.mode.0;
                     let task_type =
-                        crate::core::nt_core_e8::domain_transition::E8TaskType::detect(task);
+                        crate::l2_perception::nt_core_e8::domain_transition::E8TaskType::detect(task);
                     let next_mass: Option<[f64; 8]> =
                         self.last_e8_attention_weights.as_ref().map(|w| {
                             let mut m = [0.0f64; 8];
@@ -1394,7 +1394,7 @@ impl ReasoningEngine {
                     if let Some(path) = referenced_image_path(task) {
                         if let Ok(bytes) = std::fs::read(&path) {
                             if let Ok((_evidence, feat)) =
-                                crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(
+                                crate::l2_perception::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(
                                     &bytes,
                                 )
                             {
@@ -1410,17 +1410,17 @@ impl ReasoningEngine {
                 let multi_embeds = self.multimodal.encode_all(&multi_input);
                 if !multi_embeds.is_empty() {
                     let router_weights: BTreeMap<
-                        crate::core::nt_core_gwt::modality_router::Modality,
+                        crate::l5_cognition::nt_core_gwt::modality_router::Modality,
                         f64,
                     > = {
                         let mut m = BTreeMap::new();
                         if let Some(g) = &self.gwt {
-                            for mod_i in crate::core::nt_core_gwt::modality_router::Modality::ALL {
+                            for mod_i in crate::l5_cognition::nt_core_gwt::modality_router::Modality::ALL {
                                 m.insert(mod_i, g.modality_router.weight_of(mod_i));
                             }
                         } else {
                             m.insert(
-                                crate::core::nt_core_gwt::modality_router::Modality::Text,
+                                crate::l5_cognition::nt_core_gwt::modality_router::Modality::Text,
                                 1.0,
                             );
                         }
@@ -1437,7 +1437,7 @@ impl ReasoningEngine {
                         AttributeValue::Int(weights.len() as i64),
                     );
                     self.latent_reasoning.record(
-                        crate::core::nt_core_hex::ReasoningHexagram::new(fused_mode),
+                        crate::l5_cognition::nt_core_hex::ReasoningHexagram::new(fused_mode),
                         self.last_e8_confidence,
                         "multimodal",
                     );
@@ -1703,7 +1703,7 @@ impl ReasoningEngine {
             serde_json::from_str(json).map_err(|e| format!("deserialize: {}", e))?;
         self.current_state = FullReasoningState::new(
             ReasoningHexagram::new(state.current_mode.min(63)),
-            crate::core::nt_core_hex::MetaState::new(state.current_meta),
+            crate::l5_cognition::nt_core_hex::MetaState::new(state.current_meta),
         );
         self.last_e8_attention_weights = state.last_e8_attention_weights;
         self.last_e8_confidence = state.last_e8_confidence;
@@ -1713,7 +1713,7 @@ impl ReasoningEngine {
             .map(|(mode, meta)| {
                 FullReasoningState::new(
                     ReasoningHexagram::new(mode.min(63)),
-                    crate::core::nt_core_hex::MetaState::new(meta),
+                    crate::l5_cognition::nt_core_hex::MetaState::new(meta),
                 )
             })
             .collect();
@@ -1888,7 +1888,7 @@ impl ReasoningEngine {
             if let Some(orch) = crate::l5_cognition::nt_mind::nt_mind_background_loop::consciousness_orchestrator::ConsciousnessOrchestrator::get() {
                 orch.pre_llm(prompt)
             } else {
-                let bridge = crate::core::l7_capability::consciousness_bridge::bridge();
+                let bridge = crate::l5_cognition::nt_core::capability::consciousness_bridge::bridge();
                 match bridge.narrative_prefix() {
                     Some(prefix) => format!("{}{}", prefix, prompt),
                     None => prompt.to_string(),
@@ -1935,7 +1935,7 @@ impl ReasoningEngine {
             // T2+T4: 结果记录 + 工具路由 — 通过协调器统一处理
             if crate::l5_cognition::nt_mind::nt_mind_background_loop::consciousness_orchestrator::ConsciousnessOrchestrator::get().is_some() {
                 // 记录 LLM 调用结果
-                crate::core::l7_capability::consciousness_bridge::bridge().post_llm_record(true);
+                crate::l5_cognition::nt_core::capability::consciousness_bridge::bridge().post_llm_record(true);
                 // 如果需要工具，通过协调器的 ValueGate + NativeBus 统一路由
                 if response.content.contains("[tool_call:") {
                     log::info!("[engine] tool call routed through orchestrator");
@@ -1963,14 +1963,14 @@ impl ReasoningEngine {
         candidate: &str,
         claims: &[&str],
         evidence_ids: &[String],
-    ) -> Option<crate::core::nt_core_gate::PanelVerdict> {
-        use crate::core::nt_core_gate::{JudgeFamily, JudgeInput, JudgePanel, JudgeRegistry};
+    ) -> Option<crate::l5_cognition::nt_core_gate::PanelVerdict> {
+        use crate::l5_cognition::nt_core_gate::{JudgeFamily, JudgeInput, JudgePanel, JudgeRegistry};
         let provider = self.gateway.clone()?;
         let input = JudgeInput {
             candidate: candidate.to_string(),
             claims: claims
                 .iter()
-                .map(|c| crate::core::nt_core_gate::Claim::new(c, &[]))
+                .map(|c| crate::l5_cognition::nt_core_gate::Claim::new(c, &[]))
                 .collect(),
             evidence_ids: evidence_ids.to_vec(),
             trajectory: None,
@@ -1984,7 +1984,7 @@ impl ReasoningEngine {
         let registry =
             JudgeRegistry::new().register(JudgeFamily::None, provider, &self.default_model);
         let judges = registry.build_async_judges();
-        let refs: Vec<&dyn crate::core::nt_core_gate::AsyncPanelJudge> =
+        let refs: Vec<&dyn crate::l5_cognition::nt_core_gate::AsyncPanelJudge> =
             judges.iter().map(|j| j.as_ref()).collect();
         let panel = JudgePanel::default_panel();
         Some(tokio::task::block_in_place(|| {
@@ -2565,7 +2565,7 @@ struct VideoFeatureSummary {
 }
 
 fn aggregate_video_features(frames: &[Vec<u8>]) -> Option<(Vec<f64>, VideoFeatureSummary)> {
-    use crate::core::nt_core_e8::nt_multimodal::{ImageClass, VisionBridge};
+    use crate::l2_perception::nt_core_e8::nt_multimodal::{ImageClass, VisionBridge};
     const PHASH_DUP_THRESHOLD: u32 = 10;
 
     let mut pooled: Vec<f64> = Vec::new();
@@ -2777,7 +2777,7 @@ mod tests {
 
     #[test]
     fn test_aggregate_video_features_dedups_blank_and_near_dup() {
-        use crate::core::nt_core_e8::nt_multimodal::VisionBridge;
+        use crate::l2_perception::nt_core_e8::nt_multimodal::VisionBridge;
         // Two distinct synthetic frames: a white-with-black-text "document"
         // pattern and a solid black frame (blank → dropped).
         fn doc_frame() -> Vec<u8> {
@@ -2819,7 +2819,7 @@ mod tests {
         );
         assert_eq!(
             feat.len(),
-            crate::core::nt_core_e8::nt_multimodal::IMAGE_FEATURE_DIM
+            crate::l2_perception::nt_core_e8::nt_multimodal::IMAGE_FEATURE_DIM
         );
         let norm: f64 = feat.iter().map(|x| x * x).sum();
         assert!((norm - 1.0).abs() < 1e-6, "pooled feature normalized");
@@ -2847,12 +2847,12 @@ mod tests {
 
     #[test]
     fn test_train_from_distilled_closes_loop() {
-        use crate::core::nt_core_policy::E8Policy;
-        use crate::core::nt_core_prm::ProcessRewardLearner;
+        use crate::l5_cognition::nt_core_policy::E8Policy;
+        use crate::l5_cognition::nt_core_prm::ProcessRewardLearner;
         let mut engine = ReasoningEngine::from_env();
         let prm = ProcessRewardLearner::new(
             E8Policy::default(),
-            Box::new(crate::core::nt_core_prm::HeuristicCoach::new("test")),
+            Box::new(crate::l5_cognition::nt_core_prm::HeuristicCoach::new("test")),
         );
         engine = engine.with_prm(prm);
 
@@ -2895,11 +2895,11 @@ mod tests {
         let mut engine = ReasoningEngine::from_env();
         engine.current_state = FullReasoningState::new(
             ReasoningHexagram::new(42),
-            crate::core::nt_core_hex::MetaState::new(2),
+            crate::l5_cognition::nt_core_hex::MetaState::new(2),
         );
         engine.state_trajectory.push(FullReasoningState::new(
             ReasoningHexagram::new(9),
-            crate::core::nt_core_hex::MetaState::new(1),
+            crate::l5_cognition::nt_core_hex::MetaState::new(1),
         ));
         let json = engine.e8_state_json().expect("serialize ok");
         assert!(!json.is_empty());
@@ -2916,7 +2916,7 @@ mod tests {
     fn test_call_llm_wires_model_router_route() {
         // cumora 借鉴接线回归 (T3): call_llm 必须经 ModelRouter.route() 选模型,
         // 而非恒用 default_model。捕获 LlmRequest.model 断言 route 决策生效。
-        use crate::core::nt_core_llm::{FinishReason, LlmProvider, LlmRequest, LlmResponse, Usage};
+        use crate::l1_action::nt_core_llm::{FinishReason, LlmProvider, LlmRequest, LlmResponse, Usage};
         use crate::core::nt_core_span::CostTracker;
 
         struct CapturingProvider {
@@ -2925,14 +2925,14 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for CapturingProvider {
-            fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-                crate::core::nt_core_llm::DataTrust::Trusted
+            fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+                crate::l1_action::nt_core_llm::DataTrust::Trusted
             }
 
             async fn complete_raw(
                 &self,
                 request: &LlmRequest,
-            ) -> Result<LlmResponse, crate::core::nt_core_llm::LlmError> {
+            ) -> Result<LlmResponse, crate::l1_action::nt_core_llm::LlmError> {
                 *self.seen_model.lock().unwrap() = Some(request.model.clone());
                 *self.seen_max_tokens.lock().unwrap() = Some(request.max_tokens);
                 Ok(LlmResponse::plain(
@@ -2951,9 +2951,9 @@ mod tests {
                 _request: &LlmRequest,
             ) -> Result<
                 tokio::sync::mpsc::Receiver<
-                    Result<LlmResponse, crate::core::nt_core_llm::LlmError>,
+                    Result<LlmResponse, crate::l1_action::nt_core_llm::LlmError>,
                 >,
-                crate::core::nt_core_llm::LlmError,
+                crate::l1_action::nt_core_llm::LlmError,
             > {
                 unimplemented!("not used in this test")
             }

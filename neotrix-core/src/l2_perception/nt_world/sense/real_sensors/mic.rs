@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::core::nt_core_sense::{Sensor, SensorSample, SensoryEvent, SensoryEventKind, Transcription};
+use crate::l2_perception::nt_core_sense::{Sensor, SensorSample, SensoryEvent, SensoryEventKind, Transcription};
 
 /// macOS microphone capture using `rec` (SoX) or `ffmpeg`.
 /// Falls back to placeholder on non-macOS.

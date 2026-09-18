@@ -1,4 +1,4 @@
-pub use crate::core::nt_core_hex::ReasoningHexagram;
+pub use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 pub use crate::core::nt_core_traits::SpecialistType;
 use serde::{Deserialize, Serialize};
 

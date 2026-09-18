@@ -24,7 +24,7 @@ use super::super::dpo_stage::DpoStage;
 use super::super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::super::safety_stage::SafetyCheckStage;
 use crate::core::{E8TransitionLearner, ReasoningHexagram, strategy_matrix};
-use crate::core::nt_core_consciousness::{
+use crate::l5_cognition::nt_core_consciousness::{
     awakening::ConsciousnessAwakening,
     specious_present::SpeciousPresent,
     FirstPersonRef, ConsciousnessStream, CognitiveLoadMonitor,
@@ -90,10 +90,10 @@ pub struct SelfIteratingBrain {
     pub(crate) _knowledge_distiller: KnowledgeDistiller,
     pub _nt_memory_kb: Option<KnowledgeBase>,
     // Phase 2: Task Dispatcher & CoT Generator integration
-    pub task_dispatcher: Option<crate::core::nt_core_task_dispatcher::TaskDecomposerDispatcher>,
-    pub cot_generator: Option<crate::core::nt_core_cot_generator::DefaultCoTGenerator>,
-    pub context_builder: Option<crate::core::nt_core_reasoning::ContextBuilder>,
-    pub e8_policy: Option<crate::core::nt_core_policy::E8Policy>,
+    pub task_dispatcher: Option<crate::l1_action::nt_core_task_dispatcher::TaskDecomposerDispatcher>,
+    pub cot_generator: Option<crate::l5_cognition::nt_core_cot_generator::DefaultCoTGenerator>,
+    pub context_builder: Option<crate::l5_cognition::nt_core_reasoning::ContextBuilder>,
+    pub e8_policy: Option<crate::l5_cognition::nt_core_policy::E8Policy>,
     pub(crate) _strategy_matrix: [[ReasoningHexagram; 8]; 8],
     /// Step rewards from PRM observer, fed by the reasoning engine.
     pub(crate) _prm_step_rewards: Vec<(usize, f64)>,
@@ -119,7 +119,7 @@ pub struct SelfIteratingBrain {
     pub(crate) _checkpoint_manager: CheckpointManager,
     /// ESTRA 最近一次 re-anchor 决策 (Continue/Redirect, P6)。
     pub(crate) _last_anchor_decision: Option<super::super::checkpoint::AnchorDecision>,
-    pub echo_bridge: crate::core::nt_core_echo_terminal::EchoPrmBridge,
+    pub echo_bridge: crate::l5_cognition::nt_core_echo_terminal::EchoPrmBridge,
     pub(crate) _memory_orch: MemoryOrchestrator,
     pub(crate) _per_loop: Option<crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop>,
     pub(crate) _oracle_gate: Option<crate::neotrix::nt_act_autonomy::OracleGate>,
@@ -130,7 +130,7 @@ pub struct SelfIteratingBrain {
     /// 意识树果实 (EvolutionFruit) — 由 handlers_consciousness 注入, ProcessWrapperStage 消费。
     /// 缺陷4修复: SEAL 从"只读 tool_traces"升级为"消费意识树果实", 打通
     /// ConsciousnessTree → SEAL process 闭环 (外部调研: 果实→guidance 元认知闭环)。
-    pub(crate) _consciousness_fruits: Vec<crate::core::nt_core_consciousness_tree::EvolutionFruit>,
+    pub(crate) _consciousness_fruits: Vec<crate::l5_cognition::nt_core_consciousness_tree::EvolutionFruit>,
     /// Total consciousness critiques received
     pub(crate) _consciousness_critique_count: u64,
     /// G5 S 门控 (灵境 L4 自指闭环): 意识质量门控 SEAL 自编辑应用。
@@ -240,7 +240,7 @@ impl SelfIteratingBrain {
             permission: PermissionLevel::Suggest,
             _checkpoint_manager: CheckpointManager::new(),
             _last_anchor_decision: None,
-            echo_bridge: crate::core::nt_core_echo_terminal::EchoPrmBridge::new(),
+            echo_bridge: crate::l5_cognition::nt_core_echo_terminal::EchoPrmBridge::new(),
             _memory_orch: MemoryOrchestrator::new(),
             _per_loop: Some(crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop::new(
                 crate::neotrix::nt_act_autonomy::PerConfig::default(),
@@ -348,8 +348,8 @@ impl SelfIteratingBrain {
     /// Build EchoTrajectory data from tool_traces for ECHO terminal-prediction loss.
     /// Converts each tool execution trace into a TerminalObservation and records
     /// them through the echo_bridge for use in grpo_update_with_echo.
-    pub fn build_echo_trajectories(&mut self) -> Vec<crate::core::nt_core_echo_terminal::EchoTrajectory> {
-        use crate::core::nt_core_echo_terminal::EchoController;
+    pub fn build_echo_trajectories(&mut self) -> Vec<crate::l5_cognition::nt_core_echo_terminal::EchoTrajectory> {
+        use crate::l5_cognition::nt_core_echo_terminal::EchoController;
         let traj_id = format!("iter-{}", self.iteration);
         for (tool_name, duration_ms, success) in &self.tool_traces {
             let obs = EchoController::observe_command(
@@ -604,7 +604,7 @@ impl SelfIteratingBrain {
     }
 
     /// 主动触发知识库记忆迭代（合并+修剪+回放）
-    pub fn consolidate_memories(&mut self) -> crate::core::nt_core_bank::MemoryIterationResult {
+    pub fn consolidate_memories(&mut self) -> crate::l1_action::nt_core_bank::MemoryIterationResult {
         self.reasoning_bank.iterate_memories(0.85, 0.1)
     }
 

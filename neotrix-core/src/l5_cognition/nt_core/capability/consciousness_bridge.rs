@@ -276,19 +276,19 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for RuleMemorySelfTest
     fn name(&self) -> &str { "rule_memory" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut errs = Vec::new();
-        let conn = match crate::core::nt_core_kb_primitives::open_raw_conn() {
+        let conn = match crate::l6_meta::nt_core_kb_primitives::open_raw_conn() {
             Some(c) => c,
             None => { errs.push("KB unavailable".into()); return Err(errs); }
         };
-        crate::core::nt_core_kb_primitives::schema_initialize(&conn).ok();
+        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn).ok();
         // 验证 rule namespace 可读写
-        if crate::core::nt_core_kb_primitives::kv_set(&conn, "rule", "_health_check", "ok").is_err() {
+        if crate::l6_meta::nt_core_kb_primitives::kv_set(&conn, "rule", "_health_check", "ok").is_err() {
             errs.push("rule namespace write failed".into());
         }
-        if crate::core::nt_core_rule_memory::rule_list(&conn).is_err() {
+        if crate::l5_cognition::nt_core_rule_memory::rule_list(&conn).is_err() {
             errs.push("rule_list failed".into());
         }
-        crate::core::nt_core_kb_primitives::kv_delete(&conn, "rule", "_health_check").ok();
+        crate::l6_meta::nt_core_kb_primitives::kv_delete(&conn, "rule", "_health_check").ok();
         if errs.is_empty() { Ok(()) } else { Err(errs) }
     }
 }

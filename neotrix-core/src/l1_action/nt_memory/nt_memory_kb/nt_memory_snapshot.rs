@@ -231,7 +231,7 @@ mod tests {
     fn node(id: &str, title: &str, content: &str) -> KnowledgeNode {
         KnowledgeNode {
             id: id.into(),
-            node_type: crate::core::nt_core_kb_types::NodeType::Concept,
+            node_type: crate::l6_meta::nt_core_kb_types::NodeType::Concept,
             title: title.into(),
             summary: None,
             content: Some(content.into()),
@@ -259,7 +259,7 @@ mod tests {
             id: id.into(),
             source_id: src.into(),
             target_id: tgt.into(),
-            relation_type: crate::core::nt_core_kb_types::RelationType::RelatedTo,
+            relation_type: crate::l6_meta::nt_core_kb_types::RelationType::RelatedTo,
             weight: 1.0,
             description: None,
             created_at: 0,

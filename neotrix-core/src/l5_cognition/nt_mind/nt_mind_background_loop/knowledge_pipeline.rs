@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::l5_cognition::nt_mind::foundation::knowledge_store::{KnowledgeStore, L1KnowledgeStore};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
-use crate::core::nt_core_kb_types::NodeType;
+use crate::l6_meta::nt_core_kb_types::NodeType;
 
 // ============================================================
 // 源类型 (使用唯一名避免冲突)

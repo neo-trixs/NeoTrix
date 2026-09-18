@@ -12,13 +12,13 @@ use super::*;
 // ============================================================================
 
 /// 全局 NativeBus 单例 — 仅创建一次，后续 tick 复用。
-static GLOBAL_BUS: std::sync::OnceLock<std::sync::Arc<crate::core::l7_capability::native_bus::NativeBusHandle>> =
+static GLOBAL_BUS: std::sync::OnceLock<std::sync::Arc<crate::l5_cognition::nt_core::capability::native_bus::NativeBusHandle>> =
     std::sync::OnceLock::new();
 
-fn get_or_create_bus() -> std::sync::Arc<crate::core::l7_capability::native_bus::NativeBusHandle> {
+fn get_or_create_bus() -> std::sync::Arc<crate::l5_cognition::nt_core::capability::native_bus::NativeBusHandle> {
     GLOBAL_BUS.get_or_init(|| {
-        let bus = crate::core::l7_capability::native_bus::NativeBus::new();
-        std::sync::Arc::new(crate::core::l7_capability::native_bus::NativeBusHandle::new(bus))
+        let bus = crate::l5_cognition::nt_core::capability::native_bus::NativeBus::new();
+        std::sync::Arc::new(crate::l5_cognition::nt_core::capability::native_bus::NativeBusHandle::new(bus))
     }).clone()
 }
 
@@ -47,15 +47,15 @@ impl BackgroundLoopHandle {
         {
             // bridge 内部用 RwLock<Option<Arc<>>>，重复 attach 是幂等的
             let handle = get_or_create_bus();
-            crate::core::l7_capability::consciousness_bridge::attach_native_bus(handle);
+            crate::l5_cognition::nt_core::capability::consciousness_bridge::attach_native_bus(handle);
         }
 
         // 启用叙事注入（意识体完整初始化后才开启）
-            crate::core::l7_capability::consciousness_bridge::bridge().set_narrative("wisdom_injection_enabled".to_string());
+            crate::l5_cognition::nt_core::capability::consciousness_bridge::bridge().set_narrative("wisdom_injection_enabled".to_string());
 
             // ── 0.5 Bridge 数据同步（价值观权重 + 叙事摘要）──
         {
-            crate::core::l7_capability::consciousness_bridge::sync_from_evolution(
+            crate::l5_cognition::nt_core::capability::consciousness_bridge::sync_from_evolution(
                 vec![
                     ("autonomy".to_string(), 0.95),
                     ("harm_prevention".to_string(), 0.9),
@@ -71,14 +71,14 @@ impl BackgroundLoopHandle {
         }
 
         // E1.3: 启用叙事注入 — 意识体完整初始化后才开启
-        crate::core::l7_capability::consciousness_bridge::bridge().enable_narrative_injection();
+        crate::l5_cognition::nt_core::capability::consciousness_bridge::bridge().enable_narrative_injection();
 
         // ── 1. 规则结晶 ──
         {
-            let cfg = crate::core::nt_core_rule_memory::ScanConfig {
+            let cfg = crate::l5_cognition::nt_core_rule_memory::ScanConfig {
                 min_group: 3, domain: None, limit: 100,
             };
-            match crate::core::nt_core_rule_memory::crystallize_scan(&conn, &cfg) {
+            match crate::l5_cognition::nt_core_rule_memory::crystallize_scan(&conn, &cfg) {
                 Ok(rep) if !rep.rules_created.is_empty() => {
                     log::info!("[wisdom] crystallized {} rules", rep.rules_created.len());
                 }
@@ -88,7 +88,7 @@ impl BackgroundLoopHandle {
 
         // ── 2. Dark Forest GC ──
         {
-            match crate::core::nt_core_rule_memory::gc_rules(&conn, 30) {
+            match crate::l5_cognition::nt_core_rule_memory::gc_rules(&conn, 30) {
                 Ok(rep) if !rep.deleted.is_empty() || !rep.retired.is_empty() => {
                     log::info!("[wisdom] GC: {} deleted, {} retired",
                         rep.deleted.len(), rep.retired.len());
@@ -100,7 +100,7 @@ impl BackgroundLoopHandle {
         // ── 3. 数据同步到意识桥接层 ──
         {
             // 从 KB 读价值观权重 → 同步到 bridge
-            crate::core::l7_capability::consciousness_bridge::sync_from_evolution(
+            crate::l5_cognition::nt_core::capability::consciousness_bridge::sync_from_evolution(
                 vec![
                     ("autonomy".to_string(), 0.95),
                     ("harm_prevention".to_string(), 0.9),

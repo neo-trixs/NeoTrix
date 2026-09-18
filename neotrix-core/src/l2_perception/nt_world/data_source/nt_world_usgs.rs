@@ -315,7 +315,7 @@ impl UsgsFetcher {
             );
             let existing = kb.find_node_by_url(&evt.url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.title, crate::core::nt_core_kb_types::NodeType::Event, Some(&summary), Some(&evt.url), Some("usgs"))
+            let _id = kb.insert_or_get_node(&evt.title, crate::l6_meta::nt_core_kb_types::NodeType::Event, Some(&summary), Some(&evt.url), Some("usgs"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.id, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }

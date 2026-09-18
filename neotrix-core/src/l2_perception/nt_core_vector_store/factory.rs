@@ -23,7 +23,7 @@ pub fn create_default_store() -> Box<dyn VectorStore> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_vector_store::types::VectorRecord;
+    use crate::l2_perception::nt_core_vector_store::types::VectorRecord;
 
     #[test]
     fn test_create_ivf_store() {

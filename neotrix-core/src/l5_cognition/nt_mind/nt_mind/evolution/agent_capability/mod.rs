@@ -12,8 +12,8 @@
 //! `nt_mind` 层做路由 — 不引入平行适配器模块 (R-P42)。
 
 use super::co_evolution::{CoEvoConfig, CoEvolutionLoop};
-use crate::core::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
-use crate::core::nt_core_kb_types::NodeType;
+use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
+use crate::l6_meta::nt_core_kb_types::NodeType;
 use crate::core::nt_core_meta::{MetaCognitiveLoop, MetaCycleResult};
 use crate::core::nt_core_self::attention_head::{AttentionDomain, AttentionManager};
 use crate::l5_cognition::layer_aliases::KnowledgeBase;

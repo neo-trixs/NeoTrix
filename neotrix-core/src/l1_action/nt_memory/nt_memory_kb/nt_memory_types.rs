@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 // D3 架构倒置: NodeType / RelationType / KnowledgeNode / KnowledgeEdge /
 // TemporalValidity 下沉至 core (nt_core_kb_types), 此处 re-export 保持
 // `nt_memory_types::*` 调用方路径不变。单一事实源在 core。
-pub use crate::core::nt_core_kb_types::{NodeType, RelationType};
+pub use crate::l6_meta::nt_core_kb_types::{NodeType, RelationType};
 
 /// Permission-aware retrieval level (P0-2, Cycle 159). Maps to the caller's
 /// clearance: Public < Internal < Confidential < Secret. Each level can access
@@ -55,7 +55,7 @@ pub fn node_sensitivity(node_type: &NodeType) -> PermissionLevel {
 
 /// D3 下沉: 节点/边/时间窗口类型迁至 core `nt_core_kb_types`, 此处 re-export
 /// 保持 `nt_memory_types::KnowledgeNode/KnowledgeEdge/TemporalValidity` 调用方路径不变。
-pub use crate::core::nt_core_kb_types::{KnowledgeEdge, KnowledgeNode, TemporalValidity};
+pub use crate::l6_meta::nt_core_kb_types::{KnowledgeEdge, KnowledgeNode, TemporalValidity};
 
 /// Domain knowledge cluster — 对应 `domain_clusters` 表
 #[derive(Debug, Clone, Serialize, Deserialize)]

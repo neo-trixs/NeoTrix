@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 
-use crate::core::l2_perception::nt_core_llm::{DataTrust, LlmError, LlmProvider, LlmRequest, LlmResponse};
+use crate::l2_perception::nt_core_llm::{DataTrust, LlmError, LlmProvider, LlmRequest, LlmResponse};
 use crate::l1_action::nt_io::nt_io_provider::ollama::OllamaProvider;
 
 use super::traits::{ModelCapabilities, ModelHealth, ModelIdentifier, TaskType, UniversalModel};

@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_llm::Usage;
+use crate::l1_action::nt_core_llm::Usage;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TelemetryEvent {

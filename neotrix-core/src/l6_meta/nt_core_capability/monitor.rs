@@ -2,7 +2,7 @@
 //!
 //! 实时监控所有能力的健康状态和性能指标
 
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -265,7 +265,7 @@ impl EventStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_capability::factory::init_global_registry;
+    use crate::l6_meta::nt_core_capability::factory::init_global_registry;
 
     #[test]
     fn dashboard_creation() {

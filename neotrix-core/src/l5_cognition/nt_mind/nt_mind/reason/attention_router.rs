@@ -1,9 +1,9 @@
-use crate::core::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
-use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::core::nt_core_harness::HarnessAdapter;
-use crate::core::nt_core_hcube::axis::DimensionAxis;
-use crate::core::nt_core_hcube::coord::HyperCoord;
-use crate::core::nt_core_hcube::cube::CubeEntry;
+use crate::l5_cognition::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
+use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::l1_action::nt_core_harness::HarnessAdapter;
+use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
+use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
+use crate::l2_perception::nt_core_hcube::cube::CubeEntry;
 
 use super::hypercube_bridge::HyperCubeBridge;
 

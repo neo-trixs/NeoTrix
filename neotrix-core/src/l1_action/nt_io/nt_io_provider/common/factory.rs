@@ -213,20 +213,20 @@ impl LlmProviderType {
     /// - `Untrusted`: 免费/代理端点 (xiaohuxing/llm7/pollinations/opencode-zen 等),
     ///                靠日志/数据回灌维持免费, 是"拿去喂模型训练"的真实载体 —
     ///                检测到 NeoTrix 内部指纹时必须阻断 (fail-closed) 或脱敏。
-    pub fn data_trust(self) -> crate::core::nt_core_llm::DataTrust {
+    pub fn data_trust(self) -> crate::l1_action::nt_core_llm::DataTrust {
         if self.is_local() {
-            crate::core::nt_core_llm::DataTrust::Trusted
+            crate::l1_action::nt_core_llm::DataTrust::Trusted
         } else if self.is_free() || self.category() == ProviderCategory::Proxy {
-            crate::core::nt_core_llm::DataTrust::Untrusted
+            crate::l1_action::nt_core_llm::DataTrust::Untrusted
         } else {
-            crate::core::nt_core_llm::DataTrust::Contracted
+            crate::l1_action::nt_core_llm::DataTrust::Contracted
         }
     }
 }
 
-/// 数据信任分级 — 复用 core 层定义 (`crate::core::nt_core_llm::DataTrust`),
+/// 数据信任分级 — 复用 core 层定义 (`crate::l1_action::nt_core_llm::DataTrust`),
 /// 避免 core/neotrix 双定义 (core 不得依赖 neotrix, 故单一事实源在 core)。
-pub use crate::core::nt_core_llm::DataTrust;
+pub use crate::l1_action::nt_core_llm::DataTrust;
 
 /// 出口路由 — 吸收 personal-edge-proxy: ingress≠egress, 按域选不同出口。
 /// 进入 VPS 的入口 (ingress) 与流量离开 VPS 的出口 (egress) 必须解耦。
@@ -417,8 +417,8 @@ pub struct DeniedProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for DeniedProvider {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Untrusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Untrusted
     }
 
     fn set_proxy(&mut self, _proxy_url: &str) {

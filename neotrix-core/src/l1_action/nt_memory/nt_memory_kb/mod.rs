@@ -468,7 +468,7 @@ impl KnowledgeBase {
             return;
         }
 
-        use crate::core::nt_core_memory_budget;
+        use crate::l1_action::nt_core_memory_budget;
         let budget = nt_core_memory_budget::global();
         let page_size = budget.check().suggested_batch_size().max(100);
 
@@ -518,7 +518,7 @@ impl KnowledgeBase {
 
     /// Rebuild tech reserve index from all KB nodes (streaming, page-by-page).
     pub fn rebuild_tech_reserve(&self) {
-        use crate::core::nt_core_memory_budget;
+        use crate::l1_action::nt_core_memory_budget;
         let budget = nt_core_memory_budget::global();
         let page_size = budget.check().suggested_batch_size().max(100);
 
@@ -754,7 +754,7 @@ impl KnowledgeBase {
         Ok(())
     }
 
-    pub fn search_similar(&self, query_vector: &[u8], k: usize) -> Result<Vec<crate::core::nt_core_vector_store::types::VectorSearchResult>, String> {
+    pub fn search_similar(&self, query_vector: &[u8], k: usize) -> Result<Vec<crate::l2_perception::nt_core_vector_store::types::VectorSearchResult>, String> {
         let va = self.vector_adapter.read().map_err(|e| format!("Lock: {}", e))?;
         match va.as_ref() {
             Some(adapter) => Ok(adapter.search_similar_nodes(query_vector, k)),
@@ -1390,12 +1390,12 @@ impl KnowledgeBase {
     /// 派生维度, 不落物理列 — 由 `MemoryAssetKind::classify` 实时推断, 避免与 node_type 双源真相漂移 (R-P42)。
     pub fn nodes_by_asset_kind(
         &self,
-        kind: crate::core::nt_core_memory_asset::MemoryAssetKind,
+        kind: crate::l6_meta::nt_core_memory_asset::MemoryAssetKind,
     ) -> Result<Vec<KnowledgeNode>, String> {
         let all = self.all_nodes()?;
         Ok(all
             .into_iter()
-            .filter(|n| crate::core::nt_core_memory_asset::MemoryAssetKind::classify(n) == Some(kind))
+            .filter(|n| crate::l6_meta::nt_core_memory_asset::MemoryAssetKind::classify(n) == Some(kind))
             .collect())
     }
 
@@ -2983,7 +2983,7 @@ impl KnowledgeBase {
 
 /// 实现 core::nt_core_kb_primitives::KvStore — 让 L6 元认知层通过 trait 访问 KV 存储,
 /// 而非直接依赖 `KnowledgeBase` 具体类型。
-impl crate::core::nt_core_kb_primitives::KvStore for KnowledgeBase {
+impl crate::l6_meta::nt_core_kb_primitives::KvStore for KnowledgeBase {
     fn kv_set(&self, namespace: &str, key: &str, value: &str) -> Result<(), String> {
         KnowledgeBase::kv_set(self, namespace, key, value)
     }
@@ -3084,7 +3084,7 @@ impl crate::core::nt_core_traits::KnowledgeSink for KnowledgeBase {
     fn sink_node(
         &self,
         title: &str,
-        node_type: crate::core::nt_core_kb_types::NodeType,
+        node_type: crate::l6_meta::nt_core_kb_types::NodeType,
         summary: Option<&str>,
         url: Option<&str>,
         domain: Option<&str>,
@@ -3096,7 +3096,7 @@ impl crate::core::nt_core_traits::KnowledgeSink for KnowledgeBase {
         &self,
         source_id: &str,
         target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
+        relation_type: crate::l6_meta::nt_core_kb_types::RelationType,
         weight: f64,
         description: Option<&str>,
     ) -> Result<(), String> {
@@ -3107,7 +3107,7 @@ impl crate::core::nt_core_traits::KnowledgeSink for KnowledgeBase {
         &self,
         source_id: &str,
         target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
+        relation_type: crate::l6_meta::nt_core_kb_types::RelationType,
         weight: f64,
         description: Option<&str>,
         metadata: Option<serde_json::Value>,
@@ -3119,7 +3119,7 @@ impl crate::core::nt_core_traits::KnowledgeSink for KnowledgeBase {
         &self,
         source_id: &str,
         target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
+        relation_type: crate::l6_meta::nt_core_kb_types::RelationType,
     ) -> Result<bool, String> {
         KnowledgeBase::edge_exists(self, source_id, target_id, relation_type)
     }

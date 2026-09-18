@@ -11,12 +11,12 @@
 //! 4. **MCTS lookahead**: simulate N-step future to score current transition
 //! 5. **Differentiable attention weights**: soft distribution for GWT bridge
 
-use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType};
-use crate::core::nt_core_e8::e8_lattice_quantizer::E8LatticeQuantizer;
-use crate::core::nt_core_e8::nt_core_fable_pattern::{
+use crate::l2_perception::nt_core_e8::domain_transition::{CoTLength, E8TaskType};
+use crate::l2_perception::nt_core_e8::e8_lattice_quantizer::E8LatticeQuantizer;
+use crate::l2_perception::nt_core_e8::nt_core_fable_pattern::{
     FablePatternMatcher, FablePhase, PhaseTransitionMatrix,
 };
-use crate::core::nt_core_e8::E8TransitionMatrix;
+use crate::l2_perception::nt_core_e8::E8TransitionMatrix;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -821,7 +821,7 @@ impl E8PredictionOracle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_e8::E8TransitionMatrix;
+    use crate::l2_perception::nt_core_e8::E8TransitionMatrix;
 
     fn make_tm() -> E8TransitionMatrix {
         let mut tm = E8TransitionMatrix::new();

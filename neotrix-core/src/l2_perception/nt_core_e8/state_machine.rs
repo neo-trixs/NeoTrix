@@ -1,6 +1,6 @@
 use super::thinking_budget::DifficultyEstimator;
-use crate::core::nt_core_hex::{FullReasoningState, ReasoningHexagram};
-use crate::core::nt_core_ttc::{Allocation, TtcEngine};
+use crate::l5_cognition::nt_core_hex::{FullReasoningState, ReasoningHexagram};
+use crate::l5_cognition::nt_core_ttc::{Allocation, TtcEngine};
 use serde::{Deserialize, Serialize};
 
 /// E₈ state machine wrapping FullReasoningState with TTC integration and multi-modal output.
@@ -92,7 +92,7 @@ impl From<FullReasoningState> for E8StateMachine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hex::{MetaState, ReasoningHexagram};
+    use crate::l5_cognition::nt_core_hex::{MetaState, ReasoningHexagram};
 
     #[test]
     fn test_e8_state_machine_basic_transition() {

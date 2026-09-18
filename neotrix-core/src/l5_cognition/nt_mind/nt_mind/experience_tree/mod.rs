@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use crate::l5_cognition::layer_aliases::KnowledgeBase;
-use crate::core::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
+use crate::l2_perception::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
 
 // ============================================================================
 // 数据结构

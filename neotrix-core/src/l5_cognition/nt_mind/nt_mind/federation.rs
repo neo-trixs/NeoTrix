@@ -548,7 +548,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 #[allow(unused_imports)]
-    use crate::core::nt_core_paradigm::{Anomaly, ParadigmShiftDetector};
+    use crate::l5_cognition::nt_core_paradigm::{Anomaly, ParadigmShiftDetector};
 
     // ── FP1 ValueSync ──
 

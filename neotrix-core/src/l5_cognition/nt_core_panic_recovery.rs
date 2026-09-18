@@ -288,7 +288,7 @@ where
 #[macro_export]
 macro_rules! panic_boundary {
     ($ctx:expr => $body:expr) => {
-        $crate::core::nt_core_panic_recovery::catch_panic($ctx, || $body)
+        $crate::l5_cognition::nt_core_panic_recovery::catch_panic($ctx, || $body)
     };
 }
 

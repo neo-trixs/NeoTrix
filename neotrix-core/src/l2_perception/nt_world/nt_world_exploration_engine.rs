@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_kb_types::NodeType;
+use crate::l6_meta::nt_core_kb_types::NodeType;
 use crate::core::nt_core_traits::KnowledgeSink;
 
 /// 探索数据源类型

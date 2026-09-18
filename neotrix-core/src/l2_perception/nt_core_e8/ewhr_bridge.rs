@@ -1,4 +1,4 @@
-use crate::core::nt_core_hex::FullReasoningState;
+use crate::l5_cognition::nt_core_hex::FullReasoningState;
 
 /// EWHR bridge connecting E8 state trajectory analysis to hypothesis generation.
 pub struct E8EwhrBridge {
@@ -112,7 +112,7 @@ impl Default for E8EwhrBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hex::{FullReasoningState, MetaState, ReasoningHexagram};
+    use crate::l5_cognition::nt_core_hex::{FullReasoningState, MetaState, ReasoningHexagram};
 
     fn make_state(mode: u8, meta: u8) -> FullReasoningState {
         FullReasoningState {

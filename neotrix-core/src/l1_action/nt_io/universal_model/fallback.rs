@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::core::l2_perception::nt_core_llm::{LlmRequest, LlmResponse};
+use crate::l2_perception::nt_core_llm::{LlmRequest, LlmResponse};
 
 use super::traits::{
     ModelError, ModelHealth, TaskType, UniversalModel,
@@ -166,7 +166,7 @@ impl FallbackRouter {
         request: &LlmRequest,
     ) -> Result<LlmResponse, ModelError> {
         // 确定任务类型
-        let task_type = if request.messages.iter().any(|m| m.role == crate::core::l2_perception::nt_core_llm::Role::System) {
+        let task_type = if request.messages.iter().any(|m| m.role == crate::l2_perception::nt_core_llm::Role::System) {
             TaskType::Chat
         } else {
             TaskType::Chat

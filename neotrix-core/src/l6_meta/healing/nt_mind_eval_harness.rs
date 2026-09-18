@@ -4,7 +4,7 @@
 //! 核心指标: AUDC (Area Under Deferral Curve), QNC (Query-Normalized Cost), Peak Quality
 //! 预算执行: prompt 注入 "use at most K tokens" (Lee et al. 2025)
 
-use crate::core::nt_core_ttc::EffortTier;
+use crate::l5_cognition::nt_core_ttc::EffortTier;
 use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::{
     derive_level, ConsciousnessGoldStandard, ConsciousnessLevel, GoldStandardReport,
 };
@@ -1639,8 +1639,8 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for DummyProvider {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
         async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {

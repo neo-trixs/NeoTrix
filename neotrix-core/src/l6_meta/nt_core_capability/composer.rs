@@ -2,7 +2,7 @@
 //!
 //! 支持多个能力的链式调用和并行执行
 
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 use std::sync::Arc;
 
 /// 组合能力
@@ -209,7 +209,7 @@ impl CapabilityComposer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_capability::factory::init_global_registry;
+    use crate::l6_meta::nt_core_capability::factory::init_global_registry;
 
     #[test]
     fn composer_creation() {

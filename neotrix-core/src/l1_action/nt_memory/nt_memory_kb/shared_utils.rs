@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rusqlite::Row;
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
+use crate::l6_meta::nt_core_kb_types::{KnowledgeNode, NodeType};
 
 /// 统一时间戳函数 (秒级)
 pub fn now() -> i64 {

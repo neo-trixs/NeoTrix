@@ -12,12 +12,12 @@
 use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
     DecomposeSuggestion, TaskDecomposer,
 };
-use crate::core::nt_core_cot_generator::{CoTConfig, CoTGenerator, DefaultCoTGenerator};
-use crate::core::nt_core_crt::{CrtPlan, CrtTimeScale};
-use crate::core::nt_core_policy::E8Policy;
-use crate::core::nt_core_reasoning::{ReasoningMethod, TraceSource};
-use crate::core::nt_core_kernel_types::{KERNEL_DIM, ReasoningKernel, Vector};
-use crate::core::nt_core_llm::{
+use crate::l5_cognition::nt_core_cot_generator::{CoTConfig, CoTGenerator, DefaultCoTGenerator};
+use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
+use crate::l5_cognition::nt_core_policy::E8Policy;
+use crate::l5_cognition::nt_core_reasoning::{ReasoningMethod, TraceSource};
+use crate::l5_cognition::nt_core_kernel_types::{KERNEL_DIM, ReasoningKernel, Vector};
+use crate::l1_action::nt_core_llm::{
     estimate_tokens, truncate_preserving, LlmProvider, LlmRequest, Message, Role,
 };
 use serde::{Deserialize, Serialize};
@@ -72,7 +72,7 @@ pub struct SubTaskResult {
     pub error: Option<String>,
     pub tokens_used: u32,
     pub duration_ms: u64,
-    pub cot_output: Option<crate::core::nt_core_cot_generator::CoTOutput>,
+    pub cot_output: Option<crate::l5_cognition::nt_core_cot_generator::CoTOutput>,
 }
 
 /// 任务执行上下文（在拆解和执行过程中传递）
@@ -663,7 +663,7 @@ Output your result for this subtask only."#,
         // 高置信 + 确定性分类 → 走本地 kernel 快路径 (省 LLM 推理预算);
         // 其余情况回退到原有策略链。每次执行后观察实际转移并持久化
         // (The Spice Must Flow: 观测 → 预测 → 决策 → 再观测闭环)。
-        use crate::core::nt_core_e8_predictor::{
+        use crate::l2_perception::nt_core_e8_predictor::{
             load as predictor_load, persist as predictor_persist,
         };
         let mut predictor = predictor_load();
@@ -758,11 +758,11 @@ Output your result for this subtask only."#,
             .iter()
             .map(|(k, v)| (k.clone(), self.text_to_vector(v, KERNEL_DIM)))
             .collect();
-        let kernel_trace = crate::core::nt_core_reasoning::ReasoningTrace {
+        let kernel_trace = crate::l5_cognition::nt_core_reasoning::ReasoningTrace {
             trace_id: format!("cot_{}", uuid::Uuid::new_v4().simple()),
             task: sub_task.title.clone(),
             method: ReasoningMethod::Deductive,
-            hexagram: crate::core::nt_core_hex::ReasoningHexagram::new(
+            hexagram: crate::l5_cognition::nt_core_hex::ReasoningHexagram::new(
                 sub_task.hexagram_bias.unwrap_or(0),
             ),
             stage: sub_task.crt_scale as usize,
@@ -1210,7 +1210,7 @@ pub enum SubTaskClass {
 /// 推理特征: 深度分析/设计/写作/研究/代码生成 能力, 或长 prompt 隐含复杂度。
 /// 确定性特征: 结构化/机械化能力 (testing/verification) + 短 prompt。
 pub fn classify_sub_task(sub_task: &SubTask) -> SubTaskClass {
-    use crate::core::nt_core_crt::CrtTimeScale::*;
+    use crate::l5_cognition::nt_core::nt_crt::CrtTimeScale::*;
     let caps: Vec<&str> = sub_task
         .required_capabilities
         .iter()

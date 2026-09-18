@@ -13,7 +13,7 @@ use super::agent::{Agent, AgentError, AgentHealth, AgentMetrics, AgentStatus};
 use super::error::{PlatformError, PlatformResult};
 use super::health::HealthChecker;
 use super::metrics::MetricsCollector;
-use crate::core::nt_core_capability::{Domain, Layer};
+use crate::l6_meta::nt_core_capability::{Domain, Layer};
 
 // ============================================================
 // 1. AgentRegistry — 全局 Agent 注册表

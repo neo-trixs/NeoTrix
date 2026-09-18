@@ -4,7 +4,7 @@
 
 #![allow(dead_code)]
 
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 

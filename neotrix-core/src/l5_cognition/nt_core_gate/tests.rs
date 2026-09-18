@@ -1,6 +1,6 @@
     use super::*;
-    use crate::core::nt_core_hex::ReasoningHexagram;
-    use crate::core::nt_core_prm::TrajectoryStep;
+    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+    use crate::l5_cognition::nt_core_prm::TrajectoryStep;
     use crate::core::nt_core_traits::SpecialistType;
     use crate::l1_action::nt_io::nt_io_provider::{
         FinishReason, LlmError, LlmRequest, LlmResponse, Usage,
@@ -15,8 +15,8 @@
     #[async_trait::async_trait]
     impl LlmProvider for MockJudgeProvider {
     fn set_proxy(&mut self, _proxy_url: &str) {}
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
         async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -634,8 +634,8 @@
     #[async_trait::async_trait]
     impl LlmProvider for MockRubricProvider {
     fn set_proxy(&mut self, _proxy_url: &str) {}
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
         async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {

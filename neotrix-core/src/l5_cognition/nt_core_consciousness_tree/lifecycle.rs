@@ -9,7 +9,7 @@ impl ConsciousnessTree {
     /// 使用全局 Constitution (解析自 AGENTS.md) 中的 tree_growth_rules + absorption_rules。
     /// 回退: 若 Constitution 不可用/为空, 使用硬编码默认原则 (R-P42~R-P48 浓缩锚点)。
     fn load_internalized_principles(&mut self) -> Vec<String> {
-        use crate::core::nt_core_self_constitution::global_constitution;
+        use crate::l6_meta::nt_core_self_constitution::global_constitution;
         let constitution = global_constitution();
 
         let mut principles = Vec::new();
@@ -231,7 +231,7 @@ impl ConsciousnessTree {
     ///   - 违规项按 severity 加权: Critical 1.0 / High 0.7 / Medium 0.4 / Low 0.2
     ///   - 审计对象来自真实进化决策 (The Spice Must Flow: 决策→审计→反馈闭环)
     pub fn run_governance_audit(&mut self) {
-        use crate::core::nt_core_self_constitution::global_constitution;
+        use crate::l6_meta::nt_core_self_constitution::global_constitution;
 
         let constitution = global_constitution();
         let mut checked_count = 0usize;
@@ -268,8 +268,8 @@ impl ConsciousnessTree {
                 checked_rules.insert(rule.id.clone());
                 if constitution.check_violation(rule, action) {
                     let weight = match rule.category {
-                        crate::core::nt_core_self_constitution::RuleCategory::TreeGrowth => 1.0,
-                        crate::core::nt_core_self_constitution::RuleCategory::BehavioralGrounding => 0.7,
+                        crate::l6_meta::nt_core_self_constitution::RuleCategory::TreeGrowth => 1.0,
+                        crate::l6_meta::nt_core_self_constitution::RuleCategory::BehavioralGrounding => 0.7,
                         _ => 0.4,
                     };
                     weighted_violations += weight;
@@ -628,7 +628,7 @@ impl ConsciousnessTree {
     /// 独立 CLI/MCP 路径经 run_growth_cycle Phase 2 调用后, trunk.phi 反映真实
     /// 树状态集成度, 快照/CoreSnapshot.phi 不再是恒 0.0。
     pub fn compute_iit_phi(&self) -> f64 {
-        use crate::core::nt_core_iit_phi::IITPhiCalculator;
+        use crate::l5_cognition::nt_core::nt_iit_phi::IITPhiCalculator;
         let state = self.build_phi_state();
         IITPhiCalculator::new().compute_phi(&state).phi
     }
@@ -946,7 +946,7 @@ impl ConsciousnessTree {
     /// 输入: 各 branch 当前健康/迷雾/果实数据聚合为事件流; 输出: 方向 + 置信度 + 情景树。
     /// 无 LLM 依赖 (ForecastEngine::new() 不启用 narrator), 纯确定性计算, 可安全用于测试。
     fn forecast_evolution(&self) -> Option<EvolutionForecast> {
-        use crate::core::nt_core_forecast::ForecastEngine;
+        use crate::l5_cognition::nt_core::nt_forecast::ForecastEngine;
 
         let mut engine = ForecastEngine::new();
 

@@ -37,8 +37,8 @@ impl GatewayV2Adapter {
 
 #[async_trait]
 impl LlmProvider for GatewayV2Adapter {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
     fn set_proxy(&mut self, _proxy_url: &str) {

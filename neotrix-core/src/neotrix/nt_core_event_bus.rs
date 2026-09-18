@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
-use crate::core::nt_core_dispatch::Dispatcher;
+use crate::l5_cognition::nt_core_dispatch::Dispatcher;
 use crate::core::nt_core_event::CoreEvent;
 
 /// 事件溯源信封 (D4 — maka 'Log is the Runtime' / buzz 事件日志 + 身份 + receipts)

@@ -7,7 +7,7 @@ use super::super::types::{
     RateLimiter,
 };
 use crate::agent::AgentTeam;
-use crate::core::nt_core_gwt::resonance::OscillatorNetwork;
+use crate::l5_cognition::nt_core_gwt::resonance::OscillatorNetwork;
 use crate::core::nt_core_self::MotivationState;
 use crate::core::{optimal_starting_mode, CrtTimeScale, ReasoningHexagram};
 use crate::l5_cognition::nt_mind::foundation::distiller::{

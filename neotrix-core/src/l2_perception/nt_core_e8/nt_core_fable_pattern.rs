@@ -20,7 +20,7 @@
 //!   - NaturalThoughts (difficulty-aware distillation selection)
 //!   - ReasoningFlow (DAG-structured non-linear reasoning discovery)
 
-use crate::core::nt_core_prm::AgentTrajectory;
+use crate::l5_cognition::nt_core_prm::AgentTrajectory;
 
 /// The 9 named phases of Fable-5's reasoning pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

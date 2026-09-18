@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::time::{Duration, Instant};
 
-use crate::core::nt_core_llm::{LlmError, LlmRequest};
+use crate::l1_action::nt_core_llm::{LlmError, LlmRequest};
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::lookup_provider;
 use crate::l1_action::nt_io::nt_io_provider::health::circuit_breaker::CircuitBreaker;
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
@@ -379,8 +379,8 @@ impl OriEvalSuite {
     pub async fn score_with_provider(
         &self,
         model_name: &str,
-        provider: &(dyn crate::core::nt_core_llm::LlmProvider + Send + Sync),
-    ) -> Result<OriModelScore, crate::core::nt_core_llm::LlmError> {
+        provider: &(dyn crate::l1_action::nt_core_llm::LlmProvider + Send + Sync),
+    ) -> Result<OriModelScore, crate::l1_action::nt_core_llm::LlmError> {
         use crate::l1_action::nt_io::nt_io_provider::common::types::LlmRequest;
 
         let mut correct = 0usize;
@@ -469,7 +469,7 @@ impl GatewayV2 {
         &self,
         provider_name: &str,
         task_type: &str,
-    ) -> Result<crate::core::nt_core_consciousness_tree::ProviderBenchmark, LlmError> {
+    ) -> Result<crate::l5_cognition::nt_core_consciousness_tree::ProviderBenchmark, LlmError> {
         let tasks = self.challenge_tasks(task_type);
         let mut correct = 0usize;
         let mut total_latency_ms = 0u64;
@@ -490,7 +490,7 @@ impl GatewayV2 {
         }
 
         let task_count = 4usize;
-        Ok(crate::core::nt_core_consciousness_tree::ProviderBenchmark {
+        Ok(crate::l5_cognition::nt_core_consciousness_tree::ProviderBenchmark {
             provider: provider_name.to_string(),
             model: self
                 .provider_model(provider_name)

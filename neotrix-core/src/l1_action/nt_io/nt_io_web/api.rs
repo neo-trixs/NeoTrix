@@ -15,7 +15,7 @@ use std::sync::atomic::Ordering;
 
 
 use super::{AgentStatus, BrainStats, DiffBlock, FileNode, PermissionRequest, ProjectInfo, ProviderConfigPayload, SessionInfo};
-use crate::core::nt_core_llm::LlmProvider;
+use crate::l1_action::nt_core_llm::LlmProvider;
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -223,7 +223,7 @@ pub async fn reason_handler(
     };
     let provider_config = payload_to_provider_config(&payload);
     let provider = crate::l1_action::nt_io::nt_io_provider::create_provider(provider_config);
-    let request = crate::core::nt_core_llm::LlmRequest::new(&payload.model, &body.prompt);
+    let request = crate::l1_action::nt_core_llm::LlmRequest::new(&payload.model, &body.prompt);
     match provider.complete(&request).await {
         Ok(response) => json_ok(serde_json::json!({
             "output": response.content, "success": true
@@ -469,7 +469,7 @@ pub async fn agent_reason_stream_handler(
 
         let provider_config = payload_to_provider_config(&payload);
         let provider = crate::l1_action::nt_io::nt_io_provider::create_provider(provider_config);
-        let request = crate::core::nt_core_llm::LlmRequest::new(&payload.model, &body.prompt);
+        let request = crate::l1_action::nt_core_llm::LlmRequest::new(&payload.model, &body.prompt);
 
         match provider.complete(&request).await {
             Ok(response) => {
@@ -721,7 +721,7 @@ pub async fn test_provider_handler(
     }
     let provider_config = payload_to_provider_config(&body);
     let provider = crate::l1_action::nt_io::nt_io_provider::create_provider(provider_config);
-    let request = crate::core::nt_core_llm::LlmRequest::new(&body.model, "Hello");
+    let request = crate::l1_action::nt_core_llm::LlmRequest::new(&body.model, "Hello");
     match provider.complete(&request).await {
         Ok(_) => json_ok(serde_json::json!({"success": true, "message": "ok"})),
         Err(e) => json_ok(serde_json::json!({
@@ -1055,17 +1055,17 @@ pub async fn openai_chat_completions(
     // 转换消息格式
     let messages: Vec<crate::l1_action::nt_io::nt_io_provider::Message> = req.messages.into_iter().map(|m| {
         let role = match m.role.as_str() {
-            "system" => crate::core::nt_core_llm::Role::System,
-            "user" => crate::core::nt_core_llm::Role::User,
-            "assistant" => crate::core::nt_core_llm::Role::Assistant,
-            "tool" => crate::core::nt_core_llm::Role::Tool,
-            _ => crate::core::nt_core_llm::Role::User,
+            "system" => crate::l1_action::nt_core_llm::Role::System,
+            "user" => crate::l1_action::nt_core_llm::Role::User,
+            "assistant" => crate::l1_action::nt_core_llm::Role::Assistant,
+            "tool" => crate::l1_action::nt_core_llm::Role::Tool,
+            _ => crate::l1_action::nt_core_llm::Role::User,
         };
         crate::l1_action::nt_io::nt_io_provider::Message::new(role, m.content.as_str())
     }).collect();
 
     // 构建请求
-    let llm_request = crate::core::nt_core_llm::LlmRequest {
+    let llm_request = crate::l1_action::nt_core_llm::LlmRequest {
         model: req.model.clone(),
         messages,
         temperature: req.temperature,
@@ -1116,7 +1116,7 @@ pub async fn openai_chat_completions(
                             choice_delta["delta"]["content"] = serde_json::json!(resp.content);
                         }
                         
-                        if resp.finish_reason != crate::core::nt_core_llm::FinishReason::Stop {
+                        if resp.finish_reason != crate::l1_action::nt_core_llm::FinishReason::Stop {
                             choice_delta["finish_reason"] = serde_json::json!(format!("{:?}", resp.finish_reason).to_lowercase());
                         }
                         

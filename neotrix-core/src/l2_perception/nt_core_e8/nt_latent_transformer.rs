@@ -275,8 +275,8 @@ impl Lcg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
-    use crate::core::nt_core_hex::ReasoningHexagram;
+    use crate::l2_perception::nt_core_e8::unified_latent::UnifiedLatentSpace;
+    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 
     fn cosine(a: &[f64], b: &[f64]) -> f64 {
         if a.len() != b.len() || a.is_empty() {

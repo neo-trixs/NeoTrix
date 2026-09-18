@@ -1,4 +1,4 @@
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 use super::first_person_ref::FirstPersonRef;
 use super::specious_present::SpeciousPresent;

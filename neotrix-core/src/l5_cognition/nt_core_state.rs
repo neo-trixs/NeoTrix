@@ -15,7 +15,7 @@ use std::sync::{Mutex, OnceLock};
 use neotrix_types::core::fs_util::atomic_write;
 use rusqlite::Connection;
 
-use crate::core::nt_core_kb_primitives as kv;
+use crate::l6_meta::nt_core_kb_primitives as kv;
 
 /// state 统一命名空间 (kv_store.namespace)。
 pub const NS: &str = "state";

@@ -235,7 +235,7 @@ pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<
     }
 }
 
-use crate::core::nt_core_math::cosine_similarity_f32;
+use crate::l5_cognition::nt_core_math::cosine_similarity_f32;
 
 /// Serialize a Vec<f32> to a byte blob for SQLite storage (little-endian f32).
 fn vector_to_blob(v: &[f32]) -> Vec<u8> {

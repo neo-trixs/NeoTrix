@@ -1,4 +1,4 @@
-use crate::core::nt_core_e8::hexagram_hadamard;
+use crate::l2_perception::nt_core_e8::hexagram_hadamard;
 use std::collections::HashMap;
 
 const WH_DIM: usize = 64;

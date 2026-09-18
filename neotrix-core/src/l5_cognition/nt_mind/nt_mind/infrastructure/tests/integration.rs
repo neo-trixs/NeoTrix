@@ -3,11 +3,11 @@
 mod tests {
     #[test]
     fn test_attention_to_gwt_to_hypercube_chain() {
-        use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-        use crate::core::nt_core_gwt::module_def::SpecialistType;
-        use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
-        use crate::core::nt_core_hcube::coord::HyperCoord;
-        use crate::core::nt_core_hcube::axis::DimensionAxis;
+        use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
+        use crate::l5_cognition::nt_core_gwt::module_def::SpecialistType;
+        use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
+        use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
+        use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
         use crate::core::nt_core_self::AttentionDomain;
         use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
 

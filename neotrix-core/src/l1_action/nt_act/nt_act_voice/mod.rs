@@ -7,7 +7,7 @@ pub mod trigger;
 pub use command::VoiceCommand;
 pub use transcribe::TranscribeEngine;
 pub use trigger::VoiceTrigger;
-use crate::core::nt_core_sense::{SensoryEvent, SensoryEventKind, Transcription};
+use crate::l2_perception::nt_core_sense::{SensoryEvent, SensoryEventKind, Transcription};
 use transcribe::{MockTranscriber, WhisperTranscriber, ExternalAPITranscriber};
 
 #[derive(Clone)]

@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use crate::core::l0_substrate::nt_core_error::recovery::{ErrorContext, ErrorType, RecoveryAction};
+use crate::l0_substrate::nt_core_error::recovery::{ErrorContext, ErrorType, RecoveryAction};
 use crate::core::nt_core_cache::text_to_embedding;
-use crate::core::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
+use crate::l1_action::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
 use crate::core::nt_core_span::{SpanKind, Tracer};
 use crate::l1_action::nt_io::nt_io_provider::pool::account_pool::{AccountPoolError};
 use crate::l1_action::nt_io::nt_io_provider::gateway::routing::agent_routing::ModelTier;
@@ -842,12 +842,12 @@ impl GatewayV2 {
         let vision_candidates: Vec<String> = {
             let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
             let mut names: Vec<String> = states.keys().cloned().collect();
-            names.sort_by_key(|n| (!crate::core::nt_core_e8::nt_multimodal::model_supports_vision(n), n.clone()));
+            names.sort_by_key(|n| (!crate::l2_perception::nt_core_e8::nt_multimodal::model_supports_vision(n), n.clone()));
             names
         };
         let mut target: Option<String> = None;
         for name in vision_candidates {
-            if crate::core::nt_core_e8::nt_multimodal::model_supports_vision(&name) { target = Some(name); break; }
+            if crate::l2_perception::nt_core_e8::nt_multimodal::model_supports_vision(&name) { target = Some(name); break; }
         }
         let name = match target {
             Some(n) => { used.push(n.clone()); n }

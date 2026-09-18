@@ -2,7 +2,7 @@
 //!
 //! 支持本地和远程能力发现、注册、同步
 
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

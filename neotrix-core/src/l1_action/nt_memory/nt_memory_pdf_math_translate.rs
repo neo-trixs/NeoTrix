@@ -7,7 +7,7 @@
 //! 机制: `TranslatorBackend` trait 定义统一翻译后端接口; `PdfMathTranslateBackend`
 //! 为 PDFMathTranslate CLI/HTTP 后端的 stub 实现, 预留 FTS5 节点插入钩子。
 
-use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
+use crate::l6_meta::nt_core_kb_types::{KnowledgeNode, NodeType};
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use uuid::Uuid;
@@ -178,7 +178,7 @@ mod tests {
             .expect("ingest should succeed");
         assert!(!id.is_empty());
         let node = kb.get_node(&id).expect("node present").expect("node exists");
-        assert_eq!(node.node_type, crate::core::nt_core_kb_types::NodeType::Paper);
+        assert_eq!(node.node_type, crate::l6_meta::nt_core_kb_types::NodeType::Paper);
         assert_eq!(node.title, "Attention Is All You Need");
     }
 }

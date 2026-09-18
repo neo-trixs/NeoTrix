@@ -1,6 +1,6 @@
 use super::pipeline::{BrainStage, StageDecision};
 use super::SelfIteratingBrain;
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 use crate::neotrix::nt_core_error::NeoTrixError;
 use std::collections::HashMap;
 

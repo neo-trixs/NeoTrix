@@ -17,7 +17,7 @@ use super::nt_memory_types::*;
 use super::nt_memory_store;
 use super::KnowledgeBase;
 
-use crate::core::nt_core_kb_types::{NodeType, RelationType};
+use crate::l6_meta::nt_core_kb_types::{NodeType, RelationType};
 use super::nt_memory_gwt_router::RetrievalChannel;
 
 use serde::{Deserialize, Serialize};

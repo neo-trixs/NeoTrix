@@ -552,7 +552,7 @@ pub fn upsert_edge(
 // D3 架构倒置: 基础 count 原语下沉至 core (nt_core_kb_primitives), re-export
 // 保持 `nt_memory_store::count_nodes/count_edges` 调用方路径不变。
 // 域级聚合 count (by_type/by_domain/...) 保留本模块 (依赖 nt_memory_types)。
-pub use crate::core::nt_core_kb_primitives::{count_edges, count_nodes};
+pub use crate::l6_meta::nt_core_kb_primitives::{count_edges, count_nodes};
 
 pub fn count_nodes_by_type_map(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
     let mut stmt = conn.prepare("SELECT node_type, COUNT(*) FROM nodes GROUP BY node_type")?;

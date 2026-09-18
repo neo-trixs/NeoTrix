@@ -11,7 +11,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
 
-use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::l5_cognition::layer_aliases::{ProceduralMemoryRecord, skill_upsert, SkillRecord, KnowledgeBase};
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, HookContext, HookResult};
 

@@ -5,7 +5,7 @@ use super::super::types::{GoalIterationRecord, GoalState};
 // use crate::l5_cognition::nt_mind::KnowledgeSource;
 use super::core::truncate;
 use super::core::GoalLoop;
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 use crate::neotrix::nt_world_model::TaskType as WorldTaskType;
 
 /// 单次迭代的估算成本 (USD)。模拟环境无真实 LLM token 计量,
@@ -80,9 +80,9 @@ impl GoalLoop {
 
         // E1.2: ValueGate 价值裁决 — 目标迭代前检查（非阻断式，log-and-pass）
         {
-            let bridge = crate::core::l7_capability::consciousness_bridge::bridge();
+            let bridge = crate::l5_cognition::nt_core::capability::consciousness_bridge::bridge();
             match bridge.pre_tick_check(0) {
-                crate::core::l7_capability::consciousness_bridge::QuickVerdict::Warn(msg) => {
+                crate::l5_cognition::nt_core::capability::consciousness_bridge::QuickVerdict::Warn(msg) => {
                     log::warn!("[goal-loop] value warning during pursue: {}", msg);
                     // 不阻断执行，但记录告警供审计
                 }

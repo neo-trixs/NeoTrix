@@ -12,8 +12,8 @@
 //! unified embedding is then routed by the ModalityRouter and fused by salience
 //! weighting, producing a single latent vector that can drive the E8 state.
 
-use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
-use crate::core::nt_core_shared_types::Modality;
+use crate::l2_perception::nt_core_e8::unified_latent::UnifiedLatentSpace;
+use crate::l5_cognition::nt_core_shared_types::Modality;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;

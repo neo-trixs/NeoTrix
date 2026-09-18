@@ -3,9 +3,9 @@
 //! 核心接口定义 + L0 共享类型，解耦各层之间的直接引用。
 //! 所有实现都在各自层中，traits 本身在 core 层。
 
-use crate::core::nt_core_bank::{ReasoningBankStats, ReasoningMemory};
+use crate::l1_action::nt_core_bank::{ReasoningBankStats, ReasoningMemory};
 use crate::core::nt_core_cap::CapabilityVector;
-use crate::core::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
+use crate::l2_perception::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
 use serde::{Deserialize, Serialize};
 
 pub use neotrix_types::core::nt_core_traits::{NativeTool, ToolDef, ToolOutput, ToolProvider};
@@ -107,7 +107,7 @@ pub trait KnowledgeSink: Send + Sync {
     fn sink_node(
         &self,
         title: &str,
-        node_type: crate::core::nt_core_kb_types::NodeType,
+        node_type: crate::l6_meta::nt_core_kb_types::NodeType,
         summary: Option<&str>,
         url: Option<&str>,
         domain: Option<&str>,
@@ -118,7 +118,7 @@ pub trait KnowledgeSink: Send + Sync {
         &self,
         source_id: &str,
         target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
+        relation_type: crate::l6_meta::nt_core_kb_types::RelationType,
         weight: f64,
         description: Option<&str>,
     ) -> Result<(), String>;
@@ -128,7 +128,7 @@ pub trait KnowledgeSink: Send + Sync {
         &self,
         source_id: &str,
         target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
+        relation_type: crate::l6_meta::nt_core_kb_types::RelationType,
         weight: f64,
         description: Option<&str>,
         metadata: Option<serde_json::Value>,
@@ -139,7 +139,7 @@ pub trait KnowledgeSink: Send + Sync {
         &self,
         source_id: &str,
         target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
+        relation_type: crate::l6_meta::nt_core_kb_types::RelationType,
     ) -> Result<bool, String>;
 
     /// 更新节点元数据

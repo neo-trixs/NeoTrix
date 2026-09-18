@@ -1,5 +1,5 @@
 use super::resonance::MODULE_COUNT;
-use crate::core::nt_core_hex::ReasoningHexagram;
+use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 use serde::{Deserialize, Serialize};
 
 /// Adaptive slice clustering inspired by Transolver's Physics-Attention.

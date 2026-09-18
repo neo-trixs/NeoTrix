@@ -63,7 +63,7 @@ mod tests;
 #[cfg(test)]
 mod model_tests {
     use super::*;
-    use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
+    use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
 
     #[test]
     fn test_latent_state_similarity() {
@@ -115,7 +115,7 @@ mod model_tests {
     fn test_reward_from_knowledge_quality_partially_filled() {
         let wm = WorldModel::new(4);
         let mut cube = KnowledgeHyperCube::new();
-        let coord = crate::core::nt_core_hcube::coord::HyperCoord::new();
+        let coord = crate::l2_perception::nt_core_hcube::coord::HyperCoord::new();
         cube.insert(&coord, "test-source", "test-entry");
         let reward = wm.reward_from_knowledge_quality(&cube);
         assert!(reward >= 0.0 && reward <= 1.0);

@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_hcube::FhrrVector;
+use crate::l2_perception::nt_core_hcube::FhrrVector;
 
 /// Nuclei vulnerability finding
 #[derive(Debug, Clone, Serialize, Deserialize)]

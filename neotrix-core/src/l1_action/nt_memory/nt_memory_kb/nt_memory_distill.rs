@@ -515,7 +515,7 @@ mod tests {
             let conf = (best.0.clamp(-1.0, 1.0) * 0.5 + 0.5) as f32; // 归一化到 [0,1]
             calib_samples.push((conf, nodes[best.1].0 == ci));
         }
-        let ece = crate::core::nt_core_consciousness_tree::metacalib::expected_calibration_error(
+        let ece = crate::l5_cognition::nt_core_consciousness_tree::metacalib::expected_calibration_error(
             &calib_samples, 10,
         );
         assert!(ece < 0.6, "C3 基准: 校准误差应有界 (可信), got ECE={ece}");

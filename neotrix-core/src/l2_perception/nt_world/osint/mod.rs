@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use super::l1_facade::{KnowledgeBase, CrawlCycleReport};
 
-use crate::core::nt_core_kb_types::NodeType;
+use crate::l6_meta::nt_core_kb_types::NodeType;
 use crate::l2_perception::nt_world::nt_world_github_absorber::GitHubAbsorber;
 pub use crate::l2_perception::nt_world::nt_world_github_absorber::GitHubAbsorbReport;
 use rusqlite::Connection;

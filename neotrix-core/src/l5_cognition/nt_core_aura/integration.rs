@@ -1,5 +1,5 @@
 use super::intent_frame::IntentFrame;
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 pub trait IntentAware {
     fn infer_intent(&mut self, input: &str) -> IntentFrame;
@@ -20,7 +20,7 @@ pub trait IntentAware {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hcube::vsa_quantized::VSA_DIM;
+    use crate::l2_perception::nt_core_hcube::vsa_quantized::VSA_DIM;
 
     struct MockIntentAware {
         frame: Option<IntentFrame>,
@@ -36,7 +36,7 @@ mod tests {
         fn infer_intent(&mut self, input: &str) -> IntentFrame {
             let mut frame = IntentFrame::new(input, vec![]);
             frame.scan_phase();
-            if frame.phase == crate::core::nt_core_aura::intent_frame::IntentPhase::Resolved {
+            if frame.phase == crate::l5_cognition::nt_core_aura::intent_frame::IntentPhase::Resolved {
                 if let Some(ref intent) = frame.inferred_intent.clone() {
                     frame.resolve(intent, frame.confidence);
                 }
@@ -64,7 +64,7 @@ mod tests {
         let result = aware.infer_intent("something unclear here");
         assert_eq!(
             result.phase,
-            crate::core::nt_core_aura::intent_frame::IntentPhase::Reasoning
+            crate::l5_cognition::nt_core_aura::intent_frame::IntentPhase::Reasoning
         );
     }
 

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use super::vsa_tag::VsaTagged;
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 pub const DEFAULT_STREAM_CAPACITY: usize = 1024;
 pub const ATTENTION_SPAN_SAMPLES: usize = 64;
@@ -161,10 +161,10 @@ impl ConsciousnessStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_consciousness::vsa_tag::{
+    use crate::l5_cognition::nt_core_consciousness::vsa_tag::{
         VsaOrigin, VsaSelfCategory, VsaWorldCategory,
     };
-    use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+    use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
     fn self_tagged(v: Vec<u8>) -> VsaTagged {
         VsaTagged::new(v, VsaOrigin::Self_(VsaSelfCategory::Thought))

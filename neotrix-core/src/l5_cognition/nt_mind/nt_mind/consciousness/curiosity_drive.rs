@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
-use crate::core::nt_core_gwt::module_def::{SpecialistType, SpecialistModule};
-use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::core::nt_core_hcube::gap::GapReport;
+use crate::l5_cognition::nt_core_gwt::module_def::{SpecialistType, SpecialistModule};
+use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::l2_perception::nt_core_hcube::gap::GapReport;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExploreDomain;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,7 +163,7 @@ impl Default for CuriosityDrive {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hcube::gap::GapReport;
+    use crate::l2_perception::nt_core_hcube::gap::GapReport;
 
     fn sample_gap_report(dim: usize, gap: f64) -> GapReport {
         let mut report = GapReport::new(dim, 0.5, 0.6);

@@ -30,7 +30,7 @@ pub use crate::l1_action::nt_io::nt_io_provider::common::egress_types::{
 // L2 数据源只需 KnowledgeBase 的读写子集，通过此 trait 解耦。
 // 实现留在 L1 facade，测试代码仍可直接用 KnowledgeBase concrete type。
 
-pub use crate::core::nt_core_kb_types::KnowledgeNode;
+pub use crate::l6_meta::nt_core_kb_types::KnowledgeNode;
 
 /// L2 感知层对 KB 的最小读写接口 — 数据源入库只依赖此 trait，不依赖 KnowledgeBase concrete type。
 pub trait KnowledgeStore: Send + Sync {

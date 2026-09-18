@@ -1,4 +1,4 @@
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 /// Cross-modal aligner using HDFLIM-style random projections into VSA space.
 ///
@@ -106,7 +106,7 @@ impl CrossModalAligner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hcube::vsa_quantized::VSA_DIM;
+    use crate::l2_perception::nt_core_hcube::vsa_quantized::VSA_DIM;
 
     fn aligner() -> CrossModalAligner {
         CrossModalAligner::new(VSA_DIM, 42)

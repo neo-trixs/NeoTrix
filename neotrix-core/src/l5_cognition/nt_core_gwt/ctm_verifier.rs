@@ -20,7 +20,7 @@
 //!    out-of-bound winner), and saliences are finite.
 //! 5. **Bounded workspace tape**: Γ never grows unbounded (finiteness of ω output).
 use super::resonance::{ResonanceReport, MODULE_COUNT};
-use crate::core::nt_core_hex::ReasoningHexagram;
+use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 use serde::{Deserialize, Serialize};
 
 /// Number of possible E8 hexagram modes (6-bit states).

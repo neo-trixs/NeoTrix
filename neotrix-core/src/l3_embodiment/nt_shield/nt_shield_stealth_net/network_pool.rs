@@ -21,7 +21,7 @@ use tokio::sync::RwLock;
 use tokio::time::sleep;
 
 use super::proxy_chain::{ProxyNode, ProxyProtocol};
-use crate::core::nt_core_resource_pool::{PoolHealthReport, PoolSnapshot, PoolSelectionStrategy, PooledResource, ResourcePool};
+use crate::l1_action::nt_core_resource_pool::{PoolHealthReport, PoolSnapshot, PoolSelectionStrategy, PooledResource, ResourcePool};
 
 const POOL_REFRESH_INTERVAL_SECS: u64 = 9;
 const DNS_CHECK_TIMEOUT_SECS: u64 = 5;

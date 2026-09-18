@@ -5,21 +5,21 @@
 //! - 推理引擎行动前 → 协调器过 ValueGate 裁决
 //! - 行动结果后 → 协调器反馈给 ValueLearning + NarrativeIntegrator
 
-use crate::core::l7_capability::consciousness_bridge;
+use crate::l5_cognition::nt_core::capability::consciousness_bridge;
 fn open_raw_conn() -> Option<rusqlite::Connection> {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     rusqlite::Connection::open(
         std::path::PathBuf::from(home).join(".neotrix").join("knowledge.db")
     ).ok()
 }
-use crate::core::nt_core_rule_memory::{crystallize_scan, gc_rules, ScanConfig};
+use crate::l5_cognition::nt_core_rule_memory::{crystallize_scan, gc_rules, ScanConfig};
 use std::sync::{Arc, Mutex, OnceLock};
 
 static ORCHESTRATOR: OnceLock<Option<ConsciousnessOrchestrator>> = OnceLock::new();
 
 /// 意识体协调器 — 四系统融合的唯一枢纽。
 pub struct ConsciousnessOrchestrator {
-    bus: Arc<crate::core::l7_capability::native_bus::NativeBusHandle>,
+    bus: Arc<crate::l5_cognition::nt_core::capability::native_bus::NativeBusHandle>,
     gate: Option<ValueGateRuntime>,
     stats: Mutex<OrchestratorStats>,
 }
@@ -43,12 +43,12 @@ impl ConsciousnessOrchestrator {
     pub fn init() -> Result<&'static ConsciousnessOrchestrator, String> {
         let conn = open_raw_conn()
             .unwrap_or_else(|| rusqlite::Connection::open_in_memory().expect("mem"));
-        crate::core::nt_core_kb_primitives::schema_initialize(&conn)
+        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
             .map_err(|e| format!("schema: {e}"))?;
 
-        let bus = crate::core::l7_capability::native_bus::NativeBus::new();
+        let bus = crate::l5_cognition::nt_core::capability::native_bus::NativeBus::new();
         let bus_handle = Arc::new(
-            crate::core::l7_capability::native_bus::NativeBusHandle::new(bus),
+            crate::l5_cognition::nt_core::capability::native_bus::NativeBusHandle::new(bus),
         );
 
         let compass =
@@ -120,7 +120,7 @@ impl ConsciousnessOrchestrator {
     pub(crate) fn _wisdom_cycle(&self) -> Result<(usize, usize), String> {
         let conn = open_raw_conn()
             .unwrap_or_else(|| rusqlite::Connection::open_in_memory().expect("mem"));
-        crate::core::nt_core_kb_primitives::schema_initialize(&conn)
+        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
             .map_err(|e| format!("schema: {e}"))?;
         let cfg = ScanConfig { min_group: 3, domain: None, limit: 100 };
         let cr = crystallize_scan(&conn, &cfg).map(|r| r.rules_created.len()).unwrap_or(0);

@@ -753,13 +753,13 @@ fn tree_branch_weakness_derived_from_health_fog_constellation() {
     // 健康分支 (满 health, 低 fog, 满 constellation) → 0。
     let mut healthy = CapabilityBranch::new(BranchKind::Memory);
     healthy.health = 1.0;
-    healthy.fog = crate::core::nt_core_consciousness_tree::FogLevel {
+    healthy.fog = crate::l5_cognition::nt_core_consciousness_tree::FogLevel {
         wired: true,
         consumer_count: 3,
         has_tests: true,
         level: 0.05,
     };
-    healthy.constellation = crate::core::nt_core_consciousness_tree::Constellation {
+    healthy.constellation = crate::l5_cognition::nt_core_consciousness_tree::Constellation {
         level: 5,
         c0_compiles: true,
         c1_unit_tests: true,
@@ -788,13 +788,13 @@ fn tree_branch_stimuli_skips_healthy_drives_weak() {
     // Memory 分支设健康 (低薄弱度) → 不应产生 Semantic 刺激。
     if let Some(mem) = tree.branches.get_mut(&BranchKind::Memory) {
         mem.health = 1.0;
-        mem.fog = crate::core::nt_core_consciousness_tree::FogLevel {
+        mem.fog = crate::l5_cognition::nt_core_consciousness_tree::FogLevel {
             wired: true,
             consumer_count: 3,
             has_tests: true,
             level: 0.05,
         };
-        mem.constellation = crate::core::nt_core_consciousness_tree::Constellation {
+        mem.constellation = crate::l5_cognition::nt_core_consciousness_tree::Constellation {
             level: 5,
             c0_compiles: true,
             c1_unit_tests: true,
@@ -809,13 +809,13 @@ fn tree_branch_stimuli_skips_healthy_drives_weak() {
     // Nexus 分支默认薄弱且映射 Semantic → 也设为健康, 使断言聚焦"健康分支不刺激"。
     if let Some(nx) = tree.branches.get_mut(&BranchKind::Nexus) {
         nx.health = 1.0;
-        nx.fog = crate::core::nt_core_consciousness_tree::FogLevel {
+        nx.fog = crate::l5_cognition::nt_core_consciousness_tree::FogLevel {
             wired: true,
             consumer_count: 3,
             has_tests: true,
             level: 0.05,
         };
-        nx.constellation = crate::core::nt_core_consciousness_tree::Constellation {
+        nx.constellation = crate::l5_cognition::nt_core_consciousness_tree::Constellation {
             level: 5,
             c0_compiles: true,
             c1_unit_tests: true,
@@ -850,7 +850,7 @@ fn tree_branch_stimuli_fuses_with_goal_dispatch() {
             branch.health = 0.0; // 薄弱
         } else {
             branch.health = 1.0;
-            branch.fog = crate::core::nt_core_consciousness_tree::FogLevel {
+            branch.fog = crate::l5_cognition::nt_core_consciousness_tree::FogLevel {
                 wired: true,
                 consumer_count: 3,
                 has_tests: true,

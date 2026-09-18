@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::core::nt_core_vector_store::store::VectorStore;
-use crate::core::nt_core_vector_store::types::{IndexConfig, VectorRecord, VectorSearchResult};
+use crate::l2_perception::nt_core_vector_store::store::VectorStore;
+use crate::l2_perception::nt_core_vector_store::types::{IndexConfig, VectorRecord, VectorSearchResult};
 
 pub struct KbVectorAdapter {
     pub store: Box<dyn VectorStore>,
@@ -52,8 +52,8 @@ impl KbVectorAdapter {
 
 pub fn create_kb_vector_adapter(config: Option<IndexConfig>) -> KbVectorAdapter {
     let cfg = config.unwrap_or_default();
-    let store = crate::core::nt_core_vector_store::factory::create_store(
-        crate::core::nt_core_vector_store::factory::StoreBackend::IVF,
+    let store = crate::l2_perception::nt_core_vector_store::factory::create_store(
+        crate::l2_perception::nt_core_vector_store::factory::StoreBackend::IVF,
         cfg,
     );
 
@@ -67,8 +67,8 @@ mod tests {
     #[test]
     fn test_adapter_creation() {
         let config = IndexConfig::default();
-        let store = crate::core::nt_core_vector_store::factory::create_store(
-            crate::core::nt_core_vector_store::factory::StoreBackend::BruteForce,
+        let store = crate::l2_perception::nt_core_vector_store::factory::create_store(
+            crate::l2_perception::nt_core_vector_store::factory::StoreBackend::BruteForce,
             config,
         );
 
@@ -80,8 +80,8 @@ mod tests {
     #[test]
     fn test_adapter_insert_search() {
         let config = IndexConfig::default();
-        let store = crate::core::nt_core_vector_store::factory::create_store(
-            crate::core::nt_core_vector_store::factory::StoreBackend::BruteForce,
+        let store = crate::l2_perception::nt_core_vector_store::factory::create_store(
+            crate::l2_perception::nt_core_vector_store::factory::StoreBackend::BruteForce,
             config,
         );
 

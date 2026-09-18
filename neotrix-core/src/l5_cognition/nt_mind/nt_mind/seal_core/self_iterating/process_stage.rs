@@ -128,7 +128,7 @@ impl ProcessStage {
 
     /// 从 ConsciousnessTree EvolutionFruit 提取推理轨迹
     pub fn extract_from_consciousness_tree(
-        fruits: &[crate::core::nt_core_consciousness_tree::EvolutionFruit],
+        fruits: &[crate::l5_cognition::nt_core_consciousness_tree::EvolutionFruit],
     ) -> Vec<ReasoningTrace> {
         let mut traces = Vec::new();
         for fruit in fruits {
@@ -162,7 +162,7 @@ impl ProcessStage {
 
     /// 从 KB Experience GoldTrajectory 提取推理轨迹
     pub(crate) fn _extract_from_kb_experience(
-        trajectories: &[crate::core::nt_core_prm::AgentTrajectory],
+        trajectories: &[crate::l5_cognition::nt_core_prm::AgentTrajectory],
     ) -> Vec<ReasoningTrace> {
         trajectories.iter().enumerate().map(|(i, traj)| {
             let steps: Vec<ReasoningStep> = traj.steps.iter().map(|s| ReasoningStep {

@@ -1,11 +1,11 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::core::nt_core_bank::{
+    use crate::l1_action::nt_core_bank::{
         MemoryTier, OffloadManager, PipelineConfig, PipelineState, ReasoningBank, ReasoningMemory,
         T3ViewType,
     };
-    use crate::core::nt_core_knowledge::TaskType;
+    use crate::l2_perception::nt_core_knowledge::TaskType;
 
     fn make_mem(desc: &str, tt: TaskType, reward: f64) -> ReasoningMemory {
         ReasoningMemory::new(desc, tt, &[], reward)

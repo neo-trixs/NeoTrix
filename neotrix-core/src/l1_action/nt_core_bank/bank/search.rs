@@ -3,10 +3,10 @@ use std::sync::atomic::Ordering;
 
 use chrono::Utc;
 
-use crate::core::nt_core_bank::iteration::{rrf_fuse, Bm25Document, Bm25Index};
-use crate::core::nt_core_bank::{ReasoningBank, ReasoningMemory, T3ViewType};
-use crate::core::nt_core_knowledge::TaskType;
-use crate::core::nt_core_kron::KroneckerCleanup;
+use crate::l1_action::nt_core_bank::iteration::{rrf_fuse, Bm25Document, Bm25Index};
+use crate::l1_action::nt_core_bank::{ReasoningBank, ReasoningMemory, T3ViewType};
+use crate::l2_perception::nt_core_knowledge::TaskType;
+use crate::l5_cognition::nt_core_kron::KroneckerCleanup;
 
 impl ReasoningBank {
     fn rebuild_bm25(&self) {
@@ -165,7 +165,7 @@ impl ReasoningBank {
         k: usize,
         kronecker: &KroneckerCleanup,
     ) -> Vec<ReasoningMemory> {
-        use crate::core::nt_core_embed::TextEmbedder;
+        use crate::l1_action::nt_core_embed::TextEmbedder;
 
         let _embedder = TextEmbedder::new();
         let query_emb = _embedder.embed(task);
@@ -214,7 +214,7 @@ impl ReasoningBank {
         task_type: Option<TaskType>,
         k: usize,
     ) -> Vec<(f64, String)> {
-        use crate::core::nt_core_embed::TextEmbedder;
+        use crate::l1_action::nt_core_embed::TextEmbedder;
 
         let _embedder = TextEmbedder::new();
         let query_emb = _embedder.embed(task);
@@ -233,7 +233,7 @@ impl ReasoningBank {
             .filter_map(|&idx| self.memories.get(idx))
             .filter_map(|m| {
                 m.embedding.as_ref().map(|emb| {
-                    let sim = crate::core::nt_core_math::cosine_similarity_f64(&query_emb, emb);
+                    let sim = crate::l5_cognition::nt_core_math::cosine_similarity_f64(&query_emb, emb);
                     (sim, m)
                 })
             })
@@ -278,7 +278,7 @@ impl ReasoningBank {
             .filter_map(|&idx| self.memories.get(idx))
             .filter_map(|m| {
                 m.embedding.as_ref().map(|emb| {
-                    let sim = crate::core::nt_core_math::cosine_similarity_f64(task_embedding, emb);
+                    let sim = crate::l5_cognition::nt_core_math::cosine_similarity_f64(task_embedding, emb);
                     (sim, m)
                 })
             })
@@ -548,7 +548,7 @@ impl ReasoningBank {
     }
 
     pub fn enable_hypergraph(&mut self, initial_capacity: usize) {
-        let graph = crate::core::nt_core_graph::HyperGraph::with_capacity(initial_capacity);
+        let graph = crate::l1_action::nt_core_graph::HyperGraph::with_capacity(initial_capacity);
         self.hypergraph = Some(graph);
     }
 
@@ -566,19 +566,19 @@ impl ReasoningBank {
 
         let node_type = match mem.task_type {
             TaskType::Learning | TaskType::Research | TaskType::Reflection => {
-                crate::core::nt_core_graph::HyperNodeType::Concept
+                crate::l1_action::nt_core_graph::HyperNodeType::Concept
             }
             TaskType::CodeAnalysis | TaskType::CodeReview | TaskType::CodeGeneration => {
-                crate::core::nt_core_graph::HyperNodeType::Pattern
+                crate::l1_action::nt_core_graph::HyperNodeType::Pattern
             }
             TaskType::UIDesign | TaskType::Security => {
-                crate::core::nt_core_graph::HyperNodeType::Skill
+                crate::l1_action::nt_core_graph::HyperNodeType::Skill
             }
-            TaskType::Planning => crate::core::nt_core_graph::HyperNodeType::Goal,
-            _ => crate::core::nt_core_graph::HyperNodeType::Memory,
+            TaskType::Planning => crate::l1_action::nt_core_graph::HyperNodeType::Goal,
+            _ => crate::l1_action::nt_core_graph::HyperNodeType::Memory,
         };
 
-        let mut node = crate::core::nt_core_graph::HyperNode::new(
+        let mut node = crate::l1_action::nt_core_graph::HyperNode::new(
             &mem.id,
             node_type,
             &mem.task_description,
@@ -598,7 +598,7 @@ impl ReasoningBank {
                 let mut strength = 0.0;
                 if let Some(ref emb) = mem.embedding {
                     if !other_node.embedding.is_empty() {
-                        strength = crate::core::nt_core_math::cosine_similarity_f64(
+                        strength = crate::l5_cognition::nt_core_math::cosine_similarity_f64(
                             emb,
                             &other_node.embedding,
                         );
@@ -615,7 +615,7 @@ impl ReasoningBank {
                     graph.add_edge(
                         memory_id,
                         other_id,
-                        crate::core::nt_core_graph::EdgeRelation::SimilarTo,
+                        crate::l1_action::nt_core_graph::EdgeRelation::SimilarTo,
                         strength,
                     );
                 }

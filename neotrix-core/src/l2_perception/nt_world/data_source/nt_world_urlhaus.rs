@@ -171,7 +171,7 @@ impl UrlhausFetcher {
             let summary = format!("{} | {} | {}", evt.threat, evt.url_status, evt.host);
             let existing = kb.find_node_by_url(&evt.url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.url, crate::core::nt_core_kb_types::NodeType::External, Some(&summary), Some(&evt.url), Some("urlhaus"))
+            let _id = kb.insert_or_get_node(&evt.url, crate::l6_meta::nt_core_kb_types::NodeType::External, Some(&summary), Some(&evt.url), Some("urlhaus"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.url, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }
@@ -243,7 +243,7 @@ impl CisaKevFetcher {
             let summary = format!("{} {} | {}", evt.vendor_project, evt.product, evt.vulnerability_name);
             let existing = kb.find_node_by_url(&url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.cve_id, crate::core::nt_core_kb_types::NodeType::External, Some(&summary), Some(&url), Some("cisa-kev"))
+            let _id = kb.insert_or_get_node(&evt.cve_id, crate::l6_meta::nt_core_kb_types::NodeType::External, Some(&summary), Some(&url), Some("cisa-kev"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.cve_id, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }

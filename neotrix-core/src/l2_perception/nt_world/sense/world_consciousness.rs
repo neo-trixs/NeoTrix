@@ -1,4 +1,4 @@
-use crate::core::nt_core_sense::*;
+use crate::l2_perception::nt_core_sense::*;
 use crate::neotrix::nt_world_sense::nt_world_sense_hub::SensoryIntegrationHub;
 use crate::neotrix::nt_world_sense::omniscient_view::OmniscientView;
 

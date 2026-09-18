@@ -5,7 +5,7 @@ use super::pool::account_pool::{AccountPool, AccountPoolConfig};
 use super::common::generation_classifier::{GenerationAnalytics, GenerationClassifier};
 use super::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::health::rate_limiter::{AdaptivePacer, TieredSemaphore};
-use crate::core::l0_substrate::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator};
+use crate::l0_substrate::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator};
 use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
 use super::common::types::{LlmError, LlmProvider, LlmRequest, LlmResponse};
@@ -189,8 +189,8 @@ impl Default for GatewayV2 {
 
 #[async_trait::async_trait]
 impl LlmProvider for GatewayV2 {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
     fn set_proxy(&mut self, _proxy_url: &str) {
@@ -212,7 +212,7 @@ impl LlmProvider for GatewayV2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::l2_perception::nt_core_llm::{Usage, FinishReason, Message, Role};
+    use crate::l2_perception::nt_core_llm::{Usage, FinishReason, Message, Role};
 
     #[tokio::test]
     async fn test_gateway_selects_free_provider() {
@@ -489,8 +489,8 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for ConditionalFail {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
             async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -557,8 +557,8 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for StreamConditionalFail {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
             async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -1192,8 +1192,8 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for MockProvider {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Trusted
     }
 
         async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -1326,7 +1326,7 @@ mod tests {
 #[cfg(test)]
 mod provider_reliability_tests {
     use super::*;
-    use crate::core::l2_perception::nt_core_llm::{Usage, FinishReason, Message, Role};
+    use crate::l2_perception::nt_core_llm::{Usage, FinishReason, Message, Role};
     use std::time::Duration;
 
     // ── ResponseCache (G: Response Caching) ─────────────────────────

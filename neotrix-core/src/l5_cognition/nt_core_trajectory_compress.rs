@@ -1,5 +1,5 @@
-use crate::core::nt_core_hex::FullReasoningState;
-use crate::core::nt_core_prm::{AgentTrajectory, TrajectoryStep};
+use crate::l5_cognition::nt_core_hex::FullReasoningState;
+use crate::l5_cognition::nt_core_prm::{AgentTrajectory, TrajectoryStep};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CompressionLevel {
@@ -158,7 +158,7 @@ impl TrajectoryCompressor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hex::ReasoningHexagram;
+    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
     use crate::core::nt_core_traits::SpecialistType;
 
     fn mk_step(
@@ -269,15 +269,15 @@ mod tests {
         let s = vec![
             FullReasoningState::new(
                 ReasoningHexagram::new(0),
-                crate::core::nt_core_hex::MetaState::new(0),
+                crate::l5_cognition::nt_core_hex::MetaState::new(0),
             ),
             FullReasoningState::new(
                 ReasoningHexagram::new(0),
-                crate::core::nt_core_hex::MetaState::new(0),
+                crate::l5_cognition::nt_core_hex::MetaState::new(0),
             ),
             FullReasoningState::new(
                 ReasoningHexagram::new(1),
-                crate::core::nt_core_hex::MetaState::new(0),
+                crate::l5_cognition::nt_core_hex::MetaState::new(0),
             ),
         ];
         let c = TrajectoryCompressor::new(CompressionLevel::Light);

@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::core::nt_core_resource_pool::PooledResource;
+use crate::l1_action::nt_core_resource_pool::PooledResource;
 
 pub const PROXY_STALE_SECS: u64 = 120;
 

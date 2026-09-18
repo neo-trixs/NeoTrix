@@ -322,9 +322,9 @@ mod verification {
     use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
     use crate::l6_meta::healing::nt_core_self_test::SelfTestResult;
     use crate::l6_meta::healing::nt_core_self_test_integration::register_absorbed_modules;
-    use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-    use crate::core::nt_core_gwt::cad_route::register_cad_gwt;
-    use crate::core::nt_core_knowledge::cad_absorb::absorb_cad_experience;
+    use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
+    use crate::l5_cognition::nt_core_gwt::cad_route::register_cad_gwt;
+    use crate::l2_perception::nt_core_knowledge::cad_absorb::absorb_cad_experience;
     use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
     use nt_core_capability_tree::cad_node::{register_cad_capability, CadCapabilityNode};
     use nt_core_capability_tree::registry::CapabilityRegistry;

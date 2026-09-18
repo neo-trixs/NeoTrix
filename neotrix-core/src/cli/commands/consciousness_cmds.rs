@@ -43,7 +43,7 @@ impl CliCommand for ConsciousnessCmd {
 
         match sub {
             "tick" => {
-                let snap = crate::core::nt_core_consciousness_core::tick(cycles);
+                let snap = crate::l5_cognition::nt_core_consciousness_core::tick(cycles);
                 let msg = format!(
                     "🌳 Consciousness Tick\n\
                      ────────────────────────\n\
@@ -83,8 +83,8 @@ impl CliCommand for ConsciousnessCmd {
             }
 
             "status" => {
-                let snap = crate::core::nt_core_consciousness_core::status();
-                let fog_live = crate::core::nt_core_consciousness_core::current_fog_sum();
+                let snap = crate::l5_cognition::nt_core_consciousness_core::status();
+                let fog_live = crate::l5_cognition::nt_core_consciousness_core::current_fog_sum();
                 let msg = format!(
                     "🌳 Consciousness Status\n\
                      ────────────────────────\n\
@@ -129,8 +129,8 @@ impl CliCommand for ConsciousnessCmd {
             }
 
             "tree" => {
-                let snap = crate::core::nt_core_consciousness_core::status();
-                let branches = crate::core::nt_core_consciousness_core::branches();
+                let snap = crate::l5_cognition::nt_core_consciousness_core::status();
+                let branches = crate::l5_cognition::nt_core_consciousness_core::branches();
                 let mut body = format!(
                     "🌳 ConsciousnessTree\n\
                      ────────────────────────\n\

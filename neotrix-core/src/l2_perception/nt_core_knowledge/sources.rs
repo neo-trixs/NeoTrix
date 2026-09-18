@@ -1,6 +1,6 @@
 use super::vectors_group_a;
 use super::vectors_group_b;
-use crate::core::nt_core_knowledge::KnowledgeSource;
+use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
 use crate::core::CapabilityVector;
 
 impl KnowledgeSource {
@@ -272,7 +272,7 @@ impl super::KnowledgeProvider for KnowledgeSource {
 
 #[cfg(test)]
 mod provider_tests {
-    use crate::core::nt_core_knowledge::*;
+    use crate::l2_perception::nt_core_knowledge::*;
 
     #[test]
     fn test_knowledge_provider_heroui() {

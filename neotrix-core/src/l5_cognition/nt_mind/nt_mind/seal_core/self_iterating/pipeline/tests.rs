@@ -15,19 +15,19 @@
         // 此前果实从不被 SEAL 消费 (extract_from_consciousness_tree 无生产调用者)。
         let mut brain = crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::self_iterating::loop_impl::core::SelfIteratingBrain::new();
         // 注入一个意识树果实 (quality 0.9)
-        let fruit = crate::core::nt_core_consciousness_tree::EvolutionFruit {
+        let fruit = crate::l5_cognition::nt_core_consciousness_tree::EvolutionFruit {
             name: "NT-CORE-evo-fruit-1".into(),
-            source_branch: crate::core::nt_core_consciousness_tree::BranchKind::Core,
+            source_branch: crate::l5_cognition::nt_core_consciousness_tree::BranchKind::Core,
             description: "Evolution capability from NT-CORE".into(),
             produced_at_cycle: 1,
             quality: 0.9,
             claim: "Branch Core produces capability at maturity 0.9".into(),
-            evidence: crate::core::nt_core_consciousness_tree::EvidenceChain {
+            evidence: crate::l5_cognition::nt_core_consciousness_tree::EvidenceChain {
                 run_id: Some("fruit-run-1".into()),
-                ..crate::core::nt_core_consciousness_tree::EvidenceChain::default()
+                ..crate::l5_cognition::nt_core_consciousness_tree::EvidenceChain::default()
             },
-            stop_rule: crate::core::nt_core_consciousness_tree::StopRule::default(),
-            benchmark: crate::core::nt_core_consciousness_tree::ProviderBenchmark::default(),
+            stop_rule: crate::l5_cognition::nt_core_consciousness_tree::StopRule::default(),
+            benchmark: crate::l5_cognition::nt_core_consciousness_tree::ProviderBenchmark::default(),
             generation: 0,
         };
         brain._consciousness_fruits = vec![fruit];
@@ -86,7 +86,7 @@
     #[test]
     fn test_reward_calc_affective_guided_external() {
         // Q2 P3: 外部奖励 + 情感候选 (高愉悦 + Bond + 充足交互) → reward 被引导抬高
-        use crate::core::nt_core_knowledge::{
+        use crate::l2_perception::nt_core_knowledge::{
             publish_affective_observation, take_affective_observation, AffectiveFeedback,
         };
         let mut brain = SelfIteratingBrain::new();

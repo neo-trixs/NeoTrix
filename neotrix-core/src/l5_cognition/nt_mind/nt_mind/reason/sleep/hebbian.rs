@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::core::nt_core_bank::ReasoningMemory;
+use crate::l1_action::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_cap::CapabilityVector;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
@@ -123,7 +123,7 @@ impl HebbianUpdater {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
+    use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
     use crate::core::RewardSource;
     use crate::core::TaskType;
 

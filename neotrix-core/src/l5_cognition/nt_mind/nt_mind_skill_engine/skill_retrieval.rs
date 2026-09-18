@@ -320,7 +320,7 @@ impl _SkillRetriever {
     }
 }
 
-use crate::core::nt_core_math::cosine_similarity_f32_f32 as cosine_similarity;
+use crate::l5_cognition::nt_core_math::cosine_similarity_f32_f32 as cosine_similarity;
 
 impl Default for _SkillRetriever {
     fn default() -> Self {

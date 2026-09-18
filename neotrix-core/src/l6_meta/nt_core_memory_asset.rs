@@ -4,7 +4,7 @@
 //! `ChatMemory` / `Skill` / `LlmWiki` / `CodeGraph`。分类优先级: metadata 显式覆盖 →
 //! node_type 启发式。为 KB 提供团队级记忆中枢的资产视图, 支撑跨会话持久与技能结晶。
 
-use crate::core::nt_core_kb_types::KnowledgeNode;
+use crate::l6_meta::nt_core_kb_types::KnowledgeNode;
 use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use serde::{Deserialize, Serialize};
 
@@ -53,15 +53,15 @@ impl MemoryAssetKind {
         }
         // 2. node_type 启发式
         match node.node_type {
-            crate::core::nt_core_kb_types::NodeType::Skill => Some(MemoryAssetKind::Skill),
-            crate::core::nt_core_kb_types::NodeType::WikiPage
-            | crate::core::nt_core_kb_types::NodeType::Guide
-            | crate::core::nt_core_kb_types::NodeType::Textbook
-            | crate::core::nt_core_kb_types::NodeType::Article => Some(MemoryAssetKind::LlmWiki),
-            crate::core::nt_core_kb_types::NodeType::CodeSnippet
-            | crate::core::nt_core_kb_types::NodeType::Repository => Some(MemoryAssetKind::CodeGraph),
-            crate::core::nt_core_kb_types::NodeType::ConversationEvolution
-            | crate::core::nt_core_kb_types::NodeType::Session => Some(MemoryAssetKind::ChatMemory),
+            crate::l6_meta::nt_core_kb_types::NodeType::Skill => Some(MemoryAssetKind::Skill),
+            crate::l6_meta::nt_core_kb_types::NodeType::WikiPage
+            | crate::l6_meta::nt_core_kb_types::NodeType::Guide
+            | crate::l6_meta::nt_core_kb_types::NodeType::Textbook
+            | crate::l6_meta::nt_core_kb_types::NodeType::Article => Some(MemoryAssetKind::LlmWiki),
+            crate::l6_meta::nt_core_kb_types::NodeType::CodeSnippet
+            | crate::l6_meta::nt_core_kb_types::NodeType::Repository => Some(MemoryAssetKind::CodeGraph),
+            crate::l6_meta::nt_core_kb_types::NodeType::ConversationEvolution
+            | crate::l6_meta::nt_core_kb_types::NodeType::Session => Some(MemoryAssetKind::ChatMemory),
             _ => None,
         }
     }
@@ -91,7 +91,7 @@ impl SelfTest for MemoryAssetSelfTest {
         // 分类启发式校验
         let skill = KnowledgeNode {
             id: "s1".into(),
-            node_type: crate::core::nt_core_kb_types::NodeType::Skill,
+            node_type: crate::l6_meta::nt_core_kb_types::NodeType::Skill,
             title: "t".into(),
             summary: None,
             content: None,
@@ -131,7 +131,7 @@ pub fn register_memory_asset_self_tests(registry: &mut SelfTestRegistry) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
+    use crate::l6_meta::nt_core_kb_types::{KnowledgeNode, NodeType};
 
     fn base(node_type: NodeType) -> KnowledgeNode {
         KnowledgeNode {

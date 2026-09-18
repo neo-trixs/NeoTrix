@@ -1,7 +1,7 @@
-use crate::core::nt_core_e8::domain_transition::E8TaskType;
-use crate::core::nt_core_e8::nt_core_trajectory_prm::{TrajectoryPrm, TrajectoryScoreReport};
-use crate::core::nt_core_e8::E8TransitionMatrix;
-use crate::core::nt_core_prm::{AgentTrajectory, TrajectoryStep};
+use crate::l2_perception::nt_core_e8::domain_transition::E8TaskType;
+use crate::l2_perception::nt_core_e8::nt_core_trajectory_prm::{TrajectoryPrm, TrajectoryScoreReport};
+use crate::l2_perception::nt_core_e8::E8TransitionMatrix;
+use crate::l5_cognition::nt_core_prm::{AgentTrajectory, TrajectoryStep};
 use crate::core::{FullReasoningState, MetaState};
 use std::collections::HashMap;
 
@@ -872,7 +872,7 @@ pub enum StepRewardFeedback {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hex::{FullReasoningState, MetaState, ReasoningHexagram};
+    use crate::l5_cognition::nt_core_hex::{FullReasoningState, MetaState, ReasoningHexagram};
 
     fn make_state(mode: u8, meta: u8) -> FullReasoningState {
         FullReasoningState::new(ReasoningHexagram::new(mode % 64), MetaState::new(meta % 4))

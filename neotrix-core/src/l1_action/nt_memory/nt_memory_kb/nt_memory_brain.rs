@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::Connection;
 
-use crate::core::nt_core_math::cosine_similarity_f64;
+use crate::l5_cognition::nt_core_math::cosine_similarity_f64;
 
 /// Synaptic Plasticity — Hebbian 边强化
 ///

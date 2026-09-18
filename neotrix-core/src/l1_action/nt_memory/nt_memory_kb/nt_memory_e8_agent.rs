@@ -9,7 +9,7 @@
 //! - 泰 7 全部相关(生成) | 革 53 部分相关(改写重试) | 屯 20 全不相关(兜底)
 //! - 渐 25 图路径推进 → 既济 21 收敛完成
 
-use crate::core::nt_core_e8::{E8TransitionMatrix, Hexagram};
+use crate::l2_perception::nt_core_e8::{E8TransitionMatrix, Hexagram};
 
 use super::nt_memory_adaptive_rag::{
     rewrite_query, GradedDocument, RelevanceGrade, RetrievalAction,
@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn test_hexagram_constants_trigram_composition() {
         // 用 hexagram_matrix (Shao Yong bits) 验证卦象的上下卦组成
-        let m = crate::core::nt_core_e8::hexagram_matrix();
+        let m = crate::l2_perception::nt_core_e8::hexagram_matrix();
         // 乾 ☰: 上乾(7)下乾(7)
         assert_eq!(E8Phase::Init.hexagram(), m[7][7], "乾 = 上乾下乾");
         // 需 ䷄: 上坎(2)下乾(7) 水天需

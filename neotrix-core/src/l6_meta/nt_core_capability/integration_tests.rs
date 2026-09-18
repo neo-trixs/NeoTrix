@@ -2,17 +2,17 @@
 
 #[cfg(test)]
 mod integration_tests {
-    use crate::core::nt_core_capability::*;
-    use crate::core::nt_core_capability::cache::{CachedCapability, CapabilityCacheConfig};
-    use crate::core::nt_core_capability::composer::CapabilityComposer;
-    use crate::core::nt_core_capability::discovery::{DiscoveryConfig, DistributedDiscovery};
-    use crate::core::nt_core_capability::factory::init_global_registry;
-    use crate::core::nt_core_capability::loadbalancer::{LoadBalancer, LoadBalanceStrategy, InstanceStatus, CapabilityInstance};
-    use crate::core::nt_core_capability::monitoring::{MonitoringConfig, MonitoringCollector, MonitoredCapability};
-    use crate::core::nt_core_capability::orchestrator::{OrchestrationEngine, OrchestrationMode, OrchestrationFlow, OrchestrationStep};
-    use crate::core::nt_core_capability::performance::{PoolConfig, PerformanceOptimizer, OptimizedCapability, PerformanceCacheConfig};
-    use crate::core::nt_core_capability::security::{SecurityPolicy, SecurityManager, SecureCapability, AccessToken};
-    use crate::core::nt_core_capability::versioning::{SemanticVersion, VersionManager, UpgradeType};
+    use crate::l6_meta::nt_core_capability::*;
+    use crate::l6_meta::nt_core_capability::cache::{CachedCapability, CapabilityCacheConfig};
+    use crate::l6_meta::nt_core_capability::composer::CapabilityComposer;
+    use crate::l6_meta::nt_core_capability::discovery::{DiscoveryConfig, DistributedDiscovery};
+    use crate::l6_meta::nt_core_capability::factory::init_global_registry;
+    use crate::l6_meta::nt_core_capability::loadbalancer::{LoadBalancer, LoadBalanceStrategy, InstanceStatus, CapabilityInstance};
+    use crate::l6_meta::nt_core_capability::monitoring::{MonitoringConfig, MonitoringCollector, MonitoredCapability};
+    use crate::l6_meta::nt_core_capability::orchestrator::{OrchestrationEngine, OrchestrationMode, OrchestrationFlow, OrchestrationStep};
+    use crate::l6_meta::nt_core_capability::performance::{PoolConfig, PerformanceOptimizer, OptimizedCapability, PerformanceCacheConfig};
+    use crate::l6_meta::nt_core_capability::security::{SecurityPolicy, SecurityManager, SecureCapability, AccessToken};
+    use crate::l6_meta::nt_core_capability::versioning::{SemanticVersion, VersionManager, UpgradeType};
     use std::sync::Arc;
     use std::time::Duration;
 

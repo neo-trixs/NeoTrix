@@ -4,7 +4,7 @@ pub mod guard;
 // `nt_shield::guard_chain::*` 调用方路径不变。守卫链是纯判定聚合器 (无 I/O
 // 无会话状态), 被 core 层 (nt_core_mcp / nt_core_self_constitution) 消费,
 // 下沉后消除 core → l1 反向依赖。
-pub use crate::core::nt_core_guard_chain as guard_chain;
+pub use crate::l3_embodiment::nt_core_guard_chain as guard_chain;
 pub mod key_encryption;
 pub mod perm_chain;
 pub mod permissions;

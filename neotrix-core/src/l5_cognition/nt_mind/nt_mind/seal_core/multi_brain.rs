@@ -117,7 +117,7 @@ impl MultiBrainManager {
             
             let memory = ReasoningMemory::new(
                 &format!("consolidated from brain {} ({})", i, task_type_name),
-                crate::core::nt_core_knowledge::TaskType::General,
+                crate::l2_perception::nt_core_knowledge::TaskType::General,
                 &micro_edits,
                 brain.capability.arr().iter().sum::<f64>() / 23.0,
             );

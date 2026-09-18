@@ -233,7 +233,7 @@ fn find_repeated_lines(lines: &[&str]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_context::SourceType;
+    use crate::l5_cognition::nt_core_context::SourceType;
 
     #[test]
     fn test_compress_passthrough() {

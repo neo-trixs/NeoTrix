@@ -279,7 +279,7 @@ impl BackgroundLoopHandle {
         if infos.is_empty() {
             return;
         }
-        let snapshot_json = serde_json::to_value(crate::core::nt_core_consciousness_core::status())
+        let snapshot_json = serde_json::to_value(crate::l5_cognition::nt_core_consciousness_core::status())
             .unwrap_or(serde_json::json!({}));
         let mut harness = <crate::l6_meta::memory::evolution_harness::EvolutionHarness as EvolutionHarnessApi>::new_harness();
         let report = harness.harness_run_cycle(&snapshot_json, &infos);
@@ -401,8 +401,8 @@ impl BackgroundLoopHandle {
             // Without this, gwt_resonance_active stays false forever and coherence
             // remains 0 — the consciousness core never integrates cross-module data.
             if let Some(ref mut pano) = self.panorama {
-                let hexagram_states: [crate::core::nt_core_hex::ReasoningHexagram; crate::core::nt_core_gwt::resonance::MODULE_COUNT] =
-                    crate::core::nt_core_gwt::resonance::default_specialist_states();
+                let hexagram_states: [crate::l5_cognition::nt_core_hex::ReasoningHexagram; crate::l5_cognition::nt_core_gwt::resonance::MODULE_COUNT] =
+                    crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states();
                 pano.gwt.resonant_broadcast("[consciousness_tick] growth cycle resonance", &hexagram_states);
             }
             // Whisper 旁观流累计: 本 tick 旁观到的 GWT 广播增量 (旁观者在 tree
@@ -419,7 +419,7 @@ impl BackgroundLoopHandle {
                 .as_ref()
                 .map(|p| p.gwt.last_resonance.is_some())
                 .unwrap_or(false);
-            tree.trunk.workspace_size = crate::core::nt_core_gwt::resonance::MODULE_COUNT;
+            tree.trunk.workspace_size = crate::l5_cognition::nt_core_gwt::resonance::MODULE_COUNT;
             // Branch health is now set from SelfTest results in handle_architecture_audit
             // No simulated fallback here — real data or neutral 0.5 from set_branch_health_from_self_tests
             let growth_report = tree.run_growth_cycle();
@@ -454,8 +454,8 @@ impl BackgroundLoopHandle {
             // 使用 (高置信本地执行 / 低置信分发 LLM)。此接线使预测器不再是孤儿模块
             // (Dark Forest), 且每 tick 沉淀一条训练样本 (The Spice Must Flow)。
             {
-                use crate::core::nt_core_e8_predictor::{load as predictor_load, persist as predictor_persist};
-                use crate::core::nt_core_hex::ReasoningHexagram;
+                use crate::l2_perception::nt_core_e8_predictor::{load as predictor_load, persist as predictor_persist};
+                use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
                 let mut predictor = predictor_load();
                 // 六阶段 → 6 位卦象 (每阶段 2 位: 阶段主域 + 状态位), 形成 64 态子空间映射
                 let stage_code = |phase: u8, state_bit: u8| -> u8 {
@@ -641,8 +641,8 @@ impl BackgroundLoopHandle {
             }
             if temporally_stable && !kb_injections.is_empty() {
                 if let Some(ref mut pano) = self.panorama {
-                    let hexagram_states: [crate::core::nt_core_hex::ReasoningHexagram; crate::core::nt_core_gwt::resonance::MODULE_COUNT] =
-                        crate::core::nt_core_gwt::resonance::default_specialist_states();
+                    let hexagram_states: [crate::l5_cognition::nt_core_hex::ReasoningHexagram; crate::l5_cognition::nt_core_gwt::resonance::MODULE_COUNT] =
+                        crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states();
                     for (title, score) in &kb_injections {
                         pano.gwt.resonant_broadcast(
                             &format!(
@@ -830,15 +830,15 @@ impl BackgroundLoopHandle {
                 self.state.record_metric("thinking_budget", budget);
                 if clm.average_load() >= 0.8 {
                     self.state
-                        .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+                        .set_mode(crate::l5_cognition::nt_core::nt_state_substrate::ThinkingMode::Deep);
                     clm.record_deep_step(load);
                 }
                 let new_state_mode = self.state.active_mode;
 
                 // Update cognitive_mode field for behavioral consumption by other handlers
                 self.cognitive_mode = match new_state_mode {
-                    crate::core::nt_core_state_substrate::ThinkingMode::Deep => 1,
-                    crate::core::nt_core_state_substrate::ThinkingMode::Fast => 2,
+                    crate::l5_cognition::nt_core::nt_state_substrate::ThinkingMode::Deep => 1,
+                    crate::l5_cognition::nt_core::nt_state_substrate::ThinkingMode::Fast => 2,
                     _ => 0,
                 };
 
@@ -859,7 +859,7 @@ impl BackgroundLoopHandle {
                 }
 
                 // BEHAVIORAL RESPONSE: When deep mode is active, trigger deeper reasoning cycle
-                if new_state_mode == crate::core::nt_core_state_substrate::ThinkingMode::Deep {
+                if new_state_mode == crate::l5_cognition::nt_core::nt_state_substrate::ThinkingMode::Deep {
                     if let Ok(mut brain) = self.brain.try_write() {
                             self.goal_loop.enqueue_goal(
                                 &mut brain,
@@ -963,7 +963,7 @@ impl BackgroundLoopHandle {
                     gs_report.coherence
                 );
                 self.state
-                    .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+                    .set_mode(crate::l5_cognition::nt_core::nt_state_substrate::ThinkingMode::Deep);
             }
         }
 
@@ -1107,7 +1107,7 @@ impl BackgroundLoopHandle {
                                 br.health_score * 100.0
                             );
                             self.state
-                                .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+                                .set_mode(crate::l5_cognition::nt_core::nt_state_substrate::ThinkingMode::Deep);
                         }
                     }
                 }
@@ -1268,8 +1268,8 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_architecture_audit(&mut self) {
-        use crate::core::nt_core_consciousness::inner_critic::InnerCritic;
-        use crate::core::nt_core_gwt::monitor::EntropyMonitor;
+        use crate::l5_cognition::nt_core_consciousness::inner_critic::InnerCritic;
+        use crate::l5_cognition::nt_core_gwt::monitor::EntropyMonitor;
         use crate::core::nt_core_meta::metacognition_loop::MetaCognitiveLoop;
         use crate::core::nt_core_meta::monitor::MetaMonitor;
         use crate::core::nt_core_meta::nt_core_arch_lint::ArchLint;
@@ -1277,7 +1277,7 @@ impl BackgroundLoopHandle {
         use crate::core::nt_core_meta::self_model::SelfModel;
         use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
         use crate::core::nt_core_self::self_audit::{converge_check, ConvergeCheckFn};
-        use crate::core::nt_core_self_review::SelfReviewGate;
+        use crate::l6_meta::nt_core_self_review::SelfReviewGate;
         use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
         // GAP-2 (T3): MetaAuditor 生产消费端 — 从持久字段克隆, 周期审计发现写回。
@@ -1554,10 +1554,10 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(InnerCritic::new()));
         // ── Consciousness core detection modules (Cycle: SelfTest coverage) ──
         self_tests.register(Box::new(
-            crate::core::nt_core_consciousness::SpeciousPresent::new(5),
+            crate::l5_cognition::nt_core_consciousness::SpeciousPresent::new(5),
         ));
         self_tests.register(Box::new(
-            crate::core::nt_core_consciousness::VolitionEngine::new(),
+            crate::l5_cognition::nt_core_consciousness::VolitionEngine::new(),
         ));
         self_tests.register(Box::new(SelfReviewGate::new(false)));
         self_tests.register(Box::new(arch_lint));
@@ -1570,7 +1570,7 @@ impl BackgroundLoopHandle {
             crate::l1_action::nt_memory::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),
         ));
         self_tests.register(Box::new(
-            crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new(),
+            crate::l5_cognition::nt_core::capability::nt_core_antidistil::DistillationDetector::new(),
         ));
         self_tests.register(Box::new(
             crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate::new(),
@@ -1582,7 +1582,7 @@ impl BackgroundLoopHandle {
             crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox::new(),
         ));
         self_tests.register(Box::new(
-            crate::core::nt_core_consciousness_tree::review::ConsciousnessReview::new(),
+            crate::l5_cognition::nt_core_consciousness_tree::review::ConsciousnessReview::new(),
         ));
         // ── L10 Transcendent evolution harness (T2 注册): 超越层闭环自检 ──
         // evolution_harness::self_test 内部自建实例运行闭环, 可用作架构审计
@@ -1655,13 +1655,13 @@ impl BackgroundLoopHandle {
 
         // ── Substrate + Engine SelfTests (Cycle 119 architecture refactor) ──
         self_tests.register(Box::new(
-            crate::core::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5),
+            crate::l5_cognition::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5),
         ));
         self_tests.register(Box::new(
-            crate::core::nt_core_state_substrate::StateSubstrate::new(),
+            crate::l5_cognition::nt_core::nt_state_substrate::StateSubstrate::new(),
         ));
         self_tests.register(Box::new(
-            crate::core::nt_core_simulate_engine::SimulateEngine::new(),
+            crate::l1_action::nt_core_simulate_engine::SimulateEngine::new(),
         ));
         // ── ConvergencePulse SelfTest (Cycle 159c: fractal loop state machine) ──
         self_tests.register(Box::new(ConvergencePulse::default()));
@@ -1723,7 +1723,7 @@ impl BackgroundLoopHandle {
             }
         } else {
             self_tests.register(Box::new(
-                crate::core::nt_core_consciousness_tree::ConsciousnessTree::new(),
+                crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree::new(),
             ));
         }
 
@@ -1737,18 +1737,18 @@ impl BackgroundLoopHandle {
                 ),
             }
         } else {
-            self_tests.register(Box::new(crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()));
+            self_tests.register(Box::new(crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()));
         }
 
         // SpeciousPresent + VolitionEngine — 意识基础件不变量 (T2 注册 + T3 生产接线)
         self_tests.register(Box::new(
-            crate::core::nt_core_consciousness::specious_present::SpeciousPresent::default(),
+            crate::l5_cognition::nt_core_consciousness::specious_present::SpeciousPresent::default(),
         ));
         self_tests.register(Box::new(
-            crate::core::nt_core_consciousness::volition::VolitionEngine::default(),
+            crate::l5_cognition::nt_core_consciousness::volition::VolitionEngine::default(),
         ));
         self_tests.register(Box::new(
-            crate::core::nt_core_consciousness::awakening::ConsciousnessAwakening,
+            crate::l5_cognition::nt_core_consciousness::awakening::ConsciousnessAwakening,
         ));
 
         // ConsciousnessMonitor (awareness)
@@ -1802,7 +1802,7 @@ impl BackgroundLoopHandle {
             }
         } else {
             self_tests.register(Box::new(
-                crate::core::nt_core_consciousness::CognitiveLoadMonitor::new(),
+                crate::l5_cognition::nt_core_consciousness::CognitiveLoadMonitor::new(),
             ));
         }
 
@@ -1843,7 +1843,7 @@ impl BackgroundLoopHandle {
         }
         // 同源持久化: 基于真实 SelfTest 的分支健康也注入跨进程意识核心单例快照,
         // 保证 MCP/CLI status 读到非 0 分支健康 (此前独立 tree 计算后即丢弃 → 快照恒 0 迷雾)。
-        crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+        crate::l5_cognition::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
         log::debug!(
             "[bg] consciousness_core: persisted branch health from {} SelfTest results",
             results.len()
@@ -2040,7 +2040,7 @@ impl BackgroundLoopHandle {
                 vec!["meta observer selftest failed".into()],
             )
         });
-        let gov_ok = crate::core::nt_core_self_constitution::GovernanceConstitutionSelfTest
+        let gov_ok = crate::l6_meta::nt_core_self_constitution::GovernanceConstitutionSelfTest
             .self_test()
             .is_ok();
         results.push(if gov_ok {
@@ -2069,7 +2069,7 @@ impl BackgroundLoopHandle {
         });
 
         // 注入跨进程意识核心单例 (同步分支健康 + 快照持久化)
-        crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+        crate::l5_cognition::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
         log::debug!(
             "[bg] consciousness_core: tick branch health from {} lightweight SelfTest results",
             results.len()

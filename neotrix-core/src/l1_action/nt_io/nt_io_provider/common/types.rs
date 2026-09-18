@@ -14,7 +14,7 @@
 pub use crate::l1_action::nt_io::nt_io_llm::*;
 
 /// Backward-compatible: LlmProvider trait (old interface, defined in core::nt_core_llm)
-pub use crate::core::nt_core_llm::LlmProvider;
+pub use crate::l1_action::nt_core_llm::LlmProvider;
 
 /// Backward-compatible: re-export ToolCallFunction from neotrix-types (single source of truth)
 pub use neotrix_types::llm_types::ToolCallFunction;

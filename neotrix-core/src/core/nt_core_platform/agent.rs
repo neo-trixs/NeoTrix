@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_capability::{UnifiedCapability, Layer, Domain};
+use crate::l6_meta::nt_core_capability::{UnifiedCapability, Layer, Domain};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AgentError {

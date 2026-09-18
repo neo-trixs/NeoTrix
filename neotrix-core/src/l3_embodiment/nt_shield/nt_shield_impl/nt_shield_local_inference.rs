@@ -237,7 +237,7 @@ impl LocalInferenceEngine {
         let value = serde_json::to_string(profile)
             .map_err(|e| format!("serialize: {}", e))?;
         
-        crate::core::nt_core_kb_primitives::kv_set(
+        crate::l6_meta::nt_core_kb_primitives::kv_set(
             &conn, "inference_profile", &key, &value
         )?;
         
@@ -250,7 +250,7 @@ impl LocalInferenceEngine {
         let conn = open_kb_connection().ok()?;
         let key = format!("{}_{}", model_name, hardware);
         
-        let value = crate::core::nt_core_kb_primitives::kv_get(
+        let value = crate::l6_meta::nt_core_kb_primitives::kv_get(
             &conn, "inference_profile", &key
         ).ok()??;
         
@@ -264,7 +264,7 @@ impl LocalInferenceEngine {
             Err(_) => return Vec::new(),
         };
         
-        crate::core::nt_core_kb_primitives::kv_list(&conn, "inference_profile")
+        crate::l6_meta::nt_core_kb_primitives::kv_list(&conn, "inference_profile")
             .map(|pairs| pairs.into_iter().map(|(k, _)| k).collect())
             .unwrap_or_default()
     }

@@ -261,7 +261,7 @@ impl ReflectionConsolidation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hcube::fhrr_vsa::random_vector_dim;
+    use crate::l2_perception::nt_core_hcube::fhrr_vsa::random_vector_dim;
 
     fn populated_hc() -> FhrrHyperCube {
         let mut hc = FhrrHyperCube::new(128);

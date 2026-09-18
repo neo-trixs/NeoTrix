@@ -192,7 +192,7 @@ impl _VideoPromptCache {
         let mut best_id = None;
 
         for (id, entry) in &self.entries {
-            let similarity = crate::core::nt_core_math::cosine_similarity_f64(query_embedding, &entry.embedding);
+            let similarity = crate::l5_cognition::nt_core_math::cosine_similarity_f64(query_embedding, &entry.embedding);
             if similarity > best_score && similarity >= self.config.similarity_threshold {
                 best_score = similarity;
                 best_id = Some(id.clone());
@@ -208,7 +208,7 @@ impl _VideoPromptCache {
         let mut best_id = None;
 
         for (id, entry) in &self.entries {
-            let similarity = crate::core::nt_core_math::cosine_similarity_f64(query_embedding, &entry.embedding);
+            let similarity = crate::l5_cognition::nt_core_math::cosine_similarity_f64(query_embedding, &entry.embedding);
             if similarity > best_score && similarity >= self.config.similarity_threshold {
                 best_score = similarity;
                 best_id = Some(id.clone());

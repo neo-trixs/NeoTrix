@@ -197,7 +197,7 @@ pub async fn init_agent_registry() -> PlatformResult<AgentRegistry> {
 
     // RecoveryOrchestrator — 错误恢复编排
     {
-        use crate::core::nt_core_error::recovery::{RecoveryOrchestrator, RecoveryConfig};
+        use crate::l0_substrate::nt_core_error::recovery::{RecoveryOrchestrator, RecoveryConfig};
         let agent = RecoveryOrchestrator::new(RecoveryConfig::default());
         registry.register(Box::new(agent)).await.map_err(|e| {
             super::error::PlatformError::Agent(format!("core.recovery_orchestrator: {}", e))

@@ -1,4 +1,4 @@
-use crate::core::nt_core_knowledge::KnowledgeSource;
+use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
 use crate::core::CapabilityVector;
 
 pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<CapabilityVector> {

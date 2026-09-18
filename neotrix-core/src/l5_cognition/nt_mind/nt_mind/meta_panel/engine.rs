@@ -4,10 +4,10 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
-use crate::core::nt_core_gate::{
+use crate::l5_cognition::nt_core_gate::{
     Claim, GuardrailReport, JudgeFamily, JudgeInput, JudgePanel, ToolSpec, GateDecision,
 };
-use crate::core::nt_core_self_review::{SelfReviewGate, Severity};
+use crate::l6_meta::nt_core_self_review::{SelfReviewGate, Severity};
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{PerspectiveLens, ReasoningMethod};
 
 use super::fusion::FusionEngine;
@@ -105,7 +105,7 @@ impl MetaPanelEngine {
 
         let review_passed = review_report.is_pass()
             && panel_verdict.is_pass()
-            && guardrail.action == crate::core::nt_core_gate::GuardAction::Allow
+            && guardrail.action == crate::l5_cognition::nt_core_gate::GuardAction::Allow
             && gate_decision.allows_autonomous();
 
         MetaPanelResult {

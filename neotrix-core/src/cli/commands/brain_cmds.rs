@@ -106,7 +106,7 @@ impl CliCommand for E8Cmd {
                 let val = args[1].parse::<u8>();
                 match val {
                     Ok(v) if v < 64 => {
-                        CommandOutput::ok(&format!("设置 E8 模式为 {} ({})", v, crate::core::nt_core_hex::ReasoningHexagram::new(v).mode_name()))
+                        CommandOutput::ok(&format!("设置 E8 模式为 {} ({})", v, crate::l5_cognition::nt_core_hex::ReasoningHexagram::new(v).mode_name()))
                     }
                     Ok(_) => CommandOutput::err("E8 模式范围 0-63"),
                     Err(_) => CommandOutput::err("无效参数，请输入 0-63 的数字"),

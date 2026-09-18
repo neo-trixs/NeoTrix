@@ -103,7 +103,7 @@ impl ConsciousnessTree {
                         .iter()
                         .map(|r| (conf, r.passed))
                         .collect();
-                    let ece = crate::core::nt_core_consciousness_tree::metacalib::expected_calibration_error(
+                    let ece = crate::l5_cognition::nt_core_consciousness_tree::metacalib::expected_calibration_error(
                         &samples, 10,
                     );
                     let penalty = (CALIB_W_ECE * ece).min(CALIB_MAX_PENALTY);

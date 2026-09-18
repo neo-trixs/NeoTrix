@@ -223,8 +223,8 @@ mod tests {
     use lopdf::dictionary;
     use image::GenericImageView;
 
-    use crate::core::nt_core_hcube::vsa::{VSAEngine, VsaBackend};
-    use crate::core::nt_core_hex::ReasoningHexagram;
+    use crate::l2_perception::nt_core_hcube::vsa::{VSAEngine, VsaBackend};
+    use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
     use crate::l6_meta::healing::nt_core_self_test::SelfTest;
     use crate::neotrix::nt_file_ability::types::SpecialistType;
     use nt_core_capability_tree::ConstellationLevel;
@@ -1325,8 +1325,8 @@ mod tests {
         assert!(st.self_test().is_ok(), "SelfTest 应通过");
         // T3 接线: 名称前缀必须可被 ConsciousnessTree 路由到 Io 分支
         assert!(
-            crate::core::nt_core_consciousness_tree::BranchKind::from_module_name(st.name())
-                == Some(crate::core::nt_core_consciousness_tree::BranchKind::Io),
+            crate::l5_cognition::nt_core_consciousness_tree::BranchKind::from_module_name(st.name())
+                == Some(crate::l5_cognition::nt_core_consciousness_tree::BranchKind::Io),
             "SelfTest 名应路由到 Io 分支"
         );
     }

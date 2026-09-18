@@ -2,7 +2,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::core::nt_core_plan::{E8Plan, PlanGenerator, StepStatus};
+use crate::l5_cognition::nt_core_plan::{E8Plan, PlanGenerator, StepStatus};
 
 fn plan_manager() -> &'static Mutex<PlanManager> {
     static MANAGER: OnceLock<Mutex<PlanManager>> = OnceLock::new();

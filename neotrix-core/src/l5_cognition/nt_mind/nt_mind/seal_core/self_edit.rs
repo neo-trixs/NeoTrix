@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 /// Reverse bridge: types re-exported from `crate::core::edit`.
-pub use crate::core::nt_core_edit::{SelfEdit, MicroEdit, ToolCall};
+pub use crate::l1_action::nt_core_edit::{SelfEdit, MicroEdit, ToolCall};
 
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 
 pub fn infer_task_type(task: &str) -> TaskType {
     let t = task.to_lowercase();
@@ -76,8 +76,8 @@ pub fn _generate_tool_calls(task_type: &TaskType, _task: &str) -> Vec<ToolCall> 
 }
 
 /// Convert `core::nt_core_knowledge::TaskType` to `nt_world_model::TaskType`
-pub fn knowledge_to_world_task_type(t: &crate::core::nt_core_knowledge::TaskType) -> crate::neotrix::nt_world_model::TaskType {
-    use crate::core::nt_core_knowledge::TaskType as K;
+pub fn knowledge_to_world_task_type(t: &crate::l2_perception::nt_core_knowledge::TaskType) -> crate::neotrix::nt_world_model::TaskType {
+    use crate::l2_perception::nt_core_knowledge::TaskType as K;
     use crate::neotrix::nt_world_model::TaskType as W;
     match t {
         K::General => W::General,
@@ -92,8 +92,8 @@ pub fn knowledge_to_world_task_type(t: &crate::core::nt_core_knowledge::TaskType
 }
 
 /// Convert `nt_world_model::TaskType` to `core::nt_core_knowledge::TaskType`
-pub fn world_to_knowledge_task_type(t: &crate::neotrix::nt_world_model::TaskType) -> crate::core::nt_core_knowledge::TaskType {
-    use crate::core::nt_core_knowledge::TaskType as K;
+pub fn world_to_knowledge_task_type(t: &crate::neotrix::nt_world_model::TaskType) -> crate::l2_perception::nt_core_knowledge::TaskType {
+    use crate::l2_perception::nt_core_knowledge::TaskType as K;
     use crate::neotrix::nt_world_model::TaskType as W;
     match t {
         W::General => K::General,

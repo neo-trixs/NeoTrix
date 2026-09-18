@@ -13,7 +13,7 @@ use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use crate::l1_action::nt_io::nt_io_provider::provider_catalog::{
     ProviderCategory, lookup_provider, providers_by_category,
 };
-use crate::core::nt_core_llm::LlmRequest;
+use crate::l1_action::nt_core_llm::LlmRequest;
 
 pub struct ProviderCmd;
 

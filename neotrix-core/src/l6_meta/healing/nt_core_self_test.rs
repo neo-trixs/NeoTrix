@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::core::nt_core_self_constitution::global_constitution;
+use crate::l6_meta::nt_core_self_constitution::global_constitution;
 
 /// 跨模块共享的测试环境锁 — 串行化所有 set_var(HOME/NEOTRIX_*) 的测试隔离。
 /// 原因: kb_cmds::with_temp_home / consciousness_core::isolate_home_once 等各自

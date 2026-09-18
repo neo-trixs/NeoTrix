@@ -1,7 +1,7 @@
 //! NT-WORLD Asset Map 统一能力接口实现
 
 use std::sync::Arc;
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 
 /// Asset Map能力实现
 pub struct _AssetMapCapability {

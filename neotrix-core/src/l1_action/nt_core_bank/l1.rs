@@ -1,4 +1,4 @@
-use crate::core::nt_core_bank::ReasoningMemory;
+use crate::l1_action::nt_core_bank::ReasoningMemory;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct L1Memory {
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_l1_prompt_contains_memories() {
-        use crate::core::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
+        use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
         use crate::core::{RewardSource, TaskType};
         let mem = ReasoningMemory {
             id: "mem-1".into(),

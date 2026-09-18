@@ -2,10 +2,10 @@ use std::sync::atomic::Ordering;
 
 use chrono::Utc;
 
-use crate::core::nt_core_bank::{
+use crate::l1_action::nt_core_bank::{
     MemoryIterationResult, MemoryTier, ReasoningBank, ReasoningMemory,
 };
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_core_knowledge::TaskType;
 
 impl ReasoningBank {
     pub fn iterate_memories(

@@ -1,5 +1,5 @@
 use crate::l1_action::nt_io::nt_io_provider::common::types::*;
-use crate::core::nt_core_llm::{LlmRequest, LlmResponse, LlmError};
+use crate::l1_action::nt_core_llm::{LlmRequest, LlmResponse, LlmError};
 use crate::l1_action::nt_io::nt_io_http_factory::global_client;
 
 const GROQ_BASE: &str = "https://api.groq.com/openai/v1";
@@ -396,8 +396,8 @@ impl PollinationsProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for PollinationsProvider {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Untrusted
+    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+        crate::l1_action::nt_core_llm::DataTrust::Untrusted
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {

@@ -14,7 +14,7 @@ pub use crate::l5_cognition::layer_aliases::{
     StageInfo, KernelStats, SelfConsistencyResult, verify_answer,
     text_to_vector, format_kernel_output,
 };
-pub use crate::core::nt_core_reasoning::{ReasoningTrace, TraceSource};
+pub use crate::l5_cognition::nt_core_reasoning::{ReasoningTrace, TraceSource};
 
 #[cfg(test)]
 mod tests {

@@ -6,7 +6,7 @@
 //! - 审计：所有拦截记录落 KB 可追溯
 //! - 熔断：连续拦截触发熔断，防止死循环
 
-use crate::core::nt_core_kb_primitives::{kv_list, kv_set, now};
+use crate::l6_meta::nt_core_kb_primitives::{kv_list, kv_set, now};
 #[allow(unused_imports)]
 use crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::{
     ArbitrationResult, CoreValue, ValueAction as Action, ValueCompassRuntime, ValueCompassStore,
@@ -497,7 +497,7 @@ impl ValueGateRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_kb_primitives::schema_initialize;
+    use crate::l6_meta::nt_core_kb_primitives::schema_initialize;
     use rusqlite::Connection;
 
     fn mem_conn() -> Connection {
@@ -571,7 +571,7 @@ mod tests {
         config.circuit_breaker_cooldown_secs = 1;
 
         let conn = rusqlite::Connection::open_in_memory().unwrap();
-        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
+        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
         let compass = ValueCompassRuntime::from_kb(&conn).unwrap();
         let gate = ValueGate::new(compass, None, config);
         let rt = ValueGateRuntime::new(gate);
@@ -594,7 +594,7 @@ mod tests {
     #[test]
     fn test_record_outcome_and_learning() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
-        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
+        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
         let compass = ValueCompassRuntime::from_kb(&conn).unwrap();
         let mut cfg = crate::l5_cognition::nt_mind::nt_mind::evolution::value_learning::LearningConfig::default();
         cfg.min_observations_for_learning = 1;

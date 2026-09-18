@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::core::nt_core_kb_types::{NodeType, RelationType};
+use crate::l6_meta::nt_core_kb_types::{NodeType, RelationType};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum HyperNodeType {

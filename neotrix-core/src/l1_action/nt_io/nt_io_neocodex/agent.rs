@@ -104,7 +104,7 @@ pub struct NeoCodexAgent {
     pub goals: GoalQueue,
     pub wire: WireSession,
     pub markdown: StreamingMarkdown,
-    pub consciousness: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
+    pub consciousness: Option<crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree>,
     pub event_bus: Option<crate::neotrix::nt_core_event_bus::EventBus>,
     pub brain: Option<
         Arc<tokio::sync::RwLock<dyn crate::core::nt_core_traits::BrainHandle>>,
@@ -202,7 +202,7 @@ impl NeoCodexAgent {
 
     pub(crate) fn _set_consciousness_tree(
         &mut self,
-        tree: crate::core::nt_core_consciousness_tree::ConsciousnessTree,
+        tree: crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree,
     ) {
         self.consciousness = Some(tree);
     }
@@ -1047,14 +1047,14 @@ impl NeoCodexAgent {
         // reason over, and we drop the raw image channel.
         let active_model = self.provider.active_model();
         let active_has_vision = self.provider.has_capability(ModelCapability::Vision)
-            || crate::core::nt_core_e8::nt_multimodal::model_supports_vision(&active_model);
+            || crate::l2_perception::nt_core_e8::nt_multimodal::model_supports_vision(&active_model);
         let mut messages = messages;
         let mut image_data = image_data;
         if image_data.is_some() && !active_has_vision {
             if let Some(b64) = image_data.take() {
                 if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&b64) {
                     if let Ok((evidence, _feat)) =
-                        crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(&bytes)
+                        crate::l2_perception::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(&bytes)
                     {
                         if let Some(last_user) =
                             messages.iter_mut().rev().find(|m| m.role == Role::User)

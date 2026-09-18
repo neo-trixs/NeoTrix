@@ -1,7 +1,7 @@
 //! NT-WORLD NLP 统一能力接口实现
 
 use std::sync::Arc;
-use crate::core::nt_core_capability::*;
+use crate::l6_meta::nt_core_capability::*;
 
 /// NLP能力实现
 pub struct NlpCapability {

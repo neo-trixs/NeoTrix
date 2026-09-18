@@ -19,7 +19,7 @@ use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExplorationPipe
 use crate::neotrix::nt_act_voice::VoiceInput;
 use crate::l5_cognition::nt_mind::foundation::l1_wrappers::DistillationEngineWrapper;
 use crate::l5_cognition::nt_mind::nt_mind::self_evolver::SelfEvolver;
-use crate::core::nt_core_scheduler::SchedulerEngine;
+use crate::l6_meta::nt_core_scheduler::SchedulerEngine;
 use crate::l5_cognition::nt_mind::nt_mind::curiosity_drive::CuriosityDrive;
 use crate::l5_cognition::nt_mind::nt_mind::knowledge_aging::KnowledgeAging;
 use crate::l5_cognition::nt_mind::nt_mind::auto_crystallizer::AutoCrystallizer;
@@ -28,12 +28,12 @@ use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 // AgentDiscovery not defined — field removed from BackgroundLoop
 
-use crate::core::nt_core_second_brain::SecondBrain;
+use crate::l5_cognition::nt_core_second_brain::SecondBrain;
 use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
 use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
-use crate::core::nt_core_consciousness::CognitiveLoadMonitor;
-use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
+use crate::l5_cognition::nt_core_consciousness::CognitiveLoadMonitor;
+use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 
 mod builder;
 pub mod config;
@@ -105,12 +105,12 @@ pub bbrain: Option<BMonitor>,
     pub always_on: AlwaysOnEngine,
     pub plugin_registry: PluginRegistry,
     pub session_recovery: Option<SessionRecoveryWrapper>,
-    pub consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
-    pub consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
+    pub consciousness_runtime: Option<crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
+    pub consciousness_tree: Option<crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree>,
     pub fep_iit_bridge: Option<crate::l4_emotion::nt_feel::fep_iit_bridge::FepIitBridge>,
     pub cognitive_load: Option<CognitiveLoadMonitor>,
     /// 意图引擎 (F2 接线): EFE 域探索提案经 VolitionEngine 门控后执行。
-    pub volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
+    pub volition: Option<crate::l5_cognition::nt_core_consciousness::VolitionEngine>,
     pub second_brain: Option<SecondBrain>,
     pub kb: Option<Arc<KnowledgeBase>>,
     /// 统一的 GlobalWorkspace 单例 —— 被 engine、panorama、consciousness_bridge 共享。
@@ -130,9 +130,9 @@ impl BackgroundLoop {
         let mut shared_gwt = GlobalWorkspace::new(0.3).with_physics_attention(4);
         shared_gwt.register_default_specialists();
         // CAD 能力 T3 生产接线: GWT 共振路由 (image→CAD 经意识核心) + 经验吸收落盘
-        let _ = crate::core::nt_core_gwt::cad_route::register_cad_gwt(&mut shared_gwt);
+        let _ = crate::l5_cognition::nt_core_gwt::cad_route::register_cad_gwt(&mut shared_gwt);
         if let Ok(kb) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
-            if let Err(e) = crate::core::nt_core_knowledge::cad_absorb::absorb_cad_experience(&kb) {
+            if let Err(e) = crate::l2_perception::nt_core_knowledge::cad_absorb::absorb_cad_experience(&kb) {
                 log::warn!("[bg-init] failed to absorb CAD experience: {}", e);
             }
         }
@@ -166,7 +166,7 @@ impl BackgroundLoop {
             proxy_client: None,
             nt_act_voice_input: Some(VoiceInput::new()),
             avatar_engine: Some(DistillationEngineWrapper::new()),
-            scheduler: Some(crate::core::nt_core_scheduler::default_scheduler(
+            scheduler: Some(crate::l6_meta::nt_core_scheduler::default_scheduler(
                 std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
             )),
             handles: Vec::new(),
@@ -177,11 +177,11 @@ impl BackgroundLoop {
             brain,
             started: false,
             session_recovery: Some(SessionRecoveryWrapper::new("bg-loop")),
-            consciousness_runtime: Some(crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()),
-            consciousness_tree: Some(crate::core::nt_core_consciousness_tree::ConsciousnessTree::new()),
+            consciousness_runtime: Some(crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()),
+            consciousness_tree: Some(crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree::new()),
             fep_iit_bridge: Some(crate::l4_emotion::nt_feel::fep_iit_bridge::FepIitBridge::new()),
             cognitive_load: Some(CognitiveLoadMonitor::new()),
-            volition: Some(crate::core::nt_core_consciousness::VolitionEngine::new()),
+            volition: Some(crate::l5_cognition::nt_core_consciousness::VolitionEngine::new()),
             second_brain: Some(SecondBrain::new()),
             kb: None,
             gwt: Some(shared_gwt),
@@ -235,7 +235,7 @@ mod tests {
         // 且 GWT resonance 激活逻辑在 handle_consciousness_tick 生效。
         // 直接验证链路源头: observe() 产生非零 coherence, 注入 tree 后非零。
         use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
-        use crate::core::nt_core_consciousness_tree::ConsciousnessTree;
+        use crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree;
         let mut monitor = ConsciousnessMonitor::new();
         monitor.observe();
         let report = monitor.get_report();
@@ -254,9 +254,9 @@ mod tests {
         );
         // GWT: 后台循环每 tick 调 resonant_broadcast → last_resonance 设置。
         // 直接验证 GWT 激活判定条件 (last_resonance.is_some() && resonant_specialists 非空)
-        let mut ws = crate::core::nt_core_gwt::workspace::GlobalWorkspace::new(0.3);
+        let mut ws = crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace::new(0.3);
         ws.register_default_specialists();
-        let states = crate::core::nt_core_gwt::resonance::default_specialist_states();
+        let states = crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states();
         ws.resonant_broadcast("test resonance", &states);
         assert!(
             ws.last_resonance.is_some() && !ws.resonant_specialists().is_empty(),

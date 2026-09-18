@@ -4,7 +4,7 @@
 //! Infers required capabilities from the request (vision, tools, streaming)
 //! and matches against provider catalog metadata via `ProviderCapabilities`.
 
-use crate::core::nt_core_llm::{LlmError, LlmRequest};
+use crate::l1_action::nt_core_llm::{LlmError, LlmRequest};
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::{
     find_by_capabilities, ProviderCapabilities,
 };
@@ -99,7 +99,7 @@ impl Default for CapabilityRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_llm::{Message, Role, Tool};
+    use crate::l1_action::nt_core_llm::{Message, Role, Tool};
     use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::PROVIDER_CATALOG;
 
     fn user_msg(content: &str) -> Message {

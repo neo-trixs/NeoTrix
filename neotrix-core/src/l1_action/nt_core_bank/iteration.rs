@@ -1,4 +1,4 @@
-use crate::core::nt_core_bank::ReasoningBankStats;
+use crate::l1_action::nt_core_bank::ReasoningBankStats;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
