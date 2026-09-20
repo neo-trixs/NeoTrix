@@ -20,3 +20,7 @@ pub mod mind_modules;
 pub mod failure_taxonomy;
 pub mod context_mgmt;
 pub mod gate;
+
+/// Re-export decision engine for structured decision-making
+#[cfg(feature = "decision-engine")]
+pub use neotrix_decision_engine as decision_engine;

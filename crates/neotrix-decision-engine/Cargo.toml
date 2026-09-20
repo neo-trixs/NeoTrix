@@ -1,0 +1,31 @@
+[package]
+name = "neotrix-decision-engine"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Local decision engine inspired by TypeSafe JEV - structured decisions with calibrated probabilities"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+
+# Tokenizer (必须)
+tokenizers = "0.21"
+
+# 推理引擎 (必须)
+candle-core = "0.8"
+candle-transformers = "0.8"
+candle-nn = "0.8"
+
+# 权重加载
+safetensors = "0.4"
+
+# 异步支持
+tokio = { version = "1", features = ["rt", "sync"] }
+
+# 日志
+tracing = "0.1"
+
+# 可选: llama.cpp 后端
+# llama-cpp-rs = { version = "0.3", optional = true }
