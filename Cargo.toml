@@ -10,6 +10,8 @@ members = [
     "crates/neotrix-multi-agent",
     "neotrix-core/src/neotrix/nt_core_capability_tree",
     "crates/nt-lang",
+    "crates/neotrix-game",
+    # "crates/neotrix-decision-engine",  # disabled: pre-existing compilation errors
 ]
 
 resolver = "2"
@@ -34,7 +36,26 @@ uuid = { version = "1", features = ["v4", "serde"] }
 ureq = "2"
 
 [workspace.lints.clippy]
+# Restriction lints — bug prevention (R-P2xx)
 unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+string_slice = "warn"
+indexing_slicing = "warn"
+get_unwrap = "warn"
+unwrap_in_result = "warn"
+await_holding_lock = "warn"
+await_holding_refcell_ref = "warn"
+large_futures = "warn"
+let_underscore_must_use = "warn"
+unused_result_ok = "warn"
+map_err_ignore = "warn"
+undocumented_unsafe_blocks = "warn"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
 
 [profile.release]
 opt-level = "s"

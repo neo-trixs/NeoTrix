@@ -81,28 +81,26 @@ impl ChatPlugin {
     }
 
     fn get_messages(&self, session_id: &str) -> Result<Vec<serde_json::Value>, DomainError> {
-        let conn = self.db_pool.get().map_err(DomainError::from)?;
+        let conn = self
+            .db_pool
+            .get()
+            .map_err(|e| DomainError::from(anyhow::Error::from(e).context("acquiring DB connection for get_messages")))?;
         let messages_json: String = conn
             .query_row(
                 "SELECT messages FROM sessions WHERE id = ?1",
                 [session_id],
                 |row| row.get(0),
             )
-            .map_err(|e| DomainError {
-                code: "NOT_FOUND".into(),
-                message: format!("会话不存在: {}", e),
-                recoverable: false,
-            })?;
+            .map_err(|e| DomainError::from(anyhow::Error::from(e).context(format!("querying messages for session {}", session_id))))?;
 
-        serde_json::from_str(&messages_json).map_err(|e| DomainError {
-            code: "PARSE_ERROR".into(),
-            message: format!("解析消息失败: {}", e),
-            recoverable: true,
-        })
+        serde_json::from_str(&messages_json).map_err(|e| DomainError::from(anyhow::Error::from(e).context("parsing session messages JSON")))
     }
 
     fn add_message(&self, session_id: &str, message: serde_json::Value) -> Result<(), DomainError> {
-        let conn = self.db_pool.get().map_err(DomainError::from)?;
+        let conn = self
+            .db_pool
+            .get()
+            .map_err(|e| DomainError::from(anyhow::Error::from(e).context("acquiring DB connection for add_message")))?;
 
         let messages_json: String = conn
             .query_row(
@@ -110,36 +108,20 @@ impl ChatPlugin {
                 [session_id],
                 |row| row.get(0),
             )
-            .map_err(|e| DomainError {
-                code: "NOT_FOUND".into(),
-                message: format!("会话不存在: {}", e),
-                recoverable: false,
-            })?;
+            .map_err(|e| DomainError::from(anyhow::Error::from(e).context(format!("querying messages for session {} in add_message", session_id))))?;
 
         let mut messages: Vec<serde_json::Value> =
-            serde_json::from_str(&messages_json).map_err(|e| DomainError {
-                code: "PARSE_ERROR".into(),
-                message: format!("解析消息失败: {}", e),
-                recoverable: true,
-            })?;
+            serde_json::from_str(&messages_json).map_err(|e| DomainError::from(anyhow::Error::from(e).context("parsing messages JSON for append")))?;
 
         messages.push(message);
 
-        let updated_json = serde_json::to_string(&messages).map_err(|e| DomainError {
-            code: "SERIALIZE_ERROR".into(),
-            message: format!("序列化消息失败: {}", e),
-            recoverable: true,
-        })?;
+        let updated_json = serde_json::to_string(&messages).map_err(|e| DomainError::from(anyhow::Error::from(e).context("serializing updated messages")))?;
 
         conn.execute(
             "UPDATE sessions SET messages = ?1, updated_at = ?2 WHERE id = ?3",
             rusqlite::params![updated_json, chrono::Utc::now().timestamp(), session_id],
         )
-        .map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("保存消息失败: {}", e),
-            recoverable: true,
-        })?;
+        .map_err(|e| DomainError::from(anyhow::Error::from(e).context(format!("saving messages for session {}", session_id))))?;
 
         Ok(())
     }
@@ -190,11 +172,7 @@ impl ChatPlugin {
         }
 
         let report = {
-            let mut core = CORE.write().map_err(|e| DomainError {
-                code: "CORE_LOCK".into(),
-                message: format!("获取意识核心锁失败: {}", e),
-                recoverable: true,
-            })?;
+            let mut core = CORE.write().map_err(|e| DomainError::from(anyhow::Error::from(e).context("acquiring consciousness core lock for LLM call")))?;
             core.execute_task_loop(content, &executor, &config)
         };
 
@@ -302,11 +280,7 @@ impl ChatPlugin {
                 let registry = self.registry.read().await;
                 registry.call_async("agent", "stream", request).await
             })
-            .map_err(|e| DomainError {
-                code: "LLM_STREAM_ERROR".into(),
-                message: format!("流式请求失败: {}", e),
-                recoverable: true,
-            })?;
+            .map_err(|e| DomainError::from(anyhow::Error::from(e).context("initiating LLM stream request")))?;
 
         let mut full_content = String::new();
 
@@ -509,10 +483,12 @@ impl DomainPlugin for ChatPlugin {
                     "role": "user",
                     "timestamp": chrono::Utc::now().to_rfc3339(),
                 });
-                self.add_message(session_id, user_msg)?;
+                self.add_message(session_id, user_msg)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("saving user message")))?;
 
                 // 调用本地 LLM
-                let assistant_content = self.call_llm(content)?;
+                let assistant_content = self.call_llm(content)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("calling LLM for completion")))?;
 
                 // 保存助手消息
                 let assistant_msg = serde_json::json!({
@@ -521,7 +497,8 @@ impl DomainPlugin for ChatPlugin {
                     "role": "assistant",
                     "timestamp": chrono::Utc::now().to_rfc3339(),
                 });
-                self.add_message(session_id, assistant_msg.clone())?;
+                self.add_message(session_id, assistant_msg.clone())
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("saving assistant response")))?;
 
                 // 返回给前端（字符串格式，适配 Promise<string>）
                 Ok(serde_json::json!(assistant_content))
@@ -547,10 +524,12 @@ impl DomainPlugin for ChatPlugin {
                     "role": "user",
                     "timestamp": chrono::Utc::now().to_rfc3339(),
                 });
-                self.add_message(session_id, user_msg)?;
+                self.add_message(session_id, user_msg)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("saving user message for stream")))?;
 
                 // 流式调用 LLM
-                let assistant_content = self.call_llm_stream(content)?;
+                let assistant_content = self.call_llm_stream(content)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("calling LLM stream")))?;
 
                 // 保存助手消息
                 let assistant_msg = serde_json::json!({
@@ -559,7 +538,8 @@ impl DomainPlugin for ChatPlugin {
                     "role": "assistant",
                     "timestamp": chrono::Utc::now().to_rfc3339(),
                 });
-                self.add_message(session_id, assistant_msg)?;
+                self.add_message(session_id, assistant_msg)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("saving stream assistant response")))?;
 
                 Ok(serde_json::json!(assistant_content))
             }
@@ -576,7 +556,8 @@ impl DomainPlugin for ChatPlugin {
                     .get("session_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("default");
-                let messages = self.get_messages(session_id)?;
+                let messages = self.get_messages(session_id)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("fetching session history")))?;
                 Ok(serde_json::json!({ "ok": true, "messages": messages }))
             }
             "compact" => Ok(serde_json::json!({ "ok": true })),
@@ -585,7 +566,8 @@ impl DomainPlugin for ChatPlugin {
                     .get("session_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("default");
-                let messages = self.get_messages(session_id)?;
+                let messages = self.get_messages(session_id)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("fetching messages for export")))?;
                 let md = messages
                     .iter()
                     .filter_map(|m| {
@@ -601,16 +583,15 @@ impl DomainPlugin for ChatPlugin {
                     .get("session_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("default");
-                let conn = self.db_pool.get().map_err(DomainError::from)?;
+                let conn = self
+                    .db_pool
+                    .get()
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("acquiring DB connection for clear")))?;
                 conn.execute(
                     "UPDATE sessions SET messages = '[]', updated_at = ?1 WHERE id = ?2",
                     rusqlite::params![chrono::Utc::now().timestamp(), session_id],
                 )
-                .map_err(|e| DomainError {
-                    code: "DB_ERROR".into(),
-                    message: format!("清空失败: {}", e),
-                    recoverable: true,
-                })?;
+                .map_err(|e| DomainError::from(anyhow::Error::from(e).context(format!("clearing messages for session {}", session_id))))?;
                 Ok(serde_json::json!({ "ok": true }))
             }
             "regenerate" => Ok(serde_json::json!({ "ok": true })),
@@ -659,11 +640,15 @@ impl DomainPlugin for ChatPlugin {
                     .unwrap_or("default");
                 let index = args.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
                 let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                let mut messages = self.get_messages(session_id)?;
+                let mut messages = self.get_messages(session_id)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("fetching messages for edit")))?;
                 if index < messages.len() {
                     messages[index]["content"] = serde_json::json!(content);
                     let json = serde_json::to_string(&messages).unwrap_or_default();
-                    let conn = self.db_pool.get().map_err(DomainError::from)?;
+                    let conn = self
+                        .db_pool
+                        .get()
+                        .map_err(|e| DomainError::from(anyhow::Error::from(e).context("acquiring DB connection for edit")))?;
                     conn.execute(
                         "UPDATE sessions SET messages = ?1, updated_at = ?2 WHERE id = ?3",
                         rusqlite::params![json, chrono::Utc::now().timestamp(), session_id],
@@ -678,11 +663,15 @@ impl DomainPlugin for ChatPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("default");
                 let index = args.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                let mut messages = self.get_messages(session_id)?;
+                let mut messages = self.get_messages(session_id)
+                    .map_err(|e| DomainError::from(anyhow::Error::from(e).context("fetching messages for delete")))?;
                 if index < messages.len() {
                     messages.remove(index);
                     let json = serde_json::to_string(&messages).unwrap_or_default();
-                    let conn = self.db_pool.get().map_err(DomainError::from)?;
+                    let conn = self
+                        .db_pool
+                        .get()
+                        .map_err(|e| DomainError::from(anyhow::Error::from(e).context("acquiring DB connection for delete")))?;
                     conn.execute(
                         "UPDATE sessions SET messages = ?1, updated_at = ?2 WHERE id = ?3",
                         rusqlite::params![json, chrono::Utc::now().timestamp(), session_id],

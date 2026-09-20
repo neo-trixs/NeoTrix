@@ -6,19 +6,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![warn(
-    clippy::all,
-    clippy::pedantic,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::todo,
-    clippy::unimplemented,
-    clippy::dbg_macro,
-    clippy::print_stdout,
-    clippy::print_stderr
-)]
+#![warn(clippy::all, clippy::pedantic, clippy::dbg_macro, clippy::print_stdout, clippy::print_stderr)]
 #![allow(
+    reason = "pedantic false-positives in Tauri plugin boilerplate",
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
     clippy::missing_errors_doc,

@@ -345,3 +345,38 @@ src/
 - **规则**：所有 `~/.neotrix` 路径必须通过 `config::AppConfig::base_dir()` 获取
 - **规则**：所有项目级 `.neotrix` 路径必须通过 `config::AppConfig::project_dir()` 获取
 - **禁止**：在业务代码中直接硬编码 `.neotrix` 路径字符串
+
+## 15. 开发能力进化记录（Development Capability Evolution）
+
+> 吸收自外部最佳实践 + 内部审计经验
+
+### 防Bug编译时检查（Clippy Restriction Lints）
+18个restriction lint覆盖6类bug：
+- **Panic预防**: `panic`, `todo`, `unimplemented`, `unreachable`, `unwrap_used`, `expect_used`
+- **索引安全**: `string_slice`, `indexing_slicing`, `get_unwrap`, `unwrap_in_result`
+- **Async死锁**: `await_holding_lock`, `await_holding_refcell_ref`, `large_futures`
+- **错误吞没**: `let_underscore_must_use`, `unused_result_ok`, `map_err_ignore`
+- **Unsafe卫生**: `undocumented_unsafe_blocks`, `allow_attributes`, `allow_attributes_without_reason`
+
+### 错误上下文链（Error Context Chains）
+- 在每个 `?` 运算符处添加 `.context("doing X")`
+- 生产环境错误链是最有价值的调试工具
+- 规则：禁止裸 `?`，必须有上下文
+
+### Tauri 2 安全模式
+- **Capability最小化**: 只授予前端实际使用的权限
+- **后端插件 ≠ 前端能力**: Rust后端直接使用插件API时，不需要前端JS能力
+- **定期审计**: 每季度检查capability与实际使用的匹配度
+
+### 架构公理（Architecture Axioms）
+1. **单层信封**: API响应禁止嵌套 `{ok, data: {ok, data}}`
+2. **事件命名统一**: 全部snake_case，禁止kebab/colon/URI格式
+3. **路径集中管理**: 所有路径通过config模块获取，禁止硬编码
+4. **命令瘦包装**: Tauri命令只做参数转换+调用domain服务
+5. **错误代码集中**: 所有错误代码在error_codes.rs定义，禁止裸字符串
+6. **DomainError智能路由**: From impl按code映射到正确AppError变体
+
+### 跨域审计方法论
+1. **三路并行审计**: 结构/API/事件同时审计
+2. **先审计后修复**: 不审计就修是盲目行动
+3. **记录经验**: 每次修复后记录pattern到经验库
