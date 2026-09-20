@@ -88,7 +88,6 @@ impl BrowserHost {
         let close_handle = app.clone();
         // 窗口关闭由 Tauri 自动管理, 不需要轮询
         // 浏览器窗口关闭时, 前端通过 emit("browser:closed") 通知状态变更
-        let _window_clone = window.clone();
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if let Err(e) = close_handle.emit("browser:closed", ()) {

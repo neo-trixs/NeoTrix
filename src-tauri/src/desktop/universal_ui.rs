@@ -31,6 +31,7 @@ pub struct UniversalProvider {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ProviderCategory {
     Local,
     Cloud,
@@ -71,12 +72,7 @@ pub struct ProviderHealth {
     pub circuit_state: CircuitState,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum CircuitState {
-    Closed,
-    Open,
-    HalfOpen,
-}
+pub use crate::service::circuit_breaker::CircuitState;
 
 // ========== 模型切换 UI ==========
 
@@ -111,6 +107,7 @@ pub struct AuditLogEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum AuditEventType {
     ModelSwitch,
     ModelDownload,
@@ -172,6 +169,7 @@ pub struct AutoresearchProgress {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ResearchPhase {
     Hypothesis,
     Experiment,
@@ -206,6 +204,7 @@ pub struct ExperimentRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ExperimentStatus {
     Pending,
     Running,
@@ -257,6 +256,7 @@ pub struct WorkflowError {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ErrorSeverity {
     Info,
     Warning,
@@ -282,6 +282,7 @@ pub struct AgentSession {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum AgentType {
     General,
     Coding,
@@ -307,6 +308,7 @@ impl std::fmt::Display for AgentType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum UIAgentStatus {
     Idle,
     Running,
@@ -506,8 +508,8 @@ impl UniversalModelManager {
 
     /// 扫描所有可用模型
     pub async fn scan_all_models(&mut self) -> Result<(), String> {
-        let _local_models = self.scan_local_gguf().await?;
-        self.all_models.extend(_local_models);
+        let local_models = self.scan_local_gguf().await?;
+        self.all_models.extend(local_models);
         Ok(())
     }
 
@@ -535,7 +537,7 @@ impl UniversalModelManager {
                     format: detect_display_format(&path),
                     context_length: None,
                     parameter_count: None,
-                    capabilities: ModelCapabilityFlags {
+                    capabilities: ModelCapabilities {
                         text: true,
                         vision: false,
                         audio: false,
@@ -554,19 +556,19 @@ impl UniversalModelManager {
     }
 }
 
-fn detect_display_format(path: &std::path::Path) -> ModelFormatDisplay {
+fn detect_display_format(path: &std::path::Path) -> ModelFormat {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     match ext.to_lowercase().as_str() {
-        "gguf" => ModelFormatDisplay::GGUF,
-        "onnx" => ModelFormatDisplay::ONNX,
-        "safetensors" => ModelFormatDisplay::Safetensors,
-        "ggj" => ModelFormatDisplay::GGJ,
+        "gguf" => ModelFormat::GGUF,
+        "onnx" => ModelFormat::ONNX,
+        "safetensors" => ModelFormat::Safetensors,
+        "ggj" => ModelFormat::GGJ,
         _ => {
             let name = path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
             if name.contains("safetensors") {
-                ModelFormatDisplay::Safetensors
+                ModelFormat::Safetensors
             } else {
-                ModelFormatDisplay::GGUF
+                ModelFormat::GGUF
             }
         }
     }

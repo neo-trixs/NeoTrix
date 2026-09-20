@@ -54,7 +54,7 @@ use tauri::{Emitter, Manager};
 
 /// Build a native app menu (macOS-style) so keyboard shortcuts like Cmd+C/V,
 /// Cmd+Q and standard roles behave like a first-class desktop app. Menu events
-/// that matter to NeoCodex (check updates, new session, settings) are forwarded
+/// that matter to NeoTrix (check updates, new session, settings) are forwarded
 /// to the frontend as window events; the rest use Tauri predefined roles.
 pub fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};

@@ -108,7 +108,7 @@ export async function subscribeStream(callbacks: {
 
   if (callbacks.onToken) {
     unlistenFns.push(
-      await listen<string>('neotrix-stream-token', (event) => {
+      await listen<string>('neotrix_stream_token', (event) => {
         callbacks.onToken!(event.payload)
       })
     )
@@ -116,7 +116,7 @@ export async function subscribeStream(callbacks: {
 
   if (callbacks.onDone) {
     unlistenFns.push(
-      await listen('neotrix-stream-done', () => {
+      await listen('neotrix_stream_done', () => {
         callbacks.onDone!()
       })
     )
@@ -124,7 +124,7 @@ export async function subscribeStream(callbacks: {
 
   if (callbacks.onError) {
     unlistenFns.push(
-      await listen<{ message?: string }>('neotrix-stream-error', (event) => {
+      await listen<{ message?: string }>('neotrix_stream_error', (event) => {
         callbacks.onError!(event.payload)
       })
     )
