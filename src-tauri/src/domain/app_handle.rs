@@ -4,7 +4,9 @@ use tauri::AppHandle;
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 pub fn set_app_handle(app: AppHandle) {
-    let _ = APP_HANDLE.set(app);
+    if let Err(e) = APP_HANDLE.set(app) {
+        tracing::warn!("app_handle: already set: {e}");
+    }
 }
 
 pub fn get_app_handle() -> Option<&'static AppHandle> {

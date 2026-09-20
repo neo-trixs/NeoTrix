@@ -1,6 +1,24 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
+use thiserror::Error;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
+
+/// Errors from browser operations.
+#[derive(Debug, Clone, Error)]
+pub enum BrowserError {
+    #[error("invalid url: {0}")]
+    InvalidUrl(String),
+    #[error("browser window not open")]
+    WindowNotFound,
+    #[error("failed to create browser window: {0}")]
+    WindowCreation(String),
+    #[error("js eval error: {0}")]
+    JsEval(String),
+    #[error("navigation error: {0}")]
+    Navigation(String),
+    #[error("network error: {0}")]
+    Network(String),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserState {
@@ -43,8 +61,8 @@ impl PageContent {
 pub struct BrowserHost;
 
 impl BrowserHost {
-    pub fn open_or_navigate(app: &AppHandle, url: &str) -> Result<BrowserState, String> {
-        let parsed = url.parse().map_err(|e| format!("invalid url: {}", e))?;
+    pub fn open_or_navigate(app: &AppHandle, url: &str) -> Result<BrowserState, BrowserError> {
+        let parsed = url.parse().map_err(|e| BrowserError::InvalidUrl(format!("{e}")))?;
         let window_id = "neotrix-browser";
 
         if let Some(window) = app.get_webview_window(window_id) {
@@ -73,7 +91,9 @@ impl BrowserHost {
         let _window_clone = window.clone();
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                let _ = close_handle.emit("browser:closed", ());
+                if let Err(e) = close_handle.emit("browser:closed", ()) {
+                    tracing::warn!("Failed to emit browser:closed: {e}");
+                }
             }
         });
 
@@ -84,50 +104,50 @@ impl BrowserHost {
         })
     }
 
-    pub fn execute_js(app: &AppHandle, script: &str) -> Result<(), String> {
+    pub fn execute_js(app: &AppHandle, script: &str) -> Result<(), BrowserError> {
         let window = app
             .get_webview_window("neotrix-browser")
-            .ok_or_else(|| "browser window not open".to_string())?;
+            .ok_or(BrowserError::WindowNotFound)?;
         window
             .eval(script)
-            .map_err(|e| format!("js eval error: {}", e))
+            .map_err(|e| BrowserError::JsEval(format!("{e}")))
     }
 
-    pub fn go_back(app: &AppHandle) -> Result<(), String> {
+    pub fn go_back(app: &AppHandle) -> Result<(), BrowserError> {
         Self::execute_js(app, "window.history.back()")
     }
 
-    pub fn go_forward(app: &AppHandle) -> Result<(), String> {
+    pub fn go_forward(app: &AppHandle) -> Result<(), BrowserError> {
         Self::execute_js(app, "window.history.forward()")
     }
 
-    pub fn reload(app: &AppHandle) -> Result<(), String> {
+    pub fn reload(app: &AppHandle) -> Result<(), BrowserError> {
         Self::execute_js(app, "location.reload()")
     }
 
-    pub fn close(app: &AppHandle) -> Result<(), String> {
+    pub fn close(app: &AppHandle) -> Result<(), BrowserError> {
         if let Some(window) = app.get_webview_window("neotrix-browser") {
-            window.close().map_err(|e| format!("close error: {}", e))
+            window.close().map_err(|e| BrowserError::Navigation(format!("{e}")))
         } else {
-            Err("browser window not open".to_string())
+            Err(BrowserError::WindowNotFound)
         }
     }
 
     /// 服务端获取页面内容 (通过 HTTP, 绕过 eval 无法返回值的问题)
-    pub fn fetch_page_content(url: &str) -> Result<PageContent, String> {
+    pub fn fetch_page_content(url: &str) -> Result<PageContent, BrowserError> {
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(15))
             .user_agent("NeoTrix/1.0")
             .redirect(reqwest::redirect::Policy::limited(10))
             .build()
-            .map_err(|e| format!("http client error: {}", e))?;
+            .map_err(|e| BrowserError::Network(format!("http client error: {e}")))?;
 
         let resp = client
             .get(url)
             .send()
-            .map_err(|e| format!("fetch error: {}", e))?;
+            .map_err(|e| BrowserError::Network(format!("fetch error: {e}")))?;
         let final_url = resp.url().to_string();
-        let html = resp.text().map_err(|e| format!("read error: {}", e))?;
+        let html = resp.text().map_err(|e| BrowserError::Network(format!("read error: {e}")))?;
 
         let title = extract_title(&html);
         let text = strip_html(&html);

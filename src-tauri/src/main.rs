@@ -6,22 +6,34 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::dbg_macro,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc
+)]
 
 use clap::Parser;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 
-use neotrix_tauri::agent_identity::MemoryStore;
-use neotrix_tauri::artifacts::ArtifactStore;
-use neotrix_tauri::channels::ChannelManager;
-use neotrix_tauri::coordinator::AgentCoordinator;
-use neotrix_tauri::debouncer::Debouncer;
-use neotrix_tauri::engine::EngineRegistry;
 use neotrix_tauri::recovery;
-use neotrix_tauri::skills::SkillRegistry;
-use neotrix_tauri::triage::TriageGate;
 use neotrix_tauri::commands::file_drop::{handle_file_drop, setup_file_drop_listener};
+use neotrix_tauri::commands::model_commands::*;
+use neotrix_tauri::commands::provider_commands::*;
 use neotrix_tauri::stub::{UnifiedApi as _, UnifiedApiImpl};
 use neotrix_tauri::commands::domain_cmd::{
     domain_action_count, domain_call, domain_has, domain_list, DomainState,
@@ -83,14 +95,18 @@ fn main() {
         None | Some(Commands::Desktop) => {
             // 创建域注册表并注册 12 个插件
             let mut registry = DomainRegistry::new();
+            let db_pool = Arc::new(
+                neotrix_tauri::db_pool::DbPool::new(&config.data_dir.join("neotrix.db"))
+                    .expect("failed to create DB pool"),
+            );
             registry
-                .register(Box::new(SessionPlugin::new()))
+                .register(Box::new(SessionPlugin::new(db_pool.clone())))
                 .expect("failed to register session");
             registry
                 .register(Box::new(AgentPlugin))
                 .expect("failed to register agent");
             registry
-                .register(Box::new(KbPlugin::new()))
+                .register(Box::new(KbPlugin::new(db_pool.clone())))
                 .expect("failed to register kb");
             registry
                 .register(Box::new(FilePlugin))
@@ -111,7 +127,7 @@ fn main() {
                 .register(Box::new(SecurityPlugin))
                 .expect("failed to register security");
             registry
-                .register(Box::new(MemoryPlugin::new()))
+                .register(Box::new(MemoryPlugin::new(db_pool.clone())))
                 .expect("failed to register memory");
             registry
                 .register(Box::new(ExtPlugin))
@@ -166,7 +182,7 @@ fn main() {
             let domain_state: DomainState = Arc::new(RwLock::new(registry));
 
             // 创建 chat plugin 并注册到 domain_state
-            let chat_plugin = ChatPlugin::new(domain_state.clone());
+            let chat_plugin = ChatPlugin::new(db_pool.clone(), domain_state.clone());
             {
                 let mut registry = domain_state.blocking_write();
                 registry
@@ -182,8 +198,6 @@ fn main() {
             let provider_manager: SharedProviderManager = Arc::new(RwLock::new(
                 neotrix_tauri::service::provider_manager::ProviderManager::new(),
             ));
-
-            let agent_identity_path = config.data_dir.join("agent-identity");
 
             let builder = tauri::Builder::default()
                 .plugin(tauri_plugin_shell::init())
@@ -243,19 +257,6 @@ fn main() {
                 .manage(model_state)
                 // Provider Manager 状态
                 .manage(provider_manager)
-                // ===== 新基础设施模块 =====
-                .manage(Arc::new(RwLock::new(EngineRegistry::new())))
-                .manage(Arc::new(RwLock::new(SkillRegistry::new())))
-                .manage(Arc::new(RwLock::new(AgentCoordinator::new())))
-                .manage(Arc::new(RwLock::new(ChannelManager::new())))
-                .manage(Arc::new(RwLock::new(ArtifactStore::new())))
-                .manage(Arc::new(TriageGate::new()))
-                .manage(Arc::new(Debouncer::<String>::new(
-                    std::time::Duration::from_millis(300),
-                )))
-                .manage(Arc::new(MemoryStore::new(
-                    agent_identity_path,
-                )))
                 .invoke_handler(tauri::generate_handler![
                     // ===== 域插件统一入口 (3 个命令覆盖 12 域 × ~8 actions) =====
                     domain_call,
@@ -364,6 +365,10 @@ fn main() {
                     // 初始化开机自启管理器
                     let autostart_manager = neotrix_tauri::autostart::AutoStartManager::new(app.handle().clone());
                     app.manage(autostart_manager);
+
+                    // Setup native menu bar and system tray
+                    neotrix_tauri::setup_menu(app)?;
+                    neotrix_tauri::setup_tray(app)?;
 
                     // 设置文件拖拽监听
                     setup_file_drop_listener(app.handle());

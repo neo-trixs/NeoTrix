@@ -98,7 +98,9 @@ impl DomainRegistry {
 
     /// 发布事件
     pub fn emit(&self, event: DomainEvent) {
-        let _ = self.event_tx.send(event);
+        if let Err(e) = self.event_tx.send(event) {
+            tracing::warn!("registry: event send failed: {e}");
+        }
     }
 
     /// 订阅事件
@@ -109,7 +111,9 @@ impl DomainRegistry {
     /// 关闭所有插件
     pub async fn shutdown_all(&mut self) {
         for plugin in &mut self.plugins {
-            let _ = plugin.shutdown().await;
+            if let Err(e) = plugin.shutdown().await {
+                tracing::warn!("registry: plugin shutdown failed: {e}");
+            }
         }
     }
 

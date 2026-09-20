@@ -2,6 +2,7 @@
 //!
 //! 只暴露极少数高级命令，所有复杂逻辑委托给核心的 UnifiedApi
 
+use crate::ipc::{self, IpcResponse};
 use crate::stub::{
     RequestContext, ResponseMode, SessionInfo, UnifiedApi, UnifiedApiImpl, UnifiedRequest,
     UnifiedResponse,
@@ -15,17 +16,17 @@ use tokio::sync::RwLock;
 pub type UnifiedApiState = Arc<RwLock<UnifiedApiImpl>>;
 
 #[command]
-pub async fn unified_init(state: State<'_, UnifiedApiState>) -> Result<(), String> {
+pub async fn unified_init(state: State<'_, UnifiedApiState>) -> IpcResponse<()> {
     let mut api = state.write().await;
     *api = UnifiedApiImpl::new();
-    Ok(())
+    ipc::ok(())
 }
 
 #[command]
 pub async fn unified_chat(
     state: State<'_, UnifiedApiState>,
     request: UnifiedChatRequest,
-) -> Result<UnifiedChatResponse, String> {
+) -> IpcResponse<UnifiedChatResponse> {
     let api = state.read().await;
 
     let unified_request = UnifiedRequest {
@@ -55,19 +56,17 @@ pub async fn unified_chat(
         stream: request.stream.unwrap_or(false),
     };
 
-    let response = api
-        .handle(unified_request)
-        .await
-        .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))?;
-
-    Ok(UnifiedChatResponse::from_response(response))
+    match api.handle(unified_request).await {
+        Ok(response) => ipc::ok(UnifiedChatResponse::from_response(response)),
+        Err(e) => ipc::err("UNIFIED_CHAT_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+    }
 }
 
 #[command]
 pub async fn unified_chat_stream(
     state: State<'_, UnifiedApiState>,
     request: UnifiedChatRequest,
-) -> Result<String, String> {
+) -> IpcResponse<String> {
     let unified_request = UnifiedRequest {
         session_id: request.session_id,
         input: request.input,
@@ -102,51 +101,53 @@ pub async fn unified_chat_stream(
         let _ = api.handle_stream(unified_request).await;
     });
 
-    Ok(stream_id)
+    ipc::ok(stream_id)
 }
 
 #[command]
 pub async fn unified_system_state(
     state: State<'_, UnifiedApiState>,
-) -> Result<UnifiedChatResponse, String> {
+) -> IpcResponse<UnifiedChatResponse> {
     let api = state.read().await;
-    let response = api
-        .get_system_state()
-        .await
-        .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))?;
-    Ok(UnifiedChatResponse::from_response(response))
+    match api.get_system_state().await {
+        Ok(response) => ipc::ok(UnifiedChatResponse::from_response(response)),
+        Err(e) => ipc::err("UNIFIED_STATE_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+    }
 }
 
 #[command]
 pub async fn unified_create_session(
     state: State<'_, UnifiedApiState>,
     project_path: Option<String>,
-) -> Result<SessionInfo, String> {
+) -> IpcResponse<SessionInfo> {
     let api = state.read().await;
-    api.create_session(project_path)
-        .await
-        .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))
+    match api.create_session(project_path).await {
+        Ok(info) => ipc::ok(info),
+        Err(e) => ipc::err("SESSION_CREATE_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+    }
 }
 
 #[command]
 pub async fn unified_list_sessions(
     state: State<'_, UnifiedApiState>,
-) -> Result<Vec<SessionInfo>, String> {
+) -> IpcResponse<Vec<SessionInfo>> {
     let api = state.read().await;
-    api.list_sessions()
-        .await
-        .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))
+    match api.list_sessions().await {
+        Ok(sessions) => ipc::ok(sessions),
+        Err(e) => ipc::err("SESSION_LIST_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+    }
 }
 
 #[command]
 pub async fn unified_delete_session(
     state: State<'_, UnifiedApiState>,
     session_id: String,
-) -> Result<(), String> {
+) -> IpcResponse<()> {
     let api = state.read().await;
-    api.delete_session(&session_id)
-        .await
-        .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))
+    match api.delete_session(&session_id).await {
+        Ok(()) => ipc::ok(()),
+        Err(e) => ipc::err("SESSION_DELETE_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+    }
 }
 
 // ========== CLI stubs ==========
@@ -155,9 +156,9 @@ pub async fn unified_delete_session(
 pub async fn unified_exec_cli(
     command: String,
     args: Option<Vec<String>>,
-) -> Result<serde_json::Value, String> {
+) -> IpcResponse<serde_json::Value> {
     let _ = args;
-    Ok(serde_json::json!({
+    ipc::ok(serde_json::json!({
         "success": true,
         "message": format!("CLI stub: {} (未接入真实后端)", command),
         "exit_code": 0,
@@ -166,8 +167,8 @@ pub async fn unified_exec_cli(
 }
 
 #[command]
-pub async fn unified_cli_list() -> Result<Vec<serde_json::Value>, String> {
-    Ok(vec![
+pub async fn unified_cli_list() -> IpcResponse<Vec<serde_json::Value>> {
+    ipc::ok(vec![
         serde_json::json!({"name": "/help", "description": "显示帮助", "aliases": ["h"]}),
         serde_json::json!({"name": "/config", "description": "配置管理", "aliases": ["c"]}),
         serde_json::json!({"name": "/stats", "description": "系统统计", "aliases": ["s"]}),
@@ -223,16 +224,6 @@ pub struct ConsciousnessStateDto {
     pub gwt_resonance: f64,
     pub emotion: String,
     pub attention_focus: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionInfoDto {
-    pub id: String,
-    pub title: String,
-    pub created_at: String,
-    pub updated_at: String,
-    pub message_count: usize,
-    pub project_path: Option<String>,
 }
 
 impl UnifiedChatResponse {

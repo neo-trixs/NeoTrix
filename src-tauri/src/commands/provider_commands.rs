@@ -5,6 +5,7 @@
 //! 基于 Azure APIM Unified Model API 模式。
 //! 提供 Provider 管理、failover、cost tracking 的完整 CRUD 操作。
 
+use crate::ipc::{self, IpcResponse};
 use crate::service::provider_manager::{
     FailoverChain, ProviderConfig, SharedProviderManager,
 };
@@ -64,31 +65,33 @@ pub struct ProviderStatusDto {
 #[command]
 pub async fn provider_list_providers(
     state: State<'_, SharedProviderManager>,
-) -> Result<Vec<ProviderStatusDto>, String> {
+) -> IpcResponse<Vec<ProviderStatusDto>> {
     let manager = state.read().await;
     let cb_snapshot = manager.circuit_breaker_snapshot();
     let cost_summaries = manager.cost_summaries();
 
-    Ok(manager
-        .list_providers()
-        .iter()
-        .map(|p| {
-            let cb = cb_snapshot.iter().find(|c| c.provider_id == p.id);
-            let cost = cost_summaries.iter().find(|c| c.provider_id == p.id);
+    ipc::ok(
+        manager
+            .list_providers()
+            .iter()
+            .map(|p| {
+                let cb = cb_snapshot.iter().find(|c| c.provider_id == p.id);
+                let cost = cost_summaries.iter().find(|c| c.provider_id == p.id);
 
-            ProviderStatusDto {
-                id: p.id.clone(),
-                name: p.name.clone(),
-                provider_type: p.provider_type.clone(),
-                available: p.enabled,
-                models: p.models.clone(),
-                last_used: None,
-                error: None,
-                circuit_state: cb.map(|c| format!("{:?}", c.state).to_lowercase()),
-                total_cost: cost.map(|c| c.total_cost),
-            }
-        })
-        .collect())
+                ProviderStatusDto {
+                    id: p.id.clone(),
+                    name: p.name.clone(),
+                    provider_type: p.provider_type.clone(),
+                    available: p.enabled,
+                    models: p.models.clone(),
+                    last_used: None,
+                    error: None,
+                    circuit_state: cb.map(|c| format!("{:?}", c.state).to_lowercase()),
+                    total_cost: cost.map(|c| c.total_cost),
+                }
+            })
+            .collect(),
+    )
 }
 
 /// 列出指定 Provider 的模型
@@ -96,7 +99,7 @@ pub async fn provider_list_providers(
 pub async fn provider_list_models(
     state: State<'_, SharedProviderManager>,
     provider_id: Option<String>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> IpcResponse<Vec<serde_json::Value>> {
     let manager = state.read().await;
     let mut models = Vec::new();
 
@@ -113,7 +116,7 @@ pub async fn provider_list_models(
         }
     }
 
-    Ok(models)
+    ipc::ok(models)
 }
 
 /// 调用 Provider 进行补全（带 failover）
@@ -125,14 +128,14 @@ pub async fn provider_complete(
     prompt: String,
     max_tokens: Option<u32>,
     task_type: Option<String>,
-) -> Result<serde_json::Value, String> {
+) -> IpcResponse<serde_json::Value> {
     let mut manager = state.write().await;
 
     // 获取 failover 链
     let chain = manager.get_failover_chain(task_type.as_deref().unwrap_or("default"));
 
     if chain.is_empty() {
-        return Err("No available providers".into());
+        return ipc::err("PROVIDER_NO_AVAILABLE", "No available providers");
     }
 
     // 尝试每个 provider 直到成功
@@ -146,13 +149,15 @@ pub async fn provider_complete(
         manager.record_success(&provider.id);
 
         // 发射成功事件
-        let _ = app.emit("provider-request-success", serde_json::json!({
+        if let Err(e) = app.emit("provider-request-success", serde_json::json!({
             "provider_id": provider.id,
             "model": model_name,
             "timestamp": chrono::Utc::now().to_rfc3339(),
-        }));
+        })) {
+            tracing::trace!("emit provider-request-success: {e}");
+        }
 
-        return Ok(serde_json::json!({
+        return ipc::ok(serde_json::json!({
             "id": uuid::Uuid::new_v4().to_string(),
             "model": model_name,
             "provider": provider.name,
@@ -163,7 +168,10 @@ pub async fn provider_complete(
         }));
     }
 
-    Err(format!("All providers failed. Last error: {}", last_error))
+    ipc::err(
+        "PROVIDER_ALL_FAILED",
+        &format!("All providers failed. Last error: {}", last_error),
+    )
 }
 
 /// Provider 健康检查
@@ -171,13 +179,19 @@ pub async fn provider_complete(
 pub async fn provider_health_check(
     state: State<'_, SharedProviderManager>,
     provider_id: String,
-) -> Result<serde_json::Value, String> {
+) -> IpcResponse<serde_json::Value> {
     let manager = state.read().await;
-    let provider = manager
-        .get_provider(&provider_id)
-        .ok_or_else(|| format!("Provider '{}' not found", provider_id))?;
+    let provider = match manager.get_provider(&provider_id) {
+        Some(p) => p,
+        None => {
+            return ipc::err(
+                "PROVIDER_NOT_FOUND",
+                &format!("Provider '{}' not found", provider_id),
+            )
+        }
+    };
 
-    Ok(serde_json::json!({
+    ipc::ok(serde_json::json!({
         "provider_id": provider.id,
         "name": provider.name,
         "available": provider.enabled,
@@ -192,24 +206,29 @@ pub async fn provider_add(
     state: State<'_, SharedProviderManager>,
     app: AppHandle,
     config: ProviderConfigDto,
-) -> Result<ProviderStatusDto, String> {
+) -> IpcResponse<ProviderStatusDto> {
     let mut manager = state.write().await;
 
     if manager.get_provider(&config.id).is_some() {
-        return Err(format!("Provider '{}' already exists", config.id));
+        return ipc::err(
+            "PROVIDER_DUPLICATE",
+            &format!("Provider '{}' already exists", config.id),
+        );
     }
 
     let provider_config = config.clone().into();
     manager.register(provider_config);
 
     // 发射事件
-    let _ = app.emit("provider-added", serde_json::json!({
+    if let Err(e) = app.emit("provider-added", serde_json::json!({
         "provider_id": config.id,
         "name": config.name,
         "timestamp": chrono::Utc::now().to_rfc3339(),
-    }));
+    })) {
+        tracing::trace!("emit provider-added: {e}");
+    }
 
-    Ok(ProviderStatusDto {
+    ipc::ok(ProviderStatusDto {
         id: config.id,
         name: config.name,
         provider_type: config.provider_type,
@@ -228,20 +247,25 @@ pub async fn provider_remove(
     state: State<'_, SharedProviderManager>,
     app: AppHandle,
     provider_id: String,
-) -> Result<(), String> {
+) -> IpcResponse<()> {
     let mut manager = state.write().await;
 
     if !manager.unregister(&provider_id) {
-        return Err(format!("Provider '{}' not found", provider_id));
+        return ipc::err(
+            "PROVIDER_NOT_FOUND",
+            &format!("Provider '{}' not found", provider_id),
+        );
     }
 
     // 发射事件
-    let _ = app.emit("provider-removed", serde_json::json!({
+    if let Err(e) = app.emit("provider-removed", serde_json::json!({
         "provider_id": provider_id,
         "timestamp": chrono::Utc::now().to_rfc3339(),
-    }));
+    })) {
+        tracing::trace!("emit provider-removed: {e}");
+    }
 
-    Ok(())
+    ipc::ok(())
 }
 
 /// 获取 Provider 配置
@@ -249,13 +273,19 @@ pub async fn provider_remove(
 pub async fn provider_get_config(
     state: State<'_, SharedProviderManager>,
     provider_id: String,
-) -> Result<ProviderConfigDto, String> {
+) -> IpcResponse<ProviderConfigDto> {
     let manager = state.read().await;
-    let provider = manager
-        .get_provider(&provider_id)
-        .ok_or_else(|| format!("Provider '{}' not found", provider_id))?;
+    let provider = match manager.get_provider(&provider_id) {
+        Some(p) => p,
+        None => {
+            return ipc::err(
+                "PROVIDER_NOT_FOUND",
+                &format!("Provider '{}' not found", provider_id),
+            )
+        }
+    };
 
-    Ok(ProviderConfigDto {
+    ipc::ok(ProviderConfigDto {
         id: provider.id.clone(),
         name: provider.name.clone(),
         provider_type: provider.provider_type.clone(),
@@ -274,17 +304,20 @@ pub async fn provider_update_config(
     state: State<'_, SharedProviderManager>,
     provider_id: String,
     config: ProviderConfigDto,
-) -> Result<ProviderStatusDto, String> {
+) -> IpcResponse<ProviderStatusDto> {
     let mut manager = state.write().await;
 
     if manager.get_provider(&provider_id).is_none() {
-        return Err(format!("Provider '{}' not found", provider_id));
+        return ipc::err(
+            "PROVIDER_NOT_FOUND",
+            &format!("Provider '{}' not found", provider_id),
+        );
     }
 
     manager.unregister(&provider_id);
     manager.register(config.clone().into());
 
-    Ok(ProviderStatusDto {
+    ipc::ok(ProviderStatusDto {
         id: config.id,
         name: config.name,
         provider_type: config.provider_type,
@@ -301,44 +334,48 @@ pub async fn provider_update_config(
 #[command]
 pub async fn provider_circuit_breaker_status(
     state: State<'_, SharedProviderManager>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> IpcResponse<Vec<serde_json::Value>> {
     let manager = state.read().await;
     let snapshot = manager.circuit_breaker_snapshot();
 
-    Ok(snapshot
-        .iter()
-        .map(|cb| {
-            serde_json::json!({
-                "provider_id": cb.provider_id,
-                "state": format!("{:?}", cb.state).to_lowercase(),
-                "consecutive_failures": cb.consecutive_failures,
-                "last_failure": cb.last_failure,
-                "cooldown_until": cb.cooldown_until,
+    ipc::ok(
+        snapshot
+            .iter()
+            .map(|cb| {
+                serde_json::json!({
+                    "provider_id": cb.provider_id,
+                    "state": format!("{:?}", cb.state).to_lowercase(),
+                    "consecutive_failures": cb.consecutive_failures,
+                    "last_failure": cb.last_failure,
+                    "cooldown_until": cb.cooldown_until,
+                })
             })
-        })
-        .collect())
+            .collect(),
+    )
 }
 
 /// 获取成本摘要
 #[command]
 pub async fn provider_cost_summary(
     state: State<'_, SharedProviderManager>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> IpcResponse<Vec<serde_json::Value>> {
     let manager = state.read().await;
     let summaries = manager.cost_summaries();
 
-    Ok(summaries
-        .iter()
-        .map(|s| {
-            serde_json::json!({
-                "provider_id": s.provider_id,
-                "total_requests": s.total_requests,
-                "total_input_tokens": s.total_input_tokens,
-                "total_output_tokens": s.total_output_tokens,
-                "total_cost": s.total_cost,
+    ipc::ok(
+        summaries
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "provider_id": s.provider_id,
+                    "total_requests": s.total_requests,
+                    "total_input_tokens": s.total_input_tokens,
+                    "total_output_tokens": s.total_output_tokens,
+                    "total_cost": s.total_cost,
+                })
             })
-        })
-        .collect())
+            .collect(),
+    )
 }
 
 /// 注册 Failover Chain
@@ -348,14 +385,14 @@ pub async fn provider_register_failover_chain(
     name: String,
     providers: Vec<String>,
     task_type: String,
-) -> Result<(), String> {
+) -> IpcResponse<()> {
     let mut manager = state.write().await;
     manager.register_failover_chain(FailoverChain {
         name,
         providers,
         task_type,
     });
-    Ok(())
+    ipc::ok(())
 }
 
 /// 记录请求成功
@@ -363,10 +400,10 @@ pub async fn provider_register_failover_chain(
 pub async fn provider_record_success(
     state: State<'_, SharedProviderManager>,
     provider_id: String,
-) -> Result<(), String> {
+) -> IpcResponse<()> {
     let mut manager = state.write().await;
     manager.record_success(&provider_id);
-    Ok(())
+    ipc::ok(())
 }
 
 /// 记录请求失败
@@ -374,10 +411,10 @@ pub async fn provider_record_success(
 pub async fn provider_record_failure(
     state: State<'_, SharedProviderManager>,
     provider_id: String,
-) -> Result<(), String> {
+) -> IpcResponse<()> {
     let mut manager = state.write().await;
     manager.record_failure(&provider_id);
-    Ok(())
+    ipc::ok(())
 }
 
 // ========== 测试 ==========

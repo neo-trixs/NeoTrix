@@ -1,33 +1,54 @@
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::dbg_macro,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc
+)]
 
-pub mod agent_identity;
-pub mod artifacts;
-pub mod atomic_io;
+pub mod app_error;
+pub(crate) mod agent_identity;
+pub(crate) mod artifacts;
+pub(crate) mod atomic_io;
 pub mod autostart;
-pub mod bot;
+pub(crate) mod bot;
 pub mod browser_host;
-pub mod channels;
+pub(crate) mod channels;
 pub mod commands;
 pub mod config;
-pub mod coordinator;
+pub(crate) mod coordinator;
 pub mod db_pool;
-pub mod debouncer;
+pub(crate) mod debouncer;
 pub mod desktop;
 pub mod domain;
-pub mod engine;
+pub(crate) mod engine;
 pub mod health;
 pub mod ipc;
 pub mod logger;
-pub mod mcp;
+pub(crate) mod mcp;
 pub mod market;
 pub mod notifications;
 pub mod recovery;
 pub mod service;
-pub mod skills;
+pub(crate) mod skills;
 pub mod stub;
-pub mod triage;
-pub mod vault;
+pub(crate) mod triage;
+pub mod util;
+pub(crate) mod validated;
+pub(crate) mod vault;
 
 use tauri::{Emitter, Manager};
 
@@ -119,16 +140,24 @@ pub fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     app.on_menu_event(|app, event| match event.id().as_ref() {
         "check_updates" => {
-            let _ = app.emit("neotrix-check-updates", ());
+            if let Err(e) = app.emit("neotrix-check-updates", ()) {
+                tracing::trace!("emit check-updates: {e}");
+            }
         }
         "new_session" => {
-            let _ = app.emit("neotrix:new-session", ());
+            if let Err(e) = app.emit("neotrix:new-session", ()) {
+                tracing::trace!("emit new-session: {e}");
+            }
         }
         "open_settings" => {
-            let _ = app.emit("open-settings", ());
+            if let Err(e) = app.emit("open-settings", ()) {
+                tracing::trace!("emit open-settings: {e}");
+            }
         }
         "cmd_palette" => {
-            let _ = app.emit("neotrix-open-palette", ());
+            if let Err(e) = app.emit("neotrix-open-palette", ()) {
+                tracing::trace!("emit open-palette: {e}");
+            }
         }
         _ => {}
     });
@@ -193,24 +222,36 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => {
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                    if let Err(e) = window.show() {
+                        tracing::trace!("tray show: {e}");
+                    }
+                    if let Err(e) = window.set_focus() {
+                        tracing::trace!("tray focus: {e}");
+                    }
                 }
             }
             "config" => {
-                let _ = app.emit("open-settings", ());
+                if let Err(e) = app.emit("open-settings", ()) {
+                    tracing::trace!("emit open-settings: {e}");
+                }
             }
             "sync_now" => {
-                let _ = app.emit("sync-trigger", ());
+                if let Err(e) = app.emit("sync-trigger", ()) {
+                    tracing::trace!("emit sync-trigger: {e}");
+                }
             }
             #[cfg(feature = "stealth-net")]
             mode_id @ ("proxy_geo" | "proxy_stealth" | "proxy_tor" | "proxy_off") => {
                 let mode = mode_id.strip_prefix("proxy_").unwrap_or("geo");
-                let _ = app.emit("proxy-mode-change", mode);
+                if let Err(e) = app.emit("proxy-mode-change", mode) {
+                    tracing::trace!("emit proxy-mode-change: {e}");
+                }
             }
             #[cfg(feature = "stealth-net")]
             "proxy_status" => {
-                let _ = app.emit("open-proxy-status", ());
+                if let Err(e) = app.emit("open-proxy-status", ()) {
+                    tracing::trace!("emit open-proxy-status: {e}");
+                }
             }
             "quit" => {
                 app.exit(0);

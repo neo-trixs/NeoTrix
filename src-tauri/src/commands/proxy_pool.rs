@@ -2,7 +2,9 @@
 //!
 //! 提供代理 IP 池的增删查状态查询，前端通过 domain_call 或直接调用。
 
+use anyhow::{Context, Result as AnyhowResult};
 use crate::atomic_io;
+use crate::ipc::{self, IpcResponse};
 use serde::{Deserialize, Serialize};
 
 /// 代理池条目
@@ -41,7 +43,7 @@ pub struct ProxyPoolSnapshot {
 }
 
 /// 从 ~/.neotrix/ 读取订阅文件
-fn load_subscriptions() -> Result<Vec<String>, String> {
+fn load_subscriptions() -> AnyhowResult<Vec<String>> {
     let path = dirs::home_dir()
         .unwrap_or_default()
         .join(".neotrix")
@@ -51,27 +53,27 @@ fn load_subscriptions() -> Result<Vec<String>, String> {
         return Ok(vec![]);
     }
 
-    let content = std::fs::read_to_string(&path).map_err(|e| format!("Read subscriptions: {e}"))?;
+    let content = std::fs::read_to_string(&path).context("Read subscriptions")?;
 
-    serde_json::from_str(&content).map_err(|e| format!("Parse subscriptions: {e}"))
+    serde_json::from_str(&content).context("Parse subscriptions")
 }
 
 /// 保存订阅文件
-fn save_subscriptions(subs: &[String]) -> Result<(), String> {
+fn save_subscriptions(subs: &[String]) -> AnyhowResult<()> {
     let path = dirs::home_dir()
         .unwrap_or_default()
         .join(".neotrix")
         .join("subscriptions.json");
 
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(parent).context("Create dir")?;
     }
 
-    atomic_io::write_json_atomic(&path, subs).map_err(|e| format!("Write subscriptions: {e}"))
+    atomic_io::write_json_atomic(&path, subs).context("Write subscriptions")
 }
 
 /// 读取代理池配置
-fn load_pool_config() -> Result<serde_json::Value, String> {
+fn load_pool_config() -> AnyhowResult<serde_json::Value> {
     let path = dirs::home_dir()
         .unwrap_or_default()
         .join(".neotrix")
@@ -86,7 +88,7 @@ fn load_pool_config() -> Result<serde_json::Value, String> {
         }));
     }
 
-    let content = std::fs::read_to_string(&path).map_err(|e| format!("Read config: {e}"))?;
+    let content = std::fs::read_to_string(&path).context("Read config")?;
 
     // TOML 转 JSON (简单处理)
     Ok(serde_json::json!({
@@ -95,7 +97,7 @@ fn load_pool_config() -> Result<serde_json::Value, String> {
 }
 
 /// 保存代理池策略配置
-fn save_strategy(strategy: &str) -> Result<(), String> {
+fn save_strategy(strategy: &str) -> AnyhowResult<()> {
     let config_path = dirs::home_dir()
         .unwrap_or_default()
         .join(".neotrix")
@@ -129,10 +131,10 @@ fn save_strategy(strategy: &str) -> Result<(), String> {
     }
 
     if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(parent).context("Create dir")?;
     }
 
-    atomic_io::write_atomic(&config_path, config_str.as_bytes()).map_err(|e| format!("Write config: {e}"))
+    atomic_io::write_atomic(&config_path, config_str.as_bytes()).context("Write config")
 }
 
 // ═══════════════════════════════════════════════
@@ -141,8 +143,11 @@ fn save_strategy(strategy: &str) -> Result<(), String> {
 
 /// 获取代理池状态
 #[tauri::command]
-pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
-    let subs = load_subscriptions()?;
+pub async fn proxy_pool_status() -> IpcResponse<ProxyPoolStatus> {
+    let subs = match load_subscriptions() {
+        Ok(s) => s,
+        Err(e) => return ipc::err("PROXY_LOAD_FAILED", format!("{e}")),
+    };
 
     // 代理池节点信息从缓存文件读取
     let cache_path = dirs::home_dir()
@@ -151,8 +156,10 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
         .join("proxy_pool_cache.json");
 
     let nodes: Vec<ProxyPoolEntry> = if cache_path.exists() {
-        let content =
-            std::fs::read_to_string(&cache_path).map_err(|e| format!("Read cache: {e}"))?;
+        let content = match std::fs::read_to_string(&cache_path) {
+            Ok(c) => c,
+            Err(e) => return ipc::err("PROXY_READ_FAILED", &format!("Read cache: {e}")),
+        };
         serde_json::from_str(&content).unwrap_or_default()
     } else {
         // Cache 不存在，从 subscriptions.json 中提取直连代理节点
@@ -160,9 +167,13 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
         if !extracted.is_empty() {
             // 写入缓存供下次使用
             if let Some(parent) = cache_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    tracing::warn!("proxy_pool: create cache dir failed: {e}");
+                }
             }
-            let _ = atomic_io::write_json_atomic(&cache_path, &extracted);
+            if let Err(e) = atomic_io::write_json_atomic(&cache_path, &extracted) {
+                tracing::warn!("proxy_pool: write cache failed: {e}");
+            }
         }
         extracted
     };
@@ -170,7 +181,10 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
     let healthy = nodes.iter().filter(|n| n.fail_count < 3).count();
     let unhealthy = nodes.len() - healthy;
 
-    let config = load_pool_config()?;
+    let config = match load_pool_config() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("PROXY_LOAD_FAILED", format!("{e}")),
+    };
     let strategy = config
         .get("pool")
         .and_then(|p| p.get("selection_strategy"))
@@ -178,7 +192,7 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
         .unwrap_or("adaptive")
         .to_string();
 
-    Ok(ProxyPoolStatus {
+    ipc::ok(ProxyPoolStatus {
         total: nodes.len(),
         healthy,
         unhealthy,
@@ -234,8 +248,12 @@ fn infer_geo_from_ip(ip: &str) -> Option<String> {
 
 /// 获取代理池快照
 #[tauri::command]
-pub async fn proxy_pool_snapshot() -> Result<ProxyPoolSnapshot, String> {
-    let status = proxy_pool_status().await?;
+pub async fn proxy_pool_snapshot() -> IpcResponse<ProxyPoolSnapshot> {
+    let status = match proxy_pool_status().await {
+        IpcResponse { ok: true, data: Some(d), .. } => d,
+        IpcResponse { error: Some(e), .. } => return IpcResponse { ok: false, error: Some(e), data: None },
+        _ => return ipc::err("PROXY_SNAPSHOT_FAILED", "unexpected response"),
+    };
 
     let avg_latency = if status.nodes.is_empty() {
         0.0
@@ -264,7 +282,7 @@ pub async fn proxy_pool_snapshot() -> Result<ProxyPoolSnapshot, String> {
         *speed_tiers.entry(node.speed_tier.clone()).or_insert(0) += 1;
     }
 
-    Ok(ProxyPoolSnapshot {
+    ipc::ok(ProxyPoolSnapshot {
         total: status.total,
         healthy: status.healthy,
         avg_latency_ms: avg_latency,
@@ -276,15 +294,17 @@ pub async fn proxy_pool_snapshot() -> Result<ProxyPoolSnapshot, String> {
 
 /// 添加代理节点
 #[tauri::command]
-pub async fn proxy_pool_add(url: String, tag: String) -> Result<ProxyPoolEntry, String> {
+pub async fn proxy_pool_add(url: String, tag: String) -> IpcResponse<ProxyPoolEntry> {
     let cache_path = dirs::home_dir()
         .unwrap_or_default()
         .join(".neotrix")
         .join("proxy_pool_cache.json");
 
     let mut nodes: Vec<ProxyPoolEntry> = if cache_path.exists() {
-        let content =
-            std::fs::read_to_string(&cache_path).map_err(|e| format!("Read cache: {e}"))?;
+        let content = match std::fs::read_to_string(&cache_path) {
+            Ok(c) => c,
+            Err(e) => return ipc::err("PROXY_READ_FAILED", &format!("Read cache: {e}")),
+        };
         serde_json::from_str(&content).unwrap_or_default()
     } else {
         vec![]
@@ -292,7 +312,7 @@ pub async fn proxy_pool_add(url: String, tag: String) -> Result<ProxyPoolEntry, 
 
     // 检查重复
     if nodes.iter().any(|n| n.url == url) {
-        return Err("Proxy already exists".into());
+        return ipc::err("PROXY_DUPLICATE", "Proxy already exists");
     }
 
     let entry = ProxyPoolEntry {
@@ -309,71 +329,88 @@ pub async fn proxy_pool_add(url: String, tag: String) -> Result<ProxyPoolEntry, 
     nodes.push(entry.clone());
 
     // 保存到缓存
-    atomic_io::write_json_atomic(&cache_path, &nodes).map_err(|e| format!("Write cache: {e}"))?;
+    if let Err(e) = atomic_io::write_json_atomic(&cache_path, &nodes) {
+        return ipc::err("PROXY_WRITE_FAILED", &format!("Write cache: {e}"));
+    }
 
-    Ok(entry)
+    ipc::ok(entry)
 }
 
 /// 删除代理节点
 #[tauri::command]
-pub async fn proxy_pool_remove(url: String) -> Result<bool, String> {
+pub async fn proxy_pool_remove(url: String) -> IpcResponse<bool> {
     let cache_path = dirs::home_dir()
         .unwrap_or_default()
         .join(".neotrix")
         .join("proxy_pool_cache.json");
 
     if !cache_path.exists() {
-        return Ok(false);
+        return ipc::ok(false);
     }
 
-    let content = std::fs::read_to_string(&cache_path).map_err(|e| format!("Read cache: {e}"))?;
+    let content = match std::fs::read_to_string(&cache_path) {
+        Ok(c) => c,
+        Err(e) => return ipc::err("PROXY_READ_FAILED", &format!("Read cache: {e}")),
+    };
     let mut nodes: Vec<ProxyPoolEntry> = serde_json::from_str(&content).unwrap_or_default();
 
     let original_len = nodes.len();
     nodes.retain(|n| n.url != url);
 
     if nodes.len() == original_len {
-        return Ok(false);
+        return ipc::ok(false);
     }
 
-    atomic_io::write_json_atomic(&cache_path, &nodes).map_err(|e| format!("Write cache: {e}"))?;
+    if let Err(e) = atomic_io::write_json_atomic(&cache_path, &nodes) {
+        return ipc::err("PROXY_WRITE_FAILED", &format!("Write cache: {e}"));
+    }
 
-    Ok(true)
+    ipc::ok(true)
 }
 
 /// 添加订阅源
 #[tauri::command]
-pub async fn proxy_pool_add_subscription(url: String) -> Result<Vec<String>, String> {
-    let mut subs = load_subscriptions()?;
+pub async fn proxy_pool_add_subscription(url: String) -> IpcResponse<Vec<String>> {
+    let mut subs = match load_subscriptions() {
+        Ok(s) => s,
+        Err(e) => return ipc::err("PROXY_LOAD_FAILED", format!("{e}")),
+    };
 
     if subs.contains(&url) {
-        return Err("Subscription already exists".into());
+        return ipc::err("PROXY_DUPLICATE", "Subscription already exists");
     }
 
     subs.push(url);
-    save_subscriptions(&subs)?;
-    Ok(subs)
+    if let Err(e) = save_subscriptions(&subs) {
+        return ipc::err("PROXY_SAVE_FAILED", format!("{e}"));
+    }
+    ipc::ok(subs)
 }
 
 /// 删除订阅源
 #[tauri::command]
-pub async fn proxy_pool_remove_subscription(url: String) -> Result<Vec<String>, String> {
-    let mut subs = load_subscriptions()?;
+pub async fn proxy_pool_remove_subscription(url: String) -> IpcResponse<Vec<String>> {
+    let mut subs = match load_subscriptions() {
+        Ok(s) => s,
+        Err(e) => return ipc::err("PROXY_LOAD_FAILED", format!("{e}")),
+    };
     let original_len = subs.len();
 
     subs.retain(|s| s != &url);
 
     if subs.len() == original_len {
-        return Err("Subscription not found".into());
+        return ipc::err("PROXY_NOT_FOUND", "Subscription not found");
     }
 
-    save_subscriptions(&subs)?;
-    Ok(subs)
+    if let Err(e) = save_subscriptions(&subs) {
+        return ipc::err("PROXY_SAVE_FAILED", format!("{e}"));
+    }
+    ipc::ok(subs)
 }
 
 /// 设置选择策略
 #[tauri::command]
-pub async fn proxy_pool_set_strategy(strategy: String) -> Result<String, String> {
+pub async fn proxy_pool_set_strategy(strategy: String) -> IpcResponse<String> {
     let valid_strategies = [
         "fastest",
         "least_latency",
@@ -386,20 +423,22 @@ pub async fn proxy_pool_set_strategy(strategy: String) -> Result<String, String>
     ];
 
     if !valid_strategies.contains(&strategy.as_str()) {
-        return Err(format!(
-            "Invalid strategy. Valid: {}",
-            valid_strategies.join(", ")
-        ));
+        return ipc::err(
+            "PROXY_INVALID_STRATEGY",
+            &format!("Invalid strategy. Valid: {}", valid_strategies.join(", ")),
+        );
     }
 
-    save_strategy(&strategy)?;
-    Ok(strategy)
+    if let Err(e) = save_strategy(&strategy) {
+        return ipc::err("PROXY_SAVE_FAILED", format!("{e}"));
+    }
+    ipc::ok(strategy)
 }
 
 /// 获取可用策略列表
 #[tauri::command]
-pub async fn proxy_pool_list_strategies() -> Result<Vec<String>, String> {
-    Ok(vec![
+pub async fn proxy_pool_list_strategies() -> IpcResponse<Vec<String>> {
+    ipc::ok(vec![
         "fastest".into(),
         "least_latency".into(),
         "least_failure".into(),

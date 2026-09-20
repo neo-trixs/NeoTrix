@@ -81,6 +81,8 @@ impl fmt::Display for DomainError {
     }
 }
 
+impl std::error::Error for DomainError {}
+
 impl From<String> for DomainError {
     fn from(s: String) -> Self {
         Self {
@@ -94,6 +96,16 @@ impl From<String> for DomainError {
 impl From<&str> for DomainError {
     fn from(s: &str) -> Self {
         Self::from(s.to_string())
+    }
+}
+
+impl From<anyhow::Error> for DomainError {
+    fn from(e: anyhow::Error) -> Self {
+        Self {
+            code: "DOMAIN_ERROR".into(),
+            message: e.to_string(),
+            recoverable: true,
+        }
     }
 }
 

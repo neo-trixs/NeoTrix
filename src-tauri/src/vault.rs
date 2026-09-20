@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::sync::RwLock;
 
 /// Credential Vault - encrypted storage for API keys and secrets.
@@ -107,21 +108,12 @@ fn token_hash(token: &ScopedToken) -> String {
     format!("{:x}", hasher.finish())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum VaultError {
+    #[error("Token expired")]
     TokenExpired,
+    #[error("No credential found for provider: {0}")]
     NotFound(String),
+    #[error("Encryption error: {0}")]
     EncryptionError(String),
 }
-
-impl std::fmt::Display for VaultError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::TokenExpired => write!(f, "Token expired"),
-            Self::NotFound(p) => write!(f, "No credential found for provider: {p}"),
-            Self::EncryptionError(e) => write!(f, "Encryption error: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for VaultError {}

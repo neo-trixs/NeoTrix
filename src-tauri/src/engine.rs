@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use thiserror::Error;
 use tokio::sync::RwLock;
 
 /// Engine identifier — maps to an LLM provider.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EngineId {
     OpenAI,
     Anthropic,
@@ -46,6 +48,7 @@ impl std::str::FromStr for EngineId {
 
 /// Model tier — Cumora pattern: route to fast/standard/think per use case.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ModelTier {
     /// Low latency, low cost — for triage, classification, simple Q&A.
     Fast,
@@ -122,6 +125,7 @@ pub struct ChatMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Role {
     System,
     User,
@@ -159,6 +163,7 @@ pub struct ToolCall {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FinishReason {
     Stop,
     Length,
@@ -214,42 +219,29 @@ pub struct Persona {
 }
 
 /// Errors from engine operations.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Error)]
 pub enum EngineError {
+    #[error("auth failed: {0}")]
     AuthFailed(String),
+    #[error("rate limited, retry in {retry_after_secs}s")]
     RateLimited { retry_after_secs: u64 },
+    #[error("provider error: {0}")]
     ProviderError(String),
+    #[error("network error: {0}")]
     NetworkError(String),
+    #[error("context too long: {actual} > {max}")]
     ContextTooLong { max: u32, actual: u32 },
+    #[error("content filtered: {0}")]
     ContentFiltered(String),
+    #[error("timeout after {0}ms")]
     Timeout(u64),
+    #[error("engine error: {0}")]
     Unknown(String),
 }
 
-impl std::fmt::Display for EngineError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::AuthFailed(m) => write!(f, "auth failed: {m}"),
-            Self::RateLimited { retry_after_secs } => {
-                write!(f, "rate limited, retry in {retry_after_secs}s")
-            }
-            Self::ProviderError(m) => write!(f, "provider error: {m}"),
-            Self::NetworkError(m) => write!(f, "network error: {m}"),
-            Self::ContextTooLong { max, actual } => {
-                write!(f, "context too long: {actual} > {max}")
-            }
-            Self::ContentFiltered(m) => write!(f, "content filtered: {m}"),
-            Self::Timeout(ms) => write!(f, "timeout after {ms}ms"),
-            Self::Unknown(m) => write!(f, "engine error: {m}"),
-        }
-    }
-}
-
-impl std::error::Error for EngineError {}
-
 /// The engine registry — manages all available adapters.
 pub struct EngineRegistry {
-    adapters: RwLock<HashMap<EngineId, Box<dyn EngineAdapter>>>,
+    adapters: RwLock<HashMap<EngineId, std::sync::Arc<dyn EngineAdapter>>>,
     /// Default engine for each tier: tier → engine_id.
     tier_map: RwLock<HashMap<ModelTier, EngineId>>,
 }
@@ -265,7 +257,10 @@ impl EngineRegistry {
     /// Register an engine adapter.
     pub async fn register(&self, adapter: Box<dyn EngineAdapter>) {
         let id = adapter.id();
-        self.adapters.write().await.insert(id.clone(), adapter);
+        self.adapters
+            .write()
+            .await
+            .insert(id.clone(), std::sync::Arc::from(adapter));
         tracing::info!("registered engine adapter: {id}");
     }
 
@@ -275,15 +270,9 @@ impl EngineRegistry {
     }
 
     /// Get an adapter by engine ID.
-    pub async fn get(&self, id: &EngineId) -> Option<Box<dyn EngineAdapter>> {
-        // We can't clone a Box<dyn Trait>, so we return a reference-like handle.
-        // For now, the registry owns them and callers use run_tier().
+    pub async fn get(&self, id: &EngineId) -> Option<std::sync::Arc<dyn EngineAdapter>> {
         let adapters = self.adapters.read().await;
-        adapters.contains_key(id).then(|| {
-            // Return a reference as a string lookup — in production, use Arc<dyn EngineAdapter>
-            todo!("implement Arc-based registry")
-        });
-        None
+        adapters.get(id).cloned()
     }
 
     /// Run a request using the default engine for the given tier.
@@ -340,7 +329,7 @@ mod tests {
             ("custom:myengine", EngineId::Custom("myengine".into())),
         ];
         for (s, expected) in cases {
-            let parsed: EngineId = s.parse().unwrap();
+            let parsed: EngineId = s.parse().expect("test parse should succeed");
             assert_eq!(parsed, expected);
             assert_eq!(parsed.to_string(), s);
         }

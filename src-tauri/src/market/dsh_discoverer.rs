@@ -2,6 +2,7 @@
 //!
 //! 从 DSH 市场搜索和下载插件。
 
+use anyhow::{Context, Result as AnyhowResult};
 use serde::{Deserialize, Serialize};
 
 use crate::atomic_io;
@@ -48,7 +49,7 @@ impl DshMarketDiscoverer {
         category: Option<&str>,
         page: usize,
         per_page: usize,
-    ) -> Result<MarketSearchResult, String> {
+    ) -> AnyhowResult<MarketSearchResult> {
         let mut url = format!(
             "{}/plugins/search?q={}&page={}&per_page={}",
             self.config.api_endpoint, query, page, per_page
@@ -67,16 +68,16 @@ impl DshMarketDiscoverer {
         let response = request
             .send()
             .await
-            .map_err(|e| format!("DSH market request failed: {e}"))?;
+            .context("DSH market request failed")?;
 
         if !response.status().is_success() {
-            return Err(format!("DSH market error: {}", response.status()));
+            return Err(anyhow::anyhow!("DSH market error: {}", response.status()));
         }
 
         let data: DshSearchResponse = response
             .json()
             .await
-            .map_err(|e| format!("Parse DSH response: {e}"))?;
+            .context("Parse DSH response")?;
 
         Ok(MarketSearchResult {
             entries: data
@@ -110,7 +111,7 @@ impl DshMarketDiscoverer {
     }
 
     /// 获取插件详情
-    pub async fn get_detail(&self, plugin_id: &str) -> Result<MarketEntry, String> {
+    pub async fn get_detail(&self, plugin_id: &str) -> AnyhowResult<MarketEntry> {
         let url = format!("{}/plugins/{}", self.config.api_endpoint, plugin_id);
 
         let mut request = self.client.get(&url);
@@ -122,16 +123,16 @@ impl DshMarketDiscoverer {
         let response = request
             .send()
             .await
-            .map_err(|e| format!("DSH market request failed: {e}"))?;
+            .context("DSH market request failed")?;
 
         if !response.status().is_success() {
-            return Err(format!("DSH market error: {}", response.status()));
+            return Err(anyhow::anyhow!("DSH market error: {}", response.status()));
         }
 
         let data: DshPluginDetail = response
             .json()
             .await
-            .map_err(|e| format!("Parse DSH response: {e}"))?;
+            .context("Parse DSH response")?;
 
         let version = data.version.clone();
 
@@ -158,7 +159,7 @@ impl DshMarketDiscoverer {
         &self,
         plugin_id: &str,
         version: &str,
-    ) -> Result<Vec<PluginAsset>, String> {
+    ) -> AnyhowResult<Vec<PluginAsset>> {
         let url = format!(
             "{}/plugins/{}/versions/{}/assets",
             self.config.api_endpoint, plugin_id, version
@@ -173,16 +174,16 @@ impl DshMarketDiscoverer {
         let response = request
             .send()
             .await
-            .map_err(|e| format!("DSH market request failed: {e}"))?;
+            .context("DSH market request failed")?;
 
         if !response.status().is_success() {
-            return Err(format!("DSH market error: {}", response.status()));
+            return Err(anyhow::anyhow!("DSH market error: {}", response.status()));
         }
 
         let data: Vec<DshAsset> = response
             .json()
             .await
-            .map_err(|e| format!("Parse DSH response: {e}"))?;
+            .context("Parse DSH response")?;
 
         Ok(data
             .into_iter()
@@ -203,7 +204,7 @@ impl DshMarketDiscoverer {
         version: &str,
         asset_name: &str,
         dest_dir: &std::path::Path,
-    ) -> Result<std::path::PathBuf, String> {
+    ) -> AnyhowResult<std::path::PathBuf> {
         let url = format!(
             "{}/plugins/{}/versions/{}/assets/{}/download",
             self.config.api_endpoint, plugin_id, version, asset_name
@@ -218,22 +219,22 @@ impl DshMarketDiscoverer {
         let response = request
             .send()
             .await
-            .map_err(|e| format!("DSH download failed: {e}"))?;
+            .context("DSH download failed")?;
 
         if !response.status().is_success() {
-            return Err(format!("DSH download error: {}", response.status()));
+            return Err(anyhow::anyhow!("DSH download error: {}", response.status()));
         }
 
         let bytes = response
             .bytes()
             .await
-            .map_err(|e| format!("Read download: {e}"))?;
+            .context("Read download")?;
 
         // 确保目标目录存在
-        std::fs::create_dir_all(dest_dir).map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(dest_dir).context("Create dir")?;
 
         let dest_path = dest_dir.join(asset_name);
-        atomic_io::write_atomic(&dest_path, &bytes).map_err(|e| format!("Write file: {e}"))?;
+        atomic_io::write_atomic(&dest_path, &bytes).context("Write file")?;
 
         Ok(dest_path)
     }
@@ -242,7 +243,7 @@ impl DshMarketDiscoverer {
     pub async fn check_updates(
         &self,
         installed: &[(String, String)], // (plugin_id, current_version)
-    ) -> Result<Vec<(String, String, String)>, String> {
+    ) -> AnyhowResult<Vec<(String, String, String)>> {
         // TODO: 实现批量更新检查
         // 目前返回空列表
         Ok(vec![])

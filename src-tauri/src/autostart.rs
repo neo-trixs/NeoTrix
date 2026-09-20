@@ -1,3 +1,4 @@
+use anyhow::{Context, Result as AnyhowResult};
 use crate::ipc;
 use crate::ipc::IpcResponse;
 use tauri::AppHandle;
@@ -12,26 +13,26 @@ impl AutoStartManager {
         Self { app }
     }
 
-    pub fn is_enabled(&self) -> Result<bool, String> {
+    pub fn is_enabled(&self) -> AnyhowResult<bool> {
         let autostart = self.app.autolaunch();
         Ok(autostart.is_enabled().unwrap_or(false))
     }
 
-    pub fn enable(&self) -> Result<(), String> {
+    pub fn enable(&self) -> AnyhowResult<()> {
         let autostart = self.app.autolaunch();
         autostart
             .enable()
-            .map_err(|e| format!("Failed to enable autostart: {}", e))
+            .context("Failed to enable autostart")
     }
 
-    pub fn disable(&self) -> Result<(), String> {
+    pub fn disable(&self) -> AnyhowResult<()> {
         let autostart = self.app.autolaunch();
         autostart
             .disable()
-            .map_err(|e| format!("Failed to disable autostart: {}", e))
+            .context("Failed to disable autostart")
     }
 
-    pub fn toggle(&self) -> Result<bool, String> {
+    pub fn toggle(&self) -> AnyhowResult<bool> {
         if self.is_enabled()? {
             self.disable()?;
             Ok(false)
@@ -46,7 +47,7 @@ impl AutoStartManager {
 pub fn autostart_is_enabled(state: tauri::State<'_, AutoStartManager>) -> IpcResponse<bool> {
     match state.is_enabled() {
         Ok(v) => ipc::ok(v),
-        Err(e) => ipc::err("AUTOSTART_QUERY_FAILED", e),
+        Err(e) => ipc::err("AUTOSTART_QUERY_FAILED", format!("{e}")),
     }
 }
 
@@ -54,7 +55,7 @@ pub fn autostart_is_enabled(state: tauri::State<'_, AutoStartManager>) -> IpcRes
 pub fn autostart_enable(state: tauri::State<'_, AutoStartManager>) -> IpcResponse<()> {
     match state.enable() {
         Ok(()) => ipc::ok(()),
-        Err(e) => ipc::err("AUTOSTART_ENABLE_FAILED", e),
+        Err(e) => ipc::err("AUTOSTART_ENABLE_FAILED", format!("{e}")),
     }
 }
 
@@ -62,7 +63,7 @@ pub fn autostart_enable(state: tauri::State<'_, AutoStartManager>) -> IpcRespons
 pub fn autostart_disable(state: tauri::State<'_, AutoStartManager>) -> IpcResponse<()> {
     match state.disable() {
         Ok(()) => ipc::ok(()),
-        Err(e) => ipc::err("AUTOSTART_DISABLE_FAILED", e),
+        Err(e) => ipc::err("AUTOSTART_DISABLE_FAILED", format!("{e}")),
     }
 }
 
@@ -70,6 +71,6 @@ pub fn autostart_disable(state: tauri::State<'_, AutoStartManager>) -> IpcRespon
 pub fn autostart_toggle(state: tauri::State<'_, AutoStartManager>) -> IpcResponse<bool> {
     match state.toggle() {
         Ok(v) => ipc::ok(v),
-        Err(e) => ipc::err("AUTOSTART_TOGGLE_FAILED", e),
+        Err(e) => ipc::err("AUTOSTART_TOGGLE_FAILED", format!("{e}")),
     }
 }

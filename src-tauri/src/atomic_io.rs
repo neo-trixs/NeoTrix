@@ -7,6 +7,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 /// Write content atomically to a file.
 ///
@@ -119,47 +120,27 @@ fn backup_path(path: &Path) -> PathBuf {
 
 // ─── Error Types ─────────────────────────────────────────
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum AtomicWriteError {
+    #[error("Failed to write to {0}: {1}")]
     Write(String, std::io::Error),
+    #[error("Failed to sync {0}: {1}")]
     Sync(String, std::io::Error),
+    #[error("Failed to rename {0} → {1}: {2}")]
     Rename(String, String, std::io::Error),
+    #[error("Failed to serialize: {0}")]
     Serialize(String),
+    #[error("Failed to backup {0}: {1}")]
     Backup(String, std::io::Error),
 }
 
-impl std::fmt::Display for AtomicWriteError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Write(path, e) => write!(f, "Failed to write to {path}: {e}"),
-            Self::Sync(path, e) => write!(f, "Failed to sync {path}: {e}"),
-            Self::Rename(tmp, dest, e) => write!(f, "Failed to rename {tmp} → {dest}: {e}"),
-            Self::Serialize(e) => write!(f, "Failed to serialize: {e}"),
-            Self::Backup(path, e) => write!(f, "Failed to backup {path}: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for AtomicWriteError {}
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum AtomicReadError {
+    #[error("Neither {0} nor backup {1} readable: {2}")]
     NotFound(String, String, std::io::Error),
+    #[error("Failed to deserialize {0}: {1}")]
     Deserialize(String, serde_json::Error),
 }
-
-impl std::fmt::Display for AtomicReadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NotFound(main, bak, e) => {
-                write!(f, "Neither {main} nor backup {bak} readable: {e}")
-            }
-            Self::Deserialize(path, e) => write!(f, "Failed to deserialize {path}: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for AtomicReadError {}
 
 // ─── Tests ───────────────────────────────────────────────
 

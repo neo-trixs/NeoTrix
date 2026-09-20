@@ -3,74 +3,15 @@
 //! 支持 9 个内置渠道：微信、飞书、钉钉、企业微信、QQ、Slack、Telegram、Discord、WhatsApp
 //! 基于 DSH-IM 的 adapter 注册表模式，每个渠道独立配置和状态。
 
+use anyhow::{Context, Result as AnyhowResult};
 use crate::atomic_io;
-use crate::domain::plugins::im::ChannelType;
-use serde::{Deserialize, Serialize};
+use crate::domain::plugins::im::{
+    BotConfig, ChannelConfig, ChannelType, DshMarketConfig, ImStatus, ALL_CHANNEL_TYPES,
+};
+use crate::domain::serde_json;
+use crate::ipc::{self, IpcResponse};
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-/// 渠道连接状态
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ChannelStatus {
-    Disconnected,
-    Connecting,
-    Connected,
-    Error(String),
-}
-
-/// 机器人配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BotConfig {
-    pub id: String,
-    pub channel: ChannelType,
-    pub name: String,
-    pub credential_type: String,
-    pub workspace: Option<String>,
-    pub model: Option<String>,
-    pub enabled: bool,
-    pub created_at: u64,
-}
-
-/// 渠道配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChannelConfig {
-    pub channel: ChannelType,
-    pub enabled: bool,
-    pub bots: Vec<BotConfig>,
-    pub context_enhancement: bool,
-    pub proactive_delivery: bool,
-}
-
-/// IM 系统状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ImStatus {
-    pub channels: Vec<ChannelConfig>,
-    pub total_bots: usize,
-    pub connected_bots: usize,
-    pub dsh_market_enabled: bool,
-}
-
-/// DSH 市场配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DshMarketConfig {
-    pub enabled: bool,
-    pub api_endpoint: String,
-    pub auth_token: Option<String>,
-    pub sync_enabled: bool,
-    pub last_sync: Option<u64>,
-}
-
-impl Default for DshMarketConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            api_endpoint: "https://dshfind.com/api".into(),
-            auth_token: None,
-            sync_enabled: true,
-            last_sync: None,
-        }
-    }
-}
 
 /// 配置文件路径
 fn config_path() -> PathBuf {
@@ -89,107 +30,51 @@ fn dsh_market_path() -> PathBuf {
 }
 
 /// 加载渠道配置
-fn load_channels() -> Result<Vec<ChannelConfig>, String> {
+fn load_channels() -> AnyhowResult<Vec<ChannelConfig>> {
     let path = config_path();
     if !path.exists() {
         return Ok(default_channels());
     }
-    let content = std::fs::read_to_string(&path).map_err(|e| format!("Read IM config: {e}"))?;
-    serde_json::from_str(&content).map_err(|e| format!("Parse IM config: {e}"))
+    let content = std::fs::read_to_string(&path).context("Read IM config")?;
+    serde_json::from_str(&content).context("Parse IM config")
 }
 
 /// 保存渠道配置
-fn save_channels(channels: &[ChannelConfig]) -> Result<(), String> {
+fn save_channels(channels: &[ChannelConfig]) -> AnyhowResult<()> {
     let path = config_path();
-    atomic_io::ensure_parent_dir(&path).map_err(|e| format!("Create dir: {e}"))?;
-    atomic_io::write_json_atomic(&path, channels).map_err(|e| format!("Write config: {e}"))
+    atomic_io::ensure_parent_dir(&path).context("Create dir")?;
+    atomic_io::write_json_atomic(&path, channels).context("Write config")
 }
 
 /// 加载 DSH 市场配置
-fn load_dsh_market() -> Result<DshMarketConfig, String> {
+fn load_dsh_market() -> AnyhowResult<DshMarketConfig> {
     let path = dsh_market_path();
     if !path.exists() {
         return Ok(DshMarketConfig::default());
     }
-    let content =
-        std::fs::read_to_string(&path).map_err(|e| format!("Read DSH market config: {e}"))?;
-    serde_json::from_str(&content).map_err(|e| format!("Parse DSH market config: {e}"))
+    let content = std::fs::read_to_string(&path).context("Read DSH market config")?;
+    serde_json::from_str(&content).context("Parse DSH market config")
 }
 
 /// 保存 DSH 市场配置
-fn save_dsh_market(config: &DshMarketConfig) -> Result<(), String> {
+fn save_dsh_market(config: &DshMarketConfig) -> AnyhowResult<()> {
     let path = dsh_market_path();
-    atomic_io::ensure_parent_dir(&path).map_err(|e| format!("Create dir: {e}"))?;
-    atomic_io::write_json_atomic(&path, config).map_err(|e| format!("Write config: {e}"))
+    atomic_io::ensure_parent_dir(&path).context("Create dir")?;
+    atomic_io::write_json_atomic(&path, config).context("Write config")
 }
 
-/// 默认渠道配置
+/// 默认渠道配置（单一事实源：ALL_CHANNEL_TYPES）
 fn default_channels() -> Vec<ChannelConfig> {
-    vec![
-        ChannelConfig {
-            channel: ChannelType::WeChat,
+    ALL_CHANNEL_TYPES
+        .iter()
+        .map(|ch| ChannelConfig {
+            channel: ch.clone(),
             enabled: false,
             bots: vec![],
             context_enhancement: false,
             proactive_delivery: false,
-        },
-        ChannelConfig {
-            channel: ChannelType::Feishu,
-            enabled: false,
-            bots: vec![],
-            context_enhancement: false,
-            proactive_delivery: false,
-        },
-        ChannelConfig {
-            channel: ChannelType::DingTalk,
-            enabled: false,
-            bots: vec![],
-            context_enhancement: false,
-            proactive_delivery: false,
-        },
-        ChannelConfig {
-            channel: ChannelType::WeCom,
-            enabled: false,
-            bots: vec![],
-            context_enhancement: false,
-            proactive_delivery: false,
-        },
-        ChannelConfig {
-            channel: ChannelType::QQ,
-            enabled: false,
-            bots: vec![],
-            context_enhancement: false,
-            proactive_delivery: false,
-        },
-        ChannelConfig {
-            channel: ChannelType::Slack,
-            enabled: false,
-            bots: vec![],
-            context_enhancement: false,
-            proactive_delivery: false,
-        },
-        ChannelConfig {
-            channel: ChannelType::Telegram,
-            enabled: false,
-            bots: vec![],
-            context_enhancement: false,
-            proactive_delivery: false,
-        },
-        ChannelConfig {
-            channel: ChannelType::Discord,
-            enabled: false,
-            bots: vec![],
-            context_enhancement: false,
-            proactive_delivery: false,
-        },
-        ChannelConfig {
-            channel: ChannelType::WhatsApp,
-            enabled: false,
-            bots: vec![],
-            context_enhancement: false,
-            proactive_delivery: false,
-        },
-    ]
+        })
+        .collect()
 }
 
 // ═══════════════════════════════════════════════
@@ -198,9 +83,15 @@ fn default_channels() -> Vec<ChannelConfig> {
 
 /// 获取 IM 系统状态
 #[tauri::command]
-pub async fn im_status() -> Result<ImStatus, String> {
-    let channels = load_channels()?;
-    let dsh_market = load_dsh_market()?;
+pub async fn im_status() -> IpcResponse<ImStatus> {
+    let channels = match load_channels() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", format!("{e}")),
+    };
+    let dsh_market = match load_dsh_market() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", format!("{e}")),
+    };
 
     let total_bots: usize = channels.iter().map(|c| c.bots.len()).sum();
     let connected_bots = channels
@@ -209,7 +100,7 @@ pub async fn im_status() -> Result<ImStatus, String> {
         .map(|c| c.bots.len())
         .sum();
 
-    Ok(ImStatus {
+    ipc::ok(ImStatus {
         channels,
         total_bots,
         connected_bots,
@@ -219,28 +110,41 @@ pub async fn im_status() -> Result<ImStatus, String> {
 
 /// 获取所有渠道配置
 #[tauri::command]
-pub async fn im_list_channels() -> Result<Vec<ChannelConfig>, String> {
-    load_channels()
+pub async fn im_list_channels() -> IpcResponse<Vec<ChannelConfig>> {
+    match load_channels() {
+        Ok(channels) => ipc::ok(channels),
+        Err(e) => ipc::err("IM_LOAD_FAILED", format!("{e}")),
+    }
 }
 
 /// 获取单个渠道配置
 #[tauri::command]
-pub async fn im_get_channel(channel: String) -> Result<ChannelConfig, String> {
-    let channel_type =
-        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
-    let channels = load_channels()?;
-    channels
-        .into_iter()
-        .find(|c| c.channel == channel_type)
-        .ok_or_else(|| format!("Channel not found: {}", channel))
+pub async fn im_get_channel(channel: String) -> IpcResponse<ChannelConfig> {
+    let channel_type = match ChannelType::from_name(&channel) {
+        Some(ct) => ct,
+        None => return ipc::err("IM_UNKNOWN_CHANNEL", &format!("Unknown channel: {}", channel)),
+    };
+    let channels = match load_channels() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
+    match channels.into_iter().find(|c| c.channel == channel_type) {
+        Some(ch) => ipc::ok(ch),
+        None => ipc::err("IM_CHANNEL_NOT_FOUND", &format!("Channel not found: {}", channel)),
+    }
 }
 
 /// 启用/禁用渠道
 #[tauri::command]
-pub async fn im_toggle_channel(channel: String, enabled: bool) -> Result<ChannelConfig, String> {
-    let channel_type =
-        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
-    let mut channels = load_channels()?;
+pub async fn im_toggle_channel(channel: String, enabled: bool) -> IpcResponse<ChannelConfig> {
+    let channel_type = match ChannelType::from_name(&channel) {
+        Some(ct) => ct,
+        None => return ipc::err("IM_UNKNOWN_CHANNEL", &format!("Unknown channel: {}", channel)),
+    };
+    let mut channels = match load_channels() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
 
     let mut found = false;
     let mut result = ChannelConfig {
@@ -261,10 +165,12 @@ pub async fn im_toggle_channel(channel: String, enabled: bool) -> Result<Channel
     }
 
     if found {
-        save_channels(&channels)?;
-        Ok(result)
+        if let Err(e) = save_channels(&channels) {
+            return ipc::err("IM_SAVE_FAILED", format!("{e}"));
+        }
+        ipc::ok(result)
     } else {
-        Err(format!("Channel not found: {}", channel))
+        ipc::err("IM_CHANNEL_NOT_FOUND", &format!("Channel not found: {}", channel))
     }
 }
 
@@ -276,10 +182,15 @@ pub async fn im_add_bot(
     credential_type: String,
     workspace: Option<String>,
     model: Option<String>,
-) -> Result<BotConfig, String> {
-    let channel_type =
-        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
-    let mut channels = load_channels()?;
+) -> IpcResponse<BotConfig> {
+    let channel_type = match ChannelType::from_name(&channel) {
+        Some(ct) => ct,
+        None => return ipc::err("IM_UNKNOWN_CHANNEL", &format!("Unknown channel: {}", channel)),
+    };
+    let mut channels = match load_channels() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
 
     let bot_id = format!(
         "bot-{}-{}",
@@ -304,40 +215,52 @@ pub async fn im_add_bot(
     for ch in &mut channels {
         if ch.channel == channel_type {
             ch.bots.push(bot);
-            result = ch.bots.last().ok_or("empty bots")?.clone();
+            result = match ch.bots.last() {
+                Some(b) => b.clone(),
+                None => return ipc::err("IM_INTERNAL", "empty bots after push"),
+            };
             found = true;
             break;
         }
     }
 
     if found {
-        save_channels(&channels)?;
-        Ok(result)
+        if let Err(e) = save_channels(&channels) {
+            return ipc::err("IM_SAVE_FAILED", format!("{e}"));
+        }
+        ipc::ok(result)
     } else {
-        Err(format!("Channel not found: {}", channel))
+        ipc::err("IM_CHANNEL_NOT_FOUND", &format!("Channel not found: {}", channel))
     }
 }
 
 /// 删除机器人
 #[tauri::command]
-pub async fn im_remove_bot(channel: String, bot_id: String) -> Result<bool, String> {
-    let channel_type =
-        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
-    let mut channels = load_channels()?;
+pub async fn im_remove_bot(channel: String, bot_id: String) -> IpcResponse<bool> {
+    let channel_type = match ChannelType::from_name(&channel) {
+        Some(ct) => ct,
+        None => return ipc::err("IM_UNKNOWN_CHANNEL", &format!("Unknown channel: {}", channel)),
+    };
+    let mut channels = match load_channels() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
 
     for ch in &mut channels {
         if ch.channel == channel_type {
             let original_len = ch.bots.len();
             ch.bots.retain(|b| b.id != bot_id);
             if ch.bots.len() < original_len {
-                save_channels(&channels)?;
-                return Ok(true);
+                if let Err(e) = save_channels(&channels) {
+                    return ipc::err("IM_SAVE_FAILED", format!("{e}"));
+                }
+                return ipc::ok(true);
             }
-            return Ok(false);
+            return ipc::ok(false);
         }
     }
 
-    Ok(false)
+    ipc::ok(false)
 }
 
 /// 更新机器人配置
@@ -348,10 +271,15 @@ pub async fn im_update_bot(
     name: Option<String>,
     workspace: Option<String>,
     model: Option<String>,
-) -> Result<BotConfig, String> {
-    let channel_type =
-        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
-    let mut channels = load_channels()?;
+) -> IpcResponse<BotConfig> {
+    let channel_type = match ChannelType::from_name(&channel) {
+        Some(ct) => ct,
+        None => return ipc::err("IM_UNKNOWN_CHANNEL", &format!("Unknown channel: {}", channel)),
+    };
+    let mut channels = match load_channels() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
 
     let mut found = false;
     let mut result = BotConfig {
@@ -390,10 +318,12 @@ pub async fn im_update_bot(
     }
 
     if found {
-        save_channels(&channels)?;
-        Ok(result)
+        if let Err(e) = save_channels(&channels) {
+            return ipc::err("IM_SAVE_FAILED", format!("{e}"));
+        }
+        ipc::ok(result)
     } else {
-        Err(format!("Bot not found: {} / {}", channel, bot_id))
+        ipc::err("IM_BOT_NOT_FOUND", &format!("Bot not found: {} / {}", channel, bot_id))
     }
 }
 
@@ -402,10 +332,15 @@ pub async fn im_update_bot(
 pub async fn im_set_context_enhancement(
     channel: String,
     enabled: bool,
-) -> Result<ChannelConfig, String> {
-    let channel_type =
-        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
-    let mut channels = load_channels()?;
+) -> IpcResponse<ChannelConfig> {
+    let channel_type = match ChannelType::from_name(&channel) {
+        Some(ct) => ct,
+        None => return ipc::err("IM_UNKNOWN_CHANNEL", &format!("Unknown channel: {}", channel)),
+    };
+    let mut channels = match load_channels() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
 
     let mut found = false;
     let mut result = ChannelConfig {
@@ -426,10 +361,12 @@ pub async fn im_set_context_enhancement(
     }
 
     if found {
-        save_channels(&channels)?;
-        Ok(result)
+        if let Err(e) = save_channels(&channels) {
+            return ipc::err("IM_SAVE_FAILED", format!("{e}"));
+        }
+        ipc::ok(result)
     } else {
-        Err(format!("Channel not found: {}", channel))
+        ipc::err("IM_CHANNEL_NOT_FOUND", &format!("Channel not found: {}", channel))
     }
 }
 
@@ -438,10 +375,15 @@ pub async fn im_set_context_enhancement(
 pub async fn im_set_proactive_delivery(
     channel: String,
     enabled: bool,
-) -> Result<ChannelConfig, String> {
-    let channel_type =
-        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
-    let mut channels = load_channels()?;
+) -> IpcResponse<ChannelConfig> {
+    let channel_type = match ChannelType::from_name(&channel) {
+        Some(ct) => ct,
+        None => return ipc::err("IM_UNKNOWN_CHANNEL", &format!("Unknown channel: {}", channel)),
+    };
+    let mut channels = match load_channels() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
 
     let mut found = false;
     let mut result = ChannelConfig {
@@ -462,10 +404,12 @@ pub async fn im_set_proactive_delivery(
     }
 
     if found {
-        save_channels(&channels)?;
-        Ok(result)
+        if let Err(e) = save_channels(&channels) {
+            return ipc::err("IM_SAVE_FAILED", format!("{e}"));
+        }
+        ipc::ok(result)
     } else {
-        Err(format!("Channel not found: {}", channel))
+        ipc::err("IM_CHANNEL_NOT_FOUND", &format!("Channel not found: {}", channel))
     }
 }
 
@@ -475,17 +419,25 @@ pub async fn im_set_proactive_delivery(
 
 /// 获取 DSH 市场配置
 #[tauri::command]
-pub async fn im_dsh_market_status() -> Result<DshMarketConfig, String> {
-    load_dsh_market()
+pub async fn im_dsh_market_status() -> IpcResponse<DshMarketConfig> {
+    match load_dsh_market() {
+        Ok(config) => ipc::ok(config),
+        Err(e) => ipc::err("IM_LOAD_FAILED", format!("{e}")),
+    }
 }
 
 /// 启用/禁用 DSH 市场
 #[tauri::command]
-pub async fn im_dsh_market_toggle(enabled: bool) -> Result<DshMarketConfig, String> {
-    let mut config = load_dsh_market()?;
+pub async fn im_dsh_market_toggle(enabled: bool) -> IpcResponse<DshMarketConfig> {
+    let mut config = match load_dsh_market() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
     config.enabled = enabled;
-    save_dsh_market(&config)?;
-    Ok(config)
+    if let Err(e) = save_dsh_market(&config) {
+        return ipc::err("IM_SAVE_FAILED", format!("{e}"));
+    }
+    ipc::ok(config)
 }
 
 /// 更新 DSH 市场配置
@@ -494,8 +446,11 @@ pub async fn im_dsh_market_config(
     api_endpoint: Option<String>,
     auth_token: Option<String>,
     sync_enabled: Option<bool>,
-) -> Result<DshMarketConfig, String> {
-    let mut config = load_dsh_market()?;
+) -> IpcResponse<DshMarketConfig> {
+    let mut config = match load_dsh_market() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
     if let Some(ep) = api_endpoint {
         config.api_endpoint = ep;
     }
@@ -505,16 +460,21 @@ pub async fn im_dsh_market_config(
     if let Some(sync) = sync_enabled {
         config.sync_enabled = sync;
     }
-    save_dsh_market(&config)?;
-    Ok(config)
+    if let Err(e) = save_dsh_market(&config) {
+        return ipc::err("IM_SAVE_FAILED", format!("{e}"));
+    }
+    ipc::ok(config)
 }
 
 /// 从 DSH 市场同步插件
 #[tauri::command]
-pub async fn im_dsh_market_sync() -> Result<HashMap<String, String>, String> {
-    let config = load_dsh_market()?;
+pub async fn im_dsh_market_sync() -> IpcResponse<HashMap<String, String>> {
+    let config = match load_dsh_market() {
+        Ok(c) => c,
+        Err(e) => return ipc::err("IM_LOAD_FAILED", &e),
+    };
     if !config.enabled {
-        return Err("DSH market is not enabled".into());
+        return ipc::err("IM_DSH_DISABLED", "DSH market is not enabled");
     }
 
     // TODO: 实现实际的 DSH 市场 API 调用
@@ -525,5 +485,5 @@ pub async fn im_dsh_market_sync() -> Result<HashMap<String, String>, String> {
     plugins.insert("dsh-im-feishu".into(), "1.0.0".into());
     plugins.insert("dsh-im-telegram".into(), "1.0.0".into());
 
-    Ok(plugins)
+    ipc::ok(plugins)
 }

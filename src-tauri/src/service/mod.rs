@@ -28,7 +28,7 @@ async fn scheduler_loop(app_handle: AppHandle) {
 
 async fn tick_health_check(app_handle: &AppHandle) -> Result<(), String> {
     // Check if neotrix CLI is available
-    let bin = crate::commands::neotrix_cli::find_neotrix_binary();
+    let bin = crate::util::cli_finder::find_neotrix_binary();
     if bin.is_none() {
         tracing::debug!("neotrix CLI not found, skipping health check");
         return Ok(());
@@ -36,10 +36,12 @@ async fn tick_health_check(app_handle: &AppHandle) -> Result<(), String> {
 
     // Emit health status to frontend
     if let Some(window) = app_handle.get_webview_window("main") {
-        let _ = window.emit("health-check", serde_json::json!({
+        if let Err(e) = window.emit("health-check", serde_json::json!({
             "status": "ok",
             "timestamp": chrono::Utc::now().to_rfc3339(),
-        }));
+        })) {
+            tracing::trace!("emit health-check: {e}");
+        }
     }
 
     Ok(())

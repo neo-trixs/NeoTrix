@@ -7,6 +7,7 @@ pub mod dsh_discoverer;
 pub mod github_discoverer;
 pub mod schema;
 
+use anyhow::{Context, Result as AnyhowResult};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -78,7 +79,7 @@ impl MarketEngine {
     }
 
     /// 加载已安装插件
-    pub fn load_installed(&mut self) -> Result<(), String> {
+    pub fn load_installed(&mut self) -> AnyhowResult<()> {
         self.installed.clear();
 
         if !self.config.plugin_dir.exists() {
@@ -86,7 +87,7 @@ impl MarketEngine {
         }
 
         let entries = std::fs::read_dir(&self.config.plugin_dir)
-            .map_err(|e| format!("Read plugin dir: {e}"))?;
+            .context("Read plugin dir")?;
 
         for entry in entries.flatten() {
             let path = entry.path();
@@ -118,7 +119,7 @@ impl MarketEngine {
         category: Option<&str>,
         page: usize,
         per_page: usize,
-    ) -> Result<Vec<MarketSearchResult>, String> {
+    ) -> AnyhowResult<Vec<MarketSearchResult>> {
         let mut results = vec![];
 
         // DSH 市场搜索
@@ -166,11 +167,11 @@ impl MarketEngine {
     }
 
     /// 获取插件详情
-    pub async fn get_detail(&self, plugin_id: &str, source: &str) -> Result<MarketEntry, String> {
+    pub async fn get_detail(&self, plugin_id: &str, source: &str) -> AnyhowResult<MarketEntry> {
         match source {
             "dsh-market" => self.dsh.get_detail(plugin_id).await,
             "github" => self.github.get_detail(plugin_id).await,
-            _ => Err(format!("Unknown source: {}", source)),
+            _ => Err(anyhow::anyhow!("Unknown source: {}", source)),
         }
     }
 
@@ -180,9 +181,9 @@ impl MarketEngine {
         plugin_id: &str,
         source: &str,
         version: &str,
-    ) -> Result<PathBuf, String> {
+    ) -> AnyhowResult<PathBuf> {
         let dest_dir = self.config.cache_dir.join(plugin_id);
-        std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Create cache dir: {e}"))?;
+        std::fs::create_dir_all(&dest_dir).context("Create cache dir")?;
 
         match source {
             "dsh-market" => {
@@ -193,7 +194,7 @@ impl MarketEngine {
                         .download(plugin_id, version, &asset.name, &dest_dir)
                         .await
                 } else {
-                    Err("No assets found".into())
+                    Err(anyhow::anyhow!("No assets found"))
                 }
             }
             "github" => {
@@ -204,15 +205,15 @@ impl MarketEngine {
                         .download_asset(&asset.url, &dest_dir, &asset.name)
                         .await
                 } else {
-                    Err("No release assets found".into())
+                    Err(anyhow::anyhow!("No release assets found"))
                 }
             }
-            _ => Err(format!("Unknown source: {}", source)),
+            _ => Err(anyhow::anyhow!("Unknown source: {}", source)),
         }
     }
 
     /// 检查更新
-    pub async fn check_updates(&self) -> Result<Vec<(String, String, String)>, String> {
+    pub async fn check_updates(&self) -> AnyhowResult<Vec<(String, String, String)>> {
         let mut updates = vec![];
 
         for (plugin_id, manifest) in &self.installed {
@@ -254,28 +255,28 @@ impl MarketEngine {
         &mut self,
         manifest: PluginManifest,
         source_path: &PathBuf,
-    ) -> Result<(), String> {
+    ) -> AnyhowResult<()> {
         let plugin_id = &manifest.plugin.id;
         let dest_dir = self.config.plugin_dir.join(plugin_id);
 
         // 创建目标目录
-        std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Create plugin dir: {e}"))?;
+        std::fs::create_dir_all(&dest_dir).context("Create plugin dir")?;
 
         // 复制文件
         if source_path.is_dir() {
             copy_dir_recursive(source_path, &dest_dir)
-                .map_err(|e| format!("Copy plugin files: {e}"))?;
+                .context("Copy plugin files")?;
         } else {
             let dest_file = dest_dir.join(source_path.file_name().unwrap_or_default());
-            std::fs::copy(source_path, &dest_file).map_err(|e| format!("Copy plugin file: {e}"))?;
+            std::fs::copy(source_path, &dest_file).context("Copy plugin file")?;
         }
 
         // 写入 plugin.toml
         let toml_content = manifest
             .to_toml()
-            .map_err(|e| format!("Serialize manifest: {e}"))?;
+            .context("Serialize manifest")?;
         atomic_io::write_atomic(&dest_dir.join("plugin.toml"), toml_content.as_bytes())
-            .map_err(|e| format!("Write plugin.toml: {e}"))?;
+            .context("Write plugin.toml")?;
 
         // 更新已安装列表
         self.installed.insert(plugin_id.clone(), manifest);
@@ -284,11 +285,11 @@ impl MarketEngine {
     }
 
     /// 卸载插件
-    pub fn uninstall(&mut self, plugin_id: &str) -> Result<(), String> {
+    pub fn uninstall(&mut self, plugin_id: &str) -> AnyhowResult<()> {
         let dest_dir = self.config.plugin_dir.join(plugin_id);
 
         if dest_dir.exists() {
-            std::fs::remove_dir_all(&dest_dir).map_err(|e| format!("Remove plugin dir: {e}"))?;
+            std::fs::remove_dir_all(&dest_dir).context("Remove plugin dir")?;
         }
 
         self.installed.remove(plugin_id);

@@ -48,3 +48,12 @@ pub fn ok<T: Serialize>(data: T) -> IpcResponse<T> {
 pub fn err<T: Serialize>(code: impl Into<String>, msg: impl Into<String>) -> IpcResponse<T> {
     IpcResponse::error(code, msg)
 }
+
+/// Convert an `AppError` directly into an `IpcResponse`.
+pub fn from_error<T: Serialize>(e: crate::app_error::AppError) -> IpcResponse<T> {
+    IpcResponse {
+        ok: false,
+        error: Some(e.into()),
+        data: None,
+    }
+}

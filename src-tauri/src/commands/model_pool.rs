@@ -2,6 +2,7 @@
 //!
 //! 提供模型池的增删查状态查询，前端通过 domain_call 或直接调用。
 
+use anyhow::{Context, Result as AnyhowResult};
 use crate::atomic_io;
 use crate::ipc;
 use crate::ipc::IpcResponse;
@@ -29,7 +30,7 @@ pub struct ModelPoolStatus {
 }
 
 /// 从 provider_pool.toml 读取条目（脱敏 api_key）
-fn load_pool_entries() -> Result<Vec<ModelPoolEntry>, String> {
+fn load_pool_entries() -> AnyhowResult<Vec<ModelPoolEntry>> {
     let path = dirs::home_dir()
         .unwrap_or_default()
         .join(".config")
@@ -40,7 +41,7 @@ fn load_pool_entries() -> Result<Vec<ModelPoolEntry>, String> {
         return Ok(vec![]);
     }
 
-    let content = std::fs::read_to_string(&path).map_err(|e| format!("Read provider pool: {e}"))?;
+    let content = std::fs::read_to_string(&path).context("Read provider pool")?;
 
     #[derive(Deserialize)]
     struct RawPool {
@@ -62,7 +63,7 @@ fn load_pool_entries() -> Result<Vec<ModelPoolEntry>, String> {
     }
 
     let pool: RawPool =
-        toml::from_str(&content).map_err(|e| format!("Parse provider pool: {e}"))?;
+        toml::from_str(&content).context("Parse provider pool")?;
 
     let entries = pool
         .entries
@@ -96,7 +97,7 @@ fn load_pool_entries() -> Result<Vec<ModelPoolEntry>, String> {
 }
 
 /// 读取 pool 配置文件原始内容（用于写入）
-fn read_pool_raw() -> Result<String, String> {
+fn read_pool_raw() -> AnyhowResult<String> {
     let path = dirs::home_dir()
         .unwrap_or_default()
         .join(".config")
@@ -106,19 +107,19 @@ fn read_pool_raw() -> Result<String, String> {
     if !path.exists() {
         return Ok("[[entries]]\n".into());
     }
-    std::fs::read_to_string(&path).map_err(|e| format!("Read provider pool: {e}"))
+    std::fs::read_to_string(&path).context("Read provider pool")
 }
 
 /// 写入 pool 配置文件
-fn write_pool_raw(content: &str) -> Result<(), String> {
+fn write_pool_raw(content: &str) -> AnyhowResult<()> {
     let path = dirs::home_dir()
         .unwrap_or_default()
         .join(".config")
         .join("neotrix")
         .join("provider_pool.toml");
 
-    atomic_io::ensure_parent_dir(&path).map_err(|e| format!("Create config dir: {e}"))?;
-    atomic_io::write_atomic(&path, content.as_bytes()).map_err(|e| format!("Write provider pool: {e}"))
+    atomic_io::ensure_parent_dir(&path).context("Create config dir")?;
+    atomic_io::write_atomic(&path, content.as_bytes()).context("Write provider pool")
 }
 
 // ═══════════════════════════════════════════════
@@ -130,7 +131,7 @@ fn write_pool_raw(content: &str) -> Result<(), String> {
 pub async fn model_pool_status() -> IpcResponse<ModelPoolStatus> {
     let entries = match load_pool_entries() {
         Ok(e) => e,
-        Err(e) => return ipc::err("POOL_READ_FAILED", e),
+        Err(e) => return ipc::err("POOL_READ_FAILED", format!("{e}")),
     };
     let config_path = dirs::home_dir()
         .unwrap_or_default()
@@ -160,7 +161,7 @@ pub async fn model_pool_add(
 ) -> IpcResponse<ModelPoolEntry> {
     let mut raw = match read_pool_raw() {
         Ok(r) => r,
-        Err(e) => return ipc::err("POOL_READ_FAILED", e),
+        Err(e) => return ipc::err("POOL_READ_FAILED", format!("{e}")),
     };
 
     let new_entry = format!(
@@ -192,7 +193,7 @@ created_ts = {created_ts}"#,
 
     raw.push_str(&new_entry);
     if let Err(e) = write_pool_raw(&raw) {
-        return ipc::err("POOL_WRITE_FAILED", e);
+        return ipc::err("POOL_WRITE_FAILED", format!("{e}"));
     }
 
     let masked = if api_key.len() > 8 {
@@ -217,26 +218,10 @@ created_ts = {created_ts}"#,
 pub async fn model_pool_remove(label: String) -> IpcResponse<bool> {
     let raw = match read_pool_raw() {
         Ok(r) => r,
-        Err(e) => return ipc::err("POOL_READ_FAILED", e),
+        Err(e) => return ipc::err("POOL_READ_FAILED", format!("{e}")),
     };
-    let lines: Vec<&str> = raw.lines().collect();
-    let mut new_lines = Vec::new();
-    let mut skip_until_next = false;
-    let mut found = false;
-
-    for line in &lines {
-        if line.trim().starts_with("[[entries]]") {
-            skip_until_next = false;
-            // 检查下一个 entry 的 label
-            continue;
-        }
-        if skip_until_next {
-            continue;
-        }
-        new_lines.push(*line);
-    }
-
     // 更精确的解析: 找到 label 匹配的 entry 并删除
+    let mut found = false;
     let mut result = String::new();
     let mut in_entry = false;
     let mut current_entry = String::new();
@@ -276,7 +261,7 @@ pub async fn model_pool_remove(label: String) -> IpcResponse<bool> {
     }
 
     if let Err(e) = write_pool_raw(&result) {
-        return ipc::err("POOL_WRITE_FAILED", e);
+        return ipc::err("POOL_WRITE_FAILED", format!("{e}"));
     }
     ipc::ok(true)
 }

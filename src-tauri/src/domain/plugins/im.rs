@@ -24,6 +24,7 @@ use tauri::Emitter;
 
 /// IM 渠道类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
 pub enum ChannelType {
     WeChat,
     Feishu,
@@ -51,6 +52,19 @@ impl std::fmt::Display for ChannelType {
         }
     }
 }
+
+/// 所有内置渠道类型（单一事实源）
+pub const ALL_CHANNEL_TYPES: &[ChannelType] = &[
+    ChannelType::WeChat,
+    ChannelType::Feishu,
+    ChannelType::DingTalk,
+    ChannelType::WeCom,
+    ChannelType::QQ,
+    ChannelType::Slack,
+    ChannelType::Telegram,
+    ChannelType::Discord,
+    ChannelType::WhatsApp,
+];
 
 impl ChannelType {
     pub fn from_name(name: &str) -> Option<Self> {
@@ -85,6 +99,7 @@ impl ChannelType {
 
 /// 渠道连接状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ChannelStatus {
     Disconnected,
     Connecting,
@@ -112,6 +127,7 @@ pub struct BotConfig {
 
 /// 响应模式
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ResponseMode {
     /// 群聊中需要被 @
     GroupInvite,
@@ -256,6 +272,7 @@ pub enum MessageContent {
 
 /// 消息类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum MessageType {
     UserMessage,
     BotMessage,
@@ -305,6 +322,7 @@ pub struct BotMessage {
 
 /// 机器人间消息类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum BotMessageType {
     /// 任务委派
     TaskDelegation,
@@ -396,6 +414,7 @@ pub struct MessageProcessingState {
 
 /// 处理状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ProcessingStatus {
     Pending,
     Processing,
@@ -448,6 +467,7 @@ pub struct TimeoutRecoveryState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TimeoutRecoveryStatus {
     Pending,
     Retrying,
@@ -636,71 +656,16 @@ impl ImPlugin {
     }
 
     fn default_channels(&self) -> Vec<ChannelConfig> {
-        vec![
-            ChannelConfig {
-                channel: ChannelType::WeChat,
+        ALL_CHANNEL_TYPES
+            .iter()
+            .map(|ch| ChannelConfig {
+                channel: ch.clone(),
                 enabled: false,
                 bots: vec![],
                 context_enhancement: false,
                 proactive_delivery: false,
-            },
-            ChannelConfig {
-                channel: ChannelType::Feishu,
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            },
-            ChannelConfig {
-                channel: ChannelType::DingTalk,
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            },
-            ChannelConfig {
-                channel: ChannelType::WeCom,
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            },
-            ChannelConfig {
-                channel: ChannelType::QQ,
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            },
-            ChannelConfig {
-                channel: ChannelType::Slack,
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            },
-            ChannelConfig {
-                channel: ChannelType::Telegram,
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            },
-            ChannelConfig {
-                channel: ChannelType::Discord,
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            },
-            ChannelConfig {
-                channel: ChannelType::WhatsApp,
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            },
-        ]
+            })
+            .collect()
     }
 
     /// 检查是否应该响应消息
@@ -777,7 +742,7 @@ impl ImPlugin {
 
         // 发射事件到前端
         if let Some(app) = get_app_handle() {
-            let _ = app.emit(
+            if let Err(e) = app.emit(
                 "im_message_sent",
                 serde_json::json!({
                     "channel": channel.to_string(),
@@ -786,7 +751,9 @@ impl ImPlugin {
                     "message_id": message_id,
                     "content": content,
                 }),
-            );
+            ) {
+                tracing::warn!("Failed to emit im_message_sent: {e}");
+            }
         }
 
         Ok(message_id)
@@ -805,7 +772,7 @@ impl ImPlugin {
 
         // 发射流式事件
         if let Some(app) = get_app_handle() {
-            let _ = app.emit(
+            if let Err(e) = app.emit(
                 "im_stream_start",
                 serde_json::json!({
                     "channel": channel.to_string(),
@@ -813,27 +780,33 @@ impl ImPlugin {
                     "chat_id": chat_id,
                     "message_id": message_id,
                 }),
-            );
+            ) {
+                tracing::warn!("Failed to emit im_stream_start: {e}");
+            }
 
             // 模拟流式 token
             for token in content.chars() {
-                let _ = app.emit(
+                if let Err(e) = app.emit(
                     "im_stream_token",
                     serde_json::json!({
                         "message_id": message_id,
                         "token": token.to_string(),
                     }),
-                );
+                ) {
+                    tracing::warn!("Failed to emit im_stream_token: {e}");
+                }
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             }
 
-            let _ = app.emit(
+            if let Err(e) = app.emit(
                 "im_stream_end",
                 serde_json::json!({
                     "message_id": message_id,
                     "content": content,
                 }),
-            );
+            ) {
+                tracing::warn!("Failed to emit im_stream_end: {e}");
+            }
         }
 
         Ok(message_id)
@@ -2226,12 +2199,14 @@ impl DomainPlugin for ImPlugin {
 
                 // 发射事件到前端
                 if let Some(app) = get_app_handle() {
-                    let _ = app.emit(
+                    if let Err(e) = app.emit(
                         "im_message_received",
                         serde_json::json!({
                             "envelope": envelope,
                         }),
-                    );
+                    ) {
+                        tracing::warn!("Failed to emit im_message_received: {e}");
+                    }
                 }
 
                 // 标记完成
@@ -2363,12 +2338,14 @@ impl DomainPlugin for ImPlugin {
 
                 // 发射事件到前端
                 if let Some(app) = get_app_handle() {
-                    let _ = app.emit(
+                    if let Err(e) = app.emit(
                         "im_bot_message_sent",
                         serde_json::json!({
                             "message": message,
                         }),
-                    );
+                    ) {
+                        tracing::warn!("Failed to emit im_bot_message_sent: {e}");
+                    }
                 }
 
                 Ok(serde_json::json!(message))
@@ -2496,13 +2473,15 @@ impl DomainPlugin for ImPlugin {
 
                 // 发射事件到前端
                 if let Some(app) = get_app_handle() {
-                    let _ = app.emit(
+                    if let Err(e) = app.emit(
                         "im_workflow_executed",
                         serde_json::json!({
                             "workflow_id": workflow_id,
                             "workflow_name": template.name,
                         }),
-                    );
+                    ) {
+                        tracing::warn!("Failed to emit im_workflow_executed: {e}");
+                    }
                 }
 
                 Ok(serde_json::json!({

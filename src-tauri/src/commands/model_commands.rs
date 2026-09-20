@@ -5,6 +5,7 @@
 //! 提供模型下载、验证、列表等操作的 Tauri 命令。
 
 use crate::desktop::model_manager::{ModelManager, ModelMetadata, ModelSource, ModelFormat};
+use crate::ipc::{self, IpcResponse};
 use std::sync::Arc;
 use tauri::command;
 use tauri::State;
@@ -24,9 +25,9 @@ pub fn new_model_state() -> ModelState {
 #[command]
 pub async fn model_list_local(
     state: State<'_, ModelState>,
-) -> Result<Vec<ModelMetadata>, String> {
+) -> IpcResponse<Vec<ModelMetadata>> {
     let manager = state.read().await;
-    Ok(manager.list_models().into_iter().cloned().collect())
+    ipc::ok(manager.list_models().into_iter().cloned().collect())
 }
 
 /// 获取模型详情
@@ -34,9 +35,9 @@ pub async fn model_list_local(
 pub async fn model_get_metadata(
     state: State<'_, ModelState>,
     model_id: String,
-) -> Result<Option<ModelMetadata>, String> {
+) -> IpcResponse<Option<ModelMetadata>> {
     let manager = state.read().await;
-    Ok(manager.get_model(&model_id).cloned())
+    ipc::ok(manager.get_model(&model_id).cloned())
 }
 
 /// 删除本地模型
@@ -44,9 +45,12 @@ pub async fn model_get_metadata(
 pub async fn model_delete_local(
     state: State<'_, ModelState>,
     model_id: String,
-) -> Result<(), String> {
+) -> IpcResponse<()> {
     let mut manager = state.write().await;
-    manager.delete_model(&model_id).await
+    match manager.delete_model(&model_id).await {
+        Ok(()) => ipc::ok(()),
+        Err(e) => ipc::err("MODEL_DELETE_FAILED", format!("{e}")),
+    }
 }
 
 /// 验证模型完整性
@@ -54,39 +58,43 @@ pub async fn model_delete_local(
 pub async fn model_validate(
     state: State<'_, ModelState>,
     model_id: String,
-) -> Result<serde_json::Value, String> {
+) -> IpcResponse<serde_json::Value> {
     let manager = state.read().await;
-    let result = manager.validate_model(&model_id).await?;
-    Ok(serde_json::json!({
-        "model_id": result.model_id,
-        "sha256_valid": result.sha256_valid,
-        "model_json_valid": result.model_json_valid,
-        "format_valid": result.format_valid,
-        "file_size_matches": result.file_size_matches,
-        "overall_valid": result.overall_valid,
-    }))
+    match manager.validate_model(&model_id).await {
+        Ok(result) => ipc::ok(serde_json::json!({
+            "model_id": result.model_id,
+            "sha256_valid": result.sha256_valid,
+            "model_json_valid": result.model_json_valid,
+            "format_valid": result.format_valid,
+            "file_size_matches": result.file_size_matches,
+            "overall_valid": result.overall_valid,
+        })),
+        Err(e) => ipc::err("MODEL_VALIDATE_FAILED", e),
+    }
 }
 
 /// 扫描本地模型目录
 #[command]
 pub async fn model_scan_local(
     state: State<'_, ModelState>,
-) -> Result<Vec<ModelMetadata>, String> {
+) -> IpcResponse<Vec<ModelMetadata>> {
     let mut manager = state.write().await;
-    manager.scan_local_models().await?;
-    Ok(manager.list_models().into_iter().cloned().collect())
+    match manager.scan_local_models().await {
+        Ok(()) => ipc::ok(manager.list_models().into_iter().cloned().collect()),
+        Err(e) => ipc::err("MODEL_SCAN_FAILED", e),
+    }
 }
 
 /// 获取模型管理器统计信息
 #[command]
 pub async fn model_stats(
     state: State<'_, ModelState>,
-) -> Result<serde_json::Value, String> {
+) -> IpcResponse<serde_json::Value> {
     let manager = state.read().await;
     let models = manager.list_models();
     let total_size: u64 = models.iter().map(|m| m.file_size).sum();
 
-    Ok(serde_json::json!({
+    ipc::ok(serde_json::json!({
         "total_models": models.len(),
         "total_size_bytes": total_size,
         "total_size_mb": total_size / 1024 / 1024,
@@ -103,10 +111,10 @@ pub async fn model_stats(
 pub async fn model_search(
     state: State<'_, ModelState>,
     query: String,
-) -> Result<Vec<ModelMetadata>, String> {
+) -> IpcResponse<Vec<ModelMetadata>> {
     let manager = state.read().await;
     let query_lower = query.to_lowercase();
-    Ok(manager
+    ipc::ok(manager
         .list_models()
         .into_iter()
         .filter(|m| {

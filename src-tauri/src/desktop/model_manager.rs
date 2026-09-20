@@ -1,3 +1,4 @@
+use anyhow::{Context, Result as AnyhowResult};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -26,6 +27,7 @@ pub struct ModelMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ModelFormat {
     GGUF,
     ONNX,
@@ -56,6 +58,7 @@ impl ModelFormat {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ModelSource {
     HuggingFace,
     Ollama,
@@ -126,6 +129,7 @@ pub struct DownloadTask {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DownloadStatus {
     Pending,
     Downloading { progress: f32 },
@@ -179,26 +183,26 @@ impl ModelManager {
     }
 
     /// 初始化：扫描本地模型
-    pub async fn initialize(&mut self) -> Result<(), String> {
+    pub async fn initialize(&mut self) -> AnyhowResult<()> {
         fs::create_dir_all(&self.cache_dir)
             .await
-            .map_err(|e| format!("Failed to create cache dir: {}", e))?;
+            .context("Failed to create cache dir")?;
 
         self.scan_local_models().await?;
         Ok(())
     }
 
     /// 扫描本地模型（支持所有格式）
-    async fn scan_local_models(&mut self) -> Result<(), String> {
+    async fn scan_local_models(&mut self) -> AnyhowResult<()> {
         let valid_extensions = ["gguf", "onnx", "safetensors", "ggj"];
         let mut entries = fs::read_dir(&self.cache_dir)
             .await
-            .map_err(|e| format!("Failed to read cache dir: {}", e))?;
+            .context("Failed to read cache dir")?;
 
         while let Some(entry) = entries
             .next_entry()
             .await
-            .map_err(|e| format!("Failed to read entry: {}", e))?
+            .context("Failed to read entry")?
         {
             let path = entry.path();
             let ext = path.extension().and_then(|e| e.to_str());
@@ -331,11 +335,13 @@ impl ModelManager {
     /// 创建下载任务
     pub fn create_download_task(
         &mut self,
-        model_id: String,
-        download_url: String,
+        model_id: impl Into<String>,
+        download_url: impl Into<String>,
         source: ModelSource,
         format: ModelFormat,
-    ) -> Result<DownloadTask, String> {
+    ) -> AnyhowResult<DownloadTask> {
+        let model_id = model_id.into();
+        let download_url = download_url.into();
         let job_id = format!("job_{}", uuid::Uuid::new_v4());
 
         let task = DownloadTask {
@@ -402,58 +408,58 @@ impl ModelManager {
     }
 
     /// 暂停下载
-    pub fn pause_download(&mut self, job_id: &str) -> Result<(), String> {
+    pub fn pause_download(&mut self, job_id: &str) -> AnyhowResult<()> {
         if let Some(task) = self.download_queue.get_mut(job_id) {
             task.status = DownloadStatus::Paused;
             Ok(())
         } else {
-            Err("Download task not found".into())
+            Err(anyhow::anyhow!("Download task not found"))
         }
     }
 
     /// 恢复下载
-    pub fn resume_download(&mut self, job_id: &str) -> Result<(), String> {
+    pub fn resume_download(&mut self, job_id: &str) -> AnyhowResult<()> {
         if let Some(task) = self.download_queue.get_mut(job_id) {
             task.status = DownloadStatus::Pending;
             Ok(())
         } else {
-            Err("Download task not found".into())
+            Err(anyhow::anyhow!("Download task not found"))
         }
     }
 
     /// 取消下载
-    pub fn cancel_download(&mut self, job_id: &str) -> Result<(), String> {
+    pub fn cancel_download(&mut self, job_id: &str) -> AnyhowResult<()> {
         self.download_queue.remove(job_id);
         Ok(())
     }
 
     /// 删除模型
-    pub async fn delete_model(&mut self, model_id: &str) -> Result<(), String> {
+    pub async fn delete_model(&mut self, model_id: &str) -> AnyhowResult<()> {
         if let Some(meta) = self.models.remove(model_id) {
             if let Some(path) = meta.path {
                 fs::remove_file(&path)
                     .await
-                    .map_err(|e| format!("Failed to delete model file: {}", e))?;
+                    .context("Failed to delete model file")?;
             }
             Ok(())
         } else {
-            Err("Model not found".into())
+            Err(anyhow::anyhow!("Model not found"))
         }
     }
 
     /// 计算文件 SHA256
-    pub async fn compute_sha256(&self, path: &Path) -> Result<String, String> {
-        let content = tokio::fs::read(path)
+    pub async fn compute_sha256(&self, path: impl AsRef<Path>) -> AnyhowResult<String> {
+        let content = tokio::fs::read(path.as_ref())
             .await
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+            .context("Failed to read file")?;
         let hash = Sha256::digest(&content);
         Ok(format!("{:x}", hash))
     }
 
     /// 验证模型完整性 (SHA256 + model.json)
-    pub async fn verify_model(&self, model_id: &str) -> Result<ModelValidationResult, String> {
+    pub async fn verify_model(&self, model_id: &str) -> AnyhowResult<ModelValidationResult> {
         let meta = self.models.get(model_id)
-            .ok_or_else(|| format!("Model '{}' not found", model_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Model '{}' not found", model_id))?;
 
         let mut sha256_valid = false;
         let mut model_json_valid = false;
@@ -508,12 +514,12 @@ impl ModelManager {
     /// 从 OpenResearch 源下载模型
     pub async fn download_from_openresearch(
         &mut self,
-        model_id: String,
-        model_name: String,
-    ) -> Result<DownloadTask, String> {
+        model_id: impl Into<String>,
+        model_name: impl Into<String>,
+    ) -> AnyhowResult<DownloadTask> {
         let url = format!(
             "https://openresearch.ai/api/models/{}/download",
-            model_name
+            model_name.into()
         );
         self.create_download_task(model_id, url, ModelSource::OpenResearch, ModelFormat::GGUF)
     }
@@ -521,12 +527,12 @@ impl ModelManager {
     /// 从 LMStudio 源下载模型
     pub async fn download_from_lmstudio(
         &mut self,
-        model_id: String,
-        model_name: String,
-    ) -> Result<DownloadTask, String> {
+        model_id: impl Into<String>,
+        model_name: impl Into<String>,
+    ) -> AnyhowResult<DownloadTask> {
         let url = format!(
             "http://localhost:1234/api/llm/models/{}/download",
-            model_name
+            model_name.into()
         );
         self.create_download_task(model_id, url, ModelSource::LMStudio, ModelFormat::GGUF)
     }
@@ -534,23 +540,23 @@ impl ModelManager {
     /// 从 vLLM 源下载模型
     pub async fn download_from_vllm(
         &mut self,
-        model_id: String,
-        model_name: String,
-        base_url: String,
-    ) -> Result<DownloadTask, String> {
-        let url = format!("{}/api/download/{}", base_url, model_name);
+        model_id: impl Into<String>,
+        model_name: impl Into<String>,
+        base_url: impl Into<String>,
+    ) -> AnyhowResult<DownloadTask> {
+        let url = format!("{}/api/download/{}", base_url.into(), model_name.into());
         self.create_download_task(model_id, url, ModelSource::VLLM, ModelFormat::ONNX)
     }
 
     /// 从 oMLX 源下载模型
     pub async fn download_from_omlx(
         &mut self,
-        model_id: String,
-        model_name: String,
-    ) -> Result<DownloadTask, String> {
+        model_id: impl Into<String>,
+        model_name: impl Into<String>,
+    ) -> AnyhowResult<DownloadTask> {
         let url = format!(
             "https://olmx.ai/api/models/{}/download",
-            model_name
+            model_name.into()
         );
         self.create_download_task(model_id, url, ModelSource::oMLX, ModelFormat::GGUF)
     }
@@ -558,23 +564,23 @@ impl ModelManager {
     /// 从 LocalGGUF 源下载模型
     pub async fn download_from_localgguf(
         &mut self,
-        model_id: String,
-        model_url: String,
-    ) -> Result<DownloadTask, String> {
+        model_id: impl Into<String>,
+        model_url: impl Into<String>,
+    ) -> AnyhowResult<DownloadTask> {
         self.create_download_task(model_id, model_url, ModelSource::LocalGGUF, ModelFormat::GGUF)
     }
 
     /// 获取缓存大小
-    pub async fn get_cache_size(&self) -> Result<u64, String> {
+    pub async fn get_cache_size(&self) -> AnyhowResult<u64> {
         let mut total_size = 0;
         let mut entries = fs::read_dir(&self.cache_dir)
             .await
-            .map_err(|e| format!("Failed to read cache dir: {}", e))?;
+            .context("Failed to read cache dir")?;
 
         while let Some(entry) = entries
             .next_entry()
             .await
-            .map_err(|e| format!("Failed to read entry: {}", e))?
+            .context("Failed to read entry")?
         {
             if let Ok(metadata) = fs::metadata(entry.path()).await {
                 total_size += metadata.len();
@@ -585,14 +591,14 @@ impl ModelManager {
     }
 
     /// 清理缓存
-    pub async fn clear_cache(&mut self) -> Result<(), String> {
+    pub async fn clear_cache(&mut self) -> AnyhowResult<()> {
         fs::remove_dir_all(&self.cache_dir)
             .await
-            .map_err(|e| format!("Failed to clear cache: {}", e))?;
+            .context("Failed to clear cache")?;
 
         fs::create_dir_all(&self.cache_dir)
             .await
-            .map_err(|e| format!("Failed to recreate cache dir: {}", e))?;
+            .context("Failed to recreate cache dir")?;
 
         self.models.clear();
         self.download_queue.clear();

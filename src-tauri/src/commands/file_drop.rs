@@ -38,8 +38,8 @@ impl FileDropManager {
         }
     }
 
-    pub fn is_allowed(&self, path: &str) -> bool {
-        let p = PathBuf::from(path);
+    pub fn is_allowed(&self, path: impl AsRef<str>) -> bool {
+        let p = PathBuf::from(path.as_ref());
         match p.extension() {
             Some(ext) => {
                 let ext_str = format!(".{}", ext.to_string_lossy());
@@ -64,7 +64,8 @@ impl FileDropManager {
         FileDropResult { accepted, rejected }
     }
 
-    pub fn add_extension(&mut self, ext: String) {
+    pub fn add_extension(&mut self, ext: impl Into<String>) {
+        let ext = ext.into();
         let ext = if ext.starts_with('.') {
             ext
         } else {

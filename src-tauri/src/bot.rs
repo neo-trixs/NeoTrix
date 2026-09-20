@@ -1,7 +1,19 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use thiserror::Error;
 
 use crate::engine::ModelTier;
+
+/// Errors from bot operations.
+#[derive(Debug, Clone, Error)]
+pub enum BotError {
+    #[error("not found: {0}")]
+    NotFound(String),
+    #[error("duplicate: {0}")]
+    Duplicate(String),
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
+}
 
 /// Bot Identity — a persistent agent with its own memory, tools, and workspace.
 /// Inspired by Grok Bot: "Bots are persistent agents with their own identity,
@@ -36,6 +48,7 @@ pub struct BotIdentity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum BotStatus {
     Idle,
     Thinking,
@@ -119,6 +132,7 @@ pub struct Artifact {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ArtifactType {
     Document,
     Code,
@@ -152,7 +166,7 @@ impl BotManager {
         name: impl Into<String>,
         description: impl Into<String>,
         model_tier: ModelTier,
-    ) -> Result<&BotIdentity, String> {
+    ) -> Result<&BotIdentity, BotError> {
         let id = format!("bot_{}", uuid::Uuid::new_v4());
         let now = timestamp();
         let bot = BotIdentity {
@@ -170,7 +184,7 @@ impl BotManager {
             channels: Vec::new(),
         };
         self.bots.insert(id.clone(), bot);
-        self.bots.get(&id).ok_or("Bot not found after insert".into())
+        self.bots.get(&id).ok_or(BotError::NotFound("Bot not found after insert".into()))
     }
 
     /// Create a channel for organizing work
@@ -178,7 +192,7 @@ impl BotManager {
         &mut self,
         name: impl Into<String>,
         description: Option<String>,
-    ) -> Result<&Channel, String> {
+    ) -> Result<&Channel, BotError> {
         let id = format!("ch_{}", uuid::Uuid::new_v4());
         let channel = Channel {
             id: id.clone(),
@@ -189,13 +203,13 @@ impl BotManager {
             message_count: 0,
         };
         self.channels.insert(id.clone(), channel);
-        self.channels.get(&id).ok_or("Channel not found after insert".into())
+        self.channels.get(&id).ok_or(BotError::NotFound("Channel not found after insert".into()))
     }
 
     /// Add a bot to a channel
-    pub fn add_bot_to_channel(&mut self, bot_id: &str, channel_id: &str) -> Result<(), String> {
-        let bot = self.bots.get_mut(bot_id).ok_or("Bot not found")?;
-        let channel = self.channels.get_mut(channel_id).ok_or("Channel not found")?;
+    pub fn add_bot_to_channel(&mut self, bot_id: &str, channel_id: &str) -> Result<(), BotError> {
+        let bot = self.bots.get_mut(bot_id).ok_or(BotError::NotFound("Bot not found".into()))?;
+        let channel = self.channels.get_mut(channel_id).ok_or(BotError::NotFound("Channel not found".into()))?;
         if !bot.channels.contains(&channel_id.to_string()) {
             bot.channels.push(channel_id.to_string());
         }
@@ -206,16 +220,16 @@ impl BotManager {
     }
 
     /// Update bot status
-    pub fn update_status(&mut self, bot_id: &str, status: BotStatus) -> Result<(), String> {
-        let bot = self.bots.get_mut(bot_id).ok_or("Bot not found")?;
+    pub fn update_status(&mut self, bot_id: &str, status: BotStatus) -> Result<(), BotError> {
+        let bot = self.bots.get_mut(bot_id).ok_or(BotError::NotFound("Bot not found".into()))?;
         bot.status = status;
         bot.last_active_at = timestamp();
         Ok(())
     }
 
     /// Record a lesson learned by a bot
-    pub fn record_lesson(&mut self, bot_id: &str, context: String, lesson: String) -> Result<(), String> {
-        let bot = self.bots.get_mut(bot_id).ok_or("Bot not found")?;
+    pub fn record_lesson(&mut self, bot_id: &str, context: String, lesson: String) -> Result<(), BotError> {
+        let bot = self.bots.get_mut(bot_id).ok_or(BotError::NotFound("Bot not found".into()))?;
         bot.memory.lessons.push(MemoryLesson {
             learned_at: timestamp(),
             context,

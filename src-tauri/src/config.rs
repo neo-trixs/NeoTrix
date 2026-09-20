@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use thiserror::Error;
 
 /// Layered configuration for NeoTrix desktop app.
 /// Priority: CLI args > env vars > config file > defaults
@@ -187,21 +188,12 @@ impl AppConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ConfigError {
+    #[error("Failed to read config at {0}: {1}")]
     FileRead(String, std::io::Error),
+    #[error("Failed to parse config at {0}: {1}")]
     Parse(String, toml::de::Error),
+    #[error("Config validation failed: {0}")]
     Validation(String),
 }
-
-impl std::fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FileRead(path, e) => write!(f, "Failed to read config at {path}: {e}"),
-            Self::Parse(path, e) => write!(f, "Failed to parse config at {path}: {e}"),
-            Self::Validation(msg) => write!(f, "Config validation failed: {msg}"),
-        }
-    }
-}
-
-impl std::error::Error for ConfigError {}

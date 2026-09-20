@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use crate::commands::neotrix_cli::run_cli;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use std::collections::HashMap;
 use std::process::Command as StdCommand;

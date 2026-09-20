@@ -1,3 +1,4 @@
+use anyhow::{Context, Result as AnyhowResult};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -25,6 +26,7 @@ pub struct Message {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MessageRole {
     User,
     Assistant,
@@ -32,6 +34,7 @@ pub enum MessageRole {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MessageType {
     Text,
     Code,
@@ -47,6 +50,7 @@ pub struct SessionMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ExportFormat {
     Json,
     Markdown,
@@ -104,7 +108,7 @@ impl SessionManager {
     }
 
     /// 添加消息
-    pub fn add_message(&mut self, session_id: &str, message: Message) -> Result<(), String> {
+    pub fn add_message(&mut self, session_id: &str, message: Message) -> AnyhowResult<()> {
         if let Some(session) = self.get_session_mut(session_id) {
             session.messages.push(message.clone());
             session.updated_at = Utc::now();
@@ -112,7 +116,7 @@ impl SessionManager {
             session.metadata.total_tokens += message.tokens.unwrap_or(0);
             Ok(())
         } else {
-            Err("Session not found".into())
+            Err(anyhow::anyhow!("Session not found"))
         }
     }
 
@@ -140,35 +144,35 @@ impl SessionManager {
     }
 
     /// 重命名会话
-    pub fn rename_session(&mut self, session_id: &str, new_title: &str) -> Result<(), String> {
+    pub fn rename_session(&mut self, session_id: &str, new_title: &str) -> AnyhowResult<()> {
         if let Some(session) = self.get_session_mut(session_id) {
             session.title = new_title.to_string();
             session.updated_at = Utc::now();
             Ok(())
         } else {
-            Err("Session not found".into())
+            Err(anyhow::anyhow!("Session not found"))
         }
     }
 
     /// 删除会话
-    pub fn delete_session(&mut self, session_id: &str) -> Result<(), String> {
+    pub fn delete_session(&mut self, session_id: &str) -> AnyhowResult<()> {
         if self.sessions.remove(session_id).is_some() {
             if self.active_session.as_deref() == Some(session_id) {
                 self.active_session = None;
             }
             Ok(())
         } else {
-            Err("Session not found".into())
+            Err(anyhow::anyhow!("Session not found"))
         }
     }
 
     /// 设置活跃会话
-    pub fn set_active_session(&mut self, session_id: &str) -> Result<(), String> {
+    pub fn set_active_session(&mut self, session_id: &str) -> AnyhowResult<()> {
         if self.sessions.contains_key(session_id) {
             self.active_session = Some(session_id.to_string());
             Ok(())
         } else {
-            Err("Session not found".into())
+            Err(anyhow::anyhow!("Session not found"))
         }
     }
 
@@ -180,17 +184,17 @@ impl SessionManager {
     }
 
     /// 导出会话
-    pub async fn export_session(
+    pub fn export_session(
         &self,
         session_id: &str,
         format: ExportFormat,
-    ) -> Result<Vec<u8>, String> {
-        let session = self.sessions.get(session_id).ok_or("Session not found")?;
+    ) -> AnyhowResult<Vec<u8>> {
+        let session = self.sessions.get(session_id).ok_or_else(|| anyhow::anyhow!("Session not found"))?;
 
         match format {
             ExportFormat::Json => {
                 let json = serde_json::to_string_pretty(session)
-                    .map_err(|e| format!("Failed to serialize: {}", e))?;
+                    .context("Failed to serialize")?;
                 Ok(json.into_bytes())
             }
             ExportFormat::Markdown => {

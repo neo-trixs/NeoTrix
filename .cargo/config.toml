@@ -1,0 +1,4 @@
+[alias]
+xt = "test --lib"
+xc = "clippy --all-targets -- -D warnings -W clippy::unwrap_used -W clippy::expect_used -W clippy::panic -W clippy::manual_let_else"
+xf = "fmt -- --check"

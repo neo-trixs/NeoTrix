@@ -2,6 +2,7 @@
 //!
 //! 从 GitHub 搜索 NeoTrix 插件仓库并下载。
 
+use anyhow::{Context, Result as AnyhowResult};
 use serde::{Deserialize, Serialize};
 
 use crate::atomic_io;
@@ -46,7 +47,7 @@ impl GitHubDiscoverer {
         query: &str,
         page: usize,
         per_page: usize,
-    ) -> Result<MarketSearchResult, String> {
+    ) -> AnyhowResult<MarketSearchResult> {
         let search_query = format!("{} neotrix-plugin in:readme", query);
         let url = format!(
             "{}/search/repositories?q={}&page={}&per_page={}&sort=stars&order=desc",
@@ -65,28 +66,27 @@ impl GitHubDiscoverer {
         let response = request
             .send()
             .await
-            .map_err(|e| format!("GitHub API request failed: {e}"))?;
+            .context("GitHub API request failed")?;
 
         if !response.status().is_success() {
-            return Err(format!("GitHub API error: {}", response.status()));
+            return Err(anyhow::anyhow!("GitHub API error: {}", response.status()));
         }
 
         let data: GitHubSearchResponse = response
             .json()
             .await
-            .map_err(|e| format!("Parse GitHub response: {e}"))?;
+            .context("Parse GitHub response")?;
 
         let entries: Vec<MarketEntry> = data
             .items
             .into_iter()
             .filter_map(|repo| {
                 // 尝试从仓库描述和主题推断插件信息
-                let tags = repo.topics.clone();
-                let category = if tags.contains(&"im-channel".to_string()) {
+                let category = if repo.topics.iter().any(|t| t == "im-channel") {
                     "im-channel".into()
-                } else if tags.contains(&"tool".to_string()) {
+                } else if repo.topics.iter().any(|t| t == "tool") {
                     "tool".into()
-                } else if tags.contains(&"memory".to_string()) {
+                } else if repo.topics.iter().any(|t| t == "memory") {
                     "memory".into()
                 } else {
                     "other".into()
@@ -99,7 +99,7 @@ impl GitHubDiscoverer {
                     description: repo.description.unwrap_or_default(),
                     author: repo.owner.login.clone(),
                     category,
-                    tags,
+                    tags: repo.topics,
                     downloads: repo.forks_count as u64,
                     rating: repo.stargazers_count as f32 / 100.0, // 简化评分
                     source_type: "github".into(),
@@ -121,7 +121,7 @@ impl GitHubDiscoverer {
     }
 
     /// 获取仓库详情
-    pub async fn get_detail(&self, repo_name: &str) -> Result<MarketEntry, String> {
+    pub async fn get_detail(&self, repo_name: &str) -> AnyhowResult<MarketEntry> {
         let url = format!("{}/repos/{}", self.config.api_base, repo_name);
 
         let mut request = self.client.get(&url);
@@ -133,16 +133,16 @@ impl GitHubDiscoverer {
         let response = request
             .send()
             .await
-            .map_err(|e| format!("GitHub API request failed: {e}"))?;
+            .context("GitHub API request failed")?;
 
         if !response.status().is_success() {
-            return Err(format!("GitHub API error: {}", response.status()));
+            return Err(anyhow::anyhow!("GitHub API error: {}", response.status()));
         }
 
         let repo: GitHubRepo = response
             .json()
             .await
-            .map_err(|e| format!("Parse GitHub response: {e}"))?;
+            .context("Parse GitHub response")?;
 
         Ok(MarketEntry {
             id: repo.full_name.clone(),
@@ -163,7 +163,7 @@ impl GitHubDiscoverer {
     }
 
     /// 获取仓库 release 资产
-    pub async fn get_releases(&self, repo_name: &str) -> Result<Vec<PluginAsset>, String> {
+    pub async fn get_releases(&self, repo_name: &str) -> AnyhowResult<Vec<PluginAsset>> {
         let url = format!(
             "{}/repos/{}/releases/latest",
             self.config.api_base, repo_name
@@ -178,16 +178,16 @@ impl GitHubDiscoverer {
         let response = request
             .send()
             .await
-            .map_err(|e| format!("GitHub API request failed: {e}"))?;
+            .context("GitHub API request failed")?;
 
         if !response.status().is_success() {
-            return Err(format!("GitHub API error: {}", response.status()));
+            return Err(anyhow::anyhow!("GitHub API error: {}", response.status()));
         }
 
         let release: GitHubRelease = response
             .json()
             .await
-            .map_err(|e| format!("Parse GitHub response: {e}"))?;
+            .context("Parse GitHub response")?;
 
         Ok(release
             .assets
@@ -208,7 +208,7 @@ impl GitHubDiscoverer {
         download_url: &str,
         dest_dir: &std::path::Path,
         filename: &str,
-    ) -> Result<std::path::PathBuf, String> {
+    ) -> AnyhowResult<std::path::PathBuf> {
         let mut request = self.client.get(download_url);
 
         if let Some(ref token) = self.config.token {
@@ -218,21 +218,21 @@ impl GitHubDiscoverer {
         let response = request
             .send()
             .await
-            .map_err(|e| format!("GitHub download failed: {e}"))?;
+            .context("GitHub download failed")?;
 
         if !response.status().is_success() {
-            return Err(format!("GitHub download error: {}", response.status()));
+            return Err(anyhow::anyhow!("GitHub download error: {}", response.status()));
         }
 
         let bytes = response
             .bytes()
             .await
-            .map_err(|e| format!("Read download: {e}"))?;
+            .context("Read download")?;
 
-        std::fs::create_dir_all(dest_dir).map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(dest_dir).context("Create dir")?;
 
         let dest_path = dest_dir.join(filename);
-        atomic_io::write_atomic(&dest_path, &bytes).map_err(|e| format!("Write file: {e}"))?;
+        atomic_io::write_atomic(&dest_path, &bytes).context("Write file")?;
 
         Ok(dest_path)
     }
@@ -241,7 +241,7 @@ impl GitHubDiscoverer {
     pub async fn check_updates(
         &self,
         installed: &[(String, String)], // (repo_name, current_version)
-    ) -> Result<Vec<(String, String, String)>, String> {
+    ) -> AnyhowResult<Vec<(String, String, String)>> {
         let mut updates = vec![];
 
         for (repo_name, _current_version) in installed {

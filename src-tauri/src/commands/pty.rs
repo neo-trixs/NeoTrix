@@ -1,5 +1,6 @@
 //! PTY 终端模块 — portable-pty 驱动的终端会话管理
 
+use anyhow::{Context, Result as AnyhowResult};
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtyPair, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -46,7 +47,7 @@ impl PtyManager {
         )
     }
 
-    pub fn spawn(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
+    pub fn spawn(&self, session_id: &str, cols: u16, rows: u16) -> AnyhowResult<()> {
         let system = native_pty_system();
         let pair = system
             .openpty(PtySize {
@@ -55,7 +56,7 @@ impl PtyManager {
                 pixel_width: 0,
                 pixel_height: 0,
             })
-            .map_err(|e| format!("openpty failed: {}", e))?;
+            .context("openpty failed")?;
 
         let cmd = if cfg!(target_os = "windows") {
             CommandBuilder::new("powershell.exe")
@@ -67,16 +68,16 @@ impl PtyManager {
         let child = pair
             .slave
             .spawn_command(cmd)
-            .map_err(|e| format!("spawn failed: {}", e))?;
+            .context("spawn failed")?;
         let killer = child.clone_killer();
         let mut reader = pair
             .master
             .try_clone_reader()
-            .map_err(|e| format!("clone reader failed: {}", e))?;
+            .context("clone reader failed")?;
         let writer = pair
             .master
             .take_writer()
-            .map_err(|e| format!("take writer failed: {}", e))?;
+            .context("take writer failed")?;
 
         let sid = session_id.to_string();
         let tx = self.sender.clone();
@@ -87,11 +88,13 @@ impl PtyManager {
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) | Err(_) => {
-                        let _ = tx.send(PtyEvent {
+                        if let Err(e) = tx.send(PtyEvent {
                             session_id: sid.clone(),
                             event_type: PtyEventType::Exit(0),
                             data: String::new(),
-                        });
+                        }) {
+                            tracing::trace!("pty: exit event send failed: {e}");
+                        }
                         break;
                     }
                     Ok(n) => {
@@ -111,7 +114,7 @@ impl PtyManager {
             }
         });
 
-        let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
+        let mut sessions = self.sessions.lock().context("PTY sessions lock poisoned")?;
         sessions.insert(
             session_id.to_string(),
             PtySession {
@@ -124,27 +127,27 @@ impl PtyManager {
         Ok(())
     }
 
-    pub fn write(&self, session_id: &str, data: &str) -> Result<(), String> {
-        let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
+    pub fn write(&self, session_id: &str, data: &str) -> AnyhowResult<()> {
+        let mut sessions = self.sessions.lock().context("PTY sessions lock poisoned")?;
         let session = sessions
             .get_mut(session_id)
-            .ok_or_else(|| format!("Session {} not found", session_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Session {} not found", session_id))?;
         session
             .writer
             .write_all(data.as_bytes())
-            .map_err(|e| format!("write failed: {}", e))?;
+            .context("write failed")?;
         session
             .writer
             .flush()
-            .map_err(|e| format!("flush failed: {}", e))?;
+            .context("flush failed")?;
         Ok(())
     }
 
-    pub fn resize(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
-        let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
+    pub fn resize(&self, session_id: &str, cols: u16, rows: u16) -> AnyhowResult<()> {
+        let mut sessions = self.sessions.lock().context("PTY sessions lock poisoned")?;
         let session = sessions
             .get_mut(session_id)
-            .ok_or_else(|| format!("Session {} not found", session_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Session {} not found", session_id))?;
         session
             .pair
             .master
@@ -154,7 +157,7 @@ impl PtyManager {
                 pixel_width: 0,
                 pixel_height: 0,
             })
-            .map_err(|e| format!("resize failed: {}", e))?;
+            .context("resize failed")?;
         Ok(())
     }
 
@@ -164,7 +167,9 @@ impl PtyManager {
             e.into_inner()
         });
         if let Some(mut session) = sessions.remove(session_id) {
-            let _ = session.killer.kill();
+            if let Err(e) = session.killer.kill() {
+                tracing::warn!("pty: kill failed: {e}");
+            }
         }
     }
 }
@@ -185,7 +190,7 @@ pub fn pty_spawn(
 ) -> IpcResponse<()> {
     match manager.spawn(&session_id, cols, rows) {
         Ok(()) => ipc::ok(()),
-        Err(e) => ipc::err("PTY_SPAWN_FAILED", e),
+        Err(e) => ipc::err("PTY_SPAWN_FAILED", format!("{e}")),
     }
 }
 
@@ -197,7 +202,7 @@ pub fn pty_write(
 ) -> IpcResponse<()> {
     match manager.write(&session_id, &data) {
         Ok(()) => ipc::ok(()),
-        Err(e) => ipc::err("PTY_WRITE_FAILED", e),
+        Err(e) => ipc::err("PTY_WRITE_FAILED", format!("{e}")),
     }
 }
 
@@ -207,8 +212,11 @@ pub fn pty_resize(
     cols: u16,
     rows: u16,
     manager: State<'_, Arc<PtyManager>>,
-) -> Result<(), String> {
-    manager.resize(&session_id, cols, rows)
+) -> IpcResponse<()> {
+    match manager.resize(&session_id, cols, rows) {
+        Ok(()) => ipc::ok(()),
+        Err(e) => ipc::err("PTY_RESIZE_FAILED", format!("{e}")),
+    }
 }
 
 #[tauri::command]
