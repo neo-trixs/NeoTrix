@@ -399,7 +399,7 @@ mod tests {
     }
 }
 
-use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// NT-CORE 意识度量自测 (IIT Φ): 常数状态同步可约→phi=0, 变化状态 phi∈[0,1],
 /// 共振矩阵维度正确, NaN 被清洗为有限值 (卫生层 P0: 核心可自测)。

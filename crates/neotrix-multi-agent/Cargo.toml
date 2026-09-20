@@ -1,0 +1,27 @@
+[package]
+name = "neotrix-multi-agent"
+version.workspace = true
+edition = "2021"
+description = "NeoTrix L5 Multi-Agent — coordination, crew, parallel execution, background loop, meta-panel"
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+neotrix-types = { path = "../neotrix-types" }
+neotrix-sysctl = { path = "../neotrix-sysctl" }
+neotrix-consciousness = { path = "../neotrix-consciousness" }
+neotrix-reasoning = { path = "../neotrix-reasoning" }
+neotrix-gateway = { path = "../neotrix-gateway" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = "1"
+tracing = "0.1"
+log = "0.4"
+anyhow = { version = "1", optional = true }
+
+[features]
+default = []
+full = ["anyhow"]

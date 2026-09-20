@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PermissionMode {

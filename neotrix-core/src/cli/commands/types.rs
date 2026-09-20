@@ -5,14 +5,14 @@ use tokio::sync::RwLock;
 
 pub(crate) use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use crate::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 
 use crate::cli::approval::ApprovalEngine;
 use crate::cli::sandbox::SandboxEnforcer;
 use crate::cli::shield_enforcer::ShieldEnforcer;
 use crate::cli::nt_conn::ConnectorManager;
 use crate::cli::nt_router::SmartRouter;
-use crate::core::nt_core_ws::WorkSpaceManager;
+use crate::l0_substrate::nt_core_ws::WorkSpaceManager;
 
 /// Centralized dependency container for CLI command execution.
 /// All shared singletons live here as `Arc<Mutex<>>` — commands receive

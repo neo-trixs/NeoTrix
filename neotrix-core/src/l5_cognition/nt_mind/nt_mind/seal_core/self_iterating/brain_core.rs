@@ -335,7 +335,7 @@ impl super::super::core::BrainMutView for ReasoningBrain {
     }
 }
 
-impl crate::core::nt_core_traits::BrainProvider for ReasoningBrain {
+impl crate::l0_substrate::nt_core_traits::BrainProvider for ReasoningBrain {
     fn capability_vector(&self) -> super::super::core::CapabilityVector {
         self.capability.clone()
     }
@@ -350,8 +350,8 @@ impl crate::core::nt_core_traits::BrainProvider for ReasoningBrain {
             weight: source.source_weight(),
         }
     }
-    fn run_seal_iteration(&mut self) -> crate::core::nt_core_traits::SealResult {
-        crate::core::nt_core_traits::SealResult {
+    fn run_seal_iteration(&mut self) -> crate::l0_substrate::nt_core_traits::SealResult {
+        crate::l0_substrate::nt_core_traits::SealResult {
             score_before: 0.0,
             score_after: 0.0,
             delta: 0.0,

@@ -96,6 +96,12 @@ pub enum CrawlStrategy {
     Aggressive,
 }
 
+impl Default for CrawlStrategy {
+    fn default() -> Self {
+        CrawlStrategy::Balanced
+    }
+}
+
 impl CrawlStrategy {
     pub fn delay_ms(&self) -> u64 {
         match self {

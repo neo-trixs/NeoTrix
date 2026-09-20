@@ -37,11 +37,11 @@ impl ConsciousnessTree {
     /// Maps SelfTest module names to BranchKind and computes health per domain.
     pub fn set_branch_health_from_self_tests(
         &mut self,
-        results: &[crate::l6_meta::healing::nt_core_self_test::SelfTestResult],
+        results: &[crate::l0_substrate::nt_core_self_test::SelfTestResult],
     ) {
         let mut domain_results: HashMap<
             BranchKind,
-            Vec<&crate::l6_meta::healing::nt_core_self_test::SelfTestResult>,
+            Vec<&crate::l0_substrate::nt_core_self_test::SelfTestResult>,
         > = HashMap::new();
 
         for result in results {
@@ -332,7 +332,7 @@ impl ConsciousnessTree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTestResult;
+    use crate::l0_substrate::nt_core_self_test::SelfTestResult;
 
     #[test]
     fn test_set_branch_health_wires_calibrated_health() {

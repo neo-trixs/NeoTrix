@@ -65,7 +65,7 @@ impl FingerprintBandit {
     /// 加载持久化的 bandit（如果存在），否则新建
     pub fn load() -> Self {
         let bandit = Self::new();
-        if let Some(content) = crate::l5_cognition::nt_core_state::load("bandit") {
+        if let Some(content) = crate::l0_substrate::nt_core_state::load("bandit") {
             if let Ok(loaded) = serde_json::from_str::<Vec<(ComboArm, u64, u64)>>(&content) {
                 for (arm, success, fail) in loaded {
                     for (a, stats) in &bandit.arms {
@@ -94,7 +94,7 @@ impl FingerprintBandit {
             (a.clone(), s.success.load(Ordering::Relaxed), s.fail.load(Ordering::Relaxed))
         }).collect();
         if let Ok(json) = serde_json::to_string_pretty(&data) {
-            if let Err(e) = crate::l5_cognition::nt_core_state::save("bandit", &json) {
+            if let Err(e) = crate::l0_substrate::nt_core_state::save("bandit", &json) {
                 log::warn!("[bandit] save to KB: {}", e);
             }
         }

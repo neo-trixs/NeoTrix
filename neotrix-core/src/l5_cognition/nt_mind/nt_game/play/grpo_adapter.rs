@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::framework::Trajectory;
 use super::buffer::GameTrajectoryBuffer;
-use crate::l6_meta::nt_core_self::seal::grpo::{GRPOLoop, GrpoConfig};
+use crate::l5_cognition::l1_facade::seal::grpo::{GRPOLoop, GrpoConfig};
 
 // ═══════════════════════════════════════════════════════════════════
 // Batch / Report types

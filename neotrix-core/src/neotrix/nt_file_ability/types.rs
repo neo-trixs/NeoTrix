@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use office_oxide::DocumentFormat;
 use serde::{Deserialize, Serialize};
 
-/// 本地 SpecialistType — 消除对 crate::core::nt_core_traits 的硬耦合。
+/// 本地 SpecialistType — 消除对 crate::l0_substrate::nt_core_traits 的硬耦合。
 /// 与 NT-CORE 的 SpecialistType 保持枚举值一致 (L1→L5 依赖倒置)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpecialistType {

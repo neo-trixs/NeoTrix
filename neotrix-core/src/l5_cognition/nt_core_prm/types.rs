@@ -1,5 +1,5 @@
 pub use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
-pub use crate::core::nt_core_traits::SpecialistType;
+pub use crate::l0_substrate::nt_core_traits::SpecialistType;
 use serde::{Deserialize, Serialize};
 
 /// One step in a multi-agent reasoning trajectory.

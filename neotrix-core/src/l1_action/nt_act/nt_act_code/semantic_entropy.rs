@@ -22,7 +22,7 @@ impl Default for SemanticEntropyGate {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SemanticEntropyGate {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for SemanticEntropyGate {
     fn name(&self) -> &str {
         "semantic_entropy_gate"
     }

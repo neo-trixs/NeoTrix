@@ -7,7 +7,7 @@
 //! - 案例版本管理 + 社区标注（未来扩展）
 //! - 种子数据：电车难题、器官移植、AI对齐、隐私vs安全、自主vs保护等
 
-use crate::l6_meta::nt_core_kb_primitives::now;
+use crate::l0_substrate::nt_core_kb_primitives::now;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -174,7 +174,7 @@ impl CaseBase {
 
     /// 从 KB 加载。
     pub fn load_from_kb(&self, conn: &Connection) -> Result<usize, String> {
-        use crate::l6_meta::nt_core_kb_primitives::kv_list;
+        use crate::l0_substrate::nt_core_kb_primitives::kv_list;
         let rows = kv_list(conn, NS_CASEBASE)?;
         let mut count = 0;
         for (_key, value) in rows {
@@ -512,7 +512,7 @@ impl CaseBase {
         let json = serde_json::to_string(case).map_err(|e| e.to_string())?;
         let key = format!("case:{}", case.id);
         {
-            use crate::l6_meta::nt_core_kb_primitives::kv_set;
+            use crate::l0_substrate::nt_core_kb_primitives::kv_set;
             kv_set(conn, NS_CASEBASE, &key, &json)
         }
     }
@@ -682,7 +682,7 @@ pub struct AnalogicalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::nt_core_kb_primitives::schema_initialize;
+    use crate::l0_substrate::nt_core_kb_primitives::schema_initialize;
     use rusqlite::Connection;
 
     fn mem_conn() -> Connection {

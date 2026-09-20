@@ -14,7 +14,7 @@
 //! - `version_history`     ↔ 经验落盘 KB `experience` 命名空间的 cycle 指针链
 //! - 核心命题"改进的迁移性" ↔ ConsciousnessTree 自进化闭环是否跨 cycle 稳定增长
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 use std::collections::HashMap;
 
 /// 一次 RSI 改进的可见/隐藏评测集合标识。

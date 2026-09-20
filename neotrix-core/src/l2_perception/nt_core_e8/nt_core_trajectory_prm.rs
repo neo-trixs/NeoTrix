@@ -292,7 +292,7 @@ mod tests {
         for i in 0..n {
             t.push(TrajectoryStep {
                 step_idx: i,
-                specialist: crate::core::nt_core_traits::SpecialistType::ReflectionEngine,
+                specialist: crate::l0_substrate::nt_core_traits::SpecialistType::ReflectionEngine,
                 e8_mode: ReasoningHexagram((i * 10) as u8 % 64),
                 action: format!("step_{}", i),
                 input: String::new(),

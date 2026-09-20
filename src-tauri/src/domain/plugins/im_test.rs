@@ -2,14 +2,17 @@
 
 use super::im::{ChannelType, ImPlugin, ResponseMode};
 use super::im::{set_app_handle};
-use crate::domain::{DomainPlugin, DomainRegistry};
-use std::collections::HashSet;
+use crate::domain::{DomainError, DomainPlugin, DomainRegistry};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 fn make_plugin() -> ImPlugin {
     let registry = Arc::new(RwLock::new(DomainRegistry::new()));
     ImPlugin::new(registry)
+}
+
+fn call_sync(plugin: &ImPlugin, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+    tokio::runtime::Runtime::new().unwrap().block_on(plugin.call(action, args))
 }
 
 #[test]
@@ -31,7 +34,7 @@ fn test_im_plugin_name_and_actions() {
 #[test]
 fn test_status_action() {
     let plugin = make_plugin();
-    let result = plugin.call("status", serde_json::json!({}));
+    let result = call_sync(&plugin, "status", serde_json::json!({}));
     assert!(result.is_ok(), "status call failed: {:?}", result.err());
 
     let val = result.unwrap();
@@ -48,7 +51,7 @@ fn test_status_action() {
 #[test]
 fn test_list_channels_action() {
     let plugin = make_plugin();
-    let result = plugin.call("list_channels", serde_json::json!({}));
+    let result = call_sync(&plugin, "list_channels", serde_json::json!({}));
     assert!(result.is_ok(), "list_channels call failed: {:?}", result.err());
 
     let channels = result.unwrap().as_array().unwrap().clone();
@@ -75,7 +78,7 @@ fn test_add_bot_action() {
     let plugin = make_plugin();
 
     // Add a bot to WeChat
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "add_bot",
         serde_json::json!({
             "channel": "wechat",
@@ -97,7 +100,7 @@ fn test_add_bot_action() {
     assert!(bot["id"].as_str().unwrap().starts_with("bot-wechat-"));
 
     // Verify bot was added to channel
-    let status = plugin.call("status", serde_json::json!({})).unwrap();
+    let status = call_sync(&plugin, "status", serde_json::json!({})).unwrap();
     let total_bots = status["total_bots"].as_u64().unwrap();
     assert_eq!(total_bots, 1, "Expected 1 total bot after add_bot");
 }
@@ -105,7 +108,7 @@ fn test_add_bot_action() {
 #[test]
 fn test_add_bot_invalid_channel() {
     let plugin = make_plugin();
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "add_bot",
         serde_json::json!({
             "channel": "nonexistent",
@@ -122,7 +125,7 @@ fn test_should_respond_group_invite() {
     let plugin = make_plugin();
 
     // Add a bot first
-    let bot_result = plugin.call(
+    let bot_result = call_sync(&plugin, 
         "add_bot",
         serde_json::json!({
             "channel": "slack",
@@ -133,7 +136,7 @@ fn test_should_respond_group_invite() {
     let bot_id = bot_result["id"].as_str().unwrap().to_string();
 
     // GroupInvite mode: only responds when @mentioned
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "slack",
@@ -146,7 +149,7 @@ fn test_should_respond_group_invite() {
     .unwrap();
     assert_eq!(result, serde_json::json!(false), "Should NOT respond without @mention");
 
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "slack",
@@ -165,7 +168,7 @@ fn test_should_respond_group_keyword() {
     let plugin = make_plugin();
 
     // Add a bot and set to GroupKeyword mode
-    let bot_result = plugin.call(
+    let bot_result = call_sync(&plugin, 
         "add_bot",
         serde_json::json!({
             "channel": "telegram",
@@ -175,7 +178,7 @@ fn test_should_respond_group_keyword() {
     .unwrap();
     let bot_id = bot_result["id"].as_str().unwrap().to_string();
 
-    plugin.call(
+    call_sync(&plugin, 
         "set_response_mode",
         serde_json::json!({
             "channel": "telegram",
@@ -187,7 +190,7 @@ fn test_should_respond_group_keyword() {
     .unwrap();
 
     // Without keyword
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "telegram",
@@ -201,7 +204,7 @@ fn test_should_respond_group_keyword() {
     assert_eq!(result, serde_json::json!(false));
 
     // With keyword
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "telegram",
@@ -220,7 +223,7 @@ fn test_should_respond_private_mode() {
     let plugin = make_plugin();
 
     // Add a bot and set to Private mode
-    let bot_result = plugin.call(
+    let bot_result = call_sync(&plugin, 
         "add_bot",
         serde_json::json!({
             "channel": "discord",
@@ -230,7 +233,7 @@ fn test_should_respond_private_mode() {
     .unwrap();
     let bot_id = bot_result["id"].as_str().unwrap().to_string();
 
-    plugin.call(
+    call_sync(&plugin, 
         "set_response_mode",
         serde_json::json!({
             "channel": "discord",
@@ -241,7 +244,7 @@ fn test_should_respond_private_mode() {
     .unwrap();
 
     // Private mode with empty whitelist = respond to all
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "discord",
@@ -255,7 +258,7 @@ fn test_should_respond_private_mode() {
     assert_eq!(result, serde_json::json!(true));
 
     // Add a whitelist user
-    plugin.call(
+    call_sync(&plugin, 
         "add_whitelist",
         serde_json::json!({
             "channel": "discord",
@@ -266,7 +269,7 @@ fn test_should_respond_private_mode() {
     .unwrap();
 
     // Whitelisted user
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "discord",
@@ -280,7 +283,7 @@ fn test_should_respond_private_mode() {
     assert_eq!(result, serde_json::json!(true));
 
     // Non-whitelisted user
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "discord",
@@ -298,7 +301,7 @@ fn test_should_respond_private_mode() {
 fn test_should_respond_group_all() {
     let plugin = make_plugin();
 
-    let bot_result = plugin.call(
+    let bot_result = call_sync(&plugin, 
         "add_bot",
         serde_json::json!({
             "channel": "feishu",
@@ -308,7 +311,7 @@ fn test_should_respond_group_all() {
     .unwrap();
     let bot_id = bot_result["id"].as_str().unwrap().to_string();
 
-    plugin.call(
+    call_sync(&plugin, 
         "set_response_mode",
         serde_json::json!({
             "channel": "feishu",
@@ -319,7 +322,7 @@ fn test_should_respond_group_all() {
     .unwrap();
 
     // GroupAll mode: responds to every message
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "feishu",
@@ -336,7 +339,7 @@ fn test_should_respond_group_all() {
 #[test]
 fn test_should_respond_missing_bot() {
     let plugin = make_plugin();
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "should_respond",
         serde_json::json!({
             "channel": "slack",
@@ -403,7 +406,7 @@ fn test_session_id_roundtrip() {
 fn test_get_channel_action() {
     let plugin = make_plugin();
 
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "get_channel",
         serde_json::json!({ "channel": "slack" }),
     );
@@ -413,7 +416,7 @@ fn test_get_channel_action() {
     assert_eq!(ch["enabled"], false);
 
     // Invalid channel
-    let result = plugin.call(
+    let result = call_sync(&plugin, 
         "get_channel",
         serde_json::json!({ "channel": "nope" }),
     );
@@ -425,14 +428,14 @@ fn test_remove_bot() {
     let plugin = make_plugin();
 
     // Add then remove
-    let bot = plugin.call(
+    let bot = call_sync(&plugin, 
         "add_bot",
         serde_json::json!({ "channel": "whatsapp", "name": "TempBot" }),
     )
     .unwrap();
     let bot_id = bot["id"].as_str().unwrap();
 
-    let removed = plugin.call(
+    let removed = call_sync(&plugin, 
         "remove_bot",
         serde_json::json!({ "channel": "whatsapp", "bot_id": bot_id }),
     )
@@ -440,11 +443,11 @@ fn test_remove_bot() {
     assert_eq!(removed, serde_json::json!(true));
 
     // Verify removed
-    let status = plugin.call("status", serde_json::json!({})).unwrap();
+    let status = call_sync(&plugin, "status", serde_json::json!({})).unwrap();
     assert_eq!(status["total_bots"], 0);
 
     // Remove again should return false
-    let removed = plugin.call(
+    let removed = call_sync(&plugin, 
         "remove_bot",
         serde_json::json!({ "channel": "whatsapp", "bot_id": bot_id }),
     )

@@ -1,4 +1,4 @@
-use crate::core::nt_core_cap::{CapabilityVector, FIELD_NAMES};
+use neotrix_types::core::nt_core_cap::{CapabilityVector, FIELD_NAMES};
 
 #[derive(Debug, Clone)]
 pub struct DataPoint {

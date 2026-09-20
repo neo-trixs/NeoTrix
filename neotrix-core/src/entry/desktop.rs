@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::l1_action::nt_io::nt_io_neocodex::{NeoCodexUI, NeoCodexMode, NeoCodexAgent};
+use neotrix::l1_action::nt_io::nt_io_neocodex::{NeoCodexUI, NeoCodexMode, NeoCodexAgent};
 use neotrix::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
-use crate::core::nt_core_traits::BrainHandle;
+use neotrix::l0_substrate::nt_core_traits::BrainHandle;
 
-use crate::cli::commands::registry::default_registry;
+use neotrix::cli::commands::registry::default_registry;
 
 /// Run a single evolution-loop iteration against the agent (diagnose → fix).
 /// Kept behind a free function so the loop can be triggered from the TUI
 /// without holding the mutex across the whole command.
 pub(crate) async fn step_evolution(agent: &mut NeoCodexAgent) {
-    neotrix::neotrix::l1_action::nt_io::nt_io_neocodex::EvolutionLoop::step(agent);
+    neotrix::l1_action::nt_io::nt_io_neocodex::EvolutionLoop::step(agent);
 }
 
 

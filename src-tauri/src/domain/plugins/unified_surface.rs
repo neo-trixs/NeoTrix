@@ -17,17 +17,12 @@
 //! │  └──────────────────────────────────────┘   │
 //! └─────────────────────────────────────────────//! ```
 
+use async_trait::async_trait;
+use crate::domain::app_handle::{set_app_handle, get_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
-use tauri::AppHandle;
-
-static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-
-pub fn set_app_handle(app: AppHandle) {
-    let _ = APP_HANDLE.set(app);
-}
+use std::sync::{Arc, Mutex};
 
 // ========== Types ==========
 
@@ -291,6 +286,7 @@ impl Default for UnifiedSurfacePlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for UnifiedSurfacePlugin {
     fn name(&self) -> &str {
         "unified_surface"
@@ -360,7 +356,7 @@ impl DomainPlugin for UnifiedSurfacePlugin {
         ]
     }
 
-    fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+    async fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
         match action {
             "switch_mode" => {
                 let mode_str = args.get("mode")
@@ -479,11 +475,11 @@ impl DomainPlugin for UnifiedSurfacePlugin {
         }
     }
 
-    fn init(&mut self) -> Result<(), DomainError> {
+    async fn init(&mut self) -> Result<(), DomainError> {
         Ok(())
     }
 
-    fn shutdown(&mut self) -> Result<(), DomainError> {
+    async fn shutdown(&mut self) -> Result<(), DomainError> {
         Ok(())
     }
 }

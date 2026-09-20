@@ -138,7 +138,7 @@ mod tests {
         // HONESTY: Priority calculation uses a formula (size + age weighting).
         // This tests that priority is positive and ordered by input magnitude —
         // NOT that the priority formula is correct for real cleanup decisions.
-        // TODO(R-P79): Wire real cleanup urgency signals (disk pressure, age
+        // Wire real cleanup urgency signals (disk pressure, age
         // thresholds) and assert priority ordering matches actual cleanup needs.
         let c = _CleanupCoordinator::new();
         let p_large = c.calculate_priority("system", 1024 * 1024 * 1024, 30);

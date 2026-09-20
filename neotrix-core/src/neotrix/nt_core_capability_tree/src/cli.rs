@@ -320,12 +320,16 @@ impl CapabilityCli {
             if let Some(ov) = CapabilityRegistry::load_overlay_file(&self.overlay_path()) {
                 reg.merge_overlay(&ov);
             }
+            // 架构演进路线图 18 模块批量注册 (R-P100) — 幂等
+            let _ = crate::roadmap::register_from_default_path(&mut reg);
             Ok(reg)
         } else {
             let mut reg = CapabilityRegistry::new();
             if let Some(ov) = CapabilityRegistry::load_overlay_file(&self.overlay_path()) {
                 reg.merge_overlay(&ov);
             }
+            // 架构演进路线图 18 模块批量注册 (R-P100) — 幂等
+            let _ = crate::roadmap::register_from_default_path(&mut reg);
             Ok(reg)
         }
     }

@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use async_trait::async_trait;
 use serde::Serialize;
-use crate::core::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
+use crate::l0_substrate::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpecStatus {

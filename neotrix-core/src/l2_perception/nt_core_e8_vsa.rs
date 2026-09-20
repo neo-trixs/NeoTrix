@@ -141,7 +141,7 @@ mod tests {
     }
 }
 
-use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// NT-CORE VSA/HyperCube 核心自测: 卦象嵌入自相似 ~1 + 异卦分离 + bind 自相似 (卫生层 P0)。
 pub struct E8VsaSelfTest;

@@ -111,149 +111,7 @@ impl From<&str> for NeoTrixError {
 // From 实现 — 统一错误层级
 // ════════════════════════════════════════════════════════════════
 
-// L1 Action 层错误
-impl From<crate::l1_action::nt_act::nt_act_trade::error::TradeError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_trade::error::TradeError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::agent_protocol::AgentProtocolError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::agent_protocol::AgentProtocolError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_voice::VoiceError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_voice::VoiceError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_trade::capability_registry::TradeCapabilityError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_trade::capability_registry::TradeCapabilityError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_trade::knowledge_base::KnowledgeBaseError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_trade::knowledge_base::KnowledgeBaseError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_trade::extractors::chrome_decrypt::ChromeDecryptError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_trade::extractors::chrome_decrypt::ChromeDecryptError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_trade::extractors::joinf::JoinfError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_trade::extractors::joinf::JoinfError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::nt_act_code::recipe_refactor::RecipeError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::nt_act_code::recipe_refactor::RecipeError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::deferred_loader::DeferredError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::deferred_loader::DeferredError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_act::acp_protocol::ProtocolError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_act::acp_protocol::ProtocolError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_action_facade::FacadeError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_action_facade::FacadeError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::traits::CapabilityError> for NeoTrixError {
-    fn from(e: crate::l1_action::traits::CapabilityError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_io::nt_l1_error::L1Error> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_l1_error::L1Error) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-#[cfg(feature = "desktop")]
-impl From<crate::l1_action::nt_io::nt_io_desktop::updater_signing::SigningError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_desktop::updater_signing::SigningError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_io::nt_io_multimodal_transform::TtsError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_multimodal_transform::TtsError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_io::nt_io_provider::gateway::execution::InferenceError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_provider::gateway::execution::InferenceError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-
-
-
-
-impl From<crate::l1_action::nt_io::nt_io_provider::pool::account_pool::AccountPoolError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_provider::pool::account_pool::AccountPoolError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_io::universal_model::traits::ModelError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::universal_model::traits::ModelError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_media::audio_decode::AudioError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_media::audio_decode::AudioError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_media::hls::HlsError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_media::hls::HlsError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_media::streaming::PipelineError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_media::streaming::PipelineError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_media::thumbnail::ThumbError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_media::thumbnail::ThumbError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_media::yt_extract::YtError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_media::yt_extract::YtError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// L1 Action 层错误 — moved to crate::l1_action::error_conversions
 
 // L2 Perception 层错误
 impl From<crate::l2_perception::nt_world::asset_map::query::ParseError> for NeoTrixError {
@@ -305,24 +163,7 @@ impl From<crate::l3_embodiment::nt_shield::nt_shield_ztnet::packet::ip_parser::P
     }
 }
 
-// L5 Cognition 层错误
-impl From<crate::l5_cognition::nt_core_skill_registry::SkillError> for NeoTrixError {
-    fn from(e: crate::l5_cognition::nt_core_skill_registry::SkillError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l5_cognition::nt_core_context_engine::ContextError> for NeoTrixError {
-    fn from(e: crate::l5_cognition::nt_core_context_engine::ContextError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l5_cognition::nt_core_multi_agent::MultiAgentError> for NeoTrixError {
-    fn from(e: crate::l5_cognition::nt_core_multi_agent::MultiAgentError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// L5 Cognition 层错误 — nt_core_skill_registry and nt_core_multi_agent migrated to crates
 
 
 
@@ -358,20 +199,14 @@ impl From<crate::l6_meta::healing::nt_mind_eval_harness::EvalError> for NeoTrixE
 }
 
 // Core 层错误
-impl From<crate::core::nt_core_platform::PlatformError> for NeoTrixError {
-    fn from(e: crate::core::nt_core_platform::PlatformError) -> Self {
+impl From<crate::l0_substrate::nt_core_platform::PlatformError> for NeoTrixError {
+    fn from(e: crate::l0_substrate::nt_core_platform::PlatformError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
 
-impl From<crate::core::nt_core_platform::AgentError> for NeoTrixError {
-    fn from(e: crate::core::nt_core_platform::AgentError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l1_action::nt_core_task_dispatcher::TaskDispatchError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_core_task_dispatcher::TaskDispatchError) -> Self {
+impl From<crate::l0_substrate::nt_core_platform::AgentError> for NeoTrixError {
+    fn from(e: crate::l0_substrate::nt_core_platform::AgentError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
@@ -428,16 +263,35 @@ impl From<crate::l0_substrate::nt_core_hot_data::HotDataError> for NeoTrixError 
     }
 }
 
-// L1 Action 层补充错误
-impl From<crate::l1_action::nt_io::nt_io_provider::gateway::observability::PluginError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_provider::gateway::observability::PluginError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// ════════════════════════════════════════════════════════════════
+// From<NeoTrixError> for NtError — bridge to unified error type
+// ════════════════════════════════════════════════════════════════
 
-impl From<crate::l1_action::nt_io::nt_io_provider::gateway::observability::MiddlewareError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_provider::gateway::observability::MiddlewareError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
+impl From<NeoTrixError> for neotrix_types::NtError {
+    fn from(err: NeoTrixError) -> Self {
+        match err {
+            NeoTrixError::Config(msg) => neotrix_types::NtError::Config(msg),
+            NeoTrixError::Io(msg) => neotrix_types::NtError::Io(msg),
+            NeoTrixError::Serde(msg) => neotrix_types::NtError::Serde(msg),
+            NeoTrixError::Network(msg) => neotrix_types::NtError::Network(msg),
+            NeoTrixError::Mcp(msg) => neotrix_types::NtError::Mcp(msg),
+            NeoTrixError::Brain(msg) => neotrix_types::NtError::Brain(msg),
+            NeoTrixError::Memory(msg) => neotrix_types::NtError::Memory(msg),
+            NeoTrixError::Command { cmd, exit_code, stderr } => neotrix_types::NtError::Command { cmd, exit_code, stderr },
+            NeoTrixError::Path { path, detail } => neotrix_types::NtError::Path { path, detail },
+            NeoTrixError::Unimplemented(msg) => neotrix_types::NtError::Unimplemented(msg),
+            NeoTrixError::Wasm(msg) => neotrix_types::NtError::Wasm(msg),
+            NeoTrixError::Crypto(msg) => neotrix_types::NtError::Crypto(msg),
+            NeoTrixError::Keyring(msg) => neotrix_types::NtError::Keyring(msg),
+            NeoTrixError::Shield(msg) => neotrix_types::NtError::Shield(msg),
+            NeoTrixError::Steer(msg) => neotrix_types::NtError::Steer(msg),
+            NeoTrixError::NotFound(msg) => neotrix_types::NtError::NotFound(msg),
+            NeoTrixError::InvalidInput(msg) => neotrix_types::NtError::InvalidInput(msg),
+            NeoTrixError::InvalidState(msg) => neotrix_types::NtError::InvalidState(msg),
+            NeoTrixError::NotImplemented(msg) => neotrix_types::NtError::NotImplemented(msg),
+            NeoTrixError::OperationFailed(msg) => neotrix_types::NtError::OperationFailed(msg),
+            NeoTrixError::SafetyViolation(msg) => neotrix_types::NtError::SafetyViolation(msg),
+        }
     }
 }
 

@@ -8,7 +8,7 @@
 //!   5. 384 lines = 64 × 6 = total degrees of freedom in E₈ root system
 //!   6. 50 (Dayan) - 1 (observer) = 49 (observable dof) ↔ 49 = 7² = 248-199
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 pub mod abduction;
 pub mod domain_transition;
 pub mod e8_abduction_bridge;
@@ -1140,41 +1140,10 @@ pub fn mythos_reasoning_to_e8(text: &str) -> Vec<u8> {
 //
 // Serde compatibility: fixed arrays >32 elements need custom serialization.
 // We use FlatCounts (Vec<u64>) and SerdeCompat64 (newtype) wrappers.
+// Struct definitions moved to L0 (nt_core_substrate_types) to enforce substrate invariant.
+// Re-exports here preserve backward compatibility.
 
-/// 64-element serde-compatible wrapper.
-#[derive(Debug, Clone)]
-pub struct SerdeCompat64(pub [u64; 64]);
-
-impl serde::Serialize for SerdeCompat64 {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0[..].serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for SerdeCompat64 {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let v = Vec::<u64>::deserialize(deserializer)?;
-        if v.len() != 64 {
-            return Err(serde::de::Error::custom("expected exactly 64 elements"));
-        }
-        let mut arr = [0u64; 64];
-        arr.copy_from_slice(&v);
-        Ok(SerdeCompat64(arr))
-    }
-}
-
-/// Flat 64×64 matrix for serde compatibility.
-#[derive(Debug, Clone, serde::Serialize, Deserialize)]
-pub struct FlatCounts(pub Vec<u64>);
-
-impl FlatCounts {
-    pub(crate) fn get(&self, i: usize, j: usize) -> u64 {
-        self.0[i * 64 + j]
-    }
-    pub(crate) fn add(&mut self, i: usize, j: usize, d: u64) {
-        self.0[i * 64 + j] = self.0[i * 64 + j].saturating_add(d);
-    }
-}
+pub use crate::l0_substrate::nt_core_substrate_types::{FlatCounts, SerdeCompat64};
 
 /// Semantic edge weight for a ReasoningFlow-style typed transition.
 ///
@@ -1195,39 +1164,11 @@ pub enum EdgeSemantics {
 }
 
 /// 64×64 transition probability matrix for E8 hexagram states.
-/// cell[i][j] = empirical probability of transitioning from hexagram i to j.
-/// Seeded from discovered Mythos trace patterns and updated continuously.
-#[derive(Debug, Clone, serde::Serialize, Deserialize)]
-pub struct E8TransitionMatrix {
-    /// 64×64 transition count matrix (flat: index = i * 64 + j)
-    pub counts: FlatCounts,
-    /// Total transitions from each source state
-    pub row_totals: SerdeCompat64,
-    /// Number of times each state was visited
-    pub visit_counts: SerdeCompat64,
-    /// Sequence of recent transitions (for pattern detection)
-    pub recent_transitions: Vec<(u8, u8)>,
-    /// Maximum recent transitions to retain
-    pub max_recent: usize,
-}
-
-impl Default for E8TransitionMatrix {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+/// Struct definition moved to L0 (nt_core_substrate_types).
+/// Re-export here preserves backward compatibility.
+pub use crate::l0_substrate::nt_core_substrate_types::E8TransitionMatrix;
 
 impl E8TransitionMatrix {
-    pub fn new() -> Self {
-        Self {
-            counts: FlatCounts(vec![0u64; 4096]),
-            row_totals: SerdeCompat64([0u64; 64]),
-            visit_counts: SerdeCompat64([0u64; 64]),
-            recent_transitions: Vec::with_capacity(256),
-            max_recent: 256,
-        }
-    }
-
     /// Initialize transition matrix from the Mythos trace patterns.
     pub fn init_from_trace_patterns(&mut self) {
         let mythos_chain: [u8; 9] = [58, 50, 42, 34, 26, 18, 10, 2, 6];

@@ -11,17 +11,17 @@ pub use crate::l1_action::nt_io::nt_io_provider::types::{
 pub use crate::l1_action::nt_io::nt_l1_error::{L1Error, L1Result};
 
 // NT-MEMORY 共享类型
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::{
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_write_guard::{
     record_write_evidence, scan_write_guard_evidence, WriteGuardStats, WriteGuardVerdict,
 };
-pub use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 
 // NT-ACT 共享类型
 pub use crate::l1_action::nt_act::nt_act_cleanup::shared::*;
 
 // NT-MEMORY 共享类型
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
-pub use crate::l1_action::nt_memory::nt_memory_kb::NodeType;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::NodeType;
 
 // NT-IO 共享类型
 pub use crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env;

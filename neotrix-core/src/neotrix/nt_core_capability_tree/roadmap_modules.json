@@ -1,0 +1,436 @@
+{
+  "description": "Architecture Evolution Roadmap — 44 modules registered to capability tree, all at C1UnitTest (R-P100)",
+  "version": "2026-09-20",
+  "modules": [
+    {
+      "id": "nt_memory::add_only_writes",
+      "domain": "memory",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["memory.add_only_writes", "memory.write_append"],
+      "requires": ["memory.kv_store"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_memory::hybrid_retrieval",
+      "domain": "memory",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["memory.hybrid_retrieval", "memory.bm25_vector_fusion"],
+      "requires": ["memory.kv_store", "memory.bm25_index"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_memory::admission_control",
+      "domain": "memory",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["memory.admission_control", "memory.ingress_gate"],
+      "requires": ["memory.kv_store"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_memory::decay_forgetting",
+      "domain": "memory",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["memory.decay_forgetting", "memory.forgetting_curve"],
+      "requires": ["memory.kv_store"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_act::nt_act_typed_agent",
+      "domain": "act",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["act.typed_agent", "act.agent_dispatch"],
+      "requires": ["act.orchestrator"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_act::provider_abstraction",
+      "domain": "act",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["act.provider_abstraction", "act.model_routing"],
+      "requires": ["act.orchestrator"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_world::temporal_kg",
+      "domain": "world",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["world.temporal_kg", "world.temporal_reasoning"],
+      "requires": ["world.knowledge_graph"],
+      "consciousness_layer": "L2Perception",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Enhanced C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_shield::guard::agent_guardrails",
+      "domain": "shield",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["shield.agent_guardrails", "shield.action_boundary"],
+      "requires": ["shield.policy_engine"],
+      "consciousness_layer": "L3Embodiment",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_shield::compliance",
+      "domain": "shield",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["shield.compliance", "shield.regulatory_check"],
+      "requires": ["shield.policy_engine"],
+      "consciousness_layer": "L3Embodiment",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Enhanced C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_feel::cognitive_bridge",
+      "domain": "io",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["feel.cognitive_bridge", "feel.emotion_cognition_link"],
+      "requires": ["feel.affective_interface"],
+      "consciousness_layer": "L4Emotion",
+      "note": "Domain mapped to Io (no Emotion variant in tree Domain enum), Calibrated C0→C1 2026-09-20",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_core::nt_state_graph",
+      "domain": "core",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["core.state_graph", "core.state_machine"],
+      "requires": [],
+      "consciousness_layer": "L5Cognition",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_core::multi_agent",
+      "domain": "core",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["core.multi_agent", "core.agent_orchestration"],
+      "requires": ["core.state_graph"],
+      "consciousness_layer": "L5Cognition",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_mind::self_improvement",
+      "domain": "mind",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["mind.self_improvement", "mind.meta_learning"],
+      "requires": ["mind.skill_engine"],
+      "consciousness_layer": "L5Cognition",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_meta::otel_bridge",
+      "domain": "meta",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["meta.otel_bridge", "meta.telemetry_export"],
+      "requires": [],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_meta::eval_engine",
+      "domain": "meta",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["meta.eval_engine", "meta.evaluation_harness"],
+      "requires": [],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_meta::session_replay",
+      "domain": "meta",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["meta.session_replay", "meta.conversation_trace"],
+      "requires": [],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_meta::gwt_router",
+      "domain": "meta",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["meta.gwt_router", "meta.global_workspace_routing"],
+      "requires": [],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_nexus::memory_weaving",
+      "domain": "nexus",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["nexus.memory_weaving", "nexus.cross_session_linking"],
+      "requires": ["nexus.cross_session_memory"],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+    {
+      "id": "nt_repair::diagnostic_chain",
+      "domain": "repair",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["repair.diagnostic_chain", "repair.causal_diagnostic"],
+      "requires": ["repair.causal_trace"],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing",
+      "note": "Calibrated C0→C1 2026-09-20"
+    },
+
+    {
+      "id": "nt_memory::entity_linking",
+      "domain": "memory",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["memory.entity_linking", "memory.entity_resolution"],
+      "requires": ["memory.kv_store", "memory.add_only_writes"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_memory::consolidation",
+      "domain": "memory",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["memory.consolidation", "memory.working_memory_merge"],
+      "requires": ["memory.kv_store", "memory.admission_control"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_memory::distillation",
+      "domain": "memory",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["memory.distillation", "memory.cross_session_compress"],
+      "requires": ["memory.kv_store", "memory.consolidation"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_act::mcp_protocol",
+      "domain": "act",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["act.mcp_protocol", "act.tool_resource_endpoint"],
+      "requires": ["act.typed_agent"],
+      "consciousness_layer": "L1Action",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_world::rag_pipeline",
+      "domain": "world",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["world.rag_pipeline", "world.document_chunk_vector"],
+      "requires": ["world.knowledge_graph"],
+      "consciousness_layer": "L2Perception",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_world::osint::social_search",
+      "domain": "world",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["world.osint.social_search", "world.social_platform_enum"],
+      "requires": ["world.knowledge_graph"],
+      "consciousness_layer": "L2Perception",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_world::osint::automation",
+      "domain": "world",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["world.osint.automation", "world.recon_engine"],
+      "requires": ["world.knowledge_graph"],
+      "consciousness_layer": "L2Perception",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_world::osint::harvest",
+      "domain": "world",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["world.osint.harvest", "world.subdomain_email_harvest"],
+      "requires": ["world.knowledge_graph"],
+      "consciousness_layer": "L2Perception",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_world::osint::ad_graph",
+      "domain": "world",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["world.osint.ad_graph", "world.attack_path_analysis"],
+      "requires": ["world.knowledge_graph"],
+      "consciousness_layer": "L2Perception",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_shield::scanners::llm_scanner",
+      "domain": "shield",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["shield.scanners.llm_scanner", "shield.llm_probing"],
+      "requires": ["shield.policy_engine"],
+      "consciousness_layer": "L3Embodiment",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_shield::scanners::red_team",
+      "domain": "shield",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["shield.scanners.red_team", "shield.adversarial_simulation"],
+      "requires": ["shield.policy_engine"],
+      "consciousness_layer": "L3Embodiment",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_shield::scanners::secret_scanner",
+      "domain": "shield",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["shield.scanners.secret_scanner", "shield.secret_detection"],
+      "requires": ["shield.policy_engine"],
+      "consciousness_layer": "L3Embodiment",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_shield::scanners::container_scan",
+      "domain": "shield",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["shield.scanners.container_scan", "shield.sbom_vuln_scan"],
+      "requires": ["shield.policy_engine"],
+      "consciousness_layer": "L3Embodiment",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_core::multi_agent::coordinator",
+      "domain": "core",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["core.multi_agent.coordinator", "core.task_routing_load_balance"],
+      "requires": ["core.multi_agent"],
+      "consciousness_layer": "L5Cognition",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_core::multi_agent::graph_orch",
+      "domain": "core",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["core.multi_agent.graph_orch", "core.dag_scheduler_optimize"],
+      "requires": ["core.multi_agent"],
+      "consciousness_layer": "L5Cognition",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_mind::decision_engine",
+      "domain": "mind",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["mind.decision_engine", "mind.decision_score_recommend"],
+      "requires": ["mind.self_improvement"],
+      "consciousness_layer": "L5Cognition",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_mind::skill_chain",
+      "domain": "mind",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["mind.skill_chain", "mind.skill_step_executor"],
+      "requires": ["mind.self_improvement"],
+      "consciousness_layer": "L5Cognition",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_meta::otel_bridge::prompt_manager",
+      "domain": "meta",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["meta.otel_bridge.prompt_manager", "prompt_version_registry_eval"],
+      "requires": ["meta.otel_bridge"],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "nt_meta::session_replay::context_router",
+      "domain": "meta",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["meta.session_replay.context_router", "context_replay_analyze"],
+      "requires": ["meta.session_replay"],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "healing::self_healing",
+      "domain": "repair",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["repair.self_healing", "repair.circuit_breaker_resilience"],
+      "requires": ["repair.diagnostic_chain"],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "healing::predictive_maintenance",
+      "domain": "repair",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["repair.predictive_maintenance", "repair.anomaly_trend_predict"],
+      "requires": ["repair.diagnostic_chain"],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing"
+    },
+    {
+      "id": "governance::enforcement",
+      "domain": "governance",
+      "layer": "L0Primitive",
+      "constellation": "C1UnitTest",
+      "provides": ["governance.enforcement", "governance.audit_compliance"],
+      "requires": [],
+      "consciousness_layer": "L6Meta",
+      "wiring_evidence": "Unit tests passing"
+    }
+  ]
+}

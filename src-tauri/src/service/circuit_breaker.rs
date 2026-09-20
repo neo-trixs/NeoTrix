@@ -7,7 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
 
 /// Circuit Breaker 状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

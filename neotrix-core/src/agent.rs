@@ -268,12 +268,24 @@ pub mod decoder {
 
 pub mod skills {
     use std::path::{Path, PathBuf};
+    use crate::skill_loader::{SkillLoader, ResolvedSkill, SkillFilter, SearchResult};
 
+    /// Legacy struct kept for backward compatibility.
     #[derive(Debug, Clone)]
     pub struct DiscoveredSkill {
         pub name: String,
         pub description: String,
         pub path: PathBuf,
+    }
+
+    impl From<ResolvedSkill> for DiscoveredSkill {
+        fn from(rs: ResolvedSkill) -> Self {
+            DiscoveredSkill {
+                name: rs.name,
+                description: rs.description,
+                path: rs.path,
+            }
+        }
     }
 
     #[derive(Debug, Clone)]
@@ -290,91 +302,50 @@ pub mod skills {
             self.skills.clone()
         }
 
-        /// Discover all skills from workspace skills/, ~/.neotrix/skills/, ~/.agents/skills/
+        /// Discover all skills using enhanced index-based discovery with legacy fallback.
         pub fn discover_all() -> Vec<DiscoveredSkill> {
-            let mut skills = Vec::new();
-            let seen: &mut Vec<String> = &mut Vec::new();
-
-            // 1. Workspace skills/
-            let ws = Path::new("skills");
-            if ws.exists() {
-                Self::scan_dir(ws, seen, &mut skills);
-            }
-
-            // 2. ~/.neotrix/skills/
-            if let Ok(home) = std::env::var("HOME") {
-                let home_dir = PathBuf::from(&home).join(".neotrix").join("skills");
-                if home_dir.exists() {
-                    Self::scan_dir(&home_dir, seen, &mut skills);
+            // Try index-based discovery first
+            let mut loader = SkillLoader::new();
+            if let Ok(indexed) = loader.list_skills() {
+                if !indexed.is_empty() {
+                    return indexed.into_iter().map(DiscoveredSkill::from).collect();
                 }
             }
-
-            // 3. ~/.agents/skills/
-            if let Ok(home) = std::env::var("HOME") {
-                let agents_dir = PathBuf::from(&home).join(".agents").join("skills");
-                if agents_dir.exists() {
-                    Self::scan_dir(&agents_dir, seen, &mut skills);
-                }
-            }
-
-            skills
+            // Fallback to legacy filesystem scan
+            SkillLoader::scan_legacy()
+                .into_iter()
+                .map(DiscoveredSkill::from)
+                .collect()
         }
 
-        fn scan_dir(dir: &Path, seen: &mut Vec<String>, skills: &mut Vec<DiscoveredSkill>) {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        let name = path.file_name()
-                            .map(|n| n.to_string_lossy().to_string())
-                            .unwrap_or_default();
-                        let name_owned = name.clone();
-                        if seen.contains(&name_owned) { continue; }
-                        let skill_md = path.join("SKILL.md");
-                        if skill_md.exists() {
-                            let content = std::fs::read_to_string(&skill_md).unwrap_or_default();
-                            let description = Self::extract_description(&content);
-                            seen.push(name_owned.clone());
-                            skills.push(DiscoveredSkill {
-                                name: name_owned,
-                                description,
-                                path: skill_md,
-                            });
-                        }
-                    } else if let Some(ext) = path.extension() {
-                        if ext == "json" {
-                            if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                                let name_owned = name.to_string();
-                                if seen.contains(&name_owned) { continue; }
-                                seen.push(name.to_string());
-                                skills.push(DiscoveredSkill {
-                                    name: name.to_string(),
-                                    description: format!(".skill.json: {}", path.display()),
-                                    path,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
+        /// Search skills by filter (enhanced: supports tags, triggers, categories).
+        pub fn search(filter: &SkillFilter) -> Result<Vec<SearchResult>, String> {
+            SkillLoader::new().search_skills(filter)
         }
 
-        fn extract_description(content: &str) -> String {
-            for line in content.lines() {
-                if let Some(val) = line.strip_prefix("description:") {
-                    return val.trim().to_string();
-                }
-            }
-            String::new()
+        /// Get a specific skill by name with full metadata.
+        pub fn get_skill(name: &str) -> Result<ResolvedSkill, String> {
+            SkillLoader::new().load_skill(name)
         }
 
-        /// Find all SKILL.md files recursively within a directory
+        /// Get all skills in a category.
+        pub fn get_category(category: &str) -> Result<Vec<ResolvedSkill>, String> {
+            SkillLoader::new().get_category(category)
+        }
+
+        /// Get dependency chain for a skill.
+        pub fn get_dependencies(name: &str) -> Result<Vec<ResolvedSkill>, String> {
+            SkillLoader::new().get_dependencies(name)
+        }
+
+        /// Get reverse dependencies (skills that depend on this one).
+        pub fn get_dependents(name: &str) -> Result<Vec<ResolvedSkill>, String> {
+            SkillLoader::new().get_dependents(name)
+        }
+
+        /// Find all SKILL.md files recursively within a directory (delegated to skill_loader).
         pub fn find_skill_mds(dir: &Path) -> Vec<PathBuf> {
             let mut results = Vec::new();
-            if dir.is_file() && dir.ends_with("SKILL.md") {
-                results.push(dir.to_path_buf());
-                return results;
-            }
             Self::find_skill_mds_recursive(dir, &mut results);
             results
         }
@@ -384,7 +355,6 @@ pub mod skills {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if path.is_dir() {
-                        // Skip hidden directories and common excludes
                         let fname = path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
                         if fname.starts_with('.') || fname == "node_modules" || fname == "target" {
                             continue;
@@ -481,18 +451,18 @@ pub mod tool {
     /// 上层（GWT、SEAL、nt_cap）把每个 NativeTool 视为普通工具。
     #[derive(Default)]
     pub struct ToolOrchestrator {
-        tools: Vec<Box<dyn crate::core::nt_core_traits::NativeTool>>,
+        tools: Vec<Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>>,
     }
 
     impl ToolOrchestrator {
-        pub fn new(_cap: Arc<RwLock<crate::core::nt_core_cap::CapabilityVector>>) -> Self {
+        pub fn new(_cap: Arc<RwLock<neotrix_types::core::nt_core_cap::CapabilityVector>>) -> Self {
             Self::default()
         }
 
         /// 批量注册 NativeTool（吸收的 MCP 服务器走此路径）。
         pub fn register_native_all(
             &mut self,
-            tools: Vec<Box<dyn crate::core::nt_core_traits::NativeTool>>,
+            tools: Vec<Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>>,
         ) {
             self.tools.extend(tools);
         }
@@ -502,7 +472,7 @@ pub mod tool {
         }
 
         /// 列出所有已注册工具的 ToolDef（供 /mcp native 与上层消费）。
-        pub fn list_defs(&self) -> Vec<crate::core::nt_core_traits::ToolDef> {
+        pub fn list_defs(&self) -> Vec<crate::l0_substrate::nt_core_traits::ToolDef> {
             self.tools.iter().map(|t| t.to_def()).collect()
         }
 
@@ -511,7 +481,7 @@ pub mod tool {
             &self,
             name: &str,
             args: &serde_json::Value,
-        ) -> Result<crate::core::nt_core_traits::ToolOutput, String> {
+        ) -> Result<crate::l0_substrate::nt_core_traits::ToolOutput, String> {
             self.tools
                 .iter()
                 .find(|t| t.id() == name)
@@ -521,7 +491,7 @@ pub mod tool {
     }
 
     /// 从全局 McpRegistry 重建吸收的原生工具列表（真实路径，非空壳）。
-    pub fn all_native_tools() -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> {
+    pub fn all_native_tools() -> Vec<Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>> {
         crate::cli::commands::agent_cmds::get_mcp_registry()
             .blocking_read()
             .as_native_tools()
@@ -540,7 +510,7 @@ mod tests {
         assert_eq!(orch.native_count(), 0, "default orchestrator should have no tools");
     }
 
-    use crate::core::nt_core_traits::{NativeTool, ToolOutput};
+    use crate::l0_substrate::nt_core_traits::{NativeTool, ToolOutput};
     use serde_json::json;
 
     struct DummyTool(&'static str);

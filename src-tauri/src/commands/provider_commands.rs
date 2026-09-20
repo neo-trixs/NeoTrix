@@ -5,10 +5,8 @@
 //! 基于 Azure APIM Unified Model API 模式。
 //! 提供 Provider 管理、failover、cost tracking 的完整 CRUD 操作。
 
-use crate::service::circuit_breaker::CircuitBreakerConfig;
-use crate::service::cost_tracker::{CostRecord, ModelPricing, TokenUsage};
 use crate::service::provider_manager::{
-    FailoverChain, ProviderConfig, ProviderHealth, SharedProviderManager,
+    FailoverChain, ProviderConfig, SharedProviderManager,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

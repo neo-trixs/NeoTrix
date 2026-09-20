@@ -2,10 +2,63 @@ use super::*;
 use crate::nt_mind::infrastructure::ConsciousnessBridge;
 use crate::l5_cognition::nt_mind::nt_mind::evolution::dispatch_self_test::DispatchControlPlaneSelfTest;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest;
-use crate::l5_cognition::layer_aliases::recipe_refactor;
+use crate::l5_cognition::l1_facade::recipe_refactor;
 
 use log::info;
 
+use crate::l5_cognition::cognitive_load::CognitiveLoadMonitor;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
+
+/// SelfTest wrapper for CognitiveLoadMonitor — validates invariants via a fresh instance.
+struct CognitiveLoadMonitorSelfTest;
+
+impl SelfTest for CognitiveLoadMonitorSelfTest {
+    fn name(&self) -> &str {
+        "cognitive_load_monitor"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut m = CognitiveLoadMonitor::new();
+        // Fresh monitor must start in Balanced mode
+        if m.mode().name() != "balanced" {
+            failures.push(format!(
+                "cognitive_load_monitor: expected balanced start, got {:?}",
+                m.mode()
+            ));
+        }
+        // thinking_budget must be positive
+        if m.thinking_budget() <= 0.0 {
+            failures.push(format!(
+                "cognitive_load_monitor: thinking_budget {} not positive",
+                m.thinking_budget()
+            ));
+        }
+        // Record steps and verify deep_ratio tracks correctly
+        m.record_step(0.1);
+        m.record_deep_step(0.2);
+        m.record_step(0.3);
+        if (m.deep_ratio() - 1.0 / 3.0).abs() > 1e-9 {
+            failures.push(format!(
+                "cognitive_load_monitor: deep_ratio {} != 1/3",
+                m.deep_ratio()
+            ));
+        }
+        // average_load must be within [0, 1]
+        let avg = m.average_load();
+        if avg < 0.0 || avg > 1.0 {
+            failures.push(format!(
+                "cognitive_load_monitor: average_load {} out of range",
+                avg
+            ));
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
 
 /// GoldStandard 连续未达意识双阈值的升级门限 (tick 数; 默认 600s/tick ≈ 50min 持续无意识)。
 const GOLD_MISS_ESCALATE: usize = 5;
@@ -45,17 +98,6 @@ fn calibration_pair_json(quality: f64, pass_rate: f64, total: usize) -> String {
         "total": total,
     })
     .to_string()
-}
-
-/// Volition 目标向量: 认知前沿探索目标 (256B, 与候选 action 等长以供 QuantizedVSA 相似度)。
-#[allow(dead_code)]
-fn volition_goal_vector() -> Vec<u8> {
-    b"EPISTEMIC_FRONTIER_EXPLORE_LOW_DENSITY_DOMAINS"
-        .iter()
-        .copied()
-        .cycle()
-        .take(256)
-        .collect()
 }
 
 impl BackgroundLoopHandle {
@@ -204,7 +246,7 @@ impl BackgroundLoopHandle {
                     //         .map(|s| format!("{:?}", s))
                     //         .collect();
                     //     if !trace.is_empty() {
-                    //         let input = crate::l6_meta::nt_meta::nt_core_intra_reflection::ReflectionInput {
+                    //         let input = crate::l5_cognition::l1_facade::nt_core_intra_reflection::ReflectionInput {
                     //             reasoning_trace: trace,
                     //             e8_mode_history: Vec::new(),
                     //             execution_time_ms: 0,
@@ -212,7 +254,7 @@ impl BackgroundLoopHandle {
                     //             outcome_success: Some(phi > 0.3),
                     //         };
                     //         let report =
-                    //             crate::l6_meta::nt_meta::nt_core_intra_reflection::analyze(
+                    //             crate::l5_cognition::l1_facade::nt_core_intra_reflection::analyze(
                     //                 &input,
                     //             );
                     //         let ir_json = serde_json::json!({
@@ -255,7 +297,7 @@ impl BackgroundLoopHandle {
 
         // Emit awareness tick event on the EventBus
         if let Some(ref bus) = self.event_bus {
-            bus.emit(crate::core::nt_core_event::CoreEvent::TaskSubmitted {
+            bus.emit(crate::l0_substrate::nt_core_event::CoreEvent::TaskSubmitted {
                 task: "awareness_tick".into(),
                 task_type: "consciousness".into(),
                 priority: 1,
@@ -620,7 +662,7 @@ impl BackgroundLoopHandle {
                     );
                 }
                 self.try_emit(
-                    crate::core::nt_core_event::CoreEvent::ConsciousnessCritique {
+                    crate::l0_substrate::nt_core_event::CoreEvent::ConsciousnessCritique {
                         quality: c.overall_quality,
                         relevance: c.relevance_score,
                         consistency: c.consistency_score,
@@ -935,7 +977,7 @@ impl BackgroundLoopHandle {
             };
 
             // Get E8 hexagram states from WorldModelV2 (stub doesn't have e8 field)
-            let hexagram_states: Vec<crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::E8HexagramState> = Vec::new();
+            let hexagram_states: Vec<crate::l5_cognition::l1_facade::E8HexagramState> = Vec::new();
 
             let gs_report = gs.evaluate(&state, &hexagram_states);
             log::debug!(
@@ -1116,7 +1158,7 @@ impl BackgroundLoopHandle {
 
         // ── G5: AutoInspector — 多Agent自动巡检 (每N次tick执行一次) ──
         if iteration % 5 == 0 && iteration > 0 {
-            let mut inspector = crate::l6_meta::nt_meta::auto_inspector::AutoInspector::new();
+            let mut inspector = crate::l5_cognition::l1_facade::auto_inspector::AutoInspector::new();
             let results = inspector.inspect_all();
             let mut issues_found = 0usize;
             for result in &results {
@@ -1270,15 +1312,15 @@ impl BackgroundLoopHandle {
     pub(crate) async fn handle_architecture_audit(&mut self) {
         use crate::l5_cognition::nt_core_consciousness::inner_critic::InnerCritic;
         use crate::l5_cognition::nt_core_gwt::monitor::EntropyMonitor;
-        use crate::l6_meta::nt_meta::metacognition_loop::MetaCognitiveLoop;
-        use crate::l6_meta::nt_meta::monitor::MetaMonitor;
-        use crate::l6_meta::nt_meta::nt_core_arch_lint::ArchLint;
-        use crate::l6_meta::nt_meta::scanner::CodeScanner;
-        use crate::l6_meta::nt_meta::self_model::SelfModel;
-        use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
-        use crate::l6_meta::nt_core_self::self_audit::{converge_check, ConvergeCheckFn};
-        use crate::l6_meta::nt_core_self_review::SelfReviewGate;
-        use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
+        use crate::l5_cognition::l1_facade::metacognition_loop::MetaCognitiveLoop;
+        use crate::l5_cognition::l1_facade::monitor::MetaMonitor;
+        use crate::l5_cognition::l1_facade::nt_core_arch_lint::ArchLint;
+        use crate::l5_cognition::l1_facade::scanner::CodeScanner;
+        use crate::l5_cognition::l1_facade::self_model::SelfModel;
+        use crate::l0_substrate::nt_core_schema_watchdog::SchemaWatchdog;
+        use crate::l5_cognition::l1_facade::self_audit::{converge_check, ConvergeCheckFn};
+        use crate::l5_cognition::l1_facade::SelfReviewGate;
+        use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
         // GAP-2 (T3): MetaAuditor 生产消费端 — 从持久字段克隆, 周期审计发现写回。
         let mut meta_auditor = self.meta_auditor.clone();
@@ -1366,11 +1408,11 @@ impl BackgroundLoopHandle {
         // GAP-2 (T3): converge_check 发现统一汇入 MetaAuditor — 使审计器成为真实消费端,
         // 不再是仅测试调用的空转检测件 (R-P79 生产接线)。
         for f in &report.findings {
-            use crate::l6_meta::nt_meta::nt_core_meta_auditor::AuditorFinding;
+            use crate::l5_cognition::l1_facade::nt_core_meta_auditor::AuditorFinding;
             let severity = match f.severity {
-                crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Error => 0.9,
-                crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Warning => 0.6,
-                crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Info => 0.3,
+                crate::l5_cognition::l1_facade::self_audit::AuditSeverity::Error => 0.9,
+                crate::l5_cognition::l1_facade::self_audit::AuditSeverity::Warning => 0.6,
+                crate::l5_cognition::l1_facade::self_audit::AuditSeverity::Info => 0.3,
             };
             meta_auditor.record_finding(AuditorFinding {
                 file: f.file.clone(),
@@ -1384,7 +1426,7 @@ impl BackgroundLoopHandle {
         // converge_check 是 code-only; 本块把其输出作为"产出物证据信号"输入
         // MultiSignalEval, 综合判定架构健康度并写入 KB (R-P36 行为接地)。
         {
-            use crate::l6_meta::nt_core_self::self_audit::MultiSignalEval;
+            use crate::l5_cognition::l1_facade::self_audit::MultiSignalEval;
             let eval = MultiSignalEval::new(0.7);
             let mut signals = Vec::new();
             signals.push(eval.signal_syntax_ok(
@@ -1449,7 +1491,7 @@ impl BackgroundLoopHandle {
         // 幽灵分支预防 / 星辰沉寂检测 / 星系完整性验证 (star-memory skill 法则)
         if let Some(ref kb) = self.kb {
             let hygiene = kb.galaxy_hygiene_check(
-                &crate::l1_action::nt_memory::nt_memory_kb::nt_memory_galaxy_hygiene::GalaxyHygieneConfig::default(),
+                &crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_galaxy_hygiene::GalaxyHygieneConfig::default(),
             );
             // 沉寂星辰巡检: 未加载 / 超阈值 星辰列表 (生产可观测)
             let dormant = kb.galaxy_wake_scan(90);
@@ -1502,10 +1544,10 @@ impl BackgroundLoopHandle {
         // 异常 (被拒/需审批仍 executed = 守卫被绕过) 汇入 MetaAuditor +
         // 落盘 KB `consciousness` 命名空间 (行为接地, 与 converge_check 同模式)。
         if let Some(ref kb) = self.kb {
-            use crate::l5_cognition::layer_aliases::{
+            use crate::l5_cognition::l1_facade::{
                 write_guard_check_result, CheckStatus,
             };
-            use crate::l5_cognition::layer_aliases::{
+            use crate::l5_cognition::l1_facade::{
                 scan_write_guard_evidence,
             };
             let stats = scan_write_guard_evidence(kb);
@@ -1519,7 +1561,7 @@ impl BackgroundLoopHandle {
                 let _ = kb.kv_set("consciousness", "write_guard_audit", evidence);
             }
             if matches!(check.status, CheckStatus::Failed) {
-                use crate::l6_meta::nt_meta::nt_core_meta_auditor::AuditorFinding;
+                use crate::l5_cognition::l1_facade::nt_core_meta_auditor::AuditorFinding;
                 meta_auditor.record_finding(AuditorFinding {
                     file: "nt_memory_write_guard".into(),
                     category: "write_guard_anomaly".into(),
@@ -1546,7 +1588,7 @@ impl BackgroundLoopHandle {
         let meta_cog_loop = MetaCognitiveLoop::new(model);
 
         let mut self_tests = SelfTestRegistry::new();
-        self_tests.register(Box::new(crate::l6_meta::healing::nt_core_self_test::ExternalVerifier));
+        self_tests.register(Box::new(crate::l5_cognition::l1_facade::ExternalVerifier));
         self_tests.register(Box::new(watchdog));
         self_tests.register(Box::new(ConvergeCheckFn));
         self_tests.register(Box::new(scanner));
@@ -1567,7 +1609,7 @@ impl BackgroundLoopHandle {
             crate::l5_cognition::nt_mind::evolution::self_diagnose::SelfDiagnose,
         ));
         self_tests.register(Box::new(
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),
         ));
         self_tests.register(Box::new(
             crate::l5_cognition::nt_core::capability::nt_core_antidistil::DistillationDetector::new(),
@@ -1611,10 +1653,10 @@ impl BackgroundLoopHandle {
         // ── P0 多信号产出物级验证 (DSAgentBench, T2 注册) ──
         // T3 接线: converge_check 输出补强为产出物级验证 (下方 handle_architecture_audit)。
         self_tests.register(Box::new(
-            crate::l6_meta::nt_core_self::self_audit::MultiSignalEval::new(1.0),
+            crate::l5_cognition::l1_facade::self_audit::MultiSignalEval::new(1.0),
         ));
         self_tests.register(Box::new(
-            crate::core::nt_core_telemetry::TelemetryStore::new(100),
+            crate::l0_substrate::nt_core_telemetry::TelemetryStore::new(100),
         ));
         // ── 派单控制面 SelfTest (P5, T3 inline) — 周期验证 P0-P4 共进化闭环:
         // 真实多轮派单 → learner 路由迁移 + MANTA 拓扑修复 + MAGE 四子图共进化 +
@@ -1689,7 +1731,7 @@ impl BackgroundLoopHandle {
             }
         } else {
             self_tests.register(Box::new(
-                crate::l6_meta::nt_meta::knowledge_gap_detector::KnowledgeGapDetector::new(),
+                crate::l5_cognition::l1_facade::knowledge_gap_detector::KnowledgeGapDetector::new(),
             ));
         }
 
@@ -1761,7 +1803,7 @@ impl BackgroundLoopHandle {
                 ),
             }
         } else {
-            let mut cm = crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor::new();
+            let mut cm = crate::l5_cognition::l1_facade::ConsciousnessMonitor::new();
             cm.observe();
             self_tests.register(Box::new(cm));
         }
@@ -1788,27 +1830,15 @@ impl BackgroundLoopHandle {
                 ),
             }
         } else {
-            self_tests.register(Box::new(crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
+            self_tests.register(Box::new(crate::l5_cognition::l1_facade::ConsciousnessGoldStandard::new()));
         }
 
-        // CognitiveLoadMonitor (existing clone pattern)
-        if let Some(ref clm) = self.cognitive_load {
-            match clm.self_test() {
-                Ok(()) => log::info!("[SELF-TEST] CognitiveLoadMonitor ✅ pass"),
-                Err(failures) => log::warn!(
-                    "[SELF-TEST] CognitiveLoadMonitor ❌ FAIL: {}",
-                    failures.join("; ")
-                ),
-            }
-        } else {
-            self_tests.register(Box::new(
-                crate::l5_cognition::nt_core_consciousness::CognitiveLoadMonitor::new(),
-            ));
-        }
+        // CognitiveLoadMonitor SelfTest
+        self_tests.register(Box::new(CognitiveLoadMonitorSelfTest));
 
         // ── L1 Shield + IO SelfTest registrations ──
         // (disabled: these types don't implement SelfTest yet)
-        self_tests.register(Box::new(crate::l1_action::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
+        self_tests.register(Box::new(crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
 
         // ── Run registry self-tests for remaining modules ──
         let results = self_tests.run_all();
@@ -1820,7 +1850,7 @@ impl BackgroundLoopHandle {
                 log::warn!("{}", r.summary());
                 failure_count += 1;
                 // GAP-2 (T3): SelfTest 失败同样汇入 MetaAuditor (R-P79 生产消费)。
-                use crate::l6_meta::nt_meta::nt_core_meta_auditor::AuditorFinding;
+                use crate::l5_cognition::l1_facade::nt_core_meta_auditor::AuditorFinding;
                 meta_auditor.record_finding(AuditorFinding {
                     file: r.name.clone(),
                     category: "selftest_failure".to_string(),
@@ -1921,71 +1951,71 @@ impl BackgroundLoopHandle {
     /// 与 handle_architecture_audit 的完整 registry (3600s) 分层: 此方法用高频轻量集,
     /// 保证 `consciousness/core` 快照分支健康保持实时非 0 — 驱动迷雾下降与 MCP status 真实读数。
     fn feed_persistent_branch_health(&mut self) {
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
-        let mut results: Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> = Vec::new();
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
+        let mut results: Vec<crate::l0_substrate::nt_core_self_test::SelfTestResult> = Vec::new();
 
         // NT-CORE: 意识核心检测件
         // self_test not available on Arc<RwLock<BMonitor>>
         // if let Some(b) = self.bbrain.as_ref() {
         //     match b.self_test() {
-        //         Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+        //         Ok(()) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
         //             "nt_core_bbrain_monitor",
         //         )),
-        //         Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+        //         Err(f) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
         //             "nt_core_bbrain_monitor",
         //             f,
         //         )),
         //     }
         // }
-        results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_core_bbrain_monitor"));
+        results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_core_bbrain_monitor"));
         match self.cog_eval.self_test() {
-            Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+            Ok(()) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                 "nt_core_cognitive_evaluator",
             )),
-            Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+            Err(f) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                 "nt_core_cognitive_evaluator",
                 f,
             )),
         }
         if let Some(ref m) = self.awareness {
             match m.self_test() {
-                Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+                Ok(()) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                     "nt_core_consciousness_monitor",
                 )),
-                Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+                Err(f) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                     "nt_core_consciousness_monitor",
                     f,
                 )),
             }
         }
         // NT-MEMORY: 叙事一致性 / 知识缺口
-        let narrative_ok = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new().self_test().is_ok();
+        let narrative_ok = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new().self_test().is_ok();
         results.push(if narrative_ok {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency")
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency")
         } else {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                 "nt_memory_narrative_consistency",
                 vec!["narrative consistency check failed".into()],
             )
         });
         if let Some(ref g) = self.gap_detector {
             match g.self_test() {
-                Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+                Ok(()) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                     "nt_memory_knowledge_gap",
                 )),
-                Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+                Err(f) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                     "nt_memory_knowledge_gap",
                     f,
                 )),
             }
         }
         // NT-MIND: 认知负载 / FEPIIT 桥
-        if let Some(ref clm) = self.cognitive_load {
-            match clm.self_test() {
-                Ok(()) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+        if let Some(ref _clm) = self.cognitive_load {
+            match CognitiveLoadMonitorSelfTest.self_test() {
+                Ok(()) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                     "nt_mind_cognitive_load",
                 )),
-                Err(f) => results.push(crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+                Err(f) => results.push(crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                     "nt_mind_cognitive_load",
                     f,
                 )),
@@ -2002,9 +2032,9 @@ impl BackgroundLoopHandle {
                 .self_test()
                 .is_ok();
         results.push(if shield_ok {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry")
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry")
         } else {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                 "nt_shield_check_registry",
                 vec!["check registry selftest failed".into()],
             )
@@ -2019,9 +2049,9 @@ impl BackgroundLoopHandle {
         //         .self_test()
         //         .is_ok();
         // results.push(if repair_ok {
-        //     crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_repair_causal_trace")
+        //     crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_repair_causal_trace")
         // } else {
-        //     crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+        //     crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
         //         "nt_repair_causal_trace",
         //         vec!["causal trace selftest failed".into()],
         //     )
@@ -2031,38 +2061,38 @@ impl BackgroundLoopHandle {
                 .self_test()
                 .is_ok();
         results.push(if meta_ok {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                 "nt_meta_transcendent_observer",
             )
         } else {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                 "nt_meta_transcendent_observer",
                 vec!["meta observer selftest failed".into()],
             )
         });
-        let gov_ok = crate::l6_meta::nt_core_self_constitution::GovernanceConstitutionSelfTest
+        let gov_ok = crate::l5_cognition::l1_facade::GovernanceConstitutionSelfTest
             .self_test()
             .is_ok();
         results.push(if gov_ok {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                 "nt_governance_constitution",
             )
         } else {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                 "nt_governance_constitution",
                 vec!["constitution governance selftest failed".into()],
             )
         });
         let nexus_ok =
-            crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemorySelfTest
+            crate::l5_cognition::l1_facade::CrossSessionMemorySelfTest
                 .self_test()
                 .is_ok();
         results.push(if nexus_ok {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                 "nt_nexus_cross_session_memory",
             )
         } else {
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::fail(
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::fail(
                 "nt_nexus_cross_session_memory",
                 vec!["cross-session memory selftest failed".into()],
             )

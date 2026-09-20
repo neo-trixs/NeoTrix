@@ -13,7 +13,7 @@
 use super::CapabilityNode;
 use crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot;
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
-use crate::core::nt_core_traits::RuneSocket;
+use crate::l0_substrate::nt_core_traits::RuneSocket;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

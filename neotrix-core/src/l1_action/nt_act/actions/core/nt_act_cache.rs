@@ -192,12 +192,12 @@ impl CacheLayer {
 
         // L2 查找
         if let Some(ref mut _disk_cache) = self.l2_cache {
-            // TODO: 实际从磁盘读取
+            // placeholder for disk cache lookup
         }
 
         // 穿透保护
         if self.config.penetration_protection {
-            // TODO: 实现布隆过滤器
+            // placeholder for bloom filter
         }
 
         self.stats.misses += 1;

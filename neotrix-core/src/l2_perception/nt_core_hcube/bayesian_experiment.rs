@@ -268,7 +268,7 @@ impl BayesianExperimentDesign {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BayesianExperimentDesign {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for BayesianExperimentDesign {
     fn name(&self) -> &str {
         "nt_core_hcube_bayesian_experiment"
     }
@@ -324,7 +324,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BayesianExperiment
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     /// 均匀先验 + 零对数似然 → 归一化后均匀后验
     fn sample_design(n: usize) -> BayesianExperimentDesign {

@@ -4,7 +4,7 @@
 //! agent 提供可递归重访的经验缓存。本模块实现 `_RecurisWorkingMemory` 经验缓存
 //! trait (C1: trait 存在 + 基础逻辑 + SelfTest T1 + 3 测试)。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 use std::collections::VecDeque;
 
 /// 单条经验记录: 输入/输出/递归深度。

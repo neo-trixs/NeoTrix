@@ -171,7 +171,7 @@ impl GdacsFetcher {
             );
             let existing = kb.find_node_by_url(&evt.url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.name, crate::l6_meta::nt_core_kb_types::NodeType::Event, Some(&summary), Some(&evt.url), Some("gdacs"))
+            let _id = kb.insert_or_get_node(&evt.name, neotrix_types::knowledge_access::NodeType::Event, Some(&summary), Some(&evt.url), Some("gdacs"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.eventid, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }
@@ -260,7 +260,7 @@ mod tests {
     #[test]
     fn test_ingest_fixture() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
         let report = GdacsFetcher::new().ingest_from_json(&kb, GDACS_FIXTURE_JSON).expect("ingest");
         assert_eq!(report.nodes_created, 2);
     }

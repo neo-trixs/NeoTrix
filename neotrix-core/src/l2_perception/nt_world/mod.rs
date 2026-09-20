@@ -5,8 +5,8 @@
 //!   osint/       — 情报类 (osint + absorber)
 //!   sense/       — 感知类 (sense + jepa + model)
 //!   explore/     — 探索类 (map + cleanup)
-//!   source/      — 源类 (media_source)
-//!   data_source/ — 外部数据源采集器 (edgar/gdelt/usgs/gdacs 等 12 个)
+//!   source/      — 媒体源类 (audio/video/text/social/playlist)
+//!   data_source/ — 情报数据源采集器 (12 个)
 
 pub mod l1_facade;
 pub mod crawl;
@@ -32,10 +32,9 @@ pub mod port_service;
 pub mod nt_world_code_search;
 pub mod nt_world_e8;
 pub mod nt_world_github_absorber;
-// 数据源子目录 (12 个外部数据源采集器)
-pub mod data_source;
 
-// 向后兼容别名 — 旧路径 nt_world::nt_world_xxx 仍可用
+// ── 情报数据源 (12) ──────────────────────────────────────────
+pub mod data_source;
 pub use data_source::nt_world_edgar;
 pub use data_source::nt_world_gdelt;
 pub use data_source::nt_world_usgs;
@@ -48,6 +47,8 @@ pub use data_source::nt_world_aoi;
 pub use data_source::nt_world_adsb;
 pub use data_source::nt_world_bgpview;
 pub use data_source::nt_world_opencorporates;
+
+// ── 媒体源扩展模块 ──────────────────────────────────────────
 pub mod nt_world_intel_selftest;
 pub mod nt_world_infer;
 pub mod nt_world_scrape;
@@ -87,6 +88,9 @@ pub mod function_recovery;
 
 // 控制流图构建
 pub mod cfg_builder;
+
+// 本地 RAG 管线
+pub mod rag_pipeline;
 
 // 向后兼容别名
 pub use media_asset_registry::AssetRegistry;

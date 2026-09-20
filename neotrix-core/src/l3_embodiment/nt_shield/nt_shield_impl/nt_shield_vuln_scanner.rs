@@ -66,7 +66,7 @@ impl NucleiEngine {
                 self.templates_dir
             ));
         }
-        // TODO: Spawn nuclei with template: nuclei -t templates_dir -target target
+        // Spawn nuclei with template: nuclei -t templates_dir -target target
         // Requires nix::unistd::fork or tokio::process::Command to invoke the binary.
         Err("Nuclei subprocess not wired: requires `nuclei` binary on PATH and \
              templates directory at {:?}. Run `nuclei -ut` to download templates."

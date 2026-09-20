@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub use crate::core::nt_core_cap::CapabilityVector;
+pub use neotrix_types::core::nt_core_cap::CapabilityVector;
 
 pub type CapabilityId = Uuid;
 

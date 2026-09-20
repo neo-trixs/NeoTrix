@@ -379,7 +379,7 @@ impl SeleniumSession {
         config: &SeleniumConfig,
         _profile_dir: &Path,
     ) -> Result<Box<dyn WebDriverBackend>, String> {
-        // TODO: When a `selenium` feature is added, create real ChromeDriver-backed backend here.
+        // When a `selenium` feature is added, create real ChromeDriver-backed backend here.
         let _ = config;
         Ok(Box::new(MockBackend::new()))
     }

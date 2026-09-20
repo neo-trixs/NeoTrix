@@ -1,6 +1,6 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l6_meta::nt_core_memory_asset::MemoryAssetKind;
-use crate::l1_action::nt_memory::nt_memory_kb::{
+use crate::l4_emotion::nt_memory::nt_memory_kb::{
     diff_snapshots, kb_write_guard, record_write_evidence, snapshot_from_file, snapshot_kb,
     snapshot_to_file, KnowledgeBase, KnowledgeNode, NodeType, RelationType, WriteGuardVerdict,
 };
@@ -102,7 +102,7 @@ impl CliCommand for KbCmd {
                   /kb central [--top-k 20]       中心性分析 (PageRank)\n\
                   /kb serve [--port 8337]        启动 MCP 知识服务\n\
                   /kb export <node_id> [--format json|svg]  导出子图\n\
-                  /kb import-assets [path]       导入 assets/knowledge_data.json 到 KB\n\
+                  /kb import-assets [path]       导入 skills/assets/knowledge_data.json 到 KB\n\
                   /kb import-review [path]      导入 review-findings.json 缺陷记录到 KB\n\
                   /kb absorb-map [--dry-run] [--limit N] [--types a,b] 全库本源溯源+能力映射 (R-P79)\n\
                   /kb consistency               设定一致性检查 (对标网文每卷设定检查)\n\
@@ -159,7 +159,7 @@ fn cmd_consistency(_args: &[String]) -> CommandOutput {
 
 /// /kb axioms — 架构公理推演树 (公理→定律→模块约束)
 fn cmd_axioms(_args: &[String]) -> CommandOutput {
-    let tree = crate::core::nt_core_axiom_tree::AxiomTree::build();
+    let tree = crate::l0_substrate::nt_core_axiom_tree::AxiomTree::build();
     CommandOutput::ok(&tree.render())
 }
 
@@ -318,7 +318,7 @@ fn cmd_diff(args: &[String]) -> CommandOutput {
         return CommandOutput::ok(&out).with_json(serde_json::json!(diff));
     }
 
-    let render_nodes = |items: &[crate::l1_action::nt_memory::nt_memory_kb::DiffNode], tag: &str| {
+    let render_nodes = |items: &[crate::l4_emotion::nt_memory::nt_memory_kb::DiffNode], tag: &str| {
         let mut s = String::new();
         for item in items.iter().take(detail) {
             s.push_str(&format!(
@@ -356,7 +356,7 @@ fn cmd_diff(args: &[String]) -> CommandOutput {
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
-    let kb = match crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+    let kb = match crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
         Ok(k) => k,
         Err(e) => return CommandOutput::err(&format!("知识库初始化失败: {}", e)),
     };
@@ -377,8 +377,8 @@ fn cmd_embed(_args: &[String]) -> CommandOutput {
 /// 从 KB 已有向量采样 (q,d) 对, teacher = 余弦, 点级回归训练双塔对角学生,
 /// 落盘 ~/.neotrix/distill_student.json; hybrid_search Tier 3 自动消费。
 fn cmd_distill(args: &[String]) -> CommandOutput {
-    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::load_all_embeddings;
-    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_distill::{
+    use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_embed::load_all_embeddings;
+    use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_distill::{
         load_student, sample_contrastive_pairs, sample_training_pairs, save_student,
         train_contrastive, CONTRASTIVE_MARGIN, PointwiseDistillStudent,
     };
@@ -547,7 +547,7 @@ fn cmd_absorb_map(args: &[String]) -> CommandOutput {
     };
     let limit_opt = if limit == usize::MAX { None } else { Some(limit) };
 
-    let (mapped, report) = match crate::l1_action::nt_memory::nt_memory_kb::map_nodes(&conn, None, types.as_deref(), limit_opt)
+    let (mapped, report) = match crate::l4_emotion::nt_memory::nt_memory_kb::map_nodes(&conn, None, types.as_deref(), limit_opt)
     {
         Ok(r) => r,
         Err(e) => return CommandOutput::err(&format!("全库溯源失败: {}", e)),
@@ -582,7 +582,7 @@ fn cmd_absorb_map(args: &[String]) -> CommandOutput {
         return CommandOutput::ok(&lines.join("\n"));
     }
 
-    match crate::l1_action::nt_memory::nt_memory_kb::apply_mappings(&conn, &mapped) {
+    match crate::l4_emotion::nt_memory::nt_memory_kb::apply_mappings(&conn, &mapped) {
         Ok(n) => {
             lines.push(String::new());
             lines.push(format!("[absorb-map] 已写库: {} 条 absorbed_capability + knowledge_source", n));
@@ -593,7 +593,7 @@ fn cmd_absorb_map(args: &[String]) -> CommandOutput {
 }
 
 fn cmd_import_assets(args: &[String]) -> CommandOutput {
-    let path = args.first().map(|s| s.as_str()).unwrap_or("assets/knowledge_data.json");
+    let path = args.first().map(|s| s.as_str()).unwrap_or("skills/assets/knowledge_data.json");
     let path = std::path::Path::new(path);
 
     if !path.exists() {
@@ -624,7 +624,7 @@ fn cmd_import_assets(args: &[String]) -> CommandOutput {
 }
 
 fn cmd_import_review(_args: &[String]) -> CommandOutput {
-    let path = "design/review-findings.json";
+    let path = "skills/design/review-findings.json";
     let path = std::path::Path::new(path);
 
     if !path.exists() {
@@ -697,7 +697,7 @@ fn cmd_search(args: &[String]) -> CommandOutput {
     // Operator terminal context: Confidential clearance (keeps Secret-tier nodes
     // out unless the operator runs the full tree). Wiring the permission-aware
     // retrieval path (Onyx pattern) instead of raw search.
-    let permission = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Confidential;
+    let permission = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Confidential;
     match kb.search_permission_aware(&query, 10, permission) {
         Ok(results) => {
             if results.is_empty() {
@@ -1505,7 +1505,7 @@ mod tests {
     fn test_absorb_map_dry_run() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             seed_node(&conn, "u_2", "paper", "Attention Is All You Need", "https://arxiv.org/abs/1706.03762");
             drop(conn);
@@ -1522,7 +1522,7 @@ mod tests {
     fn test_absorb_map_apply_writes_metadata() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 
@@ -1544,7 +1544,7 @@ mod tests {
     fn test_snapshot_then_diff_reports_added_node() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 
@@ -1576,7 +1576,7 @@ mod tests {
     fn test_snapshot_roundtrip_via_diff_same_db() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 

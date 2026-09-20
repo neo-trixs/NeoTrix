@@ -6,8 +6,8 @@ use super::common::generation_classifier::{GenerationAnalytics, GenerationClassi
 use super::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::health::rate_limiter::{AdaptivePacer, TieredSemaphore};
 use crate::l0_substrate::nt_core_error::recovery::{RecoveryConfig, RecoveryOrchestrator};
-use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
-use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
+use crate::l0_substrate::nt_core_cache::{CacheConfig, SemanticCache};
+use crate::l0_substrate::nt_core_span::{ConsoleTracer, CostTracker};
 use super::common::types::{LlmError, LlmProvider, LlmRequest, LlmResponse};
 
 // ── 模块 (扁平化: 6层→3层) ─────────────────────────────────

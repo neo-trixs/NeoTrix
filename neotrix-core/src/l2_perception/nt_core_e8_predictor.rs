@@ -148,7 +148,7 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
         std::fs::create_dir_all(parent).map_err(|e| format!("KB dir: {}", e))?;
     }
     let conn = rusqlite::Connection::open(&path).map_err(|e| format!("KB open: {}", e))?;
-    crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
+    crate::l0_substrate::nt_core_kb_primitives::schema_initialize(&conn)
         .map_err(|e| format!("KB init: {}", e))?;
     Ok(conn)
 }
@@ -167,7 +167,7 @@ pub fn load() -> E8Predictor {
         Ok(c) => c,
         Err(_) => return E8Predictor::new(),
     };
-    let raw = match crate::l6_meta::nt_core_kb_primitives::kv_get(
+    let raw = match crate::l0_substrate::nt_core_kb_primitives::kv_get(
         &conn,
         KB_NAMESPACE,
         KB_KEY,
@@ -195,7 +195,7 @@ pub fn persist(predictor: &E8Predictor) {
         Ok(j) => j,
         Err(_) => return,
     };
-    let _ = crate::l6_meta::nt_core_kb_primitives::kv_set(
+    let _ = crate::l0_substrate::nt_core_kb_primitives::kv_set(
         &conn,
         KB_NAMESPACE,
         KB_KEY,

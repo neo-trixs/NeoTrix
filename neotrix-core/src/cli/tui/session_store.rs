@@ -39,7 +39,7 @@ pub struct SessionData {
 /// 会话存储 — 真实落盘到 KB `session_logs` 表 + `~/.neotrix/session-logs/*.md`
 /// 蒸馏输入。覆盖 `/session` 全子命令，替代原内存桩 (R-P79 接线)。
 pub struct SessionStore {
-    kb: crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+    kb: crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase,
     base: std::path::PathBuf,
 }
 
@@ -55,7 +55,7 @@ impl SessionStore {
 
     /// 测试/隔离环境: 指定 base 目录 (KB + session-logs 均在其下)
     pub fn with_base(base: std::path::PathBuf) -> Self {
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(base.join("knowledge.db")))
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(base.join("knowledge.db")))
             .expect("KB open");
         Self { kb, base }
     }

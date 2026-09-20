@@ -5,9 +5,9 @@
 //! 提供模型下载、验证、列表等操作的 Tauri 命令。
 
 use crate::desktop::model_manager::{ModelManager, ModelMetadata, ModelSource, ModelFormat};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::command;
+use tauri::State;
 use tokio::sync::RwLock;
 
 // ========== 模型管理状态 ==========
@@ -116,10 +116,6 @@ pub async fn model_search(
         .cloned()
         .collect())
 }
-
-// ========== 使用 tauri::State 需要的导入 ==========
-
-use tauri::State;
 
 // ========== 测试 ==========
 

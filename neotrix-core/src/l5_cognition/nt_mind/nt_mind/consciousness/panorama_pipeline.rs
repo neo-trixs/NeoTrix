@@ -5,8 +5,8 @@ use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::l5_cognition::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
 use crate::l1_action::nt_core_bank::ReasoningMemory;
 use crate::l1_action::nt_core_edit::MicroEdit;
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-use crate::l5_cognition::layer_aliases::WorldModelV2;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l5_cognition::l1_facade::WorldModelV2;
 use crate::l2_perception::nt_core_knowledge::TaskType;
 use crate::l2_perception::nt_world::nt_world_infer::FreeEnergyReport;
 use crate::l5_cognition::nt_core::nt_iit_phi::PhiReport;
@@ -295,7 +295,7 @@ mod tests {
     use super::*;
     use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
     use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
-use crate::l5_cognition::layer_aliases::WorldModelV2;
+use crate::l5_cognition::l1_facade::WorldModelV2;
 
     #[test]
     fn test_resonance_activation() {

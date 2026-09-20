@@ -3,9 +3,9 @@ use colored::Colorize;
 
 #[cfg(feature = "stealth-net")]
 pub async fn run_proxy_cmd(cmd_str: &str) {
-    use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::local_proxy::TorManager;
-    use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::{DaemonMode, ProxyClient};
-    use crate::neotrix::proxy_daemon_wrapper;
+    use neotrix::l3_embodiment::nt_shield::nt_shield_stealth_net::local_proxy::TorManager;
+    use neotrix::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::{DaemonMode, ProxyClient};
+    use neotrix::neotrix::proxy_daemon_wrapper;
 
     let client = ProxyClient::new();
     let parts: Vec<&str> = cmd_str.split_whitespace().collect();
@@ -117,7 +117,7 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
         "install" => {
             let plist = match proxy_daemon_wrapper::resolve_daemon_path() {
                 Some(p) => {
-                    let parent = p.parent().unwrap_or(std::path::Path::new("/usr/local/bin"));
+                    let parent: &std::path::Path = p.parent().unwrap_or(std::path::Path::new("/usr/local/bin"));
                     parent.join("com.neotrix.proxy-daemon.plist")
                 }
                 None => {

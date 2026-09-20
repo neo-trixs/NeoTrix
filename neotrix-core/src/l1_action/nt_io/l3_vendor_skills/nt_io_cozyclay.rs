@@ -6,7 +6,7 @@
 //! 核心能力: 把 3D 预可视化编排为场景摆位 + 镜头控制 + AI 导演接口。
 //! 本 stub 负责场景摆位校验、镜头控制规格生成与导演指令校验。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 3D 摆位: 一个角色/物体在场景中的位置 (x,y,z) 与朝向。
 #[derive(Debug, Clone, PartialEq)]

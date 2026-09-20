@@ -333,7 +333,7 @@ mod tests {
         // FABRICATED INPUT: DynamicParams and SegmentData are synthetic fixtures,
         // not derived from real content production. The test proves validation logic
         // works, not that real content passes validation.
-        // TODO(R-P79): Wire real content production data and assert that cross-module
+        // Wire real content production data and assert that cross-module
         // audit catches real inconsistencies (e.g., climax segment with Micro rating).
         let checker = CrossModuleAudit::default_checker();
         

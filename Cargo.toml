@@ -4,12 +4,12 @@ members = [
     "src-tauri",
     "crates/neotrix-types",
     "crates/neotrix-sysctl",
-    "guard_core",
+    "crates/neotrix-consciousness",
+    "crates/neotrix-reasoning",
+    "crates/neotrix-gateway",
+    "crates/neotrix-multi-agent",
     "neotrix-core/src/neotrix/nt_core_capability_tree",
     "crates/nt-lang",
-    "neotrix-sim",
-    "nt-world-sim",
-    "nt-world-sim/src-tauri",
 ]
 
 resolver = "2"

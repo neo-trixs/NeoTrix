@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
 use crate::l5_cognition::nt_mind::nt_mind::core::KnowledgeSource;
 use super::bus::ElementBus;
 use super::{Element, ElementError, ElementType, CapabilityAccess, CapabilityOp};

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::l6_meta::nt_core_capability::*;
+use crate::l0_substrate::nt_core_capability_types::*;
 
 /// Zero Trust状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

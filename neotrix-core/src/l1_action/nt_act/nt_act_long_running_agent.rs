@@ -176,8 +176,6 @@ pub struct AgentConfig {
 pub struct ContextBloatManager {
     max_context_tokens: u64,
     compaction_threshold: f64, // Trigger compaction at this % full
-    #[allow(dead_code)]
-    summary_buffer: Vec<String>,
 }
 
 impl ContextBloatManager {
@@ -185,7 +183,6 @@ impl ContextBloatManager {
         Self {
             max_context_tokens,
             compaction_threshold: 0.8, // 80% full triggers compaction
-            summary_buffer: Vec::new(),
         }
     }
 
@@ -260,15 +257,12 @@ pub struct CompactionResult {
 /// Long-running Agent Manager
 pub struct LongRunningAgentManager {
     tasks: Arc<Mutex<HashMap<String, LongRunningAgentTask>>>,
-    #[allow(dead_code)]
-    context_manager: ContextBloatManager,
 }
 
 impl LongRunningAgentManager {
     pub fn new(max_context_tokens: u64) -> Self {
         Self {
             tasks: Arc::new(Mutex::new(HashMap::new())),
-            context_manager: ContextBloatManager::new(max_context_tokens),
         }
     }
 

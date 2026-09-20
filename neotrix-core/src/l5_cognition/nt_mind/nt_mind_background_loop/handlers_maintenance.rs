@@ -327,7 +327,7 @@ impl BackgroundLoopHandle {
                 stats.max_depth
             );
             if stats.orphans > 0 {
-                self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+                self.try_emit(crate::l0_substrate::nt_core_event::CoreEvent::SystemError {
                     component: "skill_tree".into(),
                     error: format!("{} orphan skills (parent missing)", stats.orphans),
                     severity: "warning".into(),
@@ -344,7 +344,7 @@ impl BackgroundLoopHandle {
                 flagged.len(),
                 names
             );
-            self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+            self.try_emit(crate::l0_substrate::nt_core_event::CoreEvent::SystemError {
                 component: "skill_attribution".into(),
                 error: format!("procedure-heavy skills flagged: {:?}", names),
                 severity: "warning".into(),
@@ -366,7 +366,7 @@ impl BackgroundLoopHandle {
                 fat.len(),
                 names
             );
-            self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+            self.try_emit(crate::l0_substrate::nt_core_event::CoreEvent::SystemError {
                 component: "skill_residency".into(),
                 error: format!("resident-heavy skills (thin-entry candidates): {:?}", names),
                 severity: "warning".into(),
@@ -377,13 +377,6 @@ impl BackgroundLoopHandle {
                 residency.len()
             );
         }
-    }
-
-    /// G18 统一会话 digest flush (novu 吸收): 周期清出超窗摘要桶, 报告会话拓扑。
-    #[allow(dead_code)]
-    pub(crate) async fn handle_session_router_flush(&mut self) {
-        // session_router 字段已注释, stub 实现
-        log::trace!("[bg] session_router: flush skipped (disabled)");
     }
 
     /// G28 自维护巡检 healers (topics/code-health 吸收): 多维度代码健康扫描,
@@ -414,7 +407,7 @@ impl BackgroundLoopHandle {
             report.iter().filter(|s| s.dimension == "unwraps").count()
         );
         if !report.is_empty() {
-            self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+            self.try_emit(crate::l0_substrate::nt_core_event::CoreEvent::SystemError {
                 component: "healers".into(),
                 error: format!("{} code-health findings: {:?}", report.len(), dims),
                 severity: "info".into(),
@@ -495,14 +488,14 @@ impl BackgroundLoopHandle {
             Ok(r) => r,
             Err(e) => {
                 log::error!("[bg] kb_absorb failed: {}", e);
-                self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+                self.try_emit(crate::l0_substrate::nt_core_event::CoreEvent::SystemError {
                     component: "kb_absorb".into(), error: e.to_string(), severity: "error".into(),
                 });
                 return;
             }
         };
         log::info!("[bg] kb_absorb: {} sources", report.total_sources);
-        self.try_emit(crate::core::nt_core_event::CoreEvent::TaskSubmitted {
+        self.try_emit(crate::l0_substrate::nt_core_event::CoreEvent::TaskSubmitted {
             task: "kb_absorb".into(), task_type: "ingestion".into(), priority: 3,
         });
     }
@@ -594,7 +587,7 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_constitution_reload(&mut self) {
-        use crate::l6_meta::nt_core_self_constitution::ConstitutionLoader;
+        use crate::l5_cognition::l1_facade::ConstitutionLoader;
         let path = std::path::Path::new("AGENTS.md");
         if path.exists() {
             match ConstitutionLoader::load_from_file(path) {
@@ -656,7 +649,7 @@ impl BackgroundLoopHandle {
     /// ① 消费 novel_queue(外部起点采集器入队) → ingest_qidian_book;
     /// ② 离线为既有 Book 节点补世界观分类。
     pub(crate) async fn handle_novel_ingest(&mut self) {
-        use crate::l5_cognition::layer_aliases::{drain_novel_queue, classify_unanalyzed_books};
+        use crate::l5_cognition::l1_facade::{drain_novel_queue, classify_unanalyzed_books};
         let kb = match self.kb_pipeline.kb.as_ref() {
             Some(kb) => kb,
             None => { log::warn!("[bg] novel_ingest: kb not attached"); return; }
@@ -683,7 +676,7 @@ impl BackgroundLoopHandle {
     ///
     /// 聚类结果供 GWT 注意力路由和知识检索使用 (域感知检索)。
     pub(crate) async fn handle_clustering(&mut self) {
-        use crate::l5_cognition::layer_aliases::{
+        use crate::l5_cognition::l1_facade::{
             CommunityDetector, CommunityAwareSearch,
             ensure_domain_cluster, get_all_edges, get_all_nodes, update_cluster_stats,
         };
@@ -765,7 +758,7 @@ impl BackgroundLoopHandle {
             }
 
             // Update stats for all clusters
-            if let Ok(clusters) = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::list_clusters(&conn) {
+            if let Ok(clusters) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::list_clusters(&conn) {
                 for cluster in &clusters {
                     if let Err(e) = update_cluster_stats(&conn, &cluster.id) {
                         log::warn!("[bg] failed to update cluster stats for {}: {}", cluster.id, e);
@@ -775,7 +768,7 @@ impl BackgroundLoopHandle {
 
             log::info!("[bg] clustering: {} nodes, {} edges, {} hierarchy levels, {} clusters, {} reassigned",
                 nodes.len(), edges.len(), hierarchy.num_levels(),
-                crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::list_clusters(&conn)
+                crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::list_clusters(&conn)
                     .map(|c| c.len()).unwrap_or(0),
                 assigned);
         }
@@ -787,8 +780,8 @@ impl BackgroundLoopHandle {
     /// - restart_module: 重启故障模块 (通过 EventBus 发送重启信号)
     /// - alert: 经 EventBus 广播告警, 注入意识监控
     pub(crate) async fn handle_system_health_heal(&mut self) {
-        use crate::l6_meta::nt_core_self::self_audit::scan_system_health;
-        use crate::core::nt_core_event::CoreEvent;
+        use crate::l5_cognition::l1_facade::self_audit::scan_system_health;
+        use crate::l0_substrate::nt_core_event::CoreEvent;
 
         let findings = scan_system_health(".");
         if findings.is_empty() {
@@ -828,9 +821,9 @@ impl BackgroundLoopHandle {
                 component: "nt_repair".into(),
                 error: f.message.clone(),
                 severity: match f.severity {
-                    crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Error => "error",
-                    crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Warning => "warning",
-                    crate::l6_meta::nt_core_self::self_audit::AuditSeverity::Info => "info",
+                    crate::l5_cognition::l1_facade::self_audit::AuditSeverity::Error => "error",
+                    crate::l5_cognition::l1_facade::self_audit::AuditSeverity::Warning => "warning",
+                    crate::l5_cognition::l1_facade::self_audit::AuditSeverity::Info => "info",
                 }.into(),
             });
         }
@@ -887,7 +880,7 @@ impl BackgroundLoopHandle {
     }
 
     /// 发送告警 (注入意识监控, 供治理层/NT-SHIELD 处置)
-    async fn emit_alert(&mut self, alert_type: &str, findings: &[crate::l6_meta::nt_core_self::self_audit::AuditFinding]) {
+    async fn emit_alert(&mut self, alert_type: &str, findings: &[crate::l5_cognition::l1_facade::self_audit::AuditFinding]) {
         let msg = findings.iter()
             .filter(|f| f.category == alert_type)
             .map(|f| f.message.clone())
@@ -902,7 +895,7 @@ impl BackgroundLoopHandle {
     }
 
     /// 自愈动作落地 → 经验分支 (单一事实源闭环)
-    async fn report_heal_experience(&mut self, findings: &[crate::l6_meta::nt_core_self::self_audit::AuditFinding]) {
+    async fn report_heal_experience(&mut self, findings: &[crate::l5_cognition::l1_facade::self_audit::AuditFinding]) {
         let kb = match self.kb.as_ref() {
             Some(kb) => kb,
             None => {
@@ -948,7 +941,7 @@ impl BackgroundLoopHandle {
     /// L6 自我改进循环 — 采集系统指标 → 诊断瓶颈 → 生成改进方案 → 执行 → 验证。
     /// 与 SEAL pipeline 互补: SEAL 聚焦技能模板提取, 本模块聚焦系统层面参数调优。
     pub(crate) async fn handle_self_improvement(&mut self) {
-        use crate::l6_meta::coordination::self_improvement::SystemMetrics;
+        use crate::l5_cognition::l1_facade::SystemMetrics;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
@@ -1013,7 +1006,7 @@ impl BackgroundLoopHandle {
                 result.cycle, result.diagnosis_health, result.issues_found,
                 result.plans_generated, result.plans_applied, result.overall_improved
             );
-            self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+            self.try_emit(crate::l0_substrate::nt_core_event::CoreEvent::SystemError {
                 component: "self_improvement".into(),
                 error: format!(
                     "cycle {}: health={:.2}, {} issues, {} applied, improved={}",
@@ -1067,7 +1060,7 @@ impl BackgroundLoopHandle {
 //     /// Test alert emission
 //     #[tokio::test]
 //     async fn test_emit_alert() {
-//         use crate::l6_meta::nt_core_self::self_audit::{AuditFinding, AuditSeverity};
+//         use crate::l5_cognition::l1_facade::self_audit::{AuditFinding, AuditSeverity};
 //         let brain = Arc::new(RwLock::new(SelfIteratingBrain::new()));
 //         let mut bg = BackgroundLoop::new(brain);
 //         let findings = vec![

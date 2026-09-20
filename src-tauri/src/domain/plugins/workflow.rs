@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+use crate::atomic_io;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -89,15 +91,9 @@ impl WorkflowPluginImpl {
             recoverable: true,
         })?;
 
-        if let Some(parent) = self.db_path.parent() {
-            std::fs::create_dir_all(parent).ok();
-        }
+        atomic_io::ensure_parent_dir(&self.db_path).ok();
 
-        std::fs::write(
-            &self.db_path,
-            serde_json::to_string_pretty(&*workflows).unwrap_or_default(),
-        )
-        .map_err(|e| DomainError {
+        atomic_io::write_json_atomic(&self.db_path, &*workflows).map_err(|e| DomainError {
             code: "WRITE_ERROR".into(),
             message: e.to_string(),
             recoverable: true,
@@ -107,6 +103,7 @@ impl WorkflowPluginImpl {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for WorkflowPluginImpl {
     fn name(&self) -> &str {
         "workflow"
@@ -174,7 +171,7 @@ impl DomainPlugin for WorkflowPluginImpl {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,

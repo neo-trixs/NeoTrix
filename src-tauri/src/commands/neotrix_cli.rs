@@ -33,7 +33,7 @@ pub async fn run_cli(args: Vec<String>) -> Result<CliOutput, String> {
     })
     .await
     .map_err(|e| format!("Task join error: {e}"))?
-    .map_err(|e| e)?;
+    ?;
 
     Ok(CliOutput {
         success: output.status.success(),

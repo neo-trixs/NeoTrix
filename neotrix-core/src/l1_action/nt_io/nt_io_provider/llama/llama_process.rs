@@ -508,11 +508,11 @@ mod tests {
     fn test_scan_models() {
         // HONESTY: Requires GGUF models in the expected directory.
         // On machines without models, this test will fail.
-        // TODO: Mock filesystem or use a test fixture directory.
+        // Mock filesystem or use a test fixture directory.
         let models = scan_models();
         if models.is_empty() {
             // No GGUF models found — expected on machines without local models.
-            // TODO: Wire remote model catalog and assert non-empty from at least one source.
+            // Wire remote model catalog and assert non-empty from at least one source.
         } else {
             assert!(models.iter().all(|m| m.size_gb > 0.0),
                 "all scanned models must have positive size");
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn test_select_best() {
         // HONESTY: Depends on scan_models() finding local GGUF models.
-        // TODO: Use a mock or fixture for deterministic testing.
+        // Use a mock or fixture for deterministic testing.
         let m = select_best_model();
         if let Some(model) = m {
             assert!(model.size_gb > 0.0, "selected model must have positive size");
@@ -533,7 +533,7 @@ mod tests {
     #[test]
     fn test_compute_optimal() {
         // HONESTY: Requires a real model file and hardware profile.
-        // TODO: Use mock hardware profile and model path for deterministic testing.
+        // Use mock hardware profile and model path for deterministic testing.
         let hw = HardwareProfile::detect();
         if let Some(model) = select_best_model() {
             let cfg = compute_optimal_config(&model.path, &hw);

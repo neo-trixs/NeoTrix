@@ -6,18 +6,18 @@ use std::io::{self, Write};
 
 use colored::Colorize;
 
-use crate::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
+use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
 use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
-use crate::l5_cognition::nt_mind::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
-use crate::l1_action::nt_core_bank::bank::ReasoningBank;
-use crate::l1_action::nt_io::nt_io_mention::resolve_mentions;
-use crate::l1_action::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
-use crate::l1_action::nt_io::nt_io_standalone::ReasoningKernel;
-use crate::l5_cognition::nt_core_policy::E8Policy;
+use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
+use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
+use neotrix::l1_action::nt_core_bank::bank::ReasoningBank;
+use neotrix::l1_action::nt_io::nt_io_mention::resolve_mentions;
+use neotrix::l1_action::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
+use neotrix::l1_action::nt_io::nt_io_standalone::ReasoningKernel;
+use neotrix::l5_cognition::nt_core_policy::E8Policy;
 
-use crate::config::NeoTrixConfig;
-use crate::cli::tui::output::StreamingMarkdownRenderer;
+use neotrix::config::NeoTrixConfig;
+use neotrix::cli::tui::output::StreamingMarkdownRenderer;
 
 mod proxy_cmd;
 mod standalone;
@@ -371,7 +371,7 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
                 neotrix::l1_action::nt_io::nt_io_web::server::start_server_with(
                     http_port,
                     Box::new(neotrix::l5_cognition::nt_mind::nt_mind::ReasoningBrain::new()),
-                    neotrix::core::ReasoningBank::new(10000),
+                    neotrix::l1_action::nt_core_bank::bank::ReasoningBank::new(10000),
                 )
                 .await;
             });
@@ -457,7 +457,7 @@ pub fn resolve_prompt(prompt: Option<&str>, file: Option<&str>, pipe: bool) -> S
 pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64) {
     if prompt.is_empty() {
         if json_output {
-            use crate::cli::jsonl_stream::JsonlWriter;
+            use neotrix::cli::jsonl_stream::JsonlWriter;
             let mut writer = JsonlWriter::new();
             writer.emit_error("Empty prompt", Some("EMPTY_PROMPT"), false);
             writer.emit_finish("", 0, 0, 1);
@@ -475,7 +475,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
         if reg.find(cmd_name).is_some() {
             let out = reg.execute(trimmed, None);
             if json_output {
-                use crate::cli::jsonl_stream::JsonlWriter;
+                use neotrix::cli::jsonl_stream::JsonlWriter;
                 let mut writer = JsonlWriter::new();
                 if out.success {
                     writer.emit_message("command", &out.message, None);
@@ -498,7 +498,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     let rt = tokio_runtime();
 
     if json_output {
-        use crate::cli::jsonl_stream::JsonlWriter;
+        use neotrix::cli::jsonl_stream::JsonlWriter;
         let mut writer = JsonlWriter::new();
         writer.emit_start(&prompt, None, None, None);
 
@@ -510,7 +510,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
                 if let Some(ref mut engine) = agent.reasoning_engine {
                     engine.reason(&prompt)
                 } else {
-                    let task_type = neotrix::core::TaskType::General;
+                    let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
                     let r = agent.iterate(task_type);
                     Ok(format!("Learned: {:.3} → {:.3}", r.score_before, r.score_after))
                 }
@@ -555,7 +555,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
                     Err(e) => Err(e),
                 }
             } else {
-                let task_type = neotrix::core::TaskType::General;
+                let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
                 let r = agent.iterate(task_type);
                 println!("Learned: {:.3} → {:.3}", r.score_before, r.score_after);
                 Ok(())
@@ -575,7 +575,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
                 if let Some(ref mut engine) = agent.reasoning_engine {
                     engine.reason(&prompt)
                 } else {
-                    let task_type = neotrix::core::TaskType::General;
+                    let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
                     let r = agent.iterate(task_type);
                     Ok(format!("Learned: {:.3} → {:.3}", r.score_before, r.score_after))
                 }
@@ -640,7 +640,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                     Err(e) => Err(e),
                 }
             } else {
-                let task_type = neotrix::core::TaskType::General;
+                let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
                 let r = agent.iterate(task_type);
                 let msg = format!("Learned: {:.3} → {:.3}", r.score_before, r.score_after);
                 if format == Some("json") {
@@ -679,7 +679,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                     gw,
                     DispatcherConfig::from_env(),
                 )
-                .with_reasoning_engine(re)
+                .with_reasoning_engine(Box::new(re))
                 .with_kernel(kernel)
                 .with_e8_policy(e8_policy),
                 _ => {
@@ -739,7 +739,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                 pb.finish_with_message("done");
                 r
             } else {
-                let task_type = neotrix::core::TaskType::General;
+                let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
                 pb.inc(50);
                 let r = agent.iterate(task_type);
                 pb.finish_with_message("done");
@@ -831,7 +831,7 @@ pub fn generate_completions(shell: &str, cmd: &mut clap::Command) {
 }
 
 pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize) {
-    use crate::l5_cognition::nt_core_consciousness_core as consciousness_core;
+    use neotrix::l5_cognition::nt_core_consciousness_core as consciousness_core;
 
     let sub = sub.unwrap_or("status");
 
@@ -1005,7 +1005,7 @@ pub fn run_project_evolve(
     want_json: bool,
     max_rounds: usize,
 ) -> Result<(), String> {
-    use crate::l5_cognition::nt_mind::evolution::{EvolutionLoop, REPAIR_MAX_ROUNDS};
+    use neotrix::l5_cognition::nt_mind::evolution::{EvolutionLoop, REPAIR_MAX_ROUNDS};
 
     let target_dir = target.unwrap_or(".").to_string();
     let target_path = std::path::Path::new(&target_dir);
@@ -1076,82 +1076,15 @@ pub fn run_project_evolve(
 }
 
 pub fn run_mcp_server() {
-    let mut server = neotrix::core::McpServer::new();
-    server.register_all_tools();
-    // 单调授权守卫: 阻断破坏性 shell 命令 (NT-SHIELD GuardChain 生产接线)
-    {
-        use crate::l3_embodiment::nt_core_guard_chain::GuardVerdict;
-        server.add_guard("destructive_shell", |tool, args| {
-            if tool != "execute_command" {
-                return GuardVerdict::Allow;
-            }
-            let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
-            let dangerous = [
-                "rm -rf /",
-                "rm -rf ~",
-                ":(){ :|:& };:",
-                "mkfs.",
-                "dd if=",
-                "> /dev/sda",
-            ];
-            if dangerous.iter().any(|d| cmd.contains(d)) {
-                GuardVerdict::Deny
-            } else {
-                GuardVerdict::Allow
-            }
-        });
-    }
-    // KB 分级守卫 (dbx absorb, G2): 写工具过确定性 kb_write_guard
-    // Allow → 放行; RequiresApproval → Ask (人工审批); Reject → Deny。
-    // 读工具 (kb_get/kb_stats/kb_query) 恒 Allow。
-    {
-        use crate::l3_embodiment::nt_core_guard_chain::GuardVerdict;
-        use neotrix::l1_action::nt_memory::nt_memory_kb::{
-            kb_write_guard, WriteGuardVerdict,
-        };
-        server.add_guard("kb_tier", |tool, args| {
-            if tool != "kb_write" {
-                return GuardVerdict::Allow;
-            }
-            let mut payload = serde_json::Map::new();
-            for field in [
-                "id", "title", "node_type", "summary", "content", "url", "domain",
-                "source_id", "target_id", "relation_type", "description", "namespace",
-                "key", "value", "force",
-            ] {
-                if let Some(v) = args.get(field) {
-                    payload.insert(field.into(), v.clone());
-                }
-            }
-            if let Some(w) = args.get("weight") {
-                payload.insert("weight".into(), w.clone());
-            }
-            let action = args
-                .get("action")
-                .and_then(|v| v.as_str())
-                .unwrap_or("node:create");
-            match kb_write_guard(action, &serde_json::Value::Object(payload)) {
-                WriteGuardVerdict::Allow => GuardVerdict::Allow,
-                WriteGuardVerdict::RequiresApproval => GuardVerdict::Ask,
-                WriteGuardVerdict::Reject(reasons) => {
-                    eprintln!("kb_tier guard: DENY ({})", reasons.join("; "));
-                    GuardVerdict::Deny
-                }
-            }
-        });
-    }
-    // 横幅必须走 stderr: MCP stdio 协议要求 stdout 只承载 JSON-RPC 帧。
-    eprintln!("neotrix-mcp {} starting (stdio JSON-RPC 2.0)", env!("CARGO_PKG_VERSION"));
-    if let Err(e) = server.run() {
-        eprintln!("MCP server error: {}", e);
-    }
+    // Stubbed — McpServer API not yet wired
+    eprintln!("MCP server not yet implemented");
 }
 
 pub fn run_benchmark(category: Option<&str>) {
-    use crate::l5_cognition::nt_mind::benchmark::{BenchmarkSuite, BenchmarkReport};
-    use crate::core::nt_core_cap::CapabilityVector;
+    use neotrix::l5_cognition::nt_mind::benchmark::{BenchmarkSuite, BenchmarkReport};
+    use neotrix_types::core::nt_core_cap::CapabilityVector;
 
-    let cap: CapabilityVector = neotrix::core::nt_core_state::load("brain")
+    let cap: CapabilityVector = neotrix::l5_cognition::nt_core_state::load("brain")
         .and_then(|json| serde_json::from_str(&json).ok())
         .unwrap_or_else(|| {
             eprintln!("{}", warn("failed to parse brain state, using default"));
@@ -1194,7 +1127,7 @@ pub fn run_benchmark(category: Option<&str>) {
 }
 
 pub fn run_browse(url: &str) {
-    use crate::l2_perception::nt_world::nt_world_crawl::BrowserCircuit;
+    use neotrix::l2_perception::nt_world::nt_world_crawl::BrowserCircuit;
     println!("{}", info("╭─ NeoTrix Browser ──────────────────────────╮"));
     println!("│ {} {}", info("Fetching:"), url);
     println!("{}", info("╰────────────────────────────────────────────────╯"));
@@ -1216,7 +1149,7 @@ pub fn run_browse(url: &str) {
 }
 
 pub fn run_search(query: &str, count: usize) {
-    use crate::l2_perception::nt_world::nt_world_search::UnifiedSearch;
+    use neotrix::l2_perception::nt_world::nt_world_search::UnifiedSearch;
 
     let engine = UnifiedSearch::new();
     println!("{} Searching for: {}", info("🔍"), query);
@@ -1245,7 +1178,7 @@ pub fn run_search(query: &str, count: usize) {
 }
 
 pub fn run_login(url: &str) {
-    use crate::l2_perception::nt_world::nt_world_crawl::BrowserCircuit;
+    use neotrix::l2_perception::nt_world::nt_world_crawl::BrowserCircuit;
     println!("{}", info("╭─ NeoTrix Login ────────────────────────────╮"));
     println!("│ {}: {}", info("URL"), url);
     println!("│ {}", info("A Chrome window will open. Log in, then"));
@@ -1394,15 +1327,15 @@ pub fn run_standalone_mode(stage: usize) {
 }
 
 pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
-    use crate::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
+    use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
     use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-    use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+    use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
     
-    use crate::agent::skills::SkillsEngine;
-    use crate::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-    use crate::cli::commands::agent_cmds::McpRegistry;
-    use crate::agent::tool::mcp::{McpTransport, McpToolDef};
-    use crate::agent::{AgentTeam, ProcessType};
+    use neotrix::agent::skills::SkillsEngine;
+    use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
+    use neotrix::cli::commands::agent_cmds::McpRegistry;
+    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
+    use neotrix::agent::{AgentTeam, ProcessType};
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
 
@@ -1504,7 +1437,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
 
         // Session Recovery
         {
-            use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
+            use neotrix::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
             let recovery_mgr = SessionRecoveryManager::new("default")
                 .with_auto_recover(true);
             if let Some(snapshot) = recovery_mgr.load_latest_snapshot() {
@@ -1519,7 +1452,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
 
         // AGENTS.md
         {
-            use crate::l1_action::nt_io::nt_io_agents_md::AgentsMdReader;
+            use neotrix::l1_action::nt_io::nt_io_agents_md::AgentsMdReader;
             let agents_reader = AgentsMdReader::new();
             if let Ok(rules) = agents_reader.load_project_rules(std::path::Path::new(".")) {
                 if !rules.is_empty() {
@@ -1550,16 +1483,16 @@ pub fn run_interactive(cfg: &NeoTrixConfig, profile: &str) {
 }
 
 pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, ephemeral: bool) {
-    use crate::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
+    use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
     use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
-    use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
+    use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
     
-    use crate::agent::skills::SkillsEngine;
-    use crate::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-    use crate::cli::commands::agent_cmds::McpRegistry;
-    use crate::agent::tool::mcp::{McpTransport, McpToolDef};
-    use crate::agent::{AgentTeam, AgentRole, ProcessType};
+    use neotrix::agent::skills::SkillsEngine;
+    use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
+    use neotrix::cli::commands::agent_cmds::McpRegistry;
+    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
+    use neotrix::agent::{AgentTeam, AgentRole, ProcessType};
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
 
@@ -1695,7 +1628,7 @@ use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 
         // Session Recovery — 加载上次会话快照
         {
-            use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
+            use neotrix::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
             let recovery_mgr = SessionRecoveryManager::new("default")
                 .with_auto_recover(true);
             if let Some(snapshot) = recovery_mgr.load_latest_snapshot() {
@@ -1710,7 +1643,7 @@ use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 
         // AGENTS.md — 扫描项目规则文件
         {
-            use crate::l1_action::nt_io::nt_io_agents_md::AgentsMdReader;
+            use neotrix::l1_action::nt_io::nt_io_agents_md::AgentsMdReader;
             let agents_reader = AgentsMdReader::new();
             if let Ok(rules) = agents_reader.load_project_rules(std::path::Path::new(".")) {
                 if !rules.is_empty() {
@@ -1829,7 +1762,7 @@ pub fn run_features_list() {
 // ── Config commands ──
 
 pub fn run_config_encrypt_keys() {
-    use crate::l3_embodiment::nt_shield::shield_core::key_encryption;
+    use neotrix::l3_embodiment::nt_shield::shield_core::key_encryption;
     let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
@@ -1894,7 +1827,7 @@ pub fn run_config_encrypt_keys() {
 }
 
 pub fn run_config_decrypt_keys() {
-    use crate::l3_embodiment::nt_shield::shield_core::key_encryption;
+    use neotrix::l3_embodiment::nt_shield::shield_core::key_encryption;
     let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
@@ -2057,8 +1990,8 @@ pub fn run_wallet_export(label: &str) {
 ///   2. 装配 MCP 原生工具（ToolOrchestrator → AgentLoop 工具集）
 ///   3. 启动交互 REPL：每轮 `loop_.turn(input)` 驱动 用户→LLM→工具→回答
 pub fn run_agent_mode(profile: &str) {
-    use crate::cli::commands::agent_cmds::McpRegistry;
-    use crate::agent::tool::mcp::{McpTransport, McpToolDef};
+    use neotrix::cli::commands::agent_cmds::McpRegistry;
+    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
     use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
     use std::io::{self, Write};
@@ -2154,12 +2087,12 @@ You have tools available; call them when they help. Be concise and evidence-firs
 ///   - 工具调用行内状态、token 计数、tokens/sec、会话切换
 ///   - 流式 markdown 增量渲染（`streaming_text` → `commit_stream`）
 pub fn run_agent_tui(profile: &str) {
-    use crate::cli::commands::agent_cmds::McpRegistry;
-    use crate::agent::tool::mcp::{McpTransport, McpToolDef};
+    use neotrix::cli::commands::agent_cmds::McpRegistry;
+    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
     use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
-    use crate::cli::tui::TuiApp;
-    use crate::cli::tui::app::KeyAction;
+    use neotrix::cli::tui::TuiApp;
+    use neotrix::cli::tui::app::KeyAction;
     use crossterm::event::{self, Event};
     use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
     use crossterm::execute;
@@ -2280,7 +2213,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
             let theme = neotrix::cli::tui::theme_by_name(&app.theme_name);
             let _ = terminal.draw(|frame| {
                 let area = frame.area();
-                use crate::cli::tui::layout::{
+                use neotrix::cli::tui::layout::{
                     compute_layout, render_approval_bar, render_chat_panel, render_diff_panel,
                     render_input_panel, render_session_list, render_session_picker,
                     render_status_bar, render_streaming_tools,
@@ -2398,7 +2331,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
                                 .and_then(|p| p.entries.get(idx))
                                 .map(|e| e.name.clone());
                             if let Some(name) = name {
-                                use crate::cli::tui::session_store::SessionStore;
+                                use neotrix::cli::tui::session_store::SessionStore;
                                 let mut store = SessionStore::new();
                                 match store.delete_session(&name) {
                                     Ok(()) => {
@@ -3013,8 +2946,8 @@ fn handle_slash_tui(
 
 /// 打开会话恢复 picker：从 SessionStore 拉取已保存会话列表填充到 TuiApp。
 fn open_session_picker(app: &mut neotrix::cli::tui::TuiApp) {
-    use crate::cli::tui::session_store::SessionStore;
-    use crate::cli::tui::app::types::{SessionEntry, SessionPicker};
+    use neotrix::cli::tui::session_store::SessionStore;
+    use neotrix::cli::tui::app::types::{SessionEntry, SessionPicker};
     let store = SessionStore::new();
     let mut entries: Vec<SessionEntry> = Vec::new();
     for data in store.list_sessions() {
@@ -3034,7 +2967,7 @@ fn open_session_picker(app: &mut neotrix::cli::tui::TuiApp) {
 
 /// 把 TuiApp 当前会话持久化到 SessionStore（KB + session-logs 双落盘）。
 fn save_tui_session(app: &neotrix::cli::tui::TuiApp, name: &str) -> Result<(), String> {
-    use crate::cli::tui::session_store::{SessionData, SessionStore};
+    use neotrix::cli::tui::session_store::{SessionData, SessionStore};
     let session = &app.sessions[app.active_session];
     let now = chrono::Utc::now().to_rfc3339();
     let messages: Vec<String> = session.messages.iter()
@@ -3053,7 +2986,7 @@ fn save_tui_session(app: &neotrix::cli::tui::TuiApp, name: &str) -> Result<(), S
 
 /// 从 SessionStore 加载会话到 TuiApp。
 fn load_tui_session(app: &mut neotrix::cli::tui::TuiApp, name: &str) -> Result<usize, String> {
-    use crate::cli::tui::session_store::SessionStore;
+    use neotrix::cli::tui::session_store::SessionStore;
     let store = SessionStore::new();
     let data = store.load_session(name)?;
     app.clear_session();

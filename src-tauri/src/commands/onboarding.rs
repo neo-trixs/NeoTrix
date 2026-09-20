@@ -2,6 +2,9 @@
 //!
 //! 检查系统依赖 (Node.js, git, cargo, etc.) 并返回状态给前端。
 
+use crate::atomic_io;
+use crate::ipc;
+use crate::ipc::IpcResponse;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
@@ -43,7 +46,7 @@ pub struct SystemInfo {
 
 /// Check all prerequisites
 #[tauri::command]
-pub fn onboarding_check_prereqs() -> OnboardingStatus {
+pub fn onboarding_check_prereqs() -> IpcResponse<OnboardingStatus> {
     let prerequisites = vec![
         check_tool("git", "git", "--version", Some("brew install git"), true),
         check_tool("node", "node", "--version", Some("brew install node"), true),
@@ -66,17 +69,17 @@ pub fn onboarding_check_prereqs() -> OnboardingStatus {
         hostname: hostname::get().ok().map(|h| h.to_string_lossy().to_string()),
     };
 
-    OnboardingStatus {
+    ipc::ok(OnboardingStatus {
         prerequisites,
         all_required_met,
         first_run: !config_dir_exists(),
         system,
-    }
+    })
 }
 
 /// Check if a config directory exists (indicates not first run)
 fn config_dir_exists() -> bool {
-    dirs_next::home_dir()
+    dirs::home_dir()
         .map(|h| h.join(".neotrix").exists())
         .unwrap_or(false)
 }
@@ -129,22 +132,25 @@ pub fn onboarding_get_tips() -> Vec<String> {
 
 /// Mark onboarding as completed
 #[tauri::command]
-pub fn onboarding_complete() -> Result<(), String> {
-    let config_dir = dirs_next::home_dir()
-        .ok_or("Cannot find home directory")?
-        .join(".neotrix");
-    std::fs::create_dir_all(&config_dir)
-        .map_err(|e| format!("Failed to create config dir: {}", e))?;
+pub fn onboarding_complete() -> IpcResponse<()> {
+    let config_dir = match dirs::home_dir() {
+        Some(h) => h.join(".neotrix"),
+        None => return ipc::err("HOME_DIR_NOT_FOUND", "Cannot find home directory"),
+    };
+    if let Err(e) = std::fs::create_dir_all(&config_dir) {
+        return ipc::err("CONFIG_DIR_FAILED", format!("Failed to create config dir: {}", e));
+    }
     let marker = config_dir.join(".onboarded");
-    std::fs::write(&marker, b"1")
-        .map_err(|e| format!("Failed to write onboarding marker: {}", e))?;
-    Ok(())
+    if let Err(e) = atomic_io::write_atomic(&marker, b"1") {
+        return ipc::err("MARKER_WRITE_FAILED", format!("Failed to write onboarding marker: {}", e));
+    }
+    ipc::ok(())
 }
 
 /// Check if onboarding has been completed
 #[tauri::command]
 pub fn onboarding_is_completed() -> bool {
-    dirs_next::home_dir()
+    dirs::home_dir()
         .map(|h| h.join(".neotrix").join(".onboarded").exists())
         .unwrap_or(false)
 }

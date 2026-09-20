@@ -56,6 +56,15 @@ impl std::fmt::Display for HotDataError {
 
 impl std::error::Error for HotDataError {}
 
+impl From<HotDataError> for neotrix_types::NtError {
+    fn from(err: HotDataError) -> Self {
+        match err {
+            HotDataError::CapacityExceeded => neotrix_types::NtError::InvalidState("hot data capacity exceeded".into()),
+            HotDataError::KeyNotFound => neotrix_types::NtError::NotFound("key not found in hot data".into()),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // BatchLookup trait
 // ---------------------------------------------------------------------------

@@ -51,11 +51,11 @@ impl SubagentManager {
         id
     }
     pub fn list_tasks(&self) -> Vec<&AgentInfo> { self.agents.iter().collect() }
-    pub fn load_from_kb(&mut self, _kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
+    pub fn load_from_kb(&mut self, _kb: &crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
         tracing::warn!("STUB SubagentManager::load_from_kb called: no-op, not real KB load.");
         Ok(())
     }
-    pub fn save_to_kb(&self, _kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
+    pub fn save_to_kb(&self, _kb: &crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
         tracing::warn!("STUB SubagentManager::save_to_kb called: no-op, not real KB save.");
         Ok(())
     }
@@ -91,7 +91,7 @@ impl McpRegistry {
         self.tools.push(McpToolInfo { name: name.to_string(), description: desc.to_string(), server_name: name.to_string() });
         self.tools.len()
     }
-    pub fn as_native_tools(&self) -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> {
+    pub fn as_native_tools(&self) -> Vec<Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>> {
         tracing::warn!("STUB McpRegistry::as_native_tools called: returning empty, not real tool conversion.");
         Vec::new()
     }
@@ -664,15 +664,5 @@ mod tests {
         // 但不触发"校验失败" —— 证明 PTC 校验门与执行门分离)
         let r4 = cmd.execute(&["exec".into(), "echo-server_tool|{\"msg\":\"hi\"}".into()], None);
         assert!(!r4.message.contains("校验失败"), "known tool must pass validation gate: {}", r4.message);
-    }
-}
-
-#[allow(dead_code)]
-fn truncate_cli(s: &str, max_chars: usize) -> String {
-    if s.chars().count() <= max_chars {
-        s.to_string()
-    } else {
-        let truncated: String = s.chars().take(max_chars).collect();
-        format!("{}…", truncated)
     }
 }

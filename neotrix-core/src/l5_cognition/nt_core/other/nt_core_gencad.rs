@@ -7,7 +7,7 @@
 //! 目标成熟度 C0 (编译通过 + 基础逻辑 + SelfTest T1)。真实模型权重/推理不在 C0 范围。
 //! KB 接线点: 将 (几何向量, 图像向量) 对写入 KB FTS5 索引, 供检索式生成复用。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 一段 CAD 命令序列 (如 OpenCASCADE / BRep 操作历史) 的轻量表示。
 #[derive(Debug, Clone, PartialEq, Default)]

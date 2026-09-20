@@ -995,7 +995,7 @@ impl TreeSitterBackend {
 
 impl CodeParser for TreeSitterBackend {
     fn parse(&self, code: &str, language: Language) -> ParseResult {
-        // TODO: When tree-sitter crate is added, replace this delegation
+        // When tree-sitter crate is added, replace this delegation
         // with actual AST parsing:
         //   let parser = &mut self.parsers.get(&language);
         //   let tree = parser.parse(code, None);

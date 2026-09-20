@@ -212,7 +212,7 @@ impl SelfEvolver {
         if parsed.scheme() != "http" && parsed.scheme() != "https" {
             return Err(NeoTrixError::from("仅支持 http/https"));
         }
-        let (body, _host) = crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(url)
+        let (body, _host) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(url)
             .map_err(|e| NeoTrixError::Network(format!("请求失败: {}", e)))?;
         Ok(body)
     }

@@ -4,8 +4,8 @@ use super::super::core::CapabilityVector;
 use super::recipe::RecipeStage;
 use super::SelfIteratingBrain;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus;
-use crate::l1_action::nt_memory::nt_memory_kb::GraphRagConfig;
+use crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus;
+use crate::l4_emotion::nt_memory::nt_memory_kb::GraphRagConfig;
 use crate::l2_perception::nt_world::nt_world_model::TaskType;
 // P0-2 接线 (OpenMontage delivery_promise 吸收): 用 ContractAwareStage 包装
 // 蒸馏阶段, 附加 DeliveryPromiseContract 防静默降级。
@@ -49,7 +49,6 @@ impl BrainStage for ConceptEmergenceStage {
     fn frequency(&self) -> usize { 10 }
     fn process(&self, _brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         // 从brain的KB中获取节点嵌入 (ReasoningBrain 无 KB 字段, 跳过)
-        // TODO: 通过 MemoryOrchestrator 获取嵌入
         Ok(StageDecision::Continue)
     }
 }
@@ -66,14 +65,14 @@ use super::safety_stage::SafetyCheckStage;
 use super::search_skill_stage::{Evidence, SearchExercise, SearchResult, SearchTaskType};
 use super::secret_scanner::SecretScanner;
 use super::sft_stage::SupervisedExample;
-use crate::l6_meta::nt_core_self_review::SelfReviewGate;
+use crate::l5_cognition::l1_facade::SelfReviewGate;
 use crate::make_stage;
 use crate::l5_cognition::nt_mind::foundation::memory_bank::MemoryTier;
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::{PerformanceEvaluator, ExecutionFeedback};
 use crate::l5_cognition::nt_mind::foundation::seal_pipeline::{L1OracleGate, L1SemanticEntropyGate, L1ActionSandbox};
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::consciousness_bridge::ConsciousnessBridge;
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
-use crate::l1_action::nt_memory::nt_memory_kb::ProceduralMemoryRecord;
+use crate::l4_emotion::nt_memory::nt_memory_kb::ProceduralMemoryRecord;
 
 fn compute_capability_deltas(brain: &SelfIteratingBrain) -> Vec<(String, f64)> {
     let current = brain.brain.capability.arr().to_vec();
@@ -1962,16 +1961,16 @@ impl BrainStage for _ConversationDistillStage {
                     let failing_count = records.iter().filter(|r| r.effectiveness <= 0.0).count();
                     if rewarding_count + failing_count >= 3 {
                         let pattern_type = if failing_count > rewarding_count {
-                            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::EvolutionPatternType::RecurringError
+                            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::EvolutionPatternType::RecurringError
                         } else {
-                            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::EvolutionPatternType::StrategyDiscovery
+                            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::EvolutionPatternType::StrategyDiscovery
                         };
                         let ts = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .map(|d| d.as_secs())
                             .unwrap_or(0) as i64;
                         let record =
-                            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::EvolutionRecord {
+                            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::EvolutionRecord {
                                 id: format!("evol_pipe_{}", brain.iteration),
                                 source_conversation_id: format!("pipe_iter_{}", brain.iteration),
                                 pattern_type: pattern_type.clone(),
@@ -2018,8 +2017,8 @@ impl BrainStage for _HypothesisAccuracyStage {
             if let Some(ref net_lock) = engine.hypothesis_network {
                 if let Ok(net) = net_lock.lock() {
                     let total = net.hypotheses.len();
-                    let supported = net.hypotheses.iter().filter(|h| matches!(h.status, crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Supported)).count();
-                    let refuted = net.hypotheses.iter().filter(|h| matches!(h.status, crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Refuted)).count();
+                    let supported = net.hypotheses.iter().filter(|h| matches!(h.status, crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Supported)).count();
+                    let refuted = net.hypotheses.iter().filter(|h| matches!(h.status, crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Refuted)).count();
                     if total > 0 {
                         log::info!(
                             "[EWHR] Hypothesis accuracy: {}/{} supported, {}/{} refuted",
@@ -2243,7 +2242,7 @@ impl BrainStage for ExternalKnowledgeAbsorbStage {
         // Open a temporary KB connection for the explorer instead of consuming
         // the pipeline's KB connection (which would lose pending transactions,
         // LRU cache state, and uncommitted embedding data).
-        let explorer_kb = match crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+        let explorer_kb = match crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
             Ok(kb) => kb,
             Err(e) => {
                 log::warn!(
@@ -2261,7 +2260,7 @@ impl BrainStage for ExternalKnowledgeAbsorbStage {
             crate::l2_perception::nt_world::nt_world_exploration_engine::ExplorationEngine::new(
                 config,
             );
-        explorer.attach_kb(Box::new(explorer_kb) as Box<dyn crate::core::nt_core_traits::KnowledgeSink>);
+        explorer.attach_kb(Box::new(explorer_kb) as Box<dyn crate::l0_substrate::nt_core_traits::KnowledgeSink>);
         let report = explorer.run_cycle();
         log::info!(
             "[external_knowledge_absorb] tick={}, explore: discovered={}, ingested={}, skipped={}, failed={}, total_in_kb={}",
@@ -2300,7 +2299,7 @@ impl BrainStage for _ExternalBrainDigestStage {
             return Ok(StageDecision::Continue);
         }
         let tick = brain.iteration;
-        let corpus = match crate::l1_action::nt_memory::nt_memory_kb::nt_memory_resource_ingest::corpus_archive_path() {
+        let corpus = match crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_resource_ingest::corpus_archive_path() {
             Some(p) => p,
             None => {
                 log::debug!("[external_brain_digest] tick={}, 外置大脑未挂载, 跳过", tick);
@@ -2311,7 +2310,7 @@ impl BrainStage for _ExternalBrainDigestStage {
             log::debug!("[external_brain_digest] tick={}, corpus 不存在, 跳过", tick);
             return Ok(StageDecision::Continue);
         }
-        let kb = match crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+        let kb = match crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
             Ok(kb) => std::sync::Arc::new(kb),
             Err(e) => {
                 log::warn!("[external_brain_digest] tick={}, 打开 KB 失败: {}", tick, e);
@@ -2328,7 +2327,7 @@ impl BrainStage for _ExternalBrainDigestStage {
         let conn: &rusqlite::Connection = &conn_guard;
 
         // Phase 1: 有界激活冷节点进 live KB
-        match crate::l1_action::nt_memory::nt_memory_kb::nt_memory_cortex_sync::digest_sample(
+        match crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_cortex_sync::digest_sample(
             conn, &corpus, 200, None,
         ) {
             Ok(rep) => log::info!(
@@ -2339,7 +2338,7 @@ impl BrainStage for _ExternalBrainDigestStage {
         }
 
         // Phase 6: 反向修剪 (dry-run 安全, 不破坏冷存档)
-        match crate::l1_action::nt_memory::nt_memory_kb::nt_memory_cortex_sync::prune_external(
+        match crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_cortex_sync::prune_external(
             conn, &corpus, 30, true,
         ) {
             Ok(n) => log::info!(
@@ -2697,7 +2696,7 @@ impl BrainStage for _ArchitectureOptimizerStage {
         15
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::l6_meta::nt_meta::arch_optimizer::SelfArchitectureOptimizer;
+        use crate::l5_cognition::l1_facade::arch_optimizer::SelfArchitectureOptimizer;
         let optimizer = SelfArchitectureOptimizer::new();
         // Pass module sizes as proxy file list
         let caps = brain.brain.capability.arr();
@@ -2836,7 +2835,7 @@ impl BrainStage for MemoryConsolidationStage {
         12
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::l6_meta::nt_nexus::cross_session_memory::MemoryCategory;
+        use crate::l5_cognition::l1_facade::MemoryCategory;
 
         let count_before = brain._memory_orch.size();
         let tiers = [
@@ -2891,7 +2890,7 @@ impl BrainStage for MemoryConsolidationStage {
         let csm_info = brain
             ._cross_session_memory
             .as_ref()
-            .map(|csm: &crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemory| format!(" csm={}", csm.len()))
+            .map(|csm: &crate::l5_cognition::l1_facade::CrossSessionMemory| format!(" csm={}", csm.len()))
             .unwrap_or_default();
         let msg = format!(
             "memory_consolidation: size={} promoted={} persisted={}{}",
@@ -3004,7 +3003,7 @@ impl BrainStage for _ConvergenceCheckStage {
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let _ = brain; // unused: the audit runs on the source tree, not brain state
-        use crate::l6_meta::nt_core_self::self_audit::converge_check;
+        use crate::l5_cognition::l1_facade::self_audit::converge_check;
         let report = converge_check(".");
         if !report.findings.is_empty() {
             log::warn!(
@@ -3046,23 +3045,22 @@ impl BrainStage for SelfTestStage {
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let _ = brain;
-        use crate::l5_cognition::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor;
         use crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
         use crate::l5_cognition::nt_core_consciousness::inner_critic::InnerCritic;
         use crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree;
         use crate::l5_cognition::nt_core_gwt::monitor::EntropyMonitor;
-        use crate::l6_meta::nt_meta::knowledge_gap_detector::KnowledgeGapDetector;
-        use crate::l6_meta::nt_meta::metacognition_loop::MetaCognitiveLoop;
-        use crate::l6_meta::nt_meta::monitor::MetaMonitor;
-        use crate::l6_meta::nt_meta::nt_core_arch_lint::ArchLint;
-        use crate::l6_meta::nt_meta::nt_core_meta_auditor::MetaAuditor;
-        use crate::l6_meta::nt_meta::scanner::CodeScanner;
-        use crate::l6_meta::nt_meta::self_model::SelfModel;
-        use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
-        use crate::l6_meta::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
-        use crate::l6_meta::nt_core_self::self_audit::ConvergeCheckFn;
-        use crate::l6_meta::nt_core_self_review::SelfReviewGate;
-        use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
+        use crate::l5_cognition::l1_facade::knowledge_gap_detector::KnowledgeGapDetector;
+        use crate::l5_cognition::l1_facade::metacognition_loop::MetaCognitiveLoop;
+        use crate::l5_cognition::l1_facade::monitor::MetaMonitor;
+        use crate::l5_cognition::l1_facade::nt_core_arch_lint::ArchLint;
+        use crate::l5_cognition::l1_facade::nt_core_meta_auditor::MetaAuditor;
+        use crate::l5_cognition::l1_facade::scanner::CodeScanner;
+        use crate::l5_cognition::l1_facade::self_model::SelfModel;
+        use crate::l0_substrate::nt_core_schema_watchdog::SchemaWatchdog;
+        use crate::l5_cognition::l1_facade::metacognitive_evaluator::CognitiveEvaluator;
+        use crate::l5_cognition::l1_facade::self_audit::ConvergeCheckFn;
+        use crate::l5_cognition::l1_facade::SelfReviewGate;
+        use crate::l0_substrate::nt_core_self_test::SelfTestRegistry;
         let mut registry = SelfTestRegistry::new();
         registry.register(Box::new(SchemaWatchdog::new()));
         registry.register(Box::new(ConvergeCheckFn));
@@ -3080,10 +3078,10 @@ impl BrainStage for SelfTestStage {
         let sm = SelfModel::new();
         registry.register(Box::new(MetaMonitor::new(sm.clone())));
         registry.register(Box::new(MetaCognitiveLoop::new(sm)));
-        registry.register(Box::new(CognitiveLoadMonitor::new()));
+        // CognitiveLoadMonitor doesn't implement SelfTest, skip registration
         registry.register(Box::new(CognitiveEvaluator::new()));
         registry.register(Box::new({
-            let mut cm = crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor::new();
+            let mut cm = crate::l5_cognition::l1_facade::ConsciousnessMonitor::new();
             cm.observe();
             cm
         }));
@@ -3091,7 +3089,7 @@ impl BrainStage for SelfTestStage {
             crate::l5_cognition::nt_mind::evolution::self_diagnose::SelfDiagnose,
         ));
         registry.register(Box::new(
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),
         ));
         registry.register(Box::new(
             crate::l5_cognition::nt_core::capability::nt_core_antidistil::DistillationDetector::new(),
@@ -3106,14 +3104,14 @@ impl BrainStage for SelfTestStage {
         // registry.register(Box::new(
         //     crate::l4_emotion::nt_feel::nt_core_fep_iit::bridge::FEPIITBridge::new(),
         // ));
-        registry.register(Box::new(crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
+        registry.register(Box::new(crate::l5_cognition::l1_facade::ConsciousnessGoldStandard::new()));
         registry.register(Box::new(ConsciousnessBridge::new()));
         registry.register(crate::l3_embodiment::nt_shield::shield_core::browser_security::create_browser_security_self_test());
         registry.register(crate::l3_embodiment::nt_shield::shield_core::check_registry::create_check_registry_self_test());
         registry.register(Box::new(
-            crate::core::nt_core_telemetry::TelemetryStore::new(100),
+            crate::l0_substrate::nt_core_telemetry::TelemetryStore::new(100),
         ));
-        registry.register(Box::new(crate::l1_action::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
+        registry.register(Box::new(crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
         registry.register(Box::new(
             crate::l5_cognition::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5),
         ));
@@ -3136,7 +3134,7 @@ impl BrainStage for SelfTestStage {
         //     crate::l5_cognition::nt_core::nt_core_parallel::CapabilityClusterSelfTest,
         // ));
         registry.register(Box::new(
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
         ));
         for t in crate::l5_cognition::nt_core_arch_fitness::arch_fitness_tests() {
             registry.register(t);

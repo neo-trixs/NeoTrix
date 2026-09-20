@@ -87,9 +87,6 @@ pub struct MultiRegionScheduler {
     regions: HashMap<String, RegionInfo>,
     /// 调度策略
     strategy: RegionalStrategy,
-    /// 故障转移配置
-    #[allow(dead_code)]
-    failover_config: FailoverConfig,
     /// 统计信息
     stats: RegionalStats,
 }
@@ -123,7 +120,6 @@ impl MultiRegionScheduler {
         Self {
             regions: HashMap::new(),
             strategy,
-            failover_config: FailoverConfig::default(),
             stats: RegionalStats::default(),
         }
     }

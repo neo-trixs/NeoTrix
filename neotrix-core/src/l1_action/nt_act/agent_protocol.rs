@@ -330,30 +330,30 @@ impl Default for AgentOrchestrator {
 // ════════════════════════════════════════════════════════════════
 
 #[async_trait::async_trait]
-impl crate::core::nt_core_platform::Agent for AgentOrchestrator {
+impl crate::l0_substrate::nt_core_platform::Agent for AgentOrchestrator {
     fn agent_id(&self) -> &str { "act.agent_orchestrator" }
     fn agent_name(&self) -> &str { "AgentOrchestrator" }
-    fn agent_layer(&self) -> crate::l6_meta::nt_core_capability::Layer {
-        crate::l6_meta::nt_core_capability::Layer::L1Action
+    fn agent_layer(&self) -> crate::l0_substrate::nt_core_capability_types::Layer {
+        crate::l0_substrate::nt_core_capability_types::Layer::L1Action
     }
-    fn agent_domain(&self) -> crate::l6_meta::nt_core_capability::Domain {
-        crate::l6_meta::nt_core_capability::Domain::NtAct
+    fn agent_domain(&self) -> crate::l0_substrate::nt_core_capability_types::Domain {
+        crate::l0_substrate::nt_core_capability_types::Domain::NtAct
     }
 
-    async fn initialize(&mut self) -> Result<(), crate::core::nt_core_platform::AgentError> {
+    async fn initialize(&mut self) -> Result<(), crate::l0_substrate::nt_core_platform::AgentError> {
         Ok(())
     }
-    async fn start(&self) -> Result<(), crate::core::nt_core_platform::AgentError> {
+    async fn start(&self) -> Result<(), crate::l0_substrate::nt_core_platform::AgentError> {
         Ok(())
     }
-    async fn stop(&self) -> Result<(), crate::core::nt_core_platform::AgentError> {
+    async fn stop(&self) -> Result<(), crate::l0_substrate::nt_core_platform::AgentError> {
         Ok(())
     }
-    fn status(&self) -> crate::core::nt_core_platform::AgentStatus {
-        crate::core::nt_core_platform::AgentStatus::Running
+    fn status(&self) -> crate::l0_substrate::nt_core_platform::AgentStatus {
+        crate::l0_substrate::nt_core_platform::AgentStatus::Running
     }
-    fn metrics(&self) -> crate::core::nt_core_platform::AgentMetrics {
-        crate::core::nt_core_platform::AgentMetrics::default()
+    fn metrics(&self) -> crate::l0_substrate::nt_core_platform::AgentMetrics {
+        crate::l0_substrate::nt_core_platform::AgentMetrics::default()
     }
 }
 
@@ -361,26 +361,26 @@ impl crate::core::nt_core_platform::Agent for AgentOrchestrator {
 // UnifiedCapability — nt_core_capability unified capability interface
 // ════════════════════════════════════════════════════════════════
 
-impl crate::l6_meta::nt_core_capability::UnifiedCapability for AgentOrchestrator {
-    fn meta(&self) -> crate::l6_meta::nt_core_capability::CapabilityMeta {
-        crate::l6_meta::nt_core_capability::CapabilityMeta {
+impl crate::l0_substrate::nt_core_capability_types::UnifiedCapability for AgentOrchestrator {
+    fn meta(&self) -> crate::l0_substrate::nt_core_capability_types::CapabilityMeta {
+        crate::l0_substrate::nt_core_capability_types::CapabilityMeta {
             id: "act.agent_orchestrator".into(),
             name: "AgentOrchestrator".into(),
-            layer: crate::l6_meta::nt_core_capability::Layer::L1Action,
-            domain: crate::l6_meta::nt_core_capability::Domain::NtAct,
+            layer: crate::l0_substrate::nt_core_capability_types::Layer::L1Action,
+            domain: crate::l0_substrate::nt_core_capability_types::Domain::NtAct,
             version: env!("CARGO_PKG_VERSION").into(),
             description: "Multi-agent coordination orchestrator with spawn/send/mutate primitives".into(),
             tags: vec!["agent".into(), "orchestrator".into(), "l1".into()],
-            status: crate::l6_meta::nt_core_capability::CapabilityStatus::Healthy,
-            metrics: crate::l6_meta::nt_core_capability::CapabilityMetrics::default(),
+            status: crate::l0_substrate::nt_core_capability_types::CapabilityStatus::Healthy,
+            metrics: crate::l0_substrate::nt_core_capability_types::CapabilityMetrics::default(),
             cost_weight: 0.2,
             priority: 1.0,
         }
     }
 
-    fn health(&self) -> crate::l6_meta::nt_core_capability::CapabilityHealth {
-        crate::l6_meta::nt_core_capability::CapabilityHealth {
-            state: crate::l6_meta::nt_core_capability::CapabilityState::Healthy,
+    fn health(&self) -> crate::l0_substrate::nt_core_capability_types::CapabilityHealth {
+        crate::l0_substrate::nt_core_capability_types::CapabilityHealth {
+            state: crate::l0_substrate::nt_core_capability_types::CapabilityState::Healthy,
             success_rate: 1.0,
             avg_latency_ms: 0.0,
             last_called: None,
@@ -390,14 +390,14 @@ impl crate::l6_meta::nt_core_capability::UnifiedCapability for AgentOrchestrator
 
     fn execute(
         &self,
-        _input: crate::l6_meta::nt_core_capability::CapabilityInput,
-    ) -> Result<crate::l6_meta::nt_core_capability::CapabilityOutput, crate::l6_meta::nt_core_capability::CapabilityError> {
-        Ok(crate::l6_meta::nt_core_capability::CapabilityOutput::Text(
+        _input: crate::l0_substrate::nt_core_capability_types::CapabilityInput,
+    ) -> Result<crate::l0_substrate::nt_core_capability_types::CapabilityOutput, crate::l0_substrate::nt_core_capability_types::CapabilityError> {
+        Ok(crate::l0_substrate::nt_core_capability_types::CapabilityOutput::Text(
             format!("AgentOrchestrator: {} agents registered", self.agents.len()),
         ))
     }
 
-    fn supports(&self, _input: &crate::l6_meta::nt_core_capability::CapabilityInput) -> bool {
+    fn supports(&self, _input: &crate::l0_substrate::nt_core_capability_types::CapabilityInput) -> bool {
         true
     }
 }

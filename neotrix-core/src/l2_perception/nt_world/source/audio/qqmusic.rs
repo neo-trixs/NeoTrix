@@ -6,18 +6,6 @@ pub struct QQMusicSource;
 impl QQMusicSource {
     pub fn new() -> Self { Self }
 
-    /// 获取歌词
-    #[allow(dead_code)]
-    async fn get_lyrics(songmid: &str) -> Option<String> {
-        let url = format!(
-            "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid={}&format=json&nobase64=1",
-            songmid
-        );
-        let resp = reqwest::get(&url).await.ok()?;
-        let json: serde_json::Value = resp.json().await.ok()?;
-        let lyric = json["lyric"].as_str()?.to_string();
-        Some(lyric)
-    }
 }
 
 impl MediaSource for QQMusicSource {

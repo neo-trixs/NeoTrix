@@ -7,19 +7,16 @@
 //! - 超时恢复机制
 //! - 会话渠道前缀路由
 
+use async_trait::async_trait;
+use crate::atomic_io;
+use crate::domain::app_handle::{set_app_handle, get_app_handle};
 use crate::domain::registry::DomainRegistry;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
-use tauri::{AppHandle, Emitter};
-
-static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-
-pub fn set_app_handle(app: AppHandle) {
-    let _ = APP_HANDLE.set(app);
-}
+use std::sync::{Arc, Mutex};
+use tauri::Emitter;
 
 // ═══════════════════════════════════════════════
 // Core Types (from dsh-im)
@@ -631,12 +628,7 @@ impl ImPlugin {
                 recoverable: true,
             })?;
         }
-        let json = serde_json::to_string_pretty(channels).map_err(|e| DomainError {
-            code: "CONFIG_SERIALIZE_ERROR".into(),
-            message: format!("序列化配置失败: {}", e),
-            recoverable: true,
-        })?;
-        std::fs::write(&self.config_path, json).map_err(|e| DomainError {
+        atomic_io::write_json_atomic(&self.config_path, channels).map_err(|e| DomainError {
             code: "CONFIG_WRITE_ERROR".into(),
             message: format!("写入配置失败: {}", e),
             recoverable: true,
@@ -784,7 +776,7 @@ impl ImPlugin {
         let message_id = format!("msg-{}", chrono::Utc::now().timestamp_millis());
 
         // 发射事件到前端
-        if let Some(app) = APP_HANDLE.get() {
+        if let Some(app) = get_app_handle() {
             let _ = app.emit(
                 "im_message_sent",
                 serde_json::json!({
@@ -812,7 +804,7 @@ impl ImPlugin {
         let message_id = format!("msg-{}", chrono::Utc::now().timestamp_millis());
 
         // 发射流式事件
-        if let Some(app) = APP_HANDLE.get() {
+        if let Some(app) = get_app_handle() {
             let _ = app.emit(
                 "im_stream_start",
                 serde_json::json!({
@@ -883,12 +875,7 @@ impl ImPlugin {
                 recoverable: true,
             })?;
         }
-        let json = serde_json::to_string_pretty(config).map_err(|e| DomainError {
-            code: "CONFIG_SERIALIZE_ERROR".into(),
-            message: format!("序列化 DSH 市场配置失败: {}", e),
-            recoverable: true,
-        })?;
-        std::fs::write(&path, json).map_err(|e| DomainError {
+        atomic_io::write_json_atomic(&path, config).map_err(|e| DomainError {
             code: "CONFIG_WRITE_ERROR".into(),
             message: format!("写入 DSH 市场配置失败: {}", e),
             recoverable: true,
@@ -896,6 +883,7 @@ impl ImPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for ImPlugin {
     fn name(&self) -> &str {
         "im"
@@ -1371,7 +1359,7 @@ impl DomainPlugin for ImPlugin {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,
@@ -2237,7 +2225,7 @@ impl DomainPlugin for ImPlugin {
                 self.record_message_state(&envelope.id, ProcessingStatus::Processing);
 
                 // 发射事件到前端
-                if let Some(app) = APP_HANDLE.get() {
+                if let Some(app) = get_app_handle() {
                     let _ = app.emit(
                         "im_message_received",
                         serde_json::json!({
@@ -2374,7 +2362,7 @@ impl DomainPlugin for ImPlugin {
                 self.send_bot_message(message.clone())?;
 
                 // 发射事件到前端
-                if let Some(app) = APP_HANDLE.get() {
+                if let Some(app) = get_app_handle() {
                     let _ = app.emit(
                         "im_bot_message_sent",
                         serde_json::json!({
@@ -2507,7 +2495,7 @@ impl DomainPlugin for ImPlugin {
                 self.save_workflow_template(template.clone())?;
 
                 // 发射事件到前端
-                if let Some(app) = APP_HANDLE.get() {
+                if let Some(app) = get_app_handle() {
                     let _ = app.emit(
                         "im_workflow_executed",
                         serde_json::json!({
@@ -2533,7 +2521,7 @@ impl DomainPlugin for ImPlugin {
         }
     }
 
-    fn init(&mut self) -> Result<(), DomainError> {
+    async fn init(&mut self) -> Result<(), DomainError> {
         // 初始化配置文件
         if !self.config_path.exists() {
             let channels = self.default_channels();

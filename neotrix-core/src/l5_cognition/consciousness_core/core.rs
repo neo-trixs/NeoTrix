@@ -241,7 +241,7 @@ pub fn tick(cycles: usize) -> CoreSnapshot {
 
 /// 将真实 SelfTest 结果合并进意识核心单例树
 pub fn apply_branch_health_from_self_tests(
-    results: &[crate::l6_meta::healing::nt_core_self_test::SelfTestResult],
+    results: &[crate::l0_substrate::nt_core_self_test::SelfTestResult],
 ) {
     let mut h = CORE.write().unwrap_or_else(|e| e.into_inner());
     h.tree.set_branch_health_from_self_tests(results);
@@ -446,12 +446,6 @@ pub(crate) fn branch_kind_from_str(s: &str) -> BranchKind {
         "Nexus" => BranchKind::Nexus,
         _ => BranchKind::Core,
     }
-}
-
-/// 查找覆盖给定文本全部字形的系统 TTF
-#[allow(dead_code)]
-fn find_system_font_for(text: &str) -> Option<Vec<u8>> {
-    neotrix_types::core::file_parser::pdf::find_system_font_for_text(text)
 }
 
 /// 进程内单例入口: 意识核心直接处理人类语言

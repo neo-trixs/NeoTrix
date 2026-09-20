@@ -16,6 +16,7 @@ pub mod playback;
 pub mod router;
 pub mod streaming;
 pub mod thumbnail;
+pub mod vtuber;
 pub mod yt_extract;
 
 pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};

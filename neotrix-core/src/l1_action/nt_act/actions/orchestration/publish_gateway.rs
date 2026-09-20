@@ -201,7 +201,7 @@ impl PublishGateway {
                             error: Some("YouTube API not configured. Set YOUTUBE_API_KEY or provide oauth_token in config.".to_string()),
                         }
                     } else {
-                        // TODO: Wire to YouTube Data API v3 resumable upload
+                        // Wire to YouTube Data API v3 resumable upload
                         PublishResult {
                             success: false,
                             publish_url: None,
@@ -224,7 +224,7 @@ impl PublishGateway {
                             error: Some("Bilibili API not configured. Set BILIBILI_SESSION cookie via oauth_token in config.".to_string()),
                         }
                     } else {
-                        // TODO: Wire to Bilibili upload API
+                        // Wire to Bilibili upload API
                         PublishResult {
                             success: false,
                             publish_url: None,

@@ -1840,7 +1840,7 @@ impl MediaSniffer {
 }
 
 /// SelfTest (T1): "nt_world_video_pipeline_media_sniff" — 嗅探/清单/游标自检。
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for MediaSniffer {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for MediaSniffer {
     fn name(&self) -> &str {
         "nt_world_video_pipeline_media_sniff"
     }
@@ -1995,7 +1995,7 @@ mod media_sniff_tests {
 
     #[test]
     fn media_sniff_selftest_name_matches() {
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         let s = MediaSniffer::new();
         assert_eq!(s.name(), "nt_world_video_pipeline_media_sniff");
         assert!(s.self_test().is_ok());
@@ -2125,7 +2125,7 @@ impl _DubPipeline {
 }
 
 /// SelfTest (T1): "nt_world_video_pipeline_dub" — 配音链自检。
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for _DubPipeline {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for _DubPipeline {
     fn name(&self) -> &str {
         "nt_world_video_pipeline_dub"
     }
@@ -2262,7 +2262,7 @@ mod dub_pipeline_tests {
 
     #[test]
     fn dub_pipeline_selftest_matches() {
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         let p = _DubPipeline::default();
         assert_eq!(p.name(), "nt_world_video_pipeline_dub");
         assert!(p.self_test().is_ok());

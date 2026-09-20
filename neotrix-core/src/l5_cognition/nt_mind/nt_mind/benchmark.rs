@@ -5,7 +5,7 @@ use super::self_iterating::ReasoningBrain;
 use super::memory::ReasoningBank;
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::l5_cognition::nt_core_gwt::resonance::default_specialist_states;
-use crate::l6_meta::nt_core_self::SiliconSelfModel;
+use crate::l5_cognition::l1_facade::SiliconSelfModel;
 
 #[derive(Debug, Clone)]
 pub struct _BenchPhase {

@@ -2,7 +2,7 @@
 //! 给定技能名 + 风险分, 路由到 Allow/Deny/Sandbox, 维护自进化 deny/allow 名单。
 //! R-P42 强化现有 `nt_shield::tool_permissions` / `permissions`, 不平行重造权限引擎。
 
-use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use std::sync::RwLock;
 
 /// 技能路由决策。

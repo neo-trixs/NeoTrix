@@ -171,7 +171,7 @@ impl ModeRouter {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ModeRouter {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ModeRouter {
     fn name(&self) -> &str {
         "nt_core_gwt_mode_router"
     }
@@ -192,7 +192,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ModeRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_route_reasoning() {

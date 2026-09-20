@@ -5,6 +5,7 @@
 //! 每个功能域（session, chat, kb, ...）是一个 DomainPlugin，
 //! 注册到 DomainRegistry，通过统一的 domain_call 入口调用。
 
+pub mod app_handle;
 pub mod plugins;
 pub mod registry;
 
@@ -12,6 +13,7 @@ pub mod registry;
 pub use registry::DomainRegistry;
 pub use serde_json;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -120,6 +122,7 @@ pub struct DomainEvent {
 /// - Service Definition: `name()` + `actions()`
 /// - Service Provider: `call()` + `init()`
 /// - Consumer: 前端通过 `domain_call` 调用
+#[async_trait]
 pub trait DomainPlugin: Send + Sync {
     /// 域名称 (如 "session", "chat", "kb")
     fn name(&self) -> &str;
@@ -133,16 +136,16 @@ pub trait DomainPlugin: Send + Sync {
     fn actions(&self) -> Vec<ActionSpec>;
 
     /// 处理 action 调用
-    fn call(&self, action: &str, args: serde_json::Value)
+    async fn call(&self, action: &str, args: serde_json::Value)
         -> Result<serde_json::Value, DomainError>;
 
     /// 初始化 (插件注册后调用)
-    fn init(&mut self) -> Result<(), DomainError> {
+    async fn init(&mut self) -> Result<(), DomainError> {
         Ok(())
     }
 
     /// 关闭 (应用退出前调用)
-    fn shutdown(&mut self) -> Result<(), DomainError> {
+    async fn shutdown(&mut self) -> Result<(), DomainError> {
         Ok(())
     }
 }

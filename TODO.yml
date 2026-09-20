@@ -1,8 +1,10 @@
 meta:
-  generated_at: "2026-13-02T01:58:00"
-  total_items: 6
+  generated_at: "2026-09-20T16:00:00"
+  total_items: 22
   conflicts: 0
+  context: "编译修复 + 能力树 C1→C2 推进。cargo check -p neotrix --lib 有 4 个 error 需先修复。"
 items:
+  # ── 旧任务 (保留) ─────────────────────────────────────────────
   - id: task-2
     title: parent
     priority: high
@@ -13,9 +15,9 @@ items:
     updated: "2026-13-02T01:58:00"
     subagent: ses_1787882307_4
     files: []
-    depends_on: 
+    depends_on:
       - task-1
-    blocked_by: 
+    blocked_by:
       - task-1
     potential_conflict: false
   - id: task-1
@@ -83,5 +85,175 @@ items:
     depends_on: []
     blocked_by: []
     potential_conflict: false
+  # ── 统一数据源架构 — 新任务 (2026-09-20) ──────────────────────
+  - id: ds-1
+    title: "cargo check --all-targets 验证测试编译"
+    priority: high
+    status: pending
+    session: null
+    created: "2026-09-20T15:30:00"
+    updated: "2026-09-20T15:30:00"
+    subagent: null
+    files:
+      - "neotrix-core/src/**/*.rs"
+    depends_on: []
+    blocked_by: []
+    potential_conflict: false
+    notes: "运行 cargo check --all-targets -p neotrix，修复 test-only unused import 错误"
+  - id: ds-2
+    title: "检查 UnifiedEngine 集成 crawl_bridge 和 subscription_source"
+    priority: high
+    status: pending
+    session: null
+    created: "2026-09-20T15:30:00"
+    updated: "2026-09-20T15:30:00"
+    subagent: null
+    files:
+      - "neotrix-core/src/l2_perception/nt_world/source/unified_engine.rs"
+      - "neotrix-core/src/l2_perception/nt_world/source/crawl_bridge.rs"
+      - "neotrix-core/src/l2_perception/nt_world/source/subscription_source.rs"
+    depends_on:
+      - ds-1
+    blocked_by: []
+    potential_conflict: false
+    notes: "补充 with_crawl_sources() 和 with_subscription_sources() 方法"
+  - id: ds-3
+    title: "审查桥接层函数命名一致性"
+    priority: medium
+    status: pending
+    session: null
+    created: "2026-09-20T15:30:00"
+    updated: "2026-09-20T15:30:00"
+    subagent: null
+    files:
+      - "neotrix-core/src/l2_perception/nt_world/source/*_bridge.rs"
+    depends_on:
+      - ds-2
+    blocked_by: []
+    potential_conflict: false
+    notes: "统一为 bridge_all_*() 或 create_*_bridges()"
+  - id: ds-4
+    title: "补充 UnifiedEngine 测试覆盖"
+    priority: medium
+    status: pending
+    session: null
+    created: "2026-09-20T15:30:00"
+    updated: "2026-09-20T15:30:00"
+    subagent: null
+    files:
+      - "neotrix-core/src/l2_perception/nt_world/source/unified_engine.rs"
+    depends_on:
+      - ds-1
+    blocked_by: []
+    potential_conflict: false
+    notes: "补充 test_search_by_domains / test_health_check / test_engine_stats / test_registry_find"
+  - id: ds-5
+    title: "更新架构文档模块数量和桥接状态"
+    priority: low
+    status: pending
+    session: null
+    created: "2026-09-20T15:30:00"
+    updated: "2026-09-20T15:30:00"
+    subagent: null
+    files:
+      - "docs/architecture/NEOTRIX-FULL-ARCHITECTURE.md"
+      - "docs/architecture/ARCHITECTURE.md"
+      - "docs/architecture/DATAFLOW.md"
+    depends_on:
+      - ds-2
+      - ds-3
+    blocked_by: []
+    potential_conflict: false
+    notes: "更新模块数量: media=25, intel=12, osint=25, llm=35, crawl=5"
+  # ── 编译修复 (2026-09-20) ──────────────────────────────────────
+  - id: cf-1
+    title: "删除 unused import HealthChecker"
+    priority: high
+    status: pending
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    files:
+      - "neotrix-core/src/l0_substrate/nt_core_platform/agent_registry.rs"
+    notes: "第14行删除 use super::health::HealthChecker"
+  - id: cf-2
+    title: "删除 unused import DiscoveryExtractor"
+    priority: high
+    status: pending
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    files:
+      - "neotrix-core/src/l2_perception/nt_world/crawl/classifier.rs"
+    notes: "第5行删除 use super::discover::DiscoveryExtractor"
+  - id: cf-3
+    title: "修复 PersonalitySnapshot 缺少 tick 字段"
+    priority: high
+    status: pending
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    files:
+      - "neotrix-core/src/l5_cognition/nt_mind/**/*.rs"
+    notes: "搜索 PersonalitySnapshot struct，删除初始化中的 tick 或在 struct 中添加"
+  - id: cf-4
+    title: "修复 unused variable base"
+    priority: high
+    status: pending
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    notes: "改为 _base 或删除"
+  - id: cf-5
+    title: "测试编译验证"
+    priority: high
+    status: pending
+    depends_on:
+      - cf-1
+      - cf-2
+      - cf-3
+      - cf-4
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    notes: "cargo check -p neotrix --lib && cargo test -p neotrix --lib"
+  # ── 能力树 C1→C2 (2026-09-20) ─────────────────────────────────
+  - id: ct-1
+    title: "nt_memory 域 C2 推进"
+    priority: medium
+    status: pending
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    notes: "entity_linking/consolidation/distillation 等 7 模块集成测试通过"
+  - id: ct-2
+    title: "nt_shield 域 C2 推进"
+    priority: medium
+    status: pending
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    notes: "llm_scanner/red_team/secret_scanner 等 6 模块集成测试通过"
+  - id: ct-3
+    title: "nt_meta/nt_core 域 C2 推进"
+    priority: medium
+    status: pending
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    notes: "prompt_manager/context_router/coordinator 等 6 模块集成测试通过"
+  - id: ct-4
+    title: "healing/governance 域 C2 推进"
+    priority: medium
+    status: pending
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    notes: "self_healing/predictive_maintenance/enforcement 等 4 模块集成测试通过"
+  - id: ct-5
+    title: "更新能力树 roadmap.rs"
+    priority: medium
+    status: pending
+    depends_on:
+      - ct-1
+      - ct-2
+      - ct-3
+      - ct-4
+    created: "2026-09-20T16:00:00"
+    updated: "2026-09-20T16:00:00"
+    files:
+      - "nt_core_capability_tree/src/roadmap.rs"
+    notes: "41 模块 C1→C2"
 conflicts: []
 subagents: {}

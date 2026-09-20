@@ -17,7 +17,7 @@ pub static INSTANCE: LazyLock<RwLock<Arc<StealthNetConfig>>> = LazyLock::new(|| 
 
 /// DI-aware 配置访问 — 优先从容器解析，回退到静态 INSTANCE
 pub fn _resolve_config() -> Arc<StealthNetConfig> {
-    use crate::core::nt_core_di;
+    use crate::l0_substrate::nt_core_di;
     if let Some(v) = nt_core_di::resolve_global::<Arc<StealthNetConfig>>() {
         return v;
     }

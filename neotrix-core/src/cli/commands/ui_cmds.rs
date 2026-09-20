@@ -62,7 +62,7 @@ impl CliCommand for WorkSpaceCmd {
         let mut mgr = if let Some(ctx) = ctx {
             CliContext::lock(&ctx.workspace)
         } else {
-            crate::core::nt_core_ws::WORKSPACE_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+            crate::l0_substrate::nt_core_ws::WORKSPACE_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
         };
         let sub = clean_args[0];
 

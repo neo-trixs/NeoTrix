@@ -2,7 +2,7 @@ use clap::Subcommand;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::l1_action::nt_memory::nt_memory_historian::EvidenceRecord;
+use crate::l4_emotion::nt_memory::nt_memory_historian::EvidenceRecord;
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 #[derive(Debug, Subcommand)]
@@ -73,8 +73,8 @@ pub fn handle_evidence_command(cmd: &EvidenceCommand) -> Result<(), String> {
     }
 }
 
-fn get_store() -> Result<crate::l1_action::nt_memory::nt_memory_historian::EvidenceStore, String> {
-    crate::l1_action::nt_memory::nt_memory_historian::EvidenceStore::try_open_default()
+fn get_store() -> Result<crate::l4_emotion::nt_memory::nt_memory_historian::EvidenceStore, String> {
+    crate::l4_emotion::nt_memory::nt_memory_historian::EvidenceStore::try_open_default()
         .ok_or_else(|| "Failed to open KB for EWHR".into())
 }
 

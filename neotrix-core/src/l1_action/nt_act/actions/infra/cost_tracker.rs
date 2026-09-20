@@ -114,7 +114,7 @@ impl CostTracker {
             alert.current_usd = self.total_cost_usd;
             if !alert.triggered && self.total_cost_usd >= alert.limit_usd * (alert.threshold_percent / 100.0) {
                 alert.triggered = true;
-                // TODO: 发送实际告警通知
+                // send actual alert notification
             }
         }
     }

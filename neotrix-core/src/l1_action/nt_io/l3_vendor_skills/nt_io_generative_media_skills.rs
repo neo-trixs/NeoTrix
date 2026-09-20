@@ -6,7 +6,7 @@
 //! 核心能力: 把多模态生成媒体编排为图/视频/音频三种生成接口
 //! (经 muapi.ai 统一网关)。本 stub 负责生成请求校验与规格生成。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 媒体模态。
 #[derive(Debug, Clone, PartialEq)]

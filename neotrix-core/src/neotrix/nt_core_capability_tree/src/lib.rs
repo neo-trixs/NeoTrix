@@ -14,6 +14,7 @@ pub mod serialize;
 pub mod fusion;
 pub mod cad_node;
 pub mod social_access_node;
+pub mod roadmap;
 
 pub use node::{CapabilityNode, NodeLayer, ConstellationLevel, Domain, RuneSocket, EvolutionOp, EvolutionLogEntry};
 pub use registry::{CapabilityRegistry, RegistryError};
@@ -255,8 +256,8 @@ mod tests {
             vec!["cross_session_link".into()],
         );
         node.evolution_log = vec![
-            EvolutionLogEntry { cycle: "pending".into(), op: EvolutionOp::Budding, from_nodes: vec![], to_node: None, note: String::new(), timestamp: chrono::Utc::now() },
-            EvolutionLogEntry { cycle: "auto".into(), op: EvolutionOp::Maturation, from_nodes: vec![], to_node: None, note: String::new(), timestamp: chrono::Utc::now() },
+            EvolutionLogEntry { cycle: "pending".into(), op: EvolutionOp::Budding, from_nodes: vec![], to_node: None, note: String::new(), timestamp: chrono::Utc::now(), runeword_change: None },
+            EvolutionLogEntry { cycle: "auto".into(), op: EvolutionOp::Maturation, from_nodes: vec![], to_node: None, note: String::new(), timestamp: chrono::Utc::now(), runeword_change: None },
         ];
         node.promote_constellation().ok();
         reg.register(node).unwrap();

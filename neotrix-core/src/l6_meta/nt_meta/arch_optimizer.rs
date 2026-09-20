@@ -317,18 +317,6 @@ mod tests {
         (path.to_string(), lines)
     }
 
-    #[allow(dead_code)]
-    fn empty_awareness() -> AwarenessReport {
-        AwarenessReport {
-            gaps: vec![],
-            total_gap: 0.0,
-            critical_count: 0,
-            significant_count: 0,
-            recommended_focus: vec![],
-            overall_health: 1.0,
-        }
-    }
-
     fn awareness_with_focus(dims: &[&str]) -> AwarenessReport {
         AwarenessReport {
             gaps: vec![],

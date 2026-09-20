@@ -2026,7 +2026,7 @@ impl CalibrationSet {
             let mut traj = AgentTrajectory::new(id, content.to_string());
             traj.push(crate::l5_cognition::nt_core_prm::TrajectoryStep {
                 step_idx: 0,
-                specialist: crate::core::nt_core_traits::SpecialistType::RiskAssessor,
+                specialist: crate::l0_substrate::nt_core_traits::SpecialistType::RiskAssessor,
                 e8_mode: crate::l5_cognition::nt_core_hex::ReasoningHexagram::new(0b001010),
                 action: "absorb".to_string(),
                 input: evidence.to_string(),

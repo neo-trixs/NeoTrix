@@ -1,6 +1,7 @@
 use crate::l5_cognition::nt_core_arch_fitness::arch_fitness_tests;
-use crate::core::nt_core_qtest::QTestEngineSelfTest;
-use crate::l6_meta::healing::nt_core_self_test::{ConstitutionComplianceTest, SelfTest, SelfTestRegistry};
+use crate::l0_substrate::nt_core_qtest::QTestEngineSelfTest;
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
+use crate::l6_meta::healing::nt_core_self_test::ConstitutionComplianceTest;
 // use crate::l2_perception::nt_world::cad_selftest;
 use crate::l5_cognition::nt_core_cad_consciousness;
 use crate::l2_perception::nt_world::osint::{UnifiedAbsorber, AbsorberConfig};
@@ -34,7 +35,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // LLM 核心 (NT-CORE): 统一错误域接入 + token 预算引擎自测 (卫生层 P0)
     // crate::l1_action::nt_core_llm::register_llm_self_tests(&mut registry); // stub returns empty Vec
     // 缓存核心 (NT-CORE): 精确层往返 + 容量计数自测
-    crate::core::nt_core_cache::register_cache_self_tests(&mut registry);
+    crate::l0_substrate::nt_core_cache::register_cache_self_tests(&mut registry);
     // VSA/HyperCube 核心 (NT-CORE): 卦象嵌入自相似 + 异卦分离 + bind 自相似
     crate::l2_perception::nt_core_e8_vsa::register_e8_vsa_self_tests(&mut registry);
     // KB 类型核心 (NT-CORE): NodeType 枚举全变体往返
@@ -114,7 +115,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
         ),
     ));
     registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
+        crate::l4_emotion::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
     ));
     // 2026-08-15 sweep absorption batch (Phase D): 编排治理 / harness / 感知 / 多模态 / 元数据
     // registry.register(Box::new(
@@ -168,7 +169,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-19 write_guard 证据审计闭环 (dbx G4): T1→T2 注册 (run.rs 架构审计侧)
     registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
     ));
     register_c5_healers(registry);
     // 2026-08-27 Wave6 H4: 10 情报工具 SelfTest 注册 (激活 ConsciousnessTree NT-WORLD 分支)
@@ -198,7 +199,7 @@ pub fn register_c5_healers(registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-17 C5 自愈回路扩展: MEMORY 溢出层完整性 + MIND-eval 阶梯单调性
     registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::spill_storage::SpillStorageHealer,
+        crate::l4_emotion::nt_memory::nt_memory_kb::spill_storage::SpillStorageHealer,
     ));
     registry.register(Box::new(
         crate::l6_meta::nt_repair::nt_mind_eval_harness::OracleLadderHealer,
@@ -283,19 +284,19 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     // NT-MEMORY (4)
     registry.register(Box::new(LeannStoreSelfTest));
     registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
+        crate::l4_emotion::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
     ));
     // NT-MEMORY 四态资产 (吸收 TencentDB-Agent-Memory): 纯内存分类自测, 轻量注册
     registry.register(Box::new(
         crate::l6_meta::nt_core_memory_asset::MemoryAssetSelfTest,
     ));
     registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::default(),
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::default(),
     ));
     registry.register(Box::new(Bm25IndexSelfTest));
     // 2026-08-19 write_guard 证据审计闭环 (dbx G4): 纯内存检测件 → 轻量注册表
     registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
     ));
     // NT-MIND (5)
     registry.register(Box::new(
@@ -366,7 +367,7 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
 /// 轻量 SelfTest 运行器 (纯内存检测件, 无网络/无 cargo/无全仓扫描) — 供意识核心
 /// tick 前注入分支健康数据 (迷雾治理断链修复)。只跑轻量注册表,
 /// 每个注册项运行 self_test() 并收集 SelfTestResult。
-pub fn run_lightweight_self_tests() -> Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> {
+pub fn run_lightweight_self_tests() -> Vec<SelfTestResult> {
     let mut registry = SelfTestRegistry::new();
     register_lightweight_modules(&mut registry);
     let results = registry.run_all();
@@ -382,10 +383,9 @@ pub fn run_lightweight_self_tests() -> Vec<crate::l6_meta::healing::nt_core_self
 /// 每个检测件 pass→signal 1.0/失败→0.0; 融合产出单一高可靠信号, 以
 /// `nt_core_quantum_fusion` 名义注册进结果集 (归属 NT-CORE 分支)。
 fn fuse_self_test_results(
-    results: &[crate::l6_meta::healing::nt_core_self_test::SelfTestResult],
-) -> Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> {
+    results: &[SelfTestResult],
+) -> Vec<SelfTestResult> {
     use crate::l5_cognition::nt_core_quantum_fusion::{QuantumSignal, QuantumSuperposition};
-    use crate::l6_meta::healing::nt_core_self_test::SelfTestResult;
 
     if results.is_empty() {
         return results.to_vec();
@@ -426,8 +426,8 @@ impl SelfTest for AnswerEngineSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        let engine = crate::core::nt_core_answer_engine::AnswerEngine::with_mode(
-            crate::core::nt_core_answer_engine::AnswerMode::Balanced,
+        let engine = crate::l0_substrate::nt_core_answer_engine::AnswerEngine::with_mode(
+            crate::l0_substrate::nt_core_answer_engine::AnswerMode::Balanced,
         );
         let config = engine.config();
         if config.max_sources == 0 {
@@ -511,7 +511,7 @@ impl SelfTest for LeannStoreSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::l1_action::nt_memory::nt_memory_leann_store::*;
+        use crate::l4_emotion::nt_memory::nt_memory_leann_store::*;
         let store = LeannGraphStore::new(LeannConfig::default());
         if store.node_count() != 0 {
             return Err(vec!["fresh store should have 0 nodes".into()]);
@@ -529,7 +529,7 @@ impl SelfTest for Bm25IndexSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::l1_action::nt_memory::nt_memory_kb::bm25::{Bm25Document, Bm25Index};
+        use crate::l4_emotion::nt_memory::nt_memory_kb::bm25::{Bm25Document, Bm25Index};
         let docs = vec![
             Bm25Document {
                 id: "d1".into(),
@@ -599,7 +599,7 @@ impl SelfTest for UnifiedAbsorberSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+        use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
         let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))
             .map_err(|e| vec![e])?;
         let absorber = UnifiedAbsorber::new(kb, AbsorberConfig::default())

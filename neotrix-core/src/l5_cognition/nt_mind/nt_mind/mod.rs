@@ -17,7 +17,7 @@ pub use seal_core::self_iterating;
 pub use seal_core::stats;
 pub use seal_core::model_router;
 pub use seal_core::multi_brain;
-pub use crate::l5_cognition::layer_aliases::bm25;
+pub use crate::l5_cognition::l1_facade::bm25;
 pub use seal_core::embedding;
 
 // ============================================================================
@@ -76,6 +76,7 @@ pub use consciousness::wifi_sensing;                    // WiFi 感知引擎：�
 pub mod cortex_types;                    // PredictiveCortex struct, types, constants
 pub mod cortex_core;                     // PredictiveCortex core prediction logic
 pub use consciousness::predictive_cortex;               // PredictiveCortex: constructor + self-repair + re-exports
+pub mod decision_engine;                   // DecisionEngine: 多准则加权决策分析 (Decision→Score→Analysis→Recommendation)
 pub mod meta_pattern_extractor;           // MetaPatternExtractor: ThinkingTrace → 元模式 → 意识进化
 pub mod meta_panel;                       // MetaPanelEngine: 多视角推理面板 (E8×GWT×PerspectiveLens)
 pub use consciousness::panorama_pipeline;                // PanoramaPipeline: 超维度记忆知识库全景集成
@@ -188,11 +189,12 @@ pub use goal_loop::{GoalLoop, GoalState, GoalConfig, GoalTracker, GoalIterationR
 // Domain 7: 技能树 (Skill Tree)
 // ============================================================================
 pub mod skill_tree;
+pub mod skill_chain;
 
 // ============================================================================
 // Domain 8: 外贸全流程 (Foreign Trade Full Cycle) — re-export via ACT facade
 // ============================================================================
-pub use crate::l5_cognition::layer_aliases::{
+pub use crate::l5_cognition::l1_facade::{
     TradeStateMachine, TradeCapabilitySpec, TradeResult,
     InquiryDetail, IntentLevel, ProductSpec, ProductType,
     BomItem, RoutingStep, PackagingSpec, CompanyPolicy, RiskControl,

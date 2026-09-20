@@ -3,7 +3,6 @@
 //! 提供市场搜索、安装、卸载等功能。
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

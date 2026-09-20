@@ -13,7 +13,7 @@
 //!     作为系统健康的主要度
 
 pub use crate::l1_action::nt_act::nt_act_types::ProjectSnapshot;
-use crate::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
 
 /// 基准维度
 #[derive(Debug, Clone)]

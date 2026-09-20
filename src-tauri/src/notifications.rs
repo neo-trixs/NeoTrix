@@ -2,7 +2,7 @@
 //!
 //! Wraps tauri-plugin-notification to provide typed notification APIs.
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_notification::NotificationExt;
 
 pub struct NotificationManager {

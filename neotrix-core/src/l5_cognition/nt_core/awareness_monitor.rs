@@ -1,5 +1,5 @@
-use crate::core::nt_core_cap::CapabilityVector;
-use crate::core::nt_core_cap::FIELD_NAMES;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::FIELD_NAMES;
 
 /// Describes a detected capability gap
 #[derive(Debug, Clone)]
@@ -202,7 +202,7 @@ impl Default for SelfAwarenessMonitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_cap::CapabilityVector;
+    use neotrix_types::core::nt_core_cap::CapabilityVector;
 
     fn make_cv(values: &[f64]) -> CapabilityVector {
         let mut arr = vec![0.0; 23];

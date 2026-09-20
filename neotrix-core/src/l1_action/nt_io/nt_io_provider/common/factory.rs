@@ -16,7 +16,7 @@ use crate::l1_action::nt_io::nt_io_provider::gemini::GeminiProvider;
 use crate::l1_action::nt_io::nt_io_provider::gateway::free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvider, CerebrasProvider};
 use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::{ProviderCategory, CommunicationProfile};
-use crate::core::nt_core_span::CostTracker;
+use crate::l0_substrate::nt_core_span::CostTracker;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -544,14 +544,14 @@ pub fn network_access_allowed(provider_type: LlmProviderType, base_url: Option<&
     }
     match crate::cli::shield_enforcer::global_shield().lock() {
         Ok(shield) => {
-            use crate::core::nt_core_traits::NetworkPolicy;
+            use crate::l0_substrate::nt_core_traits::NetworkPolicy;
             match shield.policy.check_network_access(&host) {
-                crate::core::nt_core_traits::NetworkPolicyResult::Allow => true,
-                crate::core::nt_core_traits::NetworkPolicyResult::RequireConfirmation => {
+                crate::l0_substrate::nt_core_traits::NetworkPolicyResult::Allow => true,
+                crate::l0_substrate::nt_core_traits::NetworkPolicyResult::RequireConfirmation => {
                     log::info!("[network-isolation] provider domain '{}' requires confirmation — allowing", host);
                     true
                 }
-                crate::core::nt_core_traits::NetworkPolicyResult::Deny => {
+                crate::l0_substrate::nt_core_traits::NetworkPolicyResult::Deny => {
                     log::warn!("[network-isolation] BLOCKED provider domain '{}' (not in allowlist, default deny)", host);
                     false
                 }

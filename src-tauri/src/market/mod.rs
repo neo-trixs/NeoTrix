@@ -10,6 +10,7 @@ pub mod schema;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::atomic_io;
 use schema::{MarketEntry, MarketSearchResult, PluginManifest};
 
 /// 市场配置
@@ -273,7 +274,7 @@ impl MarketEngine {
         let toml_content = manifest
             .to_toml()
             .map_err(|e| format!("Serialize manifest: {e}"))?;
-        std::fs::write(dest_dir.join("plugin.toml"), toml_content)
+        atomic_io::write_atomic(&dest_dir.join("plugin.toml"), toml_content.as_bytes())
             .map_err(|e| format!("Write plugin.toml: {e}"))?;
 
         // 更新已安装列表

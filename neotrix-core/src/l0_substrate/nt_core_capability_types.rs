@@ -523,3 +523,301 @@ pub enum CapabilityError {
     #[error("未就绪")]
     NotReady,
 }
+
+// ─── CapabilityRegistry (下沉自 l6_meta::nt_core_capability) ───────────────
+
+use std::sync::Arc;
+
+/// 能力注册中心
+#[derive(Clone)]
+pub struct CapabilityRegistry {
+    /// 已注册的能力
+    capabilities: std::collections::HashMap<String, Arc<dyn UnifiedCapability>>,
+    /// 按域索引
+    by_domain: std::collections::HashMap<Domain, Vec<String>>,
+    /// 按层级索引
+    by_layer: std::collections::HashMap<Layer, Vec<String>>,
+}
+
+impl CapabilityRegistry {
+    /// 创建新的注册中心
+    pub fn new() -> Self {
+        Self {
+            capabilities: std::collections::HashMap::new(),
+            by_domain: std::collections::HashMap::new(),
+            by_layer: std::collections::HashMap::new(),
+        }
+    }
+
+    /// 注册能力
+    pub fn register(&mut self, cap: Arc<dyn UnifiedCapability>) {
+        let meta = cap.meta();
+        let id = meta.id.clone();
+
+        self.by_domain
+            .entry(meta.domain)
+            .or_default()
+            .push(id.clone());
+        self.by_layer
+            .entry(meta.layer)
+            .or_default()
+            .push(id.clone());
+
+        self.capabilities.insert(id, cap);
+    }
+
+    /// 获取能力
+    pub fn get(&self, id: &str) -> Option<Arc<dyn UnifiedCapability>> {
+        self.capabilities.get(id).cloned()
+    }
+
+    /// 按域获取能力列表
+    pub fn by_domain(&self, domain: Domain) -> Vec<Arc<dyn UnifiedCapability>> {
+        self.by_domain
+            .get(&domain)
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| self.capabilities.get(id).cloned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// 按层级获取能力列表
+    pub fn by_layer(&self, layer: Layer) -> Vec<Arc<dyn UnifiedCapability>> {
+        self.by_layer
+            .get(&layer)
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| self.capabilities.get(id).cloned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// 列出所有能力
+    pub fn list_all(&self) -> Vec<CapabilityMeta> {
+        self.capabilities.values().map(|cap| cap.meta()).collect()
+    }
+
+    /// 获取所有健康状态
+    pub fn health_all(&self) -> Vec<(CapabilityMeta, CapabilityHealth)> {
+        self.capabilities
+            .values()
+            .map(|cap| (cap.meta(), cap.health()))
+            .collect()
+    }
+}
+
+impl Default for CapabilityRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// MoE (Mixture of Experts) routing strategy for cost-aware capability selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MoERoutingStrategy {
+    /// Route to cheapest capable model (default, ~90% token savings)
+    CostOptimized,
+    /// Route to highest quality model regardless of cost
+    QualityFirst,
+    /// Round-robin across capable models
+    RoundRobin,
+    /// Load-balanced across capable models
+    LoadBalanced,
+}
+
+/// 路由调度器
+pub struct CapabilityRouter {
+    /// 能力注册中心
+    registry: Arc<CapabilityRegistry>,
+    /// 路由规则
+    rules: Vec<Box<dyn Fn(&CapabilityInput) -> Option<String>>>,
+    /// MoE routing strategy
+    routing_strategy: MoERoutingStrategy,
+}
+
+impl CapabilityRouter {
+    /// 创建新的路由器 (default: CostOptimized)
+    pub fn new(registry: Arc<CapabilityRegistry>) -> Self {
+        Self {
+            registry,
+            rules: Vec::new(),
+            routing_strategy: MoERoutingStrategy::CostOptimized,
+        }
+    }
+
+    /// 创建路由器 with explicit MoE routing strategy
+    pub fn with_strategy(registry: Arc<CapabilityRegistry>, strategy: MoERoutingStrategy) -> Self {
+        Self {
+            registry,
+            rules: Vec::new(),
+            routing_strategy: strategy,
+        }
+    }
+
+    /// 添加路由规则
+    pub fn add_rule<F>(&mut self, rule: F)
+    where
+        F: Fn(&CapabilityInput) -> Option<String> + 'static,
+    {
+        self.rules.push(Box::new(rule));
+    }
+
+    /// 路由调用
+    pub fn route(&self, input: CapabilityInput) -> Result<CapabilityOutput, CapabilityError> {
+        for rule in &self.rules {
+            if let Some(cap_id) = rule(&input) {
+                if let Some(cap) = self.registry.get(&cap_id) {
+                    return cap.execute(input);
+                }
+            }
+        }
+
+        match &input {
+            CapabilityInput::Text(_) => self.route_to_domain(input, Domain::NtWorld),
+            CapabilityInput::Network(_) => self.route_to_domain(input, Domain::NtShield),
+            CapabilityInput::Security(_) => self.route_to_domain(input, Domain::NtShield),
+            CapabilityInput::Nlp(_) => self.route_to_domain(input, Domain::NtWorld),
+            CapabilityInput::Asset(_) => self.route_to_domain(input, Domain::NtWorld),
+            CapabilityInput::FileEnhance(_) => self.route_to_domain(input, Domain::NtFileAbility),
+            CapabilityInput::Kv(_) => self.route_to_domain(input, Domain::NtMemory),
+        }
+    }
+
+    /// 按域路由
+    fn route_to_domain(
+        &self,
+        input: CapabilityInput,
+        domain: Domain,
+    ) -> Result<CapabilityOutput, CapabilityError> {
+        let mut caps: Vec<Arc<dyn UnifiedCapability>> = self.registry.by_domain(domain);
+        let strategy = self.routing_strategy.clone();
+
+        match strategy {
+            MoERoutingStrategy::CostOptimized => {
+                caps.sort_by(|a, b| {
+                    a.meta()
+                        .cost_weight
+                        .partial_cmp(&b.meta().cost_weight)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
+            MoERoutingStrategy::QualityFirst => {
+                caps.sort_by(|a, b| {
+                    b.meta()
+                        .cost_weight
+                        .partial_cmp(&a.meta().cost_weight)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
+            MoERoutingStrategy::RoundRobin | MoERoutingStrategy::LoadBalanced => {}
+        }
+
+        for cap in caps {
+            if cap.supports(&input) {
+                return cap.execute(input);
+            }
+        }
+        Err(CapabilityError::UnsupportedInput("无匹配能力".into()))
+    }
+
+    /// 获取注册中心引用
+    pub fn registry(&self) -> &Arc<CapabilityRegistry> {
+        &self.registry
+    }
+
+    /// Set the MoE routing strategy
+    pub fn set_routing_strategy(&mut self, strategy: MoERoutingStrategy) {
+        self.routing_strategy = strategy;
+    }
+
+    /// Get the current MoE routing strategy
+    pub fn routing_strategy(&self) -> &MoERoutingStrategy {
+        &self.routing_strategy
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capability_meta_effective_priority() {
+        let meta = CapabilityMeta {
+            id: "test".into(),
+            name: "Test".into(),
+            layer: Layer::L1Action,
+            domain: Domain::NtCore,
+            version: "1.0".into(),
+            description: "test".into(),
+            tags: vec![],
+            status: CapabilityStatus::default(),
+            metrics: CapabilityMetrics::default(),
+            cost_weight: 0.5,
+            priority: 8.0,
+        };
+        assert_eq!(meta.effective_priority(), 4.0);
+    }
+
+    #[test]
+    fn capability_status_default() {
+        assert!(matches!(CapabilityStatus::default(), CapabilityStatus::Healthy));
+    }
+
+    #[test]
+    fn capability_metrics_default() {
+        let m = CapabilityMetrics::default();
+        assert_eq!(m.total_calls, 0);
+        assert_eq!(m.total_errors, 0);
+        assert!(m.last_called.is_none());
+    }
+
+    #[test]
+    fn capability_registry_new_and_register() {
+        let mut reg = CapabilityRegistry::new();
+        assert!(reg.get("nonexistent").is_none());
+        assert!(reg.list_all().is_empty());
+    }
+
+    #[test]
+    fn moe_routing_strategy_eq() {
+        assert_eq!(MoERoutingStrategy::CostOptimized, MoERoutingStrategy::CostOptimized);
+        assert_ne!(MoERoutingStrategy::CostOptimized, MoERoutingStrategy::QualityFirst);
+    }
+
+    #[test]
+    fn capability_router_new() {
+        let reg = Arc::new(CapabilityRegistry::new());
+        let router = CapabilityRouter::new(reg);
+        assert_eq!(router.routing_strategy(), &MoERoutingStrategy::CostOptimized);
+    }
+
+    #[test]
+    fn capability_router_with_strategy() {
+        let reg = Arc::new(CapabilityRegistry::new());
+        let router = CapabilityRouter::with_strategy(reg, MoERoutingStrategy::QualityFirst);
+        assert_eq!(router.routing_strategy(), &MoERoutingStrategy::QualityFirst);
+    }
+
+    #[test]
+    fn capability_input_debug() {
+        let input = CapabilityInput::Text("hello".into());
+        let debug = format!("{:?}", input);
+        assert!(debug.contains("Text"));
+    }
+
+    #[test]
+    fn capability_output_clone_text() {
+        let out = CapabilityOutput::Text("hi".into());
+        let cloned = out.clone();
+        assert!(matches!(cloned, CapabilityOutput::Text(s) if s == "hi"));
+    }
+
+    #[test]
+    fn capability_error_display() {
+        let err = CapabilityError::Timeout;
+        assert!(format!("{}", err).contains("超时"));
+    }
+}

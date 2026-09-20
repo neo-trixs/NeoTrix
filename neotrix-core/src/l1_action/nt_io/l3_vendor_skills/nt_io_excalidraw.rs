@@ -6,7 +6,7 @@
 //! 核心能力: 将结构化图描述 (节点 + 连线) 转换为 Excalidraw scene JSON,
 //! 供后续渲染/导出。本 stub 负责场景骨架生成与基础校验。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 图节点。
 #[derive(Debug, Clone, PartialEq)]

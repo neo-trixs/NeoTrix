@@ -193,7 +193,7 @@ pub trait EvolutionHarnessApi {
     fn harness_run_cycle(&mut self, snapshot_json: &serde_json::Value, infos: &[RegistryNodeInfo]) -> serde_json::Value;
     fn harness_persist_suggestions(
         &mut self,
-        kb: &crate::l5_cognition::layer_aliases::KnowledgeBase,
+        kb: &crate::l5_cognition::l1_facade::KnowledgeBase,
         report: &serde_json::Value,
     ) -> usize;
     fn harness_actionable_suggestions(report: &serde_json::Value, threshold: f64) -> Vec<RegistrySuggestion>;

@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use crate::l5_cognition::layer_aliases::KnowledgeBase;
+use crate::l5_cognition::l1_facade::KnowledgeBase;
 use crate::l2_perception::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
 
 // ============================================================================
@@ -513,9 +513,9 @@ impl crate::l5_cognition::nt_mind::nt_mind_hook::HookAction for SessionEndHook {
             .unwrap_or("unknown");
 
         // G3: SessionLedger — 会话结束时记录证据账本，防幻觉
-        let mut ledger = crate::l1_action::nt_memory::evidence_ledger::SessionLedger::new(session_id);
+        let mut ledger = crate::l4_emotion::nt_memory::evidence_ledger::SessionLedger::new(session_id);
         ledger.add_evidence(
-            crate::l1_action::nt_memory::evidence_ledger::EvidenceType::Observation,
+            crate::l4_emotion::nt_memory::evidence_ledger::EvidenceType::Observation,
             &format!("Session {session_id} cycle {cycle} ended"),
             "experience_tree_hook",
             0.9,

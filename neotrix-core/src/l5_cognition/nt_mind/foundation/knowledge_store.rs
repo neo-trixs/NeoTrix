@@ -69,23 +69,23 @@ impl KnowledgeStore for L1KnowledgeStore {
     }
 
     fn extract_html_content(&self, html: &str) -> (String, String) {
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content(html)
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content(html)
     }
 
     fn is_safe_fetch_url(&self, url: &str) -> bool {
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::is_safe_fetch_url(url)
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::is_safe_fetch_url(url)
     }
 }
 
 /// KB-backed KnowledgeStore that delegates to a KnowledgeBase instance.
 pub struct KbKnowledgeStore {
-    pub kb: std::sync::Arc<crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase>,
+    pub kb: std::sync::Arc<crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase>,
 }
 
 impl KnowledgeStore for KbKnowledgeStore {
     fn claim_next_crawl_url(&self) -> Result<Option<CrawlQueueItem>, String> {
         let conn = self.kb.conn.lock().map_err(|e| format!("KB lock: {}", e))?;
-        let item = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::claim_next_crawl_url(&conn)
+        let item = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::claim_next_crawl_url(&conn)
             .map_err(|e| format!("claim_next_crawl_url: {}", e))?;
         Ok(item.map(|i| CrawlQueueItem {
             id: i.id,
@@ -103,27 +103,27 @@ impl KnowledgeStore for KbKnowledgeStore {
 
     fn mark_crawl_complete(&self, id: &str, success: bool, error: Option<&str>) -> Result<(), String> {
         let conn = self.kb.conn.lock().map_err(|e| format!("KB lock: {}", e))?;
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::mark_crawl_complete(&conn, id, success, error)
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::mark_crawl_complete(&conn, id, success, error)
             .map_err(|e| format!("mark_crawl_complete: {}", e))
     }
 
     fn count_nodes_by_domain(&self) -> Result<HashMap<String, usize>, String> {
         let conn = self.kb.conn.lock().map_err(|e| format!("KB lock: {}", e))?;
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::count_nodes_by_domain(&conn)
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::count_nodes_by_domain(&conn)
             .map_err(|e| format!("count_nodes_by_domain: {}", e))
     }
 
     fn enqueue_seed_urls(&self, urls: &[(&str, i64, &str)]) -> Result<usize, String> {
         let conn = self.kb.conn.lock().map_err(|e| format!("KB lock: {}", e))?;
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::enqueue_seed_urls(&conn, urls)
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::enqueue_seed_urls(&conn, urls)
             .map_err(|e| format!("enqueue_seed_urls: {}", e))
     }
 
     fn extract_html_content(&self, html: &str) -> (String, String) {
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content(html)
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content(html)
     }
 
     fn is_safe_fetch_url(&self, url: &str) -> bool {
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::is_safe_fetch_url(url)
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::is_safe_fetch_url(url)
     }
 }

@@ -17,28 +17,6 @@ impl MultiLyricSource {
             None
         }
     }
-
-    /// 解析逐字歌词 (增强版 LRC)
-    #[allow(dead_code)]
-    fn parse_enhanced_lrc(line: &str) -> Vec<_LyricWord> {
-        let mut words = Vec::new();
-        let mut remaining = line;
-        while let Some(start) = remaining.find('<') {
-            if let Some(end) = remaining[start..].find('>') {
-                let tag = &remaining[start + 1..start + end];
-                if let Some(comma) = tag.find(',') {
-                    if let Ok(time_ms) = tag[comma + 1..].parse::<i64>() {
-                        let text = tag[..comma].to_string();
-                        words.push(_LyricWord { time_ms, text });
-                    }
-                }
-                remaining = &remaining[start + end + 1..];
-            } else {
-                break;
-            }
-        }
-        words
-    }
 }
 
 impl MediaSource for MultiLyricSource {
@@ -99,11 +77,4 @@ impl MediaSource for MultiLyricSource {
             Ok(Lyric { title: Some(title), artist: Some(artist), lines, source: "multi_lyric".into() })
         })
     }
-}
-
-/// 歌词中的单个字
-#[derive(Debug, Clone)]
-pub struct _LyricWord {
-    pub time_ms: i64,
-    pub text: String,
 }

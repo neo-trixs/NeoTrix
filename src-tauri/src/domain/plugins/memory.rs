@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use rusqlite::Connection;
 use std::path::PathBuf;
@@ -61,6 +62,7 @@ impl MemoryPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for MemoryPlugin {
     fn name(&self) -> &str {
         "memory"
@@ -116,7 +118,7 @@ impl DomainPlugin for MemoryPlugin {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,

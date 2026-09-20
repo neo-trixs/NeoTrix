@@ -6,7 +6,7 @@ use chrono::Utc;
 use crate::l1_action::nt_core_bank::iteration::{rrf_fuse, Bm25Document, Bm25Index};
 use crate::l1_action::nt_core_bank::{ReasoningBank, ReasoningMemory, T3ViewType};
 use crate::l2_perception::nt_core_knowledge::TaskType;
-use crate::l5_cognition::nt_core_kron::KroneckerCleanup;
+use neotrix_reasoning::kron::KroneckerCleanup;
 
 impl ReasoningBank {
     fn rebuild_bm25(&self) {

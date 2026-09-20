@@ -302,7 +302,7 @@ mod tests {
         // latencies (100+i ms) and success flags are test inputs, NOT real observations.
         // This verifies the predictor computes p50/p95/confidence from recorded data,
         // NOT that predictions are accurate for real traffic.
-        // TODO(R-P79): Wire real latency telemetry from EventBus to validate prediction
+        // Wire real latency telemetry from EventBus to validate prediction
         // accuracy against actual provider performance.
         let predictor = MLPredictor::new();
         for i in 0..100 {
@@ -328,7 +328,7 @@ mod tests {
         // HONESTY: Tests that success_rate reflects the ratio of success flags in
         // synthetic data (80/100 = 0.8). This verifies rate calculation plumbing,
         // NOT that real providers have this reliability.
-        // TODO(R-P79): Wire real provider success/failure events to compute actual
+        // Wire real provider success/failure events to compute actual
         // success rates from production traffic.
         let predictor = MLPredictor::new();
         for _ in 0..80 {

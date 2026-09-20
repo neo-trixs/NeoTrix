@@ -149,7 +149,7 @@ impl AuthService {
     /// 浏览器模拟登录 — 使用 UniversalBrowser 打开 Chrome 让用户手动登录，抓取 cookie
     #[cfg(feature = "stealth-net")]
     pub fn login_x_browser(&mut self) -> Result<SessionEntry, SocialAccessError> {
-        use crate::l1_action::nt_io::universal_browser::{UniversalBrowser, PlatformConfig};
+        use crate::l2_perception::nt_world::l1_facade::{UniversalBrowser, PlatformConfig};
 
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| SocialAccessError::Platform(format!("tokio runtime error: {}", e)))?;

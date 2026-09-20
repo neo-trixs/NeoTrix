@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::l6_meta::nt_core_self::emotion_state::EmotionEngine;
+use crate::l5_cognition::l1_facade::emotion_state::EmotionEngine;
 // [豁免] core 层 second_brain 持久化需落 KB 单一事实源 (attach_kb/kv_set 生产路径, 非测试注入)
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrainSnapshot {
@@ -145,7 +145,7 @@ impl SecondBrain {
         let title = format!("session_note_{}", ts);
         let _ = kb.insert_or_get_node(
             &title,
-            crate::l6_meta::nt_core_kb_types::NodeType::Idea,
+            neotrix_types::knowledge_access::NodeType::Idea,
             Some(note),
             None,
             Some("second_brain"),
@@ -162,7 +162,7 @@ impl SecondBrain {
         let title = format!("session_note_{}", ts);
         let _ = kb.insert_or_get_node(
             &title,
-            crate::l6_meta::nt_core_kb_types::NodeType::Idea,
+            neotrix_types::knowledge_access::NodeType::Idea,
             Some(note),
             None,
             Some("second_brain"),
@@ -182,7 +182,7 @@ impl SecondBrain {
         kb.upsert_edge(
             source_id,
             target_id,
-            crate::l6_meta::nt_core_kb_types::RelationType::Related,
+            neotrix_types::knowledge_access::RelationType::Related,
             weight,
             Some(relation.as_str()),
         )?;
@@ -192,11 +192,11 @@ impl SecondBrain {
     pub fn build_wiki_graph(&self) -> Result<BrainWikiGraph, String> {
         let kb = self.kb.as_ref().ok_or("KB not attached")?;
         let nodes = kb.search_by_type(
-            &crate::l6_meta::nt_core_kb_types::NodeType::WikiPage,
+            &neotrix_types::knowledge_access::NodeType::WikiPage,
             10000,
         )?;
         let all_emotion_nodes = kb.search_by_type(
-            &crate::l6_meta::nt_core_kb_types::NodeType::Idea,
+            &neotrix_types::knowledge_access::NodeType::Idea,
             1000,
         )?;
 
@@ -282,13 +282,13 @@ impl SecondBrain {
         let session_notes = kb.kv_list("session_notes").unwrap_or_default();
         let conn = kb.conn.lock().map_err(|e| e.to_string())?;
         let node_count =
-            crate::l6_meta::nt_core_kb_primitives::count_nodes(&conn)
+            crate::l0_substrate::nt_core_kb_primitives::count_nodes(&conn)
                 .map_err(|e| e.to_string())?;
         let edge_count =
-            crate::l6_meta::nt_core_kb_primitives::count_edges(&conn)
+            crate::l0_substrate::nt_core_kb_primitives::count_edges(&conn)
                 .map_err(|e| e.to_string())?;
         let wiki_pages = kb.search_by_type(
-            &crate::l6_meta::nt_core_kb_types::NodeType::WikiPage,
+            &neotrix_types::knowledge_access::NodeType::WikiPage,
             10000,
         )?;
 
@@ -478,7 +478,7 @@ svg.call(d3.zoom().scaleExtent([0.1,8]).on("zoom",(e)=>{{ g.attr("transform",e.t
     )
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SecondBrain {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for SecondBrain {
     fn name(&self) -> &str {
         "second_brain"
     }
@@ -612,27 +612,27 @@ mod tests {
 
     #[test]
     fn test_save_emotion_raw_no_kb() {
-        let engine = crate::l6_meta::nt_core_self::emotion_state::EmotionEngine::default();
+        let engine = crate::l5_cognition::l1_facade::emotion_state::EmotionEngine::default();
         let brain = SecondBrain::new();
         brain.save_emotion_raw(&engine); // should not panic
     }
 
     #[test]
     fn test_emotion_engine_serde_roundtrip() {
-        let mut engine = crate::l6_meta::nt_core_self::emotion_state::EmotionEngine::default();
+        let mut engine = crate::l5_cognition::l1_facade::emotion_state::EmotionEngine::default();
         engine.observe(
-            crate::l6_meta::nt_core_self::emotion_state::EmotionDimension::Confidence,
+            crate::l5_cognition::l1_facade::emotion_state::EmotionDimension::Confidence,
             0.8,
             "test",
         );
         engine.observe(
-            crate::l6_meta::nt_core_self::emotion_state::EmotionDimension::Curiosity,
+            crate::l5_cognition::l1_facade::emotion_state::EmotionDimension::Curiosity,
             0.6,
             "explore",
         );
         engine.tick();
         let json = engine.to_json().expect("to_json");
-        let deser = crate::l6_meta::nt_core_self::emotion_state::EmotionEngine::from_json(&json)
+        let deser = crate::l5_cognition::l1_facade::emotion_state::EmotionEngine::from_json(&json)
             .expect("from_json");
         let r1 = engine.report();
         let r2 = deser.report();

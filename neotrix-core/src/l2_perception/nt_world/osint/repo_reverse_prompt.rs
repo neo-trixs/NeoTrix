@@ -3,7 +3,7 @@
 //! 将仓库元数据 (README/文件树/语言统计/dependencies) 合成单条 vibe-coding
 //! 风格用户 prompt, 实现 "repo→prompt" 反向工程。纯函数、确定性、零网络。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 仓库元数据快照 (由上游吸收管线填充)。
 #[derive(Debug, Clone, Default)]

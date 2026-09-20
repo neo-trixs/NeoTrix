@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
-use super::vsa_tag::VsaTagged;
+use crate::l5_cognition::vsa_tag::VsaTagged;
 
 const DEFAULT_WINDOW_SIZE: usize = 5;
 const MIN_WINDOW_SIZE: usize = 3;
@@ -117,7 +117,7 @@ impl SpeciousPresent {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SpeciousPresent {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for SpeciousPresent {
     fn name(&self) -> &str {
         "SpeciousPresent"
     }

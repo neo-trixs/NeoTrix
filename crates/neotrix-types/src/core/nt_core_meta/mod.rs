@@ -1,4 +1,5 @@
 pub mod self_model;
+pub mod unified_self_model;
 pub mod scanner;
 pub mod monitor;
 pub mod weakness;
@@ -16,3 +17,17 @@ pub use monitor::{MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTren
 pub use weakness::{WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary};
 pub use planner::{EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel, EvolutionAction, ActionStatus};
 pub use metacognition_loop::{MetaCognitiveLoop, MetaCycleResult};
+
+// Unified self-model types
+pub use unified_self_model::{
+    StaticIdentityModel, DynamicPerformanceModel, ValueFunctionModel,
+    SelfState, SelfModel as UnifiedSelfModel,
+    ModuleInfo as UnifiedModuleInfo, FileInfo as UnifiedFileInfo,
+    DepGraph as UnifiedDepGraph, DepEdge as UnifiedDepEdge, DepKind as UnifiedDepKind,
+    ComponentMap as UnifiedComponentMap, ComponentNode as UnifiedComponentNode,
+    TestCoverage as UnifiedTestCoverage, CompilationHealth as UnifiedCompilationHealth,
+    TechDebtInventory as UnifiedTechDebtInventory, TechDebtItem as UnifiedTechDebtItem,
+    TechDebtKind as UnifiedTechDebtKind, DebtSeverity as UnifiedDebtSeverity,
+    EvolutionEvent as UnifiedEvolutionEvent, EventKind as UnifiedEventKind,
+    ValueWeight, SELF_HISTORY,
+};

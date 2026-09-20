@@ -17,7 +17,7 @@ use crate::l2_perception::nt_core_e8::unified_latent::UnifiedLatentSpace;
 use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
-use crate::core::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
+use crate::l0_substrate::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
 
 /// Maximum number of latent episodic entries retained.
 pub const LATENT_MEMORY_SIZE: usize = 256;

@@ -7,7 +7,7 @@
 //!   - ReVeal (ICLR 2026): 多轮自验证 + TAPO 信用分配
 //!   - 核心差异: 奖励来自外部验证 (编译/测试), 非 LLM 自评
 
-use crate::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
 use crate::l5_cognition::nt_goal::behavioral_verifier::VerificationResult;
 
 /// 奖励事件类型
@@ -138,7 +138,7 @@ impl RLFeedbackLoop {
 
     /// 更新所有 23 维
     pub fn update_all(&self, cv: &mut CapabilityVector) {
-        for name in crate::core::nt_core_cap::FIELD_NAMES {
+        for name in neotrix_types::core::nt_core_cap::FIELD_NAMES {
             self.update_capability(cv, name);
         }
     }

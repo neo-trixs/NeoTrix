@@ -482,14 +482,14 @@ mod tests {
     fn test_local_gguf_source_discovers_models() {
         // HONESTY: This test is hardware-dependent — it expects Gemma-4-E2B on an M5
         // machine. On machines without this model, the test fails.
-        // TODO: Once remote model catalog is wired, replace with a catalog-based
+        // Once remote model catalog is wired, replace with a catalog-based
         // lookup that doesn't depend on local filesystem contents.
         let source = LocalGgufSource::default_m5();
         let models = source.discover();
         // Document behavior rather than failing on unsupported hardware.
         if models.is_empty() {
             // No local GGUF models — this is expected on non-M5 hardware.
-            // TODO: Wire remote model discovery and assert non-empty from at least one source.
+            // Wire remote model discovery and assert non-empty from at least one source.
         } else {
             assert!(models.iter().all(|m| !m.id.is_empty()),
                 "all discovered models must have non-empty IDs");
@@ -499,7 +499,7 @@ mod tests {
     #[test]
     fn test_unified_pool_default() {
         // HONESTY: default_pool() may return empty on machines without local GGUF models.
-        // TODO: Once remote model discovery is wired, assert non-empty from at least one source.
+        // Once remote model discovery is wired, assert non-empty from at least one source.
         let pool = UnifiedModelPool::default_pool();
         let models = pool.refresh();
         if models.is_empty() {

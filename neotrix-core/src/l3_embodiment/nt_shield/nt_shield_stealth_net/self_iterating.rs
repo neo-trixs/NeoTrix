@@ -58,7 +58,7 @@ impl FingerprintManager {
             .unwrap_or_else(|| PathBuf::from("fingerprints.json"));
 
         let gen = SystemFingerprintGenerator::new();
-        let fingerprints = crate::l5_cognition::nt_core_state::load("fingerprints")
+        let fingerprints = crate::l0_substrate::nt_core_state::load("fingerprints")
             .and_then(|json| serde_json::from_str::<FingerprintStore>(&json).ok())
             .filter(|store| !store.fingerprints.is_empty())
             .map(|store| store.fingerprints)
@@ -140,7 +140,7 @@ impl FingerprintManager {
         };
         if let Ok(json) = serde_json::to_string_pretty(&store) {
             if self.use_kb {
-                if let Err(e) = crate::l5_cognition::nt_core_state::save("fingerprints", &json) {
+                if let Err(e) = crate::l0_substrate::nt_core_state::save("fingerprints", &json) {
                     log::warn!("[fingerprint] kb write: {}", e);
                 }
             }

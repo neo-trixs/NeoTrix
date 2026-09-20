@@ -1,18 +1,14 @@
+use async_trait::async_trait;
+use crate::domain::app_handle::get_app_handle;
 use crate::domain::registry::DomainRegistry;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
-use neotrix::core::nt_core_consciousness_core::{
+use neotrix::l5_cognition::nt_core_consciousness_core::{
     AttemptOutcome, ConsciousTask, ExternalClosureConfig, SolutionExecutor, CORE,
 };
 use rusqlite::Connection;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
-use tauri::{AppHandle, Emitter};
-
-static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-
-pub fn set_app_handle(app: AppHandle) {
-    let _ = APP_HANDLE.set(app);
-}
+use std::sync::{Arc, Mutex};
+use tauri::Emitter;
 
 /// GatewayV2 LLM 执行器 — 实现 consciousness core 的 SolutionExecutor trait
 /// 通过 domain_call 统一调用，而非直接访问 GatewayV2
@@ -152,16 +148,16 @@ impl ChatPlugin {
 
     fn call_llm(&self, content: &str) -> Result<String, DomainError> {
         // 发射流开始事件
-        if let Some(app) = APP_HANDLE.get() {
-            let _ = app.emit("neocodex_stream_start", "");
+        if let Some(app) = get_app_handle() {
+            let _ = app.emit("neotrix_stream_start", "");
         }
 
         // Emit reasoning event
-        if let Some(app) = APP_HANDLE.get() {
-            if let Err(e) = app.emit("neocodex_stream_reasoning", serde_json::json!({
+        if let Some(app) = get_app_handle() {
+            if let Err(e) = app.emit("neotrix_stream_reasoning", serde_json::json!({
                 "text": format!("Starting reasoning for task: {}", content),
             })) {
-                log::warn!("Failed to emit reasoning event: {}", e);
+                tracing::warn!("Failed to emit reasoning event: {}", e);
             }
         }
 
@@ -178,12 +174,12 @@ impl ChatPlugin {
         };
 
         // Emit tool event
-        if let Some(app) = APP_HANDLE.get() {
-            if let Err(e) = app.emit("neocodex_stream_tool", serde_json::json!({
+        if let Some(app) = get_app_handle() {
+            if let Err(e) = app.emit("neotrix_stream_tool", serde_json::json!({
                 "tool_name": "consciousness_task_loop",
                 "status": "started",
             })) {
-                log::warn!("Failed to emit tool event: {}", e);
+                tracing::warn!("Failed to emit tool event: {}", e);
             }
         }
 
@@ -197,21 +193,21 @@ impl ChatPlugin {
         };
 
         // Emit tool completion event
-        if let Some(app) = APP_HANDLE.get() {
-            if let Err(e) = app.emit("neocodex_stream_tool", serde_json::json!({
+        if let Some(app) = get_app_handle() {
+            if let Err(e) = app.emit("neotrix_stream_tool", serde_json::json!({
                 "tool_name": "consciousness_task_loop",
                 "status": "completed",
             })) {
-                log::warn!("Failed to emit tool completion event: {}", e);
+                tracing::warn!("Failed to emit tool completion event: {}", e);
             }
         }
 
         // Emit reasoning event for task decomposition
-        if let Some(app) = APP_HANDLE.get() {
-            if let Err(e) = app.emit("neocodex_stream_reasoning", serde_json::json!({
+        if let Some(app) = get_app_handle() {
+            if let Err(e) = app.emit("neotrix_stream_reasoning", serde_json::json!({
                 "text": format!("Task decomposed into {} subtasks", report.allocations.len()),
             })) {
-                log::warn!("Failed to emit reasoning event: {}", e);
+                tracing::warn!("Failed to emit reasoning event: {}", e);
             }
         }
 
@@ -231,11 +227,11 @@ impl ChatPlugin {
         };
 
         // 发射流式 token 事件
-        if let Some(app) = APP_HANDLE.get() {
-            let _ = app.emit("neocodex_stream_token", combined.clone());
-            let _ = app.emit("neocodex_stream_end", combined.clone());
+        if let Some(app) = get_app_handle() {
+            let _ = app.emit("neotrix_stream_token", combined.clone());
+            let _ = app.emit("neotrix_stream_end", combined.clone());
             let _ = app.emit(
-                "neocodex_stream_done",
+                "neotrix_stream_done",
                 serde_json::json!({
                     "cancelled": false,
                     "elapsed_ms": 0,
@@ -251,19 +247,19 @@ impl ChatPlugin {
     }
 
     /// 流式 LLM 调用：通过 domain_call 统一调用获取流式响应
-    /// mpsc::Receiver，逐 token emit neocodex_stream_token 事件，返回完整内容。
+    /// mpsc::Receiver，逐 token emit neotrix_stream_token 事件，返回完整内容。
     fn call_llm_stream(&self, content: &str) -> Result<String, DomainError> {
-        if let Some(app) = APP_HANDLE.get() {
-            let _ = app.emit("neocodex_stream_start", "");
+        if let Some(app) = get_app_handle() {
+            let _ = app.emit("neotrix_stream_start", "");
         }
 
         // Emit tool event
-        if let Some(app) = APP_HANDLE.get() {
-            if let Err(e) = app.emit("neocodex_stream_tool", serde_json::json!({
+        if let Some(app) = get_app_handle() {
+            if let Err(e) = app.emit("neotrix_stream_tool", serde_json::json!({
                 "tool_name": "llm_stream",
                 "status": "started",
             })) {
-                log::warn!("Failed to emit tool event: {}", e);
+                tracing::warn!("Failed to emit tool event: {}", e);
             }
         }
 
@@ -298,13 +294,13 @@ impl ChatPlugin {
                     Ok(response) => {
                         let token = response["content"].as_str().unwrap_or("");
                         full_content.push_str(token);
-                        if let Some(app) = APP_HANDLE.get() {
-                            let _ = app.emit("neocodex_stream_token", token);
+                        if let Some(app) = get_app_handle() {
+                            let _ = app.emit("neotrix_stream_token", token);
                         }
                     }
                     Err(e) => {
-                        if let Some(app) = APP_HANDLE.get() {
-                            let _ = app.emit("neocodex_stream_error", e.to_string());
+                        if let Some(app) = get_app_handle() {
+                            let _ = app.emit("neotrix_stream_error", e.to_string());
                         }
                         break;
                     }
@@ -313,10 +309,10 @@ impl ChatPlugin {
         });
 
         // 流结束
-        if let Some(app) = APP_HANDLE.get() {
-            let _ = app.emit("neocodex_stream_end", &full_content);
+        if let Some(app) = get_app_handle() {
+            let _ = app.emit("neotrix_stream_end", &full_content);
             let _ = app.emit(
-                "neocodex_stream_done",
+                "neotrix_stream_done",
                 serde_json::json!({
                     "cancelled": false,
                     "elapsed_ms": 0,
@@ -329,12 +325,12 @@ impl ChatPlugin {
         }
 
         // Emit tool completion event
-        if let Some(app) = APP_HANDLE.get() {
-            if let Err(e) = app.emit("neocodex_stream_tool", serde_json::json!({
+        if let Some(app) = get_app_handle() {
+            if let Err(e) = app.emit("neotrix_stream_tool", serde_json::json!({
                 "tool_name": "llm_stream",
                 "status": "completed",
             })) {
-                log::warn!("Failed to emit tool completion event: {}", e);
+                tracing::warn!("Failed to emit tool completion event: {}", e);
             }
         }
 
@@ -342,6 +338,7 @@ impl ChatPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for ChatPlugin {
     fn name(&self) -> &str {
         "chat"
@@ -451,7 +448,7 @@ impl DomainPlugin for ChatPlugin {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,
@@ -533,8 +530,8 @@ impl DomainPlugin for ChatPlugin {
                 Ok(serde_json::json!(assistant_content))
             }
             "stop_stream" | "stop" => {
-                if let Some(app) = APP_HANDLE.get() {
-                    let _ = app.emit("neocodex_stream_cancel", "");
+                if let Some(app) = get_app_handle() {
+                    let _ = app.emit("neotrix_stream_cancel", "");
                 }
                 Ok(serde_json::json!({ "ok": true }))
             }

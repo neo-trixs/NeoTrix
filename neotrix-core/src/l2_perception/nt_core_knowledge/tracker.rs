@@ -1,15 +1,10 @@
-use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
-use serde::{Deserialize, Serialize};
+use crate::l0_substrate::nt_core_substrate_types::KnowledgeSource;
 use std::collections::HashMap;
 use std::time::Instant;
 
 /// Records a single absorption event: which source, when, and the applied weight.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AbsorptionRecord {
-    pub source: KnowledgeSource,
-    pub timestamp: u64,
-    pub weight: f64,
-}
+/// Re-exported from L0 to enforce substrate invariant.
+pub use crate::l0_substrate::nt_core_substrate_types::AbsorptionRecord;
 
 /// Tracks when a source was last accessed and how many times.
 #[derive(Debug, Clone)]

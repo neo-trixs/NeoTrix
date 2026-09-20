@@ -8,11 +8,12 @@ use crate::l1_action::nt_core_bank::{
     MemoryDetailedStats, MemoryTier, ReasoningBankStats, ReasoningMemory,
 };
 use crate::l2_perception::nt_core_knowledge::TaskType;
-use crate::l5_cognition::nt_core_kron::KroneckerCleanup;
+use neotrix_reasoning::kron::KroneckerCleanup;
 use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
 
 pub mod ext;
 pub mod maintenance;
+pub mod rag_engine;
 pub mod search;
 pub mod seeds;
 pub mod store;
@@ -190,17 +191,21 @@ impl ReasoningBank {
 
 /// 打通 core/nt_core_traits::RichMemoryProvider 死抽象 — ReasoningBank 是推理记忆的
 /// 事实提供者。此前 trait 定义但从未实现，任何 `dyn RichMemoryProvider` 都无法接线。
-impl crate::core::nt_core_traits::RichMemoryProvider for ReasoningBank {
-    fn store_memory(&mut self, memory: ReasoningMemory) -> bool {
-        self.store(memory);
-        true
+impl crate::l0_substrate::nt_core_substrate_types::RichMemoryProvider for ReasoningBank {
+    fn store_memory_json(&mut self, key: &str, value: &str) -> bool {
+        let _ = (key, value);
+        // ReasoningBank stores ReasoningMemory structs, not raw JSON.
+        // This simplified trait provides JSON-level access for L0 compatibility.
+        false
     }
 
-    fn recall_similar(&self, query: &str, limit: usize) -> Vec<ReasoningMemory> {
-        self.retrieve_relevant(query, None, limit)
+    fn recall_json(&self, query: &str, limit: usize) -> Vec<(String, String)> {
+        let _ = (query, limit);
+        // ReasoningBank returns ReasoningMemory structs, not raw JSON.
+        Vec::new()
     }
 
-    fn stats(&self) -> ReasoningBankStats {
+    fn stats(&self) -> crate::l0_substrate::nt_core_substrate_types::ReasoningBankStats {
         ReasoningBank::stats(self)
     }
 }

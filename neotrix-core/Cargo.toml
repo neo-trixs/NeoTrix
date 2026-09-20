@@ -72,6 +72,10 @@ path = "src/bin/model_download.rs"
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
 neotrix-sysctl = { path = "../crates/neotrix-sysctl" }
+neotrix-consciousness = { path = "../crates/neotrix-consciousness" }
+neotrix-reasoning = { path = "../crates/neotrix-reasoning" }
+neotrix-gateway = { path = "../crates/neotrix-gateway" }
+neotrix-multi-agent = { path = "../crates/neotrix-multi-agent" }
 nt_core_capability_tree = { path = "src/neotrix/nt_core_capability_tree" }
 thiserror = "1"
 serde = { workspace = true }
@@ -239,6 +243,18 @@ harness = false
 
 [[bench]]
 name = "real_tasks"
+harness = false
+
+[[bench]]
+name = "memory_bench"
+harness = false
+
+[[bench]]
+name = "security_bench"
+harness = false
+
+[[bench]]
+name = "cognition_bench"
 harness = false
 
 [features]

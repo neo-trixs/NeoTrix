@@ -197,7 +197,7 @@ impl RecurrentLatent {
     // }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for RecurrentLatent {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for RecurrentLatent {
     fn name(&self) -> &str {
         "nt_core_hcube_latent_recurrent"
     }
@@ -225,7 +225,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for RecurrentLatent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     fn sample_input(step: usize) -> LatentState {
         let mut v = vec![Complex::new(0.0, 0.0); 16];

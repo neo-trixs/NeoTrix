@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryEntry {
+pub struct CrossSessionMemoryEntry {
     pub key: String,
     pub value: String,
     pub category: MemoryCategory,
@@ -25,7 +25,7 @@ pub enum MemoryCategory {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrossSessionMemory {
-    store: HashMap<String, MemoryEntry>,
+    store: HashMap<String, CrossSessionMemoryEntry>,
     storage_path: PathBuf,
     max_entries: usize,
     #[serde(skip)]
@@ -56,7 +56,7 @@ impl CrossSessionMemory {
             entry.access_count += 1;
             entry.last_accessed = now;
         } else {
-            let entry = MemoryEntry {
+            let entry = CrossSessionMemoryEntry {
                 key: key.to_string(),
                 value: value.to_string(),
                 category,
@@ -70,7 +70,7 @@ impl CrossSessionMemory {
         self.evict_if_needed();
     }
 
-    pub fn recall(&mut self, key: &str) -> Option<&MemoryEntry> {
+    pub fn recall(&mut self, key: &str) -> Option<&CrossSessionMemoryEntry> {
         let now = current_timestamp();
         let entry = self.store.get_mut(key)?;
         entry.access_count += 1;
@@ -78,13 +78,13 @@ impl CrossSessionMemory {
         Some(&*entry)
     }
 
-    pub fn recall_by_category(&mut self, category: MemoryCategory) -> Vec<&MemoryEntry> {
+    pub fn recall_by_category(&mut self, category: MemoryCategory) -> Vec<&CrossSessionMemoryEntry> {
         let now = current_timestamp();
         let keys: Vec<String> = self
             .store
             .iter()
             .filter(|(_, e)| e.category == category)
-            .map(|(k, _)| k.clone())
+            .map(|(k, _): (&String, &CrossSessionMemoryEntry)| k.clone())
             .collect();
         for key in &keys {
             if let Some(entry) = self.store.get_mut(key) {
@@ -163,7 +163,7 @@ impl CrossSessionMemory {
         let mut sorted: Vec<(String, u64, u64)> = entries.iter()
             .filter_map(|k| self.store.get(k).map(|e| (k.clone(), e.last_accessed, e.created_at)))
             .collect();
-        sorted.sort_by(|(_, la, ca), (_, lb, cb)| {
+        sorted.sort_by(|(_, la, ca): &(_, u64, u64), (_, lb, cb): &(_, u64, u64)| {
             match la.cmp(lb) {
                 std::cmp::Ordering::Equal => ca.cmp(cb),
                 other => other,

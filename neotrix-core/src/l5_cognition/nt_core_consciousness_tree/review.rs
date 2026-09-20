@@ -321,7 +321,7 @@ impl Default for ConsciousnessReview {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessReview {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ConsciousnessReview {
     fn name(&self) -> &str {
         "ConsciousnessReview"
     }

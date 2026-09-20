@@ -24,6 +24,6 @@ mod tests {
     #[test]
     #[ignore = "_MockTunDevice not yet implemented"]
     fn mock_tun_read_write() {
-        // TODO: implement _MockTunDevice
+        // implement _MockTunDevice
     }
 }

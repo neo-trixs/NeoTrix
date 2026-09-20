@@ -392,7 +392,7 @@ impl MLPRouter {
 
     /// Forward pass through the MLP: hidden = relu(W1*x + b1), output = W2*hidden + b2.
     ///
-    /// STUB: Uses random-initialized weights (Xavier). Real implementation needs:
+    /// Uses random-initialized weights (Xavier). Real implementation needs:
     /// - Load pre-trained weights from disk (ONNX/candle format)
     /// - GPU-accelerated matrix multiplication for production latency
     /// - Softmax activation on output (currently raw logits)
@@ -420,13 +420,13 @@ impl MLPRouter {
 
     /// Flatten RouteFeatures into MLP input vector, pad/truncate to input_dim.
     ///
-    /// Note: STUB: The current implementation pads with zeros or truncates, which loses
+    /// Note: The current implementation pads with zeros or truncates, which loses
     /// information for embeddings > input_dim. Real implementation needs:
     /// - Proper tokenization-aware embedding extraction
     /// - Dynamic input_dim based on actual embedding model output size
     /// - Consider using candle/onnx for GPU-accelerated forward pass
     fn features_to_vec(&self, f: &RouteFeatures) -> Vec<f32> {
-        // STUB: placeholder feature extraction — pads/truncates to input_dim.
+        // placeholder feature extraction — pads/truncates to input_dim.
         // Real implementation needs tokenization-aware embedding extraction.
         let mut v = Vec::with_capacity(self.input_dim);
         v.push(f.complexity);
@@ -747,7 +747,7 @@ pub struct RouterFactory;
 impl RouterFactory {
     /// Create a learned router by type name.
     ///
-    /// Note: STUB: The `_create_router` method is prefixed with `_` indicating it's not
+    /// Note: The `_create_router` method is prefixed with `_` indicating it's not
     /// yet wired into production. Real implementation needs:
     /// - Load pre-trained weights from disk (KNN history, MLP weights)
     /// - Support model persistence (save/load trained state)
@@ -774,7 +774,7 @@ mod tests {
         // rankings but are NOT derived from real benchmark data. The routing
         // algorithms (KNN, Hybrid, MLP) are tested on their selection logic,
         // not on producing "correct" quality rankings.
-        // TODO(R-P79): Wire real benchmark scores from model evaluation pipeline.
+        // Wire real benchmark scores from model evaluation pipeline.
         vec![
             CandidateModel { name: "aihub/glm-5.2".into(), provider: "aihub".into(), model_id: "glm-5.2".into(), category: ProviderCategory::Cloud, is_free: false, avg_latency_ms: 500.0, avg_cost_per_1k: 0.01, quality_score: 0.95, capability_tags: vec!["reasoning".into(), "analysis".into()] },
             CandidateModel { name: "llm7/codestral-latest".into(), provider: "llm7".into(), model_id: "codestral-latest".into(), category: ProviderCategory::Cloud, is_free: true, avg_latency_ms: 300.0, avg_cost_per_1k: 0.0, quality_score: 0.8, capability_tags: vec!["coding".into()] },

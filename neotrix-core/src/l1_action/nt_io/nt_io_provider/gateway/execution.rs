@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use crate::l0_substrate::nt_core_error::recovery::{ErrorContext, ErrorType, RecoveryAction};
-use crate::core::nt_core_cache::text_to_embedding;
+use crate::l0_substrate::nt_core_cache::text_to_embedding;
 use crate::l1_action::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
-use crate::core::nt_core_span::{SpanKind, Tracer};
+use crate::l0_substrate::nt_core_span::{SpanKind, Tracer};
 use crate::l1_action::nt_io::nt_io_provider::pool::account_pool::{AccountPoolError};
 use crate::l1_action::nt_io::nt_io_provider::gateway::routing::agent_routing::ModelTier;
 use crate::l1_action::nt_io::nt_io_provider::health::circuit_breaker::BreakerState;
@@ -406,7 +406,7 @@ impl GatewayV2 {
             }
         }
         if let Ok(response) = result.as_ref() {
-            crate::core::nt_core_telemetry::global_provider_usage_ledger()
+            crate::l0_substrate::nt_core_telemetry::global_provider_usage_ledger()
                 .record_provider_usage(name, &response.usage);
         }
         {

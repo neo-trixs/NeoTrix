@@ -7,7 +7,9 @@
 
 pub mod core;
 pub mod knowledge_access;
+pub mod l1_error;
 pub mod llm_types;
+pub mod nt_error;
 pub mod search_backend;
 pub mod write_guard_types;
 pub use core::self_measure;
@@ -89,3 +91,20 @@ pub use core::{
     MetaCognitiveLoop, MetaCycleResult,
 };
 pub use core::shared_types as shared;
+
+// Re-export unified error type
+pub use nt_error::{NtError, NtResult, NeoTrixResult};
+
+// Re-export unified consciousness types
+pub use core::nt_core_gwt::unified_consciousness::{
+    ConsciousnessPhase, ConsciousnessObserverState, ConsciousnessSnapshot,
+    EmotionalState, VadEmotionalState, BranchState, Alert,
+    CapabilityConsciousnessState, Layer,
+    LegacyConsciousnessPhase, CrystalConsciousnessState, EvolutionPhase,
+};
+
+// Re-export unified self-model types
+pub use core::nt_core_meta::unified_self_model::{
+    StaticIdentityModel, DynamicPerformanceModel, ValueFunctionModel,
+    SelfState, ValueWeight, SELF_HISTORY,
+};

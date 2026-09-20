@@ -83,7 +83,7 @@ pub fn publish_download_event(progress: &PipelineProgress) {
         PipelineStatus::Complete { total_bytes, .. } => (*total_bytes, Some(*total_bytes), 0.0),
         _ => (0, None, 0.0),
     };
-    (**bus).emit(crate::core::nt_core_event::CoreEvent::DownloadProgress {
+    (**bus).emit(crate::l0_substrate::nt_core_event::CoreEvent::DownloadProgress {
         url: progress.url.clone(),
         status: status_str,
         downloaded,

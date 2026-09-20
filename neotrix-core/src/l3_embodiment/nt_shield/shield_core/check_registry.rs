@@ -762,7 +762,7 @@ impl ToolInspector for CheckRegistry {
 
 // ── SelfTest ──────────────────────────────────────────────
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CheckRegistry {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for CheckRegistry {
     fn name(&self) -> &str {
         "CheckRegistry"
     }
@@ -789,7 +789,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CheckRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
     use serde_json::json;
 
     fn fresh_registry() -> CheckRegistry {
@@ -1019,12 +1019,12 @@ tool_patterns = ["webfetch", "websearch"]
 }
 
 /// 创建 CheckRegistry 的 SelfTest 实例 (供 L5 注册，避免 L5 直接依赖 L3 类型)
-pub fn create_check_registry_self_test() -> Box<dyn crate::l6_meta::healing::nt_core_self_test::SelfTest> {
+pub fn create_check_registry_self_test() -> Box<dyn crate::l0_substrate::nt_core_self_test::SelfTest> {
     Box::new(CheckRegistry::new())
 }
 
 /// SecurityCheckRegistry trait 实现 — 打通 L5 认知层对 L3 具身层的安全检查注册接口
-impl crate::core::nt_core_traits::SecurityCheckRegistry for CheckRegistry {
+impl crate::l0_substrate::nt_core_traits::SecurityCheckRegistry for CheckRegistry {
     fn register_check(&mut self, name: &str) {
         // 注册一个通过的检查项 (简化实现: 添加到 checks 列表)
         self.checks.push(_SecurityCheck {

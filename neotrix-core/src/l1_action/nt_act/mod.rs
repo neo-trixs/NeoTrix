@@ -25,6 +25,9 @@ pub mod nt_act_types;
 pub mod acp_protocol;
 pub mod async_tool_executor;
 
+// Provider abstraction for model-agnostic LLM routing
+pub mod provider_abstraction;
+
 // Voice commands
 pub mod nt_act_voice;
 
@@ -67,6 +70,10 @@ pub mod video_audit_trail;
 
 // Agent coordination protocol (sagent-inspired multi-agent)
 pub mod agent_protocol;
+
+// Cross-domain communication primitives
+// MCP (Model Context Protocol) layer
+pub mod mcp_protocol;
 
 // Cross-domain communication primitives
 pub mod communication;

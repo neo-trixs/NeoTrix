@@ -5,7 +5,7 @@ use std::fs;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 
-use crate::core::nt_core_traits::SessionProvider;
+use crate::l0_substrate::nt_core_traits::SessionProvider;
 
 #[derive(Debug, Clone)]
 pub struct Session {
@@ -44,7 +44,7 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_traits::SessionProvider;
+    use crate::l0_substrate::nt_core_traits::SessionProvider;
 
     #[test]
     fn test_session_provider_create_and_active() {

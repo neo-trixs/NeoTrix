@@ -7,7 +7,7 @@ use crate::l2_perception::nt_core_hcube::cube::CubeEntry;
 
 use super::hypercube_bridge::HyperCubeBridge;
 
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l2_perception::nt_world::nt_world_crawl::config::{CrawlTopic, SeedEntry};
 use crate::l2_perception::nt_world::nt_world_crawl::unified::UnifiedCrawler;
 
@@ -745,14 +745,14 @@ mod tests {
     fn test_attach_kb_enables_kb_retrieval() {
         // B1 测试隔离: 用内存 KB 而非 open(None) (生产路径会被并行锁+污染)
         let kb = std::sync::Arc::new(
-            crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(std::path::PathBuf::from(
+            crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(std::path::PathBuf::from(
                 ":memory:",
             )))
             .expect("open memory kb"),
         );
         let _ = kb.insert_or_get_node(
             "KB-Wire-Test-Topic",
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Insight,
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Insight,
             Some("kb wire test summary"),
             None,
             Some("test"),

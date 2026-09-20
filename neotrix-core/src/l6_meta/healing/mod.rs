@@ -1,3 +1,5 @@
+pub mod diagnostic_chain;
+pub mod self_healing;
 pub mod nt_mind_consciousness_gold_standard;
 pub mod nt_mind_consciousness_monitor;
 pub mod nt_mind_eval_harness;
@@ -7,3 +9,4 @@ pub mod nt_repair_hanzi_video;
 pub mod nt_repair_self_heal;
 pub mod nt_core_self_test;
 pub mod nt_core_self_test_integration;
+pub mod predictive_maintenance;

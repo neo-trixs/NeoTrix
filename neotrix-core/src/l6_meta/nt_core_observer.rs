@@ -240,7 +240,7 @@ impl OneObserver {
             for (i, state) in trajectory.iter().enumerate() {
                 agent_traj.push(TrajectoryStep {
                     step_idx: i,
-                    specialist: crate::core::nt_core_traits::SpecialistType::ReflectionEngine,
+                    specialist: crate::l0_substrate::nt_core_traits::SpecialistType::ReflectionEngine,
                     e8_mode: state.mode,
                     action: format!("e8_transition_{}", i),
                     input: String::new(),

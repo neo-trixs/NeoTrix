@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use crate::l6_meta::nt_core_self::{
+use crate::l5_cognition::l1_facade::{
     CognitiveEvaluator,
     IntrinsicMotivation,
     SelfReferentialMonitor,
@@ -201,7 +201,7 @@ impl BMonitor {
         };
         let raw = report.stability_score * 100.0;
         let penalty = report.flags.iter().filter(|f| {
-            matches!(f.severity, crate::l6_meta::nt_core_self::FlagSeverity::Critical)
+            matches!(f.severity, crate::l5_cognition::l1_facade::FlagSeverity::Critical)
         }).count() as f64 * self.config.critical_flag_penalty;
         (raw - penalty).clamp(0.0, 100.0)
     }
@@ -392,7 +392,7 @@ impl BMonitor {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BMonitor {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for BMonitor {
     fn name(&self) -> &str {
         "bmonitor"
     }
@@ -417,7 +417,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BMonitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::nt_core_self::{
+    use crate::l5_cognition::l1_facade::{
         SiliconSelfModel, SiliconArchive, CrystalRegistry, SelfReferentialMonitor,
         CognitiveEvaluator, IntrinsicMotivation,
         StrategyKind, AttentionDomain,
@@ -469,7 +469,7 @@ mod tests {
         let mut reg = CrystalRegistry::new();
         for i in 0..n {
             reg.crystals.push(
-                crate::l6_meta::nt_core_self::SkillCrystal::new(
+                crate::l5_cognition::l1_facade::SkillCrystal::new(
                     i, &format!("skill_{}", i), "test",
                     StrategyKind::Direct, AttentionDomain::Code, 1,
                 )
@@ -495,7 +495,7 @@ mod tests {
         // D16 回归门禁: self_test 曾将 green>yellow 判为非法 (极性倒置),
         // 但默认配置 green=70>yellow=40 且分级语义要求 green 为最高档 →
         // 默认配置恒 Fail, 拖低 NT-CORE 分支健康至 0.667。
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         let bm = BMonitor::new();
         let r = bm.self_test();
         assert!(r.is_ok(), "default config must pass self_test: {:?}", r);

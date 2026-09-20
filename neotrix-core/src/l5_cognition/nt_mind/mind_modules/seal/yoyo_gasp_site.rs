@@ -9,7 +9,7 @@
 //! 映射, 实现字段级对照, 验证同构关系 (含 2-3 单测)。作为 NT-MIND 采纳 GASP schema
 //! 的参考基线 (C2 集成详见 absorption-20260828-batch2.md 高价值标注)。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// GASP 运行时五大入仓维度。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_vault_maps_to_neotrix_module() {
-        // TODO(R-P79): Only checks hardcoded string constants — trivial assertion.
+        // Only checks hardcoded string constants — trivial assertion.
         // Replace with test that validates actual module resolution against real vault paths.
         let m = _YoyoGaspRuntime;
         assert!(m.all_vaults_mapped());

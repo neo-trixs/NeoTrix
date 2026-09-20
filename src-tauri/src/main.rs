@@ -12,25 +12,28 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 
-mod autostart;
-mod commands;
-mod domain;
-pub mod market;
-mod notifications;
-mod stub;
-
-use crate::commands::file_drop::{handle_file_drop, setup_file_drop_listener};
-use crate::stub::{UnifiedApi as _, UnifiedApiImpl};
-use commands::domain_cmd::{
+use neotrix_tauri::agent_identity::MemoryStore;
+use neotrix_tauri::artifacts::ArtifactStore;
+use neotrix_tauri::channels::ChannelManager;
+use neotrix_tauri::coordinator::AgentCoordinator;
+use neotrix_tauri::debouncer::Debouncer;
+use neotrix_tauri::engine::EngineRegistry;
+use neotrix_tauri::recovery;
+use neotrix_tauri::skills::SkillRegistry;
+use neotrix_tauri::triage::TriageGate;
+use neotrix_tauri::commands::file_drop::{handle_file_drop, setup_file_drop_listener};
+use neotrix_tauri::stub::{UnifiedApi as _, UnifiedApiImpl};
+use neotrix_tauri::commands::domain_cmd::{
     domain_action_count, domain_call, domain_has, domain_list, DomainState,
 };
-use commands::unified::{
+use neotrix_tauri::commands::unified::{
     unified_chat, unified_chat_stream, unified_cli_list, unified_create_session,
     unified_delete_session, unified_exec_cli, unified_init, unified_list_sessions,
     unified_system_state, UnifiedApiState,
 };
-use domain::{plugins::*, DomainRegistry};
-use market::commands::*;
+use neotrix_tauri::domain::{plugins::*, DomainRegistry};
+use neotrix_tauri::market::commands::*;
+use neotrix_tauri::service::provider_manager::SharedProviderManager;
 
 #[derive(Parser)]
 #[clap(name = "neotrix-tauri", version)]
@@ -62,7 +65,18 @@ fn main() {
         return;
     }
 
-    let _sentry_guard = crate::stub::init_sentry();
+    if let Err(e) = color_eyre::install() {
+        eprintln!("Failed to install color-eyre: {e}");
+    }
+
+    // Fail-fast config validation — exits before anything else starts
+    let config = neotrix_tauri::config::AppConfig::load().unwrap_or_else(|e| {
+        eprintln!("FATAL: Configuration error: {e}");
+        eprintln!("Fix your config or set environment variables (NEOTRIX_*)");
+        std::process::exit(1);
+    });
+
+    let _sentry_guard = neotrix_tauri::stub::init_sentry();
     let cli = Cli::parse();
 
     match cli.command {
@@ -117,6 +131,27 @@ fn main() {
             registry
                 .register(Box::new(ContextPlugin))
                 .expect("failed to register context");
+            registry
+                .register(Box::new(AiOrchestrationPlugin::new()))
+                .expect("failed to register ai_orchestration");
+            registry
+                .register(Box::new(FolderInstructionsPlugin::new()))
+                .expect("failed to register folder_instructions");
+            registry
+                .register(Box::new(ImPlugin::new()))
+                .expect("failed to register im");
+            registry
+                .register(Box::new(McpExtensionPlugin::new()))
+                .expect("failed to register mcp_extension");
+            registry
+                .register(Box::new(SessionSyncPlugin::new()))
+                .expect("failed to register session_sync");
+            registry
+                .register(Box::new(UnifiedSurfacePlugin::new()))
+                .expect("failed to register unified_surface");
+            registry
+                .register(Box::new(VoiceAgentPlugin::new()))
+                .expect("failed to register voice_agent");
 
             println!("🔌 已注册 {} 个域插件", registry.plugin_count());
             for info in registry.list() {
@@ -140,8 +175,15 @@ fn main() {
             }
             let unified_api: UnifiedApiState = Arc::new(RwLock::new(UnifiedApiImpl::new()));
 
-            let (pty_manager, pty_rx) = crate::commands::pty::PtyManager::new();
+            let (pty_manager, pty_rx) = neotrix_tauri::commands::pty::PtyManager::new();
             let pty_manager = Arc::new(pty_manager);
+
+            let model_state = new_model_state();
+            let provider_manager: SharedProviderManager = Arc::new(RwLock::new(
+                neotrix_tauri::service::provider_manager::ProviderManager::new(),
+            ));
+
+            let agent_identity_path = config.data_dir.join("agent-identity");
 
             let builder = tauri::Builder::default()
                 .plugin(tauri_plugin_shell::init())
@@ -154,7 +196,7 @@ fn main() {
             let builder = if updater_enabled() {
                 builder.plugin(tauri_plugin_updater::Builder::new().build::<tauri::Wry>())
             } else {
-                log::info!("[boundary] updater disabled (NEOTRIX_UPDATER unset + debug build)");
+                tracing::info!("[boundary] updater disabled (NEOTRIX_UPDATER unset + debug build)");
                 builder
             };
 
@@ -169,8 +211,9 @@ fn main() {
                     None,
                 ))
                 .setup(|app| {
-                    // 设置 chat plugin 的 app handle 以支持事件发射
-                    set_app_handle(app.handle().clone());
+                    neotrix_tauri::logger::init_logging(app.handle());
+                    neotrix_tauri::domain::app_handle::set_app_handle(app.handle().clone());
+                    neotrix_tauri::service::start(app.handle());
                     Ok(())
                 })
                 .plugin(
@@ -190,10 +233,29 @@ fn main() {
                 )
                 // 域插件状态
                 .manage(domain_state)
+                // 分层配置
+                .manage(config)
                 // 统一 API 状态
                 .manage(unified_api)
                 // PTY 状态
                 .manage(pty_manager)
+                // Model Manager 状态
+                .manage(model_state)
+                // Provider Manager 状态
+                .manage(provider_manager)
+                // ===== 新基础设施模块 =====
+                .manage(Arc::new(RwLock::new(EngineRegistry::new())))
+                .manage(Arc::new(RwLock::new(SkillRegistry::new())))
+                .manage(Arc::new(RwLock::new(AgentCoordinator::new())))
+                .manage(Arc::new(RwLock::new(ChannelManager::new())))
+                .manage(Arc::new(RwLock::new(ArtifactStore::new())))
+                .manage(Arc::new(TriageGate::new()))
+                .manage(Arc::new(Debouncer::<String>::new(
+                    std::time::Duration::from_millis(300),
+                )))
+                .manage(Arc::new(MemoryStore::new(
+                    agent_identity_path,
+                )))
                 .invoke_handler(tauri::generate_handler![
                     // ===== 域插件统一入口 (3 个命令覆盖 12 域 × ~8 actions) =====
                     domain_call,
@@ -213,40 +275,40 @@ fn main() {
                     // ===== File Drop (文件拖拽) =====
                     handle_file_drop,
                     // ===== PTY (硬件级接口) =====
-                    crate::commands::pty::pty_spawn,
-                    crate::commands::pty::pty_write,
-                    crate::commands::pty::pty_resize,
-                    crate::commands::pty::pty_close,
+                    neotrix_tauri::commands::pty::pty_spawn,
+                    neotrix_tauri::commands::pty::pty_write,
+                    neotrix_tauri::commands::pty::pty_resize,
+                    neotrix_tauri::commands::pty::pty_close,
                     // ===== Model Pool (模型池) =====
-                    crate::commands::model_pool::model_pool_status,
-                    crate::commands::model_pool::model_pool_add,
-                    crate::commands::model_pool::model_pool_remove,
-                    crate::commands::model_pool::model_pool_update_key,
-                    crate::commands::model_pool::model_pool_check,
+                    neotrix_tauri::commands::model_pool::model_pool_status,
+                    neotrix_tauri::commands::model_pool::model_pool_add,
+                    neotrix_tauri::commands::model_pool::model_pool_remove,
+                    neotrix_tauri::commands::model_pool::model_pool_update_key,
+                    neotrix_tauri::commands::model_pool::model_pool_check,
                     // ===== Proxy Pool (代理池) =====
-                    crate::commands::proxy_pool::proxy_pool_status,
-                    crate::commands::proxy_pool::proxy_pool_snapshot,
-                    crate::commands::proxy_pool::proxy_pool_add,
-                    crate::commands::proxy_pool::proxy_pool_remove,
-                    crate::commands::proxy_pool::proxy_pool_add_subscription,
-                    crate::commands::proxy_pool::proxy_pool_remove_subscription,
-                    crate::commands::proxy_pool::proxy_pool_set_strategy,
-                    crate::commands::proxy_pool::proxy_pool_list_strategies,
+                    neotrix_tauri::commands::proxy_pool::proxy_pool_status,
+                    neotrix_tauri::commands::proxy_pool::proxy_pool_snapshot,
+                    neotrix_tauri::commands::proxy_pool::proxy_pool_add,
+                    neotrix_tauri::commands::proxy_pool::proxy_pool_remove,
+                    neotrix_tauri::commands::proxy_pool::proxy_pool_add_subscription,
+                    neotrix_tauri::commands::proxy_pool::proxy_pool_remove_subscription,
+                    neotrix_tauri::commands::proxy_pool::proxy_pool_set_strategy,
+                    neotrix_tauri::commands::proxy_pool::proxy_pool_list_strategies,
                     // ===== IM Channel (即时通讯) =====
-                    crate::commands::im::im_status,
-                    crate::commands::im::im_list_channels,
-                    crate::commands::im::im_get_channel,
-                    crate::commands::im::im_toggle_channel,
-                    crate::commands::im::im_add_bot,
-                    crate::commands::im::im_remove_bot,
-                    crate::commands::im::im_update_bot,
-                    crate::commands::im::im_set_context_enhancement,
-                    crate::commands::im::im_set_proactive_delivery,
+                    neotrix_tauri::commands::im::im_status,
+                    neotrix_tauri::commands::im::im_list_channels,
+                    neotrix_tauri::commands::im::im_get_channel,
+                    neotrix_tauri::commands::im::im_toggle_channel,
+                    neotrix_tauri::commands::im::im_add_bot,
+                    neotrix_tauri::commands::im::im_remove_bot,
+                    neotrix_tauri::commands::im::im_update_bot,
+                    neotrix_tauri::commands::im::im_set_context_enhancement,
+                    neotrix_tauri::commands::im::im_set_proactive_delivery,
                     // ===== DSH 市场模式 =====
-                    crate::commands::im::im_dsh_market_status,
-                    crate::commands::im::im_dsh_market_toggle,
-                    crate::commands::im::im_dsh_market_config,
-                    crate::commands::im::im_dsh_market_sync,
+                    neotrix_tauri::commands::im::im_dsh_market_status,
+                    neotrix_tauri::commands::im::im_dsh_market_toggle,
+                    neotrix_tauri::commands::im::im_dsh_market_config,
+                    neotrix_tauri::commands::im::im_dsh_market_sync,
                     // ===== Market (市场发现引擎) =====
                     market_status,
                     market_search,
@@ -258,27 +320,49 @@ fn main() {
                     market_check_updates,
                     market_config,
                     // ===== AutoStart (开机自启) =====
-                    autostart::autostart_is_enabled,
-                    autostart::autostart_enable,
-                    autostart::autostart_disable,
-                    autostart::autostart_toggle,
+                    neotrix_tauri::autostart::autostart_is_enabled,
+                    neotrix_tauri::autostart::autostart_enable,
+                    neotrix_tauri::autostart::autostart_disable,
+                    neotrix_tauri::autostart::autostart_toggle,
                     // ===== Onboarding (首次运行引导) =====
-                    crate::commands::onboarding::onboarding_check_prereqs,
-                    crate::commands::onboarding::onboarding_get_tips,
-                    crate::commands::onboarding::onboarding_complete,
-                    crate::commands::onboarding::onboarding_is_completed,
+                    neotrix_tauri::commands::onboarding::onboarding_check_prereqs,
+                    neotrix_tauri::commands::onboarding::onboarding_get_tips,
+                    neotrix_tauri::commands::onboarding::onboarding_complete,
+                    neotrix_tauri::commands::onboarding::onboarding_is_completed,
                     // ===== Hive (Office Floor 可视化) =====
-                    crate::commands::hive::hive_get_floor_state,
-                    crate::commands::hive::hive_send_message,
+                    neotrix_tauri::commands::hive::hive_get_floor_state,
+                    neotrix_tauri::commands::hive::hive_send_message,
+                    // ===== Model Manager (模型管理) =====
+                    model_list_local,
+                    model_get_metadata,
+                    model_delete_local,
+                    model_validate,
+                    model_scan_local,
+                    model_stats,
+                    model_search,
+                    // ===== Provider Manager (Provider 管理) =====
+                    provider_list_providers,
+                    provider_list_models,
+                    provider_complete,
+                    provider_health_check,
+                    provider_add,
+                    provider_remove,
+                    provider_get_config,
+                    provider_update_config,
+                    provider_circuit_breaker_status,
+                    provider_cost_summary,
+                    provider_register_failover_chain,
+                    provider_record_success,
+                    provider_record_failure,
                 ])
                 .setup(move |app| {
                     // 初始化通知管理器
                     let notification_manager =
-                        notifications::NotificationManager::new(app.handle().clone());
+                        neotrix_tauri::notifications::NotificationManager::new(app.handle().clone());
                     app.manage(notification_manager);
 
                     // 初始化开机自启管理器
-                    let autostart_manager = autostart::AutoStartManager::new(app.handle().clone());
+                    let autostart_manager = neotrix_tauri::autostart::AutoStartManager::new(app.handle().clone());
                     app.manage(autostart_manager);
 
                     // 设置文件拖拽监听
@@ -290,11 +374,11 @@ fn main() {
                         let mut rx = pty_rx;
                         while let Some(evt) = rx.recv().await {
                             match evt.event_type {
-                                crate::commands::pty::PtyEventType::Output => {
+                                neotrix_tauri::commands::pty::PtyEventType::Output => {
                                     let _ = pty_handle
                                         .emit(&format!("pty-output-{}", evt.session_id), &evt.data);
                                 }
-                                crate::commands::pty::PtyEventType::Exit(code) => {
+                                neotrix_tauri::commands::pty::PtyEventType::Exit(code) => {
                                     let _ = pty_handle
                                         .emit(&format!("pty-exit-{}", evt.session_id), &code);
                                 }
@@ -346,7 +430,7 @@ fn main() {
             let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
             rt.block_on(async {
                 let api = UnifiedApiImpl::new();
-                let request = crate::stub::UnifiedRequest::chat(prompt);
+                let request = neotrix_tauri::stub::UnifiedRequest::chat(prompt);
                 let response = api.handle(request).await;
                 match response {
                     Ok(r) => println!("Response: {}", r.content),

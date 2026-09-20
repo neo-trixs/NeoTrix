@@ -47,3 +47,11 @@ pub mod nt_core_capability;
 pub mod nt_agent_identity;
 /// Agent Gallery — 浏览/安装预设 agent 角色 (absorbed from munder-difflin)
 pub mod nt_agent_gallery;
+
+// ============================================================================
+// Absorbed — 从 neotrix-sim 吸收
+// ============================================================================
+/// Safety Monitor with Anomaly Detection — absorbed from neotrix-sim
+pub mod nt_safety_monitor;
+/// Emergence Detector — absorbed from neotrix-sim
+pub mod nt_emergence_detector;

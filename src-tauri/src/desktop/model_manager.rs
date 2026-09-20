@@ -44,6 +44,17 @@ impl std::fmt::Display for ModelFormat {
     }
 }
 
+impl ModelFormat {
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            ModelFormat::GGUF => "GGUF",
+            ModelFormat::ONNX => "ONNX",
+            ModelFormat::Safetensors => "Safetensors",
+            ModelFormat::GGJ => "GGJ",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ModelSource {
     HuggingFace,
@@ -97,6 +108,7 @@ pub struct ModelCapabilities {
     pub audio: bool,
     pub function_calling: bool,
     pub streaming: bool,
+    pub agent: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -243,6 +255,7 @@ impl ModelManager {
                 audio: false,
                 function_calling: false,
                 streaming: true,
+                agent: false,
             },
             context_length: None,
             parameter_count: None,

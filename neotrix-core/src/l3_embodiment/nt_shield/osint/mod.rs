@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use url::Url;
 
 use crate::l1_action::nt_core_llm::DataTrust;
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// OSINT collector that aggregates data from multiple sources.
 pub struct OsintCollector {

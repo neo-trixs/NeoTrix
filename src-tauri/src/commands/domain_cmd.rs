@@ -3,6 +3,7 @@
 //! 将 DomainRegistry 暴露为 Tauri commands。
 
 use crate::domain::{DomainCall, DomainInfo, DomainRegistry, DomainResponse};
+use crate::ipc::{self, IpcResponse};
 use std::sync::Arc;
 use tauri::{command, State};
 use tokio::sync::RwLock;
@@ -17,28 +18,28 @@ pub async fn domain_call(
     domain: String,
     action: String,
     args: serde_json::Value,
-) -> Result<DomainResponse, String> {
+) -> IpcResponse<DomainResponse> {
     let registry = state.read().await;
     let request = DomainCall {
         domain,
         action,
         args,
     };
-    Ok(registry.call(request))
+    ipc::ok(registry.call(request).await)
 }
 
 /// 列出所有已注册域
 #[command]
-pub async fn domain_list(state: State<'_, DomainState>) -> Result<Vec<DomainInfo>, String> {
+pub async fn domain_list(state: State<'_, DomainState>) -> IpcResponse<Vec<DomainInfo>> {
     let registry = state.read().await;
-    Ok(registry.list())
+    ipc::ok(registry.list())
 }
 
 /// 检查域是否存在
 #[command]
-pub async fn domain_has(state: State<'_, DomainState>, domain: String) -> Result<bool, String> {
+pub async fn domain_has(state: State<'_, DomainState>, domain: String) -> IpcResponse<bool> {
     let registry = state.read().await;
-    Ok(registry.has_domain(&domain))
+    ipc::ok(registry.has_domain(&domain))
 }
 
 /// 获取域 action 数量

@@ -448,7 +448,7 @@ impl BrowserSecurityScanner {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BrowserSecurityScanner {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for BrowserSecurityScanner {
     fn name(&self) -> &str {
         "BrowserSecurityScanner"
     }
@@ -826,12 +826,12 @@ mod tests {
 }
 
 /// 创建 BrowserSecurityScanner 的 SelfTest 实例 (供 L5 注册，避免 L5 直接依赖 L3 类型)
-pub fn create_browser_security_self_test() -> Box<dyn crate::l6_meta::healing::nt_core_self_test::SelfTest> {
+pub fn create_browser_security_self_test() -> Box<dyn crate::l0_substrate::nt_core_self_test::SelfTest> {
     Box::new(BrowserSecurityScanner::new(BrowserSecurityConfig::default()))
 }
 
 /// SecurityAudit trait 实现 — 打通 L5 认知层对 L3 具身层的安全检查接口
-impl crate::core::nt_core_traits::SecurityAudit for BrowserSecurityScanner {
+impl crate::l0_substrate::nt_core_traits::SecurityAudit for BrowserSecurityScanner {
     fn scan_browser_security(&self, url: &str) -> Result<String, String> {
         let mut results = Vec::new();
         for check in &self.checks {
@@ -846,7 +846,7 @@ impl crate::core::nt_core_traits::SecurityAudit for BrowserSecurityScanner {
         }
     }
 
-    fn scan_reasoning_trace(&self, _text: &str, _context: &str) -> Result<crate::core::nt_core_traits::ReasoningTraceReport, String> {
+    fn scan_reasoning_trace(&self, _text: &str, _context: &str) -> Result<crate::l0_substrate::nt_core_traits::ReasoningTraceReport, String> {
         // BrowserSecurityScanner 专注于浏览器安全，不处理推理轨迹
         Err("BrowserSecurityScanner does not support reasoning trace scanning".into())
     }

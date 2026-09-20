@@ -15,8 +15,8 @@ use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
 use crate::l5_cognition::nt_core_cot_generator::{CoTConfig, CoTGenerator, DefaultCoTGenerator};
 use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
 use crate::l5_cognition::nt_core_policy::E8Policy;
-use crate::l5_cognition::nt_core_reasoning::{ReasoningMethod, TraceSource};
-use crate::l5_cognition::nt_core_kernel_types::{KERNEL_DIM, ReasoningKernel, Vector};
+use crate::l5_cognition::reasoning_core::TraceSource;
+use neotrix_reasoning::kernel_types::{ReasoningMethod, KERNEL_DIM, ReasoningKernel, Vector};
 use crate::l1_action::nt_core_llm::{
     estimate_tokens, truncate_preserving, LlmProvider, LlmRequest, Message, Role,
 };
@@ -758,11 +758,11 @@ Output your result for this subtask only."#,
             .iter()
             .map(|(k, v)| (k.clone(), self.text_to_vector(v, KERNEL_DIM)))
             .collect();
-        let kernel_trace = crate::l5_cognition::nt_core_reasoning::ReasoningTrace {
+        let kernel_trace = crate::l5_cognition::reasoning_core::ReasoningTrace {
             trace_id: format!("cot_{}", uuid::Uuid::new_v4().simple()),
             task: sub_task.title.clone(),
             method: ReasoningMethod::Deductive,
-            hexagram: crate::l5_cognition::nt_core_hex::ReasoningHexagram::new(
+            hexagram: neotrix_types::e8_reasoning::ReasoningHexagram::new(
                 sub_task.hexagram_bias.unwrap_or(0),
             ),
             stage: sub_task.crt_scale as usize,
@@ -832,7 +832,7 @@ Output your result for this subtask only."#,
         // 将向量转回文本（简化）
         Ok(format!(
             "Kernel output: confidence={:.2}, method={:?}",
-            output.confidence, output.trace.method
+            output.confidence, output.method
         ))
     }
 

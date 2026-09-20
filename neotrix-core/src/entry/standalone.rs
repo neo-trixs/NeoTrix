@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 /// Standalone 模式 — 纯 ReasoningKernel 推理，不依赖外部 LLM
 pub(crate) async fn run_standalone(stage: usize) {
-    use crate::l1_action::nt_io::nt_io_standalone::StandaloneEngine;
+    use neotrix::l1_action::nt_io::nt_io_standalone::StandaloneEngine;
     let mut engine = StandaloneEngine::new(stage.min(18));
     println!("╭─ NeoTrix Standalone Mode ──────────────────────────╮");
     println!("│                                                    │");

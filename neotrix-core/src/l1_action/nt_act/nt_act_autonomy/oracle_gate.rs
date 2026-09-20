@@ -203,7 +203,7 @@ impl Default for OracleGate {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for OracleGate {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for OracleGate {
     fn name(&self) -> &str {
         "oracle_gate"
     }

@@ -902,7 +902,7 @@ mod tests {
                 .unwrap_or_default()
                 .as_nanos()
         ));
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp))
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp))
             .expect("open temp KB");
         let kb = std::sync::Arc::new(kb);
         let mut sb = crate::l5_cognition::nt_core_second_brain::SecondBrain::new();

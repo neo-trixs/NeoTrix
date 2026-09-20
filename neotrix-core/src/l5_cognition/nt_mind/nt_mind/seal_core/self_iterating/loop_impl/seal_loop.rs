@@ -29,8 +29,8 @@ use std::sync::{Arc, Mutex};
 use crate::cli::shield_enforcer::global_shield;
 use crate::l1_action::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
 use crate::l5_cognition::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
-use crate::l5_cognition::nt_core_reasoning::ContextBuilder;
-use crate::l5_cognition::layer_aliases::ReasoningKernel;
+use crate::l0_substrate::nt_core_answer_engine::ContextBuilder;
+use crate::l5_cognition::l1_facade::ReasoningKernel;
 use crate::l5_cognition::nt_core::nt_core_parallel::isolation::{IntentIsolator, AtomicDecomposer};
 use crate::l5_cognition::nt_mind::nt_mind::infrastructure::code_review::CodeReviewEngine;
 
@@ -671,10 +671,10 @@ impl SelfIteratingBrain {
         // ── NT-CORE 自我模型钩子 (T6): 候选行为变更产出后, 若 SelfModel 可用,
         //    评估其价值并回写自我状态。默认 feature 关闭 → 编译掉, 不影响既有逻辑;
         //    开启 `self_model` feature 后自动接线 (无需修改 brain 结构字段)。
-        //    真实启发式见 `l6_meta::nt_core_self_model::SelfModel::value_function` TODO(T6)。
+        //    真实启发式见 `l0_substrate::nt_core_cross_layer::SelfModel::value_function` TODO(T6)。
         #[cfg(feature = "self_model")]
         {
-            let mut model = crate::l6_meta::nt_core_self_model::SelfModel::new();
+            let mut model = crate::l5_cognition::l1_facade::SelfModel::new();
             let v = model.value_function(candidate);
             log::debug!("[seal][self-model] candidate value={:.4}", v);
             if let Err(e) = model.update(candidate) {
@@ -933,8 +933,8 @@ impl SelfIteratingBrain {
             engine = engine.with_jepa((*jepa).clone());
         }
         if !self.skip_kb_io {
-            if let Ok(mut kb) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
-            let emb_cfg = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
+            if let Ok(mut kb) = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+            let emb_cfg = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
             if !emb_cfg.api_key.is_empty() {
                 kb = kb.with_embedding(emb_cfg);
                 // Note: ensure_embeddings uses reqwest::blocking which panics
@@ -988,7 +988,7 @@ impl SelfIteratingBrain {
         }
         engine = engine.with_ewhr_bridge(E8EwhrBridge::new());
         let hyp_net = Arc::new(Mutex::new(
-            crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork::new()
+            crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork::new()
         ));
         engine = engine.with_hypothesis_network(hyp_net);
 
@@ -1020,11 +1020,11 @@ impl SelfIteratingBrain {
         // L6 Self: 注入剩余的元认知/监控/压缩/蒸馏子系统
         use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
         use crate::l5_cognition::nt_core_gwt::vsa_scorer::VsaContentScorer;
-        use crate::l6_meta::nt_core_self::silicon_self::SiliconSelfModel;
+        use crate::l5_cognition::l1_facade::silicon_self::SiliconSelfModel;
         use crate::l5_cognition::nt_core_ttc::{TtcEngine, TtcConfig};
         use crate::l5_cognition::nt_core_trajectory_compress::CompressionLevel;
         use crate::l5_cognition::nt_core::capability::nt_core_antidistil::AntiDistillationSystem;
-        use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
+        use crate::l0_substrate::nt_core_span::{ConsoleTracer, CostTracker};
         use crate::l5_cognition::nt_core_prm::{ProcessRewardLearner, HeuristicCoach};
         use crate::l5_cognition::nt_core_policy::E8Policy;
         use crate::l2_perception::nt_core_e8::nt_core_fable_pattern::FablePatternMatcher;
@@ -1058,7 +1058,7 @@ impl SelfIteratingBrain {
         // Phase 2: Initialize Task Dispatcher, CoT Generator, Context Builder, and E8Policy
         // 配置系统完善: 支持环境变量覆盖 (NEOTRIX_DISPATCH_* / NEOTRIX_COT_*)
         let dispatcher_config = DispatcherConfig::from_env();
-        let context_builder = ContextBuilder::new();
+        let context_builder = ContextBuilder::new(4096);
         let e8_policy = E8Policy::default();
 
         // 接线纪律 (R-P42/R-P79): TaskDecomposerDispatcher / DefaultCoTGenerator
@@ -1162,7 +1162,7 @@ impl SelfIteratingBrain {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
         // 接通真实知识库：超立方体检索 + analyze_gaps/sparse_topics 落到实际知识
-        if let Ok(kb) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+        if let Ok(kb) = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
             // 基础 + 前沿模型知识一次性种入 (insert_or_get 幂等, 多次启动安全)
             if let Err(e) = kb.seed_foundational() {
                 log::warn!("[KB] foundational seed failed: {e}");

@@ -3,7 +3,7 @@
 //! WordPecker: 中英文 NLP 处理技能 — 分词 + 实体抽取 (C1: trait 存在 +
 //! 基础逻辑 + SelfTest T1 + 3 测试). 当前为中英文基础 stub, 后续迭代增强。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 抽取的实体: 文本 + 类型占位。
 #[derive(Debug, Clone, PartialEq)]

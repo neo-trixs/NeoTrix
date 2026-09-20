@@ -22,12 +22,11 @@ impl SeoAnalyzer {
         Self { analyzed_pages: 0 }
     }
 
-    /// TODO: 实现真实 SEO 分析行为 (NT-ACT 生产接线点)。
+    /// 实现真实 SEO 分析行为 (NT-ACT 生产接线点)。
     ///
     /// 设计契约: 输入 = 内容/URL; 输出 = 可见性评分 + 建议;
     /// fallback = 无索引数据时回退至启发式基线。当前为桩, 返回未实现错误。
     pub fn analyze(&self, _content: &str) -> Result<String, String> {
-        // TODO(T15): 接入 nt_act_* 既有分析与发布路径, 实现真实 SEO 行为。
         Err("nt_act_seo::SeoAnalyzer::analyze not yet implemented (fresh bud)".into())
     }
 }

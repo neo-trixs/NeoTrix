@@ -28,12 +28,12 @@ use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::l0_substrate::nt_core_hex::{FullReasoningState, ReasoningHexagram};
 use crate::l6_meta::nt_core_observer::OneObserver;
 use crate::l6_meta::nt_core_observer_error::ObserverErrorRecovery;
-use crate::l6_meta::nt_core_self::silicon_self::SiliconSelfModel;
-use crate::core::nt_core_span::{
+use crate::l5_cognition::l1_facade::silicon_self::SiliconSelfModel;
+use crate::l0_substrate::nt_core_span::{
     AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer,
 };
-use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
-use crate::l5_cognition::layer_aliases::{KnowledgeBase, SearchResult};
+use crate::l5_cognition::l1_facade::ConsciousnessGoldStandard;
+use crate::l5_cognition::l1_facade::{KnowledgeBase, SearchResult};
 use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{
     AlternatingSequence, ControlDistiller, ControlTrainer, CsppoReport, ReasoningStep, SftReport,
 };
@@ -139,7 +139,7 @@ pub struct ReasoningEngine {
     /// Verifier: grounded PRM verifier for step-level verification (Phase 2.2)
     pub verifier: Option<crate::l5_cognition::nt_core_prm::GroundedPrmVerifier>,
     /// ContextBuilder: KB/经验 → Kernel context 自动注入 (Phase 1.3)
-    pub context_builder: Option<crate::l5_cognition::nt_core_reasoning::ContextBuilder>,
+    pub context_builder: Option<crate::l0_substrate::nt_core_answer_engine::ContextBuilder>,
     /// CoT Generator: Kernel 结构化推理 → 自然语言 CoT (Phase 2.1)
     pub cot_generator: Option<crate::l5_cognition::nt_core_cot_generator::DefaultCoTGenerator>,
     /// E8Policy: RL policy for reasoning mode selection (Phase 2.3)
@@ -148,7 +148,7 @@ pub struct ReasoningEngine {
     pub intent_engine: Option<IntentEngine>,
     /// Hypothesis network: shared with EWHR REST API
     pub hypothesis_network: Option<
-        Arc<Mutex<crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>>,
+        Arc<Mutex<crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>>,
     >,
     /// Fable-5 pattern matcher: scores trajectory alignment against Mythos reasoning phases
     pub fable_matcher: Option<FablePatternMatcher>,
@@ -331,7 +331,7 @@ impl ReasoningEngine {
     pub fn with_hypothesis_network(
         mut self,
         net: Arc<
-            Mutex<crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>,
+            Mutex<crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork>,
         >,
     ) -> Self {
         self.hypothesis_network = Some(net);
@@ -358,7 +358,7 @@ impl ReasoningEngine {
 
     pub(crate) fn _with_context_builder(
         mut self,
-        builder: crate::l5_cognition::nt_core_reasoning::ContextBuilder,
+        builder: crate::l0_substrate::nt_core_answer_engine::ContextBuilder,
     ) -> Self {
         self.context_builder = Some(builder);
         self
@@ -464,7 +464,7 @@ impl ReasoningEngine {
         if let Ok(ref response) = result {
             if let Some(ref mut cot_gen) = self.cot_generator {
                 // 构建一个简化的 Kernel trace 用于 CoT 生成
-                let kernel_trace = crate::l5_cognition::nt_core_reasoning::ReasoningTrace {
+                let kernel_trace = crate::l5_cognition::reasoning_core::ReasoningTrace {
                     trace_id: format!(
                         "engine_{}",
                         std::time::SystemTime::now()
@@ -474,14 +474,14 @@ impl ReasoningEngine {
                     ),
                     task: task.to_string(),
                     method: crate::l1_action::nt_io::nt_io_standalone::ReasoningMethod::Deductive,
-                    hexagram: self.current_state.mode,
+                    hexagram: neotrix_types::e8_reasoning::ReasoningHexagram::new(self.current_state.mode.0),
                     stage: self.current_state.mode.0 as usize % 19,
                     steps: Vec::new(),
                     intermediate_states: Vec::new(),
                     convergence: 0.5,
                     final_quality: 0.5,
                     llm_response: Some(response.clone()),
-                    source: crate::l5_cognition::nt_core_reasoning::TraceSource::LLMDriven,
+                    source: crate::l5_cognition::reasoning_core::TraceSource::LLMDriven,
                     timestamp: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -518,23 +518,23 @@ impl ReasoningEngine {
             // 注: self.traces 元素为 reasoning_types::ReasoningTrace, 需转换为
             // nt_core_reasoning::ReasoningTrace (E8Policy 反哺所需字段)。
             let feedback_trace = if let Some(last_trace) = self.traces.last() {
-                crate::l5_cognition::nt_core_reasoning::ReasoningTrace {
+                crate::l5_cognition::reasoning_core::ReasoningTrace {
                     trace_id: last_trace.id.clone(),
                     task: last_trace.task.clone(),
                     method: crate::l1_action::nt_io::nt_io_standalone::ReasoningMethod::Deductive,
-                    hexagram: self.current_state.mode,
+                    hexagram: neotrix_types::e8_reasoning::ReasoningHexagram::new(self.current_state.mode.0),
                     stage: self.current_state.mode.0 as usize % 19,
                     steps: Vec::new(),
                     intermediate_states: Vec::new(),
                     convergence: last_trace.outcome_score.clamp(0.0, 1.0),
                     final_quality: if last_trace.success { 0.8 } else { 0.5 },
                     llm_response: Some(last_trace.llm_response.clone()),
-                    source: crate::l5_cognition::nt_core_reasoning::TraceSource::LLMDriven,
+                    source: crate::l5_cognition::reasoning_core::TraceSource::LLMDriven,
                     timestamp: last_trace.timestamp as u64,
                 }
             } else {
                 // 回退：基于响应质量构建反馈轨迹
-                crate::l5_cognition::nt_core_reasoning::ReasoningTrace {
+                crate::l5_cognition::reasoning_core::ReasoningTrace {
                     trace_id: format!(
                         "feedback_{}",
                         std::time::SystemTime::now()
@@ -544,14 +544,14 @@ impl ReasoningEngine {
                     ),
                     task: task.to_string(),
                     method: crate::l1_action::nt_io::nt_io_standalone::ReasoningMethod::Deductive,
-                    hexagram: self.current_state.mode,
+                    hexagram: neotrix_types::e8_reasoning::ReasoningHexagram::new(self.current_state.mode.0),
                     stage: self.current_state.mode.0 as usize % 19,
                     steps: Vec::new(),
                     intermediate_states: Vec::new(),
                     convergence: 0.7, // 基于响应质量估算
                     final_quality: if response.len() > 100 { 0.8 } else { 0.5 },
                     llm_response: Some(response.clone()),
-                    source: crate::l5_cognition::nt_core_reasoning::TraceSource::LLMDriven,
+                    source: crate::l5_cognition::reasoning_core::TraceSource::LLMDriven,
                     timestamp: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -818,7 +818,7 @@ impl ReasoningEngine {
                 collector.begin(task_string.clone());
                 for (i, state) in self.state_trajectory.iter().enumerate() {
                     collector.record_step(
-                        crate::core::nt_core_traits::SpecialistType::ReflectionEngine,
+                        crate::l0_substrate::nt_core_traits::SpecialistType::ReflectionEngine,
                         state.mode,
                         format!("e8_step_{}", i),
                         String::new(),
@@ -1574,7 +1574,7 @@ impl ReasoningEngine {
             .map(|r| r.winner.to_string())
             .unwrap_or_default();
         if let Some(ref kb) = self.kb {
-            use crate::l5_cognition::layer_aliases::ConversationRecord;
+            use crate::l5_cognition::l1_facade::ConversationRecord;
             let record = ConversationRecord {
                 id: format!("conv-{}", self.llm_call_count),
                 session_id: String::new(),
@@ -1632,7 +1632,7 @@ impl ReasoningEngine {
             prm.learn_step(|collector| {
                 collector.begin("self-iteration".to_string());
                 collector.record_step(
-                    crate::core::nt_core_traits::SpecialistType::ReflectionEngine,
+                    crate::l0_substrate::nt_core_traits::SpecialistType::ReflectionEngine,
                     self.current_state.mode,
                     "self_iterate".into(),
                     String::new(),
@@ -1842,27 +1842,8 @@ impl ReasoningEngine {
         ctx
     }
 
-    fn build_kb_context_uncached(&self, task: &str, root_span: &Span) -> String {
-        if let (Some(ref kb), Some(ref builder)) = (&self.kb, &self.context_builder) {
-            // 使用 ContextBuilder 从 KB 检索相关经验并构建 context HashMap
-            let ctx_map = builder.build_context(kb, task, self.current_state.mode);
-            // 将 context HashMap 转为字符串注入 prompt
-            let mut ctx_str = String::new();
-            for (key, vec) in ctx_map {
-                let vec_str = vec
-                    .iter()
-                    .map(|x| format!("{:.3}", x))
-                    .collect::<Vec<_>>()
-                    .join(",");
-                ctx_str.push_str(&format!("{}: [{}]\n", key, vec_str));
-            }
-            if !ctx_str.is_empty() {
-                root_span.set_attribute("context_builder_used", AttributeValue::Bool(true));
-                format!("KB Context:\n{}\n", ctx_str)
-            } else {
-                String::new()
-            }
-        } else if let Some(ref kb) = self.kb {
+    fn build_kb_context_uncached(&self, _task: &str, _root_span: &Span) -> String {
+        if let Some(ref kb) = self.kb {
             // 回退到原有 E8 状态检索
             if let Ok(results) = kb.query_by_e8_state(self.current_state.mode, 5) {
                 if !results.is_empty() {
@@ -2039,7 +2020,7 @@ impl ReasoningEngine {
             // 一致性分数越高 → 推理越可信 → 奖励加成。对齐主流推理模型的
             // self-consistency / majority vote 机制 (R-P79 生产接线)。
             let sc = {
-                use crate::l5_cognition::layer_aliases::{text_to_vector, ReasoningKernel};
+                use crate::l5_cognition::l1_facade::{text_to_vector, ReasoningKernel};
                 let kernel = ReasoningKernel::new(self.current_state.mode.0 as usize % 19);
                 let query = text_to_vector(task, 128);
                 kernel.self_consistency(&query, 3)
@@ -2053,7 +2034,7 @@ impl ReasoningEngine {
             prm.learn_step(|collector| {
                 collector.begin(task.to_string());
                 collector.record_step(
-                    crate::core::nt_core_traits::SpecialistType::ReflectionEngine,
+                    crate::l0_substrate::nt_core_traits::SpecialistType::ReflectionEngine,
                     self.current_state.mode,
                     "learn_from_trace".into(),
                     task.to_string(),
@@ -2279,7 +2260,7 @@ impl ReasoningEngine {
 /// HypothesisNetwork 节点。幂等: 同一 (trajectory_len, index) 的 id 已存在则跳过,
 /// 避免每轮重复落点。返回实际新增数量。
 fn hydrate_ewhr_hypotheses(
-    net: &mut crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork,
+    net: &mut crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork,
     proposed: &[String],
     tick: usize,
 ) -> usize {
@@ -2668,7 +2649,7 @@ mod tests {
 
     #[test]
     fn test_hydrate_ewhr_hypotheses_adds_nodes() {
-        use crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        use crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
         let mut net = HypothesisNetwork::new();
         let proposed = vec![
             "agent should adopt Direct strategy when context is high".to_string(),
@@ -2683,7 +2664,7 @@ mod tests {
 
     #[test]
     fn test_hydrate_ewhr_hypotheses_idempotent() {
-        use crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        use crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
         let mut net = HypothesisNetwork::new();
         let proposed = vec!["same proposal repeated".to_string()];
         // 同一 tick 两次调用 → 第二次不重复落点
@@ -2700,7 +2681,7 @@ mod tests {
 
     #[test]
     fn test_hydrate_ewhr_hypotheses_long_title_truncated() {
-        use crate::l1_action::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        use crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
         let mut net = HypothesisNetwork::new();
         let long = "a very long hypothesis description that definitely exceeds the thirty two character title limit for display purposes".to_string();
         let added = hydrate_ewhr_hypotheses(&mut net, &[long.clone()], 1);
@@ -2917,7 +2898,7 @@ mod tests {
         // cumora 借鉴接线回归 (T3): call_llm 必须经 ModelRouter.route() 选模型,
         // 而非恒用 default_model。捕获 LlmRequest.model 断言 route 决策生效。
         use crate::l1_action::nt_core_llm::{FinishReason, LlmProvider, LlmRequest, LlmResponse, Usage};
-        use crate::core::nt_core_span::CostTracker;
+        use crate::l0_substrate::nt_core_span::CostTracker;
 
         struct CapturingProvider {
             seen_model: std::sync::Mutex<Option<String>>,

@@ -165,3 +165,142 @@ impl E8VsaEmbedding {
         mat
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn modality_all_has_five_variants() {
+        assert_eq!(Modality::ALL.len(), 5);
+    }
+
+    #[test]
+    fn modality_label() {
+        assert_eq!(Modality::Text.label(), "text");
+        assert_eq!(Modality::Image.label(), "image");
+        assert_eq!(Modality::Audio.label(), "audio");
+        assert_eq!(Modality::Code.label(), "code");
+        assert_eq!(Modality::Latent.label(), "vector");
+    }
+
+    #[test]
+    fn modality_serde_roundtrip() {
+        let m = Modality::Code;
+        let json = serde_json::to_string(&m).unwrap();
+        let back: Modality = serde_json::from_str(&json).unwrap();
+        assert_eq!(m, back);
+    }
+
+    #[test]
+    fn modality_hash_and_eq() {
+        use std::collections::HashSet;
+        let set: HashSet<Modality> = Modality::ALL.iter().copied().collect();
+        assert_eq!(set.len(), 5);
+    }
+
+    #[test]
+    fn e8_vsa_embedding_default_dim() {
+        let emb = E8VsaEmbedding::default();
+        assert_eq!(emb.dim, E8_VSA_DIM);
+        assert_eq!(emb.e8_table.len(), 64);
+    }
+
+    #[test]
+    fn e8_vsa_embedding_custom_dim() {
+        let emb = E8VsaEmbedding::new(256);
+        assert_eq!(emb.dim, 256);
+        assert_eq!(emb.e8_table.len(), 64);
+        for vec in &emb.e8_table {
+            assert_eq!(vec.len(), 256);
+        }
+    }
+
+    #[test]
+    fn e8_vsa_embedding_bipolar() {
+        let emb = E8VsaEmbedding::new(128);
+        for vec in &emb.e8_table {
+            for &v in vec {
+                assert!(v == 1.0 || v == -1.0, "expected bipolar, got {}", v);
+            }
+        }
+    }
+
+    #[test]
+    fn e8_vsa_embed_deterministic() {
+        let emb = E8VsaEmbedding::default();
+        let a = emb.embed(42);
+        let b = emb.embed(42);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn e8_vsa_embed_wraps_state() {
+        let emb = E8VsaEmbedding::default();
+        // state & 0b00111111 wraps to 0..63
+        let v0 = emb.embed(0);
+        let v64 = emb.embed(64);
+        assert_eq!(v0, v64);
+    }
+
+    #[test]
+    fn e8_vsa_similarity_identical() {
+        let emb = E8VsaEmbedding::default();
+        let hv = emb.embed(0);
+        let sim = emb.similarity(hv, hv);
+        assert!((sim - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn e8_vsa_bind_and_bundle() {
+        let emb = E8VsaEmbedding::default();
+        let a = emb.embed(0);
+        let b = emb.embed(1);
+        let bound = emb.bind(a, b);
+        let bundled = emb.bundle(a, b);
+        assert_eq!(bound.len(), emb.dim);
+        assert_eq!(bundled.len(), emb.dim);
+    }
+
+    #[test]
+    fn e8_vsa_permute_preserves_length() {
+        let emb = E8VsaEmbedding::default();
+        let hv = emb.embed(5);
+        let perm = emb.permute(hv, 3);
+        assert_eq!(perm.len(), emb.dim);
+    }
+
+    #[test]
+    fn e8_vsa_permute_shift_zero_identity() {
+        let emb = E8VsaEmbedding::default();
+        let hv = emb.embed(5);
+        let perm = emb.permute(hv, 0);
+        assert_eq!(&perm, hv);
+    }
+
+    #[test]
+    fn e8_vsa_nearest_e8_state_self() {
+        let emb = E8VsaEmbedding::default();
+        let hv = emb.embed(37);
+        let (idx, sim) = emb.nearest_e8_state(hv);
+        assert_eq!(idx, 37);
+        assert!((sim - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn e8_vsa_embed_with_meta_length() {
+        let emb = E8VsaEmbedding::default();
+        let result = emb.embed_with_meta(10, 0b0101);
+        assert_eq!(result.len(), emb.dim);
+    }
+
+    #[test]
+    fn e8_vsa_transition_matrix_diagonal() {
+        let emb = E8VsaEmbedding::new(64);
+        let mat = emb.transition_similarity_matrix();
+        assert_eq!(mat.len(), 64);
+        for i in 0..64 {
+            assert!((mat[i][i] - 1.0).abs() < 1e-10, "diagonal[{}] = {}", i, mat[i][i]);
+        }
+    }
+}

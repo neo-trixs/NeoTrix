@@ -46,6 +46,12 @@ pub mod guard;
 pub mod evasion;
 pub mod safety;
 
+// Security scanners (R-SEC04 multi-turn, R-SEC10 defense profile)
+pub mod scanners;
+
+// Compliance framework
+pub mod compliance;
+
 // Re-exports from shield_core
 pub use shield_core::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};
 pub use shield_core::guard_chain;

@@ -4,7 +4,7 @@ use crate::l2_perception::nt_world::nt_world_sense::auditory_cortex::AuditoryCor
 use crate::l2_perception::nt_world::nt_world_sense::real_sensors::screen::ScreenCapture;
 use crate::l2_perception::nt_world::nt_world_sense::real_sensors::mic::MicCapture;
 use std::time::Duration;
-use crate::l1_action::nt_act::nt_act_voice::{VoiceInput, VoiceSample};
+use crate::l2_perception::nt_world::l1_facade::{VoiceInput, VoiceSample};
 
 /// Goal context for CraniMEM gating — matches nt_memory_search GoalContext.
 #[derive(Debug, Clone)]

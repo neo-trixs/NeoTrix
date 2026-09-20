@@ -1,6 +1,6 @@
 use crate::l1_action::nt_core_bank::ReasoningBank;
 use crate::l1_action::nt_core_bank::ReasoningMemory;
-use crate::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 use super::hebbian::HebbianUpdater;
@@ -118,7 +118,7 @@ impl MemoryConsolidation {
 mod tests {
     use super::*;
     use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
-    use crate::core::nt_core_cap::CapabilityVector;
+    use neotrix_types::core::nt_core_cap::CapabilityVector;
     use crate::l2_perception::nt_core_knowledge::{RewardSource, TaskType};
     use chrono::Utc;
 

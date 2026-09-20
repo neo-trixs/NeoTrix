@@ -8,17 +8,12 @@
 //! - **Real-time Routing** (GPT-5) — Route to cheapest capable model
 //! - **Deep Think Mode** (Gemini 2.5) — Enhanced reasoning for complex problems
 
+use async_trait::async_trait;
+use crate::domain::app_handle::{set_app_handle, get_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
-use tauri::AppHandle;
-
-static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-
-pub fn set_app_handle(app: AppHandle) {
-    let _ = APP_HANDLE.set(app);
-}
+use std::sync::{Arc, Mutex};
 
 // ========== Types ==========
 
@@ -315,6 +310,7 @@ impl AiOrchestrationPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for AiOrchestrationPlugin {
     fn name(&self) -> &str {
         "ai_orchestration"
@@ -499,7 +495,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,

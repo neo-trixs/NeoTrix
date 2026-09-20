@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::atomic_io;
 use super::schema::{MarketEntry, MarketSearchResult, PluginAsset};
 
 /// GitHub 配置
@@ -231,7 +232,7 @@ impl GitHubDiscoverer {
         std::fs::create_dir_all(dest_dir).map_err(|e| format!("Create dir: {e}"))?;
 
         let dest_path = dest_dir.join(filename);
-        std::fs::write(&dest_path, &bytes).map_err(|e| format!("Write file: {e}"))?;
+        atomic_io::write_atomic(&dest_path, &bytes).map_err(|e| format!("Write file: {e}"))?;
 
         Ok(dest_path)
     }

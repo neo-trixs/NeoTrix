@@ -47,16 +47,16 @@ impl DomainRegistry {
     }
 
     /// 注册域插件 (带初始化)
-    pub fn register_with_init(
+    pub async fn register_with_init(
         &mut self,
         mut plugin: Box<dyn DomainPlugin>,
     ) -> Result<(), DomainError> {
-        plugin.init()?;
+        plugin.init().await?;
         self.register(plugin)
     }
 
     /// 执行域调用
-    pub fn call(&self, request: DomainCall) -> DomainResponse {
+    pub async fn call(&self, request: DomainCall) -> DomainResponse {
         let DomainCall {
             domain,
             action,
@@ -76,7 +76,7 @@ impl DomainRegistry {
         };
 
         // 执行 action
-        let result = self.plugins[idx].call(&action, args);
+        let result = self.plugins[idx].call(&action, args).await;
 
         match result {
             Ok(data) => ok(data),
@@ -107,9 +107,9 @@ impl DomainRegistry {
     }
 
     /// 关闭所有插件
-    pub fn shutdown_all(&mut self) {
+    pub async fn shutdown_all(&mut self) {
         for plugin in &mut self.plugins {
-            let _ = plugin.shutdown();
+            let _ = plugin.shutdown().await;
         }
     }
 
@@ -135,7 +135,7 @@ impl DomainRegistry {
             message: format!("Domain '{}' not found", domain),
             recoverable: true,
         })?;
-        self.plugins[*idx].call(action, args)
+        self.plugins[*idx].call(action, args).await
     }
 }
 

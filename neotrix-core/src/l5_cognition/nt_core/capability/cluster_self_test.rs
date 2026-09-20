@@ -6,7 +6,7 @@
 //!
 //! 供 SEAL 自迭代 pipeline 以 `Box<dyn SelfTest>` 注册消费。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// L7 能力集群自测 — 验证能力注册表的基本完整性。
 #[derive(Default)]

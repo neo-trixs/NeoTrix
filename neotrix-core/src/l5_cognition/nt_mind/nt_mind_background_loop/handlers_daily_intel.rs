@@ -51,7 +51,7 @@ impl BackgroundLoopHandle {
             // 记入 kv_store daily-intel 命名空间 (可检索的感知缺失标记, 消费方可查询)
             if let Ok(conn) = kb.raw_conn() {
                 let key = format!("daily-intel-gap-{}", today_file());
-                if let Err(e) = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::kv_set(
+                if let Err(e) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_unify::kv_set(
                     &conn, "daily-intel", &key, &note,
                 ) {
                     log::warn!("[daily-intel] failed to record perception gap: {}", e);

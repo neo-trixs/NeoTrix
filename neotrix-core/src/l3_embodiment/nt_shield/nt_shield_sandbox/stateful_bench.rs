@@ -8,7 +8,7 @@
 //! 零网络零 Docker, CI 可跑。
 
 use super::{EgressPolicy, EgressRule};
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 单步外联尝试: 会话内第 N 步访问 host:port, 期望放行与否。
 #[derive(Debug, Clone)]
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn self_test_wired() {
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         assert_eq!(StatefulEgressBench.name(), "nt_shield_stateful_egress_bench");
         assert!(StatefulEgressBench.self_test().is_ok());
     }

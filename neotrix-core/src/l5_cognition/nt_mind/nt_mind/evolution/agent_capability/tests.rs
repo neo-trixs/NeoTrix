@@ -1,6 +1,6 @@
 
 use super::*;
-use crate::l1_action::nt_memory::vector_index::SearchResult;
+use crate::l2_perception::nt_world::nt_world_search::WebSearchResult as SearchResult;
 
 fn mem_agent() -> MemoryAgent {
     let tmp = std::env::temp_dir().join(format!(

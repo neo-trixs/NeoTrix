@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use super::config::{CrawlTopic, CrawlFormat};
 use super::discover::DiscoveryExtractor;
-use crate::l1_action::nt_io::nt_io_provider::{LlmProvider, LlmRequest};
+use crate::l2_perception::nt_world::l1_facade::{IoLlmProvider as LlmProvider, IoLlmRequest as LlmRequest};
 
 #[derive(Debug, Clone)]
 pub struct ClassifiedContent {
@@ -23,8 +23,6 @@ pub struct ContentClassifier {
     format_heuristics: HashMap<CrawlFormat, Vec<String>>,
     classification_count: u64,
     topic_distribution: HashMap<CrawlTopic, u64>,
-    #[allow(dead_code)]
-    discovery_extractor: DiscoveryExtractor,
 }
 
 impl Default for ContentClassifier {
@@ -161,7 +159,6 @@ impl ContentClassifier {
             format_heuristics,
             classification_count: 0,
             topic_distribution: HashMap::new(),
-            discovery_extractor: DiscoveryExtractor::new(),
         }
     }
 
@@ -508,21 +505,21 @@ mod tests {
     #[async_trait::async_trait]
     impl LlmProvider for MockLlmProvider {
     fn set_proxy(&mut self, _proxy_url: &str) {}
-    fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
-        crate::l1_action::nt_core_llm::DataTrust::Trusted
+    fn data_trust(&self) -> crate::l2_perception::nt_world::l1_facade::DataTrust {
+        crate::l2_perception::nt_world::l1_facade::DataTrust::Trusted
     }
 
-        async fn complete_raw(&self, _request: &LlmRequest) -> Result<crate::l1_action::nt_io::nt_io_provider::LlmResponse, crate::l1_action::nt_io::nt_io_provider::LlmError> {
-            Ok(crate::l1_action::nt_io::nt_io_provider::LlmResponse {
+        async fn complete_raw(&self, _request: &LlmRequest) -> Result<crate::l2_perception::nt_world::l1_facade::LlmResponse, crate::l2_perception::nt_world::l1_facade::LlmError> {
+            Ok(crate::l2_perception::nt_world::l1_facade::LlmResponse {
                 content: r#"{"topic":"science_and_technology","format":"academic_paper","confidence":0.92}"#.into(),
                 model: "mock".into(),
-                usage: crate::l1_action::nt_io::nt_io_provider::Usage::default(),
-                finish_reason: crate::l1_action::nt_io::nt_io_provider::FinishReason::Stop,
+                usage: crate::l2_perception::nt_world::l1_facade::Usage::default(),
+                finish_reason: crate::l2_perception::nt_world::l1_facade::FinishReason::Stop,
                 tool_calls: None,
              reasoning: None,})
         }
 
-        async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::l1_action::nt_io::nt_io_provider::LlmResponse, crate::l1_action::nt_io::nt_io_provider::LlmError>>, crate::l1_action::nt_io::nt_io_provider::LlmError> {
+        async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::l2_perception::nt_world::l1_facade::LlmResponse, crate::l2_perception::nt_world::l1_facade::LlmError>>, crate::l2_perception::nt_world::l1_facade::LlmError> {
             let (_, rx) = tokio::sync::mpsc::channel(1);
             Ok(rx)
         }

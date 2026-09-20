@@ -1,4 +1,3 @@
-use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use serde::{Deserialize, Serialize};
 
 /// Maturity level of a KnowledgeSource, per TENSA multi-fidelity epistemology.
@@ -69,97 +68,12 @@ pub struct AffectiveFeedback {
 }
 
 /// Trait for objects that can provide domain-specific knowledge with capability vectors.
-pub trait KnowledgeProvider {
-    fn name(&self) -> &str;
-    fn capability_vector(&self) -> CapabilityVector;
-    fn source_weight(&self) -> f64;
-}
+/// Re-exported from L0; implemented here for `KnowledgeSource`.
+pub use crate::l0_substrate::nt_core_substrate_types::KnowledgeProvider;
 
 /// A known external knowledge source that can be absorbed into the ReasoningBrain.
-///
-/// Each variant maps to a real project/tool and provides a CapabilityVector
-/// representing its strengths across 23 core dimensions plus extension axes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum KnowledgeSource {
-    HeroUI,
-    BaseUI,
-    ArcUI,
-    CortexUI,
-    AgenticDS,
-    DesignPhilosophy,
-    Hyperframes,
-    Betterleaks,
-    YaoWebsecurity,
-    Botasaurus,
-    ReactDoctor,
-    OpenPencil,
-    AiTrader,
-    SesameRobot,
-    EverOS,
-    MattPocockSkills,
-    NestedLearning,
-    AutonomousGoal,
-    AwesomeDesignSkills,
-    // 🆕 2026-05-15: 外部来源吸收
-    DeepSeekTui,
-    Codebuff,
-    OpenClaude,
-    Cairn,
-    Orca,
-    RedRun,
-    AutonomousSpeedrunning,
-    // 🆕 2026-05-15: Memory/自改进集群
-    Synesis,
-    MemOS,
-    Reflexio,
-    Mem0,
-    Mnemosyne,
-    OriMnemos,
-    OPSD,
-    AttentionMechanism,
-    PatchFile,
-    KeyVault,
-    SealLoop,
-    // 🆕 2026-05-23: HashCortX 融合吸收
-    HashCortxAgents,
-    HashCortxSecurity,
-    HashCortxSwarm,
-    HashCortxFailover,
-    // 🆕 2026-05-24: Ancient Chinese cosmology / unified field theory
-    HetuLuoshu,
-    YijingBinary,
-    FivePhasesGauge,
-    ThreeCosmologies,
-    HuainanziCalendar,
-    ZhangHengSeismoscope,
-    MawangduiAstronomy,
-    ShaoYongCosmology,
-    DayanNumber,
-    // 🆕 2026-05-29: Adam's Law — Textual Frequency Law (arXiv 2604.02176)
-    AdamsLaw,
-    // 🆕 2026-05-30: Consciousness / VSA / JEPA 核心理论
-    IntegratedInformationTheory,
-    GlobalWorkspaceTheory,
-    ActiveInference,
-    VSAHyperdim,
-    JEPAWorldModel,
-    PredictiveCoding,
-    OrchOR,
-    AttentionSchema,
-    // 🆕 2026-05-30: SIA — Self-Improving AI (arXiv 2605.27276)
-    SiaHarnessUpdate, // scaffold 改写能力
-    SiaWeightUpdate,  // RL weight 更新能力
-    SiaFeedbackLoop,  // 三体反馈循环架构
-    // 🆕 2026-05-30: DGM-HyperAgents (arXiv 2603.19461, Meta FAIR)
-    HyperAgents, // 自指涉自我改进
-    // 🆕 2026-06-06: 对话经验反哺 — DialogueAbsorbBridge 把 KB 近期 session/experience
-    // 条目蒸馏出的能力向量以该源身份吸收, 让对话经历参与 SelfIteratingBrain 进化。
-    DialogueExperience,
-    // 🆕 2026-08-06: 研究结论反哺 — WebSearchTool/researcher agent 的统一搜索结论
-    // (DDG→Wikipedia 有序后端) 经 DialogueAbsorbBridge 蒸馏后以该源身份吸收,
-    // 让外部研究结论参与 SelfIteratingBrain 进化 (搜索结论 → KB → 脑能力闭环)。
-    ResearchFindings,
-}
+/// Re-exported from L0 to enforce substrate invariant (L0 defines, L2 extends).
+pub use crate::l0_substrate::nt_core_substrate_types::KnowledgeSource;
 
 #[cfg(test)]
 mod tests {

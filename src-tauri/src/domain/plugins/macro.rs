@@ -2,6 +2,7 @@ macro_rules! define_plugin {
     ($name:ident, $plugin_name:expr, $desc:expr, $($action:expr => $handler:expr),* $(,)?) => {
         pub struct $name;
 
+        #[async_trait::async_trait]
         impl $crate::domain::DomainPlugin for $name {
             fn name(&self) -> &str { $plugin_name }
             fn description(&self) -> &str { $desc }
@@ -17,7 +18,7 @@ macro_rules! define_plugin {
                 ),*]
             }
 
-            fn call(&self, action: &str, args: $crate::domain::serde_json::Value)
+            async fn call(&self, action: &str, args: $crate::domain::serde_json::Value)
                 -> Result<$crate::domain::serde_json::Value, $crate::domain::DomainError>
             {
                 match action {

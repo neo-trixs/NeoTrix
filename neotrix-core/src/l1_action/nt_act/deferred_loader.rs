@@ -27,6 +27,17 @@ pub enum DeferredError {
     Evicted(String),
 }
 
+impl From<DeferredError> for neotrix_types::NtError {
+    fn from(err: DeferredError) -> Self {
+        match err {
+            DeferredError::NotFound(msg) => neotrix_types::NtError::NotFound(msg),
+            DeferredError::AlreadyLoaded(msg) => neotrix_types::NtError::InvalidState(format!("resource already loaded: {msg}")),
+            DeferredError::LoadFailed(msg) => neotrix_types::NtError::OperationFailed(msg),
+            DeferredError::Evicted(msg) => neotrix_types::NtError::NotFound(format!("resource evicted: {msg}")),
+        }
+    }
+}
+
 pub struct DeferredLoader {
     resources: Arc<Mutex<HashMap<String, ResourceMeta>>>,
     loaded_keys: Arc<Mutex<HashSet<String>>>,

@@ -9,7 +9,7 @@ impl ConsciousnessTree {
     /// 使用全局 Constitution (解析自 AGENTS.md) 中的 tree_growth_rules + absorption_rules。
     /// 回退: 若 Constitution 不可用/为空, 使用硬编码默认原则 (R-P42~R-P48 浓缩锚点)。
     fn load_internalized_principles(&mut self) -> Vec<String> {
-        use crate::l6_meta::nt_core_self_constitution::global_constitution;
+        use crate::l5_cognition::l1_facade::global_constitution;
         let constitution = global_constitution();
 
         let mut principles = Vec::new();
@@ -231,7 +231,7 @@ impl ConsciousnessTree {
     ///   - 违规项按 severity 加权: Critical 1.0 / High 0.7 / Medium 0.4 / Low 0.2
     ///   - 审计对象来自真实进化决策 (The Spice Must Flow: 决策→审计→反馈闭环)
     pub fn run_governance_audit(&mut self) {
-        use crate::l6_meta::nt_core_self_constitution::global_constitution;
+        use crate::l5_cognition::l1_facade::global_constitution;
 
         let constitution = global_constitution();
         let mut checked_count = 0usize;
@@ -268,8 +268,8 @@ impl ConsciousnessTree {
                 checked_rules.insert(rule.id.clone());
                 if constitution.check_violation(rule, action) {
                     let weight = match rule.category {
-                        crate::l6_meta::nt_core_self_constitution::RuleCategory::TreeGrowth => 1.0,
-                        crate::l6_meta::nt_core_self_constitution::RuleCategory::BehavioralGrounding => 0.7,
+                        crate::l5_cognition::l1_facade::RuleCategory::TreeGrowth => 1.0,
+                        crate::l5_cognition::l1_facade::RuleCategory::BehavioralGrounding => 0.7,
                         _ => 0.4,
                     };
                     weighted_violations += weight;
@@ -505,7 +505,7 @@ impl ConsciousnessTree {
     /// Uses confidence to boost coil health and frustration/urgency to indicate stress.
     pub fn apply_emotion_report(
         &mut self,
-        report: crate::l6_meta::nt_core_self::emotion_state::EmotionReport,
+        report: crate::l5_cognition::l1_facade::emotion_state::EmotionReport,
     ) {
         // 情绪作为主观调制叠加在真实计算相干性之上 (D4): 不再全量覆盖。
         // 真实 coherence 来自 compute_coherence (分支一致性/谐振/合规/迷雾);

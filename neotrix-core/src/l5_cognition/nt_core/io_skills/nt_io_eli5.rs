@@ -6,7 +6,7 @@
 //! 核心能力: 将技术/复杂文本重写为面向新手的平白解释,
 //! 本 stub 负责可读性启发式评估与分层重写骨架。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// ELI5 解释器 trait — 把复杂文本映射为平白解释。
 pub trait Eli5Explainer: Send + Sync {

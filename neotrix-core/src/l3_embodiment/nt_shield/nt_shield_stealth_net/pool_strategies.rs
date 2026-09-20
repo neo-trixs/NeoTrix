@@ -142,7 +142,7 @@ impl StrategyLearner {
 
     pub fn save(&self) {
         if let Ok(json) = serde_json::to_string_pretty(self) {
-            if let Err(e) = crate::l5_cognition::nt_core_state::save("strategy_q", &json) {
+            if let Err(e) = crate::l0_substrate::nt_core_state::save("strategy_q", &json) {
                 log::warn!("[strategy] save to KB: {}", e);
             }
         } else {
@@ -152,7 +152,7 @@ impl StrategyLearner {
 
     /// Phase 2b KB 直写迁移: 读取 KB kv_store state.strategy_q (legacy 文件作 fallback)。
     pub fn load(path: &std::path::Path) -> Self {
-        if let Some(content) = crate::l5_cognition::nt_core_state::load("strategy_q") {
+        if let Some(content) = crate::l0_substrate::nt_core_state::load("strategy_q") {
             if let Ok(mut learner) = serde_json::from_str::<StrategyLearner>(&content) {
                 learner.persist_path = path.to_path_buf();
                 return learner;
@@ -262,6 +262,6 @@ mod tests {
         let loaded = StrategyLearner::load(&path);
         assert!(loaded.total_entries() > 0);
         let _ = std::fs::remove_file(&path);
-        let _ = crate::l5_cognition::nt_core_state::delete("strategy_q");
+        let _ = crate::l0_substrate::nt_core_state::delete("strategy_q");
     }
 }

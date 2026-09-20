@@ -8,7 +8,7 @@ use super::self_edit::MicroEdit;
 use super::self_iterating::ReasoningBrain;
 use super::memory::{ReasoningBank, ReasoningMemory};
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 /// 网络来源类型
@@ -200,7 +200,7 @@ impl WebKnowledgeMiner {
             "https://en.wikipedia.org/api/rest_v1/page/summary/{}",
             urlencoding(article_name)
         );
-        let (text, _host) = crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&api_url)
+        let (text, _host) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&api_url)
             .map_err(|e| NeoTrixError::Network(format!("Wikipedia API 请求失败: {}", e)))?;
 
         // 解析 JSON 响应
@@ -235,7 +235,7 @@ impl WebKnowledgeMiner {
 
         // arXiv API
         let api_url = format!("http://export.arxiv.org/api/query?id_list={}", paper_id);
-        let (xml_text, _host) = crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&api_url)
+        let (xml_text, _host) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&api_url)
             .map_err(|e| NeoTrixError::Network(format!("arXiv API 请求失败: {}", e)))?;
 
         // 简易 XML 解析
@@ -286,7 +286,7 @@ impl WebKnowledgeMiner {
 
         // 使用 GitHub API 获取仓库信息
         let api_url = format!("https://api.github.com/repos/{}", repo_full);
-        let (text, _host) = crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http_with_headers(
+        let (text, _host) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http_with_headers(
             &api_url,
             &[("Accept", "application/vnd.github.v3+json")],
         )
@@ -360,7 +360,7 @@ impl WebKnowledgeMiner {
 
     /// 通用 URL 挖掘
     fn mine_generic(&self, url_str: &str) -> NeoTrixResult<WebMinedKnowledge> {
-        let (text, _host) = crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(url_str)
+        let (text, _host) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(url_str)
             .map_err(|e| NeoTrixError::Network(format!("请求失败: {}", e)))?;
         let content_length = text.len();
 

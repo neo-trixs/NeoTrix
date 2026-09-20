@@ -3,7 +3,7 @@
 //! LLM 驱动的浏览器任务状态机: Interact → Agent → Interact → ... → Done。
 //! 纯确定性模拟 — 无网络、无真实浏览器、无 tokio。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 工具执行结果
 #[derive(Debug, Clone)]

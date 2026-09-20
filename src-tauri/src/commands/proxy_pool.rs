@@ -2,6 +2,7 @@
 //!
 //! 提供代理 IP 池的增删查状态查询，前端通过 domain_call 或直接调用。
 
+use crate::atomic_io;
 use serde::{Deserialize, Serialize};
 
 /// 代理池条目
@@ -66,9 +67,7 @@ fn save_subscriptions(subs: &[String]) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
     }
 
-    let json = serde_json::to_string_pretty(subs).map_err(|e| format!("Serialize: {e}"))?;
-
-    std::fs::write(&path, json).map_err(|e| format!("Write subscriptions: {e}"))
+    atomic_io::write_json_atomic(&path, subs).map_err(|e| format!("Write subscriptions: {e}"))
 }
 
 /// 读取代理池配置
@@ -133,7 +132,7 @@ fn save_strategy(strategy: &str) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
     }
 
-    std::fs::write(&config_path, config_str).map_err(|e| format!("Write config: {e}"))
+    atomic_io::write_atomic(&config_path, config_str.as_bytes()).map_err(|e| format!("Write config: {e}"))
 }
 
 // ═══════════════════════════════════════════════
@@ -163,9 +162,7 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
             if let Some(parent) = cache_path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            if let Ok(json) = serde_json::to_string_pretty(&extracted) {
-                let _ = std::fs::write(&cache_path, json);
-            }
+            let _ = atomic_io::write_json_atomic(&cache_path, &extracted);
         }
         extracted
     };
@@ -312,8 +309,7 @@ pub async fn proxy_pool_add(url: String, tag: String) -> Result<ProxyPoolEntry, 
     nodes.push(entry.clone());
 
     // 保存到缓存
-    let json = serde_json::to_string_pretty(&nodes).map_err(|e| format!("Serialize: {e}"))?;
-    std::fs::write(&cache_path, json).map_err(|e| format!("Write cache: {e}"))?;
+    atomic_io::write_json_atomic(&cache_path, &nodes).map_err(|e| format!("Write cache: {e}"))?;
 
     Ok(entry)
 }
@@ -340,8 +336,7 @@ pub async fn proxy_pool_remove(url: String) -> Result<bool, String> {
         return Ok(false);
     }
 
-    let json = serde_json::to_string_pretty(&nodes).map_err(|e| format!("Serialize: {e}"))?;
-    std::fs::write(&cache_path, json).map_err(|e| format!("Write cache: {e}"))?;
+    atomic_io::write_json_atomic(&cache_path, &nodes).map_err(|e| format!("Write cache: {e}"))?;
 
     Ok(true)
 }

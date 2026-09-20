@@ -25,8 +25,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::Rng;
 
-use crate::l6_meta::nt_core_self::attention_head::AttentionDomain;
-use crate::l5_cognition::layer_aliases::{KnowledgeBase, RetrievalStrategy};
+use crate::l5_cognition::l1_facade::attention_head::AttentionDomain;
+use crate::l5_cognition::l1_facade::{KnowledgeBase, RetrievalStrategy};
 
 /// 可选的检索策略集 — 任务级搜索 bandit 的臂 (arm)。
 pub const COEVO_STRATEGIES: &[&str] = &[
@@ -693,7 +693,7 @@ mod tests {
                 .unwrap_or_default()
                 .as_nanos()
         ));
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp.into()))
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp.into()))
             .expect("open kb");
         loop_.persist(&kb).expect("persist");
         let mut restored = CoEvolutionLoop::new();

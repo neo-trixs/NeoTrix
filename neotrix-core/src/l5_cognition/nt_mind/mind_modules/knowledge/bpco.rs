@@ -4,7 +4,7 @@
 //! 优化 LLM 训练管线。本模块为 C0 级结构吸收: 仅定义 trait 与 stub 方法骨架,
 //! 编译通过即可, 后续 C1-C4 迭代填充训练反馈逻辑。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 最佳实践评论反馈: critic 对某次生成的 critiques 与评分。
 #[derive(Debug, Clone, Default)]

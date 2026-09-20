@@ -25,7 +25,7 @@
 //! (e.g. it believed it was capable but kept failing), the discrepancy is used
 //! to tighten the model and to drive corrective motivation.
 
-use crate::l1_action::nt_memory::nt_memory_kb::DualBrainWorkingMemory;
+use crate::l4_emotion::nt_memory::nt_memory_kb::DualBrainWorkingMemory;
 use serde::{Deserialize, Serialize};
 
 /// Number of observed-behavior samples retained for self-error estimation.
@@ -316,7 +316,7 @@ mod tests {
         let wm = m.working_memory().expect("buffer attached");
         assert_eq!(
             wm.capacity(),
-            crate::l1_action::nt_memory::nt_memory_kb::DEFAULT_WORKING_CAPACITY
+            crate::l4_emotion::nt_memory::nt_memory_kb::DEFAULT_WORKING_CAPACITY
         );
         assert!(wm.is_empty());
     }

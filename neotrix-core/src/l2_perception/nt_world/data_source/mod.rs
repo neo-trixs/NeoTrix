@@ -1,8 +1,12 @@
-//! 数据源模块 — 聚合 12 个外部数据源采集器
+//! 数据源模块 — 情报类外部数据源采集器 (12 个)
 //!
 //! 包含 EDGAR、GDELT、USGS、GDACS、UCDP、URLhaus、OFAC、Polymarket、AOI、
-//! ADS-B、BGPView、OpenCorporates 等公开数据源的采集与解析。
+//! ADS-B、BGPView、OpenCorporates 等公开情报数据源的采集与解析。
+//!
+//! 注意: 学术/技术/新闻类数据源已整合到 source/ 模块统一管理，
+//! 避免与 MediaSource 架构重复。
 
+// ── 情报类 (12) ──────────────────────────────────────────────
 pub mod nt_world_edgar;
 pub mod nt_world_gdelt;
 pub mod nt_world_usgs;

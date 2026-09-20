@@ -1251,7 +1251,7 @@ impl CleanupEngine {
 #[derive(Default)]
 pub struct CleanupEngineSelfTest;
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CleanupEngineSelfTest {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for CleanupEngineSelfTest {
     fn name(&self) -> &str {
         "nt_mind_cleanup_engine"
     }
@@ -1543,7 +1543,7 @@ impl _CommandCleaner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     /// 进程级唯一临时目录 — 防并行会话同跑 cargo test 时共享固定 temp 目录互相删除。
     fn unique_tmp(name: &str) -> PathBuf {

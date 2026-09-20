@@ -46,7 +46,7 @@ pub struct EntityState {
 
 /// 记忆条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryEntry {
+pub struct WorldMemoryEntry {
     /// 实体ID
     pub entity_id: String,
     /// 实体状态
@@ -76,7 +76,7 @@ pub struct _MemoryBankConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrievalResult {
     /// 检索到的记忆条目
-    pub entries: Vec<MemoryEntry>,
+    pub entries: Vec<WorldMemoryEntry>,
     /// 平均相关度
     pub avg_relevance: f32,
     /// 检索耗时 (毫秒)
@@ -106,7 +106,7 @@ pub struct _DynamicMemoryBank {
     /// 配置
     config: _MemoryBankConfig,
     /// 记忆库：实体类型 -> (实体ID -> 记忆条目)
-    banks: HashMap<EntityType, HashMap<String, MemoryEntry>>,
+    banks: HashMap<EntityType, HashMap<String, WorldMemoryEntry>>,
     /// 候选池 (用于学习检索)
     candidate_pool: Vec<(String, String, f32)>, // (query, entity_id, score)
 }
@@ -140,7 +140,7 @@ impl _DynamicMemoryBank {
     pub fn _store_entity(&mut self, entity_id: &str, state: EntityState) {
         let bank = self.banks.entry(state.entity_type).or_insert_with(HashMap::new);
         
-        let entry = MemoryEntry {
+        let entry = WorldMemoryEntry {
             entity_id: entity_id.to_string(),
             state,
             relevance_score: 1.0,
@@ -153,7 +153,7 @@ impl _DynamicMemoryBank {
     /// 长上下文检索（身份保留）
     pub fn _retrieve_identity(&self, query: &str, k: usize) -> RetrievalResult {
         let start = std::time::Instant::now();
-        let mut results: Vec<MemoryEntry> = vec![];
+        let mut results: Vec<WorldMemoryEntry> = vec![];
         
         for bank in self.banks.values() {
             for entry in bank.values() {
@@ -185,7 +185,7 @@ impl _DynamicMemoryBank {
     /// 短上下文检索（生成连续性）
     pub fn _retrieve_context(&self, query: &str, k: usize) -> RetrievalResult {
         let start = std::time::Instant::now();
-        let mut results: Vec<MemoryEntry> = vec![];
+        let mut results: Vec<WorldMemoryEntry> = vec![];
         
         for bank in self.banks.values() {
             for entry in bank.values() {

@@ -12,8 +12,8 @@
 //! 原语 (csr/ccip/cdp/decoder/检索/合成/B-rep/自愈); 本模块提供意识级编排
 //! (SEAL 路由 / Rune 演化 / 接线验证 / 经验吸收), 契合指针守恒与 Dark Forest。
 
-use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
-use crate::core::nt_core_traits::RuneSocket;
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l0_substrate::nt_core_traits::RuneSocket;
 
 // ════════════════════════════════════════════════════════════════════════
 // Task 5: SEAL pipeline 级联集成 (CAD 作为 SEAL 自迭代阶段)
@@ -319,13 +319,13 @@ pub fn register_cad_consciousness_self_tests(registry: &mut SelfTestRegistry) {
 
 #[cfg(test)]
 mod verification {
-    use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTestResult;
+    use crate::l0_substrate::nt_core_self_test::SelfTestRegistry;
+    use crate::l0_substrate::nt_core_self_test::SelfTestResult;
     use crate::l6_meta::healing::nt_core_self_test_integration::register_absorbed_modules;
     use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
     use crate::l5_cognition::nt_core_gwt::cad_route::register_cad_gwt;
     use crate::l2_perception::nt_core_knowledge::cad_absorb::absorb_cad_experience;
-    use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+    use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
     use nt_core_capability_tree::cad_node::{register_cad_capability, CadCapabilityNode};
     use nt_core_capability_tree::registry::CapabilityRegistry;
 

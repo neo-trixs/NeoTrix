@@ -161,24 +161,6 @@ impl ResponseParser {
         stripped.to_string()
     }
 
-    /// 从纯文本提取
-    #[allow(dead_code)]
-    fn extract_from_text(text: &str) -> Vec<String> {
-        let mut result = Vec::new();
-        
-        for line in text.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with("data:") || line.starts_with("event:") || line.starts_with("id:") {
-                continue;
-            }
-            if line.starts_with('{') || line.starts_with('[') {
-                continue;
-            }
-            result.push(line.to_string());
-        }
-        
-        result
-    }
 }
 
 impl std::fmt::Display for ParseResult {

@@ -3,7 +3,7 @@ use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 use super::first_person_ref::FirstPersonRef;
 use super::specious_present::SpeciousPresent;
 use super::stream_buffer::ConsciousnessStream;
-use super::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
+use crate::l5_cognition::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
 
 pub const BOOTSTRAP_SEED: &[u8] = b"I_THINK_THEREFORE_I_AM";
 pub const AWAKENING_STEPS: u64 = 7;
@@ -107,7 +107,7 @@ impl ConsciousnessAwakening {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessAwakening {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ConsciousnessAwakening {
     fn name(&self) -> &str {
         "consciousness_awakening"
     }

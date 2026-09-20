@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::commands::neotrix_cli::run_cli;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use std::collections::HashMap;
@@ -38,6 +39,7 @@ static AGENT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> = LazyLo
 
 pub struct AgentPlugin;
 
+#[async_trait]
 impl DomainPlugin for AgentPlugin {
     fn name(&self) -> &str {
         "agent"
@@ -51,7 +53,7 @@ impl DomainPlugin for AgentPlugin {
             .map(|a| stub_action(a))
             .collect()
     }
-    fn call(
+    async fn call(
         &self,
         action: &str,
         _args: serde_json::Value,
@@ -157,6 +159,7 @@ static PLUGIN_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> = LazyL
 
 pub struct PluginPlugin;
 
+#[async_trait]
 impl DomainPlugin for PluginPlugin {
     fn name(&self) -> &str {
         "plugin"
@@ -179,7 +182,7 @@ impl DomainPlugin for PluginPlugin {
         .map(|a| stub_action(a))
         .collect()
     }
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,
@@ -631,6 +634,7 @@ impl ToolPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for ToolPlugin {
     fn name(&self) -> &str {
         "tool"
@@ -653,7 +657,7 @@ impl DomainPlugin for ToolPlugin {
         .map(|a| stub_action(a))
         .collect()
     }
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,
@@ -732,6 +736,7 @@ impl SystemPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for SystemPlugin {
     fn name(&self) -> &str {
         "system"
@@ -759,7 +764,7 @@ impl DomainPlugin for SystemPlugin {
         .map(|a| stub_action(a))
         .collect()
     }
-    fn call(
+    async fn call(
         &self,
         action: &str,
         _args: serde_json::Value,
@@ -833,6 +838,7 @@ fn security_add_audit_event(event_type: &str, detail: &str) {
 
 pub struct SecurityPlugin;
 
+#[async_trait]
 impl DomainPlugin for SecurityPlugin {
     fn name(&self) -> &str {
         "security"
@@ -856,7 +862,7 @@ impl DomainPlugin for SecurityPlugin {
         .map(|a| stub_action(a))
         .collect()
     }
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,
@@ -1065,6 +1071,7 @@ static EXT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> = LazyLock
 
 pub struct ExtPlugin;
 
+#[async_trait]
 impl DomainPlugin for ExtPlugin {
     fn name(&self) -> &str {
         "ext"
@@ -1086,7 +1093,7 @@ impl DomainPlugin for ExtPlugin {
         .map(|a| stub_action(a))
         .collect()
     }
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,
@@ -1384,6 +1391,7 @@ impl GitPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for GitPlugin {
     fn name(&self) -> &str {
         "git"
@@ -1406,7 +1414,7 @@ impl DomainPlugin for GitPlugin {
         .map(|a| stub_action(a))
         .collect()
     }
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,
@@ -1630,6 +1638,7 @@ impl CliPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for CliPlugin {
     fn name(&self) -> &str {
         "cli"
@@ -1643,7 +1652,7 @@ impl DomainPlugin for CliPlugin {
             .map(|a| stub_action(a))
             .collect()
     }
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,

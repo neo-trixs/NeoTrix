@@ -1,11 +1,11 @@
 use super::self_edit::MicroEdit;
 use super::self_iterating::ReasoningBrain;
 use super::memory::{ReasoningBank, ReasoningMemory};
-use crate::l6_meta::nt_core_self::skill_crystal::{
+use crate::l5_cognition::l1_facade::skill_crystal::{
     SkillCrystal, CrystalRegistry, VerificationContract,
 };
-use crate::l6_meta::nt_core_self::reasoning_strategy::StrategyKind;
-use crate::l6_meta::nt_core_self::attention_head::AttentionDomain;
+use crate::l5_cognition::l1_facade::reasoning_strategy::StrategyKind;
+use crate::l5_cognition::l1_facade::attention_head::AttentionDomain;
 use crate::l2_perception::nt_core_knowledge::TaskType;
 
 pub struct AutoCrystallizer {
@@ -71,7 +71,7 @@ impl AutoCrystallizer {
         if !self.anti_hallucination_gate {
             return;
         }
-        let now = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_diversity::now_unix_secs() as u64;
+        let now = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_diversity::now_unix_secs() as u64;
         self.hallucination_bin.push(_HallucinationEntry {
             source_name: source_name.to_string(),
             domain: domain.to_string(),
@@ -385,7 +385,7 @@ impl Default for AutoCrystallizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::nt_core_self::skill_crystal::VerificationStatus;
+    use crate::l5_cognition::l1_facade::skill_crystal::VerificationStatus;
 
     #[test]
     fn test_new_crystallizer() {

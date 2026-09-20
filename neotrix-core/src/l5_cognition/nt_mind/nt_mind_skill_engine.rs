@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
 
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::l5_cognition::layer_aliases::{ProceduralMemoryRecord, skill_upsert, SkillRecord, KnowledgeBase};
+use crate::l5_cognition::l1_facade::{ProceduralMemoryRecord, skill_upsert, SkillRecord, KnowledgeBase};
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, HookContext, HookResult};
 
 /// A single skill entry parsed from a markdown file with YAML frontmatter.
@@ -183,7 +183,7 @@ pub fn _validate_agent_skills_standard(content: &str) -> Result<(), Vec<String>>
 /// Agent Skills 标准校验 SelfTest (卫生层 P0: 技能结晶格式必须可自测)。
 pub struct AgentSkillsStandardSelfTest;
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for AgentSkillsStandardSelfTest {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for AgentSkillsStandardSelfTest {
     fn name(&self) -> &str {
         "agent_skills_standard"
     }
@@ -209,7 +209,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for AgentSkillsStandar
 }
 
 /// 注册 Agent Skills 标准 SelfTest 到全局注册表 (T2)。
-pub fn register_skill_standard_self_tests(registry: &mut crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry) {
+pub fn register_skill_standard_self_tests(registry: &mut crate::l0_substrate::nt_core_self_test::SelfTestRegistry) {
     registry.register(Box::new(AgentSkillsStandardSelfTest));
 }
 
@@ -325,11 +325,11 @@ impl SkillQualityScorer {
         // P4 驻留成本计量 (asm absorbed 2026-08-19): 用真实 estimate_tokens
         // (nt_memory_skill_cost) 替代字符数粗估, 计量 frontmatter+body 全量。
         let resident_tokens =
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_skill_cost::estimate_tokens(&skill.content);
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_skill_cost::estimate_tokens(&skill.content);
         let body_tokens =
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_skill_cost::estimate_tokens(body);
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_skill_cost::estimate_tokens(body);
         let desc_tokens =
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_skill_cost::estimate_tokens(&skill.description);
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_skill_cost::estimate_tokens(&skill.description);
         let cost = if desc_tokens > 0 && desc_tokens <= 45 {
             0.6
         } else {
@@ -972,7 +972,7 @@ fn clean_chapter_title(title: &str) -> String {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for BookToSkill {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for BookToSkill {
     fn name(&self) -> &str {
         "nt_mind_book_to_skill"
     }
@@ -1328,7 +1328,7 @@ impl RevertibleEffectsHealer {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for RevertibleEffectsHealer {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for RevertibleEffectsHealer {
     fn name(&self) -> &str {
         "nt_mind_skill_engine::revertible_effects_healer"
     }
@@ -1386,7 +1386,7 @@ impl FiberLifecycleHealer {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for FiberLifecycleHealer {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for FiberLifecycleHealer {
     fn name(&self) -> &str {
         "nt_mind_skill_engine::fiber_lifecycle_healer"
     }
@@ -1629,7 +1629,7 @@ impl SkillEngine {
     /// 把当前内存索引同步到 KB `skills_index` 表 (UCN Phase 1 写通)。
     /// 返回本次真正写入/更新的条数; 内容未变化 (content_hash 相同) 被去重跳过。
     pub fn sync_to_kb_index(&self, conn: &rusqlite::Connection) -> Result<usize, String> {
-        use crate::l5_cognition::layer_aliases::skill_content_hash;
+        use crate::l5_cognition::l1_facade::skill_content_hash;
         use std::collections::HashSet;
 
         let mut written = 0usize;
@@ -1649,9 +1649,9 @@ impl SkillEngine {
                     Some(skill.triggers.join(","))
                 },
                 is_builtin: false,
-                last_indexed_at: Some(crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::now()),
-                created_at: crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::now(),
-                updated_at: crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::now(),
+                last_indexed_at: Some(crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_unify::now()),
+                created_at: crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_unify::now(),
+                updated_at: crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_unify::now(),
                 content_hash: Some(skill_content_hash(&skill.content)),
             };
             if skill_upsert(conn, &record.name, &record)? {
@@ -2530,7 +2530,7 @@ impl PromptLibrary {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for PromptLibrary {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for PromptLibrary {
     fn name(&self) -> &str {
         "nt_mind_prompt_library"
     }

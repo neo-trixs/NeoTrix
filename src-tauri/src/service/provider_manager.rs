@@ -6,7 +6,7 @@
 //! 基于 Azure APIM Unified Model API 和 oxllm 路由模式。
 
 use crate::service::circuit_breaker::{CircuitBreakerConfig, CircuitBreakerManager};
-use crate::service::cost_tracker::{CostTracker, TokenUsage};
+use crate::service::cost_tracker::CostTracker;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

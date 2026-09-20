@@ -1,8 +1,33 @@
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
+pub mod agent_identity;
+pub mod artifacts;
+pub mod atomic_io;
+pub mod autostart;
+pub mod bot;
 pub mod browser_host;
+pub mod channels;
+pub mod commands;
+pub mod config;
+pub mod coordinator;
+pub mod db_pool;
+pub mod debouncer;
 pub mod desktop;
+pub mod domain;
+pub mod engine;
+pub mod health;
+pub mod ipc;
+pub mod logger;
+pub mod mcp;
+pub mod market;
+pub mod notifications;
+pub mod recovery;
+pub mod service;
+pub mod skills;
+pub mod stub;
+pub mod triage;
+pub mod vault;
 
 use tauri::{Emitter, Manager};
 
@@ -94,7 +119,7 @@ pub fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     app.on_menu_event(|app, event| match event.id().as_ref() {
         "check_updates" => {
-            let _ = app.emit("neocodex-check-updates", ());
+            let _ = app.emit("neotrix-check-updates", ());
         }
         "new_session" => {
             let _ = app.emit("neotrix:new-session", ());
@@ -103,7 +128,7 @@ pub fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             let _ = app.emit("open-settings", ());
         }
         "cmd_palette" => {
-            let _ = app.emit("neocodex-open-palette", ());
+            let _ = app.emit("neotrix-open-palette", ());
         }
         _ => {}
     });

@@ -64,7 +64,7 @@ pub struct Issue {
     pub cycle_discovered: u64,
 }
 
-pub use crate::l5_cognition::layer_aliases::ProjectSnapshot;
+pub use crate::l5_cognition::l1_facade::ProjectSnapshot;
 
 // ============================================================
 // 进化报告
@@ -736,7 +736,7 @@ impl MetaHarnessOptimizer {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for MetaHarnessOptimizer {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for MetaHarnessOptimizer {
     fn name(&self) -> &str {
         "nt_mind_meta_harness_optimizer"
     }
@@ -901,7 +901,7 @@ impl _TrainPipeline {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for _TrainPipeline {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for _TrainPipeline {
     fn name(&self) -> &str {
         "nt_mind_train_pipeline"
     }
@@ -1642,7 +1642,7 @@ impl crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::EvolutionLo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_count_actual_unsafe_zero() {

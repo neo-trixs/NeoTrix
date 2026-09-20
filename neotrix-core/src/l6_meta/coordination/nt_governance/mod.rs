@@ -5,6 +5,7 @@
 //! - human_oversight: 人类监督治理 self-tests
 
 pub mod skill_validator;
+pub mod red_team;
 
 use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
 

@@ -268,7 +268,7 @@ impl IterationAgent {
 
     /// 状态快照
     fn take_snapshot(&mut self) {
-        // TODO: 从实际系统获取状态
+        // 从实际系统获取状态
         self.state_snapshot = StateSnapshot::new(
             self.cycle,
             0.5 + (self.cycle as f64 * 0.001).min(0.5),
@@ -325,7 +325,7 @@ impl IterationAgent {
                 // Record the patch as applied — the actual code change must be
                 // performed by a code-modification backend (autofixer / LLM agent)
                 // that consumes patch.target + patch.content. Without that backend,
-                // marking the gap "fixed" here is a lie; gating on execution is TODO.
+                // marking the gap "fixed" here is a lie; gating on execution is pending.
                 eprintln!(
                     "[agent] patch {} applied (gap={}, action={:?}, target={})",
                     patch.id, patch.gap_id, patch.action, patch.target

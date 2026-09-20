@@ -1,7 +1,7 @@
 use super::*;
 use serde::{Deserialize, Serialize};
 use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
-use crate::core::nt_core_traits::SpecialistType;
+use crate::l0_substrate::nt_core_traits::SpecialistType;
 /// Collects raw reasoning steps into AgentTrajectories for coaching.
 /// Manual impls for Debug, Clone, Serialize, Deserialize (dyn = unsafe)
 pub struct TrajectoryCollector {

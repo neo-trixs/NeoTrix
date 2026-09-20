@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 use crate::l5_cognition::nt_core::nt_core_parallel::types::{Task, AgentId, AllocationStrategy};
-use crate::l5_cognition::layer_aliases::estimate_tokens;
+use crate::l5_cognition::l1_facade::estimate_tokens;
 
 pub trait ReasoningProvider: Send + Sync {
     fn reason(&mut self, task: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;

@@ -160,7 +160,7 @@ impl PtyManager {
 
     pub fn close(&self, session_id: &str) {
         let mut sessions = self.sessions.lock().unwrap_or_else(|e| {
-            log::warn!("PTY sessions mutex poisoned");
+            tracing::warn!("PTY sessions mutex poisoned");
             e.into_inner()
         });
         if let Some(mut session) = sessions.remove(session_id) {
@@ -171,6 +171,8 @@ impl PtyManager {
 
 // ========== Tauri Command Wrappers ==========
 
+use crate::ipc;
+use crate::ipc::IpcResponse;
 use std::sync::Arc;
 use tauri::State;
 
@@ -180,8 +182,11 @@ pub fn pty_spawn(
     cols: u16,
     rows: u16,
     manager: State<'_, Arc<PtyManager>>,
-) -> Result<(), String> {
-    manager.spawn(&session_id, cols, rows)
+) -> IpcResponse<()> {
+    match manager.spawn(&session_id, cols, rows) {
+        Ok(()) => ipc::ok(()),
+        Err(e) => ipc::err("PTY_SPAWN_FAILED", e),
+    }
 }
 
 #[tauri::command]
@@ -189,8 +194,11 @@ pub fn pty_write(
     session_id: String,
     data: String,
     manager: State<'_, Arc<PtyManager>>,
-) -> Result<(), String> {
-    manager.write(&session_id, &data)
+) -> IpcResponse<()> {
+    match manager.write(&session_id, &data) {
+        Ok(()) => ipc::ok(()),
+        Err(e) => ipc::err("PTY_WRITE_FAILED", e),
+    }
 }
 
 #[tauri::command]
@@ -204,7 +212,7 @@ pub fn pty_resize(
 }
 
 #[tauri::command]
-pub fn pty_close(session_id: String, manager: State<'_, Arc<PtyManager>>) -> Result<(), String> {
+pub fn pty_close(session_id: String, manager: State<'_, Arc<PtyManager>>) -> IpcResponse<()> {
     manager.close(&session_id);
-    Ok(())
+    ipc::ok(())
 }

@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -444,6 +445,7 @@ impl SessionPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for SessionPlugin {
     fn name(&self) -> &str {
         "session"
@@ -593,7 +595,7 @@ impl DomainPlugin for SessionPlugin {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,

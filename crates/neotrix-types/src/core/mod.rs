@@ -138,3 +138,25 @@ pub mod self_model;
 pub mod llm_timeout;
 pub mod context_strategy;
 pub mod shared_types;
+
+// Re-export unified SelfModel types
+pub use nt_core_meta::unified_self_model::{
+    StaticIdentityModel, DynamicPerformanceModel, ValueFunctionModel, SelfState, ValueWeight,
+    ModuleInfo as UnifiedModuleInfo, FileInfo as UnifiedFileInfo,
+    DepGraph as UnifiedDepGraph, DepEdge as UnifiedDepEdge, DepKind as UnifiedDepKind,
+    ComponentMap as UnifiedComponentMap, ComponentNode as UnifiedComponentNode,
+    TestCoverage as UnifiedTestCoverage, CompilationHealth as UnifiedCompilationHealth,
+    TechDebtInventory as UnifiedTechDebtInventory, TechDebtItem as UnifiedTechDebtItem,
+    TechDebtKind as UnifiedTechDebtKind, DebtSeverity as UnifiedDebtSeverity,
+    EvolutionEvent as UnifiedEvolutionEvent, EventKind as UnifiedEventKind,
+    SELF_HISTORY,
+};
+
+// Re-export unified ConsciousnessState types
+pub use nt_core_gwt::unified_consciousness::{
+    ConsciousnessPhase, EmotionalState, VadEmotionalState,
+    ConsciousnessObserverState, BranchState, Alert,
+    ConsciousnessSnapshot, CapabilityConsciousnessState,
+    LegacyConsciousnessPhase, CrystalConsciousnessState, EvolutionPhase,
+    Layer,
+};

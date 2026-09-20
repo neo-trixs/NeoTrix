@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::l1_action::nt_core_bank::ReasoningMemory;
-use crate::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 

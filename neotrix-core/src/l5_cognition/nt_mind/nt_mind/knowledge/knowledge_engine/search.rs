@@ -29,7 +29,7 @@ impl LiteratureSearcher {
             "http://export.arxiv.org/api/query?search_query=all:{}&max_results={}&sortBy=relevance",
             urlencoding(query), max_results.min(50)
         );
-        match crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&url) {
+        match crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&url) {
             Ok((text, _host)) => self.parse_arxiv_response(&text, query),
             Err(e) => {
                 warn!("[LitSearch] arXiv error: {}", e);
@@ -75,7 +75,7 @@ impl LiteratureSearcher {
             "https://api.semanticscholar.org/graph/v1/paper/search?query={}&limit={}&fields=title,abstract,authors,year,externalIds",
             urlencoding(query), limit.min(100)
         );
-        match crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&url) {
+        match crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&url) {
             Ok((text, _host)) => self.parse_s2_response(&text),
             Err(e) => {
                 warn!("[LitSearch] Semantic Scholar error: {}", e);
@@ -107,7 +107,7 @@ impl LiteratureSearcher {
             "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={}&format=json&srlimit={}",
             urlencoding(query), limit.min(50)
         );
-        match crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&search_url) {
+        match crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&search_url) {
             Ok((text, _host)) => self.parse_wiki_search(&text),
             Err(e) => {
                 warn!("[LitSearch] Wikipedia error: {}", e);

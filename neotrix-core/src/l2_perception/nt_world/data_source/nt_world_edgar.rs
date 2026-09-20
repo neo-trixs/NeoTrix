@@ -404,7 +404,7 @@ impl EdgarFetcher {
             let existing = kb.find_node_by_url(&url).ok().flatten();
             let is_new = existing.is_none();
             let _id = kb
-                .insert_or_get_node(&format!("{} ({})", f.form, f.accession_number), crate::l6_meta::nt_core_kb_types::NodeType::Filing, Some(&summary), Some(&url), Some("edgar"))
+                .insert_or_get_node(&format!("{} ({})", f.form, f.accession_number), neotrix_types::knowledge_access::NodeType::Filing, Some(&summary), Some(&url), Some("edgar"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", f.accession_number, e))?;
             if is_new {
                 report.nodes_created += 1;
@@ -457,13 +457,11 @@ pub struct _EdgarIngestReport {
 
 /// SEC EDGAR 作为有序搜索后端 (P1 第2个情报后端，免费无key)。
 pub struct EdgarBackend {
-    #[allow(dead_code)]
-    fetcher: EdgarFetcher,
 }
 
 impl Default for EdgarBackend {
     fn default() -> Self {
-        Self { fetcher: EdgarFetcher::new() }
+        Self { }
     }
 }
 
@@ -472,7 +470,7 @@ impl EdgarBackend {
         Self::default()
     }
     pub fn with_base_url(base: &str) -> Self {
-        Self { fetcher: EdgarFetcher::with_base_url(base) }
+        Self { }
     }
 }
 
@@ -618,7 +616,7 @@ mod tests {
     fn test_ingest_fixture_to_kb_and_requery() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("test_edgar_kb.db");
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
         let fetcher = EdgarFetcher::new();
         // 用 fixture 纯内存 ingest，无网络
         let report = fetcher._ingest_submissions_from_json(&kb, EDGAR_FIXTURE_JSON, "320193").expect("ingest");
@@ -632,7 +630,7 @@ mod tests {
         assert_eq!(node.title, "10-Q (0000320193-23-000106)");
         assert_eq!(node.domain.as_deref(), Some("edgar"));
         // FTS 搜索可回查
-        let hits = kb.search_permission_aware("Apple", 10, crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Public).expect("search");
+        let hits = kb.search_permission_aware("Apple", 10, crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Public).expect("search");
         assert!(!hits.is_empty(), "FTS should recall ingested filing by keyword");
 
         // 幂等：二次 ingest 同 fixture → nodes_reused
@@ -652,7 +650,7 @@ mod tests {
     fn test_ingest_skips_empty_accession() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("test_edgar_skip.db");
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
         let fetcher = EdgarFetcher::new();
         // 构造无 accession_number 的 bad fixture
         let bad_json = r#"{

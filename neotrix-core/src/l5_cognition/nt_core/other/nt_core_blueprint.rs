@@ -4,7 +4,7 @@
 //! 执行蓝图。本模块实现 `_BlueprintPlanner` trait (C1: trait 存在 + 基础逻辑
 //! + SelfTest T1 + 3 测试), 建模目标 → 阶段 → 步骤的蓝图展开。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 use std::collections::VecDeque;
 
 /// 蓝图中的单个执行步骤。

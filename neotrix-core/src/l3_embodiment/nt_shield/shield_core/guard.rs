@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 守卫决策
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

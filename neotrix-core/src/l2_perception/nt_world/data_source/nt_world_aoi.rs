@@ -235,7 +235,7 @@ impl AoiMonitor {
             );
             let existing = kb.find_node_by_url(&evt.url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.title, crate::l6_meta::nt_core_kb_types::NodeType::Event, Some(&summary), Some(&evt.url), Some("aoi"))
+            let _id = kb.insert_or_get_node(&evt.title, neotrix_types::knowledge_access::NodeType::Event, Some(&summary), Some(&evt.url), Some("aoi"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.id, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }
@@ -249,17 +249,6 @@ impl AoiMonitor {
             snippet: format!("M{:.1} | {}km | {} | {}", e.magnitude, e.depth as i32, e.place, e.title),
             evidence: None,
         }).collect()
-    }
-}
-
-/// `parse_geojson` 无 `&self` 时使用的默认围栏 (Tokyo 区)
-#[allow(dead_code)]
-fn self_default_fence() -> _Geofence {
-    _Geofence {
-        min_lat: 35.0,
-        max_lat: 36.0,
-        min_lon: 139.0,
-        max_lon: 140.0,
     }
 }
 
@@ -371,7 +360,7 @@ mod tests {
     #[test]
     fn test_ingest_fixture() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
         let monitor = AoiMonitor::new(default_fence());
         let report = monitor.ingest_from_json(&kb, AOI_FIXTURE_JSON).expect("ingest");
         // fixture 2 条事件均入库 (过滤在 search / 使用方侧，ingest 保留全量)

@@ -350,7 +350,7 @@ pub fn tick(cycles: usize) -> CoreSnapshot {
 /// 检测的分支健康流入跨会话快照 — 修复此前独立 tree 实例计算后即丢弃、
 /// `consciousness/core` 快照分支健康恒 0 的断链 (迷雾治理)。
 pub fn apply_branch_health_from_self_tests(
-    results: &[crate::l6_meta::healing::nt_core_self_test::SelfTestResult],
+    results: &[crate::l0_substrate::nt_core_self_test::SelfTestResult],
 ) {
     let mut h = CORE.write().unwrap_or_else(|e| e.into_inner());
     h.tree.set_branch_health_from_self_tests(results);
@@ -624,7 +624,7 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
     conn.busy_timeout(std::time::Duration::from_secs(5))
         .map_err(|e| format!("KB busy_timeout: {}", e))?;
     let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
-    crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
+    crate::l0_substrate::nt_core_kb_primitives::schema_initialize(&conn)
         .map_err(|e| format!("KB init: {}", e))?;
     Ok(conn)
 }
@@ -636,7 +636,7 @@ fn load_snapshot() -> Option<CoreSnapshot> {
 /// 连接注入版快照读取 — 供 persist 合并与测试复用 (同一连接, 单一事实源)。
 fn load_snapshot_from_conn(conn: &rusqlite::Connection) -> Option<CoreSnapshot> {
     let raw =
-        crate::l6_meta::nt_core_kb_primitives::kv_get(conn, NAMESPACE, KEY).ok()??;
+        crate::l0_substrate::nt_core_kb_primitives::kv_get(conn, NAMESPACE, KEY).ok()??;
     serde_json::from_str(&raw).ok()
 }
 
@@ -666,7 +666,7 @@ fn persist_snapshot_to_conn(
     out.coherence_trend =
         merge_trend_sample(prev_coh_hist, prev_cycle, snap.cycle, snap.coherence);
     let json = serde_json::to_string(&out).map_err(|e| format!("snapshot serialize: {}", e))?;
-    crate::l6_meta::nt_core_kb_primitives::kv_set(conn, NAMESPACE, KEY, &json)?;
+    crate::l0_substrate::nt_core_kb_primitives::kv_set(conn, NAMESPACE, KEY, &json)?;
     // D3: 金标键接到真实度量流 (尽力而为, 失败不阻断快照落盘)
     refresh_gold_standard(conn, &out);
     Ok(out)
@@ -719,7 +719,7 @@ fn refresh_gold_standard(conn: &rusqlite::Connection, snap: &CoreSnapshot) {
         "cycle": snap.cycle,
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
-    let _ = crate::l6_meta::nt_core_kb_primitives::kv_set(
+    let _ = crate::l0_substrate::nt_core_kb_primitives::kv_set(
         conn,
         NAMESPACE,
         GOLD_STANDARD_KEY,
@@ -1223,6 +1223,15 @@ pub fn load_capability_registry() -> Option<nt_core_capability_tree::registry::C
     registry.experience_targets = export.experience_targets;
     // CAD 能力节点 (GenCAD 四步框架) — 幂等: 若导出已含同名节点则忽略
     let _ = nt_core_capability_tree::cad_node::register_cad_capability(&mut registry);
+    // 架构演进路线图 18 模块批量注册 (R-P100) — 幂等: 已存在节点跳过
+    if let Ok((registered, errors)) = nt_core_capability_tree::roadmap::register_from_default_path(&mut registry) {
+        if !errors.is_empty() {
+            eprintln!("[capability_tree] roadmap registration: {} errors: {:?}", errors.len(), errors);
+        }
+        if registered > 0 {
+            eprintln!("[capability_tree] roadmap: registered {} new modules", registered);
+        }
+    }
     // Durable 覆盖层合并 (提交的 overlay 优先), 使手动写入在基础重新生成后仍生效。
     let overlay_path = capability_registry_path()
         .parent()
@@ -2277,7 +2286,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── Self model (nt_core_self) ──
         "self_model_tick" => {
-            let mut model = crate::l6_meta::nt_core_self::self_model::SelfModel::new();
+            let mut model = crate::l5_cognition::l1_facade::SelfModel::new();
             // 从意识核心快照获取 workspace_signal (coherence), load_delta (weighted_fog_sum 归一化)
             let snap = status();
             let workspace_signal = snap.coherence.clamp(0.0, 1.0);
@@ -2294,8 +2303,8 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             )
         }
         "metacog_evaluate" => {
-            use crate::l6_meta::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
-            use crate::l6_meta::nt_core_self::silicon_self::SiliconSelfModel;
+            use crate::l5_cognition::l1_facade::metacognitive_evaluator::CognitiveEvaluator;
+            use crate::l5_cognition::l1_facade::silicon_self::SiliconSelfModel;
             let mut evaluator = CognitiveEvaluator::new();
             let model = SiliconSelfModel::default();
             let report = evaluator.evaluate(&model);
@@ -2334,7 +2343,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             )
         }
         "sentrux_scan" => {
-            let sensor = crate::l6_meta::coordination::nt_meta_sentrux::SentruxSensor::new();
+            let sensor = crate::l5_cognition::l1_facade::SentruxSensor::new();
             let path = first_path(&task.summary)
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| ".".to_string());
@@ -2354,8 +2363,8 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             }
         }
         "build_watchdog" => {
-            let config = crate::l6_meta::coordination::nt_meta_build_watchdog::WatchdogConfig::default();
-            let mut watchdog = crate::l6_meta::coordination::nt_meta_build_watchdog::BuildWatchdog::new(config);
+            let config = crate::l5_cognition::l1_facade::WatchdogConfig::default();
+            let mut watchdog = crate::l5_cognition::l1_facade::BuildWatchdog::new(config);
             match watchdog.check_health() {
                 Ok(status_result) => {
                     let stats = watchdog.stats();
@@ -2788,7 +2797,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── Verifier agent (l6_meta::coordination::verifier_agent) ──
         "verifier_agent" => {
-            use crate::l6_meta::coordination::verifier_agent::_VerifierAgent;
+            use crate::l5_cognition::l1_facade::_VerifierAgent;
             let agent = _VerifierAgent::new();
             let stats = agent.statistics();
             (
@@ -2806,7 +2815,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── Layered QA (l6_meta::coordination::layered_qa) ──
         "layered_qa" => {
-            use crate::l6_meta::coordination::layered_qa::_LayeredQA;
+            use crate::l5_cognition::l1_facade::_LayeredQA;
             let qa = _LayeredQA::new();
             let stats = qa.statistics();
             (
@@ -2823,7 +2832,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── Quality control (l6_meta::coordination::quality_control) ──
         "quality_control" => {
-            use crate::l6_meta::coordination::quality_control::_QualityControlPipeline;
+            use crate::l5_cognition::l1_facade::_QualityControlPipeline;
             let pipeline = _QualityControlPipeline::new();
             let stats = pipeline.statistics();
             (
@@ -2841,7 +2850,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── Quality gate (l6_meta::coordination::quality_gate) ──
         "quality_gate" => {
-            use crate::l6_meta::coordination::quality_gate::QualityGate;
+            use crate::l5_cognition::l1_facade::QualityGate;
             let gate = QualityGate::new();
             let stats = gate.statistics();
             (
@@ -2859,7 +2868,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
         }
         // ── Template tag registry (l6_meta::coordination::template_tag_registry) ──
         "template_tags" => {
-            use crate::l6_meta::coordination::template_tag_registry::_TemplateTagRegistry;
+            use crate::l5_cognition::l1_facade::_TemplateTagRegistry;
             let registry = _TemplateTagRegistry::new();
             let stats = registry.statistics();
             (
@@ -3355,14 +3364,14 @@ mod tests {
         ONCE.call_once(|| {
             let tmp = std::env::temp_dir().join(format!("neotrix-ctests-{}", std::process::id()));
             std::fs::create_dir_all(&tmp).ok();
-            let _g = crate::l6_meta::healing::nt_core_self_test::TEST_ENV_LOCK
+            let _g = crate::l0_substrate::nt_core_self_test::TEST_ENV_LOCK
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
             std::env::set_var("HOME", &tmp);
         });
         // Once 之后 (其它模块窗口可能改过 HOME): 幂等重设回本模块隔离目录
         let tmp = std::env::temp_dir().join(format!("neotrix-ctests-{}", std::process::id()));
-        let _g = crate::l6_meta::healing::nt_core_self_test::TEST_ENV_LOCK
+        let _g = crate::l0_substrate::nt_core_self_test::TEST_ENV_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         std::env::set_var("HOME", &tmp);
@@ -3547,13 +3556,13 @@ mod tests {
         with_kb_lock(|| {
             isolate_home_once();
             let results = vec![
-                crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+                crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                     "nt_core_consciousness_monitor",
                 ),
-                crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(
+                crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(
                     "nt_memory_narrative_consistency",
                 ),
-                crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry"),
+                crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry"),
             ];
             crate::l5_cognition::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
             let snap = crate::l5_cognition::nt_core_consciousness_core::status();
@@ -3775,7 +3784,7 @@ mod tests {
             };
             persist_snapshot(&s).expect("persist");
             let conn = open_kb().expect("open kb");
-            let raw = crate::l6_meta::nt_core_kb_primitives::kv_get(
+            let raw = crate::l0_substrate::nt_core_kb_primitives::kv_get(
                 &conn,
                 NAMESPACE,
                 GOLD_STANDARD_KEY,
@@ -3802,7 +3811,7 @@ mod tests {
     fn gold_standard_thresholds_match_single_source() {
         // 本地镜像阈值与金标模块单一事实源对齐 (arch_fitness_core_boundary
         // 守卫禁止生产代码直连 l9, 对齐由本测试锁定, 漂移即红)。
-        use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::{
+        use crate::l5_cognition::l1_facade::{
             DEFAULT_COHERENCE_THRESHOLD, DEFAULT_PHI_THRESHOLD,
         };
         assert_eq!(GOLD_STANDARD_PHI_THRESHOLD, DEFAULT_PHI_THRESHOLD);
@@ -4563,7 +4572,7 @@ mod tests {
     }
 }
 
-use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// NT-CORE 意识核心本体自测: 跨会话持久化快照 (CoreSnapshot) 序列化往返 (卫生层 P0: 核心可自测)。
 /// 直接验证本模块核心特性——意识核心跨会话连续生长所依赖的快照落盘/重建机制。

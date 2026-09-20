@@ -50,7 +50,7 @@ pub fn global_client() -> &'static reqwest::Client {
 
 /// 获取异步 HTTP 客户端 (DI-ready: 可从容器注入)
 pub fn resolve_async_client() -> reqwest::Client {
-    use crate::core::nt_core_di;
+    use crate::l0_substrate::nt_core_di;
     if let Some(v) = nt_core_di::resolve_global::<reqwest::Client>() {
         return v;
     }
@@ -78,7 +78,7 @@ pub fn global_blocking_client() -> &'static reqwest::blocking::Client {
 
 /// 获取阻塞 HTTP 客户端 (DI-ready: 可从容器注入)
 pub fn resolve_blocking_client() -> reqwest::blocking::Client {
-    use crate::core::nt_core_di;
+    use crate::l0_substrate::nt_core_di;
     if let Some(v) = nt_core_di::resolve_global::<reqwest::blocking::Client>() {
         return v;
     }

@@ -312,7 +312,7 @@ impl RuleEngine {
             .collect();
         let json = serde_json::to_string_pretty(&snapshots).map_err(|e| format!("serialize: {}", e))?;
         if self.use_kb {
-            crate::l5_cognition::nt_core_state::save("rules", &json).map_err(|e| format!("write rules kb: {}", e))?;
+            crate::l0_substrate::nt_core_state::save("rules", &json).map_err(|e| format!("write rules kb: {}", e))?;
         }
         if !self.use_kb {
             if let Some(parent) = path.parent() {
@@ -326,7 +326,7 @@ impl RuleEngine {
     pub fn load(&mut self) -> Result<(), String> {
         let path = match self.persistence_path { Some(ref p) => p, None => return Ok(()) };
         let json = if self.use_kb {
-            match crate::l5_cognition::nt_core_state::load("rules") {
+            match crate::l0_substrate::nt_core_state::load("rules") {
                 Some(j) => Some(j),
                 None => path.exists().then(|| std::fs::read_to_string(path).ok()).flatten(),
             }

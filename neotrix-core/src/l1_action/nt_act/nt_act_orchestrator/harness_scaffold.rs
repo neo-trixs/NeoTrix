@@ -225,7 +225,7 @@ impl HarnessScaffold {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for HarnessScaffold {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for HarnessScaffold {
     fn name(&self) -> &str {
         "nt_act_orchestrator_harness_scaffold"
     }

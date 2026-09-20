@@ -427,7 +427,7 @@ mod tests {
         // HONESTY: Tests constructor default value. This is a trivial contract test —
         // the real behavior (analyzing skill files, generating improvement plans)
         // is tested in `test_analyze_detects_issues` and `test_apply_fixes_frontmatter`.
-        // TODO(R-P79): Once SkillImprover is wired to real skill file analysis,
+        // Once SkillImprover is wired to real skill file analysis,
         // add tests that verify iteration limits are actually respected during
         // the improvement loop.
         let improver = SkillImprover::new();
@@ -468,7 +468,7 @@ mod tests {
         // ALWAYS-PASS: self_test() returns Ok because the type exists and compiles.
         // This does NOT validate that SkillImprover can actually analyze or improve
         // skill files. The test passes on every machine.
-        // TODO(R-P79): Replace with test that verifies self_test returns Err when
+        // Replace with test that verifies self_test returns Err when
         // the improvement pipeline is not wired to real skill file analysis.
         assert!(SkillImprover::self_test().is_ok());
     }

@@ -125,6 +125,22 @@ neotrix-experience close --cycle {NNN}
 2. `docs/1-DESIGN/research-batch-{NNN}.md` — 外部研究
 3. `docs/1-DESIGN/ranking-intelligence-{NNN}.md` — 排行榜情报 (每3轮)
 
+## Sub-Skills
+
+| Skill | Purpose | Triggers |
+|-------|---------|----------|
+| `tdd/` | Red-Green-Refactor micro-loop | tdd, test, red-green-refactor |
+| `testing/` | Comprehensive testing strategy (unit, integration, property-based) | test, testing, integration test, mock, coverage |
+| `performance/` | Profiling, benchmarking, optimization | performance, profil, benchmark, bottleneck, latency |
+| `observability/` | Structured logging, metrics, distributed tracing | observ, log, metric, trac, alert, monitor |
+| `deployment/` | CI/CD pipelines, Docker, Kubernetes, release management | deploy, docker, kubernetes, ci, cd, pipeline |
+| `documentation/` | API docs, ADRs, runbooks, architecture docs | doc, document, adr, runbook, api doc, changelog |
+| `diagnose/` | System diagnosis and root cause analysis | diagnose, debug, root cause |
+| `domain-modeling/` | Domain-driven design and bounded contexts | domain, ddd, bounded context, model |
+| `grill-me/` | Code review and interrogation | review, grill, audit code |
+| `improve-architecture/` | Architecture improvement recommendations | improve, refactor, restructure |
+| `zoom-out/` | High-level architecture overview | overview, zoom out, big picture |
+
 ## 与主 agent 的接口
 
 审计 agent 发现 P0 问题时, 通过 EventBus 发布:

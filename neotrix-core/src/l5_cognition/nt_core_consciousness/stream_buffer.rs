@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use super::vsa_tag::VsaTagged;
+use crate::l5_cognition::vsa_tag::VsaTagged;
 use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 pub const DEFAULT_STREAM_CAPACITY: usize = 1024;
@@ -161,7 +161,7 @@ impl ConsciousnessStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l5_cognition::nt_core_consciousness::vsa_tag::{
+    use crate::l5_cognition::vsa_tag::{
         VsaOrigin, VsaSelfCategory, VsaWorldCategory,
     };
     use crate::l2_perception::nt_core_hcube::vsa_quantized::QuantizedVSA;

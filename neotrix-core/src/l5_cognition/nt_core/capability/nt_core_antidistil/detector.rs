@@ -411,7 +411,7 @@ fn detect_repetition(text: &str) -> f64 {
     1.0 - (unique.len() as f64 / total)
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for DistillationDetector {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for DistillationDetector {
     fn name(&self) -> &str {
         "distillation_detector"
     }

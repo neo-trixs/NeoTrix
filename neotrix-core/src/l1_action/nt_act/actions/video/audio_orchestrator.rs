@@ -207,7 +207,7 @@ impl AudioOrchestrator {
         
         // 闪避
         if self.config.enable_ducking {
-            // TODO: 实现闪避逻辑
+            // placeholder for ducking logic
         }
         
         cmd.push_str("\"");

@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 pub struct _SEALPipelineEnhanced {
     stages: Vec<_SEALStage>,
     failure_library: _FailureLibrary,
-    #[allow(dead_code)]
-    feedback_loop: _FeedbackLoop,
     config: _SEALConfig,
     stats: _SEALStats,
 }
@@ -87,14 +85,6 @@ pub struct _FailureStats {
     pub resolved_failures: u64,
     pub recurring_patterns: Vec<String>,
     pub mttr: f64, // Mean Time To Resolution
-}
-
-/// 反馈回路
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct _FeedbackLoop {
-    pub signals: Vec<FeedbackSignal>,
-    pub adjustments: Vec<_LearningAdjustment>,
-    pub effectiveness: f64,
 }
 
 /// 反馈信号
@@ -194,11 +184,6 @@ impl _SEALPipelineEnhanced {
                     recurring_patterns: Vec::new(),
                     mttr: 0.0,
                 },
-            },
-            feedback_loop: _FeedbackLoop {
-                signals: Vec::new(),
-                adjustments: Vec::new(),
-                effectiveness: 0.0,
             },
             config,
             stats: _SEALStats {

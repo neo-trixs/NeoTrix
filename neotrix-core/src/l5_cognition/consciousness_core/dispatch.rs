@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use super::core::ConsciousnessCoreHandle;
 use super::external_closure::{ExternalClosureConfig, SolutionExecutor, ExternalClosureReport};
-use crate::l5_cognition::layer_aliases::AbsorbEntry;
-use crate::l5_cognition::layer_aliases::KnowledgeBase;
+use crate::l5_cognition::l1_facade::AbsorbEntry;
+use crate::l5_cognition::l1_facade::KnowledgeBase;
 
 // ─── 能力路由表 ──────────────────────────────────────────────────────────────
 

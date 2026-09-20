@@ -18,7 +18,7 @@
 //! | journal     | (NEW) 建议注入 `leaves`/`fruits` 之外的审计轨迹 | 补强原缺失的 journal 维度     |
 //! | lineage     | `cycle: u64` + `current_contract: EvolutionContract` | 代际推进 = cycle/contract 血缘 |
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 use std::collections::HashMap;
 
 /// GASP identity 维度 — 映射 `awakened` + `SystemIdentity`。

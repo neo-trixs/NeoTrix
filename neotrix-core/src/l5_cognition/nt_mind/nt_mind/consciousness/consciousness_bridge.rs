@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use crate::l5_cognition::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::l6_meta::nt_core_self::AttentionDomain;
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l5_cognition::l1_facade::AttentionDomain;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l2_perception::nt_world::nt_world_model::TaskType;
 use super::self_iterating::SelfIteratingBrain;
 
@@ -233,7 +233,7 @@ impl Default for ConsciousnessBridge {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessBridge {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ConsciousnessBridge {
     fn name(&self) -> &str { "consciousness_bridge" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();

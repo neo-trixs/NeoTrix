@@ -50,6 +50,23 @@ impl From<&str> for L1Error {
     fn from(msg: &str) -> Self { L1Error::Brain(msg.to_string()) }
 }
 
+impl From<L1Error> for neotrix_types::NtError {
+    fn from(err: L1Error) -> Self {
+        match err {
+            L1Error::Config(msg) => neotrix_types::NtError::Config(msg),
+            L1Error::Io(msg) => neotrix_types::NtError::Io(msg),
+            L1Error::Serde(msg) => neotrix_types::NtError::Serde(msg),
+            L1Error::Network(msg) => neotrix_types::NtError::Network(msg),
+            L1Error::Command { cmd, exit_code, stderr } => neotrix_types::NtError::Command { cmd, exit_code, stderr },
+            L1Error::Path { path, detail } => neotrix_types::NtError::Path { path, detail },
+            L1Error::Wasm(msg) => neotrix_types::NtError::Wasm(msg),
+            L1Error::Crypto(msg) => neotrix_types::NtError::Crypto(msg),
+            L1Error::Keyring(msg) => neotrix_types::NtError::Keyring(msg),
+            L1Error::Brain(msg) => neotrix_types::NtError::Brain(msg),
+        }
+    }
+}
+
 pub type L1Result<T> = Result<T, L1Error>;
 
 pub fn from_string_result<T>(r: Result<T, String>) -> L1Result<T> {

@@ -43,7 +43,7 @@ impl ConsciousnessOrchestrator {
     pub fn init() -> Result<&'static ConsciousnessOrchestrator, String> {
         let conn = open_raw_conn()
             .unwrap_or_else(|| rusqlite::Connection::open_in_memory().expect("mem"));
-        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
+        crate::l0_substrate::nt_core_kb_primitives::schema_initialize(&conn)
             .map_err(|e| format!("schema: {e}"))?;
 
         let bus = crate::l5_cognition::nt_core::capability::native_bus::NativeBus::new();
@@ -120,7 +120,7 @@ impl ConsciousnessOrchestrator {
     pub(crate) fn _wisdom_cycle(&self) -> Result<(usize, usize), String> {
         let conn = open_raw_conn()
             .unwrap_or_else(|| rusqlite::Connection::open_in_memory().expect("mem"));
-        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn)
+        crate::l0_substrate::nt_core_kb_primitives::schema_initialize(&conn)
             .map_err(|e| format!("schema: {e}"))?;
         let cfg = ScanConfig { min_group: 3, domain: None, limit: 100 };
         let cr = crystallize_scan(&conn, &cfg).map(|r| r.rules_created.len()).unwrap_or(0);

@@ -1,4 +1,4 @@
-pub use crate::core::nt_core_traits::CapabilityNode;
+pub use crate::l0_substrate::nt_core_traits::CapabilityNode;
 
 pub mod consonance_orchestrator;
 pub mod evolution_harness;

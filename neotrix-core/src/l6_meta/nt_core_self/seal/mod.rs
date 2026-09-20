@@ -10,7 +10,7 @@ use async_trait::async_trait;
 
 use crate::l6_meta::nt_core_self::self_audit::{converge_check, AuditReport};
 use crate::l6_meta::nt_core_self::pilot_steering::{PilotSupervisor, SupervisorConfig, SupervisorDecision, TracePoint, TraceResult};
-use crate::core::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
+use crate::l0_substrate::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
 
 pub use self::constitution_gate::{ConstitutionGate, SELF_EDIT_MIN_CONSCIOUSNESS};
 pub use self::curriculum::{

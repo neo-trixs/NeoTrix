@@ -3,70 +3,11 @@
 //! 支持 9 个内置渠道：微信、飞书、钉钉、企业微信、QQ、Slack、Telegram、Discord、WhatsApp
 //! 基于 DSH-IM 的 adapter 注册表模式，每个渠道独立配置和状态。
 
+use crate::atomic_io;
+use crate::domain::plugins::im::ChannelType;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-/// IM 渠道类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum ChannelType {
-    WeChat,
-    Feishu,
-    DingTalk,
-    WeCom,
-    QQ,
-    Slack,
-    Telegram,
-    Discord,
-    WhatsApp,
-}
-
-impl std::fmt::Display for ChannelType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::WeChat => write!(f, "wechat"),
-            Self::Feishu => write!(f, "feishu"),
-            Self::DingTalk => write!(f, "dingtalk"),
-            Self::WeCom => write!(f, "wecom"),
-            Self::QQ => write!(f, "qq"),
-            Self::Slack => write!(f, "slack"),
-            Self::Telegram => write!(f, "telegram"),
-            Self::Discord => write!(f, "discord"),
-            Self::WhatsApp => write!(f, "whatsapp"),
-        }
-    }
-}
-
-impl ChannelType {
-    pub fn from_name(name: &str) -> Option<Self> {
-        match name.to_lowercase().as_str() {
-            "wechat" | "微信" => Some(Self::WeChat),
-            "feishu" | "飞书" => Some(Self::Feishu),
-            "dingtalk" | "钉钉" => Some(Self::DingTalk),
-            "wecom" | "企业微信" => Some(Self::WeCom),
-            "qq" => Some(Self::QQ),
-            "slack" => Some(Self::Slack),
-            "telegram" => Some(Self::Telegram),
-            "discord" => Some(Self::Discord),
-            "whatsapp" => Some(Self::WhatsApp),
-            _ => None,
-        }
-    }
-
-    pub fn display_name(&self) -> &str {
-        match self {
-            Self::WeChat => "微信",
-            Self::Feishu => "飞书",
-            Self::DingTalk => "钉钉",
-            Self::WeCom => "企业微信",
-            Self::QQ => "QQ",
-            Self::Slack => "Slack",
-            Self::Telegram => "Telegram",
-            Self::Discord => "Discord",
-            Self::WhatsApp => "WhatsApp",
-        }
-    }
-}
 
 /// 渠道连接状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -160,11 +101,8 @@ fn load_channels() -> Result<Vec<ChannelConfig>, String> {
 /// 保存渠道配置
 fn save_channels(channels: &[ChannelConfig]) -> Result<(), String> {
     let path = config_path();
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
-    }
-    let json = serde_json::to_string_pretty(channels).map_err(|e| format!("Serialize: {e}"))?;
-    std::fs::write(&path, json).map_err(|e| format!("Write config: {e}"))
+    atomic_io::ensure_parent_dir(&path).map_err(|e| format!("Create dir: {e}"))?;
+    atomic_io::write_json_atomic(&path, channels).map_err(|e| format!("Write config: {e}"))
 }
 
 /// 加载 DSH 市场配置
@@ -181,11 +119,8 @@ fn load_dsh_market() -> Result<DshMarketConfig, String> {
 /// 保存 DSH 市场配置
 fn save_dsh_market(config: &DshMarketConfig) -> Result<(), String> {
     let path = dsh_market_path();
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
-    }
-    let json = serde_json::to_string_pretty(config).map_err(|e| format!("Serialize: {e}"))?;
-    std::fs::write(&path, json).map_err(|e| format!("Write config: {e}"))
+    atomic_io::ensure_parent_dir(&path).map_err(|e| format!("Create dir: {e}"))?;
+    atomic_io::write_json_atomic(&path, config).map_err(|e| format!("Write config: {e}"))
 }
 
 /// 默认渠道配置
@@ -369,7 +304,7 @@ pub async fn im_add_bot(
     for ch in &mut channels {
         if ch.channel == channel_type {
             ch.bots.push(bot);
-            result = ch.bots.last().unwrap().clone();
+            result = ch.bots.last().ok_or("empty bots")?.clone();
             found = true;
             break;
         }

@@ -4,6 +4,9 @@ use sha2::{Digest, Sha256};
 use super::contract::*;
 use super::types::*;
 
+/// Provider Benchmark — Unstract LLM Challenge pattern
+pub use neotrix_types::consciousness::ProviderBenchmark;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CapabilityCategory {
     Perceive,
@@ -135,28 +138,6 @@ impl EvidenceChain {
     }
 }
 
-/// Provider Benchmark — Unstract LLM Challenge pattern
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ProviderBenchmark {
-    pub provider: String,
-    pub model: String,
-    pub accuracy: f64,
-    pub latency_ms: u64,
-    pub cost_usd: f64,
-    pub task_type: String, // extraction, classification, generation, etc.
-    pub timestamp: u64,
-}
-
-impl ProviderBenchmark {
-    pub fn new(provider: String, model: String, task_type: String) -> Self {
-        Self {
-            provider,
-            model,
-            task_type,
-            ..Default::default()
-        }
-    }
-}
 #[derive(Debug, Clone)]
 /// 演化趋势预测 — 由 nt_core_forecast 引擎在 growth cycle 中生成。
 ///

@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 /// 并发隔离测试器
 pub struct ConcurrencyIsolationTester {
     test_sessions: Vec<TestSession>,
-    #[allow(dead_code)]
-    isolation_configs: Vec<IsolationConfig>,
     results: Vec<TestResult>,
     config: ConcurrencyConfig,
     stats: ConcurrencyStats,
@@ -101,7 +99,6 @@ impl ConcurrencyIsolationTester {
     pub fn new() -> Self {
         Self {
             test_sessions: Vec::new(),
-            isolation_configs: Vec::new(),
             results: Vec::new(),
             config: ConcurrencyConfig::default(),
             stats: ConcurrencyStats {

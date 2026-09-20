@@ -6,7 +6,7 @@
 //! 叙事 pattern 提取 trait (存在级 + 结构占位, 无完整实现)。作为 SEAL pipeline
 //! / ConsciousnessTree 的叙事侧对标参考。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 从 yoyobook 叙事中蒸馏出的自进化 lesson 类型 (C0 stub 枚举)。
 ///

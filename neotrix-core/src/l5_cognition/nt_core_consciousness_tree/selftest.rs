@@ -1,6 +1,6 @@
 use super::types::ConsciousnessTree;
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessTree {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ConsciousnessTree {
     fn name(&self) -> &str {
         "consciousness_tree"
     }

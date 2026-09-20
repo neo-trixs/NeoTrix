@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use crate::l1_action::nt_act::async_tool_executor::AsyncToolExecutor;
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l1_action::traits::LlmRouter;
 
 // ════════════════════════════════════════════════════════════════
@@ -54,6 +54,16 @@ impl std::fmt::Display for FacadeError {
 }
 
 impl std::error::Error for FacadeError {}
+
+impl From<FacadeError> for neotrix_types::NtError {
+    fn from(err: FacadeError) -> Self {
+        match err {
+            FacadeError::SearchFailed(msg) => neotrix_types::NtError::OperationFailed(msg),
+            FacadeError::StoreFailed(msg) => neotrix_types::NtError::OperationFailed(msg),
+            FacadeError::NotInitialized => neotrix_types::NtError::InvalidState("facade not initialized".into()),
+        }
+    }
+}
 
 // ════════════════════════════════════════════════════════════════
 // Configuration (internal — not exposed in the public API)
@@ -166,7 +176,7 @@ impl ActionFacade {
         let kb = self.kb.as_ref().ok_or(FacadeError::NotInitialized)?;
 
         let node_id = kb
-            .insert_or_get_node(title, crate::l6_meta::nt_core_kb_types::NodeType::from_str(node_type), Some(summary), None, None)
+            .insert_or_get_node(title, neotrix_types::knowledge_access::NodeType::from_str(node_type), Some(summary), None, None)
             .map_err(|e| FacadeError::StoreFailed(format!("{e}")))?;
 
         Ok(node_id)
@@ -243,7 +253,7 @@ impl std::fmt::Debug for ActionFacade {
 mod tests {
     use super::*;
     use crate::l1_action::nt_act::async_tool_executor::AsyncToolExecutor;
-    use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+    use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
     use crate::l1_action::traits::{
         CapabilityCategory, CapabilityHealth, ConstellationLevel, L1Capability, LlmRequest,
         LlmRoute,

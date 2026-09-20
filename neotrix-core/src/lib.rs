@@ -48,13 +48,14 @@ pub use neotrix::ffi::{
     DualSpecializationImpl, NeoTrixHandle,
 };
 
-pub mod core;
 pub mod cli;
 pub mod server;
 pub mod agent;
+pub mod skill_loader;
 pub mod neotrix;
 pub mod config;
 pub mod unified_cmd;
+pub mod pipeline;
 
 // 六层架构 (Consciousness-Embodiment-Capability)
 pub mod l0_substrate;

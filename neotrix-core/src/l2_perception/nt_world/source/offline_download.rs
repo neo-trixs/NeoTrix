@@ -3,8 +3,7 @@
 //! Replaces the former stub that returned /tmp paths without actual I/O.
 //! Uses `StreamingPipeline` for real HTTP/magnet/FIFO downloads with progress tracking.
 
-use crate::l1_action::nt_media::detect::MediaKind;
-use crate::l1_action::nt_media::{PipelineConfig, PipelineProgress, PipelineStatus, StreamingPipeline};
+use crate::l2_perception::nt_world::l1_facade::{MediaKind, PipelineConfig, PipelineProgress, PipelineStatus, StreamingPipeline};
 use super::offline_index::OfflineIndex;
 use super::types::{MediaItem, Quality};
 use std::path::PathBuf;

@@ -13,8 +13,6 @@ use serde::{Deserialize, Serialize};
 /// 集成点管理器
 pub struct IntegrationPointManager {
     _integration_points: Vec<IntegrationPoint>,
-    #[allow(dead_code)]
-    modules: Vec<ModuleIntegration>,
     config: IntegrationPointConfig,
     stats: IntegrationPointStats,
 }
@@ -120,7 +118,6 @@ impl IntegrationPointManager {
     pub fn new() -> Self {
         Self {
             _integration_points: Vec::new(),
-            modules: Vec::new(),
             config: IntegrationPointConfig::default(),
             stats: IntegrationPointStats {
                 total_points: 0,

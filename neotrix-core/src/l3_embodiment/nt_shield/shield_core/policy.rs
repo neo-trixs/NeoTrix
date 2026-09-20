@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 策略评估结果
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -210,12 +210,12 @@ impl Default for ActionPolicy {
     }
 }
 
-impl crate::core::nt_core_traits::NetworkPolicy for ActionPolicy {
-    fn check_network_access(&self, domain: &str) -> crate::core::nt_core_traits::NetworkPolicyResult {
+impl crate::l0_substrate::nt_core_traits::NetworkPolicy for ActionPolicy {
+    fn check_network_access(&self, domain: &str) -> crate::l0_substrate::nt_core_traits::NetworkPolicyResult {
         match self.evaluate_network(domain) {
-            PolicyDecision::Allow => crate::core::nt_core_traits::NetworkPolicyResult::Allow,
-            PolicyDecision::RequireConfirmation => crate::core::nt_core_traits::NetworkPolicyResult::RequireConfirmation,
-            PolicyDecision::Deny => crate::core::nt_core_traits::NetworkPolicyResult::Deny,
+            PolicyDecision::Allow => crate::l0_substrate::nt_core_traits::NetworkPolicyResult::Allow,
+            PolicyDecision::RequireConfirmation => crate::l0_substrate::nt_core_traits::NetworkPolicyResult::RequireConfirmation,
+            PolicyDecision::Deny => crate::l0_substrate::nt_core_traits::NetworkPolicyResult::Deny,
         }
     }
 }

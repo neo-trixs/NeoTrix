@@ -9,6 +9,8 @@ mod tier;
 
 pub use bank::ReasoningBank;
 pub use iteration::MemoryIterationResult;
+pub use iteration::{Bm25Document, Bm25Index};
+pub use iteration::rrf_fuse;
 pub use l1::{ExtractionPrompt, L1Memory, Persona, SceneBlock};
 pub use mem::{ReasoningMemory, T3ViewType, T3Views, TemporalContext};
 pub use offload::OffloadManager;

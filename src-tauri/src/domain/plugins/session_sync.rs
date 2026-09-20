@@ -19,17 +19,12 @@
 //! └─────────────────────────────────────────────┘
 //! ```
 
+use async_trait::async_trait;
+use crate::domain::app_handle::{set_app_handle, get_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
-use tauri::AppHandle;
-
-static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-
-pub fn set_app_handle(app: AppHandle) {
-    let _ = APP_HANDLE.set(app);
-}
+use std::sync::{Arc, Mutex};
 
 // ========== Types ==========
 
@@ -315,6 +310,7 @@ impl Default for SessionSyncPlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for SessionSyncPlugin {
     fn name(&self) -> &str {
         "session_sync"
@@ -406,7 +402,7 @@ impl DomainPlugin for SessionSyncPlugin {
         ]
     }
 
-    fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+    async fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
         match action {
             "create_session" => {
                 let mode = args.get("mode")
@@ -504,11 +500,11 @@ impl DomainPlugin for SessionSyncPlugin {
         }
     }
 
-    fn init(&mut self) -> Result<(), DomainError> {
+    async fn init(&mut self) -> Result<(), DomainError> {
         Ok(())
     }
 
-    fn shutdown(&mut self) -> Result<(), DomainError> {
+    async fn shutdown(&mut self) -> Result<(), DomainError> {
         Ok(())
     }
 }

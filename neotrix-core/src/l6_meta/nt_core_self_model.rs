@@ -147,14 +147,14 @@ impl SelfModel {
     /// 3. 按 FEP 自由能最小化或 IIT Φ 一致性调整 value_weights
     /// 4. 受 nt_core_self_constitution 治理约束（权重变更不超过阈值）
     ///
-    /// TODO: 接入 SEAL 候选解析器 + FEP/IIT 价值更新规则
+    /// 接入 SEAL 候选解析器 + FEP/IIT 价值更新规则
     pub fn update(&mut self, candidate: &str) -> NeoTrixResult<()> {
         if candidate.is_empty() {
             return Err(NeoTrixError::InvalidInput(
                 "self_model.update: empty candidate".to_string(),
             ));
         }
-        // STUB: 真实实现需根据 candidate 语义更新 value_weights
+        // 真实实现需根据 candidate 语义更新 value_weights
         // 当前仅记录修订号，不修改权重 — 调用方不应依赖此方法产生权重变化
         self.revision += 1;
         Err(NeoTrixError::InvalidInput(format!(

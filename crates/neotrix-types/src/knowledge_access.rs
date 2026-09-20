@@ -413,6 +413,9 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
         let json = serde_json::to_string(&node).unwrap();
         let back: KnowledgeNode = serde_json::from_str(&json).unwrap();

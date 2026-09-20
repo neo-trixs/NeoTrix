@@ -14,8 +14,6 @@ use serde::{Deserialize, Serialize};
 pub struct SentruxSensor {
     rules: _RulesEngine,
     baseline: Option<QualitySnapshot>,
-    #[allow(dead_code)]
-    history: Vec<QualitySnapshot>,
 }
 
 /// 规则引擎
@@ -127,7 +125,6 @@ impl SentruxSensor {
                 boundaries: vec![],
             },
             baseline: None,
-            history: vec![],
         }
     }
 

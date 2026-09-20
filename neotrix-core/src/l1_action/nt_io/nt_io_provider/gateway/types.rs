@@ -469,7 +469,7 @@ impl GatewayV2 {
         &self,
         provider_name: &str,
         task_type: &str,
-    ) -> Result<crate::l5_cognition::nt_core_consciousness_tree::ProviderBenchmark, LlmError> {
+    ) -> Result<neotrix_types::consciousness::ProviderBenchmark, LlmError> {
         let tasks = self.challenge_tasks(task_type);
         let mut correct = 0usize;
         let mut total_latency_ms = 0u64;
@@ -490,7 +490,7 @@ impl GatewayV2 {
         }
 
         let task_count = 4usize;
-        Ok(crate::l5_cognition::nt_core_consciousness_tree::ProviderBenchmark {
+        Ok(neotrix_types::consciousness::ProviderBenchmark {
             provider: provider_name.to_string(),
             model: self
                 .provider_model(provider_name)

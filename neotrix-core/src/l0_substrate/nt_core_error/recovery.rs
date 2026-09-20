@@ -759,7 +759,7 @@ mod tests {
 // Agent trait 实现 — 统一到 nt_core_platform
 // ════════════════════════════════════════════════════════════════
 
-use crate::core::nt_core_platform::{Agent, AgentError as PlatformAgentError,  AgentMetrics, AgentStatus};
+use crate::l0_substrate::nt_core_platform::{Agent, AgentError as PlatformAgentError,  AgentMetrics, AgentStatus};
 use crate::l0_substrate::nt_core_capability_types::{Layer, Domain, UnifiedCapability, CapabilityMeta, CapabilityHealth, CapabilityState, CapabilityInput, CapabilityOutput, CapabilityError, CapabilityStatus, CapabilityMetrics};
 
 impl UnifiedCapability for RecoveryOrchestrator {

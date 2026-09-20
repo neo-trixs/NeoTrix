@@ -33,6 +33,7 @@ pub mod hex_crucible;
 pub mod mcp;
 pub mod persistence;
 pub mod play;
+pub mod render;
 pub mod rpg;
 pub mod world;
 

@@ -1,5 +1,6 @@
 pub mod auto_verifier;
 pub mod binary_analyzer;
+pub mod cloudflare_patterns;
 pub mod driver_analyzer;
 pub mod firmware_analyzer;
 pub mod ioc_extractor;
@@ -758,7 +759,7 @@ impl ReasoningTraceGuard {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ReasoningTraceGuard {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ReasoningTraceGuard {
     fn name(&self) -> &str {
         "nt_shield_reasoning_trace_guard"
     }
@@ -864,7 +865,7 @@ impl CohGuard {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CohGuard {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for CohGuard {
     fn name(&self) -> &str {
         "nt_shield_coh_guard"
     }
@@ -1126,7 +1127,7 @@ impl _ApiScanner {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for _ApiScanner {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for _ApiScanner {
     fn name(&self) -> &str {
         "nt_shield_api_attack_surface"
     }
@@ -1152,7 +1153,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for _ApiScanner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_checklist_count() {
@@ -1519,12 +1520,12 @@ mod tests {
 }
 
 /// 创建 ReasoningTraceGuard 的 SecurityAudit 实例 (供 L5 使用，避免 L5 直接依赖 L3 类型)
-pub fn create_reasoning_trace_auditor() -> Box<dyn crate::core::nt_core_traits::SecurityAudit> {
+pub fn create_reasoning_trace_auditor() -> Box<dyn crate::l0_substrate::nt_core_traits::SecurityAudit> {
     Box::new(ReasoningTraceGuard::default())
 }
 
 /// SecurityAudit trait 实现 — 打通 L5 认知层对 L3 具身层的安全检查接口
-impl crate::core::nt_core_traits::SecurityAudit for ReasoningTraceGuard {
+impl crate::l0_substrate::nt_core_traits::SecurityAudit for ReasoningTraceGuard {
     fn scan_browser_security(&self, _url: &str) -> Result<String, String> {
         // ReasoningTraceGuard 专注于推理轨迹防护，不处理浏览器安全
         Err("ReasoningTraceGuard does not support browser security scanning".into())
@@ -1534,9 +1535,9 @@ impl crate::core::nt_core_traits::SecurityAudit for ReasoningTraceGuard {
         &self,
         text: &str,
         context: &str,
-    ) -> Result<crate::core::nt_core_traits::ReasoningTraceReport, String> {
+    ) -> Result<crate::l0_substrate::nt_core_traits::ReasoningTraceReport, String> {
         let report = self.scan_protected(text, context);
-        Ok(crate::core::nt_core_traits::ReasoningTraceReport {
+        Ok(crate::l0_substrate::nt_core_traits::ReasoningTraceReport {
             session_binding_missing: report.session_binding_missing,
             pii_findings: report.pii_findings,
             injection_findings: report.injection_findings,

@@ -6,8 +6,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::l5_cognition::nt_mind::foundation::knowledge_store::{KnowledgeStore, L1KnowledgeStore};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-use crate::l6_meta::nt_core_kb_types::NodeType;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+use neotrix_types::knowledge_access::NodeType;
 
 // ============================================================
 // 源类型 (使用唯一名避免冲突)
@@ -120,7 +120,7 @@ impl KnowledgeAbsorptionPipeline {
 
         // HTTP fetch + content extraction (P0 fix: was inserting empty External nodes)
         let (content, domain) =
-            crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(url)?;
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(url)?;
 
         self.finish_absorb(url, &content, &domain)
     }
@@ -135,7 +135,7 @@ impl KnowledgeAbsorptionPipeline {
         }
 
         let (content, domain) =
-            crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http_async(url)
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http_async(url)
                 .await?;
 
         self.finish_absorb(url, &content, &domain)
@@ -329,7 +329,7 @@ pub struct _KbPipelineStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content;
+    use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content;
 
     #[test]
     fn test_pipeline_new() {

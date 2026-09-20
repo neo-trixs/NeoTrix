@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::l1_action::nt_memory_spatial::types::{
+use super::types::{
     TileCacheEntry, TileFormat, TileCacheStats, tile_key,
 };
 

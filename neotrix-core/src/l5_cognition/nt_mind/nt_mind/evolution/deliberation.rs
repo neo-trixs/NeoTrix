@@ -8,7 +8,7 @@
 //! - 落盘：辩论记录落 KB 供审计/学习
 
 #[allow(unused_imports)]
-use crate::l6_meta::nt_core_kb_primitives::now;
+use crate::l0_substrate::nt_core_kb_primitives::now;
 #[allow(unused_imports)]
 use crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::Severity;
 #[allow(unused_imports)]
@@ -584,7 +584,7 @@ mod tests {
     #[allow(unused_imports)]
     use super::*;
     #[allow(unused_imports)]
-    use crate::l6_meta::nt_core_kb_primitives::schema_initialize;
+    use crate::l0_substrate::nt_core_kb_primitives::schema_initialize;
     #[allow(unused_imports)]
     use crate::l5_cognition::nt_mind::nt_mind::evolution::casebase::{ConflictType, EthicalCase};
     #[allow(unused_imports)]

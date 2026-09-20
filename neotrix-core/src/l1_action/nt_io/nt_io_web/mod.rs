@@ -116,7 +116,7 @@ impl RateWindow {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub brain: Arc<Mutex<Box<dyn crate::core::nt_core_traits::BrainProvider>>>,
+    pub brain: Arc<Mutex<Box<dyn crate::l0_substrate::nt_core_traits::BrainProvider>>>,
     pub bank: Arc<Mutex<crate::l1_action::nt_core_bank::bank::ReasoningBank>>,
     pub sessions: Arc<Mutex<Vec<SessionInfo>>>,
     pub permission_counter: Arc<AtomicU64>,

@@ -1,0 +1,164 @@
+# NeoTrix 文档标准地图
+
+> 版本: 1.0.0 | 生效: 2026-09-20
+> **所有文档操作必须遵循本标准，禁止私自构建文件**
+
+---
+
+## 一、文档分类与存放位置
+
+### 1. 项目根目录 (`/`)
+
+| 文件 | 用途 | 维护者 |
+|------|------|--------|
+| `README.md` | 项目入口，500 字以内概述 | Owner |
+| `CHANGELOG.md` | 版本变更记录 (Keep a Changelog) | Owner |
+| `CONTRIBUTING.md` | 贡献指南 | Owner |
+| `LICENSE` | 许可证 | Owner |
+| `TODO.md` | **唯一任务清单** (结构化) | 所有会话 |
+| `TODO.yml` | 任务机器可读格式 | 所有会话 |
+| `Makefile` | 构建命令 | Owner |
+| `ARCHITECTURE-MAP-ROADMAP-V2.md` | 架构进化路线图 | Owner |
+| `FUSION-ARCHITECTURE.md` | 融合架构说明 | Owner |
+| `DOCUMENTATION-MAP.md` | 本文档 | Owner |
+
+**禁止**: 根目录放置临时文件、会话笔记、分析报告
+
+### 2. `docs/` — 文档主目录
+
+```
+docs/
+├── dev-rules.md              # 开发规则 (R-P1~R-P220)
+├── api/                      # API 文档 (mdbook)
+│   ├── SUMMARY.md
+│   ├── README.md
+│   └── {module}.md
+├── architecture/             # 架构文档
+│   ├── ARCHITECTURE.md       # 目录结构与分类标准
+│   ├── DATAFLOW.md           # 数据流
+│   └── NEOTRIX-FULL-ARCHITECTURE.md
+├── plans/                    # 设计方案 (日期前缀)
+│   └── YYYY-MM-DD-{topic}.md
+└── 2-PLANS/                  # 路线图
+    └── ROADMAP-*.md
+```
+
+**规则**:
+- `plans/` 文件必须用日期前缀: `2026-09-20-{topic}.md`
+- `architecture/` 只放稳定架构文档，不放临时分析
+- `api/` 文档从代码自动生成，不手写
+
+### 3. `neotrix-core/` — 核心 crate
+
+```
+neotrix-core/
+├── README.md                 # crate 概述
+├── Cargo.toml
+├── tests/                    # 集成测试
+│   ├── nt_memory_integration.rs
+│   ├── nt_shield_integration.rs
+│   └── ...
+└── benches/                  # 基准测试
+    ├── memory_bench.rs
+    └── ...
+```
+
+**禁止**: `neotrix-core/docs/` 存放研究笔记、分析报告
+
+### 4. `skills/` — Agent 技能系统
+
+```
+skills/
+├── SKILL.md                  # 技能系统总览
+├── SKILL-SPEC.md             # 技能规范
+├── index.json                # 技能注册表
+├── {domain}/                 # 按领域组织
+│   ├── SKILL.md              # 领域技能定义
+│   └── {sub-skill}/
+│       └── SKILL.md
+```
+
+**规则**:
+- 每个技能目录必须有 `SKILL.md`
+- 技能文件不超过 200 行
+- 不在 skills/ 放非技能文件
+
+### 5. `.neotrix/` — 内部运行时数据
+
+```
+.neotrix/
+├── knowledge.db              # 知识库 (SQLite)
+├── pending-absorb.json       # 待吸收队列
+├── capability_*.json         # 能力注册表
+├── experience/               # 会话经验 (自动)
+│   └── session-*.md
+└── agents/                   # Agent 运行时
+```
+
+**禁止**: 手动编辑 `.neotrix/` 下的 JSON/DB 文件
+
+### 6. `.opencode/agent/` — Agent 提示词
+
+```
+.opencode/agent/
+├── build.md
+├── debug.md
+├── nt-core.md
+└── review.md
+```
+
+**规则**: 每个 agent 一个 md 文件，不超过 100 行
+
+---
+
+## 二、文件命名规范
+
+| 类型 | 格式 | 示例 |
+|------|------|------|
+| 设计方案 | `YYYY-MM-DD-{topic}.md` | `2026-09-20-memory-distillation.md` |
+| 路线图 | `ROADMAP-{scope}.md` | `ROADMAP-ARCHITECTURE-FUSION.md` |
+| 分析报告 | `{topic}-analysis.md` | `gap-analysis.md` |
+| 任务清单 | `TODO.md` / `TODO.yml` | 根目录唯一 |
+| API 文档 | `{module}.md` | `memory.md`, `security.md` |
+| 技能定义 | `SKILL.md` | 每个技能目录 |
+| 变更日志 | `CHANGELOG.md` | 根目录 + 子 crate |
+
+---
+
+## 三、禁止行为
+
+| # | 禁止 | 原因 |
+|---|------|------|
+| 1 | 根目录创建临时 md 文件 | 污染项目结构 |
+| 2 | `neotrix-core/docs/` 放研究笔记 | 应放 `docs/plans/` 或删除 |
+| 3 | 每个会话创建独立 TODO 文件 | 必须使用根目录 `TODO.md` |
+| 4 | `skills/` 放非技能文件 | 破坏技能系统结构 |
+| 5 | `.neotrix/` 手动创建文件 | 运行时自动管理 |
+| 6 | 创建无日期前缀的方案文件 | 无法追踪时间线 |
+| 7 | 创建超过 500 行的单个 md | 应拆分为多个文件 |
+
+---
+
+## 四、文档生命周期
+
+```
+创建 → 审核 → 合并 → 归档/删除
+
+1. 创建: 按本标准选择正确位置
+2. 审核: 检查命名、长度、格式
+3. 合并: PR 合并到主分支
+4. 归档: 过期文档移至 git 历史，不保留
+```
+
+---
+
+## 五、执行检查清单
+
+新会话开始时检查:
+
+- [ ] 读取 `TODO.md` 了解当前任务
+- [ ] 读取 `docs/dev-rules.md` 了解开发规则 (R-P1~R-P220)
+- [ ] 读取 `DOCUMENTATION-MAP.md` 了解文档标准
+- [ ] 不在禁止位置创建文件
+- [ ] 文件命名符合第二节规范
+- [ ] 完成任务后更新 `TODO.md` 状态

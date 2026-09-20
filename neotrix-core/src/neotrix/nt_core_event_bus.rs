@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use crate::l5_cognition::nt_core_dispatch::Dispatcher;
-use crate::core::nt_core_event::CoreEvent;
+use crate::l0_substrate::nt_core_event::CoreEvent;
 
 /// 事件溯源信封 (D4 — maka 'Log is the Runtime' / buzz 事件日志 + 身份 + receipts)
 /// 落盘时包裹在 CoreEvent 之外, 提供可重建事件链的溯源字段 (全局 seq + 来源身份 + 时间戳),
@@ -325,16 +325,16 @@ pub fn subscribe_layer(bus: &EventBus, layer: LayerId) -> tokio::task::JoinHandl
                         continue;
                     }
                     match &event {
-                        crate::core::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "critical" => {
+                        crate::l0_substrate::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "critical" => {
                             log::error!("[event-bus:{}] CRITICAL: {}: {}", layer_label, component, error);
                         }
-                        crate::core::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "error" => {
+                        crate::l0_substrate::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "error" => {
                             log::warn!("[event-bus:{}] ERROR: {}: {}", layer_label, component, error);
                         }
-                        crate::core::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
+                        crate::l0_substrate::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
                             log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
                         }
-                            crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
+                            crate::l0_substrate::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
                             log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
                         }
                         _ => {
@@ -395,16 +395,16 @@ pub fn subscribe_all_layers_sync(bus: &EventBus) {
                             continue;
                         }
                         match &event {
-                            crate::core::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "critical" => {
+                            crate::l0_substrate::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "critical" => {
                                 log::error!("[event-bus:{}] CRITICAL: {}: {}", layer_label, component, error);
                             }
-                            crate::core::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "error" => {
+                            crate::l0_substrate::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "error" => {
                                 log::warn!("[event-bus:{}] ERROR: {}: {}", layer_label, component, error);
                             }
-                            crate::core::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
+                            crate::l0_substrate::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
                                 log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
                             }
-                        crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
+                        crate::l0_substrate::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
                                 log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
                             }
                             _ => {

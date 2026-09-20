@@ -7,7 +7,7 @@
 
 use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
 use crate::l5_cognition::nt_mind::evolution::evolution_daemon::IssueType;
-use crate::l5_cognition::layer_aliases::ProjectSnapshot;
+use crate::l5_cognition::l1_facade::ProjectSnapshot;
 use crate::l5_cognition::nt_mind::evolution::evolution_loop::{
     Issue,
     EXCESS_UNWRAP_THRESHOLD,
@@ -476,7 +476,7 @@ impl ActionExecutor {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SelfDiagnose {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for SelfDiagnose {
     fn name(&self) -> &str {
         "self_diagnose"
     }

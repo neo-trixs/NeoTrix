@@ -983,7 +983,7 @@ mod tests {
 
 pub struct OutputGovernorSelfTest;
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for OutputGovernorSelfTest {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for OutputGovernorSelfTest {
     fn name(&self) -> &str {
         "nt_io_output_style::output_governor"
     }
@@ -1034,7 +1034,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for OutputGovernorSelf
 #[cfg(test)]
 mod tests_output_governor_selftest {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_output_governor_selftest() {

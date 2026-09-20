@@ -1,3 +1,4 @@
+pub mod nt_judgment;
 pub mod nt_world;
 pub use crate::l1_action::nt_core_llm;
 
@@ -10,4 +11,6 @@ pub mod nt_core_sense;
 pub mod nt_core_knowledge;
 pub mod nt_core_vector_store;
 pub mod nt_core_code_search;
+pub mod nt_routing;
+pub mod nt_web_perception;
 

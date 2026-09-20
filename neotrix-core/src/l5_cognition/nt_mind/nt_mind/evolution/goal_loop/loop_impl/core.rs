@@ -8,7 +8,7 @@ use super::super::types::{
 };
 use crate::agent::AgentTeam;
 use crate::l5_cognition::nt_core_gwt::resonance::OscillatorNetwork;
-use crate::l6_meta::nt_core_self::MotivationState;
+use crate::l5_cognition::l1_facade::MotivationState;
 use crate::l5_cognition::nt_core_hex::optimal_starting_mode; use crate::l5_cognition::nt_core::nt_crt::CrtTimeScale; use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 use crate::l5_cognition::nt_mind::foundation::distiller::{
     CommandDistiller, DistilledOutput, SessionDistiller,
@@ -535,7 +535,7 @@ impl GoalLoop {
 mod tests {
     use super::truncate;
     use super::GoalLoop;
-    use crate::l6_meta::nt_core_self::MotivationState;
+    use crate::l5_cognition::l1_facade::MotivationState;
 
     #[test]
     fn test_resonance_coherence_default() {

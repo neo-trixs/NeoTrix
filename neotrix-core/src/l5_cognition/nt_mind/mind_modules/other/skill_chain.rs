@@ -333,36 +333,6 @@ impl _ChainExecutor {
         ))
     }
 
-    /// 回滚
-    #[allow(dead_code)]
-    fn rollback(&mut self) -> Result<(), String> {
-        self.state.status = _ChainStatus::RollingBack;
-
-        // 按逆序回滚已完成的步骤
-        let completed_steps: Vec<String> = self.results.iter()
-            .filter(|(_, r)| r.status == StepStatus::Completed)
-            .map(|(id, _)| id.clone())
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect();
-
-        for step_id in completed_steps {
-            let step = self.chain.steps.iter().find(|s| s.id == step_id);
-            if let Some(_step) = step {
-                // not wired: _ChainExecutor.executors not implemented.
-                // Cannot perform step rollback without real executor backend.
-                return Err(format!(
-                    "not wired: _ChainExecutor.executors not implemented — \
-                     cannot rollback step '{}' without a real executor backend",
-                    step_id
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
     /// 构建结果
     fn build_result(&self) -> _ChainExecutionResult {
         let duration = if let (Some(start), Some(end)) = (self.state.started_at, self.state.completed_at) {

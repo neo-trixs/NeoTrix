@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// L0 共享专型枚举（定义在 nt_core_traits 中以防 L4→L5 反向依赖）
-pub use crate::core::nt_core_traits::SpecialistType;
+pub use crate::l0_substrate::nt_core_traits::SpecialistType;
 
 /// Environment-domain patterns this specialist has proven effective in.
 /// Maps environment name → list of proven behavioral patterns.

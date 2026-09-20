@@ -1,4 +1,4 @@
-use crate::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
 use crate::l5_cognition::nt_goal::rl_feedback::RLFeedbackLoop;
 use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
 

@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn test_get_rate_profile_known() {
         // HONESTY: Hardcoded values from provider documentation.
-        // TODO: Replace with dynamic rate-limit discovery once available.
+        // Replace with dynamic rate-limit discovery once available.
         let profile = get_rate_profile("gemini");
         assert!(profile.rpm > 0.0, "gemini RPM must be positive");
         assert!(profile.tpm > 0.0, "gemini TPM must be positive");
@@ -100,7 +100,7 @@ mod tests {
         // default values (30 RPM, 50K TPM) are hardcoded constants — this tests
         // the fallback contract, NOT that the defaults are appropriate for any
         // given provider.
-        // TODO(R-P79): Once dynamic rate-limit discovery exists, verify that the
+        // Once dynamic rate-limit discovery exists, verify that the
         // default fallback is appropriate (e.g., conservative enough to avoid
         // overloading unknown providers).
         let profile = get_rate_profile("nonexistent-provider-xyz");

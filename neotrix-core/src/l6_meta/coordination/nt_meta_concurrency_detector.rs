@@ -14,8 +14,6 @@ pub struct _ConcurrencyConflictDetector {
     _monitored_files: Vec<_MonitoredFile>,
     conflicts: Vec<Conflict>,
     lock_states: HashMap<String, _LockState>,
-    #[allow(dead_code)]
-    config: _ConflictDetectorConfig,
     stats: _ConflictDetectorStats,
 }
 
@@ -119,7 +117,6 @@ impl _ConcurrencyConflictDetector {
             _monitored_files: Vec::new(),
             conflicts: Vec::new(),
             lock_states: HashMap::new(),
-            config: _ConflictDetectorConfig::default(),
             stats: _ConflictDetectorStats {
                 total_files_monitored: 0,
                 total_conflicts: 0,

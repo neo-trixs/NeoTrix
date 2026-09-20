@@ -13,7 +13,7 @@ use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonit
 use self::always_on::AlwaysOnEngine;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngine;
 use crate::l1_action::nt_io::nt_io_plugin::registry::PluginRegistry;
-use crate::l5_cognition::layer_aliases::WorldModelV2;
+use crate::l5_cognition::l1_facade::WorldModelV2;
 use crate::l5_cognition::nt_mind::evolution::evolution_daemon::{EvolutionDaemon, EvolutionConfig};
 use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExplorationPipeline;
@@ -25,14 +25,14 @@ use crate::l5_cognition::nt_mind::nt_mind::curiosity_drive::CuriosityDrive;
 use crate::l5_cognition::nt_mind::nt_mind::knowledge_aging::KnowledgeAging;
 use crate::l5_cognition::nt_mind::nt_mind::auto_crystallizer::AutoCrystallizer;
 use crate::l5_cognition::nt_mind::foundation::l1_wrappers::SessionRecoveryWrapper;
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 
 // AgentDiscovery not defined — field removed from BackgroundLoop
 
 use crate::l5_cognition::nt_core_second_brain::SecondBrain;
-use crate::l6_meta::nt_meta::knowledge_gap_detector::KnowledgeGapDetector;
-use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
-use crate::l5_cognition::nt_core_consciousness::CognitiveLoadMonitor;
+use crate::l5_cognition::l1_facade::knowledge_gap_detector::KnowledgeGapDetector;
+use crate::l5_cognition::l1_facade::ConsciousnessMonitor;
+use crate::l5_cognition::cognitive_load::CognitiveLoadMonitor;
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 
 mod builder;
@@ -131,7 +131,7 @@ impl BackgroundLoop {
         shared_gwt.register_default_specialists();
         // CAD 能力 T3 生产接线: GWT 共振路由 (image→CAD 经意识核心) + 经验吸收落盘
         let _ = crate::l5_cognition::nt_core_gwt::cad_route::register_cad_gwt(&mut shared_gwt);
-        if let Ok(kb) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+        if let Ok(kb) = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
             if let Err(e) = crate::l2_perception::nt_core_knowledge::cad_absorb::absorb_cad_experience(&kb) {
                 log::warn!("[bg-init] failed to absorb CAD experience: {}", e);
             }
@@ -235,7 +235,7 @@ mod tests {
         // 且 GWT resonance 激活逻辑在 handle_consciousness_tick 生效。
         // 直接验证链路源头: observe() 产生非零 coherence, 注入 tree 后非零。
 use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
-use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+use crate::l5_cognition::l1_facade::ConsciousnessMonitor;
         use crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree;
         let mut monitor = ConsciousnessMonitor::new();
         monitor.observe();

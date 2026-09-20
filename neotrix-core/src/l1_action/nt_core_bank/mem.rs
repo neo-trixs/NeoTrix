@@ -191,6 +191,12 @@ impl ReasoningMemory {
     }
 }
 
+impl Default for ReasoningMemory {
+    fn default() -> Self {
+        Self::new("default", TaskType::General, &[], 0.0)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemporalContext {
     pub task_id: String,

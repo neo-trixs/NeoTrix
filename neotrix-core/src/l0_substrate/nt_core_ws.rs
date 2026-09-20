@@ -147,3 +147,102 @@ impl Default for WorkSpaceManager {
 /// Global workspace manager fallback — prefer `CliContext.workspace` instead.
 pub static WORKSPACE_MANAGER: LazyLock<Mutex<WorkSpaceManager>> =
     LazyLock::new(|| Mutex::new(WorkSpaceManager::load()));
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workspace_manager_new_is_empty() {
+        let mgr = WorkSpaceManager::new();
+        assert!(mgr.list().is_empty());
+        assert!(mgr.active().is_none());
+    }
+
+    #[test]
+    fn workspace_manager_create() {
+        let mut mgr = WorkSpaceManager::new();
+        let ws = mgr.create("test", None, "a test workspace");
+        assert_eq!(ws.name, "test");
+        assert_eq!(ws.description, "a test workspace");
+        assert!(mgr.active().is_some());
+        assert_eq!(mgr.list().len(), 1);
+    }
+
+    #[test]
+    fn workspace_manager_switch() {
+        let mut mgr = WorkSpaceManager::new();
+        let ws1 = mgr.create("ws1", None, "first");
+        let _ws2 = mgr.create("ws2", None, "second");
+        assert_eq!(mgr.active().unwrap().name, "ws2");
+        mgr.switch(&ws1.id).unwrap();
+        assert_eq!(mgr.active().unwrap().name, "ws1");
+    }
+
+    #[test]
+    fn workspace_manager_switch_nonexistent() {
+        let mut mgr = WorkSpaceManager::new();
+        assert!(mgr.switch("nope").is_err());
+    }
+
+    #[test]
+    fn workspace_manager_delete() {
+        let mut mgr = WorkSpaceManager::new();
+        let ws = mgr.create("ws1", None, "desc");
+        mgr.delete(&ws.id).unwrap();
+        assert!(mgr.list().is_empty());
+        assert!(mgr.active().is_none());
+    }
+
+    #[test]
+    fn workspace_manager_delete_nonexistent() {
+        let mut mgr = WorkSpaceManager::new();
+        assert!(mgr.delete("nope").is_err());
+    }
+
+    #[test]
+    fn workspace_manager_get() {
+        let mut mgr = WorkSpaceManager::new();
+        let ws = mgr.create("ws1", None, "desc");
+        assert!(mgr.get(&ws.id).is_some());
+        assert!(mgr.get("nope").is_none());
+    }
+
+    #[test]
+    fn workspace_manager_rename() {
+        let mut mgr = WorkSpaceManager::new();
+        let ws = mgr.create("old", None, "desc");
+        mgr.rename(&ws.id, "new").unwrap();
+        assert_eq!(mgr.get(&ws.id).unwrap().name, "new");
+    }
+
+    #[test]
+    fn workspace_manager_rename_nonexistent() {
+        let mut mgr = WorkSpaceManager::new();
+        assert!(mgr.rename("nope", "new").is_err());
+    }
+
+    #[test]
+    fn workspace_manager_scope_root() {
+        let mut mgr = WorkSpaceManager::new();
+        assert!(mgr.scope_root("nope").is_none());
+        let ws = mgr.create("ws1", Some(PathBuf::from("/tmp")), "desc");
+        assert_eq!(mgr.scope_root(&ws.id).unwrap(), PathBuf::from("/tmp"));
+    }
+
+    #[test]
+    fn workspace_manager_default() {
+        let mgr = WorkSpaceManager::default();
+        assert!(mgr.list().is_empty());
+    }
+
+    #[test]
+    fn workspace_serde_roundtrip() {
+        let mut mgr = WorkSpaceManager::new();
+        mgr.create("ws", Some(PathBuf::from("/p")), "desc");
+        let json = mgr.to_json().unwrap();
+        let back: WorkSpaceManager = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.list().len(), 1);
+        assert_eq!(back.list()[0].name, "ws");
+    }
+}

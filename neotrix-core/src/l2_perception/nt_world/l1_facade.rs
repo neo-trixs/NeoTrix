@@ -3,21 +3,57 @@
 //! L2 感知层通过此模块访问 L1 共享类型，避免散布 `use crate::l1_action::*`。
 //! 单一事实源仍在 L1，此处仅 re-export 保持跨层引用集中可审计。
 
-pub use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-pub use crate::l1_action::nt_memory::nt_memory_kb::NodeType;
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_discovery_github_topics::DiscoveryPipelineConfig;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::NodeType;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_discovery_github_topics::DiscoveryPipelineConfig;
+pub use neotrix_types::knowledge_access::RelationType;
 
 // HTTP 集中门面 — nt_http 类型与函数
 // NOTE: download_to_file, shared_blocking_client, run_blocking 在 nt_http 中为 pub(crate)
 //       因此这里也必须用 pub(crate) re-export，不能 pub use。
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::download_to_file;
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::shared_blocking_client;
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::run_blocking;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::download_to_file;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::shared_blocking_client;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::run_blocking;
 
-// HTTP 工厂门面 — proxy_from_env
+// HTTP 工厂门面 — proxy_from_env + module re-export
 pub use crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env;
+pub use crate::l1_action::nt_io::nt_io_http_factory as http_factory;
+
+// Core edit types (MicroEdit, SelfEdit)
+pub use crate::l1_action::nt_core_edit::{MicroEdit, SelfEdit};
+
+// Core bank types (ReasoningBank, memory tier/lifecycle)
+pub use crate::l1_action::nt_core_bank::{
+    ReasoningMemory, T3Views, MemoryTier, MemoryLifecycle, ReasoningBank,
+};
+
+// Media types
+pub use crate::l1_action::nt_media::detect::MediaKind;
+pub use crate::l1_action::nt_media::{
+    PipelineConfig, PipelineProgress, PipelineStatus, StreamingPipeline,
+};
+pub use crate::l1_action::nt_media::playback::{
+    EnginePlaybackState, PlaybackController, PlaybackEngine, PlaybackHistory, PlaybackQueue,
+    PlaybackRetry, PlaybackState, PlayMode, RepeatMode,
+};
+
+// Universal browser types
+pub use crate::l1_action::nt_io::universal_browser::{UniversalBrowser, PlatformConfig};
+
+// Voice types
+pub use crate::l1_action::nt_act::nt_act_voice::{VoiceInput, VoiceSample};
+
+// LLM provider types (from nt_io_provider)
+pub use crate::l1_action::nt_io::nt_io_provider::{
+    LlmProvider as IoLlmProvider, LlmRequest as IoLlmRequest, LlmProviderType,
+};
+pub use crate::l1_action::nt_io::nt_io_provider::common::factory::create_provider_from_type;
+
+// Core LLM types (backward-compat re-exports from neotrix_types)
+pub use crate::l1_action::nt_io::nt_io_llm::{Message, Role, FinishReason, DataTrust};
+pub use crate::l1_action::nt_io::nt_io_provider::{LlmResponse, LlmError, Usage};
 
 // 共享出口类型门面 — EgressRule/EgressPolicy (避免 L2→L3 向上依赖)
 pub use crate::l1_action::nt_io::nt_io_provider::common::egress_types::{
@@ -30,7 +66,7 @@ pub use crate::l1_action::nt_io::nt_io_provider::common::egress_types::{
 // L2 数据源只需 KnowledgeBase 的读写子集，通过此 trait 解耦。
 // 实现留在 L1 facade，测试代码仍可直接用 KnowledgeBase concrete type。
 
-pub use crate::l6_meta::nt_core_kb_types::KnowledgeNode;
+pub use neotrix_types::knowledge_access::KnowledgeNode;
 
 /// L2 感知层对 KB 的最小读写接口 — 数据源入库只依赖此 trait，不依赖 KnowledgeBase concrete type。
 pub trait KnowledgeStore: Send + Sync {

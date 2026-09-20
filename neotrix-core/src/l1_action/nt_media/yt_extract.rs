@@ -39,6 +39,17 @@ pub enum YtError {
     Unsupported(String),
 }
 
+impl From<YtError> for neotrix_types::NtError {
+    fn from(err: YtError) -> Self {
+        match err {
+            YtError::Network(e) => neotrix_types::NtError::Network(e.to_string()),
+            YtError::Extraction(msg) => neotrix_types::NtError::OperationFailed(msg),
+            YtError::Parse(msg) => neotrix_types::NtError::Serde(msg),
+            YtError::Unsupported(msg) => neotrix_types::NtError::NotImplemented(msg),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // oEmbed response
 // ---------------------------------------------------------------------------

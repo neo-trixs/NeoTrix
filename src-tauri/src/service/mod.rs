@@ -1,3 +1,7 @@
+pub mod circuit_breaker;
+pub mod cost_tracker;
+pub mod provider_manager;
+
 use std::time::Duration;
 use tauri::AppHandle;
 use tauri::Manager;
@@ -24,7 +28,7 @@ async fn scheduler_loop(app_handle: AppHandle) {
 
 async fn tick_health_check(app_handle: &AppHandle) -> Result<(), String> {
     // Check if neotrix CLI is available
-    let bin = super::commands::neotrix_cli::find_neotrix_binary();
+    let bin = crate::commands::neotrix_cli::find_neotrix_binary();
     if bin.is_none() {
         tracing::debug!("neotrix CLI not found, skipping health check");
         return Ok(());

@@ -18,7 +18,7 @@
 use super::consonance_orchestrator::CapabilityNodeInfo;
 use super::transcendent_loop::{EvolutionSuggestion, LoopConfig, LoopReport, TranscendentLoop};
 use super::CapabilityNode;
-use crate::core::nt_core_traits::RuneSocket;
+use crate::l0_substrate::nt_core_traits::RuneSocket;
 use std::collections::HashMap;
 
 /// 超越层生产接线器
@@ -117,7 +117,7 @@ impl EvolutionHarness {
     /// 写入成功后计数)。返回真实写入条数。
     pub fn persist_suggestions(
         &mut self,
-        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase,
         report: &LoopReport,
     ) -> usize {
         if report.suggestions.is_empty() {
@@ -234,7 +234,7 @@ impl crate::l5_cognition::traits::EvolutionHarnessApi for EvolutionHarness {
 
     fn harness_persist_suggestions(
         &mut self,
-        kb: &crate::l5_cognition::layer_aliases::KnowledgeBase,
+        kb: &crate::l5_cognition::l1_facade::KnowledgeBase,
         report: &serde_json::Value,
     ) -> usize {
         let l6_report: LoopReport = match serde_json::from_value(report.clone()) {

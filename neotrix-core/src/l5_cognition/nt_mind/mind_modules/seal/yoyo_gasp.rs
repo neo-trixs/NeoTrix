@@ -19,7 +19,7 @@
 //! | Journal (审计轨迹)    | `ConsciousnessTree` 6-stage loop / experience-tree | SEAL self-test log |
 //! | Lineage (代际传承)    | `SEALPipelineImpl` `make_stage!` 阶段血缘     | SEAL promote/lineage  |
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 智能体身份 — 映射 `nt_core_self::Self` / `SystemIdentity` (E8引导者身份锚)。
 /// GASP: clone 即唤醒的身份指纹, 决定智能体"是谁"。
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn test_agent_five_elements_incarnation() {
-        // TODO(R-P79): Only checks identity.awakened flag — trivial assertion.
+        // Only checks identity.awakened flag — trivial assertion.
         // Replace with test that validates real incarnation behavior (memory grounding,
         // skill crystallization, lineage tracking) against actual system state.
         let mut a = _YoyoGaspAgent::new("agent-001", None, 0);

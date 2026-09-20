@@ -8,6 +8,7 @@
 //! - YAML 工作流编辑器
 //! - Agent 会话管理面板
 
+use crate::desktop::model_manager::{ModelFormat, ModelCapabilities};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -53,42 +54,13 @@ pub struct UniversalModel {
     pub id: String,
     pub name: String,
     pub display_name: String,
-    pub format: ModelFormatDisplay,
+    pub format: ModelFormat,
     pub context_length: Option<u32>,
     pub parameter_count: Option<String>,
-    pub capabilities: ModelCapabilityFlags,
+    pub capabilities: ModelCapabilities,
     pub is_active: bool,
     pub downloaded: bool,
     pub download_path: Option<PathBuf>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ModelFormatDisplay {
-    GGUF,
-    ONNX,
-    Safetensors,
-    GGJ,
-}
-
-impl std::fmt::Display for ModelFormatDisplay {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ModelFormatDisplay::GGUF => write!(f, "GGUF"),
-            ModelFormatDisplay::ONNX => write!(f, "ONNX"),
-            ModelFormatDisplay::Safetensors => write!(f, "Safetensors"),
-            ModelFormatDisplay::GGJ => write!(f, "GGJ"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelCapabilityFlags {
-    pub text: bool,
-    pub vision: bool,
-    pub audio: bool,
-    pub function_calling: bool,
-    pub streaming: bool,
-    pub agent: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -299,7 +271,7 @@ pub struct AgentSession {
     pub id: String,
     pub name: String,
     pub agent_type: AgentType,
-    pub status: AgentStatus,
+    pub status: UIAgentStatus,
     pub model: String,
     pub provider: String,
     pub started_at: Option<String>,
@@ -335,7 +307,7 @@ impl std::fmt::Display for AgentType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum AgentStatus {
+pub enum UIAgentStatus {
     Idle,
     Running,
     Paused,
@@ -343,14 +315,14 @@ pub enum AgentStatus {
     Error,
 }
 
-impl std::fmt::Display for AgentStatus {
+impl std::fmt::Display for UIAgentStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AgentStatus::Idle => write!(f, "idle"),
-            AgentStatus::Running => write!(f, "running"),
-            AgentStatus::Paused => write!(f, "paused"),
-            AgentStatus::Completed => write!(f, "completed"),
-            AgentStatus::Error => write!(f, "error"),
+            UIAgentStatus::Idle => write!(f, "idle"),
+            UIAgentStatus::Running => write!(f, "running"),
+            UIAgentStatus::Paused => write!(f, "paused"),
+            UIAgentStatus::Completed => write!(f, "completed"),
+            UIAgentStatus::Error => write!(f, "error"),
         }
     }
 }
@@ -361,7 +333,7 @@ pub struct SessionManagementPanel {
     pub active_session: Option<String>,
     pub total_sessions: usize,
     pub total_tokens: u64,
-    pub filter_status: Option<AgentStatus>,
+    pub filter_status: Option<UIAgentStatus>,
     pub filter_type: Option<AgentType>,
 }
 

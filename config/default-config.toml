@@ -1,0 +1,12 @@
+# NeoTrix Configuration
+# This file is loaded automatically from ~/.neotrix/config.toml
+# Environment variables (NEOTRIX_*) override these values.
+
+provider = "openai"
+# api_key = "sk-your-key-here"  # Or set NEOTRIX_API_KEY env var
+base_url = "https://api.openai.com/v1"
+model = "gpt-4o"
+# embedding_api_key = ""
+log_level = "info"
+max_connections = 8
+request_timeout_secs = 30

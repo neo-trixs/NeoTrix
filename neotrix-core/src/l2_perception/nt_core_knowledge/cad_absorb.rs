@@ -7,7 +7,7 @@
 
 use crate::l5_cognition::nt_core_cad_consciousness::cad_experience_payload;
 use crate::l2_perception::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l2_perception::nt_world::l1_facade::KnowledgeBase;
 
 /// 将 CAD 经验载荷真实持久化进 KB `experience` namespace (T3 生产接线证据)。
 ///

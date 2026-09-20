@@ -1,9 +1,11 @@
+use async_trait::async_trait;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use regex::Regex;
 
 /// NT-WORLD 域插件 — 网页抓取/搜索/内容提取
 pub struct WorldPlugin;
 
+#[async_trait]
 impl DomainPlugin for WorldPlugin {
     fn name(&self) -> &str {
         "world"
@@ -41,7 +43,7 @@ impl DomainPlugin for WorldPlugin {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,

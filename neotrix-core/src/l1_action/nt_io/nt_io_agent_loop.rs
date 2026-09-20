@@ -30,9 +30,9 @@ use super::nt_io_provider::generation_classifier::{GenerationClassifier, TaskTyp
 use super::nt_io_provider::types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo, Usage,
 };
-use crate::core::nt_core_traits::{PropagationGuardLike, SecretScanner, SecretRiskLevel};
+use crate::l0_substrate::nt_core_traits::{PropagationGuardLike, SecretScanner, SecretRiskLevel};
 use crate::cli::approval::{ActionType, PendingAction};
-use crate::core::nt_core_traits::{NativeTool, ToolOutput};
+use crate::l0_substrate::nt_core_traits::{NativeTool, ToolOutput};
 
 /// P1-B2 双相 compaction 阈值: 超过预算 90% 触发 LLM 摘要压缩 (OpenCode 40K 双相模式, E10)。
 const COMPACTION_THRESHOLD_RATIO: f64 = 0.9;
@@ -1098,7 +1098,7 @@ impl AgentLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_traits::ToolDef;
+    use crate::l0_substrate::nt_core_traits::ToolDef;
     use crate::l1_action::nt_io::nt_io_provider::LlmResponse;
     use async_trait::async_trait;
     use std::sync::{Arc, Mutex};

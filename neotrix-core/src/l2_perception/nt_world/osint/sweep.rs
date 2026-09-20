@@ -3,7 +3,7 @@
 //! 确定性纯模拟 — 无网络、无 tokio。每个源按固定规则产出条目,
 //! 缺 key 的源降级 (Degraded::no_key); _DeltaDetector 识别新条目并按关键词分级。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 一个扫描源
 #[derive(Debug, Clone, Copy, PartialEq)]

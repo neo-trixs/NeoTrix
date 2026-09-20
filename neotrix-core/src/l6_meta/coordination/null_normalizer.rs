@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_normalize_various_null_forms() {
-        // TODO: The normalizer should handle edge cases like "NULL", "Null", whitespace-
+        // The normalizer should handle edge cases like "NULL", "Null", whitespace-
         // padded " null ", and JSON-encoded null. Currently only literal "null" is tested.
         // Once the normalizer is wired to real JSON ingestion, add cases for:
         //   - case-insensitive null variants

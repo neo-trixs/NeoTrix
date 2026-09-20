@@ -110,7 +110,7 @@ impl YagniLadder {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for YagniLadder {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for YagniLadder {
     fn name(&self) -> &str {
         "nt_act_code_yagni_ladder"
     }
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn self_test_name_is_stable() {
         let l = YagniLadder::new();
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         assert_eq!(l.name(), "nt_act_code_yagni_ladder");
     }
 }

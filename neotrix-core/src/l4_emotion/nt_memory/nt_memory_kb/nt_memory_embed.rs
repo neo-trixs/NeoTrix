@@ -1,0 +1,1090 @@
+use serde::Deserialize;
+use rusqlite::{params, Connection};
+use std::sync::OnceLock;
+
+/// 本地 hash-kernel 嵌入提供者，实现 EmbeddingProvider trait。
+pub struct LocalEmbeddingProvider {
+    dim: usize,
+}
+
+impl LocalEmbeddingProvider {
+    pub fn new(dim: usize) -> Self {
+        Self { dim }
+    }
+}
+
+impl Default for LocalEmbeddingProvider {
+    fn default() -> Self {
+        Self::new(384)
+    }
+}
+
+impl neotrix_types::knowledge_access::EmbeddingProvider for LocalEmbeddingProvider {
+    async fn embed(&self, text: &str) -> Result<Vec<f32>, String> {
+        let results = local_embed_texts(&[text], self.dim);
+        results.into_iter().next().ok_or_else(|| "Empty embedding result".to_string())
+    }
+
+    fn dim(&self) -> usize {
+        self.dim
+    }
+
+    fn name(&self) -> &str {
+        "local_hash_kernel"
+    }
+}
+
+/// Embedding backend mode.
+///
+/// - `Http`: 调用 OpenAI 兼容远程服务 (MiniLM local server / 云端 API)。
+/// - `Local`: 内嵌确定性 hash-kernel (384-dim), 无需外部进程即可生成向量,
+///   保证 `/kb embed` 与 `ensure_embeddings` 零依赖可跑 (Cycle 207 R-P79 闭环)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmbedMode {
+    Http,
+    Local,
+}
+
+impl EmbedMode {
+    /// Resolve the embedding backend from `NEOTRIX_EMBEDDING_MODE`.
+    ///
+    /// Default (env unset or unrecognised) is `Local` so the whole pipeline is
+    /// autonomous with ZERO external process (R-P79 closure). Explicitly opt
+    /// into the HTTP/MiniLM server with `http`/`remote`/`openai`.
+    pub fn from_env() -> Self {
+        match std::env::var("NEOTRIX_EMBEDDING_MODE")
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "http" | "remote" | "openai" => EmbedMode::Http,
+            _ => EmbedMode::Local,
+        }
+    }
+}
+
+/// Configuration for the embedding API (OpenAI-compatible, incl. MiniLM local server).
+#[derive(Debug, Clone)]
+pub struct EmbeddingConfig {
+    pub api_key: String,
+    pub base_url: String,
+    pub model: String,
+    pub dimension: usize,
+    pub mode: EmbedMode,
+}
+
+impl Default for EmbeddingConfig {
+    fn default() -> Self {
+        // Default to the local all-MiniLM-L6-v2 server (384-dim), matching the
+        // existing embeddings written by scripts/kb-embed-local.py. This keeps
+        // dimension consistent across the whole corpus and avoids silent
+        // cosine-similarity degradation from mixed 384/768 vectors.
+        Self {
+            api_key: std::env::var("NEOTRIX_EMBEDDING_API_KEY")
+                .or_else(|_| std::env::var("NEOTRIX_API_KEY"))
+                .unwrap_or_else(|_| "local".to_string()),
+            base_url: std::env::var("NEOTRIX_EMBEDDING_BASE_URL")
+                .unwrap_or_else(|_| "http://127.0.0.1:8237/v1".to_string()),
+            model: std::env::var("NEOTRIX_EMBEDDING_MODEL")
+                .unwrap_or_else(|_| "all-MiniLM-L6-v2".to_string()),
+            dimension: std::env::var("NEOTRIX_EMBEDDING_DIMENSION")
+                .ok().and_then(|s| s.parse().ok())
+                .unwrap_or(384),
+            mode: EmbedMode::from_env(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct EmbeddingResponse {
+    data: Vec<EmbeddingData>,
+}
+
+#[derive(Deserialize)]
+struct EmbeddingData {
+    embedding: Vec<f32>,
+    index: usize,
+}
+
+/// Generate a single embedding vector via OpenAI-compatible API.
+pub fn embed_text(config: &EmbeddingConfig, text: &str) -> Result<Vec<f32>, String> {
+    let mut results = embed_text_batch(config, &[text])?;
+    results.pop().ok_or_else(|| "Empty batch response".to_string())
+}
+
+/// 内嵌 hash-kernel 文本嵌入 (Cycle 207): 确定性、零依赖、任意维度。
+///
+/// 特性分解 (对应 scripts/kb-embed-server.py 的 MiniLM 输出能力):
+///   - 字符 n-gram (2/3/4) 特征哈希 → 累加到 `dim` 桶
+///   - 双哈希 → (bucket, sign) 以消偏
+///   - 长度归一化 → 与 MiniLM 向量同一 embeddings 表可比 (cosine)
+///
+/// 语义质量低于真 MiniLM, 但保证无外部 server 时 embedding 链路完整可用,
+/// 供 `ensure_embeddings` / `/kb embed` 兜底 (R-P79 接线而非死代码)。
+pub fn local_embed_texts(texts: &[&str], dim: usize) -> Vec<Vec<f32>> {
+    let dim = dim.max(16);
+    texts.iter().map(|&t| hash_kernel_embed(t, dim)).collect()
+}
+
+fn hash_kernel_embed(text: &str, dim: usize) -> Vec<f32> {
+    let lower = text.to_lowercase();
+    let chars: Vec<char> = lower.chars().collect();
+    let mut acc = vec![0.0f32; dim];
+
+    let mut add_ngram = |lo: usize, hi: usize, salt: u64| {
+        for start in 0..=chars.len().saturating_sub(hi - lo) {
+            let gram: String = chars[start..start + (hi - lo)].iter().collect();
+            let h1 = fnv1a(&gram, salt);
+            let h2 = fnv1a(&gram, salt ^ 0x9E37_79B9_7F4A_7C15);
+            let bucket = ((h1 % dim as u64) as usize) % dim;
+            let sign = if (h2 & 1) == 0 { 1.0f32 } else { -1.0f32 };
+            // 简单 IDF 近似: 频次饱和 (sqrt 计数) 降噪
+            let weight = 1.0 + (h2 % 4) as f32 * 0.25;
+            acc[bucket] += sign * weight;
+        }
+    };
+    add_ngram(2, 3, 0x8D5B); // bigram
+    add_ngram(3, 4, 0x5A9E); // trigram
+    if chars.len() >= 4 { add_ngram(4, 5, 0xC3A1); } // 4-gram (仅长文本)
+
+    // L2 归一化
+    let norm: f32 = acc.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 1e-8 {
+        for x in acc.iter_mut() { *x /= norm; }
+    }
+    acc
+}
+
+fn fnv1a(s: &str, salt: u64) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ salt;
+    for b in s.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x1000_0000_01b3);
+    }
+    h
+}
+
+fn embedding_client() -> Result<&'static reqwest::blocking::Client, String> {
+    static CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .map_err(|e| format!("embedding HTTP client: {}", e))
+    })
+    .as_ref()
+    .map_err(|e| e.clone())
+}
+
+/// Generate embeddings for multiple texts in a single API call.
+pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
+    if texts.is_empty() { return Ok(Vec::new()); }
+
+    if config.mode == EmbedMode::Local {
+        return Ok(local_embed_texts(texts, config.dimension));
+    }
+
+    // reqwest::blocking (client 初始化 + send) 在 tokio runtime 上下文内
+    // 会 panic (reason 的 rt.block_on → build_context → kb.search 路径)。
+    // 统一经共享 run_blocking 包裹; 非 runtime 上下文行为不变。
+    let http = super::nt_http::run_blocking(|| {
+        let client = embedding_client()?;
+
+        let input: Vec<&str> = texts.to_vec();
+        let body = serde_json::json!({
+            "input": input,
+            "model": config.model,
+            "dimensions": config.dimension,
+        });
+
+        let resp = client
+            .post(format!("{}/embeddings", config.base_url))
+            .header("Authorization", format!("Bearer {}", config.api_key))
+            .json(&body)
+            .send()
+            .map_err(|e| format!("Embedding request: {}", e))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let err_text = resp.text().unwrap_or_default();
+            return Err(format!("Embedding API {}: {}", status, err_text));
+        }
+
+        let data: EmbeddingResponse = resp.json().map_err(|e| format!("Parse response: {}", e))?;
+
+        // Sort by index to preserve original order
+        let mut indexed: Vec<(usize, Vec<f32>)> = data.data.into_iter()
+            .map(|d| (d.index, d.embedding))
+            .collect();
+        indexed.sort_by_key(|(idx, _)| *idx);
+
+        Ok(indexed.into_iter().map(|(_, v)| v).collect())
+    });
+
+    // 自治兜底 (R-P79 闭环): HTTP/MiniLM 服务不可达时, 自动回退到内嵌
+    // hash-kernel, 保证 `/kb embed` 与 `ensure_embeddings` 零外部依赖可跑。
+    match http {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            log::warn!(
+                "embed_text_batch: HTTP embedding failed ({}); falling back to local hash-kernel (autonomous closure)",
+                e
+            );
+            Ok(local_embed_texts(texts, config.dimension))
+        }
+    }
+}
+
+use crate::l0_substrate::nt_core_math::cosine_similarity_f32;
+
+/// Serialize a Vec<f32> to a byte blob for SQLite storage (little-endian f32).
+fn vector_to_blob(v: &[f32]) -> Vec<u8> {
+    v.iter().flat_map(|f| f.to_le_bytes()).collect()
+}
+
+/// Deserialize a byte blob back to Vec<f32>.
+fn blob_to_vector(blob: &[u8]) -> Vec<f32> {
+    blob.chunks_exact(4)
+        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .collect()
+}
+
+/// Store a single node's embedding.
+pub fn store_embedding(conn: &Connection, node_id: &str, vector: &[f32], model: &str) -> rusqlite::Result<()> {
+    let dim = vector.len() as i32;
+    let blob = vector_to_blob(vector);
+    conn.execute(
+        "INSERT OR REPLACE INTO embeddings (node_id, vector, dimension, model) VALUES (?1, ?2, ?3, ?4)",
+        params![node_id, blob, dim, model],
+    )?;
+    Ok(())
+}
+
+/// Retrieve a single node's embedding.
+pub fn get_embedding(conn: &Connection, node_id: &str) -> rusqlite::Result<Option<Vec<f32>>> {
+    let mut stmt = conn.prepare("SELECT vector, dimension FROM embeddings WHERE node_id=?1")?;
+    let mut rows = stmt.query(params![node_id])?;
+    if let Some(row) = rows.next()? {
+        let blob: Vec<u8> = row.get(0)?;
+        Ok(Some(blob_to_vector(&blob)))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn embedding_count(conn: &Connection) -> rusqlite::Result<usize> {
+    conn.query_row("SELECT COUNT(*) FROM embeddings JOIN nodes ON nodes.id = embeddings.node_id", [], |row| row.get(0))
+}
+
+pub fn load_embeddings_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
+    let mut stmt = conn.prepare(
+        "SELECT e.node_id, e.vector FROM embeddings e JOIN nodes n ON n.id = e.node_id ORDER BY e.node_id LIMIT ?1 OFFSET ?2"
+    )?;
+    let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
+        let node_id: String = row.get(0)?;
+        let blob: Vec<u8> = row.get(1)?;
+        Ok((node_id, blob_to_vector(&blob)))
+    })?;
+    let mut result = Vec::with_capacity(limit.min(4096));
+    for row in rows {
+        result.push(row?);
+    }
+    Ok(result)
+}
+
+/// Load all (node_id, embedding) pairs from the database.
+/// Warning: loads entire embedding table into memory — use `load_embeddings_page` for large datasets.
+pub fn load_all_embeddings(conn: &Connection) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
+    let mut stmt = conn.prepare(
+        "SELECT e.node_id, e.vector FROM embeddings e JOIN nodes n ON n.id = e.node_id"
+    )?;
+    let mut results = Vec::new();
+    let rows = stmt.query_map([], |row| {
+        let node_id: String = row.get(0)?;
+        let blob: Vec<u8> = row.get(1)?;
+        Ok((node_id, blob_to_vector(&blob)))
+    })?;
+    for row in rows {
+        results.push(row?);
+    }
+    Ok(results)
+}
+
+/// Find nodes without embeddings.
+pub fn find_nodes_missing_embeddings(conn: &Connection) -> rusqlite::Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT id FROM nodes WHERE id NOT IN (SELECT node_id FROM embeddings)"
+    )?;
+    let rows = stmt.query_map([], |row| row.get(0))?;
+    rows.collect()
+}
+
+/// Build text for embedding from a node's title + summary + content.
+pub fn build_node_text(title: &str, summary: Option<&str>, content: Option<&str>) -> String {
+    let mut text = title.to_string();
+    if let Some(s) = summary {
+        text.push_str(". ");
+        text.push_str(s);
+    }
+    if let Some(c) = content {
+        text.push_str(". ");
+        // 缺陷4修复 (真实运转): 原 &c[..c.len().min(500)] 用字节索引截断,
+        // 对多字节 UTF-8 (中文/日文/emoji) 在字符边界外 panic → 古籍等中文
+        // 内容节点嵌入必崩。改为字符边界安全截断: 取前 max_chars 字符。
+        const MAX_CHARS: usize = 500;
+        let truncated: String = c.chars().take(MAX_CHARS).collect();
+        text.push_str(&truncated);
+    }
+    text
+}
+
+/// Product Quantization (PQ) approximate nearest neighbor support.
+///
+/// Reads the trained codebook (`pq_codebook`) + compressed codes (`embeddings_pq`)
+/// written by `scripts/kb-embed-pq.py`. Scores a query vector against all
+/// quantized vectors using asymmetric distance computation (ADC): each
+/// sub-vector of the query is compared to the K centroids of its sub-space once,
+/// then the per-code distances are summed — O(M×K) per query instead of O(D×N).
+pub fn pq_ann_search(
+    conn: &Connection,
+    query_vec: &[f32],
+    k: usize,
+    codebook_id: Option<i64>,
+) -> rusqlite::Result<Vec<(String, f64)>> {
+    let cb = match load_latest_codebook(conn, codebook_id)? {
+        Some(cb) => cb,
+        None => return Ok(Vec::new()),
+    };
+    let m = cb.m as usize;
+    let sub_dim = cb.sub_dim as usize;
+    let ks = cb.ks as usize;
+    let d = m * sub_dim;
+    if query_vec.len() != d {
+        log::warn!("pq_ann_search: query dim {} != codebook dim {}", query_vec.len(), d);
+        return Ok(Vec::new());
+    }
+
+    // Per-subspace distance tables: for each subspace s and each centroid c,
+    // store squared distance between query sub-vector and centroid.
+    let mut tables: Vec<Vec<f64>> = Vec::with_capacity(m);
+    for s in 0..m {
+        let q_sub = &query_vec[s * sub_dim..(s + 1) * sub_dim];
+        let mut row = Vec::with_capacity(ks);
+        for c in 0..ks {
+            let centroid = &cb.codewords[s][c];
+            let dist: f64 = q_sub.iter().zip(centroid.iter())
+                .map(|(a, b)| {
+                    let diff = (a - b) as f64;
+                    diff * diff
+                })
+                .sum();
+            row.push(dist);
+        }
+        tables.push(row);
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT node_id, pq_codes FROM embeddings_pq WHERE (?1 IS NULL OR codebook_id = ?1)"
+    )?;
+    let rows = stmt.query_map([codebook_id], |row| {
+        let node_id: String = row.get(0)?;
+        let codes: Vec<u8> = row.get(1)?;
+        Ok((node_id, codes))
+    })?;
+
+    let mut scored: Vec<(String, f64)> = Vec::new();
+    for row in rows.flatten() {
+        let (node_id, codes) = row;
+        if codes.len() != m {
+            continue;
+        }
+        let dist: f64 = codes.iter().enumerate()
+            .map(|(s, &c)| tables[s][c as usize])
+            .sum();
+        scored.push((node_id, -dist));
+    }
+    // Coarse candidate ranking: score = -dist, so nearest (smallest dist) has the
+    // HIGHEST score. Sort descending to pull the closest candidates first.
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    // Re-rank the top coarse candidates by exact cosine on the stored vectors.
+    // PQ centroid quantization loses fine-grained precision, so a handful of
+    // unrelated candidates can rank above the true nearest neighbours (they sit
+    // in a near-identical coarse ADC band). Re-scoring the promising subset with
+    // the exact embedding recovers the correct order while keeping PQ as the
+    // fast filter (no full-corpus scan).
+    let coarse_count = (k * 16).min(scored.len());
+    if coarse_count > 0 {
+        let coarse: Vec<(String, f64)> = scored.into_iter().take(coarse_count).collect();
+        let mut exact = Vec::with_capacity(coarse.len());
+        for (node_id, _) in coarse {
+            let sim = match exact_vector_cosine(conn, &node_id, query_vec) {
+                Some(s) => s,
+                None => continue,
+            };
+            exact.push((node_id, sim));
+        }
+        exact.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        exact.truncate(k);
+        return Ok(exact);
+    }
+    Ok(Vec::new())
+}
+
+/// Load one vector blob from the `embeddings` table and compute exact cosine
+/// against `query_vec`. Returns `None` if the node has no usable vector.
+fn exact_vector_cosine(conn: &Connection, node_id: &str, query_vec: &[f32]) -> Option<f64> {
+    let blob: Vec<u8> = conn.query_row(
+        "SELECT vector FROM embeddings WHERE node_id = ?1",
+        params![node_id],
+        |row| row.get(0),
+    ).ok()?;
+    let dim_bytes = blob.len() / 4;
+    let mut v = Vec::with_capacity(dim_bytes);
+    for i in 0..dim_bytes {
+        let off = i * 4;
+        v.push(f32::from_le_bytes([blob[off], blob[off + 1], blob[off + 2], blob[off + 3]]));
+    }
+    Some(cosine_similarity_f32(query_vec, &v))
+}
+
+struct PqCodebook {
+    m: usize,
+    ks: usize,
+    sub_dim: usize,
+    codewords: Vec<Vec<Vec<f32>>>,
+}
+
+fn load_latest_codebook(conn: &Connection, codebook_id: Option<i64>) -> rusqlite::Result<Option<PqCodebook>> {
+    let row = if let Some(id) = codebook_id {
+        conn.query_row(
+            "SELECT m, ks, sub_dim, codewords FROM pq_codebook WHERE id = ?1",
+            params![id],
+            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?, row.get::<_, Vec<u8>>(3)?)),
+        ).ok()
+    } else {
+        conn.query_row(
+            "SELECT m, ks, sub_dim, codewords FROM pq_codebook ORDER BY id DESC LIMIT 1",
+            [],
+            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?, row.get::<_, Vec<u8>>(3)?)),
+        ).ok()
+    };
+    let Some((m, ks, sub_dim, blob)) = row else {
+        return Ok(None);
+    };
+    let m = m as usize;
+    let ks = ks as usize;
+    let sub_dim = sub_dim as usize;
+    let expect = m * ks * sub_dim * 4;
+    if blob.len() != expect {
+        log::warn!("pq_codebook blob size {} != expected {}", blob.len(), expect);
+        return Ok(None);
+    }
+    let mut codewords: Vec<Vec<Vec<f32>>> = Vec::with_capacity(m);
+    for s in 0..m {
+        let mut sub = Vec::with_capacity(ks);
+        for c in 0..ks {
+            let base = (s * ks + c) * sub_dim * 4;
+            let mut v = Vec::with_capacity(sub_dim);
+            for i in 0..sub_dim {
+                let off = base + i * 4;
+                let b = [blob[off], blob[off + 1], blob[off + 2], blob[off + 3]];
+                v.push(f32::from_le_bytes(b));
+            }
+            sub.push(v);
+        }
+        codewords.push(sub);
+    }
+    Ok(Some(PqCodebook { m, ks, sub_dim, codewords }))
+}
+
+/// Result of a PQ training run.
+#[derive(Debug)]
+pub struct PqTrainReport {
+    pub codebook_id: i64,
+    pub m: usize,
+    pub ks: usize,
+    pub sub_dim: usize,
+    pub vector_count: usize,
+}
+
+/// Lloyd k-means over `rows` (n×d subspaces) with `k` centroids for `iters` iterations.
+/// Faithful port of `scripts/kb-embed-pq.py:kmeans` (seed 42, random init w/o replacement).
+fn pq_kmeans(rows: &[&[f32]], k: usize, iters: usize) -> Vec<Vec<f32>> {
+    let n = rows.len();
+    let d = rows[0].len();
+    use std::collections::HashSet;
+    let mut seed: u64 = 42;
+    let mut next_u64 = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed.wrapping_mul(2685821657736338717)
+    };
+    let mut used: HashSet<usize> = HashSet::new();
+    let mut chosen: Vec<usize> = Vec::new();
+    let k = k.min(n);
+    while chosen.len() < k {
+        let idx = (next_u64() as usize) % n;
+        if used.insert(idx) {
+            chosen.push(idx);
+        }
+    }
+    let mut centroids: Vec<Vec<f32>> = chosen.iter().map(|&i| rows[i].to_vec()).collect();
+    for _ in 0..iters {
+        let mut labels: Vec<usize> = Vec::with_capacity(n);
+        for r in rows {
+            let mut best = 0usize;
+            let mut best_dist = f32::INFINITY;
+            for (c, cen) in centroids.iter().enumerate() {
+                let mut dist = 0.0f32;
+                for (a, b) in r.iter().zip(cen.iter()) {
+                    let diff = a - b;
+                    dist += diff * diff;
+                }
+                if dist < best_dist {
+                    best_dist = dist;
+                    best = c;
+                }
+            }
+            labels.push(best);
+        }
+        let mut sums: Vec<Vec<f32>> = vec![vec![0.0f32; d]; centroids.len()];
+        let mut counts: Vec<usize> = vec![0usize; centroids.len()];
+        for (i, r) in rows.iter().enumerate() {
+            let c = labels[i];
+            counts[c] += 1;
+            for (j, v) in r.iter().enumerate() {
+                sums[c][j] += v;
+            }
+        }
+        for c in 0..centroids.len() {
+            if counts[c] > 0 {
+                for j in 0..d {
+                    centroids[c][j] = sums[c][j] / counts[c] as f32;
+                }
+            }
+        }
+    }
+    centroids
+}
+
+/// Load all vectors from the `embeddings` table (optionally the first `limit` rows).
+fn load_embeddings_raw(conn: &Connection, limit: Option<usize>) -> rusqlite::Result<(Vec<String>, Vec<Vec<f32>>)> {
+    let sql = match limit {
+        Some(l) => format!("SELECT node_id, vector FROM embeddings LIMIT {l}"),
+        None => "SELECT node_id, vector FROM embeddings".to_string(),
+    };
+    let mut stmt = conn.prepare(&sql)?;
+    let mut ids = Vec::new();
+    let mut vecs = Vec::new();
+    let rows = stmt.query_map([], |row| {
+        let node_id: String = row.get(0)?;
+        let blob: Vec<u8> = row.get(1)?;
+        Ok((node_id, blob_to_vector(&blob)))
+    })?;
+    for row in rows {
+        let (id, v) = row?;
+        ids.push(id);
+        vecs.push(v);
+    }
+    Ok((ids, vecs))
+}
+
+/// Train a PQ codebook from the `embeddings` table and persist both the codebook
+/// (`pq_codebook`) and per-node compressed codes (`embeddings_pq`).
+///
+/// Faithful port of `scripts/kb-embed-pq.py` main flow: reshapes each vector into
+/// `m` sub-spaces, trains one centroid set of size `ks` per subspace (Python
+/// recommander defaults m=24/ks=256/iters=10 on 384-dim), then assigns each
+/// vector's nearest centroid index per subspace into a packed `<m}B` byte code.
+///
+/// Errors (with a caller-facing message) if there aren't enough vectors to train
+/// the requested `ks`, or if `m` doesn't divide `dimension`.
+pub fn train_pq_codebook(
+    conn: &Connection,
+    m: usize,
+    ks: usize,
+    dimension: usize,
+    limit: Option<usize>,
+) -> Result<PqTrainReport, String> {
+    if m == 0 || !dimension.is_multiple_of(m) {
+        return Err(format!("m must be a positive divisor of {dimension}"));
+    }
+    let total: i64 = conn.query_row("SELECT COUNT(*) FROM embeddings", [], |r| r.get(0))
+        .map_err(|e| format!("PQ: count embeddings: {e}"))?;
+    if (total as usize) < ks * 4 {
+        return Err(format!(
+            "Not enough vectors to train PQ: {total} < {}( = ks×4). Need more embeddings first.",
+            ks * 4
+        ));
+    }
+    let (ids, vecs) = load_embeddings_raw(conn, limit).map_err(|e| format!("PQ: load embeddings: {e}"))?;
+    let n = vecs.len();
+    let sub_dim = dimension / m;
+
+    let mut codewords_all: Vec<Vec<Vec<f32>>> = Vec::with_capacity(m);
+    for s in 0..m {
+        let sub: Vec<&[f32]> = vecs.iter().map(|r| &r[s * sub_dim..(s + 1) * sub_dim]).collect();
+        codewords_all.push(pq_kmeans(&sub, ks, 10));
+    }
+
+    let mut codeword_blob: Vec<u8> = Vec::new();
+    for cw in &codewords_all {
+        for centroid in cw {
+            for v in centroid {
+                codeword_blob.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+    }
+    let now = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_embed::unix_now();
+    conn.execute(
+        "INSERT INTO pq_codebook (m, ks, sub_dim, codewords, dimension, model, trained_at, num_vectors) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+        params![m as i64, ks as i64, sub_dim as i64, codeword_blob, dimension as i64, "all-MiniLM-L6-v2", now, n as i64],
+    ).map_err(|e| format!("insert pq_codebook: {e}"))?;
+    let codebook_id = conn.last_insert_rowid();
+
+    for i in 0..n {
+        let mut codes: Vec<u8> = Vec::with_capacity(m);
+        for s in 0..m {
+            let sub = &vecs[i][s * sub_dim..(s + 1) * sub_dim];
+            let mut best = 0usize;
+            let mut best_dist = f32::INFINITY;
+            for (c, centroid) in codewords_all[s].iter().enumerate() {
+                let mut dist = 0.0f32;
+                for (a, b) in sub.iter().zip(centroid.iter()) {
+                    let diff = a - b;
+                    dist += diff * diff;
+                }
+                if dist < best_dist {
+                    best_dist = dist;
+                    best = c;
+                }
+            }
+            codes.push(best as u8);
+        }
+        conn.execute(
+            "INSERT OR REPLACE INTO embeddings_pq (node_id, pq_codes, codebook_id) VALUES (?1,?2,?3)",
+            params![ids[i], codes, codebook_id],
+        ).map_err(|e| format!("insert embeddings_pq for {}: {e}", ids[i]))?;
+    }
+    Ok(PqTrainReport { codebook_id, m, ks, sub_dim, vector_count: n })
+}
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cosine_dimension_mismatch_safe() {
+        // Mismatched dims must not panic and should yield 0.0 (silent-safe).
+        let a: Vec<f32> = vec![1.0, 0.0];
+        let b: Vec<f32> = vec![0.0, 1.0, 0.0];
+        assert_eq!(cosine_similarity_f32(&a, &b), 0.0);
+    }
+
+    #[test]
+    fn test_cosine_identical() {
+        let a: Vec<f32> = vec![0.5, 0.5, 0.0];
+        let b: Vec<f32> = vec![0.5, 0.5, 0.0];
+        assert!((cosine_similarity_f32(&a, &b) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_local_hash_kernel_dim_and_norm() {
+        let v = local_embed_texts(&["hello world", "hello world again"], 384);
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].len(), 384);
+        let norm: f32 = v[0].iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 1e-4, "L2 norm should be 1.0, got {}", norm);
+    }
+
+    #[test]
+    fn test_local_hash_kernel_deterministic_and_similar() {
+        let a = local_embed_texts(&["neotrix consciousness core", "neotrix consciousness core"], 384);
+        // 同文本 → 同向量
+        assert_eq!(a[0], a[1]);
+        // 相似文本 → 高 cosine
+        let b = local_embed_texts(&["neotrix consciousness tree", "random unrelated text about quantum"], 384);
+        let sim_same = cosine_similarity_f32(&a[0], &b[0]);
+        let sim_diff = cosine_similarity_f32(&a[0], &b[1]);
+        assert!(sim_same > sim_diff, "similar should rank above dissimilar: {} vs {}", sim_same, sim_diff);
+    }
+
+    #[test]
+    fn test_embed_mode_from_env() {
+        // 默认 (env 未设置) 必须是 Local — 自治零依赖闭环 (R-P79)
+        std::env::remove_var("NEOTRIX_EMBEDDING_MODE");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Local);
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Local);
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "local");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Local);
+        // 显式 opt-in 才走 HTTP
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "http");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Http);
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "remote");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Http);
+        std::env::remove_var("NEOTRIX_EMBEDDING_MODE");
+    }
+
+    #[test]
+    fn test_embed_text_batch_local_mode_no_network() {
+        let cfg = EmbeddingConfig { api_key: "local".into(), base_url: "http://127.0.0.1:1/v1".into(), model: "hash-kernel".into(), dimension: 384, mode: EmbedMode::Local };
+        let v = embed_text_batch(&cfg, &["t1", "t2"]).unwrap();
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].len(), 384);
+    }
+
+    #[test]
+    fn test_embed_text_batch_http_failure_falls_back_to_local() {
+        // 即便 mode=Http, 若 server 不可达也必须回退到 hash-kernel (零依赖闭环).
+        let cfg = EmbeddingConfig { api_key: "x".into(), base_url: "http://127.0.0.1:1/v1".into(), model: "mini".into(), dimension: 384, mode: EmbedMode::Http };
+        let v = embed_text_batch(&cfg, &["t1", "t2"]).unwrap();
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].len(), 384);
+        // 回退产物应与 Local 模式一致 (确定性)
+        let local = embed_text_batch(&EmbeddingConfig { mode: EmbedMode::Local, ..cfg.clone() }, &["t1", "t2"]).unwrap();
+        assert_eq!(v, local);
+    }
+
+    #[test]
+    fn test_vector_blob_roundtrip() {
+        let v: Vec<f32> = vec![1.5, -2.0, 3.25, 100.5];
+        let blob = vector_to_blob(&v);
+        let back = blob_to_vector(&blob);
+        assert_eq!(v, back);
+    }
+
+    #[test]
+    fn test_pq_codebook_parse_in_memory() {
+        // Build a synthetic codebook blob: m=2 subspaces, ks=2 centroids, sub_dim=2
+        let _m = 2;
+        let _ks = 2;
+        let _sub_dim = 2;
+        let mut blob = Vec::new();
+        // subspace 0: centroids [1,1],[9,9]; subspace 1: [2,2],[8,8]
+        for cw in [1.0f32, 1.0, 9.0, 9.0, 2.0, 2.0, 8.0, 8.0] {
+            blob.extend_from_slice(&cw.to_le_bytes());
+        }
+        // Build a temp DB with pq_codebook row and embeddings_pq entry
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE pq_codebook(id INTEGER PRIMARY KEY, m INTEGER, ks INTEGER, sub_dim INTEGER, codewords BLOB, dimension INTEGER, model TEXT, trained_at INTEGER, num_vectors INTEGER);
+             CREATE TABLE embeddings_pq(node_id TEXT PRIMARY KEY, pq_codes BLOB, codebook_id INTEGER);
+             CREATE TABLE embeddings(node_id TEXT PRIMARY KEY, vector BLOB, dimension INTEGER, model TEXT, created_at INTEGER);",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO pq_codebook (id, m, ks, sub_dim, codewords, dimension, model, trained_at, num_vectors) VALUES (1, 2, 2, 2, ?1, 4, 'mini', 0, 1)",
+            params![blob],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO embeddings_pq VALUES ('n1', ?1, 1)",
+            params![vec![0u8, 1u8]],
+        )
+        .unwrap();
+        // Exact vector for n1 == query, so rerank lifts it to the top.
+        let mut exact_blob = Vec::new();
+        for f in [1.0f32, 1.0, 8.0, 8.0] {
+            exact_blob.extend_from_slice(&f.to_le_bytes());
+        }
+        conn.execute(
+            "INSERT INTO embeddings (node_id, vector, dimension, model, created_at) VALUES ('n1', ?1, 4, 'mini', 0)",
+            params![exact_blob],
+        )
+        .unwrap();
+        // query vector very close to sub0 centroid0 [1,1] and sub1 centroid1 [8,8]
+        let q: Vec<f32> = vec![1.0, 1.0, 8.0, 8.0];
+        let hits = pq_ann_search(&conn, &q, 1, Some(1)).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].0, "n1");
+        // After exact re-ranking the score is cosine similarity (positive for a match).
+        assert!(hits[0].1 > 0.0, "re-ranked score should be cosine similarity");
+    }
+
+    #[test]
+    fn test_build_node_text_unicode_boundary() {
+        // 缺陷4修复 (真实运转): build_node_text 用字节索引截断内容 (c[..500]),
+        // 对多字节 UTF-8 (中文) 在字符边界外 panic → 古籍/中文节点嵌入必崩。
+        // 验证: 超长中文内容截断不 panic, 且截断在字符边界。
+        let content = "案".repeat(600); // 1800 bytes, 全中文
+        let text = build_node_text("史记", Some("司马迁"), Some(&content));
+        assert!(text.contains("史记"), "title preserved");
+        assert!(text.contains("司马迁"), "summary preserved");
+        // 截断后的 content 部分必须是完整字符 (无 replacement char / 无 panic)
+        assert!(text.contains("案"), "content chars preserved");
+        // 若截断到 500 bytes, 应以完整字符结束 — 检查最后一个 char 合法
+        assert!(text.is_char_boundary(text.len()), "text ends at char boundary");
+        // 边界精确测试: 恰好在边界外的情况
+        let content2 = "案".repeat(250); // 750 bytes > 500
+        let text2 = build_node_text("t", None, Some(&content2));
+        assert!(text2.is_char_boundary(text2.len()));
+    }
+
+    #[test]
+    fn test_train_pq_codebook_roundtrip() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE pq_codebook(id INTEGER PRIMARY KEY AUTOINCREMENT, m INTEGER, ks INTEGER, sub_dim INTEGER, codewords BLOB, dimension INTEGER, model TEXT, trained_at INTEGER, num_vectors INTEGER);
+             CREATE TABLE embeddings_pq(node_id TEXT PRIMARY KEY, pq_codes BLOB, codebook_id INTEGER);
+             CREATE TABLE embeddings(node_id TEXT PRIMARY KEY, vector BLOB, dimension INTEGER, model TEXT, created_at INTEGER);",
+        )
+        .unwrap();
+        // 8 vectors of dim 4 clustered so kmeans converges: two clusters of 4
+        let vecs: Vec<Vec<f32>> = (0..8)
+            .map(|i| if i < 4 { vec![1.0, 1.0, 1.0, 1.0] } else { vec![5.0, 5.0, 5.0, 5.0] })
+            .collect();
+        for (i, v) in vecs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO embeddings (node_id, vector, dimension, model, created_at) VALUES (?1, ?2, 4, 'mini', 0)",
+                params![format!("n{i}"), vector_to_blob(v)],
+            )
+            .unwrap();
+        }
+        // m=2 sub-spaces × ks=2 centroids; 8 vectors >= ks*4
+        let report = train_pq_codebook(&conn, 2, 2, 4, None).unwrap();
+        assert_eq!(report.m, 2);
+        assert_eq!(report.ks, 2);
+        assert_eq!(report.sub_dim, 2);
+        assert_eq!(report.vector_count, 8);
+        assert!(report.codebook_id >= 1);
+
+        let pq_count: i64 = conn.query_row("SELECT COUNT(*) FROM embeddings_pq", [], |r| r.get(0)).unwrap();
+        assert_eq!(pq_count, 8);
+        let cb_count: i64 = conn.query_row("SELECT COUNT(*) FROM pq_codebook", [], |r| r.get(0)).unwrap();
+        assert_eq!(cb_count, 1);
+
+        // The trained codebook must be loadable and searchable: query == cluster A
+        let q: Vec<f32> = vec![1.0, 1.0, 1.0, 1.0];
+        let hits = pq_ann_search(&conn, &q, 2, Some(report.codebook_id)).unwrap();
+        assert!(!hits.is_empty());
+        // n0/n1 (cluster A) must rank above n2/n3 (cluster B)
+        let top = &hits[0].0;
+        assert!(top == "n0" || top == "n1");
+    }
+
+    #[test]
+    fn test_train_pq_too_few_vectors() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE pq_codebook(id INTEGER PRIMARY KEY AUTOINCREMENT, m INTEGER, ks INTEGER, sub_dim INTEGER, codewords BLOB, dimension INTEGER, model TEXT, trained_at INTEGER, num_vectors INTEGER);
+             CREATE TABLE embeddings_pq(node_id TEXT PRIMARY KEY, pq_codes BLOB, codebook_id INTEGER);
+             CREATE TABLE embeddings(node_id TEXT PRIMARY KEY, vector BLOB, dimension INTEGER, model TEXT, created_at INTEGER);",
+        )
+        .unwrap();
+        for i in 0..3 {
+            conn.execute(
+                "INSERT INTO embeddings (node_id, vector, dimension, model, created_at) VALUES (?1, ?2, 4, 'mini', 0)",
+                params![format!("n{i}"), vector_to_blob(&vec![0.0, 0.0, 0.0, 0.0])],
+            )
+            .unwrap();
+        }
+        let err = train_pq_codebook(&conn, 2, 2, 4, None).unwrap_err();
+        assert!(err.contains("Not enough vectors"), "err: {err}");
+    }
+}
+
+// ── W3.1 (batch3 2026-08-26, 源: arxiv 2608.17050 Cross-Model Memory Transfer) ──
+// 跨模型记忆迁移 spike: target-side reader adaptation — 学一个线性映射 W 把旧
+// 空间向量投到新空间, 免全量重嵌。纯数学, 离线可验。
+
+/// 岭回归拟合线性映射 W: old_dim → new_dim, 最小化 ||old·W − new||² + λ||W||²。
+/// 按输出维独立解正规方程 (XᵀX + λI) w = Xᵀy, 高斯消元部分主元。
+pub fn fit_linear_map(old: &[Vec<f32>], new: &[Vec<f32>], lambda: f32) -> Result<Vec<Vec<f32>>, String> {
+    if old.len() != new.len() || old.is_empty() {
+        return Err("paired embeddings required".into());
+    }
+    let _n = old.len();
+    let d_in = old[0].len();
+    let d_out = new[0].len();
+    if old.iter().any(|v| v.len() != d_in) || new.iter().any(|v| v.len() != d_out) {
+        return Err("inconsistent dims".into());
+    }
+    // W3.1 方法学 v2: 仿射映射 (偏置列) — 纯线性在均值非零空间欠拟合。
+    // 增广 xi' = [xi, 1], 拟合维度 d_in+1; apply_linear_map 同步增广。
+    let da = d_in + 1;
+    let mut xtx = vec![0.0f32; da * da];
+    for xi in old {
+        for i in 0..da {
+            let vi = if i < d_in { xi[i] } else { 1.0 };
+            for j in 0..da {
+                let vj = if j < d_in { xi[j] } else { 1.0 };
+                xtx[i * da + j] += vi * vj;
+            }
+        }
+    }
+    for i in 0..da {
+        xtx[i * da + i] += lambda;
+    }
+    let mut xty = vec![vec![0.0f32; d_out]; da];
+    for (xi, yi) in old.iter().zip(new.iter()) {
+        for i in 0..da {
+            let vi = if i < d_in { xi[i] } else { 1.0 };
+            for o in 0..d_out {
+                xty[i][o] += vi * yi[o];
+            }
+        }
+    }
+    // 对每个输出维解 (XᵀX+λI) w = Xᵀy — 复用同一分解: 直接高斯消元 d_out 次
+    // (d≈128, 开销可忽略; 不引入外部 linalg 依赖)
+    let mut w_t = vec![vec![0.0f32; da]; d_out]; // [out][in+bias]
+    for o in 0..d_out {
+        let mut a = xtx.clone();
+        let mut b = vec![0.0f32; da];
+        for i in 0..da {
+            b[i] = xty[i][o];
+        }
+        solve_linear(&mut a, &mut b, da)?;
+        for i in 0..da {
+            w_t[o][i] = b[i];
+        }
+    }
+    Ok(w_t)
+}
+
+/// 应用映射: [old_vec, 1] · Wᵀ → new_space (含偏置项)
+pub fn apply_linear_map(w_t: &[Vec<f32>], old_vec: &[f32]) -> Vec<f32> {
+    w_t.iter()
+        .map(|row| {
+            row.iter()
+                .enumerate()
+                .map(|(i, a)| {
+                    let v = old_vec.get(i).copied().unwrap_or(1.0); // 越界位 = 偏置
+                    a * v
+                })
+                .sum()
+        })
+        .collect()
+}
+
+/// 高斯消元 (部分主元) 解 Ax=b, 就地修改。
+fn solve_linear(a: &mut [f32], b: &mut [f32], d: usize) -> Result<(), String> {
+    for col in 0..d {
+        // 主元
+        let mut piv = col;
+        for r in col + 1..d {
+            if a[r * d + col].abs() > a[piv * d + col].abs() {
+                piv = r;
+            }
+        }
+        if a[piv * d + col].abs() < 1e-10 {
+            return Err("singular matrix".into());
+        }
+        if piv != col {
+            for c in 0..d {
+                a.swap(col * d + c, piv * d + c);
+            }
+            b.swap(col, piv);
+        }
+        let inv = 1.0 / a[col * d + col];
+        for r in col + 1..d {
+            let f = a[r * d + col] * inv;
+            if f == 0.0 {
+                continue;
+            }
+            for c in col..d {
+                a[r * d + c] -= f * a[col * d + c];
+            }
+            b[r] -= f * b[col];
+        }
+    }
+    for i in (0..d).rev() {
+        let mut s = b[i];
+        for j in i + 1..d {
+            s -= a[i * d + j] * b[j];
+        }
+        b[i] = s / a[i * d + i];
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod migration_probe_tests {
+    use super::*;
+
+    fn cluster_docs(seed_topics: &[&str], per_topic: usize) -> Vec<String> {
+        let mut docs = Vec::new();
+        for topic in seed_topics {
+            for i in 0..per_topic {
+                docs.push(format!(
+                    "{topic} report number {i}: analysis of {topic} trends, {topic} benchmarks and {topic} outlook with quarterly data tables"
+                ));
+            }
+        }
+        docs
+    }
+
+    fn top_k_neighbors(target: &[f32], pool: &[Vec<f32>], k: usize) -> Vec<usize> {
+        let mut scored: Vec<(usize, f64)> = pool
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i, cosine_similarity_f32(target, v)))
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(k);
+        scored.into_iter().map(|(i, _)| i).collect()
+    }
+
+    /// 判据: 换 embedding 维度后, 经学习映射的旧向量召回保持 >70%。
+    #[test]
+    fn linear_reader_adaptation_preserves_recall_over_70pct() {
+        let topics = ["quantum computing", "coffee brewing", "mountain hiking", "stock market", "ocean biology", "car racing"];
+        let docs = cluster_docs(&topics, 12); // 72 docs
+        let olds = local_embed_texts(
+            &docs.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 64,
+        );
+        let news = local_embed_texts(
+            &docs.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 256,
+        );
+        // 留出评估: 每 topic 取末 2 条
+        let train_idx: Vec<usize> = (0..docs.len()).filter(|i| i % 12 < 9).collect();
+        let eval_idx: Vec<usize> = (0..docs.len()).filter(|i| i % 12 >= 9).collect();
+        let train_old: Vec<Vec<f32>> = train_idx.iter().map(|&i| olds[i].clone()).collect();
+        let train_new: Vec<Vec<f32>> = train_idx.iter().map(|&i| news[i].clone()).collect();
+
+        // λ 扫描结论 (独立复现): 1e-2 过正则化致 70% 边界, 1e-3→88.3%, 1e-4→90%
+        let w = fit_linear_map(&train_old, &train_new, 1e-3).expect("fit");
+        // 映射后向量 L2 归一化以与 cosine 口径一致
+        let mapped_eval: Vec<Vec<f32>> = eval_idx
+            .iter()
+            .map(|&i| {
+                let mut v = apply_linear_map(&w, &olds[i]);
+                let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm > 1e-8 { for x in v.iter_mut() { *x /= norm; } }
+                v
+            })
+            .collect();
+
+        // ground-truth 邻居 = 新空间全体; adapted 邻居 = 映射旧向量 vs 新空间全体
+        let mut overlap_total = 0.0f64;
+        for (ei, &doc_i) in eval_idx.iter().enumerate() {
+            let gt = top_k_neighbors(&news[doc_i], &news, 5);
+            let ad = top_k_neighbors(&mapped_eval[ei], &news, 5);
+            let hit = gt.iter().filter(|g| ad.contains(g)).count();
+            overlap_total += hit as f64 / 5.0;
+        }
+        let recall = overlap_total / eval_idx.len() as f64;
+        println!("[W3.1 probe] reader-adaptation recall@5 = {:.1}%", recall * 100.0);
+        assert!(
+            recall > 0.7,
+            "迁移召回 {:.1}% 未达 70% 判据 — hash-kernel 跨维度需全量重嵌",
+            recall * 100.0
+        );
+    }
+
+    #[test]
+    fn fit_rejects_mismatched_pairs() {
+        assert!(fit_linear_map(&[], &[], 1.0).is_err());
+        let a = vec![vec![1.0, 2.0]];
+        let b = vec![vec![1.0], vec![2.0]];
+        assert!(fit_linear_map(&a, &b, 1.0).is_err());
+    }
+}

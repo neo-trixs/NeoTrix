@@ -159,7 +159,7 @@ impl TrajectoryCompressor {
 mod tests {
     use super::*;
     use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
-    use crate::core::nt_core_traits::SpecialistType;
+    use crate::l0_substrate::nt_core_traits::SpecialistType;
 
     fn mk_step(
         idx: usize,

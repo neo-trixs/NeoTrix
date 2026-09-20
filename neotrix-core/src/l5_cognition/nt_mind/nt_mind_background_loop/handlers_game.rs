@@ -390,7 +390,7 @@ impl BackgroundLoopHandle {
 
         // Emit consciousness feedback event
         if let Some(ref bus) = self.event_bus {
-            use crate::core::nt_core_event::CoreEvent;
+            use crate::l0_substrate::nt_core_event::CoreEvent;
             bus.emit(CoreEvent::GameTrainingUpdate {
                 game_name: report.game_name,
                 iteration: report.tick,

@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+use crate::atomic_io;
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -95,7 +97,7 @@ impl FilePlugin {
 
     fn write_file(path: &str, content: &str) -> Result<(), DomainError> {
         let safe = Self::resolve_safe_path(path)?;
-        std::fs::write(&safe, content).map_err(|e| DomainError {
+        atomic_io::write_atomic(&safe, content.as_bytes()).map_err(|e| DomainError {
             code: "IO_ERROR".into(),
             message: format!("写入文件失败: {}", e),
             recoverable: true,
@@ -217,6 +219,7 @@ impl FilePlugin {
     }
 }
 
+#[async_trait]
 impl DomainPlugin for FilePlugin {
     fn name(&self) -> &str {
         "file"
@@ -320,7 +323,7 @@ impl DomainPlugin for FilePlugin {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,

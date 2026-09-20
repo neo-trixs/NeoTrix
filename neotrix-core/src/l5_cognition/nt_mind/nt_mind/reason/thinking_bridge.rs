@@ -3,7 +3,7 @@ use super::hypercube_attention_bridge::{AttentionHypercubeBridge, AttentionRecal
 use crate::l5_cognition::nt_core_gwt::module_def::SpecialistModule;
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
-use crate::l6_meta::nt_core_self::{
+use crate::l5_cognition::l1_facade::{
     AttentionDomain, CognitiveEvaluator, CognitiveHealthReport, CrystalRegistry,
     IntrinsicMotivation, MotivationState, ReflectionGrade, SelfReferentialMonitor, SiliconArchive,
     SiliconSelfModel, SiliconSelfState, StrategyKind, ThinkingStep, ThinkingTrace,

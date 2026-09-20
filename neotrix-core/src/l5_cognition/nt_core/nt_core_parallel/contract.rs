@@ -192,7 +192,7 @@ impl Default for TaskContract {
 
 /// TaskContractWarden — 契约持久化 + 生命周期管理
 pub struct TaskContractWarden {
-    kb: Option<crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase>,
+    kb: Option<crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase>,
     contracts: std::collections::HashMap<String, TaskContract>,
     ns: String,
     /// 契约完成率 (验收通过 / 总额，C4 定义)
@@ -207,7 +207,7 @@ impl Default for TaskContractWarden {
 
 impl TaskContractWarden {
     pub fn new() -> Self {
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None).ok();
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(None).ok();
         Self {
             kb,
             contracts: std::collections::HashMap::new(),

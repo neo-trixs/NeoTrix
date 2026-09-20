@@ -6,8 +6,8 @@
 use super::core::CapabilityVector;
 use super::memory::ReasoningMemory;
 use super::self_edit::MicroEdit;
-use crate::l6_meta::nt_meta::{
-    CodeScanner, MetaCognitiveLoop, MetaCycleResult, SelfModel, WeaknessAnalyzer,
+use crate::l5_cognition::l1_facade::{
+    CodeScanner, MetaCognitiveLoop, MetaCycleResult, MetaSelfModel, WeaknessAnalyzer,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -223,14 +223,14 @@ pub struct MetaCognitionBridge {
     pub metacog_loop: MetaCognitiveLoop,
     pub weak_analyzer: WeaknessAnalyzer,
     pub project_root: String,
-    pub last_scan: Option<SelfModel>,
+    pub last_scan: Option<MetaSelfModel>,
     pub last_result: Option<MetaCycleResult>,
     pub delta_history: Vec<ModuleDelta>,
 }
 
 impl MetaCognitionBridge {
     pub fn new(project_root: &str) -> Self {
-        let model = SelfModel::new();
+        let model = MetaSelfModel::new();
         Self {
             metacog_loop: MetaCognitiveLoop::new(model),
             weak_analyzer: WeaknessAnalyzer::new(),
@@ -258,8 +258,8 @@ impl MetaCognitionBridge {
 
     fn compute_delta(
         &self,
-        prev: &SelfModel,
-        current: &SelfModel,
+        prev: &MetaSelfModel,
+        current: &MetaSelfModel,
         result: &MetaCycleResult,
     ) -> ModuleDelta {
         let _prev_err_count = prev.compilation.errors;
@@ -288,7 +288,7 @@ impl MetaCognitionBridge {
         }
     }
 
-    pub fn quick_scan(&self) -> crate::l6_meta::nt_meta::WeaknessReport {
+    pub fn quick_scan(&self) -> crate::l5_cognition::l1_facade::WeaknessReport {
         let scanner = CodeScanner::new(&self.project_root);
         let model = scanner.scan();
         self.weak_analyzer.analyze(&model)
@@ -330,10 +330,10 @@ impl MetaCognitionBridge {
                 .iter()
                 .map(|p| {
                     let sev = match p.weakness.severity {
-                        crate::l6_meta::nt_meta::DebtSeverity::Critical => "CRIT",
-                        crate::l6_meta::nt_meta::DebtSeverity::Major => "MAJ",
-                        crate::l6_meta::nt_meta::DebtSeverity::Minor => "MIN",
-                        crate::l6_meta::nt_meta::DebtSeverity::Cosmetic => "COS",
+                        crate::l5_cognition::l1_facade::DebtSeverity::Critical => "CRIT",
+                        crate::l5_cognition::l1_facade::DebtSeverity::Major => "MAJ",
+                        crate::l5_cognition::l1_facade::DebtSeverity::Minor => "MIN",
+                        crate::l5_cognition::l1_facade::DebtSeverity::Cosmetic => "COS",
                     };
                     format!("[{}] {}: {}", sev, p.weakness.pattern_id, p.action)
                 })
@@ -384,7 +384,7 @@ impl MetaCognitionBridge {
             .tech_debt
             .items
             .iter()
-            .filter(|i| i.severity == crate::l6_meta::nt_meta::DebtSeverity::Critical)
+            .filter(|i| i.severity == crate::l5_cognition::l1_facade::DebtSeverity::Critical)
             .count()
     }
 

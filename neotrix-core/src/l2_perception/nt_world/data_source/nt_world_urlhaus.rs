@@ -171,7 +171,7 @@ impl UrlhausFetcher {
             let summary = format!("{} | {} | {}", evt.threat, evt.url_status, evt.host);
             let existing = kb.find_node_by_url(&evt.url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.url, crate::l6_meta::nt_core_kb_types::NodeType::External, Some(&summary), Some(&evt.url), Some("urlhaus"))
+            let _id = kb.insert_or_get_node(&evt.url, neotrix_types::knowledge_access::NodeType::External, Some(&summary), Some(&evt.url), Some("urlhaus"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.url, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }
@@ -243,7 +243,7 @@ impl CisaKevFetcher {
             let summary = format!("{} {} | {}", evt.vendor_project, evt.product, evt.vulnerability_name);
             let existing = kb.find_node_by_url(&url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.cve_id, crate::l6_meta::nt_core_kb_types::NodeType::External, Some(&summary), Some(&url), Some("cisa-kev"))
+            let _id = kb.insert_or_get_node(&evt.cve_id, neotrix_types::knowledge_access::NodeType::External, Some(&summary), Some(&url), Some("cisa-kev"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.cve_id, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn test_ingest_both() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
         let r1 = UrlhausFetcher::new().ingest_from_json(&kb, URLHAUS_FIXTURE_JSON).expect("ingest urlhaus");
         assert_eq!(r1.nodes_created, 1);
         let r2 = CisaKevFetcher::ingest_events(&kb, &CisaKevFetcher::parse_json(CISA_KEV_FIXTURE_JSON).unwrap()).expect("ingest cisa");

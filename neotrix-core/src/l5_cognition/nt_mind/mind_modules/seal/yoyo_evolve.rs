@@ -19,7 +19,7 @@
 //! | decision.created     | Decision      | Absorb (accept/reject gate)    | R-P42/R-P43 吸收协议     |
 //! | Promoted             | Promoted      | Promote (wire to prod path)    | Dark Forest 接线门禁     |
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 进化阶段机 — 与 `make_stage!` 四阶段一一对应。
 ///

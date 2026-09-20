@@ -1,5 +1,5 @@
-use crate::core::nt_core_cap::CapabilityVector;
-use crate::core::nt_core_traits::SpecialistType;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
+use crate::l0_substrate::nt_core_traits::SpecialistType;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

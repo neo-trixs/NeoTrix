@@ -5,7 +5,7 @@ pub use spec_driven::{
     SpecVerification, SpecVerifier,
 };
 
-use crate::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
 
 pub trait AbsorbValidator {
     fn validate_absorb(&self, after: &CapabilityVector) -> bool;
@@ -14,7 +14,7 @@ pub trait AbsorbValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_cap::CapabilityVector;
+    use neotrix_types::core::nt_core_cap::CapabilityVector;
 
     struct AlwaysValid;
     impl AbsorbValidator for AlwaysValid {

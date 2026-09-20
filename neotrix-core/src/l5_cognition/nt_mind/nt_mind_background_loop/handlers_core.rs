@@ -268,8 +268,8 @@ impl BackgroundLoopHandle {
             }
         }
         if let Some(ref mut gd) = self.gap_detector {
-            use crate::l6_meta::nt_meta::scanner::CodeScanner;
-            use crate::l6_meta::nt_meta::weakness::WeaknessAnalyzer;
+            use crate::l5_cognition::l1_facade::scanner::CodeScanner;
+            use crate::l5_cognition::l1_facade::weakness::WeaknessAnalyzer;
             let m = CodeScanner::new(".").scan();
             let w = WeaknessAnalyzer::new().analyze(&m);
             let r = gd.detect_gaps(&m, &w.weaknesses);
@@ -364,17 +364,6 @@ impl BackgroundLoopHandle {
         }
         log::debug!("[bg] curiosity: cortex_traces={} gaps={} queries={}",
             cortex_traces, gaps.len(), self.curiosity_drive.top_signals(3).len());
-    }
-
-    /// Log a session event to KB (obsidian-mind SessionStart/Stop pattern).
-    /// Creates a node with type=Session with event type and summary.
-    #[allow(dead_code)]
-    pub(crate) async fn log_session_event(&self, event_type: &str, summary: &str) {
-        let Some(ref kb) = self.kb else { return };
-        let title = format!("session-{}-{}", event_type, chrono::Utc::now().timestamp());
-        if let Err(e) = kb.insert_or_get_node(&title, crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Session, Some(summary), None, Some("neotrix")) {
-            log::warn!("[bg] failed to log session event '{}': {}", event_type, e);
-        }
     }
 
     pub(crate) async fn handle_knowledge_chain(&mut self) {

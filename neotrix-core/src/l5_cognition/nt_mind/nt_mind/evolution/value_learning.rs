@@ -6,7 +6,7 @@
 //! - 演化：权重调整、新价值观萌芽、层级重组
 //! - 守恒：核心价值观不退化（锚定），边缘价值观可增删
 
-use crate::l6_meta::nt_core_kb_primitives::{kv_list, kv_set, now};
+use crate::l0_substrate::nt_core_kb_primitives::{kv_list, kv_set, now};
 #[allow(unused_imports)]
 use crate::l5_cognition::nt_mind::nt_mind::evolution::value_compass::{
     CoreValue, ValueAction, ValueCompassRuntime,
@@ -330,7 +330,7 @@ impl ValueLearningEngine {
             }
         }
         // 持久化指南针 (尽力而为: KB 忙时不阻断学习闭环)
-        if let Some(conn) = crate::l6_meta::nt_core_kb_primitives::open_raw_conn() {
+        if let Some(conn) = crate::l0_substrate::nt_core_kb_primitives::open_raw_conn() {
             let _ = self.compass.persist(&conn);
         }
         Ok(())
@@ -484,7 +484,7 @@ pub fn record_outcome(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::nt_core_kb_primitives::schema_initialize;
+    use crate::l0_substrate::nt_core_kb_primitives::schema_initialize;
     use rusqlite::Connection;
 
     fn mem_conn() -> Connection {

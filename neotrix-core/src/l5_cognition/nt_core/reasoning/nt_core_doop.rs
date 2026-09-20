@@ -5,7 +5,7 @@
 //! (C1: trait 存在 + 基础逻辑 + SelfTest T1 + 3 测试), 建模声明式分析点的
 //! 指针集 (points-to set) 推导与查询。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 use std::collections::HashMap;
 
 /// 声明式分析点: 变量名 → 其指向的目标集 (points-to set)。

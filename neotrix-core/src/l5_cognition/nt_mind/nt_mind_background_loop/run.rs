@@ -32,8 +32,6 @@ const PENDING_ABSORPTION_INTERVAL_SECS: u64 = 60; // pending-absorb.json 检查 
 const DAILY_INTEL_INTERVAL_SECS: u64 = 86_400; // 每日例行感知检查 (cycle 1107)
 const ALWAYS_ON_INTERVAL_SECS: u64 = 120;
 const SKILL_SCAN_INTERVAL_SECS: u64 = 3600;
-#[allow(dead_code)]
-const SESSION_ROUTER_FLUSH_INTERVAL_SECS: u64 = 300;
 const HEALER_SCAN_INTERVAL_SECS: u64 = 3600;
 const AVATAR_AUTO_DISTILL_INTERVAL_SECS: u64 = 600;
 const KB_ABSORB_INTERVAL_SECS: u64 = 7200;
@@ -195,7 +193,7 @@ impl ConvergencePulse {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConvergencePulse {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ConvergencePulse {
     fn name(&self) -> &str {
         "convergence_pulse"
     }
@@ -236,7 +234,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConvergencePulse {
     }
 }
 
-use crate::l6_meta::nt_core_self_constitution::ConstitutionLoader;
+use crate::l5_cognition::l1_facade::ConstitutionLoader;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::{CleanupEngine, CleanupKind, BackupEngine};
 use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, LogHook};
@@ -244,7 +242,7 @@ use crate::l5_cognition::nt_mind::nt_mind_background_loop::knowledge_pipeline::K
 use crate::l5_cognition::nt_mind::foundation::l1_wrappers::SessionRecoveryWrapper;
 use crate::neotrix::nt_core_event_bus::{EventBus, flood_guard, subscribe_all_layers_sync};
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
-use crate::core::nt_core_event::CoreEvent;
+use crate::l0_substrate::nt_core_event::CoreEvent;
 use crate::l5_cognition::nt_core::nt_state_substrate::StateSubstrate;
 use crate::l1_action::nt_core_simulate_engine::SimulateEngine;
 
@@ -437,7 +435,7 @@ impl BackgroundLoop {
             }
             let summary = format!("session_start: cycle_{}", chrono::Utc::now().timestamp());
             let title = format!("session-start-{}", chrono::Utc::now().timestamp());
-            if let Err(e) = kb_ref.insert_or_get_node(&title, crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Session, Some(&summary), None, Some("neotrix")) {
+            if let Err(e) = kb_ref.insert_or_get_node(&title, crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Session, Some(&summary), None, Some("neotrix")) {
                 log::warn!("[session-start] failed to insert session node: {}", e);
             }
             let issues = kb_ref.integrity_check();
@@ -451,7 +449,7 @@ impl BackgroundLoop {
         // 语义: set 走 effect 可回滚 (coeffect operations are effects), 前置条件
         // k∉dom(σ) 防重复提供; 消费方 NT-MEMORY/CLI 插件注入时读取该表。
         if let Some(ref kb_ref) = kb {
-            use crate::l5_cognition::layer_aliases::{
+            use crate::l5_cognition::l1_facade::{
                 persist_bindings, CoeffectBinding, CoeffectRegistry, CoeffectTx,
             };
             if let Ok(conn) = kb_ref.raw_conn() {
@@ -491,7 +489,7 @@ impl BackgroundLoop {
 
         // ── Import review findings at startup ──
         if let Some(ref kb_ref) = kb {
-            let review_path = std::path::Path::new("design/review-findings.json");
+            let review_path = std::path::Path::new("skills/design/review-findings.json");
             if review_path.exists() {
                 match kb_ref.import_review_findings(review_path) {
                     Ok(report) => {
@@ -648,7 +646,7 @@ impl BackgroundLoop {
             cognitive_load: self.cognitive_load.take(),
             volition: self.volition.take(),
             // bbrain already set above (line 571)
-            cog_eval: crate::l6_meta::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
+            cog_eval: crate::l5_cognition::l1_facade::metacognitive_evaluator::CognitiveEvaluator::new(),
             second_brain: {
                 let mut sb = SecondBrain::new();
         if let Some(ref kb_ref) = self.kb {
@@ -704,8 +702,8 @@ impl BackgroundLoop {
             state: StateSubstrate::new(),
             simulate: SimulateEngine::new(),
             convergence_pulse: ConvergencePulse::default(),
-            tool_grounding: crate::l6_meta::nt_core_self::self_audit::ToolGroundingMonitor::new(),
-            meta_auditor: crate::l6_meta::nt_meta::nt_core_meta_auditor::MetaAuditor::new(),
+            tool_grounding: crate::l5_cognition::l1_facade::self_audit::ToolGroundingMonitor::new(),
+            meta_auditor: crate::l5_cognition::l1_facade::nt_core_meta_auditor::MetaAuditor::new(),
             // 门控注册表 — 默认只读工具, 运行时可扩展。
             gate_registry: Some(ToolRegistry::from_read_only(&["get", "query", "read", "search"])),
             kb_guard: crate::l5_cognition::nt_mind::foundation::guardian::KbGuard::default(),
@@ -718,7 +716,7 @@ impl BackgroundLoop {
             readiness: _LoopReadyScore::default(),
             _autonomy_tier: _AutonomyTier::L1,
             refiner: crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner::new(),
-            self_improvement: crate::l6_meta::coordination::self_improvement::SelfImprovementLoop::new(),
+            self_improvement: crate::l5_cognition::l1_facade::SelfImprovementLoop::new(),
         }));
 
         macro_rules! spawn_handler {
@@ -770,7 +768,7 @@ impl BackgroundLoop {
 
         spawn_handler!(cfg.save_interval_secs, "save", |h| {
             h.handle_save().await;
-            emit_event!(h, crate::core::nt_core_event::CoreEvent::TaskSubmitted {
+            emit_event!(h, crate::l0_substrate::nt_core_event::CoreEvent::TaskSubmitted {
                 task: "save".into(), task_type: "storage".into(), priority: 2,
             });
         });
@@ -845,7 +843,7 @@ impl BackgroundLoop {
                 let affective_json = h.kb.as_ref()
                     .and_then(|kb| kb.kv_get("emotion", "affective_interface").ok().flatten());
                 if let Some(json) = engine_json {
-                    if let Ok(engine) = crate::l6_meta::nt_core_self::emotion_state::EmotionEngine::from_json(&json) {
+                    if let Ok(engine) = crate::l5_cognition::l1_facade::emotion_state::EmotionEngine::from_json(&json) {
                         if let Some(ref mut cr) = h.consciousness_runtime {
                             cr.set_emotion_engine(engine);
                             log::info!("[bg] emotion state restored from KB");
@@ -853,7 +851,7 @@ impl BackgroundLoop {
                     }
                 }
                 if let Some(json) = affective_json {
-                    if let Ok(iface) = crate::l6_meta::nt_core_self::affective_interface::AffectiveInterface::from_json(&json) {
+                    if let Ok(iface) = crate::l5_cognition::l1_facade::affective_interface::AffectiveInterface::from_json(&json) {
                         if let Some(ref mut cr) = h.consciousness_runtime {
                             // 恢复人类情感交互界面 (关系阶段 + 用户情感历史)。
                             // 恢复后把持久化的用户情感吸收进意识 (意识影响闭环)。
@@ -968,7 +966,7 @@ pub struct BackgroundLoopHandle {
     consciousness_runtime: Option<crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     consciousness_tree: Option<crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree>,
     fep_iit_bridge: Option<crate::l4_emotion::nt_feel::fep_iit_bridge::FepIitBridge>,
-    cognitive_load: Option<crate::l5_cognition::nt_core_consciousness::CognitiveLoadMonitor>,
+    cognitive_load: Option<crate::l5_cognition::cognitive_load::CognitiveLoadMonitor>,
     /// 意图引擎 (F2 接线): EFE 域探索提案必须经 select_by_goal_alignment 放行。
     volition: Option<crate::l5_cognition::nt_core_consciousness::VolitionEngine>,
     second_brain: Option<SecondBrain>,
@@ -993,17 +991,17 @@ pub struct BackgroundLoopHandle {
     /// pending-absorb 自动吸收重入标志 (handlers_absorption.rs)。
     absorption_in_progress: std::sync::atomic::AtomicBool,
 //     bbrain: crate::l5_cognition::nt_mind::bbrain_monitor::BMonitor,
-    cog_eval: crate::l6_meta::nt_core_self::metacognitive_evaluator::CognitiveEvaluator,
+    cog_eval: crate::l5_cognition::l1_facade::metacognitive_evaluator::CognitiveEvaluator,
     /// 0=Balanced, 1=Deep, 2=Fast — updated by consciousness tick, consumed by batch loops.
     cognitive_mode: u8,
     state: StateSubstrate,
     simulate: SimulateEngine,
     convergence_pulse: ConvergencePulse,
-    tool_grounding: crate::l6_meta::nt_core_self::self_audit::ToolGroundingMonitor,
+    tool_grounding: crate::l5_cognition::l1_facade::self_audit::ToolGroundingMonitor,
     /// 元审计器 — 架构审计真实消费端 (GAP-2 修复): handle_architecture_audit 把
     /// converge_check 幽灵/孤儿/失效 + SelfTest 失败统一汇入 record_finding,
     /// 使其从"仅测试调用"变 T3 生产接线 (R-P79), 累计准确性驱动审计质量。
-    meta_auditor: crate::l6_meta::nt_meta::nt_core_meta_auditor::MetaAuditor,
+    meta_auditor: crate::l5_cognition::l1_facade::nt_core_meta_auditor::MetaAuditor,
     /// 门控注册表 — 背景循环工具执行前置检查用。
     gate_registry: Option<ToolRegistry>,
     /// KB 守卫 + 工作区守卫 (Rust 化自 sh 守护脚本)
@@ -1026,11 +1024,11 @@ pub struct BackgroundLoopHandle {
     /// Continual Harness Refinement — 审查轨迹，应用有证据支持的状态更新
     refiner: crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner,
     /// L6 自我改进循环 — 采集指标→诊断→生成方案→执行→验证闭环
-    self_improvement: crate::l6_meta::coordination::self_improvement::SelfImprovementLoop,
+    self_improvement: crate::l5_cognition::l1_facade::SelfImprovementLoop,
 }
 
 impl BackgroundLoopHandle {
-    fn try_emit(&self, event: crate::core::nt_core_event::CoreEvent) {
+    fn try_emit(&self, event: crate::l0_substrate::nt_core_event::CoreEvent) {
         if let Some(ref bus) = self.event_bus { bus.emit(event); }
     }
 
@@ -1085,7 +1083,7 @@ impl BackgroundLoopHandle {
     /// 的数值指标喂给 AnomalyDetector 做 spike/drop 检测, 告警注入意识监控。
     /// Privacy: 只聚合 scalar (计数/时长/数值), 不携带原始 payload。
     pub async fn handle_telemetry(&mut self) {
-        use crate::core::nt_core_telemetry::{
+        use crate::l0_substrate::nt_core_telemetry::{
             global_telemetry, AlertKind, AnomalyDetector, PolicyDriftMonitor, TelemetryAlert,
         };
         static DETECTOR: std::sync::LazyLock<AnomalyDetector> =
@@ -1155,13 +1153,13 @@ impl BackgroundLoopHandle {
     /// 降级为日志, 不影响主循环。
     pub(crate) fn _inject_telemetry_alerts(
         &self,
-        alerts: &[crate::core::nt_core_telemetry::TelemetryAlert],
+        alerts: &[crate::l0_substrate::nt_core_telemetry::TelemetryAlert],
     ) {
         if alerts.is_empty() {
             return;
         }
-        use crate::core::nt_core_event::CoreEvent;
-        use crate::core::nt_core_telemetry::AlertKind;
+        use crate::l0_substrate::nt_core_event::CoreEvent;
+        use crate::l0_substrate::nt_core_telemetry::AlertKind;
         for a in alerts {
             let severity = match a.kind {
                 AlertKind::Spike => "spike",
@@ -1210,7 +1208,7 @@ mod tests {
     use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
     use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
     use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-    use crate::l5_cognition::layer_aliases::WorldModelV2;
+    use crate::l5_cognition::l1_facade::WorldModelV2;
 
     #[test]
     fn test_panorama_pipeline_new() {
@@ -1228,7 +1226,7 @@ mod tests {
 
     use super::ConvergencePulse;
     use super::{_AutonomyTier, _LoopReadyScore, _PathDenylist};
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_convergence_pulse_advance_no_gaps() {

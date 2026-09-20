@@ -6,7 +6,7 @@
 //! 核心能力: 将结构化数据/步骤转换为交互式可视化辅助规格
 //! (如分步高亮、节点面板), 本 stub 负责 aid 规格生成与校验。
 
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 
 /// 可视化辅助条目 (一个可高亮/可点击的步骤或实体)。
 #[derive(Debug, Clone, PartialEq)]

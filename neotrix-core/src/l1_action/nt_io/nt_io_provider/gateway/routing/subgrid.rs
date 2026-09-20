@@ -1,4 +1,4 @@
-use crate::core::nt_core_cache::text_to_embedding;
+use crate::l0_substrate::nt_core_cache::text_to_embedding;
 use crate::l1_action::nt_core_llm::{LlmRequest, LlmResponse, LlmError};
 
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::lookup_provider;
@@ -234,8 +234,8 @@ impl GatewayV2 {
             }
         }
         // 反馈到全局遥测 (D21 外部观察): 子网格健康可见于 nt_core_telemetry
-        crate::core::nt_core_telemetry::global_telemetry().record(
-            crate::core::nt_core_telemetry::TelemetryEvent::Custom {
+        crate::l0_substrate::nt_core_telemetry::global_telemetry().record(
+            crate::l0_substrate::nt_core_telemetry::TelemetryEvent::Custom {
                 name: format!("sub_grid_{:?}", profile),
                 value: format!(
                     "{}:{}:{}ms",

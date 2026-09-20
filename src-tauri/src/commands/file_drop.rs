@@ -97,7 +97,10 @@ pub fn setup_file_drop_listener(app: &AppHandle) {
                     .iter()
                     .filter_map(|p| p.to_str().map(String::from))
                     .collect();
-                let result = mgr.lock().unwrap().handle_drop(paths_str);
+                let result = match mgr.lock() {
+                    Ok(guard) => guard.handle_drop(paths_str),
+                    Err(_) => return,
+                };
                 if !result.accepted.is_empty() {
                     let _ = app_handle.emit("neotrix://file-drop", &result);
                 }

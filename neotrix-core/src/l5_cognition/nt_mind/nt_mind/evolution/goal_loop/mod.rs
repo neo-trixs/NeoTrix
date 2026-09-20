@@ -281,7 +281,7 @@ mod tests {
             .iter_mut()
             .for_each(|g| g.priority = GoalPriority::Medium);
 
-        gl.set_motivation(crate::l6_meta::nt_core_self::MotivationState {
+        gl.set_motivation(crate::l5_cognition::l1_facade::MotivationState {
             intrinsic_reward: 0.8,
             confidence: 0.9,
             error_rate: 0.1,
@@ -314,7 +314,7 @@ mod tests {
             .iter_mut()
             .for_each(|g| g.priority = GoalPriority::Medium);
 
-        gl.set_motivation(crate::l6_meta::nt_core_self::MotivationState {
+        gl.set_motivation(crate::l5_cognition::l1_facade::MotivationState {
             intrinsic_reward: 0.2,
             confidence: 0.3,
             error_rate: 0.5,

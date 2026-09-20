@@ -339,7 +339,7 @@ mod tests {
     
     #[test]
     fn test_template_tag_registry() {
-        // TODO(R-P79): Basic CRUD only — no behavioral assertions on tag-matching logic.
+        // Basic CRUD only — no behavioral assertions on tag-matching logic.
         // Replace with test that validates template discovery, weighted matching, and
         // cross-module consistency checking against real template/tag data.
         let mut registry = _TemplateTagRegistry::new();

@@ -1,11 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ReasoningBankStats {
-    pub total_memories: usize,
-    pub success_count: usize,
-    pub success_rate: f64,
-}
+pub use crate::l0_substrate::nt_core_substrate_types::ReasoningBankStats;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryDetailedStats {

@@ -13,11 +13,11 @@
 
 use super::co_evolution::{CoEvoConfig, CoEvolutionLoop};
 use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
-use crate::l6_meta::nt_core_kb_types::NodeType;
-use crate::l6_meta::nt_meta::{MetaCognitiveLoop, MetaCycleResult};
-use crate::l6_meta::nt_core_self::attention_head::{AttentionDomain, AttentionManager};
-use crate::l5_cognition::layer_aliases::KnowledgeBase;
-use crate::l5_cognition::layer_aliases::{UnifiedSearch, WorldSearchResult};
+use neotrix_types::knowledge_access::NodeType;
+use crate::l5_cognition::l1_facade::{MetaCognitiveLoop, MetaCycleResult};
+use crate::l5_cognition::l1_facade::attention_head::{AttentionDomain, AttentionManager};
+use crate::l5_cognition::l1_facade::KnowledgeBase;
+use crate::l5_cognition::l1_facade::{UnifiedSearch, WorldSearchResult};
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator;
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
@@ -120,7 +120,7 @@ impl MemoryAgentCapability for MemoryAgent {
         let nodes = self.kb.search_permission_aware(
             query,
             limit,
-            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::default(),
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::default(),
         )?;
         let first = nodes
             .first()
@@ -835,7 +835,7 @@ impl MetaAgentShell {
     pub fn new(task_type: &str) -> Self {
         // 按任务类型选择强度 + Weapon Set (Ascendancy 双专精路由)
         let attention = AttentionManager::from_task_type(0.3, task_type);
-        let metacog = MetaCognitiveLoop::new(crate::l6_meta::nt_meta::SelfModel::new());
+        let metacog = MetaCognitiveLoop::new(crate::l5_cognition::l1_facade::MetaSelfModel::new());
         Self {
             attention,
             metacog,
@@ -851,7 +851,7 @@ impl MetaAgentShell {
     /// 以自定义路由学习配置构造 (P1: min_evidence 等经 config 注入)。
     pub fn with_learner_config(task_type: &str, learner_config: RouteLearnerConfig) -> Self {
         let attention = AttentionManager::from_task_type(0.3, task_type);
-        let metacog = MetaCognitiveLoop::new(crate::l6_meta::nt_meta::SelfModel::new());
+        let metacog = MetaCognitiveLoop::new(crate::l5_cognition::l1_facade::MetaSelfModel::new());
         Self {
             attention,
             metacog,
@@ -867,7 +867,7 @@ impl MetaAgentShell {
     /// 以自定义共进化配置构造 (P4: epsilon/max_memories/min_evidence 注入)。
     pub fn with_coevo_config(task_type: &str, coevo_config: CoEvoConfig) -> Self {
         let attention = AttentionManager::from_task_type(0.3, task_type);
-        let metacog = MetaCognitiveLoop::new(crate::l6_meta::nt_meta::SelfModel::new());
+        let metacog = MetaCognitiveLoop::new(crate::l5_cognition::l1_facade::MetaSelfModel::new());
         Self {
             attention,
             metacog,
@@ -937,7 +937,7 @@ impl MetaAgentShell {
         // System1 直通单轮。行为差异即路由落地 (R-P79)。
         let alloc = self.attention.allocate_for_task(&self.task_type);
         let mut result = self.metacog.run_cycle();
-        if alloc.mode == crate::l6_meta::nt_core_self::attention_head::ThinkingMode::System2Deliberate
+        if alloc.mode == crate::l5_cognition::l1_facade::attention_head::ThinkingMode::System2Deliberate
         {
             result = self.metacog.run_cycle();
         }

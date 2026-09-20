@@ -200,7 +200,7 @@ pub static GLOBAL_DOMAINS: LazyLock<Arc<RwLock<_DomainRules>>> = LazyLock::new(|
 });
 
 pub fn _global_geo() -> Arc<RwLock<_GeoDatabase>> {
-    use crate::core::nt_core_di;
+    use crate::l0_substrate::nt_core_di;
     if let Some(v) = nt_core_di::resolve_global::<Arc<RwLock<_GeoDatabase>>>() {
         return v;
     }
@@ -208,7 +208,7 @@ pub fn _global_geo() -> Arc<RwLock<_GeoDatabase>> {
 }
 
 pub fn _global_domains() -> Arc<RwLock<_DomainRules>> {
-    use crate::core::nt_core_di;
+    use crate::l0_substrate::nt_core_di;
     if let Some(v) = nt_core_di::resolve_global::<Arc<RwLock<_DomainRules>>>() {
         return v;
     }

@@ -16,8 +16,8 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
-use crate::l5_cognition::layer_aliases::KnowledgeBase;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
+use crate::l5_cognition::l1_facade::KnowledgeBase;
 
 // ============================================================================
 // 数据结构

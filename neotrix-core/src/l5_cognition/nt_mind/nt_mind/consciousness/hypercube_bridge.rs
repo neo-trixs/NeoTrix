@@ -76,7 +76,7 @@ impl HyperCubeBridge {
 
     /// 从真实 KB 灌入全部知识节点 — 使 analyze_gaps/sparse_topics/query 反映实际记忆。
     /// 返回灌入条数。
-    pub fn ingest_from_kb(&mut self, kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> usize {
+    pub fn ingest_from_kb(&mut self, kb: &crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase) -> usize {
         let nodes = match kb.all_nodes() {
             Ok(nodes) => nodes,
             Err(_) => return 0,
@@ -94,8 +94,8 @@ impl HyperCubeBridge {
     /// 将 KB 节点映射为超立方体坐标 — 按 node_type 落到前 8 个维度
     /// (0..8, 即 analyze_gaps/sparse_topics 检视的维度), 使真实知识
     /// 直接影响缺口分析驱动的好奇心爬取。
-    fn coord_from_kb_node(node: &crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::KnowledgeNode) -> HyperCoord {
-        use crate::l6_meta::nt_core_kb_types::NodeType as Kt;
+    fn coord_from_kb_node(node: &crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::KnowledgeNode) -> HyperCoord {
+        use neotrix_types::knowledge_access::NodeType as Kt;
         let axis = match node.node_type {
             // 代码理解 (0)
             Kt::CodeSnippet | Kt::Repository | Kt::Tool => DimensionAxis::CodeUnderstanding,
@@ -303,9 +303,9 @@ mod tests {
 
     #[test]
     fn test_ingest_from_kb_populates_hypercube() {
-        use crate::l6_meta::nt_core_kb_types::NodeType;
+        use neotrix_types::knowledge_access::NodeType;
         // B1 测试隔离: 用内存 KB 而非 open(None) (生产路径会被并行锁+污染)
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(
             Some(std::path::PathBuf::from(":memory:")),
         ).expect("open memory kb");
         let _ = kb.insert_or_get_node(
@@ -327,7 +327,7 @@ mod tests {
     #[test]
     fn test_empty_kb_ingest_zero() {
         // 打开一个新 KB 且不插入任何节点，灌入应为 0（或非负）
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(
             Some(std::path::PathBuf::from(":memory:")),
         ).expect("open memory kb");
         let mut bridge = HyperCubeBridge::new();
@@ -336,9 +336,9 @@ mod tests {
 
     #[test]
     fn test_frontier_seed_flows_into_hypercube() {
-        use crate::l6_meta::nt_core_kb_types::NodeType;
+        use neotrix_types::knowledge_access::NodeType;
         // 内存 KB 跑完整 seed → 验证前沿模型节点入库 → ingest 映射到 SystemDesign 轴
-        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(
             Some(std::path::PathBuf::from(":memory:")),
         ).expect("open memory kb");
         let _ = kb.seed_foundational().expect("seed foundational");

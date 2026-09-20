@@ -1,8 +1,42 @@
-//! NT-WORLD Media Source - 媒体源生态
+//! NT-WORLD Media Source - 统一数据源架构
 //!
-//! 媒体数据源的搜索、播放、缓存、插件、自进化
+//! 媒体 29 + 情报 3+ + OSINT 20+ + LLM 30+ + 爬虫 + 本地 = 100+ 个数据源
 //! 域: NT-WORLD (虚空探索者)
 //! 层: L2 Perception
+//!
+//! ## 架构
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────────────────┐
+//! │                    UnifiedEngine (统一入口)                          │
+//! │     search_media() / search_intel() / investigate_osint()          │
+//! │     llm_complete() / search_all()                                  │
+//! └───────────────────────────────┬─────────────────────────────────────┘
+//!                                 │
+//!       ┌─────────────────────────┼─────────────────────────┐
+//!       │                         │                         │
+//!   ┌───▼───────────┐      ┌─────▼──────┐      ┌──────────▼──────────┐
+//!   │ MediaSource   │      │ IntelSource│      │ OsintSource         │
+//!   │ (29 个)       │      │ (3+ 个)    │      │ (20+ 个)            │
+//!   │ search()      │      │ fetch()    │      │ investigate()       │
+//!   │ play_url()    │      │            │      │ sweep()             │
+//!   │ lyric()       │      │            │      │                     │
+//!   └───────────────┘      └────────────┘      └─────────────────────┘
+//!       │                         │                         │
+//!   audio/video/text          gdelt/edgar/usgs         dns/shodan/censys
+//!
+//!       ┌─────────────────────────┼─────────────────────────┐
+//!       │                         │                         │
+//!   ┌───▼───────────┐      ┌─────▼──────┐      ┌──────────▼──────────┐
+//!   │ LlmProvider   │      │CrawlSource │      │ LocalSource         │
+//!   │ (30+ 个)      │      │ (爬虫能力) │      │ (本地文件)          │
+//!   │ complete()    │      │ fetch()    │      │ scan()              │
+//!   │ stream()      │      │ crawl()    │      │ search()            │
+//!   └───────────────┘      └────────────┘      └─────────────────────┘
+//!       │                         │                         │
+//!   openai/anthropic/ollama    spider/camofox           本地文件索引
+//!   groq/cloudflare (30+)     humanize/stealth         (mp3/flac/...)
+//! ```
 
 // ============================================================================
 // Core modules
@@ -35,14 +69,36 @@ pub mod multi_cache;
 pub mod search_scorer;
 pub mod cache_warmer;
 pub mod search_analytics;
+pub mod network_access;
 
 // ============================================================================
-// Provider modules
+// Provider modules (29 个 MediaSource 实现)
 // ============================================================================
 
 pub mod audio;
 pub mod video;
 pub mod text;
+
+// ============================================================================
+// 统一数据源架构 (6 层能力模型)
+// ============================================================================
+
+pub mod unified;          // DataSource/MediaSource/IntelSource/OsintSource/LlmProvider trait + Registry
+pub mod media_bridge;     // engine::MediaSource → unified::MediaSource 桥接
+pub mod intel_bridge;     // data_source/ → IntelSource 桥接
+pub mod osint_bridge;     // osint/ → OsintSource 桥接
+pub mod llm_bridge;       // nt_io_provider/ → LlmProvider 桥接
+pub mod crawl_bridge;     // crawl/ → CrawlSource 桥接
+pub mod unified_engine;   // UnifiedEngine 统一查询入口
+pub mod subscription_source;  // RSS/Atom feed + API subscription data
+
+// ============================================================================
+// 扩展能力 (整合 go-music-dl 核心逻辑)
+// ============================================================================
+
+pub mod playlist;        // 歌单/专辑解析
+pub mod source_switch;   // 换源功能
+pub mod local_music;     // 本地音乐管理
 
 // ============================================================================
 // Governance (existing skeleton types)
@@ -160,10 +216,11 @@ impl DataRecord {
 // Re-exports
 // ============================================================================
 
+// ── 原有类型 ─────────────────────────────────────────────────
 pub use types::*;
 pub use engine::MediaEngine;
 pub use api::{MediaApi, SourceInfo, media_api};
-pub use crate::l1_action::nt_media::playback::{
+pub use crate::l2_perception::nt_world::l1_facade::{
     EnginePlaybackState, PlaybackController, PlaybackEngine, PlaybackHistory, PlaybackQueue,
     PlaybackRetry, PlaybackState, PlayMode, RepeatMode,
 };
@@ -190,6 +247,31 @@ pub use multi_cache::MultiLevelCache;
 pub use search_scorer::{score_result, fuzzy_match, rank_results};
 pub use cache_warmer::CacheWarmer;
 pub use search_analytics::SearchAnalytics;
+pub use network_access::{NetworkAccessClient, NetworkStrategy, SubscriptionManager, SubscriptionFeed};
+
+// ── 统一数据源架构 ───────────────────────────────────────────
+pub use unified::{
+    // Traits
+    DataSource, MediaSource, IntelSource, OsintSource, LlmProvider, CrawlSource, LocalSource,
+    // Types
+    SourceDomain, DataSourceRegistry, AnyDataSource,
+    MediaSearchResult, MediaResult, PlaySource, Lyric, LyricLine,
+    IntelResult, IntelItem, OsintResult, OsintFinding,
+    LlmRequest, LlmMessage, LlmResponse, LlmUsage,
+    CrawlResult, LocalEntry,
+};
+pub use media_bridge::MediaSourceBridge;
+pub use intel_bridge::{GdeltBridge, EdgarBridge, UsgsBridge};
+pub use osint_bridge::{find_sources_for_target, bridge_all_osint_sources, create_osint_bridges};
+pub use llm_bridge::{LlmProviderBridge, categorize_llm_providers};
+pub use crawl_bridge::bridge_all_crawl_sources;
+pub use unified_engine::{UnifiedEngine, UnifiedSearchResult, EngineStats};
+pub use subscription_source::{SubscriptionSource, SubscriptionItem, StealthLevel};
+
+// ── 扩展能力 ─────────────────────────────────────────────────
+pub use playlist::{PlaylistParser, Playlist, Album, PlaylistParseResult, AlbumParseResult, PlaylistPlatform};
+pub use source_switch::{SourceSwitcher, SwitchConfig, SwitchResult};
+pub use local_music::{LocalMusicScanner, LocalMusicIndex, LocalMusicEntry};
 
 /// 构建默认媒体引擎 (注册所有29个源)
 pub fn build_default_engine() -> MediaEngine {

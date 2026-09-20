@@ -171,7 +171,7 @@ impl ActionSandbox {
 }
 
 /// SelfTest: sandbox detects its own configuration sanity.
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ActionSandbox {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ActionSandbox {
     fn name(&self) -> &str { "nt_act_sandbox" }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
@@ -196,7 +196,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ActionSandbox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_destructive_action_denied() {

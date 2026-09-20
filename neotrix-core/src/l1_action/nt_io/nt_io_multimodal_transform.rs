@@ -962,7 +962,7 @@ impl VisionPreprocessor {
 }
 
 /// SelfTest (T1): "nt_io_multimodal_vision_preprocess" — 幂等 + fail-closed 自检。
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for VisionPreprocessor {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for VisionPreprocessor {
     fn name(&self) -> &str {
         "nt_io_multimodal_vision_preprocess"
     }
@@ -1134,7 +1134,7 @@ impl CpuTtsEngine {
 }
 
 /// SelfTest (T1): "nt_io_multimodal_cpu_tts" — 快速语音加载 + 实时性自检。
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CpuTtsEngine {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for CpuTtsEngine {
     fn name(&self) -> &str {
         "nt_io_multimodal_cpu_tts"
     }
@@ -1277,7 +1277,7 @@ mod multimodal_fusion_tests {
 
     #[test]
     fn vision_pre_selftest_name_matches() {
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         let p = VisionPreprocessor::new();
         assert_eq!(p.name(), "nt_io_multimodal_vision_preprocess");
         assert!(p.self_test().is_ok());
@@ -1384,7 +1384,7 @@ mod multimodal_fusion_tests {
 
     #[test]
     fn cpu_tts_selftest_name_matches() {
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         let e = CpuTtsEngine::new(VoiceLoader::empty());
         assert_eq!(e.name(), "nt_io_multimodal_cpu_tts");
         assert!(e.self_test().is_ok());
@@ -1543,7 +1543,7 @@ impl UnifiedFace {
 }
 
 /// SelfTest (T1): "nt_io_multimodal_unified_face" — 四任务统一接口自检。
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for UnifiedFace {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for UnifiedFace {
     fn name(&self) -> &str {
         "nt_io_multimodal_unified_face"
     }
@@ -1676,7 +1676,7 @@ mod unified_face_tests {
 
     #[test]
     fn unified_face_selftest_name_matches() {
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         let f = UnifiedFace::default();
         assert_eq!(f.name(), "nt_io_multimodal_unified_face");
         assert!(f.self_test().is_ok());

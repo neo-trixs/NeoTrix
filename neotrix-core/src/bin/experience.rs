@@ -48,7 +48,7 @@ use neotrix::l1_action::nt_memory::nt_memory_kb::nt_field_ledger;
 use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_schema;
 use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
 use neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-use neotrix::crate::foundation::guardian::{MapeGate, MapeGateConfig, MetricEval};
+use neotrix::l5_cognition::nt_mind::foundation::guardian::{MapeGate, MapeGateConfig, MetricEval};
 use neotrix::l2_perception::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
 };

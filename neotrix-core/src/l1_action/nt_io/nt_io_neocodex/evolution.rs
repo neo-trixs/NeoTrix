@@ -100,7 +100,7 @@ impl NeoCodexSelfAudit {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for NeoCodexSelfAudit {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for NeoCodexSelfAudit {
     fn name(&self) -> &str {
         "neocodex_self_audit"
     }
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_self_audit_impl() {
-        use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+        use crate::l0_substrate::nt_core_self_test::SelfTest;
         let agent = NeoCodexAgent::new("selftest");
         let audit = NeoCodexSelfAudit::capture(&agent);
         assert_eq!(audit.name(), "neocodex_self_audit");

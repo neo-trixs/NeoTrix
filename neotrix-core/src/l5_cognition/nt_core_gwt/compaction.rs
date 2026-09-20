@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use async_trait::async_trait;
-use crate::core::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
+use crate::l0_substrate::nt_core_platform::{Pipeline, PipelineStage, PipelineResult};
 
 /// Minimum context entries to preserve after any compaction stage.
 pub const MIN_CONTEXT_ENTRIES: usize = 10;

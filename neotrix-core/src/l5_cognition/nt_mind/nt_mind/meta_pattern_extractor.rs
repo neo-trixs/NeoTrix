@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::l6_meta::nt_core_self::thinking_trace::ThinkingTrace;
+use crate::l5_cognition::l1_facade::thinking_trace::ThinkingTrace;
 use super::core::CapabilityVector;
 use super::cognitive_map::CognitiveMap;
 
@@ -437,9 +437,9 @@ impl MetaPatternExtractor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::nt_core_self::reasoning_strategy::StrategyKind;
-    use crate::l6_meta::nt_core_self::attention_head::AttentionDomain;
-    use crate::l6_meta::nt_core_self::thinking_trace::{ThinkingStep, ReflectionGrade};
+    use crate::l5_cognition::l1_facade::reasoning_strategy::StrategyKind;
+    use crate::l5_cognition::l1_facade::attention_head::AttentionDomain;
+    use crate::l5_cognition::l1_facade::thinking_trace::{ThinkingStep, ReflectionGrade};
 
     fn make_test_trace(id: usize, grade: ReflectionGrade, steps: Vec<ThinkingStep>, task: &str) -> ThinkingTrace {
         ThinkingTrace {

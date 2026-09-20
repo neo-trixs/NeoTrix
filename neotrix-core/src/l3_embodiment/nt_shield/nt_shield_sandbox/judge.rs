@@ -168,8 +168,8 @@ pub fn _looks_like_compile_error(stderr: &str) -> bool {
 /// Phase 0a: verdict → capability-realization loss 层映射 (J-Space 六层)。
 /// 外部信号 (比赛 judge 的失败结论) 注入遥测, 使自愈能区分失败根源
 /// (推理模式 / 工具 schema / 表征 / 长程状态 / 验证机制)。
-pub fn _loss_layer_for_verdict(verdict: _JudgeVerdict) -> crate::core::nt_core_telemetry::LossLayer {
-    use crate::core::nt_core_telemetry::LossLayer;
+pub fn _loss_layer_for_verdict(verdict: _JudgeVerdict) -> crate::l0_substrate::nt_core_telemetry::LossLayer {
+    use crate::l0_substrate::nt_core_telemetry::LossLayer;
     match verdict {
         _JudgeVerdict::CompileError => LossLayer::ToolSchema,
         _JudgeVerdict::WrongAnswer => LossLayer::ActiveRepresentation,
@@ -183,7 +183,7 @@ pub fn _loss_layer_for_verdict(verdict: _JudgeVerdict) -> crate::core::nt_core_t
 /// `metric` 形如 `judge::{runtime}::{case_id}`; 失败时 observe_loss
 /// (z-score 突刺才会告警), 通过时 observe 基线 0.0。
 pub fn _emit_loss_signal(
-    detector: &crate::core::nt_core_telemetry::AnomalyDetector,
+    detector: &crate::l0_substrate::nt_core_telemetry::AnomalyDetector,
     runtime: CloudRuntime,
     case_id: &str,
     verdict: _JudgeVerdict,
@@ -209,7 +209,7 @@ pub async fn judge_code(
     runtime: CloudRuntime,
     cases: &[TestCase],
     config: &_JudgeConfig,
-    detector: Option<&crate::core::nt_core_telemetry::AnomalyDetector>,
+    detector: Option<&crate::l0_substrate::nt_core_telemetry::AnomalyDetector>,
 ) -> _JudgeSummary {
     let mut verdicts = Vec::with_capacity(cases.len());
     let mut passed = 0;
@@ -332,7 +332,7 @@ pub async fn refine_loop<F>(
     runtime: CloudRuntime,
     cases: &[TestCase],
     config: &_JudgeConfig,
-    detector: Option<&crate::core::nt_core_telemetry::AnomalyDetector>,
+    detector: Option<&crate::l0_substrate::nt_core_telemetry::AnomalyDetector>,
     repair: &mut F,
 ) -> _RefineOutcome
 where
@@ -473,7 +473,7 @@ mod judge_core_tests {
 
     #[test]
     fn test_loss_layer_mapping_six_layers_cover_verdicts() {
-        use crate::core::nt_core_telemetry::LossLayer;
+        use crate::l0_substrate::nt_core_telemetry::LossLayer;
         assert_eq!(
             _loss_layer_for_verdict(_JudgeVerdict::CompileError),
             LossLayer::ToolSchema,
@@ -500,7 +500,7 @@ mod judge_core_tests {
 
     #[test]
     fn test_emit_loss_signal_observes_without_panic() {
-        use crate::core::nt_core_telemetry::AnomalyDetector;
+        use crate::l0_substrate::nt_core_telemetry::AnomalyDetector;
         use std::time::Duration;
         let detector = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
         _emit_loss_signal(&detector, CloudRuntime::Python3, "t1", _JudgeVerdict::WrongAnswer);

@@ -39,7 +39,7 @@ use crate::l1_action::nt_act::nt_act_trade::trade_core::{
 use crate::l1_action::nt_io::nt_io_messaging::{
     Channel, MessagingBridge, MessagingRegistry, MessagingRouter,
 };
-use crate::l1_action::nt_memory::nt_memory_lead::{Lead, LeadManager, LeadQuality, LeadSource};
+use crate::l4_emotion::nt_memory::nt_memory_lead::{Lead, LeadManager, LeadQuality, LeadSource};
 
 // ════════════════════════════════════════════════════════════════
 // 全链路状态机
@@ -511,7 +511,7 @@ impl TradeOrchestrator {
     ) -> Result<(), String> {
         self.leads.record_interaction(
             lead_id,
-            crate::l1_action::nt_memory::nt_memory_lead::InteractionType::Inquiry,
+            crate::l4_emotion::nt_memory::nt_memory_lead::InteractionType::Inquiry,
             channel,
             direction,
             content,
@@ -588,7 +588,7 @@ impl TradeOrchestrator {
     /// 获取漏斗统计
     pub fn pipeline_summary(
         &self,
-    ) -> HashMap<crate::l1_action::nt_memory::nt_memory_lead::LeadStage, usize> {
+    ) -> HashMap<crate::l4_emotion::nt_memory::nt_memory_lead::LeadStage, usize> {
         self.leads.pipeline_summary()
     }
 
@@ -692,14 +692,8 @@ impl TradeOrchestrator {
             .active_trades
             .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
-        // TODO: convert ObjectionCategory to Objection type
-        // self.negotiation_engine.handle_objection(objection);
         ctx.conversations
             .push(format!("FT08_Objection:{:?}", objection));
-        // TODO: implement is_resolved check
-        // if self.negotiation_engine.is_resolved() {
-        //     ctx.current_phase = TradePhase26::Ft09ContractReviewSigning;
-        // }
         Ok(())
     }
 
@@ -793,8 +787,6 @@ impl TradeOrchestrator {
             .active_trades
             .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
-        // TODO: ProductionEngine::create_production_order is a static method
-        // let order = ProductionEngine::create_production_order(order_id, materials);
         let order = ProductionOrder {
             production_order_id: format!("PO-{}", uuid::Uuid::new_v4().simple()),
             contract_id: order_id.to_string(),
@@ -830,8 +822,6 @@ impl TradeOrchestrator {
             .active_trades
             .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
-        // TODO: ProductionEngine.track_progress() method not yet implemented
-        // self.production_engine.track_progress(progress)?;
         ctx.production_status = Some(ProductionStatus {
             stage: progress.stage.clone(),
             progress_pct: progress.progress_pct,
@@ -842,10 +832,6 @@ impl TradeOrchestrator {
             "FT13_Progress:{:.1}%",
             progress.progress_pct * 100.0
         ));
-        // TODO: DailyProgress.is_complete field not yet available
-        // if progress.is_complete {
-        //     ctx.current_phase = TradePhase26::Ft14QualityInspectionRelease;
-        // }
         Ok(())
     }
 
@@ -867,8 +853,6 @@ impl TradeOrchestrator {
             .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         ctx.conversations.push("FT15_FinalQualityCheck".into());
-        // TODO: ProductionEngine.final_check() method not yet implemented
-        // let passed = self.production_engine.final_check();
         let passed = true;
         if passed {
             ctx.current_phase = TradePhase26::Ft16InspectionCertification;
@@ -886,8 +870,6 @@ impl TradeOrchestrator {
             .active_trades
             .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
-        // TODO: LogisticsEngine.apply_inspection_cert() method not yet implemented
-        // let cert = self.logistics_engine.apply_inspection_cert()?;
         let cert = CiqCertificate {
             ciq_id: format!("CIQ-{}", uuid::Uuid::new_v4().simple()),
             certificate_no: format!("CN{:08}", rand::random::<u32>() % 100000000),

@@ -13,8 +13,6 @@ use serde::{Deserialize, Serialize};
 pub struct IntegrationPatternLibrary {
     patterns: Vec<IntegrationPattern>,
     _active_integrations: Vec<ActiveIntegration>,
-    #[allow(dead_code)]
-    config: IntegrationConfig,
 }
 
 /// 集成配置
@@ -139,7 +137,6 @@ impl IntegrationPatternLibrary {
         let mut lib = Self {
             patterns: Vec::new(),
             _active_integrations: Vec::new(),
-            config: IntegrationConfig::default(),
         };
         lib.register_default_patterns();
         lib

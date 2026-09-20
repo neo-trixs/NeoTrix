@@ -1,20 +1,20 @@
 #![deny(clippy::unwrap_used)]
 
 use super::awakening::{AwakeningReport, ConsciousnessAwakening};
-use super::bubble_wall::{BubbleWall, TokenBill};
+use crate::l5_cognition::bubble_wall::{BubbleWall, TokenBill};
 use super::inner_critic::{CritiqueResult, InnerCritic};
-use super::source_hierarchy::{
+use crate::l5_cognition::source_hierarchy::{
     ContextMeta, KnowledgeLayer, PerceptionMeta, PerceptionSource, ProvenanceChain,
 };
 use super::specious_present::SpeciousPresent;
 use super::stream_buffer::ConsciousnessStream;
 use super::volition::{ActionCandidate, VolitionEngine};
-use super::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
+use crate::l5_cognition::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
 use crate::l4_emotion::nt_feel::affective_interface::{
     AffectiveInterface, UserAffectSnapshot, UserEmotion,
 };
-use crate::l6_meta::nt_core_self::emotion_state::{EmotionDimension, EmotionEngine, EmotionReport};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l5_cognition::l1_facade::emotion_state::{EmotionDimension, EmotionEngine, EmotionReport};
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 
 /// 每次 tick 最多注入的 KB 知识条目数，防止无界流入意识流。
 const KB_INJECT_LIMIT: usize = 4;
@@ -147,7 +147,7 @@ impl ConsciousnessRuntime {
                 Ok(c) => c,
                 Err(_) => return,
             };
-            match crate::l1_action::nt_memory::nt_memory_kb::nt_field_ledger::field_journal_since(
+            match crate::l4_emotion::nt_memory::nt_memory_kb::nt_field_ledger::field_journal_since(
                 &conn,
                 self.last_field_version_seen,
                 FIELD_FACT_CAP,
@@ -447,7 +447,7 @@ impl ConsciousnessRuntime {
     }
 }
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for ConsciousnessRuntime {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for ConsciousnessRuntime {
     fn name(&self) -> &str {
         "consciousness_runtime"
     }

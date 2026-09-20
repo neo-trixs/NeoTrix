@@ -524,7 +524,7 @@ mod tests {
 
     fn mem_conn() -> rusqlite::Connection {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
-        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
+        crate::l0_substrate::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
         conn
     }
 

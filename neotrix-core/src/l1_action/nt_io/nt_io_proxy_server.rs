@@ -37,7 +37,7 @@ impl ServerProxy {
     fn kb_stats() -> (u64, i64, i64) {
         let db_path = dirs::home_dir().unwrap_or_default().join(".neotrix/knowledge.db");
         let bytes = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
-        let (nodes, edges) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None)
+        let (nodes, edges) = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(None)
             .ok()
             .and_then(|kb| {
                 kb.stats().ok().map(|s| {

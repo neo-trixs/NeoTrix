@@ -6,10 +6,11 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 
 // 从 L1 nt_act_autonomy 迁移过来的模块
 pub mod cross_session_memory;
+pub mod memory_weaving;
 
 pub use cross_session_memory::CrossSessionMemory;
 

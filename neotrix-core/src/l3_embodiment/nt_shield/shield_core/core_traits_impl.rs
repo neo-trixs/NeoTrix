@@ -3,7 +3,7 @@
 //! 将 L3 具体类型 (Redactor, PropagationGuard, scan_absorb_text, AgentReceipt)
 //! 适配为 core::nt_core_traits 抽象接口, 供 L1 消费而不产生 L1→L3 直接依赖。
 
-use crate::core::nt_core_traits::{
+use crate::l0_substrate::nt_core_traits::{
     AbsorbTextScanner, AbsorbVerdict, PropagationGuardLike, ReceiptEmitter, SecretRiskLevel,
     SecretScanner,
 };

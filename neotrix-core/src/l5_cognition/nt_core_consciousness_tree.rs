@@ -14,7 +14,7 @@ pub use nodes::*;
 pub use contract::*;
 pub use review::*;
 
-use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
 
 /// T3 SelfTest 接线 (NT-CORE ConsciousnessTree): 校验 11 分支健康注入 +
 /// 真实 SelfTest 数据推导成熟度/果实/引导的生产路径 (B2/B4 修复的运行时不变量)。
@@ -99,10 +99,10 @@ mod tests {
         // → last_cycle_guidance 非空。此前 maturity_cX 仅测试中置 true, 生产恒 0。
         let mut tree = ConsciousnessTree::new();
         let results = vec![
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_a"),
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_b"),
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_c"),
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_d"),
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_a"),
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_b"),
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_c"),
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_d"),
         ];
         tree.set_branch_health_from_self_tests(&results);
 
@@ -157,7 +157,7 @@ mod tests {
         // intent + resonance → 桥接命中
         let mut tree3 = ConsciousnessTree::new();
         tree3.trunk.gwt_resonance_active = true;
-        let results: Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> = vec![
+        let results: Vec<crate::l0_substrate::nt_core_self_test::SelfTestResult> = vec![
             "nt_core_self_test_a",
             "nt_core_self_test_b",
             "nt_core_self_test_c",
@@ -166,7 +166,7 @@ mod tests {
             "nt_core_self_test_f",
         ]
         .iter()
-        .map(|n| crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(n))
+        .map(|n| crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(n))
         .collect();
         tree3.set_branch_health_from_self_tests(&results);
         for branch in tree3.branches.values_mut() {
@@ -187,7 +187,7 @@ mod tests {
         // 桥接是 per-cycle 累积: 多 cycle 下 bridge 与 S1/S2 同步增长 (随 intent 持续产出)
         let mut tree = ConsciousnessTree::new();
         tree.trunk.gwt_resonance_active = true;
-        let results: Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> = vec![
+        let results: Vec<crate::l0_substrate::nt_core_self_test::SelfTestResult> = vec![
             "nt_core_self_test_a",
             "nt_core_self_test_b",
             "nt_core_self_test_c",
@@ -196,7 +196,7 @@ mod tests {
             "nt_core_self_test_f",
         ]
         .iter()
-        .map(|n| crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(n))
+        .map(|n| crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(n))
         .collect();
         tree.set_branch_health_from_self_tests(&results);
         for branch in tree.branches.values_mut() {
@@ -218,7 +218,7 @@ mod tests {
         let mut tree = ConsciousnessTree::new();
         // Core 分支有 10 个 mandatory atoms (6 UNDERSTAND + 4 REASON), 需 ≥5 个 self_test
         // 使 self_test_coverage >= 0.5 通过果实生长门
-        let results: Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> = vec![
+        let results: Vec<crate::l0_substrate::nt_core_self_test::SelfTestResult> = vec![
             "nt_core_self_test_a",
             "nt_core_self_test_b",
             "nt_core_self_test_c",
@@ -227,7 +227,7 @@ mod tests {
             "nt_core_self_test_f",
         ]
         .iter()
-        .map(|n| crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(n))
+        .map(|n| crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(n))
         .collect();
         tree.set_branch_health_from_self_tests(&results);
 
@@ -268,7 +268,7 @@ mod tests {
         let mut poor = ConsciousnessTree::new();
         poor.soil.kb_node_count = 0;
         for t in [&mut rich, &mut poor] {
-            let results: Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> = vec![
+            let results: Vec<crate::l0_substrate::nt_core_self_test::SelfTestResult> = vec![
                 "nt_core_self_test_a",
                 "nt_core_self_test_b",
                 "nt_core_self_test_c",
@@ -277,7 +277,7 @@ mod tests {
                 "nt_core_self_test_f",
             ]
             .iter()
-            .map(|n| crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(n))
+            .map(|n| crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(n))
             .collect();
             t.set_branch_health_from_self_tests(&results);
             for branch in t.branches.values_mut() {
@@ -368,7 +368,7 @@ mod tests {
         // 但绝不超界 — "数据增强的进化能力"以 1.0 为饱和点表达。
         let mut tree = ConsciousnessTree::new();
         tree.soil.kb_node_count = 55_826; // 真实 KB 规模 → 因子 ≈ 1.79
-        let results: Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> = vec![
+        let results: Vec<crate::l0_substrate::nt_core_self_test::SelfTestResult> = vec![
             "nt_core_self_test_a",
             "nt_core_self_test_b",
             "nt_core_self_test_c",
@@ -377,7 +377,7 @@ mod tests {
             "nt_core_self_test_f",
         ]
         .iter()
-        .map(|n| crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(n))
+        .map(|n| crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(n))
         .collect();
         tree.set_branch_health_from_self_tests(&results);
         for branch in tree.branches.values_mut() {
@@ -689,7 +689,7 @@ mod tests {
         tree.soil.kb_node_count = 500; // 数据养料充足
                                        // 生产路径: 真实 SelfTest → maturity → 果实 quality 达标。
                                        // 契约 criterion 0 要求所有分支 self_test 覆盖率 >= 80%, 故给 7 域都喂结果。
-        let results: Vec<crate::l6_meta::healing::nt_core_self_test::SelfTestResult> = vec![
+        let results: Vec<crate::l0_substrate::nt_core_self_test::SelfTestResult> = vec![
             "nt_core_self_test_a",
             "nt_core_self_test_b",
             "nt_core_self_test_c",
@@ -734,7 +734,7 @@ mod tests {
             "nt_shield_self_test_f",
         ]
         .iter()
-        .map(|n| crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass(n))
+        .map(|n| crate::l0_substrate::nt_core_self_test::SelfTestResult::pass(n))
         .collect();
         tree.set_branch_health_from_self_tests(&results);
         for branch in tree.branches.values_mut() {
@@ -1035,8 +1035,8 @@ mod tests {
         // 不可区分 (cycle9 审计缺陷②)。
         let mut tree = ConsciousnessTree::new();
         let results = vec![
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_core_detect"),
-            crate::l6_meta::healing::nt_core_self_test::SelfTestResult::pass("nt_memory_persist"),
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_core_detect"),
+            crate::l0_substrate::nt_core_self_test::SelfTestResult::pass("nt_memory_persist"),
         ];
         tree.set_branch_health_from_self_tests(&results);
         tree.run_growth_cycle();
@@ -1281,7 +1281,7 @@ mod tests {
             "uniform high-health tree must yield non-zero coherence, got {coh_after}"
         );
         // 情绪报告只作 ±0.2 调制, 不把真实相干性抹成 0
-        let report = crate::l6_meta::nt_core_self::emotion_state::EmotionReport {
+        let report = crate::l5_cognition::l1_facade::emotion_state::EmotionReport {
             frustration: 0.0,
             confidence: 0.5,
             joy: 0.5,
@@ -1292,12 +1292,12 @@ mod tests {
             valence: 0.0,
             confidence_score: 0.5,
             dominant: (
-                crate::l6_meta::nt_core_self::emotion_state::EmotionDimension::Joy,
+                crate::l5_cognition::l1_facade::emotion_state::EmotionDimension::Joy,
                 0.5,
             ),
             observation_count: 0,
             dominance: 0.5,
-            emotion_label: crate::l6_meta::nt_core_self::emotion_state::EmotionLabel::Neutral,
+            emotion_label: crate::l5_cognition::l1_facade::emotion_state::EmotionLabel::Neutral,
         };
         grown.apply_emotion_report(report);
         assert!(

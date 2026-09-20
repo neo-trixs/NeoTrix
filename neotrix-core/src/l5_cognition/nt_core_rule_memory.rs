@@ -18,7 +18,7 @@
 //! 唯一一种"会自我报错"的存储介质。GC 遵循 Dark Forest: 无消费者或验证
 //! 连续失败的规则直接删除。
 
-use crate::l6_meta::nt_core_kb_primitives::{kv_delete, kv_get, kv_list, kv_set, now};
+use crate::l0_substrate::nt_core_kb_primitives::{kv_delete, kv_get, kv_list, kv_set, now};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -825,7 +825,7 @@ mod tests {
 
     fn mem_conn() -> Connection {
         let conn = Connection::open_in_memory().expect("mem conn");
-        crate::l6_meta::nt_core_kb_primitives::schema_initialize(&conn).expect("schema");
+        crate::l0_substrate::nt_core_kb_primitives::schema_initialize(&conn).expect("schema");
         conn
     }
 
@@ -1062,7 +1062,7 @@ mod tests {
             "domain": domain,
             "content": content,
         });
-        crate::l6_meta::nt_core_kb_primitives::kv_set(conn, "experience", key, &entry.to_string())
+        crate::l0_substrate::nt_core_kb_primitives::kv_set(conn, "experience", key, &entry.to_string())
             .unwrap();
     }
 

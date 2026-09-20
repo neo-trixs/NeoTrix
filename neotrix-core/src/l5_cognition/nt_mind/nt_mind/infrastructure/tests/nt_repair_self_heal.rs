@@ -1,7 +1,7 @@
 //! NT-REPAIR Self-Heal Integration Tests (Track 3: D22/D26/D27/D28)
 //! Verifies the self-healing loop: monitoring → diagnosis → heal → retest
 
-use crate::l6_meta::nt_core_self::self_audit::{scan_system_health, scan_disk_pressure, scan_memory_pressure, scan_build_status, scan_test_flakiness, AuditSeverity};
+use crate::l5_cognition::l1_facade::self_audit::{scan_system_health, scan_disk_pressure, scan_memory_pressure, scan_build_status, scan_test_flakiness, AuditSeverity};
 use crate::l5_cognition::nt_mind::evolution::autofixer::HealerRegistry;
 use std::fs;
 use std::env;
@@ -98,7 +98,7 @@ async fn test_test_flakiness_monitoring() {
 //     bg.emit_restart_signal("test_module").await;
 //     
 //     // Test alert emission
-//     use crate::l6_meta::nt_core_self::self_audit::AuditFinding;
+//     use crate::l5_cognition::l1_facade::self_audit::AuditFinding;
 //     let findings = vec![
 //         AuditFinding {
 //             category: "test-flake".to_string(),
@@ -145,7 +145,7 @@ async fn test_healer_registry_integration() {
 // #[tokio::test]
 // async fn test_self_heal_loop_from_self_audit() {
 //     use crate::l6_meta::nt_repair::// nt_mind_self_heal::{SelfHealLoop, HealableDetector};
-//     use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
+//     use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 //     
 //     // Create a self-heal loop
 //     let loop_h = SelfHealLoop::new();

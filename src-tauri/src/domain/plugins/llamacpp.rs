@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::commands::model_pool::{self, ModelPoolEntry, ModelPoolStatus};
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use std::path::PathBuf;
@@ -428,6 +429,7 @@ fn discover_models() -> Result<serde_json::Value, DomainError> {
 
 // ========== Llamacpp Plugin ==========
 
+#[async_trait]
 impl DomainPlugin for LlamacppPlugin {
     fn name(&self) -> &str {
         "llamacpp"
@@ -537,7 +539,7 @@ impl DomainPlugin for LlamacppPlugin {
         ]
     }
 
-    fn call(
+    async fn call(
         &self,
         action: &str,
         args: serde_json::Value,

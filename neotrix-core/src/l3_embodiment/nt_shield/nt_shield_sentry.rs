@@ -131,7 +131,7 @@ pub fn _cleanse_untagged(content: &str) -> String {
 /// 纯函数无法自我修复 — 检测到破坏即返回 Err (失败即信号)。
 pub struct SentryHealer;
 
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for SentryHealer {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for SentryHealer {
     fn name(&self) -> &str {
         "nt_shield_sentry::sentry_healer"
     }

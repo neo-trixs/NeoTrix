@@ -2,6 +2,9 @@
 //!
 //! 提供模型池的增删查状态查询，前端通过 domain_call 或直接调用。
 
+use crate::atomic_io;
+use crate::ipc;
+use crate::ipc::IpcResponse;
 use serde::{Deserialize, Serialize};
 
 /// 模型池条目
@@ -114,12 +117,8 @@ fn write_pool_raw(content: &str) -> Result<(), String> {
         .join("neotrix")
         .join("provider_pool.toml");
 
-    // 确保目录存在
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Create config dir: {e}"))?;
-    }
-
-    std::fs::write(&path, content).map_err(|e| format!("Write provider pool: {e}"))
+    atomic_io::ensure_parent_dir(&path).map_err(|e| format!("Create config dir: {e}"))?;
+    atomic_io::write_atomic(&path, content.as_bytes()).map_err(|e| format!("Write provider pool: {e}"))
 }
 
 // ═══════════════════════════════════════════════
@@ -128,8 +127,11 @@ fn write_pool_raw(content: &str) -> Result<(), String> {
 
 /// 获取模型池状态
 #[tauri::command]
-pub async fn model_pool_status() -> Result<ModelPoolStatus, String> {
-    let entries = load_pool_entries()?;
+pub async fn model_pool_status() -> IpcResponse<ModelPoolStatus> {
+    let entries = match load_pool_entries() {
+        Ok(e) => e,
+        Err(e) => return ipc::err("POOL_READ_FAILED", e),
+    };
     let config_path = dirs::home_dir()
         .unwrap_or_default()
         .join(".config")
@@ -138,9 +140,9 @@ pub async fn model_pool_status() -> Result<ModelPoolStatus, String> {
         .to_string_lossy()
         .to_string();
 
-    Ok(ModelPoolStatus {
+    ipc::ok(ModelPoolStatus {
         total: entries.len(),
-        active: entries.len(), // 所有注册的条目都是 active
+        active: entries.len(),
         providers: entries,
         config_path,
     })
@@ -155,10 +157,12 @@ pub async fn model_pool_add(
     model: String,
     tags: Vec<String>,
     base_url: Option<String>,
-) -> Result<ModelPoolEntry, String> {
-    let mut raw = read_pool_raw()?;
+) -> IpcResponse<ModelPoolEntry> {
+    let mut raw = match read_pool_raw() {
+        Ok(r) => r,
+        Err(e) => return ipc::err("POOL_READ_FAILED", e),
+    };
 
-    // 追加新条目
     let new_entry = format!(
         r#"
 
@@ -187,16 +191,17 @@ created_ts = {created_ts}"#,
     );
 
     raw.push_str(&new_entry);
-    write_pool_raw(&raw)?;
+    if let Err(e) = write_pool_raw(&raw) {
+        return ipc::err("POOL_WRITE_FAILED", e);
+    }
 
-    // 返回脱敏版本
     let masked = if api_key.len() > 8 {
         format!("{}...{}", &api_key[..4], &api_key[api_key.len() - 4..])
     } else {
         "****".into()
     };
 
-    Ok(ModelPoolEntry {
+    ipc::ok(ModelPoolEntry {
         label,
         provider,
         api_key_masked: masked,
@@ -209,8 +214,11 @@ created_ts = {created_ts}"#,
 
 /// 删除模型提供者
 #[tauri::command]
-pub async fn model_pool_remove(label: String) -> Result<bool, String> {
-    let raw = read_pool_raw()?;
+pub async fn model_pool_remove(label: String) -> IpcResponse<bool> {
+    let raw = match read_pool_raw() {
+        Ok(r) => r,
+        Err(e) => return ipc::err("POOL_READ_FAILED", e),
+    };
     let lines: Vec<&str> = raw.lines().collect();
     let mut new_lines = Vec::new();
     let mut skip_until_next = false;
@@ -264,11 +272,13 @@ pub async fn model_pool_remove(label: String) -> Result<bool, String> {
     }
 
     if !found {
-        return Ok(false);
+        return ipc::ok(false);
     }
 
-    write_pool_raw(&result)?;
-    Ok(true)
+    if let Err(e) = write_pool_raw(&result) {
+        return ipc::err("POOL_WRITE_FAILED", e);
+    }
+    ipc::ok(true)
 }
 
 /// 更新模型提供者的 api_key

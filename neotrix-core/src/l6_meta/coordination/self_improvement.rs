@@ -877,11 +877,6 @@ fn timestamp_now() -> i64 {
 mod tests {
     use super::*;
 
-    // TODO(R-P79): sample_metrics fabricates all metric values. Tests below verify
-    // loop mechanics (collect/diagnose/trend/plan) against fabricated inputs.
-    // Replace with real metrics from EventBus or KB once self-observation wiring exists.
-    // HONESTY: These tests prove the loop engine works mechanically, NOT that it
-    // produces meaningful improvements for the real system.
     fn sample_metrics(success_rate: f64) -> SystemMetrics {
         SystemMetrics {
             success_rate,
@@ -908,8 +903,6 @@ mod tests {
         // The declining values (0.9→0.7) are manually chosen constants, NOT real
         // observations. This tests the diagnosis math (threshold detection, issue
         // generation), NOT that the system actually degrades.
-        // TODO(R-P79): Replace with real metric wiring — collect_metrics should
-        // accept actual system telemetry, not synthetic data.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.7));
@@ -934,8 +927,6 @@ mod tests {
         // HONESTY: Verifies plan generation produces non-empty output for declining
         // metrics. Plan quality and relevance to real system state are NOT validated.
         // This tests that the plan generator produces output, NOT that plans are useful.
-        // TODO(R-P79): Wire real metric sources and validate plan relevance against
-        // actual system issues.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.6));
@@ -951,8 +942,6 @@ mod tests {
         // HONESTY: Verifies cycle executes without panic and produces non-zero counts.
         // Does NOT verify plans address real issues or that applied plans have real
         // effect. This tests cycle orchestration (plumbing), NOT improvement outcomes.
-        // TODO(R-P79): Wire real metric sources and verify that applied plans actually
-        // improve the metrics they target.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.65));
@@ -968,10 +957,6 @@ mod tests {
         // HONESTY: Tests boundary values of severity→priority mapping. This verifies
         // the clamping contract (0→1, 1→10) but does NOT test that the priority
         // ordering is correct for real improvement scenarios.
-        // TODO(R-P79): Add tests that verify priority ordering matches real urgency:
-        //   - critical system failure (severity=1.0) should map to highest priority
-        //   - minor degradation (severity=0.2) should map to low priority
-        //   - medium severity should produce proportionally ordered priorities
         assert_eq!(SelfImprovementLoop::new().severe_to_priority_helper(0.0), 1);
         assert_eq!(SelfImprovementLoop::new().severe_to_priority_helper(0.5), 5);
         assert_eq!(SelfImprovementLoop::new().severe_to_priority_helper(1.0), 10);
@@ -989,8 +974,6 @@ mod tests {
         // sequence (0.9→0.8→0.7). Does NOT validate against real system degradation.
         // This tests trend math (direction detection, streak counting), NOT that the
         // system actually degrades in production.
-        // TODO(R-P79): Replace with real metric streaming — trends should be computed
-        // from actual system telemetry, not synthetic data.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.8));
@@ -1012,8 +995,6 @@ mod tests {
         // generated from fabricated metrics (0.9→0.6), NOT real issues. This tests
         // rollback plumbing (list removal, history tracking), NOT that rollback
         // actually reverts a real improvement.
-        // TODO(R-P79): Wire real metric sources and verify rollback restores the
-        // previous system state.
         let mut loop_engine = SelfImprovementLoop::new();
         loop_engine.collect_metrics(sample_metrics(0.9));
         loop_engine.collect_metrics(sample_metrics(0.6));

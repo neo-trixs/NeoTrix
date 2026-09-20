@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::l2_perception::nt_core_e8::domain_transition::{CoTLength, E8TaskType};
 use crate::l2_perception::nt_core_e8::e8_abduction_bridge::E8AbductionBridge;
-use crate::l6_meta::healing::nt_core_self_test::SelfTest;
+use crate::l0_substrate::nt_core_self_test::SelfTest;
 use crate::l1_action::nt_core_llm::{LlmError, LlmRequest};
 
 // ─────────────────────────────────────────────────────────────

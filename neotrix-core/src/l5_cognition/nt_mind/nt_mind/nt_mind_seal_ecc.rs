@@ -5,9 +5,9 @@
 //! 避免平行重造。base 维的 `index_from_name` 不覆盖扩展维，故另提供扩展维专用的
 //! 读写/演化 API，使 SEAL 自进化循环可定向调优这些维度而不产生死代码。
 
-use crate::core::nt_core_cap::CapabilityVector;
+use neotrix_types::core::nt_core_cap::CapabilityVector;
 use crate::l2_perception::nt_core_knowledge::TaskType;
-use crate::l6_meta::healing::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
 /// affaan-m/ECC 吸收的 SEAL 进化维度。
 pub const SEAL_ECC_DIMENSIONS: &[&str] = &[

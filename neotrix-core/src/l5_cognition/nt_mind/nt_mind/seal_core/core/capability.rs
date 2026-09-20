@@ -1,7 +1,7 @@
 //! Reverse bridge: V1 → core/
-//! All types re-exported from `crate::core::nt_core_cap`.
+//! All types re-exported from `neotrix_types::core::nt_core_cap`.
 
-pub use crate::core::nt_core_cap::{
+pub use neotrix_types::core::nt_core_cap::{
     CapabilityVector, NUM_FIELDS, FIELD_NAMES,
     IDX_TYPOGRAPHY, IDX_GRID, IDX_COLOR, IDX_WHITESPACE,
     IDX_DATA_VIZ, IDX_EMOTION, IDX_MINIMALISM, IDX_EXPERIMENTAL,
