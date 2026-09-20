@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 import { isTauriRuntime } from '../lib/env'
 
 /* ════════════════════════════════════════════
@@ -65,7 +65,7 @@ export async function call<T>(cmd: string, args?: Record<string, unknown>): Prom
     throw new ApiError('此功能仅在桌面宿主可用')
   }
   try {
-    return await invoke<T>(cmd, args)
+    return await tauriInvoke<T>(cmd, args)
   } catch (e) {
     throw toApiError(e)
   }
@@ -77,7 +77,7 @@ export async function callOr<T>(cmd: string, args: Record<string, unknown> | und
     return fallback
   }
   try {
-    return await invoke<T>(cmd, args)
+    return await tauriInvoke<T>(cmd, args)
   } catch {
     return fallback
   }

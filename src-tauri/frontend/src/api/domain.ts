@@ -5,7 +5,7 @@
  * 前端通过 domain_call(domain, action, args) 与所有 12 个功能域交互。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 import { isTauriRuntime } from '../lib/env'
 
 // ========== Types ==========
@@ -63,7 +63,7 @@ export async function call<T = unknown>(
   if (!isTauriRuntime()) {
     throw new DomainError('NOT_AVAILABLE', '此功能仅在桌面宿主可用', false)
   }
-  const response = await invoke<DomainResponse<T>>('domain_call', {
+  const response = await tauriInvoke<DomainResponse<T>>('domain_call', {
     domain,
     action,
     args,
@@ -81,21 +81,21 @@ export async function call<T = unknown>(
  * 列出所有已注册域
  */
 export async function list(): Promise<DomainInfo[]> {
-  return await invoke<DomainInfo[]>('domain_list')
+  return await tauriInvoke<DomainInfo[]>('domain_list')
 }
 
 /**
  * 检查域是否存在
  */
 export async function has(domain: string): Promise<boolean> {
-  return await invoke<boolean>('domain_has', { domain })
+  return await tauriInvoke<boolean>('domain_has', { domain })
 }
 
 /**
  * 获取域 action 数量
  */
 export async function actionCount(domain: string): Promise<number> {
-  return await invoke<number>('domain_action_count', { domain })
+  return await tauriInvoke<number>('domain_action_count', { domain })
 }
 
 // ========== Domain Error ==========

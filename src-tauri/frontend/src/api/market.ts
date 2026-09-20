@@ -2,7 +2,7 @@
 //
 // 统一市场搜索、安装、卸载功能。
 
-import { invoke } from '@tauri-apps/api/core';
+import { tauriInvoke } from './tauri-bridge';
 
 // ═══════════════════════════════════════════════
 // Types
@@ -69,7 +69,7 @@ export interface PluginManifest {
 
 /** 获取市场状态 */
 export async function marketStatus(): Promise<MarketStatus> {
-  return invoke('market_status');
+  return tauriInvoke('market_status');
 }
 
 /** 搜索插件 */
@@ -79,7 +79,7 @@ export async function marketSearch(
   page?: number,
   perPage?: number,
 ): Promise<MarketSearchResult[]> {
-  return invoke('market_search', {
+  return tauriInvoke('market_search', {
     query,
     category: category ?? null,
     page: page ?? 1,
@@ -92,7 +92,7 @@ export async function marketGetDetail(
   pluginId: string,
   source: string,
 ): Promise<MarketEntry> {
-  return invoke('market_get_detail', {
+  return tauriInvoke('market_get_detail', {
     pluginId,
     source,
   });
@@ -104,7 +104,7 @@ export async function marketDownload(
   source: string,
   version: string,
 ): Promise<string> {
-  return invoke('market_download', {
+  return tauriInvoke('market_download', {
     pluginId,
     source,
     version,
@@ -117,7 +117,7 @@ export async function marketInstall(
   source: string,
   version: string,
 ): Promise<PluginManifest> {
-  return invoke('market_install', {
+  return tauriInvoke('market_install', {
     pluginId,
     source,
     version,
@@ -126,19 +126,19 @@ export async function marketInstall(
 
 /** 卸载插件 */
 export async function marketUninstall(pluginId: string): Promise<boolean> {
-  return invoke('market_uninstall', {
+  return tauriInvoke('market_uninstall', {
     pluginId,
   });
 }
 
 /** 获取已安装插件列表 */
 export async function marketListInstalled(): Promise<PluginManifest[]> {
-  return invoke('market_list_installed');
+  return tauriInvoke('market_list_installed');
 }
 
 /** 检查更新 */
 export async function marketCheckUpdates(): Promise<[string, string, string][]> {
-  return invoke('market_check_updates');
+  return tauriInvoke('market_check_updates');
 }
 
 /** 设置市场配置 */
@@ -149,7 +149,7 @@ export async function marketConfig(options: {
   githubEnabled?: boolean;
   githubToken?: string;
 }): Promise<MarketStatus> {
-  return invoke('market_config', {
+  return tauriInvoke('market_config', {
     dsh_enabled: options.dshEnabled ?? null,
     dsh_api_endpoint: options.dshApiEndpoint ?? null,
     dsh_auth_token: options.dshAuthToken ?? null,

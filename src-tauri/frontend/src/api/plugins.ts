@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 import type { PluginEvent, PluginStatus } from './types'
 
 /* ════════════════════════════════════════════
@@ -7,29 +7,29 @@ import type { PluginEvent, PluginStatus } from './types'
    ════════════════════════════════════════════ */
 
 export function pluginList(): Promise<PluginStatus[]> {
-  return invoke('plugin_list', {})
+  return tauriInvoke('plugin_list', {})
 }
 
 export function pluginInstall(path: string): Promise<PluginStatus> {
-  return invoke('plugin_install', { path })
+  return tauriInvoke('plugin_install', { path })
 }
 
 export function pluginUninstall(id: string): Promise<void> {
-  return invoke('plugin_uninstall', { id })
+  return tauriInvoke('plugin_uninstall', { id })
 }
 
 export function pluginEnable(id: string): Promise<void> {
-  return invoke('plugin_enable', { id })
+  return tauriInvoke('plugin_enable', { id })
 }
 
 export function pluginDisable(id: string): Promise<void> {
-  return invoke('plugin_disable', { id })
+  return tauriInvoke('plugin_disable', { id })
 }
 
 export function pluginGet(id: string): Promise<PluginStatus> {
-  return invoke('plugin_get', { id })
+  return tauriInvoke('plugin_get', { id })
 }
 
 export function pluginEventLog(count: number): Promise<PluginEvent[]> {
-  return invoke('plugin_event_log', { count })
+  return tauriInvoke('plugin_event_log', { count })
 }

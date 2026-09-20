@@ -2,6 +2,9 @@
 //
 // 统一导出所有前端需要的 API
 
+// ===== Tauri IPC Bridge =====
+export { tauriInvoke, tauriInvokeSafe } from './tauri-bridge';
+
 // ===== 新架构：Domain Plugin System =====
 export * as domain from './domain';
 export { call as domainCall, list as domainList, has as domainHas, actionCount as domainActionCount } from './domain';

@@ -4,7 +4,7 @@
  * 通过 Tauri invoke 调用后端 IM 命令。
  * 基于 DSH-IM 的多渠道适配器模式。
  */
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 
 /** 渠道类型 */
 export type ChannelType = 'wechat' | 'feishu' | 'dingtalk' | 'wecom' | 'qq' | 'slack' | 'telegram' | 'discord' | 'whatsapp'

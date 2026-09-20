@@ -1,7 +1,7 @@
 /**
  * Hive API — OfficeFloor visualization commands
  */
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 
 export interface AgentFloorData {
   id: string
@@ -36,9 +36,9 @@ export interface FloorState {
 }
 
 export function getFloorState(): Promise<FloorState> {
-  return invoke('hive_get_floor_state')
+  return tauriInvoke('hive_get_floor_state')
 }
 
 export function hiveSendMessage(from: string, to: string, msgType: string, content: string): Promise<string> {
-  return invoke('hive_send_message', { from, to, msgType, content })
+  return tauriInvoke('hive_send_message', { from, to, msgType, content })
 }

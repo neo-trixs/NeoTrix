@@ -2,7 +2,7 @@
 // 
 // 前端只通过这个统一客户端与后端交互，不再直接调用 100+ 个 Tauri 命令
 
-import { invoke } from '@tauri-apps/api/core';
+import { tauriInvoke } from './tauri-bridge';
 import { listen, Event } from '@tauri-apps/api/event';
 
 // ========== 类型定义 ==========
@@ -94,7 +94,7 @@ class UnifiedApiClient {
    * 初始化统一 API（应用启动时调用）
    */
   async init(): Promise<void> {
-    await invoke('unified_init');
+    await tauriInvoke('unified_init');
     console.log('[UnifiedAPI] Initialized');
   }
 
@@ -102,7 +102,7 @@ class UnifiedApiClient {
    * 统一对话接口 - 主要入口
    */
   async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
-    return await invoke('unified_chat', { request });
+    return await tauriInvoke('unified_chat', { request });
   }
 
   /**
@@ -135,28 +135,28 @@ class UnifiedApiClient {
    * 获取系统状态
    */
   async getSystemState(): Promise<UnifiedChatResponse> {
-    return await invoke('unified_system_state');
+    return await tauriInvoke('unified_system_state');
   }
 
   /**
    * 创建新会话
    */
   async createSession(projectPath?: string): Promise<SessionInfo> {
-    return await invoke('unified_create_session', { project_path: projectPath });
+    return await tauriInvoke('unified_create_session', { project_path: projectPath });
   }
 
   /**
    * 列出所有会话
    */
   async listSessions(): Promise<SessionInfo[]> {
-    return await invoke('unified_list_sessions');
+    return await tauriInvoke('unified_list_sessions');
   }
 
   /**
    * 删除会话
    */
   async deleteSession(sessionId: string): Promise<void> {
-    await invoke('unified_delete_session', { session_id: sessionId });
+    await tauriInvoke('unified_delete_session', { session_id: sessionId });
   }
 
   /**

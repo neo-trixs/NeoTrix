@@ -232,4 +232,24 @@ desktop-package-dir:
 desktop-package:
 	@skills/dev-tools/build-desktop/build-desktop.sh package
 
-.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package
+# ═══════════════════════════════════════════════════════════
+# 开发快捷命令 (Dev Commands)
+# ═══════════════════════════════════════════════════════════
+
+lint:
+	@echo "Running cargo fmt check..."
+	@cargo fmt -- --check
+	@echo "Running clippy..."
+	@cargo clippy --all-targets --all-features -- -D warnings
+	@echo "✅ Lint passed"
+
+test:
+	@cargo test --all
+
+check:
+	@cargo check --lib -p neotrix
+
+build:
+	@cargo build -p neotrix
+
+.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build

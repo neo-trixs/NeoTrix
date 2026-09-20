@@ -3,7 +3,7 @@
    契约镜像 project_cmds.rs::parse_doc_file / ParsedDocFile
    ════════════════════════════════════════════ */
 import { openFileDialog } from './fs'
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 
 export interface ParsedDocFile {
   path: string
@@ -26,10 +26,10 @@ export async function pickAndParseDoc(): Promise<ParsedDocFile | null> {
 }
 
 export function parseDocAt(path: string): Promise<ParsedDocFile> {
-  return invoke('parse_doc_file', { path })
+  return tauriInvoke('parse_doc_file', { path })
 }
 
 /** 任意文本类文件读取 (代码/配置等) — 走 commands::read_file */
 export function readTextFileAt(path: string): Promise<string> {
-  return invoke('read_file', { path })
+  return tauriInvoke('read_file', { path })
 }

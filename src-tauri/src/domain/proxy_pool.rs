@@ -388,3 +388,355 @@ pub fn set_strategy(base_dir: &Path, strategy: &str) -> AppResult<String> {
     save_strategy(base_dir, strategy)?;
     Ok(strategy.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    // ── extract_direct_proxies ───────────────────────
+
+    #[test]
+    fn extract_valid_http_url() {
+        let subs = vec!["http://1.2.3.4:8080".into()];
+        let nodes = extract_direct_proxies(&subs);
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].url, "http://1.2.3.4:8080");
+        assert_eq!(nodes[0].speed_tier, "unknown");
+        assert!(!nodes[0].from_subscription);
+    }
+
+    #[test]
+    fn extract_valid_https_url() {
+        let subs = vec!["https://10.0.0.1:443".into()];
+        let nodes = extract_direct_proxies(&subs);
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].url, "https://10.0.0.1:443");
+    }
+
+    #[test]
+    fn extract_multiple_valid_urls() {
+        let subs = vec![
+            "http://1.2.3.4:8080".into(),
+            "https://5.6.7.8:443".into(),
+            "http://9.10.11.12:3128".into(),
+        ];
+        let nodes = extract_direct_proxies(&subs);
+        assert_eq!(nodes.len(), 3);
+    }
+
+    #[test]
+    fn extract_skips_non_http() {
+        let subs = vec!["socks5://1.2.3.4:1080".into(), "ftp://host:21".into()];
+        let nodes = extract_direct_proxies(&subs);
+        assert!(nodes.is_empty());
+    }
+
+    #[test]
+    fn extract_skips_invalid_port() {
+        let subs = vec!["http://1.2.3.4:99999".into()];
+        let nodes = extract_direct_proxies(&subs);
+        assert!(nodes.is_empty());
+    }
+
+    #[test]
+    fn extract_skips_missing_port() {
+        let subs = vec!["http://1.2.3.4".into()];
+        let nodes = extract_direct_proxies(&subs);
+        assert!(nodes.is_empty());
+    }
+
+    #[test]
+    fn extract_skips_empty_host() {
+        let subs = vec!["http://:8080".into()];
+        let nodes = extract_direct_proxies(&subs);
+        assert!(nodes.is_empty());
+    }
+
+    #[test]
+    fn extract_empty_input() {
+        let nodes = extract_direct_proxies(&[]);
+        assert!(nodes.is_empty());
+    }
+
+    #[test]
+    fn extract_tag_derived_from_host() {
+        let subs = vec!["http://192.168.1.100:8080".into()];
+        let nodes = extract_direct_proxies(&subs);
+        assert!(nodes[0].tag.starts_with("sub-"));
+    }
+
+    // ── infer_geo_from_ip ────────────────────────────
+
+    #[test]
+    fn infer_geo_us() {
+        assert_eq!(infer_geo_from_ip("1.0.0.1"), Some("US".into()));
+        assert_eq!(infer_geo_from_ip("50.0.0.1"), Some("US".into()));
+    }
+
+    #[test]
+    fn infer_geo_eu() {
+        assert_eq!(infer_geo_from_ip("51.0.0.1"), Some("EU".into()));
+        assert_eq!(infer_geo_from_ip("100.0.0.1"), Some("EU".into()));
+    }
+
+    #[test]
+    fn infer_geo_as() {
+        assert_eq!(infer_geo_from_ip("101.0.0.1"), Some("AS".into()));
+        assert_eq!(infer_geo_from_ip("150.0.0.1"), Some("AS".into()));
+    }
+
+    #[test]
+    fn infer_geo_sa() {
+        assert_eq!(infer_geo_from_ip("151.0.0.1"), Some("SA".into()));
+        assert_eq!(infer_geo_from_ip("200.0.0.1"), Some("SA".into()));
+    }
+
+    #[test]
+    fn infer_geo_af() {
+        assert_eq!(infer_geo_from_ip("201.0.0.1"), Some("AF".into()));
+        assert_eq!(infer_geo_from_ip("255.0.0.1"), Some("AF".into()));
+    }
+
+    #[test]
+    fn infer_geo_invalid_ip() {
+        assert_eq!(infer_geo_from_ip("not-an-ip"), None);
+        assert_eq!(infer_geo_from_ip(""), None);
+        assert_eq!(infer_geo_from_ip("abc.def.ghi"), None);
+    }
+
+    // ── VALID_STRATEGIES ─────────────────────────────
+
+    #[test]
+    fn valid_strategies_contains_expected() {
+        let expected = [
+            "fastest",
+            "least_latency",
+            "least_failure",
+            "weighted_random",
+            "geo_preferred",
+            "round_robin",
+            "adaptive",
+            "auto",
+        ];
+        for s in expected {
+            assert!(
+                VALID_STRATEGIES.contains(&s),
+                "Missing strategy: {s}"
+            );
+        }
+    }
+
+    // ── set_strategy / save_strategy ─────────────────
+
+    #[test]
+    fn set_strategy_valid() {
+        let dir = tempdir().unwrap();
+        let result = set_strategy(dir.path(), "adaptive");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "adaptive");
+    }
+
+    #[test]
+    fn set_strategy_invalid() {
+        let dir = tempdir().unwrap();
+        let result = set_strategy(dir.path(), "bogus_strategy");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::InvalidInput { code, .. } => {
+                assert_eq!(code, "PROXY_INVALID_STRATEGY");
+            }
+            other => panic!("Expected InvalidInput, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn set_strategy_creates_config_file() {
+        let dir = tempdir().unwrap();
+        set_strategy(dir.path(), "round_robin").unwrap();
+        let config_path = dir.path().join("config.toml");
+        assert!(config_path.exists());
+        let content = std::fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("round_robin"));
+    }
+
+    #[test]
+    fn set_strategy_updates_existing() {
+        let dir = tempdir().unwrap();
+        set_strategy(dir.path(), "adaptive").unwrap();
+        set_strategy(dir.path(), "fastest").unwrap();
+        let content = std::fs::read_to_string(dir.path().join("config.toml")).unwrap();
+        assert!(content.contains("fastest"));
+        assert!(!content.contains("adaptive"));
+    }
+
+    // ── load_subscriptions ───────────────────────────
+
+    #[test]
+    fn load_subscriptions_missing_file() {
+        let dir = tempdir().unwrap();
+        let subs = load_subscriptions(dir.path()).unwrap();
+        assert!(subs.is_empty());
+    }
+
+    #[test]
+    fn load_subscriptions_valid_json() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("subscriptions.json");
+        let data = vec!["http://a.com:80".into(), "https://b.com:443".into()];
+        atomic_io::write_json_atomic(&path, &data).unwrap();
+        let subs = load_subscriptions(dir.path()).unwrap();
+        assert_eq!(subs.len(), 2);
+    }
+
+    #[test]
+    fn load_subscriptions_invalid_json() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("subscriptions.json");
+        std::fs::write(&path, "not json!!!").unwrap();
+        let result = load_subscriptions(dir.path());
+        assert!(result.is_err());
+    }
+
+    // ── save_subscriptions ───────────────────────────
+
+    #[test]
+    fn save_and_load_subscriptions_roundtrip() {
+        let dir = tempdir().unwrap();
+        let subs = vec!["http://x.com:80".into()];
+        save_subscriptions(dir.path(), &subs).unwrap();
+        let loaded = load_subscriptions(dir.path()).unwrap();
+        assert_eq!(loaded, subs);
+    }
+
+    // ── load_pool_config ─────────────────────────────
+
+    #[test]
+    fn load_pool_config_missing_file_returns_default() {
+        let dir = tempdir().unwrap();
+        let config = load_pool_config(dir.path()).unwrap();
+        let strategy = config["pool"]["selection_strategy"].as_str().unwrap();
+        assert_eq!(strategy, "adaptive");
+    }
+
+    // ── add_node / remove_node ───────────────────────
+
+    #[test]
+    fn add_and_remove_node() {
+        let dir = tempdir().unwrap();
+        let entry = add_node(dir.path(), "http://1.2.3.4:8080", Some("test")).unwrap();
+        assert_eq!(entry.url, "http://1.2.3.4:8080");
+        assert_eq!(entry.tag, "test");
+
+        let removed = remove_node(dir.path(), "http://1.2.3.4:8080").unwrap();
+        assert!(removed);
+    }
+
+    #[test]
+    fn add_node_duplicate_returns_error() {
+        let dir = tempdir().unwrap();
+        add_node(dir.path(), "http://1.2.3.4:8080", None).unwrap();
+        let result = add_node(dir.path(), "http://1.2.3.4:8080", None);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::Duplicate { code, .. } => assert_eq!(code, "PROXY_DUPLICATE"),
+            other => panic!("Expected Duplicate, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn remove_node_nonexistent_returns_false() {
+        let dir = tempdir().unwrap();
+        let removed = remove_node(dir.path(), "http://nope.com:99").unwrap();
+        assert!(!removed);
+    }
+
+    // ── add_subscription / remove_subscription ────────
+
+    #[test]
+    fn add_and_remove_subscription() {
+        let dir = tempdir().unwrap();
+        let subs = add_subscription(dir.path(), "http://sub.com:80").unwrap();
+        assert_eq!(subs.len(), 1);
+
+        let subs = remove_subscription(dir.path(), "http://sub.com:80").unwrap();
+        assert!(subs.is_empty());
+    }
+
+    #[test]
+    fn add_subscription_duplicate_returns_error() {
+        let dir = tempdir().unwrap();
+        add_subscription(dir.path(), "http://sub.com:80").unwrap();
+        let result = add_subscription(dir.path(), "http://sub.com:80");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn remove_subscription_not_found_returns_error() {
+        let dir = tempdir().unwrap();
+        let result = remove_subscription(dir.path(), "http://nope.com:80");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::NotFound { code, .. } => assert_eq!(code, "PROXY_NOT_FOUND"),
+            other => panic!("Expected NotFound, got: {other:?}"),
+        }
+    }
+
+    // ── get_status / get_snapshot ─────────────────────
+
+    #[test]
+    fn get_status_empty_dir() {
+        let dir = tempdir().unwrap();
+        let status = get_status(dir.path()).unwrap();
+        assert_eq!(status.total, 0);
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.unhealthy, 0);
+    }
+
+    #[test]
+    fn get_snapshot_empty_dir() {
+        let dir = tempdir().unwrap();
+        let snapshot = get_snapshot(dir.path()).unwrap();
+        assert_eq!(snapshot.total, 0);
+        assert_eq!(snapshot.avg_latency_ms, 0.0);
+        assert!(snapshot.geo_distribution.is_empty());
+        assert!(snapshot.speed_tiers.is_empty());
+    }
+
+    #[test]
+    fn get_status_with_nodes() {
+        let dir = tempdir().unwrap();
+        add_node(dir.path(), "http://1.2.3.4:8080", None).unwrap();
+        add_node(dir.path(), "http://5.6.7.8:8080", None).unwrap();
+        let status = get_status(dir.path()).unwrap();
+        assert_eq!(status.total, 2);
+        assert_eq!(status.healthy, 2);
+    }
+
+    #[test]
+    fn get_snapshot_geo_distribution() {
+        let dir = tempdir().unwrap();
+        // US IP
+        let entry = ProxyPoolEntry {
+            url: "http://1.0.0.1:80".into(),
+            tag: "a".into(),
+            geo_tag: Some("US".into()),
+            latency_ms: Some(100),
+            success_count: 0,
+            fail_count: 0,
+            speed_tier: "fast".into(),
+            from_subscription: false,
+        };
+        let nodes = vec![entry];
+        atomic_io::write_json_atomic(
+            &dir.path().join("proxy_pool_cache.json"),
+            &nodes,
+        )
+        .unwrap();
+
+        let snapshot = get_snapshot(dir.path()).unwrap();
+        assert_eq!(*snapshot.geo_distribution.get("US").unwrap(), 1);
+        assert_eq!(*snapshot.speed_tiers.get("fast").unwrap(), 1);
+        assert_eq!(snapshot.avg_latency_ms, 100.0);
+    }
+}

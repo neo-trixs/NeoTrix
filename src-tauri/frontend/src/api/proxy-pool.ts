@@ -3,7 +3,7 @@
  * 
  * 通过 Tauri invoke 调用后端 proxy_pool 命令。
  */
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 
 /** 代理池条目 */
 export interface ProxyPoolEntry {

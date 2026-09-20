@@ -3,7 +3,7 @@
    后端: src-tauri pty_spawn/write/resize/close
          事件: pty_output_{id} / pty_exit_{id}
    ════════════════════════════════════════════ */
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 /** 启动 PTY 会话，返回 session id */
@@ -13,17 +13,17 @@ export function ptySpawn(cols: number, rows: number): Promise<string> {
 
 /** 写入数据到 PTY stdin */
 export function ptyWrite(sessionId: string, data: string): Promise<void> {
-  return invoke('pty_write', { session_id: sessionId, data })
+  return tauriInvoke('pty_write', { session_id: sessionId, data })
 }
 
 /** 通知后端终端尺寸变更 */
 export function ptyResize(sessionId: string, cols: number, rows: number): Promise<void> {
-  return invoke('pty_resize', { session_id: sessionId, cols, rows })
+  return tauriInvoke('pty_resize', { session_id: sessionId, cols, rows })
 }
 
 /** 关闭 PTY 会话 */
 export function ptyClose(sessionId: string): Promise<void> {
-  return invoke('pty_close', { session_id: sessionId })
+  return tauriInvoke('pty_close', { session_id: sessionId })
 }
 
 /** 订阅 PTY 输出（服务端 → 前端的字节流），返回取消订阅函数 */

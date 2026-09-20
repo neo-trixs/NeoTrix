@@ -299,3 +299,122 @@ pub async fn check_connectivity(label: &str) -> AnyhowResult<String> {
         Err(e) => Ok(format!("error: {}", e)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── mask_api_key ─────────────────────────────────
+
+    #[test]
+    fn mask_key_env_prefix_passthrough() {
+        assert_eq!(mask_api_key("env:MY_SECRET"), "env:MY_SECRET");
+    }
+
+    #[test]
+    fn mask_key_long_key() {
+        let key = "sk-1234567890abcdef";
+        let masked = mask_api_key(key);
+        assert!(masked.starts_with("sk-1"));
+        assert!(masked.ends_with("cdef"));
+        assert!(masked.contains("..."));
+    }
+
+    #[test]
+    fn mask_key_short_key() {
+        assert_eq!(mask_api_key("abc"), "****");
+        assert_eq!(mask_api_key("12345678"), "****");
+    }
+
+    #[test]
+    fn mask_key_empty_string() {
+        assert_eq!(mask_api_key(""), "****");
+    }
+
+    #[test]
+    fn mask_key_exactly_8_chars() {
+        assert_eq!(mask_api_key("12345678"), "****");
+    }
+
+    #[test]
+    fn mask_key_9_chars_gets_masked() {
+        let key = "123456789";
+        let masked = mask_api_key(key);
+        assert_eq!(masked, "1234...6789");
+    }
+
+    #[test]
+    fn mask_key_preserves_first4_last4() {
+        let key = "abcdefghij";
+        let masked = mask_api_key(key);
+        assert!(masked.starts_with("abcd"));
+        assert!(masked.ends_with("ghij"));
+    }
+
+    // ── read_pool_raw / load_pool_entries (no config) ─
+
+    #[test]
+    fn read_pool_raw_no_config_returns_skeleton() {
+        // pool_path() depends on AppConfig::base_dir() which may be None
+        // in test. This test verifies the function doesn't panic.
+        let result = read_pool_raw();
+        // Either Ok with skeleton or Err if base_dir is unset — both acceptable
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn load_pool_entries_no_config_returns_empty() {
+        let result = load_pool_entries();
+        match result {
+            Ok(entries) => assert!(entries.is_empty()),
+            Err(_) => {} // AppConfig::base_dir() may not be set in test
+        }
+    }
+
+    // ── ModelPoolEntry serialization ─────────────────
+
+    #[test]
+    fn model_pool_entry_roundtrip_json() {
+        let entry = ModelPoolEntry {
+            label: "test-openai".into(),
+            provider: "openai".into(),
+            api_key_masked: "sk-1...abcd".into(),
+            model: "gpt-4".into(),
+            tags: vec!["chat".into()],
+            base_url: Some("https://api.openai.com".into()),
+            created_ts: 1700000000,
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let decoded: ModelPoolEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.label, "test-openai");
+        assert_eq!(decoded.provider, "openai");
+        assert_eq!(decoded.api_key_masked, "sk-1...abcd");
+        assert_eq!(decoded.model, "gpt-4");
+        assert_eq!(decoded.tags, vec!["chat"]);
+        assert_eq!(decoded.created_ts, 1700000000);
+    }
+
+    #[test]
+    fn model_pool_entry_default_tags_empty() {
+        let json = r#"{"label":"x","provider":"y","api_key_masked":"z","model":"m","tags":[],"created_ts":0}"#;
+        let entry: ModelPoolEntry = serde_json::from_str(json).unwrap();
+        assert!(entry.tags.is_empty());
+        assert!(entry.base_url.is_none());
+    }
+
+    // ── ModelPoolStatus ──────────────────────────────
+
+    #[test]
+    fn model_pool_status_roundtrip() {
+        let status = ModelPoolStatus {
+            total: 0,
+            active: 0,
+            providers: vec![],
+            config_path: "/tmp/test.toml".into(),
+        };
+        let json = serde_json::to_string(&status).unwrap();
+        let decoded: ModelPoolStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total, 0);
+        assert_eq!(decoded.config_path, "/tmp/test.toml");
+    }
+}

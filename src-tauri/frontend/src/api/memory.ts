@@ -3,7 +3,7 @@
    记忆操作走 domain plugin (memory domain)
    API Key 操作走直接 invoke
    ════════════════════════════════════════════ */
-import { invoke } from '@tauri-apps/api/core'
+import { tauriInvoke } from './tauri-bridge'
 import * as domain from './domain'
 import type { MemoryStats } from './types'
 
@@ -62,13 +62,13 @@ export function memoryTimeline(days?: number): Promise<MemoryTimelineEntry[]> {
 
 /* ── API Key（直接 invoke，非 domain plugin） ── */
 export function saveApiKey(key: string): Promise<void> {
-  return invoke('save_api_key', { key })
+  return tauriInvoke('save_api_key', { key })
 }
 
 export function hasApiKey(): Promise<boolean> {
-  return invoke('has_api_key', {})
+  return tauriInvoke('has_api_key', {})
 }
 
 export function deleteApiKey(): Promise<void> {
-  return invoke('delete_api_key', {})
+  return tauriInvoke('delete_api_key', {})
 }

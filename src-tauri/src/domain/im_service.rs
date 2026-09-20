@@ -326,3 +326,332 @@ pub fn dsh_market_sync(base_dir: &Path) -> AnyhowResult<std::collections::HashMa
 
     Ok(plugins)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    // ── default_channels ─────────────────────────────
+
+    #[test]
+    fn default_channels_count_matches_all_types() {
+        let channels = default_channels();
+        assert_eq!(channels.len(), ALL_CHANNEL_TYPES.len());
+    }
+
+    #[test]
+    fn default_channels_all_disabled() {
+        let channels = default_channels();
+        for ch in &channels {
+            assert!(!ch.enabled, "Channel {} should be disabled", ch.channel);
+        }
+    }
+
+    #[test]
+    fn default_channels_no_bots() {
+        let channels = default_channels();
+        for ch in &channels {
+            assert!(ch.bots.is_empty());
+        }
+    }
+
+    #[test]
+    fn default_channels_no_enhancements() {
+        let channels = default_channels();
+        for ch in &channels {
+            assert!(!ch.context_enhancement);
+            assert!(!ch.proactive_delivery);
+        }
+    }
+
+    #[test]
+    fn default_channels_contains_each_type() {
+        let channels = default_channels();
+        for ch_type in ALL_CHANNEL_TYPES {
+            assert!(
+                channels.iter().any(|c| c.channel == *ch_type),
+                "Missing channel type: {ch_type}"
+            );
+        }
+    }
+
+    // ── load_channels ────────────────────────────────
+
+    #[test]
+    fn load_channels_missing_file_returns_defaults() {
+        let dir = tempdir().unwrap();
+        let channels = load_channels(dir.path()).unwrap();
+        assert_eq!(channels.len(), ALL_CHANNEL_TYPES.len());
+    }
+
+    #[test]
+    fn load_channels_valid_json() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("im_channels.json");
+        let channels = default_channels();
+        atomic_io::write_json_atomic(&path, &channels).unwrap();
+        let loaded = load_channels(dir.path()).unwrap();
+        assert_eq!(loaded.len(), channels.len());
+    }
+
+    // ── save_channels ────────────────────────────────
+
+    #[test]
+    fn save_and_load_channels_roundtrip() {
+        let dir = tempdir().unwrap();
+        let mut channels = default_channels();
+        channels[0].enabled = true;
+        save_channels(dir.path(), &channels).unwrap();
+        let loaded = load_channels(dir.path()).unwrap();
+        assert!(loaded[0].enabled);
+    }
+
+    // ── toggle_channel ───────────────────────────────
+
+    #[test]
+    fn toggle_channel_enable() {
+        let dir = tempdir().unwrap();
+        let ch = toggle_channel(dir.path(), "wechat", true).unwrap();
+        assert!(ch.enabled);
+    }
+
+    #[test]
+    fn toggle_channel_disable() {
+        let dir = tempdir().unwrap();
+        toggle_channel(dir.path(), "wechat", true).unwrap();
+        let ch = toggle_channel(dir.path(), "wechat", false).unwrap();
+        assert!(!ch.enabled);
+    }
+
+    #[test]
+    fn toggle_channel_nonexistent_returns_error() {
+        let dir = tempdir().unwrap();
+        let result = toggle_channel(dir.path(), "bogus_channel", true);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Unknown channel"));
+    }
+
+    // ── add_bot ──────────────────────────────────────
+
+    #[test]
+    fn add_bot_valid_channel() {
+        let dir = tempdir().unwrap();
+        let bot = add_bot(
+            dir.path(),
+            "telegram",
+            "test-bot",
+            "token",
+            "ws://localhost:8080",
+            "gpt-4",
+        )
+        .unwrap();
+        assert_eq!(bot.name, "test-bot");
+        assert_eq!(bot.channel.to_string(), "telegram");
+        assert!(bot.enabled);
+        assert!(bot.id.starts_with("bot-telegram-"));
+    }
+
+    #[test]
+    fn add_bot_invalid_channel() {
+        let dir = tempdir().unwrap();
+        let result = add_bot(
+            dir.path(),
+            "bogus_channel",
+            "test-bot",
+            "token",
+            "ws://localhost",
+            "gpt-4",
+        );
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Unknown channel"));
+    }
+
+    #[test]
+    fn add_bot_empty_name() {
+        let dir = tempdir().unwrap();
+        let bot = add_bot(
+            dir.path(),
+            "slack",
+            "",
+            "token",
+            "ws://localhost",
+            "gpt-4",
+        )
+        .unwrap();
+        assert!(bot.name.is_empty());
+    }
+
+    #[test]
+    fn add_bot_persists_to_file() {
+        let dir = tempdir().unwrap();
+        add_bot(
+            dir.path(),
+            "discord",
+            "persist-bot",
+            "token",
+            "ws://localhost",
+            "gpt-4",
+        )
+        .unwrap();
+        let channels = load_channels(dir.path()).unwrap();
+        let discord_ch = channels.iter().find(|c| c.channel == ChannelType::Discord).unwrap();
+        assert_eq!(discord_ch.bots.len(), 1);
+        assert_eq!(discord_ch.bots[0].name, "persist-bot");
+    }
+
+    // ── remove_bot ───────────────────────────────────
+
+    #[test]
+    fn remove_bot_existing() {
+        let dir = tempdir().unwrap();
+        let bot = add_bot(
+            dir.path(),
+            "slack",
+            "rm-bot",
+            "token",
+            "ws://localhost",
+            "gpt-4",
+        )
+        .unwrap();
+        let removed = remove_bot(dir.path(), "slack", &bot.id).unwrap();
+        assert!(removed);
+    }
+
+    #[test]
+    fn remove_bot_nonexistent() {
+        let dir = tempdir().unwrap();
+        let removed = remove_bot(dir.path(), "slack", "bot-slack-nobody").unwrap();
+        assert!(!removed);
+    }
+
+    #[test]
+    fn remove_bot_invalid_channel() {
+        let dir = tempdir().unwrap();
+        let result = remove_bot(dir.path(), "invalid", "bot-id");
+        assert!(result.is_err());
+    }
+
+    // ── update_bot ───────────────────────────────────
+
+    #[test]
+    fn update_bot_name() {
+        let dir = tempdir().unwrap();
+        let bot = add_bot(
+            dir.path(),
+            "wechat",
+            "old-name",
+            "token",
+            "ws://localhost",
+            "gpt-4",
+        )
+        .unwrap();
+        let updated = update_bot(dir.path(), "wechat", &bot.id, Some("new-name"), None, None).unwrap();
+        assert_eq!(updated.name, "new-name");
+    }
+
+    #[test]
+    fn update_bot_not_found() {
+        let dir = tempdir().unwrap();
+        let result = update_bot(dir.path(), "wechat", "nonexistent-id", Some("x"), None, None);
+        assert!(result.is_err());
+    }
+
+    // ── set_context_enhancement / set_proactive_delivery ──
+
+    #[test]
+    fn set_context_enhancement() {
+        let dir = tempdir().unwrap();
+        let ch = set_context_enhancement(dir.path(), "feishu", true).unwrap();
+        assert!(ch.context_enhancement);
+    }
+
+    #[test]
+    fn set_proactive_delivery() {
+        let dir = tempdir().unwrap();
+        let ch = set_proactive_delivery(dir.path(), "dingtalk", true).unwrap();
+        assert!(ch.proactive_delivery);
+    }
+
+    #[test]
+    fn set_feature_nonexistent_channel() {
+        let dir = tempdir().unwrap();
+        assert!(set_context_enhancement(dir.path(), "bogus", true).is_err());
+        assert!(set_proactive_delivery(dir.path(), "bogus", true).is_err());
+    }
+
+    // ── dsh_market ───────────────────────────────────
+
+    #[test]
+    fn load_dsh_market_missing_file_returns_default() {
+        let dir = tempdir().unwrap();
+        let config = load_dsh_market(dir.path()).unwrap();
+        assert!(!config.enabled);
+        assert_eq!(config.api_endpoint, "https://dshfind.com/api");
+    }
+
+    #[test]
+    fn dsh_market_toggle() {
+        let dir = tempdir().unwrap();
+        let config = dsh_market_toggle(dir.path(), true).unwrap();
+        assert!(config.enabled);
+    }
+
+    #[test]
+    fn dsh_market_config_update() {
+        let dir = tempdir().unwrap();
+        let config = dsh_market_config_update(
+            dir.path(),
+            Some("https://custom.api"),
+            Some("tok_abc"),
+            Some(false),
+        )
+        .unwrap();
+        assert_eq!(config.api_endpoint, "https://custom.api");
+        assert_eq!(config.auth_token.as_deref(), Some("tok_abc"));
+        assert!(!config.sync_enabled);
+    }
+
+    #[test]
+    fn dsh_market_sync_disabled_returns_error() {
+        let dir = tempdir().unwrap();
+        let result = dsh_market_sync(dir.path());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not enabled"));
+    }
+
+    #[test]
+    fn dsh_market_sync_enabled_returns_plugins() {
+        let dir = tempdir().unwrap();
+        dsh_market_toggle(dir.path(), true).unwrap();
+        let plugins = dsh_market_sync(dir.path()).unwrap();
+        assert!(plugins.contains_key("dsh-im-core"));
+        assert!(plugins.contains_key("dsh-im-wechat"));
+        assert!(plugins.contains_key("dsh-im-feishu"));
+        assert!(plugins.contains_key("dsh-im-telegram"));
+        assert_eq!(plugins.len(), 4);
+    }
+
+    // ── get_status ───────────────────────────────────
+
+    #[test]
+    fn get_status_empty() {
+        let dir = tempdir().unwrap();
+        let status = get_status(dir.path()).unwrap();
+        assert_eq!(status.total_bots, 0);
+        assert_eq!(status.connected_bots, 0);
+        assert!(!status.dsh_market_enabled);
+    }
+
+    #[test]
+    fn get_status_counts_bots() {
+        let dir = tempdir().unwrap();
+        add_bot(dir.path(), "telegram", "b1", "token", "ws://l", "gpt-4").unwrap();
+        toggle_channel(dir.path(), "telegram", true).unwrap();
+        let status = get_status(dir.path()).unwrap();
+        assert_eq!(status.total_bots, 1);
+        assert_eq!(status.connected_bots, 1);
+    }
+}
