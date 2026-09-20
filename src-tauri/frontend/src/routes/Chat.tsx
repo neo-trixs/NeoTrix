@@ -296,7 +296,7 @@ export function Chat() {
   const [slashDismissed, setSlashDismissed] = createSignal(false)
   const slashActive = () =>
     slashQuery() !== null && slashFiltered().length > 0 && !slashDismissed()
-  // /compact 命令：调用后端 neocodex.compactSession 真实压缩（keep 8 条）
+  // /compact 命令：调用后端 neotrix.compactSession 真实压缩（keep 8 条）
   // 防并发：压缩进行中禁止再次触发；成功后经 getSessionMessages 消费路径（loadSessionMessages）重读截断后的消息
   const [compacting, setCompacting] = createSignal(false)
   const runCompact = async () => {
@@ -313,7 +313,7 @@ export function Chat() {
     setCompacting(true)
     try {
       await chatDomain.compact(sessionId)
-      // 后端消息已截断，重拉当前会话消息（与 neocodex_get_session_messages 消费路径一致）
+      // 后端消息已截断，重拉当前会话消息（与 neotrix_get_session_messages 消费路径一致）
       await chatStore.loadSessionMessages(sessionId)
       // 压缩成功后关闭自动压缩提示，避免残留
       setCompactHintDismissed(true)
@@ -1088,9 +1088,9 @@ export function Chat() {
     }, 600_000)
 
     try {
-      // 流式生成经统一 IPC 层；实际 token 由 neocodex_stream_* 事件推送
+      // 流式生成经统一 IPC 层；实际 token 由 neotrix_stream_* 事件推送
       await chatDomain.send(content)
-      // The actual streaming happens via events (neocodex_stream_token, etc.)
+      // The actual streaming happens via events (neotrix_stream_token, etc.)
     } catch (error) {
       console.error('[Chat] Send message failed:', error)
       const errorMsg = errText(error) || '发送失败，请重试'
@@ -1331,7 +1331,7 @@ export function Chat() {
     const userContent = chatStore.regenerateFrom(message.id)
     if (userContent) {
       // 🟡 修复：regenerateFrom 仅截断本地 store——wire 中旧回复仍在，重载会话后
-      // 复活且 agent 上下文未重建。此处同步调后端 neocodex_regenerate 截断 wire
+      // 复活且 agent 上下文未重建。此处同步调后端 neotrix_regenerate 截断 wire
       // 并重建上下文（R-P79：功能接线到生产路径，不留死代码）。
       if (sid && visibleIdx >= 0) {
         chatDomain.regenerate(sid, visibleIdx).catch((e: Error) => {
@@ -1341,7 +1341,7 @@ export function Chat() {
         })
       }
       // regenerateFrom 已截断被点消息所在轮（及之后），用户消息保留，跳过重复添加
-      // regenerate: true — wire 已含该用户轮（neocodex_regenerate 的 truncate 保留之），
+      // regenerate: true — wire 已含该用户轮（neotrix_regenerate 的 truncate 保留之），
       // 后端跳过重复 record/context.push，修复双写（审计 F3）
       sendMessage(userContent, { userMessageAdded: true, regenerate: true })
     }

@@ -469,7 +469,7 @@ function createChatStore() {
   }
 
   const abortGeneration = (): void => {
-    // 真实停止由 neocodex.stopStream 完成；此处仅复位 UI 状态
+    // 真实停止由 neotrix.stopStream 完成；此处仅复位 UI 状态
     setState('isGenerating', false)
   }
 

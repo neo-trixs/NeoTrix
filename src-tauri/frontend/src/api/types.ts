@@ -4,7 +4,7 @@
    避免命令名散落与类型漂移。字段 snake_case 对齐 Rust serde。
    ════════════════════════════════════════════ */
 
-/* ── neocodex：会话 / 消息 ── */
+/* ── neotrix：会话 / 消息 ── */
 export interface NeoCodexSessionInfo {
   id: string
   name: string
@@ -57,7 +57,7 @@ export interface NeoCodexSearchHit {
   tag?: string
 }
 
-/* ── neocodex：提供商 ── */
+/* ── neotrix：提供商 ── */
 export interface ProviderMeta {
   id: string
   name: string
@@ -312,7 +312,7 @@ export interface ProviderUsageSnapshot {
   totalCost: number
 }
 
-/* ── Provider 健康度（原 neocodex.ts；迁移至 types 统一管理） ── */
+/* ── Provider 健康度（原 neotrix.ts；迁移至 types 统一管理） ── */
 export interface ProviderHealthStatus {
   name: string
   available: boolean
@@ -353,7 +353,7 @@ export interface DiscoveryResult {
   models: { provider: string; model_id: string; base_url: string; is_free: boolean; tier: string }[]
 }
 
-/* ── Git diff（原 neocodex.ts） ── */
+/* ── Git diff（原 neotrix.ts） ── */
 export interface GitDiffFile {
   path: string
   hunks: { lines: { t: 'add' | 'del' | 'ctx'; o: number | null; n: number | null; s: string }[] }[]
@@ -363,7 +363,7 @@ export interface GitDiffResponse {
   files: GitDiffFile[]
 }
 
-/* ── Canvas 能力网（原 neocodex.ts） ── */
+/* ── Canvas 能力网（原 neotrix.ts） ── */
 export interface CanvasCapabilityInput {
   kind: string
   label: string

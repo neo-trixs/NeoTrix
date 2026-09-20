@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════
    routes/chat/slashCommands.ts — 斜杠命令逻辑（对标 Claude Code）
    从 Chat.tsx 抽出：/compact /model /status /cost /export /clear /new /help。
-   纯逻辑模块（无 JSX），依赖注入 chatStore/neocodex/UI 反馈函数，
+   纯逻辑模块（无 JSX），依赖注入 chatStore/neotrix/UI 反馈函数，
    可在无组件环境单测。UI 渲染与键盘导航仍在 Chat.tsx / SlashMenu。
    ════════════════════════════════════════════ */
 import type { SlashCommandDef } from '../../components/SlashMenu'

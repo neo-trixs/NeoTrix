@@ -500,7 +500,7 @@ export function ChatShellProto() {
     } else {
       // 首条消息即标题逻辑不触发
     }
-    // W2 真流式: 订阅 neocodex_stream_* ; 非 Tauri 环境回退本地打字机
+    // W2 真流式: 订阅 neotrix_stream_* ; 非 Tauri 环境回退本地打字机
     const reply = CANNED_REPLIES[Math.floor(Math.random() * CANNED_REPLIES.length)]
     setMsgs((m) => [...m, { role: 'assistant', content: '' }])
     setStreaming(true)

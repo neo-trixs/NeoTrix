@@ -27,17 +27,6 @@ export {
   harnessThreadCreate,
 } from './harness';
 
-// 导出 neocodex 流式函数（向后兼容；新代码应直接用 domain）
-// DEPRECATED: 以下函数已迁移到 domain API，保留仅用于未迁移的调用方
-export {
-  listSessions,
-  createSession,
-  deleteSession,
-  sendMessageStream,
-  stopStream,
-  subscribeStream,
-} from './neocodex';
-
 // 导出 system 模块
 export {
   windowMinimize,
@@ -101,10 +90,6 @@ export {
   syncDshMarket,
 } from './im';
 export type { ChannelType, ChannelConfig, BotConfig, ImStatus, DshMarketConfig } from './im';
-
-// 创建 neocodex 命名空间对象（向后兼容）
-import * as neocodexModule from './neocodex';
-export const neocodex = neocodexModule;
 
 // 创建 system 命名空间对象（向后兼容）
 import * as systemModule from './system';

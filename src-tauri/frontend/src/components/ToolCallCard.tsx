@@ -16,7 +16,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
   // 卸载时清理复制反馈定时器，避免泄漏
   onCleanup(() => window.clearTimeout(copyTimer))
 
-  // 结束判定：所有 neocodex_stream_tool 事件均为工具执行完成事件（后端只在
+  // 结束判定：所有 neotrix_stream_tool 事件均为工具执行完成事件（后端只在
   // 执行后回调 on_tool，无"开始"事件），因此 duration_ms 存在即视为已结束。
   // 不能再用 duration_ms 是否为 0 推断"执行中"——0 时长可能是成功（exit_code=0）
   // 或失败（审批拒绝 / 参数错误 / TOOL_ERROR），否则会永久误标"执行中…"。
