@@ -37,7 +37,7 @@ describe('CostDashboard 成本/Token 看板回归（P：格式化与百分比显
   afterEach(() => vi.useRealTimers())
 
   it('加载后显示成本与 token 格式化输出', async () => {
-    mockCommand('neocodex_agent_status', async () => baseStatus())
+    mockCommand('domain_call', async () => ({ ok: true, data: baseStatus(), error: null }))
     render(() => <CostDashboard open onClose={() => {}} />)
     await settle()
     expect(document.body.textContent).toContain('成本 / Token 看板')
@@ -55,7 +55,7 @@ describe('CostDashboard 成本/Token 看板回归（P：格式化与百分比显
   })
 
   it('大 token 用 k 缩写', async () => {
-    mockCommand('neocodex_agent_status', async () => baseStatus({ tokens_used: 4500 }))
+    mockCommand('domain_call', async () => ({ ok: true, data: baseStatus({ tokens_used: 4500 }), error: null }))
     render(() => <CostDashboard open onClose={() => {}} />)
     await settle()
     expect(document.body.textContent).toContain('4.5k')
@@ -63,8 +63,8 @@ describe('CostDashboard 成本/Token 看板回归（P：格式化与百分比显
 
   it('预算超 80% 进度条转红', async () => {
     mockCommand(
-      'neocodex_agent_status',
-      async () => baseStatus({ cost_spent: 85, cost_budget: 100 }),
+      'domain_call',
+      async () => ({ ok: true, data: baseStatus({ cost_spent: 85, cost_budget: 100 }), error: null }),
     )
     render(() => <CostDashboard open onClose={() => {}} />)
     await settle()
@@ -74,14 +74,14 @@ describe('CostDashboard 成本/Token 看板回归（P：格式化与百分比显
   })
 
   it('空数据（null status）显示空态', async () => {
-    mockCommand('neocodex_agent_status', async () => null as unknown as Record<string, unknown>)
+    mockCommand('domain_call', async () => ({ ok: true, data: null as unknown as Record<string, unknown>, error: null }))
     render(() => <CostDashboard open onClose={() => {}} />)
     await settle()
     expect(document.body.textContent).toContain('暂无成本数据')
   })
 
   it('错误时显示错误信息而非挂起', async () => {
-    mockCommand('neocodex_agent_status', async () => {
+    mockCommand('domain_call', async () => {
       throw new Error('backend down')
     })
     render(() => <CostDashboard open onClose={() => {}} />)
@@ -96,7 +96,7 @@ describe('CostDashboard 成本/Token 看板回归（P：格式化与百分比显
 
   it('Esc 键关闭面板', async () => {
     const onClose = vi.fn()
-    mockCommand('neocodex_agent_status', async () => baseStatus())
+    mockCommand('domain_call', async () => ({ ok: true, data: baseStatus(), error: null }))
     render(() => <CostDashboard open onClose={onClose} />)
     await settle()
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
@@ -104,7 +104,7 @@ describe('CostDashboard 成本/Token 看板回归（P：格式化与百分比显
   })
 
   it('刷新按钮重新拉取', async () => {
-    const stub = mockCommand('neocodex_agent_status', async () => baseStatus())
+    const stub = mockCommand('domain_call', async () => ({ ok: true, data: baseStatus(), error: null }))
     render(() => <CostDashboard open onClose={() => {}} />)
     await settle()
     const refresh = document.querySelector('[aria-label="刷新"]') as HTMLButtonElement

@@ -6,7 +6,7 @@ import { createSignal, createRoot, createEffect } from 'solid-js'
 import type { CanvasNode } from '../canvas/types'
 import { getRenderer } from '../canvas/nodeRegistry'
 import { recordSpawn } from '../canvas/evolution'
-import { kbKvGet, kbKvSet } from '../api/neocodex'
+import { kb } from '../api/domain'
 
 let seq = 0
 const nid = () => `node-${Date.now().toString(36)}-${seq++}`
@@ -112,7 +112,7 @@ export const canvasStore = {
  */
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 export function initCanvasPersistence(): void {
-  kbKvGet(NS, KEY)
+  kb.kvGet(NS, KEY)
     .then((raw) => {
       if (!raw) return
       try {
@@ -129,7 +129,7 @@ export function initCanvasPersistence(): void {
       const snap = JSON.stringify(nodes())
       if (saveTimer) clearTimeout(saveTimer)
       saveTimer = setTimeout(() => {
-        kbKvSet(NS, KEY, snap).catch(() => {})
+        kb.kvSet(NS, KEY, snap).catch(() => {})
       }, 800)
     })
   })

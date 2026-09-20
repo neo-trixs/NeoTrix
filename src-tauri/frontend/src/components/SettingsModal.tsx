@@ -4,7 +4,8 @@ import { PluginMarketplace } from './PluginMarketplace'
 import { TrafficLights } from './TrafficLights'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
 import { tagsStore, RECOMMENDED_TAGS } from '../stores/tags'
-import { memory, neocodex, errText, fs as fsApi, autostartIsEnabled, autostartEnable, autostartDisable } from '../api'
+import { memory, errText, fs as fsApi, autostartIsEnabled, autostartEnable, autostartDisable } from '../api'
+import { call as domainCall } from '../api/domain'
 import { storageGet, storageSet } from '../lib/env'
 import { themeMode, setThemeMode } from '../stores/theme'
 import type { MemoryStats, ProviderConfig, ProviderMeta, CustomProviderReq } from '../api/types'
@@ -237,7 +238,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     const seq = ++cfgReqSeq
     setLoading(true)
     try {
-      const cfg = await neocodex.providerConfig()
+      const cfg = await domainCall<ProviderConfig>('llamacpp', 'provider_config')
       if (seq !== cfgReqSeq) return
       setConfig(cfg)
     } catch (e) {
@@ -258,7 +259,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
 
   const loadAppVersion = async () => {
     try {
-      setAppVersion(await neocodex.appVersion())
+      setAppVersion(await domainCall<string>('llamacpp', 'app_version'))
     } catch { /* 版本非关键 */ }
   }
 
@@ -393,7 +394,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     setSwitching(true)
     setNotice(null)
     try {
-      await neocodex.setProvider(name)
+      await domainCall<void>('llamacpp', 'set_provider', { name })
       showNotice(`已切换到 ${name}`)
       await loadConfig()
       // 广播提供商变更，输入区 ProviderSelector 即时刷新
@@ -415,7 +416,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const testConnection = async (name: string) => {
     setTestState({ ...testState(), [name]: 'testing' })
     try {
-      const ok = await neocodex.testProvider(name)
+      const ok = await domainCall<boolean>('llamacpp', 'test_provider', { name })
       setTestState({ ...testState(), [name]: ok ? 'ok' : 'fail' })
     } catch {
       setTestState({ ...testState(), [name]: 'fail' })
@@ -437,7 +438,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     }
     setCustomProviders([...customProviders(), meta])
     try {
-      await neocodex.addCustomProvider(req)
+      await domainCall<void>('llamacpp', 'add_custom_provider', { req })
       window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { name: req.name } }))
     } catch (e) {
       // 浏览器预览无后端时静默：本地乐观态已生效，桌面端会真实落盘

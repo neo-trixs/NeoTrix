@@ -1,6 +1,7 @@
 import { createSignal, createEffect, Show, onCleanup } from 'solid-js'
 import { RefreshCw, ExternalLink, MonitorPlay, Loader2, X } from 'lucide-solid'
-import { neocodex, errText } from '../api'
+import { errText } from '../api'
+import { call as domainCall } from '../api/domain'
 import { clsx } from 'clsx'
 
 /* 批次5：Live Preview 面板 —— 内嵌本地 dev server 预览（对标 Spedy/UI-Inspector/Nimbalyst live preview）。
@@ -38,7 +39,7 @@ export function LivePreview(props: Props) {
     setDetected(null)
     let workspace = ''
     try {
-      const proj = await neocodex.getProject()
+      const proj = await domainCall<string | null>('session', 'get_project')
       workspace = proj || ''
     } catch (e) {
       console.error('[LivePreview] getProject failed:', e)
@@ -80,7 +81,7 @@ export function LivePreview(props: Props) {
     if (!url()) return
     setBusy(true)
     try {
-      await neocodex.openExternal(url())
+      await domainCall<void>('file', 'open_external', { path: url() })
     } catch (e) {
       setError(errText(e) || '打开外部浏览器失败')
     } finally {

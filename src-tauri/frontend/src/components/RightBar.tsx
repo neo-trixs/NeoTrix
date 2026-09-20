@@ -1,5 +1,7 @@
 import { createSignal, onMount } from 'solid-js'
-import { neocodex, system, errText } from '../api'
+import { system, errText } from '../api'
+import { call as domainCall } from '../api/domain'
+import type { ProjectView } from '../api/types'
 import { clsx } from 'clsx'
 import { startCanvasBridge, initCanvasEvolution } from '../canvas'
 import { initCanvasPersistence } from '../stores/canvas'
@@ -36,7 +38,7 @@ export function RightBar() {
     setTreeLoading(true)
     setTreeError(null)
     try {
-      const pv = await neocodex.projectTree()
+      const pv = await domainCall<ProjectView>('file', 'project_tree')
       if (seq !== treeReqSeq) return
       const nodes = pv.tree.map(toFileNode)
       if (prevOpen.size > 0) applyOpen(nodes, prevOpen)

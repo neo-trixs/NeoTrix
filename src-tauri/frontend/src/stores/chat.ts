@@ -1,7 +1,7 @@
 
 import { createStore, produce } from 'solid-js/store'
 import { tagsStore, normalizeTagName } from './tags'
-import { neocodex } from '../api'
+import { domain } from '../api'
 import type {
   NeoCodexAttachmentDto,
   NeoCodexMessageItem,
@@ -132,7 +132,7 @@ function createChatStore() {
   const loadSessions = async (projectPath?: string): Promise<void> => {
     setState('isLoadingSessions', true)
     try {
-      const backendSessions = await neocodex.listSessions(projectPath)
+      const backendSessions = await domain.session.list() as unknown as NeoCodexSessionInfo[]
       
       const sessions: Session[] = backendSessions.map(s => ({
         id: s.id,
@@ -175,7 +175,7 @@ function createChatStore() {
     const seq = ++loadMsgsSeq
     setState('isLoadingMessages', true)
     try {
-      const backendMessages = await neocodex.getSessionMessages(sessionId)
+      const backendMessages = await domain.chat.history(sessionId) as unknown as NeoCodexMessageItem[]
 
       // 过期响应丢弃（新请求已发出）
       if (seq !== loadMsgsSeq) return
@@ -198,7 +198,7 @@ function createChatStore() {
 
   const addSession = async (title = DEFAULT_SESSION_TITLE): Promise<string> => {
     try {
-      const backendSession = await neocodex.createSession(title)
+      const backendSession = await domain.session.create(title) as unknown as NeoCodexSessionInfo
       
       const session: Session = {
         id: backendSession.id,
@@ -231,7 +231,7 @@ function createChatStore() {
 
   const deleteSession = async (id: string): Promise<void> => {
     try {
-      await neocodex.deleteSession(id)
+      await domain.session.delete(id)
     } catch (error) {
       console.error('[chatStore] Failed to delete session:', error)
       // 🟡 修复：后端删除失败时保留本地会话（对齐 archiveSession 语义），
@@ -260,7 +260,7 @@ function createChatStore() {
   /** 归档会话（对标 Claude Code Archive）：后端移入 archived/ 并从活跃列表移除 */
   const archiveSession = async (id: string): Promise<void> => {
     try {
-      await neocodex.archiveSession(id)
+      await domain.session.archive(id)
     } catch (error) {
       console.error('[chatStore] Failed to archive session:', error)
       return
@@ -282,7 +282,7 @@ function createChatStore() {
   /** 恢复归档会话：后端移回活跃列表，重新拉取列表并切入该会话 */
   const restoreSession = async (id: string): Promise<void> => {
     try {
-      await neocodex.restoreSession(id)
+      await domain.session.restore(id)
     } catch (error) {
       console.error('[chatStore] Failed to restore session:', error)
       return
@@ -297,7 +297,7 @@ function createChatStore() {
   /** 列出归档会话（只读查询；渲染层拉取，失败返回空列表） */
   const listArchived = async (): Promise<NeoCodexSessionInfo[]> => {
     try {
-      return await neocodex.listArchived()
+      return await domain.session.listArchived() as unknown as NeoCodexSessionInfo[]
     } catch (error) {
       console.error('[chatStore] Failed to list archived sessions:', error)
       return []
@@ -310,7 +310,7 @@ function createChatStore() {
     // 若仍在流式生成，先中止后端流，避免旧会话的 token 事件污染新会话
     if (state.isGenerating) {
       try {
-        await neocodex.stopStream()
+        await domain.chat.stop()
       } catch (error) {
         console.error('[chatStore] Failed to stop stream on switch:', error)
       }
@@ -324,7 +324,7 @@ function createChatStore() {
     
     // Notify backend to switch context
     try {
-      await neocodex.switchSession(id)
+      await domain.session.switch(id)
     } catch (error) {
       console.error('[chatStore] Failed to switch session on backend:', error)
     }
@@ -332,7 +332,7 @@ function createChatStore() {
 
   const updateSessionTitle = async (id: string, title: string): Promise<void> => {
     try {
-      await neocodex.renameSession(id, title)
+      await domain.session.rename(id, title)
     } catch (error) {
       console.error('[chatStore] Failed to rename session:', error)
     }
@@ -370,7 +370,7 @@ function createChatStore() {
     }))
     // 自动命名异步持久化到后端（失败不阻断发送）
     if (autoTitle !== null && state.currentSessionId) {
-      neocodex.renameSession(state.currentSessionId, autoTitle).catch((error) => {
+      domain.session.rename(state.currentSessionId, autoTitle).catch((error) => {
         console.error('[chatStore] Failed to persist auto-title:', error)
       })
     }
@@ -543,12 +543,12 @@ function createChatStore() {
     }))
     // 异步持久化到 JSONL SessionMeta（失败不阻断本地体验）
     try {
-      const info = await neocodex.tagSession(sessionId, normalizeTagName(rawName))
+      const tags = await domain.session.tag(sessionId, normalizeTagName(rawName))
       setState('sessions', produce(s => {
         const sess = s.find(x => x.id === sessionId)
-        if (sess) sess.tags = info.tags ?? []
+        if (sess) sess.tags = tags ?? []
       }))
-      return info.tags ?? []
+      return tags ?? []
     } catch (error) {
       console.error('[chatStore] Failed to persist tag:', error)
       return tagsStore.tagsForSession(sessionId)
@@ -564,12 +564,12 @@ function createChatStore() {
     }))
     // 异步持久化到后端
     try {
-      const info = await neocodex.untagSession(sessionId, name)
+      const tags = await domain.session.untag(sessionId, name)
       setState('sessions', produce(s => {
         const sess = s.find(x => x.id === sessionId)
-        if (sess) sess.tags = info.tags ?? []
+        if (sess) sess.tags = tags ?? []
       }))
-      return info.tags ?? []
+      return tags ?? []
     } catch (error) {
       console.error('[chatStore] Failed to persist untag:', error)
       return tagsStore.tagsForSession(sessionId)

@@ -24,7 +24,7 @@ describe('LivePreview 实时预览回归（URL 输入/iframe/刷新/外部打开
   })
 
   it('打开渲染端口提示条 + URL 输入框 + EmptyPreview 占位', async () => {
-    mockCommand('neocodex_open_external', async () => null)
+    mockCommand('domain_call', async () => ({ ok: true, data: null, error: null }))
     render(() => <LivePreview open onClose={() => {}} />)
     await settle()
     // 端口提示条
@@ -40,7 +40,7 @@ describe('LivePreview 实时预览回归（URL 输入/iframe/刷新/外部打开
   })
 
   it('输入 URL 后渲染 iframe', async () => {
-    mockCommand('neocodex_open_external', async () => null)
+    mockCommand('domain_call', async () => ({ ok: true, data: null, error: null }))
     render(() => <LivePreview open onClose={() => {}} />)
     await settle()
     const input = document.querySelector('input[placeholder="http://localhost:5173"]') as HTMLInputElement
@@ -53,7 +53,7 @@ describe('LivePreview 实时预览回归（URL 输入/iframe/刷新/外部打开
   })
 
   it('Enter 键触发刷新', async () => {
-    mockCommand('neocodex_open_external', async () => null)
+    mockCommand('domain_call', async () => ({ ok: true, data: null, error: null }))
     render(() => <LivePreview open onClose={() => {}} />)
     await settle()
     const input = document.querySelector('input[placeholder="http://localhost:5173"]') as HTMLInputElement
@@ -66,7 +66,7 @@ describe('LivePreview 实时预览回归（URL 输入/iframe/刷新/外部打开
   })
 
   it('点击刷新按钮递增 frameKey', async () => {
-    mockCommand('neocodex_open_external', async () => null)
+    mockCommand('domain_call', async () => ({ ok: true, data: null, error: null }))
     render(() => <LivePreview open onClose={() => {}} />)
     await settle()
     const input = document.querySelector('input[placeholder="http://localhost:5173"]') as HTMLInputElement
@@ -78,7 +78,7 @@ describe('LivePreview 实时预览回归（URL 输入/iframe/刷新/外部打开
   })
 
   it('点击外部打开调用 openExternal', async () => {
-    const openStub = mockCommand('neocodex_open_external', async () => null)
+    const openStub = mockCommand('domain_call', async () => ({ ok: true, data: null, error: null }))
     render(() => <LivePreview open onClose={() => {}} />)
     await settle()
     const input = document.querySelector('input[placeholder="http://localhost:5173"]') as HTMLInputElement
@@ -91,7 +91,7 @@ describe('LivePreview 实时预览回归（URL 输入/iframe/刷新/外部打开
 
   it('Esc 关闭面板', async () => {
     const onClose = vi.fn()
-    mockCommand('neocodex_open_external', async () => null)
+    mockCommand('domain_call', async () => ({ ok: true, data: null, error: null }))
     render(() => <LivePreview open onClose={onClose} />)
     await settle()
     fireEvent.keyDown(window, { key: 'Escape' })
@@ -100,7 +100,7 @@ describe('LivePreview 实时预览回归（URL 输入/iframe/刷新/外部打开
 
   it('点击遮罩关闭', async () => {
     const onClose = vi.fn()
-    mockCommand('neocodex_open_external', async () => null)
+    mockCommand('domain_call', async () => ({ ok: true, data: null, error: null }))
     render(() => <LivePreview open onClose={onClose} />)
     await settle()
     const overlay = document.querySelector('.fixed.inset-0') as HTMLElement

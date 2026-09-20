@@ -1,7 +1,7 @@
 import { createSignal, onMount, createEffect, onCleanup, Show, For } from 'solid-js'
 import { GitBranch, FileCode2, Check, X, Loader2, RefreshCw, ChevronDown, ChevronRight, GitCommitHorizontal, Upload, AlertTriangle } from 'lucide-solid'
-import { neocodex, errText } from '../api'
-import type { GitStatus } from '../api/types'
+import { errText } from '../api'
+import { git as gitDomain, type GitStatus, type GitDiff } from '../api/domain'
 import { clsx } from 'clsx'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
@@ -84,22 +84,24 @@ export function GitPanel(props: Props) {
     setError(null)
     try {
       const [st, df, stagedFiles, branches] = await Promise.all([
-        neocodex.gitStatus(),
-        neocodex.getDiff(),
-        neocodex.gitStagedFiles(),
-        neocodex.listBranches(),
+        gitDomain.status(),
+        gitDomain.diff(),
+        gitDomain.stagedFiles(),
+        gitDomain.branches(),
       ])
-      setStatus(st)
-      setDiff(df)
+      const gitSt = st as unknown as GitStatus
+      const gitDiff = df as unknown as DiffResponse
+      setStatus(gitSt)
+      setDiff(gitDiff)
       setStaged(new Set(stagedFiles))
       setBranches(branches)
       // 默认对齐当前分支；用户手动选择后不再覆盖
       if (!selectedBranch()) {
-        setSelectedBranch(st?.branch ?? branches[0] ?? '')
+        setSelectedBranch(gitSt?.branch ?? branches[0] ?? '')
       }
       if (firstLoad) {
         firstLoad = false
-        if (df.files.length > 0) setExpanded(new Set([df.files[0].path]))
+        if (gitDiff.files.length > 0) setExpanded(new Set([gitDiff.files[0].path]))
       }
     } catch (e) {
       setError(errText(e))
@@ -113,7 +115,7 @@ export function GitPanel(props: Props) {
   // 后台对齐后端真实暂存状态（accept/reject 后调用，失败时保留本地标记不打扰）
   const refreshStaged = async () => {
     try {
-      setStaged(new Set(await neocodex.gitStagedFiles()))
+      setStaged(new Set(await gitDomain.stagedFiles()))
     } catch {
       // 忽略：本地即时标记已足够，下次 load 会重新对齐
     }
@@ -138,7 +140,7 @@ export function GitPanel(props: Props) {
     setBusy(`${path}:${action}`)
     setError(null)
     try {
-      await neocodex.applyDiff(path, action)
+      await gitDomain.applyDiff(path, action === 'accept')
       // accept = 已暂存；reject = 变更已丢弃。本地即时更新标记，后台刷新对齐后端
       setStaged(prev => {
         const next = new Set(prev)
@@ -208,7 +210,7 @@ export function GitPanel(props: Props) {
     setBusy('commit')
     setError(null)
     try {
-      await neocodex.gitCommit(msg)
+      await gitDomain.commit(msg)
       setCommitMsg('')
       setCommitGateBypassed(false)
       showToast('提交成功')
@@ -229,8 +231,8 @@ export function GitPanel(props: Props) {
     setBusy('push')
     setError(null)
     try {
-      const summary = await neocodex.gitPush()
-      showToast(summary || '推送成功')
+      await gitDomain.push()
+      showToast('推送成功')
     } catch (e) {
       setError(errText(e))
     } finally {
@@ -246,9 +248,9 @@ export function GitPanel(props: Props) {
     setBusy('checkout')
     setError(null)
     try {
-      const checkedOut = await neocodex.gitCheckout(branch)
-      setSelectedBranch(checkedOut)
-      showToast(`已切换到分支 ${checkedOut}`)
+      await gitDomain.checkout(branch)
+      setSelectedBranch(branch)
+      showToast(`已切换到分支 ${branch}`)
       await load()
     } catch (e) {
       setSelectedBranch(prev)
@@ -326,8 +328,8 @@ export function GitPanel(props: Props) {
           <span class="panel-title">Git 变更</span>
           <Show when={status()}>
             <span class="panel-sub font-mono">{status()!.branch}</span>
-            <span class={clsx(status()!.dirty ? 'badge-warn' : 'badge-success')}>
-              {status()!.dirty ? `${totalChanges()} 处变更` : '干净'}
+            <span class={clsx((status()!.modified?.length || status()!.staged?.length || status()!.untracked?.length) ? 'badge-warn' : 'badge-success')}>
+              {(status()!.modified?.length || status()!.staged?.length || status()!.untracked?.length) ? `${totalChanges()} 处变更` : '干净'}
             </span>
           </Show>
           <button

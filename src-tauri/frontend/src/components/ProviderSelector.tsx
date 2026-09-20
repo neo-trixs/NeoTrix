@@ -2,7 +2,8 @@ import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid
 import { ChevronDown, Loader2, Check, AlertCircle } from 'lucide-solid'
 import { clsx } from 'clsx'
 import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
-import { neocodex, errText } from '../api'
+import { errText } from '../api'
+import { call as domainCall } from '../api/domain'
 import type { ProviderConfig } from '../api/types'
 
 /* ════════════════════════════════════════════
@@ -44,7 +45,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
     setLoading(true)
     setError(null)
     try {
-      const result = await neocodex.providerConfig()
+      const result = await domainCall<ProviderConfig>('llamacpp', 'provider_config')
       setConfig(result)
     } catch (err) {
       const msg = errText(err) || '获取提供商配置失败'
@@ -59,7 +60,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
     setLoading(true)
     setError(null)
     try {
-      await neocodex.setProvider(providerName)
+      await domainCall<void>('llamacpp', 'set_provider', { name: providerName })
       await loadConfig()
       setIsOpen(false)
       // 广播提供商变更，Chat 状态栏 / 其他监听方即时刷新

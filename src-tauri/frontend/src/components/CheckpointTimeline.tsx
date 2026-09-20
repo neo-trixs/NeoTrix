@@ -1,6 +1,7 @@
 import { createSignal, createEffect, onCleanup, Show, For } from 'solid-js'
 import { History, RotateCcw, Loader2, X, Clock, RefreshCw } from 'lucide-solid'
-import { neocodex, errText } from '../api'
+import { errText } from '../api'
+import { call as domainCall } from '../api/domain'
 import type { Checkpoint, NeoCodexMessageItem } from '../api/types'
 import { clsx } from 'clsx'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
@@ -83,7 +84,7 @@ export function CheckpointTimeline(props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const list = await neocodex.checkpointList(props.sessionId)
+      const list = await domainCall<Checkpoint[]>('session', 'checkpoint_list', { session_id: props.sessionId })
       setCheckpoints(list)
     } catch (e) {
       setError(errText(e))
@@ -124,7 +125,7 @@ export function CheckpointTimeline(props: Props) {
     setRestoring(cp.id)
     setError(null)
     try {
-      const restored = await neocodex.checkpointRestore(props.sessionId!, cp.id)
+      const restored = await domainCall<NeoCodexMessageItem[]>('session', 'checkpoint_restore', { session_id: props.sessionId!, checkpoint_id: cp.id })
       props.onRestored?.(restored)
       await load()
       // 就地反馈：成功提示条 + 恢复的快照短暂高亮

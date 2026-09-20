@@ -5,7 +5,8 @@
 //  → 落盘 KB kv_store，使 SEAL / ConsciousnessTree 可读取此进化轨迹。
 // ══════════════════════════════════════════════════════════════════════════
 import { createSignal, createRoot, createEffect } from 'solid-js'
-import { kbKvGet, kbKvSet, canvasSyncCapabilities, canvasPruneCapability, canvasSetDesired, canvasApplyEvolutionRoute } from '../api/neocodex'
+import { kb, call as domainCall } from '../api/domain'
+import type { CanvasCapabilitySyncResult } from '../api/types'
 import { listCapabilities } from './nodeRegistry'
 
 const NS = 'canvas_evo'
@@ -56,7 +57,7 @@ export async function syncToCapabilityTree(): Promise<void> {
       usage: c.count,
       user_added: c.userAdded,
     }))
-    const res = await canvasSyncCapabilities(payload)
+    const res = await domainCall<CanvasCapabilitySyncResult>('canvas', 'sync_capabilities', { caps: payload })
     const canonical: Record<string, { constellation: string; deprecated: boolean; desired?: number }> = {}
     for (const c of res.canonical) canonical[c.kind] = { constellation: c.constellation, deprecated: c.deprecated, desired: c.desired }
     setTreeStatus({
@@ -75,7 +76,7 @@ export async function syncToCapabilityTree(): Promise<void> {
 /** 画板覆盖层手动触发 Dark Forest 回收：写回 NeoTrix 能力树并乐观回读 canonical。 */
 export async function pruneNode(kind: string): Promise<void> {
   try {
-    const res = await canvasPruneCapability(kind)
+    const res = await domainCall<{ kind: string; pruned: boolean; constellation: string }>('canvas', 'prune_capability', { kind })
     if (res.pruned) {
       setTreeStatus((prev) =>
         prev
@@ -91,7 +92,7 @@ export async function pruneNode(kind: string): Promise<void> {
 /** 画板覆盖层把「期望成熟度」推回能力树：写入/清除 canvas_desired 并乐观回读。 */
 export async function setDesired(kind: string, stage: number | null): Promise<void> {
   try {
-    const res = await canvasSetDesired(kind, stage)
+    const res = await domainCall<{ kind: string; pruned: boolean; constellation: string }>('canvas', 'set_desired', { kind, stage })
     if (res.pruned) {
       setTreeStatus((prev) =>
         prev
@@ -113,7 +114,7 @@ export async function setDesired(kind: string, stage: number | null): Promise<vo
 /** 画板按自身能力树 SEAL 进化路线自动进化 (树提议、画板执行)，随后重新同步以刷新 canonical。 */
 export async function applyEvolutionRoute(): Promise<{ matured: number; pruned: number; applied: string[] } | null> {
   try {
-    const res = await canvasApplyEvolutionRoute()
+    const res = await domainCall<{ matured: number; pruned: number; applied: string[] }>('canvas', 'apply_evolution_route')
     await syncToCapabilityTree()
     return res
   } catch (e) {
@@ -184,7 +185,7 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 /** 启动进化路线（幂等）：加载 + 防抖落盘 KB。 */
 export function initCanvasEvolution(): void {
-  kbKvGet(NS, KEY)
+  kb.kvGet(NS, KEY)
     .then((raw) => {
       if (!raw) return
       try {
@@ -199,7 +200,7 @@ export function initCanvasEvolution(): void {
       const snap = JSON.stringify(telemetry())
       if (saveTimer) clearTimeout(saveTimer)
       saveTimer = setTimeout(() => {
-        kbKvSet(NS, KEY, snap).catch(() => {})
+        kb.kvSet(NS, KEY, snap).catch(() => {})
         syncToCapabilityTree()
       }, 1000)
     })

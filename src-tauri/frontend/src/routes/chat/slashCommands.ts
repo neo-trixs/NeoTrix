@@ -5,8 +5,9 @@
    可在无组件环境单测。UI 渲染与键盘导航仍在 Chat.tsx / SlashMenu。
    ════════════════════════════════════════════ */
 import type { SlashCommandDef } from '../../components/SlashMenu'
-import { neocodex } from '../../api'
+import { call as domainCall } from '../../api/domain'
 import type { ChatStore } from '../../stores/chat'
+import type { ProviderConfig, AgentStatus } from '../../api/types'
 
 /**
  * 解析 `/run <任务>` 命令 — 纯函数，可单测。
@@ -36,7 +37,7 @@ export interface SlashContext {
 /** 只读命令：当前激活模型（与状态栏同源 providerConfig） */
 export async function runSlashModel(ctx: SlashContext): Promise<void> {
   try {
-    const cfg = await neocodex.providerConfig()
+    const cfg = await domainCall<ProviderConfig>('llamacpp', 'provider_config')
     if (!cfg) {
       ctx.showInfo('暂无提供商配置', 3000)
       return
@@ -53,7 +54,7 @@ export async function runSlashModel(ctx: SlashContext): Promise<void> {
 /** 只读命令：运行状态诊断（模型 / 上下文 / 用量 / 成本） */
 export async function runSlashStatus(ctx: SlashContext): Promise<void> {
   try {
-    const s = await neocodex.agentStatus()
+    const s = await domainCall<AgentStatus>('agent', 'status')
     if (!s) {
       ctx.showInfo('无运行状态', 3000)
       return
@@ -73,7 +74,7 @@ export async function runSlashStatus(ctx: SlashContext): Promise<void> {
 /** 只读命令：token 用量与成本估算 */
 export async function runSlashCost(ctx: SlashContext): Promise<void> {
   try {
-    const s = await neocodex.agentStatus()
+    const s = await domainCall<AgentStatus>('agent', 'status')
     if (!s) {
       ctx.showInfo('无用量数据', 3000)
       return
@@ -97,7 +98,7 @@ export async function runSlashExport(ctx: SlashContext): Promise<void> {
     return
   }
   try {
-    const content = await neocodex.exportSession(sessionId, 'markdown')
+    const content = await domainCall<string>('chat', 'export', { session_id: sessionId, format: 'markdown' })
     if (content) {
       const name = ctx.store.currentSession?.title || 'session'
       const blob = new Blob([content], { type: 'text/markdown' })
@@ -124,7 +125,7 @@ export function runSlashDispatch(ctx: SlashContext, cmd: SlashCommandDef): void 
     const sid = ctx.currentSessionId()
     if (sid) {
       // 后端落盘同步清除：仅清本地 store 会在会话重载后复活
-      void neocodex.clearSession(sid).catch((error) => {
+      void domainCall<void>('session', 'delete', { id: sid }).catch((error) => {
         console.error('[Chat] /clear failed:', error)
         ctx.showError('清除会话失败，请重试')
       })

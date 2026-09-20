@@ -311,3 +311,72 @@ export interface ProviderUsageSnapshot {
   totalCount: number
   totalCost: number
 }
+
+/* ── Provider 健康度（原 neocodex.ts；迁移至 types 统一管理） ── */
+export interface ProviderHealthStatus {
+  name: string
+  available: boolean
+  circuit_state: string
+  success_rate: string
+  total_calls: number
+  total_errors: number
+  is_free: boolean
+  composite_score: string
+  category: string
+  latency_p95_ms: string
+  latency_avg_ms: string
+  latency_samples: number
+  total_tokens: number
+  health_penalty: string
+  model_locked_count: number
+}
+
+export interface PoolSufficiencyReport {
+  total_providers: number
+  free_total: number
+  free_available: number
+  locked_models: number
+  sufficient: boolean
+}
+
+export interface ProbeResult {
+  name: string
+  reachable: boolean
+  status_code: number
+  latency_ms: number
+  error: string | null
+}
+
+export interface DiscoveryResult {
+  discovered_count: number
+  registered_total: number
+  models: { provider: string; model_id: string; base_url: string; is_free: boolean; tier: string }[]
+}
+
+/* ── Git diff（原 neocodex.ts） ── */
+export interface GitDiffFile {
+  path: string
+  hunks: { lines: { t: 'add' | 'del' | 'ctx'; o: number | null; n: number | null; s: string }[] }[]
+}
+
+export interface GitDiffResponse {
+  files: GitDiffFile[]
+}
+
+/* ── Canvas 能力网（原 neocodex.ts） ── */
+export interface CanvasCapabilityInput {
+  kind: string
+  label: string
+  stage: number
+  usage: number
+  user_added: boolean
+}
+
+export interface CanvasCapabilitySyncResult {
+  nodes_synced: number
+  tree_cycle: string
+  deprecated: number
+  matured: number
+  plans: { action: string; node_id: string; rationale: string }[]
+  canonical: { kind: string; label: string; constellation: string; usage: number; deprecated: boolean; desired?: number }[]
+}

@@ -4,9 +4,9 @@ import { Chat } from '../routes/Chat'
 
 // Mock Tauri APIs
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn().mockImplementation((cmd: string) => {
-    if (cmd === 'neocodex_provider_config') {
-      return Promise.resolve({ providers: [], active_model: '' })
+  invoke: vi.fn().mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === 'domain_call' && args?.action === 'provider_config') {
+      return Promise.resolve({ ok: true, data: { providers: [], active_model: '' }, error: null })
     }
     return Promise.resolve([])
   }),

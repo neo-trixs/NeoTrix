@@ -12,10 +12,10 @@ describe('CheckpointTimeline 渲染回归（P1-2：快照列表必须渲染；�
   beforeEach(() => resetInvokeMock())
 
   it('加载完成后显示快照列表而非永久 spinner', async () => {
-    mockCommand('neocodex_checkpoint_list', async () => [
+    mockCommand('domain_call', async () => ({ ok: true, data: [
       { id: 'cp-1', created_at: Date.now() - 60000, message_count: 4 },
       { id: 'cp-2', created_at: Date.now() - 3000, message_count: 2 },
-    ])
+    ], error: null }))
     render(() => <CheckpointTimeline open sessionId="s-1" onClose={() => {}} />)
     // 初始加载中：spinner 出现
     expect(document.querySelector('.animate-spin')).toBeTruthy()
@@ -29,7 +29,7 @@ describe('CheckpointTimeline 渲染回归（P1-2：快照列表必须渲染；�
   })
 
   it('无快照时显示空态而非 spinner', async () => {
-    mockCommand('neocodex_checkpoint_list', async () => [])
+    mockCommand('domain_call', async () => ({ ok: true, data: [], error: null }))
     render(() => <CheckpointTimeline open sessionId="s-1" onClose={() => {}} />)
     await waitFor(() => {
       expect(document.body.textContent).toContain('暂无快照')

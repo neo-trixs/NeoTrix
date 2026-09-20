@@ -2,7 +2,8 @@ import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid
 import { ChevronDown, Loader2, Check, AlertCircle } from 'lucide-solid'
 import { clsx } from 'clsx'
 import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
-import { neocodex, errText } from '../api'
+import { errText } from '../api'
+import { call as domainCall } from '../api/domain'
 import { getModelPoolStatus } from '../api/model-pool'
 import type { ProviderConfig, ProviderMeta } from '../api/types'
 import type { ModelPoolEntry } from '../api/model-pool'
@@ -88,7 +89,7 @@ export function ModelSwitcher(props: {
     try {
       // 并行加载 config + pool
       const [cfgResult, poolResult] = await Promise.allSettled([
-        neocodex.providerConfig(),
+        domainCall<ProviderConfig>('llamacpp', 'provider_config'),
         getModelPoolStatus(),
       ])
 
@@ -114,7 +115,7 @@ export function ModelSwitcher(props: {
     setLoading(true)
     setError(null)
     try {
-      await neocodex.setProvider(model)
+      await domainCall<void>('llamacpp', 'set_provider', { name: model })
       await loadData()
       setIsOpen(false)
       window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { model } }))

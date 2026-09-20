@@ -20,11 +20,13 @@ function renderPage() {
 describe('Insights page', () => {
   beforeEach(() => {
     resetInvokeMock()
-    mockCommand('neocodex_agent_status', () => ({
-      running: true, current_task: null, uptime_secs: 8422, turn_count: 128,
-      tokens_used: 2450000, context_usage: 0.31,
-      provider_model: 'cli-session/claude-code',
-      evolution_iterations: 14, cost_spent: 3.42, cost_budget: 50,
+    mockCommand('domain_call', () => ({
+      ok: true, data: {
+        running: true, current_task: null, uptime_secs: 8422, turn_count: 128,
+        tokens_used: 2450000, context_usage: 0.31,
+        provider_model: 'cli-session/claude-code',
+        evolution_iterations: 14, cost_spent: 3.42, cost_budget: 50,
+      }, error: null,
     }))
     mockCommand('provider_usage_snapshot', () => [])
   })

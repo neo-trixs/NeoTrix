@@ -3,7 +3,8 @@
  */
 import { createSignal, createEffect } from 'solid-js'
 import { chatStore } from '../../../../stores/chat'
-import { neocodex, errText } from '../../../../api'
+import { errText } from '../../../../api'
+import { chat as chatDomain, call as domainCall } from '../../../../api/domain'
 import { usePolling } from '../../../../lib/usePolling'
 import { query } from '../../../../api/query'
 import type { AgentStatus } from '../../../../api/types'
@@ -33,7 +34,7 @@ export function useContextState(deps: {
     }
     setCompacting(true)
     try {
-      await neocodex.compactSession(sessionId, 8)
+      await chatDomain.compact(sessionId)
       await chatStore.loadSessionMessages(sessionId)
       setCompactHintDismissed(true)
       deps.showInfo('上下文已压缩，更早的对话被截断', 3000)
@@ -52,7 +53,7 @@ export function useContextState(deps: {
     immediate: true,
     run: async () => {
       try {
-        const s = await query<AgentStatus>('agent_status', () => neocodex.agentStatus(), { ttlMs: 3000 })
+        const s = await query<AgentStatus>('agent_status', () => domainCall<AgentStatus>('agent', 'status'), { ttlMs: 3000 })
         if (s && typeof s.context_usage === 'number') setContextPct(s.context_usage * 100)
       } catch { /* 只读轮询，失败静默 */ }
     },

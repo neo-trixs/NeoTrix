@@ -1,6 +1,7 @@
 import { createSignal, onMount, createEffect, Show, onCleanup } from 'solid-js'
 import { Coins, X, RefreshCw, Loader2, Cpu, Activity, Wallet, Repeat } from 'lucide-solid'
-import { neocodex, errText } from '../api'
+import { errText } from '../api'
+import { call as domainCall } from '../api/domain'
 import type { AgentStatus } from '../api/types'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
@@ -58,7 +59,7 @@ export function CostDashboard(props: Props) {
       // 同源 agentStatus（Chat.tsx 上下文占用 / CostDashboard 轮询）共享 3s TTL 缓存
       const s = await query<AgentStatus>(
         'agent_status',
-        () => neocodex.agentStatus(),
+        () => domainCall<AgentStatus>('agent', 'status'),
         { ttlMs: 3000 },
       )
       setStatus(s)
@@ -76,7 +77,7 @@ export function CostDashboard(props: Props) {
     try {
       const s = await query<AgentStatus>(
         'agent_status',
-        () => neocodex.agentStatus(),
+        () => domainCall<AgentStatus>('agent', 'status'),
         { ttlMs: 3000, force: true },
       )
       setStatus(s)
@@ -97,7 +98,7 @@ export function CostDashboard(props: Props) {
     run: () =>
       query<AgentStatus>(
         'agent_status',
-        () => neocodex.agentStatus(),
+        () => domainCall<AgentStatus>('agent', 'status'),
         { ttlMs: 3000, force: true },
       )
         .then((s) => {

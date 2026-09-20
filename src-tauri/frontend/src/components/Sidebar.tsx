@@ -5,7 +5,7 @@ import { chatStore } from '../stores/chat'
 import type { Session } from '../stores/chat'
 
 import { clsx } from 'clsx'
-import { neocodex } from '../api'
+import { session as sessionDomain } from '../api/domain'
 import { NeoPlus, NeoMessage, NeoSearch, NeoChevronRight, NeoTrash, NeoPencil, NeoClose } from './neo-icons'
 import { NeoTag } from './NeoTag'
 
@@ -56,7 +56,7 @@ export function Sidebar(props: SidebarProps) {
   // 后端重查活跃会话列表；失败返回 null（避免假阳性误报）
   const fetchSessions = async (): Promise<NeoCodexSessionInfo[] | null> => {
     try {
-      return await neocodex.listSessions()
+      return await sessionDomain.list() as unknown as NeoCodexSessionInfo[]
     } catch {
       return null
     }
@@ -293,7 +293,7 @@ export function Sidebar(props: SidebarProps) {
     setLoadingArchived(true)
     setArchivedError(false)
     try {
-      const list = await neocodex.listArchived()
+      const list = await sessionDomain.listArchived() as unknown as NeoCodexSessionInfo[]
       setArchivedSessions(list)
     } catch {
       setArchivedError(true)

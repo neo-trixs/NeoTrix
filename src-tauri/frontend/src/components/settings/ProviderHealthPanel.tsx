@@ -6,7 +6,8 @@
  */
 import { createSignal, onMount, For, Show } from 'solid-js'
 import { clsx } from 'clsx'
-import { providerStatus, type ProviderHealthStatus } from '../../api/neocodex'
+import { call as domainCall } from '../../api/domain'
+import type { ProviderHealthStatus } from '../../api/types'
 import { InfoIcon } from './settingsIcons'
 
 export function ProviderHealthPanel() {
@@ -18,7 +19,7 @@ export function ProviderHealthPanel() {
     setLoading(true)
     setError(null)
     try {
-      const result = await providerStatus()
+      const result = await domainCall<ProviderHealthStatus[]>('llamacpp', 'provider_status')
       setProviders(result)
     } catch (e) {
       setError(String(e))

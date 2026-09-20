@@ -1244,8 +1244,8 @@ export function ChatShellProto() {
     setConnTesting(true)
     setConnResult(null)
     try {
-      const { providerTest } = await import('../api/neocodex')
-      const r = await providerTest(connUrl().trim())
+      const { call: domainCall } = await import('../api/domain')
+      const r = await domainCall<{ ok: boolean; status_code: number; latency_ms: number }>('llamacpp', 'provider_test', { base_url: connUrl().trim() })
       setConnResult({ ok: r.ok, text: `● ${r.status_code} · ${r.latency_ms}ms` })
     } catch (e) {
       setConnResult({ ok: false, text: `○ ${e instanceof Error ? e.message.slice(0, 40) : 'unreachable'}` })

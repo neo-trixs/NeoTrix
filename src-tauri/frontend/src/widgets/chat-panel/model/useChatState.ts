@@ -11,7 +11,7 @@ import { useNavigate } from '@solidjs/router'
 import { chatStore, type Message, type NeoCodexAttachmentDto } from '../../../stores/chat'
 import { tagsStore } from '../../../stores/tags'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../../../api/events'
-import { neocodex, harness, unified, errText } from '../../../api'
+import { harness, unified, errText } from '../../../api'
 import type { AgentStatus } from '../../../api/types'
 import { rootCause } from '../../../lib/errorRootCause'
 

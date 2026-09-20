@@ -34,7 +34,7 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('打开后加载侧聊消息', async () => {
-    mockCommand('neocodex_get_side_chat', async () => [msg(), msg({ role: 'user', content: '问题?' })])
+    mockCommand('domain_call', async () => ({ ok: true, data: [msg(), msg({ role: 'user', content: '问题?' })], error: null }))
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
     await settle()
     expect(document.body.textContent).toContain('你好')
@@ -42,14 +42,14 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('无消息时显示空态说明', async () => {
-    mockCommand('neocodex_get_side_chat', async () => [])
+    mockCommand('domain_call', async () => ({ ok: true, data: [], error: null }))
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
     await settle()
     expect(document.body.textContent).toContain('侧向对话与主上下文隔离')
   })
 
   it('加载失败显示错误', async () => {
-    mockCommand('neocodex_get_side_chat', async () => {
+    mockCommand('domain_call', async () => {
       throw new Error('load failed')
     })
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
@@ -58,8 +58,11 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('输入 + 发送调用 sendSideChat 并清空输入', async () => {
-    mockCommand('neocodex_get_side_chat', async () => [])
-    const sendStub = mockCommand('neocodex_send_side_chat', async () => [msg({ role: 'user', content: '测试' })])
+    const sendStub = mockCommand('domain_call', async (args?: Record<string, unknown>) => {
+      const action = args?.action as string
+      if (action === 'side_chat_send') return { ok: true, data: [msg({ role: 'user', content: '测试' })], error: null }
+      return { ok: true, data: [], error: null }
+    })
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
     await settle()
     const ta = document.querySelector('textarea') as HTMLTextAreaElement
@@ -74,7 +77,7 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('发送按钮 disabled 当输入为空', async () => {
-    mockCommand('neocodex_get_side_chat', async () => [])
+    mockCommand('domain_call', async () => ({ ok: true, data: [], error: null }))
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
     await settle()
     const btn = document.querySelector('[aria-label="发送"]') as HTMLButtonElement
@@ -82,7 +85,7 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('发送按钮 enabled 当有输入', async () => {
-    mockCommand('neocodex_get_side_chat', async () => [])
+    mockCommand('domain_call', async () => ({ ok: true, data: [], error: null }))
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
     await settle()
     const ta = document.querySelector('textarea') as HTMLTextAreaElement
@@ -92,8 +95,11 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('IME 组合态 Enter 不发送（isComposing/229 守卫）', async () => {
-    const sendStub = mockCommand('neocodex_send_side_chat', async () => [msg()])
-    mockCommand('neocodex_get_side_chat', async () => [])
+    const sendStub = mockCommand('domain_call', async (args?: Record<string, unknown>) => {
+      const action = args?.action as string
+      if (action === 'side_chat_send') return { ok: true, data: [msg()], error: null }
+      return { ok: true, data: [], error: null }
+    })
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
     await settle()
     const ta = document.querySelector('textarea') as HTMLTextAreaElement
@@ -106,7 +112,7 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
 
   it('Esc 关闭面板', async () => {
     const onClose = vi.fn()
-    mockCommand('neocodex_get_side_chat', async () => [])
+    mockCommand('domain_call', async () => ({ ok: true, data: [], error: null }))
     render(() => <SideChat open sessionId="s1" onClose={onClose} />)
     await settle()
     // 面板容器 onKeyDown 处理 Esc
@@ -116,7 +122,7 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('刷新按钮重新加载', async () => {
-    const stub = mockCommand('neocodex_get_side_chat', async () => [msg()])
+    const stub = mockCommand('domain_call', async () => ({ ok: true, data: [msg()], error: null }))
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
     await settle()
     expect(document.body.textContent).toContain('你好')
@@ -127,10 +133,10 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('assistant 消息用 Markdown 渲染, user 消息纯文本', async () => {
-    mockCommand('neocodex_get_side_chat', async () => [
+    mockCommand('domain_call', async () => ({ ok: true, data: [
       msg({ role: 'user', content: 'plain text' }),
       msg({ role: 'assistant', content: '**bold** text' }),
-    ])
+    ], error: null }))
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
     await settle()
     // user 纯文本回显

@@ -6,7 +6,7 @@
 import { onMount, onCleanup } from 'solid-js'
 import { chatStore, type ToolCallRecord } from '../../../stores/chat'
 import { subscribeStream, subscribeMenuEvents, type StreamToolPayload } from '../../../api/events'
-import { neocodex } from '../../../api'
+import { call as domainCall } from '../../../api/domain'
 import { rootCause } from '../../../lib/errorRootCause'
 import type { ChatStateReturn } from './useChatState'
 
@@ -108,13 +108,13 @@ export function useStreamHandlers(state: ChatStateReturn) {
     state.setUnlistenStream(() => unlistenStream)
 
     // 读取当前激活模型
-    try { const cfg = await neocodex.providerConfig(); state.setActiveModel(cfg.active_model || null) } catch { /* 静默 */ }
+    try { const cfg = await domainCall<{ active_model?: string }>('llamacpp', 'provider_config'); state.setActiveModel(cfg.active_model || null) } catch { /* 静默 */ }
     // 读取应用版本
-    try { state.setAppVersion(await neocodex.appVersion()) } catch { /* 静默 */ }
+    try { state.setAppVersion(await domainCall<string>('llamacpp', 'app_version')) } catch { /* 静默 */ }
 
     // 监听提供商切换事件
     const onProviderChanged = () => {
-      neocodex.providerConfig().then((cfg) => state.setActiveModel(cfg.active_model || null)).catch(() => {})
+      domainCall<{ active_model?: string }>('llamacpp', 'provider_config').then((cfg) => state.setActiveModel(cfg.active_model || null)).catch(() => {})
     }
     window.addEventListener('neotrix:provider-changed', onProviderChanged)
 

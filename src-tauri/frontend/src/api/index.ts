@@ -27,7 +27,8 @@ export {
   harnessThreadCreate,
 } from './harness';
 
-// 导出 neocodex 流式函数
+// 导出 neocodex 流式函数（向后兼容；新代码应直接用 domain）
+// DEPRECATED: 以下函数已迁移到 domain API，保留仅用于未迁移的调用方
 export {
   listSessions,
   createSession,

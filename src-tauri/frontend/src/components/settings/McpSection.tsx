@@ -4,7 +4,8 @@
    自包含状态（servers/tools/loading/busy/表单），仅依赖 showNotice。
    ════════════════════════════════════════════ */
 import { createSignal, createEffect, Show, For } from 'solid-js'
-import { neocodex, errText } from '../../api'
+import { errText } from '../../api'
+import { call as domainCall } from '../../api/domain'
 import type { McpServerInfo, McpToolInfo } from '../../api/types'
 import { clsx } from 'clsx'
 import { DataIcon } from './settingsIcons'
@@ -40,7 +41,10 @@ export function McpSection(props: Props) {
     }
     setMcpLoading(true)
     try {
-      const [servers, tools] = await Promise.all([neocodex.mcpList(), neocodex.mcpTools()])
+      const [servers, tools] = await Promise.all([
+        domainCall<McpServerInfo[]>('llamacpp', 'mcp_list'),
+        domainCall<McpToolInfo[]>('llamacpp', 'mcp_tools'),
+      ])
       mcpCacheServers = servers
       mcpCacheTools = tools
       setMcpServers(servers)
@@ -62,7 +66,7 @@ export function McpSection(props: Props) {
     const args = mcpArgs().split(',').map((s) => s.trim()).filter(Boolean)
     setMcpBusy(true)
     try {
-      const servers = await neocodex.mcpRegister(name, command, args)
+      const servers = await domainCall<McpServerInfo[]>('llamacpp', 'mcp_register', { name, command, args })
       mcpCacheServers = servers
       mcpCacheTools = null // 新服务器带工具，失效缓存重拉工具列表
       setMcpServers(servers)

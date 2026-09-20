@@ -1,6 +1,7 @@
 import { createSignal, onMount, createEffect, For, Show } from 'solid-js'
 import { Folder, FolderOpen, File, FileText, ChevronRight, ChevronDown, BookOpen, Loader2, X, RefreshCw } from 'lucide-solid'
-import { neocodex, errText } from '../api'
+import { errText } from '../api'
+import { call as domainCall } from '../api/domain'
 import type { ProjectTreeItem, ProjectView as ProjectViewData } from '../api/types'
 import { clsx } from 'clsx'
 
@@ -29,7 +30,7 @@ export function ProjectView(props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const v = await neocodex.projectTree()
+      const v = await domainCall<ProjectViewData>('file', 'project_tree')
       setView(v)
       // 仅首次加载自动展开根目录；刷新保留用户展开状态
       if (firstLoad) {

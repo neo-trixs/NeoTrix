@@ -10,7 +10,8 @@ import { type ChatStateReturn } from './useChatState'
 import { chatStore, type Message } from '../../../stores/chat'
 import { tagsStore } from '../../../stores/tags'
 import { PERMISSION_MODES } from '../../../components/PermissionModeSelector'
-import { neocodex, system, errText } from '../../../api'
+import { system, errText } from '../../../api'
+import { chat as chatDomain } from '../../../api/domain'
 import type { NeoCodexAttachmentDto } from '../../../stores/chat'
 import { guessMime, estimateTokens } from '../../../lib/text'
 
@@ -81,14 +82,7 @@ export function useChatActions(state: ChatStateReturn): ChatActionsReturn {
       state.generation.value++
     }, 600_000)
     try {
-      await neocodex.sendMessageStream({
-        content,
-        attachments: atts.length > 0 ? atts : undefined,
-        regenerate: opts?.regenerate ?? false,
-        permission_mode: state.permissionMode(),
-        temperature: 0.7,
-        max_tokens: 4096,
-      })
+      await chatDomain.send(content)
     } catch (error) {
       console.error('[Chat] Send message failed:', error)
       state.setStreamError(errText(error) || '发送失败，请重试')
@@ -122,7 +116,7 @@ export function useChatActions(state: ChatStateReturn): ChatActionsReturn {
   const handleStop = async () => {
     state.generation.value++
     const msgId = state.currentAssistantMsgId()
-    try { await neocodex.stopStream() } catch (e) { console.error('[Chat] Stop stream failed:', e) }
+    try { await chatDomain.stop() } catch (e) { console.error('[Chat] Stop stream failed:', e) }
     chatStore.abortGeneration()
     if (msgId) chatStore.finishMessage(msgId)
     state.setCurrentAssistantMsgId(null)
@@ -143,7 +137,7 @@ export function useChatActions(state: ChatStateReturn): ChatActionsReturn {
     const userContent = chatStore.regenerateFrom(message.id)
     if (userContent) {
       if (sid && visibleIdx >= 0) {
-        neocodex.regenerate(sid, visibleIdx).catch((e: Error) => {
+        chatDomain.regenerate(sid, visibleIdx).catch((e: Error) => {
           console.error('[Chat] 持久化重新生成失败:', e)
           state.setStreamError(errText(e) || '重新生成失败')
           setTimeout(() => state.setStreamError(null), 3000)
@@ -176,7 +170,7 @@ export function useChatActions(state: ChatStateReturn): ChatActionsReturn {
       state.setEditingMessageId(null)
       state.setEditContent('')
       if (sid && editVisibleIdx >= 0) {
-        neocodex.regenerate(sid, editVisibleIdx).catch((e: Error) => {
+        chatDomain.regenerate(sid, editVisibleIdx).catch((e: Error) => {
           console.error('[Chat] 持久化编辑失败:', e)
         })
       }

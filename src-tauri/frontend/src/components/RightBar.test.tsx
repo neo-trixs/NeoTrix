@@ -36,7 +36,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('渲染 3 个标签：文件/地图/项目', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     const tabs = document.querySelectorAll('[role="tab"]')
@@ -48,7 +48,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('切换到地图标签显示 GlobeView', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     fireEvent.click(findBtn('地图')!)
@@ -59,7 +59,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('切换到项目标签显示 ProjectViewPanel', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     fireEvent.click(findBtn('项目')!)
@@ -70,7 +70,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('方向键切换标签', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     const fileTab = document.querySelectorAll('[role="tab"]')[0]
@@ -86,7 +86,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('文件标签：项目树加载 + 目录展开 + 文件点击', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     // 默认文件标签，树加载
@@ -108,7 +108,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('文件树键盘导航：方向键移动焦点', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     const firstItem = document.querySelector('[role="treeitem"]') as HTMLElement
@@ -121,7 +121,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('点击文件打开预览面板', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     // 展开 src
@@ -139,7 +139,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('预览面板：raw/rendered 格式切换', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     // 展开并点击文件
@@ -164,7 +164,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('Artifact 视图切换：Preview/Code', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     // 打开文件
@@ -182,7 +182,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('地图标签显示 GlobeView', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     fireEvent.click(findBtn('地图')!)
@@ -191,7 +191,7 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
   })
 
   it('项目标签显示 ProjectViewPanel', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE_DATA)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     fireEvent.click(findBtn('项目')!)

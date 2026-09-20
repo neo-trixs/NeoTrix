@@ -5,7 +5,8 @@
 import { createSignal, For, Show, onMount, onCleanup } from 'solid-js'
 import { clsx } from 'clsx'
 import type { ProviderConfig, ProviderMeta } from '../../api/types'
-import type { ProviderHealthStatus, PoolSufficiencyReport } from '../../api/neocodex'
+import type { ProviderHealthStatus, PoolSufficiencyReport, DiscoveryResult } from '../../api/types'
+import { call as domainCall } from '../../api/domain'
 import { llamacpp, type LlamacppModel } from '../../api/domain'
 import { ProviderIcon, CategoryBadge, FreeBadge } from '../ProviderIcon'
 import { ModelIcon, CheckIcon, ActiveDotIcon, TestTubeIcon, AlertCircleIcon } from './settingsIcons'
@@ -60,8 +61,8 @@ export function ModelsSection(props: Props) {
   const fetchHealth = async () => {
     try {
       const [status, report] = await Promise.all([
-        import('../../api/neocodex').then((m) => m.providerStatus()),
-        import('../../api/neocodex').then((m) => m.poolSufficiency()),
+        domainCall<ProviderHealthStatus[]>('llamacpp', 'provider_status'),
+        domainCall<PoolSufficiencyReport>('agent', 'pool_sufficiency', { min: 3 }),
       ])
       setHealth(status)
       setPoolReport(report)
@@ -73,7 +74,7 @@ export function ModelsSection(props: Props) {
   const handleDiscover = async () => {
     setDiscoverLoading(true)
     try {
-      const result = await import('../../api/neocodex').then((m) => m.discoverModels())
+      const result = await domainCall<DiscoveryResult>('llamacpp', 'discover_models', { force: true })
       setDiscoverResult(result)
       await fetchHealth()
     } catch { /* silent */ } finally {

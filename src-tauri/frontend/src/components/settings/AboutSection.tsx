@@ -4,9 +4,10 @@
    仅依赖：appVersion 访问器 + config 访问器（诊断只读）。
    ════════════════════════════════════════════ */
 import { createSignal, onCleanup, Show } from 'solid-js'
-import { neocodex, errText } from '../../api'
+import { errText } from '../../api'
+import { call as domainCall } from '../../api/domain'
 import { listenUpdateEvents } from '../../api/system'
-import type { ProviderConfig } from '../../api/types'
+import type { ProviderConfig, UpdateCheckResult } from '../../api/types'
 import { clsx } from 'clsx'
 import { InfoIcon, ExpandIcon } from './settingsIcons'
 import { SettingsHealthPanel } from './SettingsHealthPanel'
@@ -41,7 +42,7 @@ export function AboutSection(props: Props) {
     setUpdateState('checking')
     setUpdateInfo(null)
     try {
-      const result = await neocodex.checkUpdate()
+      const result = await domainCall<UpdateCheckResult>('llamacpp', 'check_update')
       setUpdateInfo({ current: result.current, latest: result.latest, error: result.error })
       if (result.available) {
         setUpdateState('available')
@@ -74,7 +75,7 @@ export function AboutSection(props: Props) {
     setUpdateState('downloading')
     setUpdateProgress(null)
     try {
-      await neocodex.downloadUpdate()
+      await domainCall<void>('llamacpp', 'download_update')
     } catch (e) {
       props.showNotice?.(errText(e))
       setUpdateState('error')
@@ -83,7 +84,7 @@ export function AboutSection(props: Props) {
 
   const restartToInstall = async () => {
     try {
-      await neocodex.restartApp()
+      await domainCall<void>('llamacpp', 'restart_app')
     } catch (e) {
       props.showNotice?.(errText(e))
       setUpdateState('error')

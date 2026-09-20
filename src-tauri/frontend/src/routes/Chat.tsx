@@ -33,7 +33,9 @@ const TerminalPanel = lazy(() => import('../components/TerminalPanel').then((m) 
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { ShortcutHelp } from '../components/ShortcutHelp'
 import { clsx } from 'clsx'
-import { neocodex, system, unified, errText, harness } from '../api'
+import { system, unified, errText, harness } from '../api'
+import { chat as chatDomain, call as domainCall } from '../api/domain'
+import type { ProviderConfig } from '../api/types'
 import type { HarnessRunResponse, HarnessProgressEvent, HarnessStep, HarnessApproval } from '../api/harness'
 import { listen } from '@tauri-apps/api/event'
 import { HarnessReportCard } from '../components/HarnessReportCard'
@@ -310,7 +312,7 @@ export function Chat() {
     }
     setCompacting(true)
     try {
-      await neocodex.compactSession(sessionId, 8)
+      await chatDomain.compact(sessionId)
       // 后端消息已截断，重拉当前会话消息（与 neocodex_get_session_messages 消费路径一致）
       await chatStore.loadSessionMessages(sessionId)
       // 压缩成功后关闭自动压缩提示，避免残留
@@ -449,7 +451,7 @@ export function Chat() {
     immediate: true,
     run: async () => {
       try {
-        const s = await query<AgentStatus>('agent_status', () => neocodex.agentStatus(), { ttlMs: 3000 })
+        const s = await query<AgentStatus>('agent_status', () => domainCall<AgentStatus>('agent', 'status'), { ttlMs: 3000 })
         if (s && typeof s.context_usage === 'number') {
           setContextPct(s.context_usage * 100)
         }
@@ -672,7 +674,7 @@ export function Chat() {
 
     // 读取当前激活模型（仅用于状态栏展示，只读命令）
     try {
-      const cfg = await neocodex.providerConfig()
+      const cfg = await domainCall<ProviderConfig>('llamacpp', 'provider_config')
       setActiveModel(cfg.active_model || null)
     } catch {
       /* 展示字段，静默失败 */
@@ -680,7 +682,7 @@ export function Chat() {
 
     // 读取应用版本（底部状态条展示，避免硬编码漂移）
     try {
-      setAppVersion(await neocodex.appVersion())
+      setAppVersion(await domainCall<string>('llamacpp', 'app_version'))
     } catch {
       /* 版本非关键 */
     }
@@ -689,8 +691,7 @@ export function Chat() {
 
     // 监听提供商切换事件（SettingsModal / ProviderSelector 广播），同步状态栏模型
     const onProviderChanged = () => {
-      neocodex
-        .providerConfig()
+      domainCall<{ active_model?: string }>('llamacpp', 'provider_config')
         .then((cfg) => setActiveModel(cfg.active_model || null))
         .catch(() => {})
     }
@@ -1088,14 +1089,7 @@ export function Chat() {
 
     try {
       // 流式生成经统一 IPC 层；实际 token 由 neocodex_stream_* 事件推送
-      await neocodex.sendMessageStream({
-        content,
-        attachments: atts.length > 0 ? atts : undefined,
-        regenerate: opts?.regenerate ?? false,
-        permission_mode: permissionMode(),
-        temperature: 0.7,
-        max_tokens: 4096,
-      })
+      await chatDomain.send(content)
       // The actual streaming happens via events (neocodex_stream_token, etc.)
     } catch (error) {
       console.error('[Chat] Send message failed:', error)
@@ -1297,7 +1291,7 @@ export function Chat() {
     generation++
     const msgId = currentAssistantMsgId()
     try {
-      await neocodex.stopStream()
+      await chatDomain.stop()
     } catch (error) {
       console.error('[Chat] Stop stream failed:', error)
     }
@@ -1340,7 +1334,7 @@ export function Chat() {
       // 复活且 agent 上下文未重建。此处同步调后端 neocodex_regenerate 截断 wire
       // 并重建上下文（R-P79：功能接线到生产路径，不留死代码）。
       if (sid && visibleIdx >= 0) {
-        neocodex.regenerate(sid, visibleIdx).catch((e: Error) => {
+        chatDomain.regenerate(sid, visibleIdx).catch((e: Error) => {
           console.error('[Chat] 持久化重新生成失败（本地已截断，重载后可能回退）:', e)
           setStreamError(errText(e) || '重新生成失败')
           setTimeout(() => setStreamError(null), 3000)
@@ -1442,7 +1436,7 @@ export function Chat() {
       setEditingMessageId(null)
       setEditContent('')
       if (sid && editVisibleIdx >= 0) {
-        neocodex.regenerate(sid, editVisibleIdx).catch((e: Error) => {
+        chatDomain.regenerate(sid, editVisibleIdx).catch((e: Error) => {
           console.error('[Chat] 持久化编辑失败（本地已截断，重载后可能回退）:', e)
         })
       }

@@ -5,7 +5,8 @@
 import { createSignal, For, Show, onMount, onCleanup } from 'solid-js'
 import { clsx } from 'clsx'
 import { getProxyPoolStatus, type ProxyPoolStatus } from '../../api/proxy-pool'
-import { providerStatus, type ProviderHealthStatus } from '../../api/neocodex'
+import { call as domainCall } from '../../api/domain'
+import type { ProviderHealthStatus } from '../../api/types'
 
 /* ── 类型 ── */
 interface SystemProxyStatus {
@@ -69,7 +70,7 @@ export function NetworkSection() {
     try {
       const [status, health] = await Promise.all([
         getProxyPoolStatus().catch(() => null),
-        providerStatus().catch(() => []),
+        domainCall<ProviderHealthStatus[]>('llamacpp', 'provider_status').catch(() => []),
       ])
       setProxyStatus(status)
       setProviderHealth(health)

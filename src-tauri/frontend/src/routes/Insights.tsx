@@ -11,7 +11,7 @@ import { useNavigate } from '@solidjs/router'
 import { ArrowLeft, Gauge, RefreshCw, Loader2, Wallet, Coins, Database, Info } from 'lucide-solid'
 import { clsx } from 'clsx'
 import type { AgentStatus } from '../api/types'
-import { neocodex } from '../api'
+import { call as domainCall } from '../api/domain'
 import type { ProviderUsageRow } from '../api/types'
 import { query } from '../api/query'
 import { createInsightsStore } from '../stores/insights'
@@ -30,7 +30,7 @@ export function Insights() {
 
   async function loadStatus(force = false) {
     try {
-      setStatus(await query<AgentStatus>('agent_status', () => neocodex.agentStatus(), { ttlMs: 3000, force }))
+      setStatus(await query<AgentStatus>('agent_status', () => domainCall<AgentStatus>('agent', 'status'), { ttlMs: 3000, force }))
     } catch {
       /* 静默 — 成本卡显示占位符 */
     }

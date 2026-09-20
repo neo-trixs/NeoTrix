@@ -39,7 +39,7 @@ describe('ProjectView 项目视图回归（目录树/tab/文件打开）', () =>
   })
 
   it('加载后显示根目录名与文件数', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE, error: null }))
     render(() => <ProjectView open onClose={() => {}} />)
     await settle()
     expect(document.querySelector('.panel-title')?.textContent).toBe('demo')
@@ -47,7 +47,7 @@ describe('ProjectView 项目视图回归（目录树/tab/文件打开）', () =>
   })
 
   it('首层目录自动展开，子文件可见', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE, error: null }))
     render(() => <ProjectView open onClose={() => {}} />)
     await settle()
     expect(document.body.textContent).toContain('main.rs')
@@ -55,7 +55,7 @@ describe('ProjectView 项目视图回归（目录树/tab/文件打开）', () =>
   })
 
   it('点击已展开目录折叠子项', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE, error: null }))
     render(() => <ProjectView open onClose={() => {}} />)
     await settle()
     const srcBtn = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('src'))!
@@ -69,7 +69,7 @@ describe('ProjectView 项目视图回归（目录树/tab/文件打开）', () =>
   })
 
   it('点击文件回调 onOpenFile 传绝对路径', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE, error: null }))
     const onOpenFile = vi.fn()
     render(() => <ProjectView open onClose={() => {}} onOpenFile={onOpenFile} />)
     await settle()
@@ -79,7 +79,7 @@ describe('ProjectView 项目视图回归（目录树/tab/文件打开）', () =>
   })
 
   it('切换到 AGENTS.md tab 显示内容', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE, error: null }))
     render(() => <ProjectView open onClose={() => {}} />)
     await settle()
     fireEvent.click([...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent === 'AGENTS.md')!)
@@ -91,7 +91,7 @@ describe('ProjectView 项目视图回归（目录树/tab/文件打开）', () =>
   })
 
   it('方向键切换 tab', async () => {
-    mockCommand('neocodex_project_tree', async () => TREE)
+    mockCommand('domain_call', async () => ({ ok: true, data: TREE, error: null }))
     render(() => <ProjectView open onClose={() => {}} />)
     await settle()
     const treeTab = document.querySelectorAll('[role="tab"]')[0]
@@ -101,7 +101,7 @@ describe('ProjectView 项目视图回归（目录树/tab/文件打开）', () =>
   })
 
   it('刷新按钮重新加载', async () => {
-    const stub = mockCommand('neocodex_project_tree', async () => TREE)
+    const stub = mockCommand('domain_call', async () => ({ ok: true, data: TREE, error: null }))
     render(() => <ProjectView open onClose={() => {}} />)
     await settle()
     fireEvent.click(document.querySelector('[aria-label="刷新"]')!)
@@ -110,7 +110,7 @@ describe('ProjectView 项目视图回归（目录树/tab/文件打开）', () =>
   })
 
   it('加载失败显示错误', async () => {
-    mockCommand('neocodex_project_tree', async () => {
+    mockCommand('domain_call', async () => {
       throw new Error('tree failed')
     })
     render(() => <ProjectView open onClose={() => {}} />)
