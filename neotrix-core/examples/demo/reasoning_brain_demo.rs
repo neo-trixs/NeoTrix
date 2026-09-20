@@ -3,7 +3,7 @@
 //! 展示吸收不同知识源（HeroUI, BaseUI 等）后能力向量的变化
 //! 使用 ReasoningBrain::absorb() 和 evaluate_capability()
 
-use neotrix::neotrix::nt_mind::{
+use neotrix::nt_mind::{
     ReasoningBrain, KnowledgeSource, CapabilityVector,
 };
 use neotrix::neotrix::nt_world_model::TaskType;

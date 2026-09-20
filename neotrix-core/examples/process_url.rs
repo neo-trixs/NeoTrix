@@ -1,7 +1,7 @@
 //! 处理指定URL的进化分析
-use neotrix::neotrix::nt_mind::self_evolver::SelfEvolver;
-use neotrix::neotrix::nt_mind::self_iterating::ReasoningBrain;
-use neotrix::neotrix::nt_mind::memory::ReasoningBank;
+use neotrix::nt_mind::self_evolver::SelfEvolver;
+use neotrix::nt_mind::self_iterating::ReasoningBrain;
+use neotrix::nt_mind::memory::ReasoningBank;
 use std::path::PathBuf;
 
 fn main() {

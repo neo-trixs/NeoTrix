@@ -1579,8 +1579,8 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
     let mut duplicated = 0usize;
     let mut mapped = 0usize;
     let now = now_ts();
-    // 管道写端连接复用于整批, 避免每节点重复 open KB (开销大)
-    let kb = KnowledgeBase::open(None).expect("open KB");
+    // FIX: 使用 main 传入的 conn (已 open_kb 初始化), 不再二次 open KnowledgeBase
+    // (二次 open 会 flock + schema_initialize 造成死锁/长时间阻塞)。
     for (i, n) in nodes.iter().enumerate() {
         let url = n
             .get("url")
@@ -1653,62 +1653,145 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
             meta["enriched_at"] = json!(now);
         }
 
-        // 7. 走最短路径管道写入 (absorb_core: nodes + FTS + 域枢纽 BelongsTo 边)
-        //    原裸 SQL 双写 (PA011 desync 防护) 已内化为 nt_memory_pipeline::absorb_core,
-        //    意识体/CLI 共用同一写端, 防逻辑分叉 (R-P42 强化现有节点)。
-        let entry = AbsorbEntry {
-            title: title.clone(),
-            summary: if summary.is_empty() { None } else { Some(summary) },
-            content: if content.is_empty() { None } else { Some(content) },
-            node_type: node_type.clone(),
-            domain: Some(domain),
-            url: Some(norm_url.to_string()),
-            language: Some(language.clone()),
-            importance: Some(importance),
-            relations: vec![],
-        };
-        let report = kb.absorb_core(&entry).expect("absorb_core pipeline");
-        if report.created {
-            inserted += 1;
-            // [根因 d] 82d06141 薄壳化回归: AbsorbEntry 无 metadata 通道, 输入 meta
-            // 不再随 INSERT 落库 (违背本函数步骤 6 "保留输入 meta 字段" 契约)。
-            // 读改写合并补齐, 同时保留管道写入的 ingest_index。
-            let db_meta: Option<String> = conn
+        // 7. 直接用 conn 写入 (nodes + FTS + 域枢纽边), 避免 KnowledgeBase 二次 open
+        let node_id = {
+            let ts = now;
+            let id = format!("batch_{}_{}", now, {
+                use std::collections::hash_map::DefaultHasher;
+                use std::hash::{Hash, Hasher};
+                let mut h = DefaultHasher::new();
+                norm_url.hash(&mut h);
+                format!("{:x}", h.finish())
+            });
+
+            // 幂等: URL 去重
+            let exists: bool = conn
                 .query_row(
-                    "SELECT metadata FROM nodes WHERE id=?1",
-                    params![report.node_id],
-                    |r| r.get(0),
+                    "SELECT 1 FROM nodes WHERE url=?1 LIMIT 1",
+                    params![norm_url],
+                    |_| Ok(true),
                 )
-                .ok();
-            let mut merged: Map<String, Value> = db_meta
-                .as_deref()
-                .and_then(|s| serde_json::from_str(s).ok())
-                .unwrap_or_default();
-            if let Some(obj) = meta.as_object() {
-                for (k, val) in obj {
-                    merged.insert(k.clone(), val.clone());
-                }
+                .unwrap_or(false);
+            if exists {
+                duplicated += 1;
+                let nid: String = conn
+                    .query_row(
+                        "SELECT id FROM nodes WHERE url=?1 LIMIT 1",
+                        params![norm_url],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or_default();
+                println!(
+                    "[absorb-node] duplicate #{}: {} (id={})",
+                    i, norm_url, nid
+                );
+                continue;
             }
-            conn.execute(
-                "UPDATE nodes SET metadata=?1 WHERE id=?2",
-                params![Value::Object(merged).to_string(), report.node_id],
-            )
-            .expect("persist input meta");
-        } else {
-            duplicated += 1;
+
+            // 插入 nodes + FTS
+            let concepts = {
+                let text = format!("{} {} {}", title, summary, content);
+                let words: Vec<&str> = text.split_whitespace().filter(|w| w.len() > 3).collect();
+                let mut seen = std::collections::HashSet::new();
+                words.into_iter()
+                    .filter(|w| seen.insert(*w))
+                    .take(24)
+                    .map(|s| s.to_lowercase())
+                    .collect::<Vec<_>>()
+            };
+            let meta_val = if concepts.is_empty() {
+                json!({"enriched_at": now}).to_string()
+            } else {
+                json!({"ingest_index": {"concepts": concepts, "compiled_at": now}, "enriched_at": now}).to_string()
+            };
+
+            let tx = conn.unchecked_transaction().expect("tx begin");
+            tx.execute(
+                "INSERT INTO nodes (id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata, data_tier, temporal, supersedes, source_episode, tier, recall_weight, norm_title, valid_start_time, valid_end_time, transaction_time, parent_id, depth, cluster_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 0, ?13, 'core', NULL, NULL, NULL, 'warm', 1.0, ?14, 0, 0, 0, NULL, 0, NULL)",
+                params![
+                    id, node_type, title,
+                    summary.is_empty().then(|| None).unwrap_or(Some(&summary)),
+                    content.is_empty().then(|| None).unwrap_or(Some(&content)),
+                    norm_url, domain, language,
+                    0.9_f64, importance, now, now,
+                    meta_val,
+                    title.to_lowercase(),
+                ],
+            ).expect("insert node");
+            // FTS 同步
+            tx.execute(
+                "INSERT INTO nodes_fts (rowid, title, summary, content, domain)
+                 SELECT rowid, title, summary, content, domain FROM nodes WHERE id=?1",
+                params![id],
+            ).expect("fts sync");
+            // 域枢纽 BelongsTo 边
+            let hub_title = format!("domain:{}", domain);
+            let hub_exists: bool = tx
+                .query_row(
+                    "SELECT 1 FROM nodes WHERE title=?1 AND node_type='concept' LIMIT 1",
+                    params![hub_title],
+                    |_| Ok(true),
+                )
+                .unwrap_or(false);
+            if !hub_exists {
+                let hub_id = format!("hub_{}", now);
+                tx.execute(
+                    "INSERT OR IGNORE INTO nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at, data_tier, tier, recall_weight, transaction_time, depth)
+                     VALUES (?1, 'concept', ?2, ?2, '', ?3, 'en', 0.9, 0.7, ?4, ?4, 'core', 'warm', 1.0, 0, 0)",
+                    params![hub_id, hub_title, domain, now],
+                ).ok();
+                tx.execute(
+                    "INSERT OR IGNORE INTO nodes_fts (rowid, title, summary, content, domain)
+                     SELECT rowid, title, summary, content, domain FROM nodes WHERE id=?1",
+                    params![hub_id],
+                ).ok();
+                tx.execute(
+                    "INSERT OR IGNORE INTO edges (id, source_id, target_id, relation_type, weight, description, created_at, transaction_time)
+                     VALUES (?1, ?2, ?3, 'belongs_to', 1.0, ?4, ?5, 0)",
+                    params![format!("edge_{}_{}", now, i), id, hub_id, format!("{} → {}", title, domain), now],
+                ).ok();
+            } else {
+                let hub_id: String = tx
+                    .query_row(
+                        "SELECT id FROM nodes WHERE title=?1 AND node_type='concept' LIMIT 1",
+                        params![hub_title],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or_default();
+                tx.execute(
+                    "INSERT OR IGNORE INTO edges (id, source_id, target_id, relation_type, weight, description, created_at, transaction_time)
+                     VALUES (?1, ?2, ?3, 'belongs_to', 1.0, ?4, ?5, 0)",
+                    params![format!("edge_{}_{}", now, i), id, hub_id, format!("{} → {}", title, domain), now],
+                ).ok();
+            }
+            tx.commit().expect("tx commit");
+            id
+        };
+        inserted += 1;
+        // 保留输入 meta 字段
+        let mut meta = match n.get("meta") {
+            Some(Value::Object(m)) => Value::Object(m.clone()),
+            _ => json!({}),
+        };
+        if meta.get("enriched_at").is_none() {
+            meta["enriched_at"] = json!(now);
         }
+        conn.execute(
+            "UPDATE nodes SET metadata=?1 WHERE id=?2",
+            params![Value::Object(meta.as_object().cloned().unwrap_or_default()).to_string(), node_id],
+        ).ok();
+        let report_created = true;
+        let report_node_id = node_id.clone();
         println!(
-            "[absorb-node] {} #{}: {} ({}, lang={}, cap={}, hub={}, edges={})",
-            if report.created { "inserted" } else { "duplicate" },
+            "[absorb-node] {} #{}: {} ({}, lang={})",
+            "inserted",
             i,
-            url,
+            norm_url,
             node_type,
             language,
-            if apply_capability { "apply" } else { "-" },
-            report.hub_linked,
-            report.edges_added,
         );
-        let eid = report.node_id;
+        let eid = report_node_id;
 
         // 8. capability 映射 (R-P79 闭环: metadata.absorbed_capability 四元组)
         if apply_capability {

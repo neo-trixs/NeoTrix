@@ -141,11 +141,12 @@ mod tests {
 
     #[test]
     fn test_execute_retry_on_failure() {
-        let mut call_count = 0;
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let call_count = AtomicU32::new(0);
         let rm = ResilienceManager::new().with_retry(3, Duration::from_millis(10));
         let result = rm.execute(|| {
-            call_count += 1;
-            if call_count < 3 {
+            let c = call_count.fetch_add(1, Ordering::SeqCst) + 1;
+            if c < 3 {
                 Err("transient error")
             } else {
                 Ok("recovered")
@@ -232,36 +233,39 @@ mod tests {
 
     #[test]
     fn test_execute_with_immediate_success_no_retries() {
+        use std::sync::atomic::{AtomicU32, Ordering};
         let rm = ResilienceManager::new().with_retry(5, Duration::from_millis(10));
-        let mut calls = 0;
+        let calls = AtomicU32::new(0);
         let result = rm.execute(|| {
-            calls += 1;
+            calls.fetch_add(1, Ordering::SeqCst);
             Ok::<_, String>("done")
         });
         assert!(result.success);
-        assert_eq!(calls, 1);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
         assert_eq!(result.attempts, 1);
     }
 
     #[test]
     fn test_execute_all_failures_returns_last_failure() {
+        use std::sync::atomic::{AtomicU32, Ordering};
         let rm = ResilienceManager::new().with_retry(3, Duration::from_millis(1));
-        let mut calls = 0;
+        let calls = AtomicU32::new(0);
         let result = rm.execute(|| {
-            calls += 1;
-            Err::<String, _>(format!("err_{}", calls))
+            let c = calls.fetch_add(1, Ordering::SeqCst) + 1;
+            Err::<String, _>(format!("err_{}", c))
         });
         assert!(!result.success);
-        assert_eq!(calls, 3);
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
     }
 
     #[test]
     fn test_execute_success_on_second_attempt() {
+        use std::sync::atomic::{AtomicU32, Ordering};
         let rm = ResilienceManager::new().with_retry(3, Duration::from_millis(1));
-        let mut calls = 0;
+        let calls = AtomicU32::new(0);
         let result = rm.execute(|| {
-            calls += 1;
-            if calls == 1 {
+            let c = calls.fetch_add(1, Ordering::SeqCst) + 1;
+            if c == 1 {
                 Err("transient")
             } else {
                 Ok("recovered")

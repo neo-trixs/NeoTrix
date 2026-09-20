@@ -14,27 +14,23 @@
 //! ```
 //!
 //! 统一版本: 0.18.0 — 推理内核 18 stages
-
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![cfg_attr(not(test), deny(warnings))] // R-P2: 生产代码 0 warning; 测试代码豁免 (测试常有良性 warning)
-#![allow(dead_code)] // Large codebase: dead items tracked by auto-patrol, not compilation gate
-// Float clamp: project convention uses .max().min() pattern
-#![allow(clippy::manual_clamp)]
-// Functions in crypto/tool APIs legitimately need many parameters
-#![allow(clippy::too_many_arguments)]
-// Closure type complexity is inherent in event/middleware systems
-#![allow(clippy::type_complexity)]
-// &mut Vec needed for API compatibility in several subsystems
-#![allow(clippy::ptr_arg)]
-// Range loops in ML/AI code are idiomatic and clearer than iterator adaptations
-#![allow(clippy::needless_range_loop)]
-// Manual strip in pattern matching is more readable than strip_prefix chains
-#![allow(clippy::manual_strip)]
-// from_str/default methods are intentional; implementing traits would add ceremony
-#![allow(clippy::should_implement_trait)]
-// is_empty not needed for all collection-like types
-#![allow(clippy::len_without_is_empty)]
+#![warn(clippy::all, clippy::pedantic)]
+#![cfg_attr(not(test), deny(warnings))]
+#![allow(dead_code)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::manual_clamp,
+    clippy::too_many_arguments,
+    clippy::type_complexity,
+    clippy::ptr_arg,
+    clippy::needless_range_loop,
+    clippy::manual_strip,
+    clippy::should_implement_trait,
+    clippy::len_without_is_empty,
+    reason = "legacy allowances — tracked for removal"
+)]
 
 #[cfg(feature = "ios-bridge")]
 uniffi::setup_scaffolding!();

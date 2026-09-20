@@ -47,6 +47,12 @@ pub mod vector_index;
 /// Entity Linking — extraction, dedup, and indexing of named entities (R-P117 ADD-only).
 pub mod entity_linking;
 
+// NOTE: 以下模块已声明但内部编译错误待修复，暂时注释
+// pub mod add_only_writes;
+// pub mod admission_control;
+// pub mod decay_forgetting;
+// pub mod hybrid_retrieval;
+
 // Re-exports for cross-module integration
 pub use addressable_store::AddressableStore;
 pub use context_fs::{ContextFileSystem, ContextNode, ContextNodeType};

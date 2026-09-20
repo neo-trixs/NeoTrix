@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use neotrix::neotrix::nt_mind::knowledge_engine::*;
+use neotrix::nt_mind::knowledge_engine::*;
 
 fn add(e: &mut KnowledgeEngine, t: &str, b: &str, tags: Vec<&str>, imp: f64) -> String {
     if e.entries.values().any(|x| x.title == t) { return String::new(); }

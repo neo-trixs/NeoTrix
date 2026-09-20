@@ -4,8 +4,8 @@
 
 use neotrix::{
     ReasoningBrain, SelfIteratingBrain,
-    CapabilityVector, KnowledgeSource,
 };
+use neotrix::nt_mind::{CapabilityVector, KnowledgeSource};
 
 fn main() {
     // 1. 创建 ReasoningBrain

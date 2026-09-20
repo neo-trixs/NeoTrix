@@ -388,6 +388,14 @@ pub fn ingest_session_resources(conn: &Connection) -> Result<String, String> {
     ingest_new_modules(&mut ingester)?;
     link_related_resources(&mut ingester)?;
 
+    // ── Wave 2026-09-20: Crystal Core absorption ──
+    // Absorb arxiv-complete dataset metadata (3.1M papers, sampled)
+    ingest_arxiv_complete_metadata(&mut ingester)?;
+    // Absorb key GitHub repos into crystal core
+    ingest_crystal_core_repos(&mut ingester)?;
+    // Absorb personal-ai ecosystem repos
+    ingest_personal_ai_ecosystem(&mut ingester)?;
+
     // External "Cortex-Brain" volume: register as a discoverable KB catalog so the
     // 114 GB offline archive is connected (Dark Forest), not inert. No-op if unmounted.
     // This runs in production (ingest_session_resources is called at startup) → T3 wiring.
@@ -1081,6 +1089,482 @@ fn link_related_resources(ingester: &mut ResourceIngester) -> Result<(), String>
 
 fn link_pair(ingester: &mut ResourceIngester, from_title: &str, to_title: &str, rel: RelationType, weight: f64, desc: &str) -> Result<(), String> {
     ingester.relate_by_title(from_title, to_title, rel, weight, Some(desc))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Wave 2026-09-20: Crystal Core Absorption — arxiv-complete + GitHub repos
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Absorb arxiv-complete dataset metadata into the crystal core.
+///
+/// The `secemp9/arxiv-complete` dataset on HuggingFace contains 3,148,796 papers
+/// with full metadata (title, authors, abstracts, categories, dates). We fetch
+/// a representative sample via the datasets-server API and ingest key papers
+/// across AI/ML/CS categories to give the KB deep academic coverage.
+///
+/// Strategy: fetch 100 metadata rows (covers major categories), then synthesize
+/// category-level summary nodes for the full 3.1M paper corpus.
+fn ingest_arxiv_complete_metadata(ingester: &mut ResourceIngester) -> Result<Vec<String>, String> {
+    let mut ids = Vec::new();
+
+    // 1. Register the dataset itself as a meta-resource
+    let dataset_desc = ResourceDescriptor::article(
+        "arxiv-complete: Full arXiv Corpus (3.1M papers)",
+        "secemp9/arxiv-complete — A snapshot of arXiv's metadata, version history, submission files \
+         and rendered documents. Covers 3,148,796 papers with file contents, paths, sizes and SHA-256 \
+         digests. Metadata from arXiv's OAI-PMH arXivRaw interface; files from GCS mirror, S3 source \
+         archives and direct PDF fetches. Configs: metadata (1.6GB), versions (269MB), files (2.4GB), \
+         paper_text (70GB), latex (0.16TB), source (6.51TB), pdf (8.65TB).",
+        "https://huggingface.co/datasets/secemp9/arxiv-complete",
+    ).with_key_insights(vec![
+        "3,148,796 papers covering all arXiv categories (cs, math, physics, bio, etc.)",
+        "Metadata config: 1.6 GB Parquet with paper_id, title, authors, abstracts, categories, dates",
+        "paper_text config: 70 GB of resolved TeX content for 2.86M papers (90.7%)",
+        "source config: 6.51 TB of complete submission packages for 3.12M papers (99.1%)",
+        "Enables large-scale academic knowledge graph construction and citation analysis",
+    ]).with_tags(vec![
+        "arxiv", "dataset", "academic", "corpus", "metadata",
+        "huggingface", "papers", "knowledge-graph",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.95).with_confidence(0.95);
+
+    let r = ingester.ingest(&dataset_desc)?;
+    ids.push(r.node_id);
+
+    // 2. Fetch a sample of metadata via the HuggingFace datasets-server API
+    //    This gives us real paper metadata to ingest
+    let sample_url = "https://datasets-server.huggingface.co/rows?dataset=secemp9/arxiv-complete&config=metadata&split=train&offset=0&length=100";
+    if let Ok(resp) = super::nt_http::run_blocking(|| {
+        super::nt_http::shared_blocking_client()
+            .get(sample_url)
+            .timeout(std::time::Duration::from_secs(30))
+            .send()
+    }) {
+        if let Ok(data) = resp.json::<serde_json::Value>() {
+            if let Some(rows) = data["rows"].as_array() {
+                for row in rows {
+                    let row_data = &row["row"];
+                    let paper_id = row_data["paper_id"].as_str().unwrap_or("");
+                    let title = row_data["title"].as_str().unwrap_or("");
+                    let abstract_text = row_data["abstract"].as_str().unwrap_or("");
+                    let authors = row_data["authors"].as_str().unwrap_or("");
+                    let categories = row_data["categories"].as_str().unwrap_or("");
+                    let date = row_data["date"].as_str().unwrap_or("");
+
+                    if title.is_empty() { continue; }
+
+                    let summary = if abstract_text.len() > 500 {
+                        format!("{}...", &abstract_text[..abstract_text.char_indices().nth(500).map(|(i, _)| i).unwrap_or(500)])
+                    } else {
+                        abstract_text.to_string()
+                    };
+
+                    let desc = ResourceDescriptor::paper(
+                        paper_id,
+                        title,
+                        &summary,
+                    ).with_content(&format!(
+                        "Authors: {}\nCategories: {}\nDate: {}\nAbstract: {}",
+                        authors, categories, date, abstract_text,
+                    )).with_tags(vec![
+                        "arxiv", "paper", "academic",
+                        categories.split_whitespace().next().unwrap_or("unknown"),
+                        &format!("absorbed-{}", now()),
+                    ]).with_importance(0.75).with_confidence(0.9);
+
+                    if let Ok(result) = ingester.ingest(&desc) {
+                        ids.push(result.node_id);
+                    }
+                }
+            }
+        }
+    } else {
+        warn!("[arxiv-complete] Failed to fetch sample metadata from HuggingFace API");
+    }
+
+    // 3. Synthesize category-level summary nodes for the full corpus
+    let arxiv_categories = vec![
+        ("cs.AI", "Artificial Intelligence", "Machine learning, knowledge representation, planning, reasoning, NLP, computer vision, robotics"),
+        ("cs.LG", "Machine Learning", "Supervised, unsupervised, reinforcement learning; deep learning; neural networks; optimization"),
+        ("cs.CL", "Computation and Language", "NLP, computational linguistics, text mining, information extraction, machine translation"),
+        ("cs.CV", "Computer Vision", "Image recognition, object detection, segmentation, video analysis, 3D vision"),
+        ("cs.RO", "Robotics", "Robot design, control, planning, perception, human-robot interaction"),
+        ("cs.IR", "Information Retrieval", "Search, recommendation systems, document ranking, query processing"),
+        ("cs.SE", "Software Engineering", "Program analysis, testing, maintenance, development tools, formal methods"),
+        ("cs.CR", "Cryptography and Security", "Security, privacy, cryptographic protocols, network security, applied crypto"),
+        ("cs.DC", "Distributed Computing", "Cloud computing, parallel processing, consensus protocols, distributed systems"),
+        ("cs.NE", "Neural and Evolutionary Computing", "Neural networks, evolutionary algorithms, genetic programming, swarm intelligence"),
+        ("stat.ML", "Statistics: Machine Learning", "Statistical learning theory, Bayesian methods, probabilistic models"),
+        ("math.OC", "Optimization and Control", "Convex optimization, control theory, operations research, mathematical programming"),
+        ("q-bio.BM", "Biomolecules", "Protein structure, genomics, computational biology, molecular modeling"),
+        ("physics.comp-ph", "Computational Physics", "Monte Carlo methods, molecular dynamics, computational methods in physics"),
+    ];
+
+    for (cat, name, desc_text) in &arxiv_categories {
+        let node_desc = ResourceDescriptor::concept(
+            &format!("arXiv:{} — {}", cat, name),
+            &format!("Category summary for the full arXiv corpus (3.1M papers total). {}: {}.", name, desc_text),
+        ).with_key_insights(vec![
+            &format!("arXiv category {} covers: {}", cat, desc_text),
+            "Part of the 3,148,796 paper arxiv-complete corpus on HuggingFace",
+            "Full metadata available via secemp9/arxiv-complete dataset",
+        ]).with_tags(vec![
+            "arxiv", "category", "taxonomy", "academic",
+            cat,
+            &format!("absorbed-{}", now()),
+        ]).with_importance(0.85).with_confidence(0.9);
+
+        if let Ok(result) = ingester.ingest(&node_desc) {
+            ids.push(result.node_id);
+        }
+    }
+
+    info!("[arxiv-complete] Absorbed {} nodes (dataset + {} sampled papers + {} category summaries)",
+          ids.len(), ids.len().saturating_sub(1 + arxiv_categories.len()), arxiv_categories.len());
+
+    Ok(ids)
+}
+
+/// Absorb key GitHub repos into the crystal core.
+///
+/// These repos represent the cutting-edge of personal AI, agent orchestration,
+/// local inference, and developer tooling — all directly relevant to NeoTrix's
+/// architecture and evolution.
+fn ingest_crystal_core_repos(ingester: &mut ResourceIngester) -> Result<Vec<String>, String> {
+    let mut ids = Vec::new();
+
+    // ── 1. OpenHuman — Personal AI superintelligence (39.9k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "tinyhumansai", "openhuman",
+        "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
+        "OpenHuman is an open source agent harness with local-first memory, agent orchestration, \
+         and workflows. Features: Memory Tree + Obsidian Wiki for persistent local memory, \
+         100+ OAuth integrations, 5000+ MCP servers, 90000+ Skills. Orchestrator with checkpointed \
+         graph runs on tinyagents, agent-to-agent E2E encryption via Signal protocol, visual \
+         workflow builder (tinyflows). Built with Rust (Tauri) + React. 39.9k stars.",
+    ).with_key_insights(vec![
+        "Memory Tree: data compressed into scored Markdown trees in SQLite, mirrored as Obsidian vault",
+        "TokenJuice: tool output compressed before model, up to 80% fewer tokens",
+        "Agent graphs with checkpoints: turns run as checkpointed graphs, pause for human, survive restart",
+        "Agent-to-agent E2E encryption via Signal protocol with x402 payments",
+        "Workflows: agent proposes automation, user reviews on canvas, durable trigger-driven runs",
+        "Split brain: fast reflex agent triages inbound, deep reasoning core delegates to worker fleets",
+        "Privacy Mode: one-switch enforced local-only inference in Rust core",
+    ]).with_tags(vec![
+        "personal-ai", "agent-harness", "memory-tree", "orchestration",
+        "workflows", "local-first", "tauri", "rust",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.95).with_confidence(0.95))?;
+    ids.push(r.node_id);
+
+    // ── 2. Splash — Local inference engine for Apple silicon (413★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "incoai", "splash",
+        "incoai/splash — Splash: Local Inference Engine for Apple Silicon",
+        "A local inference engine for Apple silicon, built around the model. Serves models to \
+         coding agents and OpenAI/Anthropic compatible clients. On 48GB M5 Pro: decodes \
+         Qwen3.8-27B at 2x speed of next-fastest engine, 282ms TTFT with 32K context cached. \
+         Kernels, draft model, and memory plan specialized per model. Speculative decoding \
+         (DFlash 2) as default decode path. Fused Metal kernels compiled for exact shapes.",
+    ).with_key_insights(vec![
+        "Speculative decoding (DFlash 2) as default, not optional — every model ships its own draft",
+        "Fused Metal kernels compiled for exact model dimensions, weights packed and mapped zero-copy",
+        "Memory plan computed per-machine from Metal recommended memory minus weights/draft/state",
+        "2x decode speed vs next-fastest engine on M5 Pro (74 tok/s on 27B, 210 tok/s on 35B-A3B)",
+        "OpenAI + Anthropic compatible API with streaming, tool calls, JSON Schema, images, PDFs",
+    ]).with_tags(vec![
+        "inference", "apple-silicon", "metal", "speculative-decoding",
+        "local-llm", "coding-agents", "llm-inference",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.85).with_confidence(0.9))?;
+    ids.push(r.node_id);
+
+    // ── 3. ccodex-sleep-state — Codex connection quality tool (441★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "gylive", "ccodex-sleep-state",
+        "gylive/ccodex-sleep-state — Codex Connection Quality Tool",
+        "A tool to improve Codex degradation, rate limiting, and connection experience. \
+         Local one-click startup with web configuration. Supports Astra/Sol/Terra models, \
+         subscriptions and proxies. Manages turn-state injection, proxy routing, and \
+         model/account isolation. Written in Go with embedded web UI.",
+    ).with_key_insights(vec![
+        "Turn-state injection for Codex connection quality management",
+        "Model and account isolation: state per account, credential, and model",
+        "Proxy pool management with subscription import, HTTP/SOCKS5 support",
+        "Web panel for configuration: model selection, proxy routing, diagnostics",
+        "Strict mode vs fallback: controlled behavior when state unavailable",
+    ]).with_tags(vec![
+        "codex", "connection-quality", "proxy", "turn-state",
+        "agent-infrastructure", "go",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.70).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 4. Laya — Non-autoregressive decision engine (2.5k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "NandhaKishorM", "laya",
+        "NandhaKishorM/laya — Laya: Non-Autoregressive Decision Engine",
+        "Multilingual, non-autoregressive System 1 decision engine. Typed decisions over 100+ \
+         languages in a single forward pass (33ms). Trained with RLCD (reinforcement learning \
+         against strictly proper scoring rules). Three checkpoints: English (ModernBERT-large, 421M), \
+         Multilingual (mmBERT-base, 322M), Typed-Decisions. Router picks optimal checkpoint per request.",
+    ).with_key_insights(vec![
+        "Single forward pass evaluation: 33ms for one question, 7.2ms/question batched on T4",
+        "Three primitives: choice (classification), score (ordinal), noul (P(true) calibration)",
+        "Router detects script/language in <0.5ms before forward pass, dispatches to optimal checkpoint",
+        "RLCD training: strictly proper scoring rules produce statistically meaningful confidence scores",
+        "Fine-tuned checkpoint beats Jev by 3.9 points on typed-decisions (0.766 vs 0.727)",
+        "Calibrated ECE: 0.081 after temperature fitting (3x better than base 0.213)",
+    ]).with_tags(vec![
+        "decision-engine", "classification", "multilingual", "non-autoregressive",
+        "rlcd", "calibration", "router", "bert",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.85).with_confidence(0.9))?;
+    ids.push(r.node_id);
+
+    // ── 5. Cutter — Reverse engineering platform (19.7k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "rizinorg", "cutter",
+        "rizinorg/cutter — Cutter: Free Open Source RE Platform",
+        "Free and open-source reverse engineering platform powered by rizin. Advanced and \
+         customizable RE platform with GUI. Supports Python and Native C++ plugins. \
+         Integrates Ghidra decompiler, DynamoRIO code coverage visualization. \
+         Cross-platform: Linux, macOS, Windows. 19.7k stars.",
+    ).with_key_insights(vec![
+        "Plugin architecture: Python and Native C++ plugins for extensibility",
+        "Rizin-powered backend with advanced binary analysis capabilities",
+        "Ghidra decompiler integration via rz-ghidra plugin",
+        "Cross-platform GUI for reverse engineering workflows",
+    ]).with_tags(vec![
+        "reverse-engineering", "binary-analysis", "rizin", "ghidra",
+        "security", "plugins", "gui",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.75).with_confidence(0.9))?;
+    ids.push(r.node_id);
+
+    // ── 6. maka-cu — macOS Computer Use execution layer (17★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "maka-agent", "maka-cu",
+        "maka-agent/maka-cu — Maka Computer Use: Native macOS Execution Layer",
+        "Native macOS execution layer for Maka's Computer Use. Forked from iFurySt/open-codex-computer-use. \
+         Accessibility snapshot as core capability. Action binding: actions bound to observation they were \
+         planned against, single-use, spent actions refused. Full Anthropic computer_20251124 action contract. \
+         SkyLight background-click path and app discovery. Swift Package with embedded plugins.",
+    ).with_key_insights(vec![
+        "Accessibility snapshot as core observation primitive for computer use",
+        "Action binding: actions are single-use, bound to the observation they were planned against",
+        "Anthropic computer_20251124 action contract support for multi-model compatibility",
+        "SkyLight private API bridge for background click events without focus stealing",
+        "WebContent/renderer elements bound to real process generation with stale refetch",
+    ]).with_tags(vec![
+        "computer-use", "macos", "accessibility", "swift",
+        "agent-execution", "sky-light", "action-binding",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.70).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 7. jev-skill — Jev use cases and agent skills (85★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "wuyoscar", "jev-skill",
+        "wuyoscar/jev-skill — Awesome Jev Skills: Decision-Making for Agents",
+        "Collection of Jev use cases, workflows, and agent skills. 90 scenarios, 9 installable \
+         skills, 14 recorded API examples. Jev is a typed decision model that chooses, classifies, \
+         and scores. Skills cover: agent supervision, routing, browser interaction, inbox triage, \
+         document evidence, data tools, creative tools. Supports choice/score/noul primitives.",
+    ).with_key_insights(vec![
+        "90 decision scenarios across 8 domains: agents, review, routing, interaction, business, documents, data, creative",
+        "Three decision primitives: choice (one option), score (graded levels), noul (P(true) yes/no)",
+        "Agent skills: jev, jev-triage, jev-documents, jev-ui, jev-route, jev-context, jev-code-review, jev-find-code, jev-simulation",
+        "Goal-drift checkpoint, stuck-loop recovery, completion evidence check patterns",
+        "Model tier routing: small_text / reasoning / vision / cannot_route",
+        "Parallel independent judgments: multiple questions over shared state in one request",
+    ]).with_tags(vec![
+        "jev", "decision-engine", "agent-skills", "classification",
+        "triage", "routing", "workflows",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.80).with_confidence(0.9))?;
+    ids.push(r.node_id);
+
+    // Cross-link related repos
+    let _ = ingester.relate_by_title(
+        "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
+        "incoai/splash — Splash: Local Inference Engine for Apple Silicon",
+        RelationType::Related, 0.7,
+        Some("OpenHuman can use Splash as local inference backend"),
+    );
+    let _ = ingester.relate_by_title(
+        "wuyoscar/jev-skill — Awesome Jev Skills: Decision-Making for Agents",
+        "NandhaKishorM/laya — Laya: Non-Autoregressive Decision Engine",
+        RelationType::Related, 0.8,
+        Some("Jev and Laya are competing/complementary typed decision engines"),
+    );
+    let _ = ingester.relate_by_title(
+        "maka-agent/maka-cu — Maka Computer Use: Native macOS Execution Layer",
+        "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
+        RelationType::Related, 0.6,
+        Some("Maka-CU provides computer use primitives applicable to agent harnesses"),
+    );
+
+    info!("[crystal-core-repos] Absorbed {} repo nodes", ids.len());
+    Ok(ids)
+}
+
+/// Absorb the personal-ai ecosystem — key repos from the GitHub personal-ai topic.
+///
+/// These represent the landscape of personal AI agents, local-first memory systems,
+/// and agent orchestration platforms that NeoTrix competes with and can learn from.
+fn ingest_personal_ai_ecosystem(ingester: &mut ResourceIngester) -> Result<Vec<String>, String> {
+    let mut ids = Vec::new();
+
+    // ── 1. LifeOS — Universal AI Harness (19.1k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "danielmiessler", "LifeOS",
+        "danielmiessler/LifeOS — LifeOS: Universal AI Harness",
+        "The universal AI Harness designed to move you from Current to Ideal state in both life and work. \
+         Productivity framework with AI augmentation, intent engineering, and life/work optimization.",
+    ).with_key_insights(vec![
+        "Current-to-Ideal state transformation framework for life and work",
+        "Intent engineering: structured approach to AI-directed personal productivity",
+        "AI harness pattern: orchestrating multiple AI tools for personal goals",
+    ]).with_tags(vec![
+        "personal-ai", "productivity", "intent-engineering", "life-harness",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.80).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 2. OpenBiliClaw — Cross-platform AI content discovery (3.3k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "whiteguo233", "OpenBiliClaw",
+        "whiteguo233/OpenBiliClaw — Cross-platform AI Content Discovery Agent",
+        "Local-first open-source cross-platform AI content discovery agent. Understands you, then \
+         proactively finds content across Bilibili, Xiaohongshu, Douyin, YouTube, X, Zhihu, Reddit, \
+         Weibo and the open web. Supports deepseek harness plugin.",
+    ).with_key_insights(vec![
+        "Local-first content discovery across 8+ platforms (Bilibili, YouTube, Reddit, etc.)",
+        "User-understanding-first approach: learns preferences before proactive discovery",
+        "DeepSeek harness plugin support for model flexibility",
+    ]).with_tags(vec![
+        "personal-ai", "content-discovery", "cross-platform", "local-first",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.75).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 3. Bitterbot — Mesh of agents (2.5k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "Bitterbot-AI", "bitterbot-desktop",
+        "Bitterbot-AI/bitterbot-desktop — Bitterbot: Agent Mesh for Collective Capability",
+        "A mesh of agents that turns shared experience into collective capability. Desktop app with \
+         P2P agent communication, cognitive architecture, skills marketplace, local-first design, \
+         agent economy with x402 payments, and dream engine.",
+    ).with_key_insights(vec![
+        "Agent mesh: P2P communication between agents for collective intelligence",
+        "Skills marketplace: agents share and trade capabilities",
+        "Dream engine: background processing and insight generation",
+        "x402 payment protocol for agent economy",
+    ]).with_tags(vec![
+        "personal-ai", "agent-mesh", "p2p", "cognitive-architecture",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.75).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 4. Memmy Agent — Personal memory hub (2k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "MemTensor", "memmy-agent",
+        "MemTensor/memmy-agent — Memmy: Personal AI Memory Hub",
+        "A personal AI agent and local memory hub for all AI agents. Gives every AI one shared, \
+         fully controlled memory and persistent context — all AI remember the same you. Supports \
+         Claude Code, Codex, OpenClaw and Hermes Agent.",
+    ).with_key_insights(vec![
+        "Shared memory hub: all AI agents share one persistent memory of the user",
+        "Cross-agent memory: Claude Code, Codex, OpenClaw, Hermes all share context",
+        "Local-first: fully controlled memory on user's device",
+    ]).with_tags(vec![
+        "personal-ai", "memory-hub", "persistent-context", "cross-agent",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.80).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 5. Personal Model — Build your HUMAN.md (1.3k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "Intuition-Lab", "personal-model",
+        "Intuition-Lab/personal-model — Personal Model: Build Your HUMAN.md",
+        "Build your HUMAN.md — a structured representation of yourself for AI agents. Local-first, \
+         privacy-focused, MCP-compatible personal model for agent context.",
+    ).with_key_insights(vec![
+        "HUMAN.md: structured user model for AI agent personalization",
+        "MCP-compatible personal model for cross-agent context sharing",
+        "Privacy-first: local storage, user-controlled data",
+    ]).with_tags(vec![
+        "personal-ai", "personal-model", "human-md", "mcp",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.75).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 6. FYAgent — Digital persona (1.1k★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "fy-agent", "fyagent",
+        "fy-agent/fyagent — FYAgent: Digital Persona for AI Era",
+        "For You Agent — AI时代的个人随身数字人格. Your model, AI accounts, skills, prompts, and \
+         workflow methods, carried into every AI tool. Rust + Tauri cross-platform desktop app.",
+    ).with_key_insights(vec![
+        "Digital persona: portable identity across AI tools",
+        "Skill and prompt management for consistent agent behavior",
+        "Cross-platform (Rust/Tauri) with MCP integration",
+    ]).with_tags(vec![
+        "personal-ai", "digital-persona", "prompt-management", "cross-platform",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.75).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 7. Elephant Agent — Self-evolving AI (585★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "agentic-in", "elephant-agent",
+        "agentic-in/elephant-agent — Elephant: Personal-Model First Self-Evolving Agent",
+        "Personal-Model First Self-Evolving AI Agent. Agent with memory, model management, \
+         context awareness, and self-evolution capabilities.",
+    ).with_key_insights(vec![
+        "Self-evolution: agent improves its own capabilities over time",
+        "Personal-model first: user's model drives agent behavior",
+        "Memory and context awareness for persistent agent state",
+    ]).with_tags(vec![
+        "personal-ai", "self-evolution", "agent-memory", "agentic",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.70).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // ── 8. Sentient OS — On-device proactive intelligence (518★) ──
+    let r = ingester.ingest(&ResourceDescriptor::github(
+        "Sentient-OS-Labs", "sentient-os",
+        "Sentient-OS-Labs/sentient-os — Sentient OS: On-device Proactive Intelligence",
+        "An on-device LLM that understands your entire life, then proactively offers to get your \
+         work done through computer use. macOS native, privacy-first, MCP-compatible, with \
+         knowledge base and proactive intelligence layer.",
+    ).with_key_insights(vec![
+        "Proactive intelligence: agent anticipates needs and offers to act",
+        "On-device LLM for full life understanding without cloud dependency",
+        "Computer use integration for autonomous task execution",
+    ]).with_tags(vec![
+        "personal-ai", "proactive-intelligence", "on-device", "computer-use",
+        &format!("absorbed-{}", now()),
+    ]).with_importance(0.75).with_confidence(0.85))?;
+    ids.push(r.node_id);
+
+    // Cross-link ecosystem repos
+    let _ = ingester.relate_by_title(
+        "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
+        "MemTensor/memmy-agent — Memmy: Personal AI Memory Hub",
+        RelationType::Related, 0.8,
+        Some("Both implement local-first persistent memory for personal AI"),
+    );
+    let _ = ingester.relate_by_title(
+        "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
+        "danielmiessler/LifeOS — LifeOS: Universal AI Harness",
+        RelationType::Related, 0.7,
+        Some("LifeOS and OpenHuman both aim to be comprehensive personal AI platforms"),
+    );
+
+    info!("[personal-ai-ecosystem] Absorbed {} ecosystem nodes", ids.len());
+    Ok(ids)
 }
 
 #[cfg(test)]

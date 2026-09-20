@@ -1,7 +1,7 @@
 //! 简单的进化测试 - 执行 S-06 流程
-use neotrix::neotrix::nt_mind::self_evolver::SelfEvolver;
-use neotrix::neotrix::nt_mind::self_iterating::ReasoningBrain;
-use neotrix::neotrix::nt_mind::memory::ReasoningBank;
+use neotrix::nt_mind::self_evolver::SelfEvolver;
+use neotrix::nt_mind::self_iterating::ReasoningBrain;
+use neotrix::nt_mind::memory::ReasoningBank;
 use std::path::PathBuf;
 
 fn main() {

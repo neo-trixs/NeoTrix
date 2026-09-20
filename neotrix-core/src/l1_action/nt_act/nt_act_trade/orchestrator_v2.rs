@@ -397,7 +397,7 @@ impl WorkerPool {
         }
     }
 
-    async fn execute_task(
+    pub async fn execute_task(
         &self,
         task: &TradeTask,
         worker_type: &WorkerType,

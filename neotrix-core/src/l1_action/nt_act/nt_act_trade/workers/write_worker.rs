@@ -89,6 +89,7 @@ impl TradeWorker for WriteWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     fn make_worker() -> WriteWorker {
         WriteWorker::new("write_test")

@@ -251,7 +251,7 @@ impl crate::l0_substrate::nt_core_self_test::SelfTest for InnerCritic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l5_cognition::nt_core_consciousness::vsa_tag::{
+    use crate::l5_cognition::vsa_tag::{
         VsaOrigin, VsaSelfCategory, VsaWorldCategory,
     };
     use crate::l5_cognition::nt_core_consciousness::SpeciousPresent;

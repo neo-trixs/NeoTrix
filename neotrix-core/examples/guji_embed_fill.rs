@@ -2,7 +2,7 @@
 //! 用法: cargo run -p neotrix --example guji_embed_fill
 use std::path::PathBuf;
 
-use neotrix::neotrix::nt_memory_kb::nt_memory_embed::{
+use neotrix::l4_emotion::nt_memory::nt_memory_kb::nt_memory_embed::{
     EmbedMode, EmbeddingConfig, build_node_text, embed_text, store_embedding,
 };
 

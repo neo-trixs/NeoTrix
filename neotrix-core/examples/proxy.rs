@@ -25,17 +25,17 @@ async fn main() {
     println!("│  NeoTrix Smart Proxy                         │");
     println!("│  纯 Rust 智能路由 · 无需外部依赖               │");
     println!("╰──────────────────────────────────────────────╯");
-    println!("  📄 配置: {}", neotrix::neotrix::nt_shield_stealth_net::config::config_file_path());
+    println!("  📄 配置: {}", neotrix::nt_shield_stealth_net::config::config_file_path());
 
     // 1. 启动 Tor/Arti（后台安装）
-    let tor = Arc::new(neotrix::neotrix::nt_shield_stealth_net::local_proxy::TorManager::new());
+    let tor = Arc::new(neotrix::nt_shield_stealth_net::local_proxy::TorManager::new());
     let tor_bg = tor.clone();
     tokio::spawn(async move {
         tor_bg.auto_install_and_start().await;
     });
 
     // 2. 设置系统代理 (macOS networksetup)
-    let sys_proxy = Arc::new(neotrix::neotrix::nt_shield_stealth_net::system_proxy::SystemProxyManager::new());
+    let sys_proxy = Arc::new(neotrix::nt_shield_stealth_net::system_proxy::SystemProxyManager::new());
     match sys_proxy.enable().await {
         Ok(_) => println!("  ✅ 系统代理已设置 → HTTP :{}", c.proxy.local_port),
         Err(e) => eprintln!("  ⚠ 系统代理: {e}"),
@@ -44,8 +44,8 @@ async fn main() {
     sys_proxy.clone().install_shutdown_handler().await;
 
     // 3. 启动本地 HTTP CONNECT 代理
-    let engine = neotrix::neotrix::nt_shield_stealth_net::rules::RuleEngine::new();
-    let proxy = neotrix::neotrix::nt_shield_stealth_net::local_proxy::LocalProxy::new()
+    let engine = neotrix::nt_shield_stealth_net::rules::RuleEngine::new();
+    let proxy = neotrix::nt_shield_stealth_net::local_proxy::LocalProxy::new()
         .with_rule_engine(Arc::new(tokio::sync::RwLock::new(engine)));
     let proxy = Arc::new(proxy);
     let p = proxy.clone();
@@ -56,7 +56,7 @@ async fn main() {
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     // 4. 代理 IP 池 — 启动健康检测 + 默认订阅
-    let pool = neotrix::neotrix::nt_shield_stealth_net::proxy_pool::global_pool();
+    let pool = neotrix::nt_shield_stealth_net::proxy_pool::global_pool();
     // 用户可在此处添加订阅地址
     // pool.fetch_subscription("https://your-sub-url").await.ok();
     let pool_hc = pool.clone();
@@ -68,9 +68,9 @@ async fn main() {
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_secs(10)).await; // 等待 arti 启动
         for _ in 0..3 {
-            if neotrix::neotrix::nt_shield_stealth_net::local_proxy::TorManager::socks5_reachable().await {
+            if neotrix::nt_shield_stealth_net::local_proxy::TorManager::socks5_reachable().await {
                 // 通过 Google 预热 Tor 电路
-                let _ = neotrix::neotrix::nt_shield_stealth_net::local_proxy::tor_connect("www.google.com", 443);
+                let _ = neotrix::nt_shield_stealth_net::local_proxy::tor_connect("www.google.com", 443);
                 break;
             }
             tokio::time::sleep(Duration::from_secs(5)).await;

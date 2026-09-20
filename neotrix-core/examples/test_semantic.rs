@@ -1,6 +1,6 @@
 fn main() {
-    use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
-    use neotrix::neotrix::nt_memory_kb::nt_memory_embed::EmbeddingConfig;
+    use neotrix::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+    use neotrix::l4_emotion::nt_memory::nt_memory_kb::nt_memory_embed::EmbeddingConfig;
     let cfg = EmbeddingConfig::default();
     let kb = KnowledgeBase::open(None).expect("open").with_embedding(cfg);
     let r = kb.pq_search("深度学习注意力机制", 5);

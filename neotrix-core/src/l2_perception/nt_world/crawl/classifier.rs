@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::config::{CrawlTopic, CrawlFormat};
-use super::discover::DiscoveryExtractor;
 use crate::l2_perception::nt_world::l1_facade::{IoLlmProvider as LlmProvider, IoLlmRequest as LlmRequest};
 
 #[derive(Debug, Clone)]

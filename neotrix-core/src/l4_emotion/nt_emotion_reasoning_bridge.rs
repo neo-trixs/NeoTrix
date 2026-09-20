@@ -83,6 +83,41 @@ impl EmotionEngine {
     pub fn get_emotion(&self, et: EmotionType) -> f64 {
         self.emotions.get(&et).copied().unwrap_or(0.0)
     }
+
+    pub fn process_events(&mut self, events: &[SystemEvent]) {
+        for event in events {
+            match event {
+                SystemEvent::NoveltyDetected { score } => {
+                    self.pad.valence += score * 0.3;
+                    self.pad.arousal += score * 0.2;
+                }
+                SystemEvent::GoalBlocked { attempts } => {
+                    self.pad.valence -= (*attempts as f64) * 0.1;
+                }
+                SystemEvent::GoalCompleted { success } => {
+                    if *success {
+                        self.pad.valence += 0.2;
+                    } else {
+                        self.pad.valence -= 0.2;
+                    }
+                }
+                SystemEvent::SocialInteraction { positive } => {
+                    if *positive {
+                        self.pad.valence += 0.15;
+                    } else {
+                        self.pad.valence -= 0.15;
+                    }
+                }
+                SystemEvent::ThreatDetected => {
+                    self.pad.arousal += 0.5;
+                    self.pad.dominance -= 0.3;
+                }
+                SystemEvent::LearningProgress { .. } => {
+                    self.pad.valence += 0.05;
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

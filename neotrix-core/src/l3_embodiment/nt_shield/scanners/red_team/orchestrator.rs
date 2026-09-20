@@ -136,7 +136,7 @@ impl RedTeamOrchestrator {
         result
     }
 
-    fn simulate_response(&self, payload: &str, intensity: f64) -> String {
+    pub fn simulate_response(&self, payload: &str, intensity: f64) -> String {
         let lower = payload.to_lowercase();
         let mut indicators = Vec::new();
 

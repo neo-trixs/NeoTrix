@@ -964,7 +964,7 @@ mod tests {
 
     #[test]
     fn test_generate_recommendations() {
-        let ti = TradeIntelligence::new();
+        let mut ti = TradeIntelligence::new();
         let input = make_test_input();
         let mut output = ti.analyze(&input);
         // Re-generate with actual output

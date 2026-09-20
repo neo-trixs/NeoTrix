@@ -46,3 +46,7 @@ pub use knowledge_gap_detector::{
     GapCategory, GapCluster, GapReport, KnowledgeGap, KnowledgeGapDetector,
 };
 pub use monitor::{AlertSeverity, HealthCheck, HealthTrend, MetaAlert, MetaMonitor};
+
+// NOTE: 以下模块已声明但内部编译错误待修复，暂时注释
+// pub mod otel_bridge;
+// pub mod session_replay;

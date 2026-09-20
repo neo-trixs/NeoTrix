@@ -3,7 +3,7 @@
 //! 展示 run_seal_loop() 如何根据任务调整能力向量
 //! 展示 ReasoningBank 如何存储和检索记忆
 
-use neotrix::neotrix::nt_mind::{
+use neotrix::nt_mind::{
     SelfIteratingBrain, ReasoningBank, ReasoningMemory, SelfEdit,
 };
 use neotrix::neotrix::nt_world_model::TaskType;

@@ -659,11 +659,12 @@ mod tests {
             &self,
             _query: &str,
         ) -> Pin<Box<dyn Future<Output = Result<IntelResult, String>> + Send>> {
-            Box::pin(async {
+            let id = self.id.clone();
+            Box::pin(async move {
                 Ok(IntelResult {
                     items: vec![],
                     total: 0,
-                    source_id: self.id.clone(),
+                    source_id: id,
                 })
             })
         }

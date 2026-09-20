@@ -11,8 +11,6 @@ use tokio::sync::RwLock;
 
 use super::agent::{Agent, AgentError, AgentHealth, AgentMetrics, AgentStatus};
 use super::error::{PlatformError, PlatformResult};
-#[cfg(not(test))]
-use super::health::HealthChecker;
 use super::metrics::MetricsCollector;
 use crate::l0_substrate::nt_core_capability_types::{Domain, Layer};
 

@@ -37,3 +37,6 @@ pub mod nt_io_context_mgmt;
 
 // JSON-first declarative agent configuration (crewAI pattern)
 pub mod nt_core_agent_config;
+
+/// Trade Intelligence — market analysis, strategy recommendation engine.
+pub mod trade_intelligence;

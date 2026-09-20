@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use neotrix::neotrix::nt_mind::knowledge_engine::*;
+use neotrix::nt_mind::knowledge_engine::*;
 use std::collections::HashMap;
 
 fn main() {

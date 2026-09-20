@@ -43,6 +43,60 @@
 
 ---
 
+## 🔴 Agent Guardrail 架构升级 (2026-09-20)
+> 解决 AI 对话过程中违反规则的问题
+> 方案文件: `docs/plans/2026-09-20-agent-guardrail-architecture.md`
+> 参考: AEGIS (336★), GuardRail (172★), AgentJail (85★), AgentGuard, LITMUS
+
+### ⬜ ag-1: 实现 Pre-Execution Firewall 核心框架
+**优先级**: 🔴 High | **状态**: pending
+文件: `neotrix-core/src/l2_perception/nt_shield/pre_execution_firewall.rs` (新建)
+操作: 创建 5-stage pipeline (Classify → Anomaly → Evaluate → Match DSL → Decide)
+参考: AEGIS architecture
+
+### ⬜ ag-2: 实现 5 个核心 Guards
+**优先级**: 🔴 High | **状态**: pending | **依赖**: ag-1
+Guards:
+- main_push_guard (禁止 push 到 protected branches)
+- force_push_guard (禁止 force push)
+- destructive_path_guard (禁止 rm -rf 系统路径)
+- secret_leak_guard (检测 API key 泄漏)
+- sql_injection_guard (检测 SQL 注入)
+参考: GuardRail 18 guards
+
+### ⬜ ag-3: 实现 Policy DSL 解析器
+**优先级**: 🔴 High | **状态**: pending
+文件: `neotrix-core/src/l2_perception/nt_shield/policy_engine.rs` (新建)
+操作: 解析 nt-policies.yaml，执行策略匹配
+参考: AEGIS Policy DSL, AgentJail OPA Rego
+
+### ⬜ ag-4: 创建 nt-policies.yaml 策略文件
+**优先级**: 🟡 Medium | **状态**: pending | **依赖**: ag-3
+文件: `nt-policies.yaml` (根目录)
+内容: 定义核心策略规则
+
+### ⬜ ag-5: 实现 Audit Log (SHA-256 hash chain)
+**优先级**: 🟡 Medium | **状态**: pending
+文件: `neotrix-core/src/l2_perception/nt_shield/audit_log.rs` (新建)
+操作: 不可篡改审计日志，每次决策记录 hash chain
+
+### ⬜ ag-6: 实现 Human Approval Queue
+**优先级**: 🟡 Medium | **状态**: pending | **依赖**: ag-3
+文件: `neotrix-core/src/l2_perception/nt_shield/approval_queue.rs` (新建)
+操作: 高风险操作需要人工审批
+
+### ⬜ ag-7: 集成到 Agent 执行循环
+**优先级**: 🔴 High | **状态**: pending | **依赖**: ag-1, ag-3
+操作: 在 Agent 执行 tool call 前调用 firewall.check()
+文件: Agent 执行循环相关文件
+
+### ⬜ ag-8: Physical-Layer Verification 原型
+**优先级**: 🟢 Low | **状态**: pending
+操作: 验证实际系统状态，检测 Execution Hallucination
+参考: LITMUS semantic-physical dual verification
+
+---
+
 ## 🔴 Bend 语言吸收 — NT-LAWS 设计 (2026-09-20)
 > 吸收自 https://github.com/bend-lang/bend (22K★)，核心启发：LAWS.bend + 数学证明机制
 > 方案文件: `docs/plans/2026-09-20-bend-absorption-analysis.md`
@@ -235,6 +289,118 @@ cargo test -p neotrix --tests       # 集成测试通过
 **优先级**: 🟡 Medium | **状态**: pending | **依赖**: ct-1~ct-4
 文件: `nt_core_capability_tree/src/roadmap.rs`
 操作: 将 41 个模块的 maturity 从 C1UnitTest 改为 C2IntegrationTest
+
+---
+
+## 🔴 P0: 紧急修复 — 编译验证 (2026-09-20)
+
+### ⬜ TODO-001: 验证编译状态
+**优先级**: 🔴 P0 | **状态**: pending
+描述: 运行 cargo clean && cargo check 验证当前编译状态
+命令:
+```bash
+cargo clean -p neotrix
+cargo check -p neotrix 2>&1 | tail -50
+```
+验收标准: 编译通过或错误数明确
+耗时: ~5 分钟
+
+---
+
+## 🟡 P1: 高优先级 — 本周任务 (2026-09-20)
+
+### ⬜ TODO-007: 修复 SelfIteratingBrain FIXME
+**优先级**: 🟡 P1 | **状态**: pending
+描述: select_operator / selective_state 字段被注释
+涉及文件:
+- `l5_cognition/nt_mind/seal_core/self_iterating/pipeline.rs:1015`
+- `l5_cognition/nt_mind/seal_core/self_iterating/loop_impl/seal_loop.rs:1211`
+耗时: ~30 分钟
+
+### ⬜ TODO-010: 提升 L2 测试覆盖率
+**优先级**: 🟡 P1 | **状态**: pending
+描述: 从 62% 提升到 70%+
+涉及目录: `neotrix-core/src/l2_perception/`
+步骤:
+1. 找出没有测试的文件
+2. 为每个文件添加基本单元测试
+3. 运行 cargo test 验证
+耗时: ~2 小时
+
+### ⬜ TODO-011: 修复剩余编译错误
+**优先级**: 🟡 P1 | **状态**: pending
+描述: 164 个预存错误需要修复
+重点区域:
+- `l2_perception/nt_world/` (导入错误)
+- `l4_emotion/nt_memory/` (类型错误)
+- `l5_cognition/nt_mind/` (路径错误)
+耗时: ~4 小时
+
+### ⬜ TODO-012: 清理 neotrix-core/src/neotrix/ 命名空间
+**优先级**: 🟡 P1 | **状态**: pending
+描述: 110 个文件在遗留命名空间中
+涉及目录: `neotrix-core/src/neotrix/`
+耗时: ~4 小时
+
+---
+
+## ⚪ P2: 中优先级 — 本月任务 (2026-09-20)
+
+### ⬜ TODO-013: 解决 fusion-plan-215 TODO
+**优先级**: ⚪ P2 | **状态**: pending
+描述: 合并 EchoPrmBridge 和 MethodRegistry
+涉及文件:
+- `echo_terminal.rs:406`
+- `reasoning_core.rs:66`
+耗时: ~2 小时
+
+### ⬜ TODO-014: 删除 neotrix-consciousness/src/legacy.rs
+**优先级**: ⚪ P2 | **状态**: pending
+描述: 所有消费者迁移到新路径后删除
+前提: 所有使用旧路径的代码已更新
+耗时: ~1 小时
+
+### ⬜ TODO-015: 添加文档注释
+**优先级**: ⚪ P2 | **状态**: pending
+描述: 78.5% 公共项未文档化
+涉及目录: 整个 neotrix-core/src/
+耗时: ~8 小时
+
+### ⬜ TODO-016: 修复 L4→L5 层次违规
+**优先级**: ⚪ P2 | **状态**: pending
+描述: nt_feel/emotion_engine.rs 导入 l5_cognition::l1_facade::emotion_state
+涉及文件:
+- `l4_emotion/nt_feel/emotion_engine.rs`
+- `l4_emotion/nt_emotion_facade.rs`
+- `l4_emotion/nt_memory_kb/mod.rs`
+耗时: ~1 小时
+
+---
+
+## ⚪ P3: 低优先级 — 积压任务 (2026-09-20)
+
+### ⬜ TODO-017: 解决 29 个 TODO 注释
+**优先级**: ⚪ P3 | **状态**: pending
+描述: 生产代码中的 TODO 注释
+耗时: ~4 小时
+
+### ⬜ TODO-018: 修复 nt_codegen.rs:165
+**优先级**: ⚪ P3 | **状态**: pending
+描述: 生成 `// TODO: implement system logic` 作为代码输出
+涉及文件: `nt_codegen.rs:165`
+耗时: ~30 分钟
+
+### ⬜ TODO-019: 实现 McpRegistry.gateway()
+**优先级**: ⚪ P3 | **状态**: pending
+描述: 2 个 FIXME 关于此功能
+涉及文件: `agent_cmds.rs:408,520`
+耗时: ~2 小时
+
+### ⬜ TODO-020: 整理 nt_core_capability_tree
+**优先级**: ⚪ P3 | **状态**: pending
+描述: 嵌入式路径 crate 需要评估
+涉及目录: `neotrix-core/src/neotrix/nt_core_capability_tree/`
+耗时: ~1 小时
 
 ---
 

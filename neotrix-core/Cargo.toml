@@ -206,22 +206,6 @@ tokio = { version = "1", features = ["macros", "rt"] }
 uniffi = { version = "0.28", features = ["build"] }
 
 [[bench]]
-name = "core_bench"
-harness = false
-
-[[bench]]
-name = "vector_ops"
-harness = false
-
-[[bench]]
-name = "seal_loop"
-harness = false
-
-[[bench]]
-name = "capability_c3"
-harness = false
-
-[[bench]]
 name = "shield_c3"
 harness = false
 
@@ -230,19 +214,7 @@ name = "repair_c3"
 harness = false
 
 [[bench]]
-name = "memory_c3"
-harness = false
-
-[[bench]]
 name = "act_c3"
-harness = false
-
-[[bench]]
-name = "affective_c3"
-harness = false
-
-[[bench]]
-name = "real_tasks"
 harness = false
 
 [[bench]]
@@ -251,10 +223,6 @@ harness = false
 
 [[bench]]
 name = "security_bench"
-harness = false
-
-[[bench]]
-name = "cognition_bench"
 harness = false
 
 [features]
@@ -286,14 +254,6 @@ desktop = []
 [[example]]
 name = "evolve"
 path = "examples/evolve.rs"
-
-[[example]]
-name = "absorption_loop_200"
-path = "examples/absorption_loop_200.rs"
-
-[[example]]
-name = "guji_llm_pool_test"
-path = "examples/guji_llm_pool_test.rs"
 
 [[example]]
 name = "guji_embed_fill"

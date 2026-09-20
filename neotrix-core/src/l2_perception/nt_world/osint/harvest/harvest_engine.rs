@@ -159,6 +159,7 @@ mod tests {
     fn test_compute_risk_score_high() {
         use super::super::email_harvester::{EmailResult, EmailSource};
         use super::super::subdomain_harvester::{SubdomainResult, SubdomainSource};
+        use chrono::Utc;
         let emails: Vec<EmailResult> = (0..20)
             .map(|i| EmailResult::new(format!("u{i}@x.com"), EmailSource::Dns, 0.9))
             .collect();
@@ -183,6 +184,8 @@ mod tests {
 
     #[test]
     fn test_harvest_report_compute_totals() {
+        use super::super::email_harvester::{EmailResult, EmailSource};
+        use super::super::subdomain_harvester::{SubdomainResult, SubdomainSource};
         let mut r = HarvestReport::new("test.com".into());
         r.emails = vec![
             EmailResult::new("a@test.com".into(), EmailSource::Dns, 0.9),
@@ -192,7 +195,7 @@ mod tests {
             SubdomainResult {
                 subdomain: "api.test.com".into(),
                 ip_addresses: vec!["1.1.1.1".into()],
-                source: super::super::subdomain_harvester::SubdomainSource::CrtSh,
+                source: SubdomainSource::CrtSh,
             },
         ];
         r.compute_totals();

@@ -3,7 +3,7 @@
 //! 展示如何使用 mcp_tools.rs 中的工具
 //! 模拟 Playwright 验证和 cua 检查
 
-use neotrix::neotrix::nt_mind::{ReasoningBrain, ReasoningBank, KnowledgeSource};
+use neotrix::nt_mind::{ReasoningBrain, ReasoningBank, KnowledgeSource};
 use neotrix::neotrix::nt_world_model::TaskType;
 use colored::Colorize;
 use std::sync::{Arc, RwLock};

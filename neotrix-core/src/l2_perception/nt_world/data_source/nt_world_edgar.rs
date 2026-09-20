@@ -469,7 +469,7 @@ impl EdgarBackend {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn with_base_url(base: &str) -> Self {
+    pub fn with_base_url(_base: &str) -> Self {
         Self { }
     }
 }

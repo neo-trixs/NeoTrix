@@ -613,6 +613,11 @@ impl Camera2D {
         self
     }
 
+    pub fn with_smoothing(mut self, smoothing: f32) -> Self {
+        self.smoothing = smoothing;
+        self
+    }
+
     pub fn with_limits(mut self, min_x: f32, max_x: f32, min_y: f32, max_y: f32) -> Self {
         self.limits = CameraLimits {
             min_x,

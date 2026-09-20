@@ -221,7 +221,7 @@ impl SafetyMonitor {
         aggression: f32,
         cooperativeness: f32,
         curiosity: f32,
-        tick: u64,
+        _tick: u64,
     ) {
         let metrics = self.agents.entry(agent_id.to_string()).or_insert_with(|| {
             AgentMetrics::new(
@@ -236,7 +236,6 @@ impl SafetyMonitor {
             aggression,
             cooperativeness,
             curiosity,
-            tick,
         });
     }
 

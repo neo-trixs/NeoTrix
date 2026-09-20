@@ -1,3 +1,10 @@
+#![warn(clippy::all, clippy::pedantic)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc,
+    reason = "CLI entry point — pedantic false-positives"
+)]
+
 mod entry;
 
 use clap::{Parser, Subcommand, CommandFactory};

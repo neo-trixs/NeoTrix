@@ -8,8 +8,8 @@
 //! 防递归: worker 是独立 #[test], 第一行检查 env 未设则立即 return ——
 //! 常规全量跑测时 worker 为空操作; 父进程经 `--exact` 让子进程只运行 worker 自身。
 
-use neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-use neotrix::l1_action::nt_memory::nt_memory_kb::nt_field_ledger;
+use neotrix::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+use neotrix::l4_emotion::nt_memory::nt_memory_kb::nt_field_ledger;
 
 /// worker 模式开关 env (存在即 worker 进程)
 const ENV_WORKER: &str = "G3_T4_WORKER_ID";

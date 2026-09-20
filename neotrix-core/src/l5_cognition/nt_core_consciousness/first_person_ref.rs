@@ -104,7 +104,7 @@ mod tests {
         let world_tagged = VsaTagged::new(
             QuantizedVSA::random_binary(),
             VsaOrigin::World(
-                crate::l5_cognition::nt_consciousness::VsaWorldCategory::UserInput,
+                crate::l5_cognition::vsa_tag::VsaWorldCategory::UserInput,
             ),
         );
         assert!(!fpr.is_self_coherent(&world_tagged));
