@@ -51,11 +51,35 @@ pub fn onboarding_check_prereqs() -> IpcResponse<OnboardingStatus> {
         check_tool("git", "git", "--version", Some("brew install git"), true),
         check_tool("node", "node", "--version", Some("brew install node"), true),
         check_tool("npm", "npm", "--version", Some("brew install npm"), true),
-        check_tool("cargo", "cargo", "--version", Some("curl https://sh.rustup.rs -sSf | sh"), true),
+        check_tool(
+            "cargo",
+            "cargo",
+            "--version",
+            Some("curl https://sh.rustup.rs -sSf | sh"),
+            true,
+        ),
         check_tool("rustc", "rustc", "--version", None, true),
-        check_tool("python3", "python3", "--version", Some("brew install python3"), false),
-        check_tool("ffmpeg", "ffmpeg", "-version", Some("brew install ffmpeg"), false),
-        check_tool("ollama", "ollama", "--version", Some("brew install ollama"), false),
+        check_tool(
+            "python3",
+            "python3",
+            "--version",
+            Some("brew install python3"),
+            false,
+        ),
+        check_tool(
+            "ffmpeg",
+            "ffmpeg",
+            "-version",
+            Some("brew install ffmpeg"),
+            false,
+        ),
+        check_tool(
+            "ollama",
+            "ollama",
+            "--version",
+            Some("brew install ollama"),
+            false,
+        ),
     ];
 
     let all_required_met = prerequisites
@@ -66,7 +90,9 @@ pub fn onboarding_check_prereqs() -> IpcResponse<OnboardingStatus> {
     let system = SystemInfo {
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
-        hostname: hostname::get().ok().map(|h| h.to_string_lossy().to_string()),
+        hostname: hostname::get()
+            .ok()
+            .map(|h| h.to_string_lossy().to_string()),
     };
 
     ipc::ok(OnboardingStatus {
@@ -85,20 +111,19 @@ fn config_dir_exists() -> bool {
 }
 
 /// Check a single tool
-fn check_tool(name: &str, cmd: &str, version_flag: &str, install_hint: Option<&str>, required: bool) -> Prerequisite {
-    let output = Command::new(cmd)
-        .arg(version_flag)
-        .output();
+fn check_tool(
+    name: &str,
+    cmd: &str,
+    version_flag: &str,
+    install_hint: Option<&str>,
+    required: bool,
+) -> Prerequisite {
+    let output = Command::new(cmd).arg(version_flag).output();
 
     match output {
         Ok(output) if output.status.success() => {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            let version = stdout
-                .lines()
-                .next()
-                .unwrap_or("")
-                .trim()
-                .to_string();
+            let version = stdout.lines().next().unwrap_or("").trim().to_string();
             Prerequisite {
                 name: name.to_string(),
                 installed: true,
@@ -138,11 +163,17 @@ pub fn onboarding_complete() -> IpcResponse<()> {
         None => return ipc::err("HOME_DIR_NOT_FOUND", "Cannot find home directory"),
     };
     if let Err(e) = std::fs::create_dir_all(&config_dir) {
-        return ipc::err("CONFIG_DIR_FAILED", format!("Failed to create config dir: {}", e));
+        return ipc::err(
+            "CONFIG_DIR_FAILED",
+            format!("Failed to create config dir: {}", e),
+        );
     }
     let marker = config_dir.join(".onboarded");
     if let Err(e) = atomic_io::write_atomic(&marker, b"1") {
-        return ipc::err("MARKER_WRITE_FAILED", format!("Failed to write onboarding marker: {}", e));
+        return ipc::err(
+            "MARKER_WRITE_FAILED",
+            format!("Failed to write onboarding marker: {}", e),
+        );
     }
     ipc::ok(())
 }

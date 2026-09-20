@@ -10,7 +10,11 @@ pub mod tauri_impl;
 pub mod universal_ui;
 
 pub use capabilities::{DesktopCapabilities, UpdateInfo};
-pub use model_manager::{DownloadProgress, DownloadTask, ModelManager, ModelMetadata, ModelFormat, ModelSource};
+pub use model_manager::{
+    DownloadProgress, DownloadTask, ModelFormat, ModelManager, ModelMetadata, ModelSource,
+};
 pub use session_manager::{Message, Session, SessionManager};
 pub use tauri_impl::TauriDesktopCapabilities;
-pub use universal_ui::{UniversalModelManager, UniversalUIState, UniversalModel, UniversalProvider};
+pub use universal_ui::{
+    UniversalModel, UniversalModelManager, UniversalProvider, UniversalUIState,
+};

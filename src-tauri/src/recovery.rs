@@ -76,11 +76,7 @@ pub struct TaggedError<E> {
 
 impl<E: fmt::Display> fmt::Display for TaggedError<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "[{}] {}: {}",
-            self.mode, self.context, self.error
-        )
+        write!(f, "[{}] {}: {}", self.mode, self.context, self.error)
     }
 }
 

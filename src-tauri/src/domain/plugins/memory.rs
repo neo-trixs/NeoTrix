@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
+use async_trait::async_trait;
 use std::sync::Arc;
 
 pub struct MemoryPlugin {

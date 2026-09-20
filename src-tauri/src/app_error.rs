@@ -214,10 +214,66 @@ impl From<AppError> for crate::ipc::IpcError {
 
 impl From<crate::domain::DomainError> for AppError {
     fn from(e: crate::domain::DomainError) -> Self {
-        Self::Other {
-            code: e.code,
-            message: e.message,
-            recoverable: e.recoverable,
+        match e.code.as_str() {
+            "DB_ERROR" | "POOL_ERROR" => Self::Db {
+                code: e.code,
+                message: e.message,
+            },
+            "LOCK_ERROR" | "CORE_LOCK" => Self::Other {
+                code: e.code,
+                message: e.message,
+                recoverable: true,
+            },
+            "NOT_FOUND" | "SESSION_NOT_FOUND" | "PROJECT_NOT_FOUND" | "PACKAGE_NOT_FOUND"
+            | "MODE_NOT_FOUND" => Self::NotFound {
+                code: e.code,
+                message: e.message,
+            },
+            "INVALID_ARGS"
+            | "INVALID_PARAMS"
+            | "INVALID_CHANNEL"
+            | "INVALID_DATA"
+            | "INVALID_MODE"
+            | "INVALID_SESSION_ID"
+            | "INVALID_PANEL"
+            | "INVALID_TRIGGER"
+            | "INVALID_STEPS"
+            | "INVALID_MESSAGE_TYPE"
+            | "INVALID_ENVELOPE" => Self::InvalidInput {
+                code: e.code,
+                message: e.message,
+            },
+            "IO_ERROR" | "GIT_ERROR" | "WRITE_ERROR" => Self::Io {
+                code: e.code,
+                message: e.message,
+                recoverable: false,
+            },
+            "PARSE_ERROR" | "SERIALIZE_ERROR" => Self::Serde {
+                code: e.code,
+                message: e.message,
+            },
+            "HTTP_ERROR" => Self::Network {
+                code: e.code,
+                message: e.message,
+            },
+            "CONFIG_READ_ERROR" | "CONFIG_WRITE_ERROR" | "CONFIG_PARSE_ERROR"
+            | "CONFIG_DIR_ERROR" => Self::Config {
+                code: e.code,
+                message: e.message,
+            },
+            "DOMAIN_DUPLICATE" => Self::Duplicate {
+                code: e.code,
+                message: e.message,
+            },
+            "UNKNOWN_ACTION" | "NOT_IMPLEMENTED" => Self::InvalidInput {
+                code: e.code,
+                message: e.message,
+            },
+            _ => Self::Other {
+                code: e.code,
+                message: e.message,
+                recoverable: e.recoverable,
+            },
         }
     }
 }

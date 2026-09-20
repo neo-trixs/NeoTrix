@@ -4,8 +4,8 @@ pub mod provider_manager;
 
 use std::time::Duration;
 use tauri::AppHandle;
-use tauri::Manager;
 use tauri::Emitter;
+use tauri::Manager;
 use tokio::time;
 
 pub fn start(app_handle: &AppHandle) {
@@ -36,10 +36,13 @@ async fn tick_health_check(app_handle: &AppHandle) -> Result<(), String> {
 
     // Emit health status to frontend
     if let Some(window) = app_handle.get_webview_window("main") {
-        if let Err(e) = window.emit("health_check", serde_json::json!({
-            "status": "ok",
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-        })) {
+        if let Err(e) = window.emit(
+            "health_check",
+            serde_json::json!({
+                "status": "ok",
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+            }),
+        ) {
             tracing::trace!("emit health_check: {e}");
         }
     }

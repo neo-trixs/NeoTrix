@@ -198,11 +198,7 @@ impl ModelManager {
             .await
             .context("Failed to read cache dir")?;
 
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .context("Failed to read entry")?
-        {
+        while let Some(entry) = entries.next_entry().await.context("Failed to read entry")? {
             let path = entry.path();
             let ext = path.extension().and_then(|e| e.to_str());
             if ext.map_or(false, |e| valid_extensions.contains(&e)) {
@@ -277,7 +273,10 @@ impl ModelManager {
             "safetensors" => ModelFormat::Safetensors,
             "ggj" => ModelFormat::GGJ,
             _ => {
-                let name = path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
                 if name.contains("safetensors") {
                     ModelFormat::Safetensors
                 } else if name.contains("gguf") {
@@ -362,8 +361,9 @@ impl ModelManager {
 
     /// 获取下载进度
     pub fn get_download_progress(&self, job_id: &str) -> Option<DownloadProgress> {
-        self.download_queue.get(job_id).map(|task| {
-            DownloadProgress {
+        self.download_queue
+            .get(job_id)
+            .map(|task| DownloadProgress {
                 job_id: task.job_id.clone(),
                 model_id: task.model_id.clone(),
                 progress: if task.total_bytes > 0 {
@@ -376,8 +376,7 @@ impl ModelManager {
                 speed_bytes_per_sec: 0,
                 source: task.source.clone(),
                 format: task.format.clone(),
-            }
-        })
+            })
     }
 
     /// 获取所有下载任务
@@ -457,7 +456,9 @@ impl ModelManager {
 
     /// 验证模型完整性 (SHA256 + model.json)
     pub async fn verify_model(&self, model_id: &str) -> AnyhowResult<ModelValidationResult> {
-        let meta = self.models.get(model_id)
+        let meta = self
+            .models
+            .get(model_id)
             .ok_or_else(|| anyhow::anyhow!("Model '{}' not found", model_id))?;
 
         let mut sha256_valid = false;
@@ -553,10 +554,7 @@ impl ModelManager {
         model_id: impl Into<String>,
         model_name: impl Into<String>,
     ) -> AnyhowResult<DownloadTask> {
-        let url = format!(
-            "https://olmx.ai/api/models/{}/download",
-            model_name.into()
-        );
+        let url = format!("https://olmx.ai/api/models/{}/download", model_name.into());
         self.create_download_task(model_id, url, ModelSource::oMLX, ModelFormat::GGUF)
     }
 
@@ -566,7 +564,12 @@ impl ModelManager {
         model_id: impl Into<String>,
         model_url: impl Into<String>,
     ) -> AnyhowResult<DownloadTask> {
-        self.create_download_task(model_id, model_url, ModelSource::LocalGGUF, ModelFormat::GGUF)
+        self.create_download_task(
+            model_id,
+            model_url,
+            ModelSource::LocalGGUF,
+            ModelFormat::GGUF,
+        )
     }
 
     /// 获取缓存大小
@@ -576,11 +579,7 @@ impl ModelManager {
             .await
             .context("Failed to read cache dir")?;
 
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .context("Failed to read entry")?
-        {
+        while let Some(entry) = entries.next_entry().await.context("Failed to read entry")? {
             if let Ok(metadata) = fs::metadata(entry.path()).await {
                 total_size += metadata.len();
             }

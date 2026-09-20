@@ -1,7 +1,7 @@
-use async_trait::async_trait;
 use crate::domain::app_handle::get_app_handle;
 use crate::domain::registry::DomainRegistry;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
+use async_trait::async_trait;
 use neotrix::l5_cognition::nt_core_consciousness_core::{
     AttemptOutcome, ConsciousTask, ExternalClosureConfig, SolutionExecutor, CORE,
 };
@@ -154,9 +154,12 @@ impl ChatPlugin {
 
         // Emit reasoning event
         if let Some(app) = get_app_handle() {
-            if let Err(e) = app.emit("neotrix_stream_reasoning", serde_json::json!({
-                "text": format!("Starting reasoning for task: {}", content),
-            })) {
+            if let Err(e) = app.emit(
+                "neotrix_stream_reasoning",
+                serde_json::json!({
+                    "text": format!("Starting reasoning for task: {}", content),
+                }),
+            ) {
                 tracing::warn!("Failed to emit reasoning event: {}", e);
             }
         }
@@ -175,10 +178,13 @@ impl ChatPlugin {
 
         // Emit tool event
         if let Some(app) = get_app_handle() {
-            if let Err(e) = app.emit("neotrix_stream_tool", serde_json::json!({
-                "tool_name": "consciousness_task_loop",
-                "status": "started",
-            })) {
+            if let Err(e) = app.emit(
+                "neotrix_stream_tool",
+                serde_json::json!({
+                    "tool_name": "consciousness_task_loop",
+                    "status": "started",
+                }),
+            ) {
                 tracing::warn!("Failed to emit tool event: {}", e);
             }
         }
@@ -194,19 +200,25 @@ impl ChatPlugin {
 
         // Emit tool completion event
         if let Some(app) = get_app_handle() {
-            if let Err(e) = app.emit("neotrix_stream_tool", serde_json::json!({
-                "tool_name": "consciousness_task_loop",
-                "status": "completed",
-            })) {
+            if let Err(e) = app.emit(
+                "neotrix_stream_tool",
+                serde_json::json!({
+                    "tool_name": "consciousness_task_loop",
+                    "status": "completed",
+                }),
+            ) {
                 tracing::warn!("Failed to emit tool completion event: {}", e);
             }
         }
 
         // Emit reasoning event for task decomposition
         if let Some(app) = get_app_handle() {
-            if let Err(e) = app.emit("neotrix_stream_reasoning", serde_json::json!({
-                "text": format!("Task decomposed into {} subtasks", report.allocations.len()),
-            })) {
+            if let Err(e) = app.emit(
+                "neotrix_stream_reasoning",
+                serde_json::json!({
+                    "text": format!("Task decomposed into {} subtasks", report.allocations.len()),
+                }),
+            ) {
                 tracing::warn!("Failed to emit reasoning event: {}", e);
             }
         }
@@ -263,10 +275,13 @@ impl ChatPlugin {
 
         // Emit tool event
         if let Some(app) = get_app_handle() {
-            if let Err(e) = app.emit("neotrix_stream_tool", serde_json::json!({
-                "tool_name": "llm_stream",
-                "status": "started",
-            })) {
+            if let Err(e) = app.emit(
+                "neotrix_stream_tool",
+                serde_json::json!({
+                    "tool_name": "llm_stream",
+                    "status": "started",
+                }),
+            ) {
                 tracing::warn!("Failed to emit tool event: {}", e);
             }
         }
@@ -342,10 +357,13 @@ impl ChatPlugin {
 
         // Emit tool completion event
         if let Some(app) = get_app_handle() {
-            if let Err(e) = app.emit("neotrix_stream_tool", serde_json::json!({
-                "tool_name": "llm_stream",
-                "status": "completed",
-            })) {
+            if let Err(e) = app.emit(
+                "neotrix_stream_tool",
+                serde_json::json!({
+                    "tool_name": "llm_stream",
+                    "status": "completed",
+                }),
+            ) {
                 tracing::warn!("Failed to emit tool completion event: {}", e);
             }
         }

@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::atomic_io;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;

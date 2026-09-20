@@ -57,11 +57,7 @@ pub fn read_with_fallback(path: &Path) -> Result<Vec<u8>, AtomicReadError> {
         Err(_) => {
             let bak = backup_path(path);
             fs::read(&bak).map_err(|e| {
-                AtomicReadError::NotFound(
-                    path.display().to_string(),
-                    bak.display().to_string(),
-                    e,
-                )
+                AtomicReadError::NotFound(path.display().to_string(), bak.display().to_string(), e)
             })
         }
     }

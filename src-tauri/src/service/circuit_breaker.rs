@@ -133,8 +133,8 @@ impl CircuitBreakerManager {
 
         if breaker.consecutive_failures >= self.config.failure_threshold {
             // 触发断路
-            let cooldown = (breaker.cooldown_minutes as f64
-                * self.config.cooldown_multiplier) as u64;
+            let cooldown =
+                (breaker.cooldown_minutes as f64 * self.config.cooldown_multiplier) as u64;
             let cooldown = cooldown.min(self.config.max_cooldown_seconds);
 
             breaker.state = CircuitState::Open;

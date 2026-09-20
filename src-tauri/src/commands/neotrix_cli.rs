@@ -16,7 +16,12 @@ pub async fn run_cli(args: Vec<String>) -> IpcResponse<CliOutput> {
         dirs::home_dir().map(|h| h.join(".cargo/bin/neotrix").to_string_lossy().to_string())
     }) {
         Some(b) => b,
-        None => return ipc::err("CLI_NOT_FOUND", "neotrix binary not found. Install with: cargo install neotrix"),
+        None => {
+            return ipc::err(
+                "CLI_NOT_FOUND",
+                "neotrix binary not found. Install with: cargo install neotrix",
+            )
+        }
     };
 
     let output = match tokio::task::spawn_blocking(move || {

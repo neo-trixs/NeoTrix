@@ -137,12 +137,13 @@ impl MemoryStore {
 
     /// Read global memory for an agent.
     pub fn read_global(&self, agent_id: &str) -> Result<String, std::io::Error> {
-        let path = self
-            .workspace
-            .join("memory")
-            .join(format!("{agent_id}.md"));
+        let path = self.workspace.join("memory").join(format!("{agent_id}.md"));
         if path.exists() {
-            String::from_utf8(atomic_io::read_with_fallback(&path).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+            String::from_utf8(
+                atomic_io::read_with_fallback(&path)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?,
+            )
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
         } else {
             Ok(String::new())
         }
@@ -150,19 +151,13 @@ impl MemoryStore {
 
     /// Write global memory for an agent.
     pub fn write_global(&self, agent_id: &str, content: &str) -> Result<(), std::io::Error> {
-        let path = self
-            .workspace
-            .join("memory")
-            .join(format!("{agent_id}.md"));
-        atomic_io::write_atomic(&path, content.as_bytes()).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        let path = self.workspace.join("memory").join(format!("{agent_id}.md"));
+        atomic_io::write_atomic(&path, content.as_bytes())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 
     /// Read project-scoped memory for an agent.
-    pub fn read_project(
-        &self,
-        agent_id: &str,
-        project_id: &str,
-    ) -> Result<String, std::io::Error> {
+    pub fn read_project(&self, agent_id: &str, project_id: &str) -> Result<String, std::io::Error> {
         let path = self
             .workspace
             .join("memory")
@@ -170,7 +165,11 @@ impl MemoryStore {
             .join(project_id)
             .join(format!("{agent_id}.md"));
         if path.exists() {
-            String::from_utf8(atomic_io::read_with_fallback(&path).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+            String::from_utf8(
+                atomic_io::read_with_fallback(&path)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?,
+            )
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
         } else {
             Ok(String::new())
         }
@@ -192,7 +191,8 @@ impl MemoryStore {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        atomic_io::write_atomic(&path, content.as_bytes()).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        atomic_io::write_atomic(&path, content.as_bytes())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 }
 

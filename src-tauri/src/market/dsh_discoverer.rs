@@ -5,8 +5,8 @@
 use anyhow::{Context, Result as AnyhowResult};
 use serde::{Deserialize, Serialize};
 
-use crate::atomic_io;
 use super::schema::{MarketEntry, MarketSearchResult, PluginAsset, PluginManifest};
+use crate::atomic_io;
 
 /// DSH 市场配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,19 +65,13 @@ impl DshMarketDiscoverer {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("DSH market request failed")?;
+        let response = request.send().await.context("DSH market request failed")?;
 
         if !response.status().is_success() {
             return Err(anyhow::anyhow!("DSH market error: {}", response.status()));
         }
 
-        let data: DshSearchResponse = response
-            .json()
-            .await
-            .context("Parse DSH response")?;
+        let data: DshSearchResponse = response.json().await.context("Parse DSH response")?;
 
         Ok(MarketSearchResult {
             entries: data
@@ -120,19 +114,13 @@ impl DshMarketDiscoverer {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("DSH market request failed")?;
+        let response = request.send().await.context("DSH market request failed")?;
 
         if !response.status().is_success() {
             return Err(anyhow::anyhow!("DSH market error: {}", response.status()));
         }
 
-        let data: DshPluginDetail = response
-            .json()
-            .await
-            .context("Parse DSH response")?;
+        let data: DshPluginDetail = response.json().await.context("Parse DSH response")?;
 
         let version = data.version.clone();
 
@@ -171,19 +159,13 @@ impl DshMarketDiscoverer {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("DSH market request failed")?;
+        let response = request.send().await.context("DSH market request failed")?;
 
         if !response.status().is_success() {
             return Err(anyhow::anyhow!("DSH market error: {}", response.status()));
         }
 
-        let data: Vec<DshAsset> = response
-            .json()
-            .await
-            .context("Parse DSH response")?;
+        let data: Vec<DshAsset> = response.json().await.context("Parse DSH response")?;
 
         Ok(data
             .into_iter()
@@ -216,19 +198,13 @@ impl DshMarketDiscoverer {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("DSH download failed")?;
+        let response = request.send().await.context("DSH download failed")?;
 
         if !response.status().is_success() {
             return Err(anyhow::anyhow!("DSH download error: {}", response.status()));
         }
 
-        let bytes = response
-            .bytes()
-            .await
-            .context("Read download")?;
+        let bytes = response.bytes().await.context("Read download")?;
 
         // 确保目标目录存在
         std::fs::create_dir_all(dest_dir).context("Create dir")?;

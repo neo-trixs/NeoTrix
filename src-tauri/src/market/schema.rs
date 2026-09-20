@@ -230,9 +230,11 @@ fn default_min_runtime() -> String {
 impl PluginManifest {
     /// 从 TOML 文件解析
     pub fn from_file(path: &Path) -> Result<Self, String> {
-        let content =
-            String::from_utf8(atomic_io::read_with_fallback(path).map_err(|e| format!("Read plugin manifest: {e}"))?)
-                .map_err(|e| format!("Read plugin manifest: {e}"))?;
+        let content = String::from_utf8(
+            atomic_io::read_with_fallback(path)
+                .map_err(|e| format!("Read plugin manifest: {e}"))?,
+        )
+        .map_err(|e| format!("Read plugin manifest: {e}"))?;
         Self::from_toml(&content)
     }
 
@@ -248,9 +250,11 @@ impl PluginManifest {
 
     /// 从 JSON 文件解析 (兼容旧格式)
     pub fn from_json_file(path: &Path) -> Result<Self, String> {
-        let content =
-            String::from_utf8(atomic_io::read_with_fallback(path).map_err(|e| format!("Read plugin manifest: {e}"))?)
-                .map_err(|e| format!("Read plugin manifest: {e}"))?;
+        let content = String::from_utf8(
+            atomic_io::read_with_fallback(path)
+                .map_err(|e| format!("Read plugin manifest: {e}"))?,
+        )
+        .map_err(|e| format!("Read plugin manifest: {e}"))?;
         Self::from_json(&content)
     }
 

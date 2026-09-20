@@ -31,14 +31,12 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 
-use neotrix_tauri::recovery;
-use neotrix_tauri::commands::file_drop::{handle_file_drop, setup_file_drop_listener};
-use neotrix_tauri::commands::model_commands::*;
-use neotrix_tauri::commands::provider_commands::*;
-use neotrix_tauri::stub::{UnifiedApi as _, UnifiedApiImpl};
 use neotrix_tauri::commands::domain_cmd::{
     domain_action_count, domain_call, domain_has, domain_list, DomainState,
 };
+use neotrix_tauri::commands::file_drop::{handle_file_drop, setup_file_drop_listener};
+use neotrix_tauri::commands::model_commands::*;
+use neotrix_tauri::commands::provider_commands::*;
 use neotrix_tauri::commands::unified::{
     unified_chat, unified_chat_stream, unified_cli_list, unified_create_session,
     unified_delete_session, unified_exec_cli, unified_init, unified_list_sessions,
@@ -46,7 +44,9 @@ use neotrix_tauri::commands::unified::{
 };
 use neotrix_tauri::domain::{plugins::*, DomainRegistry};
 use neotrix_tauri::market::commands::*;
+use neotrix_tauri::recovery;
 use neotrix_tauri::service::provider_manager::SharedProviderManager;
+use neotrix_tauri::stub::{UnifiedApi as _, UnifiedApiImpl};
 
 #[derive(Parser)]
 #[clap(name = "neotrix-tauri", version)]
@@ -77,7 +77,10 @@ fn register_plugins(
     registry: &mut DomainRegistry,
     db_pool: &Arc<neotrix_tauri::db_pool::DbPool>,
 ) -> Result<(), String> {
-    let registrations: Vec<(&str, Box<dyn neotrix_tauri::domain::DomainPlugin + Send + Sync>)> = vec![
+    let registrations: Vec<(
+        &str,
+        Box<dyn neotrix_tauri::domain::DomainPlugin + Send + Sync>,
+    )> = vec![
         ("session", Box::new(SessionPlugin::new(db_pool.clone()))),
         ("agent", Box::new(AgentPlugin)),
         ("kb", Box::new(KbPlugin::new(db_pool.clone()))),
@@ -95,7 +98,10 @@ fn register_plugins(
         ("world", Box::new(WorldPlugin)),
         ("context", Box::new(ContextPlugin)),
         ("ai_orchestration", Box::new(AiOrchestrationPlugin::new())),
-        ("folder_instructions", Box::new(FolderInstructionsPlugin::new())),
+        (
+            "folder_instructions",
+            Box::new(FolderInstructionsPlugin::new()),
+        ),
         ("im", Box::new(ImPlugin::new())),
         ("mcp_extension", Box::new(McpExtensionPlugin::new())),
         ("session_sync", Box::new(SessionSyncPlugin::new())),
@@ -338,11 +344,14 @@ fn main() {
                 .setup(move |app| {
                     // 初始化通知管理器
                     let notification_manager =
-                        neotrix_tauri::notifications::NotificationManager::new(app.handle().clone());
+                        neotrix_tauri::notifications::NotificationManager::new(
+                            app.handle().clone(),
+                        );
                     app.manage(notification_manager);
 
                     // 初始化开机自启管理器
-                    let autostart_manager = neotrix_tauri::autostart::AutoStartManager::new(app.handle().clone());
+                    let autostart_manager =
+                        neotrix_tauri::autostart::AutoStartManager::new(app.handle().clone());
                     app.manage(autostart_manager);
 
                     // Setup native menu bar and system tray

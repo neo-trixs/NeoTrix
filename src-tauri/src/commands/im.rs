@@ -42,12 +42,20 @@ pub async fn im_list_channels() -> IpcResponse<Vec<ChannelConfig>> {
 pub async fn im_get_channel(channel: String) -> IpcResponse<ChannelConfig> {
     let channel_type = match ChannelType::from_name(&channel) {
         Some(ct) => ct,
-        None => return ipc::err("IM_UNKNOWN_CHANNEL", &format!("Unknown channel: {}", channel)),
+        None => {
+            return ipc::err(
+                "IM_UNKNOWN_CHANNEL",
+                &format!("Unknown channel: {}", channel),
+            )
+        }
     };
     match im_service::load_channels(&base_dir()) {
         Ok(channels) => match channels.into_iter().find(|c| c.channel == channel_type) {
             Some(ch) => ipc::ok(ch),
-            None => ipc::err("IM_CHANNEL_NOT_FOUND", &format!("Channel not found: {}", channel)),
+            None => ipc::err(
+                "IM_CHANNEL_NOT_FOUND",
+                &format!("Channel not found: {}", channel),
+            ),
         },
         Err(e) => ipc::err("IM_LOAD_FAILED", &e),
     }

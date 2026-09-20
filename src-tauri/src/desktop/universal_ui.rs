@@ -8,7 +8,7 @@
 //! - YAML 工作流编辑器
 //! - Agent 会话管理面板
 
-use crate::desktop::model_manager::{ModelFormat, ModelCapabilities};
+use crate::desktop::model_manager::{ModelCapabilities, ModelFormat};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -528,7 +528,10 @@ impl UniversalModelManager {
             let path = entry.path();
             let ext = path.extension().and_then(|e| e.to_str());
             if ext == Some("gguf") || ext == Some("onnx") || ext == Some("safetensors") {
-                let file_name = path.file_stem().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let file_name = path
+                    .file_stem()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 models.push(UniversalModel {
                     id: file_name.clone(),
                     name: file_name.clone(),
@@ -563,7 +566,10 @@ fn detect_display_format(path: &std::path::Path) -> ModelFormat {
         "safetensors" => ModelFormat::Safetensors,
         "ggj" => ModelFormat::GGJ,
         _ => {
-            let name = path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
             if name.contains("safetensors") {
                 ModelFormat::Safetensors
             } else {

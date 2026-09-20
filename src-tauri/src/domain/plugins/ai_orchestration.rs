@@ -8,9 +8,9 @@
 //! - **Real-time Routing** (GPT-5) — Route to cheapest capable model
 //! - **Deep Think Mode** (Gemini 2.5) — Enhanced reasoning for complex problems
 
-use async_trait::async_trait;
-use crate::domain::app_handle::{set_app_handle, get_app_handle};
+use crate::domain::app_handle::{get_app_handle, set_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

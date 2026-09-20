@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
+use async_trait::async_trait;
 use regex::Regex;
 
 /// NT-WORLD 域插件 — 网页抓取/搜索/内容提取

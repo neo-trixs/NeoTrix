@@ -29,12 +29,10 @@ pub async fn domain_call(
     if resp.ok {
         IpcResponse::success(resp.data)
     } else {
-        let err = resp.error.unwrap_or_else(|| {
-            crate::domain::DomainError {
-                code: "UNKNOWN".into(),
-                message: "Unknown domain error".into(),
-                recoverable: true,
-            }
+        let err = resp.error.unwrap_or_else(|| crate::domain::DomainError {
+            code: "UNKNOWN".into(),
+            message: "Unknown domain error".into(),
+            recoverable: true,
         });
         IpcResponse {
             ok: false,

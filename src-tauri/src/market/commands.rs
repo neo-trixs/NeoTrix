@@ -110,14 +110,16 @@ pub async fn market_search(
         Err(e) => return ipc::err("SEARCH_FAILED", format!("{e}")),
     };
 
-    ipc::ok(results
-        .into_iter()
-        .map(|r| MarketSearchResponse {
-            entries: r.entries,
-            total: r.total,
-            source: r.source,
-        })
-        .collect())
+    ipc::ok(
+        results
+            .into_iter()
+            .map(|r| MarketSearchResponse {
+                entries: r.entries,
+                total: r.total,
+                source: r.source,
+            })
+            .collect(),
+    )
 }
 
 /// 获取插件详情

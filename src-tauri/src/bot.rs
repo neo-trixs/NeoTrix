@@ -23,7 +23,7 @@ pub enum BotError {
 pub struct BotIdentity {
     pub id: String,
     pub name: String,
-    pub avatar: Option<String>,       // URL or emoji
+    pub avatar: Option<String>, // URL or emoji
     pub description: String,
     pub created_at: u64,
     pub last_active_at: u64,
@@ -113,9 +113,9 @@ pub struct Thread {
     pub channel_id: String,
     pub title: Option<String>,
     pub created_at: u64,
-    pub participants: Vec<String>,  // bot IDs
+    pub participants: Vec<String>, // bot IDs
     pub message_count: u64,
-    pub parent_thread_id: Option<String>,  // for nested threads
+    pub parent_thread_id: Option<String>, // for nested threads
 }
 
 /// Artifact — durable output created by a bot
@@ -125,7 +125,7 @@ pub struct Artifact {
     pub bot_id: String,
     pub artifact_type: ArtifactType,
     pub title: String,
-    pub content_path: String,   // file path on disk
+    pub content_path: String, // file path on disk
     pub created_at: u64,
     pub updated_at: u64,
     pub metadata: HashMap<String, String>,
@@ -184,7 +184,9 @@ impl BotManager {
             channels: Vec::new(),
         };
         self.bots.insert(id.clone(), bot);
-        self.bots.get(&id).ok_or(BotError::NotFound("Bot not found after insert".into()))
+        self.bots
+            .get(&id)
+            .ok_or(BotError::NotFound("Bot not found after insert".into()))
     }
 
     /// Create a channel for organizing work
@@ -203,13 +205,21 @@ impl BotManager {
             message_count: 0,
         };
         self.channels.insert(id.clone(), channel);
-        self.channels.get(&id).ok_or(BotError::NotFound("Channel not found after insert".into()))
+        self.channels
+            .get(&id)
+            .ok_or(BotError::NotFound("Channel not found after insert".into()))
     }
 
     /// Add a bot to a channel
     pub fn add_bot_to_channel(&mut self, bot_id: &str, channel_id: &str) -> Result<(), BotError> {
-        let bot = self.bots.get_mut(bot_id).ok_or(BotError::NotFound("Bot not found".into()))?;
-        let channel = self.channels.get_mut(channel_id).ok_or(BotError::NotFound("Channel not found".into()))?;
+        let bot = self
+            .bots
+            .get_mut(bot_id)
+            .ok_or(BotError::NotFound("Bot not found".into()))?;
+        let channel = self
+            .channels
+            .get_mut(channel_id)
+            .ok_or(BotError::NotFound("Channel not found".into()))?;
         if !bot.channels.contains(&channel_id.to_string()) {
             bot.channels.push(channel_id.to_string());
         }
@@ -221,15 +231,26 @@ impl BotManager {
 
     /// Update bot status
     pub fn update_status(&mut self, bot_id: &str, status: BotStatus) -> Result<(), BotError> {
-        let bot = self.bots.get_mut(bot_id).ok_or(BotError::NotFound("Bot not found".into()))?;
+        let bot = self
+            .bots
+            .get_mut(bot_id)
+            .ok_or(BotError::NotFound("Bot not found".into()))?;
         bot.status = status;
         bot.last_active_at = timestamp();
         Ok(())
     }
 
     /// Record a lesson learned by a bot
-    pub fn record_lesson(&mut self, bot_id: &str, context: String, lesson: String) -> Result<(), BotError> {
-        let bot = self.bots.get_mut(bot_id).ok_or(BotError::NotFound("Bot not found".into()))?;
+    pub fn record_lesson(
+        &mut self,
+        bot_id: &str,
+        context: String,
+        lesson: String,
+    ) -> Result<(), BotError> {
+        let bot = self
+            .bots
+            .get_mut(bot_id)
+            .ok_or(BotError::NotFound("Bot not found".into()))?;
         bot.memory.lessons.push(MemoryLesson {
             learned_at: timestamp(),
             context,
@@ -239,9 +260,15 @@ impl BotManager {
         Ok(())
     }
 
-    pub fn list_bots(&self) -> Vec<&BotIdentity> { self.bots.values().collect() }
-    pub fn list_channels(&self) -> Vec<&Channel> { self.channels.values().collect() }
-    pub fn get_bot(&self, id: &str) -> Option<&BotIdentity> { self.bots.get(id) }
+    pub fn list_bots(&self) -> Vec<&BotIdentity> {
+        self.bots.values().collect()
+    }
+    pub fn list_channels(&self) -> Vec<&Channel> {
+        self.channels.values().collect()
+    }
+    pub fn get_bot(&self, id: &str) -> Option<&BotIdentity> {
+        self.bots.get(id)
+    }
 }
 
 fn timestamp() -> u64 {

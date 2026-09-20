@@ -62,10 +62,16 @@ impl CredentialVault {
     ) -> Result<ScopedToken, VaultError> {
         // In production: encrypt with AES-256-GCM before storing
         // For now, store directly (keyring integration is in anthropic/client.rs)
-        self.store.write().await.insert(provider.to_string(), api_key.to_string());
+        self.store
+            .write()
+            .await
+            .insert(provider.to_string(), api_key.to_string());
 
         let token = ScopedToken::new(provider, 3600); // 1 hour TTL
-        self.tokens.write().await.insert(token_hash(&token), token.clone());
+        self.tokens
+            .write()
+            .await
+            .insert(token_hash(&token), token.clone());
 
         Ok(token)
     }
@@ -76,7 +82,9 @@ impl CredentialVault {
             return Err(VaultError::TokenExpired);
         }
 
-        self.store.read().await
+        self.store
+            .read()
+            .await
             .get(&token.provider)
             .cloned()
             .ok_or(VaultError::NotFound(token.provider.clone()))

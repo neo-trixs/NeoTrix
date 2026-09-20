@@ -27,11 +27,11 @@ impl std::fmt::Display for HealthGrade {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthWeights {
-    pub plugin_uptime: f64,      // default: 0.25
-    pub db_integrity: f64,       // default: 0.20
-    pub error_rate: f64,         // default: 0.25
-    pub response_latency: f64,   // default: 0.15
-    pub dependency_health: f64,  // default: 0.15
+    pub plugin_uptime: f64,     // default: 0.25
+    pub db_integrity: f64,      // default: 0.20
+    pub error_rate: f64,        // default: 0.25
+    pub response_latency: f64,  // default: 0.15
+    pub dependency_health: f64, // default: 0.15
 }
 
 impl Default for HealthWeights {
@@ -62,7 +62,9 @@ impl HealthMetrics {
     }
 
     pub fn error_rate_score(&self) -> f64 {
-        if self.total_calls == 0 { return 1.0; }
+        if self.total_calls == 0 {
+            return 1.0;
+        }
         let rate = self.error_count as f64 / self.total_calls as f64;
         (1.0 - rate).max(0.0)
     }
@@ -78,7 +80,9 @@ pub struct HealthScorer {
 
 impl Default for HealthScorer {
     fn default() -> Self {
-        Self { weights: HealthWeights::default() }
+        Self {
+            weights: HealthWeights::default(),
+        }
     }
 }
 

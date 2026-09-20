@@ -18,9 +18,9 @@
 //! └─────────────────────────────────────────────┘
 //! ```
 
-use async_trait::async_trait;
-use crate::domain::app_handle::{set_app_handle, get_app_handle};
+use crate::domain::app_handle::{get_app_handle, set_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -231,12 +231,11 @@ impl McpExtensionPlugin {
             recoverable: false,
         })?;
 
-        let package = state.installed.get_mut(name)
-            .ok_or_else(|| DomainError {
-                code: "PACKAGE_NOT_FOUND".into(),
-                message: format!("Package '{}' not found", name),
-                recoverable: true,
-            })?;
+        let package = state.installed.get_mut(name).ok_or_else(|| DomainError {
+            code: "PACKAGE_NOT_FOUND".into(),
+            message: format!("Package '{}' not found", name),
+            recoverable: true,
+        })?;
 
         package.enabled = enabled;
         Ok(package.clone())
@@ -250,12 +249,11 @@ impl McpExtensionPlugin {
             recoverable: false,
         })?;
 
-        let package = state.installed.get_mut(name)
-            .ok_or_else(|| DomainError {
-                code: "PACKAGE_NOT_FOUND".into(),
-                message: format!("Package '{}' not found", name),
-                recoverable: true,
-            })?;
+        let package = state.installed.get_mut(name).ok_or_else(|| DomainError {
+            code: "PACKAGE_NOT_FOUND".into(),
+            message: format!("Package '{}' not found", name),
+            recoverable: true,
+        })?;
 
         package.running = running;
         if running {
@@ -286,7 +284,9 @@ impl McpExtensionPlugin {
         })?;
 
         // Simplified — would search actual registry
-        let results: Vec<PackageResult> = state.registry.iter()
+        let results: Vec<PackageResult> = state
+            .registry
+            .iter()
             .filter(|p| p.name.contains(query) || p.description.contains(query))
             .cloned()
             .collect();
@@ -305,15 +305,21 @@ impl McpExtensionPlugin {
         let installed = state.installed.len();
         let enabled = state.installed.values().filter(|p| p.enabled).count();
         let running = state.installed.values().filter(|p| p.running).count();
-        let tools: usize = state.installed.values()
+        let tools: usize = state
+            .installed
+            .values()
             .filter(|p| p.enabled)
             .map(|p| p.manifest.tools.len())
             .sum();
-        let prompts: usize = state.installed.values()
+        let prompts: usize = state
+            .installed
+            .values()
             .filter(|p| p.enabled)
             .map(|p| p.manifest.prompts.len())
             .sum();
-        let resources: usize = state.installed.values()
+        let resources: usize = state
+            .installed
+            .values()
             .filter(|p| p.enabled)
             .map(|p| p.manifest.resources.len())
             .sum();
@@ -351,32 +357,67 @@ impl DomainPlugin for McpExtensionPlugin {
                 name: "install".into(),
                 description: "Install an MCP extension package".into(),
                 params: vec![
-                    ParamSpec { name: "name".into(), typ: "string".into(), required: true, description: "Package name".into() },
-                    ParamSpec { name: "version".into(), typ: "string".into(), required: false, description: "Version (default: latest)".into() },
+                    ParamSpec {
+                        name: "name".into(),
+                        typ: "string".into(),
+                        required: true,
+                        description: "Package name".into(),
+                    },
+                    ParamSpec {
+                        name: "version".into(),
+                        typ: "string".into(),
+                        required: false,
+                        description: "Version (default: latest)".into(),
+                    },
                 ],
             },
             ActionSpec {
                 name: "uninstall".into(),
                 description: "Uninstall an MCP extension package".into(),
-                params: vec![ParamSpec { name: "name".into(), typ: "string".into(), required: true, description: "Package name".into() }],
+                params: vec![ParamSpec {
+                    name: "name".into(),
+                    typ: "string".into(),
+                    required: true,
+                    description: "Package name".into(),
+                }],
             },
             ActionSpec {
                 name: "toggle".into(),
                 description: "Enable or disable an installed package".into(),
                 params: vec![
-                    ParamSpec { name: "name".into(), typ: "string".into(), required: true, description: "Package name".into() },
-                    ParamSpec { name: "enabled".into(), typ: "boolean".into(), required: true, description: "Enable or disable".into() },
+                    ParamSpec {
+                        name: "name".into(),
+                        typ: "string".into(),
+                        required: true,
+                        description: "Package name".into(),
+                    },
+                    ParamSpec {
+                        name: "enabled".into(),
+                        typ: "boolean".into(),
+                        required: true,
+                        description: "Enable or disable".into(),
+                    },
                 ],
             },
             ActionSpec {
                 name: "start".into(),
                 description: "Start a package runtime".into(),
-                params: vec![ParamSpec { name: "name".into(), typ: "string".into(), required: true, description: "Package name".into() }],
+                params: vec![ParamSpec {
+                    name: "name".into(),
+                    typ: "string".into(),
+                    required: true,
+                    description: "Package name".into(),
+                }],
             },
             ActionSpec {
                 name: "stop".into(),
                 description: "Stop a package runtime".into(),
-                params: vec![ParamSpec { name: "name".into(), typ: "string".into(), required: true, description: "Package name".into() }],
+                params: vec![ParamSpec {
+                    name: "name".into(),
+                    typ: "string".into(),
+                    required: true,
+                    description: "Package name".into(),
+                }],
             },
             ActionSpec {
                 name: "list".into(),
@@ -386,7 +427,12 @@ impl DomainPlugin for McpExtensionPlugin {
             ActionSpec {
                 name: "search".into(),
                 description: "Search the package registry".into(),
-                params: vec![ParamSpec { name: "query".into(), typ: "string".into(), required: true, description: "Search query".into() }],
+                params: vec![ParamSpec {
+                    name: "query".into(),
+                    typ: "string".into(),
+                    required: true,
+                    description: "Search query".into(),
+                }],
             },
             ActionSpec {
                 name: "get_stats".into(),
@@ -396,37 +442,74 @@ impl DomainPlugin for McpExtensionPlugin {
         ]
     }
 
-    async fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+    async fn call(
+        &self,
+        action: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, DomainError> {
         match action {
             "install" => {
-                let name = args.get("name").and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError { code: "INVALID_PARAMS".into(), message: "Missing 'name'".into(), recoverable: true })?;
+                let name =
+                    args.get("name")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'name'".into(),
+                            recoverable: true,
+                        })?;
                 let version = args.get("version").and_then(|v| v.as_str());
                 let pkg = self.install(name, version)?;
                 Ok(serde_json::to_value(pkg).unwrap_or_default())
             }
             "uninstall" => {
-                let name = args.get("name").and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError { code: "INVALID_PARAMS".into(), message: "Missing 'name'".into(), recoverable: true })?;
+                let name =
+                    args.get("name")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'name'".into(),
+                            recoverable: true,
+                        })?;
                 self.uninstall(name)?;
                 Ok(serde_json::json!({"success": true}))
             }
             "toggle" => {
-                let name = args.get("name").and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError { code: "INVALID_PARAMS".into(), message: "Missing 'name'".into(), recoverable: true })?;
-                let enabled = args.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+                let name =
+                    args.get("name")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'name'".into(),
+                            recoverable: true,
+                        })?;
+                let enabled = args
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
                 let pkg = self.toggle(name, enabled)?;
                 Ok(serde_json::to_value(pkg).unwrap_or_default())
             }
             "start" => {
-                let name = args.get("name").and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError { code: "INVALID_PARAMS".into(), message: "Missing 'name'".into(), recoverable: true })?;
+                let name =
+                    args.get("name")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'name'".into(),
+                            recoverable: true,
+                        })?;
                 let pkg = self.set_running(name, true)?;
                 Ok(serde_json::to_value(pkg).unwrap_or_default())
             }
             "stop" => {
-                let name = args.get("name").and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError { code: "INVALID_PARAMS".into(), message: "Missing 'name'".into(), recoverable: true })?;
+                let name =
+                    args.get("name")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'name'".into(),
+                            recoverable: true,
+                        })?;
                 let pkg = self.set_running(name, false)?;
                 Ok(serde_json::to_value(pkg).unwrap_or_default())
             }
@@ -443,10 +526,18 @@ impl DomainPlugin for McpExtensionPlugin {
                 let stats = self.get_stats()?;
                 Ok(serde_json::to_value(stats).unwrap_or_default())
             }
-            _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
+            _ => Err(DomainError {
+                code: "UNKNOWN_ACTION".into(),
+                message: format!("Unknown action: {}", action),
+                recoverable: true,
+            }),
         }
     }
 
-    async fn init(&mut self) -> Result<(), DomainError> { Ok(()) }
-    async fn shutdown(&mut self) -> Result<(), DomainError> { Ok(()) }
+    async fn init(&mut self) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn shutdown(&mut self) -> Result<(), DomainError> {
+        Ok(())
+    }
 }

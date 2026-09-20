@@ -67,7 +67,8 @@ pub fn load_pool_entries() -> AnyhowResult<Vec<ModelPoolEntry>> {
         return Ok(vec![]);
     }
 
-    let content = String::from_utf8(atomic_io::read_with_fallback(&path).context("Read provider pool")?)?;
+    let content =
+        String::from_utf8(atomic_io::read_with_fallback(&path).context("Read provider pool")?)?;
     let pool: RawPool = toml::from_str(&content).context("Parse provider pool")?;
 
     let entries = pool

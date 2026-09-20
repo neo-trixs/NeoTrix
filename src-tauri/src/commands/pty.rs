@@ -65,19 +65,13 @@ impl PtyManager {
             CommandBuilder::new(shell)
         };
 
-        let child = pair
-            .slave
-            .spawn_command(cmd)
-            .context("spawn failed")?;
+        let child = pair.slave.spawn_command(cmd).context("spawn failed")?;
         let killer = child.clone_killer();
         let mut reader = pair
             .master
             .try_clone_reader()
             .context("clone reader failed")?;
-        let writer = pair
-            .master
-            .take_writer()
-            .context("take writer failed")?;
+        let writer = pair.master.take_writer().context("take writer failed")?;
 
         let sid = session_id.to_string();
         let tx = self.sender.clone();
@@ -136,10 +130,7 @@ impl PtyManager {
             .writer
             .write_all(data.as_bytes())
             .context("write failed")?;
-        session
-            .writer
-            .flush()
-            .context("flush failed")?;
+        session.writer.flush().context("flush failed")?;
         Ok(())
     }
 

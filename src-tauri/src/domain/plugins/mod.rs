@@ -12,11 +12,11 @@ pub mod world;
 pub mod ai_orchestration;
 pub mod folder_instructions;
 pub mod im;
+pub(crate) mod r#macro;
 pub mod mcp_extension;
 pub mod session_sync;
 pub mod unified_surface;
 pub mod voice_agent;
-pub(crate) mod r#macro;
 
 pub use chat::ChatPlugin;
 pub use context::ContextPlugin;

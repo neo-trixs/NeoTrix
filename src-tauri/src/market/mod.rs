@@ -86,8 +86,7 @@ impl MarketEngine {
             return Ok(());
         }
 
-        let entries = std::fs::read_dir(&self.config.plugin_dir)
-            .context("Read plugin dir")?;
+        let entries = std::fs::read_dir(&self.config.plugin_dir).context("Read plugin dir")?;
 
         for entry in entries.flatten() {
             let path = entry.path();
@@ -264,17 +263,14 @@ impl MarketEngine {
 
         // 复制文件
         if source_path.is_dir() {
-            copy_dir_recursive(source_path, &dest_dir)
-                .context("Copy plugin files")?;
+            copy_dir_recursive(source_path, &dest_dir).context("Copy plugin files")?;
         } else {
             let dest_file = dest_dir.join(source_path.file_name().unwrap_or_default());
             std::fs::copy(source_path, &dest_file).context("Copy plugin file")?;
         }
 
         // 写入 plugin.toml
-        let toml_content = manifest
-            .to_toml()
-            .context("Serialize manifest")?;
+        let toml_content = manifest.to_toml().context("Serialize manifest")?;
         atomic_io::write_atomic(&dest_dir.join("plugin.toml"), toml_content.as_bytes())
             .context("Write plugin.toml")?;
 

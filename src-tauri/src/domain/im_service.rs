@@ -2,13 +2,13 @@
 //!
 //! 核心 IM 配置和状态管理逻辑，供 commands/im.rs 和 domain/plugins/im.rs 共用。
 
-use anyhow::{Context, Result as AnyhowResult};
 use crate::atomic_io;
 use crate::config::AppConfig;
 use crate::domain::plugins::im::{
     BotConfig, ChannelConfig, ChannelType, DshMarketConfig, ImStatus, ALL_CHANNEL_TYPES,
 };
 use crate::domain::serde_json;
+use anyhow::{Context, Result as AnyhowResult};
 use std::path::{Path, PathBuf};
 
 // ═══════════════════════════════════════════════
@@ -36,7 +36,8 @@ pub fn load_channels(base_dir: &Path) -> AnyhowResult<Vec<ChannelConfig>> {
     if !path.exists() {
         return Ok(default_channels());
     }
-    let content = String::from_utf8(atomic_io::read_with_fallback(&path).context("Read IM config")?)?;
+    let content =
+        String::from_utf8(atomic_io::read_with_fallback(&path).context("Read IM config")?)?;
     serde_json::from_str(&content).context("Parse IM config")
 }
 
@@ -55,9 +56,8 @@ pub fn load_dsh_market(base_dir: &Path) -> AnyhowResult<DshMarketConfig> {
     if !path.exists() {
         return Ok(DshMarketConfig::default());
     }
-    let content = String::from_utf8(
-        atomic_io::read_with_fallback(&path).context("Read DSH market config")?,
-    )?;
+    let content =
+        String::from_utf8(atomic_io::read_with_fallback(&path).context("Read DSH market config")?)?;
     serde_json::from_str(&content).context("Parse DSH market config")
 }
 
@@ -311,9 +311,7 @@ pub fn dsh_market_config_update(
     Ok(config)
 }
 
-pub fn dsh_market_sync(
-    base_dir: &Path,
-) -> AnyhowResult<std::collections::HashMap<String, String>> {
+pub fn dsh_market_sync(base_dir: &Path) -> AnyhowResult<std::collections::HashMap<String, String>> {
     let config = load_dsh_market(base_dir)?;
     if !config.enabled {
         return Err(anyhow::anyhow!("DSH market is not enabled"));

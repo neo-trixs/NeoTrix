@@ -58,7 +58,10 @@ pub async fn unified_chat(
 
     match api.handle(unified_request).await {
         Ok(response) => ipc::ok(UnifiedChatResponse::from_response(response)),
-        Err(e) => ipc::err("UNIFIED_CHAT_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+        Err(e) => ipc::err(
+            "UNIFIED_CHAT_FAILED",
+            format!("Unified API error: {} - {}", e.code, e.message),
+        ),
     }
 }
 
@@ -111,7 +114,10 @@ pub async fn unified_system_state(
     let api = state.read().await;
     match api.get_system_state().await {
         Ok(response) => ipc::ok(UnifiedChatResponse::from_response(response)),
-        Err(e) => ipc::err("UNIFIED_STATE_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+        Err(e) => ipc::err(
+            "UNIFIED_STATE_FAILED",
+            format!("Unified API error: {} - {}", e.code, e.message),
+        ),
     }
 }
 
@@ -123,7 +129,10 @@ pub async fn unified_create_session(
     let api = state.read().await;
     match api.create_session(project_path).await {
         Ok(info) => ipc::ok(info),
-        Err(e) => ipc::err("SESSION_CREATE_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+        Err(e) => ipc::err(
+            "SESSION_CREATE_FAILED",
+            format!("Unified API error: {} - {}", e.code, e.message),
+        ),
     }
 }
 
@@ -134,7 +143,10 @@ pub async fn unified_list_sessions(
     let api = state.read().await;
     match api.list_sessions().await {
         Ok(sessions) => ipc::ok(sessions),
-        Err(e) => ipc::err("SESSION_LIST_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+        Err(e) => ipc::err(
+            "SESSION_LIST_FAILED",
+            format!("Unified API error: {} - {}", e.code, e.message),
+        ),
     }
 }
 
@@ -146,7 +158,10 @@ pub async fn unified_delete_session(
     let api = state.read().await;
     match api.delete_session(&session_id).await {
         Ok(()) => ipc::ok(()),
-        Err(e) => ipc::err("SESSION_DELETE_FAILED", format!("Unified API error: {} - {}", e.code, e.message)),
+        Err(e) => ipc::err(
+            "SESSION_DELETE_FAILED",
+            format!("Unified API error: {} - {}", e.code, e.message),
+        ),
     }
 }
 

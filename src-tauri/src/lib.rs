@@ -19,8 +19,8 @@
     clippy::missing_panics_doc
 )]
 
-pub mod app_error;
 pub(crate) mod agent_identity;
+pub mod app_error;
 pub(crate) mod atomic_io;
 pub mod autostart;
 pub(crate) mod bot;
@@ -32,6 +32,7 @@ pub(crate) mod debouncer;
 pub mod desktop;
 pub mod domain;
 pub(crate) mod engine;
+pub mod error_codes;
 pub mod health;
 pub mod ipc;
 pub mod logger;

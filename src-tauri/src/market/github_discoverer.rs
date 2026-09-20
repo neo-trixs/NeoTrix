@@ -5,8 +5,8 @@
 use anyhow::{Context, Result as AnyhowResult};
 use serde::{Deserialize, Serialize};
 
-use crate::atomic_io;
 use super::schema::{MarketEntry, MarketSearchResult, PluginAsset};
+use crate::atomic_io;
 
 /// GitHub 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,19 +63,13 @@ impl GitHubDiscoverer {
             request = request.header("Authorization", format!("token {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("GitHub API request failed")?;
+        let response = request.send().await.context("GitHub API request failed")?;
 
         if !response.status().is_success() {
             return Err(anyhow::anyhow!("GitHub API error: {}", response.status()));
         }
 
-        let data: GitHubSearchResponse = response
-            .json()
-            .await
-            .context("Parse GitHub response")?;
+        let data: GitHubSearchResponse = response.json().await.context("Parse GitHub response")?;
 
         let entries: Vec<MarketEntry> = data
             .items
@@ -130,19 +124,13 @@ impl GitHubDiscoverer {
             request = request.header("Authorization", format!("token {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("GitHub API request failed")?;
+        let response = request.send().await.context("GitHub API request failed")?;
 
         if !response.status().is_success() {
             return Err(anyhow::anyhow!("GitHub API error: {}", response.status()));
         }
 
-        let repo: GitHubRepo = response
-            .json()
-            .await
-            .context("Parse GitHub response")?;
+        let repo: GitHubRepo = response.json().await.context("Parse GitHub response")?;
 
         Ok(MarketEntry {
             id: repo.full_name.clone(),
@@ -175,19 +163,13 @@ impl GitHubDiscoverer {
             request = request.header("Authorization", format!("token {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("GitHub API request failed")?;
+        let response = request.send().await.context("GitHub API request failed")?;
 
         if !response.status().is_success() {
             return Err(anyhow::anyhow!("GitHub API error: {}", response.status()));
         }
 
-        let release: GitHubRelease = response
-            .json()
-            .await
-            .context("Parse GitHub response")?;
+        let release: GitHubRelease = response.json().await.context("Parse GitHub response")?;
 
         Ok(release
             .assets
@@ -215,19 +197,16 @@ impl GitHubDiscoverer {
             request = request.header("Authorization", format!("token {}", token));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("GitHub download failed")?;
+        let response = request.send().await.context("GitHub download failed")?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("GitHub download error: {}", response.status()));
+            return Err(anyhow::anyhow!(
+                "GitHub download error: {}",
+                response.status()
+            ));
         }
 
-        let bytes = response
-            .bytes()
-            .await
-            .context("Read download")?;
+        let bytes = response.bytes().await.context("Read download")?;
 
         std::fs::create_dir_all(dest_dir).context("Create dir")?;
 

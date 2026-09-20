@@ -10,7 +10,7 @@ pub mod model_commands;
 pub mod model_pool;
 pub mod neotrix_cli;
 pub mod onboarding;
-pub mod proxy_pool;
 pub mod provider_commands;
+pub mod proxy_pool;
 pub mod pty;
 pub mod unified;

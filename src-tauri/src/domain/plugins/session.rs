@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -42,10 +42,14 @@ impl SessionPlugin {
             tracing::warn!("schema init: {e}");
         }
         // backward-compat columns
-        if let Err(e) = db_pool.init_schema("ALTER TABLE sessions ADD COLUMN project TEXT NOT NULL DEFAULT ''") {
+        if let Err(e) =
+            db_pool.init_schema("ALTER TABLE sessions ADD COLUMN project TEXT NOT NULL DEFAULT ''")
+        {
             tracing::warn!("schema init: {e}");
         }
-        if let Err(e) = db_pool.init_schema("ALTER TABLE sessions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0") {
+        if let Err(e) = db_pool
+            .init_schema("ALTER TABLE sessions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+        {
             tracing::warn!("schema init: {e}");
         }
         Self { db_pool }
@@ -288,15 +292,12 @@ impl SessionPlugin {
             message: format!("归档失败: {}", e),
             recoverable: true,
         })?;
-        conn.execute(
-            "DELETE FROM sessions WHERE id = ?1",
-            rusqlite::params![id],
-        )
-        .map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("归档失败: {}", e),
-            recoverable: true,
-        })?;
+        conn.execute("DELETE FROM sessions WHERE id = ?1", rusqlite::params![id])
+            .map_err(|e| DomainError {
+                code: "DB_ERROR".into(),
+                message: format!("归档失败: {}", e),
+                recoverable: true,
+            })?;
         Ok(())
     }
 

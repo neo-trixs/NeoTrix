@@ -23,15 +23,7 @@ pub struct ChannelName(String);
 impl ChannelName {
     /// All valid channel names (lowercase).
     const VALID: &[&str] = &[
-        "wechat",
-        "feishu",
-        "dingtalk",
-        "wecom",
-        "qq",
-        "slack",
-        "telegram",
-        "discord",
-        "whatsapp",
+        "wechat", "feishu", "dingtalk", "wecom", "qq", "slack", "telegram", "discord", "whatsapp",
     ];
 
     pub fn as_str(&self) -> &str {
@@ -97,9 +89,7 @@ impl std::error::Error for ChannelNameError {}
 pub struct ModelPath(String);
 
 impl ModelPath {
-    const VALID_EXTENSIONS: &[&str] = &[
-        "gguf", "onnx", "safetensors", "pt", "bin", "pth",
-    ];
+    const VALID_EXTENSIONS: &[&str] = &["gguf", "onnx", "safetensors", "pt", "bin", "pth"];
 
     pub fn as_str(&self) -> &str {
         &self.0
@@ -349,10 +339,7 @@ mod tests {
 
     #[test]
     fn model_path_empty() {
-        assert_eq!(
-            ModelPath::try_from("").unwrap_err(),
-            ModelPathError::Empty
-        );
+        assert_eq!(ModelPath::try_from("").unwrap_err(), ModelPathError::Empty);
     }
 
     #[test]

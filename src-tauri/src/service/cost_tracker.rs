@@ -117,7 +117,8 @@ impl CostTracker {
     pub fn calculate_cost(&self, model_id: &str, usage: &TokenUsage) -> (f64, f64) {
         if let Some(pricing) = self.model_pricing.get(model_id) {
             let input_cost = (usage.prompt_tokens as f64 / 1000.0) * pricing.input_cost_per_1k;
-            let output_cost = (usage.completion_tokens as f64 / 1000.0) * pricing.output_cost_per_1k;
+            let output_cost =
+                (usage.completion_tokens as f64 / 1000.0) * pricing.output_cost_per_1k;
             (input_cost, output_cost)
         } else {
             // 默认定价

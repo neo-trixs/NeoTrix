@@ -117,7 +117,9 @@ impl ProviderManager {
     }
 
     /// 获取 Circuit Breaker 快照
-    pub fn circuit_breaker_snapshot(&self) -> Vec<crate::service::circuit_breaker::ProviderCircuitBreaker> {
+    pub fn circuit_breaker_snapshot(
+        &self,
+    ) -> Vec<crate::service::circuit_breaker::ProviderCircuitBreaker> {
         self.circuit_breakers.snapshot()
     }
 

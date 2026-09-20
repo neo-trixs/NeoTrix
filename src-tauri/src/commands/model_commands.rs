@@ -4,7 +4,7 @@
 //!
 //! 提供模型下载、验证、列表等操作的 Tauri 命令。
 
-use crate::desktop::model_manager::{ModelManager, ModelMetadata, ModelSource, ModelFormat};
+use crate::desktop::model_manager::{ModelFormat, ModelManager, ModelMetadata, ModelSource};
 use crate::ipc::{self, IpcResponse};
 use std::sync::Arc;
 use tauri::command;
@@ -23,9 +23,7 @@ pub fn new_model_state() -> ModelState {
 
 /// 列出所有本地模型
 #[command]
-pub async fn model_list_local(
-    state: State<'_, ModelState>,
-) -> IpcResponse<Vec<ModelMetadata>> {
+pub async fn model_list_local(state: State<'_, ModelState>) -> IpcResponse<Vec<ModelMetadata>> {
     let manager = state.read().await;
     ipc::ok(manager.list_models().into_iter().cloned().collect())
 }
@@ -42,10 +40,7 @@ pub async fn model_get_metadata(
 
 /// 删除本地模型
 #[command]
-pub async fn model_delete_local(
-    state: State<'_, ModelState>,
-    model_id: String,
-) -> IpcResponse<()> {
+pub async fn model_delete_local(state: State<'_, ModelState>, model_id: String) -> IpcResponse<()> {
     let mut manager = state.write().await;
     match manager.delete_model(&model_id).await {
         Ok(()) => ipc::ok(()),
@@ -75,9 +70,7 @@ pub async fn model_validate(
 
 /// 扫描本地模型目录
 #[command]
-pub async fn model_scan_local(
-    state: State<'_, ModelState>,
-) -> IpcResponse<Vec<ModelMetadata>> {
+pub async fn model_scan_local(state: State<'_, ModelState>) -> IpcResponse<Vec<ModelMetadata>> {
     let mut manager = state.write().await;
     match manager.scan_local_models().await {
         Ok(()) => ipc::ok(manager.list_models().into_iter().cloned().collect()),
@@ -87,9 +80,7 @@ pub async fn model_scan_local(
 
 /// 获取模型管理器统计信息
 #[command]
-pub async fn model_stats(
-    state: State<'_, ModelState>,
-) -> IpcResponse<serde_json::Value> {
+pub async fn model_stats(state: State<'_, ModelState>) -> IpcResponse<serde_json::Value> {
     let manager = state.read().await;
     let models = manager.list_models();
     let total_size: u64 = models.iter().map(|m| m.file_size).sum();
@@ -114,15 +105,17 @@ pub async fn model_search(
 ) -> IpcResponse<Vec<ModelMetadata>> {
     let manager = state.read().await;
     let query_lower = query.to_lowercase();
-    ipc::ok(manager
-        .list_models()
-        .into_iter()
-        .filter(|m| {
-            m.id.to_lowercase().contains(&query_lower)
-                || m.display_name.to_lowercase().contains(&query_lower)
-        })
-        .cloned()
-        .collect())
+    ipc::ok(
+        manager
+            .list_models()
+            .into_iter()
+            .filter(|m| {
+                m.id.to_lowercase().contains(&query_lower)
+                    || m.display_name.to_lowercase().contains(&query_lower)
+            })
+            .cloned()
+            .collect(),
+    )
 }
 
 // ========== 测试 ==========

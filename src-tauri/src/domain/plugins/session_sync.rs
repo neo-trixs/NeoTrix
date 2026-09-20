@@ -19,9 +19,9 @@
 //! └─────────────────────────────────────────────┘
 //! ```
 
-use async_trait::async_trait;
-use crate::domain::app_handle::{set_app_handle, get_app_handle};
+use crate::domain::app_handle::{get_app_handle, set_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -110,7 +110,7 @@ pub struct DeviceInfo {
     pub device_id: String,
     pub device_name: String,
     pub device_type: String, // "desktop", "mobile", "web"
-    pub platform: String,   // "macos", "windows", "linux", "ios", "android"
+    pub platform: String,    // "macos", "windows", "linux", "ios", "android"
     pub last_sync: Option<String>,
     pub sync_enabled: bool,
 }
@@ -148,7 +148,9 @@ impl SessionSyncPlugin {
                 sessions: HashMap::new(),
                 devices: vec![DeviceInfo {
                     device_id: device_id.clone(),
-                    device_name: hostname::get().map(|h| h.to_string_lossy().to_string()).unwrap_or_else(|_| "Unknown".to_string()),
+                    device_name: hostname::get()
+                        .map(|h| h.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| "Unknown".to_string()),
                     device_type: "desktop".to_string(),
                     platform: std::env::consts::OS.to_string(),
                     last_sync: None,
@@ -194,14 +196,21 @@ impl SessionSyncPlugin {
     }
 
     /// Add a message to a session
-    fn add_message(&self, session_id: &str, role: &str, content: &str) -> Result<SyncedMessage, DomainError> {
+    fn add_message(
+        &self,
+        session_id: &str,
+        role: &str,
+        content: &str,
+    ) -> Result<SyncedMessage, DomainError> {
         let mut state = self.state.lock().map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
         })?;
 
-        let session = state.sessions.get_mut(session_id)
+        let session = state
+            .sessions
+            .get_mut(session_id)
             .ok_or_else(|| DomainError {
                 code: "SESSION_NOT_FOUND".into(),
                 message: format!("Session '{}' not found", session_id),
@@ -225,7 +234,10 @@ impl SessionSyncPlugin {
         session.modified_at = now;
 
         // Increment vector clock
-        let clock = session.vector_clock.entry(state.current_device_id.clone()).or_insert(0);
+        let clock = session
+            .vector_clock
+            .entry(state.current_device_id.clone())
+            .or_insert(0);
         *clock += 1;
 
         // Mark as needing sync
@@ -251,7 +263,10 @@ impl SessionSyncPlugin {
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
         })?;
-        state.sessions.get(session_id).cloned()
+        state
+            .sessions
+            .get(session_id)
+            .cloned()
             .ok_or_else(|| DomainError {
                 code: "SESSION_NOT_FOUND".into(),
                 message: format!("Session '{}' not found", session_id),
@@ -286,10 +301,14 @@ impl SessionSyncPlugin {
         }
 
         let total = state.sessions.len();
-        let synced = state.sessions.values()
+        let synced = state
+            .sessions
+            .values()
             .filter(|s| s.sync_status == SyncStatus::Synced)
             .count();
-        let conflicts = state.sessions.values()
+        let conflicts = state
+            .sessions
+            .values()
             .filter(|s| matches!(s.sync_status, SyncStatus::Conflict(_)))
             .count();
 
@@ -403,13 +422,16 @@ impl DomainPlugin for SessionSyncPlugin {
         ]
     }
 
-    async fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+    async fn call(
+        &self,
+        action: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, DomainError> {
         match action {
             "create_session" => {
-                let mode = args.get("mode")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("chat");
-                let title = args.get("title")
+                let mode = args.get("mode").and_then(|v| v.as_str()).unwrap_or("chat");
+                let title = args
+                    .get("title")
                     .and_then(|v| v.as_str())
                     .unwrap_or("New Session");
 
@@ -417,19 +439,16 @@ impl DomainPlugin for SessionSyncPlugin {
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "add_message" => {
-                let session_id = args.get("session_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
-                let role = args.get("role")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("user");
-                let content = args.get("content")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
+                let role = args.get("role").and_then(|v| v.as_str()).unwrap_or("user");
+                let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
 
                 let message = self.add_message(session_id, role, content)?;
                 Ok(serde_json::to_value(message).unwrap_or_default())
@@ -442,24 +461,26 @@ impl DomainPlugin for SessionSyncPlugin {
                 }))
             }
             "get_session" => {
-                let session_id = args.get("session_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
                 let session = self.get_session(session_id)?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "delete_session" => {
-                let session_id = args.get("session_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
                 self.delete_session(session_id)?;
                 Ok(serde_json::json!({"success": true}))
             }
@@ -475,10 +496,14 @@ impl DomainPlugin for SessionSyncPlugin {
                 })?;
 
                 let total = state.sessions.len();
-                let synced = state.sessions.values()
+                let synced = state
+                    .sessions
+                    .values()
                     .filter(|s| s.sync_status == SyncStatus::Synced)
                     .count();
-                let conflicts = state.sessions.values()
+                let conflicts = state
+                    .sessions
+                    .values()
                     .filter(|s| matches!(s.sync_status, SyncStatus::Conflict(_)))
                     .count();
 

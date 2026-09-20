@@ -17,9 +17,9 @@
 //! │  └──────────────────────────────────────┘   │
 //! └─────────────────────────────────────────────//! ```
 
-use async_trait::async_trait;
-use crate::domain::app_handle::{set_app_handle, get_app_handle};
+use crate::domain::app_handle::{get_app_handle, set_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -173,59 +173,70 @@ impl UnifiedSurfacePlugin {
     pub fn new() -> Self {
         let mut modes = HashMap::new();
 
-        modes.insert(SurfaceMode::Chat, ModeConfig {
-            mode: SurfaceMode::Chat,
-            label: "Chat".to_string(),
-            description: "Fast conversational assistance and everyday questions".to_string(),
-            icon: "chat-bubble".to_string(),
-            features: vec![
-                "chat".to_string(),
-                "search".to_string(),
-                "quick-questions".to_string(),
-            ],
-            default_model_tier: "balanced".to_string(),
-            show_file_panel: false,
-            show_terminal: false,
-            show_browser: false,
-        });
+        modes.insert(
+            SurfaceMode::Chat,
+            ModeConfig {
+                mode: SurfaceMode::Chat,
+                label: "Chat".to_string(),
+                description: "Fast conversational assistance and everyday questions".to_string(),
+                icon: "chat-bubble".to_string(),
+                features: vec![
+                    "chat".to_string(),
+                    "search".to_string(),
+                    "quick-questions".to_string(),
+                ],
+                default_model_tier: "balanced".to_string(),
+                show_file_panel: false,
+                show_terminal: false,
+                show_browser: false,
+            },
+        );
 
-        modes.insert(SurfaceMode::Work, ModeConfig {
-            mode: SurfaceMode::Work,
-            label: "Work".to_string(),
-            description: "Research, analyze, create documents, spreadsheets, presentations".to_string(),
-            icon: "work".to_string(),
-            features: vec![
-                "research".to_string(),
-                "document-creation".to_string(),
-                "analysis".to_string(),
-                "file-access".to_string(),
-                "browser".to_string(),
-                "scheduled-tasks".to_string(),
-            ],
-            default_model_tier: "strong".to_string(),
-            show_file_panel: true,
-            show_terminal: false,
-            show_browser: true,
-        });
+        modes.insert(
+            SurfaceMode::Work,
+            ModeConfig {
+                mode: SurfaceMode::Work,
+                label: "Work".to_string(),
+                description: "Research, analyze, create documents, spreadsheets, presentations"
+                    .to_string(),
+                icon: "work".to_string(),
+                features: vec![
+                    "research".to_string(),
+                    "document-creation".to_string(),
+                    "analysis".to_string(),
+                    "file-access".to_string(),
+                    "browser".to_string(),
+                    "scheduled-tasks".to_string(),
+                ],
+                default_model_tier: "strong".to_string(),
+                show_file_panel: true,
+                show_terminal: false,
+                show_browser: true,
+            },
+        );
 
-        modes.insert(SurfaceMode::Code, ModeConfig {
-            mode: SurfaceMode::Code,
-            label: "Code".to_string(),
-            description: "Software development, Git integration, testing, deployment".to_string(),
-            icon: "code".to_string(),
-            features: vec![
-                "code-editing".to_string(),
-                "git-integration".to_string(),
-                "testing".to_string(),
-                "terminal".to_string(),
-                "worktrees".to_string(),
-                "code-review".to_string(),
-            ],
-            default_model_tier: "strong".to_string(),
-            show_file_panel: true,
-            show_terminal: true,
-            show_browser: false,
-        });
+        modes.insert(
+            SurfaceMode::Code,
+            ModeConfig {
+                mode: SurfaceMode::Code,
+                label: "Code".to_string(),
+                description: "Software development, Git integration, testing, deployment"
+                    .to_string(),
+                icon: "code".to_string(),
+                features: vec![
+                    "code-editing".to_string(),
+                    "git-integration".to_string(),
+                    "testing".to_string(),
+                    "terminal".to_string(),
+                    "worktrees".to_string(),
+                    "code-review".to_string(),
+                ],
+                default_model_tier: "strong".to_string(),
+                show_file_panel: true,
+                show_terminal: true,
+                show_browser: false,
+            },
+        );
 
         Self {
             state: Arc::new(Mutex::new(SurfaceState {
@@ -239,7 +250,11 @@ impl UnifiedSurfacePlugin {
     }
 
     /// Switch mode
-    fn switch_mode(&self, target: SurfaceMode, reason: Option<String>) -> Result<SurfaceState, DomainError> {
+    fn switch_mode(
+        &self,
+        target: SurfaceMode,
+        reason: Option<String>,
+    ) -> Result<SurfaceState, DomainError> {
         let mut state = self.state.lock().map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
@@ -298,17 +313,20 @@ impl DomainPlugin for UnifiedSurfacePlugin {
             ActionSpec {
                 name: "switch_mode".into(),
                 description: "Switch between Chat/Work/Code modes".into(),
-                params: vec![ParamSpec {
-                    name: "mode".into(),
-                    typ: "string".into(),
-                    required: true,
-                    description: "Target mode: chat, work, or code".into(),
-                }, ParamSpec {
-                    name: "reason".into(),
-                    typ: "string".into(),
-                    required: false,
-                    description: "Reason for switching".into(),
-                }],
+                params: vec![
+                    ParamSpec {
+                        name: "mode".into(),
+                        typ: "string".into(),
+                        required: true,
+                        description: "Target mode: chat, work, or code".into(),
+                    },
+                    ParamSpec {
+                        name: "reason".into(),
+                        typ: "string".into(),
+                        required: false,
+                        description: "Reason for switching".into(),
+                    },
+                ],
             },
             ActionSpec {
                 name: "get_state".into(),
@@ -332,7 +350,9 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                     name: "panel".into(),
                     typ: "string".into(),
                     required: true,
-                    description: "Panel name: file_panel, terminal, browser, memory, skills, automations".into(),
+                    description:
+                        "Panel name: file_panel, terminal, browser, memory, skills, automations"
+                            .into(),
                 }],
             },
             ActionSpec {
@@ -353,29 +373,39 @@ impl DomainPlugin for UnifiedSurfacePlugin {
         ]
     }
 
-    async fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+    async fn call(
+        &self,
+        action: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, DomainError> {
         match action {
             "switch_mode" => {
-                let mode_str = args.get("mode")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'mode' parameter".into(),
-                        recoverable: true,
-                    })?;
+                let mode_str =
+                    args.get("mode")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'mode' parameter".into(),
+                            recoverable: true,
+                        })?;
 
                 let mode = match mode_str.to_lowercase().as_str() {
                     "chat" => SurfaceMode::Chat,
                     "work" => SurfaceMode::Work,
                     "code" => SurfaceMode::Code,
-                    _ => return Err(DomainError {
-                        code: "INVALID_MODE".into(),
-                        message: format!("Invalid mode: {}. Use chat, work, or code", mode_str),
-                        recoverable: true,
-                    }),
+                    _ => {
+                        return Err(DomainError {
+                            code: "INVALID_MODE".into(),
+                            message: format!("Invalid mode: {}. Use chat, work, or code", mode_str),
+                            recoverable: true,
+                        })
+                    }
                 };
 
-                let reason = args.get("reason").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let reason = args
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 let state = self.switch_mode(mode, reason)?;
                 Ok(serde_json::to_value(state).unwrap_or_default())
             }
@@ -384,9 +414,7 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                 Ok(serde_json::to_value(state).unwrap_or_default())
             }
             "get_mode_config" => {
-                let mode_str = args.get("mode")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("chat");
+                let mode_str = args.get("mode").and_then(|v| v.as_str()).unwrap_or("chat");
 
                 let mode = match mode_str.to_lowercase().as_str() {
                     "chat" => SurfaceMode::Chat,
@@ -407,13 +435,14 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                 }
             }
             "toggle_panel" => {
-                let panel = args.get("panel")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'panel' parameter".into(),
-                        recoverable: true,
-                    })?;
+                let panel =
+                    args.get("panel")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'panel' parameter".into(),
+                            recoverable: true,
+                        })?;
 
                 let mut state = self.state.lock().map_err(|e| DomainError {
                     code: "LOCK_ERROR".into(),
@@ -428,11 +457,13 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                     "memory" => state.panels.memory = !state.panels.memory,
                     "skills" => state.panels.skills = !state.panels.skills,
                     "automations" => state.panels.automations = !state.panels.automations,
-                    _ => return Err(DomainError {
-                        code: "INVALID_PANEL".into(),
-                        message: format!("Invalid panel: {}", panel),
-                        recoverable: true,
-                    }),
+                    _ => {
+                        return Err(DomainError {
+                            code: "INVALID_PANEL".into(),
+                            message: format!("Invalid panel: {}", panel),
+                            recoverable: true,
+                        })
+                    }
                 }
 
                 Ok(serde_json::to_value(&*state).unwrap_or_default())

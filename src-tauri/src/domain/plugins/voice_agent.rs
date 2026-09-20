@@ -18,9 +18,9 @@
 //! └─────────────────────────────────────────────┘
 //! ```
 
-use async_trait::async_trait;
-use crate::domain::app_handle::{set_app_handle, get_app_handle};
+use crate::domain::app_handle::{get_app_handle, set_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -225,7 +225,9 @@ impl VoiceAgentPlugin {
             recoverable: false,
         })?;
 
-        let session = state.sessions.get_mut(session_id)
+        let session = state
+            .sessions
+            .get_mut(session_id)
             .ok_or_else(|| DomainError {
                 code: "SESSION_NOT_FOUND".into(),
                 message: format!("Voice session '{}' not found", session_id),
@@ -247,7 +249,9 @@ impl VoiceAgentPlugin {
             recoverable: false,
         })?;
 
-        let session = state.sessions.get_mut(session_id)
+        let session = state
+            .sessions
+            .get_mut(session_id)
             .ok_or_else(|| DomainError {
                 code: "SESSION_NOT_FOUND".into(),
                 message: format!("Voice session '{}' not found", session_id),
@@ -259,7 +263,11 @@ impl VoiceAgentPlugin {
     }
 
     /// Process voice input (transcribe)
-    fn process_input(&self, session_id: &str, audio_data: Option<String>) -> Result<VoiceCommand, DomainError> {
+    fn process_input(
+        &self,
+        session_id: &str,
+        audio_data: Option<String>,
+    ) -> Result<VoiceCommand, DomainError> {
         let mut state = self.state.lock().map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
@@ -312,7 +320,9 @@ impl VoiceAgentPlugin {
             recoverable: false,
         })?;
 
-        let session = state.sessions.get_mut(session_id)
+        let session = state
+            .sessions
+            .get_mut(session_id)
             .ok_or_else(|| DomainError {
                 code: "SESSION_NOT_FOUND".into(),
                 message: format!("Voice session '{}' not found", session_id),
@@ -436,80 +446,94 @@ impl DomainPlugin for VoiceAgentPlugin {
         ]
     }
 
-    async fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+    async fn call(
+        &self,
+        action: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, DomainError> {
         match action {
             "start_session" => {
-                let language = args.get("language").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let language = args
+                    .get("language")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 let session = self.start_session(language)?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "stop_session" => {
-                let session_id = args.get("session_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
                 self.stop_session(session_id)?;
                 Ok(serde_json::json!({"success": true}))
             }
             "start_listening" => {
-                let session_id = args.get("session_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
                 let session = self.start_listening(session_id)?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "stop_listening" => {
-                let session_id = args.get("session_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
                 let session = self.stop_listening(session_id)?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "process_input" => {
-                let session_id = args.get("session_id")
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
+                let audio_data = args
+                    .get("audio_data")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
-                let audio_data = args.get("audio_data").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    .map(|s| s.to_string());
                 let command = self.process_input(session_id, audio_data)?;
                 Ok(serde_json::to_value(command).unwrap_or_default())
             }
             "speak" => {
-                let session_id = args.get("session_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
-                let text = args.get("text")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
+                let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
                 self.speak(session_id, text)?;
                 Ok(serde_json::json!({"success": true}))
             }
             "toggle_mute" => {
-                let session_id = args.get("session_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError {
-                        code: "INVALID_PARAMS".into(),
-                        message: "Missing 'session_id' parameter".into(),
-                        recoverable: true,
-                    })?;
+                let session_id =
+                    args.get("session_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'session_id' parameter".into(),
+                            recoverable: true,
+                        })?;
                 let session = self.toggle_mute(session_id)?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
@@ -521,13 +545,13 @@ impl DomainPlugin for VoiceAgentPlugin {
                 })?;
 
                 let total_sessions = state.sessions.len();
-                let active = state.sessions.values()
+                let active = state
+                    .sessions
+                    .values()
                     .filter(|s| matches!(s.status, VoiceStatus::Listening | VoiceStatus::Speaking))
                     .count();
                 let total_commands = state.commands.len();
-                let successful = state.commands.iter()
-                    .filter(|c| c.confidence > 0.5)
-                    .count();
+                let successful = state.commands.iter().filter(|c| c.confidence > 0.5).count();
 
                 let stats = VoiceStats {
                     total_sessions,
@@ -536,7 +560,8 @@ impl DomainPlugin for VoiceAgentPlugin {
                     successful_commands: successful,
                     failed_commands: total_commands - successful,
                     avg_confidence: if total_commands > 0 {
-                        state.commands.iter().map(|c| c.confidence).sum::<f32>() / total_commands as f32
+                        state.commands.iter().map(|c| c.confidence).sum::<f32>()
+                            / total_commands as f32
                     } else {
                         0.0
                     },

@@ -150,8 +150,11 @@ pub trait DomainPlugin: Send + Sync {
     fn actions(&self) -> Vec<ActionSpec>;
 
     /// 处理 action 调用
-    async fn call(&self, action: &str, args: serde_json::Value)
-        -> Result<serde_json::Value, DomainError>;
+    async fn call(
+        &self,
+        action: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, DomainError>;
 
     /// 初始化 (插件注册后调用)
     async fn init(&mut self) -> Result<(), DomainError> {

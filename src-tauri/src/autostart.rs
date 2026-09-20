@@ -1,6 +1,6 @@
-use anyhow::{Context, Result as AnyhowResult};
 use crate::ipc;
 use crate::ipc::IpcResponse;
+use anyhow::{Context, Result as AnyhowResult};
 use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 
@@ -20,16 +20,12 @@ impl AutoStartManager {
 
     pub fn enable(&self) -> AnyhowResult<()> {
         let autostart = self.app.autolaunch();
-        autostart
-            .enable()
-            .context("Failed to enable autostart")
+        autostart.enable().context("Failed to enable autostart")
     }
 
     pub fn disable(&self) -> AnyhowResult<()> {
         let autostart = self.app.autolaunch();
-        autostart
-            .disable()
-            .context("Failed to disable autostart")
+        autostart.disable().context("Failed to disable autostart")
     }
 
     pub fn toggle(&self) -> AnyhowResult<bool> {

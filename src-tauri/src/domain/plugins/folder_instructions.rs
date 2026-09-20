@@ -22,9 +22,9 @@
 //! └─────────────────────────────────────────────┘
 //! ```
 
-use async_trait::async_trait;
-use crate::domain::app_handle::{set_app_handle, get_app_handle};
+use crate::domain::app_handle::{get_app_handle, set_app_handle};
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -186,7 +186,9 @@ impl FolderInstructionsPlugin {
             loaded_at: chrono::Utc::now().to_rfc3339(),
         };
 
-        state.projects.insert(root_path.to_string(), context.clone());
+        state
+            .projects
+            .insert(root_path.to_string(), context.clone());
         Ok(context)
     }
 
@@ -209,12 +211,11 @@ impl FolderInstructionsPlugin {
             recoverable: false,
         })?;
 
-        let project = state.projects.get(root_path)
-            .ok_or_else(|| DomainError {
-                code: "PROJECT_NOT_FOUND".into(),
-                message: format!("Project '{}' not loaded", root_path),
-                recoverable: true,
-            })?;
+        let project = state.projects.get(root_path).ok_or_else(|| DomainError {
+            code: "PROJECT_NOT_FOUND".into(),
+            message: format!("Project '{}' not loaded", root_path),
+            recoverable: true,
+        })?;
 
         let mut parts = Vec::new();
         let mut sources = Vec::new();
@@ -274,15 +275,17 @@ impl FolderInstructionsPlugin {
             recoverable: false,
         })?;
 
-        let total_instructions = state.projects.values()
+        let total_instructions = state
+            .projects
+            .values()
             .filter(|p| p.instructions.is_some())
             .count();
-        let total_memory = state.projects.values()
+        let total_memory = state
+            .projects
+            .values()
             .filter(|p| p.memory.is_some())
             .count();
-        let total_skills: usize = state.projects.values()
-            .map(|p| p.skills.len())
-            .sum();
+        let total_skills: usize = state.projects.values().map(|p| p.skills.len()).sum();
 
         Ok(FolderStats {
             projects_loaded: state.projects.len(),
@@ -315,17 +318,32 @@ impl DomainPlugin for FolderInstructionsPlugin {
             ActionSpec {
                 name: "load_project".into(),
                 description: "Load project context from a directory".into(),
-                params: vec![ParamSpec { name: "root_path".into(), typ: "string".into(), required: true, description: "Project root path".into() }],
+                params: vec![ParamSpec {
+                    name: "root_path".into(),
+                    typ: "string".into(),
+                    required: true,
+                    description: "Project root path".into(),
+                }],
             },
             ActionSpec {
                 name: "unload_project".into(),
                 description: "Unload a project context".into(),
-                params: vec![ParamSpec { name: "root_path".into(), typ: "string".into(), required: true, description: "Project root path".into() }],
+                params: vec![ParamSpec {
+                    name: "root_path".into(),
+                    typ: "string".into(),
+                    required: true,
+                    description: "Project root path".into(),
+                }],
             },
             ActionSpec {
                 name: "get_context".into(),
                 description: "Get merged context for a project".into(),
-                params: vec![ParamSpec { name: "root_path".into(), typ: "string".into(), required: true, description: "Project root path".into() }],
+                params: vec![ParamSpec {
+                    name: "root_path".into(),
+                    typ: "string".into(),
+                    required: true,
+                    description: "Project root path".into(),
+                }],
             },
             ActionSpec {
                 name: "list_projects".into(),
@@ -335,7 +353,12 @@ impl DomainPlugin for FolderInstructionsPlugin {
             ActionSpec {
                 name: "set_global_instructions".into(),
                 description: "Set global instructions applied to all projects".into(),
-                params: vec![ParamSpec { name: "instructions".into(), typ: "string".into(), required: true, description: "Instructions content".into() }],
+                params: vec![ParamSpec {
+                    name: "instructions".into(),
+                    typ: "string".into(),
+                    required: true,
+                    description: "Instructions content".into(),
+                }],
             },
             ActionSpec {
                 name: "get_stats".into(),
@@ -345,23 +368,45 @@ impl DomainPlugin for FolderInstructionsPlugin {
         ]
     }
 
-    async fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+    async fn call(
+        &self,
+        action: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, DomainError> {
         match action {
             "load_project" => {
-                let root_path = args.get("root_path").and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError { code: "INVALID_PARAMS".into(), message: "Missing 'root_path'".into(), recoverable: true })?;
+                let root_path =
+                    args.get("root_path")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'root_path'".into(),
+                            recoverable: true,
+                        })?;
                 let ctx = self.load_project(root_path)?;
                 Ok(serde_json::to_value(ctx).unwrap_or_default())
             }
             "unload_project" => {
-                let root_path = args.get("root_path").and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError { code: "INVALID_PARAMS".into(), message: "Missing 'root_path'".into(), recoverable: true })?;
+                let root_path =
+                    args.get("root_path")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'root_path'".into(),
+                            recoverable: true,
+                        })?;
                 self.unload_project(root_path)?;
                 Ok(serde_json::json!({"success": true}))
             }
             "get_context" => {
-                let root_path = args.get("root_path").and_then(|v| v.as_str())
-                    .ok_or_else(|| DomainError { code: "INVALID_PARAMS".into(), message: "Missing 'root_path'".into(), recoverable: true })?;
+                let root_path =
+                    args.get("root_path")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| DomainError {
+                            code: "INVALID_PARAMS".into(),
+                            message: "Missing 'root_path'".into(),
+                            recoverable: true,
+                        })?;
                 let ctx = self.get_context(root_path)?;
                 Ok(serde_json::to_value(ctx).unwrap_or_default())
             }
@@ -370,7 +415,10 @@ impl DomainPlugin for FolderInstructionsPlugin {
                 Ok(serde_json::json!({"projects": projects, "total": projects.len()}))
             }
             "set_global_instructions" => {
-                let instructions = args.get("instructions").and_then(|v| v.as_str()).unwrap_or("");
+                let instructions = args
+                    .get("instructions")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 self.set_global_instructions(instructions)?;
                 Ok(serde_json::json!({"success": true}))
             }
@@ -378,10 +426,18 @@ impl DomainPlugin for FolderInstructionsPlugin {
                 let stats = self.get_stats()?;
                 Ok(serde_json::to_value(stats).unwrap_or_default())
             }
-            _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
+            _ => Err(DomainError {
+                code: "UNKNOWN_ACTION".into(),
+                message: format!("Unknown action: {}", action),
+                recoverable: true,
+            }),
         }
     }
 
-    async fn init(&mut self) -> Result<(), DomainError> { Ok(()) }
-    async fn shutdown(&mut self) -> Result<(), DomainError> { Ok(()) }
+    async fn init(&mut self) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn shutdown(&mut self) -> Result<(), DomainError> {
+        Ok(())
+    }
 }

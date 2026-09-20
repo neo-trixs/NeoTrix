@@ -184,17 +184,15 @@ impl SessionManager {
     }
 
     /// 导出会话
-    pub fn export_session(
-        &self,
-        session_id: &str,
-        format: ExportFormat,
-    ) -> AnyhowResult<Vec<u8>> {
-        let session = self.sessions.get(session_id).ok_or_else(|| anyhow::anyhow!("Session not found"))?;
+    pub fn export_session(&self, session_id: &str, format: ExportFormat) -> AnyhowResult<Vec<u8>> {
+        let session = self
+            .sessions
+            .get(session_id)
+            .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
 
         match format {
             ExportFormat::Json => {
-                let json = serde_json::to_string_pretty(session)
-                    .context("Failed to serialize")?;
+                let json = serde_json::to_string_pretty(session).context("Failed to serialize")?;
                 Ok(json.into_bytes())
             }
             ExportFormat::Markdown => {

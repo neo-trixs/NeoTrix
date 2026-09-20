@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use thiserror::Error;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
+use thiserror::Error;
 
 /// Errors from browser operations.
 #[derive(Debug, Clone, Error)]
@@ -62,7 +62,9 @@ pub struct BrowserHost;
 
 impl BrowserHost {
     pub fn open_or_navigate(app: &AppHandle, url: &str) -> Result<BrowserState, BrowserError> {
-        let parsed = url.parse().map_err(|e| BrowserError::InvalidUrl(format!("{e}")))?;
+        let parsed = url
+            .parse()
+            .map_err(|e| BrowserError::InvalidUrl(format!("{e}")))?;
         let window_id = "neotrix-browser";
 
         if let Some(window) = app.get_webview_window(window_id) {
@@ -126,7 +128,9 @@ impl BrowserHost {
 
     pub fn close(app: &AppHandle) -> Result<(), BrowserError> {
         if let Some(window) = app.get_webview_window("neotrix-browser") {
-            window.close().map_err(|e| BrowserError::Navigation(format!("{e}")))
+            window
+                .close()
+                .map_err(|e| BrowserError::Navigation(format!("{e}")))
         } else {
             Err(BrowserError::WindowNotFound)
         }
@@ -146,7 +150,9 @@ impl BrowserHost {
             .send()
             .map_err(|e| BrowserError::Network(format!("fetch error: {e}")))?;
         let final_url = resp.url().to_string();
-        let html = resp.text().map_err(|e| BrowserError::Network(format!("read error: {e}")))?;
+        let html = resp
+            .text()
+            .map_err(|e| BrowserError::Network(format!("read error: {e}")))?;
 
         let title = extract_title(&html);
         let text = strip_html(&html);

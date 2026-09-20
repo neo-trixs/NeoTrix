@@ -104,11 +104,19 @@ impl AppConfig {
 
         for path in &config_paths {
             if path.exists() {
-                let content = String::from_utf8(
-                    atomic_io::read_with_fallback(path)
-                        .map_err(|e| ConfigError::FileRead(path.display().to_string(), std::io::Error::new(std::io::ErrorKind::Other, e)))?
-                )
-                .map_err(|e| ConfigError::FileRead(path.display().to_string(), std::io::Error::new(std::io::ErrorKind::InvalidData, e)))?;
+                let content =
+                    String::from_utf8(atomic_io::read_with_fallback(path).map_err(|e| {
+                        ConfigError::FileRead(
+                            path.display().to_string(),
+                            std::io::Error::new(std::io::ErrorKind::Other, e),
+                        )
+                    })?)
+                    .map_err(|e| {
+                        ConfigError::FileRead(
+                            path.display().to_string(),
+                            std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+                        )
+                    })?;
                 let parsed: Self = toml::from_str(&content)
                     .map_err(|e| ConfigError::Parse(path.display().to_string(), e))?;
                 tracing::info!(path = %path.display(), "Loaded config file");
@@ -154,12 +162,10 @@ impl AppConfig {
 
     /// Ensure the user base directory exists; create if missing.
     pub fn ensure_base_dir() -> Result<PathBuf, ConfigError> {
-        let dir = Self::base_dir().ok_or_else(|| {
-            ConfigError::Validation("cannot determine home directory".into())
-        })?;
-        std::fs::create_dir_all(&dir).map_err(|e| {
-            ConfigError::FileRead(dir.display().to_string(), e)
-        })?;
+        let dir = Self::base_dir()
+            .ok_or_else(|| ConfigError::Validation("cannot determine home directory".into()))?;
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| ConfigError::FileRead(dir.display().to_string(), e))?;
         Ok(dir)
     }
 

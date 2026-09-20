@@ -16,13 +16,10 @@ pub fn init_logging(app_handle: &tauri::AppHandle) {
         .with_writer(io::stderr)
         .with_filter(env_filter);
 
-    let log_dir = app_handle
-        .path()
-        .app_log_dir()
-        .unwrap_or_else(|e| {
-            tracing::error!("failed to resolve log dir: {e}");
-            std::path::PathBuf::from(".")
-        });
+    let log_dir = app_handle.path().app_log_dir().unwrap_or_else(|e| {
+        tracing::error!("failed to resolve log dir: {e}");
+        std::path::PathBuf::from(".")
+    });
     std::fs::create_dir_all(&log_dir).ok();
 
     let file_appender = rolling::daily(&log_dir, "neotrix.log");

@@ -75,5 +75,10 @@ pub async fn proxy_pool_set_strategy(strategy: String) -> IpcResponse<String> {
 
 #[tauri::command]
 pub async fn proxy_pool_list_strategies() -> IpcResponse<Vec<String>> {
-    ipc::ok(pool::VALID_STRATEGIES.iter().map(|s| s.to_string()).collect())
+    ipc::ok(
+        pool::VALID_STRATEGIES
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+    )
 }

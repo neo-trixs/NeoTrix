@@ -5,10 +5,9 @@
 //! 基于 Azure APIM Unified Model API 模式。
 //! 提供 Provider 管理、failover、cost tracking 的完整 CRUD 操作。
 
+use crate::error_codes;
 use crate::ipc::{self, IpcResponse};
-use crate::service::provider_manager::{
-    FailoverChain, ProviderConfig, SharedProviderManager,
-};
+use crate::service::provider_manager::{FailoverChain, ProviderConfig, SharedProviderManager};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::{command, AppHandle, Emitter, State};
@@ -149,11 +148,14 @@ pub async fn provider_complete(
         manager.record_success(&provider.id);
 
         // 发射成功事件
-        if let Err(e) = app.emit("provider_request_success", serde_json::json!({
-            "provider_id": provider.id,
-            "model": model_name,
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-        })) {
+        if let Err(e) = app.emit(
+            "provider_request_success",
+            serde_json::json!({
+                "provider_id": provider.id,
+                "model": model_name,
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+            }),
+        ) {
             tracing::trace!("emit provider_request_success: {e}");
         }
 
@@ -185,7 +187,7 @@ pub async fn provider_health_check(
         Some(p) => p,
         None => {
             return ipc::err(
-                "PROVIDER_NOT_FOUND",
+                error_codes::PROVIDER_NOT_FOUND,
                 &format!("Provider '{}' not found", provider_id),
             )
         }
@@ -218,11 +220,14 @@ pub async fn provider_add(
 
     manager.register(config.clone().into());
 
-    if let Err(e) = app.emit("provider_added", serde_json::json!({
-        "provider_id": config.id,
-        "name": config.name,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-    })) {
+    if let Err(e) = app.emit(
+        "provider_added",
+        serde_json::json!({
+            "provider_id": config.id,
+            "name": config.name,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+        }),
+    ) {
         tracing::trace!("emit provider_added: {e}");
     }
 
@@ -250,16 +255,19 @@ pub async fn provider_remove(
 
     if !manager.unregister(&provider_id) {
         return ipc::err(
-            "PROVIDER_NOT_FOUND",
+            error_codes::PROVIDER_NOT_FOUND,
             &format!("Provider '{}' not found", provider_id),
         );
     }
 
     // 发射事件
-    if let Err(e) = app.emit("provider_removed", serde_json::json!({
-        "provider_id": provider_id,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-    })) {
+    if let Err(e) = app.emit(
+        "provider_removed",
+        serde_json::json!({
+            "provider_id": provider_id,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+        }),
+    ) {
         tracing::trace!("emit provider_removed: {e}");
     }
 
@@ -277,7 +285,7 @@ pub async fn provider_get_config(
         Some(p) => p,
         None => {
             return ipc::err(
-                "PROVIDER_NOT_FOUND",
+                error_codes::PROVIDER_NOT_FOUND,
                 &format!("Provider '{}' not found", provider_id),
             )
         }
@@ -307,7 +315,7 @@ pub async fn provider_update_config(
 
     if manager.get_provider(&provider_id).is_none() {
         return ipc::err(
-            "PROVIDER_NOT_FOUND",
+            error_codes::PROVIDER_NOT_FOUND,
             &format!("Provider '{}' not found", provider_id),
         );
     }

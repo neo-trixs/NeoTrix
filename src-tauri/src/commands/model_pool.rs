@@ -22,7 +22,14 @@ pub async fn model_pool_add(
     tags: Vec<String>,
     base_url: Option<String>,
 ) -> IpcResponse<ModelPoolEntry> {
-    match mp::add_entry(&label, &provider, &api_key, &model, &tags, base_url.as_deref()) {
+    match mp::add_entry(
+        &label,
+        &provider,
+        &api_key,
+        &model,
+        &tags,
+        base_url.as_deref(),
+    ) {
         Ok(entry) => ipc::ok(entry),
         Err(e) => ipc::err("POOL_WRITE_FAILED", format!("{e}")),
     }
@@ -43,5 +50,7 @@ pub async fn model_pool_update_key(label: String, new_api_key: String) -> Result
 
 #[tauri::command]
 pub async fn model_pool_check(label: String) -> Result<String, String> {
-    mp::check_connectivity(&label).await.map_err(|e| e.to_string())
+    mp::check_connectivity(&label)
+        .await
+        .map_err(|e| e.to_string())
 }

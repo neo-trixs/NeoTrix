@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::atomic_io;
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

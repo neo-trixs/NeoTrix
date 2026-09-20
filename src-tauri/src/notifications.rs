@@ -36,7 +36,11 @@ impl NotificationManager {
     }
 
     /// 显示新消息通知
-    pub fn notify_new_message(&self, session_title: &str, preview: &str) -> Result<(), NotificationError> {
+    pub fn notify_new_message(
+        &self,
+        session_title: &str,
+        preview: &str,
+    ) -> Result<(), NotificationError> {
         self.show_notification(&format!("新消息 - {}", session_title), preview)
     }
 

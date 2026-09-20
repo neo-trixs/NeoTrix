@@ -1,7 +1,7 @@
-use async_trait::async_trait;
 use crate::atomic_io;
 use crate::domain::model_pool as mp;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
+use async_trait::async_trait;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
@@ -695,12 +695,19 @@ impl DomainPlugin for LlamacppPlugin {
                     .get("base_url")
                     .and_then(|v| v.as_str())
                     .map(String::from);
-                let entry = mp::add_entry(&label, &provider, &api_key, &model, &tags, base_url.as_deref())
-                    .map_err(|e| DomainError {
-                        code: "POOL_ERROR".into(),
-                        message: e.to_string(),
-                        recoverable: true,
-                    })?;
+                let entry = mp::add_entry(
+                    &label,
+                    &provider,
+                    &api_key,
+                    &model,
+                    &tags,
+                    base_url.as_deref(),
+                )
+                .map_err(|e| DomainError {
+                    code: "POOL_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
                 Ok(serde_json::json!(entry))
             }
             "pool_remove" => {
@@ -727,11 +734,12 @@ impl DomainPlugin for LlamacppPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let updated = mp::update_api_key(&label, &new_api_key).map_err(|e| DomainError {
-                    code: "POOL_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let updated =
+                    mp::update_api_key(&label, &new_api_key).map_err(|e| DomainError {
+                        code: "POOL_ERROR".into(),
+                        message: e.to_string(),
+                        recoverable: true,
+                    })?;
                 Ok(serde_json::json!(updated))
             }
             "pool_check" => {
@@ -740,11 +748,13 @@ impl DomainPlugin for LlamacppPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let result = mp::check_connectivity(&label).await.map_err(|e| DomainError {
-                    code: "POOL_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let result = mp::check_connectivity(&label)
+                    .await
+                    .map_err(|e| DomainError {
+                        code: "POOL_ERROR".into(),
+                        message: e.to_string(),
+                        recoverable: true,
+                    })?;
                 Ok(serde_json::json!(result))
             }
             "pool_health" => {
@@ -871,10 +881,15 @@ fn scan_models(dir: &PathBuf) -> Vec<serde_json::Value> {
                     let path = e.path();
                     let meta = e.metadata().ok()?;
                     let name = path.file_stem()?.to_string_lossy().to_string();
-                    let format = path.extension()
+                    let format = path
+                        .extension()
                         .map(|ext| ext.to_string_lossy().to_uppercase())
                         .unwrap_or_default();
-                    let backend = if format == "ONNX" { "onnxruntime" } else { "llamacpp" };
+                    let backend = if format == "ONNX" {
+                        "onnxruntime"
+                    } else {
+                        "llamacpp"
+                    };
                     Some(serde_json::json!({
                         "name": name,
                         "path": path.to_string_lossy(),
