@@ -98,7 +98,7 @@ impl ChannelType {
 }
 
 /// 渠道连接状态
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelStatus {
     Disconnected,
@@ -107,8 +107,19 @@ pub enum ChannelStatus {
     Error(String),
 }
 
+impl std::fmt::Display for ChannelStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disconnected => write!(f, "disconnected"),
+            Self::Connecting => write!(f, "connecting"),
+            Self::Connected => write!(f, "connected"),
+            Self::Error(msg) => write!(f, "error: {msg}"),
+        }
+    }
+}
+
 /// 机器人配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BotConfig {
     pub id: String,
     pub channel: ChannelType,
@@ -126,7 +137,7 @@ pub struct BotConfig {
 }
 
 /// 响应模式
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseMode {
     /// 群聊中需要被 @
@@ -145,8 +156,19 @@ impl Default for ResponseMode {
     }
 }
 
+impl std::fmt::Display for ResponseMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GroupInvite => write!(f, "group_invite"),
+            Self::GroupKeyword { keyword } => write!(f, "group_keyword:{keyword}"),
+            Self::GroupAll => write!(f, "group_all"),
+            Self::Private => write!(f, "private"),
+        }
+    }
+}
+
 /// 渠道配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChannelConfig {
     pub channel: ChannelType,
     pub enabled: bool,
@@ -193,7 +215,7 @@ impl SessionChannelPrefix {
 }
 
 /// DSH 市场配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DshMarketConfig {
     pub enabled: bool,
     pub api_endpoint: String,
@@ -624,48 +646,33 @@ impl ImPlugin {
         templates.values().cloned().collect()
     }
 
+    fn base_dir(&self) -> std::path::PathBuf {
+        self.config_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::path::PathBuf::from(".neotrix"))
+    }
+
     fn load_channels(&self) -> Result<Vec<ChannelConfig>, DomainError> {
-        if !self.config_path.exists() {
-            return Ok(self.default_channels());
-        }
-        let content = std::fs::read_to_string(&self.config_path).map_err(|e| DomainError {
+        crate::domain::im_service::load_channels(&self.base_dir()).map_err(|e| DomainError {
             code: "CONFIG_READ_ERROR".into(),
             message: format!("读取 IM 配置失败: {}", e),
-            recoverable: true,
-        })?;
-        serde_json::from_str(&content).map_err(|e| DomainError {
-            code: "CONFIG_PARSE_ERROR".into(),
-            message: format!("解析 IM 配置失败: {}", e),
             recoverable: true,
         })
     }
 
     fn save_channels(&self, channels: &[ChannelConfig]) -> Result<(), DomainError> {
-        if let Some(parent) = self.config_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| DomainError {
-                code: "CONFIG_DIR_ERROR".into(),
-                message: format!("创建配置目录失败: {}", e),
+        crate::domain::im_service::save_channels(&self.base_dir(), channels).map_err(|e| {
+            DomainError {
+                code: "CONFIG_WRITE_ERROR".into(),
+                message: format!("写入配置失败: {}", e),
                 recoverable: true,
-            })?;
-        }
-        atomic_io::write_json_atomic(&self.config_path, channels).map_err(|e| DomainError {
-            code: "CONFIG_WRITE_ERROR".into(),
-            message: format!("写入配置失败: {}", e),
-            recoverable: true,
+            }
         })
     }
 
     fn default_channels(&self) -> Vec<ChannelConfig> {
-        ALL_CHANNEL_TYPES
-            .iter()
-            .map(|ch| ChannelConfig {
-                channel: ch.clone(),
-                enabled: false,
-                bots: vec![],
-                context_enhancement: false,
-                proactive_delivery: false,
-            })
-            .collect()
+        crate::domain::im_service::default_channels()
     }
 
     /// 检查是否应该响应消息
@@ -814,43 +821,26 @@ impl ImPlugin {
 
     /// DSH 市场配置路径
     fn dsh_market_path(&self) -> PathBuf {
-        crate::config::AppConfig::base_dir()
-            .unwrap_or_default()
-            .join("dsh_market.json")
+        crate::domain::im_service::dsh_market_path()
     }
 
     /// 加载 DSH 市场配置
     fn load_dsh_market(&self) -> Result<DshMarketConfig, DomainError> {
-        let path = self.dsh_market_path();
-        if !path.exists() {
-            return Ok(DshMarketConfig::default());
-        }
-        let content = std::fs::read_to_string(&path).map_err(|e| DomainError {
+        crate::domain::im_service::load_dsh_market(&self.base_dir()).map_err(|e| DomainError {
             code: "CONFIG_READ_ERROR".into(),
             message: format!("读取 DSH 市场配置失败: {}", e),
-            recoverable: true,
-        })?;
-        serde_json::from_str(&content).map_err(|e| DomainError {
-            code: "CONFIG_PARSE_ERROR".into(),
-            message: format!("解析 DSH 市场配置失败: {}", e),
             recoverable: true,
         })
     }
 
     /// 保存 DSH 市场配置
     fn save_dsh_market(&self, config: &DshMarketConfig) -> Result<(), DomainError> {
-        let path = self.dsh_market_path();
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| DomainError {
-                code: "CONFIG_DIR_ERROR".into(),
-                message: format!("创建配置目录失败: {}", e),
+        crate::domain::im_service::save_dsh_market(&self.base_dir(), config).map_err(|e| {
+            DomainError {
+                code: "CONFIG_WRITE_ERROR".into(),
+                message: format!("写入 DSH 市场配置失败: {}", e),
                 recoverable: true,
-            })?;
-        }
-        atomic_io::write_json_atomic(&path, config).map_err(|e| DomainError {
-            code: "CONFIG_WRITE_ERROR".into(),
-            message: format!("写入 DSH 市场配置失败: {}", e),
-            recoverable: true,
+            }
         })
     }
 }

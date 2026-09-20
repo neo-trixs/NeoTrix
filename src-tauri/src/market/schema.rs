@@ -2,6 +2,7 @@
 //!
 //! 统一插件清单格式，支持 DSH 市场、GitHub、npm 等多源。
 
+use crate::atomic_io;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -230,7 +231,8 @@ impl PluginManifest {
     /// 从 TOML 文件解析
     pub fn from_file(path: &Path) -> Result<Self, String> {
         let content =
-            std::fs::read_to_string(path).map_err(|e| format!("Read plugin manifest: {e}"))?;
+            String::from_utf8(atomic_io::read_with_fallback(path).map_err(|e| format!("Read plugin manifest: {e}"))?)
+                .map_err(|e| format!("Read plugin manifest: {e}"))?;
         Self::from_toml(&content)
     }
 
@@ -247,7 +249,8 @@ impl PluginManifest {
     /// 从 JSON 文件解析 (兼容旧格式)
     pub fn from_json_file(path: &Path) -> Result<Self, String> {
         let content =
-            std::fs::read_to_string(path).map_err(|e| format!("Read plugin manifest: {e}"))?;
+            String::from_utf8(atomic_io::read_with_fallback(path).map_err(|e| format!("Read plugin manifest: {e}"))?)
+                .map_err(|e| format!("Read plugin manifest: {e}"))?;
         Self::from_json(&content)
     }
 

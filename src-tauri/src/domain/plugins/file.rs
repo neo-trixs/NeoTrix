@@ -88,7 +88,12 @@ impl FilePlugin {
 
     fn read_file(path: &str) -> Result<String, DomainError> {
         let safe = Self::resolve_safe_path(path)?;
-        std::fs::read_to_string(&safe).map_err(|e| DomainError {
+        let bytes = atomic_io::read_with_fallback(&safe).map_err(|e| DomainError {
+            code: "IO_ERROR".into(),
+            message: format!("读取文件失败: {}", e),
+            recoverable: true,
+        })?;
+        String::from_utf8(bytes).map_err(|e| DomainError {
             code: "IO_ERROR".into(),
             message: format!("读取文件失败: {}", e),
             recoverable: true,

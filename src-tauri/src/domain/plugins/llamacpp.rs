@@ -1,5 +1,6 @@
 use async_trait::async_trait;
-use crate::commands::model_pool::{self, ModelPoolEntry, ModelPoolStatus};
+use crate::atomic_io;
+use crate::domain::model_pool as mp;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -91,8 +92,8 @@ fn read_config_file() -> ConfigData {
         return empty;
     }
 
-    let content = match std::fs::read_to_string(&path) {
-        Ok(c) => c,
+    let content = match atomic_io::read_with_fallback(&path) {
+        Ok(c) => String::from_utf8(c).unwrap_or_default(),
         Err(_) => return empty,
     };
 
@@ -125,8 +126,8 @@ fn read_pool_entries() -> Vec<serde_json::Value> {
     if !path.exists() {
         return vec![];
     }
-    let content = match std::fs::read_to_string(&path) {
-        Ok(c) => c,
+    let content = match atomic_io::read_with_fallback(&path) {
+        Ok(c) => String::from_utf8(c).unwrap_or_default(),
         Err(_) => return vec![],
     };
 
@@ -601,16 +602,18 @@ impl DomainPlugin for LlamacppPlugin {
                         });
 
                         let url = format!("http://127.0.0.1:{port}/v1/chat/completions");
-                        let client = reqwest::blocking::Client::new();
+                        let client = reqwest::Client::new();
                         let resp = client
                             .post(&url)
                             .json(&body)
                             .timeout(Duration::from_secs(120))
                             .send()
+                            .await
                             .map_err(|e| DomainError::from(format!("Request failed: {e}")))?;
 
                         let json: serde_json::Value = resp
                             .json()
+                            .await
                             .map_err(|e| DomainError::from(format!("Parse response: {e}")))?;
 
                         Ok(json)
@@ -651,14 +654,11 @@ impl DomainPlugin for LlamacppPlugin {
             }
             "discover_models" | "discover" => discover_models(),
             "pool_status" => {
-                let handle = tokio::runtime::Handle::current();
-                let status = handle
-                    .block_on(model_pool::model_pool_status())
-                    .map_err(|e| DomainError {
-                        code: "POOL_ERROR".into(),
-                        message: e,
-                        recoverable: true,
-                    })?;
+                let status = mp::get_status().map_err(|e| DomainError {
+                    code: "POOL_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
                 Ok(serde_json::json!(status))
             }
             "pool_add" => {
@@ -695,14 +695,10 @@ impl DomainPlugin for LlamacppPlugin {
                     .get("base_url")
                     .and_then(|v| v.as_str())
                     .map(String::from);
-                let handle = tokio::runtime::Handle::current();
-                let entry = handle
-                    .block_on(model_pool::model_pool_add(
-                        label, provider, api_key, model, tags, base_url,
-                    ))
+                let entry = mp::add_entry(&label, &provider, &api_key, &model, &tags, base_url.as_deref())
                     .map_err(|e| DomainError {
                         code: "POOL_ERROR".into(),
-                        message: e,
+                        message: e.to_string(),
                         recoverable: true,
                     })?;
                 Ok(serde_json::json!(entry))
@@ -713,14 +709,11 @@ impl DomainPlugin for LlamacppPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let handle = tokio::runtime::Handle::current();
-                let removed = handle
-                    .block_on(model_pool::model_pool_remove(label))
-                    .map_err(|e| DomainError {
-                        code: "POOL_ERROR".into(),
-                        message: e,
-                        recoverable: true,
-                    })?;
+                let removed = mp::remove_entry(&label).map_err(|e| DomainError {
+                    code: "POOL_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
                 Ok(serde_json::json!(removed))
             }
             "pool_update_key" => {
@@ -734,14 +727,11 @@ impl DomainPlugin for LlamacppPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let handle = tokio::runtime::Handle::current();
-                let updated = handle
-                    .block_on(model_pool::model_pool_update_key(label, new_api_key))
-                    .map_err(|e| DomainError {
-                        code: "POOL_ERROR".into(),
-                        message: e,
-                        recoverable: true,
-                    })?;
+                let updated = mp::update_api_key(&label, &new_api_key).map_err(|e| DomainError {
+                    code: "POOL_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
                 Ok(serde_json::json!(updated))
             }
             "pool_check" => {
@@ -750,14 +740,11 @@ impl DomainPlugin for LlamacppPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let handle = tokio::runtime::Handle::current();
-                let result = handle
-                    .block_on(model_pool::model_pool_check(label))
-                    .map_err(|e| DomainError {
-                        code: "POOL_ERROR".into(),
-                        message: e,
-                        recoverable: true,
-                    })?;
+                let result = mp::check_connectivity(&label).await.map_err(|e| DomainError {
+                    code: "POOL_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
                 Ok(serde_json::json!(result))
             }
             "pool_health" => {

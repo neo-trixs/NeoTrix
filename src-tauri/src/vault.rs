@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 /// Keys never leave the Rust backend. Frontend only sees scoped tokens.
 /// Pattern from ARES zero-trust + onecli credential isolation.
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ScopedToken {
     pub provider: String,
     pub created_at: u64,
@@ -108,7 +108,7 @@ fn token_hash(token: &ScopedToken) -> String {
     format!("{:x}", hasher.finish())
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum VaultError {
     #[error("Token expired")]
     TokenExpired,

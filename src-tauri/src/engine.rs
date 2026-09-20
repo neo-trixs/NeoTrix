@@ -47,7 +47,7 @@ impl std::str::FromStr for EngineId {
 }
 
 /// Model tier — Cumora pattern: route to fast/standard/think per use case.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelTier {
     /// Low latency, low cost — for triage, classification, simple Q&A.
@@ -124,7 +124,7 @@ pub struct ChatMessage {
     pub name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     System,

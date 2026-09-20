@@ -56,8 +56,9 @@ impl WorkflowPluginImpl {
 
         // 加载已有工作流
         let workflows = if db_path.exists() {
-            std::fs::read_to_string(&db_path)
+            atomic_io::read_with_fallback(&db_path)
                 .ok()
+                .and_then(|b| String::from_utf8(b).ok())
                 .and_then(|s| serde_json::from_str(&s).ok())
                 .unwrap_or_default()
         } else {

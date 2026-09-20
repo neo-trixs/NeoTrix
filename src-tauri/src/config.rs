@@ -1,10 +1,11 @@
+use crate::atomic_io;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use thiserror::Error;
 
 /// Layered configuration for NeoTrix desktop app.
 /// Priority: CLI args > env vars > config file > defaults
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AppConfig {
     #[serde(default = "default_provider")]
@@ -103,8 +104,11 @@ impl AppConfig {
 
         for path in &config_paths {
             if path.exists() {
-                let content = std::fs::read_to_string(path)
-                    .map_err(|e| ConfigError::FileRead(path.display().to_string(), e))?;
+                let content = String::from_utf8(
+                    atomic_io::read_with_fallback(path)
+                        .map_err(|e| ConfigError::FileRead(path.display().to_string(), std::io::Error::new(std::io::ErrorKind::Other, e)))?
+                )
+                .map_err(|e| ConfigError::FileRead(path.display().to_string(), std::io::Error::new(std::io::ErrorKind::InvalidData, e)))?;
                 let parsed: Self = toml::from_str(&content)
                     .map_err(|e| ConfigError::Parse(path.display().to_string(), e))?;
                 tracing::info!(path = %path.display(), "Loaded config file");

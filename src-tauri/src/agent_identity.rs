@@ -1,3 +1,4 @@
+use crate::atomic_io;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -141,7 +142,7 @@ impl MemoryStore {
             .join("memory")
             .join(format!("{agent_id}.md"));
         if path.exists() {
-            std::fs::read_to_string(&path)
+            String::from_utf8(atomic_io::read_with_fallback(&path).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
         } else {
             Ok(String::new())
         }
@@ -153,7 +154,7 @@ impl MemoryStore {
             .workspace
             .join("memory")
             .join(format!("{agent_id}.md"));
-        std::fs::write(&path, content)
+        atomic_io::write_atomic(&path, content.as_bytes()).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 
     /// Read project-scoped memory for an agent.
@@ -169,7 +170,7 @@ impl MemoryStore {
             .join(project_id)
             .join(format!("{agent_id}.md"));
         if path.exists() {
-            std::fs::read_to_string(&path)
+            String::from_utf8(atomic_io::read_with_fallback(&path).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
         } else {
             Ok(String::new())
         }
@@ -191,7 +192,7 @@ impl MemoryStore {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(&path, content)
+        atomic_io::write_atomic(&path, content.as_bytes()).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 }
 

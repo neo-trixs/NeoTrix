@@ -6,6 +6,8 @@
 //! 注册到 DomainRegistry，通过统一的 domain_call 入口调用。
 
 pub mod app_handle;
+pub mod im_service;
+pub mod model_pool;
 pub mod plugins;
 pub mod registry;
 
@@ -54,7 +56,7 @@ pub struct DomainCall {
 }
 
 /// 统一响应
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DomainResponse {
     pub ok: bool,
     pub data: serde_json::Value,
@@ -63,7 +65,7 @@ pub struct DomainResponse {
 }
 
 /// 域错误
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DomainError {
     pub code: String,
     pub message: String,
