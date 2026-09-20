@@ -176,6 +176,7 @@ impl SessionSyncPlugin {
         let session = SyncedSession {
             id: session_id.clone(),
             device_id: state.current_device_id.clone(),
+
             mode: mode.to_string(),
             title: title.to_string(),
             messages: Vec::new(),

@@ -26,6 +26,7 @@
 )]
 
 use clap::Parser;
+use std::process;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
@@ -72,6 +73,43 @@ fn updater_enabled() -> bool {
     }
 }
 
+fn register_plugins(
+    registry: &mut DomainRegistry,
+    db_pool: &Arc<neotrix_tauri::db_pool::DbPool>,
+) -> Result<(), String> {
+    let registrations: Vec<(&str, Box<dyn neotrix_tauri::domain::DomainPlugin + Send + Sync>)> = vec![
+        ("session", Box::new(SessionPlugin::new(db_pool.clone()))),
+        ("agent", Box::new(AgentPlugin)),
+        ("kb", Box::new(KbPlugin::new(db_pool.clone()))),
+        ("file", Box::new(FilePlugin)),
+        ("plugin", Box::new(PluginPlugin)),
+        ("workflow", Box::new(WorkflowPluginImpl::new())),
+        ("tool", Box::new(ToolPlugin)),
+        ("system", Box::new(SystemPlugin)),
+        ("security", Box::new(SecurityPlugin)),
+        ("memory", Box::new(MemoryPlugin::new(db_pool.clone()))),
+        ("ext", Box::new(ExtPlugin)),
+        ("llamacpp", Box::new(LlamacppPlugin::new())),
+        ("git", Box::new(GitPlugin)),
+        ("cli", Box::new(CliPlugin)),
+        ("world", Box::new(WorldPlugin)),
+        ("context", Box::new(ContextPlugin)),
+        ("ai_orchestration", Box::new(AiOrchestrationPlugin::new())),
+        ("folder_instructions", Box::new(FolderInstructionsPlugin::new())),
+        ("im", Box::new(ImPlugin::new())),
+        ("mcp_extension", Box::new(McpExtensionPlugin::new())),
+        ("session_sync", Box::new(SessionSyncPlugin::new())),
+        ("unified_surface", Box::new(UnifiedSurfacePlugin::new())),
+        ("voice_agent", Box::new(VoiceAgentPlugin::new())),
+    ];
+    for (name, plugin) in registrations {
+        registry
+            .register(plugin)
+            .map_err(|e| format!("failed to register {name} plugin: {e}"))?;
+    }
+    Ok(())
+}
+
 fn main() {
     if std::env::var("NEOTRIX_MCP_STDIO").as_deref() == Ok("1") {
         return;
@@ -97,77 +135,15 @@ fn main() {
             let mut registry = DomainRegistry::new();
             let db_pool = Arc::new(
                 neotrix_tauri::db_pool::DbPool::new(&config.data_dir.join("neotrix.db"))
-                    .expect("failed to create DB pool"),
+                    .unwrap_or_else(|e| {
+                        eprintln!("FATAL: Failed to create DB pool: {e}");
+                        process::exit(1);
+                    }),
             );
-            registry
-                .register(Box::new(SessionPlugin::new(db_pool.clone())))
-                .expect("failed to register session");
-            registry
-                .register(Box::new(AgentPlugin))
-                .expect("failed to register agent");
-            registry
-                .register(Box::new(KbPlugin::new(db_pool.clone())))
-                .expect("failed to register kb");
-            registry
-                .register(Box::new(FilePlugin))
-                .expect("failed to register file");
-            registry
-                .register(Box::new(PluginPlugin))
-                .expect("failed to register plugin");
-            registry
-                .register(Box::new(WorkflowPluginImpl::new()))
-                .expect("failed to register workflow");
-            registry
-                .register(Box::new(ToolPlugin))
-                .expect("failed to register tool");
-            registry
-                .register(Box::new(SystemPlugin))
-                .expect("failed to register system");
-            registry
-                .register(Box::new(SecurityPlugin))
-                .expect("failed to register security");
-            registry
-                .register(Box::new(MemoryPlugin::new(db_pool.clone())))
-                .expect("failed to register memory");
-            registry
-                .register(Box::new(ExtPlugin))
-                .expect("failed to register ext");
-            registry
-                .register(Box::new(LlamacppPlugin::new()))
-                .expect("failed to register llamacpp");
-            registry
-                .register(Box::new(GitPlugin))
-                .expect("failed to register git");
-            registry
-                .register(Box::new(CliPlugin))
-                .expect("failed to register cli");
-            registry
-                .register(Box::new(WorldPlugin))
-                .expect("failed to register world");
-            registry
-                .register(Box::new(ContextPlugin))
-                .expect("failed to register context");
-            registry
-                .register(Box::new(AiOrchestrationPlugin::new()))
-                .expect("failed to register ai_orchestration");
-            registry
-                .register(Box::new(FolderInstructionsPlugin::new()))
-                .expect("failed to register folder_instructions");
-            registry
-                .register(Box::new(ImPlugin::new()))
-                .expect("failed to register im");
-            registry
-                .register(Box::new(McpExtensionPlugin::new()))
-                .expect("failed to register mcp_extension");
-            registry
-                .register(Box::new(SessionSyncPlugin::new()))
-                .expect("failed to register session_sync");
-            registry
-                .register(Box::new(UnifiedSurfacePlugin::new()))
-                .expect("failed to register unified_surface");
-            registry
-                .register(Box::new(VoiceAgentPlugin::new()))
-                .expect("failed to register voice_agent");
+            register_plugins(&mut registry, &db_pool).unwrap_or_else(|e| {
+                eprintln!("FATAL: {e}");
+                process::exit(1);
+            });
 
             println!("🔌 已注册 {} 个域插件", registry.plugin_count());
             for info in registry.list() {
@@ -187,7 +163,10 @@ fn main() {
                 let mut registry = domain_state.blocking_write();
                 registry
                     .register(Box::new(chat_plugin))
-                    .expect("failed to register chat");
+                    .unwrap_or_else(|e| {
+                        eprintln!("FATAL: Failed to register chat plugin: {e}");
+                        process::exit(1);
+                    });
             }
             let unified_api: UnifiedApiState = Arc::new(RwLock::new(UnifiedApiImpl::new()));
 
@@ -240,7 +219,7 @@ fn main() {
                                     let _ = window.unminimize();
                                     let _ = window.set_focus();
                                 }
-                                let _ = app.emit("neotrix-global-shortcut", shortcut.to_string());
+                                let _ = app.emit("neotrix_global_shortcut", shortcut.to_string());
                             }
                         })
                         .build(),
@@ -381,11 +360,11 @@ fn main() {
                             match evt.event_type {
                                 neotrix_tauri::commands::pty::PtyEventType::Output => {
                                     let _ = pty_handle
-                                        .emit(&format!("pty-output-{}", evt.session_id), &evt.data);
+                                        .emit(&format!("pty_output_{}", evt.session_id), &evt.data);
                                 }
                                 neotrix_tauri::commands::pty::PtyEventType::Exit(code) => {
                                     let _ = pty_handle
-                                        .emit(&format!("pty-exit-{}", evt.session_id), &code);
+                                        .emit(&format!("pty_exit_{}", evt.session_id), &code);
                                 }
                             }
                         }
@@ -406,7 +385,10 @@ fn main() {
                     Ok(())
                 })
                 .build(tauri::generate_context!())
-                .expect("error while building tauri application")
+                .unwrap_or_else(|e| {
+                    eprintln!("FATAL: Failed to build Tauri application: {e}");
+                    process::exit(1);
+                })
                 .run(
                     |_app, event| {
                         if let tauri::RunEvent::ExitRequested { .. } = event {}
@@ -415,7 +397,10 @@ fn main() {
         }
         Some(Commands::Headless) => {
             println!("NeoTrix headless mode starting...");
-            let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
+            let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
+                eprintln!("FATAL: Failed to create tokio runtime: {e}");
+                process::exit(1);
+            });
             rt.block_on(async {
                 let api = UnifiedApiImpl::new();
                 loop {
@@ -432,7 +417,10 @@ fn main() {
         }
         Some(Commands::Reason { prompt }) => {
             println!("NeoTrix reasoning: {}", prompt);
-            let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
+            let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
+                eprintln!("FATAL: Failed to create tokio runtime: {e}");
+                process::exit(1);
+            });
             rt.block_on(async {
                 let api = UnifiedApiImpl::new();
                 let request = neotrix_tauri::stub::UnifiedRequest::chat(prompt);

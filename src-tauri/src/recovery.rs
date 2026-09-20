@@ -23,6 +23,7 @@ use std::fmt;
 /// - **FailSilent**: Observability-only operations. Logging, metrics, telemetry.
 ///   Never block the user for observability.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FailureMode {
     /// Worst case: duplicate, not lost. Coordination signals, WS events, presence.
     FailOpen,

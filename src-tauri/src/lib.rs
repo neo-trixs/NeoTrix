@@ -21,15 +21,12 @@
 
 pub mod app_error;
 pub(crate) mod agent_identity;
-pub(crate) mod artifacts;
 pub(crate) mod atomic_io;
 pub mod autostart;
 pub(crate) mod bot;
 pub mod browser_host;
-pub(crate) mod channels;
 pub mod commands;
 pub mod config;
-pub(crate) mod coordinator;
 pub mod db_pool;
 pub(crate) mod debouncer;
 pub mod desktop;
@@ -38,14 +35,11 @@ pub(crate) mod engine;
 pub mod health;
 pub mod ipc;
 pub mod logger;
-pub(crate) mod mcp;
 pub mod market;
 pub mod notifications;
 pub mod recovery;
 pub mod service;
-pub(crate) mod skills;
 pub mod stub;
-pub(crate) mod triage;
 pub mod util;
 pub(crate) mod validated;
 pub(crate) mod vault;
@@ -140,23 +134,23 @@ pub fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     app.on_menu_event(|app, event| match event.id().as_ref() {
         "check_updates" => {
-            if let Err(e) = app.emit("neotrix-check-updates", ()) {
-                tracing::trace!("emit check-updates: {e}");
+            if let Err(e) = app.emit("neotrix_check_updates", ()) {
+                tracing::trace!("emit check_updates: {e}");
             }
         }
         "new_session" => {
-            if let Err(e) = app.emit("neotrix:new-session", ()) {
-                tracing::trace!("emit new-session: {e}");
+            if let Err(e) = app.emit("neotrix_new_session", ()) {
+                tracing::trace!("emit new_session: {e}");
             }
         }
         "open_settings" => {
-            if let Err(e) = app.emit("open-settings", ()) {
-                tracing::trace!("emit open-settings: {e}");
+            if let Err(e) = app.emit("open_settings", ()) {
+                tracing::trace!("emit open_settings: {e}");
             }
         }
         "cmd_palette" => {
-            if let Err(e) = app.emit("neotrix-open-palette", ()) {
-                tracing::trace!("emit open-palette: {e}");
+            if let Err(e) = app.emit("neotrix_open_palette", ()) {
+                tracing::trace!("emit open_palette: {e}");
             }
         }
         _ => {}
@@ -231,26 +225,26 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "config" => {
-                if let Err(e) = app.emit("open-settings", ()) {
-                    tracing::trace!("emit open-settings: {e}");
+                if let Err(e) = app.emit("open_settings", ()) {
+                    tracing::trace!("emit open_settings: {e}");
                 }
             }
             "sync_now" => {
-                if let Err(e) = app.emit("sync-trigger", ()) {
-                    tracing::trace!("emit sync-trigger: {e}");
+                if let Err(e) = app.emit("sync_trigger", ()) {
+                    tracing::trace!("emit sync_trigger: {e}");
                 }
             }
             #[cfg(feature = "stealth-net")]
             mode_id @ ("proxy_geo" | "proxy_stealth" | "proxy_tor" | "proxy_off") => {
                 let mode = mode_id.strip_prefix("proxy_").unwrap_or("geo");
-                if let Err(e) = app.emit("proxy-mode-change", mode) {
-                    tracing::trace!("emit proxy-mode-change: {e}");
+                if let Err(e) = app.emit("proxy_mode_change", mode) {
+                    tracing::trace!("emit proxy_mode_change: {e}");
                 }
             }
             #[cfg(feature = "stealth-net")]
             "proxy_status" => {
-                if let Err(e) = app.emit("open-proxy-status", ()) {
-                    tracing::trace!("emit open-proxy-status: {e}");
+                if let Err(e) = app.emit("open_proxy_status", ()) {
+                    tracing::trace!("emit open_proxy_status: {e}");
                 }
             }
             "quit" => {

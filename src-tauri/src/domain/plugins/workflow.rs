@@ -50,8 +50,8 @@ pub struct WorkflowPluginImpl {
 
 impl WorkflowPluginImpl {
     pub fn new() -> Self {
-        let db_path = dirs::home_dir()
-            .map(|h| h.join(".neotrix").join("workflows.json"))
+        let db_path = crate::config::AppConfig::base_dir()
+            .map(|h| h.join("workflows.json"))
             .unwrap_or_else(|| PathBuf::from(".neotrix/workflows.json"));
 
         // 加载已有工作流
@@ -85,15 +85,18 @@ impl WorkflowPluginImpl {
     }
 
     fn save_workflows(&self) -> Result<(), DomainError> {
-        let workflows = self.workflows.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: e.to_string(),
-            recoverable: true,
-        })?;
+        let snapshot = {
+            let workflows = self.workflows.lock().map_err(|e| DomainError {
+                code: "LOCK_ERROR".into(),
+                message: e.to_string(),
+                recoverable: true,
+            })?;
+            workflows.clone()
+        };
 
         atomic_io::ensure_parent_dir(&self.db_path).ok();
 
-        atomic_io::write_json_atomic(&self.db_path, &*workflows).map_err(|e| DomainError {
+        atomic_io::write_json_atomic(&self.db_path, &snapshot).map_err(|e| DomainError {
             code: "WRITE_ERROR".into(),
             message: e.to_string(),
             recoverable: true,

@@ -79,8 +79,8 @@ pub fn onboarding_check_prereqs() -> IpcResponse<OnboardingStatus> {
 
 /// Check if a config directory exists (indicates not first run)
 fn config_dir_exists() -> bool {
-    dirs::home_dir()
-        .map(|h| h.join(".neotrix").exists())
+    crate::config::AppConfig::base_dir()
+        .map(|h| h.exists())
         .unwrap_or(false)
 }
 
@@ -133,8 +133,8 @@ pub fn onboarding_get_tips() -> Vec<String> {
 /// Mark onboarding as completed
 #[tauri::command]
 pub fn onboarding_complete() -> IpcResponse<()> {
-    let config_dir = match dirs::home_dir() {
-        Some(h) => h.join(".neotrix"),
+    let config_dir = match crate::config::AppConfig::base_dir() {
+        Some(h) => h,
         None => return ipc::err("HOME_DIR_NOT_FOUND", "Cannot find home directory"),
     };
     if let Err(e) = std::fs::create_dir_all(&config_dir) {
@@ -150,7 +150,7 @@ pub fn onboarding_complete() -> IpcResponse<()> {
 /// Check if onboarding has been completed
 #[tauri::command]
 pub fn onboarding_is_completed() -> bool {
-    dirs::home_dir()
-        .map(|h| h.join(".neotrix").join(".onboarded").exists())
+    crate::config::AppConfig::base_dir()
+        .map(|h| h.join(".onboarded").exists())
         .unwrap_or(false)
 }

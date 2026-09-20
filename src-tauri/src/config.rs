@@ -136,6 +136,29 @@ impl AppConfig {
         paths
     }
 
+    /// Return the user-level base directory (`~/.neotrix/`).
+    /// All per-user state (plugins, tokens, models, im data) lives here.
+    pub fn base_dir() -> Option<PathBuf> {
+        dirs::home_dir().map(|h| h.join(".neotrix"))
+    }
+
+    /// Return the project-local directory (`.neotrix/` in cwd).
+    /// Per-project config and instructions live here.
+    pub fn project_dir() -> Option<PathBuf> {
+        std::env::current_dir().ok().map(|cwd| cwd.join(".neotrix"))
+    }
+
+    /// Ensure the user base directory exists; create if missing.
+    pub fn ensure_base_dir() -> Result<PathBuf, ConfigError> {
+        let dir = Self::base_dir().ok_or_else(|| {
+            ConfigError::Validation("cannot determine home directory".into())
+        })?;
+        std::fs::create_dir_all(&dir).map_err(|e| {
+            ConfigError::FileRead(dir.display().to_string(), e)
+        })?;
+        Ok(dir)
+    }
+
     fn apply_env_overrides(&mut self) {
         if let Ok(val) = std::env::var("NEOTRIX_PROVIDER") {
             self.provider = val;

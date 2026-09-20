@@ -246,21 +246,18 @@ impl UnifiedSurfacePlugin {
             recoverable: false,
         })?;
 
-        let from = state.current_mode.clone();
-
         // Record switch
         state.mode_history.push(ModeSwitch {
-            from: from.clone(),
+            from: state.current_mode.clone(),
             to: target.clone(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             reason,
         });
 
-        // Update mode
-        state.current_mode = target.clone();
+        state.current_mode = target;
 
         // Update panel visibility based on mode config
-        if let Some(config) = state.modes.get(&target) {
+        if let Some(config) = state.modes.get(&state.current_mode) {
             state.panels.file_panel = config.show_file_panel;
             state.panels.terminal = config.show_terminal;
             state.panels.browser = config.show_browser;
@@ -438,7 +435,7 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                     }),
                 }
 
-                Ok(serde_json::to_value(state.clone()).unwrap_or_default())
+                Ok(serde_json::to_value(&*state).unwrap_or_default())
             }
             "get_sessions" => {
                 // Simplified — would query session manager

@@ -1,46 +1,14 @@
 use async_trait::async_trait;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
-use rusqlite::Connection;
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::Arc;
 
 pub struct KbPlugin {
-    db_path: PathBuf,
-    _db: Mutex<()>,
+    db_pool: Arc<crate::db_pool::DbPool>,
 }
 
 impl KbPlugin {
-    pub fn new() -> Self {
-        let db_path = dirs::home_dir()
-            .map(|h| h.join(".neotrix").join("knowledge.db"))
-            .unwrap_or_else(|| PathBuf::from(".neotrix/knowledge.db"));
-        Self {
-            db_path,
-            _db: Mutex::new(()),
-        }
-    }
-
-    fn open_db(&self) -> Result<Connection, DomainError> {
-        if let Some(parent) = self.db_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| DomainError {
-                code: "DB_ERROR".into(),
-                message: format!("创建数据目录失败: {}", e),
-                recoverable: true,
-            })?;
-        }
-        let conn = Connection::open(&self.db_path).map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("打开数据库失败: {}", e),
-            recoverable: true,
-        })?;
-        conn.pragma_update(None, "journal_mode", "WAL")
-            .map_err(|e| DomainError {
-                code: "DB_ERROR".into(),
-                message: format!("启用 WAL 失败: {}", e),
-                recoverable: true,
-            })?;
-        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-        conn.execute_batch(
+    pub fn new(db_pool: Arc<crate::db_pool::DbPool>) -> Self {
+        if let Err(e) = db_pool.init_schema(
             "CREATE TABLE IF NOT EXISTS kv_store (
                 namespace TEXT NOT NULL,
                 key TEXT NOT NULL,
@@ -71,9 +39,10 @@ impl KbPlugin {
                 created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
                 updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
             );",
-        )
-        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("初始化表失败: {}", e), recoverable: true })?;
-        Ok(conn)
+        ) {
+            tracing::warn!("schema init: {e}");
+        }
+        Self { db_pool }
     }
 }
 
@@ -186,7 +155,7 @@ impl DomainPlugin for KbPlugin {
         action: &str,
         args: serde_json::Value,
     ) -> Result<serde_json::Value, DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
 
         match action {
             "search" => {

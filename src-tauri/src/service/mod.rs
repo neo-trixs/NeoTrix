@@ -36,11 +36,11 @@ async fn tick_health_check(app_handle: &AppHandle) -> Result<(), String> {
 
     // Emit health status to frontend
     if let Some(window) = app_handle.get_webview_window("main") {
-        if let Err(e) = window.emit("health-check", serde_json::json!({
+        if let Err(e) = window.emit("health_check", serde_json::json!({
             "status": "ok",
             "timestamp": chrono::Utc::now().to_rfc3339(),
         })) {
-            tracing::trace!("emit health-check: {e}");
+            tracing::trace!("emit health_check: {e}");
         }
     }
 

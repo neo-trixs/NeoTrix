@@ -85,7 +85,7 @@ pub fn handle_file_drop(paths: Vec<String>) -> FileDropResult {
 }
 
 /// Set up file drop event listener on the main window.
-/// Emits `neotrix://file-drop` to the frontend with the filtered results.
+/// Emits `neotrix_file_drop` to the frontend with the filtered results.
 pub fn setup_file_drop_listener(app: &AppHandle) {
     let manager = std::sync::Mutex::new(FileDropManager::new());
     let app_handle = app.clone();
@@ -103,7 +103,7 @@ pub fn setup_file_drop_listener(app: &AppHandle) {
                     Err(_) => return,
                 };
                 if !result.accepted.is_empty() {
-                    let _ = app_handle.emit("neotrix://file-drop", &result);
+                    let _ = app_handle.emit("neotrix_file_drop", &result);
                 }
             }
         });

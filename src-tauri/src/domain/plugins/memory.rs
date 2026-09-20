@@ -1,46 +1,14 @@
 use async_trait::async_trait;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
-use rusqlite::Connection;
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::Arc;
 
 pub struct MemoryPlugin {
-    db_path: PathBuf,
-    _db: Mutex<()>,
+    db_pool: Arc<crate::db_pool::DbPool>,
 }
 
 impl MemoryPlugin {
-    pub fn new() -> Self {
-        let db_path = dirs::home_dir()
-            .map(|h| h.join(".neotrix").join("memory.db"))
-            .unwrap_or_else(|| PathBuf::from(".neotrix/memory.db"));
-        Self {
-            db_path,
-            _db: Mutex::new(()),
-        }
-    }
-
-    fn open_db(&self) -> Result<Connection, DomainError> {
-        if let Some(parent) = self.db_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| DomainError {
-                code: "DB_ERROR".into(),
-                message: format!("创建数据目录失败: {}", e),
-                recoverable: true,
-            })?;
-        }
-        let conn = Connection::open(&self.db_path).map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("打开数据库失败: {}", e),
-            recoverable: true,
-        })?;
-        conn.pragma_update(None, "journal_mode", "WAL")
-            .map_err(|e| DomainError {
-                code: "DB_ERROR".into(),
-                message: format!("启用 WAL 失败: {}", e),
-                recoverable: true,
-            })?;
-        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-        conn.execute_batch(
+    pub fn new(db_pool: Arc<crate::db_pool::DbPool>) -> Self {
+        if let Err(e) = db_pool.init_schema(
             "CREATE TABLE IF NOT EXISTS memories (
                 id TEXT PRIMARY KEY,
                 kind TEXT NOT NULL,
@@ -52,13 +20,10 @@ impl MemoryPlugin {
             );
             CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories(kind);
             CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at);",
-        )
-        .map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("初始化表失败: {}", e),
-            recoverable: true,
-        })?;
-        Ok(conn)
+        ) {
+            tracing::warn!("schema init: {e}");
+        }
+        Self { db_pool }
     }
 }
 
@@ -123,7 +88,7 @@ impl DomainPlugin for MemoryPlugin {
         action: &str,
         args: serde_json::Value,
     ) -> Result<serde_json::Value, DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
 
         match action {
             "list" => {

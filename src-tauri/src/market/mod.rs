@@ -35,15 +35,15 @@ pub struct MarketConfig {
 
 impl Default for MarketConfig {
     fn default() -> Self {
-        let home = dirs::home_dir().unwrap_or_default();
+        let base = crate::config::AppConfig::base_dir().unwrap_or_default();
         Self {
             dsh_enabled: true,
             dsh_api_endpoint: "https://dshfind.com/api".into(),
             dsh_auth_token: None,
             github_enabled: true,
             github_token: None,
-            cache_dir: home.join(".neotrix").join("market").join("cache"),
-            plugin_dir: home.join(".neotrix").join("plugins"),
+            cache_dir: base.join("market").join("cache"),
+            plugin_dir: base.join("plugins"),
         }
     }
 }

@@ -169,9 +169,8 @@ pub struct ModelManager {
 
 impl ModelManager {
     pub fn new() -> Self {
-        let cache_dir = dirs::home_dir()
+        let cache_dir = crate::config::AppConfig::base_dir()
             .unwrap_or_default()
-            .join(".neotrix")
             .join("models");
 
         Self {

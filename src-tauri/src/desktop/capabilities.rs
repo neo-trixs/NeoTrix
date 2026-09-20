@@ -37,6 +37,7 @@ pub struct FileAssociation {
 
 /// 通知优先级
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NotificationPriority {
     Low,
     Normal,

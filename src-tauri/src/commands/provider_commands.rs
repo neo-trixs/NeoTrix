@@ -149,12 +149,12 @@ pub async fn provider_complete(
         manager.record_success(&provider.id);
 
         // 发射成功事件
-        if let Err(e) = app.emit("provider-request-success", serde_json::json!({
+        if let Err(e) = app.emit("provider_request_success", serde_json::json!({
             "provider_id": provider.id,
             "model": model_name,
             "timestamp": chrono::Utc::now().to_rfc3339(),
         })) {
-            tracing::trace!("emit provider-request-success: {e}");
+            tracing::trace!("emit provider_request_success: {e}");
         }
 
         return ipc::ok(serde_json::json!({
@@ -216,16 +216,14 @@ pub async fn provider_add(
         );
     }
 
-    let provider_config = config.clone().into();
-    manager.register(provider_config);
+    manager.register(config.clone().into());
 
-    // 发射事件
-    if let Err(e) = app.emit("provider-added", serde_json::json!({
+    if let Err(e) = app.emit("provider_added", serde_json::json!({
         "provider_id": config.id,
         "name": config.name,
         "timestamp": chrono::Utc::now().to_rfc3339(),
     })) {
-        tracing::trace!("emit provider-added: {e}");
+        tracing::trace!("emit provider_added: {e}");
     }
 
     ipc::ok(ProviderStatusDto {
@@ -258,11 +256,11 @@ pub async fn provider_remove(
     }
 
     // 发射事件
-    if let Err(e) = app.emit("provider-removed", serde_json::json!({
+    if let Err(e) = app.emit("provider_removed", serde_json::json!({
         "provider_id": provider_id,
         "timestamp": chrono::Utc::now().to_rfc3339(),
     })) {
-        tracing::trace!("emit provider-removed: {e}");
+        tracing::trace!("emit provider_removed: {e}");
     }
 
     ipc::ok(())
@@ -319,6 +317,10 @@ pub async fn provider_update_config(
 
     ipc::ok(ProviderStatusDto {
         id: config.id,
+        name: config.name,
+        provider_type: config.provider_type,
+        available: config.enabled,
+        models: config.models,
         name: config.name,
         provider_type: config.provider_type,
         available: config.enabled,

@@ -319,3 +319,29 @@ src/
 - `pub(crate)` 优于 `pub`
 - `pub(super)` 用于模块内共享
 - 无修饰符 = 私有实现
+
+## 14. 跨域审计发现（Cross-Domain Audit Findings）
+
+> 2026-08-28 审计结论，持续更新
+
+### 事件命名
+- **规则**：所有事件名必须 snake_case
+- **禁止**：kebab-case (`neotrix-check-updates`)、colon (`neotrix:new-session`)、URI (`neotrix://file-drop`)
+- **例外**：Tauri 内置插件事件保留原格式 (`neotrix_update_*`)
+
+### 错误代码体系
+- **现状**：3套并行系统 — `ErrorCode`枚举(System1) + `DomainError`裸字符串(System2) + `ipc::err()`硬编码(System3)
+- **问题**：120个唯一代码，12个语义冲突（`NOT_FOUND`在System2有27处，System3有5个变体）
+- **规则**：新错误代码必须添加到 `commands/error.rs` 的 `ErrorCode` 枚举
+- **禁止**：在 `commands/*.rs` 中使用裸字符串作为错误代码
+- **规则**：`From<DomainError> for AppError` 必须映射到正确变体，不能全部落入 `AppError::Other`
+
+### 状态包装
+- **规范模式**：`State<Arc<RwLock<T>>>` — 适用于需要可变状态的管理器
+- **可接受模式**：`State<Arc<T>>` — 适用于内部自管理并发的类型（如 PtyManager）
+- **可接受模式**：`State<T>` — 适用于不可变配置或简单管理器
+
+### 路径管理
+- **规则**：所有 `~/.neotrix` 路径必须通过 `config::AppConfig::base_dir()` 获取
+- **规则**：所有项目级 `.neotrix` 路径必须通过 `config::AppConfig::project_dir()` 获取
+- **禁止**：在业务代码中直接硬编码 `.neotrix` 路径字符串

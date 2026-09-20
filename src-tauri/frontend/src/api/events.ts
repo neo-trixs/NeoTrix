@@ -112,10 +112,10 @@ export interface MenuEventHandlers {
 export async function subscribeMenuEvents(handlers: MenuEventHandlers): Promise<UnlistenFn> {
   const unlisteners: UnlistenFn[] = []
   const entries: Array<[string, (() => void) | undefined]> = [
-    ['neotrix:new-session', handlers.onNewSession],
-    ['open-settings', handlers.onOpenSettings],
-    ['neotrix-open-palette', handlers.onOpenPalette],
-    ['neotrix-check-updates', handlers.onCheckUpdates],
+    ['neotrix_new_session', handlers.onNewSession],
+    ['open_settings', handlers.onOpenSettings],
+    ['neotrix_open_palette', handlers.onOpenPalette],
+    ['neotrix_check_updates', handlers.onCheckUpdates],
   ]
   for (const [event, cb] of entries) {
     if (!cb) continue

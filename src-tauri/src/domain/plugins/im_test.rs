@@ -1,7 +1,7 @@
 //! IM Plugin integration tests
 
 use super::im::{ChannelType, ImPlugin, ResponseMode};
-use super::im::{set_app_handle};
+use crate::domain::app_handle::set_app_handle;
 use crate::domain::{DomainError, DomainPlugin, DomainRegistry};
 use std::sync::Arc;
 use tokio::sync::RwLock;

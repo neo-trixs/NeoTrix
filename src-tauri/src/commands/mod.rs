@@ -1,6 +1,6 @@
 //! V2 Tauri 命令 — NeoTrix V2 架构的 Tauri 后端
 //!
-//! 当前只保留 unified + PTY + model_pool + proxy_pool 命令，其他旧命令模块暂不编译。
+//! V2 命令模块：unified, PTY, model_pool, proxy_pool, IM, hive, domain_cmd, file_drop 等。
 
 pub mod domain_cmd;
 pub mod file_drop;

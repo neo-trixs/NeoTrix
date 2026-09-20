@@ -496,8 +496,8 @@ pub struct ImPlugin {
 
 impl ImPlugin {
     pub fn new(registry: Arc<tokio::sync::RwLock<DomainRegistry>>) -> Self {
-        let config_path = dirs::home_dir()
-            .map(|h| h.join(".neotrix").join("im_channels.json"))
+        let config_path = crate::config::AppConfig::base_dir()
+            .map(|h| h.join("im_channels.json"))
             .unwrap_or_else(|| PathBuf::from(".neotrix/im_channels.json"));
 
         Self {
@@ -814,9 +814,8 @@ impl ImPlugin {
 
     /// DSH 市场配置路径
     fn dsh_market_path(&self) -> PathBuf {
-        dirs::home_dir()
+        crate::config::AppConfig::base_dir()
             .unwrap_or_default()
-            .join(".neotrix")
             .join("dsh_market.json")
     }
 

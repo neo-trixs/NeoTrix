@@ -1,9 +1,7 @@
 use async_trait::async_trait;
 use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
-use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::Arc;
 
 // ========== Types ==========
 
@@ -21,42 +19,12 @@ pub struct SessionInfo {
 // ========== Plugin ==========
 
 pub struct SessionPlugin {
-    db_path: PathBuf,
-    _db: Mutex<()>,
+    db_pool: Arc<crate::db_pool::DbPool>,
 }
 
 impl SessionPlugin {
-    pub fn new() -> Self {
-        let db_path = dirs::home_dir()
-            .map(|h| h.join(".neotrix").join("desktop.db"))
-            .unwrap_or_else(|| PathBuf::from(".neotrix/desktop.db"));
-        Self {
-            db_path,
-            _db: Mutex::new(()),
-        }
-    }
-
-    fn open_db(&self) -> Result<Connection, DomainError> {
-        if let Some(parent) = self.db_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| DomainError {
-                code: "DB_ERROR".into(),
-                message: format!("创建数据目录失败: {}", e),
-                recoverable: true,
-            })?;
-        }
-        let conn = Connection::open(&self.db_path).map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("打开数据库失败: {}", e),
-            recoverable: true,
-        })?;
-        conn.pragma_update(None, "journal_mode", "WAL")
-            .map_err(|e| DomainError {
-                code: "DB_ERROR".into(),
-                message: format!("启用 WAL 失败: {}", e),
-                recoverable: true,
-            })?;
-        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-        conn.execute_batch(
+    pub fn new(db_pool: Arc<crate::db_pool::DbPool>) -> Self {
+        if let Err(e) = db_pool.init_schema(
             "CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -70,26 +38,21 @@ impl SessionPlugin {
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );",
-        )
-        .map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("初始化表失败: {}", e),
-            recoverable: true,
-        })?;
-        // 向后兼容
-        let _ = conn.execute(
-            "ALTER TABLE sessions ADD COLUMN project TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        let _ = conn.execute(
-            "ALTER TABLE sessions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
-            [],
-        );
-        Ok(conn)
+        ) {
+            tracing::warn!("schema init: {e}");
+        }
+        // backward-compat columns
+        if let Err(e) = db_pool.init_schema("ALTER TABLE sessions ADD COLUMN project TEXT NOT NULL DEFAULT ''") {
+            tracing::warn!("schema init: {e}");
+        }
+        if let Err(e) = db_pool.init_schema("ALTER TABLE sessions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0") {
+            tracing::warn!("schema init: {e}");
+        }
+        Self { db_pool }
     }
 
     fn list_all(&self) -> Result<Vec<SessionInfo>, DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         let mut stmt = conn
             .prepare("SELECT id, name, created_at, updated_at, messages, project, sort_order FROM sessions ORDER BY sort_order ASC, updated_at DESC")
             .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("准备查询失败: {}", e), recoverable: true })?;
@@ -134,7 +97,7 @@ impl SessionPlugin {
     fn create(&self, name: &str) -> Result<String, DomainError> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp();
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         conn.execute(
             "INSERT INTO sessions (id, name, created_at, updated_at, messages) VALUES (?1, ?2, ?3, ?3, '[]')",
             rusqlite::params![id, name, now],
@@ -144,22 +107,24 @@ impl SessionPlugin {
     }
 
     fn delete(&self, id: &str) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         conn.execute("DELETE FROM sessions WHERE id = ?1", rusqlite::params![id])
             .map_err(|e| DomainError {
                 code: "DB_ERROR".into(),
                 message: format!("删除失败: {}", e),
                 recoverable: true,
             })?;
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "DELETE FROM app_state WHERE key = 'active_session_id' AND value = ?1",
             rusqlite::params![id],
-        );
+        ) {
+            tracing::warn!("db: {e}");
+        }
         Ok(())
     }
 
     fn switch_to(&self, id: &str) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         let exists: bool = conn
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?1)",
@@ -187,7 +152,7 @@ impl SessionPlugin {
     }
 
     fn reorder(&self, ids: &[String]) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         let tx = conn.unchecked_transaction().map_err(|e| DomainError {
             code: "DB_ERROR".into(),
             message: format!("事务失败: {}", e),
@@ -213,7 +178,7 @@ impl SessionPlugin {
     }
 
     fn set_project(&self, id: &str, project: &str) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         let n = conn
             .execute(
                 "UPDATE sessions SET project = ?1, updated_at = ?2 WHERE id = ?3",
@@ -235,7 +200,7 @@ impl SessionPlugin {
     }
 
     fn fork(&self, from_id: &str, up_to: Option<usize>) -> Result<String, DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         let messages: String = conn
             .query_row(
                 "SELECT messages FROM sessions WHERE id = ?1",
@@ -278,7 +243,7 @@ impl SessionPlugin {
     }
 
     fn rename(&self, id: &str, name: &str) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         let n = conn
             .execute(
                 "UPDATE sessions SET name = ?1, updated_at = ?2 WHERE id = ?3",
@@ -300,18 +265,33 @@ impl SessionPlugin {
     }
 
     fn archive(&self, id: &str) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         // Move to archived_sessions table
-        conn.execute_batch(&format!(
+        conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS archived_sessions (
                 id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL, messages TEXT NOT NULL DEFAULT '[]',
                 project TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0
-            );
-            INSERT OR REPLACE INTO archived_sessions SELECT * FROM sessions WHERE id = '{}';
-            DELETE FROM sessions WHERE id = '{}';",
-            id, id
-        ))
+            );",
+        )
+        .map_err(|e| DomainError {
+            code: "DB_ERROR".into(),
+            message: format!("归档失败: {}", e),
+            recoverable: true,
+        })?;
+        conn.execute(
+            "INSERT OR REPLACE INTO archived_sessions SELECT * FROM sessions WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .map_err(|e| DomainError {
+            code: "DB_ERROR".into(),
+            message: format!("归档失败: {}", e),
+            recoverable: true,
+        })?;
+        conn.execute(
+            "DELETE FROM sessions WHERE id = ?1",
+            rusqlite::params![id],
+        )
         .map_err(|e| DomainError {
             code: "DB_ERROR".into(),
             message: format!("归档失败: {}", e),
@@ -321,12 +301,20 @@ impl SessionPlugin {
     }
 
     fn restore(&self, id: &str) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
-        conn.execute_batch(&format!(
-            "INSERT OR REPLACE INTO sessions SELECT * FROM archived_sessions WHERE id = '{}';
-            DELETE FROM archived_sessions WHERE id = '{}';",
-            id, id
-        ))
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
+        conn.execute(
+            "INSERT OR REPLACE INTO sessions SELECT * FROM archived_sessions WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .map_err(|e| DomainError {
+            code: "DB_ERROR".into(),
+            message: format!("恢复失败: {}", e),
+            recoverable: true,
+        })?;
+        conn.execute(
+            "DELETE FROM archived_sessions WHERE id = ?1",
+            rusqlite::params![id],
+        )
         .map_err(|e| DomainError {
             code: "DB_ERROR".into(),
             message: format!("恢复失败: {}", e),
@@ -336,14 +324,16 @@ impl SessionPlugin {
     }
 
     fn list_archived(&self) -> Result<Vec<SessionInfo>, DomainError> {
-        let conn = self.open_db()?;
-        let _ = conn.execute_batch(
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
+        if let Err(e) = conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS archived_sessions (
                 id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL, messages TEXT NOT NULL DEFAULT '[]',
                 project TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0
             );",
-        );
+        ) {
+            tracing::warn!("db: {e}");
+        }
         let mut stmt = conn
             .prepare("SELECT id, name, created_at, updated_at, messages, project, sort_order FROM archived_sessions ORDER BY updated_at DESC")
             .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("查询失败: {}", e), recoverable: true })?;
@@ -386,7 +376,7 @@ impl SessionPlugin {
     }
 
     fn tag(&self, id: &str, tag: &str) -> Result<Vec<String>, DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         // Store tags in app_state as JSON array
         let key = format!("session_tags:{}", id);
         let existing: String = conn
@@ -410,7 +400,7 @@ impl SessionPlugin {
     }
 
     fn untag(&self, id: &str, tag: &str) -> Result<Vec<String>, DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         let key = format!("session_tags:{}", id);
         let existing: String = conn
             .query_row(
@@ -431,7 +421,7 @@ impl SessionPlugin {
     }
 
     fn clear(&self, id: &str) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         conn.execute(
             "UPDATE sessions SET messages = '[]' WHERE id = ?1",
             rusqlite::params![id],

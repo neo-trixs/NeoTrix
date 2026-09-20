@@ -4,6 +4,7 @@
 
 use anyhow::{Context, Result as AnyhowResult};
 use crate::atomic_io;
+use crate::config::AppConfig;
 use crate::ipc::{self, IpcResponse};
 use serde::{Deserialize, Serialize};
 
@@ -44,9 +45,8 @@ pub struct ProxyPoolSnapshot {
 
 /// 从 ~/.neotrix/ 读取订阅文件
 fn load_subscriptions() -> AnyhowResult<Vec<String>> {
-    let path = dirs::home_dir()
+    let path = AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("subscriptions.json");
 
     if !path.exists() {
@@ -60,9 +60,8 @@ fn load_subscriptions() -> AnyhowResult<Vec<String>> {
 
 /// 保存订阅文件
 fn save_subscriptions(subs: &[String]) -> AnyhowResult<()> {
-    let path = dirs::home_dir()
+    let path = AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("subscriptions.json");
 
     if let Some(parent) = path.parent() {
@@ -74,9 +73,8 @@ fn save_subscriptions(subs: &[String]) -> AnyhowResult<()> {
 
 /// 读取代理池配置
 fn load_pool_config() -> AnyhowResult<serde_json::Value> {
-    let path = dirs::home_dir()
+    let path = AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("config.toml");
 
     if !path.exists() {
@@ -98,9 +96,8 @@ fn load_pool_config() -> AnyhowResult<serde_json::Value> {
 
 /// 保存代理池策略配置
 fn save_strategy(strategy: &str) -> AnyhowResult<()> {
-    let config_path = dirs::home_dir()
+    let config_path = AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("config.toml");
 
     // 读取现有配置或创建新的
@@ -150,9 +147,8 @@ pub async fn proxy_pool_status() -> IpcResponse<ProxyPoolStatus> {
     };
 
     // 代理池节点信息从缓存文件读取
-    let cache_path = dirs::home_dir()
+    let cache_path = AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("proxy_pool_cache.json");
 
     let nodes: Vec<ProxyPoolEntry> = if cache_path.exists() {
@@ -295,9 +291,8 @@ pub async fn proxy_pool_snapshot() -> IpcResponse<ProxyPoolSnapshot> {
 /// 添加代理节点
 #[tauri::command]
 pub async fn proxy_pool_add(url: String, tag: String) -> IpcResponse<ProxyPoolEntry> {
-    let cache_path = dirs::home_dir()
+    let cache_path = AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("proxy_pool_cache.json");
 
     let mut nodes: Vec<ProxyPoolEntry> = if cache_path.exists() {
@@ -339,9 +334,8 @@ pub async fn proxy_pool_add(url: String, tag: String) -> IpcResponse<ProxyPoolEn
 /// 删除代理节点
 #[tauri::command]
 pub async fn proxy_pool_remove(url: String) -> IpcResponse<bool> {
-    let cache_path = dirs::home_dir()
+    let cache_path = AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("proxy_pool_cache.json");
 
     if !cache_path.exists() {

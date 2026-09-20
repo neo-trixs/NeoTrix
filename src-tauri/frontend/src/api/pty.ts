@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════
    api/pty.ts — PTY 终端 IPC 封装
    后端: src-tauri pty_spawn/write/resize/close
-        事件: pty-output-{id} / pty-exit-{id}
+         事件: pty_output_{id} / pty_exit_{id}
    ════════════════════════════════════════════ */
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
@@ -28,10 +28,10 @@ export function ptyClose(sessionId: string): Promise<void> {
 
 /** 订阅 PTY 输出（服务端 → 前端的字节流），返回取消订阅函数 */
 export function onPtyOutput(sessionId: string, handler: (data: string) => void): Promise<UnlistenFn> {
-  return listen<string>(`pty-output-${sessionId}`, (event) => handler(event.payload))
+  return listen<string>(`pty_output_${sessionId}`, (event) => handler(event.payload))
 }
 
 /** 订阅 PTY 退出事件 */
 export function onPtyExit(sessionId: string, handler: (code: number) => void): Promise<UnlistenFn> {
-  return listen<number>(`pty-exit-${sessionId}`, (event) => handler(event.payload))
+  return listen<number>(`pty_exit_${sessionId}`, (event) => handler(event.payload))
 }

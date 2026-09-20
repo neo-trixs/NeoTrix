@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 /// Pattern from CodeFlow A-F grading + Pond self-healing.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum HealthGrade {
     A, // Excellent (0.9-1.0)
     B, // Good (0.8-0.9)

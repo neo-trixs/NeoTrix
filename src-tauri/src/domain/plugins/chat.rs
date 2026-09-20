@@ -5,8 +5,6 @@ use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use neotrix::l5_cognition::nt_core_consciousness_core::{
     AttemptOutcome, ConsciousTask, ExternalClosureConfig, SolutionExecutor, CORE,
 };
-use rusqlite::Connection;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 
@@ -57,32 +55,16 @@ impl SolutionExecutor for GatewayExecutor {
 }
 
 pub struct ChatPlugin {
-    db_path: PathBuf,
+    db_pool: Arc<crate::db_pool::DbPool>,
     registry: std::sync::Arc<tokio::sync::RwLock<DomainRegistry>>,
 }
 
 impl ChatPlugin {
-    pub fn new(registry: std::sync::Arc<tokio::sync::RwLock<DomainRegistry>>) -> Self {
-        let db_path = dirs::home_dir()
-            .map(|h| h.join(".neotrix").join("desktop.db"))
-            .unwrap_or_else(|| PathBuf::from(".neotrix/desktop.db"));
-        Self { db_path, registry }
-    }
-
-    fn open_db(&self) -> Result<Connection, DomainError> {
-        let conn = Connection::open(&self.db_path).map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("打开数据库失败: {}", e),
-            recoverable: true,
-        })?;
-        conn.pragma_update(None, "journal_mode", "WAL")
-            .map_err(|e| DomainError {
-                code: "DB_ERROR".into(),
-                message: format!("启用 WAL 失败: {}", e),
-                recoverable: true,
-            })?;
-        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-        conn.execute_batch(
+    pub fn new(
+        db_pool: Arc<crate::db_pool::DbPool>,
+        registry: std::sync::Arc<tokio::sync::RwLock<DomainRegistry>>,
+    ) -> Self {
+        if let Err(e) = db_pool.init_schema(
             "CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -92,17 +74,14 @@ impl ChatPlugin {
                 project TEXT NOT NULL DEFAULT '',
                 sort_order INTEGER NOT NULL DEFAULT 0
             );",
-        )
-        .map_err(|e| DomainError {
-            code: "DB_ERROR".into(),
-            message: format!("初始化表失败: {}", e),
-            recoverable: true,
-        })?;
-        Ok(conn)
+        ) {
+            tracing::warn!("schema init: {e}");
+        }
+        Self { db_pool, registry }
     }
 
     fn get_messages(&self, session_id: &str) -> Result<Vec<serde_json::Value>, DomainError> {
-        let conn = self.open_db()?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
         let messages_json: String = conn
             .query_row(
                 "SELECT messages FROM sessions WHERE id = ?1",
@@ -123,11 +102,30 @@ impl ChatPlugin {
     }
 
     fn add_message(&self, session_id: &str, message: serde_json::Value) -> Result<(), DomainError> {
-        let conn = self.open_db()?;
-        let mut messages = self.get_messages(session_id)?;
+        let conn = self.db_pool.get().map_err(DomainError::from)?;
+
+        let messages_json: String = conn
+            .query_row(
+                "SELECT messages FROM sessions WHERE id = ?1",
+                [session_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| DomainError {
+                code: "NOT_FOUND".into(),
+                message: format!("会话不存在: {}", e),
+                recoverable: false,
+            })?;
+
+        let mut messages: Vec<serde_json::Value> =
+            serde_json::from_str(&messages_json).map_err(|e| DomainError {
+                code: "PARSE_ERROR".into(),
+                message: format!("解析消息失败: {}", e),
+                recoverable: true,
+            })?;
+
         messages.push(message);
 
-        let messages_json = serde_json::to_string(&messages).map_err(|e| DomainError {
+        let updated_json = serde_json::to_string(&messages).map_err(|e| DomainError {
             code: "SERIALIZE_ERROR".into(),
             message: format!("序列化消息失败: {}", e),
             recoverable: true,
@@ -135,7 +133,7 @@ impl ChatPlugin {
 
         conn.execute(
             "UPDATE sessions SET messages = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![messages_json, chrono::Utc::now().timestamp(), session_id],
+            rusqlite::params![updated_json, chrono::Utc::now().timestamp(), session_id],
         )
         .map_err(|e| DomainError {
             code: "DB_ERROR".into(),
@@ -149,7 +147,9 @@ impl ChatPlugin {
     fn call_llm(&self, content: &str) -> Result<String, DomainError> {
         // 发射流开始事件
         if let Some(app) = get_app_handle() {
-            let _ = app.emit("neotrix_stream_start", "");
+            if let Err(e) = app.emit("neotrix_stream_start", "") {
+                tracing::trace!("emit stream_start: {e}");
+            }
         }
 
         // Emit reasoning event
@@ -228,9 +228,13 @@ impl ChatPlugin {
 
         // 发射流式 token 事件
         if let Some(app) = get_app_handle() {
-            let _ = app.emit("neotrix_stream_token", combined.clone());
-            let _ = app.emit("neotrix_stream_end", combined.clone());
-            let _ = app.emit(
+            if let Err(e) = app.emit("neotrix_stream_token", combined.clone()) {
+                tracing::trace!("emit stream_token: {e}");
+            }
+            if let Err(e) = app.emit("neotrix_stream_end", combined.clone()) {
+                tracing::trace!("emit stream_end: {e}");
+            }
+            if let Err(e) = app.emit(
                 "neotrix_stream_done",
                 serde_json::json!({
                     "cancelled": false,
@@ -240,7 +244,9 @@ impl ChatPlugin {
                     "internal_executed": report.internal_count,
                     "external_gaps": report.external_gap_count,
                 }),
-            );
+            ) {
+                tracing::trace!("emit stream_done: {e}");
+            }
         }
 
         Ok(combined)
@@ -250,7 +256,9 @@ impl ChatPlugin {
     /// mpsc::Receiver，逐 token emit neotrix_stream_token 事件，返回完整内容。
     fn call_llm_stream(&self, content: &str) -> Result<String, DomainError> {
         if let Some(app) = get_app_handle() {
-            let _ = app.emit("neotrix_stream_start", "");
+            if let Err(e) = app.emit("neotrix_stream_start", "") {
+                tracing::trace!("emit stream_start: {e}");
+            }
         }
 
         // Emit tool event
@@ -295,12 +303,16 @@ impl ChatPlugin {
                         let token = response["content"].as_str().unwrap_or("");
                         full_content.push_str(token);
                         if let Some(app) = get_app_handle() {
-                            let _ = app.emit("neotrix_stream_token", token);
+                            if let Err(e) = app.emit("neotrix_stream_token", token) {
+                                tracing::trace!("emit stream_token: {e}");
+                            }
                         }
                     }
                     Err(e) => {
                         if let Some(app) = get_app_handle() {
-                            let _ = app.emit("neotrix_stream_error", e.to_string());
+                            if let Err(e) = app.emit("neotrix_stream_error", e.to_string()) {
+                                tracing::trace!("emit stream_error: {e}");
+                            }
                         }
                         break;
                     }
@@ -310,8 +322,10 @@ impl ChatPlugin {
 
         // 流结束
         if let Some(app) = get_app_handle() {
-            let _ = app.emit("neotrix_stream_end", &full_content);
-            let _ = app.emit(
+            if let Err(e) = app.emit("neotrix_stream_end", &full_content) {
+                tracing::trace!("emit stream_end: {e}");
+            }
+            if let Err(e) = app.emit(
                 "neotrix_stream_done",
                 serde_json::json!({
                     "cancelled": false,
@@ -321,7 +335,9 @@ impl ChatPlugin {
                     "internal_executed": 0,
                     "external_gaps": 0,
                 }),
-            );
+            ) {
+                tracing::trace!("emit stream_done: {e}");
+            }
         }
 
         // Emit tool completion event
@@ -531,7 +547,9 @@ impl DomainPlugin for ChatPlugin {
             }
             "stop_stream" | "stop" => {
                 if let Some(app) = get_app_handle() {
-                    let _ = app.emit("neotrix_stream_cancel", "");
+                    if let Err(e) = app.emit("neotrix_stream_cancel", "") {
+                        tracing::trace!("emit stream_cancel: {e}");
+                    }
                 }
                 Ok(serde_json::json!({ "ok": true }))
             }
@@ -565,7 +583,7 @@ impl DomainPlugin for ChatPlugin {
                     .get("session_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("default");
-                let conn = self.open_db()?;
+                let conn = self.db_pool.get().map_err(DomainError::from)?;
                 conn.execute(
                     "UPDATE sessions SET messages = '[]', updated_at = ?1 WHERE id = ?2",
                     rusqlite::params![chrono::Utc::now().timestamp(), session_id],
@@ -627,7 +645,7 @@ impl DomainPlugin for ChatPlugin {
                 if index < messages.len() {
                     messages[index]["content"] = serde_json::json!(content);
                     let json = serde_json::to_string(&messages).unwrap_or_default();
-                    let conn = self.open_db()?;
+                    let conn = self.db_pool.get().map_err(DomainError::from)?;
                     conn.execute(
                         "UPDATE sessions SET messages = ?1, updated_at = ?2 WHERE id = ?3",
                         rusqlite::params![json, chrono::Utc::now().timestamp(), session_id],
@@ -646,7 +664,7 @@ impl DomainPlugin for ChatPlugin {
                 if index < messages.len() {
                     messages.remove(index);
                     let json = serde_json::to_string(&messages).unwrap_or_default();
-                    let conn = self.open_db()?;
+                    let conn = self.db_pool.get().map_err(DomainError::from)?;
                     conn.execute(
                         "UPDATE sessions SET messages = ?1, updated_at = ?2 WHERE id = ?3",
                         rusqlite::params![json, chrono::Utc::now().timestamp(), session_id],

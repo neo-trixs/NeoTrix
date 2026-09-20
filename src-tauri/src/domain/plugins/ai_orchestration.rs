@@ -19,6 +19,7 @@ use std::sync::{Arc, Mutex};
 
 /// Thinking budget levels (inspired by Gemini 2.5)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum ThinkingBudget {
     /// No thinking, fast response
     Off,
@@ -52,6 +53,7 @@ impl Default for ThinkingBudget {
 
 /// Background task status (inspired by GPT-5 background mode)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum BackgroundTaskStatus {
     Queued,
     Running,

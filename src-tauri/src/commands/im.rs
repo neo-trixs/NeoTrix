@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result as AnyhowResult};
 use crate::atomic_io;
+use crate::config::AppConfig;
 use crate::domain::plugins::im::{
     BotConfig, ChannelConfig, ChannelType, DshMarketConfig, ImStatus, ALL_CHANNEL_TYPES,
 };
@@ -15,17 +16,15 @@ use std::path::PathBuf;
 
 /// 配置文件路径
 fn config_path() -> PathBuf {
-    dirs::home_dir()
+    AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("im_channels.json")
 }
 
 /// DSH 市场配置路径
 fn dsh_market_path() -> PathBuf {
-    dirs::home_dir()
+    AppConfig::base_dir()
         .unwrap_or_default()
-        .join(".neotrix")
         .join("dsh_market.json")
 }
 

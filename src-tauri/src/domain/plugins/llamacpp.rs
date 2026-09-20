@@ -854,8 +854,12 @@ fn start_server(state: &mut LlamacppState, model_path: &str) -> Result<(), Domai
 
 fn stop_server(state: &mut LlamacppState) {
     if let Some(mut child) = state.child.take() {
-        let _ = child.kill();
-        let _ = child.wait();
+        if let Err(e) = child.kill() {
+            tracing::warn!("llamacpp: kill failed: {e}");
+        }
+        if let Err(e) = child.wait() {
+            tracing::warn!("llamacpp: wait failed: {e}");
+        }
     }
     state.started_at = None;
     state.current_model = None;

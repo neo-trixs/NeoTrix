@@ -514,9 +514,8 @@ impl UniversalModelManager {
     }
 
     async fn scan_local_gguf(&self) -> Result<Vec<UniversalModel>, String> {
-        let cache_dir = dirs::home_dir()
+        let cache_dir = crate::config::AppConfig::base_dir()
             .unwrap_or_default()
-            .join(".neotrix")
             .join("models");
 
         let mut models = Vec::new();
