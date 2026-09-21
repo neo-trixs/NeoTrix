@@ -1,7 +1,8 @@
 # NeoTrix 总蓝图：按图施工手册
 
-> **版本**: 1.2.0 | **日期**: 2026-09-21 | **状态**: 可执行 (Executable)
-> **变更记**: v1.5.3 SDB 调用链追踪收敛（loops 系脚手架，活 P 点仅 dispatcher；
+> **版本**: 1.5.4 | **日期**: 2026-09-21 | **状态**: 可执行 (Executable)
+> **变更记**: v1.5.4 提交清场＋V 构件定级＋R-P111 指针落地（SDB-REGISTRY v0.5；
+> SIM-29 建档）。v1.5.3 SDB 调用链追踪收敛（loops 系脚手架，活 P 点仅 dispatcher；
 > SDB-REGISTRY v0.4；SIM-28 建档）。v1.5.2 A组收尾＋B1合入CI见证（层脚本去注水真数197／SDB v0.3／阅读索引；
 > P1-05 类型＋3单测待CI首绿，ADR-0002；SIM-27 建档）。v1.5.1 实施影响面分析（5–8% 广度／<10 行为点；SDB 烘焙要求进 P1-03；
 > SIM-26 建档）。v1.5.0 第六轮吸收（API 治理/Judge 去偏/故障注入/Diátaxis；SIM-25 建档）。v1.4.0 全域审计＋第五轮吸收（2191 文件/719k 行快照；sysctl 特许登记；
@@ -824,4 +825,4 @@ graph TD
 
 ---
 
-*End of Master Blueprint v1.5.3*
+*End of Master Blueprint v1.5.4*

@@ -77,6 +77,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-26 | 蓝图实施影响面分析（本文件 §25） | GO | IMPACT-ANALYSIS + P1-03 修订 |
 | SIM-27 | A组收尾＋B1合入CI见证（本文件 §26） | GO-WITH-CI-BACKSTOP | ADR-0002 |
 | SIM-28 | SDB调用链追踪收敛＋B1验证环境战（本文件 §27） | GO-WITH-CI-BACKSTOP | SDB v0.4 |
+| SIM-29 | 提交清场＋SDB-06/07定级＋R-P111指针落地（本文件 §28） | GO | SDB v0.5 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -165,7 +166,7 @@ P3 启动时复核 G-2 vet 烘焙是否排期（Owner：Architect，日期：M2 
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*。*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*。*
 
 ---
 
@@ -199,7 +200,7 @@ fuzz 首 harness 落地时复核语料种子已提交（Owner：L3 owner，日�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -236,7 +237,7 @@ P2 启动时复核 quartet 缺口是否进 gate（Owner：QA，日期：M2 评�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -271,7 +272,7 @@ NT-STD-1.1 OSINT 附录（Owner：Security，日期：M3 评审日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -306,7 +307,7 @@ RUST-STANDARDS 并入 STD 的时机评估（Owner：Architect，日期：NT-STD-
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -344,7 +345,7 @@ dependabot.yml 加 cargo 段（YAML 机验通过）；Annex B FLAG 维持（加�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -384,7 +385,7 @@ G-4 AGENTS/TODO 引用——有意不动（E-4）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -419,7 +420,7 @@ SKILL 教学 NTS 优先括号留 legacy；MAP×0/ROADMAP×0（已无活引用）
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -455,7 +456,7 @@ D-05 加 P3/P4 标注；§19 D-15＋索引/附录 2 行；v1.3.0 changelog。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -491,7 +492,7 @@ G-3 游戏域 todo! 字串——域外，不管（记录）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -526,7 +527,7 @@ G-2 本机 OOM 跑不完门（转 infra：CI 大 runner 兜底）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -565,7 +566,7 @@ G-4 脚本执行位 2 缺（已 chmod，机验 4/4 +x）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -617,7 +618,7 @@ E-3 其余我方文件全平衡、单结尾、版本头尾一致（机验）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -654,7 +655,7 @@ R-P128b/c 改号（Owner：模块 owner，日期：M1）；31 缺失（Owner：A
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -689,7 +690,7 @@ AgentHarm 对子首跑（Owner：L3，日期：P3）；DORA 四格首填（Owner
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -723,7 +724,7 @@ toxics 首测（Owner：SRE，日期：P3）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -754,7 +755,7 @@ P0-01 数量出炉后刷新本分析 §1（Owner：P0，日期：M0 日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -788,7 +789,7 @@ G-3 全量 --tests 本机不可复现（转 CI 大 runner，承接 SIM-23）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
 
 ---
 
@@ -821,4 +822,39 @@ B1 CI 首绿（Owner：CI，承接 ADR-0002）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*
+
+---
+
+## §28 SIM-29：提交清场＋V 构件定级＋R-P111 指针落地（GO）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针：暂存污染排查＋双 verifier 精读
+> ＋R-P111 全源搜索。生产代码零改动（只读＋文档）。
+
+**探针**：P-1 暂存区审计（揪出协作者 nt_dialogue 重命名已 staged→剥离，内容未动）；
+P-2 prm/verifier.rs 精读（6 维 VerificationAction＋label 全覆盖）；
+P-3 behavioral_verifier 精读（编译＋测试＋属性＋run_bounded＋RL 信号）；
+P-4 R-P111 全源搜索（唯一命中 bend 分析指针行；112–115 全仓零命中）；
+P-5 nt_laws.rs 确认（LawViolation 引擎本体存在）。
+
+**证据**：E-1 SDB-06/07 均为真 verifier 构件（V-READY，接线待定）——SDB 首次拥有 V 库存；
+E-2 R-P111 意图可落地（law 进治理已有 nt_laws 实现承载）；
+E-3 R-P112–115 确认佚失（非暂置，是真丢）。
+
+**缺口**：G-1 V 构件与 dispatcher 三点位的接线设计（P1-03）；
+G-2 R-P112–115 重议（无 seed，需 architect 主持，NT-STD-1.1）。
+
+**外部方案**：无（内部考古＋清场）。
+
+**落点**：7b9e0777 提交（4 文件干净）＋ SDB-REGISTRY v0.5 ＋ BLUEPRINT v1.5.4。
+
+**蓝图回写**：即本轮。
+
+**放行判定**：GO（只读审计＋干净提交；接线与重议转 P-task）。
+
+**tripwire**：V 接线设计（Owner：L5，日期：P1-03 启动日）；
+R-P112–115 重议会（Owner：Architect，日期：NT-STD-1.1 规划日）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-30.*

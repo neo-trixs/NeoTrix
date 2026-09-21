@@ -1,7 +1,8 @@
 # SDB 登记表 (Stochastic-Deterministic Boundary Registry)
 
-> **版本**: v0.4 (脚手架甄别) | **日期**: 2026-09-21 | **对应**: ROADMAP P1-03 / BLUEPRINT D-04
-> **变更记**: v0.3 实点登记 (SIM-27)：SDB-04 退役（误报）＋ dispatcher 3 实点＋ loops 待追。
+> **版本**: v0.5 (V 构件定级) | **日期**: 2026-09-21 | **对应**: ROADMAP P1-03 / BLUEPRINT D-04
+> **变更记**: v0.5 V 构件定级 (SIM-29)：SDB-06/07 均为真 verifier（接线待定）。
+> v0.3 实点登记 (SIM-27)：SDB-04 退役（误报）＋ dispatcher 3 实点＋ loops 待追。
 > v0.2 新增 §Verifier 评分标准（源自 Reflect/PSR/NeurIPS25，见 ABSORPTION-ROUND2 §2.2）。
 > **规则**: 无 Verifier 的 LLM→动作路径一律 BLOCKER。本表是全部登记的唯一事实源。
 > **状态（诚实口径 v0.4）**: 活 P 点 1 组（dispatcher 442/890/1001）＋ 脚手架 3
@@ -23,8 +24,8 @@
 | SDB-03 | l1_action/nt_act/nt_act_autonomy/ (oracle_gate) | 无（确定性 Gap 枚举） | oracle_gate 系 gap 推理（非 LLM） | — | — | SCAFFOLD | 接 LLM 时重登记 |
 | SDB-04 | ~~nt_act_trade (TradeEngineRegistry)~~ | — | — | — | — | RETIRED | 误报：TradeEngine 系交易引擎注册表，非 LLM 调用点 (SIM-27 实测退役) |
 | SDB-05 | l1_action/nt_core_task_dispatcher.rs | `.complete()`×3 (L442/890/1001) ＋ CoTGenerator 接线 | E8Policy? | UNKNOWN | UNKNOWN | PARTIAL (缺 V/C/R) | 首个实名 P 点；V/C/R 待补（P1-03），先 log-only |
-| SDB-06 | l5_cognition/nt_core_prm/ (verifier.rs) | UNKNOWN | verifier.rs | UNKNOWN | UNKNOWN | UNKNOWN | PRM verifier 可能是可复用的 V 构件 |
-| SDB-07 | l5_cognition/nt_goal/ (behavioral_verifier/rl_feedback) | UNKNOWN | behavioral_verifier? | UNKNOWN | UNKNOWN | UNKNOWN | 行为 verifier，需确认是否 gate 动作 |
+| SDB-06 | l5_cognition/nt_core_prm/ (verifier.rs) | — (评估器，非动作路径) | V-CONFIRMED：6 维 MCTS 步评估（ModeConsistency/TransitionPattern/RewardHistory/DirectionChange/OscillationCheck/StepPosition） | — | — | V-READY (待接线) | 真 verifier 构件首件；接哪个 LLM→动作点待 P1-03 定 |
+| SDB-07 | l5_cognition/nt_goal/ (behavioral_verifier/rl_feedback) | — (门控对象为代码修改) | V-CONFIRMED：编译＋测试＋属性三重门＋run_bounded 超时 kill＋RL 奖励信号 | — | — | V-READY (待接线) | 全仓最接近生产 SDB verifier 的构件；是否 gate agent 动作待确认 |
 
 ---
 
