@@ -1,7 +1,9 @@
 # NeoTrix 总蓝图：按图施工手册
 
 > **版本**: 1.2.0 | **日期**: 2026-09-21 | **状态**: 可执行 (Executable)
-> **变更记**: v1.5.0 第六轮吸收（API 治理/Judge 去偏/故障注入/Diátaxis；SIM-25 建档）。v1.4.0 全域审计＋第五轮吸收（2191 文件/719k 行快照；sysctl 特许登记；
+> **变更记**: v1.5.2 A组收尾＋B1合入CI见证（层脚本去注水真数197／SDB v0.3／阅读索引；
+> P1-05 类型＋3单测待CI首绿，ADR-0002；SIM-27 建档）。v1.5.1 实施影响面分析（5–8% 广度／<10 行为点；SDB 烘焙要求进 P1-03；
+> SIM-26 建档）。v1.5.0 第六轮吸收（API 治理/Judge 去偏/故障注入/Diátaxis；SIM-25 建档）。v1.4.0 全域审计＋第五轮吸收（2191 文件/719k 行快照；sysctl 特许登记；
 > NTS-E09/D09/B13；DORA 进仪表盘；SIM-24 建档）。v1.3.5 核心建议修复轮（R-P 打捞 19+1＋31 悬空；他人 4 错证灭；
 > hook -j4 抗 OOM；lib/test 双 profile 实跑绿；SIM-23 建档）。v1.3.4 经验吸收＋全量总验收尾（12 教训成文；围栏总验唯一例外 ARCHITECTURE.md
 > 转 finding 不越权修；7 核心建议；SIM-22 建档）。v1.3.3 cli 升级残留审计（100 文件删除零悬空；4 错归属他人进行中；
@@ -250,6 +252,7 @@ stateDiagram-v2
 
 ### 目的
 LLM 的一句话变成系统动作，必须经过四步＋评分。缺任何一步 = BLOCKER；二值糊弄 = BLOCKER。
+现状（SIM-27）：P 实点 3（dispatcher），V/C/R 实现 0——以上是目标态，进度见 SDB-REGISTRY v0.3。
 
 ```mermaid
 sequenceDiagram
@@ -820,4 +823,4 @@ graph TD
 
 ---
 
-*End of Master Blueprint v1.5.0*
+*End of Master Blueprint v1.5.2*

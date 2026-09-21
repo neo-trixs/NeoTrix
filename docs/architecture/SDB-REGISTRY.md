@@ -1,13 +1,15 @@
 # SDB 登记表 (Stochastic-Deterministic Boundary Registry)
 
-> **版本**: v0.2 (评分制) | **日期**: 2026-09-21 | **对应**: ROADMAP P1-03 / BLUEPRINT D-04
-> **变更记**: v0.2 新增 §Verifier 评分标准（源自 Reflect/PSR/NeurIPS25，见 ABSORPTION-ROUND2 §2.2）。
+> **版本**: v0.3 (实点登记) | **日期**: 2026-09-21 | **对应**: ROADMAP P1-03 / BLUEPRINT D-04
+> **变更记**: v0.3 实点登记 (SIM-27)：SDB-04 退役（误报）＋ dispatcher 3 实点＋ loops 待追。
+> v0.2 新增 §Verifier 评分标准（源自 Reflect/PSR/NeurIPS25，见 ABSORPTION-ROUND2 §2.2）。
 > **规则**: 无 Verifier 的 LLM→动作路径一律 BLOCKER。本表是全部登记的唯一事实源。
-> **状态**: 登记中 — 下表为 2026-09-21 代码实测枚举的候选站点，四格多为待确认。
-> SDB 覆盖率当前为 0% (已登记 0 / 候选 7)，目标 P1 末登记 100%。
+> **状态（诚实口径）**: P 实点 3（dispatcher 442/890/1001）＋ 待追 3（loops 调用链）
+> ＋ 退役 1（SDB-04）＋ V/C 复用构件 2 组；**V/C/R 实现 0，verifier 一行未编码**。
+> 规则是目标态，不是现状——现状见本表，目标见 §Verifier。
 
 四格定义：P=Proposer(LLM) / V=Verifier(确定性) / C=Commit(持久) / R=Reject(类型化回执)。
-状态：OK=四件套齐全 / PARTIAL=缺格(注明缺哪格) / UNKNOWN=待审计。
+状态：OK=四件套齐全 / PARTIAL=缺格(注明缺哪格) / UNKNOWN=待审计 / RETIRED=误报退役。
 
 ---
 
@@ -15,11 +17,11 @@
 
 | ID | 站点 (代码路径) | P | V | C | R | 状态 | 备注 |
 |----|----------------|---|---|---|---|------|------|
-| SDB-01 | l1_action/nt_act/agent_loop/ (manager/executor/planner) | LLM planning? | checker_executor + auditor? | UNKNOWN | UNKNOWN | UNKNOWN | 需审计：planner 提议→checker 是否为确定性 verifier |
-| SDB-02 | l1_action/nt_io/nt_io_hive_agent_loop.rs | hive LLM? | UNKNOWN | outbox 有引用 | UNKNOWN | UNKNOWN | outbox 存在是 C 的起点，需确认是否为持久提交 |
-| SDB-03 | l1_action/nt_act/nt_act_autonomy/ (oracle_gate) | per_agent? | oracle_gate? | UNKNOWN | UNKNOWN | UNKNOWN | gate 命名像 verifier，需确认谓词是否确定性 |
-| SDB-04 | l1_action/nt_act/nt_act_trade/ (engine_traits/mod) | EngineAdapter run? | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | 引擎适配层，需确认 run_tier 调用点 |
-| SDB-05 | l1_action/nt_core_task_dispatcher.rs | CoTGenerator? | E8Policy? | UNKNOWN | UNKNOWN | UNKNOWN | CoT+policy 同处一文件，需拆分 P/V 边界 |
+| SDB-01 | l1_action/nt_act/agent_loop/ (manager/executor/planner) | 待追（表面无直接 LLM 调用） | checker_executor + auditor? | UNKNOWN | UNKNOWN | UNKNOWN | manager 系任务记账，需 call-graph 追踪其 LLM 触达路径 |
+| SDB-02 | l1_action/nt_io/nt_io_hive_agent_loop.rs | 待追（仅见 LlmProvider mock 注释） | UNKNOWN | outbox 有引用 | UNKNOWN | UNKNOWN | outbox 存在是 C 的起点，需确认是否为持久提交 |
+| SDB-03 | l1_action/nt_act/nt_act_autonomy/ (oracle_gate) | 待追（表面无直接 LLM 调用） | oracle_gate? | UNKNOWN | UNKNOWN | UNKNOWN | gate 命名像 verifier，需确认谓词是否确定性 |
+| SDB-04 | ~~nt_act_trade (TradeEngineRegistry)~~ | — | — | — | — | RETIRED | 误报：TradeEngine 系交易引擎注册表，非 LLM 调用点 (SIM-27 实测退役) |
+| SDB-05 | l1_action/nt_core_task_dispatcher.rs | `.complete()`×3 (L442/890/1001) ＋ CoTGenerator 接线 | E8Policy? | UNKNOWN | UNKNOWN | PARTIAL (缺 V/C/R) | 首个实名 P 点；V/C/R 待补（P1-03），先 log-only |
 | SDB-06 | l5_cognition/nt_core_prm/ (verifier.rs) | UNKNOWN | verifier.rs | UNKNOWN | UNKNOWN | UNKNOWN | PRM verifier 可能是可复用的 V 构件 |
 | SDB-07 | l5_cognition/nt_goal/ (behavioral_verifier/rl_feedback) | UNKNOWN | behavioral_verifier? | UNKNOWN | UNKNOWN | UNKNOWN | 行为 verifier，需确认是否 gate 动作 |
 

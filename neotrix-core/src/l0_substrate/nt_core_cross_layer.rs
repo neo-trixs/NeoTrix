@@ -651,6 +651,62 @@ impl SelfReviewReport {
 // NOTE: L6 concrete type re-exports have been moved to l5_cognition::l1_facade.
 // L0 should not depend on L6 — those re-exports belong in L5's facade.
 
+// ─── Dependency Confidence (P1-05 / SIM-27) ────────────────────────────────────
+// Provenance labels for cross-module edges (graphify confidence pattern).
+// Critical paths MUST carry zero AMBIGUOUS edges (see ConfidenceLabelFitness).
+
+/// How a cross-module dependency was established.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum Confidence {
+    /// Explicit in source: direct `use`, trait impl, direct call, event subscription.
+    Extracted,
+    /// Reasonable deduction: shared types, runtime patterns, inferred data flow.
+    Inferred,
+    /// Uncertain: potential cycle, unclear ownership, feature-gated path. Flag for review.
+    Ambiguous,
+}
+
+/// The mechanism of a cross-module dependency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum DependencyKind {
+    Import,
+    TraitImpl,
+    Call,
+    Event,
+    SharedType,
+}
+
+/// Where a dependency was observed.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct SourceLocation {
+    pub file: String,
+    pub line: u32,
+}
+
+/// A single labeled edge between two modules.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LabeledDependency {
+    pub source: String,
+    pub target: String,
+    pub kind: DependencyKind,
+    pub confidence: Confidence,
+    pub location: Option<SourceLocation>,
+    pub rationale: Option<String>,
+}
+
+impl LabeledDependency {
+    /// True when this edge needs human review before it may sit on a critical path.
+    pub fn needs_review(&self) -> bool {
+        self.confidence == Confidence::Ambiguous
+    }
+}
+
+/// Collect the ambiguous edges out of a dependency set.
+/// Used by critical-path gates: a non-empty return blocks the path.
+pub fn ambiguous_edges(deps: &[LabeledDependency]) -> Vec<&LabeledDependency> {
+    deps.iter().filter(|d| d.needs_review()).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -911,5 +967,66 @@ mod tests {
         let json = serde_json::to_string(&s).unwrap();
         let back: DecomposeSuggestion = serde_json::from_str(&json).unwrap();
         assert_eq!(back.subtask, "step1");
+    }
+
+    #[test]
+    fn confidence_ambiguous_needs_review() {
+        let mk = |confidence| LabeledDependency {
+            source: "l1_action::nt_io".into(),
+            target: "l2_perception::nt_world".into(),
+            kind: DependencyKind::Import,
+            confidence,
+            location: None,
+            rationale: None,
+        };
+        assert!(!mk(Confidence::Extracted).needs_review());
+        assert!(!mk(Confidence::Inferred).needs_review());
+        assert!(mk(Confidence::Ambiguous).needs_review());
+    }
+
+    #[test]
+    fn ambiguous_edges_filters_critical_path() {
+        let deps = vec![
+            LabeledDependency {
+                source: "a".into(),
+                target: "b".into(),
+                kind: DependencyKind::Call,
+                confidence: Confidence::Extracted,
+                location: Some(SourceLocation {
+                    file: "a.rs".into(),
+                    line: 10,
+                }),
+                rationale: None,
+            },
+            LabeledDependency {
+                source: "b".into(),
+                target: "c".into(),
+                kind: DependencyKind::SharedType,
+                confidence: Confidence::Ambiguous,
+                location: None,
+                rationale: Some("ownership unclear".into()),
+            },
+        ];
+        let bad = ambiguous_edges(&deps);
+        assert_eq!(bad.len(), 1);
+        assert_eq!(bad[0].target, "c");
+    }
+
+    #[test]
+    fn labeled_dependency_serde_roundtrip() {
+        let d = LabeledDependency {
+            source: "l1".into(),
+            target: "l0".into(),
+            kind: DependencyKind::TraitImpl,
+            confidence: Confidence::Inferred,
+            location: Some(SourceLocation {
+                file: "x.rs".into(),
+                line: 1,
+            }),
+            rationale: Some("via shared trait".into()),
+        };
+        let json = serde_json::to_string(&d).unwrap();
+        let back: LabeledDependency = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, d);
     }
 }

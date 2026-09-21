@@ -15,9 +15,13 @@ check_layer() {
   shift 2
   # Remaining args: forbidden patterns
   for pattern in "$@"; do
-    # Exclude facade bridge files and cross-layer traits (sanctioned channels)
+    # Exclude facade bridge files and cross-layer traits (sanctioned channels).
+    # SIM-27: drop full-line comments (//, ///, //!, /*) — migration notes like
+    # "migrated from cli::" are not dependencies. Trailing inline comments and
+    # string literals still count (conservative: may over-report, never under-).
     hits=$(rg --no-heading -n "$pattern" "$SRC/$layer_dir" \
-      -g '!*facade*' -g '!*l1_facade*' -g '!traits.rs' 2>/dev/null || true)
+      -g '!*facade*' -g '!*l1_facade*' -g '!traits.rs' 2>/dev/null \
+      | rg -v ':[0-9]+:\s*//' | rg -v ':[0-9]+:\s*/\*' || true)
     if [ -n "$hits" ]; then
       echo "VIOLATION: $layer_label must not reference $pattern"
       echo "$hits" | head -n 20
