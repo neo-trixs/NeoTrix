@@ -1,23 +1,23 @@
-//! # nt_opencode_ask — 借 opencode 的免费模型
+//! # nt_model_cli — 模型 CLI 问答桥（资源适配器）
 //!
-//! NeoTrix 自己的 CLI 终端没有独立模型配额，本模块把 `opencode run`
-//! （headless）包成晶体的同步 `NtLlmAsk`：子任务问答直接用 opencode
-//! 当前登录态下的默认（免费）模型；`-m provider/model` 可显式指定。
+//! NeoTrix 自己的 CLI 终端没有独立模型配额，本模块把外部模型 CLI
+//! （默认 `opencode run`，headless；任何同形 CLI 均可替换）包成晶体的
+//! 同步 `NtLlmAsk`。外部项目永远只是可替换资源：类型名不带外部标签，
+//! 命令/模型/后缀全是构造参数。
 //!
 //! ```text
-//! NtCrystalTaskLoop ──▶ NtOpencodeAsk::ask(prompt)
-//!                          │  opencode run [--dir W] [-m M] [--log-level ERROR] <prompt>
+//! NtCrystalTaskLoop ──▶ NtModelCliAsk::ask(prompt)
+//!                          │  <cmd> run [--dir W] [-m M] [--log-level ERROR] <prompt>
 //!                          ▼
 //!                       stdout（trim 后）→ NtLlmReply { text, 结构置信度, model }
 //! ```
 //!
 //! ## 设计要点
-//! - 每次问答都是无状态单次 `run`（不 `--continue`），上下文膨胀由晶体侧
-//!   的预算/剪枝管，不在 opencode 会话里堆历史。
-//! - 超时可杀：轮询 `try_wait`，超时 `kill`，不留僵尸 opencode 进程
-//!   （本机已有 6 个 opencode 在跑，不能再漏）。
+//! - 每次问答都是无状态单次 `run`（不接长会话），上下文膨胀由晶体侧
+//!   的预算/剪枝管，不在外部会话里堆历史。
+//! - 超时可杀：轮询 `try_wait`，超时 `kill`，不留僵尸进程。
 //! - 可测性：`argv_template` 允许测试期替换命令（`/bin/echo` 验证透传，
-//!   `/bin/sleep` 验证超时，`/nonexistent` 验证失败路径）。
+//!   `/bin/sh` 验证超时，`/nonexistent` 验证失败路径）。
 //!
 //! # Safety
 //! - 只用 `std::process`，无 shell 拼接（prompt 整体作单个 argv 传参），
@@ -29,7 +29,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 /// 借模型问答桥。
-pub struct NtOpencodeAsk {
+pub struct NtModelCliAsk {
     command: String,
     /// 显式 argv 模板（测试/特殊调用用）；`None` = 标准 opencode run 构造。
     /// 模板 + prompt（单个 argv 追加）即完整命令。
@@ -41,7 +41,7 @@ pub struct NtOpencodeAsk {
     base_confidence: f64,
 }
 
-impl NtOpencodeAsk {
+impl NtModelCliAsk {
     pub fn new() -> Self {
         Self {
             command: "opencode".to_string(),
@@ -132,7 +132,7 @@ impl NtOpencodeAsk {
     }
 }
 
-impl Default for NtOpencodeAsk {
+impl Default for NtModelCliAsk {
     fn default() -> Self {
         Self::new()
     }
@@ -168,13 +168,15 @@ fn run_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<String, Stri
                     .wait_with_output()
                     .map_err(|e| format!("collect failed: {e}"))?;
                 if output.status.success() {
-                    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    let raw = String::from_utf8_lossy(&output.stdout);
+                    let text = strip_ansi(&raw).trim().to_string();
                     if text.is_empty() {
                         return Err("empty stdout from model command".to_string());
                     }
                     return Ok(text);
                 }
-                let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let raw = String::from_utf8_lossy(&output.stderr);
+                let err = strip_ansi(&raw).trim().to_string();
                 return Err(format!("model command failed: {err}"));
             }
             None => {
@@ -192,6 +194,30 @@ fn run_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<String, Stri
     }
 }
 
+/// 去 ANSI 转义（`\x1b[...<字母>` CSI 序列 + 残留 ESC）：窗口展示与 `-free` 后缀
+/// 判定都依赖干净文本；无匹配时原样返回。
+pub fn strip_ansi(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // CSI: ESC [ params... final-byte(@..~)
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for nc in chars.by_ref() {
+                    if ('@'..='~').contains(&nc) {
+                        break;
+                    }
+                }
+                continue;
+            }
+            // 孤立 ESC：丢弃
+            continue;
+        }
+        out.push(c);
+    }
+    out
+}
 /// 回复结构置信度（与 `nt_crystal_llm_bridge::confidence_for_text` 同规则）。
 fn confidence_for_text(text: &str, base: f64) -> f64 {
     let t = text.trim();
@@ -220,7 +246,7 @@ fn confidence_for_text(text: &str, base: f64) -> f64 {
     c.clamp(0.0, 1.0)
 }
 
-impl NtLlmAsk for NtOpencodeAsk {
+impl NtLlmAsk for NtModelCliAsk {
     fn ask(&self, prompt: &str) -> Result<NtLlmReply, NtTaskFusionError> {
         let text = self
             .run_once(prompt)
@@ -240,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_build_argv_default_shape() {
-        let ask = NtOpencodeAsk::new();
+        let ask = NtModelCliAsk::new();
         let argv = ask.build_argv("你好");
         assert_eq!(argv[0], "run");
         assert!(argv.contains(&"--log-level".to_string()));
@@ -251,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_build_argv_with_model_and_dir() {
-        let ask = NtOpencodeAsk::new()
+        let ask = NtModelCliAsk::new()
             .with_model("test/model")
             .with_workdir(PathBuf::from("/tmp"));
         let argv = ask.build_argv("p");
@@ -263,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_prompt_clipped() {
-        let ask = NtOpencodeAsk::new();
+        let ask = NtModelCliAsk::new();
         let long = "x".repeat(12_001);
         let clipped = ask.prompt_clipped(&long);
         assert!(clipped.contains("clipped"));
@@ -273,7 +299,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_ask_echo_plumbs_prompt() {
-        let ask = NtOpencodeAsk::new()
+        let ask = NtModelCliAsk::new()
             .with_command("/bin/echo")
             .with_argv_template(vec![])
             .with_model("echo-test");
@@ -284,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_ask_missing_command_errors() {
-        let ask = NtOpencodeAsk::new().with_command("/nonexistent-nt-xyz");
+        let ask = NtModelCliAsk::new().with_command("/nonexistent-nt-xyz");
         let err = ask.ask("hi").unwrap_err();
         assert!(err.to_string().contains("spawn failed"));
     }
@@ -293,7 +319,7 @@ mod tests {
     #[test]
     fn test_ask_timeout_kills() {
         // sh -c "sleep 2"：多余的 prompt 参数仅占 $0 位，不影响睡眠
-        let ask = NtOpencodeAsk::new()
+        let ask = NtModelCliAsk::new()
             .with_command("/bin/sh")
             .with_argv_template(vec!["-c".to_string(), "sleep 2".to_string()])
             .with_timeout(Duration::from_millis(400));

@@ -453,7 +453,7 @@ mod tests {
         NtTuiState::new(
             "目标：G\n融合结论（置信 0.62）：答案文本\n内需：1 项",
             &[demand("retry-1")],
-            "opencode-free×2".to_string(),
+            "cli-free×2".to_string(),
             2,
             vec![],
         )
@@ -475,7 +475,7 @@ mod tests {
         let status = s.status_line();
         assert!(status.contains("第2轮"));
         assert!(status.contains("内需1"));
-        assert!(status.contains("opencode-free×2"));
+        assert!(status.contains("cli-free×2"));
     }
 
     #[test]

@@ -13,8 +13,8 @@
 use neotrix::l1_action::nt_dialogue_tui::NtTuiHuman;
 use neotrix::l1_action::nt_free_pool::NtFreePoolAsk;
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::UnifiedModelPool;
-use neotrix::l1_action::nt_io::nt_io_provider::catalog::opencode_free_source::OpencodeFreeSource;
-use neotrix::l1_action::nt_opencode_ask::NtOpencodeAsk;
+use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::CliFreeSource;
+use neotrix::l1_action::nt_model_cli::NtModelCliAsk;
 use neotrix::l1_action::nt_stdin_human::NtStdinHuman;
 use neotrix::neotrix::nt_crystal_core::{
     CrystalCore, NtInnerLoop, NtLlmAsk, NtLoopStatus, NtTaskLoopConfig,
@@ -150,7 +150,7 @@ fn main() {
     // 返回（问答桥，池摘要行）：摘要行喂给 TUI 侧栏/底栏。
     let (ask, pool_line): (Box<dyn NtLlmAsk>, String) = match &args.model {
         Some(m) => {
-            let mut op = NtOpencodeAsk::new()
+            let mut op = NtModelCliAsk::new()
                 .with_model(m.clone())
                 .with_timeout(Duration::from_secs(args.timeout_secs));
             if let Some(dir) = &args.workdir {
@@ -161,9 +161,9 @@ fn main() {
         }
         None => {
             // 全源统一管理：内置源（本地GGUF/免费云/本地端点）+ opencode实时发现，
-            // 一张表展示；CLI 可直接调用的只有 opencode-free，其余需 key/端点。
+            // 一张表展示；CLI 可直接调用的只有 cli-free 源，其余需 key/端点。
             let mut pool = UnifiedModelPool::default_pool();
-            pool.add_source(Box::new(OpencodeFreeSource::new()));
+            pool.add_source(Box::new(CliFreeSource::new()));
             let entries = pool.refresh();
             println!("模型池统一清单（{} 个）：", entries.len());
             let mut order: Vec<&str> = Vec::new();
@@ -191,12 +191,12 @@ fn main() {
             }
             let cli_ids: Vec<String> = entries
                 .iter()
-                .filter(|e| e.is_free && e.source == "opencode-free")
+                .filter(|e| e.is_free && e.source == "cli-free")
                 .map(|e| e.id.clone())
                 .collect();
             if cli_ids.is_empty() {
                 println!("池中无可直接调用的免费模型，回退 opencode 默认模型。");
-                let mut op = NtOpencodeAsk::new()
+                let mut op = NtModelCliAsk::new()
                     .with_timeout(Duration::from_secs(args.timeout_secs));
                 if let Some(dir) = &args.workdir {
                     op = op.with_workdir(dir.clone());
@@ -213,7 +213,7 @@ fn main() {
                 }
                 (
                     Box::new(fp),
-                    format!("opencode-free×{}", cli_ids.len()),
+                    format!("cli-free×{}", cli_ids.len()),
                 )
             }
         }

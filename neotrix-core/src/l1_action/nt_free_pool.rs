@@ -1,14 +1,14 @@
 //! # nt_free_pool — 池免费模型的智能调用
 //!
 //! 晶体要的不是"一个模型"，而是"打不死的免费模型池"。本模块把池子
-//! （`UnifiedModelPool::free_models`，经 `OpencodeFreeSource` 发现更新）
+//! （`UnifiedModelPool::free_models`，经 `CliFreeSource` 发现更新）
 //! 包成晶体的同步 `NtLlmAsk`：
 //!
 //! ```text
 //! NtCrystalTaskLoop ──▶ NtFreePoolAsk::ask(prompt)
 //!                          │  轮转起点 + 跳过冷却中模型
 //!                          ▼
-//!                       逐个 NtOpencodeAsk 调用 → 首个成功即返回（游标前移）
+//!                       逐个 NtModelCliAsk 调用 → 首个成功即返回（游标前移）
 //!                          │  失败记冷却（默认 60s），全灭才报错
 //! ```
 //!
@@ -19,7 +19,7 @@
 //! - `Mutex`  guard 游标/冷却（`NtLlmAsk: Send + Sync`），无 unsafe (R-P1)。
 //! - 生产代码无 `unwrap/expect/panic`。
 
-use crate::l1_action::nt_opencode_ask::NtOpencodeAsk;
+use crate::l1_action::nt_model_cli::NtModelCliAsk;
 use crate::neotrix::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -77,7 +77,7 @@ impl NtFreePoolAsk {
     }
 
     fn ask_one(&self, model: &str, prompt: &str) -> Result<NtLlmReply, NtTaskFusionError> {
-        let mut ask = NtOpencodeAsk::new()
+        let mut ask = NtModelCliAsk::new()
             .with_command(self.command.clone())
             .with_model(model)
             .with_timeout(self.timeout)

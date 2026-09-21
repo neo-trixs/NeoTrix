@@ -1,13 +1,14 @@
-//! # opencode_free_source — opencode 免费模型发现源
+//! # cli_free_source — 外部 CLI 免费模型发现源（资源适配器）
 //!
-//! 池子（`UnifiedModelPool`）的 `ModelSource` 插件：跑 `opencode models`，
-//! 把 `-free` 后缀的模型发现为 `is_free` 池条目。发现结果经
-//! `pool.refresh()` 进缓存，`pool.free_models()` 即免费模型清单，
+//! 池子（`UnifiedModelPool`）的 `ModelSource` 插件：跑外部模型 CLI 的列表命令
+//! （默认 `opencode models`），把免费后缀的模型发现为 `is_free` 池条目。
+//! 外部项目永远只是可替换资源：类型名不带外部标签，命令/参数/后缀全是构造参数。
+//! 发现结果经 `pool.refresh()` 进缓存，`pool.free_models()` 即免费模型清单，
 //! 晶体经 `NtFreePoolAsk` 智能调用（轮转 + 故障转移 + 冷却）。
 //!
 //! ```text
-//! opencode models ──▶ parse（provider/model 行，-free 过滤）──▶ cloud_free 条目
-//!                                                              ──▶ UnifiedModelPool
+//! <cli> models ──▶ parse（provider/model 行，免费后缀过滤）──▶ cloud_free 条目
+//!                                                                 ──▶ UnifiedModelPool
 //! ```
 //!
 //! # Safety
@@ -17,22 +18,25 @@
 use super::model_pool::{ModelSource, UnifiedModelEntry};
 use super::provider_catalog::ProviderCategory;
 use crate::l1_action::nt_io::nt_io_provider::common::factory::LlmProviderType;
-use crate::l1_action::nt_opencode_ask::run_capture;
+use crate::l1_action::nt_model_cli::run_capture;
 use std::time::Duration;
 
-/// opencode 免费模型发现源。
-pub struct OpencodeFreeSource {
+/// 外部 CLI 免费模型发现源（默认后端：opencode）。
+pub struct CliFreeSource {
     command: String,
     /// 显式 argv（测试注入用）；`None` = 标准 `models` 调用。
     argv: Option<Vec<String>>,
+    /// 免费后缀（默认 `-free`，随后端可配）。
+    free_suffix: String,
     timeout: Duration,
 }
 
-impl OpencodeFreeSource {
+impl CliFreeSource {
     pub fn new() -> Self {
         Self {
             command: "opencode".to_string(),
             argv: None,
+            free_suffix: "-free".to_string(),
             timeout: Duration::from_secs(30),
         }
     }
@@ -47,19 +51,24 @@ impl OpencodeFreeSource {
         self
     }
 
+    pub fn with_free_suffix(mut self, suffix: impl Into<String>) -> Self {
+        self.free_suffix = suffix.into();
+        self
+    }
+
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 }
 
-impl Default for OpencodeFreeSource {
+impl Default for CliFreeSource {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// 纯函数：解析 `opencode models` 输出 → `(provider, model)`。
+/// 纯函数：解析模型列表输出 → `(provider, model)`。
 /// 只收含 `/` 且无空白的行（表头/空行/日志自动过滤）。
 pub fn parse_models_list(output: &str) -> Vec<(String, String)> {
     let mut out = Vec::new();
@@ -79,9 +88,14 @@ pub fn parse_models_list(output: &str) -> Vec<(String, String)> {
     out
 }
 
-/// 免费判定：模型名以 `-free` 结尾（opencode 免费档命名约定）。
+/// 免费判定：模型名以免费后缀结尾（默认 `-free`，随后端可配）。
 pub fn is_free_model_id(model: &str) -> bool {
-    model.ends_with("-free")
+    is_free_model_id_with(model, "-free")
+}
+
+/// 带后缀参数的免费判定（纯函数，源内复用）。
+pub fn is_free_model_id_with(model: &str, suffix: &str) -> bool {
+    !suffix.is_empty() && model.ends_with(suffix)
 }
 
 /// 免费档真实调用端点：opencode zen（OpenAI 兼容，匿名可用）。
@@ -92,9 +106,9 @@ pub fn zen_base_url() -> String {
         .unwrap_or_else(|_| "https://opencode.ai/zen/v1".to_string())
 }
 
-impl ModelSource for OpencodeFreeSource {
+impl ModelSource for CliFreeSource {
     fn name(&self) -> &str {
-        "opencode-free"
+        "cli-free"
     }
 
     fn category(&self) -> ProviderCategory {
@@ -112,7 +126,7 @@ impl ModelSource for OpencodeFreeSource {
         };
         parse_models_list(&output)
             .into_iter()
-            .filter(|(_, m)| is_free_model_id(m))
+            .filter(|(_, m)| is_free_model_id_with(m, &self.free_suffix))
             .map(|(p, m)| {
                 UnifiedModelEntry::cloud_free(
                     &p,
@@ -180,7 +194,7 @@ mod tests {
     fn test_discover_positive_via_sh() {
         // /bin/sh 内建 printf 输出多行，模拟 `opencode models` 真实输出
         //（macOS 无 /bin/printf 独立二进制，故走 sh -c）
-        let src = OpencodeFreeSource::new()
+        let src = CliFreeSource::new()
             .with_command("/bin/sh")
             .with_argv(vec![
                 "-c".to_string(),
@@ -195,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_discover_unavailable_command_empty() {
-        let src = OpencodeFreeSource::new().with_command("/nonexistent-nt-xyz");
+        let src = CliFreeSource::new().with_command("/nonexistent-nt-xyz");
         assert!(src.discover().is_empty());
         assert!(!src.is_available());
     }
