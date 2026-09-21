@@ -939,23 +939,12 @@ impl BoardCmd {
             "sync" | "smart-sync" => {
                 let mut b = board().lock().unwrap_or_else(|e| e.into_inner());
                 // Persist subagent registry first so efficiency scoring sees real state.
-                if let Some(kb) = open_kb() {
-                    let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
-                    let mut mgr = shared.blocking_write();
-                    if let Err(e) = mgr.load_from_kb(&kb) {
-                        log::warn!("todo sync: load subagents: {e}");
-                    }
-                }
+                // Note: shared_subagent_manager migrated to AutoOrchestrator
                 let report = b.smart_analyze();
                 let yml = b.export_todo_yml();
                 if let (Ok(y), Some(kb)) = (&yml, open_kb()) {
                     let _ = kb.kv_set("todo", "TODO.yml", y);
                     let _ = kb.kv_set("todo", "TODO.md", &b.export_todo_md());
-                    let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
-                    let mgr = shared.try_write();
-                    if let Ok(mgr) = mgr {
-                        let _ = mgr.save_to_kb(&kb);
-                    }
                 }
                 if let Ok(y) = &yml {
                     if let Err(e) = std::fs::write("TODO.yml", y) {
@@ -973,45 +962,11 @@ impl BoardCmd {
                     let b = board().lock().unwrap_or_else(|e| e.into_inner());
                     (b.ready_for_allocation().iter().map(|i| i.id.clone()).collect::<Vec<_>>(), b)
                 };
-//                 let allocator = crate::l5_cognition::nt_core::nt_core_parallel::OptimalTaskAllocator::new(
-//                     crate::l5_cognition::nt_core::nt_core_parallel::AllocationStrategy::Hybrid,
-//                 );
-                let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
-                let mgr = shared.blocking_write();
-                let running = mgr.running_count();
-                if running >= max_parallel {
-                    return CommandOutput::ok(&format!(
-                        "已达最大并行数 ({max_parallel})，当前 running={running}，等待…"
-                    ));
-                }
-                let _budget = max_parallel - running;
+                // Note: shared_subagent_manager migrated to AutoOrchestrator
+                // Task allocation now handled by AutoOrchestrator::handle_intent()
                 let allocated: Vec<String> = Vec::new();
-                // Build TodoTask views of ready items and pick top-budget by efficiency score.
-                for id in &ready_ids {
-                    let _item = match b.get_item_by_id(id) {
-                        Some(i) => i.clone(),
-                        None => continue,
-                    };
-//                     let todo = crate::l5_cognition::nt_core::nt_core_parallel::TodoTask::new(
-//                         item.id.clone(), item.title.clone(), "todo".into(),
-//                     )
-//                         .with_priority(item.priority as i32)
-//                         .with_dependencies(item.dependencies.clone());
-//                     let mut t = todo;
-//                     t.created_at = item.created_at;
-//                     let budget_hit = allocator.allocate_todo(std::slice::from_ref(&t), budget, |_| false);
-//                     if !budget_hit.is_empty() && allocated.len() < budget {
-//                         let agent_id = mgr.register_for_task(&item.id, item.milestone.as_deref().unwrap_or(""));
-//                         if let Some(wi) = b.get_item_by_id_mut(&item.id) {
-//                             wi.phase = WorkItemPhase::Running;
-//                             wi.assignee = Some(agent_id.clone());
-//                             wi.updated_at = KanbanBoard::now();
-//                         }
-//                         allocated.push(format!("{agent_id} → {} ({})", item.id, item.title));
-//                     }
-                }
                 if allocated.is_empty() {
-                    return CommandOutput::ok("无可用任务（pending 且未阻塞）");
+                    return CommandOutput::ok("无可用任务（pending 且未阻塞）\n注意：任务分配已迁移到自动编排系统，使用 AutoOrchestrator::handle_intent() 进行任务路由");
                 }
                 let _ = b.save_to_kb(&open_kb().unwrap_or_else(|| KnowledgeBase::open(None).expect("kb")));
                 CommandOutput::ok(&format!("分配了 {} 个任务:\n{}", allocated.len(), allocated.join("\n")))

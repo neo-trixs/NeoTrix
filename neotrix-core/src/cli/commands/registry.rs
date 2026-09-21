@@ -2,7 +2,7 @@
 
 use crate::cli::commands::types::CommandRegistry;
 use crate::cli::commands::bench_cmds::BenchmarkCmd;
-use crate::cli::commands::agent_cmds::{AgentCmd, DiscoverCmd, McpCmd};
+use crate::cli::commands::agent_cmds::{AgentStatusCmd, DiscoverCmd, McpCmd};
 use crate::cli::commands::brain_cmds::E8Cmd;
 use crate::cli::commands::consciousness_cmds::ConsciousnessCmd;
 use crate::cli::commands::crystal_cmds::CrystalCmd;
@@ -89,8 +89,8 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(CompactCmd));
     reg.register(Box::new(DistillCmd));
 
-    // Agent
-    reg.register(Box::new(AgentCmd));
+    // Agent (观测/调试)
+    reg.register(Box::new(AgentStatusCmd));
     reg.register(Box::new(DiscoverCmd));
     reg.register(Box::new(McpCmd));
 

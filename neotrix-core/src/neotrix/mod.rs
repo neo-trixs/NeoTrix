@@ -19,6 +19,7 @@ pub mod nt_core_error;
 pub mod nt_core_event_bus;
 pub mod nt_file_ability;
 pub mod nt_crystal_core;
+pub mod nt_jev;
 pub mod proxy_daemon_wrapper;
 
 // ─── Standalone crate re-export ──────────────────────────────────────────

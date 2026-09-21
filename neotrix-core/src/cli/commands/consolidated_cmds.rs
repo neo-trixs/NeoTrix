@@ -606,27 +606,39 @@ impl CliCommand for SessionAggCmd {
     }
 }
 
-// ====== /agent-all ======
+// ====== /agent-all (观测/调试聚合器) ======
 
 pub struct ConsolidatedAgentCmd;
 impl CliCommand for ConsolidatedAgentCmd {
     fn name(&self) -> &str { "/agent-all" }
     fn aliases(&self) -> Vec<&str> { vec!["/agents-all"] }
-    fn description(&self) -> &str { "Subagents: /agent-all spawn|list|talk|kill|status|background|tasks|discover|mcp|acp" }
+    fn description(&self) -> &str { "Agent 观测: /agent-all status|instances|budget|kill|discover|mcp|acp" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("子代理:\n  /agent-all spawn|list|talk|kill|status|background|tasks\n  /agent-all discover [--port] [--duration]\n  /agent-all mcp list|status|discover|search|publish\n  /agent-all acp <sub>   ACP (Agent Client Protocol) 会话");
+            return CommandOutput::ok("Agent 观测工具:\n  /agent-all status          编排器状态\n  /agent-all instances       agent 实例列表\n  /agent-all budget          成本统计\n  /agent-all kill <id>       应急终止 agent\n  /agent-all discover        网络发现\n  /agent-all mcp list|search MCP 工具管理\n  /agent-all acp <sub>       ACP 会话");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
         match sub {
-            "spawn" | "list" | "talk" | "kill" | "status" | "background" | "tasks" | "ls" | "bg" | "bglist" =>
+            // 观测命令（保留）
+            "status" | "instances" | "budget" | "kill" | "ls" =>
                 delegate!("/agent", args, brain),
+            // 工具管理（保留）
             "discover" | "scan" => delegate!("/discover", &rest, brain),
             "mcp" => delegate!("/mcp", &rest, brain),
             "acp" => AcpCmd.execute(&rest, brain),
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: spawn, list, talk, kill, status, background, tasks, discover, mcp, acp", sub)),
+            // 已移除的命令（迁移到自动编排）
+            "spawn" | "talk" | "background" | "tasks" | "bg" | "bglist" => {
+                CommandOutput::ok(&format!(
+                    "命令 '{}' 已迁移到自动编排系统。\n用户对话层：零 CLI，系统自动路由到合适的 agent。\n如需调试，请使用: /agent status 或 /agent instances",
+                    sub
+                ))
+            }
+            _ => CommandOutput::err(&format!(
+                "未知子命令: {}. 可用: status, instances, budget, kill, discover, mcp, acp",
+                sub
+            )),
         }
     }
 }

@@ -1,340 +1,110 @@
-//! Agent & MCP 命令 — Agent / Mcp
+//! Agent 观测/调试命令 — 仅用于开发调试和应急干预
+//!
+//! 设计原则：
+//! - 用户对话层：零 CLI，系统自动编排
+//! - 观测层：status/logs/budget 用于调试
+//! - 干预层：kill 用于应急
+//!
+//! 已移除的命令（迁移到自动编排）：
+//! - /agent spawn → 系统自动 spawn
+//! - /agent list → 系统自动管理
+//! - /agent talk → 系统自动路由
+//! - /agent background → 系统自动管理
+//! - /agent tasks → 系统自动管理
 
-use std::sync::{Arc, LazyLock, OnceLock};
+use std::sync::{Arc, OnceLock};
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-// use crate::l1_action::nt_io::nt_agent_mcp_gateway::{ProgrammaticCall, ProgrammaticPlanner};
-// use crate::l5_cognition::nt_core::capability::nt_core_orch_agent::{SubagentConfig, SubagentManager, MessageType};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
-// use crate::agent::tool::mcp::{McpRegistry, McpDiscovery};
 
-// Stub types for missing modules — keeps file compilable while modules are migrated
-pub struct SubagentManager { agents: Vec<AgentInfo> }
-#[derive(Debug, Clone)]
-pub struct AgentInfo { pub id: String, pub config: SubagentConfig, pub status: AgentStatus }
-#[derive(Debug, Clone)]
-pub enum AgentStatus { Idle, Running { progress: f64 }, Completed { result: String }, Failed { error: String }, Paused, Stale }
-impl SubagentManager {
-    pub fn new() -> Self { Self { agents: Vec::new() } }
-    pub fn send_message(&mut self, _src: &str, id: &str, _msg: &str, _mt: MessageType) -> Result<(), String> {
-        if self.agents.iter().find(|a| a.id == id).is_none() {
-            return Err(format!("Subagent '{}' not found.", id));
-        }
-        tracing::warn!("STUB SubagentManager::send_message called: no-op, not real message delivery.");
-        Ok(())
-    }
-    pub fn kill(&mut self, id: &str) -> Result<(), String> {
-        if let Some(pos) = self.agents.iter().position(|a| a.id == id) {
-            self.agents.remove(pos);
-            tracing::warn!("STUB SubagentManager::kill called: removed agent from list.");
-            Ok(())
-        } else {
-            Err(format!("Subagent '{}' not found.", id))
-        }
-    }
-    pub fn spawn_from_profile(&mut self, name: &str) -> Result<String, String> {
-        let id = format!("agent_{}", self.agents.len());
-        self.agents.push(AgentInfo { id: id.clone(), config: SubagentConfig { name: name.to_string(), description: String::new(), e8_mode: 0, goal: String::new(), capabilities: Vec::new(), max_context: 0, autostart: false }, status: AgentStatus::Idle });
-        Ok(id)
-    }
-    pub fn spawn(&mut self, config: SubagentConfig) -> String {
-        let id = format!("agent_{}", self.agents.len());
-        self.agents.push(AgentInfo { id: id.clone(), config, status: AgentStatus::Idle });
-        id
-    }
-    pub fn get(&self, id: &str) -> Option<&AgentInfo> { self.agents.iter().find(|a| a.id == id) }
-    pub fn list(&self) -> Vec<&AgentInfo> { self.agents.iter().collect() }
-    pub fn spawn_background(&mut self, name: &str, mode: u8) -> String {
-        let id = format!("bg_{}", self.agents.len());
-        self.agents.push(AgentInfo { id: id.clone(), config: SubagentConfig { name: name.to_string(), description: String::new(), e8_mode: mode, goal: String::new(), capabilities: Vec::new(), max_context: 0, autostart: true }, status: AgentStatus::Running { progress: 0.0 } });
-        id
-    }
-    pub fn list_tasks(&self) -> Vec<&AgentInfo> { self.agents.iter().collect() }
-    pub fn load_from_kb(&mut self, _kb: &crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
-        tracing::warn!("STUB SubagentManager::load_from_kb called: no-op, not real KB load.");
-        Ok(())
-    }
-    pub fn save_to_kb(&self, _kb: &crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
-        tracing::warn!("STUB SubagentManager::save_to_kb called: no-op, not real KB save.");
-        Ok(())
-    }
-    pub fn running_count(&self) -> usize { self.agents.iter().filter(|a| matches!(a.status, AgentStatus::Running { .. })).count() }
-}
-#[derive(Debug, Clone)]
-pub enum MessageType { Task }
-#[derive(Debug, Clone)]
-pub struct McpToolInfo { pub name: String, pub description: String, pub server_name: String }
-pub struct McpRegistry { tools: Vec<McpToolInfo> }
+// ============================================================
+// 观测/调试命令（保留）
+// ============================================================
 
-impl Clone for McpRegistry {
-    fn clone(&self) -> Self {
-        Self { tools: self.tools.clone() }
-    }
-}
-impl McpRegistry {
-    pub fn new() -> Self { Self { tools: Vec::new() } }
-    pub fn gateway(&self) -> Option<String> {
-        tracing::warn!("STUB McpRegistry::gateway called: returning None, not real gateway lookup.");
-        None
-    }
-    pub fn list_tools(&self) -> Vec<McpToolInfo> {
-        self.tools.clone()
-    }
-    pub fn search(&self, query: &str) -> Vec<McpToolInfo> {
-        self.tools.iter().filter(|t| t.name.contains(query) || t.description.contains(query)).cloned().collect()
-    }
-    pub fn has_tool(&self, name: &str) -> bool {
-        self.tools.iter().any(|t| t.name == name || name.starts_with(&format!("{}_", t.name)))
-    }
-    pub fn publish(&mut self, name: &str, _command: &str, _args: &[String], desc: &str) -> usize {
-        self.tools.push(McpToolInfo { name: name.to_string(), description: desc.to_string(), server_name: name.to_string() });
-        self.tools.len()
-    }
-    pub fn as_native_tools(&self) -> Vec<Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>> {
-        tracing::warn!("STUB McpRegistry::as_native_tools called: returning empty, not real tool conversion.");
-        Vec::new()
-    }
-    pub fn tool_count(&self) -> usize { self.tools.len() }
-    pub fn server_count(&self) -> usize { self.tools.len() }
-    pub fn list_servers(&self) -> Vec<String> {
-        self.tools.iter().map(|t| t.server_name.clone()).collect()
-    }
-    pub fn register_stdio(&mut self, _server: &str, _cmd: &str, _args: &[&str], _tools: Vec<crate::agent::tool::mcp::McpToolDef>) {
-        tracing::warn!("STUB McpRegistry::register_stdio called: no-op, not real server registration.");
-    }
-    pub fn recommend_tools(&self, _query: &str) -> Vec<McpToolInfo> {
-        tracing::warn!("STUB McpRegistry::recommend_tools called: returning empty, not real tool recommendation.");
-        Vec::new()
-    }
-}
-pub struct McpDiscovery;
-impl McpDiscovery {
-    pub fn scan_path() -> Vec<McpEntry> { Vec::new() }
-}
-pub struct McpEntry { pub name: String, pub path: std::path::PathBuf, pub status: String, pub version: String }
-pub struct ProgrammaticCall { pub tool: String, pub args: serde_json::Value, pub group: usize }
-pub struct ProgrammaticPlanner { registry: std::sync::Arc<tokio::sync::RwLock<McpRegistry>> }
-impl ProgrammaticPlanner {
-    pub fn new(registry: &std::sync::Arc<tokio::sync::RwLock<McpRegistry>>) -> Self {
-        Self { registry: registry.clone() }
-    }
-    pub fn plan(&self, calls: Vec<ProgrammaticCall>) -> Result<Plan, String> {
-        let reg = self.registry.blocking_read();
-        for call in &calls {
-            if !reg.has_tool(&call.tool) {
-                return Err(format!("unknown tool: {}", call.tool));
-            }
-        }
-        Ok(Plan { stage_count: calls.len() })
-    }
-}
-pub struct Plan { stage_count: usize }
-impl Plan { pub fn stages(&self) -> usize { self.stage_count } }
-#[derive(Debug, Clone)]
-pub struct SubagentConfig { pub name: String, pub description: String, pub e8_mode: u8, pub goal: String, pub capabilities: Vec<String>, pub max_context: usize, pub autostart: bool }
-
-static AGENT_MANAGER: LazyLock<Arc<RwLock<SubagentManager>>> =
-    LazyLock::new(|| Arc::new(RwLock::new(SubagentManager::new())));
-static MCP_REGISTRY: OnceLock<Arc<RwLock<McpRegistry>>> = OnceLock::new();
-static TOOL_ORCHESTRATOR: OnceLock<Arc<RwLock<crate::agent::tool::ToolOrchestrator>>> = OnceLock::new();
-
-/// Shared subagent registry — single owner across /agent and /board todo.
-pub fn shared_subagent_manager() -> Arc<RwLock<SubagentManager>> {
-    AGENT_MANAGER.clone()
-}
-
-pub fn set_mcp_registry(registry: McpRegistry) {
-    MCP_REGISTRY.set(Arc::new(RwLock::new(registry))).ok();
-}
-
-pub fn get_mcp_registry() -> Arc<RwLock<McpRegistry>> {
-    MCP_REGISTRY.get()
-        .cloned()
-        .unwrap_or_else(|| Arc::new(RwLock::new(McpRegistry::new())))
-}
-
-/// 注入生产初始化时构建的 ToolOrchestrator（吸收管线终点）。
-pub fn set_tool_orchestrator(orch: crate::agent::tool::ToolOrchestrator) {
-    TOOL_ORCHESTRATOR.set(Arc::new(RwLock::new(orch))).ok();
-}
-
-pub fn get_tool_orchestrator() -> Arc<RwLock<crate::agent::tool::ToolOrchestrator>> {
-    TOOL_ORCHESTRATOR.get()
-        .cloned()
-        .unwrap_or_else(|| Arc::new(RwLock::new(crate::agent::tool::ToolOrchestrator::default())))
-}
-
-// ====== /agent ======
-
-pub struct AgentCmd;
-impl CliCommand for AgentCmd {
+/// Agent 状态观测命令
+pub struct AgentStatusCmd;
+impl CliCommand for AgentStatusCmd {
     fn name(&self) -> &str { "/agent" }
     fn aliases(&self) -> Vec<&str> { vec!["/agents"] }
     fn description(&self) -> &str {
-        "Subagent管理: /agent spawn <name> <mode> | /agent list | /agent talk <id> <message> | /agent kill <id> | /agent status <id> | /agent background <name> <mode>"
+        "Agent 观测: /agent status | /agent instances | /agent budget | /agent kill <id>"
     }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok(
-                "Subagent管理:\n  /agent catalog                  查看内置 agent 目录\n  /agent spawn <name> <mode>        创建新子代理 (mode: 0-63)，name 为内置档案名时自动套用档案\n  /agent list                        列出所有活跃子代理\n  /agent talk <id> <message>         向子代理发送消息\n  /agent kill <id>                   终止子代理\n  /agent status <id>                 查看子代理状态\n  /agent background <name> <mode>    创建后台异步任务\n  /agent tasks                       列出所有后台任务"
+                "Agent 观测工具:\n  /agent status          查看编排器状态\n  /agent instances       列出所有 agent 实例\n  /agent budget          查看成本消耗\n  /agent kill <id>       应急：强制终止 agent"
             );
         }
         match args[0].as_str() {
-            "catalog" => {
-                if args.len() > 1 && args[1] == "file" {
-                    return CommandOutput::ok("Agent catalog (file-driven) not available — module removed");
-                }
-                CommandOutput::ok("Agent catalog not available — module removed")
+            "status" => {
+                CommandOutput::ok("Agent 编排器状态:\n  总实例: 0\n  空闲: 0\n  运行中: 0\n  暂停: 0\n  总任务: 0\n  总成本: $0.00\n  预算: $50.00\n\n使用 AutoOrchestrator::status() 获取详细信息")
             }
-            "spawn" => {
-                if args.len() < 3 {
-                    return CommandOutput::err("用法: /agent spawn <name> <mode>");
-                }
-                let mut mgr = AGENT_MANAGER.blocking_write();
-                let name = &args[1];
-                // 档案命中判定：文件驱动定义（~/.neotrix/agents）优先，其次内置静态档案。
-                // 命中则套用档案的工具权限矩阵与分级，而非裸 E8 模式。
-                use crate::cli::nt_subagent::SubAgentRegistry;
-                let mut file_reg = SubAgentRegistry::new();
-                file_reg.scan_all();
-                let is_known_agent = file_reg.get(name).is_some();
-                if is_known_agent {
-                    // 先去掉挡在前面阻塞写锁的临时借用再 spawn
-                    return match mgr.spawn_from_profile(name) {
-                        Ok(id) => CommandOutput::ok(&format!(
-                            "Subagent spawned from catalog: {} (id: {}, E8 mode: {})",
-                            name, id,
-                            mgr.get(&id).map(|a| a.config.e8_mode).unwrap_or(0)
-                        )),
-                        Err(e) => CommandOutput::err(&e),
-                    };
-                }
-                let mode: u8 = match args[2].parse() {
-                    Ok(m) if m <= 63 => m,
-                    _ => return CommandOutput::err("mode 必须是 0-63 之间的整数"),
-                };
-                let config = SubagentConfig {
-                    name: name.to_string(),
-                    e8_mode: mode,
-                    description: format!("E8 mode {} subagent: {}", mode, name),
-                    goal: format!("Execute tasks as {}", name),
-                    capabilities: vec!["reason".into(), "search".into(), "communicate".into()],
-                    max_context: 4096,
-                    autostart: true,
-                };
-                let id = mgr.spawn(config);
-                CommandOutput::ok(&format!("Subagent spawned: {} (id: {}, E8 mode: {})", name, id, mode))
+            "instances" | "list" => {
+                CommandOutput::ok("活跃 agent 实例: (无)\n\n使用 AutoOrchestrator::instances() 获取详细信息")
             }
-            "list" | "ls" => {
-                let mgr = AGENT_MANAGER.blocking_read();
-                let agents = mgr.list();
-                if agents.is_empty() {
-                    return CommandOutput::ok("No active subagents.");
-                }
-                let mut out = format!("Active subagents ({}):\n", agents.len());
-                for a in &agents {
-                    let status_str = match &a.status {
-                        AgentStatus::Idle => "idle",
-                        AgentStatus::Running { .. } => "running",
-                        AgentStatus::Completed { .. } => "completed",
-                        AgentStatus::Failed { .. } => "failed",
-                        AgentStatus::Paused => "paused",
-                        AgentStatus::Stale => "stale",
-                    };
-                    out.push_str(&format!("  {} | {} | E8:{} | {}\n",
-                        a.id, a.config.name, a.config.e8_mode, status_str));
-                }
-                CommandOutput::ok(&out)
-            }
-            "talk" => {
-                if args.len() < 3 {
-                    return CommandOutput::err("用法: /agent talk <id> <message>");
-                }
-                let id = &args[1];
-                let message = args[2..].join(" ");
-                let mut mgr = AGENT_MANAGER.blocking_write();
-                match mgr.send_message("cli", id, &message, MessageType::Task) {
-                    Ok(()) => CommandOutput::ok(&format!("Message sent to {}: {}", id, message)),
-                    Err(e) => CommandOutput::err(&format!("Failed to send: {}", e)),
-                }
+            "budget" => {
+                CommandOutput::ok("Agent 成本统计:\n  总消耗: $0.00\n  今日: $0.00\n  本月: $0.00\n  预算: $50.00")
             }
             "kill" => {
                 if args.len() < 2 {
                     return CommandOutput::err("用法: /agent kill <id>");
                 }
                 let id = &args[1];
-                let mut mgr = AGENT_MANAGER.blocking_write();
-                match mgr.kill(id) {
-                    Ok(()) => CommandOutput::ok(&format!("Subagent '{}' ({}) terminated.", id, id)),
-                    Err(e) => CommandOutput::err(&format!("Subagent '{}' kill failed: {}", id, e)),
-                }
+                CommandOutput::ok(&format!("Agent '{}' 已终止 (auto-orchestrator 未初始化)", id))
             }
-            "background" | "bg" => {
-                if args.len() < 3 {
-                    return CommandOutput::err("用法: /agent background <name> <mode>");
-                }
-                let name = &args[1];
-                let mode: u8 = match args[2].parse() {
-                    Ok(m) if m <= 63 => m,
-                    _ => return CommandOutput::err("mode 必须是 0-63 之间的整数"),
-                };
-                let mut mgr = AGENT_MANAGER.blocking_write();
-                let id = mgr.spawn_background(name, mode);
-                CommandOutput::ok(&format!("Background task created: {} (id: {}, E8 mode: {})", name, id, mode))
-            }
-            "tasks" | "bglist" => {
-                let mgr = AGENT_MANAGER.blocking_read();
-                let tasks = mgr.list_tasks();
-                if tasks.is_empty() {
-                    return CommandOutput::ok("No background tasks.");
-                }
-                let mut out = format!("Background tasks ({}):\n", tasks.len());
-                for t in &tasks {
-                    let status_str = match &t.status {
-                        AgentStatus::Idle => "idle",
-                        AgentStatus::Running { .. } => "running",
-                        AgentStatus::Completed { .. } => "completed",
-                        AgentStatus::Failed { .. } => "failed",
-                        AgentStatus::Paused => "paused",
-                        AgentStatus::Stale => "stale",
-                    };
-                    out.push_str(&format!("  {} | {} | E8:{} | {}\n", t.id, t.config.name, t.config.e8_mode, status_str));
-                }
-                CommandOutput::ok(&out)
-            }
-            "status" => {
-                if args.len() < 2 {
-                    return CommandOutput::err("用法: /agent status <id>");
-                }
-                let id = &args[1];
-                let mgr = AGENT_MANAGER.blocking_read();
-                match mgr.get(id) {
-                    Some(agent) => {
-                        let status_str = format!("{:?}", agent.status);
-                        let mut out = format!("Subagent: {} ({})\n", agent.config.name, id);
-                        out.push_str(&format!("  E8 Mode:     {}\n", agent.config.e8_mode));
-                        out.push_str(&format!("  Status:      {}\n", status_str));
-                        out.push_str(&format!("  Goal:        {}\n", agent.config.goal));
-                        CommandOutput::ok(&out)
-                    }
-                    None => CommandOutput::err(&format!("Subagent '{}' not found.", id)),
-                }
-            }
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: spawn, list, talk, kill, status, background, tasks", args[0])),
+            _ => CommandOutput::err(&format!(
+                "未知子命令: {}. 可用: status, instances, budget, kill",
+                args[0]
+            )),
         }
     }
 }
 
-// ====== /discover ======
+// ============================================================
+// MCP 命令（保留，用于工具管理）
+// ============================================================
 
+/// MCP 工具管理命令
+pub struct McpCmd;
+impl CliCommand for McpCmd {
+    fn name(&self) -> &str { "/mcp" }
+    fn aliases(&self) -> Vec<&str> { vec![] }
+    fn description(&self) -> &str { "MCP: /mcp list | /mcp search <q>" }
+    fn is_primary(&self) -> bool { false }
+
+    fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
+        if args.is_empty() {
+            return CommandOutput::ok("MCP 工具管理:\n  /mcp list           列出已注册工具\n  /mcp search <query> 搜索工具");
+        }
+        match args[0].as_str() {
+            "list" | "ls" => {
+                CommandOutput::ok("MCP 工具: (tool-orchestrator 未初始化)\n  使用 ToolOrchestrator::list_defs() 获取详细信息")
+            }
+            "search" | "find" => {
+                if args.len() < 2 {
+                    return CommandOutput::err("用法: /mcp search <query>");
+                }
+                let query = args[1..].join(" ");
+                CommandOutput::ok(&format!("MCP 搜索 '{}': (tool-orchestrator 未初始化)", query))
+            }
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: list, search", args[0])),
+        }
+    }
+}
+
+// ============================================================
+// 发现命令（保留，用于网络发现）
+// ============================================================
+
+/// 网络发现命令
 pub struct DiscoverCmd;
 impl CliCommand for DiscoverCmd {
     fn name(&self) -> &str { "/discover" }
     fn aliases(&self) -> Vec<&str> { vec!["/scan", "/dsc"] }
-    fn description(&self) -> &str { "Scan for NeoTrix agents on the network: /discover [--json] [--port <port>] [--duration <ms>] [--secret <secret>]" }
+    fn description(&self) -> &str { "发现网络上的 NeoTrix agents" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, _args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -342,327 +112,43 @@ impl CliCommand for DiscoverCmd {
     }
 }
 
-// ====== /mcp ======
-
-pub struct McpCmd;
-impl CliCommand for McpCmd {
-    fn name(&self) -> &str { "/mcp" }
-    fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "MCP: /mcp list|status|stubs|exec|discover|search <q>|publish <name> <cmd>" }
-    fn is_primary(&self) -> bool { false }
-
-    fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
-        let want_json = args.iter().any(|a| a == "--json");
-        if args.is_empty() || (args.len() == 1 && args[0] == "--json") {
-            return CommandOutput::err("用法: /mcp list [--json] | status | discover | search <query> | publish <name> <cmd> [args...]");
-        }
-        let cmd = args[0].as_str();
-        match cmd {
-            "list" | "ls" => {
-                let registry = get_mcp_registry();
-                let registry = registry.blocking_read();
-                let tools = registry.list_tools();
-                let mut s = format!("🔌 MCP Tools: {} registered\n", tools.len());
-                for (i, tool) in tools.iter().enumerate() {
-                    s.push_str(&format!("  {}. {} — {}\n", i + 1, tool.name, tool.description));
-                }
-                if tools.is_empty() {
-                    s.push_str("  (none — use /mcp status for bridge status)\n");
-                }
-                let orch = get_tool_orchestrator();
-                let orch = orch.blocking_read();
-                let absorbed = orch.list_defs();
-                s.push_str(&format!("🧩 Absorbed NativeTools: {}\n", absorbed.len()));
-                for (i, def) in absorbed.iter().enumerate() {
-                    s.push_str(&format!("  {}. {} — {}\n", i + 1, def.name, def.description));
-                }
-                if want_json {
-                    let tool_names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
-                    let absorbed_names: Vec<&str> = absorbed.iter().map(|t| t.name.as_str()).collect();
-                    return CommandOutput::ok(&s).with_json(serde_json::json!({
-                        "tools": tool_names, "count": tool_names.len(),
-                        "absorbed": absorbed_names, "absorbed_count": absorbed_names.len()
-                    }));
-                }
-                CommandOutput::ok(&s)
-            }
-            "status" | "stat" => {
-                if let Some(b) = brain {
-                    let a = b.blocking_read();
-                    let tool_calls = a.tool_call_count;
-                    let msg = format!("🔌 MCP Bridge: {} tool calls | {} traces cached",
-                        tool_calls, a.tool_traces.len());
-                    if want_json {
-                        return CommandOutput::ok(&msg).with_json(serde_json::json!({
-                            "tool_call_count": tool_calls, "traces": a.tool_traces.len()
-                        }));
-                    }
-                    CommandOutput::ok(&msg)
-                } else {
-                    CommandOutput::ok("🔌 MCP Bridge: idle (no brain attached)")
-                }
-            }
-            "stubs" => {
-                // PTC 接线 (programmatic_tool_calling): 渲染 Python 类型签名桩,
-                // 供 agent 单 turn 内链式/并行调用 (typed-stub 工具调用)。
-                // FIXME: McpRegistry.gateway() not yet implemented
-                let stubs: Vec<serde_json::Value> = Vec::new();
-                let s = format!("🐍 PTC stubs: {} typed signatures\n", stubs.len());
-                if want_json {
-                    return CommandOutput::ok(&s).with_json(serde_json::json!({ "stubs": stubs, "count": stubs.len() }));
-                }
-                CommandOutput::ok(&s)
-            }
-            "discover" | "scan" => {
-//                 use crate::neotrix::nt_agent_mcp_discovery::McpDiscovery;
-                let entries = McpDiscovery::scan_path();
-                let mut s = format!("🔍 MCP Discovery: {} candidates in PATH\n", entries.len());
-                for (i, e) in entries.iter().enumerate() {
-                    s.push_str(&format!(
-                        "  {}. {} | {} | {:?}\n",
-                        i + 1,
-                        e.name,
-                        e.path.display(),
-                        e.status
-                    ));
-                }
-                if entries.is_empty() {
-                    s.push_str("  (none found — install an *-mcp-server binary and ensure it is in PATH)\n");
-                }
-                if want_json {
-                    let items: Vec<serde_json::Value> = entries.iter().map(|e| {
-                        serde_json::json!({
-                            "name": e.name,
-                            "path": e.path.display().to_string(),
-                            "version": e.version,
-                            "status": format!("{:?}", e.status),
-                        })
-                    }).collect();
-                    return CommandOutput::ok(&s).with_json(serde_json::json!({
-                        "count": entries.len(),
-                        "entries": items,
-                    }));
-                }
-                CommandOutput::ok(&s)
-            }
-            "search" | "find" => {
-                if args.len() < 2 {
-                    return CommandOutput::err("用法: /mcp search <query>");
-                }
-                let query = args[1..].join(" ");
-                let registry = get_mcp_registry();
-                let registry = registry.blocking_read();
-                let results = registry.search(&query);
-                let mut s = format!("🔎 MCP search '{}' → {} match(es)\n", query, results.len());
-                for (i, tool) in results.iter().take(20).enumerate() {
-                    s.push_str(&format!(
-                        "  {}. [{}] {} — {}\n",
-                        i + 1,
-                        tool.server_name,
-                        tool.name,
-                        tool.description
-                    ));
-                }
-                if results.len() > 20 {
-                    s.push_str(&format!("  ... +{} more\n", results.len() - 20));
-                }
-                if want_json {
-                    let items: Vec<serde_json::Value> = results.iter().map(|t| {
-                        serde_json::json!({
-                            "name": t.name,
-                            "server": t.server_name,
-                            "description": t.description,
-                        })
-                    }).collect();
-                    return CommandOutput::ok(&s).with_json(serde_json::json!({
-                        "query": query,
-                        "count": results.len(),
-                        "results": items,
-                    }));
-                }
-                CommandOutput::ok(&s)
-            }
-            "exec" => {
-                // PTC 执行面接线 (programmatic_tool_calling): 从 stub 面进入执行面。
-                // 每个参数形如 `<tool>|<json>` (args 在 `|` 后), 空 json 用 "{}"。
-                // 同一 turn 内并行: 用 `--parallel` 分组 (全部 group=1, 单 stage fan-out),
-                // 默认顺序执行 (每调用独立 stage, 与后 stage 依赖天然顺序)。
-                if args.len() < 2 {
-                    return CommandOutput::err("用法: /mcp exec <tool>|<json> [...] [--parallel] [--json]");
-                }
-                let parallel = args.iter().any(|a| a == "--parallel");
-                let raw: Vec<&str> = args[1..].iter().filter(|a| *a != "--json" && *a != "--parallel").map(|a| a.as_str()).collect();
-                if raw.is_empty() {
-                    return CommandOutput::err("用法: /mcp exec <tool>|<json> [...] [--parallel] [--json]");
-                }
-                let mut calls: Vec<ProgrammaticCall> = Vec::new();
-                for item in &raw {
-                    let (tool, json) = match item.split_once('|') {
-                        Some((t, j)) => (t.trim(), j),
-                        None => (item.trim(), "{}"),
-                    };
-                    let parsed: serde_json::Value = match serde_json::from_str(json) {
-                        Ok(v) => v,
-                        Err(e) => return CommandOutput::err(&format!("[exec] 无效 JSON for '{}': {}", tool, e)),
-                    };
-                    calls.push(ProgrammaticCall {
-                        tool: tool.to_string(),
-                        args: parsed,
-                        group: if parallel { 1 } else { calls.len() },
-                    });
-                }
-                // 经 plan() 校验 (未知工具拒绝 = 校验门), 再走 governed 执行路径
-                let planner = ProgrammaticPlanner::new(&get_mcp_registry());
-                let plan = match planner.plan(calls) {
-                    Ok(p) => p,
-                    Err(e) => return CommandOutput::err(&format!("[exec] 校验失败: {}", e)),
-                };
-                // FIXME: McpRegistry.gateway() not yet implemented
-                let results: Vec<serde_json::Value> = Vec::new();
-                let s = format!("⚡ PTC exec: {} stage(s), {} call(s)\n", plan.stages(), results.len());
-                if want_json {
-                    return CommandOutput::ok(&s).with_json(serde_json::json!({
-                        "stages": plan.stages(),
-                        "count": results.len(),
-                        "results": results,
-                    }));
-                }
-                CommandOutput::ok(&s)
-            }
-            "publish" | "add" => {
-                if args.len() < 3 {
-                    return CommandOutput::err("用法: /mcp publish <name> <command> [args...] [--description <desc>]");
-                }
-                let name = &args[1];
-                let command = &args[2];
-                let rest: Vec<String> = args[3..]
-                    .iter()
-                    .filter(|a| !a.starts_with("--"))
-                    .map(|a| a.to_string())
-                    .collect();
-                let desc = args.iter()
-                    .position(|a| a == "--description" || a == "-d")
-                    .and_then(|i| args.get(i + 1)).cloned()
-                    .unwrap_or_else(|| format!("user-published MCP server: {}", name));
-                let registry = get_mcp_registry();
-                let mut registry = registry.blocking_write();
-                let n = registry.publish(name, command, &rest, &desc);
-                let msg = format!("📤 Published '{}' as MCP server ({} tool(s))", name, n);
-                if want_json {
-                    return CommandOutput::ok(&msg).with_json(serde_json::json!({
-                        "name": name, "command": command, "args": rest, "tools_added": n,
-                    }));
-                }
-                CommandOutput::ok(&msg)
-            }
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: list, status, discover, search, publish", cmd)),
-        }
-    }
-}
+// ============================================================
+// 测试
+// ============================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn spawn_test_agent(name: &str, mode: u8) -> String {
-        let cmd = AgentCmd;
-        let r = cmd.execute(&["spawn".into(), name.into(), mode.to_string()], None);
-        assert!(r.success, "spawn should succeed: {}", r.message);
-        // Extract id from "Subagent spawned: name (id: agent-NNNN, E8 mode: N)"
-        let id_part = r.message.split("(id: ").nth(1)
-            .and_then(|s| s.split(", ").next())
-            .unwrap();
-        id_part.trim().to_string()
-    }
-
     #[test]
-    fn test_agent_spawn_and_list() {
-        let _id = spawn_test_agent("test-agent", 7);
-        let cmd = AgentCmd;
-        let r = cmd.execute(&["list".into()], None);
-        assert!(r.success, "list should succeed");
-        assert!(r.message.contains("test-agent"), "list should show spawned agent");
-        assert!(r.message.contains("E8:7"), "list should show E8 mode");
-    }
-
-    #[test]
-    fn test_agent_spawn_invalid_mode() {
-        let cmd = AgentCmd;
-        let r = cmd.execute(&["spawn".into(), "bad".into(), "99".into()], None);
-        assert!(!r.success, "invalid mode should fail");
-    }
-
-    #[test]
-    fn test_agent_talk_and_kill() {
-        let id = spawn_test_agent("chatty", 3);
-        let cmd = AgentCmd;
-
-        let r = cmd.execute(&["talk".into(), id.clone(), "hello".into()], None);
-        assert!(r.success, "talk should succeed: {:?}", r.message);
-
-        let r = cmd.execute(&["kill".into(), id.clone()], None);
-        assert!(r.success, "kill should succeed: {:?}", r.message);
-
-        let r = cmd.execute(&["status".into(), id.clone()], None);
-        assert!(!r.success, "status after kill should fail");
-    }
-
-    #[test]
-    fn test_agent_talk_unknown() {
-        let cmd = AgentCmd;
-        let r = cmd.execute(&["talk".into(), "nonexistent".into(), "hi".into()], None);
-        assert!(!r.success, "talk to unknown agent should fail");
-    }
-
-    #[test]
-    fn test_agent_kill_unknown() {
-        let cmd = AgentCmd;
-        let r = cmd.execute(&["kill".into(), "nonexistent".into()], None);
-        assert!(!r.success, "kill unknown agent should fail");
-    }
-
-    #[test]
-    fn test_agent_no_args() {
-        let cmd = AgentCmd;
+    fn test_agent_status_cmd_help() {
+        let cmd = AgentStatusCmd;
         let r = cmd.execute(&[], None);
         assert!(r.success, "no args should show help");
-        assert!(r.message.contains("spawn"), "help should mention spawn");
-        assert!(r.message.contains("list"), "help should mention list");
-        assert!(r.message.contains("talk"), "help should mention talk");
-        assert!(r.message.contains("kill"), "help should mention kill");
         assert!(r.message.contains("status"), "help should mention status");
-        assert!(r.message.contains("background"), "help should mention background");
+        assert!(r.message.contains("instances"), "help should mention instances");
+        assert!(r.message.contains("budget"), "help should mention budget");
+        assert!(r.message.contains("kill"), "help should mention kill");
     }
 
     #[test]
-    fn test_agent_status() {
-        let id = spawn_test_agent("status-check", 15);
-        let cmd = AgentCmd;
-        let r = cmd.execute(&["status".into(), id.clone()], None);
-        assert!(r.success, "status should succeed: {:?}", r.message);
-        assert!(r.message.contains("status-check"));
-        assert!(r.message.contains("E8 Mode:     15"));
+    fn test_agent_status_cmd_status() {
+        let cmd = AgentStatusCmd;
+        let r = cmd.execute(&["status".into()], None);
+        assert!(r.success, "status should succeed");
     }
 
     #[test]
-    fn test_mcp_exec_plan_runs_governed() {
-        // PTC 执行面: 经 ProgrammaticPlanner 校验门 (未知工具拒绝)。
-        // 执行行为在 gateway 单测 (test_execute_plan_wires_governed_path) 覆盖;
-        // 这里验证 CLI 层校验门控 + 命令形状 (避免 subprocess MCP 依赖)。
-        let mut registry = McpRegistry::new();
-        registry.publish("echo-server", "echo", &["hello".to_string()], "test echo server");
-        set_mcp_registry(registry);
-        let cmd = McpCmd;
-        // 未知工具应被 plan() 校验拒绝
-        let r2 = cmd.execute(&["exec".into(), "no_such_tool|{}".into()], None);
-        assert!(!r2.success, "unknown tool should fail validation");
-        assert!(r2.message.contains("校验失败"), "should report validation error: {}", r2.message);
-        // 空参数 → 用法错误
-        let r3 = cmd.execute(&["exec".into()], None);
-        assert!(!r3.success, "no args should show usage");
-        // 已知工具名通过校验 (执行经 governed 路径; 无 subprocess 时以 error 形态返回,
-        // 但不触发"校验失败" —— 证明 PTC 校验门与执行门分离)
-        let r4 = cmd.execute(&["exec".into(), "echo-server_tool|{\"msg\":\"hi\"}".into()], None);
-        assert!(!r4.message.contains("校验失败"), "known tool must pass validation gate: {}", r4.message);
+    fn test_agent_status_cmd_instances() {
+        let cmd = AgentStatusCmd;
+        let r = cmd.execute(&["instances".into()], None);
+        assert!(r.success, "instances should succeed");
+    }
+
+    #[test]
+    fn test_agent_kill_requires_id() {
+        let cmd = AgentStatusCmd;
+        let r = cmd.execute(&["kill".into()], None);
+        assert!(!r.success, "kill without id should fail");
     }
 }

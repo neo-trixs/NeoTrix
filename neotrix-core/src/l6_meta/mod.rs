@@ -13,6 +13,9 @@ pub mod evolution;
 /// L1 Facade
 pub mod l1_facade;
 
+/// NT-CORE-GUARDIAN — 统一自守护模块 (融合 8 个分散机制)
+pub mod nt_core_guardian;
+
 pub mod nt_meta;
 pub use coordination as nt_governance;
 pub use healing as nt_repair;
@@ -47,6 +50,8 @@ pub mod nt_core_capability;
 pub mod nt_agent_identity;
 /// Agent Gallery — 浏览/安装预设 agent 角色 (absorbed from munder-difflin)
 pub mod nt_agent_gallery;
+/// AutoOrchestrator — 自动编排器（替代所有 CLI 管理命令，用户只说意图，系统自动路由）
+pub mod nt_auto_orchestrator;
 
 // ============================================================================
 // Absorbed — 从 neotrix-sim 吸收
