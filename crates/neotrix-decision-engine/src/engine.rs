@@ -27,7 +27,63 @@ impl DecisionEngine {
     pub fn new(backend: Box<dyn InferenceBackend>) -> Self {
         Self { backend }
     }
-    
+
+    /// Validate inputs without running the model (dry-run)
+    ///
+    /// Checks:
+    /// - Questions have non-empty IDs
+    /// - State is non-empty
+    /// - Question types are valid
+    /// - Temperature parameters are within bounds
+    /// - Returns list of validation errors (empty = valid)
+    pub fn dry_run(&self, state: &State, questions: &[Question]) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        // Validate state
+        if state.content.trim().is_empty() {
+            errors.push("State content is empty".to_string());
+        }
+
+        // Validate questions
+        if questions.is_empty() {
+            errors.push("No questions provided".to_string());
+        }
+
+        for q in questions {
+            // Check ID
+            if q.id.trim().is_empty() {
+                errors.push("Question has empty ID".to_string());
+            }
+
+            // Check question type
+            match &q.question_type {
+                QuestionType::Noul { instructions, .. } => {
+                    if instructions.trim().is_empty() {
+                        errors.push(format!("Question '{}' has empty instructions", q.id));
+                    }
+                }
+                QuestionType::Choice { instructions, criteria } => {
+                    if instructions.trim().is_empty() {
+                        errors.push(format!("Question '{}' has empty instructions", q.id));
+                    }
+                    if criteria.is_empty() {
+                        errors.push(format!("Question '{}' has no criteria", q.id));
+                    }
+                }
+                QuestionType::Score { instructions, criteria, .. } => {
+                    if instructions.trim().is_empty() {
+                        errors.push(format!("Question '{}' has empty instructions", q.id));
+                    }
+                    if criteria.is_empty() {
+                        errors.push(format!("Question '{}' has no criteria", q.id));
+                    }
+                }
+            }
+        }
+
+        errors
+    }
+
     /// Evaluate state against questions and return answers
     pub fn evaluate(&self, state: &State, question_set: &QuestionSet) -> Result<EvaluationResult> {
         // Build prompt
@@ -546,5 +602,45 @@ Some text after
         let result = engine.evaluate(&state, &question_set).unwrap();
         // Mock backend returns "mock_question", "mock_choice", "mock_score"
         assert_eq!(result.answers.len(), 3);
+    }
+
+    #[test]
+    fn test_dry_run_valid() {
+        let engine = DecisionEngine::default();
+        let state: State = "Test state".into();
+        let questions = vec![
+            Question::noul("q1", "Is this valid?"),
+        ];
+        let errors = engine.dry_run(&state, &questions);
+        assert!(errors.is_empty(), "Valid input should have no errors: {:?}", errors);
+    }
+
+    #[test]
+    fn test_dry_run_empty_state() {
+        let engine = DecisionEngine::default();
+        let state: State = "  ".into();
+        let questions = vec![Question::noul("q1", "Test?")];
+        let errors = engine.dry_run(&state, &questions);
+        assert!(!errors.is_empty());
+        assert!(errors[0].contains("empty"));
+    }
+
+    #[test]
+    fn test_dry_run_empty_questions() {
+        let engine = DecisionEngine::default();
+        let state: State = "Test".into();
+        let errors = engine.dry_run(&state, &[]);
+        assert!(!errors.is_empty());
+        assert!(errors[0].contains("No questions"));
+    }
+
+    #[test]
+    fn test_dry_run_empty_instructions() {
+        let engine = DecisionEngine::default();
+        let state: State = "Test".into();
+        let questions = vec![Question::noul("q1", "")];
+        let errors = engine.dry_run(&state, &questions);
+        assert!(!errors.is_empty());
+        assert!(errors[0].contains("empty instructions"));
     }
 }

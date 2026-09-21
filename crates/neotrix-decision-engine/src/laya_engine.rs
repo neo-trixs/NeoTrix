@@ -24,6 +24,31 @@ pub struct LayaEngine {
 }
 
 impl LayaEngine {
+    /// Try to create engine — returns None if model files not available
+    pub fn try_new(model_dir: &std::path::Path) -> Option<Self> {
+        let weights = model_dir.join("model.safetensors");
+        let tokenizer = model_dir.join("tokenizer.json");
+        let config = model_dir.join("config.json");
+
+        if !weights.exists() || !tokenizer.exists() || !config.exists() {
+            tracing::info!("Model files not found in {:?}, simulation mode available", model_dir);
+            return None;
+        }
+
+        match Self::from_files(&weights, &tokenizer, ModelConfig::modernbert_large(), TemperatureScaler::default(), Device::Cpu) {
+            Ok(e) => Some(e),
+            Err(e) => {
+                tracing::warn!("Failed to load model: {}, simulation mode available", e);
+                None
+            }
+        }
+    }
+
+    /// Generate simulation answers when model is unavailable
+    pub fn simulate_answers(questions: &[Question]) -> HashMap<String, Answer> {
+        crate::backends::simulation::simulate_answers(questions)
+    }
+
     /// Create from files
     pub fn from_files(
         weights_path: &Path,
@@ -132,6 +157,8 @@ impl LayaEngine {
         let usage = Usage {
             input_tokens: total_input_tokens,
             output_tokens: 0,
+            cost_usd: None,
+            provider: Some("local-candle".to_string()),
         };
 
         Ok(EvaluationResult {

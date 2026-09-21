@@ -127,6 +127,11 @@ impl LayaBackend {
                 output_tokens: u.get("output_tokens")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as u32,
+                cost_usd: u.get("cost_usd")
+                    .and_then(|v| v.as_f64()),
+                provider: u.get("provider")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
             }
         });
         

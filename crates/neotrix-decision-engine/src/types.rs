@@ -273,6 +273,29 @@ pub struct EvaluationResult {
 pub struct Usage {
     pub input_tokens: u32,
     pub output_tokens: u32,
+    /// Estimated cost in USD (optional, set by API backends)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_usd: Option<f64>,
+    /// Model provider name (e.g., "openrouter", "local")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+}
+
+impl Usage {
+    /// Create a minimal usage entry
+    pub fn new(input: u32, output: u32) -> Self {
+        Self {
+            input_tokens: input,
+            output_tokens: output,
+            cost_usd: None,
+            provider: None,
+        }
+    }
+
+    /// Total tokens
+    pub fn total(&self) -> u32 {
+        self.input_tokens + self.output_tokens
+    }
 }
 
 /// Decision result for guardrail checks
@@ -286,6 +309,54 @@ pub enum Decision {
     
     /// Requires human approval
     Pending { reason: String },
+}
+
+/// Exit codes for CLI/process integration
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(i32)]
+pub enum ExitCode {
+    /// All decisions successful, all within confidence thresholds
+    Success = 0,
+    /// Evaluation error (model failure, invalid input, etc.)
+    Error = 1,
+    /// One or more answers need human review
+    NeedsReview = 2,
+}
+
+impl ExitCode {
+    /// Derive exit code from answers — returns NeedsReview if any answer needs_review
+    pub fn from_answers(answers: &HashMap<String, Answer>) -> Self {
+        if answers.values().any(|a| a.needs_review()) {
+            Self::NeedsReview
+        } else {
+            Self::Success
+        }
+    }
+
+    /// Derive exit code from evaluation result
+    pub fn from_result(result: &EvaluationResult) -> Self {
+        if result.answers.values().any(|a| a.needs_review()) {
+            Self::NeedsReview
+        } else {
+            Self::Success
+        }
+    }
+
+    /// Convert to process exit code
+    pub fn as_i32(self) -> i32 {
+        self as i32
+    }
+}
+
+impl Answer {
+    /// Check if this answer needs human review
+    pub fn needs_review(&self) -> bool {
+        match self {
+            Answer::Noul(n) => n.needs_review,
+            Answer::Choice(c) => c.needs_review,
+            Answer::Score(s) => s.needs_review,
+        }
+    }
 }
 
 impl Question {
@@ -716,7 +787,7 @@ mod tests {
         let result = EvaluationResult {
             answers,
             model: Some("test-model".to_string()),
-            usage: Some(Usage { input_tokens: 100, output_tokens: 0 }),
+            usage: Some(Usage { input_tokens: 100, output_tokens: 0, cost_usd: None, provider: None }),
         };
         let json = serde_json::to_string_pretty(&result).unwrap();
         assert!(json.contains("test-model"));
@@ -734,5 +805,45 @@ mod tests {
         // model and usage should be skipped
         assert!(!json.contains("model"));
         assert!(!json.contains("usage"));
+    }
+
+    #[test]
+    fn test_exit_code_success() {
+        let mut answers = HashMap::new();
+        answers.insert("q1".to_string(), Answer::Noul(NoulAnswer {
+            noul: 0.9,
+            needs_review: false,
+            reason: None,
+            status: DecisionStatus::Selected,
+        }));
+        assert_eq!(ExitCode::from_answers(&answers), ExitCode::Success);
+    }
+
+    #[test]
+    fn test_exit_code_needs_review() {
+        let mut answers = HashMap::new();
+        answers.insert("q1".to_string(), Answer::Noul(NoulAnswer {
+            noul: 0.5,
+            needs_review: true,
+            reason: Some("uncertain".to_string()),
+            status: DecisionStatus::Review,
+        }));
+        assert_eq!(ExitCode::from_answers(&answers), ExitCode::NeedsReview);
+    }
+
+    #[test]
+    fn test_exit_code_as_i32() {
+        assert_eq!(ExitCode::Success.as_i32(), 0);
+        assert_eq!(ExitCode::Error.as_i32(), 1);
+        assert_eq!(ExitCode::NeedsReview.as_i32(), 2);
+    }
+
+    #[test]
+    fn test_answer_needs_review() {
+        let n = Answer::Noul(NoulAnswer { noul: 0.5, needs_review: true, reason: None, status: DecisionStatus::Review });
+        assert!(n.needs_review());
+
+        let c = Answer::Choice(ChoiceAnswer { choice: "a".into(), probabilities: HashMap::new(), confidence: 0.0, margin: 0.0, needs_review: false, reason: None, status: DecisionStatus::Selected });
+        assert!(!c.needs_review());
     }
 }

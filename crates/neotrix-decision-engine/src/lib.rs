@@ -38,6 +38,7 @@ pub use types::*;
 pub use engine::{DecisionEngine, InferenceBackend};
 pub use error::{Error, Result};
 pub use backends::{LayaBackend, LayaCandleBackend};
+pub use backends::simulation::{SimulationBackend, SimulationResponse, simulate_answers};
 pub use tokenizer::LayaTokenizer;
 pub use sequence::{SequenceBuilder, BuiltSequence};
 pub use temperature::TemperatureScaler;
