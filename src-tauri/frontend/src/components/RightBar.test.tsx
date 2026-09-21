@@ -35,15 +35,17 @@ describe('RightBar 右栏回归（标签/项目树/文件树/预览/嵌入）', 
     document.body.innerHTML = ''
   })
 
-  it('渲染 3 个标签：文件/地图/项目', async () => {
+  it('渲染 5 个标签：文件/地图/项目/画板/协调', async () => {
     mockCommand('domain_call', async () => ({ ok: true, data: TREE_DATA, error: null }))
     render(() => <RightBar />)
     await settle()
     const tabs = document.querySelectorAll('[role="tab"]')
-    expect(tabs.length).toBe(3)
+    expect(tabs.length).toBe(5)
     expect(document.body.textContent).toContain('文件')
     expect(document.body.textContent).toContain('地图')
     expect(document.body.textContent).toContain('项目')
+    expect(document.body.textContent).toContain('画板')
+    expect(document.body.textContent).toContain('协调')
     expect(document.querySelector('[aria-selected="true"]')?.textContent).toBe('文件')
   })
 

@@ -17,6 +17,15 @@ const timeline = [
   { date: '2026-08-25', entries_created: 9, entries_accessed: 20, top_topic: 'app-features' },
 ]
 
+/** mock domain_call（memory 域），返回 {ok, data} 信封 */
+function mockMemoryDomain(handlers: Record<string, (args: any) => unknown>) {
+  return mockCommand('domain_call', async (req: any) => {
+    const fn = handlers[`${req.domain}/${req.action}`]
+    if (!fn) throw new Error(`unexpected domain call: ${req.domain}/${req.action}`)
+    return { ok: true, data: await fn(req.args) }
+  })
+}
+
 function renderPage() {
   return render(() => (
     <MemoryRouter>
@@ -27,8 +36,10 @@ function renderPage() {
 
 describe('MemoryManager page (B6 直连后端)', () => {
   it('渲染统计四格与时间线柱状', async () => {
-    mockCommand('memory_stats', () => stats)
-    mockCommand('memory_timeline', () => timeline)
+    mockMemoryDomain({
+      'memory/stats': async () => stats,
+      'memory/timeline': async () => timeline,
+    })
     renderPage()
     expect(await screen.findByLabelText('记忆统计')).toBeTruthy()
     expect(screen.getByText('42')).toBeTruthy()
@@ -39,15 +50,17 @@ describe('MemoryManager page (B6 直连后端)', () => {
   })
 
   it('搜索提交调用 memory_search 并渲染结果与 kind 徽章', async () => {
-    mockCommand('memory_stats', () => stats)
-    mockCommand('memory_timeline', () => timeline)
-    mockCommand('memory_search', (args) => {
-      const query = String(args?.query ?? '')
-      return query === '吸收' ? [{
-        id: 'e1', kind: 'pattern', content: '吸收纪律要点', summary: '', source: 'self-session',
-        confidence: 0.9, created_at: Date.now(), last_accessed_at: Date.now(),
-        access_count: 3, tags: ['R-P79'], is_pinned: true,
-      }] : []
+    mockMemoryDomain({
+      'memory/stats': async () => stats,
+      'memory/timeline': async () => timeline,
+      'memory/search': async (args) => {
+        const query = String(args?.query ?? '')
+        return query === '吸收' ? [{
+          id: 'e1', kind: 'pattern', content: '吸收纪律要点', summary: '', source: 'self-session',
+          confidence: 0.9, created_at: Date.now(), last_accessed_at: Date.now(),
+          access_count: 3, tags: ['R-P79'], is_pinned: true,
+        }] : []
+      },
     })
     renderPage()
     await screen.findByLabelText('记忆统计')
@@ -63,8 +76,12 @@ describe('MemoryManager page (B6 直连后端)', () => {
   })
 
   it('后端错误渲染错误态', async () => {
-    mockCommand('memory_stats', () => { throw new Error('db locked') })
-    mockCommand('memory_timeline', () => [])
+    mockMemoryDomain({
+      'memory/stats': async () => {
+        throw new Error('db locked')
+      },
+      'memory/timeline': async () => [],
+    })
     renderPage()
     expect(await screen.findByText('db locked')).toBeTruthy()
     expect(screen.getByRole('button', { name: '重试' })).toBeTruthy()

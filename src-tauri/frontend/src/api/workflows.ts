@@ -38,14 +38,16 @@ export function workflowList(): Promise<Workflow[]> {
   return call<Workflow[]>('workflow', 'list')
 }
 
-export function workflowRun(workflowId: string): Promise<string> {
-  return call<string>('workflow', 'run', { workflow_id: workflowId })
+export async function workflowRun(workflowId: string): Promise<string> {
+  // 后端 run 返回完整 WorkflowRun 对象，此处提取 id 以保持调用方契约
+  const run = await call<WorkflowRun>('workflow', 'run', { workflow_id: workflowId })
+  return run.id
 }
 
 export function workflowRunStatus(runId: string): Promise<WorkflowRun> {
-  return call<WorkflowRun>('workflow', 'run_status', { run_id: runId })
+  return call<WorkflowRun>('workflow', 'status', { run_id: runId })
 }
 
 export function workflowRunCancel(runId: string): Promise<void> {
-  return call<void>('workflow', 'run_cancel', { run_id: runId })
+  return call<void>('workflow', 'cancel', { run_id: runId })
 }

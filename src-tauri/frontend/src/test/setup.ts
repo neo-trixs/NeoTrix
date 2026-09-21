@@ -27,3 +27,8 @@ if (typeof globalThis !== 'undefined') {
     configurable: true,
   })
 }
+
+// Tauri 宿主标识：chat-first 迁移后几乎所有 API 经 domain.call/chatSend 调用，
+// 它们有 isTauriRuntime() 门禁。测试默认运行在“桌面宿主”下；需要断言非宿主
+// 行为的用例自行删除该标记（见 lib/env.test.ts）。
+;(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ ??= {}

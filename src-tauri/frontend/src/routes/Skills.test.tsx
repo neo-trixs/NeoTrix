@@ -20,6 +20,15 @@ const seed = {
 
 beforeEach(() => resetInvokeMock())
 
+/** mock domain_call（skill 域），返回 {ok, data} 信封 */
+function mockSkillDomain(handlers: Record<string, (args: any) => unknown>) {
+  return mockCommand('domain_call', async (req: any) => {
+    const fn = handlers[`${req.domain}/${req.action}`]
+    if (!fn) throw new Error(`unexpected domain call: ${req.domain}/${req.action}`)
+    return { ok: true, data: await fn(req.args) }
+  })
+}
+
 function renderPage() {
   return render(() => (
     <MemoryRouter>
@@ -30,7 +39,7 @@ function renderPage() {
 
 describe('Skills page (B4 直连后端)', () => {
   it('加载后按域分组渲染技能卡片与总数', async () => {
-    mockCommand('skill_list', () => seed)
+    mockSkillDomain({ 'skill/list': async () => seed })
     renderPage()
     expect(await screen.findByText('3 个技能')).toBeTruthy()
     expect(await screen.findByLabelText('技能域 shield')).toBeTruthy()
@@ -41,10 +50,12 @@ describe('Skills page (B4 直连后端)', () => {
   it('搜索输入防抖后调用 skill_search 并渲染过滤结果', async () => {
     vi.useFakeTimers()
     try {
-      mockCommand('skill_list', () => seed)
-      mockCommand('skill_search', (args) => {
-        const q = String(args?.query ?? '')
-        return seed.skills.filter((s) => s.name.includes(q))
+      mockSkillDomain({
+        'skill/list': async () => seed,
+        'skill/search': async (args) => {
+          const q = String(args?.query ?? '')
+          return seed.skills.filter((s) => s.name.includes(q))
+        },
       })
       renderPage()
       await screen.findByText('rev-officer')
@@ -62,8 +73,10 @@ describe('Skills page (B4 直连后端)', () => {
   })
 
   it('点击卡片经 skill_get 打开详情侧滑', async () => {
-    mockCommand('skill_list', () => seed)
-    mockCommand('skill_get', (args) => seed.skills.find((s) => s.name === String(args?.name)))
+    mockSkillDomain({
+      'skill/list': async () => seed,
+      'skill/get': async (args) => seed.skills.find((s) => s.name === String(args?.name)),
+    })
     renderPage()
     const card = await screen.findByText('dev-implementer')
     card.click()
@@ -75,8 +88,10 @@ describe('Skills page (B4 直连后端)', () => {
   })
 
   it('后端错误渲染错误态与重试按钮', async () => {
-    mockCommand('skill_list', () => {
-      throw new Error('skills dir missing')
+    mockSkillDomain({
+      'skill/list': async () => {
+        throw new Error('skills dir missing')
+      },
     })
     renderPage()
     expect(await screen.findByText('skills dir missing')).toBeTruthy()

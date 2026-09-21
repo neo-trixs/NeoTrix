@@ -7,6 +7,7 @@ pub mod memory;
 pub mod model_pool;
 pub mod proxy_pool;
 pub mod session;
+pub mod skill;
 pub mod stubs;
 pub mod workflow;
 pub mod world;
@@ -30,6 +31,7 @@ pub use memory::MemoryPlugin;
 pub use model_pool::ModelPoolPlugin;
 pub use proxy_pool::ProxyPoolPlugin;
 pub use session::SessionPlugin;
+pub use skill::SkillPlugin;
 pub use stubs::{
     AgentPlugin, CliPlugin, ExtPlugin, GitPlugin, PluginPlugin, SecurityPlugin, SystemPlugin,
     ToolPlugin,

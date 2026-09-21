@@ -58,9 +58,13 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('输入 + 发送调用 sendSideChat 并清空输入', async () => {
-    const sendStub = mockCommand('domain_call', async (args?: Record<string, unknown>) => {
+    let sendCalls = 0
+    mockCommand('domain_call', async (args?: Record<string, unknown>) => {
       const action = args?.action as string
-      if (action === 'side_chat_send') return { ok: true, data: [msg({ role: 'user', content: '测试' })], error: null }
+      if (action === 'side_chat_send') {
+        sendCalls += 1
+        return { ok: true, data: [msg({ role: 'user', content: '测试' })], error: null }
+      }
       return { ok: true, data: [], error: null }
     })
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
@@ -69,7 +73,7 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
     fireEvent.input(ta, { target: { value: '测试' } })
     fireEvent.keyDown(ta, { key: 'Enter', shiftKey: false })
     await settle()
-    expect(sendStub.calledTimes()).toBe(1)
+    expect(sendCalls).toBe(1)
     // 发送后清空输入
     expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe('')
     // 发送后消息列表出现新内容
@@ -95,9 +99,13 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
   })
 
   it('IME 组合态 Enter 不发送（isComposing/229 守卫）', async () => {
-    const sendStub = mockCommand('domain_call', async (args?: Record<string, unknown>) => {
+    let sendCalls = 0
+    mockCommand('domain_call', async (args?: Record<string, unknown>) => {
       const action = args?.action as string
-      if (action === 'side_chat_send') return { ok: true, data: [msg()], error: null }
+      if (action === 'side_chat_send') {
+        sendCalls += 1
+        return { ok: true, data: [msg()], error: null }
+      }
       return { ok: true, data: [], error: null }
     })
     render(() => <SideChat open sessionId="s1" onClose={() => {}} />)
@@ -107,7 +115,7 @@ describe('SideChat 侧向对话面板回归（加载/发送/IME/焦点还原）'
     // IME 组合中按 Enter：keyCode 229
     fireEvent.keyDown(ta, { key: 'Enter', keyCode: 229, isComposing: true })
     await settle()
-    expect(sendStub.calledTimes()).toBe(0) // 不发送
+    expect(sendCalls).toBe(0) // 不发送
   })
 
   it('Esc 关闭面板', async () => {

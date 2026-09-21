@@ -74,6 +74,7 @@ fn register_plugins(
         ("proxy_pool", Box::new(ProxyPoolPlugin::new())),
         ("model_pool", Box::new(ModelPoolPlugin::new())),
         ("autostart", Box::new(AutostartPlugin::new())),
+        ("skill", Box::new(SkillPlugin::new())),
         ("ext", Box::new(ExtPlugin)),
         ("llamacpp", Box::new(LlamacppPlugin::new())),
         ("git", Box::new(GitPlugin)),

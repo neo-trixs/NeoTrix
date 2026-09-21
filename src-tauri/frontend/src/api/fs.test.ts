@@ -19,6 +19,8 @@ describe('api/fs — 文件对话框封装', () => {
     saveMock.mockReset()
     openMock.mockReset()
     writeTextFileMock.mockReset()
+    // 本文件断言非宿主回退；移除全局 setup 的宿主标识
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
   })
 
   it('非 Tauri 宿主 saveFileDialog 返回 null（不调 tauri）', async () => {

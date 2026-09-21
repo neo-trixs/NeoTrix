@@ -8,6 +8,108 @@ use std::process::Command as StdCommand;
 pub struct GitPlugin;
 
 impl GitPlugin {
+    /// Parse `git diff` unified output into per-file hunks matching the
+    /// frontend `DiffFile` contract: `{path, hunks: [{lines: [{t, o, n, s}]}]}`
+    /// where `t` is `add`/`del`/`ctx` and `o`/`n` are old/new line numbers.
+    fn parse_diff_files(output: &str) -> Vec<serde_json::Value> {
+        let mut files: Vec<serde_json::Value> = Vec::new();
+        let mut cur_path: Option<String> = None;
+        let mut cur_hunks: Vec<serde_json::Value> = Vec::new();
+        let mut cur_lines: Vec<serde_json::Value> = Vec::new();
+        let mut old_no: u32 = 0;
+        let mut new_no: u32 = 0;
+        let mut in_hunk = false;
+
+        let flush_hunk = |hunks: &mut Vec<serde_json::Value>,
+                          lines: &mut Vec<serde_json::Value>| {
+            if in_hunk {
+                hunks.push(serde_json::json!({ "lines": std::mem::take(lines) }));
+            }
+        };
+
+        for line in output.lines() {
+            if let Some(rest) = line.strip_prefix("diff --git ") {
+                // Close previous file.
+                if cur_path.is_some() {
+                    let mut hunks = std::mem::take(&mut cur_hunks);
+                    let mut lines = std::mem::take(&mut cur_lines);
+                    flush_hunk(&mut hunks, &mut lines);
+                    cur_hunks = hunks;
+                    files.push(serde_json::json!({
+                        "path": cur_path.take().unwrap_or_default(),
+                        "hunks": cur_hunks,
+                    }));
+                    cur_hunks = Vec::new();
+                    in_hunk = false;
+                }
+                // `diff --git a/<path> b/<path>` — take the b-side path.
+                let path = rest
+                    .rsplit_once(" b/")
+                    .map(|(_, b)| b.to_string())
+                    .unwrap_or_else(|| rest.to_string());
+                let path = path
+                    .trim_matches('"')
+                    .strip_prefix("b/")
+                    .unwrap_or(&path)
+                    .to_string();
+                cur_path = Some(path);
+                in_hunk = false;
+            } else if line.starts_with("@@") {
+                // New hunk header: `@@ -old[,old_count] +new[,new_count] @@ ...`
+                let mut hunks = std::mem::take(&mut cur_hunks);
+                let mut lines = std::mem::take(&mut cur_lines);
+                flush_hunk(&mut hunks, &mut lines);
+                cur_hunks = hunks;
+                in_hunk = true;
+                let header = line.trim_start_matches('@').trim_end_matches('@').trim();
+                let mut parts = header.split_whitespace();
+                old_no = parts
+                    .next()
+                    .and_then(|p| p.trim_start_matches('-').split(',').next())
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(1);
+                new_no = parts
+                    .next()
+                    .and_then(|p| p.trim_start_matches('+').split(',').next())
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(1);
+            } else if in_hunk {
+                if let Some(content) = line.strip_prefix('+') {
+                    if !content.starts_with('+') {
+                        cur_lines.push(serde_json::json!({
+                            "t": "add", "o": null, "n": new_no, "s": line,
+                        }));
+                        new_no += 1;
+                    }
+                } else if let Some(_content) = line.strip_prefix('-') {
+                    if !line.starts_with("---") {
+                        cur_lines.push(serde_json::json!({
+                            "t": "del", "o": old_no, "n": null, "s": line,
+                        }));
+                        old_no += 1;
+                    }
+                } else if line.starts_with(' ') {
+                    cur_lines.push(serde_json::json!({
+                        "t": "ctx", "o": old_no, "n": new_no, "s": line,
+                    }));
+                    old_no += 1;
+                    new_no += 1;
+                }
+                // Else: `\ No newline...`, index/---/+++/Binary lines — skip.
+            }
+        }
+        if cur_path.is_some() {
+            let mut hunks = std::mem::take(&mut cur_hunks);
+            let mut lines = std::mem::take(&mut cur_lines);
+            flush_hunk(&mut hunks, &mut lines);
+            files.push(serde_json::json!({
+                "path": cur_path.unwrap_or_default(),
+                "hunks": hunks,
+            }));
+        }
+        files
+    }
+
     fn git_command(args: &[&str], cwd: Option<&str>) -> Result<String, DomainError> {
         let mut cmd = StdCommand::new("git");
         cmd.args(args);
@@ -49,6 +151,8 @@ impl DomainPlugin for GitPlugin {
             "commit",
             "push",
             "apply_diff",
+            "stage",
+            "discard",
         ]
         .iter()
         .map(|a| stub_action(a))
@@ -63,6 +167,9 @@ impl DomainPlugin for GitPlugin {
         match action {
             "status" => {
                 let output = Self::git_command(&["status", "--porcelain"], cwd)?;
+                let branch = Self::git_command(&["rev-parse", "--abbrev-ref", "HEAD"], cwd)
+                    .map(|b| b.trim().to_string())
+                    .unwrap_or_default();
                 let files: Vec<serde_json::Value> = output
                     .lines()
                     .filter(|l| !l.is_empty())
@@ -76,6 +183,7 @@ impl DomainPlugin for GitPlugin {
                     })
                     .collect();
                 Ok(serde_json::json!({
+                    "branch": branch,
                     "clean": files.is_empty(),
                     "files": files,
                     "count": files.len(),
@@ -90,9 +198,55 @@ impl DomainPlugin for GitPlugin {
                     git_args.push("HEAD");
                 }
                 let output = Self::git_command(&git_args, cwd)?;
+                let files = Self::parse_diff_files(&output);
+                // Flat hunks for GitDiffViewer ({file, additions, deletions, content}).
+                let hunks: Vec<serde_json::Value> = files
+                    .iter()
+                    .flat_map(|f| {
+                        let path = f.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                        f.get("hunks")
+                            .and_then(|v| v.as_array())
+                            .cloned()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|h| {
+                                let lines = h
+                                    .get("lines")
+                                    .and_then(|v| v.as_array())
+                                    .cloned()
+                                    .unwrap_or_default();
+                                let additions = lines
+                                    .iter()
+                                    .filter(|l| {
+                                        l.get("t").and_then(|v| v.as_str()) == Some("add")
+                                    })
+                                    .count();
+                                let deletions = lines
+                                    .iter()
+                                    .filter(|l| {
+                                        l.get("t").and_then(|v| v.as_str()) == Some("del")
+                                    })
+                                    .count();
+                                let content = lines
+                                    .iter()
+                                    .filter_map(|l| l.get("s").and_then(|v| v.as_str()))
+                                    .collect::<Vec<_>>()
+                                    .join("\n");
+                                serde_json::json!({
+                                    "file": path,
+                                    "additions": additions,
+                                    "deletions": deletions,
+                                    "content": content,
+                                })
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect();
                 Ok(serde_json::json!({
                     "diff": output,
                     "lines": output.lines().count(),
+                    "files": files,
+                    "hunks": hunks,
                 }))
             }
             "staged_files" => {
@@ -246,6 +400,32 @@ impl DomainPlugin for GitPlugin {
                         recoverable: true,
                     })
                 }
+            }
+            "stage" => {
+                let path = args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 path 参数".into(),
+                        recoverable: true,
+                    })?;
+                Self::git_command(&["add", "--", path], cwd)?;
+                Ok(serde_json::json!({ "ok": true, "path": path }))
+            }
+            "discard" => {
+                let path = args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 path 参数".into(),
+                        recoverable: true,
+                    })?;
+                // `checkout -- <path>` restores working-tree file (universal,
+                // unlike newer `git restore` which old installs lack).
+                Self::git_command(&["checkout", "--", path], cwd)?;
+                Ok(serde_json::json!({ "ok": true, "path": path }))
             }
             _ => Err(DomainError {
                 code: "UNKNOWN_ACTION".into(),

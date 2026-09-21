@@ -9,7 +9,11 @@ vi.mock('@tauri-apps/api/core', async () => {
 import { call } from '../api/client'
 
 describe('test/invokeMock — 契约 mock 基础设施', () => {
-  beforeEach(() => resetInvokeMock())
+  beforeEach(() => {
+    resetInvokeMock()
+    // client.call 要求 Tauri 宿主环境；测试中桩化运行时标识
+    ;(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {}
+  })
   afterEach(() => resetInvokeMock())
 
   it('已注册命令走 handler 并记录调用', async () => {

@@ -37,7 +37,7 @@ neotrix = { path = "../neotrix-core" }
 chrono = { workspace = true }
 dirs = { workspace = true }
 uuid = { workspace = true }
-tokio = { version = "1", features = ["sync", "rt", "macros", "process"] }
+tokio = { version = "1", features = ["sync", "rt", "macros", "process", "time"] }
 tokio-stream = "0.1"
 color-eyre = "0.6"
 tracing = "0.1"

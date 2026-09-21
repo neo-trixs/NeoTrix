@@ -19,6 +19,8 @@ function catchErr(p: Promise<unknown>): Promise<unknown> {
 describe('api/client — 错误信封三要素 (code/message/details)', () => {
   beforeEach(() => {
     invokeMock.mockReset()
+    // client.call 要求 Tauri 宿主环境；测试中桩化运行时标识
+    ;(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {}
   })
 
   it('call 成功透传结果', async () => {

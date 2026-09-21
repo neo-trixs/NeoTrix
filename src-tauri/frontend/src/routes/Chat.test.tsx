@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, fireEvent } from '@solidjs/testing-library'
+import { MemoryRouter, Route } from '@solidjs/router'
 import { Chat } from '../routes/Chat'
 
 // Mock Tauri APIs
@@ -22,13 +23,21 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
   })
 
   it('侧栏 seg 已移除协同（单态对话）', () => {
-    render(() => <Chat />)
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
     const tabs = document.querySelectorAll('.seg [role="tab"]')
     expect(tabs.length).toBe(0)
   })
 
   it('顶部 ch-top 极简：无功能按钮（仅拖拽区）', () => {
-    render(() => <Chat />)
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
     const header = document.querySelector('.ch-top')
     expect(header).toBeTruthy()
     // 顶部不应有 tb-btn（功能按钮已移除，仅保留拖拽区）
@@ -37,43 +46,62 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
   })
 
   it('协同入口已移除（单态对话，ch-top 常驻）', () => {
-    render(() => <Chat />)
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
     const tabs = document.querySelectorAll('.seg [role="tab"]')
     expect(tabs.length).toBe(0)
     expect(document.querySelector('.ch-top')).toBeTruthy()
   })
 
   it('侧栏用户条点击打开设置弹窗，含插件 section（技能插件市场放设置）', () => {
-    render(() => <Chat />)
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
     const sfBtn = document.querySelector('[aria-label="用户设置"]')!
     fireEvent.click(sfBtn)
     // 设置弹窗应渲染（role=dialog + aria-label）
     const dialog = document.querySelector('[role="dialog"][aria-label="设置"]')
     expect(dialog).toBeTruthy()
-    // 点击插件 section，应渲染插件市场
-    const pluginTab = [...dialog!.querySelectorAll('[role="tab"]')].find(t => t.textContent?.includes('插件'))
+    // 点击市场 section（标签“市场”），应渲染插件市场
+    const pluginTab = [...dialog!.querySelectorAll('[role="tab"]')].find(t => t.textContent?.includes('市场'))
     expect(pluginTab).toBeTruthy()
     fireEvent.click(pluginTab!)
     expect(document.querySelector('.panel-title')?.textContent).toContain('插件市场')
   })
 
-  it('权限模式选择器在空态 hero 输入区渲染（对标 Claude 权限模式可见性），可点击切换', () => {
-    render(() => <Chat />)
-    const selector = document.querySelector('[aria-label="权限模式"]') as HTMLElement | null
-    expect(selector).toBeTruthy()
-    fireEvent.click(selector!)
-    const opts = document.querySelectorAll('[role="option"]')
-    expect(opts.length).toBeGreaterThan(0)
+  it('空态 hero 无权限徽章（徽章只在消息模式底部状态条；选择器逻辑由独立组件测试覆盖）', () => {
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
+    // 空态 hero 输入区不渲染权限徽章（设计使然）
+    expect(document.querySelector('[aria-label^="权限模式"]')).toBeNull()
+    // 但空态输入框本身可用
+    expect(document.querySelector('[aria-label="对话输入框"]')).toBeTruthy()
   })
 
   it('功能面板入口已移除（极简侧栏）', () => {
-    render(() => <Chat />)
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
     const group = document.querySelector('[role="group"][aria-label="功能面板"]')
     expect(group).toBeNull()
   })
 
   it('折叠标签置于三色灯下方且同按钮复用', () => {
-    render(() => <Chat />)
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
     const btn = document.querySelector('[aria-label="折叠侧边栏"]') as HTMLElement
     expect(btn).toBeTruthy()
     // 三色灯占位 h-7 紧邻折叠行
@@ -81,7 +109,11 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
   })
 
   it('斜杠 / 菜单包含 model/status/cost/export 命令（对标 Claude Code 命令菜单）', () => {
-    render(() => <Chat />)
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
     // 在输入区输入 / 激活命令菜单
     const textarea = document.querySelector('textarea')!
     fireEvent.input(textarea, { target: { value: '/' } })
@@ -96,7 +128,11 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
   })
 
   it('斜杠 /mo 过滤出模型命令（关键词匹配）', () => {
-    render(() => <Chat />)
+    render(() => (
+    <MemoryRouter>
+      <Route path="/" component={Chat} />
+    </MemoryRouter>
+  ))
     const textarea = document.querySelector('textarea')!
     fireEvent.input(textarea, { target: { value: '/mo' } })
     const items = [...document.querySelectorAll('.slash-item')].map((el) => el.textContent ?? '')

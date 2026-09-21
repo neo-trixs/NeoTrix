@@ -313,12 +313,11 @@ impl IntentRouter {
         None
     }
 
-    /// Fallback classification for messages that miss Tier-1 patterns.
+    /// Tier-2 classification for messages that miss Tier-1 patterns.
     ///
-    /// Scores every registered `(domain, action)` by keyword overlap with the
-    /// message (domain/action names weighted highest, then description tokens).
-    /// A real LLM classifier can replace this when wired; the scoring contract
-    /// (`Intent { domain, action, args }`) stays the same.
+    /// Three stages: live LLM (`llm_route`) → deterministic keyword fallback
+    /// (`fuzzy_route`) → local clarification reply. The `Intent` contract
+    /// stays the same across stages.
     /// Destructive actions the fuzzy matcher must never route to.
     ///
     /// Fuzzy intents always carry empty `args`, so any action that mutates
@@ -372,7 +371,111 @@ impl IntentRouter {
             .any(|(d, a)| *d == domain && *a == action)
     }
 
+    /// Timeout for the live-LLM classification call (local server answers fast).
+    const LLM_CLASSIFY_TIMEOUT_SECS: u64 = 20;
+
+    /// Max user-message chars forwarded to the classifier (prompt hygiene).
+    const LLM_CLASSIFY_MAX_MSG: usize = 500;
+
     async fn llm_classify(message: &str, registry: &DomainRegistry) -> Result<Intent, DomainError> {
+        // Tier 2a: live LLM via the local llamacpp server (if up).
+        if let Some(intent) = Self::llm_route(message, registry).await {
+            return Ok(intent);
+        }
+        // Tier 2b: deterministic keyword fallback.
+        if let Some(intent) = Self::fuzzy_route(message, registry) {
+            return Ok(intent);
+        }
+        // No transport error — answer locally as a clarification so the
+        // UI renders helpful text instead of an unhandled rejection.
+        Ok(Self::clarify(&format!(
+            "无法理解指令: {message}。请尝试更具体的描述，或输入“帮助”查看支持的操作。"
+        )))
+    }
+
+    /// Live-LLM intent routing through `llamacpp/send`.
+    ///
+    /// Returns `None` on any failure (server down, timeout, malformed or
+    /// out-of-catalog output) so the caller falls back to keyword matching.
+    /// Guardrails: the returned domain/action must exist in the registry,
+    /// args must be an object, and fuzzy-denied destructive pairs stay denied.
+    async fn llm_route(message: &str, registry: &DomainRegistry) -> Option<Intent> {
+        let catalog: Vec<String> = registry
+            .list()
+            .iter()
+            .map(|info| {
+                let acts: Vec<&str> =
+                    info.actions.iter().map(|a| a.name.as_str()).collect();
+                format!("{}: {}", info.name, acts.join(", "))
+            })
+            .collect();
+        let truncated: String = message.chars().take(Self::LLM_CLASSIFY_MAX_MSG).collect();
+        let prompt = format!(
+            "You are an intent classifier for the NeoTrix desktop app. Given the user message, pick ONE domain and ONE action from the catalog and extract arguments as a JSON object.\n\nCatalog (domain: action, action, ...):\n{}\n\nUser message: {}\n\nReply with ONLY a JSON object, no markdown fences, no commentary: {{\"domain\": \"...\", \"action\": \"...\", \"args\": {{}}}}",
+            catalog.join("\n"),
+            truncated
+        );
+        let body = json!({
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.0,
+            "max_tokens": 256,
+        });
+        let fut = registry.call_async("llamacpp", "send", body);
+        let data = match tokio::time::timeout(
+            std::time::Duration::from_secs(Self::LLM_CLASSIFY_TIMEOUT_SECS),
+            fut,
+        )
+        .await
+        {
+            Ok(Ok(data)) => data,
+            _ => return None,
+        };
+        // llamacpp/send returns OpenAI-style {choices: [{message: {content}}]}.
+        let content = data
+            .pointer("/choices/0/message/content")
+            .and_then(|v| v.as_str())?;
+        let parsed = Self::extract_json(content)?;
+        let domain = parsed.get("domain")?.as_str()?;
+        let action = parsed.get("action")?.as_str()?;
+        let args = parsed.get("args").cloned().unwrap_or(json!({}));
+        if !args.is_object() {
+            return None;
+        }
+        let info = registry.list().into_iter().find(|i| i.name == domain)?;
+        if !info.actions.iter().any(|a| a.name == action) {
+            return None;
+        }
+        if Self::fuzzy_denied(domain, action) {
+            return None;
+        }
+        Some(Intent {
+            domain: domain.into(),
+            action: action.into(),
+            args,
+            response_hint: None,
+        })
+    }
+
+    /// Pull the first JSON object out of free-form LLM output
+    /// (tolerates markdown fences and surrounding commentary).
+    fn extract_json(text: &str) -> Option<serde_json::Value> {
+        let t = text.trim();
+        let t = t
+            .strip_prefix("```json")
+            .or_else(|| t.strip_prefix("```"))
+            .unwrap_or(t);
+        let t = t.strip_suffix("```").unwrap_or(t).trim();
+        let start = t.find('{')?;
+        let end = t.rfind('}')?;
+        if end < start {
+            return None;
+        }
+        serde_json::from_str(&t[start..=end]).ok()
+    }
+
+    /// Deterministic keyword fallback: scores every registered
+    /// `(domain, action)` by keyword overlap with the message.
+    fn fuzzy_route(message: &str, registry: &DomainRegistry) -> Option<Intent> {
         let msg = message.to_lowercase();
         // (score, domain, action, description)
         let mut best: Option<(usize, String, String, String)> = None;
@@ -419,19 +522,12 @@ impl IntentRouter {
             }
         }
 
-        match best {
-            Some((_, domain, action, description)) => Ok(Intent {
-                domain,
-                action,
-                args: json!({}),
-                response_hint: Some(description),
-            }),
-            // No transport error — answer locally as a clarification so the
-            // UI renders helpful text instead of an unhandled rejection.
-            None => Ok(Self::clarify(&format!(
-                "无法理解指令: {message}。请尝试更具体的描述，或输入“帮助”查看支持的操作。"
-            ))),
-        }
+        best.map(|(_, domain, action, description)| Intent {
+            domain,
+            action,
+            args: json!({}),
+            response_hint: Some(description),
+        })
     }
 
     fn extract_url(message: &str) -> Option<String> {

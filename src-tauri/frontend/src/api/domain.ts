@@ -448,12 +448,22 @@ export const ext = {
 export const git = {
   status: () => call<GitStatus>('git', 'status'),
   diff: (path?: string) => call<GitDiff>('git', 'diff', { path }),
-  stagedFiles: () => call<string[]>('git', 'staged_files'),
-  branches: () => call<string[]>('git', 'branches'),
+  stagedFiles: async (): Promise<string[]> => {
+    const r = await call<{ files: { path: string }[] }>('git', 'staged_files')
+    return (r.files ?? []).map((f) => f.path)
+  },
+  branches: async (): Promise<string[]> => {
+    const r = await call<{ branches: string[] }>('git', 'branches')
+    return r.branches ?? []
+  },
   checkout: (branch: string) => call<void>('git', 'checkout', { branch }),
   commit: (message: string) => call<void>('git', 'commit', { message }),
   push: () => call<void>('git', 'push'),
-  applyDiff: (path: string, apply: boolean) => call<void>('git', 'apply_diff', { path, apply }),
+  // accept = 暂存文件，reject = 丢弃变更；后端 stage/discard 语义与此对齐
+  applyDiff: (path: string, apply: boolean) =>
+    apply
+      ? call<void>('git', 'stage', { path })
+      : call<void>('git', 'discard', { path }),
 }
 
 export interface GitStatus {

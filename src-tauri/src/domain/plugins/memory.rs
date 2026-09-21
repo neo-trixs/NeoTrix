@@ -80,6 +80,24 @@ impl DomainPlugin for MemoryPlugin {
                 params: vec![],
                 returns: "Value".into(),
             },
+            ActionSpec {
+                name: "save_api_key".into(),
+                description: "保存 API Key（本地文件）".into(),
+                params: vec![],
+                returns: "Value".into(),
+            },
+            ActionSpec {
+                name: "has_api_key".into(),
+                description: "是否存在已保存的 API Key".into(),
+                params: vec![],
+                returns: "Value".into(),
+            },
+            ActionSpec {
+                name: "delete_api_key".into(),
+                description: "删除已保存的 API Key".into(),
+                params: vec![],
+                returns: "Value".into(),
+            },
         ]
     }
 
@@ -133,7 +151,8 @@ impl DomainPlugin for MemoryPlugin {
                     .filter_map(|r| r.ok())
                     .collect::<Vec<_>>();
 
-                Ok(serde_json::json!({ "ok": true, "memories": rows }))
+                // Bare array: frontend MemoryEntry[] contract.
+                Ok(serde_json::Value::Array(rows))
             }
             "search" => {
                 let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
@@ -162,7 +181,8 @@ impl DomainPlugin for MemoryPlugin {
                     .filter_map(|r| r.ok())
                     .collect::<Vec<_>>();
 
-                Ok(serde_json::json!({ "ok": true, "memories": rows }))
+                // Bare array: frontend MemoryEntry[] contract.
+                Ok(serde_json::Value::Array(rows))
             }
             "clear" => {
                 let kind = args.get("kind").and_then(|v| v.as_str());
@@ -181,7 +201,8 @@ impl DomainPlugin for MemoryPlugin {
                             recoverable: true,
                         })?
                 };
-                Ok(serde_json::json!({ "ok": true, "deleted": count }))
+                // Bare count: frontend expects a number.
+                Ok(serde_json::json!(count))
             }
             "stats" => {
                 let total: i64 = conn
@@ -228,7 +249,8 @@ impl DomainPlugin for MemoryPlugin {
                 let days = args.get("days").and_then(|v| v.as_u64()).unwrap_or(7) as i64;
                 let cutoff = chrono::Utc::now().timestamp() - (days * crate::constants::SECS_PER_DAY);
 
-                let rows: Vec<(String, i64)> = conn
+                // Per-day created counts.
+                let created: Vec<(String, i64)> = conn
                     .prepare("SELECT DATE(created_at, 'unixepoch') as day, COUNT(*) FROM memories WHERE created_at > ?1 GROUP BY day ORDER BY day")
                     .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("查询失败: {}", e), recoverable: true })?
                     .query_map([cutoff], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
@@ -236,10 +258,57 @@ impl DomainPlugin for MemoryPlugin {
                     .filter_map(|r| r.ok())
                     .collect();
 
-                Ok(serde_json::json!({
-                    "ok": true,
-                    "timeline": rows.into_iter().map(|(d, c)| serde_json::json!({ "date": d, "count": c })).collect::<Vec<_>>(),
-                }))
+                // Per-day access counts (accessed_at is bumped on read; rows
+                // never re-read since insert share their created timestamp).
+                let accessed: std::collections::HashMap<String, i64> = conn
+                    .prepare("SELECT DATE(accessed_at, 'unixepoch') as day, COUNT(*) FROM memories WHERE accessed_at > ?1 GROUP BY day")
+                    .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("查询失败: {}", e), recoverable: true })?
+                    .query_map([cutoff], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+                    .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("查询失败: {}", e), recoverable: true })?
+                    .filter_map(|r| r.ok())
+                    .collect();
+
+                // Top kind per day as the "hot topic" label.
+                let top_kinds: std::collections::HashMap<String, String> = {
+                    let mut best: std::collections::HashMap<String, (String, i64)> =
+                        std::collections::HashMap::new();
+                    let rows: Vec<(String, String, i64)> = conn
+                        .prepare("SELECT DATE(created_at, 'unixepoch') as day, kind, COUNT(*) FROM memories WHERE created_at > ?1 GROUP BY day, kind")
+                        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("查询失败: {}", e), recoverable: true })?
+                        .query_map([cutoff], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?)))
+                        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("查询失败: {}", e), recoverable: true })?
+                        .filter_map(|r| r.ok())
+                        .collect();
+                    for (day, kind, count) in rows {
+                        match best.get(&day) {
+                            Some((_, c)) if *c >= count => {}
+                            _ => {
+                                best.insert(day, (kind, count));
+                            }
+                        }
+                    }
+                    best.into_iter().map(|(d, (k, _))| (d, k)).collect()
+                };
+
+                // Bare array matching the frontend TimelineEntry contract.
+                let timeline: Vec<serde_json::Value> = created
+                    .into_iter()
+                    .map(|(date, entries_created)| {
+                        let entries_accessed =
+                            accessed.get(&date).copied().unwrap_or(0);
+                        let top_topic = top_kinds
+                            .get(&date)
+                            .cloned()
+                            .unwrap_or_default();
+                        serde_json::json!({
+                            "date": date,
+                            "entries_created": entries_created,
+                            "entries_accessed": entries_accessed,
+                            "top_topic": top_topic,
+                        })
+                    })
+                    .collect();
+                Ok(serde_json::Value::Array(timeline))
             }
             "export" => {
                 let format = args
@@ -268,24 +337,22 @@ impl DomainPlugin for MemoryPlugin {
                     .filter_map(|r| r.ok())
                     .collect();
 
+                // Both consumers (SettingsModal file save, ChatShellProto Blob
+                // download) need a JSON *string*; the non-json branch keeps a
+                // serialized string as well for symmetry.
+                let payload = serde_json::json!({
+                    "memories": memories,
+                    "exported_at": chrono::Utc::now().to_rfc3339(),
+                    "count": memories.len(),
+                });
                 if format == "json" {
-                    Ok(serde_json::json!({
-                        "ok": true,
-                        "data": serde_json::json!({
-                            "memories": memories,
-                            "exported_at": chrono::Utc::now().to_rfc3339(),
-                            "count": memories.len(),
-                        }),
-                    }))
+                    Ok(serde_json::Value::String(
+                        serde_json::to_string(&payload).unwrap_or_default(),
+                    ))
                 } else {
-                    Ok(serde_json::json!({
-                        "ok": true,
-                        "data": serde_json::to_string(&serde_json::json!({
-                            "memories": memories,
-                            "exported_at": chrono::Utc::now().to_rfc3339(),
-                            "count": memories.len(),
-                        })).unwrap_or_default(),
-                    }))
+                    Ok(serde_json::Value::String(
+                        serde_json::to_string(&payload).unwrap_or_default(),
+                    ))
                 }
             }
             "import" => {
@@ -343,6 +410,65 @@ impl DomainPlugin for MemoryPlugin {
                     "ok": true,
                     "imported": imported,
                 }))
+            }
+            // API Key persistence (local file under base_dir; never logged).
+            "save_api_key" => {
+                let key = args
+                    .get("key")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "missing 'key'".into(),
+                        recoverable: true,
+                    })?;
+                let dir = crate::config::AppConfig::base_dir().ok_or_else(|| {
+                    DomainError {
+                        code: "CONFIG_DIR_ERROR".into(),
+                        message: "Cannot determine base directory".into(),
+                        recoverable: false,
+                    }
+                })?;
+                let path = dir.join("api_key");
+                crate::atomic_io::ensure_parent_dir(&path).map_err(|e| DomainError {
+                    code: "IO_ERROR".into(),
+                    message: format!("创建目录失败: {e}"),
+                    recoverable: true,
+                })?;
+                crate::atomic_io::write_atomic(&path, key.as_bytes()).map_err(|e| {
+                    DomainError {
+                        code: "IO_ERROR".into(),
+                        message: format!("写入失败: {e}"),
+                        recoverable: true,
+                    }
+                })?;
+                Ok(serde_json::json!({ "ok": true }))
+            }
+            "has_api_key" => {
+                let has = crate::config::AppConfig::base_dir()
+                    .map(|d| d.join("api_key"))
+                    .filter(|p| p.exists())
+                    .and_then(|p| {
+                        crate::atomic_io::read_with_fallback(&p)
+                            .ok()
+                            .and_then(|b| String::from_utf8(b).ok())
+                    })
+                    .map(|s| !s.trim().is_empty())
+                    .unwrap_or(false);
+                // Bare bool: frontend hasApiKey() contract.
+                Ok(serde_json::json!(has))
+            }
+            "delete_api_key" => {
+                if let Some(path) = crate::config::AppConfig::base_dir().map(|d| d.join("api_key"))
+                {
+                    if path.exists() {
+                        std::fs::remove_file(&path).map_err(|e| DomainError {
+                            code: "IO_ERROR".into(),
+                            message: format!("删除失败: {e}"),
+                            recoverable: true,
+                        })?;
+                    }
+                }
+                Ok(serde_json::json!({ "ok": true }))
             }
             _ => Err(DomainError {
                 code: "UNKNOWN_ACTION".into(),
