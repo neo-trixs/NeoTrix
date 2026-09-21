@@ -53,6 +53,11 @@ pub use nt_crystal_task_fusion::{
     NtAnswerCluster, NtCrystalSubtask, NtCrystalTaskLoop, NtFusedAnswer, NtLlmReply,
     NtScoredAnswer, NtSubtaskRoute, NtTaskFusionError, NtTaskLoopConfig, NtTaskLoopReport, NtLlmAsk,
 };
+pub mod nt_crystal_dialogue; // 对话窗口 + 内需循环 — 人机回灌多轮收敛
+pub use nt_crystal_dialogue::{
+    NtDemand, NtDemandKind, NtDialogueWindow, NtHumanChannel, NtHumanReply, NtInnerLoop,
+    NtInnerLoopOutcome, NtLoopStatus,
+};
 
 #[cfg(test)]
 mod tests;

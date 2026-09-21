@@ -428,7 +428,7 @@ impl NtCrystalTaskLoop {
 
     // ── 3. 融合：置信度加权共识聚类 ──
 
-    fn fuse(&self, answers: &[NtScoredAnswer]) -> NtFusedAnswer {
+    pub(crate) fn fuse(&self, answers: &[NtScoredAnswer]) -> NtFusedAnswer {
         let mut clusters: Vec<NtAnswerCluster> = Vec::new();
 
         for a in answers {
@@ -540,7 +540,7 @@ impl NtCrystalTaskLoop {
 
     // ── J4：校准分 ──
 
-    fn calibrate(&self, fused: &NtFusedAnswer) -> f64 {
+    pub(crate) fn calibrate(&self, fused: &NtFusedAnswer) -> f64 {
         let total: f64 = fused.clusters.iter().map(|c| c.weight).sum();
         if total <= 0.0 || fused.clusters.is_empty() {
             return 0.0;
@@ -555,7 +555,7 @@ impl NtCrystalTaskLoop {
 
     // ── 4. 后续任务汇总 ──
 
-    fn follow_ups(
+    pub(crate) fn follow_ups(
         &self,
         goal: &str,
         subtasks: &[NtCrystalSubtask],
