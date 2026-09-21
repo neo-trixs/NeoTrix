@@ -1,14 +1,16 @@
-//! # nt-dialogue — NeoTrix 自己的对话终端
+//! # ntcode — NeoTrix 对话终端（产品名）
 //!
 //! ```text
-//! nt-dialogue "接入支付功能" [--model provider/model] [--max-rounds 3]
+//! ntcode "接入支付功能" [--model provider/model] [--max-rounds 3] [--line]
 //! ```
 //!
 //! goal → 晶体智能拆解 → 池免费模型智能调用 → JEV 融合 →
 //! 内需摆上本终端 → 你回车回复 → 回灌重熔 → 收敛/挂起/超轮。
 //! 模型选择回到池子：`--model` 定点，否则发现 opencode 免费档进池轮转调用。
+//! 形态：TTY 下默认全屏 TUI（借鉴 Claude Code / opencode），管道/CI 或 `--line` 走行式。
 //! 退出码：0 收敛 / 2 人沉默挂起 / 3 打满轮次 / 1 参数错误。
 
+use neotrix::l1_action::nt_dialogue_tui::NtTuiHuman;
 use neotrix::l1_action::nt_free_pool::NtFreePoolAsk;
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::UnifiedModelPool;
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::opencode_free_source::OpencodeFreeSource;
@@ -27,11 +29,14 @@ struct Args {
     timeout_secs: u64,
     workdir: Option<PathBuf>,
     max_subtasks: usize,
+    tui: bool,
+    line: bool,
 }
 
 fn usage() -> &'static str {
-    "用法: nt-dialogue \"<目标>\" [--model provider/model] [--max-rounds N] [--timeout-secs N] [--workdir PATH] [--max-subtasks N]\n\
-     不指定 --model 则发现 opencode 免费档进池轮转调用；NEOTRIX_DIALOGUE_MODEL 可指定默认模型。"
+    "用法: ntcode \"<目标>\" [--model provider/model] [--max-rounds N] [--timeout-secs N] [--workdir PATH] [--max-subtasks N] [--tui|--line]\n\
+     不指定 --model 则发现 opencode 免费档进池轮转调用；NEOTRIX_DIALOGUE_MODEL 可指定默认模型。\n\
+     TTY 下默认全屏 TUI；--line 强制行式；管道/CI 自动回退行式。"
 }
 
 fn parse_args(argv: &[String]) -> Result<Args, String> {
@@ -41,11 +46,19 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
     let mut timeout_secs = 300u64;
     let mut workdir: Option<PathBuf> = None;
     let mut max_subtasks = 5usize;
+    let mut tui = false;
+    let mut line = false;
 
     let mut i = 1;
     while i < argv.len() {
         match argv[i].as_str() {
             "--help" | "-h" => return Err(usage().to_string()),
+            "--tui" => {
+                tui = true;
+            }
+            "--line" => {
+                line = true;
+            }
             "--model" => {
                 i += 1;
                 model = Some(
@@ -106,6 +119,8 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
         timeout_secs,
         workdir,
         max_subtasks,
+        tui,
+        line,
     })
 }
 
@@ -131,8 +146,9 @@ fn main() {
         }
     };
 
-    // 模型选择回到池子：定点 or 发现免费档进池轮转，兜底默认
-    let ask: Box<dyn NtLlmAsk> = match &args.model {
+    // 模型选择回到池子：定点 or 发现免费档进池轮转，兜底默认。
+    // 返回（问答桥，池摘要行）：摘要行喂给 TUI 侧栏/底栏。
+    let (ask, pool_line): (Box<dyn NtLlmAsk>, String) = match &args.model {
         Some(m) => {
             let mut op = NtOpencodeAsk::new()
                 .with_model(m.clone())
@@ -141,7 +157,7 @@ fn main() {
                 op = op.with_workdir(dir.clone());
             }
             println!("问答模型（定点）：{m}");
-            Box::new(op)
+            (Box::new(op), format!("定点 {m}"))
         }
         None => {
             // 全源统一管理：内置源（本地GGUF/免费云/本地端点）+ opencode实时发现，
@@ -185,17 +201,20 @@ fn main() {
                 if let Some(dir) = &args.workdir {
                     op = op.with_workdir(dir.clone());
                 }
-                Box::new(op)
+                (Box::new(op), "回退 opencode 默认".to_string())
             } else {
                 println!("池免费模型 {} 个轮转调用：{}",
                     cli_ids.len(),
                     cli_ids.join(", "));
-                let mut fp = NtFreePoolAsk::new(cli_ids)
+                let mut fp = NtFreePoolAsk::new(cli_ids.clone())
                     .with_timeout(Duration::from_secs(args.timeout_secs));
                 if let Some(dir) = &args.workdir {
                     fp = fp.with_workdir(dir.clone());
                 }
-                Box::new(fp)
+                (
+                    Box::new(fp),
+                    format!("opencode-free×{}", cli_ids.len()),
+                )
             }
         }
     };
@@ -204,9 +223,23 @@ fn main() {
         max_subtasks: args.max_subtasks,
         ..NtTaskLoopConfig::default()
     };
-    let human = NtStdinHuman::new();
-    let outcome =
-        NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &core, ask.as_ref(), &human);
+    // 人：TTY 默认全屏 TUI（--line 强制行式；NtTuiHuman 建不起终端也会回退）。
+    // 选中逻辑集中在一处，行式与全屏同协议（NtStdinHuman::parse_lines）。
+    use std::io::IsTerminal;
+    let use_tui = if args.line {
+        false
+    } else if args.tui {
+        true
+    } else {
+        std::io::stdout().is_terminal()
+    };
+    let outcome = if use_tui {
+        let tui_human = NtTuiHuman::new(pool_line);
+        NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &core, ask.as_ref(), &tui_human)
+    } else {
+        let human = NtStdinHuman::new();
+        NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &core, ask.as_ref(), &human)
+    };
 
     println!("\n══ 对话实录 ══");
     for line in &outcome.transcript {
