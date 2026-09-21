@@ -79,6 +79,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-28 | SDB调用链追踪收敛＋B1验证环境战（本文件 §27） | GO-WITH-CI-BACKSTOP | SDB v0.4 |
 | SIM-29 | 提交清场＋SDB-06/07定级＋R-P111指针落地（本文件 §28） | GO | SDB v0.5 |
 | SIM-30 | 门禁复测零进展＋audit-all聚合（本文件 §29） | GO | Makefile |
+| SIM-31 | B2守卫编码＋14/14实跑绿＋死守卫发现（本文件 §30） | GO | fitness.rs |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -167,7 +168,7 @@ P3 启动时复核 G-2 vet 烘焙是否排期（Owner：Architect，日期：M2 
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*。*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*。*
 
 ---
 
@@ -201,7 +202,7 @@ fuzz 首 harness 落地时复核语料种子已提交（Owner：L3 owner，日�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -238,7 +239,7 @@ P2 启动时复核 quartet 缺口是否进 gate（Owner：QA，日期：M2 评�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -273,7 +274,7 @@ NT-STD-1.1 OSINT 附录（Owner：Security，日期：M3 评审日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -308,7 +309,7 @@ RUST-STANDARDS 并入 STD 的时机评估（Owner：Architect，日期：NT-STD-
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -346,7 +347,7 @@ dependabot.yml 加 cargo 段（YAML 机验通过）；Annex B FLAG 维持（加�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -386,7 +387,7 @@ G-4 AGENTS/TODO 引用——有意不动（E-4）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -421,7 +422,7 @@ SKILL 教学 NTS 优先括号留 legacy；MAP×0/ROADMAP×0（已无活引用）
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -457,7 +458,7 @@ D-05 加 P3/P4 标注；§19 D-15＋索引/附录 2 行；v1.3.0 changelog。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -493,7 +494,7 @@ G-3 游戏域 todo! 字串——域外，不管（记录）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -528,7 +529,7 @@ G-2 本机 OOM 跑不完门（转 infra：CI 大 runner 兜底）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -567,7 +568,7 @@ G-4 脚本执行位 2 缺（已 chmod，机验 4/4 +x）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -619,7 +620,7 @@ E-3 其余我方文件全平衡、单结尾、版本头尾一致（机验）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -656,7 +657,7 @@ R-P128b/c 改号（Owner：模块 owner，日期：M1）；31 缺失（Owner：A
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -691,7 +692,7 @@ AgentHarm 对子首跑（Owner：L3，日期：P3）；DORA 四格首填（Owner
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -725,7 +726,7 @@ toxics 首测（Owner：SRE，日期：P3）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -756,7 +757,7 @@ P0-01 数量出炉后刷新本分析 §1（Owner：P0，日期：M0 日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -790,7 +791,7 @@ G-3 全量 --tests 本机不可复现（转 CI 大 runner，承接 SIM-23）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -823,7 +824,7 @@ B1 CI 首绿（Owner：CI，承接 ADR-0002）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -858,7 +859,7 @@ R-P112–115 重议会（Owner：Architect，日期：NT-STD-1.1 规划日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -887,4 +888,38 @@ P-3 构建面 clean；P-4 fuzz 1/4（持平）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-31.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
+
+---
+
+## §30 SIM-31：B2 守卫编码＋实跑绿（GO）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针：守卫写法精读＋目录存在性机验。
+> 生产代码增量：1 guard＋6 单测＋注册（约 150 行， additive only）。
+
+**探针**：P-1 现有 7 守卫写法（helpers/allowlist/注册/测试四范式）；
+P-2 目录存在性（`src/core`、`l1_body_impl` 双双不存在——Layer/Core 二守卫为 theater）；
+P-3 锁门控（wait 0s 即空闲，窗口难得，立即开编）。
+
+**证据**：E-1 `cargo test --lib nt_core_arch_fitness` **14/14 绿**（8 旧＋6 新），
+新守卫真实仓库实跑 60s＋零干净对违规——校准与实现一次证完；
+E-2 fmt 仅剩历史漂移；E-3 死守卫发现（见缺口）。
+
+**缺口**：G-1 Layer/Core 二 theater 守卫修退役（转 P1 tripwire，不在本轮动——改他人守卫语义需独立 SIM）；
+G-2 其余 4 fitness 阈值未定义（SIM-09 G-2 延续）；
+G-3 B1 CI 首绿仍挂（ADR-0002 tripwire 不变）。
+
+**外部方案**：无（内部实现；Ford 分类学已在 R-P246）。
+
+**落点**：nt_core_arch_fitness.rs（守卫＋注册＋6 测）＋BLUEPRINT v1.5.6。
+
+**蓝图回写**：即本轮。
+
+**放行判定**：GO（实跑绿为证；死守卫发现如实记录未私刑）。
+
+**tripwire**：死守卫修退役（Owner：Architect，日期：P1 启动日）；
+其余 fitness 阈值（Owner：L5，日期：P1-04 开工日）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*

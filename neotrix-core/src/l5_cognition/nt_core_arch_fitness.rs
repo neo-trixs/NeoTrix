@@ -3,13 +3,15 @@
 //! 演进式架构 (Evolutionary Architecture): 架构约束编码为可执行守卫,
 //! 违反即报警 (SelfTest Err), 驱动渐进收敛而非一次性大重构。
 //!
-//! P0 六个守卫:
+//! P0 八个守卫 (SIM-28: LayerBoundary/CoreBoundary 所扫目录已不存在，二守卫修退役转 P1):
 //!   1. LayerBoundaryFitness    — 层边界: L1 不得直接依赖 L8+ (现有 3 文件违规)
 //!   2. NoCycleFitness          — 能力网 DAG 无环
 //!   3. CapabilityConsistencyFitness — 能力网幂等: registry 重复边 = 0
 //!   4. TreeSingletonFitness    — ConsciousnessTree 生产单例 (实例化点 ≤ 1)
 //!   5. DeadCodeFitness         — dead_code warning = 0
 //!   6. PanicDensityFitness     — panic 债务 (unwrap/expect) 密度告警 (ADR-0002)
+//!   7. CoreBoundaryFitness     — core→neotrix 反向边界 (allowlist 制)
+//!   8. ConfidenceLabelFitness  — 跨层引用置信标注 + 干净对回归 (P1-04/B2, SIM-27/28)
 //!
 //! 设计原则:
 //!   - 纯只读扫描 (不修改代码), 违规返回 Err 附明细
@@ -638,6 +640,126 @@ impl SelfTest for PanicDensityFitness {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 8. ConfidenceLabelFitness — 跨层引用置信标注 + 干净对回归 (P1-04/B2, SIM-27/28)
+// ─────────────────────────────────────────────────────────────
+
+/// L0–L6 真实目录上的跨层引用守卫 (LayerBoundaryFitness 扫的是已不存在的
+/// neotrix/ 旧路径 —— 本守卫扫 `src/l<N>_*` 真实层目录)。
+/// 每条直接引用按定义标注 EXTRACTED；2026-09-21 机测干净的三对做回归断言；
+/// 其余方向只计数上报 (info)，消减归 P1-02，本守卫不抢活。
+/// 已知局限: 注释行已排除；字符串字面量可能计入 (保守多报不少报)。
+pub struct ConfidenceLabelFitness;
+
+/// 机测干净对 (2026-09-21 bash 复核): 必须保持零引用，否则回归失败。
+/// (L2→L6, L3→L4, L4→L6)。
+const CLEAN_PAIRS: &[(&str, &str)] = &[("l2", "l6"), ("l3", "l4"), ("l4", "l6")];
+
+/// 真实层子目录 (L0 无上游可违，L6 无下游可违，故只扫 L1–L5)。
+const LAYER_DIRS: &[&str] = &[
+    "l1_action",
+    "l2_perception",
+    "l3_embodiment",
+    "l4_emotion",
+    "l5_cognition",
+];
+
+/// 层序号: "l1_action" → 1。未知返回 99 (保守: 未知目标视为上层，宁可多报)。
+fn layer_rank(name: &str) -> u32 {
+    name.strip_prefix('l')
+        .and_then(|s| s.chars().next())
+        .and_then(|c| c.to_digit(10))
+        .unwrap_or(99)
+}
+
+/// 上层引用 (from_rank < to_rank) 即越层。调用方只喂真实层目录/模块名。
+fn is_forbidden(from_dir: &str, to_mod: &str) -> bool {
+    layer_rank(from_dir) < layer_rank(to_mod)
+}
+
+/// 整行注释判定 (镜像 scripts/check-layer-deps.sh 过滤)。
+fn is_comment_line(line: &str) -> bool {
+    let t = line.trim_start();
+    t.starts_with("//") || t.starts_with("/*")
+}
+
+/// 从一行提取 `crate::lN_...` 目标模块段 (如 "l2_perception")。
+fn extract_layer_targets(line: &str, re: &Regex) -> Vec<String> {
+    re.captures_iter(line)
+        .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+        .collect()
+}
+
+impl SelfTest for ConfidenceLabelFitness {
+    fn name(&self) -> &str {
+        "arch_fitness_confidence_labels"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let re = Regex::new(r"crate::(l[0-6]_[a-z0-9_]+)").expect("valid regex");
+        let mut clean_violations = Vec::new();
+        let mut extracted_total = 0usize;
+        for dir in LAYER_DIRS {
+            let root = src_root().join(dir);
+            for file in rs_files(&root) {
+                let rel = file
+                    .strip_prefix(&root)
+                    .unwrap_or(&file)
+                    .to_string_lossy()
+                    .to_string();
+                // Facade 桥接与 traits 定义是 sanctioned 通道；测试文件天然引用实现层。
+                if rel.contains("facade") || rel.ends_with("traits.rs") {
+                    continue;
+                }
+                if rel.ends_with("tests.rs") || rel.ends_with("_tests.rs") {
+                    continue;
+                }
+                let Ok(content) = std::fs::read_to_string(&file) else {
+                    continue;
+                };
+                for (i, line) in content.lines().enumerate() {
+                    if is_comment_line(line) || in_test_context(&content, i) {
+                        continue;
+                    }
+                    for target in extract_layer_targets(line, &re) {
+                        if !is_forbidden(dir, &target) {
+                            continue;
+                        }
+                        // 直接引用即 EXTRACTED (定义使然)；计数上报，消减归 P1-02。
+                        extracted_total += 1;
+                        let from_tag = &dir[..2];
+                        let to_tag = &target[..2];
+                        if CLEAN_PAIRS.contains(&(from_tag, to_tag)) {
+                            clean_violations.push(format!(
+                                "干净对回归: {}→{} 在 {}:{} | {}",
+                                from_tag,
+                                to_tag,
+                                file.strip_prefix(repo_root()).unwrap_or(&file).display(),
+                                i + 1,
+                                line.trim()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        log::info!(
+            "[arch-fitness] confidence_labels OK: {} extracted refs (info only; P1-02 owns reduction)",
+            extracted_total
+        );
+        if clean_violations.is_empty() {
+            Ok(())
+        } else {
+            let mut msg = vec![format!(
+                "干净对出现新的跨层引用 {} 处 (L2→L6/L3→L4/L4→L6 必须保持零引用)",
+                clean_violations.len()
+            )];
+            msg.extend(clean_violations.iter().take(20).cloned());
+            Err(msg)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
 // 批量注册
 // ─────────────────────────────────────────────────────────────
 
@@ -651,6 +773,7 @@ pub fn arch_fitness_tests() -> Vec<Box<dyn SelfTest>> {
         Box::new(TreeSingletonFitness),
         Box::new(DeadCodeFitness),
         Box::new(PanicDensityFitness::default()),
+        Box::new(ConfidenceLabelFitness),
     ]
 }
 
@@ -726,6 +849,77 @@ mod tests {
         assert!(
             result.is_ok(),
             "core→neotrix 守卫必须在现状下通过: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_layer_rank_orders_l0_to_l6() {
+        assert_eq!(super::layer_rank("l0_substrate"), 0);
+        assert_eq!(super::layer_rank("l1_action"), 1);
+        assert_eq!(super::layer_rank("l5_cognition"), 5);
+        assert_eq!(super::layer_rank("l6_meta"), 6);
+        assert_eq!(super::layer_rank("neotrix"), 99);
+        assert_eq!(super::layer_rank("traits"), 99);
+    }
+
+    #[test]
+    fn test_is_forbidden_direction() {
+        // 方向即层级: 低层 (小编号) 引用高层 (大编号) 才算越层。
+        assert!(super::is_forbidden("l1_action", "l2_perception"));
+        assert!(super::is_forbidden("l2_perception", "l6_meta"));
+        assert!(!super::is_forbidden("l2_perception", "l1_action"));
+        assert!(!super::is_forbidden("l3_embodiment", "l3_embodiment"));
+        // 未知目标保守判违规 (宁可多报)。
+        assert!(super::is_forbidden("l1_action", "neotrix"));
+    }
+
+    #[test]
+    fn test_is_comment_line() {
+        assert!(super::is_comment_line("// migrated from x"));
+        assert!(super::is_comment_line("   /// doc"));
+        assert!(super::is_comment_line("//! module"));
+        assert!(super::is_comment_line("/* block */"));
+        assert!(!super::is_comment_line("use crate::l2_perception::x;"));
+        assert!(!super::is_comment_line(""));
+    }
+
+    #[test]
+    fn test_extract_layer_targets() {
+        let re = regex::Regex::new(r"crate::(l[0-6]_[a-z0-9_]+)").expect("valid regex");
+        let hits = super::extract_layer_targets(
+            "use crate::l2_perception::nt_world::{A, B}; let x = crate::l5_cognition::y;",
+            &re,
+        );
+        assert_eq!(
+            hits,
+            vec!["l2_perception".to_string(), "l5_cognition".to_string()]
+        );
+        let commented = super::extract_layer_targets("// use crate::l2_perception::x;", &re);
+        // 注意: 本函数不过滤注释 (仍能提取)，注释过滤由调用方 is_comment_line 负责。
+        assert_eq!(commented, vec!["l2_perception".to_string()]);
+        let none = super::extract_layer_targets("let x = 1;", &re);
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn test_clean_pairs_are_the_measured_three() {
+        // 校准来源: 2026-09-21 bash 复核 (SIM-28)。改这里必须同步改 CLEAN_PAIRS 并重测。
+        assert_eq!(super::CLEAN_PAIRS.len(), 3);
+        assert!(super::CLEAN_PAIRS.contains(&("l2", "l6")));
+        assert!(super::CLEAN_PAIRS.contains(&("l3", "l4")));
+        assert!(super::CLEAN_PAIRS.contains(&("l4", "l6")));
+    }
+
+    #[test]
+    fn test_confidence_guard_passes_on_real_repo() {
+        let guard = super::ConfidenceLabelFitness;
+        // 针对真实仓库运行: 干净对必须零引用，否则本次接线自身即引入违规。
+        // (同 test_core_boundary_allowlist_covers_all_reverse_deps 范式。)
+        let result = guard.self_test();
+        assert!(
+            result.is_ok(),
+            "干净对守卫必须在现状下通过: {:?}",
             result
         );
     }
