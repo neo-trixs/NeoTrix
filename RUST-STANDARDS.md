@@ -380,3 +380,52 @@ src/
 1. **三路并行审计**: 结构/API/事件同时审计
 2. **先审计后修复**: 不审计就修是盲目行动
 3. **记录经验**: 每次修复后记录pattern到经验库
+
+## 16. CLI 命令架构禁令（CLI Architecture Ban）
+
+> 2026-09-21 确立：Agent 管理迁移到自动编排，禁止 CLI 命令架构设计
+
+### 设计原则
+1. **用户对话层零 CLI**：用户只说意图，系统自动路由到合适的 agent
+2. **自动编排**：系统自动 spawn/kill/manage agent，零手动管理
+3. **CLI 仅用于观测/调试**：status/logs/budget/kill 用于开发调试和应急干预
+
+### 禁止的模式
+```rust
+// ❌ 禁止：用户手动管理 agent
+/agent spawn <name> <mode>        // 系统应自动 spawn
+/agent list                       // 系统应自动管理
+/agent talk <id> <message>        // 系统应自动路由
+/agent background <name> <mode>   // 系统应自动管理
+```
+
+### 允许的模式
+```rust
+// ✅ 允许：观测/调试/应急
+/agent status                     // 查看编排器状态
+/agent instances                  // 列出 agent 实例
+/agent budget                     // 查看成本消耗
+/agent kill <id>                  // 应急终止 agent
+/mcp list                         // 查看 MCP 工具
+/mcp search <query>               // 搜索 MCP 工具
+```
+
+### 架构要求
+1. **AutoOrchestrator**：自动编排器，处理用户意图，自动选择/创建/管理 agent
+2. **AgentLifecycleManager**：生命周期管理器，自动 spawn/kill/recycle agent
+3. **IntentClassifier**：意图分类器，自动识别任务类型
+4. **CLI 命令**：仅用于观测/调试/应急，不用于管理
+
+### 迁移指南
+1. **移除**：spawn/list/talk/background/tasks 等管理命令
+2. **降级**：status/instances/budget/kill 保留为调试命令
+3. **新增**：AutoOrchestrator + AgentLifecycleManager + IntentClassifier
+4. **文档**：更新所有文档，说明自动编排架构
+
+### 验证清单
+- [ ] AutoOrchestrator 实现完成
+- [ ] AgentLifecycleManager 实现完成
+- [ ] IntentClassifier 实现完成
+- [ ] CLI 命令降级为观测/调试
+- [ ] 开发规则更新
+- [ ] 文档更新
