@@ -163,11 +163,7 @@ impl SessionSyncPlugin {
 
     /// Create a new synced session
     async fn create_session(&self, mode: &str, title: &str) -> Result<SyncedSession, DomainError> {
-        let mut state = self.state.lock().await.map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+        let mut state = self.state.lock().await;
 
         let session_id = format!("session-{}", uuid::Uuid::new_v4());
         let now = chrono::Utc::now().to_rfc3339();
@@ -202,11 +198,7 @@ impl SessionSyncPlugin {
         role: &str,
         content: &str,
     ) -> Result<SyncedMessage, DomainError> {
-        let mut state = self.state.lock().await.map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+        let mut state = self.state.lock().await;
 
         let device_id = state.current_device_id.clone();
 
@@ -250,21 +242,13 @@ impl SessionSyncPlugin {
 
     /// Get all sessions
     async fn get_sessions(&self) -> Result<Vec<SyncedSession>, DomainError> {
-        let state = self.state.lock().await.map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+        let state = self.state.lock().await;
         Ok(state.sessions.values().cloned().collect())
     }
 
     /// Get a session by ID
     async fn get_session(&self, session_id: &str) -> Result<SyncedSession, DomainError> {
-        let state = self.state.lock().await.map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+        let state = self.state.lock().await;
         state
             .sessions
             .get(session_id)
@@ -278,22 +262,14 @@ impl SessionSyncPlugin {
 
     /// Delete a session
     async fn delete_session(&self, session_id: &str) -> Result<(), DomainError> {
-        let mut state = self.state.lock().await.map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+        let mut state = self.state.lock().await;
         state.sessions.remove(session_id);
         Ok(())
     }
 
     /// Simulate sync (simplified)
     async fn sync(&self) -> Result<SyncStats, DomainError> {
-        let mut state = self.state.lock().await.map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+        let mut state = self.state.lock().await;
 
         // Mark all local sessions as synced
         for session in state.sessions.values_mut() {
@@ -498,11 +474,7 @@ impl DomainPlugin for SessionSyncPlugin {
                 Ok(serde_json::to_value(stats).unwrap_or_default())
             }
             "get_stats" => {
-                let state = self.state.lock().await.map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: format!("Failed to lock state: {}", e),
-                    recoverable: false,
-                })?;
+                let state = self.state.lock().await;
 
                 let total = state.sessions.len();
                 let synced = state

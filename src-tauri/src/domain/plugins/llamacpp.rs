@@ -541,8 +541,7 @@ impl DomainPlugin for LlamacppPlugin {
             "start" | "stop" | "swap" => {
                 let mut state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 match action {
                     "start" => {
                         let model_path = args.get("model_path").and_then(|v| v.as_str());
@@ -589,8 +588,7 @@ impl DomainPlugin for LlamacppPlugin {
                 let port = {
                     let state = self
                         .state
-                        .lock().await
-                        .map_err(|e| DomainError::from(e.to_string()))?;
+                        .lock().await;
                     state.port
                 };
 
@@ -622,8 +620,7 @@ impl DomainPlugin for LlamacppPlugin {
             "health" => {
                 let state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 let running = state.child.is_some();
                 Ok(serde_json::json!({
                     "running": running,
@@ -637,8 +634,7 @@ impl DomainPlugin for LlamacppPlugin {
             "models" => {
                 let state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 let models = scan_models(&state.models_dir);
                 Ok(serde_json::json!({ "models": models }))
             }

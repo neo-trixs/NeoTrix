@@ -1,4 +1,12 @@
-import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
+
+// Local alias: all current callers pass JSON objects (or nothing), so the
+// type is narrowed to that. Upstream `InvokeArgs` also permits number[] and
+// binary payloads, and is imported directly (not re-exported) because the
+// package's `export type { InvokeArgs }` re-export is invisible to tsc in
+// this project's program (TS2305 under full-project compilation while
+// single-file checks pass). Widen here if binary payloads are ever needed.
+export type InvokeArgs = Record<string, unknown>;
 
 /**
  * Centralized Tauri IPC bridge.

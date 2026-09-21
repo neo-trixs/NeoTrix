@@ -524,16 +524,14 @@ impl DomainPlugin for AiOrchestrationPlugin {
                 };
                 let mut state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 state.thinking_budget = budget.clone();
                 Ok(serde_json::to_value(&budget).map_err(|e| DomainError::from(e.to_string()))?)
             }
             "get_thinking_budget" => {
                 let state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 Ok(serde_json::to_value(&state.thinking_budget)
                     .map_err(|e| DomainError::from(e.to_string()))?)
             }
@@ -557,8 +555,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
                 };
                 let mut state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 state.background_tasks.insert(task_id.clone(), task.clone());
                 Ok(serde_json::to_value(&task).map_err(|e| DomainError::from(e.to_string()))?)
             }
@@ -568,8 +565,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
                     .ok_or("Missing 'task_id' parameter")?;
                 let state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 let task = state
                     .background_tasks
                     .get(task_id)
@@ -579,8 +575,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
             "list_background_tasks" => {
                 let state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 let tasks: Vec<&BackgroundTask> = if let Some(status_str) = args["status"].as_str()
                 {
                     let status_filter = match status_str.to_lowercase().as_str() {
@@ -612,8 +607,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
                     .ok_or("Missing 'task_id' parameter")?;
                 let mut state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 if let Some(task) = state.background_tasks.get_mut(task_id) {
                     if task.status == BackgroundTaskStatus::Running
                         || task.status == BackgroundTaskStatus::Queued
@@ -642,8 +636,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
                 let extracted = self.extract_memories(session_id, conversation);
                 let mut state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 state.memories.extend(extracted.clone());
                 // Enforce max memories
                 if state.memories.len() > state.max_memories {
@@ -656,8 +649,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
             "get_memories" => {
                 let state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 let memories: Vec<&ExtractedMemory> =
                     if let Some(category) = args["category"].as_str() {
                         state
@@ -677,8 +669,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
                 let query = args["query"].as_str().ok_or("Missing 'query' parameter")?;
                 let state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 let query_lower = query.to_lowercase();
                 let matches: Vec<&ExtractedMemory> = state
                     .memories
@@ -693,8 +684,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
                     .ok_or("Missing 'memory_id' parameter")?;
                 let mut state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 let before = state.memories.len();
                 state.memories.retain(|m| m.id != memory_id);
                 Ok(serde_json::Value::Bool(state.memories.len() < before))
@@ -748,8 +738,7 @@ impl DomainPlugin for AiOrchestrationPlugin {
             "get_stats" => {
                 let state = self
                     .state
-                    .lock().await
-                    .map_err(|e| DomainError::from(e.to_string()))?;
+                    .lock().await;
                 let total_tasks = state.background_tasks.len();
                 let completed_tasks = state
                     .background_tasks

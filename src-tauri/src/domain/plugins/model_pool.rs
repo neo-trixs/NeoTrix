@@ -171,6 +171,7 @@ impl DomainPlugin for ModelPoolPlugin {
                         "INVALID_ARGS",
                         "Missing required string argument: new_key".into(),
                     ))?;
+                let new_key = new_key.as_str();
                 let updated = pool::update_api_key(label, new_key)
                     .map_err(|e| err("POOL_ERROR", e.to_string()))?;
                 Ok(serde_json::json!({ "updated": updated }))

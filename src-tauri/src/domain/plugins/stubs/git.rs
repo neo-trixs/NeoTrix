@@ -7,6 +7,17 @@ use std::process::Command as StdCommand;
 
 pub struct GitPlugin;
 
+/// Push the accumulated hunk lines when inside a hunk.
+fn flush_hunk(
+    hunks: &mut Vec<serde_json::Value>,
+    lines: &mut Vec<serde_json::Value>,
+    in_hunk: bool,
+) {
+    if in_hunk {
+        hunks.push(serde_json::json!({ "lines": std::mem::take(lines) }));
+    }
+}
+
 impl GitPlugin {
     /// Parse `git diff` unified output into per-file hunks matching the
     /// frontend `DiffFile` contract: `{path, hunks: [{lines: [{t, o, n, s}]}]}`
@@ -20,12 +31,8 @@ impl GitPlugin {
         let mut new_no: u32 = 0;
         let mut in_hunk = false;
 
-        let flush_hunk = |hunks: &mut Vec<serde_json::Value>,
-                          lines: &mut Vec<serde_json::Value>| {
-            if in_hunk {
-                hunks.push(serde_json::json!({ "lines": std::mem::take(lines) }));
-            }
-        };
+        // NOTE: free function (not a closure) — a closure would borrow
+        // `in_hunk` for its whole lifetime and conflict with assignments.
 
         for line in output.lines() {
             if let Some(rest) = line.strip_prefix("diff --git ") {
@@ -33,7 +40,7 @@ impl GitPlugin {
                 if cur_path.is_some() {
                     let mut hunks = std::mem::take(&mut cur_hunks);
                     let mut lines = std::mem::take(&mut cur_lines);
-                    flush_hunk(&mut hunks, &mut lines);
+                    flush_hunk(&mut hunks, &mut lines, in_hunk);
                     cur_hunks = hunks;
                     files.push(serde_json::json!({
                         "path": cur_path.take().unwrap_or_default(),
@@ -58,7 +65,7 @@ impl GitPlugin {
                 // New hunk header: `@@ -old[,old_count] +new[,new_count] @@ ...`
                 let mut hunks = std::mem::take(&mut cur_hunks);
                 let mut lines = std::mem::take(&mut cur_lines);
-                flush_hunk(&mut hunks, &mut lines);
+                flush_hunk(&mut hunks, &mut lines, in_hunk);
                 cur_hunks = hunks;
                 in_hunk = true;
                 let header = line.trim_start_matches('@').trim_end_matches('@').trim();
@@ -101,7 +108,7 @@ impl GitPlugin {
         if cur_path.is_some() {
             let mut hunks = std::mem::take(&mut cur_hunks);
             let mut lines = std::mem::take(&mut cur_lines);
-            flush_hunk(&mut hunks, &mut lines);
+            flush_hunk(&mut hunks, &mut lines, in_hunk);
             files.push(serde_json::json!({
                 "path": cur_path.unwrap_or_default(),
                 "hunks": hunks,

@@ -4,9 +4,9 @@
   "version": "0.19.0-rc1",
   "identifier": "ai.neotrix.desktop",
   "build": {
-    "beforeDevCommand": "cd \"$(git rev-parse --show-toplevel)/neocodex-frontend\" && npm run dev",
-    "beforeBuildCommand": "cd \"$(git rev-parse --show-toplevel)/neocodex-frontend\" && npm ci && npm run build",
-    "frontendDist": "../neocodex-frontend/dist",
+    "beforeDevCommand": "cd \"$(git rev-parse --show-toplevel)/src-tauri/frontend\" && npm run dev",
+    "beforeBuildCommand": "cd \"$(git rev-parse --show-toplevel)/src-tauri/frontend\" && npm ci && npm run build",
+    "frontendDist": "frontend/dist",
     "devUrl": "http://localhost:1421"
   },
   "app": {

@@ -178,10 +178,6 @@ impl VoiceAgentPlugin {
     /// Start a voice session
     async fn start_session(&self, language: Option<String>) -> Result<VoiceSession, DomainError> {
         let mut state = self.state.lock().await;
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
 
         let session_id = format!("voice-{}", uuid::Uuid::new_v4());
         let lang = language.unwrap_or_else(|| "en-US".to_string());
@@ -217,10 +213,6 @@ impl VoiceAgentPlugin {
     /// Start listening
     async fn start_listening(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
         let mut state = self.state.lock().await;
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
 
         let session = state
             .sessions
@@ -241,10 +233,6 @@ impl VoiceAgentPlugin {
     /// Stop listening
     async fn stop_listening(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
         let mut state = self.state.lock().await;
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
 
         let session = state
             .sessions
@@ -266,10 +254,6 @@ impl VoiceAgentPlugin {
         audio_data: Option<String>,
     ) -> Result<VoiceCommand, DomainError> {
         let mut state = self.state.lock().await;
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
 
         // Simplified — would use actual STT engine
         let command = VoiceCommand {
@@ -296,10 +280,6 @@ impl VoiceAgentPlugin {
     /// Speak response
     async fn speak(&self, session_id: &str, text: &str) -> Result<(), DomainError> {
         let mut state = self.state.lock().await;
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
 
         if let Some(session) = state.sessions.get_mut(session_id) {
             session.status = VoiceStatus::Speaking;
@@ -312,10 +292,6 @@ impl VoiceAgentPlugin {
     /// Toggle mute
     async fn toggle_mute(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
         let mut state = self.state.lock().await;
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
 
         let session = state
             .sessions
