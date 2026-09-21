@@ -128,7 +128,7 @@ impl ModelSource for CliFreeSource {
             .into_iter()
             .filter(|(_, m)| is_free_model_id_with(m, &self.free_suffix))
             .map(|(p, m)| {
-                UnifiedModelEntry::cloud_free(
+                let mut e = UnifiedModelEntry::cloud_free(
                     &p,
                     &m,
                     &m,
@@ -137,7 +137,11 @@ impl ModelSource for CliFreeSource {
                     false,
                     None,
                     LlmProviderType::OpenCodeZen,
-                )
+                );
+                // 来源打真标签：cloud_free() 统一盖 "cloud_free" 章，
+                // 这里纠正为发现源名，否则池展示/过滤认不出自家条目。
+                e.source = "cli-free".to_string();
+                e
             })
             .collect()
     }
@@ -204,6 +208,7 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].id, "opencode/mimo-v2.5-free");
         assert!(entries[0].is_free);
+        assert_eq!(entries[0].source, "cli-free");
         assert_eq!(entries[0].source, "cloud_free");
     }
 

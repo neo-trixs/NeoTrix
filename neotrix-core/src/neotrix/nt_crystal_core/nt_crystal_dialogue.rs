@@ -241,7 +241,7 @@ impl NtInnerLoop {
     pub fn drive(
         &self,
         goal: &str,
-        core: &CrystalCore,
+        core: &mut CrystalCore,
         llm: &dyn NtLlmAsk,
         human: &dyn NtHumanChannel,
     ) -> NtInnerLoopOutcome {
@@ -266,6 +266,7 @@ impl NtInnerLoop {
             let demands = NtDialogueWindow::demands_from(&report, &resolved);
             if demands.is_empty() {
                 transcript.push(format!("[round{round}-system] 内需清空，收敛。"));
+                Self::record_outcome(core, goal, &report, NtLoopStatus::Converged, &transcript);
                 return NtInnerLoopOutcome {
                     status: NtLoopStatus::Converged,
                     report,
@@ -282,6 +283,7 @@ impl NtInnerLoop {
             let replies = human.prompt(&window, &demands);
             if replies.is_empty() {
                 transcript.push(format!("[round{round}-system] 人沉默，挂起。"));
+                Self::record_outcome(core, goal, &report, NtLoopStatus::Stalled, &transcript);
                 return NtInnerLoopOutcome {
                     status: NtLoopStatus::Stalled,
                     report,
@@ -339,6 +341,7 @@ impl NtInnerLoop {
             "[system] 达到最大轮次{}，仍有内需未清。",
             self.max_rounds
         ));
+        Self::record_outcome(core, goal, &report, NtLoopStatus::MaxRounds, &transcript);
         NtInnerLoopOutcome {
             status: NtLoopStatus::MaxRounds,
             report,
@@ -346,6 +349,122 @@ impl NtInnerLoop {
             rounds: self.max_rounds,
         }
     }
+
+    /// 终态写回晶体记忆（只写内存，落盘由调用方 `persist` 显式触发，
+    /// 测试不碰磁盘）。
+    /// - 任何终态都记 Episode（情境=目标，行动=实录尾，复盘=少数派/矛盾）。
+    /// - Converged 且有结论再记一条可复用 Solution（置信≥0.7 才算可复用）。
+    fn record_outcome(
+        core: &mut CrystalCore,
+        goal: &str,
+        report: &super::nt_crystal_task_fusion::NtTaskLoopReport,
+        status: NtLoopStatus,
+        transcript: &[String],
+    ) {
+        let tail: Vec<&str> = transcript
+            .iter()
+            .rev()
+            .take(3)
+            .map(|s| s.as_str())
+            .collect();
+        let mut tail_rev = tail.clone();
+        tail_rev.reverse();
+        let mut reflection = report.fused.minority.join("；");
+        if !report.fused.contradictions.is_empty() {
+            if !reflection.is_empty() {
+                reflection.push_str("；");
+            }
+            reflection.push_str(&report.fused.contradictions.join("；"));
+        }
+        if reflection.is_empty() {
+            reflection = "本轮无内需残留".to_string();
+        }
+        core.experience.record_episode(
+            trunc(goal, 200),
+            trunc(&tail_rev.join("\n"), 300),
+            format!("{status:?}（融合置信 {:.2}）", report.fused.confidence),
+            trunc(&reflection, 300),
+            "dialogue",
+            report.fused.confidence.clamp(0.0, 1.0),
+        );
+        if status == NtLoopStatus::Converged && !report.fused.text.is_empty() {
+            core.experience.record_success(
+                trunc(goal, 200),
+                trunc(&report.fused.text, 500),
+                format!("calibration {:.2}", report.calibration),
+                report.fused.confidence >= 0.7,
+                "crystal-loop-fusion",
+                "dialogue",
+            );
+        }
+    }
+
+    /// 落盘晶体记忆（bin 显式调用，失败如实返回）。
+    ///
+    /// 并发安全（尽力而为）：共享 `crystal.json` 会被多会话同时写，
+    /// 直接全量覆盖必丢别人的更新。这里加文件锁 + 读-合并-写：
+    /// 只把本轮新增的 Episode/Solution/Lesson 按 id 并入，别人先写的都保留。
+    /// 注意：锁只能约束同样加锁的写入方；窗口期已压到毫秒级，残余竞态如实接受。
+    pub fn persist(core: &CrystalCore) -> Result<(), String> {
+        Self::persist_to(core, &super::crystal_root().join("crystal.json"))
+    }
+
+    pub(crate) fn persist_to(core: &CrystalCore, path: &std::path::Path) -> Result<(), String> {
+        use fs2::FileExt;
+        use std::io::{Read, Seek, SeekFrom, Write};
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| format!("mkdir failed: {e}"))?;
+        }
+        let mut f = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)
+            .map_err(|e| format!("open failed: {e}"))?;
+        f.lock_exclusive()
+            .map_err(|e| format!("lock failed: {e}"))?;
+        let mut buf = String::new();
+        f.read_to_string(&mut buf)
+            .map_err(|e| format!("read failed: {e}"))?;
+        let mut disk: CrystalCore = if buf.trim().is_empty() {
+            core.clone()
+        } else {
+            serde_json::from_str(&buf).map_err(|e| format!("parse failed: {e}"))?
+        };
+        for ep in &core.experience.episodes {
+            if !disk.experience.episodes.iter().any(|e| e.id == ep.id) {
+                disk.experience.episodes.push(ep.clone());
+            }
+        }
+        for s in &core.experience.successes {
+            if !disk.experience.successes.iter().any(|e| e.id == s.id) {
+                disk.experience.successes.push(s.clone());
+            }
+        }
+        for l in &core.experience.failures {
+            if !disk.experience.failures.iter().any(|e| e.id == l.id) {
+                disk.experience.failures.push(l.clone());
+            }
+        }
+        let data =
+            serde_json::to_string_pretty(&disk).map_err(|e| format!("serialize failed: {e}"))?;
+        f.set_len(0).map_err(|e| format!("truncate failed: {e}"))?;
+        f.seek(SeekFrom::Start(0))
+            .map_err(|e| format!("seek failed: {e}"))?;
+        f.write_all(data.as_bytes())
+            .map_err(|e| format!("write failed: {e}"))?;
+        f.sync_all().map_err(|e| format!("sync failed: {e}"))?;
+        Ok(())
+    }
+}
+
+/// 截断（字符级，超长加省略号）。
+fn trunc(s: &str, n: usize) -> String {
+    if s.chars().count() <= n {
+        return s.to_string();
+    }
+    let t: String = s.chars().take(n).collect();
+    format!("{t}…")
 }
 
 #[cfg(test)]
@@ -441,7 +560,7 @@ mod tests {
 
     #[test]
     fn test_drive_converges_when_human_resolves_retry() {
-        let core = CrystalCore::new("e");
+        let mut core = CrystalCore::new("e");
         let llm = StubLlm { fail_on: vec!["炸".to_string()] };
         // 先跑一轮拿到 retry 需求单 id（确定性：同输入同 id）
         let engine = NtCrystalTaskLoop::new(config());
@@ -458,25 +577,31 @@ mod tests {
             text: "已手动执行完毕，结果符合预期要求，可以归档".to_string(),
             approved: true,
         }]]);
-        let outcome = NtInnerLoop::new(config(), 3).drive("一定会炸的问题", &core, &llm, &human);
+        let outcome = NtInnerLoop::new(config(), 3).drive("一定会炸的问题", &mut core, &llm, &human);
         assert_eq!(outcome.status, NtLoopStatus::Converged);
         assert_eq!(outcome.rounds, 2);
         assert!(!outcome.transcript.is_empty());
+        // 写回：Converged 有结论 → Episode + Solution 各一条
+        assert_eq!(core.experience.episodes.len(), 1);
+        assert_eq!(core.experience.successes.len(), 1);
     }
 
     #[test]
     fn test_drive_stalls_on_silence() {
-        let core = CrystalCore::new("e");
+        let mut core = CrystalCore::new("e");
         let llm = StubLlm { fail_on: vec!["炸".to_string()] };
         let human = ScriptHuman::new(vec![]);
-        let outcome = NtInnerLoop::new(config(), 3).drive("一定会炸的问题", &core, &llm, &human);
+        let outcome = NtInnerLoop::new(config(), 3).drive("一定会炸的问题", &mut core, &llm, &human);
         assert_eq!(outcome.status, NtLoopStatus::Stalled);
         assert_eq!(outcome.rounds, 1);
+        // 写回：Stalled 只记 Episode，不记 Solution
+        assert_eq!(core.experience.episodes.len(), 1);
+        assert!(core.experience.successes.is_empty());
     }
 
     #[test]
     fn test_drive_max_rounds_when_never_resolved() {
-        let core = CrystalCore::new("e");
+        let mut core = CrystalCore::new("e");
         let llm = StubLlm { fail_on: vec!["炸".to_string()] };
         // 每轮都给新文字但从不带 demand_id → 需求单永不清 → 打满轮次
         let human = ScriptHuman::new(vec![
@@ -485,7 +610,7 @@ mod tests {
             vec![NtHumanReply { demand_id: None, text: "第三轮补充说明文字足够长".to_string(), approved: false }],
         ]);
         // 注意 ScriptHuman 用 pop 取脚本：逆序压入
-        let outcome = NtInnerLoop::new(config(), 3).drive("一定会炸的问题", &core, &llm, &human);
+        let outcome = NtInnerLoop::new(config(), 3).drive("一定会炸的问题", &mut core, &llm, &human);
         assert_eq!(outcome.status, NtLoopStatus::MaxRounds);
         assert_eq!(outcome.rounds, 3);
     }
@@ -500,5 +625,30 @@ mod tests {
         let w = NtDialogueWindow::render(&report, &demands);
         assert!(w.contains("对话窗口"));
         assert!(w.contains("目标："));
+    }
+
+    #[test]
+    fn test_persist_merges_without_clobbering() {
+        // 磁盘已有别人的条目 → 我方 persist 只并入新增，谁也不丢谁
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("crystal.json");
+        let mut other = CrystalCore::new("other");
+        other
+            .experience
+            .record_episode("ctx", "act", "res", "ref", "d", 0.8);
+        NtInnerLoop::persist_to(&other, &path).unwrap();
+        let mut mine = CrystalCore::new("mine");
+        mine.experience.record_success("prob", "appr", "res", true, "pat", "d");
+        NtInnerLoop::persist_to(&mine, &path).unwrap();
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let back: CrystalCore = serde_json::from_str(&raw).unwrap();
+        assert_eq!(back.experience.episodes.len(), 1);
+        assert_eq!(back.experience.successes.len(), 1);
+        // 幂等：重复 persist 不产生副本
+        NtInnerLoop::persist_to(&mine, &path).unwrap();
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let back: CrystalCore = serde_json::from_str(&raw).unwrap();
+        assert_eq!(back.experience.episodes.len(), 1);
+        assert_eq!(back.experience.successes.len(), 1);
     }
 }

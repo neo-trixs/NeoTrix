@@ -12,7 +12,7 @@
 
 use neotrix::l1_action::nt_dialogue_tui::NtTuiHuman;
 use neotrix::l1_action::nt_free_pool::NtFreePoolAsk;
-use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::UnifiedModelPool;
+use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::{ModelSource, UnifiedModelPool};
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::CliFreeSource;
 use neotrix::l1_action::nt_model_cli::NtModelCliAsk;
 use neotrix::l1_action::nt_stdin_human::NtStdinHuman;
@@ -21,6 +21,10 @@ use neotrix::neotrix::nt_crystal_core::{
 };
 use std::path::PathBuf;
 use std::time::Duration;
+
+/// 最后兜底的免费模型（已验证显式 -m 可通；发现与定点全空时用）。
+/// 注意：这是资源标识字符串，不是类型名；随时可被 --model 覆盖。
+const FALLBACK_FREE_MODEL: &str = "opencode/mimo-v2.5-free";
 
 struct Args {
     goal: String,
@@ -126,6 +130,10 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
 
 fn main() {
     let argv: Vec<String> = std::env::args().collect();
+    if argv.iter().any(|a| a == "--help" || a == "-h") {
+        println!("{}", usage());
+        std::process::exit(0);
+    }
     let args = match parse_args(&argv) {
         Ok(a) => a,
         Err(e) => {
@@ -135,7 +143,7 @@ fn main() {
     };
 
     // 晶体：磁盘有记忆就载入，没有就新建（两条路都不 panic）
-    let core = match CrystalCore::load() {
+    let mut core = match CrystalCore::load() {
         Ok(c) => {
             println!("已载入晶体记忆。");
             c
@@ -195,13 +203,19 @@ fn main() {
                 .map(|e| e.id.clone())
                 .collect();
             if cli_ids.is_empty() {
-                println!("池中无可直接调用的免费模型，回退 opencode 默认模型。");
+                // 诊断：发现源不可用还是真的无免费模型（第一单曾踩空，原因未定位）
+                let available = CliFreeSource::new().is_available();
+                println!("池中无可直接调用的免费模型（发现源可用：{available}）。");
+                // 兜底定点：默认路由曾报服务端错，显式 -m 已验证可通；
+                // 仅为最后手段，可被 --model / NEOTRIX_DIALOGUE_MODEL 覆盖。
                 let mut op = NtModelCliAsk::new()
+                    .with_model(FALLBACK_FREE_MODEL)
                     .with_timeout(Duration::from_secs(args.timeout_secs));
                 if let Some(dir) = &args.workdir {
                     op = op.with_workdir(dir.clone());
                 }
-                (Box::new(op), "回退 opencode 默认".to_string())
+                println!("回退定点免费模型：{FALLBACK_FREE_MODEL}");
+                (Box::new(op), format!("回退 {FALLBACK_FREE_MODEL}"))
             } else {
                 println!("池免费模型 {} 个轮转调用：{}",
                     cli_ids.len(),
@@ -235,11 +249,17 @@ fn main() {
     };
     let outcome = if use_tui {
         let tui_human = NtTuiHuman::new(pool_line);
-        NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &core, ask.as_ref(), &tui_human)
+        NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &mut core, ask.as_ref(), &tui_human)
     } else {
         let human = NtStdinHuman::new();
-        NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &core, ask.as_ref(), &human)
+        NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &mut core, ask.as_ref(), &human)
     };
+
+    // 记忆落盘：循环已写回内存，这里显式持久化（失败如实打印，不改退出码）
+    match NtInnerLoop::persist(&core) {
+        Ok(()) => println!("晶体记忆已落盘。"),
+        Err(e) => eprintln!("晶体记忆落盘失败：{e}"),
+    }
 
     println!("\n══ 对话实录 ══");
     for line in &outcome.transcript {
