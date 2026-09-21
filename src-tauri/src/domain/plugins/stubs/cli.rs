@@ -39,9 +39,23 @@ impl CliPlugin {
         let bin = binary_name(&args[0]).to_lowercase();
         if BLOCKED_BINARIES.contains(&bin.as_str()) {
             tracing::warn!("cli/exec denied blocked binary: {}", args[0]);
+            // Ask, don't just deny: file an approval so the attempt is
+            // visible in ApprovalPanel (resolve = record decision; the
+            // command itself is never executed from this path).
+            let entry = super::tool::request_approval(
+                "cli/exec",
+                &format!("Blocked binary requested: {} {:?}", args[0], &args[1..]),
+            );
+            let id = entry
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
             return Err(DomainError {
                 code: "CLI_DENIED".into(),
-                message: format!("Refusing to execute blocked binary: {}", args[0]),
+                message: format!(
+                    "Refusing to execute blocked binary: {} (approval {id} filed for review)",
+                    args[0]
+                ),
                 recoverable: false,
             });
         }

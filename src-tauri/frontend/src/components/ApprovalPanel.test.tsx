@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, fireEvent, waitFor } from '@solidjs/testing-library'
 import { ApprovalPanel } from './ApprovalPanel'
 import type { HarnessApproval } from '../api/harness'
-import { mockInvokeImpl, resetInvokeMock } from '../test/invokeMock'
+import { mockCommand, mockInvokeImpl, resetInvokeMock } from '../test/invokeMock'
 
 vi.mock('@tauri-apps/api/core', async () => {
   const { mockInvokeImpl } = await import('../test/invokeMock')
@@ -29,27 +29,35 @@ describe('ApprovalPanel', () => {
     expect(container.textContent).toContain('1 待处理')
   })
 
-  // 后端无审批队列：harnessApprovalResolve 明确抛出 NOT_IMPLEMENTED，
-  // 组件 catch 打日志且不触发 onResolved，按钮恢复可用。
-  it('点击「通过」后端未实现时不触发 onResolved 且按钮恢复', async () => {
+  // 真实后端（tool/approval_resolve）：决定写回成功后触发 onResolved。
+  it('点击「通过」写入审批决定并触发 onResolved', async () => {
+    const resolve = mockCommand('domain_call', async (req: any) => {
+      expect(req).toMatchObject({ domain: 'tool', action: 'approval_resolve' })
+      expect(req.args).toMatchObject({ id: 'a1', decision: 'approve' })
+      return { ok: true, data: { id: 'a1', action: 'shell:rm -rf', state: 'approved' } }
+    })
     let resolved = 0
     const list: HarnessApproval[] = [{ id: 'a1', action: 'shell:rm -rf', state: 'pending' }]
     const { getByText } = render(() => (
       <ApprovalPanel approvals={list} onClose={() => {}} onResolved={() => { resolved++ }} />
     ))
     fireEvent.click(getByText('通过'))
-    await waitFor(() => expect(resolved).toBe(0))
-    expect(getByText('通过')).toBeTruthy()
+    await waitFor(() => expect(resolve.calledTimes()).toBe(1))
+    await waitFor(() => expect(resolved).toBe(1))
   })
 
-  it('点击「拒绝」后端未实现时不触发 onResolved', async () => {
+  it('点击「拒绝」写入审批决定', async () => {
+    const resolve = mockCommand('domain_call', async (req: any) => {
+      expect(req.args).toMatchObject({ id: 'a1', decision: 'reject' })
+      return { ok: true, data: { id: 'a1', action: 'shell:rm -rf', state: 'denied' } }
+    })
     let resolved = 0
     const list: HarnessApproval[] = [{ id: 'a1', action: 'shell:rm -rf', state: 'pending' }]
     const { getByText } = render(() => (
       <ApprovalPanel approvals={list} onClose={() => {}} onResolved={() => { resolved++ }} />
     ))
     fireEvent.click(getByText('拒绝'))
-    await waitFor(() => expect(resolved).toBe(0))
-    expect(getByText('拒绝')).toBeTruthy()
+    await waitFor(() => expect(resolve.calledTimes()).toBe(1))
+    await waitFor(() => expect(resolved).toBe(1))
   })
 })

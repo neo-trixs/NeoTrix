@@ -3,6 +3,39 @@
 use super::common::stub_action;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use async_trait::async_trait;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
+
+/// Pending approval queue (PI-style Allow/Ask/Deny).
+///
+/// Producers file requests here instead of executing directly (see
+/// `request_approval`); the UI (`ApprovalPanel`) lists them and writes
+/// back decisions via `approval_resolve`. State is in-memory: pending
+/// approvals do not survive restarts by design (fail-closed on reboot).
+static APPROVALS: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// File an approval request. Shared by the `approval_request` action and by
+/// guardrailed executors (e.g. blocked `cli/exec` binaries auto-file here
+/// instead of running). Returns the created entry.
+pub(crate) fn request_approval(action: &str, detail: &str) -> serde_json::Value {
+    let id = format!("appr-{}", uuid::Uuid::new_v4());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let entry = serde_json::json!({
+        "id": id,
+        "action": action,
+        "state": "pending",
+        "detail": detail,
+        "created_at": now,
+    });
+    if let Ok(mut q) = APPROVALS.lock() {
+        q.insert(id, entry.clone());
+    }
+    entry
+}
 
 pub struct ToolPlugin;
 
@@ -52,6 +85,9 @@ impl DomainPlugin for ToolPlugin {
             "computer_click",
             "computer_type",
             "voice_synthesize",
+            "approval_request",
+            "approval_list",
+            "approval_resolve",
         ]
         .iter()
         .map(|a| stub_action(a))
@@ -100,6 +136,72 @@ impl DomainPlugin for ToolPlugin {
             "voice_synthesize" => Ok(
                 serde_json::json!({ "ok": true, "stub": true, "message": "voice_synthesize not yet implemented" }),
             ),
+            "approval_request" => {
+                let action = args
+                    .get("action")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                let detail = args
+                    .get("detail")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                Ok(request_approval(action, detail))
+            }
+            "approval_list" => {
+                let queue = APPROVALS.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let mut items: Vec<serde_json::Value> = queue.values().cloned().collect();
+                // Newest first.
+                items.sort_by(|a, b| {
+                    b.get("created_at")
+                        .and_then(|v| v.as_u64())
+                        .cmp(&a.get("created_at").and_then(|v| v.as_u64()))
+                });
+                Ok(serde_json::json!({
+                    "approvals": items,
+                    "count": items.len(),
+                }))
+            }
+            "approval_resolve" => {
+                let id = args
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "Missing required string argument: id".into(),
+                        recoverable: true,
+                    })?;
+                let decision = args
+                    .get("decision")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("deny");
+                let state = if decision == "approve" {
+                    "approved"
+                } else {
+                    "denied"
+                };
+                let mut queue = APPROVALS.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                match queue.get_mut(id) {
+                    Some(entry) => {
+                        if let Some(obj) = entry.as_object_mut() {
+                            obj.insert("state".into(), serde_json::json!(state));
+                        }
+                        Ok(entry.clone())
+                    }
+                    None => Err(DomainError {
+                        code: "NOT_FOUND".into(),
+                        message: format!("Approval '{id}' not found"),
+                        recoverable: true,
+                    }),
+                }
+            }
             _ => Err(DomainError {
                 code: "UNKNOWN_ACTION".into(),
                 message: format!("Unknown action: {}", action),

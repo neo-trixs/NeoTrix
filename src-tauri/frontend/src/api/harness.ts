@@ -166,11 +166,17 @@ export interface HarnessApproval {
 }
 
 export async function harnessApprovalList(): Promise<HarnessApproval[]> {
-  // 后端无审批队列：无待审批项即为空列表（调用方已有空态兜底）
-  return []
+  // tool 域审批队列（被禁 cli 二进制、显式申请等在此排队）
+  const r = await domainCall<{ approvals: HarnessApproval[] }>('tool', 'approval_list')
+  return r.approvals ?? []
 }
 
-/** 审批交互：后端无审批队列，明确抛出未实现（调用方 catch 打日志） */
-export async function harnessApprovalResolve(_id: string, _decision: 'approve' | 'reject'): Promise<HarnessApproval> {
-  throw notImplemented('harness_approval_resolve')
+/** 审批交互：approve / reject 写回 tool 域审批队列 */
+export async function harnessApprovalResolve(id: string, decision: 'approve' | 'reject'): Promise<HarnessApproval> {
+  return domainCall<HarnessApproval>('tool', 'approval_resolve', { id, decision })
+}
+
+/** 显式申请审批（高风险操作先审批后执行） */
+export async function harnessApprovalRequest(action: string, detail: string): Promise<HarnessApproval> {
+  return domainCall<HarnessApproval>('tool', 'approval_request', { action, detail })
 }

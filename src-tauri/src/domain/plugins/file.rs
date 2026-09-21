@@ -27,18 +27,24 @@ pub struct ProjectInfo {
 pub struct FilePlugin;
 
 impl FilePlugin {
-    /// 路径安全校验：最终路径必须在用户主目录内，且不包含 `..` 逃逸
+    /// 路径安全校验（三层）：
+    /// 1. 词法：最终路径必须在用户主目录内，且不包含 `..` 逃逸；
+    /// 2. 主目录解析失败即拒绝（不再回退到 `/`，否则全盘放行）；
+    /// 3. 符号链接：对最近已存在祖先做 canonicalize，链接逃逸同样拒绝。
     fn resolve_safe_path(path: &str) -> Result<PathBuf, DomainError> {
         let p = std::path::Path::new(path);
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
-        let home_path = std::path::Path::new(&home);
+        let home_path = dirs::home_dir().ok_or_else(|| DomainError {
+            code: "CONFIG_DIR_ERROR".into(),
+            message: "Cannot determine home directory".into(),
+            recoverable: false,
+        })?;
 
         let abs = if p.is_absolute() {
             p.to_path_buf()
         } else {
             home_path.join(p)
         };
-        if !abs.starts_with(home_path) {
+        if !abs.starts_with(&home_path) {
             return Err(DomainError {
                 code: "PATH_ESCAPE".into(),
                 message: format!("Path escapes home directory: {}", path),
@@ -52,6 +58,27 @@ impl FilePlugin {
                     message: format!("Path traversal not allowed: {}", path),
                     recoverable: true,
                 });
+            }
+        }
+        // Symlink check on the nearest existing ancestor (the full path
+        // itself may not exist yet for writes).
+        let mut anchor = abs.clone();
+        while !anchor.exists() {
+            if !anchor.pop() {
+                break;
+            }
+        }
+        if anchor.exists() {
+            if let Ok(canon) = std::fs::canonicalize(&anchor) {
+                let home_canon =
+                    std::fs::canonicalize(&home_path).unwrap_or_else(|_| home_path.clone());
+                if !canon.starts_with(&home_canon) {
+                    return Err(DomainError {
+                        code: "PATH_ESCAPE".into(),
+                        message: format!("Symlink escapes home directory: {}", path),
+                        recoverable: true,
+                    });
+                }
             }
         }
         Ok(abs)
