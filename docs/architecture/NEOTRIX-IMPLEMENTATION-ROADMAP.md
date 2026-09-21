@@ -244,7 +244,7 @@ LLM 提议 -> 确定性 Verifier (schema/策略/状态机) -> 持久 Commit (out
 |------|------|------|----|
 | P1-01 | 越层分类: 下沉 vs Facade vs 重导出 (每处一类, 无第四类) | 越层处置清单 | architect 签字 |
 | P1-02 | 下沉共享类型到 L0 (knowledge TaskType / sense / math / policy 接口) | L0 新增类型 + L1 改用 | check 递减 |
-| P1-03 | SDB 全覆盖: 枚举 L5 全部 LLM->动作点, 补 Verifier+Reject | SDB 登记表 + 测试 | BLOCKER 门 |
+| P1-03 | SDB 全覆盖: 枚举 L5 全部 LLM->动作点, 补 Verifier+Reject (先 log-only 烘焙, 逐站点 ADR 翻转 fail-closed, SIM-26 RISK-1) | SDB 登记表 + 测试 | BLOCKER 门 |
 | P1-04 | 编码 5 个新适应度函数 (Pipeline/DocDrift/SecurityMitigation/Confidence/Responsibility) | nt_core_arch_fitness.rs 扩展 | self_test green |
 | P1-05 | Confidence 类型进 nt_core_cross_layer | 类型 + 单测 | doc 同步 |
 | P1-06 | pre-commit 增强 (doc-drift/confidence/security-mitigation) | .githooks + 说明 | 本地可跑 |
