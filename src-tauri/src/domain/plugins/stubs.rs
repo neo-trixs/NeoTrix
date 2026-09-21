@@ -1,4 +1,5 @@
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
+use crate::commands::neotrix_cli::run_cli;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::process::Command as StdCommand;
@@ -716,14 +717,15 @@ impl SystemPlugin {
     fn get_system_info_sync() -> Result<serde_json::Value, DomainError> {
         let platform = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_else(|_| "unknown".into());
         let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_else(|_| "unknown".into());
-        let hostname = hostname::get()
-            .map(|h| h.to_string_lossy().to_string())
-            .unwrap_or_else(|_| "unknown".into());
+        let hostname = std::env::var("HOSTNAME")
+            .unwrap_or_else(|_| "unknown".to_string());
         let uptime_seconds = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        let cpu_count = num_cpus::get();
+        let cpu_count = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
         Ok(serde_json::json!({
             "platform": platform,
             "arch": arch,
@@ -1620,20 +1622,31 @@ impl DomainPlugin for GitPlugin {
 pub struct CliPlugin;
 
 impl CliPlugin {
-    fn run_command(args: &[String]) -> Result<serde_json::Value, DomainError> {
-        let rt = tokio::runtime::Handle::current();
-        let output = rt
-            .block_on(run_cli(args.to_vec()))
-            .map_err(|e| DomainError {
-                code: "CLI_ERROR".into(),
-                message: e,
+    async fn run_command(args: &[String]) -> Result<serde_json::Value, DomainError> {
+        let response = run_cli(args.to_vec()).await;
+        if response.ok {
+            let output = response.data.unwrap_or_else(|| crate::commands::neotrix_cli::CliOutput {
+                success: false,
+                stdout: String::new(),
+                stderr: "No data".to_string(),
+            });
+            Ok(serde_json::json!({
+                "success": output.success,
+                "stdout": output.stdout,
+                "stderr": output.stderr,
+            }))
+        } else {
+            let err = response.error.unwrap_or_else(|| crate::ipc::IpcError {
+                code: "CLI_ERROR".to_string(),
+                message: "Unknown CLI error".to_string(),
                 recoverable: true,
-            })?;
-        Ok(serde_json::json!({
-            "success": output.success,
-            "stdout": output.stdout,
-            "stderr": output.stderr,
-        }))
+            });
+            Err(DomainError {
+                code: err.code,
+                message: err.message,
+                recoverable: err.recoverable,
+            })
+        }
     }
 }
 
@@ -1677,7 +1690,7 @@ impl DomainPlugin for CliPlugin {
                     .unwrap_or_default();
                 let mut full_args = vec![command.to_string()];
                 full_args.extend(cmd_args);
-                Self::run_command(&full_args)
+                Self::run_command(&full_args).await
             }
             "list" => {
                 // Return available CLI commands

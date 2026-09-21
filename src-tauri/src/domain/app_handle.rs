@@ -5,7 +5,7 @@ static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 pub fn set_app_handle(app: AppHandle) {
     if let Err(e) = APP_HANDLE.set(app) {
-        tracing::warn!("app_handle: already set: {e}");
+        tracing::warn!("app_handle: already set: {:?}", e);
     }
 }
 

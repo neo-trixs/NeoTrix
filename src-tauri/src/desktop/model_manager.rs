@@ -518,7 +518,7 @@ impl ModelManager {
         model_name: impl Into<String>,
     ) -> AnyhowResult<DownloadTask> {
         let url = format!(
-            "https://openresearch.ai/api/models/{}/download",
+            crate::constants::OPENRESEARCH_DOWNLOAD_URL,
             model_name.into()
         );
         self.create_download_task(model_id, url, ModelSource::OpenResearch, ModelFormat::GGUF)
@@ -531,7 +531,7 @@ impl ModelManager {
         model_name: impl Into<String>,
     ) -> AnyhowResult<DownloadTask> {
         let url = format!(
-            "http://localhost:1234/api/llm/models/{}/download",
+            crate::constants::LOCALHOST_DOWNLOAD_URL,
             model_name.into()
         );
         self.create_download_task(model_id, url, ModelSource::LMStudio, ModelFormat::GGUF)
@@ -554,7 +554,7 @@ impl ModelManager {
         model_id: impl Into<String>,
         model_name: impl Into<String>,
     ) -> AnyhowResult<DownloadTask> {
-        let url = format!("https://olmx.ai/api/models/{}/download", model_name.into());
+        let url = format!(crate::constants::OLMX_DOWNLOAD_URL, model_name.into());
         self.create_download_task(model_id, url, ModelSource::oMLX, ModelFormat::GGUF)
     }
 

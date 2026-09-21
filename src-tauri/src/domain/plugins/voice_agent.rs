@@ -357,40 +357,44 @@ impl DomainPlugin for VoiceAgentPlugin {
                 description: "Start a new voice session".into(),
                 params: vec![ParamSpec {
                     name: "language".into(),
-                    typ: "string".into(),
-                    required: false,
+                    r#type: "string".into(),
+                    optional: true,
                     description: "Language code (e.g., en-US)".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "stop_session".into(),
                 description: "Stop a voice session".into(),
                 params: vec![ParamSpec {
                     name: "session_id".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Voice session ID".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "start_listening".into(),
                 description: "Start listening for voice input".into(),
                 params: vec![ParamSpec {
                     name: "session_id".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Voice session ID".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "stop_listening".into(),
                 description: "Stop listening for voice input".into(),
                 params: vec![ParamSpec {
                     name: "session_id".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Voice session ID".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "process_input".into(),
@@ -398,17 +402,18 @@ impl DomainPlugin for VoiceAgentPlugin {
                 params: vec![
                     ParamSpec {
                         name: "session_id".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Voice session ID".into(),
                     },
                     ParamSpec {
                         name: "audio_data".into(),
-                        typ: "string".into(),
-                        required: false,
+                        r#type: "string".into(),
+                        optional: true,
                         description: "Base64 encoded audio data".into(),
                     },
                 ],
+                ..Default::default()
             },
             ActionSpec {
                 name: "speak".into(),
@@ -416,32 +421,35 @@ impl DomainPlugin for VoiceAgentPlugin {
                 params: vec![
                     ParamSpec {
                         name: "session_id".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Voice session ID".into(),
                     },
                     ParamSpec {
                         name: "text".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Text to speak".into(),
                     },
                 ],
+                ..Default::default()
             },
             ActionSpec {
                 name: "toggle_mute".into(),
                 description: "Toggle microphone mute".into(),
                 params: vec![ParamSpec {
                     name: "session_id".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Voice session ID".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_stats".into(),
                 description: "Get voice statistics".into(),
                 params: vec![],
+                ..Default::default()
             },
         ]
     }

@@ -41,7 +41,7 @@ pub fn write_atomic(path: &Path, content: &[u8]) -> Result<(), AtomicWriteError>
 }
 
 /// Write JSON content atomically with pretty formatting.
-pub fn write_json_atomic<T: serde::Serialize>(
+pub fn write_json_atomic<T: serde::Serialize + ?Sized>(
     path: &Path,
     value: &T,
 ) -> Result<(), AtomicWriteError> {

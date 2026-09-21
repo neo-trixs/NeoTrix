@@ -41,7 +41,7 @@ impl DesktopCapabilities for TauriDesktopCapabilities {
 
     async fn show_notification(&self, config: NotificationConfig) -> Result<(), String> {
         let manager = self.app.state::<NotificationManager>();
-        manager.show_notification(&config.title, &config.body)
+        manager.show_notification(&config.title, &config.body).map_err(|e| e.to_string())
     }
 
     async fn request_notification_permission(&self) -> Result<bool, String> {
@@ -135,11 +135,23 @@ impl DesktopCapabilities for TauriDesktopCapabilities {
     // ----- 进程 -----
 
     async fn open_url(&self, url: &str) -> Result<(), String> {
-        open::that(url).map_err(|e| e.to_string())
+        #[cfg(target_os = "macos")]
+        { std::process::Command::new("open").arg(url).spawn().map_err(|e| e.to_string())?; }
+        #[cfg(target_os = "linux")]
+        { std::process::Command::new("xdg-open").arg(url).spawn().map_err(|e| e.to_string())?; }
+        #[cfg(target_os = "windows")]
+        { std::process::Command::new("cmd").args(["/C", "start", url]).spawn().map_err(|e| e.to_string())?; }
+        Ok(())
     }
 
     async fn open_file_manager(&self, path: &str) -> Result<(), String> {
-        open::that(path).map_err(|e| e.to_string())
+        #[cfg(target_os = "macos")]
+        { std::process::Command::new("open").arg(path).spawn().map_err(|e| e.to_string())?; }
+        #[cfg(target_os = "linux")]
+        { std::process::Command::new("xdg-open").arg(path).spawn().map_err(|e| e.to_string())?; }
+        #[cfg(target_os = "windows")]
+        { std::process::Command::new("cmd").args(["/C", "explorer", path]).spawn().map_err(|e| e.to_string())?; }
+        Ok(())
     }
 
     async fn exit_app(&self, code: i32) -> Result<(), String> {

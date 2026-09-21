@@ -547,7 +547,7 @@ impl DomainPlugin for LlamacppPlugin {
     ) -> Result<serde_json::Value, DomainError> {
         match action {
             // ---- Process management (requires lock) ----
-            "start" | "stop" | "swap" | "send" => {
+            "start" | "stop" | "swap" => {
                 let mut state = self
                     .state
                     .lock()
@@ -577,49 +577,55 @@ impl DomainPlugin for LlamacppPlugin {
                         start_server(&mut state, model_path)?;
                         Ok(serde_json::json!({ "swapped": true }))
                     }
-                    "send" => {
-                        let messages = args
-                            .get("messages")
-                            .cloned()
-                            .ok_or_else(|| DomainError::from("messages required"))?;
-                        let temperature = args
-                            .get("temperature")
-                            .and_then(|v| v.as_f64())
-                            .unwrap_or(0.7);
-                        let max_tokens = args
-                            .get("max_tokens")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(2048);
-
-                        let port = state.port;
-                        drop(state);
-
-                        let body = serde_json::json!({
-                            "messages": messages,
-                            "temperature": temperature,
-                            "max_tokens": max_tokens,
-                            "stream": false,
-                        });
-
-                        let url = format!("http://127.0.0.1:{port}/v1/chat/completions");
-                        let client = reqwest::Client::new();
-                        let resp = client
-                            .post(&url)
-                            .json(&body)
-                            .timeout(Duration::from_secs(120))
-                            .send()
-                            .await
-                            .map_err(|e| DomainError::from(format!("Request failed: {e}")))?;
-
-                        let json: serde_json::Value = resp
-                            .json()
-                            .await
-                            .map_err(|e| DomainError::from(format!("Parse response: {e}")))?;
-
-                        Ok(json)
-                    }
                     _ => unreachable!(),
                 }
+            }
+            // ---- Send (needs async HTTP, so lock must be dropped before .await) ----
+            "send" => {
+                let messages = args
+                    .get("messages")
+                    .cloned()
+                    .ok_or_else(|| DomainError::from("messages required"))?;
+                let temperature = args
+                    .get("temperature")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.7);
+                let max_tokens = args
+                    .get("max_tokens")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(2048);
+
+                let port = {
+                    let state = self
+                        .state
+                        .lock()
+                        .map_err(|e| DomainError::from(e.to_string()))?;
+                    state.port
+                };
+
+                let body = serde_json::json!({
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": false,
+                });
+
+                let url = format!("http://127.0.0.1:{port}/v1/chat/completions");
+                let client = reqwest::Client::new();
+                let resp = client
+                    .post(&url)
+                    .json(&body)
+                    .timeout(Duration::from_secs(120))
+                    .send()
+                    .await
+                    .map_err(|e| DomainError::from(format!("Request failed: {e}")))?;
+
+                let json: serde_json::Value = resp
+                    .json()
+                    .await
+                    .map_err(|e| DomainError::from(format!("Parse response: {e}")))?;
+
+                Ok(json)
             }
             // ---- Health / models (read-only, needs state) ----
             "health" => {

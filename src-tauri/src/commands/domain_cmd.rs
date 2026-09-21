@@ -18,7 +18,7 @@ pub async fn domain_call(
     domain: String,
     action: String,
     args: serde_json::Value,
-) -> IpcResponse<serde_json::Value> {
+) -> Result<IpcResponse<serde_json::Value>, String> {
     let registry = state.read().await;
     let request = DomainCall {
         domain,
@@ -27,33 +27,33 @@ pub async fn domain_call(
     };
     let resp = registry.call(request).await;
     if resp.ok {
-        IpcResponse::success(resp.data)
+        Ok(IpcResponse::success(resp.data))
     } else {
         let err = resp.error.unwrap_or_else(|| crate::domain::DomainError {
             code: "UNKNOWN".into(),
             message: "Unknown domain error".into(),
             recoverable: true,
         });
-        IpcResponse {
+        Ok(IpcResponse {
             ok: false,
             error: Some(IpcError::new(err.code, err.message)),
             data: None,
-        }
+        })
     }
 }
 
 /// 列出所有已注册域
 #[command]
-pub async fn domain_list(state: State<'_, DomainState>) -> IpcResponse<Vec<DomainInfo>> {
+pub async fn domain_list(state: State<'_, DomainState>) -> Result<IpcResponse<Vec<DomainInfo>>, String> {
     let registry = state.read().await;
-    ipc::ok(registry.list())
+    Ok(ipc::ok(registry.list()))
 }
 
 /// 检查域是否存在
 #[command]
-pub async fn domain_has(state: State<'_, DomainState>, domain: String) -> IpcResponse<bool> {
+pub async fn domain_has(state: State<'_, DomainState>, domain: String) -> Result<IpcResponse<bool>, String> {
     let registry = state.read().await;
-    ipc::ok(registry.has_domain(&domain))
+    Ok(ipc::ok(registry.has_domain(&domain)))
 }
 
 /// 获取域 action 数量
@@ -61,12 +61,12 @@ pub async fn domain_has(state: State<'_, DomainState>, domain: String) -> IpcRes
 pub async fn domain_action_count(
     state: State<'_, DomainState>,
     domain: String,
-) -> IpcResponse<usize> {
+) -> Result<IpcResponse<usize>, String> {
     let registry = state.read().await;
     if registry.has_domain(&domain) {
         let info = registry.list().into_iter().find(|i| i.name == domain);
-        ipc::ok(info.map(|i| i.actions.len()).unwrap_or(0))
+        Ok(ipc::ok(info.map(|i| i.actions.len()).unwrap_or(0)))
     } else {
-        ipc::err("DOMAIN_NOT_FOUND", format!("Domain '{}' not found", domain))
+        Ok(ipc::err("DOMAIN_NOT_FOUND", format!("Domain '{}' not found", domain)))
     }
 }

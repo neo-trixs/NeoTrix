@@ -16,17 +16,17 @@ use tokio::sync::RwLock;
 pub type UnifiedApiState = Arc<RwLock<UnifiedApiImpl>>;
 
 #[command]
-pub async fn unified_init(state: State<'_, UnifiedApiState>) -> IpcResponse<()> {
+pub async fn unified_init(state: State<'_, UnifiedApiState>) -> Result<IpcResponse<()>, String> {
     let mut api = state.write().await;
     *api = UnifiedApiImpl::new();
-    ipc::ok(())
+    Ok(ipc::ok(()))
 }
 
 #[command]
 pub async fn unified_chat(
     state: State<'_, UnifiedApiState>,
     request: UnifiedChatRequest,
-) -> IpcResponse<UnifiedChatResponse> {
+) -> Result<IpcResponse<UnifiedChatResponse>, String> {
     let api = state.read().await;
 
     let unified_request = UnifiedRequest {
@@ -57,11 +57,11 @@ pub async fn unified_chat(
     };
 
     match api.handle(unified_request).await {
-        Ok(response) => ipc::ok(UnifiedChatResponse::from_response(response)),
-        Err(e) => ipc::err(
+        Ok(response) => Ok(ipc::ok(UnifiedChatResponse::from_response(response))),
+        Err(e) => Ok(ipc::err(
             "UNIFIED_CHAT_FAILED",
             format!("Unified API error: {} - {}", e.code, e.message),
-        ),
+        )),
     }
 }
 
@@ -69,7 +69,7 @@ pub async fn unified_chat(
 pub async fn unified_chat_stream(
     state: State<'_, UnifiedApiState>,
     request: UnifiedChatRequest,
-) -> IpcResponse<String> {
+) -> Result<IpcResponse<String>, String> {
     let unified_request = UnifiedRequest {
         session_id: request.session_id,
         input: request.input,
@@ -104,20 +104,20 @@ pub async fn unified_chat_stream(
         let _ = api.handle_stream(unified_request).await;
     });
 
-    ipc::ok(stream_id)
+    Ok(ipc::ok(stream_id))
 }
 
 #[command]
 pub async fn unified_system_state(
     state: State<'_, UnifiedApiState>,
-) -> IpcResponse<UnifiedChatResponse> {
+) -> Result<IpcResponse<UnifiedChatResponse>, String> {
     let api = state.read().await;
     match api.get_system_state().await {
-        Ok(response) => ipc::ok(UnifiedChatResponse::from_response(response)),
-        Err(e) => ipc::err(
+        Ok(response) => Ok(ipc::ok(UnifiedChatResponse::from_response(response))),
+        Err(e) => Ok(ipc::err(
             "UNIFIED_STATE_FAILED",
             format!("Unified API error: {} - {}", e.code, e.message),
-        ),
+        )),
     }
 }
 
@@ -125,28 +125,28 @@ pub async fn unified_system_state(
 pub async fn unified_create_session(
     state: State<'_, UnifiedApiState>,
     project_path: Option<String>,
-) -> IpcResponse<SessionInfo> {
+) -> Result<IpcResponse<SessionInfo>, String> {
     let api = state.read().await;
     match api.create_session(project_path).await {
-        Ok(info) => ipc::ok(info),
-        Err(e) => ipc::err(
+        Ok(info) => Ok(ipc::ok(info)),
+        Err(e) => Ok(ipc::err(
             "SESSION_CREATE_FAILED",
             format!("Unified API error: {} - {}", e.code, e.message),
-        ),
+        )),
     }
 }
 
 #[command]
 pub async fn unified_list_sessions(
     state: State<'_, UnifiedApiState>,
-) -> IpcResponse<Vec<SessionInfo>> {
+) -> Result<IpcResponse<Vec<SessionInfo>>, String> {
     let api = state.read().await;
     match api.list_sessions().await {
-        Ok(sessions) => ipc::ok(sessions),
-        Err(e) => ipc::err(
+        Ok(sessions) => Ok(ipc::ok(sessions)),
+        Err(e) => Ok(ipc::err(
             "SESSION_LIST_FAILED",
             format!("Unified API error: {} - {}", e.code, e.message),
-        ),
+        )),
     }
 }
 
@@ -154,14 +154,14 @@ pub async fn unified_list_sessions(
 pub async fn unified_delete_session(
     state: State<'_, UnifiedApiState>,
     session_id: String,
-) -> IpcResponse<()> {
+) -> Result<IpcResponse<()>, String> {
     let api = state.read().await;
     match api.delete_session(&session_id).await {
-        Ok(()) => ipc::ok(()),
-        Err(e) => ipc::err(
+        Ok(()) => Ok(ipc::ok(())),
+        Err(e) => Ok(ipc::err(
             "SESSION_DELETE_FAILED",
             format!("Unified API error: {} - {}", e.code, e.message),
-        ),
+        )),
     }
 }
 

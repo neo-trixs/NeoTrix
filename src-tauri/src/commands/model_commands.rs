@@ -23,9 +23,9 @@ pub fn new_model_state() -> ModelState {
 
 /// 列出所有本地模型
 #[command]
-pub async fn model_list_local(state: State<'_, ModelState>) -> IpcResponse<Vec<ModelMetadata>> {
+pub async fn model_list_local(state: State<'_, ModelState>) -> Result<IpcResponse<Vec<ModelMetadata>>, String> {
     let manager = state.read().await;
-    ipc::ok(manager.list_models().into_iter().cloned().collect())
+    Ok(ipc::ok(manager.list_models().into_iter().cloned().collect()))
 }
 
 /// 获取模型详情
@@ -33,18 +33,18 @@ pub async fn model_list_local(state: State<'_, ModelState>) -> IpcResponse<Vec<M
 pub async fn model_get_metadata(
     state: State<'_, ModelState>,
     model_id: String,
-) -> IpcResponse<Option<ModelMetadata>> {
+) -> Result<IpcResponse<Option<ModelMetadata>>, String> {
     let manager = state.read().await;
-    ipc::ok(manager.get_model(&model_id).cloned())
+    Ok(ipc::ok(manager.get_model(&model_id).cloned()))
 }
 
 /// 删除本地模型
 #[command]
-pub async fn model_delete_local(state: State<'_, ModelState>, model_id: String) -> IpcResponse<()> {
+pub async fn model_delete_local(state: State<'_, ModelState>, model_id: String) -> Result<IpcResponse<()>, String> {
     let mut manager = state.write().await;
     match manager.delete_model(&model_id).await {
-        Ok(()) => ipc::ok(()),
-        Err(e) => ipc::err("MODEL_DELETE_FAILED", format!("{e}")),
+        Ok(()) => Ok(ipc::ok(())),
+        Err(e) => Ok(ipc::err("MODEL_DELETE_FAILED", format!("{e}"))),
     }
 }
 
@@ -53,39 +53,39 @@ pub async fn model_delete_local(state: State<'_, ModelState>, model_id: String) 
 pub async fn model_validate(
     state: State<'_, ModelState>,
     model_id: String,
-) -> IpcResponse<serde_json::Value> {
+) -> Result<IpcResponse<serde_json::Value>, String> {
     let manager = state.read().await;
     match manager.validate_model(&model_id).await {
-        Ok(result) => ipc::ok(serde_json::json!({
+        Ok(result) => Ok(ipc::ok(serde_json::json!({
             "model_id": result.model_id,
             "sha256_valid": result.sha256_valid,
             "model_json_valid": result.model_json_valid,
             "format_valid": result.format_valid,
             "file_size_matches": result.file_size_matches,
             "overall_valid": result.overall_valid,
-        })),
-        Err(e) => ipc::err("MODEL_VALIDATE_FAILED", e),
+        }))),
+        Err(e) => Ok(ipc::err("MODEL_VALIDATE_FAILED", e)),
     }
 }
 
 /// 扫描本地模型目录
 #[command]
-pub async fn model_scan_local(state: State<'_, ModelState>) -> IpcResponse<Vec<ModelMetadata>> {
+pub async fn model_scan_local(state: State<'_, ModelState>) -> Result<IpcResponse<Vec<ModelMetadata>>, String> {
     let mut manager = state.write().await;
     match manager.scan_local_models().await {
-        Ok(()) => ipc::ok(manager.list_models().into_iter().cloned().collect()),
-        Err(e) => ipc::err("MODEL_SCAN_FAILED", e),
+        Ok(()) => Ok(ipc::ok(manager.list_models().into_iter().cloned().collect())),
+        Err(e) => Ok(ipc::err("MODEL_SCAN_FAILED", e)),
     }
 }
 
 /// 获取模型管理器统计信息
 #[command]
-pub async fn model_stats(state: State<'_, ModelState>) -> IpcResponse<serde_json::Value> {
+pub async fn model_stats(state: State<'_, ModelState>) -> Result<IpcResponse<serde_json::Value>, String> {
     let manager = state.read().await;
     let models = manager.list_models();
     let total_size: u64 = models.iter().map(|m| m.file_size).sum();
 
-    ipc::ok(serde_json::json!({
+    Ok(ipc::ok(serde_json::json!({
         "total_models": models.len(),
         "total_size_bytes": total_size,
         "total_size_mb": total_size / 1024 / 1024,
@@ -94,7 +94,7 @@ pub async fn model_stats(state: State<'_, ModelState>) -> IpcResponse<serde_json
             "onnx": models.iter().filter(|m| m.format == ModelFormat::ONNX).count(),
             "safetensors": models.iter().filter(|m| m.format == ModelFormat::Safetensors).count(),
         },
-    }))
+    })))
 }
 
 /// 搜索模型（按名称）
@@ -102,10 +102,10 @@ pub async fn model_stats(state: State<'_, ModelState>) -> IpcResponse<serde_json
 pub async fn model_search(
     state: State<'_, ModelState>,
     query: String,
-) -> IpcResponse<Vec<ModelMetadata>> {
+) -> Result<IpcResponse<Vec<ModelMetadata>>, String> {
     let manager = state.read().await;
     let query_lower = query.to_lowercase();
-    ipc::ok(
+    Ok(ipc::ok(
         manager
             .list_models()
             .into_iter()
@@ -115,7 +115,7 @@ pub async fn model_search(
             })
             .cloned()
             .collect(),
-    )
+    ))
 }
 
 // ========== 测试 ==========

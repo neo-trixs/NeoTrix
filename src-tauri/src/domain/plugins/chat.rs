@@ -126,7 +126,7 @@ impl ChatPlugin {
         Ok(())
     }
 
-    fn call_llm(&self, content: &str) -> Result<String, DomainError> {
+    async fn call_llm(&self, content: &str) -> Result<String, DomainError> {
         // 发射流开始事件
         if let Some(app) = get_app_handle() {
             if let Err(e) = app.emit("neotrix_stream_start", "") {
@@ -244,7 +244,7 @@ impl ChatPlugin {
 
     /// 流式 LLM 调用：通过 domain_call 统一调用获取流式响应
     /// mpsc::Receiver，逐 token emit neotrix_stream_token 事件，返回完整内容。
-    fn call_llm_stream(&self, content: &str) -> Result<String, DomainError> {
+    async fn call_llm_stream(&self, content: &str) -> Result<String, DomainError> {
         if let Some(app) = get_app_handle() {
             if let Err(e) = app.emit("neotrix_stream_start", "") {
                 tracing::trace!("emit stream_start: {e}");
@@ -274,40 +274,21 @@ impl ChatPlugin {
             "stream": true,
         });
 
-        let rt = tokio::runtime::Handle::current();
-        let mut rx = rt
-            .block_on(async {
-                let registry = self.registry.read().await;
-                registry.call_async("agent", "stream", request).await
-            })
-            .map_err(|e| DomainError::from(anyhow::Error::from(e).context("initiating LLM stream request")))?;
-
         let mut full_content = String::new();
 
-        // 逐 token 接收并 emit 事件
-        rt.block_on(async {
-            while let Some(result) = rx.recv().await {
-                match result {
-                    Ok(response) => {
-                        let token = response["content"].as_str().unwrap_or("");
-                        full_content.push_str(token);
-                        if let Some(app) = get_app_handle() {
-                            if let Err(e) = app.emit("neotrix_stream_token", token) {
-                                tracing::trace!("emit stream_token: {e}");
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if let Some(app) = get_app_handle() {
-                            if let Err(e) = app.emit("neotrix_stream_error", e.to_string()) {
-                                tracing::trace!("emit stream_error: {e}");
-                            }
-                        }
-                        break;
-                    }
-                }
+        let response = {
+                let registry = self.registry.read().await;
+                registry.call_async("agent", "stream", request).await
             }
-        });
+            .map_err(|e| DomainError::from(anyhow::Error::from(e).context("initiating LLM stream request")))?;
+
+        let token = response["content"].as_str().unwrap_or("");
+        full_content.push_str(token);
+        if let Some(app) = get_app_handle() {
+            if let Err(e) = app.emit("neotrix_stream_token", token) {
+                tracing::trace!("emit stream_token: {e}");
+            }
+        }
 
         // 流结束
         if let Some(app) = get_app_handle() {
@@ -487,7 +468,7 @@ impl DomainPlugin for ChatPlugin {
                     .map_err(|e| DomainError::from(anyhow::Error::from(e).context("saving user message")))?;
 
                 // 调用本地 LLM
-                let assistant_content = self.call_llm(content)
+                let assistant_content = self.call_llm(content).await
                     .map_err(|e| DomainError::from(anyhow::Error::from(e).context("calling LLM for completion")))?;
 
                 // 保存助手消息
@@ -528,7 +509,7 @@ impl DomainPlugin for ChatPlugin {
                     .map_err(|e| DomainError::from(anyhow::Error::from(e).context("saving user message for stream")))?;
 
                 // 流式调用 LLM
-                let assistant_content = self.call_llm_stream(content)
+                let assistant_content = self.call_llm_stream(content).await
                     .map_err(|e| DomainError::from(anyhow::Error::from(e).context("calling LLM stream")))?;
 
                 // 保存助手消息
@@ -596,14 +577,12 @@ impl DomainPlugin for ChatPlugin {
             }
             "regenerate" => Ok(serde_json::json!({ "ok": true })),
             "provider_health" => {
-                let rt = tokio::runtime::Handle::current();
-                let status_list = rt
-                    .block_on(async {
+                let status_list = {
                         let registry = self.registry.read().await;
                         registry
                             .call_async("agent", "provider_status", serde_json::json!({}))
                             .await
-                    })
+                    }
                     .unwrap_or_else(|_| serde_json::json!([]));
 
                 let providers = status_list

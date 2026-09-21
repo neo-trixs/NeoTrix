@@ -276,11 +276,11 @@ pub async fn check_connectivity(label: &str) -> AnyhowResult<String> {
         .base_url
         .as_deref()
         .unwrap_or(match entry.provider.as_str() {
-            "openai" => "https://api.openai.com",
-            "anthropic" => "https://api.anthropic.com",
-            "ollama" => "http://localhost:11434",
-            "siliconflow" => "https://api.siliconflow.cn",
-            _ => "https://api.openai.com",
+            "openai" => crate::constants::OPENAI_API_BASE,
+            "anthropic" => crate::constants::ANTHROPIC_API_BASE,
+            "ollama" => crate::constants::OLLAMA_API_BASE,
+            "siliconflow" => crate::constants::SILICONFLOW_API_BASE,
+            _ => crate::constants::OPENAI_API_BASE,
         });
 
     match reqwest::Client::new()

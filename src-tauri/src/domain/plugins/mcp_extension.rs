@@ -359,27 +359,29 @@ impl DomainPlugin for McpExtensionPlugin {
                 params: vec![
                     ParamSpec {
                         name: "name".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Package name".into(),
                     },
                     ParamSpec {
                         name: "version".into(),
-                        typ: "string".into(),
-                        required: false,
+                        r#type: "string".into(),
+                        optional: true,
                         description: "Version (default: latest)".into(),
                     },
                 ],
+                ..Default::default()
             },
             ActionSpec {
                 name: "uninstall".into(),
                 description: "Uninstall an MCP extension package".into(),
                 params: vec![ParamSpec {
                     name: "name".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Package name".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "toggle".into(),
@@ -387,57 +389,63 @@ impl DomainPlugin for McpExtensionPlugin {
                 params: vec![
                     ParamSpec {
                         name: "name".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Package name".into(),
                     },
                     ParamSpec {
                         name: "enabled".into(),
-                        typ: "boolean".into(),
-                        required: true,
+                        r#type: "boolean".into(),
+                        optional: false,
                         description: "Enable or disable".into(),
                     },
                 ],
+                ..Default::default()
             },
             ActionSpec {
                 name: "start".into(),
                 description: "Start a package runtime".into(),
                 params: vec![ParamSpec {
                     name: "name".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Package name".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "stop".into(),
                 description: "Stop a package runtime".into(),
                 params: vec![ParamSpec {
                     name: "name".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Package name".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "list".into(),
                 description: "List installed packages".into(),
                 params: vec![],
+                ..Default::default()
             },
             ActionSpec {
                 name: "search".into(),
                 description: "Search the package registry".into(),
                 params: vec![ParamSpec {
                     name: "query".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Search query".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_stats".into(),
                 description: "Get extension statistics".into(),
                 params: vec![],
+                ..Default::default()
             },
         ]
     }

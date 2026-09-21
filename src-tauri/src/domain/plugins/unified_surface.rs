@@ -262,8 +262,9 @@ impl UnifiedSurfacePlugin {
         })?;
 
         // Record switch
+        let prev_mode = state.current_mode.clone();
         state.mode_history.push(ModeSwitch {
-            from: state.current_mode.clone(),
+            from: prev_mode,
             to: target.clone(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             reason,
@@ -272,11 +273,14 @@ impl UnifiedSurfacePlugin {
         state.current_mode = target;
 
         // Update panel visibility based on mode config
-        if let Some(config) = state.modes.get(&state.current_mode) {
-            state.panels.file_panel = config.show_file_panel;
-            state.panels.terminal = config.show_terminal;
-            state.panels.browser = config.show_browser;
-        }
+        let (file_panel, terminal, browser) = if let Some(config) = state.modes.get(&state.current_mode) {
+            (config.show_file_panel, config.show_terminal, config.show_browser)
+        } else {
+            (state.panels.file_panel, state.panels.terminal, state.panels.browser)
+        };
+        state.panels.file_panel = file_panel;
+        state.panels.terminal = terminal;
+        state.panels.browser = browser;
 
         Ok(state.clone())
     }
@@ -316,59 +320,66 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                 params: vec![
                     ParamSpec {
                         name: "mode".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Target mode: chat, work, or code".into(),
                     },
                     ParamSpec {
                         name: "reason".into(),
-                        typ: "string".into(),
-                        required: false,
+                        r#type: "string".into(),
+                        optional: true,
                         description: "Reason for switching".into(),
                     },
                 ],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_state".into(),
                 description: "Get current surface state".into(),
                 params: vec![],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_mode_config".into(),
                 description: "Get configuration for a specific mode".into(),
                 params: vec![ParamSpec {
                     name: "mode".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Mode to get config for".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "toggle_panel".into(),
                 description: "Toggle panel visibility".into(),
                 params: vec![ParamSpec {
                     name: "panel".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description:
                         "Panel name: file_panel, terminal, browser, memory, skills, automations"
                             .into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_sessions".into(),
                 description: "Get sessions for current mode".into(),
                 params: vec![],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_mode_history".into(),
                 description: "Get mode switch history".into(),
                 params: vec![],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_stats".into(),
                 description: "Get surface statistics".into(),
                 params: vec![],
+                ..Default::default()
             },
         ]
     }

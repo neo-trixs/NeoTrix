@@ -19,7 +19,7 @@ pub struct DshMarketConfig {
 impl Default for DshMarketConfig {
     fn default() -> Self {
         Self {
-            api_endpoint: "https://dshfind.com/api".into(),
+            api_endpoint: crate::constants::DSHFIND_API_BASE.into(),
             auth_token: None,
             cache_ttl_secs: 3600,
         }

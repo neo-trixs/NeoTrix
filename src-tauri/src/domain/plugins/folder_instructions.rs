@@ -320,50 +320,56 @@ impl DomainPlugin for FolderInstructionsPlugin {
                 description: "Load project context from a directory".into(),
                 params: vec![ParamSpec {
                     name: "root_path".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Project root path".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "unload_project".into(),
                 description: "Unload a project context".into(),
                 params: vec![ParamSpec {
                     name: "root_path".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Project root path".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_context".into(),
                 description: "Get merged context for a project".into(),
                 params: vec![ParamSpec {
                     name: "root_path".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Project root path".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "list_projects".into(),
                 description: "List all loaded projects".into(),
                 params: vec![],
+                ..Default::default()
             },
             ActionSpec {
                 name: "set_global_instructions".into(),
                 description: "Set global instructions applied to all projects".into(),
                 params: vec![ParamSpec {
                     name: "instructions".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Instructions content".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_stats".into(),
                 description: "Get folder instructions statistics".into(),
                 params: vec![],
+                ..Default::default()
             },
         ]
     }

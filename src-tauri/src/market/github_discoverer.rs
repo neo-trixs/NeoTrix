@@ -19,7 +19,7 @@ impl Default for GitHubConfig {
     fn default() -> Self {
         Self {
             token: None,
-            api_base: "https://api.github.com".into(),
+            api_base: crate::constants::GITHUB_API_BASE.into(),
         }
     }
 }

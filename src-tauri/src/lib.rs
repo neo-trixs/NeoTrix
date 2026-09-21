@@ -2,11 +2,11 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(clippy::all, clippy::pedantic, clippy::dbg_macro, clippy::print_stdout, clippy::print_stderr)]
 #![allow(
-    reason = "pedantic false-positives in Tauri plugin boilerplate",
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
     clippy::missing_errors_doc,
-    clippy::missing_panics_doc
+    clippy::missing_panics_doc,
+    reason = "pedantic false-positives in Tauri plugin boilerplate"
 )]
 
 pub(crate) mod agent_identity;
@@ -17,6 +17,7 @@ pub(crate) mod bot;
 pub mod browser_host;
 pub mod commands;
 pub mod config;
+pub mod constants;
 pub mod db_pool;
 pub(crate) mod debouncer;
 pub mod desktop;

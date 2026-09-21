@@ -125,7 +125,7 @@ impl MarketEngine {
         if self.config.dsh_enabled {
             match self.dsh.search(query, category, page, per_page).await {
                 Ok(result) => results.push(result),
-                Err(e) => eprintln!("[market] DSH search error: {e}"),
+                Err(e) => tracing::warn!("[market] DSH search error: {e}"),
             }
         }
 
@@ -133,7 +133,7 @@ impl MarketEngine {
         if self.config.github_enabled {
             match self.github.search(query, page, per_page).await {
                 Ok(result) => results.push(result),
-                Err(e) => eprintln!("[market] GitHub search error: {e}"),
+                Err(e) => tracing::warn!("[market] GitHub search error: {e}"),
             }
         }
 
@@ -226,7 +226,7 @@ impl MarketEngine {
                             .await
                         {
                             Ok(u) => updates.extend(u),
-                            Err(e) => eprintln!("[market] Check updates for {}: {e}", plugin_id),
+                            Err(e) => tracing::warn!("[market] Check updates for {}: {e}", plugin_id),
                         }
                     }
                 }
@@ -238,7 +238,7 @@ impl MarketEngine {
                             .await
                         {
                             Ok(u) => updates.extend(u),
-                            Err(e) => eprintln!("[market] Check updates for {}: {e}", plugin_id),
+                            Err(e) => tracing::warn!("[market] Check updates for {}: {e}", plugin_id),
                         }
                     }
                 }

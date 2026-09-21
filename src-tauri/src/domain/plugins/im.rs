@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri::Emitter;
 
 // ═══════════════════════════════════════════════
@@ -503,17 +503,17 @@ pub enum TimeoutRecoveryStatus {
 
 pub struct ImPlugin {
     config_path: PathBuf,
-    timeout_recovery: Arc<Mutex<HashMap<String, TimeoutRecoveryState>>>,
+    timeout_recovery: Arc<tokio::sync::Mutex<HashMap<String, TimeoutRecoveryState>>>,
     timeout_config: TimeoutRecoveryConfig,
     registry: Arc<tokio::sync::RwLock<DomainRegistry>>,
     /// 消息处理状态（用于幂等处理）
-    message_states: Arc<Mutex<HashMap<String, MessageProcessingState>>>,
+    message_states: Arc<tokio::sync::Mutex<HashMap<String, MessageProcessingState>>>,
     /// 机器人间消息队列
-    bot_message_queue: Arc<Mutex<Vec<BotMessage>>>,
+    bot_message_queue: Arc<tokio::sync::Mutex<Vec<BotMessage>>>,
     /// 工作流模板
-    workflow_templates: Arc<Mutex<HashMap<String, WorkflowTemplate>>>,
+    workflow_templates: Arc<tokio::sync::Mutex<HashMap<String, WorkflowTemplate>>>,
     /// 用户身份映射（channel_user_id -> global_user_id）
-    identity_map: Arc<Mutex<HashMap<String, String>>>,
+    identity_map: Arc<tokio::sync::Mutex<HashMap<String, String>>>,
 }
 
 impl ImPlugin {
@@ -524,22 +524,19 @@ impl ImPlugin {
 
         Self {
             config_path,
-            timeout_recovery: Arc::new(Mutex::new(HashMap::new())),
+            timeout_recovery: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             timeout_config: TimeoutRecoveryConfig::default(),
             registry,
-            message_states: Arc::new(Mutex::new(HashMap::new())),
-            bot_message_queue: Arc::new(Mutex::new(Vec::new())),
-            workflow_templates: Arc::new(Mutex::new(HashMap::new())),
-            identity_map: Arc::new(Mutex::new(HashMap::new())),
+            message_states: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            bot_message_queue: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+            workflow_templates: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            identity_map: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         }
     }
 
     /// 检查消息是否已处理（幂等性检查）
-    fn is_message_processed(&self, message_id: &str) -> bool {
-        let states = self
-            .message_states
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+    async fn is_message_processed(&self, message_id: &str) -> bool {
+        let states = self.message_states.lock().await;
         states
             .get(message_id)
             .map(|s| s.status == ProcessingStatus::Completed)
@@ -547,11 +544,8 @@ impl ImPlugin {
     }
 
     /// 记录消息处理状态
-    fn record_message_state(&self, message_id: &str, status: ProcessingStatus) {
-        let mut states = self
-            .message_states
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+    async fn record_message_state(&self, message_id: &str, status: ProcessingStatus) {
+        let mut states = self.message_states.lock().await;
         let now = chrono::Utc::now().timestamp() as u64;
 
         let state =
@@ -574,9 +568,9 @@ impl ImPlugin {
     }
 
     /// 获取全局用户 ID（五层身份模型）
-    fn get_global_user_id(&self, channel: &ChannelType, channel_user_id: &str) -> String {
+    async fn get_global_user_id(&self, channel: &ChannelType, channel_user_id: &str) -> String {
         let key = format!("{}:{}", channel, channel_user_id);
-        let mut map = self.identity_map.lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = self.identity_map.lock().await;
 
         map.get(&key).cloned().unwrap_or_else(|| {
             let global_id = format!("user-{}", uuid::Uuid::new_v4().to_string()[..8]);
@@ -586,22 +580,15 @@ impl ImPlugin {
     }
 
     /// 发送机器人间消息
-    fn send_bot_message(&self, message: BotMessage) -> Result<(), DomainError> {
-        let mut queue = self.bot_message_queue.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("获取机器人消息队列锁失败: {}", e),
-            recoverable: true,
-        })?;
+    async fn send_bot_message(&self, message: BotMessage) -> Result<(), DomainError> {
+        let mut queue = self.bot_message_queue.lock().await;
         queue.push(message);
         Ok(())
     }
 
     /// 接收机器人间消息
-    fn receive_bot_messages(&self, bot_id: &str) -> Vec<BotMessage> {
-        let mut queue = self
-            .bot_message_queue
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+    async fn receive_bot_messages(&self, bot_id: &str) -> Vec<BotMessage> {
+        let mut queue = self.bot_message_queue.lock().await;
         let mut received = Vec::new();
         let mut remaining = Vec::new();
 
@@ -618,31 +605,21 @@ impl ImPlugin {
     }
 
     /// 保存工作流模板
-    fn save_workflow_template(&self, template: WorkflowTemplate) -> Result<(), DomainError> {
-        let mut templates = self.workflow_templates.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("获取工作流模板锁失败: {}", e),
-            recoverable: true,
-        })?;
+    async fn save_workflow_template(&self, template: WorkflowTemplate) -> Result<(), DomainError> {
+        let mut templates = self.workflow_templates.lock().await;
         templates.insert(template.id.clone(), template);
         Ok(())
     }
 
     /// 获取工作流模板
-    fn get_workflow_template(&self, template_id: &str) -> Option<WorkflowTemplate> {
-        let templates = self
-            .workflow_templates
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+    async fn get_workflow_template(&self, template_id: &str) -> Option<WorkflowTemplate> {
+        let templates = self.workflow_templates.lock().await;
         templates.get(template_id).cloned()
     }
 
     /// 列出所有工作流模板
-    fn list_workflow_templates(&self) -> Vec<WorkflowTemplate> {
-        let templates = self
-            .workflow_templates
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+    async fn list_workflow_templates(&self) -> Vec<WorkflowTemplate> {
+        let templates = self.workflow_templates.lock().await;
         templates.values().cloned().collect()
     }
 
@@ -707,12 +684,8 @@ impl ImPlugin {
     }
 
     /// 处理超时恢复
-    fn handle_timeout_recovery(&self, bot_id: &str, message_id: &str) -> Result<(), DomainError> {
-        let mut state = self.timeout_recovery.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("获取超时恢复锁失败: {}", e),
-            recoverable: true,
-        })?;
+    async fn handle_timeout_recovery(&self, bot_id: &str, message_id: &str) -> Result<(), DomainError> {
+        let mut state = self.timeout_recovery.lock().await;
 
         let entry = state
             .entry(message_id.to_string())
@@ -1864,11 +1837,8 @@ impl DomainPlugin for ImPlugin {
                     recoverable: true,
                 })?;
 
-                let rt = tokio::runtime::Handle::current();
-                let message_id = rt.block_on(async {
-                    self.send_to_channel(&channel_type, bot_id, chat_id, content)
-                        .await
-                })?;
+                let message_id = self.send_to_channel(&channel_type, bot_id, chat_id, content)
+                    .await?;
 
                 Ok(serde_json::json!({
                     "message_id": message_id,
@@ -1918,11 +1888,8 @@ impl DomainPlugin for ImPlugin {
                     recoverable: true,
                 })?;
 
-                let rt = tokio::runtime::Handle::current();
-                let message_id = rt.block_on(async {
-                    self.send_streaming(&channel_type, bot_id, chat_id, content)
-                        .await
-                })?;
+                let message_id = self.send_streaming(&channel_type, bot_id, chat_id, content)
+                    .await?;
 
                 Ok(serde_json::json!({
                     "message_id": message_id,
@@ -2056,11 +2023,7 @@ impl DomainPlugin for ImPlugin {
 
             // 超时恢复
             "timeout_recovery_status" => {
-                let state = self.timeout_recovery.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: format!("获取超时恢复锁失败: {}", e),
-                    recoverable: true,
-                })?;
+                let state = self.timeout_recovery.lock().await;
                 let states: Vec<&TimeoutRecoveryState> = state.values().collect();
                 Ok(serde_json::json!(states))
             }
@@ -2083,13 +2046,9 @@ impl DomainPlugin for ImPlugin {
                             recoverable: true,
                         })?;
 
-                self.handle_timeout_recovery(bot_id, message_id)?;
+                self.handle_timeout_recovery(bot_id, message_id).await?;
 
-                let state = self.timeout_recovery.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: format!("获取超时恢复锁失败: {}", e),
-                    recoverable: true,
-                })?;
+                let state = self.timeout_recovery.lock().await;
 
                 state
                     .get(message_id)
@@ -2176,7 +2135,7 @@ impl DomainPlugin for ImPlugin {
                 })?;
 
                 // 幂等性检查
-                if self.is_message_processed(&envelope.id) {
+                if self.is_message_processed(&envelope.id).await {
                     return Ok(serde_json::json!({
                         "status": "already_processed",
                         "message_id": envelope.id,
@@ -2217,7 +2176,7 @@ impl DomainPlugin for ImPlugin {
                             recoverable: true,
                         })?;
 
-                let processed = self.is_message_processed(message_id);
+                let processed = self.is_message_processed(message_id).await;
                 Ok(serde_json::json!(processed))
             }
 
@@ -2248,7 +2207,7 @@ impl DomainPlugin for ImPlugin {
                     recoverable: true,
                 })?;
 
-                let global_user_id = self.get_global_user_id(&channel_type, channel_user_id);
+                let global_user_id = self.get_global_user_id(&channel_type, channel_user_id).await;
 
                 let identity = IdentityLayers {
                     channel_user_id: channel_user_id.to_string(),
@@ -2323,7 +2282,7 @@ impl DomainPlugin for ImPlugin {
                     timestamp: chrono::Utc::now().timestamp() as u64,
                 };
 
-                self.send_bot_message(message.clone())?;
+                self.send_bot_message(message.clone()).await?;
 
                 // 发射事件到前端
                 if let Some(app) = get_app_handle() {
@@ -2350,7 +2309,7 @@ impl DomainPlugin for ImPlugin {
                             recoverable: true,
                         })?;
 
-                let messages = self.receive_bot_messages(bot_id);
+                let messages = self.receive_bot_messages(bot_id).await;
                 Ok(serde_json::json!(messages))
             }
 
@@ -2395,8 +2354,9 @@ impl DomainPlugin for ImPlugin {
                     recoverable: true,
                 })?;
 
+                let short_id = uuid::Uuid::new_v4().to_string();
                 let template = WorkflowTemplate {
-                    id: format!("wf-{}", uuid::Uuid::new_v4().to_string()[..8]),
+                    id: format!("wf-{}", &short_id[..8]),
                     name: name.to_string(),
                     description: description.to_string(),
                     steps,
@@ -2406,7 +2366,7 @@ impl DomainPlugin for ImPlugin {
                     use_count: 0,
                 };
 
-                self.save_workflow_template(template.clone())?;
+                self.save_workflow_template(template.clone()).await?;
 
                 Ok(serde_json::json!(template))
             }
@@ -2422,6 +2382,7 @@ impl DomainPlugin for ImPlugin {
                     })?;
 
                 self.get_workflow_template(workflow_id)
+                    .await
                     .map(|t| Ok(serde_json::json!(t)))
                     .unwrap_or_else(|| {
                         Err(DomainError {
@@ -2433,7 +2394,7 @@ impl DomainPlugin for ImPlugin {
             }
 
             "list_workflows" => {
-                let templates = self.list_workflow_templates();
+                let templates = self.list_workflow_templates().await;
                 Ok(serde_json::json!(templates))
             }
 
@@ -2449,6 +2410,7 @@ impl DomainPlugin for ImPlugin {
 
                 let mut template =
                     self.get_workflow_template(workflow_id)
+                        .await
                         .ok_or_else(|| DomainError {
                             code: "NOT_FOUND".into(),
                             message: format!("工作流不存在: {}", workflow_id),
@@ -2458,7 +2420,7 @@ impl DomainPlugin for ImPlugin {
                 // 更新使用统计
                 template.last_used = Some(chrono::Utc::now().timestamp() as u64);
                 template.use_count += 1;
-                self.save_workflow_template(template.clone())?;
+                self.save_workflow_template(template.clone()).await?;
 
                 // 发射事件到前端
                 if let Some(app) = get_app_handle() {

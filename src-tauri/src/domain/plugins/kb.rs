@@ -429,7 +429,7 @@ impl DomainPlugin for KbPlugin {
                                 message: format!("查询失败: {}", e),
                                 recoverable: true,
                             })?;
-                    stmt.query_map([], |row| {
+                    let mapped = stmt.query_map([], |row| {
                         Ok((
                             row.get::<_, String>(0)?,
                             row.get::<_, String>(1)?,
@@ -440,9 +440,9 @@ impl DomainPlugin for KbPlugin {
                         code: "DB_ERROR".into(),
                         message: format!("查询失败: {}", e),
                         recoverable: true,
-                    })?
-                    .filter_map(|r| r.ok())
-                    .collect()
+                    })?;
+                    let collected: Vec<_> = mapped.filter_map(|r| r.ok()).collect();
+                    collected
                 };
                 conn.execute("DELETE FROM nodes_fts", []).ok();
                 let mut reindexed = 0;

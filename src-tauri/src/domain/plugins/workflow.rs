@@ -3,7 +3,7 @@ use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use tokio::sync::RwLock;
 
 /// 工作流定义
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -44,8 +44,8 @@ pub struct WorkflowRun {
 /// 工作流域插件
 pub struct WorkflowPluginImpl {
     db_path: PathBuf,
-    workflows: Mutex<HashMap<String, Workflow>>,
-    runs: Mutex<HashMap<String, WorkflowRun>>,
+    workflows: RwLock<HashMap<String, Workflow>>,
+    runs: RwLock<HashMap<String, WorkflowRun>>,
 }
 
 impl WorkflowPluginImpl {
@@ -67,17 +67,13 @@ impl WorkflowPluginImpl {
 
         Self {
             db_path,
-            workflows: Mutex::new(workflows),
-            runs: Mutex::new(HashMap::new()),
+            workflows: RwLock::new(workflows),
+            runs: RwLock::new(HashMap::new()),
         }
     }
 
-    fn get_runs(&self, workflow_id: Option<&str>) -> Result<serde_json::Value, DomainError> {
-        let runs = self.runs.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: e.to_string(),
-            recoverable: true,
-        })?;
+    async fn get_runs(&self, workflow_id: Option<&str>) -> Result<serde_json::Value, DomainError> {
+        let runs = self.runs.read().await;
         let filtered: Vec<&WorkflowRun> = match workflow_id {
             Some(wid) => runs.values().filter(|r| r.workflow_id == wid).collect(),
             None => runs.values().collect(),
@@ -85,13 +81,9 @@ impl WorkflowPluginImpl {
         Ok(serde_json::json!({ "runs": filtered }))
     }
 
-    fn save_workflows(&self) -> Result<(), DomainError> {
+    async fn save_workflows(&self) -> Result<(), DomainError> {
         let snapshot = {
-            let workflows = self.workflows.lock().map_err(|e| DomainError {
-                code: "LOCK_ERROR".into(),
-                message: e.to_string(),
-                recoverable: true,
-            })?;
+            let workflows = self.workflows.read().await;
             workflows.clone()
         };
 
@@ -182,11 +174,7 @@ impl DomainPlugin for WorkflowPluginImpl {
     ) -> Result<serde_json::Value, DomainError> {
         match action {
             "list" => {
-                let workflows = self.workflows.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let workflows = self.workflows.read().await;
                 let list: Vec<&Workflow> = workflows.values().collect();
                 Ok(serde_json::json!(list))
             }
@@ -199,11 +187,7 @@ impl DomainPlugin for WorkflowPluginImpl {
                         message: "missing 'id'".into(),
                         recoverable: true,
                     })?;
-                let workflows = self.workflows.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let workflows = self.workflows.read().await;
                 match workflows.get(id) {
                     Some(w) => Ok(serde_json::json!(w)),
                     None => Err(DomainError {
@@ -247,14 +231,10 @@ impl DomainPlugin for WorkflowPluginImpl {
                     tags,
                 };
 
-                let mut workflows = self.workflows.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let mut workflows = self.workflows.write().await;
                 workflows.insert(workflow.id.clone(), workflow.clone());
                 drop(workflows);
-                self.save_workflows()?;
+                self.save_workflows().await?;
 
                 Ok(serde_json::json!(workflow))
             }
@@ -267,11 +247,7 @@ impl DomainPlugin for WorkflowPluginImpl {
                         message: "missing 'id'".into(),
                         recoverable: true,
                     })?;
-                let mut workflows = self.workflows.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let mut workflows = self.workflows.write().await;
                 let workflow = workflows.get_mut(id).ok_or_else(|| DomainError {
                     code: "NOT_FOUND".into(),
                     message: format!("Workflow {} not found", id),
@@ -292,7 +268,7 @@ impl DomainPlugin for WorkflowPluginImpl {
 
                 let updated = workflow.clone();
                 drop(workflows);
-                self.save_workflows()?;
+                self.save_workflows().await?;
 
                 Ok(serde_json::json!(updated))
             }
@@ -305,14 +281,10 @@ impl DomainPlugin for WorkflowPluginImpl {
                         message: "missing 'id'".into(),
                         recoverable: true,
                     })?;
-                let mut workflows = self.workflows.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let mut workflows = self.workflows.write().await;
                 workflows.remove(id);
                 drop(workflows);
-                self.save_workflows()?;
+                self.save_workflows().await?;
                 Ok(serde_json::json!({ "ok": true }))
             }
             "run" => {
@@ -327,11 +299,7 @@ impl DomainPlugin for WorkflowPluginImpl {
 
                 // 验证工作流存在
                 {
-                    let workflows = self.workflows.lock().map_err(|e| DomainError {
-                        code: "LOCK_ERROR".into(),
-                        message: e.to_string(),
-                        recoverable: true,
-                    })?;
+                    let workflows = self.workflows.read().await;
                     if !workflows.contains_key(workflow_id) {
                         return Err(DomainError {
                             code: "NOT_FOUND".into(),
@@ -352,11 +320,7 @@ impl DomainPlugin for WorkflowPluginImpl {
                     results: HashMap::new(),
                 };
 
-                let mut runs = self.runs.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let mut runs = self.runs.write().await;
                 runs.insert(run_id.clone(), run.clone());
 
                 Ok(serde_json::json!(run))
@@ -370,11 +334,7 @@ impl DomainPlugin for WorkflowPluginImpl {
                             message: "missing 'run_id'".into(),
                             recoverable: true,
                         })?;
-                let runs = self.runs.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let runs = self.runs.read().await;
                 match runs.get(run_id) {
                     Some(r) => Ok(serde_json::json!(r)),
                     None => Err(DomainError {
@@ -393,11 +353,7 @@ impl DomainPlugin for WorkflowPluginImpl {
                             message: "missing 'run_id'".into(),
                             recoverable: true,
                         })?;
-                let mut runs = self.runs.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: e.to_string(),
-                    recoverable: true,
-                })?;
+                let mut runs = self.runs.write().await;
                 if let Some(run) = runs.get_mut(run_id) {
                     run.status = "cancelled".to_string();
                     Ok(serde_json::json!({ "ok": true }))
@@ -411,7 +367,7 @@ impl DomainPlugin for WorkflowPluginImpl {
             }
             "runs" => {
                 let workflow_id = args.get("workflow_id").and_then(|v| v.as_str());
-                self.get_runs(workflow_id)
+                self.get_runs(workflow_id).await
             }
             _ => Err(DomainError {
                 code: "UNKNOWN_ACTION".into(),

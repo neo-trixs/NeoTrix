@@ -44,7 +44,7 @@ pub enum SyncStatus {
 }
 
 /// Conflict resolution
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConflictResolution {
     pub field: String,
     pub local_value: serde_json::Value,
@@ -148,9 +148,8 @@ impl SessionSyncPlugin {
                 sessions: HashMap::new(),
                 devices: vec![DeviceInfo {
                     device_id: device_id.clone(),
-                    device_name: hostname::get()
-                        .map(|h| h.to_string_lossy().to_string())
-                        .unwrap_or_else(|_| "Unknown".to_string()),
+                    device_name: std::env::var("HOSTNAME")
+                        .unwrap_or_else(|_| "unknown".to_string()),
                     device_type: "desktop".to_string(),
                     platform: std::env::consts::OS.to_string(),
                     last_sync: None,
@@ -208,6 +207,8 @@ impl SessionSyncPlugin {
             recoverable: false,
         })?;
 
+        let device_id = state.current_device_id.clone();
+
         let session = state
             .sessions
             .get_mut(session_id)
@@ -236,7 +237,7 @@ impl SessionSyncPlugin {
         // Increment vector clock
         let clock = session
             .vector_clock
-            .entry(state.current_device_id.clone())
+            .entry(device_id)
             .or_insert(0);
         *clock += 1;
 
@@ -348,17 +349,18 @@ impl DomainPlugin for SessionSyncPlugin {
                 params: vec![
                     ParamSpec {
                         name: "mode".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Session mode: chat, work, or code".into(),
                     },
                     ParamSpec {
                         name: "title".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Session title".into(),
                     },
                 ],
+                ..Default::default()
             },
             ActionSpec {
                 name: "add_message".into(),
@@ -366,58 +368,64 @@ impl DomainPlugin for SessionSyncPlugin {
                 params: vec![
                     ParamSpec {
                         name: "session_id".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Session ID".into(),
                     },
                     ParamSpec {
                         name: "role".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Message role: user, assistant, or system".into(),
                     },
                     ParamSpec {
                         name: "content".into(),
-                        typ: "string".into(),
-                        required: true,
+                        r#type: "string".into(),
+                        optional: false,
                         description: "Message content".into(),
                     },
                 ],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_sessions".into(),
                 description: "Get all synced sessions".into(),
                 params: vec![],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_session".into(),
                 description: "Get a specific session by ID".into(),
                 params: vec![ParamSpec {
                     name: "session_id".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Session ID".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "delete_session".into(),
                 description: "Delete a session".into(),
                 params: vec![ParamSpec {
                     name: "session_id".into(),
-                    typ: "string".into(),
-                    required: true,
+                    r#type: "string".into(),
+                    optional: false,
                     description: "Session ID".into(),
                 }],
+                ..Default::default()
             },
             ActionSpec {
                 name: "sync".into(),
                 description: "Sync all sessions with remote".into(),
                 params: vec![],
+                ..Default::default()
             },
             ActionSpec {
                 name: "get_stats".into(),
                 description: "Get sync statistics".into(),
                 params: vec![],
+                ..Default::default()
             },
         ]
     }

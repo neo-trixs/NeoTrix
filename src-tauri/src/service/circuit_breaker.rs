@@ -121,6 +121,10 @@ impl CircuitBreakerManager {
 
     /// 记录请求失败
     pub fn record_failure(&mut self, provider_id: &str) {
+        let failure_threshold = self.config.failure_threshold;
+        let cooldown_multiplier = self.config.cooldown_multiplier;
+        let max_cooldown_seconds = self.config.max_cooldown_seconds;
+
         let breaker = self.get_or_create(provider_id);
         breaker.consecutive_failures += 1;
 
@@ -131,11 +135,11 @@ impl CircuitBreakerManager {
 
         breaker.last_failure = Some(now.to_string());
 
-        if breaker.consecutive_failures >= self.config.failure_threshold {
+        if breaker.consecutive_failures >= failure_threshold {
             // 触发断路
             let cooldown =
-                (breaker.cooldown_minutes as f64 * self.config.cooldown_multiplier) as u64;
-            let cooldown = cooldown.min(self.config.max_cooldown_seconds);
+                (breaker.cooldown_minutes as f64 * cooldown_multiplier) as u64;
+            let cooldown = cooldown.min(max_cooldown_seconds);
 
             breaker.state = CircuitState::Open;
             breaker.cooldown_minutes = cooldown / 60;
@@ -144,7 +148,7 @@ impl CircuitBreakerManager {
             // 半开状态下失败，重新断路
             breaker.state = CircuitState::Open;
             let cooldown = breaker.cooldown_minutes * 2;
-            let cooldown = cooldown.min(self.config.max_cooldown_seconds / 60);
+            let cooldown = cooldown.min(max_cooldown_seconds / 60);
             breaker.cooldown_minutes = cooldown;
             breaker.cooldown_until = Some((now + cooldown * 60).to_string());
         }

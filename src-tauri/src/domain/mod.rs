@@ -9,6 +9,7 @@ pub mod app_handle;
 pub mod im_service;
 pub mod model_pool;
 pub mod plugins;
+pub mod proxy_pool;
 pub mod registry;
 
 // Re-export serde_json for plugin convenience
@@ -32,6 +33,17 @@ pub struct ActionSpec {
     pub returns: String,
 }
 
+impl Default for ActionSpec {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            description: String::new(),
+            params: Vec::new(),
+            returns: default_returns(),
+        }
+    }
+}
+
 fn default_returns() -> String {
     "Value".into()
 }
@@ -40,6 +52,7 @@ fn default_returns() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParamSpec {
     pub name: String,
+    #[serde(alias = "typ")]
     pub r#type: String,
     pub description: String,
     #[serde(default)]

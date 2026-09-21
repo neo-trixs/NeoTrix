@@ -1,6 +1,7 @@
 use std::io;
+use tauri::Manager;
 use tracing_appender::rolling;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
 /// Initialize structured logging with tracing.
 /// - stderr: human-readable, colorized in dev, plain in release

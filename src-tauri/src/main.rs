@@ -8,11 +8,11 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(clippy::all, clippy::pedantic, clippy::dbg_macro, clippy::print_stdout, clippy::print_stderr)]
 #![allow(
-    reason = "pedantic false-positives in Tauri plugin boilerplate",
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
     clippy::missing_errors_doc,
-    clippy::missing_panics_doc
+    clippy::missing_panics_doc,
+    reason = "pedantic false-positives in Tauri plugin boilerplate"
 )]
 
 use clap::Parser;
@@ -112,13 +112,13 @@ fn main() {
     }
 
     if let Err(e) = color_eyre::install() {
-        eprintln!("Failed to install color-eyre: {e}");
+        tracing::warn!("Failed to install color-eyre: {e}");
     }
 
     // Fail-fast config validation — exits before anything else starts
     let config = neotrix_tauri::config::AppConfig::load().unwrap_or_else(|e| {
-        eprintln!("FATAL: Configuration error: {e}");
-        eprintln!("Fix your config or set environment variables (NEOTRIX_*)");
+        tracing::error!("FATAL: Configuration error: {e}");
+        tracing::error!("Fix your config or set environment variables (NEOTRIX_*)");
         std::process::exit(1);
     });
 
@@ -132,18 +132,18 @@ fn main() {
             let db_pool = Arc::new(
                 neotrix_tauri::db_pool::DbPool::new(&config.data_dir.join("neotrix.db"))
                     .unwrap_or_else(|e| {
-                        eprintln!("FATAL: Failed to create DB pool: {e}");
+                        tracing::error!("FATAL: Failed to create DB pool: {e}");
                         process::exit(1);
                     }),
             );
             register_plugins(&mut registry, &db_pool).unwrap_or_else(|e| {
-                eprintln!("FATAL: {e}");
+                tracing::error!("FATAL: {e}");
                 process::exit(1);
             });
 
-            println!("🔌 已注册 {} 个域插件", registry.plugin_count());
+            tracing::info!("已注册 {} 个域插件", registry.plugin_count());
             for info in registry.list() {
-                println!(
+                tracing::info!(
                     "   {} — {} ({} actions)",
                     info.name,
                     info.description,
@@ -160,7 +160,7 @@ fn main() {
                 registry
                     .register(Box::new(chat_plugin))
                     .unwrap_or_else(|e| {
-                        eprintln!("FATAL: Failed to register chat plugin: {e}");
+                        tracing::error!("FATAL: Failed to register chat plugin: {e}");
                         process::exit(1);
                     });
             }
@@ -376,16 +376,16 @@ fn main() {
                         }
                     }
 
-                    println!("✅ NeoTrix V2 Desktop ready (domain plugin architecture)");
-                    println!("   域调用: domain_call(domain, action, args)");
-                    println!("   域列表: domain_list()");
-                    println!("   PTY: 就绪");
+                    tracing::info!("NeoTrix V2 Desktop ready (domain plugin architecture)");
+                    tracing::info!("   域调用: domain_call(domain, action, args)");
+                    tracing::info!("   域列表: domain_list()");
+                    tracing::info!("   PTY: 就绪");
 
                     Ok(())
                 })
                 .build(tauri::generate_context!())
                 .unwrap_or_else(|e| {
-                    eprintln!("FATAL: Failed to build Tauri application: {e}");
+                    tracing::error!("FATAL: Failed to build Tauri application: {e}");
                     process::exit(1);
                 })
                 .run(
@@ -395,9 +395,9 @@ fn main() {
                 );
         }
         Some(Commands::Headless) => {
-            println!("NeoTrix headless mode starting...");
+            tracing::info!("NeoTrix headless mode starting...");
             let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
-                eprintln!("FATAL: Failed to create tokio runtime: {e}");
+                tracing::error!("FATAL: Failed to create tokio runtime: {e}");
                 process::exit(1);
             });
             rt.block_on(async {
@@ -405,7 +405,7 @@ fn main() {
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(60)).await;
                     if let Ok(state) = api.get_system_state().await {
-                        println!(
+                        tracing::info!(
                             "  [tick] phi={:.3} coherence={:.3}",
                             state.metadata.consciousness_state.phi,
                             state.metadata.consciousness_state.coherence
@@ -415,9 +415,9 @@ fn main() {
             });
         }
         Some(Commands::Reason { prompt }) => {
-            println!("NeoTrix reasoning: {}", prompt);
+            tracing::info!("NeoTrix reasoning: {}", prompt);
             let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
-                eprintln!("FATAL: Failed to create tokio runtime: {e}");
+                tracing::error!("FATAL: Failed to create tokio runtime: {e}");
                 process::exit(1);
             });
             rt.block_on(async {
@@ -425,8 +425,8 @@ fn main() {
                 let request = neotrix_tauri::stub::UnifiedRequest::chat(prompt);
                 let response = api.handle(request).await;
                 match response {
-                    Ok(r) => println!("Response: {}", r.content),
-                    Err(e) => println!("Error: {} - {}", e.code, e.message),
+                    Ok(r) => tracing::info!("Response: {}", r.content),
+                    Err(e) => tracing::error!("Error: {} - {}", e.code, e.message),
                 }
             });
         }

@@ -218,10 +218,10 @@ fn fetch_url(url: &str) -> Result<serde_json::Value, DomainError> {
     // 简单 HTML 清理
     let text = if content_type.contains("html") {
         // 移除 script/style 标签
-        let re_script = regex::Regex::new(r"(?s)<script[^>]*>.*?</script>").unwrap_or_default();
-        let re_style = regex::Regex::new(r"(?s)<style[^>]*>.*?</style>").unwrap_or_default();
-        let re_tag = regex::Regex::new(r"<[^>]+>").unwrap_or_default();
-        let re_space = regex::Regex::new(r"\s+").unwrap_or_default();
+        let re_script = regex::Regex::new(r"(?s)<script[^>]*>.*?</script>").unwrap();
+        let re_style = regex::Regex::new(r"(?s)<style[^>]*>.*?</style>").unwrap();
+        let re_tag = regex::Regex::new(r"<[^>]+>").unwrap();
+        let re_space = regex::Regex::new(r"\s+").unwrap();
 
         let cleaned = re_script.replace_all(&body, "");
         let cleaned = re_style.replace_all(&cleaned, "");

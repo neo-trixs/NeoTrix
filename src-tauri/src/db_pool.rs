@@ -28,14 +28,14 @@ impl DbPool {
     /// Run a schema-creation SQL block exactly once.
     /// Call this in the plugin constructor after `DbPool::new()`.
     pub fn init_schema(&self, sql: &str) -> AnyhowResult<()> {
-        let conn = self.inner.lock().context("Lock poisoned")?;
+        let conn = self.inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         conn.execute_batch(sql).context("Schema init failed")
     }
 
     /// Synchronous access to the underlying `Connection`.
     /// Returns a `MutexGuard` that derefs to `&Connection`.
     pub fn get(&self) -> AnyhowResult<MutexGuard<'_, Connection>> {
-        self.inner.lock().context("Lock poisoned")
+        self.inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))
     }
 
     // ── convenience methods ──
@@ -45,7 +45,7 @@ impl DbPool {
         sql: &str,
         params: &[&dyn rusqlite::types::ToSql],
     ) -> AnyhowResult<usize> {
-        let conn = self.inner.lock().context("Lock poisoned")?;
+        let conn = self.inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         conn.execute(sql, params).context("SQL error")
     }
 
@@ -59,7 +59,7 @@ impl DbPool {
         F: FnOnce(&rusqlite::Row) -> Result<T, rusqlite::Error> + Send + 'static,
         T: Send + 'static,
     {
-        let conn = self.inner.lock().context("Lock poisoned")?;
+        let conn = self.inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         conn.query_row(sql, params, f).context("SQL query error")
     }
 
@@ -73,12 +73,12 @@ impl DbPool {
         F: FnMut(&rusqlite::Row) -> Result<T, rusqlite::Error> + Send + 'static,
         T: Send + 'static,
     {
-        let conn = self.inner.lock().context("Lock poisoned")?;
+        let conn = self.inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         let mut stmt = conn.prepare(sql).context("Prepare error")?;
         let rows = stmt.query_map(params, f).context("Query map error")?;
         let mut results = Vec::new();
         for row in rows {
-            results.push(row.context("Row error")?);
+            results.push(row.map_err(|e| anyhow::anyhow!("Row error: {}", e))?);
         }
         Ok(results)
     }
