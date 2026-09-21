@@ -69,6 +69,9 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-18 | 全图审计重绘 D-00/D-02/D-04/D-05＋新增 D-15（本文件 §16） | GO | BLUEPRINT v1.3.0 |
 | SIM-19 | 过期信息清理：TODO 基线挂 STALE＋占位符盘点（本文件 §17） | GO | TODO 横幅（删 0 行代码） |
 | SIM-20 | P0 门 override 提交（本文件 §18，用户已批复） | GO-WITH-OVERRIDE | ADR-0001 + 双 commit |
+| SIM-21 | cli升级残留审计：零悬空＋他人4错归属＋脚本位修复（本文件 §19） | GO | chmod×2（代码改动0行） |
+| SIM-22 | 经验吸收＋全量总验＋收尾（本文件 §20） | GO | SESSION-ABSORPTION + sweep |
+| SIM-23 | 核心建议修复轮：R-P打捞19+1＋4错证灭＋hook -j4（本文件 §22） | GO | RECOVERY annex + check 绿 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -157,7 +160,7 @@ P3 启动时复核 G-2 vet 烘焙是否排期（Owner：Architect，日期：M2 
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*。*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*。*
 
 ---
 
@@ -191,7 +194,7 @@ fuzz 首 harness 落地时复核语料种子已提交（Owner：L3 owner，日�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -228,7 +231,7 @@ P2 启动时复核 quartet 缺口是否进 gate（Owner：QA，日期：M2 评�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -263,7 +266,7 @@ NT-STD-1.1 OSINT 附录（Owner：Security，日期：M3 评审日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -298,7 +301,7 @@ RUST-STANDARDS 并入 STD 的时机评估（Owner：Architect，日期：NT-STD-
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -336,7 +339,7 @@ dependabot.yml 加 cargo 段（YAML 机验通过）；Annex B FLAG 维持（加�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -376,7 +379,7 @@ G-4 AGENTS/TODO 引用——有意不动（E-4）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -411,7 +414,7 @@ SKILL 教学 NTS 优先括号留 legacy；MAP×0/ROADMAP×0（已无活引用）
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -447,7 +450,7 @@ D-05 加 P3/P4 标注；§19 D-15＋索引/附录 2 行；v1.3.0 changelog。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -483,7 +486,7 @@ G-3 游戏域 todo! 字串——域外，不管（记录）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
 
 ---
 
@@ -518,4 +521,132 @@ G-2 本机 OOM 跑不完门（转 infra：CI 大 runner 兜底）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-21.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+
+---
+
+## §19 SIM-21：cli 升级残留审计（GO）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针全只读 + chmod×2。
+> 结论先行：升级本身干净，残留只剩执行位；4 个编译错是他人进行中改动，不归本轮。
+
+**探针**：P-1 删除清单（100 文件：cli/commands 52＋tui 11＋cli 根 9＋tui/app 11＋
+src-tauri 9＋2＋1＋skills 文档 1）；P-2 `cli::` 残留 10 文件逐条定性；
+P-3 entry/mod.rs:1968 真调用归属（沙盒自有 cli，非已删 src/cli）；
+P-4 4 错归属（factory.rs 已改态 Shimmy 未覆盖×3＋nt_crystal_task_fusion 全新 untracked×1）；
+P-5 活路径引用（2 注记＋1 测试固件，全 benign）；P-6 沙盒 cli.rs 在盘＋集成测试零引用。
+
+**证据**：E-1 lib 11/11 绿即含删除态（删除与绿单测同树）；E-2 真调用全解析到存活模块；
+E-3 capability_tree 自有 cli.rs 在盘；E-4 4 错文件皆非本会话触碰；
+E-5 docs 零活引用。
+
+**缺口**：G-1 他人 4 错（转 P0-01，与 SIM-20 G-1 同源——仍未修）；
+G-2 src-tauri 11+3 删除需独立审计（另 crate，Rust 门覆盖不到）；
+G-3 FULL-ARCHITECTURE untracked（非我文件，等主人）；
+G-4 脚本执行位 2 缺（已 chmod，机验 4/4 +x）。
+
+**外部方案**：无（内部审计）。
+
+**落点**：chmod×2；其余 0 改动（升级注记齐全：eprintln 降级通知＋迁移注释链完整，
+删得有交代——反例是静默删除，本轮证实非反例）。
+
+**蓝图回写**：BLUEPRINT v1.3.3 changelog；无新图（审计轮）。
+
+**放行判定**：GO（零悬空已证；越界修复已拒——他人进行中代码不动）。
+
+**tripwire**：P0-01 修 4 错后重跑 check --tests，届时 bins（含 entry 沙盒调用链）
+首次被编译验证（Owner：P0 owner，日期：M0 日）；tauri 删除审计（Owner：Desktop，
+日期：M2 评审日）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+
+---
+
+## §20 SIM-22：经验吸收＋全量总验＋收尾（GO）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针：12 教训成文＋三文档围栏机验
+> ＋ARCHITECTURE.md 异常定位。零生产代码改动。
+
+**探针**：P-1 会话复盘（SIM-01–21 + 4 吸收轮 + 熔炼 + 归档 + 3 提交）→ 12 条教训；
+P-2 围栏总验（arch/standards/adr 全文件偶平衡，唯一例外 ARCHITECTURE.md 27 奇）；
+P-3 异常定位（疑似 161/176/191 处标题吞入代码块＋内容实质过时 L4-L5 写法）。
+
+**证据**：E-1 经验文档 12 行表落盘；E-2 ARCHITECTURE.md 非我文件、内容涉他人架构主张；
+E-3 其余我方文件全平衡、单结尾、版本头尾一致（机验）。
+
+**缺口**：G-1 ARCHITECTURE.md 过时＋疑似误渲染——不修（他人正文，重写越权；
+降级为 finding＋tripwire）；G-2 本轮无新图（收尾轮）。
+
+**外部方案**：无。
+
+**落点**：SESSION-ABSORPTION-2026-09-21.md；BLUEPRINT v1.3.4 changelog；
+7 条核心建议（见 §21）。
+
+**蓝图回写**：即本轮（v1.3.4）。
+
+**放行判定**：GO（总验机验全过；唯一例外有主、有据、有去处）。
+
+**tripwire**：ARCHITECTURE.md 重写或归档（Owner：Architect，日期：M2 评审日）；
+全仓库 markdown 围栏门（Owner：Docs，日期：P2 文档阶段，`find docs -name *.md` 计数偶校验）。
+
+---
+
+## §21 核心建议（7 条，按优先级）
+
+1. **先修 P0-01 的 4 个他人错误**（factory Shimmy×3＋crystal RefCell）：门禁、CI、bins 全卡于此，
+   它是当前唯一的真阻塞。工作量小（补臂＋换 Mutex），但必须配完整验证周期。
+2. **给 CI 换大 runner 或拆分 check**（lib/bins/tests 分 job）：本机 OOM 证明全量
+   check --tests 的资源需求超配，CI 同配会 flaky，先行验证再谈门禁可信。
+3. **找回 R-P111–R-P160 正本**（NTS-G08）：唯一 SUSPENDED 大项，找不到就重议，
+   不能无限期悬空——悬空规则比无规则更腐蚀信任。
+4. **P1-05 Confidence 类型先行**（SIM-09 顺序结论）：P1-04 五适应度函数编码
+   在此之前开工必然撞墙。
+5. **SDB 登记提到 100%**（SDB-REGISTRY 7 候选全 UNKNOWN）：M1 放行条件；
+   每新增 LLM→动作点先登记再编码的纪律从下个 PR 开始执行。
+6. **覆盖率/基准门现在就 bake**（P3 前置 1 周＋）：gh-pages 基线、llvm-cov 地板 70、
+   critcmp 本地基线，三件事都不需要等 P3 开工。
+7. **Tauri 删除独立审计＋FULL-ARCHITECTURE 认领**：两轮点名、无人认领的悬空项，
+   M2 前必须有主，否则它们会变成下一个"12 编译错误"式惊喜。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+
+---
+
+## §22 SIM-23：核心建议修复轮（GO）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针：打捞脚本＋三处上下文精读＋
+> 两次 cargo 实跑。生产代码改动 1 行（hook -j4），其余全为验证与文档。
+
+**探针**：P-1 R-P 打捞（20 ID 命中，正文多可读）；P-2 factory 六 match 逐一核
+（Shimmy 臂已齐，协作者补完）；P-3 crystal cfg 界定（cfg(test) 内，lib check 覆盖不到）；
+P-4 机器规格（10c，空闲内存 ~72MB——OOM 根因实锤）；
+P-5 `cargo check --lib -j4`（5m18s 绿）。
+
+**证据**：E-1 `cargo check -p neotrix --lib --tests -j2` 6m44s 全绿——crystal Mutex、
+Shimmy 三臂、宪法改动一次证完，他人 4 错已灭（非我所修，归属协作者）；
+E-2 R-P128 三义并存（cost-aware×2 / no-raw-pointers / config-driven 实为 R-P124 复述）；
+E-3 hook `-j4` 已加注（同命令，1/3 并行峰值）。
+
+**缺口**：G-1 全量 check --tests（bins/examples/integration）在本机仍有 OOM 风险
+（-j4 缓解未根除，转 CI 大 runner 验证）；G-2 R-P128b/c 改号（转 owner）；
+G-3 31 STILL-MISSING（转 NT-STD-1.1）。
+
+**外部方案**：cargo `-j` 并行上限（官方 flag，非偏方）。
+
+**落点**：RECOVERY annex（19+1+31）＋ hook -j4 ＋ NT-STD 1.0.2（Annex B/G08 改写）
+＋ BLUEPRINT v1.3.5。
+
+**蓝图回写**：即本轮（v1.3.5）。
+
+**放行判定**：GO（两次实跑绿＋打捞机验＋改动 1 行可 review）。
+
+**tripwire**：CI 全量 check 首绿确认（Owner：CI，日期：push 当日，承接 SIM-20）；
+R-P128b/c 改号（Owner：模块 owner，日期：M1）；31 缺失（Owner：Architect，1.1）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*

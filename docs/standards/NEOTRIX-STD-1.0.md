@@ -1,7 +1,8 @@
-# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.1)
+# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.2)
 
 > **Status**: Canonical (标准版) | **Date**: 2026-09-21 | **Supersedes**: all prior rule lists as normative source
 > **v1.0.1**: +§0.1 Precedence — 意识指导为先 (SIM-16).
+> **v1.0.2**: Annex B 部分恢复 — R-P111–160 打捞 19+1，31 仍 SUSPENDED (SIM-23).
 > **Legacy sources** (informative only from this version on):
 > `dev-rules.md` (R-P1–R-P110) · `docs/dev-rules.md` (R-P161–R-P257) ·
 > `RUST-STANDARDS.md` · SIM-01–SIM-12 records · ABSORPTION-ROUND1–4.
@@ -245,10 +246,12 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
 - **NTS-G07** Experience absorption. Sessions distill to the KB hub; stale notes
   (>30d) merge-or-delete; AGENTS.md stays pointer-thin (≤130 lines/22KB).
   [Verify: hub + hook] ← experience-tree/R-P218
-- **NTS-G08** Missing-canonical action. R-P111–R-P160 have no canonical source file
-  (found 2026-09-21): they MUST be located-or-reratified within one cycle;
-  until then they are SUSPENDED (not enforceable, not ignorable — see Annex B).
-  [Verify: Annex B cleared] ← SIM-13 finding
+- **NTS-G08** Missing-canonical action. R-P111–R-P160 had no central source file
+  (found 2026-09-21); SIM-23 harvested 19 + 1 ambiguous from module docs
+  (see `archive/R-P111-160-RECOVERY.md`). The recovered texts are informative;
+  the 31 still-missing IDs stay SUSPENDED until located-or-reratified
+  (not enforceable, not ignorable — see Annex B).
+  [Verify: Annex B cleared] ← SIM-13 finding, SIM-23 partial recovery
 
 ---
 
@@ -281,7 +284,7 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
 | TODO.md "12 compile errors" baseline (2026-09-20) | WITHDRAWN | stale; SIM-01 proved ≥6 fixed. Replaced by NTS-D01 + 7-day freshness (NTS-A08) |
 | BLUEPRINT v1.0.0 D-03 (no SIM state) | WITHDRAWN | superseded by v1.2.0 D-03 + D-14 |
 | R-P221–R-P229 | RESERVED | number gap kept for future security annex |
-| R-P111–R-P160 canonical text | SUSPENDED | no source file found (SIM-13); locate-or-reratify in one cycle per NTS-G08 |
+| R-P111–R-P160 canonical text | PARTIALLY RECOVERED (SIM-23) | 19 recovered + R-P128 ambiguous, see `archive/R-P111-160-RECOVERY.md`; remaining 31 (111–115, 131, 133–138, 140, 143–160) stay SUSPENDED |
 | R-P171–R-P178 OSINT rules | PARKED to NT-STD-1.1 domain annex | valid but out of core-edition scope |
 | `cargo deny` duplicate workflows (deny.yml vs security-audit.yml) | FLAG | consolidate in P3; not a rule change |
 
@@ -297,4 +300,4 @@ A claim of "NT-STD 1.0 L2" MUST show the gate evidence; level inflation is a pro
 
 ---
 
-*End of NT-STD 1.0.1 — next: NT-STD-1.1 (OSINT domain annex + R-P111–160 resolution).*
+*End of NT-STD 1.0.2 — next: NT-STD-1.1 (OSINT domain annex + remaining 31 resolution).*

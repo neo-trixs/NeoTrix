@@ -44,7 +44,9 @@ fi
 # (本仓库曾出现 LlmResponse 字面量漏字段导致测试编译失败却入库的情况)。
 if git diff --cached --name-only | grep -qE '\.rs$'; then
   echo -e "\033[1;33m🔨 P0 pre-commit gate: cargo check --tests -p neotrix ...\033[0m"
-  if ! cargo check --tests -p neotrix >/tmp/precommit-cargo-check.log 2>&1; then
+  # SIM-23: -j4 caps rustc parallelism; default -j10 OOM-kills on 10c/low-mem boxes
+  # (Killed: 9, 2026-09-21). Same check, lower peak memory. See NT-STD NTS-D01.
+  if ! cargo check --tests -p neotrix -j4 >/tmp/precommit-cargo-check.log 2>&1; then
     echo -e "\033[0;31m❌ BUILD GATE FAILED: neotrix 未通过编译(test), 拒绝提交\033[0m"
     echo -e "\033[1;33m   详见 /tmp/precommit-cargo-check.log; 加 --no-verify 可绕过 (不推荐, 会破坏 P0)\033[0m"
     exit 1
