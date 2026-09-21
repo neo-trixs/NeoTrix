@@ -72,6 +72,8 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-21 | cli升级残留审计：零悬空＋他人4错归属＋脚本位修复（本文件 §19） | GO | chmod×2（代码改动0行） |
 | SIM-22 | 经验吸收＋全量总验＋收尾（本文件 §20） | GO | SESSION-ABSORPTION + sweep |
 | SIM-23 | 核心建议修复轮：R-P打捞19+1＋4错证灭＋hook -j4（本文件 §22） | GO | RECOVERY annex + check 绿 |
+| SIM-24 | 全域审计＋第五轮吸收＋蓝图 v1.4.0（本文件 §23） | GO | ROUND5 + NTS 1.0.3 |
+| SIM-25 | 第六轮吸收：API/文档/Judge/混沌（本文件 §24） | GO | ROUND6 + NTS 1.0.4 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -160,7 +162,7 @@ P3 启动时复核 G-2 vet 烘焙是否排期（Owner：Architect，日期：M2 
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*。*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*。*
 
 ---
 
@@ -194,7 +196,7 @@ fuzz 首 harness 落地时复核语料种子已提交（Owner：L3 owner，日�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -231,7 +233,7 @@ P2 启动时复核 quartet 缺口是否进 gate（Owner：QA，日期：M2 评�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -266,7 +268,7 @@ NT-STD-1.1 OSINT 附录（Owner：Security，日期：M3 评审日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -301,7 +303,7 @@ RUST-STANDARDS 并入 STD 的时机评估（Owner：Architect，日期：NT-STD-
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -339,7 +341,7 @@ dependabot.yml 加 cargo 段（YAML 机验通过）；Annex B FLAG 维持（加�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -379,7 +381,7 @@ G-4 AGENTS/TODO 引用——有意不动（E-4）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -414,7 +416,7 @@ SKILL 教学 NTS 优先括号留 legacy；MAP×0/ROADMAP×0（已无活引用）
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -450,7 +452,7 @@ D-05 加 P3/P4 标注；§19 D-15＋索引/附录 2 行；v1.3.0 changelog。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -486,7 +488,7 @@ G-3 游戏域 todo! 字串——域外，不管（记录）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -521,7 +523,7 @@ G-2 本机 OOM 跑不完门（转 infra：CI 大 runner 兜底）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -560,7 +562,7 @@ G-4 脚本执行位 2 缺（已 chmod，机验 4/4 +x）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -612,7 +614,7 @@ E-3 其余我方文件全平衡、单结尾、版本头尾一致（机验）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
 
 ---
 
@@ -649,4 +651,73 @@ R-P128b/c 改号（Owner：模块 owner，日期：M1）；31 缺失（Owner：A
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-24.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
+
+---
+
+## §23 SIM-24：全域审计＋第五轮吸收（GO）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针：机测规模三组＋外部三组搜索＋
+> unsafe 逐一定性。生产代码零改动（Largest diff：Makefile 1 target＋hook 已在 SIM-23）。
+
+**探针**：P-1 规模机测（2191 文件/~719k 行分层＋9 crates＋26 集成测试）；
+P-2 违规/漂移机测（12 组越层，111 漂移零进展）；P-3 unsafe 逐一定性
+（sysctl 真 FFI＋文书 vs 其余全字串/固件）；P-4 外部三组
+（AgentHarm 110×11＋τ-bench＋DORA/SPACE＋cargo-modules 家族）。
+
+**证据**：E-1 sysctl `#![allow]`＋ justification 头＋ core forbid 不受影响（三段式齐全）；
+E-2 DORA/SPACE 共识序列（先 DORA 后 SPACE，团队级禁个人排名）；
+E-3 cargo-modules orphans/--acyclic/cargoscope 免编译三件套定位完成。
+
+**缺口**：G-1 111 漂移零进展（转 P2，与覆盖率门同批）；G-2 12 越层组未消（P1-02）；
+G-3 AgentHarm 落地需 P3 评估管线（设计已定 NTS-E09）。
+
+**外部方案**：见 ABSORPTION-ROUND5.md §1（S-28–S-32）＋否决项。
+
+**落点**：ROUND5＋NTS-E09/D09/B13（STD 1.0.3）＋sysctl 特许登记＋ROADMAP 快照＋
+`make arch-acyclic`＋BLUEPRINT v1.4.0（D-05 G6 行＋changelog）。
+
+**蓝图回写**：即本轮。
+
+**放行判定**：GO（机验数字全出自实跑；条款计数待下轮复核）。
+
+**tripwire**：111 漂移到 0 才进 `--strict`（Owner：Docs，日期：P2）；
+AgentHarm 对子首跑（Owner：L3，日期：P3）；DORA 四格首填（Owner：QA，日期：M2）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*
+
+---
+
+## §24 SIM-25：第六轮吸收（GO）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针：4 组搜索（Judge 组 429，
+> 以既定知识＋R4 实证推进并标注）＋ API/文档双盘点。生产代码零改动。
+
+**探针**：P-1 四组外部搜索（oasdiff 全家桶＋Diátaxis 全套＋Toxiproxy 全家桶）；
+P-2 API 盘点（19 tauri＋267 routes 上限＋0 spec）；P-3 文档盘点（70 文件无象限）；
+P-4 Judge 复核（Criterion 有，bias 处理零）；P-5 混沌复核（零引用）。
+
+**证据**：E-1 无 spec 即无契约（lint 单文档，diff 需双文档——缺第一份）；
+E-2 Diátaxis 警告禁空目录（只分类不新建）；E-3 bias 清单皆有标准缓解；
+E-4 toxiproxy `/reset` 强制 teardown 是可靠性关键。
+
+**缺口**：G-1 spec 导出（P-task，门之门）；G-2 bias 代码（P2）；G-3 toxics 套件（P3）；
+G-4 本轮无 Makefile 新增（无 spec/工具前加 target 即空转，诚实省略）。
+
+**外部方案**：见 ABSORPTION-ROUND6.md §1（S-33–S-38）＋否决项（Pro 版 approve 门等）。
+
+**落点**：ROUND6＋api-surface 脚本（19/267/0 机验）＋MAP 象限节＋NTS-D10/F09/E10
+（STD 1.0.4）＋BLUEPRINT v1.5.0。
+
+**蓝图回写**：即本轮（无新图——四机制归属既有图位：D-05 门/G8 文档/MAP）。
+
+**放行判定**：GO（探针数字全机验；省略项有书面理由）。
+
+**tripwire**：spec 导出首版（Owner：API，日期：P2 启动日）；bias 代码（Owner：ML，日期：P2）；
+toxics 首测（Owner：SRE，日期：P3）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-26.*

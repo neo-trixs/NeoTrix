@@ -1,8 +1,10 @@
-# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.2)
+# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.4)
 
 > **Status**: Canonical (标准版) | **Date**: 2026-09-21 | **Supersedes**: all prior rule lists as normative source
 > **v1.0.1**: +§0.1 Precedence — 意识指导为先 (SIM-16).
 > **v1.0.2**: Annex B 部分恢复 — R-P111–160 打捞 19+1，31 仍 SUSPENDED (SIM-23).
+> **v1.0.4**: +NTS-D10/F09/E10（API 契约/Judge 去偏/故障注入，SIM-25）.
+> **v1.0.3**: +NTS-E09/D09/B13（红队对子/DORA 基线/孤儿环门，SIM-24）＋ sysctl 特许登记入 Annex B.
 > **Legacy sources** (informative only from this version on):
 > `dev-rules.md` (R-P1–R-P110) · `docs/dev-rules.md` (R-P161–R-P257) ·
 > `RUST-STANDARDS.md` · SIM-01–SIM-12 records · ABSORPTION-ROUND1–4.
@@ -96,6 +98,10 @@ enforce the spirit; both leave records. No silent overrides, ever.
   (MADR + sim-id + quality-attributes); spike-first when uncertainty is material;
   ADRs immutable except status; supersession bidirectional.
   [Verify: R-P249 lint bar + index] ← R-P244/R-P249
+- **NTS-B13** No orphans, no cycles. Unlinked source files MUST be registered or removed
+  (`orphans`); module graph MUST stay acyclic (`--acyclic`); volatility (hot-change
+  modules) feeds split decisions.
+  [Verify: `make arch-acyclic` + volatility note] ← cargo-modules/SIM-24
 
 ---
 
@@ -163,8 +169,15 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
 - **NTS-D08** Weekly fitness report. SelfTestRegistry summary publishes weekly
   (pass/fail rate, new violations, allowlist expiries). Architects read it;
   unread reports are process failure, not paper. [Verify: artifact exists] ← Ford/R-P246
+- **NTS-D09** Delivery scorecard. DORA four keys (frequency/lead time/failure rate/MTTR)
+  are first-class dashboard cells, system-derived, at team level — never individual.
+  SPACE dimensions join after DORA stabilizes (consensus sequencing).
+  [Verify: dashboard + CI-derived numbers] ← DORA/SPACE/SIM-24
 
 ---
+
+- **NTS-D10** API contract governance. No OpenAPI spec = no contract: export the spec first (Tauri commands + Axum routes), then Schemathesis 4 checks against a test server (not_a_server_error, schema/content-type/status conformance, JUnit gate), then oasdiff `breaking --fail-on ERR` vs base branch (empty-baseline guard for new specs). Intentional breaks go through a `breaking-change-approved` label in report-only mode.
+  [Verify: spec artifact + CI gate] ← oasdiff/Schemathesis/SIM-25
 
 ## Part E — Security & Supply Chain (NTS-E)
 
@@ -190,8 +203,15 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
 - **NTS-E08** Safety monitor + HITL. Irreversible/high-stakes actions need approval
   gates with durable state; anomaly detection alerts; MTTR < 30s proven by chaos.
   [Verify: chaos report + monitor tests] ← QS-5/P3
+- **NTS-E09** Adversarial pairs. Every red-team probe ships as a harmful+benign twin;
+  refusal rate tracked per harm category; capability retention scored
+  (jailbroken-but-incompetent ≠ success); probes rotate monthly (static defenses decay).
+  [Verify: pair ledger + refusal dashboard] ← AgentHarm/SIM-24
 
 ---
+
+- **NTS-E10** Network fault injection. Toxiproxy per-test pattern: populate once, toxic per test, `/reset` unconditional teardown. First faults: `timeout=0` black-hole (finds missing read timeouts), latency+jitter (finds pool exhaustion), disabled-proxy down (refused vs silent-hang differ — test both). Mocks prove logic; toxics prove resilience.
+  [Verify: resilience test suite + CI service job (P3)] ← Toxiproxy/SIM-25
 
 ## Part F — Agent Operations (NTS-F)
 
@@ -224,6 +244,9 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
   runs on every prompt/model/tool change. [Verify: traces + eval gate] ← RefArch L6
 
 ---
+
+- **NTS-F09** Judge debias. Position bias → swap order and average; length bias → normalize or cap verbosity scoring; self-preference → blind model identity where feasible. Fixed judge model (R-P255 carryover); scores stay relative signals, human-spot-checked before thresholds bite.
+  [Verify: bias-mitigation tests + judge config] ← SIM-25
 
 ## Part G — Evolution (NTS-G)
 
@@ -285,6 +308,7 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
 | BLUEPRINT v1.0.0 D-03 (no SIM state) | WITHDRAWN | superseded by v1.2.0 D-03 + D-14 |
 | R-P221–R-P229 | RESERVED | number gap kept for future security annex |
 | R-P111–R-P160 canonical text | PARTIALLY RECOVERED (SIM-23) | 19 recovered + R-P128 ambiguous, see `archive/R-P111-160-RECOVERY.md`; remaining 31 (111–115, 131, 133–138, 140, 143–160) stay SUSPENDED |
+| neotrix-sysctl unsafe FFI | SANCTIONED (permanent, annual re-ratification) | macOS sysctl FFI, crate-level allow + written justification header; neotrix-core keeps forbid (SIM-24 audit §3) |
 | R-P171–R-P178 OSINT rules | PARKED to NT-STD-1.1 domain annex | valid but out of core-edition scope |
 | `cargo deny` duplicate workflows (deny.yml vs security-audit.yml) | FLAG | consolidate in P3; not a rule change |
 
@@ -300,4 +324,4 @@ A claim of "NT-STD 1.0 L2" MUST show the gate evidence; level inflation is a pro
 
 ---
 
-*End of NT-STD 1.0.2 — next: NT-STD-1.1 (OSINT domain annex + remaining 31 resolution).*
+*End of NT-STD 1.0.4 — next: NT-STD-1.1 (OSINT domain annex + remaining 31 resolution).*

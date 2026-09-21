@@ -1,7 +1,8 @@
 # NeoTrix 总蓝图：按图施工手册
 
 > **版本**: 1.2.0 | **日期**: 2026-09-21 | **状态**: 可执行 (Executable)
-> **变更记**: v1.3.5 核心建议修复轮（R-P 打捞 19+1＋31 悬空；他人 4 错证灭；
+> **变更记**: v1.5.0 第六轮吸收（API 治理/Judge 去偏/故障注入/Diátaxis；SIM-25 建档）。v1.4.0 全域审计＋第五轮吸收（2191 文件/719k 行快照；sysctl 特许登记；
+> NTS-E09/D09/B13；DORA 进仪表盘；SIM-24 建档）。v1.3.5 核心建议修复轮（R-P 打捞 19+1＋31 悬空；他人 4 错证灭；
 > hook -j4 抗 OOM；lib/test 双 profile 实跑绿；SIM-23 建档）。v1.3.4 经验吸收＋全量总验收尾（12 教训成文；围栏总验唯一例外 ARCHITECTURE.md
 > 转 finding 不越权修；7 核心建议；SIM-22 建档）。v1.3.3 cli 升级残留审计（100 文件删除零悬空；4 错归属他人进行中；
 > 脚本位 4/4；SIM-21 建档）。v1.3.2 P0 门 override 提交事件（环境 OOM＋他人 4 错；§0.1 首战；
@@ -316,7 +317,7 @@ graph TD
 | G3 | cargo nextest run --lib | ci.yml test | 补单测 |
 | G4 | fitness + check-layer-deps + architecture_constraints | ci.yml/自测 | 按 D-02 消减 |
 | G5 | clippy -D warnings / gitleaks / cyclonedx | lint/security-scan | 修 lint/换密钥 |
-| G6 | cargo test --test  constraints/integration | ci.yml | 修集成/混沌复现 |
+| G6 | cargo test --test constraints/integration + 红队对子 (NTS-E09, P3) | ci.yml | 修集成/混沌复现/拒答率 |
 | G7 | criterion (P3 起卡点) | bench/performance | 优化或 ADR 豁免 |
 | G8 | doc 检查 (P4 起卡点) | docs-deploy | 补 README/ADR |
 
@@ -819,4 +820,4 @@ graph TD
 
 ---
 
-*End of Master Blueprint v1.3.5*
+*End of Master Blueprint v1.5.0*
