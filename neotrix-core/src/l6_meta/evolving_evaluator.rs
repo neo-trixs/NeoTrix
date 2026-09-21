@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 
+use crate::neotrix::nt_jev::eval::EvalReport;
+use crate::neotrix::nt_jev::evolve::{report_scores, JEV_CRITERIA};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationCriteria {
     pub name: String,
@@ -132,6 +135,31 @@ impl EvolvingEvaluator {
         criteria.push(EvaluationCriteria { name, weight, threshold, description });
     }
 
+    /// S1Bench-aligned criteria for JEV nightly eval (weights sum to 1.0).
+    ///
+    /// Names match `nt_jev::evolve::JEV_CRITERIA` exactly so
+    /// [`EvolvingEvaluator::evaluate_jev_report`] joins without loss.
+    /// Thresholds are starting points (jevassert-style); the evolu­tion loop
+    /// moves weights/thresholds via [`EvolvingEvaluator::evolve_criteria`].
+    pub fn jev_criteria() -> Vec<EvaluationCriteria> {
+        vec![
+            EvaluationCriteria { name: "accuracy".to_string(), weight: 0.35, threshold: 0.8, description: "S1Bench macro accuracy".to_string() },
+            EvaluationCriteria { name: "calibration".to_string(), weight: 0.25, threshold: 0.85, description: "1 - ECE (max_ece 0.15)".to_string() },
+            EvaluationCriteria { name: "coverage".to_string(), weight: 0.15, threshold: 0.6, description: "kept-coverage at 0.9 precision".to_string() },
+            EvaluationCriteria { name: "efficiency".to_string(), weight: 0.15, threshold: 0.7, description: "latency-derived efficiency".to_string() },
+            EvaluationCriteria { name: "robustness".to_string(), weight: 0.10, threshold: 0.6, description: "1 - Brier".to_string() },
+        ]
+    }
+
+    /// One nightly step: score an [`EvalReport`] against JEV criteria.
+    ///
+    /// This is the L1→L4 landing point. Callers then invoke
+    /// [`EvolvingEvaluator::evolve_criteria`] so sustained gains/losses move
+    /// weights and append to the evolution log.
+    pub fn evaluate_jev_report(&self, target: &str, report: &EvalReport) -> ScoreBreakdown {
+        self.evaluate(target, &report_scores(report))
+    }
+
     pub fn remove_criterion(&self, name: &str) -> bool {
         let mut criteria = self.criteria.lock().unwrap();
         let len_before = criteria.len();
@@ -161,4 +189,32 @@ mod tests {
     #[test] fn test_evaluate() { let e = EvolvingEvaluator::default(); let mut actual = HashMap::new(); actual.insert("accuracy".to_string(), 0.9); actual.insert("efficiency".to_string(), 0.8); actual.insert("robustness".to_string(), 0.7); let score = e.evaluate("target_1", &actual); assert!(score.weighted_score >= 0.0 && score.weighted_score <= 1.0); }
     #[test] fn test_evolve_criteria() { let e = EvolvingEvaluator::default(); let mut actual = HashMap::new(); actual.insert("accuracy".to_string(), 0.95); actual.insert("efficiency".to_string(), 0.9); actual.insert("robustness".to_string(), 0.85); e.evaluate("t1", &actual); e.evolve_criteria(); assert!(e.get_score() >= 0.0); }
     #[test] fn test_get_score() { let e = EvolvingEvaluator::default(); assert_eq!(e.get_score(), 0.0); }
+
+    #[test] fn test_jev_criteria_names_match_bridge() {
+        use crate::neotrix::nt_jev::evolve::JEV_CRITERIA;
+        let names: Vec<String> = EvolvingEvaluator::jev_criteria().iter().map(|c| c.name.clone()).collect();
+        for k in JEV_CRITERIA {
+            assert!(names.contains(&k.to_string()), "criterion {} missing", k);
+        }
+        let w: f64 = EvolvingEvaluator::jev_criteria().iter().map(|c| c.weight).sum();
+        assert!((w - 1.0).abs() < 1e-12, "weights sum {}", w);
+    }
+
+    #[test] fn test_nightly_loop_two_cycles() {
+        use crate::neotrix::nt_jev::eval::EvalReport;
+        let e = EvolvingEvaluator::new(EvolvingEvaluator::jev_criteria(), 0.05);
+        // Cycle 1: weak night.
+        let weak = EvalReport { n: 50, accuracy: 0.6, brier: 0.3, ece: 0.25, coverage_at_p90: 0.4, mean_latency_ms: 200.0 };
+        let s1 = e.evaluate_jev_report("nightly-1", &weak);
+        assert!(s1.weighted_score >= 0.0 && s1.weighted_score <= 1.0);
+        assert_eq!(s1.criteria_scores.len(), JEV_CRITERIA.len());
+        e.evolve_criteria();
+        // Cycle 2: strong night after calibration work.
+        let strong = EvalReport { n: 50, accuracy: 0.92, brier: 0.08, ece: 0.05, coverage_at_p90: 0.8, mean_latency_ms: 30.0 };
+        let s2 = e.evaluate_jev_report("nightly-2", &strong);
+        assert!(s2.weighted_score > s1.weighted_score, "{} vs {}", s2.weighted_score, s1.weighted_score);
+        e.evolve_criteria();
+        assert_eq!(e.evaluation_count(), 2);
+        assert!(!e.get_evolution_log().is_empty());
+    }
 }

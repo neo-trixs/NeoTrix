@@ -30,6 +30,7 @@
 pub mod primitives;
 pub mod conversion;
 pub mod eval;
+pub mod evolve;
 pub mod validation;
 pub mod gate;
 pub mod presets;
@@ -43,6 +44,7 @@ pub mod audit;
 pub use primitives::*;
 pub use conversion::*;
 pub use eval::*;
+pub use evolve::*;
 pub use validation::*;
 pub use gate::*;
 pub use presets::*;
