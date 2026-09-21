@@ -270,7 +270,7 @@ impl MarketEngine {
         }
 
         // 写入 plugin.toml
-        let toml_content = manifest.to_toml().context("Serialize manifest")?;
+        let toml_content = manifest.to_toml().map_err(|e| anyhow::anyhow!("Serialize manifest: {}", e))?;
         atomic_io::write_atomic(&dest_dir.join("plugin.toml"), toml_content.as_bytes())
             .context("Write plugin.toml")?;
 

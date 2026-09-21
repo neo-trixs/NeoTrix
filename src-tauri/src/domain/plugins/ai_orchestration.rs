@@ -168,7 +168,7 @@ impl AiOrchestrationPlugin {
             || query.contains("optimize")
             || query.contains("design");
 
-        let mut score: f64 = 0.0;
+        let mut score: f32 = 0.0;
         let mut factors = Vec::new();
 
         if word_count > 100 {

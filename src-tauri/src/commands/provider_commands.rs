@@ -132,6 +132,7 @@ pub async fn provider_complete(
 
     // 获取 failover 链
     let chain = manager.get_failover_chain(task_type.as_deref().unwrap_or("default"));
+    let chain: Vec<_> = chain.into_iter().cloned().collect();
 
     if chain.is_empty() {
         return Ok(ipc::err("PROVIDER_NO_AVAILABLE", "No available providers"));

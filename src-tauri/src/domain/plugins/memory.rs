@@ -83,6 +83,7 @@ impl DomainPlugin for MemoryPlugin {
         ]
     }
 
+    #[tracing::instrument(skip(self, args), fields(action = %action))]
     async fn call(
         &self,
         action: &str,

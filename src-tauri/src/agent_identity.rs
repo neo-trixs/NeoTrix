@@ -139,11 +139,10 @@ impl MemoryStore {
     pub fn read_global(&self, agent_id: &str) -> Result<String, std::io::Error> {
         let path = self.workspace.join("memory").join(format!("{agent_id}.md"));
         if path.exists() {
-            String::from_utf8(
-                atomic_io::read_with_fallback(&path)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?,
-            )
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+            let bytes = atomic_io::read_with_fallback(&path)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            String::from_utf8(bytes)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
         } else {
             Ok(String::new())
         }
@@ -165,11 +164,10 @@ impl MemoryStore {
             .join(project_id)
             .join(format!("{agent_id}.md"));
         if path.exists() {
-            String::from_utf8(
-                atomic_io::read_with_fallback(&path)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?,
-            )
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+            let bytes = atomic_io::read_with_fallback(&path)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            String::from_utf8(bytes)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
         } else {
             Ok(String::new())
         }

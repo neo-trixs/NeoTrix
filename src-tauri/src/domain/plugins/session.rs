@@ -559,6 +559,7 @@ impl DomainPlugin for SessionPlugin {
         ]
     }
 
+    #[tracing::instrument(skip(self, args), fields(action = %action))]
     async fn call(
         &self,
         action: &str,
@@ -781,17 +782,6 @@ impl DomainPlugin for SessionPlugin {
                 message: format!("Unknown action: {}", action),
                 recoverable: true,
             }),
-        }
-    }
-}
-
-impl Default for ActionSpec {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            description: String::new(),
-            params: vec![],
-            returns: "Value".into(),
         }
     }
 }

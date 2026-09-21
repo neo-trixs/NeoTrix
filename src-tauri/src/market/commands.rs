@@ -187,7 +187,7 @@ pub async fn market_install(
         };
         match engine.download(&plugin_id, &source, &version).await {
             Ok(p) => p,
-            Err(e) => return ipc::err("DOWNLOAD_FAILED", e),
+            Err(e) => return ipc::err("DOWNLOAD_FAILED", e.to_string()),
         }
     };
 

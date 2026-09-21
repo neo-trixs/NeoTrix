@@ -105,15 +105,9 @@ pub fn write_pool_raw(content: &str) -> AnyhowResult<()> {
     atomic_io::write_atomic(&path, content.as_bytes()).context("Write provider pool")
 }
 
-/// Mask an API key for safe display.
+/// Mask an API key for safe display. Re-exported from shared utility.
 pub fn mask_api_key(key: &str) -> String {
-    if key.starts_with("env:") {
-        key.to_string()
-    } else if key.len() > 8 {
-        format!("{}...{}", &key[..4], &key[key.len() - 4..])
-    } else {
-        "****".into()
-    }
+    crate::util::masking::mask_api_key(key)
 }
 
 /// Append a new entry to the pool.
@@ -327,8 +321,8 @@ mod tests {
     }
 
     #[test]
-    fn mask_key_empty_string() {
-        assert_eq!(mask_api_key(""), "****");
+    fn mask_key_empty_string_passthrough() {
+        assert_eq!(mask_api_key(""), "");
     }
 
     #[test]

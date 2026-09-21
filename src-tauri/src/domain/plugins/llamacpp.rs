@@ -236,17 +236,7 @@ fn read_provider_config() -> Result<serde_json::Value, DomainError> {
     let cfg = read_config_file();
     let pool = read_pool_entries();
     let models = get_provider_models(&cfg.provider);
-    let masked_key = if cfg.api_key.len() > 8 {
-        format!(
-            "{}...{}",
-            &cfg.api_key[..4],
-            &cfg.api_key[cfg.api_key.len() - 4..]
-        )
-    } else if cfg.api_key.starts_with("env:") || cfg.api_key == "no-key" || cfg.api_key.is_empty() {
-        cfg.api_key.clone()
-    } else {
-        "****".into()
-    };
+    let masked_key = crate::util::masking::mask_api_key(&cfg.api_key);
     let resolvable = !cfg.provider.is_empty() && !cfg.default_model.is_empty();
 
     let mut providers = vec![serde_json::json!({
@@ -540,6 +530,7 @@ impl DomainPlugin for LlamacppPlugin {
         ]
     }
 
+    #[tracing::instrument(skip(self, args), fields(action = %action))]
     async fn call(
         &self,
         action: &str,

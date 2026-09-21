@@ -523,8 +523,8 @@ impl UniversalModelManager {
             return Ok(models);
         }
 
-        let entries = tokio::fs::read_dir(&cache_dir).await?;
-        while let Some(entry) = entries.next_entry().await? {
+        let mut entries = tokio::fs::read_dir(&cache_dir).await.map_err(|e| e.to_string())?;
+        while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
             let path = entry.path();
             let ext = path.extension().and_then(|e| e.to_str());
             if ext == Some("gguf") || ext == Some("onnx") || ext == Some("safetensors") {

@@ -573,7 +573,8 @@ impl ImPlugin {
         let mut map = self.identity_map.lock().await;
 
         map.get(&key).cloned().unwrap_or_else(|| {
-            let global_id = format!("user-{}", uuid::Uuid::new_v4().to_string()[..8]);
+            let short_id = uuid::Uuid::new_v4().to_string();
+            let global_id = format!("user-{}", &short_id[..8]);
             map.insert(key, global_id.clone());
             global_id
         })
@@ -710,6 +711,7 @@ impl ImPlugin {
     }
 
     /// 发送消息到渠道（模拟）
+    #[tracing::instrument(skip(self, content), fields(channel = %channel, bot_id = %bot_id, chat_id = %chat_id))]
     async fn send_to_channel(
         &self,
         channel: &ChannelType,
@@ -1294,6 +1296,7 @@ impl DomainPlugin for ImPlugin {
         ]
     }
 
+    #[tracing::instrument(skip(self, args), fields(action = %action))]
     async fn call(
         &self,
         action: &str,
@@ -1304,7 +1307,7 @@ impl DomainPlugin for ImPlugin {
             "status" => {
                 let channels = self.load_channels()?;
                 let total_bots: usize = channels.iter().map(|c| c.bots.len()).sum();
-                let connected_bots = channels
+                let connected_bots: usize = channels
                     .iter()
                     .filter(|c| c.enabled)
                     .map(|c| c.bots.len())

@@ -85,7 +85,7 @@ impl BrowserHost {
             .resizable(true)
             .fullscreen(false)
             .build()
-            .map_err(|e| format!("failed to create browser window: {}", e))?;
+            .map_err(|e| BrowserError::WindowCreation(format!("failed to create browser window: {}", e)))?;
 
         let close_handle = app.clone();
         // 窗口关闭由 Tauri 自动管理, 不需要轮询

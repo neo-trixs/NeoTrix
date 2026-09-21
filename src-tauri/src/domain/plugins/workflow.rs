@@ -82,14 +82,18 @@ impl WorkflowPluginImpl {
     }
 
     async fn save_workflows(&self) -> Result<(), DomainError> {
-        let snapshot = {
+        let json = {
             let workflows = self.workflows.read().await;
-            workflows.clone()
+            serde_json::to_vec_pretty(&*workflows).map_err(|e| DomainError {
+                code: "SERIALIZE_ERROR".into(),
+                message: e.to_string(),
+                recoverable: true,
+            })?
         };
 
         atomic_io::ensure_parent_dir(&self.db_path).ok();
 
-        atomic_io::write_json_atomic(&self.db_path, &snapshot).map_err(|e| DomainError {
+        atomic_io::write_atomic(&self.db_path, &json).map_err(|e| DomainError {
             code: "WRITE_ERROR".into(),
             message: e.to_string(),
             recoverable: true,

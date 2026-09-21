@@ -57,7 +57,7 @@ pub async fn im_get_channel(channel: String) -> IpcResponse<ChannelConfig> {
                 &format!("Channel not found: {}", channel),
             ),
         },
-        Err(e) => ipc::err("IM_LOAD_FAILED", &e),
+        Err(e) => ipc::err("IM_LOAD_FAILED", e.to_string()),
     }
 }
 

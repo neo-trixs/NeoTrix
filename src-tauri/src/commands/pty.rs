@@ -108,7 +108,7 @@ impl PtyManager {
             }
         });
 
-        let mut sessions = self.sessions.lock().context("PTY sessions lock poisoned")?;
+        let mut sessions = self.sessions.lock().map_err(|e| anyhow::anyhow!("PTY sessions lock poisoned: {}", e))?;
         sessions.insert(
             session_id.to_string(),
             PtySession {
@@ -122,7 +122,7 @@ impl PtyManager {
     }
 
     pub fn write(&self, session_id: &str, data: &str) -> AnyhowResult<()> {
-        let mut sessions = self.sessions.lock().context("PTY sessions lock poisoned")?;
+        let mut sessions = self.sessions.lock().map_err(|e| anyhow::anyhow!("PTY sessions lock poisoned: {}", e))?;
         let session = sessions
             .get_mut(session_id)
             .ok_or_else(|| anyhow::anyhow!("Session {} not found", session_id))?;
@@ -135,7 +135,7 @@ impl PtyManager {
     }
 
     pub fn resize(&self, session_id: &str, cols: u16, rows: u16) -> AnyhowResult<()> {
-        let mut sessions = self.sessions.lock().context("PTY sessions lock poisoned")?;
+        let mut sessions = self.sessions.lock().map_err(|e| anyhow::anyhow!("PTY sessions lock poisoned: {}", e))?;
         let session = sessions
             .get_mut(session_id)
             .ok_or_else(|| anyhow::anyhow!("Session {} not found", session_id))?;

@@ -126,6 +126,7 @@ impl ChatPlugin {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, content), fields(content_len = content.len()))]
     async fn call_llm(&self, content: &str) -> Result<String, DomainError> {
         // 发射流开始事件
         if let Some(app) = get_app_handle() {
@@ -172,7 +173,7 @@ impl ChatPlugin {
         }
 
         let report = {
-            let mut core = CORE.write().map_err(|e| DomainError::from(anyhow::Error::from(e).context("acquiring consciousness core lock for LLM call")))?;
+            let mut core = CORE.write().map_err(|e| DomainError::from(format!("acquiring consciousness core lock for LLM call: {}", e)))?;
             core.execute_task_loop(content, &executor, &config)
         };
 
@@ -244,6 +245,7 @@ impl ChatPlugin {
 
     /// 流式 LLM 调用：通过 domain_call 统一调用获取流式响应
     /// mpsc::Receiver，逐 token emit neotrix_stream_token 事件，返回完整内容。
+    #[tracing::instrument(skip(self, content), fields(content_len = content.len()))]
     async fn call_llm_stream(&self, content: &str) -> Result<String, DomainError> {
         if let Some(app) = get_app_handle() {
             if let Err(e) = app.emit("neotrix_stream_start", "") {
@@ -437,6 +439,7 @@ impl DomainPlugin for ChatPlugin {
         ]
     }
 
+    #[tracing::instrument(skip(self, args), fields(action = %action))]
     async fn call(
         &self,
         action: &str,

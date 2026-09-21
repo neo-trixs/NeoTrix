@@ -93,7 +93,7 @@ pub fn setup_file_drop_listener(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let mgr = manager;
         window.on_window_event(move |event| {
-            if let tauri::WindowEvent::FileDrop { paths, .. } = event {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
                 let paths_str: Vec<String> = paths
                     .iter()
                     .filter_map(|p| p.to_str().map(String::from))

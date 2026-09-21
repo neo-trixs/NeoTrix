@@ -55,7 +55,7 @@ pub async fn model_validate(
     model_id: String,
 ) -> Result<IpcResponse<serde_json::Value>, String> {
     let manager = state.read().await;
-    match manager.validate_model(&model_id).await {
+    match manager.verify_model(&model_id).await {
         Ok(result) => Ok(ipc::ok(serde_json::json!({
             "model_id": result.model_id,
             "sha256_valid": result.sha256_valid,
@@ -64,7 +64,7 @@ pub async fn model_validate(
             "file_size_matches": result.file_size_matches,
             "overall_valid": result.overall_valid,
         }))),
-        Err(e) => Ok(ipc::err("MODEL_VALIDATE_FAILED", e)),
+        Err(e) => Ok(ipc::err("MODEL_VALIDATE_FAILED", e.to_string())),
     }
 }
 
@@ -72,9 +72,9 @@ pub async fn model_validate(
 #[command]
 pub async fn model_scan_local(state: State<'_, ModelState>) -> Result<IpcResponse<Vec<ModelMetadata>>, String> {
     let mut manager = state.write().await;
-    match manager.scan_local_models().await {
+    match manager.initialize().await {
         Ok(()) => Ok(ipc::ok(manager.list_models().into_iter().cloned().collect())),
-        Err(e) => Ok(ipc::err("MODEL_SCAN_FAILED", e)),
+        Err(e) => Ok(ipc::err("MODEL_SCAN_FAILED", e.to_string())),
     }
 }
 

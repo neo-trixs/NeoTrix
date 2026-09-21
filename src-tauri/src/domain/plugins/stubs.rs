@@ -502,8 +502,9 @@ impl DomainPlugin for PluginPlugin {
                             let current_version = obj
                                 .get("version")
                                 .and_then(|v| v.as_str())
-                                .unwrap_or("0.0.0");
-                            let bumped = bump_version(current_version);
+                                .unwrap_or("0.0.0")
+                                .to_string();
+                            let bumped = bump_version(&current_version);
                             obj.insert("version".into(), serde_json::json!(bumped));
                             Ok(serde_json::json!({
                                 "ok": true,
@@ -1101,10 +1102,13 @@ impl DomainPlugin for ExtPlugin {
     ) -> Result<serde_json::Value, DomainError> {
         match action {
             "remote_connect" => {
-                let host = args
-                    .get("host")
+                let host = args.get("host")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("127.0.0.1")
+                    .ok_or_else(|| DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "remote_connect requires 'host' argument".into(),
+                        recoverable: false,
+                    })?
                     .to_string();
                 let port = args.get("port").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
                 let device_id = args
@@ -1153,10 +1157,13 @@ impl DomainPlugin for ExtPlugin {
                 }))
             }
             "remote_disconnect" => {
-                let host = args
-                    .get("host")
+                let host = args.get("host")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("127.0.0.1")
+                    .ok_or_else(|| DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "remote_disconnect requires 'host' argument".into(),
+                        recoverable: false,
+                    })?
                     .to_string();
                 let port = args.get("port").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
                 let mut state = EXT_STATE.lock().map_err(|e| DomainError {
