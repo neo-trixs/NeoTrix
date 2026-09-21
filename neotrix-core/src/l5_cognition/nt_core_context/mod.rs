@@ -1,9 +1,13 @@
 pub mod ccr;
 pub mod context_budget;
+pub mod nt_core_smart_context;
 pub mod revertible;
 pub use context_budget::{
     AllocatedSlice, AssembledContext, CompactionIntent, CompactionPriority, ContextBudget,
     SourceType,
+};
+pub use nt_core_smart_context::{
+    NtMemoryNode, NtPackKind, NtPruneReport, NtRoutedPack, NtRulePack, NtSmartContext,
 };
 pub use revertible::{ClosureEffect, RevertibleContext, RevertibleEffect};
 

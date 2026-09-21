@@ -9,6 +9,8 @@ pub mod nt_io_download; // 下载引擎 (自研，无外部依赖)
 
 pub mod nt_memory_spatial; // moved from L2 (no L2 deps, spatial storage belongs in L1)
 pub mod nt_action_facade; // L1 行动层唯一门面 (sole facade)
+pub mod nt_conn; // migrated from cli/nt_conn
+pub mod nt_router; // migrated from cli/nt_router
 
 // 从 core/ 迁移的 L1 模块
 pub mod nt_core_bank;
@@ -19,6 +21,7 @@ pub mod nt_core_edit;
 pub mod nt_core_embed;
 pub mod nt_core_llm;
 pub mod nt_core_task_dispatcher;
+pub mod nt_crystal_llm_bridge; // L1 Provider → 晶体 NtLlmAsk（dispatcher 直调晶体闭环）
 pub mod nt_core_harness;
 pub mod nt_harness;
 pub mod nt_core_simulate_engine;

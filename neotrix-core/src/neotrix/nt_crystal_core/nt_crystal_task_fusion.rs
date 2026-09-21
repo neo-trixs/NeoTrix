@@ -1,0 +1,863 @@
+//! # nt_crystal_task_fusion — 晶体任务闭环
+//!
+//! 之前设计的任务机制落地：晶体内核智能拆解 → 需要推理的小任务分发给
+//! LLM 问答 → 答案智能融合 → 汇总成后续任务。
+//!
+//! ```text
+//! goal ──▶ suggest（晶体记忆感知拆解：Solution/Theory/Episode 命中 + 兜底切分）
+//!           │
+//!           ▼
+//!        dispatch（Reasoning 走 NtLlmAsk 问答；Deterministic 走晶体经验直给，零 LLM 开销）
+//!           │
+//!           ▼
+//!        fuse（置信度加权共识聚类 + 少数派/矛盾报告）──▶ 后续任务队列 follow_ups
+//!           │                                              （失败重试 / 矛盾裁决 / 低置信复核 / 人工确认）
+//!           ▼
+//!        report（含 JEV 决策留痕 + 校准分；follow_ups 可直接再跑 run 闭环）
+//! ```
+//!
+//! ## JEV 接线点（R-P79：外部机制同会话接到生产）
+//! - **J1 拆解分级 = JEV Choice**：每个候选子任务在
+//!   `{reasoning, deterministic, skip}` 上的概率分布 → `ChoiceAnswer::new`
+//!   自动给出 confidence + margin；胶着（margin < 0.05）经
+//!   `abstain_if_contested` 弃权转人工确认。
+//! - **J2 回复可信 = JEV Noul**：每条 LLM 回答经 `NoulAnswer::new`
+//!   归一（"该回答可信？"），`< 0.7` 自动挂 `needs_review`。
+//! - **J3 融合裁决 = Noul + RiskTier**：获胜簇权重占比 → Noul
+//!   （"融合结论为真？"）；`RiskTier::decide` 定 Automate 直接进后续任务
+//!   还是 HumanReview 进人工队列。
+//! - **J4 校准尺 = eval::brier_score**：报告 `calibration = 1 - brier`
+//!   （簇权重作概率、是否共识作正确性代理），融合质量可度量。
+//! - **J5 决策留痕 = JevResultSet**：每子任务分级 Choice + 融合 Noul
+//!   全量记录，可审计、可复跑。
+//!
+//! # Safety
+//! - 纯内存 + trait 注入的 LLM，无 IO、无锁、无 unsafe (R-P1)。
+//! - 生产代码无 `unwrap/expect/panic`；浮点排序用
+//!   `partial_cmp().unwrap_or(Equal)`（与 `nt_core_task_dispatcher` 一致）。
+//! - 单条 LLM 失败只记 `failed`，不掀翻整轮（弹性）。
+
+use super::CrystalCore;
+use crate::neotrix::nt_jev::{
+    abstain_if_contested, brier_score, is_abstained, ChoiceAnswer, JevDecision, JevResultSet,
+    NoulAnswer, RiskDecision, RiskTier,
+};
+use std::collections::{HashMap, HashSet};
+
+// ============================================================================
+// 文本相似度（模块内自包含：中英混合关键词 Jaccard）
+// ============================================================================
+
+fn is_cjk(c: char) -> bool {
+    ('\u{4e00}'..='\u{9fff}').contains(&c)
+}
+
+/// 关键词集：空白/标点切词（≥2字保留）+ 中文二元字（解决无空格中文的部分重叠）。
+fn keywords(text: &str) -> HashSet<String> {
+    let lower = text.to_lowercase();
+    let mut set = HashSet::new();
+    for tok in lower.split(|c: char| !(c.is_alphanumeric() || is_cjk(c))) {
+        if tok.chars().count() >= 2 {
+            set.insert(tok.to_string());
+        }
+    }
+    let cjk: Vec<char> = lower.chars().filter(|c| is_cjk(*c)).collect();
+    for w in cjk.windows(2) {
+        set.insert(w.iter().collect());
+    }
+    set
+}
+
+fn jaccard(a: &HashSet<String>, b: &HashSet<String>) -> f64 {
+    if a.is_empty() || b.is_empty() {
+        return 0.0;
+    }
+    let inter = a.intersection(b).count() as f64;
+    let union = (a.len() + b.len()) as f64 - inter;
+    if union <= 0.0 {
+        0.0
+    } else {
+        (inter / union).clamp(0.0, 1.0)
+    }
+}
+
+fn truncate_chars(s: &str, n: usize) -> String {
+    let t: String = s.chars().take(n).collect();
+    if s.chars().count() > n {
+        format!("{}…", t)
+    } else {
+        t
+    }
+}
+
+// ============================================================================
+// 类型
+// ============================================================================
+
+/// 子任务路由：推理走 LLM，确定性走晶体经验直给，胶着/低价值跳过。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NtSubtaskRoute {
+    Reasoning,
+    Deterministic,
+    Skip,
+}
+
+/// 晶体拆解出的子任务（J1：route 由 JEV Choice 产生并留痕）。
+#[derive(Debug, Clone)]
+pub struct NtCrystalSubtask {
+    pub id: String,
+    pub title: String,
+    pub question: String,
+    pub route: NtSubtaskRoute,
+    pub route_decision: JevDecision,
+    pub confidence: f64,
+    /// 来源：`Solution:<id>` / `Theory:<id>` / `Episode:<id>` / `fallback:split`。
+    pub provenance: String,
+    /// Deterministic 子任务的本地直给答案（晶体经验原文）。
+    pub local_answer: Option<String>,
+}
+
+/// LLM 单次问答回复。
+#[derive(Debug, Clone)]
+pub struct NtLlmReply {
+    pub text: String,
+    pub confidence: f64,
+    pub model: String,
+}
+
+/// LLM 问答抽象：同步 trait（与 L1 `ReasoningEngineProvider` 同形），
+///
+/// 异步 Provider 由调用方桥接（block_on 或产出回复后注入），晶体侧保持纯同步可测。
+pub trait NtLlmAsk: Send + Sync {
+    fn ask(&self, prompt: &str) -> Result<NtLlmReply, NtTaskFusionError>;
+}
+
+/// 融合错误。
+#[derive(Debug, thiserror::Error)]
+pub enum NtTaskFusionError {
+    #[error("LLM ask failed: {0}")]
+    Llm(String),
+}
+
+/// 带评分的单条答案（J2：verdict 为 JEV Noul）。
+#[derive(Debug, Clone)]
+pub struct NtScoredAnswer {
+    pub subtask_id: String,
+    pub text: String,
+    pub confidence: f64,
+    pub verdict: NoulAnswer,
+    pub model: String,
+}
+
+/// 答案共识簇。
+#[derive(Debug, Clone)]
+pub struct NtAnswerCluster {
+    pub representative: String,
+    pub member_ids: Vec<String>,
+    pub weight: f64,
+    pub avg_confidence: f64,
+}
+
+/// 融合结论（J3：verdict Noul + risk RiskTier 裁决）。
+#[derive(Debug, Clone)]
+pub struct NtFusedAnswer {
+    pub text: String,
+    pub confidence: f64,
+    pub verdict: NoulAnswer,
+    pub risk: RiskDecision,
+    pub clusters: Vec<NtAnswerCluster>,
+    pub minority: Vec<String>,
+    pub contradictions: Vec<String>,
+    /// 实际熔入结论的子任务 ID。
+    pub used_ids: Vec<String>,
+}
+
+/// 整轮报告：follow_ups 可直接再跑 `run`，形成后续任务闭环。
+#[derive(Debug, Clone)]
+pub struct NtTaskLoopReport {
+    pub goal: String,
+    pub subtasks: Vec<NtCrystalSubtask>,
+    pub answers: Vec<NtScoredAnswer>,
+    /// (subtask_id, error)：单点失败记录，不阻断整轮。
+    pub failed: Vec<(String, String)>,
+    pub fused: NtFusedAnswer,
+    pub follow_ups: Vec<String>,
+    /// J5：子任务分级 Choice + 融合 Noul，全量留痕。
+    pub decisions: JevResultSet,
+    /// J4：`1 - brier_score`，融合校准度 0.0..=1.0。
+    pub calibration: f64,
+}
+
+/// 闭环配置。
+#[derive(Debug, Clone, Copy)]
+pub struct NtTaskLoopConfig {
+    pub max_subtasks: usize,
+    pub min_answer_chars: usize,
+    pub consensus_jaccard: f64,
+    pub contra_lo: f64,
+    pub contra_hi: f64,
+    pub max_follow_ups: usize,
+    pub risk_tier: RiskTier,
+}
+
+impl Default for NtTaskLoopConfig {
+    fn default() -> Self {
+        Self {
+            max_subtasks: 5,
+            min_answer_chars: 8,
+            consensus_jaccard: 0.5,
+            contra_lo: 0.25,
+            contra_hi: 0.5,
+            max_follow_ups: 6,
+            risk_tier: RiskTier::Recoverable,
+        }
+    }
+}
+
+// ============================================================================
+// 引擎
+// ============================================================================
+
+/// 晶体任务闭环引擎。
+pub struct NtCrystalTaskLoop {
+    config: NtTaskLoopConfig,
+}
+
+/// 拆解候选（内部）。
+struct Candidate {
+    title: String,
+    question: String,
+    score: f64,
+    provenance: String,
+    deterministic: bool,
+    local_answer: Option<String>,
+}
+
+impl NtCrystalTaskLoop {
+    pub fn new(config: NtTaskLoopConfig) -> Self {
+        Self { config }
+    }
+
+    /// 一轮闭环：拆解 → 分发问答 → 融合 → 后续任务汇总。
+    pub fn run(
+        &self,
+        goal: &str,
+        core: &CrystalCore,
+        llm: &dyn NtLlmAsk,
+    ) -> NtTaskLoopReport {
+        let subtasks = self.suggest(goal, core);
+        let (answers, failed) = self.dispatch(&subtasks, llm);
+        let fused = self.fuse(&answers);
+        let calibration = self.calibrate(&fused);
+        let follow_ups = self.follow_ups(goal, &subtasks, &fused, &failed);
+
+        let mut decisions: JevResultSet = HashMap::new();
+        for st in &subtasks {
+            decisions.insert(st.id.clone(), st.route_decision.clone());
+        }
+        decisions.insert("fused".to_string(), JevDecision::Noul(fused.verdict.clone()));
+
+        NtTaskLoopReport {
+            goal: goal.to_string(),
+            subtasks,
+            answers,
+            failed,
+            fused,
+            follow_ups,
+            decisions,
+            calibration,
+        }
+    }
+
+    // ── 1. 晶体记忆感知拆解 ──
+
+    fn suggest(&self, goal: &str, core: &CrystalCore) -> Vec<NtCrystalSubtask> {
+        let goal_kws = keywords(goal);
+        let mut cands: Vec<Candidate> = Vec::new();
+
+        // L3 成功经验：可复用 Solution 命中 → Deterministic 直给候选
+        for sol in &core.experience.successes {
+            let text = format!("{} {}", sol.problem, sol.approach);
+            let j = jaccard(&goal_kws, &keywords(&text));
+            if j > 0.0 {
+                let score = j * 0.7 + if sol.reusable { 0.3 } else { 0.0 };
+                let det = sol.reusable && score >= 0.3;
+                cands.push(Candidate {
+                    title: truncate_chars(&sol.problem, 24),
+                    question: format!("基于晶体经验解决：{}", sol.problem),
+                    score,
+                    provenance: format!("Solution:{}", sol.id),
+                    deterministic: det,
+                    local_answer: Some(sol.approach.clone()),
+                });
+            }
+        }
+
+        // L2 理论：core_claim 命中 → Reasoning 候选
+        for theory in core.knowledge.theories.values() {
+            let text = format!("{} {}", theory.name, theory.core_claim);
+            let j = jaccard(&goal_kws, &keywords(&text));
+            if j > 0.0 {
+                cands.push(Candidate {
+                    title: truncate_chars(&theory.name, 24),
+                    question: format!("用「{}」分析：{}（{}）", theory.name, goal, theory.core_claim),
+                    score: j * theory.confidence.clamp(0.0, 1.0),
+                    provenance: format!("Theory:{}", theory.id),
+                    deterministic: false,
+                    local_answer: None,
+                });
+            }
+        }
+
+        // L3 情境：高质量 Episode 命中 → Reasoning 候选
+        for ep in &core.experience.episodes {
+            if ep.quality < 0.6 {
+                continue;
+            }
+            let text = format!("{} {}", ep.context, ep.reflection);
+            let j = jaccard(&goal_kws, &keywords(&text));
+            if j > 0.0 {
+                cands.push(Candidate {
+                    title: truncate_chars(&ep.context, 24),
+                    question: format!("参考历史情境推理：{}（行动：{}）", ep.context, ep.action),
+                    score: j * ep.quality.clamp(0.0, 1.0),
+                    provenance: format!("Episode:{}", ep.id),
+                    deterministic: false,
+                    local_answer: None,
+                });
+            }
+        }
+
+        // 兜底：晶体无命中 → 按连词切分（中英），切不出则整题单问
+        if cands.is_empty() {
+            let parts = split_goal(goal);
+            if parts.len() > 1 {
+                for (i, p) in parts.iter().enumerate() {
+                    cands.push(Candidate {
+                        title: truncate_chars(p, 24),
+                        question: format!("步骤{}：{}", i + 1, p),
+                        score: 0.1,
+                        provenance: "fallback:split".to_string(),
+                        deterministic: false,
+                        local_answer: None,
+                    });
+                }
+            } else {
+                cands.push(Candidate {
+                    title: truncate_chars(goal, 24),
+                    question: goal.to_string(),
+                    score: 0.1,
+                    provenance: "fallback:single".to_string(),
+                    deterministic: false,
+                    local_answer: None,
+                });
+            }
+        }
+
+        // 分数降序、provenance 升序（确定性），截断到上限
+        cands.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.provenance.cmp(&b.provenance))
+        });
+        cands.truncate(self.config.max_subtasks.max(1));
+
+        cands
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| {
+                let (route, decision) = route_choice(&c);
+                NtCrystalSubtask {
+                    id: format!("st-{}", i + 1),
+                    title: c.title,
+                    question: c.question,
+                    route,
+                    confidence: decision.confidence(),
+                    route_decision: decision,
+                    provenance: c.provenance,
+                    local_answer: c.local_answer,
+                }
+            })
+            .collect()
+    }
+
+    // ── 2. 分发：Reasoning 问 LLM，Deterministic 晶体直给 ──
+
+    fn dispatch(
+        &self,
+        subtasks: &[NtCrystalSubtask],
+        llm: &dyn NtLlmAsk,
+    ) -> (Vec<NtScoredAnswer>, Vec<(String, String)>) {
+        let mut answers = Vec::new();
+        let mut failed = Vec::new();
+
+        for st in subtasks {
+            match st.route {
+                NtSubtaskRoute::Skip => continue,
+                NtSubtaskRoute::Deterministic => match &st.local_answer {
+                    Some(text) if !text.trim().is_empty() => {
+                        let conf = st.confidence.clamp(0.0, 1.0).max(0.5);
+                        answers.push(NtScoredAnswer {
+                            subtask_id: st.id.clone(),
+                            text: text.clone(),
+                            confidence: conf,
+                            verdict: NoulAnswer::new(conf),
+                            model: "crystal-memory".to_string(),
+                        });
+                    }
+                    _ => failed.push((st.id.clone(), "no local answer".to_string())),
+                },
+                NtSubtaskRoute::Reasoning => match llm.ask(&st.question) {
+                    Ok(reply) => {
+                        let conf = reply.confidence.clamp(0.0, 1.0);
+                        answers.push(NtScoredAnswer {
+                            subtask_id: st.id.clone(),
+                            text: reply.text,
+                            confidence: conf,
+                            verdict: NoulAnswer::new(conf),
+                            model: reply.model,
+                        });
+                    }
+                    Err(e) => failed.push((st.id.clone(), e.to_string())),
+                },
+            }
+        }
+        (answers, failed)
+    }
+
+    // ── 3. 融合：置信度加权共识聚类 ──
+
+    fn fuse(&self, answers: &[NtScoredAnswer]) -> NtFusedAnswer {
+        let mut clusters: Vec<NtAnswerCluster> = Vec::new();
+
+        for a in answers {
+            if a.text.chars().count() < self.config.min_answer_chars {
+                continue;
+            }
+            let kws = keywords(&a.text);
+            let mut best: Option<usize> = None;
+            let mut best_j = 0.0;
+            for (i, c) in clusters.iter().enumerate() {
+                let j = jaccard(&kws, &keywords(&c.representative));
+                if j >= self.config.consensus_jaccard && j > best_j {
+                    best = Some(i);
+                    best_j = j;
+                }
+            }
+            match best {
+                Some(i) => {
+                    let c = &mut clusters[i];
+                    if a.confidence > c.avg_confidence {
+                        c.representative = a.text.clone();
+                    }
+                    c.member_ids.push(a.subtask_id.clone());
+                    c.weight += a.confidence;
+                    let n = c.member_ids.len() as f64;
+                    c.avg_confidence = if n > 0.0 { c.weight / n } else { 0.0 };
+                }
+                None => clusters.push(NtAnswerCluster {
+                    representative: a.text.clone(),
+                    member_ids: vec![a.subtask_id.clone()],
+                    weight: a.confidence,
+                    avg_confidence: a.confidence,
+                }),
+            }
+        }
+
+        clusters.sort_by(|a, b| {
+            b.weight
+                .partial_cmp(&a.weight)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.representative.cmp(&b.representative))
+        });
+
+        let total: f64 = clusters.iter().map(|c| c.weight).sum();
+        let share = clusters
+            .first()
+            .map(|c| {
+                if total > 0.0 {
+                    (c.weight / total).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                }
+            })
+            .unwrap_or(0.0);
+
+        let text = clusters
+            .first()
+            .map(|c| c.representative.clone())
+            .unwrap_or_default();
+        let used_ids = clusters
+            .first()
+            .map(|c| c.member_ids.clone())
+            .unwrap_or_default();
+
+        // 少数派：未形成共识的孤簇
+        let minority: Vec<String> = clusters
+            .iter()
+            .skip(1)
+            .filter(|c| c.member_ids.len() == 1)
+            .take(3)
+            .map(|c| truncate_chars(&c.representative, 120))
+            .collect();
+
+        // 矛盾：部分重叠但未达共识的簇对
+        let mut contradictions = Vec::new();
+        for (i, a) in clusters.iter().enumerate() {
+            for b in clusters.iter().skip(i + 1) {
+                let j = jaccard(&keywords(&a.representative), &keywords(&b.representative));
+                if j >= self.config.contra_lo && j < self.config.contra_hi {
+                    contradictions.push(format!(
+                        "{} ↔ {}",
+                        truncate_chars(&a.representative, 60),
+                        truncate_chars(&b.representative, 60)
+                    ));
+                    if contradictions.len() >= 3 {
+                        break;
+                    }
+                }
+            }
+            if contradictions.len() >= 3 {
+                break;
+            }
+        }
+
+        let verdict = NoulAnswer::new(share);
+        let risk = self.config.risk_tier.decide(share, verdict.needs_review);
+
+        NtFusedAnswer {
+            text,
+            confidence: share,
+            verdict,
+            risk,
+            clusters,
+            minority,
+            contradictions,
+            used_ids,
+        }
+    }
+
+    // ── J4：校准分 ──
+
+    fn calibrate(&self, fused: &NtFusedAnswer) -> f64 {
+        let total: f64 = fused.clusters.iter().map(|c| c.weight).sum();
+        if total <= 0.0 || fused.clusters.is_empty() {
+            return 0.0;
+        }
+        let items: Vec<(f64, bool)> = fused
+            .clusters
+            .iter()
+            .map(|c| ((c.weight / total).clamp(0.0, 1.0), c.member_ids.len() >= 2))
+            .collect();
+        (1.0 - brier_score(&items)).clamp(0.0, 1.0)
+    }
+
+    // ── 4. 后续任务汇总 ──
+
+    fn follow_ups(
+        &self,
+        goal: &str,
+        subtasks: &[NtCrystalSubtask],
+        fused: &NtFusedAnswer,
+        failed: &[(String, String)],
+    ) -> Vec<String> {
+        let mut ups = Vec::new();
+
+        // 人工复核优先（J3 RiskTier 裁决）
+        if fused.risk == RiskDecision::HumanReview {
+            ups.push(format!("人工复核融合结论后推进：{}", truncate_chars(goal, 60)));
+        }
+        // 失败重试
+        for (id, err) in failed {
+            ups.push(format!("重试子任务 {}（上次失败：{}）", id, truncate_chars(err, 80)));
+        }
+        // 弃权确认（J1 abstain）
+        for st in subtasks {
+            if st.route == NtSubtaskRoute::Skip && is_abstained(&st.route_decision) {
+                ups.push(format!("人工确认子任务「{}」是否执行", st.title));
+            }
+        }
+        // 矛盾裁决
+        for c in &fused.contradictions {
+            ups.push(format!("裁决矛盾：{}", c));
+        }
+        // 少数派核查
+        for m in fused.minority.iter().take(2) {
+            ups.push(format!("核查少数派观点：{}", m));
+        }
+        // 低置信复核
+        if fused.confidence < 0.5 && !fused.text.is_empty() {
+            ups.push(format!("复核低置信结论：{}", truncate_chars(goal, 60)));
+        }
+
+        ups.truncate(self.config.max_follow_ups);
+        ups
+    }
+}
+
+// ============================================================================
+// J1：路由 Choice（模块级函数，单独可测）
+// ============================================================================
+
+/// 候选 → JEV Choice 路由：概率由晶体命中强度推导，胶着自动弃权。
+fn route_choice(c: &Candidate) -> (NtSubtaskRoute, JevDecision) {
+    let (pr, pd, ps) = if c.deterministic {
+        (0.25, 0.70, 0.05)
+    } else if c.score >= 0.5 {
+        (0.70, 0.20, 0.10)
+    } else {
+        (0.55, 0.15, 0.30)
+    };
+    let sum = pr + pd + ps;
+    let mut probs = HashMap::new();
+    probs.insert("reasoning".to_string(), pr / sum);
+    probs.insert("deterministic".to_string(), pd / sum);
+    probs.insert("skip".to_string(), ps / sum);
+    let top = if pr >= pd && pr >= ps {
+        "reasoning"
+    } else if pd >= ps {
+        "deterministic"
+    } else {
+        "skip"
+    };
+    let decision = abstain_if_contested(JevDecision::Choice(ChoiceAnswer::new(
+        top.to_string(),
+        probs,
+    )));
+    let route = if is_abstained(&decision) {
+        NtSubtaskRoute::Skip
+    } else {
+        match &decision {
+            JevDecision::Choice(c) if c.choice == "reasoning" => NtSubtaskRoute::Reasoning,
+            JevDecision::Choice(c) if c.choice == "deterministic" => {
+                NtSubtaskRoute::Deterministic
+            }
+            _ => NtSubtaskRoute::Skip,
+        }
+    };
+    (route, decision)
+}
+
+/// 兜底切分：中英连词。
+fn split_goal(goal: &str) -> Vec<String> {
+    let delims = [
+        "然后", "接着", "和", "与", "并", "、", "；", ";", " and ", " then ", " & ",
+    ];
+    let mut parts = vec![goal.to_string()];
+    for d in delims {
+        let mut next = Vec::new();
+        for p in parts {
+            for s in p.split(d) {
+                let t = s.trim();
+                if !t.is_empty() {
+                    next.push(t.to_string());
+                }
+            }
+        }
+        parts = next;
+    }
+    parts
+        .into_iter()
+        .filter(|p| p.chars().count() >= 4)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    struct StubAsk {
+        replies: HashMap<String, NtLlmReply>,
+        fail_on: Vec<String>,
+        calls: Mutex<Vec<String>>,
+    }
+
+    impl StubAsk {
+        fn new() -> Self {
+            Self {
+                replies: HashMap::new(),
+                fail_on: Vec::new(),
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl NtLlmAsk for StubAsk {
+        fn ask(&self, prompt: &str) -> Result<NtLlmReply, NtTaskFusionError> {
+            self.calls.lock().unwrap().push(prompt.to_string());
+            if self.fail_on.iter().any(|f| prompt.contains(f)) {
+                return Err(NtTaskFusionError::Llm("boom".to_string()));
+            }
+            Ok(self
+                .replies
+                .get(prompt)
+                .cloned()
+                .unwrap_or(NtLlmReply {
+                    text: "stub 默认回答内容足够长可以过长度门槛".to_string(),
+                    confidence: 0.6,
+                    model: "stub".to_string(),
+                }))
+        }
+    }
+
+    fn seeded_core() -> CrystalCore {
+        let mut core = CrystalCore::new("test");
+        core.experience.record_success(
+            "支付功能接入",
+            "调用支付网关SDK并做幂等下单",
+            "接入成功",
+            true,
+            "网关幂等模式",
+            "pay",
+        );
+        core.experience.record_episode(
+            "数据库慢查询",
+            "加索引",
+            "恢复正常",
+            "先看执行计划再加索引",
+            "db",
+            0.9,
+        );
+        core
+    }
+
+    fn engine() -> NtCrystalTaskLoop {
+        NtCrystalTaskLoop::new(NtTaskLoopConfig::default())
+    }
+
+    #[test]
+    fn test_suggest_hits_reusable_solution_as_deterministic() {
+        let core = seeded_core();
+        let subs = engine().suggest("如何接入支付功能", &core);
+        assert!(!subs.is_empty());
+        let hit = subs
+            .iter()
+            .find(|s| s.provenance.starts_with("Solution:"))
+            .unwrap();
+        assert_eq!(hit.route, NtSubtaskRoute::Deterministic);
+        assert!(hit.local_answer.is_some());
+    }
+
+    #[test]
+    fn test_suggest_fallback_splits_goal() {
+        let core = CrystalCore::new("empty");
+        let subs = engine().suggest("先设计数据库然后接入支付功能", &core);
+        assert!(subs.len() >= 2);
+        assert!(subs.iter().all(|s| s.provenance == "fallback:split"));
+    }
+
+    #[test]
+    fn test_route_choice_contested_abstains_to_skip() {
+        // 0.34/0.33/0.33：margin < 0.05 → 弃权 → Skip
+        let mut probs = HashMap::new();
+        probs.insert("reasoning".to_string(), 0.34);
+        probs.insert("deterministic".to_string(), 0.33);
+        probs.insert("skip".to_string(), 0.33);
+        let d = abstain_if_contested(JevDecision::Choice(ChoiceAnswer::new(
+            "reasoning".to_string(),
+            probs,
+        )));
+        assert!(is_abstained(&d));
+        assert!(d.needs_review());
+    }
+
+    #[test]
+    fn test_dispatch_routes_reasoning_to_llm_and_skips_llm_for_memory() {
+        let core = seeded_core();
+        let eng = engine();
+        let subs = eng.suggest("如何接入支付功能", &core);
+        assert!(subs.iter().any(|s| s.route == NtSubtaskRoute::Deterministic));
+        let llm = StubAsk::new();
+        let (answers, failed) = eng.dispatch(&subs, &llm);
+        assert!(failed.is_empty());
+        // Deterministic 不耗 LLM：calls 只来自 Reasoning 子任务
+        let reasoning_count = subs
+            .iter()
+            .filter(|s| s.route == NtSubtaskRoute::Reasoning)
+            .count();
+        assert_eq!(llm.calls.lock().unwrap().len(), reasoning_count);
+        assert!(answers.iter().any(|a| a.model == "crystal-memory"));
+    }
+
+    #[test]
+    fn test_dispatch_failure_recorded_not_fatal() {
+        let subs = vec![NtCrystalSubtask {
+            id: "st-1".to_string(),
+            title: "t".to_string(),
+            question: "一定会炸的问题".to_string(),
+            route: NtSubtaskRoute::Reasoning,
+            route_decision: JevDecision::Noul(NoulAnswer::new(0.9)),
+            confidence: 0.9,
+            provenance: "test".to_string(),
+            local_answer: None,
+        }];
+        let mut llm = StubAsk::new();
+        llm.fail_on.push("会炸".to_string());
+        let (answers, failed) = engine().dispatch(&subs, &llm);
+        assert!(answers.is_empty());
+        assert_eq!(failed.len(), 1);
+        assert!(failed[0].1.contains("boom"));
+    }
+
+    #[test]
+    fn test_fuse_weights_by_confidence() {
+        let eng = engine();
+        let mk = |id: &str, text: &str, conf: f64| NtScoredAnswer {
+            subtask_id: id.to_string(),
+            text: text.to_string(),
+            confidence: conf,
+            verdict: NoulAnswer::new(conf),
+            model: "m".to_string(),
+        };
+        let answers = vec![
+            mk("a", "结论是采用方案甲进行系统重构工作", 0.9),
+            mk("b", "结论是采用方案甲进行系统重构任务", 0.8),
+            mk("c", "结论是全部推倒重写毫无保留余地", 0.3),
+        ];
+        let fused = eng.fuse(&answers);
+        assert!(fused.text.contains("方案甲"));
+        assert!(fused.confidence > 0.5);
+        assert!(!fused.verdict.needs_review);
+        assert_eq!(fused.risk, RiskDecision::Automate);
+    }
+
+    #[test]
+    fn test_fuse_low_share_flags_review_and_followup() {
+        let eng = engine();
+        let mk = |id: &str, text: &str| NtScoredAnswer {
+            subtask_id: id.to_string(),
+            text: text.to_string(),
+            confidence: 0.4,
+            verdict: NoulAnswer::new(0.4),
+            model: "m".to_string(),
+        };
+        let answers = vec![
+            mk("a", "苹果是水果中维生素含量最高的一种"),
+            mk("b", "汽车发动机需要定期更换机油保养"),
+            mk("c", "数据库索引可以显著提升查询速度"),
+        ];
+        let fused = eng.fuse(&answers);
+        assert!(fused.verdict.needs_review);
+        assert_eq!(fused.risk, RiskDecision::HumanReview);
+        // 后续任务汇总直接消费该 fused（而非 run 的单答案闭环）
+        let ups = eng.follow_ups("互不相关的三件事", &[], &fused, &[]);
+        assert!(ups.iter().any(|u| u.contains("人工复核")));
+    }
+
+    #[test]
+    fn test_run_end_to_end_with_memory_and_llm() {
+        let core = seeded_core();
+        let llm = StubAsk::new();
+        let report = engine().run("如何接入支付功能", &core, &llm);
+        assert!(!report.answers.is_empty());
+        assert!(!report.fused.text.is_empty());
+        assert!(report.decisions.contains_key("fused"));
+        assert!((0.0..=1.0).contains(&report.calibration));
+        // 后续任务可闭环：follow_ups 能再跑
+        for up in &report.follow_ups {
+            assert!(!up.is_empty());
+        }
+    }
+}

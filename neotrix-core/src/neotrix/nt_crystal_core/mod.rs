@@ -48,6 +48,11 @@ pub use developmental_training::*;
 pub use link_graph_active::*;
 pub mod cross_source;
 pub use cross_source::CrossSourceFusionEngine;
+pub mod nt_crystal_task_fusion; // 晶体任务闭环 — 智能拆解 → LLM问答分发 → JEV融合 → 后续任务
+pub use nt_crystal_task_fusion::{
+    NtAnswerCluster, NtCrystalSubtask, NtCrystalTaskLoop, NtFusedAnswer, NtLlmReply,
+    NtScoredAnswer, NtSubtaskRoute, NtTaskFusionError, NtTaskLoopConfig, NtTaskLoopReport, NtLlmAsk,
+};
 
 #[cfg(test)]
 mod tests;

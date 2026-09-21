@@ -237,6 +237,27 @@ impl TaskDecomposerDispatcher {
         Ok(final_answer)
     }
 
+    /// 晶体闭环直调：goal → 晶体内核智能拆解 → 本 provider 问答 → JEV 融合 → 后续任务。
+    ///
+    /// 与 `decompose_and_execute`（L1 自有拆解/聚合）并存—
+    /// 本方法走晶体记忆感知的拆解与 JEV 融合（`nt_crystal_task_fusion`），
+    /// 同步方法（内部经 `NtLlmProviderBridge` 桥接异步 provider）：
+    /// 在 tokio multi-thread 运行时内或无 runtime 的同步上下文均可调用。
+    pub fn crystal_loop_report(
+        &self,
+        goal: &str,
+        core: &crate::neotrix::nt_crystal_core::CrystalCore,
+        model: &str,
+    ) -> Result<crate::neotrix::nt_crystal_core::NtTaskLoopReport, TaskDispatchError> {
+        use crate::neotrix::nt_crystal_core::{NtCrystalTaskLoop, NtTaskLoopConfig};
+        let bridge = super::nt_crystal_llm_bridge::NtLlmProviderBridge::new(
+            self.provider.clone(),
+            model,
+        );
+        let engine = NtCrystalTaskLoop::new(NtTaskLoopConfig::default());
+        Ok(engine.run(goal, core, &bridge))
+    }
+
     /// 仅拆解任务（不执行）
     pub async fn decompose_task(
         &self,
