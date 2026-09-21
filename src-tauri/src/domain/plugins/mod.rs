@@ -4,6 +4,8 @@ pub mod file;
 pub mod kb;
 pub mod llamacpp;
 pub mod memory;
+pub mod model_pool;
+pub mod proxy_pool;
 pub mod session;
 pub mod stubs;
 pub mod workflow;
@@ -24,6 +26,8 @@ pub use file::FilePlugin;
 pub use kb::KbPlugin;
 pub use llamacpp::LlamacppPlugin;
 pub use memory::MemoryPlugin;
+pub use model_pool::ModelPoolPlugin;
+pub use proxy_pool::ProxyPoolPlugin;
 pub use session::SessionPlugin;
 pub use stubs::{
     AgentPlugin, CliPlugin, ExtPlugin, GitPlugin, PluginPlugin, SecurityPlugin, SystemPlugin,

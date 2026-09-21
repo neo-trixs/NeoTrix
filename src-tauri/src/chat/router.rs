@@ -107,23 +107,23 @@ impl IntentRouter {
             }
         }
 
-        // Provider commands
+        // Provider commands → llamacpp/provider_status (no standalone provider plugin exists)
         if msg.contains("provider") || msg.contains("供应商") || msg.contains("提供商") {
-            if msg.contains("列表") || msg.contains("list") || msg.contains("查看") {
+            if msg.contains("列表") || msg.contains("list") || msg.contains("查看") || msg.contains("状态") || msg.contains("status") {
                 return Some(Intent {
-                    domain: "provider".into(),
-                    action: "list".into(),
+                    domain: "llamacpp".into(),
+                    action: "provider_status".into(),
                     args: json!({}),
-                    response_hint: Some("Provider列表:".into()),
+                    response_hint: Some("Provider状态:".into()),
                 });
             }
         }
 
-        // System commands
+        // System commands → system/system_info (SystemPlugin has no `state` action)
         if msg.contains("状态") || msg.contains("status") || msg.contains("健康") || msg.contains("health") {
             return Some(Intent {
                 domain: "system".into(),
-                action: "state".into(),
+                action: "system_info".into(),
                 args: json!({}),
                 response_hint: Some("系统状态:".into()),
             });
@@ -169,29 +169,63 @@ impl IntentRouter {
     }
 
     fn extract_url(message: &str) -> Option<String> {
-        // Simple URL extraction
+        // URL extraction: strip wrapping quotes/brackets and trailing punctuation
+        // (e.g. "http://1.2.3.4:8080," or "http://h:8080。" from CJK input).
         let words: Vec<&str> = message.split_whitespace().collect();
         for word in words {
-            if word.starts_with("http://") || word.starts_with("https://") {
-                return Some(word.to_string());
+            let trimmed = word.trim_matches(|c: char| {
+                "\"'()[]<>,;!?，。！？；：、）".contains(c)
+            });
+            let lower = trimmed.to_lowercase();
+            if lower.starts_with("http://")
+                || lower.starts_with("https://")
+                || lower.starts_with("socks5://")
+            {
+                let clean = trimmed.trim_end_matches(|c: char| c == '.' || c == ',' || c == '。' || c == '，');
+                if !clean.is_empty() {
+                    return Some(clean.to_string());
+                }
             }
         }
         None
     }
 
+    /// Strategy names must be members of `domain::proxy_pool::VALID_STRATEGIES`.
     fn extract_strategy(message: &str) -> Option<String> {
-        let strategies = ["random", "round_robin", "least_latency", "least_error_rate", "weighted"];
-        for s in strategies {
+        // Valid tokens first (exact backend vocabulary).
+        for s in crate::domain::proxy_pool::VALID_STRATEGIES {
             if message.contains(s) {
                 return Some(s.to_string());
             }
         }
-        // Chinese strategy names
-        if message.contains("随机") { return Some("random".into()); }
-        if message.contains("轮询") || message.contains("round") { return Some("round_robin".into()); }
-        if message.contains("延迟") || message.contains("latency") { return Some("least_latency".into()); }
-        if message.contains("错误率") || message.contains("error") { return Some("least_error_rate".into()); }
-        if message.contains("权重") || message.contains("weighted") { return Some("weighted".into()); }
+        // Aliases → valid members.
+        if message.contains("最快") || message.contains("fastest") {
+            return Some("fastest".into());
+        }
+        if message.contains("延迟") || message.contains("低延迟") || message.contains("latency") {
+            return Some("least_latency".into());
+        }
+        if message.contains("错误率") || message.contains("失败率") || message.contains("least_error_rate") || message.contains("least_failure") {
+            return Some("least_failure".into());
+        }
+        if message.contains("权重") || message.contains("weighted") {
+            return Some("weighted_random".into());
+        }
+        if message.contains("地理") || message.contains("geo") {
+            return Some("geo_preferred".into());
+        }
+        if message.contains("轮询") || message.contains("round") {
+            return Some("round_robin".into());
+        }
+        if message.contains("自适应") || message.contains("adaptive") {
+            return Some("adaptive".into());
+        }
+        if message.contains("随机") || message.contains("random") {
+            return Some("round_robin".into());
+        }
+        if message.contains("自动") || message.contains("auto") {
+            return Some("auto".into());
+        }
         None
     }
 
@@ -214,7 +248,7 @@ impl IntentRouter {
         json!({})
     }
 
-    fn help_text() -> String {
+    pub(crate) fn help_text() -> String {
         r#"NeoTrix 自然语言助手 — 支持的操作:
 
 🔹 代理管理

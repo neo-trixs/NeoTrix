@@ -34,14 +34,29 @@ export interface ChatAction {
  * console.log(response.message); // "已添加代理: http://1.2.3.4:8080"
  * ```
  */
+/**
+ * Backend envelope for chat_send (mirrors Rust IpcResponse<ChatResponse>).
+ * Unwrapped here so callers keep working with plain ChatResponse.
+ */
+interface ChatEnvelope {
+  ok: boolean;
+  error?: { code: string; message: string };
+  data?: ChatResponse;
+}
+
 export async function chatSend(
   message: string,
   sessionId?: string,
 ): Promise<ChatResponse> {
-  return tauriInvoke<ChatResponse>('chat_send', {
+  const env = await tauriInvoke<ChatEnvelope>('chat_send', {
     message,
     session_id: sessionId,
   });
+  if (!env.ok || !env.data) {
+    const err = env.error ?? { code: 'UNKNOWN', message: 'Unknown chat error' };
+    throw new Error(`[${err.code}] ${err.message}`);
+  }
+  return env.data;
 }
 
 /**

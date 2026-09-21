@@ -289,8 +289,8 @@ export function setMode(mode: string): Promise<void> {
 }
 
 /* ── 项目 / 文件 ── */
-export function setProject(path: string): Promise<void> {
-  return domain.call<void>('session', 'set_project', { path })
+export function setProject(id: string, path: string): Promise<void> {
+  return domain.call<void>('session', 'set_project', { id, project: path })
 }
 
 export function getProject(): Promise<string | null> {

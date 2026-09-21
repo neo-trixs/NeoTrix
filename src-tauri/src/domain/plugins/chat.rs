@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use neotrix::l5_cognition::nt_core_consciousness_core::{
     AttemptOutcome, ConsciousTask, ExternalClosureConfig, SolutionExecutor, CORE,
 };
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri::Emitter;
 
 /// GatewayV2 LLM 执行器 — 实现 consciousness core 的 SolutionExecutor trait

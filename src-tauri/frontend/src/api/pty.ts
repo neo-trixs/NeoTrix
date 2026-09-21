@@ -6,9 +6,16 @@
 import { tauriInvoke } from './tauri-bridge'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
-/** 启动 PTY 会话，返回 session id */
-export function ptySpawn(cols: number, rows: number): Promise<string> {
-  return tauriInvoke<string>('pty_spawn', { cols, rows })
+/**
+ * 启动 PTY 会话，返回 session id
+ *
+ * 后端 pty_spawn 要求调用方提供 session_id（IpcResponse<()> 无返回体），
+ * 因此此处在前端生成并透传，调用方拿到的即是订阅事件用的 id。
+ */
+export async function ptySpawn(cols: number, rows: number): Promise<string> {
+  const sessionId = crypto.randomUUID()
+  await tauriInvoke('pty_spawn', { session_id: sessionId, cols, rows })
+  return sessionId
 }
 
 /** 写入数据到 PTY stdin */

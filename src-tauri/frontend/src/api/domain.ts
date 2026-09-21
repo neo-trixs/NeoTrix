@@ -400,7 +400,8 @@ export interface UpdateInfo { available: boolean; version?: string }
  * 安全域操作
  */
 export const security = {
-  scan: (path: string) => call<ScanResult>('security', 'scan', { path }),
+  // 后端读取 args["target"]（stubs.rs），path 键会被忽略；同时发送两者保持兼容
+  scan: (path: string) => call<ScanResult>('security', 'scan', { path, target: path }),
   permissionRequest: (action: string, target: string) =>
     call<PermissionResult>('security', 'permission_request', { action, target }),
   permissionRespond: (id: string, approved: boolean) =>
