@@ -24,7 +24,8 @@ use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // ========== Types ==========
 
@@ -161,8 +162,8 @@ impl SessionSyncPlugin {
     }
 
     /// Create a new synced session
-    fn create_session(&self, mode: &str, title: &str) -> Result<SyncedSession, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+    async fn create_session(&self, mode: &str, title: &str) -> Result<SyncedSession, DomainError> {
+        let mut state = self.state.lock().await.map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -195,13 +196,13 @@ impl SessionSyncPlugin {
     }
 
     /// Add a message to a session
-    fn add_message(
+    async fn add_message(
         &self,
         session_id: &str,
         role: &str,
         content: &str,
     ) -> Result<SyncedMessage, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+        let mut state = self.state.lock().await.map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -248,8 +249,8 @@ impl SessionSyncPlugin {
     }
 
     /// Get all sessions
-    fn get_sessions(&self) -> Result<Vec<SyncedSession>, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
+    async fn get_sessions(&self) -> Result<Vec<SyncedSession>, DomainError> {
+        let state = self.state.lock().await.map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -258,8 +259,8 @@ impl SessionSyncPlugin {
     }
 
     /// Get a session by ID
-    fn get_session(&self, session_id: &str) -> Result<SyncedSession, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
+    async fn get_session(&self, session_id: &str) -> Result<SyncedSession, DomainError> {
+        let state = self.state.lock().await.map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -276,8 +277,8 @@ impl SessionSyncPlugin {
     }
 
     /// Delete a session
-    fn delete_session(&self, session_id: &str) -> Result<(), DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+    async fn delete_session(&self, session_id: &str) -> Result<(), DomainError> {
+        let mut state = self.state.lock().await.map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -287,8 +288,8 @@ impl SessionSyncPlugin {
     }
 
     /// Simulate sync (simplified)
-    fn sync(&self) -> Result<SyncStats, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+    async fn sync(&self) -> Result<SyncStats, DomainError> {
+        let mut state = self.state.lock().await.map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -443,7 +444,7 @@ impl DomainPlugin for SessionSyncPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("New Session");
 
-                let session = self.create_session(mode, title)?;
+                let session = self.create_session(mode, title).await?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "add_message" => {
@@ -458,11 +459,11 @@ impl DomainPlugin for SessionSyncPlugin {
                 let role = args.get("role").and_then(|v| v.as_str()).unwrap_or("user");
                 let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
 
-                let message = self.add_message(session_id, role, content)?;
+                let message = self.add_message(session_id, role, content).await?;
                 Ok(serde_json::to_value(message).unwrap_or_default())
             }
             "get_sessions" => {
-                let sessions = self.get_sessions()?;
+                let sessions = self.get_sessions().await?;
                 Ok(serde_json::json!({
                     "sessions": sessions,
                     "total": sessions.len()
@@ -477,7 +478,7 @@ impl DomainPlugin for SessionSyncPlugin {
                             message: "Missing 'session_id' parameter".into(),
                             recoverable: true,
                         })?;
-                let session = self.get_session(session_id)?;
+                let session = self.get_session(session_id).await?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "delete_session" => {
@@ -489,15 +490,15 @@ impl DomainPlugin for SessionSyncPlugin {
                             message: "Missing 'session_id' parameter".into(),
                             recoverable: true,
                         })?;
-                self.delete_session(session_id)?;
+                self.delete_session(session_id).await?;
                 Ok(serde_json::json!({"success": true}))
             }
             "sync" => {
-                let stats = self.sync()?;
+                let stats = self.sync().await?;
                 Ok(serde_json::to_value(stats).unwrap_or_default())
             }
             "get_stats" => {
-                let state = self.state.lock().map_err(|e| DomainError {
+                let state = self.state.lock().await.map_err(|e| DomainError {
                     code: "LOCK_ERROR".into(),
                     message: format!("Failed to lock state: {}", e),
                     recoverable: false,

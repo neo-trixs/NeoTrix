@@ -22,7 +22,8 @@ use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // ========== Types ==========
 
@@ -250,16 +251,12 @@ impl UnifiedSurfacePlugin {
     }
 
     /// Switch mode
-    fn switch_mode(
+    async fn switch_mode(
         &self,
         target: SurfaceMode,
         reason: Option<String>,
     ) -> Result<SurfaceState, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+        let mut state = self.state.lock().await;
 
         // Record switch
         let prev_mode = state.current_mode.clone();
@@ -286,12 +283,8 @@ impl UnifiedSurfacePlugin {
     }
 
     /// Get current state
-    fn get_state(&self) -> Result<SurfaceState, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn get_state(&self) -> Result<SurfaceState, DomainError> {
+        let state = self.state.lock().await;
         Ok(state.clone())
     }
 }
@@ -417,11 +410,11 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                     .get("reason")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
-                let state = self.switch_mode(mode, reason)?;
+                let state = self.switch_mode(mode, reason).await?;
                 Ok(serde_json::to_value(state).unwrap_or_default())
             }
             "get_state" => {
-                let state = self.get_state()?;
+                let state = self.get_state().await?;
                 Ok(serde_json::to_value(state).unwrap_or_default())
             }
             "get_mode_config" => {
@@ -434,7 +427,7 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                     _ => SurfaceMode::Chat,
                 };
 
-                let state = self.get_state()?;
+                let state = self.get_state().await?;
                 if let Some(config) = state.modes.get(&mode) {
                     Ok(serde_json::to_value(config).unwrap_or_default())
                 } else {
@@ -455,11 +448,7 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                             recoverable: true,
                         })?;
 
-                let mut state = self.state.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: format!("Failed to lock state: {}", e),
-                    recoverable: false,
-                })?;
+                let mut state = self.state.lock().await;
 
                 match panel {
                     "file_panel" => state.panels.file_panel = !state.panels.file_panel,
@@ -487,11 +476,11 @@ impl DomainPlugin for UnifiedSurfacePlugin {
                 }))
             }
             "get_mode_history" => {
-                let state = self.get_state()?;
+                let state = self.get_state().await?;
                 Ok(serde_json::to_value(state.mode_history).unwrap_or_default())
             }
             "get_stats" => {
-                let state = self.get_state()?;
+                let state = self.get_state().await?;
                 let mut sessions_by_mode = HashMap::new();
                 // Simplified stats
                 sessions_by_mode.insert("chat".to_string(), 0);

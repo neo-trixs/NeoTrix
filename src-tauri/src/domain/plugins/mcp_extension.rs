@@ -23,7 +23,8 @@ use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // ========== Types ==========
 
@@ -167,12 +168,8 @@ impl McpExtensionPlugin {
     }
 
     /// Install a package
-    fn install(&self, name: &str, version: Option<&str>) -> Result<InstalledPackage, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn install(&self, name: &str, version: Option<&str>) -> Result<InstalledPackage, DomainError> {
+        let mut state = self.state.lock().await;
 
         let manifest = PackageManifest {
             name: name.to_string(),
@@ -213,23 +210,15 @@ impl McpExtensionPlugin {
     }
 
     /// Uninstall a package
-    fn uninstall(&self, name: &str) -> Result<(), DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn uninstall(&self, name: &str) -> Result<(), DomainError> {
+        let mut state = self.state.lock().await;
         state.installed.remove(name);
         Ok(())
     }
 
     /// Enable/disable a package
-    fn toggle(&self, name: &str, enabled: bool) -> Result<InstalledPackage, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn toggle(&self, name: &str, enabled: bool) -> Result<InstalledPackage, DomainError> {
+        let mut state = self.state.lock().await;
 
         let package = state.installed.get_mut(name).ok_or_else(|| DomainError {
             code: "PACKAGE_NOT_FOUND".into(),
@@ -242,12 +231,8 @@ impl McpExtensionPlugin {
     }
 
     /// Start/stop a package
-    fn set_running(&self, name: &str, running: bool) -> Result<InstalledPackage, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn set_running(&self, name: &str, running: bool) -> Result<InstalledPackage, DomainError> {
+        let mut state = self.state.lock().await;
 
         let package = state.installed.get_mut(name).ok_or_else(|| DomainError {
             code: "PACKAGE_NOT_FOUND".into(),
@@ -266,22 +251,14 @@ impl McpExtensionPlugin {
     }
 
     /// List installed packages
-    fn list_installed(&self) -> Result<Vec<InstalledPackage>, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn list_installed(&self) -> Result<Vec<InstalledPackage>, DomainError> {
+        let state = self.state.lock().await;
         Ok(state.installed.values().cloned().collect())
     }
 
     /// Search registry
-    fn search(&self, query: &str) -> Result<Vec<PackageResult>, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn search(&self, query: &str) -> Result<Vec<PackageResult>, DomainError> {
+        let state = self.state.lock().await;
 
         // Simplified — would search actual registry
         let results: Vec<PackageResult> = state
@@ -295,12 +272,8 @@ impl McpExtensionPlugin {
     }
 
     /// Get stats
-    fn get_stats(&self) -> Result<ExtensionStats, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn get_stats(&self) -> Result<ExtensionStats, DomainError> {
+        let state = self.state.lock().await;
 
         let installed = state.installed.len();
         let enabled = state.installed.values().filter(|p| p.enabled).count();
@@ -466,7 +439,7 @@ impl DomainPlugin for McpExtensionPlugin {
                             recoverable: true,
                         })?;
                 let version = args.get("version").and_then(|v| v.as_str());
-                let pkg = self.install(name, version)?;
+                let pkg = self.install(name, version).await?;
                 Ok(serde_json::to_value(pkg).unwrap_or_default())
             }
             "uninstall" => {
@@ -478,7 +451,7 @@ impl DomainPlugin for McpExtensionPlugin {
                             message: "Missing 'name'".into(),
                             recoverable: true,
                         })?;
-                self.uninstall(name)?;
+                self.uninstall(name).await?;
                 Ok(serde_json::json!({"success": true}))
             }
             "toggle" => {
@@ -494,7 +467,7 @@ impl DomainPlugin for McpExtensionPlugin {
                     .get("enabled")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(true);
-                let pkg = self.toggle(name, enabled)?;
+                let pkg = self.toggle(name, enabled).await?;
                 Ok(serde_json::to_value(pkg).unwrap_or_default())
             }
             "start" => {
@@ -506,7 +479,7 @@ impl DomainPlugin for McpExtensionPlugin {
                             message: "Missing 'name'".into(),
                             recoverable: true,
                         })?;
-                let pkg = self.set_running(name, true)?;
+                let pkg = self.set_running(name, true).await?;
                 Ok(serde_json::to_value(pkg).unwrap_or_default())
             }
             "stop" => {
@@ -518,20 +491,20 @@ impl DomainPlugin for McpExtensionPlugin {
                             message: "Missing 'name'".into(),
                             recoverable: true,
                         })?;
-                let pkg = self.set_running(name, false)?;
+                let pkg = self.set_running(name, false).await?;
                 Ok(serde_json::to_value(pkg).unwrap_or_default())
             }
             "list" => {
-                let packages = self.list_installed()?;
+                let packages = self.list_installed().await?;
                 Ok(serde_json::json!({"packages": packages, "total": packages.len()}))
             }
             "search" => {
                 let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                let results = self.search(query)?;
+                let results = self.search(query).await?;
                 Ok(serde_json::json!({"results": results, "total": results.len()}))
             }
             "get_stats" => {
-                let stats = self.get_stats()?;
+                let stats = self.get_stats().await?;
                 Ok(serde_json::to_value(stats).unwrap_or_default())
             }
             _ => Err(DomainError {

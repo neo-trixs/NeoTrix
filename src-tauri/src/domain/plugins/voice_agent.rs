@@ -23,7 +23,8 @@ use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // ========== Types ==========
 
@@ -175,8 +176,8 @@ impl VoiceAgentPlugin {
     }
 
     /// Start a voice session
-    fn start_session(&self, language: Option<String>) -> Result<VoiceSession, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+    async fn start_session(&self, language: Option<String>) -> Result<VoiceSession, DomainError> {
+        let mut state = self.state.lock().await;
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -207,19 +208,15 @@ impl VoiceAgentPlugin {
     }
 
     /// Stop a voice session
-    fn stop_session(&self, session_id: &str) -> Result<(), DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn stop_session(&self, session_id: &str) -> Result<(), DomainError> {
+        let mut state = self.state.lock().await;
         state.sessions.remove(session_id);
         Ok(())
     }
 
     /// Start listening
-    fn start_listening(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+    async fn start_listening(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
+        let mut state = self.state.lock().await;
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -242,8 +239,8 @@ impl VoiceAgentPlugin {
     }
 
     /// Stop listening
-    fn stop_listening(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+    async fn stop_listening(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
+        let mut state = self.state.lock().await;
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -263,12 +260,12 @@ impl VoiceAgentPlugin {
     }
 
     /// Process voice input (transcribe)
-    fn process_input(
+    async fn process_input(
         &self,
         session_id: &str,
         audio_data: Option<String>,
     ) -> Result<VoiceCommand, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+        let mut state = self.state.lock().await;
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -297,8 +294,8 @@ impl VoiceAgentPlugin {
     }
 
     /// Speak response
-    fn speak(&self, session_id: &str, text: &str) -> Result<(), DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+    async fn speak(&self, session_id: &str, text: &str) -> Result<(), DomainError> {
+        let mut state = self.state.lock().await;
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -313,8 +310,8 @@ impl VoiceAgentPlugin {
     }
 
     /// Toggle mute
-    fn toggle_mute(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
+    async fn toggle_mute(&self, session_id: &str) -> Result<VoiceSession, DomainError> {
+        let mut state = self.state.lock().await;
             code: "LOCK_ERROR".into(),
             message: format!("Failed to lock state: {}", e),
             recoverable: false,
@@ -465,7 +462,7 @@ impl DomainPlugin for VoiceAgentPlugin {
                     .get("language")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
-                let session = self.start_session(language)?;
+                let session = self.start_session(language).await?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "stop_session" => {
@@ -477,7 +474,7 @@ impl DomainPlugin for VoiceAgentPlugin {
                             message: "Missing 'session_id' parameter".into(),
                             recoverable: true,
                         })?;
-                self.stop_session(session_id)?;
+                self.stop_session(session_id).await?;
                 Ok(serde_json::json!({"success": true}))
             }
             "start_listening" => {
@@ -489,7 +486,7 @@ impl DomainPlugin for VoiceAgentPlugin {
                             message: "Missing 'session_id' parameter".into(),
                             recoverable: true,
                         })?;
-                let session = self.start_listening(session_id)?;
+                let session = self.start_listening(session_id).await?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "stop_listening" => {
@@ -501,7 +498,7 @@ impl DomainPlugin for VoiceAgentPlugin {
                             message: "Missing 'session_id' parameter".into(),
                             recoverable: true,
                         })?;
-                let session = self.stop_listening(session_id)?;
+                let session = self.stop_listening(session_id).await?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "process_input" => {
@@ -517,7 +514,7 @@ impl DomainPlugin for VoiceAgentPlugin {
                     .get("audio_data")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
-                let command = self.process_input(session_id, audio_data)?;
+                let command = self.process_input(session_id, audio_data).await?;
                 Ok(serde_json::to_value(command).unwrap_or_default())
             }
             "speak" => {
@@ -530,7 +527,7 @@ impl DomainPlugin for VoiceAgentPlugin {
                             recoverable: true,
                         })?;
                 let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
-                self.speak(session_id, text)?;
+                self.speak(session_id, text).await?;
                 Ok(serde_json::json!({"success": true}))
             }
             "toggle_mute" => {
@@ -542,15 +539,11 @@ impl DomainPlugin for VoiceAgentPlugin {
                             message: "Missing 'session_id' parameter".into(),
                             recoverable: true,
                         })?;
-                let session = self.toggle_mute(session_id)?;
+                let session = self.toggle_mute(session_id).await?;
                 Ok(serde_json::to_value(session).unwrap_or_default())
             }
             "get_stats" => {
-                let state = self.state.lock().map_err(|e| DomainError {
-                    code: "LOCK_ERROR".into(),
-                    message: format!("Failed to lock state: {}", e),
-                    recoverable: false,
-                })?;
+                let state = self.state.lock().await;
 
                 let total_sessions = state.sessions.len();
                 let active = state

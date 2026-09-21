@@ -4,7 +4,7 @@ use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use async_trait::async_trait;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 use std::time::{Duration, Instant};
 
 pub struct LlamacppPlugin {
@@ -541,7 +541,7 @@ impl DomainPlugin for LlamacppPlugin {
             "start" | "stop" | "swap" => {
                 let mut state = self
                     .state
-                    .lock()
+                    .lock().await
                     .map_err(|e| DomainError::from(e.to_string()))?;
                 match action {
                     "start" => {
@@ -589,7 +589,7 @@ impl DomainPlugin for LlamacppPlugin {
                 let port = {
                     let state = self
                         .state
-                        .lock()
+                        .lock().await
                         .map_err(|e| DomainError::from(e.to_string()))?;
                     state.port
                 };
@@ -622,7 +622,7 @@ impl DomainPlugin for LlamacppPlugin {
             "health" => {
                 let state = self
                     .state
-                    .lock()
+                    .lock().await
                     .map_err(|e| DomainError::from(e.to_string()))?;
                 let running = state.child.is_some();
                 Ok(serde_json::json!({
@@ -637,7 +637,7 @@ impl DomainPlugin for LlamacppPlugin {
             "models" => {
                 let state = self
                     .state
-                    .lock()
+                    .lock().await
                     .map_err(|e| DomainError::from(e.to_string()))?;
                 let models = scan_models(&state.models_dir);
                 Ok(serde_json::json!({ "models": models }))

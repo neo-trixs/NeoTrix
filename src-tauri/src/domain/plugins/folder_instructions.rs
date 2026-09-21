@@ -27,7 +27,8 @@ use crate::domain::{ActionSpec, DomainError, DomainPlugin, ParamSpec};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // ========== Types ==========
 
@@ -157,12 +158,8 @@ impl FolderInstructionsPlugin {
     }
 
     /// Load project context from a directory
-    fn load_project(&self, root_path: &str) -> Result<ProjectContext, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn load_project(&self, root_path: &str) -> Result<ProjectContext, DomainError> {
+        let mut state = self.state.lock().await;
 
         let name = std::path::Path::new(root_path)
             .file_name()
@@ -193,23 +190,15 @@ impl FolderInstructionsPlugin {
     }
 
     /// Unload a project
-    fn unload_project(&self, root_path: &str) -> Result<(), DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn unload_project(&self, root_path: &str) -> Result<(), DomainError> {
+        let mut state = self.state.lock().await;
         state.projects.remove(root_path);
         Ok(())
     }
 
     /// Get merged context for a project
-    fn get_context(&self, root_path: &str) -> Result<MergedContext, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn get_context(&self, root_path: &str) -> Result<MergedContext, DomainError> {
+        let state = self.state.lock().await;
 
         let project = state.projects.get(root_path).ok_or_else(|| DomainError {
             code: "PROJECT_NOT_FOUND".into(),
@@ -247,33 +236,21 @@ impl FolderInstructionsPlugin {
     }
 
     /// List all loaded projects
-    fn list_projects(&self) -> Result<Vec<ProjectContext>, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn list_projects(&self) -> Result<Vec<ProjectContext>, DomainError> {
+        let state = self.state.lock().await;
         Ok(state.projects.values().cloned().collect())
     }
 
     /// Set global instructions
-    fn set_global_instructions(&self, instructions: &str) -> Result<(), DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn set_global_instructions(&self, instructions: &str) -> Result<(), DomainError> {
+        let mut state = self.state.lock().await;
         state.global_instructions = Some(instructions.to_string());
         Ok(())
     }
 
     /// Get stats
-    fn get_stats(&self) -> Result<FolderStats, DomainError> {
-        let state = self.state.lock().map_err(|e| DomainError {
-            code: "LOCK_ERROR".into(),
-            message: format!("Failed to lock state: {}", e),
-            recoverable: false,
-        })?;
+    async fn get_stats(&self) -> Result<FolderStats, DomainError> {
+        let state = self.state.lock().await;
 
         let total_instructions = state
             .projects
@@ -389,7 +366,7 @@ impl DomainPlugin for FolderInstructionsPlugin {
                             message: "Missing 'root_path'".into(),
                             recoverable: true,
                         })?;
-                let ctx = self.load_project(root_path)?;
+                let ctx = self.load_project(root_path).await?;
                 Ok(serde_json::to_value(ctx).unwrap_or_default())
             }
             "unload_project" => {
@@ -401,7 +378,7 @@ impl DomainPlugin for FolderInstructionsPlugin {
                             message: "Missing 'root_path'".into(),
                             recoverable: true,
                         })?;
-                self.unload_project(root_path)?;
+                self.unload_project(root_path).await?;
                 Ok(serde_json::json!({"success": true}))
             }
             "get_context" => {
@@ -413,11 +390,11 @@ impl DomainPlugin for FolderInstructionsPlugin {
                             message: "Missing 'root_path'".into(),
                             recoverable: true,
                         })?;
-                let ctx = self.get_context(root_path)?;
+                let ctx = self.get_context(root_path).await?;
                 Ok(serde_json::to_value(ctx).unwrap_or_default())
             }
             "list_projects" => {
-                let projects = self.list_projects()?;
+                let projects = self.list_projects().await?;
                 Ok(serde_json::json!({"projects": projects, "total": projects.len()}))
             }
             "set_global_instructions" => {
@@ -425,11 +402,11 @@ impl DomainPlugin for FolderInstructionsPlugin {
                     .get("instructions")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                self.set_global_instructions(instructions)?;
+                self.set_global_instructions(instructions).await?;
                 Ok(serde_json::json!({"success": true}))
             }
             "get_stats" => {
-                let stats = self.get_stats()?;
+                let stats = self.get_stats().await?;
                 Ok(serde_json::to_value(stats).unwrap_or_default())
             }
             _ => Err(DomainError {
