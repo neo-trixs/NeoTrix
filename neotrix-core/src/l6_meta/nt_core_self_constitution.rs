@@ -36,6 +36,20 @@ pub enum RuleCategory {
 
 impl RuleCategory {
     pub fn from_rule_id(id: &str) -> Self {
+        // NT-STD 1.0 canonical IDs (SIM-16 意识指导为先): part letter drives category.
+        // Principles (A) steer behavior just below growth governance; evolution (G) tops.
+        if let Some(part) = id.strip_prefix("NTS-").and_then(|s| s.chars().next()) {
+            return match part {
+                'A' => RuleCategory::BehavioralGrounding,
+                'B' => RuleCategory::ArchitectureConstraint,
+                'C' => RuleCategory::CodeQualityPattern,
+                'D' => RuleCategory::BuildDiscipline,
+                'E' => RuleCategory::ArchitectureConstraint,
+                'F' => RuleCategory::BehavioralGrounding,
+                'G' => RuleCategory::TreeGrowth,
+                _ => RuleCategory::CodeQualityPattern,
+            };
+        }
         let num = id.trim_start_matches("R-P").parse::<u32>().unwrap_or(0);
         match num {
             1..=8 | 9 | 13 | 17 | 29 | 35 => RuleCategory::BuildDiscipline,
@@ -389,18 +403,59 @@ impl ConstitutionLoader {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read AGENTS.md: {}", e))?;
         let mut constitution = Self::parse(&content)?;
-        // R-P101 分层契约: AGENTS.md 是 L1 指针层, 全量法则在同目录 dev-rules.md。
-        // 显式加载 AGENTS.md 时合并同伴全量规则文件, 避免指针化后规则集退化
-        // (经验集以主文件为准, 不做合并)。
+        // R-P101 分层契约 superseded by NT-STD 1.0 (SIM-16 意识指导为先):
+        // 正典优先，legacy 保连续，桩/缺席只警告不失败。
+        // 合并顺序 (or_insert 先到先得; R-P 与 NTS 的 ID 空间不交叠):
+        //   主文件 > legacy 伴生 > archive R-P > 正典 NT-STD。
+        // 派生索引重建前先清空 (categorize_rules 非幂等, append 语义)。
         if let Some(dir) = path.parent() {
+            let mut merged_any = false;
+            // 1) legacy companion (stub-safe: unparseable warns, never fails load).
             let companion = dir.join("dev-rules.md");
             if companion.exists() {
-                let full = std::fs::read_to_string(&companion)
-                    .map_err(|e| format!("Failed to read companion dev-rules.md: {}", e))?;
-                let mut merged = Self::parse(&full)?;
-                for (id, rule) in merged.rules.drain() {
-                    constitution.rules.entry(id).or_insert(rule);
+                match std::fs::read_to_string(&companion)
+                    .map_err(|e| format!("Failed to read companion dev-rules.md: {}", e))
+                    .and_then(|full| Self::parse(&full))
+                {
+                    Ok(mut merged) => {
+                        for (id, rule) in merged.rules.drain() {
+                            constitution.rules.entry(id).or_insert(rule);
+                            merged_any = true;
+                        }
+                    }
+                    Err(e) => eprintln!("[constitution] companion skipped: {}", e),
                 }
+            }
+            // 2-3) upward search for archive legacy R-P + canonical NT-STD.
+            let mut probe = dir.to_path_buf();
+            for _depth in 0..6 {
+                let legacy = probe.join("docs/standards/archive/dev-rules-legacy-R-P1-110.md");
+                if legacy.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&legacy) {
+                        for (id, rule) in Self::extract_loose_rules(&content) {
+                            constitution.rules.entry(id).or_insert(rule);
+                            merged_any = true;
+                        }
+                    }
+                }
+                let std = probe.join("docs/standards/NEOTRIX-STD-1.0.md");
+                if std.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&std) {
+                        for (id, rule) in Self::extract_nts_clauses(&content) {
+                            constitution.rules.entry(id).or_insert(rule);
+                            merged_any = true;
+                        }
+                    }
+                    break;
+                }
+                if !probe.pop() {
+                    break;
+                }
+            }
+            if merged_any {
+                // categorize_rules appends: clear derived vecs first for idempotence.
+                constitution.tree_growth_rules.clear();
+                constitution.absorption_rules.clear();
                 Self::categorize_rules(&mut constitution);
                 Self::vectorize_rules(&mut constitution);
                 constitution.build_vector_index();
@@ -438,15 +493,17 @@ impl ConstitutionLoader {
     fn extract_dev_rules(content: &str) -> Result<HashMap<String, DevRule>, String> {
         let mut rules = HashMap::new();
 
-        // Find Dev Rules section
+        // Find Dev Rules section; tolerate absence (SIM-16): pointer-conserved files
+        // (e.g. AGENTS.md) carry no inline section — rules arrive via companion /
+        // archive / canonical merges in `load_from_file`. Empty section = zero rules, not error.
         let dev_rules_section = Self::find_section(content, "Dev Rules", "Experience Tree")
             .or_else(|| Self::find_section(content, "Dev Rules Added", "Experience Tree"))
             .or_else(|| Self::find_section(content, "Dev Rules", "## "))
-            .ok_or("Dev Rules section not found")?;
+            .unwrap_or_default();
 
         // 兼容格式:
         //   1. `- **R-Pxx (Title)**: content` (AGENTS.md 历史格式)
-        //   2. `- **R-Pxx**: content` (dev-rules.md 现行格式, 无 Title 括号)
+        //   2. `- **R-Pxx**: content` (legacy 归档格式, 无 Title 括号)
         //   3. `- **R-P42 / R-P47 (Title)**: content` (组合 ID, 双规则共用正文)
         let rule_regex = regex::Regex::new(
             r"(?m)^\s*-\s*\*\*R-P(\d+)(?:\s*/\s*R-P(\d+))?(?:\s*\(([^)]+)\))?\*\*:\s*(.+)$",
@@ -488,6 +545,75 @@ impl ConstitutionLoader {
         }
 
         Ok(rules)
+    }
+
+    /// Section-free R-P bullet scan (SIM-16): for archive legacy files whose
+    /// headings predate the `Dev Rules` marker convention. Same bullet grammar
+    /// as the primary pass (formats 1–3); no section gate.
+    fn extract_loose_rules(content: &str) -> HashMap<String, DevRule> {
+        let mut rules = HashMap::new();
+        let Ok(rule_regex) = regex::Regex::new(
+            r"(?m)^\s*-\s*\*\*R-P(\d+)(?:\s*/\s*R-P(\d+))?(?:\s*\(([^)]+)\))?\*\*:\s*(.+)$",
+        ) else {
+            return rules;
+        };
+        for cap in rule_regex.captures_iter(content) {
+            let title = cap
+                .get(3)
+                .map(|m| m.as_str().trim().to_string())
+                .unwrap_or_default();
+            let content_text = cap[4].trim().to_string();
+            let mut ids = vec![format!("R-P{}", &cap[1])];
+            if let Some(second) = cap.get(2) {
+                ids.push(format!("R-P{}", second.as_str()));
+            }
+            for id in ids {
+                let category = RuleCategory::from_rule_id(&id);
+                rules.insert(
+                    id.clone(),
+                    DevRule {
+                        id,
+                        title: title.clone(),
+                        content: content_text.clone(),
+                        category,
+                        source_cycle: 0,
+                        vector: None,
+                    },
+                );
+            }
+        }
+        rules
+    }
+
+    /// NT-STD 1.0 canonical clause scan (SIM-16, 意识指导为先):
+    /// `- **NTS-Xnn** statement …` bullets, whole-file, no section gate.
+    /// Bodies may span continuation lines; Annex table rows (`|`), headings
+    /// (`#`) and list items (`-`) terminate a clause. Table cells mentioning
+    /// legacy IDs never match the anchored bullet pattern.
+    fn extract_nts_clauses(content: &str) -> HashMap<String, DevRule> {
+        let mut rules = HashMap::new();
+        let Ok(nts_regex) = regex::Regex::new(
+            r"(?ms)^\s*-\s*\*\*(NTS-[A-G]\d+)\*\*\s*(.+?)(?=\n\s*(?:[-*]|\||#)|\z)",
+        ) else {
+            return rules;
+        };
+        for cap in nts_regex.captures_iter(content) {
+            let id = cap[1].to_string();
+            let content_text = cap[2].trim().to_string();
+            let category = RuleCategory::from_rule_id(&id);
+            rules.insert(
+                id.clone(),
+                DevRule {
+                    id,
+                    title: String::new(),
+                    content: content_text,
+                    category,
+                    source_cycle: 0,
+                    vector: None,
+                },
+            );
+        }
+        rules
     }
 
     /// Extract Experience Tree entries
@@ -667,9 +793,11 @@ fn default_governance_guard() -> GuardChain {
 
 /// Global constitution instance (loaded at startup)
 static GLOBAL_CONSTITUTION: LazyLock<Constitution> = LazyLock::new(|| {
-    // 优先加载全量规则文件 dev-rules.md (R-P1~R-P101), 回退 AGENTS.md。
-    // 两者都向上查找以兼容任意 CWD (测试 crate 根 / 仓库根 / 子目录)。
-    // dev-rules.md 是规则单一事实源 (R-P101: 两处修订必须同步)。
+    // 正典 NT-STD 1.0 优先 (SIM-16/17 意识指导): load_from_file 内合并
+    // 主文件 + archive R-P + 正典 NTS。两者都向上查找以兼容任意 CWD。
+    // R-P101 同步契约已退役 (root dev-rules.md 归档为桩, 见 NT-STD Annex B)。
+    // SIM-16: 正典 NT-STD 1.0 在 load_from_file 内合并 (伴生/archive/正典三源);
+    // GLOBAL 只要求非空, 具体 ID 覆盖由测试断言。
     let candidates = ["dev-rules.md", "AGENTS.md"];
     for candidate in candidates {
         let mut search_path = std::path::PathBuf::from(candidate);
@@ -694,7 +822,7 @@ static GLOBAL_CONSTITUTION: LazyLock<Constitution> = LazyLock::new(|| {
         }
     }
     eprintln!(
-        "Failed to load constitution: dev-rules.md and AGENTS.md not found (CWD and parents)"
+        "Failed to load constitution: dev-rules.md and AGENTS.md not found (CWD and parents; NT-STD merges inside load_from_file when found)"
     );
     Constitution::new()
 });
@@ -725,7 +853,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for GovernanceConstitu
         let constitution = global_constitution();
         let mut failures = Vec::new();
 
-        // 规则已加载 (单一事实源: dev-rules.md / AGENTS.md)
+        // 规则已加载 (单一事实源: dev-rules.md / AGENTS.md + 正典 NT-STD 合并, SIM-16)
         if constitution.rules.is_empty() {
             failures.push("constitution has no rules loaded".into());
         }
@@ -845,7 +973,7 @@ mod tests {
             let rule = constitution
                 .rules
                 .get("R-P42")
-                .expect("R-P42 must load from AGENTS.md/dev-rules.md companion merge");
+                .expect("R-P42 must load from archive legacy merge (SIM-16)");
             assert!(
                 constitution.check_violation(
                     rule,
@@ -867,11 +995,11 @@ mod tests {
         if path.exists() {
             let constitution = ConstitutionLoader::load_from_file(path).unwrap();
             // Action that violates R-P48: shelling out to an external binary dep
-            // (R-P43~R-P46 已退役, 现行吸收纪律见 dev-rules.md R-P42/47/48/79)
+            // (R-P43~R-P46 已退役, 现行吸收纪律见 NT-STD NTS-B10/G04; legacy 见 archive)
             let rule = constitution
                 .rules
                 .get("R-P48")
-                .expect("R-P48 must load from dev-rules.md companion merge");
+                .expect("R-P48 must load from archive legacy merge (SIM-16)");
             assert!(
                 constitution
                     .check_violation(rule, "deploy external checker via command::new binary dep"),
@@ -928,11 +1056,11 @@ mod tests {
         if path.exists() {
             let constitution = ConstitutionLoader::load_from_file(path).unwrap();
             // Action that violates R-P47: adapter/wrapper without capability-node
-            // reinforcement (R-P46 已退役; 现行树生长纪律 R-P42/44-48, 见 dev-rules.md)
+            // reinforcement (R-P46 已退役; 现行树生长纪律见 NT-STD NTS-B09/G04)
             let rule = constitution
                 .rules
                 .get("R-P47")
-                .expect("R-P47 must load from dev-rules.md companion merge");
+                .expect("R-P47 must load from archive legacy merge (SIM-16)");
             assert!(
                 constitution.check_violation(
                     rule,
@@ -945,8 +1073,8 @@ mod tests {
 
     #[test]
     fn test_governance_constitution_selftest_real() {
-        // NT-GOVERNANCE 域 SelfTest 必须通过 — 全局宪法在仓库根 (dev-rules.md /
-        // AGENTS.md) 可加载, R-P42 违规可检出。
+        // NT-GOVERNANCE 域 SelfTest 必须通过 — 正典 NT-STD + archive R-P 可加载,
+        // R-P42 违规可检出 (SIM-16)。
         assert!(
             GovernanceConstitutionSelfTest.self_test().is_ok(),
             "governance selftest failed: {:?}",
