@@ -13,6 +13,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use crate::l0_substrate::nt_core_self_test::SelfTest;
+use crate::neotrix::nt_jev::{DecisionStatus, JevDecision, NoulAnswer, ToJev};
 
 /// 守卫决策
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,6 +24,49 @@ pub enum GuardDecision {
     Denied,
     DeniedSession,
     RequiresConfirmation,
+}
+
+impl ToJev for GuardDecision {
+    fn to_jev(&self) -> JevDecision {
+        match self {
+            GuardDecision::Allowed => JevDecision::Noul(NoulAnswer {
+                noul: 0.95,
+                needs_review: false,
+                reason: Some("GuardDecision::Allowed [guard] — unconditional allow".into()),
+                status: DecisionStatus::Selected,
+            }),
+            GuardDecision::AllowedOnce => JevDecision::Noul(NoulAnswer {
+                noul: 0.9,
+                needs_review: false,
+                reason: Some("GuardDecision::AllowedOnce [guard] — single-use allow".into()),
+                status: DecisionStatus::Selected,
+            }),
+            GuardDecision::AllowedSession => JevDecision::Noul(NoulAnswer {
+                noul: 0.9,
+                needs_review: false,
+                reason: Some("GuardDecision::AllowedSession [guard] — session-scoped allow".into()),
+                status: DecisionStatus::Selected,
+            }),
+            GuardDecision::Denied => JevDecision::Noul(NoulAnswer {
+                noul: 0.05,
+                needs_review: false,
+                reason: Some("GuardDecision::Denied [guard] — unconditional deny".into()),
+                status: DecisionStatus::Selected,
+            }),
+            GuardDecision::DeniedSession => JevDecision::Noul(NoulAnswer {
+                noul: 0.05,
+                needs_review: false,
+                reason: Some("GuardDecision::DeniedSession [guard] — session-scoped deny".into()),
+                status: DecisionStatus::Selected,
+            }),
+            GuardDecision::RequiresConfirmation => JevDecision::Noul(NoulAnswer {
+                noul: 0.5,
+                needs_review: true,
+                reason: Some("GuardDecision::RequiresConfirmation [guard] — interactive confirmation pending".into()),
+                status: DecisionStatus::Review,
+            }),
+        }
+    }
 }
 
 /// 守卫请求
@@ -519,5 +563,31 @@ mod tests {
     fn test_denylist_count() {
         let dl = _DenyList::new();
         assert!(dl.blocked_count() > 30);
+    }
+
+    #[test]
+    fn test_guard_decision_to_jev_allowed_variants() {
+        for d in [GuardDecision::Allowed, GuardDecision::AllowedOnce, GuardDecision::AllowedSession] {
+            let j = d.to_jev();
+            assert!(!j.needs_review(), "allow-ish {:?} must not need review", d);
+            assert_eq!(j.status(), DecisionStatus::Selected);
+        }
+    }
+
+    #[test]
+    fn test_guard_decision_to_jev_denied_variants() {
+        for d in [GuardDecision::Denied, GuardDecision::DeniedSession] {
+            let j = d.to_jev();
+            assert!(!j.needs_review(), "deny-ish {:?} must not need review", d);
+            assert_eq!(j.status(), DecisionStatus::Selected);
+        }
+    }
+
+    #[test]
+    fn test_guard_decision_to_jev_requires_confirmation() {
+        let j = GuardDecision::RequiresConfirmation.to_jev();
+        assert!(j.needs_review());
+        assert_eq!(j.status(), DecisionStatus::Review);
+        assert!(j.reason().is_some_and(|r| r.contains("GuardDecision::RequiresConfirmation")));
     }
 }

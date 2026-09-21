@@ -55,6 +55,7 @@ pub enum LlmProviderType {
     Empero,
     Vllm,
     Sglang,
+    Shimmy,
     Aihub,
     Xai,
     Moonshot,
@@ -98,6 +99,7 @@ impl LlmProviderType {
             "empero" | "free-empero" | "free_empero" => Some(Self::Empero),
             "vllm" => Some(Self::Vllm),
             "sglang" => Some(Self::Sglang),
+            "shimmy" | "shimmy-local" | "shimmy_local" => Some(Self::Shimmy),
             "aihub" | "aihub.humorously.cn" => Some(Self::Aihub),
             "xai" | "grok" => Some(Self::Xai),
             "moonshot" | "kimi" => Some(Self::Moonshot),
@@ -121,7 +123,7 @@ impl LlmProviderType {
             Self::Cloudflare | Self::Nvidia | Self::GitHubModels | Self::HuggingFace |
             Self::TogetherFree | Self::Llm7 | Self::Kilo | Self::SiliconFlow |
             Self::ZAI | Self::OpenCodeZen | Self::Ovh | Self::DeepSeekFree | Self::ModelScope |
-            Self::ApiAirforce | Self::Empero
+            Self::ApiAirforce | Self::Empero | Self::Shimmy
         )
     }
 
@@ -148,16 +150,16 @@ impl LlmProviderType {
     /// are treated as Untrusted for privacy guard purposes.
     pub fn category(self) -> ProviderCategory {
         match self {
-            Self::Ollama | Self::Vllm | Self::Sglang => ProviderCategory::Local,
+            Self::Ollama | Self::Vllm | Self::Sglang | Self::Shimmy => ProviderCategory::Local,
             Self::CustomProxy => ProviderCategory::Proxy,
             Self::Aihub => ProviderCategory::Cloud,
             _ => ProviderCategory::Cloud,
         }
     }
 
-    /// 是否本地推理 (数据不出设备)。`Ollama`/`Vllm`/`Sglang` 为 localhost 自托管。
+    /// 是否本地推理 (数据不出设备)。`Ollama`/`Vllm`/`Sglang`/`Shimmy` 为 localhost 自托管。
     pub fn is_local(self) -> bool {
-        matches!(self, Self::Ollama | Self::Vllm | Self::Sglang)
+        matches!(self, Self::Ollama | Self::Vllm | Self::Sglang | Self::Shimmy)
     }
 
     /// 规范名 (用于日志 / 隐私守卫错误信息)。反向映射 `from_name`。
@@ -195,6 +197,7 @@ impl LlmProviderType {
             Self::Empero => "empero",
             Self::Vllm => "vllm",
             Self::Sglang => "sglang",
+            Self::Shimmy => "shimmy",
             Self::Aihub => "aihub",
             Self::Xai => "xai",
             Self::Moonshot => "moonshot",
@@ -376,6 +379,7 @@ impl ProviderConfig {
             "empero" | "free-empero" | "free_empero" => LlmProviderType::Empero,
             "vllm" => LlmProviderType::Vllm,
             "sglang" => LlmProviderType::Sglang,
+            "shimmy" | "shimmy-local" | "shimmy_local" => LlmProviderType::Shimmy,
             "aihub" | "aihub.humorously.cn" => LlmProviderType::Aihub,
             _ => LlmProviderType::Anthropic,
         };
@@ -504,10 +508,11 @@ fn default_host(provider_type: LlmProviderType) -> Option<&'static str> {
         LlmProviderType::ApiAirforce => Some("api.airforce"),
         LlmProviderType::Empero => Some("free.empero.org"),
         LlmProviderType::Aihub => Some("aihub.humorously.cn"),
-        // 本地主体: Ollama / vLLM / SGLang / 自定义代理默认走 localhost
+        // 本地主体: Ollama / vLLM / SGLang / Shimmy / 自定义代理默认走 localhost
         LlmProviderType::Ollama
         | LlmProviderType::Vllm
         | LlmProviderType::Sglang
+        | LlmProviderType::Shimmy
         | LlmProviderType::CustomProxy => Some("localhost"),
     }
 }
@@ -542,7 +547,7 @@ pub fn network_access_allowed(provider_type: LlmProviderType, base_url: Option<&
             return true;
         }
     }
-    match crate::cli::shield_enforcer::global_shield().lock() {
+    match crate::l3_embodiment::nt_shield_enforcer::global_shield().lock() {
         Ok(shield) => {
             use crate::l0_substrate::nt_core_traits::NetworkPolicy;
             match shield.policy.check_network_access(&host) {
@@ -633,6 +638,22 @@ pub fn create_provider(config: ProviderConfig) -> Arc<dyn LlmProvider> {
             });
             let base_url = config.base_url.unwrap_or_else(|| {
                 std::env::var("NEOTRIX_SGLANG_BASE_URL").unwrap_or_else(|_| "http://localhost:30000/v1".to_string())
+            });
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Arc::new(provider)
+        }
+        LlmProviderType::Shimmy => {
+            // Shimmy: external pure-Rust GGUF server, OpenAI-compatible HTTP.
+            // Self-hosted: defaults to http://127.0.0.1:11435/v1 (override with
+            // SHIMMY_BASE_URL or NEOTRIX_SHIMMY_BASE_URL).
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("SHIMMY_API_KEY").unwrap_or_else(|_| "local".to_string())
+            });
+            let base_url = config.base_url.unwrap_or_else(|| {
+                std::env::var("SHIMMY_BASE_URL")
+                    .or_else(|_| std::env::var("NEOTRIX_SHIMMY_BASE_URL"))
+                    .unwrap_or_else(|_| "http://127.0.0.1:11435/v1".to_string())
             });
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);

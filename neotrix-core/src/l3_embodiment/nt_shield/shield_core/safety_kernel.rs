@@ -9,6 +9,7 @@ use sha2::Sha256;
 use super::policy::{ActionPolicy, PolicyDecision};
 
 use crate::l0_substrate::nt_core_self_test::SelfTest;
+use crate::neotrix::nt_jev::{DecisionStatus, JevDecision, NoulAnswer, ToJev};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -98,6 +99,40 @@ pub enum SafetyDecision {
     Denied { reason: String, signed_at: u64, appeal_path: Option<String> },
     /// Action requires human-in-the-loop approval
     RequiresApproval { reason: String, escalation_path: String },
+}
+
+impl ToJev for SafetyDecision {
+    fn to_jev(&self) -> JevDecision {
+        match self {
+            SafetyDecision::Allowed { reason, .. } => JevDecision::Noul(NoulAnswer {
+                noul: 0.95,
+                needs_review: false,
+                reason: Some(format!("SafetyDecision::Allowed [safety_kernel] — {}", reason)),
+                status: DecisionStatus::Selected,
+            }),
+            SafetyDecision::Denied { reason, appeal_path, .. } => JevDecision::Noul(NoulAnswer {
+                noul: 0.05,
+                needs_review: false,
+                reason: Some(format!(
+                    "SafetyDecision::Denied [safety_kernel] — {} (appeal: {})",
+                    reason,
+                    appeal_path.as_deref().unwrap_or("none")
+                )),
+                status: DecisionStatus::Selected,
+            }),
+            SafetyDecision::RequiresApproval { reason, escalation_path } => {
+                JevDecision::Noul(NoulAnswer {
+                    noul: 0.5,
+                    needs_review: true,
+                    reason: Some(format!(
+                        "SafetyDecision::RequiresApproval [safety_kernel] — {} [{}]",
+                        reason, escalation_path
+                    )),
+                    status: DecisionStatus::Review,
+                })
+            }
+        }
+    }
 }
 
 /// Signed evidence of a safety decision, verifiable outside the agent's trust boundary
@@ -864,5 +899,32 @@ mod tests {
             other => return Err(format!("FileWrite with low risk should not be denied, got: {:?}", other)),
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_safety_decision_to_jev_allowed() {
+        let d = SafetyDecision::Allowed { reason: "low risk".into(), signed_at: 1 };
+        let j = d.to_jev();
+        assert!(!j.needs_review());
+        assert_eq!(j.status(), DecisionStatus::Selected);
+        assert!(j.reason().is_some_and(|r| r.contains("SafetyDecision::Allowed")));
+    }
+
+    #[test]
+    fn test_safety_decision_to_jev_denied() {
+        let d = SafetyDecision::Denied { reason: "policy deny".into(), signed_at: 1, appeal_path: None };
+        let j = d.to_jev();
+        assert!(!j.needs_review());
+        assert_eq!(j.status(), DecisionStatus::Selected);
+        assert!(j.reason().is_some_and(|r| r.contains("SafetyDecision::Denied")));
+    }
+
+    #[test]
+    fn test_safety_decision_to_jev_requires_approval() {
+        let d = SafetyDecision::RequiresApproval { reason: "destructive".into(), escalation_path: "human_in_the_loop://approve".into() };
+        let j = d.to_jev();
+        assert!(j.needs_review());
+        assert_eq!(j.status(), DecisionStatus::Review);
+        assert!(j.reason().is_some_and(|r| r.contains("SafetyDecision::RequiresApproval")));
     }
 }

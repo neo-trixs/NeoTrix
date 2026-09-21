@@ -14,6 +14,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::neotrix::nt_jev::{DecisionStatus, JevDecision, NoulAnswer, ToJev};
+
 /// Authorization decision
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum AuthorizationDecision {
@@ -25,6 +27,51 @@ pub enum AuthorizationDecision {
     RequireApproval { reason: String, approver: String },
     /// Action is allowed with modifications
     AllowWithModifications { modifications: Vec<String> },
+}
+
+impl ToJev for AuthorizationDecision {
+    fn to_jev(&self) -> JevDecision {
+        match self {
+            AuthorizationDecision::Allow => JevDecision::Noul(NoulAnswer {
+                noul: 0.95,
+                needs_review: false,
+                reason: Some("AuthorizationDecision::Allow [nt_shield_action_authorizer] — action allowed".into()),
+                status: DecisionStatus::Selected,
+            }),
+            AuthorizationDecision::Deny { reason } => JevDecision::Noul(NoulAnswer {
+                noul: 0.05,
+                needs_review: false,
+                reason: Some(format!(
+                    "AuthorizationDecision::Deny [nt_shield_action_authorizer] — {}",
+                    reason
+                )),
+                status: DecisionStatus::Selected,
+            }),
+            AuthorizationDecision::RequireApproval { reason, approver } => {
+                JevDecision::Noul(NoulAnswer {
+                    noul: 0.5,
+                    needs_review: true,
+                    reason: Some(format!(
+                        "AuthorizationDecision::RequireApproval [nt_shield_action_authorizer] — {} (approver: {})",
+                        reason, approver
+                    )),
+                    status: DecisionStatus::Review,
+                })
+            }
+            AuthorizationDecision::AllowWithModifications { modifications } => {
+                JevDecision::Noul(NoulAnswer {
+                    noul: 0.75,
+                    needs_review: true,
+                    reason: Some(format!(
+                        "AuthorizationDecision::AllowWithModifications [nt_shield_action_authorizer] — {} modification(s): {}",
+                        modifications.len(),
+                        modifications.join("; ")
+                    )),
+                    status: DecisionStatus::Review,
+                })
+            }
+        }
+    }
 }
 
 /// Agent action to be authorized
@@ -675,5 +722,37 @@ mod tests {
             result.decision,
             AuthorizationDecision::RequireApproval { .. }
         ));
+    }
+
+    #[test]
+    fn test_authorization_decision_to_jev_allow() {
+        let j = AuthorizationDecision::Allow.to_jev();
+        assert!(!j.needs_review());
+        assert_eq!(j.status(), DecisionStatus::Selected);
+        assert!(j.reason().is_some_and(|r| r.contains("AuthorizationDecision::Allow")));
+    }
+
+    #[test]
+    fn test_authorization_decision_to_jev_deny() {
+        let j = AuthorizationDecision::Deny { reason: "too risky".into() }.to_jev();
+        assert!(!j.needs_review());
+        assert_eq!(j.status(), DecisionStatus::Selected);
+        assert!(j.reason().is_some_and(|r| r.contains("AuthorizationDecision::Deny")));
+    }
+
+    #[test]
+    fn test_authorization_decision_to_jev_require_approval() {
+        let j = AuthorizationDecision::RequireApproval { reason: "prod env".into(), approver: "admin".into() }.to_jev();
+        assert!(j.needs_review());
+        assert_eq!(j.status(), DecisionStatus::Review);
+        assert!(j.reason().is_some_and(|r| r.contains("AuthorizationDecision::RequireApproval")));
+    }
+
+    #[test]
+    fn test_authorization_decision_to_jev_allow_with_modifications() {
+        let j = AuthorizationDecision::AllowWithModifications { modifications: vec!["redact token".into()] }.to_jev();
+        assert!(j.needs_review());
+        assert_eq!(j.status(), DecisionStatus::Review);
+        assert!(j.reason().is_some_and(|r| r.contains("AuthorizationDecision::AllowWithModifications")));
     }
 }
