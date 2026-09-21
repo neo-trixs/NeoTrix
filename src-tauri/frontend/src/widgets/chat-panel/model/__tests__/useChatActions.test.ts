@@ -85,6 +85,13 @@ vi.mock('../../../../api/events', () => ({
   subscribeMenuEvents: vi.fn(() => Promise.resolve(() => {})),
 }))
 
+// useChatActions 经 domain.chat.send 发送（chat-first）；桩化实际调用路径
+const mockChatSend = vi.fn(() => Promise.resolve({ id: 'r1', content: 'hi', role: 'assistant' }))
+vi.mock('../../../../api/domain', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../api/domain')>()
+  return { ...actual, chat: { ...actual.chat, send: mockChatSend } }
+})
+
 describe('useChatActions', () => {
   let state: any
   let actions: any
@@ -127,8 +134,7 @@ describe('useChatActions', () => {
   it('sendMessage should add messages and call stream', async () => {
     await actions.sendMessage('hello')
     expect(mockAddMessage).toHaveBeenCalled()
-    const { neocodex } = await import('../../../../api')
-    expect(neocodex.sendMessageStream).toHaveBeenCalledWith(expect.objectContaining({ content: 'hello' }))
+    expect(mockChatSend).toHaveBeenCalledWith('hello')
   })
 
   it('handleEditMessage should set editing id and content', () => {

@@ -1,7 +1,9 @@
 /**
  * Hive API — OfficeFloor visualization commands
+ *
+ * Routes through domain_call since direct IPC commands are not registered.
  */
-import { tauriInvoke } from './tauri-bridge'
+import { call } from './domain'
 
 export interface AgentFloorData {
   id: string
@@ -36,9 +38,9 @@ export interface FloorState {
 }
 
 export function getFloorState(): Promise<FloorState> {
-  return tauriInvoke('hive_get_floor_state')
+  return call<FloorState>('hive', 'get_floor_state')
 }
 
 export function hiveSendMessage(from: string, to: string, msgType: string, content: string): Promise<string> {
-  return tauriInvoke('hive_send_message', { from, to, msgType, content })
+  return call<string>('hive', 'send_message', { from, to, msg_type: msgType, content })
 }

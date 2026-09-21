@@ -2,14 +2,16 @@
 //
 // 统一导出所有前端需要的 API
 
+// ===== 新架构：Chat API (Primary) =====
+export { chatSend, chatHelp } from './chat';
+export type { ChatResponse, ChatAction } from './chat';
+
 // ===== Tauri IPC Bridge =====
 export { tauriInvoke, tauriInvokeSafe } from './tauri-bridge';
 
-// ===== 新架构：Domain Plugin System =====
+// ===== Domain Plugin System (backward-compatible) =====
 export * as domain from './domain';
 export { call as domainCall, list as domainList, has as domainHas, actionCount as domainActionCount } from './domain';
-
-
 
 // ===== 旧架构导出（保留向后兼容） =====
 export * from './unified';
@@ -151,3 +153,8 @@ export type { MarketStatus, MarketEntry, MarketSearchResult, PluginManifest } fr
 // 创建 market 命名空间对象
 import * as marketModule from './market';
 export const market = marketModule;
+
+// 创建 neocodex 命名空间对象（向后兼容：全部经由 domain.call 路由）
+import * as neocodexModule from './neocodex';
+export const neocodex = neocodexModule;
+export { sendMessageStream, stopStream, subscribeStream } from './neocodex';

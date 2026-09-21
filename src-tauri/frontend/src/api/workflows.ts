@@ -1,10 +1,8 @@
 /* ════════════════════════════════════════════
    api/workflows.ts — 工作流命令入口
-   契约镜像 src-tauri/commands/workflow_cmds.rs:
-   Workflow { id,name,description,version,steps,created_at,updated_at,tags }
-   workflow_list / workflow_run / workflow_run_status / workflow_run_cancel
+   Routes through domain_call (no direct IPC registered).
    ════════════════════════════════════════════ */
-import { tauriInvoke } from './tauri-bridge'
+import { call } from './domain'
 
 export interface WorkflowStep {
   id: string
@@ -37,17 +35,17 @@ export interface WorkflowRun {
 }
 
 export function workflowList(): Promise<Workflow[]> {
-  return tauriInvoke('workflow_list')
+  return call<Workflow[]>('workflow', 'list')
 }
 
 export function workflowRun(workflowId: string): Promise<string> {
-  return tauriInvoke('workflow_run', { workflow_id: workflowId })
+  return call<string>('workflow', 'run', { workflow_id: workflowId })
 }
 
 export function workflowRunStatus(runId: string): Promise<WorkflowRun> {
-  return tauriInvoke('workflow_run_status', { run_id: runId })
+  return call<WorkflowRun>('workflow', 'run_status', { run_id: runId })
 }
 
 export function workflowRunCancel(runId: string): Promise<void> {
-  return tauriInvoke('workflow_run_cancel', { run_id: runId })
+  return call<void>('workflow', 'run_cancel', { run_id: runId })
 }

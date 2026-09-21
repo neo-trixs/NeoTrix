@@ -8,7 +8,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 /** 启动 PTY 会话，返回 session id */
 export function ptySpawn(cols: number, rows: number): Promise<string> {
-  return invoke<string>('pty_spawn', { cols, rows })
+  return tauriInvoke<string>('pty_spawn', { cols, rows })
 }
 
 /** 写入数据到 PTY stdin */

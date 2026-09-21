@@ -1,9 +1,9 @@
 /* ════════════════════════════════════════════
    api/files.ts — 文件选择 + doc-parse 解析 (W1)
-   契约镜像 project_cmds.rs::parse_doc_file / ParsedDocFile
+   Routes through domain_call (no direct IPC registered).
    ════════════════════════════════════════════ */
 import { openFileDialog } from './fs'
-import { tauriInvoke } from './tauri-bridge'
+import { call } from './domain'
 
 export interface ParsedDocFile {
   path: string
@@ -26,10 +26,10 @@ export async function pickAndParseDoc(): Promise<ParsedDocFile | null> {
 }
 
 export function parseDocAt(path: string): Promise<ParsedDocFile> {
-  return tauriInvoke('parse_doc_file', { path })
+  return call<ParsedDocFile>('file', 'parse_doc', { path })
 }
 
-/** 任意文本类文件读取 (代码/配置等) — 走 commands::read_file */
+/** 任意文本类文件读取 (代码/配置等) — 走 file domain */
 export function readTextFileAt(path: string): Promise<string> {
-  return tauriInvoke('read_file', { path })
+  return call<string>('file', 'read', { path })
 }

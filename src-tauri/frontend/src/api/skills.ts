@@ -1,10 +1,8 @@
 /* ════════════════════════════════════════════
    api/skills.ts — 技能中心命令入口
-   契约镜像 src-tauri/commands/skill_cmds.rs:
-   SkillInfo { name, path, description, line_count, domain }
-   skill_list / skill_get / skill_search
+   Routes through domain_call (no direct IPC registered).
    ════════════════════════════════════════════ */
-import { tauriInvoke } from './tauri-bridge'
+import { call } from './domain'
 
 export interface SkillInfo {
   name: string
@@ -20,13 +18,13 @@ export interface SkillListResult {
 }
 
 export function skillList(): Promise<SkillListResult> {
-  return tauriInvoke('skill_list')
+  return call<SkillListResult>('skill', 'list')
 }
 
 export function skillGet(name: string): Promise<SkillInfo> {
-  return tauriInvoke('skill_get', { name })
+  return call<SkillInfo>('skill', 'get', { name })
 }
 
 export function skillSearch(query: string): Promise<SkillInfo[]> {
-  return tauriInvoke('skill_search', { query })
+  return call<SkillInfo[]>('skill', 'search', { query })
 }

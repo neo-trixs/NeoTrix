@@ -1,9 +1,8 @@
-import { tauriInvoke } from './tauri-bridge'
+import { call } from './domain'
 
 /* ════════════════════════════════════════════
    api/geo.ts — 地图数据 API 层（前后端分离）
-   后端: kb_cmds.rs → kb_geo_points / kb_geo_stats / kb_geo_layers
-   前端: 本模块封装 Tauri IPC，GlobeView 只负责渲染
+   Routes through domain_call (kb domain).
    ════════════════════════════════════════════ */
 
 export interface GeoPoint {
@@ -35,23 +34,22 @@ export function isMirage(p: { source: string }): boolean {
  *  `source` 可选过滤："shanhai" 返回全部幻境点（peaks+mappings），
  *  其他字符串按 source 精确匹配，undefined 返回混合（按 confidence 排序）。 */
 export function geoPoints(limit?: number, source?: string): Promise<GeoPoint[]> {
-  return tauriInvoke('kb_geo_points', { limit: limit ?? null, source: source ?? null })
+  return call<GeoPoint[]>('kb', 'geo_points', { limit: limit ?? null, source: source ?? null })
 }
 
-/** B2 v0: 从 NT-Pack 高密度文件读地理点（绕 SQLite，冷层文件优先）。
- *  IPC 契约同 `geoPoints`，前端无感切换。默认仍走 SQLite，需显式开启 pack 源。 */
+/** B2 v0: 从 NT-Pack 高密度文件读地理点（绕 SQLite，冷层文件优先）。 */
 export function geoPointsPack(limit?: number, source?: string): Promise<GeoPoint[]> {
-  return tauriInvoke('kb_geo_points_pack', { limit: limit ?? null, source: source ?? null })
+  return call<GeoPoint[]>('kb', 'geo_points_pack', { limit: limit ?? null, source: source ?? null })
 }
 
 /** 地理索引统计 (总数, 有国家数) */
 export function geoStats(): Promise<[number, number]> {
-  return tauriInvoke('kb_geo_stats', {})
+  return call<[number, number]>('kb', 'geo_stats')
 }
 
 /** 地图分层摘要 — 各数据源计数，前端据此决定加载策略 */
 export function geoLayers(): Promise<GeoLayerSummary[]> {
-  return tauriInvoke('kb_geo_layers', {})
+  return call<GeoLayerSummary[]>('kb', 'geo_layers')
 }
 
 /** 海拔点记录 — geo_elevation 表 + geo_index 来源，供海拔渐变着色 */
@@ -65,7 +63,7 @@ export interface GeoElevationPoint {
 
 /** 导出海拔记录 (geo_elevation) — 前端按高度渐变着色 */
 export function geoElevations(limit?: number): Promise<GeoElevationPoint[]> {
-  return tauriInvoke('kb_geo_elevations', { limit: limit ?? null })
+  return call<GeoElevationPoint[]>('kb', 'geo_elevations', { limit: limit ?? null })
 }
 
 /** B1 轨迹存储 */
@@ -87,12 +85,12 @@ export function trajectoryAdd(
   bbox: [number, number, number, number],
   distance_km: number
 ): Promise<void> {
-  return tauriInvoke('kb_trajectory_add', { id, name, kind, points, west: bbox[0], south: bbox[1], east: bbox[2], north: bbox[3], distance_km })
+  return call<void>('kb', 'trajectory_add', { id, name, kind, points, west: bbox[0], south: bbox[1], east: bbox[2], north: bbox[3], distance_km })
 }
 
 /** 查询所有轨迹 */
 export function trajectoryQuery(): Promise<TrajectoryRecord[]> {
-  return tauriInvoke('kb_trajectory_query', {})
+  return call<TrajectoryRecord[]>('kb', 'trajectory_query')
 }
 
 /** C2 离线地图包: 导出 bbox 区域为 NT-Pack 文件 */
@@ -100,5 +98,5 @@ export function geoOfflinePack(
   bbox: [number, number, number, number],
   name: string
 ): Promise<{ path: string; count: number; bytes: number }> {
-  return tauriInvoke('kb_geo_offline_pack', { bbox, name })
+  return call<{ path: string; count: number; bytes: number }>('kb', 'geo_offline_pack', { bbox, name })
 }
