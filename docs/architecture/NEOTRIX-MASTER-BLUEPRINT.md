@@ -1,7 +1,8 @@
 # NeoTrix 总蓝图：按图施工手册
 
 > **版本**: 1.5.4 | **日期**: 2026-09-21 | **状态**: 可执行 (Executable)
-> **变更记**: v1.5.6 B2 守卫落地（ConfidenceLabelFitness＋6 单测，14/14 实跑绿；
+> **变更记**: v1.5.7 有序执行清单（EQ-01~20＋完成定义＋阻塞边；SIM-32 建档）。
+> v1.5.6 B2 守卫落地（ConfidenceLabelFitness＋6 单测，14/14 实跑绿；
 > 死守卫发现 Layer/Core 扫不存在目录；SIM-31 建档）。v1.5.5 门禁复测＋聚合器（12 组／111 持平零进展；`make audit-all`；
 > SIM-30 建档）。v1.5.4 提交清场＋V 构件定级＋R-P111 指针落地（SDB-REGISTRY v0.5；
 > SIM-29 建档）。v1.5.3 SDB 调用链追踪收敛（loops 系脚手架，活 P 点仅 dispatcher；
@@ -827,4 +828,4 @@ graph TD
 
 ---
 
-*End of Master Blueprint v1.5.6*
+*End of Master Blueprint v1.5.7*

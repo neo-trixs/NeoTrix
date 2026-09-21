@@ -80,6 +80,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-29 | 提交清场＋SDB-06/07定级＋R-P111指针落地（本文件 §28） | GO | SDB v0.5 |
 | SIM-30 | 门禁复测零进展＋audit-all聚合（本文件 §29） | GO | Makefile |
 | SIM-31 | B2守卫编码＋14/14实跑绿＋死守卫发现（本文件 §30） | GO | fitness.rs |
+| SIM-32 | 有序执行清单 EQ-01~20（本文件 §31） | GO | EXECUTION-QUEUE |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -134,7 +135,6 @@ SIM 记录永不删除；NO-GO 的 SIM 同样归档（失败证据比成功经�
 
 ---
 
-*End of SIM Protocol v1.0.0 — 下一编号 SIM-10 (superseded by §8 below)
 
 ---
 
@@ -168,7 +168,6 @@ P3 启动时复核 G-2 vet 烘焙是否排期（Owner：Architect，日期：M2 
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*。*
 
 ---
 
@@ -202,7 +201,6 @@ fuzz 首 harness 落地时复核语料种子已提交（Owner：L3 owner，日�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -239,7 +237,6 @@ P2 启动时复核 quartet 缺口是否进 gate（Owner：QA，日期：M2 评�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -274,7 +271,6 @@ NT-STD-1.1 OSINT 附录（Owner：Security，日期：M3 评审日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -309,7 +305,6 @@ RUST-STANDARDS 并入 STD 的时机评估（Owner：Architect，日期：NT-STD-
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -347,7 +342,6 @@ dependabot.yml 加 cargo 段（YAML 机验通过）；Annex B FLAG 维持（加�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -387,7 +381,6 @@ G-4 AGENTS/TODO 引用——有意不动（E-4）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -422,7 +415,6 @@ SKILL 教学 NTS 优先括号留 legacy；MAP×0/ROADMAP×0（已无活引用）
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -458,7 +450,6 @@ D-05 加 P3/P4 标注；§19 D-15＋索引/附录 2 行；v1.3.0 changelog。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -494,7 +485,6 @@ G-3 游戏域 todo! 字串——域外，不管（记录）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -529,7 +519,6 @@ G-2 本机 OOM 跑不完门（转 infra：CI 大 runner 兜底）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -568,7 +557,6 @@ G-4 脚本执行位 2 缺（已 chmod，机验 4/4 +x）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -620,7 +608,6 @@ E-3 其余我方文件全平衡、单结尾、版本头尾一致（机验）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -657,7 +644,6 @@ R-P128b/c 改号（Owner：模块 owner，日期：M1）；31 缺失（Owner：A
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -692,7 +678,6 @@ AgentHarm 对子首跑（Owner：L3，日期：P3）；DORA 四格首填（Owner
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -726,7 +711,6 @@ toxics 首测（Owner：SRE，日期：P3）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -757,7 +741,6 @@ P0-01 数量出炉后刷新本分析 §1（Owner：P0，日期：M0 日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -791,7 +774,6 @@ G-3 全量 --tests 本机不可复现（转 CI 大 runner，承接 SIM-23）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -824,7 +806,6 @@ B1 CI 首绿（Owner：CI，承接 ADR-0002）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -859,7 +840,6 @@ R-P112–115 重议会（Owner：Architect，日期：NT-STD-1.1 规划日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -888,7 +868,6 @@ P-3 构建面 clean；P-4 fuzz 1/4（持平）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
 
 ---
 
@@ -922,4 +901,31 @@ G-3 B1 CI 首绿仍挂（ADR-0002 tripwire 不变）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-32.*
+
+---
+
+## §31 SIM-32：有序执行清单（GO）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针：既有决议收敛（无新探针，
+> 全部引用已验证结论）。生产代码零改动（纯计划文档）。
+
+**探针**：P-1 前 31 个 SIM 的决议＋tripwire＋defer 项收敛（去重、排序、定完成定义）。
+
+**证据**：E-1 每行 EQ 均有出处（SIM 号／门禁数／审计结论），无拍脑袋项；
+E-2 阻塞边全部显式化（B1→B2，基线→P1-02，设计→实现）。
+
+**缺口**：G-1 EQ-01/02 执行（本轮只建表不执行——建表与执行分开，避免计划即开工的幻觉）。
+
+**外部方案**：无。
+
+**落点**：EXECUTION-QUEUE.md（EQ-01~20＋状态机）＋BLUEPRINT v1.5.7。
+
+**蓝图回写**：即本轮。
+
+**放行判定**：GO（计划文档；执行按表逐项开 SIM）。
+
+**tripwire**：首个 EQ 状态翻绿时复核完成定义是否被绕过（Owner：QA，持续）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-33.*
