@@ -250,8 +250,9 @@ mod tests {
         fn predict(&self, _state: &State, _questions: &[Question]) -> Result<EvaluationResult> {
             let mut answers = std::collections::HashMap::new();
             answers.insert("mock_q".to_string(), Answer::Noul(NoulAnswer {
-                value: true,
-                probability: 0.5,
+                noul: 0.5,
+                needs_review: false,
+                reason: None,
                 status: DecisionStatus::Selected,
             }));
             Ok(EvaluationResult {

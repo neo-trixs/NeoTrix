@@ -149,15 +149,42 @@ impl LayaBackend {
                     .unwrap_or("")
                     .to_string();
                 
+                let probabilities: HashMap<String, f64> = val.get("probabilities")
+                    .and_then(|v| v.as_object())
+                    .map(|m| m.iter()
+                        .map(|(k, v)| (k.clone(), v.as_f64().unwrap_or(0.0)))
+                        .collect()
+                    )
+                    .unwrap_or_default();
+                
                 let confidence = val.get("confidence")
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(0.5);
+                    .unwrap_or_else(|| crate::types::choice_confidence(&probabilities));
+                
+                let margin = val.get("margin")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                
+                let needs_review = val.get("needs_review")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(confidence < 0.5 || margin < 0.1);
+                
+                let reason = val.get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 
                 Ok(Answer::Choice(ChoiceAnswer {
-                    status: DecisionStatus::Selected,
-                    value: choice,
-                    probability: confidence,
-                    margin: 0.0,
+                    choice,
+                    probabilities,
+                    confidence,
+                    margin,
+                    needs_review,
+                    reason,
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Selected
+                    },
                 }))
             }
             
@@ -174,10 +201,34 @@ impl LayaBackend {
                     )
                     .unwrap_or_default();
                 
+                let confidence = val.get("confidence")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or_else(|| crate::types::score_confidence(&probabilities));
+                
+                let legend: Vec<String> = val.get("legend")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+                
+                let needs_review = val.get("needs_review")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(confidence < 0.4);
+                
+                let reason = val.get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                
                 Ok(Answer::Score(ScoreAnswer {
-                    status: DecisionStatus::Scored,
-                    value: score,
+                    score,
                     probabilities,
+                    confidence,
+                    legend,
+                    needs_review,
+                    reason,
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Scored
+                    },
                 }))
             }
             
@@ -186,12 +237,24 @@ impl LayaBackend {
                     .or_else(|| val.get("probability"))
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.5);
-                let value = prob >= 0.5;
+                
+                let needs_review = val.get("needs_review")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(!(0.1..=0.9).contains(&prob));
+                
+                let reason = val.get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 
                 Ok(Answer::Noul(NoulAnswer {
-                    value,
-                    probability: prob,
-                    status: DecisionStatus::Selected,
+                    noul: prob,
+                    needs_review,
+                    reason,
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Selected
+                    },
                 }))
             }
             
@@ -228,8 +291,8 @@ mod tests {
         
         match &eval_result.answers["dept"] {
             Answer::Choice(c) => {
-                assert_eq!(c.value, "billing");
-                assert!((c.probability - 0.94).abs() < 0.01);
+                assert_eq!(c.choice, "billing");
+                assert!((c.confidence - 0.94).abs() < 0.01);
             }
             _ => panic!("Expected Choice answer"),
         }

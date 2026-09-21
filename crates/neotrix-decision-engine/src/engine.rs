@@ -150,52 +150,92 @@ impl DecisionEngine {
         Err(Error::ParseError("No JSON found in response".to_string()))
     }
     
-    /// Parse a single answer value
+    /// Parse a single answer value (JEV format)
     fn parse_answer(&self, value: &serde_json::Value, question_type: &QuestionType) -> Result<Answer> {
         match question_type {
             QuestionType::Noul { .. } => {
-                let prob = value.get("probability")
-                    .or_else(|| value.get("noul"))
+                let prob = value.get("noul")
+                    .or_else(|| value.get("probability"))
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.5);
-                let val = value.get("value")
+                let needs_review = value.get("needs_review")
                     .and_then(|v| v.as_bool())
-                    .unwrap_or(prob >= 0.5);
+                    .unwrap_or(!(0.1..=0.9).contains(&prob));
+                let reason = value.get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 
                 Ok(Answer::Noul(NoulAnswer {
-                    value: val,
-                    probability: prob.clamp(0.0, 1.0),
-                    status: DecisionStatus::Selected,
+                    noul: prob.clamp(0.0, 1.0),
+                    needs_review,
+                    reason,
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Selected
+                    },
                 }))
             }
             
             QuestionType::Choice { criteria: _, .. } => {
-                let selected = value.get("value")
-                    .or_else(|| value.get("choice"))
+                let selected = value.get("choice")
+                    .or_else(|| value.get("value"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("unknown")
                     .to_string();
                 
-                let probability = value.get("probability")
-                    .or_else(|| value.get("confidence"))
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.5);
+                // Full probability distribution
+                let probabilities = value.get("probabilities")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_else(|| {
+                        // Build from single probability if full distribution not provided
+                        let p = value.get("probability")
+                            .or_else(|| value.get("confidence"))
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(0.5);
+                        let mut map = HashMap::new();
+                        map.insert(selected.clone(), p);
+                        map
+                    });
                 
+                let confidence = crate::types::choice_confidence(&probabilities);
                 let margin = value.get("margin")
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
+                    .unwrap_or_else(|| {
+                        // Compute from probabilities: top-1 - top-2
+                        let mut sorted: Vec<f64> = probabilities.values().cloned().collect();
+                        sorted.sort_by(|a, b| b.partial_cmp(a).unwrap());
+                        if sorted.len() >= 2 {
+                            sorted[0] - sorted[1]
+                        } else {
+                            sorted[0]
+                        }
+                    });
+                let needs_review = value.get("needs_review")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(confidence < 0.5 || margin < 0.1);
+                let reason = value.get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 
                 Ok(Answer::Choice(ChoiceAnswer {
-                    status: DecisionStatus::Selected,
-                    value: selected,
-                    probability: probability.clamp(0.0, 1.0),
+                    choice: selected,
+                    probabilities,
+                    confidence,
                     margin,
+                    needs_review,
+                    reason,
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Selected
+                    },
                 }))
             }
             
-            QuestionType::Score { .. } => {
-                let val = value.get("value")
-                    .or_else(|| value.get("score"))
+            QuestionType::Score { criteria, .. } => {
+                let val = value.get("score")
+                    .or_else(|| value.get("value"))
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
                 
@@ -203,10 +243,37 @@ impl DecisionEngine {
                     .and_then(|v| serde_json::from_value(v.clone()).ok())
                     .unwrap_or_default();
                 
+                let confidence = value.get("confidence")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or_else(|| crate::types::score_confidence(&probabilities));
+                
+                let legend: Vec<String> = value.get("legend")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_else(|| {
+                        criteria.iter().enumerate()
+                            .map(|(i, c)| format!("Level {}: {}", i, c))
+                            .collect()
+                    });
+                
+                let needs_review = value.get("needs_review")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(confidence < 0.4);
+                let reason = value.get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                
                 Ok(Answer::Score(ScoreAnswer {
-                    status: DecisionStatus::Scored,
-                    value: val,
+                    score: val,
                     probabilities,
+                    confidence,
+                    legend,
+                    needs_review,
+                    reason,
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Scored
+                    },
                 }))
             }
         }
@@ -379,7 +446,10 @@ Some text after
         
         let answer = engine.parse_answer(&value, &qt).unwrap();
         match answer {
-            Answer::Noul(n) => assert!((n.probability - 0.85).abs() < 0.001),
+            Answer::Noul(n) => {
+                assert!((n.noul - 0.85).abs() < 0.001);
+                assert!(!n.needs_review); // 0.85 is not extreme
+            }
             _ => panic!("Expected Noul answer"),
         }
     }
@@ -391,7 +461,7 @@ Some text after
         let qt = QuestionType::Noul { instructions: "test".into(), criteria: None };
         let answer = engine.parse_answer(&value, &qt).unwrap();
         match answer {
-            Answer::Noul(n) => assert!(n.probability <= 1.0),
+            Answer::Noul(n) => assert!(n.noul <= 1.0),
             _ => panic!("Expected Noul"),
         }
     }
@@ -402,13 +472,16 @@ Some text after
         let mut criteria = HashMap::new();
         criteria.insert("a".to_string(), None);
         criteria.insert("b".to_string(), None);
-        let value = serde_json::json!({"choice": "a", "confidence": 0.9});
+        let value = serde_json::json!({"choice": "a", "probabilities": {"a": 0.9, "b": 0.1}});
         let qt = QuestionType::Choice { instructions: "test".into(), criteria };
         let answer = engine.parse_answer(&value, &qt).unwrap();
         match answer {
             Answer::Choice(c) => {
-                assert_eq!(c.value, "a");
-                assert!((c.probability - 0.9).abs() < 0.001);
+                assert_eq!(c.choice, "a");
+                eprintln!("confidence={}, margin={}", c.confidence, c.margin);
+                // With probs {a:0.9, b:0.1}: confidence = (0.9-0.5)/(1-0.5) = 0.8
+                assert!((c.confidence - 0.8).abs() < 0.001);
+                assert!((c.margin - 0.8).abs() < 0.001);
             }
             _ => panic!("Expected Choice"),
         }
@@ -425,7 +498,7 @@ Some text after
         let answer = engine.parse_answer(&value, &qt).unwrap();
         match answer {
             Answer::Score(s) => {
-                assert!((s.value - 2.0).abs() < 0.001);
+                assert!((s.score - 2.0).abs() < 0.001);
                 // probabilities from input JSON; empty if not provided
             }
             _ => panic!("Expected Score"),

@@ -113,36 +113,71 @@ pub enum DecisionStatus {
 /// Answer to a Noul question
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoulAnswer {
-    /// Boolean decision value (true/false)
-    pub value: bool,
     /// Probability that the proposition is true (0.0 ~ 1.0)
-    pub probability: f64,
+    pub noul: f64,
+    /// Whether this answer needs human review (abstention signal)
+    #[serde(default)]
+    pub needs_review: bool,
+    /// Short evidence-based reason for the decision
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
     /// Decision status
+    #[serde(default = "default_selected")]
     pub status: DecisionStatus,
+}
+
+fn default_selected() -> DecisionStatus {
+    DecisionStatus::Selected
 }
 
 /// Answer to a Choice question
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChoiceAnswer {
-    /// Decision status
-    pub status: DecisionStatus,
-    /// Selected option
-    pub value: String,
-    /// Probability of the selected option (0.0 ~ 1.0)
-    pub probability: f64,
+    /// Selected option label
+    pub choice: String,
+    /// Full probability distribution across all labels
+    pub probabilities: HashMap<String, f64>,
+    /// Distribution concentration (NOT correctness probability)
+    /// Formula: (max(p) - 1/K) / (1 - 1/K) where K = number of labels
+    pub confidence: f64,
     /// Margin: gap between top-1 and top-2 probabilities
     pub margin: f64,
+    /// Whether this answer needs human review
+    #[serde(default)]
+    pub needs_review: bool,
+    /// Short evidence-based reason for the decision
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// Decision status
+    #[serde(default = "default_selected")]
+    pub status: DecisionStatus,
 }
 
 /// Answer to a Score question
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoreAnswer {
-    /// Decision status
-    pub status: DecisionStatus,
-    /// Score value (0 ~ max_level)
-    pub value: f64,
-    /// Probability distribution across all levels
+    /// Score value (fractional expected rubric index, e.g., 1.4)
+    pub score: f64,
+    /// Full probability distribution across all levels
     pub probabilities: HashMap<String, f64>,
+    /// Distribution concentration (NOT correctness probability)
+    pub confidence: f64,
+    /// Level descriptions (legend), indexed from 0
+    #[serde(default)]
+    pub legend: Vec<String>,
+    /// Whether this answer needs human review
+    #[serde(default)]
+    pub needs_review: bool,
+    /// Short evidence-based reason for the decision
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// Decision status
+    #[serde(default = "default_scored")]
+    pub status: DecisionStatus,
+}
+
+fn default_scored() -> DecisionStatus {
+    DecisionStatus::Scored
 }
 
 /// Unified answer type
@@ -152,6 +187,70 @@ pub enum Answer {
     Noul(NoulAnswer),
     Choice(ChoiceAnswer),
     Score(ScoreAnswer),
+}
+
+/// Compute choice confidence from probability distribution
+///
+/// Formula: `(max(p) - 1/K) / (1 - 1/K)` where K = number of labels
+/// Returns 0.0 for uniform distribution, 1.0 for certain.
+pub fn choice_confidence(probs: &HashMap<String, f64>) -> f64 {
+    let k = probs.len() as f64;
+    if k <= 1.0 {
+        return 1.0;
+    }
+    let max_p = probs.values().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let uniform = 1.0 / k;
+    let denominator = 1.0 - uniform;
+    if denominator <= 0.0 {
+        return 0.0;
+    }
+    ((max_p - uniform) / denominator).clamp(0.0, 1.0)
+}
+
+/// Compute score confidence from probability distribution
+///
+/// Measures distribution concentration around the mode.
+/// Higher = more concentrated = more confident.
+pub fn score_confidence(probs: &HashMap<String, f64>) -> f64 {
+    if probs.is_empty() {
+        return 0.0;
+    }
+    // Find mode (level with highest probability)
+    let mode = probs.iter()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+        .map(|(k, _)| k.parse::<f64>().unwrap_or(0.0))
+        .unwrap_or(0.0);
+    
+    // Compute D_K (max possible divergence) as K-1
+    let k = probs.len() as f64;
+    let d_k = k - 1.0;
+    if d_k <= 0.0 {
+        return 1.0;
+    }
+    
+    // sum(p[i] * |i - mode|)
+    let weighted_distance: f64 = probs.iter()
+        .map(|(level, p)| {
+            let i = level.parse::<f64>().unwrap_or(0.0);
+            p * (i - mode).abs()
+        })
+        .sum();
+    
+    (1.0 - weighted_distance / d_k).clamp(0.0, 1.0)
+}
+
+/// Validate probability distribution: total mass must be within 0.05 of 1.0
+pub fn validate_probabilities(probs: &HashMap<String, f64>) -> std::result::Result<(), String> {
+    let total: f64 = probs.values().sum();
+    let error = (total - 1.0).abs();
+    if error > 0.05 {
+        Err(format!(
+            "Probability mass error {:.4} exceeds threshold 0.05 (total: {:.4})",
+            error, total
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 /// Complete evaluation result
@@ -474,16 +573,18 @@ mod tests {
     #[test]
     fn test_answer_serialization_noul() {
         let answer = Answer::Noul(NoulAnswer {
-            value: true,
-            probability: 0.85,
+            noul: 0.85,
+            needs_review: false,
+            reason: Some("test reason".to_string()),
             status: DecisionStatus::Selected,
         });
         let json = serde_json::to_string(&answer).unwrap();
         let back: Answer = serde_json::from_str(&json).unwrap();
         match back {
             Answer::Noul(n) => {
-                assert!(n.value);
-                assert!((n.probability - 0.85).abs() < 0.001);
+                assert!((n.noul - 0.85).abs() < 0.001);
+                assert!(!n.needs_review);
+                assert_eq!(n.reason.as_deref(), Some("test reason"));
             }
             _ => panic!("Expected Noul"),
         }
@@ -491,19 +592,25 @@ mod tests {
 
     #[test]
     fn test_answer_serialization_choice() {
+        let mut probs = HashMap::new();
+        probs.insert("a".to_string(), 0.9);
+        probs.insert("b".to_string(), 0.1);
         let answer = Answer::Choice(ChoiceAnswer {
+            choice: "a".to_string(),
+            probabilities: probs,
+            confidence: 0.8,
+            margin: 0.8,
+            needs_review: false,
+            reason: None,
             status: DecisionStatus::Selected,
-            value: "a".to_string(),
-            probability: 0.9,
-            margin: 0.7,
         });
         let json = serde_json::to_string(&answer).unwrap();
         let back: Answer = serde_json::from_str(&json).unwrap();
         match back {
             Answer::Choice(c) => {
-                assert_eq!(c.value, "a");
-                assert!((c.probability - 0.9).abs() < 0.001);
-                assert!((c.margin - 0.7).abs() < 0.001);
+                assert_eq!(c.choice, "a");
+                assert!((c.confidence - 0.8).abs() < 0.001);
+                assert!((c.margin - 0.8).abs() < 0.001);
             }
             _ => panic!("Expected Choice"),
         }
@@ -515,18 +622,67 @@ mod tests {
         probs.insert("0".to_string(), 0.3);
         probs.insert("1".to_string(), 0.7);
         let answer = Answer::Score(ScoreAnswer {
-            status: DecisionStatus::Scored,
-            value: 0.7,
+            score: 0.7,
             probabilities: probs,
+            confidence: 0.6,
+            legend: vec!["Low".into(), "High".into()],
+            needs_review: false,
+            reason: None,
+            status: DecisionStatus::Scored,
         });
         let json = serde_json::to_string(&answer).unwrap();
         let back: Answer = serde_json::from_str(&json).unwrap();
         match back {
             Answer::Score(s) => {
-                assert!((s.value - 0.7).abs() < 0.001);
+                assert!((s.score - 0.7).abs() < 0.001);
+                assert_eq!(s.legend.len(), 2);
             }
             _ => panic!("Expected Score"),
         }
+    }
+
+    // ── Confidence Computation ────────────────────────────────
+
+    #[test]
+    fn test_choice_confidence_certain() {
+        let mut probs = HashMap::new();
+        probs.insert("a".to_string(), 1.0);
+        probs.insert("b".to_string(), 0.0);
+        assert!((choice_confidence(&probs) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_choice_confidence_uniform() {
+        let mut probs = HashMap::new();
+        probs.insert("a".to_string(), 0.5);
+        probs.insert("b".to_string(), 0.5);
+        assert!((choice_confidence(&probs) - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_score_confidence_concentrated() {
+        let mut probs = HashMap::new();
+        probs.insert("0".to_string(), 0.05);
+        probs.insert("1".to_string(), 0.9);
+        probs.insert("2".to_string(), 0.05);
+        let conf = score_confidence(&probs);
+        assert!(conf > 0.8, "Concentrated distribution should have high confidence: {}", conf);
+    }
+
+    #[test]
+    fn test_validate_probabilities_ok() {
+        let mut probs = HashMap::new();
+        probs.insert("a".to_string(), 0.6);
+        probs.insert("b".to_string(), 0.4);
+        assert!(validate_probabilities(&probs).is_ok());
+    }
+
+    #[test]
+    fn test_validate_probabilities_error() {
+        let mut probs = HashMap::new();
+        probs.insert("a".to_string(), 0.6);
+        probs.insert("b".to_string(), 0.6);
+        assert!(validate_probabilities(&probs).is_err());
     }
 
     // ── Edge Cases ─────────────────────────────────────────────
@@ -552,8 +708,9 @@ mod tests {
     fn test_evaluation_result_with_usage() {
         let mut answers = HashMap::new();
         answers.insert("q1".to_string(), Answer::Noul(NoulAnswer {
-            value: true,
-            probability: 0.5,
+            noul: 0.5,
+            needs_review: false,
+            reason: None,
             status: DecisionStatus::Selected,
         }));
         let result = EvaluationResult {

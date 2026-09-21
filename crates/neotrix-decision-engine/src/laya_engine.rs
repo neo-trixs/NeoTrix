@@ -268,14 +268,22 @@ impl LayaEngine {
         let probs = softmax(&logits_vec);
         
         match &question.question_type {
-            QuestionType::Noul { .. } => {
-                // JEV format: value is boolean, probability is P(true)
-                let is_true = probs[1] >= probs[0];
+            QuestionType::Noul { instructions, .. } => {
+                // JEV format: noul = P(true), no separate boolean value
                 let probability = probs[1]; // P(true)
+                let needs_review = !(0.1..=0.9).contains(&probability);
                 Ok(Answer::Noul(NoulAnswer {
-                    value: is_true,
-                    probability,
-                    status: DecisionStatus::Selected,
+                    noul: probability,
+                    needs_review,
+                    reason: Some(format!(
+                        "P(true)={:.2} for: {}",
+                        probability, instructions
+                    )),
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Selected
+                    },
                 }))
             }
             QuestionType::Choice { criteria, .. } => {
@@ -285,7 +293,15 @@ impl LayaEngine {
                     .map(|(i, _)| i)
                     .unwrap_or(0);
                 
-                // Compute margin: gap between top-1 and top-2
+                // Full probability distribution
+                let probabilities: HashMap<String, f64> = keys.iter().zip(probs.iter())
+                    .map(|(k, p)| (k.clone(), *p))
+                    .collect();
+                
+                // Confidence: distribution concentration
+                let confidence = crate::types::choice_confidence(&probabilities);
+                
+                // Margin: gap between top-1 and top-2
                 let mut sorted_probs = probs.clone();
                 sorted_probs.sort_by(|a, b| b.partial_cmp(a).unwrap());
                 let margin = if sorted_probs.len() >= 2 {
@@ -294,14 +310,27 @@ impl LayaEngine {
                     sorted_probs[0]
                 };
                 
+                // needs_review if confidence < 0.5 or margin < 0.1
+                let needs_review = confidence < 0.5 || margin < 0.1;
+                
                 Ok(Answer::Choice(ChoiceAnswer {
-                    status: DecisionStatus::Selected,
-                    value: keys[max_idx].clone(),
-                    probability: probs[max_idx],
+                    choice: keys[max_idx].clone(),
+                    probabilities,
+                    confidence,
                     margin,
+                    needs_review,
+                    reason: Some(format!(
+                        "Selected '{}' (p={:.2}, margin={:.2})",
+                        keys[max_idx], probs[max_idx], margin
+                    )),
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Selected
+                    },
                 }))
             }
-            QuestionType::Score { .. } => {
+            QuestionType::Score { criteria, .. } => {
                 let exp_score: f64 = probs.iter().enumerate()
                     .map(|(i, p)| i as f64 * p)
                     .sum();
@@ -310,10 +339,29 @@ impl LayaEngine {
                     .map(|(i, p)| (i.to_string(), *p))
                     .collect();
                 
+                let confidence = crate::types::score_confidence(&probabilities);
+                let legend: Vec<String> = criteria.iter().enumerate()
+                    .map(|(i, c)| format!("Level {}: {}", i, c))
+                    .collect();
+                
+                // needs_review if confidence < 0.4
+                let needs_review = confidence < 0.4;
+                
                 Ok(Answer::Score(ScoreAnswer {
-                    status: DecisionStatus::Scored,
-                    value: exp_score,
+                    score: exp_score,
                     probabilities,
+                    confidence,
+                    legend,
+                    needs_review,
+                    reason: Some(format!(
+                        "Score={:.2} (confidence={:.2})",
+                        exp_score, confidence
+                    )),
+                    status: if needs_review {
+                        DecisionStatus::Review
+                    } else {
+                        DecisionStatus::Scored
+                    },
                 }))
             }
         }
