@@ -273,6 +273,29 @@ pub fn disagreement_gate_to_jev(level: &str, score: f64) -> JevDecision {
     })
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Opt-in migration trait (no layer inversion)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Opt-in migration trait for concrete decision enums.
+///
+/// Implemented **by the owning module** (not here), so `nt_jev` never depends
+/// on L1–L6 types and layering stays clean. This is the migration path for the
+/// ~77 ad-hoc decision enums across the codebase — one `impl` at a time:
+/// ```ignore
+/// use crate::neotrix::nt_jev::{JevDecision, ToJev};
+/// impl ToJev for SafetyDecision {
+///     fn to_jev(&self) -> JevDecision {
+///         // map variants → Noul/Choice/Score, then validate + audit
+///         todo!()
+///     }
+/// }
+/// ```
+pub trait ToJev {
+    /// Convert this decision into a unified JEV primitive.
+    fn to_jev(&self) -> JevDecision;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

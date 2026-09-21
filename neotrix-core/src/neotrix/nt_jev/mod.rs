@@ -29,10 +29,26 @@
 
 pub mod primitives;
 pub mod conversion;
+pub mod eval;
 pub mod validation;
 pub mod gate;
+pub mod presets;
+pub mod script_detect;
+pub mod action;
+pub mod multilabel;
+pub mod batch;
+pub mod risk;
+pub mod audit;
 
 pub use primitives::*;
 pub use conversion::*;
+pub use eval::*;
 pub use validation::*;
 pub use gate::*;
+pub use presets::*;
+pub use script_detect::*;
+pub use action::*;
+pub use multilabel::*;
+pub use batch::*;
+pub use risk::*;
+pub use audit::*;

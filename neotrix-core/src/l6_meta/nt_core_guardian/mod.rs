@@ -43,6 +43,7 @@ pub use supervisor::{SupervisorConfig, SupervisorEvent, backoff_with_jitter, wri
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     #[test]
     fn test_full_guardian_pipeline() {
@@ -51,7 +52,7 @@ mod tests {
 
         // 2. 执行系统扫描
         let findings = scan_system_health(&health);
-        health.update_batch(findings);
+        health.update_batch(findings.clone());
 
         // 3. 看门狗检查
         let mut registry = WatchdogRegistry::new();

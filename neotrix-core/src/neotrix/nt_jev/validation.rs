@@ -26,6 +26,24 @@ pub fn validate_probabilities(probs: &HashMap<String, f64>, tolerance: f64) -> R
     Ok(())
 }
 
+/// Maximum options/levels per question — the hosted Jev cardinality limit.
+///
+/// Upstream supports up to 255 options per Choice (2-stage score-then-choose
+/// at high cardinality). Local backends should truncate long before this
+/// (jev-browser caps at 240 elements per step and says so in state).
+pub const JEV_MAX_OPTIONS: usize = 255;
+
+/// Validate option count against [`JEV_MAX_OPTIONS`].
+pub fn validate_cardinality(count: usize) -> Result<(), String> {
+    if count > JEV_MAX_OPTIONS {
+        return Err(format!(
+            "option count {} exceeds Jev limit {} — split or truncate",
+            count, JEV_MAX_OPTIONS
+        ));
+    }
+    Ok(())
+}
+
 /// Validate a NoulAnswer
 pub fn validate_noul(answer: &NoulAnswer) -> Vec<String> {
     let mut errors = Vec::new();
@@ -46,6 +64,10 @@ pub fn validate_choice(answer: &ChoiceAnswer) -> Vec<String> {
     if answer.probabilities.is_empty() {
         errors.push("probabilities is empty".into());
     } else if let Err(e) = validate_probabilities(&answer.probabilities, 0.05) {
+        errors.push(e);
+    }
+
+    if let Err(e) = validate_cardinality(answer.probabilities.len()) {
         errors.push(e);
     }
 
@@ -78,6 +100,10 @@ pub fn validate_score(answer: &ScoreAnswer) -> Vec<String> {
         if let Err(e) = validate_probabilities(&answer.probabilities, 0.05) {
             errors.push(e);
         }
+    }
+
+    if let Err(e) = validate_cardinality(answer.legend.len()) {
+        errors.push(e);
     }
 
     if answer.confidence < 0.0 || answer.confidence > 1.0 {
@@ -241,5 +267,41 @@ mod tests {
 
         let errors = dry_run_validate("", &[("q1".into(), "noul".into())]);
         assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_validate_cardinality_ok() {
+        assert!(validate_cardinality(0).is_ok());
+        assert!(validate_cardinality(255).is_ok());
+    }
+
+    #[test]
+    fn test_validate_cardinality_over_limit() {
+        let err = validate_cardinality(256).unwrap_err();
+        assert!(err.contains("255"), "got: {}", err);
+    }
+
+    #[test]
+    fn test_validate_choice_cardinality() {
+        // 256 options each with tiny mass — mass check may pass, count must fail.
+        let mut probs = HashMap::new();
+        for i in 0..256 {
+            probs.insert(format!("opt{i}"), 1.0 / 256.0);
+        }
+        let c = ChoiceAnswer {
+            choice: "opt0".into(),
+            probabilities: probs,
+            confidence: 0.0,
+            margin: 0.0,
+            needs_review: true,
+            reason: None,
+            status: DecisionStatus::Review,
+        };
+        let errors = validate_choice(&c);
+        assert!(
+            errors.iter().any(|e| e.contains("255")),
+            "expected cardinality error, got: {:?}",
+            errors
+        );
     }
 }

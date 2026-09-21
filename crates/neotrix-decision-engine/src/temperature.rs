@@ -187,11 +187,158 @@ impl TemperatureScaler {
             QuestionType::Choice { .. } => 1,
             QuestionType::Score { .. } => 2,
         };
-        
+
         let bucket = (qtype_idx, num_options);
         self.by_options.get(&bucket)
             .copied()
             .unwrap_or(self.default[qtype_idx])
+    }
+
+    /// Single-case negative log-likelihood under temperature scaling:
+    /// `-ln softmax(logits / temp)[gold]`.
+    ///
+    /// Numerically stable: the max scaled logit is subtracted before `exp`.
+    /// Returns `f64::INFINITY` instead of panicking on unusable input
+    /// (empty `logits`, `gold` out of range, non-positive/non-finite `temp`,
+    /// or NaN-poisoned arithmetic).
+    pub fn nll(logits: &[f64], gold: usize, temp: f64) -> f64 {
+        if logits.is_empty() || gold >= logits.len() {
+            return f64::INFINITY;
+        }
+        if !(temp > 0.0) || !temp.is_finite() {
+            return f64::INFINITY;
+        }
+        let mut max = f64::NEG_INFINITY;
+        for &z in logits {
+            let s = z / temp;
+            if s > max {
+                max = s;
+            }
+        }
+        if !max.is_finite() {
+            return f64::INFINITY;
+        }
+        let mut sum = 0.0;
+        for &z in logits {
+            sum += ((z / temp) - max).exp();
+        }
+        if !(sum > 0.0) || !sum.is_finite() {
+            return f64::INFINITY;
+        }
+        let v = (max - logits[gold] / temp) + sum.ln();
+        if v.is_finite() {
+            v
+        } else {
+            f64::INFINITY
+        }
+    }
+
+    /// Mean NLL over a case set, skipping cases whose per-case NLL
+    /// ([`TemperatureScaler::nll`]) is non-finite.
+    /// Returns `f64::INFINITY` when no case is usable.
+    fn mean_nll(cases: &[(Vec<f64>, usize)], temp: f64) -> f64 {
+        let mut sum = 0.0;
+        let mut n = 0usize;
+        for (logits, gold) in cases {
+            let v = Self::nll(logits, *gold, temp);
+            if v.is_finite() {
+                sum += v;
+                n += 1;
+            }
+        }
+        if n == 0 {
+            f64::INFINITY
+        } else {
+            sum / n as f64
+        }
+    }
+
+    /// Coarse-to-fine grid search for the NLL-optimal temperature.
+    ///
+    /// Coarse pass: 40 log-spaced points `T = 0.05 * 200^(i/39)` covering
+    /// `[0.05, 10.0]`. Then two refinement rounds, each 20 log-spaced points
+    /// over ±30% of the current best (clamped to `[0.05, 10.0]`). The best
+    /// value seen is carried forward so refinement never regresses.
+    /// Returns `None` when no case is usable. Fully deterministic.
+    fn search_best_temperature(cases: &[(Vec<f64>, usize)]) -> Option<f64> {
+        let usable = cases
+            .iter()
+            .any(|(logits, gold)| !logits.is_empty() && *gold < logits.len());
+        if !usable {
+            return None;
+        }
+        let mut best_t = 0.05;
+        let mut best_v = f64::INFINITY;
+        for i in 0..40 {
+            let t = 0.05 * 200.0f64.powf(i as f64 / 39.0);
+            let v = Self::mean_nll(cases, t);
+            if v < best_v {
+                best_v = v;
+                best_t = t;
+            }
+        }
+        for _ in 0..2 {
+            let lo = (best_t * 0.7).clamp(0.05, 10.0);
+            let hi = (best_t * 1.3).clamp(0.05, 10.0);
+            for j in 0..20 {
+                let t = if hi > lo {
+                    lo * (hi / lo).powf(j as f64 / 19.0)
+                } else {
+                    best_t
+                };
+                let v = Self::mean_nll(cases, t);
+                if v < best_v {
+                    best_v = v;
+                    best_t = t;
+                }
+            }
+        }
+        Some(best_t)
+    }
+
+    /// Fit one bucket's temperature by minimizing mean NLL over `cases`.
+    ///
+    /// `bucket` uses the same spec language as config keys: JEV form
+    /// (`"choice:3-5"`, `"noul:2"`) or Laya form (`"1,3"`). A JEV range
+    /// writes the fitted `T` into every expanded `(qtype_idx, num_options)`
+    /// entry of the bucket map, so [`TemperatureScaler::scale`] picks it up immediately.
+    ///
+    /// Leaves the scaler unchanged (no panic) when `cases` is empty, when no
+    /// case is usable (all empty logits / out-of-range gold), or when
+    /// `bucket` is unparseable.
+    pub fn fit_nll(&mut self, bucket: &str, cases: &[(Vec<f64>, usize)]) {
+        if cases.is_empty() {
+            return;
+        }
+        let keys = expand_bucket(bucket);
+        if keys.is_empty() {
+            return;
+        }
+        let Some(best) = Self::search_best_temperature(cases) else {
+            return;
+        };
+        for k in keys {
+            self.by_options.insert(k, best);
+        }
+    }
+
+    /// Fit every bucket independently: group `cases` by bucket name, then
+    /// call [`TemperatureScaler::fit_nll`] on each group. Empty input, groups
+    /// case, and unparseable bucket names are skipped without panicking.
+    pub fn fit_all_nll(&mut self, cases: &[(String, Vec<f64>, usize)]) {
+        if cases.is_empty() {
+            return;
+        }
+        let mut groups: HashMap<&str, Vec<(Vec<f64>, usize)>> = HashMap::new();
+        for (bucket, logits, gold) in cases {
+            groups
+                .entry(bucket.as_str())
+                .or_default()
+                .push((logits.clone(), *gold));
+        }
+        for (bucket, group) in groups {
+            self.fit_nll(bucket, &group);
+        }
     }
 }
 
@@ -205,6 +352,19 @@ fn parse_laya_bucket(key: &str) -> Option<(usize, usize)> {
     } else {
         None
     }
+}
+
+/// Expand a bucket spec into concrete `(qtype_idx, num_options)` keys.
+/// Accepts JEV (`"choice:3-5"`, `"noul:2"`) and Laya (`"1,3"`) forms.
+/// Returns an empty vec for unparseable specs.
+fn expand_bucket(spec: &str) -> Vec<(usize, usize)> {
+    if let Some((qtype_idx, min, max)) = parse_jev_bucket(spec) {
+        return (min..=max).map(|n| (qtype_idx, n)).collect();
+    }
+    if let Some(key) = parse_laya_bucket(spec) {
+        return vec![key];
+    }
+    Vec::new()
 }
 
 impl Default for TemperatureScaler {
@@ -296,5 +456,170 @@ mod tests {
         let config: LayaAgentConfig = serde_json::from_str(config_json).unwrap();
         let result = TemperatureScaler::from_config(config);
         assert!(result.is_err());
+    }
+
+    // ── Post-hoc NLL temperature fitting ─────────────────────────
+
+    #[test]
+    fn test_nll_sanity() {
+        // Hand-check: exp(2)=7.389, exp(1)=2.718, exp(0.1)=1.105,
+        // sum≈11.2125, p(gold)=0.659, NLL≈0.4170.
+        let logits = vec![2.0, 1.0, 0.1];
+        let got = TemperatureScaler::nll(&logits, 0, 1.0);
+        // Independent direct computation (no max-subtraction trick).
+        let e0 = 2.0f64.exp();
+        let e1 = 1.0f64.exp();
+        let e2 = 0.1f64.exp();
+        let direct = -(e0 / (e0 + e1 + e2)).ln();
+        assert!(
+            (got - direct).abs() < 1e-12,
+            "stable nll {} vs direct {}",
+            got,
+            direct
+        );
+        // Precomputed constant (float64: 0.4170300162778335).
+        assert!(
+            (got - 0.41703).abs() < 1e-6,
+            "nll {} vs precomputed 0.41703",
+            got
+        );
+    }
+
+    #[test]
+    fn test_fit_recovers_known_temperature() {
+        // Binary calibration design: with n0 gold-0 and n1 gold-1 copies of
+        // gap-`a` logits, mean NLL is minimized exactly where
+        // sigmoid(a/T) = n0/(n0+n1), i.e. T = a / ln(n0/n1).
+        // Group A: a = 2*ln3, 3:1 split -> T* = 2.0.
+        // Group B: b = 2*ln2, gold 1 twice + gold 0 once -> T* = 2.0.
+        // Both groups are minimized at T=2 and each is strictly convex in
+        // 1/T, so the joint optimum is exactly T* = 2.0.
+        let a = 2.0 * 3.0f64.ln();
+        let b = 2.0 * 2.0f64.ln();
+        let cases = vec![
+            (vec![a, 0.0], 0),
+            (vec![a, 0.0], 0),
+            (vec![a, 0.0], 0),
+            (vec![a, 0.0], 1),
+            (vec![0.0, b], 1),
+            (vec![0.0, b], 1),
+            (vec![0.0, b], 0),
+        ];
+        let mut scaler = TemperatureScaler::default();
+        scaler.fit_nll("choice:2", &cases);
+        let choice = QuestionType::Choice { instructions: "test".into(), criteria: HashMap::new() };
+        let fitted = scaler.get_temperature(&choice, 2);
+        assert!(
+            (fitted - 2.0).abs() < 0.5,
+            "fitted T {} should recover T*=2.0 within 0.5",
+            fitted
+        );
+    }
+
+    #[test]
+    fn test_fit_lowers_nll_for_overconfident_wrong() {
+        // Model confidently predicts the wrong class: softening (T > 1)
+        // must reduce mean NLL below the T=1.0 baseline.
+        let cases = vec![
+            (vec![5.0, 1.0, 0.0], 1),
+            (vec![4.0, 0.5, 0.2], 2),
+            (vec![1.0, 4.5, 0.3], 0),
+        ];
+        let mean_at = |t: f64| {
+            cases
+                .iter()
+                .map(|(l, g)| TemperatureScaler::nll(l, *g, t))
+                .sum::<f64>()
+                / cases.len() as f64
+        };
+        let baseline = mean_at(1.0);
+        let mut scaler = TemperatureScaler::default();
+        scaler.fit_nll("choice:3", &cases);
+        let choice = QuestionType::Choice { instructions: "test".into(), criteria: HashMap::new() };
+        let fitted = scaler.get_temperature(&choice, 3);
+        assert!(fitted > 1.0, "overconfident-wrong fit T {} should exceed 1.0", fitted);
+        assert!(
+            mean_at(fitted) <= baseline + 1e-9,
+            "fitted NLL {} should not exceed baseline {}",
+            mean_at(fitted),
+            baseline
+        );
+    }
+
+    #[test]
+    fn test_fit_empty_input_leaves_bucket_unchanged() {
+        let mut scaler = TemperatureScaler::default();
+        let choice = QuestionType::Choice { instructions: "test".into(), criteria: HashMap::new() };
+        let before = scaler.get_temperature(&choice, 3);
+        scaler.fit_nll("choice:3", &[]);
+        assert_eq!(scaler.get_temperature(&choice, 3), before);
+        scaler.fit_all_nll(&[]);
+        assert_eq!(scaler.get_temperature(&choice, 3), before);
+        // Unparseable bucket spec: no panic, nothing stored.
+        scaler.fit_nll("not-a-bucket", &[(vec![1.0, 2.0], 0)]);
+        assert_eq!(scaler.get_temperature(&choice, 3), before);
+    }
+
+    #[test]
+    fn test_nll_out_of_range_gold() {
+        // Degenerate inputs yield +inf instead of panicking.
+        assert_eq!(TemperatureScaler::nll(&[1.0, 2.0], 5, 1.0), f64::INFINITY);
+        assert_eq!(TemperatureScaler::nll(&[], 0, 1.0), f64::INFINITY);
+        assert_eq!(TemperatureScaler::nll(&[1.0, 2.0], 0, 0.0), f64::INFINITY);
+        assert_eq!(TemperatureScaler::nll(&[1.0, 2.0], 0, -1.0), f64::INFINITY);
+        // Fitting over only-invalid cases leaves the bucket unchanged.
+        let mut scaler = TemperatureScaler::default();
+        let choice = QuestionType::Choice { instructions: "test".into(), criteria: HashMap::new() };
+        let before = scaler.get_temperature(&choice, 2);
+        scaler.fit_nll("choice:2", &[(vec![1.0, 2.0], 7)]);
+        assert_eq!(scaler.get_temperature(&choice, 2), before);
+        // Mixed valid + invalid: invalid skipped, valid case still fits
+        // (gold 1 is not top logit, so optimum softens past 1.0).
+        scaler.fit_nll("choice:2", &[(vec![1.0, 2.0], 9), (vec![5.0, 1.0], 1)]);
+        assert!(scaler.get_temperature(&choice, 2) > 1.0);
+    }
+
+    #[test]
+    fn test_fit_all_nll_groups_by_bucket() {
+        // "choice:2": sharp-but-mostly-right (gap 1, 5:1 split ->
+        // T* = 1/ln5 ≈ 0.62 < 1). "choice:3": overconfident-wrong
+        // (T* at the 10.0 cap > 1). Each bucket must fit independently.
+        let mut cases: Vec<(String, Vec<f64>, usize)> = Vec::new();
+        for _ in 0..5 {
+            cases.push(("choice:2".to_string(), vec![2.0, 1.0], 0));
+        }
+        cases.push(("choice:2".to_string(), vec![2.0, 1.0], 1));
+        cases.push(("choice:3".to_string(), vec![5.0, 1.0, 0.0], 1));
+        cases.push(("choice:3".to_string(), vec![4.0, 0.5, 0.2], 2));
+        cases.push(("choice:3".to_string(), vec![1.0, 4.5, 0.3], 0));
+        let mut scaler = TemperatureScaler::default();
+        scaler.fit_all_nll(&cases);
+        let choice = QuestionType::Choice { instructions: "test".into(), criteria: HashMap::new() };
+        let t2 = scaler.get_temperature(&choice, 2);
+        let t3 = scaler.get_temperature(&choice, 3);
+        assert!(t2 < 1.0, "choice:2 fitted T {} should sharpen (< 1.0)", t2);
+        assert!(t3 > 1.0, "choice:3 fitted T {} should soften (> 1.0)", t3);
+    }
+
+    #[test]
+    fn test_fit_jev_range_and_laya_bucket_forms() {
+        let cases = vec![
+            (vec![5.0, 1.0, 0.0], 1),
+            (vec![4.0, 0.5, 0.2], 2),
+        ];
+        let mut scaler = TemperatureScaler::default();
+        scaler.fit_nll("choice:3-5", &cases);
+        let choice = QuestionType::Choice { instructions: "test".into(), criteria: HashMap::new() };
+        let t3 = scaler.get_temperature(&choice, 3);
+        assert!(t3 > 1.0, "range fit T {} should soften (> 1.0)", t3);
+        // JEV range writes every expanded key.
+        assert_eq!(scaler.get_temperature(&choice, 4), t3);
+        assert_eq!(scaler.get_temperature(&choice, 5), t3);
+        // Outside the range stays default.
+        assert_eq!(scaler.get_temperature(&choice, 2), 1.0);
+        // Laya "qtype_idx,num_options" form addresses the same key.
+        let mut scaler2 = TemperatureScaler::default();
+        scaler2.fit_nll("1,3", &cases);
+        assert_eq!(scaler2.get_temperature(&choice, 3), t3);
     }
 }

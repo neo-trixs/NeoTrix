@@ -33,6 +33,27 @@ pub struct NoulAnswer {
     pub status: DecisionStatus,
 }
 
+impl NoulAnswer {
+    /// Create with auto-computed confidence from probability
+    pub fn new(noul: f64) -> Self {
+        let confidence = noul.max(1.0 - noul); // max(p, 1-p)
+        Self {
+            noul,
+            needs_review: confidence < 0.7,
+            reason: if confidence < 0.7 {
+                Some(format!("low confidence: {:.4}", confidence))
+            } else {
+                None
+            },
+            status: if confidence < 0.7 {
+                DecisionStatus::Review
+            } else {
+                DecisionStatus::Selected
+            },
+        }
+    }
+}
+
 /// Choice — select one option from a fixed set
 ///
 /// Use for: "Which tool?", "Which agent?", "Which policy?"
@@ -55,6 +76,37 @@ pub struct ChoiceAnswer {
     pub status: DecisionStatus,
 }
 
+impl ChoiceAnswer {
+    /// Create with auto-computed confidence and margin from probabilities
+    pub fn new(choice: String, probabilities: HashMap<String, f64>) -> Self {
+        let confidence = choice_confidence(&probabilities);
+        let mut sorted: Vec<f64> = probabilities.values().cloned().collect();
+        sorted.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        let margin = if sorted.len() >= 2 {
+            sorted[0] - sorted[1]
+        } else {
+            sorted.first().copied().unwrap_or(0.0)
+        };
+        Self {
+            choice,
+            probabilities,
+            confidence,
+            margin,
+            needs_review: confidence < 0.7,
+            reason: if confidence < 0.7 {
+                Some(format!("low confidence: {:.4}", confidence))
+            } else {
+                None
+            },
+            status: if confidence < 0.7 {
+                DecisionStatus::Review
+            } else {
+                DecisionStatus::Selected
+            },
+        }
+    }
+}
+
 /// Score — rate on an ordered scale
 ///
 /// Use for: "Severity level?", "Maturity stage?", "Risk level?"
@@ -75,6 +127,30 @@ pub struct ScoreAnswer {
     pub reason: Option<String>,
     /// Decision status
     pub status: DecisionStatus,
+}
+
+impl ScoreAnswer {
+    /// Create with auto-computed confidence from probabilities
+    pub fn new(score: f64, probabilities: HashMap<String, f64>, legend: Vec<String>) -> Self {
+        let confidence = score_confidence(&probabilities);
+        Self {
+            score,
+            probabilities,
+            confidence,
+            legend,
+            needs_review: confidence < 0.7,
+            reason: if confidence < 0.7 {
+                Some(format!("low confidence: {:.4}", confidence))
+            } else {
+                None
+            },
+            status: if confidence < 0.7 {
+                DecisionStatus::Review
+            } else {
+                DecisionStatus::Scored
+            },
+        }
+    }
 }
 
 /// Unified JEV decision — wraps all three primitives
@@ -125,6 +201,82 @@ impl JevDecision {
             Self::Score(s) => s.status,
         }
     }
+}
+
+/// Normalized Shannon entropy confidence: 1 - H(p) / log(k)
+/// Ported from Laya's `confidence_from_probs(p, k)`.
+/// k is the number of options (must be >= 2, otherwise returns 1.0).
+pub fn confidence_from_probs(probs: &[f64], k: usize) -> f64 {
+    if k < 2 {
+        return 1.0;
+    }
+    let log_k = (k as f64).ln();
+    let entropy: f64 = probs
+        .iter()
+        .take(k)
+        .map(|&p| if p > 0.0 { -p * p.ln() } else { 0.0 })
+        .sum();
+    (1.0 - entropy / log_k).clamp(0.0, 1.0)
+}
+
+/// Compute confidence from a HashMap<String, f64> of probabilities
+pub fn confidence_from_map(probs: &HashMap<String, f64>) -> f64 {
+    let values: Vec<f64> = probs.values().cloned().collect();
+    confidence_from_probs(&values, values.len())
+}
+
+/// Temperature bucket: maps (question_type, option_count) → bucket string
+/// Ported from Laya's `temp_bucket(qtype, k)`.
+pub fn temp_bucket(qtype: &str, k: usize) -> String {
+    let size = if k <= 2 {
+        "2"
+    } else if k <= 5 {
+        "3-5"
+    } else if k <= 10 {
+        "6-10"
+    } else {
+        "11+"
+    };
+    format!("{}:{}", qtype, size)
+}
+
+/// Upstream Jev API confidence: rescaled top-probability `(k·p_top − 1)/(k − 1)`.
+///
+/// Live-API measurements (~1M answers, 2026-09) show the hosted Jev `confidence`
+/// field follows this formula within rounding error — it summarizes the returned
+/// distribution (distance of the winner from pure chance), it is NOT a separate
+/// model-uncertainty signal. Use [`confidence_from_probs`] (normalized entropy,
+/// full distribution) as the primary gating signal; use this only when
+/// cross-comparing with upstream API values.
+pub fn confidence_top_prob(probs: &HashMap<String, f64>) -> f64 {
+    let k = probs.len();
+    if k < 2 {
+        return 1.0;
+    }
+    let top = probs.values().cloned().fold(0.0f64, f64::max);
+    ((k as f64 * top - 1.0) / (k as f64 - 1.0)).clamp(0.0, 1.0)
+}
+
+/// Contested margin: when top-1 and top-2 are closer than this, the winning
+/// label is unstable across repeated calls (measured flips when the gap is
+/// within ~0.05). Contested answers must go to review, never auto-act.
+pub const CONTESTED_MARGIN: f64 = 0.05;
+
+/// Returns true if a choice is contested (margin below [`CONTESTED_MARGIN`]).
+pub fn choice_is_contested(choice: &ChoiceAnswer) -> bool {
+    choice.margin < CONTESTED_MARGIN
+}
+
+/// Compute choice confidence from a HashMap of option probabilities
+pub fn choice_confidence(probs: &HashMap<String, f64>) -> f64 {
+    let values: Vec<f64> = probs.values().cloned().collect();
+    confidence_from_probs(&values, values.len())
+}
+
+/// Compute score confidence from a HashMap of level probabilities
+pub fn score_confidence(probs: &HashMap<String, f64>) -> f64 {
+    let values: Vec<f64> = probs.values().cloned().collect();
+    confidence_from_probs(&values, values.len())
 }
 
 /// A set of JEV decisions keyed by question ID
@@ -247,5 +399,83 @@ mod tests {
             status: DecisionStatus::Review,
         }));
         assert_eq!(ExitCode::from_decisions(&decisions), ExitCode::NeedsReview);
+    }
+
+    #[test]
+    fn test_confidence_from_probs_concentrated() {
+        let probs = vec![0.9, 0.1];
+        let conf = confidence_from_probs(&probs, 2);
+        assert!(conf > 0.5, "concentrated should have high confidence: {}", conf);
+    }
+
+    #[test]
+    fn test_confidence_from_probs_uniform() {
+        let probs = vec![0.5, 0.5];
+        let conf = confidence_from_probs(&probs, 2);
+        assert!((conf - 0.0).abs() < 0.001, "uniform should have zero confidence: {}", conf);
+    }
+
+    #[test]
+    fn test_confidence_from_probs_single() {
+        let probs = vec![1.0];
+        let conf = confidence_from_probs(&probs, 1);
+        assert!((conf - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_temp_bucket() {
+        assert_eq!(temp_bucket("choice", 3), "choice:3-5");
+        assert_eq!(temp_bucket("noul", 2), "noul:2");
+        assert_eq!(temp_bucket("score", 7), "score:6-10");
+        assert_eq!(temp_bucket("choice", 15), "choice:11+");
+    }
+
+    #[test]
+    fn test_noul_answer_new() {
+        let n = NoulAnswer::new(0.9);
+        assert!(!n.needs_review);
+        assert_eq!(n.status, DecisionStatus::Selected);
+
+        let n = NoulAnswer::new(0.5);
+        assert!(n.needs_review);
+        assert_eq!(n.status, DecisionStatus::Review);
+    }
+
+    #[test]
+    fn test_confidence_top_prob() {
+        // 5 options, top 0.76 → (5·0.76−1)/4 = 0.70 (upstream formula)
+        let mut probs = HashMap::new();
+        probs.insert("a".to_string(), 0.76);
+        probs.insert("b".to_string(), 0.06);
+        probs.insert("c".to_string(), 0.06);
+        probs.insert("d".to_string(), 0.06);
+        probs.insert("e".to_string(), 0.06);
+        let conf = confidence_top_prob(&probs);
+        assert!((conf - 0.70).abs() < 0.001, "got {}", conf);
+    }
+
+    #[test]
+    fn test_confidence_top_prob_chance_is_zero() {
+        // Uniform over 4 → (4·0.25−1)/3 = 0
+        let mut probs = HashMap::new();
+        for k in ["a", "b", "c", "d"] {
+            probs.insert(k.to_string(), 0.25);
+        }
+        assert!((confidence_top_prob(&probs)).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_choice_is_contested() {
+        let mut probs = HashMap::new();
+        probs.insert("a".to_string(), 0.51);
+        probs.insert("b".to_string(), 0.49);
+        let c = ChoiceAnswer::new("a".to_string(), probs);
+        assert!(choice_is_contested(&c), "margin={}", c.margin);
+
+        let mut probs2 = HashMap::new();
+        probs2.insert("a".to_string(), 0.9);
+        probs2.insert("b".to_string(), 0.1);
+        let c2 = ChoiceAnswer::new("a".to_string(), probs2);
+        assert!(!choice_is_contested(&c2));
     }
 }

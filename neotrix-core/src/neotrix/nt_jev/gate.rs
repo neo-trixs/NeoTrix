@@ -3,9 +3,10 @@
 //! The gate takes a set of JEV questions, evaluates them (via backend or simulation),
 //! validates results, and returns a unified verdict with exit code.
 
-use std::collections::HashMap;
+use super::presets::ABSTAIN_OPTION;
 use super::primitives::*;
 use super::validation::validate_result_set;
+use std::collections::HashMap;
 
 /// A question to be evaluated by the gate
 #[derive(Debug, Clone)]
@@ -230,6 +231,43 @@ impl JevGate {
     }
 }
 
+/// Flip a contested Choice decision to abstain ("unknown").
+///
+/// If the decision is a Choice whose margin is below [`CONTESTED_MARGIN`] (see
+/// [`choice_is_contested`]), the winning label is unstable, so the gate says
+/// "I don't know" instead of forcing a closed-set classification: the choice
+/// becomes [`ABSTAIN_OPTION`] with `needs_review = true` and
+/// [`DecisionStatus::Review`]. The original probabilities and confidence are
+/// kept as-is for audit. All other decisions are returned unchanged.
+pub fn abstain_if_contested(decision: JevDecision) -> JevDecision {
+    match decision {
+        JevDecision::Choice(mut c) => {
+            if c.choice != ABSTAIN_OPTION && choice_is_contested(&c) {
+                let margin = c.margin;
+                c.choice = ABSTAIN_OPTION.to_string();
+                c.needs_review = true;
+                c.status = DecisionStatus::Review;
+                c.reason = Some(format!(
+                    "contested margin {:.4} < {:.4}; abstained to \"{}\"",
+                    margin, CONTESTED_MARGIN, ABSTAIN_OPTION
+                ));
+                JevDecision::Choice(c)
+            } else {
+                JevDecision::Choice(c)
+            }
+        }
+        other => other,
+    }
+}
+
+/// Returns true iff the decision is a Choice abstention (choice == "unknown").
+pub fn is_abstained(decision: &JevDecision) -> bool {
+    match decision {
+        JevDecision::Choice(c) => c.choice == ABSTAIN_OPTION,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,5 +385,96 @@ mod tests {
         ];
         let result = gate.evaluate(&questions, low_conf_evaluator);
         assert_eq!(result.verdict, GateVerdict::Review);
+    }
+
+    #[test]
+    fn test_abstain_if_contested_flips_close_call() {
+        let mut probs = HashMap::new();
+        probs.insert("a".to_string(), 0.51);
+        probs.insert("b".to_string(), 0.49);
+        let c = ChoiceAnswer::new("a".to_string(), probs.clone());
+        assert!(choice_is_contested(&c));
+        let confidence = c.confidence;
+
+        let out = abstain_if_contested(JevDecision::Choice(c));
+        match out {
+            JevDecision::Choice(c) => {
+                assert_eq!(c.choice, "unknown");
+                assert!(c.needs_review);
+                assert_eq!(c.status, DecisionStatus::Review);
+                assert!(c
+                    .reason
+                    .as_deref()
+                    .unwrap_or("")
+                    .contains("contested margin"));
+                assert_eq!(c.probabilities, probs);
+                assert!((c.confidence - confidence).abs() < 1e-12);
+            }
+            other => panic!("expected Choice, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_abstain_if_contested_leaves_clear_winner_untouched() {
+        let decision = JevDecision::Choice(ChoiceAnswer {
+            choice: "a".into(),
+            probabilities: [("a".into(), 0.9), ("b".into(), 0.1)].into_iter().collect(),
+            confidence: 0.8,
+            margin: 0.8,
+            needs_review: false,
+            reason: None,
+            status: DecisionStatus::Selected,
+        });
+        let out = abstain_if_contested(decision);
+        match out {
+            JevDecision::Choice(c) => {
+                assert_eq!(c.choice, "a");
+                assert!(!c.needs_review);
+                assert_eq!(c.status, DecisionStatus::Selected);
+                assert!(c.reason.is_none());
+            }
+            other => panic!("expected Choice, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_abstain_if_contested_leaves_noul_untouched() {
+        let decision = JevDecision::Noul(NoulAnswer::new(0.9));
+        let out = abstain_if_contested(decision);
+        match &out {
+            JevDecision::Noul(n) => {
+                assert!((n.noul - 0.9).abs() < 1e-12);
+                assert!(!n.needs_review);
+            }
+            other => panic!("expected Noul, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_is_abstained() {
+        let abstained = JevDecision::Choice(ChoiceAnswer {
+            choice: "unknown".into(),
+            probabilities: [("unknown".into(), 1.0)].into_iter().collect(),
+            confidence: 1.0,
+            margin: 1.0,
+            needs_review: true,
+            reason: None,
+            status: DecisionStatus::Review,
+        });
+        assert!(is_abstained(&abstained));
+
+        let chosen = JevDecision::Choice(ChoiceAnswer {
+            choice: "a".into(),
+            probabilities: [("a".into(), 0.9), ("b".into(), 0.1)].into_iter().collect(),
+            confidence: 0.8,
+            margin: 0.8,
+            needs_review: false,
+            reason: None,
+            status: DecisionStatus::Selected,
+        });
+        assert!(!is_abstained(&chosen));
+
+        let noul = JevDecision::Noul(NoulAnswer::new(0.9));
+        assert!(!is_abstained(&noul));
     }
 }
