@@ -12,6 +12,7 @@ pub mod workflow;
 pub mod world;
 
 pub mod ai_orchestration;
+pub mod autostart;
 pub mod folder_instructions;
 pub mod im;
 pub(crate) mod r#macro;
@@ -37,6 +38,7 @@ pub use workflow::WorkflowPluginImpl;
 pub use world::WorldPlugin;
 
 pub use ai_orchestration::AiOrchestrationPlugin;
+pub use autostart::AutostartPlugin;
 pub use folder_instructions::FolderInstructionsPlugin;
 pub use im::ImPlugin;
 pub use mcp_extension::McpExtensionPlugin;

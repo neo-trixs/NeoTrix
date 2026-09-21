@@ -1,31 +1,66 @@
-import { call } from './client'
+import { call as domainCall } from './domain'
+import { ApiError } from './client'
 import type { BackgroundTask } from './types'
 
 /* ════════════════════════════════════════════
    api/tasks.ts — 定时后台任务
-   对应 background_cmds.rs
+   chat-first 迁移后经 ai_orchestration 域插件路由。
+   后端动作：submit/get/list/cancel_background_task；
+   pause / resume / run_now 后端不存在，明确抛出 NOT_IMPLEMENTED。
    ════════════════════════════════════════════ */
 
-export function listBackgroundTasks(): Promise<BackgroundTask[]> {
-  return call('list_background_tasks', {})
+interface BackendTask {
+  id: string
+  description: string
+  status: string
+  created_at?: string
+  started_at?: string | null
+  completed_at?: string | null
+  progress?: number
+  result?: string | null
+  error?: string | null
 }
 
-export function createBackgroundTask(name: string, prompt: string, schedule: string): Promise<BackgroundTask> {
-  return call('create_background_task', { name, prompt, schedule })
+function adaptTask(t: BackendTask): BackgroundTask {
+  return {
+    id: t.id,
+    name: t.description,
+    prompt: t.description,
+    schedule: '',
+    last_run: null,
+    next_run: null,
+    status: t.status,
+    runs: [],
+  }
 }
 
-export function pauseBackgroundTask(id: string): Promise<void> {
-  return call('pause_background_task', { id })
+function notImplemented(op: string): ApiError {
+  return new ApiError(`后台任务操作 ${op} 后端未实现`, 'NOT_IMPLEMENTED')
 }
 
-export function resumeBackgroundTask(id: string): Promise<void> {
-  return call('resume_background_task', { id })
+export async function listBackgroundTasks(): Promise<BackgroundTask[]> {
+  const tasks = await domainCall<BackendTask[]>('ai_orchestration', 'list_background_tasks')
+  return tasks.map(adaptTask)
 }
 
-export function deleteBackgroundTask(id: string): Promise<void> {
-  return call('delete_background_task', { id })
+export async function createBackgroundTask(name: string, prompt: string, schedule: string): Promise<BackgroundTask> {
+  const description = schedule ? `${name}: ${prompt} @${schedule}` : `${name}: ${prompt}`
+  const task = await domainCall<BackendTask>('ai_orchestration', 'submit_background_task', { description })
+  return adaptTask(task)
 }
 
-export function runBackgroundTaskNow(id: string): Promise<string> {
-  return call('run_background_task_now', { id })
+export async function pauseBackgroundTask(_id: string): Promise<void> {
+  throw notImplemented('pause')
+}
+
+export async function resumeBackgroundTask(_id: string): Promise<void> {
+  throw notImplemented('resume')
+}
+
+export async function deleteBackgroundTask(id: string): Promise<void> {
+  await domainCall('ai_orchestration', 'cancel_background_task', { task_id: id })
+}
+
+export async function runBackgroundTaskNow(_id: string): Promise<string> {
+  throw notImplemented('run_now')
 }

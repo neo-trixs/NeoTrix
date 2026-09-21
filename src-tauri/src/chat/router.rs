@@ -142,30 +142,71 @@ impl IntentRouter {
         None
     }
 
-    /// LLM classification for complex requests.
+    /// Fallback classification for messages that miss Tier-1 patterns.
+    ///
+    /// Scores every registered `(domain, action)` by keyword overlap with the
+    /// message (domain/action names weighted highest, then description tokens).
+    /// A real LLM classifier can replace this when wired; the scoring contract
+    /// (`Intent { domain, action, args }`) stays the same.
     async fn llm_classify(message: &str, registry: &DomainRegistry) -> Result<Intent, DomainError> {
-        // Get available domains and actions
-        let domains: Vec<String> = registry.list()
-            .iter()
-            .map(|info| format!("{}: {}", info.name, info.actions.iter().map(|a| &a.name).collect::<Vec<_>>().join(", ")))
-            .collect();
-        
-        let _prompt = format!(
-            "You are an intent classifier. Given a user message and available domains, \
-             return a JSON object with: domain, action, args.\n\n\
-             Available domains:\n{}\n\n\
-             User message: {}\n\n\
-             Return ONLY a JSON object like: {{\"domain\": \"...\", \"action\": \"...\", \"args\": {{}}}}",
-            domains.join("\n"),
-            message
-        );
+        let msg = message.to_lowercase();
+        // (score, domain, action, description)
+        let mut best: Option<(usize, String, String, String)> = None;
 
-        // For now, return a default intent — LLM integration will be added later
-        Err(DomainError {
-            code: "INTENT_NOT_FOUND".into(),
-            message: format!("无法理解指令: {message}. 请尝试更具体的描述，或输入'帮助'查看支持的操作。"),
-            recoverable: true,
-        })
+        for info in registry.list() {
+            let domain_name = info.name.to_lowercase();
+            let domain_hit = if msg.contains(&domain_name.as_str()) {
+                domain_name.len() * 2
+            } else {
+                0
+            };
+            for action in &info.actions {
+                let mut score = domain_hit;
+                let action_name = action.name.to_lowercase();
+                if msg.contains(&action_name.as_str()) {
+                    score += action_name.len() * 3;
+                }
+                // Description tokens: byte-len >= 6 skips single CJK chars
+                // (3 bytes each) and tiny English words; action-name
+                // matching above already covers short tokens.
+                for token in action.description.split(|c: char| {
+                    c.is_whitespace() || "，。、；：！？（）()[]{}<>\"'".contains(c)
+                }) {
+                    let token = token.trim().to_lowercase();
+                    if token.len() >= 6 && msg.contains(&token) {
+                        score += token.len();
+                    }
+                }
+                let is_better = match &best {
+                    Some((prev, _, _, _)) => score > *prev,
+                    None => score > 0,
+                };
+                if is_better {
+                    best = Some((
+                        score,
+                        info.name.clone(),
+                        action.name.clone(),
+                        action.description.clone(),
+                    ));
+                }
+            }
+        }
+
+        match best {
+            Some((_, domain, action, description)) => Ok(Intent {
+                domain,
+                action,
+                args: json!({}),
+                response_hint: Some(description),
+            }),
+            None => Err(DomainError {
+                code: "INTENT_NOT_FOUND".into(),
+                message: format!(
+                    "无法理解指令: {message}. 请尝试更具体的描述，或输入'帮助'查看支持的操作。"
+                ),
+                recoverable: true,
+            }),
+        }
     }
 
     fn extract_url(message: &str) -> Option<String> {

@@ -4,7 +4,10 @@
  * Flow: check prerequisites → show status → tips → complete
  */
 import { createSignal, onMount, Show } from 'solid-js'
-import { invoke } from '@tauri-apps/api/core'
+import { call as domainCall } from '../api/domain'
+import { chatHelp } from '../api/chat'
+
+const ONBOARDED_KEY = 'neotrix.onboarded'
 
 interface Prerequisite {
   name: string
@@ -38,10 +41,38 @@ export function OnboardingWizard(props: Props) {
 
   onMount(async () => {
     try {
-      const [s, t] = await Promise.all([
-        invoke<OnboardingStatus>('onboarding_check_prereqs'),
-        invoke<string[]>('onboarding_get_tips'),
+      const firstRun = (() => {
+        try {
+          return localStorage.getItem(ONBOARDED_KEY) !== '1'
+        } catch {
+          return true
+        }
+      })()
+      const [sys, help] = await Promise.all([
+        domainCall<{ platform: string; arch: string; hostname?: string; neotrix_version?: string }>('system', 'system_info').catch(() => null),
+        chatHelp().catch(() => ''),
       ])
+      const version = sys?.neotrix_version
+      const s: OnboardingStatus = {
+        prerequisites: [
+          {
+            name: 'Tauri WebView Runtime',
+            installed: true,
+            version,
+            required: true,
+          },
+        ],
+        all_required_met: true,
+        first_run: firstRun,
+        system: {
+          os: sys?.platform ?? 'unknown',
+          arch: sys?.arch ?? 'unknown',
+          hostname: sys?.hostname,
+        },
+      }
+      const t = help
+        ? help.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
+        : ['在输入框中用自然语言描述你的需求', '输入“帮助”查看支持的操作', '所有操作均经由本地领域插件执行']
       setStatus(s)
       setTips(t)
       setStep(s.first_run ? 'check' : 'done')
@@ -57,7 +88,7 @@ export function OnboardingWizard(props: Props) {
 
   const handleComplete = async () => {
     try {
-      await invoke('onboarding_complete')
+      localStorage.setItem(ONBOARDED_KEY, '1')
     } catch (e) {
       console.error('Failed to mark onboarding complete:', e)
     }

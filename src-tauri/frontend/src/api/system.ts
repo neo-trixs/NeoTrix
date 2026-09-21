@@ -1,62 +1,80 @@
-import { call, errText } from './client'
+import { errText, ApiError } from './client'
+import { call as domainCall } from './domain'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { isTauriRuntime } from '../lib/env'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { ProjectTreeItem, ProjectView, UpdateProgress, VoiceTranscript } from './types'
 
 /* ════════════════════════════════════════════
-   api/system.ts — 窗口 / 项目树 / 文件 / 语音 / 更新事件
-    对应 desktop_cmds.rs / project_cmds.rs / voice_cmds.rs / neotrix_cmds.rs(update)
+   api/system.ts — 窗口 / 项目树 / 文件 / 语音 / 开机自启 / 更新事件
+   chat-first 迁移后：
+   - 窗口操作走 @tauri-apps/api/window（前端原生，无需后端命令）
+   - 文件/项目走 file 域插件；开机自启走 autostart 域插件
    ════════════════════════════════════════════ */
 
-/* ── 窗口 ── */
+function requireRuntime(): void {
+  if (!isTauriRuntime()) {
+    throw new ApiError('此功能仅在桌面宿主可用')
+  }
+}
+
+/* ── 窗口（前端原生） ── */
 export function windowMinimize(): Promise<void> {
-  return call('window_minimize', {})
+  requireRuntime()
+  return getCurrentWindow().minimize()
 }
 
 export function windowMaximize(): Promise<void> {
-  return call('window_maximize', {})
+  requireRuntime()
+  return getCurrentWindow().toggleMaximize()
 }
 
 export function windowClose(): Promise<void> {
-  return call('window_close', {})
+  requireRuntime()
+  return getCurrentWindow().close()
 }
 
-/* ── 项目 / 文件 ── */
+/* ── 项目 / 文件（file 域插件） ── */
 export function projectTree(): Promise<ProjectView> {
-  return call('neotrix_project_tree', {})
+  return domainCall<ProjectView>('file', 'tree', {})
 }
 
 export function readFile(path: string): Promise<string> {
-  return call('read_file', { path })
+  return domainCall<string>('file', 'read', { path })
 }
 
 export function writeFile(path: string, content: string): Promise<void> {
-  return call('write_file', { path, content })
+  return domainCall<void>('file', 'write', { path, content })
 }
 
 /* ── 语音 ── */
-export function voiceGetTranscription(audioData: string, language?: string, model?: string): Promise<VoiceTranscript> {
-  return call('voice_get_transcription', {
-    audio_data: audioData,
-    language: language ?? null,
-    model: model ?? null,
-  })
+export function voiceGetTranscription(
+  _audioData: string,
+  _language?: string,
+  _model?: string,
+): Promise<VoiceTranscript> {
+  // 后端 voice_agent 域只有会话/监听/合成动作，无离线转写端点；
+  // 保留签名以兼容调用方，明确抛出未实现而非未知命令错误。
+  return Promise.reject(new ApiError('语音转写后端未实现', 'NOT_IMPLEMENTED'))
 }
 
-/* ── 开机自启 ── */
-export function autostartIsEnabled(): Promise<boolean> {
-  return call('autostart_is_enabled', {})
+/* ── 开机自启（autostart 域插件） ── */
+export async function autostartIsEnabled(): Promise<boolean> {
+  const r = await domainCall<{ enabled: boolean }>('autostart', 'is_enabled')
+  return r.enabled
 }
 
 export function autostartEnable(): Promise<void> {
-  return call('autostart_enable', {})
+  return domainCall<void>('autostart', 'enable')
 }
 
 export function autostartDisable(): Promise<void> {
-  return call('autostart_disable', {})
+  return domainCall<void>('autostart', 'disable')
 }
 
-export function autostartToggle(): Promise<boolean> {
-  return call('autostart_toggle', {})
+export async function autostartToggle(): Promise<boolean> {
+  const r = await domainCall<{ enabled: boolean }>('autostart', 'toggle')
+  return r.enabled
 }
 
 /* ── 更新事件监听（热更新进度） ── */

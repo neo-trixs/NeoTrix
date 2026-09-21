@@ -1,4 +1,5 @@
-import { call } from './client'
+import { call as domainCall } from './domain'
+import { ApiError } from './client'
 
 /* ════════════════════════════════════════════
    api/harness.ts — Harness 统一网关前端 SDK
@@ -73,13 +74,28 @@ export interface HarnessTurn {
   status: string
 }
 
-/** 统一执行（对话即OS）— 唯一生产入口，自动路由 */
-export function harnessExecute(req: HarnessExecuteRequest): Promise<HarnessExecuteResponse> {
-  return call<HarnessExecuteResponse>('harness_execute', {
+function notImplemented(op: string): ApiError {
+  return new ApiError(`harness 操作 ${op} 后端未实现`, 'NOT_IMPLEMENTED')
+}
+
+/** 统一执行（对话即OS）— 唯一生产入口，自动路由（经 tool 域） */
+export async function harnessExecute(req: HarnessExecuteRequest): Promise<HarnessExecuteResponse> {
+  const r = await domainCall<{ ok?: boolean; stub?: boolean; message?: string }>('tool', 'harness_execute', {
     instruction: req.instruction,
     capability_tag: req.capability_tag ?? null,
     project: req.project ?? null,
   })
+  return {
+    instruction: req.instruction,
+    capability_tag: req.capability_tag ?? 'orchestration',
+    domain: '',
+    specialist: '',
+    harness_tool: '',
+    allocations: [],
+    internal_count: 0,
+    external_gap_count: 0,
+    message: r.message ?? '',
+  }
 }
 
 /** 重路径真实执行（按需触发）— 完整闭环: 内置执行 + 外部缺口 LLM 试错求解 */
@@ -94,53 +110,52 @@ export interface HarnessRunResponse {
   external_closures: { solved: boolean; solution: string; knowledge_acquired: boolean }[]
 }
 
-export function harnessRun(req: HarnessExecuteRequest): Promise<HarnessRunResponse> {
-  return call<HarnessRunResponse>('harness_run', {
-    instruction: req.instruction,
-    run_id: req.run_id ?? null,
-    capability_tag: req.capability_tag ?? null,
-    project: req.project ?? null,
-  })
+export async function harnessRun(_req: HarnessExecuteRequest): Promise<HarnessRunResponse> {
+  throw notImplemented('harness_run')
 }
 
 /** 能力标签API地图（调试用） */
-export function harnessApiMap(): Promise<CapabilityApiEntry[]> {
-  return call<CapabilityApiEntry[]>('harness_api_map')
+export async function harnessApiMap(): Promise<CapabilityApiEntry[]> {
+  throw notImplemented('harness_api_map')
 }
 
-export function harnessToolCatalog(): Promise<{ name: string; description: string }[]> {
-  return call<{ name: string; description: string }[]>('harness_tool_catalog')
+export async function harnessToolCatalog(): Promise<{ name: string; description: string }[]> {
+  throw notImplemented('harness_tool_catalog')
 }
 
-export function harnessResolve(instruction: string): Promise<CapabilityApiEntry | null> {
-  return call<CapabilityApiEntry | null>('harness_resolve', { instruction })
+export async function harnessResolve(instruction: string): Promise<CapabilityApiEntry | null> {
+  const r = await domainCall<CapabilityApiEntry | { ok?: boolean }>('tool', 'harness_resolve', { instruction })
+  if (r && typeof r === 'object' && 'capability_tag' in (r as object)) {
+    return r as CapabilityApiEntry
+  }
+  return null
 }
 
 /** 推理路由 */
-export function harnessRouterStatus(): Promise<{ default_provider: string; auto_routing: boolean }> {
-  return call<{ default_provider: string; auto_routing: boolean }>('harness_router_status')
+export async function harnessRouterStatus(): Promise<{ default_provider: string; auto_routing: boolean }> {
+  throw notImplemented('harness_router_status')
 }
 
-export function harnessRouterSetProvider(provider: string): Promise<{ default_provider: string }> {
-  return call<{ default_provider: string }>('harness_router_set_provider', { provider })
+export async function harnessRouterSetProvider(_provider: string): Promise<{ default_provider: string }> {
+  throw notImplemented('harness_router_set_provider')
 }
 
 /** 沙箱 */
-export function harnessSandboxStatus(): Promise<{ config: { use_local_docker: boolean }; state: string }> {
-  return call<{ config: { use_local_docker: boolean }; state: string }>('harness_sandbox_status')
+export async function harnessSandboxStatus(): Promise<{ config: { use_local_docker: boolean }; state: string }> {
+  throw notImplemented('harness_sandbox_status')
 }
 
 /** App-Server 线程/turn（对标 codex app-server） */
-export function harnessThreadCreate(project?: string): Promise<HarnessThread> {
-  return call<HarnessThread>('harness_thread_create', { project: project ?? null })
+export async function harnessThreadCreate(_project?: string): Promise<HarnessThread> {
+  throw notImplemented('harness_thread_create')
 }
 
-export function harnessThreadList(): Promise<HarnessThread[]> {
-  return call<HarnessThread[]>('harness_thread_list')
+export async function harnessThreadList(): Promise<HarnessThread[]> {
+  throw notImplemented('harness_thread_list')
 }
 
-export function harnessTurnStart(thread_id: string, instruction: string): Promise<HarnessTurn> {
-  return call<HarnessTurn>('harness_turn_start', { thread_id, instruction })
+export async function harnessTurnStart(_thread_id: string, _instruction: string): Promise<HarnessTurn> {
+  throw notImplemented('harness_turn_start')
 }
 
 /** 审批流：Harness 外部动作待人工确认队列（只读；后端暂未暴露 approve/reject 端点） */
@@ -150,11 +165,12 @@ export interface HarnessApproval {
   state: string
 }
 
-export function harnessApprovalList(): Promise<HarnessApproval[]> {
-  return call<HarnessApproval[]>('harness_approval_list')
+export async function harnessApprovalList(): Promise<HarnessApproval[]> {
+  // 后端无审批队列：无待审批项即为空列表（调用方已有空态兜底）
+  return []
 }
 
-/** 审批交互：approve / reject 写回 app_server（决策 -> Approved / Denied） */
-export function harnessApprovalResolve(id: string, decision: 'approve' | 'reject'): Promise<HarnessApproval> {
-  return call<HarnessApproval>('harness_approval_resolve', { id, decision })
+/** 审批交互：后端无审批队列，明确抛出未实现（调用方 catch 打日志） */
+export async function harnessApprovalResolve(_id: string, _decision: 'approve' | 'reject'): Promise<HarnessApproval> {
+  throw notImplemented('harness_approval_resolve')
 }

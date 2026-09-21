@@ -73,6 +73,7 @@ fn register_plugins(
         ("memory", Box::new(MemoryPlugin::new(db_pool.clone()))),
         ("proxy_pool", Box::new(ProxyPoolPlugin::new())),
         ("model_pool", Box::new(ModelPoolPlugin::new())),
+        ("autostart", Box::new(AutostartPlugin::new())),
         ("ext", Box::new(ExtPlugin)),
         ("llamacpp", Box::new(LlamacppPlugin::new())),
         ("git", Box::new(GitPlugin)),
