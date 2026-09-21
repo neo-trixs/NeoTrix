@@ -83,6 +83,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-32 | 有序执行清单 EQ-01~20（本文件 §31） | GO | EXECUTION-QUEUE |
 | SIM-33 | 提交清场＋暂存污染排查＋标记清扫（本文件 §32） | GO | 7b044f42 |
 | SIM-34 | EQ-01/02/03闭环＋ADR-0003＋死守卫退役决议（本文件 §33） | GO | ADR-0003 |
+| SIM-35 | EQ-04执行：死守卫删除＋13/13实跑绿（本文件 §34） | GO | fitness.rs |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -949,7 +950,7 @@ P-2 标记计数（24→1，节/行完好性机验）；P-3 §31 虚惊复核（
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-35.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-36.*
 
 ---
 
@@ -973,4 +974,33 @@ P-3 调用方枚举（self_test_integration＋SEAL pipeline——注册表是活
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-35.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-36.*
+
+---
+
+## §34 SIM-35：EQ-04 执行（GO）
+
+> 认领：单会话内完成。探针：调用方枚举＋共享 helper 存活确认＋精确行锚。
+> 生产代码：删 175 行（2 守卫＋1 helper＋1 allowlist＋注册 2 行＋专属单测），零新增逻辑。
+
+**探针**：P-1 外部引用（仅本文件内：注册＋专属单测）；P-2 共享 helper 存活
+（repo_root/src_root/rs_files/in_test_context/regex/HashSet 全被幸存者使用）；
+P-3 精确行锚（l1_root 42–45，Layer 58–102，Core 104–211，测试 843–854）。
+
+**证据**：E-1 `cargo test --lib nt_core_arch_fitness` **13/13 绿**（213s）：
+7 旧幸存者（core 专属单测已随葬）＋6 新全过，含真实仓库 60s＋实跑；
+E-2 fmt 全文件零 diff（含历史漂移被协作者顺手清零）；
+E-3 计数机验：13＝7＋6，删除前后自洽。
+
+**缺口**：G-1 其余 4 fitness 阈值（EQ-08，不变）；G-2 B1 CI 首绿（ADR-0002，不变）。
+
+**落点**：fitness.rs（-175 行）＋BLUEPRINT v1.6.0。
+
+**放行判定**：GO（实跑绿为证；删的是恒 Ok 项，行为面零变化）。
+
+**tripwire**：注册表再有人加 theater 守卫（扫描不存在目录）即按本案重演
+（Owner： reviewer，持续；判据：守卫必须有一次红过或对应真实目录）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-36.*
