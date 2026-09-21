@@ -53,3 +53,8 @@ Chosen option: **合入，单测首绿由 CI 见证**，因为证据结构（静
 - SIM: [SIM-27](../architecture/SIM-PROTOCOL.md)
 - Code: [nt_core_cross_layer.rs](../../neotrix-core/src/l0_substrate/nt_core_cross_layer.rs) (Confidence § + 3 tests)
 - Precedent: [ADR-0001](0001-precommit-bypass-oom-preexisting.md)（同类 override 程序）
+
+## Resolution (2026-09-21, EQ-01)
+
+本地实跑 3/3 绿（`cargo test --lib nt_core_cross_layer`，SIM-34），
+pending-CI 转 closed。CI 首绿仍欢迎作为复核，但不再阻塞。本 ADR 关闭。

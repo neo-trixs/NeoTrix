@@ -82,6 +82,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-31 | B2守卫编码＋14/14实跑绿＋死守卫发现（本文件 §30） | GO | fitness.rs |
 | SIM-32 | 有序执行清单 EQ-01~20（本文件 §31） | GO | EXECUTION-QUEUE |
 | SIM-33 | 提交清场＋暂存污染排查＋标记清扫（本文件 §32） | GO | 7b044f42 |
+| SIM-34 | EQ-01/02/03闭环＋ADR-0003＋死守卫退役决议（本文件 §33） | GO | ADR-0003 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -948,4 +949,28 @@ P-2 标记计数（24→1，节/行完好性机验）；P-3 §31 虚惊复核（
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-34.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-35.*
+
+---
+
+## §33 SIM-34：EQ-01/02/03 闭环（GO）
+
+> 认领：单会话内完成。探针：B1 实跑＋allowlist 路径存活检查＋调用方枚举。
+
+**探针**：P-1 B1 三单测本地 3/3（EQ-01 关）；P-2 allowlist 路径半数已不在
+（consciousness_core/second_brain 在，forecast/chain/bridge 不在）；
+P-3 调用方枚举（self_test_integration＋SEAL pipeline——注册表是活的）。
+
+**证据**：E-1 退役不改变活行为（删恒 Ok 项）；E-2 后继覆盖已实跑（B2＋脚本）。
+
+**缺口**：G-1 EQ-04 代码删除＋全量验证（下轮，需独占窗口）。
+
+**落点**：ADR-0002 关闭＋ADR-0003＋EQ 状态三翻绿＋BLUEPRINT v1.5.9。
+
+**放行判定**：GO（决议类产出；执行转 EQ-04）。
+
+**tripwire**：EQ-04 执行时复核调用方无行为依赖（Owner：L5，日期：执行日）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-35.*

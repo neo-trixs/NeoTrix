@@ -7,14 +7,14 @@
 
 | ID | 任务 | 完成定义 | Owner | 前置 | 状态 |
 |----|------|---------|-------|------|------|
-| EQ-01 | B1 三单测执行 | `cargo test --lib nt_core_cross_layer` 3/3 绿 | P1 | 无（机器独占窗口） | ⬜ |
-| EQ-02 | ADR-0002 关闭 | B1 首绿后，pending-CI 转 closed | P1 | EQ-01 | ⬜ |
+| EQ-01 | B1 三单测执行 | `cargo test --lib nt_core_cross_layer` 3/3 绿 | P1 | 无（机器独占窗口） | 🟩 (SIM-34 本地实跑) |
+| EQ-02 | ADR-0002 关闭 | B1 首绿后，pending-CI 转 closed | P1 | EQ-01 | 🟩 (Resolution 已记) |
 
 ## T1. 守卫可信度（先修裁判，再踢比赛）
 
 | ID | 任务 | 完成定义 | Owner | 前置 | 状态 |
 |----|------|---------|-------|------|------|
-| EQ-03 | 死守卫修退役 SIM＋ADR | Layer/Core 二守卫去向书面化（二选一：重定向＋allowlist／退役） | Architect | 无 | ⬜ |
+| EQ-03 | 死守卫修退役 SIM＋ADR | Layer/Core 二守卫去向书面化（二选一：重定向＋allowlist／退役） | Architect | 无 | 🟩 (ADR-0003: 退役) |
 | EQ-04 | 执行 EQ-03 决议 | 代码落地＋对应单测绿 | L5 | EQ-03 | ⬜ |
 
 ## T2. P1-02 越层消减（主战场，197 行／12 组）
