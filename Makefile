@@ -252,4 +252,50 @@ check:
 build:
 	@cargo build -p neotrix
 
-.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build
+# ═══════════════════════════════════════════════════════════
+# 架构门禁快捷命令 (Arch Gates, 蓝图 D-05 / R-P230-R-P240)
+# ═══════════════════════════════════════════════════════════
+
+# L0-L6 单向依赖快检 (镜像 architecture_constraints.rs)
+layer-deps:
+	bash scripts/check-layer-deps.sh
+
+# 模块文档漂移 (R-P232, 基线 111, 目标 0 后切 --strict 进 CI)
+doc-drift:
+	bash scripts/check-doc-drift.sh
+
+doc-drift-strict:
+	bash scripts/check-doc-drift.sh --strict
+
+# 覆盖率地板 (过渡值 70 防腐化; P2 清理后提到 80 卡点)
+# 需: cargo install cargo-llvm-cov
+coverage-gate:
+	cargo llvm-cov --lcov --output-path lcov.info --lib -p neotrix -p neotrix-types --fail-under-lines 70
+
+# 基准基线/对比 (需: cargo install critcmp; P3 接 github-action-benchmark 烘焙门)
+bench-baseline:
+	cargo bench -- --save-baseline main
+
+bench-compare:
+	cargo bench -- --save-baseline pr && critcmp main pr
+
+# 依赖树 unsafe 审计 (快门, 免编译; 需: cargo install cargo-geiger)
+geiger:
+	cargo geiger --forbid-only
+
+# 未使用依赖检查 (stable 可用; udeps 需 nightly 故不用; 需: cargo install cargo-machete)
+machete:
+	cargo machete
+
+# 构建面盘点 (build.rs + proc-macro, R-P248, 基线: 2 良性 build.rs + 0 自有 proc-macro)
+build-surface:
+	bash scripts/check-build-surface.sh
+
+build-surface-strict:
+	bash scripts/check-build-surface.sh --strict
+
+# Fuzz 就绪探针 (R-P253 烘焙计划; nightly 仅用于 fuzz 构建, 生产保持 stable)
+fuzz:
+	bash scripts/check-fuzz-ready.sh
+
+.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build layer-deps doc-drift doc-drift-strict coverage-gate bench-baseline bench-compare geiger machete build-surface build-surface-strict fuzz

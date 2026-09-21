@@ -2,6 +2,11 @@
 
 > 生成: 2026-09-20 | 总工时: 246h | 状态: 待执行
 > 参考: all-capability-analysis.md, design-fusion-analysis-2026-09-20.md
+>
+> ⚠️ STALE (SIM-01, 2026-09-21 实测): 本文件构建基线与 T1 清单已过期
+> （抽查 10 项至少 6 项已修复）。P0 开工第一步必须是重跑
+> `cargo check --tests -p neotrix` 生成新清单，而非照此执行。
+> 本文件保留为历史记录，不删除；刷新后移除本横幅。
 
 ---
 

@@ -28,7 +28,7 @@
 
 ```
 docs/
-├── dev-rules.md              # 开发规则 (R-P1~R-P220)
+├── dev-rules.md              # ARCHIVED桩 → 正典 docs/standards/NEOTRIX-STD-1.0.md
 ├── api/                      # API 文档 (mdbook)
 │   ├── SUMMARY.md
 │   ├── README.md
@@ -157,7 +157,7 @@ skills/
 新会话开始时检查:
 
 - [ ] 读取 `TODO.md` 了解当前任务
-- [ ] 读取 `docs/dev-rules.md` 了解开发规则 (R-P1~R-P220)
+- [ ] 读取 `docs/standards/NEOTRIX-STD-1.0.md` 了解开发规则（正典；旧 `docs/dev-rules.md` 已归档为桩）
 - [ ] 读取 `DOCUMENTATION-MAP.md` 了解文档标准
 - [ ] 不在禁止位置创建文件
 - [ ] 文件命名符合第二节规范
