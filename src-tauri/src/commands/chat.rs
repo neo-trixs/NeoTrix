@@ -1,11 +1,9 @@
 //! Chat command — single entry point for all user interactions.
 
 use tauri::State;
-use serde_json::Value;
 use crate::chat::{ChatResponse, ChatAction};
 use crate::chat::router::IntentRouter;
 use crate::commands::domain_cmd::DomainState;
-use crate::ipc;
 
 /// Send a natural language message to NeoTrix.
 #[tauri::command]

@@ -150,7 +150,7 @@ impl IntentRouter {
             .map(|info| format!("{}: {}", info.name, info.actions.iter().map(|a| &a.name).collect::<Vec<_>>().join(", ")))
             .collect();
         
-        let prompt = format!(
+        let _prompt = format!(
             "You are an intent classifier. Given a user message and available domains, \
              return a JSON object with: domain, action, args.\n\n\
              Available domains:\n{}\n\n\
@@ -209,7 +209,7 @@ impl IntentRouter {
         None
     }
 
-    fn extract_model_args(message: &str) -> Value {
+    fn extract_model_args(_message: &str) -> Value {
         // Simple extraction — will be enhanced with LLM
         json!({})
     }

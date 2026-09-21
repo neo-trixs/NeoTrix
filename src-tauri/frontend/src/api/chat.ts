@@ -50,3 +50,17 @@ export async function chatSend(
 export async function chatHelp(): Promise<string> {
   return tauriInvoke<string>('chat_help');
 }
+
+/**
+ * Extract typed result from a ChatResponse.
+ *
+ * Backend contract: human-readable text lives in `message`,
+ * structured data lives in `actions[0].result`.
+ * Falls back to `fallback` when no action result is present
+ * (e.g. unparseable intent) instead of throwing.
+ */
+export function extractResult<T>(response: ChatResponse, fallback: T): T {
+  const result = response.actions?.[0]?.result as T | undefined;
+  if (result === undefined || result === null) return fallback;
+  return result;
+}

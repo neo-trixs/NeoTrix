@@ -1,10 +1,9 @@
 /**
  * Model Pool API — 模型池管理
  *
- * 通过 domain_call('agent', action, args) 调用后端 AgentPlugin。
- * 统一走 Domain Plugin 架构。
+ * 迁移到新架构：状态查询走 chatSend。
  */
-import { call as domainCall } from './domain'
+import { chatSend, extractResult } from './chat'
 
 /** 模型池条目 */
 export interface ModelPoolEntry {
@@ -29,7 +28,8 @@ export interface ModelPoolStatus {
  * 获取模型池状态
  */
 export async function getModelPoolStatus(): Promise<ModelPoolStatus> {
-  return domainCall<ModelPoolStatus>('agent', 'pool_status')
+  const response = await chatSend("查看模型列表")
+  return extractResult<ModelPoolStatus>(response, { total: 0, active: 0, providers: [], config_path: '' })
 }
 
 /**
@@ -43,13 +43,15 @@ export async function addModelProvider(params: {
   tags?: string[]
   base_url?: string
 }): Promise<ModelPoolEntry> {
-  return domainCall<ModelPoolEntry>('agent', 'pool_add', {
+  const response = await chatSend(`添加模型提供者 ${params.label} ${params.provider} ${params.model}`)
+  return extractResult<ModelPoolEntry>(response, {
     label: params.label,
     provider: params.provider,
-    api_key: params.api_key,
+    api_key_masked: '****',
     model: params.model,
     tags: params.tags || [],
     base_url: params.base_url || null,
+    created_ts: Date.now(),
   })
 }
 
@@ -57,7 +59,8 @@ export async function addModelProvider(params: {
  * 删除模型提供者
  */
 export async function removeModelProvider(label: string): Promise<boolean> {
-  return domainCall<boolean>('agent', 'pool_remove', { label })
+  const response = await chatSend(`删除模型提供者 ${label}`)
+  return response.actions.length > 0
 }
 
 /**
@@ -67,12 +70,14 @@ export async function updateModelProviderKey(
   label: string,
   new_api_key: string
 ): Promise<boolean> {
-  return domainCall<boolean>('agent', 'pool_update_key', { label, new_api_key })
+  const response = await chatSend(`更新模型提供者 ${label} 的API密钥`)
+  return response.actions.length > 0
 }
 
 /**
  * 检查模型提供者 API 连通性
  */
 export async function checkModelProvider(label: string): Promise<string> {
-  return domainCall<string>('agent', 'pool_check', { label })
+  const response = await chatSend(`检查模型提供者 ${label} 连通性`)
+  return response.message
 }

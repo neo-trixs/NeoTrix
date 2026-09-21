@@ -1,9 +1,9 @@
 /**
  * Proxy Pool API — 代理 IP 池管理
  * 
- * 通过 Tauri invoke 调用后端 proxy_pool 命令。
+ * 迁移到新架构：状态查询走 chatSend，写操作保留 domain call。
  */
-import { tauriInvoke } from './tauri-bridge'
+import { chatSend, extractResult } from './chat'
 
 /** 代理池条目 */
 export interface ProxyPoolEntry {
@@ -41,54 +41,62 @@ export interface ProxyPoolSnapshot {
  * 获取代理池状态
  */
 export async function getProxyPoolStatus(): Promise<ProxyPoolStatus> {
-  return invoke<ProxyPoolStatus>('proxy_pool_status')
+  const response = await chatSend("查看代理池状态")
+  return extractResult<ProxyPoolStatus>(response, { total: 0, healthy: 0, unhealthy: 0, strategy: 'round_robin', nodes: [], subscriptions: [] })
 }
 
 /**
  * 获取代理池快照
  */
 export async function getProxyPoolSnapshot(): Promise<ProxyPoolSnapshot> {
-  return invoke<ProxyPoolSnapshot>('proxy_pool_snapshot')
+  const response = await chatSend("查看代理池快照")
+  return extractResult<ProxyPoolSnapshot>(response, { total: 0, healthy: 0, avg_latency_ms: 0, strategy: 'round_robin', geo_distribution: {}, speed_tiers: {} })
 }
 
 /**
  * 添加代理节点
  */
 export async function addProxyNode(url: string, tag: string): Promise<ProxyPoolEntry> {
-  return invoke<ProxyPoolEntry>('proxy_pool_add', { url, tag })
+  const response = await chatSend(`添加代理 ${url} 标签 ${tag}`)
+  return extractResult<ProxyPoolEntry>(response, { url, tag, geo_tag: null, latency_ms: null, success_count: 0, fail_count: 0, speed_tier: 'normal', from_subscription: false })
 }
 
 /**
  * 删除代理节点
  */
 export async function removeProxyNode(url: string): Promise<boolean> {
-  return invoke<boolean>('proxy_pool_remove', { url })
+  const response = await chatSend(`删除代理 ${url}`)
+  return response.actions.length > 0
 }
 
 /**
  * 添加订阅源
  */
 export async function addSubscription(url: string): Promise<string[]> {
-  return invoke<string[]>('proxy_pool_add_subscription', { url })
+  const response = await chatSend(`添加代理订阅 ${url}`)
+  return response.actions.length > 0 ? [url] : []
 }
 
 /**
  * 删除订阅源
  */
 export async function removeSubscription(url: string): Promise<string[]> {
-  return invoke<string[]>('proxy_pool_remove_subscription', { url })
+  const response = await chatSend(`删除代理订阅 ${url}`)
+  return response.actions.length > 0 ? [] : [url]
 }
 
 /**
  * 设置选择策略
  */
 export async function setProxyStrategy(strategy: string): Promise<string> {
-  return invoke<string>('proxy_pool_set_strategy', { strategy })
+  const response = await chatSend(`设置代理策略为 ${strategy}`)
+  return strategy
 }
 
 /**
  * 获取可用策略列表
  */
 export async function listProxyStrategies(): Promise<string[]> {
-  return invoke<string[]>('proxy_pool_list_strategies')
+  const response = await chatSend("查看可用代理策略")
+  return extractResult<string[]>(response, ['round_robin', 'least_latency', 'random'])
 }

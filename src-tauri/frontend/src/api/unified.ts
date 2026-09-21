@@ -2,8 +2,19 @@
 // 
 // 前端只通过这个统一客户端与后端交互，不再直接调用 100+ 个 Tauri 命令
 
-import { tauriInvoke } from './tauri-bridge';
 import { listen, Event } from '@tauri-apps/api/event';
+import { chatSend, chatHelp } from './chat';
+import { call as domainCall } from './domain';
+
+function emptyMetadata(): ResponseMetadata {
+  return {
+    duration_ms: 0,
+    layers_involved: [],
+    capabilities_used: [],
+    consciousness_state: { phi: 0, coherence: 0, gwt_resonance: 0, emotion: '', attention_focus: [] },
+    confidence: 0,
+  };
+}
 
 // ========== 类型定义 ==========
 
@@ -87,29 +98,44 @@ export interface UnifiedChatResponse {
 // ========== 统一 API 客户端 ==========
 
 class UnifiedApiClient {
-  private streamListeners: Map<string, (chunk: UnifiedResponse) => void> = new Map();
-  private streamAbortControllers: Map<string, AbortController> = new Map();
+  private pendingStreams: Map<string, UnifiedChatResponse> = new Map();
 
   /**
    * 初始化统一 API（应用启动时调用）
    */
   async init(): Promise<void> {
-    await tauriInvoke('unified_init');
-    console.log('[UnifiedAPI] Initialized');
+    await chatHelp();
+    console.log('[UnifiedAPI] Initialized (chat-first)');
   }
 
   /**
-   * 统一对话接口 - 主要入口
+   * 统一对话接口 - 主要入口（经由自然语言 chat）
    */
   async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
-    return await tauriInvoke('unified_chat', { request });
+    const res = await chatSend(request.input, request.session_id);
+    const firstAction = res.actions?.[0];
+    return {
+      response_id: crypto.randomUUID(),
+      session_id: request.session_id || '',
+      content: res.message,
+      payload: firstAction ? { type: 'task_result', data: firstAction.result } : undefined,
+      message_type: 'text',
+      metadata: emptyMetadata(),
+      is_stream_chunk: false,
+      stream_done: true,
+    };
   }
 
   /**
    * 流式对话 - 返回流 ID，通过事件监听接收分片
+   *
+   * 后端不再提供原生流式命令；此处经由 chatSend 一次性获取完整回复，
+   * 缓存后通过 onStreamChunk 以单分片形式投递，保持调用方兼容。
    */
   async chatStream(request: UnifiedChatRequest): Promise<string> {
-    const streamId = await invoke<string>('unified_chat_stream', { request });
+    const response = await this.chat(request);
+    const streamId = crypto.randomUUID();
+    this.pendingStreams.set(streamId, { ...response, is_stream_chunk: true, stream_done: true });
     return streamId;
   }
 
@@ -117,60 +143,79 @@ class UnifiedApiClient {
    * 监听流式响应分片
    */
   onStreamChunk(streamId: string, callback: (chunk: UnifiedChatResponse) => void): () => void {
+    const pending = this.pendingStreams.get(streamId);
+    if (pending) {
+      this.pendingStreams.delete(streamId);
+      queueMicrotask(() => callback(pending));
+      return () => {};
+    }
     const eventName = `unified-stream-${streamId}`;
     let unlistenFn: (() => void) | null = null;
-    
+
     listen<UnifiedChatResponse>(eventName, (event: Event<UnifiedChatResponse>) => {
       callback(event.payload);
     }).then((unlisten) => {
       unlistenFn = unlisten;
     });
-    
+
     return () => {
       unlistenFn?.();
     };
   }
 
   /**
-   * 获取系统状态
+   * 获取系统状态（经由自然语言 chat）
    */
   async getSystemState(): Promise<UnifiedChatResponse> {
-    return await tauriInvoke('unified_system_state');
+    const res = await chatSend('查看状态');
+    const firstAction = res.actions?.[0];
+    return {
+      response_id: crypto.randomUUID(),
+      session_id: '',
+      content: res.message,
+      payload: firstAction ? { type: 'health_snapshot', data: firstAction.result } : undefined,
+      message_type: 'text',
+      metadata: emptyMetadata(),
+      is_stream_chunk: false,
+      stream_done: true,
+    };
   }
 
   /**
-   * 创建新会话
+   * 创建新会话（经由 session 域）
    */
   async createSession(projectPath?: string): Promise<SessionInfo> {
-    return await tauriInvoke('unified_create_session', { project_path: projectPath });
+    const session = await domainCall<{ id: string; name: string; created_at: string; message_count: number; project?: string }>('session', 'create', { name: projectPath });
+    return { id: session.id, title: session.name, created_at: session.created_at, updated_at: session.created_at, message_count: session.message_count, project_path: session.project };
   }
 
   /**
-   * 列出所有会话
+   * 列出所有会话（经由 session 域）
    */
   async listSessions(): Promise<SessionInfo[]> {
-    return await tauriInvoke('unified_list_sessions');
+    const sessions = await domainCall<Array<{ id: string; name: string; created_at: string; message_count: number; project?: string }>>('session', 'list');
+    return sessions.map((s) => ({ id: s.id, title: s.name, created_at: s.created_at, updated_at: s.created_at, message_count: s.message_count, project_path: s.project }));
   }
 
   /**
-   * 删除会话
+   * 删除会话（经由 session 域）
    */
   async deleteSession(sessionId: string): Promise<void> {
-    await tauriInvoke('unified_delete_session', { session_id: sessionId });
+    await domainCall('session', 'delete', { id: sessionId });
   }
 
   /**
-   * 执行 CLI 命令
+   * 执行 CLI 命令（经由 cli 域）
    */
   async execCli(command: string, args?: string[]): Promise<{message: string; success: boolean}> {
-    return await invoke<{message: string; success: boolean}>('unified_exec_cli', { command, args });
+    return await domainCall<{message: string; success: boolean}>('cli', 'exec', { command: args ? [command, ...args].join(' ') : command });
   }
 
   /**
-   * 列出 CLI 命令
+   * 列出 CLI 命令（经由 cli 域）
    */
   async cliList(): Promise<{ name: string; description: string; aliases: string[] }[]> {
-    return await invoke<{ name: string; description: string; aliases: string[] }[]>('unified_cli_list');
+    return await domainCall<{ name: string; description: string; aliases: string[] }[]>('cli', 'list');
   }
 
   /**
@@ -188,7 +233,7 @@ class UnifiedApiClient {
     const { sessionId, mode = 'chat', context, onStream } = options;
 
     if (onStream) {
-      // 流式模式
+      // 流式模式（chat-first：单分片投递）
       const streamId = await this.chatStream({
         session_id: sessionId,
         input,
@@ -197,36 +242,15 @@ class UnifiedApiClient {
         stream: true,
       });
 
-      // 监听流
-      const unlisten = this.onStreamChunk(streamId, onStream);
-      
-      // 等待流结束（简化处理，实际需要更完善的流控制）
-      await new Promise<void>((resolve) => {
-        const checkDone = (chunk: UnifiedChatResponse) => {
+      return new Promise<UnifiedChatResponse>((resolve) => {
+        const unlisten = this.onStreamChunk(streamId, (chunk) => {
+          onStream(chunk);
           if (chunk.stream_done) {
             unlisten();
-            resolve();
+            resolve(chunk);
           }
-        };
-        // 这里需要配合 onStream 回调，实际实现中可能需要不同的模式
+        });
       });
-
-      // 返回最后一个完整响应（简化）
-      return {
-        response_id: '',
-        session_id: sessionId || '',
-        content: '',
-        message_type: 'text',
-        metadata: {
-          duration_ms: 0,
-          layers_involved: [],
-          capabilities_used: [],
-          consciousness_state: { phi: 0, coherence: 0, gwt_resonance: 0, emotion: '', attention_focus: [] },
-          confidence: 0,
-        },
-        is_stream_chunk: false,
-        stream_done: true,
-      };
     } else {
       // 非流式模式
       return this.chat({
@@ -246,27 +270,31 @@ export const unifiedApi = new UnifiedApiClient();
 // ========== 独立函数（测试用） ==========
 
 export async function fullCatalog(): Promise<{name: string; backend: string}[]> {
-  return await invoke<{name: string; backend: string}[]>('unified_tauri_full_catalog');
+  const plugins = await domainCall<Array<{ id: string; name: string }>>('plugin', 'list');
+  return plugins.map((p) => ({ name: p.name || p.id, backend: 'plugin' }));
 }
 
 export async function cliList(): Promise<{name: string; backend: string}[]> {
-  return await invoke<{name: string; backend: string}[]>('unified_cli_list');
+  const commands = await domainCall<Array<{ name: string; description: string; aliases: string[] }>>('cli', 'list');
+  return commands.map((c) => ({ name: c.name, backend: 'cli' }));
 }
 
 export async function tauriList(): Promise<{name: string; backend: string}[]> {
-  return await invoke<{name: string; backend: string}[]>('unified_tauri_list');
+  return cliList();
 }
 
 export async function unifiedCatalog(): Promise<{name: string; backend: string}[]> {
-  return await invoke<{name: string; backend: string}[]>('unified_command_catalog');
+  return cliList();
 }
 
 export async function execCli(input: string): Promise<{success: boolean; message: string; exit_code: number; json: unknown}> {
-  return await invoke<{success: boolean; message: string; exit_code: number; json: unknown}>('unified_cli_execute', { input });
+  const result = await domainCall<{message: string; success: boolean}>('cli', 'exec', { command: input });
+  return { success: result.success, message: result.message, exit_code: result.success ? 0 : 1, json: null };
 }
 
 export async function cliLookup(name: string): Promise<{name: string; backend: string} | null> {
-  return await invoke<{name: string; backend: string} | null>('unified_cli_lookup', { name });
+  const commands = await cliList();
+  return commands.find((c) => c.name === name) || null;
 }
 
 // ========== SolidJS 响应式封装 ==========

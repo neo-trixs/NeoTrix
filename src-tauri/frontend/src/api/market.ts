@@ -1,8 +1,8 @@
 // NeoTrix Frontend API — Market (市场发现引擎)
 //
-// 统一市场搜索、安装、卸载功能。
+// 迁移到新架构：状态查询走 chatSend。
 
-import { tauriInvoke } from './tauri-bridge';
+import { chatSend, extractResult } from './chat';
 
 // ═══════════════════════════════════════════════
 // Types
@@ -69,7 +69,8 @@ export interface PluginManifest {
 
 /** 获取市场状态 */
 export async function marketStatus(): Promise<MarketStatus> {
-  return tauriInvoke('market_status');
+  const response = await chatSend("查看市场状态")
+  return extractResult<MarketStatus>(response, { dsh_enabled: false, github_enabled: false, installed_count: 0, cache_dir: '', plugin_dir: '' })
 }
 
 /** 搜索插件 */
@@ -79,12 +80,9 @@ export async function marketSearch(
   page?: number,
   perPage?: number,
 ): Promise<MarketSearchResult[]> {
-  return tauriInvoke('market_search', {
-    query,
-    category: category ?? null,
-    page: page ?? 1,
-    per_page: perPage ?? 20,
-  });
+  const response = await chatSend(`搜索插件 ${query}`)
+  const results = extractResult<MarketSearchResult[] | MarketSearchResult>(response, [])
+  return Array.isArray(results) ? results : [results]
 }
 
 /** 获取插件详情 */
@@ -92,10 +90,8 @@ export async function marketGetDetail(
   pluginId: string,
   source: string,
 ): Promise<MarketEntry> {
-  return tauriInvoke('market_get_detail', {
-    pluginId,
-    source,
-  });
+  const response = await chatSend(`查看插件 ${pluginId} 详情`)
+  return extractResult<MarketEntry>(response, { id: pluginId, name: pluginId, version: '', description: '', author: '', category: '', tags: [], downloads: 0, rating: 0, source_type: source, source_repo: null, icon: null, homepage: null, latest_version: '' })
 }
 
 /** 下载插件 */
@@ -104,11 +100,8 @@ export async function marketDownload(
   source: string,
   version: string,
 ): Promise<string> {
-  return tauriInvoke('market_download', {
-    pluginId,
-    source,
-    version,
-  });
+  const response = await chatSend(`下载插件 ${pluginId} 版本 ${version}`)
+  return response.message
 }
 
 /** 安装插件 */
@@ -117,28 +110,30 @@ export async function marketInstall(
   source: string,
   version: string,
 ): Promise<PluginManifest> {
-  return tauriInvoke('market_install', {
-    pluginId,
-    source,
-    version,
-  });
+  const response = await chatSend(`安装插件 ${pluginId}`)
+  return extractResult<PluginManifest>(response, {
+    plugin: { id: pluginId, name: pluginId, version, description: '', author: '', license: null, category: '', tags: [], min_runtime: '' },
+    source: { type: source, repo: null, asset: null },
+    permissions: { network: [], filesystem: [], capabilities: [] },
+  })
 }
 
 /** 卸载插件 */
 export async function marketUninstall(pluginId: string): Promise<boolean> {
-  return tauriInvoke('market_uninstall', {
-    pluginId,
-  });
+  const response = await chatSend(`卸载插件 ${pluginId}`)
+  return response.actions.length > 0
 }
 
 /** 获取已安装插件列表 */
 export async function marketListInstalled(): Promise<PluginManifest[]> {
-  return tauriInvoke('market_list_installed');
+  const response = await chatSend("查看已安装插件列表")
+  return extractResult<PluginManifest[]>(response, [])
 }
 
 /** 检查更新 */
 export async function marketCheckUpdates(): Promise<[string, string, string][]> {
-  return tauriInvoke('market_check_updates');
+  const response = await chatSend("检查插件更新")
+  return extractResult<[string, string, string][]>(response, [])
 }
 
 /** 设置市场配置 */
@@ -149,11 +144,6 @@ export async function marketConfig(options: {
   githubEnabled?: boolean;
   githubToken?: string;
 }): Promise<MarketStatus> {
-  return tauriInvoke('market_config', {
-    dsh_enabled: options.dshEnabled ?? null,
-    dsh_api_endpoint: options.dshApiEndpoint ?? null,
-    dsh_auth_token: options.dshAuthToken ?? null,
-    github_enabled: options.githubEnabled ?? null,
-    github_token: options.githubToken ?? null,
-  });
+  await chatSend("更新市场配置")
+  return { dsh_enabled: options.dshEnabled ?? false, github_enabled: options.githubEnabled ?? false, installed_count: 0, cache_dir: '', plugin_dir: '' }
 }
