@@ -21,6 +21,7 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 
+use neotrix_tauri::commands::chat::{chat_send, chat_help};
 use neotrix_tauri::commands::domain_cmd::{
     domain_action_count, domain_call, domain_has, domain_list, DomainState,
 };
@@ -233,6 +234,9 @@ fn main() {
                 // Provider Manager 状态
                 .manage(provider_manager)
                 .invoke_handler(tauri::generate_handler![
+                    // ===== NEW: Natural Language Chat (single entry point) =====
+                    chat_send,
+                    chat_help,
                     // ===== 域插件统一入口 (3 个命令覆盖 12 域 × ~8 actions) =====
                     domain_call,
                     domain_list,

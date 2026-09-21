@@ -13,4 +13,5 @@ pub mod onboarding;
 pub mod provider_commands;
 pub mod proxy_pool;
 pub mod pty;
+pub mod chat;
 pub mod unified;

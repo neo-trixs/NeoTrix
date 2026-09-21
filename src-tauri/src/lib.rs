@@ -15,6 +15,7 @@ pub(crate) mod atomic_io;
 pub mod autostart;
 pub(crate) mod bot;
 pub mod browser_host;
+pub mod chat;
 pub mod commands;
 pub mod config;
 pub mod constants;
