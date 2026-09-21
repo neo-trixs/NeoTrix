@@ -22,6 +22,9 @@ pub mod nt_core_embed;
 pub mod nt_core_llm;
 pub mod nt_core_task_dispatcher;
 pub mod nt_crystal_llm_bridge; // L1 Provider → 晶体 NtLlmAsk（dispatcher 直调晶体闭环）
+pub mod nt_opencode_ask; // 借 opencode 免费模型 → 晶体 NtLlmAsk（自有终端问答）
+pub mod nt_free_pool; // 池免费模型智能调用 → 晶体 NtLlmAsk（轮转+故障转移+冷却）
+pub mod nt_stdin_human; // 终端里的人 → 晶体 NtHumanChannel（窗口回话）
 pub mod nt_core_harness;
 pub mod nt_harness;
 pub mod nt_core_simulate_engine;
