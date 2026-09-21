@@ -76,6 +76,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-25 | 第六轮吸收：API/文档/Judge/混沌（本文件 §24） | GO | ROUND6 + NTS 1.0.4 |
 | SIM-26 | 蓝图实施影响面分析（本文件 §25） | GO | IMPACT-ANALYSIS + P1-03 修订 |
 | SIM-27 | A组收尾＋B1合入CI见证（本文件 §26） | GO-WITH-CI-BACKSTOP | ADR-0002 |
+| SIM-28 | SDB调用链追踪收敛＋B1验证环境战（本文件 §27） | GO-WITH-CI-BACKSTOP | SDB v0.4 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -164,7 +165,7 @@ P3 启动时复核 G-2 vet 烘焙是否排期（Owner：Architect，日期：M2 
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*。*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*。*
 
 ---
 
@@ -198,7 +199,7 @@ fuzz 首 harness 落地时复核语料种子已提交（Owner：L3 owner，日�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -235,7 +236,7 @@ P2 启动时复核 quartet 缺口是否进 gate（Owner：QA，日期：M2 评�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -270,7 +271,7 @@ NT-STD-1.1 OSINT 附录（Owner：Security，日期：M3 评审日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -305,7 +306,7 @@ RUST-STANDARDS 并入 STD 的时机评估（Owner：Architect，日期：NT-STD-
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -343,7 +344,7 @@ dependabot.yml 加 cargo 段（YAML 机验通过）；Annex B FLAG 维持（加�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -383,7 +384,7 @@ G-4 AGENTS/TODO 引用——有意不动（E-4）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -418,7 +419,7 @@ SKILL 教学 NTS 优先括号留 legacy；MAP×0/ROADMAP×0（已无活引用）
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -454,7 +455,7 @@ D-05 加 P3/P4 标注；§19 D-15＋索引/附录 2 行；v1.3.0 changelog。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -490,7 +491,7 @@ G-3 游戏域 todo! 字串——域外，不管（记录）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -525,7 +526,7 @@ G-2 本机 OOM 跑不完门（转 infra：CI 大 runner 兜底）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -564,7 +565,7 @@ G-4 脚本执行位 2 缺（已 chmod，机验 4/4 +x）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -616,7 +617,7 @@ E-3 其余我方文件全平衡、单结尾、版本头尾一致（机验）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -653,7 +654,7 @@ R-P128b/c 改号（Owner：模块 owner，日期：M1）；31 缺失（Owner：A
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -688,7 +689,7 @@ AgentHarm 对子首跑（Owner：L3，日期：P3）；DORA 四格首填（Owner
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -722,7 +723,7 @@ toxics 首测（Owner：SRE，日期：P3）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -753,7 +754,7 @@ P0-01 数量出炉后刷新本分析 §1（Owner：P0，日期：M0 日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
 
 ---
 
@@ -787,4 +788,37 @@ G-3 全量 --tests 本机不可复现（转 CI 大 runner，承接 SIM-23）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-28.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
+
+---
+
+## §27 SIM-28：SDB 调用链追踪收敛（GO-WITH-CI-BACKSTOP）
+
+> 认领/时间盒：NeoTrix agent，单会话内完成。探针全只读（4 文件精读＋调用链两跳）。
+> B1 验证战：nohup 不存活、锁被协作者构建持有、30min 上限三连——转 CI 兜底（甲决议已覆盖）。
+
+**探针**：P-1 executor 解剖（strategy 分发＋trait 对象，无 LLM 句柄）；
+P-2 planner 精读（decompose 硬编码模板＋execute_step 纯 format!）；
+P-3 oracle_gate 精读（确定性 Gap 枚举）；P-4 hive（mock 注释 only）。
+
+**证据**：E-1 loops 三处皆无 LLM 调用——SDB-01/02/03 从 UNTRACED 改判 SCAFFOLD；
+E-2 全仓唯一活 P 点组：dispatcher 442/890/1001；
+E-3 B1 验证在本机不可完成（锁＋时长＋nohup 三重门，实测三轮）。
+
+**缺口**：G-1 B1 执行确认（CI，ADR-0002 不变）；G-2 loops 接 LLM 日重登记（tripwire，
+Owner 为接线 PR 作者）；G-3 SDB-06/07 构件是否为真 verifier（P1-03 内审）。
+
+**外部方案**：无（内部代码考古）。
+
+**落点**：SDB-REGISTRY v0.4（收敛结论＋SCAFFOLD 态）＋BLUEPRINT v1.5.3。
+
+**蓝图回写**：即本轮。
+
+**放行判定**：GO-WITH-CI-BACKSTOP（同甲；追踪结论本身零风险）。
+
+**tripwire**：loops 任一文件出现 LLM 调用即重登记（Owner：接线作者，即时）；
+B1 CI 首绿（Owner：CI，承接 ADR-0002）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-29.*
