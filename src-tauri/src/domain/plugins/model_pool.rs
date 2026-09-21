@@ -163,7 +163,14 @@ impl DomainPlugin for ModelPoolPlugin {
             }
             "update_key" => {
                 let label = req_str(&args, "label")?;
-                let new_key = req_str(&args, "new_key")?;
+                // Accept both key names: ours (`new_key`) and llamacpp's
+                // (`new_api_key`) — same backend, one contract.
+                let new_key = opt_str(&args, "new_key")
+                    .or_else(|| opt_str(&args, "new_api_key"))
+                    .ok_or_else(|| err(
+                        "INVALID_ARGS",
+                        "Missing required string argument: new_key".into(),
+                    ))?;
                 let updated = pool::update_api_key(label, new_key)
                     .map_err(|e| err("POOL_ERROR", e.to_string()))?;
                 Ok(serde_json::json!({ "updated": updated }))

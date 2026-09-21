@@ -24,8 +24,9 @@ pub async fn chat_send(
         .await
         .map_err(|e| e.message)?;
 
-    // `help` is answered locally — no domain plugin implements it.
-    if intent.domain == "chat" && intent.action == "help" {
+    // `chat/*` intents (help, clarify) are answered locally — no domain
+    // plugin implements them; they carry their reply in `response_hint`.
+    if intent.domain == "chat" {
         let text = intent
             .response_hint
             .take()

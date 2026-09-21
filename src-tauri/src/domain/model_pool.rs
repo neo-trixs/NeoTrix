@@ -58,6 +58,72 @@ struct RawEntry {
     created_ts: Option<u64>,
 }
 
+// ── TOML safety helpers ──────────────────────────────
+
+/// Escape a string for embedding in a double-quoted TOML basic string.
+fn toml_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Extract the label value from a `label = "..."` TOML line (exact match).
+/// Returns `None` for any other line, so `label = "a"` never matches `"abc"`.
+fn label_of_line(line: &str) -> Option<&str> {
+    let rest = line.trim().strip_prefix("label")?.trim_start();
+    let rest = rest.strip_prefix('=')?.trim_start();
+    let rest = rest.strip_prefix('"')?;
+    rest.strip_suffix('"')
+}
+
+/// Split raw TOML into (header, entry blocks). Each entry block starts with
+/// its own `[[entries]]` line, so per-entry operations can't leak into
+/// neighboring entries.
+fn split_entries(raw: &str) -> (String, Vec<String>) {
+    let mut header = String::new();
+    let mut entries: Vec<String> = Vec::new();
+    let mut current: Option<String> = None;
+    for line in raw.lines() {
+        if line.trim().starts_with("[[entries]]") {
+            if let Some(block) = current.take() {
+                entries.push(block);
+            }
+            current = Some(String::new());
+        }
+        match current.as_mut() {
+            Some(block) => {
+                block.push_str(line);
+                block.push('\n');
+            }
+            None => {
+                header.push_str(line);
+                header.push('\n');
+            }
+        }
+    }
+    if let Some(block) = current.take() {
+        entries.push(block);
+    }
+    (header, entries)
+}
+
+fn entry_label(block: &str) -> Option<String> {
+    block
+        .lines()
+        .filter_map(label_of_line)
+        .next()
+        .map(str::to_string)
+}
+
 // ── Public API ───────────────────────────────────────
 
 /// Read all pool entries with masked api_keys.
@@ -119,6 +185,14 @@ pub fn add_entry(
     tags: &[String],
     base_url: Option<&str>,
 ) -> AnyhowResult<ModelPoolEntry> {
+    // Fail fast on corrupt pool instead of appending to garbage, and reject
+    // duplicate labels instead of silently creating ambiguous entries.
+    if load_pool_entries()?
+        .iter()
+        .any(|e| e.label == label)
+    {
+        return Err(anyhow::anyhow!("Provider '{}' already exists", label));
+    }
     let mut raw = read_pool_raw()?;
 
     let new_block = format!(
@@ -133,17 +207,17 @@ tags = [{tags}]
 base_url = {base_url}
 created_ts = {created_ts}"#,
         created_ts = chrono::Utc::now().timestamp() as u64,
-        label = label,
-        provider = provider,
-        api_key = api_key,
-        model = model,
+        label = toml_escape(label),
+        provider = toml_escape(provider),
+        api_key = toml_escape(api_key),
+        model = toml_escape(model),
         tags = tags
             .iter()
-            .map(|t| format!("\"{}\"", t))
+            .map(|t| format!("\"{}\"", toml_escape(t)))
             .collect::<Vec<_>>()
             .join(", "),
         base_url = match base_url {
-            Some(url) => format!("\"{}\"", url),
+            Some(url) => format!("\"{}\"", toml_escape(url)),
             None => "null".into(),
         },
     );
@@ -162,86 +236,74 @@ created_ts = {created_ts}"#,
     })
 }
 
-/// Remove an entry by label. Returns `true` if found and removed.
+/// Remove an entry by label (exact match). Returns `true` if found and removed.
 pub fn remove_entry(label: &str) -> AnyhowResult<bool> {
     let raw = read_pool_raw()?;
+    let (header, entries) = split_entries(&raw);
+    let mut kept: Vec<String> = Vec::new();
     let mut found = false;
-    let mut result = String::new();
-    let mut in_entry = false;
-    let mut current_entry = String::new();
-    let mut skip_entry = false;
-
-    for line in raw.lines() {
-        if line.trim().starts_with("[[entries]]") {
-            if in_entry && !skip_entry {
-                result.push_str(&current_entry);
-                result.push('\n');
-            }
-            in_entry = true;
-            current_entry = line.to_string();
-            current_entry.push('\n');
-            skip_entry = false;
-            continue;
+    for block in entries {
+        if entry_label(&block).as_deref() == Some(label) {
+            found = true;
+        } else {
+            kept.push(block);
         }
-
-        if in_entry {
-            if line.contains(&format!("label = \"{}\"", label)) {
-                skip_entry = true;
-                found = true;
-            }
-            current_entry.push_str(line);
-            current_entry.push('\n');
-        }
-    }
-
-    if in_entry && !skip_entry {
-        result.push_str(&current_entry);
     }
 
     if !found {
         return Ok(false);
     }
 
+    let mut result = header;
+    for block in kept {
+        result.push_str(&block);
+    }
     write_pool_raw(&result)?;
     Ok(true)
 }
 
-/// Replace the api_key for the entry matching `label`. Returns `true` if found.
+/// Replace the api_key for the entry matching `label` (exact match).
+/// Returns `true` if found. Operates per entry block, so key order within
+/// an entry and neighboring entries can never cause a wrong replacement.
 pub fn update_api_key(label: &str, new_key: &str) -> AnyhowResult<bool> {
     let raw = read_pool_raw()?;
-    let mut result = String::new();
-    let mut in_entry = false;
+    let (header, entries) = split_entries(&raw);
     let mut found = false;
-    let mut skip_old_key = false;
-
-    for line in raw.lines() {
-        if line.trim().starts_with("[[entries]]") {
-            in_entry = true;
-            skip_old_key = false;
-            result.push_str(line);
-            result.push('\n');
-            continue;
-        }
-
-        if in_entry && line.contains(&format!("label = \"{}\"", label)) {
+    let mut out_blocks: Vec<String> = Vec::new();
+    for block in entries {
+        if entry_label(&block).as_deref() == Some(label) {
             found = true;
+            let mut rebuilt = String::new();
+            let mut replaced = false;
+            for line in block.lines() {
+                if !replaced && line.trim_start().starts_with("api_key") {
+                    rebuilt.push_str(&format!("api_key = \"{}\"", toml_escape(new_key)));
+                    rebuilt.push('\n');
+                    replaced = true;
+                } else {
+                    rebuilt.push_str(line);
+                    rebuilt.push('\n');
+                }
+            }
+            if !replaced {
+                // Entry had no api_key line (hand-edited file?) — add one.
+                rebuilt.push_str(&format!("api_key = \"{}\"", toml_escape(new_key)));
+                rebuilt.push('\n');
+            }
+            out_blocks.push(rebuilt);
+        } else {
+            out_blocks.push(block);
         }
-
-        if found && line.trim().starts_with("api_key") && !skip_old_key {
-            result.push_str(&format!("api_key = \"{}\"", new_key));
-            result.push('\n');
-            skip_old_key = true;
-            continue;
-        }
-
-        result.push_str(line);
-        result.push('\n');
     }
 
     if !found {
         return Ok(false);
     }
 
+    let mut result = header;
+    for block in out_blocks {
+        result.push_str(&block);
+    }
     write_pool_raw(&result)?;
     Ok(true)
 }

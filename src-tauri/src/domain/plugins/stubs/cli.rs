@@ -8,6 +8,25 @@ use async_trait::async_trait;
 
 pub struct CliPlugin;
 
+/// Binaries that are never executed via `cli/exec`, even when requested.
+/// Rationale: `domain_call` is an open dispatcher reachable from any
+/// frontend JS, so destructive/privilege-escalating tools default to deny.
+/// No shell is involved (argv split), which already rules out `;`/`&&`
+/// injection — this list closes the remaining direct-spawn surface.
+const BLOCKED_BINARIES: &[&str] = &[
+    "rm", "rmdir", "mkfs", "dd", "shutdown", "reboot", "halt", "poweroff",
+    "passwd", "su", "sudo", "doas", "chmod", "chown", "chsh", "visudo",
+    "launchctl", "sc", "net", "reg", "format", "diskpart",
+];
+
+fn binary_name(program: &str) -> &str {
+    program
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(program)
+        .trim_end_matches(".exe")
+}
+
 impl CliPlugin {
     async fn run_command(args: &[String]) -> Result<serde_json::Value, DomainError> {
         if args.is_empty() {
@@ -17,6 +36,17 @@ impl CliPlugin {
                 recoverable: true,
             });
         }
+        let bin = binary_name(&args[0]).to_lowercase();
+        if BLOCKED_BINARIES.contains(&bin.as_str()) {
+            tracing::warn!("cli/exec denied blocked binary: {}", args[0]);
+            return Err(DomainError {
+                code: "CLI_DENIED".into(),
+                message: format!("Refusing to execute blocked binary: {}", args[0]),
+                recoverable: false,
+            });
+        }
+        // Audit log: every spawn is recorded (who/what, never full secrets).
+        tracing::info!("cli/exec spawn: {} ({} args)", args[0], args.len() - 1);
         let output = tokio::process::Command::new(&args[0])
             .args(&args[1..])
             .output()

@@ -120,7 +120,7 @@ fn main() {
 
     match cli.command {
         None | Some(Commands::Desktop) => {
-            // 创建域注册表并注册 12 个插件
+            // 创建域注册表并注册全部域插件（见 register_plugins）
             let mut registry = DomainRegistry::new();
             let db_pool = Arc::new(
                 neotrix_tauri::db_pool::DbPool::new(&config.data_dir.join("neotrix.db"))

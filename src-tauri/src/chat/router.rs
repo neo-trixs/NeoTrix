@@ -30,21 +30,140 @@ impl IntentRouter {
         Self::llm_classify(message, registry).await
     }
 
+    /// Clarification reply — answered locally by chat_send, no domain call.
+    fn clarify(question: &str) -> Intent {
+        Intent {
+            domain: "chat".into(),
+            action: "clarify".into(),
+            args: json!({}),
+            response_hint: Some(question.into()),
+        }
+    }
+
     /// Fast pattern matching for common commands.
+    ///
+    /// Arms are ordered most-specific-first within each domain block so that
+    /// e.g. subscription handling wins over the generic add arm, and snapshot
+    /// wins over the generic status arm. Missing-argument cases fall through
+    /// to a clarification reply instead of aborting the whole match.
     fn pattern_match(message: &str) -> Option<Intent> {
         let msg = message.trim().to_lowercase();
-        
-        // Proxy pool commands
+
+        // Proxy pool commands — most-specific arms first.
         if msg.contains("代理") || msg.contains("proxy") {
-            if msg.contains("添加") || msg.contains("add") || msg.contains("新增") {
-                let url = Self::extract_url(message)?;
+            // Subscription management (must precede generic add/remove).
+            if msg.contains("订阅") || msg.contains("subscription") {
+                if msg.contains("删除")
+                    || msg.contains("移除")
+                    || msg.contains("remove")
+                    || msg.contains("取消")
+                {
+                    match Self::extract_url(message) {
+                        Some(url) => {
+                            return Some(Intent {
+                                domain: "proxy_pool".into(),
+                                action: "remove_subscription".into(),
+                                args: json!({"url": url}),
+                                response_hint: Some(format!("已删除订阅: {url}")),
+                            });
+                        }
+                        None => {
+                            return Some(Self::clarify("请提供要删除的订阅 URL。"));
+                        }
+                    }
+                }
+                match Self::extract_url(message) {
+                    Some(url) => {
+                        return Some(Intent {
+                            domain: "proxy_pool".into(),
+                            action: "add_subscription".into(),
+                            args: json!({"url": url}),
+                            response_hint: Some(format!("已添加订阅: {url}")),
+                        });
+                    }
+                    None => {
+                        return Some(Self::clarify("请提供要添加的订阅 URL。"));
+                    }
+                }
+            }
+            // Remove node.
+            if msg.contains("删除") || msg.contains("移除") || msg.contains("remove") {
+                match Self::extract_url(message) {
+                    Some(url) => {
+                        return Some(Intent {
+                            domain: "proxy_pool".into(),
+                            action: "remove".into(),
+                            args: json!({"url": url}),
+                            response_hint: Some(format!("已删除代理: {url}")),
+                        });
+                    }
+                    None => {
+                        return Some(Self::clarify("请提供要删除的代理 URL。"));
+                    }
+                }
+            }
+            // Snapshot (must precede the generic 查看/status arm).
+            if msg.contains("快照") || msg.contains("snapshot") {
                 return Some(Intent {
                     domain: "proxy_pool".into(),
-                    action: "add".into(),
-                    args: json!({"url": url}),
-                    response_hint: Some(format!("已添加代理: {url}")),
+                    action: "snapshot".into(),
+                    args: json!({}),
+                    response_hint: Some("代理池快照:".into()),
                 });
             }
+            // Strategy list (must precede generic 查看/status; only when no
+            // concrete strategy token is present).
+            if (msg.contains("策略") || msg.contains("strategy"))
+                && (msg.contains("列表")
+                    || msg.contains("list")
+                    || msg.contains("可用")
+                    || msg.contains("查看"))
+                && Self::extract_strategy(message).is_none()
+            {
+                return Some(Intent {
+                    domain: "proxy_pool".into(),
+                    action: "list_strategies".into(),
+                    args: json!({}),
+                    response_hint: Some("可用策略:".into()),
+                });
+            }
+            // Add node.
+            if msg.contains("添加") || msg.contains("add") || msg.contains("新增") {
+                match Self::extract_url(message) {
+                    Some(url) => {
+                        return Some(Intent {
+                            domain: "proxy_pool".into(),
+                            action: "add".into(),
+                            args: json!({"url": url}),
+                            response_hint: Some(format!("已添加代理: {url}")),
+                        });
+                    }
+                    None => {
+                        return Some(Self::clarify(
+                            "请提供要添加的代理 URL，例如：添加代理 http://1.2.3.4:8080",
+                        ));
+                    }
+                }
+            }
+            // Strategy set.
+            if msg.contains("策略") || msg.contains("strategy") {
+                match Self::extract_strategy(message) {
+                    Some(strategy) => {
+                        return Some(Intent {
+                            domain: "proxy_pool".into(),
+                            action: "set_strategy".into(),
+                            args: json!({"strategy": strategy}),
+                            response_hint: Some(format!("已切换策略: {strategy}")),
+                        });
+                    }
+                    None => {
+                        return Some(Self::clarify(
+                            "请指定策略名称，可用策略：fastest, least_latency, least_failure, weighted_random, geo_preferred, round_robin, adaptive, auto",
+                        ));
+                    }
+                }
+            }
+            // Status (generic catch-all, last).
             if msg.contains("状态") || msg.contains("status") || msg.contains("查看") {
                 return Some(Intent {
                     domain: "proxy_pool".into(),
@@ -52,16 +171,6 @@ impl IntentRouter {
                     args: json!({}),
                     response_hint: Some("代理池状态:".into()),
                 });
-            }
-            if msg.contains("策略") || msg.contains("strategy") {
-                if let Some(strategy) = Self::extract_strategy(message) {
-                    return Some(Intent {
-                        domain: "proxy_pool".into(),
-                        action: "set_strategy".into(),
-                        args: json!({"strategy": strategy}),
-                        response_hint: Some(format!("已切换策略: {strategy}")),
-                    });
-                }
             }
         }
 
@@ -75,19 +184,45 @@ impl IntentRouter {
                     response_hint: Some("模型池状态:".into()),
                 });
             }
-            if msg.contains("添加") || msg.contains("add") {
-                return Some(Intent {
-                    domain: "model_pool".into(),
-                    action: "add".into(),
-                    args: Self::extract_model_args(message),
-                    response_hint: Some("已添加模型配置".into()),
-                });
+            if msg.contains("添加") || msg.contains("add") || msg.contains("新增") {
+                match Self::extract_model_args(message) {
+                    Some((label, provider, model, api_key)) => {
+                        return Some(Intent {
+                            domain: "model_pool".into(),
+                            action: "add".into(),
+                            args: json!({
+                                "label": label,
+                                "provider": provider,
+                                "model": model,
+                                "api_key": api_key,
+                            }),
+                            response_hint: Some(format!("已添加模型配置: {label}")),
+                        });
+                    }
+                    None => {
+                        return Some(Self::clarify(
+                            "添加模型需要提供：标签、供应商、模型名和 API Key。例如：添加模型 我的模型 openai gpt-4 sk-xxx",
+                        ));
+                    }
+                }
             }
         }
 
-        // IM commands
-        if msg.contains("频道") || msg.contains("channel") || msg.contains("机器人") || msg.contains("bot") {
-            if msg.contains("状态") || msg.contains("status") {
+        // IM commands — checked before the generic system arm.
+        if msg.contains("频道")
+            || msg.contains("渠道")
+            || msg.contains("channel")
+            || msg.contains("机器人")
+            || msg.contains("bot")
+            || msg.contains("im")
+            || msg.contains("dsh")
+        {
+            if msg.contains("状态")
+                || msg.contains("status")
+                || msg.contains("查看")
+                || msg.contains("列表")
+                || msg.contains("list")
+            {
                 return Some(Intent {
                     domain: "im".into(),
                     action: "status".into(),
@@ -95,14 +230,50 @@ impl IntentRouter {
                     response_hint: Some("IM状态:".into()),
                 });
             }
-            if msg.contains("切换") || msg.contains("toggle") {
-                let channel = Self::extract_channel(message)?;
-                let enabled = !msg.contains("关闭") && !msg.contains("禁用") && !msg.contains("disable");
+            if msg.contains("切换")
+                || msg.contains("toggle")
+                || msg.contains("启用")
+                || msg.contains("禁用")
+                || msg.contains("开启")
+                || msg.contains("关闭")
+                || msg.contains("enable")
+                || msg.contains("disable")
+            {
+                match Self::extract_channel(message) {
+                    Some(channel) => {
+                        let enabled = !(msg.contains("关闭")
+                            || msg.contains("禁用")
+                            || msg.contains("停用")
+                            || msg.contains("disable")
+                            || msg.contains("off")
+                            || msg.contains("close"));
+                        return Some(Intent {
+                            domain: "im".into(),
+                            action: "toggle_channel".into(),
+                            args: json!({"channel": channel, "enabled": enabled}),
+                            response_hint: Some(format!(
+                                "已{}频道: {channel}",
+                                if enabled { "启用" } else { "禁用" }
+                            )),
+                        });
+                    }
+                    None => {
+                        return Some(Self::clarify(
+                            "请指定频道，例如：启用 telegram 频道",
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Market/plugin commands → plugin/list (no standalone market domain exists)
+        if msg.contains("插件") || msg.contains("市场") || msg.contains("安装") || msg.contains("market") || msg.contains("plugin") {
+            if msg.contains("列表") || msg.contains("list") || msg.contains("查看") || msg.contains("有哪些") || msg.contains("状态") || msg.contains("status") {
                 return Some(Intent {
-                    domain: "im".into(),
-                    action: "toggle_channel".into(),
-                    args: json!({"channel": channel, "enabled": enabled}),
-                    response_hint: Some(format!("已{}频道: {channel}", if enabled { "启用" } else { "禁用" })),
+                    domain: "plugin".into(),
+                    action: "list".into(),
+                    args: json!({}),
+                    response_hint: Some("插件列表:".into()),
                 });
             }
         }
@@ -148,6 +319,59 @@ impl IntentRouter {
     /// message (domain/action names weighted highest, then description tokens).
     /// A real LLM classifier can replace this when wired; the scoring contract
     /// (`Intent { domain, action, args }`) stays the same.
+    /// Destructive actions the fuzzy matcher must never route to.
+    ///
+    /// Fuzzy intents always carry empty `args`, so any action that mutates
+    /// state without required arguments (or whose required arguments cannot
+    /// be extracted) is a data-loss risk — e.g. `memory/clear` wipes all
+    /// memories, `cli/exec` spawns arbitrary processes. Explicit Tier-1 arms
+    /// (which extract real arguments) are unaffected by this list.
+    const FUZZY_DENY: &'static [(&'static str, &'static str)] = &[
+        ("memory", "clear"),
+        ("autostart", "toggle"),
+        ("autostart", "enable"),
+        ("autostart", "disable"),
+        ("system", "restart_app"),
+        ("system", "update_download"),
+        ("system", "window_close"),
+        ("chat", "clear"),
+        ("chat", "delete_message"),
+        ("session", "delete"),
+        ("session_sync", "delete_session"),
+        ("workflow", "cancel"),
+        ("workflow", "delete"),
+        ("plugin", "uninstall"),
+        ("model_pool", "remove"),
+        ("proxy_pool", "remove"),
+        ("proxy_pool", "remove_subscription"),
+        ("ext", "remote_disconnect"),
+        ("security", "quarantine"),
+        ("git", "push"),
+        ("git", "commit"),
+        ("git", "checkout"),
+        ("file", "write"),
+        ("kb", "doc_delete"),
+        ("cli", "exec"),
+        ("cli", "run"),
+        ("tool", "computer_click"),
+        ("tool", "computer_type"),
+        ("mcp_extension", "uninstall"),
+    ];
+
+    /// Minimum fuzzy score to accept a match.
+    ///
+    /// Domain-only hits score `len * 2` and action hits `len * 3`, so the
+    /// threshold keeps meaningful matches (e.g. `status` = 18, `session` =
+    /// 14, `list` = 12, `add` = 9) while rejecting short-name noise such as
+    /// `im` (4) or `cli` (6) matching "him"/"time"/"click".
+    const FUZZY_MIN_SCORE: usize = 8;
+
+    fn fuzzy_denied(domain: &str, action: &str) -> bool {
+        Self::FUZZY_DENY
+            .iter()
+            .any(|(d, a)| *d == domain && *a == action)
+    }
+
     async fn llm_classify(message: &str, registry: &DomainRegistry) -> Result<Intent, DomainError> {
         let msg = message.to_lowercase();
         // (score, domain, action, description)
@@ -155,15 +379,18 @@ impl IntentRouter {
 
         for info in registry.list() {
             let domain_name = info.name.to_lowercase();
-            let domain_hit = if msg.contains(&domain_name.as_str()) {
+            let domain_hit = if msg.contains(domain_name.as_str()) {
                 domain_name.len() * 2
             } else {
                 0
             };
             for action in &info.actions {
+                if Self::fuzzy_denied(&info.name, &action.name) {
+                    continue;
+                }
                 let mut score = domain_hit;
                 let action_name = action.name.to_lowercase();
-                if msg.contains(&action_name.as_str()) {
+                if msg.contains(action_name.as_str()) {
                     score += action_name.len() * 3;
                 }
                 // Description tokens: byte-len >= 6 skips single CJK chars
@@ -179,7 +406,7 @@ impl IntentRouter {
                 }
                 let is_better = match &best {
                     Some((prev, _, _, _)) => score > *prev,
-                    None => score > 0,
+                    None => score >= Self::FUZZY_MIN_SCORE,
                 };
                 if is_better {
                     best = Some((
@@ -199,13 +426,11 @@ impl IntentRouter {
                 args: json!({}),
                 response_hint: Some(description),
             }),
-            None => Err(DomainError {
-                code: "INTENT_NOT_FOUND".into(),
-                message: format!(
-                    "无法理解指令: {message}. 请尝试更具体的描述，或输入'帮助'查看支持的操作。"
-                ),
-                recoverable: true,
-            }),
+            // No transport error — answer locally as a clarification so the
+            // UI renders helpful text instead of an unhandled rejection.
+            None => Ok(Self::clarify(&format!(
+                "无法理解指令: {message}。请尝试更具体的描述，或输入“帮助”查看支持的操作。"
+            ))),
         }
     }
 
@@ -270,23 +495,68 @@ impl IntentRouter {
         None
     }
 
+    /// Channel detection over all 9 registered channel types
+    /// (`ALL_CHANNEL_TYPES` is the single source of truth).
     fn extract_channel(message: &str) -> Option<String> {
-        let channels = ["telegram", "discord", "slack", "wechat", "feishu", "dingtalk"];
-        for c in channels {
-            if message.to_lowercase().contains(c) {
-                return Some(c.to_string());
+        let msg = message.to_lowercase();
+        for channel in crate::domain::plugins::im::ALL_CHANNEL_TYPES {
+            if msg.contains(&channel.to_string()) || message.contains(channel.display_name()) {
+                return Some(channel.to_string());
             }
         }
-        if message.contains("电报") || message.contains("TG") { return Some("telegram".into()); }
-        if message.contains("飞书") { return Some("feishu".into()); }
-        if message.contains("钉钉") { return Some("dingtalk".into()); }
-        if message.contains("微信") { return Some("wechat".into()); }
+        // Aliases not covered by canonical/display names.
+        if message.contains("电报") || message.contains("TG") {
+            return Some("telegram".into());
+        }
         None
     }
 
-    fn extract_model_args(_message: &str) -> Value {
-        // Simple extraction — will be enhanced with LLM
-        json!({})
+    /// Best-effort extraction of `(label, provider, model, api_key)`.
+    ///
+    /// Drops command keywords/stopwords, treats an `sk-`-prefixed or long
+    /// alphanumeric token as the API key, and assigns the remaining tokens
+    /// positionally. Returns `None` when the message is under-specified so
+    /// the caller can ask a clarification question instead of dispatching
+    /// a call that is guaranteed to fail with `INVALID_ARGS`.
+    fn extract_model_args(message: &str) -> Option<(String, String, String, String)> {
+        const STOPWORDS: &[&str] = &[
+            "添加", "模型", "提供者", "供应商", "提供商", "新增", "创建", "配置",
+            "add", "model", "provider", "label", "api_key", "apikey", "key",
+            "密钥", "标签", "名称", "名字", "的", "和", "与", "为", "个",
+            "把", "将", "用", "一个", "请", "帮", "我", "给",
+        ];
+        let mut candidates: Vec<String> = Vec::new();
+        let mut key_candidate: Option<String> = None;
+        for word in message.split_whitespace() {
+            let cleaned = word
+                .trim_matches(|c: char| "\"'()[]<>,;!?，。！？；：、）".contains(c));
+            if cleaned.is_empty() {
+                continue;
+            }
+            let lower = cleaned.to_lowercase();
+            if STOPWORDS.iter().any(|s| lower == *s) {
+                continue;
+            }
+            let alnum = cleaned.chars().filter(|c| c.is_ascii_alphanumeric()).count();
+            if lower.starts_with("sk-")
+                || lower.starts_with("sk_")
+                || (cleaned.len() >= 20 && alnum * 2 >= cleaned.len())
+            {
+                key_candidate = Some(cleaned.to_string());
+                continue;
+            }
+            candidates.push(cleaned.to_string());
+        }
+        let api_key = key_candidate?;
+        if candidates.len() < 3 {
+            return None;
+        }
+        Some((
+            candidates[0].clone(),
+            candidates[1].clone(),
+            candidates[2].clone(),
+            api_key,
+        ))
     }
 
     pub(crate) fn help_text() -> String {
@@ -295,7 +565,7 @@ impl IntentRouter {
 🔹 代理管理
   "添加代理 http://1.2.3.4:8080" — 添加代理节点
   "查看代理状态" — 查看代理池状态
-  "切换策略 random" — 切换负载均衡策略
+  "切换策略 round_robin" — 切换负载均衡策略
 
 🔹 模型管理
   "查看模型列表" — 查看所有模型
