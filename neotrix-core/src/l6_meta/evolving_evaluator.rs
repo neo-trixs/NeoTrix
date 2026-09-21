@@ -1,13 +1,17 @@
 //! # EvolvingEvaluator — Self-Improving Evaluation
 //!
 //! Self-improving evaluation from RQGM.
+//!
+//! Note: `coordination::quality_control::evolving_evaluator::EvolvingEvaluator`
+//! is a separate baseline-relative tracker, not this type. This is the
+//! canonical threshold-gated evaluator wired to the JEV nightly loop.
 
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 
 use crate::neotrix::nt_jev::eval::EvalReport;
-use crate::neotrix::nt_jev::evolve::{report_scores, JEV_CRITERIA};
+use crate::neotrix::nt_jev::evolve::report_scores;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationCriteria {
@@ -202,6 +206,7 @@ mod tests {
 
     #[test] fn test_nightly_loop_two_cycles() {
         use crate::neotrix::nt_jev::eval::EvalReport;
+        use crate::neotrix::nt_jev::evolve::JEV_CRITERIA;
         let e = EvolvingEvaluator::new(EvolvingEvaluator::jev_criteria(), 0.05);
         // Cycle 1: weak night.
         let weak = EvalReport { n: 50, accuracy: 0.6, brier: 0.3, ece: 0.25, coverage_at_p90: 0.4, mean_latency_ms: 200.0 };

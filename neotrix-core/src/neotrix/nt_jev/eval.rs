@@ -11,6 +11,8 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use super::primitives::JevDecision;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -18,7 +20,7 @@ use super::primitives::JevDecision;
 // ═══════════════════════════════════════════════════════════════════
 
 /// Gold-standard answer for one eval case.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GoldAnswer {
     /// Expected boolean outcome.
     Noul(bool),
@@ -27,7 +29,7 @@ pub enum GoldAnswer {
 }
 
 /// One labelled eval case.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvalCase {
     /// Case id; predictions join on this.
     pub id: String,
@@ -36,7 +38,7 @@ pub struct EvalCase {
 }
 
 /// One model prediction for a case.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvalPrediction {
     /// Must match an [`EvalCase::id`]; unknown ids are ignored.
     pub case_id: String,
@@ -47,7 +49,7 @@ pub struct EvalPrediction {
 }
 
 /// Aggregate S1Bench-style report over joined case/prediction pairs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvalReport {
     /// Number of joined pairs (cases with a matching prediction).
     pub n: usize,
@@ -244,6 +246,52 @@ pub fn evaluate(cases: &[EvalCase], preds: &[EvalPrediction]) -> EvalReport {
         coverage_at_p90,
         mean_latency_ms,
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Golden-pack persistence (JSONL, string-level — callers own the fs)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Serialize cases to JSONL (one object per line) for golden-pack storage.
+pub fn cases_to_jsonl(cases: &[EvalCase]) -> Result<String, serde_json::Error> {
+    let mut out = String::new();
+    for c in cases {
+        out.push_str(&serde_json::to_string(c)?);
+        out.push('\n');
+    }
+    Ok(out)
+}
+
+/// Parse JSONL back into cases (blank lines skipped).
+pub fn cases_from_jsonl(s: &str) -> Result<Vec<EvalCase>, serde_json::Error> {
+    s.lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(serde_json::from_str)
+        .collect()
+}
+
+/// Serialize predictions to JSONL (record/replay for CI: run `check` on the
+/// recording without calling any model).
+pub fn preds_to_jsonl(preds: &[EvalPrediction]) -> Result<String, serde_json::Error> {
+    let mut out = String::new();
+    for p in preds {
+        out.push_str(&serde_json::to_string(p)?);
+        out.push('\n');
+    }
+    Ok(out)
+}
+
+/// Parse JSONL back into predictions (blank lines skipped).
+pub fn preds_from_jsonl(s: &str) -> Result<Vec<EvalPrediction>, serde_json::Error> {
+    s.lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(serde_json::from_str)
+        .collect()
+}
+
+/// Serialize a report to compact JSON for nightly archives.
+pub fn report_to_json(report: &EvalReport) -> Result<String, serde_json::Error> {
+    serde_json::to_string(report)
 }
 
 #[cfg(test)]
@@ -482,5 +530,40 @@ mod tests {
         let r = evaluate(&cases, &preds);
         assert!((r.accuracy - 1.0).abs() < 1e-12);
         assert!((r.ece - 0.1).abs() < 1e-12, "ece={}", r.ece);
+    }
+
+    #[test]
+    fn test_golden_pack_jsonl_roundtrip() {
+        let cases = vec![
+            EvalCase { id: "c1".into(), gold: GoldAnswer::Noul(true) },
+            EvalCase { id: "c2".into(), gold: GoldAnswer::Choice("b".into()) },
+        ];
+        let s = cases_to_jsonl(&cases).unwrap();
+        assert_eq!(s.lines().count(), 2);
+        let back = cases_from_jsonl(&format!("\n{}\n", s)).unwrap();
+        assert_eq!(back.len(), 2);
+        assert_eq!(back[0].id, "c1");
+        assert!(matches!(back[1].gold, GoldAnswer::Choice(ref o) if o == "b"));
+
+        let preds = vec![EvalPrediction {
+            case_id: "c1".into(),
+            decision: noul_decision(0.9),
+            latency_ms: 12,
+        }];
+        let ps = preds_to_jsonl(&preds).unwrap();
+        let pback = preds_from_jsonl(&ps).unwrap();
+        assert_eq!(pback.len(), 1);
+        assert_eq!(pback[0].latency_ms, 12);
+    }
+
+    #[test]
+    fn test_report_to_json() {
+        let r = evaluate(
+            &[EvalCase { id: "c1".into(), gold: GoldAnswer::Noul(true) }],
+            &[EvalPrediction { case_id: "c1".into(), decision: noul_decision(0.9), latency_ms: 10 }],
+        );
+        let j = report_to_json(&r).unwrap();
+        assert!(j.contains("\"accuracy\""), "got {}", j);
+        assert!(j.contains("\"ece\""), "got {}", j);
     }
 }

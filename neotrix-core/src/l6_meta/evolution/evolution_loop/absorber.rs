@@ -4,6 +4,10 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::neotrix::nt_jev::audit::JEV_POLICY_VERSION;
+use crate::neotrix::nt_jev::eval::EvalReport;
+use crate::neotrix::nt_jev::evolve::report_scores;
+
 /// 吸收结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AbsorptionResult {
@@ -111,6 +115,92 @@ impl KnowledgeAbsorber {
     pub fn accumulated_count(&self) -> usize {
         self.accumulated_rules.len()
     }
+
+    /// Absorb a nightly [`EvalReport`] into prescriptive tuning rules.
+    ///
+    /// Each under-threshold criterion becomes one [`AbsorbedRule`], routed
+    /// through the same dedupe/conflict pipeline as [`Self::absorb`]:
+    /// - calibration < 0.85 → refit per-bucket temperature on validation split
+    /// - accuracy < 0.8 → expand the golden pack (weak-question mining)
+    /// - coverage < 0.6 → add abstain options to Choice presets
+    /// - robustness < 0.6 → review preset legends for overlap
+    /// - efficiency < 0.7 → batch independent questions, trim context
+    ///
+    /// Rules are idempotent across nights (same `rule_id` dedupes).
+    pub fn absorb_jev_report(&mut self, report: &EvalReport) -> AbsorptionResult {
+        let source = format!("jev-nightly:{}", JEV_POLICY_VERSION);
+        let scores = report_scores(report);
+        let get = |k: &str| scores.get(k).copied().unwrap_or(0.0);
+        let mut rules = Vec::new();
+        let mut push = |id: &str, content: &str, priority: u8| {
+            rules.push(AbsorbedRule {
+                rule_id: format!("jev/{}", id),
+                source: source.clone(),
+                content: content.to_string(),
+                priority,
+            });
+        };
+        if get("calibration") < 0.85 {
+            push(
+                "refit-temperature",
+                "refit TemperatureScaler per temp_bucket on held-out validation split",
+                9,
+            );
+        }
+        if get("accuracy") < 0.8 {
+            push(
+                "expand-golden-pack",
+                "mine weak questions into golden pack; re-run eval",
+                8,
+            );
+        }
+        if get("coverage") < 0.6 {
+            push(
+                "add-abstain-options",
+                "inject unknown option into Choice presets; wire contested→abstain",
+                7,
+            );
+        }
+        if get("robustness") < 0.6 {
+            push(
+                "review-presets",
+                "review preset legends for overlapping options",
+                6,
+            );
+        }
+        if get("efficiency") < 0.7 {
+            push(
+                "enable-batching",
+                "batch independent questions; trim state context",
+                5,
+            );
+        }
+        // Same pipeline as absorb(): conflicts first, then dedupe-apply.
+        let conflicts = self.detect_conflicts(&rules);
+        let conflicts_resolved = conflicts.len();
+        self.resolve_conflicts(conflicts);
+        let rules_extracted = rules.len();
+        let mut rules_applied = 0;
+        for rule in rules {
+            if !self.accumulated_rules.iter().any(|r| r.rule_id == rule.rule_id) {
+                rules_applied += 1;
+                self.accumulated_rules.push(rule);
+            }
+        }
+        AbsorptionResult {
+            rules_extracted,
+            rules_applied,
+            conflicts_resolved,
+        }
+    }
+
+    /// Currently accumulated rule ids (for nightly outcome tracing).
+    pub fn rule_ids(&self) -> Vec<String> {
+        self.accumulated_rules
+            .iter()
+            .map(|r| r.rule_id.clone())
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -150,5 +240,56 @@ mod tests {
         };
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("rules_extracted"));
+    }
+
+    fn weak_report() -> EvalReport {
+        EvalReport {
+            n: 40,
+            accuracy: 0.5,
+            brier: 0.5,
+            ece: 0.5,
+            coverage_at_p90: 0.2,
+            mean_latency_ms: 500.0,
+        }
+    }
+
+    fn strong_report() -> EvalReport {
+        EvalReport {
+            n: 40,
+            accuracy: 0.95,
+            brier: 0.05,
+            ece: 0.03,
+            coverage_at_p90: 0.9,
+            mean_latency_ms: 20.0,
+        }
+    }
+
+    #[test]
+    fn absorb_jev_report_extracts_all_five_rules_when_weak() {
+        let mut absorber = KnowledgeAbsorber::new(1);
+        let result = absorber.absorb_jev_report(&weak_report());
+        assert_eq!(result.rules_extracted, 5);
+        assert_eq!(result.rules_applied, 5);
+        let ids = absorber.rule_ids();
+        assert!(ids.iter().any(|id| id == "jev/refit-temperature"));
+        assert!(ids.iter().any(|id| id == "jev/enable-batching"));
+    }
+
+    #[test]
+    fn absorb_jev_report_extracts_nothing_when_strong() {
+        let mut absorber = KnowledgeAbsorber::new(1);
+        let result = absorber.absorb_jev_report(&strong_report());
+        assert_eq!(result.rules_extracted, 0);
+        assert_eq!(result.rules_applied, 0);
+    }
+
+    #[test]
+    fn absorb_jev_report_is_idempotent() {
+        let mut absorber = KnowledgeAbsorber::new(1);
+        absorber.absorb_jev_report(&weak_report());
+        let again = absorber.absorb_jev_report(&weak_report());
+        assert_eq!(again.rules_extracted, 5);
+        assert_eq!(again.rules_applied, 0);
+        assert_eq!(absorber.accumulated_count(), 5);
     }
 }

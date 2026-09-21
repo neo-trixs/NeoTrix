@@ -1,3 +1,11 @@
+//! Quality-control metric tracker (baseline-relative score/trend/snapshot).
+//!
+//! Role split — do NOT merge with the canonical evaluator:
+//! this type tracks metrics against baselines for QC gates, while
+//! `crate::l6_meta::evolving_evaluator::EvolvingEvaluator` does
+//! threshold-gated criteria evolution (weights/learning/log) and is the one
+//! wired to the JEV nightly loop. Different APIs, different consumers.
+
 #[derive(Debug, Clone)]
 pub struct EvalMetric {
     pub name: String,

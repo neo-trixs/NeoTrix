@@ -10,6 +10,9 @@ use super::absorber::{AbsorptionResult, KnowledgeAbsorber};
 use super::self_evolver::{EvolutionPlan, SelfEvolver};
 use super::verifier::{EvolutionVerifier, VerificationResult};
 
+use crate::l6_meta::evolving_evaluator::EvolvingEvaluator;
+use crate::neotrix::nt_jev::eval::EvalReport;
+
 /// 进化闭环配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvolutionLoopConfig {
@@ -91,6 +94,18 @@ pub struct CycleResult {
     pub improvements: Vec<Improvement>,
     pub duration_ms: u64,
     pub net_score_delta: f64,
+}
+
+/// Outcome of one JEV nightly step (serializable for trace archives).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JevNightlyOutcome {
+    pub target: String,
+    pub weighted_score: f64,
+    pub criteria_scores: std::collections::HashMap<String, f64>,
+    pub absorption: AbsorptionResult,
+    /// Rule ids newly applied this night (not previously accumulated).
+    pub new_rule_ids: Vec<String>,
+    pub improvements: Vec<Improvement>,
 }
 
 /// 进化闭环驱动器
@@ -264,6 +279,50 @@ impl EvolutionLoop {
         self.verifier.verify(before, after)
     }
 
+    /// Nightly JEV step: score the report, evolve criteria, absorb tuning rules.
+    ///
+    /// Landing point of the autonomous loop (`evaluator` is caller-owned so
+    /// weights persist across nights; this method only borrows it):
+    /// evaluate_jev_report → evolve_criteria → absorb_jev_report.
+    pub fn run_jev_nightly(
+        &mut self,
+        evaluator: &EvolvingEvaluator,
+        target: &str,
+        report: &EvalReport,
+    ) -> JevNightlyOutcome {
+        // Score + evolve (Orient/Decide).
+        let breakdown = evaluator.evaluate_jev_report(target, report);
+        evaluator.evolve_criteria();
+        // Absorb prescriptive rules (Observe).
+        let absorption = self.absorber.absorb_jev_report(report);
+        let new_rule_ids: Vec<String> = {
+            let ids = self.absorber.rule_ids();
+            let n = absorption.rules_applied.min(ids.len());
+            ids[ids.len() - n..].to_vec()
+        };
+        let mut improvements = Vec::new();
+        for id in &new_rule_ids {
+            improvements.push(Improvement {
+                description: format!("JEV nightly rule: {}", id),
+                phase: CyclePhase::Observe,
+                impact: 0.02,
+            });
+        }
+        improvements.push(Improvement {
+            description: format!("JEV nightly {} scored {:.3}", target, breakdown.weighted_score),
+            phase: CyclePhase::Decide,
+            impact: breakdown.weighted_score,
+        });
+        JevNightlyOutcome {
+            target: target.to_string(),
+            weighted_score: breakdown.weighted_score,
+            criteria_scores: breakdown.criteria_scores,
+            absorption,
+            new_rule_ids,
+            improvements,
+        }
+    }
+
     /// 获取当前循环计数
     pub fn cycle_count(&self) -> u64 {
         self.cycle_counter
@@ -324,5 +383,56 @@ mod tests {
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("cycle_id"));
         assert!(json.contains("phase_results"));
+    }
+
+    fn weak_report() -> EvalReport {
+        EvalReport {
+            n: 40,
+            accuracy: 0.5,
+            brier: 0.5,
+            ece: 0.5,
+            coverage_at_p90: 0.2,
+            mean_latency_ms: 500.0,
+        }
+    }
+
+    fn strong_report() -> EvalReport {
+        EvalReport {
+            n: 40,
+            accuracy: 0.95,
+            brier: 0.05,
+            ece: 0.03,
+            coverage_at_p90: 0.9,
+            mean_latency_ms: 20.0,
+        }
+    }
+
+    #[test]
+    fn jev_nightly_weak_report_yields_rules() {
+        use crate::l6_meta::evolving_evaluator::EvolvingEvaluator;
+        let mut loop_runner = EvolutionLoop::new(EvolutionLoopConfig::default());
+        let evaluator = EvolvingEvaluator::new(EvolvingEvaluator::jev_criteria(), 0.05);
+        let out = loop_runner.run_jev_nightly(&evaluator, "nightly-1", &weak_report());
+        assert_eq!(out.new_rule_ids.len(), 5);
+        assert!(!out.improvements.is_empty());
+        assert_eq!(out.target, "nightly-1");
+        assert_eq!(evaluator.evaluation_count(), 1);
+        let json = serde_json::to_string(&out).unwrap();
+        assert!(json.contains("weighted_score"));
+    }
+
+    #[test]
+    fn jev_nightly_strong_report_scores_higher() {
+        use crate::l6_meta::evolving_evaluator::EvolvingEvaluator;
+        let mut loop_runner = EvolutionLoop::new(EvolutionLoopConfig::default());
+        let evaluator = EvolvingEvaluator::new(EvolvingEvaluator::jev_criteria(), 0.05);
+        let weak = loop_runner.run_jev_nightly(&evaluator, "n1", &weak_report());
+        let strong = loop_runner.run_jev_nightly(&evaluator, "n2", &strong_report());
+        assert!(strong.weighted_score > weak.weighted_score);
+        assert!(strong.new_rule_ids.is_empty());
+        // Second weak run: rules already accumulated → nothing new.
+        let weak2 = loop_runner.run_jev_nightly(&evaluator, "n3", &weak_report());
+        assert!(weak2.new_rule_ids.is_empty());
+        assert_eq!(evaluator.evaluation_count(), 3);
     }
 }
