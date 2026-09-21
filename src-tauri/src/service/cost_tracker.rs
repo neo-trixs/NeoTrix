@@ -122,8 +122,8 @@ impl CostTracker {
             (input_cost, output_cost)
         } else {
             // 默认定价
-            let input_cost = usage.prompt_tokens as f64 * 0.00001;
-            let output_cost = usage.completion_tokens as f64 * 0.00003;
+            let input_cost = usage.prompt_tokens as f64 * crate::constants::DEFAULT_INPUT_COST_PER_TOKEN;
+            let output_cost = usage.completion_tokens as f64 * crate::constants::DEFAULT_OUTPUT_COST_PER_TOKEN;
             (input_cost, output_cost)
         }
     }

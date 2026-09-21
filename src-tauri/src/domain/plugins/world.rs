@@ -89,7 +89,7 @@ impl DomainPlugin for WorldPlugin {
             }
             "crawl_status" => Ok(serde_json::json!({
                 "status": "ready",
-                " backends": ["ddg", "wikipedia"],
+                "backends": ["ddg", "wikipedia"],
                 "features": ["web_search", "fetch_url", "extract_content"]
             })),
             _ => Err(DomainError {
@@ -233,8 +233,8 @@ fn fetch_url(url: &str) -> Result<serde_json::Value, DomainError> {
     };
 
     // 截断到合理长度
-    let truncated = if text.len() > 10000 {
-        format!("{}...", &text[..10000])
+    let truncated = if text.len() > crate::constants::MAX_FETCH_TEXT_LEN {
+        format!("{}...", &text[..crate::constants::MAX_FETCH_TEXT_LEN])
     } else {
         text
     };
@@ -255,8 +255,8 @@ fn extract_content(url: &str, format: &str) -> Result<serde_json::Value, DomainE
     match format {
         "summary" => {
             // 简单摘要：取前500字符
-            let summary = if text.len() > 500 {
-                format!("{}...", &text[..500])
+            let summary = if text.len() > crate::constants::SUMMARY_MAX_LEN {
+                format!("{}...", &text[..crate::constants::SUMMARY_MAX_LEN])
             } else {
                 text.to_string()
             };

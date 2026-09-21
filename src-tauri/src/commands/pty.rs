@@ -78,7 +78,7 @@ impl PtyManager {
 
         // 后台读取线程: PTY → mpsc channel
         std::thread::spawn(move || {
-            let mut buf = [0u8; 8192];
+            let mut buf = [0u8; crate::constants::PTY_BUF_SIZE];
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) | Err(_) => {

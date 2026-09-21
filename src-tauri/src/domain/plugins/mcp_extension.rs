@@ -241,11 +241,7 @@ impl McpExtensionPlugin {
         })?;
 
         package.running = running;
-        if running {
-            package.pid = Some(12345); // Simplified
-        } else {
-            package.pid = None;
-        }
+        package.pid = None;
 
         Ok(package.clone())
     }

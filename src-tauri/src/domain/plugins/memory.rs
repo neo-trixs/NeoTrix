@@ -226,7 +226,7 @@ impl DomainPlugin for MemoryPlugin {
             }
             "timeline" => {
                 let days = args.get("days").and_then(|v| v.as_u64()).unwrap_or(7) as i64;
-                let cutoff = chrono::Utc::now().timestamp() - (days * 86400);
+                let cutoff = chrono::Utc::now().timestamp() - (days * crate::constants::SECS_PER_DAY);
 
                 let rows: Vec<(String, i64)> = conn
                     .prepare("SELECT DATE(created_at, 'unixepoch') as day, COUNT(*) FROM memories WHERE created_at > ?1 GROUP BY day ORDER BY day")

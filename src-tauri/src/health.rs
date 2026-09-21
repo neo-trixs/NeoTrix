@@ -58,7 +58,7 @@ pub struct HealthMetrics {
 
 impl HealthMetrics {
     pub fn uptime_score(&self) -> f64 {
-        (self.uptime_secs as f64 / 3600.0).min(1.0)
+        (self.uptime_secs as f64 / crate::constants::SECS_PER_HOUR).min(1.0)
     }
 
     pub fn error_rate_score(&self) -> f64 {
@@ -70,7 +70,7 @@ impl HealthMetrics {
     }
 
     pub fn latency_score(&self) -> f64 {
-        (1.0 - self.avg_latency_ms / 5000.0).max(0.0)
+        (1.0 - self.avg_latency_ms / crate::constants::MAX_LATENCY_MS).max(0.0)
     }
 }
 

@@ -39,9 +39,9 @@ impl Default for CircuitBreakerConfig {
     fn default() -> Self {
         Self {
             failure_threshold: 3,
-            cooldown_seconds: 300, // 5 minutes
+            cooldown_seconds: crate::constants::CIRCUIT_BREAKER_COOLDOWN_SECS,
             cooldown_multiplier: 2.0,
-            max_cooldown_seconds: 1800, // 30 minutes
+            max_cooldown_seconds: crate::constants::CIRCUIT_BREAKER_MAX_COOLDOWN_SECS,
             probe_timeout_seconds: 30,
         }
     }

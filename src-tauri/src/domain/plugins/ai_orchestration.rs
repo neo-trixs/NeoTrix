@@ -151,7 +151,7 @@ impl AiOrchestrationPlugin {
             state: Arc::new(Mutex::new(AiOrchestrationState {
                 thinking_budget: ThinkingBudget::Adaptive,
                 memory_extraction_enabled: true,
-                max_memories: 10000,
+                max_memories: crate::constants::DEFAULT_MAX_MEMORIES,
                 ..Default::default()
             })),
         }

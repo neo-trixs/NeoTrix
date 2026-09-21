@@ -29,7 +29,7 @@ impl LlamacppPlugin {
         Self {
             state: Mutex::new(LlamacppState {
                 child: None,
-                port: 8080,
+                port: crate::constants::DEFAULT_LLAMACPP_PORT,
                 started_at: None,
                 current_model: None,
                 models_dir,
@@ -584,7 +584,7 @@ impl DomainPlugin for LlamacppPlugin {
                 let max_tokens = args
                     .get("max_tokens")
                     .and_then(|v| v.as_u64())
-                    .unwrap_or(2048);
+                    .unwrap_or(crate::constants::DEFAULT_MAX_LLM_TOKENS as u64);
 
                 let port = {
                     let state = self
@@ -606,7 +606,7 @@ impl DomainPlugin for LlamacppPlugin {
                 let resp = client
                     .post(&url)
                     .json(&body)
-                    .timeout(Duration::from_secs(120))
+                    .timeout(Duration::from_secs(crate::constants::LLAMACPP_REQUEST_TIMEOUT_SECS))
                     .send()
                     .await
                     .map_err(|e| DomainError::from(format!("Request failed: {e}")))?;

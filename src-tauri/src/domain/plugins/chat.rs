@@ -29,7 +29,7 @@ impl SolutionExecutor for GatewayExecutor {
                 {"role": "user", "content": task.summary}
             ],
             "temperature": 0.7,
-            "max_tokens": 2048,
+            "max_tokens": crate::constants::DEFAULT_MAX_LLM_TOKENS,
         });
 
         // 通过 domain_call 统一调用
@@ -154,8 +154,8 @@ impl ChatPlugin {
 
         let config = ExternalClosureConfig {
             max_attempts: 3,
-            token_budget: 4096,
-            max_llm_tokens: 2048,
+            token_budget: crate::constants::DEFAULT_TOKEN_BUDGET,
+            max_llm_tokens: crate::constants::DEFAULT_MAX_LLM_TOKENS,
             acquire_knowledge: false,
         };
 
@@ -272,7 +272,7 @@ impl ChatPlugin {
                 {"role": "user", "content": content}
             ],
             "temperature": 0.7,
-            "max_tokens": 2048,
+            "max_tokens": crate::constants::DEFAULT_MAX_LLM_TOKENS,
             "stream": true,
         });
 
