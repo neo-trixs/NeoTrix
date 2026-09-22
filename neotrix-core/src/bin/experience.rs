@@ -46,14 +46,12 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use neotrix::l1_action::nt_memory::nt_memory_kb::nt_field_ledger;
 use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_schema;
-use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
-use neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use neotrix::l5_cognition::nt_mind::foundation::guardian::{MapeGate, MapeGateConfig, MetricEval};
 use neotrix::l2_perception::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
 };
 use neotrix::l2_perception::nt_core_hcube::{PersistentHomology, PointCloud};
-use neotrix::l5_cognition::nt_core_math::normalize_url;
+use neotrix::l0_substrate::nt_core_math::normalize_url;
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
@@ -101,7 +99,7 @@ const OBS_BUFFER_RATIO: f64 = 0.2;
 const OBS_BUFFER_ACTIVATION: f64 = 0.8;
 const REF_TOKEN_BUDGET: usize = 40_000;
 const REF_BUFFER_ACTIVATION: f64 = 0.5;
-     const OBS_BLOCK_AFTER: f64 = 1.2;
+
 
 /// 简易 token 估算 (单一事实源, 兼容 CJK): 无 tiktoken 时回退逐字符估算 (保守上界, 最小 1)。
 fn estimate_tokens(text: &str) -> usize {
@@ -136,7 +134,7 @@ fn cn_stop() -> &'static HashSet<char> {
 // ─── value 透明压缩层 (方案 D) ─────────────────────────────────────
 const VALUE_MAGIC: &[u8] = b"NTZ1";
 
-// normalize_url 已统一到 neotrix::l5_cognition::nt_core_math::normalize_url
+// normalize_url 已统一到 neotrix::l0_substrate::nt_core_math::normalize_url
 
 fn now_ts() -> i64 {
     SystemTime::now()
@@ -533,6 +531,7 @@ impl Extractor {
     fn new(name: &str, schema: Value, extract: ExtractorFn) -> Self {
         Self { name: name.to_string(), schema, extract, on_extracted: None }
     }
+     #[allow(dead_code)] // builder API：保留供后续 extractor 接线
      fn with_hook(mut self, hook: fn(&mut Value) -> Result<(), String>) -> Self {
         self.on_extracted = Some(hook);
         self
@@ -1655,7 +1654,7 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
 
         // 7. 直接用 conn 写入 (nodes + FTS + 域枢纽边), 避免 KnowledgeBase 二次 open
         let node_id = {
-            let ts = now;
+            let _ts = now;
             let id = format!("batch_{}_{}", now, {
                 use std::collections::hash_map::DefaultHasher;
                 use std::hash::{Hash, Hasher};
@@ -1781,7 +1780,7 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
             "UPDATE nodes SET metadata=?1 WHERE id=?2",
             params![Value::Object(meta.as_object().cloned().unwrap_or_default()).to_string(), node_id],
         ).ok();
-        let report_created = true;
+        let _report_created = true;
         let report_node_id = node_id.clone();
         println!(
             "[absorb-node] {} #{}: {} ({}, lang={})",

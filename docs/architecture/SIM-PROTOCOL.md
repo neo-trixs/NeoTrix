@@ -88,6 +88,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-37 | 第七轮吸收：旗标/签名/行为扫描（本文件 §36） | GO | ROUND7 + NTS 1.0.5 |
 | SIM-38 | EQ-06执行：TaskType改指正典＋playback递延＋lib门绿（本文件 §37） | GO | bank |
 | SIM-39 | 第八轮吸收：策略/持久化/WASM（本文件 §38） | GO | ROUND8 + NTS 1.0.6 |
+| SIM-40 | EQ-07部分执行：门面/正典改指5处＋结构项递延（本文件 §39） | GO | bank/hive |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -954,7 +955,6 @@ P-2 标记计数（24→1，节/行完好性机验）；P-3 §31 虚惊复核（
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -978,7 +978,6 @@ P-3 调用方枚举（self_test_integration＋SEAL pipeline——注册表是活
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1007,7 +1006,6 @@ E-3 计数机验：13＝7＋6，删除前后自洽。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1037,7 +1035,6 @@ svaf/bin 的 L5 路径改直引（Owner：L4/Desktop，日期：P1-02 内，不�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1070,7 +1067,6 @@ Flagd 首旗（Owner：L5，日期：SDB 翻转日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1100,7 +1096,6 @@ playback 设计启动（Owner：L2，日期：P1-02 内）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1133,4 +1128,34 @@ Cedar 依赖评审（Owner：L5，日期：P1-03 内）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
+
+---
+
+## §39 SIM-40：EQ-07 部分执行（GO）
+
+> 认领：单会话内完成。探针：门面库存普查＋正典复用核查＋fmt 归属鉴定。
+> 生产代码：5 文件改指（facade+1 别名、io/hive/svaf/bin 路径），零逻辑变更。
+
+**探针**：P-1 门面库存（emotion 空、feel 有数字人、L3/L5 l1_facade 系 L1 向上便利贴）；
+P-2 正典复用（multi_agent crate 含全部 6 hive 项；L5 系重导出）；
+P-3 Lead 无正典（types-crate 零命中→递延）；P-4 MediaSource 不可分拆
+（trait＋6 类型＋L2 实现者→递延）；P-5 fmt 归属（我行全洁，余皆历史）。
+
+**证据**：E-1 旧路径归零 4 处（hive×3 位点、digital_human、svaf、bin）；
+E-2 别名回绕保本地名不变（DigitalHumanEmotion as Emotion）；
+E-3 改动文件 fmt 增量为零（新增 hunk 全归历史）。
+
+**缺口**：G-1 server 路由器/state（门面 API 设计，P-task）；
+G-2 hotreload 搬迁 vs 门面（P-task）；G-3 lead 正典（L4 owner）；
+G-4 全量门确认（转 CI）。
+
+**落点**：5 文件＋BLUEPRINT v1.6.4。
+
+**放行判定**：GO（机械改指＋证据闭环；结构项有据递延非跳过）。
+
+**tripwire**：全量门首红先查他人文件（Owner：CI，持续）；
+门面 API 设计启动（Owner：L1/L3/L4，日期：P1-02 内）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-41.*

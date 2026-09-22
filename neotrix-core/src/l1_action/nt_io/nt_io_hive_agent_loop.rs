@@ -13,9 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use super::nt_io_agent_loop::{AgentLoop, ToolInvocation};
 use super::nt_io_provider::types::LlmError;
-use crate::l5_cognition::multi_agent_hive::{
-    EventType, HiveEvent, HiveMessage, HiveRouter, MessageType,
-};
+use neotrix_multi_agent::hive::{EventType, HiveEvent, HiveMessage, HiveRouter, MessageType};
 
 /// Wraps AgentLoop with Hive coordination
 pub struct HiveAgentLoop {
@@ -251,7 +249,7 @@ impl HiveAgentLoop {
     }
 
     /// Get router stats
-    pub fn router_stats(&self) -> crate::l5_cognition::multi_agent_hive::HiveStats {
+    pub fn router_stats(&self) -> neotrix_multi_agent::hive::HiveStats {
         self.router.lock().unwrap().stats()
     }
 }
@@ -273,7 +271,7 @@ use crate::l0_substrate::nt_core_time::now_secs;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l5_cognition::multi_agent_hive::{HiveMessage, MessageType};
+    use neotrix_multi_agent::hive::{HiveMessage, MessageType};
 
     // Note: Full integration tests require LlmProvider mock
     // These tests verify the wrapper construction and message helpers
