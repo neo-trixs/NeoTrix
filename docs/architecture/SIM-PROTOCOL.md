@@ -98,6 +98,8 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-47 | Phase 2 dispatcher 代码实施（本文件 §46） | GO-WITH-CI-BACKSTOP | dispatcher E1a-E6 |
 | SIM-48 | 调用方补齐＋E1b 证伪＋Phase 3 探针（本文件 §47） | GO-WITH-CI-BACKSTOP | entry 注入＋下沉位 |
 | SIM-49 | 并行收口：双路探针＋点火清单（本文件 §48） | GO | IGNITION-CHECKLIST |
+| SIM-50 | CI 侦察：公开 API 归因（本文件 §49） | GO | 红基线清单 |
+| SIM-51 | Phase 3 类型迁移提案（本文件 §50） | GO (proposed，待 Architect 签) | 下沉三决 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1453,4 +1455,54 @@ CI 仅 push-main/PR 触发——点火只能人来（已入清单 #1）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-50.*
+## §49 SIM-50：CI 侦察（GO）
+
+> 手段：公开 Actions API（匿名可读）＋jobs 下钻。零推送，零写操作。
+
+**证据**：E-1 main 全红：Security Scan（09-21：sbom✗／security-scan✗／secret-scan✓）、
+Security Audit（audit✗，09-20）、evolution-release（自 09-10 每日✗，慢性）；
+E-2 本分支末跑 09-17（Security Audit✗）；E-3 本地 12 commit 从未推送——CI 没见过我的代码；
+E-4 可观测窗内无 ci.yml（check/test/layer-deps）运行记录。
+
+**结论**：点火≠门绿。PR 落上已红主干，首红归因先行（SIM-40 纪律）：
+sbom/security-scan/audit/evolution 四红属既有，他人先修或注脚隔离；
+我的两批代码只认 ci.yml check/test 两门。工单升级为：push→归因→分门裁决。
+
+**落点**：EQ-13＋IGNITION #1 追记＋BLUEPRINT v1.6.13。
+
+**放行判定**：GO（侦察即交付；点火仍待人）。
+
+**tripwire**：PR 创建（Owner：人，即刻）；首红归因（Owner：CI，PR 即验）。
+
+---
+
+## §50 SIM-51：Phase 3 类型迁移提案（GO，proposed）
+
+> 认领：单会话内完成。输入：SIM-48 P-4＋SIM-49 A路反转（E8 83 引用／Crt new 13／
+> Trace 18）＋E1b 证伪。零代码（提案态；实现另立执行 SIM）。
+
+**三决**：
+D-3.1 E8Policy **留守 L5**（83 引用，下沉成本＞收益；改走 L0 trait 抽象新接口，
+dispatcher 只依赖 trait——E1b 教训：trait 方法禁原生 async，签名前先定 async 形态）。
+D-3.2 CRT **整体搬 L0**（`CrtPlan::new` 13 处；枚举＋planner＋helper 同迁；
+`nt_core_shared_types` 相邻；迁移后 dispatcher 用线归零一半）。
+D-3.3 CoT **拆分**（`CoTGenerator` trait 下沉 `nt_core_traits`；`DefaultCoTGenerator`
+实现留 L5；用点签名不变）。
+
+**顺序**：D-3.2 → D-3.3 → D-3.1（由易到难；每步独立 commit＋CI 门）。
+**allowlist 退役计划**：Phase 2b builder 激活（with_crt/factory、predictor）与 D-3.2 同车；
+退役条件＝dispatcher L1×L5/L2 计数归零＋全量门绿；deadline 2026-10-31 不动。
+E1b async_trait 重构：否决（引入成本＞单文件收益；trait 下沉时统一 async 形态）。
+
+**缺口**：G-1 Architect 签字（本提案→accepted）；G-2 可构建窗口（实现）。
+
+**落点**：本提案＋BLUEPRINT v1.6.14。
+
+**放行判定**：GO（提案态；签字前任何实现按无 SIM 编码论处）。
+
+**tripwire**：Architect 签字（Owner：Architect，日期：P1-02 内）；
+allowlist 倒计时延续（Owner：L1/L5，每周复核）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-52.*
