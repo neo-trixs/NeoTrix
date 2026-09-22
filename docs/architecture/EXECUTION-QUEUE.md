@@ -24,22 +24,22 @@
 | EQ-05 | H-08 math 改直引 L0（首血；原下沉方案已证伪；L1×l5计数26→23已验，全门待CI） | `check-layer-deps` L1×L5 组计数下降＋全量门绿 | L1 | EQ-04 | 🟨 (代码完，待门禁) |
 | EQ-06 | H-02 改指正典＋H-05 递延（原下沉方案证伪过半） | 同上，两组计数下降 | L1 | EQ-05 | 🟩 (L1×l2 34→27＋lib门绿；playback递延有据) | ⬜ |
 | EQ-07 | Facade 类（H-03/04/06）走门面 | 同上，三组计数下降 | L1/L3 | EQ-06 | 🟨 (机械 5 处完，server/hotreload/lead 递延有据) |
-| EQ-08 | dispatcher policy 类（H-01，最后） | L1×L2/L5 计数下降 | L1/L5 | EQ-07 | ⬜ |
+| EQ-08 | dispatcher policy 类（H-01，最后） | L1×L2/L5 计数下降 | L1/L5 | EQ-07 | 🟨 (SIM-42：实结构引用，改指/下沉皆证伪；B06 时限 allowlist 至 2026-10-31＋P1-02 构造注入递延) |
 
 ## T3. SDB 烘焙设计（与 T2 并行，不早于此）
 
 | ID | 任务 | 完成定义 | Owner | 前置 | 状态 |
 |----|------|---------|-------|------|------|
-| EQ-09 | dispatcher 三点 verifier 谓词＋阈值＋log-only 方案 | 设计文档＋SDB-REGISTRY 评分列首填 | L5 | SDB-06/07 定级（已有） | ⬜ |
-| EQ-10 | SDB-06/07 接线对象确定 | 登记表 C 列填实 | L5 | EQ-09 | ⬜ |
+| EQ-09 | dispatcher 三点 verifier 谓词＋阈值＋log-only 方案 | 设计文档＋SDB-REGISTRY 评分列首填 | L5 | SDB-06/07 定级（已有） | 🟩 (SDB v0.6：VP-1~3＋τ=0.65＋log 格式＋首填 1/2/2/1/1；SIM-42) |
+| EQ-10 | SDB-06/07 接线对象确定 | 登记表 C 列填实 | L5 | EQ-09 | 🟩 (06→SDB-05 分解步；07→代码修改动作 SDB-08+；C=log-only 结构化日志，outbox 推广 P-task；SIM-42) |
 
 ## T4. P1 收尾
 
 | ID | 任务 | 完成定义 | Owner | 前置 | 状态 |
 |----|------|---------|-------|------|------|
-| EQ-11 | 其余 4 fitness 阈值拍板 | L5 书面签字（数字＋理由） | L5 | 无（可并行） | ⬜ |
-| EQ-12 | pre-commit 增强落地 | doc-drift／confidence 本地可跑 | Infra | EQ-11 | ⬜ |
-| EQ-13 | P0 独占重验（check --tests 全绿） | 门绿＋新基线入库 | QA | 独占窗口 | ⬜ |
+| EQ-11 | 其余 4 fitness 阈值拍板 | L5 书面签字（数字＋理由） | L5 | 无（可并行） | 🟨 (提案备齐待签：NoCycle 0 环／Capability 0 重边／TreeSingleton ≤1 实例点／DeadCode 0 警告＋禁 crate 级 allow；PanicDensity 3000·12.0 与 B2 已有数；SIM-42 §41) |
+| EQ-12 | pre-commit 增强落地 | doc-drift／confidence 本地可跑 | Infra | EQ-11 | 🟨 (doc-drift advisory 已接（bash -n 过，随本轮提交实跑）；confidence 系 cargo 侧，待全量门；SIM-42) |
+| EQ-13 | P0 独占重验（check --tests 全绿） | 门绿＋新基线入库 | QA | 独占窗口 | 🟥 (本机 OOM Killed:9＋锁串行，转 CI 独占窗口；SIM-42 记录) |
 
 ## T5. P2/P3（条件触发，提前开工即错）
 

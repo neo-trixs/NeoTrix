@@ -1,7 +1,9 @@
 # SDB 登记表 (Stochastic-Deterministic Boundary Registry)
 
-> **版本**: v0.5 (V 构件定级) | **日期**: 2026-09-21 | **对应**: ROADMAP P1-03 / BLUEPRINT D-04
-> **变更记**: v0.5 V 构件定级 (SIM-29)：SDB-06/07 均为真 verifier（接线待定）。
+> **版本**: v0.6 (EQ-09/10 落地) | **日期**: 2026-09-22 | **对应**: ROADMAP P1-03 / BLUEPRINT D-04
+> **变更记**: v0.6 dispatcher 三 verifier 谓词＋阈值＋log-only 方案（SIM-42）；
+> SDB-06/07 接线对象确定；评分列首填（V-1~V-5 vs SDB-05）。
+> v0.5 V 构件定级 (SIM-29)：SDB-06/07 均为真 verifier（接线待定）。
 > v0.3 实点登记 (SIM-27)：SDB-04 退役（误报）＋ dispatcher 3 实点＋ loops 待追。
 > v0.2 新增 §Verifier 评分标准（源自 Reflect/PSR/NeurIPS25，见 ABSORPTION-ROUND2 §2.2）。
 > **规则**: 无 Verifier 的 LLM→动作路径一律 BLOCKER。本表是全部登记的唯一事实源。
@@ -23,9 +25,9 @@
 | SDB-02 | l1_action/nt_io/nt_io_hive_agent_loop.rs | 无（仅 mock 注释） | — | outbox 引用存（C 候选） | — | SCAFFOLD | 接 LLM 时重登记；outbox 可复用 |
 | SDB-03 | l1_action/nt_act/nt_act_autonomy/ (oracle_gate) | 无（确定性 Gap 枚举） | oracle_gate 系 gap 推理（非 LLM） | — | — | SCAFFOLD | 接 LLM 时重登记 |
 | SDB-04 | ~~nt_act_trade (TradeEngineRegistry)~~ | — | — | — | — | RETIRED | 误报：TradeEngine 系交易引擎注册表，非 LLM 调用点 (SIM-27 实测退役) |
-| SDB-05 | l1_action/nt_core_task_dispatcher.rs | `.complete()`×3 (L442/890/1001) ＋ CoTGenerator 接线 | E8Policy? | UNKNOWN | UNKNOWN | PARTIAL (缺 V/C/R) | 首个实名 P 点；V/C/R 待补（P1-03），先 log-only |
-| SDB-06 | l5_cognition/nt_core_prm/ (verifier.rs) | — (评估器，非动作路径) | V-CONFIRMED：6 维 MCTS 步评估（ModeConsistency/TransitionPattern/RewardHistory/DirectionChange/OscillationCheck/StepPosition） | — | — | V-READY (待接线) | 真 verifier 构件首件；接哪个 LLM→动作点待 P1-03 定 |
-| SDB-07 | l5_cognition/nt_goal/ (behavioral_verifier/rl_feedback) | — (门控对象为代码修改) | V-CONFIRMED：编译＋测试＋属性三重门＋run_bounded 超时 kill＋RL 奖励信号 | — | — | V-READY (待接线) | 全仓最接近生产 SDB verifier 的构件；是否 gate agent 动作待确认 |
+| SDB-05 | l1_action/nt_core_task_dispatcher.rs | `.complete()`×3 (L442/890/1001) ＋ CoTGenerator 接线 | VP-1 快路径门：class==Deterministic ∧ kernel.is_some() ∧ pred_confidence≥0.65（代码 L700 实证）；VP-2 置信阈值 τ=0.65（E8 predict_next）；VP-3 状态钳位 hexagram&0x3f | dispatch 结构化日志（log-only；outbox 推广 P-task） | TaskDispatchError 类型化回执（已有） | PARTIAL (V 谓词已定分未打；C log-only) | 首个实名 P 点；三谓词 log-only 先行，阻断待 P1-03（SIM-42/EQ-09） |
+| SDB-06 | l5_cognition/nt_core_prm/ (verifier.rs) | — (评估器，非动作路径) | V-CONFIRMED：6 维 MCTS 步评估（ModeConsistency/TransitionPattern/RewardHistory/DirectionChange/OscillationCheck/StepPosition） | — | — | V-READY (已接线：SDB-05 decompose_task 步评估) | 接线对象确定＝SDB-05 分解步（SIM-42/EQ-10）；log-only 起步 |
+| SDB-07 | l5_cognition/nt_goal/ (behavioral_verifier/rl_feedback) | — (门控对象为代码修改) | V-CONFIRMED：编译＋测试＋属性三重门＋run_bounded 超时 kill＋RL 奖励信号 | — | — | V-READY (已接线：未来代码修改类动作 SDB-08+；dispatcher 暂不适用) | 接线对象确定＝代码修改动作（SIM-42/EQ-10）；新 SDB 号登记时生效 |
 
 ---
 
@@ -95,6 +97,23 @@ Reflexion 式 revise 经验注入 experience-tree 时有界（默认 ≤3 条/�
 
 propose→reject 无界循环视为 DoS on self：超 N 轮自动升级人工（HITL），
 audit 记 `SDB_LOOP_EXCEEDED`。
+
+---
+
+## §评分首填 (EQ-09；SIM-42；基线口径，P1-03 复测)
+
+> 方法：同一评分器重算、不自报（AERS/R9 信条）。低分是基线，不是事故。
+
+| 标准 | SDB-05 现状 | 首填分 (1–5) |
+|------|-------------|--------------|
+| V-1 评分制 | 谓词已定（VP-1~3），无 Likert 评分器 | 1 |
+| V-2 风险分级 | Fast/高风险未分级，直通单路径 | 2 |
+| V-3 误放厌恶 | log-only 未阻断；阈值收紧方向已定（只许调严） | 2 |
+| V-4 经验有界 | 经验记忆未接 experience-tree | 1 |
+| V-5 反自杀环 | 无循环计数/HITL 升级 | 1 |
+
+log-only 记录格式（每 dispatch 一条）：`{pred_confidence, τ=0.65, class, kernel_present, vp1_pass, vp2_pass, vp3_pass, decision}`；
+阻断翻转需 P1-03＋ADR（V-3 只许调严）。
 
 ---
 

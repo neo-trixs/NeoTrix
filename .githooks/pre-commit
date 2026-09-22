@@ -54,4 +54,11 @@ if git diff --cached --name-only | grep -qE '\.rs$'; then
   echo -e "\033[0;32m✅ Build gate passed\033[0m"
 fi
 
+# ---------- 3) doc-drift 提示位 (SIM-42/EQ-12; advisory, 永不拦门) ----------
+# check-doc-drift.sh 基线 111 (2026-09-21)。只提示不阻断：基线变化靠 CI audit-all 裁决。
+if [ -x scripts/check-doc-drift.sh ]; then
+  echo -e "\033[1;33m📝 doc-drift advisory:\033[0m"
+  scripts/check-doc-drift.sh 2>&1 | tail -2 || true
+fi
+
 exit 0

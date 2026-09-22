@@ -90,6 +90,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-39 | 第八轮吸收：策略/持久化/WASM（本文件 §38） | GO | ROUND8 + NTS 1.0.6 |
 | SIM-40 | EQ-07部分执行：门面/正典改指5处＋结构项递延（本文件 §39） | GO | bank/hive |
 | SIM-41 | 第九轮吸收：技能/审议/防御/路由（本文件 §40） | GO | ROUND9 + NTS 1.0.7 |
+| SIM-42 | EQ-08~12＋T3 并行执行轮（本文件 §41） | GO-WITH-MITIGATION | SDB v0.6 + hook |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1192,4 +1193,41 @@ R10 P1 批次 triage（Owner：全组，日期：下轮吸收前）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-42.*
+## §41 SIM-42：EQ-08~12＋T3 并行执行轮（GO-WITH-MITIGATION）
+
+> 认领：单会话内完成。探针：dispatcher 只读扫描（1494 行；L5 用点全枚举）＋
+> 门面库存（l1_facade 系向下便利贴，无向上 CoT/Crt/E8 出口）＋守卫阈值提取＋hook 现状。
+> 生产代码：hook advisory 9 行（`bash -n` 过）；dispatcher 零改动（结构项，有据递延）。
+
+**探针**：P-1 dispatcher L5 实结构引用 5 路（antidistil-decompose／CoTGenerator 实例化／
+CrtPlan::new+decompose／E8Policy 持有／TraceSource+ReasoningTrace 构造）＋L2 predictor
+load/persist（L687 函数内）；P-2 `l5_cognition/l1_facade.rs` 系向下重导出（L1/L3/L4），
+无 CoT/Crt/E8 出口——改指门面不可行；P-3 三谓词代码实证（L700 快路径门／τ=0.65／&0x3f）；
+P-4 六守卫阈值（0／0／≤1／0／3000·12.0／B2 零新增干净对）；P-5 pre-commit 现有 2 门，
+doc-drift 基线 111 可跑。
+
+**证据**：E-1 构造性使用（`DefaultCoTGenerator::new`、`CrtPlan::new`）≠ 剧场重导出，
+下沉 L0 违层语义；E-2 hook advisory `bash -n` 过；E-3 drift 门 exit=0 持平 111。
+
+**缺口**：G-1 dispatcher 构造注入（P1-02 门面 API 设计，L1/L5）；
+G-2 三谓词语 Likert 化＋阻断翻转（P1-03＋ADR）；G-3 C 列 outbox 推广（P-task）；
+G-4 EQ-11 四阈值 L5 书面签字（提案已备，待签）；G-5 全量门／P0 独占／P3 件转 CI。
+
+**外部方案**：NTS-B06 时限 allowlist（到期 2026-10-31，过期即红）；
+defense-harness/SIM-41 证据交接（finder/grader 分离，log-only 先行）；
+AERS 同一评分器（首填低分是基线）。
+
+**落点**：SDB v0.6（VP-1~3＋τ＋log 格式＋评分首填 1/2/2/1/1＋06/07 接线确定）＋
+hook advisory＋EQ-08~12 状态推进＋BLUEPRINT v1.6.7。
+
+**蓝图回写**：即本轮（头/志/尾三处同升，机验）。
+
+**放行判定**：GO-WITH-MITIGATION（条件：allowlist 到期前 P1-02 启动；缺则 EQ-08 转红）。
+
+**tripwire**：allowlist 到期 2026-10-31（Owner：L1/L5，每周复核）；
+EQ-11 签字追踪（Owner：L5，日期：P1-03 内）；
+全量门首红先查他人文件（Owner：CI，持续）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-43.*
