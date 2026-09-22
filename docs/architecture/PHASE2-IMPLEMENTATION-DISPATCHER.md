@@ -148,11 +148,15 @@ pub struct DispatchLogRecord {
 4. `bash scripts/check-doc-drift.sh`：111 持平。
 5. 回滚：单 commit 还原；allowlist 至 2026-10-31 不动。
 
-## 组合根待办（本文件外，窗口内定位）
+## 组合根待办（SIM-48 更新）
 
-- `grep -rn "TaskDecomposerDispatcher::new\|with_kernel\|with_e8_policy"` 定调用方，
-  逐一补 `with_cot_generator/with_crt_factory/with_predictor_store`（L5/L6 侧）。
-- E1b/E3 签名确认（CoTGenerator 对象安全／predictor 真实签名）。
+- entry/mod.rs：已补 `with_cot_generator`（SIM-48，同 E1a 语义恢复）。
+- seal_loop.rs：**有据不补**——独立 `self.cot_generator` 已用＋dispatcher 侧 kernel 主路径完好，
+  重复构造浪费（SIM-48 P-2）。
+- E1b（字段 trait-boxing）：**证伪**——`CoTGenerator` 系原生 async fn trait，
+  `Box<dyn>` 非对象安全；改需 async_trait 重构，另议（SIM-48 P-3）。
+- Phase 3 下沉位（SIM-48 P-4）：E8Policy→L0 shared；CoTGenerator trait→L0 traits；
+  CrtTimeScale 枚举下沉／CrtPlan 留 L5；Trace 贴遥测。需 Architect SIM（P1-02 内）。
 
 ---
 

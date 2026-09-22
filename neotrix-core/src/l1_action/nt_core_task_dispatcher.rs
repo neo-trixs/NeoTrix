@@ -12,7 +12,7 @@
 use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
     DecomposeSuggestion, TaskDecomposer,
 };
-use crate::l5_cognition::nt_core_cot_generator::DefaultCoTGenerator;
+use crate::l5_cognition::nt_core_cot_generator::{CoTGenerator, DefaultCoTGenerator};
 use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
 use crate::l5_cognition::nt_core_policy::E8Policy;
 use crate::l5_cognition::reasoning_core::TraceSource;
@@ -38,7 +38,8 @@ pub trait ReasoningEngineProvider: Send + Sync {
 
 /// E8 预测存储缝（SIM-43 D-4；L1 拥有，L5 组合根做 adapter 包装）。
 /// 缺席＝降级模式：VP-2 跳过＋记录，可见性代替阻断。
-pub trait PredictorStore: Send {
+/// Send + Sync：宿主结构经 BrainHandle 跨线程共享（spawn_handler 要求）。
+pub trait PredictorStore: Send + Sync {
     /// 下一状态预测，返回 (预测状态, 置信度)。
     fn predict_next(&mut self, state: u8) -> (u8, f64);
     /// 观测实际转移。

@@ -96,6 +96,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-45 | 第十一轮吸收：meta-skill/编排/MCP/桌面（本文件 §44） | GO | ROUND11 + BP v1.6.10 |
 | SIM-46 | 第十二轮吸收：余项扫尾（本文件 §45） | GO | ROUND12 + BP v1.6.11 |
 | SIM-47 | Phase 2 dispatcher 代码实施（本文件 §46） | GO-WITH-CI-BACKSTOP | dispatcher E1a-E6 |
+| SIM-48 | 调用方补齐＋E1b 证伪＋Phase 3 探针（本文件 §47） | GO-WITH-CI-BACKSTOP | entry 注入＋下沉位 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1398,4 +1399,32 @@ allowlist 与 EQ-08 🟨 不动）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-48.*
+## §47 SIM-48：调用方补齐＋E1b 证伪＋Phase 3 探针（GO-WITH-CI-BACKSTOP）
+
+> 认领：单会话内完成。Spike＝SIM-43/47＋调用位实测。
+> 生产代码：`entry/mod.rs` 2 处（import＋with_cot 链）；seal_loop 零改（有据不补）。
+
+**探针**：P-1 entry/mod.rs:677 调用方 gateway 为 Arc（clone 廉价），同文件已有
+ReasoningKernel/E8Policy 同类导入——注入不新增违层类；
+P-2 seal_loop:1069 已独立持有 `self.cot_generator`（`DefaultCoTGenerator::new(gw,
+CoTConfig::from_env())`）＋dispatcher 侧 kernel+e8 双注入——重复构造浪费，
+且 kernel 主路径完好，决议不补（非跳过）；
+P-3 E1b：`execute_with_cot` 仅调 trait 方法 `generate_cot`（✓），但 trait 系原生
+`async fn`（L115，无 async_trait）→ `Box<dyn CoTGenerator>` 非对象安全，
+E1b **证伪**（不做；trait-boxing 需 async_trait 重构，另议）；
+P-4 Phase 3 下沉位：L0 有 `nt_core_shared_types / nt_core_capability_types /
+nt_core_traits` 三候选；E8Policy（纯数据＋default）可整体下沉；
+CoTGenerator trait 可下沉（用点不变）；CrtTimeScale 枚举下沉／CrtPlan 留 L5；
+Trace 系贴遥测（`nt_core_telemetry` 相邻）。
+
+**行为增量**：entry 恢复 `enable_cot` 默认语义（与 E1a 前一致）；seal_loop 行为零变。
+
+**缺口**：G-1 CI 绿（两文件）；G-2 Phase 3 下沉 SIM（Architect，P1-02 内）。
+
+**放行判定**：GO-WITH-CI-BACKSTOP（同 SIM-47 条件）。
+
+**tripwire**：CI 首跑（Owner：CI，PR 即验）；Phase 3 SIM（Owner：Architect，P1-02 内）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-49.*
