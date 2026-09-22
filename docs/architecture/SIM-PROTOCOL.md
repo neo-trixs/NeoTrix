@@ -100,6 +100,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-49 | 并行收口：双路探针＋点火清单（本文件 §48） | GO | IGNITION-CHECKLIST |
 | SIM-50 | CI 侦察：公开 API 归因（本文件 §49） | GO | 红基线清单 |
 | SIM-51 | Phase 3 类型迁移提案（本文件 §50） | GO (proposed，待 Architect 签) | 下沉三决 |
+| SIM-52 | M1–M7 执行（ADR-0005/SEAL/F03/Footer/iocs/H抽验/fuzz/复验） | GO | ADR-0005＋fuzz 骨架 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1505,4 +1506,27 @@ allowlist 倒计时延续（Owner：L1/L5，每周复核）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-52.*
+## §51 SIM-52：M1–M7 批量执行（GO）
+
+> 手段：ADR-0005（M1）＋F03 playbook（M3）＋Footer 惯例（M5）＋supply-iocs 扩展
+> （M2，实跑通过）＋H 抽验（M6，H-01/H-02 归档 H-05 保留）＋fuzz 骨架（M4）＋
+> 蓝图/复验（M7）。drift 111 全程持平。
+
+**证据**：
+M1: `docs/adr/0005-seal-threat-model-skeleton.md`（proposed，三层骨架：L1 门/L2 表/L3 纲）。
+M2: `scripts/check-supply-iocs.sh`（+38 行，advisory A/B 双检查，实跑 IOC 全绿，advisory 三告警均为已知）。
+M3: `docs/architecture/MEMORY-OVERFLOW-PLAYBOOK.md`（compaction 四件＋volume 纪律）。
+M4: `fuzz/`（独立 crate，3 harness：confidence/compactor/dispatch_plan；nightly only，cargo test 零影响）。
+M5: `docs/architecture/REVIEW-FOOTER-CONVENTION.md`（三行 footer 惯例）。
+M6: `docs/architecture/ABSORPTION-R10-TRIAGE.md` H 抽验结论＋蓝图 §15 D-02 H-01/H-02 归档行。
+M7: drift 111 持平，fuzz 骨架不入 workspace（零回归面）。
+
+**结论**：M1–M7 全部完成。SIM-52 作为批量执行 SIM 收口本轮全部小任务。
+
+**放行判定**：GO（纯文档/脚本/骨架，零运行时行为变更）。
+
+**tripwire**：无（本轮无 P0 门依赖）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-53.*
