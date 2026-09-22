@@ -1,7 +1,7 @@
 use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier};
 use crate::l1_action::nt_core_edit::{MicroEdit, SelfEdit};
-use crate::l2_perception::nt_core_knowledge::{RewardSource, TaskType};
 use chrono::Utc;
+use neotrix_types::core::{RewardSource, TaskType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

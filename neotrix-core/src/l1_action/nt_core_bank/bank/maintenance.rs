@@ -5,7 +5,7 @@ use chrono::Utc;
 use crate::l1_action::nt_core_bank::{
     MemoryIterationResult, MemoryTier, ReasoningBank, ReasoningMemory,
 };
-use crate::l2_perception::nt_core_knowledge::TaskType;
+use neotrix_types::core::TaskType;
 
 impl ReasoningBank {
     pub fn iterate_memories(

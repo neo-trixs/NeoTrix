@@ -7,9 +7,9 @@ use super::iteration::Bm25Index;
 use crate::l1_action::nt_core_bank::{
     MemoryDetailedStats, MemoryTier, ReasoningBankStats, ReasoningMemory,
 };
-use crate::l2_perception::nt_core_knowledge::TaskType;
-use neotrix_reasoning::kron::KroneckerCleanup;
 use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
+use neotrix_reasoning::kron::KroneckerCleanup;
+use neotrix_types::core::TaskType;
 
 pub mod ext;
 pub mod maintenance;

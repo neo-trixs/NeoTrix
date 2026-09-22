@@ -86,6 +86,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-35 | EQ-04执行：死守卫删除＋13/13实跑绿（本文件 §34） | GO | fitness.rs |
 | SIM-36 | EQ-05执行：H-08改直引＋覆盖丢失事故＋即交原则（本文件 §35） | GO | search.rs |
 | SIM-37 | 第七轮吸收：旗标/签名/行为扫描（本文件 §36） | GO | ROUND7 + NTS 1.0.5 |
+| SIM-38 | EQ-06执行：TaskType改指正典＋playback递延＋lib门绿（本文件 §37） | GO | bank |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -952,7 +953,7 @@ P-2 标记计数（24→1，节/行完好性机验）；P-3 §31 虚惊复核（
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
 
 ---
 
@@ -976,7 +977,7 @@ P-3 调用方枚举（self_test_integration＋SEAL pipeline——注册表是活
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
 
 ---
 
@@ -1005,7 +1006,7 @@ E-3 计数机验：13＝7＋6，删除前后自洽。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
 
 ---
 
@@ -1035,7 +1036,7 @@ svaf/bin 的 L5 路径改直引（Owner：L4/Desktop，日期：P1-02 内，不�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
 
 ---
 
@@ -1068,4 +1069,34 @@ Flagd 首旗（Owner：L5，日期：SDB 翻转日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
+
+---
+
+## §37 SIM-38：EQ-06 执行（GO）
+
+> 认领：单会话内完成。探针：15 同名 TaskType 普查＋正典比对＋跨界读写审计。
+> 生产代码：8 文件 import 改指（7 bank＋1 shield），零逻辑变更。
+
+**探针**：P-1 TaskType×15 同名普查（types-crate 正典版为合并超集，12 原生全在）；
+P-2 RewardSource 双版本逐字同一（变体/方法/值）；P-3 跨界审计
+（field 读零、task_type 读全系他家字段、构造点全在 bank 内＋shield 一处同改）；
+P-4 playback 判定（trait＋6 类型＋L2 实现者不可分拆→递延，非沉默跳过）。
+
+**证据**：E-1 L1×l2 真数 34→27（恰为 7 改道行，一一对应）；
+E-2 `cargo check --lib -j4` exit 0（1m42s）；E-3 fmt 全文件零 diff；
+E-4 H-02 原"下沉"方案证伪两次（math 重导出案＋本次正典已存案）。
+
+**缺口**：G-1 全量 --tests 门（转 CI，本地 OOM 旧疾）；
+G-2 playback trait 拆分设计（P-task，需 L2 owner）。
+
+**落点**：8 文件改指＋BLUEPRINT v1.6.3。
+
+**放行判定**：GO（计数＋编译双证；行为面零变化）。
+
+**tripwire**：CI 全量门首红先查他人文件（Owner：CI，日期：push 当日）；
+playback 设计启动（Owner：L2，日期：P1-02 内）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*

@@ -1,14 +1,16 @@
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::path::PathBuf;
-use std::ops::Range;
 use rand::Rng;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::ops::Range;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::l1_action::nt_io::nt_io_http_factory::TlsVariant;
 
+use super::system_fingerprint::{
+    Browser, Platform, SystemFingerprint, SystemFingerprintConfig, SystemFingerprintGenerator,
+};
 use super::StealthHttpClient;
-use super::system_fingerprint::{SystemFingerprint, SystemFingerprintGenerator, SystemFingerprintConfig, Platform, Browser};
 
 /// 指纹 = 完整系统指纹 + 成功/失败统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +24,11 @@ pub struct Fingerprint {
 impl Fingerprint {
     pub fn success_rate(&self) -> f64 {
         let total = self.success_count + self.fail_count;
-        if total == 0 { 0.5 } else { self.success_count as f64 / total as f64 }
+        if total == 0 {
+            0.5
+        } else {
+            self.success_count as f64 / total as f64
+        }
     }
 }
 
@@ -118,19 +124,27 @@ impl FingerprintManager {
             (Platform::IOS, Browser::Safari),
             (Platform::IOS, Browser::Chrome),
         ];
-        combos.into_iter().map(|(platform, stealth_browser)| {
-            let cfg = SystemFingerprintConfig {
-                platform: Some(platform),
-                stealth_browser: Some(stealth_browser),
-                timezone: None,
-                locale: None,
-                h2_profile: None,
-                auto_consistent: true,
-            };
-            let system = gen.generate(&cfg);
-            let headers = SystemFingerprintGenerator::to_headers(&system);
-            Fingerprint { system, headers, success_count: rng.gen_range(0..3), fail_count: 0 }
-        }).collect()
+        combos
+            .into_iter()
+            .map(|(platform, stealth_browser)| {
+                let cfg = SystemFingerprintConfig {
+                    platform: Some(platform),
+                    stealth_browser: Some(stealth_browser),
+                    timezone: None,
+                    locale: None,
+                    h2_profile: None,
+                    auto_consistent: true,
+                };
+                let system = gen.generate(&cfg);
+                let headers = SystemFingerprintGenerator::to_headers(&system);
+                Fingerprint {
+                    system,
+                    headers,
+                    success_count: rng.gen_range(0..3),
+                    fail_count: 0,
+                }
+            })
+            .collect()
     }
 
     fn save(&self) {
@@ -146,9 +160,13 @@ impl FingerprintManager {
             }
             if !self.use_kb {
                 if let Some(parent) = self.store_path.parent() {
-                    if let Err(e) = std::fs::create_dir_all(parent) { log::warn!("[fingerprint] create dir: {}", e); }
+                    if let Err(e) = std::fs::create_dir_all(parent) {
+                        log::warn!("[fingerprint] create dir: {}", e);
+                    }
                 }
-                if let Err(e) = std::fs::write(&self.store_path, json) { log::warn!("[fingerprint] write: {}", e); }
+                if let Err(e) = std::fs::write(&self.store_path, json) {
+                    log::warn!("[fingerprint] write: {}", e);
+                }
             }
         }
     }
@@ -158,16 +176,25 @@ impl FingerprintManager {
     }
 
     pub fn rotate(&mut self) {
-        let total_requests: u64 = self.fingerprints.iter()
-            .map(|f| f.success_count + f.fail_count).sum();
+        let total_requests: u64 = self
+            .fingerprints
+            .iter()
+            .map(|f| f.success_count + f.fail_count)
+            .sum();
         if total_requests < 10 {
             self.current_index = (self.current_index + 1) % self.fingerprints.len();
             return;
         }
         let mut rng = rand::thread_rng();
-        let best = self.fingerprints.iter()
+        let best = self
+            .fingerprints
+            .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.success_rate().partial_cmp(&b.success_rate()).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|(_, a), (_, b)| {
+                a.success_rate()
+                    .partial_cmp(&b.success_rate())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|(i, _)| i)
             .unwrap_or(0);
         if rng.gen_bool(0.7) {
@@ -179,7 +206,11 @@ impl FingerprintManager {
 
     pub fn _report_result(&mut self, success: bool) {
         let fp = &mut self.fingerprints[self.current_index];
-        if success { fp.success_count += 1; } else { fp.fail_count += 1; }
+        if success {
+            fp.success_count += 1;
+        } else {
+            fp.fail_count += 1;
+        }
         let interval = self.rotation_interval.load(Ordering::Relaxed);
         if fp.success_count + fp.fail_count >= interval {
             self.rotate();
@@ -190,7 +221,10 @@ impl FingerprintManager {
     pub fn _apply_headers(&self) -> HashMap<String, String> {
         let fp = self.current();
         let mut headers = fp.headers.clone();
-        headers.insert("User-Agent".to_string(), self.ua_from_fingerprint(&fp.system));
+        headers.insert(
+            "User-Agent".to_string(),
+            self.ua_from_fingerprint(&fp.system),
+        );
         headers
     }
 
@@ -198,7 +232,8 @@ impl FingerprintManager {
         let days_since_epoch = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs() / 86400;
+            .as_secs()
+            / 86400;
         let chrome_ver = format!("{}.0.0.0", 120 + (days_since_epoch / 90) as u32);
         let ff_ver = format!("{}.0", 121 + (days_since_epoch / 90) as u32);
         let safari_ver = format!("{}.2", 17 + (days_since_epoch / 90) as u32);
@@ -266,10 +301,12 @@ impl FingerprintManager {
         let platforms = Platform::all();
         let stealth_browsers = Browser::all();
         let platform = platforms[rng.gen_range(0..platforms.len())];
-        let compat_stealth_browsers: Vec<&Browser> = stealth_browsers.iter()
+        let compat_stealth_browsers: Vec<&Browser> = stealth_browsers
+            .iter()
             .filter(|b| b.compatible_platforms().contains(&platform))
             .collect();
-        let stealth_browser = *compat_stealth_browsers[rng.gen_range(0..compat_stealth_browsers.len())];
+        let stealth_browser =
+            *compat_stealth_browsers[rng.gen_range(0..compat_stealth_browsers.len())];
         let config = SystemFingerprintConfig {
             platform: Some(platform),
             stealth_browser: Some(stealth_browser),
@@ -295,14 +332,17 @@ impl FingerprintManager {
     }
 
     pub fn _best_success_rate(&self) -> f64 {
-        self.fingerprints.iter()
+        self.fingerprints
+            .iter()
             .map(|f| f.success_rate())
             .fold(0.0f64, |a, b| a.max(b))
     }
 
     pub fn total_requests(&self) -> u64 {
-        self.fingerprints.iter()
-            .map(|f| f.success_count + f.fail_count).sum()
+        self.fingerprints
+            .iter()
+            .map(|f| f.success_count + f.fail_count)
+            .sum()
     }
 
     /// Apply a RotationProfile — synchronously switch fingerprint + timing + TLS
@@ -336,8 +376,11 @@ pub struct StealthLearning {
 }
 
 impl StealthLearning {
-    pub fn _to_reasoning_memory(&self, task: &str) -> crate::l1_action::nt_core_bank::ReasoningMemory {
-        use crate::l2_perception::nt_core_knowledge::TaskType;
+    pub fn _to_reasoning_memory(
+        &self,
+        task: &str,
+    ) -> crate::l1_action::nt_core_bank::ReasoningMemory {
+        use neotrix_types::core::TaskType;
         crate::l1_action::nt_core_bank::ReasoningMemory::new(
             task,
             TaskType::CodeAnalysis,
@@ -537,7 +580,8 @@ mod tests {
         // verify saved
         assert!(path.exists());
         let json = std::fs::read_to_string(&path).expect("value should be ok in test");
-        let store: FingerprintStore = serde_json::from_str(&json).expect("value should be ok in test");
+        let store: FingerprintStore =
+            serde_json::from_str(&json).expect("value should be ok in test");
         assert!(store.fingerprints.len() >= 4);
         let _ = std::fs::remove_file(&path);
     }

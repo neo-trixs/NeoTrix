@@ -1,11 +1,9 @@
-
 #[cfg(test)]
 mod tests {
     use crate::l1_action::nt_core_bank::{
-        MemoryTier, OffloadManager, PipelineConfig, PipelineState, ReasoningBank, ReasoningMemory,
-        T3ViewType,
+        OffloadManager, PipelineConfig, PipelineState, ReasoningBank, ReasoningMemory, T3ViewType,
     };
-    use crate::l2_perception::nt_core_knowledge::TaskType;
+    use neotrix_types::core::TaskType;
 
     fn make_mem(desc: &str, tt: TaskType, reward: f64) -> ReasoningMemory {
         ReasoningMemory::new(desc, tt, &[], reward)
@@ -273,22 +271,22 @@ mod tests {
     //     assert!((sim - 1.0).abs() < 1e-10);
 }
 
-    // Disabled: cosine_similarity not migrated
-    // #[test]
-    // fn test_cosine_similarity_orthogonal() {
-    //     let a = vec![1.0, 0.0];
-    //     let b = vec![0.0, 1.0];
-    //     let sim = ReasoningBank::cosine_similarity(&a, &b);
-    //     assert!((sim - 0.0).abs() < 1e-10);
-    // }
+// Disabled: cosine_similarity not migrated
+// #[test]
+// fn test_cosine_similarity_orthogonal() {
+//     let a = vec![1.0, 0.0];
+//     let b = vec![0.0, 1.0];
+//     let sim = ReasoningBank::cosine_similarity(&a, &b);
+//     assert!((sim - 0.0).abs() < 1e-10);
+// }
 
-    // Disabled: cosine_similarity not migrated
-    // #[test]
-    // fn test_cosine_similarity_zero() { ... }
+// Disabled: cosine_similarity not migrated
+// #[test]
+// fn test_cosine_similarity_zero() { ... }
 
-    // #[test]
-    // fn test_cosine_similarity_zero_only_a() { ... }
-// 
+// #[test]
+// fn test_cosine_similarity_zero_only_a() { ... }
+//
 //     #[test]
 //     fn test_quality_score_high_quality() {
 //         let mut bank = ReasoningBank::new(100);
@@ -308,7 +306,7 @@ mod tests {
 //         let score = bank.quality_score();
 //         assert!(score > 0.5);
 //     }
-// 
+//
 //     #[test]
 //     fn test_promote_tiers() {
 //         let mut bank = ReasoningBank::new(100);
@@ -320,7 +318,7 @@ mod tests {
 //         let promoted = bank.promote_tiers();
 //         assert!(promoted >= 1);
 //     }
-// 
+//
 //     #[test]
 //     fn test_enable_hypergraph() {
 //         let mut bank = ReasoningBank::new(100);
@@ -332,7 +330,7 @@ mod tests {
 //         let traverse = bank.hypergraph_traverse(&id, 1);
 //         assert!(traverse.is_empty() || !traverse.is_empty());
 //     }
-// 
+//
 //     #[test]
 //     fn test_split_context() {
 //         let mut bank = ReasoningBank::new(100);
@@ -343,7 +341,7 @@ mod tests {
 //         assert!(!stable.is_empty());
 //         assert!(!dynamic.is_empty());
 //     }
-// 
+//
 //     #[test]
 //     fn test_checkpoint_roundtrip() {
 //         let state = PipelineState::new();
@@ -355,20 +353,20 @@ mod tests {
 //         assert_eq!(loaded.l1_count, 0);
 //         let _ = std::fs::remove_dir_all(&dir);
 //     }
-// 
+//
 //     #[test]
 //     fn test_checkpoint_load_nonexistent() {
 //         let path = std::path::Path::new("/nonexistent/path/checkpoint.json");
 //         let state = ReasoningBank::load_pipeline_checkpoint(path);
 //         assert_eq!(state.l1_count, 0);
 //     }
-// 
+//
 //     #[test]
 //     fn test_retrieve_by_wh_empty_bank() {
 //         let bank = ReasoningBank::new(100);
 //         assert!(bank.retrieve_by_wh("anything", 5).is_empty());
 //     }
-// 
+//
 //     #[test]
 //     fn test_store_deferred_then_search() {
 //         let mut bank = ReasoningBank::new(100);
@@ -376,7 +374,7 @@ mod tests {
 //         let results = bank.retrieve_relevant("deferred", None, 5);
 //         assert!(!results.is_empty());
 //     }
-// 
+//
 //     #[test]
 //     fn test_multiple_task_types() {
 //         let mut bank = ReasoningBank::new(100);
@@ -387,7 +385,7 @@ mod tests {
 //         let detailed = bank.stats_detailed();
 //         assert_eq!(detailed.total, 4);
 //     }
-// 
+//
 //     #[test]
 //     fn test_initialize_full_knowledge() {
 //         let mut bank = ReasoningBank::new(1000);
@@ -396,7 +394,7 @@ mod tests {
 //         bank.initialize_with_everos_knowledge();
 //         assert_eq!(bank.memories().len(), 7 + 10 + 4);
 //     }
-// 
+//
 //     #[test]
 //     fn test_retrieve_with_task_type_filter() {
 //         let mut bank = ReasoningBank::new(100);
@@ -409,13 +407,13 @@ mod tests {
 //         assert_eq!(gen[0].task_type, TaskType::CodeGeneration);
 //         assert_eq!(ui[0].task_type, TaskType::UIDesign);
 //     }
-// 
+//
 //     #[test]
 //     fn test_empty_bank_quality_score_zero() {
 //         let bank = ReasoningBank::new(100);
 //         assert!((bank.quality_score()).abs() < 1e-10);
 //     }
-// 
+//
 //     #[test]
 //     fn test_consolidate_no_similar() {
 //         let mut bank = ReasoningBank::new(100);
@@ -425,7 +423,7 @@ mod tests {
 //         assert_eq!(merged, 0);
 //         assert_eq!(bank.memories().len(), 2);
 //     }
-// 
+//
 //     #[test]
 //     fn test_replay_max_memories() {
 //         let mut bank = ReasoningBank::new(2);
