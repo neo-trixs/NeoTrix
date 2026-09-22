@@ -130,6 +130,29 @@ pub struct NtLlmReply {
 /// 异步 Provider 由调用方桥接（block_on 或产出回复后注入），晶体侧保持纯同步可测。
 pub trait NtLlmAsk: Send + Sync {
     fn ask(&self, prompt: &str) -> Result<NtLlmReply, NtTaskFusionError>;
+
+    /// 流式问答：逐块回调，返回 false 即取消。
+    /// 默认实现 = 非流式 ask + 全文一次回调（行为与 ask 一致）。
+    fn ask_stream(
+        &self,
+        prompt: &str,
+        on_chunk: &dyn Fn(&str) -> bool,
+    ) -> Result<NtLlmReply, NtTaskFusionError> {
+        let reply = self.ask(prompt)?;
+        let _ = on_chunk(&reply.text);
+        Ok(reply)
+    }
+}
+
+/// 进度接收器（TUI 工作相实时渲染用；None = 静默）。
+/// 全默认空实现，按需覆盖；`cancelled` 被轮询用于 Esc 中断。
+pub trait NtProgressSink: Send + Sync {
+    fn on_subtask_start(&self, _subtask_id: &str, _title: &str) {}
+    fn on_answer_chunk(&self, _subtask_id: &str, _delta: &str) {}
+    fn on_subtask_done(&self, _subtask_id: &str, _success: bool) {}
+    fn cancelled(&self) -> bool {
+        false
+    }
 }
 
 /// 融合错误。
@@ -245,8 +268,19 @@ impl NtCrystalTaskLoop {
         core: &CrystalCore,
         llm: &dyn NtLlmAsk,
     ) -> NtTaskLoopReport {
+        self.run_with_sink(goal, core, llm, None)
+    }
+
+    /// 带进度接收器的闭环（TUI 工作相实时渲染 + Esc 取消走这里）。
+    pub fn run_with_sink(
+        &self,
+        goal: &str,
+        core: &CrystalCore,
+        llm: &dyn NtLlmAsk,
+        sink: Option<&dyn NtProgressSink>,
+    ) -> NtTaskLoopReport {
         let subtasks = self.suggest(goal, core);
-        let (answers, failed) = self.dispatch(&subtasks, llm);
+        let (answers, failed) = self.dispatch(&subtasks, llm, sink);
         let fused = self.fuse(&answers);
         let calibration = self.calibrate(&fused);
         let follow_ups = self.follow_ups(goal, &subtasks, &fused, &failed);
@@ -388,6 +422,7 @@ impl NtCrystalTaskLoop {
         &self,
         subtasks: &[NtCrystalSubtask],
         llm: &dyn NtLlmAsk,
+        sink: Option<&dyn NtProgressSink>,
     ) -> (Vec<NtScoredAnswer>, Vec<(String, String)>) {
         let mut answers = Vec::new();
         let mut failed = Vec::new();
@@ -398,6 +433,9 @@ impl NtCrystalTaskLoop {
                 NtSubtaskRoute::Deterministic => match &st.local_answer {
                     Some(text) if !text.trim().is_empty() => {
                         let conf = st.confidence.clamp(0.0, 1.0).max(0.5);
+                        if let Some(s) = sink {
+                            s.on_subtask_start(&st.id, &st.title);
+                        }
                         answers.push(NtScoredAnswer {
                             subtask_id: st.id.clone(),
                             text: text.clone(),
@@ -405,22 +443,51 @@ impl NtCrystalTaskLoop {
                             verdict: NoulAnswer::new(conf),
                             model: "crystal-memory".to_string(),
                         });
+                        if let Some(s) = sink {
+                            s.on_subtask_done(&st.id, true);
+                        }
                     }
-                    _ => failed.push((st.id.clone(), "no local answer".to_string())),
-                },
-                NtSubtaskRoute::Reasoning => match llm.ask(&st.question) {
-                    Ok(reply) => {
-                        let conf = reply.confidence.clamp(0.0, 1.0);
-                        answers.push(NtScoredAnswer {
-                            subtask_id: st.id.clone(),
-                            text: reply.text,
-                            confidence: conf,
-                            verdict: NoulAnswer::new(conf),
-                            model: reply.model,
-                        });
+                    _ => {
+                        failed.push((st.id.clone(), "no local answer".to_string()));
+                        if let Some(s) = sink {
+                            s.on_subtask_done(&st.id, false);
+                        }
                     }
-                    Err(e) => failed.push((st.id.clone(), e.to_string())),
                 },
+                NtSubtaskRoute::Reasoning => {
+                    if let Some(s) = sink {
+                        s.on_subtask_start(&st.id, &st.title);
+                    }
+                    let stream_result = llm.ask_stream(&st.question, &|chunk| {
+                        if let Some(s) = sink {
+                            s.on_answer_chunk(&st.id, chunk);
+                            !s.cancelled()
+                        } else {
+                            true
+                        }
+                    });
+                    match stream_result {
+                        Ok(reply) => {
+                            let conf = reply.confidence.clamp(0.0, 1.0);
+                            answers.push(NtScoredAnswer {
+                                subtask_id: st.id.clone(),
+                                text: reply.text,
+                                confidence: conf,
+                                verdict: NoulAnswer::new(conf),
+                                model: reply.model,
+                            });
+                            if let Some(s) = sink {
+                                s.on_subtask_done(&st.id, true);
+                            }
+                        }
+                        Err(e) => {
+                            failed.push((st.id.clone(), e.to_string()));
+                            if let Some(s) = sink {
+                                s.on_subtask_done(&st.id, false);
+                            }
+                        }
+                    }
+                }
             }
         }
         (answers, failed)
@@ -770,7 +837,7 @@ mod tests {
         let subs = eng.suggest("如何接入支付功能", &core);
         assert!(subs.iter().any(|s| s.route == NtSubtaskRoute::Deterministic));
         let llm = StubAsk::new();
-        let (answers, failed) = eng.dispatch(&subs, &llm);
+        let (answers, failed) = eng.dispatch(&subs, &llm, None);
         assert!(failed.is_empty());
         // Deterministic 不耗 LLM：calls 只来自 Reasoning 子任务
         let reasoning_count = subs
@@ -795,7 +862,7 @@ mod tests {
         }];
         let mut llm = StubAsk::new();
         llm.fail_on.push("会炸".to_string());
-        let (answers, failed) = engine().dispatch(&subs, &llm);
+        let (answers, failed) = engine().dispatch(&subs, &llm, None);
         assert!(answers.is_empty());
         assert_eq!(failed.len(), 1);
         assert!(failed[0].1.contains("boom"));

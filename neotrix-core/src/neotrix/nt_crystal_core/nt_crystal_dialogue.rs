@@ -33,7 +33,7 @@
 //! - 生产代码无 `unwrap/expect/panic`。
 
 use super::nt_crystal_task_fusion::{
-    NtCrystalTaskLoop, NtScoredAnswer, NtTaskLoopConfig, NtTaskLoopReport,
+    NtCrystalTaskLoop, NtProgressSink, NtScoredAnswer, NtTaskLoopConfig, NtTaskLoopReport,
 };
 use super::CrystalCore;
 use crate::neotrix::nt_crystal_core::NtLlmAsk;
@@ -245,13 +245,25 @@ impl NtInnerLoop {
         llm: &dyn NtLlmAsk,
         human: &dyn NtHumanChannel,
     ) -> NtInnerLoopOutcome {
+        self.drive_with_sink(goal, core, llm, human, None)
+    }
+
+    /// 带进度接收器的驱动（TUI 工作相实时渲染 + Esc 取消走这里）。
+    pub fn drive_with_sink(
+        &self,
+        goal: &str,
+        core: &mut CrystalCore,
+        llm: &dyn NtLlmAsk,
+        human: &dyn NtHumanChannel,
+        sink: Option<&dyn NtProgressSink>,
+    ) -> NtInnerLoopOutcome {
         let engine = NtCrystalTaskLoop::new(self.config);
         let mut extra: Vec<NtScoredAnswer> = Vec::new();
         let mut resolved: HashSet<String> = HashSet::new();
         let mut transcript: Vec<String> = Vec::new();
 
         for round in 1..=self.max_rounds {
-            let mut report = engine.run(goal, core, llm);
+            let mut report = engine.run_with_sink(goal, core, llm, sink);
             if !extra.is_empty() {
                 report.answers.extend(extra.iter().cloned());
                 report.fused = engine.fuse(&report.answers);

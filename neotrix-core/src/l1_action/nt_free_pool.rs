@@ -36,6 +36,8 @@ pub struct NtFreePoolAsk {
     cooldown: Duration,
     cursor: Mutex<usize>,
     cooled: Mutex<HashMap<String, Instant>>,
+    /// TUI 模型选择器定点（None = 轮转；定点失败自动回落轮转）。
+    pinned: Mutex<Option<String>>,
 }
 
 impl NtFreePoolAsk {
@@ -49,6 +51,7 @@ impl NtFreePoolAsk {
             cooldown: Duration::from_secs(60),
             cursor: Mutex::new(0),
             cooled: Mutex::new(HashMap::new()),
+            pinned: Mutex::new(None),
         }
     }
 
@@ -76,7 +79,31 @@ impl NtFreePoolAsk {
         &self.models
     }
 
+    /// 定点模型（TUI 选择器调用；None 回轮转）。
+    pub fn set_pinned(&self, model: Option<String>) {
+        if let Ok(mut p) = self.pinned.lock() {
+            *p = model;
+        }
+    }
+
+    pub fn pinned(&self) -> Option<String> {
+        self.pinned.lock().ok().and_then(|p| p.clone())
+    }
+
     fn ask_one(&self, model: &str, prompt: &str) -> Result<NtLlmReply, NtTaskFusionError> {
+        self.build_one(model).ask(prompt)
+    }
+
+    fn ask_one_stream(
+        &self,
+        model: &str,
+        prompt: &str,
+        on_chunk: &dyn Fn(&str) -> bool,
+    ) -> Result<NtLlmReply, NtTaskFusionError> {
+        self.build_one(model).ask_stream(prompt, on_chunk)
+    }
+
+    fn build_one(&self, model: &str) -> NtModelCliAsk {
         let mut ask = NtModelCliAsk::new()
             .with_command(self.command.clone())
             .with_model(model)
@@ -85,7 +112,40 @@ impl NtFreePoolAsk {
         if let Some(dir) = &self.workdir {
             ask = ask.with_workdir(dir.clone());
         }
-        ask.ask(prompt)
+        ask
+    }
+
+    /// 调用顺序：定点优先（池内才有效），随后轮转；共享给 ask/ask_stream。
+    fn order_seq(&self) -> (Vec<String>, usize) {
+        if self.models.is_empty() {
+            return (Vec::new(), 0);
+        }
+        let now = Instant::now();
+        let (mut seq, start) = match (self.cursor.lock(), self.cooled.lock()) {
+            (Ok(c), Ok(k)) => (order(&self.models, *c, &k, now, self.cooldown), *c),
+            _ => (self.models.clone(), 0),
+        };
+        if let Some(pin) = self.pinned() {
+            if self.models.iter().any(|m| m == &pin) {
+                seq.retain(|m| m != &pin);
+                seq.insert(0, pin);
+            }
+        }
+        (seq, start)
+    }
+
+    fn note_success(&self, model: &str, start: usize, offset: usize) {
+        if let (Ok(mut c), Ok(mut k)) = (self.cursor.lock(), self.cooled.lock()) {
+            *c = (start + offset + 1) % self.models.len().max(1);
+            k.remove(model);
+        }
+    }
+
+    fn note_failure(&self, model: &str, e: NtTaskFusionError, errors: &mut Vec<String>) {
+        if let Ok(mut k) = self.cooled.lock() {
+            k.insert(model.to_string(), Instant::now());
+        }
+        errors.push(format!("{model}: {e}"));
     }
 }
 
@@ -126,27 +186,41 @@ impl NtLlmAsk for NtFreePoolAsk {
         if self.models.is_empty() {
             return Err(NtTaskFusionError::Llm("free pool is empty".to_string()));
         }
-        let now = Instant::now();
-        let (seq, start) = match (self.cursor.lock(), self.cooled.lock()) {
-            (Ok(c), Ok(k)) => (order(&self.models, *c, &k, now, self.cooldown), *c),
-            _ => (self.models.clone(), 0),
-        };
+        let (seq, start) = self.order_seq();
         let mut errors = Vec::new();
         for (offset, model) in seq.iter().enumerate() {
             match self.ask_one(model, prompt) {
                 Ok(reply) => {
-                    if let (Ok(mut c), Ok(mut k)) = (self.cursor.lock(), self.cooled.lock()) {
-                        *c = (start + offset + 1) % self.models.len().max(1);
-                        k.remove(model);
-                    }
+                    self.note_success(model, start, offset);
                     return Ok(reply);
                 }
-                Err(e) => {
-                    if let Ok(mut k) = self.cooled.lock() {
-                        k.insert(model.clone(), Instant::now());
-                    }
-                    errors.push(format!("{model}: {e}"));
+                Err(e) => self.note_failure(model, e, &mut errors),
+            }
+        }
+        Err(NtTaskFusionError::Llm(format!(
+            "all {} free models failed: {}",
+            seq.len(),
+            errors.join(" | ")
+        )))
+    }
+
+    fn ask_stream(
+        &self,
+        prompt: &str,
+        on_chunk: &dyn Fn(&str) -> bool,
+    ) -> Result<NtLlmReply, NtTaskFusionError> {
+        if self.models.is_empty() {
+            return Err(NtTaskFusionError::Llm("free pool is empty".to_string()));
+        }
+        let (seq, start) = self.order_seq();
+        let mut errors = Vec::new();
+        for (offset, model) in seq.iter().enumerate() {
+            match self.ask_one_stream(model, prompt, on_chunk) {
+                Ok(reply) => {
+                    self.note_success(model, start, offset);
+                    return Ok(reply);
                 }
+                Err(e) => self.note_failure(model, e, &mut errors),
             }
         }
         Err(NtTaskFusionError::Llm(format!(

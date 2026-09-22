@@ -48,10 +48,22 @@ pub use developmental_training::*;
 pub use link_graph_active::*;
 pub mod cross_source;
 pub use cross_source::CrossSourceFusionEngine;
+pub mod nt_db_awakening; // DB 直达觉醒 — knowledge.db → 晶体意识全链路
+pub use nt_db_awakening::{AwakenBudget, AwakenReport, NtDbAwakening};
+pub mod nt_archive_train; // 档案分域流式炼制 — 2209万节点模式沉淀
+pub use nt_archive_train::{ArchiveTrainConfig, ArchiveTrainReport, NtArchiveTrain};
+pub mod nt_train_export; // 记忆 → LLM 训练数据（MiniMind 数据飞轮映射）
+pub use nt_train_export::NtTrainExport;
+pub mod nt_awaken_loop; // 自验证觉醒循环（Voyager 课程 + SEAL ReST EM）
+pub use nt_awaken_loop::{AwakenCycleReport, NtAwakenLoop, VerifyScores};
+pub mod nt_hf_bridge; // HF 开源训练数据 → 晶体摄入桥
+pub use nt_hf_bridge::{HfMemory, NtHfBridge};
+pub mod nt_predict_loop; // FEP 预测误差 → 爬取优先级（AutoExplore 映射）
+pub use nt_predict_loop::NtPredictLoop;
 pub mod nt_crystal_task_fusion; // 晶体任务闭环 — 智能拆解 → LLM问答分发 → JEV融合 → 后续任务
 pub use nt_crystal_task_fusion::{
     NtAnswerCluster, NtCrystalSubtask, NtCrystalTaskLoop, NtFusedAnswer, NtLlmReply,
-    NtScoredAnswer, NtSubtaskRoute, NtTaskFusionError, NtTaskLoopConfig, NtTaskLoopReport, NtLlmAsk,
+    NtProgressSink, NtScoredAnswer, NtSubtaskRoute, NtTaskFusionError, NtTaskLoopConfig, NtTaskLoopReport, NtLlmAsk,
 };
 pub mod nt_crystal_dialogue; // 对话窗口 + 内需循环 — 人机回灌多轮收敛
 pub use nt_crystal_dialogue::{
@@ -64,6 +76,10 @@ mod tests;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+/// save() 并发 tmp 序列号（见 `CrystalCore::save`）
+static SAVE_TMP_SEQ: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 /// 晶体核心根目录
 pub fn crystal_root() -> PathBuf {
@@ -97,26 +113,56 @@ impl CrystalCore {
         }
     }
 
-    /// 从磁盘加载
+    /// 从磁盘加载（R-P0-2：主文件损坏时自动回退到 .bak 快照）
     pub fn load() -> Result<Self, String> {
         let root = crystal_root();
         let path = root.join("crystal.json");
-        let data = std::fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read crystal core: {}", e))?;
-        serde_json::from_str(&data)
-            .map_err(|e| format!("Failed to parse crystal core: {}", e))
+        match std::fs::read_to_string(&path) {
+            Ok(data) => serde_json::from_str(&data)
+                .map_err(|e| format!("Failed to parse crystal core: {}", e)),
+            Err(first_err) => {
+                let bak = root.join("crystal.json.bak");
+                let data = std::fs::read_to_string(&bak).map_err(|_| {
+                    format!("Failed to read crystal core: {}", first_err)
+                })?;
+                serde_json::from_str(&data)
+                    .map_err(|e| format!("Failed to parse crystal core (.bak): {}", e))
+            }
+        }
     }
 
-    /// 保存到磁盘
+    /// 保存到磁盘（R-P0-2：tmp + rename 原子写，旧核轮转为 .bak 快照）
+    ///
+    /// 并发安全：tmp 文件名带 pid + 自增序列，多线程同时 save 不会
+    /// 抢同一个 tmp（否则第二个 rename 会 ENOENT）；`rename` 本身原子，
+    /// 最后落盘者胜，绝不出现半截文件。
     pub fn save(&self) -> Result<(), String> {
         let root = crystal_root();
         std::fs::create_dir_all(&root)
             .map_err(|e| format!("Failed to create crystal dir: {}", e))?;
         let path = root.join("crystal.json");
+        let tmp = root.join(format!(
+            "crystal.json.tmp.{}-{}",
+            std::process::id(),
+            SAVE_TMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        ));
+        let bak = root.join("crystal.json.bak");
         let data = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize crystal: {}", e))?;
-        std::fs::write(&path, data)
-            .map_err(|e| format!("Failed to write crystal: {}", e))
+        std::fs::write(&tmp, data)
+            .map_err(|e| format!("Failed to write crystal tmp: {}", e))?;
+        if path.exists() {
+            match std::fs::rename(&path, &bak) {
+                Ok(()) => {}
+                // 并发 save 时另一线程已搬走 crystal.json：快照已有，直接继续
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => {
+                    return Err(format!("Failed to rotate crystal backup: {}", e))
+                }
+            }
+        }
+        std::fs::rename(&tmp, &path)
+            .map_err(|e| format!("Failed to commit crystal: {}", e))
     }
 
     /// 获取当前状态摘要

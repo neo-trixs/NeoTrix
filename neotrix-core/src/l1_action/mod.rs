@@ -26,6 +26,7 @@ pub mod nt_model_cli; // 模型 CLI 问答桥 → 晶体 NtLlmAsk（外部命令
 pub mod nt_free_pool; // 池免费模型智能调用 → 晶体 NtLlmAsk（轮转+故障转移+冷却）
 pub mod nt_stdin_human; // 终端里的人 → 晶体 NtHumanChannel（窗口回话）
 pub mod nt_dialogue_tui; // 对话终端 TUI 形态 → 晶体 NtHumanChannel（借鉴 Claude/opencode）
+pub mod nt_tui_app; // v2 事件驱动会话应用（工作线程 + 实时渲染 + Esc 取消）
 pub mod nt_core_harness;
 pub mod nt_harness;
 pub mod nt_core_simulate_engine;

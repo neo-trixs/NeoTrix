@@ -155,8 +155,13 @@ fn main() {
     };
 
     // 模型选择回到池子：定点 or 发现免费档进池轮转，兜底默认。
-    // 返回（问答桥，池摘要行）：摘要行喂给 TUI 侧栏/底栏。
-    let (ask, pool_line): (Box<dyn NtLlmAsk>, String) = match &args.model {
+    // 返回（问答桥，池共享句柄，池展示行，选择器模型）：TUI 事件驱动与行式共用。
+    let (ask, pool_arc, pool_lines, picker_models): (
+        std::sync::Arc<dyn NtLlmAsk>,
+        Option<std::sync::Arc<NtFreePoolAsk>>,
+        Vec<String>,
+        Vec<String>,
+    ) = match &args.model {
         Some(m) => {
             let mut op = NtModelCliAsk::new()
                 .with_model(m.clone())
@@ -165,7 +170,12 @@ fn main() {
                 op = op.with_workdir(dir.clone());
             }
             println!("问答模型（定点）：{m}");
-            (Box::new(op), format!("定点 {m}"))
+            (
+                std::sync::Arc::new(op),
+                None,
+                vec![format!("定点 {m}")],
+                vec![m.clone()],
+            )
         }
         None => {
             // 全源统一管理：内置源（本地GGUF/免费云/本地端点）+ opencode实时发现，
@@ -215,7 +225,12 @@ fn main() {
                     op = op.with_workdir(dir.clone());
                 }
                 println!("回退定点免费模型：{FALLBACK_FREE_MODEL}");
-                (Box::new(op), format!("回退 {FALLBACK_FREE_MODEL}"))
+                (
+                    std::sync::Arc::new(op),
+                    None,
+                    vec![format!("回退 {FALLBACK_FREE_MODEL}")],
+                    vec![FALLBACK_FREE_MODEL.to_string()],
+                )
             } else {
                 println!("池免费模型 {} 个轮转调用：{}",
                     cli_ids.len(),
@@ -225,9 +240,17 @@ fn main() {
                 if let Some(dir) = &args.workdir {
                     fp = fp.with_workdir(dir.clone());
                 }
+                let pool_line = format!("cli-free×{}", cli_ids.len());
+                let msgs: Vec<String> = cli_ids
+                    .iter()
+                    .map(|id| format!("池 {id}"))
+                    .collect();
+                let arc = std::sync::Arc::new(fp);
                 (
-                    Box::new(fp),
-                    format!("cli-free×{}", cli_ids.len()),
+                    arc.clone() as std::sync::Arc<dyn NtLlmAsk>,
+                    Some(arc),
+                    std::iter::once(pool_line).chain(msgs).collect(),
+                    cli_ids,
                 )
             }
         }
@@ -237,8 +260,8 @@ fn main() {
         max_subtasks: args.max_subtasks,
         ..NtTaskLoopConfig::default()
     };
-    // 人：TTY 默认全屏 TUI（--line 强制行式；NtTuiHuman 建不起终端也会回退）。
-    // 选中逻辑集中在一处，行式与全屏同协议（NtStdinHuman::parse_lines）。
+    // 人：TTY 默认全屏 TUI（--line 强制行式）。
+    // v2 事件驱动（工作线程 + 实时渲染 + Esc 取消）；终端建失败自动回退 v1 行式。
     use std::io::IsTerminal;
     let use_tui = if args.line {
         false
@@ -248,8 +271,36 @@ fn main() {
         std::io::stdout().is_terminal()
     };
     let outcome = if use_tui {
-        let tui_human = NtTuiHuman::new(pool_line);
-        NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &mut core, ask.as_ref(), &tui_human)
+        let history = Vec::new();
+        match neotrix::l1_action::nt_tui_app::run_tui_session(
+            args.goal.clone(),
+            core,
+            ask.clone(),
+            pool_arc.unwrap_or_else(|| {
+                std::sync::Arc::new(NtFreePoolAsk::new(picker_models.clone()))
+            }),
+            pool_lines.clone(),
+            history,
+            config,
+            args.max_rounds,
+        ) {
+            Ok((outcome, core_back)) => {
+                core = core_back;
+                outcome
+            }
+            Err((e, core_back)) => {
+                core = core_back;
+                eprintln!("TUI 启动失败（{e}），回退行式。");
+                let tui_human =
+                    NtTuiHuman::new(pool_lines.first().cloned().unwrap_or_default());
+                NtInnerLoop::new(config, args.max_rounds).drive(
+                    &args.goal,
+                    &mut core,
+                    ask.as_ref(),
+                    &tui_human,
+                )
+            }
+        }
     } else {
         let human = NtStdinHuman::new();
         NtInnerLoop::new(config, args.max_rounds).drive(&args.goal, &mut core, ask.as_ref(), &human)
