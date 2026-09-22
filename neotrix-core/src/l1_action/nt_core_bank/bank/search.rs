@@ -48,20 +48,6 @@ impl ReasoningBank {
         }
     }
 
-    // Disabled: cosine_similarity not migrated
-    // pub(crate) fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
-    //     let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    //     let norm_a: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
-    //     let norm_b: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
-    //     if norm_a == 0.0 && norm_b == 0.0 {
-    //         return 1.0;
-    //     }
-    //     if norm_a == 0.0 || norm_b == 0.0 {
-    //         return 0.0;
-    //     }
-    //     dot / (norm_a * norm_b)
-    // }
-
     pub fn retrieve_by_wh(&self, query: &str, k: usize) -> Vec<(f64, String)> {
         match self.wh_index {
             Some(ref wh) => wh.search(query, k),
@@ -233,7 +219,8 @@ impl ReasoningBank {
             .filter_map(|&idx| self.memories.get(idx))
             .filter_map(|m| {
                 m.embedding.as_ref().map(|emb| {
-                    let sim = crate::l5_cognition::nt_core_math::cosine_similarity_f64(&query_emb, emb);
+                    let sim =
+                        crate::l0_substrate::nt_core_math::cosine_similarity_f64(&query_emb, emb);
                     (sim, m)
                 })
             })
@@ -278,7 +265,10 @@ impl ReasoningBank {
             .filter_map(|&idx| self.memories.get(idx))
             .filter_map(|m| {
                 m.embedding.as_ref().map(|emb| {
-                    let sim = crate::l5_cognition::nt_core_math::cosine_similarity_f64(task_embedding, emb);
+                    let sim = crate::l0_substrate::nt_core_math::cosine_similarity_f64(
+                        task_embedding,
+                        emb,
+                    );
                     (sim, m)
                 })
             })
@@ -598,7 +588,7 @@ impl ReasoningBank {
                 let mut strength = 0.0;
                 if let Some(ref emb) = mem.embedding {
                     if !other_node.embedding.is_empty() {
-                        strength = crate::l5_cognition::nt_core_math::cosine_similarity_f64(
+                        strength = crate::l0_substrate::nt_core_math::cosine_similarity_f64(
                             emb,
                             &other_node.embedding,
                         );
@@ -633,4 +623,3 @@ impl ReasoningBank {
         nodes.iter().map(|n| n.id.clone()).collect()
     }
 }
-

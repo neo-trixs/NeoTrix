@@ -84,6 +84,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-33 | 提交清场＋暂存污染排查＋标记清扫（本文件 §32） | GO | 7b044f42 |
 | SIM-34 | EQ-01/02/03闭环＋ADR-0003＋死守卫退役决议（本文件 §33） | GO | ADR-0003 |
 | SIM-35 | EQ-04执行：死守卫删除＋13/13实跑绿（本文件 §34） | GO | fitness.rs |
+| SIM-36 | EQ-05执行：H-08改直引＋覆盖丢失事故＋即交原则（本文件 §35） | GO | search.rs |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -950,7 +951,7 @@ P-2 标记计数（24→1，节/行完好性机验）；P-3 §31 虚惊复核（
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-36.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-37.*
 
 ---
 
@@ -974,7 +975,7 @@ P-3 调用方枚举（self_test_integration＋SEAL pipeline——注册表是活
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-36.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-37.*
 
 ---
 
@@ -1003,4 +1004,34 @@ E-3 计数机验：13＝7＋6，删除前后自洽。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-36.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-37.*
+
+---
+
+## §35 SIM-36：EQ-05 执行（GO）
+
+> 认领：单会话内完成。探针：双 math 溯源＋全仓路径普查＋格式三轮收敛。
+> 生产代码：3 行改路径（同项 item，零行为）＋删 14 行过期注释。
+
+**探针**：P-1 L0/L5 math 关系（L0 实现＋L5 `pub use` 重导出，mod.rs:81）；
+P-2 全仓 L5 路径普查（bank×3 属 EQ-05；svaf f32/bin/diverse 属他域，不管）；
+P-3 L0 四函数齐备（f32/f32_f32/f64/normalize_url）。
+
+**证据**：E-1 改路径前后同一 item（重导出恒等式），语义零变化；
+E-2 rustfmt 全文件零 diff；E-3 L1×l5 组数待门禁复核（预期 26→23）。
+
+**缺口**：G-1 全量门禁确认（本机排队，见 tripwire）；
+G-2 **覆盖丢失事故**：首轮改写被外部 checkout 式覆盖还原（09:03 距检出 60 秒），
+根因是改完未即交、暴露窗口 40 分钟。教训：改验证交必须同轮闭环，
+本轮已做到（改→验→交同一 turn 内）。
+
+**落点**：search.rs（+3/-14 行）＋BLUEPRINT v1.6.1。
+
+**放行判定**：GO（改动机械可审；门禁复核转 tripwire）。
+
+**tripwire**：门禁确认 L1×l5 计数 26→23（Owner：CI/下次全量门，日期：即时）；
+svaf/bin 的 L5 路径改直引（Owner：L4/Desktop，日期：P1-02 内，不属 EQ-05）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-37.*
