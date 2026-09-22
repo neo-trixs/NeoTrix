@@ -5,7 +5,7 @@
 
 | # | 项 | 动作（精确） | 关项标准 |
 |---|---|---|---|
-| 1 | CI 点火 | 向 main 建 PR（含 973d7719＋1f7ea5b4 两批代码）；读 check×3OS＋test＋layer-deps 全部门 | 门绿＋基线入库；红则单 commit 还原，当事人文件先查（SIM-47/48） |
+| 1 | CI 点火 | 向 main 建 PR；**先归因后裁决**（SIM-50：sbom/security-scan/audit/evolution 四红属既有；我代码只认 ci.yml check/test 两门）；门绿＋基线入库。**禁直推**：分支 ahead 数十 commits 含他人重写，推前确认归属；env 无 GH_TOKEN，只能人点 | 门绿（分门）＋基线入库；红则单 commit 还原 |
 | 2 | entry 4 行合入 | 属主在其重写分支内重放 hunk（SIM-48 内附精确文本）；或通知代理重放 | hunk 入属主分支，CI 同验 |
 | 3 | ADR-0004 签字 | L5 审 `docs/adr/0004-sdb-fail-closed-flip.md`，proposed→accepted | 状态行改 accepted＋签字人日期 |
 | 4 | EQ-11 签字 | L5 审 `docs/architecture/FITNESS-THRESHOLDS-SIGNOFF.md` 六行 | 签字栏落笔，EQ-11 关 |
