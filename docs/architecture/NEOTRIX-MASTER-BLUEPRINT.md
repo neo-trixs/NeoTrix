@@ -217,8 +217,8 @@ graph LR
 
 | 热点 | 源文件 | 目标层 | 推荐处置 | 对应卡 |
 |------|--------|--------|---------|--------|
-| H-01 | nt_core_task_dispatcher.rs | L2+L5 | 政策/CoT 接口下沉 L0 | NODE-L1 |
-| H-02 | nt_core_bank/* (6 处 TaskType) | L2 | TaskType 下沉 L0 | NODE-L1 |
+| H-01 | ~~nt_core_task_dispatcher.rs~~ | ~~L2+L5~~ | ~~政策/CoT 接口下沉 L0~~ | **归档**（M6：dispatcher 已在 L1，原分类失效） |
+| H-02 | ~~nt_core_bank/* (6 处 TaskType)~~ | ~~L2~~ | ~~TaskType 下沉 L0~~ | **归档**（M6：引用链 L1→L0 合规，非越层） |
 | H-03 | nt_io_web/server+tiles+proxy | L4 | 经 memory Facade，不直引 | NODE-L1 |
 | H-04 | nt_io_hotreload | L3 | 经 shield Facade，不直引 | NODE-L1 |
 | H-05 | nt_media/playback | L2 | source 类型下沉 L0 | NODE-L1 |

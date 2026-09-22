@@ -52,7 +52,18 @@ killmyidea · typesafe-mario · typesafe-mcp · mr-boxington · jev-trader
 （名信号弱；R10 只在 A–G 读完有余量时抽 2–3 验名，否则整体 parked，
 不算跳过——triage 即允许折叠）
 
-## 3. R10 执行约束（先立后读）
+## 3. H类抽验结论（M6，SIM-52）
+
+| 项 | 蓝图分类 | 实际 | 名实 | 判定 |
+|---|---|---|---|---|
+| H-01 | L2+L5→L0 | dispatcher 在 L1（L5 使用，非 L2） | 层号过时 | **归档**——Phase 2 已将 dispatcher 移至 L1，原分类失效 |
+| H-02 | L2（nt_core_bank 6处 TaskType） | TaskType 定义在 L0，nt_core_bank 在 L1，引用链 L1→L0 合规 | 名实不符 | **归档**——引用链合规，非越层 |
+| H-05 | L2（playback source 类型→L0） | playback 在 L1，L2 facade 重导出 | 名实相符 | **保留**——L1→L2 重导出模式仍存在 |
+
+> H-01/H-02 归档后，蓝图 §15 D-02 索引行标注"已归档"，不再参与下沉计数。
+> H-03/04/06/07（Facade 类）仍待 Phase 3 SIM；H-08 仍待 P1-02 首批。
+
+## 4. R10 执行约束（先立后读）
 
 - 另立 SIM（SIM-44 起），沿用九格＋GO/GO-WITH-MITIGATION/NO-GO。
 - 每源上限：README＋关键 1 文件；超限转 P-task，不在本轮深读。
