@@ -43,6 +43,7 @@ use crate::neotrix::nt_jev::{
     NoulAnswer, RiskDecision, RiskTier,
 };
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 // ============================================================================
 // 文本相似度（模块内自包含：中英混合关键词 Jaccard）
@@ -537,13 +538,7 @@ impl NtCrystalTaskLoop {
     ) -> NtTaskLoopReport {
         let subtasks = self.suggest(goal, core);
         let shared = super::SharedMind::new();
-        let (answers, failed) = self.dispatch_parallel(
-            &subtasks,
-            llm,
-            sink,
-            &shared,
-            self.config.overlap_threshold,
-        );
+        let (answers, failed) = self.dispatch_parallel(&subtasks, llm, sink, &shared);
         let fused = self.fuse(&answers);
         let calibration = self.calibrate(&fused);
         let follow_ups = self.follow_ups(goal, &subtasks, &fused, &failed);
@@ -573,16 +568,19 @@ impl NtCrystalTaskLoop {
     ///
     /// - 每个 Reasoning 线程先查 `SharedMind` 重叠：高覆盖则跳过（省 LLM 调用）。
     /// - 每个 Reasoning 线程完成后 `post` 发现到 `SharedMind`。
-    /// - `overlap_threshold`：Jaccard ≥ 此值视为重叠（0.0=禁用, 0.6=默认）。
+    /// - `config.overlap_threshold`：Jaccard ≥ 此值视为重叠（0.0=禁用, 0.6=默认）。
+    /// - `config.max_concurrent`：> 0 时限制并行线程数（超出部分排队）。
     fn dispatch_parallel(
         &self,
         subtasks: &[NtCrystalSubtask],
         llm: &dyn NtLlmAsk,
         sink: Option<&dyn NtProgressSink>,
         shared: &super::SharedMind,
-        overlap_threshold: f64,
     ) -> (Vec<NtScoredAnswer>, Vec<(String, String)>) {
         use std::sync::mpsc;
+
+        let overlap_threshold = self.config.overlap_threshold;
+        let max_concurrent = self.config.max_concurrent;
 
         // 1) Deterministic 子任务：顺序处理（零 LLM 开销）
         let mut answers = Vec::new();
@@ -673,8 +671,18 @@ impl NtCrystalTaskLoop {
         )>();
 
         std::thread::scope(|scope| {
+            // max_concurrent 限流：AtomicUsize 计数 + yield 自旋等待
+            let active = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             for (i, st) in to_run.iter() {
                 let i = *i;
+
+                // 限流：等待活跃线程数 < max_concurrent
+                if max_concurrent > 0 {
+                    while active.load(std::sync::atomic::Ordering::SeqCst) >= max_concurrent {
+                        std::thread::yield_now();
+                    }
+                }
+
                 if let Some(s) = sink {
                     s.on_subtask_start(&st.id, &st.title);
                 }
@@ -684,8 +692,18 @@ impl NtCrystalTaskLoop {
                 let shared = shared.clone();
                 let st = (*st).clone();
                 let sink_ref: Option<&(dyn NtProgressSink + '_)> = sink;
+                let active = active.clone();
 
+                active.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 scope.spawn(move || {
+                    // RAII guard: 线程结束时自动 decrement active count
+                    struct ActiveGuard(Arc<std::sync::atomic::AtomicUsize>);
+                    impl Drop for ActiveGuard {
+                        fn drop(&mut self) {
+                            self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+                        }
+                    }
+                    let _guard = ActiveGuard(active);
                     // panic 安全：单线程 panic 不炸整轮
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         // 注入已有发现作为上下文（避免重复回答）
@@ -1235,6 +1253,52 @@ mod tests {
         }
     }
 
+    /// 带并发度追踪的脚本 LLM（max_concurrent 测试用）。
+    struct ScriptParallelAskWithConcurrency {
+        answers: std::sync::Mutex<Vec<String>>,
+        current: Arc<std::sync::atomic::AtomicUsize>,
+        peak: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl NtLlmAsk for ScriptParallelAskWithConcurrency {
+        fn ask(
+            &self,
+            _prompt: &str,
+        ) -> Result<NtLlmReply, NtTaskFusionError> {
+            let prev = self.current.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            // 更新峰值
+            self.peak.fetch_max(prev, std::sync::atomic::Ordering::SeqCst);
+            // 模拟工作
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            let mut pool = self.answers.lock().unwrap();
+            let text = if pool.is_empty() {
+                "默认答案".to_string()
+            } else {
+                pool.remove(0)
+            };
+            self.current.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(NtLlmReply {
+                text,
+                confidence: 0.8,
+                model: "concurrency-test".to_string(),
+            })
+        }
+    }
+
+    /// 构造 Reasoning 子任务（测试辅助）。
+    fn mk_reasoning(id: &str, question: &str) -> NtCrystalSubtask {
+        NtCrystalSubtask {
+            id: id.to_string(),
+            title: format!("title-{id}"),
+            question: question.to_string(),
+            route: NtSubtaskRoute::Reasoning,
+            route_decision: JevDecision::Noul(NoulAnswer::new(0.8)),
+            confidence: 0.8,
+            provenance: "test".into(),
+            local_answer: None,
+        }
+    }
+
     /// 并行分发 + SharedMind 基础功能验证。
     #[test]
     fn test_dispatch_parallel_basic() {
@@ -1267,7 +1331,7 @@ mod tests {
             "分布式一致性保证数据同步".into(),
         ]);
         let shared = SharedMind::new();
-        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared, 0.6);
+        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared);
         assert_eq!(answers.len(), 2);
         assert!(failed.is_empty());
         // SharedMind 应有 2 条发现
@@ -1278,7 +1342,12 @@ mod tests {
     #[test]
     fn test_dispatch_parallel_overlap_skips() {
         use crate::neotrix::nt_crystal_core::SharedMind;
-        let eng = engine();
+        // 阈值 0.05：中文 Jaccard 天然低，0.05 即可检测同领域重叠
+        let eng = NtCrystalTaskLoop::new(NtTaskLoopConfig {
+            parallel: true,
+            overlap_threshold: 0.05,
+            ..Default::default()
+        });
         let subtasks = vec![
             NtCrystalSubtask {
                 id: "st-1".into(),
@@ -1307,7 +1376,7 @@ mod tests {
         ]);
         let shared = SharedMind::new();
         // 阈值 0.05：中文 Jaccard 天然低，0.05 即可检测同领域重叠
-        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared, 0.05);
+        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared);
         // 只有 st-1 被执行
         assert_eq!(answers.len(), 1);
         assert_eq!(answers[0].subtask_id, "st-1");
@@ -1343,7 +1412,7 @@ mod tests {
         ];
         let llm = ScriptParallelAsk::new(vec!["最佳方案是方案甲".into()]);
         let shared = SharedMind::new();
-        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared, 0.6);
+        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared);
         assert_eq!(answers.len(), 2);
         assert!(failed.is_empty());
         // 确定性答案应来自 crystal-memory
@@ -1373,5 +1442,101 @@ mod tests {
         assert!(!report.answers.is_empty());
         assert!(!report.fused.text.is_empty());
         assert!(report.decisions.contains_key("fused"));
+    }
+
+    /// panic 安全：LLM 线程 panic 不炸整轮，转为 failed 记录。
+    #[test]
+    fn test_dispatch_parallel_panic_safety() {
+        use crate::neotrix::nt_crystal_core::SharedMind;
+        struct PanicAsk;
+        impl NtLlmAsk for PanicAsk {
+            fn ask(&self, _: &str) -> Result<NtLlmReply, NtTaskFusionError> {
+                panic!("boom")
+            }
+        }
+        let eng = NtCrystalTaskLoop::new(NtTaskLoopConfig {
+            parallel: true,
+            overlap_threshold: 0.0, // 禁用重叠检测
+            ..Default::default()
+        });
+        let subtasks = vec![
+            NtCrystalSubtask {
+                id: "st-1".into(),
+                title: "会炸的任务".into(),
+                question: "必炸问题".into(),
+                route: NtSubtaskRoute::Reasoning,
+                route_decision: JevDecision::Noul(NoulAnswer::new(0.8)),
+                confidence: 0.8,
+                provenance: "test".into(),
+                local_answer: None,
+            },
+            NtCrystalSubtask {
+                id: "st-2".into(),
+                title: "正常任务".into(),
+                question: "正常问题".into(),
+                route: NtSubtaskRoute::Reasoning,
+                route_decision: JevDecision::Noul(NoulAnswer::new(0.7)),
+                confidence: 0.7,
+                provenance: "test".into(),
+                local_answer: None,
+            },
+        ];
+        let shared = SharedMind::new();
+        let (answers, failed) = eng.dispatch_parallel(&subtasks, &PanicAsk, None, &shared);
+        // panic 的子任务进 failed，另一个也被 panic 炸了（scope 传播）
+        // 但不会导致进程 abort
+        assert!(failed.len() >= 1);
+        assert!(failed.iter().any(|(_, e)| e.contains("panic") || e.contains("boom")));
+    }
+
+    /// parallel=false 走串行路径。
+    #[test]
+    fn test_run_sequential_path() {
+        let core = seeded_core();
+        let llm = StubAsk::new();
+        let eng = NtCrystalTaskLoop::new(NtTaskLoopConfig {
+            parallel: false,
+            ..Default::default()
+        });
+        let report = eng.run("如何接入支付功能", &core, &llm);
+        assert!(!report.answers.is_empty());
+        assert!(!report.fused.text.is_empty());
+    }
+
+    /// max_concurrent=1 串行执行（并行但实际单线程）。
+    #[test]
+    fn test_dispatch_parallel_max_concurrent_1() {
+        use crate::neotrix::nt_crystal_core::SharedMind;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let eng = NtCrystalTaskLoop::new(NtTaskLoopConfig {
+            parallel: true,
+            max_concurrent: 1,
+            overlap_threshold: 0.0,
+            ..Default::default()
+        });
+        let peak = Arc::new(AtomicUsize::new(0));
+        let current = Arc::new(AtomicUsize::new(0));
+        let peak_clone = peak.clone();
+        let current_clone = current.clone();
+        let llm = ScriptParallelAskWithConcurrency {
+            answers: std::sync::Mutex::new(vec![
+                "答案甲".into(),
+                "答案乙".into(),
+                "答案丙".into(),
+            ]),
+            current: current_clone,
+            peak: peak_clone,
+        };
+        let subtasks = vec![
+            mk_reasoning("s1", "问题一"),
+            mk_reasoning("s2", "问题二"),
+            mk_reasoning("s3", "问题三"),
+        ];
+        let shared = SharedMind::new();
+        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared);
+        assert_eq!(answers.len(), 3);
+        assert!(failed.is_empty());
+        // max_concurrent=1 → 峰值并行度 ≤ 1
+        assert!(peak.load(Ordering::SeqCst) <= 1);
     }
 }

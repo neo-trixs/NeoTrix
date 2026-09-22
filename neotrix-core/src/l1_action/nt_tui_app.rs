@@ -197,6 +197,8 @@ struct WorkingView {
     stream: String,
     started: Instant,
     done_note: Option<String>,
+    /// 完成时间（用于延迟清除）。
+    done_at: Option<Instant>,
 }
 
 /// v2 会话应用（UI 线程拥有）。
@@ -246,6 +248,7 @@ impl NtTuiApp {
                     stream: String::new(),
                     started: Instant::now(),
                     done_note: None,
+                    done_at: None,
                 });
                 self.state.transcript.push(format!("▶ {id} {title}"));
             }
@@ -257,6 +260,7 @@ impl NtTuiApp {
             UiEvent::SubtaskDone { id, ok } => {
                 if let Some(w) = self.active_tasks.iter_mut().find(|w| w.subtask_id == id) {
                     w.done_note = Some(if ok { "✓".to_string() } else { "✗".to_string() });
+                    w.done_at = Some(Instant::now());
                     let tail: String = w
                         .stream
                         .chars()
@@ -272,8 +276,7 @@ impl NtTuiApp {
                         tail.replace('\n', " ")
                     ));
                 }
-                // 清理已完成的子任务（保留5秒后移除）
-                self.active_tasks.retain(|w| w.subtask_id != id || w.done_note.is_none());
+                // 不立即清除——保留完成态供 UI 展示，在 tick 中延迟清除
             }
             UiEvent::Demands { window, demands } => {
                 self.active_tasks.clear();
@@ -287,6 +290,24 @@ impl NtTuiApp {
                 // 终态由主循环直接处理，core 经工作线程 join 交还。
             }
         }
+    }
+
+    /// 清理已完成超过3秒的子任务（每次 tick 调用）。
+    fn tick_cleanup(&mut self) {
+        let _now = Instant::now();
+        self.active_tasks.retain(|w| {
+            w.done_at
+                .map(|t| t.elapsed() < Duration::from_secs(3))
+                .unwrap_or(true)
+        });
+    }
+
+    /// 当前活跃（执行中）子任务数。
+    pub fn active_count(&self) -> usize {
+        self.active_tasks
+            .iter()
+            .filter(|w| w.done_note.is_none())
+            .count()
     }
 
     fn clear_input(&mut self) {
@@ -410,6 +431,8 @@ fn app_main_loop(
                 _ => app.on_event(ev),
             }
         }
+        // 1b. 清理超时完成态
+        app.tick_cleanup();
         if app.quit {
             cancel.store(true, Ordering::SeqCst);
             return;
@@ -750,8 +773,19 @@ fn render_status_app(
     area: ratatui::layout::Rect,
     app: &NtTuiApp,
 ) {
-    let p = Paragraph::new(format!("{} · {}", app.state.status_line(), app.pinned_label()))
-        .style(Style::default().fg(Color::Cyan));
+    let active = app.active_count();
+    let parallel_info = if active > 1 {
+        format!(" · 并行×{active}")
+    } else {
+        String::new()
+    };
+    let p = Paragraph::new(format!(
+        "{} · {}{}",
+        app.state.status_line(),
+        app.pinned_label(),
+        parallel_info,
+    ))
+    .style(Style::default().fg(Color::Cyan));
     f.render_widget(p, area);
 }
 

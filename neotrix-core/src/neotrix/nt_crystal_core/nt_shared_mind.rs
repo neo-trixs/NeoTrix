@@ -102,8 +102,26 @@ impl SharedMind {
     }
 
     /// 发布一条发现（子任务产出后调用）。
+    ///
+    /// 自动去重：若已有高置信度（≥0.7）且 Jaccard ≥ 0.5 的相似发现，则合并
+    /// （保留高置信版本），不重复追加。
     pub fn post(&self, discovery: Discovery) {
-        self.inner.lock().unwrap().facts.push(discovery);
+        let mut inner = self.inner.lock().unwrap();
+        let new_kws = keywords(&discovery.text);
+        for existing in &mut inner.facts {
+            let e_kws = keywords(&existing.text);
+            let j = jaccard(&new_kws, &e_kws);
+            if j >= 0.5 && existing.confidence >= 0.7 {
+                // 保留高置信版本
+                if discovery.confidence > existing.confidence {
+                    existing.text = discovery.text;
+                    existing.confidence = discovery.confidence;
+                    existing.source_id = discovery.source_id;
+                }
+                return;
+            }
+        }
+        inner.facts.push(discovery);
     }
 
     /// 重叠检测：检查目标问题是否已被已有发现覆盖。
@@ -237,12 +255,34 @@ mod tests {
     #[test]
     fn test_concurrent_post() {
         use std::thread;
+        let topics = [
+            "量子纠缠是物理现象",
+            "幂等性在分布式系统中很重要",
+            "深度学习需要大量标注数据",
+            "容器化部署提高了可移植性",
+            "函数式编程强调不可变性",
+            "索引能显著提升数据库查询速度",
+            "消息队列实现了系统间解耦",
+            "负载均衡分散了请求压力",
+            "缓存减少了重复计算开销",
+            "版本控制保障了代码可追溯",
+            "微服务架构降低了耦合度",
+            "持续集成加快了交付速度",
+            "代码审查提升了软件质量",
+            "自动化测试减少了回归风险",
+            "监控告警缩短了故障响应时间",
+            "日志分析帮助定位了根因",
+            "灰度发布降低了上线风险",
+            "蓝绿部署实现了零停机",
+            "熔断机制保护了下游服务",
+            "限流策略防止了系统过载",
+        ];
         let m = SharedMind::new();
         let m2 = m.clone();
         let h = thread::spawn(move || {
             for i in 0..10 {
                 m2.post(Discovery {
-                    text: format!("发现-{i}"),
+                    text: topics[i].to_string(),
                     source_id: format!("st-{i}"),
                     confidence: 0.8,
                 });
@@ -250,12 +290,49 @@ mod tests {
         });
         for i in 10..20 {
             m.post(Discovery {
-                text: format!("发现-{i}"),
+                text: topics[i].to_string(),
                 source_id: format!("st-{i}"),
                 confidence: 0.8,
             });
         }
         h.join().unwrap();
         assert_eq!(m.snapshot().len(), 20);
+    }
+
+    #[test]
+    fn test_post_dedup_merges_similar() {
+        let m = SharedMind::new();
+        // 两条高度相似的发现（Jaccard > 0.5）→ 应去重合并
+        m.post(Discovery {
+            text: "幂等性是指操作可重复执行结果一致".to_string(),
+            source_id: "st-1".to_string(),
+            confidence: 0.8,
+        });
+        m.post(Discovery {
+            text: "幂等性是操作可重复执行结果保持一致".to_string(),
+            source_id: "st-2".to_string(),
+            confidence: 0.9, // 更高置信 → 应替换
+        });
+        let snap = m.snapshot();
+        assert_eq!(snap.len(), 1, "相似发现应去重合并");
+        assert_eq!(snap[0].confidence, 0.9, "应保留高置信版本");
+        assert_eq!(snap[0].source_id, "st-2");
+    }
+
+    #[test]
+    fn test_post_no_dedup_different() {
+        let m = SharedMind::new();
+        // 两条不同领域的发现 → 不去重
+        m.post(Discovery {
+            text: "幂等性是指操作可重复执行".to_string(),
+            source_id: "st-1".to_string(),
+            confidence: 0.8,
+        });
+        m.post(Discovery {
+            text: "量子纠缠是物理现象".to_string(),
+            source_id: "st-2".to_string(),
+            confidence: 0.9,
+        });
+        assert_eq!(m.snapshot().len(), 2);
     }
 }
