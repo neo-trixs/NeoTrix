@@ -263,7 +263,7 @@ impl NtInnerLoop {
         let mut transcript: Vec<String> = Vec::new();
 
         for round in 1..=self.max_rounds {
-            let mut report = engine.run_with_sink(goal, core, llm, sink);
+            let mut report = engine.run_with_sink_parallel(goal, core, llm, sink);
             if !extra.is_empty() {
                 report.answers.extend(extra.iter().cloned());
                 report.fused = engine.fuse(&report.answers);

@@ -493,6 +493,235 @@ impl NtCrystalTaskLoop {
         (answers, failed)
     }
 
+    // ── 2b. 并行分发：多 Reasoning 子任务同时执行，共享 SharedMind ──
+
+    /// 带进度接收器的闭环（并行版本）。
+    ///
+    /// 与 `run_with_sink` 相同语义，但 Reasoning 子任务通过 `thread::scope` 并行执行，
+    /// 共享 `SharedMind` 实时交换发现、检测重叠、避免冗余 LLM 调用。
+    pub fn run_with_sink_parallel(
+        &self,
+        goal: &str,
+        core: &CrystalCore,
+        llm: &dyn NtLlmAsk,
+        sink: Option<&dyn NtProgressSink>,
+    ) -> NtTaskLoopReport {
+        let subtasks = self.suggest(goal, core);
+        let shared = super::SharedMind::new();
+        let (answers, failed) =
+            self.dispatch_parallel(&subtasks, llm, sink, &shared, 0.6);
+        let fused = self.fuse(&answers);
+        let calibration = self.calibrate(&fused);
+        let follow_ups = self.follow_ups(goal, &subtasks, &fused, &failed);
+
+        let mut decisions: JevResultSet = HashMap::new();
+        for st in &subtasks {
+            decisions.insert(st.id.clone(), st.route_decision.clone());
+        }
+        decisions.insert(
+            "fused".to_string(),
+            JevDecision::Noul(fused.verdict.clone()),
+        );
+
+        NtTaskLoopReport {
+            goal: goal.to_string(),
+            subtasks,
+            answers,
+            failed,
+            fused,
+            follow_ups,
+            decisions,
+            calibration,
+        }
+    }
+
+    /// 并行分发：Deterministic 顺序处理，Reasoning 通过 `thread::scope` 并行。
+    ///
+    /// - 每个 Reasoning 线程先查 `SharedMind` 重叠：高覆盖则跳过（省 LLM 调用）。
+    /// - 每个 Reasoning 线程完成后 `post` 发现到 `SharedMind`。
+    /// - `overlap_threshold`：Jaccard ≥ 此值视为重叠（0.0=禁用, 0.6=默认）。
+    fn dispatch_parallel(
+        &self,
+        subtasks: &[NtCrystalSubtask],
+        llm: &dyn NtLlmAsk,
+        sink: Option<&dyn NtProgressSink>,
+        shared: &super::SharedMind,
+        overlap_threshold: f64,
+    ) -> (Vec<NtScoredAnswer>, Vec<(String, String)>) {
+        use std::sync::mpsc;
+
+        // 1) Deterministic 子任务：顺序处理（零 LLM 开销）
+        let mut answers = Vec::new();
+        let mut failed = Vec::new();
+        for st in subtasks {
+            if st.route != NtSubtaskRoute::Deterministic {
+                continue;
+            }
+            match &st.local_answer {
+                Some(text) if !text.trim().is_empty() => {
+                    let conf = st.confidence.clamp(0.0, 1.0).max(0.5);
+                    if let Some(s) = sink {
+                        s.on_subtask_start(&st.id, &st.title);
+                    }
+                    answers.push(NtScoredAnswer {
+                        subtask_id: st.id.clone(),
+                        text: text.clone(),
+                        confidence: conf,
+                        verdict: NoulAnswer::new(conf),
+                        model: "crystal-memory".to_string(),
+                    });
+                    if let Some(s) = sink {
+                        s.on_subtask_done(&st.id, true);
+                    }
+                    // 确定性答案也写入共享心智（供后续并行子任务参考）
+                    shared.post(super::Discovery {
+                        text: text.clone(),
+                        source_id: st.id.clone(),
+                        confidence: conf,
+                    });
+                }
+                _ => {
+                    failed.push((st.id.clone(), "no local answer".to_string()));
+                    if let Some(s) = sink {
+                        s.on_subtask_done(&st.id, false);
+                    }
+                }
+            }
+        }
+
+        // 2) Reasoning 子任务：先过滤重叠，再并行
+        let reasoning: Vec<&NtCrystalSubtask> = subtasks
+            .iter()
+            .filter(|st| st.route == NtSubtaskRoute::Reasoning)
+            .collect();
+
+        if reasoning.is_empty() {
+            return (answers, failed);
+        }
+
+        // 2a) 顺序预过滤：重叠检测（廉价关键词匹配）+ 发布确定性发现
+        //     双向检测：(1) 问题 vs 已发布发现 (2) 问题 vs 已排队子任务
+        //     确保后续并行线程能看到已有发现，避免竞态。
+        let mut to_run: Vec<(usize, &NtCrystalSubtask)> = Vec::new();
+        let mut queued_kws: Vec<HashSet<String>> = Vec::new(); // 已排队子任务的关键词
+        for (i, st) in reasoning.iter().enumerate() {
+            let q_kws = super::SharedMind::keywords_of(&st.question);
+            // 双向重叠检测
+            let overlaps = if overlap_threshold > 0.0 {
+                shared.has_overlap(&st.question, overlap_threshold)
+                    || queued_kws.iter().any(|kws| {
+                        let inter = q_kws.intersection(kws).count() as f64;
+                        let union = (q_kws.len() + kws.len()) as f64 - inter;
+                        union > 0.0 && (inter / union) >= overlap_threshold
+                    })
+            } else {
+                false
+            };
+            if overlaps {
+                if let Some(s) = sink {
+                    s.on_subtask_start(&st.id, &st.title);
+                    s.on_subtask_done(&st.id, true);
+                }
+                continue;
+            }
+            queued_kws.push(q_kws);
+            to_run.push((i, st));
+        }
+
+        if to_run.is_empty() {
+            return (answers, failed);
+        }
+
+        // 2b) 并行执行：线程间共享已过滤的子任务列表
+        let (tx, rx) = mpsc::channel::<(
+            usize,
+            Result<NtScoredAnswer, (String, String)>,
+        )>();
+
+        std::thread::scope(|scope| {
+            for (i, st) in to_run.iter() {
+                let i = *i;
+                if let Some(s) = sink {
+                    s.on_subtask_start(&st.id, &st.title);
+                }
+
+                shared.register_active(&st.id);
+                let tx = tx.clone();
+                let shared = shared.clone();
+                let st = (*st).clone();
+                let sink_ref: Option<&(dyn NtProgressSink + '_)> = sink;
+
+                scope.spawn(move || {
+                    // 注入已有发现作为上下文（避免重复回答）
+                    let context = shared.relevant_context(&st.question, 3);
+                    let enhanced_question = if context.is_empty() {
+                        st.question.clone()
+                    } else {
+                        format!(
+                            "{}\n\n[已有发现供参考，避免重复]\n{}",
+                            st.question,
+                            context.join("\n")
+                        )
+                    };
+
+                    let stream_result = llm.ask_stream(&enhanced_question, &|chunk| {
+                        if let Some(s) = sink_ref {
+                            s.on_answer_chunk(&st.id, chunk);
+                            !s.cancelled()
+                        } else {
+                            true
+                        }
+                    });
+
+                    match stream_result {
+                        Ok(reply) => {
+                            let conf = reply.confidence.clamp(0.0, 1.0);
+                            let answer = NtScoredAnswer {
+                                subtask_id: st.id.clone(),
+                                text: reply.text.clone(),
+                                confidence: conf,
+                                verdict: NoulAnswer::new(conf),
+                                model: reply.model,
+                            };
+                            shared.post(super::Discovery {
+                                text: reply.text,
+                                source_id: st.id.clone(),
+                                confidence: conf,
+                            });
+                            shared.unregister_active(&st.id);
+                            let _ = tx.send((i, Ok(answer)));
+                        }
+                        Err(e) => {
+                            shared.unregister_active(&st.id);
+                            let _ = tx.send((i, Err((st.id.clone(), e.to_string()))));
+                        }
+                    }
+                });
+            }
+
+            drop(tx);
+
+            for (i, result) in rx.into_iter() {
+                match result {
+                    Ok(answer) => {
+                        if let Some(s) = sink {
+                            s.on_subtask_done(&reasoning[i].id, true);
+                        }
+                        answers.push(answer);
+                    }
+                    Err((id, err)) => {
+                        if let Some(s) = sink {
+                            s.on_subtask_done(&id, false);
+                        }
+                        failed.push((id, err));
+                    }
+                }
+            }
+        });
+
+        (answers, failed)
+    }
+
     // ── 3. 融合：置信度加权共识聚类 ──
 
     pub(crate) fn fuse(&self, answers: &[NtScoredAnswer]) -> NtFusedAnswer {
@@ -926,5 +1155,175 @@ mod tests {
         for up in &report.follow_ups {
             assert!(!up.is_empty());
         }
+    }
+
+    // ── 并行分发测试 ──
+
+    /// 脚本 LLM：按顺序返回预设答案，带延迟模拟真实并行。
+    struct ScriptParallelAsk {
+        answers: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl ScriptParallelAsk {
+        fn new(answers: Vec<String>) -> Self {
+            Self {
+                answers: std::sync::Mutex::new(answers),
+            }
+        }
+    }
+
+    impl NtLlmAsk for ScriptParallelAsk {
+        fn ask(
+            &self,
+            _prompt: &str,
+        ) -> Result<NtLlmReply, NtTaskFusionError> {
+            let mut pool = self.answers.lock().unwrap();
+            let text = pool.remove(0);
+            Ok(NtLlmReply {
+                text,
+                confidence: 0.8,
+                model: "parallel-test".to_string(),
+            })
+        }
+    }
+
+    /// 并行分发 + SharedMind 基础功能验证。
+    #[test]
+    fn test_dispatch_parallel_basic() {
+        use crate::neotrix::nt_crystal_core::SharedMind;
+        let eng = engine();
+        let subtasks = vec![
+            NtCrystalSubtask {
+                id: "st-1".into(),
+                title: "子任务一".into(),
+                question: "什么是幂等性".into(),
+                route: NtSubtaskRoute::Reasoning,
+                route_decision: JevDecision::Noul(NoulAnswer::new(0.8)),
+                confidence: 0.8,
+                provenance: "test".into(),
+                local_answer: None,
+            },
+            NtCrystalSubtask {
+                id: "st-2".into(),
+                title: "子任务二".into(),
+                question: "分布式系统一致性".into(),
+                route: NtSubtaskRoute::Reasoning,
+                route_decision: JevDecision::Noul(NoulAnswer::new(0.7)),
+                confidence: 0.7,
+                provenance: "test".into(),
+                local_answer: None,
+            },
+        ];
+        let llm = ScriptParallelAsk::new(vec![
+            "幂等性是多次调用结果相同".into(),
+            "分布式一致性保证数据同步".into(),
+        ]);
+        let shared = SharedMind::new();
+        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared, 0.6);
+        assert_eq!(answers.len(), 2);
+        assert!(failed.is_empty());
+        // SharedMind 应有 2 条发现
+        assert_eq!(shared.snapshot().len(), 2);
+    }
+
+    /// 跳过与重叠：子任务二的问题被子任务一的答案覆盖 → 跳过。
+    #[test]
+    fn test_dispatch_parallel_overlap_skips() {
+        use crate::neotrix::nt_crystal_core::SharedMind;
+        let eng = engine();
+        let subtasks = vec![
+            NtCrystalSubtask {
+                id: "st-1".into(),
+                title: "幂等性定义".into(),
+                question: "什么是幂等性".into(),
+                route: NtSubtaskRoute::Reasoning,
+                route_decision: JevDecision::Noul(NoulAnswer::new(0.9)),
+                confidence: 0.9,
+                provenance: "test".into(),
+                local_answer: None,
+            },
+            NtCrystalSubtask {
+                id: "st-2".into(),
+                title: "幂等性应用".into(),
+                question: "幂等性在 HTTP 中的应用".into(),
+                route: NtSubtaskRoute::Reasoning,
+                route_decision: JevDecision::Noul(NoulAnswer::new(0.8)),
+                confidence: 0.8,
+                provenance: "test".into(),
+                local_answer: None,
+            },
+        ];
+        let llm = ScriptParallelAsk::new(vec![
+            // 只需要 st-1 的答案，st-2 应被跳过
+            "幂等性是指操作可重复执行".into(),
+        ]);
+        let shared = SharedMind::new();
+        // 阈值 0.05：中文 Jaccard 天然低，0.05 即可检测同领域重叠
+        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared, 0.05);
+        // 只有 st-1 被执行
+        assert_eq!(answers.len(), 1);
+        assert_eq!(answers[0].subtask_id, "st-1");
+        assert!(failed.is_empty());
+    }
+
+    /// Deterministic + Reasoning 混合并行。
+    #[test]
+    fn test_dispatch_parallel_mixed() {
+        use crate::neotrix::nt_crystal_core::SharedMind;
+        let eng = engine();
+        let subtasks = vec![
+            NtCrystalSubtask {
+                id: "det-1".into(),
+                title: "晶体经验".into(),
+                question: "基于经验".into(),
+                route: NtSubtaskRoute::Deterministic,
+                route_decision: JevDecision::Noul(NoulAnswer::new(0.9)),
+                confidence: 0.9,
+                provenance: "Solution:1".into(),
+                local_answer: Some("经验方案：按步骤执行".into()),
+            },
+            NtCrystalSubtask {
+                id: "reason-1".into(),
+                title: "推理分析".into(),
+                question: "分析最佳方案".into(),
+                route: NtSubtaskRoute::Reasoning,
+                route_decision: JevDecision::Noul(NoulAnswer::new(0.8)),
+                confidence: 0.8,
+                provenance: "Theory:1".into(),
+                local_answer: None,
+            },
+        ];
+        let llm = ScriptParallelAsk::new(vec!["最佳方案是方案甲".into()]);
+        let shared = SharedMind::new();
+        let (answers, failed) = eng.dispatch_parallel(&subtasks, &llm, None, &shared, 0.6);
+        assert_eq!(answers.len(), 2);
+        assert!(failed.is_empty());
+        // 确定性答案应来自 crystal-memory
+        let det = answers.iter().find(|a| a.model == "crystal-memory");
+        assert!(det.is_some());
+        // 推理答案应来自 parallel-test
+        let reason = answers.iter().find(|a| a.model == "parallel-test");
+        assert!(reason.is_some());
+        // SharedMind 应有 2 条发现
+        assert_eq!(shared.snapshot().len(), 2);
+    }
+
+    /// 并行闭环：run_with_sink_parallel 端到端。
+    #[test]
+    fn test_run_with_sink_parallel_end_to_end() {
+        let core = seeded_core();
+        let llm = ScriptParallelAsk::new(vec![
+            "接入支付需要 API 网关".into(),
+            "支付安全需要加密认证".into(),
+        ]);
+        let report = engine().run_with_sink_parallel(
+            "如何安全接入支付功能",
+            &core,
+            &llm,
+            None,
+        );
+        assert!(!report.answers.is_empty());
+        assert!(!report.fused.text.is_empty());
+        assert!(report.decisions.contains_key("fused"));
     }
 }
