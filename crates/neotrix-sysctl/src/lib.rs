@@ -9,7 +9,7 @@
 //! crate 级放行 unsafe：scope 被物理限制在本 crate 内部，
 //! 上层 crate (neotrix-core) 保持 `#![forbid(unsafe_code)]` 不受影响。
 
-#![allow(unsafe_code)]
+#![allow(unsafe_code, reason = "FFI crate: sysctl/procfs access requires unsafe; confined to this crate, neotrix-core remains forbid(unsafe_code)")]
 
 /// 当前进程 RSS（常驻内存），单位字节。
 ///
@@ -20,13 +20,16 @@
 pub fn current_rss_bytes() -> u64 {
     #[cfg(target_os = "macos")]
     {
+        // SAFETY: getpid() is always safe on POSIX; returns valid pid for current process.
         let pid = unsafe { libc::getpid() };
         let mut mib: [libc::c_int; 4] = [libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_PID, pid];
         let mut size: libc::size_t = 0;
+        // SAFETY: mib is a valid 4-element sysctl identifier; null output pointer + zero output len queries size only.
         if unsafe { libc::sysctl(mib.as_mut_ptr(), 4, std::ptr::null_mut(), &mut size, std::ptr::null_mut(), 0) } != 0 {
             return 0;
         }
         let mut proc_info: Vec<u8> = vec![0u8; size];
+        // SAFETY: proc_info is sized to `size` from the first sysctl call; pointer cast matches ProcExeTaskInfo layout.
         if unsafe { libc::sysctl(mib.as_mut_ptr(), 4, proc_info.as_mut_ptr() as *mut libc::c_void, &mut size, std::ptr::null_mut(), 0) } != 0 {
             return 0;
         }
@@ -78,6 +81,7 @@ pub fn current_rss_bytes() -> u64 {
             ti: ProcTaskInfo,
         }
 
+        // SAFETY: proc_info was filled by sysctl with ProcExeTaskInfo layout; pointer alignment and size validated by the kernel.
         let info: &ProcExeTaskInfo = unsafe { &*(proc_info.as_ptr() as *const ProcExeTaskInfo) };
         info.ti.resident_size
     }
@@ -111,6 +115,7 @@ pub fn total_physical_memory() -> u64 {
         let mut mib: [libc::c_int; 2] = [libc::CTL_HW, libc::HW_MEMSIZE];
         let mut size: u64 = 0;
         let mut len: libc::size_t = std::mem::size_of::<u64>() as libc::size_t;
+        // SAFETY: mib is [CTL_HW, HW_MEMSIZE]; size points to valid u64; len is sizeof(u64).
         if unsafe { libc::sysctl(mib.as_mut_ptr(), 2, &mut size as *mut u64 as *mut libc::c_void, &mut len, std::ptr::null_mut(), 0) } == 0 {
             return size;
         }

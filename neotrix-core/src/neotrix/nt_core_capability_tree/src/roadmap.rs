@@ -162,12 +162,15 @@ pub fn register_roadmap_modules(
     (registered, errors)
 }
 
+/// Result type for roadmap registration: (registered count, warnings).
+type RoadmapResult = Result<(usize, Vec<(String, String)>), Box<dyn std::error::Error>>;
+
 /// 从默认路径加载并注册 roadmap 模块
 ///
 /// 默认路径: `neotrix-core/src/neotrix/nt_core_capability_tree/roadmap_modules.json`
 pub fn register_from_default_path(
     registry: &mut CapabilityRegistry,
-) -> Result<(usize, Vec<(String, String)>), Box<dyn std::error::Error>> {
+) -> RoadmapResult {
     // 相对于 crate root 的路径
     let manifest_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("roadmap_modules.json");
