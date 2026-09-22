@@ -1,9 +1,10 @@
-# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.6)
+# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.7)
 
 > **Status**: Canonical (标准版) | **Date**: 2026-09-21 | **Supersedes**: all prior rule lists as normative source
 > **v1.0.1**: +§0.1 Precedence — 意识指导为先 (SIM-16).
 > **v1.0.2**: Annex B 部分恢复 — R-P111–160 打捞 19+1，31 仍 SUSPENDED (SIM-23).
 > **v1.0.4**: +NTS-D10/F09/E10（API 契约/Judge 去偏/故障注入，SIM-25）.
+> **v1.0.7**: +NTS-F11/E12/E13/G10（provider账本/证据交接/饱和停止/自进化门，SIM-41）.
 > **v1.0.6**: +NTS-F10/E11（策略即代码/Wasm 加固，SIM-38）.
 > **v1.0.5**: +NTS-G09（flag 纪律，SIM-37）.
 > **v1.0.3**: +NTS-E09/D09/B13（红队对子/DORA 基线/孤儿环门，SIM-24）＋ sysctl 特许登记入 Annex B.
@@ -219,6 +220,15 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
   signed bundles verified before load, pinned by content hash; host-function calls
   logged with arguments; capability grants diff-reviewed on every deploy.
   [Verify: hardening checklist + hostile-plugin tests] ← Safeguard/SIM-38
+- **NTS-E12** Evidence-only handoff. Finder and grader are separated roles; only the
+  artifact (PoC/finding) crosses between them, never the finder's narrative.
+  Patch acceptance requires all four: builds, PoC no longer reproduces, suite stays
+  green, and a fresh find pass cannot bypass the fix.
+  [Verify: pipeline stage separation + acceptance record] ← defending-harness/SIM-41
+- **NTS-E13** Saturation stop rule. Every unbounded search loop (fuzz, red-team,
+  discovery scans) declares no-new-N / max-runs / max-time BEFORE starting;
+  the result reports which bound fired.
+  [Verify: loop configs carry the stop rule + fired-bound in output] ← codex-security/SIM-41
 
 ## Part F — Agent Operations (NTS-F)
 
@@ -259,6 +269,10 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
   permit/forbid with default deny; schema-validated; versioned in git and reviewed
   like code. Native `.so` plugin loading is deny-by-default until proven otherwise.
   [Verify: policy files + schema + evaluation tests] ← Cedar/SIM-38
+- **NTS-F11** Provider certification ledger. Every external provider/model seat is
+  recorded: endpoint + version + eval snapshot + expiry. CI fails on expired or
+  unrecorded entries; polarity pairs stay on different families where feasible.
+  [Verify: ledger file + CI expiry check] ← Shimmy/council/SIM-41
 
 ## Part G — Evolution (NTS-G)
 
@@ -293,6 +307,11 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
   critical path (fail-open default + tight timeout); permission checks are NOT flags.
   Start backend: Flagd-style file rules in repo, graduate only on pain.
   [Verify: flag registry with TTLs + kill-switch test log] ← OpenFeature/SIM-37
+- **NTS-G10** Self-evolution gate. Self-modifying artifacts (skills, prompts,
+  policies) change only via bounded edits accepted on strict held-out improvement;
+  rejected edits are buffered and reviewable, never silently dropped. Offline
+  consolidation (sleep-style) runs behind the same gate.
+  [Verify: gate record + rejected-edit buffer] ← SkillOpt/SIM-41
 
 | Legacy | NTS | Notes |
 |--------|-----|-------|

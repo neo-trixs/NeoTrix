@@ -89,6 +89,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-38 | EQ-06执行：TaskType改指正典＋playback递延＋lib门绿（本文件 §37） | GO | bank |
 | SIM-39 | 第八轮吸收：策略/持久化/WASM（本文件 §38） | GO | ROUND8 + NTS 1.0.6 |
 | SIM-40 | EQ-07部分执行：门面/正典改指5处＋结构项递延（本文件 §39） | GO | bank/hive |
+| SIM-41 | 第九轮吸收：技能/审议/防御/路由（本文件 §40） | GO | ROUND9 + NTS 1.0.7 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1158,4 +1159,37 @@ G-4 全量门确认（转 CI）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-41.*
+## §40 SIM-41：第九轮吸收（GO）
+
+> 认领：单会话内完成。探针：全单去重 ~95（8 先读＋8 新读＋2 摘要）＋
+> 本地三处机验（SIM 下号 41／STD 现版 1.0.6／蓝图现版 1.6.5 一致）。
+> 生产代码零改动（文档＋4 条款）。
+
+**探针**：P-1 去重计数（council×4 等 15 组重复，净 ~95）；
+P-2 P0 新读 8（council/AERS/defense-harness/SkillOpt/deepteam/codex-security/LLMRouter/OpenResearch）；
+P-3 摘要 2（2609.10883 imprinting／2609.20800 JEPA）；P-4 版本三处对账一致。
+
+**证据**：E-1 PoC-only 跨越＋四条件补丁验收（defense-harness 实测形态）；
+E-2 饱和停止三元组（codex-security 默认 stopAfterNoNew=3/maxRuns=10/maxTime=1.5h）；
+E-3 held-out 门＋拒收缓冲（SkillOpt 17.3k★，52 格全优）；
+E-4 工作树隔离＋不可变运行归档（OpenResearch，与 .worktrees/ 同构）。
+
+**缺口**：G-1 SEAL 威胁模型＋奖励设计（L5，P-task）；G-2 EQ-08 分发器路由记忆
+（L1，P-task）；G-3 运行归档不可变（P-task）；G-4 R10 P1 批次。
+
+**外部方案**：见 ABSORPTION-ROUND9.md §2–§3（S-48–S-65）＋否决项（托管安全 SaaS/
+原生默认/JEPA 运行时/无门自变异）。
+
+**落点**：ROUND9＋NTS-F11/E12/E13/G10（STD 1.0.7）＋BLUEPRINT v1.6.6。
+
+**蓝图回写**：即本轮（头/志/尾三处同升，机验）。
+
+**放行判定**：GO（版本号三处机验一致；条款计数下轮复核）。
+
+**tripwire**：SEAL 威胁模型启动（Owner：L5，日期：P1-03 内）；
+EQ-08 路由记忆评估（Owner：L1，日期：P1-02 内）；
+R10 P1 批次 triage（Owner：全组，日期：下轮吸收前）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-42.*
