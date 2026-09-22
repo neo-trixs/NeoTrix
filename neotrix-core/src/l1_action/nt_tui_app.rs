@@ -204,7 +204,8 @@ pub struct NtTuiApp {
     state: NtTuiState,
     pool: Arc<NtFreePoolAsk>,
     pool_lines: Vec<String>,
-    working: Option<WorkingView>,
+    /// 并行执行中的子任务（可能多个同时活跃）。
+    active_tasks: Vec<WorkingView>,
     quit: bool,
 }
 
@@ -223,7 +224,7 @@ impl NtTuiApp {
             state,
             pool,
             pool_lines,
-            working: None,
+            active_tasks: Vec::new(),
             quit: false,
         }
     }
@@ -239,7 +240,7 @@ impl NtTuiApp {
     fn on_event(&mut self, ev: UiEvent) {
         match ev {
             UiEvent::SubtaskStart { id, title } => {
-                self.working = Some(WorkingView {
+                self.active_tasks.push(WorkingView {
                     subtask_id: id.clone(),
                     title: title.clone(),
                     stream: String::new(),
@@ -249,27 +250,33 @@ impl NtTuiApp {
                 self.state.transcript.push(format!("▶ {id} {title}"));
             }
             UiEvent::Chunk { id, delta } => {
-                if let Some(w) = self.working.as_mut() {
-                    if w.subtask_id == id {
-                        w.stream.push_str(&delta);
-                    }
+                if let Some(w) = self.active_tasks.iter_mut().find(|w| w.subtask_id == id) {
+                    w.stream.push_str(&delta);
                 }
             }
             UiEvent::SubtaskDone { id, ok } => {
-                if let Some(w) = self.working.as_mut() {
-                    if w.subtask_id == id {
-                        w.done_note = Some(if ok { "✓" .to_string()} else { "✗".to_string() });
-                        let tail: String = w.stream.chars().rev().take(60).collect::<Vec<_>>().into_iter().rev().collect();
-                        self.state.transcript.push(format!(
-                            "■ {id} {} {}",
-                            if ok { "完成" } else { "失败" },
-                            tail.replace('\n', " ")
-                        ));
-                    }
+                if let Some(w) = self.active_tasks.iter_mut().find(|w| w.subtask_id == id) {
+                    w.done_note = Some(if ok { "✓".to_string() } else { "✗".to_string() });
+                    let tail: String = w
+                        .stream
+                        .chars()
+                        .rev()
+                        .take(60)
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .rev()
+                        .collect();
+                    self.state.transcript.push(format!(
+                        "■ {id} {} {}",
+                        if ok { "完成" } else { "失败" },
+                        tail.replace('\n', " ")
+                    ));
                 }
+                // 清理已完成的子任务（保留5秒后移除）
+                self.active_tasks.retain(|w| w.subtask_id != id || w.done_note.is_none());
             }
             UiEvent::Demands { window, demands } => {
-                self.working = None;
+                self.active_tasks.clear();
                 for line in window.lines() {
                     self.state.transcript.push(line.to_string());
                 }
@@ -534,10 +541,12 @@ fn app_slash(app: &mut NtTuiApp) -> bool {
 fn draw_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &NtTuiApp) {
     let _ = terminal.draw(|f| {
         let area = f.area();
-        let has_working = app.working.is_some();
+        let active_count = app.active_tasks.len();
         let mut constraints = vec![Constraint::Min(3)];
-        if has_working {
-            constraints.push(Constraint::Length(5));
+        if active_count > 0 {
+            // 每个活跃子任务一行 + 边框上下各一行
+            let work_height = (active_count as u16 + 2).min(8);
+            constraints.push(Constraint::Length(work_height));
         }
         constraints.push(Constraint::Length(3));
         constraints.push(Constraint::Length(1));
@@ -559,7 +568,7 @@ fn draw_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &Nt
             render_transcript_app(f, rows[0], app);
         }
         row_idx += 1;
-        if has_working {
+        if active_count > 0 {
             render_working(f, rows[row_idx], app);
             row_idx += 1;
         }
@@ -635,30 +644,62 @@ fn render_sidebar_app(
 }
 
 fn render_working(f: &mut ratatui::Frame, area: ratatui::layout::Rect, app: &NtTuiApp) {
-    let (title, body) = match &app.working {
-        Some(w) => {
-            let elapsed = w.started.elapsed().as_millis() as u64;
-            let tail: String = w
-                .stream
-                .chars()
-                .rev()
-                .take(120)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect();
-            let tail = tail.replace('\n', " ");
-            (
-                format!(" 工作中 {} {:.1}s ", spinner_frame(elapsed), elapsed as f64 / 1000.0),
-                format!("{} {}…{}", w.subtask_id, w.title, tail),
-            )
-        }
-        None => (" 工作中 ".to_string(), String::new()),
+    if app.active_tasks.is_empty() {
+        let p = Paragraph::new(Line::from("")).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" 工作中 ")
+                .style(Style::default().fg(Color::Yellow)),
+        );
+        f.render_widget(p, area);
+        return;
+    }
+
+    // 并行度指示 + 各子任务状态
+    let parallelism = app.active_tasks.len();
+    let header = if parallelism > 1 {
+        format!(" 并行×{parallelism} ")
+    } else {
+        " 工作中 ".to_string()
     };
-    let p = Paragraph::new(Line::from(body)).block(
+
+    let mut lines: Vec<Line> = Vec::new();
+    for w in &app.active_tasks {
+        let elapsed = w.started.elapsed().as_millis() as u64;
+        let spin = spinner_frame(elapsed);
+        let tail: String = w
+            .stream
+            .chars()
+            .rev()
+            .take(80)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        let tail = tail.replace('\n', " ");
+        let status_icon = match &w.done_note {
+            Some(s) => s.as_str(),
+            None => "",
+        };
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!(" {spin} "),
+                Style::default().fg(Color::Yellow),
+            ),
+            Span::styled(
+                format!("{} ", w.subtask_id),
+                Style::default().fg(Color::Cyan),
+            ),
+            Span::raw(format!("{} ", w.title)),
+            Span::raw(format!("{} ", status_icon)),
+            Span::styled(tail, Style::default().fg(Color::DarkGray)),
+        ]));
+    }
+
+    let p = Paragraph::new(lines).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(title)
+            .title(header)
             .style(Style::default().fg(Color::Yellow)),
     );
     f.render_widget(p, area);

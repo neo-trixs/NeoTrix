@@ -221,6 +221,12 @@ pub struct NtTaskLoopConfig {
     pub contra_hi: f64,
     pub max_follow_ups: usize,
     pub risk_tier: RiskTier,
+    /// 并行执行 Reasoning 子任务（默认 true）。
+    pub parallel: bool,
+    /// 并行子任务最大并发数（0=不限，由 CPU/模型配额决定）。
+    pub max_concurrent: usize,
+    /// 重叠检测阈值：Jaccard ≥ 此值视为冗余可跳过（0.0=禁用）。
+    pub overlap_threshold: f64,
 }
 
 impl Default for NtTaskLoopConfig {
@@ -233,6 +239,9 @@ impl Default for NtTaskLoopConfig {
             contra_hi: 0.5,
             max_follow_ups: 6,
             risk_tier: RiskTier::Recoverable,
+            parallel: true,
+            max_concurrent: 0,
+            overlap_threshold: 0.6,
         }
     }
 }
@@ -272,6 +281,8 @@ impl NtCrystalTaskLoop {
     }
 
     /// 带进度接收器的闭环（TUI 工作相实时渲染 + Esc 取消走这里）。
+    ///
+    /// `config.parallel = true` 时自动走并行路径。
     pub fn run_with_sink(
         &self,
         goal: &str,
@@ -279,27 +290,10 @@ impl NtCrystalTaskLoop {
         llm: &dyn NtLlmAsk,
         sink: Option<&dyn NtProgressSink>,
     ) -> NtTaskLoopReport {
-        let subtasks = self.suggest(goal, core);
-        let (answers, failed) = self.dispatch(&subtasks, llm, sink);
-        let fused = self.fuse(&answers);
-        let calibration = self.calibrate(&fused);
-        let follow_ups = self.follow_ups(goal, &subtasks, &fused, &failed);
-
-        let mut decisions: JevResultSet = HashMap::new();
-        for st in &subtasks {
-            decisions.insert(st.id.clone(), st.route_decision.clone());
-        }
-        decisions.insert("fused".to_string(), JevDecision::Noul(fused.verdict.clone()));
-
-        NtTaskLoopReport {
-            goal: goal.to_string(),
-            subtasks,
-            answers,
-            failed,
-            fused,
-            follow_ups,
-            decisions,
-            calibration,
+        if self.config.parallel {
+            self.run_with_sink_parallel(goal, core, llm, sink)
+        } else {
+            self.run_with_sink_sequential(goal, core, llm, sink)
         }
     }
 
@@ -495,6 +489,41 @@ impl NtCrystalTaskLoop {
 
     // ── 2b. 并行分发：多 Reasoning 子任务同时执行，共享 SharedMind ──
 
+    /// 串行闭环（向后兼容，config.parallel = false 时走这里）。
+    fn run_with_sink_sequential(
+        &self,
+        goal: &str,
+        core: &CrystalCore,
+        llm: &dyn NtLlmAsk,
+        sink: Option<&dyn NtProgressSink>,
+    ) -> NtTaskLoopReport {
+        let subtasks = self.suggest(goal, core);
+        let (answers, failed) = self.dispatch(&subtasks, llm, sink);
+        let fused = self.fuse(&answers);
+        let calibration = self.calibrate(&fused);
+        let follow_ups = self.follow_ups(goal, &subtasks, &fused, &failed);
+
+        let mut decisions: JevResultSet = HashMap::new();
+        for st in &subtasks {
+            decisions.insert(st.id.clone(), st.route_decision.clone());
+        }
+        decisions.insert(
+            "fused".to_string(),
+            JevDecision::Noul(fused.verdict.clone()),
+        );
+
+        NtTaskLoopReport {
+            goal: goal.to_string(),
+            subtasks,
+            answers,
+            failed,
+            fused,
+            follow_ups,
+            decisions,
+            calibration,
+        }
+    }
+
     /// 带进度接收器的闭环（并行版本）。
     ///
     /// 与 `run_with_sink` 相同语义，但 Reasoning 子任务通过 `thread::scope` 并行执行，
@@ -508,8 +537,13 @@ impl NtCrystalTaskLoop {
     ) -> NtTaskLoopReport {
         let subtasks = self.suggest(goal, core);
         let shared = super::SharedMind::new();
-        let (answers, failed) =
-            self.dispatch_parallel(&subtasks, llm, sink, &shared, 0.6);
+        let (answers, failed) = self.dispatch_parallel(
+            &subtasks,
+            llm,
+            sink,
+            &shared,
+            self.config.overlap_threshold,
+        );
         let fused = self.fuse(&answers);
         let calibration = self.calibrate(&fused);
         let follow_ups = self.follow_ups(goal, &subtasks, &fused, &failed);
@@ -652,29 +686,32 @@ impl NtCrystalTaskLoop {
                 let sink_ref: Option<&(dyn NtProgressSink + '_)> = sink;
 
                 scope.spawn(move || {
-                    // 注入已有发现作为上下文（避免重复回答）
-                    let context = shared.relevant_context(&st.question, 3);
-                    let enhanced_question = if context.is_empty() {
-                        st.question.clone()
-                    } else {
-                        format!(
-                            "{}\n\n[已有发现供参考，避免重复]\n{}",
-                            st.question,
-                            context.join("\n")
-                        )
-                    };
-
-                    let stream_result = llm.ask_stream(&enhanced_question, &|chunk| {
-                        if let Some(s) = sink_ref {
-                            s.on_answer_chunk(&st.id, chunk);
-                            !s.cancelled()
+                    // panic 安全：单线程 panic 不炸整轮
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        // 注入已有发现作为上下文（避免重复回答）
+                        let context = shared.relevant_context(&st.question, 3);
+                        let enhanced_question = if context.is_empty() {
+                            st.question.clone()
                         } else {
-                            true
-                        }
-                    });
+                            format!(
+                                "{}\n\n[已有发现供参考，避免重复]\n{}",
+                                st.question,
+                                context.join("\n")
+                            )
+                        };
 
-                    match stream_result {
-                        Ok(reply) => {
+                        llm.ask_stream(&enhanced_question, &|chunk| {
+                            if let Some(s) = sink_ref {
+                                s.on_answer_chunk(&st.id, chunk);
+                                !s.cancelled()
+                            } else {
+                                true
+                            }
+                        })
+                    }));
+
+                    match result {
+                        Ok(Ok(reply)) => {
                             let conf = reply.confidence.clamp(0.0, 1.0);
                             let answer = NtScoredAnswer {
                                 subtask_id: st.id.clone(),
@@ -691,9 +728,20 @@ impl NtCrystalTaskLoop {
                             shared.unregister_active(&st.id);
                             let _ = tx.send((i, Ok(answer)));
                         }
-                        Err(e) => {
+                        Ok(Err(e)) => {
                             shared.unregister_active(&st.id);
                             let _ = tx.send((i, Err((st.id.clone(), e.to_string()))));
+                        }
+                        Err(panic) => {
+                            shared.unregister_active(&st.id);
+                            let msg = if let Some(s) = panic.downcast_ref::<&str>() {
+                                s.to_string()
+                            } else if let Some(s) = panic.downcast_ref::<String>() {
+                                s.clone()
+                            } else {
+                                "子任务线程 panic".to_string()
+                            };
+                            let _ = tx.send((i, Err((st.id.clone(), msg))));
                         }
                     }
                 });
