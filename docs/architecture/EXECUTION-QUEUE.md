@@ -24,7 +24,7 @@
 | EQ-05 | H-08 math 改直引 L0（首血；原下沉方案已证伪；L1×l5计数26→23已验，全门待CI） | `check-layer-deps` L1×L5 组计数下降＋全量门绿 | L1 | EQ-04 | 🟨 (代码完，待门禁) |
 | EQ-06 | H-02 改指正典＋H-05 递延（原下沉方案证伪过半） | 同上，两组计数下降 | L1 | EQ-05 | 🟩 (L1×l2 34→27＋lib门绿；playback递延有据) | ⬜ |
 | EQ-07 | Facade 类（H-03/04/06）走门面 | 同上，三组计数下降 | L1/L3 | EQ-06 | 🟨 (机械 5 处完，server/hotreload/lead 递延有据) |
-| EQ-08 | dispatcher policy 类（H-01，最后） | L1×L2/L5 计数下降 | L1/L5 | EQ-07 | 🟨 (SIM-42：实结构引用，改指/下沉皆证伪；B06 时限 allowlist 至 2026-10-31＋P1-02 构造注入递延) |
+| EQ-08 | dispatcher policy 类（H-01，最后） | L1×L2/L5 计数下降 | L1/L5 | EQ-07 | 🟨 (SIM-42 allowlist 至 2026-10-31；SIM-43 API 草案 D-1~D-6 已定：with_cot 缝＋Crt 走 trait＋降级可观测＋τ 配置化[0.65,1.0]＋路由记忆；待 Phase 2 可构建窗口) |
 
 ## T3. SDB 烘焙设计（与 T2 并行，不早于此）
 

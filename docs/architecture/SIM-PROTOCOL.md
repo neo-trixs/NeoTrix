@@ -91,6 +91,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-40 | EQ-07部分执行：门面/正典改指5处＋结构项递延（本文件 §39） | GO | bank/hive |
 | SIM-41 | 第九轮吸收：技能/审议/防御/路由（本文件 §40） | GO | ROUND9 + NTS 1.0.7 |
 | SIM-42 | EQ-08~12＋T3 并行执行轮（本文件 §41） | GO-WITH-MITIGATION | SDB v0.6 + hook |
+| SIM-43 | P1-02 门面 API 设计：dispatcher 注入缝（本文件 §42） | GO (设计) | API 草案 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1230,4 +1231,45 @@ EQ-11 签字追踪（Owner：L5，日期：P1-03 内）；
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-43.*
+## §42 SIM-43：P1-02 门面 API 设计（GO，设计态）
+
+> 认领：单会话内完成。探针：构造位全枚举（只读）＋既有缝盘点＋阈值配置化。
+> 生产代码零改动（设计先行，实现待可构建窗口＋独立 SIM）。
+
+**探针**：P-1 构造位 4 处：`new()` L183 直构 `DefaultCoTGenerator::new`；
+`decompose_task` L271 直构 `CrtPlan::new`＋`decompose()`；
+`with_kernel/with_e8_policy` L211/217（缝已存在，仅持有）；
+`execute_single_sub_task` L687 直调 L2 `predictor_load/persist`。
+P-2 既有缝：`reasoning_engine: Option<Box<dyn ReasoningEngineProvider>>`＋
+`with_reasoning_engine` L205，文件内注释已明示“L1 不直接依赖 L5 具体类型”——
+作者留过门，只是 CoT/Crt/ predictor 三处没走。
+P-3 配置化点：`DispatcherConfig` 已有 from_env 七键，τ=0.65 系字面量（L700 实证）。
+
+**证据**：E-1 注入缝 precedent 在文件内（trait object builder）；
+E-2 `kernel.is_some()` 已是 VP-1 合取项——缺失注入天然可观测；
+E-3 τ 环境键缺失是 V-3 可调阈值要求的具体缺口。
+
+**API 草案（Phase 2 实现契约）**：
+D-1 `with_cot_generator()` 新增；`new()` 不再直构（None＋log 记录缺席进 dispatch 日志）。
+D-2 Crt 规划走 `ReasoningEngineProvider` 扩展方法；`CrtTimeScale→hexagram` 映射留 L1
+（确定性域逻辑，非认知构造）。
+D-3 E8/Kernel 保持持有＋builder；缺席＝降级模式（VP 谓词记 false＋reason，可见性代替阻断）。
+D-4 L2 predictor 抽 `PredictorStore {load,persist}` 缝注入；缺席则 VP-2 跳过＋记录。
+D-5 `DispatcherConfig.confidence_threshold` 默认 0.65＋`NEOTRIX_DISPATCH_CONFIDENCE` 键，
+钳位 [0.65, 1.0]（V-3：只许调严，调松需 ADR＋安全签字）。
+D-6 路由记忆（R9 tripwire 收敛）：dispatch 日志累积 `{task_sig, confidence, class, decision}`；
+top-k 相似历史调制单任务 aggression；与不可变运行归档互引（LLMRouter＋OpenResearch 共振）。
+
+**缺口**：G-1 Phase 2 实现＋layer-deps dispatcher 计数归零＋单测绿（可构建窗口＋独立 SIM）；
+G-2 Phase 3 allowlist 退役（2026-10-31 前）。
+
+**落点**：本草案＋EQ-08 追记＋BLUEPRINT v1.6.8。
+
+**放行判定**：GO（设计态；任何代码实现另立 SIM，否则按无 SIM 编码论处）。
+
+**tripwire**：Phase 2 启动（Owner：L1/L5，条件：可构建窗口）；
+allowlist 倒计时延续（Owner：L1/L5，每周复核）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-44.*
