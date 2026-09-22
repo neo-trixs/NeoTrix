@@ -1,7 +1,8 @@
 # NeoTrix 总蓝图：按图施工手册
 
-> **版本**: 1.6.10 | **日期**: 2026-09-22 | **状态**: 可执行 (Executable)
-> **变更记**: v1.6.10 第十一轮吸收（零条款决议＋SEAL 骨架＋桌面 checklist 增补；SIM-45 建档）。
+> **版本**: 1.6.11 | **日期**: 2026-09-22 | **状态**: 可执行 (Executable)
+> **变更记**: v1.6.11 第十二轮吸收（余项扫尾＋EQ-17 成本纪律；SIM-46 建档）。
+> v1.6.10 第十一轮吸收（零条款决议＋SEAL 骨架＋桌面 checklist 增补；SIM-45 建档）。
 > v1.6.9 第十轮吸收（agentic 工作流纪律；SIM-44 建档）。
 > v1.6.8 P1-02 门面 API 设计（dispatcher 注入缝 D-1~D-6＋路由记忆；SIM-43 建档）。
 > v1.6.7 EQ-08~12＋T3 执行轮（dispatcher 有据递延＋SDB v0.6＋hook advisory；SIM-42 建档）。
@@ -842,4 +843,4 @@ graph TD
 
 ---
 
-*End of Master Blueprint v1.6.10*
+*End of Master Blueprint v1.6.11*

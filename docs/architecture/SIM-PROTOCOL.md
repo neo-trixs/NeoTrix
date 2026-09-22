@@ -94,6 +94,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-43 | P1-02 门面 API 设计：dispatcher 注入缝（本文件 §42） | GO (设计) | API 草案 |
 | SIM-44 | 第十轮吸收：compaction/路由/安全/技能（本文件 §43） | GO | ROUND10 + NTS 1.0.8 |
 | SIM-45 | 第十一轮吸收：meta-skill/编排/MCP/桌面（本文件 §44） | GO | ROUND11 + BP v1.6.10 |
+| SIM-46 | 第十二轮吸收：余项扫尾（本文件 §45） | GO | ROUND12 + BP v1.6.11 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1338,4 +1339,35 @@ R12 立项（Owner：全组，日期：下轮吸收前）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-46.*
+## §45 SIM-46：第十二轮吸收（GO）
+
+> 认领：单会话内完成。探针：余项 6 读封顶（5 实读＋Exegol 双失败永久折叠）＋
+> 本地三处机验（SIM 下号 46／STD 现版 1.0.8／蓝图现版 1.6.10 一致）。
+> 生产代码零改动（文档＋0 条款；STD 停 1.0.8 三轮决议）。
+
+**探针**：P-1 RE IDE（Engine trait／grounded 引用／eval 独立二进制／懒分析＋降级）；
+P-2 安全全景（扫描器矩阵／pinning／memory guard／flight recorder／凭据占位）；
+P-3 具身＋抓取＋工作区（模块切换／独白透明／strip 注入／AutoThrottle／issue 钉证据／license 警告）；
+P-4 Exegol 双失败折叠；P-5 版本三处对账一致。
+
+**证据**：E-1 Engine trait 与 SIM-43 D-2 同构（独立佐证）；
+E-2 eval-binary 形态可直接写入 EQ-17 工单（成本纪律）；
+E-3 Exegol 两次传输失败记录在案（未读不判）。
+
+**缺口**：G-1 H 类维持折叠；G-2 R13（需新 P0 出现，否则不开轮）；
+G-3 SEAL 采购单取用（P-task L5）；G-4 本地 judge（P-task 延续）。
+
+**外部方案**：见 ABSORPTION-ROUND12.md §2（S-77b–S-84）＋否决项（未读不判/云 judge/新 SaaS/H 类）。
+
+**落点**：ROUND12＋BLUEPRINT v1.6.11（STD 停 1.0.8）。
+
+**蓝图回写**：即本轮（头/志/尾三处同升，机验）。
+
+**放行判定**：GO（版本号三处机验一致；条款计数下轮复核）。
+
+**tripwire**：SEAL 采购单取用（Owner：L5，日期：P1-03 内）；
+R13 门禁：新 P0 出现才开轮（Owner：全组，持续）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-47.*

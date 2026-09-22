@@ -48,7 +48,7 @@
 | EQ-14 | 覆盖率 70→80 烘焙 | fail-under-lines 提到 80 且门绿 | QA | P2 启动 | ⬜ |
 | EQ-15 | bench 基线＋翻转 | gh-pages 基线满 1 周 → fail-on | Perf | P3 启动 | ⬜ |
 | EQ-16 | vet／Scorecard／SLSA／dist | 烘焙计划逐项关 | Security | P3 启动 | ⬜ |
-| EQ-17 | fuzz／toxics／AgentHarm 首跑 | 首 harness＋首 toxic＋首对子 | SRE/L3 | P3 启动 | ⬜ |
+| EQ-17 | fuzz／toxics／AgentHarm 首跑 | 首 harness＋首 toxic＋首对子 | SRE/L3 | P3 启动 | ⬜ (R12 成本纪律：eval-run 须是独立 binary 非 test——cargo test 永不花钱；recurse 同构；SIM-46) |
 | EQ-18 | Tauri 独立审计 | 审计报告＋问题清单 | Desktop | M2 | 🟨 (范围已定：main 8 行/conf 82 行/capabilities default.json/permissions neotrix_commands.toml/plugins 2＋src ~30（vault/ipc/commands/browser_host/anthropic/db_pool/agent_identity/autostart…）；checklist＝IPC 暴露面/capability 最小权限/vault 密钥/browser_host 外联/错误外泄；R11 增补见 ROUND11 §2 桌面段（ref 永不擅选/headless 默认/loopback/Keychain/零遥测）；待主＋报告) |
 | EQ-19 | FULL-ARCHITECTURE 认领 | 有主（人＋日期） | Architect | M2 | 🟨 (scope 已定：801 行 v1.0.0(09-20) vs 蓝图 v1.6.7 差 6 代；提案：Architect 09-30 前认领并三选一 同步/归档/重写；待批) |
 | EQ-20 | R-P112–115 重议＋ARCHITECTURE.md 重写 | 会议纪要＋新版／归档 | Architect | NT-STD-1.1 | ⬜ |
