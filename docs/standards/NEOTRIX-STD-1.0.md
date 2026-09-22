@@ -1,9 +1,10 @@
-# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.7)
+# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.8)
 
 > **Status**: Canonical (标准版) | **Date**: 2026-09-21 | **Supersedes**: all prior rule lists as normative source
 > **v1.0.1**: +§0.1 Precedence — 意识指导为先 (SIM-16).
 > **v1.0.2**: Annex B 部分恢复 — R-P111–160 打捞 19+1，31 仍 SUSPENDED (SIM-23).
 > **v1.0.4**: +NTS-D10/F09/E10（API 契约/Judge 去偏/故障注入，SIM-25）.
+> **v1.0.8**: +NTS-F12（agentic 工作流纪律，SIM-44）.
 > **v1.0.7**: +NTS-F11/E12/E13/G10（provider账本/证据交接/饱和停止/自进化门，SIM-41）.
 > **v1.0.6**: +NTS-F10/E11（策略即代码/Wasm 加固，SIM-38）.
 > **v1.0.5**: +NTS-G09（flag 纪律，SIM-37）.
@@ -273,6 +274,11 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
   recorded: endpoint + version + eval snapshot + expiry. CI fails on expired or
   unrecorded entries; polarity pairs stay on different families where feasible.
   [Verify: ledger file + CI expiry check] ← Shimmy/council/SIM-41
+- **NTS-F12** Agentic workflow discipline. Orchestration lives in code; models serve
+  bounded typed judgments only. Thresholds and routing policy are code constants,
+  not prompt prose. Workflow layers depend downward only (checked by script).
+  Findings are review prompts, never proof — promotion requires independent verification.
+  [Verify: workflow files + direction check + verification record] ← jev-review/SIM-44
 
 ## Part G — Evolution (NTS-G)
 

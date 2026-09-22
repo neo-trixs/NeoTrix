@@ -92,6 +92,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-41 | 第九轮吸收：技能/审议/防御/路由（本文件 §40） | GO | ROUND9 + NTS 1.0.7 |
 | SIM-42 | EQ-08~12＋T3 并行执行轮（本文件 §41） | GO-WITH-MITIGATION | SDB v0.6 + hook |
 | SIM-43 | P1-02 门面 API 设计：dispatcher 注入缝（本文件 §42） | GO (设计) | API 草案 |
+| SIM-44 | 第十轮吸收：compaction/路由/安全/技能（本文件 §43） | GO | ROUND10 + NTS 1.0.8 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1272,4 +1273,37 @@ allowlist 倒计时延续（Owner：L1/L5，每周复核）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-44.*
+## §43 SIM-44：第十轮吸收（GO）
+
+> 认领：单会话内完成。探针：R10 triage P0 短名单 8/8 深读（README＋关键行为摘录）＋
+> 本地三处机验（SIM 下号 44／STD 现版 1.0.7／蓝图现版 1.6.8 一致）。
+> 生产代码零改动（文档＋1 条款，预算 ≤2 用 1）。
+
+**探针**：P-1 compaction 双子（never-rewrite＋τ=0.5 keep/drop／reduction 门／模型输出永不执行）；
+P-2 路由＋扫描（dossier/replay 分离／fail-open＋kill-switch／双轮 0.35-0.85-0.6-0.7／永不执行目标）；
+P-3 技能＋本地 judge（maturity 标签／trust 五问／meta-skill 闭环／未校准声明／checkpoint 信任警告）；
+P-4 能力层＋评审流（有序后端＋真实探测＋doctor／编排在代码＋层向下＋finding 非定罪）；
+P-5 版本三处对账一致。
+
+**证据**：E-1 编排在代码＋阈值为常量（jev-review 可机验形态：check-dependencies 脚本）；
+E-2 dossier/replay 分离与 SIM-43 D-1~D-6 同构（独立佐证）；
+E-3 SEAL 候选阈值四数＋未校准声明（诚实口径，可直接入 ledger）。
+
+**缺口**：G-1 本地 judge 引擎评估（P-task）；G-2 supply-iocs 语义扩展（P-task）；
+G-3 SEAL ledger 阈值校准（P-task L5）；G-4 R10 A–G 余项＋R11（下轮 SIM）。
+
+**外部方案**：见 ABSORPTION-ROUND10.md §2（S-66–S-73）＋否决项（云 judge 依赖/
+全量翻转/H 类/新 SaaS）。
+
+**落点**：ROUND10＋NTS-F12（STD 1.0.8）＋BLUEPRINT v1.6.9。
+
+**蓝图回写**：即本轮（头/志/尾三处同升，机验）。
+
+**放行判定**：GO（版本号三处机验一致；条款计数下轮复核）。
+
+**tripwire**：本地 judge 评估启动（Owner：L5，日期：P1-03 内）；
+R11 立项（Owner：全组，日期：下轮吸收前）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-45.*

@@ -1,7 +1,8 @@
 # NeoTrix 总蓝图：按图施工手册
 
-> **版本**: 1.6.8 | **日期**: 2026-09-22 | **状态**: 可执行 (Executable)
-> **变更记**: v1.6.8 P1-02 门面 API 设计（dispatcher 注入缝 D-1~D-6＋路由记忆；SIM-43 建档）。
+> **版本**: 1.6.9 | **日期**: 2026-09-22 | **状态**: 可执行 (Executable)
+> **变更记**: v1.6.9 第十轮吸收（agentic 工作流纪律；SIM-44 建档）。
+> v1.6.8 P1-02 门面 API 设计（dispatcher 注入缝 D-1~D-6＋路由记忆；SIM-43 建档）。
 > v1.6.7 EQ-08~12＋T3 执行轮（dispatcher 有据递延＋SDB v0.6＋hook advisory；SIM-42 建档）。
 > v1.6.6 第九轮吸收（provider账本/证据交接/饱和停止/自进化门；SIM-41 建档）。
 > v1.6.5 EQ-07 部分执行（门面/正典改指 5 文件＋结构项有据递延；SIM-40 建档）。
@@ -840,4 +841,4 @@ graph TD
 
 ---
 
-*End of Master Blueprint v1.6.8*
+*End of Master Blueprint v1.6.9*
