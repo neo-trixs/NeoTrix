@@ -25,7 +25,7 @@
 //! - 生产代码无 `unwrap/expect/panic`。
 
 use crate::l1_action::nt_stdin_human::NtStdinHuman;
-use crate::neotrix::nt_crystal_core::{NtDemand, NtHumanChannel, NtHumanReply};
+use crate::neotrix::nt_crystal_core::{NtDemand, NtDemandKind, NtHumanChannel, NtHumanReply};
 use std::sync::Mutex;
 
 use crossterm::{
@@ -92,12 +92,13 @@ impl NtTuiState {
         }
     }
 
-    /// 底栏 status line（Claude 式）：轮次·内需·置信·模型·键位。
+    /// 底栏 status line（Claude 式）：轮次·内需·置信·模型·已收集·键位。
     pub fn status_line(&self) -> String {
         format!(
-            "第{}轮 · 内需{} · {} · {} · Enter提交 空回结束 Esc结束 Ctrl+O详情 F2侧栏 ?帮助",
+            "第{}轮 · 内需{} · 已收集{} · {} · {} · Enter提交 空回结束 Esc结束 Ctrl+O详情 F2侧栏 ?帮助",
             self.round_no,
             self.demands.len(),
+            self.collected.len(),
             if self.fused_line.is_empty() {
                 "暂无结论".to_string()
             } else {
@@ -112,6 +113,7 @@ impl NtTuiState {
     }
 
     /// 侧栏行（opencode 式折叠区 meanings）：结论 / 内需单 / 池。
+    /// 需求单行走 `demand_row_text`（渲染侧再套 `demand_style` 配色）。
     pub fn sidebar_lines(&self) -> Vec<String> {
         let mut out = vec![format!(
             "融合：{}",
@@ -123,15 +125,35 @@ impl NtTuiState {
         )];
         out.push(format!("内需（{}）：", self.demands.len()));
         for d in &self.demands {
-            if self.show_details {
-                out.push(format!("[{}] {}：{}", d.id, d.kind.label(), d.text));
-            } else {
-                out.push(format!("[{}] {}", d.id, d.kind.label()));
-            }
+            out.push(demand_row_text(d, self.show_details));
         }
         out.push(format!("池：{}", self.pool_line));
         out
     }
+}
+
+/// 需求单行文本（纯函数，侧栏与测试共用）。
+pub fn demand_row_text(d: &NtDemand, detailed: bool) -> String {
+    if detailed {
+        format!("[{}] {}：{}", d.id, d.kind.label(), d.text)
+    } else {
+        format!("[{}] {}", d.id, d.kind.label())
+    }
+}
+
+/// 需求单配色（自有进化特性：kind 即 JEV 式紧急度语义）。
+/// 复核=黄（待审），重试=红（失败），裁决=品红（冲突），
+/// 核查=青（求证），确认=蓝（待定），其他=灰。
+pub fn demand_style(kind: NtDemandKind) -> Style {
+    let fg = match kind {
+        NtDemandKind::ReviewFusion | NtDemandKind::RecheckLowConf => Color::Yellow,
+        NtDemandKind::RetryFailed => Color::Red,
+        NtDemandKind::Adjudicate => Color::Magenta,
+        NtDemandKind::RecheckMinority => Color::Cyan,
+        NtDemandKind::ConfirmSkipped => Color::Blue,
+        NtDemandKind::Other => Color::Gray,
+    };
+    Style::default().fg(fg)
 }
 
 /// 从窗口文本按前缀取行（render() 格式的逆操作）。
@@ -390,11 +412,26 @@ fn render_transcript(
 }
 
 fn render_sidebar(f: &mut ratatui::Frame, area: ratatui::layout::Rect, state: &NtTuiState) {
-    let items: Vec<ListItem> = state
-        .sidebar_lines()
-        .into_iter()
-        .map(|l| ListItem::new(Line::from(l)))
-        .collect();
+    let mut items: Vec<ListItem> = Vec::new();
+    items.push(ListItem::new(Line::from(format!(
+        "融合：{}",
+        if state.fused_line.is_empty() {
+            "（暂无）".to_string()
+        } else {
+            state.fused_line.clone()
+        }
+    ))));
+    items.push(ListItem::new(Line::from(format!(
+        "内需（{}）：",
+        state.demands.len()
+    ))));
+    for d in &state.demands {
+        items.push(ListItem::new(Line::from(vec![Span::styled(
+            demand_row_text(d, state.show_details),
+            demand_style(d.kind),
+        )])));
+    }
+    items.push(ListItem::new(Line::from(format!("池：{}", state.pool_line))));
     let list = List::new(items).block(
         Block::default()
             .borders(Borders::ALL)
@@ -412,8 +449,11 @@ fn render_input(f: &mut ratatui::Frame, area: ratatui::layout::Rect, state: &NtT
     } else {
         Span::raw(state.input.clone())
     };
-    let p = Paragraph::new(Line::from(vec![Span::raw("> "), hint]))
-        .block(Block::default().borders(Borders::ALL).title(" 回复 "));
+    let p = Paragraph::new(Line::from(vec![Span::raw("> "), hint])).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" 回复（已收集{}） ", state.collected.len())),
+    );
     f.render_widget(p, area);
 }
 
@@ -571,5 +611,33 @@ mod tests {
             TuiKeyOutcome::Continue
         );
         assert!(s.show_help);
+    }
+
+    #[test]
+    fn test_demand_row_and_style() {
+        let d = demand("retry-1");
+        assert_eq!(
+            demand_row_text(&d, false),
+            "[retry-1] 失败重试".to_string()
+        );
+        assert!(demand_row_text(&d, true).contains("重试子任务"));
+        assert_eq!(demand_style(NtDemandKind::RetryFailed).fg, Some(Color::Red));
+        assert_eq!(
+            demand_style(NtDemandKind::ReviewFusion).fg,
+            Some(Color::Yellow)
+        );
+        assert_eq!(
+            demand_style(NtDemandKind::Adjudicate).fg,
+            Some(Color::Magenta)
+        );
+        assert_eq!(demand_style(NtDemandKind::Other).fg, Some(Color::Gray));
+    }
+
+    #[test]
+    fn test_status_shows_collected() {
+        let mut s = state();
+        assert!(s.status_line().contains("已收集0"));
+        s.collected.push("ok retry-1".to_string());
+        assert!(s.status_line().contains("已收集1"));
     }
 }
