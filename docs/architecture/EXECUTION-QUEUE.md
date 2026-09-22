@@ -37,7 +37,7 @@
 
 | ID | 任务 | 完成定义 | Owner | 前置 | 状态 |
 |----|------|---------|-------|------|------|
-| EQ-11 | 其余 4 fitness 阈值拍板 | L5 书面签字（数字＋理由） | L5 | 无（可并行） | 🟨 (提案备齐待签：NoCycle 0 环／Capability 0 重边／TreeSingleton ≤1 实例点／DeadCode 0 警告＋禁 crate 级 allow；PanicDensity 3000·12.0 与 B2 已有数；SIM-42 §41) |
+| EQ-11 | 其余 4 fitness 阈值拍板 | L5 书面签字（数字＋理由） | L5 | 无（可并行） | 🟨 (签字单已备 `FITNESS-THRESHOLDS-SIGNOFF.md`：6 行数字＋理由＋签字栏；ADR-0004 翻转路径 proposed 同批；待签) |
 | EQ-12 | pre-commit 增强落地 | doc-drift／confidence 本地可跑 | Infra | EQ-11 | 🟨 (doc-drift advisory 已接（bash -n 过，随本轮提交实跑）；confidence 系 cargo 侧，待全量门；SIM-42) |
 | EQ-13 | P0 独占重验（check --tests 全绿） | 门绿＋新基线入库 | QA | 独占窗口 | 🟨 (工单备齐待跑：本机无 gh 且 CI 无 dispatch，触发＝向 main 建 PR；CI 自带 check×3OS＋test＋layer-deps；步骤：建 PR→读全部门→基线入库→关 EQ-05/07/12 尾巴；待执行) |
 
