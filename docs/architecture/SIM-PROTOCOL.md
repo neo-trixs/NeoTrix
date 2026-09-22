@@ -87,6 +87,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-36 | EQ-05执行：H-08改直引＋覆盖丢失事故＋即交原则（本文件 §35） | GO | search.rs |
 | SIM-37 | 第七轮吸收：旗标/签名/行为扫描（本文件 §36） | GO | ROUND7 + NTS 1.0.5 |
 | SIM-38 | EQ-06执行：TaskType改指正典＋playback递延＋lib门绿（本文件 §37） | GO | bank |
+| SIM-39 | 第八轮吸收：策略/持久化/WASM（本文件 §38） | GO | ROUND8 + NTS 1.0.6 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -953,7 +954,7 @@ P-2 标记计数（24→1，节/行完好性机验）；P-3 §31 虚惊复核（
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -977,7 +978,7 @@ P-3 调用方枚举（self_test_integration＋SEAL pipeline——注册表是活
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1006,7 +1007,7 @@ E-3 计数机验：13＝7＋6，删除前后自洽。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1036,7 +1037,7 @@ svaf/bin 的 L5 路径改直引（Owner：L4/Desktop，日期：P1-02 内，不�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1069,7 +1070,7 @@ Flagd 首旗（Owner：L5，日期：SDB 翻转日）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
 
 ---
 
@@ -1099,4 +1100,37 @@ playback 设计启动（Owner：L2，日期：P1-02 内）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-39.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
+
+---
+
+## §38 SIM-39：第八轮吸收（GO）
+
+> 认领：单会话内完成。探针：3 组外部搜索（1 组传输失败转既定知识＋标注）＋
+> 本地三处机验。生产代码零改动（文档＋2 条款）。
+
+**探针**：P-1 Cedar 全家桶（语言＋Rust crates＋Atlas 2025＋42–60x）；
+P-2 WASM 现状（wasmtime 已用＋registry 兼收原生 .so＋零加固机验）；
+P-3 policy 单文件 935 行；P-4 版本三处对账（头 1.6.3／志 1.6.3／尾 1.6.3 一致）。
+
+**证据**：E-1 WASM 零加固是机验事实（StoreLimits/fuel/WasiCtx/provenance 全缺）；
+E-2 原生 `.so` 加载路径存在——即 tartanllama 警告的精确形态；
+E-3 Durable 组搜索失败两次，已转既定知识＋诚实标注（promptfoo先例）。
+
+**缺口**：G-1 Cedar crate 采用（需依赖评审 SIM）；G-2 WASM 加固代码（P-task）；
+G-3 原生插件 verdict（dedicated SIM，否则维持 deny）。
+
+**外部方案**：见 ABSORPTION-ROUND8.md §1（S-44–S-47）＋否决项（托管服务/原生默认/全文 SLSA）。
+
+**落点**：ROUND8＋NTS-F10/E10（STD 1.0.6）＋BLUEPRINT v1.6.4。
+
+**蓝图回写**：即本轮（头/志/尾三处同升，机验）。
+
+**放行判定**：GO（版本号三处机验一致；条款计数下轮复核）。
+
+**tripwire**：WASM 加固代码落地（Owner：L1/L3，日期：P-task 启动日）；
+Cedar 依赖评审（Owner：L5，日期：P1-03 内）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-40.*
