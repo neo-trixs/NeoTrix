@@ -39,7 +39,7 @@
 |----|------|---------|-------|------|------|
 | EQ-11 | 其余 4 fitness 阈值拍板 | L5 书面签字（数字＋理由） | L5 | 无（可并行） | 🟨 (提案备齐待签：NoCycle 0 环／Capability 0 重边／TreeSingleton ≤1 实例点／DeadCode 0 警告＋禁 crate 级 allow；PanicDensity 3000·12.0 与 B2 已有数；SIM-42 §41) |
 | EQ-12 | pre-commit 增强落地 | doc-drift／confidence 本地可跑 | Infra | EQ-11 | 🟨 (doc-drift advisory 已接（bash -n 过，随本轮提交实跑）；confidence 系 cargo 侧，待全量门；SIM-42) |
-| EQ-13 | P0 独占重验（check --tests 全绿） | 门绿＋新基线入库 | QA | 独占窗口 | 🟥 (本机 OOM Killed:9＋锁串行，转 CI 独占窗口；SIM-42 记录) |
+| EQ-13 | P0 独占重验（check --tests 全绿） | 门绿＋新基线入库 | QA | 独占窗口 | 🟨 (工单备齐待跑：本机无 gh 且 CI 无 dispatch，触发＝向 main 建 PR；CI 自带 check×3OS＋test＋layer-deps；步骤：建 PR→读全部门→基线入库→关 EQ-05/07/12 尾巴；待执行) |
 
 ## T5. P2/P3（条件触发，提前开工即错）
 
@@ -49,8 +49,8 @@
 | EQ-15 | bench 基线＋翻转 | gh-pages 基线满 1 周 → fail-on | Perf | P3 启动 | ⬜ |
 | EQ-16 | vet／Scorecard／SLSA／dist | 烘焙计划逐项关 | Security | P3 启动 | ⬜ |
 | EQ-17 | fuzz／toxics／AgentHarm 首跑 | 首 harness＋首 toxic＋首对子 | SRE/L3 | P3 启动 | ⬜ |
-| EQ-18 | Tauri 独立审计 | 审计报告＋问题清单 | Desktop | M2 | ⬜ |
-| EQ-19 | FULL-ARCHITECTURE 认领 | 有主（人＋日期） | Architect | M2 | ⬜ |
+| EQ-18 | Tauri 独立审计 | 审计报告＋问题清单 | Desktop | M2 | 🟨 (范围已定：main 8 行/conf 82 行/capabilities default.json/permissions neotrix_commands.toml/plugins 2＋src ~30（vault/ipc/commands/browser_host/anthropic/db_pool/agent_identity/autostart…）；checklist＝IPC 暴露面/capability 最小权限/vault 密钥/browser_host 外联/错误外泄；待主＋报告) |
+| EQ-19 | FULL-ARCHITECTURE 认领 | 有主（人＋日期） | Architect | M2 | 🟨 (scope 已定：801 行 v1.0.0(09-20) vs 蓝图 v1.6.7 差 6 代；提案：Architect 09-30 前认领并三选一 同步/归档/重写；待批) |
 | EQ-20 | R-P112–115 重议＋ARCHITECTURE.md 重写 | 会议纪要＋新版／归档 | Architect | NT-STD-1.1 | ⬜ |
 
 ---
