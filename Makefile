@@ -310,4 +310,8 @@ audit-all:
 arch-acyclic:
 	cargo modules dependencies --lib -p neotrix --acyclic --no-fns --no-traits --no-types 2>/dev/null || echo "need: cargo install cargo-modules (NTS-B13 bake plan)"
 
-.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build layer-deps doc-drift doc-drift-strict coverage-gate bench-baseline bench-compare geiger machete build-surface build-surface-strict fuzz arch-acyclic audit-all
+# 供应链 IOC 巡检 (SIM-37; 零成本 tripwire, P3 前置 Socket 全套)
+supply-iocs:
+	bash scripts/check-supply-iocs.sh
+
+.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build layer-deps doc-drift doc-drift-strict coverage-gate bench-baseline bench-compare geiger machete build-surface build-surface-strict fuzz arch-acyclic audit-all supply-iocs

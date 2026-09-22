@@ -85,6 +85,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-34 | EQ-01/02/03闭环＋ADR-0003＋死守卫退役决议（本文件 §33） | GO | ADR-0003 |
 | SIM-35 | EQ-04执行：死守卫删除＋13/13实跑绿（本文件 §34） | GO | fitness.rs |
 | SIM-36 | EQ-05执行：H-08改直引＋覆盖丢失事故＋即交原则（本文件 §35） | GO | search.rs |
+| SIM-37 | 第七轮吸收：旗标/签名/行为扫描（本文件 §36） | GO | ROUND7 + NTS 1.0.5 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -951,7 +952,7 @@ P-2 标记计数（24→1，节/行完好性机验）；P-3 §31 虚惊复核（
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-37.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
 
 ---
 
@@ -975,7 +976,7 @@ P-3 调用方枚举（self_test_integration＋SEAL pipeline——注册表是活
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-37.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
 
 ---
 
@@ -1004,7 +1005,7 @@ E-3 计数机验：13＝7＋6，删除前后自洽。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-37.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
 
 ---
 
@@ -1034,4 +1035,37 @@ svaf/bin 的 L5 路径改直引（Owner：L4/Desktop，日期：P1-02 内，不�
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-37.*
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*
+
+---
+
+## §36 SIM-37：第七轮吸收（GO）
+
+> 认领：单会话内完成。探针：3 组外部搜索（全命中）＋版本号三处对账。
+> 生产代码零改动（脚本＋文档＋Makefile target）。
+
+**探针**：P-1 OpenFeature/Flagd/TTL/杀伤开关/渐进发布；P-2 sigstore keyless
+（Fulcio+Rekor）＋ Rust 原生验证库（sigstore-rust/jdx）；P-3 Socket 2026-08
+proc-macro1 构建期攻击＋time/finch 战役＋Rust GA；
+P-4 版本对账（蓝图头 1.5.9／志 1.6.1——头滞后，再犯必查三处）。
+
+**证据**：E-1 自家 Cargo.lock 零命中（机验）；E-2 IOC 脚本双向验证
+（clean 0／投毒 1，参数化后不再碰真文件）；E-3 `make -n` 全 target 可解析。
+
+**缺口**：G-1 Flagd 后端＋渐进发布接线（P-task，SDB log-only 翻转为天然首用）；
+G-2 cosign CI 作业（P3）；G-3 Socket 全套（P3）。
+
+**外部方案**：见 ABSORPTION-ROUND7.md §1（S-39–S-43）＋否决项（vendor 锁／管制 key／企业版）。
+
+**落点**：ROUND7＋supply-iocs 脚本＋Makefile target＋NTS-G09（STD 1.0.5）＋BLUEPRINT v1.6.2。
+
+**蓝图回写**：即本轮（头/志/尾三处同升，治头滞后旧病）。
+
+**放行判定**：GO（双向验证＋版本三处机验）。
+
+**tripwire**：IOC 名单复核（Owner：Security，日期：新 advisory 即时）；
+Flagd 首旗（Owner：L5，日期：SDB 翻转日）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-38.*

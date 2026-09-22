@@ -1,9 +1,10 @@
-# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.4)
+# NeoTrix Standard — Engineering & Governance Rules (NT-STD 1.0.5)
 
 > **Status**: Canonical (标准版) | **Date**: 2026-09-21 | **Supersedes**: all prior rule lists as normative source
 > **v1.0.1**: +§0.1 Precedence — 意识指导为先 (SIM-16).
 > **v1.0.2**: Annex B 部分恢复 — R-P111–160 打捞 19+1，31 仍 SUSPENDED (SIM-23).
 > **v1.0.4**: +NTS-D10/F09/E10（API 契约/Judge 去偏/故障注入，SIM-25）.
+> **v1.0.5**: +NTS-G09（flag 纪律，SIM-37）.
 > **v1.0.3**: +NTS-E09/D09/B13（红队对子/DORA 基线/孤儿环门，SIM-24）＋ sysctl 特许登记入 Annex B.
 > **Legacy sources** (informative only from this version on):
 > `dev-rules.md` (R-P1–R-P110) · `docs/dev-rules.md` (R-P161–R-P257) ·
@@ -275,10 +276,12 @@ G5 security → G6 integration → G7 perf → G8 docs. Red upstream stops the l
   the 31 still-missing IDs stay SUSPENDED until located-or-reratified
   (not enforceable, not ignorable — see Annex B).
   [Verify: Annex B cleared] ← SIM-13 finding, SIM-23 partial recovery
-
----
-
-## Annex A — Legacy Mapping (old → NTS)
+- **NTS-G09** Flag discipline. Release flags carry TTL at creation and die on schedule;
+  kill switches tested in non-production on a cadence; progressive rollout 1%→100%
+  with sticky bucketing and per-stage metrics; evaluation never in the availability
+  critical path (fail-open default + tight timeout); permission checks are NOT flags.
+  Start backend: Flagd-style file rules in repo, graduate only on pain.
+  [Verify: flag registry with TTLs + kill-switch test log] ← OpenFeature/SIM-37
 
 | Legacy | NTS | Notes |
 |--------|-----|-------|
@@ -324,4 +327,4 @@ A claim of "NT-STD 1.0 L2" MUST show the gate evidence; level inflation is a pro
 
 ---
 
-*End of NT-STD 1.0.4 — next: NT-STD-1.1 (OSINT domain annex + remaining 31 resolution).*
+*End of NT-STD 1.0.5 — next: NT-STD-1.1 (OSINT domain annex + remaining 31 resolution).*
