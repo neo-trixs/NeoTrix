@@ -95,6 +95,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-44 | 第十轮吸收：compaction/路由/安全/技能（本文件 §43） | GO | ROUND10 + NTS 1.0.8 |
 | SIM-45 | 第十一轮吸收：meta-skill/编排/MCP/桌面（本文件 §44） | GO | ROUND11 + BP v1.6.10 |
 | SIM-46 | 第十二轮吸收：余项扫尾（本文件 §45） | GO | ROUND12 + BP v1.6.11 |
+| SIM-47 | Phase 2 dispatcher 代码实施（本文件 §46） | GO-WITH-CI-BACKSTOP | dispatcher E1a-E6 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1370,4 +1371,31 @@ R13 门禁：新 P0 出现才开轮（Owner：全组，持续）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-47.*
+## §46 SIM-47：Phase 2 dispatcher 代码实施（GO-WITH-CI-BACKSTOP）
+
+> 认领：单会话内完成。Spike＝SIM-43 D-1~D-6＋PHASE2 施工单＋本轮锚点机验
+> （hexagram_bias: Option<u8>／SubTaskClass: Copy／estimate_time_budget→f64／
+> CrtTimeScale: Copy／serde_json 在 dependencies／tests mod L1306 起）。
+> 生产代码：单文件 `l1_action/nt_core_task_dispatcher.rs`，E1a/E2/E3/E4/E5（record＋
+> retrieval，调制接线 Phase 2b 不碰行为）＋E6 四纯测。本地不可构建（OOM），
+> 验证＝重读＋grep＋rustfmt（如有）＋CI backstop（SIM-27/28 先例）。
+
+**探针**：P-1 爆炸半径 2 调用方（entry/mod.rs:677 全注入／seal_loop.rs:1069 kernel+e8）；
+P-2 `CoTGenerator` trait 零使用（仅 DefaultCoTGenerator）→ E1a 去 CoTConfig 导入；
+P-3 `log::debug!` 既有可用；P-4 `unwrap_or` 存量（L733）不动，新增零 unwrap。
+
+**行为增量（诚实）**：`new()` 不再按 `enable_cot` 自构 CoT——2 调用方 CoT 路径降级
+（有日志），其余路径照常；组合根补 `with_cot_generator` 是 follow-up（本轮不动他文件）。
+
+**缺口**：G-1 CI 绿（check --tests -j4＋dispatcher 单测＋layer-deps 计数记录）；
+G-2 E1b 对象安全确认；G-3 调用方注入补齐；G-4 Phase 3 类型迁移（另 SIM）。
+
+**放行判定**：GO-WITH-CI-BACKSTOP（首红先查他人文件；本文件红则单 commit 还原；
+allowlist 与 EQ-08 🟨 不动）。
+
+**tripwire**：CI 首跑结果（Owner：CI，PR 即验）；
+调用方注入补齐（Owner：L1/L5，日期：Phase 2b 内）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-48.*

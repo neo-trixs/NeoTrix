@@ -41,12 +41,12 @@ E1b（stretch，窗口内确认）：若 `CoTGenerator`（L15 已导入）对象
 
 ```rust
 // struct 新增字段：
-crt_factory: Option<Arc<dyn Fn(CrtTimeScale, u64) -> CrtPlan + Send + Sync>>,
+crt_factory: Option<Arc<dyn Fn(CrtTimeScale, f64) -> CrtPlan + Send + Sync>>,
 
 // builder：
 pub fn with_crt_factory(
     mut self,
-    f: Arc<dyn Fn(CrtTimeScale, u64) -> CrtPlan + Send + Sync>,
+    f: Arc<dyn Fn(CrtTimeScale, f64) -> CrtPlan + Send + Sync>,
 ) -> Self {
     self.crt_factory = Some(f);
     self

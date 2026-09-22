@@ -12,7 +12,7 @@
 use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
     DecomposeSuggestion, TaskDecomposer,
 };
-use crate::l5_cognition::nt_core_cot_generator::{CoTConfig, CoTGenerator, DefaultCoTGenerator};
+use crate::l5_cognition::nt_core_cot_generator::DefaultCoTGenerator;
 use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
 use crate::l5_cognition::nt_core_policy::E8Policy;
 use crate::l5_cognition::reasoning_core::TraceSource;
@@ -21,7 +21,7 @@ use crate::l1_action::nt_core_llm::{
     estimate_tokens, truncate_preserving, LlmProvider, LlmRequest, Message, Role,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -34,6 +34,87 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub trait ReasoningEngineProvider: Send + Sync {
     /// 执行推理任务，返回推理结果文本。
     fn reason(&mut self, prompt: &str) -> Result<String, String>;
+}
+
+/// E8 预测存储缝（SIM-43 D-4；L1 拥有，L5 组合根做 adapter 包装）。
+/// 缺席＝降级模式：VP-2 跳过＋记录，可见性代替阻断。
+pub trait PredictorStore: Send {
+    /// 下一状态预测，返回 (预测状态, 置信度)。
+    fn predict_next(&mut self, state: u8) -> (u8, f64);
+    /// 观测实际转移。
+    fn observe_trace(&mut self, trace: &[u8]);
+    /// 持久化。
+    fn persist(&self);
+}
+
+/// 单次 dispatch 记录（SDB v0.6 §评分首填格式对齐；log-only）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DispatchLogRecord {
+    /// 任务签名（标题哈希，不存原文，防日志膨胀）。
+    pub task_sig: u64,
+    pub pred_confidence: f64,
+    pub tau: f64,
+    pub class: SubTaskClass,
+    pub kernel_present: bool,
+    pub vp1_pass: bool,
+    pub vp2_pass: bool,
+    /// VP-3（状态钳位 &0x3f）构造性强制，恒 true，留位供审计。
+    pub vp3_pass: bool,
+    /// 决策分支：kernel_fast | kernel | cot | reasoning | kernel_direct | direct_llm。
+    pub decision: &'static str,
+}
+
+/// 路由记忆上限（D-6；满弹旧，防无界增长）。
+pub const HISTORY_CAP: usize = 64;
+/// 置信阈值下限（V-3：只许调严，调松需 ADR＋安全签字）。
+pub const CONFIDENCE_FLOOR: f64 = 0.65;
+
+/// τ 钳位 [0.65, 1.0]；非数回落下限（禁 unwrap/panic 路径）。
+fn clamp_confidence(v: f64) -> f64 {
+    if !v.is_finite() {
+        return CONFIDENCE_FLOOR;
+    }
+    v.clamp(CONFIDENCE_FLOOR, 1.0)
+}
+
+/// 任务签名（确定性哈希）。
+fn task_sig(task: &str) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    task.hash(&mut h);
+    h.finish()
+}
+
+/// 路由记忆追加（有界）。
+fn push_history(history: &mut VecDeque<DispatchLogRecord>, rec: DispatchLogRecord) {
+    if history.len() >= HISTORY_CAP {
+        history.pop_front();
+    }
+    history.push_back(rec);
+}
+
+/// 路由记忆检索（纯函数）：海明邻近（≤8 bit）历史 confidence 均值偏低则建议保守。
+/// 返回值仅供日志（log-only）；调制接线 Phase 2b，调用方暂只有日志位（防死代码警告）。
+fn suggest_aggression(history: &VecDeque<DispatchLogRecord>, sig: u64, base: f64) -> f64 {
+    let mut sum = 0.0;
+    let mut n = 0u32;
+    for r in history
+        .iter()
+        .filter(|r| (r.task_sig ^ sig).count_ones() <= 8)
+    {
+        sum += r.pred_confidence;
+        n += 1;
+    }
+    if n == 0 {
+        return base;
+    }
+    let avg = sum / f64::from(n);
+    if avg < 0.5 {
+        (base - 0.1).max(0.1)
+    } else {
+        base
+    }
 }
 
 /// 子任务定义
@@ -98,6 +179,12 @@ pub struct TaskDecomposerDispatcher {
     kernel: Option<ReasoningKernel>,
     /// E8 Policy
     e8_policy: Option<E8Policy>,
+    /// CRT 规划工厂缝（SIM-43 D-2；缺席＝直构降级＋记录）。
+    crt_factory: Option<Arc<dyn Fn(CrtTimeScale, f64) -> CrtPlan + Send + Sync>>,
+    /// E8 预测存储缝（SIM-43 D-4；缺席＝VP-2 跳过＋记录）。
+    predictor_store: Option<Box<dyn PredictorStore>>,
+    /// 路由记忆（D-6；有界 64，log-only）。
+    history: VecDeque<DispatchLogRecord>,
     /// 配置
     config: DispatcherConfig,
     /// P2-D3: 本调度器直接 LLM 调用的真实 usage 累积器 (execute_sub_task 消费后清零)。
@@ -122,6 +209,8 @@ pub struct DispatcherConfig {
     pub sub_task_timeout_secs: u64,
     /// 是否隐藏内部实现细节（用户视角）
     pub hide_internal_details: bool,
+    /// 置信阈值 τ（D-5；默认 0.65；V-3 只许调严，钳位 [0.65, 1.0]）。
+    pub confidence_threshold: f64,
 }
 
 impl Default for DispatcherConfig {
@@ -134,6 +223,7 @@ impl Default for DispatcherConfig {
             max_concurrent_tasks: 3,
             sub_task_timeout_secs: 60,
             hide_internal_details: true,
+            confidence_threshold: CONFIDENCE_FLOOR,
         }
     }
 }
@@ -143,7 +233,7 @@ impl DispatcherConfig {
     /// 支持: NEOTRIX_DISPATCH_AGGRESSION, NEOTRIX_DISPATCH_MAX_SUBTASKS,
     ///       NEOTRIX_DISPATCH_COT, NEOTRIX_DISPATCH_VERIFIER,
     ///       NEOTRIX_DISPATCH_CONCURRENCY, NEOTRIX_DISPATCH_TIMEOUT,
-    ///       NEOTRIX_DISPATCH_HIDE_INTERNAL
+    ///       NEOTRIX_DISPATCH_HIDE_INTERNAL, NEOTRIX_DISPATCH_CONFIDENCE
     pub fn from_env() -> Self {
         let mut cfg = Self::default();
         if let Ok(v) = std::env::var("NEOTRIX_DISPATCH_AGGRESSION") {
@@ -175,30 +265,36 @@ impl DispatcherConfig {
         if let Ok(v) = std::env::var("NEOTRIX_DISPATCH_HIDE_INTERNAL") {
             cfg.hide_internal_details = v == "1" || v.eq_ignore_ascii_case("true");
         }
+        if let Ok(v) = std::env::var("NEOTRIX_DISPATCH_CONFIDENCE") {
+            if let Ok(f) = v.parse::<f64>() {
+                cfg.confidence_threshold = clamp_confidence(f);
+            }
+        }
         cfg
     }
 }
 
 impl TaskDecomposerDispatcher {
     pub fn new(provider: Arc<dyn LlmProvider>, config: DispatcherConfig) -> Self {
-        let cot_generator = if config.enable_cot {
-            Some(DefaultCoTGenerator::new(
-                provider.clone(),
-                CoTConfig::default(),
-            ))
-        } else {
-            None
-        };
-
+        // D-1：不再直构 CoT（缺席＝降级＋记录）；注入走 with_cot_generator（组合根：L5/L6）。
         Self {
             provider,
-            cot_generator,
+            cot_generator: None,
             reasoning_engine: None,
             kernel: None,
             e8_policy: None,
+            crt_factory: None,
+            predictor_store: None,
+            history: VecDeque::new(),
             config,
             usage_accumulator: std::sync::atomic::AtomicU32::new(0),
         }
+    }
+
+    /// 注入 CoT 生成器（组合根：L5/L6）。
+    pub fn with_cot_generator(mut self, gen: DefaultCoTGenerator) -> Self {
+        self.cot_generator = Some(gen);
+        self
     }
 
     /// 设置 Reasoning Engine (trait object)
@@ -216,6 +312,21 @@ impl TaskDecomposerDispatcher {
     /// 设置 E8 Policy
     pub fn with_e8_policy(mut self, policy: E8Policy) -> Self {
         self.e8_policy = Some(policy);
+        self
+    }
+
+    /// 设置 CRT 规划工厂（组合根：L5/L6）。
+    pub fn with_crt_factory(
+        mut self,
+        f: Arc<dyn Fn(CrtTimeScale, f64) -> CrtPlan + Send + Sync>,
+    ) -> Self {
+        self.crt_factory = Some(f);
+        self
+    }
+
+    /// 设置 E8 预测存储（组合根：L5/L6）。
+    pub fn with_predictor_store(mut self, store: Box<dyn PredictorStore>) -> Self {
+        self.predictor_store = Some(store);
         self
     }
 
@@ -266,9 +377,16 @@ impl TaskDecomposerDispatcher {
         // 1. 使用现有的 TaskDecomposer 进行基础拆解
         let suggestions = TaskDecomposer::analyze(task, self.config.decomposition_aggression);
 
-        // 2. 使用 CRT 进行多尺度规划
+        // 2. 使用 CRT 进行多尺度规划（D-2：工厂注入，缺席＝直构降级＋记录）
         let crt_scale = self.determine_crt_scale(task);
-        let mut crt_plan = CrtPlan::new(crt_scale, self.estimate_time_budget(task));
+        let budget = self.estimate_time_budget(task);
+        let mut crt_plan = match &self.crt_factory {
+            Some(f) => f(crt_scale, budget),
+            None => {
+                log::debug!("[dispatcher] crt_factory absent; direct construct (degraded)");
+                CrtPlan::new(crt_scale, budget)
+            }
+        };
         crt_plan.decompose();
 
         // 3. 生成子任务
@@ -684,49 +802,94 @@ Output your result for this subtask only."#,
         // 高置信 + 确定性分类 → 走本地 kernel 快路径 (省 LLM 推理预算);
         // 其余情况回退到原有策略链。每次执行后观察实际转移并持久化
         // (The Spice Must Flow: 观测 → 预测 → 决策 → 再观测闭环)。
-        use crate::l2_perception::nt_core_e8_predictor::{
-            load as predictor_load, persist as predictor_persist,
+        // D-4：预测存储走注入缝；缺席＝VP-2 跳过＋记录（降级可观测）。
+        let raw_bias = sub_task.hexagram_bias.unwrap_or(0) & 0x3f;
+        let (predicted_next, pred_confidence, vp2_present) = match self.predictor_store.as_mut() {
+            Some(store) => {
+                let (pn, pc) = store.predict_next(raw_bias);
+                (pn, pc, true)
+            }
+            None => {
+                log::debug!("[dispatcher] predictor absent; VP-2 skipped (degraded)");
+                (raw_bias, 0.0, false)
+            }
         };
-        let mut predictor = predictor_load();
-        let current_state = sub_task.hexagram_bias.unwrap_or(0) & 0x3f;
-        let (predicted_next, pred_confidence) = predictor.predict_next(current_state);
         // 预测状态与任务本体相关: 用预测结果修正 hexagram 偏好供策略选择
         let _predicted = predicted_next;
 
         // 选择执行策略 (H8: 确定性任务走代码/kernel 快路径, 推理任务走 LLM 链)
+        let tau = self.config.confidence_threshold;
         let class = classify_sub_task(sub_task);
-        let result = if pred_confidence >= 0.65
-            && class == SubTaskClass::Deterministic
-            && self.kernel.is_some()
-        {
+        let vp1_pass =
+            class == SubTaskClass::Deterministic && self.kernel.is_some() && pred_confidence >= tau;
+        let vp2_pass = vp2_present && pred_confidence >= tau;
+        let vp3_pass = true; // 状态钳位 raw_bias(&0x3f) 构造性强制
+        let (decision, result) = if vp1_pass {
             // 预测高置信 + 确定性: 本地 kernel 结构化执行 (E8 预测增强快路径)
-            self.execute_with_kernel(sub_task, context).await
+            (
+                "kernel_fast",
+                self.execute_with_kernel(sub_task, context).await,
+            )
         } else if class == SubTaskClass::Deterministic && self.kernel.is_some() {
             // 确定性: kernel 结构化执行, 不耗费 LLM 推理预算
-            self.execute_with_kernel(sub_task, context).await
+            ("kernel", self.execute_with_kernel(sub_task, context).await)
         } else if self.config.enable_cot && self.cot_generator.is_some() {
             // 使用 CoT 生成器
-            self.execute_with_cot(sub_task, context).await
+            ("cot", self.execute_with_cot(sub_task, context).await)
         } else if self.reasoning_engine.is_some() {
             // 使用 Reasoning Engine
-            self.execute_with_reasoning_engine(sub_task, context).await
+            (
+                "reasoning",
+                self.execute_with_reasoning_engine(sub_task, context).await,
+            )
         } else if self.kernel.is_some() {
             // 使用 Kernel
-            self.execute_with_kernel(sub_task, context).await
+            (
+                "kernel_direct",
+                self.execute_with_kernel(sub_task, context).await,
+            )
         } else {
             // 直接调用 LLM
-            self.execute_direct_llm(sub_task, context).await
+            (
+                "direct_llm",
+                self.execute_direct_llm(sub_task, context).await,
+            )
         };
 
         // 观察实际执行结果: 成功 → 记录预测-实际转移 (current → predicted/实际成功态)
         let outcome_state = if result.is_ok() {
             predicted_next
         } else {
-            current_state
+            raw_bias
         };
-        let actual_trace = vec![current_state, outcome_state];
-        predictor.observe_trace(&actual_trace);
-        predictor_persist(&predictor);
+        if let Some(store) = self.predictor_store.as_mut() {
+            store.observe_trace(&[raw_bias, outcome_state]);
+            store.persist();
+        }
+
+        // D-6：dispatch 记录（log-only；调制接线 Phase 2b，此处仅记录＋建议日志）。
+        let sig = task_sig(&sub_task.title);
+        let rec = DispatchLogRecord {
+            task_sig: sig,
+            pred_confidence,
+            tau,
+            class,
+            kernel_present: self.kernel.is_some(),
+            vp1_pass,
+            vp2_pass,
+            vp3_pass,
+            decision,
+        };
+        push_history(&mut self.history, rec);
+        let suggestion =
+            suggest_aggression(&self.history, sig, self.config.decomposition_aggression);
+        log::debug!(
+            "[dispatcher] decision={} conf={:.3} tau={:.2} suggest_aggr={:.2}",
+            decision,
+            pred_confidence,
+            tau,
+            suggestion
+        );
 
         let duration = SystemTime::now()
             .duration_since(start)
@@ -1219,7 +1382,7 @@ pub fn format_reducer_signals(report: &ReduceReport) -> String {
 
 /// 子任务分级: 确定性 (可结构化处理) vs 需要智能推理。
 /// 由 `required_capabilities` 与 prompt 特征派生, 不改 SubTask schema。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SubTaskClass {
     /// 确定性任务: 走 kernel/代码路径, 不耗费 LLM 推理预算
     Deterministic,
@@ -1314,6 +1477,60 @@ mod tests {
         assert_eq!(config.max_sub_tasks, 10);
         assert!(config.enable_cot);
         assert!(config.enable_verifier);
+        assert_eq!(config.confidence_threshold, CONFIDENCE_FLOOR);
+    }
+
+    #[test]
+    fn test_confidence_clamp_table() {
+        // V-3：只许调严，下限锁死 0.65；非数回落。
+        assert_eq!(clamp_confidence(0.0), 0.65);
+        assert_eq!(clamp_confidence(0.65), 0.65);
+        assert_eq!(clamp_confidence(0.9), 0.9);
+        assert_eq!(clamp_confidence(2.0), 1.0);
+        assert_eq!(clamp_confidence(f64::NAN), 0.65);
+        assert_eq!(clamp_confidence(f64::INFINITY), 0.65);
+    }
+
+    fn log_rec(sig: u64, conf: f64) -> DispatchLogRecord {
+        DispatchLogRecord {
+            task_sig: sig,
+            pred_confidence: conf,
+            tau: 0.65,
+            class: SubTaskClass::Deterministic,
+            kernel_present: true,
+            vp1_pass: true,
+            vp2_pass: true,
+            vp3_pass: true,
+            decision: "kernel_fast",
+        }
+    }
+
+    #[test]
+    fn test_task_sig_deterministic_and_distinct() {
+        assert_eq!(task_sig("abc"), task_sig("abc"));
+        assert_ne!(task_sig("abc"), task_sig("abd"));
+    }
+
+    #[test]
+    fn test_push_history_cap_eviction() {
+        let mut h = VecDeque::new();
+        for i in 0..(HISTORY_CAP + 5) as u64 {
+            push_history(&mut h, log_rec(i, 0.9));
+        }
+        assert_eq!(h.len(), HISTORY_CAP);
+        assert_eq!(h.front().map(|r| r.task_sig), Some(5));
+    }
+
+    #[test]
+    fn test_suggest_aggression_neighbors() {
+        let empty = VecDeque::new();
+        assert_eq!(suggest_aggression(&empty, 0, 0.5), 0.5);
+        let mut low = VecDeque::new();
+        push_history(&mut low, log_rec(0b1010, 0.1));
+        assert_eq!(suggest_aggression(&low, 0b1011, 0.5), 0.4);
+        let mut high = VecDeque::new();
+        push_history(&mut high, log_rec(0b1010, 0.9));
+        assert_eq!(suggest_aggression(&high, 0b1011, 0.5), 0.5);
     }
 
     #[test]
