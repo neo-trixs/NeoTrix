@@ -93,6 +93,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-42 | EQ-08~12＋T3 并行执行轮（本文件 §41） | GO-WITH-MITIGATION | SDB v0.6 + hook |
 | SIM-43 | P1-02 门面 API 设计：dispatcher 注入缝（本文件 §42） | GO (设计) | API 草案 |
 | SIM-44 | 第十轮吸收：compaction/路由/安全/技能（本文件 §43） | GO | ROUND10 + NTS 1.0.8 |
+| SIM-45 | 第十一轮吸收：meta-skill/编排/MCP/桌面（本文件 §44） | GO | ROUND11 + BP v1.6.10 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1306,4 +1307,35 @@ R11 立项（Owner：全组，日期：下轮吸收前）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-45.*
+## §44 SIM-45：第十一轮吸收（GO）
+
+> 认领：单会话内完成。探针：A–G 余项 6 读封顶（5 实读＋Exegol 正文传输失败诚实记未读）＋
+> 本地三处机验（SIM 下号 45／STD 现版 1.0.8／蓝图现版 1.6.9 一致）。
+> 生产代码零改动（文档＋0 条款；零条款是决议，STD 停 1.0.8）。
+
+**探针**：P-1 meta-skill（自写 lens／constraint footer／conservation law／增长环三局限）；
+P-2 编排＋MCP（ScopeGuard 双层／dry-run／HMAC＋taint／10 工具逐 claim fail-closed／
+风险轴→decide／模糊永不重试）；P-3 桌面双子（ref 稳定永不擅选／headless 默认／
+权限层／Keychain／零遥测）；P-4 Exegol 传输失败（仅目录机验，不判内容）；
+P-5 版本三处对账一致。
+
+**证据**：E-1 jev_gate 双真才 auto 即 ADR-0004 Stage 门同构（独立佐证）；
+E-2 ARES 六件套即 SEAL 骨架（可直接取用）；E-3 桌面 checklist 增补六条均有对照源。
+
+**缺口**：G-1 Exegol 正文（R12）；G-2 本地 judge＋supply-iocs 扩展（P-task 延续）；
+G-3 SEAL 骨架取用（P-task L5）；G-4 R12 A–G 余项＋H（下轮 SIM）。
+
+**外部方案**：见 ABSORPTION-ROUND11.md §2（S-74–S-79）＋否决项（云 judge/新 SaaS/H 类/未读不判）。
+
+**落点**：ROUND11＋BLUEPRINT v1.6.10（STD 停 1.0.8，决议记录在案）。
+
+**蓝图回写**：即本轮（头/志/尾三处同升，机验）。
+
+**放行判定**：GO（版本号三处机验一致；条款计数下轮复核）。
+
+**tripwire**：SEAL 骨架取用（Owner：L5，日期：P1-03 内）；
+R12 立项（Owner：全组，日期：下轮吸收前）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-46.*
