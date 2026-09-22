@@ -97,6 +97,7 @@ tripwire:  每缺口一行：信号 + 日期 + Owner
 | SIM-46 | 第十二轮吸收：余项扫尾（本文件 §45） | GO | ROUND12 + BP v1.6.11 |
 | SIM-47 | Phase 2 dispatcher 代码实施（本文件 §46） | GO-WITH-CI-BACKSTOP | dispatcher E1a-E6 |
 | SIM-48 | 调用方补齐＋E1b 证伪＋Phase 3 探针（本文件 §47） | GO-WITH-CI-BACKSTOP | entry 注入＋下沉位 |
+| SIM-49 | 并行收口：双路探针＋点火清单（本文件 §48） | GO | IGNITION-CHECKLIST |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
@@ -1427,4 +1428,29 @@ Trace 系贴遥测（`nt_core_telemetry` 相邻）。
 
 ---
 
-*End of SIM Protocol v1.0.0 —— 下一编号 SIM-49.*
+## §48 SIM-49：并行收口（GO）
+
+> 双路子代理（只读）＋主收口。生产代码零改动（文档＋清单＋修订）。
+
+**A路（Phase 3 深探）**：E8Policy 字段（epsilon/decay/lr/discount/mode[64] 系＋select/update/best/decay/learn）；
+CoT trait（generate_cot＋默认 batch）／Default{provider,config}；
+CRT 变体＋helper 全／CrtPlan{scale/budget/max_ticks/sub_plans/parent}；
+L0 shared 纯数据／traits 可容纳；引用计数 E8Policy 83／CrtPlan::new 13／ReasoningTrace{ 18。
+**结论反转 SIM-48 P-4**：E8 留守（83 引用成本）／CRT 整体搬／CoT 拆分。
+
+**B路（代码终审）**：dispatcher 括号差 0；with_crt_factory/with_predictor_store 仓外零调用
+（预期内，pub 无警告，激活待 2b）；测试 helper 全在；entry 导入风格一致、
+gw.clone＋复用确认；零残留（CoTConfig/l2/0.65 字面量全清）。
+
+**CI 认证实测**：`git ls-remote` 读 OK；写 main 禁区；无 `gh`；
+CI 仅 push-main/PR 触发——点火只能人来（已入清单 #1）。
+
+**落点**：IGNITION-CHECKLIST（6 项人侧）＋PHASE2 SIM-49 修订＋BLUEPRINT v1.6.12。
+
+**放行判定**：GO（纯文档；点火清单即交付物）。
+
+**tripwire**：6 项逐项关（Owner：见清单，日期：见清单）。
+
+---
+
+*End of SIM Protocol v1.0.0 —— 下一编号 SIM-50.*

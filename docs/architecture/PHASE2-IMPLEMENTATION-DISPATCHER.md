@@ -158,6 +158,25 @@ pub struct DispatchLogRecord {
 - Phase 3 下沉位（SIM-48 P-4）：E8Policy→L0 shared；CoTGenerator trait→L0 traits；
   CrtTimeScale 枚举下沉／CrtPlan 留 L5；Trace 贴遥测。需 Architect SIM（P1-02 内）。
 
+## SIM-49 修订（并行探针，反转 P-4 部分结论）
+
+- E8Policy：**留守**——83 处引用，下沉成本过高；改走 L0 trait 抽象或维持 allowlist（待 Phase 3 SIM 定）。
+- CRT：**整体搬**——`CrtPlan::new` 仅 13 处，枚举＋planner 可同迁（变体 Gaitian/Huntian/Xuanye＋helper 全）。
+- CoT：**拆分**——trait（generate_cot＋默认 batch）下沉 L0 traits，Default 实现留 L5。
+- with_crt_factory／with_predictor_store：仓外零调用（预期内，pub API 无警告）；
+  激活待 Phase 2b 组合根，_deadline_ 2026-10-31 allowlist 到期前。
+- entry hunk（精确文本，属主重放用）：
+  ```rust
+  use neotrix::l5_cognition::nt_core_cot_generator::{CoTConfig, DefaultCoTGenerator};
+  // ...
+  (Some(gw), Some(re)) => TaskDecomposerDispatcher::new(
+      gw.clone(),
+      DispatcherConfig::from_env(),
+  )
+  .with_cot_generator(DefaultCoTGenerator::new(gw, CoTConfig::default()))
+  .with_reasoning_engine(Box::new(re))
+  ```
+
 ---
 
 *End of Phase 2 implementation plan — SIM-43 design; code SIM pending.*
