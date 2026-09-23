@@ -1,36 +1,38 @@
 #![deny(clippy::unwrap_used)]
 
-use std::sync::Arc;
-use std::path::PathBuf;
 use std::io::{self, Write};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use colored::Colorize;
 
-use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
-use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
-use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
 use neotrix::l1_action::nt_core_bank::bank::ReasoningBank;
+use neotrix::l1_action::nt_core_task_dispatcher::{DispatcherConfig, TaskDecomposerDispatcher};
 use neotrix::l1_action::nt_io::nt_io_mention::resolve_mentions;
-use neotrix::l1_action::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
 use neotrix::l1_action::nt_io::nt_io_standalone::ReasoningKernel;
+use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
 use neotrix::l5_cognition::nt_core_cot_generator::{CoTConfig, DefaultCoTGenerator};
 use neotrix::l5_cognition::nt_core_policy::E8Policy;
+use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
+use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
+use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
 
 use neotrix::config::NeoTrixConfig;
 
+mod clean;
+mod desktop;
+mod headless;
 mod proxy_cmd;
 mod standalone;
-mod headless;
-mod desktop;
 mod sysops;
-mod wiki;
 mod todo;
+mod wiki;
 
+pub use clean::run_clean;
 pub use proxy_cmd::run_proxy_cmd;
 pub use sysops::run_sysops;
-pub use wiki::run_wiki;
 pub use todo::run_todo;
+pub use wiki::run_wiki;
 fn success(msg: impl AsRef<str>) -> String {
     msg.as_ref().green().to_string()
 }
@@ -151,7 +153,10 @@ pub fn run_provider_wizard() {
     let config_path = neotrix::config::NeoTrixConfig::path();
     if let Some(parent) = config_path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            eprintln!("[config] warning: failed to create config directory ({}); continuing", e);
+            eprintln!(
+                "[config] warning: failed to create config directory ({}); continuing",
+                e
+            );
         }
     }
 
@@ -165,7 +170,11 @@ pub fn run_provider_wizard() {
                 eprintln!("Failed to read stdin; using default endpoint.");
             }
             let url = url.trim().to_string();
-            if url.is_empty() { None } else { Some(url) }
+            if url.is_empty() {
+                None
+            } else {
+                Some(url)
+            }
         }
         _ => None,
     };
@@ -190,7 +199,11 @@ pub fn run_provider_wizard() {
         match neotrix::nt_shield::shield_core::key_encryption::encrypt(&api_key) {
             Ok(enc) => enc,
             Err(e) => {
-                eprintln!("{}: key encryption failed ({}); refusing to store plaintext key", err("Error"), e);
+                eprintln!(
+                    "{}: key encryption failed ({}); refusing to store plaintext key",
+                    err("Error"),
+                    e
+                );
                 return;
             }
         }
@@ -213,14 +226,21 @@ pub fn run_provider_wizard() {
     }
 
     if let Err(e) = std::fs::write(&config_path, content) {
-        eprintln!("{}: failed to write config file ({}); configuration not saved", err("Error"), e);
+        eprintln!(
+            "{}: failed to write config file ({}); configuration not saved",
+            err("Error"),
+            e
+        );
         return;
     }
     println!();
     println!("✅ Configuration saved to: {}", config_path.display());
     println!("   Provider: {}", provider);
     if !api_key.is_empty() {
-        println!("   API Key: ****{}", &api_key[api_key.len().saturating_sub(4)..]);
+        println!(
+            "   API Key: ****{}",
+            &api_key[api_key.len().saturating_sub(4)..]
+        );
     }
     println!();
     println!("You can change these settings anytime by editing the config file.");
@@ -228,19 +248,39 @@ pub fn run_provider_wizard() {
 
 fn print_brain_stats(brain: &SelfIteratingBrain) {
     let stats = brain.brain.get_statistics();
-    println!("\n{}", info("╭─ NeoTrix V2 Brain Status ──────────────────────────╮"));
-    println!("│ {} {:<5}  {} {:<5}             │",
-        info("Iteration:"), brain.iteration,
-        info("Absorbed:"), brain.brain.total_absorb_count);
-    println!("│ {} {:.3}  {} {:<5}       │",
-        info("Capability Sum:"), stats.capability_sum,
-        info("Memory:"), brain.reasoning_bank.memories().len());
-    println!("{}", info("╰──────────────────────────────────────────────────────╯"));
+    println!(
+        "\n{}",
+        info("╭─ NeoTrix V2 Brain Status ──────────────────────────╮")
+    );
+    println!(
+        "│ {} {:<5}  {} {:<5}             │",
+        info("Iteration:"),
+        brain.iteration,
+        info("Absorbed:"),
+        brain.brain.total_absorb_count
+    );
+    println!(
+        "│ {} {:.3}  {} {:<5}       │",
+        info("Capability Sum:"),
+        stats.capability_sum,
+        info("Memory:"),
+        brain.reasoning_bank.memories().len()
+    );
+    println!(
+        "{}",
+        info("╰──────────────────────────────────────────────────────╯")
+    );
 }
 
 fn brain_dir(profile: &str) -> PathBuf {
-    let base = dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".neotrix");
-    if profile.is_empty() || profile == "default" { base } else { base.join("profiles").join(profile) }
+    let base = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".neotrix");
+    if profile.is_empty() || profile == "default" {
+        base
+    } else {
+        base.join("profiles").join(profile)
+    }
 }
 
 fn init_brain(profile: &str) -> (ReasoningBrain, ReasoningBank) {
@@ -250,16 +290,25 @@ fn init_brain(profile: &str) -> (ReasoningBrain, ReasoningBank) {
     if ReasoningBrain::has_saved_state() {
         match ReasoningBrain::load() {
             Ok(b) => {
-                println!("{}", info(format!("Loaded brain from {}/brain.json", dir.display())));
+                println!(
+                    "{}",
+                    info(format!("Loaded brain from {}/brain.json", dir.display()))
+                );
                 (b, ReasoningBank::new(100))
             }
             Err(e) => {
-                eprintln!("{}", warn(format!("Load failed ({}), creating new brain", e)));
+                eprintln!(
+                    "{}",
+                    warn(format!("Load failed ({}), creating new brain", e))
+                );
                 (ReasoningBrain::new(), ReasoningBank::new(100))
             }
         }
     } else {
-        println!("{}", info(format!("New brain at {}/brain.json", dir.display())));
+        println!(
+            "{}",
+            info(format!("New brain at {}/brain.json", dir.display()))
+        );
         (ReasoningBrain::new(), ReasoningBank::new(100))
     }
 }
@@ -331,7 +380,10 @@ fn ensure_provider_env_from_config() {
 /// Named "daemon" to distinguish from the actual HTTP server in server.rs.
 pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
     println!("{} v{}", info("NeoTrix Server"), env!("CARGO_PKG_VERSION"));
-    println!("{}", info("Starting background services... Press Ctrl+C to stop."));
+    println!(
+        "{}",
+        info("Starting background services... Press Ctrl+C to stop.")
+    );
     let server_rt = tokio_runtime();
     server_rt.block_on(async {
         let (brain, bank) = init_brain(profile);
@@ -414,7 +466,9 @@ pub(crate) fn spawn_sighup_reload() -> tokio::task::JoinHandle<()> {
                         }
                     }
                     #[cfg(not(feature = "stealth-net"))]
-                    log::info!("[hotreload] SIGHUP received (stealth-net feature off, nothing to reload)");
+                    log::info!(
+                        "[hotreload] SIGHUP received (stealth-net feature off, nothing to reload)"
+                    );
                 }
                 Err(e) => {
                     log::warn!("[hotreload] failed to register SIGHUP handler: {}", e);
@@ -436,7 +490,9 @@ fn parse_http_port(addr: &str) -> u16 {
 /// Resolve the effective prompt from positional arg, file, or stdin.
 pub fn resolve_prompt(prompt: Option<&str>, file: Option<&str>, pipe: bool) -> String {
     if let Some(p) = prompt {
-        if !p.is_empty() { return p.to_string(); }
+        if !p.is_empty() {
+            return p.to_string();
+        }
     }
     if let Some(f) = file {
         let path = std::path::Path::new(f);
@@ -470,25 +526,8 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
         }
         return;
     }
-    // 管理类 slash 命令 (provider pool / provider list / free 等) 直接走命令注册表,
-    // 不经 LLM 推理 — 它们不依赖 provider 且不应被网络/LLM 错误阻塞。
-    let trimmed = prompt.trim_start();
-    if trimmed.starts_with('/') {
-        // cli::commands removed — slash commands no longer available
-        if json_output {
-            use neotrix::l0_substrate::nt_core_jsonl::JsonlWriter;
-            match std::fs::File::create("output.jsonl") {
-                Ok(f) => {
-                    let mut writer = JsonlWriter::new_with_writer(Box::new(f));
-                    writer.emit_message("command", "CommandRegistry removed", None);
-                }
-                Err(e) => eprintln!("jsonl output failed: {}", e),
-            }
-        } else {
-            println!("CommandRegistry removed");
-        }
-        return;
-    }
+    // src/cli/commands 已删除: slash 输入不再走命令注册表,
+    // 与 desktop.rs 一致直接落到正常流程 (视为 LLM prompt)。
     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let (prompt, mentions) = resolve_mentions(prompt, &cwd);
     if !mentions.is_empty() && !json_output {
@@ -512,7 +551,10 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
                 } else {
                     let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
                     let r = agent.iterate(task_type);
-                    Ok(format!("Learned: {:.3} → {:.3}", r.score_before, r.score_after))
+                    Ok(format!(
+                        "Learned: {:.3} → {:.3}",
+                        r.score_before, r.score_after
+                    ))
                 }
             };
             tokio::time::timeout(timeout, task).await
@@ -577,7 +619,10 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
                 } else {
                     let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
                     let r = agent.iterate(task_type);
-                    Ok(format!("Learned: {:.3} → {:.3}", r.score_before, r.score_after))
+                    Ok(format!(
+                        "Learned: {:.3} → {:.3}",
+                        r.score_before, r.score_after
+                    ))
                 }
             };
             tokio::time::timeout(timeout, task).await
@@ -601,7 +646,10 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
 
 pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: bool) {
     if prompt.is_empty() {
-        eprintln!("{}: usage: neotrix run <prompt> | neotrix reason <prompt>", err("Error"));
+        eprintln!(
+            "{}: usage: neotrix run <prompt> | neotrix reason <prompt>",
+            err("Error")
+        );
         return;
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
@@ -633,7 +681,10 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                                 "response": full_response,
                                 "prompt": prompt,
                             });
-                            eprintln!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                            eprintln!(
+                                "{}",
+                                serde_json::to_string_pretty(&json).unwrap_or_default()
+                            );
                         }
                         Ok(())
                     }
@@ -644,7 +695,8 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                 let r = agent.iterate(task_type);
                 let msg = format!("Learned: {:.3} → {:.3}", r.score_before, r.score_after);
                 if format == Some("json") {
-                    let json = serde_json::json!({"success": true, "response": msg, "prompt": prompt});
+                    let json =
+                        serde_json::json!({"success": true, "response": msg, "prompt": prompt});
                     println!("{}", serde_json::to_string_pretty(&json).unwrap_or(msg));
                 } else {
                     println!("{}", msg);
@@ -654,7 +706,10 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
             if let Err(e) = result {
                 if format == Some("json") {
                     let json = serde_json::json!({"success": false, "error": e.to_string()});
-                    eprintln!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                    eprintln!(
+                        "{}",
+                        serde_json::to_string_pretty(&json).unwrap_or_default()
+                    );
                 } else {
                     eprintln!("{}: {}", err("Reasoning error"), e);
                 }
@@ -667,25 +722,30 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
         // Use TaskDispatcher for complex tasks
         rt.block_on(async {
             let mut agent = build_brain(profile);
-            
+
             // Extract components from the agent before moving it (single brain instance)
-            let gateway = agent.reasoning_engine.as_ref().and_then(|e| e.gateway.clone());
+            let gateway = agent
+                .reasoning_engine
+                .as_ref()
+                .and_then(|e| e.gateway.clone());
             let reasoning_engine = agent.reasoning_engine.take();
             let kernel = ReasoningKernel::new(3);
             let e8_policy = E8Policy::default();
-            
+
             let mut dispatcher = match (gateway, reasoning_engine) {
-                (Some(gw), Some(re)) => TaskDecomposerDispatcher::new(
-                    gw.clone(),
-                    DispatcherConfig::from_env(),
-                )
-                // Phase 2 top-up (SIM-47)：CoT 显式注入，恢复 new() 自构前的行为。
+                (Some(gw), Some(re)) => {
+                    TaskDecomposerDispatcher::new(gw.clone(), DispatcherConfig::from_env())
+                        // Phase 2 top-up (SIM-47)：CoT 显式注入，恢复 new() 自构前的行为。
                         .with_cot_generator(DefaultCoTGenerator::new(gw, CoTConfig::default()))
-                .with_reasoning_engine(Box::new(re))
-                .with_kernel(kernel)
-                .with_e8_policy(e8_policy),
+                        .with_reasoning_engine(Box::new(re))
+                        .with_kernel(kernel)
+                        .with_e8_policy(e8_policy)
+                }
                 _ => {
-                    eprintln!("{}: missing gateway or reasoning engine", err("Reasoning error"));
+                    eprintln!(
+                        "{}: missing gateway or reasoning engine",
+                        err("Reasoning error")
+                    );
                     return;
                 }
             };
@@ -699,7 +759,10 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                             "response": response,
                             "prompt": prompt,
                         });
-                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or(response));
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json).unwrap_or(response)
+                        );
                     } else {
                         println!("\n{}", response);
                     }
@@ -710,7 +773,10 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                             "success": false,
                             "error": e.to_string(),
                         });
-                        eprintln!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                        eprintln!(
+                            "{}",
+                            serde_json::to_string_pretty(&json).unwrap_or_default()
+                        );
                     } else {
                         eprintln!("{}: {}", err("Reasoning error"), e);
                     }
@@ -745,7 +811,10 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                 pb.inc(50);
                 let r = agent.iterate(task_type);
                 pb.finish_with_message("done");
-                Ok(format!("Learned: {:.3} → {:.3}", r.score_before, r.score_after))
+                Ok(format!(
+                    "Learned: {:.3} → {:.3}",
+                    r.score_before, r.score_after
+                ))
             };
 
             match result {
@@ -756,7 +825,10 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                             "response": response,
                             "prompt": prompt,
                         });
-                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or(response));
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json).unwrap_or(response)
+                        );
                     } else {
                         println!("\n{}", response);
                     }
@@ -767,7 +839,10 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                             "success": false,
                             "error": e.to_string(),
                         });
-                        eprintln!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                        eprintln!(
+                            "{}",
+                            serde_json::to_string_pretty(&json).unwrap_or_default()
+                        );
                     } else {
                         eprintln!("{}: {}", err("Reasoning error"), e);
                     }
@@ -784,9 +859,21 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
 fn is_complex_task(prompt: &str) -> bool {
     let lower = prompt.to_lowercase();
     let complex_keywords = [
-        "analyze", "design", "implement", "debug", "refactor", "optimize",
-        "architecture", "plan", "research", "compare", "evaluate",
-        "step by step", "think through", "break down", "decompose",
+        "analyze",
+        "design",
+        "implement",
+        "debug",
+        "refactor",
+        "optimize",
+        "architecture",
+        "plan",
+        "research",
+        "compare",
+        "evaluate",
+        "step by step",
+        "think through",
+        "break down",
+        "decompose",
     ];
     complex_keywords.iter().any(|kw| lower.contains(kw)) || prompt.len() > 200
 }
@@ -794,24 +881,34 @@ fn is_complex_task(prompt: &str) -> bool {
 pub fn show_status() {
     let status = neotrix::l1_action::nt_io::nt_io_proxy_server::ServerProxy::status();
     println!("{}", info("╭─ NeoTrix Status ───────────────────────╮"));
-    println!("│ {}  {:<2} / {:<2} {}   │",
+    println!(
+        "│ {}  {:<2} / {:<2} {}   │",
         info("Brain dimensions:"),
         status["brain_dims"].as_i64().unwrap_or(0),
         status["total_dims"].as_i64().unwrap_or(23),
-        info("active"));
-    println!("│ {}  {:<4}               │",
+        info("active")
+    );
+    println!(
+        "│ {}  {:<4}               │",
         info("Extensions:"),
-        status["brain_extension"].as_i64().unwrap_or(0));
-    println!("│ {}   {:<8} {}  │",
+        status["brain_extension"].as_i64().unwrap_or(0)
+    );
+    println!(
+        "│ {}   {:<8} {}  │",
         info("Knowledge store:"),
         status["knowledge_store_bytes"].as_i64().unwrap_or(0),
-        info("bytes"));
+        info("bytes")
+    );
     let nodes = status["knowledge_nodes"].as_i64().unwrap_or(0);
     let edges = status["knowledge_edges"].as_i64().unwrap_or(0);
-    println!("│ {}  {:<6} {} / {:<6} {} │",
+    println!(
+        "│ {}  {:<6} {} / {:<6} {} │",
         info("KB graph:"),
-        nodes, info("nodes"),
-        edges, info("edges"));
+        nodes,
+        info("nodes"),
+        edges,
+        info("edges")
+    );
     println!("{}", info("╰─────────────────────────────────────────╯"));
 }
 
@@ -824,7 +921,10 @@ pub fn generate_completions(shell: &str, cmd: &mut clap::Command) {
         "powershell" => Shell::PowerShell,
         "elvish" => Shell::Elvish,
         other => {
-            eprintln!("error: unsupported shell '{}'. Use: bash, zsh, fish, powershell, elvish", other);
+            eprintln!(
+                "error: unsupported shell '{}'. Use: bash, zsh, fish, powershell, elvish",
+                other
+            );
             std::process::exit(1);
         }
     };
@@ -833,7 +933,7 @@ pub fn generate_completions(shell: &str, cmd: &mut clap::Command) {
 }
 
 pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize) {
-    use neotrix::l5_cognition::nt_core_consciousness_core as consciousness_core;
+    use neotrix::l5_cognition::consciousness_core;
 
     let sub = sub.unwrap_or("status");
 
@@ -880,11 +980,17 @@ pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize)
             })
         }
         "health" => {
-            let health_map: serde_json::Value = branches.iter().fold(
-                serde_json::Map::new(),
-                |mut acc, b| {
-                    let health_v = b.get("health").and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
-                    let fog_v = b.get("fog").and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+            let health_map: serde_json::Value = branches
+                .iter()
+                .fold(serde_json::Map::new(), |mut acc, b| {
+                    let health_v = b
+                        .get("health")
+                        .and_then(|v| v.parse::<f64>().ok())
+                        .unwrap_or(0.0);
+                    let fog_v = b
+                        .get("fog")
+                        .and_then(|v| v.parse::<f64>().ok())
+                        .unwrap_or(0.0);
                     acc.insert(
                         b.get("kind").cloned().unwrap_or_default(),
                         serde_json::json!({
@@ -895,8 +1001,8 @@ pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize)
                         }),
                     );
                     acc
-                },
-            ).into();
+                })
+                .into();
             serde_json::json!({
                 "op": "health",
                 "cycle": cycle,
@@ -959,7 +1065,14 @@ pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize)
             println!("│ 相位(Φ)   {:>53.4}", phi);
             println!("│ 相干性    {:>53.4}", coherence);
             println!("│ 谐振周期  {:>54}", resonance_cycle);
-            println!("│ GWT 谐振  {:>54}", if snap.gwt_resonance_active { "active" } else { "idle" });
+            println!(
+                "│ GWT 谐振  {:>54}",
+                if snap.gwt_resonance_active {
+                    "active"
+                } else {
+                    "idle"
+                }
+            );
             println!("│ 分支数    {:>54}", branch_count);
             println!("│ 已消化果实{:>54}", fruits);
             println!("│ 雾(加权)  {:>53.3}", fog);
@@ -977,7 +1090,10 @@ pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize)
                 let health = b.get("health").cloned().unwrap_or_default();
                 let tier = b.get("node_tier").cloned().unwrap_or_default();
                 let constel = b.get("constellation").cloned().unwrap_or_default();
-                println!("  {:<14} 健康 {:>5}  {:?} {:?}", kind, health, tier, constel);
+                println!(
+                    "  {:<14} 健康 {:>5}  {:?} {:?}",
+                    kind, health, tier, constel
+                );
             }
             println!("└──────────────────────────────────────────────────┘");
         }
@@ -989,7 +1105,10 @@ pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize)
                 let fog_s = b.get("fog").cloned().unwrap_or_default();
                 let tier = b.get("node_tier").cloned().unwrap_or_default();
                 let constel = b.get("constellation").cloned().unwrap_or_default();
-                println!("  {:<14} 健康{:>5} 雾{:>4}  {:?} {:?}", kind, health, fog_s, tier, constel);
+                println!(
+                    "  {:<14} 健康{:>5} 雾{:>4}  {:?} {:?}",
+                    kind, health, fog_s, tier, constel
+                );
             }
             println!("└──────────────────────────────────────────────────┘");
         }
@@ -1062,8 +1181,15 @@ pub fn run_project_evolve(
     println!("文件数     {}", report.snapshot.total_files);
     println!("总行数     {}", report.snapshot.total_lines);
     println!("大文件     {} 个", report.snapshot.large_files.len());
-    println!("无测试模块 {} 个", report.snapshot.modules_without_tests.len());
-    println!("unsafe    {} 处 (热点 {} 文件)", report.snapshot.unsafe_count, report.snapshot.file_unsafe_hotspots.len());
+    println!(
+        "无测试模块 {} 个",
+        report.snapshot.modules_without_tests.len()
+    );
+    println!(
+        "unsafe    {} 处 (热点 {} 文件)",
+        report.snapshot.unsafe_count,
+        report.snapshot.file_unsafe_hotspots.len()
+    );
     println!("unwrap    {} 处", report.snapshot.unwrap_count);
     println!("TODO      {} 处", report.snapshot.todo_count);
     println!("编译错误  {} 个", report.snapshot.compile_errors);
@@ -1083,7 +1209,7 @@ pub fn run_mcp_server() {
 }
 
 pub fn run_benchmark(category: Option<&str>) {
-    use neotrix::l5_cognition::nt_mind::benchmark::{BenchmarkSuite, BenchmarkReport};
+    use neotrix::l5_cognition::nt_mind::benchmark::{BenchmarkReport, BenchmarkSuite};
     use neotrix_types::core::nt_core_cap::CapabilityVector;
 
     let cap: CapabilityVector = neotrix::l5_cognition::nt_core_state::load("brain")
@@ -1097,7 +1223,9 @@ pub fn run_benchmark(category: Option<&str>) {
     let report = match category {
         Some(cat) => {
             let results = BenchmarkSuite::run_category(&cap, cat);
-            let overall = if results.is_empty() { 0.0 } else {
+            let overall = if results.is_empty() {
+                0.0
+            } else {
                 results.iter().map(|r| r.score / r.max_score).sum::<f64>() / results.len() as f64
             };
             BenchmarkReport {
@@ -1119,12 +1247,18 @@ pub fn run_benchmark(category: Option<&str>) {
         } else {
             r.name.clone()
         };
-        println!("│ {:<13} | {:<17} | {:.2}  │", r.category, name_display, r.score);
+        println!(
+            "│ {:<13} | {:<17} | {:.2}  │",
+            r.category, name_display, r.score
+        );
     }
     if !report.results.is_empty() {
         println!("├───────────────┼───────────────────┼───────┤");
     }
-    println!("│ OVERALL       │                   │ {:.2}  │", report.overall_score);
+    println!(
+        "│ OVERALL       │                   │ {:.2}  │",
+        report.overall_score
+    );
     println!("╰───────────────┴───────────────────┴───────╯");
 }
 
@@ -1135,7 +1269,10 @@ pub fn run_browse(url: &str) {
     println!("{}", info("╭─ NeoTrix Browser ──────────────────────────╮"));
     println!("│ {} {}", info("Fetching:"), url);
     println!("│ {} {:?}", info("Backend:"), BackendKind::Http);
-    println!("{}", info("╰────────────────────────────────────────────────╯"));
+    println!(
+        "{}",
+        info("╰────────────────────────────────────────────────╯")
+    );
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -1172,7 +1309,9 @@ pub fn run_browse(url: &str) {
             .ok()
             .filter(|s| !s.trim().is_empty());
         if let Some(site) = auth_site {
-            if let Err(e) = engine.set_session_auth_by_site(&session_id, site.trim()).await
+            if let Err(e) = engine
+                .set_session_auth_by_site(&session_id, site.trim())
+                .await
             {
                 eprintln!("{}: auth: {}", err("Error"), e);
                 return;
@@ -1254,9 +1393,7 @@ pub fn run_search(query: &str, count: usize) {
             }
             println!("{}", info(format!("Found {} results:\n", results.len())));
             for (i, result) in results.iter().enumerate() {
-                println!("{}. {}",
-                    info(format!("{}", i + 1)),
-                    result.title.bold());
+                println!("{}. {}", info(format!("{}", i + 1)), result.title.bold());
                 println!("   {}", result.url.blue().underline());
                 println!("   {}", result.snippet);
                 println!();
@@ -1274,7 +1411,10 @@ pub fn run_login(url: &str) {
     println!("│ {}: {}", info("URL"), url);
     println!("│ {}", info("A Chrome window will open. Log in, then"));
     println!("│ {}", info("close the window to save the session."));
-    println!("{}", info("╰─────────────────────────────────────────────╯"));
+    println!(
+        "{}",
+        info("╰─────────────────────────────────────────────╯")
+    );
     let browser = BrowserCircuit::new();
     match browser.login(url) {
         Ok(_) => println!("{}", success("✅ Login session saved.")),
@@ -1302,7 +1442,10 @@ pub fn run_update(check_only: bool) {
                         println!("{} {}", info("Current version:"), env!("CARGO_PKG_VERSION"));
                         println!("{} {}", info("Latest version:"), release.version);
                         if release.version != cargo_crate_version!() {
-                            println!("{}", success("✅ Update available! Run `neotrix update` to install."));
+                            println!(
+                                "{}",
+                                success("✅ Update available! Run `neotrix update` to install.")
+                            );
                         } else {
                             println!("{}", success("✅ You have the latest version."));
                         }
@@ -1335,7 +1478,10 @@ pub fn run_update(check_only: bool) {
     {
         let _ = check_only;
         println!("{}", info("Self-update is not enabled in this build."));
-        println!("{}", info("Build with --features self-update or use your package manager."));
+        println!(
+            "{}",
+            info("Build with --features self-update or use your package manager.")
+        );
     }
 }
 
@@ -1400,10 +1546,16 @@ pub fn run_daemon(profile: &str) {
                 // ── 关键: 打开 KB 并附加到 BackgroundLoop ──
                 // 没有 KB, 所有吸收 handler (crawl_queue/exploration/knowledge_chain)
                 // 都会在 "kb not attached" 处直接 return, 晶体无法吸收外部数据。
-                if let Ok(kb) = neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+                if let Ok(kb) =
+                    neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None)
+                {
                     let kb = std::sync::Arc::new(kb);
                     bg.kb = Some(kb.clone());
-                    log_recovery(&recovery, "KB已打开", &format!("attached to BackgroundLoop"));
+                    log_recovery(
+                        &recovery,
+                        "KB已打开",
+                        &format!("attached to BackgroundLoop"),
+                    );
                     // 同时附加到 panorama
                     let mut panorama = PanoramaPipeline::new();
                     panorama.attach_kb(kb);
@@ -1419,8 +1571,7 @@ pub fn run_daemon(profile: &str) {
                 // 心跳任务: 每 60s 写入时间戳
                 let heartbeat_clone = heartbeat.clone();
                 let heartbeat_task = tokio::spawn(async move {
-                    let mut ticker =
-                        tokio::time::interval(std::time::Duration::from_secs(60));
+                    let mut ticker = tokio::time::interval(std::time::Duration::from_secs(60));
                     loop {
                         ticker.tick().await;
                         let ts = std::time::SystemTime::now()
@@ -1480,10 +1631,7 @@ pub fn run_daemon(profile: &str) {
                     eprintln!("{} {}", err("[daemon-supervisor]"), err(&msg));
 
                     if restart_count >= MAX_RESTARTS {
-                        let msg = format!(
-                            "连续重启{}次, 超过上限, 停止守护",
-                            MAX_RESTARTS
-                        );
+                        let msg = format!("连续重启{}次, 超过上限, 停止守护", MAX_RESTARTS);
                         log_recovery(&recovery_log, "守护终止", &msg);
                         eprintln!("{} {}", err("[daemon-supervisor]"), err(&msg));
                         break;
@@ -1711,14 +1859,14 @@ pub fn run_standalone_mode(stage: usize) {
 }
 
 pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
-    use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
     use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
     use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-    
+    use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
+
+    use neotrix::agent::hooks::{EccHookRegistry, HookContext, HookEvent};
     use neotrix::agent::skills::SkillsEngine;
-    use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
+    use neotrix::agent::tool::mcp::{McpToolDef, McpTransport};
     use neotrix::agent::tool::McpRegistry;
-    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::agent::{AgentTeam, ProcessType};
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
@@ -1740,9 +1888,18 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
 
         let has_engine = agent.reasoning_engine.is_some();
         if has_engine {
-            println!("{}: {} {}", info("ReasoningEngine"), success("active"), info("(LLM connected)"));
+            println!(
+                "{}: {} {}",
+                info("ReasoningEngine"),
+                success("active"),
+                info("(LLM connected)")
+            );
         } else {
-            println!("{}: {}", warn("ReasoningEngine"), warn("inactive (set NEOTRIX_PROVIDER/API_KEY/MODEL)"));
+            println!(
+                "{}: {}",
+                warn("ReasoningEngine"),
+                warn("inactive (set NEOTRIX_PROVIDER/API_KEY/MODEL)")
+            );
         }
         print_brain_stats(&agent);
 
@@ -1769,41 +1926,57 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
             );
         }
         // TODO(E2-next): Evolver 反馈接线 — SkillCandidate.performance_history 不在作用域, 待统一通道接入 (不跨文件新建依赖)
-        println!("{}: {} ", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)));
-        println!("  -> {} /skills list to browse, /skills ecc <id> to load from ECC community", info("/skills"));
+        println!(
+            "{}: {} ",
+            info("SkillsEngine"),
+            success(format!("{} local skills loaded", skill_count))
+        );
+        println!(
+            "  -> {} /skills list to browse, /skills ecc <id> to load from ECC community",
+            info("/skills")
+        );
 
         let mut mcp_registry = McpRegistry::new();
-        let mut builtin_tools = vec![
-            McpToolDef {
-                name: "neotrix_info".to_string(),
-                description: "NeoTrix MCP system info".to_string(),
-                server_name: "built-in".to_string(),
-                transport: McpTransport::Local {
-                    command: "echo".to_string(),
-                    args: vec![],
-                },
-                input_schema: serde_json::json!({"type": "object"}),
-                schema_version: None,
-                ..Default::default()
+        let mut builtin_tools = vec![McpToolDef {
+            name: "neotrix_info".to_string(),
+            description: "NeoTrix MCP system info".to_string(),
+            server_name: "built-in".to_string(),
+            transport: McpTransport::Local {
+                command: "echo".to_string(),
+                args: vec![],
             },
-        ];
+            input_schema: serde_json::json!({"type": "object"}),
+            schema_version: None,
+            ..Default::default()
+        }];
         builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
-        
+
         let mut orchestrator = neotrix::agent::tool::ToolOrchestrator::default();
         orchestrator.register_native_all(mcp_registry.as_native_tools());
         // set_tool_orchestrator removed with cli::commands
-        println!("{}: {} native MCP tools absorbed via McpToolAdapter", info("ToolOrchestrator"), success(mcp_registry.tool_count().to_string()));
+        println!(
+            "{}: {} native MCP tools absorbed via McpToolAdapter",
+            info("ToolOrchestrator"),
+            success(mcp_registry.tool_count().to_string())
+        );
         // set_mcp_registry removed with cli::commands
-        println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
+        println!(
+            "{}: {} ({})",
+            info("McpRegistry"),
+            success("ready"),
+            info("use /mcp list")
+        );
         let mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
         let mut hook_registry = EccHookRegistry::default();
         hook_registry.set_profile(neotrix::agent::hooks::HookProfile::Standard);
-        println!("{}: {} {}",
+        println!(
+            "{}: {} {}",
             info("EccHookRegistry"),
             success(format!("{} hooks registered", hook_registry.hook_count())),
-            info("(profile: standard)"));
+            info("(profile: standard)")
+        );
 
         let session_ctx = HookContext::new(HookEvent::SessionStart);
         let hook_actions = hook_registry.execute_event(&session_ctx);
@@ -1818,7 +1991,10 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
 
         let mut bg_goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
         bg_goal_loop.load();
-        let agent_team = Arc::new(Mutex::new(AgentTeam::new("default", ProcessType::Sequential)));
+        let agent_team = Arc::new(Mutex::new(AgentTeam::new(
+            "default",
+            ProcessType::Sequential,
+        )));
         bg_goal_loop = bg_goal_loop.with_agent_team(agent_team);
         tokio::spawn(async move {
             let mut bg = BackgroundLoop::new(bg_agent)
@@ -1844,15 +2020,21 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         // Session Recovery
         {
             use neotrix::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
-            let recovery_mgr = SessionRecoveryManager::new("default")
-                .with_auto_recover(true);
+            let recovery_mgr = SessionRecoveryManager::new("default").with_auto_recover(true);
             if let Some(snapshot) = recovery_mgr.load_latest_snapshot() {
-                println!("{}: {} (session #{}, {} messages)",
-                    info("SessionRecovery"), success("restored"),
-                    snapshot.session_id, snapshot.message_count);
+                println!(
+                    "{}: {} (session #{}, {} messages)",
+                    info("SessionRecovery"),
+                    success("restored"),
+                    snapshot.session_id,
+                    snapshot.message_count
+                );
             } else {
-                println!("{}: {} — no previous session found",
-                    info("SessionRecovery"), dim("fresh start"));
+                println!(
+                    "{}: {} — no previous session found",
+                    info("SessionRecovery"),
+                    dim("fresh start")
+                );
             }
         }
 
@@ -1862,19 +2044,20 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
             let agents_reader = AgentsMdReader::new();
             if let Ok(rules) = agents_reader.load_project_rules(std::path::Path::new(".")) {
                 if !rules.is_empty() {
-                    println!("{}: {} ({} sections)",
-                        info("AGENTS.md"), success("loaded"), rules.sections.len());
+                    println!(
+                        "{}: {} ({} sections)",
+                        info("AGENTS.md"),
+                        success("loaded"),
+                        rules.sections.len()
+                    );
                 } else {
-                    println!("{}: {} — no rules found",
-                        info("AGENTS.md"), dim("skipped"));
+                    println!("{}: {} — no rules found", info("AGENTS.md"), dim("skipped"));
                 }
             }
         }
 
         let sp = indicatif::ProgressBar::new_spinner();
-        match indicatif::ProgressStyle::default_spinner()
-            .template("{spinner:.blue} {msg}")
-        {
+        match indicatif::ProgressStyle::default_spinner().template("{spinner:.blue} {msg}") {
             Ok(style) => sp.set_style(style),
             Err(e) => eprintln!("{}: invalid spinner template: {}", err("Error"), e),
         }
@@ -1889,16 +2072,16 @@ pub fn run_interactive(cfg: &NeoTrixConfig, profile: &str) {
 }
 
 pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, ephemeral: bool) {
-    use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
     use neotrix::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
+    use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
     use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-    
+    use neotrix::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
+
+    use neotrix::agent::hooks::{EccHookRegistry, HookContext, HookEvent};
     use neotrix::agent::skills::SkillsEngine;
-    use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
+    use neotrix::agent::tool::mcp::{McpToolDef, McpTransport};
     use neotrix::agent::tool::McpRegistry;
-    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
-    use neotrix::agent::{AgentTeam, AgentRole, ProcessType};
+    use neotrix::agent::{AgentRole, AgentTeam, ProcessType};
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
 
@@ -1923,9 +2106,18 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
 
         let has_engine = agent.reasoning_engine.is_some();
         if has_engine {
-            println!("{}: {} {}", info("ReasoningEngine"), success("active"), info("(LLM connected)"));
+            println!(
+                "{}: {} {}",
+                info("ReasoningEngine"),
+                success("active"),
+                info("(LLM connected)")
+            );
         } else {
-            println!("{}: {}", warn("ReasoningEngine"), warn("inactive (set NEOTRIX_PROVIDER/API_KEY/MODEL)"));
+            println!(
+                "{}: {}",
+                warn("ReasoningEngine"),
+                warn("inactive (set NEOTRIX_PROVIDER/API_KEY/MODEL)")
+            );
         }
         print_brain_stats(&agent);
 
@@ -1952,39 +2144,51 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
             );
         }
         // TODO(E2-next): Evolver 反馈接线 — SkillCandidate.performance_history 不在作用域, 待统一通道接入 (不跨文件新建依赖)
-        println!("{}: {} ", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)));
-        println!("  -> {} /skills list to browse, /skills ecc <id> to load from ECC community", info("/skills"));
+        println!(
+            "{}: {} ",
+            info("SkillsEngine"),
+            success(format!("{} local skills loaded", skill_count))
+        );
+        println!(
+            "  -> {} /skills list to browse, /skills ecc <id> to load from ECC community",
+            info("/skills")
+        );
 
         let mut mcp_registry = McpRegistry::new();
-        let mut builtin_tools = vec![
-            McpToolDef {
-                name: "neotrix_info".to_string(),
-                description: "NeoTrix MCP system info".to_string(),
-                server_name: "built-in".to_string(),
-                transport: McpTransport::Local {
-                    command: "echo".to_string(),
-                    args: vec![],
-                },
-                input_schema: serde_json::json!({"type": "object"}),
-                schema_version: None,
-                ..Default::default()
+        let mut builtin_tools = vec![McpToolDef {
+            name: "neotrix_info".to_string(),
+            description: "NeoTrix MCP system info".to_string(),
+            server_name: "built-in".to_string(),
+            transport: McpTransport::Local {
+                command: "echo".to_string(),
+                args: vec![],
             },
-        ];
+            input_schema: serde_json::json!({"type": "object"}),
+            schema_version: None,
+            ..Default::default()
+        }];
         builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
-        
+
         let mut orchestrator = neotrix::agent::tool::ToolOrchestrator::default();
         orchestrator.register_native_all(mcp_registry.as_native_tools());
         // set_tool_orchestrator and set_mcp_registry removed with cli::commands
-        println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
+        println!(
+            "{}: {} ({})",
+            info("McpRegistry"),
+            success("ready"),
+            info("use /mcp list")
+        );
         let _mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
         let mut hook_registry = EccHookRegistry::default();
         hook_registry.set_profile(neotrix::agent::hooks::HookProfile::Standard);
-        println!("{}: {} {}",
+        println!(
+            "{}: {} {}",
             info("EccHookRegistry"),
             success(format!("{} hooks registered", hook_registry.hook_count())),
-            info("(profile: standard)"));
+            info("(profile: standard)")
+        );
 
         let session_ctx = HookContext::new(HookEvent::SessionStart);
         let hook_actions = hook_registry.execute_event(&session_ctx);
@@ -2000,10 +2204,17 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
         let mut bg_goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
         bg_goal_loop.load();
         if bg_goal_loop.active_goal.is_some() {
-            println!("{} {}", info("[bg]"), info("Restored background goal from ~/.neotrix/goals.json"));
+            println!(
+                "{} {}",
+                info("[bg]"),
+                info("Restored background goal from ~/.neotrix/goals.json")
+            );
         }
 
-        let agent_team = Arc::new(Mutex::new(AgentTeam::new("default", ProcessType::Sequential)));
+        let agent_team = Arc::new(Mutex::new(AgentTeam::new(
+            "default",
+            ProcessType::Sequential,
+        )));
         {
             let mut team = agent_team.lock().unwrap_or_else(|e| e.into_inner());
             // TODO(T14-next): E2 接线后删除旧构造（goal/tools 去向待 E2 裁决，见 team_role_to_card 注记）
@@ -2022,7 +2233,9 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
         bg_goal_loop = bg_goal_loop.with_agent_team(agent_team);
 
         let mut panorama = PanoramaPipeline::new();
-        let bg_kb: Option<std::sync::Arc<neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase>>;
+        let bg_kb: Option<
+            std::sync::Arc<neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase>,
+        >;
         if let Ok(kb) = neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
             let kb = std::sync::Arc::new(kb);
             panorama.attach_kb(kb.clone());
@@ -2061,15 +2274,22 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
         // Session Recovery — 加载上次会话快照
         {
             use neotrix::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
-            let recovery_mgr = SessionRecoveryManager::new("default")
-                .with_auto_recover(true);
+            let recovery_mgr = SessionRecoveryManager::new("default").with_auto_recover(true);
             if let Some(snapshot) = recovery_mgr.load_latest_snapshot() {
-                println!("{}: {} (session #{}, {} messages, {} e8 states)",
-                    info("SessionRecovery"), success("restored"),
-                    snapshot.session_id, snapshot.message_count, snapshot.e8_state_sequence.len());
+                println!(
+                    "{}: {} (session #{}, {} messages, {} e8 states)",
+                    info("SessionRecovery"),
+                    success("restored"),
+                    snapshot.session_id,
+                    snapshot.message_count,
+                    snapshot.e8_state_sequence.len()
+                );
             } else {
-                println!("{}: {} — no previous session found",
-                    info("SessionRecovery"), dim("fresh start"));
+                println!(
+                    "{}: {} — no previous session found",
+                    info("SessionRecovery"),
+                    dim("fresh start")
+                );
             }
         }
 
@@ -2080,14 +2300,25 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
             if let Ok(rules) = agents_reader.load_project_rules(std::path::Path::new(".")) {
                 if !rules.is_empty() {
                     let sections: Vec<&str> = rules.sections.keys().map(|k| k.as_str()).collect();
-                    println!("{}: {} ({}) — {} sections: {}",
-                        info("AGENTS.md"), success("loaded"),
-                        rules.source_files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "),
+                    println!(
+                        "{}: {} ({}) — {} sections: {}",
+                        info("AGENTS.md"),
+                        success("loaded"),
+                        rules
+                            .source_files
+                            .iter()
+                            .map(|p| p.display().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", "),
                         rules.sections.len(),
-                        sections.join(", "));
+                        sections.join(", ")
+                    );
                 } else {
-                    println!("{}: {} — no rules found in current directory",
-                        info("AGENTS.md"), dim("skipped"));
+                    println!(
+                        "{}: {} — no rules found in current directory",
+                        info("AGENTS.md"),
+                        dim("skipped")
+                    );
                 }
             }
         }
@@ -2105,10 +2336,13 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
     });
 }
 
-
 pub fn run_sandbox_run(code: Option<&str>, runtime: &str, timeout: u64) {
     use neotrix::l3_embodiment::nt_shield::nt_shield_sandbox::cli;
-    let runtime = if runtime.is_empty() { None } else { Some(runtime) };
+    let runtime = if runtime.is_empty() {
+        None
+    } else {
+        Some(runtime)
+    };
     let rt = tokio_runtime();
     rt.block_on(cli::handle_run(code, runtime, Some(timeout)));
 }
@@ -2182,7 +2416,10 @@ pub fn run_features_list() {
     if features.is_empty() {
         println!("  {} No feature flags are currently enabled", info("ℹ"));
         println!();
-        println!("  Use {} to enable a feature", info("neotrix features enable <name>"));
+        println!(
+            "  Use {} to enable a feature",
+            info("neotrix features enable <name>")
+        );
         return;
     }
     println!("  {} Enabled feature flags:", success("✓"));
@@ -2197,7 +2434,11 @@ pub fn run_config_encrypt_keys() {
     use neotrix::l3_embodiment::nt_shield::shield_core::key_encryption;
     let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
-        eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
+        eprintln!(
+            "{} No config file found at {}",
+            err("Error:"),
+            config_path.display()
+        );
         return;
     }
     let content = match std::fs::read_to_string(&config_path) {
@@ -2220,7 +2461,9 @@ pub fn run_config_encrypt_keys() {
             .iter()
             .filter(|(k, v)| {
                 let k_lower = k.to_lowercase();
-                (k_lower.contains("api_key") || k_lower.contains("apikey") || k_lower.contains("secret"))
+                (k_lower.contains("api_key")
+                    || k_lower.contains("apikey")
+                    || k_lower.contains("secret"))
                     && v.is_str()
                     && !key_encryption::is_encrypted(v.as_str().unwrap_or_default())
             })
@@ -2247,7 +2490,10 @@ pub fn run_config_encrypt_keys() {
         }
     }
     if !changed {
-        println!("  {} No plaintext API keys or secrets found in config", info("ℹ"));
+        println!(
+            "  {} No plaintext API keys or secrets found in config",
+            info("ℹ")
+        );
         return;
     }
     let output = toml::to_string_pretty(&cfg).unwrap_or(content);
@@ -2255,14 +2501,22 @@ pub fn run_config_encrypt_keys() {
         eprintln!("{} Failed to write config: {}", err("Error:"), e);
         return;
     }
-    println!("  {} Config written to {}", success("✓"), config_path.display());
+    println!(
+        "  {} Config written to {}",
+        success("✓"),
+        config_path.display()
+    );
 }
 
 pub fn run_config_decrypt_keys() {
     use neotrix::l3_embodiment::nt_shield::shield_core::key_encryption;
     let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
-        eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
+        eprintln!(
+            "{} No config file found at {}",
+            err("Error:"),
+            config_path.display()
+        );
         return;
     }
     let content = match std::fs::read_to_string(&config_path) {
@@ -2283,7 +2537,9 @@ pub fn run_config_decrypt_keys() {
     if let Some(table) = cfg.as_table_mut() {
         let keys_to_decrypt: Vec<String> = table
             .iter()
-            .filter(|(_, v)| v.is_str() && key_encryption::is_encrypted(v.as_str().unwrap_or_default()))
+            .filter(|(_, v)| {
+                v.is_str() && key_encryption::is_encrypted(v.as_str().unwrap_or_default())
+            })
             .map(|(k, _)| k.clone())
             .collect();
         for key in &keys_to_decrypt {
@@ -2315,7 +2571,11 @@ pub fn run_config_decrypt_keys() {
         "{} API keys are now stored in plaintext. Consider re-encrypting with `neotrix config encrypt-keys`.",
         warn("⚠")
     );
-    println!("  {} Config written to {}", success("✓"), config_path.display());
+    println!(
+        "  {} Config written to {}",
+        success("✓"),
+        config_path.display()
+    );
 }
 
 // ── Wallet commands ──
@@ -2352,24 +2612,34 @@ pub fn run_wallet_list(json: bool) {
     match crypto.wallet_store.list_wallets() {
         Ok(wallets) => {
             if json {
-                let list: Vec<serde_json::Value> = wallets.iter().map(|w| {
-                    serde_json::json!({
-                        "label": w.label, "address": w.address,
-                        "chain": w.chain, "created": w.created_at
+                let list: Vec<serde_json::Value> = wallets
+                    .iter()
+                    .map(|w| {
+                        serde_json::json!({
+                            "label": w.label, "address": w.address,
+                            "chain": w.chain, "created": w.created_at
+                        })
                     })
-                }).collect();
+                    .collect();
                 match serde_json::to_string_pretty(&serde_json::json!({"wallets": list})) {
                     Ok(s) => println!("{}", s),
                     Err(e) => eprintln!("{}: JSON serialization failed: {}", err("Error"), e),
                 }
             } else if wallets.is_empty() {
-                println!("  {} No wallets found. Use {} to create one.",
-                    info("ℹ"), info("neotrix wallet create <label>"));
+                println!(
+                    "  {} No wallets found. Use {} to create one.",
+                    info("ℹ"),
+                    info("neotrix wallet create <label>")
+                );
             } else {
                 println!("  {} Wallets ({})", success("✓"), wallets.len());
                 for w in &wallets {
                     let addr_short = if w.address.len() > 12 {
-                        format!("{}...{}", &w.address[..6], &w.address[w.address.len()-4..])
+                        format!(
+                            "{}...{}",
+                            &w.address[..6],
+                            &w.address[w.address.len() - 4..]
+                        )
                     } else {
                         w.address.clone()
                     };
@@ -2386,11 +2656,19 @@ pub fn run_wallet_balance(chain: &str) {
     let addr = match crypto.wallet_manager.active_wallet() {
         Some(w) => w.address.clone(),
         None => {
-            eprintln!("{} No active wallet. Create or import one first.", err("Error:"));
+            eprintln!(
+                "{} No active wallet. Create or import one first.",
+                err("Error:")
+            );
             return;
         }
     };
-    println!("  {} Checking balance of {} on {}", info("ℹ"), &addr[..10], chain);
+    println!(
+        "  {} Checking balance of {} on {}",
+        info("ℹ"),
+        &addr[..10],
+        chain
+    );
 }
 
 pub fn run_wallet_delete(label: &str) {
@@ -2405,7 +2683,10 @@ pub fn run_wallet_export(label: &str) {
     let crypto = neotrix::l1_action::nt_act::nt_act_crypto::CryptoAgent::new();
     match crypto.wallet_store.load_wallet(label) {
         Ok(w) => {
-            println!("{}", warn("⚠️  安全警告: 私钥可控制你的全部资产, 请勿泄露!"));
+            println!(
+                "{}",
+                warn("⚠️  安全警告: 私钥可控制你的全部资产, 请勿泄露!")
+            );
             println!();
             println!("🔑 {} 私钥:", w.label);
             println!("{}", w.private_key_hex());
@@ -2423,8 +2704,8 @@ pub fn run_wallet_export(label: &str) {
 ///   3. 启动交互 REPL：每轮 `loop_.turn(input)` 驱动 用户→LLM→工具→回答
 #[allow(dead_code)] // 保留入口：待上层接线后启用
 pub fn run_agent_mode(profile: &str) {
+    use neotrix::agent::tool::mcp::{McpToolDef, McpTransport};
     use neotrix::agent::tool::McpRegistry;
-    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
     use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
     use std::io::{self, Write};
@@ -2448,31 +2729,37 @@ You have tools available; call them when they help. Be concise and evidence-firs
                 command: "echo".to_string(),
                 args: vec![],
             },
-                input_schema: serde_json::json!({"type": "object"}),
-                schema_version: None,
-                ..Default::default()
+            input_schema: serde_json::json!({"type": "object"}),
+            schema_version: None,
+            ..Default::default()
         }];
         builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
-        
-        // 意识核心能力面: 命令面 (file/git/session/memory/crypto/...) 全部桥接为
-        // NativeTool, LLM 意识核心智能调度; 人类只接触基础控制命令。
+
+        // 意识核心能力面: src/cli/commands 已删除, awareness_core_tools() 为空;
+        // 工具面由 MCP 注册表提供, 意图路由由 nt_auto_orchestrator 分类。
         let mut tools = mcp_registry.as_native_tools();
         tools.extend(neotrix::l5_cognition::nt_core::nt_io_awareness_core::awareness_core_tools());
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
             let cfg = neotrix::config::NeoTrixConfig::load();
-            cfg.default_model.clone().unwrap_or_else(|| "default".to_string())
+            cfg.default_model
+                .clone()
+                .unwrap_or_else(|| "default".to_string())
         });
 
         let mut loop_ = AgentLoop::new(Arc::new(gateway), &default_model, NT_CORE_SYSTEM_PROMPT)
-            .with_tools(tools);        let _ = profile;
+            .with_tools(tools);
+        let _ = profile;
 
         println!("╭─ NeoTrix Agent Loop ─────────────────────────────╮");
         println!("│  NT-CORE 作为主体 · LLM 作为后端推理引擎        │");
-        println!("│  model: {} · tools: {}          │",
-            loop_.model(), loop_.tool_count());
+        println!(
+            "│  model: {} · tools: {}          │",
+            loop_.model(),
+            loop_.tool_count()
+        );
         println!("│  /exit 退出 · /tools 查看工具 · /hist 查看历史  │");
         println!("╰──────────────────────────────────────────────────╯");
 
@@ -2485,29 +2772,38 @@ You have tools available; call them when they help. Be concise and evidence-firs
                 Ok(_) => {
                     let trimmed = input.trim();
                     match trimmed {
-                        "/exit" | "/q" => { println!("Exiting."); break; }
+                        "/exit" | "/q" => {
+                            println!("Exiting.");
+                            break;
+                        }
                         "/tools" => {
                             for t in loop_.tool_count()..loop_.tool_count() {
                                 let _ = t;
                             }
                             println!("{} tools registered", loop_.tool_count());
                             for inv in &loop_.tool_log {
-                                println!("  {} → {}: {}", if inv.success { "✓" } else { "✗" }, inv.name, inv.output);
+                                println!(
+                                    "  {} → {}: {}",
+                                    if inv.success { "✓" } else { "✗" },
+                                    inv.name,
+                                    inv.output
+                                );
                             }
                         }
                         "/hist" => {
                             println!("{} messages in history", loop_.history_len());
                         }
-                        _ if !trimmed.is_empty() => {
-                            match loop_.turn(trimmed).await {
-                                Ok(response) => println!("\n{}", response),
-                                Err(e) => eprintln!("\n{} {}", err("Error:"), e),
-                            }
-                        }
+                        _ if !trimmed.is_empty() => match loop_.turn(trimmed).await {
+                            Ok(response) => println!("\n{}", response),
+                            Err(e) => eprintln!("\n{} {}", err("Error:"), e),
+                        },
                         _ => {}
                     }
                 }
-                Err(e) => { eprintln!("error: {}", e); break; }
+                Err(e) => {
+                    eprintln!("error: {}", e);
+                    break;
+                }
             }
         }
     });
@@ -2517,10 +2813,11 @@ You have tools available; call them when they help. Be concise and evidence-firs
 ///
 /// **STUB** — cli::tui 模块已移除，此函数仅打印错误并返回。
 pub fn run_agent_tui(_profile: &str) {
-    eprintln!("{} TUI 模块已移除，请使用 --headless 或 web 模式", err("Error"));
+    eprintln!(
+        "{} TUI 模块已移除，请使用 --headless 或 web 模式",
+        err("Error")
+    );
 }
-
-
 
 #[cfg(test)] // 仅测试使用（nt_entry_tests）
 fn run_shell_direct(cmd: &str) -> Result<(i32, String, String), String> {
@@ -2534,62 +2831,6 @@ fn run_shell_direct(cmd: &str) -> Result<(i32, String, String), String> {
     let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
     Ok((code, stdout, stderr))
 }
-
-/// 复制文本到系统剪贴板（/copy）：优先 pbcopy (macOS) / pbpaste 对照，回退 xclip/xsel (Linux)。
-/// Windows 下无内置命令，回退错误提示。
-#[allow(dead_code)] // 保留工具函数：待 /copy 接线后启用
-fn copy_to_clipboard(text: &str) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        let mut child = std::process::Command::new("pbcopy")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("pbcopy 启动失败: {}", e))?;
-        use std::io::Write;
-        child
-            .stdin
-            .take()
-            .ok_or("pbcopy stdin 不可用")?
-            .write_all(text.as_bytes())
-            .map_err(|e| format!("写入剪贴板失败: {}", e))?;
-        let status = child.wait().map_err(|e| format!("pbcopy 等待失败: {}", e))?;
-        if !status.success() {
-            return Err(format!("pbcopy 退出码非零: {}", status));
-        }
-        Ok(())
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        let cmd = if std::process::Command::new("xclip").arg("-version").output().is_ok() {
-            "xclip"
-        } else {
-            "xsel"
-        };
-        let mut child = std::process::Command::new(cmd)
-            .arg("-b")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("{} 启动失败: {}", cmd, e))?;
-        use std::io::Write;
-        child
-            .stdin
-            .take()
-            .ok_or("剪贴板 stdin 不可用")?
-            .write_all(text.as_bytes())
-            .map_err(|e| format!("写入剪贴板失败: {}", e))?;
-        let status = child.wait().map_err(|e| format!("{} 等待失败: {}", cmd, e))?;
-        if !status.success() {
-            return Err(format!("{} 退出码非零: {}", cmd, status));
-        }
-        return Ok(());
-    }
-    #[cfg(windows)]
-    {
-        let _ = text;
-        Err("Windows 暂不支持 /copy (无内置剪贴板命令)".into())
-    }
-}
-
 
 /// 运行 `git diff --no-color [path]`，返回 stdout（best-effort，失败返回错误信息）。
 #[allow(dead_code)] // 保留工具函数：待调用方接线后启用
@@ -2616,11 +2857,8 @@ pub fn team_role_to_card(
     id: &str,
     role: &neotrix::agent::team::AgentRole,
 ) -> neotrix::l1_action::nt_infra_agent_card::AgentCard {
-    let mut card = neotrix::l1_action::nt_infra_agent_card::AgentCard::new(
-        id,
-        &role.name,
-        &role.backstory,
-    );
+    let mut card =
+        neotrix::l1_action::nt_infra_agent_card::AgentCard::new(id, &role.name, &role.backstory);
     card.tags = role.tools.clone();
     card.role.role_chain = vec![role.role.clone()];
     card

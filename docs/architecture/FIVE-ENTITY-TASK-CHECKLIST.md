@@ -31,9 +31,9 @@ E0.3/E0.1/E0.4（风险升序串行；E0.4 必须最后）
 | T03c | 数据类型跨层 DTO（DecomposeSuggestion/CrtPlan/CrtTimeScale/TraceSource/CoTOutput/E8Policy 去留） | dispatcher＋调用方 | 跨层 DTO 方案后动 | T03b | ✅ WaveE3b（＋218/-15；写入点全等价；读点未迁清单已立；cargo 未跑） | 2 天 |
 | T04 | E0.3 facade 收敛＋58 项裁决 | `l1_facade.rs:131-173` 拆子模块＋ALLOW 注释 | 20+ 消费者不断；新增走 trait | T03 | ✅ 代码 Wave1＋裁决关闭：259 导出真零消费者为 0（T04 车道 58 系计数口径误报，已证伪），DEFER 决议撤销，无删除项 | 2 天 |
 | T05 | E0.1 From 上移 | 各层 `error_conversions`，L0 只留枚举 | `rg 'crate::l[56]_' l0_substrate` 零命中 | T04 | ✅ Wave2（实存 20 处非 33，已纠正；L3/L6 注册行总控已补；调用方零改；cargo 未跑） | 2 天 |
-| T06a | E0.4a 类型搬迁＋判决快照回归测试 | `ApprovalMode/ActionType/PendingAction`→L0/neotrix-types；快照当前放行/拦截判决 | 快照测试全绿 | T05 | ⚠️ 阻塞中（L3/L6 他窗迁移：nt_approval/shield_enforcer 呈 untracked 态，待其落定） | 1 天 |
-| T06b | E0.4b L0 `ApproveGate` trait 定义 | L0 trait（引擎不知情） | trait 编译＋mock 可测 | T06a | ⬜ | 0.5 天 |
-| T06c | E0.4c 引擎留 L6、向 L3 注入 | L3 经回调调用，L6 注入实现 | 快照测试行为一致（第二 PR） | T06b | ⬜ | 1.5 天 |
+| T06a | E0.4a 类型搬迁＋判决快照回归测试 | `ApprovalMode/ActionType/PendingAction`→L0/neotrix-types；快照当前放行/拦截判决 | 快照测试全绿 | T05 | ✅ 自解：L3/L6 双文件实为成品（48h 无动），`nt_core_approval.rs` 新建＋L6 重导出＋矩阵快照测试（T06b trait 对象测试同批） | 1 天 |
+| T06b | E0.4b L0 `ApproveGate` trait 定义 | L0 trait（引擎不知情） | trait 编译＋mock 可测 | T06a | ✅ `ApproveGate{needs_approval,approval_mode}` 落 L0，`ApprovalEngine` 实现＋trait 对象测试 | 0.5 天 |
+| T06c | E0.4c 引擎留 L6、向 L3 注入 | L3 经回调调用，L6 注入实现 | 快照测试行为一致（第二 PR） | T06b | ✅ `ApprovalOverride` 回调＋无注入回落引擎＋3 注入测试（allow/block/passthrough），默认行为零变 | 1.5 天 |
 
 ## Phase P0：桌面热身
 
@@ -43,7 +43,7 @@ E0.3/E0.1/E0.4（风险升序串行；E0.4 必须最后）
 | T08 | P0-2 三段式门禁 | `skill_loader.rs`＋门禁＋4 单测 | 门禁 2/2 独立通过；`cargo check` 通过 | — | ✅ 本窗完成（lib 代码） | 0.5 天 |
 | T09 | P0-1 模型档位层 | `model_router.rs`＋`model_gateway.rs` 四元组＋双 tier | 档位＋系数＋锁档；前端只传档位名 | T07 | ✅ 后端本窗完成（TierDomain/TierLevel/route_by_level＋Preferences 三档位；fmt 我区 clean；cargo 待复验）；前端他窗并行（`settings/modelTiers.ts`，档位名一致 auto/fast/expert/ultra，系数同源）；⚠️ Preferences 扩展落入孤儿文件（`nt_core_model_unified.rs` 零引用不编译），live 路径由 L1 单数版覆盖，孤儿归 T45 统一处理 | 1 天 |
 | T45 | 孤儿文件治理程序（78 严格死文件，bin/test 除外） | 已验真孤儿：skill_evolution（已接线复活✅）/model_unified/dual_track/awareness_monitor/consciousness_types… | 逐文件编译验证→接线或删除（禁并行删，需串行门） | T41 | 🔄 部分（model_unified/dual_track/consciousness_types/awareness_monitor 已接线 4 处；cost_router/cost_ladder/nt_task_decomposition 已接线 3 处；registry 同步更新） | 8 天 |
-| T46 | 类型化错误程序（515 文件 `Result<_,String>`） | 新代码禁 `Result<_,String>`（用既有 NeoTrixError/专用 Error）；存量分批迁移 | clippy 门＋逐模块迁移 | — | ⬜ | 长期 |
+| T46 | 类型化错误程序（515 文件 `Result<_,String>`） | 新代码禁 `Result<_,String>`（用既有 NeoTrixError/专用 Error）；存量分批迁移 | clippy 门＋逐模块迁移 | — | 🔄 新代码已合规（本轮 T06/E2/dispatch 新增零 `Result<_,String>`）；存量 4 处（skill_loader×10／gallery.install／crystal.save／approval approve-deny）调用方跨窗，逐模块排期，不强拆 | 长期 |
 
 ## Phase E1：实体正典
 
@@ -72,9 +72,9 @@ E0.3/E0.1/E0.4（风险升序串行；E0.4 必须最后）
 | T23 | tick 接线＋`workspace_context`＋时钟合并 | `consciousness_core/core.rs` | tick 单测：快照含上下文 | T22 | ✅ WaveE2b（＋100/-0，1 单测；workspace_id 暂读环境变量＋TODO；advance_tick 需持有点未硬上；fmt 我区 clean；cargo 未跑） | 2 天 |
 | T24 | 首条数据流（entry 两调用方＋Evolver 反馈） | `entry/mod.rs`＋`headless.rs` | trace＋1→history＋1→成本断言 | T22 | ✅ WaveE2b（3 包裹点＋42/+31/-2 纯观测，零行为变更；headless 系 stub（记录 Err），真数据待真实接线；Evolver＋TODO；fmt 我区 clean；cargo 未跑） | 1 天 |
 | T25 | KB 命名空间＋`crystal_state.json`（R-P0-2 写模式） | 各实体＋crystal_root | 读写往返单测 | T22 | ✅ WaveE2b（＋134/-0，save/load＋隔离单测不碰 live HOME；.bak 单代 vs crystal.json 五代轮转 mismatch→follow-up T25b；fmt 我区 clean；cargo 未跑） | 1 天 |
-| T25b | 备份轮转泛化（两文件共享） | `nt_crystal_core/mod.rs`（跨文件，需协调） | 单代→多代对等耐久 | T25 | ✅ 换道完成（不碰 mod.rs：`rotate_backups` 落 crystal_state.rs 内＋save 接入＋实跑验证通过；mod.rs 后续复用时再收敛） | 0.5 天 |
+| T25b | 备份轮转泛化（两文件共享） | `nt_crystal_core/mod.rs`（跨文件，需协调） | 单代→多代对等耐久 | T25 | ✅ 换道完成（不碰 mod.rs：`rotate_backups` 落 crystal_state.rs 内＋save 接入＋实跑验证通过；真收敛随旧 `neotrix/` 目录裁决——plan 函数宿主在待删目录内，删时同步迁移） | 0.5 天 |
 | T38 | E2-runtime 接线（持有点＋全量填充） | core.rs tick＋crystal_state | 持有点＋agents/skills 填充；fmt 我区 clean | T22 | ✅ 直落（`crystal: Option`＋setter＋推进；tools/tasks 暂空＋精确 unblock 条件；cargo 未跑） | 1 天 |
-| T39 | 双 ConsciousnessCoreHandle 收敛（A1＋调用迁移已落地） | core.rs:158（E2 新核） vs nt_core_consciousness_core.rs:202（旧核，4665 行）双 tick 同写 `consciousness` 命名空间；调用分裂已消除 4 处（SelfTest 本体移植＋status/apply×2/register×1 迁移）；残余：literals（observer/run_cycle deep 链）＋旧文件内自测＋A2 垫片＋A4 删文件（待串行门） | A1 ✅（新 tick 已含 5 行为，逐项核对）；A3 部分（旧核 tick E2 移植已落地：持有点＋agents/skills 填充，排序 bug 已修）；A2/A4 待定 | T38 | 🔄 部分 | 5 天 |
+| T39 | 双 ConsciousnessCoreHandle 收敛（A1＋调用迁移已落地） | core.rs:158（E2 新核） vs nt_core_consciousness_core.rs:202（旧核，4665 行）双 tick 同写 `consciousness` 命名空间；调用分裂已消除 4 处（SelfTest 本体移植＋status/apply×2/register×1 迁移）；残余已清：8 消费方全迁 E2（L6 memory×4＋self_test＋handlers×3＋entry alias）；旧文件 4725 行已删（`git rm`）；空占位 re-export 腾名给本地 E2；dispatch 4 phantom 调用诚实降级（not wired 惯例）；fitness 豁免迁 kb_persistence | A1 ✅；A3 ✅；A4 ✅（终门 3m47s 0 error 0 warning；旧文件内自测随文件走，E2 自测已移植；literals 随旧文件消失） | T38 | ✅ 完成 | 5 天 |
 | T40 | 同名类型收敛裁决落地 | crates 双 enum 保留已裁决；其余注记 | V3 A37 | — | ✅ 本轮裁决（保留＋注记，零代码） | 0.5 天 |
 | T41 | "能力"概念收敛（tree/L6/L0/file_ability 四处） | tree crate（图谱本体保留）vs L6 `nt_core_capability/`（orchestrator/discovery/integrator）vs L0 types vs `nt_file_ability/capability.rs` | 划界：图谱唯一坐标系；其余只做消费适配，禁自建坐标 | T28 | ⬜ | 2 天 |
 | T26 | 实例注册→Card 桥＋升级提示事件 | L0 registry＋E2 | 心跳对齐；版本漂移事件 | T24 | ✅ 直落（upsert_heartbeat＋publish_external_card＋check_upgrade＋2 单测；L0 侧零改动合法；fmt 我区 clean；cargo 未跑） | 1 天 |

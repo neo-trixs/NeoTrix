@@ -5,13 +5,13 @@
 //!
 //! 节点: nt_mind::transcendent::consonance_orchestrator (L10)
 //! Provides: consciousness_capability_sync, evolution_direction
-//! Requires: nt_core_consciousness_core, nt_core_capability_tree
+//! Requires: consciousness_core (E2), nt_core_capability_tree
 //! Rune: Crimson, Golden
 
 #![forbid(unsafe_code)]
 
 use super::CapabilityNode;
-use crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot;
+use crate::l5_cognition::consciousness_core::CoreSnapshot;
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::l0_substrate::nt_core_traits::RuneSocket;
 use std::collections::HashMap;

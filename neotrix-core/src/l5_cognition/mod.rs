@@ -10,11 +10,12 @@ pub mod nt_cognition_facade;
 pub mod nt_council;
 /// L1 Facade — consolidated re-export facade
 pub mod l1_facade;
+/// L5 → L0 error conversions (moved from l0_substrate to respect L0 ← L5 direction)
+pub mod error_conversions;
 
 // ============================================================================
 // Consciousness — 意识核心与 GWT
 // ============================================================================
-pub mod nt_core_consciousness_core;
 pub mod nt_core_consciousness_tree;
 pub mod nt_core_consciousness;
 pub mod nt_core_cad_consciousness;
@@ -69,6 +70,8 @@ pub mod nt_core_agent_circuit_breaker;
 pub mod nt_core_model_router;
 /// Skill Registry
 pub mod nt_core_model_skills;
+/// Unified Model Interface — 通用模型适配框架 (orphan wired T45+1: 含 ModelPreferences 三档位)
+pub mod nt_core_model_unified;
 /// Hybrid Code Search Retriever
 pub mod nt_core_hybrid_search;
 pub mod nt_core_second_brain;
@@ -116,7 +119,9 @@ pub mod nt_agent;
 // preserve backwards-compatible paths (e.g. `crate::l5_cognition::consciousness_core`).
 
 // ── neotrix-consciousness ───────────────────────────────────────────────────
-pub use neotrix_consciousness::consciousness_core;
+// T39-A4：空占位 `neotrix_consciousness::consciousness_core`（0 行）腾名——
+// 本地 E2 目录正式接管 `consciousness_core` 之名，消费者直指 E2 实现。
+pub mod consciousness_core;
 pub use neotrix_consciousness::consciousness_tree;
 pub use neotrix_consciousness::cad_consciousness;
 pub use neotrix_consciousness::gwt;

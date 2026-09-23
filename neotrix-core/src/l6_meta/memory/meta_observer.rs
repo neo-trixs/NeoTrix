@@ -5,13 +5,13 @@
 //!
 //! 节点: nt_mind::transcendent::meta_observer (L10)
 //! Provides: meta_observation, consciousness_state_read
-//! Requires: nt_core_consciousness_core, nt_mind_consciousness_monitor
+//! Requires: consciousness_core (E2), nt_mind_consciousness_monitor
 //! Rune: Alabaster, Indigo
 
 #![forbid(unsafe_code)]
 
 use super::CapabilityNode;
-use crate::l5_cognition::nt_core_consciousness_core::CoreSnapshot;
+use crate::l5_cognition::consciousness_core::CoreSnapshot;
 use crate::l6_meta::healing::nt_core_self_test::SelfTest;
 use crate::l0_substrate::nt_core_traits::RuneSocket;
 use std::collections::HashMap;

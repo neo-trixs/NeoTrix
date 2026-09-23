@@ -51,7 +51,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // 2026-08-29 外部吸收 (affaan-m/ECC): NT-MIND SEAL 进化维度 instincts/security
     crate::l5_cognition::nt_mind::nt_mind::nt_mind_seal_ecc::register_seal_ecc_self_tests(&mut registry);
     // 意识核心本体 (NT-CORE): 跨会话 CoreSnapshot 持久化往返
-    crate::l5_cognition::nt_core_consciousness_core::register_consciousness_core_self_tests(&mut registry);
+    crate::l5_cognition::consciousness_core::register_consciousness_core_self_tests(&mut registry);
     // 意识度量 IIT Φ (NT-CORE): 同步可约→phi=0 + 变化状态 phi∈[0,1] + 共振矩阵维度
     crate::l5_cognition::nt_core::nt_iit_phi::register_iit_phi_self_tests(&mut registry);
     registry.register(Box::new(

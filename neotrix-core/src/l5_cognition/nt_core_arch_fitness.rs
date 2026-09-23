@@ -198,10 +198,10 @@ impl SelfTest for TreeSingletonFitness {
             if file.ends_with("nt_core_arch_fitness.rs") {
                 continue;
             }
-            // 单例工厂宿主豁免: nt_core_consciousness_core.rs 的 load_or_new()
+            // 单例工厂宿主豁免 (T39-A4 已迁至 E2): kb_persistence.rs 的 load_or_new()
             // 是 CORE 进程单例的唯一工厂 (LazyLock)。工厂内实例化是单例链起点,
             // 守卫检测的是工厂之外的散落实例化。
-            if file.ends_with("nt_core_consciousness_core.rs") {
+            if file.ends_with("consciousness_core/kb_persistence.rs") {
                 continue;
             }
             let Ok(content) = std::fs::read_to_string(&file) else {

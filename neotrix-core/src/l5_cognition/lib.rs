@@ -23,7 +23,6 @@ pub mod nt_council;
 pub mod l1_facade;
 
 // ── Consciousness ──────────────────────────────────────────────────────────
-pub mod nt_core_consciousness_core;
 pub mod nt_core_consciousness_tree;
 pub mod nt_core_consciousness;
 pub mod nt_core_cad_consciousness;
@@ -94,7 +93,8 @@ pub mod nt_agent;
 // ============================================================================
 
 // neotrix-consciousness
-pub use neotrix_consciousness::consciousness_core;
+// T39-A4：空占位腾名，本地 E2 目录接管 `consciousness_core` 之名。
+pub mod consciousness_core;
 pub use neotrix_consciousness::consciousness_tree;
 pub use neotrix_consciousness::cad_consciousness;
 pub use neotrix_consciousness::gwt;

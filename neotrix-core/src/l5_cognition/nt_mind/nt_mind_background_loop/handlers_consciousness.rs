@@ -321,7 +321,7 @@ impl BackgroundLoopHandle {
         if infos.is_empty() {
             return;
         }
-        let snapshot_json = serde_json::to_value(crate::l5_cognition::nt_core_consciousness_core::status())
+        let snapshot_json = serde_json::to_value(crate::l5_cognition::consciousness_core::status())
             .unwrap_or(serde_json::json!({}));
         let mut harness = <crate::l6_meta::memory::evolution_harness::EvolutionHarness as EvolutionHarnessApi>::new_harness();
         let report = harness.harness_run_cycle(&snapshot_json, &infos);
@@ -1873,7 +1873,7 @@ impl BackgroundLoopHandle {
         }
         // 同源持久化: 基于真实 SelfTest 的分支健康也注入跨进程意识核心单例快照,
         // 保证 MCP/CLI status 读到非 0 分支健康 (此前独立 tree 计算后即丢弃 → 快照恒 0 迷雾)。
-        crate::l5_cognition::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+        crate::l5_cognition::consciousness_core::apply_branch_health_from_self_tests(&results);
         log::debug!(
             "[bg] consciousness_core: persisted branch health from {} SelfTest results",
             results.len()
@@ -2099,7 +2099,7 @@ impl BackgroundLoopHandle {
         });
 
         // 注入跨进程意识核心单例 (同步分支健康 + 快照持久化)
-        crate::l5_cognition::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+        crate::l5_cognition::consciousness_core::apply_branch_health_from_self_tests(&results);
         log::debug!(
             "[bg] consciousness_core: tick branch health from {} lightweight SelfTest results",
             results.len()
@@ -2110,7 +2110,6 @@ impl BackgroundLoopHandle {
 #[cfg(test)]
 mod f2_calibration_tests {
     use super::*;
-use crate::nt_mind::infrastructure::ConsciousnessBridge;
 
 
     #[test]

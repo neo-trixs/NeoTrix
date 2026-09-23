@@ -1062,29 +1062,15 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             }
         }
         "universal_model" => {
-            let model_name = task.summary.split_whitespace().find(|w| !w.contains('/') && !w.contains('\\')).unwrap_or("default");
-            match crate::neotrix::list_llm_providers() {
-                Ok(providers) => {
-                    let mut matched_providers: Vec<String> = providers.iter()
-                        .map(|p| p.to_lowercase())
-                        .filter(|p| p.contains(&model_name.to_lowercase()) || model_name.to_lowercase() == "default")
-                        .collect();
-                    if matched_providers.is_empty() { matched_providers = providers; }
-                    (true, format!("统一模型接口: {} 个可用 provider ({})",
-                        matched_providers.len(), matched_providers.join(", ")))
-                }
-                Err(e) => (false, format!("统一模型接口失败: {e}")),
-            }
+            // T39-A4: `crate::neotrix::list_llm_providers` 在 port 时被调用，
+            // 但该函数从未存在（phantom）——诚实降级，不再虚构 provider 列表。
+            (false, "统一模型接口未接线: 无 provider 后端 (not wired)".to_string())
         }
         "file_enhance" => {
+            // T39-A4: `crate::neotrix::enhance_file_icon` phantom——诚实降级。
             let path = first_path(&task.summary);
             match path {
-                Some(p) if p.exists() => {
-                    match crate::neotrix::enhance_file_icon(&p) {
-                        Ok(output) => (true, format!("文件增强完成: {}", output)),
-                        Err(e) => (false, format!("文件增强失败: {e}")),
-                    }
-                }
+                Some(p) if p.exists() => (false, format!("文件增强未接线: enhance_file_icon 后端缺失 (not wired): {}", p.display())),
                 Some(p) => (false, format!("路径 '{}' 不存在, 无法增强", p.display())),
                 None => (false, format!("子任务 '{}' 未提供有效文件路径", task.summary)),
             }
@@ -1103,30 +1089,13 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             }
         }
         "seal_process" => {
+            // T39-A4: `crate::neotrix::seal_{distill,absorb,iterate}` phantom——
+            // 与 seal_enhanced.rs:329 同惯例诚实降级（旧二进制本无此 arm）。
             let lower = task.summary.to_lowercase();
             let action = if lower.contains("distill") || lower.contains("蒸馏") { "distill" }
                 else if lower.contains("absorb") || lower.contains("吸收") { "absorb" }
                 else { "iterate" };
-            match action {
-                "distill" => {
-                    match crate::neotrix::seal_distill() {
-                        Ok(report) => (true, format!("SEAL distill 完成: {report}")),
-                        Err(e) => (false, format!("SEAL distill 失败: {e}")),
-                    }
-                }
-                "absorb" => {
-                    match crate::neotrix::seal_absorb() {
-                        Ok(report) => (true, format!("SEAL absorb 完成: {report}")),
-                        Err(e) => (false, format!("SEAL absorb 失败: {e}")),
-                    }
-                }
-                _ => {
-                    match crate::neotrix::seal_iterate() {
-                        Ok(report) => (true, format!("SEAL iterate 完成: {report}")),
-                        Err(e) => (false, format!("SEAL iterate 失败: {e}")),
-                    }
-                }
-            }
+            (false, format!("SEAL {action} not wired: no backend connected"))
         }
         "crawl4ai" => {
             let url = task.summary.split_whitespace()
@@ -1150,26 +1119,14 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             }
         }
         "seal_genstep" => {
+            // T39-A4: 同上诚实降级（旧二进制本无此 arm）。
             let lower = task.summary.to_lowercase();
             let phase = if lower.contains("distill") || lower.contains("蒸馏") { "distill" }
                 else if lower.contains("absorb") || lower.contains("吸收") { "absorb" }
                 else if lower.contains("test") || lower.contains("测试") { "self_test" }
                 else if lower.contains("explore") || lower.contains("探索") { "explore" }
                 else { "iterate" };
-            match phase {
-                "distill" => match crate::neotrix::seal_distill() {
-                    Ok(report) => (true, format!("seal_genstep distill 阶段完成: {report}")),
-                    Err(e) => (false, format!("seal_genstep distill 阶段失败: {e}")),
-                },
-                "absorb" => match crate::neotrix::seal_absorb() {
-                    Ok(report) => (true, format!("seal_genstep absorb 阶段完成: {report}")),
-                    Err(e) => (false, format!("seal_genstep absorb 阶段失败: {e}")),
-                },
-                _ => match crate::neotrix::seal_iterate() {
-                    Ok(report) => (true, format!("seal_genstep iterate 阶段完成: {report}")),
-                    Err(e) => (false, format!("seal_genstep iterate 阶段失败: {e}")),
-                },
-            }
+            (false, format!("seal_genstep {phase} not wired: no backend connected"))
         }
         "self_test_t3" => {
             match KnowledgeBase::open(None) {
@@ -2187,5 +2144,169 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 task.capability_tag, task.domain,
             ),
         ),
+    }
+}
+
+// ─── 三层路由＋执行上下文（T27c＋T29，蓝图 V3 §5 E3）──────────────────────────
+
+// T27c 42 词复核（skills/index.json 147 triggers vs 静态表关键词，简版）：
+// L3 专属词：仅 skill triggers 有、无静态关键词（如 TDD/RAG/MCP/gitleaks/ADR/changelog）。
+// 需静态兜底词：仅静态表有（如合并pdf/断点续传/分镜提取）；两者均无时走 DirectLlm。
+// 重叠词 21 个一律 L3 优先：安全/审计/架构→shield 系 skill；测试→tdd；漏洞扫描→agentic_scan；
+// 审查/设计/诊断/重构/吸收→各自 skill；L3 未命中才落静态表（复用 decompose 既有入口）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum EntityRouteDecision {
+    Skill {
+        skill_id: String,
+        agent_id: Option<String>,
+    },
+    Agent {
+        agent_id: String,
+    },
+    Static {
+        capability: String,
+        layer: String,
+        role: String,
+    },
+    DirectLlm,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionContext {
+    pub workspace_id: String,
+    pub agent_id: String,
+    pub task_id: Option<String>,
+    pub skill_id: Option<String>,
+    pub shared_memory: serde_json::Value,
+    pub available_tools: Vec<String>,
+}
+
+/// 三层路由：L3 skill 触发 → L2 agent 能力匹配 → L1 静态表兜底 → DirectLlm。
+///
+/// L1 复用既有 `decompose_instruction` 入口，不动 `CAPABILITY_ROUTES` 内容；
+/// 跨层引用只向下（L5 → L0/L1），`workspace_id` 用于 workspace 内 agent 优先。
+pub fn route_entity_aware(
+    input: &str,
+    workspace_id: &str,
+    skill_registry: &mut crate::skill_registry::SkillRegistry,
+    agent_registry: &crate::l1_action::nt_infra_agent_card::AgentCardRegistry,
+) -> EntityRouteDecision {
+    let query = input.trim();
+    if query.is_empty() {
+        return EntityRouteDecision::DirectLlm;
+    }
+    // Layer-3：skill 触发命中（新门面 SkillRegistry::match_trigger）。
+    if let Some(skill) = skill_registry.match_trigger(query).into_iter().next() {
+        return bind_skill_to_agent(&skill.name, &skill.triggers, agent_registry);
+    }
+    // Layer-2：agent 能力匹配（wanted 取自既有静态分解的能力标签）。
+    let tasks = decompose_instruction(query);
+    let mut wanted: Vec<String> = Vec::new();
+    for task in &tasks {
+        if !wanted.iter().any(|w| w == &task.capability_tag) {
+            wanted.push(task.capability_tag.clone());
+        }
+    }
+    // workspace 内优先（只读既有 find_by_workspace 公共入口，同 match_capabilities 交集规则）。
+    let workspace_best = agent_registry
+        .find_by_workspace(workspace_id)
+        .into_iter()
+        .map(|card| {
+            let overlap = card
+                .capabilities
+                .iter()
+                .filter(|cap| wanted.iter().any(|w| w == &cap.name))
+                .count();
+            (card.id.clone(), overlap)
+        })
+        .filter(|(_, overlap)| *overlap > 0)
+        .max_by_key(|(_, overlap)| *overlap)
+        .map(|(id, _)| id);
+    if let Some(agent_id) = workspace_best {
+        return EntityRouteDecision::Agent { agent_id };
+    }
+    if let Some(card) = agent_registry.find_best_agent_for(&wanted) {
+        return EntityRouteDecision::Agent {
+            agent_id: card.id.clone(),
+        };
+    }
+    // Layer-1：静态表兜底（首个分解任务；纯 orchestration 视为无路由）。
+    if let Some(task) = tasks.into_iter().next() {
+        if task.capability_tag != "orchestration" {
+            return EntityRouteDecision::Static {
+                capability: task.capability_tag,
+                layer: task.domain,
+                role: task.specialist,
+            };
+        }
+    }
+    EntityRouteDecision::DirectLlm
+}
+
+/// Skill 分支决议：agent 绑定可选（仅已声明该 skill/同名能力的 agent 才绑定）。
+fn bind_skill_to_agent(
+    skill_id: &str,
+    skill_triggers: &[String],
+    agent_registry: &crate::l1_action::nt_infra_agent_card::AgentCardRegistry,
+) -> EntityRouteDecision {
+    let mut wanted: Vec<String> = vec![skill_id.to_string()];
+    wanted.extend(skill_triggers.iter().cloned());
+    let agent_id = agent_registry
+        .find_best_agent_for(&wanted)
+        .map(|card| card.id.clone());
+    EntityRouteDecision::Skill {
+        skill_id: skill_id.to_string(),
+        agent_id,
+    }
+}
+
+#[cfg(test)]
+mod entity_routing_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn empty_registries() -> (
+        crate::skill_registry::SkillRegistry,
+        crate::l1_action::nt_infra_agent_card::AgentCardRegistry,
+    ) {
+        (
+            crate::skill_registry::SkillRegistry::with_dirs(vec![PathBuf::from(
+                "/nonexistent-nt-dir",
+            )]),
+            crate::l1_action::nt_infra_agent_card::AgentCardRegistry::new(),
+        )
+    }
+
+    #[test]
+    fn test_route_skill_branch_binds_optional_agent() {
+        // 注：Skill 真命中需 SkillLoader 读盘（fixture 在 skills/ 下），单测不碰文件系统；
+        // 此处锁定 Skill 分支的纯决议逻辑：skill_id 必携带，无声明该能力的 agent 时绑定为 None。
+        let agent_registry = crate::l1_action::nt_infra_agent_card::AgentCardRegistry::new();
+        let decision = bind_skill_to_agent("tdd", &["测试".to_string()], &agent_registry);
+        assert!(
+            matches!(decision, EntityRouteDecision::Skill { ref skill_id, agent_id: None } if skill_id == "tdd"),
+            "期望 Skill(tdd, None)，实际 {decision:?}"
+        );
+    }
+
+    #[test]
+    fn test_route_all_miss_falls_back_to_static_or_direct() {
+        // 空 registry（不存在目录 → 空命中，不碰文件系统）＋空 agent 注册表。
+        let (mut skills, agents) = empty_registries();
+        let static_hit = route_entity_aware("请做漏洞扫描", "ws-test", &mut skills, &agents);
+        assert!(
+            matches!(static_hit, EntityRouteDecision::Static { ref capability, .. } if capability == "agentic_scan"),
+            "静态兜底应命中 agentic_scan，实际 {static_hit:?}"
+        );
+        let direct = route_entity_aware("zxqw kjrblp vapour", "ws-test", &mut skills, &agents);
+        assert!(
+            matches!(direct, EntityRouteDecision::DirectLlm),
+            "无意义输入应走 DirectLlm，实际 {direct:?}"
+        );
+        let empty = route_entity_aware("   ", "ws-test", &mut skills, &agents);
+        assert!(
+            matches!(empty, EntityRouteDecision::DirectLlm),
+            "空输入应走 DirectLlm，实际 {empty:?}"
+        );
     }
 }

@@ -10,7 +10,8 @@ pub mod kb_persistence;
 pub mod dispatch;
 pub mod external_closure;
 
-// Backward-compatible re-exports: 所有 pub 项从原路径 `nt_core_consciousness_core::*` 仍可达
+// T39-A4：旧 `nt_core_consciousness_core.rs`（4725 行）已删除；E2 即正典，
+// `CoreSnapshot` / status / tick / 自测注册皆以此处为准，不再保留旧路径。
 pub use self::core::*;
 pub use self::kb_persistence::*;
 pub use self::dispatch::*;
