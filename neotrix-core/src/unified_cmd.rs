@@ -1,23 +1,20 @@
 //! 统一命令桥 (Unified Command Bridge)
 //!
-//! 融合 CLI 命令系统与 NoeCodex (Tauri) 命令系统的统一接口层:
+//! NoeCodex (Tauri) 命令系统的统一描述层:
 //! - `CommandSpec` — 统一命令描述 (name/aliases/category/description/backend)
-//! - `CommandBackend` — 命令归属: Cli(neotrix CLI 注册表) / Tauri(NoeCodex 后端)
-//! - `unified_catalog()` — 全量统一命令目录 (CLI 侧动态 + Tauri 侧静态)
+//! - `CommandBackend` — 命令归属 (仅 Tauri; Cli 变体已随 src/cli/commands 删除)
+//! - `unified_catalog()` — 全量统一命令目录 (现等价于 Tauri 侧静态目录)
 //!
-//! 设计动机 (D26-D30 生产就绪):
-//! - CLI 75 个命令与 NoeCodex 400+ 命令此前互不可达
-//! - NoeCodex 前端只能 invoke Tauri 命令, 无法执行 /kb /board /goal 等 CLI 命令
-//! - 本模块提供双向可寻址的命令描述, 由 Tauri 侧 `unified_cli_execute` 桥接执行
+//! src/cli/commands 删除后: 人类走 Tauri, agent 走 MCP/entry。
+//! 历史注记 (D26-D30): CLI 75 命令与 NoeCodex 400+ 命令曾互不可达,
+//! 本模块曾提供双向可寻址描述; CLI 侧移除后仅保留 Tauri 侧。
 
 use serde::Serialize;
 
-/// 命令归属后端
+/// 命令归属后端 (CLI 侧已删除, 仅保留 Tauri)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CommandBackend {
-    /// neotrix CLI 注册表 (CommandRegistry)
-    Cli,
     /// NoeCodex Tauri 后端 (generate_handler)
     Tauri,
 }
@@ -124,11 +121,26 @@ pub fn tauri_catalog() -> Vec<CommandSpec> {
     push("cmd_agent_stop", "停止 Agent");
     push("cmd_agent_status", "Agent 状态");
     // 自动化域高层入口 (对应 /chain 子命令, 内部 CRUD 隐藏)
-    push("automation.workflow", "工作流编排: 生成/创建/运行/调度 (内部 19 个 CRUD 命令)");
-    push("automation.routine", "例行任务编排: 生成/创建/运行/云同步 (内部 14 个 CRUD 命令)");
-    push("automation.loop", "循环调度编排: 创建/启用/执行/统计 (内部 13 个 CRUD 命令)");
-    push("automation.background", "后台任务编排: 创建/暂停/恢复/运行/日志 (内部 7 个 CRUD 命令)");
-    push("automation.coordinator", "协调器编排: 生成/列表/更新/策略 (内部 6 个 CRUD 命令)");
+    push(
+        "automation.workflow",
+        "工作流编排: 生成/创建/运行/调度 (内部 19 个 CRUD 命令)",
+    );
+    push(
+        "automation.routine",
+        "例行任务编排: 生成/创建/运行/云同步 (内部 14 个 CRUD 命令)",
+    );
+    push(
+        "automation.loop",
+        "循环调度编排: 创建/启用/执行/统计 (内部 13 个 CRUD 命令)",
+    );
+    push(
+        "automation.background",
+        "后台任务编排: 创建/暂停/恢复/运行/日志 (内部 7 个 CRUD 命令)",
+    );
+    push(
+        "automation.coordinator",
+        "协调器编排: 生成/列表/更新/策略 (内部 6 个 CRUD 命令)",
+    );
 
     // ---- 审查 / 安全 ----
     push("cmd_diff_review", "静态审查 diff");
@@ -157,7 +169,11 @@ fn category_of(name: &str) -> &'static str {
         if name.contains("session") || name.contains("checkpoint") || name.contains("archive") {
             return "会话管理";
         }
-        if name.contains("diff") || name.contains("file") || name.contains("project") || name.contains("git") {
+        if name.contains("diff")
+            || name.contains("file")
+            || name.contains("project")
+            || name.contains("git")
+        {
             return "项目文件";
         }
         if name.contains("mcp") || name.contains("provider") {
@@ -183,8 +199,13 @@ fn category_of(name: &str) -> &'static str {
     if name.starts_with("automation.") {
         return "自动化";
     }
-    if name.contains("agent") || name.contains("coordinator") || name.contains("background")
-        || name.contains("routines") || name.contains("loop") || name.contains("workflow") {
+    if name.contains("agent")
+        || name.contains("coordinator")
+        || name.contains("background")
+        || name.contains("routines")
+        || name.contains("loop")
+        || name.contains("workflow")
+    {
         return "自动化";
     }
     if name.contains("memory") || name.contains("insight") {
@@ -199,33 +220,9 @@ fn category_of(name: &str) -> &'static str {
     "系统"
 }
 
-/// 从 CLI CommandRegistry 动态构建 CLI 侧统一目录
-pub fn cli_catalog() -> Vec<CommandSpec> {
-    use crate::cli::commands::types::category_for;
-    let reg = crate::cli::commands::registry::default_registry();
-    let mut specs = Vec::new();
-    for name in reg.list_primary() {
-        if let Some(cmd) = reg.get(name) {
-            let aliases = cmd.aliases().into_iter().map(String::from).collect::<Vec<_>>();
-            specs.push(CommandSpec {
-                name: name.to_string(),
-                aliases,
-                category: category_for(name).label().to_string(),
-                description: cmd.description().to_string(),
-                backend: CommandBackend::Cli,
-                json_support: true,
-                internal: false,
-            });
-        }
-    }
-    specs
-}
-
-/// 全量统一命令目录 (CLI + Tauri)
+/// 全量统一命令目录 (现仅 Tauri 侧; CLI 侧已随 src/cli/commands 删除)
 pub fn unified_catalog() -> Vec<CommandSpec> {
-    let mut all = cli_catalog();
-    all.extend(tauri_catalog());
-    all
+    tauri_catalog()
 }
 
 /// 按后端过滤目录
@@ -249,29 +246,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cli_catalog_contains_core_commands() {
-        let specs = cli_catalog();
-        let names: Vec<&str> = specs.iter().map(|s| s.name.as_str()).collect();
-        assert!(names.contains(&"/help"), "cli catalog missing /help");
-        assert!(names.contains(&"/config"), "cli catalog missing /config");
-        assert!(names.contains(&"/plan"), "cli catalog missing /plan");
-        // 命令面精简: 聚合器与领域命令是 agent 工具, 不进人类目录
-        assert!(!names.contains(&"/memory"), "cli catalog 不应含 agent 工具 /memory");
-        assert!(!names.contains(&"/kb"), "cli catalog 不应含 agent 工具 /kb");
-        assert!(!names.contains(&"/board"), "cli catalog 不应含 agent 工具 /board");
-        assert!(!names.contains(&"/goal"), "cli catalog 不应含 agent 工具 /goal");
-        // 控制命令白名单 (命令面精简 12→7: version/doctor→/stats, completions/benchmark 降级, consciousness→/e8)
-        for ctl in ["/help", "/exit", "/clear", "/config", "/stats", "/e8", "/plan"] {
-            assert!(names.contains(&ctl), "cli catalog missing 控制命令 {}", ctl);
-        }
-        assert!(names.len() >= 7, "cli catalog too small: {}", names.len());
+    fn test_cli_side_removed_by_design() {
+        // src/cli/commands 已删除: 统一目录恒等于 Tauri 侧, 无 CLI 条目。
+        let all = unified_catalog();
+        assert!(!all.is_empty(), "tauri catalog 不应为空");
+        assert!(
+            all.iter().all(|s| s.backend == CommandBackend::Tauri),
+            "CLI 删除后目录应仅含 Tauri 条目"
+        );
+        assert_eq!(all.len(), tauri_catalog().len());
     }
 
     #[test]
     fn test_tauri_catalog_nonempty() {
         let specs = tauri_catalog();
         // 5 automation entry points + other commands
-        assert!(specs.len() >= 40, "tauri catalog too small: {}", specs.len());
+        assert!(
+            specs.len() >= 40,
+            "tauri catalog too small: {}",
+            specs.len()
+        );
         assert!(specs.iter().any(|s| s.name == "neocodex_create_session"));
         // Verify automation entry points exist
         assert!(specs.iter().any(|s| s.name == "automation.workflow"));
@@ -282,17 +276,17 @@ mod tests {
     }
 
     #[test]
-    fn test_unified_catalog_merges_both() {
+    fn test_unified_catalog_is_tauri_only() {
         let all = unified_catalog();
-        assert!(all.iter().any(|s| s.backend == CommandBackend::Cli));
         assert!(all.iter().any(|s| s.backend == CommandBackend::Tauri));
     }
 
     #[test]
     fn test_catalog_by_backend_filters() {
-        let cli_only = catalog_by_backend(CommandBackend::Cli);
-        assert!(cli_only.iter().all(|s| s.backend == CommandBackend::Cli));
         let tauri_only = catalog_by_backend(CommandBackend::Tauri);
-        assert!(tauri_only.iter().all(|s| s.backend == CommandBackend::Tauri));
+        assert!(!tauri_only.is_empty());
+        assert!(tauri_only
+            .iter()
+            .all(|s| s.backend == CommandBackend::Tauri));
     }
 }
