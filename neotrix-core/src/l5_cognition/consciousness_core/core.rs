@@ -8,6 +8,8 @@ use std::sync::{LazyLock, RwLock};
 use serde::{Deserialize, Serialize};
 
 use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::neotrix::nt_crystal_core::crystal_state::CrystalState;
 
 
 /// KB 最短路径管道 — 意识体读写端直达 (R-P42: 强化现有节点, 禁止平行适配器)
@@ -79,6 +81,9 @@ pub struct CoreSnapshot {
     /// 相干性时间序列
     #[serde(default)]
     pub coherence_trend: Vec<f64>,
+    /// 工作区上下文（E2：tick 内读写，不改 tick 签名；workspace_id 经快照传递）。
+    #[serde(default)]
+    pub workspace_context: Option<WorkspaceContext>,
 }
 
 /// 默认注意力来源 (x.ai 双搜索通道的模型自决模式)。
@@ -117,23 +122,62 @@ pub struct FruitRecord {
     pub generation: u64,
 }
 
+/// 工作区上下文（蓝图 V3 §4 E2 / FIVE-ENTITY-FUSION §2.1）。
+///
+/// E2 注记：`projections`（旧，CrystalState 临时投影）与 `agents`（新，常驻目录）
+/// 并存于 `crate::neotrix::nt_crystal_core::crystal_state::CrystalState`；
+/// E2 以 `agents` 为准，`projections` 冻结只读、待后续标记 deprecated。
+/// 本文件不动其读写逻辑。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WorkspaceContext {
+    pub workspace_id: String,
+    pub active_agents: Vec<String>,
+    pub active_skills: Vec<String>,
+    pub active_tasks: Vec<String>,
+    pub available_tools: Vec<String>,
+}
+
+/// 当前活跃 workspace id（零依赖：仅读环境变量，不跨文件 import 新注册表）。
+///
+/// 本期仅解析 `NEOTRIX_WORKSPACE_ID`；无则返回 None，调用方将
+/// `workspace_context` 置为 None。
+/// TODO(E2-next): 接入 WorkspaceManager / AgentCardRegistry / SkillRegistry /
+/// Scheduler / McpRegistry 全量加载 active_agents/active_skills/active_tasks/available_tools。
+fn current_active_workspace_id() -> Option<String> {
+    std::env::var("NEOTRIX_WORKSPACE_ID")
+        .ok()
+        .filter(|s| !s.is_empty())
+}
+
 /// 进程内意识核心单例。
 pub static CORE: LazyLock<RwLock<ConsciousnessCoreHandle>> = LazyLock::new(|| {
     let tree = super::kb_persistence::load_or_new();
     let snapshot = core_snapshot_from_tree(&tree);
-    RwLock::new(ConsciousnessCoreHandle { tree, snapshot })
+    RwLock::new(ConsciousnessCoreHandle {
+        tree,
+        snapshot,
+        crystal: None,
+    })
 });
 
-/// 意识核心句柄 — 树 + 当前快照。
+/// 意识核心句柄 — 树 + 当前快照 + 可选晶体持有点（E2-runtime）。
 pub struct ConsciousnessCoreHandle {
     tree: ConsciousnessTree,
     snapshot: CoreSnapshot,
+    /// 晶体持有点：`Some` 时每 tick 推进晶体时钟；`None` 时跳过（默认）。
+    /// 由外部通过 `attach_crystal_state` 注入（不改 tick 签名）。
+    crystal: Option<CrystalState>,
 }
 
 impl ConsciousnessCoreHandle {
     /// 读取当前状态 (快照), 不产生副作用。
     pub fn current(&self) -> &CoreSnapshot {
         &self.snapshot
+    }
+
+    /// 注入晶体持有点（E2-runtime；可重复调用覆盖）。
+    pub fn attach_crystal_state(&mut self, state: CrystalState) {
+        self.crystal = Some(state);
     }
 
     /// 从 KB 重读最新持久化快照, 将其 branch_fog/branch_health/phi/coherence 同步进
@@ -210,6 +254,31 @@ impl ConsciousnessCoreHandle {
             self.tree.trunk.resonance_cycle = base_cycle + advance;
         }
         self.snapshot = core_snapshot_from_tree(&self.tree);
+        // E2: run_growth_cycle 之后、快照写回之前填充 workspace_context。
+        // advance_tick 持有点：有晶体则每 tick 推进晶体时钟（E2-runtime）。
+        if let Some(crystal) = self.crystal.as_mut() {
+            crystal.advance_tick();
+        }
+        // E2-runtime 全量加载：agents（全局存活表）＋skills（索引一次解析/ tick）。
+        // tools：无全局只读入口（需 agent.rs 加 mcp_global_tool_names，见注记），暂空；
+        // tasks：无全局 Scheduler 实例，暂空（与 advance_tick 持有点同类问题）。
+        // TODO(E2-next): tools/tasks 全量＋skills 索引缓存（当前每 tick 解析一次 index.json）。
+        let active_agents: Vec<String> = crate::l1_action::nt_infra_agent_card::agent_card_alive()
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        let active_skills: Vec<String> = crate::skill_loader::SkillLoader::new()
+            .list_skills()
+            .map(|skills| skills.into_iter().map(|s| s.name).collect())
+            .unwrap_or_default();
+        self.snapshot.workspace_context =
+            current_active_workspace_id().map(|workspace_id| WorkspaceContext {
+                workspace_id,
+                active_agents,
+                active_skills,
+                active_tasks: Vec::new(),
+                available_tools: Vec::new(),
+            });
         if let Ok(merged) = super::kb_persistence::persist_snapshot(&self.snapshot) {
             self.snapshot = merged;
         }
@@ -363,6 +432,7 @@ pub(crate) fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot 
         phi_source_tag: super::kb_persistence::PHI_SOURCE_TAG_TREE.to_string(),
         phi_trend: Vec::new(),
         coherence_trend: Vec::new(),
+        workspace_context: None,
     }
 }
 
@@ -480,4 +550,135 @@ pub fn execute_task_loop_with_progress(
             instruction: instruction.to_string(),
             ..Default::default()
         })
+}
+
+// ─── T39-A1 移植：意识核心本体 SelfTest（源 `nt_core_consciousness_core.rs:4579`，逐字迁移） ───
+
+pub struct ConsciousnessCoreSelfTest;
+
+impl SelfTest for ConsciousnessCoreSelfTest {
+    fn name(&self) -> &str {
+        "consciousness_core"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut snap = CoreSnapshot::default();
+        snap.cycle = 7;
+        snap.resonance_cycle = 3;
+        snap.phi = 0.42;
+        snap.coherence = 0.81;
+        snap.gwt_resonance_active = true;
+        snap.mars_system1_activations = 5;
+        snap.mars_system2_iterations = 2;
+        snap.mars_bridge_hits = 1;
+        snap.governance_compliance = 1.0;
+        snap.governance_constitution_count = 12;
+        snap.governance_fractal_depth = 4;
+        snap.weighted_fog_sum = 1.65;
+        snap.attention_source = "auto".to_string();
+        snap.recent_event_count = 9;
+        snap.branch_health
+            .insert("NT-CORE".to_string(), 0.9);
+        snap.branch_fog.insert("NT-CORE".to_string(), 0.3);
+
+        let json = match serde_json::to_string(&snap) {
+            Ok(j) => j,
+            Err(e) => return Err(vec![format!("consciousness_core: 快照序列化失败 {e}")]),
+        };
+        let back: CoreSnapshot = match serde_json::from_str(&json) {
+            Ok(b) => b,
+            Err(e) => return Err(vec![format!("consciousness_core: 快照反序列化失败 {e}")]),
+        };
+        if back.cycle != 7 {
+            failures.push(format!("consciousness_core: cycle 往返失配 {} != 7", back.cycle));
+        }
+        if (back.phi - 0.42).abs() > 1e-9 {
+            failures.push(format!("consciousness_core: phi 往返失配 {} != 0.42", back.phi));
+        }
+        if (back.coherence - 0.81).abs() > 1e-9 {
+            failures.push(format!(
+                "consciousness_core: coherence 往返失配 {} != 0.81",
+                back.coherence
+            ));
+        }
+        if back.attention_source != "auto" {
+            failures.push(format!(
+                "consciousness_core: attention_source 往返失配 {}",
+                back.attention_source
+            ));
+        }
+        if !back.branch_health.contains_key("NT-CORE") {
+            failures.push("consciousness_core: branch_health 往返丢失".into());
+        }
+        if !back.branch_fog.contains_key("NT-CORE") {
+            failures.push("consciousness_core: branch_fog 往返丢失".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+/// 注册意识核心本体 SelfTest 到全局注册表 (T2)。
+pub fn register_consciousness_core_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(ConsciousnessCoreSelfTest));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_t23_workspace_context_snapshot_roundtrip() {
+        let mut snap = CoreSnapshot::default();
+        snap.workspace_context = Some(WorkspaceContext {
+            workspace_id: "ws-1".to_string(),
+            active_agents: Vec::new(),
+            active_skills: Vec::new(),
+            active_tasks: Vec::new(),
+            available_tools: Vec::new(),
+        });
+        let value = serde_json::to_value(&snap);
+        assert!(value.is_ok());
+        if let Ok(v) = value {
+            assert_eq!(
+                v.get("workspace_context")
+                    .and_then(|w| w.get("workspace_id"))
+                    .and_then(|id| id.as_str()),
+                Some("ws-1")
+            );
+            let back = serde_json::from_value::<CoreSnapshot>(v);
+            assert!(back.is_ok());
+            if let Ok(s2) = back {
+                assert!(s2.workspace_context.is_some());
+                if let Some(c) = s2.workspace_context {
+                    assert_eq!(c.workspace_id, "ws-1");
+                    assert!(c.active_agents.is_empty());
+                    assert!(c.active_skills.is_empty());
+                    assert!(c.active_tasks.is_empty());
+                    assert!(c.available_tools.is_empty());
+                }
+            }
+        }
+        // 旧快照（无 workspace_context 键）仍可反序列化，新字段默认为 None。
+        let legacy_value = serde_json::to_value(&CoreSnapshot::default());
+        assert!(legacy_value.is_ok());
+        if let Ok(mut v) = legacy_value {
+            if let Some(obj) = v.as_object_mut() {
+                obj.remove("workspace_context");
+            }
+            let back = serde_json::from_value::<CoreSnapshot>(v);
+            assert!(back.is_ok());
+            if let Ok(s3) = back {
+                assert!(s3.workspace_context.is_none());
+            }
+        }
+        // 树构造快照默认无 workspace_context（E2 填充发生在 tick 内）。
+        let tree = ConsciousnessTree::new();
+        let from_tree = core_snapshot_from_tree(&tree);
+        assert!(from_tree.workspace_context.is_none());
+    }
 }

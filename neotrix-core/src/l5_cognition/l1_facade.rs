@@ -4,6 +4,16 @@
 //!
 //! ⚠️ 向下依赖: L5 → L1/L2/L3, 已通过此单一 facade 集中化。
 
+// L6 再导出已收敛至两个子门面（T04 facade 收敛）：
+// - `l1_facade_observer`: 观察/健康/自测类
+// - `l1_facade_meta`: nt_meta/进化/审计/governance 类
+// `#[path]` 必需：`l1_facade.rs` 为文件模块，其 `pub mod` 默认寻址
+// `l1_facade/<name>.rs` 子目录； sibling 文件需显式 path，否则 rustc E0583。
+#[path = "l1_facade_meta.rs"]
+pub mod l1_facade_meta;
+#[path = "l1_facade_observer.rs"]
+pub mod l1_facade_observer;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // NT-ACT 共享类型 (原 act_facade)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -127,152 +137,10 @@ pub use crate::l2_perception::nt_world::nt_world_novel::{
 // L5 is the proper location for L6 re-exports — L0 should not depend on L6.
 // These types have deep field access patterns that prevent trait-object usage.
 
-// ─── L6 observer/gold-standard types ────────────────────────────────────────
-pub use crate::l6_meta::nt_core_observer::OneObserver;
-pub use crate::l6_meta::nt_core_observer_error::ObserverErrorRecovery;
-pub use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
-pub use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::E8HexagramState;
-pub use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::{
-    DEFAULT_COHERENCE_THRESHOLD, DEFAULT_PHI_THRESHOLD,
-};
-pub use crate::l6_meta::healing::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+// ─── L6 observer/health/self-test (源：l1_facade_observer) ────────────────────
+// 实定义已迁至 `l1_facade_observer.rs`；此处 glob 回导保持 `l1_facade::Xxx` 零断裂。
+pub use self::l1_facade_observer::*;
 
-// ─── L6 healing/self-test types ─────────────────────────────────────────────
-pub use crate::l6_meta::healing::nt_core_self_test::ExternalVerifier;
-pub use crate::l6_meta::nt_core_self_review::SelfReviewGate;
-
-// ─── L6 nt_meta sub-modules ─────────────────────────────────────────────────
-pub use crate::l6_meta::nt_meta::scanner;
-pub use crate::l6_meta::nt_meta::weakness;
-pub use crate::l6_meta::nt_meta::knowledge_gap_detector;
-pub use crate::l6_meta::nt_meta::metacognition_loop;
-pub use crate::l6_meta::nt_meta::monitor;
-pub use crate::l6_meta::nt_meta::nt_core_arch_lint;
-pub use crate::l6_meta::nt_meta::nt_core_meta_auditor;
-pub use crate::l6_meta::nt_meta::planner;
-pub use crate::l6_meta::nt_meta::self_model;
-pub use crate::l6_meta::nt_meta::auto_inspector;
-pub use crate::l6_meta::nt_meta::arch_optimizer;
-
-// ─── L6 nt_meta type re-exports ─────────────────────────────────────────────
-pub use crate::l6_meta::nt_meta::MetaCognitiveLoop;
-pub use crate::l6_meta::nt_meta::MetaCycleResult;
-pub use crate::l6_meta::nt_meta::CodeScanner;
-pub use crate::l6_meta::nt_meta::MetaAuditor;
-pub use crate::l6_meta::nt_meta::ArchLint;
-pub use crate::l6_meta::nt_meta::KnowledgeGapDetector;
-pub use crate::l6_meta::nt_meta::MetaMonitor;
-pub use crate::l6_meta::nt_meta::WeaknessAnalyzer;
-pub use crate::l6_meta::nt_meta::WeaknessReport;
-pub use crate::l6_meta::nt_meta::SelfArchitectureOptimizer;
-pub use crate::l6_meta::nt_meta::self_model::SelfModel as MetaSelfModel;
-pub use crate::l6_meta::nt_meta::nt_core_meta_auditor::AuditorFinding;
-pub use crate::l6_meta::nt_meta::weakness::Weakness;
-pub use crate::l6_meta::nt_meta::self_model::ModuleInfo;
-pub use crate::l6_meta::nt_meta::planner::EvolutionPlanner;
-pub use crate::l6_meta::nt_meta::planner::{
-    weakness_to_goals, ActionStatus, EvolutionAction, ImpactEstimate, MetaGoal, MetaGoalBridge,
-    PlannedEvolution, RiskLevel as MetaRiskLevel,
-};
-pub use crate::l6_meta::nt_meta::knowledge_gap_detector::{
-    GapCategory, GapCluster, GapReport, KnowledgeGap,
-};
-pub use crate::l6_meta::nt_meta::monitor::{AlertSeverity, HealthCheck, HealthTrend, MetaAlert};
-pub use crate::l6_meta::nt_meta::self_model::{
-    CompilationHealth, ComponentMap, ComponentNode, DebtSeverity, DepEdge, DepGraph, DepKind,
-    EventKind, EvolutionEvent, FileInfo, TechDebtInventory, TechDebtItem, TechDebtKind,
-    TestCoverage,
-};
-pub use crate::l6_meta::nt_meta::weakness::WeaknessSummary;
-
-// ─── L6 coordination types ──────────────────────────────────────────────────
-pub use crate::l6_meta::coordination::self_improvement::{SelfImprovementLoop, SystemMetrics};
-pub use crate::l6_meta::coordination::nt_meta_sentrux::SentruxSensor;
-pub use crate::l6_meta::coordination::nt_meta_build_watchdog::{BuildWatchdog, WatchdogConfig};
-pub use crate::l6_meta::coordination::verifier_agent::_VerifierAgent;
-pub use crate::l6_meta::coordination::layered_qa::_LayeredQA;
-pub use crate::l6_meta::coordination::quality_control::_QualityControlPipeline;
-pub use crate::l6_meta::coordination::quality_gate::QualityGate;
-pub use crate::l6_meta::coordination::template_tag_registry::_TemplateTagRegistry;
-
-// ─── L6 memory types ────────────────────────────────────────────────────────
-pub use crate::l6_meta::memory::evolution_harness::EvolutionHarness;
-pub use crate::l6_meta::memory::meta_observer::{MetaObserver, MetaObserverConfig};
-pub use crate::l6_meta::memory::meta_observer::MetaObserverSelfTest;
-pub use crate::l6_meta::memory::transcendent_loop::LoopConfig;
-
-// ─── L6 scheduler types ─────────────────────────────────────────────────────
-pub use crate::l6_meta::nt_core_scheduler::{SchedulerEngine, default_scheduler};
-
-// ─── L6 constitution types ──────────────────────────────────────────────────
-pub use crate::l6_meta::nt_core_self_constitution::ConstitutionLoader;
-pub use crate::l6_meta::nt_core_self_constitution::Constitution;
-pub use crate::l6_meta::nt_core_self_constitution::global_constitution;
-pub use crate::l6_meta::nt_core_self_constitution::GovernanceConstitutionSelfTest;
-pub use crate::l6_meta::nt_core_self_constitution::RuleCategory;
-
-// ─── L6 nexus types ─────────────────────────────────────────────────────────
-pub use crate::l6_meta::nt_nexus::cross_session_memory::{CrossSessionMemory, CrossSessionMemorySelfTest, MemoryCategory};
-
-// ─── L6 nt_core_kb_types ────────────────────────────────────────────────────
-pub use neotrix_types::knowledge_access::{NodeType, RelationType};
-
-// ─── L6 auto-inspector ──────────────────────────────────────────────────────
-pub use crate::l6_meta::nt_meta::auto_inspector::AutoInspector;
-
-// ─── L6 nt_core_self modules (L5 → L0 abstraction) ──────────────────────────
-// Module re-exports (preserves submodule paths for L5 code)
-pub use crate::l6_meta::nt_core_self::attention_head;
-pub use crate::l6_meta::nt_core_self::emotion_state;
-pub use crate::l6_meta::nt_core_self::metacognitive_evaluator;
-pub use crate::l6_meta::nt_core_self::silicon_self;
-pub use crate::l6_meta::nt_core_self::self_referential;
-pub use crate::l6_meta::nt_core_self::intrinsic_motivation;
-pub use crate::l6_meta::nt_core_self::archive;
-pub use crate::l6_meta::nt_core_self::skill_crystal;
-pub use crate::l6_meta::nt_core_self::reasoning_strategy;
-pub use crate::l6_meta::nt_core_self::thinking_trace;
-pub use crate::l6_meta::nt_core_self::self_audit;
-pub use crate::l6_meta::nt_core_self::seal;
-pub use crate::l6_meta::nt_core_self::affective_interface;
-
-// Type re-exports (direct access without submodule)
-pub use crate::l6_meta::nt_core_self::attention_head::{
-    AttentionDomain, AttentionManager, ThinkingMode, WeaponSet,
-};
-pub use crate::l6_meta::nt_core_self::emotion_state::{
-    EmotionDimension, EmotionEngine, EmotionLabel, EmotionReport,
-};
-pub use crate::l6_meta::nt_core_self::metacognitive_evaluator::{
-    CognitiveEvaluator, CognitiveHealthReport, FlagSeverity,
-};
-pub use crate::l6_meta::nt_core_self::silicon_self::{SiliconSelfModel, SiliconSelfState};
-pub use crate::l6_meta::nt_core_self::self_model::SelfModel;
-pub use crate::l6_meta::nt_core_self::self_referential::SelfReferentialMonitor;
-pub use crate::l6_meta::nt_core_self::intrinsic_motivation::{IntrinsicMotivation, MotivationState};
-pub use crate::l6_meta::nt_core_self::archive::SiliconArchive;
-pub use crate::l6_meta::nt_core_self::skill_crystal::{
-    CrystalRegistry, SkillCrystal, VerificationContract, VerificationStatus as CrystalVerificationStatus,
-};
-pub use crate::l6_meta::nt_core_self::reasoning_strategy::StrategyKind;
-pub use crate::l6_meta::nt_core_self::thinking_trace::{ReflectionGrade, ThinkingStep, ThinkingTrace};
-pub use crate::l6_meta::nt_core_self::self_audit::{
-    AuditFinding, AuditReport, AuditSeverity, ConvergeCheckFn, MultiSignalEval,
-    ToolGroundingMonitor, converge_check, scan_build_status, scan_disk_pressure,
-    scan_memory_pressure, scan_system_health, scan_test_flakiness,
-};
-pub use crate::l6_meta::nt_core_self::seal::ConstitutionGate;
-pub use crate::l6_meta::nt_core_self::seal::grpo::{GrpoConfig, GRPOLoop};
-pub use crate::l6_meta::nt_core_self::affective_interface::AffectiveInterface;
-
-// ─── L6 value-function self-model ───────────────────────────────────────────
-pub use crate::l6_meta::nt_core_self_model::SelfModel as ValueSelfModel;
-
-// ─── L6 spec-driven pipeline ────────────────────────────────────────────────
-pub use crate::l6_meta::nt_core_absorb::spec_driven::{
-    EvolutionSpec, SpecDiff, SpecDrivenPipeline, SpecPipelineConfig, SpecPipelineStats, SpecStatus,
-    SpecVerification, SpecVerifier,
-};
-
-// ─── L6 self-ref code ───────────────────────────────────────────────────────
-pub use crate::l6_meta::nt_core_iter::self_ref_code::{SelfCodeMonitor, MutationResult};
+// ─── L6 nt_meta/evolution/governance (源：l1_facade_meta) ─────────────────────
+// 实定义已迁至 `l1_facade_meta.rs`；此处 glob 回导保持 `l1_facade::Xxx` 零断裂。
+pub use self::l1_facade_meta::*;

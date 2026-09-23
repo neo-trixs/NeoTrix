@@ -17,6 +17,8 @@ pub mod layered_qa;
 pub mod null_normalizer;
 pub mod self_improvement;
 pub mod nt_task_orchestrator;
+pub mod skill_evolution;
+pub mod nt_risk_score;
 
 pub use governance::*;
 pub use nt_governance::*;

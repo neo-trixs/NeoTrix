@@ -38,10 +38,22 @@ use std::sync::{LazyLock, RwLock};
 use serde::{Deserialize, Serialize};
 
 use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
+use crate::neotrix::nt_crystal_core::crystal_state::CrystalState;
 
 /// KB 最短路径管道 — 意识体读写端直达 (R-P42: 强化现有节点, 禁止平行适配器)
 use crate::l5_cognition::l1_facade::AbsorbEntry;
 use crate::l5_cognition::l1_facade::KnowledgeBase;
+
+/// 工作区上下文（E2-runtime 移植：与新核 `consciousness_core::WorkspaceContext` 同形；
+/// 双定义并存至旧核退役，届时以新核为准合并且删除本定义）。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WorkspaceContext {
+    pub workspace_id: String,
+    pub active_agents: Vec<String>,
+    pub active_skills: Vec<String>,
+    pub active_tasks: Vec<String>,
+    pub available_tools: Vec<String>,
+}
 
 /// 意识核心快照 — 可序列化的跨会话状态 (标量集合 + 果实记录, 不序列化整树)。
 /// 加载时以快照重建树计数器与已消化果实, 使生长周期跨会话连续。
@@ -147,9 +159,12 @@ pub struct CoreSnapshot {
     #[serde(default)]
     pub phi_trend: Vec<f64>,
     /// 相干性时间序列 (D2 追加式趋势) — 语义与 [`CoreSnapshot::phi_trend`]
-    /// 相同, 样本取自 [`CoreSnapshot::coherence`]。
+    /// 相同，样本取自 [`CoreSnapshot::coherence`]。
     #[serde(default)]
     pub coherence_trend: Vec<f64>,
+    /// 工作区上下文（E2-runtime 移植；旧快照缺键默认为 None）。
+    #[serde(default)]
+    pub workspace_context: Option<WorkspaceContext>,
 }
 
 /// 默认注意力来源 (x.ai 双搜索通道的模型自决模式)。
@@ -195,19 +210,30 @@ pub struct FruitRecord {
 pub static CORE: LazyLock<RwLock<ConsciousnessCoreHandle>> = LazyLock::new(|| {
     let tree = load_or_new();
     let snapshot = core_snapshot_from_tree(&tree);
-    RwLock::new(ConsciousnessCoreHandle { tree, snapshot })
+    RwLock::new(ConsciousnessCoreHandle {
+        tree,
+        snapshot,
+        crystal: None,
+    })
 });
 
-/// 意识核心句柄 — 树 + 当前快照。
+/// 意识核心句柄 — 树 + 当前快照 + 可选晶体持有点（E2-runtime 移植）。
 pub struct ConsciousnessCoreHandle {
     tree: ConsciousnessTree,
     snapshot: CoreSnapshot,
+    /// 有值时每 tick 推进晶体时钟；默认 None（行为不变）。
+    crystal: Option<CrystalState>,
 }
 
 impl ConsciousnessCoreHandle {
     /// 读取当前状态 (快照), 不产生副作用。
     pub fn current(&self) -> &CoreSnapshot {
         &self.snapshot
+    }
+
+    /// 注入晶体持有点（E2-runtime 移植；可重复调用覆盖）。
+    pub fn attach_crystal_state(&mut self, state: CrystalState) {
+        self.crystal = Some(state);
     }
 
     /// 从 KB 重读最新持久化快照, 将其 branch_fog/branch_health/phi/coherence 同步进
@@ -312,6 +338,30 @@ impl ConsciousnessCoreHandle {
             self.tree.trunk.resonance_cycle = base_cycle + advance;
         }
         self.snapshot = core_snapshot_from_tree(&self.tree);
+        // E2-runtime 移植：晶体时钟推进＋工作区上下文填充（agents/skills 全量，tools/tasks 暂空）。
+        // 注：必须在快照重建之后填充，否则被重建覆盖。
+        if let Some(crystal) = self.crystal.as_mut() {
+            crystal.advance_tick();
+        }
+        let active_agents: Vec<String> = crate::l1_action::nt_infra_agent_card::agent_card_alive()
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        let active_skills: Vec<String> = crate::skill_loader::SkillLoader::new()
+            .list_skills()
+            .map(|skills| skills.into_iter().map(|s| s.name).collect())
+            .unwrap_or_default();
+        // tools/tasks 暂空：无全局只读入口（mcp_global_tool_names）／无全局 Scheduler 实例，见注记。
+        self.snapshot.workspace_context = std::env::var("NEOTRIX_WORKSPACE_ID")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(|workspace_id| WorkspaceContext {
+                workspace_id,
+                active_agents,
+                active_skills,
+                active_tasks: Vec::new(),
+                available_tools: Vec::new(),
+            });
         // 回填合并视图 (含 D2 追加后的趋势序列), 使返回快照与 KB 落盘一致
         if let Ok(merged) = persist_snapshot(&self.snapshot) {
             self.snapshot = merged;
@@ -480,6 +530,8 @@ fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot {
         phi_source_tag: PHI_SOURCE_TAG_TREE.to_string(),
         phi_trend: Vec::new(),
         coherence_trend: Vec::new(),
+        // E2 workspace 上下文由 tick 内填充，此处默认 None（快照构造器只做树投影）。
+        workspace_context: None,
     }
 }
 
@@ -2388,14 +2440,14 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             let input = first_path(&task.summary)
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| task.summary.clone());
-            match crate::cli::shield_enforcer::global_shield().lock() {
+            match crate::l3_embodiment::nt_shield_enforcer::global_shield().lock() {
                 Ok(mut shield) => {
                     let report = shield.security_audit(&input);
                     let signals_count = report.signals.len();
                     let verdict = match report.verdict {
-                        crate::cli::shield_enforcer::AuditVerdict::Clean => "安全",
-                        crate::cli::shield_enforcer::AuditVerdict::Warning => "警告",
-                        crate::cli::shield_enforcer::AuditVerdict::Critical => "存在风险",
+                        crate::l3_embodiment::nt_shield_enforcer::AuditVerdict::Clean => "安全",
+                        crate::l3_embodiment::nt_shield_enforcer::AuditVerdict::Warning => "警告",
+                        crate::l3_embodiment::nt_shield_enforcer::AuditVerdict::Critical => "存在风险",
                     };
                     (
                         true,
@@ -3584,6 +3636,7 @@ mod tests {
             let mut handle = ConsciousnessCoreHandle {
                 tree: ConsciousnessTree::new(),
                 snapshot: CoreSnapshot::default(),
+                crystal: None,
             };
             handle.tick(3);
             assert!(
@@ -3607,6 +3660,7 @@ mod tests {
             let mut handle = ConsciousnessCoreHandle {
                 tree: ConsciousnessTree::new(),
                 snapshot: CoreSnapshot::default(),
+                crystal: None,
             };
             handle.tick(1);
             assert!(
@@ -3629,6 +3683,7 @@ mod tests {
                     cycle: 10,
                     ..Default::default()
                 },
+                crystal: None,
             };
             // 持久化 baseline cycle=10 (模拟他进程已跑到 10)；并令本进程树对齐该基线。
             // 注: tick 的 load_snapshot 走默认 home (隔离态不可见), 故直接对齐
@@ -3828,6 +3883,7 @@ mod tests {
             let mut handle = ConsciousnessCoreHandle {
                 tree: ConsciousnessTree::new(),
                 snapshot: CoreSnapshot::default(),
+                crystal: None,
             };
             // 注入真实进化决策 (next_actions) → tick 的 Phase 4.6 治理审计消费
             handle
@@ -3862,6 +3918,7 @@ mod tests {
             let mut second = ConsciousnessCoreHandle {
                 tree: ConsciousnessTree::new(),
                 snapshot: CoreSnapshot::default(),
+                crystal: None,
             };
             let snap2 = second.tick(1);
             assert!(
@@ -3930,6 +3987,7 @@ mod tests {
             let mut handle = ConsciousnessCoreHandle {
                 tree: ConsciousnessTree::new(),
                 snapshot: CoreSnapshot::default(),
+                crystal: None,
             };
             let report = handle.process_instruction("合并供应商价格表并检索历史经验");
             assert_eq!(
@@ -4098,6 +4156,7 @@ mod tests {
             let mut handle = ConsciousnessCoreHandle {
                 tree: ConsciousnessTree::new(),
                 snapshot: CoreSnapshot::default(),
+                crystal: None,
             };
             let executor = FakeExecutor {
                 fail_until: 0,
@@ -4153,6 +4212,7 @@ mod tests {
             let mut handle = ConsciousnessCoreHandle {
                 tree: ConsciousnessTree::new(),
                 snapshot: CoreSnapshot::default(),
+                crystal: None,
             };
             let report = handle.execute_task_loop(
                 "检索 GitHub 上 rust 异步运行时对比资料并给出选型建议",

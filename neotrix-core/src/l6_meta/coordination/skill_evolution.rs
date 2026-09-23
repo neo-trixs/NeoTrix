@@ -8,6 +8,8 @@
 //!
 //! Reference: COBRA-Skills (arXiv:2609.11682) — 55-58% cost reduction vs baseline.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -39,6 +41,51 @@ impl SkillMaturity {
     pub const MAX_FAILURES: u32 = 5;
 }
 
+/// Where a skill comes from (evolution-state provenance)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillSource {
+    Builtin,
+    Local {
+        #[serde(default)]
+        path: String,
+    },
+    Git {
+        #[serde(default)]
+        url: String,
+        #[serde(default)]
+        branch: String,
+    },
+    Registry {
+        #[serde(default)]
+        url: String,
+        #[serde(default)]
+        skill_id: String,
+    },
+}
+
+impl Default for SkillSource {
+    fn default() -> Self {
+        Self::Builtin
+    }
+}
+
+/// Security audit record for a skill candidate.
+///
+/// 5-step pipeline: 扫描 / 签名锁版 / 运行时监控 / 最小权限 / 人工复核.
+/// `stage` records the current step (e.g. "scan", "pin", "monitor", "least-privilege", "review").
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SecurityAudit {
+    #[serde(default)]
+    pub passed: bool,
+    #[serde(default)]
+    pub checked_at: u64,
+    #[serde(default)]
+    pub issues: Vec<String>,
+    #[serde(default)]
+    pub stage: String,
+}
+
 /// A skill candidate tracked by the bandit
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillCandidate {
@@ -50,6 +97,34 @@ pub struct SkillCandidate {
     pub evaluation_count: u32,
     pub last_evaluated: Option<u64>,
     pub maturity: SkillMaturity,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub triggers: Vec<String>,
+    #[serde(default)]
+    pub required_permissions: Vec<String>,
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub source: SkillSource,
+    #[serde(default)]
+    pub security_audit: Option<SecurityAudit>,
+    /// Data scope: 0 = pure dialogue, 8 = needs 数云·ERP
+    #[serde(default)]
+    pub data_scope: u8,
+    #[serde(default)]
+    pub external_id: Option<String>,
+    #[serde(default)]
+    pub updated_at: u64,
+    #[serde(default)]
+    pub certified: bool,
+    // ── T35 E轨（候选本体侧对齐 S7.1 install 记录 license/sourceUrl）──
+    #[serde(default)]
+    pub license: String,
+    #[serde(default)]
+    pub source_url: Option<String>,
 }
 
 impl SkillCandidate {
@@ -131,6 +206,19 @@ impl SkillEvolver {
             evaluation_count: 0,
             last_evaluated: None,
             maturity: SkillMaturity::Candidate,
+            author: String::new(),
+            tags: Vec::new(),
+            triggers: Vec::new(),
+            required_permissions: Vec::new(),
+            dependencies: Vec::new(),
+            source: SkillSource::Builtin,
+            security_audit: None,
+            data_scope: 0,
+            external_id: None,
+            updated_at: 0,
+            certified: false,
+            license: String::new(),
+            source_url: None,
         });
         self.bandit
             .skill_scores
@@ -169,8 +257,12 @@ impl SkillEvolver {
             .collect()
     }
 
-    /// Record an evaluation outcome and update bandit state
-    pub fn record_outcome(&mut self, skill_id: &str, success: bool, score: f64) {
+    /// Record an evaluation outcome and update bandit state.
+    ///
+    /// NOTE: `success` is currently recorded only via `score` (callers fold
+    /// success into the score); the flag is kept for a future success-weighted
+    /// update — see blueprint V3 A26.
+    pub fn record_outcome(&mut self, skill_id: &str, _success: bool, score: f64) {
         if self.bandit.budget_remaining == 0 {
             return;
         }
@@ -251,7 +343,6 @@ impl SkillEvolver {
                 match c.maturity {
                     SkillMaturity::Candidate if c.evaluation_count >= SkillMaturity::CANDIDATE_THRESHOLD => {
                         let id_clone = id.clone();
-                        drop(c);
                         self.promote(&id_clone);
                         changes.push((id_clone, "promoted to Provisional".to_string()));
                     }
@@ -259,13 +350,11 @@ impl SkillEvolver {
                         && c.average_score() >= SkillMaturity::TRUSTED_MIN_SCORE =>
                     {
                         let id_clone = id.clone();
-                        drop(c);
                         self.promote(&id_clone);
                         changes.push((id_clone, "promoted to Trusted".to_string()));
                     }
                     SkillMaturity::Trusted if c.recent_failures(10) >= SkillMaturity::MAX_FAILURES => {
                         let id_clone = id.clone();
-                        drop(c);
                         self.demote(&id_clone);
                         changes.push((id_clone, "demoted to Provisional (too many failures)".to_string()));
                     }
@@ -516,6 +605,19 @@ mod tests {
             evaluation_count: 0,
             last_evaluated: None,
             maturity: SkillMaturity::Candidate,
+            author: String::new(),
+            tags: Vec::new(),
+            triggers: Vec::new(),
+            required_permissions: Vec::new(),
+            dependencies: Vec::new(),
+            source: SkillSource::Builtin,
+            security_audit: None,
+            data_scope: 0,
+            external_id: None,
+            updated_at: 0,
+            certified: false,
+            license: String::new(),
+            source_url: None,
         };
         assert_eq!(c.average_score(), 0.0);
     }
@@ -531,6 +633,19 @@ mod tests {
             evaluation_count: 3,
             last_evaluated: None,
             maturity: SkillMaturity::Candidate,
+            author: String::new(),
+            tags: Vec::new(),
+            triggers: Vec::new(),
+            required_permissions: Vec::new(),
+            dependencies: Vec::new(),
+            source: SkillSource::Builtin,
+            security_audit: None,
+            data_scope: 0,
+            external_id: None,
+            updated_at: 0,
+            certified: false,
+            license: String::new(),
+            source_url: None,
         };
         assert!((c.average_score() - 0.8).abs() < 1e-10);
     }
@@ -546,10 +661,120 @@ mod tests {
             evaluation_count: 5,
             last_evaluated: None,
             maturity: SkillMaturity::Candidate,
+            author: String::new(),
+            tags: Vec::new(),
+            triggers: Vec::new(),
+            required_permissions: Vec::new(),
+            dependencies: Vec::new(),
+            source: SkillSource::Builtin,
+            security_audit: None,
+            data_scope: 0,
+            external_id: None,
+            updated_at: 0,
+            certified: false,
+            license: String::new(),
+            source_url: None,
         };
         // Window of 3: [0.8, 0.2, 0.95] → 1 failure
         assert_eq!(c.recent_failures(3), 1);
         // Window of 5: [0.9, 0.1, 0.8, 0.2, 0.95] → 2 failures
         assert_eq!(c.recent_failures(5), 2);
+    }
+
+    #[test]
+    fn test_new_fields_default_and_serde_backward_compat() {
+        // Defaults via register()
+        let ev = make_evolver();
+        let c = &ev.candidates[0];
+        assert!(c.author.is_empty());
+        assert!(c.tags.is_empty());
+        assert!(c.triggers.is_empty());
+        assert!(c.required_permissions.is_empty());
+        assert!(c.dependencies.is_empty());
+        assert_eq!(c.source, SkillSource::Builtin);
+        assert!(c.security_audit.is_none());
+        assert_eq!(c.data_scope, 0);
+        assert!(c.external_id.is_none());
+        assert_eq!(c.updated_at, 0);
+        assert!(!c.certified);
+
+        // Old snapshot without the new keys must still parse (serde defaults)
+        let old_json = r#"{"id":"x","name":"X","description":"","version":1,"performance_history":[],"evaluation_count":0,"last_evaluated":null,"maturity":"candidate"}"#;
+        let parsed: SkillCandidate = match serde_json::from_str(old_json) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "old snapshot must parse: {e}");
+                return;
+            }
+        };
+        assert!(parsed.author.is_empty());
+        assert!(parsed.tags.is_empty());
+        assert_eq!(parsed.source, SkillSource::Builtin);
+        assert!(parsed.security_audit.is_none());
+        assert_eq!(parsed.data_scope, 0);
+        assert!(parsed.external_id.is_none());
+        assert!(!parsed.certified);
+
+        // Serde round-trip preserves the new fields
+        let value = match serde_json::to_value(&parsed) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "serialize must succeed: {e}");
+                return;
+            }
+        };
+        let back: SkillCandidate = match serde_json::from_value(value) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "round-trip must parse: {e}");
+                return;
+            }
+        };
+        assert_eq!(back.id, parsed.id);
+        assert_eq!(back.source, parsed.source);
+        assert_eq!(back.data_scope, parsed.data_scope);
+    }
+
+    #[test]
+    fn test_t35_license_source_url_serde() {
+        // register 默认
+        let ev = make_evolver();
+        let c = &ev.candidates[0];
+        assert!(c.license.is_empty());
+        assert!(c.source_url.is_none());
+        // 旧快照（无 license/source_url）兼容
+        let old_json = r#"{"id":"y","name":"Y","description":"","version":1,"performance_history":[],"evaluation_count":0,"last_evaluated":null,"maturity":"candidate"}"#;
+        let parsed: SkillCandidate = match serde_json::from_str(old_json) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "old snapshot must parse: {e}");
+                return;
+            }
+        };
+        assert!(parsed.license.is_empty());
+        assert!(parsed.source_url.is_none());
+        // 非默认往返
+        let mut full = parsed;
+        full.license = "MIT".to_string();
+        full.source_url = Some("https://example.com/skill.zip".to_string());
+        let value = match serde_json::to_value(&full) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "serialize must succeed: {e}");
+                return;
+            }
+        };
+        let back: SkillCandidate = match serde_json::from_value(value) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "round-trip must parse: {e}");
+                return;
+            }
+        };
+        assert_eq!(back.license, "MIT");
+        assert_eq!(
+            back.source_url,
+            Some("https://example.com/skill.zip".to_string())
+        );
     }
 }
