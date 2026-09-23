@@ -447,9 +447,9 @@ API 包络约定（artifacts/catalog/install 三处同形）：`code / data{item
 | A44 | 旧核 tick E2 移植（生产路径修正） | ✅ 旧 `tick()` 加持有点＋agents/skills 全量填充（排序 bug 现场捕获已修；merge 语义 `clone` 先行已验存活；fmt 我区 clean；cargo 未跑） | 旧核为生产 tick（background＋MCP/CLI 共用），E2 遗漏即功能缺席——本次补齐；死目录（`consciousness_core/` 未声明编译）内 E2 代码维持现状不动，待模块归属裁决 |
 | A45 | T04 终裁＋门禁救火两连 | ✅ facade 259 导出真零消费者为 0（T04 车道 58 系计数口径误报，已证伪；DEFER 决议撤销，无删除项）；门禁 E0063×2 均为我方新增字段所致（CoreSnapshot 字面量＋SkillCrystal::new），已补齐；教训：加字段必须全仓扫字面量构造（含 `Self {` 变体） |
 | A46 | E3 活路径迁移 | ✅ 死目录 `l5_cognition/consciousness_core/` 未声明编译（T27c 代码永不链接）→ `EntityRouteDecision`/`ExecutionContext`/`route_entity_aware` 已迁入活文件 `skill_registry.rs`（仅依赖 SkillLoader＋AgentCardRegistry，fmt clean，2 单测；Layer-1 静态兜底留 orchestrator 侧；cargo 未跑） |
-| A47 | 串行验证门首绿＋复绿（`cargo check -p neotrix --lib`） | ✅ 首绿 0 error＋0 warning，34 分钟（含排队；清锁 4 进程见 handoff；`BUILD-SCHEDULING.md` 已立为公约文档）；复绿 6 分 24 秒前台直跑（缓存暖后），此前所有"cargo 未跑"注记至此批量验证通过（含 E0063×2 修复、T05 搬迁、T20 死链修复、T27c 新类型、E2 移植区）；cfg(test) 与 tauri 侧仍未覆盖，终门仍在 CI |
+| A47 | 串行验证门首绿＋复绿（`cargo check -p neotrix --lib`） | ✅ 首绿 0 error＋0 warning，34 分钟（含排队；清锁 4 进程见 handoff；`BUILD-SCHEDULING.md` 已立为公约文档）；复绿 6 分 24 秒前台直跑（缓存暖后），此前所有"cargo 未跑"注记至此批量验证通过（含 E0063×2 修复、T05 搬迁、T20 死链修复、T27c 新类型、E2 移植区）；cfg(test) 与 tauri 侧仍未覆盖；终门（8 commits 落盘后，`target/nt_gate-final.log`）1m03s 0 error 0 warning 全绿（/tmp 日志曾被系统清理，门日志已改落 gitignored 的 target/，结论以本行冻结为准） |
 | A48 | 孤儿接线第二波（4 文件） | 🔄 已接线待门验：`nt_core_model_unified`（T09 三档位复活）／`nt_mind_dual_track`（自含 traits＋L1 合法下引）／`nt_core_consciousness_types`＋`awareness_monitor`（rand/serde/HashMap clean；第 3 个 CoreSnapshot 并存已注记，adjudication 待 T39）；门：后台 `check-orphan-wire.log` ✅ 通过（21 分 31 秒，0 error＋0 warning；含 E3 迁移代码一并验证） |
-| A49 | 孤儿接线第三波（3 文件：成本簇＋trait 家） | 🔄 已接线待门验：`cost_router`／`cost_ladder`（std＋serde clean，他窗 M 区已避让）／`nt_task_decomposition`（69 行零 import，L1 trait 正是 T03b 缺的抽象家）；门：后台 `check-orphan2.log` 进行中 |
+| A49 | 孤儿接线第三波（3 文件：成本簇＋trait 家） | 🔄 已接线待门验：`cost_router`／`cost_ladder`（std＋serde clean，他窗 M 区已避让）／`nt_task_decomposition`（69 行零 import，L1 trait 正是 T03b 缺的抽象家）；门：后台 `check-orphan2.log` ✅ 收官（30m21s，11 error 全归因他窗区，我区 0；/tmp 日志已失，结论冻结） |
 | A50 | 孤儿第三波独立验证收官 | ✅ cost_router 20/20（含修 pre-existing 档位测试输入×1000 量级错位，生产阈值未动）／cost_ladder 4/4／task_decomposition 编译通过；fmt 我区 clean；登记簿三行同步 |
 
 ## 附录 B：E4 待插入节（ARCHITECTURE.md §2 后§3 前，原样可用）
