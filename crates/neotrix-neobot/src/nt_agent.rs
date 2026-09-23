@@ -96,6 +96,18 @@ fn run_loop(
     let mut history: Vec<TranscriptItem> = Vec::new();
     let mut current = TurnStatus::Continue;
     for n in 0..steps {
+        // 最后一步且已有工具活动: 提醒收尾 (防跑满 max_steps 仍无终态).
+        if n + 1 == steps && !history.is_empty() {
+            history.push(TranscriptItem {
+                role: TranscriptRole::User,
+                content: format!(
+                    "提醒: 这是最后一步 (max_steps={steps})。请用已有信息直接回复, \
+                     并调用 set_turn_status(done) 收尾, 不要再调工具。"
+                ),
+                tool_calls: Vec::new(),
+                tool_call_id: None,
+            });
+        }
         let turn = match on_delta.as_mut() {
             Some(callback) => engine.run_turn_stream(user_text, &history, &mut **callback)?,
             None => engine.run_turn_with_history(user_text, &history)?,
@@ -185,6 +197,10 @@ fn run_loop(
         } else if current != TurnStatus::Continue {
             break;
         }
+    }
+    // 跑满仍无终态 (模型一直行动不收尾) → Waiting (任务 Pending, 人可接手).
+    if current == TurnStatus::Continue {
+        current = TurnStatus::Waiting;
     }
     Ok(current)
 }
@@ -431,6 +447,82 @@ mod tests {
         let status = run_local_turn(&store, &config, &LocalEchoEngine, "t", "hello").expect("run");
         assert_eq!(status, crate::nt_types::TurnStatus::Done);
         assert_eq!(store.list_tasks(10).expect("list").len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 永远只调工具不收尾的引擎 — 验证耗尽转 Waiting + 最后一步 nudge.
+    struct LoopForever {
+        seen_nudge: std::sync::Mutex<bool>,
+    }
+
+    impl crate::nt_engine::EngineAdapter for LoopForever {
+        fn engine_id(&self) -> &str {
+            "loop"
+        }
+
+        fn probe(&self) -> Result<String, crate::NtBotError> {
+            Ok("loop".to_owned())
+        }
+
+        fn run_turn(
+            &self,
+            _prompt: &str,
+            _inbox: &[String],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            Ok(crate::nt_engine::EngineTurn {
+                assistant_text: String::new(),
+                status: crate::nt_types::TurnStatus::Continue,
+                tool_calls: vec![crate::nt_types::ToolCall {
+                    id: "l1".to_owned(),
+                    name: crate::nt_types::ToolName::Bash,
+                    args: serde_json::json!({"command": "echo x"}),
+                }],
+                usage: None,
+            })
+        }
+
+        fn run_turn_with_history(
+            &self,
+            prompt: &str,
+            history: &[crate::nt_types::TranscriptItem],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            if history.iter().any(|item| item.content.contains("最后一步")) {
+                if let Ok(mut seen) = self.seen_nudge.lock() {
+                    *seen = true;
+                }
+            }
+            self.run_turn(prompt, &[])
+        }
+    }
+
+    #[test]
+    fn exhaustion_becomes_waiting_with_nudge() {
+        let dir = std::env::temp_dir().join("neobot-agent-loop-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        let config = NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: dir.join("workspace"),
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 3,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+        };
+        config.validate().expect("validate");
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = LoopForever {
+            seen_nudge: std::sync::Mutex::new(false),
+        };
+        let status = run_local_turn(&store, &config, &engine, "loop", "go").expect("run");
+        assert_eq!(status, crate::nt_types::TurnStatus::Waiting);
+        assert!(engine.seen_nudge.lock().map(|seen| *seen).unwrap_or(false));
+        // 3 跳 bash 全执行.
+        let audits = store.list_audit(20).expect("audits");
+        assert_eq!(
+            audits.iter().filter(|event| event.tool == "bash").count(),
+            3
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
