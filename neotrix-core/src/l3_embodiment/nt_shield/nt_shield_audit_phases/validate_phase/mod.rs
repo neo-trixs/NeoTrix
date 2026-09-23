@@ -1,9 +1,9 @@
 //! Validate Phase — cloudflare/security-audit-skill Phase 3 吸收
-//! 
+//!
 //! 合并重复发现、对抗性反证、双路径验证 (R-P106)
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 验证结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,13 +24,6 @@ pub enum Verdict {
     Disproved,
     Inconclusive,
     Duplicate,
-}
-
-/// 对抗性验证器
-#[derive(Debug)]
-pub struct AdversarialValidator {
-    #[allow(dead_code)]
-    findings: Vec<ValidatedFinding>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,26 +99,26 @@ impl ValidatePhase {
     pub fn run(&mut self) -> Vec<ValidationResult> {
         // 1. 合并重复
         let deduplicated = self.deduplicate();
-        
+
         // 2. 对抗性反证
         for finding in &deduplicated {
             let result = self.validate_finding(finding);
             self.validated.push(result);
         }
-        
+
         self.validated.clone()
     }
 
     /// 重复发现合并 (语义去重 + 实体归一化)
     fn deduplicate(&self) -> Vec<ValidatedFinding> {
         let mut groups: HashMap<String, Vec<ValidatedFinding>> = HashMap::new();
-        
+
         for finding in &self.raw_findings {
             // 生成语义键: 攻击类别 + 归一化实体 + 影响类型
             let key = self.semantic_key(finding);
             groups.entry(key).or_default().push(finding.clone());
         }
-        
+
         let mut deduplicated = Vec::new();
         for (_, mut group) in groups {
             if group.len() == 1 {
@@ -140,20 +133,20 @@ impl ValidatePhase {
                 deduplicated.push(merged);
             }
         }
-        
+
         deduplicated
     }
 
     fn semantic_key(&self, finding: &ValidatedFinding) -> String {
         // 归一化实体: CVE-2026-0001 -> cve, 变量 ID -> var, 时间戳 -> timestamp
-        let normalized_title = finding.title
+        let normalized_title = finding
+            .title
             .replace(|c: char| c.is_ascii_digit(), "#")
             .replace(|c: char| !c.is_alphanumeric(), "_");
-        
-        format!("{:?}:{}:{:?}", 
-            finding.domain_companion, 
-            normalized_title,
-            finding.severity
+
+        format!(
+            "{:?}:{}:{:?}",
+            finding.domain_companion, normalized_title, finding.severity
         )
     }
 
@@ -168,25 +161,25 @@ impl ValidatePhase {
             dual_path_verified: false,
             final_verdict: Verdict::Inconclusive,
         };
-        
+
         // 路径 1: 规则验证
         let rule_passed = self.verify_rules(finding);
-        
+
         // 路径 2: 动态/规范验证
         let dynamic_passed = self.verify_dynamic(finding);
-        
+
         result.dual_path_verified = rule_passed && dynamic_passed;
-        
+
         // 尝试反证
         result.disproof_attempted = true;
         result.disproof_succeeded = self.attempt_disproof(finding);
-        
+
         if result.disproof_succeeded {
             result.final_verdict = Verdict::Disproved;
         } else if result.dual_path_verified {
             result.final_verdict = Verdict::Confirmed;
         }
-        
+
         result
     }
 
@@ -195,20 +188,23 @@ impl ValidatePhase {
         if finding.attack_vector.steps.is_empty() {
             return false;
         }
-        
+
         // 2. Meaningful impact
         let impact = &finding.impact;
         if !impact.data_exfiltration && !impact.privilege_escalation && !impact.dos && !impact.rce {
             return false;
         }
-        
+
         // 3. Defense layer check (需结合架构)
         // 4. Baseline comparison (需基线数据)
         // 5. Parser/runtime verification
-        let has_parser_evidence = finding.evidence.iter().any(|e| 
-            matches!(e.source, EvidenceSource::ParserBehavior | EvidenceSource::SpecReference)
-        );
-        
+        let has_parser_evidence = finding.evidence.iter().any(|e| {
+            matches!(
+                e.source,
+                EvidenceSource::ParserBehavior | EvidenceSource::SpecReference
+            )
+        });
+
         // 6. Confirmed only — all prior rule checks passed
         let rule_passed = true;
         rule_passed && has_parser_evidence
@@ -216,63 +212,64 @@ impl ValidatePhase {
 
     fn verify_dynamic(&self, finding: &ValidatedFinding) -> bool {
         // 动态验证: 有动态测试证据
-        finding.evidence.iter().any(|e| matches!(e.source, EvidenceSource::DynamicTest))
+        finding
+            .evidence
+            .iter()
+            .any(|e| matches!(e.source, EvidenceSource::DynamicTest))
     }
 
     fn attempt_disproof(&self, finding: &ValidatedFinding) -> bool {
         // 尝试找到防御层阻断攻击
         // 检查是否有证据显示攻击被缓解
-        finding.evidence.iter().any(|e| 
-            e.content.contains("mitigated") || 
-            e.content.contains("blocked") ||
-            e.content.contains("prevented")
-        )
+        finding.evidence.iter().any(|e| {
+            e.content.contains("mitigated")
+                || e.content.contains("blocked")
+                || e.content.contains("prevented")
+        })
     }
 
     /// SelfTest for C1 promotion
     pub fn self_test() -> Result<(), String> {
-        let findings = vec![
-            ValidatedFinding {
-                id: "F1".to_string(),
-                title: "SQL Injection in user search".to_string(),
-                attack_vector: AttackVector {
-                    steps: vec!["Send ' OR 1=1--".to_string()],
-                    inputs: HashMap::new(),
-                    code_paths: vec!["src/api/search.rs:42".to_string()],
+        let findings = vec![ValidatedFinding {
+            id: "F1".to_string(),
+            title: "SQL Injection in user search".to_string(),
+            attack_vector: AttackVector {
+                steps: vec!["Send ' OR 1=1--".to_string()],
+                inputs: HashMap::new(),
+                code_paths: vec!["src/api/search.rs:42".to_string()],
+            },
+            impact: Impact {
+                description: "Full database dump".to_string(),
+                data_exfiltration: true,
+                privilege_escalation: false,
+                dos: false,
+                rce: false,
+            },
+            severity: Severity::Critical,
+            evidence: vec![
+                Evidence {
+                    source: EvidenceSource::DynamicTest,
+                    content: "Payload returned all users".to_string(),
+                    file_path: Some("src/api/search.rs".to_string()),
+                    line_number: Some(42),
                 },
-                impact: Impact {
-                    description: "Full database dump".to_string(),
-                    data_exfiltration: true,
-                    privilege_escalation: false,
-                    dos: false,
-                    rce: false,
+                Evidence {
+                    source: EvidenceSource::ParserBehavior,
+                    content: "Parameterized query not used".to_string(),
+                    file_path: Some("src/api/search.rs".to_string()),
+                    line_number: Some(42),
                 },
-                severity: Severity::Critical,
-                evidence: vec![
-                    Evidence {
-                        source: EvidenceSource::DynamicTest,
-                        content: "Payload returned all users".to_string(),
-                        file_path: Some("src/api/search.rs".to_string()),
-                        line_number: Some(42),
-                    },
-                    Evidence {
-                        source: EvidenceSource::ParserBehavior,
-                        content: "Parameterized query not used".to_string(),
-                        file_path: Some("src/api/search.rs".to_string()),
-                        line_number: Some(42),
-                    },
-                ],
-                domain_companion: None,
-            }
-        ];
-        
+            ],
+            domain_companion: None,
+        }];
+
         let mut phase = ValidatePhase::new(findings);
         let results = phase.run();
-        
+
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].final_verdict, Verdict::Confirmed);
         assert!(results[0].dual_path_verified);
-        
+
         Ok(())
     }
 }
@@ -293,8 +290,18 @@ mod tests {
             ValidatedFinding {
                 id: "F1".to_string(),
                 title: "SQL Injection in user search".to_string(),
-                attack_vector: AttackVector { steps: vec![], inputs: HashMap::new(), code_paths: vec![] },
-                impact: Impact { description: "".to_string(), data_exfiltration: true, privilege_escalation: false, dos: false, rce: false },
+                attack_vector: AttackVector {
+                    steps: vec![],
+                    inputs: HashMap::new(),
+                    code_paths: vec![],
+                },
+                impact: Impact {
+                    description: "".to_string(),
+                    data_exfiltration: true,
+                    privilege_escalation: false,
+                    dos: false,
+                    rce: false,
+                },
                 severity: Severity::Critical,
                 evidence: vec![],
                 domain_companion: None,
@@ -302,14 +309,24 @@ mod tests {
             ValidatedFinding {
                 id: "F2".to_string(),
                 title: "SQL Injection in user search".to_string(),
-                attack_vector: AttackVector { steps: vec![], inputs: HashMap::new(), code_paths: vec![] },
-                impact: Impact { description: "".to_string(), data_exfiltration: true, privilege_escalation: false, dos: false, rce: false },
+                attack_vector: AttackVector {
+                    steps: vec![],
+                    inputs: HashMap::new(),
+                    code_paths: vec![],
+                },
+                impact: Impact {
+                    description: "".to_string(),
+                    data_exfiltration: true,
+                    privilege_escalation: false,
+                    dos: false,
+                    rce: false,
+                },
                 severity: Severity::Critical,
                 evidence: vec![],
                 domain_companion: None,
             },
         ];
-        
+
         let phase = ValidatePhase::new(findings);
         let deduped = phase.deduplicate();
         assert_eq!(deduped.len(), 1);
@@ -321,13 +338,23 @@ mod tests {
         let finding = ValidatedFinding {
             id: "F1".to_string(),
             title: "CVE-2026-0001 in component".to_string(),
-            attack_vector: AttackVector { steps: vec![], inputs: HashMap::new(), code_paths: vec![] },
-            impact: Impact { description: "".to_string(), data_exfiltration: false, privilege_escalation: false, dos: false, rce: false },
+            attack_vector: AttackVector {
+                steps: vec![],
+                inputs: HashMap::new(),
+                code_paths: vec![],
+            },
+            impact: Impact {
+                description: "".to_string(),
+                data_exfiltration: false,
+                privilege_escalation: false,
+                dos: false,
+                rce: false,
+            },
             severity: Severity::High,
             evidence: vec![],
             domain_companion: None,
         };
-        
+
         let key = phase.semantic_key(&finding);
         // CVE-2026-0001 should be normalized
         assert!(key.contains("cve"));

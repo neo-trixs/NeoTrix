@@ -255,8 +255,7 @@ pub struct ActionAuthorizer {
     policies: Vec<AuthorizationPolicy>,
     dangerous_patterns: Vec<DangerousPattern>,
     audit_log: Vec<AuditEntry>,
-    #[allow(dead_code)]
-    approval_queue: Vec<PendingApproval>,
+    // (approval_queue 写-only 已删除; PendingApproval 类型保留待接线)
 }
 
 /// Pending approval
@@ -347,7 +346,6 @@ impl ActionAuthorizer {
             policies,
             dangerous_patterns,
             audit_log: Vec::new(),
-            approval_queue: Vec::new(),
         }
     }
 
@@ -729,30 +727,48 @@ mod tests {
         let j = AuthorizationDecision::Allow.to_jev();
         assert!(!j.needs_review());
         assert_eq!(j.status(), DecisionStatus::Selected);
-        assert!(j.reason().is_some_and(|r| r.contains("AuthorizationDecision::Allow")));
+        assert!(j
+            .reason()
+            .is_some_and(|r| r.contains("AuthorizationDecision::Allow")));
     }
 
     #[test]
     fn test_authorization_decision_to_jev_deny() {
-        let j = AuthorizationDecision::Deny { reason: "too risky".into() }.to_jev();
+        let j = AuthorizationDecision::Deny {
+            reason: "too risky".into(),
+        }
+        .to_jev();
         assert!(!j.needs_review());
         assert_eq!(j.status(), DecisionStatus::Selected);
-        assert!(j.reason().is_some_and(|r| r.contains("AuthorizationDecision::Deny")));
+        assert!(j
+            .reason()
+            .is_some_and(|r| r.contains("AuthorizationDecision::Deny")));
     }
 
     #[test]
     fn test_authorization_decision_to_jev_require_approval() {
-        let j = AuthorizationDecision::RequireApproval { reason: "prod env".into(), approver: "admin".into() }.to_jev();
+        let j = AuthorizationDecision::RequireApproval {
+            reason: "prod env".into(),
+            approver: "admin".into(),
+        }
+        .to_jev();
         assert!(j.needs_review());
         assert_eq!(j.status(), DecisionStatus::Review);
-        assert!(j.reason().is_some_and(|r| r.contains("AuthorizationDecision::RequireApproval")));
+        assert!(j
+            .reason()
+            .is_some_and(|r| r.contains("AuthorizationDecision::RequireApproval")));
     }
 
     #[test]
     fn test_authorization_decision_to_jev_allow_with_modifications() {
-        let j = AuthorizationDecision::AllowWithModifications { modifications: vec!["redact token".into()] }.to_jev();
+        let j = AuthorizationDecision::AllowWithModifications {
+            modifications: vec!["redact token".into()],
+        }
+        .to_jev();
         assert!(j.needs_review());
         assert_eq!(j.status(), DecisionStatus::Review);
-        assert!(j.reason().is_some_and(|r| r.contains("AuthorizationDecision::AllowWithModifications")));
+        assert!(j
+            .reason()
+            .is_some_and(|r| r.contains("AuthorizationDecision::AllowWithModifications")));
     }
 }

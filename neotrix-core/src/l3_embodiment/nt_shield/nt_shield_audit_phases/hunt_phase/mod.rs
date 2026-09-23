@@ -1,10 +1,10 @@
 //! Hunt Phase — cloudflare/security-audit-skill Phase 2 吸收
-//! 
+//!
 //! 并行 general agents 按攻击类别狩猎
 //! 12 个狩猎角度 + 验证规则 + 域伴侣路由
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 攻击类别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -106,16 +106,14 @@ pub struct HuntScope {
 /// Hunt Phase 引擎
 use neotrix_types::shared::Severity;
 pub struct HuntPhase {
-    #[allow(dead_code)]
-    architecture_summary: String, // 注入的 architecture.md
     scopes: Vec<HuntScope>,
     findings: Vec<HuntingFinding>,
 }
 
 impl HuntPhase {
-    pub fn new(architecture_summary: String) -> Self {
+    // (architecture_summary 写-only 已删除; new() 不再接注入串)
+    pub fn new() -> Self {
         Self {
-            architecture_summary,
             scopes: Self::default_scopes(),
             findings: Vec::new(),
         }
@@ -163,12 +161,16 @@ impl HuntPhase {
             let findings = self.hunt_scope(scope).await;
             self.findings.extend(findings);
         }
-        
+
         // 应用验证规则
         let findings_clone = self.findings.clone();
-        let valid: Vec<_> = findings_clone.iter().filter(|f| self.validate_finding(f)).cloned().collect();
+        let valid: Vec<_> = findings_clone
+            .iter()
+            .filter(|f| self.validate_finding(f))
+            .cloned()
+            .collect();
         self.findings = valid;
-        
+
         self.findings.clone()
     }
 
@@ -184,13 +186,13 @@ impl HuntPhase {
         if finding.attack_vector.steps.is_empty() {
             return false;
         }
-        
+
         // 2. Meaningful impact
         let impact = &finding.impact;
         if !impact.data_exfiltration && !impact.privilege_escalation && !impact.dos && !impact.rce {
             return false;
         }
-        
+
         // 3. Defense layer check (简化)
         // 4. Baseline comparison (简化)
         // 5. Parser/runtime verification (简化)
@@ -201,10 +203,9 @@ impl HuntPhase {
     /// 根据 Phase 1 动态调整范围
     pub fn adjust_scopes(&mut self, prior_findings: &[HuntingFinding]) {
         // Skip known findings
-        let known_classes: std::collections::HashSet<_> = prior_findings.iter()
-            .map(|f| f.attack_class)
-            .collect();
-        
+        let known_classes: std::collections::HashSet<_> =
+            prior_findings.iter().map(|f| f.attack_class).collect();
+
         // Weight toward gaps
         for scope in &mut self.scopes {
             if !known_classes.contains(&scope.attack_class) {
@@ -215,16 +216,17 @@ impl HuntPhase {
 
     /// SelfTest for C1 promotion
     pub fn self_test() -> Result<(), String> {
-        let phase = HuntPhase::new("test architecture".to_string());
-        
+        let phase = HuntPhase::new();
+
         // Test 1: Default scopes cover major classes
-        let classes: std::collections::HashSet<_> = phase.scopes.iter().map(|s| s.attack_class).collect();
+        let classes: std::collections::HashSet<_> =
+            phase.scopes.iter().map(|s| s.attack_class).collect();
         assert!(classes.contains(&AttackClass::Injection));
         assert!(classes.contains(&AttackClass::AccessControl));
         assert!(classes.contains(&AttackClass::BusinessLogic));
         assert!(classes.contains(&AttackClass::Wildcard));
         assert!(classes.contains(&AttackClass::ObviousThings));
-        
+
         // Test 2: Validation rules
         let finding = HuntingFinding {
             attack_class: AttackClass::Injection,
@@ -248,17 +250,17 @@ impl HuntPhase {
             domain_companion: None,
             validation_passed: true,
         };
-        
+
         assert!(finding.impact.data_exfiltration);
         assert!(!finding.attack_vector.steps.is_empty());
-        
+
         Ok(())
     }
 }
 
 impl Default for HuntPhase {
     fn default() -> Self {
-        Self::new("".to_string())
+        Self::new()
     }
 }
 
@@ -268,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_hunt_phase_scopes() {
-        let phase = HuntPhase::new("test".to_string());
+        let phase = HuntPhase::new();
         assert_eq!(phase.scopes.len(), 5);
     }
 
@@ -296,7 +298,7 @@ mod tests {
             domain_companion: None,
             validation_passed: true,
         };
-        
+
         // Should pass validation
         assert!(!finding.attack_vector.steps.is_empty());
         assert!(finding.impact.data_exfiltration);
