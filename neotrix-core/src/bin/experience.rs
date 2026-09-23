@@ -531,11 +531,7 @@ impl Extractor {
     fn new(name: &str, schema: Value, extract: ExtractorFn) -> Self {
         Self { name: name.to_string(), schema, extract, on_extracted: None }
     }
-     #[allow(dead_code)] // builder API：保留供后续 extractor 接线
-     fn with_hook(mut self, hook: fn(&mut Value) -> Result<(), String>) -> Self {
-        self.on_extracted = Some(hook);
-        self
-    }
+    // (with_hook 零调用已删除; on_extracted 字段保留, run_extractors 照常执行钩子)
 }
 
 /// 运行所有 extractors, 失败隔离 + on_extracted 钩子执行。
