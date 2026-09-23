@@ -6,15 +6,14 @@
 //! - 条件执行
 //! - 回滚机制
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 技能链管理器
 pub struct _SkillChainManager {
     chains: HashMap<String, _SkillChain>,
     executors: HashMap<String, Box<dyn _SkillExecutor>>,
-    #[allow(dead_code)]
-    config: ChainConfig,
+    // (config 写-only 且 new() 零调用, 一并删除; ChainConfig 类型保留)
     stats: _ChainStats,
 }
 
@@ -140,8 +139,16 @@ pub enum StepStatus {
 
 /// 技能执行器 trait
 pub trait _SkillExecutor: Send + Sync {
-    fn execute(&self, config: &serde_json::Value, input: Option<&serde_json::Value>) -> Result<serde_json::Value, String>;
-    fn rollback(&self, config: &serde_json::Value, output: &serde_json::Value) -> Result<(), String>;
+    fn execute(
+        &self,
+        config: &serde_json::Value,
+        input: Option<&serde_json::Value>,
+    ) -> Result<serde_json::Value, String>;
+    fn rollback(
+        &self,
+        config: &serde_json::Value,
+        output: &serde_json::Value,
+    ) -> Result<(), String>;
     fn name(&self) -> &str;
 }
 
@@ -168,11 +175,10 @@ pub struct _ChainExecutionResult {
 
 impl _SkillChainManager {
     /// 创建新的技能链管理器
-    pub fn new(config: ChainConfig) -> Self {
+    pub fn new() -> Self {
         Self {
             chains: HashMap::new(),
             executors: HashMap::new(),
-            config,
             stats: _ChainStats {
                 total_chains: 0,
                 running_chains: 0,
@@ -195,7 +201,9 @@ impl _SkillChainManager {
 
     /// 创建执行器
     pub(crate) fn _create_executor(&self, chain_id: &str) -> Result<_ChainExecutor, String> {
-        let chain = self.chains.get(chain_id)
+        let chain = self
+            .chains
+            .get(chain_id)
             .ok_or_else(|| format!("Chain {} not found", chain_id))?;
 
         Ok(_ChainExecutor {
@@ -219,7 +227,10 @@ impl _SkillChainManager {
 
 impl _ChainExecutor {
     /// 执行链
-    pub fn execute(&mut self, initial_input: Option<&serde_json::Value>) -> Result<_ChainExecutionResult, String> {
+    pub fn execute(
+        &mut self,
+        initial_input: Option<&serde_json::Value>,
+    ) -> Result<_ChainExecutionResult, String> {
         self.state.status = _ChainStatus::Running;
         self.state.started_at = Some(chrono::Utc::now());
 
@@ -229,7 +240,11 @@ impl _ChainExecutor {
         let sorted_steps = self.topological_sort();
 
         for step_id in &sorted_steps {
-            let step = self.chain.steps.iter().find(|s| &s.id == step_id)
+            let step = self
+                .chain
+                .steps
+                .iter()
+                .find(|s| &s.id == step_id)
                 .ok_or_else(|| format!("Step {} not found", step_id))?;
 
             // 检查条件
@@ -237,13 +252,16 @@ impl _ChainExecutor {
                 match self.evaluate_condition(condition) {
                     Ok(true) => { /* condition met, proceed */ }
                     Ok(false) => {
-                        self.results.insert(step_id.clone(), StepResult {
-                            step_id: step_id.clone(),
-                            status: StepStatus::Skipped,
-                            output: None,
-                            error: None,
-                            duration_ms: 0,
-                        });
+                        self.results.insert(
+                            step_id.clone(),
+                            StepResult {
+                                step_id: step_id.clone(),
+                                status: StepStatus::Skipped,
+                                output: None,
+                                error: None,
+                                duration_ms: 0,
+                            },
+                        );
                         continue;
                     }
                     Err(e) => {
@@ -257,7 +275,10 @@ impl _ChainExecutor {
 
             // 检查依赖
             let deps_met = step.dependencies.iter().all(|dep| {
-                self.results.get(dep).map(|r| r.status == StepStatus::Completed).unwrap_or(false)
+                self.results
+                    .get(dep)
+                    .map(|r| r.status == StepStatus::Completed)
+                    .unwrap_or(false)
             });
 
             if !deps_met {
@@ -292,12 +313,16 @@ impl _ChainExecutor {
             graph.entry(step.id.clone()).or_insert_with(Vec::new);
 
             for dep in &step.dependencies {
-                graph.entry(dep.clone()).or_insert_with(Vec::new).push(step.id.clone());
+                graph
+                    .entry(dep.clone())
+                    .or_insert_with(Vec::new)
+                    .push(step.id.clone());
                 *in_degree.entry(step.id.clone()).or_insert(0) += 1;
             }
         }
 
-        let mut queue: Vec<String> = in_degree.iter()
+        let mut queue: Vec<String> = in_degree
+            .iter()
             .filter(|(_, &degree)| degree == 0)
             .map(|(id, _)| id.clone())
             .collect();
@@ -335,19 +360,18 @@ impl _ChainExecutor {
 
     /// 构建结果
     fn build_result(&self) -> _ChainExecutionResult {
-        let duration = if let (Some(start), Some(end)) = (self.state.started_at, self.state.completed_at) {
-            end.signed_duration_since(start).num_milliseconds() as u64
-        } else {
-            0
-        };
+        let duration =
+            if let (Some(start), Some(end)) = (self.state.started_at, self.state.completed_at) {
+                end.signed_duration_since(start).num_milliseconds() as u64
+            } else {
+                0
+            };
 
         _ChainExecutionResult {
             chain_id: self.chain.id.clone(),
             status: self.state.status.clone(),
             results: self.results.clone(),
-            output: self.results.values()
-                .last()
-                .and_then(|r| r.output.clone()),
+            output: self.results.values().last().and_then(|r| r.output.clone()),
             error: self.state.error.clone(),
             duration_ms: duration,
         }

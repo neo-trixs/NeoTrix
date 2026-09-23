@@ -5,19 +5,19 @@
 //!
 //! 真实实现来自 L5 nt_goal 与 L2 nt_world_infer，替代原本的本地存根。
 
-use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
-use crate::l5_cognition::nt_mind::evolution::evolution_loop::EvolutionLoop;
-use crate::l5_cognition::nt_goal::{
-    BehavioralVerifier, CoverageAnalyzer, AutoGoalGenerator, RLFeedbackLoop,
-    EvolutionGoal, GoalCategory,
-};
-use crate::l5_cognition::nt_goal::behavioral_verifier::VerificationLevel;
+use crate::l2_perception::nt_world::nt_world_code_search::CodeSearchEngine;
 use crate::l2_perception::nt_world::nt_world_infer::ActiveInferenceEngine;
 use crate::l5_cognition::nt_core::nt_iit_phi::IITPhiCalculator;
-use crate::l6_meta::nt_core_absorb::spec_driven::{
-    SpecDrivenPipeline, SpecPipelineConfig, EvolutionSpec, SpecDiff, SpecStatus,
+use crate::l5_cognition::nt_goal::behavioral_verifier::VerificationLevel;
+use crate::l5_cognition::nt_goal::{
+    AutoGoalGenerator, BehavioralVerifier, CoverageAnalyzer, EvolutionGoal, GoalCategory,
+    RLFeedbackLoop,
 };
-use crate::l2_perception::nt_world::nt_world_code_search::CodeSearchEngine;
+use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
+use crate::l5_cognition::nt_mind::evolution::evolution_loop::EvolutionLoop;
+use crate::l6_meta::nt_core_absorb::spec_driven::{
+    EvolutionSpec, SpecDiff, SpecDrivenPipeline, SpecPipelineConfig, SpecStatus,
+};
 use std::path::PathBuf;
 
 // ============================================================
@@ -89,21 +89,23 @@ pub enum IssueType {
 #[derive(Debug, Clone)]
 pub struct _PersistentIssueTracker {
     pub issues: Vec<_IssueTrackerItem>,
-    #[allow(dead_code)]
-    storage_path: String,
+    // (storage_path 写-only 且唯一调用点在文件内, 参数一并删除)
     counter: u64,
 }
 
 impl _PersistentIssueTracker {
-    pub fn new(storage_path: &str) -> Self {
+    pub fn new() -> Self {
         Self {
             issues: Vec::new(),
-            storage_path: storage_path.to_string(),
             counter: 0,
         }
     }
 
-    pub(crate) fn _register_issue(&mut self, file: Option<String>, issue_type: IssueType) -> String {
+    pub(crate) fn _register_issue(
+        &mut self,
+        file: Option<String>,
+        issue_type: IssueType,
+    ) -> String {
         self.counter += 1;
         let id = format!("ISSUE-{}", self.counter);
         self.issues.push(_IssueTrackerItem {
@@ -120,8 +122,11 @@ impl _PersistentIssueTracker {
 
     /// 获取未尝试或尝试次数不足的问题
     pub(crate) fn _get_unattempted(&self, max_attempts: u32) -> Vec<String> {
-        self.issues.iter()
-            .filter(|t| matches!(t.lifecycle, _IssueLifecycle::AttemptingFix(n) if n < max_attempts))
+        self.issues
+            .iter()
+            .filter(
+                |t| matches!(t.lifecycle, _IssueLifecycle::AttemptingFix(n) if n < max_attempts),
+            )
             .map(|t| t.id.clone())
             .collect()
     }
@@ -145,9 +150,13 @@ impl _PersistentIssueTracker {
     pub(crate) fn _mark_stale(&mut self, max_cycles: u64, current_cycle: u64) {
         for ti in self.issues.iter_mut() {
             if current_cycle.saturating_sub(ti.last_seen_at) > max_cycles
-                && matches!(ti.lifecycle, _IssueLifecycle::Fixed(_) | _IssueLifecycle::Failed(_)) {
-                    ti.lifecycle = _IssueLifecycle::Stale;
-                }
+                && matches!(
+                    ti.lifecycle,
+                    _IssueLifecycle::Fixed(_) | _IssueLifecycle::Failed(_)
+                )
+            {
+                ti.lifecycle = _IssueLifecycle::Stale;
+            }
         }
     }
 }
@@ -190,9 +199,7 @@ pub struct EvolutionDaemon {
 impl EvolutionDaemon {
     pub fn new(config: EvolutionConfig) -> Self {
         Self {
-            tracker: _PersistentIssueTracker::new(
-                &shellexpand::tilde("~/.neotrix/issues.json"),
-            ),
+            tracker: _PersistentIssueTracker::new(),
             config,
             cycle_count: 0,
             evolution_loop: EvolutionLoop::new(),
@@ -233,23 +240,14 @@ impl EvolutionDaemon {
             if let Some(ti) = self.tracker.issues.iter().find(|t| t.id == id) {
                 let file = ti.file.as_deref().unwrap_or("");
                 let result = match ti.issue_type {
-                    IssueType::MissingTests if !file.is_empty() => {
-                        AutoFixer::record_test_gap(file)
-                    }
-                    IssueType::CompileWarning => {
-                        AutoFixer::cargo_fix()
-                    }
-                    IssueType::LargeFile if !file.is_empty() => {
-                        AutoFixer::split_file(file)
-                    }
+                    IssueType::MissingTests if !file.is_empty() => AutoFixer::record_test_gap(file),
+                    IssueType::CompileWarning => AutoFixer::cargo_fix(),
+                    IssueType::LargeFile if !file.is_empty() => AutoFixer::split_file(file),
                     IssueType::TodoLeftovers if !file.is_empty() => {
-                        AutoFixer::cleanup_todos_tx(file)
-                            .map(|n| format!("移除 {} 个 TODO", n))
+                        AutoFixer::cleanup_todos_tx(file).map(|n| format!("移除 {} 个 TODO", n))
                     }
-                    IssueType::TodoLeftovers => {
-                        AutoFixer::cleanup_todos_tx("src/lib.rs")
-                            .map(|n| format!("移除 {} 个 TODO", n))
-                    }
+                    IssueType::TodoLeftovers => AutoFixer::cleanup_todos_tx("src/lib.rs")
+                        .map(|n| format!("移除 {} 个 TODO", n)),
                     _ => Err("no auto-fix available".into()),
                 };
 
@@ -312,17 +310,20 @@ impl EvolutionDaemon {
 
             // 认识价值 = 不确定性降低潜力
             let epistemic_value = match goal.category {
-                GoalCategory::Architecture => 0.7,    // 高不确定性
+                GoalCategory::Architecture => 0.7, // 高不确定性
                 GoalCategory::Security => 0.6,
                 GoalCategory::Knowledge => 0.6,
                 GoalCategory::TestCoverage => 0.5,
                 _ => 0.3,
             };
-            let fe = self.nt_world_infer.expected_free_energy(epistemic_value, complexity);
+            let fe = self
+                .nt_world_infer
+                .expected_free_energy(epistemic_value, complexity);
             scored.push((i, fe));
         }
         scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-        self.goal_fe_scores = scored.iter()
+        self.goal_fe_scores = scored
+            .iter()
             .map(|(i, fe)| (format!("goal_{}", i), *fe))
             .collect();
         scored
@@ -330,9 +331,14 @@ impl EvolutionDaemon {
     /// Compute JEPA prediction energy from system state
     /// Higher = more prediction error = less certain
     pub fn compute_jepa_energy(&self) -> f64 {
-        let unresolved = self.tracker._get_unattempted(self.config.max_fix_attempts).len() as f64;
+        let unresolved = self
+            .tracker
+            ._get_unattempted(self.config.max_fix_attempts)
+            .len() as f64;
         let total = self.tracker.issues.len() as f64;
-        if total == 0.0 { return 0.3; }
+        if total == 0.0 {
+            return 0.3;
+        }
         let uncertainty_ratio = unresolved / total;
         0.2 + uncertainty_ratio * 0.6
     }
@@ -383,11 +389,9 @@ impl EvolutionDaemon {
             if let Some(goal) = goals.get(*idx) {
                 // 记录 FE 作为基线自由能
                 let jepa_energy = self.compute_jepa_energy();
-                let _ = self.nt_world_infer.compute_free_energy(
-                    jepa_energy,
-                    1.0,
-                    0.1,
-                );
+                let _ = self
+                    .nt_world_infer
+                    .compute_free_energy(jepa_energy, 1.0, 0.1);
 
                 let file = match &goal.target_file {
                     Some(f) => f.clone(),
@@ -401,10 +405,7 @@ impl EvolutionDaemon {
 
                 // 修复前确认目标文件存在 + 符号验证 (代码智能: 符号索引定位)
                 let target_path = std::path::Path::new(&file);
-                let file_exists = !CodeSearchEngine::search(
-                    "fn ",
-                    target_path,
-                ).is_empty()
+                let file_exists = !CodeSearchEngine::search("fn ", target_path).is_empty()
                     || CodeSearchEngine::file_symbol_count(target_path) > 0
                     || target_path.exists();
                 if !file_exists {
@@ -413,7 +414,9 @@ impl EvolutionDaemon {
 
                 let fix_result = match goal.category {
                     GoalCategory::TestCoverage => AutoFixer::record_test_gap(&file),
-                    GoalCategory::CodeHealth if goal.description.contains("compile") => AutoFixer::cargo_fix(),
+                    GoalCategory::CodeHealth if goal.description.contains("compile") => {
+                        AutoFixer::cargo_fix()
+                    }
                     GoalCategory::CodeHealth => {
                         AutoFixer::cleanup_todos_tx(&file).map(|n| format!("移除 {} 个 TODO", n))
                     }
@@ -426,7 +429,12 @@ impl EvolutionDaemon {
                 if fix_result.is_ok() {
                     fixes += 1;
                     applied_fixes += 1;
-                    let result = BehavioralVerifier::verify(&file, "", "", VerificationLevel::CompileAndTest);
+                    let result = BehavioralVerifier::verify(
+                        &file,
+                        "",
+                        "",
+                        VerificationLevel::CompileAndTest,
+                    );
                     // A2 commit-then-verify (autoresearch absorb, R-P79): 修复提交后
                     // 必须过行为验证 (compile+test) 才算有效; 验证失败 → 该修复被视为
                     // 回滚 (score 归零), 不积累进化奖励, 防止 "提交了但坏了" 的假进展。
@@ -448,14 +456,17 @@ impl EvolutionDaemon {
                     });
                     // EWC stability bonus: reward consistent phi over time
                     let phi_stability = if self.phi_reward_history.len() >= 3 {
-                        let recent = &self.phi_reward_history[self.phi_reward_history.len().saturating_sub(3)..];
+                        let recent = &self.phi_reward_history
+                            [self.phi_reward_history.len().saturating_sub(3)..];
                         let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-                        let variance = recent.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / recent.len() as f64;
+                        let variance = recent.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
+                            / recent.len() as f64;
                         1.0 - (variance.sqrt()).min(1.0)
                     } else {
                         0.5
                     };
-                    total_reward += reward + phi_reward * 0.3 + causal_coherence * 0.2 + phi_stability * 0.1;
+                    total_reward +=
+                        reward + phi_reward * 0.3 + causal_coherence * 0.2 + phi_stability * 0.1;
                 }
             }
         }
@@ -470,7 +481,10 @@ impl EvolutionDaemon {
         let state: Vec<f64> = vec![
             self.cycle_count as f64 / 100.0,
             self.tracker.issues.len() as f64 / 50.0,
-            self.tracker._get_unattempted(self.config.max_fix_attempts).len() as f64 / 20.0,
+            self.tracker
+                ._get_unattempted(self.config.max_fix_attempts)
+                .len() as f64
+                / 20.0,
         ];
         let report = self.phi_calculator.compute_phi(&state);
         report.phi
@@ -480,10 +494,15 @@ impl EvolutionDaemon {
     /// High = 系统状态转移可预测 = 低预测误差
     pub(crate) fn _compute_causal_coherence(&self) -> f64 {
         let total = self.tracker.issues.len() as f64;
-        let fixed = self.tracker.issues.iter()
+        let fixed = self
+            .tracker
+            .issues
+            .iter()
             .filter(|t| matches!(t.lifecycle, _IssueLifecycle::Fixed(_)))
             .count() as f64;
-        if total == 0.0 { return 0.5; }
+        if total == 0.0 {
+            return 0.5;
+        }
         let fix_rate = fixed / total;
         let cycle_factor = (self.cycle_count as f64 / 100.0).min(1.0);
         0.3 + fix_rate * 0.4 + cycle_factor * 0.3
@@ -492,8 +511,18 @@ impl EvolutionDaemon {
     /// 仪表盘
     pub fn dashboard(&self) -> String {
         let total = self.tracker.issues.len();
-        let fixed = self.tracker.issues.iter().filter(|t| matches!(t.lifecycle, _IssueLifecycle::Fixed(_))).count();
-        let failed = self.tracker.issues.iter().filter(|t| matches!(t.lifecycle, _IssueLifecycle::Failed(_))).count();
+        let fixed = self
+            .tracker
+            .issues
+            .iter()
+            .filter(|t| matches!(t.lifecycle, _IssueLifecycle::Fixed(_)))
+            .count();
+        let failed = self
+            .tracker
+            .issues
+            .iter()
+            .filter(|t| matches!(t.lifecycle, _IssueLifecycle::Failed(_)))
+            .count();
         let coverage_report = self.coverage_analyzer.analyze();
         let spec_stats = self.spec_pipeline.stats();
         format!(
@@ -513,12 +542,18 @@ impl EvolutionDaemon {
         let (fixes, _reward) = self.run_intelligent_cycle();
 
         // Phase 2: 蒸馏 — 统计已修复模式
-        let fixed_patterns = self.tracker.issues.iter()
+        let fixed_patterns = self
+            .tracker
+            .issues
+            .iter()
             .filter(|t| matches!(t.lifecycle, _IssueLifecycle::Fixed(_)))
             .count() as u32;
 
         // Phase 3: 自我进化 — 检测大量失败问题并做出调整
-        let failed_count = self.tracker.issues.iter()
+        let failed_count = self
+            .tracker
+            .issues
+            .iter()
             .filter(|t| matches!(t.lifecycle, _IssueLifecycle::Failed(_)))
             .count() as u32;
         let thresholds_changed = failed_count > 2;
@@ -531,7 +566,10 @@ impl EvolutionDaemon {
             patterns_distilled: fixed_patterns,
             thresholds_evolved: thresholds_changed,
             total_tracked: self.tracker.issues.len(),
-            unresolved: self.tracker._get_unattempted(self.config.max_fix_attempts).len(),
+            unresolved: self
+                .tracker
+                ._get_unattempted(self.config.max_fix_attempts)
+                .len(),
             elapsed_ms: start.elapsed().as_millis() as u64,
             phi_reward_total,
         }
@@ -592,7 +630,9 @@ mod tests {
     #[test]
     fn test_register_and_mark_fixed() {
         let mut d = EvolutionDaemon::default();
-        let id = d.tracker._register_issue(Some("foo.rs".into()), IssueType::MissingTests);
+        let id = d
+            .tracker
+            ._register_issue(Some("foo.rs".into()), IssueType::MissingTests);
         d.tracker.mark_fixed(&id, 1);
         let ti = d.tracker.issues.iter().find(|t| t.id == id).unwrap();
         assert_eq!(ti.lifecycle, _IssueLifecycle::Fixed(1));
@@ -601,7 +641,9 @@ mod tests {
     #[test]
     fn test_register_and_record_failure() {
         let mut d = EvolutionDaemon::default();
-        let id = d.tracker._register_issue(Some("foo.rs".into()), IssueType::CompileWarning);
+        let id = d
+            .tracker
+            ._register_issue(Some("foo.rs".into()), IssueType::CompileWarning);
         d.tracker.record_failure(&id, "test error");
         let ti = d.tracker.issues.iter().find(|t| t.id == id).unwrap();
         assert_eq!(ti.fix_attempts, 1);
@@ -611,7 +653,9 @@ mod tests {
     #[test]
     fn test_max_failures_mark_failed() {
         let mut d = EvolutionDaemon::default();
-        let id = d.tracker._register_issue(Some("foo.rs".into()), IssueType::Other);
+        let id = d
+            .tracker
+            ._register_issue(Some("foo.rs".into()), IssueType::Other);
         for _ in 0..3 {
             d.tracker.record_failure(&id, "err");
         }
@@ -622,8 +666,12 @@ mod tests {
     #[test]
     fn test_get_unattempted_filters_marked() {
         let mut d = EvolutionDaemon::default();
-        let id1 = d.tracker._register_issue(Some("a.rs".into()), IssueType::MissingTests);
-        let id2 = d.tracker._register_issue(Some("b.rs".into()), IssueType::LargeFile);
+        let id1 = d
+            .tracker
+            ._register_issue(Some("a.rs".into()), IssueType::MissingTests);
+        let id2 = d
+            .tracker
+            ._register_issue(Some("b.rs".into()), IssueType::LargeFile);
         d.tracker.mark_fixed(&id1, 1);
         let unattempted = d.tracker._get_unattempted(3);
         assert!(!unattempted.contains(&id1));
@@ -641,7 +689,9 @@ mod tests {
     #[test]
     fn test_stale_marking() {
         let mut d = EvolutionDaemon::default();
-        let id = d.tracker._register_issue(Some("x.rs".into()), IssueType::Other);
+        let id = d
+            .tracker
+            ._register_issue(Some("x.rs".into()), IssueType::Other);
         d.tracker.mark_fixed(&id, 1);
         d.cycle_count = 20;
         d.tracker._mark_stale(10, d.cycle_count);
@@ -737,9 +787,15 @@ mod tests {
         let mut d = EvolutionDaemon::default();
         let r1 = d._compute_phi_reward();
         d.cycle_count = 50;
-        d.tracker._register_issue(Some("test.rs".into()), IssueType::MissingTests);
+        d.tracker
+            ._register_issue(Some("test.rs".into()), IssueType::MissingTests);
         let r2 = d._compute_phi_reward();
-        assert!(r2 >= r1, "phi should increase with cycles: r1={}, r2={}", r1, r2);
+        assert!(
+            r2 >= r1,
+            "phi should increase with cycles: r1={}, r2={}",
+            r1,
+            r2
+        );
     }
 
     #[test]
@@ -758,9 +814,13 @@ mod tests {
     #[test]
     fn test_autofix_gated_by_mutation_flag() {
         let mut d = EvolutionDaemon::default();
-        d.tracker._register_issue(Some("gated.rs".into()), IssueType::TodoLeftovers);
+        d.tracker
+            ._register_issue(Some("gated.rs".into()), IssueType::TodoLeftovers);
         let fixes = d._autofix_attempt();
-        assert_eq!(fixes, 0, "autofix must not mutate when mutation_enabled=false");
+        assert_eq!(
+            fixes, 0,
+            "autofix must not mutate when mutation_enabled=false"
+        );
     }
 
     // Test disabled: nt_l1_shared_types not yet migrated
@@ -777,13 +837,15 @@ mod tests {
         d.config.mutation_enabled = true;
         assert_eq!(d.code_monitor.stats().total_mutations, 0);
         // 直接验证记录路径 (不触发真实 AutoFixer 文件系统写)
-        d.code_monitor.record_result(crate::l6_meta::nt_core_iter::self_ref_code::MutationResult {
-            mutation_id: "autofix-test-1".into(),
-            success: true,
-            error: None,
-            applied_at: 1,
-            verification_score: 1.0,
-        });
+        d.code_monitor.record_result(
+            crate::l6_meta::nt_core_iter::self_ref_code::MutationResult {
+                mutation_id: "autofix-test-1".into(),
+                success: true,
+                error: None,
+                applied_at: 1,
+                verification_score: 1.0,
+            },
+        );
         assert_eq!(d.code_monitor.stats().total_mutations, 1);
         assert!(d.code_monitor.get_status("autofix-test-1").is_some());
     }
@@ -800,7 +862,8 @@ mod tests {
     fn test_causal_coherence_increases_with_fixes() {
         let mut d = EvolutionDaemon::default();
         let c1 = d._compute_causal_coherence();
-        d.tracker._register_issue(Some("test.rs".into()), IssueType::MissingTests);
+        d.tracker
+            ._register_issue(Some("test.rs".into()), IssueType::MissingTests);
         // Mark it as fixed
         if let Some(item) = d.tracker.issues.last_mut() {
             item.lifecycle = _IssueLifecycle::Fixed(0);
