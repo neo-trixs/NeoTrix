@@ -9,11 +9,17 @@
 /// 6. 对用户完全隐藏意识核心内部实现细节（E8、CRT、GWT 等）
 ///
 /// L1 不直接依赖 L5 — 通过 `ReasoningEngineProvider` trait 抽象推理能力。
+// T03c 类型本地化（行为零变更）：新写入点经 L1 本地 DTO（LocalDecomposeSuggestion /
+// LocalCrtPlan / LocalTrace）再转回 L5 存储；读点仍为 L5 类型（见各 from_l5 注记与遗留清单）。
+// LAYER-EXCEPTION(T03c 遗留读点): DecomposeSuggestion（generate_sub_tasks 等签名）/ CrtPlan
+// （DecompositionResult.crt_plan 字段）/ CrtTimeScale（SubTask.crt_scale 字段＋分类/分配读点）/
+// TraceSource（kernel_trace 构造）/ CoTOutput（SubTaskResult.cot_output 字段），只读不断行为故暂留。
 use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
     DecomposeSuggestion, TaskDecomposer,
 };
 use crate::l5_cognition::nt_core_cot_generator::{CoTGenerator, DefaultCoTGenerator};
 use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
+// LAYER-EXCEPTION: E8Policy 仅存储（组合根注入），本文件无读取／透传逻辑，不动。
 use crate::l5_cognition::nt_core_policy::E8Policy;
 use crate::l5_cognition::reasoning_core::TraceSource;
 use neotrix_reasoning::kernel_types::{ReasoningMethod, KERNEL_DIM, ReasoningKernel, Vector};
@@ -24,6 +30,91 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+// ── T03c L1 本地 DTO（类型本地化，不动行为） ──
+// 新写入点先构本地 DTO 再转回 L5（读点未迁，见遗留清单）；全部宽松反序列化供 LLM/旧 JSON 兼容。
+// E8Policy 为纯存储字段（组合根注入、本文件无读取），保留原类型＋注记，不另建 DTO。
+
+/// L1 本地拆解建议。from_l5：title←subtask，reason←reasoning（逐字段直对）；
+/// detail 为溢出槽（L5 暂无对应字段，置空供后续扩展）。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct LocalDecomposeSuggestion {
+    pub title: String,
+    pub detail: String,
+    pub reason: String,
+}
+
+impl LocalDecomposeSuggestion {
+    pub fn from_l5(s: &DecomposeSuggestion) -> Self {
+        Self {
+            title: s.subtask.clone(),
+            detail: String::new(),
+            reason: s.reasoning.clone(),
+        }
+    }
+}
+
+/// L1 本地 CRT 计划。from_l5：scale←CrtTimeScale::label，
+/// budget_hours←time_budget_seconds/3600；
+/// max_ticks/sub_plans/parent_scale 无对应位（读点 DecompositionResult.crt_plan 未迁，暂舍）。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct LocalCrtPlan {
+    pub scale: String,
+    pub budget_hours: f64,
+}
+
+impl LocalCrtPlan {
+    pub fn from_l5(plan: &CrtPlan) -> Self {
+        Self {
+            scale: plan.scale.label().to_string(),
+            budget_hours: plan.time_budget_seconds / 3600.0,
+        }
+    }
+
+    /// 转回 L5（写点回填用；未知字符串回落调用方原 scale，保证行为不变）。
+    pub fn to_scale_label(scale: &str, fallback: CrtTimeScale) -> CrtTimeScale {
+        match scale {
+            "gaitian" => CrtTimeScale::Gaitian,
+            "huntian" => CrtTimeScale::Huntian,
+            "xuanye" => CrtTimeScale::Xuanye,
+            _ => fallback,
+        }
+    }
+}
+
+/// L1 本地轨迹摘要。source←Debug 字符串（TraceSource / CoTOutput / ReasoningTrace 三源），
+/// 对不上结构的载荷进 detail 字符串；读点（kernel_trace 构造、cot_output 字段）未迁。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct LocalTrace {
+    pub source: String,
+    pub detail: String,
+}
+
+impl LocalTrace {
+    pub fn from_trace_source(s: &TraceSource) -> Self {
+        Self {
+            source: format!("{:?}", s),
+            detail: String::new(),
+        }
+    }
+
+    pub fn from_cot(o: &crate::l5_cognition::nt_core_cot_generator::CoTOutput) -> Self {
+        Self {
+            source: "CoTOutput".to_string(),
+            detail: o.final_answer.clone(),
+        }
+    }
+
+    pub fn from_reasoning_trace(t: &crate::l5_cognition::reasoning_core::ReasoningTrace) -> Self {
+        Self {
+            source: format!("{:?}", t.source),
+            detail: t.task.clone(),
+        }
+    }
+}
 
 /// 推理引擎抽象 trait — L1 通过此 trait 使用 L5 推理能力，不直接依赖具体类型。
 ///
@@ -119,6 +210,8 @@ fn suggest_aggression(history: &VecDeque<DispatchLogRecord>, sig: u64, base: f64
 }
 
 /// 子任务定义
+///
+/// 降级定位（E1.4/T19）：LLM 派发中间态，只做分解输出，不做调度。正典调度见 Scheduler。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubTask {
     pub id: String,
@@ -172,16 +265,21 @@ pub struct TaskExecutionContext {
 pub struct TaskDecomposerDispatcher {
     /// LLM Provider
     provider: Arc<dyn LlmProvider>,
-    /// CoT Generator
-    cot_generator: Option<DefaultCoTGenerator>,
+    /// CoT Generator（T03b：dyn trait 对象 — L1 不依赖 L5 具体类型；
+    /// 注入签名仍收 DefaultCoTGenerator，内部 Arc 包裹，行为不变）。
+    cot_generator: Option<Arc<dyn CoTGenerator>>,
     /// Reasoning Engine (trait object — L1 不直接依赖 L5 具体类型)
     reasoning_engine: Option<Box<dyn ReasoningEngineProvider>>,
     /// Kernel
     kernel: Option<ReasoningKernel>,
     /// E8 Policy
+    // LAYER-EXCEPTION: 仅存储（组合根注入），本文件无读取逻辑，不动。
     e8_policy: Option<E8Policy>,
     /// CRT 规划工厂缝（SIM-43 D-2；缺席＝直构降级＋记录）。
     crt_factory: Option<Arc<dyn Fn(CrtTimeScale, f64) -> CrtPlan + Send + Sync>>,
+    /// 拆解函数注入缝（T03b；缺席＝TaskDecomposer::analyze 原路径，行为不变）。
+    decompose_fn:
+        Option<Arc<dyn Fn(&str, f64) -> Option<Vec<DecomposeSuggestion>> + Send + Sync>>,
     /// E8 预测存储缝（SIM-43 D-4；缺席＝VP-2 跳过＋记录）。
     predictor_store: Option<Box<dyn PredictorStore>>,
     /// 路由记忆（D-6；有界 64，log-only）。
@@ -285,6 +383,7 @@ impl TaskDecomposerDispatcher {
             kernel: None,
             e8_policy: None,
             crt_factory: None,
+            decompose_fn: None,
             predictor_store: None,
             history: VecDeque::new(),
             config,
@@ -292,9 +391,9 @@ impl TaskDecomposerDispatcher {
         }
     }
 
-    /// 注入 CoT 生成器（组合根：L5/L6）。
+    /// 注入 CoT 生成器（组合根：L5/L6；签名不动，内部 Arc 包裹为 dyn 对象）。
     pub fn with_cot_generator(mut self, gen: DefaultCoTGenerator) -> Self {
-        self.cot_generator = Some(gen);
+        self.cot_generator = Some(Arc::new(gen));
         self
     }
 
@@ -322,6 +421,15 @@ impl TaskDecomposerDispatcher {
         f: Arc<dyn Fn(CrtTimeScale, f64) -> CrtPlan + Send + Sync>,
     ) -> Self {
         self.crt_factory = Some(f);
+        self
+    }
+
+    /// 注入拆解函数（组合根／测试可替换 TaskDecomposer::analyze；缺席走原路径）。
+    pub fn with_decompose_fn(
+        mut self,
+        f: Arc<dyn Fn(&str, f64) -> Option<Vec<DecomposeSuggestion>> + Send + Sync>,
+    ) -> Self {
+        self.decompose_fn = Some(f);
         self
     }
 
@@ -375,17 +483,30 @@ impl TaskDecomposerDispatcher {
         &self,
         task: &str,
     ) -> Result<DecompositionResult, TaskDispatchError> {
-        // 1. 使用现有的 TaskDecomposer 进行基础拆解
-        let suggestions = TaskDecomposer::analyze(task, self.config.decomposition_aggression);
+        // 1. 基础拆解（T03b 可注入；缺席＝TaskDecomposer::analyze 原路径，行为锚点不变。
+        // T03c 迁移度：建议写入点已过 LocalDecomposeSuggestion::from_l5；读点
+        // generate_sub_tasks / create_sub_task / build_sub_task_prompt 签名仍用 L5
+        // DecomposeSuggestion，暂留。）
+        let suggestions = match self.decompose_fn.as_ref() {
+            Some(f) => f(task, self.config.decomposition_aggression),
+            None => TaskDecomposer::analyze(task, self.config.decomposition_aggression),
+        };
 
-        // 2. 使用 CRT 进行多尺度规划（D-2：工厂注入，缺席＝直构降级＋记录）
+        // 2. 使用 CRT 进行多尺度规划（D-2：工厂注入，缺席＝直构降级＋记录；
+        // T03c：新写入点经 LocalCrtPlan 再转回 L5，读点 crt_plan 字段未迁）
         let crt_scale = self.determine_crt_scale(task);
         let budget = self.estimate_time_budget(task);
+        let local_plan = LocalCrtPlan {
+            scale: crt_scale.label().to_string(),
+            budget_hours: budget / 3600.0,
+        };
+        let scale_back = LocalCrtPlan::to_scale_label(&local_plan.scale, crt_scale);
+        let budget_back = local_plan.budget_hours * 3600.0;
         let mut crt_plan = match &self.crt_factory {
-            Some(f) => f(crt_scale, budget),
+            Some(f) => f(scale_back, budget_back),
             None => {
                 log::debug!("[dispatcher] crt_factory absent; direct construct (degraded)");
-                CrtPlan::new(crt_scale, budget)
+                CrtPlan::new(scale_back, budget_back)
             }
         };
         crt_plan.decompose();
@@ -490,6 +611,9 @@ impl TaskDecomposerDispatcher {
         index: usize,
         crt_plan: &CrtPlan,
     ) -> Result<SubTask, TaskDispatchError> {
+        // T03c：标题/描述写入点经 LocalDecomposeSuggestion::from_l5（值与直读一致，
+        // 行为不变）；prompt 构造读点仍用 L5 suggestion（未迁）。
+        let local = LocalDecomposeSuggestion::from_l5(suggestion);
         // 根据建议生成精准提示词
         let prompt = self.build_sub_task_prompt(original_task, suggestion, index);
 
@@ -501,8 +625,8 @@ impl TaskDecomposerDispatcher {
 
         Ok(SubTask {
             id: format!("subtask_{}", uuid::Uuid::new_v4().simple()),
-            title: suggestion.subtask.clone(),
-            description: suggestion.reasoning.clone(),
+            title: local.title.clone(),
+            description: local.reason.clone(),
             prompt,
             context: HashMap::new(),
             priority: 10 - (index as u8).min(9),
@@ -914,6 +1038,8 @@ Output your result for this subtask only."#,
                     error: None,
                     tokens_used,
                     duration_ms: duration,
+                    // T03c 遗留：字段仍为 L5 CoTOutput，读点未迁；新写统一走
+                    // LocalTrace::from_cot（见 execute_with_cot）。
                     cot_output: None,
                 })
             }
@@ -926,6 +1052,7 @@ Output your result for this subtask only."#,
                     error: Some(e.to_string()),
                     tokens_used: real_usage,
                     duration_ms: duration,
+                    // T03c 遗留：同上，字段仍为 L5 CoTOutput，读点未迁。
                     cot_output: None,
                 })
             }
@@ -956,7 +1083,11 @@ Output your result for this subtask only."#,
             convergence: 0.5,
             final_quality: 0.5,
             llm_response: None,
-            source: TraceSource::LLMDriven,
+            // T03c：source 写入点经 LocalTrace 快照（log-only，行为不变；读点未迁）。
+            source: {
+                let _local_source = LocalTrace::from_trace_source(&TraceSource::LLMDriven);
+                TraceSource::LLMDriven
+            },
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
@@ -965,7 +1096,7 @@ Output your result for this subtask only."#,
 
         let cot_gen = self
             .cot_generator
-            .as_mut()
+            .as_ref()
             .ok_or(TaskDispatchError::ConfigError(
                 "CoT generator not initialized".to_string(),
             ))?;
@@ -973,6 +1104,9 @@ Output your result for this subtask only."#,
             .generate_cot(&sub_task.prompt, &kernel_trace, Some(cot_context))
             .await
             .map_err(|e| TaskDispatchError::CotError(e.to_string()))?;
+        // T03c：CoT 写入点经 LocalTrace 快照（log-only，只取 final_answer，行为不变；
+        // SubTaskResult.cot_output 字段读点未迁，见下）。
+        let _local_cot = LocalTrace::from_cot(&cot_output);
 
         Ok(cot_output.final_answer)
     }
@@ -1395,7 +1529,6 @@ pub enum SubTaskClass {
 /// 推理特征: 深度分析/设计/写作/研究/代码生成 能力, 或长 prompt 隐含复杂度。
 /// 确定性特征: 结构化/机械化能力 (testing/verification) + 短 prompt。
 pub fn classify_sub_task(sub_task: &SubTask) -> SubTaskClass {
-    use crate::l5_cognition::nt_core::nt_crt::CrtTimeScale::*;
     let caps: Vec<&str> = sub_task
         .required_capabilities
         .iter()
@@ -1417,7 +1550,7 @@ pub fn classify_sub_task(sub_task: &SubTask) -> SubTaskClass {
         return SubTaskClass::Deterministic;
     }
     // 兜底: 长 prompt / 战略尺度 = 推理
-    if sub_task.prompt.len() > 300 || matches!(sub_task.crt_scale, Xuanye) {
+    if sub_task.prompt.len() > 300 || matches!(sub_task.crt_scale, CrtTimeScale::Xuanye) {
         SubTaskClass::Reasoning
     } else {
         SubTaskClass::Deterministic
@@ -1708,5 +1841,75 @@ mod tests {
         assert!(report.contains("DET"), "deterministic subtask tagged");
         assert!(report.contains("RES"), "reasoning subtask tagged");
         assert!(report.contains("order=[s2,s1]"));
+    }
+
+    #[test]
+    fn test_t03c_local_dto_roundtrip_and_from_l5() {
+        // T03c 类型本地化冒烟：from_l5 字段直对＋serde 宽松往返（最小字面量）。
+        let s = DecomposeSuggestion {
+            subtask: "Phase 1: design".to_string(),
+            reasoning: "reduce scope".to_string(),
+        };
+        let local_s = LocalDecomposeSuggestion::from_l5(&s);
+        assert_eq!(local_s.title, "Phase 1: design");
+        assert_eq!(local_s.reason, "reduce scope");
+        assert!(local_s.detail.is_empty());
+
+        let plan = CrtPlan::new(CrtTimeScale::Gaitian, 3600.0);
+        let local_p = LocalCrtPlan::from_l5(&plan);
+        assert_eq!(local_p.scale, "gaitian");
+        assert_eq!(local_p.budget_hours, 1.0);
+        assert_eq!(
+            LocalCrtPlan::to_scale_label(&local_p.scale, CrtTimeScale::Xuanye),
+            CrtTimeScale::Gaitian
+        );
+
+        let local_t = LocalTrace::from_trace_source(&TraceSource::LLMDriven);
+        assert_eq!(local_t.source, "LLMDriven");
+
+        let cot = crate::l5_cognition::nt_core_cot_generator::CoTOutput {
+            reasoning_steps: Vec::new(),
+            final_answer: "ans".to_string(),
+            overall_confidence: 0.9,
+            raw_response: String::new(),
+        };
+        let local_c = LocalTrace::from_cot(&cot);
+        assert_eq!(local_c.source, "CoTOutput");
+        assert_eq!(local_c.detail, "ans");
+
+        let trace = crate::l5_cognition::reasoning_core::ReasoningTrace {
+            trace_id: "t".to_string(),
+            task: "task".to_string(),
+            method: ReasoningMethod::Deductive,
+            hexagram: neotrix_types::e8_reasoning::ReasoningHexagram::new(0),
+            stage: 0,
+            steps: Vec::new(),
+            intermediate_states: Vec::new(),
+            convergence: 0.5,
+            final_quality: 0.5,
+            llm_response: None,
+            source: TraceSource::LLMDriven,
+            timestamp: 0,
+        };
+        let local_r = LocalTrace::from_reasoning_trace(&trace);
+        assert_eq!(local_r.source, "LLMDriven");
+        assert_eq!(local_r.detail, "task");
+
+        // serde 往返＋宽松（缺字段不断行）。
+        assert!(serde_json::to_string(&local_s).is_ok());
+        assert!(serde_json::to_string(&local_p).is_ok());
+        assert!(serde_json::to_string(&local_t).is_ok());
+        assert!(serde_json::from_str::<LocalDecomposeSuggestion>("{}").is_ok());
+        assert!(serde_json::from_str::<LocalCrtPlan>("{}").is_ok());
+        assert!(serde_json::from_str::<LocalTrace>("{}").is_ok());
+        if let Ok(json) = serde_json::to_string(&local_s) {
+            if let Ok(back) = serde_json::from_str::<LocalDecomposeSuggestion>(&json) {
+                assert_eq!(back.title, "Phase 1: design");
+            } else {
+                assert!(false, "local dto roundtrip must parse");
+            }
+        } else {
+            assert!(false, "local dto roundtrip must serialize");
+        }
     }
 }

@@ -1,6 +1,6 @@
 #![deny(clippy::unwrap_used)]
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::path::PathBuf;
 use std::io::{self, Write};
 
@@ -14,19 +14,23 @@ use neotrix::l1_action::nt_core_bank::bank::ReasoningBank;
 use neotrix::l1_action::nt_io::nt_io_mention::resolve_mentions;
 use neotrix::l1_action::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
 use neotrix::l1_action::nt_io::nt_io_standalone::ReasoningKernel;
+use neotrix::l5_cognition::nt_core_cot_generator::{CoTConfig, DefaultCoTGenerator};
 use neotrix::l5_cognition::nt_core_policy::E8Policy;
 
 use neotrix::config::NeoTrixConfig;
-use neotrix::cli::tui::output::StreamingMarkdownRenderer;
 
 mod proxy_cmd;
 mod standalone;
 mod headless;
 mod desktop;
 mod sysops;
+mod wiki;
+mod todo;
 
 pub use proxy_cmd::run_proxy_cmd;
 pub use sysops::run_sysops;
+pub use wiki::run_wiki;
+pub use todo::run_todo;
 fn success(msg: impl AsRef<str>) -> String {
     msg.as_ref().green().to_string()
 }
@@ -457,7 +461,7 @@ pub fn resolve_prompt(prompt: Option<&str>, file: Option<&str>, pipe: bool) -> S
 pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64) {
     if prompt.is_empty() {
         if json_output {
-            use neotrix::cli::jsonl_stream::JsonlWriter;
+            use neotrix::l0_substrate::nt_core_jsonl::JsonlWriter;
             let mut writer = JsonlWriter::new();
             writer.emit_error("Empty prompt", Some("EMPTY_PROMPT"), false);
             writer.emit_finish("", 0, 0, 1);
@@ -470,24 +474,20 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     // 不经 LLM 推理 — 它们不依赖 provider 且不应被网络/LLM 错误阻塞。
     let trimmed = prompt.trim_start();
     if trimmed.starts_with('/') {
-        let reg = neotrix::cli::commands::registry::default_registry();
-        let cmd_name = trimmed.split(' ').next().unwrap_or(trimmed);
-        if reg.find(cmd_name).is_some() {
-            let out = reg.execute(trimmed, None);
-            if json_output {
-                use neotrix::cli::jsonl_stream::JsonlWriter;
-                let mut writer = JsonlWriter::new();
-                if out.success {
-                    writer.emit_message("command", &out.message, None);
-                } else {
-                    writer.emit_error(&out.message, Some("COMMAND_ERROR"), false);
+        // cli::commands removed — slash commands no longer available
+        if json_output {
+            use neotrix::l0_substrate::nt_core_jsonl::JsonlWriter;
+            match std::fs::File::create("output.jsonl") {
+                Ok(f) => {
+                    let mut writer = JsonlWriter::new_with_writer(Box::new(f));
+                    writer.emit_message("command", "CommandRegistry removed", None);
                 }
-                writer.emit_finish(&out.message, 0, 0, if out.success { 0 } else { 1 });
-            } else {
-                println!("{}", out.message);
+                Err(e) => eprintln!("jsonl output failed: {}", e),
             }
-            return;
+        } else {
+            println!("CommandRegistry removed");
         }
+        return;
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let (prompt, mentions) = resolve_mentions(prompt, &cwd);
@@ -498,7 +498,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     let rt = tokio_runtime();
 
     if json_output {
-        use neotrix::cli::jsonl_stream::JsonlWriter;
+        use neotrix::l0_substrate::nt_core_jsonl::JsonlWriter;
         let mut writer = JsonlWriter::new();
         writer.emit_start(&prompt, None, None, None);
 
@@ -676,9 +676,11 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
             
             let mut dispatcher = match (gateway, reasoning_engine) {
                 (Some(gw), Some(re)) => TaskDecomposerDispatcher::new(
-                    gw,
+                    gw.clone(),
                     DispatcherConfig::from_env(),
                 )
+                // Phase 2 top-up (SIM-47)：CoT 显式注入，恢复 new() 自构前的行为。
+                        .with_cot_generator(DefaultCoTGenerator::new(gw, CoTConfig::default()))
                 .with_reasoning_engine(Box::new(re))
                 .with_kernel(kernel)
                 .with_e8_policy(e8_policy),
@@ -1127,25 +1129,114 @@ pub fn run_benchmark(category: Option<&str>) {
 }
 
 pub fn run_browse(url: &str) {
-    use neotrix::l2_perception::nt_world::nt_world_crawl::BrowserCircuit;
+    use neotrix::l1_action::nt_io::nt_io_browser_engine::{
+        AuthConfig, BackendKind, BrowserAction, BrowserConfig, BrowserEngine,
+    };
     println!("{}", info("╭─ NeoTrix Browser ──────────────────────────╮"));
     println!("│ {} {}", info("Fetching:"), url);
+    println!("│ {} {:?}", info("Backend:"), BackendKind::Http);
     println!("{}", info("╰────────────────────────────────────────────────╯"));
-    let browser = BrowserCircuit::new();
-    match browser.browse(url) {
-        Ok(text) => {
-            let lines: Vec<&str> = text.lines().collect();
-            println!("\n{} ({} lines, ~{} chars):",
-                info("Content"), lines.len(), text.len());
-            for line in lines.iter().take(60) {
-                println!("  {}", line);
-            }
-            if lines.len() > 60 {
-                println!("  {} ({})", info("..."), info(format!("{} more lines", lines.len() - 60)));
-            }
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("{}: runtime: {}", err("Error"), e);
+            return;
         }
-        Err(e) => eprintln!("{}: {}", err("Error"), e),
-    }
+    };
+    rt.block_on(async {
+        let engine = BrowserEngine::new(BrowserConfig {
+            backend: BackendKind::Http,
+            timeout_ms: 30_000,
+            ..Default::default()
+        });
+        let session_id = match engine.create_session().await {
+            Ok(id) => id,
+            Err(e) => {
+                eprintln!("{}: {}", err("Error"), e);
+                return;
+            }
+        };
+        // 认证（可选）：优先级 站点名 > token 文件 > 内存 token。
+        // 例：NEOTRIX_AUTH_SITE=lingee neotrix browse <url>
+        // 例：NEOTRIX_AUTH_TOKEN_FILE=~/.config/neotrix/lingee.token neotrix browse <url>
+        let auth_site = std::env::var("NEOTRIX_AUTH_SITE")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
+        let token_file = std::env::var("NEOTRIX_AUTH_TOKEN_FILE")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
+        let token_literal = std::env::var("NEOTRIX_AUTH_TOKEN")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
+        if let Some(site) = auth_site {
+            if let Err(e) = engine.set_session_auth_by_site(&session_id, site.trim()).await
+            {
+                eprintln!("{}: auth: {}", err("Error"), e);
+                return;
+            }
+            println!("│ {} {}", info("Auth:"), info("site (auth.toml)"));
+        } else if let Some(path) = token_file {
+            // 默认 7 天有效期的站（如 Lingee）可直接用；已知过期点可再配
+            if let Err(e) = engine
+                .set_session_auth(&session_id, AuthConfig::file(path))
+                .await
+            {
+                eprintln!("{}: auth: {}", err("Error"), e);
+                return;
+            }
+            println!("│ {} {}", info("Auth:"), info("token file (hot-reload)"));
+        } else if let Some(token) = token_literal {
+            if let Err(e) = engine
+                .set_session_auth(&session_id, AuthConfig::literal(token))
+                .await
+            {
+                eprintln!("{}: auth: {}", err("Error"), e);
+                return;
+            }
+            println!("│ {} {}", info("Auth:"), info("inline token"));
+        }
+        match engine
+            .execute(
+                &session_id,
+                BrowserAction::Navigate {
+                    url: url.to_string(),
+                },
+            )
+            .await
+        {
+            Ok(result) if result.success => {
+                let lines: Vec<&str> = result.output.lines().collect();
+                if let Some(title) = result.title {
+                    println!("{} {}", info("Title:"), title);
+                }
+                println!(
+                    "\n{} ({} lines, ~{} chars):",
+                    info("Content"),
+                    lines.len(),
+                    result.output.len()
+                );
+                for line in lines.iter().take(60) {
+                    println!("  {}", line);
+                }
+                if lines.len() > 60 {
+                    println!(
+                        "  {} ({})",
+                        info("..."),
+                        info(format!("{} more lines", lines.len() - 60))
+                    );
+                }
+            }
+            Ok(result) => eprintln!(
+                "{}: {}",
+                err("Error"),
+                result.error.unwrap_or_else(|| "unknown".to_string())
+            ),
+            Err(e) => eprintln!("{}: {}", err("Error"), e),
+        }
+    });
 }
 
 pub fn run_search(query: &str, count: usize) {
@@ -1306,6 +1397,20 @@ pub fn run_daemon(profile: &str) {
                 let mut bg = BackgroundLoop::new(bg_agent.clone());
                 bg.goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
                 bg.nt_world_model = Some(WorldModelV2::new(8, 64));
+                // ── 关键: 打开 KB 并附加到 BackgroundLoop ──
+                // 没有 KB, 所有吸收 handler (crawl_queue/exploration/knowledge_chain)
+                // 都会在 "kb not attached" 处直接 return, 晶体无法吸收外部数据。
+                if let Ok(kb) = neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+                    let kb = std::sync::Arc::new(kb);
+                    bg.kb = Some(kb.clone());
+                    log_recovery(&recovery, "KB已打开", &format!("attached to BackgroundLoop"));
+                    // 同时附加到 panorama
+                    let mut panorama = PanoramaPipeline::new();
+                    panorama.attach_kb(kb);
+                    bg = bg.with_panorama(panorama);
+                } else {
+                    log_recovery(&recovery, "KB打开失败", "吸收功能将不可用");
+                }
                 #[cfg(feature = "stealth-net")]
                 {
                     bg = bg.with_world_consciousness();
@@ -1488,6 +1593,17 @@ pub fn run_daemon_evolution(profile: &str) {
                 let mut bg = BackgroundLoop::new(bg_agent.clone());
                 bg.goal_loop = neotrix::l5_cognition::nt_mind::nt_mind::GoalLoop::new();
                 bg.nt_world_model = Some(WorldModelV2::new(8, 64));
+                // ── 关键: 打开 KB 并附加到 BackgroundLoop ──
+                if let Ok(kb) = neotrix::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
+                    let kb = std::sync::Arc::new(kb);
+                    bg.kb = Some(kb.clone());
+                    log_recovery(&recovery, "KB已打开", &format!("attached to evolution daemon"));
+                    let mut panorama = PanoramaPipeline::new();
+                    panorama.attach_kb(kb);
+                    bg = bg.with_panorama(panorama);
+                } else {
+                    log_recovery(&recovery, "KB打开失败", "吸收功能将不可用");
+                }
                 #[cfg(feature = "stealth-net")]
                 {
                     bg = bg.with_world_consciousness();
@@ -1601,7 +1717,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
     
     use neotrix::agent::skills::SkillsEngine;
     use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-    use neotrix::cli::commands::agent_cmds::McpRegistry;
+    use neotrix::agent::tool::McpRegistry;
     use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::agent::{AgentTeam, ProcessType};
     use std::sync::{Arc, Mutex};
@@ -1631,7 +1747,28 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         print_brain_stats(&agent);
 
         let mut skills_engine = SkillsEngine::new();
+        // E2 观测: SkillsEngine load 包裹 (纯观测, 不改变控制流/返回值/错误路径)
+        let e2_start_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
         let skill_count = skills_engine.init().len();
+        {
+            let e2_end_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(e2_start_ms);
+            let mut e2_crystal =
+                neotrix::neotrix::nt_crystal_core::crystal_state::CrystalState::new("entry");
+            e2_crystal.record_execution(
+                "skills_engine.init".to_string(),
+                "entry".to_string(),
+                format!("{} local skills loaded", skill_count),
+                true,
+                e2_end_ms.saturating_sub(e2_start_ms),
+            );
+        }
+        // TODO(E2-next): Evolver 反馈接线 — SkillCandidate.performance_history 不在作用域, 待统一通道接入 (不跨文件新建依赖)
         println!("{}: {} ", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)));
         println!("  -> {} /skills list to browse, /skills ecc <id> to load from ECC community", info("/skills"));
 
@@ -1647,6 +1784,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
                 },
                 input_schema: serde_json::json!({"type": "object"}),
                 schema_version: None,
+                ..Default::default()
             },
         ];
         builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
@@ -1654,9 +1792,9 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         
         let mut orchestrator = neotrix::agent::tool::ToolOrchestrator::default();
         orchestrator.register_native_all(mcp_registry.as_native_tools());
-        neotrix::cli::commands::agent_cmds::set_tool_orchestrator(orchestrator);
+        // set_tool_orchestrator removed with cli::commands
         println!("{}: {} native MCP tools absorbed via McpToolAdapter", info("ToolOrchestrator"), success(mcp_registry.tool_count().to_string()));
-        neotrix::cli::commands::agent_cmds::set_mcp_registry(mcp_registry.clone());
+        // set_mcp_registry removed with cli::commands
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
@@ -1758,7 +1896,7 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
     
     use neotrix::agent::skills::SkillsEngine;
     use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-    use neotrix::cli::commands::agent_cmds::McpRegistry;
+    use neotrix::agent::tool::McpRegistry;
     use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::agent::{AgentTeam, AgentRole, ProcessType};
     use std::sync::{Arc, Mutex};
@@ -1792,7 +1930,28 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
         print_brain_stats(&agent);
 
         let mut skills_engine = SkillsEngine::new();
+        // E2 观测: SkillsEngine load 包裹 (纯观测, 不改变控制流/返回值/错误路径)
+        let e2_start_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
         let skill_count = skills_engine.init().len();
+        {
+            let e2_end_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(e2_start_ms);
+            let mut e2_crystal =
+                neotrix::neotrix::nt_crystal_core::crystal_state::CrystalState::new("entry");
+            e2_crystal.record_execution(
+                "skills_engine.init".to_string(),
+                "entry".to_string(),
+                format!("{} local skills loaded", skill_count),
+                true,
+                e2_end_ms.saturating_sub(e2_start_ms),
+            );
+        }
+        // TODO(E2-next): Evolver 反馈接线 — SkillCandidate.performance_history 不在作用域, 待统一通道接入 (不跨文件新建依赖)
         println!("{}: {} ", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)));
         println!("  -> {} /skills list to browse, /skills ecc <id> to load from ECC community", info("/skills"));
 
@@ -1808,6 +1967,7 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
                 },
                 input_schema: serde_json::json!({"type": "object"}),
                 schema_version: None,
+                ..Default::default()
             },
         ];
         builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
@@ -1815,8 +1975,7 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
         
         let mut orchestrator = neotrix::agent::tool::ToolOrchestrator::default();
         orchestrator.register_native_all(mcp_registry.as_native_tools());
-        neotrix::cli::commands::agent_cmds::set_tool_orchestrator(orchestrator);
-        neotrix::cli::commands::agent_cmds::set_mcp_registry(mcp_registry.clone());
+        // set_tool_orchestrator and set_mcp_registry removed with cli::commands
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let _mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
@@ -1847,13 +2006,18 @@ use neotrix::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline
         let agent_team = Arc::new(Mutex::new(AgentTeam::new("default", ProcessType::Sequential)));
         {
             let mut team = agent_team.lock().unwrap_or_else(|e| e.into_inner());
-            team.add_agent(AgentRole {
+            // TODO(T14-next): E2 接线后删除旧构造（goal/tools 去向待 E2 裁决，见 team_role_to_card 注记）
+            let legacy_role = AgentRole {
                 name: "planner".into(),
                 role: "Task Planner".into(),
                 goal: "Break down complex tasks into sub-tasks".into(),
                 backstory: "Strategic planner with systems thinking".into(),
                 tools: vec!["reason".into()],
-            });
+            };
+            // T14 语义迁移：并行产出正典卡并注册（行为不变，旧路径保留）
+            let card = team_role_to_card("planner", &legacy_role);
+            neotrix::l1_action::nt_infra_agent_card::agent_card_register(card);
+            team.add_agent(legacy_role);
         }
         bg_goal_loop = bg_goal_loop.with_agent_team(agent_team);
 
@@ -2257,8 +2421,9 @@ pub fn run_wallet_export(label: &str) {
 ///   1. 初始化 GatewayV2（provider 路由/熔断/限流）
 ///   2. 装配 MCP 原生工具（ToolOrchestrator → AgentLoop 工具集）
 ///   3. 启动交互 REPL：每轮 `loop_.turn(input)` 驱动 用户→LLM→工具→回答
+#[allow(dead_code)] // 保留入口：待上层接线后启用
 pub fn run_agent_mode(profile: &str) {
-    use neotrix::cli::commands::agent_cmds::McpRegistry;
+    use neotrix::agent::tool::McpRegistry;
     use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
     use neotrix::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
     use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
@@ -2283,8 +2448,9 @@ You have tools available; call them when they help. Be concise and evidence-firs
                 command: "echo".to_string(),
                 args: vec![],
             },
-            input_schema: serde_json::json!({"type": "object"}),
-            schema_version: None,
+                input_schema: serde_json::json!({"type": "object"}),
+                schema_version: None,
+                ..Default::default()
         }];
         builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
@@ -2349,940 +2515,14 @@ You have tools available; call them when they help. Be concise and evidence-firs
 
 /// NT-AGENT TUI 模式 — 基于 ratatui 的完整对话终端。
 ///
-/// 与 [`run_agent_mode`]（逐行 REPL）不同，本入口使用 `TuiApp` 状态机 +
-/// crossterm 事件循环 + `AgentLoop::turn_stream()` 流式渲染：
-///   - 多行输入 / 历史（↑↓ / Ctrl+R 搜索）/ vim 模式 / Tab 斜杠补全
-///   - 工具调用行内状态、token 计数、tokens/sec、会话切换
-///   - 流式 markdown 增量渲染（`streaming_text` → `commit_stream`）
-pub fn run_agent_tui(profile: &str) {
-    use neotrix::cli::commands::agent_cmds::McpRegistry;
-    use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
-    use neotrix::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
-    use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
-    use neotrix::cli::tui::TuiApp;
-    use neotrix::cli::tui::app::KeyAction;
-    use crossterm::event::{self, Event};
-    use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
-    use crossterm::execute;
-    use ratatui::backend::CrosstermBackend;
-    use ratatui::Terminal;
-    use std::io;
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
-
-    const NT_CORE_SYSTEM_PROMPT: &str = "\
-You are NT-CORE, the orchestrating brain of the NeoTrix system. \
-You hold state, route work, and decide. The language model you are part of is a \
-backend reasoning engine you call — not your master. Answer the user directly. \
-You have tools available; call them when they help. Be concise and evidence-first.";
-
-    let rt = tokio_runtime();
-    rt.block_on(async {
-        ensure_provider_env_from_config();
-
-        let mut mcp_registry = McpRegistry::new();
-        let mut builtin_tools = vec![McpToolDef {
-            name: "neotrix_info".to_string(),
-            description: "NeoTrix MCP system info".to_string(),
-            server_name: "built-in".to_string(),
-            transport: McpTransport::Local {
-                command: "echo".to_string(),
-                args: vec![],
-            },
-            input_schema: serde_json::json!({"type": "object"}),
-            schema_version: None,
-        }];
-        builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
-        mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
-        
-        // 意识核心能力面: 命令面 (file/git/session/memory/crypto/...) 全部桥接为
-        // NativeTool, LLM 意识核心智能调度; 人类只接触基础控制命令。
-        let mut tools = mcp_registry.as_native_tools();
-        tools.extend(neotrix::l5_cognition::nt_core::nt_io_awareness_core::awareness_core_tools());
-
-        let gateway = create_gateway_async().await;
-        let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
-            let cfg = neotrix::config::NeoTrixConfig::load();
-            cfg.default_model.clone().unwrap_or_else(|| "default".to_string())
-        });
-        // 整体链路链接: 未显式指定模型时, 从池子实际注册名解析默认 (而非硬编码 provider)。
-        let default_model = if default_model.is_empty() || default_model == "default" {
-            gateway.resolve_default_model().await
-        } else {
-            default_model
-        };
-
-        let agent = Arc::new(Mutex::new(
-            AgentLoop::new(Arc::new(gateway), &default_model, NT_CORE_SYSTEM_PROMPT)
-                .with_tools(tools),
-        ));
-        let _ = profile;
-        // ── TUI 初始化 ──────────────────────────────────────────────
-        // 前置检查：stdin 必须是 tty（交互式终端），否则 crossterm 事件循环会立即失败。
-        use std::io::IsTerminal;
-        if !io::stdin().is_terminal() {
-            eprintln!("{} TUI 需要交互式终端（stdin 非 tty）。请直接在终端运行，或使用 --headless 模式。", err("Error"));
-            return;
-        }
-        // P0-3 修复: panic 兜底 — 一旦 panic, 恢复 raw mode + alternate screen,
-        // 避免终端残留不可用状态。设置钩子后在 re-panic 前尝试清理。
-        {
-            use std::panic;
-            let prev = panic::take_hook();
-            panic::set_hook(Box::new(move |info| {
-                use std::io::Write;
-                let _ = execute!(std::io::stdout(), LeaveAlternateScreen);
-                let _ = terminal::disable_raw_mode();
-                let _ = io::stdout().flush();
-                prev(info);
-            }));
-        }
-        terminal::enable_raw_mode().ok();
-        let mut stdout = io::stdout();
-        let _ = execute!(stdout, EnterAlternateScreen);
-        // P1-2 修复: 启用 bracketed paste, 多行粘贴被 crossterm 作为单个
-        // Event::Paste(String) 交付, 而非逐 \n 触发 Enter/Submit。
-        let _ = execute!(stdout, crossterm::event::EnableBracketedPaste);
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = match Terminal::new(backend) {
-            Ok(t) => t,
-            Err(e) => {
-                let _ = execute!(io::stdout(), LeaveAlternateScreen);
-                let _ = terminal::disable_raw_mode();
-                eprintln!("{} TUI init failed: {}", err("Error"), e);
-                return;
-            }
-        };
-        let _ = terminal.clear();
-
-        let mut app = TuiApp::new(false);
-        // 从 config 读取主题偏好（color_mode）——非法值回退 dark
-        {
-            let cfg = neotrix::config::NeoTrixConfig::load();
-            if let Some(mode) = cfg.color_mode {
-                if matches!(mode.as_str(), "dark" | "light" | "gruvbox") {
-                    app.theme_name = mode;
-                }
-            }
-        }
-        let model_name = {
-            let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
-            guard.model().to_string()
-        };
-        app.status_text = format!("Ready | model: {}", model_name);
-
-        // 会话自动恢复：把最近会话历史加载到 TuiApp.sessions（替代仅打印 restored）。
-        let restored = app.restore_sessions();
-        if restored > 0 {
-            app.status_text = format!("已恢复上次会话 ({} 条消息) | model: {}", restored, model_name);
-        }
-
-        let draw = |terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &TuiApp| {
-            let theme = neotrix::cli::tui::theme_by_name(&app.theme_name);
-            let _ = terminal.draw(|frame| {
-                let area = frame.area();
-                use neotrix::cli::tui::layout::{
-                    compute_layout, render_approval_bar, render_chat_panel, render_diff_panel,
-                    render_input_panel, render_session_list, render_session_picker,
-                    render_status_bar, render_streaming_tools,
-                };
-                let (left, chat, input_area, status) = compute_layout(area, app.show_sessions, app.input.lines().count());
-                if let Some(left_area) = left {
-                    render_session_list(frame, left_area, app, &theme);
-                }
-                // 审批条：chat 区顶部切 1 行（仅在有 pending 时显示）。
-                let (chat_area, approval_area) = if app.pending_approval.is_some() {
-                    let v = ratatui::layout::Layout::default()
-                        .direction(ratatui::layout::Direction::Vertical)
-                        .constraints([
-                            ratatui::layout::Constraint::Length(1),
-                            ratatui::layout::Constraint::Min(0),
-                        ])
-                        .split(chat);
-                    (v[1], Some(v[0]))
-                } else {
-                    (chat, None)
-                };
-                // 流式工具区：审批条之下再切一段（有工具时显示，最高 5 行）。
-                let (chat_area, tools_area) = if !app.streaming_tool_calls.is_empty() {
-                    let max_rows = app.streaming_tool_calls.len().min(5) as u16 + 1;
-                    let v = ratatui::layout::Layout::default()
-                        .direction(ratatui::layout::Direction::Vertical)
-                        .constraints([
-                            ratatui::layout::Constraint::Length(max_rows),
-                            ratatui::layout::Constraint::Min(0),
-                        ])
-                        .split(chat_area);
-                    (v[1], Some(v[0]))
-                } else {
-                    (chat_area, None)
-                };
-                if app.diff_viewer.is_some() {
-                    render_diff_panel(frame, chat_area, app, &theme);
-                } else {
-                    render_chat_panel(frame, chat_area, app, &theme);
-                }
-                if let Some(a) = approval_area {
-                    render_approval_bar(frame, a, app, &theme);
-                }
-                if let Some(t) = tools_area {
-                    render_streaming_tools(frame, t, app, &theme);
-                }
-                render_input_panel(frame, input_area, app, &theme);
-                render_status_bar(frame, status, app, &theme);
-                // 会话恢复 picker：最顶层 overlay（全屏区域居中弹出）。
-                render_session_picker(frame, area, app, &theme);
-            });
-        };
-
-        let mut exit = neotrix::cli::tui::app::TuiExit::Quit;
-
-        // ── 事件循环 ────────────────────────────────────────────────
-        loop {
-            // 每 tick 推进 spinner 帧（poll 超时也会重绘 → 动画持续驱动）
-            app.tick_spinner();
-            draw(&mut terminal, &app);
-
-            // P1-5: 会话切换/清空后, 同步重置 AgentLoop 内部历史 (模型上下文跟随当前会话)。
-            if app.needs_agent_reset {
-                app.needs_agent_reset = false;
-                if let Ok(mut g) = agent.lock() {
-                    g.reset_history(NT_CORE_SYSTEM_PROMPT);
-                }
-            }
-
-            if !event::poll(Duration::from_millis(100)).unwrap_or(false) {
-                continue;
-            }
-            let ev = match event::read() {
-                Ok(e) => e,
-                Err(e) => {
-                    eprintln!("{} TUI 事件读取失败: {}", err("Error"), e);
-                    break;
-                }
-            };
-
-            match ev {
-                Event::Key(key) => {
-                    let action = app.handle_key(key.code, key.modifiers);
-                    match action {
-                        KeyAction::Quit => { exit = neotrix::cli::tui::app::TuiExit::Quit; break; }
-                        KeyAction::ClearScreen => {
-                            let _ = terminal.clear();
-                            app.scroll_offset = 0;
-                        }
-                        // 审批决策在外层仅在非流式时可达（无 pending 审批时无意义），
-                        // 真实审批事件在流式内循环 (a/d) 处理；此处留空。
-                        KeyAction::CancelGeneration | KeyAction::ApprovePending | KeyAction::DenyPending => {}
-                        KeyAction::SelectSession(idx) => {
-                            // 从 picker 选择会话 → 加载到当前 TuiApp。
-                            let name = app.session_picker.as_ref()
-                                .and_then(|p| p.entries.get(idx))
-                                .map(|e| e.name.clone());
-                            app.session_picker = None;
-                            if let Some(name) = name {
-                                match load_tui_session(&mut app, &name) {
-                                    Ok(n) => {
-                                        app.status_text = format!("已加载会话 {} ({} 条消息)", name, n);
-                                        app.scroll_offset = 0;
-                                    }
-                                    Err(e) => app.status_text = format!("加载失败: {}", e),
-                                }
-                            }
-                        }
-                        KeyAction::ClosePicker => {
-                            app.session_picker = None;
-                        }
-                        KeyAction::DeleteSession(idx) => {
-                            // 从 picker 删除选中会话（从 SessionStore + 会话列表同步移除）。
-                            let name = app.session_picker.as_ref()
-                                .and_then(|p| p.entries.get(idx))
-                                .map(|e| e.name.clone());
-                            if let Some(name) = name {
-                                use neotrix::cli::tui::session_store::SessionStore;
-                                let mut store = SessionStore::new();
-                                match store.delete_session(&name) {
-                                    Ok(()) => {
-                                        if let Some(p) = &mut app.session_picker {
-                                            p.entries.remove(idx);
-                                            if p.entries.is_empty() {
-                                                app.session_picker = None;
-                                                app.status_text = "会话已删除，无剩余会话".into();
-                                            } else {
-                                                p.selected = p.selected.min(p.entries.len() - 1);
-                                                app.status_text = format!("已删除会话 {}", name);
-                                            }
-                                        }
-                                    }
-                                    Err(e) => app.status_text = format!("删除失败: {}", e),
-                                }
-                            }
-                        }
-                        KeyAction::Submit => {
-                            let input = app.trim().to_string();
-                            app.cursor = 0;
-                            if input.is_empty() { continue; }
-                            // 斜杠命令
-                            if input.starts_with('/') {
-                                match handle_slash_tui(&mut app, &input, Some(&agent)) {
-                                    SlashResult::Quit => { exit = neotrix::cli::tui::app::TuiExit::Quit; break; }
-                                    SlashResult::Handled => { app.input.clear(); app.cursor = 0; continue; }
-                                    SlashResult::NotHandled => {
-                                        // 作为普通消息发给 AgentLoop。
-                                    }
-                                }
-                            }
-                            // `!` shell 直跑：本地 sh -c 执行，输出进会话（对标 claude-code 的 ! 前缀）。
-                            if let Some(shell_cmd) = input.strip_prefix('!') {
-                                let shell_cmd = shell_cmd.trim();
-                                if shell_cmd.is_empty() {
-                                    app.status_text = "用法: !<shell 命令>".into();
-                                    app.input.clear();
-                                    app.cursor = 0;
-                                    continue;
-                                }
-                                app.push_message("user", input.clone());
-                                app.command_history.push(input.clone());
-                                app.input.clear();
-                                app.cursor = 0;
-                                match run_shell_direct(shell_cmd) {
-                                    Ok((code, stdout, stderr)) => {
-                                        let mut out = format!("$ {}\n", shell_cmd);
-                                        if !stdout.is_empty() { out.push_str(&stdout); }
-                                        if !stderr.is_empty() {
-                                            if !stdout.is_empty() { out.push('\n'); }
-                                            out.push_str(&stderr);
-                                        }
-                                        out.push_str(&format!("\n[exit {}]", code));
-                                        app.push_message_with_model("assistant", out, Some("shell".into()));
-                                        app.status_text = if code == 0 { "shell: exit 0".to_string() } else { format!("shell: exit {} (非零)", code) };
-                                    }
-                                    Err(e) => {
-                                        app.push_message("system", format!("[shell 失败] {}", e));
-                                        app.status_text = format!("shell 失败: {}", e);
-                                    }
-                                }
-                                continue;
-                            }
-                            // 交给 AgentLoop 流式生成（后台线程，主循环边收 chunk 边渲染）。
-                            let text = input;
-                            app.push_message("user", text.clone());
-                            app.command_history.push(text.clone());
-                            app.input.clear();
-                            app.cursor = 0;
-                            app.agent_busy = true;
-                            app.streaming = true;
-                            app.streaming_role = "assistant".into();
-                            app.streaming_model = {
-                                let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
-                                Some(guard.model().to_string())
-                            };
-                            app.streaming_text.clear();
-                            app.streaming_renderer = StreamingMarkdownRenderer::new();
-                            app.clear_streaming_tools();
-
-                            use std::sync::mpsc as sync_mpsc;
-                            let (event_tx, event_rx) = sync_mpsc::channel::<WorkerEvent>();
-                            // 审批决策通道：主循环 → worker（true=允许, false=拒绝）。
-                            let (approval_tx, approval_rx) = sync_mpsc::channel::<bool>();
-                            // 取消标志：主循环设置，worker 的 on_token/审批回调读取，
-                            // 保证「取消」真正传导到 LLM 生成循环（不再只是 UI 状态）。
-                            let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-                            let cancel_flag_worker = cancel_flag.clone();
-                            let agent_worker = agent.clone();
-                            let text_worker = text.clone();
-                            let worker_handle = std::thread::spawn(move || {
-                                let rt = match tokio::runtime::Runtime::new() {
-                                    Ok(rt) => rt,
-                                    Err(_) => {
-                                        let _ = event_tx.send(WorkerEvent::Error("runtime init failed".into()));
-                                        return;
-                                    }
-                                };
-                                let mut guard = match agent_worker.lock() {
-                                    Ok(g) => g,
-                                    Err(poisoned) => poisoned.into_inner(),
-                                };
-                                let result = rt.block_on(guard.turn_stream_with_approval(
-                                    &text_worker,
-                                    |chunk| {
-                                        if cancel_flag_worker.load(std::sync::atomic::Ordering::Relaxed) {
-                                            return false; // 取消 → 中止本轮生成
-                                        }
-                                        let _ = event_tx.send(WorkerEvent::Token(chunk.to_string()));
-                                        true
-                                    },
-                                    |name, args| {
-                                        if cancel_flag_worker.load(std::sync::atomic::Ordering::Relaxed) {
-                                            return false;
-                                        }
-                                        let _ = event_tx.send(WorkerEvent::ToolStart(name.to_string(), args.to_string()));
-                                        true
-                                    },
-                                    |name, args, result, duration, success| {
-                                        let _ = event_tx.send(WorkerEvent::ToolEnd(
-                                            name.to_string(), args.to_string(),
-                                            result.to_string(), duration, success,
-                                        ));
-                                        true
-                                    },
-                                    Some(Box::new({
-                                        let tx = event_tx.clone();
-                                        let cancel = cancel_flag_worker.clone();
-                                        move |pending| {
-                                            // 阻塞等待主循环决策（a=允许 / d=拒绝）。
-                                            // 取消已设置 → 立即拒绝，避免卡在 recv() 上
-                                            // （否则 worker 持锁阻塞、主线程 agent.lock() 永久死锁）。
-                                            if cancel.load(std::sync::atomic::Ordering::Relaxed) {
-                                                return false;
-                                            }
-                                            let _ = tx.send(WorkerEvent::ApprovalRequest(pending.clone()));
-                                            // 使用 recv_timeout 轮询取消标志，保证可中断。
-                                            loop {
-                                                match approval_rx.recv_timeout(std::time::Duration::from_millis(200)) {
-                                                    Ok(approved) => break approved,
-                                                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                                                        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
-                                                            break false;
-                                                        }
-                                                    }
-                                                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break false,
-                                                }
-                                            }
-                                        }
-                                    })),
-                                ));
-                                match result {
-                                    Ok(_) => { let _ = event_tx.send(WorkerEvent::Done); }
-                                    Err(e) => { let _ = event_tx.send(WorkerEvent::Error(e.to_string())); }
-                                }
-                            });
-
-                            // 主循环：边收事件边渲染，同时响应键盘（Ctrl+C 取消 / a/d 审批决策）。
-                            let mut worker_done = false;
-                            let mut frame_counter = 0u32;
-                            let mut stream_ended = false;
-                            while !worker_done {
-                                while let Ok(ev) = event_rx.try_recv() {
-                                    match ev {
-                                        WorkerEvent::Token(t) => app.feed_stream(&t),
-                                        WorkerEvent::ToolStart(name, args) => {
-                                            app.start_streaming_tool(&name, &args);
-                                        }
-                                        WorkerEvent::ToolEnd(name, _args, result, duration, success) => {
-                                            app.finish_streaming_tool(&name, duration, success, &result);
-                                        }
-                                        WorkerEvent::ApprovalRequest(pending) => {
-                                            app.pending_approval = Some(pending);
-                                            app.status_text = "等待审批: [a]允许 [d]拒绝".into();
-                                        }
-                                        WorkerEvent::Error(e) => { app.push_message_with_model("error", format!("[error] {}", e), None); app.status_text = format!("[error] {}", e); },
-                                        WorkerEvent::Done => {
-                                            stream_ended = true;
-                                            worker_done = true;
-                                        }
-                                    }
-                                }
-                                // 每 3 圈（≈90ms）推进一次 spinner 帧，贴近参考 100ms/帧；
-                                // 无 chunk 时也重绘（借鉴 claude-code-local：沉默≠卡死）。
-                                frame_counter += 1;
-                                if frame_counter.is_multiple_of(3) {
-                                    app.tick_spinner();
-                                }
-                                draw(&mut terminal, &app);
-                                // 处理键盘（Ctrl+C 取消 / a 允许 / d 拒绝）。
-                                if let Ok(true) = event::poll(Duration::from_millis(30)) {
-                                    if let Ok(Event::Key(key)) = event::read() {
-                                        match app.handle_key(key.code, key.modifiers) {
-                                            KeyAction::CancelGeneration => {
-                                                app.agent_busy = false;
-                                                app.streaming = false;
-                                                app.status_text = "生成已取消".into();
-                                                app.pending_approval = None;
-                                                // 取消真正传导：设置标志中止 LLM 生成，
-                                                // 并 send(false) 唤醒可能阻塞在审批 recv_timeout 的 worker。
-                                                cancel_flag.store(true, std::sync::atomic::Ordering::Relaxed);
-                                                let _ = approval_tx.send(false);
-                                                worker_done = true;
-                                            }
-                                            KeyAction::ApprovePending => {
-                                                let _ = approval_tx.send(true);
-                                            }
-                                            KeyAction::DenyPending => {
-                                                let _ = approval_tx.send(false);
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                }
-                                // sender drop → 工作线程结束。
-                                match event_rx.try_recv() {
-                                    Err(sync_mpsc::TryRecvError::Disconnected) => {
-                                        stream_ended = true;
-                                        worker_done = true;
-                                    }
-                                    Err(sync_mpsc::TryRecvError::Empty) => {}
-                                    Ok(ev) => match ev {
-                                        WorkerEvent::Token(t) => app.feed_stream(&t),
-                                        WorkerEvent::ToolStart(name, args) => {
-                                            app.start_streaming_tool(&name, &args);
-                                        }
-                                        WorkerEvent::ToolEnd(name, _args, result, duration, success) => {
-                                            app.finish_streaming_tool(&name, duration, success, &result);
-                                        }
-                                        WorkerEvent::ApprovalRequest(pending) => {
-                                            app.pending_approval = Some(pending);
-                                            app.status_text = "等待审批: [a]允许 [d]拒绝".into();
-                                        }
-                                        WorkerEvent::Error(e) => { app.push_message_with_model("error", format!("[error] {}", e), None); app.status_text = format!("[error] {}", e); },
-                                        WorkerEvent::Done => {
-                                            stream_ended = true;
-                                            worker_done = true;
-                                        }
-                                    },
-                                }
-                                draw(&mut terminal, &app);
-                            }
-                            // worker 已发 Done/取消完, 释放 agent 锁后主线程才可安全重入。
-                            let _ = worker_handle.join();
-
-                            // 收尾：应用剩余事件并提交。
-                            while let Ok(ev) = event_rx.try_recv() {
-                                match ev {
-                                    WorkerEvent::Token(t) => app.feed_stream(&t),
-                                    WorkerEvent::ToolStart(name, args) => {
-                                        app.start_streaming_tool(&name, &args);
-                                    }
-                                    WorkerEvent::ToolEnd(name, _args, result, duration, success) => {
-                                        app.finish_streaming_tool(&name, duration, success, &result);
-                                    }
-                                    WorkerEvent::ApprovalRequest(pending) => {
-                                        app.pending_approval = Some(pending);
-                                        app.status_text = "等待审批: [a]允许 [d]拒绝".into();
-                                    }
-                                    WorkerEvent::Error(e) => { app.push_message_with_model("error", format!("[error] {}", e), None); app.status_text = format!("[error] {}", e); },
-                                    WorkerEvent::Done => stream_ended = true,
-                                }
-                            }
-                            let _ = stream_ended;
-                            if app.streaming_text.trim().is_empty() && app.status_text.contains("[error]") {
-                                let _ = app.status_text.clone();
-                            }
-                            app.agent_busy = false;
-                            app.streaming = false;
-                            app.pending_approval = None;
-                            let model = {
-                                let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
-                                guard.model().to_string()
-                            };
-                            app.commit_stream_with_model("assistant", Some(model));
-                        }
-                        KeyAction::None => {}
-                    }
-                }
-                Event::Resize(_, _) => {
-                    let _ = terminal.clear();
-                }
-                // P1-2 修复: bracketed paste — 粘贴文本原样插入输入缓冲 (含换行/多行),
-                // 不会逐 \n 触发 Enter/Submit, 杜绝大段粘贴被拆行发送丢失。
-                Event::Paste(pasted) => {
-                    if !app.agent_busy {
-                        append_paste(&mut app, &pasted);
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        // ── TUI 清理 ────────────────────────────────────────────────
-        // P1-3 修复: 退出前自动保存当前会话 (不再依赖显式 /save), 防正常退出丢对话。
-        {
-            let name = format!("session-{}", app.sessions[app.active_session].id);
-            let n = app.sessions[app.active_session].messages.len();
-            if n > 0 {
-                match save_tui_session(&app, &name) {
-                    Ok(()) => eprintln!("{} 会话已自动保存 ({} 条消息)", info("Saved"), n),
-                    Err(e) => eprintln!("{} 会话自动保存失败: {}", err("Error"), e),
-                }
-            }
-        }
-        let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
-        let _ = terminal::disable_raw_mode();
-        println!("{}", info("NT-AGENT TUI 结束"));
-        let _ = exit;
-    });
+/// **STUB** — cli::tui 模块已移除，此函数仅打印错误并返回。
+pub fn run_agent_tui(_profile: &str) {
+    eprintln!("{} TUI 模块已移除，请使用 --headless 或 web 模式", err("Error"));
 }
 
-enum SlashResult {
-    Quit,
-    Handled,
-    NotHandled,
-}
 
-/// AgentLoop 后台线程 → 主循环的事件（流式生成期间）。
-enum WorkerEvent {
-    Token(String),
-    ToolStart(String, String),
-    ToolEnd(String, String, String, u64, bool),
-    ApprovalRequest(neotrix::cli::approval::PendingAction),
-    Error(String),
-    Done,
-}
 
-/// TUI 模式斜杠命令分发（当前仅本地命令；其余透传给 AgentLoop 当消息）。
-/// `agent` 为可选的 AgentLoop 句柄（/model /compact /status /cost 需要读写模型/用量）。
-fn handle_slash_tui(
-    app: &mut neotrix::cli::tui::TuiApp,
-    input: &str,
-    agent: Option<&Arc<Mutex<neotrix::l1_action::nt_io::nt_io_agent_loop::AgentLoop>>>,
-) -> SlashResult {
-    let (cmd, rest) = match input.split_once(' ') {
-        Some((c, r)) => (c, r),
-        None => (input, ""),
-    };
-    match cmd {
-        "/exit" | "/quit" | "/q" => SlashResult::Quit,
-        "/clear" => {
-            app.clear_session();
-            app.needs_agent_reset = true;
-            app.status_text = "已清空会话".into();
-            SlashResult::Handled
-        }
-        "/new" => {
-            app.new_session();
-            app.needs_agent_reset = true;
-            app.status_text = format!("已切换到会话 {}", app.sessions.len());
-            SlashResult::Handled
-        }
-        "/hist" => {
-            let n = app.sessions[app.active_session].messages.len();
-            app.status_text = format!("{} 条消息", n);
-            SlashResult::Handled
-        }
-        "/context" => {
-            // 借鉴 claude-code-local 的 /context：显示估算的 context 用量（含可视化进度条）。
-            let pct = app.context_pct();
-            let used_k = app.token_count as f64 / 1000.0;
-            let limit_k = neotrix::cli::tui::app::CONTEXT_LIMIT_ESTIMATE as f64 / 1000.0;
-            let warn = if pct >= 90 { " (接近上限，建议 /new 或 /clear)" } else { "" };
-            // 20 格进度条（█ 满格 / ░ 空格）
-            let filled = ((pct as usize * 20) / 100).min(20);
-            let bar: String = format!("{}{}", "█".repeat(filled), "░".repeat(20 - filled));
-            app.status_text = format!("ctx {} {:.1}k / {:.1}k tokens ({pct}%){warn}", bar, used_k, limit_k);
-            SlashResult::Handled
-        }
-        "/model" => {
-            // 运行时切换模型（对标 Claude Code /model）。无参 → 显示当前模型 + 候选。
-            let m = rest.trim().to_string();
-            if m.is_empty() {
-                let current = agent.as_ref()
-                    .and_then(|a| a.lock().ok())
-                    .map(|g| g.model().to_string())
-                    .unwrap_or_else(|| "unknown".into());
-                app.status_text = format!("当前模型: {} | 用法: /model <name> (如 /model llama3.1:8b)", current);
-            } else {
-                let applied = match agent.as_ref() {
-                    Some(a) => {
-                        let mut g = a.lock().unwrap_or_else(|e| e.into_inner());
-                        g.set_model(&m);
-                        g.model().to_string()
-                    }
-                    None => m.clone(),
-                };
-                app.status_text = format!("模型已切换: {}", applied);
-            }
-            SlashResult::Handled
-        }
-        "/models" => {
-            // 列出候选模型（env NEOTRIX_MODELS 或配置 default_model 的近似集）。
-            let mut list: Vec<String> = Vec::new();
-            if let Ok(v) = std::env::var("NEOTRIX_MODELS") {
-                list = v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
-            }
-            if list.is_empty() {
-                let cfg = neotrix::config::NeoTrixConfig::load();
-                if let Some(dm) = cfg.default_model {
-                    list.push(dm);
-                }
-            }
-            if list.is_empty() {
-                list.push("(未配置 NEOTRIX_MODELS / default_model)".into());
-            }
-            let cur = agent.as_ref().and_then(|a| a.lock().ok()).map(|g| g.model().to_string());
-            let shown = list.iter().map(|m| {
-                if Some(m) == cur.as_ref() { format!("{} ✓", m) } else { m.clone() }
-            }).collect::<Vec<_>>().join(" · ");
-            app.status_text = format!("可用模型: {}", shown);
-            SlashResult::Handled
-        }
-        "/compact" => {
-            // 压缩当前会话上下文（对标 opencode /compact）：保留 System + 最近 N 条，
-            // 把更早的对话折叠为一条 summary 消息（保持语义不断链）。
-            let keep = rest.trim().parse::<usize>().unwrap_or(6);
-            let n = app.compact_session(keep);
-            if n > 0 {
-                app.status_text = format!("已压缩会话: 保留最近 {} 条, 折叠 {} 条为摘要", keep, n);
-            } else {
-                app.status_text = "会话过短，无需压缩".into();
-            }
-            SlashResult::Handled
-        }
-        "/cost" => {
-            // 显示本会话 token 用量与估算成本（对标 Claude Code /cost）。
-            let (prompt, completion, total) = app.token_usage();
-            let approx_cost = total as f64 * 0.0000015; // 粗估 $/tok（约 $1.5/M 混合价）
-            app.status_text = format!(
-                "tokens: prompt {prompt} · completion {completion} · total {total} (≈ ${:.4})",
-                approx_cost
-            );
-            SlashResult::Handled
-        }
-        "/status" => {
-            // 会话状态诊断（对标 Claude Code /status）：model / 分支 / dirty / 消息数 / 上下文。
-            let model = agent.as_ref()
-                .and_then(|a| a.lock().ok())
-                .map(|g| g.model().to_string())
-                .unwrap_or_else(|| "unknown".into());
-            let msgs = app.active_session().messages.len();
-            let pct = app.context_pct();
-            let branch = neotrix::cli::tui::TuiApp::detect_git_branch_pub();
-            let dirty = neotrix::cli::tui::TuiApp::detect_git_dirty_pub();
-            let dirty_txt = if dirty { "dirty" } else { "clean" };
-            let theme = &app.theme_name;
-            app.status_text = format!(
-                "model: {} | messages: {} | ctx: {}% | git: {}{} | theme: {}",
-                model, msgs, pct,
-                branch.as_deref().unwrap_or("(no repo)"),
-                dirty_txt,
-                theme
-            );
-            SlashResult::Handled
-        }
-        "/copy" => {
-            // 复制最后一条 assistant 回复到系统剪贴板（对标 Claude Code /copy）。
-            let last = app.active_session().messages.iter().rev().find(|m| m.role == "assistant");
-            match last {
-                Some(m) => {
-                    match copy_to_clipboard(&m.content) {
-                        Ok(()) => app.status_text = format!("已复制 {} 字符到剪贴板", m.content.len()),
-                        Err(e) => app.status_text = format!("复制失败: {}", e),
-                    }
-                }
-                None => app.status_text = "没有可复制的回复".into(),
-            }
-            SlashResult::Handled
-        }
-        "/undo" => {
-            // 撤销最后轮次（assistant + 其前置 user），对标 opencode /undo。
-            let removed = app.undo_last_turn();
-            app.status_text = if removed > 0 {
-                format!("已撤销最后 {} 条消息", removed)
-            } else {
-                "没有可撤销的消息".into()
-            };
-            SlashResult::Handled
-        }
-        "/redo" => {
-            let restored = app.redo_last_turn();
-            app.status_text = if restored > 0 {
-                format!("已恢复 {} 条消息", restored)
-            } else {
-                "没有可恢复的撤销".into()
-            };
-            SlashResult::Handled
-        }
-        "/export" => {
-            // 导出当前会话为 Markdown（对标 opencode /export / Claude Code /export）。
-            let path = if rest.trim().is_empty() {
-                format!("session-{}.md", app.active_session().id)
-            } else {
-                rest.trim().to_string()
-            };
-            match export_session_markdown(app, &path) {
-                Ok(()) => app.status_text = format!("会话已导出: {}", path),
-                Err(e) => app.status_text = format!("导出失败: {}", e),
-            }
-            SlashResult::Handled
-        }
-        "/theme" => {
-            // 切换 / 列出主题（对标 opencode /themes）。
-            let t = rest.trim().to_string();
-            if t.is_empty() {
-                let cur = app.theme_name.clone();
-                let available: Vec<String> = neotrix::cli::tui::theme_list();
-                app.status_text = format!("主题: {} | 可用: {} | 用法: /theme <name>", cur, available.join(" · "));
-            } else if matches!(t.as_str(), "dark" | "light" | "gruvbox") {
-                app.theme_name = t;
-                app.status_text = format!("主题已切换: {}", app.theme_name);
-            } else {
-                app.status_text = format!("未知主题 '{}' (dark/light/gruvbox)", t);
-            }
-            SlashResult::Handled
-        }
-        "/save" => {
-            let name = if rest.trim().is_empty() {
-                format!("session-{}", app.sessions[app.active_session].id)
-            } else {
-                rest.trim().to_string()
-            };
-            match save_tui_session(app, &name) {
-                Ok(()) => {
-                    app.status_text = format!("会话已保存到 KB + session-logs ({})", name);
-                    SlashResult::Handled
-                }
-                Err(e) => {
-                    app.status_text = format!("保存失败: {}", e);
-                    SlashResult::Handled
-                }
-            }
-        }
-        "/load" => {
-            let name = rest.trim().to_string();
-            if name.is_empty() {
-                app.status_text = "用法: /load <会话名>".into();
-                return SlashResult::Handled;
-            }
-            match load_tui_session(app, &name) {
-                Ok(n) => {
-                    app.needs_agent_reset = true;
-                    app.status_text = format!("已加载会话 {} ({} 条消息)", name, n);
-                    SlashResult::Handled
-                }
-                Err(e) => {
-                    app.status_text = format!("加载失败: {}", e);
-                    SlashResult::Handled
-                }
-            }
-        }
-        "/sessions" | "/resume" => {
-            // 打开会话恢复 picker（对标 claude-code /resume picker）：↑↓ 选择 · Enter 加载。
-            app.needs_agent_reset = true;
-            open_session_picker(app);
-            SlashResult::Handled
-        }
-        "/diff" => {
-            // 打开 diff 查看模式：无参 → git diff 全量；带路径 → git diff <path>；
-            // 含换行的参数视为命令行直接传入的 diff 文本（纯空白文本 → 无内容）。
-            let content = if rest.contains('\n') {
-                if rest.trim().is_empty() {
-                    Ok(String::new()) // 纯空白 diff 文本 → 无内容（确定性，不依赖 git 状态）
-                } else {
-                    Ok(rest.to_string())
-                }
-            } else if rest.trim().is_empty() {
-                run_git_diff(None)
-            } else {
-                run_git_diff(Some(rest.trim()))
-            };
-            match content {
-                Ok(text) if !text.trim().is_empty() => {
-                    app.open_diff(text);
-                    SlashResult::Handled
-                }
-                Ok(_) => {
-                    app.status_text = "无 diff 内容".into();
-                    SlashResult::Handled
-                }
-                Err(e) => {
-                    app.status_text = format!("diff 失败: {}", e);
-                    SlashResult::Handled
-                }
-            }
-        }
-        "/help" => {
-            app.push_message("system", "NeoTrix TUI 快捷键\n\n输入: Enter 发送 | Alt+E 多行 | ↑↓ 历史 | Ctrl+R 搜索 | Tab 补全 | Ctrl+L 清屏\n引用: @路径 Tab 补全文件 | !<cmd> 直跑 shell\n生成: Esc / Ctrl+C 取消 | Ctrl+T 展开 thinking | Ctrl+X 展开工具调用\n审批: 工具执行前提示 [a]允许 [d]拒绝 (Esc 取消)\n视图: Ctrl+S 会话侧栏 | Alt+T 主题 | PageUp/Down 滚动\nDiff: /diff [路径] 打开 diff 查看 (↑↓ 滚动 · q/Esc 退出)\n会话: /new /clear /save <名> /load <名> /sessions 恢复面板 /hist /context /undo /redo /export [路径]\n模型: /model <名> 切换 | /models 列出候选 | /cost 用量 | /compact [N] 压缩上下文\n诊断: /status 会话状态 | /copy 复制最后回复 | /theme [dark|light|gruvbox]\n其他: /exit /quit /help".into());
-            SlashResult::Handled
-        }
-        _ => {
-            // Registry fallback: unknown slash commands route to the command
-            // registry (90+ commands). Hardcoded commands above take priority.
-            // If the registry also misses, return NotHandled so the input is
-            // treated as a normal message.
-            if input.starts_with('/') {
-                let reg = neotrix::cli::commands::registry::default_registry();
-                let cmd = input.split(' ').next().unwrap_or(input);
-                if reg.find(cmd).is_some() {
-                    let out = reg.execute(input, None);
-                    app.status_text = out.message;
-                    return SlashResult::Handled;
-                }
-            }
-            SlashResult::NotHandled
-        }
-    }
-}
-
-/// 打开会话恢复 picker：从 SessionStore 拉取已保存会话列表填充到 TuiApp。
-fn open_session_picker(app: &mut neotrix::cli::tui::TuiApp) {
-    use neotrix::cli::tui::session_store::SessionStore;
-    use neotrix::cli::tui::app::types::{SessionEntry, SessionPicker};
-    let store = SessionStore::new();
-    let mut entries: Vec<SessionEntry> = Vec::new();
-    for data in store.list_sessions() {
-        entries.push(SessionEntry {
-            name: data.name,
-            updated_at: data.updated_at,
-            message_count: data.messages.len(),
-        });
-    }
-    if entries.is_empty() {
-        app.status_text = "无已保存会话（/save <名> 保存当前会话）".into();
-        return;
-    }
-    entries.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-    app.session_picker = Some(SessionPicker { entries, selected: 0 });
-}
-
-/// 把 TuiApp 当前会话持久化到 SessionStore（KB + session-logs 双落盘）。
-fn save_tui_session(app: &neotrix::cli::tui::TuiApp, name: &str) -> Result<(), String> {
-    use neotrix::cli::tui::session_store::{SessionData, SessionStore};
-    let session = &app.sessions[app.active_session];
-    let now = chrono::Utc::now().to_rfc3339();
-    let messages: Vec<String> = session.messages.iter()
-        .map(|m| format!("[{}] {}", m.role, m.content))
-        .collect();
-    let data = SessionData {
-        id: session.id.clone(),
-        name: name.to_string(),
-        messages,
-        created_at: now.clone(),
-        updated_at: now,
-    };
-    let mut store = SessionStore::new();
-    store.save_session(name, &data)
-}
-
-/// 从 SessionStore 加载会话到 TuiApp。
-fn load_tui_session(app: &mut neotrix::cli::tui::TuiApp, name: &str) -> Result<usize, String> {
-    use neotrix::cli::tui::session_store::SessionStore;
-    let store = SessionStore::new();
-    let data = store.load_session(name)?;
-    app.clear_session();
-    for line in &data.messages {
-        let (role, content) = if let Some(c) = line.strip_prefix("[user] ") {
-            ("user", c.to_string())
-        } else if let Some(c) = line.strip_prefix("[assistant] ") {
-            ("assistant", c.to_string())
-        } else {
-            ("system", line.clone())
-        };
-        app.push_message(role, content);
-    }
-    Ok(data.messages.len())
-}
-
-/// 直接执行 shell 命令（`!` 前缀直跑），返回 (exit_code, stdout, stderr)。
-/// 语义对标 claude-code 的 `!` 前缀：用户显式发起，不经 agent/审批（等价于终端直跑）。
-/// P1-2 修复: 粘贴文本插入输入缓冲 (保留换行/多行), 通过 TuiApp 的 insert_char
-/// 逐字符插入以保持光标/宽字符正确。多行粘贴自动切换多行编辑语义。
-fn append_paste(app: &mut neotrix::cli::tui::TuiApp, pasted: &str) {
-    app.insert_text(pasted);
-    // 含换行 → 提示已进入多行编辑 (Enter 在空行处才提交, 多行模式 Enter 插行)。
-    if pasted.contains('\n') {
-        app.status_text = "已粘贴多行文本 (Alt+E 多行模式; 空行 Enter 提交)".into();
-    }
-}
-
+#[cfg(test)] // 仅测试使用（nt_entry_tests）
 fn run_shell_direct(cmd: &str) -> Result<(i32, String, String), String> {
     let out = std::process::Command::new("sh")
         .arg("-c")
@@ -3297,6 +2537,7 @@ fn run_shell_direct(cmd: &str) -> Result<(i32, String, String), String> {
 
 /// 复制文本到系统剪贴板（/copy）：优先 pbcopy (macOS) / pbpaste 对照，回退 xclip/xsel (Linux)。
 /// Windows 下无内置命令，回退错误提示。
+#[allow(dead_code)] // 保留工具函数：待 /copy 接线后启用
 fn copy_to_clipboard(text: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -3349,32 +2590,9 @@ fn copy_to_clipboard(text: &str) -> Result<(), String> {
     }
 }
 
-/// 导出当前会话为 Markdown（/export）：完整对话含角色/模型/时间戳。
-fn export_session_markdown(
-    app: &neotrix::cli::tui::TuiApp,
-    path: &str,
-) -> Result<(), String> {
-    let session = app.active_session();
-    let mut out = String::new();
-    out.push_str(&format!("# NeoTrix 会话: {}\n\n", session.name));
-    out.push_str(&format!("- id: `{}`\n", session.id));
-    out.push_str(&format!("- 消息数: {}\n\n", session.messages.len()));
-    for m in &session.messages {
-        let role = match m.role.as_str() {
-            "user" => "**User**",
-            "assistant" => "**Assistant**",
-            "system" => "**System**",
-            other => other,
-        };
-        let model = m.model.as_ref().map(|mm| format!(" · {}", mm)).unwrap_or_default();
-        out.push_str(&format!("## {}{} ({})\n\n", role, model, m.timestamp));
-        out.push_str(m.content.trim());
-        out.push_str("\n\n---\n\n");
-    }
-    std::fs::write(path, out).map_err(|e| format!("写入 {} 失败: {}", path, e))
-}
 
 /// 运行 `git diff --no-color [path]`，返回 stdout（best-effort，失败返回错误信息）。
+#[allow(dead_code)] // 保留工具函数：待调用方接线后启用
 fn run_git_diff(path: Option<&str>) -> Result<String, String> {
     let mut cmd = std::process::Command::new("git");
     cmd.args(["diff", "--no-color"]);
@@ -3386,6 +2604,48 @@ fn run_git_diff(path: Option<&str>) -> Result<String, String> {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
     }
     Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
+// ── T14b 语义迁移桥接（A 侧，调用方侧）：team::AgentRole → L1 正典 AgentCard ──
+// 旧 struct 定义与旧调用点不动（E2 接线）；正典文件只读。
+// 映射：id＝调用方传入；name←role.name；description←role.backstory；
+// tags←role.tools 克隆；role_chain←vec![role.role]；其余走 AgentCard::new 正典默认。
+// 语义缺口：goal 字段无处可放（正典无对应位），本次丢弃，E2 需裁决去向。
+#[allow(dead_code)] // E2 接线前保留：旧调用点切换时启用
+pub fn team_role_to_card(
+    id: &str,
+    role: &neotrix::agent::team::AgentRole,
+) -> neotrix::l1_action::nt_infra_agent_card::AgentCard {
+    let mut card = neotrix::l1_action::nt_infra_agent_card::AgentCard::new(
+        id,
+        &role.name,
+        &role.backstory,
+    );
+    card.tags = role.tools.clone();
+    card.role.role_chain = vec![role.role.clone()];
+    card
+}
+
+#[cfg(test)]
+mod t14b_team_card_tests {
+    use super::team_role_to_card;
+
+    #[test]
+    fn team_role_maps_to_card() {
+        let role = neotrix::agent::team::AgentRole {
+            name: "planner".to_string(),
+            role: "Task Planner".to_string(),
+            goal: "Break down complex tasks".to_string(),
+            backstory: "Strategic planner".to_string(),
+            tools: vec!["reason".to_string()],
+        };
+        let card = team_role_to_card("planner", &role);
+        assert_eq!(card.id, "planner");
+        assert_eq!(card.name, "planner");
+        assert_eq!(card.description, "Strategic planner");
+        assert_eq!(card.tags, vec!["reason".to_string()]);
+        assert_eq!(card.role.role_chain, vec!["Task Planner".to_string()]);
+    }
 }
 
 #[cfg(test)]

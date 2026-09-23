@@ -9,7 +9,8 @@ use neotrix::l5_cognition::nt_mind::nt_mind::goal_loop::{GoalLoop, GoalState};
 use neotrix::agent::skills::SkillsEngine;
 use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
 use neotrix::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
-use neotrix::cli::commands::agent_cmds::McpRegistry;
+use neotrix::agent::tool::McpRegistry;
+use neotrix::l6_meta::nt_auto_orchestrator::AutoOrchestrator;
 use neotrix_types::core::nt_core_cap::FIELD_NAMES;
 
 use super::print_brain_stats;
@@ -26,6 +27,9 @@ pub(crate) async fn run_headless(
     if goal_loop.active_goal.is_some() {
         println!("[bg] Restored active goal from ~/.neotrix/goals.json");
     }
+    // 意图路由收敛：自由文本经 AutoOrchestrator 分类后自动分发，
+    // slash 命令仅保留为显式观测/调试/应急入口。
+    let mut orchestrator = AutoOrchestrator::new();
 
     loop {
         print!("\n> ");
@@ -63,6 +67,7 @@ pub(crate) async fn run_headless(
 
                 let should_exit = handle_command_headless(
                     &input, &mut a, &mut se, &hr, &mut mcp, &mut goal_loop,
+                    &mut orchestrator,
                 ).await;
 
                 // PostToolUse hook
@@ -94,8 +99,20 @@ pub(crate) async fn run_headless(
     }
 }
 
-async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _skills: &mut SkillsEngine, hooks: &EccHookRegistry, mcp: &mut McpRegistry, goal_loop: &mut GoalLoop) -> bool {
-    let cmd = input.trim().to_lowercase();
+async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _skills: &mut SkillsEngine, hooks: &EccHookRegistry, mcp: &mut McpRegistry, goal_loop: &mut GoalLoop, orchestrator: &mut AutoOrchestrator) -> bool {
+    // 意图路由（仅非 slash 自由文本）：高置信系统意图自动转为等价 slash 命令。
+    let routed = if !input.trim().starts_with('/') && !input.trim().is_empty() {
+        orchestrator.route_headless(input)
+    } else {
+        None
+    };
+    if let Some(ref slash) = routed {
+        println!("🎯 意图路由 → {slash}");
+    }
+    let cmd = match routed {
+        Some(slash) => slash.to_lowercase(),
+        None => input.trim().to_lowercase(),
+    };
 
     match cmd.as_str() {
         "/help" | "/h" => {
@@ -121,7 +138,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("  /workflow      - Workflow orchestration (list/demo/run)");
             println!("  /mcp           - MCP tool registry (list/status/register/search)");
             println!("  /exit /q       - Exit and save");
-            println!("  <text>         - Reason with current task");
+            println!("  <text>         - Intent-routed: recall/absorb/mem auto-dispatch (≥0.8 conf), else reason");
         }
         "/status" => {
             let mut bridge = neotrix::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
@@ -190,12 +207,40 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 }
                 Some("ecc") => {
                     if let Some(skill_id) = parts.get(2) {
+                        // E2 观测: skill load 尝试包裹 (纯观测, 不改变控制流/返回值/错误路径)
+                        let e2_start_ms = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_millis() as u64)
+                            .unwrap_or(0);
                         println!("Loading '{}' from ECC community...", skill_id);
                         let name: Result<String, &str> = Err("ECC discovery not available in stub");
+                        let e2_success = name.is_ok();
+                        let e2_output: String = match &name {
+                            Ok(n) => n.clone(),
+                            Err(e) => (*e).to_string(),
+                        };
                         match name {
                             Ok(name) => println!("✅ Loaded: {}", name),
                             Err(e) => eprintln!("❌ Failed: {}", e),
                         }
+                        {
+                            let e2_end_ms = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_millis() as u64)
+                                .unwrap_or(e2_start_ms);
+                            let mut e2_crystal =
+                                neotrix::neotrix::nt_crystal_core::crystal_state::CrystalState::new(
+                                    "entry",
+                                );
+                            e2_crystal.record_execution(
+                                "skills_ecc_load".to_string(),
+                                (*skill_id).to_string(),
+                                e2_output,
+                                e2_success,
+                                e2_end_ms.saturating_sub(e2_start_ms),
+                            );
+                        }
+                        // TODO(E2-next): Evolver 反馈接线 — SkillCandidate.performance_history 不在作用域, 待统一通道接入 (不跨文件新建依赖)
                     } else {
                         println!("Usage: /skills ecc <skill-id>");
                         println!("Example: /skills ecc agent-harness-construction");
