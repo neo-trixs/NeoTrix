@@ -10,7 +10,7 @@ use serde::{Serialize, Deserialize};
 
 /// 工作空间状态快照 — 固定大小，用于每步上下文重建
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceSnapshot {
+pub struct FileTaskSnapshot {
     pub task_id: String,
     pub plan_summary: String,
     pub file_descriptions: Vec<String>,
@@ -19,6 +19,9 @@ pub struct WorkspaceSnapshot {
     pub recent_actions: Vec<ActionRecord>,
     pub timestamp: u64,
 }
+
+#[deprecated]
+pub type WorkspaceSnapshot = FileTaskSnapshot;
 
 /// 动作记录 — 固定窗口大小
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +36,7 @@ pub struct ActionRecord {
 /// 文件中心状态管理器
 pub struct FileCentricState {
     workspace_dir: PathBuf,
-    snapshots: HashMap<String, WorkspaceSnapshot>,
+    snapshots: HashMap<String, FileTaskSnapshot>,
     action_buffer_size: usize,
 }
 
@@ -47,12 +50,12 @@ impl FileCentricState {
     }
 
     /// 从工作空间重建上下文 — O(1) 大小
-    pub fn reconstruct_context(&self, task_id: &str) -> Option<WorkspaceSnapshot> {
+    pub fn reconstruct_context(&self, task_id: &str) -> Option<FileTaskSnapshot> {
         self.snapshots.get(task_id).cloned()
     }
 
     /// 更新工作空间快照
-    pub fn update_snapshot(&mut self, snapshot: WorkspaceSnapshot) {
+    pub fn update_snapshot(&mut self, snapshot: FileTaskSnapshot) {
         self.snapshots.insert(snapshot.task_id.clone(), snapshot);
     }
 
@@ -83,7 +86,7 @@ impl FileCentricState {
         let path = self.workspace_dir.join(format!("{}.json", task_id));
         if path.exists() {
             let json = std::fs::read_to_string(&path)?;
-            let snapshot: WorkspaceSnapshot = serde_json::from_str(&json)
+            let snapshot: FileTaskSnapshot = serde_json::from_str(&json)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             self.snapshots.insert(task_id.to_string(), snapshot);
         }
@@ -112,7 +115,7 @@ mod tests {
         std::fs::create_dir_all(&tmp).unwrap();
         
         let mut state = FileCentricState::new(tmp.clone());
-        let snapshot = WorkspaceSnapshot {
+        let snapshot = FileTaskSnapshot {
             task_id: "test_task".to_string(),
             plan_summary: "Test plan".to_string(),
             file_descriptions: vec!["file1.rs".to_string()],
@@ -144,7 +147,7 @@ mod tests {
         std::fs::create_dir_all(&tmp).unwrap();
         
         let mut state = FileCentricState::new(tmp.clone());
-        state.update_snapshot(WorkspaceSnapshot {
+        state.update_snapshot(FileTaskSnapshot {
             task_id: "t".to_string(),
             plan_summary: "".to_string(),
             file_descriptions: vec![],

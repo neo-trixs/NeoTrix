@@ -10,7 +10,7 @@ use super::nt_memory_types::{NodeType, RelationType};
 /// A registered executable skill derived from external resources.
 /// Follows Resource2Skill pattern: resource → skill → tool.
 #[derive(Debug, Clone)]
-pub struct SkillEntry {
+pub struct KbSkillAsset {
     pub name: String,
     pub description: String,
     pub source_resource: String,
@@ -19,11 +19,14 @@ pub struct SkillEntry {
     pub confidence: f64,
 }
 
+#[deprecated(note = "Use `KbSkillAsset` instead")]
+pub type SkillEntry = KbSkillAsset;
+
 /// Skills library — registry of skills distilled from external resources.
 /// In-memory store that can be rebuilt from KB nodes.
 #[derive(Debug, Clone)]
 pub struct SkillsLibrary {
-    skills: HashMap<String, SkillEntry>,
+    skills: HashMap<String, KbSkillAsset>,
 }
 
 impl SkillsLibrary {
@@ -31,19 +34,19 @@ impl SkillsLibrary {
         Self { skills: HashMap::new() }
     }
 
-    pub fn register(&mut self, entry: SkillEntry) {
+    pub fn register(&mut self, entry: KbSkillAsset) {
         self.skills.insert(entry.name.clone(), entry);
     }
 
-    pub fn get(&self, name: &str) -> Option<&SkillEntry> {
+    pub fn get(&self, name: &str) -> Option<&KbSkillAsset> {
         self.skills.get(name)
     }
 
-    pub fn all(&self) -> Vec<&SkillEntry> {
+    pub fn all(&self) -> Vec<&KbSkillAsset> {
         self.skills.values().collect()
     }
 
-    pub fn by_domain(&self, domain: &str) -> Vec<&SkillEntry> {
+    pub fn by_domain(&self, domain: &str) -> Vec<&KbSkillAsset> {
         self.skills.values().filter(|s| s.domain == domain).collect()
     }
 
@@ -60,7 +63,7 @@ impl SkillsLibrary {
         }).map_err(|e| format!("Query: {}", e))?;
         let mut count = 0;
         for (name, summary, _url, domain) in rows.flatten() {
-            self.skills.insert(name.clone(), SkillEntry {
+            self.skills.insert(name.clone(), KbSkillAsset {
                 name,
                 description: summary.unwrap_or_default(),
                 source_resource: String::new(),

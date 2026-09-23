@@ -1,4 +1,4 @@
-//! GlobalWorkspace — broadcast-based attention routing.
+//! GwtBroadcastBus — broadcast-based attention routing.
 //!
 //! Specialists subscribe to the workspace and receive broadcasts filtered by relevance.
 //! Implements the core GWT mechanism: salient content is broadcast, non-relevant content
@@ -64,15 +64,18 @@ pub enum DeliveryReason {
     Suppressed,
 }
 
-/// GlobalWorkspace — the broadcast hub for attention routing.
-pub struct GlobalWorkspace {
+/// GwtBroadcastBus — the broadcast hub for attention routing.
+pub struct GwtBroadcastBus {
     subscribers: Vec<Subscriber>,
     delivery_log: Vec<DeliveryRecord>,
     next_broadcast_id: AtomicU64,
     next_subscriber_id: AtomicU64,
 }
 
-impl GlobalWorkspace {
+#[deprecated]
+pub type GlobalWorkspace = GwtBroadcastBus;
+
+impl GwtBroadcastBus {
     pub fn new() -> Self {
         Self {
             subscribers: Vec::new(),
@@ -207,7 +210,7 @@ impl GlobalWorkspace {
     }
 }
 
-impl Default for GlobalWorkspace {
+impl Default for GwtBroadcastBus {
     fn default() -> Self {
         Self::new()
     }
@@ -219,7 +222,7 @@ mod tests {
 
     #[test]
     fn subscriber_receives_matching_broadcast() {
-        let mut ws = GlobalWorkspace::new();
+        let mut ws = GwtBroadcastBus::new();
         ws.subscribe(
             "nt_core".into(),
             vec!["reasoning".into()],
@@ -238,7 +241,7 @@ mod tests {
 
     #[test]
     fn subscriber_ignores_non_matching_broadcast() {
-        let mut ws = GlobalWorkspace::new();
+        let mut ws = GwtBroadcastBus::new();
         ws.subscribe(
             "nt_core".into(),
             vec!["reasoning".into()],
@@ -257,7 +260,7 @@ mod tests {
 
     #[test]
     fn priority_threshold_filters() {
-        let mut ws = GlobalWorkspace::new();
+        let mut ws = GwtBroadcastBus::new();
         ws.subscribe(
             "nt_core".into(),
             vec![],
@@ -276,7 +279,7 @@ mod tests {
 
     #[test]
     fn domain_match_delivers_regardless_of_tags() {
-        let mut ws = GlobalWorkspace::new();
+        let mut ws = GwtBroadcastBus::new();
         ws.subscribe(
             "nt_core".into(),
             vec!["unrelated_tag".into()],
@@ -295,7 +298,7 @@ mod tests {
 
     #[test]
     fn unsubscribe_prevents_delivery() {
-        let mut ws = GlobalWorkspace::new();
+        let mut ws = GwtBroadcastBus::new();
         let sub_id = ws.subscribe(
             "nt_core".into(),
             vec!["tag".into()],
@@ -315,7 +318,7 @@ mod tests {
 
     #[test]
     fn delivery_stats_count_correctly() {
-        let mut ws = GlobalWorkspace::new();
+        let mut ws = GwtBroadcastBus::new();
         ws.subscribe("a".into(), vec![], BroadcastPriority::Low);
         ws.subscribe("b".into(), vec![], BroadcastPriority::Low);
         let content = ws.next_broadcast("a".into(), vec![], BroadcastPriority::Normal, vec![], 0);

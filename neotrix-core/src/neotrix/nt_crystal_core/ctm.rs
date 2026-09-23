@@ -47,16 +47,19 @@ pub enum Response {
     Override { action: String, priority: f64 },
 }
 
-/// Workspace: 短期记忆 (容量=1, CTM核心)
+/// CtmShortTerm: 短期记忆 (容量=1, CTM核心)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Workspace {
+pub struct CtmShortTerm {
     current_chunk: Option<Chunk>,
     iteration: u64,
     pub threshold: f64,
     pub max_iterations: u64,
 }
 
-impl Workspace {
+#[deprecated]
+pub type Workspace = CtmShortTerm;
+
+impl CtmShortTerm {
     pub fn new() -> Self {
         Self {
             current_chunk: None,
@@ -369,7 +372,7 @@ pub enum ModuleType {
 
 /// 意识循环引擎 (10步CRP循环)
 pub struct ConsciousnessLoop {
-    pub workspace: Workspace,
+    pub workspace: CtmShortTerm,
     pub affect: AffectState,
     pub links: LinkGraph,
     pub base_priorities: HashMap<String, f64>,
@@ -386,7 +389,7 @@ impl ConsciousnessLoop {
         base_priorities.insert("safety".into(), 0.5);
 
         Self {
-            workspace: Workspace::new(),
+            workspace: CtmShortTerm::new(),
             affect: AffectState::default(),
             links: LinkGraph::new(),
             base_priorities,

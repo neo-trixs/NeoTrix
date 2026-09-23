@@ -4,7 +4,7 @@
 //! Components:
 //! - `config` — GwtConfig: budget, salience weights, cost weight factor
 //! - `salience` — SalienceCalculator: compute composite salience scores
-//! - `broadcast` — GlobalWorkspace: broadcast content to relevant subscribers
+//! - `broadcast` — GwtBroadcastBus: broadcast content to relevant subscribers
 //! - `attention` — AttentionManager: allocate attention budget across components
 //! - `cost_weight` — CostWeightedRouting: route tasks to cheapest capable model
 
@@ -15,7 +15,7 @@ pub mod cost_weight;
 pub mod salience;
 
 pub use attention::{Allocation, AttentionManager};
-pub use broadcast::{BroadcastContent, BroadcastPriority, DeliveryReason, DeliveryRecord, GlobalWorkspace, Subscriber};
+pub use broadcast::{BroadcastContent, BroadcastPriority, DeliveryReason, DeliveryRecord, GwtBroadcastBus, Subscriber};
 pub use config::{GwtConfig, SalienceWeights};
 pub use cost_weight::{CostWeightConfig, CostWeightedRouting, ModelTier, RoutingDecision, RoutingReason};
 pub use salience::{Context, SalienceCalculator, SalienceComponents, SalienceScore, Task};

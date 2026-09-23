@@ -17,7 +17,7 @@ use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, Ho
 
 /// A single skill entry parsed from a markdown file with YAML frontmatter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SkillEntry {
+pub struct SkillDocEntry {
     pub name: String,
     pub description: String,
     pub triggers: Vec<String>,
@@ -40,7 +40,10 @@ pub struct SkillEntry {
     pub verified: bool,
 }
 
-impl SkillEntry {
+#[deprecated(note = "Use `SkillDocEntry` instead")]
+pub type SkillEntry = SkillDocEntry;
+
+impl SkillDocEntry {
     fn from_file(path: &Path) -> Option<Self> {
         let content = std::fs::read_to_string(path).ok()?;
         Self::from_content(path, &content)
@@ -145,7 +148,7 @@ impl SkillEntry {
 
 /// Agent Skills 标准校验 (吸收 `anthropics/skills`): 解析 SKILL.md frontmatter,
 /// 校验 Agent Skills 标准**必需**字段 (`name` + `description`)。缺则 `Err`(违规列表)。
-/// R-P42 强化现有 SkillEntry 解析路径, 不新建平行解析器 (复用同一 frontmatter 切片逻辑)。
+/// R-P42 强化现有 SkillDocEntry 解析路径, 不新建平行解析器 (复用同一 frontmatter 切片逻辑)。
 pub fn _validate_agent_skills_standard(content: &str) -> Result<(), Vec<String>> {
     let stripped = content.trim_start();
     let mut violations = Vec::new();
@@ -217,7 +220,7 @@ pub fn register_skill_standard_self_tests(registry: &mut crate::l0_substrate::nt
 // ────────────────────────────────────────────────────────────────
 // A5 吸收 (SkillNet, zjunlp/SkillNet): 技能五维质量评估。
 // SkillNet 把技能当软件资产, 五维评估 = Safety / Completeness /
-// Executability / Maintainability / Cost-awareness。注入 SkillEntry
+// Executability / Maintainability / Cost-awareness。注入 SkillDocEntry
 // 作为生产质量门: 新技能入库前评分, 低于阈值的标记低质量 (R-P55 对接
 // 质量门禁语义)。纯确定性启发式, 无 LLM 依赖。
 // ────────────────────────────────────────────────────────────────
@@ -260,12 +263,12 @@ impl SkillQualityScores {
     }
 }
 
-/// A5 技能质量评估器 — 对 SkillEntry 做确定性五维评分。
+/// A5 技能质量评估器 — 对 SkillDocEntry 做确定性五维评分。
 pub struct SkillQualityScorer;
 
 impl SkillQualityScorer {
     /// 评估一个技能条目, 返回五维分。
-    pub fn evaluate(skill: &SkillEntry) -> SkillQualityScores {
+    pub fn evaluate(skill: &SkillDocEntry) -> SkillQualityScores {
         let body = skill.body();
         // 安全性: 正文含危险 shell 操作标记 → 降分。
         let danger_marks = ["rm -rf", "curl.*|.*sh", "sudo ", "--force", "dangerously"];
@@ -366,7 +369,7 @@ impl SkillQualityScorer {
 
 /// EVOMAL 毒化扫描: `Ok(true)`=干净可入库; `Ok(false)`=命中毒化模式;
 /// `Err`=扫描无法完成 (保守地视为不可入库, 由调用方阻断 promote)。
-pub fn evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
+pub fn evomal_poison_scan(skill: &SkillDocEntry) -> Result<bool, String> {
     let body = skill.body().to_lowercase();
 
     // 1) pipe-to-shell: 把下载/外部内容直接喂给 shell 执行 (经典投毒)。
@@ -544,7 +547,7 @@ impl SkillComposer {
     }
 
     /// 判定两技能关系。
-    pub fn compose(a: &SkillEntry, b: &SkillEntry) -> SkillRelationship {
+    pub fn compose(a: &SkillDocEntry, b: &SkillDocEntry) -> SkillRelationship {
         let tool_overlap = Self::overlap(&a.tools, &b.tools);
         let trig_overlap = Self::overlap(&a.triggers, &b.triggers);
         let same_category = !a.category.is_empty() && a.category == b.category;
@@ -818,7 +821,7 @@ static REPEAT_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|
 // P6: BookToSkill (book-to-skill 机制输入侧)
 // 书/文档 (PDF/EPUB/DOCX/MD/HTML/RTF/MOBI) → 统一 agent skill 铸造的
 // 输入建模与章节→技能候选映射。本层只做"输入归一化 + 章节→技能候选
-// 映射"; 产出路径复用既有 SkillEngine/SkillEntry, 禁止平行适配器 (R-P42)。
+// 映射"; 产出路径复用既有 SkillEngine/SkillDocEntry, 禁止平行适配器 (R-P42)。
 // ────────────────────────────────────────────────────────────────
 
 /// 支持的文档格式 (输入归一化)。
@@ -1465,7 +1468,7 @@ impl crate::l0_substrate::nt_core_self_test::SelfTest for FiberLifecycleHealer {
 /// Core skill engine: scan, index, match, activate/deactivate.
 pub struct SkillEngine {
     skills_dir: PathBuf,
-    skills: Vec<SkillEntry>,
+    skills: Vec<SkillDocEntry>,
     /// Index: trigger keyword → skill indices
     trigger_index: HashMap<String, Vec<usize>>,
     /// Index: E8 mode → skill indices
@@ -1531,7 +1534,7 @@ impl SkillEngine {
     }
 
     /// Scan the skills directory and load all valid skill files.
-    pub fn load_all(&mut self) -> Vec<SkillEntry> {
+    pub fn load_all(&mut self) -> Vec<SkillDocEntry> {
         self.skills.clear();
         self.trigger_index.clear();
         self.e8_index.clear();
@@ -1550,7 +1553,7 @@ impl SkillEngine {
                 if path.is_dir() {
                     let skill_md = path.join("SKILL.md");
                     if skill_md.exists() {
-                        if let Some(skill) = SkillEntry::from_file(&skill_md) {
+                        if let Some(skill) = SkillDocEntry::from_file(&skill_md) {
                             let scores = SkillQualityScorer::evaluate(&skill);
                             // P6 SkillTrustBench 安全门 (Tencent AIG absorbed, R-P79):
                             // 静态 T01-T09 扫描 — 命中任一攻击分类即拒收, 不进入生产索引。
@@ -1583,7 +1586,7 @@ impl SkillEngine {
                     continue;
                 }
                 if path.extension().is_some_and(|e| e == "md") {
-                    if let Some(skill) = SkillEntry::from_file(&path) {
+                    if let Some(skill) = SkillDocEntry::from_file(&path) {
                         let scores = SkillQualityScorer::evaluate(&skill);
                         // P6 SkillTrustBench 安全门 (同目录型技能, R-P79)。
                         let (trust_findings, trust_verdict) =
@@ -1685,7 +1688,7 @@ impl SkillEngine {
     /// (open-code-review 预算纪律) — 防止路由返回无界候选淹没下游消费方。
     pub const MAX_ROUTE_RESULTS: usize = 8;
 
-    pub fn find_matching(&self, query: &str, e8_mode: Option<u8>) -> Vec<&SkillEntry> {
+    pub fn find_matching(&self, query: &str, e8_mode: Option<u8>) -> Vec<&SkillDocEntry> {
         let query_lower = query.to_lowercase();
         let query_words: Vec<String> = query_lower.split_whitespace()
             .map(|s| s.to_string())
@@ -1694,8 +1697,8 @@ impl SkillEngine {
 
         // tier 0 = exact trigger equality (最高优先级, 确定性命中)
         // tier 1 = substring 命中
-        let mut exact: Vec<(usize, usize, &SkillEntry)> = Vec::new();
-        let mut scored: Vec<(usize, usize, &SkillEntry)> = Vec::new();
+        let mut exact: Vec<(usize, usize, &SkillDocEntry)> = Vec::new();
+        let mut scored: Vec<(usize, usize, &SkillDocEntry)> = Vec::new();
 
         for skill in self.skills.iter() {
             if let Some(mode) = e8_mode {
@@ -1734,8 +1737,8 @@ impl SkillEngine {
     }
 
     /// 技能树 (AgentSkillOS 吸收): category → skills, 每类内按 priority 降序。
-    pub fn skill_tree(&self) -> HashMap<String, Vec<&SkillEntry>> {
-        let mut tree: HashMap<String, Vec<&SkillEntry>> = HashMap::new();
+    pub fn skill_tree(&self) -> HashMap<String, Vec<&SkillDocEntry>> {
+        let mut tree: HashMap<String, Vec<&SkillDocEntry>> = HashMap::new();
         for s in self.skills.iter() {
             tree.entry(s.category.clone()).or_default().push(s);
         }
@@ -1745,7 +1748,7 @@ impl SkillEngine {
         tree
     }
 
-    pub fn children_of(&self, name: &str) -> Vec<&SkillEntry> {
+    pub fn children_of(&self, name: &str) -> Vec<&SkillDocEntry> {
         self.skills.iter().filter(|s| s.parent == name).collect()
     }
 
@@ -1756,7 +1759,7 @@ impl SkillEngine {
         query: &str,
         e8_mode: Option<u8>,
         active_names: &[&str],
-    ) -> Vec<&SkillEntry> {
+    ) -> Vec<&SkillDocEntry> {
         let covered: Vec<String> = self
             .skills
             .iter()
@@ -1959,11 +1962,11 @@ impl SkillEngine {
         report
     }
 
-    pub fn get_skill(&self, name: &str) -> Option<&SkillEntry> {
+    pub fn get_skill(&self, name: &str) -> Option<&SkillDocEntry> {
         self.skills.iter().find(|s| s.name == name)
     }
 
-    pub(crate) fn _get_skill_mut(&mut self, name: &str) -> Option<&mut SkillEntry> {
+    pub(crate) fn _get_skill_mut(&mut self, name: &str) -> Option<&mut SkillDocEntry> {
         self.skills.iter_mut().find(|s| s.name == name)
     }
 
@@ -2057,7 +2060,7 @@ impl SkillEngine {
         Ok(())
     }
 
-    pub fn list_active(&self) -> Vec<&SkillEntry> {
+    pub fn list_active(&self) -> Vec<&SkillDocEntry> {
         self.skills.iter().filter(|s| s.active).collect()
     }
 
@@ -2065,8 +2068,8 @@ impl SkillEngine {
     /// 真实限制模型可见工具集 — stage 0 (Minimal) 时仅暴露预算数量的
     /// 高优先级技能, promote 到 Standard 后暴露全部活跃技能。
     /// 这是 active_tool_count() 从"展示"到"行为门控"的生产路径。
-    pub fn visible_active(&self) -> Vec<&SkillEntry> {
-        let mut active: Vec<&SkillEntry> = self.skills.iter().filter(|s| s.active).collect();
+    pub fn visible_active(&self) -> Vec<&SkillDocEntry> {
+        let mut active: Vec<&SkillDocEntry> = self.skills.iter().filter(|s| s.active).collect();
         let budget = self.disclosure.active_tool_count();
         if self.disclosure.stage == 0 && active.len() > budget {
             // Minimal 阶段: 按 priority 升序 (高优先级在前) 截断到预算
@@ -2145,7 +2148,7 @@ impl SkillEngine {
         crate::l5_cognition::nt_mind::nt_mind_skill_engine::audit_residency(&self.quality_stats)
     }
 
-    pub fn list_all(&self) -> Vec<&SkillEntry> {
+    pub fn list_all(&self) -> Vec<&SkillDocEntry> {
         self.skills.iter().collect()
     }
 
@@ -2166,7 +2169,7 @@ impl SkillEngine {
                 return Err("Directory must contain a SKILL.md file".to_string());
             }
             let content = std::fs::read_to_string(&skill_md).map_err(|e| e.to_string())?;
-            let entry = SkillEntry::from_content(&skill_md, &content)
+            let entry = SkillDocEntry::from_content(&skill_md, &content)
                 .ok_or_else(|| "Invalid frontmatter in SKILL.md".to_string())?;
 
             let target_dir = self.skills_dir.join(&entry.name);
@@ -2205,7 +2208,7 @@ impl SkillEngine {
             Ok(())
         } else if source_path.extension().is_some_and(|e| e == "md") {
             let content = std::fs::read_to_string(source_path).map_err(|e| e.to_string())?;
-            let entry = SkillEntry::from_content(source_path, &content)
+            let entry = SkillDocEntry::from_content(source_path, &content)
                 .ok_or_else(|| "Invalid frontmatter in skill file".to_string())?;
 
             let target_dir = self.skills_dir.join(&entry.name);
@@ -2221,10 +2224,10 @@ impl SkillEngine {
         }
     }
 
-    /// Build a SkillEntry from a ProceduralMemoryRecord (KB-stored E8 trajectory pattern).
+    /// Build a SkillDocEntry from a ProceduralMemoryRecord (KB-stored E8 trajectory pattern).
     /// Converts the E8 sequence, trigger, reward, and tags into a YAML-frontmatter skill
     /// that can be written to the filesystem and loaded by SkillEngine.
-    pub fn skill_from_procedural_record(record: &ProceduralMemoryRecord) -> SkillEntry {
+    pub fn skill_from_procedural_record(record: &ProceduralMemoryRecord) -> SkillDocEntry {
         let e8_str = format!("[{}]", record.e8_sequence.iter().map(|m| m.to_string()).collect::<Vec<_>>().join(","));
 
         let yaml = format!(
@@ -2237,7 +2240,7 @@ impl SkillEngine {
             record.description,
         );
 
-        SkillEntry {
+        SkillDocEntry {
             name: record.name.clone(),
             description: record.description.clone(),
             triggers: vec!["e8".to_string(), "proc_skill".to_string(), record.skill_id.clone()],

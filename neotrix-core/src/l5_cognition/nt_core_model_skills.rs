@@ -19,11 +19,14 @@ pub struct ModelSkill {
     pub description: String,
 }
 
-pub struct ModelSkillRegistry {
+pub struct ModelCapabilityTable {
     models: HashMap<String, ModelCapability>,
 }
 
-impl ModelSkillRegistry {
+#[deprecated(note = "Use `ModelCapabilityTable` instead")]
+pub type ModelSkillRegistry = ModelCapabilityTable;
+
+impl ModelCapabilityTable {
     pub fn new() -> Self {
         let mut models = HashMap::new();
         for (name, provider, ctx, vision, audio, ft) in BUILTIN_MODELS {
@@ -71,7 +74,7 @@ impl ModelSkillRegistry {
     }
 }
 
-impl Default for ModelSkillRegistry {
+impl Default for ModelCapabilityTable {
     fn default() -> Self {
         Self::new()
     }
@@ -121,7 +124,7 @@ const BUILTIN_MODELS: &[(&str, &str, usize, bool, bool, &[&str])] = &[
     ("gemma-2-2b", "google", 8192, false, false, &["sft", "dpo"]),
 ];
 
-pub static REGISTRY: LazyLock<ModelSkillRegistry> = LazyLock::new(ModelSkillRegistry::new);
+pub static REGISTRY: LazyLock<ModelCapabilityTable> = LazyLock::new(ModelCapabilityTable::new);
 
 static SKILLS: LazyLock<Vec<ModelSkill>> = LazyLock::new(|| {
     vec![
@@ -184,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_registry_custom_model() {
-        let mut registry = ModelSkillRegistry::new();
+        let mut registry = ModelCapabilityTable::new();
         let custom = ModelCapability {
             model_name: "custom-model-v1".to_string(),
             provider: "custom".to_string(),

@@ -75,7 +75,7 @@ pub enum WorkspaceStatus {
 
 /// A git worktree-based isolated workspace
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct IsolatedWorkspace {
+pub struct SandboxWorkspaceExecutor {
     /// Unique workspace identifier
     pub id: String,
     /// Human-readable name
@@ -101,6 +101,9 @@ pub struct IsolatedWorkspace {
     /// Whether changes have been approved for merge
     pub approved: bool,
 }
+
+#[deprecated]
+pub type IsolatedWorkspace = SandboxWorkspaceExecutor;
 
 /// Merge strategy for combining workspace changes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -178,7 +181,7 @@ pub struct WorkspaceIsolator {
     /// Configuration
     config: WorkspaceConfig,
     /// Active workspaces
-    workspaces: Arc<RwLock<HashMap<String, IsolatedWorkspace>>>,
+    workspaces: Arc<RwLock<HashMap<String, SandboxWorkspaceExecutor>>>,
     /// Main repository path
     repo_path: PathBuf,
 }
@@ -205,7 +208,7 @@ impl WorkspaceIsolator {
         &self,
         name: String,
         task_id: Option<String>,
-    ) -> Result<IsolatedWorkspace, WorkspaceError> {
+    ) -> Result<SandboxWorkspaceExecutor, WorkspaceError> {
         // Check concurrent limit
         {
             let workspaces = self.workspaces.read().await;
@@ -230,7 +233,7 @@ impl WorkspaceIsolator {
         // Create git worktree
         self.git_worktree_add(&branch_name, &worktree_path).await?;
 
-        let workspace = IsolatedWorkspace {
+        let workspace = SandboxWorkspaceExecutor {
             id: workspace_id.clone(),
             name,
             worktree_path,
@@ -255,13 +258,13 @@ impl WorkspaceIsolator {
     }
 
     /// Get a workspace by ID
-    pub async fn get_workspace(&self, workspace_id: &str) -> Option<IsolatedWorkspace> {
+    pub async fn get_workspace(&self, workspace_id: &str) -> Option<SandboxWorkspaceExecutor> {
         let workspaces = self.workspaces.read().await;
         workspaces.get(workspace_id).cloned()
     }
 
     /// List all active workspaces
-    pub async fn list_workspaces(&self) -> Vec<IsolatedWorkspace> {
+    pub async fn list_workspaces(&self) -> Vec<SandboxWorkspaceExecutor> {
         let workspaces = self.workspaces.read().await;
         workspaces.values().cloned().collect()
     }
@@ -467,7 +470,7 @@ impl WorkspaceIsolator {
         Ok(())
     }
 
-    async fn git_worktree_remove(&self, workspace: &IsolatedWorkspace) -> Result<(), WorkspaceError> {
+    async fn git_worktree_remove(&self, workspace: &SandboxWorkspaceExecutor) -> Result<(), WorkspaceError> {
         let output = tokio::process::Command::new("git")
             .args(["worktree", "remove", "--force"])
             .arg(&workspace.worktree_path)
@@ -486,7 +489,7 @@ impl WorkspaceIsolator {
 
     async fn git_merge_fast_forward(
         &self,
-        workspace: &IsolatedWorkspace,
+        workspace: &SandboxWorkspaceExecutor,
     ) -> Result<Option<String>, WorkspaceError> {
         let output = tokio::process::Command::new("git")
             .args(["merge", "--ff-only", &workspace.branch_name])
@@ -507,7 +510,7 @@ impl WorkspaceIsolator {
 
     async fn git_merge_squash(
         &self,
-        workspace: &IsolatedWorkspace,
+        workspace: &SandboxWorkspaceExecutor,
     ) -> Result<Option<String>, WorkspaceError> {
         let output = tokio::process::Command::new("git")
             .args(["merge", "--squash", &workspace.branch_name])
@@ -540,7 +543,7 @@ impl WorkspaceIsolator {
 
     async fn git_merge_rebase(
         &self,
-        workspace: &IsolatedWorkspace,
+        workspace: &SandboxWorkspaceExecutor,
     ) -> Result<Option<String>, WorkspaceError> {
         // Checkout main
         tokio::process::Command::new("git")
@@ -569,7 +572,7 @@ impl WorkspaceIsolator {
 
     async fn git_create_pr(
         &self,
-        workspace: &IsolatedWorkspace,
+        workspace: &SandboxWorkspaceExecutor,
     ) -> Result<Option<String>, WorkspaceError> {
         // Push branch to origin
         let output = tokio::process::Command::new("git")
@@ -693,7 +696,7 @@ mod tests {
 
     #[test]
     fn test_workspace_serialization() {
-        let workspace = IsolatedWorkspace {
+        let workspace = SandboxWorkspaceExecutor {
             id: "ws-test".to_string(),
             name: "test workspace".to_string(),
             worktree_path: PathBuf::from("/tmp/test"),
@@ -709,7 +712,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&workspace).unwrap();
-        let deserialized: IsolatedWorkspace = serde_json::from_str(&json).unwrap();
+        let deserialized: SandboxWorkspaceExecutor = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.id, "ws-test");
         assert_eq!(deserialized.status, WorkspaceStatus::Ready);
     }
