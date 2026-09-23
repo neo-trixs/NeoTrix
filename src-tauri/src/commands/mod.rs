@@ -8,6 +8,7 @@ pub mod hive;
 pub mod im;
 pub mod model_commands;
 pub mod model_pool;
+pub mod neobot;
 pub mod neotrix_cli;
 pub mod onboarding;
 pub mod provider_commands;

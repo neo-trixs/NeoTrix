@@ -93,7 +93,8 @@ pub struct TokenUsage {
 }
 
 /// 极简 tool 名 — cumora 三板斧 + openbot computer 受控动作之最小交集.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// `Unknown` 保留原始名用于审计, 网关一律拒绝 (fail-closed).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolName {
     Bash,
@@ -104,10 +105,11 @@ pub enum ToolName {
     /// openbot `COMPUTER_ACTING_TOOLS` 本地占位: 当前只做策略门控,
     /// 具体 navigate/click/type 由后续 `nt_computer` 实现.
     ComputerAct,
+    Unknown(String),
 }
 
 impl ToolName {
-    pub fn as_str(self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Bash => "bash",
             Self::SetTurnStatus => "set_turn_status",
@@ -115,18 +117,20 @@ impl ToolName {
             Self::WriteFile => "write_file",
             Self::EditFile => "edit_file",
             Self::ComputerAct => "computer_act",
+            Self::Unknown(_) => "unknown_tool",
         }
     }
 
-    pub fn parse(raw: &str) -> Option<Self> {
+    /// 未知名 → `Unknown(raw)` (审计保留原名, 策略层拒绝).
+    pub fn parse(raw: &str) -> Self {
         match raw {
-            "bash" => Some(Self::Bash),
-            "set_turn_status" => Some(Self::SetTurnStatus),
-            "read_file" => Some(Self::ReadFile),
-            "write_file" => Some(Self::WriteFile),
-            "edit_file" => Some(Self::EditFile),
-            "computer_act" => Some(Self::ComputerAct),
-            _ => None,
+            "bash" => Self::Bash,
+            "set_turn_status" => Self::SetTurnStatus,
+            "read_file" => Self::ReadFile,
+            "write_file" => Self::WriteFile,
+            "edit_file" => Self::EditFile,
+            "computer_act" => Self::ComputerAct,
+            _ => Self::Unknown(raw.to_owned()),
         }
     }
 }
@@ -134,9 +138,33 @@ impl ToolName {
 /// 一次工具调用 (LLM 侧发出, 网关先审后执).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
+    /// OpenAI `tool_calls[].id` 回填 (`tool` role 必需); 本地引擎合成.
+    pub id: String,
     pub name: ToolName,
     /// 参数 JSON (如 `{"command":"ls"}` / `{"status":"done"}`).
     pub args: serde_json::Value,
+}
+
+/// 对话历史项 — 多跳 loop 的记忆 (OpenAI messages 兼容子集).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscriptItem {
+    pub role: TranscriptRole,
+    pub content: String,
+    /// assistant 本轮发出的调用 (仅 Assistant).
+    #[serde(default)]
+    pub tool_calls: Vec<ToolCall>,
+    /// tool 结果对应的调用 id (仅 Tool).
+    #[serde(default)]
+    pub tool_call_id: Option<String>,
+}
+
+/// 历史角色.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranscriptRole {
+    User,
+    Assistant,
+    Tool,
 }
 
 /// 工具执行结果.
@@ -166,8 +194,10 @@ mod tests {
     }
 
     #[test]
-    fn unknown_tool_is_none_fail_closed() {
-        assert_eq!(ToolName::parse("rm_rf_root"), None);
+    fn unknown_tool_is_named_and_deniable() {
+        let name = ToolName::parse("rm_rf_root");
+        assert!(matches!(name, ToolName::Unknown(_)));
+        assert_eq!(name.as_str(), "unknown_tool");
         assert_eq!(TaskStatus::parse("bogus"), None);
     }
 }

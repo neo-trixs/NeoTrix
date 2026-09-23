@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::nt_audit::redact_detail;
 use crate::nt_engine::{EngineAdapter, EngineTurn};
 use crate::nt_error::NtBotError;
-use crate::nt_types::{TokenUsage, TurnStatus};
+use crate::nt_types::{ToolCall, ToolName, TokenUsage, TranscriptItem, TranscriptRole, TurnStatus};
 
 /// 默认本地端点 (Ollama).
 pub const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434/v1";
@@ -83,6 +83,8 @@ impl HttpEngineConfig {
 pub struct HttpEngine {
     config: HttpEngineConfig,
     api_key: String,
+    /// 是否向模型开放 `computer_act` (执行仍受网关 allowlist 门控).
+    offer_computer: bool,
 }
 
 impl std::fmt::Debug for HttpEngine {
@@ -91,6 +93,7 @@ impl std::fmt::Debug for HttpEngine {
             .debug_struct("HttpEngine")
             .field("base_url", &self.config.base_url)
             .field("model", &self.config.model)
+            .field("offer_computer", &self.offer_computer)
             .field("api_key", &"[redacted]")
             .finish()
     }
@@ -99,12 +102,29 @@ impl std::fmt::Debug for HttpEngine {
 impl HttpEngine {
     pub fn new(config: HttpEngineConfig, api_key: String) -> Result<Self, NtBotError> {
         config.validate()?;
-        Ok(Self { config, api_key })
+        Ok(Self {
+            config,
+            api_key,
+            offer_computer: false,
+        })
+    }
+
+    /// `NEOBOT_OFFER_COMPUTER=1` 时向模型开放 `computer_act` schema.
+    pub fn with_computer(mut self, offer: bool) -> Self {
+        self.offer_computer = offer;
+        self
     }
 
     pub fn from_env() -> Result<Self, NtBotError> {
         let (config, api_key) = HttpEngineConfig::from_env()?;
-        Self::new(config, api_key)
+        let offer = std::env::var("NEOBOT_OFFER_COMPUTER")
+            .map(|raw| raw.trim() == "1")
+            .unwrap_or(false);
+        Ok(Self {
+            config,
+            api_key,
+            offer_computer: offer,
+        })
     }
 
     /// 仅列表模式 (不校验模型名) — `neobot models` 用.
@@ -121,6 +141,7 @@ impl HttpEngine {
                 timeout_secs,
             },
             api_key: api_key.to_owned(),
+            offer_computer: false,
         }
     }
 
@@ -152,6 +173,29 @@ impl HttpEngine {
             engine: engine_id_of(&self.config.model),
             reason: format!("bad json response: {err}"),
         })
+    }
+
+    fn chat_body(&self, prompt: &str, history: &[TranscriptItem], stream: bool) -> serde_json::Value {
+        let mut messages = Vec::with_capacity(history.len() + 2);
+        messages.push(serde_json::json!({
+            "role": "system",
+            "content": "你是 neobot 本地助手。需要行动时调用工具, 否则直接回复。结束时调用 set_turn_status。",
+        }));
+        for item in history {
+            messages.push(transcript_message(item));
+        }
+        messages.push(serde_json::json!({"role": "user", "content": prompt}));
+        let mut body = serde_json::json!({
+            "model": self.config.model,
+            "messages": messages,
+            "temperature": 0.2,
+            "stream": stream,
+        });
+        let tools = tool_schemas(self.offer_computer);
+        if let Some(map) = body.as_object_mut() {
+            map.insert("tools".to_owned(), serde_json::Value::Array(tools));
+        }
+        body
     }
     /// 列出服务端模型 (`GET /v1/models`), 返回 `(id, owned_by)`.
     /// `owned_by` 为空时回落为 id 的 `/` 前缀 (与服务端 `openai_list_models` 一致).
@@ -188,6 +232,165 @@ impl HttpEngine {
             }
         }
         Ok(out)
+    }
+}
+
+fn transcript_message(item: &TranscriptItem) -> serde_json::Value {
+    match item.role {
+        TranscriptRole::User => serde_json::json!({"role": "user", "content": item.content}),
+        TranscriptRole::Assistant => {
+            let calls: Vec<serde_json::Value> = item
+                .tool_calls
+                .iter()
+                .map(|call| {
+                    serde_json::json!({
+                        "id": call.id,
+                        "type": "function",
+                        "function": {
+                            "name": call.name.as_str(),
+                            "arguments": call.args.to_string(),
+                        },
+                    })
+                })
+                .collect();
+            if calls.is_empty() {
+                serde_json::json!({"role": "assistant", "content": item.content})
+            } else {
+                serde_json::json!({
+                    "role": "assistant",
+                    "content": item.content,
+                    "tool_calls": calls,
+                })
+            }
+        }
+        TranscriptRole::Tool => serde_json::json!({
+            "role": "tool",
+            "tool_call_id": item.tool_call_id.as_deref().unwrap_or(""),
+            "content": item.content,
+        }),
+    }
+}
+
+/// OpenAI function schemas — 与本地网关工具 1:1 (`computer_act` 仅 opt-in).
+fn tool_schemas(offer_computer: bool) -> Vec<serde_json::Value> {
+    let mut tools = vec![
+        serde_json::json!({"type": "function", "function": {
+            "name": "bash",
+            "description": "在 workspace 内执行 shell(唯一世界动作入口)",
+            "parameters": {"type": "object", "properties": {
+                "command": {"type": "string", "description": "shell 命令"},
+            }, "required": ["command"]},
+        }}),
+        serde_json::json!({"type": "function", "function": {
+            "name": "set_turn_status",
+            "description": "终态协议信号, 防沉默即完成误判",
+            "parameters": {"type": "object", "properties": {
+                "status": {"type": "string", "enum": ["done", "continue", "needs_clarification", "blocked", "waiting"]},
+                "reason": {"type": "string"},
+            }, "required": ["status"]},
+        }}),
+        serde_json::json!({"type": "function", "function": {
+            "name": "read_file",
+            "description": "读 workspace 内文件(512KiB 上限)",
+            "parameters": {"type": "object", "properties": {
+                "path": {"type": "string"},
+            }, "required": ["path"]},
+        }}),
+        serde_json::json!({"type": "function", "function": {
+            "name": "write_file",
+            "description": "写 workspace 内文件(2MiB 上限)",
+            "parameters": {"type": "object", "properties": {
+                "path": {"type": "string"},
+                "content": {"type": "string"},
+            }, "required": ["path", "content"]},
+        }}),
+        serde_json::json!({"type": "function", "function": {
+            "name": "edit_file",
+            "description": "精确一次匹配编辑(多/零匹配拒绝)",
+            "parameters": {"type": "object", "properties": {
+                "path": {"type": "string"},
+                "old": {"type": "string"},
+                "new": {"type": "string"},
+            }, "required": ["path", "old", "new"]},
+        }}),
+    ];
+    if offer_computer {
+        tools.push(serde_json::json!({"type": "function", "function": {
+            "name": "computer_act",
+            "description": "受控 computer 动作(网关 allowlist 门控, 无后端时诚实失败)",
+            "parameters": {"type": "object", "properties": {
+                "action": {"type": "string", "enum": ["navigate", "click", "type", "key", "scroll", "screenshot", "read_file", "write_file", "list_files"]},
+                "target": {"type": "string"},
+                "text": {"type": "string"},
+            }, "required": ["action"]},
+        }}));
+    }
+    tools
+}
+
+/// 非流式 chat → EngineTurn. 有 tool_calls 即 Continue (执行后再回填).
+fn parse_chat_turn(model: &str, value: serde_json::Value) -> Result<EngineTurn, NtBotError> {
+    let chat: ChatResponse = serde_json::from_value(value).map_err(|err| NtBotError::Engine {
+        engine: engine_id_of(model),
+        reason: format!("unexpected chat schema: {err}"),
+    })?;
+    let Some(choice) = chat.choices.first() else {
+        return Err(NtBotError::Engine {
+            engine: engine_id_of(model),
+            reason: "empty choices".to_owned(),
+        });
+    };
+    let tool_calls = choice
+        .message
+        .tool_calls
+        .iter()
+        .map(|raw| decode_tool_call(&raw.id, &raw.function.name, &raw.function.arguments))
+        .collect::<Vec<_>>();
+    let usage = chat.usage.unwrap_or_default();
+    let mut content = choice.message.content.as_deref().unwrap_or("").to_owned();
+    if choice.finish_reason.as_deref() == Some("length") {
+        content = format!("[truncated by max_tokens] {content}");
+    }
+    Ok(finish_turn(
+        &content,
+        tool_calls,
+        Some(TokenUsage {
+            prompt_tokens: usage.prompt_tokens.max(0),
+            completion_tokens: usage.completion_tokens.max(0),
+            cost_usd: 0.0,
+        }),
+    ))
+}
+
+fn decode_tool_call(id: &str, name: &str, arguments: &str) -> ToolCall {
+    let args = serde_json::from_str(arguments).unwrap_or(serde_json::Value::Null);
+    ToolCall {
+        id: if id.is_empty() {
+            format!("call-{name}")
+        } else {
+            id.to_owned()
+        },
+        name: ToolName::parse(name),
+        args,
+    }
+}
+
+fn finish_turn(content: &str, tool_calls: Vec<ToolCall>, usage: Option<TokenUsage>) -> EngineTurn {
+    let text = if content.trim().is_empty() && tool_calls.is_empty() {
+        "(empty reply)".to_owned()
+    } else {
+        content.to_owned()
+    };
+    let status = if tool_calls.is_empty() {
+        TurnStatus::Done
+    } else {
+        TurnStatus::Continue
+    };
+    EngineTurn {
+        assistant_text: text,
+        status,
+        tool_calls,
+        usage,
     }
 }
 
@@ -248,12 +451,32 @@ struct ChatResponse {
 struct ChatChoice {
     #[serde(default)]
     message: ChatMessage,
+    #[serde(default)]
+    finish_reason: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 struct ChatMessage {
     #[serde(default)]
-    content: String,
+    content: Option<String>,
+    #[serde(default)]
+    tool_calls: Vec<RawToolCall>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RawToolCall {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    function: RawFunction,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RawFunction {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    arguments: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -317,44 +540,124 @@ impl EngineAdapter for HttpEngine {
     }
 
     fn run_turn(&self, prompt: &str, inbox: &[String]) -> Result<EngineTurn, NtBotError> {
-        let mut messages = Vec::with_capacity(inbox.len() + 1);
-        for item in inbox {
-            messages.push(serde_json::json!({"role": "user", "content": item}));
-        }
-        messages.push(serde_json::json!({"role": "user", "content": prompt}));
-        let body = serde_json::json!({
-            "model": self.config.model,
-            "messages": messages,
-            "temperature": 0.2,
-            "stream": false,
-        });
+        let history: Vec<TranscriptItem> = inbox
+            .iter()
+            .map(|content| TranscriptItem {
+                role: TranscriptRole::User,
+                content: content.clone(),
+                tool_calls: Vec::new(),
+                tool_call_id: None,
+            })
+            .collect();
+        self.run_turn_with_history(prompt, &history)
+    }
+
+    fn run_turn_with_history(
+        &self,
+        prompt: &str,
+        history: &[TranscriptItem],
+    ) -> Result<EngineTurn, NtBotError> {
+        let body = self.chat_body(prompt, history, false);
         let value = self.post_json(&self.chat_url(), &body)?;
-        let chat: ChatResponse = serde_json::from_value(value).map_err(|err| NtBotError::Engine {
-            engine: engine_id_of(&self.config.model),
-            reason: format!("unexpected chat schema: {err}"),
-        })?;
-        let Some(choice) = chat.choices.first() else {
-            return Err(NtBotError::Engine {
+        parse_chat_turn(&self.config.model, value)
+    }
+
+    fn run_turn_stream(
+        &self,
+        prompt: &str,
+        history: &[TranscriptItem],
+        on_delta: &mut dyn FnMut(&str),
+    ) -> Result<EngineTurn, NtBotError> {
+        use std::io::BufRead as _;
+        let body = self.chat_body(prompt, history, true);
+        let timeout = Duration::from_secs(self.config.timeout_secs);
+        let mut request = ureq::post(&self.chat_url()).timeout(timeout);
+        if !self.api_key.trim().is_empty() {
+            request = request.set("Authorization", &format!("Bearer {}", self.api_key.trim()));
+        }
+        let response = request
+            .send_json(body)
+            .map_err(|err| http_err(&self.config.model, err))?;
+        let reader = response.into_reader();
+        let mut content = String::new();
+        let mut partials: Vec<StreamToolCall> = Vec::new();
+        let mut usage = ChatUsage::default();
+        for line in std::io::BufReader::new(reader).lines() {
+            let line = line.map_err(|err| NtBotError::Engine {
                 engine: engine_id_of(&self.config.model),
-                reason: "empty choices".to_owned(),
-            });
-        };
-        let usage = chat.usage.unwrap_or_default();
-        Ok(EngineTurn {
-            assistant_text: if choice.message.content.trim().is_empty() {
-                "(empty reply)".to_owned()
-            } else {
-                choice.message.content.clone()
-            },
-            status: TurnStatus::Done,
-            tool_calls: Vec::new(),
-            usage: Some(TokenUsage {
+                reason: format!("stream read: {err}"),
+            })?;
+            let data = line.strip_prefix("data:").map(str::trim).unwrap_or("");
+            if data.is_empty() || data == "[DONE]" {
+                continue;
+            }
+            let chunk: serde_json::Value = match serde_json::from_str(data) {
+                Ok(chunk) => chunk,
+                Err(_) => continue,
+            };
+            if let Some(text) = chunk
+                .pointer("/choices/0/delta/content")
+                .and_then(|value| value.as_str())
+            {
+                content.push_str(text);
+                on_delta(text);
+            }
+            if let Some(calls) = chunk
+                .pointer("/choices/0/delta/tool_calls")
+                .and_then(|value| value.as_array())
+            {
+                for call in calls {
+                    let index = call.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                    while partials.len() <= index {
+                        partials.push(StreamToolCall::default());
+                    }
+                    let Some(slot) = partials.get_mut(index) else {
+                        continue;
+                    };
+                    if let Some(id) = call.get("id").and_then(|v| v.as_str()) {
+                        if !id.is_empty() {
+                            slot.id = id.to_owned();
+                        }
+                    }
+                    if let Some(name) = call.pointer("/function/name").and_then(|v| v.as_str()) {
+                        if !name.is_empty() {
+                            slot.name = name.to_owned();
+                        }
+                    }
+                    if let Some(args) = call.pointer("/function/arguments").and_then(|v| v.as_str()) {
+                        slot.arguments.push_str(args);
+                    }
+                }
+            }
+            // neotrix 服务端也可能在末 chunk 带 usage.
+            if let Some(value) = chunk.get("usage") {
+                if let Ok(parsed) = serde_json::from_value::<ChatUsage>(value.clone()) {
+                    usage = parsed;
+                }
+            }
+        }
+        let tool_calls = partials
+            .into_iter()
+            .filter(|slot| !slot.name.is_empty())
+            .map(|slot| decode_tool_call(&slot.id, &slot.name, &slot.arguments))
+            .collect::<Vec<_>>();
+        Ok(finish_turn(
+            &content,
+            tool_calls,
+            Some(TokenUsage {
                 prompt_tokens: usage.prompt_tokens.max(0),
                 completion_tokens: usage.completion_tokens.max(0),
                 cost_usd: 0.0,
             }),
-        })
+        ))
     }
+}
+
+#[derive(Debug, Default)]
+struct StreamToolCall {
+    id: String,
+    name: String,
+    arguments: String,
 }
 
 #[cfg(test)]
@@ -525,7 +828,180 @@ mod tests {
     }
 
     #[test]
-    fn config_validation() {        let bad = HttpEngineConfig {
+    fn stream_accumulates_deltas_and_tool_calls() {
+        let sse = "data: {\"choices\":[{\"delta\":{\"content\":\"hel\"}}]}\n\n\
+                   data: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n\n\
+                   data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"bash\",\"arguments\":\"{\\\"comma\"}}]}}]}\n\n\
+                   data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"nd\\\":\\\"echo hi\\\"}\"}}]}}]}\n\n\
+                   data: [DONE]\n\n";
+        let base = fake_raw_server(sse);
+        let engine = HttpEngine::new(test_config(&base), String::new()).expect("engine");
+        let mut deltas = String::new();
+        let mut turn = None;
+        for _ in 0..40 {
+            let mut capture = String::new();
+            match engine.run_turn_stream("hi", &[], &mut |delta| capture.push_str(delta)) {
+                Ok(done) => {
+                    deltas = capture;
+                    turn = Some(done);
+                    break;
+                }
+                Err(_) => std::thread::sleep(std::time::Duration::from_millis(50)),
+            }
+        }
+        let turn = turn.expect("turn");
+        assert_eq!(deltas, "hello");
+        assert_eq!(turn.assistant_text, "hello");
+        assert_eq!(turn.tool_calls.len(), 1);
+        assert_eq!(turn.tool_calls[0].id, "c1");
+        assert_eq!(
+            turn.tool_calls[0].args.get("command").and_then(|v| v.as_str()),
+            Some("echo hi")
+        );
+    }
+
+    /// 原始字节应答的 fake 服务器 (SSE 用).
+    fn fake_raw_server(reply: &str) -> String {
+        use std::io::{Read as _, Write as _};
+        let reply = reply.to_owned();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr").to_string();
+        std::thread::spawn(move || {
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut buf = vec![0u8; 65536];
+            let Ok(n) = stream.read(&mut buf) else {
+                return;
+            };
+            let raw = String::from_utf8_lossy(&buf[..n]).into_owned();
+            let content_len = raw
+                .lines()
+                .take_while(|line| !line.trim().is_empty())
+                .filter_map(|line| line.strip_prefix("Content-Length:"))
+                .filter_map(|rest| rest.trim().parse::<usize>().ok())
+                .next()
+                .unwrap_or(0);
+            let mut owned = raw
+                .find("\r\n\r\n")
+                .and_then(|idx| raw.get(idx + 4..))
+                .unwrap_or("")
+                .to_owned();
+            while owned.len() < content_len {
+                let mut extra = vec![0u8; 4096];
+                let Ok(m) = stream.read(&mut extra) else {
+                    break;
+                };
+                if m == 0 {
+                    break;
+                }
+                owned.push_str(&String::from_utf8_lossy(&extra[..m]));
+            }
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                reply.len(),
+                reply
+            );
+            let _ = stream.write_all(response.as_bytes());
+        });
+        format!("http://{addr}/v1")
+    }
+
+    /// 按序应答的 fake 服务器 (多跳回路用, 用完即停).
+    fn fake_server_seq(replies: Vec<String>) -> String {
+        use std::io::{Read as _, Write as _};
+        use std::sync::{Arc, Mutex};
+        let queue = Arc::new(Mutex::new(replies));
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr").to_string();
+        std::thread::spawn(move || {
+            for _ in 0..16 {
+                let Ok((mut stream, _)) = listener.accept() else {
+                    return;
+                };
+                let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
+                let mut buf = vec![0u8; 65536];
+                let Ok(n) = stream.read(&mut buf) else {
+                    continue;
+                };
+                if n == 0 {
+                    continue;
+                }
+                let reply = queue
+                    .lock()
+                    .ok()
+                    .and_then(|mut q| if q.is_empty() { None } else { Some(q.remove(0)) })
+                    .unwrap_or_else(|| "{}".to_owned());
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    reply.len(),
+                    reply
+                );
+                if stream.write_all(response.as_bytes()).is_err() {
+                    return;
+                }
+            }
+        });
+        format!("http://{addr}/v1")
+    }
+
+    #[test]
+    fn tool_loop_runs_bash_then_done() {
+        let first = serde_json::json!({
+            "choices": [{"message": {
+                "content": "",
+                "tool_calls": [{"id": "c1", "type": "function",
+                    "function": {"name": "bash", "arguments": "{\"command\":\"echo loop-hi\"}"}}],
+            }, "finish_reason": "tool_calls"}],
+            "usage": {"prompt_tokens": 20, "completion_tokens": 5},
+        })
+        .to_string();
+        let second = serde_json::json!({
+            "choices": [{"message": {"content": "saw loop-hi"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 30, "completion_tokens": 3},
+        })
+        .to_string();
+        let base = fake_server_seq(vec![first, second]);
+        let engine = HttpEngine::new(test_config(&base), String::new()).expect("engine");
+        let dir = std::env::temp_dir().join("neobot-toolloop-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        let config = crate::nt_config::NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: dir.join("workspace"),
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 4,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+        };
+        config.validate().expect("validate");
+        let store = crate::nt_store::NeobotStore::open(":memory:").expect("open");
+        let mut status = None;
+        for _ in 0..40 {
+            match crate::run_local_turn(&store, &config, &engine, "loop", "go") {
+                Ok(done) => {
+                    status = Some(done);
+                    break;
+                }
+                Err(_) => std::thread::sleep(std::time::Duration::from_millis(50)),
+            }
+        }
+        assert_eq!(status, Some(crate::nt_types::TurnStatus::Done));
+        // bash 真执行且审计放行, 任务终态 Done.
+        let audits = store.list_audit(20).expect("audits");
+        assert!(audits.iter().any(|event| event.tool == "bash"
+            && matches!(event.decision, crate::nt_audit::AuditDecision::Allow)));
+        let tasks = store.list_tasks(10).expect("list");
+        assert!(tasks
+            .iter()
+            .any(|task| task.status == crate::nt_types::TaskStatus::Done));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn config_validation() {
+        let bad = HttpEngineConfig {
             base_url: "ftp://x".to_owned(),
             model: "m".to_owned(),
             timeout_secs: 5,

@@ -33,6 +33,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 portable-pty = "0.9.0"
 nt_core_capability_tree = { path = "../neotrix-core/src/neotrix/nt_core_capability_tree" }
+neotrix-neobot = { path = "../crates/neotrix-neobot" }
 neotrix = { path = "../neotrix-core" }
 chrono = { workspace = true }
 dirs = { workspace = true }

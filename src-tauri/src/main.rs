@@ -293,6 +293,12 @@ fn main() {
                     neotrix_tauri::browser_host::auth_bridge_get_config,
                     // ===== ntos 壳窗口（第二切面，同内核） =====
                     neotrix_tauri::commands::ntos::open_ntos_window,
+                    // ===== neobot 本地 agent（SQLite + 网关 + 池子模型） =====
+                    neotrix_tauri::commands::neobot::neobot_doctor,
+                    neotrix_tauri::commands::neobot::neobot_run,
+                    neotrix_tauri::commands::neobot::neobot_tasks,
+                    neotrix_tauri::commands::neobot::neobot_audit,
+                    neotrix_tauri::commands::neobot::neobot_models,
                 ])
                 .setup(move |app| {
                     neotrix_tauri::logger::init_logging(app.handle());

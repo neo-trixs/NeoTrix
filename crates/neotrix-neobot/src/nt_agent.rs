@@ -30,6 +30,29 @@ pub fn run_local_turn(
     title: &str,
     user_text: &str,
 ) -> Result<TurnStatus, NtBotError> {
+    run_local_turn_inner(store, config, engine, title, user_text, None)
+}
+
+/// 流式版 — 模型增量内容经 `on_delta` 回调 (SSE 真流式引擎).
+pub fn run_local_turn_stream(
+    store: &NeobotStore,
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    title: &str,
+    user_text: &str,
+    on_delta: &mut dyn FnMut(&str),
+) -> Result<TurnStatus, NtBotError> {
+    run_local_turn_inner(store, config, engine, title, user_text, Some(on_delta))
+}
+
+fn run_local_turn_inner(
+    store: &NeobotStore,
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    title: &str,
+    user_text: &str,
+    on_delta: Option<&mut dyn FnMut(&str)>,
+) -> Result<TurnStatus, NtBotError> {
     let now = Utc::now().to_rfc3339();
     let task = AgentTask {
         id: Uuid::new_v4().to_string(),
@@ -39,7 +62,7 @@ pub fn run_local_turn(
         updated_at: now,
     };
     store.save_task(&task)?;
-    let status = run_loop(store, config, engine, &task.id, user_text)?;
+    let status = run_loop(store, config, engine, &task.id, user_text, on_delta)?;
     let finished = AgentTask {
         status: match status {
             TurnStatus::Done => TaskStatus::Done,
@@ -66,11 +89,17 @@ fn run_loop(
     engine: &dyn EngineAdapter,
     task_id: &str,
     user_text: &str,
+    mut on_delta: Option<&mut dyn FnMut(&str)>,
 ) -> Result<TurnStatus, NtBotError> {
+    use crate::nt_types::{TranscriptItem, TranscriptRole};
     let steps = config.max_steps.max(1);
+    let mut history: Vec<TranscriptItem> = Vec::new();
     let mut current = TurnStatus::Continue;
     for n in 0..steps {
-        let turn = engine.run_turn(user_text, &[])?;
+        let turn = match on_delta.as_mut() {
+            Some(callback) => engine.run_turn_stream(user_text, &history, &mut **callback)?,
+            None => engine.run_turn_with_history(user_text, &history)?,
+        };
         // 有用量即落账本 (cumora `llm_calls` 本地子集).
         if let Some(usage) = turn.usage.as_ref() {
             store.record_ledger(
@@ -83,6 +112,12 @@ fn run_loop(
                 usage.cost_usd,
             )?;
         }
+        history.push(TranscriptItem {
+            role: TranscriptRole::Assistant,
+            content: turn.assistant_text.clone(),
+            tool_calls: turn.tool_calls.clone(),
+            tool_call_id: None,
+        });
         // 引擎自带 tool_calls 为空时按纯回复处理.
         if turn.tool_calls.is_empty() {
             store.add_step(task_id, i64::from(n), "reply", true, &turn.assistant_text)?;
@@ -93,9 +128,17 @@ fn run_loop(
         for call in &turn.tool_calls {
             let (decision, rule) = gate(config, call)?;
             let allowed = matches!(decision, PolicyDecision::Allow);
-            // dry-run: 记录但不执行.
+            // dry-run: 记录但不执行. 执行错误转失败结果 (模型可见, 可换路),
+            // 只有落库/审计失败才 `?` 中断.
             let result = if allowed && config.policy_mode == crate::nt_config::PolicyMode::Enforce {
-                execute_tool(config, call)?
+                match execute_tool(config, call) {
+                    Ok(result) => result,
+                    Err(err) => ToolResult {
+                        ok: false,
+                        output: format!("tool error: {err}"),
+                        truncated: false,
+                    },
+                }
             } else {
                 ToolResult {
                     ok: false,
@@ -120,6 +163,12 @@ fn run_loop(
             );
             store.record_audit(&event)?;
             store.add_step(task_id, i64::from(n), call.name.as_str(), result.ok, &result.output)?;
+            history.push(TranscriptItem {
+                role: TranscriptRole::Tool,
+                content: truncate_history(&result.output),
+                tool_calls: Vec::new(),
+                tool_call_id: Some(call.id.clone()),
+            });
             if call.name == ToolName::SetTurnStatus {
                 saw_status = parse_status_arg(&call.args);
             }
@@ -140,7 +189,23 @@ fn run_loop(
     Ok(current)
 }
 
-/// 网关门控: 未知工具名在类型层已拒; 这里只做策略评估.
+/// 历史回填截断 (4KiB/条, 防上下文爆炸; 全量仍在 steps 表).
+fn truncate_history(output: &str) -> String {
+    const LIMIT: usize = 4096;
+    if output.len() <= LIMIT {
+        return output.to_owned();
+    }
+    let mut cut = LIMIT;
+    while cut > 0 && !output.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    match output.get(..cut) {
+        Some(safe) => format!("{safe}…[truncated]"),
+        None => "…[truncated]".to_owned(),
+    }
+}
+
+/// 网关门控: `Unknown` 工具也进策略 (一律拒绝, 原名进审计).
 fn gate(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<(PolicyDecision, Option<String>), NtBotError> {
     let file_path = ["path", "file"]
         .iter()
@@ -152,12 +217,26 @@ fn gate(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<(Poli
         .get("command")
         .and_then(|value| value.as_str())
         .map(str::to_owned);
+    let computer_action = call
+        .args
+        .get("action")
+        .and_then(|value| value.as_str())
+        .map(str::to_owned);
+    let computer_target = call
+        .args
+        .get("target")
+        .and_then(|value| value.as_str())
+        .map(str::to_owned);
     let ctx = PolicyContext {
-        tool: call.name,
+        tool: call.name.clone(),
         actor: Actor::Bot,
         human_has_control: config.human_has_control,
         file_path,
         command,
+        computer_action,
+        computer_target,
+        computer_allow: config.computer_allow.clone(),
+        computer_hosts: config.computer_hosts.clone(),
     };
     let decision = evaluate_policy(&ctx);
     let rule = match &decision {
@@ -174,7 +253,7 @@ fn parse_status_arg(args: &serde_json::Value) -> Option<TurnStatus> {
 }
 
 fn execute_tool(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
-    match call.name {
+    match &call.name {
         ToolName::SetTurnStatus => Ok(ToolResult {
             ok: parse_status_arg(&call.args).is_some(),
             output: "status recorded".to_owned(),
@@ -184,11 +263,21 @@ fn execute_tool(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Resu
         ToolName::ReadFile => execute_read(config, call),
         ToolName::WriteFile => execute_write(config, call),
         ToolName::EditFile => execute_edit(config, call),
-        ToolName::ComputerAct => Err(NtBotError::Denied {
-            rule: "computer-default-deny".to_owned(),
-            reason: "computer actions need explicit grant".to_owned(),
-        }),
+        ToolName::ComputerAct => execute_computer(call),
+        ToolName::Unknown(raw) => Err(NtBotError::Invalid(format!("unknown tool '{raw}'"))),
     }
+}
+
+/// computer 执行 — 当前 Noop 后端诚实失败 (调用方转失败结果回填模型).
+fn execute_computer(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+    use crate::nt_computer::{ComputerBackend as _, NoopBackend, parse_computer_call};
+    let parsed = parse_computer_call(&call.args)?;
+    let output = NoopBackend.execute(&parsed)?;
+    Ok(ToolResult {
+        ok: true,
+        output,
+        truncated: false,
+    })
 }
 
 fn execute_bash(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
@@ -334,6 +423,8 @@ mod tests {
             human_has_control: false,
             max_steps: 4,
             engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
         };
         config.validate().expect("validate");
         let store = NeobotStore::open(":memory:").expect("open");

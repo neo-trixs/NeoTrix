@@ -50,6 +50,12 @@ pub struct NeobotConfig {
     /// agent loop 上限 (OpenMuse chat=6 / model=16, 本地默认 8).
     pub max_steps: u8,
     pub engine: EngineKind,
+    /// computer 动作 allowlist (空 = 全拒, fail-closed; 如 ["navigate", "screenshot"]).
+    #[serde(default)]
+    pub computer_allow: Vec<String>,
+    /// navigate 目标 host allowlist (空 = 全拒; 如 ["example.com"]).
+    #[serde(default)]
+    pub computer_hosts: Vec<String>,
 }
 
 impl NeobotConfig {
@@ -64,6 +70,8 @@ impl NeobotConfig {
             human_has_control: false,
             max_steps: 8,
             engine: EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
         })
     }
 
@@ -141,6 +149,8 @@ mod tests {
             human_has_control: false,
             max_steps: 0,
             engine: super::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
         };
         assert!(cfg.validate().is_err());
         cfg.max_steps = 33;

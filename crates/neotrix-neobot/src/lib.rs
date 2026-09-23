@@ -20,6 +20,7 @@
 pub mod nt_agent;
 pub mod nt_audit;
 pub mod nt_cli;
+pub mod nt_computer;
 pub mod nt_config;
 pub mod nt_daemon;
 pub mod nt_engine;
@@ -30,8 +31,10 @@ pub mod nt_store;
 pub mod nt_types;
 
 pub use nt_agent::run_local_turn;
+pub use nt_agent::run_local_turn_stream;
 pub use nt_audit::{AuditDecision, AuditEvent, redact_detail};
 pub use nt_cli::{format_side_effect, parse_side_effect};
+pub use nt_computer::{ComputerAction, ComputerBackend, ComputerCall, NoopBackend};
 pub use nt_config::{EngineKind, NeobotConfig, PolicyMode};
 pub use nt_daemon::{DaemonGate, SteerMsg};
 pub use nt_engine::{CliEngine, EngineAdapter, EngineTurn, LocalEchoEngine};
@@ -39,4 +42,7 @@ pub use nt_http_engine::{HttpEngine, HttpEngineConfig};
 pub use nt_error::NtBotError;
 pub use nt_policy::{Actor, PolicyContext, PolicyDecision, evaluate_policy};
 pub use nt_store::NeobotStore;
-pub use nt_types::{AgentTask, TaskStatus, TokenUsage, ToolCall, ToolName, ToolResult, TurnStatus};
+pub use nt_types::{
+    AgentTask, TaskStatus, TokenUsage, ToolCall, ToolName, ToolResult, TranscriptItem,
+    TranscriptRole, TurnStatus,
+};

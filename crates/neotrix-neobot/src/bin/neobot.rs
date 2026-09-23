@@ -13,7 +13,7 @@
 use clap::{Parser, Subcommand};
 use neotrix_neobot::{
     CliEngine, EngineAdapter, EngineKind, HttpEngine, LocalEchoEngine, NeobotConfig, NeobotStore,
-    NtBotError, PolicyMode, run_local_turn,
+    NtBotError, PolicyMode, run_local_turn, run_local_turn_stream,
 };
 
 #[derive(Debug, Parser)]
@@ -40,6 +40,9 @@ enum Cmd {
         /// 引擎: `echo` | 本机命令名 (如 `claude`) | `http` (OpenAI 兼容, 读 NEOBOT_* env).
         #[arg(long, default_value = "echo")]
         engine: String,
+        /// 流式输出增量内容 (仅 http 引擎).
+        #[arg(long, default_value_t = false)]
+        stream: bool,
     },
     /// 任务管理.
     Task {
@@ -77,7 +80,7 @@ fn real_main() -> Result<(), NtBotError> {
     match cli.cmd {
         Cmd::Init => cmd_init(),
         Cmd::Doctor => cmd_doctor(),
-        Cmd::Run { title, text, engine } => cmd_run(&title, &text, &engine),
+        Cmd::Run { title, text, engine, stream } => cmd_run(&title, &text, &engine, stream),
         Cmd::Task { cmd: TaskCmd::List } => cmd_task_list(),
         Cmd::Audit { cmd: AuditCmd::List } => cmd_audit_list(),
         Cmd::Models => cmd_models(),
@@ -129,7 +132,7 @@ fn cmd_doctor() -> Result<(), NtBotError> {
     Ok(())
 }
 
-fn cmd_run(title: &str, text: &str, engine_name: &str) -> Result<(), NtBotError> {
+fn cmd_run(title: &str, text: &str, engine_name: &str, stream: bool) -> Result<(), NtBotError> {
     let mut cfg = load_config()?;
     let trimmed = engine_name.trim();
     if trimmed == "http" {
@@ -144,15 +147,38 @@ fn cmd_run(title: &str, text: &str, engine_name: &str) -> Result<(), NtBotError>
         };
     }
     let store = open_store(&cfg)?;
+    let mut emit = |delta: &str| {
+        print!("{delta}");
+        use std::io::Write as _;
+        let _ = std::io::stdout().flush();
+    };
     let status = match &cfg.engine {
-        EngineKind::Echo => run_local_turn(&store, &cfg, &LocalEchoEngine, title, text)?,
+        EngineKind::Echo => {
+            if stream {
+                run_local_turn_stream(&store, &cfg, &LocalEchoEngine, title, text, &mut emit)?
+            } else {
+                run_local_turn(&store, &cfg, &LocalEchoEngine, title, text)?
+            }
+        }
         EngineKind::Cli { command } => {
             let engine = CliEngine::new(command)?;
-            run_local_turn(&store, &cfg, &engine, title, text)?
+            if stream {
+                run_local_turn_stream(&store, &cfg, &engine, title, text, &mut emit)?
+            } else {
+                run_local_turn(&store, &cfg, &engine, title, text)?
+            }
         }
         EngineKind::Http { .. } => {
             let engine = HttpEngine::from_env()?;
-            run_local_turn(&store, &cfg, &engine, title, text)?
+            if stream {
+                println!("--- stream ---");
+                let status =
+                    run_local_turn_stream(&store, &cfg, &engine, title, text, &mut emit)?;
+                println!("\n--- end ---");
+                status
+            } else {
+                run_local_turn(&store, &cfg, &engine, title, text)?
+            }
         }
     };
     println!("neobot run ok: status={}", status.as_str());

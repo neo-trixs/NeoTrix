@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::nt_error::NtBotError;
-use crate::nt_types::{TokenUsage, ToolCall, ToolName, TurnStatus};
+use crate::nt_types::{TokenUsage, ToolCall, ToolName, TranscriptItem, TurnStatus};
 
 /// 引擎一轮产出.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +29,29 @@ pub trait EngineAdapter {
     }
     fn probe(&self) -> Result<String, NtBotError>;
     fn run_turn(&self, prompt: &str, inbox: &[String]) -> Result<EngineTurn, NtBotError>;
+    /// 带历史的多跳入口 — 默认忽略历史 (Echo/CLI 保持原语义).
+    fn run_turn_with_history(
+        &self,
+        prompt: &str,
+        history: &[TranscriptItem],
+    ) -> Result<EngineTurn, NtBotError> {
+        let inbox: Vec<String> = history
+            .iter()
+            .map(|item| item.content.clone())
+            .collect();
+        self.run_turn(prompt, &inbox)
+    }
+    /// 流式回合 — 默认退化为整段一次回调, 真流式引擎覆盖.
+    fn run_turn_stream(
+        &self,
+        prompt: &str,
+        history: &[TranscriptItem],
+        on_delta: &mut dyn FnMut(&str),
+    ) -> Result<EngineTurn, NtBotError> {
+        let turn = self.run_turn_with_history(prompt, history)?;
+        on_delta(&turn.assistant_text);
+        Ok(turn)
+    }
 }
 
 /// 零模型回显引擎 (OpenMuse `sample` 对应物): 不调任何外部模型,
@@ -131,6 +154,7 @@ impl EngineAdapter for CliEngine {
         let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
         // CLI 引擎不直接给 tool_calls (工具统一走本地网关, 防模型直调).
         let call = ToolCall {
+            id: "cli-status-1".to_owned(),
             name: ToolName::SetTurnStatus,
             args: serde_json::json!({"status": "done"}),
         };

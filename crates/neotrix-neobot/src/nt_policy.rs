@@ -28,6 +28,14 @@ pub struct PolicyContext {
     pub file_path: Option<String>,
     /// `bash` 原始命令 (做越狱启发式检查).
     pub command: Option<String>,
+    /// `computer_act` 动作名 (如 `navigate`); 必须命中 `computer_allow`.
+    pub computer_action: Option<String>,
+    /// `computer_act` 目标 (navigate 时校验 host).
+    pub computer_target: Option<String>,
+    /// computer 动作 allowlist (空 = 全拒).
+    pub computer_allow: Vec<String>,
+    /// navigate host allowlist (空 = 全拒).
+    pub computer_hosts: Vec<String>,
 }
 
 /// 策略裁决.
@@ -50,9 +58,21 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {
     if ctx.human_has_control && ctx.actor != Actor::Person {
         return deny("human-control", "human has control; bot actions refused");
     }
-    // 2) computer 受控动作默认拒 (后续 nt_computer 接入快照+allowlist 后放行).
+    // 2) computer 受控动作: 动作必须进 allowlist, navigate 再验 host.
+    //    默认双空 = 全拒 (fail-closed, 替代旧 blanket-deny 的可配版本).
     if ctx.tool == ToolName::ComputerAct {
-        return deny("computer-default-deny", "computer actions need explicit grant");
+        let action = ctx.computer_action.as_deref().unwrap_or("");
+        if !ctx.computer_allow.iter().any(|allowed| allowed == action) {
+            return deny("computer-allow", "action not in computer_allow");
+        }
+        if action == "navigate" {
+            let target = ctx.computer_target.as_deref().unwrap_or("");
+            let host = crate::nt_computer::host_of(target).unwrap_or_default();
+            if !ctx.computer_hosts.iter().any(|allowed| allowed == &host) {
+                return deny("computer-host", "navigate host not in computer_hosts");
+            }
+        }
+        return PolicyDecision::Allow;
     }
     // 3) 文件越狱拦截 (OpenMuse workspacePath 语义).
     if let Some(path) = ctx.file_path.as_deref() {
@@ -70,11 +90,12 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {
         }
         return PolicyDecision::Allow;
     }
-    // 5) 纯协议工具默认放行.
-    match ctx.tool {
+    // 5) 纯协议工具默认放行; 未知工具永拒 (fail-closed, 原名进审计).
+    match &ctx.tool {
         ToolName::SetTurnStatus | ToolName::ReadFile | ToolName::WriteFile | ToolName::EditFile => {
             PolicyDecision::Allow
         }
+        ToolName::Unknown(raw) => deny("unknown-tool", &format!("unknown tool '{raw}'")),
         ToolName::Bash | ToolName::ComputerAct => {
             deny("default-deny", "no explicit allow rule matched")
         }
@@ -104,6 +125,10 @@ mod tests {
             human_has_control: false,
             file_path: None,
             command: None,
+            computer_action: None,
+            computer_target: None,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
         }
     }
 
@@ -120,25 +145,15 @@ mod tests {
     #[test]
     fn jailbreak_paths_denied() {
         for bad in ["../secret", "/etc/passwd", "~/keys", "a/../../b", ""] {
-            let context = PolicyContext {
-                tool: ToolName::ReadFile,
-                actor: Actor::Bot,
-                human_has_control: false,
-                file_path: Some(bad.to_owned()),
-                command: None,
-            };
+            let mut context = ctx(ToolName::ReadFile);
+            context.file_path = Some(bad.to_owned());
             assert!(matches!(
                 evaluate_policy(&context),
                 PolicyDecision::Deny { .. }
             ));
         }
-        let good = PolicyContext {
-            tool: ToolName::ReadFile,
-            actor: Actor::Bot,
-            human_has_control: false,
-            file_path: Some("notes/todo.md".to_owned()),
-            command: None,
-        };
+        let mut good = ctx(ToolName::ReadFile);
+        good.file_path = Some("notes/todo.md".to_owned());
         assert_eq!(evaluate_policy(&good), PolicyDecision::Allow);
     }
 
@@ -146,6 +161,27 @@ mod tests {
     fn computer_act_default_deny() {
         assert!(matches!(
             evaluate_policy(&ctx(ToolName::ComputerAct)),
+            PolicyDecision::Deny { .. }
+        ));
+    }
+
+    #[test]
+    fn computer_allowlist_and_host_gate() {
+        let mut context = ctx(ToolName::ComputerAct);
+        context.computer_action = Some("navigate".to_owned());
+        context.computer_target = Some("https://example.com/a".to_owned());
+        context.computer_allow = vec!["navigate".to_owned()];
+        // host 未放行 → 拒.
+        assert!(matches!(
+            evaluate_policy(&context),
+            PolicyDecision::Deny { .. }
+        ));
+        context.computer_hosts = vec!["example.com".to_owned()];
+        assert_eq!(evaluate_policy(&context), PolicyDecision::Allow);
+        // 动作未放行 → 拒.
+        context.computer_action = Some("click".to_owned());
+        assert!(matches!(
+            evaluate_policy(&context),
             PolicyDecision::Deny { .. }
         ));
     }
