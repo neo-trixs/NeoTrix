@@ -138,6 +138,7 @@ pub mod self_model;
 pub mod llm_timeout;
 pub mod context_strategy;
 pub mod shared_types;
+pub mod nt_core_approval;
 
 // Re-export unified SelfModel types
 pub use nt_core_meta::unified_self_model::{
