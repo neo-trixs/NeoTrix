@@ -71,6 +71,18 @@ fn run_loop(
     let mut current = TurnStatus::Continue;
     for n in 0..steps {
         let turn = engine.run_turn(user_text, &[])?;
+        // 有用量即落账本 (cumora `llm_calls` 本地子集).
+        if let Some(usage) = turn.usage.as_ref() {
+            store.record_ledger(
+                &Uuid::new_v4().to_string(),
+                &Utc::now().to_rfc3339(),
+                engine.engine_id(),
+                engine.model_name(),
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                usage.cost_usd,
+            )?;
+        }
         // 引擎自带 tool_calls 为空时按纯回复处理.
         if turn.tool_calls.is_empty() {
             store.add_step(task_id, i64::from(n), "reply", true, &turn.assistant_text)?;

@@ -34,6 +34,9 @@ pub enum EngineKind {
     Echo,
     /// 本机 CLI 引擎 (`claude`/`codex`/`opencode` 等, 经 PATH 启动).
     Cli { command: String },
+    /// OpenAI 兼容 HTTP 引擎 (Ollama/LM Studio/vLLM/自建网关).
+    /// key 永不落盘, 运行时读 `NEOBOT_API_KEY`.
+    Http { base_url: String, model: String },
 }
 
 /// neobot 配置 (文件 `~/.neobot/config.json` + 环境变量覆盖).
@@ -84,7 +87,13 @@ impl NeobotConfig {
         }
         if let Ok(engine) = std::env::var("NEOBOT_ENGINE") {
             let trimmed = engine.trim();
-            if !trimmed.is_empty() && trimmed != "echo" {
+            if trimmed == "http" {
+                let (http, _) = crate::nt_http_engine::HttpEngineConfig::from_env()?;
+                cfg.engine = EngineKind::Http {
+                    base_url: http.base_url,
+                    model: http.model,
+                };
+            } else if !trimmed.is_empty() && trimmed != "echo" {
                 cfg.engine = EngineKind::Cli {
                     command: trimmed.to_owned(),
                 };

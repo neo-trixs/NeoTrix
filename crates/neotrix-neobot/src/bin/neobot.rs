@@ -12,8 +12,8 @@
 
 use clap::{Parser, Subcommand};
 use neotrix_neobot::{
-    CliEngine, EngineAdapter, EngineKind, LocalEchoEngine, NeobotConfig, NeobotStore, NtBotError,
-    PolicyMode, run_local_turn,
+    CliEngine, EngineAdapter, EngineKind, HttpEngine, LocalEchoEngine, NeobotConfig, NeobotStore,
+    NtBotError, PolicyMode, run_local_turn,
 };
 
 #[derive(Debug, Parser)]
@@ -37,7 +37,7 @@ enum Cmd {
         /// 用户输入.
         #[arg(short = 'x', long, default_value = "hello neobot")]
         text: String,
-        /// 引擎: `echo` 或本机命令名 (如 `claude`).
+        /// 引擎: `echo` | 本机命令名 (如 `claude`) | `http` (OpenAI 兼容, 读 NEOBOT_* env).
         #[arg(long, default_value = "echo")]
         engine: String,
     },
@@ -51,6 +51,8 @@ enum Cmd {
         #[command(subcommand)]
         cmd: AuditCmd,
     },
+    /// 列出模型池 (`GET /v1/models`; neotrix serve 默认 http://127.0.0.1:3000/v1).
+    Models,
 }
 
 #[derive(Debug, Subcommand)]
@@ -78,6 +80,7 @@ fn real_main() -> Result<(), NtBotError> {
         Cmd::Run { title, text, engine } => cmd_run(&title, &text, &engine),
         Cmd::Task { cmd: TaskCmd::List } => cmd_task_list(),
         Cmd::Audit { cmd: AuditCmd::List } => cmd_audit_list(),
+        Cmd::Models => cmd_models(),
     }
 }
 
@@ -110,6 +113,7 @@ fn cmd_doctor() -> Result<(), NtBotError> {
     let engine_info = match &cfg.engine {
         EngineKind::Echo => LocalEchoEngine.probe()?,
         EngineKind::Cli { command } => CliEngine::new(command)?.probe()?,
+        EngineKind::Http { .. } => HttpEngine::from_env()?.probe()?,
     };
     let tasks = store.list_tasks(1)?;
     println!(
@@ -128,7 +132,13 @@ fn cmd_doctor() -> Result<(), NtBotError> {
 fn cmd_run(title: &str, text: &str, engine_name: &str) -> Result<(), NtBotError> {
     let mut cfg = load_config()?;
     let trimmed = engine_name.trim();
-    if !trimmed.is_empty() && trimmed != "echo" {
+    if trimmed == "http" {
+        let (http, _) = neotrix_neobot::HttpEngineConfig::from_env()?;
+        cfg.engine = EngineKind::Http {
+            base_url: http.base_url,
+            model: http.model,
+        };
+    } else if !trimmed.is_empty() && trimmed != "echo" {
         cfg.engine = EngineKind::Cli {
             command: trimmed.to_owned(),
         };
@@ -138,6 +148,10 @@ fn cmd_run(title: &str, text: &str, engine_name: &str) -> Result<(), NtBotError>
         EngineKind::Echo => run_local_turn(&store, &cfg, &LocalEchoEngine, title, text)?,
         EngineKind::Cli { command } => {
             let engine = CliEngine::new(command)?;
+            run_local_turn(&store, &cfg, &engine, title, text)?
+        }
+        EngineKind::Http { .. } => {
+            let engine = HttpEngine::from_env()?;
             run_local_turn(&store, &cfg, &engine, title, text)?
         }
     };
@@ -166,6 +180,16 @@ fn cmd_audit_list() -> Result<(), NtBotError> {
             event.decision.as_str(),
             rule
         );
+    }
+    Ok(())
+}
+
+fn cmd_models() -> Result<(), NtBotError> {
+    let engine = HttpEngine::for_listing()?;
+    let mut models = engine.list_models()?;
+    models.sort();
+    for (id, owner) in models {
+        println!("{id}  (owner={owner})");
     }
     Ok(())
 }

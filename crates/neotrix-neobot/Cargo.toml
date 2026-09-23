@@ -19,6 +19,7 @@ uuid = { workspace = true }
 thiserror = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 clap = { version = "4", features = ["derive"] }
+ureq = { version = "2", features = ["json"] }
 
 [lints]
 workspace = true

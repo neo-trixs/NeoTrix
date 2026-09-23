@@ -11,6 +11,7 @@ members = [
     "neotrix-core/src/neotrix/nt_core_capability_tree",
     "crates/nt-lang",
     "crates/neotrix-game",
+    "crates/neotrix-neobot",
     # "crates/neotrix-decision-engine",  # disabled: pre-existing compilation errors
 ]
 

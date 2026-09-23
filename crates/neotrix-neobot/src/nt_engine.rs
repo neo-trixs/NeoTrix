@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::nt_error::NtBotError;
-use crate::nt_types::{ToolCall, ToolName, TurnStatus};
+use crate::nt_types::{TokenUsage, ToolCall, ToolName, TurnStatus};
 
 /// 引擎一轮产出.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,11 +15,18 @@ pub struct EngineTurn {
     pub assistant_text: String,
     pub status: TurnStatus,
     pub tool_calls: Vec<ToolCall>,
+    /// 有则由 `nt_agent` 落 `ledger` (cumora `llm_calls` 本地子集).
+    #[serde(default)]
+    pub usage: Option<TokenUsage>,
 }
 
 /// 本地引擎接口.
 pub trait EngineAdapter {
     fn engine_id(&self) -> &str;
+    /// 模型名 (ledger 用; 无模型概念返回空串).
+    fn model_name(&self) -> &str {
+        ""
+    }
     fn probe(&self) -> Result<String, NtBotError>;
     fn run_turn(&self, prompt: &str, inbox: &[String]) -> Result<EngineTurn, NtBotError>;
 }
@@ -44,6 +51,7 @@ impl EngineAdapter for LocalEchoEngine {
             assistant_text: text,
             status: TurnStatus::Done,
             tool_calls: Vec::new(),
+            usage: None,
         })
     }
 }
@@ -134,6 +142,7 @@ impl EngineAdapter for CliEngine {
             },
             status: TurnStatus::Done,
             tool_calls: vec![call],
+            usage: None,
         })
     }
 }

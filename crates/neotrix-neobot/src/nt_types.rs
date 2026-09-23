@@ -83,6 +83,15 @@ pub struct AgentTask {
     pub updated_at: String,
 }
 
+/// token 用量 (OpenAI `usage` 形状子集, 落 `ledger` 表).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TokenUsage {
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    /// 本地模型默认 0.0; 云端由上游账单回填.
+    pub cost_usd: f64,
+}
+
 /// 极简 tool 名 — cumora 三板斧 + openbot computer 受控动作之最小交集.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
