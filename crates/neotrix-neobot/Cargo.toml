@@ -1,0 +1,24 @@
+[package]
+name = "neotrix-neobot"
+version.workspace = true
+edition = "2021"
+description = "NeoBot — local-first personal agent app core (absorbed OpenMuse/openbot/cumora). SQLite + fail-closed gateway + EngineAdapter, no Docker/Postgres/cloud required."
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "neobot"
+path = "src/bin/neobot.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = "1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+clap = { version = "4", features = ["derive"] }
+
+[lints]
+workspace = true

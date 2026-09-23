@@ -1,0 +1,333 @@
+//! `nt_agent` — 有界多跳 agent loop.
+//!
+//! 编排移植 OpenMuse `engine/{conversation,model,worker}.ts`
+//! (bounded steps + lease 心跳思想) 与 cumora `turn.ts` hop loop,
+//! 工具收敛为 `bash + set_turn_status + 3×FS` (cumora 极简 schema),
+//! 每个动作必经 `nt_policy` 网关 + `nt_audit` 先写后执.
+
+use std::path::Path;
+
+use chrono::Utc;
+use uuid::Uuid;
+
+use crate::nt_audit::{AuditDecision, AuditEvent};
+use crate::nt_config::{NeobotConfig, PolicyMode};
+use crate::nt_engine::EngineAdapter;
+use crate::nt_error::NtBotError;
+use crate::nt_policy::{Actor, PolicyContext, PolicyDecision, evaluate_policy};
+use crate::nt_store::NeobotStore;
+use crate::nt_types::{AgentTask, TaskStatus, ToolName, ToolResult, TurnStatus};
+
+const READ_CAP: u64 = 512 * 1024;
+const WRITE_CAP: usize = 2 * 1024 * 1024;
+const OUTPUT_CAP: usize = 8 * 1024;
+
+/// 跑一轮本地任务 (创建 task → 有界 loop → 落库), 返回终态.
+pub fn run_local_turn(
+    store: &NeobotStore,
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    title: &str,
+    user_text: &str,
+) -> Result<TurnStatus, NtBotError> {
+    let now = Utc::now().to_rfc3339();
+    let task = AgentTask {
+        id: Uuid::new_v4().to_string(),
+        title: title.to_owned(),
+        status: TaskStatus::Running,
+        created_at: now.clone(),
+        updated_at: now,
+    };
+    store.save_task(&task)?;
+    let status = run_loop(store, config, engine, &task.id, user_text)?;
+    let finished = AgentTask {
+        status: match status {
+            TurnStatus::Done => TaskStatus::Done,
+            TurnStatus::Blocked => TaskStatus::Failed,
+            TurnStatus::Continue | TurnStatus::NeedsClarification | TurnStatus::Waiting => {
+                TaskStatus::Pending
+            }
+        },
+        updated_at: Utc::now().to_rfc3339(),
+        ..task
+    };
+    store.save_task(&finished)?;
+    store.enqueue_outbox(
+        &Uuid::new_v4().to_string(),
+        "CH_MESSAGE_NEW",
+        &serde_json::json!({"task_id": finished.id, "status": finished.status.as_str()}).to_string(),
+    )?;
+    Ok(status)
+}
+
+fn run_loop(
+    store: &NeobotStore,
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    task_id: &str,
+    user_text: &str,
+) -> Result<TurnStatus, NtBotError> {
+    let steps = config.max_steps.max(1);
+    let mut current = TurnStatus::Continue;
+    for n in 0..steps {
+        let turn = engine.run_turn(user_text, &[])?;
+        // 引擎自带 tool_calls 为空时按纯回复处理.
+        if turn.tool_calls.is_empty() {
+            store.add_step(task_id, i64::from(n), "reply", true, &turn.assistant_text)?;
+            current = turn.status;
+            break;
+        }
+        let mut saw_status: Option<TurnStatus> = None;
+        for call in &turn.tool_calls {
+            let (decision, rule) = gate(config, call)?;
+            let allowed = matches!(decision, PolicyDecision::Allow);
+            // dry-run: 记录但不执行.
+            let result = if allowed && config.policy_mode == crate::nt_config::PolicyMode::Enforce {
+                execute_tool(config, call)?
+            } else {
+                ToolResult {
+                    ok: false,
+                    output: if allowed {
+                        "(dry-run: not executed)".to_owned()
+                    } else {
+                        "(denied)".to_owned()
+                    },
+                    truncated: false,
+                }
+            };
+            let event = AuditEvent::new(
+                "bot",
+                call.name.as_str(),
+                if allowed {
+                    AuditDecision::Allow
+                } else {
+                    AuditDecision::Deny
+                },
+                rule,
+                &format!("task={task_id} ok={} out={}", result.ok, result.output),
+            );
+            store.record_audit(&event)?;
+            store.add_step(task_id, i64::from(n), call.name.as_str(), result.ok, &result.output)?;
+            if call.name == ToolName::SetTurnStatus {
+                saw_status = parse_status_arg(&call.args);
+            }
+            if !allowed && config.policy_mode == PolicyMode::Enforce {
+                current = TurnStatus::Blocked;
+                break;
+            }
+        }
+        if let Some(status) = saw_status {
+            current = status;
+            if status != TurnStatus::Continue {
+                break;
+            }
+        } else if current != TurnStatus::Continue {
+            break;
+        }
+    }
+    Ok(current)
+}
+
+/// 网关门控: 未知工具名在类型层已拒; 这里只做策略评估.
+fn gate(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<(PolicyDecision, Option<String>), NtBotError> {
+    let file_path = ["path", "file"]
+        .iter()
+        .find_map(|key| call.args.get(*key))
+        .and_then(|value| value.as_str())
+        .map(str::to_owned);
+    let command = call
+        .args
+        .get("command")
+        .and_then(|value| value.as_str())
+        .map(str::to_owned);
+    let ctx = PolicyContext {
+        tool: call.name,
+        actor: Actor::Bot,
+        human_has_control: config.human_has_control,
+        file_path,
+        command,
+    };
+    let decision = evaluate_policy(&ctx);
+    let rule = match &decision {
+        PolicyDecision::Allow => None,
+        PolicyDecision::Deny { rule, .. } => Some(rule.clone()),
+    };
+    Ok((decision, rule))
+}
+
+fn parse_status_arg(args: &serde_json::Value) -> Option<TurnStatus> {
+    args.get("status")
+        .and_then(|value| value.as_str())
+        .and_then(TurnStatus::parse)
+}
+
+fn execute_tool(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+    match call.name {
+        ToolName::SetTurnStatus => Ok(ToolResult {
+            ok: parse_status_arg(&call.args).is_some(),
+            output: "status recorded".to_owned(),
+            truncated: false,
+        }),
+        ToolName::Bash => execute_bash(config, call),
+        ToolName::ReadFile => execute_read(config, call),
+        ToolName::WriteFile => execute_write(config, call),
+        ToolName::EditFile => execute_edit(config, call),
+        ToolName::ComputerAct => Err(NtBotError::Denied {
+            rule: "computer-default-deny".to_owned(),
+            reason: "computer actions need explicit grant".to_owned(),
+        }),
+    }
+}
+
+fn execute_bash(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+    let Some(command) = call.args.get("command").and_then(|v| v.as_str()) else {
+        return Err(NtBotError::Invalid("bash requires {command}".to_owned()));
+    };
+    if command.trim().is_empty() {
+        return Err(NtBotError::Invalid("bash command is empty".to_owned()));
+    }
+    let output = std::process::Command::new("bash")
+        .arg("-c")
+        .arg(command)
+        .current_dir(&config.workspace_dir)
+        .output()?;
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        text.push_str(&stderr);
+    }
+    Ok(truncate_output(text, output.status.success()))
+}
+
+fn execute_read(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+    let path = required_path(&call.args)?;
+    let full = join_workspace(&config.workspace_dir, &path)?;
+    let meta = std::fs::metadata(&full)?;
+    if meta.len() > READ_CAP {
+        return Err(NtBotError::Invalid(format!(
+            "file too large ({} > 512KiB)",
+            meta.len()
+        )));
+    }
+    let content = std::fs::read_to_string(&full)?;
+    Ok(truncate_output(content, true))
+}
+
+fn execute_write(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+    let path = required_path(&call.args)?;
+    let Some(content) = call.args.get("content").and_then(|v| v.as_str()) else {
+        return Err(NtBotError::Invalid("write_file requires {content}".to_owned()));
+    };
+    if content.len() > WRITE_CAP {
+        return Err(NtBotError::Invalid("content exceeds 2MiB".to_owned()));
+    }
+    let full = join_workspace(&config.workspace_dir, &path)?;
+    if let Some(parent) = full.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&full, content)?;
+    Ok(ToolResult {
+        ok: true,
+        output: format!("wrote {} bytes", content.len()),
+        truncated: false,
+    })
+}
+
+fn execute_edit(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+    let path = required_path(&call.args)?;
+    let (Some(old), Some(new)) = (
+        call.args.get("old").and_then(|v| v.as_str()),
+        call.args.get("new").and_then(|v| v.as_str()),
+    ) else {
+        return Err(NtBotError::Invalid("edit_file requires {old,new}".to_owned()));
+    };
+    let full = join_workspace(&config.workspace_dir, &path)?;
+    let content = std::fs::read_to_string(&full)?;
+    let matches = content.matches(old).count();
+    if matches != 1 {
+        return Err(NtBotError::Invalid(format!(
+            "edit needs exactly 1 match, found {matches}"
+        )));
+    }
+    let updated = content.replacen(old, new, 1);
+    if updated.len() > WRITE_CAP {
+        return Err(NtBotError::Invalid("result exceeds 2MiB".to_owned()));
+    }
+    std::fs::write(&full, updated)?;
+    Ok(ToolResult {
+        ok: true,
+        output: "edited 1 occurrence".to_owned(),
+        truncated: false,
+    })
+}
+
+fn required_path(args: &serde_json::Value) -> Result<String, NtBotError> {
+    args.get("path")
+        .or_else(|| args.get("file"))
+        .and_then(|v| v.as_str())
+        .map(str::to_owned)
+        .ok_or_else(|| NtBotError::Invalid("file tool requires {path}".to_owned()))
+}
+
+/// workspace jail 双保险 (策略层已判一次, 执行层再拼一次, 防 TOCTOU 式误用).
+fn join_workspace(workspace: &Path, rel: &str) -> Result<std::path::PathBuf, NtBotError> {
+    if rel.trim().is_empty() || rel.starts_with('/') || rel.starts_with('~') || rel.contains("..") {
+        return Err(NtBotError::Denied {
+            rule: "workspace-jail".to_owned(),
+            reason: "path escapes workspace".to_owned(),
+        });
+    }
+    Ok(workspace.join(rel))
+}
+
+fn truncate_output(text: String, ok: bool) -> ToolResult {
+    if text.len() <= OUTPUT_CAP {
+        return ToolResult {
+            ok,
+            output: text,
+            truncated: false,
+        };
+    }
+    let mut cut = OUTPUT_CAP;
+    while cut > 0 && !text.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    let output = if let Some(safe) = text.get(..cut) {
+        format!("{safe}…[truncated]")
+    } else {
+        "…[truncated]".to_owned()
+    };
+    ToolResult {
+        ok,
+        output,
+        truncated: true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_local_turn;
+    use crate::nt_config::NeobotConfig;
+    use crate::nt_engine::LocalEchoEngine;
+    use crate::nt_store::NeobotStore;
+
+    #[test]
+    fn echo_run_completes_and_persists() {
+        let dir = std::env::temp_dir().join("neobot-agent-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        let config = NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: dir.join("workspace"),
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 4,
+            engine: crate::nt_config::EngineKind::Echo,
+        };
+        config.validate().expect("validate");
+        let store = NeobotStore::open(":memory:").expect("open");
+        let status = run_local_turn(&store, &config, &LocalEchoEngine, "t", "hello").expect("run");
+        assert_eq!(status, crate::nt_types::TurnStatus::Done);
+        assert_eq!(store.list_tasks(10).expect("list").len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
