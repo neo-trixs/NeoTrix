@@ -7,15 +7,14 @@
 //! - 会话状态
 //! - 多文件协调
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 上下文管理器
 pub struct ContextManager {
     windows: HashMap<String, ContextWindow>,
     priority_queue: Vec<ContextItem>,
-    #[allow(dead_code)]
-    compression_engine: CompressionEngine,
+    // (compression_engine 写-only 且 CompressionEngine 零引用, 已删除)
     config: ContextConfig,
     stats: ContextStats,
     /// Paged KV virtualization state (KVMem CSA2).
@@ -262,9 +261,6 @@ impl ContextManager {
         Self {
             windows: HashMap::new(),
             priority_queue: Vec::new(),
-            compression_engine: CompressionEngine {
-                compression_map: HashMap::new(),
-            },
             config,
             stats: ContextStats {
                 total_windows: 0,
@@ -356,7 +352,12 @@ impl ContextManager {
     }
 
     /// Get the recommended memory tier for a page based on access recency.
-    pub fn page_tier(&self, page_index: usize, last_access_step: usize, current_step: usize) -> MemoryTier {
+    pub fn page_tier(
+        &self,
+        page_index: usize,
+        last_access_step: usize,
+        current_step: usize,
+    ) -> MemoryTier {
         let age = current_step.saturating_sub(last_access_step);
         if self.paged_kv.working_set.retained.contains(&page_index) {
             MemoryTier::Gpu
@@ -389,7 +390,9 @@ impl ContextManager {
     pub fn add_item(&mut self, window_id: &str, item: ContextItem) -> Result<(), String> {
         // Check if compression is needed (immutable borrow, scoped)
         let need_compress = {
-            let window = self.windows.get(window_id)
+            let window = self
+                .windows
+                .get(window_id)
                 .ok_or_else(|| format!("Window {} not found", window_id))?;
             window.current_size + item.token_count > window.max_size
         };
@@ -404,9 +407,12 @@ impl ContextManager {
 
         // Now push the item (no outstanding borrows on self.windows)
         self.priority_queue.push(item.clone());
-        self.priority_queue.sort_by(|a, b| b.priority.cmp(&a.priority));
+        self.priority_queue
+            .sort_by(|a, b| b.priority.cmp(&a.priority));
 
-        let window = self.windows.get_mut(window_id)
+        let window = self
+            .windows
+            .get_mut(window_id)
             .ok_or_else(|| format!("Window {} not found", window_id))?;
         let token_count = item.token_count;
         window.items.push(item);
@@ -419,7 +425,9 @@ impl ContextManager {
 
     /// 压缩窗口
     fn compress_window(&mut self, window_id: &str) -> Result<(), String> {
-        let window = self.windows.get_mut(window_id)
+        let window = self
+            .windows
+            .get_mut(window_id)
             .ok_or_else(|| format!("Window {} not found", window_id))?;
 
         // 移除低优先级的非固定项
@@ -454,7 +462,9 @@ impl ContextManager {
     /// 搜索上下文
     pub(crate) fn _search_context(&self, window_id: &str, query: &str) -> Vec<&ContextItem> {
         if let Some(window) = self.windows.get(window_id) {
-            window.items.iter()
+            window
+                .items
+                .iter()
                 .filter(|item| item.content.contains(query))
                 .collect()
         } else {
@@ -463,7 +473,11 @@ impl ContextManager {
     }
 
     /// 协调多文件编辑
-    pub(crate) fn _coordinate_multi_file_edit(&self, files: Vec<FileContext>, edit_plan: Vec<EditOperation>) -> MultiFileCoordination {
+    pub(crate) fn _coordinate_multi_file_edit(
+        &self,
+        files: Vec<FileContext>,
+        edit_plan: Vec<EditOperation>,
+    ) -> MultiFileCoordination {
         let dependencies = Vec::new();
         let mut conflicts = Vec::new();
 
@@ -476,7 +490,10 @@ impl ContextManager {
                         conflicts.push(EditConflict {
                             file_path: op1.file_path.clone(),
                             conflict_type: "overlapping_range".into(),
-                            range: (op1.start_line.max(op2.start_line), op1.end_line.min(op2.end_line)),
+                            range: (
+                                op1.start_line.max(op2.start_line),
+                                op1.end_line.min(op2.end_line),
+                            ),
                             resolution: None,
                         });
                     }
@@ -509,7 +526,10 @@ mod context_strategy_tests {
     #[test]
     fn test_default_strategy_is_compaction() {
         let mgr = make_manager();
-        assert!(matches!(mgr.current_strategy(), ContextStrategy::Compaction));
+        assert!(matches!(
+            mgr.current_strategy(),
+            ContextStrategy::Compaction
+        ));
     }
 
     #[test]
@@ -524,7 +544,10 @@ mod context_strategy_tests {
     fn test_stay_compaction_below_threshold() {
         let mut mgr = make_manager();
         mgr.update_token_count(100_000);
-        assert!(matches!(mgr.current_strategy(), ContextStrategy::Compaction));
+        assert!(matches!(
+            mgr.current_strategy(),
+            ContextStrategy::Compaction
+        ));
     }
 
     #[test]
@@ -536,7 +559,10 @@ mod context_strategy_tests {
 
         // Drop below half threshold → switch back
         mgr.update_token_count(100_000);
-        assert!(matches!(mgr.current_strategy(), ContextStrategy::Compaction));
+        assert!(matches!(
+            mgr.current_strategy(),
+            ContextStrategy::Compaction
+        ));
     }
 
     #[test]

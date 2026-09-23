@@ -4,15 +4,16 @@
 //! 核心流程: Takeover 检测 → 控制信号生成 → 交替序列构建 → SFT + CSPO (Segmented GRPO + Control Masking)
 //! 对接现有: nt_core_prm (λ-GRPO), nt_core_policy (E8Policy), nt_core_ttc (EffortTier), gold_standard
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
-use crate::l5_cognition::nt_core_prm::{StepGrpoConfig, ProcessScore, AgentTrajectory, TrajectoryStep};
-use crate::l5_cognition::nt_core_policy::E8Policy;
-use crate::l5_cognition::nt_core_ttc::EffortTier;
 use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 use crate::l0_substrate::nt_core_traits::SpecialistType;
 use crate::l5_cognition::l1_facade::ConsciousnessGoldStandard;
+use crate::l5_cognition::nt_core_policy::E8Policy;
+use crate::l5_cognition::nt_core_prm::{
+    AgentTrajectory, ProcessScore, StepGrpoConfig, TrajectoryStep,
+};
+use crate::l5_cognition::nt_core_ttc::EffortTier;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// 控制类型 (MERA 同款)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -30,17 +31,17 @@ pub enum _ControlType {
 /// Takeover 点 (控制介入位置)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _TakeoverPoint {
-    pub step_idx: usize,           // 在 reasoning trace 中的步骤索引
+    pub step_idx: usize, // 在 reasoning trace 中的步骤索引
     pub control_type: _ControlType,
-    pub confidence: f64,           // 检测置信度 0~1
-    pub trigger_text: String,      // 触发的标记词片段
+    pub confidence: f64,      // 检测置信度 0~1
+    pub trigger_text: String, // 触发的标记词片段
 }
 
 /// 控制指令 (生成的 meta-cognitive guidance)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _ControlSignal {
     pub takeover_point: _TakeoverPoint,
-    pub instruction: String,       // 自然语言控制指令
+    pub instruction: String,                    // 自然语言控制指令
     pub target_effort_tier: Option<EffortTier>, // 建议的努力分层调整
     pub target_strategy: Option<String>,        // 建议的推理策略
 }
@@ -59,16 +60,16 @@ pub struct AlternatingSequence {
     pub task: String,
     pub segments: Vec<_AlternatingSegment>,
     pub final_answer: String,
-    pub outcome_quality: f64,      // 0~1 (gold_standard 或 judge)
+    pub outcome_quality: f64, // 0~1 (gold_standard 或 judge)
     pub effort_tier: EffortTier,
 }
 
 /// 控制段奖励 (CSPO 核心)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _ControlReward {
-    pub semantic_score: f64,       // 语义一致性 (vs 参考控制目标)
-    pub format_score: f64,         // 格式规范性 (<think>...</think> 等)
-    pub total: f64,                // semantic + format
+    pub semantic_score: f64, // 语义一致性 (vs 参考控制目标)
+    pub format_score: f64,   // 格式规范性 (<think>...</think> 等)
+    pub total: f64,          // semantic + format
 }
 
 /// Takeover 检测器
@@ -84,16 +85,50 @@ pub struct _TakeoverDetector {
 
 #[async_trait::async_trait]
 pub trait _TakeoverVerifier: Send + Sync {
-    async fn verify(&self, trace_segment: &str, candidate_type: _ControlType) -> Result<f64, String>;
+    async fn verify(
+        &self,
+        trace_segment: &str,
+        candidate_type: _ControlType,
+    ) -> Result<f64, String>;
 }
 
 impl Default for _TakeoverDetector {
     fn default() -> Self {
         Self {
-            backtrack_markers: vec!["wait", "hmm", "let me rethink", "on second thought", "actually", "reconsider", "backtrack", "revise"],
-            strategy_switch_markers: vec!["alternatively", "let me try a different approach", "switch to", "change strategy", "decompose", "first principles"],
-            self_verify_markers: vec!["verify", "check", "validate", "confirm", "self-correct", "proof"],
-            early_stop_markers: vec!["therefore", "thus", "conclude", "final answer", "sufficient", "confident"],
+            backtrack_markers: vec![
+                "wait",
+                "hmm",
+                "let me rethink",
+                "on second thought",
+                "actually",
+                "reconsider",
+                "backtrack",
+                "revise",
+            ],
+            strategy_switch_markers: vec![
+                "alternatively",
+                "let me try a different approach",
+                "switch to",
+                "change strategy",
+                "decompose",
+                "first principles",
+            ],
+            self_verify_markers: vec![
+                "verify",
+                "check",
+                "validate",
+                "confirm",
+                "self-correct",
+                "proof",
+            ],
+            early_stop_markers: vec![
+                "therefore",
+                "thus",
+                "conclude",
+                "final answer",
+                "sufficient",
+                "confident",
+            ],
             llm_verifier: None,
         }
     }
@@ -112,32 +147,44 @@ impl _TakeoverDetector {
         // 启发式扫描
         for (idx, step) in steps.iter().enumerate() {
             let step_lower = step.text.to_lowercase();
-            
+
             let mut best_type = None;
             let mut best_conf = 0.0;
 
             for marker in &self.backtrack_markers {
                 if step_lower.contains(marker) {
                     let conf = self.score_marker(marker, &step_lower);
-                    if conf > best_conf { best_conf = conf; best_type = Some(_ControlType::Backtrack); }
+                    if conf > best_conf {
+                        best_conf = conf;
+                        best_type = Some(_ControlType::Backtrack);
+                    }
                 }
             }
             for marker in &self.strategy_switch_markers {
                 if step_lower.contains(marker) {
                     let conf = self.score_marker(marker, &step_lower);
-                    if conf > best_conf { best_conf = conf; best_type = Some(_ControlType::StrategySwitch); }
+                    if conf > best_conf {
+                        best_conf = conf;
+                        best_type = Some(_ControlType::StrategySwitch);
+                    }
                 }
             }
             for marker in &self.self_verify_markers {
                 if step_lower.contains(marker) {
                     let conf = self.score_marker(marker, &step_lower);
-                    if conf > best_conf { best_conf = conf; best_type = Some(_ControlType::SelfVerify); }
+                    if conf > best_conf {
+                        best_conf = conf;
+                        best_type = Some(_ControlType::SelfVerify);
+                    }
                 }
             }
             for marker in &self.early_stop_markers {
                 if step_lower.contains(marker) {
                     let conf = self.score_marker(marker, &step_lower);
-                    if conf > best_conf { best_conf = conf; best_type = Some(_ControlType::EarlyStop); }
+                    if conf > best_conf {
+                        best_conf = conf;
+                        best_type = Some(_ControlType::EarlyStop);
+                    }
                 }
             }
 
@@ -190,16 +237,14 @@ pub struct ReasoningStep {
 pub struct ControlDistiller {
     detector: _TakeoverDetector,
     signal_generator: _ControlSignalGenerator,
-    #[allow(dead_code)]
-    gold_standard: Arc<ConsciousnessGoldStandard>,
+    // (gold_standard 写-only 已删除; new 参数下划线化保持 engine_core 调用点兼容)
 }
 
 impl ControlDistiller {
-    pub fn new(gold_standard: Arc<ConsciousnessGoldStandard>) -> Self {
+    pub fn new(_gold_standard: Arc<ConsciousnessGoldStandard>) -> Self {
         Self {
             detector: _TakeoverDetector::default(),
             signal_generator: _ControlSignalGenerator::default(),
-            gold_standard,
         }
     }
 
@@ -219,7 +264,7 @@ impl ControlDistiller {
     ) -> Result<AlternatingSequence, _DistillError> {
         // 1. Takeover 检测
         let takeovers = self.detector.detect(trace, steps);
-        
+
         // 2. 生成控制信号
         let mut signals = Vec::new();
         for tp in &takeovers {
@@ -262,7 +307,9 @@ impl ControlDistiller {
                 });
             }
             // control: 插入控制指令
-            segments.push(_AlternatingSegment::Control { signal: signal.clone() });
+            segments.push(_AlternatingSegment::Control {
+                signal: signal.clone(),
+            });
             last_reason_end = tp.step_idx + 1;
         }
 
@@ -286,9 +333,7 @@ impl ControlDistiller {
 /// 控制信号生成器 (few-shot LLM)
 #[derive(Default)]
 pub struct _ControlSignalGenerator {
-    // 模板: control_type -> (system_prompt, few_shot_examples)
-    #[allow(dead_code)]
-    templates: HashMap<_ControlType, (&'static str, Vec<(&'static str, &'static str)>)>,
+    // (templates 写-only 且零构造, 已删除; Default 派生不受影响)
 }
 
 impl _ControlSignalGenerator {
@@ -297,7 +342,7 @@ impl _ControlSignalGenerator {
         task: &str,
         trace: &str,
         takeover: &_TakeoverPoint,
-        ) -> Result<_ControlSignal, _DistillError> {
+    ) -> Result<_ControlSignal, _DistillError> {
         let (instruction, target_effort, target_strategy) = match takeover.control_type {
             _ControlType::Backtrack => (
                 format!("Backtrack to step {} and try a different decomposition. The previous path led to: {}", 
@@ -342,10 +387,16 @@ impl _ControlSignalGenerator {
 
     fn suggest_strategy(&self, task: &str) -> String {
         let lower = task.to_lowercase();
-        if lower.contains("math") || lower.contains("calculate") { "decompose" }
-        else if lower.contains("code") || lower.contains("program") { "step_by_step" }
-        else if lower.contains("reason") || lower.contains("logic") { "first_principles" }
-        else { "decompose" }.to_string()
+        if lower.contains("math") || lower.contains("calculate") {
+            "decompose"
+        } else if lower.contains("code") || lower.contains("program") {
+            "step_by_step"
+        } else if lower.contains("reason") || lower.contains("logic") {
+            "first_principles"
+        } else {
+            "decompose"
+        }
+        .to_string()
     }
 }
 
@@ -380,15 +431,25 @@ impl ControlTrainer {
                 }
             }
             // reason segments 正常通过 PRM 学习 (复用现有 learn_from_trace)
-            reason_updates += seq.segments.iter().filter(|s| matches!(s, _AlternatingSegment::Reason {..})).count();
+            reason_updates += seq
+                .segments
+                .iter()
+                .filter(|s| matches!(s, _AlternatingSegment::Reason { .. }))
+                .count();
         }
 
-        Ok(SftReport { control_updates, reason_updates })
+        Ok(SftReport {
+            control_updates,
+            reason_updates,
+        })
     }
 
     /// CSPO: Control-Segment Policy Optimization (阶段 2)
     /// 核心: Segmented GRPO + Control Reward + Control Masking
-    pub fn csppo(&mut self, sequences: &[AlternatingSequence]) -> Result<CsppoReport, _DistillError> {
+    pub fn csppo(
+        &mut self,
+        sequences: &[AlternatingSequence],
+    ) -> Result<CsppoReport, _DistillError> {
         let mut total_control_reward = 0.0;
         let mut masked_steps = 0;
 
@@ -396,17 +457,20 @@ impl ControlTrainer {
         // 这里简化: 每个 sequence 视为一组，使用其 outcome_quality 作为 reward 基线
         for seq in sequences {
             // 1. Partition into reasoning-control segments
-            let control_segments: Vec<_> = seq.segments.iter()
+            let control_segments: Vec<_> = seq
+                .segments
+                .iter()
                 .filter_map(|s| match s {
                     _AlternatingSegment::Control { signal } => Some(signal),
                     _ => None,
-                }).collect();
+                })
+                .collect();
 
             // 2. Segment-wise reward (Control Reward = semantic + format)
             for signal in &control_segments {
                 let reward = self.compute_control_reward(signal, seq.outcome_quality)?;
                 total_control_reward += reward.total;
-                
+
                 // 3. Control Masking: 只对 control tokens 更新策略
                 // 这里通过 ProcessScore 的 attribution_tags="control" 实现 masking
                 self.apply_masked_policy_update(seq, signal, reward.total)?;
@@ -417,10 +481,17 @@ impl ControlTrainer {
             // 由 nt_core_prm 处理，此处不重复
         }
 
-        Ok(CsppoReport { total_control_reward, masked_steps })
+        Ok(CsppoReport {
+            total_control_reward,
+            masked_steps,
+        })
     }
 
-    fn apply_control_to_policy(&mut self, seq: &AlternatingSequence, signal: &_ControlSignal) -> Result<(), _DistillError> {
+    fn apply_control_to_policy(
+        &mut self,
+        seq: &AlternatingSequence,
+        signal: &_ControlSignal,
+    ) -> Result<(), _DistillError> {
         // 将 control_type 映射为 E8 因子 delta (复用 E8Policy::learn_from_scores)
         let (tag, delta) = match signal.takeover_point.control_type {
             _ControlType::Backtrack => ("backtrack", 0.15),
@@ -440,15 +511,32 @@ impl ControlTrainer {
         Ok(())
     }
 
-    fn compute_control_reward(&self, signal: &_ControlSignal, outcome_quality: f64) -> Result<_ControlReward, _DistillError> {
+    fn compute_control_reward(
+        &self,
+        signal: &_ControlSignal,
+        outcome_quality: f64,
+    ) -> Result<_ControlReward, _DistillError> {
         // 语义奖励: 简化用 outcome_quality 代理 (实际需 LLM judge 对比参考控制目标)
         let semantic = outcome_quality * 0.7;
         // 格式奖励: control 指令是否包含标准标记
-        let format = if signal.instruction.contains("<think>") || signal.instruction.len() > 20 { 0.3 } else { 0.1 };
-        Ok(_ControlReward { semantic_score: semantic, format_score: format, total: semantic + format })
+        let format = if signal.instruction.contains("<think>") || signal.instruction.len() > 20 {
+            0.3
+        } else {
+            0.1
+        };
+        Ok(_ControlReward {
+            semantic_score: semantic,
+            format_score: format,
+            total: semantic + format,
+        })
     }
 
-    fn apply_masked_policy_update(&mut self, seq: &AlternatingSequence, signal: &_ControlSignal, advantage: f64) -> Result<(), _DistillError> {
+    fn apply_masked_policy_update(
+        &mut self,
+        seq: &AlternatingSequence,
+        signal: &_ControlSignal,
+        advantage: f64,
+    ) -> Result<(), _DistillError> {
         // Control Masking: 只更新 control 相关的因子
         // 通过 attribution_tags="control" 实现 (E8Policy 已支持 factorized learning)
         let process_score = ProcessScore {
@@ -456,7 +544,10 @@ impl ControlTrainer {
             score: advantage,
             confidence: signal.takeover_point.confidence,
             criteria: vec![],
-            attribution_tags: vec!["control".to_string(), format!("{:?}", signal.takeover_point.control_type).to_lowercase()],
+            attribution_tags: vec![
+                "control".to_string(),
+                format!("{:?}", signal.takeover_point.control_type).to_lowercase(),
+            ],
         };
         let trajectory = Self::build_trajectory(seq);
         self.policy.learn_from_scores(&trajectory, &[process_score]);
@@ -549,10 +640,24 @@ mod tests {
     fn test_takeover_detection_backtrack() {
         let detector = _TakeoverDetector::default();
         let steps = vec![
-            ReasoningStep { step_idx: 0, text: "Let me solve this step by step".into(), e8_mode: None, token_count: 20 },
-            ReasoningStep { step_idx: 1, text: "Wait, I made an error in the calculation".into(), e8_mode: None, token_count: 30 },
+            ReasoningStep {
+                step_idx: 0,
+                text: "Let me solve this step by step".into(),
+                e8_mode: None,
+                token_count: 20,
+            },
+            ReasoningStep {
+                step_idx: 1,
+                text: "Wait, I made an error in the calculation".into(),
+                e8_mode: None,
+                token_count: 30,
+            },
         ];
-        let trace = steps.iter().map(|s| s.text.as_str()).collect::<Vec<_>>().join(" ");
+        let trace = steps
+            .iter()
+            .map(|s| s.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
         let takeovers = detector.detect(&trace, &steps);
         assert_eq!(takeovers.len(), 1);
         assert_eq!(takeovers[0].control_type, _ControlType::Backtrack);
@@ -563,10 +668,24 @@ mod tests {
     fn test_takeover_detection_strategy_switch() {
         let detector = _TakeoverDetector::default();
         let steps = vec![
-            ReasoningStep { step_idx: 0, text: "First I'll try algebraic manipulation".into(), e8_mode: None, token_count: 20 },
-            ReasoningStep { step_idx: 1, text: "Alternatively, let me use a geometric approach".into(), e8_mode: None, token_count: 25 },
+            ReasoningStep {
+                step_idx: 0,
+                text: "First I'll try algebraic manipulation".into(),
+                e8_mode: None,
+                token_count: 20,
+            },
+            ReasoningStep {
+                step_idx: 1,
+                text: "Alternatively, let me use a geometric approach".into(),
+                e8_mode: None,
+                token_count: 25,
+            },
         ];
-        let trace = steps.iter().map(|s| s.text.as_str()).collect::<Vec<_>>().join(" ");
+        let trace = steps
+            .iter()
+            .map(|s| s.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
         let takeovers = detector.detect(&trace, &steps);
         assert_eq!(takeovers.len(), 1);
         assert_eq!(takeovers[0].control_type, _ControlType::StrategySwitch);
@@ -575,7 +694,12 @@ mod tests {
     #[test]
     fn test_control_signal_generation() {
         let gen = _ControlSignalGenerator::default();
-        let tp = _TakeoverPoint { step_idx: 2, control_type: _ControlType::Backtrack, confidence: 0.9, trigger_text: "wait".into() };
+        let tp = _TakeoverPoint {
+            step_idx: 2,
+            control_type: _ControlType::Backtrack,
+            confidence: 0.9,
+            trigger_text: "wait".into(),
+        };
         let signal = gen.generate("test task", "trace", &tp).unwrap();
         assert!(signal.instruction.contains("Backtrack"));
         assert_eq!(signal.target_effort_tier, Some(EffortTier::High));
@@ -586,16 +710,41 @@ mod tests {
         let gold = Arc::new(ConsciousnessGoldStandard::new());
         let distiller = ControlDistiller::new(gold);
         let steps = vec![
-            ReasoningStep { step_idx: 0, text: "Step 1".into(), e8_mode: None, token_count: 10 },
-            ReasoningStep { step_idx: 1, text: "Wait, rethink".into(), e8_mode: None, token_count: 15 },
-            ReasoningStep { step_idx: 2, text: "Step 2 corrected".into(), e8_mode: None, token_count: 12 },
+            ReasoningStep {
+                step_idx: 0,
+                text: "Step 1".into(),
+                e8_mode: None,
+                token_count: 10,
+            },
+            ReasoningStep {
+                step_idx: 1,
+                text: "Wait, rethink".into(),
+                e8_mode: None,
+                token_count: 15,
+            },
+            ReasoningStep {
+                step_idx: 2,
+                text: "Step 2 corrected".into(),
+                e8_mode: None,
+                token_count: 12,
+            },
         ];
         let trace = "Step 1 Wait, rethink Step 2 corrected";
-        let seq = distiller.extract_alternating_sequence("t1".into(), "task", trace, &steps, "answer").unwrap();
-        
+        let seq = distiller
+            .extract_alternating_sequence("t1".into(), "task", trace, &steps, "answer")
+            .unwrap();
+
         // 应有: Reason(0), Reason(1), Control(Backtrack), Reason(2)
-        let reason_count = seq.segments.iter().filter(|s| matches!(s, _AlternatingSegment::Reason{..})).count();
-        let control_count = seq.segments.iter().filter(|s| matches!(s, _AlternatingSegment::Control{..})).count();
+        let reason_count = seq
+            .segments
+            .iter()
+            .filter(|s| matches!(s, _AlternatingSegment::Reason { .. }))
+            .count();
+        let control_count = seq
+            .segments
+            .iter()
+            .filter(|s| matches!(s, _AlternatingSegment::Control { .. }))
+            .count();
         assert_eq!(reason_count, 3);
         assert_eq!(control_count, 1);
         assert!(seq.outcome_quality >= 0.0);
@@ -604,12 +753,29 @@ mod tests {
     fn build_training_sequence(gold: Arc<ConsciousnessGoldStandard>) -> AlternatingSequence {
         let distiller = ControlDistiller::new(gold);
         let steps = vec![
-            ReasoningStep { step_idx: 0, text: "Step 1".into(), e8_mode: None, token_count: 10 },
-            ReasoningStep { step_idx: 1, text: "Wait, rethink".into(), e8_mode: None, token_count: 15 },
-            ReasoningStep { step_idx: 2, text: "Step 2 corrected".into(), e8_mode: None, token_count: 12 },
+            ReasoningStep {
+                step_idx: 0,
+                text: "Step 1".into(),
+                e8_mode: None,
+                token_count: 10,
+            },
+            ReasoningStep {
+                step_idx: 1,
+                text: "Wait, rethink".into(),
+                e8_mode: None,
+                token_count: 15,
+            },
+            ReasoningStep {
+                step_idx: 2,
+                text: "Step 2 corrected".into(),
+                e8_mode: None,
+                token_count: 12,
+            },
         ];
         let trace = "Step 1 Wait, rethink Step 2 corrected";
-        distiller.extract_alternating_sequence("t1".into(), "task", trace, &steps, "answer").unwrap()
+        distiller
+            .extract_alternating_sequence("t1".into(), "task", trace, &steps, "answer")
+            .unwrap()
     }
 
     #[test]
@@ -618,8 +784,14 @@ mod tests {
         let mut trainer = ControlTrainer::new(E8Policy::default(), gold.clone());
         let seq = build_training_sequence(gold);
         let report = trainer.sft(&[seq]).expect("SFT 训练应成功执行 (非空壳)");
-        assert!(report.control_updates >= 1, "SFT 应至少执行 1 次 control 策略更新");
-        assert!(report.reason_updates >= 1, "SFT 应至少识别 1 个 reason segment");
+        assert!(
+            report.control_updates >= 1,
+            "SFT 应至少执行 1 次 control 策略更新"
+        );
+        assert!(
+            report.reason_updates >= 1,
+            "SFT 应至少识别 1 个 reason segment"
+        );
     }
 
     #[test]
@@ -628,7 +800,13 @@ mod tests {
         let mut trainer = ControlTrainer::new(E8Policy::default(), gold.clone());
         let seq = build_training_sequence(gold);
         let report = trainer.csppo(&[seq]).expect("CSPO 训练应成功执行 (非空壳)");
-        assert!(report.masked_steps >= 1, "CSPO 应至少执行 1 步 masked 策略更新");
-        assert!(report.total_control_reward.is_finite(), "CSPO control reward 应有限");
+        assert!(
+            report.masked_steps >= 1,
+            "CSPO 应至少执行 1 步 masked 策略更新"
+        );
+        assert!(
+            report.total_control_reward.is_finite(),
+            "CSPO control reward 应有限"
+        );
     }
 }

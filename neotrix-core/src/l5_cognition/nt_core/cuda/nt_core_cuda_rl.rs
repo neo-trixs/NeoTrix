@@ -6,15 +6,14 @@
 //! - attention routing 集成
 //! - 自适应优化能力
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// CUDA Agent RL优化器
 pub struct _CUDAAgentRLOptimizer {
     strategies: Vec<_RLStrategy>,
     curriculum: Vec<_CurriculumItem>,
-    #[allow(dead_code)]
-    optimization_history: Vec<OptimizationResult>,
+    // (optimization_history 写-only 已删除)
     config: _RLOptimizerConfig,
     stats: _RLOptimizerStats,
 }
@@ -100,7 +99,6 @@ impl _CUDAAgentRLOptimizer {
         Self {
             strategies: Vec::new(),
             curriculum: Vec::new(),
-            optimization_history: Vec::new(),
             config: _RLOptimizerConfig::default(),
             stats: _RLOptimizerStats {
                 total_strategies: 0,
@@ -120,7 +118,11 @@ impl _CUDAAgentRLOptimizer {
 
     /// 选择最佳策略
     pub(crate) fn _select_best_strategy(&self) -> Option<&_RLStrategy> {
-        self.strategies.iter().max_by(|a, b| a.performance.partial_cmp(&b.performance).unwrap_or(std::cmp::Ordering::Equal))
+        self.strategies.iter().max_by(|a, b| {
+            a.performance
+                .partial_cmp(&b.performance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// 探索新策略
@@ -136,7 +138,11 @@ impl _CUDAAgentRLOptimizer {
 
     /// 更新策略性能
     pub(crate) fn _update_performance(&mut self, strategy_id: &str, reward: f64) {
-        if let Some(strategy) = self.strategies.iter_mut().find(|s| s.strategy_id == strategy_id) {
+        if let Some(strategy) = self
+            .strategies
+            .iter_mut()
+            .find(|s| s.strategy_id == strategy_id)
+        {
             strategy.performance = strategy.performance * 0.9 + reward * 0.1;
             strategy.usage_count += 1;
             self.stats.total_reward += reward;
