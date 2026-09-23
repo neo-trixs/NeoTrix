@@ -181,11 +181,7 @@ pub enum ItemType {
     Error,
 }
 
-/// 压缩引擎
-pub struct CompressionEngine {
-    #[allow(dead_code)]
-    compression_map: HashMap<String, String>,
-}
+// (CompressionEngine 空壳零引用已删除)
 
 /// 上下文统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
