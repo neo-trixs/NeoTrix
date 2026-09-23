@@ -743,7 +743,13 @@ mod tests {
 
     #[test]
     fn test_t06c_override_allow_and_block() {
+        // FullAuto 下游全放行（sandbox/perm 均跳过审批），隔离第 6 步注入点：
+        // 无注入必过（引擎在 FullAuto 全放），有注入则听注入的。
         let mut s = t06c_open_shield();
+        s.set_approval_mode(ApprovalMode::FullAuto);
+        let r = s.check_all("file_write", "/project/test.txt", None, Some(&t06c_action()));
+        assert!(r.is_ok(), "baseline FullAuto must pass: {:?}", r.map(|_| ()));
+
         s.set_approval_override(std::sync::Arc::new(|_| Some(false)));
         let r = s.check_all("file_write", "/project/test.txt", None, Some(&t06c_action()));
         assert!(r.is_ok(), "injected allow must pass: {:?}", r.map(|_| ()));
