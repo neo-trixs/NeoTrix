@@ -7,8 +7,8 @@
 //! - 多语言支持
 //! - 情感驱动响应
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use super::emotion_engine::EmotionEngine;
 use crate::l5_cognition::l1_facade::emotion_state::EmotionLabel;
@@ -19,8 +19,7 @@ pub struct _VTuberEmotionEngine {
     persona: _CharacterPersona,
     feel_engine: EmotionEngine,
     emotion_history: Vec<_EmotionReading>,
-    #[allow(dead_code)]
-    voice_config: _VoiceConfig,
+    // (voice_config 写-only 且 _VoiceConfig 零引用, 一并删除)
 }
 
 /// 角色人格
@@ -97,18 +96,6 @@ pub enum _EmotionSource {
     Inferred,
 }
 
-/// 语音配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct _VoiceConfig {
-    pub tts_provider: String,
-    pub stt_provider: String,
-    pub voice_id: Option<String>,
-    pub language: String,
-    pub speed: f64,
-    pub pitch: f64,
-    pub volume: f64,
-}
-
 /// 情绪调节策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _EmotionRegulation {
@@ -163,15 +150,6 @@ impl _VTuberEmotionEngine {
             persona,
             feel_engine,
             emotion_history: vec![],
-            voice_config: _VoiceConfig {
-                tts_provider: "default".into(),
-                stt_provider: "default".into(),
-                voice_id: None,
-                language: "en".into(),
-                speed: 1.0,
-                pitch: 1.0,
-                volume: 1.0,
-            },
         }
     }
 
@@ -187,7 +165,11 @@ impl _VTuberEmotionEngine {
         // EmotionLabel → _EmotionType 映射
         let emotion = match label {
             EmotionLabel::Joy => {
-                if intensity > 0.7 { _EmotionType::Excited } else { _EmotionType::Happy }
+                if intensity > 0.7 {
+                    _EmotionType::Excited
+                } else {
+                    _EmotionType::Happy
+                }
             }
             EmotionLabel::Sadness => _EmotionType::Sad,
             EmotionLabel::Anger => _EmotionType::Angry,
@@ -294,7 +276,7 @@ impl _VTuberEmotionEngine {
     /// **Not wired** — text-to-speech synthesis requires:
     /// - TTS provider integration (Edge-TTS, ElevenLabs, VITS, Bark)
     /// - Emotion-conditioned prosody (pitch/speed/rhythm modulation)
-    /// - Voice cloning support via _VoiceConfig.voice_id
+    /// - Voice cloning support (voice config removed as unwired)
     /// - Streaming audio output for real-time conversation
     pub fn synthesize_speech(
         &self,

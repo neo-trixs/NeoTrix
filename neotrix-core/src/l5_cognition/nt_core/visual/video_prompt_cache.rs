@@ -142,26 +142,31 @@ impl _VideoPromptCache {
         }
 
         let version = if self.config.versioning {
-            self.entries.values()
+            self.entries
+                .values()
                 .filter(|e| e.prompt == prompt)
                 .map(|e| e.version)
                 .max()
-                .unwrap_or(0) + 1
+                .unwrap_or(0)
+                + 1
         } else {
             1
         };
 
-        self.entries.insert(id.clone(), _PromptCacheEntry {
-            id,
-            prompt: prompt.to_string(),
-            embedding,
-            response: response.to_string(),
-            created_at: Instant::now(),
-            last_accessed: Instant::now(),
-            access_count: 0,
-            version,
-            tags,
-        });
+        self.entries.insert(
+            id.clone(),
+            _PromptCacheEntry {
+                id,
+                prompt: prompt.to_string(),
+                embedding,
+                response: response.to_string(),
+                created_at: Instant::now(),
+                last_accessed: Instant::now(),
+                access_count: 0,
+                version,
+                tags,
+            },
+        );
 
         self.stats.total_entries += 1;
     }
@@ -185,22 +190,7 @@ impl _VideoPromptCache {
         embedding
     }
 
-    /// 查找相似条目
-    #[allow(dead_code)]
-    fn find_similar(&mut self, query_embedding: &[f64]) -> Option<String> {
-        let mut best_score = 0.0;
-        let mut best_id = None;
-
-        for (id, entry) in &self.entries {
-            let similarity = crate::l5_cognition::nt_core_math::cosine_similarity_f64(query_embedding, &entry.embedding);
-            if similarity > best_score && similarity >= self.config.similarity_threshold {
-                best_score = similarity;
-                best_id = Some(id.clone());
-            }
-        }
-
-        best_id
-    }
+    // (find_similar 可变借用版零引用已删除; 统一用 immutable 版 find_similar_id)
 
     /// 查找相似条目 ID (immutable borrow)
     fn find_similar_id(&self, query_embedding: &[f64]) -> Option<String> {
@@ -208,7 +198,10 @@ impl _VideoPromptCache {
         let mut best_id = None;
 
         for (id, entry) in &self.entries {
-            let similarity = crate::l5_cognition::nt_core_math::cosine_similarity_f64(query_embedding, &entry.embedding);
+            let similarity = crate::l5_cognition::nt_core_math::cosine_similarity_f64(
+                query_embedding,
+                &entry.embedding,
+            );
             if similarity > best_score && similarity >= self.config.similarity_threshold {
                 best_score = similarity;
                 best_id = Some(id.clone());
@@ -243,7 +236,11 @@ impl _VideoPromptCache {
             entries.sort_by(|a, b| a.1.access_count.cmp(&b.1.access_count));
 
             let to_remove_count = self.entries.len() - self.config.max_entries + 1000;
-            let keys_to_remove: Vec<_> = entries.iter().take(to_remove_count).map(|(id, _)| (*id).clone()).collect();
+            let keys_to_remove: Vec<_> = entries
+                .iter()
+                .take(to_remove_count)
+                .map(|(id, _)| (*id).clone())
+                .collect();
             for id in keys_to_remove {
                 self.entries.remove(&id);
             }

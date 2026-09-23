@@ -24,8 +24,7 @@ pub struct Game2048 {
     best: u32,
     turn: usize,
     is_terminal: bool,
-    #[allow(dead_code)]
-    seed: u64,
+    // (seed 写-only 已删除; 随机状态由 rng_state 承载, new(seed) 签名不变)
     rng_state: u64,
 }
 
@@ -37,7 +36,6 @@ impl Game2048 {
             best: 0,
             turn: 0,
             is_terminal: false,
-            seed,
             rng_state: seed,
         };
         game.spawn_tile();

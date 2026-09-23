@@ -235,26 +235,7 @@ pub fn scan_for_pattern_in_lazy_init(dir: &Path) -> usize {
 }
 
 // ─── Python scanner helpers ───
-
-/// Scan Python files for a simple pattern match.
-#[allow(dead_code)]
-pub fn scan_python_for_pattern(dir: &Path, pattern: &str) -> usize {
-    let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                continue;
-            }
-            if path.extension().is_some_and(|e| e == "py") {
-                if let Ok(content) = read_source_cached(&path) {
-                    count += content.matches(pattern).count();
-                }
-            }
-        }
-    }
-    count
-}
+// (scan_python_for_pattern 零引用已删除; find系保留 bare_except 等被调函数)
 
 /// Count bare `except:` clauses (not `except Exception:`, `except ValueError:`, etc.)
 pub fn scan_python_for_bare_except(dir: &Path) -> usize {
@@ -879,4 +860,3 @@ pub fn syn_expr_max_depth(expr: &syn::Expr, depth: usize) -> usize {
         _ => depth,
     }
 }
-
