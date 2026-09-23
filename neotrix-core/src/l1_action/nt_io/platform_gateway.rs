@@ -3,7 +3,7 @@
 //! 统一接口适配多平台
 //! 适用于：所有需要多平台集成的场景
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -143,9 +143,7 @@ pub struct PlatformGatewayConfig {
 /// 统一管理多平台集成
 #[derive(Debug)]
 pub struct PlatformGateway {
-    /// 配置
-    #[allow(dead_code)]
-    config: PlatformGatewayConfig,
+    // (config 写-only 且 with_config 零调用, 一并删除; Config 类型保留)
     /// 平台配置列表
     platforms: HashMap<String, PlatformConfig>,
     /// 平台状态
@@ -160,63 +158,43 @@ impl PlatformGateway {
     /// 创建网关
     pub fn new() -> Self {
         Self {
-            config: PlatformGatewayConfig {
-                default_timeout_secs: 300,
-                enable_load_balancing: true,
-                enable_failover: true,
-                max_retries: 3,
-                enable_cache: true,
-                cache_ttl_secs: 300,
-            },
             platforms: HashMap::new(),
             statuses: HashMap::new(),
             capabilities: HashMap::new(),
             history: vec![],
         }
     }
-    
-    /// 使用配置创建
-    pub fn with_config(config: PlatformGatewayConfig) -> Self {
-        Self {
-            config,
-            platforms: HashMap::new(),
-            statuses: HashMap::new(),
-            capabilities: HashMap::new(),
-            history: vec![],
-        }
-    }
-    
+
     /// 注册平台
-    pub fn register_platform(
-        &mut self,
-        config: PlatformConfig,
-        capability: PlatformCapability,
-    ) {
+    pub fn register_platform(&mut self, config: PlatformConfig, capability: PlatformCapability) {
         let id = config.id.clone();
         self.platforms.insert(id.clone(), config);
         self.capabilities.insert(id.clone(), capability);
         self.statuses.insert(id, PlatformStatus::Online);
     }
-    
+
     /// 获取可用平台
     pub fn get_available_platforms(&self, task_type: &str) -> Vec<&PlatformConfig> {
-        self.platforms.values()
+        self.platforms
+            .values()
             .filter(|p| {
                 p.enabled
                     && self.statuses.get(&p.id) == Some(&PlatformStatus::Online)
-                    && self.capabilities.get(&p.id)
+                    && self
+                        .capabilities
+                        .get(&p.id)
                         .map_or(false, |c| c.task_types.contains(&task_type.to_string()))
             })
             .collect()
     }
-    
+
     /// 选择最佳平台
     pub(crate) fn _select_best_platform(&self, task_type: &str) -> Option<&PlatformConfig> {
         let mut available = self.get_available_platforms(task_type);
         available.sort_by(|a, b| b.priority.cmp(&a.priority));
         available.into_iter().next()
     }
-    
+
     /// 发送请求
     pub fn send_request(
         &mut self,
@@ -236,7 +214,7 @@ impl PlatformGateway {
                 };
             }
         };
-        
+
         // not wired: actual platform API call
         let response = PlatformResponse {
             success: false,
@@ -246,19 +224,23 @@ impl PlatformGateway {
             error: Some("not wired: platform API not implemented".to_string()),
             metadata: HashMap::new(),
         };
-        
-        self.history.push((platform_id.to_string(), response.clone()));
+
+        self.history
+            .push((platform_id.to_string(), response.clone()));
         response
     }
-    
+
     /// 带故障转移的请求
     pub(crate) fn _send_request_with_failover(
         &mut self,
         task_type: &str,
         request: &PlatformRequest,
     ) -> PlatformResponse {
-        let platform_ids: Vec<String> = self.get_available_platforms(task_type)
-            .iter().map(|p| p.id.clone()).collect();
+        let platform_ids: Vec<String> = self
+            .get_available_platforms(task_type)
+            .iter()
+            .map(|p| p.id.clone())
+            .collect();
 
         for pid in &platform_ids {
             let response = self.send_request(pid, request.clone());
@@ -266,7 +248,7 @@ impl PlatformGateway {
                 return response;
             }
         }
-        
+
         PlatformResponse {
             success: false,
             task_id: None,
@@ -276,24 +258,28 @@ impl PlatformGateway {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// 获取平台状态
     pub(crate) fn _get_platform_status(&self, platform_id: &str) -> Option<PlatformStatus> {
         self.statuses.get(platform_id).cloned()
     }
-    
+
     /// 更新平台状态
     pub(crate) fn _update_platform_status(&mut self, platform_id: &str, status: PlatformStatus) {
         self.statuses.insert(platform_id.to_string(), status);
     }
-    
+
     /// 获取统计信息
     pub fn statistics(&self) -> GatewayStats {
         let total_platforms = self.platforms.len();
-        let online = self.statuses.values().filter(|s| **s == PlatformStatus::Online).count();
+        let online = self
+            .statuses
+            .values()
+            .filter(|s| **s == PlatformStatus::Online)
+            .count();
         let total_requests = self.history.len();
         let successful = self.history.iter().filter(|(_, r)| r.success).count();
-        
+
         GatewayStats {
             total_platforms,
             online_platforms: online,
@@ -330,11 +316,11 @@ pub type PlatformAdapter = PlatformGateway;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_platform_gateway() {
         let mut gateway = PlatformGateway::new();
-        
+
         gateway.register_platform(
             PlatformConfig {
                 id: "comfyui".to_string(),
@@ -356,10 +342,10 @@ mod tests {
                 supports_batch: true,
             },
         );
-        
+
         let platforms = gateway.get_available_platforms("img2img");
         assert!(!platforms.is_empty());
-        
+
         let stats = gateway.statistics();
         assert_eq!(stats.total_platforms, 1);
         assert_eq!(stats.online_platforms, 1);

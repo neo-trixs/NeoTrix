@@ -12,8 +12,7 @@ const USER_AGENTS: &[&str] = &[
 
 pub struct SessionPool {
     sessions: Arc<Mutex<VecDeque<Fingerprint>>>,
-    #[allow(dead_code)]
-    size: usize,
+    // (size 写-only 已删除; 容量由 new(size) 构造时循环决定, 签名不变)
 }
 
 impl SessionPool {
@@ -24,7 +23,6 @@ impl SessionPool {
         }
         Self {
             sessions: Arc::new(Mutex::new(sessions)),
-            size,
         }
     }
 
@@ -74,7 +72,13 @@ pub struct Fingerprint {
 impl Fingerprint {
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
-        let viewports = [(1440, 900), (1920, 1080), (1366, 768), (1680, 1050), (2560, 1440)];
+        let viewports = [
+            (1440, 900),
+            (1920, 1080),
+            (1366, 768),
+            (1680, 1050),
+            (2560, 1440),
+        ];
         Self {
             user_agent: USER_AGENTS[rng.gen_range(0..USER_AGENTS.len())].to_string(),
             platform: PLATFORMS[rng.gen_range(0..PLATFORMS.len())].to_string(),
@@ -88,7 +92,10 @@ impl Fingerprint {
         let mut args = Vec::new();
         args.push("--disable-blink-features=AutomationControlled".into());
         args.push(format!("--user-agent={}", self.user_agent));
-        args.push(format!("--window-size={},{}", self.viewport.0, self.viewport.1));
+        args.push(format!(
+            "--window-size={},{}",
+            self.viewport.0, self.viewport.1
+        ));
         args.push("--disable-features=ChromeWhatsNewUI,ChromeLabs,ChromeMenu".into());
         args.push("--no-first-run".into());
         args.push("--no-default-nt_world_browse-check".into());
@@ -123,7 +130,11 @@ mod tests {
         let pool: Vec<String> = USER_AGENTS.iter().map(|s| s.to_string()).collect();
         for _ in 0..100 {
             let fp = Fingerprint::random();
-            assert!(pool.contains(&fp.user_agent), "unexpected UA: {}", fp.user_agent);
+            assert!(
+                pool.contains(&fp.user_agent),
+                "unexpected UA: {}",
+                fp.user_agent
+            );
         }
     }
 
@@ -132,7 +143,11 @@ mod tests {
         let pool: Vec<String> = PLATFORMS.iter().map(|s| s.to_string()).collect();
         for _ in 0..50 {
             let fp = Fingerprint::random();
-            assert!(pool.contains(&fp.platform), "unexpected platform: {}", fp.platform);
+            assert!(
+                pool.contains(&fp.platform),
+                "unexpected platform: {}",
+                fp.platform
+            );
         }
     }
 
@@ -159,6 +174,9 @@ mod tests {
         let same = fp1.user_agent == fp2.user_agent
             && fp1.platform == fp2.platform
             && fp1.language == fp2.language;
-        assert!(!same, "highly unlikely that 2 random fingerprints are identical");
+        assert!(
+            !same,
+            "highly unlikely that 2 random fingerprints are identical"
+        );
     }
 }

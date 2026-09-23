@@ -3,7 +3,7 @@
 //! 统一接口适配 LoRA、IP-Adapter、ControlNet 等模型
 //! 适用于：所有需要模型适配的场景
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -101,9 +101,7 @@ pub struct ModelAdapterConfig {
 /// 统一管理 LoRA、IP-Adapter、ControlNet 等模型
 #[derive(Debug)]
 pub struct ModelAdapter {
-    /// 配置
-    #[allow(dead_code)]
-    config: ModelAdapterConfig,
+    // (config 写-only 且 with_config 零调用, 一并删除; ModelAdapterConfig 类型保留)
     /// 已注册的适配器
     adapters: HashMap<String, AdapterConfig>,
     /// 应用历史
@@ -114,36 +112,21 @@ impl ModelAdapter {
     /// 创建适配器
     pub fn new() -> Self {
         Self {
-            config: ModelAdapterConfig {
-                adapter_dir: "./adapters".to_string(),
-                enable_auto_load: true,
-                max_concurrent_loads: 4,
-                cache_size: 100,
-            },
             adapters: HashMap::new(),
             history: vec![],
         }
     }
-    
-    /// 使用配置创建
-    pub fn with_config(config: ModelAdapterConfig) -> Self {
-        Self {
-            config,
-            adapters: HashMap::new(),
-            history: vec![],
-        }
-    }
-    
+
     /// 注册适配器
     pub fn register_adapter(&mut self, adapter: AdapterConfig) {
         self.adapters.insert(adapter.id.clone(), adapter);
     }
-    
+
     /// 获取适配器
     pub fn get_adapter(&self, adapter_id: &str) -> Option<&AdapterConfig> {
         self.adapters.get(adapter_id)
     }
-    
+
     /// 移除适配器
     pub(crate) fn _remove_adapter(&mut self, adapter_id: &str) -> Result<(), String> {
         if self.adapters.remove(adapter_id).is_some() {
@@ -152,7 +135,7 @@ impl ModelAdapter {
             Err("适配器不存在".to_string())
         }
     }
-    
+
     /// 应用 LoRA
     ///
     /// Real implementation needs:
@@ -160,12 +143,7 @@ impl ModelAdapter {
     /// - Apply to the target model's attention layers
     /// - Run inference pipeline (txt2img/img2img) with the adapted model
     /// - Return actual output path from inference pipeline
-    pub fn apply_lora(
-        &mut self,
-        lora_id: &str,
-        input_path: &str,
-        _strength: f32,
-    ) -> AdapterResult {
+    pub fn apply_lora(&mut self, lora_id: &str, input_path: &str, _strength: f32) -> AdapterResult {
         let adapter = self.adapters.get(lora_id);
         let adapter_name = adapter.map(|a| a.name.clone()).unwrap_or_default();
 
@@ -185,7 +163,7 @@ impl ModelAdapter {
         self.history.push(result.clone());
         result
     }
-    
+
     /// 应用 IP-Adapter
     ///
     /// Real implementation needs:
@@ -219,7 +197,7 @@ impl ModelAdapter {
         self.history.push(result.clone());
         result
     }
-    
+
     /// 应用 ControlNet
     ///
     /// Real implementation needs:
@@ -253,24 +231,24 @@ impl ModelAdapter {
         self.history.push(result.clone());
         result
     }
-    
+
     /// 列出所有适配器
     pub fn list_adapters(&self) -> Vec<&AdapterConfig> {
         self.adapters.values().collect()
     }
-    
+
     /// 获取统计信息
     pub fn statistics(&self) -> AdapterStats {
         let total_adapters = self.adapters.len();
-        let by_type: HashMap<String, usize> = self.adapters.values()
-            .fold(HashMap::new(), |mut acc, a| {
+        let by_type: HashMap<String, usize> =
+            self.adapters.values().fold(HashMap::new(), |mut acc, a| {
                 *acc.entry(format!("{:?}", a.model_type)).or_insert(0) += 1;
                 acc
             });
-        
+
         let total_applications = self.history.len();
         let successful = self.history.iter().filter(|r| r.success).count();
-        
+
         AdapterStats {
             total_adapters,
             adapters_by_type: by_type,
@@ -307,11 +285,11 @@ pub type ConsistencyAdapter = ModelAdapter;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_model_adapter() {
         let mut adapter = ModelAdapter::new();
-        
+
         adapter.register_adapter(AdapterConfig {
             id: "lora_001".to_string(),
             name: "测试LoRA".to_string(),
@@ -321,13 +299,13 @@ mod tests {
             enabled: true,
             params: HashMap::new(),
         });
-        
+
         let result = adapter.apply_lora("lora_001", "/input/test.png", 0.8);
         // LoRA is not wired — expect explicit failure, not fabricated success
         assert!(!result.success);
         assert!(result.error.is_some());
         assert!(result.error.unwrap().contains("not yet wired"));
-        
+
         let stats = adapter.statistics();
         assert_eq!(stats.total_adapters, 1);
         assert_eq!(stats.total_applications, 1);

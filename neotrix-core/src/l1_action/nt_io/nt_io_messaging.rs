@@ -8,14 +8,13 @@
 //! 模板引擎: 渲染 {{variable}} 占位符
 //! 会话管理: 按渠道+联系人聚合消息
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Deserialize, Serialize};
 
 use crate::l1_action::traits::{
-    L1Capability, MessagingProvider, CapabilityCategory, ConstellationLevel,
-    CapabilityHealth, CapabilityStats, CapabilityError,
-    Message, MessageStatus,
+    CapabilityCategory, CapabilityError, CapabilityHealth, CapabilityStats, ConstellationLevel,
+    L1Capability, Message, MessageStatus, MessagingProvider,
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -127,7 +126,8 @@ impl MessageTemplate {
     pub fn render(&self, vars: &HashMap<String, String>) -> Result<String, String> {
         let mut result = self.body.clone();
         for var in &self.variables {
-            let value = vars.get(&var.name)
+            let value = vars
+                .get(&var.name)
                 .or(var.default.as_ref())
                 .filter(|_| var.required)
                 .ok_or_else(|| format!("Missing required variable: {}", var.name))?;
@@ -153,7 +153,12 @@ pub struct WhatsAppProvider {
 }
 
 impl WhatsAppProvider {
-    pub fn new(api_url: &str, access_token: &str, phone_number_id: &str, business_account_id: &str) -> Self {
+    pub fn new(
+        api_url: &str,
+        access_token: &str,
+        phone_number_id: &str,
+        business_account_id: &str,
+    ) -> Self {
         Self {
             id: format!("messaging.whatsapp.{}", phone_number_id),
             api_url: api_url.to_string(),
@@ -171,20 +176,33 @@ impl WhatsAppProvider {
 }
 
 impl L1Capability for WhatsAppProvider {
-    fn capability_id(&self) -> &str { &self.id }
-    fn category(&self) -> CapabilityCategory { CapabilityCategory::Communication }
-    fn constellation(&self) -> ConstellationLevel { ConstellationLevel::C1UnitTest }
+    fn capability_id(&self) -> &str {
+        &self.id
+    }
+    fn category(&self) -> CapabilityCategory {
+        CapabilityCategory::Communication
+    }
+    fn constellation(&self) -> ConstellationLevel {
+        ConstellationLevel::C1UnitTest
+    }
     fn health_check(&self) -> CapabilityHealth {
         CapabilityHealth {
             healthy: !self.access_token.is_empty(),
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+            last_check: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
             message: None,
         }
     }
-    fn description(&self) -> &str { "WhatsApp Business API messaging provider" }
-    fn stats(&self) -> CapabilityStats { self.stats.clone() }
+    fn description(&self) -> &str {
+        "WhatsApp Business API messaging provider"
+    }
+    fn stats(&self) -> CapabilityStats {
+        self.stats.clone()
+    }
 }
 
 impl MessagingProvider for WhatsAppProvider {
@@ -214,7 +232,7 @@ impl MessagingProvider for WhatsAppProvider {
     /// - Delivery/read receipt tracking
     fn get_status(&self, _id: &str) -> Result<MessageStatus, CapabilityError> {
         Err(CapabilityError::NotAvailable(
-            "not wired: WhatsApp Business API status check not implemented".into()
+            "not wired: WhatsApp Business API status check not implemented".into(),
         ))
     }
 }
@@ -233,7 +251,13 @@ pub struct EmailProvider {
 }
 
 impl EmailProvider {
-    pub fn new(smtp_host: &str, smtp_port: u16, username: &str, password: &str, from: &str) -> Self {
+    pub fn new(
+        smtp_host: &str,
+        smtp_port: u16,
+        username: &str,
+        password: &str,
+        from: &str,
+    ) -> Self {
         Self {
             id: format!("messaging.email.{}", smtp_host),
             smtp_host: smtp_host.to_string(),
@@ -249,20 +273,33 @@ impl EmailProvider {
 }
 
 impl L1Capability for EmailProvider {
-    fn capability_id(&self) -> &str { &self.id }
-    fn category(&self) -> CapabilityCategory { CapabilityCategory::Communication }
-    fn constellation(&self) -> ConstellationLevel { ConstellationLevel::C1UnitTest }
+    fn capability_id(&self) -> &str {
+        &self.id
+    }
+    fn category(&self) -> CapabilityCategory {
+        CapabilityCategory::Communication
+    }
+    fn constellation(&self) -> ConstellationLevel {
+        ConstellationLevel::C1UnitTest
+    }
     fn health_check(&self) -> CapabilityHealth {
         CapabilityHealth {
             healthy: !self.smtp_host.is_empty(),
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+            last_check: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
             message: None,
         }
     }
-    fn description(&self) -> &str { "SMTP email provider" }
-    fn stats(&self) -> CapabilityStats { self.stats.clone() }
+    fn description(&self) -> &str {
+        "SMTP email provider"
+    }
+    fn stats(&self) -> CapabilityStats {
+        self.stats.clone()
+    }
 }
 
 impl MessagingProvider for EmailProvider {
@@ -273,7 +310,8 @@ impl MessagingProvider for EmailProvider {
     /// - Attachment handling
     fn send(&self, _msg: &Message) -> Result<String, CapabilityError> {
         Err(CapabilityError::NotAvailable(
-            "not wired: SMTP email send not implemented (requires SMTP client + credentials)".into()
+            "not wired: SMTP email send not implemented (requires SMTP client + credentials)"
+                .into(),
         ))
     }
 
@@ -283,7 +321,7 @@ impl MessagingProvider for EmailProvider {
     /// - MIME parsing for received messages
     fn receive(&self, _since: Option<u64>) -> Result<Vec<Message>, CapabilityError> {
         Err(CapabilityError::NotAvailable(
-            "not wired: SMTP email receive not implemented (requires IMAP/POP3 client)".into()
+            "not wired: SMTP email receive not implemented (requires IMAP/POP3 client)".into(),
         ))
     }
 
@@ -292,7 +330,7 @@ impl MessagingProvider for EmailProvider {
     /// - Read receipt tracking
     fn get_status(&self, _id: &str) -> Result<MessageStatus, CapabilityError> {
         Err(CapabilityError::NotAvailable(
-            "not wired: SMTP email status check not implemented".into()
+            "not wired: SMTP email status check not implemented".into(),
         ))
     }
 }
@@ -304,20 +342,20 @@ impl MessagingProvider for EmailProvider {
 /// 消息能力注册中心
 pub struct MessagingRegistry {
     providers: Vec<Box<dyn MessagingProvider>>,
-    #[allow(dead_code)]
-    by_channel: HashMap<Channel, Vec<usize>>,
+    // (by_channel 写-only 且 route 未实现动态填充, 已删除)
     templates: HashMap<String, MessageTemplate>,
 }
 
 impl Default for MessagingRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MessagingRegistry {
     pub fn new() -> Self {
         Self {
             providers: Vec::new(),
-            by_channel: HashMap::new(),
             templates: HashMap::new(),
         }
     }
@@ -326,7 +364,6 @@ impl MessagingRegistry {
         // 注册时无法直接获取 channel，通过 capability_id 推断
         let _idx = self.providers.len();
         self.providers.push(provider);
-        // by_channel 在 route 时动态填充
     }
 
     pub fn register_template(&mut self, template: MessageTemplate) {
@@ -334,22 +371,29 @@ impl MessagingRegistry {
     }
 
     pub fn get(&self, id: &str) -> Option<&dyn MessagingProvider> {
-        self.providers.iter().find(|p| p.capability_id() == id).map(|p| p.as_ref())
+        self.providers
+            .iter()
+            .find(|p| p.capability_id() == id)
+            .map(|p| p.as_ref())
     }
 
     pub fn health_check_all(&self) -> Vec<(String, CapabilityHealth)> {
-        self.providers.iter()
+        self.providers
+            .iter()
             .map(|p| (p.capability_id().to_string(), p.health_check()))
             .collect()
     }
 
     pub fn optimal(&self) -> Option<&dyn MessagingProvider> {
-        self.providers.iter()
+        self.providers
+            .iter()
             .filter(|p| p.health_check().healthy)
             .max_by(|a, b| {
                 let a_score = 1.0 - a.health_check().error_rate;
                 let b_score = 1.0 - b.health_check().error_rate;
-                a_score.partial_cmp(&b_score).unwrap_or(std::cmp::Ordering::Equal)
+                a_score
+                    .partial_cmp(&b_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|p| p.as_ref())
     }
@@ -381,7 +425,9 @@ impl MessagingRouter {
 
     /// 发送消息
     pub fn send(&self, msg: &Message) -> Result<String, CapabilityError> {
-        let provider = self.registry.optimal()
+        let provider = self
+            .registry
+            .optimal()
             .ok_or_else(|| CapabilityError::NotAvailable("No messaging provider".into()))?;
         provider.send(msg)
     }
@@ -399,9 +445,12 @@ impl MessagingRouter {
         to: &str,
         vars: &HashMap<String, String>,
     ) -> Result<String, CapabilityError> {
-        let template = self.template(template_id)
-            .ok_or_else(|| CapabilityError::NotAvailable(format!("Template {} not found", template_id)))?;
-        let body = template.render(vars).map_err(|e| CapabilityError::InvalidInput(e))?;
+        let template = self.template(template_id).ok_or_else(|| {
+            CapabilityError::NotAvailable(format!("Template {} not found", template_id))
+        })?;
+        let body = template
+            .render(vars)
+            .map_err(|e| CapabilityError::InvalidInput(e))?;
         let msg = Message {
             id: uuid::Uuid::new_v4().to_string(),
             channel: format!("{:?}", channel),
@@ -409,7 +458,10 @@ impl MessagingRouter {
             to: to.to_string(),
             body,
             status: MessageStatus::Queued,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         };
         self.send(&msg)
     }
@@ -579,7 +631,12 @@ mod tests {
             language: "en".into(),
             subject: None,
             body: "Hello {{name}}.".into(),
-            variables: vec![TemplateVariable { name: "name".into(), var_type: "string".into(), required: true, default: None }],
+            variables: vec![TemplateVariable {
+                name: "name".into(),
+                var_type: "string".into(),
+                required: true,
+                default: None,
+            }],
             category: TemplateCategory::Custom,
             tags: vec![],
         };

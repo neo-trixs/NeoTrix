@@ -4,12 +4,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::time::{Duration, Instant};
 
+use super::GatewayV2;
 use crate::l1_action::nt_core_llm::{LlmError, LlmRequest};
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::lookup_provider;
+use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::{
+    CommunicationProfile, ProviderCategory,
+};
 use crate::l1_action::nt_io::nt_io_provider::health::circuit_breaker::CircuitBreaker;
-use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
 use crate::l1_action::nt_io::nt_io_provider::health::rate_limiter::RateLimiter;
-use super::GatewayV2;
 
 // ═══════════════════════════════════════════════════════════════════
 // Auto Exacto 周期重估注册表 (R-P79 生产接线)
@@ -328,15 +330,7 @@ impl OriEvalCase {
     }
 }
 
-/// Score for a single evaluation case.
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct OriCaseScore {
-    pub case_id: String,
-    pub answer_grade: f64,         // rubric keyword hit rate 0.0-1.0
-    pub tool_call_legit: bool,     // was tool call in expected set?
-    pub tool_call_necessary: bool, // was tool call needed?
-}
+// (OriCaseScore 与 benchmark 侧重名且零引用, 已删除; 以 nt_mind_benchmark 侧为准)
 
 /// Model-level aggregate score.
 #[derive(Debug, Clone)]
@@ -393,7 +387,9 @@ impl OriEvalSuite {
             let content = resp.content.to_lowercase();
 
             // Rubric keyword scoring
-            let keyword_hits = case.rubric_keywords.iter()
+            let keyword_hits = case
+                .rubric_keywords
+                .iter()
                 .filter(|kw| content.contains(&kw.to_lowercase()))
                 .count();
             let answer_grade = if case.rubric_keywords.is_empty() {
@@ -420,7 +416,12 @@ impl OriEvalSuite {
         let total = self.cases.len() as f64;
         let accuracy = correct as f64 / total;
         let tool_accuracy = if self.cases.iter().any(|c| c.expected_tool.is_some()) {
-            tool_correct as f64 / self.cases.iter().filter(|c| c.expected_tool.is_some()).count() as f64
+            tool_correct as f64
+                / self
+                    .cases
+                    .iter()
+                    .filter(|c| c.expected_tool.is_some())
+                    .count() as f64
         } else {
             1.0
         };
@@ -444,9 +445,19 @@ impl OriEvalSuite {
     pub fn finalize_report(scores: Vec<OriModelScore>) -> OriEvalReport {
         let mut ranking: Vec<String> = scores.iter().map(|s| s.model.clone()).collect();
         ranking.sort_by(|a, b| {
-            let score_a = scores.iter().find(|s| s.model == *a).map(|s| s.composite).unwrap_or(0.0);
-            let score_b = scores.iter().find(|s| s.model == *b).map(|s| s.composite).unwrap_or(0.0);
-            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            let score_a = scores
+                .iter()
+                .find(|s| s.model == *a)
+                .map(|s| s.composite)
+                .unwrap_or(0.0);
+            let score_b = scores
+                .iter()
+                .find(|s| s.model == *b)
+                .map(|s| s.composite)
+                .unwrap_or(0.0);
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         OriEvalReport {
