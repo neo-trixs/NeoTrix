@@ -413,6 +413,10 @@ impl From<crate::browser_host::BrowserError> for AppError {
                 code: "BROWSER_NETWORK".into(),
                 message: msg,
             },
+            BrowserError::Emit(msg) => Self::Platform {
+                code: "BROWSER_EMIT".into(),
+                message: msg,
+            },
         }
     }
 }

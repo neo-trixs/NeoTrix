@@ -129,3 +129,55 @@ export async function subscribeMenuEvents(handlers: MenuEventHandlers): Promise<
     for (const un of unlisteners) un()
   }
 }
+
+/* ════════════════════════════════════════════
+   AuthBridge 鉴权事件（P0-3）
+   401 处理链：后端 emit('token-expired') → 前端静默续签 →
+   续签失败则后端 emit('require-login')，前端跳转登录页。
+   组件禁止直接 import '@tauri-apps/api/event'，统一经此层。
+   ════════════════════════════════════════════ */
+
+/** token 过期/回退登录负载（后端 `TokenExpiredPayload` 同形） */
+export interface TokenExpiredPayload {
+  reason: string
+  at_ms: number
+}
+
+export interface AuthBridgeHandlers {
+  /** token 过期：先静默续签，不要直接跳登录 */
+  onTokenExpired?: (payload: TokenExpiredPayload) => void
+  /** 回退登录：续签已失败，跳转登录页 */
+  onRequireLogin?: (payload: TokenExpiredPayload) => void
+  /** 登出广播：清本地会话态 */
+  onLogout?: () => void
+  /** 单个事件订阅失败时回调 */
+  onSubscribeError?: (event: string, error: unknown) => void
+}
+
+/** 订阅鉴权桥事件，返回解除订阅函数 */
+export async function subscribeAuthBridge(handlers: AuthBridgeHandlers): Promise<UnlistenFn> {
+  const unlisteners: UnlistenFn[] = []
+  const subscribe = async (event: string, cb: () => Promise<UnlistenFn>) => {
+    try {
+      unlisteners.push(await cb())
+    } catch (e) {
+      handlers.onSubscribeError?.(event, e)
+    }
+  }
+  if (handlers.onTokenExpired) {
+    await subscribe('token-expired', () =>
+      listen<TokenExpiredPayload>('token-expired', (e) => handlers.onTokenExpired?.(e.payload)),
+    )
+  }
+  if (handlers.onRequireLogin) {
+    await subscribe('require-login', () =>
+      listen<TokenExpiredPayload>('require-login', (e) => handlers.onRequireLogin?.(e.payload)),
+    )
+  }
+  if (handlers.onLogout) {
+    await subscribe('auth-logout', () => listen<void>('auth-logout', () => handlers.onLogout?.()))
+  }
+  return () => {
+    for (const un of unlisteners) un()
+  }
+}
