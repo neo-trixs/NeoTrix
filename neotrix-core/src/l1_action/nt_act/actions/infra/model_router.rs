@@ -66,6 +66,58 @@ pub struct ModelInfo {
     pub max_output_tokens: u32,
     /// 支持的模态
     pub modalities: Vec<String>,
+    /// 档位表：该模型在各档位/域下的映射（P0-1，前端只传档位名，后端映射真实模型＋系数）
+    pub tier_levels: Vec<ModelTierLevel>,
+}
+
+/// 档位域（对标 Lingee work/task 双域）
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TierDomain {
+    /// 日常工作域
+    Work,
+    /// 定时任务域
+    Task,
+}
+
+/// 模型档位（对标 Lingee modelLevel 四元组）
+#[derive(Debug, Clone)]
+pub struct ModelTierLevel {
+    /// 档位名（fast/expert/ultra/auto…），前端唯一入参
+    pub level: String,
+    /// 档位描述
+    pub desc: String,
+    /// 是否自动路由（auto 档为 true）
+    pub auto_routing: bool,
+    /// 消费系数（计费乘子）
+    pub consumption_coefficient: f64,
+    /// 排序号（档位内按后端顺序取）
+    pub order_number: i32,
+    /// 所属域
+    pub domain: TierDomain,
+}
+
+/// 默认档位表（Lingee 11 档实测锚点，S6.3；双域同表）。
+pub fn default_tier_levels() -> Vec<ModelTierLevel> {
+    let rows = [
+        ("auto", "自动", true, 0.0, -1),
+        ("fast", "快速", false, 0.3, 50),
+        ("expert", "专家", false, 0.9, 270),
+        ("ultra", "极致", false, 1.2, 570),
+    ];
+    let mut out = Vec::with_capacity(rows.len() * 2);
+    for domain in [TierDomain::Work, TierDomain::Task] {
+        for (level, desc, auto_routing, consumption_coefficient, order_number) in rows {
+            out.push(ModelTierLevel {
+                level: level.to_string(),
+                desc: desc.to_string(),
+                auto_routing,
+                consumption_coefficient,
+                order_number,
+                domain: domain.clone(),
+            });
+        }
+    }
+    out
 }
 
 /// 路由决策
@@ -81,6 +133,10 @@ pub struct RoutingDecision {
     pub estimated_latency_ms: f64,
     /// 路由分数
     pub score: f64,
+    /// 命中的档位名（P0-1；QualityTier 路径为空）
+    pub tier_level: String,
+    /// 消费系数（P0-1；E2 成本断言的系数来源）
+    pub consumption_coefficient: f64,
 }
 
 /// 模型路由器
@@ -186,8 +242,52 @@ impl ModelRouter {
                 estimated_cost_usd: model.cost_per_1k_tokens * 0.001, // 假设 1K tokens
                 estimated_latency_ms: model.latency_ms,
                 score: 1.0,
+                tier_level: String::new(),
+                consumption_coefficient: 1.0,
             }
         })
+    }
+
+    /// 按档位名路由（P0-1：前端只传档位名，后端映射真实模型＋系数）。
+    ///
+    /// 候选＝档位表命中（档位名＋域）的模型，按 order_number 升序取首个。
+    pub fn route_by_level(
+        &self,
+        level: &str,
+        domain: &TierDomain,
+        modalities: &[String],
+    ) -> Option<RoutingDecision> {
+        let mut candidates: Vec<_> = self
+            .providers
+            .values()
+            .filter(|p| p.status == ProviderStatus::Available)
+            .flat_map(|p| p.models.iter().map(move |m| (p, m)))
+            .filter(|(_, m)| {
+                modalities
+                    .iter()
+                    .all(|modality| m.modalities.contains(modality))
+            })
+            .filter_map(|(p, m)| {
+                m.tier_levels
+                    .iter()
+                    .find(|t| t.level == level && &t.domain == domain)
+                    .map(|t| (p, m, t))
+            })
+            .collect();
+
+        candidates.sort_by(|a, b| a.2.order_number.cmp(&b.2.order_number));
+
+        candidates
+            .first()
+            .map(|(provider, model, tier)| RoutingDecision {
+                provider_id: provider.id.clone(),
+                model_id: model.id.clone(),
+                estimated_cost_usd: model.cost_per_1k_tokens * tier.consumption_coefficient * 0.001,
+                estimated_latency_ms: model.latency_ms,
+                score: 1.0,
+                tier_level: tier.level.clone(),
+                consumption_coefficient: tier.consumption_coefficient,
+            })
     }
 
     /// 质量分数
@@ -222,6 +322,8 @@ impl ModelRouter {
                 estimated_cost_usd: model.cost_per_1k_tokens * 0.001,
                 estimated_latency_ms: model.latency_ms,
                 score: 0.8, // 故障转移分数略低
+                tier_level: String::new(),
+                consumption_coefficient: 1.0,
             }
         })
     }
@@ -264,6 +366,7 @@ mod tests {
                 latency_ms: 500.0,
                 max_output_tokens: 4096,
                 modalities: vec!["text".to_string()],
+                tier_levels: default_tier_levels(),
             }],
             base_url: "https://api.openai.com".to_string(),
             api_key_encrypted: None,
@@ -274,5 +377,61 @@ mod tests {
 
         let decision = router.route(&QualityTier::Final, &["text".to_string()]);
         assert!(decision.is_some());
+    }
+
+    #[test]
+    fn test_default_tier_levels() {
+        let levels = default_tier_levels();
+        // 4 档 × 双域
+        assert_eq!(levels.len(), 8);
+        let expert = levels
+            .iter()
+            .find(|t| t.level == "expert" && t.domain == TierDomain::Work)
+            .expect("expert work tier");
+        assert!((expert.consumption_coefficient - 0.9).abs() < f64::EPSILON);
+        assert_eq!(expert.order_number, 270);
+        assert!(!expert.auto_routing);
+        let auto = levels
+            .iter()
+            .find(|t| t.level == "auto" && t.domain == TierDomain::Task)
+            .expect("auto task tier");
+        assert!(auto.auto_routing);
+    }
+
+    #[test]
+    fn test_route_by_level() {
+        let mut router = ModelRouter::new(RoutingStrategy::CostOptimized);
+        router.register_provider(ModelProvider {
+            id: "openai".to_string(),
+            name: "OpenAI".to_string(),
+            models: vec![ModelInfo {
+                id: "gpt-4".to_string(),
+                name: "GPT-4".to_string(),
+                quality_tiers: vec![QualityTier::Final],
+                cost_per_1k_tokens: 0.03,
+                latency_ms: 500.0,
+                max_output_tokens: 4096,
+                modalities: vec!["text".to_string()],
+                tier_levels: default_tier_levels(),
+            }],
+            base_url: "https://api.openai.com".to_string(),
+            api_key_encrypted: None,
+            status: ProviderStatus::Available,
+            rate_limit_rpm: 60,
+            current_rpm: 10,
+        });
+
+        let decision = router
+            .route_by_level("expert", &TierDomain::Work, &["text".to_string()])
+            .expect("expert route");
+        assert_eq!(decision.tier_level, "expert");
+        assert!((decision.consumption_coefficient - 0.9).abs() < f64::EPSILON);
+        // 0.03 * 0.9 * 0.001
+        assert!((decision.estimated_cost_usd - 0.000027).abs() < 1e-9);
+
+        // 未知档位 → None（前端只传档位名，拼错即空）
+        assert!(router
+            .route_by_level("nope", &TierDomain::Work, &["text".to_string()])
+            .is_none());
     }
 }

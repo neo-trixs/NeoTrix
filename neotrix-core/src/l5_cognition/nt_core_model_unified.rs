@@ -16,7 +16,7 @@ use std::collections::HashMap;
 pub use neotrix_types::core::TaskType;
 
 /// Model preferences — user preferences for model selection
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelPreferences {
     /// Allowed model providers (empty = all allowed)
     pub allowed_providers: Vec<String>,
@@ -32,6 +32,37 @@ pub struct ModelPreferences {
     pub latency_tolerance: u64,
     /// Quality priority (0.0 = cost priority, 1.0 = quality priority)
     pub quality_priority: f32,
+    /// Preferred model tier name (P0-1; frontend passes tier name only)
+    #[serde(default = "default_tier")]
+    pub preferred_tier: String,
+    /// Work-domain default tier (P0-1; mirrors Lingee workModelLevel)
+    #[serde(default = "default_tier")]
+    pub work_tier: String,
+    /// Scheduled-task default tier (P0-1; mirrors Lingee scheduledModelLevel)
+    #[serde(default = "default_tier")]
+    pub scheduled_tier: String,
+}
+
+/// Default tier name for missing fields in old snapshots.
+fn default_tier() -> String {
+    "auto".to_string()
+}
+
+impl Default for ModelPreferences {
+    fn default() -> Self {
+        Self {
+            allowed_providers: Vec::new(),
+            forbidden_providers: Vec::new(),
+            required_capabilities: Vec::new(),
+            avoided_capabilities: Vec::new(),
+            max_cost_per_query: None,
+            latency_tolerance: 0,
+            quality_priority: 0.0,
+            preferred_tier: "auto".to_string(),
+            work_tier: "auto".to_string(),
+            scheduled_tier: "auto".to_string(),
+        }
+    }
 }
 
 /// 统一模型请求 — 所有外部模型的标准输入格式
@@ -317,6 +348,22 @@ mod tests {
         assert_eq!(meta.tier, ModelTier::Balanced);
         assert_eq!(meta.context_window, 200000);
         assert!(meta.capabilities.contains(&Capability::CodeGeneration));
+    }
+
+    #[test]
+    fn test_model_preferences_tier_defaults() {
+        // P0-1: 缺省即 auto（工作档/定时档分离）
+        let prefs = ModelPreferences::default();
+        assert_eq!(prefs.preferred_tier, "auto");
+        assert_eq!(prefs.work_tier, "auto");
+        assert_eq!(prefs.scheduled_tier, "auto");
+        // 旧快照（无三字段）反序列化兼容
+        let legacy = concat!(
+            r#"{"allowed_providers":[],"forbidden_providers":[],"required_capabilities":[],"#,
+            r#"avoided_capabilities":[],"max_cost_per_query":null,"latency_tolerance":0,"quality_priority":0.0}"#,
+        );
+        let back: ModelPreferences = serde_json::from_str(legacy).expect("legacy snapshot compat");
+        assert_eq!(back.preferred_tier, "auto");
     }
 
     #[test]

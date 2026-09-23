@@ -15,6 +15,93 @@ pub struct WorkSpace {
     pub memory_count: u32,
     pub goal_count: u32,
     pub skill_count: u32,
+    #[serde(default)]
+    pub kind: WorkspaceKind,
+    #[serde(default)]
+    pub agent_ids: Vec<String>,
+    #[serde(default)]
+    pub skill_ids: Vec<String>,
+    #[serde(default)]
+    pub mcp_servers: Vec<McpServerBinding>,
+    #[serde(default)]
+    pub shared_memory_keys: Vec<String>,
+    #[serde(default)]
+    pub config: WorkspaceEntityConfig,
+    #[serde(default)]
+    pub locale: String,
+    #[serde(default)]
+    pub llm_response_language: String,
+}
+
+/// Workspace 运行形态：本地 / 远端 / 沙箱执行器。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WorkspaceKind {
+    Local,
+    Remote {
+        #[serde(default)]
+        url: String,
+    },
+    Sandbox,
+}
+
+impl Default for WorkspaceKind {
+    fn default() -> Self {
+        Self::Local
+    }
+}
+
+/// MCP 服务器绑定（E1.1 Workspace.mcp_servers 条目＋S7.1 三开关＋ERP 门）。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct McpServerBinding {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub switchable: bool,
+    #[serde(default)]
+    pub selectable: bool,
+    #[serde(default)]
+    pub open_flag: bool,
+    #[serde(default)]
+    pub requires_erp: bool,
+}
+
+/// 文件门禁白名单（S7.1：preview/upload）。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FileGates {
+    #[serde(default)]
+    pub preview_exts: Vec<String>,
+    #[serde(default)]
+    pub upload_exts: Vec<String>,
+}
+
+/// E1.1 Workspace 实体配置（含 S7.1 governance/file_gates/menus）。
+///
+/// 注：`WorkspaceConfig` 已被 `l1_action::nt_act::nt_act_workspace_isolator`
+/// （隔离配置，语义不同）占用，故本类型后缀改名为 `WorkspaceEntityConfig`。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WorkspaceEntityConfig {
+    #[serde(default)]
+    pub model_tier_preference: Option<String>,
+    #[serde(default)]
+    pub max_concurrent_agents: u32,
+    #[serde(default)]
+    pub auto_save: bool,
+    #[serde(default)]
+    pub governance_level: String,
+    #[serde(default)]
+    pub file_gates: FileGates,
+    #[serde(default)]
+    pub menus: Vec<String>,
+    #[serde(default)]
+    pub feature_flags: Vec<String>,
+    #[serde(default)]
+    pub memory_offline_extract_enabled: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,6 +137,14 @@ impl WorkSpaceManager {
             memory_count: 0,
             goal_count: 0,
             skill_count: 0,
+            kind: WorkspaceKind::default(),
+            agent_ids: Vec::new(),
+            skill_ids: Vec::new(),
+            mcp_servers: Vec::new(),
+            shared_memory_keys: Vec::new(),
+            config: WorkspaceEntityConfig::default(),
+            locale: String::new(),
+            llm_response_language: String::new(),
         };
         self.active_id = Some(id);
         self.workspaces.push(ws.clone());
@@ -108,12 +203,12 @@ impl WorkSpaceManager {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        crate::l5_cognition::nt_core_state::save("workspaces", &self.to_json()?)
+        crate::l0_substrate::nt_core_state::save("workspaces", &self.to_json()?)
     }
 
     /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
     pub fn save_with(&self, conn: &rusqlite::Connection) -> Result<(), String> {
-        crate::l5_cognition::nt_core_state::save_with(conn, "workspaces", &self.to_json()?)
+        crate::l0_substrate::nt_core_state::save_with(conn, "workspaces", &self.to_json()?)
     }
 
     fn to_json(&self) -> Result<String, String> {
@@ -121,14 +216,14 @@ impl WorkSpaceManager {
     }
 
     pub fn load() -> Self {
-        crate::l5_cognition::nt_core_state::load("workspaces")
+        crate::l0_substrate::nt_core_state::load("workspaces")
             .and_then(|content| serde_json::from_str(&content).ok())
             .unwrap_or_default()
     }
 
     /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
     pub fn load_with(conn: &rusqlite::Connection) -> Self {
-        crate::l5_cognition::nt_core_state::load_with(conn, "workspaces")
+        crate::l0_substrate::nt_core_state::load_with(conn, "workspaces")
             .and_then(|content| serde_json::from_str(&content).ok())
             .unwrap_or_default()
     }
@@ -244,5 +339,87 @@ mod tests {
         let back: WorkSpaceManager = serde_json::from_str(&json).unwrap();
         assert_eq!(back.list().len(), 1);
         assert_eq!(back.list()[0].name, "ws");
+    }
+
+    #[test]
+    fn workspace_full_construct_serde_roundtrip_with_defaults() {
+        let now = chrono::Utc::now();
+        let ws = WorkSpace {
+            id: "ws-full-1".to_string(),
+            name: "full".to_string(),
+            created_at: now,
+            last_active: now,
+            project_root: Some(PathBuf::from("/repo")),
+            description: "full construct".to_string(),
+            tags: vec!["t1".to_string()],
+            memory_count: 2,
+            goal_count: 3,
+            skill_count: 4,
+            kind: WorkspaceKind::Remote {
+                url: "https://example.invalid/ws".to_string(),
+            },
+            agent_ids: vec!["a1".to_string()],
+            skill_ids: vec!["s1".to_string()],
+            mcp_servers: vec![McpServerBinding {
+                name: "erp".to_string(),
+                command: "npx".to_string(),
+                args: vec!["-y".to_string()],
+                enabled: true,
+                switchable: true,
+                selectable: true,
+                open_flag: true,
+                requires_erp: true,
+            }],
+            shared_memory_keys: vec!["mem-k1".to_string()],
+            config: WorkspaceEntityConfig {
+                model_tier_preference: Some("expert".to_string()),
+                max_concurrent_agents: 4,
+                auto_save: true,
+                governance_level: "enforce".to_string(),
+                file_gates: FileGates {
+                    preview_exts: vec!["md".to_string()],
+                    upload_exts: vec!["pdf".to_string()],
+                },
+                menus: vec!["ceo".to_string()],
+                feature_flags: vec!["imageGen".to_string()],
+                memory_offline_extract_enabled: true,
+            },
+            locale: "zh-CN".to_string(),
+            llm_response_language: "zh".to_string(),
+        };
+        let json = serde_json::to_string(&ws).unwrap();
+        let back: WorkSpace = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "ws-full-1");
+        assert!(matches!(
+            back.kind,
+            WorkspaceKind::Remote { ref url } if url == "https://example.invalid/ws"
+        ));
+        assert_eq!(back.mcp_servers.len(), 1);
+        assert!(back.mcp_servers[0].requires_erp);
+        assert_eq!(back.config.model_tier_preference.as_deref(), Some("expert"));
+        assert_eq!(back.locale, "zh-CN");
+
+        // 旧快照兼容：缺新键 → 全部回退默认值。
+        let legacy = serde_json::json!({
+            "id": "ws-legacy",
+            "name": "legacy",
+            "created_at": now.to_rfc3339(),
+            "last_active": now.to_rfc3339(),
+            "project_root": null,
+            "description": "old snapshot",
+            "tags": [],
+            "memory_count": 0,
+            "goal_count": 0,
+            "skill_count": 0
+        });
+        let legacy_ws: WorkSpace = serde_json::from_value(legacy).unwrap();
+        assert!(matches!(legacy_ws.kind, WorkspaceKind::Local));
+        assert!(legacy_ws.agent_ids.is_empty());
+        assert!(legacy_ws.skill_ids.is_empty());
+        assert!(legacy_ws.mcp_servers.is_empty());
+        assert!(legacy_ws.shared_memory_keys.is_empty());
+        assert!(legacy_ws.config.model_tier_preference.is_none());
+        assert!(legacy_ws.locale.is_empty());
+        assert!(legacy_ws.llm_response_language.is_empty());
     }
 }

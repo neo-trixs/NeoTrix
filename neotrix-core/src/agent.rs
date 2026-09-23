@@ -425,7 +425,7 @@ pub mod workflow {
 pub mod tool {
     pub mod mcp {
         //! MCP tool definitions (stub)
-        #[derive(Debug, Clone, Default)]
+        #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
         pub struct McpToolDef {
             pub name: String,
             pub description: String,
@@ -433,17 +433,82 @@ pub mod tool {
             pub transport: McpTransport,
             pub server_name: String,
             pub schema_version: Option<String>,
+            /// 调用该工具所需的权限标识（None＝无需显式授权）。
+            #[serde(default)]
+            pub required_permission: Option<String>,
+            /// 风险等级（默认 Low）。
+            #[serde(default)]
+            pub risk_level: RiskLevel,
+            /// 累计调用次数（由调用侧回写统计）。
+            #[serde(default)]
+            pub usage_count: u64,
+            /// 均值延迟 ms（由调用侧回写统计）。
+            #[serde(default)]
+            pub avg_latency_ms: f64,
         }
-        #[derive(Debug, Clone, Default)]
+        #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
         pub enum McpTransport {
             #[default]
             Stdio,
             Sse,
             Local { command: String, args: Vec<String> },
         }
+
+        /// 工具风险等级（默认 Low；fail-closed：未知按 Low 展示、高危需显式标注）。
+        #[derive(
+            Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize,
+        )]
+        pub enum RiskLevel {
+            #[default]
+            Low,
+            Medium,
+            High,
+            Critical,
+        }
     }
 
-    use std::sync::{Arc, RwLock};
+    use std::sync::{Arc, LazyLock, Mutex, RwLock};
+
+    /// 模块内全局 McpRegistry（MCP 正典；`all_native_tools()` 的真实来源）。
+    ///
+    /// 仿 `nt_infra_agent_card::GLOBAL_CARDS` 模式：实例方法
+    /// `register_stdio`/`register_sse` 经 `try_lock` 同步镜像写入全局
+    /// （已持有全局锁时 `try_lock` 失败则跳过，避免死锁与重复写入）。
+    static GLOBAL_MCP: LazyLock<Mutex<McpRegistry>> =
+        LazyLock::new(|| Mutex::new(McpRegistry::new()));
+
+    /// 快捷入口：注册 stdio 服务器并同步写入全局 McpRegistry。
+    pub fn register_stdio_global(
+        server_name: &str,
+        command: &str,
+        args: &[&str],
+        tools: Vec<mcp::McpToolDef>,
+    ) {
+        GLOBAL_MCP
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .register_stdio(server_name, command, args, tools);
+    }
+
+    /// 快捷入口：注册 SSE 服务器并同步写入全局 McpRegistry。
+    pub fn register_sse_global(server_name: &str, url: &str, tools: Vec<mcp::McpToolDef>) {
+        GLOBAL_MCP
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .register_sse(server_name, url, tools);
+    }
+
+    #[cfg(test)]
+    pub fn reset_global_mcp_for_tests() {
+        if let Ok(mut global) = GLOBAL_MCP.try_lock() {
+            *global = McpRegistry::new();
+        }
+    }
+
+    /// 测试串行锁：触碰全局 McpRegistry 的单测必须先持有，
+    /// 避免并行 harness 下 reset/register 交错导致 flake。
+    #[cfg(test)]
+    pub static TEST_MCP_SERIAL: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     /// ToolOrchestrator — 统一原生工具编排器
     ///
@@ -492,9 +557,262 @@ pub mod tool {
 
     /// 从全局 McpRegistry 重建吸收的原生工具列表（真实路径，非空壳）。
     pub fn all_native_tools() -> Vec<Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>> {
-        crate::cli::commands::agent_cmds::get_mcp_registry()
-            .blocking_read()
+        GLOBAL_MCP
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
             .as_native_tools()
+    }
+
+    /// McpRegistry — MCP 服务器注册表 (stdio/SSE 传输)。
+    ///
+    /// 融合已删除的 cli::commands McpRegistry: 服务器注册 → McpToolDef 清单 →
+    /// NativeTool 适配。execute 经 stdio 子进程做 JSON-RPC tools/call (30s 超时)。
+    #[derive(Debug, Default)]
+    pub struct McpRegistry {
+        servers: Vec<McpServer>,
+        /// S3.1: 以 resource 形式托管的 Agent Card JSON（只存不调）。
+        agent_cards: Vec<serde_json::Value>,
+    }
+
+    #[derive(Debug, Clone)]
+    struct McpServer {
+        name: String,
+        command: String,
+        args: Vec<String>,
+        /// SSE 端点（stdio 服务器为 None）。
+        sse_url: Option<String>,
+        tools: Vec<mcp::McpToolDef>,
+    }
+
+    impl McpRegistry {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// 注册一个 stdio MCP 服务器及其工具清单（同步镜像写入全局）。
+        pub fn register_stdio(
+            &mut self,
+            server_name: &str,
+            command: &str,
+            args: &[&str],
+            tools: Vec<mcp::McpToolDef>,
+        ) {
+            let entry = McpServer {
+                name: server_name.to_string(),
+                command: command.to_string(),
+                args: args.iter().map(|s| s.to_string()).collect(),
+                sse_url: None,
+                tools,
+            };
+            self.servers.push(entry.clone());
+            Self::mirror_to_global(&entry);
+        }
+
+        /// 注册一个 SSE MCP 服务器及其工具清单（同步镜像写入全局）。
+        pub fn register_sse(&mut self, server_name: &str, url: &str, tools: Vec<mcp::McpToolDef>) {
+            let entry = McpServer {
+                name: server_name.to_string(),
+                command: String::new(),
+                args: Vec::new(),
+                sse_url: Some(url.to_string()),
+                tools,
+            };
+            self.servers.push(entry.clone());
+            Self::mirror_to_global(&entry);
+        }
+
+        /// 镜像单条服务器记录到全局 McpRegistry。
+        ///
+        /// `try_lock` 语义：调用方已持有全局锁（经 `*_global` 快捷入口进入）
+        /// 时加锁失败，直接跳过——既避免死锁，也不重复写入。
+        fn mirror_to_global(entry: &McpServer) {
+            if let Ok(mut global) = GLOBAL_MCP.try_lock() {
+                global.servers.push(entry.clone());
+            }
+        }
+
+        /// 已注册工具总数。
+        pub fn tool_count(&self) -> usize {
+            self.servers.iter().map(|s| s.tools.len()).sum()
+        }
+
+        /// 已注册服务器数量。
+        pub fn server_count(&self) -> usize {
+            self.servers.len()
+        }
+
+        /// 服务器一览 (`name (N tools)`), 供 /mcp list|status 展示。
+        pub fn list_servers(&self) -> Vec<String> {
+            self.servers
+                .iter()
+                .map(|s| format!("{} ({} tools)", s.name, s.tools.len()))
+                .collect()
+        }
+
+        /// 按关键字推荐工具 (名称/描述子串匹配; 空查询返回全部)。
+        pub fn recommend_tools(&self, query: &str) -> Vec<mcp::McpToolDef> {
+            let q = query.trim().to_lowercase();
+            self.servers
+                .iter()
+                .flat_map(|s| s.tools.iter())
+                .filter(|t| {
+                    q.is_empty()
+                        || t.name.to_lowercase().contains(&q)
+                        || t.description.to_lowercase().contains(&q)
+                })
+                .cloned()
+                .collect()
+        }
+
+        /// 按 agent 过滤可见工具。
+        ///
+        /// 当前返回全部工具；TODO(E2): 与 `AgentCard.mcp_permissions`
+        /// (`server_name`＋`tools`，空＝全部) 取交集做权限过滤，
+        /// 跨文件逻辑留 E2。
+        pub fn tools_for_agent(&self, agent_id: &str) -> Vec<mcp::McpToolDef> {
+            let _ = agent_id;
+            self.servers
+                .iter()
+                .flat_map(|s| s.tools.iter().cloned())
+                .collect()
+        }
+
+        /// 按风险等级过滤工具。
+        pub fn tools_by_risk(&self, level: mcp::RiskLevel) -> Vec<mcp::McpToolDef> {
+            self.servers
+                .iter()
+                .flat_map(|s| s.tools.iter())
+                .filter(|t| t.risk_level == level)
+                .cloned()
+                .collect()
+        }
+
+        /// 逐工具用量统计：`(tool_name, usage_count, avg_latency_ms)`。
+        pub fn usage_stats(&self) -> Vec<(String, u64, f64)> {
+            self.servers
+                .iter()
+                .flat_map(|s| s.tools.iter())
+                .map(|t| (t.name.clone(), t.usage_count, t.avg_latency_ms))
+                .collect()
+        }
+
+        /// S3.1: 以 resource 形式托管 Agent Card JSON——只存不调。
+        ///
+        /// discovery 经 `list_agent_cards` 查询；执行仍走原生调用路径。
+        pub fn register_agent_card(&mut self, card: serde_json::Value) {
+            self.agent_cards.push(card);
+        }
+
+        /// 已托管的 Agent Card JSON discovery 查询接口。
+        pub fn list_agent_cards(&self) -> Vec<serde_json::Value> {
+            self.agent_cards.clone()
+        }
+
+        /// 已托管的 Agent Card 数量。
+        pub fn agent_card_count(&self) -> usize {
+            self.agent_cards.len()
+        }
+
+        /// 全部工具的 NativeTool 适配 (供 ToolOrchestrator 注册)。
+        pub fn as_native_tools(
+            &self,
+        ) -> Vec<Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>> {
+            self.servers
+                .iter()
+                .flat_map(|s| {
+                    s.tools.iter().map(|t| {
+                        let tool = StdioNativeTool {
+                            def: t.clone(),
+                            command: s.command.clone(),
+                            args: s.args.clone(),
+                        };
+                        Box::new(tool)
+                            as Box<
+                                dyn crate::l0_substrate::nt_core_traits::NativeTool,
+                            >
+                    })
+                })
+                .collect()
+        }
+    }
+
+    /// stdio MCP 工具的 NativeTool 适配: 每次调用 spawn 子进程, stdin 写入
+    /// JSON-RPC tools/call 请求, 30s 超时内读取 stdout。长驻式 MCP 服务器
+    /// (等待多轮输入) 会超时返回 Err, 短命令式工具 (如 echo) 直接返回输出。
+    #[derive(Debug, Clone)]
+    struct StdioNativeTool {
+        def: mcp::McpToolDef,
+        command: String,
+        args: Vec<String>,
+    }
+
+    impl crate::l0_substrate::nt_core_traits::NativeTool for StdioNativeTool {
+        fn id(&self) -> &str {
+            &self.def.name
+        }
+        fn description(&self) -> &str {
+            &self.def.description
+        }
+        fn input_schema(&self) -> serde_json::Value {
+            self.def.input_schema.clone()
+        }
+        fn capability_tags(&self) -> Vec<&'static str> {
+            Vec::new()
+        }
+        fn execute(
+            &self,
+            args: &serde_json::Value,
+        ) -> Result<crate::l0_substrate::nt_core_traits::ToolOutput, String> {
+            use std::io::Write;
+            let req = serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": self.def.name, "arguments": args},
+            });
+            let mut child = std::process::Command::new(&self.command)
+                .args(&self.args)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .map_err(|e| format!("spawn {}: {}", self.command, e))?;
+            if let Some(stdin) = child.stdin.take() {
+                let mut stdin = stdin;
+                let _ = writeln!(stdin, "{}", req);
+            }
+            let mut waited = 0u32;
+            loop {
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        let mut out = String::new();
+                        if let Some(stdout) = child.stdout.take() {
+                            use std::io::Read;
+                            let mut stdout = stdout;
+                            let _ = stdout.read_to_string(&mut out);
+                        }
+                        return Ok(
+                            crate::l0_substrate::nt_core_traits::ToolOutput {
+                                success: status.success(),
+                                content: out.trim().to_string(),
+                            },
+                        );
+                    }
+                    Ok(None) => {
+                        waited += 1;
+                        if waited >= 300 {
+                            let _ = child.kill();
+                            return Err(format!(
+                                "tool '{}' timed out after 30s",
+                                self.def.name
+                            ));
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                    Err(e) => return Err(format!("wait {}: {}", self.def.name, e)),
+                }
+            }
+        }
     }
 }
 
@@ -564,8 +882,59 @@ mod tests {
     #[test]
     fn test_all_native_tools_from_global_registry() {
         // Before any registry is set, must return empty (never panic).
+        let _guard = super::tool::TEST_MCP_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        super::tool::reset_global_mcp_for_tests();
         let tools = super::tool::all_native_tools();
         assert!(tools.is_empty());
+    }
+
+    fn sample_mcp_tool(name: &str) -> super::tool::mcp::McpToolDef {
+        super::tool::mcp::McpToolDef {
+            name: name.to_string(),
+            description: "sample tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            transport: super::tool::mcp::McpTransport::Stdio,
+            server_name: "sample-server".to_string(),
+            schema_version: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_mcp_register_grows_tool_count() {
+        let _guard = super::tool::TEST_MCP_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        super::tool::reset_global_mcp_for_tests();
+        let mut reg = super::tool::McpRegistry::new();
+        assert_eq!(reg.tool_count(), 0);
+        reg.register_stdio(
+            "sample-server",
+            "echo",
+            &["mcp"],
+            vec![sample_mcp_tool("tool_a"), sample_mcp_tool("tool_b")],
+        );
+        assert_eq!(reg.server_count(), 1);
+        assert_eq!(reg.tool_count(), 2);
+    }
+
+    #[test]
+    fn test_all_native_tools_nonempty_after_register() {
+        let _guard = super::tool::TEST_MCP_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        super::tool::reset_global_mcp_for_tests();
+        super::tool::register_stdio_global(
+            "sample-server",
+            "echo",
+            &["mcp"],
+            vec![sample_mcp_tool("tool_a")],
+        );
+        let tools = super::tool::all_native_tools();
+        assert!(!tools.is_empty());
+        assert!(tools.iter().any(|t| t.id() == "tool_a"));
     }
 
     use super::hooks::{HookContext, HookEvent, HookProfile, EccHookRegistry};

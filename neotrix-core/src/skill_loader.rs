@@ -22,6 +22,15 @@ pub struct SkillEntry {
     /// Skill names this skill depends on.
     #[serde(default)]
     pub dependencies: Vec<String>,
+    /// Explicit exclusions: cases this skill must NOT be used for (P0-2 三段式之二).
+    #[serde(default)]
+    pub exclusions: Vec<String>,
+    /// Output contract: promised result shape (P0-2 三段式之三).
+    #[serde(default)]
+    pub output_contract: Option<String>,
+    /// License identifier (T35 E轨；S7.1 install 侧已有 license，此处候选本体侧对齐）.
+    #[serde(default)]
+    pub license: String,
 }
 
 /// Category grouping multiple skills.
@@ -60,6 +69,73 @@ pub struct ResolvedSkill {
     pub dependencies: Vec<String>,
     /// Whether the SKILL.md file actually exists on disk.
     pub exists: bool,
+    /// Explicit exclusions (P0-2 三段式之二).
+    pub exclusions: Vec<String>,
+    /// Output contract (P0-2 三段式之三).
+    pub output_contract: Option<String>,
+    /// License identifier (T35 E轨；index 透传／legacy 空串）.
+    pub license: String,
+    /// Intake gate verdict (P0-2 门禁).
+    pub admission: SkillAdmission,
+}
+
+/// Intake gate verdict for the three-part description rule (P0-2).
+///
+/// A skill is `Admitted` only when all three parts are present:
+/// triggers + exclusions + output contract. Anything else is `NeedsWork`
+/// and enters the maturity pipeline at Candidate (never Trusted).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkillAdmission {
+    Admitted,
+    NeedsWork {
+        missing_trigger: bool,
+        missing_exclusion: bool,
+        missing_contract: bool,
+    },
+}
+
+impl SkillAdmission {
+    /// Whether the skill passed the intake gate.
+    pub fn is_admitted(&self) -> bool {
+        *self == SkillAdmission::Admitted
+    }
+}
+
+/// Run the three-part intake gate over an index entry (P0-2).
+///
+/// Pure function so the gate is testable without filesystem access.
+pub fn gate_skill(
+    triggers: &[String],
+    exclusions: &[String],
+    output_contract: &Option<String>,
+) -> SkillAdmission {
+    let missing_trigger = triggers.is_empty();
+    let missing_exclusion = exclusions.is_empty();
+    let missing_contract = output_contract
+        .as_ref()
+        .map(|c| c.trim().is_empty())
+        .unwrap_or(true);
+    if !missing_trigger && !missing_exclusion && !missing_contract {
+        SkillAdmission::Admitted
+    } else {
+        SkillAdmission::NeedsWork {
+            missing_trigger,
+            missing_exclusion,
+            missing_contract,
+        }
+    }
+}
+
+/// 官方认证去重门禁占位（T35 E轨；蓝图桌面清单 P2-8＋R-P100）。
+///
+/// 同名（大小写不敏感）且已有官方认证条目存在即 true。
+/// `certified` 是 SkillCandidate（L6）侧概念；本文件 ResolvedSkill 有 `tags` 字段，
+/// 故以 `tags` 含 `"official"` 近似（精确小写匹配）。P 轨接入真实 certified 透传后再收敛。
+/// 纯函数，无 IO。
+pub fn is_official_converged(name: &str, existing: &[ResolvedSkill]) -> bool {
+    existing
+        .iter()
+        .any(|s| s.name.eq_ignore_ascii_case(name) && s.tags.iter().any(|t| t == "official"))
 }
 
 /// Search filter for querying skills.
@@ -75,6 +151,8 @@ pub struct SkillFilter {
     pub query: Option<String>,
     /// If true, only return skills whose SKILL.md exists on disk.
     pub require_exists: bool,
+    /// If true, only return skills admitted by the three-part gate (P0-2).
+    pub require_admitted: bool,
 }
 
 /// Search results with relevance ranking.
@@ -192,6 +270,14 @@ impl SkillLoader {
                     triggers: entry.triggers.clone(),
                     dependencies: entry.dependencies.clone(),
                     exists,
+                    exclusions: entry.exclusions.clone(),
+                    output_contract: entry.output_contract.clone(),
+                    license: entry.license.clone(),
+                    admission: gate_skill(
+                        &entry.triggers,
+                        &entry.exclusions,
+                        &entry.output_contract,
+                    ),
                 });
             }
         }
@@ -327,6 +413,10 @@ impl SkillLoader {
             return false;
         }
 
+        if filter.require_admitted && !skill.admission.is_admitted() {
+            return false;
+        }
+
         true
     }
 
@@ -371,6 +461,11 @@ impl SkillLoader {
             score += 5.0;
         }
 
+        // Bonus for passing the three-part intake gate (P0-2)
+        if skill.admission.is_admitted() {
+            score += 8.0;
+        }
+
         // Bonus for fewer dependencies (simpler = more likely standalone)
         score += (10.0 - skill.dependencies.len() as f64).max(0.0);
 
@@ -407,6 +502,14 @@ impl SkillLoader {
                     triggers: entry.triggers.clone(),
                     dependencies: entry.dependencies.clone(),
                     exists: false, // Not resolving in this context
+                    exclusions: entry.exclusions.clone(),
+                    output_contract: entry.output_contract.clone(),
+                    license: entry.license.clone(),
+                    admission: gate_skill(
+                        &entry.triggers,
+                        &entry.exclusions,
+                        &entry.output_contract,
+                    ),
                 });
 
                 // Recurse into dependencies
@@ -449,6 +552,14 @@ impl SkillLoader {
                             triggers: Vec::new(),
                             dependencies: Vec::new(),
                             exists: true,
+                            exclusions: Vec::new(),
+                            output_contract: None,
+                            license: String::new(),
+                            admission: SkillAdmission::NeedsWork {
+                                missing_trigger: true,
+                                missing_exclusion: true,
+                                missing_contract: true,
+                            },
                         });
                     }
                 } else if let Some(ext) = path.extension() {
@@ -468,6 +579,14 @@ impl SkillLoader {
                                 triggers: Vec::new(),
                                 dependencies: Vec::new(),
                                 exists: true,
+                                exclusions: Vec::new(),
+                                output_contract: None,
+                                license: String::new(),
+                                admission: SkillAdmission::NeedsWork {
+                                    missing_trigger: true,
+                                    missing_exclusion: true,
+                                    missing_contract: true,
+                                },
                             });
                         }
                     }
@@ -562,5 +681,160 @@ mod tests {
             SkillLoader::extract_description_legacy(content),
             "Fallback description"
         );
+    }
+
+    // -- P0-2 三段式门禁 --
+
+    fn gated_entry() -> SkillEntry {
+        SkillEntry {
+            description: "d".into(),
+            tags: vec![],
+            triggers: vec!["合并".into()],
+            dependencies: vec![],
+            exclusions: vec!["不用于删除".into()],
+            output_contract: Some("JSON".into()),
+            license: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_gate_admitted() {
+        let e = gated_entry();
+        assert_eq!(
+            gate_skill(&e.triggers, &e.exclusions, &e.output_contract),
+            SkillAdmission::Admitted
+        );
+    }
+
+    #[test]
+    fn test_gate_missing_parts() {
+        assert_eq!(
+            gate_skill(&[], &["x".into()], &Some("y".into())),
+            SkillAdmission::NeedsWork {
+                missing_trigger: true,
+                missing_exclusion: false,
+                missing_contract: false,
+            }
+        );
+        assert_eq!(
+            gate_skill(&["x".into()], &[], &None),
+            SkillAdmission::NeedsWork {
+                missing_trigger: false,
+                missing_exclusion: true,
+                missing_contract: true,
+            }
+        );
+        // 空白契约视同缺失
+        assert!(
+            gate_skill(&["x".into()], &["y".into()], &Some("  ".into()))
+                == SkillAdmission::NeedsWork {
+                    missing_trigger: false,
+                    missing_exclusion: false,
+                    missing_contract: true,
+                }
+        );
+    }
+
+    #[test]
+    fn test_admission_scoring_bonus() {
+        let loader = SkillLoader::new();
+        let admitted = ResolvedSkill {
+            name: "a".into(),
+            description: String::new(),
+            path: PathBuf::new(),
+            category: String::new(),
+            tags: Vec::new(),
+            triggers: Vec::new(),
+            dependencies: Vec::new(),
+            exists: false,
+            exclusions: Vec::new(),
+            output_contract: None,
+            license: String::new(),
+            admission: SkillAdmission::Admitted,
+        };
+        let needs_work = ResolvedSkill {
+            admission: SkillAdmission::NeedsWork {
+                missing_trigger: true,
+                missing_exclusion: true,
+                missing_contract: true,
+            },
+            ..admitted.clone()
+        };
+        let filter = SkillFilter::default();
+        let admitted_score = loader.compute_score(&admitted, &filter);
+        let needs_work_score = loader.compute_score(&needs_work, &filter);
+        assert!(admitted_score - needs_work_score >= 8.0);
+    }
+
+    // -- T35 E轨：license 透传＋官方去重占位 --
+
+    fn official_skill(name: &str) -> ResolvedSkill {
+        ResolvedSkill {
+            name: name.to_string(),
+            description: String::new(),
+            path: PathBuf::new(),
+            category: String::new(),
+            tags: vec!["official".to_string()],
+            triggers: Vec::new(),
+            dependencies: Vec::new(),
+            exists: true,
+            exclusions: Vec::new(),
+            output_contract: None,
+            license: "MIT".to_string(),
+            admission: SkillAdmission::NeedsWork {
+                missing_trigger: true,
+                missing_exclusion: true,
+                missing_contract: true,
+            },
+        }
+    }
+
+    #[test]
+    fn test_is_official_converged() {
+        let existing = vec![official_skill("DataSync")];
+        // 同名大小写不敏感＋official 近似即 true
+        assert!(is_official_converged("datasync", &existing));
+        assert!(is_official_converged("DATASYNC", &existing));
+        // 不同名即 false
+        assert!(!is_official_converged("other", &existing));
+        // 同名但无 official tag 即 false
+        let mut plain = official_skill("DataSync");
+        plain.tags = Vec::new();
+        assert!(!is_official_converged("datasync", &[plain]));
+        // 空表即 false
+        let empty: Vec<ResolvedSkill> = Vec::new();
+        assert!(!is_official_converged("datasync", &empty));
+    }
+
+    #[test]
+    fn test_skill_entry_t35_license_serde() {
+        // 旧快照（无 license）兼容且落默认空串
+        let old_json = r#"{"description":"d","tags":[],"triggers":["t"],"dependencies":[],"exclusions":["e"],"output_contract":"JSON"}"#;
+        let parsed: SkillEntry = match serde_json::from_str(old_json) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "old snapshot must parse: {e}");
+                return;
+            }
+        };
+        assert!(parsed.license.is_empty());
+        // 非默认往返
+        let mut full = parsed;
+        full.license = "Apache-2.0".to_string();
+        let value = match serde_json::to_value(&full) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "serialize must succeed: {e}");
+                return;
+            }
+        };
+        let back: SkillEntry = match serde_json::from_value(value) {
+            Ok(v) => v,
+            Err(e) => {
+                assert!(false, "round-trip must parse: {e}");
+                return;
+            }
+        };
+        assert_eq!(back.license, "Apache-2.0");
     }
 }
