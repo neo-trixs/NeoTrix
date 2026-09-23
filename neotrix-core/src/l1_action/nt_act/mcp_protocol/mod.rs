@@ -10,4 +10,7 @@ pub mod tool_endpoint;
 
 pub use protocol::McpProtocol;
 pub use resource_endpoint::{McpResourceEndpoint, McpResourceRegistry};
-pub use tool_endpoint::{McpToolEndpoint, McpToolRegistry};
+pub use tool_endpoint::{McpEndpointRegistry, McpToolEndpoint};
+/// 迁移期重导出（deprecated 别名，调用方正迁往 McpEndpointRegistry）
+#[allow(deprecated)]
+pub use tool_endpoint::McpToolRegistry;

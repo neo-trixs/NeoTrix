@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use super::resource_endpoint::{McpResourceEndpoint, McpResourceRegistry};
-use super::tool_endpoint::{McpToolEndpoint, McpToolRegistry};
+use super::tool_endpoint::{McpEndpointRegistry, McpToolEndpoint};
 
 // ============================================================================
 // MCP Protocol
@@ -19,7 +19,7 @@ use super::tool_endpoint::{McpToolEndpoint, McpToolRegistry};
 /// handshake, and routes incoming JSON-RPC-style requests to the
 /// correct handler.
 pub struct McpProtocol {
-    tools: McpToolRegistry,
+    tools: McpEndpointRegistry,
     resources: McpResourceRegistry,
     version: String,
 }
@@ -28,7 +28,7 @@ impl McpProtocol {
     /// Create a new protocol with the given MCP version string.
     pub fn new(version: &str) -> Self {
         Self {
-            tools: McpToolRegistry::new(),
+            tools: McpEndpointRegistry::new(),
             resources: McpResourceRegistry::new(),
             version: version.to_string(),
         }
@@ -50,7 +50,7 @@ impl McpProtocol {
     }
 
     /// Reference to the tool registry.
-    pub fn tools(&self) -> &McpToolRegistry {
+    pub fn tools(&self) -> &McpEndpointRegistry {
         &self.tools
     }
 

@@ -16,12 +16,15 @@ pub struct ToolResult {
     pub error: Option<String>,
 }
 
-/// MCP 工具注册表
-pub struct McpToolRegistry {
+/// MCP HTTP 注册表（传输层静态注册表：只做 HTTP 外暴露，不做能力注册/调度）。
+pub struct McpHttpRegistry {
     tools: Vec<McpTool>,
 }
 
-impl McpToolRegistry {
+#[deprecated(note = "use `McpHttpRegistry` instead")]
+pub type McpToolRegistry = McpHttpRegistry;
+
+impl McpHttpRegistry {
     pub fn new() -> Self {
         Self { tools: Vec::new() }
     }
@@ -48,8 +51,8 @@ impl McpToolRegistry {
 }
 
 /// 创建默认工具注册表
-pub fn create_default_registry() -> McpToolRegistry {
-    let mut registry = McpToolRegistry::new();
+pub fn create_default_registry() -> McpHttpRegistry {
+    let mut registry = McpHttpRegistry::new();
 
     // ── 基础工具 ──────────────────────────────────────────────────
     registry.register(McpTool {

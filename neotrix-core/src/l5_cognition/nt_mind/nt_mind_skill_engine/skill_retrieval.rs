@@ -9,7 +9,7 @@
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEntry;
+use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillDocEntry;
 
 /// 技能检索查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -190,7 +190,7 @@ impl _SkillRetriever {
     }
 
     /// 索引技能 (计算嵌入 + 分类)
-    pub(crate) fn _index_skill(&self, skill: &SkillEntry) -> Result<(), String> {
+    pub(crate) fn _index_skill(&self, skill: &SkillDocEntry) -> Result<(), String> {
         let text = format!("{} {}", skill.name, skill.description);
         let embedding = self.bi_encoder.encode(&text)?;
 
@@ -214,7 +214,7 @@ impl _SkillRetriever {
     }
 
     /// 批量索引
-    pub(crate) fn _index_skills(&self, skills: &[SkillEntry]) -> Result<usize, String> {
+    pub(crate) fn _index_skills(&self, skills: &[SkillDocEntry]) -> Result<usize, String> {
         let mut count = 0;
         for skill in skills {
             if self._index_skill(skill).is_ok() {

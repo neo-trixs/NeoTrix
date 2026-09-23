@@ -34,7 +34,7 @@ priority: 80
         let dir = setup_temp_dir();
         let path = dir.path().join("no-selftest.md");
         std::fs::write(&path, sample_skill_content()).unwrap();
-        let entry = SkillEntry::from_file(&path).unwrap();
+        let entry = SkillDocEntry::from_file(&path).unwrap();
         assert!(!entry.verified, "skill without scripts/selftest must be unverified");
     }
 
@@ -47,7 +47,7 @@ priority: 80
         std::fs::create_dir_all(&scripts).unwrap();
         std::fs::write(skill_dir.join("SKILL.md"), sample_skill_content()).unwrap();
         std::fs::write(scripts.join("selftest.sh"), "#!/usr/bin/env bash\necho '{\"gates\":[]}'\n").unwrap();
-        let entry = SkillEntry::from_file(&skill_dir.join("SKILL.md")).unwrap();
+        let entry = SkillDocEntry::from_file(&skill_dir.join("SKILL.md")).unwrap();
         assert!(entry.verified, "skill with scripts/selftest.sh must be verified");
     }
 
@@ -59,7 +59,7 @@ priority: 80
         std::fs::create_dir_all(&scripts).unwrap();
         std::fs::write(skill_dir.join("SKILL.md"), sample_skill_content()).unwrap();
         std::fs::write(scripts.join("selftest.js"), "console.log('{\"gates\":[]}')").unwrap();
-        let entry = SkillEntry::from_file(&skill_dir.join("SKILL.md")).unwrap();
+        let entry = SkillDocEntry::from_file(&skill_dir.join("SKILL.md")).unwrap();
         assert!(entry.verified);
     }
 
@@ -69,7 +69,7 @@ priority: 80
         let path = dir.path().join("test.md");
         std::fs::write(&path, sample_skill_content()).unwrap();
 
-        let entry = SkillEntry::from_file(&path).unwrap();
+        let entry = SkillDocEntry::from_file(&path).unwrap();
         assert_eq!(entry.name, "rust-analyzer");
         assert_eq!(entry.description, "Expertise in Rust code analysis and optimization");
         assert_eq!(entry.triggers, vec!["rust", "cargo", "unsafe", "lifetime", "ownership"]);
@@ -85,7 +85,7 @@ priority: 80
         let dir = setup_temp_dir();
         let path = dir.path().join("test.md");
         std::fs::write(&path, sample_skill_content_no_frontmatter()).unwrap();
-        assert!(SkillEntry::from_file(&path).is_none());
+        assert!(SkillDocEntry::from_file(&path).is_none());
     }
 
     #[test]
@@ -97,7 +97,7 @@ body"#;
         let dir = setup_temp_dir();
         let path = dir.path().join("test.md");
         std::fs::write(&path, content).unwrap();
-        assert!(SkillEntry::from_file(&path).is_none());
+        assert!(SkillDocEntry::from_file(&path).is_none());
     }
 
     #[test]
@@ -110,7 +110,7 @@ body"#;
         let dir = setup_temp_dir();
         let path = dir.path().join("test.md");
         std::fs::write(&path, content).unwrap();
-        let entry = SkillEntry::from_file(&path).unwrap();
+        let entry = SkillDocEntry::from_file(&path).unwrap();
         assert_eq!(entry.priority, 50);
     }
 
@@ -382,7 +382,7 @@ body"#;
         let dir = setup_temp_dir();
         let path = dir.path().join("test.md");
         std::fs::write(&path, content).unwrap();
-        let entry = SkillEntry::from_file(&path).unwrap();
+        let entry = SkillDocEntry::from_file(&path).unwrap();
         let body = entry.body();
         assert!(body.contains("Analyze Rust code"));
         assert!(body.to_lowercase().contains("suggest optimizations"));
@@ -480,7 +480,7 @@ low"#;
 
     #[test]
     fn test_skill_entry_from_content_direct() {
-        let entry = SkillEntry::from_content(Path::new("test.md"), sample_skill_content());
+        let entry = SkillDocEntry::from_content(Path::new("test.md"), sample_skill_content());
         assert!(entry.is_some());
         let entry = entry.unwrap();
         assert_eq!(entry.name, "rust-analyzer");
@@ -665,14 +665,14 @@ category: "test-domain"
 parent: root-skill
 ---
 body"#;
-        let entry = SkillEntry::from_content(Path::new("nested.md"), content).unwrap();
+        let entry = SkillDocEntry::from_content(Path::new("nested.md"), content).unwrap();
         assert_eq!(entry.category, "test-domain");
         assert_eq!(entry.parent, "root-skill");
     }
 
     #[test]
     fn test_default_category_is_general() {
-        let entry = SkillEntry::from_content(Path::new("x.md"), sample_skill_content()).unwrap();
+        let entry = SkillDocEntry::from_content(Path::new("x.md"), sample_skill_content()).unwrap();
         assert_eq!(entry.category, "general");
         assert!(entry.parent.is_empty());
     }
@@ -1124,7 +1124,7 @@ category: general
         let mut engine = SkillEngine::new(PathBuf::from("/nonexistent/skills"));
         // 直接注入 4 个活跃技能 (优先级 4/3/2/1 → 1 最高)
         for (name, prio) in [("low", 4u8), ("mid", 3), ("high", 2), ("top", 1)] {
-            engine.skills.push(SkillEntry {
+            engine.skills.push(SkillDocEntry {
                 name: name.to_string(),
                 description: format!("skill {}", name),
                 category: "test".into(),
@@ -1498,7 +1498,7 @@ category: general
         let dir = std::env::temp_dir().join("neotrix_quality_test");
         let _ = std::fs::create_dir_all(&dir);
         std::fs::write(dir.join("SKILL.md"), content).unwrap();
-        let skill = SkillEntry::from_file(&dir.join("SKILL.md")).expect("parse skill");
+        let skill = SkillDocEntry::from_file(&dir.join("SKILL.md")).expect("parse skill");
         let scores = SkillQualityScorer::evaluate(&skill);
         assert!(scores.completeness > 0.8, "结构化 skill 完整性高, got {}", scores.completeness);
         assert!(scores.executability > 0.0, "Verification 段 → 可执行性 >0");
@@ -1514,7 +1514,7 @@ category: general
         let dir = std::env::temp_dir().join("neotrix_quality_danger_test");
         let _ = std::fs::create_dir_all(&dir);
         std::fs::write(dir.join("SKILL.md"), content).unwrap();
-        let skill = SkillEntry::from_file(&dir.join("SKILL.md")).expect("parse skill");
+        let skill = SkillDocEntry::from_file(&dir.join("SKILL.md")).expect("parse skill");
         let scores = SkillQualityScorer::evaluate(&skill);
         assert!(scores.safety < 0.5, "危险命令 → 安全分低, got {}", scores.safety);
         assert!(!scores.passes_gate(0.5, 0.6), "安全分不足 → 拒绝");
@@ -1522,8 +1522,8 @@ category: general
     }
 
     // ── A5b (SkillNet): 技能组合推断 ──
-    fn skill_entry(name: &str, category: &str, tools: &[&str], triggers: &[&str]) -> SkillEntry {
-        SkillEntry {
+    fn skill_entry(name: &str, category: &str, tools: &[&str], triggers: &[&str]) -> SkillDocEntry {
+        SkillDocEntry {
             name: name.to_string(),
             description: String::new(),
             triggers: triggers.iter().map(|s| s.to_string()).collect(),
@@ -1581,7 +1581,7 @@ category: general
     #[test]
     fn test_quality_scores_measure_resident_tokens() {
         // 短技能: resident/body 应小且 cost_awareness 高。
-        let short = SkillEntry {
+        let short = SkillDocEntry {
             name: "short-skill".into(),
             description: "quick helper".into(),
             triggers: vec!["quick".into()],

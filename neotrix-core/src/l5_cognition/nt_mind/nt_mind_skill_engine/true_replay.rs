@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use super::SkillEntry;
+use super::SkillDocEntry;
 
 /// 验证清单项
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,12 +44,12 @@ pub struct _ReplayReport {
 
 /// Baseline 运行器 trait
 pub trait _BaselineRunner: Send + Sync {
-    fn run(&self, skill: &SkillEntry, input: &str) -> Result<String, String>;
+    fn run(&self, skill: &SkillDocEntry, input: &str) -> Result<String, String>;
 }
 
 /// Candidate 运行器 trait
 pub trait _CandidateRunner: Send + Sync {
-    fn run(&self, skill: &SkillEntry, input: &str) -> Result<String, String>;
+    fn run(&self, skill: &SkillDocEntry, input: &str) -> Result<String, String>;
 }
 
 /// True Replay 验证器
@@ -123,7 +123,7 @@ impl _TrueReplayValidator {
         ]
     }
 
-    pub fn validate(&self, skill: &SkillEntry, test_inputs: &[String]) -> Result<_ReplayReport, String> {
+    pub fn validate(&self, skill: &SkillDocEntry, test_inputs: &[String]) -> Result<_ReplayReport, String> {
         let mut results = Vec::new();
         let mut all_mandatory_passed = true;
         let mut weighted_score = 0.0;
@@ -180,7 +180,7 @@ impl _TrueReplayValidator {
         })
     }
 
-    fn run_baseline(&self, skill: &SkillEntry, input: &str) -> Result<String, String> {
+    fn run_baseline(&self, skill: &SkillDocEntry, input: &str) -> Result<String, String> {
         if let Some(ref runner) = self.baseline_runner {
             runner.run(skill, input)
         } else {
@@ -188,7 +188,7 @@ impl _TrueReplayValidator {
         }
     }
 
-    fn run_candidate(&self, skill: &SkillEntry, input: &str) -> Result<String, String> {
+    fn run_candidate(&self, skill: &SkillDocEntry, input: &str) -> Result<String, String> {
         if let Some(ref runner) = self.candidate_runner {
             runner.run(skill, input)
         } else {

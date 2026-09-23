@@ -30,7 +30,10 @@ pub struct McpToolResult {
     pub is_error: bool,
 }
 
-/// MCP Bridge — 管理工具注册和调用
+/// MCP Bridge — 只做 IO 桥接，不做能力注册。
+///
+/// 在本地工具与外部 MCP 服务器之间转发调用；能力注册由传输层注册表负责，
+/// 本桥不做能力注册。
 pub struct McpBridge {
     /// 已注册的本地工具 (供外部调用)
     local_tools: HashMap<String, McpTool>,

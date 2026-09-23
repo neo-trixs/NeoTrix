@@ -640,16 +640,18 @@ mod tests {
 
     #[test]
     fn test_tier_classification() {
+        // 输入为 $/token；classify 按 $/1K 分档（阈值见 classify_tier）。
+        // 此前三档输入小了 1000×（落在 Free 区间），按单位约定修正输入，档位意图不变。
         let free = ModelProfile::new("free", "test", 0.0, 0.0, 0.5, 100, 8_000);
         assert_eq!(free.tier, PricingTier::Free);
 
-        let budget = ModelProfile::new("budget", "test", 0.05e-6, 0.1e-6, 0.6, 200, 32_000);
+        let budget = ModelProfile::new("budget", "test", 0.05e-3, 0.1e-3, 0.6, 200, 32_000);
         assert_eq!(budget.tier, PricingTier::Budget);
 
-        let standard = ModelProfile::new("standard", "test", 2.5e-6, 10.0e-6, 0.9, 500, 128_000);
+        let standard = ModelProfile::new("standard", "test", 2.5e-4, 10.0e-4, 0.9, 500, 128_000);
         assert_eq!(standard.tier, PricingTier::Standard);
 
-        let premium = ModelProfile::new("premium", "test", 15.0e-6, 75.0e-6, 0.99, 1000, 200_000);
+        let premium = ModelProfile::new("premium", "test", 15.0e-3, 75.0e-3, 0.99, 1000, 200_000);
         assert_eq!(premium.tier, PricingTier::Premium);
     }
 

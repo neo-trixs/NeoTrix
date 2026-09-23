@@ -42,12 +42,15 @@ pub struct ToolDescription {
 // Registry
 // ============================================================================
 
-/// Thread-safe registry of MCP tool endpoints.
-pub struct McpToolRegistry {
+/// Thread-safe registry of MCP tool endpoints (endpoint dispatch only, no capability registration).
+pub struct McpEndpointRegistry {
     tools: RwLock<HashMap<String, Arc<dyn McpToolEndpoint>>>,
 }
 
-impl McpToolRegistry {
+#[deprecated(note = "use `McpEndpointRegistry` instead")]
+pub type McpToolRegistry = McpEndpointRegistry;
+
+impl McpEndpointRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
         Self {
@@ -101,7 +104,7 @@ impl McpToolRegistry {
     }
 }
 
-impl Default for McpToolRegistry {
+impl Default for McpEndpointRegistry {
     fn default() -> Self {
         Self::new()
     }
@@ -162,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_register_and_call() {
-        let registry = McpToolRegistry::new();
+        let registry = McpEndpointRegistry::new();
         assert_eq!(registry.tool_count(), 0);
 
         registry.register(Arc::new(EchoTool));
@@ -176,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_list_tools() {
-        let registry = McpToolRegistry::new();
+        let registry = McpEndpointRegistry::new();
         registry.register(Arc::new(EchoTool));
         registry.register(Arc::new(FailTool));
 
@@ -190,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_call_tool_not_found() {
-        let registry = McpToolRegistry::new();
+        let registry = McpEndpointRegistry::new();
         let result = registry.call_tool("missing", json!({}));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
@@ -198,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_call_tool_failure_propagation() {
-        let registry = McpToolRegistry::new();
+        let registry = McpEndpointRegistry::new();
         registry.register(Arc::new(FailTool));
         let result = registry.call_tool("fail", json!({}));
         assert!(result.is_err());
@@ -207,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_overwrite_registration() {
-        let registry = McpToolRegistry::new();
+        let registry = McpEndpointRegistry::new();
         registry.register(Arc::new(EchoTool));
         registry.register(Arc::new(EchoTool));
         assert_eq!(registry.tool_count(), 1);
