@@ -1,8 +1,8 @@
 //! Hook 生命周期系统 — 25+ 事件点 × before/after
 //! 集成到 SEAL pipeline、CLI 命令、GWT 广播的全生命周期
 
-use std::collections::HashMap;
 use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+use std::collections::HashMap;
 
 /// 钩子事件枚举 — 覆盖 SEAL 管线、CLI 命令、E8 推理、GWT 广播
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -78,7 +78,9 @@ impl HookContext {
             brain_state: None,
             payload: None,
             timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         }
     }
 
@@ -88,7 +90,11 @@ impl HookContext {
     }
 
     pub(crate) fn _with_brain(mut self, brain: &SelfIteratingBrain) -> Self {
-        self.brain_state = Some(format!("iter={}, champion={:?}", brain.iteration, brain.champion.is_some()));
+        self.brain_state = Some(format!(
+            "iter={}, champion={:?}",
+            brain.iteration,
+            brain.champion.is_some()
+        ));
         self
     }
 }
@@ -108,11 +114,19 @@ pub struct HookResult {
 
 impl HookResult {
     pub fn ok(msg: &str) -> Self {
-        Self { success: true, message: msg.to_string(), effects: vec![] }
+        Self {
+            success: true,
+            message: msg.to_string(),
+            effects: vec![],
+        }
     }
 
     pub fn err(msg: &str) -> Self {
-        Self { success: false, message: msg.to_string(), effects: vec![] }
+        Self {
+            success: false,
+            message: msg.to_string(),
+            effects: vec![],
+        }
     }
 
     pub fn with_effect(mut self, effect: &str) -> Self {
@@ -132,8 +146,7 @@ struct HookLogEntry {
     event: HookEvent,
     action: String,
     success: bool,
-    #[allow(dead_code)]
-    message: String,
+    // (message 写-only 已删除; _recent_log 仅格式化 timestamp/event/action/success)
     timestamp: u64,
 }
 
@@ -169,9 +182,10 @@ impl MindHookRegistry {
                     event: event.clone(),
                     action: action.name().to_string(),
                     success: result.success,
-                    message: result.message.clone(),
                     timestamp: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
                 });
                 results.push(result);
             }
@@ -188,9 +202,20 @@ impl MindHookRegistry {
     }
 
     pub(crate) fn _recent_log(&self, limit: usize) -> Vec<String> {
-        self.execution_log.iter().rev().take(limit).map(|e| {
-            format!("[{}] {:?} -> {}: {}", e.timestamp, e.event, e.action, if e.success { "OK" } else { "FAIL" })
-        }).collect()
+        self.execution_log
+            .iter()
+            .rev()
+            .take(limit)
+            .map(|e| {
+                format!(
+                    "[{}] {:?} -> {}: {}",
+                    e.timestamp,
+                    e.event,
+                    e.action,
+                    if e.success { "OK" } else { "FAIL" }
+                )
+            })
+            .collect()
     }
 
     pub(crate) fn _clear_log(&mut self) {
@@ -211,7 +236,9 @@ pub struct LogHook {
 
 impl LogHook {
     pub fn new(prefix: &str) -> Self {
-        Self { prefix: prefix.to_string() }
+        Self {
+            prefix: prefix.to_string(),
+        }
     }
 }
 
@@ -229,16 +256,31 @@ impl HookAction for LogHook {
 /// 提供所有预定义的 HookEvent 常量名
 pub mod events {
     pub const ALL_HOOKS: &[&str] = &[
-        "seal_before_each", "seal_after_each", "seal_before_pipeline", "seal_after_pipeline",
-        "cli_before_execute", "cli_after_execute",
-        "e8_reasoning_start", "e8_reasoning_complete",
-        "gwt_broadcast", "gwt_resonance",
-        "subagent_spawned", "subagent_message", "subagent_completed",
-        "plan_created", "plan_step_completed", "plan_failed",
-        "session_start", "session_end", "session_recovered",
-        "kb_node_created", "kb_search",
-        "conversation_distilled", "evolution_created",
-        "skill_loaded", "skill_unloaded",
+        "seal_before_each",
+        "seal_after_each",
+        "seal_before_pipeline",
+        "seal_after_pipeline",
+        "cli_before_execute",
+        "cli_after_execute",
+        "e8_reasoning_start",
+        "e8_reasoning_complete",
+        "gwt_broadcast",
+        "gwt_resonance",
+        "subagent_spawned",
+        "subagent_message",
+        "subagent_completed",
+        "plan_created",
+        "plan_step_completed",
+        "plan_failed",
+        "session_start",
+        "session_end",
+        "session_recovered",
+        "kb_node_created",
+        "kb_search",
+        "conversation_distilled",
+        "evolution_created",
+        "skill_loaded",
+        "skill_unloaded",
     ];
 }
 
@@ -248,7 +290,9 @@ mod tests {
 
     struct TestHook;
     impl HookAction for TestHook {
-        fn name(&self) -> &str { "test_hook" }
+        fn name(&self) -> &str {
+            "test_hook"
+        }
         fn execute(&self, ctx: &HookContext) -> HookResult {
             HookResult::ok(&format!("handled: {}", ctx.message))
         }

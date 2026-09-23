@@ -7,16 +7,15 @@
 //! - 概念路由表
 //! - 跨会话记忆
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 知识管线增强
 pub struct _KnowledgePipelineEnhanced {
     pipelines: Vec<_KnowledgePipeline>,
     concepts: Vec<_ConceptNode>,
     route_table: HashMap<String, String>,
-    #[allow(dead_code)]
-    config: KnowledgePipelineConfig,
+    // (config 写-only 已删除; KnowledgePipelineConfig 类型保留)
     stats: PipelineStats,
 }
 
@@ -57,9 +56,9 @@ pub struct _KnowledgePipeline {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum _PipelineType {
-    Absorption,     // 吸收管线
-    Distillation,   // 蒸馏管线
-    Classification, // 分类管线
+    Absorption,      // 吸收管线
+    Distillation,    // 蒸馏管线
+    Classification,  // 分类管线
     Synchronization, // 同步管线
 }
 
@@ -121,7 +120,6 @@ impl _KnowledgePipelineEnhanced {
             pipelines: Vec::new(),
             concepts: Vec::new(),
             route_table: HashMap::new(),
-            config: KnowledgePipelineConfig::default(),
             stats: PipelineStats {
                 total_pipelines: 0,
                 running_pipelines: 0,
@@ -197,7 +195,8 @@ impl _KnowledgePipelineEnhanced {
     pub fn add_concept(&mut self, concept: _ConceptNode) {
         // 添加到路由表
         for route in &concept.routes {
-            self.route_table.insert(route.clone(), concept.concept_id.clone());
+            self.route_table
+                .insert(route.clone(), concept.concept_id.clone());
         }
 
         self.concepts.push(concept);
@@ -212,7 +211,8 @@ impl _KnowledgePipelineEnhanced {
 
     /// 通过路由查询
     pub(crate) fn _query_by_route(&self, route: &str) -> Option<&_ConceptNode> {
-        self.route_table.get(route)
+        self.route_table
+            .get(route)
             .and_then(|concept_id| self.concepts.iter().find(|c| c.concept_id == *concept_id))
     }
 

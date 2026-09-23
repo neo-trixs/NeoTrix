@@ -281,9 +281,7 @@ pub struct DiscoveryManager {
     pub discovery: DistributedDiscovery,
     /// 发现任务
     tasks: Vec<DiscoveryTask>,
-    /// 最大并发任务
-    #[allow(dead_code)]
-    max_concurrent_tasks: usize,
+    // (max_concurrent_tasks 写-only 已删除; 并发由调用方 gateway 侧控制)
 }
 
 /// 任务状态
@@ -314,7 +312,6 @@ impl DiscoveryManager {
         Self {
             discovery,
             tasks: Vec::new(),
-            max_concurrent_tasks: 10,
         }
     }
 
