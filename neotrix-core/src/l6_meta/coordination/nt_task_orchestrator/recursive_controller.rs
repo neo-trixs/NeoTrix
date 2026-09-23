@@ -10,6 +10,8 @@
 use serde::{Serialize, Deserialize};
 
 /// 任务节点
+///
+/// 降级定位（E1.4/T19）：ROMA 递归控制节点，只做递归展开。正典调度见 L1 Scheduler。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskNode {
     pub id: String,

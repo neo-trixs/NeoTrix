@@ -4,6 +4,7 @@
 
 pub mod capability;
 pub mod nt_crt;
+pub mod nt_core_cost_ladder; // 成本阶梯（孤儿接线 T45+2）
 pub mod nt_iit_phi;
 pub mod nt_meta;
 pub mod nt_forecast;

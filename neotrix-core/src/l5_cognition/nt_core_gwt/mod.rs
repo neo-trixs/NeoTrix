@@ -3,6 +3,7 @@ pub mod cognitive_hub;
 pub mod cognitive_type;
 pub mod compaction;
 pub mod competition_gate;
+pub mod cost_router; // GWT 成本路由（孤儿接线 T45+2）
 pub mod ctm_verifier;
 pub mod independence;
 pub mod instruction_follow;

@@ -190,6 +190,87 @@ pub enum CoreEvent {
         event_type: String,
         payload: serde_json::Value,
     },
+
+    // ── T28 实体生命周期 (E3) ───────────────────────────────────────────
+    #[serde(rename = "workspace_switched")]
+    WorkspaceSwitched {
+        workspace_id: String,
+        agent_count: usize,
+        skill_count: usize,
+    },
+    #[serde(rename = "workspace_agent_added")]
+    WorkspaceAgentAdded {
+        workspace_id: String,
+        agent_id: String,
+    },
+    #[serde(rename = "workspace_agent_removed")]
+    WorkspaceAgentRemoved {
+        workspace_id: String,
+        agent_id: String,
+    },
+    #[serde(rename = "agent_status_changed")]
+    AgentStatusChanged {
+        agent_id: String,
+        old_status: String,
+        new_status: String,
+    },
+    #[serde(rename = "agent_task_delegated")]
+    AgentTaskDelegated {
+        from_agent: String,
+        to_agent: String,
+        task_id: String,
+    },
+    #[serde(rename = "skill_installed")]
+    SkillInstalled {
+        skill_id: String,
+        workspace_id: String,
+        version: u32,
+    },
+    #[serde(rename = "skill_executed")]
+    SkillExecuted {
+        skill_id: String,
+        agent_id: String,
+        success: bool,
+        duration_ms: u64,
+    },
+    #[serde(rename = "skill_maturity_changed")]
+    SkillMaturityChanged {
+        skill_id: String,
+        old_maturity: String,
+        new_maturity: String,
+    },
+    #[serde(rename = "task_assigned")]
+    TaskAssigned {
+        task_id: String,
+        agent_id: String,
+        workspace_id: String,
+    },
+    #[serde(rename = "task_completed_v2")]
+    TaskCompletedV2 {
+        task_id: String,
+        execution_id: String,
+        success: bool,
+        deliverables: Vec<String>,
+    },
+    #[serde(rename = "mcp_tool_called")]
+    McpToolCalled {
+        tool_name: String,
+        server_name: String,
+        agent_id: String,
+        latency_ms: u64,
+        success: bool,
+    },
+    #[serde(rename = "mcp_server_connected")]
+    McpServerConnected {
+        server_name: String,
+        tool_count: usize,
+    },
+    #[serde(rename = "upgrade_available")]
+    UpgradeAvailable {
+        agent_id: String,
+        installed_version: String,
+        latest_version: String,
+    },
 }
 
 // ── Backward-compatible type aliases ──────────────────────────────────────
@@ -311,6 +392,65 @@ mod tests {
             } => {
                 assert_eq!(goal_id, "g1");
                 assert_eq!(iterations, 5);
+            }
+            _ => return Err("wrong variant".to_string()),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_workspace_switched_serde_roundtrip() -> Result<(), String> {
+        let e = CoreEvent::WorkspaceSwitched {
+            workspace_id: "ws1".into(),
+            agent_count: 2,
+            skill_count: 3,
+        };
+        let v = serde_json::to_value(&e).map_err(|e| e.to_string())?;
+        match v.get("type").and_then(|t| t.as_str()) {
+            Some("workspace_switched") => {}
+            other => return Err(format!("wrong tag: {:?}", other)),
+        }
+        let parsed: CoreEvent = serde_json::from_value(v).map_err(|e| e.to_string())?;
+        match parsed {
+            CoreEvent::WorkspaceSwitched {
+                workspace_id,
+                agent_count,
+                skill_count,
+            } => {
+                assert_eq!(workspace_id, "ws1");
+                assert_eq!(agent_count, 2);
+                assert_eq!(skill_count, 3);
+            }
+            _ => return Err("wrong variant".to_string()),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_skill_executed_serde_roundtrip() -> Result<(), String> {
+        let e = CoreEvent::SkillExecuted {
+            skill_id: "sk1".into(),
+            agent_id: "a1".into(),
+            success: true,
+            duration_ms: 120,
+        };
+        let v = serde_json::to_value(&e).map_err(|e| e.to_string())?;
+        match v.get("type").and_then(|t| t.as_str()) {
+            Some("skill_executed") => {}
+            other => return Err(format!("wrong tag: {:?}", other)),
+        }
+        let parsed: CoreEvent = serde_json::from_value(v).map_err(|e| e.to_string())?;
+        match parsed {
+            CoreEvent::SkillExecuted {
+                skill_id,
+                agent_id,
+                success,
+                duration_ms,
+            } => {
+                assert_eq!(skill_id, "sk1");
+                assert_eq!(agent_id, "a1");
+                assert!(success);
+                assert_eq!(duration_ms, 120);
             }
             _ => return Err("wrong variant".to_string()),
         }
@@ -453,6 +593,19 @@ impl CoreEvent {
             | Self::GameTrainingUpdate { .. }
             | Self::GameConsciousnessFeedback { .. } => "nt_mind",
             Self::DomainEvent { domain, .. } => domain,
+            Self::WorkspaceSwitched { .. }
+            | Self::WorkspaceAgentAdded { .. }
+            | Self::WorkspaceAgentRemoved { .. }
+            | Self::AgentStatusChanged { .. }
+            | Self::AgentTaskDelegated { .. }
+            | Self::SkillInstalled { .. }
+            | Self::SkillExecuted { .. }
+            | Self::SkillMaturityChanged { .. }
+            | Self::TaskAssigned { .. }
+            | Self::TaskCompletedV2 { .. }
+            | Self::McpToolCalled { .. }
+            | Self::McpServerConnected { .. }
+            | Self::UpgradeAvailable { .. } => "nt_core",
         }
     }
 

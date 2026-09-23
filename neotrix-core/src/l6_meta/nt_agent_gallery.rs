@@ -95,6 +95,43 @@ impl AgentGallery {
         }
     }
 
+    /// Feed gallery from L5 preset AgentCards (E1.2 T15).
+    ///
+    /// Field mapping uses only fields observed on both sides:
+    /// `id / name / description / tags / version`.
+    /// Remaining `GalleryPreset` fields take builtin-style defaults;
+    /// `install()` logic is untouched.
+    pub fn register_builtin_from_presets(&mut self) {
+        for card in crate::l5_cognition::nt_agent::presets::all_presets() {
+            if self.presets.iter().any(|p| p.id == card.id) {
+                continue;
+            }
+            let specialty = match card.tags.first() {
+                Some(t) => t.clone(),
+                None => card.id.clone(),
+            };
+            self.presets.push(GalleryPreset {
+                id: card.id.clone(),
+                name: card.name.clone(),
+                avatar: "🤖".to_string(),
+                description: card.description.clone(),
+                specialty,
+                personality: card.description.clone(),
+                autonomy: AutonomyLevel::ReadOnly,
+                cost_budget: 0.0,
+                provider: None,
+                model: None,
+                system_prompt: None,
+                tags: card.tags.clone(),
+                source: "builtin".to_string(),
+                author: Some("NeoTrix".to_string()),
+                version: card.version.clone(),
+                rating: 0.0,
+                install_count: 0,
+            });
+        }
+    }
+
     /// Register a community preset
     pub fn register_community(&mut self, preset: GalleryPreset) {
         self.presets.push(preset);
