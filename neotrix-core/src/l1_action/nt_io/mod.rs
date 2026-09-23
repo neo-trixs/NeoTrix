@@ -44,6 +44,8 @@ pub mod nt_io_plugin;
 pub mod platform_gateway;
 pub mod nt_io_http_factory;
 pub mod universal_browser;
+/// 浏览器网络捕获（XHR URL＋响应体＋文本/坐标点击 JS＋登录壳检查，WSD 实战融合）
+pub mod nt_io_browser_capture;
 pub mod nt_io_proxy_server;
 #[cfg(feature = "desktop")]
 pub mod nt_io_desktop;
