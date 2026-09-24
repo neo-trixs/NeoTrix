@@ -86,8 +86,9 @@ workspace 14/14 对齐；`decision-engine` 意图性隔离（编译红，见 §�
    NTZ1/SQLite 语义逐命令 diff；browser_engine/memory_kb 排后。
 3. **认知下沉（按周，需产品拍板）**：TTC/PRM/TD trait 先行（DimensionAxis 模式已验证），
    实现搬迁另算；dispatcher 签名换本地 trait（LocalCrtPlan/LocalTrace 已有）。
-4. **oauth2 4→5（半天）**：消灭 reqwest 0.11（唯一可动的多版本），同步 exchange 改 async，
-   调用链在 `social_access/auth.rs` 单文件内。
+4. **oauth2 4→5（已完成，需方认领提交）**：reqwest 0.11 已退出 lock；
+   `social_access/auth.rs` 完整 v5 化（typestate 构建器+显式端点类型+blocking 同步交换），
+   `cargo check -p neotrix --lib` 0 error 验证通过。文件仍是未提交状态，等 owner 收。
 5. **施工纪律（立即，零成本）**：脏区仍 ~900——handoff 恢复写；门禁本轮 3 次真拦截
    （consciousness 笔误、axis 漏消费者、game 版本号），保持常开；selective-stage 走
    blob 手术（`scripts/ops/PATCHING.md`）。
