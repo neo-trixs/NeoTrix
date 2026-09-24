@@ -147,6 +147,17 @@ project-search:
 	@echo "[MAKEFILE] 搜索功能: $(QUERY)"
 	@grep -i "$(QUERY)" .project-map/functions.txt 2>/dev/null || echo "未找到匹配项"
 
+# 精细定位（索引优先，毫秒级）：make project-locate COMPONENT=Foo / FILE=bar.rs / QUERY=xxx
+project-locate:
+	@if [ -n "$(COMPONENT)" ]; then python3 scripts/ops/nt_locate.py --component "$(COMPONENT)" --root .; \
+	elif [ -n "$(FILE)" ]; then python3 scripts/ops/nt_locate.py --source-file "$(FILE)" --root .; \
+	elif [ -n "$(QUERY)" ]; then python3 scripts/ops/nt_locate.py --selector "$(QUERY)" --root .; \
+	else echo "用法: make project-locate COMPONENT=Foo | FILE=bar.rs | QUERY=xxx"; exit 1; fi
+
+# 索引完整性审计（CI 用）：missing 必须为 0
+project-audit-map:
+	@python3 scripts/ops/nt_locate.py --audit --root .
+
 # 显示项目统计
 project-stats:
 	@echo "[MAKEFILE] 项目统计:"

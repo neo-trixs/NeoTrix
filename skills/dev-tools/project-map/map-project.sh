@@ -51,3 +51,9 @@ done
 
 echo "=== 完成 ==="
 echo "输出目录: $OUTPUT_DIR"
+
+# 结构化 code map (nt_mapgen.py → codemap.json, 供 nt_locate 索引模式):
+if command -v python3 >/dev/null 2>&1 && [ -f "$PROJECT_ROOT/scripts/ops/nt_mapgen.py" ]; then
+  echo "4. 生成结构化索引..."
+  python3 "$PROJECT_ROOT/scripts/ops/nt_mapgen.py" --root "$PROJECT_ROOT" \
+    --out "$OUTPUT_DIR/codemap.json" || echo "(codemap 生成跳过)"
