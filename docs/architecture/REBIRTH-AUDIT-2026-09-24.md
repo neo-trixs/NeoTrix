@@ -1,4 +1,4 @@
-# NeoTrix 全项目审计 + 蜕皮方案（2026-09-24，同日刷新至 11:40）
+# NeoTrix 全项目审计 + 蜕皮方案（2026-09-24，同日第三刷 13:10）
 
 > 方法：rev-officer（FPAM + 7 维并行 squad），只读审计 + 最小安全执行。
 > 基线：2939 `.rs` / 904,902 行 → 现约 2830 `.rs` / ~87 万行；
@@ -72,19 +72,25 @@ workspace 14/14 对齐；`decision-engine` 意图性隔离（编译红，见 §�
 - [x] P0（2026-09-24）：5 crate 根补 `forbid(unsafe_code)`；删 `notes/`；`neotrix-audit` 入库；本报告。
 - [x] P1：Tauri 红已修（`b05061c0` 前序 `3bba2507`）；decision-engine 复活（113 测试）；78 strict-dead 清零（7+60+2兼容+3归档+3已接线+1保留+2豁免）。
 - [x] P2 分层：L1/L2 上翻 20+4 处——改道 7 行（nt_core_state×6、hex×1）/ 注记 8 处 / 其余认证不动；L5↔L6 环判定为**设计如此**（门面+trait 实现双向桥，不拆）；双生消除（causal_inventor、DimensionAxis→types）。
-- [ ] P3（供给）：`cargo-deny` 引入 + workspace 依赖收敛、多版本去重（reqwest×3/wasmtime×2）。
+- [x] P3（供给）：`deny.toml` 落地（bans/licenses/sources 全绿）+ workspace 依赖 7→20 收敛 + serde_yml 换血（RUSTSEC-2025-0068）；多版本台账（tauri/otlp 系第三方强制，oauth2 4→5 另立项）。
+- [x] 游戏三件套入库（abilities/game/guixu，零密钥零 unsafe）；版本纠错（workspace 实 0.21.0）；swords→guixu 更名跟进。
 - [ ] P4（God-file）：experience.rs 4195、browser_engine 4559、memory_kb 3839——需专窗+回归，另立项。
 
-## 六、后续核心建议（2026-09-24 刷新后）
+## 六、后续核心建议（2026-09-24 第三刷，P0–P3 已结项）
 
-按杠杆/风险排序，只列能开工的：
+只剩三类活，按先决关系排序：
 
-1. **P3 供给收敛（低风险，半天）**：`cargo deny init` + ban 多版本（reqwest/wasmtime/axum/tungstenite 二选一）；workspace 依赖 7→20 件收敛。先只告警不拦门，跑一周再转硬门。
-2. **experience.rs 回归线（先决条件，半天）**：God-file 拆分前，先给 `neotrix-experience` 补全命令冒烟脚本（absorb/query/distill/stale 各一遍真 KB，断言行数/退出码）。没这条线，P4 不开工。
-3. **God-file 拆分（专窗，2–3 天）**：experience.rs 用 `#[path]` 子模块（util/kv/concepts/cmds/topo），NTZ1 编解码与 SQLite 语义逐命令 diff 验证；browser_engine/memory_kb 排后。
-4. **TTC/PRM/TD 下沉（按周）**：先把三者的 trait 抽到 `neotrix-types`（如 DimensionAxis 模式），L2 只转 trait 不转实现；实现搬迁另算。
-5. **dispatcher 解耦（按周）**：`LocalCrtPlan/LocalTrace` 已有，下一步把 `cot_generator/decompose_fn` 签名换本地 trait，组合根注入 L5 实现；E8Policy 字段不动（纯存储）。
-6. **施工纪律（立即）**：多窗口已关，但脏区仍 ~900 项——`sessions/handoff-*.md` 恢复写，`git stash` 兜底；pre-commit 门禁证明了自己（本轮 2 次真拦截：consciousness 笔误、axis 漏消费者），保持常开。
+1. **experience 回归线（P4 先决条件，半天）**：给 `neotrix-experience` 补全命令冒烟脚本
+   （absorb/query/distill/stale 真 KB，断言退出码+行数）。没这条线 P4 不开工。
+2. **God-file 拆分（专窗，2–3 天）**：experience.rs → `#[path]` 子模块，
+   NTZ1/SQLite 语义逐命令 diff；browser_engine/memory_kb 排后。
+3. **认知下沉（按周，需产品拍板）**：TTC/PRM/TD trait 先行（DimensionAxis 模式已验证），
+   实现搬迁另算；dispatcher 签名换本地 trait（LocalCrtPlan/LocalTrace 已有）。
+4. **oauth2 4→5（半天）**：消灭 reqwest 0.11（唯一可动的多版本），同步 exchange 改 async，
+   调用链在 `social_access/auth.rs` 单文件内。
+5. **施工纪律（立即，零成本）**：脏区仍 ~900——handoff 恢复写；门禁本轮 3 次真拦截
+   （consciousness 笔误、axis 漏消费者、game 版本号），保持常开；selective-stage 走
+   blob 手术（`scripts/ops/PATCHING.md`）。
 
 ## 七、codemap 定位入口（新增）
 
